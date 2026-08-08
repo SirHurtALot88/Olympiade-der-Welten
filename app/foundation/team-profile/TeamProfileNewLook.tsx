@@ -1688,6 +1688,41 @@ export default function TeamProfileNewLook({
         </div>
       </NlCard>
 
+      <div ref={rosterCardRef} className="nl-teamprofile-anchor">
+        <NlCard
+          className="nl-teamprofile-roster-card"
+          eyebrow="Kaderprofil"
+          title="Kader"
+          data-testid="nl-teamprofile-roster"
+          actions={
+            <NlSubTabs
+              items={NL_TEAMPROFILE_ROSTER_MODE_ITEMS.map((item) => ({
+                ...item,
+                count: visiblePlayers.length,
+              }))}
+              activeId={rosterMode}
+              onSelect={(id) => setRosterMode(id as NlTeamProfileRosterMode)}
+              aria-label="Kader-Ansicht wählen"
+              className="nl-teamprofile-roster-subtabs"
+            />
+          }
+        >
+          <p className="nl-teamprofile-roster-summary nl-tnum">
+            Ø OVR {formatNlNumber(teamSummary.avgOvr, 1)} · Ø Gehalt {formatNlNumber(teamSummary.avgSalary, 2)} ·{" "}
+            {teamSummary.expiringCount} laufen aus · {teamSummary.issueCount} Hinweise
+          </p>
+          {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
+        </NlCard>
+      </div>
+
+      {/*
+        CHRIS: „1. ist das viel zu groß und soll unter die spieler!"
+
+        Der Saison-Verlauf stand VOR dem Kader und nahm mit vier grossen Kacheln fast einen
+        ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbei.
+        Die Spieler sind das, wofuer man diese Seite oeffnet; der Verlauf ist der Rueckblick
+        danach. Deshalb steht er jetzt darunter.
+      */}
       {developmentSeries != null ? (
         <div ref={developmentCardRef} className="nl-teamprofile-anchor">
           <NlCard
@@ -1842,33 +1877,6 @@ export default function TeamProfileNewLook({
           </NlCard>
         </div>
       ) : null}
-
-      <div ref={rosterCardRef} className="nl-teamprofile-anchor">
-        <NlCard
-          className="nl-teamprofile-roster-card"
-          eyebrow="Kaderprofil"
-          title="Kader"
-          data-testid="nl-teamprofile-roster"
-          actions={
-            <NlSubTabs
-              items={NL_TEAMPROFILE_ROSTER_MODE_ITEMS.map((item) => ({
-                ...item,
-                count: visiblePlayers.length,
-              }))}
-              activeId={rosterMode}
-              onSelect={(id) => setRosterMode(id as NlTeamProfileRosterMode)}
-              aria-label="Kader-Ansicht wählen"
-              className="nl-teamprofile-roster-subtabs"
-            />
-          }
-        >
-          <p className="nl-teamprofile-roster-summary nl-tnum">
-            Ø OVR {formatNlNumber(teamSummary.avgOvr, 1)} · Ø Gehalt {formatNlNumber(teamSummary.avgSalary, 2)} ·{" "}
-            {teamSummary.expiringCount} laufen aus · {teamSummary.issueCount} Hinweise
-          </p>
-          {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
-        </NlCard>
-      </div>
 
       {depthChart != null || depthChartFallback != null ? (
         <NlCard
