@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-08",
+      "seite": "Server · Spielstand-Export",
+      "pr": null,
+      "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Betrieb · Spielstand einsetzen",
       "pr": null,
       "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",

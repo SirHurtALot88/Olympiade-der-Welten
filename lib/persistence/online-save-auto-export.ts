@@ -149,6 +149,19 @@ function computeSignature() {
 }
 
 
+/**
+ * Erkennt Fehler, die bedeuten: in DIESER Umgebung kann der Push nie gelingen.
+ *
+ * Abgegrenzt gegen die voruebergehenden Faelle (Netz weg, Remote weitergelaufen, Sperrdatei) — die
+ * sollen weiterhin im naechsten Zyklus erneut versucht werden. Nur „kein Repository" und „kein git"
+ * sind endgueltig: daran aendert kein Wiederholen etwas.
+ *
+ * Die Texte stammen wortwoertlich aus dem Server-Log (siehe Kommentar bei `pushEnabled`).
+ */
+export function istPushInDieserUmgebungAussichtslos(fehlertext: string): boolean {
+  return /not a git repository|git: not found|command not found/i.test(fehlertext);
+}
+
 let started = false;
 
 export function startOnlineSaveAutoExport() {
@@ -157,7 +170,27 @@ export function startOnlineSaveAutoExport() {
   started = true;
 
   const intervalMs = Math.max(30_000, Number(process.env.OLY_AUTO_EXPORT_INTERVAL_MS ?? 180_000));
-  const pushEnabled = envFlag("OLY_AUTO_EXPORT_PUSH", true);
+  /**
+   * VERAENDERLICH, weil der Push sich selbst stilllegen koennen muss.
+   *
+   * GEMELDET: „fix den auto export endlich mal". Im Server-Log stand seit Wochen alle 180 Sekunden:
+   *
+   *     [online-saves] exportiert: 15 Save(s) → /app/data/online-saves
+   *     [online-saves] Auto-Export-Fehler: Command failed: git add -- data/online-saves data/bug-reports
+   *     fatal: not a git repository (or any of the parent directories): .git
+   *
+   * `git` ist inzwischen im Image (die frueher hier gepruefte Ursache), aber `/app` ist ein
+   * BUILD-ERGEBNIS und kein Checkout — kein Repository, keine Zugangsdaten. Der Push aus dem
+   * Container heraus kann prinzipiell nicht gelingen, egal wie oft man es versucht.
+   *
+   * Ein Fehler im Minutentakt ist nach dem dritten Mal keine Meldung mehr, sondern Tapete: er stand
+   * wochenlang daneben und wurde nicht mehr gelesen. Deshalb legt der Push sich beim ersten
+   * belegten Fehlschlag selbst still und sagt EINMAL, was stattdessen greift —
+   * `deploy/hetzner/push-live-save.sh` auf dem HOST, laut Projektdoku ohnehin der vorgesehene Weg.
+   *
+   * Der Export in den Ordner laeuft weiter: die Dateien sind auch ohne Push nuetzlich.
+   */
+  let pushEnabled = envFlag("OLY_AUTO_EXPORT_PUSH", true);
   const branch = process.env.OLY_AUTO_EXPORT_BRANCH ?? "main";
 
   let lastSignature: string | null = null;
@@ -201,7 +234,19 @@ export function startOnlineSaveAutoExport() {
         console.log(`[online-saves] GitHub-Push: ${outcome.pushed ? "OK" : `übersprungen (${outcome.reason})`}`);
       }
     } catch (error) {
-      console.error("[online-saves] Auto-Export-Fehler (wird nächsten Zyklus erneut versucht):", error instanceof Error ? error.message : error);
+      const text = error instanceof Error ? error.message : String(error);
+      if (istPushInDieserUmgebungAussichtslos(text)) {
+        pushEnabled = false;
+        console.warn(
+          "[online-saves] PUSH ABGESCHALTET — diese Umgebung hat kein Git-Repository unter dem App-Verzeichnis.\n" +
+            `[online-saves] Grund: ${text.split("\n").filter(Boolean).pop()}\n` +
+            `[online-saves] Exportiert wird weiter nach ${ONLINE_SAVES_DIR}; nur das Hochladen entfaellt.\n` +
+            "[online-saves] Auf dem Server uebernimmt `deploy/hetzner/push-live-save.sh` (Cron, Branch live-save).\n" +
+            "[online-saves] Diese Meldung erscheint genau einmal pro Start.",
+        );
+        return;
+      }
+      console.error("[online-saves] Auto-Export-Fehler (wird nächsten Zyklus erneut versucht):", text);
     } finally {
       running = false;
     }
