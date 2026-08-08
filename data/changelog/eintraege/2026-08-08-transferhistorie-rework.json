@@ -1,0 +1,30 @@
+[
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Historie",
+    "text": "Die Transferhistorie ist im Velo-Stil neu geordnet. Oben stehen jetzt Top-Käufe, Top-Verkäufe und die besten Gewinne als echte Top-5-Listen statt je einer Einzelkachel; ein Klick wählt den Deal im Spotlight. Darunter zeigt ein Team-Board alle 32 Teams auf gemeinsamer Skala, das eigene Team klar abgesetzt mit kumulierter Transferbilanz. Der Filterblock ist zu einem schmalen Streifen geschrumpft, die Fokus-Reiter sind weg — alles steht direkt da.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Historie",
+    "text": "Bei „Alle Seasons“ fehlte der Knopf zum Nachladen. Dadurch waren nur die zuerst geholten Deals erreichbar — im laufenden Spielstand 100 von 551 — und die Bestenlisten rechneten stillschweigend nur auf diesem Ausschnitt. Nachladen geht jetzt auch dort.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Historie",
+    "text": "Ein Klick auf einen Top-Deal, der auf einer anderen Seite der Liste lag, sprang sofort auf einen anderen Spieler zurück. Die Auswahl wurde gegen die gerade sichtbare Seite geprüft statt gegen alle gefilterten Deals. Der gewählte Deal bleibt jetzt stehen.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Historie",
+    "text": "Der Typ-Filter kannte „Abgänge“ nicht, obwohl Vertragsauflösungen in der Liste stehen. Der Eintrag fehlt nicht mehr.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

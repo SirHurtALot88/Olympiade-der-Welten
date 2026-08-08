@@ -87,6 +87,9 @@ export type TransferHistoryV2ClientProps = {
   onLoadMore?: () => void;
 };
 
+/** Länge der Top-Listen (Top-Käufe / Top-Verkäufe / beste Gewinne). */
+export const TOP_LIST_SIZE = 5;
+
 export type ActivityCard = {
   teamId: string;
   teamName: string;
@@ -152,10 +155,14 @@ export default function TransferHistoryV2Client(props: TransferHistoryV2ClientPr
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
 
   useEffect(() => {
-    if (!visibleRows.some((row) => row.transferId === selectedTransferId)) {
+    // Nur zurücksetzen, wenn der gewählte Deal den FILTER nicht mehr passiert —
+    // nicht, wenn er bloß auf einer anderen Seite des Pagers liegt. Sonst
+    // springt ein Klick in den Top-Listen (die aus filteredRows kommen) sofort
+    // wieder auf den ersten sichtbaren Deal zurück.
+    if (!filteredRows.some((row) => row.transferId === selectedTransferId)) {
       setSelectedTransferId(visibleRows[0]?.transferId ?? null);
     }
-  }, [selectedTransferId, visibleRows]);
+  }, [filteredRows, selectedTransferId, visibleRows]);
 
   const activityCards = useMemo(() => getActivitySummary(filteredRows, teamOptions), [filteredRows, teamOptions]);
   const timelineRows = useMemo(() => visibleRows, [visibleRows]);
@@ -167,21 +174,36 @@ export default function TransferHistoryV2Client(props: TransferHistoryV2ClientPr
       })[0] ?? null,
     [activityCards],
   );
-  const biggestBuy = useMemo(
-    () => filteredRows.filter((row) => row.type === "buy").sort((left, right) => right.fee - left.fee)[0] ?? null,
+  // Chris-Rework: echte Top-Listen statt einzelner "biggest"-Kacheln. Die
+  // Einzelwerte (biggestBuy/biggestSale/bestProfit) sind bewusst NUR noch der
+  // erste Eintrag der jeweiligen Liste — eine Quelle pro Größe.
+  const topBuys = useMemo(
+    () =>
+      filteredRows
+        .filter((row) => row.type === "buy")
+        .sort((left, right) => right.fee - left.fee)
+        .slice(0, TOP_LIST_SIZE),
     [filteredRows],
   );
-  const biggestSale = useMemo(
-    () => filteredRows.filter((row) => row.type === "sell").sort((left, right) => right.fee - left.fee)[0] ?? null,
+  const topSales = useMemo(
+    () =>
+      filteredRows
+        .filter((row) => row.type === "sell")
+        .sort((left, right) => right.fee - left.fee)
+        .slice(0, TOP_LIST_SIZE),
     [filteredRows],
   );
-  const bestProfit = useMemo(
+  const topProfits = useMemo(
     () =>
       filteredRows
         .filter((row) => row.type === "sell" && row.guv != null)
-        .sort((left, right) => (right.guv ?? Number.NEGATIVE_INFINITY) - (left.guv ?? Number.NEGATIVE_INFINITY))[0] ?? null,
+        .sort((left, right) => (right.guv ?? Number.NEGATIVE_INFINITY) - (left.guv ?? Number.NEGATIVE_INFINITY))
+        .slice(0, TOP_LIST_SIZE),
     [filteredRows],
   );
+  const biggestBuy = topBuys[0] ?? null;
+  const biggestSale = topSales[0] ?? null;
+  const bestProfit = topProfits[0] ?? null;
   const selectedRow =
     timelineRows.find((row) => row.transferId === selectedTransferId) ??
     filteredRows.find((row) => row.transferId === selectedTransferId) ??
@@ -193,6 +215,9 @@ export default function TransferHistoryV2Client(props: TransferHistoryV2ClientPr
       {...props}
       activityCards={activityCards}
       mostActiveTeam={mostActiveTeam}
+      topBuys={topBuys}
+      topSales={topSales}
+      topProfits={topProfits}
       biggestBuy={biggestBuy}
       biggestSale={biggestSale}
       bestProfit={bestProfit}
