@@ -77,7 +77,28 @@ const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
  * bit-identical to before this flag existed (same pattern as IDFIT_ENABLED in utility.ts:38/FILLQ_B_ENABLED
  * above). This is a SOFT utility nudge only — no hard band filter, no slot sequence, no stopUtility change.
  */
-const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
+/**
+ * STANDARD AN, seit am Spielstand gemessen wurde, was er bringt.
+ *
+ * CHRIS: „ich will nicht dass die teams nur mit füllspielern aufgefüllt werden sondern eine gute
+ * mischung aus stars, guten spielern und ergaenzungsspielern"
+ *
+ * Der Schalter lag seit dem Einbau auf AUS und war nirgends im Repo oder im Deploy gesetzt — die
+ * Qualitaets-Pyramide existierte also, lief aber nie. Am Klon von Chris' Spielstand gemessen, ab
+ * demselben Zustand nach dem Saisonwechsel und auf dem bereits reparierten Kaderziel:
+ *
+ *   aus                     Kader 337, Kaeufe 103, geliehen 161.3, liegengeblieben 37.2, stark 47
+ *   COMPOSE+FILLQA an       Kader 337, Kaeufe 103, geliehen  79.2, liegengeblieben 20.7, stark 49
+ *   zusaetzlich FILLQB      Kader 332, Kaeufe  98, geliehen 147.2, liegengeblieben 61.3, stark 56
+ *
+ * Die mittlere Zeile ist auf fast jeder Achse besser: gleiche Kadergroesse, gleiche Kaufzahl, halb
+ * so viel Kredit, 17 Mio weniger totes Geld, zwei starke Zugaenge mehr. FILLQB bleibt deshalb AUS —
+ * es kauft zwar die staerksten Kader (56 starke Zugaenge), erkauft das aber mit fuenf Spielern
+ * weniger und doppelt so viel liegengebliebenem Geld, weil es das Kaderziel zusaetzlich trimmt.
+ *
+ * Mit "0" laesst sich der Schalter weiterhin ausschalten.
+ */
+const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE !== "0";
 
 /**
  * Env flag for the sponsor-forecast + team-value SALARY CEILING (salary-ceiling.ts computeTeamSalaryCeiling).
