@@ -106,4 +106,4 @@ export {
   type NlSkeletonTableProps,
   type NlSkeletonCardProps,
 } from "@/components/foundation/new-look/NlSkeleton";
-export { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+export { formatNlMoney, formatNlSignedMoney } from "@/components/foundation/new-look/nl-format";

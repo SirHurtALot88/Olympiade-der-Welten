@@ -16,6 +16,8 @@ export function shouldLoadSeasonArchiveForView(
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
     activeView === "allTimeTable" ||
+    // Finanzen: Cash-Abgleich/Verlauf lesen das Saisonarchiv (Saisonstart-Cash der Vorsaison).
+    activeView === "finances" ||
     (activeView === "teams" && options.showExtendedTeamPanels === true)
   ) {
     return true;

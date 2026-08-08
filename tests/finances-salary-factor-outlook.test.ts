@@ -119,7 +119,10 @@ describe("buildSalaryFactorOutlook (Verdrahtung auf das kanonische Season-Ökono
 describe("finances salary factor ui contract", () => {
   it("zeigt den Salary-Factor-Chip im Finanzen-Reiter mit Richtungs-Ton und Erklär-Tooltip", async () => {
     const viewText = await fs.readFile(path.join(root, "app/foundation/finances/FoundationFinancesNewLook.tsx"), "utf8");
-    expect(viewText).toContain('label="Salary Factor"');
+    // M3 (Markt-Audit F5): Label eingedeutscht — der Tooltip nennt weiterhin den englischen
+    // Begriff „Salary Factor", damit der Draht zu Season-Briefing/KI-Doku nicht abreißt.
+    expect(viewText).toContain('label="Gehaltsfaktor"');
+    expect(viewText).toContain("Salary Factor");
     expect(viewText).toContain("salaryFactorOutlook");
     // Ton nach Nutzen für den Spieler: steigender Faktor = mehr Liga-Einnahmen = good.
     expect(viewText).toContain('if (direction === "up") return "good"');

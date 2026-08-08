@@ -37,7 +37,8 @@ const CSS = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 // als Text bei dunklen Vereinsfarben unlesbar). Senkt ein Paket die Zahl,
 // wird die Konstante mit abgesenkt.
 // Nach S2/T1 (Inbox-Gruppen, Teams „Liste & Verträge": tote Vertragslisten-Styles raus): 220.
-const ACCENT_ALS_TEXT_OBERGRENZE = 220;
+// Nach M3 (Finanzen: „Dein Team"-Chip auf --nl-accent-text, gemessen war er 3,28:1): 219.
+const ACCENT_ALS_TEXT_OBERGRENZE = 219;
 
 // Stand nach Paket F1. NIE erhöhen — `--nl-mut-2` ist Deko (Linien, Icons).
 // Informationstragender Sekundärtext nimmt `color: var(--nl-mut)` (6,8:1);

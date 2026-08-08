@@ -1151,7 +1151,11 @@ export function useFoundationShellRouterBodyScope({
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
-    activeView === "playerProfile";
+    activeView === "playerProfile" ||
+    // Finanzen: Cash-Abgleich und Saison-Verlauf lesen `seasonSnapshots` (Saisonstart-Cash der
+    // Vorsaison). Ohne diesen Load blieben beide Sektionen fälschlich auf „nicht archiviert",
+    // obwohl das Archiv existiert — nur der kompakte Initial-Payload hatte es gestrippt (M3-Befund F4).
+    activeView === "finances";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const shouldBuildSeasonStandRowsGate = shouldBuildSeasonStandRows({
     activeView: activeView as FoundationViewId,
