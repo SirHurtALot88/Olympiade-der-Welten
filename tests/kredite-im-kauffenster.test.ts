@@ -28,6 +28,7 @@ const runAutoRosterFillForMatchdaySetup = vi.fn();
 const resolveAiLoanDecision = vi.fn();
 const buildLoanOffers = vi.fn();
 const originateLoan = vi.fn();
+const applyInsolvencyBackstop = vi.fn();
 
 vi.mock("@/lib/ai/ai-market-plan-apply-service", () => ({ applyAiMarketPlanLocally }));
 vi.mock("@/lib/ai/ai-manager-apply-service", () => ({ applyAiManagerPlan }));
@@ -35,7 +36,18 @@ vi.mock("@/lib/ai/ai-injury-depth-topup-service", () => ({ applyAiInjuryDepthTop
 vi.mock("@/lib/ai/ai-picks-run-service", () => ({ runAiPicksExecutePreview }));
 vi.mock("@/lib/ai/auto-roster-fill-service", () => ({ runAutoRosterFillForMatchdaySetup }));
 vi.mock("@/lib/ai/ai-loan-decision-service", () => ({ resolveAiLoanDecision }));
-vi.mock("@/lib/finance/loan-service", () => ({ buildLoanOffers, originateLoan }));
+vi.mock("@/lib/finance/loan-service", () => ({ buildLoanOffers, originateLoan, applyInsolvencyBackstop }));
+
+// Der Snapshot-Patch am Ende des Laufs haengt hier nur als Nachbar mit drin; was er tut, prueft
+// tests/kein-minus-nach-kauffenster.test.ts.
+vi.mock("@/lib/season/season-snapshot-service", () => ({
+  patchCompletedSeasonSnapshotAfterPreseasonBuy: (gameState: unknown) => ({
+    gameState,
+    patched: false,
+    completedSeasonId: null,
+    warnings: [],
+  }),
+}));
 
 vi.mock("@/lib/room/server-authoritative-write-guard", () => ({
   authorizeServerRoomWrite: () => ({ allowed: true, warnings: [], room: null, participant: null, status: 200 }),
@@ -124,6 +136,7 @@ describe("Kauffenster der neuen Saison: die KI nimmt Kredite auf", () => {
       resolveAiLoanDecision,
       buildLoanOffers,
       originateLoan,
+      applyInsolvencyBackstop,
     ]) {
       spion.mockReset();
     }
@@ -143,6 +156,11 @@ describe("Kauffenster der neuen Saison: die KI nimmt Kredite auf", () => {
       termSeasons: 3,
       reason: "liquidity_negative_cash",
     });
+    applyInsolvencyBackstop.mockImplementation(({ gameState }: { gameState: GameState }) => ({
+      gameState,
+      emergencyLoans: [],
+      warnings: [],
+    }));
     buildLoanOffers.mockReturnValue([{ lenderType: "bank", lenderTeamId: null }]);
     originateLoan.mockImplementation((gameState: GameState) => ({
       ok: true,

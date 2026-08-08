@@ -2283,6 +2283,22 @@ export type SeasonSnapshotTeamRecord = {
     soc: number | null;
   };
   cashEnd: number | null;
+  /**
+   * DER KONTOSTAND, MIT DEM DAS TEAM IN DIE NAECHSTE SAISON GEHT — eingefroren am Saisonstart,
+   * NACH Kaeufen, Kaderfuellung und Krediten.
+   *
+   * CHRIS' REGEL: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison
+   * nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+   *
+   * Warum ein EIGENES Feld statt `cashEnd` zu ueberschreiben: `cashEnd` ist der wahre
+   * Saison-Endstand (nach Sponsoren, vor dem Transferfenster) und die Bezugsgroesse des
+   * Abgleichs in `getSnapshotCashByTeam`. Wird er mit dem Stand nach den Kaeufen ueberschrieben,
+   * rechnet der Abgleich die Preseason-Ausgaben doppelt und meldet ein falsches
+   * `cash_reconciliation_delta_hard` — genau der Grund, aus dem
+   * `buildTeamEntryEconomyFromGameState` das Feld bisher gar nicht anfasste. Die Ansichten lesen
+   * jetzt `cashEntry` zuerst und fallen auf `cashEnd` zurueck, wo es fehlt (Altsaves).
+   */
+  cashEntry?: number | null;
   /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
   rosterEndPostSell?: number | null;
   rosterEnd: number;

@@ -53,6 +53,18 @@ vi.mock("@/lib/ai/ai-loan-decision-service", () => ({
 vi.mock("@/lib/finance/loan-service", () => ({
   buildLoanOffers: () => [],
   originateLoan: (gameState: unknown) => ({ ok: false, loan: null, reason: "test", capacity: 0, terms: null, gameState }),
+  applyInsolvencyBackstop: ({ gameState }: { gameState: unknown }) => ({ gameState, emergencyLoans: [], warnings: [] }),
+}));
+
+// Der Snapshot-Patch am Ende des Laufs haengt hier nur als Nachbar mit drin; was er tut, prueft
+// tests/kein-minus-nach-kauffenster.test.ts.
+vi.mock("@/lib/season/season-snapshot-service", () => ({
+  patchCompletedSeasonSnapshotAfterPreseasonBuy: (gameState: unknown) => ({
+    gameState,
+    patched: false,
+    completedSeasonId: null,
+    warnings: [],
+  }),
 }));
 
 vi.mock("@/lib/room/server-authoritative-write-guard", () => ({
