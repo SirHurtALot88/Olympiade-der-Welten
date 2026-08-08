@@ -1204,13 +1204,23 @@ export async function buildPreSeasonWorkflowPreview(
     },
     {
       stepId: "sponsor_choice",
+      /**
+       * CHRIS: „nimm die Warnung raus für Sponsoren, die werden in s2 sauber dann gepickt."
+       *
+       * Der Schritt hing an `requiresManualChoice` — also daran, ob ein manuell gefuehrtes Team
+       * schon einen Vertrag fuer die KOMMENDE Saison hat. Am Saisonende hat es den nie: die
+       * Angebote werden hier ueberhaupt erst erzeugt (`regenerateSponsorOffersForSeason` weiter
+       * oben), gewaehlt wird in der neuen Saison. Der Schritt meldete damit dauerhaft eine Blockade
+       * fuer etwas, das planmaessig spaeter passiert — am echten Spielstand gemessen lief der
+       * Saisonwechsel trotzdem durch (`applied: true`), die Meldung stand also ohne Folge daneben.
+       *
+       * Der Schritt bleibt als Hinweis stehen (Angebote sind da, Prognose steht), blockiert aber
+       * nicht mehr. Die echte Sponsor-PFLICHT sitzt unveraendert woanders: der Abschluss-Gate in
+       * `season-completion-service.ts:234` verlangt weiterhin einen Vertrag fuer die LAUFENDE
+       * Saison — dort haengt echtes Geld dran (die Vorschau zieht Gehalt nur mit Vertrag ab).
+       */
       label: "Sponsor wählen",
-      status:
-        manualSponsorChoicesPending > 0
-          ? "blocked"
-          : sponsorChoiceSummary.some((entry) => entry.hasContract)
-            ? "ready"
-            : "warning",
+      status: sponsorChoiceSummary.some((entry) => entry.hasContract) ? "ready" : "warning",
       productive: true,
       summary: {
         offersReady: sponsorChoiceSummary.reduce((sum, entry) => sum + entry.offers.length, 0),
@@ -1222,12 +1232,9 @@ export async function buildPreSeasonWorkflowPreview(
             Math.max(1, sponsorChoiceSummary.length),
         ),
       },
-      warnings:
-        manualSponsorChoicesPending > 0
-          ? [`manual_sponsor_choice_pending:${manualSponsorChoicesPending}`]
-          : ["sponsor_offers_regenerated_after_transfer_window"],
-      blockingReasons: manualSponsorChoicesPending > 0 ? ["manual_sponsor_choice_pending"] : [],
-      confirmToken: manualSponsorChoicesPending > 0 ? null : "SPONSOR_CHOICE_READY",
+      warnings: ["sponsor_offers_regenerated_after_transfer_window"],
+      blockingReasons: [],
+      confirmToken: "SPONSOR_CHOICE_READY",
     },
     {
       stepId: "next_season_setup",
