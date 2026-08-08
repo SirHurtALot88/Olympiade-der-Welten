@@ -40,9 +40,8 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
-import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
-import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { baueNachkaufSitzung, ermittleKiTeamIds } from "@/lib/ai/organischer-nachkauf-eingabe";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
@@ -110,9 +109,7 @@ async function main() {
   const vorher = kaderBericht(start.gameState);
   const bekannteTransfers = new Set((start.gameState.transferHistory ?? []).map((entry) => entry.id));
 
-  const kiTeams = start.gameState.teams
-    .filter((team) => (getTeamControlSettings(start.gameState, team.teamId)?.controlMode ?? "ai") === "ai")
-    .map((team) => team.teamId);
+  const kiTeams = ermittleKiTeamIds(start.gameState);
   const menschlich = start.gameState.teams
     .filter((team) => !kiTeams.includes(team.teamId))
     .map((team) => `${team.name} (${team.shortCode})`);
@@ -135,15 +132,21 @@ async function main() {
   }
 
   console.log("\nKauffenster laeuft ...");
-  await runTransferWindowSession({
-    saveId,
-    seasonId,
-    persistence,
-    phase: "preseason",
-    dryRun: false,
-    confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
-    teamIds: kiTeams,
-  } as never);
+  const sitzung = await runTransferWindowSession(
+    baueNachkaufSitzung({ saveId, seasonId, persistence, kiTeamIds: kiTeams }),
+  );
+
+  if (sitzung.skipped) {
+    console.error(
+      "\nABGEBROCHEN: die Sitzung hat sich selbst uebersprungen und NICHTS gekauft." +
+        (sitzung.warnings.length > 0 ? `\nGrund: ${sitzung.warnings.join(", ")}` : ""),
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (sitzung.warnings.length > 0) {
+    console.log(`\nHinweise der Sitzung: ${sitzung.warnings.slice(0, 8).join(", ")}`);
+  }
 
   const ende = persistence.getSaveById(saveId)!.gameState;
   const neue = (ende.transferHistory ?? []).filter(
