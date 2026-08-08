@@ -25,8 +25,14 @@ export type ContractOfferClientProps = {
   onContractShapeChange: (value: ContractShape) => void;
   onSalaryChange: (value: number | null) => void;
   onResetSuggestion: () => void;
-  onSendOffer: () => void;
-  onCancel: () => void;
+  /**
+   * M2 (Audit-Befund M8): beide optional. Der Kaufdialog übergibt sie NICHT mehr —
+   * dort sind „Verhandeln" (Schritt 1) und „Abbrechen" genau einmal in der
+   * Fußleiste der Entscheidungs-Hülle verdrahtet. Zwei gleich laute „Abbrechen"
+   * und ein doppelter Sende-Primärknopf waren die gemeldete Verwirrung.
+   */
+  onSendOffer?: (() => void) | null;
+  onCancel?: (() => void) | null;
   extraActions?: ReactNode;
 };
 
@@ -87,14 +93,18 @@ export default function ContractOfferClient({
       <div className="contract-offer-grid">
         <section className="contract-offer-panel">
           <h3>Gehalt</h3>
+          {/* M2 (Audit-Befund M7): Das Feld hieß „Monatsgehalt" und zeigte „10.82" —
+              der Wert ist das JAHRESgehalt in Mio (dieselbe Größe wie „Forderung
+              10,8 Mio p.a." direkt darunter). Richtige Bezugsgröße + Einheit am Feld. */}
           <label className="filter-field">
-            <span>Monatsgehalt</span>
+            <span>Gehalt p.a. (Mio)</span>
             <input
               className="input"
               type="number"
               min={0}
               step={0.1}
               value={offeredSalary ?? ""}
+              aria-label="Gehaltsangebot pro Saison in Millionen"
               onChange={(event) => {
                 const next = event.target.value === "" ? null : Number(event.target.value);
                 onSalaryChange(Number.isFinite(next as number) ? next : null);
@@ -163,12 +173,20 @@ export default function ContractOfferClient({
         <button type="button" className="secondary-button" onClick={onResetSuggestion}>
           Auto-Angebot
         </button>
-        <button type="button" className="secondary-button" onClick={onCancel}>
-          Abbrechen
-        </button>
-        <button type="button" className="primary-button" disabled={busy} onClick={onSendOffer}>
-          {busy ? "Sende…" : "Angebot senden"}
-        </button>
+        {onCancel ? (
+          <button type="button" className="secondary-button" onClick={onCancel}>
+            Abbrechen
+          </button>
+        ) : null}
+        {onSendOffer ? (
+          <button type="button" className="primary-button" disabled={busy} onClick={onSendOffer}>
+            {busy ? "Sende…" : "Angebot senden"}
+          </button>
+        ) : (
+          <span className="contract-offer-actions-note">
+            Angebot wird erst mit „Verhandeln" (unten) verbindlich — tippen und schieben ist frei.
+          </span>
+        )}
         {extraActions}
       </div>
     </section>

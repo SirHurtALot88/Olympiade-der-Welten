@@ -8,12 +8,13 @@ import {
   NlEmptyState,
   NlGauge,
   NlProgressBar,
-  NlSubTabs,
+  NlTable,
   NL_TONE_VAR,
   StatChip,
   StatChipRow,
   formatNlNumber,
   useCountUp,
+  type NlTableColumn,
   type NlTone,
 } from "@/components/foundation/new-look";
 import {
@@ -46,6 +47,7 @@ import {
   buildAnalyticsSponsorAxisLive,
 } from "@/lib/facilities/analytics-live-progress";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
+import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import {
   SPONSOR_CURVE_FAMILIES,
   SPONSOR_CURVE_SHAPES,
@@ -73,6 +75,33 @@ function formatSignedCash(formatCash: (value: number) => string, value: number) 
 function formatSponsorChoiceMessage(message: string): string {
   const looksLikeReasonSlug = !/\s/.test(message) && /[:_]/.test(message);
   return looksLikeReasonSlug ? formatGameFlowBlocker(message) : message;
+}
+
+/**
+ * W3-Fix (Audit-Befund 2, Sponsoren): `contract.variantKey` ist ein interner
+ * Katalog-Schlüssel (`lib/sponsor/sponsor-brand-variants.ts`) und stand roh
+ * mit Unterstrichen im UI ("identity special" aus "identity_special"). Die
+ * fünf bekannten Varianten bekommen ihren echten deutschen Namen (identisch
+ * zum `flavorSuffix`-Kurztitel im Katalog); ein unbekannter künftiger
+ * Schlüssel fällt auf Titelcase statt auf einen rohen Slug zurück — nie
+ * wieder Unterstriche im UI.
+ */
+const SPONSOR_VARIANT_LABELS: Record<string, string> = {
+  security_standard: "Sicherheits-Paket",
+  performance_rank: "Leistungs-Paket",
+  identity_special: "Identitäts-Paket",
+  premium_elite: "Premium-Elite",
+  regional_fan: "Fan-Paket",
+};
+
+function formatSponsorVariantLabel(variantKey: string | null | undefined): string | null {
+  if (!variantKey) return null;
+  return (
+    SPONSOR_VARIANT_LABELS[variantKey] ??
+    variantKey
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
 }
 
 type SponsorComponentKind = SponsorOffer["components"][number]["kind"];
@@ -243,11 +272,15 @@ function ActiveContractHero({
   // Tilt ist bei allen neuen Karten 0, "EV-neutral" stuende also auf jeder Karte und saegte
   // genau nichts aus. Altvertraege tragen weiterhin ihren Tilt.
   const axisKey = contract.sponsorV3?.axis?.key ?? null;
+  // W3-Fix (Audit-Befund 2, Sponsoren): "EV-neutral" war Modell-Jargon
+  // (Expected Value) ohne Übersetzung im UI. Klartext wie im freigegebenen
+  // Mockup (prize.html): "ausgewogen" für Tilt 0, "Hebel" blieb bereits
+  // deutsch und bleibt unverändert.
   const familyLabel = axisKey
     ? `Zielachse · ${sponsorV4AxisLabel(axisKey as SponsorV4AxisKey)}`
     : contract.sponsorV3
       ? contract.sponsorV3.tilt === 0
-        ? "EV-neutral"
+        ? "ausgewogenes Bonus/Malus-Profil"
         : `${contract.sponsorV3.tilt > 0 ? "+" : ""}${Math.round(contract.sponsorV3.tilt * 100)} % Hebel`
       : SPONSOR_CURVE_FAMILIES[getSponsorCurveFamily(shape)].labelDe;
   const payoutTiles = buildContractPayoutTiles(contract);
@@ -315,7 +348,7 @@ function ActiveContractHero({
           <RarityPill rarity={rarity} className="nl-sponsor-hero-rarity" />
           <strong className="nl-sponsor-hero-name">{contract.name}</strong>
           <small>
-            {contract.variantKey ? `${contract.variantKey.replace(/_/g, " ")} · ` : ""}
+            {contract.variantKey ? `${formatSponsorVariantLabel(contract.variantKey)} · ` : ""}
             {contract.components.length} Vertragskomponenten
             {contract.startRank != null ? ` · Start-Rang ${contract.startRank}` : ""}
           </small>
@@ -396,12 +429,23 @@ export default function FoundationSponsorsNewLook({
   sponsorChoiceMessage,
   sponsorChoiceBusy,
   selectedTeamCanManage,
-  formatMoney,
+  formatMoney: formatMoneyProp,
   chooseTeamSponsor,
 }: FoundationSponsorsPanelProps) {
   // "Neuer Look" Hooks laufen unconditionally vor jedem Return (dieser
   // Component hat kein weiteres Flag-Gate mehr — er wird nur gerendert,
   // wenn `useNewLook` im Parent bereits aktiv ist).
+  //
+  // W3-Fix (Audit-Befund 3, Sponsoren): der übergebene `formatMoney` (aus
+  // `foundation-format-render-helpers.ts`) formatiert dieselben Zahlen wie
+  // `formatTransfermarktCurrency`, hängt aber nirgends eine Einheit an —
+  // "CASH/SAISON 63,5", "Ø-ANGEBOTSWERT 88,1" und die komplette Liga-Spalte
+  // standen ohne "Mio" da. Diese Seite nutzt konsequent den App-weiten
+  // Geld-Helfer statt der ungelabelten Variante; `formatMoneyProp` bleibt
+  // ungenutzt (Prop-Vertrag unverändert), damit kein Aufrufer angefasst
+  // werden muss.
+  const formatSponsorMoney = formatTransfermarktCurrency;
+  void formatMoneyProp;
   const [ratingDetailsOpen, setRatingDetailsOpen] = useState(false);
   const [leagueSponsorSort, setLeagueSponsorSort] = useState<LeagueSponsorSort>("cash");
 
@@ -580,6 +624,148 @@ export default function FoundationSponsorsNewLook({
     [leagueSponsorRows, leagueSponsorSort],
   );
 
+  // W3-Fix (Audit-Befund 1, Sponsoren): volle Team-/Sponsornamen statt der
+  // beidseitig gestutzten Karten ("Zero…" / "Jaguar La…") — als sortierbare
+  // `NlTable` (geteiltes Primitiv, siehe velo-ui-Katalog), Sortier-Modus
+  // bleibt exakt `sortLeagueSponsorRows`/`leagueSponsorSort`, jetzt über die
+  // Spaltenköpfe statt separater Pillen bedienbar.
+  type LeagueSponsorRow = (typeof sortedLeagueSponsorRows)[number];
+  const leagueTableColumns: NlTableColumn<LeagueSponsorRow>[] = [
+    {
+      key: "team",
+      label: "Team",
+      sortable: true,
+      className: "nl-sponsor-league-col-team",
+    },
+    {
+      key: "sponsor",
+      label: "Sponsor",
+      sortable: true,
+      className: "nl-sponsor-league-col-sponsor",
+    },
+    {
+      key: "cash",
+      label: "Cash/Saison",
+      align: "right",
+      sortable: true,
+      tooltip: "Voraussichtliche Auszahlung beim aktuellen Rang",
+    },
+    {
+      key: "coverage",
+      label: "Fixkosten-Deckung",
+      align: "right",
+      tooltip: "Anteil der Gehälter + Unterhalt, den der Sponsor deckt. Unter 100 % zahlt das Team drauf.",
+    },
+    {
+      key: "tier",
+      label: "Rarität",
+      sortable: true,
+      className: "nl-sponsor-league-col-tier",
+    },
+  ];
+
+  function renderLeagueTableCell(row: LeagueSponsorRow, column: NlTableColumn<LeagueSponsorRow>) {
+    const isCurrent = row.teamName === selectedTeamName;
+    switch (column.key) {
+      case "team":
+        return (
+          <span className="nl-sponsor-league-teamcell">
+            <span className="nl-sponsor-league-code">{row.shortCode}</span>
+            <span className="nl-sponsor-league-teamname">{row.teamName}</span>
+            {isCurrent ? <span className="nl-sponsor-league-you">Dein Team</span> : null}
+            {row.isGolden ? (
+              <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
+                ✦ Golden
+              </span>
+            ) : null}
+          </span>
+        );
+      case "sponsor":
+        return row.sponsorName ? (
+          <span className="nl-sponsor-league-sponsorcell">
+            <span className="nl-sponsor-league-crest">
+              {row.archetype ? <SponsorCrest name={row.sponsorName} archetype={row.archetype} /> : null}
+            </span>
+            <span className="nl-sponsor-league-sponsorname">{row.sponsorName}</span>
+            {row.curveShape ? (
+              <span className={`nl-sponsor-league-chip is-${row.archetype ?? "neutral"}`}>
+                {SPONSOR_CURVE_SHAPES[row.curveShape].labelDe}
+              </span>
+            ) : null}
+            {row.rarity ? <RarityPill rarity={row.rarity} className="nl-sponsor-league-rarity" /> : null}
+          </span>
+        ) : (
+          <span className="nl-sponsor-league-sponsorcell is-empty">— noch keiner —</span>
+        );
+      case "cash":
+        return (
+          <span
+            className="nl-sponsor-league-cash nl-tnum"
+            title={
+              row.projectedCash != null
+                ? `Voraussichtliche Auszahlung beim aktuellen Rang${
+                    row.rank != null ? ` #${row.rank}` : ""
+                  }${row.maxCash != null ? ` · max. Vertragswert ${formatSponsorMoney(row.maxCash)}` : ""}`
+                : "Kein Sponsor unter Vertrag"
+            }
+          >
+            {row.projectedCash != null ? formatSponsorMoney(row.projectedCash) : "—"}
+          </span>
+        );
+      case "coverage":
+        // Deckungsgrad: traegt der Sponsor die laufenden Kosten? Unter 100 % zahlt das Team drauf.
+        // Die Farbe ist NICHT der einzige Traeger — der Prozentwert steht daneben.
+        return row.costCoverage != null ? (
+          <span
+            className={`nl-sponsor-league-coverage nl-tnum is-${getSponsorCoverageTone(row.costCoverage)}`}
+            title={`Sponsor deckt ${Math.round(row.costCoverage * 100)} % der Fixkosten · Gehälter ${formatSponsorMoney(
+              row.salaryTotal,
+            )}${row.upkeepTotal > 0 ? ` + Unterhalt ${formatSponsorMoney(row.upkeepTotal)}` : ""} = ${formatSponsorMoney(
+              row.fixedCostTotal,
+            )}`}
+          >
+            {Math.round(row.costCoverage * 100)} %
+            {/* Apron: Text-Zusatz, Farbe ist NUR Verstärkung — wer über einer Linie liegt, gibt am
+                Saisonende einen Teil des Überschusses ab. */}
+            {row.apronStatus !== "unter" ? (
+              <span
+                className={`nl-sponsor-league-apron is-${row.apronStatus === "ueber_linie_2" ? "linie2" : "linie1"}`}
+                title={`Gehalt ${formatSponsorMoney(row.salaryTotal)} liegt über der ${
+                  row.apronStatus === "ueber_linie_2" ? "2." : "1."
+                } Apron-Linie (${formatSponsorMoney(
+                  row.apronStatus === "ueber_linie_2" ? apronLines.line2 : apronLines.line1,
+                )}) — Abgabe am Saisonende möglich.`}
+              >
+                {" "}
+                über {row.apronStatus === "ueber_linie_2" ? "2." : "1."} Linie
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          "—"
+        );
+      case "tier":
+        return row.rarity ? <RarityPill rarity={row.rarity} /> : <span className="nl-tnum">—</span>;
+      default:
+        return null;
+    }
+  }
+
+  const LEAGUE_SPONSOR_SORT_LABELS: Record<LeagueSponsorSort, string> = {
+    cash: "Cash/Saison",
+    sponsor: "Sponsor",
+    tier: "Rarität",
+    team: "Team",
+  };
+  // `sortLeagueSponsorRows` hat je Modus eine feste Richtung (kein Umschalten
+  // pro Klick) — hier nur für den Pfeil in der Spaltenkopf-Anzeige gespiegelt.
+  const LEAGUE_SPONSOR_SORT_DIRECTION: Record<LeagueSponsorSort, "asc" | "desc"> = {
+    cash: "desc",
+    sponsor: "asc",
+    tier: "desc",
+    team: "asc",
+  };
+
   // #D12: Schwächster Treiber des Kommerz-Ratings. Die drei Treiber
   // (Historie/Kader/Prestige) summieren sich additiv zum Score
   // (buildSponsorCommercialRating: recentPerformance ≤ 55, rosterPotential ≤ 35,
@@ -641,10 +827,18 @@ export default function FoundationSponsorsNewLook({
     // Vertragswert) — konsistent mit der Liga-Sponsorenübersicht.
     return sponsorProjectedByTeamId.get(selectedTeamSponsorContract.teamId) ?? 0;
   }, [selectedTeamSponsorContract, sponsorProjectedByTeamId]);
+  // W3-Fix (Audit-Befund 4, Sponsoren): `selectedTeamSponsorOffers` wird
+  // unabhängig vom Vertragsstatus geladen (lib/sponsor/sponsor-offer-read.ts)
+  // — bei laufendem Vertrag rendert die Seite die Angebotskarten gar nicht
+  // (Zweig weiter unten), trotzdem zeigte die KPI-Zeile weiterhin
+  // "Ø-Angebotswert · N Angebote" für Angebote, die nirgends zu sehen waren.
+  // Der KPI-Chip zeigt den Wert nur noch, wenn wirklich wählbare Angebote da
+  // sind — kein Vertrag aktiv, und mindestens ein Angebot vorhanden.
   const avgOfferCashValue = useMemo(() => {
+    if (selectedTeamSponsorContract) return null;
     if (offerCashSummaries.length === 0) return null;
     return offerCashSummaries.reduce((sum, entry) => sum + entry.totalCash, 0) / offerCashSummaries.length;
-  }, [offerCashSummaries]);
+  }, [offerCashSummaries, selectedTeamSponsorContract]);
 
   // Aus dem SPIELSTAND gelesen, nicht aus der Umgebung: ein V1-Save bleibt V1, auch wenn der
   // Server gerade das neue Modell fuer neue Spiele vergibt.
@@ -683,7 +877,7 @@ export default function FoundationSponsorsNewLook({
             label="Cash/Saison"
             value={
               activeContractCashTotal != null
-                ? formatMoney(animatedKpiContractCash ?? activeContractCashTotal)
+                ? formatSponsorMoney(animatedKpiContractCash ?? activeContractCashTotal)
                 : "—"
             }
             sub={activeContractCashTotal != null ? "beim aktuellen Rang" : "kein Vertrag"}
@@ -691,8 +885,14 @@ export default function FoundationSponsorsNewLook({
           />
           <StatChip
             label="Ø-Angebotswert"
-            value={avgOfferCashValue != null ? formatMoney(animatedKpiAvgOfferCash ?? avgOfferCashValue) : "—"}
-            sub={avgOfferCashValue != null ? `${offerCashSummaries.length} Angebote` : undefined}
+            value={avgOfferCashValue != null ? formatSponsorMoney(animatedKpiAvgOfferCash ?? avgOfferCashValue) : "—"}
+            sub={
+              avgOfferCashValue != null
+                ? `${offerCashSummaries.length} Angebote`
+                : selectedTeamSponsorContract
+                  ? "Vertrag aktiv · neue Angebote zum Saisonende"
+                  : undefined
+            }
           />
         </StatChipRow>
         <NlCard
@@ -738,7 +938,7 @@ export default function FoundationSponsorsNewLook({
                 value={selectedTeamCommercialRating.breakdown.recentPerformance}
                 max={100}
                 tone="accent"
-                format={(value) => formatNlNumber(value, 0)}
+                format={(value) => `${formatNlNumber(value, 0)} / 100`}
                 title="Jüngste sportliche Performance"
               />
               <NlProgressBar
@@ -746,7 +946,7 @@ export default function FoundationSponsorsNewLook({
                 value={selectedTeamCommercialRating.breakdown.rosterPotential}
                 max={100}
                 tone="accent"
-                format={(value) => formatNlNumber(value, 0)}
+                format={(value) => `${formatNlNumber(value, 0)} / 100`}
                 title="Kader-Potential"
               />
               <NlProgressBar
@@ -754,7 +954,7 @@ export default function FoundationSponsorsNewLook({
                 value={selectedTeamCommercialRating.breakdown.prestige}
                 max={100}
                 tone="accent"
-                format={(value) => formatNlNumber(value, 0)}
+                format={(value) => `${formatNlNumber(value, 0)} / 100`}
                 title="Prestige/Medaillenhistorie"
               />
               <small className="nl-sponsor-rating-hint">Erwartung: {expectationRarityLabel ?? "—"}</small>
@@ -831,7 +1031,7 @@ export default function FoundationSponsorsNewLook({
 
         {selectedTeamSponsorContract ? (
           <>
-            <ActiveContractHero contract={selectedTeamSponsorContract} gameState={gameState} formatCash={formatMoney} />
+            <ActiveContractHero contract={selectedTeamSponsorContract} gameState={gameState} formatCash={formatSponsorMoney} />
             {/* #21: Sponsor-Auszahlungs-Timeline aus echten Saison-Events */}
             <NlCard className="nl-sponsor-payout-card" eyebrow="Saison-Ereignisse" title="Sponsor-Auszahlungs-Timeline">
               {sponsorPayoutEvents.length ? (
@@ -845,7 +1045,7 @@ export default function FoundationSponsorsNewLook({
                       </span>
                       <NlDeltaChip
                         value={event.cashDelta}
-                        format={(value) => formatSignedCash(formatMoney, value)}
+                        format={(value) => formatSignedCash(formatSponsorMoney, value)}
                         title={`${event.cashDelta >= 0 ? "Bonus" : "Malus"} · Status ${event.status}`}
                       />
                     </div>
@@ -872,13 +1072,13 @@ export default function FoundationSponsorsNewLook({
                       const fillPct = Math.max(0, Math.min(100, (entry.totalCash / maxTotal) * 100));
                       return (
                         <div className="nl-sponsor-stackcol" key={entry.offerId}>
-                          <span className="nl-sponsor-stackcol-total nl-tnum">{formatMoney(entry.totalCash)}</span>
+                          <span className="nl-sponsor-stackcol-total nl-tnum">{formatSponsorMoney(entry.totalCash)}</span>
                           <div className="nl-sponsor-stackcol-track">
                             <div
                               className="nl-sponsor-stackcol-bar"
                               style={{ height: `${fillPct}%` }}
                               title={entry.segments
-                                .map((seg) => `${seg.label}: ${formatMoney(seg.value)}`)
+                                .map((seg) => `${seg.label}: ${formatSponsorMoney(seg.value)}`)
                                 .join(" · ")}
                             >
                               {entry.segments.map((seg) => (
@@ -886,7 +1086,7 @@ export default function FoundationSponsorsNewLook({
                                   key={seg.kind}
                                   className="nl-sponsor-stackseg"
                                   style={{ flexGrow: seg.value, background: NL_TONE_VAR[seg.tone] }}
-                                  title={`${seg.label}: ${formatMoney(seg.value)}`}
+                                  title={`${seg.label}: ${formatSponsorMoney(seg.value)}`}
                                 />
                               ))}
                             </div>
@@ -927,7 +1127,7 @@ export default function FoundationSponsorsNewLook({
                     canManage={selectedTeamCanManage}
                     isBestCashOffer={bestCashOfferId != null && offer.offerId === bestCashOfferId}
                     onChoose={() => void chooseTeamSponsor(offer.offerId)}
-                    formatCash={formatMoney}
+                    formatCash={formatSponsorMoney}
                   />
                 );
               })}
@@ -937,151 +1137,49 @@ export default function FoundationSponsorsNewLook({
           <NlEmptyState title="Noch keine Sponsor-Angebote für diese Saison geladen." />
         )}
 
-        {/* #78: Liga-Sponsorenübersicht — wer hat wen, sortierbar */}
+        {/* #78 + W3-Fix (Audit-Befund 1, Sponsoren): war ein 32-Karten-Raster mit
+            beidseitig gestutzten Namen ("Zero…" / "Jaguar La…") — jetzt eine
+            sortierbare Tabelle mit vollen Team- und Sponsornamen, wie im
+            freigegebenen Mockup (prize.html). Sortierung wandert von den
+            separaten NlSubTabs-Pillen auf klickbare Spaltenköpfe (dieselbe
+            Quelle, `sortLeagueSponsorRows`/`leagueSponsorSort`). */}
         <NlCard
           className="nl-sponsor-league-card"
           eyebrow="Liga"
           title={`Sponsorenübersicht · ${sortedLeagueSponsorRows.length} Teams`}
-          actions={
-            <NlSubTabs
-              className="nl-sponsor-league-sort-tabs"
-              aria-label="Liga-Sponsorenübersicht sortieren"
-              activeId={leagueSponsorSort}
-              onSelect={(id) => setLeagueSponsorSort(id as LeagueSponsorSort)}
-              items={[
-                { id: "cash", label: "Cash" },
-                { id: "sponsor", label: "Sponsor" },
-                { id: "tier", label: "Rarität" },
-                { id: "team", label: "Team" },
-              ]}
-            />
-          }
         >
-          <div className="nl-sponsor-league-grid" role="list" aria-label="Sponsoren aller Teams">
-            {sortedLeagueSponsorRows.map((row) => {
-              const isCurrent = row.teamName === selectedTeamName;
-              const classes = [
-                "nl-sponsor-league-item",
-                isCurrent ? "is-current" : "",
-                row.isGolden ? "is-golden" : "",
-                row.sponsorName ? "" : "is-empty",
-              ]
+          <p className="nl-sponsor-league-table-hint">
+            Sortiert nach {LEAGUE_SPONSOR_SORT_LABELS[leagueSponsorSort]} — Spaltenkopf klicken zum
+            Umsortieren. Deine Zeile ist markiert.
+          </p>
+          <NlTable
+            className="nl-sponsor-league-table"
+            aria-label="Sponsoren aller Teams"
+            data-testid="sponsor-league-table"
+            columns={leagueTableColumns}
+            rows={sortedLeagueSponsorRows}
+            rowKey={(row) => row.teamId}
+            rowClassName={(row) =>
+              [row.teamName === selectedTeamName ? "is-current" : "", row.isGolden ? "is-golden" : ""]
                 .filter(Boolean)
-                .join(" ");
-              return (
-                <div
-                  key={row.teamId}
-                  role="listitem"
-                  className={classes}
-                  // Jede Zeile oeffnet die Sponsor-Details DIESES Teams — auch fremder Teams.
-                  onClick={row.sponsorName ? () => setLeagueDetailTeamId(row.teamId) : undefined}
-                  onKeyDown={
-                    row.sponsorName
-                      ? (event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setLeagueDetailTeamId(row.teamId);
-                          }
-                        }
-                      : undefined
-                  }
-                  tabIndex={row.sponsorName ? 0 : undefined}
-                  title={row.sponsorName ? `${row.teamName}: Sponsor-Details oeffnen` : undefined}
-                  data-testid={row.sponsorName ? "sponsor-league-row-open" : undefined}
-                >
-                  {row.isGolden ? (
-                    <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
-                      ✦ Golden Card
-                    </span>
-                  ) : null}
-                  <span className="nl-sponsor-league-crest">
-                    {row.sponsorName && row.archetype ? (
-                      <SponsorCrest name={row.sponsorName} archetype={row.archetype} />
-                    ) : (
-                      <span className="nl-sponsor-league-crest-empty" aria-hidden="true">
-                        ✕
-                      </span>
-                    )}
-                  </span>
-                  <div className="nl-sponsor-league-body">
-                    <div className="nl-sponsor-league-teamline">
-                      <span className="nl-sponsor-league-code">{row.shortCode}</span>
-                      <span className="nl-sponsor-league-teamname" title={row.teamName}>
-                        {row.teamName}
-                      </span>
-                      {isCurrent ? <span className="nl-sponsor-league-you">Dein Team</span> : null}
-                    </div>
-                    {row.sponsorName ? (
-                      <>
-                        <span className="nl-sponsor-league-sponsor" title={row.sponsorName}>
-                          {row.sponsorName}
-                        </span>
-                        <div className="nl-sponsor-league-meta">
-                          {row.curveShape ? (
-                            <span className={`nl-sponsor-league-chip is-${row.archetype ?? "neutral"}`}>
-                              {SPONSOR_CURVE_SHAPES[row.curveShape].labelDe}
-                            </span>
-                          ) : null}
-                          {row.rarity ? (
-                            <RarityPill rarity={row.rarity} className="nl-sponsor-league-rarity" />
-                          ) : null}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="nl-sponsor-league-sponsor is-empty">— noch keiner —</span>
-                    )}
-                  </div>
-                  <span className="nl-sponsor-league-figures">
-                    <span
-                      className="nl-sponsor-league-cash nl-tnum"
-                      title={
-                        row.projectedCash != null
-                          ? `Voraussichtliche Auszahlung beim aktuellen Rang${
-                              row.rank != null ? ` #${row.rank}` : ""
-                            }${row.maxCash != null ? ` · max. Vertragswert ${formatMoney(row.maxCash)}` : ""}`
-                          : "Kein Sponsor unter Vertrag"
-                      }
-                    >
-                      {row.projectedCash != null ? formatMoney(row.projectedCash) : "—"}
-                    </span>
-                    {/* Deckungsgrad: traegt der Sponsor die laufenden Kosten? Unter 100 % zahlt das
-                        Team drauf. Die Farbe ist NICHT der einzige Traeger — der Prozentwert steht
-                        daneben, damit die Aussage auch ohne Farbunterscheidung ankommt. */}
-                    {row.costCoverage != null ? (
-                      <span
-                        className={`nl-sponsor-league-coverage nl-tnum is-${getSponsorCoverageTone(row.costCoverage)}`}
-                        title={`Sponsor deckt ${Math.round(
-                          row.costCoverage * 100,
-                        )} % der Fixkosten · Gehälter ${formatMoney(row.salaryTotal)}${
-                          row.upkeepTotal > 0 ? ` + Unterhalt ${formatMoney(row.upkeepTotal)}` : ""
-                        } = ${formatMoney(row.fixedCostTotal)}`}
-                      >
-                        {Math.round(row.costCoverage * 100)} % der Fixkosten
-                      </span>
-                    ) : null}
-                    {/* Apron: Text-Badge, Farbe ist NUR Verstärkung (nie der einzige Träger) — wer
-                        über einer Linie liegt, gibt am Saisonende einen Teil des Überschusses ab. */}
-                    {row.apronStatus !== "unter" ? (
-                      <span
-                        className={`nl-sponsor-league-apron nl-tnum is-${row.apronStatus === "ueber_linie_2" ? "linie2" : "linie1"}`}
-                        title={`Gehalt ${formatMoney(row.salaryTotal)} liegt über der ${
-                          row.apronStatus === "ueber_linie_2" ? "2." : "1."
-                        } Apron-Linie (${formatMoney(row.apronStatus === "ueber_linie_2" ? apronLines.line2 : apronLines.line1)}) — Abgabe am Saisonende möglich.`}
-                      >
-                        über {row.apronStatus === "ueber_linie_2" ? "2." : "1."} Linie
-                      </span>
-                    ) : null}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                .join(" ") || undefined
+            }
+            renderCell={renderLeagueTableCell}
+            sortState={{ key: leagueSponsorSort, direction: LEAGUE_SPONSOR_SORT_DIRECTION[leagueSponsorSort] }}
+            onSort={(key) => setLeagueSponsorSort(key as LeagueSponsorSort)}
+            onRowClick={(row) => {
+              // Jede Zeile mit Sponsor oeffnet dessen Details — auch fremder Teams.
+              if (row.sponsorName) {
+                setLeagueDetailTeamId(row.teamId);
+              }
+            }}
+          />
           {/* Apron-Linien dieser Saison — zu Saisonbeginn eingefroren und ab da unveränderlich,
               genau deshalb hier sichtbar: eine Grenze, gegen die man kalkuliert, muss man kennen. */}
           <p className="nl-sponsor-league-apron-lines">
             Apron-Linien{apronLines.frozen ? " (eingefroren)" : " (noch nicht eingefroren — Vorschau)"}: Median-Gehalt{" "}
-            {formatMoney(apronLines.medianSalary)} · 1. Linie {formatMoney(apronLines.line1)} · 2. Linie{" "}
-            {formatMoney(apronLines.line2)}
+            {formatSponsorMoney(apronLines.medianSalary)} · 1. Linie {formatSponsorMoney(apronLines.line1)} · 2. Linie{" "}
+            {formatSponsorMoney(apronLines.line2)}
             {apronLines.usedReferenceSalary ? " · Referenzgehalt (Liga noch ohne echte Gehälter)" : ""}
           </p>
         </NlCard>
@@ -1144,7 +1242,7 @@ export default function FoundationSponsorsNewLook({
                         <span className="nl-sponsor-league-detail-label" title={leagueDetail.baseRow.reason}>
                           {leagueDetail.baseRow.label}
                         </span>
-                        <span className="nl-tnum">{formatMoney(leagueDetail.baseRow.cashDelta)}</span>
+                        <span className="nl-tnum">{formatSponsorMoney(leagueDetail.baseRow.cashDelta)}</span>
                       </li>
                     </ul>
                   ) : null}
@@ -1163,7 +1261,7 @@ export default function FoundationSponsorsNewLook({
                         baseCash={leagueDetail.baseCash}
                         rankLadder={leagueDetail.rankLadder}
                         currentTeamRank={leagueDetail.row.rank}
-                        formatCash={formatMoney}
+                        formatCash={formatSponsorMoney}
                       />
                     </div>
                   ) : null}
@@ -1181,7 +1279,7 @@ export default function FoundationSponsorsNewLook({
                             <span className="nl-sponsor-league-detail-label" title={component.reason}>
                               {component.label}
                             </span>
-                            <span className="nl-tnum">{formatMoney(component.cashDelta)}</span>
+                            <span className="nl-tnum">{formatSponsorMoney(component.cashDelta)}</span>
                           </li>
                         ))}
                       </ul>
@@ -1197,7 +1295,7 @@ export default function FoundationSponsorsNewLook({
               <div className="nl-sponsor-league-detail-total">
                 <span>Auszahlung beim aktuellen Platz</span>
                 <span className="nl-tnum">
-                  {leagueDetail.row.projectedCash != null ? formatMoney(leagueDetail.row.projectedCash) : "—"}
+                  {leagueDetail.row.projectedCash != null ? formatSponsorMoney(leagueDetail.row.projectedCash) : "—"}
                 </span>
               </div>
               {/* Bewusst KEIN "max. Vertragswert" hier: dieser Wert ist die Summe der

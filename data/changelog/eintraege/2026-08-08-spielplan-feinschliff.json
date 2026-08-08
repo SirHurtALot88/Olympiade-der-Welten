@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Welt · Spielplan",
+  "text": "Die Technik-Strings sind aus dem Spielplan raus: 'QUELLE season_seed', zehnmal 'season_seed' als Karten-Fußzeile und die komplette Schedule-Seed-Zeile stecken jetzt hinter einem 'Details'-Aufklappen — wer sie braucht, findet sie, alle anderen sehen Spielplan statt Debug. Solange noch kein Spieltag gewertet ist, steht über dem Draftboard EIN Satz ('Treffer erscheinen nach der ersten Wertung') statt 40-mal 'ausstehend' in den Mutator-Spalten; sobald die erste Wertung da ist, kommen die Trefferzahlen je Zelle zurück. Das '· läuft'-Tag am aktuellen Spieltag besteht jetzt den Kontrasttest (vorher 3,4:1 — ausgerechnet die wichtigste Info der Karte war die leiseste), und die Spalten 'Original' und 'Reihenfolge' erklären im Tooltip, was sie praktisch bedeuten: fester Draftboard-Platz vs. die pro Saison neu ausgeloste Spiel-Reihenfolge.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

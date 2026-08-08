@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Spieltag · Saisonstand",
+  "text": "Der Saisonstand zeigte \"Dein Team\" zweimal direkt untereinander — jetzt nur noch einmal, samt Rückstand auf Platz 1. Die Daten-Tabelle scrollt jetzt sichtbar (Schatten am Rand) und die Team-Spalte bleibt beim Scrollen stehen, statt CASH/SPONSOREN wortlos aus dem Rahmen laufen zu lassen. Das \"Top-Spieler der Saison\"-Modul zeigte vor Spieltag 1 nur Initialen-Kreise ohne Namen (ein fehlendes CSS-Raster hatte die Namensspalte auf 0 Pixel zusammengedrückt) — jetzt stehen Name, Team und Hinweis sichtbar da. POW/SPE/MEN/SOC zeigten farbige Nullen, wo die Punkte-Spalte daneben ehrlich \"—\" sagte — jetzt einheitlich. Die Top-3 im Liga-Board hatten nur einen Farbpunkt statt einer Rangzahl.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

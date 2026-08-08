@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Team · Spieler-Detail",
+  "text": "Ein Klick auf einen Profil-Reiter (Stats/Details/Vertrag/…) konnte je nach Scroll-Zustand komplett wirkungslos bleiben — der Reiter leuchtete als aktiv, die Seite blieb stehen, wo sie war. Ursache war ein Wettlauf zwischen der Klick-Navigation und der Scroll-Beobachtung, die den aktiven Reiter beim freien Scrollen mitführt; ein Klick gewinnt jetzt immer. Zusätzlich hing die Scroll-Beobachtung selbst gelegentlich tot, weil sie einmalig nach den Anker-Abschnitten suchte, bevor die (asynchron nachladende) Detailkomponente sie überhaupt gerendert hatte — sie versucht es jetzt erneut, sobald die Abschnitte da sind. OVR/PPs/MVS standen ausserdem doppelt auf dem Bildschirm (Kopfzeile und Kennzahlen-Karten); die Kopfzeile zeigt jetzt nur noch Marktwert/Gehalt/Vertrag, die reichhaltigeren Karten (mit Rang, Vorsaison-Delta, Liga-Leaders-Link) bleiben die einzige Quelle.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

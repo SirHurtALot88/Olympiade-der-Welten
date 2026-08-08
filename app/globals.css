@@ -2054,6 +2054,20 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* M2 — Aktionszeile des Angebots-Formulars: nur noch „Auto-Angebot" plus
+   Hinweis; Verhandeln/Abbrechen leben genau einmal in der Dialog-Fußleiste. */
+.contract-offer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.contract-offer-actions-note {
+  font-size: 12px;
+  color: var(--nl-mut, #93a3bd);
+}
+
 @media (min-width: 1180px) {
   .player-drawer-page .player-drawer-top-grid {
     grid-template-columns: minmax(280px, 0.95fr) minmax(320px, 1.35fr);
@@ -11622,7 +11636,8 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .ranks-table tbody td.ranks-metric-cell .ranks-rank-delta.is-declined {
-  color: #fecaca;
+  /* W1-Befund 4: #fecaca lag auf grünen Heat-Zellen unter 4,5:1 (10px!). */
+  color: #fee2e2;
 }
 
 .league-leaders-panel {
@@ -11820,21 +11835,15 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: linear-gradient(180deg, rgba(77, 87, 102, 0.98), rgba(45, 52, 64, 0.98)) !important;
 }
 
-.ranks-table .ranks-head-metric-pow {
-  background: linear-gradient(180deg, rgba(132, 61, 58, 0.98), rgba(71, 48, 52, 0.98)) !important;
-}
-
-.ranks-table .ranks-head-metric-spe {
-  background: linear-gradient(180deg, rgba(70, 124, 66, 0.98), rgba(51, 73, 55, 0.98)) !important;
-}
-
-.ranks-table .ranks-head-metric-men {
-  background: linear-gradient(180deg, rgba(67, 103, 169, 0.98), rgba(48, 61, 87, 0.98)) !important;
-}
-
+/* W1-Befund 3 (Farbkollision): Die Achsenfarbe lebt NUR noch im Gruppenband
+   über den Spalten (.ranks-group-row) — die Aggregat-Köpfe POW/SPE/MEN/SOC
+   sind neutral, damit „rot im Kopf" nie mehr mit „rot = schlechter Rang" in
+   den Zellen konkurriert. */
+.ranks-table .ranks-head-metric-pow,
+.ranks-table .ranks-head-metric-spe,
+.ranks-table .ranks-head-metric-men,
 .ranks-table .ranks-head-metric-soc {
-  background: linear-gradient(180deg, rgba(199, 145, 46, 0.98), rgba(89, 68, 38, 0.98)) !important;
-  color: #fff6db !important;
+  background: rgba(49, 56, 66, 0.98) !important;
 }
 
 .ranks-table .ranks-summary-block-start {
@@ -11855,21 +11864,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: rgba(64, 72, 86, 0.72) !important;
 }
 
-.ranks-table tbody td.ranks-metric-cell-pow.rank-muted {
-  background: rgba(181, 75, 70, 0.16) !important;
-}
-
-.ranks-table tbody td.ranks-metric-cell-spe.rank-muted {
-  background: rgba(92, 148, 76, 0.16) !important;
-}
-
-.ranks-table tbody td.ranks-metric-cell-men.rank-muted {
-  background: rgba(76, 119, 197, 0.16) !important;
-}
-
-.ranks-table tbody td.ranks-metric-cell-soc.rank-muted {
-  background: rgba(225, 164, 47, 0.18) !important;
-}
+/* W1-Befund 3: keine Achsen-Tönung mehr in den Zellen — Zellenfarbe heißt
+   ausschließlich „Rang". Die Aggregat-rank-muted-Zellen erben das neutrale
+   .rank-muted; nur die TOT-Spalte behält ihren (neutralen) Summenton oben. */
 
 .ranks-table .ranks-head-discipline {
   text-align: center;
@@ -11883,21 +11880,12 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-left-style: solid !important;
 }
 
-.ranks-table .ranks-head-discipline-power {
-  background: rgba(181, 53, 48, 0.92) !important;
-}
-
-.ranks-table .ranks-head-discipline-speed {
-  background: rgba(58, 131, 57, 0.92) !important;
-}
-
-.ranks-table .ranks-head-discipline-mental {
-  background: rgba(42, 106, 193, 0.92) !important;
-}
-
+/* W1-Befund 3: Disziplin-Köpfe neutral — die Achse steht im Gruppenband. */
+.ranks-table .ranks-head-discipline-power,
+.ranks-table .ranks-head-discipline-speed,
+.ranks-table .ranks-head-discipline-mental,
 .ranks-table .ranks-head-discipline-social {
-  background: rgba(225, 164, 47, 0.92) !important;
-  color: #1d1608 !important;
+  background: rgba(38, 44, 54, 0.98) !important;
 }
 
 .ranks-table tbody td {
@@ -11964,21 +11952,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-right: 1px solid rgba(0, 0, 0, 0.14);
 }
 
-.ranks-table tbody td.ranks-discipline-cell-power.rank-muted {
-  background: rgba(181, 75, 70, 0.08) !important;
-}
-
-.ranks-table tbody td.ranks-discipline-cell-speed.rank-muted {
-  background: rgba(92, 148, 76, 0.08) !important;
-}
-
-.ranks-table tbody td.ranks-discipline-cell-mental.rank-muted {
-  background: rgba(76, 119, 197, 0.09) !important;
-}
-
-.ranks-table tbody td.ranks-discipline-cell-social.rank-muted {
-  background: rgba(225, 164, 47, 0.09) !important;
-}
+/* W1-Befund 3: die Achsen-Tönungen der rank-muted-Disziplinzellen sind
+   entfallen — dort erbt jetzt das neutrale .rank-muted (Zellenfarbe = Rang,
+   sonst nichts). */
 
 .ranks-table tbody .ranks-sticky-team {
   text-align: left;
@@ -12034,7 +12010,8 @@ button.selected-roster-pps-axis-sortable:focus-visible {
    gemacht (cursor:pointer, Akzent-Rand + aufgehellte Team-Spalte oben), kein
    dauerhaftes „Profil"-Label. Der Team-Name bekommt bei Hover Akzentfarbe. */
 .ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
-  color: var(--nl-accent, #7fb0ff);
+  /* F1-Regel: Teamfarbe als TEXT immer über --nl-accent-text (lesbar angehoben). */
+  color: var(--nl-accent-text, #7fb0ff);
   font-weight: 700;
 }
 
@@ -12478,7 +12455,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .rank-muted {
   background: rgba(43, 43, 43, 0.88);
-  color: rgba(242, 237, 226, 0.62);
+  /* W1-Befund 4: vorher 0.62 Alpha — auf den getönten Zellen gemessen bis
+     4,0:1. Voll deckend lesbar, die Ruhe kommt aus Hintergrund + font-weight. */
+  color: rgba(242, 237, 226, 0.88);
   font-weight: 500;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
 }
@@ -47175,7 +47154,8 @@ button.foundation-team-portrait-card {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
   background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
-  color: var(--nl-accent);
+  /* F1-Regel (Q1, gemessen 3,18:1): Teamfarbe als Text → --nl-accent-text. */
+  color: var(--nl-accent-text);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -50281,14 +50261,18 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* Aktionen */
+/* Aktionen. M1/M4: „Deal prüfen" maß mit rohem Akzent auf Akzent-Soft 3,28:1,
+   und auch --nl-accent-text zielt auf das Panel, nicht auf die Soft-Fläche
+   (gemessen 4,09:1 unter S-C-Theme). Deshalb das F1-Primärknopf-Muster:
+   Akzent-FLÄCHE + --nl-accent-ink — die Tinte ist per accentTextFor für alle
+   32 Teams gegen die Akzentfläche gerechnet. */
 .is-new-look .nl-market-primary-action,
 .is-new-look .nl-scout-primary-action {
   padding: 8px 16px;
   border-radius: var(--nl-r-pill);
   border: 1px solid var(--nl-accent);
-  background: var(--nl-accent-soft);
-  color: var(--nl-accent);
+  background: var(--nl-accent-fill);
+  color: var(--nl-accent-ink);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -50331,7 +50315,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-market-secondary-action.is-active {
   border-color: var(--nl-accent);
   background: var(--nl-accent-soft);
-  color: var(--nl-accent);
+  color: var(--nl-accent-text);
 }
 
 .is-new-look .nl-market-secondary-action:disabled,
@@ -50370,6 +50354,12 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-market-live-pill.is-ready {
   color: var(--nl-good);
   border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+}
+
+/* M1 — Deal-Desk-Pill: „blockiert" ist ein Urteil, kein Dauerzustand „prüfen". */
+.is-new-look .nl-market-live-pill.is-blocked {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
 }
 
 .is-new-look .nl-market-board {
@@ -50654,7 +50644,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-market-advanced-toggle:hover,
 .is-new-look .nl-market-advanced-toggle:focus-visible {
-  color: var(--nl-accent);
+  color: var(--nl-accent-text);
 }
 
 .is-new-look .nl-market-advanced-title {
@@ -50677,15 +50667,6 @@ button.foundation-team-portrait-card {
   flex-direction: column;
   gap: var(--nl-s3);
   margin-top: var(--nl-s2);
-}
-
-/* Dauerhaft sichtbare "Erweitert"-Sektion (kein Akkordeon mehr):
-   Titel als eigenständiger Sektions-Header statt klickbarer Toggle-Button. */
-.is-new-look .nl-market-advanced.is-static .nl-market-advanced-title {
-  display: block;
-  color: var(--nl-mut);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 /* F(neu) — Head-to-Head-Vergleich (angeheftet vs. Fokus) in der Fokus-Karte:
@@ -50802,9 +50783,12 @@ button.foundation-team-portrait-card {
 }
 
 /* Kopfzeile der Kachel (kompakter Ruhezustand): Portrait · Copy · Zahlen · Toggle. */
+/* M12 — die rechte Preisspalte ist in die Copy-Spalte gewandert (MW/Gehalt als
+   Zeile unter dem Namen); vorher stutzte sie Namen auf „Blacks…". Spalten:
+   Portrait · Copy (voll) · Expand. */
 .is-new-look .nl-market-candidate-head {
   display: grid;
-  grid-template-columns: 48px 1fr auto auto;
+  grid-template-columns: 48px 1fr auto;
   gap: var(--nl-s3);
   align-items: center;
 }
@@ -50933,11 +50917,16 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-market-candidate-numbers {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
   font-size: 11px;
   color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-candidate-numbers strong {
+  font-size: 13px;
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-market-candidate-numbers strong {
@@ -51355,6 +51344,99 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-market-deal-flat {
   font-size: 12px;
   color: var(--nl-mut);
+}
+
+/* M1 — Subjekt-Kopf des Deal-Desks: der Desk sagt, über wen er redet
+   (Audit-Befund M2: nameloser Desk rechnete still mit dem vorherigen Spieler). */
+.is-new-look .nl-market-deal-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: var(--nl-s2);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-market-deal-who-portrait {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--nl-r-sm);
+  overflow: hidden;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-market-deal-who-copy {
+  display: flex;
+  flex-direction: column;
+  /* Der Name hat Vorrang vor dem Herkunfts-Chip: die Copy-Spalte wächst,
+     der Chip bricht bei Platznot in die nächste Zeile (flex-wrap am Row). */
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-deal-who-name {
+  font-family: var(--nl-display);
+  font-size: 17px;
+  line-height: 1.15;
+  color: var(--nl-ink);
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-market-deal-who-sub {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-deal-who-source {
+  margin-left: auto;
+  flex: none;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+  color: var(--nl-good);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* M1 — Sektionstitel „Wenn der Kauf durchgeht" + ehrlicher Rechnet-Zustand. */
+.is-new-look .nl-market-deal-section {
+  display: block;
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-market-deal-pending {
+  margin: var(--nl-s2) 0 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* M1 — Kassenzettel-Lücke: „es fehlen X" statt ±0-Zeilen bei blockiertem Deal. */
+.is-new-look .nl-market-deal-shortfall {
+  margin-top: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 55%, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-risk) 10%, var(--nl-panel-2));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-market-deal-shortfall strong {
+  font-size: 13px;
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-market-deal-shortfall small {
+  font-size: 11px;
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-market-warning-box {
@@ -54546,6 +54628,12 @@ button.foundation-team-portrait-card {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--nl-s4);
+  /* T7-Fix (Audit-Befund F4): die sticky Aktions-Leiste hängt am unteren
+     Rand des Viewports und legte sich beim Scrollen direkt über die
+     Kartentitel der jeweils letzten sichtbaren Reihe. Reservierter
+     Bodenabstand in Höhe der Leiste sorgt dafür, dass die letzte Kartenreihe
+     immer Luft hat, statt darunter zu verschwinden. */
+  padding-bottom: calc(var(--nl-s3) + 96px);
 }
 
 .is-new-look .nl-facility-card {
@@ -54587,6 +54675,13 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-facility-card.is-good {
   border-top: 3px solid var(--nl-good);
+}
+
+/* T7-Fix (Audit-Befund F1): "nicht gebaut" ist kein Risiko-Zustand — eigener,
+   neutraler (gestrichelter) Rahmen statt der Risiko-Farbe. Bedeutungsfarbe
+   bleibt echten Zustandsstufen vorbehalten. */
+.is-new-look .nl-facility-card.is-unbuilt {
+  border-top: 3px dashed var(--nl-line-2);
 }
 
 .is-new-look .nl-facility-motif {
@@ -54678,13 +54773,15 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-/* Arena-Karte: Hinweis, dass die Einnahme mit der Beliebtheit skaliert. */
+/* Arena-Karte: Hinweis, dass die Einnahme mit der Beliebtheit skaliert.
+   T7-Fix (Audit-Befund F5/Q2): Teamfarbe als Text lief hier über das rohe
+   --nl-accent (bei S-C 3,72:1) statt über die angehobene --nl-accent-text. */
 .is-new-look .nl-facility-arena-popularity {
   display: block;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--nl-accent, var(--nl-mut));
+  color: var(--nl-accent-text, var(--nl-mut));
   opacity: 0.9;
 }
 
@@ -54702,6 +54799,12 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-facility-card-stats .is-negative {
   color: var(--nl-risk);
+}
+
+/* T7-Fix (Audit-Befund F2): eine Null (typischerweise "nicht gebaut") ist
+   weder Erfolg noch Risiko — neutraler Ton statt Grün/Rot für ein Nichts. */
+.is-new-look .nl-facility-card-stats .is-neutral {
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-facility-action-bar {
@@ -54959,24 +55062,19 @@ button.foundation-team-portrait-card {
 }
 
 /* Welches Sponsor-Regelwerk dieser Spielstand benutzt. Bewusst eine ruhige Kennzeichnung und kein
-   Warnhinweis: beide Systeme sind gueltig, der Spieler soll nur nicht raten muessen, welches gilt. */
+   Warnhinweis: beide Systeme sind gueltig, der Spieler soll nur nicht raten muessen, welches gilt.
+   W3-Fix (Audit-Befund 2, Sponsoren): war eine umrandete Pille im Fließtext — genau die Optik einer
+   wichtigen Aussage, obwohl es reine Technik-Fußnote ist ("Modellversion"). Jetzt stille
+   Fußnotenschrift, Erklärung bleibt im Tooltip. */
 .is-new-look .nl-sponsor-system-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--nl-line);
-  border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   color: var(--nl-mut);
-}
-.is-new-look .nl-sponsor-system-badge[data-sponsor-system="2"] {
-  border-color: color-mix(in srgb, var(--nl-acc) 45%, var(--nl-line));
-  background: color-mix(in srgb, var(--nl-acc) 12%, transparent);
-  color: var(--nl-ink);
+  cursor: help;
 }
 
 /* Erfolgs-Banner nach Sponsorwahl — im Token-System (--nl-good). */
@@ -57884,6 +57982,23 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-standings-podium-btn:hover,
 .is-new-look .nl-standings-podium-btn:focus-visible {
   background: var(--nl-panel-2);
+}
+
+/* S5/S6 (Audit Spieltag): Medaille + explizite Rangzahl übereinander, statt
+   nur des reinen Farbpunkts (Gold/Silber/Bronze allein sind ohne Zahl nicht
+   sicher zu unterscheiden). */
+.is-new-look .nl-standings-podium-medal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-standings-podium-ranknum {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-standings-podium-copy {
@@ -61458,13 +61573,11 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-/* --- Daten-Modus: KPI-Kacheln (eigenes Team) + Balkenchart über der
-   sortierbaren Tabelle; Chart-Muster folgt der Prize-Forecast-Karte --- */
-.is-new-look .nl-standings-daten-kpis {
-  margin: 0 0 var(--nl-s3);
-  flex-wrap: wrap;
-}
-
+/* --- Daten-Modus: Balkenchart über der sortierbaren Tabelle; Chart-Muster
+   folgt der Prize-Forecast-Karte. Die zweite "Dein Team"-KPI-Zeile
+   (`.nl-standings-daten-kpis`) ist S5/S2 (Audit Spieltag) zum Opfer gefallen
+   — dieselben Zahlen standen bereits im Kartenkopf, siehe
+   SeasonStandingsNewLook.tsx `.nl-standings-own-chips`. --- */
 .is-new-look .nl-standings-daten-chart-scroll {
   overflow-x: auto;
   margin-bottom: var(--nl-s3);
@@ -62672,12 +62785,24 @@ span.nl-facility-ampel-chip {
   box-shadow: inset 3px 0 0 var(--nl-good);
 }
 
+/* T7-Fix (Audit-Befund F1): siehe .nl-facility-card.is-unbuilt — dieselbe
+   Regel für die Listenansicht, gestrichelt statt risiko-rot. */
+.is-new-look .nl-facility-list-row.is-unbuilt td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-line-2);
+}
+
 .is-new-look .nl-facility-list-table .is-positive {
   color: var(--nl-good);
 }
 
 .is-new-look .nl-facility-list-table .is-negative {
   color: var(--nl-risk);
+}
+
+/* T7-Fix (Audit-Befund F2): eine Null (typischerweise "nicht gebaut") ist
+   weder Erfolg noch Risiko — neutraler Ton statt Grün/Rot für ein Nichts. */
+.is-new-look .nl-facility-list-table .is-neutral {
+  color: var(--nl-mut);
 }
 
 /* --- Gebäude: Ausbau-Kurve (Gebäude-Detail) --- */
@@ -63657,61 +63782,41 @@ span.nl-facility-ampel-chip {
   margin-top: var(--nl-s1);
 }
 
-/* --- Sponsoren #78: Liga-Sponsorenübersicht --- */
-.is-new-look .nl-sponsor-league-sort-tabs {
-  flex-wrap: wrap;
+/* --- Sponsoren #78 / W3-Fix (Audit-Befund 1): Liga-Sponsorenübersicht als
+   sortierbare Tabelle (NlTable) statt eines 32-Karten-Rasters mit beidseitig
+   gestutzten Namen. Team-/Sponsorspalte laufen bewusst NICHT durch
+   `text-overflow: ellipsis` — volle Namen sind der ganze Punkt des Umbaus. */
+.is-new-look .nl-sponsor-league-table-hint {
+  margin: 0 0 var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
 }
 
-/* Moderne Liga-Sponsorenübersicht: responsives Karten-Grid statt flacher Liste. */
-.is-new-look .nl-sponsor-league-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
-  gap: var(--nl-s2);
-  max-height: 560px;
-  overflow-y: auto;
-  padding: 2px;
+.is-new-look .nl-sponsor-league-table.nl-table th,
+.is-new-look .nl-sponsor-league-table.nl-table td {
+  vertical-align: middle;
 }
 
-.is-new-look .nl-sponsor-league-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  padding: var(--nl-s2) var(--nl-s3);
-  border-radius: var(--nl-r-md);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
+.is-new-look .nl-sponsor-league-table.nl-table tbody tr.is-current td {
+  background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
 }
 
-.is-new-look .nl-sponsor-league-item.is-current {
-  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+.is-new-look .nl-sponsor-league-table.nl-table tbody tr.is-current td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-accent);
 }
 
-.is-new-look .nl-sponsor-league-item.is-empty {
-  border-style: dashed;
-  border-color: var(--nl-line-2);
-  opacity: 0.72;
-}
-
-/* Golden Card: goldener Rahmen + zarter Schimmer, oben angepinnt. */
-.is-new-look .nl-sponsor-league-item.is-golden {
-  border-color: color-mix(in srgb, var(--nl-warn) 70%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--nl-warn) 16%, transparent), transparent 62%),
-    var(--nl-panel-2);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 35%, transparent),
-    0 6px 20px color-mix(in srgb, var(--nl-warn) 22%, transparent);
+/* Golden Card: goldener Zeilentopf statt Karten-Schimmer. */
+.is-new-look .nl-sponsor-league-table.nl-table tbody tr.is-golden td {
+  background: color-mix(in srgb, var(--nl-warn) 8%, transparent);
 }
 
 .is-new-look .nl-sponsor-league-golden-badge {
-  position: absolute;
-  top: -8px;
-  right: 10px;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--nl-warn) 60%, transparent);
-  background: color-mix(in srgb, var(--nl-warn) 26%, var(--nl-panel));
+  background: color-mix(in srgb, var(--nl-warn) 22%, var(--nl-panel));
   color: var(--nl-warn);
   font-size: 10px;
   font-weight: 800;
@@ -63719,43 +63824,31 @@ span.nl-facility-ampel-chip {
   white-space: nowrap;
 }
 
+.is-new-look .nl-sponsor-league-teamcell,
+.is-new-look .nl-sponsor-league-sponsorcell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-sponsor-league-sponsorcell.is-empty {
+  color: var(--nl-mut-2);
+  font-style: italic;
+}
+
 .is-new-look .nl-sponsor-league-crest {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 34px;
+  width: 26px;
 }
 
 .is-new-look .nl-sponsor-league-crest .nl-sponsor-crest {
-  width: 34px;
-  height: 38px;
+  width: 26px;
+  height: 30px;
   display: block;
-}
-
-.is-new-look .nl-sponsor-league-crest-empty {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 34px;
-  border-radius: var(--nl-r-sm);
-  border: 1px dashed var(--nl-line-2);
-  color: var(--nl-mut-2);
-  font-size: 12px;
-}
-
-.is-new-look .nl-sponsor-league-body {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-
-.is-new-look .nl-sponsor-league-teamline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
 }
 
 .is-new-look .nl-sponsor-league-code {
@@ -63768,13 +63861,19 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
+/* Volle Namen, kein Kürzen — der eigentliche Punkt des Tabellen-Umbaus. */
 .is-new-look .nl-sponsor-league-teamname {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--nl-mut);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  white-space: normal;
+}
+
+.is-new-look .nl-sponsor-league-sponsorname {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  white-space: normal;
 }
 
 .is-new-look .nl-sponsor-league-you {
@@ -63782,34 +63881,11 @@ span.nl-facility-ampel-chip {
   padding: 0 6px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  color: var(--nl-accent);
+  color: var(--nl-accent-text);
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.is-new-look .nl-sponsor-league-sponsor {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--nl-ink);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-empty {
-  color: var(--nl-mut-2);
-  font-style: italic;
-  font-weight: 400;
-}
-
-.is-new-look .nl-sponsor-league-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .is-new-look .nl-sponsor-league-chip {
@@ -72285,13 +72361,110 @@ span.nl-facility-ampel-chip {
 /* Wave B — Transfermarkt */
 
 /*
- * B2 (P1): Transfermarkt degradiert bei geschlossenem Transferfenster zu einer
- * Read-only-Ansicht statt zu einem Dauer-Spinner. Der Hinweisbanner nutzt die
- * bestehenden `.transfer-callout.is-blocked`-Styles; hier nur der Abstand zum
- * darunterliegenden Markt-Layout im „Neuer Look".
+ * M1 — EIN Fensterstatus statt drei sich widersprechender Aussagen: Der Banner
+ * trägt Ton (offen/verkauf/geschlossen), Titel, Badge und Detail aus EINEM
+ * strukturierten Urteil des Clients. Vorher stand ein hart codiertes
+ * „Transferfenster geschlossen" + „nur Ansicht" auch über „kaufen ist offen".
+ * Töne sind Semantik-Tokens (good/warn/risk), bewusst NICHT die Teamfarbe.
  */
-.nl-market .nl-market-window-notice {
+.is-new-look .nl-market-window-status {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
   margin-bottom: 12px;
+  padding: 10px 16px;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-market-window-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--nl-mut);
+}
+
+.is-new-look .nl-market-window-status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-window-status-title {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-window-status-detail {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-window-status-badge {
+  margin-left: auto;
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-window-status.is-open {
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-window-status.is-open .nl-market-window-status-dot {
+  background: var(--nl-good);
+}
+
+.is-new-look .nl-market-window-status.is-open .nl-market-window-status-title,
+.is-new-look .nl-market-window-status.is-open .nl-market-window-status-badge {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-market-window-status.is-open .nl-market-window-status-badge {
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-window-status.is-sell {
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-window-status.is-sell .nl-market-window-status-dot {
+  background: var(--nl-warn);
+}
+
+.is-new-look .nl-market-window-status.is-sell .nl-market-window-status-title,
+.is-new-look .nl-market-window-status.is-sell .nl-market-window-status-badge {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-market-window-status.is-sell .nl-market-window-status-badge {
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-window-status.is-closed {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-window-status.is-closed .nl-market-window-status-dot {
+  background: var(--nl-risk);
+}
+
+.is-new-look .nl-market-window-status.is-closed .nl-market-window-status-title,
+.is-new-look .nl-market-window-status.is-closed .nl-market-window-status-badge {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-market-window-status.is-closed .nl-market-window-status-badge {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
 }
 
 
@@ -75709,7 +75882,11 @@ span.nl-facility-ampel-chip {
 
 
 .is-new-look .nl-diszis-md-current-tag {
-  color: var(--nl-accent);
+  /* W4-Befund 3 (gemessen 3,40:1 mit rohem Akzent): das Tag sitzt auf dem
+     akzent-GETÖNTEN Kartenkopf — dort maß auch --nl-accent-text nur 4,24:1
+     (accentTextFor zielt auf den Panel-Grund). Deshalb volle Tinte; das
+     „läuft"-Signal trägt der akzentfarbene Kopfbalken der Karte. */
+  color: var(--nl-ink);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -78521,6 +78698,26 @@ span.nl-facility-ampel-chip {
 }
 
 /* =====================================================================================
+   S4 · disciplineStage-Redirect + matchdayResult-Leerzustand (Audit Spieltag A4/A5)
+   -------------------------------------------------------------------------------------
+   A4: der entfallene Standalone-View `disciplineStage` war eine leere Fläche ohne
+   Erklärung und ohne Weg zurück — jetzt ein `VeloPendingRanking`-Hinweis mit CTA in
+   die Arena. Nur ein schmaler Layout-Rahmen; die Karte selbst bringt ihre Optik mit.
+   ===================================================================================== */
+.foundation-discipline-stage-redirect {
+  padding: 24px 4px;
+  max-width: 640px;
+}
+
+/* A5: `matchdayResult` vor dem ersten gebuchten Ergebnis — statt 32 „—"-Zeilen und
+   einem erfundenen Tagessieger (alphabetisch erste Zeile) steht hier eine kurze
+   Erklärung über der Tageswertung, die selbst als VeloPendingRanking rendert. */
+.nl-result-pending-note {
+  margin: 0;
+  color: var(--nl-mut);
+}
+
+/* =====================================================================================
    S1 · Home-Umbau: Handlungszeile, klickbare Hinweise, Kapitän-Hinweis,
    vollständige OVR-Werte auf den Spielerkarten
    -------------------------------------------------------------------------------------
@@ -78828,4 +79025,427 @@ span.nl-facility-ampel-chip {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+}
+
+/* =====================================================================================
+   W1 · RANKS-UMBAU — Achsen-Gruppenband, Legende, gepinnte eigene Zeile,
+   lesbare Heat-Zellen, PP-Board-Saisonstart (VeloPendingRanking + Vorsaison-Podium).
+
+   Farbgrammatik (gilt auch für den Spielplan, W4):
+   - Achsenfarbe (POW rot / SPE grün / MEN blau / SOC gold) markiert NUR die
+     Achse — hier ausschließlich im Gruppenband über den Spalten und in den
+     Gruppen-Schaltern. Nie in den Zellen.
+   - Zellenfarbe = Rang (grün 1–3 · gelb 4–6 · rot 7–10 · ab 11 ruhig), erklärt
+     durch die Legende. Zellwerte voll deckend.
+   - Teamfarbe (Akzent) markiert NUR "dein Team"/Interaktion, Text über
+     --nl-accent-text.
+   ===================================================================================== */
+
+/* ---- Heat-Stufen der Rank-Matrix: dunklere Flächen, damit die volle
+   Zellwert-Deckung auf JEDER Stufe >= 4,5:1 hält (die globalen Heat-Tokens
+   bleiben unangetastet — nur die Ranks-Matrix nutzt die dunkleren Stufen). ---- */
+#discipline-ranks {
+  --ranks-heat-ink: #f2ede2;
+  --ranks-heat-strong-bg: #2e6b40;
+  --ranks-heat-mid-bg: #5e5430;
+  --ranks-heat-weak-bg: #6e3030;
+}
+
+#discipline-ranks .rank-strong {
+  background: var(--ranks-heat-strong-bg);
+  color: var(--ranks-heat-ink);
+}
+
+#discipline-ranks .rank-mid {
+  background: var(--ranks-heat-mid-bg);
+  color: var(--ranks-heat-ink);
+}
+
+#discipline-ranks .rank-weak {
+  background: var(--ranks-heat-weak-bg);
+  color: var(--ranks-heat-ink);
+}
+
+#discipline-ranks .rank-muted {
+  background: rgba(43, 43, 43, 0.9);
+  color: #cfc9bd;
+}
+
+/* Delta-Chips (+2/−3) erben auf Heat-Flächen die helle Zell-Tinte — die
+   Richtung trägt das Vorzeichen, die Lesbarkeit gewinnt. */
+#discipline-ranks td.rank-strong .ranks-rank-delta,
+#discipline-ranks td.rank-mid .ranks-rank-delta,
+#discipline-ranks td.rank-weak .ranks-rank-delta {
+  color: inherit;
+}
+
+/* ---- Farb-Legende über der Matrix ---- */
+.ranks-color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  border: 1px solid var(--nl-line, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.75rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.ranks-color-legend b {
+  color: var(--nl-ink, #f2ede2);
+  font-weight: 700;
+}
+
+.ranks-color-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ranks-color-legend-item.is-scrollhint {
+  margin-left: auto;
+}
+
+.ranks-heatstrip {
+  display: inline-flex;
+  height: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ranks-heatstrip i {
+  display: block;
+  width: 20px;
+  height: 100%;
+}
+
+/* ---- Achsen-Gruppen-Schalter (ersetzen den px-Spalten-Manager) ---- */
+.ranks-axis-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ranks-axis-groups-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.ranks-axis-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ranks-axis-group-toggle small {
+  font-size: 0.66rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.ranks-axis-group-toggle .ranks-axis-group-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ranks-axis-color, rgba(255, 255, 255, 0.4));
+}
+
+.ranks-axis-group-toggle.is-power {
+  --ranks-axis-color: var(--nl-pow, #ff6b6b);
+}
+
+.ranks-axis-group-toggle.is-speed {
+  --ranks-axis-color: var(--nl-spe, #57d08a);
+}
+
+.ranks-axis-group-toggle.is-mental {
+  --ranks-axis-color: var(--nl-men, #5b9bff);
+}
+
+.ranks-axis-group-toggle.is-social {
+  --ranks-axis-color: var(--nl-soc, #e6b455);
+}
+
+.ranks-axis-group-toggle.is-active {
+  border-color: color-mix(in srgb, var(--ranks-axis-color, #93a3bd) 60%, transparent);
+  background: color-mix(in srgb, var(--ranks-axis-color, #93a3bd) 14%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+.ranks-axis-group-toggle:not(.is-active) .ranks-axis-group-dot {
+  opacity: 0.35;
+}
+
+.ranks-axis-groups-reset {
+  font-size: 0.72rem;
+}
+
+/* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */
+.ranks-table thead .ranks-group-row .ranks-group-cell {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 26px;
+  padding: 4px 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  background: rgba(24, 30, 40, 0.99);
+  color: var(--nl-mut, #93a3bd);
+  border-top: 2px solid transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ranks-table thead .ranks-group-row .ranks-group-cell.ranks-sticky-team,
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-team {
+  z-index: 6;
+  background: rgba(24, 30, 40, 0.99);
+}
+
+/* Gruppen-Text minimal aufgehellt (color-mix mit Weiß), damit auch POW/MEN auf
+   dem dunklen Bandgrund sicher über 4,5:1 liegen. */
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-power {
+  color: color-mix(in srgb, var(--nl-pow, #ff6b6b) 80%, white);
+  border-top-color: var(--nl-pow, #ff6b6b);
+}
+
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-speed {
+  color: color-mix(in srgb, var(--nl-spe, #57d08a) 88%, white);
+  border-top-color: var(--nl-spe, #57d08a);
+}
+
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-mental {
+  color: color-mix(in srgb, var(--nl-men, #5b9bff) 80%, white);
+  border-top-color: var(--nl-men, #5b9bff);
+}
+
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-social {
+  color: color-mix(in srgb, var(--nl-soc, #e6b455) 88%, white);
+  border-top-color: var(--nl-soc, #e6b455);
+}
+
+.ranks-table thead .ranks-group-row .ranks-group-cell.is-base {
+  border-top-color: rgba(255, 255, 255, 0.24);
+}
+
+/* Die eigentliche Kopfzeile rutscht beim Scrollen unter das Gruppenband. */
+.ranks-table thead tr:not(.ranks-group-row) th {
+  top: 26px;
+}
+
+/* ---- Scroll-Affordanz: rechte Kante deutet an, dass rechts mehr Spalten
+   liegen; die Team-Spalte bleibt sticky. ---- */
+.ranks-table-scrollwrap {
+  position: relative;
+}
+
+.ranks-table-scrollwrap::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 22px;
+  pointer-events: none;
+  border-radius: 0 14px 14px 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.4), transparent);
+}
+
+#discipline-ranks .table-shell {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.06);
+}
+
+/* ---- Eigene Zeile: Chip + gepinnte Kopie oben ---- */
+.ranks-own-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent, #5aa0ff) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent, #5aa0ff) 14%, transparent);
+  /* Volle Tinte statt Akzent-Text: der Chip sitzt auf der akzent-getönten
+     eigenen Zeile — Akzent-Text zielt auf Panel-Grund und maß hier nur 3,55:1
+     (dasselbe Muster wie der Viewwidth-Umschalter in F1). Der Teamton sitzt
+     in Rahmen + Grund. */
+  color: var(--nl-ink, #f2ede2);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ranks-table tbody tr.ranks-own-pinned-row td {
+  border-bottom: 2px solid color-mix(in srgb, var(--nl-accent, #5aa0ff) 55%, rgba(0, 0, 0, 0.4));
+}
+
+.ranks-table tbody tr.ranks-own-pinned-row .ranks-sticky-team {
+  box-shadow:
+    inset 3px 0 0 var(--nl-accent, #5aa0ff),
+    1px 0 0 rgba(255, 255, 255, 0.08),
+    10px 0 14px rgba(0, 0, 0, 0.18);
+  white-space: normal;
+}
+
+.ranks-own-pinned-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  color: var(--nl-mut, #93a3bd);
+  white-space: normal;
+}
+
+/* ---- PP-Board am Saisonstart: Leerzustand + echtes Vorsaison-Podium ---- */
+.is-new-look .nl-ranks-pending {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: var(--nl-s4, 20px);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-ranks-pending {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-ranks-prev-podium {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background: var(--nl-panel-2);
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.is-new-look .nl-ranks-prev-podium-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nl-accent-text);
+}
+
+.is-new-look .nl-ranks-prev-podium-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.is-new-look .nl-ranks-prev-podium-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-ranks-prev-podium-team {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--nl-ink);
+  font: inherit;
+}
+
+.is-new-look .nl-ranks-prev-podium-team strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-ranks-prev-podium-team:hover strong,
+.is-new-look .nl-ranks-prev-podium-team:focus-visible strong {
+  color: var(--nl-accent-text);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-ranks-prev-podium-team small {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-ranks-prev-podium-value {
+  color: var(--nl-mut);
+  font-size: 12.5px;
+}
+
+/* =====================================================================================
+   W4 · SPIELPLAN-FEINSCHLIFF — Details-Aufklappen für Seed-/Quelle-Infos,
+   Mutator-Hinweiszeile statt 40× "ausstehend".
+   ===================================================================================== */
+.is-new-look .nl-diszis-details-toggle {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill, 999px);
+  background: none;
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-diszis-details-toggle:hover,
+.is-new-look .nl-diszis-details-toggle[aria-expanded="true"] {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-diszis-details {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.is-new-look .nl-diszis-details code {
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.is-new-look .nl-diszis-mutator-hint {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--nl-accent);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 12.5px;
 }

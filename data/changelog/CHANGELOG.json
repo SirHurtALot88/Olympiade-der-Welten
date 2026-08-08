@@ -39,6 +39,24 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Markt · Transfermarkt & Kaufdialog",
+      "pr": null,
+      "text": "Der Deal-Desk ist jetzt verbindlich: Er trägt Namen und Porträt des Kandidaten im Kopf, und ein Wechsel in der Liste entwertet die alte Rechnung sofort — vorher rechnete der namenlose Desk still mit dem vorherigen Spieler weiter (Profil: Lotte Lance, Desk: Blacksmith). Die Vorher/Nachher-Zeilen zeigen unter \"Wenn der Kauf durchgeht\" echte Folgen statt ±0 auf jeder Zeile, und fehlt Cash, steht der Betrag da (\"Noch nicht ausführbar — es fehlen 4,3 Mio\") statt einer Rechnung, die so tut, als passiere nichts. \"MW\" heißt im Desk jetzt \"Team-MW\". Der Fensterstatus ist EINE Aussage (\"Kauffenster offen\" in Grün) statt \"geschlossen\" + \"kaufen ist offen\" + \"nur Ansicht\" übereinander. Kandidatennamen werden nicht mehr gestutzt (Preis steht unter dem Namen), der Filterberg startet eingeklappt, und \"Deal prüfen\" besteht den Kontrasttest. Im Kaufdialog: die Gehaltsverteilung je Saison steht bei Mehrjahresverträgen direkt am Angebot, \"Monatsgehalt\" heißt richtig \"Gehalt p.a. (Mio)\", es gibt nur noch EIN \"Abbrechen\" und einen Primärknopf pro Schritt, \"Stört ihn\" hat seinen Umlaut, und die Warnung vor dem Abbruch-Malus steht VOR dem Klick im Gegenangebots-Banner.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Kleinere Klarheits-Korrekturen an der Einsatzliste (die Struktur bleibt, wie sie ist): der rote \"Spieler fehlt\"-Alarm für einen einfach noch nicht bearbeiteten Slot heißt jetzt neutral \"Offen\" — Rot bleibt echten Blockern vorbehalten (doppelt gewählter Spieler, verletzter Spieler, der aktive Slot). Fatigue-Kosten zeigen bei einer leeren Liste \"0\" statt \"−0\", Rivalen-Teamnamen laufen seltener in \"Wicked ...\" ab, Attribut-Noten (z. B. \"SPE B\") tragen ihre Notenskala jetzt im Tooltip, und der Formplan-Karten-Deck-Hinweis erklärt in einer Zeile, was eine aktivierte Karte kostet und bewirkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Betrieb · Spielstand einsetzen",
       "pr": null,
       "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",
@@ -98,6 +116,15 @@
       "text": "Beim Start der neuen Saison hat der Kader-Füll-Lauf auch für manuell geführte Teams eingekauft — im laufenden Spielstand drei Zugänge für Stronghold Crusaders über zusammen 34,5 Mio. Der Dienst läuft über alle Teams des Spielstands und bekam beim Verdrahten in die Saisonstart-Kette die Schreibgrenze nicht mit, die jeder andere Schritt dieses Laufs hat. Er bekommt sie jetzt: dieselbe KI-Teamliste, die auch Marktplan und Manager-Aktionen benutzen.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Gebäude",
+      "pr": null,
+      "text": "Nicht gebaute Gebäude trugen denselben roten Rahmen wie ein echtes Risiko-Gebäude — sieben von acht Karten sahen nach Problem aus, obwohl alles in Ordnung war; 'nicht gebaut' hat jetzt einen eigenen, neutral gestrichelten Rahmen. Unterhalt/Netto zeigten für nicht gebaute Gebäude hartkodiert '−0,0 Mio' (ein negatives Nichts) und färbten die Null grün oder rot — jetzt schlicht '0,0 Mio' in neutralem Ton. Die Kopf-Chips 'Recovery' und 'Trainingseffekt' quetschten mehrere Fakten ohne Einheit in eine Zeile; Recovery hat jetzt eine erklärende Sub-Zeile, Trainings-XP/Scouting/Analytics sind eigene Chips. Die sticky Aktionsleiste bekommt am Ende der Kartenliste reservierten Abstand, damit sie die letzte Kartenreihe nicht mehr überdeckt — während des Scrollens durch die Mitte der Seite überdeckt eine unten fixierte Leiste zwangsläufig kurzzeitig die jeweils unterste sichtbare Zeile, das ist unverändertes Verhalten sticky positionierter Leisten.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
@@ -210,6 +237,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Welt · Ranks",
+      "pr": null,
+      "text": "Die Rank-Matrix spricht jetzt eine Farbsprache: Die Achsenfarbe (Power rot, Speed grün, Mental blau, Social gold) lebt nur noch im schmalen Gruppenband über den Spalten, die Zellen färben ausschließlich nach Rang — und eine Legende erklärt beides (vorher hieß Grün mal 'Speed-Disziplin', mal 'guter Rang', ohne ein Wort dazu). Der px-Spalten-Manager ist durch Achsen-Gruppen-Schalter ersetzt: Power/Speed/Mental/Social lassen sich je Gruppe ein- und ausblenden, 'Standard' setzt alles zurück. Jedes Kürzel hat jetzt einen echten Tooltip (GEW = Gewichtheben, TOT = Gesamtrang …) — vorher sagte der Hover nur 'Nach GEW sortieren', und SCH bekam sogar die falsche Achsen-Erklärung (derselbe Substring-Fehler, der auf der Kreditseite 'Zins-Range' als 'Rang' erklärte — beides behoben, die Begriffssuche matcht nur noch ganze Wörter). Deine Zeile ist zusätzlich oben angepinnt (mit 'Rang 17 von 32'), die Zellwerte sind voll deckend und bestehen auf jeder Heat-Stufe den Kontrasttest, und 'KI-Teams gefüllt' ist ein Status-Chip statt eines Buttons, der nichts tut. Das PP-Board darunter erfindet am Saisonstart keine Rangliste mehr: Statt Gold/Silber/Bronze für die ersten drei Teams des Alphabets und 'Rang 22 von 32' aus reiner Alphabet-Position stehen dort leere Podest-Ringe ('Noch zu vergeben') mit Erklärung — und daneben das ECHTE Podium der Vorsaison (Zero Heroes, Mayhem Mavericks, Last Ride) aus dem Saisonarchiv.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Teams · Teamprofil",
       "pr": null,
       "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",
@@ -228,9 +264,27 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Der Saisonstand zeigte \"Dein Team\" zweimal direkt untereinander — jetzt nur noch einmal, samt Rückstand auf Platz 1. Die Daten-Tabelle scrollt jetzt sichtbar (Schatten am Rand) und die Team-Spalte bleibt beim Scrollen stehen, statt CASH/SPONSOREN wortlos aus dem Rahmen laufen zu lassen. Das \"Top-Spieler der Saison\"-Modul zeigte vor Spieltag 1 nur Initialen-Kreise ohne Namen (ein fehlendes CSS-Raster hatte die Namensspalte auf 0 Pixel zusammengedrückt) — jetzt stehen Name, Team und Hinweis sichtbar da. POW/SPE/MEN/SOC zeigten farbige Nullen, wo die Punkte-Spalte daneben ehrlich \"—\" sagte — jetzt einheitlich. Die Top-3 im Liga-Board hatten nur einen Farbpunkt statt einer Rangzahl.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Verwaltung · Settings",
       "pr": null,
       "text": "Der 32-Klub-Picker fürs \"Neues Spiel erstellen\" lag offen mitten in den Settings des laufenden Saves, mit vorausgewähltem Team und \"DEIN TEAM\"-Badge — Verwechslungsgefahr mit der echten Team-Zuordnung. Er ist jetzt standardmäßig eingeklappt. Der Season-Start-Reset steht jetzt in einer eigenen, klar markierten Gefahrenzone statt neben harmlosen Aktionen, \"Löschen\" je Spielstand ist räumlich von \"Klonen\"/\"Snapshot erstellen\" abgesetzt. Der Untertitel erklärt jetzt in Klartext, wofür die Seite gut ist, statt Modell-Doku zu zitieren. \"Warnungen 200\" lässt sich aufklappen und zeigt die echten Meldungen aus dem Daten-Mapping beim Import.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Spieler-Detail",
+      "pr": null,
+      "text": "Ein Klick auf einen Profil-Reiter (Stats/Details/Vertrag/…) konnte je nach Scroll-Zustand komplett wirkungslos bleiben — der Reiter leuchtete als aktiv, die Seite blieb stehen, wo sie war. Ursache war ein Wettlauf zwischen der Klick-Navigation und der Scroll-Beobachtung, die den aktiven Reiter beim freien Scrollen mitführt; ein Klick gewinnt jetzt immer. Zusätzlich hing die Scroll-Beobachtung selbst gelegentlich tot, weil sie einmalig nach den Anker-Abschnitten suchte, bevor die (asynchron nachladende) Detailkomponente sie überhaupt gerendert hatte — sie versucht es jetzt erneut, sobald die Abschnitte da sind. OVR/PPs/MVS standen ausserdem doppelt auf dem Bildschirm (Kopfzeile und Kennzahlen-Karten); die Kopfzeile zeigt jetzt nur noch Marktwert/Gehalt/Vertrag, die reichhaltigeren Karten (mit Rang, Vorsaison-Delta, Liga-Leaders-Link) bleiben die einzige Quelle.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"
@@ -251,6 +305,33 @@
       "text": "Bei erst einer archivierten Saison waren Ø Rang und Bester Rang spaltenweise identisch — jetzt heißt es dann schlicht Rang, eine Spalte statt zwei (ab der zweiten archivierten Saison kommen beide zurück). Die Verlauf-Kacheln sagen jetzt, was sie zeigen, z. B. Top 8 nach Punkte · dein Team ergänzt, statt den Cut stillschweigend vorauszusetzen. Der Kopf erklärt jetzt, dass die Saisons-Spalte die laufende Saison mitzählt, auch wenn sie gerade erst begonnen hat.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Welt · Spielplan",
+      "pr": null,
+      "text": "Die Technik-Strings sind aus dem Spielplan raus: 'QUELLE season_seed', zehnmal 'season_seed' als Karten-Fußzeile und die komplette Schedule-Seed-Zeile stecken jetzt hinter einem 'Details'-Aufklappen — wer sie braucht, findet sie, alle anderen sehen Spielplan statt Debug. Solange noch kein Spieltag gewertet ist, steht über dem Draftboard EIN Satz ('Treffer erscheinen nach der ersten Wertung') statt 40-mal 'ausstehend' in den Mutator-Spalten; sobald die erste Wertung da ist, kommen die Trefferzahlen je Zelle zurück. Das '· läuft'-Tag am aktuellen Spieltag besteht jetzt den Kontrasttest (vorher 3,4:1 — ausgerechnet die wichtigste Info der Karte war die leiseste), und die Spalten 'Original' und 'Reihenfolge' erklären im Tooltip, was sie praktisch bedeuten: fester Draftboard-Platz vs. die pro Saison neu ausgeloste Spiel-Reihenfolge.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Arena & Spieltagsergebnis",
+      "pr": null,
+      "text": "Zwei Leerzustände vor dem ersten Ergebnis eines Spieltags waren bisher irreführend statt leer: die alte Disziplin-Bühne (eigenständige Ansicht) zeigte gar nichts mehr an, weil sie in die Arena umgezogen ist — jetzt erklärt eine Karte mit Weg zurück, wohin. Und die Spieltagsergebnis-Seite erfand vor der ersten Wertung einen \"Tagessieger\" (alphabetisch erstes Team) samt 32 Zeilen aus lauter \"—\" — jetzt steht dort ehrlich \"Wertung folgt\", solange nichts gewertet ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Welt · Sponsoren",
+      "pr": null,
+      "text": "Die Liga-Sponsorenübersicht war ein Raster aus 32 Karten mit beidseitig gestutzten Namen ('Zero…' / 'Jaguar La…') — jetzt eine sortierbare Tabelle mit vollen Team- und Sponsornamen, Spaltenköpfe klickbar. Modell-Jargon ist raus: 'EV-NEUTRAL' heisst jetzt 'ausgewogenes Bonus/Malus-Profil', der rohe Vertrags-Schlüssel 'identity special' heisst 'Identitäts-Paket', und die Sponsorsystem-Kennzeichnung ist eine stille Fußnote statt einer auffälligen Pille. Geldbeträge tragen jetzt durchgängig die Einheit 'Mio' (Cash/Saison, Ø-Angebotswert, Liga-Spalte, Apron-Linien — vorher stand dort nackt '63,5'). Die KPI 'Ø-Angebotswert · N Angebote' blieb sichtbar, obwohl bei laufendem Vertrag gar keine Angebotskarten angezeigt werden — der Chip erklärt jetzt, dass ein Vertrag läuft und neue Angebote erst zum Saisonende kommen, statt auf unsichtbare Angebote zu verweisen. Die Kommerz-Rating-Treiber (Historie/Kader/Prestige) zeigen jetzt ihre Skala (.../100).",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {

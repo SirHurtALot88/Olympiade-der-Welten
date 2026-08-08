@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Spieltag · Einsatzliste",
+  "text": "Kleinere Klarheits-Korrekturen an der Einsatzliste (die Struktur bleibt, wie sie ist): der rote \"Spieler fehlt\"-Alarm für einen einfach noch nicht bearbeiteten Slot heißt jetzt neutral \"Offen\" — Rot bleibt echten Blockern vorbehalten (doppelt gewählter Spieler, verletzter Spieler, der aktive Slot). Fatigue-Kosten zeigen bei einer leeren Liste \"0\" statt \"−0\", Rivalen-Teamnamen laufen seltener in \"Wicked ...\" ab, Attribut-Noten (z. B. \"SPE B\") tragen ihre Notenskala jetzt im Tooltip, und der Formplan-Karten-Deck-Hinweis erklärt in einer Zeile, was eine aktivierte Karte kostet und bewirkt.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

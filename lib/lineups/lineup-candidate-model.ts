@@ -379,7 +379,14 @@ export function buildCandidateAxisReasonChips(
     }
     const rating = rosterCard.attributeRatings?.[attribute.attribute] ?? null;
     const value = rosterCard.attributeStats?.[attribute.attribute] ?? null;
-    const detail = `${axisReasonLabels[axis]} ${rating ?? (value != null ? Math.round(value) : "—")} · Slot ${formatDecimalScore(attribute.weightPct, 0)}%`;
+    // S6/L3 (Audit Spieltag): die Attribut-Note (z. B. "B") stand bisher ohne jede
+    // Erklärung der Skala im Tooltip — man kann "B" nicht einordnen, ohne die Skala
+    // zu kennen. Die Buchstaben kommen 1:1 aus den importierten Spieler-Attributen
+    // (`attributeRatings`, s. `lib/data/playerAttributeSheet.ts`); die echten Werte
+    // im Datensatz reichen von S+ (beste Note) bis F (schwächste) — keine erfundene
+    // Skala, nur die vorhandenen Stufen einmal ausgeschrieben.
+    const ratingScaleHint = rating ? " (Notenskala S+ bis F, S+ am stärksten)" : "";
+    const detail = `${axisReasonLabels[axis]} ${rating ?? (value != null ? Math.round(value) : "—")}${ratingScaleHint} · Slot ${formatDecimalScore(attribute.weightPct, 0)}%`;
     const existing = axisMap.get(axis);
     if (!existing || attribute.weightPct > existing.weightPct) {
       axisMap.set(axis, {

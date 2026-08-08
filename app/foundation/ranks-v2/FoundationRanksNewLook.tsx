@@ -19,6 +19,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import type { FoundationRanksPanelProps } from "@/app/foundation/ranks-v2/FoundationRanksPanel";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
@@ -68,6 +69,7 @@ export default function FoundationRanksNewLook({
   sortedPpAreaRows,
   openTeamProfileById,
   ownTeamId,
+  previousSeasonPodium,
 }: FoundationRanksPanelProps) {
   const [metric, setMetric] = useState<NlRanksMetric>("total");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
@@ -109,6 +111,24 @@ export default function FoundationRanksNewLook({
   const isRowOwnTeam = useCallback(
     (row: NlRanksRow) => row.team.humanControlled || ownTeamIds.has(row.team.teamId),
     [ownTeamIds],
+  );
+
+  // Saisonstart-Leerzustand (Muster 3): stehen ALLE Teams bei 0 PPs, gibt es
+  // keine Wertung — eine "Rangliste" wäre nur das Alphabet (Gold/Silber/Bronze
+  // an A-A, B-P, B-B; "Dein Team: Rang 22 von 32" = Alphabet-Position). Statt
+  // dessen rendert das Board unten VeloPendingRanking + das echte
+  // Vorsaison-Podium. Erst wenn irgendein Team echte PPs trägt, erscheint die
+  // Rangliste. formBonus zählt bewusst mit: auch ein reiner Formkarten-Bonus
+  // ist ein echter, reihbarer Wert.
+  const boardIsPending = useMemo(
+    () =>
+      sortedPpAreaRows.length > 0 &&
+      sortedPpAreaRows.every(
+        (row) =>
+          NL_RANKS_METRICS.every((entry) => (row.pps[entry.id] ?? 0) === 0) &&
+          NL_RANKS_METRICS.every((entry) => (row.formBonus[entry.id] ?? 0) === 0),
+      ),
+    [sortedPpAreaRows],
   );
 
   const areaRadarMax = useMemo(() => {
@@ -213,22 +233,72 @@ export default function FoundationRanksNewLook({
         eyebrow="Saison-Ranking"
         title="PPs pro Bereich"
         actions={
-          <div className="nl-ranks-filterbar" role="group" aria-label="Bereich wählen">
-            {NL_RANKS_METRICS.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                className={`nl-ranks-filter ${nlToneClass(entry.tone)}${metric === entry.id ? " is-active" : ""}`}
-                onClick={() => setMetric(entry.id)}
-                aria-pressed={metric === entry.id}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
+          boardIsPending ? undefined : (
+            <div className="nl-ranks-filterbar" role="group" aria-label="Bereich wählen">
+              {NL_RANKS_METRICS.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={`nl-ranks-filter ${nlToneClass(entry.tone)}${metric === entry.id ? " is-active" : ""}`}
+                  onClick={() => setMetric(entry.id)}
+                  aria-pressed={metric === entry.id}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          )
         }
       >
-        {metricStats ? (
+        {boardIsPending ? (
+          <div className="nl-ranks-pending" data-testid="nl-ranks-pending">
+            <VeloPendingRanking
+              title="Noch zu vergeben"
+              note="Alle Teams stehen bei 0 PPs — PPs entstehen erst aus gespielten Wettbewerben. Ohne Werte wäre jede Reihenfolge hier nur das Alphabet, deshalb bleibt das Podest leer. Die Rangliste füllt sich mit dem ersten gewerteten Spieltag."
+              slots={[
+                { key: "gold", ring: "1.", label: "Noch zu vergeben" },
+                { key: "silver", ring: "2.", label: "Noch zu vergeben" },
+                { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
+              ]}
+              meta={`${formatNlNumber(sortedPpAreaRows.length, 0)} Teams gemeldet · POW, SPE, MEN und SOC starten alle bei 0`}
+              data-testid="nl-ranks-pending-ranking"
+            />
+            {previousSeasonPodium && previousSeasonPodium.entries.length > 0 ? (
+              <aside className="nl-ranks-prev-podium" data-testid="nl-ranks-prev-podium" aria-label={`Vorsaison-Podium ${previousSeasonPodium.seasonLabel}`}>
+                <span className="nl-ranks-prev-podium-eyebrow">Vorsaison · Endstand {previousSeasonPodium.seasonLabel}</span>
+                <ol className="nl-ranks-prev-podium-list">
+                  {previousSeasonPodium.entries.map((entry) => (
+                    <li key={entry.teamId} className="nl-ranks-prev-podium-row">
+                      <NlMedalBadge
+                        kind={entry.rank === 1 ? "gold" : entry.rank === 2 ? "silver" : "bronze"}
+                        title={`Endrang ${entry.rank} · ${previousSeasonPodium.seasonLabel}`}
+                      />
+                      <button
+                        type="button"
+                        className="nl-ranks-prev-podium-team"
+                        onClick={() => openTeamProfileById(entry.teamId)}
+                        title={`${entry.teamName} öffnen`}
+                      >
+                        <strong>{entry.teamName}</strong>
+                        <small>{entry.teamCode}</small>
+                      </button>
+                      <span className="nl-ranks-prev-podium-value nl-tnum">
+                        {entry.points != null
+                          ? `${formatNlNumber(entry.points, 0)} Punkte`
+                          : entry.rank === 1
+                            ? "Meister"
+                            : entry.rank === 2
+                              ? "Vize"
+                              : "Dritter"}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </aside>
+            ) : null}
+          </div>
+        ) : null}
+        {!boardIsPending && metricStats ? (
           <StatChipRow className="nl-ranks-statrow" aria-label={`Liga-Überblick ${activeMetric.label}`}>
             <StatChip
               label={`Liga Ø · ${activeMetric.label}`}
@@ -289,7 +359,7 @@ export default function FoundationRanksNewLook({
             ) : null}
           </StatChipRow>
         ) : null}
-        {metricBars.length > 0 ? (
+        {!boardIsPending && metricBars.length > 0 ? (
           <div className="nl-ranks-metric-chart-scroll">
             <NlBarChart
               bars={metricBars}
@@ -299,6 +369,7 @@ export default function FoundationRanksNewLook({
             />
           </div>
         ) : null}
+        {boardIsPending ? null : (
         <div className="nl-ranks-board-scroll">
         <ol className={`nl-ranks-board ${nlToneClass(activeMetric.tone)}`} aria-label={`Ranking ${activeMetric.label}`}>
           {rankedRows.map(({ row, displayRank }) => {
@@ -418,7 +489,10 @@ export default function FoundationRanksNewLook({
           })}
         </ol>
         </div>
-        {rankedRows.length === 0 ? <p className="nl-ranks-empty">Noch keine PP-Daten für diese Saison.</p> : null}
+        )}
+        {!boardIsPending && rankedRows.length === 0 ? (
+          <p className="nl-ranks-empty">Noch keine PP-Daten für diese Saison.</p>
+        ) : null}
       </NlCard>
 
       <NlRankingDrawer
