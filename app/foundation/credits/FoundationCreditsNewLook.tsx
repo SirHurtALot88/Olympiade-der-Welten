@@ -848,6 +848,12 @@ export default function FoundationCreditsNewLook({
   // #182: Liga-Kreditübersicht — welche Teams aktuell wie viel Kredit laufen
   // haben. Aggregiert aktive Kredite (`gameState.loans`) je Borrower-Team;
   // Rest reines Read-Modell, absteigend nach Restschuld sortiert.
+  /**
+   * Jeder einzelne Kredit der Liga — Quelle fuer die Detail-Tabelle weiter unten. Die Aufbereitung
+   * (Sortierung, Namen, „betrifft mich") steckt im View-Model, damit sie testbar bleibt.
+   */
+  const alleKredite = team?.leagueLoans ?? [];
+
   const leagueCreditRows = useMemo(() => {
     const loans = gameState.seasonState.loans ?? [];
     const byTeam = new Map<string, { outstanding: number; installment: number; count: number; missed: number }>();
@@ -1239,6 +1245,84 @@ export default function FoundationCreditsNewLook({
           </div>
         ) : (
           <NlEmptyState title="Aktuell hat kein Team einen laufenden Kredit." />
+        )}
+      </NlCard>
+
+      {/*
+        JEDER EINZELNE KREDIT DER LIGA.
+
+        CHRIS: „der spieler soll im kredite tab ALLE kredite sehen können mit allen infos die in der
+        liga aktiv oder abgelaufen sind … so dass man sehen kann welches team hat von welchem einen
+        kredit genommen, laufzeit raten usw."
+
+        Die Liste darueber fasst pro Team zusammen — man sieht WER Schulden hat, aber nicht BEI WEM
+        und zu welchen Konditionen. Genau das steht hier, inklusive der beendeten Kredite: eine
+        Historie, die verschwindet sobald sie interessant wird, ist keine.
+      */}
+      <NlCard
+        className="nl-credits-alle-card"
+        eyebrow="Liga"
+        title={`Alle Kredite · ${alleKredite.filter((row) => row.status === "active").length} laufend von ${alleKredite.length}`}
+      >
+        {alleKredite.length > 0 ? (
+          <div className="nl-credits-alle-wrap">
+            <table className="nl-credits-alle">
+              <thead>
+                <tr>
+                  <th scope="col">Schuldner</th>
+                  <th scope="col">Geldgeber</th>
+                  <th scope="col" className="nl-credits-alle-num">Summe</th>
+                  <th scope="col" className="nl-credits-alle-num">Offen</th>
+                  <th scope="col" className="nl-credits-alle-num">Zins</th>
+                  <th scope="col" className="nl-credits-alle-num">Laufzeit</th>
+                  <th scope="col" className="nl-credits-alle-num">Rate</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alleKredite.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={[
+                      "nl-credits-alle-row",
+                      row.involvesOwnTeam ? "is-own" : "",
+                      row.status === "active" ? "" : "is-done",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <td>
+                      {row.borrowerName}
+                      {row.involvesOwnTeam ? <span className="nl-credits-alle-du">du</span> : null}
+                    </td>
+                    <td>{row.lenderName}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{row.principal.toFixed(1)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{row.outstanding.toFixed(1)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{(row.interestRate * 100).toFixed(1)} %</td>
+                    <td className="nl-credits-alle-num nl-tnum">
+                      {row.status === "active"
+                        ? `${row.remainingSeasons}/${row.termSeasons}`
+                        : `${row.termSeasons}`}
+                    </td>
+                    <td className="nl-credits-alle-num nl-tnum">{row.installmentPerSeason.toFixed(1)}</td>
+                    <td>
+                      {row.status === "active" ? "laufend" : row.status === "defaulted" ? "geplatzt" : "beendet"}
+                      {row.missedPayments > 0 ? (
+                        <span className="nl-credits-alle-missed" title={`${row.missedPayments} verpasste Rate(n)`}>
+                          {row.missedPayments} verpasst
+                        </span>
+                      ) : null}
+                      {row.originatedSeasonId ? (
+                        <span className="nl-credits-alle-seit">seit {row.originatedSeasonId}</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <NlEmptyState title="In dieser Liga wurde noch kein Kredit aufgenommen." />
         )}
       </NlCard>
     </div>
