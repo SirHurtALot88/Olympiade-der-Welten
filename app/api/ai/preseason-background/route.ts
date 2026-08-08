@@ -6,8 +6,6 @@ import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-con
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { applyAiManagerPlan, type AiManagerAction, type AiManagerActionType } from "@/lib/ai/ai-manager-apply-service";
 import { applyAiInjuryDepthTopup } from "@/lib/ai/ai-injury-depth-topup-service";
-import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
-import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
@@ -379,63 +377,38 @@ async function executeAiPreseasonBackgroundWork(input: {
     // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung und
     // Messung oben beim ersten Pass). Er laeuft vor dem Fuell-Lauf, damit das Geld noch wirkt.
     kreditPass();
-    /**
-     * KADER AUFS OPTIMUM FUELLEN — mit demselben Dienst, der das in Saison 1 tut.
+    /*
+     * FUELL-LAUF ABGESCHALTET — der organische Planer pickt.
      *
-     * GEMELDET: „wieso ist die Logik nicht wie beim kaufen in season 1? da haben wir doch auch
-     * teils teams die 10 oder 12 spieler haben?" und „schau dass kein team was das geld hat nur
-     * auf minimum geht"
+     * CHRIS: „schau mal die neuen spieler bei N-N sind alles so filler" und, als ich ihn nur
+     * begrenzen wollte: „Du sollst auf den Organic Lauf umschalten und der soll picken" /
+     * „keine filler mehr! VERBOT".
      *
-     * Der Kommentar ueber dem Saison-Markt-Zweig sagt „Kader existieren bereits". Seit die
-     * Verkaeufe an das Saisonende gewandert sind, stimmt das nicht mehr: die Teams stehen beim
-     * Saisonstart bei 3 bis 7 Spielern. Saison 1 BAUT Kader auf (`runAiPicksExecutePreview`),
-     * der Marktplan PFLEGT sie nur — fuer einen leergeraeumten Kader ist Pflege das falsche
-     * Werkzeug.
+     * BEFUND: `scoreRosterFillCandidate` hat KEINEN Qualitaetsterm. `valueScore` belohnt ein
+     * gutes Marktwert-Gehalt-Verhaeltnis, `pricePenalty` bestraft teure Spieler — ein 9-Mio-
+     * Fueller schlaegt damit einen 40-Mio-Star. In Chris' Liga, Saison 2:
      *
-     * Am Klon von Chris' Spielstand gemessen, jeweils nach dem Saisonwechsel (Kader 234,
-     * kleinster 3, 20 Teams unter Minimum, 30 unter Optimum):
+     *     ai_preseason_market_buy (organisch)  33 Kaeufe, 1013.8 Mio,  0 unter 12 Mio
+     *     ai_roster_fill (Fuell-Lauf)          74 Kaeufe,  826.9 Mio, 52 unter 12 Mio
      *
-     *   nur Marktplan, VIER Laeufe : Kader 314, kleinster 5, 6 unter Minimum, 13 unter Optimum
-     *   Fuell-Dienst, EIN Lauf     : Kader 350, kleinster 8, 0 unter Minimum,  1 unter Optimum
+     * N-N stand danach mit drei ordentlichen Spielern aus dem Erst-Draft und sechs Zugaengen
+     * dieses Laufs da, fuenf davon unter 10 Mio — bei 98.4 Mio Cash auf dem Konto.
      *
-     * `auto-roster-fill-service` zielt auf `teamIdentity.playerOpt` (dort Zeile 205-209), macht
-     * einen Minimum- und danach einen Optimum-Durchgang und hat KEIN Saison-Gate — er lief in
-     * Saison 2 nur nie. Genau das wird hier nachgeholt.
+     * Der Lauf kam in #446 herein, weil der Marktplan damals zu wenig kaufte (gemessen: nur
+     * Marktplan 314 Spieler, mit Fuell-Lauf 350). Diese Begruendung ist weg. Nach den
+     * Engine-Reparaturen (Blatt-Opt als Untergrenze, Kredit gegen Kaufplan, Qualitaets-Pyramide)
+     * schafft der organische Planer den Kader ALLEIN. Am selben Ausgangszustand gemessen:
      *
-     * Er laeuft NACH dem Markt, nicht statt seiner: der Markt macht die strategisch begruendeten
-     * Zugaenge, der Fuell-Lauf schliesst danach die Luecke bis zum Optimum. Wie viel er kauft,
-     * entscheidet weiterhin das Geld — `target_unreachable_cash` ist ein regulaeres Ergebnis.
+     *     mit Fuell-Lauf   Kader 343, unter Min 1, unter Opt 5, 109 Kaeufe, stark/mittel/schwach 49/44/16
+     *     ohne Fuell-Lauf  Kader 342, unter Min 1, unter Opt 5, 108 Kaeufe, stark/mittel/schwach 49/44/15
+     *
+     * Der Unterschied ist EIN Spieler — ein schwacher fuer 8.4 Mio. Dafuer schleppte der Lauf in
+     * der Praxis dutzende Fueller ein, sobald der Markt mehr Luecken liess.
+     *
+     * Der Dienst selbst bleibt bestehen: Saison 1 baut damit die Kader auf, und
+     * `app/api/ai/roster-fill` bleibt als ausdruecklicher Handgriff erhalten. Nur aus der
+     * automatischen Preseason-Kette ist er raus.
      */
-    const rosterFill = await runAutoRosterFillForMatchdaySetup(
-      {
-        source: "sqlite",
-        saveId,
-        seasonId,
-        dryRun: false,
-        confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
-        /**
-         * GEMELDET: „S-C hat gekauft. das ist MEIN TEAM. Wie kann das passieren dass die AI da
-         * wieder für kauft."
-         *
-         * Am Spielstand nachgemessen: drei Zugaenge fuer S-C mit `source=ai_roster_fill`. Der
-         * Fuell-Dienst laeuft ohne Einschraenkung ueber ALLE Teams des Spielstands — genau davor
-         * warnt sein eigener Parameter-Kommentar („that was the S6 bug for this path",
-         * `auto-roster-fill-service.ts:129`). Beim Verdrahten in #446 wurde die Einschraenkung
-         * schlicht nicht mitgegeben; die anderen Schritte dieses Laufs haben sie alle
-         * (`teamScope: "ai"`, `teamIds: aiTeamIds`).
-         *
-         * `aiTeamIds` ist die bereits gefilterte Liste: `getAiTeamIds` nimmt nur Teams mit
-         * `controlMode === "ai"`, zieht `getProtectedHumanTeamIds` ab und schneidet zusaetzlich
-         * mit den im Raum beschreibbaren Teams. Genau die darf der Fuell-Lauf anfassen.
-         */
-        callerWritableTeamIds: aiTeamIds,
-      },
-      persistence,
-    );
-    const rosterFillFilled = rosterFill.teams.filter(
-      (team) => team.status === "filled" || team.status === "partially_filled",
-    ).length;
-
     // Owner request: after a season with too many injuries, an AI team should buy one or two
     // cheap depth players. Runs AFTER the regular market pipeline above (so it only tops up
     // whatever that pipeline already did) and is scoped to the same AI-only `aiTeamIds` — see
@@ -505,13 +478,12 @@ async function executeAiPreseasonBackgroundWork(input: {
       aiTeamsCompleted: completedTeams,
       managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
       transferBuysApplied:
-        market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal + rosterFill.summary.appliedBuys,
+        market.summary.appliedBuys + injuryDepthTopup.playersBoughtTotal,
       transferSellsApplied: market.summary.appliedSells,
       warnings: [
         ...managerResult.warnings,
         ...market.warnings,
         ...injuryDepthTopup.warnings,
-        `roster_fill_auf_optimum:${rosterFillFilled}/${rosterFill.teams.length}`,
         ...kreditNotizen,
         ...snapshotPatchNotiz,
       ],

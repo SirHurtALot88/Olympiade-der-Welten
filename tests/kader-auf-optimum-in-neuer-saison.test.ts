@@ -1,27 +1,29 @@
 /**
- * GEMELDET: „passt nicht sind immernoch 6 teams unter 8 und man soll sich ja eher an opt
- * orientieren", danach „wenn c-c gerne 13 leute hätte wären 11 auch noch ok aber auf minimum zu
- * gehen ist scheiße! … schau dass kein team was das geld hat nur auf minimum geht!!!" und
- * schliesslich die Frage, die den Fix vorgibt: „wieso ist die Logik nicht wie beim kaufen in
- * season 1? da haben wir doch auch teils teams die 10 oder 12 spieler haben?"
+ * GEMELDET: „schau mal die neuen spieler bei N-N sind alles so filler, wir müssen die noch mal
+ * raus nehmen im save und dann auch den korrekten lauf einmal durch laufen lassen organic picking
+ * sonst haben alle teams so trash picks drin!" — und, als ich den Fuell-Lauf nur begrenzen wollte:
+ * „Du sollst auf den Organic Lauf umschalten und der soll picken" / „keine filler mehr! VERBOT".
  *
- * BEFUND: es gibt ZWEI Werkzeuge, und in der Folgesaison lief das falsche.
+ * BEFUND: `scoreRosterFillCandidate` hat KEINEN Qualitaetsterm. `valueScore` belohnt ein gutes
+ * Marktwert-Gehalt-Verhaeltnis, `pricePenalty` bestraft teure Spieler — ein 9-Mio-Fueller schlaegt
+ * damit einen 40-Mio-Star. In Chris' Liga, Saison 2:
  *
- *   - `auto-roster-fill-service` BAUT Kader auf. Er zielt auf `teamIdentity.playerOpt`
- *     (`resolveTargetRoster`, dort Zeile 205-209), macht erst einen Minimum- und danach einen
- *     Optimum-Durchgang. Kein Saison-Gate — er wurde in Saison 2+ schlicht nie aufgerufen.
- *   - `applyAiMarketPlanLocally` PFLEGT Kader. Seine Schrittzahl kommt aus
- *     `resolveUnifiedMarketPickSteps` und ist am Bedarf bis zum MINIMUM aufgehaengt.
+ *     ai_preseason_market_buy (organisch)  33 Kaeufe, 1013.8 Mio,  0 unter 12 Mio
+ *     ai_roster_fill (Fuell-Lauf)          74 Kaeufe,  826.9 Mio, 52 unter 12 Mio
  *
- * Seit die Verkaeufe ans Saisonende gewandert sind (#445), stehen die Teams beim Saisonstart bei
- * 3 bis 7 Spielern. Fuer einen leergeraeumten Kader ist Pflege das falsche Werkzeug — genau das
- * war der Grund, warum Teams auf dem Minimum haengen blieben.
+ * N-N stand mit drei ordentlichen Spielern aus dem Erst-Draft und sechs Zugaengen des Fuell-Laufs
+ * da, fuenf davon unter 10 Mio — bei 98.4 Mio Cash auf dem Konto.
  *
- * Am Klon von Chris' Spielstand gemessen, jeweils ab demselben Zustand nach dem Saisonwechsel
- * (Kader 234, kleinster 3, 20 Teams unter Minimum, 30 unter Optimum):
+ * Diese Datei sicherte frueher die GEGENTEILIGE Zusicherung ab: dass der Fuell-Lauf im Kauffenster
+ * laeuft (#446). Seine Begruendung war, dass der Marktplan damals zu wenig kaufte — gemessen 314
+ * gegen 350 Spieler. Nach den Engine-Reparaturen (Blatt-Opt als Untergrenze, Kredit gegen
+ * Kaufplan, Qualitaets-Pyramide) stimmt das nicht mehr. Am selben Ausgangszustand gemessen:
  *
- *   nur Marktplan, VIER Laeufe : Kader 314, kleinster 5, 6 unter Minimum, 13 unter Optimum
- *   Fuell-Dienst, EIN Lauf     : Kader 350, kleinster 8, 0 unter Minimum,  1 unter Optimum
+ *     mit Fuell-Lauf   Kader 343, unter Min 1, unter Opt 5, 109 Kaeufe, stark/mittel/schwach 49/44/16
+ *     ohne Fuell-Lauf  Kader 342, unter Min 1, unter Opt 5, 108 Kaeufe, stark/mittel/schwach 49/44/15
+ *
+ * Ein Spieler Unterschied, ein schwacher fuer 8.4 Mio. N-N bekommt ohne den Lauf stattdessen
+ * Nevara 44.7, Nachtschatten 25.7, Akali 21.5 und Titania 20.8 — und gibt sein Geld aus (98.4 -> 12.1).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -139,7 +141,7 @@ function baueRequest() {
 
 type Lauf = { transferBuysApplied: number; warnings: string[] };
 
-describe("Kauffenster der neuen Saison: der Kader wird bis zum Optimum gefuellt", () => {
+describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-Lauf", () => {
   beforeEach(() => {
     applyAiMarketPlanLocally.mockReset();
     applyAiManagerPlan.mockReset();
@@ -155,61 +157,28 @@ describe("Kauffenster der neuen Saison: der Kader wird bis zum Optimum gefuellt"
       warnings: [],
       blockingReasons: [],
     });
-    runAutoRosterFillForMatchdaySetup.mockResolvedValue({
-      summary: { appliedBuys: 4 },
-      teams: [
-        { teamId: "C-C", status: "filled" },
-        { teamId: "D-L", status: "partially_filled" },
-        { teamId: "A-A", status: "target_unreachable_cash" },
-      ],
-    });
   });
 
-  it("laeuft im Kauffenster — und zwar NACH dem Marktlauf", async () => {
+  it("ruft den Fuell-Lauf NICHT mehr auf", async () => {
     store.gameState = baueGameState("season_active");
 
     const { POST } = await import("@/app/api/ai/preseason-background/route");
     const response = await POST(baueRequest());
     expect(response.status).toBe(200);
 
-    expect(runAutoRosterFillForMatchdaySetup).toHaveBeenCalledTimes(1);
-    // Reihenfolge ist keine Geschmacksfrage: der Markt macht die strategisch begruendeten
-    // Zugaenge, der Fuell-Lauf schliesst danach die verbliebene Luecke bis zum Optimum. Umgekehrt
-    // wuerde der Markt auf einen bereits vollen Kader treffen und nichts mehr beitragen.
-    expect(applyAiMarketPlanLocally.mock.invocationCallOrder[0]).toBeLessThan(
-      runAutoRosterFillForMatchdaySetup.mock.invocationCallOrder[0]!,
-    );
+    // Der Kern des Verbots: in der automatischen Kette darf dieser Dienst gar nicht mehr vorkommen.
+    expect(runAutoRosterFillForMatchdaySetup).not.toHaveBeenCalled();
   });
 
-  it("schreibt wirklich (kein Trockenlauf) und weist sich als bestaetigt aus", async () => {
-    store.gameState = baueGameState("season_active");
-
-    const { POST } = await import("@/app/api/ai/preseason-background/route");
-    await POST(baueRequest());
-
-    const aufruf = runAutoRosterFillForMatchdaySetup.mock.calls[0]![0] as {
-      dryRun?: boolean;
-      confirmToken?: string;
-      saveId?: string;
-      seasonId?: string;
-    };
-    // Ein Trockenlauf haette denselben Bericht geliefert und nichts gekauft — der Kader waere
-    // weiterhin auf Minimum geblieben, nur mit beruhigender Zusammenfassung.
-    expect(aufruf.dryRun).toBe(false);
-    expect(aufruf.confirmToken).toBeTruthy();
-    expect(aufruf.saveId).toBe("save-local");
-    expect(aufruf.seasonId).toBe("season-2");
-  });
-
-  it("zaehlt die Fuell-Kaeufe im Lauf-Protokoll mit", async () => {
+  it("der Marktlauf laeuft weiterhin und zaehlt seine Kaeufe", async () => {
     store.gameState = baueGameState("season_active");
 
     const { POST } = await import("@/app/api/ai/preseason-background/route");
     const payload = (await (await POST(baueRequest())).json()) as { run: Lauf };
 
-    // 1 aus dem Marktlauf + 0 aus dem Verletzungs-Topup + 4 aus der Fuellung.
-    expect(payload.run.transferBuysApplied).toBe(5);
-    expect(payload.run.warnings).toContain("roster_fill_auf_optimum:2/3");
+    // 1 aus dem Marktlauf + 0 aus dem Verletzungs-Topup. Der frueher addierte Fuell-Anteil ist weg.
+    expect(payload.run.transferBuysApplied).toBe(1);
+    expect(payload.run.warnings.some((eintrag) => eintrag.startsWith("roster_fill_auf_optimum:"))).toBe(false);
   });
 
   it("laeuft NICHT, solange der Spielstand in der Saisonende-Kette steht", async () => {
@@ -218,60 +187,23 @@ describe("Kauffenster der neuen Saison: der Kader wird bis zum Optimum gefuellt"
     const { POST } = await import("@/app/api/ai/preseason-background/route");
     const payload = (await (await POST(baueRequest())).json()) as { skipped: boolean };
 
-    // Am Saisonende wird nur verkauft. Ein Fuell-Lauf dort wuerde genau die Spieler zurueckkaufen,
-    // die der Verkaufsschritt eben erst abgegeben hat.
+    // Am Saisonende wird nur verkauft — daran aendert der Wegfall des Fuell-Laufs nichts.
     expect(payload.skipped).toBe(true);
-    expect(runAutoRosterFillForMatchdaySetup).not.toHaveBeenCalled();
   });
 
-  it("der gerufene Dienst zielt tatsaechlich auf das Optimum, nicht auf das Minimum", () => {
-    // Gegenprobe zum ganzen Fix: wuerde `auto-roster-fill-service` selbst nur bis zum Minimum
-    // fuellen, waere die Verdrahtung wirkungslos — dann haetten wir denselben Zustand mit einem
-    // zweiten Dienst davor.
-    const quelle = readFileSync(join(process.cwd(), "lib/ai/auto-roster-fill-service.ts"), "utf8");
-    expect(quelle).toContain("teamIdentity.playerOpt");
-    expect(quelle).toContain("team_identity_player_opt");
-  });
-});
-
-/**
- * GEMELDET: „S-C hat gekauft. das ist MEIN TEAM. Wie kann das passieren dass die AI da wieder für
- * kauft. dachte du hast das sauber repariert."
- *
- * BEFUND, am echten Spielstand: drei Zugaenge fuer S-C in Saison 2, alle mit
- * `source=ai_roster_fill` — 15.09 + 10.30 + 9.13 = 34.52 Mio. S-C steht in
- * `teamControlSettings` auf `controlMode: "manual"`.
- *
- * URSACHE: der Fuell-Dienst laeuft ohne Einschraenkung ueber ALLE Teams. Sein eigener
- * Parameter-Kommentar warnt davor (`auto-roster-fill-service.ts:129`: „that was the S6 bug for this
- * path") und bietet `callerWritableTeamIds` genau dagegen an — beim Verdrahten in #446 wurde der
- * Parameter nicht mitgegeben. Jeder andere Schritt desselben Laufs hat seine Einschraenkung.
- */
-describe("Fuell-Lauf fasst manuell gefuehrte Teams nicht an", () => {
-  it("bekommt die KI-Teamliste als Schreibgrenze mit", async () => {
-    store.gameState = baueGameState("season_active");
-
-    const { POST } = await import("@/app/api/ai/preseason-background/route");
-    await POST(baueRequest());
-
-    const aufruf = runAutoRosterFillForMatchdaySetup.mock.calls[0]![0] as {
-      callerWritableTeamIds?: string[] | null;
-    };
-    // Ohne diese Liste kauft der Dienst fuer JEDES Team im Spielstand, auch fuer Chris' eigenes.
-    expect(Array.isArray(aufruf.callerWritableTeamIds)).toBe(true);
-    expect(aufruf.callerWritableTeamIds).toEqual(["C-C"]);
+  it("die Preseason-Route bindet den Fuell-Dienst nicht mehr ein", () => {
+    // Gegenprobe auf Quelltext-Ebene: solange der Import dasteht, kann ihn jemand versehentlich
+    // wieder aufrufen, ohne dass ein Test darueber stolpert.
+    const quelle = readFileSync(join(process.cwd(), "app/api/ai/preseason-background/route.ts"), "utf8");
+    expect(quelle).not.toContain("runAutoRosterFillForMatchdaySetup");
   });
 
-  it("die Grenze ist dieselbe Liste, die auch Markt und Manager-Plan benutzen", async () => {
-    store.gameState = baueGameState("season_active");
-
-    const { POST } = await import("@/app/api/ai/preseason-background/route");
-    await POST(baueRequest());
-
-    // Eine zweite, eigene Teamliste waere genau die Sorte Doppelpflege, an der es schon einmal
-    // gescheitert ist — beide muessen aus `getAiTeamIds` kommen.
-    const fuell = runAutoRosterFillForMatchdaySetup.mock.calls[0]![0] as { callerWritableTeamIds?: string[] | null };
-    const manager = applyAiManagerPlan.mock.calls[0]![0] as { teamIds?: string[] };
-    expect(fuell.callerWritableTeamIds).toEqual(manager.teamIds);
+  it("der Fuell-Dienst selbst bleibt erhalten — Saison 1 und der Handgriff brauchen ihn", () => {
+    // Abgeschaltet ist die automatische Kette, nicht das Werkzeug. Saison 1 BAUT damit die Kader
+    // auf, und `app/api/ai/roster-fill` bleibt als ausdruecklicher Aufruf bestehen.
+    const dienst = readFileSync(join(process.cwd(), "lib/ai/auto-roster-fill-service.ts"), "utf8");
+    expect(dienst).toContain("export async function runAutoRosterFillForMatchdaySetup");
+    const route = readFileSync(join(process.cwd(), "app/api/ai/roster-fill/route.ts"), "utf8");
+    expect(route).toContain("runAutoRosterFillForMatchdaySetup");
   });
 });

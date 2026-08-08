@@ -1,3 +1,37 @@
+/**
+ * ============================================================================================
+ *  VERBOTEN AB SAISON 2 — ES WIRD NUR NOCH ORGANISCH GEPICKT.
+ * ============================================================================================
+ *
+ * CHRIS: „keine filler mehr! VERBOT" · „Du sollst auf den Organic Lauf umschalten und der soll
+ * picken" · „bitte füll lauf deaktivieren und remark machen dass der verboten ist! wir picken nur
+ * noch organic!"
+ *
+ * WARUM: `scoreRosterFillCandidate` (weiter unten) hat KEINEN Qualitaetsterm. `valueScore`
+ * belohnt ein gutes Marktwert-Gehalt-Verhaeltnis, `pricePenalty` bestraft teure Spieler — ein
+ * 9-Mio-Fueller schlaegt damit einen 40-Mio-Star. Am Live-Spielstand gemessen, Saison 2:
+ *
+ *     ai_preseason_market_buy (organisch)  33 Kaeufe, 1013.8 Mio,  0 unter 12 Mio
+ *     ai_roster_fill (dieser Dienst)       74 Kaeufe,  826.9 Mio, 52 unter 12 Mio
+ *
+ * N-N stand danach mit drei ordentlichen Spielern aus dem Erst-Draft und sechs Zugaengen dieses
+ * Dienstes da, fuenf davon unter 10 Mio — bei 98.4 Mio Cash auf dem Konto.
+ *
+ * WOFUER ER NOCH DA IST: Saison 1. Dort BAUT er die Kader ueberhaupt erst auf, und dort ist er
+ * unbestritten richtig. Ab Saison 2 lehnt `runAutoRosterFillForMatchdaySetup` jeden Aufruf ab —
+ * die Sperre steht IM DIENST, nicht nur beim Aufrufer, damit sie nicht durch einen neuen Aufruf
+ * umgangen werden kann.
+ *
+ * WER STATTDESSEN KAUFT: der organische Planer (`ai-transfer-window-session-service` ->
+ * `planOrganicDraftForTeam`, Quelle `ai_organic_squad_buy` / `ai_preseason_market_buy`). Gemessen
+ * am selben Ausgangszustand erreicht er dieselbe Kadergroesse ohne diesen Dienst:
+ *
+ *     mit Fuell-Lauf   Kader 343, unter Opt 5, stark/mittel/schwach 49/44/16
+ *     ohne Fuell-Lauf  Kader 342, unter Opt 5, stark/mittel/schwach 49/44/15
+ *
+ * WENN DU DIESE SPERRE AUFHEBEN WILLST: dann nicht hier, sondern indem der Dienst eine
+ * Qualitaetsschwelle bekommt. Ohne die kauft er wieder Ramsch — das ist gemessen, nicht vermutet.
+ */
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import type { GameState, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
@@ -393,6 +427,62 @@ function buildRosterFillCandidates(input: {
   };
 }
 
+/**
+ * DIE SPERRE. Siehe die Begruendung im Kopf dieser Datei.
+ *
+ * Kein Wurf, sondern ein leeres Ergebnis mit klarem Grund: der Dienst hat mehrere Aufrufer
+ * (Preseason-Kette, Admin-Route, Skripte). Eine Ausnahme wuerde einen laufenden Saisonstart
+ * mittendrin abbrechen; ein leeres Ergebnis laesst die Kette sauber weiterlaufen und sagt
+ * trotzdem unmissverstaendlich, dass hier nichts gekauft wurde und warum.
+ */
+function baueGesperrtesErgebnis(input: {
+  saveId: string;
+  seasonId: string;
+  dryRun: boolean;
+  teamCount: number;
+  saveName: string | null;
+  requestedSeasonId: string | null;
+}): AutoRosterFillResult {
+  return {
+    source: "sqlite",
+    readOnly: true,
+    dryRun: input.dryRun,
+    executed: false,
+    status: "blocked",
+    scope: { saveId: input.saveId, seasonId: input.seasonId, mode: "fill_all_teams_to_target_for_matchday_setup" },
+    saveContext: {
+      source: "sqlite",
+      requestedSaveId: input.saveId,
+      resolvedSaveId: input.saveId,
+      requestedSeasonId: input.requestedSeasonId,
+      resolvedSeasonId: input.seasonId,
+      saveName: input.saveName,
+      saveStatus: null,
+      scopeWarning: null,
+    },
+    summary: {
+      totalTeams: input.teamCount,
+      targetResolvedTeams: 0,
+      missingTargetTeams: 0,
+      teamsNeedingBuys: 0,
+      alreadyAtTargetTeams: 0,
+      filledTeams: 0,
+      partialTeams: 0,
+      blockedTeams: 0,
+      plannedBuys: 0,
+      appliedBuys: 0,
+      historyWrites: 0,
+    },
+    teams: [],
+    warnings: [
+      "fuell_lauf_ab_saison_2_verboten: es wird nur noch organisch gepickt " +
+        "(ai_transfer_window_session -> planOrganicDraftForTeam)",
+    ],
+    blockingReasons: ["roster_fill_nur_in_season_1_erlaubt"],
+    skippedTeamIds: [],
+  };
+}
+
 export async function runAutoRosterFillForMatchdaySetup(
   input: AutoRosterFillParams,
   persistence: PersistenceService = createPersistenceService(),
@@ -406,11 +496,37 @@ export async function runAutoRosterFillForMatchdaySetup(
     throw new Error("Roster fill execute requires explicit confirm token.");
   }
 
+  // Die Sperre steht ganz vorn — vor dem Laden des Spielstands, damit ein verbotener Aufruf gar
+  // nicht erst Arbeit ausloest. Nur wenn der Aufrufer keine Saison nennt, muss der Save gelesen
+  // werden (die zweite Pruefung weiter unten).
+  const angefragteSaison = input.seasonId?.trim() || null;
+  if (angefragteSaison != null && angefragteSaison !== "season-1") {
+    return baueGesperrtesErgebnis({
+      saveId: input.saveId,
+      seasonId: angefragteSaison,
+      dryRun,
+      teamCount: 0,
+      saveName: null,
+      requestedSeasonId: angefragteSaison,
+    });
+  }
+
   const save = resolveStrictLocalSave(persistence, input.saveId);
   const seasonId = input.seasonId?.trim() || save.gameState.season.id;
   if (seasonId !== save.gameState.season.id) {
     throw new Error(`Requested season ${seasonId} is not available in save ${save.saveId}.`);
   }
+  if (seasonId !== "season-1") {
+    return baueGesperrtesErgebnis({
+      saveId: save.saveId,
+      seasonId,
+      dryRun,
+      teamCount: save.gameState.teams.length,
+      saveName: save.name ?? null,
+      requestedSeasonId: input.seasonId ?? null,
+    });
+  }
+
 
   // One in-memory run context for the ENTIRE fill: every buy accumulates here (deferPersist) and we persist
   // ONCE at the very end. All per-team reads come from this context's live gameState instead of
