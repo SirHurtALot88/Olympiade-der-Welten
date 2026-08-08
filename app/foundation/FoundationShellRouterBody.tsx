@@ -164,6 +164,7 @@ import type {
   FoundationCommandItem,
   FoundationFlowCoachAction,
   FoundationFlowLoopStage,
+  PreSeasonWorkflowStepSummaryResponse,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { FoundationWarningInboxItem } from "@/lib/foundation/tabs/use-foundation-cross-tab-game-flow";
 import type { useFoundationCrossTabSeasonBriefing } from "@/lib/foundation/tabs/use-foundation-cross-tab-season-briefing";
@@ -2796,6 +2797,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenDevelopment={() => setFoundationView("trainingCompact", setActiveView, { push: true })}
               onOpenRoster={() => setFoundationView("teams", setActiveView, { push: true })}
               onOpenTransferWindow={() => void runSeasonTransition("open_transfer_window")}
+              /* Ohne diese vier Zeilen ist jede Ablehnung des Servers auf dieser Seite
+                 unsichtbar — der Knopf tut dann scheinbar nichts. Siehe die Prop-Doku im
+                 Panel. */
+              workflowError={preSeasonWorkflowError}
+              workflowBlockingReasons={preSeasonWorkflowFeed?.blockingReasons ?? []}
+              sponsorChoicePending={Number(
+                preSeasonWorkflowFeed?.steps?.find(
+                  (step: PreSeasonWorkflowStepSummaryResponse) => step.stepId === "sponsor_choice",
+                )?.summary?.manualPending ?? 0,
+              )}
+              onOpenSponsors={() => openPrizeFinanceView()}
             />
           ) : null}
 

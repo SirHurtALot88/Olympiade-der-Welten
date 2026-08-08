@@ -20,6 +20,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
+import { isLegacySeasonCompletedFlagSet } from "@/lib/season/season-completion-state";
 
 export type GameFlowPhase =
   | "preseason"
@@ -97,7 +98,7 @@ function derivePreseasonPhase(gameState: GameState): GameFlowPhase | null {
   if (gamePhase === "season_completed" || gamePhase === "season_review") return "season_review";
   if (gamePhase === "season_rewards" || gamePhase === "player_development") return "season_end";
   if (
-    gamePhase === "preseason_management" ||
+    gamePhase === "season_end_management" ||
     gamePhase === "transfer_sell_phase" ||
     gamePhase === "transfer_buy_phase" ||
     gamePhase === "lineup_setup" ||
@@ -920,7 +921,7 @@ const SEASON_BRIEFING_END_GAME_PHASES = new Set<GamePhase>([
 ]);
 
 const SEASON_BRIEFING_PRESEASON_GAME_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",
@@ -935,7 +936,7 @@ export function shouldAutoOpenSeasonBriefing(
     return false;
   }
 
-  if (gameState.season.isCompleted === true) {
+  if (isLegacySeasonCompletedFlagSet(gameState)) {
     return false;
   }
 

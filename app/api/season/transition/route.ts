@@ -70,7 +70,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const summary = dryRun
+    // `advance_step` ist seit der KI-Verkaufs-Verdrahtung asynchron (der Schritt „Verkaeufe" laesst
+    // die Transferfenster-Sitzung laufen). Das `await` steht vor dem ganzen Ausdruck, damit die
+    // uebrigen, weiterhin synchronen Zweige unveraendert bleiben — `await` auf einen Nicht-Promise
+    // reicht ihn unveraendert durch.
+    const summary = await (dryRun
       ? buildSeasonTransitionPreview(save)
       : body.action === "start_transition"
         ? startSeasonTransition(save, persistence)
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
           ? advanceSeasonTransitionStep(save, persistence)
           : body.action === "open_transfer_window"
             ? advanceSeasonTransitionToTransferWindow(save, persistence)
-            : buildSeasonTransitionPreview(save);
+            : buildSeasonTransitionPreview(save));
     const success = "applied" in summary ? Boolean(summary.applied) : summary.ok;
     notifyRoomGameplayWrite(writeAuth, {
       saveId,

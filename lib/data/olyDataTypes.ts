@@ -24,6 +24,13 @@ export type GamePhase =
   | "season_review"
   | "season_rewards"
   | "player_development"
+  // Die Station des SAISONENDES (Training/Ziele, nach der Spielerentwicklung). Hiess bis 0.4.11
+  // ebenfalls `preseason_management` — derselbe Name wie der frische Spielaufbau, obwohl es der
+  // gegenteilige Zeitpunkt ist. Aus dieser Doppeldeutigkeit sind zwei Fehler entstanden (der
+  // Setup-Draft feuerte am Saisonende erneut, Client wie Server). Deshalb ein eigener Name.
+  | "season_end_management"
+  // Nur noch der FRISCHE Aufbau vor dem allerersten Spieltag. Neue Spiele legt
+  // `new-game-setup-service` in `season_active` an; diese Phase tragen nur noch Altstaende.
   | "preseason_management"
   | "transfer_sell_phase"
   | "transfer_buy_phase"
@@ -56,6 +63,15 @@ export type SeasonTransitionState = {
    * beim Saisonstart ein zweites Mal laeuft.
    */
   progressionAppliedForSeasonId?: string | null;
+  /**
+   * Saison-Id, fuer die die KI-Verkaeufe des Saisonendes bereits gelaufen sind.
+   *
+   * Derselbe Zweck wie `progressionAppliedForSeasonId` eine Zeile darueber, und aus demselben
+   * Grund noetig: der Schritt „Verkaeufe" schreibt jetzt selbst, also muss er sich merken, dass er
+   * fertig ist. Ohne den Marker verkauft die KI bei jedem erneuten Durchlauf der Station ein
+   * weiteres Mal Spieler — und ein Klick zurueck und wieder vor wuerde Kader leerraeumen.
+   */
+  aiSeasonEndSellsAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =
@@ -1047,6 +1063,23 @@ export type TeamControlSettings = {
   aiTransferAutoApplyEnabled: boolean;
   aiSellPreviewEnabled: boolean;
   aiSellAutoApplyEnabled: boolean;
+  /**
+   * KREDIT-BUDGET, das dieses Team anderen Teams zur Verfuegung stellt (Mio).
+   *
+   * CHRIS: „wie kann man als spieler kredite an AI Teams anbieten? die picken ja direkt ihre
+   * spieler das heißt wenn ich z.B. C-C spiele wäre es gut wenn das geht, die sollen damit ihr geld
+   * verdienen! … sonst muss es eine möglichkeit geben, ein budget für kredite vorab festzulegen an
+   * dem andere teams sich bedienen können."
+   *
+   * Nur fuer von Hand gefuehrte Teams von Belang: KI-Teams entscheiden selbst und stellen ihr Geld
+   * ohnehin zur Verfuegung. Fuer ein manuell gefuehrtes Team ist ein Team-Kredit dagegen eine
+   * Entscheidung ueber das Geld des Spielers — ohne gesetztes Budget taucht es gar nicht erst als
+   * Geldgeber auf. `null`/`0` heisst also „verleihe nichts"; das ist der Startwert.
+   *
+   * Gegenzaehler ist die bereits verliehene Summe: es kann nie mehr als dieses Budget gleichzeitig
+   * draussen sein.
+   */
+  lendingBudget?: number | null;
   notes?: string | null;
   strategyLock?: string | null;
 };
@@ -2267,6 +2300,22 @@ export type SeasonSnapshotTeamRecord = {
     soc: number | null;
   };
   cashEnd: number | null;
+  /**
+   * DER KONTOSTAND, MIT DEM DAS TEAM IN DIE NAECHSTE SAISON GEHT — eingefroren am Saisonstart,
+   * NACH Kaeufen, Kaderfuellung und Krediten.
+   *
+   * CHRIS' REGEL: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison
+   * nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+   *
+   * Warum ein EIGENES Feld statt `cashEnd` zu ueberschreiben: `cashEnd` ist der wahre
+   * Saison-Endstand (nach Sponsoren, vor dem Transferfenster) und die Bezugsgroesse des
+   * Abgleichs in `getSnapshotCashByTeam`. Wird er mit dem Stand nach den Kaeufen ueberschrieben,
+   * rechnet der Abgleich die Preseason-Ausgaben doppelt und meldet ein falsches
+   * `cash_reconciliation_delta_hard` — genau der Grund, aus dem
+   * `buildTeamEntryEconomyFromGameState` das Feld bisher gar nicht anfasste. Die Ansichten lesen
+   * jetzt `cashEntry` zuerst und fallen auf `cashEnd` zurueck, wo es fehlt (Altsaves).
+   */
+  cashEntry?: number | null;
   /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
   rosterEndPostSell?: number | null;
   rosterEnd: number;

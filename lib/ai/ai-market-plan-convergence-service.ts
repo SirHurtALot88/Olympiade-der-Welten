@@ -154,6 +154,11 @@ export function getTeamHardMinRequired(gameState: GameState, teamId: string) {
 }
 
 export function getTeamOptTarget(gameState: GameState, teamId: string) {
+  /**
+   * Die eine Zahl fuer „wie voll soll der Kader sein" — das Blatt-Opt aus der Team-Identitaet plus
+   * Kaderstress. Der organische Planer wird in `deriveUtilityWeights` auf denselben Wert als
+   * UNTERGRENZE gezogen, damit nicht zwei Instanzen verschiedene Zahlen fuer „fertig" halten.
+   */
   return resolvePlannerRosterTargets(gameState, teamId).playerOpt;
 }
 

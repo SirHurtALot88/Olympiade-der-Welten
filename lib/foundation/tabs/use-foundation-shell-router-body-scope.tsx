@@ -68,7 +68,7 @@ import {
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
-import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { LOCAL_TRANSFER_WINDOW_PHASE, getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import {
   getTransfermarktScoutingDisclosure,
   getTransfermarktScoutingVisibilityBuckets,
@@ -9416,10 +9416,25 @@ export function useFoundationShellRouterBodyScope({
       isFirstSeason &&
       seasonIntroHandled &&
       (gameFlowState.currentStepId === "scouting_facilities" || gameFlowState.currentStepId === "buy_players");
+    /**
+     * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird
+     * erst in der folgesaison."
+     *
+     * Vorher feuerte der Folgesaison-Ausloeser auf `gameFlowState.phase === "preseason"` —
+     * das sind die Stationen der Saisonende-Kette der ALTEN Saison (`derivePreseasonPhase`).
+     * Der KI-Marktlauf startete also mitten im Saisonende (wo nur verkauft werden darf) und in
+     * der NEUEN Saison nie wieder: dort ist die Flow-Phase nicht mehr „preseason", der einzige
+     * S2+-Kaufausloeser des Spiels lief damit ins Leere und die KI-Teams blieben nach ihren
+     * Saisonende-Verkaeufen dauerhaft ohne Zugaenge.
+     *
+     * Massstab ist jetzt DASSELBE Fenster wie beim Menschen: das Saisonstart-Setup der neuen
+     * Saison (`isEarlySeasonTransferSetup` via `getTransferWindowStatus`) — Saison aktiv,
+     * Spieltag 1 noch offen. Dort ist der Erloes der Saisonende-Verkaeufe das Kaufbudget.
+     * Der Run-Record (`aiPreseasonAutomationRuns[seasonId]`) haelt den Lauf wie bisher auf
+     * genau einmal pro Saison.
+     */
     const followingSeasonTrigger =
-      !isFirstSeason &&
-      gameFlowState.phase === "preseason" &&
-      gameFlowState.currentStepId === "buy_players";
+      !isFirstSeason && getTransferWindowStatus(gameState).isSeasonStartSetup;
     const runKey = `${activeSaveId}:${gameState.season.id}`;
 
     if (staleOrphanRun) {
@@ -9451,6 +9466,10 @@ export function useFoundationShellRouterBodyScope({
     aiTeams.length,
     gameFlowState.currentStepId,
     gameFlowState.phase,
+    // Das Saisonstart-Fenster (getTransferWindowStatus) haengt an Phase, Spieltag und
+    // Spieltagsstatus — der ganze gameState als Dep, damit der Ausloeser den Fensterwechsel
+    // nicht verpasst (die Wachen im Effekt verhindern Doppellaeufe).
+    gameState,
     gameState.season.id,
     gameState.season.name,
     isFoundationBootstrapState,
@@ -9612,7 +9631,23 @@ export function useFoundationShellRouterBodyScope({
       !activeSaveId ||
       activeSaveId === "loading-save" ||
       leagueSetupStatus !== "ready" ||
-      gameState.gamePhase !== "preseason_management"
+      gameState.gamePhase !== "preseason_management" ||
+      // GEMELDET: „die sind ja sogar mit 4.8. und 5.8. datiert die käufe! da sind sehr viele
+      // falsche käufe bei" — der Liga-Draft lief einen Tag nach dem Anlegen des Spielstands
+      // erneut und kaufte Kader voll, die laengst spielten (Quelle `ai_roster_fill`, 5.8.).
+      //
+      // Ursache war die Bedingung darueber: `preseason_management` galt hier als „frischer
+      // S1-Aufbau". Seit der Saisonende-Kette ist das aber die ERSTE STATION JEDES SAISONENDES —
+      // und genau dort stehen nach den KI-Verkaeufen reihenweise Teams unter Kadermindestgroesse.
+      // Beide Gates zusammen waren am Saisonende also praktisch immer erfuellt, und der
+      // Ref-Guard haelt nur pro Browser-Sitzung; jedes Neuladen scharfte ihn neu.
+      //
+      // Der belastbare Unterschied ist nicht die Phase, sondern ob ueberhaupt schon gespielt
+      // wurde: dieser Effekt existiert einzig, um einen ABGEBROCHENEN ERST-DRAFT zu Ende zu
+      // bringen. In dem Moment liegt noch kein einziges Spieltagsergebnis vor. An jedem
+      // Saisonende liegen welche vor — dort hat er nichts verloren, das Auffuellen uebernimmt
+      // die KI-Preseason.
+      (gameState.seasonState.matchdayResults ?? []).length > 0
     ) {
       return undefined;
     }

@@ -20,6 +20,7 @@
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --save <saveId>      # anderer Spielstand
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --season season-3    # nur diese Saison
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --nur-mein-team      # nur das menschliche Team
+ *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --ab 2026-08-05      # nur ab diesem Zeitpunkt
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --apply              # SCHREIBT (Backup vorher)
  *
  * Umgekehrt wird genau das, was `applyLocalTransfermarktBuy` schreibt
@@ -40,15 +41,57 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Ein Kauf gilt als AUTOMATISCH, wenn seine Quelle nicht die manuelle Kaufaktion des Spielers ist.
- * Bewusst so herum: die Liste der KI-/System-Quellen waechst (`ai_roster_fill`,
- * `ai_preseason_market_buy`, `season1_draft`, …), die manuelle ist genau eine. Wer eine neue
- * KI-Quelle ergaenzt, bekommt den Schutz damit automatisch statt ihn zu vergessen.
+ * NUR diese Quellen werden zurueckgenommen — eine Positivliste, keine Ausschlussliste.
+ *
+ * Die Vorfassung nahm „alles, was nicht `manual_transfermarkt_buy` ist". Am echten Spielstand
+ * gemessen waeren das 347 Kaeufe gewesen — davon 343 mit der Quelle `ai_roster_fill`, also der
+ * ERSTMALIGE LIGA-DRAFT: die Startkader aller 32 Teams. Ein `--apply` haette die komplette Liga
+ * ausgeleert. Nur 4 Kaeufe stammten tatsaechlich vom gemeldeten Preseason-Lauf.
+ *
+ * Deshalb andersherum: hier steht ausschliesslich das drin, was der gemeldete Fehler erzeugt hat.
+ * Eine neue KI-Quelle wird damit NICHT automatisch zurueckgenommen — sie taucht im Bericht unter
+ * „nicht zurueckgenommen" auf und jemand entscheidet bewusst, ob sie dazugehoert. Bei einem
+ * Werkzeug, das in einen echten Spielstand schreibt, ist Vergessen die harmlosere Richtung.
  */
-const MANUELLE_KAUF_QUELLEN = new Set(["manual_transfermarkt_buy"]);
+const RUECKNEHMBARE_KAUF_QUELLEN = new Set(["ai_preseason_market_buy"]);
 
-function istAutomatischerKauf(entry: TransferHistoryEntry) {
-  return entry.transferType === "buy" && !MANUELLE_KAUF_QUELLEN.has(String(entry.source ?? ""));
+/**
+ * Quellen, die NUR zusammen mit `--ab <zeitpunkt>` zurueckgenommen werden duerfen.
+ *
+ * `ai_roster_fill` traegt zwei voellig verschiedene Dinge: den echten Erst-Draft beim Anlegen des
+ * Spielstands (muss bleiben — sonst steht die halbe Liga ohne Kader da) und die faelschlich
+ * spaeter gelaufenen Wiederholungen (`use-foundation-shell-router-body-scope.tsx`, Auto-Finish am
+ * Saisonende). An der Quelle sind die beiden nicht zu unterscheiden, nur an der ZEIT.
+ *
+ * Am echten Spielstand: 329 Eintraege vom Anlegetag, 14+ vom Tag darauf. Ohne `--ab` verweigert
+ * das Skript diese Quelle deshalb komplett, statt zu raten.
+ */
+const NUR_MIT_ZEITGRENZE = new Set(["ai_roster_fill"]);
+
+/** Der erstmalige Liga-Draft. Steht hier nur, damit der Bericht ihn benennen kann. */
+const LIGA_DRAFT_QUELLE = "ai_roster_fill";
+
+/**
+ * Eintraege OHNE Quelle werden NICHT zurueckgenommen.
+ *
+ * Aeltere Spielstaende haben Historien-Zeilen ohne `source` (im Bericht als `[undefined]`
+ * sichtbar). Ob so eine Zeile ein KI-Kauf oder ein Kauf des Spielers von damals war, laesst sich
+ * nicht mehr entscheiden — und dieses Skript schreibt in einen echten Spielstand. Im Zweifel also
+ * nichts anfassen: solche Zeilen werden getrennt ausgewiesen, damit der Mensch entscheidet, statt
+ * sie stillschweigend mitzuloeschen.
+ */
+function hatKeineQuelle(entry: TransferHistoryEntry) {
+  const source = entry.source == null ? "" : String(entry.source).trim();
+  return source === "" || source === "undefined" || source === "null";
+}
+
+function istRuecknehmbarerKauf(entry: TransferHistoryEntry, ab: string | null) {
+  if (entry.transferType !== "buy") return false;
+  if (hatKeineQuelle(entry)) return false;
+  const source = String(entry.source);
+  if (ab != null && (entry.happenedAt ?? "") < ab) return false;
+  if (NUR_MIT_ZEITGRENZE.has(source)) return ab != null;
+  return RUECKNEHMBARE_KAUF_QUELLEN.has(source);
 }
 
 function parseArgs(argv: string[]) {
@@ -56,14 +99,16 @@ function parseArgs(argv: string[]) {
   let seasonId: string | null = null;
   let apply = false;
   let nurMeinTeam = false;
+  let ab: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--apply") apply = true;
     else if (arg === "--nur-mein-team") nurMeinTeam = true;
     else if (arg === "--save") saveId = argv[++i] ?? null;
     else if (arg === "--season") seasonId = argv[++i] ?? null;
+    else if (arg === "--ab") ab = argv[++i] ?? null;
   }
-  return { saveId, seasonId, apply, nurMeinTeam };
+  return { saveId, seasonId, apply, nurMeinTeam, ab };
 }
 
 function istManuellGesteuert(gameState: GameState, teamId: string) {
@@ -77,7 +122,7 @@ function runde(value: number) {
 }
 
 async function main() {
-  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam } = parseArgs(process.argv.slice(2));
+  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam, ab } = parseArgs(process.argv.slice(2));
   const persistence = createPersistenceService();
 
   const saveId = saveIdArg ?? persistence.getActiveSave()?.saveId ?? null;
@@ -119,8 +164,70 @@ async function main() {
     `\nMenschlich gesteuert: ${menschlicheTeams.map((t) => `${t.name} (${t.teamId})`).join(", ") || "— keins"}`,
   );
 
+  // ---- Verkaufsbild: die Vorbereitung fuer den naechsten Schritt ------------------------------
+  // Der fehlende Kontrollmodus-Filter in `scopeTeam` betraf nicht nur die Kaufpfade, sondern auch
+  // die Saisonende-Verkaufsschleife. Ein automatischer Verkauf AUS einem menschlich gesteuerten
+  // Team heraus ist derselbe Uebergriff wie ein Kauf hinein — deshalb steht er hier als eigene
+  // Zeile, auch wenn dieses Skript ihn (noch) nicht zurueckninmt.
+  if (verkaeufe.length > 0) {
+    const verkaufProTeam = new Map<string, TransferHistoryEntry[]>();
+    for (const entry of verkaeufe) {
+      const key = entry.fromTeamId ?? "?";
+      if (!verkaufProTeam.has(key)) verkaufProTeam.set(key, []);
+      verkaufProTeam.get(key)!.push(entry);
+    }
+    const teamNameKurz = (teamId: string | null) =>
+      gameState.teams.find((t) => t.teamId === teamId)?.name ?? teamId ?? "?";
+    console.log(`\n${"-".repeat(78)}\nVERKAEUFE je Team (Bestandsaufnahme, wird NICHT angefasst)`);
+    const auffaellig: string[] = [];
+    for (const [teamId, list] of [...verkaufProTeam.entries()].sort()) {
+      const summe = runde(list.reduce((sum, e) => sum + (e.fee ?? 0), 0));
+      const automatisch = list.filter((e) => !String(e.source ?? "").startsWith("manual_")).length;
+      const manuell = list.length - automatisch;
+      const istMeins = istManuellGesteuert(gameState, teamId);
+      const markierung = istMeins ? "  ← DEIN TEAM" : "";
+      console.log(
+        `  ${teamNameKurz(teamId).padEnd(24)} ${String(list.length).padStart(3)} Verkaeufe` +
+          ` (${automatisch} automatisch, ${manuell} manuell), ${summe} Mio${markierung}`,
+      );
+      if (istMeins && automatisch > 0) {
+        auffaellig.push(`${teamNameKurz(teamId)}: ${automatisch} AUTOMATISCHE Verkaeufe aus deinem Team`);
+      }
+    }
+    if (auffaellig.length > 0) {
+      console.log("\n  ACHTUNG:");
+      for (const zeile of auffaellig) console.log(`    - ${zeile}`);
+      console.log("    Das ist derselbe Fehler wie bei den Kaeufen, nur andersherum.");
+    }
+    console.log("-".repeat(78));
+  }
+
   // ---- Auswahl: was wird zurueckgenommen? ----------------------------------------------------
-  let ruecknahme = derSaison.filter(istAutomatischerKauf);
+  const ohneQuelle = derSaison.filter((entry) => entry.transferType === "buy" && hatKeineQuelle(entry));
+  if (ohneQuelle.length > 0) {
+    console.log(
+      `\nHINWEIS: ${ohneQuelle.length} Kaeufe ohne erkennbare Quelle — die bleiben unangetastet.\n` +
+        `  Bei denen laesst sich nicht mehr entscheiden, ob KI oder du. Im Zweifel nichts anfassen.`,
+    );
+  }
+
+  const nichtAngefasst = derSaison.filter(
+    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry, ab),
+  );
+  if (nichtAngefasst.length > 0) {
+    const proQuelle = new Map<string, number>();
+    for (const entry of nichtAngefasst) {
+      const key = String(entry.source);
+      proQuelle.set(key, (proQuelle.get(key) ?? 0) + 1);
+    }
+    console.log("\nNICHT zurueckgenommen (keine Quelle des gemeldeten Fehlers):");
+    for (const [quelle, anzahl] of [...proQuelle.entries()].sort()) {
+      const hinweis = quelle === LIGA_DRAFT_QUELLE ? "  ← erstmaliger Liga-Draft, MUSS stehen bleiben" : "";
+      console.log(`  ${String(anzahl).padStart(4)}  ${quelle}${hinweis}`);
+    }
+  }
+
+  let ruecknahme = derSaison.filter((entry) => istRuecknehmbarerKauf(entry, ab));
   if (nurMeinTeam) {
     const ids = new Set(menschlicheTeams.map((t) => t.teamId));
     ruecknahme = ruecknahme.filter((entry) => entry.toTeamId && ids.has(entry.toTeamId));

@@ -31,7 +31,7 @@ function team(teamId: string, control: "ai" | "manual" | "passive"): Team {
 function gameState(input?: { seasonId?: string }): GameState {
   const teams = [team("A-I", "ai"), team("H-U", "manual"), team("P-S", "passive")];
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: input?.seasonId ?? "season-1",
       name: input?.seasonId === "season-2" ? "Season 2" : "Season 1",

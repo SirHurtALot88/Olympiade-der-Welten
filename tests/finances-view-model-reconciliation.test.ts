@@ -22,6 +22,8 @@ function buildGameState(input: {
   salaryDemand?: number;
   snapshotCashEnd?: number | null;
   snapshotCashTotalPhantom?: number | null;
+  /** Eintrittsstand nach den Kaeufen der Folgesaison (Chris' Vorgabe, siehe Fall (e) unten). */
+  snapshotCashEntry?: number | null;
   transferHistory?: GameState["transferHistory"];
 }): GameState {
   const team = makeTeam({ teamId: "team-1", shortCode: "T1", name: "Test United", cash: input.teamCash, budget: 100 });
@@ -43,6 +45,7 @@ function buildGameState(input: {
                 disciplinePointsByArea: { pow: 10, spe: 10, men: 10, soc: 10 },
                 // Real carried cash end (must win) vs. phantom projectedCash (must be ignored).
                 cashEnd: input.snapshotCashEnd ?? 100,
+                ...(input.snapshotCashEntry == null ? {} : { cashEntry: input.snapshotCashEntry }),
                 cashTotal: input.snapshotCashTotalPhantom ?? 9999,
                 // Legacy prize-as-income GuV in the archive — must NOT be surfaced as a bar.
                 guv: 42,
@@ -277,5 +280,22 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     // The current season still carries the corrected live guv.
     const current = model.team.history.find((point) => point.isCurrent);
     expect(current?.guv).toBe(model.team.guv);
+  });
+  /**
+   * CHRIS' VORGABE: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison
+   * nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+   *
+   * Die Sparkline meint ohnehin den Saisonstart (Cash-Ende von N = Start von N+1) — nur eben nach
+   * Kaeufen, Fuellung und Krediten statt davor. `cashEnd` bleibt unangetastet, weil der Abgleich
+   * in `getSnapshotCashByTeam` ihn als Saison-Endstand braucht.
+   */
+  it("(e) archivierte Historie zeigt den Eintrittsstand nach den Kaeufen, wenn es ihn gibt", () => {
+    const model = buildFinancesViewModel(
+      buildGameState({ teamCash: 200, salary: 20, snapshotCashEnd: 150, snapshotCashEntry: 12.5 }),
+      "team-1",
+    );
+    if (model.status !== "ready") throw new Error("expected ready");
+    const archived = model.team.history.filter((point) => !point.isCurrent);
+    expect(archived[0].cash).toBe(12.5);
   });
 });

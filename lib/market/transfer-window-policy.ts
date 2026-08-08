@@ -22,20 +22,24 @@ export type LocalTransferWindowPhase = typeof LOCAL_TRANSFER_WINDOW_PHASE;
  * Kaufen. Ein Test haelt die Disjunktheit fest, damit die Trennung nicht wieder verwaescht.
  */
 const TRANSFER_SELL_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
 ]);
 
 /**
- * Fuer MENSCHLICHE Kaeufe gibt es am Saisonende keine Phase — leer ist hier die Aussage.
+ * Am Saisonende gibt es KEINE Kaufphase — fuer niemanden. Leer ist hier die Aussage.
  *
  * `transfer_buy_phase` stand hier und ist raus: die Station liegt in der Saisonende-Kette, also
- * VOR „Neue Saison starten" und damit noch in der alten Saison. Sie ist die Station der KI
- * („AI-Käufe laufen nach Verkäufen über Buy-Service", `season-transition-service`); KI- und
- * System-Kaeufe tragen eine eigene `transferSource` und laufen ohnehin an diesem Gate vorbei.
- * Der Mensch kauft ausschliesslich in der neuen Saison vor ihrem ersten Spieltag
- * (`isEarlySeasonTransferSetup`) — der Weg, den die Checkliste selbst geht:
- * verkaufen/verlaengern → „Neue Saison starten" → kaufen.
+ * VOR „Neue Saison starten" und damit noch in der alten Saison. Sie ist heute eine reine
+ * BESCHRIFTUNG der Kette — hier kauft NIEMAND mehr, auch die KI nicht. (Eine aeltere Fassung
+ * dieses Kommentars nannte sie „die Station der KI" — das war der Stand vor Chris' Regel
+ * „verkauft wird als separater Schritt zum Saisonende, gekauft erst in der Folgesaison" und hat
+ * bereits einmal in die Irre gefuehrt.) Die KI-Kaufsperre am Saisonende sitzt im Apply-Dienst
+ * (`saisonendeKaufsperre`, ai-market-plan-apply-service) und in der Plan-Vorschau
+ * (`kaeufeAufsKauffensterVerschoben`, ai-market-plan-preview-service).
+ * Gekauft wird — Mensch wie KI — ausschliesslich in der neuen Saison vor ihrem ersten Spieltag
+ * (`isEarlySeasonTransferSetup`): der Mensch ueber den Markt, die KI ueber den
+ * Preseason-Hintergrundlauf, den der Client in genau diesem Fenster anstoesst.
  */
 const TRANSFER_BUY_PHASES = new Set<GamePhase>([]);
 

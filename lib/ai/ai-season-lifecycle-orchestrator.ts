@@ -411,7 +411,7 @@ function phaseDefinition(phase: AiLifecyclePhase) {
 function resolveCurrentLifecyclePhase(gameState: GameState): AiLifecyclePhase {
   if (gameState.gamePhase === "season_completed" || gameState.gamePhase === "season_review") return "season_end_review";
   if (gameState.gamePhase === "season_rewards" || gameState.gamePhase === "player_development") return "postseason_management";
-  if (gameState.gamePhase === "preseason_management") return "preseason_strategy";
+  if (gameState.gamePhase === "season_end_management") return "preseason_strategy";
   if (gameState.gamePhase === "transfer_sell_phase" || gameState.gamePhase === "transfer_buy_phase") return "preseason_market";
   if (gameState.gamePhase === "lineup_setup") return "matchday_preparation";
   if (gameState.gamePhase === "next_season_ready") return "season_transition";

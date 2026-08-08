@@ -15,7 +15,7 @@ export function useFoundationCrossTabFlowCoach(input: {
       nextLabel: input.globalNextLabel,
       nextTitle: input.globalNextTitle,
     };
-    if (input.gameFlowPhase === "preseason_management" || input.gameFlowPhase === "transfer_sell_phase" || input.gameFlowPhase === "transfer_buy_phase") {
+    if (input.gameFlowPhase === "season_end_management" || input.gameFlowPhase === "transfer_sell_phase" || input.gameFlowPhase === "transfer_buy_phase") {
       // Die Reihenfolge nennt das KAUFEN bewusst hinter dem Saisonstart: am Saisonende wird
       // verkauft und verlaengert, gekauft wird in der neuen Saison vor dem 1. Spieltag
       // (`lib/market/transfer-window-policy.ts`). Vorher stand hier „Sell → Buy → … → Saisonstart"

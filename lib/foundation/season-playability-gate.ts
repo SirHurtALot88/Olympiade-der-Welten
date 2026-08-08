@@ -85,7 +85,7 @@ const AUDIT_HINT_LABELS: Record<string, string> = {
   human_teams_manual_only:
     "Sell-Phase bleibt für Human-Teams manuell; AI-Teams laufen über ihre eigenen Auto-Entscheidungen.",
   buy_after_sell_only:
-    "Buy-Phase startet bewusst nach Sell/Contract, damit Roster- und Budgetdruck nicht vermischt wird.",
+    "Am Saisonende wird nur verkauft; gekauft wird erst im Kauffenster der neuen Saison — die Verkaufserlöse sind dort das Budget.",
   board_objectives_failed:
     "Mindestens ein Board-Ziel ist verfehlt; Hinweis im Team-Profil, kein technischer Season-Blocker.",
   board_objectives_at_risk:

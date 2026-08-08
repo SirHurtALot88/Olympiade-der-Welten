@@ -31,7 +31,7 @@ function createTeam(partial?: Partial<Team>): Team {
     budget: partial?.budget ?? 100,
     cash: partial?.cash ?? 50,
     identityId: partial?.identityId ?? partial?.teamId ?? "C-C",
-    humanControlled: partial?.humanControlled ?? true,
+    humanControlled: partial?.humanControlled ?? false,
     rosterLimit: partial?.rosterLimit ?? 12,
     logoPath: partial?.logoPath ?? null,
   };
@@ -510,5 +510,92 @@ describe("AI best-offer pick (Phase 3)", () => {
     );
     expect(result.ok).toBe(true);
     expect(result.loan?.lenderType).toBe("bank");
+  });
+});
+
+/**
+ * GEMELDET: „wie kann man als spieler kredite an AI Teams anbieten? die picken ja direkt ihre
+ * spieler das heißt wenn ich z.B. C-C spiele wäre es gut wenn das geht, die sollen damit ihr geld
+ * verdienen! … sonst muss es eine möglichkeit geben, ein budget für kredite vorab festzulegen an
+ * dem andere teams sich bedienen können."
+ *
+ * VORGESCHICHTE: im Messlauf lieh sich H-R 32.0 und R-R 16.4 Mio ausgerechnet beim manuell
+ * gefuehrten Team — 48.4 Mio verliessen dessen Konto, ohne dass der Spieler gefragt wurde (Cash
+ * 91.3 -> 42.9). Ein Team-Kredit ist eine Entscheidung ueber fremdes Geld; fuer ein von Hand
+ * gefuehrtes Team gehoert sie dem Spieler.
+ *
+ * Die Loesung ist kein Verbot, sondern ein VORAB gesetztes Budget: was der Spieler freigibt, duerfen
+ * sich KI-Teams holen — und er verdient daran. Ohne gesetztes Budget (Startwert) verleiht er nichts.
+ */
+describe("Kredit-Budget eines von Hand gefuehrten Teams", () => {
+  function baueMitVerleiher(input: { lendingBudget?: number | null; bereitsVerliehen?: number }) {
+    const gameState = buildBorrowLenderState({ borrowerCash: 30, lenderCash: 100 });
+    const verleiher = { teamId: FRIENDLY_LENDER_ID };
+    gameState.seasonState.teamControlSettings = {
+      [verleiher.teamId]: {
+        teamId: verleiher.teamId,
+        controlMode: "manual",
+        ...(input.lendingBudget == null ? {} : { lendingBudget: input.lendingBudget }),
+      },
+    } as never;
+    if (input.bereitsVerliehen) {
+      gameState.seasonState.loans = [
+        {
+          loanId: "alt-1",
+          borrowerTeamId: RIVAL_BORROWER_ID,
+          lenderTeamId: verleiher.teamId,
+          lenderType: "team",
+          principal: input.bereitsVerliehen,
+          principalOutstanding: input.bereitsVerliehen,
+          status: "active",
+          termSeasons: 3,
+          interestRatePerSeason: 0.1,
+          installmentPerSeason: 1,
+          originatedSeasonId: gameState.season.id,
+          missedPayments: 0,
+        },
+      ] as never;
+    }
+    return { gameState, verleiherId: verleiher.teamId };
+  }
+
+  const teamAngebote = (gameState: GameState, borrowerTeamId: string, betrag: number) =>
+    buildLoanOffers(gameState, borrowerTeamId, betrag, 3).filter((offer) => offer.lenderType === "team");
+
+  it("verleiht ohne gesetztes Budget gar nichts", () => {
+    // Genau der gemeldete Fall: 48.4 Mio verliessen das Konto ungefragt.
+    const { gameState, verleiherId } = baueMitVerleiher({ lendingBudget: null });
+    expect(teamAngebote(gameState, BORROWER_ID, 10).some((o) => o.lenderTeamId === verleiherId)).toBe(
+      false,
+    );
+  });
+
+  it("die Bank bleibt trotzdem im Angebot — niemand steht ohne Kreditrahmen da", () => {
+    const { gameState } = baueMitVerleiher({ lendingBudget: null });
+    const alle = buildLoanOffers(gameState, BORROWER_ID, 10, 3);
+    expect(alle.some((offer) => offer.lenderType === "bank")).toBe(true);
+  });
+
+  it("verleiht mit gesetztem Budget", () => {
+    // „die sollen damit ihr geld verdienen" — freigegeben ist freigegeben.
+    const { gameState, verleiherId } = baueMitVerleiher({ lendingBudget: 60 });
+    expect(teamAngebote(gameState, BORROWER_ID, 10).some((o) => o.lenderTeamId === verleiherId)).toBe(
+      true,
+    );
+  });
+
+  it("nie mehr als das Budget — auch nicht ueber mehrere Kredite", () => {
+    // 60 freigegeben, 55 schon draussen: fuer eine Anfrage ueber 10 reicht der Rest nicht.
+    const { gameState, verleiherId } = baueMitVerleiher({ lendingBudget: 60, bereitsVerliehen: 55 });
+    expect(teamAngebote(gameState, BORROWER_ID, 10).some((o) => o.lenderTeamId === verleiherId)).toBe(
+      false,
+    );
+  });
+
+  it("deckelt auch die angebotene Summe auf den freien Rahmen", () => {
+    const { gameState, verleiherId } = baueMitVerleiher({ lendingBudget: 40, bereitsVerliehen: 25 });
+    const angebot = teamAngebote(gameState, BORROWER_ID, 5).find((o) => o.lenderTeamId === verleiherId);
+    // Frei sind 15 — mehr darf im Schieberegler nicht auswaehlbar sein.
+    expect(angebot?.maxAmount).toBeLessThanOrEqual(15);
   });
 });

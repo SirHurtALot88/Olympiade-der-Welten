@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
+import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
+import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { isSeasonComplete } from "@/lib/season/season-completion-state";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
@@ -19,7 +22,7 @@ import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/seas
 const SEASON_TRANSITION_POST_REVIEW_PHASES = new Set<GamePhase>([
   "season_rewards",
   "player_development",
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",
@@ -67,7 +70,7 @@ const STEP_LABELS: Record<SeasonTransitionStepId, string> = {
   season_review: "Saisonrückblick",
   season_rewards: "Finanzen",
   player_development: "Spielerentwicklung",
-  preseason_management: "Pre-Season Management",
+  season_end_management: "Training / Ziele",
   transfer_sell_phase: "Verkäufe",
   transfer_buy_phase: "Käufe",
   lineup_setup: "Setup neue Saison",
@@ -79,7 +82,7 @@ const PHASE_TO_STEP: Partial<Record<GamePhase, SeasonTransitionStepId>> = {
   season_review: "season_review",
   season_rewards: "season_rewards",
   player_development: "player_development",
-  preseason_management: "preseason_management",
+  season_end_management: "season_end_management",
   transfer_sell_phase: "transfer_sell_phase",
   transfer_buy_phase: "transfer_buy_phase",
   lineup_setup: "lineup_setup",
@@ -100,26 +103,9 @@ function getNextSeasonId(gameState: GameState) {
   return `season-${parseSeasonNumber(gameState) + 1}`;
 }
 
-export function isSeasonComplete(gameState: GameState) {
-  if (gameState.gamePhase && gameState.gamePhase !== "season_active") {
-    return true;
-  }
-
-  const matchdayIds = gameState.season.matchdayIds ?? [];
-  const lastMatchdayId = matchdayIds[matchdayIds.length - 1] ?? gameState.matchdayState.matchdayId;
-  const lastFixtures = gameState.seasonState.schedule.filter((fixture) => fixture.matchdayId === lastMatchdayId);
-  const lastFixturesResolved = lastFixtures.length === 0 || lastFixtures.every((fixture) => fixture.status === "resolved");
-  const hasLastMatchdayResult = (gameState.seasonState.matchdayResults ?? []).some(
-    (result) => result.seasonId === gameState.season.id && result.matchdayId === lastMatchdayId,
-  );
-  const hasLastStandingsApply = (gameState.seasonState.standingsApplyLogs ?? []).some(
-    (log) => log.seasonId === gameState.season.id && log.matchdayId === lastMatchdayId,
-  );
-  const activeMatchdayIsLast = gameState.matchdayState.matchdayId === lastMatchdayId || gameState.season.currentMatchday >= matchdayIds.length;
-  const matchdayResolved = gameState.matchdayState.status === "resolved";
-
-  return activeMatchdayIsLast && matchdayResolved && (lastFixturesResolved || (hasLastMatchdayResult && hasLastStandingsApply));
-}
+// Die Definition steht in `lib/season/season-completion-state.ts` — hier nur der Re-Export, damit die
+// bisherigen Importpfade (Season-Completion, Debug-Bootstrap, Tests) unveraendert bleiben.
+export { isSeasonComplete };
 
 function buildTransitionState(save: PersistedSaveGame, input?: { status?: SeasonTransitionState["status"]; currentStep?: SeasonTransitionStepId }) {
   const existing = save.gameState.seasonTransition;
@@ -134,6 +120,11 @@ function buildTransitionState(save: PersistedSaveGame, input?: { status?: Season
     errors: existing?.errors ?? [],
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     appliedAt: existing?.appliedAt,
+    // Die Erledigt-Marker muessen den Neuaufbau ueberleben, sonst laufen ihre Schritte erneut. Der
+    // Entwicklungs-Marker wurde bisher weiter unten von Hand nachgereicht; hier stehen beide an
+    // derselben Stelle, damit der naechste Marker nicht wieder vergessen wird.
+    progressionAppliedForSeasonId: existing?.progressionAppliedForSeasonId ?? null,
+    aiSeasonEndSellsAppliedForSeasonId: existing?.aiSeasonEndSellsAppliedForSeasonId ?? null,
   } satisfies SeasonTransitionState;
 }
 
@@ -170,9 +161,10 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
           ? `Preview liest Preisgeld, Sponsor, Facilities; Formkarten offen: ${formCardUsageAudit.unusedCards} (${formCardUsageAudit.unusedNegativeCards} negative = ${formCardUsageAudit.negativePenaltyPoints} Strafpunkte, positive verfallen).`
           : "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income. Alle Formkarten wurden verbraucht.",
       player_development: `Preview berechnet die organische Saisonende-Entwicklung für ${rosterCount} aktive Spieler (identisch zum Apply, ohne Attribut-Writes bis zur Bestätigung).`,
-      preseason_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
+      season_end_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
       transfer_sell_phase: "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
-      transfer_buy_phase: "AI-Käufe laufen nach Verkäufen über Buy-Service; keine Duplikate/kein negatives Cash als spätere Gate-Regeln.",
+      transfer_buy_phase:
+        "Reine Durchgangsstation: am Saisonende kauft niemand mehr. Käufe (Mensch wie KI) laufen erst im Kauffenster der neuen Saison; die Verkaufserlöse sind dort das Budget.",
       lineup_setup: `${lineupCount} gespeicherte Lineups würden für neue Season geprüft/resetet.`,
       next_season_ready: "Neue Saison startet ueber den bestaetigten Pre-Season Workflow.",
     };
@@ -331,7 +323,7 @@ export function startSeasonTransition(
  */
 type SeasonTransitionAdvanceCompute =
   | { status: "blocked" | "chain_complete"; preview: SeasonTransitionPreview }
-  | { status: "advanced"; nextGameState: GameState; transition: SeasonTransitionState };
+  | { status: "advanced"; appliedStep: SeasonTransitionStepId; nextGameState: GameState; transition: SeasonTransitionState };
 
 /**
  * Rechnet EINEN Schritt der Kette im Speicher — OHNE zu schreiben. `advanceSeasonTransitionStep`
@@ -372,7 +364,7 @@ function computeSeasonTransitionAdvance(
     if ("blocked" in started) {
       return { status: "blocked", preview: started.blocked };
     }
-    return { status: "advanced", nextGameState: started.nextGameState, transition: started.transition };
+    return { status: "advanced", appliedStep: currentStep, nextGameState: started.nextGameState, transition: started.transition };
   }
 
   const nextPhase = getPhaseAfterStep(currentStep);
@@ -485,7 +477,7 @@ function computeSeasonTransitionAdvance(
     seasonTransition: transition,
   };
 
-  return { status: "advanced", nextGameState, transition };
+  return { status: "advanced", appliedStep: currentStep, nextGameState, transition };
 }
 
 /**
@@ -495,22 +487,133 @@ function computeSeasonTransitionAdvance(
  * bei einem Schreibvorgang; die Mehrfach-Schleife (`advanceSeasonTransitionToTransferWindow`)
  * nutzt die Compute-Funktion direkt und schreibt selbst nur einmal am Ende der Kette.
  */
-export function advanceSeasonTransitionStep(
+export async function advanceSeasonTransitionStep(
   save: PersistedSaveGame,
   persistence: PersistenceService = createPersistenceService(),
-): SeasonTransitionPreview {
+): Promise<SeasonTransitionPreview> {
   const computed = computeSeasonTransitionAdvance(save, persistence);
   if (computed.status !== "advanced") {
     return computed.preview;
   }
   persistGameStateWithMaterializedDerivations(persistence, save.saveId, computed.nextGameState);
 
+  const nachVerkaeufen = await runSeasonEndAiSellsIfDue({
+    saveId: save.saveId,
+    appliedStep: computed.appliedStep,
+    seasonId: save.gameState.season.id,
+    gameStateAfterHop: computed.nextGameState,
+    transitionAfterHop: computed.transition,
+    persistence,
+  });
+
   return {
-    ...buildSeasonTransitionPreview({ ...save, gameState: computed.nextGameState }),
+    ...buildSeasonTransitionPreview({ ...save, gameState: nachVerkaeufen.gameState }),
     dryRun: false,
     applied: true,
-    transition: computed.transition,
+    transition: nachVerkaeufen.transition,
   };
+}
+
+/**
+ * DER SCHRITT „VERKAEUFE" VERKAUFT JETZT WIRKLICH.
+ *
+ * Die Station `transfer_sell_phase` trug bis hierher nur eine Ankuendigung: „AI-Verkaeufe werden
+ * spaeter ueber Sell-Service vorbereitet". Der Sell-Service existierte laengst und war getestet
+ * (`runTransferWindowSession` mit `phase: "season_end"`) — er wurde von der Kette nur nie
+ * aufgerufen. Ergebnis: die KI-Teams gingen mit unveraendertem Kader und ohne frisches Geld in die
+ * neue Saison, und auf dem Markt lag nichts, was der Spieler haette kaufen koennen.
+ *
+ * WARUM HIER UND NICHT IN `computeSeasonTransitionAdvance`: die Compute-Funktion ist bewusst rein —
+ * sie rechnet im Speicher und schreibt nie, damit die Mehrfach-Schleife
+ * (`advanceSeasonTransitionToTransferWindow`) mehrere Stationen ohne Zwischenspeichern durchlaufen
+ * kann. `runTransferWindowSession` liest und schreibt ueber die Persistenz. In die Compute-Funktion
+ * gehaengt wuerde es genau diese Zusage brechen und der Schleife den Stand unter den Fuessen
+ * wegschreiben. Deshalb laeuft es hier, NACH dem einen Schreibvorgang des Hops.
+ *
+ * Die Schleife erreicht diese Station ohnehin nie: sie bricht ab, sobald das Transferfenster offen
+ * ist (`season_end_management`), also eine Station davor.
+ *
+ * MANUELL GEFUEHRTE TEAMS: hier steht bewusst KEIN eigener Filter. Der Schutz sitzt in
+ * `runTransferWindowSession` selbst (`scopeTeam`, eingezogen nach „Wieso wird für mich gepickt und
+ * gedraftet???"). Ihn hier zu wiederholen hiesse, ihn an zwei Stellen pflegen zu muessen — und
+ * genau daran ist er beim letzten Mal gescheitert.
+ */
+async function runSeasonEndAiSellsIfDue(input: {
+  saveId: string;
+  appliedStep: SeasonTransitionStepId;
+  seasonId: string;
+  gameStateAfterHop: GameState;
+  transitionAfterHop: SeasonTransitionState;
+  persistence: PersistenceService;
+}): Promise<{ gameState: GameState; transition: SeasonTransitionState }> {
+  const unveraendert = { gameState: input.gameStateAfterHop, transition: input.transitionAfterHop };
+
+  if (input.appliedStep !== "transfer_sell_phase") return unveraendert;
+  if (input.transitionAfterHop.aiSeasonEndSellsAppliedForSeasonId === input.seasonId) return unveraendert;
+
+  /**
+   * SCHEITERN DARF DIE KETTE NICHT SPERREN — dieselbe Entscheidung wie bei der Spielerentwicklung
+   * oben, aus demselben Grund: ein blockierter Saisonuebergang sperrt Verkaeufe und
+   * Vertragsverlaengerungen des Spielers gleich mit aus, und dieser Ablauf hatte schon einmal eine
+   * Sackgasse. Der Marker wird nur gesetzt, wenn die Sitzung wirklich durchlief — ein Fehlschlag
+   * bleibt also nachholbar, statt still als erledigt zu gelten.
+   */
+  try {
+    const sitzung = await runTransferWindowSession({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      persistence: input.persistence,
+      phase: "season_end",
+      dryRun: false,
+      confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+      transferPhase: "manual_transfer_window",
+      teamScope: "all",
+      // Am Saisonende wird nur verkauft. Gekauft wird in der neuen Saison — der Riegel dafuer sitzt
+      // zusaetzlich in der Sitzung selbst (`isSeasonEndPhase`), hier ist er die Absicht des Aufrufs.
+      allowBuys: false,
+      skipIfExistingMarketTransfers: false,
+      progressLog: false,
+    });
+
+    const frisch = input.persistence.getSaveById(input.saveId);
+    if (!frisch) {
+      return {
+        gameState: input.gameStateAfterHop,
+        transition: {
+          ...input.transitionAfterHop,
+          warnings: [...new Set([...input.transitionAfterHop.warnings, "ai_season_end_sells_save_missing_after_session"])],
+        },
+      };
+    }
+
+    const transition: SeasonTransitionState = {
+      ...input.transitionAfterHop,
+      warnings: [
+        ...new Set([
+          ...input.transitionAfterHop.warnings,
+          `ai_season_end_sells_applied:${sitzung.appliedSells}`,
+          ...sitzung.warnings.slice(0, 8),
+        ]),
+      ],
+      aiSeasonEndSellsAppliedForSeasonId: input.seasonId,
+    };
+    const gameState: GameState = { ...frisch.gameState, seasonTransition: transition };
+    persistGameStateWithMaterializedDerivations(input.persistence, input.saveId, gameState);
+    return { gameState, transition };
+  } catch (error) {
+    return {
+      gameState: input.gameStateAfterHop,
+      transition: {
+        ...input.transitionAfterHop,
+        warnings: [
+          ...new Set([
+            ...input.transitionAfterHop.warnings,
+            `ai_season_end_sells_failed:${error instanceof Error ? error.message : "unknown"}`,
+          ]),
+        ],
+      },
+    };
+  }
 }
 
 /**

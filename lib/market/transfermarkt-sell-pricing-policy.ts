@@ -124,7 +124,7 @@ function getTimingMultiplier(gameState: GameState) {
   if (getTransferWindowStatus(gameState).isSeasonStartSetup) {
     return 0.95;
   }
-  if (phase === "preseason_management") {
+  if (phase === "season_end_management") {
     return 0.98;
   }
   return 0.92;

@@ -294,7 +294,7 @@ describe("gameplay priorities wiring", () => {
   it("keeps preseason cockpit steps open until rewards and development are done", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
-        gamePhase: "preseason_management",
+        gamePhase: "season_end_management",
         season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["season-2-md-1"] },
         seasonState: {
           seasonId: "season-2",

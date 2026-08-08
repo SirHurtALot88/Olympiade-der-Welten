@@ -675,7 +675,20 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   }
 
   const runSaveAction = useCallback(
-    async (body: SaveActionRequest) => {
+    /**
+     * `stayOnCurrentSave` — fuer den manuellen Sicherungspunkt.
+     *
+     * Jede Save-Aktion schaltet bisher auf den neu entstandenen Spielstand um. Fuer „anlegen",
+     * „duplizieren" und „aktivieren" ist das richtig. Fuer „manuell speichern" ist es das Gegenteil
+     * von dem, was jemand erwartet: man will eine Sicherung ablegen und WEITERSPIELEN, nicht in die
+     * Sicherung wechseln.
+     *
+     * GEMELDET: „ABER Problem was ich sehe S1 MD 1 speichert er den save und nicht auf dem aktuellen
+     * Stand wo ich gerade war" — dort war es „Neuer Save", der ein komplett frisches Spiel anlegte
+     * und darauf umschaltete. Dieser Schalter sorgt dafuer, dass der neue Knopf diesen Fehler nicht
+     * wiederholt.
+     */
+    async (body: SaveActionRequest, options?: { stayOnCurrentSave?: boolean }) => {
       if (readMeta.readOnly) {
         showReadOnlyNotice();
         return;
@@ -709,7 +722,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
 
         setSaveSummaries(payload.saves ?? []);
 
-        if (payload.save?.saveId) {
+        if (payload.save?.saveId && !options?.stayOnCurrentSave) {
           onFetchSlowClear?.();
           if (requestVersion !== saveActionRequestVersion.current) {
             return;
