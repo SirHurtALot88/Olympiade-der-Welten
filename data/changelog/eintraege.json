@@ -1,4 +1,0 @@
-{
-  "hinweis": "ABGELOEST — neue Eintraege gehoeren als EIGENE DATEI nach data/changelog/eintraege/ (eine Datei pro Eintrag, Name: <datum>-pr<nummer>.json). Grund: an dieser Sammeldatei hing jeder PR seinen Eintrag ans Ende desselben Arrays, wodurch jeder PR mit jedem anderen zeitgleich offenen kollidierte — ein mechanischer Konflikt, der jedes Mal Rebase und einen neuen CI-Lauf kostete. Diese Datei wird weiterhin GELESEN, damit aeltere Zweige ihren Eintrag nicht verlieren; der Generator mahnt an, was hier noch liegt. Aufbau eines Eintrags siehe data/changelog/eintraege/README.md.",
-  "eintraege": []
-}

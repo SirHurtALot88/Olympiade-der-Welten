@@ -1,9 +1,0 @@
-[
-  {
-    "datum": "2026-08-03",
-    "seite": "Saison · Spieltagswechsel",
-    "text": "Beim Spieltagswechsel schrieb das automatische Aufstellen der KI-Teams unter Umständen direkt in die echte Spielstand-Ablage, statt in die vom Aufrufer vorgegebene — dadurch konnte ein reiner Vorschau-Durchlauf den gespeicherten Stand verändern.",
-    "gewicht": "behebung",
-    "version": "0.3"
-  }
-]

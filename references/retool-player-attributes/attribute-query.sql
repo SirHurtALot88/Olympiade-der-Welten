@@ -1,8 +1,0 @@
--- Retool attribute source located
--- queryName: getPlayerAttributesForAI
--- sourceKind: SqlQueryUnified
--- page: transfermarktPage
--- sourcePath: references/retool-ai-golden-master/getPlayerAttributesForAI.state.js
--- spreadsheetId: unknown
--- sheetName: unknown
--- Query found, data not embedded.

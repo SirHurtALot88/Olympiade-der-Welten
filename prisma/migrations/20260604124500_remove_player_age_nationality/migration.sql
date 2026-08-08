@@ -1,3 +1,0 @@
-ALTER TABLE "Player"
-  DROP COLUMN IF EXISTS "age",
-  DROP COLUMN IF EXISTS "nationality";

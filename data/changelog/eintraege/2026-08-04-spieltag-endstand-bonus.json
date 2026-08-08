@@ -1,8 +1,0 @@
-{
-  "datum": "2026-08-04",
-  "seite": "Spieltag · Arena",
-  "text": "Die Endtabelle am Ende eines Spieltags rechnete den Bonus des Spieltags nicht mit und zeigte deshalb eine andere Reihenfolge als der Saisonstand danach — ein Team mit viel Bonus stand dort zu tief und rutschte hinterher überraschend nach oben. Jetzt zählt derselbe Bonus, der auch gebucht wird, und alle Ränge kommen aus einer einzigen Rangliste statt aus zwei zusammengesetzten.",
-  "gewicht": "behebung",
-  "pr": "#401",
-  "version": "0.4"
-}

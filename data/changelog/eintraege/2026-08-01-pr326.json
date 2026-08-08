@@ -1,8 +1,0 @@
-{
-  "datum": "2026-08-01",
-  "seite": "Info · Changelog",
-  "text": "Am Changelog wird intern anders gearbeitet: jeder Eintrag liegt jetzt in einer eigenen Datei statt gesammelt in einer Liste. Im Spiel sieht das gleich aus — es sorgt nur dafuer, dass sich gleichzeitig gebaute Aenderungen nicht mehr gegenseitig blockieren und Fixes schneller bei dir ankommen.",
-  "gewicht": "feinschliff",
-  "pr": "#326",
-  "version": "0.3"
-}
