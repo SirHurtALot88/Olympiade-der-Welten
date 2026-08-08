@@ -39,6 +39,42 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Inbox",
+      "pr": null,
+      "text": "Die Inbox hat jetzt EIN Filtersystem und sortiert nach Dringlichkeit: Kritisch → Heute sinnvoll → Kann warten → Berichte, Erledigtes eingeklappt. Das kritische Item ist rot markiert und steht ganz oben (vorher sagte der Kopf 1 kritisch, aber keine Karte war als kritisch erkennbar), die äußeren Kategorie-Reiter mit ihren leeren Alles-erledigt-Seiten sind weg, der Kopf-Zähler zählt dieselbe Basis wie Home, und das Kritisch-Badge ist von 3,1:1 auf gemessene 7,1:1 angehoben.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams",
+      "pr": null,
+      "text": "Der Kader hat zwei Ansichten: Portraits bleiben Standard (und sind entrümpelt — Vertragsdetails raus, Kürzel mit Tooltips, nichts mehr abgeschnitten), die Tabelle heißt jetzt Liste & Verträge und trägt die Kaderplanung: Auslauf-Kennzahlen und Gehaltslast-Projektion über der Tabelle, Läuft-aus als beschrifteter Chip statt unerklärter Goldfärbung. Der Verträge-Reiter bleibt für die tiefen Werkzeuge (Buyout, Board-Vorschlag) bestehen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams · Team-Profil",
+      "pr": null,
+      "text": "Saison-Verlauf sagt die Wahrheit: Die Marktwert- und Cash-Sparklines färben sich nach der Richtung aus derselben Quelle wie der Delta-Chip (vorher leuchtete ein Cash-Absturz von 91 auf 7 Mio grün), und die Punkte-Kachel zeigt bei einer einzigen Saison Wert plus Einordnung statt eines einzelnen riesigen Balkens — der Höhen-Deckel gilt jetzt auch auf der Teams-Seite.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams",
+      "pr": null,
+      "text": "Im Disziplin-Profil bedeutet eine Farbe nur noch eines: Die Balken tragen die Kategoriefarbe (POW/SPE/MEN/SOC, wie das Radar daneben), der Liga-Rang bleibt die Zahl — mit Medaille für die Top-3 und dezentem Risiko-Ton fürs Schlussviertel. Vorher stand ein grüner Kategorie-Punkt neben einem grünen Quartil-Balken, und Grün hieß zweierlei.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Markt · Kauffenster und Kredite",
       "pr": null,
       "text": "Die KI-Teams haben Kredite aufgenommen und das Geld dann nicht ausgegeben — von 223,4 Mio geliehenem Geld lagen 134,7 Mio unangetastet auf den Konten, bei vollem Zins und überwiegend an andere Teams gezahlt. Die Ursache lag nicht beim Kredit: für dasselbe Team gab es drei verschiedene Kaderziele. Der kaufende Planer hielt Barbarian Plunderers bei 8 von 8 für fertig, während Sitzung und Kreditprüfung 8 von 9 sahen und für den fehlenden Platz Geld liehen. Jetzt ist der Wert aus dem Identitäts-Blatt die verbindliche Untergrenze, die Trainer-Persönlichkeit darf nur noch daraufsatteln. Ein Kredit wird außerdem vorher gegen den echten Kaufplan geprüft: plant das Team nichts, gibt es keinen Kredit. Und die Qualitäts-Mischung beim Einkauf ist eingeschaltet — mehr Stars und gute Spieler statt Auffüllware. Gemessen am laufenden Spielstand: liegengebliebenes Geld von 134,7 auf 5,3 Mio, Kreditvolumen von 223,4 auf 65,9 Mio, sechs Spieler mehr in den Kadern und statt elf nur noch fünf Teams unter ihrem Optimum.",

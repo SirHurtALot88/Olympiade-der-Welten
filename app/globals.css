@@ -38987,7 +38987,9 @@ button.market-v2-bucket-card.is-selected {
 .foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-submeta {
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  /* Audit T2 („Berserker · Orc · Warrior · Destroye…"): zwei Zeilen statt einer,
+     damit Klasse · Rasse · Subklassen nicht abgeschnitten werden. */
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
@@ -39039,6 +39041,17 @@ button.market-v2-bucket-card.is-selected {
 
 .foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat strong {
   font-size: var(--nl-portrait-value-fs);
+  /* Audit T2 („77,0 · …"): Kennzahl + Liga-Rang dürfen nicht abgeschnitten werden.
+     Chips wachsen nach Inhalt (die leeren „—"-Chips geben den Platz her), statt
+     jeden Wert in ein starres Fünftel zu quetschen. */
+  overflow: visible;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .foundation-player-portrait-card.is-full-art.is-team-layout .nl-portrait-ability-stars {
@@ -45874,6 +45887,12 @@ button.foundation-team-portrait-card {
   flex-wrap: wrap;
 }
 
+.is-new-look .nl-inbox-header-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .is-new-look .nl-inbox-eyebrow {
   font-size: 11px;
   font-weight: 600;
@@ -45916,8 +45935,10 @@ button.foundation-team-portrait-card {
   padding: 4px 10px;
   border: 1px solid color-mix(in srgb, var(--nl-tone) 50%, transparent);
   border-radius: var(--nl-r-pill);
-  background: color-mix(in srgb, var(--nl-tone) 16%, transparent);
-  color: var(--nl-tone);
+  /* Audit I5: „1 kritisch" lag bei 3,09:1 — ausgerechnet der Alarm war am schwächsten
+     lesbar. Fester dunkler Grund + aufgehellter Risk-Ton, gemessen ≥ 4,5:1. */
+  background: color-mix(in srgb, var(--nl-risk) 18%, #14101c);
+  color: color-mix(in srgb, var(--nl-risk) 62%, #ffffff);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -46005,84 +46026,126 @@ button.foundation-team-portrait-card {
   max-width: 960px;
 }
 
-/* --- Die drei Räume (docs/INBOX_KONZEPT.md) ------------------------------
-   Gemeldet war „alles gleich wichtig" und „auf breiten Schirmen bleibt die
-   rechte Hälfte leer". Beides beantwortet dasselbe Raster: drei Spalten,
-   nebeneinander, jede mit ihrer eigenen Frage im Kopf. Auf schmalen Schirmen
-   stapeln sie in derselben Reihenfolge — Handeln bleibt oben. */
-.is-new-look .nl-inbox-lanes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--nl-s4);
-  align-items: start;
+.is-new-look .nl-inbox-list-row {
+  min-width: 0;
 }
 
-.is-new-look .nl-inbox-lanes .nl-inbox-list {
-  /* Im Raster bestimmt die Spalte die Breite, nicht die Karte. */
-  max-width: none;
+/* Nur sichtbar, wenn ein Mount den Modus wirklich umschalten kann (onModeChange). */
+.is-new-look .nl-inbox-mode-tabs {
+  align-self: flex-start;
 }
 
-.is-new-look .nl-inbox-lane {
+/* --- Dringlichkeits-Gruppen (Mockup inboxV2.html, Audit I1–I4) ------------
+   Kritisch → Heute sinnvoll → Kann warten → Berichte → Erledigt (eingeklappt).
+   Dringlichkeit ist POSITION, nicht nur Farbe; leere Gruppen entfallen komplett,
+   damit nie wieder „Alles erledigt" neben „11 offen" steht. Die Gruppenköpfe
+   nutzen die theme-festen Semantik-Töne (risk/warn/neutral), NIE die Teamfarbe. */
+.is-new-look .nl-inbox-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s5);
+  max-width: 960px;
+}
+
+.is-new-look .nl-inbox-group {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s3);
   min-width: 0;
-  padding: var(--nl-s3);
-  border-radius: var(--nl-r-md);
-  border: 1px solid var(--nl-line);
-  background: color-mix(in srgb, var(--nl-panel-2) 55%, transparent);
 }
 
-/* Der Handeln-Raum trägt seine Dringlichkeit im Rahmen — sichtbar, bevor man
-   eine einzelne Karte gelesen hat. */
-.is-new-look .nl-inbox-lane-act {
-  border-color: color-mix(in srgb, var(--nl-risk) 35%, var(--nl-line));
-  background: color-mix(in srgb, var(--nl-risk) 6%, var(--nl-panel-2));
-}
-
-.is-new-look .nl-inbox-lane-head {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.is-new-look .nl-inbox-lane-title {
+.is-new-look .nl-inbox-group-head {
   display: flex;
   align-items: center;
-  gap: var(--nl-s2);
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--nl-ink);
+  gap: var(--nl-s3);
 }
 
-.is-new-look .nl-inbox-lane-count {
-  padding: 0 7px;
-  border-radius: var(--nl-r-pill);
-  background: var(--nl-panel);
-  border: 1px solid var(--nl-line);
-  font-size: 11.5px;
-  font-weight: 600;
+.is-new-look .nl-inbox-group-title {
+  margin: 0;
+  font-family: var(--nl-sans);
+  font-style: normal;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-inbox-lane-act .nl-inbox-lane-count {
-  border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
+.is-new-look .nl-inbox-group-critical .nl-inbox-group-title {
   color: var(--nl-risk);
 }
 
-.is-new-look .nl-inbox-lane-question {
-  margin: 0;
-  font-size: 12.5px;
+.is-new-look .nl-inbox-group-today .nl-inbox-group-title {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-inbox-group-line {
+  flex: 1;
+  height: 1px;
+  background: var(--nl-line);
+}
+
+.is-new-look .nl-inbox-group-count {
+  font-size: 12px;
+  font-weight: 700;
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-inbox-lane-empty {
+/* Das eine kritische Item ist ROT MARKIERT und steht oben — vorher sagte der
+   Kopf „1 kritisch", aber keine Karte war als kritisch erkennbar (Audit I3). */
+.is-new-look .nl-inbox-card.is-critical {
+  border-color: color-mix(in srgb, var(--nl-risk) 60%, var(--nl-line));
+  border-left-color: var(--nl-risk);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-risk) 12%, transparent), transparent 65%),
+    var(--nl-panel);
+}
+
+.is-new-look .nl-inbox-critical-tag {
+  padding: 1px 9px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-risk);
+  color: #240604;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Konsequenz-Zeile: was passiert, wenn man nichts tut. Nur bei belegten Regeln. */
+.is-new-look .nl-inbox-card-consequence {
   margin: 0;
-  padding: var(--nl-s4) var(--nl-s3);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--nl-mut);
-  text-align: center;
+}
+
+.is-new-look .nl-inbox-card-consequence em {
+  font-style: normal;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--nl-risk) 70%, var(--nl-ink));
+}
+
+/* Erledigtes ist eingeklappt statt gleichrangiger Karten in der Liste. */
+.is-new-look .nl-inbox-done-block {
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  padding: var(--nl-s3) var(--nl-s4);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-done-block[open] {
+  padding-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-inbox-done-summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-done-block .nl-inbox-list {
+  margin-top: var(--nl-s3);
 }
 
 /* Das Sprungziel als Chip: man sieht VOR dem Klick, wo man landet. */
@@ -46096,12 +46159,6 @@ button.foundation-team-portrait-card {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--nl-mut);
-}
-
-@media (max-width: 1180px) {
-  .is-new-look .nl-inbox-lanes {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 .is-new-look .nl-inbox-card {
@@ -48925,8 +48982,73 @@ button.foundation-team-portrait-card {
   outline-offset: -2px;
 }
 
-.is-new-look .nl-teams-table-row.is-contract-expiring .nl-teams-playername {
+/* Audit T7: Die unerklärte Goldfärbung des Spielernamens bei auslaufenden Verträgen ist
+   durch den beschrifteten Chip ersetzt — Farbe, die Bedeutung trägt, sagt sie jetzt dazu. */
+.is-new-look .nl-teams-expiring-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-warn) 14%, var(--nl-panel-2));
   color: var(--nl-warn);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Kaderplanung über der „Liste & Verträge"-Tabelle bzw. kompakt unter den Portraits. */
+.is-new-look .nl-teams-contractplan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-teams-contractplan.is-compact {
+  margin-bottom: 0;
+}
+
+.is-new-look .nl-teams-contractplan-line {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-contractplan-line strong {
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+.is-new-look .nl-teams-contractplan-switch {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nl-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.is-new-look .nl-teams-contractplan-switch:hover,
+.is-new-look .nl-teams-contractplan-switch:focus-visible {
+  color: var(--nl-ink);
+}
+
+/* Abkürzungs-Legende unter der Tabelle — einmal ausgeschrieben statt 9px-Rätsel. */
+.is-new-look .nl-teams-table-legend {
+  margin: var(--nl-s3) 0 0;
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-table-legend strong {
+  color: var(--nl-ink);
+  font-weight: 600;
 }
 
 .is-new-look .nl-teams-playerlink {
@@ -49823,87 +49945,8 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-teams-contracts-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.is-new-look .nl-teams-contracts-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: var(--nl-r-sm);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-  font-size: 13px;
-}
-
-.is-new-look .nl-teams-contracts-row.is-expiring {
-  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
-  box-shadow: inset 3px 0 0 var(--nl-warn);
-}
-
-.is-new-look .nl-teams-contracts-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 650;
-  color: var(--nl-ink);
-  cursor: pointer;
-}
-
-.is-new-look .nl-teams-contracts-name:hover {
-  color: var(--nl-accent);
-  text-decoration: underline;
-}
-
-.is-new-look .nl-teams-contracts-role {
-  font-size: 11px;
-  color: var(--nl-mut);
-  white-space: nowrap;
-}
-
-.is-new-look .nl-teams-contracts-salary {
-  min-width: 72px;
-  text-align: right;
-  color: var(--nl-ink);
-}
-
-.is-new-look .nl-teams-contracts-term {
-  min-width: 84px;
-  text-align: right;
-  color: var(--nl-mut);
-  white-space: nowrap;
-}
-
-.is-new-look .nl-teams-contracts-term small {
-  color: var(--nl-mut-2);
-}
-
-.is-new-look .nl-teams-contracts-flag {
-  justify-self: end;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-teams-contracts-flag.is-expiring {
-  color: var(--nl-warn);
-}
+/* Die frühere per-Spieler-Vertragsliste („Verträge & Auslauf"-Karte) ist entfallen —
+   die Daten stehen genau einmal in der „Liste & Verträge"-Tabelle (T1, eine Quelle pro Größe). */
 
 .is-new-look .nl-teams-boardrow {
   display: flex;
@@ -61092,6 +61135,11 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-teams-development-bars {
   max-width: 100%;
+  /* Chris' Screenshot-Befund: der 96px-Deckel existierte nur auf dem Team-PROFIL
+     (.nl-teamprofile-development-bars) — hier auf der Teams-Seite fehlte er, und ein
+     einzelner Punkte-Balken wuchs mit width:100% + SVG-Seitenverhältnis auf mehrere
+     hundert Pixel. Gleicher Deckel wie im Profil. */
+  max-height: 96px;
 }
 
 .is-new-look .nl-teams-development-meta {
@@ -69039,9 +69087,11 @@ span.nl-facility-ampel-chip {
   list-style: none;
 }
 
+/* Der frühere Kategorie-Punkt (erste 12px-Spalte) ist raus: der Balken trägt die
+   Kategoriefarbe selbst — ein Farbsystem pro Zeile statt zwei (Chris-Befund). */
 .is-new-look .nl-teamdisc-row {
   display: grid;
-  grid-template-columns: 12px 38px minmax(60px, 1fr) 48px 40px;
+  grid-template-columns: 38px minmax(60px, 1fr) 48px 52px;
   align-items: center;
   gap: var(--nl-s2);
   padding: 4px var(--nl-s2);
@@ -69050,14 +69100,6 @@ span.nl-facility-ampel-chip {
 
 .is-new-look .nl-teamdisc-row:hover {
   background: var(--nl-panel-2);
-}
-
-.is-new-look .nl-teamdisc-row-axis {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--nl-tone, var(--nl-mut));
 }
 
 .is-new-look .nl-teamdisc-row-label {
@@ -69086,11 +69128,25 @@ span.nl-facility-ampel-chip {
   text-align: right;
 }
 
+/* Der Rang ist wieder die ZAHL: kein Quartil-Farbverlauf über alle 20 Zeilen mehr.
+   Markiert werden nur die Ausreißer — Medaille für Top-3, Risiko-Ton fürs Schlussviertel. */
 .is-new-look .nl-teamdisc-row-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   font-size: 11px;
   font-weight: 700;
   text-align: right;
-  color: var(--nl-tone, var(--nl-mut));
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamdisc-row-rank.is-tail {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamdisc-row-medal {
+  transform: scale(0.85);
 }
 
 .is-new-look .nl-teamdisc-footnote {

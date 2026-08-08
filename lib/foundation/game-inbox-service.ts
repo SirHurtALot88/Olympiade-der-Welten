@@ -647,9 +647,11 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           severity: lineupSet ? "info" : team.teamId === input.activeTeamId ? "critical" : "warning",
           status: lineupSet ? "done" : "open",
           title: lineupSet ? "Lineup gesetzt" : "Lineup fehlt",
+          // Anzeigename statt rohem Bezeichner („season-2-matchday-1") — gleiche Regel wie bei
+          // den Ergebnis-Meldungen (`resolveMatchdayDisplayLabel`).
           description: lineupSet
-            ? `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist gesetzt.`
-            : `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
+            ? `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist gesetzt.`
+            : `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup öffnen",

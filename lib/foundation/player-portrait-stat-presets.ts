@@ -156,16 +156,31 @@ function starTierStatExtra(metricLabel: string, rank: number | null | undefined)
   };
 }
 
+/**
+ * Abkürzungs-Tooltips (Audit T2/H7): jede Kachel erklärt ihr Kürzel im Titel.
+ * Trägt die Kennzahl zusätzlich eine Star-Tier-Stufe, wird deren Erklärung angehängt —
+ * eine der beiden ging vorher immer verloren.
+ */
+function withMetricTitle(base: string, extra: Partial<PortraitOverlayStat>): Partial<PortraitOverlayStat> {
+  return { ...extra, title: extra.title ? `${base} · ${extra.title}` : base };
+}
+
+const ROSTER_METRIC_TITLES = {
+  ovr: "OVR — Gesamtstärke (Overall)",
+  pps: "PPs — Performance-Punkte dieser Saison, füllen sich ab Spieltag 1",
+  mvs: "MVS — Marktwert-Score",
+} as const;
+
 export function buildRosterOverlayStats(input: BuildRosterOverlayInput): PortraitOverlayStat[] {
   const rankInline = input.rankStyle === "inline";
   const stats: PortraitOverlayStat[] = [
     stat(
       rankInline ? "OVR" : formatStatLabel("OVR", input.ovrRank),
       rankInline ? formatMetricWithRank(input.playerOvr, input.ovrRank, 1) : formatNumber(input.playerOvr, 1),
-      {
+      withMetricTitle(ROSTER_METRIC_TITLES.ovr, {
         heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
         ...starTierStatExtra("OVR", input.ovrRank),
-      },
+      }),
     ),
     stat(
       rankInline ? "PPs" : formatStatLabel("PPs", input.ppsRank),
@@ -174,27 +189,34 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
         : input.playerPps != null
           ? formatNumber(input.playerPps, 1)
           : "—",
-      input.playerPps != null
-        ? {
-            heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps),
-            ...starTierStatExtra("PPs", input.ppsRank),
-          }
-        : starTierStatExtra("PPs", input.ppsRank),
+      withMetricTitle(
+        ROSTER_METRIC_TITLES.pps,
+        input.playerPps != null
+          ? {
+              heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps),
+              ...starTierStatExtra("PPs", input.ppsRank),
+            }
+          : starTierStatExtra("PPs", input.ppsRank),
+      ),
     ),
   ];
   stats.push(
     stat(
       rankInline ? "MVS" : formatStatLabel("MVS", input.mvsRank),
       rankInline ? formatMetricWithRank(input.playerMvs, input.mvsRank, 1) : formatNumber(input.playerMvs, 1),
-      {
+      withMetricTitle(ROSTER_METRIC_TITLES.mvs, {
         heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
         ...starTierStatExtra("MVS", input.mvsRank),
-      },
+      }),
     ),
   );
   if (input.showCaPo && (input.caRating != null || input.poRangeMin != null || input.poRangeMax != null)) {
-    stats.push(stat("CA", formatNumber(input.caRating, 0)));
-    stats.push(stat("PO", formatPotentialRange(input.poRangeMin, input.poRangeMax)));
+    stats.push(stat("CA", formatNumber(input.caRating, 0), { title: "CA — aktuelles Fähigkeitslevel (Current Ability)" }));
+    stats.push(
+      stat("PO", formatPotentialRange(input.poRangeMin, input.poRangeMax), {
+        title: "PO — Potenzial-Spanne (mögliche Entwicklung)",
+      }),
+    );
   }
   return stats;
 }

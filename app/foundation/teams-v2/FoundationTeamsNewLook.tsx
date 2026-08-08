@@ -20,6 +20,7 @@ import {
   formatNlNumber,
   formatNlMoney,
   nlToneClass,
+  nlTrendToneFromDelta,
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
@@ -228,9 +229,16 @@ export type FoundationTeamsNewLookProps = {
   assignTeamCaptainBusy?: boolean;
 };
 
+/**
+ * Chris' Vorgabe („Team → kader als tabelle ist für mich 2. ansicht, kann mit verträgen quasi
+ * kombiniert werden … Ich will die portrait ansicht weiterhin haben!"): Portraits bleiben die
+ * erste Ansicht, die Tabelle wird zur zweiten Ansicht „Liste & Verträge" und trägt die
+ * Vertragsdaten (Auslauf-Kennzahlen + Gehaltslast-Projektion über der Tabelle, „Läuft aus"
+ * als beschrifteter Chip in der Zeile).
+ */
 const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }> = [
   { id: "portraits", label: "Portraits" },
-  { id: "tabelle", label: "Tabelle" },
+  { id: "tabelle", label: "Liste & Verträge" },
 ];
 
 /**
@@ -1227,9 +1235,6 @@ export default function FoundationTeamsNewLook({
           const portrait = getPlayerPortraitModel(player);
           const marketValue = getRosterEntryDisplayMarketValue(entry, player);
           const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
-          const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
-          const currentSeasonSalary = getRosterEntryCurrentSeasonSalary(entry, player);
-          const shapeShort = formatContractShapeShortLabel(entry.contractShape);
           const subMeta = formatPlayerIdentitySubMeta(player);
           return (
             <FoundationPlayerPortraitCard
@@ -1263,10 +1268,14 @@ export default function FoundationTeamsNewLook({
               poScoreRange={row.poScoreRange}
               onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
               title={`${player.name} öffnen`}
+              // T2 (Chris: „es ist ein game und kein excel"): Die Portrait-Karte trägt keine
+              // Vertragsdetails mehr — Gehalt und Laufzeit stehen genau einmal in der Ansicht
+              // „Liste & Verträge". Übrig bleibt der Marktwert als Spieler-Kennzahl.
               economyStats={[
                 {
                   label: "MW",
                   value: formatNlMoney(marketValue),
+                  title: "MW — Marktwert (mit Delta zur Vorwoche)",
                   delta:
                     marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
                       ? `${marketValueDelta > 0 ? "+" : ""}${formatNlNumber(marketValueDelta, 2)}`
@@ -1278,28 +1287,84 @@ export default function FoundationTeamsNewLook({
                         ? "text-negative"
                         : "",
                 },
-                {
-                  label: "Gehalt",
-                  value: formatDisplayMoney(currentSeasonSalary),
-                  delta:
-                    salaryDelta != null && Math.abs(salaryDelta) >= 0.01
-                      ? `${salaryDelta > 0 ? "+" : ""}${formatDisplayMoney(salaryDelta)}`
-                      : null,
-                  deltaClass:
-                    salaryDelta != null && salaryDelta < 0
-                      ? "text-positive"
-                      : salaryDelta != null && salaryDelta > 0
-                        ? "text-negative"
-                        : "",
-                },
-                {
-                  label: "LZ",
-                  value: `${entry.contractLength ?? "—"}${shapeShort ? ` · ${shapeShort}` : ""}`,
-                },
               ]}
             />
           );
         })}
+      </div>
+    );
+  }
+
+  /**
+   * Auslauf-Zusammenfassung der Kaderplanung — EINE Quelle (`contractSummary`/
+   * `contractSalaryLoad`), zwei Darstellungen: über der „Liste & Verträge"-Tabelle
+   * die volle Fassung (KPIs + Gehaltslast-Projektion), unter den Portraits nur die
+   * KPIs samt Absprung in die Listenansicht. Die per-Spieler-Vertragsdaten stehen
+   * NUR noch in der Tabelle — nicht mehr als dritte Kopie in einer Extra-Liste.
+   */
+  function renderContractPlanningSummary(variant: "list" | "compact") {
+    if (contractRows.length === 0) {
+      return null;
+    }
+    const expiringNames = contractRows.filter((row) => row.expiring).map((row) => row.playerName);
+    return (
+      <div className={`nl-teams-contractplan${variant === "compact" ? " is-compact" : ""}`}>
+        <StatChipRow className="nl-teams-contracts-kpis" aria-label="Vertrags-Kennzahlen">
+          <StatChip
+            label="Ausläufer"
+            value={formatNlNumber(contractSummary.expiringCount, 0)}
+            sub={`von ${formatNlNumber(contractSummary.count, 0)} im Kader`}
+            tone={contractSummary.expiringCount > 0 ? "warn" : "good"}
+            title="Verträge mit Restlaufzeit ≤ 1 Saison — laufen bald aus"
+          />
+          <StatChip
+            label="Ø Restlaufzeit"
+            value={contractSummary.avgLength != null ? `${formatNlNumber(contractSummary.avgLength, 1)} Sais.` : "—"}
+            title="Durchschnittliche verbleibende Vertragslaufzeit des Kaders"
+          />
+          {heroIsOwnTeam ? (
+            <StatChip
+              label="Gehaltslast p.a."
+              value={contractSummary.salaryTotal != null ? formatNlMoney(contractSummary.salaryTotal) : "—"}
+              tone="warn"
+              title="Summe der aktuellen Jahresgehälter des Kaders"
+            />
+          ) : null}
+        </StatChipRow>
+        {variant === "list" && heroIsOwnTeam && contractSalaryLoad.length > 0 ? (
+          <div className="nl-teams-contracts-load" aria-label="Gehaltslast-Projektion je Saison">
+            <span className="nl-teams-contracts-load-label">
+              Gehaltslast je Saison — sinkt mit auslaufenden Verträgen
+            </span>
+            <NlBarChart
+              bars={contractSalaryLoad}
+              format={(value) => formatNlMoney(value)}
+              aria-label="Projizierte Gehaltslast der kommenden Saisons"
+              className="nl-teams-contracts-load-chart"
+            />
+          </div>
+        ) : null}
+        {variant === "compact" ? (
+          <p className="nl-teams-contractplan-line">
+            {expiringNames.length > 0 ? (
+              <>
+                Läuft aus: <strong>{expiringNames.join(" · ")}</strong> —{" "}
+              </>
+            ) : (
+              <>Kein Vertrag läuft aus — </>
+            )}
+            <button
+              type="button"
+              className="nl-teams-contractplan-switch"
+              onClick={() => {
+                setRosterMode("tabelle");
+                scrollToSection(rosterCardRef);
+              }}
+            >
+              Details in „Liste &amp; Verträge"
+            </button>
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -1321,6 +1386,8 @@ export default function FoundationTeamsNewLook({
         ? "Test-Modus: Aktion freigeschaltet. Gehaltsverhandlung öffnet regulär am Season-End (nach MD10)."
         : "Gehaltsverhandlung öffnet am Season-End (nach MD10).";
     return (
+      <>
+      {renderContractPlanningSummary("list")}
       <div className="nl-teams-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
         <table className="nl-teams-table nl-tnum">
           <thead>
@@ -1330,9 +1397,9 @@ export default function FoundationTeamsNewLook({
               <th>OVR</th>
               <th>MVS</th>
               <th>PPs</th>
-              <th>MW</th>
+              <th title="Marktwert">MW</th>
               <th>Gehalt</th>
-              <th>LZ</th>
+              <th title="Vertrags-Restlaufzeit in Saisons">Vertrag</th>
               {showActions ? <th className="nl-teams-th-actions">Aktionen</th> : null}
             </tr>
           </thead>
@@ -1378,7 +1445,19 @@ export default function FoundationTeamsNewLook({
                         void openPlayerDrawerById(player.id, entry.id);
                       }}
                     >
-                      <span className="nl-teams-playername">{player.name}</span>
+                      <span className="nl-teams-playername">
+                        {player.name}
+                        {/* Audit T7: „Läuft aus" als beschrifteter Chip statt unerklärter
+                            Goldfärbung des Namens. */}
+                        {isContractExpiring ? (
+                          <span
+                            className="nl-teams-expiring-chip"
+                            title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
+                          >
+                            Läuft aus
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="nl-teams-playermeta">{formatPlayerIdentitySubMeta(player) || "—"}</span>
                     </button>
                   </td>
@@ -1407,7 +1486,7 @@ export default function FoundationTeamsNewLook({
                     </span>
                   </td>
                   <td>
-                    {entry.contractLength}
+                    {formatNlNumber(entry.contractLength, 0)} Sais.
                     {shapeShort ? <small className="nl-teams-shape"> · {shapeShort}</small> : null}
                   </td>
                   {showActions ? (
@@ -1477,6 +1556,12 @@ export default function FoundationTeamsNewLook({
           </tbody>
         </table>
       </div>
+      <p className="nl-teams-table-legend">
+        <strong>OVR</strong> Gesamtstärke · <strong>MVS</strong> Marktwert-Score · <strong>PPs</strong>{" "}
+        Performance-Punkte · <strong>MW</strong> Marktwert · Vertrag = Restlaufzeit. Tiefe Vertragswerkzeuge
+        (Buyout, Netto bei Verkauf, Board-Vorschlag) liegen im Reiter „Verträge".
+      </p>
+      </>
     );
   }
 
@@ -1540,22 +1625,33 @@ export default function FoundationTeamsNewLook({
                   <NlSparkline points={seasonPointsSpark} tone="accent" />
                 </span>
               ) : null}
+              {/* Ton = Richtung der gezeichneten Serie selbst (letzter minus erster Wert) —
+                  vorher trugen die Linien fest verdrahtete good/warn-Farben ohne Bedeutung. */}
               {seasonRankSpark.length >= 2 ? (
                 <span className="nl-teams-board-hover-trend">
                   <small>Rang (oben = besser)</small>
-                  <NlSparkline points={seasonRankSpark} tone="good" />
+                  <NlSparkline
+                    points={seasonRankSpark}
+                    tone={nlTrendToneFromDelta(seasonRankSpark[seasonRankSpark.length - 1] - seasonRankSpark[0])}
+                  />
                 </span>
               ) : null}
               {marketValueSpark.length >= 2 ? (
                 <span className="nl-teams-board-hover-trend">
                   <small>Marktwert</small>
-                  <NlSparkline points={marketValueSpark} tone="warn" />
+                  <NlSparkline
+                    points={marketValueSpark}
+                    tone={nlTrendToneFromDelta(marketValueSpark[marketValueSpark.length - 1] - marketValueSpark[0])}
+                  />
                 </span>
               ) : null}
               {cashSpark.length >= 2 ? (
                 <span className="nl-teams-board-hover-trend">
                   <small>Cash</small>
-                  <NlSparkline points={cashSpark} tone="good" />
+                  <NlSparkline
+                    points={cashSpark}
+                    tone={nlTrendToneFromDelta(cashSpark[cashSpark.length - 1] - cashSpark[0])}
+                  />
                 </span>
               ) : null}
             </div>
@@ -2033,28 +2129,50 @@ export default function FoundationTeamsNewLook({
               </figure>
               <ul className="nl-teamdisc-list" aria-label={`Disziplin-Breakdown ${selectedTeam.name}`}>
                 {sortedDisciplineBreakdown.map((entry) => {
+                  /**
+                   * Chris' Screenshot-Befund: In dieser Liste steckten ZWEI Farbsysteme in einer
+                   * Zeile — der Kategorie-Punkt (SPE = grün) neben dem Rang-Quartil-Balken
+                   * (zweites Viertel = ebenfalls grün). Grün bedeutete zwei verschiedene Dinge.
+                   * Entscheidung: Der BALKEN trägt die Kategoriefarbe (dasselbe Vokabular wie das
+                   * Radar links — beide sagen jetzt dasselbe), der RANG bleibt die Zahl. Die
+                   * Quartil-Skala (`getDisciplineRankTone`) färbt hier keine Fläche mehr; sie
+                   * markiert nur noch die Ausreißer: Medaille für die Top-3, dezenter
+                   * Risiko-Marker für das Schlussviertel. Überall sonst (Spieler-Perzentile,
+                   * Team-Ränge) gilt die geteilte Quartil-Skala unverändert.
+                   */
                   const tone = getDisciplineRankTone(entry.rank, teamCount);
                   const axisLabel = NL_TEAMS_AXES.find((axis) => axis.key === entry.axis)?.label ?? entry.axis;
+                  const medalKind =
+                    entry.rank === 1 ? ("gold" as const) : entry.rank === 2 ? ("silver" as const) : entry.rank === 3 ? ("bronze" as const) : null;
+                  const isTailQuartile = tone === "risk";
                   return (
                     <li key={entry.disciplineId} className="nl-teamdisc-row">
-                      <span
-                        className={`nl-teamdisc-row-axis ${nlToneClass(entry.axis)}`}
-                        aria-hidden="true"
-                        title={`Kategorie ${axisLabel}`}
-                      />
-                      <span className="nl-teamdisc-row-label" title={entry.label}>
+                      {/* Der frühere Kategorie-Punkt ist raus: der Balken trägt die Kategoriefarbe
+                          jetzt selbst, der Punkt wäre nur eine zweite Kopie derselben Aussage.
+                          Sein Tooltip lebt im Disziplin-Label weiter. */}
+                      <span className="nl-teamdisc-row-label" title={`${entry.label} — Kategorie ${axisLabel}`}>
                         {entry.shortLabel}
                       </span>
                       <NlProgressBar
                         value={entry.score ?? 0}
                         max={entry.leagueMax ?? 100}
-                        tone={tone}
+                        tone={entry.axis}
                         showValue={false}
                         className="nl-teamdisc-row-bar"
-                        title={`${entry.label}: ${formatNlNumber(entry.score, 1)} · Liga-Max ${formatNlNumber(entry.leagueMax, 1)}`}
+                        title={`${entry.label} (Kategorie ${axisLabel}): ${formatNlNumber(entry.score, 1)} · Liga-Max ${formatNlNumber(entry.leagueMax, 1)}`}
                       />
                       <span className="nl-teamdisc-row-score nl-tnum">{formatNlNumber(entry.score, 1)}</span>
-                      <span className={`nl-teamdisc-row-rank nl-tnum ${nlToneClass(tone)}`}>
+                      <span
+                        className={`nl-teamdisc-row-rank nl-tnum${isTailQuartile ? " is-tail" : ""}`}
+                        title={
+                          entry.rank != null
+                            ? `Liga-Rang #${formatNlNumber(entry.rank, 0)} von ${formatNlNumber(teamCount, 0)}${
+                                medalKind ? " — Top 3" : isTailQuartile ? " — Schlussviertel" : ""
+                              }`
+                            : undefined
+                        }
+                      >
+                        {medalKind ? <NlMedalBadge kind={medalKind} className="nl-teamdisc-row-medal" title={`Liga-Rang #${formatNlNumber(entry.rank, 0)} — Top 3`} /> : null}
                         {entry.rank != null ? `#${formatNlNumber(entry.rank, 0)}` : "—"}
                       </span>
                     </li>
@@ -2128,13 +2246,22 @@ export default function FoundationTeamsNewLook({
                         />
                       ) : null}
                     </header>
-                    {developmentSeries.pointBars.length > 0 ? (
+                    {developmentSeries.pointBars.length >= 2 ? (
                       <NlBarChart
                         bars={developmentSeries.pointBars}
                         format={(value) => formatNlNumber(value, 0)}
                         className="nl-teams-development-bars"
                         aria-label={`Punkte pro Saison von ${selectedTeam.name}`}
                       />
+                    ) : developmentSeries.pointBars.length === 1 ? (
+                      // Chris' Screenshot-Befund: EIN Datenpunkt ist kein Verlauf — der einzelne
+                      // Riesenbalken („86 · S1", mehrere hundert Pixel) wird zu Wert + Einordnung,
+                      // genau wie die drei Nachbar-Kacheln bei < 2 Punkten.
+                      <p className="nl-teams-empty">
+                        Erst eine Saison mit Punkten ({developmentSeries.pointBars[0].label}:{" "}
+                        {formatNlNumber(developmentSeries.pointBars[0].value, 0)}) — der Verlauf entsteht ab der
+                        zweiten.
+                      </p>
                     ) : (
                       <p className="nl-teams-empty">Keine Punktedaten vorhanden.</p>
                     )}
@@ -2156,9 +2283,11 @@ export default function FoundationTeamsNewLook({
                       ) : null}
                     </header>
                     {developmentSeries.marketValueSpark.length >= 2 ? (
+                      // Ton aus der RICHTUNG, aus derselben Quelle wie der Delta-Chip darüber —
+                      // nie mehr fest verdrahtetes Grün für eine fallende Kurve.
                       <NlSparkline
                         points={developmentSeries.marketValueSpark}
-                        tone="good"
+                        tone={nlTrendToneFromDelta(seasonDeltas?.marketValueDelta)}
                         className="nl-teams-development-spark"
                         aria-label={`Marktwert-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons`}
                       />
@@ -2188,7 +2317,7 @@ export default function FoundationTeamsNewLook({
                     {developmentSeries.cashSpark.length >= 2 ? (
                       <NlSparkline
                         points={developmentSeries.cashSpark}
-                        tone="good"
+                        tone={nlTrendToneFromDelta(seasonDeltas?.cashDelta)}
                         className="nl-teams-development-spark"
                         aria-label={`Cash-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons`}
                       />
@@ -2465,92 +2594,22 @@ export default function FoundationTeamsNewLook({
       </NlCard>
       </div>
 
-      <div className="nl-teams-anchor">
-      <NlCard
-        className="nl-teams-contracts-card"
-        eyebrow="Kaderplanung"
-        title="Verträge & Auslauf"
-      >
-        {contractRows.length > 0 ? (
-          <>
-            <StatChipRow className="nl-teams-contracts-kpis" aria-label="Vertrags-Kennzahlen">
-              <StatChip
-                label="Ausläufer"
-                value={formatNlNumber(contractSummary.expiringCount, 0)}
-                sub={`von ${formatNlNumber(contractSummary.count, 0)} im Kader`}
-                tone={contractSummary.expiringCount > 0 ? "warn" : "good"}
-                title="Verträge mit Restlaufzeit ≤ 1 Saison — laufen bald aus"
-              />
-              <StatChip
-                label="Ø Restlaufzeit"
-                value={contractSummary.avgLength != null ? `${formatNlNumber(contractSummary.avgLength, 1)} Sais.` : "—"}
-                tone="accent"
-                title="Durchschnittliche verbleibende Vertragslaufzeit des Kaders"
-              />
-              {heroIsOwnTeam ? (
-                <StatChip
-                  label="Gehaltslast p.a."
-                  value={contractSummary.salaryTotal != null ? formatNlMoney(contractSummary.salaryTotal) : "—"}
-                  tone="warn"
-                  title="Summe der aktuellen Jahresgehälter des Kaders"
-                />
-              ) : null}
-            </StatChipRow>
-            {heroIsOwnTeam && contractSalaryLoad.length > 0 ? (
-              <div className="nl-teams-contracts-load" aria-label="Gehaltslast-Projektion je Saison">
-                <span className="nl-teams-contracts-load-label">
-                  Gehaltslast je Saison — sinkt mit auslaufenden Verträgen
-                </span>
-                <NlBarChart
-                  bars={contractSalaryLoad}
-                  format={(value) => formatNlMoney(value)}
-                  aria-label="Projizierte Gehaltslast der kommenden Saisons"
-                  className="nl-teams-contracts-load-chart"
-                />
-              </div>
-            ) : null}
-            <ol className="nl-teams-contracts-list" aria-label="Verträge nach Restlaufzeit">
-              {contractRows.map((row) => (
-                <li
-                  key={row.entryId}
-                  className={`nl-teams-contracts-row${row.expiring ? " is-expiring" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="nl-teams-contracts-name"
-                    onClick={() => void openPlayerDrawerById(row.playerId, row.entryId)}
-                    title={`${row.playerName} öffnen`}
-                  >
-                    {row.playerName}
-                  </button>
-                  <span className="nl-teams-contracts-role">
-                    {row.roleTag === "starter"
-                      ? "Starter"
-                      : row.roleTag === "bench"
-                        ? "Bank"
-                        : row.roleTag === "rotation"
-                          ? "Rotation"
-                          : "Kader"}
-                  </span>
-                  <span className="nl-teams-contracts-salary nl-tnum">
-                    {row.salary != null ? formatNlMoney(row.salary) : "—"}
-                  </span>
-                  <span className="nl-teams-contracts-term nl-tnum">
-                    {row.contractLength > 0 ? `${formatNlNumber(row.contractLength, 0)} Sais.` : "—"}
-                    {row.shapeShort ? <small> · {row.shapeShort}</small> : null}
-                  </span>
-                  <span className={`nl-teams-contracts-flag${row.expiring ? " is-expiring" : ""}`}>
-                    {row.expiring ? "läuft aus" : "läuft"}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </>
-        ) : (
-          <p className="nl-teams-empty">Keine Kaderdaten für diese Ansicht.</p>
-        )}
-      </NlCard>
-      </div>
+      {/* T1 „Liste & Verträge": In der Listenansicht steht die Kaderplanung ÜBER der Tabelle
+          (renderContractPlanningSummary) — die frühere Extra-Karte mit einer dritten Kopie der
+          per-Spieler-Vertragsdaten entfällt dort. Unter den Portraits bleibt eine kompakte
+          Zusammenfassung mit Absprung in die Listenansicht (Portraits bleiben vertragsfrei —
+          „es ist ein game und kein excel"). */}
+      {rosterMode === "portraits" ? (
+        <div className="nl-teams-anchor">
+          <NlCard className="nl-teams-contracts-card" eyebrow="Kaderplanung" title="Verträge & Auslauf">
+            {contractRows.length > 0 ? (
+              renderContractPlanningSummary("compact")
+            ) : (
+              <p className="nl-teams-empty">Keine Kaderdaten für diese Ansicht.</p>
+            )}
+          </NlCard>
+        </div>
+      ) : null}
     </div>
   );
 }

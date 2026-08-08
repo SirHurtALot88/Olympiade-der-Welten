@@ -114,3 +114,32 @@ describe("die Gold-Stufe existiert beidseitig", () => {
     expect(css).toMatch(/\.is-new-look \.nl-tone-gold,[\s\S]{0,400}--nl-tone-text: var\(--nl-tone\);/);
   });
 });
+
+/**
+ * DIE EINE AUSNAHME (Chris-Entscheidung, S2/T-Paket): Im Disziplin-Profil der Teams-Seite
+ * („Stärken je Disziplin") steht die Achsen-Kategoriefarbe DIREKT neben der Rang-Skala —
+ * dort bedeutete Grün gleichzeitig „Kategorie Speed" (Punkt) und „zweites Viertel" (Balken).
+ * Deshalb trägt in DIESER Liste der Balken die Kategoriefarbe (dasselbe Vokabular wie das
+ * Radar daneben) und der Rang bleibt die Zahl; die Quartil-Skala markiert nur noch die
+ * Ausreißer (Medaille Top-3, Risiko-Marker Schlussviertel). NICHT zurückbauen: die volle
+ * Quartil-Färbung hier stellt die Doppeldeutigkeit wieder her. Überall sonst (Spieler-
+ * Perzentile, Team-Ränge) gilt die geteilte Skala unverändert — das prüfen die Tests oben.
+ */
+describe("Ausnahme Disziplin-Profil: Balken = Kategoriefarbe, Rang = Zahl mit Ausreißer-Markern", () => {
+  const teams = quelle("app/foundation/teams-v2/FoundationTeamsNewLook.tsx");
+
+  it("der Balken läuft auf der Achsen-Kategorie, nicht auf dem Rang-Quartil", () => {
+    expect(teams).toContain("tone={entry.axis}");
+    expect(teams).not.toContain("tone={tone}\n                        showValue={false}");
+  });
+
+  it("der Rang trägt keinen Quartil-Farbverlauf mehr, nur Medaille/Schlussviertel", () => {
+    expect(teams).toContain('const isTailQuartile = tone === "risk";');
+    expect(teams).toContain("nl-teamdisc-row-medal");
+    expect(teams).not.toContain("nl-teamdisc-row-rank nl-tnum ${nlToneClass(tone)}");
+  });
+
+  it("der redundante Kategorie-Punkt ist raus (der Balken sagt es jetzt selbst)", () => {
+    expect(teams).not.toContain("nl-teamdisc-row-axis");
+  });
+});

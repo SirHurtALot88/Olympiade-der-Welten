@@ -71,6 +71,21 @@ export function formatNlSignedNumber(value: number | null | undefined, digits = 
   return `${prefix}${formatNlNumber(value, digits)}`;
 }
 
+/**
+ * Trend-Ton aus einem Saison-Delta — DIESELBE Quelle wie der Delta-Chip daneben.
+ *
+ * Chris' Screenshot-Befund (Team-Seite): die Cash-Sparkline war fest auf `good`
+ * verdrahtet und leuchtete grün, während Cash von 91,3 auf 2,5 Mio fiel und der
+ * Delta-Chip daneben korrekt rot war. Bedeutungsfarbe muss Bedeutung tragen:
+ * steigt das Delta → good, fällt es → risk, kein Delta/±0 → neutral.
+ */
+export function nlTrendToneFromDelta(delta: number | null | undefined): NlTone {
+  if (delta == null || !Number.isFinite(delta) || delta === 0) {
+    return "neutral";
+  }
+  return delta > 0 ? "good" : "risk";
+}
+
 /** Vorzeichenbehaftetes Prozentformat ("+4%" / "-4%" / "0%"), null-sicher. */
 export function formatNlSignedPercent(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) {

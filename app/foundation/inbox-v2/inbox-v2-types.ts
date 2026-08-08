@@ -16,6 +16,11 @@ export type InboxV2Item = {
   lane?: InboxLaneId;
   /** Ziel in Nutzersprache („Teams · Verträge") — als Chip auf der Karte, VOR dem Klick lesbar. */
   targetLabel?: string | null;
+  /**
+   * Quell-Kennung des Items (`GameInboxItem.source`) — speist die Konsequenz-Zeile
+   * („Wenn du nichts tust: …") in `inbox-urgency-groups.ts`. Nie sichtbar im UI.
+   */
+  source?: string | null;
 };
 
 export type InboxV2Mode = "decisions" | "chronicle";
