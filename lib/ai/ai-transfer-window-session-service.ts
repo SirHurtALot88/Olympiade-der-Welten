@@ -713,6 +713,90 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
    * Saison 1 ist unberuehrt: `resolveAiLoanDecision` sperrt sie hart (`season_one_no_loans`), der
    * zweite Durchgang findet dort also genauso wenig wie der erste.
    */
+  /**
+   * EIN KREDIT NUR GEGEN EINEN ECHTEN KAUFPLAN.
+   *
+   * CHRIS: „kredite sollten eigentlich nur für investitionen oder negatives cash ausgleichen
+   * aufgenommen werden! sonst kosten die unfassbar viel und machen andere teams nur noch reicher"
+   *
+   * BEFUND, am Spielstand gemessen: von 223.4 Mio geliehenem Geld blieben 134.7 Mio unangetastet auf
+   * den Konten liegen — rund 60 Prozent. Die Kredite kamen ueberwiegend von anderen Teams zu 8 bis 17
+   * Prozent Zins; das Geld wanderte also innerhalb der Liga von den Klammen zu den Reichen, ohne dass
+   * ein einziger Spieler den Verein wechselte. B-P zahlte 47.7 Gesamtkosten auf 36.6 nie genutzte Mio.
+   *
+   * URSACHE: `resolveAiLoanDecision` schaetzt den Bedarf aus der Kaderluecke mal einem angenommenen
+   * Spielerpreis. Niemand fragte, ob der kaufende Planer das Geld ueberhaupt ausgeben WUERDE.
+   *
+   * Deshalb wird der Plan hier vorher geprobt — derselbe Planer, dieselben Kandidaten, nur mit dem
+   * hypothetischen Cash nach Kreditaufnahme. Plant er nichts, gibt es keinen Kredit; plant er weniger
+   * als beantragt, wird auf die geplanten Ausgaben gedeckelt (plus einem kleinen Aufschlag, weil
+   * Preise zwischen Plan und Ausfuehrung leicht steigen koennen).
+   *
+   * Die Liquiditaets-Ausnahme bleibt unberuehrt: wer negatives Cash ausgleicht, braucht keinen
+   * Kaufplan — das Minus IST der Grund. Nur der bedarfsgetriebene Kredit muss sich rechtfertigen.
+   */
+  const KREDIT_AUFSCHLAG = 1.3;
+  const deckleKreditAufKaufplan = (
+    gameState: GameState,
+    teamId: string,
+    entscheidung: { loanAmount: number; reason?: string | null },
+  ): { loanAmount: number } | null => {
+    const liquiditaet = typeof entscheidung.reason === "string" && entscheidung.reason.includes("liquidity");
+    if (liquiditaet) return { loanAmount: entscheidung.loanAmount };
+    const team = gameState.teams.find((entry) => entry.teamId === teamId);
+    if (!team) return { loanAmount: entscheidung.loanAmount };
+    let geplant = 0;
+    try {
+      const probeState: GameState = {
+        ...gameState,
+        teams: gameState.teams.map((entry) =>
+          entry.teamId === teamId ? { ...entry, cash: (entry.cash ?? 0) + entscheidung.loanAmount } : entry,
+        ),
+      };
+      const probeTeam = probeState.teams.find((entry) => entry.teamId === teamId)!;
+      const spielerNachId = new Map<string, Player>(probeState.players.map((player) => [player.id, player]));
+      const startingSquad = probeState.rosters
+        .filter((entry) => entry.teamId === teamId)
+        .map((entry) => spielerNachId.get(entry.playerId))
+        .filter((player): player is Player => Boolean(player));
+      const rosterIds = new Set(startingSquad.map((player) => player.id));
+      const freeAgents = listLocalTransfermarktFreeAgents({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId,
+        mode: "ai_preview",
+        localRunContext: sessionRunContext,
+        fullPool: true,
+      }).items;
+      const candidates: Player[] = [];
+      for (const item of freeAgents) {
+        if (rosterIds.has(item.playerId)) continue;
+        const player = spielerNachId.get(item.playerId);
+        if (player) candidates.push(player);
+      }
+      const plan = planOrganicDraftForTeam({
+        gameState: probeState,
+        team: probeTeam,
+        identity: probeState.teamIdentities.find((entry) => entry.teamId === teamId),
+        startingSquad,
+        candidates,
+        draftSeed: saltOrganicSeed(`${input.saveId}:${teamId}`),
+      });
+      // Was der Plan tatsaechlich ausgibt: Startkapital der Probe minus dem, was am Ende uebrig ist.
+      // Genauer als eine Summe ueber die Entscheidungen — der Planer verrechnet Gehaltsreserven mit.
+      const probeCash = (probeTeam.cash ?? 0);
+      geplant = plan.decisions.length === 0 ? 0 : Math.max(probeCash - plan.finalCash, 0);
+    } catch {
+      // Die Probe ist eine Zusatzpruefung, kein Tor: faellt sie aus (fehlender RunContext, leerer
+      // Marktcache), bleibt es beim bisherigen Verhalten statt den Kredit faelschlich zu blocken.
+      return { loanAmount: entscheidung.loanAmount };
+    }
+    const eigenes = Math.max(team.cash ?? 0, 0);
+    const luecke = Math.max(geplant * KREDIT_AUFSCHLAG - eigenes, 0);
+    if (luecke <= 0) return null;
+    return { loanAmount: Math.min(entscheidung.loanAmount, Math.ceil(luecke * 10) / 10) };
+  };
+
   const fuehreKreditPassAus = () => {
     if (!(useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun)) return;
     const borrowSave = readLiveSave();
@@ -725,15 +809,23 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         if (!current) break;
         const loanDecision = resolveAiLoanDecision(current.gameState, teamId);
         if (!loanDecision.shouldBorrow) continue;
+        const geprueft = deckleKreditAufKaufplan(current.gameState, teamId, loanDecision);
+        if (!geprueft) {
+          warnings.push(`ai_loan_skipped_no_plan:${teamId}:${loanDecision.loanAmount}`);
+          continue;
+        }
+        if (geprueft.loanAmount < loanDecision.loanAmount) {
+          warnings.push(`ai_loan_capped:${teamId}:${loanDecision.loanAmount}->${geprueft.loanAmount}`);
+        }
         // Günstigstes Angebot (Bank oder Team); buildLoanOffers ist aufsteigend nach Zinssatz sortiert
         // und enthält immer die Bank, es gibt also mindestens ein Angebot.
-        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+        const offers = buildLoanOffers(current.gameState, teamId, geprueft.loanAmount, loanDecision.termSeasons);
         const bestOffer = offers[0] ?? null;
         const loanResult = originateLoan(
           current.gameState,
           {
             borrowerTeamId: teamId,
-            principal: loanDecision.loanAmount,
+            principal: geprueft.loanAmount,
             termSeasons: loanDecision.termSeasons,
             lenderType: bestOffer?.lenderType ?? "bank",
             lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
@@ -747,7 +839,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
           sessionRunContext.save = persisted;
         }
-        warnings.push(`ai_loan_borrow:${teamId}:${loanDecision.loanAmount}:${loanDecision.termSeasons}s`);
+        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s`);
       }
     }
   };
