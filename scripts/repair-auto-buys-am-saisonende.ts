@@ -86,6 +86,30 @@ function hatKeineQuelle(entry: TransferHistoryEntry) {
   return source === "" || source === "undefined" || source === "null";
 }
 
+/**
+ * Warum eine Quelle stehen blieb — und was zu tun ist, wenn das nicht gewollt war.
+ *
+ * GEBRAUCHT, WEIL DER ALTE HINWEIS IN DIE IRRE FUEHRTE: bei `ai_roster_fill` stand pauschal
+ * „erstmaliger Liga-Draft, MUSS stehen bleiben". In Saison 1 stimmt das. Am echten Spielstand
+ * (`new-game-1785823388048-1hf25q`) lagen die 329 Draft-Kaeufe aber in `season-1` vom 04.08., und
+ * die 74 zu entfernenden Fueller in `season-2` vom 08.08. — der Aufruf war auf `season-2` verengt,
+ * der Erst-Draft also gar nicht in Reichweite. Trotzdem behauptete das Skript, es schuetze ihn
+ * gerade, und schloss mit „nichts zurueckzunehmen". Das liest sich wie „alles in Ordnung", war
+ * aber eine Verweigerung mit falscher Begruendung.
+ *
+ * Der Grund fuer die Verweigerung ist in Wahrheit immer derselbe und steht in `NUR_MIT_ZEITGRENZE`:
+ * ohne `--ab` laesst sich echter Draft nicht von spaeterer Wiederholung trennen. Also sagt der
+ * Hinweis das jetzt — samt dem Schalter, der fehlt.
+ */
+function hinweisZurQuelle(quelle: string, seasonId: string, ab: string | null) {
+  if (quelle !== LIGA_DRAFT_QUELLE) return "";
+  if (ab != null) return "  ← ausserhalb der Zeitgrenze --ab";
+  const istErsteSaison = seasonId === "season-1";
+  return istErsteSaison
+    ? "  ← erstmaliger Liga-Draft; nur mit --ab <zeitpunkt> zurueckzunehmen"
+    : `  ← braucht --ab <zeitpunkt>; in ${seasonId} ist das NICHT der erstmalige Liga-Draft`;
+}
+
 function istRuecknehmbarerKauf(entry: TransferHistoryEntry, ab: string | null, nurQuelle: string | null) {
   if (entry.transferType !== "buy") return false;
   if (hatKeineQuelle(entry)) return false;
@@ -235,8 +259,7 @@ async function main() {
     }
     console.log("\nNICHT zurueckgenommen (keine Quelle des gemeldeten Fehlers):");
     for (const [quelle, anzahl] of [...proQuelle.entries()].sort()) {
-      const hinweis = quelle === LIGA_DRAFT_QUELLE ? "  ← erstmaliger Liga-Draft, MUSS stehen bleiben" : "";
-      console.log(`  ${String(anzahl).padStart(4)}  ${quelle}${hinweis}`);
+      console.log(`  ${String(anzahl).padStart(4)}  ${quelle}${hinweisZurQuelle(quelle, seasonId, ab)}`);
     }
   }
 
@@ -247,6 +270,23 @@ async function main() {
   }
 
   if (ruecknahme.length === 0) {
+    /**
+     * Ein leeres Ergebnis hat ZWEI ganz verschiedene Gruende, und der alte Text nannte nur den
+     * harmlosen: „nichts zurueckzunehmen" liest sich wie „alles in Ordnung". Am echten Spielstand
+     * lagen aber 74 Fueller bereit und das Skript hatte sie bloss ohne `--ab` verweigert. Wer das
+     * fuer Erfolg haelt, spielt mit dem Schrott weiter.
+     */
+    const verweigert = nichtAngefasst.filter((entry) => NUR_MIT_ZEITGRENZE.has(String(entry.source)));
+    if (verweigert.length > 0 && ab == null) {
+      console.log(
+        `\nNICHTS GETAN — aber nicht, weil nichts da waere: ${verweigert.length} Kaeufe der Quelle ` +
+          `${LIGA_DRAFT_QUELLE} liegen in ${seasonId} und brauchen eine Zeitgrenze.\n` +
+          "  Ohne --ab laesst sich der echte Erst-Draft nicht von einer spaeteren Wiederholung\n" +
+          "  trennen, deshalb fasst das Skript die Quelle gar nicht an. Zeitpunkt setzen und\n" +
+          "  denselben Aufruf wiederholen, zum Beispiel: --ab 2026-08-05",
+      );
+      return;
+    }
     console.log("\nKeine automatischen Kaeufe in dieser Saison — nichts zurueckzunehmen.");
     return;
   }
