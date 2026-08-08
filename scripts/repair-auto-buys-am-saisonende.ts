@@ -21,6 +21,7 @@
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --season season-3    # nur diese Saison
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --nur-mein-team      # nur das menschliche Team
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --ab 2026-08-05      # nur ab diesem Zeitpunkt
+ *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --nur-quelle ai_roster_fill   # nur diese Quelle
  *   npx tsx scripts/repair-auto-buys-am-saisonende.ts --apply              # SCHREIBT (Backup vorher)
  *
  * Umgekehrt wird genau das, was `applyLocalTransfermarktBuy` schreibt
@@ -85,10 +86,20 @@ function hatKeineQuelle(entry: TransferHistoryEntry) {
   return source === "" || source === "undefined" || source === "null";
 }
 
-function istRuecknehmbarerKauf(entry: TransferHistoryEntry, ab: string | null) {
+function istRuecknehmbarerKauf(entry: TransferHistoryEntry, ab: string | null, nurQuelle: string | null) {
   if (entry.transferType !== "buy") return false;
   if (hatKeineQuelle(entry)) return false;
   const source = String(entry.source);
+  /**
+   * `--nur-quelle` schneidet die Ruecknahme auf EINE Quelle zu.
+   *
+   * GEBRAUCHT FUER: „schau mal die neuen spieler bei N-N sind alles so filler … wir müssen die
+   * noch mal raus nehmen im save". Ohne diesen Schalter nahm derselbe Aufruf auch die GUTEN
+   * organischen Zugaenge mit — im Bericht am Live-Spielstand waren das Hel 43.57, Phoenix 27.13,
+   * Lady Yueqin 32.73, Beast Keeper Morga 43.83 und Noir 36.87, alle `ai_preseason_market_buy`.
+   * Genau die sollen bleiben; raus soll nur, was der Fuell-Lauf eingekauft hat.
+   */
+  if (nurQuelle != null && source !== nurQuelle) return false;
   if (ab != null && (entry.happenedAt ?? "") < ab) return false;
   if (NUR_MIT_ZEITGRENZE.has(source)) return ab != null;
   return RUECKNEHMBARE_KAUF_QUELLEN.has(source);
@@ -100,6 +111,7 @@ function parseArgs(argv: string[]) {
   let apply = false;
   let nurMeinTeam = false;
   let ab: string | null = null;
+  let nurQuelle: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--apply") apply = true;
@@ -107,8 +119,9 @@ function parseArgs(argv: string[]) {
     else if (arg === "--save") saveId = argv[++i] ?? null;
     else if (arg === "--season") seasonId = argv[++i] ?? null;
     else if (arg === "--ab") ab = argv[++i] ?? null;
+    else if (arg === "--nur-quelle") nurQuelle = argv[++i] ?? null;
   }
-  return { saveId, seasonId, apply, nurMeinTeam, ab };
+  return { saveId, seasonId, apply, nurMeinTeam, ab, nurQuelle };
 }
 
 function istManuellGesteuert(gameState: GameState, teamId: string) {
@@ -122,7 +135,7 @@ function runde(value: number) {
 }
 
 async function main() {
-  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam, ab } = parseArgs(process.argv.slice(2));
+  const { saveId: saveIdArg, seasonId: seasonArg, apply, nurMeinTeam, ab, nurQuelle } = parseArgs(process.argv.slice(2));
   const persistence = createPersistenceService();
 
   const saveId = saveIdArg ?? persistence.getActiveSave()?.saveId ?? null;
@@ -212,7 +225,7 @@ async function main() {
   }
 
   const nichtAngefasst = derSaison.filter(
-    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry, ab),
+    (entry) => entry.transferType === "buy" && !hatKeineQuelle(entry) && !istRuecknehmbarerKauf(entry, ab, nurQuelle),
   );
   if (nichtAngefasst.length > 0) {
     const proQuelle = new Map<string, number>();
@@ -227,7 +240,7 @@ async function main() {
     }
   }
 
-  let ruecknahme = derSaison.filter((entry) => istRuecknehmbarerKauf(entry, ab));
+  let ruecknahme = derSaison.filter((entry) => istRuecknehmbarerKauf(entry, ab, nurQuelle));
   if (nurMeinTeam) {
     const ids = new Set(menschlicheTeams.map((t) => t.teamId));
     ruecknahme = ruecknahme.filter((entry) => entry.toTeamId && ids.has(entry.toTeamId));
