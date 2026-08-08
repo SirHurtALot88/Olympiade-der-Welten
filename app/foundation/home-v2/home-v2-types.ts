@@ -113,10 +113,23 @@ export type HomeV2ClientProps = {
   nextStepBlocked?: boolean;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
+  /**
+   * F4 (eine Quelle pro Größe): Achsen-Zusammenfassung des Teams — Ø Top-6
+   * je Achse aus `computeTeamTopSixAxisStats`, dieselbe Zahl wie im
+   * Office-Kopf und in der Markt-Impact-Vorschau. Das Radar rechnet NICHT
+   * selbst aus den Portrait-Karten.
+   */
+  teamAxisAverages: { pow: number; spe: number; men: number; soc: number } | null;
   leagueHeatPools: LeaguePlayerHeatPools;
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
   inboxItems: HomeV2InboxItem[];
+  /**
+   * F4 (eine Quelle pro Größe): Gesamtzahl der offenen Entscheidungen —
+   * dieselbe Liste, die die Inbox zählt. `inboxItems` ist nur die gekappte
+   * Anzeige (Top 5); ihre Länge darf NIE als Gesamtzahl gerendert werden.
+   */
+  inboxOpenCount: number;
   inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
   boardObjectives: HomeV2BoardObjective[];

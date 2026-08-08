@@ -3,6 +3,8 @@
  *
  * Achsen-Töne (pow/spe/men/soc) tragen die Spiel-Identität,
  * semantische Töne (good/warn/risk) sind bewusst vom Akzent getrennt.
+ * `gold` ist die Spitzen-Stufe der Rang-Skala „Bestwert → Schlusslicht"
+ * (lib/foundation/quartile-tone.ts) — themefest, nie die Teamfarbe.
  * Alle Farben kommen aus den `--nl-*` Tokens in `app/globals.css`
  * und greifen nur unterhalb von `.is-new-look`.
  */
@@ -12,6 +14,7 @@ export type NlTone =
   | "men"
   | "soc"
   | "accent"
+  | "gold"
   | "good"
   | "warn"
   | "risk"
@@ -35,6 +38,7 @@ export const NL_TONE_VAR: Record<NlTone, string> = {
   men: "var(--nl-men, #5b9bff)",
   soc: "var(--nl-soc, #e6b455)",
   accent: "var(--nl-accent, #5b9bff)",
+  gold: "var(--nl-gold, #f6c750)",
   good: "var(--nl-good, #4cc56b)",
   warn: "var(--nl-warn, #e0a53a)",
   risk: "var(--nl-risk, #e5615a)",

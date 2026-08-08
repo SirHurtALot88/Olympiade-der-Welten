@@ -35,6 +35,7 @@ import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat"
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
+import { getQuartileRankTone } from "@/lib/foundation/quartile-tone";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
@@ -418,22 +419,25 @@ function compareDisciplineByStrength(left: NlTeamDisciplineEntry, right: NlTeamD
   if (leftRank !== rightRank) {
     return leftRank - rightRank;
   }
+  // Befund T3: gleicher Liga-Rang wird strikt nach eigenem Score aufgelöst
+  // (stärker zuerst) — vorher sortierte hier das Alphabet und „Rang 4" stand
+  // scheinbar wahllos durcheinander. Das Label bleibt nur Tertiärschlüssel
+  // für vollständige Gleichstände.
+  const leftScore = left.score ?? Number.NEGATIVE_INFINITY;
+  const rightScore = right.score ?? Number.NEGATIVE_INFINITY;
+  if (leftScore !== rightScore) {
+    return rightScore - leftScore;
+  }
   return left.label.localeCompare(right.label, "de-DE");
 }
 
-/** Ton nach Liga-Rang-Quartil auf der Haus-Farbskala blau→grün→gelb→rot
- * (blau = Spitze/Rang 1 = das Beste, grün, gelb, rot = schwächstes) —
- * dieselbe 4-Stufen-Logik wie `getAxisRankTone` (players-table), nur auf
- * den Liga-Rang statt auf Rating-Bänder angewandt. */
+/** Ton nach Liga-Rang-Quartil: die geteilte, theme-FESTE Rang-Skala
+ * Gold→good→warn→risk (lib/foundation/quartile-tone.ts, Paket F2) —
+ * dieselbe Skala wie die Liga-Perzentil-Chips der Spielerliste. Vorher
+ * stand das Spitzenviertel auf `accent`: bei rotem Team-Theme sahen
+ * Rang 1 und Rang 31 gleich aus. */
 function getDisciplineRankTone(rank: number | null, teamCount: number): NlTone {
-  if (rank == null || teamCount <= 1) {
-    return "neutral";
-  }
-  const ratio = (rank - 1) / (teamCount - 1);
-  if (ratio <= 1 / 4) return "accent"; // Spitzen-Viertel: blau, "das Beste".
-  if (ratio <= 1 / 2) return "good"; // grün.
-  if (ratio <= 3 / 4) return "warn"; // gelb.
-  return "risk"; // rot = schwächstes.
+  return getQuartileRankTone(rank, teamCount);
 }
 
 type NlTeamDisciplineRadarAxis = {

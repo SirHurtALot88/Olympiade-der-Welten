@@ -18,6 +18,7 @@ import type {
   HomeV2TopPlayerCard,
 } from "@/app/foundation/home-v2/home-v2-types";
 import { sortTodayCardsByUrgency } from "@/lib/foundation/player-identity-meta";
+import { computeTeamTopSixAxisStats } from "@/lib/market/transfermarkt-roster-impact";
 import {
   buildHomePlayerCardsFromRoster,
   formatLocalePoints,
@@ -147,6 +148,13 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
     selectedTeam,
   ]);
 
+  // F4 (eine Quelle pro Größe): Achsen-Zusammenfassung = Ø Top-6 je Achse,
+  // dieselbe Basis wie Office-Kopf und Markt-Impact-Vorschau.
+  const homeTeamTopSixAxisStats = useMemo(
+    () => computeTeamTopSixAxisStats(selectedRosterTableRows.map((row) => row.player)),
+    [selectedRosterTableRows],
+  );
+
   const homePlayerCards = useMemo(
     () =>
       buildHomePlayerCardsFromRoster({
@@ -158,6 +166,12 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
     [gameState, playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows],
   );
 
+  // F4 (eine Quelle pro Größe): der Home-Zähler ist die Länge der VOLLEN
+  // Entscheidungsliste — exakt die Liste, die auch die Inbox zählt
+  // (FoundationInboxV2Host `openCount`). `homeTasks` ist nur die
+  // Top-5-Anzeige davon; ihre Länge als Gesamtzahl auszugeben war der
+  // „5 offen vs. 11 offen"-Widerspruch.
+  const homeOpenTaskCount = activeTeamDecisionInboxItems.length;
   const homeTasks = useMemo(() => {
     const severityOrder: Record<GameInboxItem["severity"], number> = {
       critical: 0,
@@ -182,11 +196,12 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         {
           key: "tasks",
           kicker: "Entscheidungen",
-          title: homeTasks.length > 0 ? `${homeTasks.length} offen` : "Alles erledigt",
+          // F4: Zähler = volle Liste (wie Inbox), nicht die Top-5-Anzeige.
+          title: homeOpenTaskCount > 0 ? `${homeOpenTaskCount} offen` : "Alles erledigt",
           detail: homeTasks[0]?.title ?? "Bereit für den nächsten Zug",
           tone: homeTasks.some((task) => task.severity === "critical")
             ? "warning"
-            : homeTasks.length > 0
+            : homeOpenTaskCount > 0
               ? "info"
               : "ready",
         },
@@ -198,7 +213,7 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
           tone: "info",
         },
       ]),
-    [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank],
+    [homeNextMatchdayStatus.openSlots, homeOpenTaskCount, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank],
   );
 
   const homeV2Facilities = useMemo((): HomeV2FacilitySnapshot[] => {
@@ -271,13 +286,20 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
   }, [enableTopPlayerForecasts, gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap]);
 
   const homeV2ScheduleItems = useMemo((): HomeV2ScheduleItem[] => {
-    const currentIndex = gameState.season.matchdayIds.indexOf(gameState.matchdayState.matchdayId);
-    return gameState.season.matchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => ({
-      matchdayId,
-      label: matchdayId,
-      isCurrent: offset === 0,
-      isPast: currentIndex >= 0 && gameState.season.matchdayIds.indexOf(matchdayId) < currentIndex,
-    }));
+    const allMatchdayIds = gameState.season.matchdayIds;
+    const currentIndex = allMatchdayIds.indexOf(gameState.matchdayState.matchdayId);
+    return allMatchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => {
+      // F5: nie den rohen Slug ("season-2-matchday-1") anzeigen — Position in
+      // der kanonischen Liste ist die Nummer, Rückfall auf die Slug-Endziffer.
+      const absoluteIndex = allMatchdayIds.indexOf(matchdayId);
+      const slugNumber = matchdayId.match(/(\d+)\s*$/)?.[1];
+      return {
+        matchdayId,
+        label: absoluteIndex >= 0 ? `Spieltag ${absoluteIndex + 1}` : slugNumber ? `Spieltag ${slugNumber}` : "Spieltag",
+        isCurrent: offset === 0,
+        isPast: currentIndex >= 0 && absoluteIndex < currentIndex,
+      };
+    });
   }, [gameState.matchdayState.matchdayId, gameState.season.matchdayIds]);
 
   const homeV2BoardObjectives = useMemo((): HomeV2BoardObjective[] => {
@@ -312,6 +334,8 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
     homeV2ScheduleItems,
     homeV2BoardObjectives,
     homeV2InboxItems,
+    homeOpenTaskCount,
+    homeTeamTopSixAxisStats,
     homeTodayCards,
   };
 }

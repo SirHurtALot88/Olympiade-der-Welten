@@ -68,6 +68,29 @@ export function computeTopSixAxisAverages(
   );
 }
 
+/**
+ * F4 (eine Quelle pro Größe): DIE Achsen-Zusammenfassung eines Teams.
+ *
+ * Home-Radar („Team-Stärke"), Office-Kopf und die Markt-Impact-Vorschau
+ * zeigen alle dieselbe Größe — Ø der sechs besten Werte je Achse
+ * (`computeTopSixAxisAverages`, dieselbe Basis wie die Vorher/Nachher-
+ * Rechnung beim Kauf). Vorher rechnete das Office den Schnitt über den
+ * GANZEN Kader und Home über die sechs Portrait-Spieler: drei ähnliche,
+ * widersprechende Zahlenreihen (55/40/42/44 vs. 54/39/39/41).
+ * Beschriftung an den Anzeigen: „Ø Top-6".
+ *
+ * `null`, wenn eine Achse keine Werte hat — keine erfundenen Nullen.
+ */
+export function computeTeamTopSixAxisStats(
+  roster: Array<{ coreStats: { pow: number; spe: number; men: number; soc: number } }>,
+): { pow: number; spe: number; men: number; soc: number } | null {
+  const averages = computeTopSixAxisAverages(roster.map((entry) => entry.coreStats));
+  if (averages.pow == null || averages.spe == null || averages.men == null || averages.soc == null) {
+    return null;
+  }
+  return { pow: averages.pow, spe: averages.spe, men: averages.men, soc: averages.soc };
+}
+
 export function computeTopSixAxisImpact(
   roster: TransfermarktAxisValues[],
   candidate: TransfermarktAxisValues | null | undefined,

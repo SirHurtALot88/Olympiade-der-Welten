@@ -23,6 +23,7 @@ import {
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
@@ -251,7 +252,10 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     })
     .filter((row) => row.salary > 0)
     .sort((left, right) => right.salary - left.salary);
-  const salaryTotal = round1(salaryRows.reduce((sum, row) => sum + row.salary, 0));
+  // F4: die Summe kommt aus dem geteilten Helper — dieselbe Funktion, die
+  // auch der Kredite-Chart zeigt. Die Zeilen oben sind nur die Aufschlüsselung
+  // derselben Verträge; ein Test hält fest, dass beide Wege gleich bleiben.
+  const salaryTotal = getTeamActualSalaryTotal(gameState, teamId);
 
   // --- Gebäude: Einnahmen + BEZAHLTER Unterhalt (T-108 b) ------------------
   // Symmetrisch cash-wirksam: der Season-End-Service schreibt sowohl den Facility-INCOME gut als

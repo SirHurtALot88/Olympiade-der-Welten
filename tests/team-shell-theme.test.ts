@@ -135,10 +135,35 @@ describe("buildTeamShellThemeVars", () => {
       return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
     };
     const PANEL = 0.0095; // --nl-panel #131a26
+    // F1: die Schwelle gilt auch gegen die TEAM-getönte Panel-Fläche —
+    // buildTeamShellThemeVars mischt 5 % Akzent ins Panel, und genau darauf
+    // steht der Text (Eyebrows, Karten). Gemessen war S-C vorher bei 4,44:1,
+    // weil nur gegen das ungetönte Panel gerechnet wurde.
+    const srgbAusHsl = (wert: string): [number, number, number] => {
+      const m = /^hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*\)$/.exec(wert)!;
+      const [h, s, l] = [Number(m[1]), Number(m[2]) / 100, Number(m[3]) / 100];
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const hp = (((h % 360) + 360) % 360) / 60;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      const [r, g, b] =
+        hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+      const m2 = l - c / 2;
+      return [r + m2, g + m2, b + m2];
+    };
+    const linear = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const teamPanelLuminanz = (accent: string) => {
+      const [ar, ag, ab] = srgbAusHsl(accent);
+      const basis = [0x13 / 255, 0x1a / 255, 0x26 / 255];
+      const mixed = [ar, ag, ab].map((v, i) => v * 0.05 + basis[i]! * 0.95);
+      return 0.2126 * linear(mixed[0]!) + 0.7152 * linear(mixed[1]!) + 0.0722 * linear(mixed[2]!);
+    };
     for (const code of Object.keys(TEAM_COLOR)) {
-      const text = luminanz(buildTeamShellThemeVars(code)!["--nl-accent-text"]!);
-      const verhaeltnis = (Math.max(text, PANEL) + 0.05) / (Math.min(text, PANEL) + 0.05);
-      expect(verhaeltnis, `${code}: Teamton als Text zu leise`).toBeGreaterThanOrEqual(4.5);
+      const vars = buildTeamShellThemeVars(code)!;
+      const text = luminanz(vars["--nl-accent-text"]!);
+      for (const grund of [PANEL, teamPanelLuminanz(vars["--nl-accent"]!)]) {
+        const verhaeltnis = (Math.max(text, grund) + 0.05) / (Math.min(text, grund) + 0.05);
+        expect(verhaeltnis, `${code}: Teamton als Text zu leise (Grund ${grund.toFixed(4)})`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 

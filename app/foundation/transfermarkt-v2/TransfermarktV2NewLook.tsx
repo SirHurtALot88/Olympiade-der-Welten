@@ -504,9 +504,12 @@ function formatNlBracketLabel(
 }
 
 function getNlFitTone(fit: number | null | undefined): NlTone {
+  // Bestwert→Schlusslicht-Skala (F2-Regel): Spitze Gold, dann good/warn/risk.
+  // Die zweite Stufe war vorher `accent` — Teamfarbe in einer Skala mit
+  // `risk` kollidiert bei roten Teams mit der Schlusslicht-Stufe.
   const value = fit ?? -99;
-  if (value >= 18) return "good";
-  if (value >= 10) return "accent";
+  if (value >= 18) return "gold";
+  if (value >= 10) return "good";
   if (value >= 0) return "warn";
   return "risk";
 }
