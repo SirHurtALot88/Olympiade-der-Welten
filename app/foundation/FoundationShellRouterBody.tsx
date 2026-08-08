@@ -363,6 +363,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   activeSaveSummary,
   activeScenarioWarning,
   activeTeamCriticalInboxItems,
+  activeTeamDecisionInboxItems,
   activeTeamMatchdaySummaryRow,
   activeTeamOpenInboxItems,
   activeView,
@@ -987,10 +988,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   }, [teamThemeCode]);
 
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
-  const inboxAllBadgeCount =
-    Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
-      ? activeTeamOpenInboxItems.length
-      : null;
   const teamsRosterBadgeCount =
     Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
 
@@ -1140,22 +1137,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
             />
           ) : activeView === "inboxV2" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "ALL", label: "Alle", count: inboxAllBadgeCount },
-                { id: "task", label: "Aufgaben" },
-                { id: "warning", label: "Warnungen" },
-                { id: "transfer", label: "Transfers" },
-                { id: "finance", label: "Finanzen" },
-                { id: "training", label: "Training" },
-              ]}
-              activeId={inboxCategoryFilter}
-              onSelect={(id) => {
-                setInboxCategoryFilter(id);
-                syncFoundationViewInUrl("inboxV2", id === "ALL" ? null : id, null, { push: true });
-              }}
-            />
+            // EIN Filtersystem (Audit I1): Die äußeren Kategorie-Reiter sind weg — sie
+            // konkurrierten mit den Pills in der Inbox selbst und boten Kategorien an
+            // („Warnungen", „Finanzen"), die als leere „Alles erledigt"-Seiten neben
+            // „11 offen" endeten (Audit I2). Gefiltert wird nur noch in der Inbox.
+            null
           ) : activeView === "scoutingCenterV2" ? (
             <FoundationSubNav
               className="foundation-shell-subnav"
@@ -2327,7 +2313,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 items={inboxV2Items}
                 selectedItemId={inboxV2SelectedItemId ?? inboxV2Items[0]?.id ?? null}
                 onSelectItem={setInboxV2SelectedItemId}
-                openCount={activeTeamOpenInboxItems.length}
+                // F4-Regel „eine Quelle pro Größe": derselbe Zähler wie auf Home
+                // (`homeOpenTaskCount` = `activeTeamDecisionInboxItems.length`) —
+                // „offen" meint, was zu TUN ist; Berichte zählen nicht mit.
+                openCount={activeTeamDecisionInboxItems.length}
                 criticalCount={activeTeamCriticalInboxItems.length}
                 teamLabel={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
                 categoryFilter={inboxCategoryFilter}

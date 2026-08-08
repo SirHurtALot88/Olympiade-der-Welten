@@ -394,7 +394,9 @@ export default function FoundationPlayerPortraitCard({
         </div>
         <div className="home-v2-player-overlay-bottom">
           {resolvedSubMeta && density !== "mini" ? (
-            <span className="foundation-player-portrait-submeta">{resolvedSubMeta}</span>
+            // title = Volltext: falls die zwei Clamp-Zeilen doch nicht reichen,
+            // ist nichts verloren (Audit T2: nichts Abgeschnittenes ohne Ausweg).
+            <span className="foundation-player-portrait-submeta" title={resolvedSubMeta}>{resolvedSubMeta}</span>
           ) : null}
           <strong className="home-v2-player-name">{name}</strong>
           {overlayStatsRow}

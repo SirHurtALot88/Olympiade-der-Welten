@@ -144,19 +144,18 @@ describe("Die Räume sind auch wirklich verdrahtet", () => {
     expect(source).toContain("laneLayout ? activeTeamInboxItems : filterInboxItemsByMode");
   });
 
-  it("die Ansicht rendert das Spaltenraster und blendet den Modus-Umschalter aus", () => {
+  it("die Ansicht gruppiert nach Dringlichkeit (Nachfolger des Spaltenrasters)", () => {
+    /**
+     * S2-Umbau (Mockup inboxV2.html): Aus den drei Räumen wurden Dringlichkeits-GRUPPEN
+     * untereinander (Kritisch → Heute sinnvoll → Kann warten → Berichte → Erledigt).
+     * Die Raum-Zuordnung (`resolveInboxLane`) bleibt die Datenbasis — sie speist jetzt
+     * `resolveInboxUrgencyGroup` statt eines Spaltenrasters. Details prüft
+     * `inbox-dringlichkeit-velo-look.test.ts`.
+     */
     const source = read("app/foundation/inbox-v2/InboxV2NewLook.tsx");
-    expect(source).toContain("nl-inbox-lanes");
-    expect(source).toContain("INBOX_LANES.map");
-    // Der Umschalter darf in der Raeume-Ansicht nicht mehr erscheinen.
-    expect(source).toContain("laneLayout ? null : (");
-  });
-
-  it("es gibt ein echtes Spaltenraster im Stylesheet, kein Untereinander", () => {
-    const css = read("app/globals.css");
-    const laneBlock = css.slice(css.indexOf(".is-new-look .nl-inbox-lanes {"));
-    expect(laneBlock.slice(0, 300)).toContain("grid-template-columns: repeat(3");
-    // Auf schmalen Schirmen muss es stapeln, sonst quetschen sich drei Spalten aufs Handy.
-    expect(css).toContain("grid-template-columns: minmax(0, 1fr)");
+    expect(source).toContain("groupInboxItemsByUrgency");
+    expect(source).toContain("INBOX_URGENCY_GROUPS.map");
+    // Der tote Ein-Tab-Modus-Umschalter erscheint nur noch, wenn ihn ein Mount bedienen kann.
+    expect(source).toContain("{onModeChange ? (");
   });
 });

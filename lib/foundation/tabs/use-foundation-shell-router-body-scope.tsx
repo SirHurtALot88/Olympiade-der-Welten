@@ -1,6 +1,7 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
-import { describeInboxTargetDestination } from "@/lib/foundation/inbox-target-labels";
+import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
+import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FoundationShellRouterCockpit,
@@ -10200,14 +10201,17 @@ export function useFoundationShellRouterBodyScope({
       }),
     [selectedTeamFacilityState],
   );
+  // EIN Filtersystem (Audit I1): die Kategorie filtert nur noch in der Ansicht selbst
+  // (`InboxV2NewLook`, Pills mit echten Zählern). Hier wird deshalb NICHT mehr nach Kategorie
+  // vorgefiltert — sonst könnte die Ansicht die Zähler der übrigen Kategorien nicht kennen und
+  // ein leerer Filter würde wieder als „Alles erledigt" neben „11 offen" stehen (Audit I2).
   const visibleInboxItems = useMemo(
     () =>
       filterGameInboxItems(activeTeamInboxItems, {
-        category: inboxCategoryFilter,
         includeDone: inboxIncludeDone,
         includeDismissed: inboxIncludeDismissed,
       }),
-    [activeTeamInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone],
+    [activeTeamInboxItems, inboxIncludeDismissed, inboxIncludeDone],
   );
   const inboxV2Items = useMemo(
     () =>
@@ -10222,6 +10226,12 @@ export function useFoundationShellRouterBodyScope({
           item.ctaLabel && item.targetView
             ? [{ id: "open-target", label: item.ctaLabel, detail: describeInboxTargetDestination(item) }]
             : undefined,
+        // Dringlichkeits-Gruppierung + Ziel-Chip + Konsequenz-Zeile — dieselben Ableitungen
+        // wie in `use-inbox-v2-derivations` (FoundationInboxV2Host), damit beide Mounts
+        // identisch gruppieren.
+        lane: resolveInboxLane(item),
+        targetLabel: resolveInboxTargetLabel(item),
+        source: item.source,
       })),
     [visibleInboxItems],
   );
@@ -11980,6 +11990,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveSummary,
     activeScenarioWarning,
     activeTeamCriticalInboxItems,
+    activeTeamDecisionInboxItems,
     activeTeamMatchdaySummaryRow,
     activeTeamOpenInboxItems,
     activeView,

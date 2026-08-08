@@ -21,6 +21,7 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  nlTrendToneFromDelta,
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
@@ -1782,13 +1783,21 @@ export default function TeamProfileNewLook({
                     />
                   ) : null}
                 </header>
-                {developmentSeries.pointBars.length > 0 ? (
+                {developmentSeries.pointBars.length >= 2 ? (
                   <NlBarChart
                     bars={developmentSeries.pointBars}
                     format={(value) => formatNlNumber(value, 0)}
                     className="nl-teamprofile-development-bars"
                     aria-label={`Punkte pro Saison von ${data.teamName}`}
                   />
+                ) : developmentSeries.pointBars.length === 1 ? (
+                  // Ein Datenpunkt ist kein Verlauf (Chris-Befund auf der Teams-Seite,
+                  // gleiche Kachel): Wert + Einordnung statt eines einzelnen Riesenbalkens.
+                  <p className="nl-teamprofile-empty">
+                    Erst eine Saison mit Punkten ({developmentSeries.pointBars[0].label}:{" "}
+                    {formatNlNumber(developmentSeries.pointBars[0].value, 0)}) — der Verlauf entsteht ab der
+                    zweiten.
+                  </p>
                 ) : (
                   <p className="nl-teamprofile-empty">Keine Punktedaten vorhanden.</p>
                 )}
@@ -1811,9 +1820,11 @@ export default function TeamProfileNewLook({
                   ) : null}
                 </header>
                 {developmentSeries.marketValueSpark.length >= 2 ? (
+                  // Ton aus der RICHTUNG — dieselbe Quelle wie der Delta-Chip darüber,
+                  // kein fest verdrahtetes Grün mehr für fallende Kurven.
                   <NlSparkline
                     points={developmentSeries.marketValueSpark}
-                    tone="good"
+                    tone={nlTrendToneFromDelta(seasonDeltas?.marketValueDelta)}
                     className="nl-teamprofile-development-spark"
                     aria-label={`Marktwert-Verlauf von ${data.teamName} über ${developmentRows.length} Saisons`}
                   />
@@ -1843,7 +1854,7 @@ export default function TeamProfileNewLook({
                 {developmentSeries.cashSpark.length >= 2 ? (
                   <NlSparkline
                     points={developmentSeries.cashSpark}
-                    tone="good"
+                    tone={nlTrendToneFromDelta(seasonDeltas?.cashDelta)}
                     className="nl-teamprofile-development-spark"
                     aria-label={`Cash-Verlauf von ${data.teamName} über ${developmentRows.length} Saisons`}
                   />

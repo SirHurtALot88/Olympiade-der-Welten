@@ -92,6 +92,7 @@ export {
   NL_AXIS_LABELS,
   NL_TONE_VAR,
   nlToneClass,
+  nlTrendToneFromDelta,
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look/nl-tones";
