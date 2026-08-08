@@ -7,6 +7,8 @@
  * - VeloImpactStrip: phased metrics (Base / Form / Mutator / Final, XP / Fatigue, Rank window)
  * - VeloSplitMeter: EINE Groesse in zwei Teile zerlegt (erlassen vs. zahlbar) — das Verhaeltnis
  *   soll lesbar sein, nicht nur die zwei Zahlen. Ab drei Teilen stattdessen VeloImpactStrip.
+ * - VeloDivergingBar: ZWEI gegenlaeufige Groessen um eine Mittelachse (Ausgaben vs. Einnahmen) —
+ *   mit `max` als gemeinsamer Skala werden mehrere Zeilen (Team-Boards) direkt vergleichbar.
  * - VeloIntensityRail: Push / Normal / Conserve selection rails (Training, filters)
  * - VeloAttributeFocusTags: training weight gain/loss tags
  * - VeloStarRating / VeloPotentialStars: class/potential display
@@ -15,6 +17,7 @@
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
  */
 export { VeloAxisRail, type VeloAxisRailEntry, type VeloAxisRailProps } from "@/components/foundation/velo-ui/VeloAxisRail";
+export { VeloDivergingBar, type VeloDivergingBarProps } from "@/components/foundation/velo-ui/VeloDivergingBar";
 export { VeloScoutMetric } from "@/components/foundation/velo-ui/VeloScoutMetric";
 export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/components/foundation/velo-ui/VeloAttributeFocusTags";
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";
