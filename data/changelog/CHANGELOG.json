@@ -66,6 +66,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Teams · Teamprofil",
+      "pr": null,
+      "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Saison · Saisonende",
       "pr": null,
       "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
@@ -107,6 +116,15 @@
       "text": "KI-Teams mit zu kleinem Kader blieben unter dem Minimum stehen und blockierten den Preseason-Markt — obwohl Geld und freie Spieler reichlich da waren. Die Vorschlagsliste war auf drei Spieler fest verdrahtet, egal wie viele fehlten, und die Schrittzahl des Pick-Planers übernahm ungeprüft eine zu kleine Vorgabe. Beides richtet sich jetzt nach dem tatsächlichen Bedarf bis zum Kader-Minimum.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die Achsen-Kopfzeilen im Squad Depth Chart waren zugeklappt leer — jetzt steht dort der Schnitt der Achse und ihre stärksten Spieler auf den Plätzen 1 bis 6, in denselben Spalten wie die Disziplinen darunter. Gerechnet wird über alle fünf Disziplinen einer Achse, damit niemand nach oben rutscht, nur weil er in zweien davon stark ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
@@ -170,6 +188,15 @@
       "text": "„Neue Saison starten\" tat bei einer Ablehnung des Servers scheinbar gar nichts — der Grund landete nur im Cockpit und war auf der Saisonabschluss-Seite unsichtbar. Jetzt steht er dort, offene Blocker werden im Klartext genannt, und eine fehlende Sponsorenwahl führt mit einem Knopf direkt zu den Sponsoren statt in den Assistenten.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Alle Seiten · Kopfbereich",
+      "pr": null,
+      "text": "Die Statuszeile ganz oben lässt sich jetzt wegklappen — eine Meldung, die tagelang stehen bleibt, hängt sonst dauerhaft über jeder Seite. Zugeklappt bleibt ein schmaler Knopf mit der Zahl der Meldungen, damit nichts spurlos verschwindet; ein Blocker bleibt daran auch weiterhin als solcher erkennbar. Der Zustand wird gemerkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
