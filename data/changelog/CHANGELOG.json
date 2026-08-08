@@ -39,6 +39,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Neues Spiel · Saison-1-Draft",
+      "pr": null,
+      "text": "Project Suicide startete eine neue Saison mit einem Konto im Minus, und die Saison-Vorprüfung ließ das Spiel dann nicht weiterlaufen. Grund war die Reihenfolge: Nula gehört per Sonderregel immer zu P-S und wird von P-S auch ganz normal bezahlt — nur wurde sie erst nach dem Draft verrechnet. Der Draft plante deshalb mit den vollen 300 Mio statt mit dem, was nach Nula übrig ist, gab 297,6 aus, und die 4,6 für Nula rissen das Konto danach ins Minus. Nula wird jetzt schon beim Anlegen des Spielstands gekauft, damit der Draft mit dem echten Rest rechnet. Am Kader von P-S und an Nulas Vertrag ändert sich nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Saison · Saisonende",
       "pr": null,
       "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
