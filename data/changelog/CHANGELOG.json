@@ -84,9 +84,27 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Teamprofil · Saison-Verlauf und Historie",
+      "pr": null,
+      "text": "Die Zeile der abgelaufenen Saison war überall leer — im Saison-Verlauf stand „Kein Rang-Verlauf vorhanden\", in der Historie-Tabelle war Season 1 durchgehend ein Strich. Der Verdacht lag auf kaputten Saison-Schnappschüssen; nachgezählt war aber keiner kaputt: alle 32 Teams standen mit Rang und Punkten drin. Sie kamen nur nie im Browser an. Die Anfangsladung streicht die Schnappschüsse nämlich weg, weil an ihnen sämtliche Spielerleistungen und Spieltagsergebnisse hängen — dreieinhalb Megabyte, die keine Ansicht am Stück braucht. Ohne sie fiel jede vergangene Saison auf eine leere Platzhalterzeile zurück. Jetzt fährt eine Kurzfassung mit: pro Saison und Team Rang, Punkte, PPS, Cash, Gehalt, Marktwert, GuV, Verletzungen und die größten Zu- und Abgänge. Das sind 53 Kilobyte statt dreieinhalb Megabyte. Leer bleibt nur die durchschnittliche Müdigkeit — die braucht die Spieltagsergebnisse, und genau die sind der Grund fürs Streichen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Saison · Saisonende",
       "pr": null,
       "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Transferhistorie · Team-Board",
+      "pr": null,
+      "text": "Auf dem Transferboard stand bei jedem einzelnen Team „Einnahmen 0,0 Mio\", als hätte die ganze Liga nur Geld ausgegeben. Verkauft worden war reichlich: 49 Verkäufe von 20 Teams. Sie tauchten nur nicht auf, weil das Transferfenster am Saisonwechsel auf zwei Saisons aufgeteilt wird — verkauft wird am letzten Spieltag der alten Saison, gekauft am ersten der neuen, und das Board gruppierte nach Saison. Damit zerschnitt es einen einzigen Vorgang: die Verkäufe, aus denen die Käufe bezahlt wurden, landeten in der Ansicht davor. Das Board gruppiert jetzt nach Transferfenster statt nach Saison, und jedes Team zeigt wieder Einnahmen, Ausgaben und eine echte Bilanz. An der gespeicherten Historie ändert sich nichts — dort steht weiterhin wahrheitsgemäß, wann ein Transfer passiert ist. Auslaufende Verträge bleiben bewusst bei ihrer Saison: das sind keine Transfers und bringen kein Geld.",
       "quelle": "gepflegt",
       "gewicht": null,
       "version": "0.4"
