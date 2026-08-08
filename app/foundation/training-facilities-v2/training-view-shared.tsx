@@ -28,7 +28,10 @@ import {
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { Player, PlayerDemandStatus } from "@/lib/data/olyDataTypes";
-import { estimateClassTrainingGains } from "@/lib/training/class-training-gain-estimate";
+import {
+  estimateClassTrainingGains,
+  type ClassTrainingAttributeGain,
+} from "@/lib/training/class-training-gain-estimate";
 import {
   DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
   getDevelopmentRouteBonusMultiplier,
@@ -78,6 +81,14 @@ export type TrainingIntensityProjectionEntry = {
   label: string;
   /** "durch Training" — Trainingsbudget für diese Intensität (potentialgetrieben, pro Spieler). */
   trainingGain: number;
+  /**
+   * Auf die Fokus-Stats ANGEWENDETER Trainingsanteil bei dieser Intensität (dieselbe lineare
+   * Skalierung wie `trainingGain`, aber auf `Σ attributeForecast.training` statt auf das Budget).
+   * Das ist die Größe, die die Kopf-KPI „Trainings-Zugewinn" summiert — sie stand hier schon immer
+   * als Zwischenwert (`appliedTraining`) und wird jetzt exponiert, damit die Simulation der
+   * KPI-Zeile dieselbe Semantik zeigt wie der Ist-Zustand (eine Quelle, ein Bezug).
+   */
+  appliedTrainingGain: number;
   /** Angewendeter Performance-Anteil bei dieser Intensität. */
   performanceGain: number;
   /** Regressions-Drag (negativ), intensitätsunabhängig. */
@@ -179,6 +190,7 @@ export function buildTrainingIntensityProjection(
       mode: option.value,
       label: option.label,
       trainingGain: rTrainingGain,
+      appliedTrainingGain: roundTo(appliedTraining, 1),
       performanceGain: rPerformanceGain,
       regression: rRegression,
       ceilingLoss,
@@ -263,6 +275,12 @@ export type TrainingClassGainEstimate = {
    * in der Karte angezeigt wird — damit „Klassen-SP" und „Intensitäts-SP" dieselbe (Netto-)Einheit sprechen.
    */
   netComparableGain: number;
+  /**
+   * T6 · Klassen-Stat-Vorschau: welche Attribute diese Klasse mit wie viel SP trainiert —
+   * 1:1 aus `estimateClassTrainingGains` durchgereicht (dort in derselben Schleife berechnet,
+   * aus der auch `estimatedGain` summiert wird; Invariante `roundTo(Σ gain, 1) === estimatedGain`).
+   */
+  attributeGains: ClassTrainingAttributeGain[];
   isCurrent: boolean;
   /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
   rank: number;
@@ -347,6 +365,7 @@ export function buildTrainingClassGainRanking(
       label,
       estimatedGain,
       netComparableGain: roundTo(netAnchor + (estimatedGain - currentGross), 1),
+      attributeGains: gain?.attributeGains ?? [],
       isCurrent: className === currentClass,
       developmentRoute,
       hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis, trainingFocusBonusPct) > 1,

@@ -101,16 +101,46 @@ type ShortlistTableRow = {
   isLoadedReport: boolean;
 };
 
+// S2 (Audit „markt"): Kürzel ohne Erklärung — CA, PO-Decke, Intel, Fee bekommen jetzt einen
+// Glossar-Tooltip am Spaltenkopf (`NlTableColumn.tooltip`, rendert als natives `title`, siehe
+// NlTable.tsx), nach demselben Muster wie die bereits bestehende "Top-6-Impact"-Spalte.
 const SHORTLIST_COLUMNS: NlTableColumn<ShortlistTableRow>[] = [
   { key: "rank", label: "#", align: "right", width: "44px", sortable: true },
   { key: "name", label: "Spieler", sortable: true },
   { key: "status", label: "Status", sortable: true },
-  { key: "intel", label: "Intel", align: "right", sortable: true },
+  {
+    key: "intel",
+    label: "Intel",
+    align: "right",
+    sortable: true,
+    tooltip: "Scouting-Fortschritt für diesen Spieler — 100 % = vollständig gescoutet, echte Werte statt Schätzung.",
+  },
   { key: "level", label: "Stufe", align: "right", sortable: true },
-  { key: "ca", label: "CA", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
-  { key: "po", label: "PO-Decke", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
+  {
+    key: "ca",
+    label: "CA",
+    align: "right",
+    sortable: true,
+    className: "nl-scout-shortlist-nowrap",
+    tooltip: "Current Ability — die aktuelle Spielstärke, so gut wie euer Scouting sie schon kennt.",
+  },
+  {
+    key: "po",
+    label: "PO-Decke",
+    align: "right",
+    sortable: true,
+    className: "nl-scout-shortlist-nowrap",
+    tooltip: "Potential Overall — die geschätzte Entwicklungsdecke; solange nicht voll gescoutet, eine Spanne.",
+  },
   { key: "potential", label: "Potenzial", sortable: true },
-  { key: "fee", label: "Fee", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
+  {
+    key: "fee",
+    label: "Fee",
+    align: "right",
+    sortable: true,
+    className: "nl-scout-shortlist-nowrap",
+    tooltip: "Geschätzte Ablösesumme — der Marktwert des Spielers, keine verbindliche Forderung des Teams.",
+  },
   { key: "impact", label: "Top-6-Impact", align: "right", sortable: true, tooltip: "Top-6-Achsen-Schnitt Δ mit Kauf" },
 ];
 

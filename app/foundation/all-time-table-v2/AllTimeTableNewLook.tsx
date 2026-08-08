@@ -147,14 +147,42 @@ const BASE_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
   { key: "seasonsPlayed", label: "Saisons", align: "right", sortable: true, tooltip: "Anzahl gespielter Saisons (inkl. laufender Saison)" },
 ];
 
-const FOCUS_COLUMNS: Record<TableFocus, Array<NlTableColumn<AllTimeTableRow>>> = {
-  points: [
-    ...BASE_COLUMNS,
-    { key: "cumulativePoints", label: "Punkte", align: "right", sortable: true, tooltip: "Kumulierte Liga-Punkte über alle Saisons inkl. laufender Saison" },
-    { key: "avgPoints", label: "Ø Punkte", align: "right", sortable: true, tooltip: "Ø Liga-Punkte je gespielter Saison" },
-    { key: "avgRank", label: "Ø Rang", align: "right", sortable: true, tooltip: "Ø Abschluss-Rang über alle Saisons (kleiner = besser)" },
-    { key: "bestRank", label: "Best", align: "right", sortable: true, tooltip: "Bester je erreichter Abschluss-Rang" },
-  ],
+const POINTS_COLUMNS_BASE: Array<NlTableColumn<AllTimeTableRow>> = [
+  ...BASE_COLUMNS,
+  { key: "cumulativePoints", label: "Punkte", align: "right", sortable: true, tooltip: "Kumulierte Liga-Punkte über alle Saisons inkl. laufender Saison" },
+  { key: "avgPoints", label: "Ø Punkte", align: "right", sortable: true, tooltip: "Ø Liga-Punkte je gespielter Saison" },
+  { key: "avgRank", label: "Ø Rang", align: "right", sortable: true, tooltip: "Ø Abschluss-Rang über alle Saisons (kleiner = besser)" },
+  { key: "bestRank", label: "Best", align: "right", sortable: true, tooltip: "Bester je erreichter Abschluss-Rang" },
+];
+
+/**
+ * T8/A1 (Team-Audit): "Bei 1 archivierter Saison sind Ø Rang und Best
+ * spaltenweise identisch — drei Spalten ohne Unterscheidungskraft."
+ * `avgRank`/`bestRank` kommen beide aus genau demselben einen Wert
+ * (`ranks.length === 1` → Ø = Min), solange nur eine Saison abgeschlossen
+ * ist — kein Rechenfehler, nur eine Spalte, die noch nichts zu unterscheiden
+ * hat. Ab der zweiten archivierten Saison können sich Ø und Bester
+ * unterscheiden → beide Spalten kommen zurück. Nicht ausgeblendet, sondern
+ * zusammengelegt UND erklärt (Tooltip), statt zwei Spalten mit derselben
+ * Zahl nebeneinander stehen zu lassen.
+ */
+function getPointsColumns(archivedSeasonCount: number): Array<NlTableColumn<AllTimeTableRow>> {
+  if (archivedSeasonCount >= 2) {
+    return POINTS_COLUMNS_BASE;
+  }
+  return POINTS_COLUMNS_BASE.filter((column) => column.key !== "bestRank").map((column) =>
+    column.key === "avgRank"
+      ? {
+          ...column,
+          label: "Rang",
+          tooltip:
+            "Abschluss-Rang der bisher einen archivierten Saison. Ø-Rang und Bester Rang trennen sich, sobald eine zweite Saison archiviert ist — bis dahin dieselbe Zahl, eine Spalte statt zwei.",
+        }
+      : column,
+  );
+}
+
+const FOCUS_COLUMNS: Record<Exclude<TableFocus, "points">, Array<NlTableColumn<AllTimeTableRow>>> = {
   medals: [
     ...BASE_COLUMNS,
     { key: "gold", label: "🥇", align: "right", sortable: true, tooltip: "Gold — Anzahl 1. Plätze (Meistertitel)" },
@@ -382,6 +410,17 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
     return [...model.rows].sort((left, right) => (getSortValue(left, sort.key) - getSortValue(right, sort.key)) * factor);
   }, [model, sort]);
 
+  /**
+   * Die tatsächlich gerenderten Spalten des aktuellen Fokus — EINE Quelle für
+   * Tabellenkopf UND die Verlauf-Caption unten (T8/A2: "Top 8" muss das
+   * wirklich aktive Sortierkriterium nennen, nicht immer "nach Punkten"
+   * behaupten, wenn gerade z. B. nach Marktwert sortiert ist).
+   */
+  const activeColumns = useMemo(
+    () => (focus === "points" ? getPointsColumns(model?.archivedSeasonCount ?? 0) : FOCUS_COLUMNS[focus]),
+    [focus, model?.archivedSeasonCount],
+  );
+
   const openKpiMetric = useMemo(() => KPI_METRICS.find((metric) => metric.key === openKpi) ?? null, [openKpi]);
 
   const drawerRows = useMemo<NlRankingDrawerRow[]>(() => {
@@ -435,7 +474,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         }
       >
         <NlTable
-          columns={FOCUS_COLUMNS[focus]}
+          columns={activeColumns}
           rows={sortedRows}
           rowKey={(row) => row.teamId}
           rowClassName={(row) => (selectedTeamId != null && row.teamId === selectedTeamId ? "is-own-team" : undefined)}
@@ -478,11 +517,23 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
   const canShowCharts = maxSeasonPoints >= 2 || hasSingleMoneyAnchor;
   const defaultChartRows = sortedRows.slice(0, 8);
   const ownRow = selectedTeamId != null ? model.rows.find((row) => row.teamId === selectedTeamId) ?? null : null;
-  const chartRows = showAllCharts
-    ? sortedRows
-    : ownRow != null && !defaultChartRows.some((row) => row.teamId === ownRow.teamId)
-      ? [...defaultChartRows, ownRow]
-      : defaultChartRows;
+  const ownRowAppended = ownRow != null && !defaultChartRows.some((row) => row.teamId === ownRow.teamId);
+  const chartRows = showAllCharts ? sortedRows : ownRowAppended ? [...defaultChartRows, ownRow] : defaultChartRows;
+
+  /**
+   * T8/A2 (Team-Audit): "Der Cut bei 8+eigenes ist nicht beschriftet ('Top 8
+   * nach Punkten' fehlt als Caption)." Die Auswahl kommt aus `sortedRows` —
+   * der TABELLEN-Sortierung, die je nach Fokus-Reiter/Klick auf einen anderen
+   * Spaltenkopf wechselt (nicht immer Punkte, nicht immer absteigend). Label
+   * kommt aus `activeColumns` — derselben Quelle wie der Tabellenkopf, damit
+   * Caption und Kopfzeile nie auseinanderlaufen können.
+   */
+  const chartSortLabel = activeColumns.find((column) => column.key === sort.key)?.label ?? sort.key;
+  const chartCaption = showAllCharts
+    ? `Alle ${formatNlNumber(sortedRows.length, 0)} Teams — sortiert nach ${chartSortLabel}${sort.direction === "asc" ? " (aufsteigend)" : ""}.`
+    : `Top ${formatNlNumber(defaultChartRows.length, 0)} nach ${chartSortLabel}${
+        sort.direction === "asc" ? " (aufsteigend)" : ""
+      }${ownRowAppended ? " · dein Team ergänzt" : ""}.`;
 
   const renderChartsCard = () => (
     <NlCard
@@ -503,6 +554,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         <p className="nl-alltime-chart-hint">Verläufe erscheinen ab 2 Saisons Historie je Team.</p>
       ) : (
         <>
+          <p className="nl-alltime-chart-caption">{chartCaption}</p>
           <div className="nl-alltime-chart-grid">
             {chartRows.map((row) => {
               const { values, labels } = getChartSeries(row, chartMetric);
@@ -581,6 +633,18 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
       >
         <p className="nl-alltime-hint">
           Team-Entwicklung über alle Saisons: kumulierte Punkte, Marktwert- und Cash-Verlauf sowie der ewige Leader.
+          {/* T8 (Chris' Rückfrage): früher Saisonzustand erklären statt stillschweigend
+              voraussetzen — bei erst 1 archivierten Saison stammt fast alles hier noch
+              aus dieser einen Saison, die laufende zählt in "Saisons" mit, obwohl sie
+              gerade erst begonnen hat. */}
+          {model.archivedSeasonCount === 1 ? (
+            <>
+              {" "}
+              Aktuell ist erst eine Saison archiviert — die „Saisons"-Spalte zählt die laufende Saison mit, auch
+              wenn sie gerade erst begonnen hat. Verläufe, Ø-/Bester-Rang-Trennung und der ewige Leader werden
+              erst mit der zweiten archivierten Saison aussagekräftig.
+            </>
+          ) : null}
         </p>
       </NlCard>
 

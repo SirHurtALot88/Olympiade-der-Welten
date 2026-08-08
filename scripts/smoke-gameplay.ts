@@ -1031,11 +1031,19 @@ async function main() {
         run: async (step) => {
           await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
           await page.locator("#foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
-          const lightSegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
-          const visible = await lightSegment.isVisible().catch(() => false);
-          if (visible) {
-            await lightSegment.click();
-            step.details.push("Training mode segment clicked on testsave.");
+          // Seit Paket T5 ist die Team-Rail (.velo-intensity-segment) nur noch eine
+          // VORSCHAU (Simulation) — geschrieben wird pro Spieler über die
+          // Zeilen-Segmente der Steuer-Tabelle. Der Write-Smoke klickt deshalb
+          // zuerst ein Zeilen-Segment; die alte Rail bleibt als Fallback für
+          // Legacy-Ansichten.
+          const rowSegment = page.locator(".nl-training-row-seg-btn").first();
+          const legacySegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
+          if (await rowSegment.isVisible().catch(() => false)) {
+            await rowSegment.click();
+            step.details.push("Training row intensity segment clicked on testsave.");
+          } else if (await legacySegment.isVisible().catch(() => false)) {
+            await legacySegment.click();
+            step.details.push("Training mode segment clicked on testsave (legacy rail).");
           } else {
             step.warnings.push("No training intensity segment visible — skipped.");
           }

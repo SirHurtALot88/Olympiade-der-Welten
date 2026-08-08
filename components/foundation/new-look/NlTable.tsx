@@ -148,12 +148,20 @@ export function NlTable<Row>({
                       className={`nl-table-sort-th${isActive ? " is-active" : ""}`}
                       onClick={() => onSort?.(column.key)}
                       title={column.tooltip}
+                      // T8/A3: Spaltenköpfe, die nur ein Emoji/Kürzel als Label tragen
+                      // (z. B. 🥇/🥈/🥉), brauchen mehr als einen Hover-Tooltip —
+                      // `aria-label` macht die Erklärung für Screenreader/Touch
+                      // verfügbar, nicht nur für Maus-Hover. Additiv, kein
+                      // sichtbarer Unterschied für Spalten ohne Tooltip.
+                      aria-label={column.tooltip ? `${column.label} — ${column.tooltip}` : undefined}
                     >
                       <span>{column.label}</span>
                       <b aria-hidden="true">{!isActive ? "↕" : sortState?.direction === "asc" ? "↑" : "↓"}</b>
                     </button>
                   ) : (
-                    <span title={column.tooltip}>{column.label}</span>
+                    <span title={column.tooltip} aria-label={column.tooltip ? `${column.label} — ${column.tooltip}` : undefined}>
+                      {column.label}
+                    </span>
                   )}
                 </th>
               );

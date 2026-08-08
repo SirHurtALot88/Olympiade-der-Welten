@@ -44,7 +44,10 @@ const ACCENT_ALS_TEXT_OBERGRENZE = 219;
 // Informationstragender Sekundärtext nimmt `color: var(--nl-mut)` (6,8:1);
 // `--nl-mut-2` liegt mit 3,7:1 auf Panel unter der Schwelle.
 // Nach T1 (tote Vertragslisten-Styles raus): 77.
-const MUT2_ALS_TEXT_OBERGRENZE = 77;
+// Nach T3 (Spielerliste: Podium-Kennzahllabel, PPs-Erklärzeile, Free-Agent-
+// Status, Saison-Gehaltszeile, Alltime-Saisonanzahl — alle fünf trugen echte
+// Information, nicht Deko): 72.
+const MUT2_ALS_TEXT_OBERGRENZE = 72;
 
 const zaehle = (re: RegExp) => (CSS.match(re) ?? []).length;
 

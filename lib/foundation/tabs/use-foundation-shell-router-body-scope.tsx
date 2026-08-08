@@ -10018,8 +10018,19 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "lineup",
         kicker: "Heute wichtig",
-        title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
-        detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
+        // S1: die Karte ist jetzt die Handlungszeile der Home-Ansicht — Titel
+        // benennt die Handlung, das Detail erklärt die Konsequenz (der alte
+        // kryptische Zwei-Wort-Text ist raus).
+        title:
+          homeNextMatchdayStatus.openSlots > 0
+            ? `Einsatzliste füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
+            : "Einsatzliste steht",
+        detail:
+          homeNextMatchdayStatus.openSlots > 0
+            ? homeNextMatchdayStatus.requiredSlots > 0
+              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Einsatzliste startet der Spieltag nicht.`
+              : "Ohne Einsatzliste startet der Spieltag nicht."
+            : "Alles gesetzt — weiter in die Arena.",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
         urgency: homeNextMatchdayStatus.openSlots > 0 ? 0 : 2,

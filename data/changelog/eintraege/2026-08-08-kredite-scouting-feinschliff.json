@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Kredite",
+    "text": "Vier kleine Korrekturen auf der Kredite-Seite: das Bestes-Angebot-Badge lag mitten im Anbieternamen, jetzt bricht es sauber daneben um. Die Einnahmen-Referenz im Belastungsbalken lief als abgeschnittener Text aus der Karte, jetzt steht sie als Legendenpunkt daneben. Der Admin-Vorschau-Schalter für die Season-1-Sperre stand offen im Spieler-UI, er ist jetzt hinter einen Dev-Modus verschwunden. Und \"Zins-Range\" zeigte durch einen Substring-Treffer im Lexikon fälschlich die Erklärung von \"Rang\" — jetzt ein eigener, korrekter Tooltip.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Markt · Scouting",
+    "text": "Der Scouting Report zeigte zuerst ein bildschirmfüllendes Vorher/Nachher-Balkendiagramm und erst darunter, wessen Report das überhaupt ist — die Balken-Spiegelung war eine zweite Darstellung derselben Zahlen wie die kompakte Chip-Zeile weiter unten und ist raus, der Spielerkopf steht jetzt zuerst. CA, PO-Decke, Intel und Fee in der Shortlist-Tabelle sowie die Potenzial-Einstufung im Report (vorher roh \"low\") tragen jetzt Erklärungen auf Deutsch. Der eigene \"Empfehlungen\"-Reiter (eine Karte plus zwei Zeilen Text) ist in die Übersicht gefaltet.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

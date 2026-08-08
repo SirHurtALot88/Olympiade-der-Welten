@@ -1143,12 +1143,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // „11 offen" endeten (Audit I2). Gefiltert wird nur noch in der Inbox.
             null
           ) : activeView === "scoutingCenterV2" ? (
+            // S3 (Audit „markt"): der separate "Empfehlungen"-Reiter bestand am Saisonstart aus
+            // einer einzigen Karte plus Erklärtext — in die Übersicht gefaltet
+            // (ScoutingCenterV2NewLook rendert den Inhalt jetzt unter "overview"; ein alter
+            // `?tab=recommended`-Deep-Link fällt dort weiterhin auf denselben Inhalt zurück).
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
                 { id: "overview", label: "Übersicht" },
                 { id: "reports", label: "Scouting Report" },
-                { id: "recommended", label: "Empfehlungen" },
               ]}
               activeId={scoutingCenterTab}
               onSelect={(id) => {
@@ -1157,20 +1160,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
             />
           ) : activeView === "trainingCompact" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "control", label: "Steuerung" },
-                { id: "forecast", label: "Forecast" },
-              ]}
-              activeId="control"
-              onSelect={(id) => {
-                // Auf tatsächlich existierende Anker scrollen (vorher zeigten die IDs
-                // ins Leere → Klick tat nichts).
-                const targetId = id === "forecast" ? "training-development-filters" : "foundation-training-compact";
-                document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-            />
+            // Steuerung/Forecast-Subnav entfernt (Audit TR4): „Forecast" war kein eigener
+            // Inhalt, sondern nur ein Scroll-Anker auf die Entwicklungsfilter derselben
+            // Seite — zwei Reiter, die dieselbe Kartenwand zeigten. Seit der Steuer-Tabelle
+            // (Paket T5) stehen Steuerung UND Forecast in einer Tabelle; ein Umschalter,
+            // der nichts umschaltet, verspricht nur einen Unterschied, den es nicht gibt.
+            null
           ) : activeView === "prize" ? (
             // LEGACY: Der "Preisgeld"-Untertab ist entfernt — Preisgeld wird nicht
             // mehr ausgezahlt/genutzt. Es gibt nur noch Sponsoren, daher kein
@@ -1988,9 +1983,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   : gameFlowActionStep.warnings[0]
                     ? formatCockpitReason(gameFlowActionStep.warnings[0])
                     : "Flow bereit — weiter zum nächsten Schritt.",
+              // S1: roher Schlüssel bleibt am Chip — die Home-Ansicht braucht ihn,
+              // um Band-Doppelungen zu filtern und Chips klickbar zu machen.
               warnings: (homeWarnings as string[])
                 .filter((warning: string) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
-                .map(formatHomeWarningLabel),
+                .map((warning: string) => ({ key: warning, label: formatHomeWarningLabel(warning) })),
               // Friction fix (Generalprobe #2): a fresh save starts with no
               // human-controlled team and no flow-blocker routes there — surface
               // a dedicated CTA instead of the silently-hidden `no_active_team` chip.
@@ -2008,12 +2005,40 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               inboxOpenCount: homeOpenTaskCount,
               inboxCriticalCount: activeTeamCriticalInboxItems.length,
               todayCards: homeTodayCards,
+              // S1 (Mockup homeV2): Kapitän-Hinweis im Board-Block — dieselbe Quelle
+              // wie die Kapitänwahl im Office (Kandidatenliste), keine zweite Rechnung.
+              captainSummary: (() => {
+                const candidates = selectedTeamCaptainCandidates ?? [];
+                if (candidates.length === 0) return null;
+                const current =
+                  candidates.find(
+                    (candidate: { playerId: string }) => candidate.playerId === selectedTeamCaptainPlayerId,
+                  ) ?? null;
+                const best = candidates.reduce(
+                  (
+                    leader: { playerId: string; playerName: string; leadershipScore: number } | null,
+                    candidate: { playerId: string; playerName: string; leadershipScore: number },
+                  ) => (leader == null || candidate.leadershipScore > leader.leadershipScore ? candidate : leader),
+                  null,
+                );
+                const challenger =
+                  current && best && best.playerId !== current.playerId && best.leadershipScore > current.leadershipScore + 1
+                    ? best
+                    : null;
+                return {
+                  captainName: current?.playerName ?? null,
+                  captainLeadership: current?.leadershipScore ?? null,
+                  challengerName: challenger?.playerName ?? null,
+                  challengerLeadership: challenger?.leadershipScore ?? null,
+                };
+              })(),
               onContinue: triggerGlobalNext,
               // Alle Home-Schnellsprünge pushen einen History-Eintrag (wie die
               // Sidebar), damit „Zurück" von der Zielseite verlässlich wieder auf
               // Home führt statt auf den zuvor aktiven Tab.
               onOpenTeams: () => setFoundationView("teams", setActiveView, { push: true }),
               onOpenLineup: () => setFoundationView("lineup", setActiveView, { push: true }),
+              onOpenArena: () => setFoundationView("matchdayArena", setActiveView, { push: true }),
               onOpenMarket: () => setFoundationView("marketV2", setActiveView, { push: true }),
               onOpenTraining: () => setFoundationView("trainingCompact", setActiveView, { push: true }),
               onOpenOffice: () => navigateHomeTab("office"),
@@ -2746,6 +2771,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             onCommitDiscipline={commitArenaDiscipline}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+            // S3 Pre-Matchday: „Einsatzliste öffnen →" ist der Held vor dem Anpfiff.
+            // History-Push wie bei den Home-Schnellsprüngen, damit „Zurück" wieder
+            // in der Arena landet.
+            onOpenLineup={() => setFoundationView("lineup", setActiveView, { push: true })}
             roomContext={roomContext}
           />
               {/* Die "Spieltagsergebnis"-Sektion ist entfernt: sie wiederholte, was die

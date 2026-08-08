@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import changelogDatei from "@/data/changelog/CHANGELOG.json";
 import { NlCard, NlEmptyState } from "@/components/foundation/new-look";
@@ -14,6 +14,25 @@ import {
   sortiereChangelog,
   type ChangelogEintrag,
 } from "@/lib/changelog/changelog";
+
+/**
+ * W6 (Audit „welt", Befund 2): 137+ Einträge auf einer 18.000-px-Seite ohne Filter, Suche oder
+ * Sprungmarken — eine einzige Scroll-Wand. Fix hier: nur die NEUESTE Version steht initial offen,
+ * ältere liegen hinter einem "Anzeigen"-Schalter je Versionsabschnitt; eine Sprungleiste im Kopf
+ * springt zu jeder Version und klappt sie dabei auf.
+ *
+ * Befund 1 (45–60s Ladezeit) ist NICHT hier behoben — nachgemessen (siehe PR-Beschreibung): die
+ * Komponente selbst lädt keine Daten nach (die JSON-Datei ist zur Build-Zeit eingebacken, reines
+ * `useMemo`-Parsen/Gruppieren, keine Netzwerk-Anfrage) und rendert warm in ~3–5s. Die 45–60s waren
+ * die einmalige Dev-Server-Kompilierung der riesigen gemeinsamen Modulkette dieser Seite (u. a.
+ * `use-foundation-shell-router-body-scope.tsx`, >12.000 Zeilen) — kein Datenweg-Bug dieser
+ * Komponente, sondern ein Dev-Mode-Artefakt, das im gebauten Produktiv-Build nicht auftritt.
+ */
+
+/** `version` → stabiler React-/Anker-Schlüssel; `null` wird zu "ohne-version". */
+function versionsSchluessel(version: string | null): string {
+  return version ?? "ohne-version";
+}
 
 /**
  * Der Changelog-Reiter — unterster Reiter im Spiel, reine Nur-Lese-Ansicht.
@@ -94,6 +113,53 @@ export default function FoundationChangelogHost() {
   // Aus der flachen Liste, nicht aus `abschnitte` — die Kennzahlen sollen die Gliederung ueberleben.
   const zusammenfassung = useMemo(() => fasseChangelogZusammen(eintraege), [eintraege]);
 
+  // EINE Quelle fuer "welche Versionen gibt es, in welcher Reihenfolge, wie voll": direkt aus der
+  // flachen Liste (nicht aus `abschnitte`), damit die globale Reihenfolge stimmt, auch wenn
+  // verschiedene Gewicht-Abschnitte unterschiedliche Versionen enthalten. Speist sowohl die
+  // Sprungleiste als auch die "welche Version ist die neueste"-Entscheidung unten.
+  const versionsUebersicht = useMemo(
+    () =>
+      gruppiereChangelogNachVersion(eintraege).map((gruppe) => ({
+        schluessel: versionsSchluessel(gruppe.version),
+        version: gruppe.version,
+        anzahl: gruppe.eintraege.length,
+      })),
+    [eintraege],
+  );
+  const neuesteVersionSchluessel = versionsUebersicht[0]?.schluessel ?? "ohne-version";
+
+  // Nur die neueste Version startet offen; alle anderen liegen hinter "Anzeigen" (Befund 2).
+  const [ausgeklappt, setAusgeklappt] = useState<Set<string>>(() => new Set([neuesteVersionSchluessel]));
+  // Erstes DOM-Element je Version — Ziel der Sprungleiste. `!has(...)`-Wache haelt bei mehrfach
+  // vorkommenden Versionen (dieselbe Version in mehreren Gewicht-Abschnitten) das OBERSTE Vorkommen.
+  const versionsAnkerRef = useRef<Map<string, HTMLElement>>(new Map());
+  const registriereVersionsAnker = useCallback(
+    (schluessel: string) => (element: HTMLElement | null) => {
+      if (element && !versionsAnkerRef.current.has(schluessel)) {
+        versionsAnkerRef.current.set(schluessel, element);
+      }
+    },
+    [],
+  );
+
+  const toggleVersion = useCallback((schluessel: string) => {
+    setAusgeklappt((bisher) => {
+      const naechste = new Set(bisher);
+      if (naechste.has(schluessel)) naechste.delete(schluessel);
+      else naechste.add(schluessel);
+      return naechste;
+    });
+  }, []);
+
+  const springeZuVersion = useCallback((schluessel: string) => {
+    setAusgeklappt((bisher) => (bisher.has(schluessel) ? bisher : new Set(bisher).add(schluessel)));
+    // Erst NACH dem Ausklappen scrollen (naechster Frame), sonst zielt scrollIntoView auf die
+    // Position VOR dem Aufklappen der ggf. neu eingeblendeten Tage-Karten.
+    requestAnimationFrame(() => {
+      versionsAnkerRef.current.get(schluessel)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   return (
     <div className="nl-changelog" data-testid="foundation-changelog" data-new-look="true">
       <NlCard eyebrow="Changelog" title="Was sich geändert hat">
@@ -122,6 +188,23 @@ export default function FoundationChangelogHost() {
               </div>
             </dl>
           ) : null}
+          {/* Sprungleiste (Befund 2): springt zur Version UND klappt sie dabei auf. */}
+          {versionsUebersicht.length > 1 ? (
+            <nav className="nl-changelog-sprungleiste" aria-label="Zu einer Version springen">
+              {versionsUebersicht.map((eintrag) => (
+                <button
+                  key={eintrag.schluessel}
+                  type="button"
+                  className={`nl-changelog-sprung-chip${ausgeklappt.has(eintrag.schluessel) ? " is-offen" : ""}`}
+                  onClick={() => springeZuVersion(eintrag.schluessel)}
+                  data-testid={`nl-changelog-sprung-${eintrag.schluessel}`}
+                >
+                  {formatVersionsTitel(eintrag.version)}
+                  <span className="nl-changelog-sprung-anzahl nl-tnum">{eintrag.anzahl}</span>
+                </button>
+              ))}
+            </nav>
+          ) : null}
         </div>
       </NlCard>
 
@@ -140,32 +223,57 @@ export default function FoundationChangelogHost() {
               <h2 className="nl-changelog-abschnitt-titel">{abschnitt.beschriftung.titel}</h2>
               <p className="nl-changelog-abschnitt-erklaerung">{abschnitt.beschriftung.erklaerung}</p>
             </header>
-            {abschnitt.versionen.map((versionsGruppe) => (
-              <section
-                key={versionsGruppe.version ?? "ohne-version"}
-                className="nl-changelog-version"
-                data-testid={`foundation-changelog-version-${versionsGruppe.version ?? "ohne-version"}`}
-              >
-                {/* Nur zeigen, wenn es innerhalb dieses Abschnitts ueberhaupt eine Versionsangabe
-                    gibt — sonst waere "Ohne Versionsangabe" die einzige, unnoetige Zwischenzeile. */}
-                {abschnitt.versionen.length > 1 || versionsGruppe.version ? (
-                  <h3 className="nl-changelog-version-heading">{formatVersionsTitel(versionsGruppe.version)}</h3>
-                ) : null}
-                {versionsGruppe.tage.map((gruppe) => (
-                  <NlCard
-                    key={`${versionsGruppe.version ?? "ohne-version"}-${gruppe.datum}`}
-                    className="nl-changelog-day"
-                    title={formatChangelogDatum(gruppe.datum)}
-                  >
-                    <ul className="nl-changelog-list">
-                      {gruppe.eintraege.map((eintrag, index) => (
-                        <ChangelogEintragZeile key={`${gruppe.datum}-${index}`} eintrag={eintrag} />
-                      ))}
-                    </ul>
-                  </NlCard>
-                ))}
-              </section>
-            ))}
+            {abschnitt.versionen.map((versionsGruppe) => {
+              const schluessel = versionsSchluessel(versionsGruppe.version);
+              // Nur zeigen, wenn es innerhalb dieses Abschnitts ueberhaupt eine Versionsangabe gibt —
+              // sonst waere "Ohne Versionsangabe" die einzige, unnoetige Zwischenzeile.
+              const zeigtKopf = abschnitt.versionen.length > 1 || Boolean(versionsGruppe.version);
+              // Ohne sichtbaren Kopf gibt es auch keinen Schalter, der wieder aufklappen koennte —
+              // dann bleibt der Abschnitt immer offen statt sich unwiderruflich einzuklappen.
+              const offen = zeigtKopf ? ausgeklappt.has(schluessel) : true;
+              const anzahlEintraege = versionsGruppe.tage.reduce((summe, tag) => summe + tag.eintraege.length, 0);
+              return (
+                <section
+                  key={schluessel}
+                  ref={registriereVersionsAnker(schluessel)}
+                  className={`nl-changelog-version${offen ? "" : " is-eingeklappt"}`}
+                  data-testid={`foundation-changelog-version-${schluessel}`}
+                >
+                  {zeigtKopf ? (
+                    <div className="nl-changelog-version-kopf">
+                      <h3 className="nl-changelog-version-heading">{formatVersionsTitel(versionsGruppe.version)}</h3>
+                      {/* Nur die neueste Version steht initial offen (Befund 2) — der Schalter bleibt
+                          aber IMMER da, auch fuer die neueste, damit sich jeder Abschnitt gleich
+                          verhaelt und sich bei Bedarf wieder einklappen laesst. */}
+                      <button
+                        type="button"
+                        className="nl-changelog-version-toggle"
+                        onClick={() => toggleVersion(schluessel)}
+                        aria-expanded={offen}
+                        data-testid={`nl-changelog-toggle-${schluessel}`}
+                      >
+                        {offen ? "Einklappen" : `Anzeigen (${anzahlEintraege})`}
+                      </button>
+                    </div>
+                  ) : null}
+                  {offen ? (
+                    versionsGruppe.tage.map((gruppe) => (
+                      <NlCard key={`${schluessel}-${gruppe.datum}`} className="nl-changelog-day" title={formatChangelogDatum(gruppe.datum)}>
+                        <ul className="nl-changelog-list">
+                          {gruppe.eintraege.map((eintrag, index) => (
+                            <ChangelogEintragZeile key={`${gruppe.datum}-${index}`} eintrag={eintrag} />
+                          ))}
+                        </ul>
+                      </NlCard>
+                    ))
+                  ) : (
+                    <p className="nl-changelog-version-collapsed-hint muted">
+                      {anzahlEintraege} Eintrag{anzahlEintraege === 1 ? "" : "e"} eingeklappt — „Anzeigen" holt sie zurück.
+                    </p>
+                  )}
+                </section>
+              );
+            })}
           </section>
         ))
       )}
