@@ -11,6 +11,15 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-07",
+      "seite": "Alle Seiten · Kopfbereich",
+      "pr": null,
+      "text": "Die Statuszeile ganz oben lässt sich jetzt wegklappen — eine Meldung, die tagelang stehen bleibt, hängt sonst dauerhaft über jeder Seite. Zugeklappt bleibt ein schmaler Knopf mit der Zahl der Meldungen, damit nichts spurlos verschwindet; ein Blocker bleibt daran auch weiterhin als solcher erkennbar. Der Zustand wird gemerkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-06",
       "seite": "Spieltag · Kopfleiste",
       "pr": null,

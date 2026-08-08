@@ -4,6 +4,9 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { FoundationActivityItem } from "@/lib/foundation/foundation-activity-types";
 
+/** Merkt sich über Neuladen hinweg, ob die Statuszeile weggeklappt ist. */
+const ACTIVITY_STRIP_COLLAPSED_KEY = "oly-activity-strip-collapsed";
+
 type FoundationActivityStripProps = {
   activities: FoundationActivityItem[];
 };
@@ -107,6 +110,28 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
   // sich pro Aktivität aufklappen — die lange Blocker-Liste soll nicht dauerhaft
   // Platz fressen, aber zum Debuggen erreichbar bleiben.
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
+  // Die ganze Statuszeile lässt sich wegklappen. Sie steht ganz oben über jeder
+  // Seite; eine Meldung, die tagelang stehen bleibt (etwa ein Preseason-Lauf, der
+  // nicht alle Teams geschafft hat), hängt sonst dauerhaft im Weg.
+  //
+  // Der Startwert ist bewusst `false` und wird erst nach dem Mount aus dem
+  // localStorage nachgezogen: Server und erster Client-Render müssen dasselbe
+  // liefern, sonst gibt es einen Hydration-Fehler.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(ACTIVITY_STRIP_COLLAPSED_KEY) === "1");
+    } catch {
+      // Privater Modus oder gesperrter Speicher: dann eben nicht gemerkt.
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTIVITY_STRIP_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      // s. o. — der Zustand gilt dann nur für diese Sitzung.
+    }
+  }, [collapsed]);
   const toggleReasons = (id: string) =>
     setExpandedReasons((prev) => {
       const next = new Set(prev);
@@ -122,8 +147,46 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
     return null;
   }
 
+  if (collapsed) {
+    // Zugeklappt bleibt eine schmale Zeile stehen statt gar nichts: Ein Hinweis, der
+    // spurlos verschwindet, ist schlimmer als einer, der Platz braucht — man wüsste
+    // nicht mehr, dass es ihn gibt. Der Streifen nennt die Zahl der Meldungen und
+    // trägt die Tönung der auffälligsten (blockiert vor laufend), damit ein Blocker
+    // auch zugeklappt sichtbar bleibt.
+    const worstTone = activities.some((activity) => activity.tone === "blocked")
+      ? "blocked"
+      : (activities[0]?.tone ?? "running");
+    return (
+      <div className="foundation-activity-strip is-collapsed" data-testid="foundation-activity-strip">
+        <button
+          type="button"
+          className={`foundation-activity-reopen is-${worstTone}`}
+          onClick={() => setCollapsed(false)}
+          aria-expanded={false}
+          title="Statuszeile wieder einblenden"
+        >
+          <span className="foundation-activity-chip-indicator" aria-hidden="true" />
+          <span>
+            {activities.length === 1 ? "1 Meldung" : `${activities.length} Meldungen`}
+          </span>
+          <span aria-hidden="true">▸</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="foundation-activity-strip" data-testid="foundation-activity-strip" role="status" aria-live="polite">
+      <button
+        type="button"
+        className="foundation-activity-collapse"
+        onClick={() => setCollapsed(true)}
+        aria-expanded
+        title="Statuszeile einklappen"
+        aria-label="Statuszeile einklappen"
+      >
+        ✕
+      </button>
       {activities.map((activity) => {
         const hasProgress = activity.progressPct != null && Number.isFinite(activity.progressPct);
         const pct = hasProgress ? clampPct(activity.progressPct as number) : null;
