@@ -939,6 +939,10 @@ async function main() {
             // deckt beide Beschriftungen ab ("Disziplin (Spieltag)" bzw. Admin-Variante).
             "Disziplin (",
             "Lineup bestätigen",
+            // Vor dem Anpfiff rendert die Arena nicht die Buehne, sondern den
+            // Startbereitschafts-Zustand. Vorher stand dort eine alphabetisch
+            // erfundene Rangliste mit Medaillen — der Zustand ist neu, nicht der Reiter.
+            "Vor dem Anpfiff",
           ]),
           "Arena öffnet.",
         );
@@ -973,8 +977,29 @@ async function main() {
             hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
           "Lanes oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
-        assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        // Fehlt die Einsatzliste, kann der Spieltag nicht starten — die Arena zeigt dann
+        // bewusst KEINE Buehnensteuerung, sondern den Vor-dem-Anpfiff-Zustand mit genau
+        // einer Handlung. Die beiden Zusagen unten forderten bisher unbedingt Step- und
+        // Reset-Knopf und schrieben damit den alten Zustand fest, in dem die Buehne auch
+        // ohne startbaren Spieltag Steuerung (und eine alphabetisch erfundene Rangliste)
+        // anzeigte. Sie pruefen jetzt den Zustand, der wirklich da ist.
+        const preMatchVisible = await page
+          .locator("[data-arena-prematch='true']")
+          .isVisible()
+          .catch(() => false);
+        if (preMatchVisible) {
+          const lineupCtaVisible = await page
+            .getByTestId("arena-prematch-lineup-cta")
+            .isVisible()
+            .catch(() => false);
+          assertStep(step, lineupCtaVisible, "Vor dem Anpfiff: Weg zur Einsatzliste sichtbar.");
+          // Die Gegenprobe gehoert dazu: waere hier doch Steuerung sichtbar, haetten wir
+          // den Zustand nur uebermalt statt ihn zu loesen.
+          assertStep(step, !stepButtonVisible && !resetButtonVisible, "Vor dem Anpfiff: keine Buehnensteuerung.");
+        } else {
+          assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
+          assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        }
       },
     }));
 
