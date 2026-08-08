@@ -233,3 +233,45 @@ describe("Kauffenster der neuen Saison: der Kader wird bis zum Optimum gefuellt"
     expect(quelle).toContain("team_identity_player_opt");
   });
 });
+
+/**
+ * GEMELDET: „S-C hat gekauft. das ist MEIN TEAM. Wie kann das passieren dass die AI da wieder für
+ * kauft. dachte du hast das sauber repariert."
+ *
+ * BEFUND, am echten Spielstand: drei Zugaenge fuer S-C in Saison 2, alle mit
+ * `source=ai_roster_fill` — 15.09 + 10.30 + 9.13 = 34.52 Mio. S-C steht in
+ * `teamControlSettings` auf `controlMode: "manual"`.
+ *
+ * URSACHE: der Fuell-Dienst laeuft ohne Einschraenkung ueber ALLE Teams. Sein eigener
+ * Parameter-Kommentar warnt davor (`auto-roster-fill-service.ts:129`: „that was the S6 bug for this
+ * path") und bietet `callerWritableTeamIds` genau dagegen an — beim Verdrahten in #446 wurde der
+ * Parameter nicht mitgegeben. Jeder andere Schritt desselben Laufs hat seine Einschraenkung.
+ */
+describe("Fuell-Lauf fasst manuell gefuehrte Teams nicht an", () => {
+  it("bekommt die KI-Teamliste als Schreibgrenze mit", async () => {
+    store.gameState = baueGameState("season_active");
+
+    const { POST } = await import("@/app/api/ai/preseason-background/route");
+    await POST(baueRequest());
+
+    const aufruf = runAutoRosterFillForMatchdaySetup.mock.calls[0]![0] as {
+      callerWritableTeamIds?: string[] | null;
+    };
+    // Ohne diese Liste kauft der Dienst fuer JEDES Team im Spielstand, auch fuer Chris' eigenes.
+    expect(Array.isArray(aufruf.callerWritableTeamIds)).toBe(true);
+    expect(aufruf.callerWritableTeamIds).toEqual(["C-C"]);
+  });
+
+  it("die Grenze ist dieselbe Liste, die auch Markt und Manager-Plan benutzen", async () => {
+    store.gameState = baueGameState("season_active");
+
+    const { POST } = await import("@/app/api/ai/preseason-background/route");
+    await POST(baueRequest());
+
+    // Eine zweite, eigene Teamliste waere genau die Sorte Doppelpflege, an der es schon einmal
+    // gescheitert ist — beide muessen aus `getAiTeamIds` kommen.
+    const fuell = runAutoRosterFillForMatchdaySetup.mock.calls[0]![0] as { callerWritableTeamIds?: string[] | null };
+    const manager = applyAiManagerPlan.mock.calls[0]![0] as { teamIds?: string[] };
+    expect(fuell.callerWritableTeamIds).toEqual(manager.teamIds);
+  });
+});
