@@ -215,7 +215,13 @@ export function deriveUtilityWeights(
       // and re-clamping would collapse back to the same bound every seed. Jittering the clamped value
       // makes a depth club land on 13 or 14, an elite-small club on 8 or 9 — visible size variance.
       const delta = Math.round((draftUnit(`${variationSeed}:opt`) - 0.5) * 2 * STRATEGY_OPT_JITTER);
-      optTarget = clamp(optTarget + delta, ROSTER_MIN, ROSTER_MAX);
+      // Der Blatt-Floor gilt AUCH nach dem Jitter — sonst ist er keiner. Beim ersten Einbau stand er
+      // nur vor diesem Block, und der Jitter zog danach wieder darunter: in echten Laeufen (also mit
+      // Seed) landeten 9 von 32 Teams weiterhin 1 unter ihrem Blatt-Opt, darunter B-P mit 9 -> 8 —
+      // genau der Fall, wegen dem der Floor eingebaut wurde. Der Test sah es nicht, weil er ohne
+      // variationSeed lief und diesen Block damit komplett uebersprang.
+      const jitterMin = blattOpt != null ? Math.round(clamp(blattOpt, ROSTER_MIN, ROSTER_MAX)) : ROSTER_MIN;
+      optTarget = clamp(optTarget + delta, jitterMin, ROSTER_MAX);
     }
   }
 

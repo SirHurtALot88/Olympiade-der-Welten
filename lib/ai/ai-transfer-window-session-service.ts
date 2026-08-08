@@ -783,12 +783,16 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         draftSeed: saltOrganicSeed(`${input.saveId}:${teamId}`),
       });
       // Was der Plan tatsaechlich ausgibt: Startkapital der Probe minus dem, was am Ende uebrig ist.
-      // Genauer als eine Summe ueber die Entscheidungen — der Planer verrechnet Gehaltsreserven mit.
+      // `finalCash` ist im Buy-Planner exakt Startcash minus Summe der Kaufpreise (draft-builder.ts:
+      // pro Kauf nur `cash -= price`), es fliessen also keine Einnahmen oder Gehaltsposten ein.
       const probeCash = (probeTeam.cash ?? 0);
       geplant = plan.decisions.length === 0 ? 0 : Math.max(probeCash - plan.finalCash, 0);
-    } catch {
+    } catch (error) {
       // Die Probe ist eine Zusatzpruefung, kein Tor: faellt sie aus (fehlender RunContext, leerer
       // Marktcache), bleibt es beim bisherigen Verhalten statt den Kredit faelschlich zu blocken.
+      // Der Rueckfall wird aber GEMELDET — sonst ist ein Programmierfehler im Planer nicht vom
+      // Normalbetrieb zu unterscheiden und die Deckelung waere still wieder ausgeschaltet.
+      warnings.push(`ai_loan_probe_failed:${teamId}:${error instanceof Error ? error.name : "unknown"}`);
       return { loanAmount: entscheidung.loanAmount };
     }
     const eigenes = Math.max(team.cash ?? 0, 0);

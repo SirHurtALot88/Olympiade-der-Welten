@@ -56,8 +56,8 @@ const identitaet = (playerOpt: number) => ({
   boardConfidence: 5,
 });
 
-const ziel = (playerOpt: number, gm: Partial<typeof NEUTRALER_GM> = {}) =>
-  deriveUtilityWeights(identitaet(playerOpt) as never, { ...NEUTRALER_GM, ...gm } as never, null).optTarget;
+const ziel = (playerOpt: number, gm: Partial<typeof NEUTRALER_GM> = {}, seed: string | null = null) =>
+  deriveUtilityWeights(identitaet(playerOpt) as never, { ...NEUTRALER_GM, ...gm } as never, seed).optTarget;
 
 describe("Das Blatt-Opt ist die Untergrenze des Kaderziels", () => {
   it("ein Elite-GM darf nicht unter das Blatt ziehen", () => {
@@ -77,6 +77,38 @@ describe("Das Blatt-Opt ist die Untergrenze des Kaderziels", () => {
   it("ein neutraler GM landet genau auf dem Blatt", () => {
     // Ohne Ausschlag in eine Richtung soll schlicht das stehen, was im Blatt steht.
     expect(ziel(12)).toBe(12);
+  });
+
+  /**
+   * DIESER BLOCK FEHLTE BEIM ERSTEN EINBAU — und deshalb blieb der Fehler drin.
+   *
+   * Der Floor stand nur VOR dem Jitter-Block; der Jitter (±1 Slot, per Default aktiv) zog danach
+   * wieder darunter. Gemessen in echten Laeufen: 9 von 32 Teams landeten weiterhin 1 unter ihrem
+   * Blatt-Opt, darunter B-P mit 9 -> 8 — genau der Fall, wegen dem der Floor gebaut wurde. Die
+   * Tests oben sahen nichts davon, weil sie ohne `variationSeed` laufen und der Jitter-Block dann
+   * komplett uebersprungen wird. Ein Seed gehoert also dazu, sonst prueft man die halbe Funktion.
+   */
+  describe("auch mit Variations-Seed, denn der Jitter laeuft nach dem Floor", () => {
+    it("haelt ueber viele Seeds hinweg das Blatt", () => {
+      for (let i = 0; i < 50; i += 1) {
+        for (const blatt of [8, 9, 11, 13]) {
+          expect(ziel(blatt, {}, `save-${i}:team-${blatt}`)).toBeGreaterThanOrEqual(blatt);
+        }
+      }
+    });
+
+    it("haelt es auch bei Elite-Bias, der zusaetzlich nach unten zieht", () => {
+      for (let i = 0; i < 50; i += 1) {
+        const wert = ziel(11, { eliteSmallRosterPreference: 9, rosterDepthPreference: 1 }, `s${i}`);
+        expect(wert).toBeGreaterThanOrEqual(11);
+      }
+    });
+
+    it("laesst den Jitter nach OBEN weiterhin zu — die Varianz bleibt erhalten", () => {
+      const werte = new Set<number>();
+      for (let i = 0; i < 50; i += 1) werte.add(ziel(10, {}, `v${i}`));
+      expect(werte.size).toBeGreaterThan(1);
+    });
   });
 
   it("gilt ueber die ganze Spanne der Blattwerte", () => {
