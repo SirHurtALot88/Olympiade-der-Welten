@@ -173,6 +173,28 @@ export function deriveUtilityWeights(
     K * eliteSmallRosterPreference;
   let optTarget = Math.round(clamp(optTargetRaw, ROSTER_MIN, ROSTER_MAX));
 
+  /**
+   * DAS BLATT-OPT IST DIE UNTERGRENZE, NICHT NUR DER AUSGANGSWERT.
+   *
+   * BEFUND (am Spielstand gemessen): der GM-Nudge zog dieses Ziel unter den Wert aus
+   * `data/source/team-identities.json` — B-P auf 8 statt 9, H-R auf 9 statt 11, M-S auf 12 statt
+   * 13. Der Planer hielt die Kader damit fuer fertig, waehrend Sitzung und Kreditpruefung noch eine
+   * Luecke sahen: B-P sass auf 37.8 Mio, kaufte nichts mehr und galt trotzdem als „unter Optimum".
+   * Dieselbe Diskrepanz erzeugte Kredite fuer Plaetze, die niemand besetzen wollte.
+   *
+   * CHRIS' VORGABE dazu: „wenn c-c gerne 13 leute hätte wären 11 auch noch ok aber auf minimum zu
+   * gehen ist scheiße" — das Blatt sagt, wie gross der Kader gedacht ist; die Persoenlichkeit darf
+   * daraufsatteln, aber nicht darunter.
+   *
+   * Der Nudge bleibt also erhalten, wirkt aber nur noch NACH OBEN: ein Tiefen-GM will mehr als das
+   * Blatt, ein Elite-GM nicht weniger. Der Kommentar oben sagt es selbst — „the per-team playerOpt
+   * … is the intended roster size".
+   */
+  const blattOpt = Number.isFinite(identity?.playerOpt) ? Number(identity.playerOpt) : null;
+  if (blattOpt != null) {
+    optTarget = Math.max(optTarget, Math.round(clamp(blattOpt, ROSTER_MIN, ROSTER_MAX)));
+  }
+
   // --- Reproducible per-save/season strategy variance (see STRATEGY_WEIGHT_JITTER/STRATEGY_OPT_JITTER
   // doc comments above). Only engages when a variationSeed is passed; without one, this block is
   // skipped entirely and the return below is bitidentical to the un-jittered computation. ---

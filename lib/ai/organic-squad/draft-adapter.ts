@@ -294,6 +294,41 @@ export function resolveOrganicDisciplines(gameState: GameState): OrganicDiscipli
   return (gameState.disciplines ?? []).map((d) => ({ id: d.id, category: d.category }));
 }
 
+/**
+ * DAS KADERZIEL, MIT DEM DER ORGANISCHE PLANER WIRKLICH RECHNET.
+ *
+ * BEFUND (Fable, am Spielstand gemessen): es gab DREI verschiedene Kaderziele fuer dasselbe Team.
+ * Die Sitzung und die Kreditpruefung lasen `resolvePlannerRosterTargets` (Identitaets-Opt plus
+ * Stress-Bump), der kaufende Planer dagegen sein eigenes aus `deriveUtilityWeights` (Identitaets-Opt
+ * plus GM-Nudge, plus Jitter). B-P stand damit fuer die Sitzung bei 8 von 9 und fuer den Planer bei
+ * 8 von 8 — planmaessig fertig. Ab dem Punkt springt der Kaufpuffer vom Notwert 5 auf den vollen
+ * Betrag (bei B-P 26.2 Mio) und der Rotationsnutzen faellt auf 0, also kauft es nicht mehr. Es sass
+ * auf 37.8 Mio und galt trotzdem als „unter Optimum".
+ *
+ * Dieselbe Diskrepanz erzeugte die unsinnigen Kredite: der zweite Kredit-Durchgang mass die Luecke
+ * gegen das Sitzungs-Ziel und lieh Geld fuer Plaetze, die der Planer gar nicht besetzen wollte.
+ *
+ * Deshalb gibt es die Zahl jetzt an EINER Stelle, und zwar an der, die kauft. Wer wissen will, wie
+ * voll ein Kader nach dem Willen des Teams sein soll, fragt hier — nicht an einer zweiten Formel
+ * daneben.
+ */
+export function resolveOrganicOptTarget(
+  gameState: GameState,
+  teamId: string,
+  draftSeed?: string | null,
+): number | null {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team) return null;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const variationSeed = draftSeed ? `${draftSeed}:${gameState.season.id}` : null;
+  const weights = deriveUtilityWeights(
+    buildOrganicIdentityInput(identity),
+    resolveGmBias(gameState, teamId),
+    variationSeed,
+  );
+  return weights.optTarget;
+}
+
 function resolveGmBias(gameState: GameState, teamId: string): OrganicGmBiasInput {
   const bias = getTeamGeneralManager(gameState, teamId)?.profile?.bias;
   if (!bias) return {};
