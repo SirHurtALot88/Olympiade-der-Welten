@@ -102,6 +102,15 @@
     },
     {
       "datum": "2026-08-07",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die Achsen-Kopfzeilen im Squad Depth Chart waren zugeklappt leer — jetzt steht dort der Schnitt der Achse und ihre stärksten Spieler auf den Plätzen 1 bis 6, in denselben Spalten wie die Disziplinen darunter. Gerechnet wird über alle fünf Disziplinen einer Achse, damit niemand nach oben rutscht, nur weil er in zweien davon stark ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
       "text": "KI-Teams kauften mitten in der Saisonende-Kette und in der neuen Saison dann gar nicht mehr — der einzige automatische Marktlauf feuerte in der alten Saison und konnte in der Folgesaison nie auslösen. Jetzt gilt für die KI dieselbe Regel wie für dich: am Saisonende wird nur verkauft, gekauft wird im Kauffenster der neuen Saison, und der Verkaufserlös ist dort das Budget.",
@@ -161,6 +170,15 @@
       "text": "„Neue Saison starten\" tat bei einer Ablehnung des Servers scheinbar gar nichts — der Grund landete nur im Cockpit und war auf der Saisonabschluss-Seite unsichtbar. Jetzt steht er dort, offene Blocker werden im Klartext genannt, und eine fehlende Sponsorenwahl führt mit einem Knopf direkt zu den Sponsoren statt in den Assistenten.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Alle Seiten · Kopfbereich",
+      "pr": null,
+      "text": "Die Statuszeile ganz oben lässt sich jetzt wegklappen — eine Meldung, die tagelang stehen bleibt, hängt sonst dauerhaft über jeder Seite. Zugeklappt bleibt ein schmaler Knopf mit der Zahl der Meldungen, damit nichts spurlos verschwindet; ein Blocker bleibt daran auch weiterhin als solcher erkennbar. Der Zustand wird gemerkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
