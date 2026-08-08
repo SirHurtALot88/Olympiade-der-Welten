@@ -5,6 +5,7 @@ import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-ov
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolveTeamLiquidityBufferTarget } from "@/lib/ai/planner-cash-buffer-policy";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
@@ -312,6 +313,21 @@ export type LoanOffer = {
  * Angebots-UI als auch die KI-Kreditwahl (Phase 3 KI-Anbindung). Season 1 = keine Kredite (harte
  * Regel) -> leere Liste, dasselbe Verhalten wie `originateLoan`.
  */
+/**
+ * Summe, die dieses Team aktuell an andere verliehen hat (aktive und geplatzte Kredite).
+ *
+ * Gegenzaehler zum Kredit-Budget eines von Hand gefuehrten Teams: mehr als das Budget darf nie
+ * gleichzeitig draussen sein. Geplatzte Kredite zaehlen mit — das Geld ist ja ebenfalls weg.
+ */
+export function getTeamLentOutTotal(gameState: GameState, lenderTeamId: string): number {
+  return (gameState.seasonState.loans ?? [])
+    .filter(
+      (loan) =>
+        loan.lenderTeamId === lenderTeamId && (loan.status === "active" || loan.status === "defaulted"),
+    )
+    .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
+}
+
 export function buildLoanOffers(
   gameState: GameState,
   borrowerTeamId: string,
@@ -359,6 +375,25 @@ export function buildLoanOffers(
 
   for (const lender of gameState.teams) {
     if (lender.teamId === borrowerTeamId) continue;
+    /**
+     * GEMELDET, nachdem der Fuell-Lauf schon einmal fuer ein fremdes Team eingekauft hatte:
+     * dieselbe Luecke auf der Geldseite. Im Messlauf lieh sich H-R 32.0 und R-R 16.4 Mio
+     * ausgerechnet beim MANUELL gefuehrten Team — 48.4 Mio verliessen dessen Konto, ohne dass der
+     * Spieler gefragt wurde. Sein Cash fiel von 91.3 auf 42.9.
+     *
+     * Ein Team-Kredit ist eine Entscheidung ueber fremdes Geld. Fuer KI-Teams trifft sie die KI,
+     * fuer ein von Hand gefuehrtes Team gehoert sie dem Spieler — solange es dafuer keine
+     * Zustimmungs-Ansicht gibt, taucht es als Geldgeber gar nicht erst auf. Die Bank steht immer im
+     * Angebot (oben fest eingetragen), es bleibt also nie jemand ohne Kreditrahmen zurueck.
+     */
+    const lenderControl = getTeamControlSettings(gameState, lender.teamId);
+    const lenderIstManuell = (lenderControl?.controlMode ?? "ai") === "manual";
+    // Was ein von Hand gefuehrtes Team hoechstens verleiht: sein gesetztes Budget minus dem, was
+    // davon schon draussen ist. Ohne Budget (Startwert) kommt 0 heraus — dann kein Angebot.
+    const manuellerRahmen = lenderIstManuell
+      ? Math.max(0, (lenderControl?.lendingBudget ?? 0) - getTeamLentOutTotal(gameState, lender.teamId))
+      : Number.POSITIVE_INFINITY;
+    if (lenderIstManuell && manuellerRahmen < principal) continue;
     const relationshipValue = getTeamRelationshipValue(lender.teamId, borrowerTeamId);
     if (relationshipValue <= RIVAL_CUTOFF) continue;
 
@@ -378,7 +413,7 @@ export function buildLoanOffers(
       lenderType: "team",
       lenderTeamId: lender.teamId,
       lenderName: lender.name,
-      maxAmount: Math.min(lenderOfferAmount, capacity),
+      maxAmount: Math.min(lenderOfferAmount, capacity, manuellerRahmen),
       interestRatePerSeason: rate,
       installmentPerSeason: annuityInstallment(principal, rate, termSeasons),
       relationshipValue,

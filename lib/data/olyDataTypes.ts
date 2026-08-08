@@ -1063,6 +1063,23 @@ export type TeamControlSettings = {
   aiTransferAutoApplyEnabled: boolean;
   aiSellPreviewEnabled: boolean;
   aiSellAutoApplyEnabled: boolean;
+  /**
+   * KREDIT-BUDGET, das dieses Team anderen Teams zur Verfuegung stellt (Mio).
+   *
+   * CHRIS: „wie kann man als spieler kredite an AI Teams anbieten? die picken ja direkt ihre
+   * spieler das heißt wenn ich z.B. C-C spiele wäre es gut wenn das geht, die sollen damit ihr geld
+   * verdienen! … sonst muss es eine möglichkeit geben, ein budget für kredite vorab festzulegen an
+   * dem andere teams sich bedienen können."
+   *
+   * Nur fuer von Hand gefuehrte Teams von Belang: KI-Teams entscheiden selbst und stellen ihr Geld
+   * ohnehin zur Verfuegung. Fuer ein manuell gefuehrtes Team ist ein Team-Kredit dagegen eine
+   * Entscheidung ueber das Geld des Spielers — ohne gesetztes Budget taucht es gar nicht erst als
+   * Geldgeber auf. `null`/`0` heisst also „verleihe nichts"; das ist der Startwert.
+   *
+   * Gegenzaehler ist die bereits verliehene Summe: es kann nie mehr als dieses Budget gleichzeitig
+   * draussen sein.
+   */
+  lendingBudget?: number | null;
   notes?: string | null;
   strategyLock?: string | null;
 };
