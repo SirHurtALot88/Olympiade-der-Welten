@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
+import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -124,6 +125,17 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
       ...gameState.seasonState,
       persistedSeasonDerivations: undefined,
       seasonSnapshots: undefined,
+      /**
+       * Ersatz fuer die gestrichenen Schnappschuesse — siehe
+       * `foundation-season-history-projection`. Ohne das zeigte die Saison-Verlauf-Karte fuer jede
+       * vergangene Saison „—", weil die Historie mangels Schnappschuss auf Platzhalterzeilen mit
+       * `rank: null` zurueckfiel. Die Daten waren nie weg, sie kamen nur nie im Browser an.
+       *
+       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz vergleicht nur die Anzahl der
+       * Eintraege, eine gleich lange Kurzfassung kaeme also durch und wuerde die vollen
+       * Schnappschuesse beim naechsten Speichern ueberschreiben.
+       */
+      foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
@@ -217,6 +229,14 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
         incoming.seasonState.seasonSnapshots,
         existing.seasonState.seasonSnapshots,
       ),
+      /**
+       * FAELLT HIER RAUS, IMMER. Die Kurzfassung der Saisonhistorie faehrt nur zum Browser hinaus
+       * (siehe `compactFoundationInitialGameState`); zurueck darf sie nicht. Sie ist eine
+       * Projektion aus `seasonSnapshots`, also abgeleitet — im Spielstand haette sie nichts zu
+       * suchen ausser Gewicht, und jede Aenderung an den echten Schnappschuessen wuerde sie still
+       * veralten lassen. Beim naechsten Ausliefern wird sie ohnehin frisch gebaut.
+       */
+      foundationSeasonHistory: undefined,
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

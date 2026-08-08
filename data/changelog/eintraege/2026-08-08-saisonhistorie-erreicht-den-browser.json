@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Teamprofil · Saison-Verlauf und Historie",
+  "text": "Die Zeile der abgelaufenen Saison war überall leer — im Saison-Verlauf stand „Kein Rang-Verlauf vorhanden\", in der Historie-Tabelle war Season 1 durchgehend ein Strich. Der Verdacht lag auf kaputten Saison-Schnappschüssen; nachgezählt war aber keiner kaputt: alle 32 Teams standen mit Rang und Punkten drin. Sie kamen nur nie im Browser an. Die Anfangsladung streicht die Schnappschüsse nämlich weg, weil an ihnen sämtliche Spielerleistungen und Spieltagsergebnisse hängen — dreieinhalb Megabyte, die keine Ansicht am Stück braucht. Ohne sie fiel jede vergangene Saison auf eine leere Platzhalterzeile zurück. Jetzt fährt eine Kurzfassung mit: pro Saison und Team Rang, Punkte, PPS, Cash, Gehalt, Marktwert, GuV, Verletzungen und die größten Zu- und Abgänge. Das sind 53 Kilobyte statt dreieinhalb Megabyte. Leer bleibt nur die durchschnittliche Müdigkeit — die braucht die Spieltagsergebnisse, und genau die sind der Grund fürs Streichen.",
+  "gewicht": "stoerend",
+  "version": "0.4"
+}

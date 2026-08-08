@@ -1,4 +1,6 @@
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
+// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
+import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 
 export type DisciplineCategory =
   | "power"
@@ -2937,6 +2939,13 @@ export type SeasonState = {
    */
   matchdayResolveSnapshots?: MatchdayResolveSnapshotRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
+  /**
+   * NUR ANZEIGEFRACHT, NIEMALS QUELLE. Schlanke Fassung der abgeschlossenen Saisons fuer den
+   * Browser, weil die Anfangsladung `seasonSnapshots` streicht (siehe
+   * `foundation-season-history-projection`). Wird nie in den Spielstand zurueckgeschrieben — sie
+   * traegt absichtlich weniger Felder als das Original, und ein Rueckschreiben waere Datenverlust.
+   */
+  foundationSeasonHistory?: FoundationSeasonHistoryEntry[];
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
