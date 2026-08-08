@@ -97,9 +97,16 @@ einsetzen() {
   #
   # `--user 0`, weil nur root fremde Dateien uebereignen darf. Das `|| true` faengt den Fall ab,
   # dass ein Image ohne `oly` gebaut wurde; dann bleibt es beim alten Verhalten statt abzubrechen.
+  #
+  # ERNEUT GEMELDET, nach genau diesem Fix: „attempt to write a readonly database" stand wieder auf
+  # dem Bildschirm. Die Zeile eignete nur die HAUPTDATEI ueber. SQLite braucht zum Schreiben aber
+  # auch das VERZEICHNIS: es legt `-wal` und `-shm` daneben an, und dafuer muss `oly` im Ordner
+  # anlegen duerfen. Bleibt `/app/data/persistence` root, scheitert das Anlegen — und SQLite meldet
+  # das als „readonly database", obwohl die Datei selbst laengst passt. Deshalb jetzt `-R` auf das
+  # ganze Datenverzeichnis: dieselbe Zeile, die auch das Image beim Bauen faehrt (Dockerfile:80).
   echo "      Besitzrechte auf den Dienst-Benutzer zuruecksetzen ..."
   compose run --rm --no-deps --user 0 --entrypoint sh oly-app \
-    -c "chown oly:nodejs ${DB_IM_CONTAINER}" >/dev/null 2>&1 || true
+    -c "chown -R oly:nodejs /app/data" >/dev/null 2>&1 || true
   echo "      App starten ..."
   compose up -d oly-app
 }

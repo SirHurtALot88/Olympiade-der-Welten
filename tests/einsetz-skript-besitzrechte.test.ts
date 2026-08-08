@@ -27,20 +27,32 @@ const SKRIPT = readFileSync(SKRIPT_PFAD, "utf8");
 /** Der Rumpf von `einsetzen()` — beide Richtungen laufen hier durch. */
 const EINSETZEN = SKRIPT.slice(SKRIPT.indexOf("einsetzen() {"), SKRIPT.indexOf("\n}", SKRIPT.indexOf("einsetzen() {")));
 
+/**
+ * Nur die AUSGEFUEHRTEN Zeilen, ohne Kommentare.
+ *
+ * Noetig, weil die Begruendung ueber der chown-Zeile den Befehl woertlich zitiert
+ * (`Dockerfile:80 setzt beim Bauen eigens chown -R oly:nodejs /app/data`). Eine Pruefung auf den
+ * blossen Text haette deshalb auch dann gegriffen, wenn das Skript etwas ganz anderes ausfuehrt —
+ * ein Test, der sich an seinem eigenen Kommentar festhaelt, prueft nichts.
+ */
+const EINSETZEN_BEFEHLE = EINSETZEN.split("\n")
+  .filter((zeile) => !zeile.trim().startsWith("#"))
+  .join("\n");
+
 describe("Einsetz-Skript: der Spielstand bleibt beschreibbar", () => {
   it("setzt die Besitzrechte nach dem Kopieren zurueck", () => {
     // Ohne diese Zeile gehoert die Datei root, und die App kann nur noch lesen.
-    expect(EINSETZEN).toContain("chown oly:nodejs");
+    expect(EINSETZEN_BEFEHLE).toContain("chown -R oly:nodejs");
   });
 
   it("tut das als root — sonst darf es niemand", () => {
     // Der Standardbenutzer des Images ist `oly`; der kann eine root-Datei nicht uebereignen.
-    expect(EINSETZEN).toContain("--user 0");
+    expect(EINSETZEN_BEFEHLE).toContain("--user 0");
   });
 
   it("setzt die Rechte NACH dem Kopieren, nicht davor", () => {
-    const kopieAt = EINSETZEN.indexOf('compose cp "$quelle"');
-    const chownAt = EINSETZEN.indexOf("chown oly:nodejs");
+    const kopieAt = EINSETZEN_BEFEHLE.indexOf('compose cp "$quelle"');
+    const chownAt = EINSETZEN_BEFEHLE.indexOf("chown -R oly:nodejs");
     expect(kopieAt).toBeGreaterThan(-1);
     expect(chownAt).toBeGreaterThan(kopieAt);
   });
@@ -52,10 +64,22 @@ describe("Einsetz-Skript: der Spielstand bleibt beschreibbar", () => {
     expect(zurueckBlock).toContain('einsetzen "$TMP_DB"');
   });
 
+  it("uebereignet das ganze Datenverzeichnis, nicht nur die Datei", () => {
+    /**
+     * ERNEUT GEMELDET, nach dem ersten Fix: „attempt to write a readonly database" stand wieder da.
+     *
+     * Die alte Zeile eignete nur `${DB_IM_CONTAINER}` ueber. SQLite braucht zum Schreiben aber auch
+     * das VERZEICHNIS: es legt `-wal` und `-shm` daneben an. Gehoert `/app/data/persistence` root,
+     * scheitert schon das Anlegen — und SQLite meldet das als „readonly database", obwohl die Datei
+     * selbst passt. Genau dieser Unterschied hat den Spielstand ein zweites Mal eingefroren.
+     */
+    expect(EINSETZEN_BEFEHLE).toContain("chown -R oly:nodejs /app/data");
+  });
+
   it("bricht nicht ab, wenn der Benutzer im Image fehlt", () => {
     // Ein Image ohne `oly` soll das alte Verhalten behalten statt den ganzen Lauf zu stoppen —
     // `set -euo pipefail` wuerde sonst genau hier aussteigen.
-    const chownZeile = EINSETZEN.slice(EINSETZEN.indexOf("chown oly:nodejs"));
+    const chownZeile = EINSETZEN_BEFEHLE.slice(EINSETZEN_BEFEHLE.indexOf("chown -R oly:nodejs"));
     expect(chownZeile).toContain("|| true");
   });
 

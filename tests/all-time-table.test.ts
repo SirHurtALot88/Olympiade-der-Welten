@@ -24,7 +24,9 @@ function standing(input: {
   points: number | null;
   marketValueEnd?: number | null;
   marketValueTotalEnd?: number | null;
+  marketValueSeasonEnd?: number | null;
   cashEnd?: number | null;
+  cashEntry?: number | null;
   cashTotal?: number | null;
 }) {
   return {
@@ -35,7 +37,9 @@ function standing(input: {
     points: input.points,
     marketValueEnd: input.marketValueEnd ?? null,
     marketValueTotalEnd: input.marketValueTotalEnd,
+    marketValueSeasonEnd: input.marketValueSeasonEnd,
     cashEnd: input.cashEnd ?? null,
+    cashEntry: input.cashEntry,
     cashTotal: input.cashTotal,
     disciplinePointsByArea: {},
   };
@@ -380,5 +384,90 @@ describe("all-time-table", () => {
     const row = model.rows.find((entry) => entry.teamId === "t1");
     expect(row?.seasons.map((season) => season.seasonId)).toEqual(["season-2", "season-10"]);
     expect(model.seasonLabels).toHaveLength(2);
+  });
+  /**
+   * CHRIS' VORGABE: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison
+   * nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+   *
+   * Den Eintrittsstand schreibt `patchCompletedSeasonSnapshotAfterPreseasonBuy` in
+   * `marketValueTotalEnd` und `cashEntry`; dass er gelaufen ist, sagt `entryRosterPatchedAt`.
+   */
+  describe("Eintrittsstand nach den Kaeufen", () => {
+    function baueModell(snapshot: Record<string, unknown>) {
+      return buildAllTimeTableModel({
+        gameState: buildGameState({
+          seasonState: { seasonSnapshots: [snapshot] } as unknown as GameState["seasonState"],
+          teams: [team("t1", "AAA", "Alpha")],
+        }),
+      });
+    }
+
+    const zeile = (modell: ReturnType<typeof buildAllTimeTableModel>) =>
+      modell.rows.find((entry) => entry.teamId === "t1")?.seasons[0];
+
+    it("zeigt nach dem Patch den Stand nach den Kaeufen", () => {
+      const modell = baueModell({
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        entryRosterPatchedAt: "2026-08-08T00:00:00.000Z",
+        finalStandings: [
+          standing({
+            teamId: "t1",
+            teamCode: "AAA",
+            teamName: "Alpha",
+            rank: 1,
+            points: 10,
+            marketValueSeasonEnd: 100,
+            marketValueTotalEnd: 260,
+            cashEnd: 90,
+            cashEntry: 12.5,
+          }),
+        ],
+        playerPerformances: [],
+      });
+
+      // Nicht der Saison-Endstand (100 / 90), sondern der Stand, mit dem das Team weiterspielt.
+      expect(zeile(modell)?.marketValue).toBe(260);
+      expect(zeile(modell)?.cash).toBe(12.5);
+    });
+
+    it("faellt ohne Patch auf den Saison-Endstand zurueck", () => {
+      const modell = baueModell({
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        finalStandings: [
+          standing({
+            teamId: "t1",
+            teamCode: "AAA",
+            teamName: "Alpha",
+            rank: 1,
+            points: 10,
+            marketValueSeasonEnd: 100,
+            marketValueTotalEnd: 55,
+            cashEnd: 90,
+          }),
+        ],
+        playerPerformances: [],
+      });
+
+      // Ohne Patch traegt `marketValueTotalEnd` noch den Stand VOR der Entwicklung (55) und waere
+      // die schlechtere Zahl — hier gewinnt der echte Saisonabschluss.
+      expect(zeile(modell)?.marketValue).toBe(100);
+      expect(zeile(modell)?.cash).toBe(90);
+    });
+
+    it("nimmt `cashTotal` erst, wenn sonst nichts da ist", () => {
+      const modell = baueModell({
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        finalStandings: [
+          standing({ teamId: "t1", teamCode: "AAA", teamName: "Alpha", rank: 1, points: 10, cashTotal: 77 }),
+        ],
+        playerPerformances: [],
+      });
+
+      // `cashTotal` ist eine Prognose aus dem Cash-Apply — deshalb ganz hinten.
+      expect(zeile(modell)?.cash).toBe(77);
+    });
   });
 });

@@ -375,7 +375,15 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
       // kein reales Cash). Der archivierte `guv` wurde mit der alten prize-als-Einnahme-Formel
       // gebildet und ist nicht mit der korrigierten GuV vergleichbar → bewusst `null`, damit die
       // Sparkline ehrlich in den Empty-State degradiert statt Phantomwerte zu zeigen.
-      const cash = row.cashEnd ?? row.cashTotal ?? null;
+      //
+      // `cashEntry` GEHT VOR: Chris' Vorgabe „die snapshots für Cash und Marktwert sollen ja auch
+      // erst am anfang der Saison nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+      // Das ist derselbe Zeitpunkt, den die Sparkline ohnehin meint (Cash-Ende von Saison N =
+      // Start von N+1) — nur eben NACH Kaeufen, Fuellung und Krediten statt davor. Fehlt das Feld
+      // (Altsaves, oder die Folgesaison hat ihr Kauffenster noch vor sich), bleibt es beim alten
+      // Wert. Der Abgleich in `getSnapshotCashByTeam` liest weiterhin `cashEnd` und ist davon
+      // unberuehrt.
+      const cash = row.cashEntry ?? row.cashEnd ?? row.cashTotal ?? null;
       return {
         seasonId: snapshot.seasonId,
         seasonName: snapshot.seasonName,

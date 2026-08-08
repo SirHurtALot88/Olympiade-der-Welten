@@ -64,9 +64,19 @@ describe("Saisonabschluss: der Knopf darf nicht stumm scheitern", () => {
     expect(BODY).toContain("sponsorChoicePending");
   });
 
-  it("zeigt den Sponsoren-Schritt nur, wenn wirklich eine Wahl aussteht", () => {
-    // Sonst stuende dauerhaft ein Schritt in der Liste, der nichts zu tun hat.
-    expect(PANEL).toMatch(/sponsorChoicePending > 0/);
+  it("zeigt den Sponsoren-Schritt nur, wenn wirklich etwas blockiert", () => {
+    /**
+     * CHRIS: „nimm die Warnung raus für Sponsoren, die werden in s2 sauber dann gepickt."
+     *
+     * Ausloeser war frueher die offene Wahl selbst — und die steht am Saisonende IMMER offen, weil
+     * die Angebote fuer die neue Saison dort erst erzeugt und erst in der neuen Saison gewaehlt
+     * werden. Der Schritt stand damit dauerhaft in der Liste, ohne dass es etwas zu tun gab.
+     *
+     * Jetzt haengt er am echten Blocker. Den kann weiterhin der Abschluss-Gate setzen
+     * (`season-completion-service.ts:234`, fehlender Vertrag fuer die LAUFENDE Saison) — dann ist
+     * der Schritt der einzige Weg heraus und muss erscheinen.
+     */
+    expect(PANEL).toContain('workflowBlockingReasons.includes("manual_sponsor_choice_pending")');
   });
 
   it("sind Fehler und Blocker auch sichtbar gestaltet", () => {

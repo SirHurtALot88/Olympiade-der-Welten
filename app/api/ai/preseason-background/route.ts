@@ -12,8 +12,9 @@ import { buildAiActionBreakdown } from "@/lib/ai/ai-action-breakdown";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
-import { buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
+import { applyInsolvencyBackstop, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -424,6 +425,63 @@ async function executeAiPreseasonBackgroundWork(input: {
     // whatever that pipeline already did) and is scoped to the same AI-only `aiTeamIds` — see
     // lib/ai/ai-injury-depth-topup-service.ts for the injury signal / cheap-price / afford gating.
     const injuryDepthTopup = applyAiInjuryDepthTopup({ saveId, seasonId, aiTeamIds });
+
+    /**
+     * KEIN MINUS MEHR, WENN DAS FENSTER ZU IST.
+     *
+     * CHRIS' REGEL: „d-p darf negativ in die neue Saison gehen das ist ok! Nur nach dem kaufen und
+     * kredite aufnehmen darf es nicht mehr negativ sein."
+     *
+     * Der regulaere Kredit-Pass oben kann ein Minus stehen lassen: er prueft Kapazitaet und
+     * Tragfaehigkeit, und beides darf nein sagen. Danach hat das Team keinen Weg mehr — verkauft
+     * wird erst am naechsten Saisonende. Der Notkredit ist genau dafuer da (`emergency: true`
+     * umgeht Kapazitaet, Distress-Gate und die S1-Sperre, weil er unfreiwillig ist) und deckt exakt
+     * den Fehlbetrag; Cash steht danach auf 0, die Restschuld laeuft im normalen Kreditsystem.
+     *
+     * Er steht bewusst am ENDE: erst wenn Markt, Fuellung und Verletzungs-Topup fertig sind, steht
+     * der Kontostand fest, mit dem das Team in die Saison geht.
+     */
+    const vorAusgleich = persistence.getSaveById(saveId);
+    let notkredite: Array<{ teamId: string; principal: number }> = [];
+    if (vorAusgleich) {
+      const ausgleich = applyInsolvencyBackstop({ gameState: vorAusgleich.gameState, saveId });
+      if (ausgleich.emergencyLoans.length > 0) {
+        persistence.saveSingleplayerState(saveId, ausgleich.gameState);
+        notkredite = ausgleich.emergencyLoans;
+      }
+      kreditNotizen.push(
+        ...ausgleich.warnings,
+        ...notkredite.map((kredit) => `ai_notkredit:${kredit.teamId}:${kredit.principal}`),
+      );
+    }
+
+    /**
+     * SNAPSHOT DER VORSAISON AUF DEN EINTRITTSSTAND NACHZIEHEN.
+     *
+     * CHRIS' VORGABE: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der
+     * Saison nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+     *
+     * BEFUND: `patchCompletedSeasonSnapshotAfterPreseasonBuy` gibt es seit Langem und tut genau
+     * das — aufgerufen hat es im Spiel aber NIEMAND. Die einzigen Aufrufer waren
+     * `scripts/long-run-sandbox-s1-s6.ts:3514` und die Tests. In der ewigen Tabelle stand deshalb
+     * der Stand vom Saisonende; seit die Verkaeufe dorthin gewandert sind (#445) heisst das: Kader
+     * von 3 bis 7 Spielern und ein entsprechend kleiner Marktwert.
+     *
+     * Hier ist der richtige Zeitpunkt: Markt, Fuellung, Verletzungs-Topup und der
+     * Zahlungsausgleich sind durch, der Eintrittsstand steht fest.
+     */
+    let snapshotPatchNotiz: string[] = [];
+    const vorPatch = persistence.getSaveById(saveId);
+    if (vorPatch) {
+      const patch = patchCompletedSeasonSnapshotAfterPreseasonBuy(vorPatch.gameState, seasonId);
+      if (patch.patched) {
+        persistence.saveSingleplayerState(saveId, patch.gameState);
+        snapshotPatchNotiz = [`snapshot_eintrittsstand_gesetzt:${patch.completedSeasonId}`];
+      } else {
+        snapshotPatchNotiz = patch.warnings;
+      }
+    }
+
     const finalRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
       status: market.status === "blocked" ? "failed" : "completed",
@@ -439,6 +497,7 @@ async function executeAiPreseasonBackgroundWork(input: {
         ...injuryDepthTopup.warnings,
         `roster_fill_auf_optimum:${rosterFillFilled}/${rosterFill.teams.length}`,
         ...kreditNotizen,
+        ...snapshotPatchNotiz,
       ],
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
       actionBreakdown: buildAiActionBreakdown(managerResult.actions),

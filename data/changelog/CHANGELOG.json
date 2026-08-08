@@ -2,6 +2,33 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-08",
+      "seite": "Betrieb · Spielstand einsetzen",
+      "pr": null,
+      "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen · Ewige Tabelle",
+      "pr": null,
+      "text": "Zwei Dinge am Saisonstart: Erstens steht am Ende des Kauffensters garantiert kein Team mehr im Minus — wer nach Käufen, Kaderfüllung und regulärem Kredit noch negativ ist, bekommt einen Notkredit über genau den Fehlbetrag. Mit Minus in die neue Saison zu gehen bleibt erlaubt, das löst sich jetzt im Fenster auf. Zweitens zeigen ewige Tabelle und Finanzen für eine abgeschlossene Saison den Stand, mit dem das Team wirklich weiterspielt: Marktwert und Cash nach den Käufen der Folgesaison statt des Kaders vom Saisonende, der seit der Verkaufsumstellung nur noch drei bis sieben Spieler groß war. Der Wert dafür wurde bisher nie geschrieben — die Funktion existierte, aber niemand rief sie auf.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Saison · Saisonende",
+      "pr": null,
+      "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-07",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
