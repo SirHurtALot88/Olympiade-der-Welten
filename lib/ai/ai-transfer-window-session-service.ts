@@ -701,7 +701,20 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // ausgenommen). Das geliehene Cash wird in die Session (persist + sessionRunContext.save) geschrieben,
   // damit die anschließende Kaufschleife das erhöhte Budget sieht. Nur im Organic-Pfad, damit es sich
   // nicht mit dem Batch-Hook (der bereits über runAiPicksExecutePreview leiht) doppelt.
-  if (useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun) {
+  /**
+   * CHRIS: „du kannst ja bei organic dann einen kredit zyklus ergänzen, der dann ab season 2
+   * greift" — deshalb steht der Pass jetzt in einer Funktion und laeuft ZWEIMAL.
+   *
+   * WARUM ZWEIMAL: vor den Kaufzyklen liest sich fast jedes Team als `cash_sufficient` — das Geld
+   * ist ja noch da. Erst danach steht fest, wer sich leergekauft hat und trotzdem unter seinem Ziel
+   * steht. Am Klon von Chris' Spielstand gemessen, ab demselben Zustand nach dem Saisonwechsel:
+   * ein Durchgang ergab 2 Kredite, zwei Durchgaenge 8 — und ein Team weniger unter dem Optimum.
+   *
+   * Saison 1 ist unberuehrt: `resolveAiLoanDecision` sperrt sie hart (`season_one_no_loans`), der
+   * zweite Durchgang findet dort also genauso wenig wie der erste.
+   */
+  const fuehreKreditPassAus = () => {
+    if (!(useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun)) return;
     const borrowSave = readLiveSave();
     if (borrowSave) {
       const borrowTeamIds = scopeTeam(borrowSave.gameState.teams.map((team) => team.teamId)).filter(
@@ -737,7 +750,9 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         warnings.push(`ai_loan_borrow:${teamId}:${loanDecision.loanAmount}:${loanDecision.termSeasons}s`);
       }
     }
-  }
+  };
+
+  fuehreKreditPassAus();
 
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();
@@ -998,6 +1013,11 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // season_end session is sell-only end to end and must not perform any buy, rescue or otherwise.
   const OPT_GAP_RESCUE_THRESHOLD = 1;
   const OPT_GAP_RESCUE_MAX_CYCLES = 2;
+  // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung oben bei
+  // `fuehreKreditPassAus`). Er steht VOR der Opt-Luecken-Rettung, damit die das geliehene Geld noch
+  // ausgeben kann — danach waere es nur Zinslast ohne Gegenwert.
+  fuehreKreditPassAus();
+
   const rescueSave = isPreseasonBuyPhase && !usePreseasonS1DraftBatch ? readLiveSave() : null;
   if (rescueSave) {
     const rescueCandidates = scopeTeam(
