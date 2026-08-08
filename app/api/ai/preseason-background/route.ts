@@ -413,6 +413,22 @@ async function executeAiPreseasonBackgroundWork(input: {
         seasonId,
         dryRun: false,
         confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+        /**
+         * GEMELDET: „S-C hat gekauft. das ist MEIN TEAM. Wie kann das passieren dass die AI da
+         * wieder für kauft."
+         *
+         * Am Spielstand nachgemessen: drei Zugaenge fuer S-C mit `source=ai_roster_fill`. Der
+         * Fuell-Dienst laeuft ohne Einschraenkung ueber ALLE Teams des Spielstands — genau davor
+         * warnt sein eigener Parameter-Kommentar („that was the S6 bug for this path",
+         * `auto-roster-fill-service.ts:129`). Beim Verdrahten in #446 wurde die Einschraenkung
+         * schlicht nicht mitgegeben; die anderen Schritte dieses Laufs haben sie alle
+         * (`teamScope: "ai"`, `teamIds: aiTeamIds`).
+         *
+         * `aiTeamIds` ist die bereits gefilterte Liste: `getAiTeamIds` nimmt nur Teams mit
+         * `controlMode === "ai"`, zieht `getProtectedHumanTeamIds` ab und schneidet zusaetzlich
+         * mit den im Raum beschreibbaren Teams. Genau die darf der Fuell-Lauf anfassen.
+         */
+        callerWritableTeamIds: aiTeamIds,
       },
       persistence,
     );
