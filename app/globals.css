@@ -63850,6 +63850,62 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-ink);
 }
 
+/*
+  ALLE KREDITE DER LIGA — Detail-Tabelle unter der Team-Uebersicht.
+
+  Chris: „der spieler soll im kredite tab ALLE kredite sehen können … welches team hat von welchem
+  einen kredit genommen, laufzeit raten usw." Die Liste darueber fasst pro Team zusammen; hier steht
+  jeder einzelne Kredit. Beendete Kredite bleiben, nur gedaempft.
+*/
+.is-new-look .nl-credits-alle-wrap {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-credits-alle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--nl-font-size-sm, 0.875rem);
+}
+
+.is-new-look .nl-credits-alle th,
+.is-new-look .nl-credits-alle td {
+  padding: var(--nl-space-2, 0.5rem) var(--nl-space-3, 0.75rem);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--nl-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.is-new-look .nl-credits-alle th {
+  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
+  font-weight: 600;
+}
+
+.is-new-look .nl-credits-alle .nl-credits-alle-num {
+  text-align: right;
+}
+
+/* Eigene Beteiligung hervorheben — als Schuldner ODER als Geldgeber. */
+.is-new-look .nl-credits-alle-row.is-own td {
+  background: var(--nl-surface-raised, rgba(255, 255, 255, 0.04));
+}
+
+/* Beendetes bleibt lesbar, tritt aber zurueck. */
+.is-new-look .nl-credits-alle-row.is-done td {
+  opacity: 0.55;
+}
+
+.is-new-look .nl-credits-alle-du,
+.is-new-look .nl-credits-alle-seit,
+.is-new-look .nl-credits-alle-missed {
+  margin-left: var(--nl-space-2, 0.5rem);
+  font-size: var(--nl-font-size-xs, 0.75rem);
+  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.is-new-look .nl-credits-alle-missed {
+  color: var(--nl-danger, #f26d6d);
+}
+
 .is-new-look .nl-credits-league-list {
   display: flex;
   flex-direction: column;
