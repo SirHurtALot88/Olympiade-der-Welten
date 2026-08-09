@@ -16,6 +16,7 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import { buildDisciplineStageTeamsFromBookedResult } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
@@ -663,6 +664,13 @@ export default function DisciplineStageArena({
   // Erlaubt manuelles Neuladen der Engine-Preview (Retry-Button), falls der erste Versuch
   // fehlschlägt/hängt — ohne den Retry säßen normale Spieler bei „unavailable" still fest.
   const [previewReloadNonce, setPreviewReloadNonce] = useState(0);
+  /**
+   * „Tafel gelesen, ab auf die Bühne." Bewusst NUR im Komponentenzustand und nicht im Spielstand:
+   * die Tafel soll vor JEDEM Spieltag einmal kommen (das war Chris' Anliegen), aber wer sie
+   * weggeklickt hat, soll beim Hin- und Herwechseln nicht wieder darauf landen. Ein neuer Spieltag
+   * mountet die Arena neu, damit steht der Merker wieder auf `false`.
+   */
+  const [preMatchdayDismissed, setPreMatchdayDismissed] = useState(false);
 
   /**
    * Stand der Aufstellungen dieses Spieltags. Teil des Cache-Schluessels UND Ausloeser des Effekts
@@ -1124,16 +1132,40 @@ export default function DisciplineStageArena({
     : null;
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
+  /**
+   * Bahnen aus ECHTEN Daten — Vorschau bevorzugt, sonst das gebuchte Ergebnis.
+   *
+   * GEMELDET VON CHRIS: Die Bühne zeigte für S-C in der Staffel Tahra (+40,7) und Chad (+40,2),
+   * Rang 28 mit 80,9 Pkt. Gebucht waren Spineshard (29,3) und Myrth (9,9), Rang 31 mit 47,8 —
+   * Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi. Dasselbe
+   * bei V-D, wo die Bühne Queen Butterfly an die Spitze stellte und das Team in Wahrheit Vierter
+   * wurde.
+   *
+   * Ursache war der stille Rückfall auf `buildDisciplineStageModel`: das Modell liest die
+   * Aufstellung nicht, es sucht sich pro Team selbst die stärksten Spieler. Am gemeldeten
+   * Spielstand nachgerechnet wählt es für S-C in der Staffel genau Tahra (41,7) und Chad (41,2).
+   * Als Vorschau ist das richtig — als Ergebnis-Anzeige erfindet es Tatsachen.
+   *
+   * Deshalb gibt es jetzt eine zweite echte Quelle: ist die Disziplin gewertet, kommen die Bahnen
+   * aus `disciplineResults` + `playerDisciplinePerformances`. Das Modell bleibt dem Test-/
+   * Random-Modus vorbehalten.
+   */
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
-    if (!disc || disc.teamResults.length === 0) {
-      return null;
+    if (disc && disc.teamResults.length > 0) {
+      return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
     }
-    return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
-  }, [preview, disciplineId, teamMetaById, portraitById]);
+    return buildDisciplineStageTeamsFromBookedResult(gameState, disciplineId, teamMetaById, portraitById);
+  }, [preview, disciplineId, teamMetaById, portraitById, gameState]);
 
-  // Echt-Modus nutzt die Engine, wenn Daten für diese Disziplin vorliegen.
+  // Echt-Modus nutzt IMMER echte Daten. Fehlen sie, wird nichts erfunden — siehe
+  // `realDataMissing` unten, das statt der Bühne eine ehrliche Meldung zeigt.
   const useEngine = mode === "real" && engineTeams !== null;
+  /**
+   * Echt-Modus ohne echte Daten. Vorher lief die Bühne hier mit dem Modell weiter und sah aus wie
+   * ein Ergebnis; jetzt ist der Zustand benannt und wird angezeigt statt kaschiert.
+   */
+  const realDataMissing = mode === "real" && engineTeams === null;
 
   // Random-Test: 2 Mutator-Traits werden für die Disziplin bestimmt.
   const mutatorTraits = useMemo(
@@ -1289,10 +1321,27 @@ export default function DisciplineStageArena({
    * Dev-/Test-Modus behält die rohe Bühne (Admin will die Disziplinen frei sehen).
    */
   const matchdayHasBookedResult = useMemo(() => hasCurrentMatchdayResult(gameState), [gameState]);
+  /**
+   * GEMELDET VON CHRIS: „diese infotafel vor dem spieltag kommt glaub ich nur beim ersten spieltag
+   * danach nie wieder gesehen."
+   *
+   * Stimmte. In der Bedingung stand `arenaStartBlockedByLineups` — also „mindestens ein Team der
+   * Liga ist noch nicht bereit". Damit war die Tafel kein Vorspiel-Bildschirm, sondern ein
+   * BLOCKADE-Bildschirm: sie erschien nur, solange jemand trödelte. Am ersten Spieltag fehlten
+   * noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel war weg,
+   * obwohl ihre Überschrift „Vor dem Anpfiff" lautet und der Kommentar sie als „expliziten
+   * Pre-Matchday-Zustand" beschreibt. Bedingung und Absicht liefen auseinander.
+   *
+   * Jetzt zählt nur noch, ob der Spieltag WIRKLICH noch nicht begonnen hat: nichts gebucht, keine
+   * Disziplin gelaufen. Weil die Tafel damit auch dann kommt, wenn alle bereit sind, hat sie einen
+   * Weg nach vorn bekommen (`onStartStage` unten) — vorher war sie eine Sackgasse mit dem einzigen
+   * Ausgang „Einsatzliste öffnen", was genügte, solange sie nur bei Blockaden erschien.
+   */
+  const preMatchdayReady = !arenaStartBlockedByLineups;
   const showPreMatchday =
     mode === "real" &&
     !devMode &&
-    arenaStartBlockedByLineups &&
+    !preMatchdayDismissed &&
     !matchdayHasBookedResult &&
     endedDisciplineIds.size === 0;
 
@@ -1792,9 +1841,9 @@ export default function DisciplineStageArena({
               {` · Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
             </span>
           </div>
-          {onOpenLineup ? (
-            <div className="arena-prematch-hero-actions">
-              {ownLineupComplete ? (
+          <div className="arena-prematch-hero-actions">
+            {onOpenLineup ? (
+              ownLineupComplete ? (
                 <button type="button" className="arena-prematch-ghost" onClick={() => onOpenLineup()}>
                   Einsatzliste prüfen
                 </button>
@@ -1803,9 +1852,24 @@ export default function DisciplineStageArena({
                   Einsatzliste öffnen →
                   {totalRequired > 0 ? <small className="nl-tnum">{totalRequired - filledTotal} von {totalRequired} Plätzen offen</small> : null}
                 </button>
-              )}
-            </div>
-          ) : null}
+              )
+            ) : null}
+            {/* Der Weg nach vorn. Ohne ihn wäre die Tafel eine Sackgasse — was hinnehmbar war,
+                solange sie nur bei Blockaden erschien, aber nicht mehr, seit sie vor jedem
+                Spieltag kommt. Erscheint erst, wenn die ganze Liga bereit ist: vorher DARF die
+                Bühne nicht loslaufen, und ein Knopf, der dann nichts tut, wäre eine Lüge. */}
+            {preMatchdayReady ? (
+              <button
+                type="button"
+                className="arena-prematch-cta"
+                onClick={() => setPreMatchdayDismissed(true)}
+                data-testid="arena-prematch-start-cta"
+              >
+                Zur Bühne →
+                <small className="nl-tnum">Liga vollzählig bereit</small>
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="arena-prematch-disc-grid">
@@ -2033,7 +2097,15 @@ export default function DisciplineStageArena({
               border: "1px solid var(--nl-line)",
             }}
           >
-            {previewState === "loading" ? "Engine lädt …" : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
+            {/* Der frühere Text „Vereinfachte Ansicht (keine Engine-Aufstellung)" verschwieg das
+                Entscheidende: die gezeigten Spieler sind dann NICHT die aufgestellten, sondern eine
+                Schätzung des Modells. Chris las die Bühne deshalb als Ergebnis — mit Namen, die gar
+                nicht gespielt hatten. Jetzt steht dran, was es ist. */}
+            {previewState === "loading"
+              ? "Engine lädt …"
+              : realDataMissing
+                ? "Vorschau mit GESCHÄTZTER Aufstellung — nicht das Ergebnis"
+                : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
           </span>
           {previewState === "unavailable" ? (
             <button

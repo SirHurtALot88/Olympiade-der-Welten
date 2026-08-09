@@ -1,0 +1,9 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Arena · Disziplin-Bühne",
+    "text": "Die Arena zeigte falsche Spieler und falsche Ränge. Gemeldet war: „ich hab hier platz 28 … bin aber hier letzter?“ — die Bühne führte für Stronghold Crusaders in der Staffel Tahra (+40,7) und Chad Thunderjaw (+40,2) auf, Rang 28 mit 80,9 Punkten. Gewertet wurde etwas völlig anderes: aufgestellt waren Spineshard (29,3) und Myrth (9,9), Team-Rang 31 mit 47,8. Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi's Castle. Dasselbe bei anderen Teams — bei V-D stellte die Bühne Queen Butterfly an die Spitze, während das Team in Wahrheit Vierter wurde. Die Ursache lag allein in der Anzeige, nicht in der Wertung: lagen der Bühne für eine Disziplin keine Engine-Daten vor, wich sie still auf ein schätzendes Modell aus, das die Aufstellung gar nicht liest, sondern sich pro Team selbst die stärksten Spieler heraussucht. Am gemeldeten Spielstand nachgerechnet wählt genau dieses Modell für S-C in der Staffel Tahra und Chad. Deine Punkte waren also immer korrekt gebucht — falsch war nur, was auf der Bühne stand. Jetzt holt die Arena die Bahnen aus dem gebuchten Ergebnis, sobald eine Disziplin gewertet ist: dieselben Spieler, Ränge und Scores, die auch in der Tabelle stehen. Und solange eine Disziplin noch nicht gelaufen ist, sagt der Hinweis oben unmissverständlich „Vorschau mit GESCHÄTZTER Aufstellung – nicht das Ergebnis“, statt wie bisher nur von einer vereinfachten Ansicht zu sprechen.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]
