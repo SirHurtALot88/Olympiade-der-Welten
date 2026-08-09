@@ -1339,10 +1339,15 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         matchday: log.matchdayId ?? null,
         category: "finance",
         severity: "info",
-        title: prizeMatchdayLabel ? `Preisgeld ausgezahlt — ${prizeMatchdayLabel}` : "Preisgeld ausgezahlt",
+        // GEMELDET VON CHRIS: „Preisgeld soll nicht ausgezahlt werden hab ich auch nie gesagt."
+        // Die Karte hiess „Preisgeld ausgezahlt" und meldete damit eine Zahlung, die es nicht gibt:
+        // die Preisgeld-Tabelle ist ein Vergleichswert (`CASH_PRIZE_BENCHMARK_ONLY`), Team-Cash
+        // bleibt davon unberuehrt. Gebucht wird an dieser Stelle die Saisonabrechnung — Sponsorgeld
+        // abzueglich Gehaelter, Apron, Gebaeude, Kreditraten und Vorstandsziele.
+        title: prizeMatchdayLabel ? `Saisonabrechnung gebucht — ${prizeMatchdayLabel}` : "Saisonabrechnung gebucht",
         description: [
-          totalPrizeMoney != null ? `${totalPrizeMoney} Preisgeld` : null,
           appliedTeams != null ? `${appliedTeams} Teams` : null,
+          totalPrizeMoney != null ? `Preisgeld-Vergleichswert ${totalPrizeMoney} (nicht ausgezahlt)` : null,
         ]
           .filter(Boolean)
           .join(" · "),

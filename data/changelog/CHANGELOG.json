@@ -192,6 +192,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Spieltag · Formkarten",
+      "pr": null,
+      "text": "Jeder Spieler bekam ein exakt gespiegeltes Kartenpaar — +8 und −8, +4 und −4 — und zwar immer: über 20.000 Ziehungen nachgemessen waren die beiden Werte in 100 % der Fälle betragsgleich. Im Live-Save steht genau das: 680 Karten der Saison, Nennwertsumme exakt 0. Das war kein Zufall, sondern eine Kollision: die Auswahl nahm nur die untersten zwei Bits des Hashes, und in dieser Rechnung laufen die Seeds für „positiv\" und „negativ\" nach dem vierten Zeichen zusammen. Beide Beträge werden jetzt getrennt gezogen, die Verteilung trifft alle 16 Kombinationen. Bestehende Saisons behalten ihre Karten — die Werte entstehen beim Saisonwechsel und stehen im Spielstand.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Saisonende · Abrechnung",
       "pr": null,
       "text": "Die Formkarten-Übernutzungs-Strafe (Punktabzug plus Neu-Einordnung der Endtabelle) greift jetzt auch auf dem normalen Spielerweg über „Sponsoren buchen“ — vorher lief sie nur im Cockpit-Saisonabschluss, sodass Sponsor- und Apron-Abrechnung sowie der eingefrorene Saison-Schnappschuss auf der unbestraften Tabelle rechneten; sie greift zudem nur bei wirklich beendeter Saison, damit eine laufende Saison nicht für Karten bestraft wird, die noch gespielt werden können.",
@@ -330,6 +339,15 @@
       "seite": "Liga · Ranks",
       "pr": null,
       "text": "Die Teamstärke-Ränge einer abgeschlossenen Saison werden jetzt beim letzten gewerteten Spieltag festgehalten statt erst beim Saisonabschluss — vorher flossen die Verkäufe nach Saisonende in die Saisonränge ein und die Veränderungs-Spalte zeigte Sprünge wie „+24“, die es im Saisonlauf nie gab; dazu gibt es ein Reparaturskript, das den bestehenden Season-1-Snapshot aus der Transferhistorie rückwirkend korrigiert.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Saisonende",
+      "pr": null,
+      "text": "Der Schritt hiess „Sponsoren & Preisgeld buchen\" und die Inbox meldete danach „Preisgeld ausgezahlt\" — beides versprach eine Zahlung, die es nicht gibt: die Preisgeld-Tabelle ist ein Vergleichswert, das Team-Cash bleibt davon unberührt. Der Schritt heisst jetzt „Saisonabrechnung buchen\" und nennt auch, was wirklich passiert: Sponsorgeld abzüglich Gehälter, dazu Apron, Gebäude, Kreditraten und Vorstandsziele. „Sponsoren buchen\" war nämlich die zweite Untertreibung — an dieser Stelle laufen sieben Buchungen, nicht eine. Der Weg dorthin heisst im Ablauf ebenfalls „Saisonabrechnung\" statt „Preisgeld & Finanzen\".",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"
