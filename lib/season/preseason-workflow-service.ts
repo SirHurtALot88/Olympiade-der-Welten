@@ -30,7 +30,6 @@ import {
   regenerateSponsorOffersForSeason,
 } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonSponsorCashTotal, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
-import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
@@ -751,13 +750,18 @@ function buildNextSeasonGameState(
         }),
       );
 
-  // Apron-Linien fuer die NEUE Saison einfrieren, unmittelbar nachdem `gamePhase` auf `season_active`
-  // geschaltet hat: das Transferfenster ist zu diesem Zeitpunkt bereits durchlaufen (dieser Workflow
-  // laeuft am Ende von `next_season_ready`), der Gehaltsstand, gegen den die Saison antritt, steht
-  // also fest. Idempotent — ein bereits vorhandener Snapshot fuer diese Saison bleibt unangetastet.
+  // Apron-Linien werden hier BEWUSST NICHT MEHR eingefroren. Ein frueherer Stand tat es und
+  // begruendete das mit "das Transferfenster ist zu diesem Zeitpunkt bereits durchlaufen" — das war
+  // FALSCH: das KAUFfenster der neuen Saison (`isEarlySeasonTransferSetup`, transfer-window-policy.ts)
+  // oeffnet erst NACH diesem Workflow und schliesst mit der ersten Wertung des ersten Spieltags.
+  // Eine hier eingefrorene Linie misst die ausgeduennten Nach-Verkaufs-Kader und gilt dann fuer
+  // eine Liga, die nach dem Kauffenster ganz anders aussieht (gemessen: Median 45,0 eingefroren,
+  // real 63,9 → 29/32 Teams ueber der Linie, 3 Empfaenger teilen 428,7). Das Einfrieren sitzt jetzt
+  // beim Fensterschluss: `freezeApronLinesAtBuyWindowClose` (apron-settlement-service.ts), aufgerufen
+  // aus dem Spieltags-Result-Apply (legacy-matchday-result-apply-service.ts).
   return {
     auditLog,
-    gameState: ensureSeasonApronLinesFrozen(nextGameState),
+    gameState: nextGameState,
   };
 }
 

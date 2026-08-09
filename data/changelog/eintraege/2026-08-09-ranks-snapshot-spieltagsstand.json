@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-09",
+  "seite": "Liga · Ranks",
+  "text": "Die Teamstärke-Ränge einer abgeschlossenen Saison werden jetzt beim letzten gewerteten Spieltag festgehalten statt erst beim Saisonabschluss — vorher flossen die Verkäufe nach Saisonende in die Saisonränge ein und die Veränderungs-Spalte zeigte Sprünge wie „+24“, die es im Saisonlauf nie gab; dazu gibt es ein Reparaturskript, das den bestehenden Season-1-Snapshot aus der Transferhistorie rückwirkend korrigiert.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

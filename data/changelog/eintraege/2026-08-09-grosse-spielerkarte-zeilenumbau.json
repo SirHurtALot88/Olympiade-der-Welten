@@ -1,0 +1,9 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Home · Top-Kader",
+    "text": "Die große Spielerkarte ist neu geordnet: OVR, PPs und MVS stehen jetzt in EINER Zeile statt in zweien — der Liga-Rang klebt dafür nicht mehr im Wert (\"79,9 · #20\"), sondern steht als eigene kleine Zeile im Chip. Darunter neu: die Saison-PPs je Achse (POW/SPE/MEN/SOC samt Ligarang, dieselbe Quelle wie die Ranks-Spalten), mit der Kopfzeile \"PPs je Achse\", damit sie nicht mit den Achswerten direkt darunter verwechselt wird — die stehen wie bisher als farbige Attribut-Chips da. CA und PO bleiben Sterne, PPs und MVS bleiben auch bei 0 oder ohne Wertung sichtbar. Gilt überall, wo die große Karte hängt: Home-Top-6, Team-Profil-Kader, Teams-Portraits und Teams-Detail.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  }
+]

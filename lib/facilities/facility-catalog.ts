@@ -82,21 +82,21 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "training_center",
     label: "Trainingszentrum",
-    description: "Verbessert nur Base Training XP, nicht Match-Performance.",
+    description: "Verbessert nur das Grundtraining, nicht die Spieltags-Leistung.",
     maxLevel: 5,
     effectType: "training_xp",
-    effectDescription: "Base Training XP Modifier",
+    effectDescription: "Grundtrainings-Bonus",
     // WICHTIG (Single Source of Truth): `modifierPct` ist der REAL angewandte Base-Training-XP-Bonus.
     // Die organische Saison-Progression (organic-season-progression.ts) liest den Modifier über
     // getFacilityLevelDefinition() aus GENAU diesen Werten — es gibt kein zweites hartkodiertes Array
     // mehr, damit Anzeige (Trainingspanel/Forecasts/Facility-Cards) und angewandter Wert niemals
     // divergieren können. Werte = [14,28,42,56,70] % (L1..L5), L5 = +70 %.
     levels: [
-      { level: 1, effectDescription: "+14% Base Training XP", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 14 },
-      { level: 2, effectDescription: "+28% Base Training XP", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 28 },
-      { level: 3, effectDescription: "+42% Base Training XP", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 42 },
-      { level: 4, effectDescription: "+56% Base Training XP", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 56 },
-      { level: 5, effectDescription: "+70% Base Training XP", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 70 },
+      { level: 1, effectDescription: "+14 % Grundtraining", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 14 },
+      { level: 2, effectDescription: "+28 % Grundtraining", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 28 },
+      { level: 3, effectDescription: "+42 % Grundtraining", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 42 },
+      { level: 4, effectDescription: "+56 % Grundtraining", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 56 },
+      { level: 5, effectDescription: "+70 % Grundtraining", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 70 },
     ],
   },
   {
@@ -105,13 +105,13 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     description: "Verbessert Erholung und Fatigue-Signale, macht Push aber nicht kostenlos.",
     maxLevel: 5,
     effectType: "recovery",
-    effectDescription: "Recovery Modifier",
+    effectDescription: "Erholungs-Bonus",
     levels: [
-      { level: 1, effectDescription: "+2 Recovery (Basis 20 → 22)", upgradeCost: 7, seasonUpkeep: 0.7, modifierPct: 5 },
-      { level: 2, effectDescription: "+4 Recovery (Basis 20 → 24)", upgradeCost: 13, seasonUpkeep: 1.2, modifierPct: 10 },
-      { level: 3, effectDescription: "+6 Recovery (Basis 20 → 26)", upgradeCost: 22, seasonUpkeep: 2.1, modifierPct: 15 },
-      { level: 4, effectDescription: "+9 Recovery (Basis 20 → 29)", upgradeCost: 35, seasonUpkeep: 3.3, modifierPct: 20 },
-      { level: 5, effectDescription: "+12 Recovery (Basis 20 → 32)", upgradeCost: 54, seasonUpkeep: 4.8, modifierPct: 25 },
+      { level: 1, effectDescription: "+2 Erholung (Basis 20 → 22)", upgradeCost: 7, seasonUpkeep: 0.7, modifierPct: 5 },
+      { level: 2, effectDescription: "+4 Erholung (Basis 20 → 24)", upgradeCost: 13, seasonUpkeep: 1.2, modifierPct: 10 },
+      { level: 3, effectDescription: "+6 Erholung (Basis 20 → 26)", upgradeCost: 22, seasonUpkeep: 2.1, modifierPct: 15 },
+      { level: 4, effectDescription: "+9 Erholung (Basis 20 → 29)", upgradeCost: 35, seasonUpkeep: 3.3, modifierPct: 20 },
+      { level: 5, effectDescription: "+12 Erholung (Basis 20 → 32)", upgradeCost: 54, seasonUpkeep: 4.8, modifierPct: 25 },
     ],
   },
   {
@@ -120,7 +120,7 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     description: "Verbessert Potential-, Wishlist-, Fit- und Economy-Informationen.",
     maxLevel: 5,
     effectType: "scouting",
-    effectDescription: "Scouting Confidence",
+    effectDescription: "Scouting-Genauigkeit",
     levels: [
       { level: 1, effectDescription: "grobe Diszi-/Potential-Spannen", upgradeCost: 6, seasonUpkeep: 0.6 },
       { level: 2, effectDescription: "kleinere Scouting-Spannen", upgradeCost: 12, seasonUpkeep: 1.1 },
@@ -163,7 +163,7 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     description: "Erzeugt langsames saisonales Cash-Income (flach, verlässlich — nicht beliebtheitsskaliert).",
     maxLevel: 5,
     effectType: "season_income",
-    effectDescription: "Season Cash Income",
+    effectDescription: "Saison-Einnahmen",
     // BALANCE (tunable): seasonIncome erneut angehoben (3.25/6.5/9.75/14.3/20.8 →
     // 3.9/7.8/11.7/17.2/25.0), damit sich der Fan-Shop schneller amortisiert (marginale Amortisation
     // jetzt ~3–8.5 Saisons statt bis ~8.3, kumuliert ~3–7). Der Fan-Shop ist die SICHERE Cash-Quelle
@@ -183,7 +183,7 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     description: "Erzeugt saisonales Arena-Cash. Basis × Beliebtheit — starke/beliebte Teams verdienen mehr.",
     maxLevel: 5,
     effectType: "season_income",
-    effectDescription: "Season Arena Income (Basis × Beliebtheit)",
+    effectDescription: "Arena-Einnahmen (Basis × Beliebtheit)",
     // BALANCE (tunable): Arena-Basis-Einnahmen deutlich angehoben (2.28/4.55/7.15/10.4/15.6 →
     // 2.4/6.0/10.8/17.7/28.5), damit sich JEDES Arena-Upgrade in ~8 Saisons amortisiert (marginale
     // Amortisation vorher 9–22 Saisons — die Arena war praktisch nie ein rationaler Bau). Bei
@@ -206,7 +206,7 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     description: "Beschleunigt die organische Entwicklung junger/Low-Tier-Spieler (F/E/D).",
     maxLevel: 5,
     effectType: "low_tier_upgrade_discount",
-    effectDescription: "F/E/D Youth Development Boost",
+    effectDescription: "Jugend-Entwicklung (F/E/D)",
     // EFFEKT-REPURPOSE: Der alte Upgrade-Kosten-Rabatt (`discountPct`) war tot — das XP-Kostensystem
     // ist abgeschafft, der reale Season-End-Apply läuft über die organische Progression zu Kosten 0.
     // NEU: `modifierPct` beschleunigt das organische Trainingsbudget berechtigter F/E/D-Spieler

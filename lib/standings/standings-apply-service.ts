@@ -1,4 +1,8 @@
 import type { GameState, StandingsApplyAuditLogRecord } from "@/lib/data/olyDataTypes";
+import {
+  buildTeamStrengthRankCaptureRecord,
+  upsertTeamStrengthRankCapture,
+} from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
@@ -327,11 +331,25 @@ function writeLocalStandingsApply(input: {
     createdAt: now,
   };
 
+  // Teamstärke-Ränge JETZT festhalten, nicht erst beim Saisonabschluss: zwischen letztem Spieltag
+  // und Abschluss liegen Verkäufe/Vertragsenden, die den Live-Kader — und damit die Saisonränge im
+  // Schnappschuss — verfälschen würden. Der jeweils letzte gewertete Spieltag gewinnt; der
+  // Saison-Schnappschuss übernimmt den Satz unverändert (season-snapshot-service).
+  const teamStrengthRankCapture = buildTeamStrengthRankCaptureRecord(save.gameState, {
+    saveId: input.preview.scope.saveId,
+    seasonId: input.preview.scope.seasonId,
+    matchdayId,
+  }, now);
+
   const nextGameState: GameState = {
     ...save.gameState,
     seasonState: {
       ...seasonState,
       standings: nextStandings,
+      teamStrengthRankCaptures: upsertTeamStrengthRankCapture(
+        seasonState.teamStrengthRankCaptures,
+        teamStrengthRankCapture,
+      ),
       standingsApplyLogs: [
         ...(seasonState.standingsApplyLogs ?? []).filter(
           (log) => log.payload.idempotencyKey !== input.idempotencyKey,

@@ -55,6 +55,8 @@ export type ApronProjectionTeamRow = {
   nettoDelta: number;
   /** `true`, wenn der Deckel (halber Wertungsanteil) die Abgabe begrenzt hat. */
   gedeckelt: boolean;
+  /** Empfangsberechtigt (unter der 1. Linie) — durchgereicht aus `computeApronSettlement`. */
+  empfaenger: boolean;
 };
 
 export type ApronProjection = {
@@ -133,6 +135,7 @@ export function buildApronProjection(input: {
           // hat. Gleichstand zählt nicht als gedeckelt — sonst meldete jede Abgabe von exakt 0
           // einen greifenden Deckel.
           gedeckelt: row.rohAbgabe > row.deckel + 0.005 && row.rohAbgabe > 0,
+          empfaenger: row.istEmpfaenger,
         },
       ]),
     ),

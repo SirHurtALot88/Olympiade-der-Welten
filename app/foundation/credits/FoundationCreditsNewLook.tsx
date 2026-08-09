@@ -1342,15 +1342,18 @@ export default function FoundationCreditsNewLook({
                       {row.involvesOwnTeam ? <span className="nl-credits-alle-du">du</span> : null}
                     </td>
                     <td>{row.lenderName}</td>
-                    <td className="nl-credits-alle-num nl-tnum">{row.principal.toFixed(1)}</td>
-                    <td className="nl-credits-alle-num nl-tnum">{row.outstanding.toFixed(1)}</td>
-                    <td className="nl-credits-alle-num nl-tnum">{(row.interestRate * 100).toFixed(1)} %</td>
+                    {/* Durchklick-Test G5: dieselbe Seite zeigte oben „38,9 Mio · 13,8 %"
+                        und hier „38.3 · 13.4 %" — Punkt statt Komma, ohne Einheit.
+                        Geld läuft wie überall über formatNlMoney (de-DE + „Mio"). */}
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.principal)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.outstanding)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlNumber(row.interestRate * 100, 1)} %</td>
                     <td className="nl-credits-alle-num nl-tnum">
                       {row.status === "active"
                         ? `${row.remainingSeasons}/${row.termSeasons}`
                         : `${row.termSeasons}`}
                     </td>
-                    <td className="nl-credits-alle-num nl-tnum">{row.installmentPerSeason.toFixed(1)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.installmentPerSeason)}</td>
                     <td>
                       {row.status === "active" ? "laufend" : row.status === "defaulted" ? "geplatzt" : "beendet"}
                       {row.missedPayments > 0 ? (
@@ -1358,8 +1361,8 @@ export default function FoundationCreditsNewLook({
                           {row.missedPayments} verpasst
                         </span>
                       ) : null}
-                      {row.originatedSeasonId ? (
-                        <span className="nl-credits-alle-seit">seit {row.originatedSeasonId}</span>
+                      {formatLoanSeasonLabel(row.originatedSeasonId) ? (
+                        <span className="nl-credits-alle-seit">seit {formatLoanSeasonLabel(row.originatedSeasonId)}</span>
                       ) : null}
                     </td>
                   </tr>
@@ -1394,6 +1397,16 @@ function loanHistoryStatusLabel(status: NlCreditsHistoryRow["status"]): string {
   return status === "paid" ? "Getilgt" : "Ausgefallen";
 }
 
+/**
+ * Durchklick-Test G5: „laufend seit season-2" zeigte den rohen Saison-Slug.
+ * Aus `season-2` wird „Season 2"; ein unparsebarer Wert wird NICHT roh
+ * gerendert (F5-Regel), sondern der Zusatz entfällt (null).
+ */
+function formatLoanSeasonLabel(seasonId: string | null | undefined): string | null {
+  const nummer = seasonId?.match(/(\d+)\s*$/)?.[1];
+  return nummer ? `Season ${nummer}` : null;
+}
+
 const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
   { key: "season", label: "Saison" },
   { key: "lender", label: "Kreditgeber" },
@@ -1405,7 +1418,7 @@ const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
 function renderCreditsHistoryCell(row: NlCreditsHistoryRow, column: NlTableColumn<NlCreditsHistoryRow>) {
   switch (column.key) {
     case "season":
-      return row.originatedSeasonId;
+      return formatLoanSeasonLabel(row.originatedSeasonId) ?? "—";
     case "lender":
       return row.lenderName;
     case "principal":

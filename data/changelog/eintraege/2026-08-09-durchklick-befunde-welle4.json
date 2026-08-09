@@ -1,0 +1,79 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Überall · Statuszeile",
+    "text": "Der Preseason-Banner zeigte unter „Grund anzeigen“ rohe Enum-Codes wie „roster_after_market_plan_below_player_min“ — auf jeder Seite. Alle Blocker-Codes sind jetzt deutsche Klartextsätze, ein unbekannter Code bekommt künftig einen lesbaren Ersatztext statt durchzurutschen, und „482 Setup-Aktionen“ heißt jetzt „Team-Einstellungen“.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Spieltag · Saisonstand",
+    "text": "Vor Spieltag 1 zeigte der Saisonstand kommentarlos Rang 1–32 mit lauter „—“, das Board vergab sogar Gold/Silber/Bronze, und „Top-Spieler der Saison“ listete #1–#10 mit ausschließlich „—“ — während die Ergebnisseite daneben „bewusst keine Reihenfolge“ versprach. Die Reihenfolge ist der Endstand der Vorsaison (die Startplätze) und wird jetzt genau so beschriftet; Medaillen gibt es erst mit echten Punkten, und die leere Top-Spieler-Liste ist der geteilte „Noch zu vergeben“-Block wie in Arena und Ranks.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Spieltag · Saisonstand",
+    "text": "Die erste Zeile der Seite war eine halbenglische Status-Flag-Reihe („Spielstand: aktiv · Live · Aktive Season · lokale Results“). Dort steht jetzt „Liga-Wertung · Saison läuft“ bzw. „· Archiv“; die technische Quelle bleibt als Tooltip erreichbar.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Spieltag · Home",
+    "text": "Die Saisonstand-Kachel rechnete „verbleibend 3 Spieltage“ vor Spieltag 1 einer Zehn-Spieltage-Saison — sie zählte auf dem 4er-Fenster des Spieltag-Steppers und wertete den aktuellen, ungespielten Spieltag als gespielt. Jetzt zählt der echte Spielplan (verbleibend 10), gespielt sind nur gewertete Spieltage, und der Ø-Punkte-Chip erklärt seinen Strich („ab Spieltag 1“).",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Überall · Lesbarkeit",
+    "text": "Zwei Farbtöne rissen die Lesbarkeitsgrenze systematisch: die Teamfarbe als Schriftfarbe (Karten-Eyebrows, Links, Kennzahlen — mit S-C-Rot 3,3–3,9:1) und das gedämpfte Blau der Rasse/Klasse-Chips und Erklärtexte (3,6:1). Alle betroffenen Stellen laufen jetzt über die Lesbarkeits-Token (--nl-accent-text, --nl-mut, Tinte auf Teamfarb-Flächen), plus ein neues --nl-risk-text für rote Chips auf rotem Grund („1 kritisch“, „⚔ Rivale“). Nachgemessen mit vier Themes (S-C, S-S, G-G, Standard): alle betroffenen Texte über 4,5:1.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Markt · Historie",
+    "text": "Die Historie überschrieb ihre Abschnitte mit „SEASON 2 · MANUAL_TRANSFER_WINDOW“ und hängte denselben Slug als Fußnote an jede Zeile. Daraus wurde „Season 2 · Transferfenster“ — und ein unbekannter Phasen-Slug fällt nie mehr roh ins UI.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Welt · Sponsoren",
+    "text": "„Sponsorsystem V1 (alt)“ und der Button „Rohdaten zeigen“ waren Entwickler-Vokabular im Spieler-UI — jetzt „Klassisches/Neues Sponsormodell“ und „Rechenwerte zeigen“.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Markt · Transfermarkt",
+    "text": "Zwischen den deutschen Bedarf-Chips stand „Status unknown“. Bekannte Zustände heißen jetzt „startklar“, „Kader zu klein“ usw.; ist der Status unbekannt, verschwindet der Chip, statt es auf Englisch zuzugeben.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Markt · Kredite",
+    "text": "Die Liga-Kredittabelle zeigte „38.3 · 13.4 %“ (Punkt statt Komma, ohne Einheit), während dieselbe Seite oben „38,9 Mio · 13,8 %“ schrieb — und „laufend seit season-2“ war ein roher Slug. Jetzt überall deutsches Zahlenformat mit „Mio“ und „seit Season 2“.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Team · Gebäude",
+    "text": "Die Gebäudekarten sprachen halb Englisch („Season Cash Income“, „Recovery Modifier“, „F/E/D Youth Development Boost“) und die rote Arena-Zeile „Basis 0,0 Mio × 1 = 0,0 Mio“ wirkte wie Debug-Ausgabe. Der Katalog spricht jetzt Deutsch, die Arena-Rechnung ist ein erklärender Satz in ruhiger Farbe („Noch keine Einnahme — ab Level 1 gilt: Basis × Beliebtheit“), und der Academy-Chip zeigt den echten Entwicklungs-Boost statt des toten Upgrade-Rabatts.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Überall · Wortwahl",
+    "text": "Terminologie vereinheitlicht: sichtbarer Spieltext sagt jetzt durchgängig „Wunschliste“ (statt gemischt „Wishlist“), „Einsatzliste“ (statt „Lineup“) und „Gebäude“ (statt „Facilities“). Der Home-Status sagt nicht mehr nackt „bereit“ über einer fehlenden Einsatzliste, sondern nennt den Flow-Schritt beim Namen.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

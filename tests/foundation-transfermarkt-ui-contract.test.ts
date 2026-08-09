@@ -79,9 +79,11 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Deal-Desk");
     expect(fileText).toContain("Deal-Vorschau");
     expect(fileText).toContain("Aktueller Kader");
-    expect(fileText).toContain("Wishlist & Scouting");
+    // G6 (Durchklick-Test, Terminologie): sichtbarer Spieltext sagt durchgängig
+    // „Wunschliste" — „Wishlist" lebt nur noch in Code-Bezeichnern weiter.
+    expect(fileText).toContain("Wunschliste & Scouting");
     expect(fileText).toContain("Deal prüfen");
-    expect(fileText).toContain("Auf Wishlist");
+    expect(fileText).toContain("Auf Wunschliste");
     expect(fileText).toContain("Beobachten");
     expect(fileText).toContain("nl-market-ca-stars");
     expect(fileText).toContain("axisStarsDisplay");

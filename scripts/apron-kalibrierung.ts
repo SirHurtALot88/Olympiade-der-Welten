@@ -152,8 +152,10 @@ function guvVorApron(team: TeamRow, f: number): number {
 }
 
 type ZeileErgebnis = {
+  /** Eingesammelter = vollstaendig ausgeschuetteter Topf (Empfaenger-Deckel zurueckgebaut). */
   topf: number;
-  ausgleichProEmpfaenger: number;
+  /** Kopfanteil je Empfaenger (Topf / Anzahl Empfaenger; 0 = kein Empfaenger). */
+  maxAusgleich: number;
   zahlerCount: number;
   minGuvNach: number;
   untereN: { shortCode: string; finalRank: number; guvVor: number; guvNach: number; deckungPct: number | null }[];
@@ -199,8 +201,7 @@ function rechneZeile(
     guvNachByTeamId.set(team.teamId, r1(guvVor + nettoDelta));
   }
 
-  const empfaenger = settlement.empfaengerCount;
-  const ausgleichProEmpfaenger = empfaenger > 0 ? settlement.topf / empfaenger : 0;
+  const maxAusgleich = settlement.rows.reduce((max, row) => Math.max(max, row.ausgleich), 0);
   const minGuvNach = Math.min(...Array.from(guvNachByTeamId.values()));
 
   const untereN = [...teams]
@@ -234,7 +235,7 @@ function rechneZeile(
 
   return {
     topf: r1(settlement.topf),
-    ausgleichProEmpfaenger: r1(ausgleichProEmpfaenger),
+    maxAusgleich: r1(maxAusgleich),
     zahlerCount: settlement.zahlerCount,
     minGuvNach,
     untereN,
@@ -275,12 +276,12 @@ function main() {
     console.log(`=== Bemessungsgrundlage: ${basis === "display" ? "GEGLAETTET (Produktivstand)" : "ECHT (nur Diagnose)"} ===`);
     for (const { r1: r1rate, r2: r2rate } of RATEN) {
       console.log(`\n--- Saetze ${r1rate}/${r2rate} ---`);
-      console.log("f      Hebel  Topf   Ausgleich  Zahler  minGuvNach");
+      console.log("f      Hebel  Topf   maxAusgleich  Zahler  minGuvNach");
       for (const f of SALARY_FACTORS) {
         const ergebnis = rechneZeile(teams, medianSalaryDisplay, medianSalaryReal, r1rate, r2rate, f, basis);
         const hebel = Math.max(0, Math.min(1, (f - 0.95) / (1.24 - 0.95)));
         console.log(
-          `${f.toFixed(2).padStart(5)}  ${hebel.toFixed(2)}  ${ergebnis.topf.toFixed(1).padStart(6)}  ${ergebnis.ausgleichProEmpfaenger.toFixed(2).padStart(9)}  ${String(ergebnis.zahlerCount).padStart(6)}  ${ergebnis.minGuvNach.toFixed(1).padStart(10)}`,
+          `${f.toFixed(2).padStart(5)}  ${hebel.toFixed(2)}  ${ergebnis.topf.toFixed(1).padStart(6)}  ${ergebnis.maxAusgleich.toFixed(2).padStart(12)}  ${String(ergebnis.zahlerCount).padStart(6)}  ${ergebnis.minGuvNach.toFixed(1).padStart(10)}`,
         );
         if (DETAIL) {
           console.log(

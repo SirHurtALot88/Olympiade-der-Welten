@@ -278,6 +278,7 @@ export default function HomeV2NewLook({
   leagueHeatPools,
   facilities,
   scheduleItems,
+  seasonMatchdayTotal,
   inboxItems,
   inboxOpenCount,
   inboxCriticalCount = 0,
@@ -381,12 +382,21 @@ export default function HomeV2NewLook({
   const hasDevelopmentHighlights = developmentWinners.length > 0 || developmentRisks.length > 0;
 
   // Saisonstand-Kachel (Redundanz-Abbau #40): Rang/Punkte/GuV stehen
-  // bereits im Hero oben — hier stattdessen echte, dort nicht gezeigte
-  // Kennzahlen aus scheduleItems ableiten statt die Hero-Chips zu
-  // wiederholen.
-  const playedMatchdayCount = scheduleItems.filter((item) => item.isPast || item.isCurrent).length;
+  // bereits im Hero oben — hier stattdessen abgeleitete Kennzahlen.
+  //
+  // G3 (Durchklick-Test): Vorher rechnete diese Kachel auf `scheduleItems` —
+  // dem 4-Elemente-FENSTER des Steppers, nicht dem Spielplan — und zählte den
+  // aktuellen, noch UNgespielten Spieltag als gespielt (`isPast || isCurrent`).
+  // Ergebnis vor Spieltag 1 einer Zehn-Spieltage-Saison: „verbleibend 3".
+  // Jetzt: gespielt = gewertete Spieltage (Feld-Rennen-Ledger, dieselbe Quelle
+  // wie der Form-Strip), Saisonlänge = echter Spielplan (`seasonMatchdayTotal`).
+  const playedMatchdayCount =
+    fieldRacePlayedMatchdays ?? scheduleItems.filter((item) => item.isPast).length;
   const pointsPerMatchday = points != null && playedMatchdayCount > 0 ? points / playedMatchdayCount : null;
-  const remainingMatchdayCount = scheduleItems.length > 0 ? scheduleItems.length - playedMatchdayCount : null;
+  const remainingMatchdayCount =
+    seasonMatchdayTotal != null && seasonMatchdayTotal > 0
+      ? Math.max(0, seasonMatchdayTotal - playedMatchdayCount)
+      : null;
 
   // Gleiche Ziel-Zuordnung wie im bestehenden HomeV2Client. S1-Ergänzung: steht
   // die Einsatzliste bereits (tone "ready"), führt der nächste Schritt in die
@@ -436,7 +446,13 @@ export default function HomeV2NewLook({
                 The hero no longer duplicates that button — it only surfaces the
                 current flow status so the richer context stays without a second
                 advance control. */}
-            <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
+            {/* G6: Das nackte Wort „bereit" stand direkt über „ohne Einsatzliste
+                startet der Spieltag nicht" und las sich wie „Team startklar".
+                Gemeint ist der FLOW-SCHRITT (nextStepStatus) — der Schritt wird
+                deshalb beim Namen genannt. */}
+            <span className="nl-home-next-status" title={nextStepDetail}>
+              {nextStepLabel ? `${nextStepLabel}: ${nextStepStatus}` : nextStepStatus}
+            </span>
             {nextStepBlocked ? (
               <span className={`nl-home-next-reason ${nlToneClass("warn")}`}>{nextStepDetail}</span>
             ) : null}
@@ -695,6 +711,7 @@ export default function HomeV2NewLook({
                 spe={player.spe}
                 men={player.men}
                 soc={player.soc}
+                axisPps={player.axisPps ?? null}
                 leagueHeatPools={leagueHeatPools}
                 rosterRank={player.rosterRank}
                 highlight={getPlayerHighlightLabel(player)}
@@ -873,13 +890,22 @@ export default function HomeV2NewLook({
                 label="Ø Punkte/Spieltag"
                 value={pointsPerMatchday != null ? formatNlNumber(pointsPerMatchday, 2) : "—"}
                 tone="accent"
-                title="Punkte geteilt durch bereits gespielte Spieltage"
+                sub={pointsPerMatchday == null ? "ab Spieltag 1" : undefined}
+                title={
+                  pointsPerMatchday == null
+                    ? "Punkte geteilt durch gewertete Spieltage — noch keiner gewertet, füllt sich ab Spieltag 1"
+                    : "Punkte geteilt durch bereits gewertete Spieltage"
+                }
               />
               <StatChip
                 label="Verbleibend"
                 value={remainingMatchdayCount != null ? formatNlNumber(remainingMatchdayCount, 0) : "—"}
                 sub="Spieltage"
-                title="Verbleibende Spieltage bis Saisonende"
+                title={
+                  remainingMatchdayCount != null && seasonMatchdayTotal != null
+                    ? `Noch ${formatNlNumber(remainingMatchdayCount, 0)} von ${formatNlNumber(seasonMatchdayTotal, 0)} Spieltagen bis Saisonende`
+                    : "Verbleibende Spieltage bis Saisonende"
+                }
               />
             </StatChipRow>
           </div>

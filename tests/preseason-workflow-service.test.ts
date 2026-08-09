@@ -648,6 +648,26 @@ describe("pre-season workflow service", () => {
     expect(Object.keys(savedState.seasonState.boardConfidence ?? {})).toHaveLength(savedState.teams.length);
   });
 
+  it("friert die Apron-Linien NICHT mehr beim Saisonübergang ein — das Kauffenster öffnet erst danach", () => {
+    // Kern des Apron-Timing-Fixes: der alte Stand fror hier ein und begründete das mit „das
+    // Transferfenster ist bereits durchlaufen" — falsch, das KAUFfenster der neuen Saison
+    // (isEarlySeasonTransferSetup) öffnet NACH diesem Workflow. Eine hier eingefrorene Linie misst
+    // die ausgedünnten Nach-Verkaufs-Kader (gemessen: Median 45,0 statt real 63,9 → 3 Empfänger
+    // teilen 428,7). Eingefroren wird jetzt beim Fensterschluss (erste Spieltagswertung,
+    // freezeApronLinesAtBuyWindowClose im legacy-matchday-result-apply-service).
+    const sourceSave = save();
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+
+    const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!savedState) throw new Error("Expected lightweight next season setup to persist state.");
+    expect(savedState.season.id).toBe("season-2");
+    expect(savedState.seasonState.apronLinesSnapshot?.seasonId === "season-2").toBe(false);
+  });
+
   it("resets rostered player fatigue to 0 on lightweight next-season setup", () => {
     const sourceSave = save();
     sourceSave.gameState.players = sourceSave.gameState.players.map((player) => ({ ...player, fatigue: 88 }));

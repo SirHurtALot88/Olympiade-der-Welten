@@ -27,6 +27,7 @@ import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-disp
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
+  FinanceApronLeagueRow,
   FinanceApronStatus,
   FinanceFacilityIncome,
   FinanceFacilityIncomeRow,
@@ -347,6 +348,48 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const apronGebucht = (gameState.seasonState.apronSettlementLogs ?? []).some(
     (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
   );
+  // NEU (Chris): „in den finanzen fehlt mir immernoch ein ausweis vom APRON was die teams dadurch
+  // zahlen müssen oder einnehmen" — die Karte nannte 28 Zahler / 3 Empfänger nur als Aggregat.
+  // Hier werden DIESELBEN Projektionszeilen benannt statt neu gerechnet: jede Zahl ist das
+  // round1 der `byTeamId`-Zeile, `distanceLine1` dieselbe Anzeige-Subtraktion wie oben beim
+  // eigenen Team. Sortierung erzählt die Richtung: größter Zahler zuerst, dann Neutrale, dann
+  // Empfänger. Die Rolle „Empfänger" kommt als Engine-Flag mit (streng unter der 1. Linie),
+  // damit sie auch bei leerem Topf benannt bleibt (bei 0 wird erklärt, nicht versteckt).
+  const teamIdentityById = new Map(
+    gameState.teams.map((entry) => [entry.teamId, { name: entry.name, code: entry.shortCode }] as const),
+  );
+  const APRON_ROLLE_ORDER: Record<FinanceApronLeagueRow["rolle"], number> = { zahler: 0, neutral: 1, empfaenger: 2 };
+  const apronLeague: FinanceApronLeagueRow[] = apronProjection
+    ? [...apronProjection.byTeamId.values()]
+        .map((row): FinanceApronLeagueRow => {
+          const identity = teamIdentityById.get(row.teamId);
+          return {
+            teamId: row.teamId,
+            teamName: identity?.name ?? row.teamId,
+            teamCode: identity?.code ?? row.teamId,
+            rank: row.rank,
+            salaryBasis: round1(row.salary),
+            distanceLine1: round1(row.salary - apronProjection.lines.line1),
+            abgabe: round1(row.abgabe),
+            ausgleich: round1(row.ausgleich),
+            nettoDelta: round1(row.nettoDelta),
+            gedeckelt: row.gedeckelt,
+            // `abgabe > 0` ist exakt die Zahler-Definition der Engine (`zahlerCount`); Empfänger
+            // ist das durchgereichte Engine-Flag — beide Rollen ohne zweite Linienrechnung.
+            rolle: row.abgabe > 0 ? "zahler" : row.empfaenger ? "empfaenger" : "neutral",
+          };
+        })
+        .sort(
+          (left, right) =>
+            APRON_ROLLE_ORDER[left.rolle] - APRON_ROLLE_ORDER[right.rolle] ||
+            // Zahler: größte Abgabe zuerst · Empfänger teilen den Topf zu gleichen Kopfteilen
+            // (Ausgleich identisch) · Rest: höchste Bemessung zuerst.
+            right.abgabe - left.abgabe ||
+            right.ausgleich - left.ausgleich ||
+            right.salaryBasis - left.salaryBasis,
+        )
+    : [];
+
   const apron: FinanceApronStatus | null =
     apronProjection && apronNettoDelta
       ? {
@@ -374,6 +417,8 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
           topf: round1(apronProjection.topf),
           zahlerCount: apronProjection.zahlerCount,
           empfaengerCount: apronProjection.empfaengerCount,
+          league: apronLeague,
+          gedeckeltCount: apronLeague.filter((row) => row.gedeckelt).length,
         }
       : null;
 

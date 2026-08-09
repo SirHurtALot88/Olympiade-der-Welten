@@ -26,6 +26,15 @@ export type PortraitOverlayStat = {
   title?: string;
   valueClass?: string;
   /**
+   * Liga-Rang als EIGENE Zeile im Chip (`#20`) statt in den Wert eingeklebt
+   * (`79,9 · #20`). Der eingeklebte Rang machte die Chips so breit, dass
+   * OVR/PPs/MVS auf der großen Karte in zwei Zeilen umbrachen (Chris: „statt
+   * OVR PPS MVS in 2 zeilen soll das in eine!"). Als eigene, kleinere Zeile
+   * kostet er keine Breite — und die Chips tragen dieselbe dreizeilige Form
+   * wie die Achsen-PPs-Chips darunter.
+   */
+  rankLabel?: string | null;
+  /**
    * Star-Tier DIESER Kennzahl (`is-star-tier-*`, siehe
    * `lib/foundation/player-star-tier.ts`) — steht bewusst neben `heatClass`
    * statt darin: die Heat-Bänder sagen "wie gut im Ligavergleich" (Achtel des
@@ -130,9 +139,14 @@ function formatPotentialRange(min: number | null | undefined, max: number | null
   return `${formatAbility(min)}–${formatAbility(max)}`;
 }
 
-function formatMetricWithRank(value: number | null | undefined, rank: number | null | undefined, digits = 1) {
-  const formattedValue = formatNumber(value, digits);
-  return rank != null ? `${formattedValue} · #${rank}` : formattedValue;
+/**
+ * Rang-Zeile für den Chip: `#20` oder null. Früher stand der Rang IM Wert
+ * (`79,9 · #20`, `formatMetricWithRank`) — das machte drei Chips breiter als
+ * die Karte und brach die OVR/PPs/MVS-Zeile um. Jetzt ist er eine eigene,
+ * kleinere Zeile im Chip (siehe `PortraitOverlayStat.rankLabel`).
+ */
+function formatRankLabel(rank: number | null | undefined) {
+  return rank != null ? `#${rank}` : null;
 }
 
 function stat(label: string, value: string, extra?: Partial<PortraitOverlayStat>): PortraitOverlayStat {
@@ -176,39 +190,35 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
   const stats: PortraitOverlayStat[] = [
     stat(
       rankInline ? "OVR" : formatStatLabel("OVR", input.ovrRank),
-      rankInline ? formatMetricWithRank(input.playerOvr, input.ovrRank, 1) : formatNumber(input.playerOvr, 1),
+      formatNumber(input.playerOvr, 1),
       withMetricTitle(ROSTER_METRIC_TITLES.ovr, {
+        rankLabel: rankInline ? formatRankLabel(input.ovrRank) : null,
         heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
         ...starTierStatExtra("OVR", input.ovrRank),
       }),
     ),
     stat(
       rankInline ? "PPs" : formatStatLabel("PPs", input.ppsRank),
-      rankInline
-        ? formatMetricWithRank(input.playerPps, input.ppsRank, 1)
-        : input.playerPps != null
-          ? formatNumber(input.playerPps, 1)
-          : "—",
-      withMetricTitle(
-        ROSTER_METRIC_TITLES.pps,
-        input.playerPps != null
-          ? {
-              heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps),
-              ...starTierStatExtra("PPs", input.ppsRank),
-            }
-          : starTierStatExtra("PPs", input.ppsRank),
-      ),
+      input.playerPps != null ? formatNumber(input.playerPps, 1) : "—",
+      withMetricTitle(ROSTER_METRIC_TITLES.pps, {
+        rankLabel: rankInline ? formatRankLabel(input.ppsRank) : null,
+        ...(input.playerPps != null
+          ? { heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps) }
+          : {}),
+        ...starTierStatExtra("PPs", input.ppsRank),
+      }),
     ),
   ];
   stats.push(
     stat(
       rankInline ? "MVS" : formatStatLabel("MVS", input.mvsRank),
-      rankInline ? formatMetricWithRank(input.playerMvs, input.mvsRank, 1) : formatNumber(input.playerMvs, 1),
+      formatNumber(input.playerMvs, 1),
       withMetricTitle(
         // Chris-Regel (S1): bei 0/„—" wird erklärt, nicht versteckt — der leere
         // MVS sagt dazu, WANN er sich füllt (wie der PPs-Titel es schon tat).
         input.playerMvs == null ? `${ROSTER_METRIC_TITLES.mvs} — noch keine Wertung, füllt sich ab Spieltag 1` : ROSTER_METRIC_TITLES.mvs,
         {
+          rankLabel: rankInline ? formatRankLabel(input.mvsRank) : null,
           heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
           ...starTierStatExtra("MVS", input.mvsRank),
         },

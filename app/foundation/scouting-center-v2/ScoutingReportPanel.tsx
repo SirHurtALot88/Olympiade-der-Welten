@@ -65,7 +65,7 @@ export default function ScoutingReportPanel({
         <NlEmptyState
           icon="📋"
           title="Kein Scouting-Ziel gewählt"
-          message="Sobald ein Spieler auf der Wishlist steht, erscheint hier sein Scouting Report."
+          message="Sobald ein Spieler auf der Wunschliste steht, erscheint hier sein Scouting Report."
           data-testid="scouting-report-empty"
         />
       );
@@ -73,7 +73,7 @@ export default function ScoutingReportPanel({
     return (
       <div className="scouting-report-empty" data-testid="scouting-report-empty">
         <p className="muted">
-          Noch kein Scouting-Ziel ausgewählt — sobald ein Spieler auf der Wishlist steht, erscheint hier sein
+          Noch kein Scouting-Ziel ausgewählt — sobald ein Spieler auf der Wunschliste steht, erscheint hier sein
           Scouting Report.
         </p>
       </div>
@@ -139,7 +139,7 @@ export default function ScoutingReportPanel({
           </button>
           {onRemove ? (
             <button type="button" className="ghost-button inline-button is-danger" onClick={() => onRemove(report.playerId)}>
-              Von Wishlist entfernen
+              Von Wunschliste entfernen
             </button>
           ) : null}
         </div>

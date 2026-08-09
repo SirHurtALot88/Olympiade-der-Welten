@@ -43,6 +43,40 @@ export type FoundationPlayerPortraitAxisPps = {
   socRank?: number | null;
 };
 
+/**
+ * Achsen-PPs direkt aus einer Rating-Zeile (`PlayerRatingContractRow`-Form) für die Karte
+ * aufbereiten — EINE Quelle, dieselben `ppPow`/`ppPowRank`/…-Felder wie die POW/SPE/MEN/SOC-
+ * Spalten der Ranks-Seite. Strukturell typisiert, damit jeder Aufrufer mit einer Rating-Zeile
+ * (Teams-Panel, Teams-Grid, …) sie ohne Extra-Mapping durchreichen kann.
+ */
+export function buildAxisPpsFromRating(
+  rating:
+    | {
+        ppPow: number | null;
+        ppPowRank: number | null;
+        ppSpe: number | null;
+        ppSpeRank: number | null;
+        ppMen: number | null;
+        ppMenRank: number | null;
+        ppSoc: number | null;
+        ppSocRank: number | null;
+      }
+    | null
+    | undefined,
+): FoundationPlayerPortraitAxisPps | null {
+  if (!rating) return null;
+  return {
+    pow: rating.ppPow,
+    powRank: rating.ppPowRank,
+    spe: rating.ppSpe,
+    speRank: rating.ppSpeRank,
+    men: rating.ppMen,
+    menRank: rating.ppMenRank,
+    soc: rating.ppSoc,
+    socRank: rating.ppSocRank,
+  };
+}
+
 export type FoundationPlayerPortraitEconomyStat = {
   label: string;
   value: string;
@@ -131,7 +165,15 @@ function renderOverlayStat(stat: PortraitOverlayStat) {
       title={stat.title}
     >
       <small>{stat.label}</small>
-      <strong className={stat.valueClass ?? ""}>{stat.value}</strong>
+      {/* Wert + Liga-Rang teilen sich eine umbruchfähige Zeile (Chris: „rank neben
+          punkte, wir wollen platz sparen"): passt beides nebeneinander, steht es
+          nebeneinander („79,9 #20"); wird der Chip zu schmal (dreistellige Ränge am
+          Grid-Minimum), rutscht NUR der Rang unter den Wert — automatisch per
+          flex-wrap, nichts wird abgeschnitten (#458/#463 bleibt gewahrt). */}
+      <span className="foundation-player-portrait-metric-line">
+        <strong className={stat.valueClass ?? ""}>{stat.value}</strong>
+        {stat.rankLabel ? <em>{stat.rankLabel}</em> : null}
+      </span>
     </span>
   );
 }
@@ -291,8 +333,12 @@ export default function FoundationPlayerPortraitCard({
   /**
    * Die PPs-Zeile hängt an denselben Sichtbarkeitsregeln wie der Orbit (`showOrbit`): wo die
    * Attributzeile keinen Platz hat (Mini-Dichte, Rail-Kacheln), hat die PPs-Zeile erst recht
-   * keinen. Fehlt der Achsenwert komplett — Saisonstart, noch kein Spieltag gewertet — bleibt
-   * die Zeile ganz weg, statt vier Nullen zu zeigen, die wie ein Datenfehler aussehen.
+   * keinen. Sobald ein Aufrufer `axisPps` verdrahtet, steht die Zeile IMMER — auch vor der
+   * ersten Wertung (Chris-Regel: „PPs und MVS auch bei 0 beibehalten", bei 0/— wird erklärt,
+   * nicht versteckt). Die zwei Leerzustände bleiben unterscheidbar:
+   *   `null` = noch nichts gewertet → „—" + „füllen sich ab Spieltag 1" (Aussage über die Liga),
+   *   `0` mit Wertung → „0" samt Ligarang (Aussage über den Spieler).
+   * Nur ganz ohne `axisPps`-Verdrahtung (Hover-Previews, alte Aufrufer) gibt es keine Zeile.
    */
   const axisPpsCells = axisPps
     ? PORTRAIT_AXIS_PPS_CELLS.map((cell) => ({
@@ -302,25 +348,42 @@ export default function FoundationPlayerPortraitCard({
       }))
     : [];
   const axisPpsRow =
-    showOrbit && axisPpsCells.some((cell) => cell.value != null) ? (
+    showOrbit && axisPps ? (
       <div
         className="foundation-player-portrait-pps"
         aria-label={`${name} Saison-PPs je Achse`}
         data-testid="foundation-player-portrait-pps"
       >
+        {/* Die Zeile trägt DIESELBEN vier Kürzel wie die Attributzeile darunter —
+            ohne Beschriftung wären zwei Größen unter einem Namen (der „Punkte"-
+            Fehler der Ranks-Seite). Die Kopfzeile macht den Unterschied ohne
+            Nachdenken lesbar: hier die Saison-PPs, darunter die Achswerte. */}
+        <small className="foundation-player-portrait-pps-caption" aria-hidden="true">
+          PPs je Achse
+        </small>
         {axisPpsCells.map((cell) => (
           <span
             key={cell.axis}
             className={`foundation-player-portrait-pps-chip is-${cell.axis}`}
-            title={`${cell.label} · ${formatNlNumber(cell.value, 1)} PPs diese Saison${
-              cell.rank != null ? ` · Liga-Rang ${cell.rank}` : ""
-            }`}
+            // Gleicher Erklärton wie die PPs-/MVS-Chips derselben Karte: bei „—"
+            // steht dabei, WANN sich die Zeile füllt — erklärt statt versteckt.
+            title={
+              cell.value != null
+                ? `${cell.label} · ${formatNlNumber(cell.value, 1)} PPs diese Saison${
+                    cell.rank != null ? ` · Liga-Rang ${cell.rank}` : ""
+                  }`
+                : `${cell.label} · PPs diese Saison — noch keine Wertung, füllen sich ab Spieltag 1`
+            }
           >
             <small>{cell.label}</small>
-            <strong>{formatNlNumber(cell.value, 1)}</strong>
-            {/* Als EIN Textknoten, nicht `#{cell.rank}` — sonst schiebt React beim
-                Server-Rendern einen Kommentar-Marker zwischen Raute und Zahl. */}
-            {cell.rank != null ? <em>{`#${cell.rank}`}</em> : null}
+            {/* Wie in der Kennzahl-Zeile: Wert + Rang nebeneinander („8,2 #4"),
+                mit automatischem Umbruch des Rangs nach unten, wo es zu schmal wird. */}
+            <span className="foundation-player-portrait-metric-line">
+              <strong>{formatNlNumber(cell.value, 1)}</strong>
+              {/* Als EIN Textknoten, nicht `#{cell.rank}` — sonst schiebt React beim
+                  Server-Rendern einen Kommentar-Marker zwischen Raute und Zahl. */}
+              {cell.rank != null ? <em>{`#${cell.rank}`}</em> : null}
+            </span>
           </span>
         ))}
       </div>
@@ -351,6 +414,10 @@ export default function FoundationPlayerPortraitCard({
         className={`home-v2-player-stats foundation-player-portrait-stats${
           portraitLayout === "rail" ? " is-rail-tile-overlay" : ""
         }`}
+        // Chris: „statt OVR PPS MVS in 2 zeilen soll das in eine!" — bei genau drei
+        // Kennzahl-Chips erzwingt das CSS über diesen Zähler eine Zeile (nowrap);
+        // Kontexte mit mehr Chips (Markt, Lineup) behalten den Umbruch.
+        data-stat-count={overlayStats.length}
         data-testid="foundation-player-portrait-stats"
       >
         {overlayStats.map(renderOverlayStat)}
@@ -399,11 +466,15 @@ export default function FoundationPlayerPortraitCard({
             <span className="foundation-player-portrait-submeta" title={resolvedSubMeta}>{resolvedSubMeta}</span>
           ) : null}
           <strong className="home-v2-player-name">{name}</strong>
+          {/* Zeilenfolge nach Chris' Vorgabe: OVR/PPs/MVS in EINER Zeile, direkt
+              darunter die Saison-PPs je Achse, darunter „wie bisher die stats"
+              (die Achswerte). CA/PO-Sterne und Economy rücken dafür unter das
+              Achsen-Paar — sie bleiben Sterne und bleiben sichtbar. */}
           {overlayStatsRow}
+          {axisPpsRow}
+          {orbitRow}
           {abilityStarsRow}
           {economyRow}
-          {orbitRow}
-          {axisPpsRow}
           {footerSlot && density !== "mini" ? (
             <div className="foundation-player-portrait-footer" onClick={(event) => event.stopPropagation()}>
               {footerSlot}

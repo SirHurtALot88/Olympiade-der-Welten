@@ -1588,7 +1588,7 @@ export default function LineupNewLook({
                   }}
                   title={`${rival.teamName}: Saison-Rang #${rival.rank} · ${rivalStrengthLabel(rival.relationship)}`}
                 >
-                  <strong className="nl-tnum" style={{ color: "var(--nl-accent)" }}>
+                  <strong className="nl-tnum" style={{ color: "var(--nl-accent-text, var(--nl-accent))" }}>
                     #{rival.rank}
                   </strong>
                   {/* S6/L4 (Audit Spieltag): 9ch schnitt praktisch jeden Teamnamen ab

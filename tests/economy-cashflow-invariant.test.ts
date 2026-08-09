@@ -746,6 +746,21 @@ beforeAll(async () => {
       addPrizePhaseBooking(event.teamId, income - (event.cost ?? 0), "season_end:facility", event.eventId);
     }
   }
+  // APRON — seit dem Einfrier-Timing-Fix Teil der ECHTEN Saisonende-Buchungen dieser Mini-Saison:
+  // die Linien frieren jetzt mit der ersten Spieltagswertung ein (freezeApronLinesAtBuyWindowClose
+  // im Matchday-Result-Apply), also besitzt auch dieser simulierte Lauf einen Snapshot, und die
+  // Saisonende-Abrechnung bucht Abgaben/Ausgleiche wirklich — mit eigenem Ledger
+  // (apronSettlementLogs, analog sponsorPayoutLogs). Vorher lief die Mini-Saison ohne Snapshot,
+  // der Apron blockierte still (apron_lines_not_frozen) und tauchte hier nie auf. Ohne diese
+  // Zeilen fiele die Invariante mit „Cash-Änderung ohne Buchung" auf, obwohl jede Bewegung einen
+  // sauberen Beleg hat. (Σ der Apron-Buchungen ist 0: Abgaben und Ausgleiche decken sich exakt —
+  // der Topf wird vollständig zu gleichen Kopfteilen ausgeschüttet, siehe computeApronSettlement.)
+  const apronLogsBefore = new Set((prizeSave.gameState.seasonState.apronSettlementLogs ?? []).map((log) => log.id));
+  for (const log of afterPrizeGameState.seasonState.apronSettlementLogs ?? []) {
+    if (!apronLogsBefore.has(log.id)) {
+      addPrizePhaseBooking(log.teamId, log.cashDelta, "season_end:apron", log.id);
+    }
+  }
   // `plannedChanges[].newCash` ist NICHT der maßgebliche Beweis und insbesondere KEIN
   // "Cash nach Preisgeld": es ist `prize-money-preview.ts`' `projectedCash`, also die
   // SAISONEND-PROGNOSE `Cash − Gehälter + Sponsor/Gebäude-Einnahme − Kreditrate`. Sie weicht daher

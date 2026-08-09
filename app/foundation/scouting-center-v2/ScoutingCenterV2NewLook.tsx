@@ -304,7 +304,7 @@ export default function ScoutingCenterV2NewLook({
             sub={scoutingFacilityLabel}
             title={
               onOpenFacilities
-                ? "Zu den Facilities — Scouting Office upgraden für schnellere Enthüllung."
+                ? "Zu den Gebäuden — Scouting Office upgraden für schnellere Enthüllung."
                 : "Progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar."
             }
             onClick={onOpenFacilities}

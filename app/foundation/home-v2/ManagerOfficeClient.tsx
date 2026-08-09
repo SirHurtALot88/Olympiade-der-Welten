@@ -459,7 +459,7 @@ export function ManagerOfficeClient({
           <div className="foundation-hq-notes-grid">
             {wishlistRows.length > 0 ? (
               <button type="button" className="foundation-hq-notes-row" onClick={() => onNavigate("marketV2")}>
-                <span className="foundation-hq-notes-label">Wishlist</span>
+                <span className="foundation-hq-notes-label">Wunschliste</span>
                 <strong>
                   {wishlistRows
                     .map((entry) => `${entry.playerName} (${entry.className}${entry.marketValue != null ? ` · MW ${formatTransfermarktCurrency(entry.marketValue)}` : ""})`)

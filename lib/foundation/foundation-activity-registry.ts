@@ -88,7 +88,10 @@ function buildPreseasonStats(
     stats.push({ label: "Verkäufe", value: `${run.transferSellsApplied}` });
   }
   if (run.managerActionsApplied > 0) {
-    stats.push({ label: "Setup-Aktionen", value: `${run.managerActionsApplied}` });
+    // „Setup-Aktionen" war Entwickler-Vokabular mitten im Spieler-Banner
+    // („482 SETUP-AKTIONEN") — gemeint sind die Team-Einstellungen (Training,
+    // Aufstellung, Strategie), die die KI für ihre Teams gesetzt hat.
+    stats.push({ label: "Team-Einstellungen", value: `${run.managerActionsApplied}` });
   }
   // Gezählt wird, was wirklich hakt. Die planmäßig gegriffenen Schutzregeln stehen sonst als
   // dreistellige Warnzahl in der Leiste („124 blockiert"), obwohl sie nur belegen, dass die

@@ -45,7 +45,12 @@ const CSS = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 // Nach T7 (Gebäude: Arena-Karten-Hinweis „Basis × Beliebtheit" 3,72:1, −1): 212.
 // Nach W3 (Sponsoren: Liga-Tabelle ersetzt das Karten-Raster, „Dein Team"-Tag
 // jetzt auf --nl-accent-text statt --nl-accent, tote Karten-Styles raus): 211.
-const ACCENT_ALS_TEXT_OBERGRENZE = 211;
+// Nach G4 (Durchklick-Kontrast: Karten-Eyebrows/-Links Home, Inbox-Zähler und
+// Wiederkehrend-Tag, Lineup-HUD-Kennzahl/Chip/Primärbuttons (Tinte auf Soft),
+// Scouting-Fokus-Pill, Sponsoren-Toggle, Teams-„Live", Historie-Links,
+// Breadcrumb-Kontext, Spieler-„+ Hinzufügen": 15 Stellen auf
+// --nl-accent-text bzw. --nl-ink): 196.
+const ACCENT_ALS_TEXT_OBERGRENZE = 196;
 
 // Stand nach Paket F1. NIE erhöhen — `--nl-mut-2` ist Deko (Linien, Icons).
 // Informationstragender Sekundärtext nimmt `color: var(--nl-mut)` (6,8:1);
@@ -56,7 +61,10 @@ const ACCENT_ALS_TEXT_OBERGRENZE = 211;
 // Information, nicht Deko): 72.
 // Nach W3 (Sponsoren: Liga-Tabelle ersetzt das Karten-Raster — zwei tote
 // mut-2-Stellen raus, eine neue für den leeren Sponsor-Zellenzustand): 71.
-const MUT2_ALS_TEXT_OBERGRENZE = 71;
+// Nach G4 (Durchklick-Kontrast: Breadcrumb-Root, Kredit-Gauge-Label,
+// Scouting-Potenzial-Pills „Niedrig"/„Unbekannt", Teams-Disziplin-Fußnote —
+// alle fünf trugen echte Information): 66.
+const MUT2_ALS_TEXT_OBERGRENZE = 66;
 
 const zaehle = (re: RegExp) => (CSS.match(re) ?? []).length;
 

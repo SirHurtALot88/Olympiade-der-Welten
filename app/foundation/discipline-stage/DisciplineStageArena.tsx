@@ -2094,7 +2094,7 @@ export default function DisciplineStageArena({
               ? "✓ Engine-echt"
               : previewState === "loading"
                 ? "Engine lädt …"
-                : "Vereinfacht (kein Lineup)"}
+                : "Vereinfacht (keine Einsatzliste)"}
           </span>
         ) : null}
         {mode === "random" ? (
