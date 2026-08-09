@@ -42,6 +42,12 @@ export type FoundationFinancesNewLookProps = {
   activeManagerTeamId: string | null;
   /** Salary Factor der laufenden Season + Richtung zur nächsten — siehe `salary-factor-outlook.ts`. */
   salaryFactorOutlook: SalaryFactorOutlook;
+  /**
+   * Öffnet das Teamprofil aus der Liga-Tabelle heraus. Optional: fehlt der
+   * Öffner, bleibt die Team-Spalte reiner Text — ein Knopf, der nichts tut,
+   * wäre schlimmer als gar keiner.
+   */
+  onOpenTeam?: (teamId: string) => void;
 };
 
 /** Grün bei GuV ≥ 0, sonst Rot — gleiche binäre Ton-Regel wie andere GuV-Chips im neuen Look. */
@@ -862,13 +868,14 @@ function renderLeagueCell(
   column: NlTableColumn<FinanceLeagueTableRow>,
   rank: number,
   isOwnTeam: boolean,
+  onOpenTeam: ((teamId: string) => void) | null,
 ) {
   switch (column.key) {
     case "rank":
       return rank;
-    case "team":
-      return (
-        <span className="nl-fin-league-team">
+    case "team": {
+      const content = (
+        <>
           <BudgetedMediaImage
             src={row.logoUrl}
             alt={`${row.teamName} Logo`}
@@ -883,8 +890,24 @@ function renderLeagueCell(
             {row.teamName}
           </span>
           {isOwnTeam ? <span className="nl-fin-league-you">Dein Team</span> : null}
-        </span>
+        </>
       );
+      // Ohne Öffner bleibt es der bisherige reine Text: ein Knopf, der nichts tut,
+      // wäre schlimmer als gar keiner.
+      if (!onOpenTeam) {
+        return <span className="nl-fin-league-team">{content}</span>;
+      }
+      return (
+        <button
+          type="button"
+          className="nl-fin-league-team is-linked"
+          onClick={() => onOpenTeam(row.teamId)}
+          title={`${row.teamName} — Teamprofil öffnen`}
+        >
+          {content}
+        </button>
+      );
+    }
     case "cash":
       return formatNlMoney(row.cash);
     case "incomeAnnual":
@@ -916,9 +939,11 @@ function renderLeagueCell(
 function FinanceLeagueTable({
   leagueTable,
   activeManagerTeamId,
+  onOpenTeam,
 }: {
   leagueTable: FinanceLeagueTableRow[];
   activeManagerTeamId: string | null;
+  onOpenTeam: ((teamId: string) => void) | null;
 }) {
   const [sort, setSort] = useState<{ key: LeagueSortKey; direction: NlTableSortDirection }>({
     key: "cash",
@@ -958,7 +983,9 @@ function FinanceLeagueTable({
           sortState={{ key: sort.key, direction: sort.direction }}
           onSort={handleSort}
           rowClassName={(row) => (row.teamId === activeManagerTeamId ? "is-active-row" : undefined)}
-          renderCell={(row, column) => renderLeagueCell(row, column, sortedRows.indexOf(row) + 1, row.teamId === activeManagerTeamId)}
+          renderCell={(row, column) =>
+            renderLeagueCell(row, column, sortedRows.indexOf(row) + 1, row.teamId === activeManagerTeamId, onOpenTeam)
+          }
           data-testid="nl-fin-league-table"
           aria-label="Finanzvergleich aller Teams"
         />
@@ -988,6 +1015,7 @@ export default function FoundationFinancesNewLook({
   leagueTable,
   activeManagerTeamId,
   salaryFactorOutlook,
+  onOpenTeam,
 }: FoundationFinancesNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
   const incomeLines = team ? buildIncomeLines(team) : [];
@@ -1171,7 +1199,11 @@ export default function FoundationFinancesNewLook({
         </div>
       ) : null}
 
-      <FinanceLeagueTable leagueTable={leagueTable} activeManagerTeamId={activeManagerTeamId} />
+      <FinanceLeagueTable
+        leagueTable={leagueTable}
+        activeManagerTeamId={activeManagerTeamId}
+        onOpenTeam={onOpenTeam ?? null}
+      />
     </div>
   );
 }

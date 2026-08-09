@@ -2342,6 +2342,34 @@ export type SeasonSnapshotTeamRecord = {
    * in der die Entwicklung nicht lief), fallen die Ansichten auf `marketValueTotalEnd` zurueck.
    */
   marketValueSeasonEnd?: number | null;
+  /**
+   * Die uebrigen Momentwerte zum selben Zeitpunkt wie `marketValueSeasonEnd`:
+   * Ende `player_development`, also NACH dem Trainings-Apply und VOR dem ersten
+   * Verkauf des Transferfensters.
+   *
+   * Warum eigene Felder statt `cashEnd`/`salaryEnd`/`rosterEnd`: Die alten Felder
+   * bezeichnen andere Zeitpunkte und werden von spaeteren Patches ueberschrieben —
+   * `salaryEnd`/`rosterEnd` tragen nach `patchCompletedSeasonSnapshotAfterPreseasonBuy`
+   * den Eintrittsstand der FOLGE-Saison, `cashEnd` den Stand nach den Verkaeufen.
+   * Die Historie zeigte dadurch drei Spalten mit drei verschiedenen Zeitpunkten,
+   * zwei davon aus der falschen Saison (gemeldet von Chris).
+   *
+   * Alle drei werden wie `marketValueSeasonEnd` write-once gesetzt und danach nie
+   * wieder angefasst. `cashEnd` bleibt unveraendert bestehen — es ist die
+   * Bezugsgroesse des Cash-Abgleichs (`cash_reconciliation_delta_hard`).
+   */
+  cashSeasonEnd?: number | null;
+  salarySeasonEnd?: number | null;
+  rosterSeasonEnd?: number | null;
+  /** Zeitpunkt des Einfrierens — belegt, dass der Block wirklich vor der Verkaufsphase entstand. */
+  seasonEndFrozenAt?: string | null;
+  /**
+   * Woher der Snapshot stammt. `"post_sell_fallback"` markiert einen Datensatz, der
+   * NICHT beim Saisonabschluss entstand, sondern nachtraeglich beim
+   * `next_season_setup` — dann liegen die Verkaeufe bereits dahinter und die
+   * eingefrorenen Felder bleiben leer, statt eine falsche Zahl zu behaupten.
+   */
+  economySnapshotSource?: "season_completion" | "post_sell_fallback";
   transferCount: number;
   transferBuyCount: number;
   transferSellCount: number;

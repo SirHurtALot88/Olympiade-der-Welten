@@ -104,6 +104,24 @@
       "datum": "2026-08-08",
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
+      "text": "Im Fokus-Board fehlten Spieler auf der Bank: Wer verletzt oder gesperrt war, verschwand komplett aus der Kandidatenliste, statt unter „Blockiert\" zu stehen — der Reiter zeigte deshalb dauerhaft 0. Jetzt ist jeder Spieler des Kaders auffindbar, und „Blockiert\" zeigt, wer warum nicht kann.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Die Punkte eines aufgestellten Spielers sprangen nach oben, sobald die Vorschau nachlud — aus 72,8 wurden plötzlich 96,8. Mutator- und Team-Power-Bonus sind Werte für die ganze Disziplin-Seite, wurden aber jedem Slot einzeln voll gutgeschrieben und damit mehrfach gezählt. Jetzt bekommt jeder Spieler nur seinen eigenen Anteil.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
       "text": "Kleinere Klarheits-Korrekturen an der Einsatzliste (die Struktur bleibt, wie sie ist): der rote \"Spieler fehlt\"-Alarm für einen einfach noch nicht bearbeiteten Slot heißt jetzt neutral \"Offen\" — Rot bleibt echten Blockern vorbehalten (doppelt gewählter Spieler, verletzter Spieler, der aktive Slot). Fatigue-Kosten zeigen bei einer leeren Liste \"0\" statt \"−0\", Rivalen-Teamnamen laufen seltener in \"Wicked ...\" ab, Attribut-Noten (z. B. \"SPE B\") tragen ihre Notenskala jetzt im Tooltip, und der Formplan-Karten-Deck-Hinweis erklärt in einer Zeile, was eine aktivierte Karte kostet und bewirkt.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
@@ -159,6 +177,15 @@
       "seite": "Finanzen",
       "pr": null,
       "text": "Liga-Vergleich entwirrt: GuV p.a. und Cashflow p.a. waren für 26 von 32 Teams identische Zwillingsspalten. Jetzt gibt es eine GuV-Spalte, und nur bei Teams mit laufender Tilgung steht der echte Geldabfluss als beschriftete Zusatzzeile (nach Kreditraten −25,9) direkt in der Zelle. Außerdem: Transfersaldo mit konsistenten Vorzeichen (Käufe −84,2, Verkäufe +0,0, Saldo −84,2), Salary Factor heißt Gehaltsfaktor, der Dein-Team-Chip ist von 3,3:1 auf lesbaren Kontrast angehoben, und die Kreditzins-Ausgabenzeile heißt, was sie ist — Zins, nicht Rate. Der Teamvergleich unten bleibt, wie er ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen · Liga-Vergleich",
+      "pr": null,
+      "text": "Die Teams in der Finanz-Tabelle waren als Einzige nicht anklickbar — von überall sonst kommt man per Klick ins Teamprofil. Jetzt auch von hier.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"
@@ -309,6 +336,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Team · Historie",
+      "pr": null,
+      "text": "Cash, Gehalt und Marktwert einer abgeschlossenen Saison standen nebeneinander, stammten aber aus drei verschiedenen Momenten — zwei davon sogar aus der Folgesaison. Jetzt werden alle vier Größen gemeinsam eingefroren: nach dem Trainings-Apply und vor dem ersten Verkauf. Wo dieser Stand fehlt, sagt die Zeile das, statt eine falsche Zahl zu zeigen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Teams · Teamprofil",
       "pr": null,
       "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",
@@ -350,6 +386,15 @@
       "text": "Ein Klick auf einen Profil-Reiter (Stats/Details/Vertrag/…) konnte je nach Scroll-Zustand komplett wirkungslos bleiben — der Reiter leuchtete als aktiv, die Seite blieb stehen, wo sie war. Ursache war ein Wettlauf zwischen der Klick-Navigation und der Scroll-Beobachtung, die den aktiven Reiter beim freien Scrollen mitführt; ein Klick gewinnt jetzt immer. Zusätzlich hing die Scroll-Beobachtung selbst gelegentlich tot, weil sie einmalig nach den Anker-Abschnitten suchte, bevor die (asynchron nachladende) Detailkomponente sie überhaupt gerendert hatte — sie versucht es jetzt erneut, sobald die Abschnitte da sind. OVR/PPs/MVS standen ausserdem doppelt auf dem Bildschirm (Kopfzeile und Kennzahlen-Karten); die Kopfzeile zeigt jetzt nur noch Marktwert/Gehalt/Vertrag, die reichhaltigeren Karten (mit Rang, Vorsaison-Delta, Liga-Leaders-Link) bleiben die einzige Quelle.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieler · Verzeichnis",
+      "pr": null,
+      "text": "Der Filter „Bedingungen\" stand als eigene Karte unter den Marktwert-Balken und schob die Spielerliste weit nach unten, obwohl daneben Platz frei war. Jetzt liegt er rechts neben den Balken, direkt unter den Kennzahl-Kacheln. Auf schmalen Bildschirmen rutscht er wieder darunter.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {

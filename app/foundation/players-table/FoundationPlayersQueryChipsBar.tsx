@@ -19,7 +19,7 @@
  * Styles: `app/globals.css` unter `.is-new-look .nl-pquery-*`.
  */
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { NlCard } from "@/components/foundation/new-look";
 import {
@@ -41,7 +41,38 @@ export type FoundationPlayersQueryChipsBarProps = {
   raceOptions: string[];
   /** Kategorien-Optionen für das Attribut "Beste Diszi" (aus den geladenen Zeilen abgeleitet). */
   bestDisciplineOptions: string[];
+  /**
+   * Eingebettet neben den Brackets statt als eigene Karte darunter. Dann trägt
+   * der Filter keinen eigenen Kartenrahmen — eine Karte in der Karte sähe aus
+   * wie ein Versehen — sondern nur seine Überschrift.
+   */
+  embedded?: boolean;
 };
+
+/**
+ * Rahmenlose Variante der Filter-Karte für den eingebetteten Fall: gleiche
+ * Kopfzeile (Eyebrow + Titel) wie `NlCard`, aber ohne deren Rahmen, Hintergrund
+ * und Schatten — die umgebende Karte bringt beides bereits mit.
+ */
+function NlQueryChipsShell({
+  className,
+  eyebrow,
+  title,
+  children,
+}: {
+  className?: string;
+  eyebrow?: string;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`nl-pquery-embedded${className ? ` ${className}` : ""}`}>
+      {eyebrow ? <p className="nl-pquery-embedded-eyebrow">{eyebrow}</p> : null}
+      {title ? <h3 className="nl-pquery-embedded-title">{title}</h3> : null}
+      {children}
+    </section>
+  );
+}
 
 export default function FoundationPlayersQueryChipsBar({
   chips,
@@ -49,6 +80,7 @@ export default function FoundationPlayersQueryChipsBar({
   classOptions,
   raceOptions,
   bestDisciplineOptions,
+  embedded = false,
 }: FoundationPlayersQueryChipsBarProps) {
   const [draftAttr, setDraftAttr] = useState<QueryChipAttr>("ovr");
   const [draftOperator, setDraftOperator] = useState<QueryChipOperator>(">=");
@@ -153,8 +185,10 @@ export default function FoundationPlayersQueryChipsBar({
     setPresetMessage(preset ? `Preset "${preset.name}" gelöscht.` : "Preset gelöscht.");
   }
 
+  const Shell = embedded ? NlQueryChipsShell : NlCard;
+
   return (
-    <NlCard className="nl-pquery-card" eyebrow="Filter" title="Bedingungen">
+    <Shell className="nl-pquery-card" eyebrow="Filter" title="Bedingungen">
       <form className="nl-pquery-builder" onSubmit={handleAddChip} aria-label="Filter-Bedingung hinzufügen">
         <label className="nl-pquery-field">
           <span>Attribut</span>
@@ -274,6 +308,6 @@ export default function FoundationPlayersQueryChipsBar({
           {presetMessage}
         </p>
       ) : null}
-    </NlCard>
+    </Shell>
   );
 }

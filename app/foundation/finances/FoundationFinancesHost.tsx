@@ -18,14 +18,16 @@ export type FoundationFinancesHostProps = {
    * Season-Briefing und KI-Engine; deshalb wird sie hier explizit durchgereicht.
    */
   saveId: string;
+  /** Öffnet das Teamprofil aus der Liga-Tabelle heraus (Klick auf einen Team-Namen). */
+  onOpenTeam?: (teamId: string) => void;
 };
 
 /**
- * Host/view split mirrors `FoundationCreditsHost` — read-only view, no
- * mutating actions, so no callback props are needed here (unlike Kredite's
- * `onBorrow`/`onEarlyPayoff`).
+ * Host/view split mirrors `FoundationCreditsHost` — read-only view. Einzige
+ * Ausnahme von "keine Callbacks": der Sprung ins Teamprofil aus der
+ * Liga-Tabelle, der nichts verändert, sondern nur navigiert.
  */
-export default function FoundationFinancesHost({ gameState, teamId, saveId }: FoundationFinancesHostProps) {
+export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam }: FoundationFinancesHostProps) {
   const model = useFinancesViewModel(gameState, teamId);
   // Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — bewusst getrennt
   // vom Fog-of-War-gesperrten `model` oben, siehe `use-finances-league-table.ts`.
@@ -51,6 +53,7 @@ export default function FoundationFinancesHost({ gameState, teamId, saveId }: Fo
       leagueTable={leagueTable}
       activeManagerTeamId={teamId}
       salaryFactorOutlook={salaryFactorOutlook}
+      onOpenTeam={onOpenTeam}
     />
   );
 }

@@ -2462,6 +2462,13 @@ export default function FoundationPlayersTableNewLook({
                 Leaderboard (MW-Kennzahl) abgedeckt. Kein "Volle Rangliste"-/
                 Ranking-Drawer-Einstieg lebte hier (der sitzt im Hub), daher gibt
                 es nichts umzuquartieren. */}
+            {/* Brackets und Vertragsauslauf links, der Filter rechts daneben — beides
+                unter den Kennzahl-Kacheln. Der Filter stand vorher als eigene Karte
+                darunter und schob die Spielerliste weit nach unten, während neben den
+                Balken Platz frei blieb. Ab hier zweispaltig; unter 1200 px fällt es
+                wieder untereinander (siehe globals.css). */}
+            <div className="nl-players-brackets-row">
+              <div className="nl-players-brackets-col">
             <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl — Balken anklicken filtert die Spielerliste">
               <div className="nl-players-bracket-bars">
                 {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => {
@@ -2544,19 +2551,19 @@ export default function FoundationPlayersTableNewLook({
                 </button>
               ) : null}
             </div>
+              </div>
+              <FoundationPlayersQueryChipsBar
+                embedded
+                chips={queryChips}
+                onChipsChange={setQueryChips}
+                classOptions={playerClassOptions}
+                raceOptions={raceOptions}
+                bestDisciplineOptions={bestDisciplineOptions}
+              />
+            </div>
           </>
         ) : null}
       </NlCard>
-
-      {playersView === "directory" ? (
-        <FoundationPlayersQueryChipsBar
-          chips={queryChips}
-          onChipsChange={setQueryChips}
-          classOptions={playerClassOptions}
-          raceOptions={raceOptions}
-          bestDisciplineOptions={bestDisciplineOptions}
-        />
-      ) : null}
 
       {playersView === "hub" ? (
         // Korrektheits-Fix (Phase 0): Der Hub bekommt jetzt EXAKT die im Verzeichnis
