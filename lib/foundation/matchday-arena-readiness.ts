@@ -18,8 +18,8 @@ export type MatchdayArenaBlockerReason =
   | null;
 
 export function hasCurrentMatchdayResult(gameState: GameState) {
-  return (gameState.seasonState.matchdayResults ?? []).some(
-    (result) => result.seasonId === gameState.season.id && result.matchdayId === gameState.matchdayState.matchdayId,
+  return (gameState.seasonState?.matchdayResults ?? []).some(
+    (result) => result.seasonId === gameState.season?.id && result.matchdayId === gameState.matchdayState?.matchdayId,
   );
 }
 
@@ -28,7 +28,7 @@ export function mergeFormCardPlansIntoGameState(
   nextPlans: FormCardPlanRecord[],
   scope: { seasonId: string; teamId: string },
 ): GameState {
-  const retained = (gameState.seasonState.formCardPlans ?? []).filter(
+  const retained = (gameState.seasonState?.formCardPlans ?? []).filter(
     (plan) => !(plan.seasonId === scope.seasonId && plan.teamId === scope.teamId),
   );
   const scopedPlans = nextPlans.filter((plan) => plan.seasonId === scope.seasonId && plan.teamId === scope.teamId);
@@ -116,7 +116,12 @@ export type MatchdayLeagueLineupReadiness = {
  * aber erst starten, wenn `allReady` true ist.
  */
 export function getMatchdayLeagueLineupReadiness(gameState: GameState): MatchdayLeagueLineupReadiness {
-  const teams = gameState.teams.map((team) => {
+  // Defensiv gegen Bootstrap-/Teilzustaende: im Ladefenster kann `teams` noch fehlen. Ohne das
+  // `?? []` warf diese Zeile `Cannot read properties of undefined (reading 'map')` und riss die
+  // ganze Disziplin-Buehne mit — genau der Fall, den `tests/discipline-stage-host.test.ts` mit
+  // "bootstrap/partial state (empty object) does NOT throw" abdeckt und der dort seit laengerem
+  // rot stand. Dieselbe Absicherung nutzen die Nachbarn in dieser Datei bereits.
+  const teams = (gameState.teams ?? []).map((team) => {
     const readiness = getMatchdayArenaReadiness(gameState, team.teamId);
     return {
       teamId: team.teamId,
