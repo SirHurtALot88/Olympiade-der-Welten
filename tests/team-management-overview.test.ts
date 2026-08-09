@@ -635,18 +635,19 @@ describe("team management overview", () => {
 
     expect(result[0]?.disciplineValues.mini_dm).toBe(11);
     expect(result[0]?.disciplineValues.fechten).toBe(12);
-    // KNOWN REGRESSION (left red intentionally, do not weaken): `disciplineValues`
-    // correctly honors `preferStandingDisciplineValues` (mergeSeasonDisciplineValues
-    // nulls out ledgerValues when the flag is set — see
-    // lib/foundation/team-management-overview.ts ~line 511), but ppsPow/ppsSpe
-    // do not: `resolveDisplayAreaPoints(ledgerValue, disciplineFallback)`
-    // (~line 290) returns the LIVE ledger area total whenever it is > 0,
-    // regardless of `preferStandingDisciplineValues`, only falling back to the
-    // (correctly flag-aware) disciplineValues-derived total when the live
-    // value is exactly 0. Here the live ledger's baseScore (4.2/3.8) is > 0,
-    // so it wins over the standings snapshot (11/12) this test is asking for
-    // — the flag's intent isn't honored for these two fields even though it
-    // is for the sibling disciplineValues field one line above.
+    // BEHOBEN (war: „KNOWN REGRESSION, left red intentionally"). Der Befund: `disciplineValues`
+    // beachtete `preferStandingDisciplineValues` korrekt (`mergeSeasonDisciplineValues` bekommt
+    // `ledgerValues: null`, sobald das Flag steht), `ppsPow`/`ppsSpe` aber nicht —
+    // `resolveDisplayAreaPoints` nahm den LIVE-Ledger-Wert, sobald er > 0 war, und fiel nur bei
+    // exakt 0 auf den (flag-bewussten) Disziplinwert zurück.
+    //
+    // Hier ist der Live-Ledger-Wert 4,2/3,8 und damit > 0, also gewann er gegen den Snapshot
+    // 11/12, den dieser Test verlangt. In der Zeile standen damit zwei Zeitpunkte nebeneinander:
+    // Snapshot-Disziplinwerte neben PPs der laufenden Saison. Dieselbe Fehlerklasse wie beim
+    // Saison-Snapshot-Umbau, nur an einer anderen Lesestelle.
+    //
+    // `resolveDisplayAreaPoints` bekommt das Flag jetzt durchgereicht: mit gesetztem Flag gilt
+    // ausschliesslich der Snapshot-Stand, und die Zeile ist wieder in sich stimmig.
     expect(result[0]?.ppsPow).toBe(11);
     expect(result[0]?.ppsSpe).toBe(12);
     expect(result[0]?.points).toBe(23);

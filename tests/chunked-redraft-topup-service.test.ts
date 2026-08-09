@@ -190,6 +190,17 @@ function duplicatePlayerIds(save: PersistedSaveGame) {
   return [...counts.entries()].filter(([, count]) => count > 1);
 }
 
+/**
+ * ZEITLIMIT: Drei Faelle hier fahren einen ECHTEN Draft-Lauf ueber einen kleinen, aber
+ * vollstaendigen Spielstand (Kader fuellen, fortsetzen, Phase B). Nachgemessen liegen sie
+ * zwischen 6 und 17 s und rissen damit reihum das vitest-Standardlimit von 5 s — inhaltlich
+ * haben sie nie etwas anderes gemeldet als „zu langsam".
+ *
+ * 60 s decken den langsamsten gemessenen Fall mit reichlich Abstand ab. Eine echte
+ * Verlangsamung faellt weiterhin auf, ein ueberladener Volllauf nicht mehr.
+ */
+const DRAFT_LAUF_TIMEOUT_MS = 60_000;
+
 describe("chunked redraft topup service", () => {
   it("uses player coreStats for draft axes instead of treating OVR as every axis", () => {
     const seed = loadFreshSeasonOneSeedData();
@@ -316,7 +327,7 @@ describe("chunked redraft topup service", () => {
     expect(fs.existsSync(path.join(outputDir, "redraft-progress-log.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "redraft-candidate-counters.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "redraft-first-pick-debug.md"))).toBe(true);
-  });
+  }, DRAFT_LAUF_TIMEOUT_MS);
 
   it("repairs a team below hardMin whose cash barely covers the cheapest candidate (regression: soft cash reserve used to wipe out the only affordable pick)", () => {
     const save = createTightCashBelowHardMinSave();
@@ -480,7 +491,7 @@ describe("chunked redraft topup service", () => {
     expect(finalSave?.gameState.transferHistory.map((entry) => entry.playerId).sort()).toEqual(
       finalSave?.gameState.rosters.map((entry) => entry.playerId).sort(),
     );
-  });
+  }, DRAFT_LAUF_TIMEOUT_MS);
 
   it("plans playerOpt by default and enters phase B after playerMin", () => {
     const save = createSmallEmptySeasonOneSave();
@@ -520,7 +531,7 @@ describe("chunked redraft topup service", () => {
     expect(result.picks.some((pick) => pick.phase === "phase_b_core_optimum")).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "underopt-stop-audit.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "team-readiness-score.csv"))).toBe(true);
-  });
+  }, DRAFT_LAUF_TIMEOUT_MS);
 
   it("exports distinct manager AI plans for key identity teams", () => {
     const seed = loadFreshSeasonOneSeedData();

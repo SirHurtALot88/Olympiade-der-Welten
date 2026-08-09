@@ -2,11 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
-import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
 
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -805,11 +803,25 @@ function formatFormCardColorLabel(color: LegacyFormCardOption["color"]) {
 
 const formCardColorOrder: LegacyFormCardOption["color"][] = ["red", "green", "blue", "yellow"];
 
+/**
+ * GEMELDET VON CHRIS: „in der einsatzliste sind die farben von pow spe men soc beim dropdown
+ * der formkarten weg bitte wieder hinuzfügen"
+ *
+ * Die Farbe war nie weg — sie kam nur nie an. Alle vier Bereiche trugen DENSELBEN neutralen
+ * Punkt `●`, und die Farbe hing allein an `style={{ color }}` der `<option>`. Genau das ist
+ * die eine CSS-Eigenschaft, die native Auswahlmenüs nicht mitmachen: Chrome und Safari auf
+ * macOS zeichnen das Aufklappmenü über das Betriebssystem und ignorieren die Angabe. Übrig
+ * blieben vier identische graue Punkte.
+ *
+ * Farbige Emoji-Kreise tragen ihre Farbe im Zeichen selbst und überleben deshalb jedes
+ * native Menü. Die `color`-Angabe bleibt zusätzlich stehen — wo sie wirkt (Firefox, Linux),
+ * färbt sie weiterhin die ganze Zeile.
+ */
 const formCardColorIcon: Record<LegacyFormCardOption["color"], string> = {
-  red: "●",
-  green: "●",
-  blue: "●",
-  yellow: "●",
+  red: "🔴",
+  green: "🟢",
+  blue: "🔵",
+  yellow: "🟡",
 };
 
 // Bereichs-Hex der Formkarten (POW=rot, SPE=grün, MEN=blau, SOC=gelb) — identisch zu
@@ -1043,16 +1055,6 @@ function defaultParamsFromProps(props: LegacyLineupLabClientProps) {
   };
 }
 
-const LEGACY_LINEUP_EXPERT_MODE_STORAGE_KEY = "legacy-lineup-expert-mode-v1";
-
-function loadLegacyLineupExpertModePreference() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return window.localStorage.getItem(LEGACY_LINEUP_EXPERT_MODE_STORAGE_KEY) === "true";
-}
-
 function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: Record<string, string>) {
   const d1 = context?.matchdayContract?.discipline1 ?? null;
   const d2 = context?.matchdayContract?.discipline2 ?? null;
@@ -1178,9 +1180,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   } | null>(null);
   const formCardPlanSaveTimerRef = useRef<number | null>(null);
   const pendingFormBoardFocusRef = useRef(false);
-  const [expertPlayerTableScrollTop, handleExpertPlayerTableScroll] = useRafThrottledScrollTop();
-  const [expertPlayerTableViewportHeight, setExpertPlayerTableViewportHeight] = useState(560);
-  const expertPlayerTableShellRef = useRef<HTMLDivElement | null>(null);
   const pendingFormCardPlanRef = useRef<{
     matchdayId: string;
     disciplineSide: "d1" | "d2";
@@ -1196,7 +1195,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     d1: { form: false, mutators: false },
     d2: { form: false, mutators: false },
   });
-  const [isExpertModeEnabled, setIsExpertModeEnabled] = useState<boolean>(() => loadLegacyLineupExpertModePreference());
   const [tablePreferences, setTablePreferences] = useState<LegacyLineupTablePreferences>(() =>
     loadLegacyLineupTablePreferences(),
   );
@@ -1661,28 +1659,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return sortState.direction === "asc" ? result : -result;
     });
   }, [context, playerFilter, tablePreferences.lineupPlayerTable?.sortState]);
-
-  const expertPlayerTableVirtualWindow = useRowVirtualWindow({
-    count: playerRows.length,
-    scrollTop: expertPlayerTableScrollTop,
-    viewportHeight: expertPlayerTableViewportHeight,
-  });
-  const visibleExpertPlayerRows = useMemo(
-    () => playerRows.slice(expertPlayerTableVirtualWindow.start, expertPlayerTableVirtualWindow.end),
-    [expertPlayerTableVirtualWindow.end, expertPlayerTableVirtualWindow.start, playerRows],
-  );
-
-  useEffect(() => {
-    const node = expertPlayerTableShellRef.current;
-    if (!node || !isExpertModeEnabled) {
-      return;
-    }
-    const syncHeight = () => setExpertPlayerTableViewportHeight(node.clientHeight || 560);
-    syncHeight();
-    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncHeight) : null;
-    observer?.observe(node);
-    return () => observer?.disconnect();
-  }, [isExpertModeEnabled, playerRows.length]);
 
   const filteredTeamOptions = useMemo(() => {
     const currentTeam = options.teams.find((team) => team.id === params.teamId) ?? null;
@@ -5748,7 +5724,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
   }
 
-  const showExpertBackupPanels = isExpertModeEnabled;
   const lineupPlayerTableColumns = useMemo<LegacyLineupTableColumn[]>(
     () => [
       { id: "image", label: "Bild", defaultWidth: 84, minWidth: 72 },
@@ -5823,17 +5798,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       JSON.stringify(tablePreferences),
     );
   }, [tablePreferences]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(
-      LEGACY_LINEUP_EXPERT_MODE_STORAGE_KEY,
-      isExpertModeEnabled ? "true" : "false",
-    );
-  }, [isExpertModeEnabled]);
 
   // "Neuer Look" Flag-Gate (additiv): alle Hooks und Derivations sind an dieser
   // Stelle bereits gelaufen (stabile Hook-Reihenfolge beim Umschalten). Der neue

@@ -101,7 +101,11 @@ describe("Chris-Overrides: Karten bleiben, Sterne bleiben, 0 wird erklärt", () 
   });
 
   it("leere Hero-KPIs (GuV, Saisonpunkte) sagen dazu, wann sie sich füllen", () => {
-    expect(HOME).toContain('sub={guv == null ? "ab Spieltag 1" : undefined}');
+    // Die GuV-Kachel unterscheidet seit #472 ZWEI leere Zustände, statt beide „ab Spieltag 1"
+    // zu nennen: Vor dem ersten Spieltag füllt sie sich noch, danach ist schlicht nichts
+    // gebucht. Der Test hing an der alten, undifferenzierten Zeichenkette — geprüft wird
+    // jetzt die Unterscheidung selbst, denn genau sie ist die Zusage.
+    expect(HOME).toContain('playedMatchdayCount > 0 ? "noch keine Buchung" : "ab Spieltag 1"');
     expect(HOME).toContain('sub={points == null ? "ab Spieltag 1" : undefined}');
   });
 

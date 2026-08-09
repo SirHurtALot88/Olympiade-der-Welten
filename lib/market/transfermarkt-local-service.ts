@@ -1423,23 +1423,31 @@ function buildCompactFreeAgentItem(input: {
   const { gameState, player, playerPotentialById, browseEntry } = input;
   const marketValue = browseEntry?.marketValue ?? getPlayerMarketValue(player);
   const salary = browseEntry?.salary ?? getPlayerSalary(player);
-  const baseTraitView = browseEntry
-    ? {
-        visiblePositiveTraits: browseEntry.traitsPositive,
-        visibleNegativeTraits: browseEntry.traitsNegative,
-        // Browse mode shows every trait, so report full (level-5) scouting disclosure
-        // instead of the ad-hoc partial object this used to build (which mismatched
-        // TransfermarktScoutingDisclosure's shape: negativeTraitsVisible is a boolean
-        // gate, not a trait count, and `level`/`exactAttributeValuesVisible` were missing).
-        disclosure: getTransfermarktScoutingDisclosure(5),
-        hiddenPositiveTraitCount: 0,
-        hiddenNegativeTraitCount: 0,
-      }
-    : getScoutedTraitView({
-        traitsPositive: player.traitsPositive,
-        traitsNegative: player.traitsNegative,
-        scoutingLevel: 0,
-      });
+  /**
+   * NEGATIVE TRAITS VERSCHWANDEN SPURLOS AUS DER FREIE-SPIELER-LISTE.
+   *
+   * Hier stand eine Sonderbehandlung fuer den Browse-Pfad mit der Begruendung „Browse mode shows
+   * every trait" — und daraus abgeleitet: volle Aufdeckung (Stufe 5), null verborgene Traits.
+   *
+   * Die Begruendung widerspricht den Daten, auf denen sie sitzt. `buildFreeAgentBrowseIndex`
+   * baut `traitsPositive`/`traitsNegative` seinerseits ueber
+   * `getScoutedTraitView({ ..., scoutingLevel: 0 })`, also bereits GEFILTERT. Der Browse-Eintrag
+   * enthaelt somit gar nicht „jeden Trait", sondern nur die auf Stufe 0 sichtbaren — bei
+   * negativen Traits regelmaessig keinen einzigen.
+   *
+   * Folge: Die Liste zeigte weder den Trait noch den Hinweis „N verborgen". Ein Spieler mit
+   * negativen Eigenschaften sah aus wie einer ohne. Das ist schlimmer als eine Luecke, weil es
+   * eine falsche Sicherheit erzeugt — man kauft gegen eine Information, die es nicht gibt.
+   *
+   * Beide Zweige lieferten ohnehin dieselben sichtbaren Traits. Uebrig bleibt deshalb EIN Pfad,
+   * der zusaetzlich die Wahrheit ueber das Verborgene mitfuehrt. `browseEntry` liefert weiterhin
+   * Marktwert und Gehalt.
+   */
+  const baseTraitView = getScoutedTraitView({
+    traitsPositive: player.traitsPositive,
+    traitsNegative: player.traitsNegative,
+    scoutingLevel: 0,
+  });
   const potentialRecord = playerPotentialById.get(player.id) ?? null;
   const quickPotentialScore = potentialRecord?.hiddenPotentialScore ?? player.potential ?? player.rating;
 

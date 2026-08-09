@@ -89,22 +89,25 @@ describe("sync catalog player to transfermarkt", () => {
         race: "Fish",
       });
       expect(item?.marketValue).toBeCloseTo(economy.marketValue, 1);
-      // KNOWN REGRESSION (left red intentionally, do not weaken): the default
-      // (compact-list) path resolves to buildCompactFreeAgentItem() with a
-      // browseEntry built by buildFreeAgentBrowseIndex(), which computes its
-      // traitsPositive/traitsNegative via getScoutedTraitView({ ...,
-      // scoutingLevel: 0 }) — i.e. fully filtered/hidden. buildCompactFreeAgentItem
-      // then reuses that already-empty browseEntry.traitsNegative as-is AND
-      // reports a hardcoded `hiddenNegativeTraitCount: 0` / level-5 disclosure on
-      // top of it (lib/market/transfermarkt-local-service.ts ~lines 1328-1339,
-      // comment: "Browse mode shows every trait, so report full (level-5)
-      // scouting disclosure"). The comment's intent (full trait visibility in
-      // browse mode) contradicts the scoutingLevel:0 data it is actually built
-      // from, so both the trait list AND the hidden-count end up empty — a
-      // player's negative traits silently disappear from the free-agent list
-      // with no "N hidden" signal either. Reproduced directly via this test;
-      // not something a test fixture can route around since even
-      // `mode: "full"` uses the same scoutingLevel:0 call.
+      /**
+       * BEHOBEN (war: „KNOWN REGRESSION, left red intentionally"). Der Befund:
+       * `buildCompactFreeAgentItem` hatte fuer den Browse-Pfad eine Sonderbehandlung mit der
+       * Begruendung „Browse mode shows every trait" — und meldete daraus volle Aufdeckung
+       * (Stufe 5) und null verborgene Traits.
+       *
+       * Die Begruendung widersprach den Daten: `buildFreeAgentBrowseIndex` baut
+       * `traitsPositive`/`traitsNegative` seinerseits ueber
+       * `getScoutedTraitView({ ..., scoutingLevel: 0 })`, also bereits gefiltert. Der
+       * Browse-Eintrag enthielt gar nicht „jeden Trait", sondern nur die auf Stufe 0
+       * sichtbaren — bei negativen Traits regelmaessig keinen einzigen.
+       *
+       * Damit fehlten in der Freie-Spieler-Liste beide Haelften: der Trait UND der Hinweis
+       * „N verborgen". Ein Spieler mit negativen Eigenschaften sah aus wie einer ohne — eine
+       * falsche Sicherheit, nicht bloss eine Luecke.
+       *
+       * Beide Zweige lieferten ohnehin dieselben sichtbaren Traits; uebrig bleibt EIN Pfad,
+       * der die Wahrheit ueber das Verborgene mitfuehrt.
+       */
       expect((item?.hiddenNegativeTraitCount ?? 0) + (item?.traitsNegative?.length ?? 0)).toBeGreaterThan(0);
     },
     20_000,

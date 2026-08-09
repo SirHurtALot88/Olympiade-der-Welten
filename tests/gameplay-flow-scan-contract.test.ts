@@ -97,40 +97,43 @@ describe("gameplay flow scan contract", () => {
   });
 
   it("wires prep performance markers for lineup, season and arena", async () => {
-    const [lineupText, seasonText, packageText] = await Promise.all([
+    const [lineupText, playersTableText, packageText] = await Promise.all([
       fs.readFile(
         path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
-      // SeasonStandingsV2Client.tsx is now a thin wrapper around SeasonStandingsNewLook.tsx.
       fs.readFile(
-        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsNewLook.tsx"),
+        path.join(process.cwd(), "app/foundation/players-table/FoundationPlayersTableBody.tsx"),
         "utf8",
       ),
       fs.readFile(path.join(process.cwd(), "package.json"), "utf8"),
     ]);
 
-    expect(packageText).toContain("@tanstack/react-virtual");
     // "LegacyLineupVirtualCardGrid" pinnte nur einen nie genutzten Import aus
     // der toten Geschwisterdatei LegacyLineupVirtualTableBody.tsx — beide sind
-    // mit dem Dead-Code-Cleanup entfernt. Die echte Virtualisierung der
-    // Spieler-Tabelle läuft über useRowVirtualWindow / expertPlayerTableVirtualWindow
-    // (siehe Assertion unten), die davon unberührt bleibt.
+    // mit dem Dead-Code-Cleanup entfernt.
     expect(lineupText).toContain("scheduleHoveredCandidate");
-    expect(lineupText).toContain("expertPlayerTableVirtualWindow");
+
     /**
      * HIER STAND EINE ABSICHTLICH ROTE ZUSICHERUNG auf `standingsTableVirtualWindow`, mit dem
      * eigenen Zusatz, das könne auch eine gewollte Vereinfachung sein.
      *
      * Genau das ist es: Virtualisierung lohnt ab Zeilenzahlen, bei denen das Rendern spürbar wird.
      * Der Saisonstand ist durch die Ligagröße gedeckelt — 32 Zeilen. Dafür einen Virtualizer zu
-     * halten kostet Komplexität ohne Gegenwert. Die echte Virtualisierung läuft weiter dort, wo sie
-     * gebraucht wird: in der Spieler-Tabelle und der Einsatzliste (`expertPlayerTableVirtualWindow`,
-     * eine Zeile darüber geprüft).
+     * halten kostet Komplexität ohne Gegenwert. Diese Begründung stammt aus `main` und bleibt.
      *
-     * Gesichert wird deshalb das, worauf es ankommt: dass die Virtualisierung dort NICHT
-     * verschwunden ist, wo die Listen wirklich lang werden.
+     * NACHTRAG (Merge, Entscheidung Chris 2026-08-09): Ihr Zusatz nannte als Gegenbeispiel „die
+     * Einsatzliste (`expertPlayerTableVirtualWindow`)". Das hat nie gestimmt — nachgemessen wurde
+     * `visibleExpertPlayerRows` zwar berechnet, aber NIE gerendert, der Viewport-Ref hing an keinem
+     * Element und `setIsExpertModeEnabled` hatte keinen Aufrufer. Dort lief keine Virtualisierung,
+     * die man hätte sichern können; der Expertenmodus ist mit diesem Zweig ausgebaut.
+     *
+     * Die Aussage, die der Test schützen soll, bleibt aber richtig und wird deshalb nicht
+     * gestrichen, sondern auf den Ort gezogen, wo die Virtualisierung TATSÄCHLICH läuft: die
+     * Spieler-Tabelle. Das ist die einzige Liste im Spiel, die wirklich lang wird (rund 3000
+     * Spieler), und sie ist auch die einzige verbliebene Nutzerin von `@tanstack/react-virtual`.
      */
-    expect(lineupText).toContain("useRowVirtualWindow");
+    expect(packageText).toContain("@tanstack/react-virtual");
+    expect(playersTableText).toContain("useVirtualizer");
   });
 });

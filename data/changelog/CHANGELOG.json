@@ -21,11 +21,38 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Liga · Archivierte Saisons",
+      "pr": null,
+      "text": "Der Bereichs-Rückfall in der archivierten Tabelle trug seine Punkte in die falsche Disziplin ein: statt in die erste Disziplin des Bereichs landeten sie in der mit dem größten Kader — Gewichtheben statt TDM, Climbing statt Staffel, I-Spy statt Schach, während die eigentliche Spalte leer blieb; nur SOC sah zufällig richtig aus, weil Basketball dort beides ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Arena · Disziplin-Bühne",
       "pr": null,
       "text": "Die Arena zeigte falsche Spieler und falsche Ränge. Gemeldet war: „ich hab hier platz 28 … bin aber hier letzter?“ — die Bühne führte für Stronghold Crusaders in der Staffel Tahra (+40,7) und Chad Thunderjaw (+40,2) auf, Rang 28 mit 80,9 Punkten. Gewertet wurde etwas völlig anderes: aufgestellt waren Spineshard (29,3) und Myrth (9,9), Team-Rang 31 mit 47,8. Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi's Castle. Dasselbe bei anderen Teams — bei V-D stellte die Bühne Queen Butterfly an die Spitze, während das Team in Wahrheit Vierter wurde. Die Ursache lag allein in der Anzeige, nicht in der Wertung: lagen der Bühne für eine Disziplin keine Engine-Daten vor, wich sie still auf ein schätzendes Modell aus, das die Aufstellung gar nicht liest, sondern sich pro Team selbst die stärksten Spieler heraussucht. Am gemeldeten Spielstand nachgerechnet wählt genau dieses Modell für S-C in der Staffel Tahra und Chad. Deine Punkte waren also immer korrekt gebucht — falsch war nur, was auf der Bühne stand. Jetzt holt die Arena die Bahnen aus dem gebuchten Ergebnis, sobald eine Disziplin gewertet ist: dieselben Spieler, Ränge und Scores, die auch in der Tabelle stehen. Und solange eine Disziplin noch nicht gelaufen ist, sagt der Hinweis oben unmissverständlich „Vorschau mit GESCHÄTZTER Aufstellung – nicht das Ergebnis“, statt wie bisher nur von einer vereinfachten Ansicht zu sprechen.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
+      "text": "Disziplin-Feld und Rangliste enden jetzt wirklich auf einer Linie — im Browser nachgemessen: die Tabelle war zusätzlich um Polster und Rahmen höher als die Arena, weil ihre zugewiesene Höhe nur den Inhalt meinte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
+      "text": "Das Disziplin-Feld und die Rangliste daneben enden wieder auf einer Linie: die Höhenmessung war zirkulär — die Tabelle richtete sich an der Arena aus, während die Arena über das Flex-Layout auf die Höhe der Tabelle gedehnt wurde, was in Disziplinen mit langer Rangliste unter dem Feld tote Fläche stehen ließ.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
@@ -156,6 +183,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Einsatzliste · Formkarten",
+      "pr": null,
+      "text": "Die Bereichsfarben (POW/SPE/MEN/SOC) sind im Formkarten-Dropdown wieder zu sehen: bisher trugen alle vier denselben grauen Punkt und die Farbe hing allein an einer CSS-Angabe, die native Auswahlmenüs in Chrome und Safari ignorieren — jetzt steht ein farbiger Kreis im Text selbst, der jedes Betriebssystem-Menü übersteht.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Saisonende · Abrechnung",
       "pr": null,
       "text": "Die Formkarten-Übernutzungs-Strafe (Punktabzug plus Neu-Einordnung der Endtabelle) greift jetzt auch auf dem normalen Spielerweg über „Sponsoren buchen“ — vorher lief sie nur im Cockpit-Saisonabschluss, sodass Sponsor- und Apron-Abrechnung sowie der eingefrorene Saison-Schnappschuss auf der unbestraften Tabelle rechneten; sie greift zudem nur bei wirklich beendeter Saison, damit eine laufende Saison nicht für Karten bestraft wird, die noch gespielt werden können.",
@@ -210,11 +246,29 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Import · Spielerkatalog",
+      "pr": null,
+      "text": "Ein importierter Spieler bekommt im Baseline-Katalog nicht mehr einen zweiten, minimal abweichenden Marktwert: der Katalog rechnete eigenständig nach, statt den liga-relativ ermittelten Wert des Imports zu übernehmen — den Wert also, der im Spiel tatsächlich gilt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Arena · Vor dem Anpfiff",
       "pr": null,
       "text": "Die Infotafel vor dem Spieltag kommt wieder — und zwar vor jedem, nicht nur vor dem ersten. Gemeldet war: „die kommt glaub ich nur beim ersten spieltag, danach nie wieder gesehen“. Stimmte: sie hing an der Bedingung „mindestens ein Team der Liga ist noch nicht bereit“ und war damit kein Vorspiel-, sondern ein Blockade-Bildschirm. Am ersten Spieltag fehlten noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel blieb weg, obwohl ihre Überschrift „Vor dem Anpfiff“ lautet. Jetzt zählt nur noch, ob der Spieltag wirklich noch nicht begonnen hat. Damit sie keine Sackgasse ist, hat sie einen Knopf „Zur Bühne“ bekommen; er erscheint, sobald die Liga vollzählig bereit ist. Wer ihn drückt, landet beim Hin- und Herwechseln nicht wieder auf der Tafel — beim nächsten Spieltag kommt sie von selbst zurück.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "KI · Kaderplanung",
+      "pr": null,
+      "text": "Die KI-Teams unterscheiden sich wieder in ihrer Ausgabenhaltung: ein unbedingter Anti-Hortungs-Übersteuerer setzte jedes Team mit komfortabler Kasse und Kaderlücke auf die niedrigste Reserve und überschrieb damit die gesamte aus Identität und Strategieprofil hergeleitete Haltung — ein bewusst sparsames Team verhielt sich exakt wie ein ausgabefreudiges; die Lockerung wirkt jetzt gewichtet nach Haltung und erzwingt die Politik nicht mehr.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {
@@ -264,6 +318,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "KI · Kaderplanung",
+      "pr": null,
+      "text": "Spitzenspieler fallen nicht mehr aus dem Kandidatenpool der KI: wer teuer, achsenfremd und noch nicht bewertet war, wurde gar nicht erst betrachtet — unabhängig davon, wie stark er ist; ab OVR 72 kommt er jetzt in die engere Wahl, die Bewertung danach darf ihn weiterhin ablehnen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Liga · Ranks",
       "pr": null,
       "text": "Die Teamstärke-Ränge einer abgeschlossenen Saison werden jetzt beim letzten gewerteten Spieltag festgehalten statt erst beim Saisonabschluss — vorher flossen die Verkäufe nach Saisonende in die Saisonränge ein und die Veränderungs-Spalte zeigte Sprünge wie „+24“, die es im Saisonlauf nie gab; dazu gibt es ein Reparaturskript, das den bestehenden Season-1-Snapshot aus der Transferhistorie rückwirkend korrigiert.",
@@ -291,11 +354,38 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Sponsoren · Neues Spiel",
+      "pr": null,
+      "text": "Beim Start eines neuen Spiels gibt es wieder fünf Sponsorenangebote statt vier: die Achse „Frische“ fiel aus dem Angebot, weil die Karten erzeugt werden, bevor der Liga-Draft die Kader angelegt hat — besonders ärgerlich, weil die KI-Teams unmittelbar danach unterschreiben und ihre Verträge nie neu gebaut werden, die Achse also der gesamten Liga für Saison 1 fehlte.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Teams · Saisonübersicht",
+      "pr": null,
+      "text": "Beim Blick auf eine abgeschlossene Saison stehen in der Teams-Tabelle nicht mehr zwei Zeitpunkte nebeneinander: die Achspunkte (POW/SPE/MEN/SOC) zeigten weiter den Stand der laufenden Saison, während die Disziplin-Spalten derselben Zeile korrekt den Snapshot lasen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Spieler · Trainingshistorie",
       "pr": null,
       "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Freie Spieler",
+      "pr": null,
+      "text": "Negative Eigenschaften verschwinden nicht mehr spurlos aus der Freie-Spieler-Liste: bei Scouting-Stufe 0 fehlte nicht nur der Trait, sondern auch der Hinweis „N verborgen“ — ein Spieler mit schlechten Eigenschaften sah damit aus wie einer ohne, was eine falsche Sicherheit erzeugte statt einer sichtbaren Lücke.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {

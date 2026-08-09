@@ -344,6 +344,11 @@ export function syncImportedCharacterPersistence(result: CharacterImportResult) 
     createPlayerBaselineFromPlayer(result.player, {
       source: "import",
       sourceFile: "references/character-briefs",
+      // Der Import hat den Marktwert bereits liga-relativ gerechnet
+      // (`calculateImportedPlayerEconomy`) — genau der Wert steht auch im Spieler und damit im
+      // Spiel. Ohne diese Uebergabe rechnete die Baseline eigenstaendig nach und legte eine
+      // zweite, minimal abweichende Zahl im Katalog ab (gemessen 72,75 gegen 72,74).
+      marketValueOverride: result.economy.marketValue,
     }),
   ]);
   // This is a dev-tooling catalog re-sync (no single target save), so clearing

@@ -1,7 +1,7 @@
 import type { SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import {
   buildTeamHistoryDisciplineValuesFromSnapshot,
-  SEASON_DISCIPLINE_AREA_GROUPS,
+  SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER,
   sumSeasonDisciplineAreaTotal,
   type PlayerHistoryDisciplineValues,
 } from "@/lib/season/season-discipline-area-groups";
@@ -57,7 +57,23 @@ function buildArchivedDisciplineValues(
     ]),
   ) as Record<string, number | null>;
 
-  for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
+  /**
+   * BEFUND: Der Bereichs-Rückfall landete in der falschen Spalte.
+   *
+   * `SEASON_DISCIPLINE_AREA_GROUPS` sortiert seine `keys` nach KADERGRÖSSE — das war eine
+   * Anforderung der Rang-Tabelle, wo die Spaltenbreite mit der Spielerzahl korrespondiert.
+   * `keys[0]` ist dadurch nicht die erste Disziplin des Bereichs, sondern die mit dem
+   * grössten Kader: Gewichtheben (6) statt TDM, Climbing (6) statt Staffel, I-Spy (6)
+   * statt Schach. Nur SOC stimmte zufällig, weil Basketball dort beides ist — erste
+   * Disziplin UND grösster Kader. Genau das hat den Fehler so lange verdeckt: eine von
+   * vier Spalten sah richtig aus.
+   *
+   * Der Rückfall trug seine Punkte also in eine Disziplin ein, die sie nicht erzielt hat,
+   * während die eigentliche leer blieb. Für diesen Fall gibt es den zweiten Export in
+   * kanonischer Reihenfolge; sein Kommentar warnt bereits vor genau dieser Verwechslung —
+   * diese Aufrufstelle war nur nie umgestellt worden.
+   */
+  for (const group of SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER) {
     const currentTotal = sumSeasonDisciplineAreaTotal(merged, group.id);
     const fallback = areaPoints?.[group.id];
     if (
