@@ -161,12 +161,12 @@ export default function PlayerProfileClient({
         return false;
       }
 
-      const intersecting = new Map<string, number>();
+      const intersecting = new Set<string>();
       intersectionObserver = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (entry.isIntersecting) {
-              intersecting.set(entry.target.id, entry.boundingClientRect.top);
+              intersecting.add(entry.target.id);
             } else {
               intersecting.delete(entry.target.id);
             }
@@ -175,9 +175,16 @@ export default function PlayerProfileClient({
             return;
           }
           // Innerhalb des Lese-Bands gewinnt die unterste (zuletzt erreichte) Sektion.
+          // BUGFIX (Durchklick, Reiter-Markierung): der top wird FRISCH gemessen statt den
+          // beim Übergang gespeicherten `entry.boundingClientRect.top` zu vergleichen —
+          // gespeicherte tops veralten beim Weiterscrollen (eine Sektion, die lange im Band
+          // bleibt, behält ihren Eintritts-top) und ließen an der Sektionsgrenze die falsche
+          // Sektion gewinnen. Die Mitgliedschaft im Band kommt weiter vom Observer, nur der
+          // Vergleich liest die aktuelle Position.
           let nextAnchorId: string | null = null;
           let nextTop = Number.NEGATIVE_INFINITY;
-          for (const [anchorId, top] of intersecting) {
+          for (const anchorId of intersecting) {
+            const top = document.getElementById(anchorId)?.getBoundingClientRect().top ?? Number.NEGATIVE_INFINITY;
             if (top > nextTop) {
               nextTop = top;
               nextAnchorId = anchorId;

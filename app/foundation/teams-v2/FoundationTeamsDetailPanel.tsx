@@ -2937,14 +2937,16 @@ function FoundationTeamsDetailPanel({
                         <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Gebäude und Entwicklung.</p>
                       </div>
                       <div className="room-meta foundation-admin-meta">
+                        {/* Formatfix (Durchklick): Rating/Druck sind 1-Nachkommastellen-Größen —
+                            roh interpoliert stand hier „8.4/10" (JS-Punkt statt Hauskomma). */}
                         <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
-                          Board Rating {selectedBoardConfidence?.value ?? "—"}/10
+                          Board Rating {formatNlNumber(selectedBoardConfidence?.value, 1)}/10
                         </span>
                         <span
                           className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
                           title={TEAM_BOARD_PRESSURE_TOOLTIP}
                         >
-                          Druck {selectedBoardConfidence?.pressure ?? "—"}/10
+                          Druck {formatNlNumber(selectedBoardConfidence?.pressure, 1)}/10
                         </span>
                       </div>
                     </div>

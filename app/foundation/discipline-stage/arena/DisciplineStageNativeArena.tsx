@@ -863,7 +863,8 @@ export function renderTerritory(sorted: RT[], W: number, H: number, env: StageEn
                   {t.code}
                 </text>
                 <text x={x + w / 2} y={y + h / 2 + 14} textAnchor="middle" fontSize={10} fill={INK} opacity={0.85}>
-                  {pv.toFixed(1)}%
+                  {/* Formatfix (Durchklick): Hauskomma statt toFixed-Punkt („95,5%" statt „95.5%"). */}
+                  {fmt1(pv)}%
                 </text>
               </>
             ) : mid ? (
@@ -3695,9 +3696,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                           const k = Math.round(kc);
                           const d = Math.round(4 + (1 - n) * 16);
                           const a = Math.round(ac);
-                          const kda = ((k + a) / Math.max(1, d)).toFixed(1);
+                          // Formatfix (Durchklick): fmt1 (Hauskomma) statt toFixed-Punkt.
+                          const kda = fmt1((k + a) / Math.max(1, d));
                           const hs = Math.round(28 + n * 42);
-                          const pts = (kc + ac * 0.5).toFixed(1);
+                          const pts = fmt1(kc + ac * 0.5);
                           const top = kdaTopFrag(t);
                           return (
                             <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
