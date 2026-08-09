@@ -1120,7 +1120,6 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildHomeV2Overview = activeView === "homeV2";
   const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
   const shouldBuildDebugView = activeView === "debug";
-  const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
   const shouldBuildTeamsView = resolveShouldBuildTeamsView(activeView);
@@ -1133,6 +1132,34 @@ export function useFoundationShellRouterBodyScope({
   const shouldLoadSeasonManagementFeed = resolveShouldLoadSeasonManagementFeed(activeView as FoundationViewId, homeV2Tab);
   const shouldBuildGameFlow = shouldBuildFoundationGameFlow(activeView, homeV2Tab);
   const shouldBuildGameInbox = shouldBuildGameFlow;
+  /**
+   * Die HQ-Uebersicht malt zuerst, rechnet danach. Die Liga-Heat-Pools sind der teure Teil der
+   * Seite; frueher hingen sie an dieser Sperre und wurden erst gebaut, wenn der Browser Luft
+   * hatte. Beim Umbau in `fd984c8` fiel die Sperre heraus — `shouldBuildFoundationLeagueHeatPools`
+   * faellt ohne sie auf `?? true` zurueck, seither rechnet die Seite sofort mit.
+   *
+   * `false` bei jedem Wechsel: wer die HQ-Seite verlaesst und zurueckkommt, soll wieder erst das
+   * Geruest sehen. `requestIdleCallback` mit 1500 ms Deckel, damit es auch dann kommt, wenn der
+   * Browser nie zur Ruhe kommt; ohne `requestIdleCallback` ein `setTimeout(0)`.
+   */
+  const [homeV2OverviewHeavyReady, setHomeV2OverviewHeavyReady] = useState(false);
+  useEffect(() => {
+    setHomeV2OverviewHeavyReady(false);
+    if (activeView !== "homeV2") {
+      return;
+    }
+    const schedule =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => setHomeV2OverviewHeavyReady(true), { timeout: 1500 })
+        : window.setTimeout(() => setHomeV2OverviewHeavyReady(true), 0);
+    return () => {
+      if (typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(schedule);
+      } else {
+        window.clearTimeout(schedule);
+      }
+    };
+  }, [activeView]);
   const shouldLoadSeasonOverviewFeed =
     activeView === "seasonV2" ||
     activeView === "prize" ||
@@ -8675,6 +8702,11 @@ export function useFoundationShellRouterBodyScope({
     shouldBuildTeamHistory,
     showExtendedTeamPanels,
     selectedTeamDetailTab,
+    // Beide gehoerten schon immer hierher, kamen beim Umbau aber abhanden: ohne `homeV2Tab` gilt
+    // jeder HQ-Unterreiter als „Uebersicht" und baut die Heat-Pools mit, ohne `homeV2OverviewHeavyReady`
+    // rechnet die Uebersicht sofort statt im Leerlauf.
+    homeV2Tab,
+    homeV2OverviewHeavyReady,
     gameState,
     playerRatingsById,
     playerDirectorySlice,
@@ -12184,7 +12216,6 @@ export function useFoundationShellRouterBodyScope({
     matchdayMvpScoringFeed,
     matchdaySummary,
     matchdaySummaryOptions,
-    matchdaySummaryTab,
     moveTableColumn,
     navigateHomeTab,
     navigatePrizeFinanceTab,
@@ -12417,7 +12448,6 @@ export function useFoundationShellRouterBodyScope({
     setMatchdayAutoRunOverwriteExistingLineups,
     setMatchdayAutoRunStopOnTie,
     setMatchdayMvpForceReplaceExisting,
-    setMatchdaySummaryTab,
     setNewGamePreview,
     setNewGameSandbox,
     setNewGameSaveName,
