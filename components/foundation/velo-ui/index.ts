@@ -14,7 +14,8 @@
  * - VeloStarRating / VeloPotentialStars: class/potential display
  * - VeloPendingRanking: Leerzustand fuer Wertungen OHNE Daten — leere Podest-Slots
  *   („Noch zu vergeben") statt erfundener Rangfolge/Alphabet-Medaillen (Arena Pre-Matchday,
- *   Ranks-PP-Board am Saisonstart). Eine leere Rangliste behauptet hier NIE eine Reihenfolge.
+ *   Ranks-PP-Board und Leaders-Kategorien am Saisonstart). Eine leere Rangliste behauptet
+ *   hier NIE eine Reihenfolge; Pending-Erkennung der Leaders: `isLeagueLeaderCategoryPending`.
  *
  * Prefer `.velo-*` classes; feature aliases (e.g. `training-v2-rider-orbit`) stay for legacy CSS.
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
