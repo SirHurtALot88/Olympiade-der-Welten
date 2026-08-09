@@ -52,6 +52,7 @@ import DisciplineStageMatchdayPanel, {
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
+import { buildStandingsMatchdayRankPair } from "@/lib/foundation/season-standings-matchday-rank-delta";
 import { getMatchdayScoringProgress, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
@@ -814,12 +815,37 @@ export default function DisciplineStageArena({
       const rank = canonicalStandings[teamId]?.rank;
       return typeof rank === "number" && Number.isFinite(rank) ? rank : null;
     };
+    /**
+     * GEMELDET VON CHRIS (Spieltag 4): „auch nach D1 müsste es ja eine Rangänderung geben …
+     * ausgangsrang ist z. B. der von MD3" — und nach der Buchung von D2 stand in der S-Rang-Spalte
+     * bei allen 32 Teams „7 → 7", „22 → 22" usw.
+     *
+     * Ursache: Sobald der Spieltag GEBUCHT ist, trägt `standings[team].rank` bereits den Stand NACH
+     * diesem Spieltag — als „vorher" gelesen war das Paar zwangsläufig entartet (vorher == nachher).
+     * Der echte Ausgangsrang steckt in `matchdayBaselinePoints` (Punktestand VOR der Wertung,
+     * geschrieben von standings-apply für genau diesen Spieltag). Die Rangliste daraus baut
+     * `buildStandingsMatchdayRankPair` — DIESELBE Rechnung, aus der auch der Saisonstand seine
+     * Rang-Bewegung bezieht (eine Quelle pro Größe, sonst widersprechen sich zwei Seiten).
+     *
+     * Vor der Buchung (auch beim halb gewerteten Spieltag) bleibt `standings.rank` der Stand nach
+     * dem VORIGEN Spieltag und ist damit selbst der richtige „vorher"-Wert.
+     */
+    const bookedForThisMatchday =
+      matchdayId != null &&
+      results.some((r) => canonicalStandings[r.teamId]?.matchdayBaselineId === matchdayId);
+    const baselineRankPairByTeam = bookedForThisMatchday
+      ? buildStandingsMatchdayRankPair(
+          (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name })),
+          canonicalStandings,
+        )
+      : null;
     const standings: MatchdayPanelStandingRow[] = results.map((r) => {
       const s = rankByTeam.get(r.teamId);
+      const pair = baselineRankPairByTeam?.get(r.teamId) ?? null;
       return {
         teamId: r.teamId,
-        currentRank: canonicalRankOf(r.teamId) ?? s?.currentRank ?? null,
-        projectedRank: s?.projectedRank ?? null,
+        currentRank: pair != null ? pair.previousRank : canonicalRankOf(r.teamId) ?? s?.currentRank ?? null,
+        projectedRank: pair != null ? canonicalRankOf(r.teamId) ?? pair.currentRank : s?.projectedRank ?? null,
         currentPoints: s?.currentPoints ?? null,
         projectedPoints: s?.projectedPoints ?? null,
         pointsDelta: s?.pointsDelta ?? null,

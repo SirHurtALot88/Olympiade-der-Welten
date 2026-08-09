@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-09",
+  "seite": "Spieler · Trainingshistorie",
+  "text": "Die Trainingshistorie ist jetzt eine Liste über die Saisons hinweg: eine Summenzeile je Saison, und erst beim Aufklappen zeigt die Saison ihre Herkunft (Training, Leistung, Alterung). Die laufende Saison trägt das Badge „Prognose n/m“ — real gebucht wird erst am Saisonende —, abgeschlossene Saisons das Badge „gebucht“. Für Saisons, die vor der Herkunfts-Mitschrift abgeschlossen wurden, stehen die Saison-Summen in der Σ-Spalte, und die Liste sagt ehrlich, dass die Aufteilung je Attribut damals nicht festgehalten wurde. Die „Auswirkung auf die Disziplinen“ wandert mit in die aufgeklappte laufende Saison.",
+  "gewicht": "grundlegend",
+  "version": "0.4"
+}

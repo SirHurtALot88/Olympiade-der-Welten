@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { StandingRecord } from "@/lib/data/olyDataTypes";
-import { buildStandingsMatchdayRankDelta } from "@/lib/foundation/season-standings-matchday-rank-delta";
+import {
+  buildStandingsMatchdayRankDelta,
+  buildStandingsMatchdayRankPair,
+} from "@/lib/foundation/season-standings-matchday-rank-delta";
 
 const read = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
 
@@ -109,6 +112,82 @@ describe("Saisonstand: Rang-Bewegung aus dem Punktestand vor der letzten Wertung
     });
 
     expect(deltas.get("C")).toBe(0);
+  });
+});
+
+/**
+ * GEMELDET VON CHRIS (Spieltag 4, Spieltags-Wertung): nach der Buchung stand in
+ * der S-Rang-Spalte bei allen 32 Teams „7 → 7", „22 → 22" — der Vorher-Wert kam
+ * aus derselben Quelle wie der Nachher-Wert (`standings.rank` trägt nach der
+ * Buchung bereits den NEUEN Stand). Der echte Ausgangsrang entsteht aus der
+ * Baseline; die Spieltags-Wertung braucht dafür neben dem Δ auch die beiden
+ * Ränge selbst. `buildStandingsMatchdayRankPair` liefert sie aus DERSELBEN
+ * Rechnung wie das Δ des Saisonstands — eine Quelle pro Größe, sonst
+ * widersprechen sich die beiden Seiten wieder.
+ */
+describe("Spieltags-Wertung: Vorher-/Nachher-Rang aus derselben Baseline-Rechnung", () => {
+  const teams = [
+    { teamId: "A", teamName: "Alpha" },
+    { teamId: "B", teamName: "Beta" },
+    { teamId: "C", teamName: "Gamma" },
+  ];
+
+  const standing = (points: number, baselinePoints: number | null): StandingRecord =>
+    ({
+      points,
+      ...(baselinePoints == null
+        ? {}
+        : { matchdayBaselinePoints: baselinePoints, matchdayBaselineId: "matchday-4" }),
+    }) as StandingRecord;
+
+  it("liefert Ausgangs- und Zielrang, nicht nur die Bewegung", () => {
+    // Vor Spieltag 4: Alpha 100 (1.), Beta 90 (2.), Gamma 80 (3.).
+    // Spieltag 4: Gamma zieht mit 110 an beiden vorbei.
+    const pairs = buildStandingsMatchdayRankPair(teams, {
+      A: standing(100, 100),
+      B: standing(90, 90),
+      C: standing(110, 80),
+    });
+
+    expect(pairs.get("C")).toEqual({ previousRank: 3, currentRank: 1, delta: 2 });
+    expect(pairs.get("A")).toEqual({ previousRank: 1, currentRank: 2, delta: -1 });
+    expect(pairs.get("B")).toEqual({ previousRank: 2, currentRank: 3, delta: -1 });
+  });
+
+  it("degeneriert NICHT zu vorher == nachher, obwohl `points` schon den neuen Stand trägt", () => {
+    // Genau der gemeldete Fall: Buchung durch, `points` inkrementiert. Der
+    // Vorher-Rang MUSS aus der Baseline kommen — sonst steht überall „X → X".
+    const pairs = buildStandingsMatchdayRankPair(teams, {
+      A: standing(100, 100),
+      B: standing(90, 90),
+      C: standing(110, 80),
+    });
+    const bewegte = [...pairs.values()].filter((pair) => pair != null && pair.delta !== 0);
+    expect(bewegte.length).toBeGreaterThan(0);
+    // Ränge sind ein Nullsummenspiel.
+    expect([...pairs.values()].reduce((summe, pair) => summe + (pair?.delta ?? 0), 0)).toBe(0);
+  });
+
+  it("Δ-Funktion und Paar-Funktion sind dieselbe Rechnung", () => {
+    const standings = {
+      A: standing(100, 100),
+      B: standing(90, 90),
+      C: standing(110, 80),
+    };
+    const deltas = buildStandingsMatchdayRankDelta(teams, standings);
+    const pairs = buildStandingsMatchdayRankPair(teams, standings);
+    for (const team of teams) {
+      expect(deltas.get(team.teamId)).toBe(pairs.get(team.teamId)?.delta ?? null);
+    }
+  });
+
+  it("liefert null ohne jede Baseline — kein erfundener Ausgangsrang", () => {
+    const pairs = buildStandingsMatchdayRankPair(teams, {
+      A: standing(0, null),
+      B: standing(0, null),
+      C: standing(0, null),
+    });
+    expect([...pairs.values()]).toEqual([null, null, null]);
   });
 });
 

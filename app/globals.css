@@ -2087,7 +2087,6 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   }
 
   .player-drawer-page .player-drawer-transfer-history-shell,
-  .player-drawer-page .player-drawer-training-history-shell,
   .player-drawer-page .player-attribute-progress-table-shell {
     max-height: 360px;
   }
@@ -17127,14 +17126,13 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .player-drawer-transfer-history-block,
-.player-drawer-training-history {
+.player-drawer-training-history-block {
   margin-top: 18px;
   display: grid;
   gap: 10px;
 }
 
 .player-drawer-transfer-history-shell,
-.player-drawer-training-history-shell,
 .player-attribute-progress-table-shell {
   max-height: 280px;
   overflow: auto;
@@ -17144,7 +17142,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .player-drawer-transfer-history-table,
-.player-drawer-training-history-table,
 .player-attribute-progress-table {
   width: 100%;
   min-width: 0;
@@ -17152,23 +17149,12 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-spacing: 0;
 }
 
-.player-drawer-training-history-table th,
-.player-drawer-training-history-table td {
-  padding: 6px 7px;
-  font-size: 0.68rem;
-}
-
-.player-drawer-training-history-table th.is-attribute-col,
-.player-drawer-training-history-table td.is-attribute-col {
-  min-width: 38px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
+/* `.player-drawer-training-history-table`/`-shell` sind mit der Saison-Liste (Trainingshistorie
+   aufklappbar je Saison) entfallen — abgeschlossene Saisons rendern jetzt in der
+   `.player-drawer-matchday-training-table` mit. Regeln entfernt statt still durchzufallen. */
 
 .player-drawer-transfer-history-table th,
 .player-drawer-transfer-history-table td,
-.player-drawer-training-history-table th,
-.player-drawer-training-history-table td,
 .player-attribute-progress-table th,
 .player-attribute-progress-table td {
   padding: 9px 10px;
@@ -17237,22 +17223,115 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-weight: 600;
 }
 
+/* Trainingshistorie als Saison-Liste (Wunsch: „das müsste wo die summe steht pro season sein
+   und dann ausklappbar dass man training leistung regression sehen kann"): eine Summenzeile je
+   Saison, die Herkunfts-Zeilen erscheinen erst beim Aufklappen. Der Toggle sitzt IM Zeilenkopf
+   und erbt dessen Typografie — kein Button-Chrome, nur Chevron + Saison + Status-Badge. */
+.player-drawer-training-season-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.player-drawer-training-season-toggle:focus-visible {
+  outline: 2px solid var(--nl-accent-text, #7fb0ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.player-drawer-training-season-chevron {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.62rem;
+  width: 10px;
+  text-align: center;
+}
+
+.player-drawer-training-season-label {
+  font-weight: 600;
+}
+
+/* Status-Badge: die laufende Saison ist eine PROGNOSE (gestrichelte Kante), abgeschlossene
+   Saisons sind GEBUCHT (durchgezogene Kante) — der Unterschied Hochrechnung/Tatsache bleibt
+   auch ohne Farbe erkennbar. Muted-Ton wie die übrigen Nebentexte der Tabelle. */
+.player-drawer-training-season-badge {
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--nl-mut, #93a3bd);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.player-drawer-training-season-badge.is-forecast {
+  border-style: dashed;
+}
+
+.player-drawer-training-season-badge.is-booked {
+  border-style: solid;
+}
+
+/* Aufgeklappte Herkunfts-Zeilen: eingerückt unter ihrer Saison, damit die Hierarchie
+   (Saison → Posten) auch ohne Rahmen lesbar ist. */
+.player-drawer-training-origin-row th.player-drawer-training-origin-label {
+  padding-left: 27px;
+}
+
+/* Keine erfundenen Zahlen: Saisons ohne mitgeschriebene Herkunft je Attribut sagen es an
+   Ort und Stelle, statt drei Zeilen voller Striche zu zeigen. */
+.player-drawer-matchday-training-table td.player-drawer-training-origin-missing {
+  color: var(--nl-mut, #93a3bd);
+  font-style: italic;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+}
+
+.player-drawer-matchday-training-table td.player-drawer-training-season-detail {
+  white-space: normal;
+  padding: 8px 10px 12px 27px;
+}
+
+.player-drawer-training-season-detail-note {
+  margin: 0;
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  max-width: 72ch;
+}
+
+.player-drawer-training-season-detail .player-drawer-discipline-forecast {
+  margin-top: 8px;
+}
+
+/* Saison-Gruppen optisch trennen: die Summenzeile jeder weiteren Saison bekommt eine etwas
+   kräftigere Oberkante als die normalen Zeilenlinien. */
+.player-drawer-matchday-training-table tbody.player-drawer-training-season-group + tbody.player-drawer-training-season-group tr[data-row="total"] th,
+.player-drawer-matchday-training-table tbody.player-drawer-training-season-group + tbody.player-drawer-training-season-group tr[data-row="total"] td {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 /* Trainingshistorie/Saison-Forecast: Die Legende verspricht "Grün = Zuwachs, Rot = Rückgang",
    aber die von getDeltaToneClass gesetzten is-positive/is-negative-Klassen hatten in diesen
    Tabellen KEINE Farbregel (nur spezifische Selektoren wie .player-drawer-delta.is-positive
    existierten) — alle Deltas blieben einfarbig. Farben aus dem bestehenden Ton-Vokabular
    (--nl-good/--nl-risk/--nl-mut, wie NlDeltaChip), mit Fallback-Hex für Render-Kontexte
    ohne .is-new-look-Vorfahren. Helle Töne auf dunklem Grund → Kontrast bleibt erhalten. */
-.player-drawer-matchday-training-table td.is-positive,
-.player-drawer-training-history-table .is-positive {
+.player-drawer-matchday-training-table td.is-positive {
   color: var(--nl-good, #4cc56b);
 }
-.player-drawer-matchday-training-table td.is-negative,
-.player-drawer-training-history-table .is-negative {
+.player-drawer-matchday-training-table td.is-negative {
   color: var(--nl-risk, #e5615a);
 }
-.player-drawer-matchday-training-table td.is-neutral,
-.player-drawer-training-history-table .is-neutral {
+.player-drawer-matchday-training-table td.is-neutral {
   color: var(--nl-mut, #93a3bd);
 }
 

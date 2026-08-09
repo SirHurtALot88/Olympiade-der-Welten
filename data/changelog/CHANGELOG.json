@@ -354,6 +354,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Die Rangänderung der Spieltags-Wertung stand an der falschen Spalte: Die Pfeile hingen am Spieltagsrang — der ist einmalig und hat gar kein „vorher“ —, während die S-Rang-Spalte nach der Buchung zweimal denselben Rang zeigte („7 → 7“ bei allen Teams). Jetzt zeigt der S-Rang die echte Saisonrang-Bewegung: Ausgangswert ist der Stand nach dem vorigen gewerteten Spieltag, und schon nach der ersten Disziplin steht dort der Zwischenstand. Der Pfeil am Spieltagsrang bleibt, heißt aber jetzt sichtbar „Mod“: Er zeigt, was Aufstellung, Form, Captain und Mutatoren an Plätzen gebracht haben. Die Kopfzeile erklärt beide.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Sponsoren · Neues Spiel",
       "pr": null,
       "text": "Beim Start eines neuen Spiels gibt es wieder fünf Sponsorenangebote statt vier: die Achse „Frische“ fiel aus dem Angebot, weil die Karten erzeugt werden, bevor der Liga-Draft die Kader angelegt hat — besonders ärgerlich, weil die KI-Teams unmittelbar danach unterschreiben und ihre Verträge nie neu gebaut werden, die Achse also der gesamten Liga für Saison 1 fehlte.",
@@ -377,6 +386,15 @@
       "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Die Trainingshistorie ist jetzt eine Liste über die Saisons hinweg: eine Summenzeile je Saison, und erst beim Aufklappen zeigt die Saison ihre Herkunft (Training, Leistung, Alterung). Die laufende Saison trägt das Badge „Prognose n/m“ — real gebucht wird erst am Saisonende —, abgeschlossene Saisons das Badge „gebucht“. Für Saisons, die vor der Herkunfts-Mitschrift abgeschlossen wurden, stehen die Saison-Summen in der Σ-Spalte, und die Liste sagt ehrlich, dass die Aufteilung je Attribut damals nicht festgehalten wurde. Die „Auswirkung auf die Disziplinen“ wandert mit in die aufgeklappte laufende Saison.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {
