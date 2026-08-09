@@ -606,10 +606,6 @@ function FoundationTeamsDetailPanel({
   teamPicksRefillBusyTeamId,
   teamPicksRefillMessage,
 }: FoundationTeamsDetailPanelProps) {
-  if (!active) {
-    return null;
-  }
-
   const showLeagueLogos = teamsHydrationPhase === "full";
   const showSecondaryPanels = teamsHydrationPhase === "full";
   const [showDeferredTeamLogos, setShowDeferredTeamLogos] = useState(false);
@@ -628,6 +624,47 @@ function FoundationTeamsDetailPanel({
   const [expandedRosterPpsDisziId, setExpandedRosterPpsDisziId] = useState<string | null>(null);
   // Dasselbe Ausklapp-Muster für die Verträge-Tabelle (NlTable), Zustand je Spieler-ID.
   const [expandedContractPpsPlayerId, setExpandedContractPpsPlayerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showLeagueLogos) {
+      setShowDeferredTeamLogos(false);
+      return;
+    }
+
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) {
+        setShowDeferredTeamLogos(true);
+      }
+    };
+
+    if (typeof globalThis.requestIdleCallback === "function") {
+      const idleId = globalThis.requestIdleCallback(finish, { timeout: TEAMS_DEFERRED_LOGO_IDLE_MS });
+      return () => {
+        cancelled = true;
+        globalThis.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timerId = globalThis.setTimeout(finish, TEAMS_DEFERRED_LOGO_IDLE_MS);
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(timerId);
+    };
+  }, [showLeagueLogos, selectedTeam?.teamId]);
+
+  // Früher Ausstieg erst NACH allen Hooks (Rules of Hooks): Der Ausstieg stand
+  // früher ganz oben, VOR den useState/useEffect-Aufrufen. Das ging nur gut,
+  // weil der Shell-Router die Komponente bei Inaktivität komplett aushängt und
+  // `active` damit faktisch nie kippt — eine Landmine: Sobald irgendein Host
+  // `active` an einer gemounteten Instanz umschaltet, ändert sich die Zahl der
+  // Hook-Aufrufe zwischen zwei Renders und React wirft. Deshalb laufen jetzt
+  // erst alle Hooks, dann der Ausstieg. Für den (praktisch einzigen) Fall
+  // `active === true` ist das Verhalten identisch.
+  if (!active) {
+    return null;
+  }
+
   // Roster-Zeilen nach Spieler-ID (trägt ppPow/… + disciplinePpsByAxis) — Quelle
   // für die Achsen-/Disziplin-PPs der Verträge-Tabelle (join über playerId).
   const rosterRowByPlayerId = new Map(
@@ -734,34 +771,6 @@ function FoundationTeamsDetailPanel({
       </div>
     </div>
   );
-
-  useEffect(() => {
-    if (!showLeagueLogos) {
-      setShowDeferredTeamLogos(false);
-      return;
-    }
-
-    let cancelled = false;
-    const finish = () => {
-      if (!cancelled) {
-        setShowDeferredTeamLogos(true);
-      }
-    };
-
-    if (typeof globalThis.requestIdleCallback === "function") {
-      const idleId = globalThis.requestIdleCallback(finish, { timeout: TEAMS_DEFERRED_LOGO_IDLE_MS });
-      return () => {
-        cancelled = true;
-        globalThis.cancelIdleCallback?.(idleId);
-      };
-    }
-
-    const timerId = globalThis.setTimeout(finish, TEAMS_DEFERRED_LOGO_IDLE_MS);
-    return () => {
-      cancelled = true;
-      globalThis.clearTimeout(timerId);
-    };
-  }, [showLeagueLogos, selectedTeam?.teamId]);
 
   const shouldShowTeamRowLogo = (teamId: string, rowIndex: number) =>
     showLeagueLogos &&
