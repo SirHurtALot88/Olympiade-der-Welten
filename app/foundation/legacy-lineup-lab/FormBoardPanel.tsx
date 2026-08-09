@@ -523,6 +523,16 @@ export default function FormBoardPanel({
             <span className="legacy-lineup-form-deck-progress" aria-label="Saison-Fortschritt Formplan">
               {formPlanProgress.filledCells}/{formPlanProgress.totalCells} Spieltage geplant
             </span>
+            {/* S6/L5 (Audit Spieltag): "Zelle rechts aktivieren" war die einzige
+                Bedienungshilfe — was eine aktivierte Karte kostet/bewirkt, stand nur
+                im Hover-Tooltip der einzelnen Kartenchips. Eine Zeile Klartext statt
+                Rätselraten; die Wirkung selbst (POW +8,0 …) bleibt exakt die Zahl aus
+                der Karte, hier nur einmal eingeordnet. */}
+            <p className="legacy-lineup-form-resource-note">
+              Zelle wählen, dann eine Karte anklicken oder hineinziehen — sie ersetzt die
+              Basiswerte dieses Spieltag-Slots durch ihren Bonus/Malus und wird aus dem
+              Formkarten-Budget oben verbraucht (bei Farbmatch zur Disziplin doppelt, x2).
+            </p>
           </div>
           {activeFormPickCell ? (
             <button className="secondary-button legacy-lineup-form-deck-clear" type="button" onClick={clearActiveFormPickCell} disabled={isReadOnly}>

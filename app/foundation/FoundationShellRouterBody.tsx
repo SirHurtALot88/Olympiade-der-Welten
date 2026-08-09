@@ -11,6 +11,7 @@ import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, type CSSProperties } from "react";
 import {
   buildTeamShellThemeVars,
@@ -34,7 +35,6 @@ import {
   BudgetedMediaImage,
   ClassColorChip,
   ClassIcon,
-  ColumnVisibilityManager,
   DEFAULT_ACTIVE_OWNER_ID,
   DisciplineIcon,
   FACILITY_CATALOG,
@@ -342,6 +342,18 @@ type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 // Matches the inline `areaRows` literal built for marketSellPlayerContext in
 // use-foundation-shell-router-body-scope.tsx (not a separately exported type).
 type MarketSellAreaRow = { key: string; value: number | null; tone: string };
+
+// W1 · Ranks-Matrix: Tooltips der Aggregat-Spalten. Die Disziplin-Spalten
+// bekommen ihren vollen Namen direkt aus `discipline.name`; nur die fünf
+// Aggregat-Kürzel brauchen eine feste Erklärung (vorher sagte der Hover nur
+// "Nach GEW sortieren", SCH bekam sogar den falschen Achsen-Tooltip).
+const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
+  totalRank: "TOT — Gesamtrang: Teamstärke über alle Disziplinen summiert und ligaweit gerankt. Rang 1 = stärkstes Team.",
+  powRank: "POW — Teamrank der Power-Achse (Summe der Power-Disziplinen).",
+  speRank: "SPE — Teamrank der Speed-Achse (Summe der Speed-Disziplinen).",
+  menRank: "MEN — Teamrank der Mental-Achse (Summe der Mental-Disziplinen).",
+  socRank: "SOC — Teamrank der Social-Achse (Summe der Social-Disziplinen).",
+};
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
   const [viewWidthMode] = useViewWidth();
@@ -661,7 +673,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonSnapshotFeed,
   seasonStandRows,
   seasonStandingsLoading,
-  seasonStandingsMode,
   seasonStartResetBusy,
   seasonStartResetFeed,
   seasonTransitionBusy,
@@ -774,7 +785,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   setPlayerTrainingMode,
   setScoutingCenterTab,
   setSeasonOverviewSeasonId,
-  setSeasonStandingsMode,
   setSelectedEncyclopediaEntryId,
   setSelectedMatchdaySummaryId,
   setSelectedTeamDetailTab,
@@ -991,6 +1001,82 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   const teamsRosterBadgeCount =
     Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
 
+  // ===== W1 · Ranks-Matrix: Achsen-Gruppen, Gruppenband, gepinnte eigene Zeile =====
+  // Chris' Entscheidung: Spalten werden nach POW/SPE/MEN/SOC gruppiert und je
+  // Gruppe ein-/ausgeblendet — der px-Spalten-Manager entfällt (bewusster Tausch
+  // Feinsteuerung gegen Klarheit). Sichtbarkeit läuft weiter über den
+  // bestehenden Tabellen-Store (isTableColumnVisible/setTableColumnVisible),
+  // damit die Wahl wie bisher pro Save erhalten bleibt.
+  const ranksCategoryLabels: Record<string, string> = {
+    power: "Power",
+    speed: "Speed",
+    mental: "Mental",
+    social: "Social",
+  };
+  const ranksAxisGroups = (() => {
+    const groups: Array<{
+      category: string;
+      label: string;
+      columns: FoundationTableColumn[];
+      anyVisible: boolean;
+    }> = [];
+    for (const column of disciplineRanksColumns as FoundationTableColumn[]) {
+      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
+      if (!discipline) {
+        continue;
+      }
+      let group = groups.find((candidate) => candidate.category === discipline.category);
+      if (!group) {
+        group = {
+          category: discipline.category,
+          label: ranksCategoryLabels[discipline.category] ?? discipline.category,
+          columns: [],
+          anyVisible: false,
+        };
+        groups.push(group);
+      }
+      group.columns.push(column);
+      if (isTableColumnVisible("disciplineRanksTable", column.id, column.visibleByDefault)) {
+        group.anyVisible = true;
+      }
+    }
+    return groups;
+  })();
+  // Gruppenband über den sichtbaren Spalten: Achsenfarbe lebt NUR noch hier —
+  // die Zellen darunter färben ausschließlich nach Rang (Legende darüber).
+  const ranksHeaderGroups = (() => {
+    const cells: Array<{ key: string; category: string; label: string; span: number }> = [];
+    for (const column of visibleDisciplineRanksColumns as FoundationTableColumn[]) {
+      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
+      const category = column.id === "team" ? "team" : (discipline?.category ?? "base");
+      const last = cells[cells.length - 1];
+      if (last && last.category === category) {
+        last.span += 1;
+      } else {
+        cells.push({
+          key: `ranks-group-${category}-${column.id}`,
+          category,
+          label:
+            category === "team"
+              ? ""
+              : category === "base"
+                ? "Teamranks"
+                : (ranksCategoryLabels[category] ?? category),
+          span: 1,
+        });
+      }
+    }
+    return cells;
+  })();
+  // Eigene Zeile zusätzlich oben anpinnen (W1-Befund 6): das Original bleibt an
+  // seiner sortierten Position, die gepinnte Kopie trägt "Rang X von N".
+  const pinnedOwnRankRow =
+    activeManagerTeamId != null
+      ? (sortedDisciplineRankRows.find(
+          (row: FoundationDisciplineRankRow) => row.team.teamId === activeManagerTeamId,
+        ) ?? null)
+      : null;
+
   return (
     (
     <main
@@ -1099,17 +1185,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               activeId={homeV2Tab}
               onSelect={(id) => navigateHomeTab(id === "office" ? "office" : "overview")}
             />
-          ) : activeView === "seasonV2" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "table", label: "Datenansicht" },
-                { id: "gms", label: "Manager" },
-              ]}
-              activeId={seasonStandingsMode}
-              onSelect={(id) => setSeasonStandingsMode(id as "table" | "gms")}
-            />
-          ) : activeView === "playerProfile" ? (
+          ) : /* S5/S5 (Audit Spieltag): die Sidebar-Kopie "Datenansicht"/"Manager"
+                 kontrollierte hier nichts — `viewMode`/`onViewModeChange` wurden
+                 zwar bis in SeasonStandingsV2Client.tsx durchgereicht, aber nie
+                 gelesen. Der SICHTBARE Umschalter war "Daten"/"Board"/"Vereine"
+                 IM Panel (SeasonStandingsNewLook.tsx, eigener localStorage-
+                 Zustand) — zwei Tab-Ebenen, von denen nur eine echt etwas tat.
+                 Klick auf "Manager" hier änderte sichtbar gar nichts (Befund).
+                 Statt beide Ebenen zu synchronisieren (Race-Risiko zwischen zwei
+                 Zustandsquellen für dieselbe Frage), fällt die tote Ebene weg —
+                 "Vereine" im Panel selbst zeigt exakt denselben Manager-Inhalt. */
+          activeView === "playerProfile" ? (
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
@@ -2865,8 +2951,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onOpenPlayer={(playerId) => void openPlayerDrawerById(playerId)}
-              viewMode={seasonStandingsMode}
-              onViewModeChange={setSeasonStandingsMode}
               onOpenRanks={() => setFoundationView("ranks", setActiveView)}
               // Der Knopf heisst "Sponsoren" (SeasonStandingsNewLook.tsx) — er muss auch dorthin
               // fuehren. Bis hierher zwang er die Preisgeld-Ansicht auf, die weder Namen noch
@@ -2939,26 +3023,28 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <span className="pill is-warning">Rank-Archiv fehlt · Live-Fallback</span>
                   ) : null}
                   <span className="muted ranks-season-source">{seasonOverviewSourceLabel}</span>
+                  {/* W1-Befund 7: Zustand und Aktion trennen — "alles gefüllt"
+                      ist ein Status (Pill), nur "nachpicken" ist ein Button. */}
                   {!readMeta.readOnly && readMeta.source !== "prisma" && runBulkAiTeamsRefill ? (
-                    <button
-                      type="button"
-                      className="secondary-button inline-button"
-                      disabled={bulkAiPicksRefillBusy || (underFilledAiTeamIds?.length ?? 0) === 0}
-                      title={
-                        (underFilledAiTeamIds?.length ?? 0) === 0
-                          ? "Alle KI-Teams sind gefüllt"
-                          : "Alle nicht befüllten KI-Teams automatisch nachpicken"
-                      }
-                      onClick={() => void runBulkAiTeamsRefill()}
-                    >
-                      {bulkAiPicksRefillBusy
-                        ? bulkAiPicksProgress
-                          ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
-                          : "Wirbt an…"
-                        : (underFilledAiTeamIds?.length ?? 0) === 0
-                          ? "KI-Teams gefüllt"
+                    !bulkAiPicksRefillBusy && (underFilledAiTeamIds?.length ?? 0) === 0 ? (
+                      <span className="pill is-ready" title="Alle KI-Teams sind gefüllt — nichts zu tun">
+                        KI-Teams gefüllt
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary-button inline-button"
+                        disabled={bulkAiPicksRefillBusy}
+                        title="Alle nicht befüllten KI-Teams automatisch nachpicken"
+                        onClick={() => void runBulkAiTeamsRefill()}
+                      >
+                        {bulkAiPicksRefillBusy
+                          ? bulkAiPicksProgress
+                            ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
+                            : "Wirbt an…"
                           : `KI-Teams nachpicken (${underFilledAiTeamIds?.length ?? 0})`}
-                    </button>
+                      </button>
+                    )
                   ) : null}
                   {bulkAiPicksRefillBusy && bulkAiPicksProgress ? (
                     <span className="pill is-running ranks-draft-progress" title="KI-Draft läuft — Teams werden nacheinander besetzt">
@@ -2989,20 +3075,46 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   ) : null}
                 </div>
               </div>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={disciplineRanksColumns}
-                activePreset={getTableActivePreset("disciplineRanksTable")}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("disciplineRanksTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) => setTableColumnVisible("disciplineRanksTable", columnId, nextVisible)}
-                onMove={(columnId, direction) => moveTableColumn("disciplineRanksTable", columnId, direction, disciplineRanksColumns)}
-                getWidth={(column) => getTableColumnWidth("disciplineRanksTable", column)}
-                onStepWidth={(column, delta) => adjustTableColumnWidth("disciplineRanksTable", column, delta)}
-                onResetWidth={(column) => resetTableColumnWidth("disciplineRanksTable", column)}
-                onResetToDefault={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
-              />
+              {/* W1 (Chris' Entscheidung): Achsen-Gruppen statt px-Spalten-Manager.
+                  Je Gruppe ein Schalter, der alle Disziplin-Spalten der Achse
+                  ein-/ausblendet; "Standard" setzt das Tabellen-Layout zurück. */}
+              <div className="ranks-axis-groups" role="group" aria-label="Achsen-Gruppen ein- oder ausblenden" data-testid="ranks-axis-groups">
+                <span className="ranks-axis-groups-label">Achsen-Gruppen</span>
+                {ranksAxisGroups.map((group) => (
+                  <button
+                    key={group.category}
+                    type="button"
+                    className={joinClassNames(
+                      "ranks-axis-group-toggle",
+                      `is-${group.category}`,
+                      group.anyVisible && "is-active",
+                    )}
+                    aria-pressed={group.anyVisible}
+                    title={
+                      group.anyVisible
+                        ? `${group.label}-Disziplinen ausblenden (${group.columns.length} Spalten)`
+                        : `${group.label}-Disziplinen einblenden (${group.columns.length} Spalten)`
+                    }
+                    onClick={() =>
+                      group.columns.forEach((column) =>
+                        setTableColumnVisible("disciplineRanksTable", column.id, !group.anyVisible),
+                      )
+                    }
+                  >
+                    <span className="ranks-axis-group-dot" aria-hidden="true" />
+                    {group.label}
+                    <small className="nl-tnum">{group.columns.length}</small>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="ghost-button ranks-axis-groups-reset"
+                  onClick={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
+                  title="Alle Spalten, Reihenfolge und Breiten auf den Standard zurücksetzen"
+                >
+                  Standard
+                </button>
+              </div>
             </div>
             <section className="ranks-leader-grid" aria-label="Aktuelle Teamstärke Leader">
               {rankLeaderCards.map((entry: FoundationDisciplineLeaderEntry) => (
@@ -3015,6 +3127,25 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 </article>
               ))}
             </section>
+            {/* W1: Legende trennt die zwei Farbsysteme — Zellenfarbe = Rang,
+                Achsenfarbe lebt nur noch im Gruppenband über den Spalten. */}
+            <div className="ranks-color-legend" role="note" aria-label="Farb-Legende der Rank-Matrix" data-testid="ranks-color-legend">
+              <span className="ranks-color-legend-item">
+                <b>Zellenfarbe = Rang:</b>
+                <span className="ranks-heatstrip" role="img" aria-label="Heat-Skala: Rang 1 bis 3 grün, 4 bis 6 gelb, 7 bis 10 rot, ab 11 ruhig">
+                  <i className="rank-strong" />
+                  <i className="rank-mid" />
+                  <i className="rank-weak" />
+                  <i className="rank-muted" />
+                </span>
+                <span className="nl-tnum">1–3 · 4–6 · 7–10 · ab 11 ruhig</span>
+              </span>
+              <span className="ranks-color-legend-item">
+                <b>Farbband oben = Achse</b> (Power · Speed · Mental · Social) — Kürzel hovern zeigt den vollen Disziplinnamen.
+              </span>
+              <span className="ranks-color-legend-item is-scrollhint">Weitere Disziplinen rechts — die Tabelle scrollt, die Team-Spalte bleibt stehen.</span>
+            </div>
+            <div className="ranks-table-scrollwrap">
             <div className="table-shell">
               <table className="team-table ranks-table">
                 <colgroup>
@@ -3023,6 +3154,23 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   ))}
                 </colgroup>
                 <thead>
+                  {/* W1: Gruppenband — die EINZIGE Stelle mit Achsenfarbe. */}
+                  <tr className="ranks-group-row" data-testid="ranks-axis-group-row">
+                    {ranksHeaderGroups.map((group) => (
+                      <th
+                        key={group.key}
+                        colSpan={group.span}
+                        scope="colgroup"
+                        className={joinClassNames(
+                          "ranks-group-cell",
+                          `is-${group.category}`,
+                          group.category === "team" && "ranks-sticky-team",
+                        )}
+                      >
+                        {group.label}
+                      </th>
+                    ))}
+                  </tr>
                   <tr>
                     {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
                       const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
@@ -3044,7 +3192,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           style={{ width: `${getTableColumnWidth("disciplineRanksTable", column)}px`, minWidth: `${column.minWidth}px` }}
                         >
                           <div className="resizable-header-cell">
-                            <SortableHeader label={column.label} tableId="disciplineRanks" columnKey={column.dataKey} sortState={tableSorts.disciplineRanks} onToggle={toggleTableSort} />
+                            <SortableHeader
+                              label={column.label}
+                              tableId="disciplineRanks"
+                              columnKey={column.dataKey}
+                              sortState={tableSorts.disciplineRanks}
+                              onToggle={toggleTableSort}
+                              tooltip={
+                                discipline
+                                  ? `${discipline.name} — Teamstärke-Rang in dieser Disziplin (Top-6-Spieler je Team). Klick sortiert.`
+                                  : (RANKS_AGGREGATE_COLUMN_TOOLTIPS[column.id] ?? null)
+                              }
+                            />
                             <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("disciplineRanksTable", column, event)} onDoubleClick={() => resetTableColumnWidth("disciplineRanksTable", column)} />
                           </div>
                         </th>
@@ -3053,12 +3212,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => (
+                  {/* W1: eigene Zeile zusätzlich oben angepinnt — das Original
+                      bleibt an seiner sortierten Position weiter unten. */}
+                  {[
+                    ...(pinnedOwnRankRow ? [{ row: pinnedOwnRankRow, isPinned: true }] : []),
+                    ...sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => ({ row, isPinned: false })),
+                  ].map(({ row, isPinned }: { row: FoundationDisciplineRankRow; isPinned: boolean }) => (
                     <tr
-                      key={row.team.teamId}
+                      key={isPinned ? `pinned-${row.team.teamId}` : row.team.teamId}
                       className={joinClassNames(
                         "ranks-row-clickable",
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
+                        isPinned && "ranks-own-pinned-row",
                         activeTeamRivalIds.has(row.team.teamId) && "is-rival",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
@@ -3071,8 +3236,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                             <td key={column.id} className="ranks-sticky-team">
                               <span className="ranks-team-name-wrap">
                                 {row.team.name}
+                                {row.team.teamId === activeManagerTeamId ? (
+                                  <span className="ranks-own-tag">Dein Team</span>
+                                ) : null}
                                 {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
                               </span>
+                              {isPinned ? (
+                                <small className="ranks-own-pinned-note nl-tnum">
+                                  Rang {row.totalRank} von {gameState.teams.length} — steht auch unten im Feld
+                                </small>
+                              ) : null}
                             </td>
                           );
                         }
@@ -3137,6 +3310,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 </tbody>
               </table>
             </div>
+            </div>
           </section>
           <FoundationRanksHost {...foundationRanksHostProps} />
           </>
@@ -3147,8 +3321,32 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
-          {/* Der frühere Standalone-View `disciplineStage` ist entfallen — die Bühne
-              rendert jetzt im `matchdayArena`-View (siehe oben). */}
+          {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist
+              entfallen — die Bühne rendert jetzt im `matchdayArena`-View (siehe oben).
+              Wer diese Ansicht trotzdem ansteuert (alter Link/Lesezeichen), bekam bis
+              hierher eine komplett leere Fläche ohne Text, ohne Hinweis, ohne Weg
+              zurück — eine echte Sackgasse. `VeloPendingRanking` ist genau für erklärte
+              Leerzustände gebaut (siehe Arena-Pre-Matchday, S3) — hier ohne Slots, nur
+              Titel + Erklärung + ein echter Weg weiter in die Arena. */}
+          {activeView === "disciplineStage" ? (
+            <div className="foundation-discipline-stage-redirect" data-testid="foundation-discipline-stage-redirect">
+              <VeloPendingRanking
+                eyebrow="Disziplin-Bühne"
+                title="Diese Ansicht ist umgezogen"
+                note="Die Bühne läuft jetzt direkt in der Spieltags-Arena — als eigene Ansicht gibt es sie nicht mehr. Dort siehst du Startbereitschaft, laufende Disziplinen und die Spieltags-Wertung an einem Ort."
+                meta={
+                  <button
+                    type="button"
+                    className="nl-result-button is-primary"
+                    onClick={() => setFoundationView("matchdayArena", setActiveView, { push: true })}
+                  >
+                    Zur Arena →
+                  </button>
+                }
+                data-testid="discipline-stage-redirect-pending-ranking"
+              />
+            </div>
+          ) : null}
 
           <FoundationShellRouterPrize
             active={activeView === "prize"}

@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEv
 
 import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
-import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
+import TransfermarktV2NewLook, { type TransfermarktWindowStatus } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import type { ContractShape, Discipline, GameState, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { formatNegotiationSignalLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers";
@@ -12,6 +12,7 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
+import { buildTransfermarktDealReceipt } from "@/lib/market/transfermarkt-deal-receipt";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import {
   buildTransfermarktScoutedAttributeRows,
@@ -656,18 +657,36 @@ export default function TransfermarktV2Client({
   /**
    * „Offen" ist nicht dasselbe wie „kaufen erlaubt". Kaufen und Verkaufen liegen in getrennten
    * Fenstern (`transfer-window-policy.ts`): am Saisonende wird verkauft und verlaengert, gekauft
-   * wird in der neuen Saison vor dem ersten Spieltag. Vorher fiel dieser Hinweis auf `null`,
-   * sobald irgendein Fenster offen war — der Markt sah dann normal aus und der Kauf-Knopf war
-   * ohne erkennbaren Grund tot.
+   * wird in der neuen Saison vor dem ersten Spieltag.
+   *
+   * M1 (Audit-Befund „Fensterstatus widerspricht sich selbst"): Der Status ist EIN strukturiertes
+   * Urteil (Ton + Titel + Badge + Detail) statt eines Freitexts, den die Ansicht dann unter einen
+   * hart codierten „Transferfenster geschlossen"-Kopf klemmte. Vorher standen „geschlossen",
+   * „kaufen ist offen" und „nur Ansicht" gleichzeitig in einem Banner.
    */
-  const marketWindowNotice = !transferWindowOpen
-    ? transferWindow?.phaseLabel
-      ? `Transferfenster geschlossen (${transferWindow.phaseLabel}) — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
-      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`
+  const marketWindowStatus: TransfermarktWindowStatus | null = !transferWindowOpen
+    ? {
+        tone: "closed",
+        title: "Transferfenster geschlossen",
+        badge: "nur Ansicht",
+        detail: transferWindow?.phaseLabel
+          ? `${transferWindow.phaseLabel} — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
+          : "Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.",
+      }
     : !transferCanBuy
-      ? "Verkaufsfenster der Saisonwende — verkaufen und verlängern ist offen. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag."
+      ? {
+          tone: "sell",
+          title: "Verkaufsfenster offen",
+          badge: "verkaufen & verlängern",
+          detail: "Saisonwende: verkaufen und verlängern ist offen. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag.",
+        }
       : !transferCanSell
-        ? "Kaufphase vor dem 1. Spieltag — kaufen ist offen. Verkauft und verlängert wird am Ende der Saison."
+        ? {
+            tone: "open",
+            title: "Kauffenster offen",
+            badge: "kaufen offen",
+            detail: "Kaufphase vor dem 1. Spieltag — Verkauf und Verlängerung öffnen zur Saisonwende.",
+          }
         : null;
   const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
   useEffect(() => {
@@ -1443,6 +1462,30 @@ export default function TransfermarktV2Client({
     }
   }, [marketItems, selectedPlayerId, selectedWishlistEntries, visibleItems]);
 
+  /**
+   * M1 — DIE ZWEI AUSWAHLMECHANISMEN SIND ZUSAMMENGEFÜHRT: Der Shell-Zustand
+   * (`marketPreviewPlayerId`, speist u. a. die Screen-Hauptaktion „Kandidat wählen") spiegelt
+   * jetzt IMMER die effektive Auswahl dieses Clients — auch die automatische (Fallback auf den
+   * ersten sichtbaren Kandidaten, Wunschlisten-Fokus), nicht nur den direkten Kartenklick.
+   * Vorher meldete nur der Klick-Handler nach oben; der Kopf-Knopf blieb „Kandidat wählen",
+   * obwohl links längst einer markiert war und der Deal-Desk mit ihm rechnete.
+   * Callback über Ref, weil der Parent ihn inline (instabil) übergibt — sonst liefe der
+   * Effekt auf jeder Parent-Renderrunde.
+   */
+  const onSelectCandidateUpstreamRef = useRef(onSelectCandidateUpstream);
+  useEffect(() => {
+    onSelectCandidateUpstreamRef.current = onSelectCandidateUpstream;
+  });
+  const lastReportedCandidateIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const effectiveId = selectedPlayer?.playerId ?? null;
+    if (!effectiveId || lastReportedCandidateIdRef.current === effectiveId) {
+      return;
+    }
+    lastReportedCandidateIdRef.current = effectiveId;
+    onSelectCandidateUpstreamRef.current?.(effectiveId, selectedPlayer?.name ?? effectiveId);
+  }, [selectedPlayer]);
+
   useEffect(() => {
     if (!selectedPlayerId || !shouldFocusSelectedCandidateRef.current) {
       return;
@@ -1461,6 +1504,16 @@ export default function TransfermarktV2Client({
     setContractShape(null);
     setOfferedSalary(null);
     setSalaryEditedManually(false);
+    /**
+     * M1-AUSWAHLBINDUNG (Audit-Befund M2): Ein Kandidatenwechsel entwertet die alte Vorschau
+     * SOFORT. Vorher blieb `buyPreview` bis zur Antwort des neuen Fetches stehen — der Deal-Desk
+     * rechnete sichtbar mit dem vorherigen Spieler weiter (Scouting-Profil: Lotte Lance, Desk:
+     * Blacksmith), ohne dass irgendwo ein Name stand. Zusammen mit dem Subjekt-Wächter unten
+     * (`boundBuyPreview`) gilt: der Desk rendert nie Zahlen eines anderen Spielers als des
+     * ausgewählten Kandidaten. Das Verhandlungsergebnis gehört ebenfalls zum alten Spieler.
+     */
+    setBuyPreview(null);
+    setBuyNegotiationOutcome(null);
   }, [selectedPlayerId, selectedTeamId]);
 
   useEffect(() => {
@@ -2139,25 +2192,40 @@ export default function TransfermarktV2Client({
   }
 
   const historyItems = historyFeed?.items ?? [];
-  const previewPurchasePrice = buyPreview?.purchasePrice ?? selectedPlayer?.marketValue ?? null;
-  const previewAnnualSalary = buyPreview?.salary ?? selectedPlayer?.salary ?? null;
-  const previewCashBefore = buyPreview?.cashBefore ?? marketContext?.teamCash ?? selectedTeam?.cash ?? null;
-  const previewCashAfter =
-    buyPreview?.cashAfter ??
-    (previewCashBefore != null && previewPurchasePrice != null ? previewCashBefore - previewPurchasePrice : null);
-  const previewTeamSalaryBefore = buyPreview?.salaryBefore ?? marketContext?.teamSalary ?? null;
-  const previewTeamSalaryAfter =
-    buyPreview?.salaryAfter ??
-    (previewTeamSalaryBefore != null && previewAnnualSalary != null ? previewTeamSalaryBefore + previewAnnualSalary : null);
-  const previewRosterBefore = buyPreview?.rosterBefore ?? marketContext?.rosterCount ?? null;
-  const previewRosterAfter = buyPreview?.rosterAfter ?? (previewRosterBefore != null && selectedPlayer ? previewRosterBefore + 1 : null);
-  const previewMarketValueBefore = buyPreview?.marketValueBefore ?? marketContext?.marketValueTotal ?? null;
-  const previewMarketValueAfter =
-    buyPreview?.marketValueAfter ??
-    (previewMarketValueBefore != null && previewPurchasePrice != null ? previewMarketValueBefore + previewPurchasePrice : null);
+  /**
+   * M1-SUBJEKT-WÄCHTER: Eine Vorschau, die zu einem ANDEREN Spieler gehört als der aktuellen
+   * Auswahl, wird nie gerendert — Gürtel zum Hosenträger des Zurücksetzens beim
+   * Kandidatenwechsel (Effekt oben). Ohne den Wächter genügte ein Rennen zwischen Klick und
+   * Fetch, und der Deal-Desk trug wieder fremde Zahlen ohne Namen.
+   */
+  const boundBuyPreview = useMemo(() => {
+    if (!buyPreview) {
+      return null;
+    }
+    if (buyPreview.player?.id && previewPlayerId && buyPreview.player.id !== previewPlayerId) {
+      return null;
+    }
+    return buyPreview;
+  }, [buyPreview, previewPlayerId]);
+  /**
+   * Kassenzettel (eine Quelle für alle Anzeige-Größen des Deals): heutige Kosten, Lücke zum
+   * Cash und die „wenn der Kauf durchgeht"-Folgezahlen — auch bei blockiertem Deal, wo die
+   * Server-`*After`-Felder auf „nichts passiert" klemmen (Begründung im Modul).
+   */
+  const dealReceipt = useMemo(() => buildTransfermarktDealReceipt(boundBuyPreview), [boundBuyPreview]);
+  const previewPurchasePrice = boundBuyPreview?.purchasePrice ?? selectedPlayer?.marketValue ?? null;
+  const previewAnnualSalary = boundBuyPreview?.salary ?? selectedPlayer?.salary ?? null;
+  const previewCashBefore = dealReceipt?.cashBefore ?? marketContext?.teamCash ?? selectedTeam?.cash ?? null;
+  const previewCashAfter = dealReceipt?.cashAfterIfBought ?? null;
+  const previewTeamSalaryBefore = dealReceipt?.salaryBefore ?? marketContext?.teamSalary ?? null;
+  const previewTeamSalaryAfter = dealReceipt?.salaryAfterIfBought ?? null;
+  const previewRosterBefore = dealReceipt?.rosterBefore ?? marketContext?.rosterCount ?? null;
+  const previewRosterAfter = dealReceipt?.rosterAfterIfBought ?? null;
+  const previewMarketValueBefore = dealReceipt?.marketValueBefore ?? marketContext?.marketValueTotal ?? null;
+  const previewMarketValueAfter = dealReceipt?.marketValueAfterIfBought ?? null;
   const previewSalaryLabel =
-    buyPreview?.expectedSalary != null
-      ? `${formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(buyPreview.expectedSalary)}`
+    boundBuyPreview?.expectedSalary != null
+      ? `${formatTransfermarktCurrency(boundBuyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(boundBuyPreview.expectedSalary)}`
       : formatTransfermarktCurrency(previewAnnualSalary);
   const dealOpenDisabledReason =
     !transferCanBuy
@@ -2181,7 +2249,7 @@ export default function TransfermarktV2Client({
         teamName={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
         teamShortCode={selectedTeam?.shortCode ?? null}
         availabilityLabel={availabilityLabel}
-        marketWindowNotice={marketWindowNotice}
+        marketWindowStatus={marketWindowStatus}
         marketBusy={marketBusy}
         marketError={marketError}
         onRetryMarket={() => setReloadToken((current) => current + 1)}
@@ -2238,10 +2306,8 @@ export default function TransfermarktV2Client({
         onSelectCandidate={(playerId) => {
           shouldFocusSelectedCandidateRef.current = false;
           setSelectedPlayerId(playerId);
-          // Der Name kommt aus der Liste, die der Spieler gerade sieht — nicht aus einem Feed,
-          // der beim Oeffnen des Marktes leer ist.
-          const gewaehlt = marketItems.find((item) => item.playerId === playerId);
-          onSelectCandidateUpstream?.(playerId, gewaehlt?.name ?? playerId);
+          // Die Meldung nach oben (Shell-Zustand) übernimmt der Sync-Effekt über
+          // `selectedPlayer` — EIN Meldeweg für Klick, Tastatur, Fallback und Wunschliste.
         }}
         selectedPlayer={selectedPlayer}
         onOpenPlayerDetails={onOpenPlayerDetails}
@@ -2266,7 +2332,9 @@ export default function TransfermarktV2Client({
         contractLength={contractLength}
         onContractLengthChange={setContractLength}
         previewError={previewError}
-        buyPreviewCanBuy={buyPreview?.canBuy ?? null}
+        previewBusy={previewBusy}
+        buyPreviewCanBuy={boundBuyPreview?.canBuy ?? null}
+        previewMissingCash={dealReceipt?.missingCash ?? null}
         previewPurchasePrice={previewPurchasePrice}
         previewSalaryLabel={previewSalaryLabel}
         previewCashBefore={previewCashBefore}
@@ -2277,21 +2345,25 @@ export default function TransfermarktV2Client({
         previewRosterAfter={previewRosterAfter}
         previewMarketValueBefore={previewMarketValueBefore}
         previewMarketValueAfter={previewMarketValueAfter}
-        previewAcceptChance={buyPreview?.acceptChance ?? null}
-        previewCounterChance={buyPreview?.counterChance ?? null}
-        previewRejectChance={buyPreview?.rejectChance ?? null}
+        previewAcceptChance={boundBuyPreview?.acceptChance ?? null}
+        previewCounterChance={boundBuyPreview?.counterChance ?? null}
+        previewRejectChance={boundBuyPreview?.rejectChance ?? null}
         offeredSalary={offeredSalary}
-        previewExpectedSalary={buyPreview?.expectedSalary ?? buyPreview?.baseExpectedSalary ?? null}
+        previewExpectedSalary={boundBuyPreview?.expectedSalary ?? boundBuyPreview?.baseExpectedSalary ?? null}
         onOfferedSalaryChange={(value) => {
           // Phase-2 F2 — Deal-Desk-Slider setzt dasselbe Angebots-State wie das Modal; der
           // Manuell-Flag hält den Preview-Effekt auf dem 90-ms-Debounce-Pfad statt Auto-Reset.
           applyOfferedSalaryChange(value);
           setSalaryEditedManually(true);
         }}
-        previewYearlySalarySchedule={buyPreview?.yearlySalarySchedule ?? null}
-        previewBuyoutCost={buyPreview?.buyoutCost ?? null}
-        buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
-        buyWarnings={filterVisibleNegotiationWarnings(buyPreview?.warnings).map(formatNegotiationSignalLabel)}
+        previewYearlySalarySchedule={boundBuyPreview?.yearlySalarySchedule ?? null}
+        previewBuyoutCost={boundBuyPreview?.buyoutCost ?? null}
+        buyBlockingReasons={(boundBuyPreview?.blockingReasons ?? [])
+          // Die Cash-Lücke steht im Desk bereits als exakter Betrag („es fehlen X") —
+          // der generische insufficient_cash-Satz daneben wäre dieselbe Größe zweimal.
+          .filter((code) => !(code === "insufficient_cash" && (dealReceipt?.missingCash ?? 0) > 0))
+          .map(formatNegotiationSignalLabel)}
+        buyWarnings={filterVisibleNegotiationWarnings(boundBuyPreview?.warnings).map(formatNegotiationSignalLabel)}
         topSixCount={topSixCount}
         topSixAxisImpact={topSixAxisImpact}
         topSixCompositeBefore={topSixCompositeBefore}
@@ -2345,7 +2417,8 @@ export default function TransfermarktV2Client({
               selectedPortrait,
               selectedTeamCanManage,
               selectedTeamId,
-              buyPreview,
+              // Subjekt-gebundene Vorschau — das Modal rendert nie Zahlen eines fremden Spielers.
+              buyPreview: boundBuyPreview,
               previewBusy,
               previewError,
               buyBusy,

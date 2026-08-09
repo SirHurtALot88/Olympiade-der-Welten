@@ -439,9 +439,17 @@ export function buildSlotIssuesByKey(input: {
       const issues: LineupSlotIssue[] = [];
 
       if (!selectedId) {
+        // S6/L2 (Audit Spieltag): ein leerer, noch nicht in Bearbeitung befindlicher
+        // Slot ist der NORMALZUSTAND jedes Spieltags vor dem Ausfüllen — vorher hieß
+        // er "Spieler fehlt" und wurde (Rendering-Bug in LineupNewLook.tsx: jedes
+        // Issue lief hart auf `is-risk`) rot wie ein echter Fehler dargestellt, 9×
+        // gleichzeitig auf der Seite. "Offen" deckt sich mit dem Label, das die Karte
+        // ohnehin schon zeigt ("Offen" / "Slot wählen") — der Best-Fit-Name steht
+        // bereits als eigene Zeile darunter, keine zweite Nennung nötig. Der aktive
+        // Slot ("Hier weiter") bleibt bewusst ein echter Blocker (tone "blocked").
         issues.push({
           tone: activeSlotKey === slot.key ? "blocked" : "warning",
-          label: activeSlotKey === slot.key ? "Hier weiter" : "Spieler fehlt",
+          label: activeSlotKey === slot.key ? "Hier weiter" : "Offen",
           detail: `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} wartet noch auf einen Spieler.`,
         });
       }

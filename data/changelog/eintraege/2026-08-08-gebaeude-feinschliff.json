@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Team · Gebäude",
+  "text": "Nicht gebaute Gebäude trugen denselben roten Rahmen wie ein echtes Risiko-Gebäude — sieben von acht Karten sahen nach Problem aus, obwohl alles in Ordnung war; 'nicht gebaut' hat jetzt einen eigenen, neutral gestrichelten Rahmen. Unterhalt/Netto zeigten für nicht gebaute Gebäude hartkodiert '−0,0 Mio' (ein negatives Nichts) und färbten die Null grün oder rot — jetzt schlicht '0,0 Mio' in neutralem Ton. Die Kopf-Chips 'Recovery' und 'Trainingseffekt' quetschten mehrere Fakten ohne Einheit in eine Zeile; Recovery hat jetzt eine erklärende Sub-Zeile, Trainings-XP/Scouting/Analytics sind eigene Chips. Die sticky Aktionsleiste bekommt am Ende der Kartenliste reservierten Abstand, damit sie die letzte Kartenreihe nicht mehr überdeckt — während des Scrollens durch die Mitte der Seite überdeckt eine unten fixierte Leiste zwangsläufig kurzzeitig die jeweils unterste sichtbare Zeile, das ist unverändertes Verhalten sticky positionierter Leisten.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

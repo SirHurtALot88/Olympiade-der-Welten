@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Markt · Transfermarkt & Kaufdialog",
+  "text": "Der Deal-Desk ist jetzt verbindlich: Er trägt Namen und Porträt des Kandidaten im Kopf, und ein Wechsel in der Liste entwertet die alte Rechnung sofort — vorher rechnete der namenlose Desk still mit dem vorherigen Spieler weiter (Profil: Lotte Lance, Desk: Blacksmith). Die Vorher/Nachher-Zeilen zeigen unter \"Wenn der Kauf durchgeht\" echte Folgen statt ±0 auf jeder Zeile, und fehlt Cash, steht der Betrag da (\"Noch nicht ausführbar — es fehlen 4,3 Mio\") statt einer Rechnung, die so tut, als passiere nichts. \"MW\" heißt im Desk jetzt \"Team-MW\". Der Fensterstatus ist EINE Aussage (\"Kauffenster offen\" in Grün) statt \"geschlossen\" + \"kaufen ist offen\" + \"nur Ansicht\" übereinander. Kandidatennamen werden nicht mehr gestutzt (Preis steht unter dem Namen), der Filterberg startet eingeklappt, und \"Deal prüfen\" besteht den Kontrasttest. Im Kaufdialog: die Gehaltsverteilung je Saison steht bei Mehrjahresverträgen direkt am Angebot, \"Monatsgehalt\" heißt richtig \"Gehalt p.a. (Mio)\", es gibt nur noch EIN \"Abbrechen\" und einen Primärknopf pro Schritt, \"Stört ihn\" hat seinen Umlaut, und die Warnung vor dem Abbruch-Malus steht VOR dem Klick im Gegenangebots-Banner.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

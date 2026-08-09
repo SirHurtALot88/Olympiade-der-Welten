@@ -549,6 +549,37 @@ function getWearTone(facility: FacilityRowView) {
   return "good" as const;
 }
 
+/**
+ * T7-Fix (Audit-Befund F1, Gebäude): Karten-/Zeilen-Ton für die Anzeige.
+ * `getWearTone` allein rechnet "nicht gebaut" (conditionPct 0) fälschlich zu
+ * "risk" — 7 von 8 Karten trugen dadurch denselben roten Rahmen wie die
+ * "Risiko"-Legende direkt darüber, obwohl "nicht gebaut" nur "noch nicht da"
+ * bedeutet, kein schlechter Zustand. Bedeutungsfarbe (rot/gelb/grün) bleibt
+ * ausschließlich echten Zustands-Stufen vorbehalten; "nicht gebaut" bekommt
+ * einen eigenen, neutralen Ton.
+ */
+export function getFacilityCardTone(facility: FacilityRowView) {
+  if (facility.level <= 0) return "unbuilt" as const;
+  return getWearTone(facility);
+}
+
+/**
+ * T7-Fix (Audit-Befund F2): Unterhalt/Netto sind für nicht gebaute Gebäude
+ * exakt 0 — kein Minus-Vorzeichen (die Karte zeigte hart kodiert "−0,0 Mio",
+ * ein negatives Nichts) und keine Erfolgs-/Risiko-Farbe für eine Null, die
+ * schlicht "noch nichts passiert" bedeutet statt "gut" oder "schlecht".
+ * Beide exportiert, damit der Test die echte Formel prüft statt nur den
+ * Quelltext nach einem Muster zu durchsuchen.
+ */
+export function formatFacilityUpkeepAmount(value: number) {
+  return Math.round(value * 10) === 0 ? formatTransfermarktCurrency(0) : `−${formatTransfermarktCurrency(value)}`;
+}
+
+export function facilityNetToneClass(net: number) {
+  if (Math.round(net * 10) === 0) return "is-neutral";
+  return net > 0 ? "is-positive" : "is-negative";
+}
+
 /** Sinnvollste nächste Aktion: Wartung bei schlechtem Zustand, sonst Upgrade. */
 function getPrimaryFacilityAction(facility: FacilityRowView): "maintenance" | "upgrade" {
   const maintenancePossible = facility.level > 0 && facility.conditionPct < 100;
@@ -890,7 +921,7 @@ export default function FacilitiesV2NewLook({
           />
           <StatChip
             label="Unterhalt"
-            value={`−${formatTransfermarktCurrency(portfolioFinance.upkeepTotal)}`}
+            value={formatFacilityUpkeepAmount(portfolioFinance.upkeepTotal)}
             tone="warn"
             sub={`${portfolioFinance.builtCount} Gebäude · pro Saison`}
             title={`${TIP_UNTERHALT} Klick: Gebäude nach Unterhalt sortieren.`}
@@ -904,7 +935,16 @@ export default function FacilitiesV2NewLook({
             title="Klick: Gebäude nach Netto (Einnahmen − Unterhalt) sortieren."
             onClick={() => setSort({ key: "net", direction: "desc" })}
           />
-          <StatChip label="Recovery" value={formatNlNumber(summary.recoveryAfterTraining, 1)} tone="spe" />
+          {/* T7-Fix (Audit-Befund F3): "RECOVERY 20" stand ohne Einheit und ohne
+              Einordnung da (gut? schlecht?) — jetzt mit Sub-Zeile und Tooltip:
+              Team-Durchschnitt, höher = mehr Erholung zwischen den Spieltagen. */}
+          <StatChip
+            label="Regeneration"
+            value={formatNlNumber(summary.recoveryAfterTraining, 1)}
+            tone="spe"
+            sub="Team-Ø nach Training · höher = mehr Erholung"
+            title="Team-Durchschnitt der Erholungsrate nach der aktuellen Trainingsplanung. Höher bedeutet mehr Erholung zwischen den Spieltagen."
+          />
           {beliebtheit ? (
             <StatChip
               label="Beliebtheit"
@@ -920,16 +960,38 @@ export default function FacilitiesV2NewLook({
               title={TIP_BELIEBTHEIT}
             />
           ) : null}
+          {/* T7-Fix (Audit-Befund F3): "TRAININGSEFFEKT 0 · +1,2% · Scouting … ·
+              Analytics …" quetschte drei unabhängige Fakten in eine Sub-Zeile.
+              Jeder Fakt bekommt jetzt sein eigenes Label + Wert + Klartext. */}
           {trainingFacilityEffectPreview ? (
             <StatChip
-              label="Trainingseffekt"
+              label="Trainings-XP"
               value={formatNlNumber(trainingFacilityEffectPreview.trainingXp.after, 1)}
-              sub={`${
+              sub={
                 trainingFacilityEffectPreview.trainingXp.modifierPct > 0
-                  ? `+${formatNlNumber(trainingFacilityEffectPreview.trainingXp.modifierPct, 1)}% · `
-                  : ""
-              }Scouting ${trainingFacilityEffectPreview.scouting.label} · Analytics ${trainingFacilityEffectPreview.analytics.label}`}
+                  ? `+${formatNlNumber(trainingFacilityEffectPreview.trainingXp.modifierPct, 1)}% durchs Trainingszentrum`
+                  : "Basis-XP je Trainings-Durchgang"
+              }
               tone="accent"
+              title="Trainings-XP je Durchgang, inklusive des Bonus aus dem Trainingszentrum."
+            />
+          ) : null}
+          {trainingFacilityEffectPreview ? (
+            <StatChip
+              label="Scouting"
+              value={trainingFacilityEffectPreview.scouting.label}
+              sub={`Level ${trainingFacilityEffectPreview.scouting.level}`}
+              tone="accent"
+              title="Scouting-Genauigkeit: bestimmt, wie eng die geschätzten Disziplin- und Potenzial-Spannen ausfallen."
+            />
+          ) : null}
+          {trainingFacilityEffectPreview ? (
+            <StatChip
+              label="Analytics"
+              value={trainingFacilityEffectPreview.analytics.label}
+              sub={`Level ${trainingFacilityEffectPreview.analytics.level}`}
+              tone="accent"
+              title="Analytik-Stufe: schaltet den Live-Fortschritt auf Sponsor-Achse und Board-Zielen frei."
             />
           ) : null}
         </StatChipRow>
@@ -1002,7 +1064,7 @@ export default function FacilitiesV2NewLook({
             />
           ) : (
             visibleFacilityRows.map((facility) => {
-            const wearTone = getWearTone(facility);
+            const wearTone = getFacilityCardTone(facility);
             const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
             return (
               <button
@@ -1055,10 +1117,10 @@ export default function FacilitiesV2NewLook({
                 )}
                 <div className="nl-facility-card-stats nl-tnum">
                   <span title="Effizienz">Eff. {facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</span>
-                  <span title="Unterhalt pro Saison">−{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
+                  <span title="Unterhalt pro Saison">{formatFacilityUpkeepAmount(facility.currentUpkeep)}</span>
                   <span
                     title="Netto (Einnahmen − Unterhalt, Arena effektiv Basis × Beliebtheit)"
-                    className={effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}
+                    className={facilityNetToneClass(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}
                   >
                     {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}
                   </span>
@@ -1109,7 +1171,7 @@ export default function FacilitiesV2NewLook({
                 </tr>
               ) : (
                 visibleFacilityRows.map((facility) => {
-                const wearTone = getWearTone(facility);
+                const wearTone = getFacilityCardTone(facility);
                 const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
                 return (
                   <tr
@@ -1122,9 +1184,9 @@ export default function FacilitiesV2NewLook({
                     <td className="nl-tnum">{facility.level <= 0 ? "—" : `L${facility.level}`}</td>
                     <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.conditionPct, 0)}%` : "—"}</td>
                     <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</td>
-                    <td className="nl-tnum">−{formatTransfermarktCurrency(facility.currentUpkeep)}</td>
+                    <td className="nl-tnum">{formatFacilityUpkeepAmount(facility.currentUpkeep)}</td>
                     <td
-                      className={`nl-tnum ${effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}`}
+                      className={`nl-tnum ${facilityNetToneClass(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}`}
                       title={
                         facility.id === "arena_upgrade" && beliebtheit
                           ? `Basis ${formatTransfermarktCurrency(facility.currentIncome)} × ${formatNlNumber(beliebtheit.value, 2)} = ${formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit))}`

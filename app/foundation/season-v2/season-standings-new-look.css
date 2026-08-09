@@ -60,6 +60,56 @@
 }
 
 /* ------------------------------------------------------------------ *
+ * FINDING D — S1 (Audit Spieltag): der Container scrollt seit FINDING C
+ * zwar wirklich (statt die ganze Seite zu sprengen), aber ohne jede
+ * sichtbare Affordanz — kein Schatten, keine Scrollbar im Blick, „CASH"/
+ * „SPONSOREN" laufen wortlos aus dem Rahmen. Klassische Scroll-Shadow-
+ * Technik (`local`- + `scroll`-Gradient): der rechte Schatten verblasst
+ * von selbst, sobald bis zum Ende gescrollt ist — ohne JS/Scroll-Listener.
+ * NUR rechts: links übernimmt die sticky Team-Spalte (s. u.) ohnehin den
+ * äußersten Rand, ein Links-Schatten läge unsichtbar darunter.
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-table-shell {
+  background:
+    linear-gradient(to left, var(--nl-panel) 30%, rgba(0, 0, 0, 0)) 100% 0,
+    linear-gradient(to left, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0)) 100% 0;
+  background-repeat: no-repeat;
+  background-color: var(--nl-panel);
+  background-size:
+    36px 100%,
+    14px 100%;
+  background-attachment: local, scroll;
+}
+
+/* S1: fixierte Team-Spalte — beim Scrollen nach rechts bleibt erkennbar,
+   welche Zeile welches Team ist. Sticky braucht keine Breitenrechnung: die
+   Spalte "fängt" sich am linken Rand des Scroll-Containers, sobald Rang/
+   Aufklapp-Pfeil links davon aus dem sichtbaren Bereich laufen. Eigener
+   opaker Hintergrund je Zeilenzustand, sonst schimmern gescrollte Spalten
+   durch die sonst transparente Zelle. */
+.is-new-look .nl-standings-th-team,
+.is-new-look .nl-standings-td-team {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--nl-panel);
+  box-shadow: 1px 0 0 var(--nl-line);
+}
+
+.is-new-look .nl-standings-th-team {
+  z-index: 3;
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-table-row:hover .nl-standings-td-team {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-table-row.is-selected .nl-standings-td-team {
+  background: var(--nl-accent-soft);
+}
+
+/* ------------------------------------------------------------------ *
  * Daten-Modus: Chart + Top-10-Spieler in EINER Zeile.
  * Der Balkenchart deckt (max-width: 900px) nur die linke Hälfte der
  * Zeile ab — rechts blieb bislang eine große leere Fläche. Die füllt
@@ -92,6 +142,17 @@
   .is-new-look .nl-standings-daten-chartrow {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* S5/S3 (Audit Spieltag): Ohne Chart-Daten (vor Spieltag 1, `datenChartHasData`
+   false) rendert `renderDatenChart()` `null` — die erste Spaltenspur blieb aber
+   trotzdem reserviert (minmax(300px, 0.58fr)), und dem Fünf-Spalten-Raster der
+   Top-Spieler blieb nur der Rest. Gemessen: 76px pro Spalte, die Name/Team-Spalte
+   (`flex: 1 1 auto; min-width: 0`) kollabierte auf 0px — zehn Kacheln zeigten nur
+   noch Rang, Initialen-Kreis und ein rotes „—", keinen Namen, keinen Wert. Ohne
+   Chart bekommt die Zeile die volle Breite als eine Spalte. */
+.is-new-look .nl-standings-daten-chartrow.is-chart-empty {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .is-new-look .nl-standings-daten-players {
@@ -194,4 +255,20 @@
 
 .is-new-look .nl-standings-td-areacol.nl-rankband-risk {
   background: color-mix(in srgb, var(--nl-risk) 20%, transparent);
+}
+
+/* ------------------------------------------------------------------ *
+ * FINDING E — S5/S7 (Audit Spieltag): "Dein Team"-Zeilenlabel.
+ * `.nl-stat-chip-row-label` (geteiltes StatChip.tsx-Primitive) steht per
+ * Basisregel auf `--nl-mut-2` — laut F1-Regel nur noch für Deko (Linien,
+ * Icons), informationstragender Text gehört auf `--nl-mut`. F1 hat das
+ * für die dort genannten geteilten Klassen (Versionsbadge,
+ * Team-Kürzel-Spaltenstile) bereits erledigt; diese Zeile war nicht
+ * darunter — gemessen gegen den Kartenhintergrund `nl-standings-header-card`
+ * (`color(srgb …)`, S-C-Theme UND ohne Theme identisch): 3,60:1. Fix hier
+ * statt an der geteilten Basisklasse, um den Radius klein zu halten (nur
+ * das "Dein Team"-Label im Saisonstand, nicht jede StatChipRow im Spiel).
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-own-chips.nl-stat-chip-row .nl-stat-chip-row-label {
+  color: var(--nl-mut);
 }

@@ -20,6 +20,7 @@ import {
   type UseMarketBuyDerivationsInput,
 } from "@/lib/foundation/tabs/use-market-buy-derivations";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
+import { buildTransfermarktDealReceipt } from "@/lib/market/transfermarkt-deal-receipt";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 
@@ -217,6 +218,13 @@ export default function FoundationMarketBuyShellHost({
     buyNegotiationOutcome,
   });
 
+  /**
+   * M1/M2 — dieselbe Kassenzettel-Quelle wie der Deal-Desk (Begründung im Modul):
+   * die Team-Auswirkung zeigt die Hypothese „wenn der Kauf durchgeht" statt der
+   * bei blockiertem Deal auf ±0 geklemmten Server-`*After`-Felder.
+   */
+  const dealReceipt = buildTransfermarktDealReceipt(buyPreview);
+
   return (
     <FoundationDecisionSurface
       kicker={`Transfermarkt · Vertragsangebot${selectedPlayer?.name ? ` · ${selectedPlayer.name}` : ""}`}
@@ -244,7 +252,9 @@ export default function FoundationMarketBuyShellHost({
       */
       secondary={{
         label:
-          buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln",
+          buyNegotiationOutcome?.status === "accepted"
+            ? "Annahme liegt vor"
+            : "Schritt 1: Verhandeln — Angebot senden",
         busyLabel: "verhandelt…",
         busy: buyBusy,
         emphasized: buyNegotiationOutcome?.status !== "accepted",
@@ -500,9 +510,52 @@ export default function FoundationMarketBuyShellHost({
                   onSalaryEditedManuallyChange(value != null);
                 }}
                 onResetSuggestion={resetBuyDemandFrame}
-                onSendOffer={() => void negotiateBuy()}
-                onCancel={closeBuyModal}
+                /* M2 (Audit-Befund M8): kein zweites „Abbrechen" und kein zweiter
+                   Sende-Primärknopf im Formular — Verhandeln (Schritt 1) und
+                   Abbrechen stehen genau einmal in der Fußleiste der Hülle. */
+                onSendOffer={null}
+                onCancel={null}
               />
+
+              {/* M2 (Chris): Gehaltsverteilung bei Mehrjahresverträgen direkt am Angebot —
+                  der Jahresplan (buyPreview.yearlySalarySchedule, EINE Quelle, serverseitig
+                  gerechnet) steht jetzt neben Laufzeit/Vertragsform statt unter dem Falz. */}
+              {buyPreview ? (
+                <NlCard
+                  className="market-v2-buy-schedule-card"
+                  eyebrow={`${formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · ${buyPreview.contractLength} Saison${buyPreview.contractLength === 1 ? "" : "en"}`}
+                  title="Gehaltsverteilung je Saison"
+                >
+                  {buyPreview.yearlySalarySchedule?.length ? (
+                    <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
+                      <div className="contract-schedule-row is-head" role="row">
+                        <span>Jahr</span>
+                        <span>Season</span>
+                        <span>Gehalt</span>
+                      </div>
+                      {buyPreview.yearlySalarySchedule.map((entry) => (
+                        <div className="contract-schedule-row" role="row" key={`${entry.label}-${entry.yearIndex}`}>
+                          <span>Jahr {entry.yearIndex}</span>
+                          <span>{entry.label}</span>
+                          <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
+                        </div>
+                      ))}
+                      <div className="contract-schedule-row is-total" role="row">
+                        <span>Summe</span>
+                        <span>Buyout {formatTransfermarktCurrency(buyPreview.buyoutCost ?? null)}</span>
+                        <strong>{formatTransfermarktCurrency(buyPreview.totalSalary ?? null)}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="nl-market-muted">Noch kein Jahresplan verfügbar.</p>
+                  )}
+                  <p className="market-v2-buy-schedule-note">
+                    Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · Forderung{" "}
+                    {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Δ {formatTransfermarktCurrency(marketAndFitDelta)}
+                    {fitSalaryDiscountActive ? " · Fit-Bonus" : ""}
+                  </p>
+                </NlCard>
+              ) : null}
 
               {/* F1 — Kompakt-Feedback als NlCard; die tonfarbigen negotiation-factor-Chips bleiben (bereits chip-artig). */}
               <NlCard
@@ -526,7 +579,7 @@ export default function FoundationMarketBuyShellHost({
                       </div>
                     </div>
                     <div className="transfer-compact-feedback-column">
-                      <span className="nl-market-eyebrow">Stoert ihn</span>
+                      <span className="nl-market-eyebrow">Stört ihn</span>
                       <div className="negotiation-factor-list">
                         {compactNegotiationFeedback.concerns.length ? (
                           compactNegotiationFeedback.concerns.map((entry) => (
@@ -631,43 +684,11 @@ export default function FoundationMarketBuyShellHost({
 
               {buyPreview ? (
                 <>
-                  <NlCard
-                    className="market-v2-buy-schedule-card"
-                    eyebrow={`${formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · ${buyPreview.contractLength} Saison${buyPreview.contractLength === 1 ? "" : "en"}`}
-                    title="Jahresplan"
-                  >
-                    {buyPreview.yearlySalarySchedule?.length ? (
-                      <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
-                        <div className="contract-schedule-row is-head" role="row">
-                          <span>Jahr</span>
-                          <span>Season</span>
-                          <span>Gehalt</span>
-                        </div>
-                        {buyPreview.yearlySalarySchedule.map((entry) => (
-                          <div className="contract-schedule-row" role="row" key={`${entry.label}-${entry.yearIndex}`}>
-                            <span>Jahr {entry.yearIndex}</span>
-                            <span>{entry.label}</span>
-                            <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
-                          </div>
-                        ))}
-                        <div className="contract-schedule-row is-total" role="row">
-                          <span>Summe</span>
-                          <span>Buyout {formatTransfermarktCurrency(buyPreview.buyoutCost ?? null)}</span>
-                          <strong>{formatTransfermarktCurrency(buyPreview.totalSalary ?? null)}</strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="nl-market-muted">Noch kein Jahresplan verfügbar.</p>
-                    )}
-                    <p className="market-v2-buy-schedule-note">
-                      Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · Forderung{" "}
-                      {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Δ {formatTransfermarktCurrency(marketAndFitDelta)}
-                      {fitSalaryDiscountActive ? " · Fit-Bonus" : ""}
-                    </p>
-                  </NlCard>
-
-                  {/* F1 — Team-Auswirkung: Vorher→Nachher als NlMarketBeforeAfterRow +
-                      NlDeltaChip, exakt die gleiche Zeile wie der Deal-Desk im Neuen Look. */}
+                  {/* F1/M1 — Team-Auswirkung: Vorher→Nachher exakt wie der Deal-Desk —
+                      inklusive derselben Quelle (buildTransfermarktDealReceipt): bei
+                      blockiertem Deal klemmen die Server-`*After`-Felder auf „nichts
+                      passiert" — die Zeilen zeigen die Kassenzettel-Hypothese, die
+                      Lücke steht ehrlich daneben. */}
                   <NlCard
                     className="market-v2-buy-impact-card"
                     eyebrow="Sofort sichtbar, final erst beim Abschluss"
@@ -680,33 +701,44 @@ export default function FoundationMarketBuyShellHost({
                         tone="accent"
                       />
                     </StatChipRow>
-                    <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
+                    <div className="nl-market-deal-rows" aria-label="Vorher-Nachher, wenn der Kauf durchgeht">
                       <NlMarketBeforeAfterRow
                         label="Cash"
-                        before={buyPreview.cashBefore}
-                        after={buyPreview.cashAfter}
+                        before={dealReceipt?.cashBefore ?? buyPreview.cashBefore}
+                        after={dealReceipt?.cashAfterIfBought ?? null}
                         format={(value) => formatTransfermarktCurrency(value)}
                       />
                       <NlMarketBeforeAfterRow
-                        label="Gehalt"
-                        before={buyPreview.salaryBefore}
-                        after={buyPreview.salaryAfter}
+                        label="Gehalt p.a."
+                        before={dealReceipt?.salaryBefore ?? buyPreview.salaryBefore}
+                        after={dealReceipt?.salaryAfterIfBought ?? null}
                         format={(value) => formatTransfermarktCurrency(value)}
                         invert
                       />
                       <NlMarketBeforeAfterRow
                         label="Kader"
-                        before={buyPreview.rosterBefore}
-                        after={buyPreview.rosterAfter}
+                        before={dealReceipt?.rosterBefore ?? buyPreview.rosterBefore}
+                        after={dealReceipt?.rosterAfterIfBought ?? null}
                         format={(value) => (value != null ? String(Math.round(value)) : "—")}
                       />
                       <NlMarketBeforeAfterRow
-                        label="MW"
-                        before={buyPreview.marketValueBefore}
-                        after={buyPreview.marketValueAfter}
+                        label="Team-MW"
+                        before={dealReceipt?.marketValueBefore ?? buyPreview.marketValueBefore}
+                        after={dealReceipt?.marketValueAfterIfBought ?? null}
                         format={(value) => formatTransfermarktCurrency(value)}
                       />
                     </div>
+                    {dealReceipt?.missingCash != null && dealReceipt.missingCash > 0 ? (
+                      <div className="nl-market-deal-shortfall" role="status">
+                        <strong className="nl-tnum">
+                          Noch nicht ausführbar — es fehlen {formatTransfermarktCurrency(dealReceipt.missingCash)}.
+                        </strong>
+                        <small className="nl-tnum">
+                          Ablöse {formatTransfermarktCurrency(dealReceipt.purchasePrice)} · Cash heute{" "}
+                          {formatTransfermarktCurrency(dealReceipt.cashBefore)}
+                        </small>
+                      </div>
+                    ) : null}
                   </NlCard>
 
                   <div className="transfer-buy-meta-grid market-v2-buy-meta-grid">
@@ -811,6 +843,11 @@ export default function FoundationMarketBuyShellHost({
               <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-counter-offer">
                 <strong>{buyNegotiationOutcome.title}</strong>
                 <span>{buyNegotiationOutcome.message}</span>
+                {/* M2 — die Wirkung von „Abbrechen" steht VOR dem Klick da, nicht erst danach. */}
+                <span className="muted">
+                  Achtung: Wer den Dialog jetzt schließt oder abbricht, bricht die Verhandlung ab — das
+                  gibt einen Malus für die nächste Runde.
+                </span>
                 <button
                   type="button"
                   className="secondary-button"

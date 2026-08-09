@@ -26,18 +26,22 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8")
 describe("Der Hauptknopf im Kopf sieht, was in der Liste ausgewählt ist", () => {
   const client = () => quelle("app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
 
-  it("meldet jede Listen-Auswahl nach oben", () => {
-    // Vorher setzte `onSelectCandidate` NUR den lokalen Zustand. Der Shell-Zustand, aus dem der
-    // Kopfknopf liest, erfuhr davon nie.
+  it("meldet jede effektive Auswahl nach oben — auch Fallback und Wunschlisten-Fokus", () => {
+    // Vorher meldete NUR der Klick-Handler nach oben; die automatische Auswahl (Fallback auf den
+    // ersten sichtbaren Kandidaten) blieb dem Shell-Zustand verborgen — der Kopfknopf stand auf
+    // „Kandidat wählen [gesperrt]", während der Deal-Desk längst rechnete. Seit M1 spiegelt ein
+    // Sync-Effekt die EFFEKTIVE Auswahl (`selectedPlayer`) in den Shell-Zustand.
     const text = client();
     expect(text).toContain("onSelectCandidate?: (playerId: string, name: string) => void;");
-    expect(text).toContain("onSelectCandidateUpstream?.(playerId,");
+    expect(text).toContain("const lastReportedCandidateIdRef = useRef<string | null>(null);");
+    expect(text).toContain("onSelectCandidateUpstreamRef.current?.(effectiveId,");
   });
 
   it("schickt den Namen mit, nicht nur die Id", () => {
     // Der Knopf beschriftet sich mit dem Namen („X prüfen"). Nur die Id zu melden hätte den
-    // Knopf freigeschaltet, aber ohne lesbare Beschriftung.
-    expect(client()).toContain("marketItems.find((item) => item.playerId === playerId)");
+    // Knopf freigeschaltet, aber ohne lesbare Beschriftung. Der Name kommt aus der effektiven
+    // Auswahl selbst — nicht aus einem Feed, der beim Öffnen des Marktes leer sein kann.
+    expect(client()).toContain("selectedPlayer?.name ?? effectiveId");
   });
 
   /**
