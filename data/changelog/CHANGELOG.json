@@ -111,6 +111,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Finanzen · Liga-Vergleich",
+      "pr": null,
+      "text": "Die Teams in der Finanz-Tabelle waren als Einzige nicht anklickbar — von überall sonst kommt man per Klick ins Teamprofil. Jetzt auch von hier.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Markt · Preseason-Marktplan",
       "pr": null,
       "text": "Beim Start der neuen Saison hat der Kader-Füll-Lauf auch für manuell geführte Teams eingekauft — im laufenden Spielstand drei Zugänge für Stronghold Crusaders über zusammen 34,5 Mio. Der Dienst läuft über alle Teams des Spielstands und bekam beim Verdrahten in die Saisonstart-Kette die Schreibgrenze nicht mit, die jeder andere Schritt dieses Laufs hat. Er bekommt sie jetzt: dieselbe KI-Teamliste, die auch Marktplan und Manager-Aktionen benutzen.",

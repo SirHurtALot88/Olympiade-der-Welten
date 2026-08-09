@@ -3402,7 +3402,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
               activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
           {activeView === "finances" ? (
-            <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} saveId={activeSaveId} />
+            <FoundationFinancesHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              saveId={activeSaveId}
+              onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+            />
           ) : null}
 
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}

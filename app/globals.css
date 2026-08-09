@@ -75780,6 +75780,25 @@ span.nl-facility-ampel-chip {
   min-width: 0;
 }
 
+/* Als Knopf gerendert (Sprung ins Teamprofil): erbt Schrift und Farbe der Zelle,
+   damit die Tabelle ruhig bleibt — erst beim Überfahren zeigt sich, dass hier
+   etwas klickbar ist. */
+.is-new-look button.nl-fin-league-team.is-linked {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look button.nl-fin-league-team.is-linked:hover .nl-fin-league-name,
+.is-new-look button.nl-fin-league-team.is-linked:focus-visible .nl-fin-league-name {
+  color: var(--nl-accent);
+  text-decoration: underline;
+}
+
 .is-new-look .nl-fin-league-crest {
   width: 22px;
   height: 22px;
