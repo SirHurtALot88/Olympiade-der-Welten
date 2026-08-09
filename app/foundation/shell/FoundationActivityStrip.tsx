@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { FoundationActivityItem } from "@/lib/foundation/foundation-activity-types";
+import { formatPreseasonBlockerLabel } from "@/lib/foundation/preseason-blocker-labels";
 
 /** Merkt sich über Neuladen hinweg, ob die Statuszeile weggeklappt ist. */
 const ACTIVITY_STRIP_COLLAPSED_KEY = "oly-activity-strip-collapsed";
@@ -253,8 +254,11 @@ export default function FoundationActivityStrip({ activities }: FoundationActivi
                 <div className="foundation-activity-reasons">
                   <span className="foundation-activity-reasons-title">Grund</span>
                   <ul>
+                    {/* Die Rohdaten tragen Enum-Codes (fürs Debuggen) — gerendert wird
+                        IMMER der deutsche Klartext, nie der Code selbst. Unbekannte
+                        Codes bekommen einen lesbaren Ersatztext (preseason-blocker-labels). */}
                     {activity.reasons.map((reason, index) => (
-                      <li key={`${activity.id}-reason-${index}`}>{reason.replace(/:/g, " · ")}</li>
+                      <li key={`${activity.id}-reason-${index}`}>{formatPreseasonBlockerLabel(reason)}</li>
                     ))}
                   </ul>
                 </div>

@@ -928,7 +928,9 @@ export default function FoundationSponsorsNewLook({
                   : "Dieser Spielstand wurde vor der Umstellung angelegt und rechnet unveraendert nach dem alten Sponsormodell weiter."
               }
             >
-              {sponsorSystemVersion === 2 ? "Sponsorsystem V2 (neu)" : "Sponsorsystem V1 (alt)"}
+              {/* Durchklick-Test G5: „Sponsorsystem V1 (alt)" war Versions-Jargon im
+                  Spieler-UI — der Spieler braucht das Regelwerk, nicht die Modulnummer. */}
+              {sponsorSystemVersion === 2 ? "Neues Sponsormodell" : "Klassisches Sponsormodell"}
             </span>
           </p>
           {selectedTeamCommercialRating ? (
@@ -984,10 +986,12 @@ export default function FoundationSponsorsNewLook({
                 aria-expanded={ratingDetailsOpen}
                 onClick={() => setRatingDetailsOpen((current) => !current)}
               >
-                {ratingDetailsOpen ? "Rohdaten verbergen" : "Rohdaten zeigen"}
+                {/* G5: „Rohdaten" ist Entwickler-Vokabular — für den Spieler ist es
+                    die Rechnung hinter dem Kommerz-Wert. */}
+                {ratingDetailsOpen ? "Rechenwerte verbergen" : "Rechenwerte zeigen"}
               </button>
               {ratingDetailsOpen ? (
-                <StatChipRow className="nl-sponsor-rating-inputs" aria-label="Kommerz-Rating Rohdaten">
+                <StatChipRow className="nl-sponsor-rating-inputs" aria-label="Kommerz-Rating im Detail">
                   {selectedTeamCommercialRating.inputs.lastSeasonRank != null ? (
                     <StatChip label="Letzte Saison" value={`#${selectedTeamCommercialRating.inputs.lastSeasonRank}`} tone="neutral" />
                   ) : null}

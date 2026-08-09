@@ -119,6 +119,24 @@ function getNlTransferToneClass(type: TransferHistoryV2Row["type"]) {
   return "is-exit";
 }
 
+/**
+ * Durchklick-Test (G5 Historie): `row.phase` kam als roher Slug ins UI —
+ * „SEASON 2 · MANUAL_TRANSFER_WINDOW" als Abschnittstitel, dazu
+ * `manual_transfer_window` als Fußnote JEDER Zeile. Übersetzt wird hier;
+ * ein unbekannter Wert fällt auf einen deutschen Sammelbegriff zurück,
+ * nie auf den Enum-Namen (F5-Regel, wie formatNegotiationSignalLabel).
+ */
+function formatNlTransferPhaseLabel(row: Pick<TransferHistoryV2Row, "phase" | "matchdayId" | "seasonLabel">) {
+  if (row.phase === "manual_transfer_window") return "Transferfenster";
+  if (row.phase === "season_snapshot") return "Saisonwechsel";
+  if (row.phase === "setup_draft") return "Setup-Draft";
+  // Kein bekannter Phasen-Slug: Spieltag-Nummer aus der Matchday-ID ziehen …
+  const matchdayNummer = row.matchdayId?.match(/(\d+)\s*$/)?.[1];
+  if (matchdayNummer) return `Spieltag ${matchdayNummer}`;
+  // … sonst lieber ein ehrlicher Sammelbegriff als ein roher Code.
+  return row.phase ? "Transferphase" : row.seasonLabel;
+}
+
 function getNlTimelineTargetLabel(row: TransferHistoryV2Row) {
   if (row.type === "buy") {
     return `${row.toTeamName ?? row.toTeamId ?? "Team"} verpflichtet`;
@@ -851,7 +869,7 @@ export default function TransferHistoryV2NewLook({
                   // Sortierung von `visibleRows`; keine Umsortierung.
                   let lastGroupKey: string | null = null;
                   return visibleRows.map((row) => {
-                    const groupLabel = `${row.seasonLabel} · ${row.phase ?? row.matchdayId ?? "—"}`;
+                    const groupLabel = `${row.seasonLabel} · ${formatNlTransferPhaseLabel(row)}`;
                     const groupKey = `${row.seasonId}__${row.phase ?? row.matchdayId ?? "—"}`;
                     const isNewGroup = groupKey !== lastGroupKey;
                     lastGroupKey = groupKey;
@@ -884,7 +902,7 @@ export default function TransferHistoryV2NewLook({
                           </span>
                           <span className="nl-thist-timeline-numbers">
                             <strong className="nl-tnum">{formatTransfermarktCurrency(row.fee)}</strong>
-                            <small>{row.phase ?? row.matchdayId ?? row.seasonLabel}</small>
+                            <small>{formatNlTransferPhaseLabel(row)}</small>
                             {row.guv != null ? (
                               <NlDeltaChip value={row.guv} format={() => formatNlSignedMoney(row.guv)} title="GuV dieses Deals" />
                             ) : null}
@@ -927,7 +945,7 @@ export default function TransferHistoryV2NewLook({
                       <td>
                         <div className="nl-thist-table-cell-stack">
                           <strong>{new Date(row.happenedAt).toLocaleDateString("de-DE")}</strong>
-                          <span>{row.phase ?? row.matchdayId ?? row.seasonLabel}</span>
+                          <span>{formatNlTransferPhaseLabel(row)}</span>
                         </div>
                       </td>
                       <td>
@@ -1080,7 +1098,7 @@ export default function TransferHistoryV2NewLook({
                   </div>
                   <small className="nl-thist-spotlight-meta">
                     {new Date(selectedRow.happenedAt).toLocaleString("de-DE")} · {selectedRow.sourceLabel} ·{" "}
-                    {selectedRow.phase ?? selectedRow.matchdayId ?? selectedRow.seasonLabel}
+                    {formatNlTransferPhaseLabel(selectedRow)}
                   </small>
                 </div>
               </div>

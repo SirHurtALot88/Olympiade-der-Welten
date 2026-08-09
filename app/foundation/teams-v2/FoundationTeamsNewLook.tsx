@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitCard, {
+  buildAxisPpsFromRating,
+} from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import {
   NlBarChart,
   NlCard,
@@ -33,6 +35,7 @@ import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-c
 import { areTeamPowersEnabled } from "@/lib/lineups/team-powers";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
@@ -159,6 +162,12 @@ export type FoundationTeamsNewLookProps = {
   teamRosterFocusMode: TeamRosterFocusMode;
   setTeamRosterFocusMode: (value: TeamRosterFocusMode) => void;
   teamRosterFocusOptions: Array<NlTeamsFilterOption<TeamRosterFocusMode>>;
+  /**
+   * Rating-Zeilen je Spieler-ID — Quelle der Saison-PPs je Achse (`ppPow`/`ppPowRank`/…)
+   * für die Portraitkarten, dieselben Felder wie die POW/SPE/MEN/SOC-Spalten der
+   * Ranks-Seite. Optional: ohne Map bleibt die PPs-Zeile auf den Karten einfach weg.
+   */
+  playerRatingsById?: ReadonlyMap<string, PlayerRatingContractRow>;
   leaguePlayerHeatPools: LeaguePlayerHeatPools;
   openTeamProfileById: (teamId: string) => void;
   openPlayerDrawerById: (playerId: string, activePlayerId?: string) => void | Promise<void>;
@@ -692,6 +701,7 @@ export default function FoundationTeamsNewLook({
   teamRosterFocusMode,
   setTeamRosterFocusMode,
   teamRosterFocusOptions,
+  playerRatingsById,
   leaguePlayerHeatPools,
   openTeamProfileById,
   openPlayerDrawerById,
@@ -1254,6 +1264,7 @@ export default function FoundationTeamsNewLook({
               spe={player.coreStats.spe}
               men={player.coreStats.men}
               soc={player.coreStats.soc}
+              axisPps={buildAxisPpsFromRating(playerRatingsById?.get(player.id))}
               leagueHeatPools={leaguePlayerHeatPools}
               variant="team"
               roleTag={entry.roleTag}

@@ -12,6 +12,8 @@ import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+// Nur die Mapping-Funktion — die Karte selbst bleibt der dynamische Import weiter unten.
+import { buildAxisPpsFromRating } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@/lib/foundation/player-economy-contract";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
@@ -2932,7 +2934,7 @@ function FoundationTeamsDetailPanel({
                     <div className="panel-header compact">
                       <div className="stack">
                         <h2>Board-Ziele</h2>
-                        <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
+                        <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Gebäude und Entwicklung.</p>
                       </div>
                       <div className="room-meta foundation-admin-meta">
                         <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
@@ -3006,6 +3008,7 @@ function FoundationTeamsDetailPanel({
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}
                           soc={player.coreStats.soc}
+                          axisPps={buildAxisPpsFromRating(ratings)}
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}
@@ -3067,6 +3070,7 @@ function FoundationTeamsDetailPanel({
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}
                           soc={player.coreStats.soc}
+                          axisPps={buildAxisPpsFromRating(ratings)}
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}

@@ -15,7 +15,10 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
-import { buildTeamDisciplineRankSnapshotRecords } from "@/lib/foundation/team-discipline-rank-engine";
+import {
+  buildTeamDisciplineRankSnapshotRecords,
+  findTeamStrengthRankCapture,
+} from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -552,7 +555,31 @@ function buildSeasonSnapshotRecord(
       ? "partial"
       : "missing_source";
   const archivedAt = new Date().toISOString();
-  const teamDisciplineRankSnapshots = buildTeamDisciplineRankSnapshotRecords(gameState);
+  /**
+   * Teamstärke-Ränge: den bei der LETZTEN SPIELTAGSWERTUNG festgehaltenen Satz übernehmen, nicht
+   * neu aus dem Live-Kader rechnen. GEMELDET VON CHRIS: „die snapshots für die ranking änderungen
+   * [müssen] sich auf den season 1 lauf beziehen vor verkäufen! da ist N-N zb 32. … das kann nicht
+   * der stand während der saison gewesen sein" — im echten Spielstand lagen zwischen letztem
+   * Spieltag und Saisonabschluss vier Tage und 49 Verkäufe; der Live-Kader zum Abschluss war der
+   * Nach-Ausverkauf-Stand. Rückfall für Spielstände ohne festgehaltenen Satz bleibt die bisherige
+   * Live-Rechnung — dann sagt es der Herkunftsvermerk (`season_end_live`).
+   */
+  const teamStrengthRankCapture = findTeamStrengthRankCapture(gameState, seasonId);
+  const teamDisciplineRankSnapshots = teamStrengthRankCapture
+    ? structuredClone(teamStrengthRankCapture.records)
+    : buildTeamDisciplineRankSnapshotRecords(gameState);
+  const teamDisciplineRankSnapshotMeta: SeasonSnapshotRecord["teamDisciplineRankSnapshotMeta"] =
+    teamStrengthRankCapture
+      ? {
+          source: "matchday_capture",
+          matchdayId: teamStrengthRankCapture.matchdayId,
+          capturedAt: teamStrengthRankCapture.capturedAt,
+        }
+      : {
+          source: "season_end_live",
+          matchdayId: null,
+          capturedAt: archivedAt,
+        };
 
   return {
     snapshotId: buildSnapshotId(seasonId),
@@ -574,6 +601,7 @@ function buildSeasonSnapshotRecord(
     transferSnapshots,
     gmAssignments,
     teamDisciplineRankSnapshots,
+    teamDisciplineRankSnapshotMeta,
     warnings,
   };
 }
@@ -965,8 +993,39 @@ export function patchSeasonSnapshotMarketValueAfterProgression(
   gameState: GameState,
   seasonId: string,
 ): { gameState: GameState; patched: boolean } {
-  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
-  const index = snapshots.findIndex((entry) => entry.seasonId === seasonId);
+  const vorhandeneSnapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const vorhandenerIndex = vorhandeneSnapshots.findIndex((entry) => entry.seasonId === seasonId);
+
+  /**
+   * WENN ES NOCH KEINEN SNAPSHOT GIBT, WIRD ER HIER ANGELEGT.
+   *
+   * Vorher gab die Funktion an dieser Stelle einfach `patched: false` zurueck.
+   * Das war die eigentliche Ursache des gemeldeten Fehlers: Der Snapshot entsteht
+   * nur im Cockpit-Pfad (`runLocalSeasonCompletion`) vor der Kette. Wer ueber das
+   * Saisonende-Panel spielt, hat an dieser Stelle noch gar keinen — der Freeze
+   * lief ins Leere, und erst der Notbehelf beim `next_season_setup` baute einen,
+   * da lagen die Verkaeufe aber schon dahinter.
+   *
+   * Anlegen statt aufgeben: Zu diesem Zeitpunkt sind Sponsoren gebucht, die
+   * Entwicklung gerechnet und das Transferfenster noch zu — genau der Stand, den
+   * die Historie zeigen soll.
+   */
+  let snapshots = vorhandeneSnapshots;
+  if (vorhandenerIndex < 0) {
+    try {
+      snapshots = upsertSeasonSnapshotRecord(vorhandeneSnapshots, buildSeasonSnapshot(gameState, seasonId));
+    } catch {
+      // `buildSeasonSnapshotRecord` verlangt einen vollstaendigen Saison-Stand und
+      // wirft, wenn er ihn nicht vorfindet. Der Freeze laeuft aber MITTEN in der
+      // Uebergangskette — ein Absturz hier wuerde den Saisonwechsel abbrechen.
+      // Deshalb: still auf das alte Verhalten zurueckfallen (nichts eingefroren,
+      // `patched: false`), statt die Kette zu sprengen. Der Notbehelf beim
+      // `next_season_setup` baut dann einen Datensatz und markiert ihn ehrlich als
+      // `post_sell_fallback`.
+      return { gameState, patched: false };
+    }
+  }
+  const index = vorhandenerIndex < 0 ? snapshots.findIndex((entry) => entry.seasonId === seasonId) : vorhandenerIndex;
   if (index < 0) {
     return { gameState, patched: false };
   }
@@ -974,10 +1033,16 @@ export function patchSeasonSnapshotMarketValueAfterProgression(
   const snapshot = snapshots[index]!;
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const marketValueByTeamId = new Map<string, number>();
+  const salaryByTeamId = new Map<string, number>();
+  const rosterCountByTeamId = new Map<string, number>();
   for (const entry of gameState.rosters) {
     const value = getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice, playerById) ?? 0;
     marketValueByTeamId.set(entry.teamId, (marketValueByTeamId.get(entry.teamId) ?? 0) + value);
+    salaryByTeamId.set(entry.teamId, (salaryByTeamId.get(entry.teamId) ?? 0) + (entry.salary ?? 0));
+    rosterCountByTeamId.set(entry.teamId, (rosterCountByTeamId.get(entry.teamId) ?? 0) + 1);
   }
+  const cashByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team.cash ?? 0] as const));
+  const frozenAt = new Date().toISOString();
 
   const patchTeams = (records: SeasonSnapshotTeamRecord[]) =>
     records.map((record) => ({
@@ -986,6 +1051,13 @@ export function patchSeasonSnapshotMarketValueAfterProgression(
       // (z. B. nach einem Reload) die Historie nicht nachträglich verschiebt.
       marketValueSeasonEnd:
         record.marketValueSeasonEnd ?? roundValue(marketValueByTeamId.get(record.teamId) ?? 0, 2),
+      // Dieselbe Momentaufnahme für die übrigen Größen. Ohne sie stünden in der
+      // Historie drei Spalten mit drei Zeitpunkten nebeneinander: Cash nach den
+      // Verkäufen, Gehalt und Marktwert nach den Käufen der FOLGE-Saison.
+      cashSeasonEnd: record.cashSeasonEnd ?? roundValue(cashByTeamId.get(record.teamId) ?? 0, 2),
+      salarySeasonEnd: record.salarySeasonEnd ?? roundValue(salaryByTeamId.get(record.teamId) ?? 0, 2),
+      rosterSeasonEnd: record.rosterSeasonEnd ?? (rosterCountByTeamId.get(record.teamId) ?? 0),
+      seasonEndFrozenAt: record.seasonEndFrozenAt ?? frozenAt,
     }));
 
   const patched: SeasonSnapshotRecord = {

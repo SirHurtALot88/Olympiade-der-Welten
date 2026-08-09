@@ -271,15 +271,19 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
  * wie die Karten und der reale Upgrade-Service.
  */
 const FACILITY_EFFECT_CHIP_LABEL: Record<FacilityId, string> = {
-  training_center: "Base Training XP",
-  recovery_center: "Recovery",
-  scouting_office: "Scouting Confidence",
+  // Durchklick-Test G5: die Karten sprachen halb Englisch („Base Training XP",
+  // „Season Cash", „Scouting Confidence") — Spieltext ist Deutsch.
+  training_center: "Grundtraining",
+  recovery_center: "Erholung",
+  scouting_office: "Scouting-Genauigkeit",
   // War „Forecast Quality" — eine Groesse, die nirgends gemessen wurde. Der Raum schaltet den
   // Live-Fortschritt auf Sponsor-Achse und Board-Zielen frei (lib/facilities/analytics-live-progress.ts).
   analytics_room: "Live-Fortschritt",
-  fan_shop: "Season Cash",
+  fan_shop: "Saison-Cash",
   arena_upgrade: "Arena-Einnahme",
-  academy: "F/E/D Upgrade-Rabatt",
+  // Der reale Academy-Effekt ist die beschleunigte F/E/D-Entwicklung
+  // (Katalog `modifierPct`) — der alte Upgrade-Rabatt ist tot (s. Katalog-Kommentar).
+  academy: "F/E/D-Entwicklung",
   // S1: Der Flügel bewirbt keinen Rabatt mehr — er setzt die Trainings-Fokusachse des Teams und
   // hebt den Routenbonus passender Spieler (Katalog `modifierPct`, 8 % → 13 %).
   specialist_wing: "Fokusachse-Routenbonus",
@@ -360,7 +364,11 @@ function FacilityEffectDeltaChip({
       );
     }
     case "low_tier_upgrade_discount": {
-      const delta = (nextDef?.discountPct ?? 0) - (currentDef?.discountPct ?? 0);
+      // G5/„keine erfundenen Zahlen": der Chip zeigte den TOTEN Upgrade-Rabatt
+      // (`discountPct`, wirkungslos seit Abschaffung des XP-Kostensystems).
+      // Der reale Academy-Effekt ist der Entwicklungs-Boost (`modifierPct`) —
+      // dieselbe Quelle wie getAcademyDevelopmentBoostPct.
+      const delta = (nextDef?.modifierPct ?? 0) - (currentDef?.modifierPct ?? 0);
       return (
         <NlDeltaChip
           value={delta}
@@ -1086,12 +1094,16 @@ export default function FacilitiesV2NewLook({
                 </div>
                 <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
                 {facility.id === "arena_upgrade" && beliebtheit ? (
+                  /* G5: „Basis 0,0 Mio × 1 = 0,0 Mio" las sich wie Debug-Ausgabe.
+                     Als Satz mit benannten Größen — und bei 0 wird erklärt statt
+                     eine leere Formel gerechnet. */
                   <small
                     className="nl-facility-arena-popularity nl-tnum"
                     title={TIP_BELIEBTHEIT}
                   >
-                    Basis {formatTransfermarktCurrency(facility.currentIncome)} × {formatNlNumber(beliebtheit.value, 2)} ={" "}
-                    {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit))}
+                    {facility.currentIncome > 0
+                      ? `Einnahme je Saison: ${formatTransfermarktCurrency(facility.currentIncome)} Basis × ${formatNlNumber(beliebtheit.value, 2)} Beliebtheit = ${formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit))}`
+                      : `Noch keine Einnahme — ab Level 1 gilt: Basis × Beliebtheit (aktuell ${formatNlNumber(beliebtheit.value, 2)})`}
                   </small>
                 ) : null}
                 {facility.level > 0 ? (

@@ -272,3 +272,24 @@
 .is-new-look .nl-standings-own-chips.nl-stat-chip-row .nl-stat-chip-row-label {
   color: var(--nl-mut);
 }
+
+/* ------------------------------------------------------------------ *
+ * Durchklick-Test G2 · Saisonstand vor Spieltag 1 („beschriften statt
+ * löschen"): eine Zeile im Kartenkopf erklärt, dass die Reihenfolge der
+ * Endstand der Vorsaison (Startplätze) ist — sichtbar in allen drei
+ * Ansichten (Daten/Board/Vereine), statt dass Ergebnisseite und Saisonstand
+ * einander widersprechen. Lesbarer Sekundärtext → --nl-mut, nicht mut-2.
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-preseason-note {
+  margin: var(--nl-s2) 0 0;
+  font-size: var(--nl-fs-md);
+  line-height: 1.5;
+  color: var(--nl-mut);
+  max-width: 72ch;
+}
+
+/* Leerzustand „Top-Spieler — noch zu vergeben" (VeloPendingRanking):
+ * übernimmt im Daten-Modus den Platz des Kachel-Rasters in der Chart-Zeile. */
+.is-new-look .nl-standings-players-pending {
+  min-width: 0;
+}

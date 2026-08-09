@@ -23,6 +23,7 @@ import {
 } from "@/components/foundation/new-look";
 import { VeloRangeBar } from "@/components/foundation/velo-ui";
 import type {
+  FinanceApronLeagueRow,
   FinanceApronStatus,
   FinanceLeagueTableRow,
   FinanceLoanCommitments,
@@ -42,6 +43,12 @@ export type FoundationFinancesNewLookProps = {
   activeManagerTeamId: string | null;
   /** Salary Factor der laufenden Season + Richtung zur nächsten — siehe `salary-factor-outlook.ts`. */
   salaryFactorOutlook: SalaryFactorOutlook;
+  /**
+   * Öffnet das Teamprofil aus der Liga-Tabelle heraus. Optional: fehlt der
+   * Öffner, bleibt die Team-Spalte reiner Text — ein Knopf, der nichts tut,
+   * wäre schlimmer als gar keiner.
+   */
+  onOpenTeam?: (teamId: string) => void;
 };
 
 /** Grün bei GuV ≥ 0, sonst Rot — gleiche binäre Ton-Regel wie andere GuV-Chips im neuen Look. */
@@ -665,6 +672,202 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
   );
 }
 
+// --- Apron liga-weit: wer zahlt, wer bekommt ------------------------------
+// CHRIS: „in den finanzen fehlt mir immernoch ein ausweis vom APRON was die teams dadurch zahlen
+// müssen oder einnehmen." Die Karte oben nannte 28 Zahler / 3 Empfänger nur als Aggregat — hier
+// stehen sie mit Namen. EINE Quelle: `apron.league` sind dieselben Projektionszeilen
+// (`buildApronProjection`), aus denen auch Topf/Zahler-/Empfängerzahl stammen — nichts neu
+// gerechnet (siehe use-finances-view-model.ts). „Es ist ein Game und kein Excel": kollabiert
+// zeigt die Liste nur die Extreme — die größten Zahler, dein Team, alle Empfänger; der Rest
+// kommt auf Klick, und der Aufklapp-Knopf trägt die Zwischensumme der verborgenen Zahler,
+// damit die Summenprobe auch kollabiert aufgeht.
+
+/** Wie viele der größten Zahler die kollabierte Liste zeigt (plus dein Team plus alle Empfänger). */
+const APRON_LEAGUE_TOP_ZAHLER = 5;
+
+const APRON_LEAGUE_COLUMNS: NlTableColumn<FinanceApronLeagueRow>[] = [
+  {
+    key: "rank",
+    label: "#",
+    align: "right",
+    width: "36px",
+    tooltip: "Aktueller Ligarang — der Rang, auf den die Hochrechnung rechnet; bis zum Saisonende kann er sich verschieben",
+  },
+  { key: "team", label: "Team" },
+  {
+    key: "basis",
+    label: "Bemessung (geglättet)",
+    align: "right",
+    tooltip:
+      "Geglättete Gehaltssumme (Verträge über die Laufzeit verteilt) — die Bemessungsgrundlage des Apron, absichtlich NICHT die echte Gehaltssumme der GuV (siehe Hinweis bei den Apron-Linien)",
+  },
+  {
+    key: "abstand",
+    label: "zur 1. Linie",
+    align: "right",
+    tooltip: "Bemessungsgrundlage minus 1. Linie: wer drüber liegt, zahlt auf den Überschuss — wer drunter liegt, ist empfangsberechtigt",
+  },
+  {
+    key: "netto",
+    label: "Zahlt / bekommt",
+    align: "right",
+    tooltip: "Hochrechnung beim aktuellen Rang: Abgabe (−) in den Topf bzw. Ausgleich (+) aus dem Topf",
+  },
+];
+
+/** Farb-Wahrheit (Befund aus PR #460): Einnahme grün, Abgabe rot — nie der Team-Akzent. */
+function apronLeagueRolleTone(rolle: FinanceApronLeagueRow["rolle"]): NlTone {
+  return rolle === "empfaenger" ? "good" : rolle === "zahler" ? "risk" : "neutral";
+}
+
+function apronLeagueNettoTitle(row: FinanceApronLeagueRow): string {
+  if (row.rolle === "zahler") {
+    return `Zahlt bei diesem Rang ${formatNlMoney(row.abgabe)} in den Apron-Topf${
+      row.gedeckelt ? " — durch den Deckel begrenzt (höchstens der halbe rangabhängige Wertungsanteil)" : ""
+    }.`;
+  }
+  if (row.rolle === "empfaenger") {
+    if (row.ausgleich > 0) {
+      return `Bekommt ${formatNlMoney(row.ausgleich)} aus dem Topf — gleicher Kopfanteil für jedes Team unter der 1. Linie, der Topf wird vollständig verteilt.`;
+    }
+    return "Empfangsberechtigt (unter der 1. Linie), aber der Topf ist leer — es gibt nichts zu verteilen.";
+  }
+  return "Weder Abgabe noch Ausgleich: liegt nicht unter der 1. Linie (kein Empfänger) und zahlt bei dieser Hochrechnung nichts.";
+}
+
+function renderApronLeagueCell(row: FinanceApronLeagueRow, column: NlTableColumn<FinanceApronLeagueRow>, ownTeamId: string) {
+  switch (column.key) {
+    case "rank":
+      return row.rank != null ? row.rank : <span title="Rang unbekannt — letzter Platz angenommen">—</span>;
+    case "team":
+      return (
+        <span className="nl-fin-league-team">
+          <span className="nl-fin-league-code">{row.teamCode}</span>
+          <span className="nl-fin-league-name" title={row.teamName}>
+            {row.teamName}
+          </span>
+          {row.teamId === ownTeamId ? <span className="nl-fin-league-you">Dein Team</span> : null}
+        </span>
+      );
+    case "basis":
+      return formatNlMoney(row.salaryBasis);
+    case "abstand":
+      return (
+        <span className="nl-fin-apron-lg-dist nl-tnum" title={formatApronDistance(row.distanceLine1)}>
+          {formatNlSignedMoney(row.distanceLine1)}
+        </span>
+      );
+    case "netto":
+      return (
+        <span className={`nl-fin-apron-lg-netto ${nlToneClass(apronLeagueRolleTone(row.rolle))}`} title={apronLeagueNettoTitle(row)}>
+          <span className="nl-tnum">{formatNlSignedMoney(row.nettoDelta)}</span>
+          <span className="nl-fin-apron-lg-role">
+            {row.rolle === "zahler" ? "Zahler" : row.rolle === "empfaenger" ? "Empfänger" : "neutral"}
+            {row.gedeckelt ? (
+              <span className="nl-fin-apron-lg-deckel" title="Abgabe durch den Deckel begrenzt — höchstens der halbe rangabhängige Wertungsanteil.">
+                Deckel
+              </span>
+            ) : null}
+          </span>
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownTeamId: string }) {
+  const [alleZeigen, setAlleZeigen] = useState(false);
+
+  const kollabiert = useMemo(() => {
+    const topZahler = new Set(
+      apron.league
+        .filter((row) => row.rolle === "zahler")
+        .slice(0, APRON_LEAGUE_TOP_ZAHLER)
+        .map((row) => row.teamId),
+    );
+    return apron.league.filter((row) => row.rolle === "empfaenger" || row.teamId === ownTeamId || topZahler.has(row.teamId));
+  }, [apron.league, ownTeamId]);
+
+  const kollabierbar = kollabiert.length < apron.league.length;
+  const sichtbareZeilen = alleZeigen || !kollabierbar ? apron.league : kollabiert;
+
+  // Zwischensumme der verborgenen Zahler — Summe genau der Zeilenwerte, die beim Aufklappen
+  // erscheinen (dieselbe Quelle, keine zweite Rechnung): sichtbare Abgaben + diese Zwischensumme
+  // ergeben zusammen wieder den Topf (bis auf die dokumentierte Anzeigerundung).
+  const verborgen = useMemo(() => {
+    const sichtbar = new Set(kollabiert.map((row) => row.teamId));
+    const zeilen = apron.league.filter((row) => !sichtbar.has(row.teamId));
+    const zahler = zeilen.filter((row) => row.rolle === "zahler");
+    return {
+      zahlerCount: zahler.length,
+      zahlerSumme: Number(zahler.reduce((sum, row) => sum + row.abgabe, 0).toFixed(1)),
+      neutralCount: zeilen.filter((row) => row.rolle === "neutral").length,
+    };
+  }, [apron.league, kollabiert]);
+
+  const statusText = apron.gebucht
+    ? "Abrechnung dieser Saison bereits gebucht"
+    : apron.frozenLines
+      ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
+      : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";
+  // Summenprobe im Klartext: Topf und Kopfanteil kommen als FERTIGE Werte aus dem View-Model
+  // (eine Quelle; der Kopfanteil ist der `ausgleich` einer Empfänger-Zeile, keine zweite
+  // Rechnung). Der Topf wird VOLLSTÄNDIG zu gleichen Kopfteilen verteilt — kein Deckel auf der
+  // Empfängerseite, kein Verfall (apron-service.ts, Nutzer-Entscheidung). Gäbe es keinen einzigen Empfänger,
+  // würde auch nichts eingesammelt — dann ist zahlerCount hier 0 und der Text sagt warum.
+  const kopfanteil = apron.league.find((row) => row.rolle === "empfaenger")?.ausgleich ?? 0;
+  const summenText =
+    apron.zahlerCount > 0
+      ? `${apron.zahlerCount} Zahler zahlen zusammen ${formatNlMoney(apron.topf)} in den Topf, ` +
+        `${apron.empfaengerCount} Empfänger teilen ihn vollständig — je ${formatNlMoney(kopfanteil)}`
+      : apron.empfaengerCount === 0
+        ? "Kein Team liegt unter der 1. Linie — ohne Empfänger wird keine Abgabe eingesammelt (der Apron verteilt nur um, er vernichtet kein Geld)"
+        : "Kein Team zahlt bei dieser Hochrechnung — der Topf ist leer, es gibt nichts zu verteilen";
+
+  return (
+    <section className="nl-fin-apron-league-block" aria-label="Apron liga-weit: wer zahlt, wer bekommt" data-testid="nl-fin-apron-league-block">
+      <h3 className="nl-fin-commit-section-title">Apron liga-weit — wer zahlt, wer bekommt</h3>
+      <p className="nl-fin-apron-lg-summary muted nl-tnum" data-testid="nl-fin-apron-lg-summary">
+        {statusText} · {summenText}.
+      </p>
+      <NlTable
+        className="nl-fin-apron-lg-table"
+        columns={APRON_LEAGUE_COLUMNS}
+        rows={sichtbareZeilen}
+        rowKey={(row) => row.teamId}
+        rowClassName={(row) => (row.teamId === ownTeamId ? "is-active-row" : undefined)}
+        renderCell={(row, column) => renderApronLeagueCell(row, column, ownTeamId)}
+        stickyHeader={false}
+        data-testid="nl-fin-apron-lg-table"
+        aria-label="Apron liga-weit: wer zahlt, wer bekommt"
+      />
+      {kollabierbar ? (
+        <button
+          type="button"
+          className="nl-fin-apron-lg-more nl-rankdrawer-more"
+          data-testid="nl-fin-apron-lg-more"
+          onClick={() => setAlleZeigen((current) => !current)}
+        >
+          {alleZeigen
+            ? "Nur die Extreme zeigen — größte Zahler, dein Team, Empfänger"
+            : `Alle ${apron.league.length} Teams anzeigen` +
+              (verborgen.zahlerCount > 0
+                ? ` · ${verborgen.zahlerCount} weitere Zahler zahlen zusammen ${formatNlMoney(verborgen.zahlerSumme)}`
+                : "") +
+              (verborgen.neutralCount > 0 ? ` · ${verborgen.neutralCount} neutral` : "")}
+        </button>
+      ) : null}
+      <p className="nl-fin-apron-lg-note muted" data-testid="nl-fin-apron-lg-note">
+        {apron.gedeckeltCount > 0
+          ? `${apron.gedeckeltCount === 1 ? "1 Zahler ist" : `${apron.gedeckeltCount} Zahler sind`} durch den Deckel begrenzt (höchstens der halbe rangabhängige Wertungsanteil): sie zahlen weniger, als ihr Überschuss nach den Linien-Sätzen ergäbe. Der Topf enthält nur die begrenzten Beträge. `
+          : ""}
+        Beträge auf 0,1 Mio gerundet, verteilt wird ungerundet — die Summe der gerundeten Zeilen kann darum minimal von Topf und Ausschüttung abweichen.
+      </p>
+    </section>
+  );
+}
+
 function LoanCommitmentsPanel({ loans }: { loans: FinanceLoanCommitments }) {
   return (
     <div className="nl-fin-commit" data-testid="nl-fin-commit">
@@ -862,13 +1065,14 @@ function renderLeagueCell(
   column: NlTableColumn<FinanceLeagueTableRow>,
   rank: number,
   isOwnTeam: boolean,
+  onOpenTeam: ((teamId: string) => void) | null,
 ) {
   switch (column.key) {
     case "rank":
       return rank;
-    case "team":
-      return (
-        <span className="nl-fin-league-team">
+    case "team": {
+      const content = (
+        <>
           <BudgetedMediaImage
             src={row.logoUrl}
             alt={`${row.teamName} Logo`}
@@ -883,8 +1087,24 @@ function renderLeagueCell(
             {row.teamName}
           </span>
           {isOwnTeam ? <span className="nl-fin-league-you">Dein Team</span> : null}
-        </span>
+        </>
       );
+      // Ohne Öffner bleibt es der bisherige reine Text: ein Knopf, der nichts tut,
+      // wäre schlimmer als gar keiner.
+      if (!onOpenTeam) {
+        return <span className="nl-fin-league-team">{content}</span>;
+      }
+      return (
+        <button
+          type="button"
+          className="nl-fin-league-team is-linked"
+          onClick={() => onOpenTeam(row.teamId)}
+          title={`${row.teamName} — Teamprofil öffnen`}
+        >
+          {content}
+        </button>
+      );
+    }
     case "cash":
       return formatNlMoney(row.cash);
     case "incomeAnnual":
@@ -916,9 +1136,11 @@ function renderLeagueCell(
 function FinanceLeagueTable({
   leagueTable,
   activeManagerTeamId,
+  onOpenTeam,
 }: {
   leagueTable: FinanceLeagueTableRow[];
   activeManagerTeamId: string | null;
+  onOpenTeam: ((teamId: string) => void) | null;
 }) {
   const [sort, setSort] = useState<{ key: LeagueSortKey; direction: NlTableSortDirection }>({
     key: "cash",
@@ -958,7 +1180,9 @@ function FinanceLeagueTable({
           sortState={{ key: sort.key, direction: sort.direction }}
           onSort={handleSort}
           rowClassName={(row) => (row.teamId === activeManagerTeamId ? "is-active-row" : undefined)}
-          renderCell={(row, column) => renderLeagueCell(row, column, sortedRows.indexOf(row) + 1, row.teamId === activeManagerTeamId)}
+          renderCell={(row, column) =>
+            renderLeagueCell(row, column, sortedRows.indexOf(row) + 1, row.teamId === activeManagerTeamId, onOpenTeam)
+          }
           data-testid="nl-fin-league-table"
           aria-label="Finanzvergleich aller Teams"
         />
@@ -988,6 +1212,7 @@ export default function FoundationFinancesNewLook({
   leagueTable,
   activeManagerTeamId,
   salaryFactorOutlook,
+  onOpenTeam,
 }: FoundationFinancesNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
   const incomeLines = team ? buildIncomeLines(team) : [];
@@ -1077,6 +1302,9 @@ export default function FoundationFinancesNewLook({
               <LoanCommitmentsPanel loans={team.loanCommitments} />
             </section>
           </div>
+          {/* Chris: „…ein ausweis vom APRON was die teams dadurch zahlen müssen oder einnehmen" —
+              liga-weit mit Namen; ohne Projektion erklärt das ApronLinesPanel oben bereits, warum nicht. */}
+          {team.apron ? <ApronLeagueList apron={team.apron} ownTeamId={team.teamId} /> : null}
         </NlCard>
       ) : null}
 
@@ -1171,7 +1399,11 @@ export default function FoundationFinancesNewLook({
         </div>
       ) : null}
 
-      <FinanceLeagueTable leagueTable={leagueTable} activeManagerTeamId={activeManagerTeamId} />
+      <FinanceLeagueTable
+        leagueTable={leagueTable}
+        activeManagerTeamId={activeManagerTeamId}
+        onOpenTeam={onOpenTeam ?? null}
+      />
     </div>
   );
 }

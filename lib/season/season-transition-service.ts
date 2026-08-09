@@ -495,13 +495,31 @@ export async function advanceSeasonTransitionStep(
   if (computed.status !== "advanced") {
     return computed.preview;
   }
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, computed.nextGameState);
+  /**
+   * LETZTE GELEGENHEIT, DIE SAISON EINZUFRIEREN — direkt vor den Verkaeufen.
+   *
+   * Der Freeze laeuft eigentlich am Ende von `player_development`. Haengt er nur
+   * dort, faellt er bei jeder gescheiterten oder uebersprungenen Entwicklung
+   * ersatzlos aus — und genau das ist auf dem Live-Spielstand passiert: kein Team
+   * trug `marketValueSeasonEnd`, die Historie fiel auf Werte der FOLGE-Saison
+   * zurueck.
+   *
+   * Deshalb hier noch einmal, idempotent (write-once je Feld) und unabhaengig
+   * davon, ob die Entwicklung durchlief. Ab der naechsten Zeile verkauft die KI;
+   * was danach eingefroren wuerde, waere nicht mehr der Saisonstand.
+   */
+  const gameStateVorVerkaeufen =
+    computed.appliedStep === "transfer_sell_phase"
+      ? (patchSeasonSnapshotMarketValueAfterProgression(computed.nextGameState, save.gameState.season.id).gameState ??
+        computed.nextGameState)
+      : computed.nextGameState;
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, gameStateVorVerkaeufen);
 
   const nachVerkaeufen = await runSeasonEndAiSellsIfDue({
     saveId: save.saveId,
     appliedStep: computed.appliedStep,
     seasonId: save.gameState.season.id,
-    gameStateAfterHop: computed.nextGameState,
+    gameStateAfterHop: gameStateVorVerkaeufen,
     transitionAfterHop: computed.transition,
     persistence,
   });

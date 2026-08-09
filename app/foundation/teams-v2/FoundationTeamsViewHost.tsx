@@ -308,6 +308,7 @@ export default function FoundationTeamsViewHost({
         teamRosterFocusOptions={
           rosterDerivations.teamRosterFocusOptions as FoundationTeamsNewLookProps["teamRosterFocusOptions"]
         }
+        playerRatingsById={playerRatingsById}
         leaguePlayerHeatPools={panelProps.leaguePlayerHeatPools as FoundationTeamsNewLookProps["leaguePlayerHeatPools"]}
         openTeamProfileById={panelProps.openTeamProfileById as FoundationTeamsNewLookProps["openTeamProfileById"]}
         openPlayerDrawerById={panelProps.openPlayerDrawerById as FoundationTeamsNewLookProps["openPlayerDrawerById"]}

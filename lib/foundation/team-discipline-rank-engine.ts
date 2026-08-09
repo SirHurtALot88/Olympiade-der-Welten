@@ -1,4 +1,10 @@
-import type { Discipline, GameState, Team, TeamDisciplineRankSnapshotRecord } from "@/lib/data/olyDataTypes";
+import type {
+  Discipline,
+  GameState,
+  Team,
+  TeamDisciplineRankSnapshotRecord,
+  TeamStrengthRankCaptureRecord,
+} from "@/lib/data/olyDataTypes";
 import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
 
 export type TeamDisciplineRankScorePack = {
@@ -266,6 +272,53 @@ export function buildTeamDisciplineRankSnapshotRecords(
     disciplineRanks: row.disciplineRanks,
     scorePack: row.scorePack,
   }));
+}
+
+/**
+ * Hält die Teamstärke-Ränge ZUM ZEITPUNKT EINER SPIELTAGSWERTUNG fest.
+ *
+ * GEMELDET VON CHRIS: Der Saison-Schnappschuss rechnete die Ränge erst beim Saisonabschluss aus dem
+ * Live-Kader — im echten Spielstand lagen zwischen letztem Spieltag und Abschluss vier Tage und
+ * 49 Verkäufe, und N-N stand plötzlich als 32. der Teamstärke im Archiv. Die Delta-Spalte der
+ * Ranks-Matrix maß damit „wie stark habe ich nach dem Ausverkauf wieder aufgebaut" statt „wie habe
+ * ich mich seit der Vorsaison entwickelt".
+ *
+ * Deshalb wird der Satz jetzt bei jeder Wertung (Standings-Apply) neu festgehalten — der jeweils
+ * letzte Spieltag gewinnt — und der Saison-Schnappschuss übernimmt ihn unverändert. Dieselbe
+ * Rangfunktion wie überall (`buildTeamDisciplineRankSnapshotRecords`), nur ein anderer Zeitpunkt.
+ */
+export function buildTeamStrengthRankCaptureRecord(
+  gameState: GameState,
+  scope: { saveId: string; seasonId: string; matchdayId: string },
+  capturedAt: string = new Date().toISOString(),
+): TeamStrengthRankCaptureRecord {
+  return {
+    id: `team-strength-rank-capture__${scope.saveId}__${scope.seasonId}`,
+    saveId: scope.saveId,
+    seasonId: scope.seasonId,
+    matchdayId: scope.matchdayId,
+    capturedAt,
+    records: buildTeamDisciplineRankSnapshotRecords(gameState),
+  };
+}
+
+/** Ein Eintrag pro Saison: der neue Satz ersetzt den alten derselben Saison, andere bleiben stehen. */
+export function upsertTeamStrengthRankCapture(
+  captures: TeamStrengthRankCaptureRecord[] | undefined,
+  capture: TeamStrengthRankCaptureRecord,
+): TeamStrengthRankCaptureRecord[] {
+  const next = (captures ?? []).filter((entry) => entry.seasonId !== capture.seasonId);
+  next.push(capture);
+  return next.sort((left, right) => left.seasonId.localeCompare(right.seasonId, "de"));
+}
+
+export function findTeamStrengthRankCapture(
+  gameState: GameState,
+  seasonId: string,
+): TeamStrengthRankCaptureRecord | null {
+  return (
+    (gameState.seasonState.teamStrengthRankCaptures ?? []).find((entry) => entry.seasonId === seasonId) ?? null
+  );
 }
 
 export function buildTeamDisciplineRankRowsFromSnapshotRecords(

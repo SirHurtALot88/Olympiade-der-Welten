@@ -1,13 +1,18 @@
 /**
  * APRON-SERVICE — Gummiband gegen "Reich wird reicher" (siehe lib/season/apron-service.ts).
  *
- * Geprueft werden genau die Kriterien aus dem Entwurf:
+ * Geprueft werden genau die Kriterien aus dem Entwurf (Stand nach der Nutzer-Entscheidung
+ * "Empfaenger-Deckel raus" in PR #468 — der Topf wird vollstaendig verteilt):
  *  1. Konjunkturhebel: 0 bei f <= 0,95, 1 bei f >= 1,24, linear dazwischen.
- *  2. Deckel greift: ein Team mit hohem Gehalt und kleinem Wertungsanteil zahlt hoechstens die
- *     Haelfte davon.
- *  3. Erhaltung: Summe der Abgaben = Summe der Ausgleiche (kein Geld entsteht oder verschwindet).
+ *  2. Deckel greift NUR auf der Abgabe-Seite: ein Team mit hohem Gehalt und kleinem
+ *     Wertungsanteil zahlt hoechstens die Haelfte davon.
+ *  3. Erhaltung: Σ Abgaben = Topf = Σ Ausgleiche, Σ Netto = 0 — IMMER; es entsteht und
+ *     verschwindet kein Geld.
  *  4. Referenz-Fallback: bei leerer Liga stehen die Linien auf 64,9 × 1,10 bzw. × 1,28.
  *  5. Ein Team genau auf einer Linie zahlt nichts (Grenzfall).
+ *  6. Vollstaendige Ausschuettung: die Empfaenger teilen den GANZEN Topf zu gleichen
+ *     Kopfteilen, unabhaengig vom Rang. Randfall: ohne einen einzigen Empfaenger wird auch
+ *     nichts eingesammelt (bestraft wird nur, was umverteilt werden kann).
  */
 import { describe, expect, it } from "vitest";
 
@@ -100,9 +105,9 @@ describe("Apron — Abgaben und Ausgleiche", () => {
   it("Deckel greift: hohes Gehalt, kleiner Wertungsanteil zahlt höchstens die Hälfte davon", () => {
     // Extremfall: Gehalt weit über Linie 2, aber ein winziger Wertungsanteil (schlechter Endrang).
     const rankShare = 4;
-    const teams = [buildTeam("Ueberzahler", 500, rankShare)];
+    const teams = [buildTeam("Ueberzahler", 500, rankShare), buildTeam("Sparer", 40, 500)];
     const settlement = computeApronSettlement({ lines, salaryFactor: 1.24, teams });
-    const row = settlement.rows[0]!;
+    const row = settlement.rows.find((entry) => entry.teamId === "Ueberzahler")!;
     // Die rohe (ungedeckelte) Abgabe muss den Deckel tatsächlich reißen — sonst testet der Fall den
     // Deckel gar nicht.
     expect(row.rohAbgabe).toBeGreaterThan(APRON_CAP_SHARE_OF_RANK_PAYOUT * rankShare);
@@ -110,8 +115,11 @@ describe("Apron — Abgaben und Ausgleiche", () => {
     expect(row.abgabe).toBeLessThanOrEqual(rankShare * 0.5 + 1e-9);
   });
 
-  it("Erhaltung: Summe der Abgaben = Summe der Ausgleiche, über mehrere Konstellationen", () => {
+  it("Erhaltung: Σ Abgaben = Topf = Σ Ausgleiche und Σ Netto = 0, über mehrere Konstellationen", () => {
     const configs: ApronTeamInput[][] = [
+      [buildTeam("A", 150, 300), buildTeam("B", 40, 400), buildTeam("C", 60, 350), buildTeam("D", 95, 120)],
+      // Empfänger B mit winzigem Wertungsanteil — sein Kopfanteil ist trotzdem der volle
+      // (kein Empfänger-Deckel mehr), die Erhaltung gilt exakt.
       [buildTeam("A", 150, 300), buildTeam("B", 40, 5), buildTeam("C", 60, 40), buildTeam("D", 95, 120)],
       Array.from({ length: 32 }, (_, index) =>
         buildTeam(`T${index}`, 30 + index * 3, Math.max(1, 200 - index * 6)),
@@ -125,12 +133,29 @@ describe("Apron — Abgaben und Ausgleiche", () => {
         const totalAusgleich = settlement.rows.reduce((sum, row) => sum + row.ausgleich, 0);
         expect(totalAusgleich).toBeCloseTo(totalAbgabe, 9);
         expect(totalAbgabe).toBeCloseTo(settlement.topf, 9);
+        expect(settlement.rows.reduce((sum, row) => sum + row.nettoDelta, 0)).toBeCloseTo(0, 9);
       }
     }
   });
 
-  it("Ausschüttung geht zu gleichen Teilen an alle Teams STRENG unter der 1. Linie", () => {
-    const teams = [buildTeam("Zahler", 200, 300), buildTeam("B", 40, 10), buildTeam("C", 40, 10), buildTeam("D", lines.line1, 10)];
+  it("Randfall: ohne einen einzigen Empfänger wird auch nichts eingesammelt (keine Abgabe ins Nichts)", () => {
+    // Alle Teams über der 1. Linie — niemand ist empfangsberechtigt. Früher zahlten die Zahler
+    // trotzdem und das Geld verschwand; jetzt gilt: bestraft wird nur, was auch umverteilt wird.
+    const teams = [buildTeam("A", 150, 300), buildTeam("B", 120, 200), buildTeam("C", 95, 120)];
+    const settlement = computeApronSettlement({ lines, salaryFactor: 1.24, teams });
+    expect(settlement.empfaengerCount).toBe(0);
+    // Die Roh-Abgaben wären positiv — eingesammelt wird trotzdem nichts.
+    expect(settlement.rows.some((row) => row.rohAbgabe > 0)).toBe(true);
+    expect(settlement.topf).toBe(0);
+    expect(settlement.zahlerCount).toBe(0);
+    for (const row of settlement.rows) {
+      expect(row.abgabe).toBe(0);
+      expect(row.nettoDelta).toBe(0);
+    }
+  });
+
+  it("Ausschüttung geht zu gleichen KOPFTEILEN an alle Teams STRENG unter der 1. Linie", () => {
+    const teams = [buildTeam("Zahler", 200, 300), buildTeam("B", 40, 200), buildTeam("C", 40, 200), buildTeam("D", lines.line1, 200)];
     const settlement = computeApronSettlement({ lines, salaryFactor: 1.24, teams });
     const b = settlement.rows.find((row) => row.teamId === "B")!;
     const c = settlement.rows.find((row) => row.teamId === "C")!;
@@ -139,6 +164,29 @@ describe("Apron — Abgaben und Ausgleiche", () => {
     expect(b.ausgleich).toBeGreaterThan(0);
     // D liegt GENAU auf der Linie — kein Empfänger.
     expect(d.ausgleich).toBe(0);
+  });
+
+  it("vollständige Ausschüttung: die Empfänger teilen den GANZEN Topf, unabhängig vom Rang", () => {
+    // Nutzer-Entscheidung (PR #468): kein Empfänger-Deckel. Auch ein Empfänger mit
+    // Wertungsanteil 0 (letzter Rang) bekommt den vollen Kopfanteil — die Verteidigung gegen
+    // den 428,7-auf-3-Schadensfall ist der korrekte Einfrier-Zeitpunkt, nicht ein Deckel.
+    const teams = [
+      buildTeam("Z1", 200, 500),
+      buildTeam("Z2", 190, 450),
+      buildTeam("E-vorn", 40, 60),
+      buildTeam("E-mitte", 45, 20),
+      buildTeam("E-letzter", 50, 0),
+    ];
+    const settlement = computeApronSettlement({ lines, salaryFactor: 1.24, teams });
+    const kopfanteil = settlement.topf / settlement.empfaengerCount;
+    expect(settlement.topf).toBeGreaterThan(0);
+    for (const id of ["E-vorn", "E-mitte", "E-letzter"]) {
+      const row = settlement.rows.find((entry) => entry.teamId === id)!;
+      expect(row.istEmpfaenger).toBe(true);
+      expect(row.ausgleich).toBeCloseTo(kopfanteil, 9);
+    }
+    const totalAusgleich = settlement.rows.reduce((sum, row) => sum + row.ausgleich, 0);
+    expect(totalAusgleich).toBeCloseTo(settlement.topf, 9);
   });
 });
 

@@ -1259,8 +1259,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 : "Kandidaten"
             }
             onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
-            title="Zur Wishlist springen"
-            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wishlist springen`}
+            title="Zur Wunschliste springen"
+            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wunschliste springen`}
           />
           <StatChip label="Filter aktiv" value={activeFilterCount} tone={activeFilterCount > 0 ? "warn" : "neutral"} />
         </StatChipRow>
@@ -2235,12 +2235,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     disabled={Boolean(wishlistDisabledReason && !selectedPlayerWishlisted)}
                     title={
                       selectedPlayerWishlisted
-                        ? "Von der Wishlist nehmen — Scouting-Slot wird frei."
-                        : wishlistDisabledReason ?? "Spieler auf die Wishlist setzen und bevorzugt scouten."
+                        ? "Von der Wunschliste nehmen — Scouting-Slot wird frei."
+                        : wishlistDisabledReason ?? "Spieler auf die Wunschliste setzen und bevorzugt scouten."
                     }
                     onClick={onToggleSelectedWishlist}
                   >
-                    {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
+                    {selectedPlayerWishlisted ? "Von Wunschliste nehmen" : "Auf Wunschliste"}
                   </button>
                   <button
                     type="button"
@@ -2675,7 +2675,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
       <div className="nl-market-context-grid">
         <NlCard
           className="nl-market-wishlist-card"
-          eyebrow="Wishlist & Scouting"
+          eyebrow="Wunschliste & Scouting"
           title={
             scoutingPipelineCapacity?.draftSuspended
               ? `${wishlistEntries.length} gemerkt · Draft ohne Limit`
@@ -2685,7 +2685,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           }
         >
           {wishlistEntries.length > 0 ? (
-            <div className="nl-market-wishlist-strip" role="list" aria-label="Wishlist-Kandidaten">
+            <div className="nl-market-wishlist-strip" role="list" aria-label="Wunschlisten-Kandidaten">
               {wishlistEntries.map((entry) => {
                 const marketItem = marketItemsById.get(entry.playerId);
                 const portraitBase = marketItem
@@ -2748,7 +2748,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         <button
                           type="button"
                           className="nl-market-inline-action is-danger"
-                          title="Spieler von der Wishlist nehmen."
+                          title="Spieler von der Wunschliste nehmen."
                           onClick={() => onRemoveWishlist(entry.playerId)}
                         >
                           Entfernen
@@ -2761,7 +2761,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             </div>
           ) : (
             <p className="nl-market-muted">
-              Wishlist leer — merke Kandidaten im Markt, um sie später gezielt zu scouten.
+              Wunschliste leer — merke Kandidaten im Markt, um sie später gezielt zu scouten.
             </p>
           )}
         </NlCard>

@@ -408,11 +408,26 @@ function formatToneLabel(value: string | null | undefined) {
   return LABEL_MAP[value] ?? value.replaceAll("_", " ");
 }
 
-function formatReadinessLabel(value: string | null | undefined) {
-  if (!value) {
-    return "unbekannt";
+/**
+ * Durchklick-Test G5: Der Bedarf-Chip zeigte „Status unknown" — roher
+ * Statuscode zwischen deutschen Chips. Bekannte Zustände bekommen Spieltext;
+ * `unknown`/fehlend liefert null, damit der Chip ausgeblendet wird (dieselbe
+ * F2-Konvention wie beim Budget-Chip: kein Chip statt „Status unbekannt").
+ */
+const READINESS_STATUS_LABELS: Record<string, string> = {
+  ready: "startklar",
+  underfilled_roster: "Kader zu klein",
+  missing_lineup: "Einsatzliste fehlt",
+  invalid_lineup: "Einsatzliste ungültig",
+  missing_score_coverage: "Wertung unvollständig",
+};
+
+function formatReadinessLabel(value: string | null | undefined): string | null {
+  if (!value || value === "unknown") {
+    return null;
   }
-  return value.replaceAll("_", " ");
+  // Nie roher Code: unbekannte neue Zustände bekommen einen ehrlichen Sammelbegriff.
+  return READINESS_STATUS_LABELS[value] ?? "wird geprüft";
 }
 
 // F5: formatNegotiationSignalLabel kommt aus foundation-format-render-helpers —
@@ -1031,7 +1046,7 @@ export default function TransfermarktV2Client({
     ? null
     : scoutingPipelineCapacity?.draftSuspended
       ? `Wunschliste im Draft voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — erst einen Spieler entfernen.`
-      : `Wishlist voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`;
+      : `Wunschliste voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`;
   const scoutingPipelineFull = Boolean(
     scoutingPipelineCapacity &&
       !scoutingPipelineCapacity.draftSuspended &&
@@ -2388,7 +2403,7 @@ export default function TransfermarktV2Client({
         disciplineRankByDisciplineId={selectedTeamId ? disciplineRanksByTeamId[selectedTeamId] ?? null : null}
         leagueTeamCount={leagueTeamCount ?? teams.length}
         budgetStatusLabel={marketContext?.affordabilityStatus ? formatToneLabel(marketContext.affordabilityStatus) : null}
-        readinessStatusLabel={marketContext?.readinessStatus ? formatReadinessLabel(marketContext.readinessStatus) : null}
+        readinessStatusLabel={formatReadinessLabel(marketContext?.readinessStatus)}
         onSellRow={
           canSellRoster && onSell
             ? (row) =>

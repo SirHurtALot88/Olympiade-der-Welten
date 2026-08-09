@@ -2083,6 +2083,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               leagueHeatPools: leaguePlayerHeatPools,
               facilities: homeV2Facilities,
               scheduleItems: homeV2ScheduleItems,
+              // G3: der echte Spielplan — scheduleItems ist nur das 4er-Fenster
+              // des Steppers und taugt nicht als Saisonlänge.
+              seasonMatchdayTotal: gameState.season.matchdayIds.length,
               inboxItems: homeV2InboxItems,
               // F4: Zähler = volle Entscheidungsliste (identisch zur Inbox),
               // die Item-Liste bleibt die Top-5-Anzeige.
@@ -3119,8 +3122,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
                   <span>{entry.label}</span>
                   <strong>{entry.row?.team.name ?? "—"}</strong>
-                  <small>
-                    {entry.row ? `#1 · ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)} Punkte` : "keine Werte"}
+                  {/* „Stärke", nicht „Punkte": der Wert ist der Teamstärke-Score der Rank-Matrix
+                      (scorePack — Summe der Top-6-Disziplin-Ratings der Kader, team-discipline-
+                      rank-engine.ts), keine erspielte Größe. „Punkte" meint auf derselben Seite
+                      bereits die PPs des Saison-Rankings — ein Wort pro Größe. */}
+                  <small title="Teamstärke-Score aus den Disziplin-Ratings der Kader (Rank-Matrix) — nicht die erspielten PPs des Saison-Rankings">
+                    {entry.row ? `#1 · Stärke ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)}` : "keine Werte"}
                   </small>
                 </article>
               ))}
@@ -3402,7 +3409,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
               activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
           {activeView === "finances" ? (
-            <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} saveId={activeSaveId} />
+            <FoundationFinancesHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              saveId={activeSaveId}
+              onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+            />
           ) : null}
 
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}

@@ -42,6 +42,7 @@ import {
   type NlRankingDrawerRow,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import {
   getSeasonV2TeamTagStyle,
   type SeasonStandingsV2ClientProps,
@@ -549,6 +550,21 @@ export default function SeasonStandingsNewLook({
 
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
 
+  /**
+   * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
+   * Vor Spieltag 1 ist `row.points` überall `null` — die Ränge 1–32 sind dann
+   * der ENDSTAND DER VORSAISON (deckungsgleich mit der Ewigen Tabelle), also
+   * die Startplätze der neuen Saison. Das ist eine legitime Reihenfolge, sie
+   * muss nur gesagt werden (die Arena macht es vor: „die Reihenfolge sind die
+   * Startplätze aus dem Endstand der Vorsaison"). Was dagegen NICHT geht:
+   * Gold/Silber/Bronze für 0 Punkte — Medaillen-Optik gibt es erst, wenn
+   * mindestens ein Team eine echte Saison-Wertung trägt.
+   */
+  const hasSeasonScoring = useMemo(
+    () => boardRows.some((row) => row.points != null && Number.isFinite(row.points)),
+    [boardRows],
+  );
+
   const displayBoardRows = useMemo(() => {
     if (boardSort === "rank") {
       return boardRows;
@@ -624,6 +640,18 @@ export default function SeasonStandingsNewLook({
   );
 
   const topPlayersStrip = useMemo(() => topPlayers.slice(0, 10), [topPlayers]);
+
+  /**
+   * „Top-Spieler der Saison" mit zehn Zeilen voller „—" ist keine Rangliste,
+   * sondern eine Behauptung. Stehen ALLE Kandidaten ohne PPs da (vor dem
+   * ersten gewerteten Spieltag), rendert stattdessen das geteilte
+   * Leerzustand-Primitive `VeloPendingRanking` — dasselbe, das Arena, Ranks,
+   * Ergebnisseite und Leaders für exakt diese Situation benutzen.
+   */
+  const topPlayersPending = useMemo(
+    () => topPlayersStrip.length > 0 && topPlayersStrip.every((player) => player.pps == null),
+    [topPlayersStrip],
+  );
 
   const leaderPoints = useMemo(
     () =>
@@ -1170,8 +1198,13 @@ export default function SeasonStandingsNewLook({
 
   function renderBoardRow(row: SeasonV2StandingsRow, revealIndex: number) {
     const isExpanded = expandedTeamId === row.teamId;
-    const isPodium = row.rank != null && row.rank >= 1 && row.rank <= 3;
-    const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
+    // G2: Medaillen und Podium-Glow nur, wenn es überhaupt eine Saison-Wertung
+    // gibt. Vor Spieltag 1 ist Rang 1–3 nur der Startplatz aus der Vorsaison —
+    // Gold für 0 Punkte wäre eine erfundene Auszeichnung.
+    const isPodium = hasSeasonScoring && row.rank != null && row.rank >= 1 && row.rank <= 3;
+    const medalKind = !hasSeasonScoring
+      ? null
+      : row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
 
     return (
       <li
@@ -1311,6 +1344,9 @@ export default function SeasonStandingsNewLook({
   function renderDatenTopPlayers() {
     if (topPlayersStrip.length === 0) {
       return null;
+    }
+    if (topPlayersPending) {
+      return renderTopPlayersPendingCard();
     }
     return (
       <div className="nl-standings-daten-players">
@@ -1630,9 +1666,35 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Leerzustand für „Top-Spieler der Saison": alle Kandidaten stehen bei „—"
+   * (keine PPs vor dem ersten gewerteten Spieltag) — statt zehn leerer Zeilen
+   * mit #1–#10 das geteilte `VeloPendingRanking` (wie Arena/Ranks/Leaders).
+   */
+  function renderTopPlayersPendingCard() {
+    return (
+      <VeloPendingRanking
+        className="nl-standings-players-pending"
+        eyebrow="Spieler-Highlights"
+        title="Top-Spieler — noch zu vergeben"
+        note="Die Top-Spieler der Saison entstehen aus PPs gespielter Wettbewerbe — die erste Wertung gibt es an Spieltag 1. Bis dahin steht hier bewusst keine Reihenfolge."
+        slots={[
+          { key: "gold", ring: "1.", label: "Noch zu vergeben" },
+          { key: "silver", ring: "2.", label: "Noch zu vergeben" },
+          { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
+        ]}
+        meta={`${formatNlNumber(standingsRows.length, 0)} Teams gemeldet · alle Spieler starten bei 0 PPs`}
+        data-testid="nl-standings-top-players-pending"
+      />
+    );
+  }
+
   function renderTopPlayersStrip() {
     if (topPlayersStrip.length === 0) {
       return null;
+    }
+    if (topPlayersPending) {
+      return renderTopPlayersPendingCard();
     }
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Spieler-Highlights" title="Top-Spieler der Saison">
@@ -1953,7 +2015,15 @@ export default function SeasonStandingsNewLook({
     <div className="nl-standings" data-testid="nl-season-standings" data-new-look="true" ref={rootRef}>
       <NlCard
         className="nl-standings-header-card"
-        eyebrow={`${sourceBadgeLabel} · ${isArchived ? "Archiv" : "Live"} · ${sourceLabel}`}
+        eyebrow={
+          /* Durchklick-Test (G5): „SPIELSTAND: AKTIV · LIVE · AKTIVE SEASON ·
+             LOKALE RESULTS" war eine halbenglische Status-Flag-Reihe als erste
+             Zeile der Seite. Der Spieler bekommt Klartext; die technische
+             Quelle bleibt als Tooltip erreichbar. */
+          <span title={`${sourceBadgeLabel} · ${sourceLabel}`}>
+            {isArchived ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+          </span>
+        }
         title={`Saisonstand — ${selectedSeasonLabel}`}
         actions={
           <>
@@ -2036,6 +2106,16 @@ export default function SeasonStandingsNewLook({
             </StatChipRow>
           ) : null}
         </div>
+        {/* G2 „beschriften statt löschen": vor der ersten Wertung ist die
+            Reihenfolge der Tabelle der Endstand der Vorsaison (= Startplätze).
+            Das steht hier EINMAL, sichtbar in allen drei Ansichten — dieselbe
+            Erklärung, die die Arena für ihr Umfeld bereits mitliefert. */}
+        {!hasSeasonScoring && !isArchived && boardRows.length > 0 ? (
+          <p className="nl-standings-preseason-note" data-testid="nl-standings-preseason-note">
+            Noch kein Spieltag gewertet — die Reihenfolge ist der Endstand der Vorsaison
+            (deine Startplätze). Punkte, Achsenwerte und Medaillen füllen sich ab Spieltag 1.
+          </p>
+        ) : null}
       </NlCard>
 
       {isLoading && boardRows.length === 0 ? (

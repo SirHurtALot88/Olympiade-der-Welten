@@ -281,6 +281,19 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         poRangeMax: developmentInsight?.potentialRangeDisplay?.max ?? null,
         caStars: forecast?.currentAbilityStars ?? null,
         poStars: forecast?.potentialStars ?? null,
+        // Saison-PPs je Achse samt Ligarang — direkt aus der Rating-Zeile
+        // (`ppPow`/`ppPowRank`/…), derselben Quelle wie die POW/SPE/MEN/SOC-
+        // Spalten der Ranks-Seite. Hier wird nichts nachgerechnet.
+        axisPps: {
+          pow: rating?.ppPow ?? null,
+          powRank: rating?.ppPowRank ?? null,
+          spe: rating?.ppSpe ?? null,
+          speRank: rating?.ppSpeRank ?? null,
+          men: rating?.ppMen ?? null,
+          menRank: rating?.ppMenRank ?? null,
+          soc: rating?.ppSoc ?? null,
+          socRank: rating?.ppSocRank ?? null,
+        },
       };
     });
   }, [enableTopPlayerForecasts, gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap]);

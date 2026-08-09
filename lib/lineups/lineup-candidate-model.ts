@@ -650,15 +650,45 @@ export function buildSlotPreviewByKey(input: {
     const sidePreview = resolvedPreview?.disciplineSideScores.find((entry) => entry.disciplineSide === slot.disciplineSide) ?? null;
     const role: MatchdaySlotRoleDefinition | null = slotRoleByKey.get(slot.key) ?? null;
     const intensity = intensityBySide[slot.disciplineSide];
+    // JEDER Slot bekommt NUR seinen eigenen Anteil an den Modifikatoren.
+    //
+    // Vorher standen hier `sidePreview.mutatorModifier` und `.teamPowerModifier`
+    // roh drin — das sind aber SEITEN-Summen, keine Pro-Spieler-Werte
+    // (`legacy-lineup-modifiers.ts`: mutatorModifier = Treffer × 6 über die ganze
+    // Seite; `legacy-score-engine.ts`: teamPowerModifier = Prozentsatz auf den
+    // Seiten-Score). Bei N belegten Slots wurden beide N-fach gezählt. Weil die
+    // Vorschau asynchron nachlädt, sprang die Anzeige genau in dem Moment nach
+    // oben: gemeldet als „erst 72,8 Punkte, dann lädt es neu und er hat 96,8".
+    //
+    // Die Engine liefert die Pro-Spieler-Zahlen längst mit (`formShare`,
+    // `mutatorBonus`, `captainBonus` je Eintrag) — hier wird jetzt der eigene
+    // Eintrag nachgeschlagen statt der Seiten-Summe.
+    const selectedActivePlayerId = selections[slot.key] ?? "";
+    const sideEntry =
+      sidePreview?.entries?.find(
+        (entry) => entry.activePlayerId === selectedActivePlayerId && entry.slotIndex === slot.slotIndex,
+      ) ?? null;
+    // Team-Power ist als einziger Posten wirklich team-weit (Prozent auf den
+    // Seiten-Score) und hat in der Engine keinen Pro-Spieler-Kanal. Gleichmäßig
+    // auf die belegten Slots verteilt bleibt wenigstens die Summe über die Seite
+    // richtig — voll pro Slot wäre sie es garantiert nicht.
+    const teamPowerSlotDivisor =
+      (sidePreview?.selectedPlayers ?? 0) > 0
+        ? (sidePreview?.selectedPlayers as number)
+        : (sidePreview?.requiredPlayers ?? 0) > 0
+          ? (sidePreview?.requiredPlayers as number)
+          : 1;
     const knownModifierBonus =
-      calculatePerPlayerFormModifier({
-        formModifier: sidePreview?.formModifier,
-        selectedPlayers: sidePreview?.selectedPlayers,
-        requiredPlayers: sidePreview?.requiredPlayers,
-      }) +
-      (sidePreview?.mutatorModifier ?? 0) +
-      (sidePreview?.teamPowerModifier ?? 0) +
-      (captains[slot.disciplineSide] === selections[slot.key] ? sidePreview?.captainBonusTotal ?? 0 : 0);
+      (sideEntry?.formShare ??
+        calculatePerPlayerFormModifier({
+          formModifier: sidePreview?.formModifier,
+          selectedPlayers: sidePreview?.selectedPlayers,
+          requiredPlayers: sidePreview?.requiredPlayers,
+        })) +
+      (sideEntry?.mutatorBonus ?? 0) +
+      (sideEntry?.captainBonus ??
+        (captains[slot.disciplineSide] === selectedActivePlayerId ? sidePreview?.captainBonusTotal ?? 0 : 0)) +
+      (sidePreview?.teamPowerModifier ?? 0) / teamPowerSlotDivisor;
     const revealVariance =
       (context?.formCardSource?.effectStatus === "ready" ? 0 : 2) +
       (context?.mutatorSource?.effectStatus === "ready" ? 0 : 2) +

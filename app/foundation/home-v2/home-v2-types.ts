@@ -1,5 +1,6 @@
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
+import type { FoundationPlayerPortraitAxisPps } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 
 export type HomeV2TopPlayerCard = {
   playerId: string;
@@ -27,6 +28,11 @@ export type HomeV2TopPlayerCard = {
   /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
   caStars?: number | string | null;
   poStars?: number | string | null;
+  /**
+   * Saison-PPs je Achse samt Ligarang — dieselbe Quelle wie die POW/SPE/MEN/SOC-Spalten
+   * der Ranks-Seite (`PlayerRatingContractRow.ppPow/…`), hier wird nichts nachgerechnet.
+   */
+  axisPps?: FoundationPlayerPortraitAxisPps | null;
 };
 
 export const HOME_V2_TOP_PLAYER_COUNT = 6;
@@ -147,6 +153,13 @@ export type HomeV2ClientProps = {
   leagueHeatPools: LeaguePlayerHeatPools;
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
+  /**
+   * Länge des ECHTEN Spielplans (`gameState.season.matchdayIds.length`).
+   * `scheduleItems` ist nur das 4-Elemente-Fenster des Steppers — dessen Länge
+   * darf NIE als Saisonlänge gerechnet werden (Durchklick-Test G3: „verbleibend
+   * 3 Spieltage" vor Spieltag 1 einer Zehn-Spieltage-Saison).
+   */
+  seasonMatchdayTotal?: number | null;
   inboxItems: HomeV2InboxItem[];
   /**
    * F4 (eine Quelle pro Größe): Gesamtzahl der offenen Entscheidungen —

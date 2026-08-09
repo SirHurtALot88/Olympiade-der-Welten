@@ -190,6 +190,42 @@ export type FinanceSeasonHistoryPoint = {
  * (`contract.salary`, das Feld der Season-End-Abbuchung). Die UI muss beide nebeneinander erklären,
  * sonst liest sich der Unterschied wie ein Rechenfehler (siehe Kopfkommentar apron-service.ts).
  */
+/**
+ * Eine Team-Zeile des liga-weiten Apron-Ausweises — Chris: „in den finanzen fehlt mir immernoch
+ * ein ausweis vom APRON was die teams dadurch zahlen müssen oder einnehmen". Die bisherige Karte
+ * nannte 28 Zahler und 3 Empfänger nur als Zahl; diese Zeilen benennen sie.
+ *
+ * EINE Quelle: jede Zahl kommt unverändert (nur anzeige-gerundet) aus derselben
+ * `buildApronProjection`, die auch die eigene Karte und die Apron-Zeile der GuV speist —
+ * hier wird nichts neu gerechnet. `distanceLine1` ist dieselbe reine Anzeige-Subtraktion
+ * (`salaryBasis − line1`) wie beim eigenen Team; Name/Kürzel kommen aus `gameState.teams`.
+ */
+export type FinanceApronLeagueRow = {
+  teamId: string;
+  teamName: string;
+  teamCode: string;
+  /** Aktueller Ligarang (Basis der Hochrechnung) — `null` = unbekannt, letzter Platz angenommen. */
+  rank: number | null;
+  /** GEGLÄTTETE Gehaltssumme — dieselbe Bemessungsgrundlage wie `salaryBasis` des eigenen Teams. */
+  salaryBasis: number;
+  /** `salaryBasis − line1` (positiv = über der 1. Linie — erklärt, warum die Zeile zahlt). */
+  distanceLine1: number;
+  /** Abgabe der Hochrechnung (positiver Betrag; 0 = zahlt nicht). */
+  abgabe: number;
+  /** Kopfanteil am Topf (0 = kein Empfänger oder leerer Topf) — gleicher Anteil für jeden Empfänger. */
+  ausgleich: number;
+  /** `ausgleich − abgabe`. */
+  nettoDelta: number;
+  /** `true`, wenn der Deckel (halber Wertungsanteil) die Abgabe begrenzt hat. */
+  gedeckelt: boolean;
+  /**
+   * Zahler = Abgabe > 0 · Empfänger = ausschüttungsberechtigt (streng unter der 1. Linie, Flag
+   * aus der Engine — auch bei leerem Topf) · sonst neutral. Zahler und Empfänger schließen sich
+   * aus, weil Zahler zwingend über der 1. Linie liegen.
+   */
+  rolle: "zahler" | "empfaenger" | "neutral";
+};
+
 export type FinanceApronStatus = {
   /** Median-Gehalt der Liga (geglättet) — Basis beider Linien. */
   medianSalary: number;
@@ -221,10 +257,25 @@ export type FinanceApronStatus = {
   frozenLines: boolean;
   /** `true` = Frisch-Save-Schranke: Linien aus dem Referenzgehalt statt gemessener Gehälter. */
   usedReferenceSalary: boolean;
-  /** Liga-Kontext der Hochrechnung. */
+  /**
+   * Liga-Kontext der Hochrechnung. Der Topf wird VOLLSTÄNDIG zu gleichen Kopfteilen an die
+   * Empfänger ausgeschüttet (Σ Abgaben = Topf = Σ Ausgleiche, apron-service.ts) — es gibt
+   * keinen Empfänger-Deckel und keinen Verfall.
+   */
   topf: number;
   zahlerCount: number;
   empfaengerCount: number;
+  /**
+   * Liga-weiter Ausweis: ALLE Teams, sortiert größter Zahler → Neutrale → Empfänger — dieselben
+   * Projektionszeilen, aus denen auch `topf`/`zahlerCount`/`empfaengerCount` stammen.
+   */
+  league: FinanceApronLeagueRow[];
+  /**
+   * Wie viele Zahler der Deckel begrenzt. Wichtig für die Summenprobe der Anzeige: der Topf ist
+   * die Summe der GEDECKELTEN Abgaben — die naive Rechnung „Überschuss × Sätze" ginge bei
+   * greifendem Deckel nicht auf, und die UI sagt das dazu.
+   */
+  gedeckeltCount: number;
 };
 
 /**

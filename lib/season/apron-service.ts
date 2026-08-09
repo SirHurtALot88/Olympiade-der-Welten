@@ -249,6 +249,12 @@ export type ApronTeamRow = ApronTeamInput & {
   abgabe: number;
   /** Anteil am ausgeschütteten Topf (nur Teams unter der 1. Linie). */
   ausgleich: number;
+  /**
+   * Empfangsberechtigt, also unter der 1. Linie. Nicht aus `ausgleich > 0` ableitbar: Sammelt in
+   * einer Saison niemand etwas ein, ist der Anteil 0 und ein Empfänger wäre von einem Zahler ohne
+   * Abgabe nicht mehr zu unterscheiden. Der Liga-Ausweis auf der Finanzenseite trennt beide.
+   */
+  istEmpfaenger: boolean;
   /** ausgleich − abgabe. */
   nettoDelta: number;
 };
@@ -302,14 +308,22 @@ export function computeApronSettlement(input: {
     return { ...team, ueberLinie1, ueberLinie2, rohAbgabe, deckel, abgabe };
   });
 
-  const topf = partial.reduce((sum, row) => sum + row.abgabe, 0);
   const empfaenger = partial.filter((row) => row.salary < line1);
-  const anteil = empfaenger.length > 0 ? topf / empfaenger.length : 0;
   const empfaengerIds = new Set(empfaenger.map((row) => row.teamId));
 
+  // Liegt KEIN Team unter der 1. Linie, wird auch nichts eingesammelt. Der Apron verteilt um; er
+  // vernichtet kein Geld. Vorher floss die Abgabe in diesem Fall ersatzlos aus der Liga heraus —
+  // ein stiller Kapitalabfluss, den niemand bestellt hat. Mit Linien, die erst nach dem Kaderbau
+  // einrasten, ist der Fall ohnehin fast unmoeglich: Der Median trennt die Liga, es liegt also
+  // immer mindestens die Haelfte darunter. Er bleibt trotzdem definiert.
+  const topf = empfaenger.length > 0 ? partial.reduce((sum, row) => sum + row.abgabe, 0) : 0;
+  const anteil = empfaenger.length > 0 ? topf / empfaenger.length : 0;
+
   const rows: ApronTeamRow[] = partial.map((row) => {
-    const ausgleich = empfaengerIds.has(row.teamId) ? anteil : 0;
-    return { ...row, ausgleich, nettoDelta: ausgleich - row.abgabe };
+    const istEmpfaenger = empfaengerIds.has(row.teamId);
+    const ausgleich = istEmpfaenger ? anteil : 0;
+    const abgabe = empfaenger.length > 0 ? row.abgabe : 0;
+    return { ...row, abgabe, ausgleich, istEmpfaenger, nettoDelta: ausgleich - abgabe };
   });
 
   return {
