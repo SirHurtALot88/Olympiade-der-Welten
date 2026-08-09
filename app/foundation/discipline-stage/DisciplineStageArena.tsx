@@ -664,6 +664,13 @@ export default function DisciplineStageArena({
   // Erlaubt manuelles Neuladen der Engine-Preview (Retry-Button), falls der erste Versuch
   // fehlschlägt/hängt — ohne den Retry säßen normale Spieler bei „unavailable" still fest.
   const [previewReloadNonce, setPreviewReloadNonce] = useState(0);
+  /**
+   * „Tafel gelesen, ab auf die Bühne." Bewusst NUR im Komponentenzustand und nicht im Spielstand:
+   * die Tafel soll vor JEDEM Spieltag einmal kommen (das war Chris' Anliegen), aber wer sie
+   * weggeklickt hat, soll beim Hin- und Herwechseln nicht wieder darauf landen. Ein neuer Spieltag
+   * mountet die Arena neu, damit steht der Merker wieder auf `false`.
+   */
+  const [preMatchdayDismissed, setPreMatchdayDismissed] = useState(false);
 
   /**
    * Stand der Aufstellungen dieses Spieltags. Teil des Cache-Schluessels UND Ausloeser des Effekts
@@ -1314,10 +1321,27 @@ export default function DisciplineStageArena({
    * Dev-/Test-Modus behält die rohe Bühne (Admin will die Disziplinen frei sehen).
    */
   const matchdayHasBookedResult = useMemo(() => hasCurrentMatchdayResult(gameState), [gameState]);
+  /**
+   * GEMELDET VON CHRIS: „diese infotafel vor dem spieltag kommt glaub ich nur beim ersten spieltag
+   * danach nie wieder gesehen."
+   *
+   * Stimmte. In der Bedingung stand `arenaStartBlockedByLineups` — also „mindestens ein Team der
+   * Liga ist noch nicht bereit". Damit war die Tafel kein Vorspiel-Bildschirm, sondern ein
+   * BLOCKADE-Bildschirm: sie erschien nur, solange jemand trödelte. Am ersten Spieltag fehlten
+   * noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel war weg,
+   * obwohl ihre Überschrift „Vor dem Anpfiff" lautet und der Kommentar sie als „expliziten
+   * Pre-Matchday-Zustand" beschreibt. Bedingung und Absicht liefen auseinander.
+   *
+   * Jetzt zählt nur noch, ob der Spieltag WIRKLICH noch nicht begonnen hat: nichts gebucht, keine
+   * Disziplin gelaufen. Weil die Tafel damit auch dann kommt, wenn alle bereit sind, hat sie einen
+   * Weg nach vorn bekommen (`onStartStage` unten) — vorher war sie eine Sackgasse mit dem einzigen
+   * Ausgang „Einsatzliste öffnen", was genügte, solange sie nur bei Blockaden erschien.
+   */
+  const preMatchdayReady = !arenaStartBlockedByLineups;
   const showPreMatchday =
     mode === "real" &&
     !devMode &&
-    arenaStartBlockedByLineups &&
+    !preMatchdayDismissed &&
     !matchdayHasBookedResult &&
     endedDisciplineIds.size === 0;
 
@@ -1817,9 +1841,9 @@ export default function DisciplineStageArena({
               {` · Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
             </span>
           </div>
-          {onOpenLineup ? (
-            <div className="arena-prematch-hero-actions">
-              {ownLineupComplete ? (
+          <div className="arena-prematch-hero-actions">
+            {onOpenLineup ? (
+              ownLineupComplete ? (
                 <button type="button" className="arena-prematch-ghost" onClick={() => onOpenLineup()}>
                   Einsatzliste prüfen
                 </button>
@@ -1828,9 +1852,24 @@ export default function DisciplineStageArena({
                   Einsatzliste öffnen →
                   {totalRequired > 0 ? <small className="nl-tnum">{totalRequired - filledTotal} von {totalRequired} Plätzen offen</small> : null}
                 </button>
-              )}
-            </div>
-          ) : null}
+              )
+            ) : null}
+            {/* Der Weg nach vorn. Ohne ihn wäre die Tafel eine Sackgasse — was hinnehmbar war,
+                solange sie nur bei Blockaden erschien, aber nicht mehr, seit sie vor jedem
+                Spieltag kommt. Erscheint erst, wenn die ganze Liga bereit ist: vorher DARF die
+                Bühne nicht loslaufen, und ein Knopf, der dann nichts tut, wäre eine Lüge. */}
+            {preMatchdayReady ? (
+              <button
+                type="button"
+                className="arena-prematch-cta"
+                onClick={() => setPreMatchdayDismissed(true)}
+                data-testid="arena-prematch-start-cta"
+              >
+                Zur Bühne →
+                <small className="nl-tnum">Liga vollzählig bereit</small>
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="arena-prematch-disc-grid">

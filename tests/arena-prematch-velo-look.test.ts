@@ -48,6 +48,9 @@ describe("Beidseitige Klassen-Absicherung (Markup ↔ globals.css)", () => {
   // data-Attribute/Testids sind keine Klassen.
   tokens.delete("arena-prematch-lineup-cta");
   tokens.delete("arena-prematch-pending-ranking");
+  // Der „Zur Bühne"-Knopf trägt die vorhandene Klasse `arena-prematch-cta`; dies hier ist nur
+  // sein Testid.
+  tokens.delete("arena-prematch-start-cta");
 
   it("es gibt überhaupt Tokens (der Extraktor läuft nicht ins Leere)", () => {
     expect(tokens.size).toBeGreaterThan(10);
@@ -89,11 +92,24 @@ describe("Vor dem Start behauptet keine Wertung eine Reihenfolge", () => {
     expect(PREMATCH).not.toContain("DisciplineStageMatchdayPanel");
   });
 
-  it("die Zustandserkennung kommt aus echten Daten (Lineup-Gate, gebuchte Ergebnisse, gelaufene Disziplinen)", () => {
-    expect(ARENA).toContain("arenaStartBlockedByLineups &&");
+  /**
+   * FRÜHER stand hier zusätzlich `arenaStartBlockedByLineups &&`. Das war der gemeldete Fehler:
+   * „diese infotafel vor dem spieltag kommt glaub ich nur beim ersten spieltag danach nie wieder
+   * gesehen." Mit dem Lineup-Gate in der Bedingung war die Tafel ein BLOCKADE-Bildschirm — sie kam
+   * nur, solange irgendein Team der Liga noch nicht bereit war. Ab Spieltag 2 hatten alle 32 Teams
+   * ihre Aufstellung fertig, und die Tafel blieb dauerhaft weg.
+   *
+   * Der Anspruch des Falls bleibt: die Erkennung muss aus ECHTEN Daten kommen, nicht aus UI-Zustand
+   * geraten. Nur ist die Frage jetzt richtig gestellt — „hat der Spieltag schon begonnen?" statt
+   * „darf die Bühne noch nicht starten?". Das Lineup-Gate steuert weiterhin den „Zur Bühne"-Knopf
+   * (`preMatchdayReady`), es entscheidet nur nicht mehr, OB die Tafel erscheint.
+   */
+  it("die Zustandserkennung kommt aus echten Daten (gebuchte Ergebnisse, gelaufene Disziplinen)", () => {
     expect(ARENA).toContain("!matchdayHasBookedResult &&");
     expect(ARENA).toContain("endedDisciplineIds.size === 0");
     expect(ARENA).toContain("hasCurrentMatchdayResult(gameState)");
+    // Das Lineup-Gate lebt weiter — als Bedingung für den Weg nach vorn, nicht für die Tafel.
+    expect(ARENA).toContain("const preMatchdayReady = !arenaStartBlockedByLineups;");
   });
 });
 
