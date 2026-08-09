@@ -20,6 +20,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
@@ -1595,7 +1596,9 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         category: "news",
         severity: "warning",
         title: "Story Card: Board unter Hochspannung",
-        description: `${team.shortCode}: Board-Druck bei ${board.pressure}/10 — Vertrauen nur ${board.value}/10.`,
+        // Formatfix (Durchklick): Druck/Vertrauen sind 1-Nachkommastellen-Größen — roh
+        // interpoliert stand hier „8.4/10" (JS-Punkt statt Hauskomma).
+        description: `${team.shortCode}: Board-Druck bei ${formatLocalePoints(board.pressure, 1)}/10 — Vertrauen nur ${formatLocalePoints(board.value, 1)}/10.`,
         targetView: "teams",
         targetParams: { team: teamId, panel: "board-objectives" },
         source: "story:board_confidence_high_pressure",

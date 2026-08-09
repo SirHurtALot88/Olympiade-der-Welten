@@ -1864,10 +1864,14 @@ export default function FoundationPlayersTableNewLook({
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatNlMoney(marketValue)}</span>
+            {/* Formatfix (Durchklick): Geld-Deltas liefen mit 2 Nachkommastellen („+54,27")
+                neben 1-Nachkommastellen-Geldwerten (formatNlMoney) — jetzt überall das
+                Haus-Format mit einer Nachkommastelle (gilt für alle Geld-Delta-Chips
+                dieser Datei). */}
             {marketValueDelta != null && marketValueDelta !== 0 ? (
               <NlDeltaChip
                 value={marketValueDelta}
-                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
                 title="Marktwert-Entwicklung gegenüber der Baseline"
               />
             ) : null}
@@ -1925,7 +1929,7 @@ export default function FoundationPlayersTableNewLook({
               return (
                 <NlDeltaChip
                   value={aufschlag}
-                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
                   title={`Aufschlag des Verkaufsfaktors: ${formatNlMoney(row.sellPreview.grossSalePrice)} Verkaufspreis − ${formatNlMoney(marketValue)} Marktwert`}
                 />
               );
@@ -1941,7 +1945,7 @@ export default function FoundationPlayersTableNewLook({
               <NlDeltaChip
                 value={salaryDelta}
                 invert
-                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
                 title="Gehalts-Entwicklung gegenüber der Baseline (weniger = besser)"
               />
             ) : null}
@@ -3199,7 +3203,7 @@ function FoundationPlayersHub({
                         </button>
                         <NlDeltaChip
                           value={delta}
-                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
                           title="Marktwert-Entwicklung gegenüber der Baseline"
                         />
                       </li>
@@ -3225,7 +3229,7 @@ function FoundationPlayersHub({
                         </button>
                         <NlDeltaChip
                           value={delta}
-                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
                           title="Marktwert-Entwicklung gegenüber der Baseline"
                         />
                       </li>

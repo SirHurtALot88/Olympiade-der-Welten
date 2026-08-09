@@ -2385,12 +2385,23 @@ export default function PlayerDetailDrawer({
             </>
 
         <div className="player-drawer-body">
-          <section className="player-drawer-section player-drawer-hero-surface" id="player-drawer-profile">
+          {/* BUGFIX (Durchklick, Reiter-Markierung): die Anker `#player-drawer-profile` und
+              `#player-drawer-axis` waren INEINANDER verschachtelt (Achsen-Block im Profil-
+              <section>). Der Scroll-Beobachter in `PlayerProfileClient` hält Sektionen als
+              „intersecting"-Menge mit dem beim ÜBERGANG gemessenen top — solange das Profil
+              den Achsen-Block ENTHÄLT, bleibt es für dessen gesamte Höhe in der Menge und
+              gewinnt beim Hochscrollen mit seinem veralteten top gegen den frisch (negativ)
+              gemessenen Achsen-top: die Pille zeigt „Stats", während „Details"-Inhalt im
+              Leseband steht. Fix: die Anker sind jetzt GESCHWISTER in derselben Hero-Karte
+              (die Karte selbst trägt keinen Anker mehr) — der Inhalt und sein Aussehen sind
+              unverändert, nur die Anker-Rechtecke überlappen nicht mehr. */}
+          <section className="player-drawer-section player-drawer-hero-surface">
             {/* Einheitliches Kopf-Layout für ALLE Spieler (auch Free Agents):
                 Profil-Karte mit CA/PO-Sternstapel + KPI-Grid (OVR/PPs/MVS).
                 Free Agents sehen dieselbe Struktur — CA/PO als geschätzte Range
                 (`fogged`), OVR/PPs/MVS als "—" (keine Liga-Leistung vor dem
                 Kauf). So sieht das Profil unabhängig vom Einstieg gleich aus. */}
+            <div className="player-drawer-section-block" id="player-drawer-profile">
               <div className="player-drawer-top-grid">
                 <div className="player-drawer-profile-stack">
                   <div className={`player-drawer-profile-card${variant === "page" ? " is-compact" : ""}`}>
@@ -2472,8 +2483,8 @@ export default function PlayerDetailDrawer({
                   })}
                 </div>
               </div>
-            {showCompactAxisStrip ? axisStrip : null}
-            {isScoutedProfile && visibleScoutedAttributeChips.length ? (
+              {showCompactAxisStrip ? axisStrip : null}
+              {isScoutedProfile && visibleScoutedAttributeChips.length ? (
               <div className="player-drawer-chip-row player-drawer-scout-attribute-row">
                 {visibleScoutedAttributeChips.map((entry) => (
                   <span
@@ -2493,7 +2504,8 @@ export default function PlayerDetailDrawer({
                   </span>
                 ))}
               </div>
-            ) : null}
+              ) : null}
+            </div>
             {showFullAxisGrid ? (
               <div className="player-drawer-section-block" id="player-drawer-axis">
                 {variant === "page" ? (

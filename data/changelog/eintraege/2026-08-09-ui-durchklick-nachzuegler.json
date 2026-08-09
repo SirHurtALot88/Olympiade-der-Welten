@@ -1,0 +1,51 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Team · Saisonstand (Ranks)",
+    "text": "Im PP-Board stand der Formkarten-Wert als nackte Klammer neben den PPs („9,6 (−120,9)“) — der „Bonus“ wirkte größer als der Gesamtwert, dabei sind es zwei Skalen (PPs gegen Score-Modifikatoren). Der Wert heißt jetzt sichtbar „Form-Score“, steht gedämpft statt in Bonus-Grün und erklärt seine Skala im Tooltip.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Welt · Leaders",
+    "text": "Auf derselben Seite standen „Ganze Rangliste · 314 Spieler“ (PP-Kategorien) und „340 Spieler“ (OVR/Training) als nackte Zahlen nebeneinander. Beide stimmen — sie meinen verschiedene Mengen: nur Spieler mit Wertung gegen alle gemeldeten. Das Label sagt das jetzt: „314 von 340 gemeldeten mit Wertung“ bzw. „alle 340 gemeldeten Spieler“.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Markt · Kredite",
+    "text": "Kredite nannten „Einnahmen (Referenz) 64,1 Mio“, die Finanzen daneben „Einnahmen (Saison) 61,6 Mio“ — dieselbe Vokabel für zwei absichtlich verschiedene Größen. Die Kredit-Zahl heißt jetzt nach ihrer echten Rolle „Einnahmen-Bemessung (Sponsor Vorsaison)“: es ist die Bemessungsgrundlage des Kreditrahmens aus der abgerechneten Vorsaison, keine laufende Saison-Hochrechnung.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Markt · Scouting",
+    "text": "Die Kopf-Kachel „Budget 2,5 Mio“ zeigte in Wahrheit das aktuelle Team-Cash, nicht das Startbudget (205). Sie heißt jetzt „Cash · verfügbar am Markt“ — die Zahl, mit der am Transfermarkt wirklich bezahlt wird.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Team · Saisonstand",
+    "text": "Beim Seitenaufbau standen sekundenlang unmögliche Werte wie „Rang #−2“ und „MW −15,7 Mio“ in den „Dein Team“-Kacheln: die Zähler-Animation konnte mit negativem Fortschritt starten (rAF-Zeitstempel vor dem Animationsstart) und fror unter Last genau dort ein. Der Zähler klemmt Fortschritt jetzt bei 0 ab, und die Saisonstand-Kacheln zeigen Rang, Punkte und Marktwert ab dem ersten Frame fest — wie die Finanzen-Kopfzahlen.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Mehrere Seiten",
+    "text": "Zahlen, die am Haus-Formatierer vorbei liefen, schrieben Punkt statt Komma („95.5%“ im Arena-Treemap, „Druck 3.4 · Board 8.4“ auf Home, im Team-Dossier und in der Inbox) oder zwei Nachkommastellen neben 1-Nachkommastellen-Geldwerten („+54,27“ bei den Marktwert-/Gehalts-Deltas der Spieler-Tabelle). Alle laufen jetzt über die Haus-Formatierer mit de-DE-Komma und einer Nachkommastelle; der Disziplin-Bühnen-Formatierer fmt1 formatiert zentral de-DE.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-09",
+    "seite": "Team · Spieler-Detail",
+    "text": "Die Reiter-Pille im Spieler-Profil sprang an der Grenze „Stats“/„Details“ um eins daneben, weil der „Details“-Anker im DOM innerhalb des „Stats“-Ankers steckte und der Scroll-Beobachter beim Hochscrollen den veralteten Messwert des äußeren Ankers gewinnen ließ. Die Anker sind jetzt Geschwister in derselben Karte — Inhalt und Optik unverändert, nur die Markierung stimmt jetzt.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]

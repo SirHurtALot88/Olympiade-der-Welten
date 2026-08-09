@@ -147,6 +147,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Formkarten-Übernutzungs-Strafe (Punktabzug plus Neu-Einordnung der Endtabelle) greift jetzt auch auf dem normalen Spielerweg über „Sponsoren buchen“ — vorher lief sie nur im Cockpit-Saisonabschluss, sodass Sponsor- und Apron-Abrechnung sowie der eingefrorene Saison-Schnappschuss auf der unbestraften Tabelle rechneten; sie greift zudem nur bei wirklich beendeter Saison, damit eine laufende Saison nicht für Karten bestraft wird, die noch gespielt werden können.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Home · Top-Kader",
       "pr": null,
       "text": "Die große Spielerkarte ist neu geordnet: OVR, PPs und MVS stehen jetzt in EINER Zeile statt in zweien — der Liga-Rang klebt dafür nicht mehr im Wert (\"79,9 · #20\"), sondern steht als eigene kleine Zeile im Chip. Darunter neu: die Saison-PPs je Achse (POW/SPE/MEN/SOC samt Ligarang, dieselbe Quelle wie die Ranks-Spalten), mit der Kopfzeile \"PPs je Achse\", damit sie nicht mit den Achswerten direkt darunter verwechselt wird — die stehen wie bisher als farbige Attribut-Chips da. CA und PO bleiben Sterne, PPs und MVS bleiben auch bei 0 oder ohne Wertung sichtbar. Gilt überall, wo die große Karte hängt: Home-Top-6, Team-Profil-Kader, Teams-Portraits und Teams-Detail.",
@@ -264,11 +273,83 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Saisonende-Buchung prüft jetzt, dass die angeforderte Saison die aktuelle ist: ein veralteter „Sponsoren buchen“-Aufruf mit der Saison-ID der Vorsaison (alter Tab, Doppelklick im Rennen mit „Neue Saison starten“) rutschte vorher an allen Duplikat-Wachen vorbei und buchte die komplette Saisonende-Abrechnung der neuen Saison schon an deren Spieltag 1 — Sponsorgeld und Gehaltsabzug zur Unzeit, und am echten Saisonende wären alle Zahlungen übersprungen worden.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Spieler · Trainingshistorie",
       "pr": null,
       "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand (Ranks)",
+      "pr": null,
+      "text": "Im PP-Board stand der Formkarten-Wert als nackte Klammer neben den PPs („9,6 (−120,9)“) — der „Bonus“ wirkte größer als der Gesamtwert, dabei sind es zwei Skalen (PPs gegen Score-Modifikatoren). Der Wert heißt jetzt sichtbar „Form-Score“, steht gedämpft statt in Bonus-Grün und erklärt seine Skala im Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Auf derselben Seite standen „Ganze Rangliste · 314 Spieler“ (PP-Kategorien) und „340 Spieler“ (OVR/Training) als nackte Zahlen nebeneinander. Beide stimmen — sie meinen verschiedene Mengen: nur Spieler mit Wertung gegen alle gemeldeten. Das Label sagt das jetzt: „314 von 340 gemeldeten mit Wertung“ bzw. „alle 340 gemeldeten Spieler“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Kredite nannten „Einnahmen (Referenz) 64,1 Mio“, die Finanzen daneben „Einnahmen (Saison) 61,6 Mio“ — dieselbe Vokabel für zwei absichtlich verschiedene Größen. Die Kredit-Zahl heißt jetzt nach ihrer echten Rolle „Einnahmen-Bemessung (Sponsor Vorsaison)“: es ist die Bemessungsgrundlage des Kreditrahmens aus der abgerechneten Vorsaison, keine laufende Saison-Hochrechnung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Scouting",
+      "pr": null,
+      "text": "Die Kopf-Kachel „Budget 2,5 Mio“ zeigte in Wahrheit das aktuelle Team-Cash, nicht das Startbudget (205). Sie heißt jetzt „Cash · verfügbar am Markt“ — die Zahl, mit der am Transfermarkt wirklich bezahlt wird.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand",
+      "pr": null,
+      "text": "Beim Seitenaufbau standen sekundenlang unmögliche Werte wie „Rang #−2“ und „MW −15,7 Mio“ in den „Dein Team“-Kacheln: die Zähler-Animation konnte mit negativem Fortschritt starten (rAF-Zeitstempel vor dem Animationsstart) und fror unter Last genau dort ein. Der Zähler klemmt Fortschritt jetzt bei 0 ab, und die Saisonstand-Kacheln zeigen Rang, Punkte und Marktwert ab dem ersten Frame fest — wie die Finanzen-Kopfzahlen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Mehrere Seiten",
+      "pr": null,
+      "text": "Zahlen, die am Haus-Formatierer vorbei liefen, schrieben Punkt statt Komma („95.5%“ im Arena-Treemap, „Druck 3.4 · Board 8.4“ auf Home, im Team-Dossier und in der Inbox) oder zwei Nachkommastellen neben 1-Nachkommastellen-Geldwerten („+54,27“ bei den Marktwert-/Gehalts-Deltas der Spieler-Tabelle). Alle laufen jetzt über die Haus-Formatierer mit de-DE-Komma und einer Nachkommastelle; der Disziplin-Bühnen-Formatierer fmt1 formatiert zentral de-DE.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Spieler-Detail",
+      "pr": null,
+      "text": "Die Reiter-Pille im Spieler-Profil sprang an der Grenze „Stats“/„Details“ um eins daneben, weil der „Details“-Anker im DOM innerhalb des „Stats“-Ankers steckte und der Scroll-Beobachter beim Hochscrollen den veralteten Messwert des äußeren Ankers gewinnen ließ. Die Anker sind jetzt Geschwister in derselben Karte — Inhalt und Optik unverändert, nur die Markierung stimmt jetzt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {

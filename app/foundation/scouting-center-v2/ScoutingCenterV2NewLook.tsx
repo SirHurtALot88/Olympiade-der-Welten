@@ -282,12 +282,21 @@ export default function ScoutingCenterV2NewLook({
 
       {activeTab === "overview" || activeTab === "recommended" ? (
         <StatChipRow className="nl-scout-stats" aria-label="Scouting-Kennzahlen">
-          {/* #31 — Header-StatChips als Portale: Budget → Markt, Stufe → Facilities. */}
+          {/* #31 — Header-StatChips als Portale: Cash → Markt, Stufe → Facilities. */}
+          {/* BUGFIX (Durchklick): die Kachel hieß „Budget", zeigte aber das aktuelle Team-Cash
+              (`selectedStandingRow.cash`, z. B. 2,5 Mio) — das Team-BUDGET wäre der Startwert
+              (`team.budget`, z. B. 205) und für eine Kaufentscheidung wertlos. Die Kachel heißt
+              jetzt, was sie zeigt: das am Markt verfügbare Cash. */}
           <StatChip
-            label="Budget"
+            label="Cash"
             value={recruitmentBudget}
             tone="accent"
-            title={draftContextNote ? `${draftContextNote} · Zum Transfermarkt` : "Zum Transfermarkt"}
+            sub="verfügbar am Markt"
+            title={
+              draftContextNote
+                ? `${draftContextNote} · Aktuelles Team-Cash — damit wird am Transfermarkt bezahlt. Zum Transfermarkt`
+                : "Aktuelles Team-Cash — damit wird am Transfermarkt bezahlt. Zum Transfermarkt"
+            }
             onClick={onOpenMarket}
           />
           <StatChip

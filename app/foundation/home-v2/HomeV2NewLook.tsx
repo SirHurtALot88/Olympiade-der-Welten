@@ -809,7 +809,9 @@ export default function HomeV2NewLook({
           title="Board-Ziele"
           actions={
             <span className="nl-home-board-meta nl-tnum">
-              Druck {boardPressure ?? "—"} · Board {boardRating ?? "—"}
+              {/* Formatfix (Durchklick): roh interpoliert stand hier „Druck 3.4 · Board 8.4"
+                  (JS-Punkt statt Hauskomma) — durch den Haus-Formatierer wie überall sonst. */}
+              Druck {formatNlNumber(boardPressure, 1)} · Board {formatNlNumber(boardRating, 1)}
             </span>
           }
         >

@@ -645,14 +645,28 @@ export default function LeagueLeadersNewLook({
                 // Der Knopf, den es vorher nicht gab: die Chips oeffneten den Drawer nur als
                 // Nebeneffekt („Leader", „Median"). Gewuenscht war ein sichtbarer Weg in die
                 // ganze Rangliste.
+                //
+                // BUGFIX (Durchklick): auf derselben Seite standen „314 Spieler" (PP-Kategorien)
+                // und „340 Spieler" (MVS/OVR) als nackte Zahlen nebeneinander — beide stimmen,
+                // meinen aber verschiedene Grundgesamtheiten: eine Kategorie listet nur Spieler,
+                // die in dieser Wertung einen Wert TRAGEN (PPs erst nach dem ersten Einsatz),
+                // MVS/OVR tragen alle gemeldeten Spieler. Der Unterschied steht jetzt im Label
+                // („X von Y gemeldeten mit Wertung") statt nur implizit in der Datenherkunft.
                 <button
                   type="button"
                   className="nl-leaders-openall"
                   data-testid="leaders-open-full-ranking"
                   onClick={() => openCategoryRankingDrawer(category.id, ownBest?.playerId ?? null)}
-                  title={`Ganze Rangliste ${category.label} — ${formatNlNumber(alleEintraege.length, 0)} Spieler`}
+                  title={
+                    alleEintraege.length < gemeldeteSpieler
+                      ? `Ganze Rangliste ${category.label} — ${formatNlNumber(alleEintraege.length, 0)} von ${formatNlNumber(gemeldeteSpieler, 0)} gemeldeten Spielern tragen hier schon eine Wertung (${category.label} entsteht erst aus Einsätzen)`
+                      : `Ganze Rangliste ${category.label} — alle ${formatNlNumber(alleEintraege.length, 0)} gemeldeten Spieler tragen hier eine Wertung`
+                  }
                 >
-                  Ganze Rangliste · {formatNlNumber(alleEintraege.length, 0)} Spieler
+                  Ganze Rangliste ·{" "}
+                  {alleEintraege.length < gemeldeteSpieler
+                    ? `${formatNlNumber(alleEintraege.length, 0)} von ${formatNlNumber(gemeldeteSpieler, 0)} gemeldeten mit Wertung`
+                    : `alle ${formatNlNumber(alleEintraege.length, 0)} gemeldeten Spieler`}
                 </button>
               ) : null}
             </article>
