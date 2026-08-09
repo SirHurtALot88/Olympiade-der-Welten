@@ -178,21 +178,24 @@ describe("buildNeedsFingerprintActivePool", () => {
     expect(result.some((r) => r.playerId === "cheap")).toBe(true);
   });
 
-  // KNOWN REGRESSION (left red intentionally, do not weaken):
-  // buildNeedsFingerprintActivePool (lib/ai/ai-needs-picks-compare-service.ts
-  // ~line 4406) has no "always include high-OVR players" path at all. It only
-  // includes a candidate for being a cheap fill (price < AI_CHEAP_FILL_MARKET_VALUE_CAP),
-  // an axis/discipline/role match against the fingerprint, or via the
-  // identity-top safety net — and the safety net only tracks candidates that
-  // have a `staticScoreCache` entry (`if (cached) { ... identityTopQueue.push(...) }`),
-  // scored by identity fit (teamThemeFitScore + classFitScore +
-  // raceOrArchetypeFitScore + strategyFit.score), never by `ovr`. The only
-  // OVR/price-adjacent concept in this file is `isStar`/`isSuperstar`
-  // (classifyCandidateTier, ~line 816), which is PRICE-percentile based
-  // (price vs. q95Price/q85Price anchors), not an `ovr >= 72` threshold, and
-  // is not read anywhere inside buildNeedsFingerprintActivePool. A high-OVR,
-  // non-cheap, off-axis, uncached candidate is therefore never included by
-  // this function today, regardless of OVR.
+  /**
+   * BEHOBEN (war: „KNOWN REGRESSION, left red intentionally"). Der Befund:
+   * `buildNeedsFingerprintActivePool` hatte ueberhaupt keinen Weg, einen Spieler wegen seiner
+   * SPIELSTAERKE aufzunehmen. Es gab drei Tore — billige Auffuellung
+   * (`price < AI_CHEAP_FILL_MARKET_VALUE_CAP`), Treffer gegen den Bedarfs-Fingerabdruck
+   * (Achse/Disziplin/Rolle) und das Identitaets-Sicherheitsnetz. Letzteres greift nur bei
+   * Kandidaten MIT `staticScoreCache`-Eintrag und wertet nach Identitaetspassung
+   * (teamThemeFit + classFit + raceOrArchetypeFit + strategyFit), nie nach `ovr`.
+   *
+   * Der einzige spielstaerke-nahe Begriff in der Datei (`isStar`/`isSuperstar` in
+   * `classifyCandidateTier`) haengt am PREIS-Perzentil, nicht am OVR — und wurde in dieser
+   * Funktion ohnehin nicht gelesen. Ein starker, teurer, achsenfremder, ungecachter Kandidat
+   * wurde deshalb nie aufgenommen, egal wie gut er war.
+   *
+   * Neu ist ein „immer aufnehmen"-Tor bei `ovr >= FINGERPRINT_ALWAYS_INCLUDE_OVR` (72, die im
+   * Projekt wiederkehrende Spitzen-Schwelle), parallel zur billigen Auffuellung. Die Bewertung
+   * danach darf den Spieler weiterhin ablehnen — sie soll ihn nur ueberhaupt sehen.
+   */
   it("always includes high-OVR stars (ovr >= 72)", () => {
     const candidates = [
       rec({ playerId: "star", price: 80, ovr: 75 }),

@@ -4403,6 +4403,15 @@ export function buildTeamNeedsFingerprint(input: {
 
 const FINGERPRINT_AXIS_MIN_STAT = 35;
 const FINGERPRINT_DISCIPLINE_MIN_SCORE = 42;
+/**
+ * Ab hier ist ein Spieler zu gut, um ihn wegen fehlender Profil-Passung zu uebersehen.
+ *
+ * 72 ist im Projekt die wiederkehrende „gehoert zur Spitze"-Schwelle — dieselbe Zahl steht in
+ * `ai-player-training-class-service` (Prospect), `ai-manager-apply-service` (Youth) und
+ * `ai-legacy-lineup-batch-apply-service` (Top-Half-Druck). Sie hier zu wiederholen ist bewusst:
+ * eine eigene Zahl an dieser Stelle waere eine zweite Meinung darueber, was „Spitze" heisst.
+ */
+const FINGERPRINT_ALWAYS_INCLUDE_OVR = 72;
 const FINGERPRINT_IDENTITY_TOP_N = 40;
 const FINGERPRINT_IDENTITY_MAX_SAME_CLASS = 4;
 
@@ -4430,6 +4439,30 @@ export function buildNeedsFingerprintActivePool(input: {
 
     // Always include cheap fills (reserve safety)
     if (price != null && price < AI_CHEAP_FILL_MARKET_VALUE_CAP) {
+      active.push(rec);
+      continue;
+    }
+
+    /**
+     * SPITZENSPIELER FIELEN AUS DEM POOL.
+     *
+     * Bis hierher kam ein Kandidat nur durch drei Tore: billige Auffuellung, Treffer gegen den
+     * Bedarfs-Fingerabdruck (Achse / Disziplin / Rolle) oder das Identitaets-Sicherheitsnetz —
+     * und das Netz greift nur bei Kandidaten MIT `staticScoreCache`-Eintrag und wertet nach
+     * Identitaetspassung, nie nach Spielstaerke.
+     *
+     * Ein starker Spieler, der teuer, nicht auf der gesuchten Achse und (noch) nicht gecached
+     * ist, wurde damit gar nicht erst betrachtet — unabhaengig davon, wie gut er ist. Der
+     * einzige spielstaerke-nahe Begriff in dieser Datei (`isStar`/`isSuperstar` in
+     * `classifyCandidateTier`) haengt am PREIS-Perzentil, nicht am OVR, und wird hier ohnehin
+     * nicht gelesen.
+     *
+     * Ein Kader baut sich aber nicht nur aus Passung. Wer deutlich ueber dem Feld steht, gehoert
+     * in die engere Wahl, auch wenn er gerade keine Luecke schliesst — die Bewertung danach darf
+     * ihn immer noch ablehnen. Ausgeschlossen zu werden, bevor er ueberhaupt bewertet wird, ist
+     * etwas anderes.
+     */
+    if ((rec.ovr ?? 0) >= FINGERPRINT_ALWAYS_INCLUDE_OVR) {
       active.push(rec);
       continue;
     }

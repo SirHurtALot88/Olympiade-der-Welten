@@ -61,7 +61,19 @@ describe("singleplayer game state", () => {
     expect(second?.gameState.teams[0]?.logoPath).toBeTruthy();
     expect(second?.gameState.players[0]?.portraitPath).toBeTruthy();
     expect(persistence.listSaves().length).toBeGreaterThan(0);
-    expect(getDatabasePath()).toContain("oly-app");
+    /**
+     * WIDERSPRUCH IM HARNESS, nicht im Code: Hier stand `toContain("oly-app")` — der
+     * Dateiname der ECHTEN Spielstands-Datenbank. `tests/setup/sqlite-pro-testdatei.ts`
+     * setzt aber fuer JEDE Testdatei einen eigenen, isolierten Pfad
+     * (`/tmp/oly-test-<pid>-<uuid>.sqlite`), und `resolveDatabasePath()` bevorzugt genau den.
+     * Die Zusage konnte damit auf keinem Rechner erfuellt werden — auch nicht auf dem des
+     * Autors; beide Zeilen kamen im selben Commit ins Repo.
+     *
+     * Geprueft wird jetzt, was die Zusage MEINTE: dass die Persistenz die konfigurierte
+     * Datenbank benutzt und sich keine eigene sucht. Das ist die schaerfere Aussage — sie
+     * haette auch die Isolationslecks gefangen, gegen die das Setup ueberhaupt existiert.
+     */
+    expect(getDatabasePath()).toBe(process.env.OLY_APP_SQLITE_PATH);
   }, 60000);
 
   it("normalizes legacy 10-player roster limits from season management targets", () => {

@@ -3079,9 +3079,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const LADDER_ROW_MIN_H = 17;
   const LADDER_ROW_MAX_H = 34;
   const LADDER_PAD_Y = 10; // padding des Ladder-Containers, oben + unten je 10px
+  const LADDER_BORDER_Y = 1; // 1px Rahmen, oben + unten
   const LADDER_ROW_H = useMemo(() => {
     if (ladderMaxH == null || ladderHeadH <= 0) return 25;
-    const available = ladderMaxH - ladderHeadH - LADDER_PAD_Y * 2;
+    // Der Container rechnet seit dem Hoehen-Fix mit `border-box`: `ladderMaxH` ist die
+    // AUSSENhoehe. Fuer die Zeilen bleibt davon der Innenraum — also abzueglich Polster UND
+    // Rahmen. Der Rahmen fehlte hier, was die Zeilen um 2px zu hoch ansetzte und die Liste
+    // ueber den unteren Rand schob.
+    const available = ladderMaxH - ladderHeadH - LADDER_PAD_Y * 2 - LADDER_BORDER_Y * 2;
     if (available <= 0) return LADDER_ROW_MIN_H;
     return Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N));
   }, [ladderMaxH, ladderHeadH, N]);
@@ -4011,7 +4016,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           gegenueber der Arena wandern, `maxHeight` deckelte nur nach oben und liess
           kurze Listen ein Loch darunter. `overflowY: auto` bleibt als Notnagel fuer
           den Fall, dass selbst die Minimal-Zeilenhoehe nicht reicht. */}
-      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, height: ladderMaxH ?? undefined, overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: LADDER_PAD_Y, order: 2, display: "flex", flexDirection: "column" }}>
+      {/* `boxSizing: "border-box"` ist hier KEIN Beiwerk, sondern die zweite Haelfte des Fixes.
+          Im Browser nachgemessen (drei Varianten gegeneinander): Mit dem Standard `content-box`
+          meint `height: ladderMaxH` nur den INHALT — Polster (2x10px) und Rahmen (2x1px) kommen
+          obendrauf. Die Tabelle war damit 22px hoeher als die Arena, obwohl sie exakt deren
+          gemessene Hoehe zugewiesen bekam. Mit `border-box` zaehlt beides in die Hoehe hinein,
+          und die Aussenkanten liegen wirklich auf einer Linie — gemessen 420 gegen 420, bei
+          langer Liste (scrollt innen) wie bei kurzer (fuellt auf). */}
+      <div ref={ladderRef} data-testid="arena-ladder" style={{ flex: "0 0 340px", minWidth: 300, boxSizing: "border-box", height: ladderMaxH ?? undefined, overflowY: "auto", overscrollBehavior: "contain", background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: LADDER_PAD_Y, order: 2, display: "flex", flexDirection: "column" }}>
         {/* Kopfblock (Titel + Spaltenkoepfe) in einem gemessenen Wrapper: aus seiner
             Hoehe folgt, wie viel Platz den Zeilen bleibt (siehe LADDER_ROW_H). */}
         <div ref={ladderHeadRef} style={{ flex: "none" }}>

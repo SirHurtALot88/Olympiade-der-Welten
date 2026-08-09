@@ -41,6 +41,15 @@
       "datum": "2026-08-09",
       "seite": "Arena · Disziplinen",
       "pr": null,
+      "text": "Disziplin-Feld und Rangliste enden jetzt wirklich auf einer Linie — im Browser nachgemessen: die Tabelle war zusätzlich um Polster und Rahmen höher als die Arena, weil ihre zugewiesene Höhe nur den Inhalt meinte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
       "text": "Das Disziplin-Feld und die Rangliste daneben enden wieder auf einer Linie: die Höhenmessung war zirkulär — die Tabelle richtete sich an der Arena aus, während die Arena über das Flex-Layout auf die Höhe der Tabelle gedehnt wurde, was in Disziplinen mit langer Rangliste unter dem Feld tote Fläche stehen ließ.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
@@ -273,6 +282,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "KI · Kaderplanung",
+      "pr": null,
+      "text": "Spitzenspieler fallen nicht mehr aus dem Kandidatenpool der KI: wer teuer, achsenfremd und noch nicht bewertet war, wurde gar nicht erst betrachtet — unabhängig davon, wie stark er ist; ab OVR 72 kommt er jetzt in die engere Wahl, die Bewertung danach darf ihn weiterhin ablehnen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Liga · Ranks",
       "pr": null,
       "text": "Die Teamstärke-Ränge einer abgeschlossenen Saison werden jetzt beim letzten gewerteten Spieltag festgehalten statt erst beim Saisonabschluss — vorher flossen die Verkäufe nach Saisonende in die Saisonränge ein und die Veränderungs-Spalte zeigte Sprünge wie „+24“, die es im Saisonlauf nie gab; dazu gibt es ein Reparaturskript, das den bestehenden Season-1-Snapshot aus der Transferhistorie rückwirkend korrigiert.",
@@ -314,6 +332,15 @@
       "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Freie Spieler",
+      "pr": null,
+      "text": "Negative Eigenschaften verschwinden nicht mehr spurlos aus der Freie-Spieler-Liste: bei Scouting-Stufe 0 fehlte nicht nur der Trait, sondern auch der Hinweis „N verborgen“ — ein Spieler mit schlechten Eigenschaften sah damit aus wie einer ohne, was eine falsche Sicherheit erzeugte statt einer sichtbaren Lücke.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {

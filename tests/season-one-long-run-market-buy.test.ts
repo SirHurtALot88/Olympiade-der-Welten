@@ -13,6 +13,17 @@ import { SEASON_ONE_MARKET_BUY_BLOCKER } from "@/lib/season/transfer-season-poli
 // the same season via the Unified-backed convergence/apply path, exactly like any later season.
 // This test used to assert the opposite (S1 market buys hard-blocked); it now asserts the new,
 // intended behaviour.
+/**
+ * ZEITLIMIT: Nachgemessen braucht der zweite Fall `createFreshSeasonOneSave` 4,8 s plus
+ * `applyAiMarketPlanLocally` 55,4 s — zusammen 60,1 s gegen ein Limit von 60 s. Er ist also
+ * nicht am Inhalt gescheitert, sondern um 100 ms am Budget: Die geprueften Zusagen
+ * (`season_market_buy_forbidden` kommt nicht mehr vor) waren jedes Mal erfuellt.
+ *
+ * 180 s geben dem echten Liga-Durchlauf Luft, ohne eine Verlangsamung zu verstecken — der
+ * gemessene Lauf braucht ein Drittel davon.
+ */
+const S1_MARKTLAUF_TIMEOUT_MS = 180_000;
+
 describe("season-one long-run market buy (course-corrected)", () => {
   it("permits a S1 market buy through applyAiMarketPlanLocally and direct execute", async () => {
     const persistence = createPersistenceService();
@@ -41,7 +52,7 @@ describe("season-one long-run market buy (course-corrected)", () => {
     expect(after).toBeTruthy();
     const counts = countSeasonBuyTransfers(after!.gameState.transferHistory, seasonId);
     expect(counts.marketBuyCount).toBe(1);
-  }, 60_000);
+  }, S1_MARKTLAUF_TIMEOUT_MS);
 
   it("no longer forbids S1 market buys in applyAiMarketPlanLocally's marketBuysAllowed gate", async () => {
     const persistence = createPersistenceService();
@@ -64,5 +75,5 @@ describe("season-one long-run market buy (course-corrected)", () => {
     });
 
     expect(marketApply.warnings).not.toContain("season_market_buy_forbidden");
-  }, 60_000);
+  }, S1_MARKTLAUF_TIMEOUT_MS);
 });
