@@ -40,7 +40,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
+import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";

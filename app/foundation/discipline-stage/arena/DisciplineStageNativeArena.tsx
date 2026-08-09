@@ -1413,6 +1413,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const [spotlight, setSpotlight] = useState<Spot>(null);
   const [flash, setFlash] = useState<{ color: string; id: number } | null>(null);
   const [shake, setShake] = useState<"none" | "hard" | "soft">("none");
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt (Dead-Code-Durchgang 2026-08-09):
+   *
+   * `pops` und `frags` werden vollstaendig befuellt — Position mit Streuung, Netto-Wert,
+   * eigener/fremder Treffer, Aufraeum-Timer nach 950/900 ms — aber im gesamten Repo liest sie
+   * KEINE Stelle. Die Partikel entstehen und verfallen, ohne je gezeichnet zu werden.
+   *
+   * Das ist kein ungenutzter Code, sondern eine verlorene Anzeige: der Zustand ist da, die
+   * Renderstelle fehlt. Loeschen wuerde den Beleg dafuer beseitigen, deshalb bleibt beides
+   * stehen, bis entschieden ist, ob der Effekt zurueckkommt.
+   */
   const [pops, setPops] = useState<Pop[]>([]);
   const [frags, setFrags] = useState<Frag[]>([]);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→

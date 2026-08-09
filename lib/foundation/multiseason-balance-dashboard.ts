@@ -142,10 +142,6 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function getTeamCode(gameState: GameState, teamId: string) {
-  const team = gameState.teams.find((entry) => entry.teamId === teamId);
-  return team?.shortCode ?? teamId;
-}
 
 function getTeamName(gameState: GameState, teamId: string) {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);

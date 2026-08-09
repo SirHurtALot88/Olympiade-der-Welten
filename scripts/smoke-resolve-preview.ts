@@ -210,12 +210,6 @@ async function main() {
         matchdayId: matchday1,
         teamId: team.teamId,
       };
-      const matchday2Params: LegacyLineupKeyParams = {
-        saveId: smokeSave.saveId,
-        seasonId,
-        matchdayId: matchday2,
-        teamId: team.teamId,
-      };
       const firstEntries = buildEntriesFromContext(matchday1Params, { includeCaptains: false });
       const firstSave = saveLocalLegacyLineupDraft(matchday1Params, firstEntries);
       if (!firstSave.ok) {

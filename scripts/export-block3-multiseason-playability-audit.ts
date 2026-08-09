@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { GameState, SeasonSnapshotRecord, SeasonSnapshotTeamRecord, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, SeasonSnapshotRecord, SeasonSnapshotTeamRecord } from "@/lib/data/olyDataTypes";
 import { buildMultiSeasonBalanceDashboard } from "@/lib/foundation/multiseason-balance-dashboard";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 

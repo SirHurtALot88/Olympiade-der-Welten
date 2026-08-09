@@ -234,9 +234,6 @@ function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-function sum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
-}
 
 function getAxisPriority(identity: TeamIdentity | null | undefined): Record<DraftAxis, number> {
   return {

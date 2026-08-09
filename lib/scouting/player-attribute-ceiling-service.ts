@@ -1,6 +1,5 @@
 import type {
   Player,
-  GameState,
   PlayerGeneratorAttributeName,
   PlayerPotentialRecord,
 } from "@/lib/data/olyDataTypes";
@@ -104,10 +103,6 @@ function getClassAxisAffinity(className: string | null | undefined, axis: Player
   return 1;
 }
 
-function mapHiddenScoreToUpsideBudget(score: number) {
-  const normalized = clamp(score, 35, 99);
-  return 0.5 + ((normalized - 35) / 64) * 3.5;
-}
 
 function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
   const sorted = (["pow", "spe", "men", "soc"] as const)
@@ -120,12 +115,6 @@ function getAttributesByPrimaryAxis(axis: PlayerAxisKey) {
   return playerGeneratorAttributeKeys.filter((attribute) => ATTRIBUTE_PRIMARY_AXIS[attribute] === axis);
 }
 
-function getStrongestAttributeValueOnAxis(player: Player, axis: PlayerAxisKey) {
-  const values = getAttributesByPrimaryAxis(axis)
-    .map((attribute) => getPlayerAttributeValue(player, attribute))
-    .filter(isFiniteNumber);
-  return values.length > 0 ? Math.max(...values) : null;
-}
 
 /**
  * Primary source of truth: per-attribute numeric ceilings (max erreichbarer Wert je

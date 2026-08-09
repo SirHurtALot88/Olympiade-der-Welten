@@ -1,4 +1,4 @@
-import type { GameState, Player, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { AiSellPreviewCandidate } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
@@ -52,21 +52,6 @@ function getPlayerAxis(player: Player | null): ReplacementSlot["soldAxis"] {
   return top?.[0] ?? null;
 }
 
-function getAxisPpRank(rating: PlayerRatingContractRow | null, axis: ReplacementSlot["soldAxis"]) {
-  if (!rating || !axis) return null;
-  switch (axis) {
-    case "pow":
-      return rating.ppPowRank;
-    case "spe":
-      return rating.ppSpeRank;
-    case "men":
-      return rating.ppMenRank;
-    case "soc":
-      return rating.ppSocRank;
-    default:
-      return null;
-  }
-}
 
 function isStarLikeSell(input: {
   rating: PlayerRatingContractRow | null;

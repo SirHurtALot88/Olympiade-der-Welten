@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
-import type { GameState, Player, RosterEntry, RosterPromisedRole, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";

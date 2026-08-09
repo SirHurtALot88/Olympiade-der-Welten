@@ -219,7 +219,6 @@ describe("CA specialist formula — best axis rewarded", () => {
 
     // 3.0★ should be the most common group (Liga-Mitte = 25% in theory)
     const star3 = starCounts[3.0] ?? 0;
-    const star35 = starCounts[3.5] ?? 0;
     const star4 = starCounts[4.0] ?? 0;
     expect(star3).toBeGreaterThan(star4);   // more average than very good
     // At least some weak players (1.0-2.5★)

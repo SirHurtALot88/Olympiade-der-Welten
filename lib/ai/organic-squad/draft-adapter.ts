@@ -21,7 +21,6 @@ import {
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import { computeTeamSalaryCeiling } from "@/lib/ai/organic-squad/salary-ceiling";
 import {
-  CATEGORY_TO_AXIS,
   ROSTER_MAX,
   ROSTER_MIN,
   type CoreAxis,

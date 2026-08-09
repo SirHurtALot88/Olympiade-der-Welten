@@ -14,7 +14,6 @@
  * interaktive Kern-Affordanzen. Nur die Datenspalten sind umschaltbar.
  */
 
-import { getActiveSaveIdFromLocation } from "@/app/foundation/players-table/foundation-players-query-chips";
 
 /** Immer sichtbare Strukturspalten (nicht abschaltbar) — Identität + Kern-Interaktion. */
 export const NL_PLAYERS_STRUCTURAL_COLUMN_IDS: ReadonlyArray<string> = ["compare", "image", "name"];

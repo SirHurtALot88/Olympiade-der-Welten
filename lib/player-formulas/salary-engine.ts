@@ -1,7 +1,6 @@
 import type { PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import type {
   AttributeSalaryModifierName,
-  AttributeSalaryModifiers,
   SalaryEngineBreakdown,
   SalaryEngineInput,
   TraitSalaryFactors,

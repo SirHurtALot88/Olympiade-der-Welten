@@ -105,7 +105,6 @@ vi.mock("@/lib/ai/ai-market-plan-preview-service", () => ({
 const {
   applyPreSeasonNextSeasonSetupLightweight,
   buildPreSeasonNextSeasonSetupToken,
-  PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN,
   applyPreSeasonNextSeasonSetup,
   buildPreSeasonWorkflowPreview,
 } = await import("@/lib/season/preseason-workflow-service");

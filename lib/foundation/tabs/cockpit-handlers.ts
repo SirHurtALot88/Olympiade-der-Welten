@@ -7,8 +7,6 @@ import type {
   FoundationAiLineupBatchApplyResponse,
   FoundationApplySummary,
   FoundationAutoRosterFillResponse,
-  FoundationMatchdayAutoRunSummary,
-  FoundationMatchdayMvpScoringResponse,
   FoundationSeasonSnapshotSummary,
   FoundationView,
   FoundationWholeSeasonDryRunSummary,

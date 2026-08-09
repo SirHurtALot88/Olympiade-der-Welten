@@ -48,7 +48,6 @@ describe("navigation-coalescing", () => {
       const autoPersistPausedRef = { current: false };
       const foundationViewTransitionUntilRef = { current: 0 };
       const autoPersistUnpauseTimeoutRef = { current: null as ReturnType<typeof setTimeout> | null };
-      const autoPersistRefs = { autoPersistPausedRef, autoPersistUnpauseTimeoutRef };
 
       pauseFoundationNavigationSideEffects({
         autoPersistPausedRef,

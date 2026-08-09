@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type SetStateAction } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
 
 import { getClassColorToken } from "@/app/foundation/ClassColorChip";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
@@ -640,10 +640,8 @@ export default function TransfermarktV2Client({
   disciplineRanksByTeamId = {},
   leagueTeamCount,
   rosterRows = [],
-  playerRatingsById = new Map(),
   wishlistEntries = [],
   wishlistPlayerIds = [],
-  boardObjectiveHighlights = [],
   onOpenPlayerDetails,
   onOpenHistory,
   onToggleWishlist,
@@ -775,6 +773,11 @@ export default function TransfermarktV2Client({
   const [marketItems, setMarketItems] = useState<TransfermarktFreeAgentItem[]>([]);
   const [marketBusy, setMarketBusy] = useState(false);
   const [marketError, setMarketError] = useState<string | null>(null);
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt (Dead-Code-Durchgang 2026-08-09):
+   * `marketHasMore` wird an fuenf Stellen gesetzt, aber nirgends gelesen — der Hinweis
+   * "es gibt noch mehr" erreicht die Oberflaeche nie. Verlorene Anzeige, kein toter Code.
+   */
   const [marketHasMore, setMarketHasMore] = useState(false);
   const [marketTotal, setMarketTotal] = useState(0);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -814,9 +817,13 @@ export default function TransfermarktV2Client({
   const [reloadToken, setReloadToken] = useState(0);
   const [filterStorageReady, setFilterStorageReady] = useState(false);
   const [filterPresets, setFilterPresets] = useState<MarketFilterPreset[]>([]);
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt: `filterPresetMessage` wird fuenfmal gesetzt und nie
+   * gelesen — die Rueckmeldung zum Filter-Preset wird formuliert und nicht angezeigt.
+   */
   const [filterPresetMessage, setFilterPresetMessage] = useState<string | null>(null);
   const [selectedDisciplineLens, setSelectedDisciplineLens] = useState<OfficialDisciplineWeightId | "">("");
-  const [wishlistSort, setWishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
+  const [wishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
   // Phase-0-Cleanup: Pool-Bracket-Drilldown (State + Paging-Effekt) entfernt — kein
   // Renderpfad im Neuen Look setzt jemals poolBracketPanel, der Effekt lief nie.
 
@@ -1003,10 +1010,6 @@ export default function TransfermarktV2Client({
       visibleItems[0] ??
       null,
     [marketItems, selectedPlayerId, visibleItems],
-  );
-  const selectedVisibleIndex = useMemo(
-    () => (selectedPlayerId ? visibleItems.findIndex((item) => item.playerId === selectedPlayerId) : -1),
-    [selectedPlayerId, visibleItems],
   );
   /**
    * ALLE sichtbaren Kandidaten werden gerendert — die Auslagerung uebernimmt der Browser.

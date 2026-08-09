@@ -47,10 +47,7 @@ export default function SchachField(props: DisciplineFieldProps): ReactNode {
   // 32 Bahnen horizontal
   const WX0 = (58 / 900) * LW;  // Wall-left
   const WX1 = (892 / 900) * LW; // Wall-right
-  const LANES = N;
-  const pitch = (WX1 - WX0) / (LANES - 1);
 
-  const laneCX = (i: number): number => (LANES > 1 ? WX0 + (i / (LANES - 1)) * (WX1 - WX0) : (WX0 + WX1) / 2);
 
   // Elo → Y position
   const yOf = (elo: number): number => {

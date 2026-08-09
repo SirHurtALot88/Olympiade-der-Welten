@@ -12,7 +12,6 @@ import {
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getFacilityEfficiency,
-  getFacilityLevel,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { getDevelopmentWeightedFacilityUpgradeDiscount, getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";

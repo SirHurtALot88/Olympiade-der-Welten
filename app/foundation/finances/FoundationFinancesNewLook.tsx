@@ -117,14 +117,6 @@ function buildFacilityIncomeTooltip(team: TeamFinancesState): string | undefined
   return facilities.map((facility) => `${facility.label}: ${formatNlMoney(facility.income)}`).join("\n");
 }
 
-function buildTransferTooltip(team: TeamFinancesState): string | undefined {
-  const transfer = team.transfer;
-  if (!transfer) return undefined;
-  return (
-    `Verkäufe: ${formatNlMoney(transfer.sellTotal)} (${transfer.sellCount} Spieler) · ` +
-    `Käufe: ${formatNlMoney(transfer.buyTotal)} (${transfer.buyCount} Spieler)`
-  );
-}
 
 /** Mehr Zeilen würden den Tooltip sprengen — Rest wird als "+ N weitere" zusammengefasst. */
 const SALARY_TOOLTIP_MAX_ROWS = 12;

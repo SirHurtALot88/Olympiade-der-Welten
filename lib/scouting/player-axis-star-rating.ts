@@ -164,22 +164,6 @@ function applyDisciplineSpecialistBonus(input: {
   return 0;
 }
 
-function getClassAxisWeights(className: string | null | undefined): Record<PlayerAxisKey, number> {
-  const normalized = (className ?? "").toLowerCase();
-  if (normalized.includes("charger") || normalized.includes("warrior") || normalized.includes("tank")) {
-    return { pow: 0.45, spe: 0.2, men: 0.2, soc: 0.15 };
-  }
-  if (normalized.includes("runner") || normalized.includes("scout") || normalized.includes("speed")) {
-    return { pow: 0.15, spe: 0.45, men: 0.2, soc: 0.2 };
-  }
-  if (normalized.includes("teacher") || normalized.includes("scholar") || normalized.includes("tactician")) {
-    return { pow: 0.15, spe: 0.15, men: 0.45, soc: 0.25 };
-  }
-  if (normalized.includes("bard") || normalized.includes("charmer") || normalized.includes("diplomat")) {
-    return { pow: 0.1, spe: 0.15, men: 0.25, soc: 0.5 };
-  }
-  return { pow: 0.25, spe: 0.25, men: 0.25, soc: 0.25 };
-}
 
 function buildDisciplineTags(input: {
   player: Player;

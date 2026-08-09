@@ -19,13 +19,7 @@ function getTraits(player: Pick<Player, "traitsPositive" | "traitsNegative">) {
   return [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map(normalizeTrait).filter(Boolean);
 }
 
-function hasTrait(player: Pick<Player, "traitsPositive" | "traitsNegative">, traits: Set<string>) {
-  return getTraits(player).some((trait) => traits.has(trait));
-}
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
 
 export type TrainingModeDemandView = {
   demandId: string;

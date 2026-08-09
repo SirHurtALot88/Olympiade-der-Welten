@@ -2331,7 +2331,6 @@ export function applyTeamSeasonObjectiveRewards(
     };
   }
 
-  const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const nextTeams = gameState.teams.map((team) => {
     const summary = settlement.byTeamId[team.teamId];
     if (!summary || summary.cashDelta === 0) {

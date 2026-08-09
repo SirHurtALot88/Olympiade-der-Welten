@@ -303,13 +303,6 @@ const ENV_VELODROME: StageEnv = {
   glow: { color: "hsl(215 64% 53%)", kind: "finish" },
   deco: [{ kind: "spotlights", color: "hsl(48 30% 88%)", count: 2 }],
 };
-const ENV_SKYLINE: StageEnv = {
-  sky: ["hsl(24 60% 6%)", "hsl(25 65% 14%)"],
-  stands: "hsl(24 40% 10%)",
-  surface: ["hsl(28 22% 16%)", "hsl(27 20% 12%)", "hsl(26 18% 8%)"],
-  line: "hsl(41 42% 84%)",
-  deco: [{ kind: "skyline", back: "hsl(24 50% 9%)", front: "hsl(24 77% 6%)", windows: "hsl(35 80% 60%)" }],
-};
 const ENV_JUNGLE: StageEnv = {
   sky: ["hsl(87 31% 6%)", "hsl(80 25% 10%)"],
   stands: "hsl(90 20% 9%)",
@@ -386,16 +379,6 @@ const ENV_POWER_STAGE: StageEnv = {
   line: "hsl(30 35% 68%)",
   glow: { color: "hsl(43 90% 80%)", kind: "spot" },
   deco: [{ kind: "spotlights", color: "hsl(43 90% 82%)", count: 2 }],
-};
-const ENV_CLIMBING_WALL: StageEnv = {
-  sky: ["hsl(180 12% 16%)", "hsl(180 12% 10%)"],
-  stands: "hsl(180 12% 13%)",
-  surface: ["hsl(194 40% 20%)", "hsl(195 38% 15%)", "hsl(195 38% 10%)"],
-  line: "hsl(175 13% 82%)",
-  deco: [
-    { kind: "holds", colors: ["hsl(194 57% 46%)", "hsl(38 80% 55%)", "hsl(350 60% 52%)"] },
-    { kind: "grid", color: "hsl(175 13% 70%)" },
-  ],
 };
 const ENV_FLOODLIT_STADIUM: StageEnv = {
   sky: ["hsl(135 15% 4%)", "hsl(139 18% 8%)"],

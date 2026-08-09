@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import {
-  applyRankTableMarketValuesToGameState,
   syncRosterMarketValuesWithPlayerEconomy,
 } from "@/lib/player-formulas/market-value-apply";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";

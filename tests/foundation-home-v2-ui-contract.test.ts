@@ -4,7 +4,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
 const shellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
 const shellScopePath = path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 const shellRouterPath = path.join(root, "app/foundation/FoundationShellRouter.tsx");

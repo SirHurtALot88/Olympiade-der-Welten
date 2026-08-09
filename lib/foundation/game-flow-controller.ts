@@ -9,7 +9,6 @@ import {
 } from "@/lib/foundation/form-card-flow";
 import {
   getTeamMatchdayLineupDraft,
-  isTeamMatchdayLineupComplete,
   isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";

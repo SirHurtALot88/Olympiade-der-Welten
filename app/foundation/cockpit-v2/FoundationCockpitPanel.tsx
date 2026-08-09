@@ -25,7 +25,6 @@ import type {
   FeatureAuditStatus,
 } from "@/lib/foundation/feature-audit-matrix";
 import type { FoundationPanelId } from "@/lib/foundation/foundation-navigation-history";
-import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   formatAiLineupAuditWarning,
   formatCockpitReason,
@@ -42,10 +41,7 @@ import type {
   FoundationApplySummary,
   FoundationAutoRosterFillResponse,
   FoundationMatchdayAutoRunSummary,
-  FoundationMatchdayMvpLineupTeam,
-  FoundationMatchdayMvpScoreboardRow,
   FoundationMatchdayMvpScoringResponse,
-  FoundationMatchdayMvpTopPlayerRow,
   FoundationPrizePreviewItem,
   FoundationPrizePreviewResponse,
   FoundationReadMeta,
@@ -269,7 +265,6 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
     activeSaveId,
     activeSaveName,
     activeSaveSummary,
-    activeView,
     adjustTableColumnWidth,
     aiLineupApplyTeams,
     aiTeams,

@@ -341,11 +341,6 @@ function getPlayerName(gameState: GameState, playerId: string) {
   return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
 
-function getTeamLabel(gameState: GameState, teamId: string | null | undefined) {
-  if (!teamId) return "—";
-  const team = gameState.teams.find((entry) => entry.teamId === teamId);
-  return team?.shortCode ?? team?.name ?? teamId;
-}
 
 function teamTrainingMissingCount(gameState: GameState, teamId: string) {
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));

@@ -24,10 +24,10 @@ import type {
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
-import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
+import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
-import { deriveRosterTargets, getTeamPlayerMax } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";

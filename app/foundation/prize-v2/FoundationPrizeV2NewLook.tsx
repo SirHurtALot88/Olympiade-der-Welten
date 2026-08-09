@@ -92,7 +92,6 @@ export default function FoundationPrizeV2NewLook({
   selectedTeam,
   prizeForecastRank,
   setPrizeForecastRank,
-  prizeForecastRankRow,
   prizeForecastRows,
   displayPrizePreviewRows,
   prizeV2Summary,
@@ -198,7 +197,6 @@ export default function FoundationPrizeV2NewLook({
 
   // Story-/Champion-Karten sind Portale: nur wenn die Zeile ein Team mit
   // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
-  const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
   const topSponsorTeamId = prizeV2TopSponsorRow?.teamId ?? null;
   const outlookTeamId = (prizeV2SelectedTeamSummary?.teamId as string | null | undefined) ?? null;
   // Kredit-Kern (Fog of War, own-team-only — siehe `use-prize-v2-panel-model.ts`):

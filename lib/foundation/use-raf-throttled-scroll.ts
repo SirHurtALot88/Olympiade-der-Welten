@@ -1,52 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
- * rAF-throttled scroll position.
+ * Drosselt einen Aufruf auf hoechstens einen pro Animationsbild.
  *
- * Heavy tables (Einsatzliste-Expertenpool, Saisonstand) drive virtualization
- * off `scrollTop`. Calling `setState` on every raw scroll event re-renders the
- * whole (large) client component per scroll frame → jank. This batches updates
- * to at most one per animation frame, which is all the render needs.
+ * Gedacht fuer Ereignisse, die der Browser schneller feuert als er zeichnet — Scrollen,
+ * Mausbewegung, Groessenaenderung. Ohne Drosselung loest jedes Rohereignis ein `setState`
+ * und damit ein Neuzeichnen der (grossen) Client-Komponente aus; gebuendelt bleibt genau
+ * ein Aufruf je Bild uebrig, mehr braucht die Darstellung nicht.
  *
- * Returns `[scrollTop, onScroll]` — drop `onScroll` onto the scroll container.
- */
-export function useRafThrottledScrollTop(): [
-  number,
-  (event: { currentTarget: { scrollTop: number } }) => void,
-] {
-  const [scrollTop, setScrollTop] = useState(0);
-  const rafRef = useRef<number | null>(null);
-
-  const onScroll = useCallback((event: { currentTarget: { scrollTop: number } }) => {
-    const nextScrollTop = event.currentTarget.scrollTop;
-    if (rafRef.current != null) {
-      return;
-    }
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      setScrollTop(nextScrollTop);
-    });
-  }, []);
-
-  return [scrollTop, onScroll];
-}
-
-/**
- * rAF-throttled generic callback — same gating pattern as
- * `useRafThrottledScrollTop` above, but for `window`-level `scroll`/`resize`
- * listeners that call an arbitrary handler instead of tracking `scrollTop`.
+ * Genutzt von den Portrait-Vorschauen (Team und Spieler).
  *
- * At most one call per animation frame; a call that arrives while a frame is
- * already pending is dropped (trailing calls are not queued — the next event
- * within the same pending frame still wins once it fires, since the ref
- * always reads the latest `callback`). Any frame still pending is cancelled
- * on unmount so it can never fire against an unmounted component.
- *
- * Returns a stable function reference — safe to pass directly into
- * `addEventListener`/`removeEventListener` without re-subscribing on every
- * render.
+ * Hier stand bis zum Dead-Code-Durchgang am 2026-08-09 zusaetzlich
+ * `useRafThrottledScrollTop`, das `[scrollTop, onScroll]` lieferte. Sein letzter Nutzer war
+ * der Expertenpool der Einsatzliste, der mit dem Expertenmodus entfallen ist — die Funktion
+ * hatte danach keinen Aufrufer mehr und ist entfernt.
  */
 export function useRafThrottledCallback<Args extends unknown[]>(
   callback: (...args: Args) => void,

@@ -130,7 +130,6 @@ import {
 } from "@/lib/foundation/player-star-tier";
 import {
   buildDisciplinePpsSortKey,
-  getDisciplineIdFromPpsSortKey,
   getRowDisciplinePps,
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
@@ -551,26 +550,7 @@ function getLeagueRank(value: number | null | undefined, pool: number[]): number
   return higher + 1;
 }
 
-/** Kompaktes "Top 8%" → "T8%" für enge Zellen (Achsen-Zeilen). Leitet nichts neu her — reine Textkürzung des `formatLeaguePercentile`-Labels. */
-function formatCompactPercentile(label: string | null): string | null {
-  return label ? label.replace(/^Top\s+/, "T") : null;
-}
 
-/** Liga-Perzentil-Chip (StatChip-Vokabular in Miniatur) — `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung). */
-function renderMetricPercentileChip(value: number | null | undefined, pool: number[], compact = false) {
-  const rank = getLeagueRank(value, pool);
-  const label = formatLeaguePercentile(rank, pool.length);
-  if (!label) {
-    return null;
-  }
-  const tone = getPoolHeatTone(value, pool);
-  const fullTitle = `Liga-Perzentil: ${label} (Rang #${rank} von ${pool.length})`;
-  return (
-    <span className={`nl-ptable-percentile ${nlToneClass(tone)}`} title={fullTitle}>
-      {compact ? formatCompactPercentile(label) : label}
-    </span>
-  );
-}
 
 /**
  * Absoluter Liga-Rang-Chip ("#N") — ersetzt den Perzentil-Chip in ALLEN drei
@@ -944,11 +924,6 @@ export default function FoundationPlayersTableNewLook({
     setExpandedAxes((current) => ({ ...current, [axisKey]: !current[axisKey] }));
   }
 
-  /** Aktuell nach PPs sortierte Disziplin (`disciplinePps:<id>`), falls aktiv. */
-  const activeDisciplinePpsSortId = useMemo(
-    () => getDisciplineIdFromPpsSortKey(sortState?.key),
-    [sortState?.key],
-  );
 
   /**
    * Ligaweite Heat-Pools der DISZIPLIN-PPs (je Disziplin alle PPs-Werte des

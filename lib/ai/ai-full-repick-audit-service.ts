@@ -5,7 +5,7 @@ import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
-import { isAiPickResettableSource, type AiPickResettableSource } from "@/lib/ai/ai-pick-audit-reset-contract";
+import { isAiPickResettableSource } from "@/lib/ai/ai-pick-audit-reset-contract";
 
 type AuditSource = "sqlite";
 

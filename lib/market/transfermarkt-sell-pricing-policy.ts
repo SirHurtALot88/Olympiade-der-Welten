@@ -1,4 +1,4 @@
-import type { GameState, Player, RosterEntry, TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import type { TransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";

@@ -27,9 +27,7 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
     reducedMotion,
     W,
     H,
-    N,
     geo,
-    layout,
     finalMax,
     rt,
     sorted,
@@ -71,7 +69,6 @@ export default function EiskunstField(props: DisciplineFieldProps): ReactNode {
   const uOf = (score: number): number => (finalMax > 0 ? score / finalMax : 0);
 
   // Wertung-Skala (jury scoring 1.0…6.0)
-  const wOf = (score: number): string => ((uOf(score) * 6).toFixed(1));
 
   // Route radius at normalized progress u (outer bande → inner Schluss-Pose)
   const rOfU = (u: number): number => U_OUT - (U_OUT - U_IN) * u;

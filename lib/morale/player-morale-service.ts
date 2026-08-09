@@ -16,7 +16,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { buildTrainingModeDemandRecord, evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
+import { evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {

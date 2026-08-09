@@ -1270,7 +1270,6 @@ export function computeSeasonEndContractTick(
 
   const preview = previewOverride ?? previewSeasonEndContracts(save);
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
-  const teamsById = new Map(save.gameState.teams.map((team) => [team.teamId, team] as const));
   const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
   const nextRosters: RosterEntry[] = [];
   const contractEvents: ContractEventRecord[] = [];
@@ -1292,7 +1291,6 @@ export function computeSeasonEndContractTick(
         continue;
       }
 
-      const team = teamsById.get(entry.teamId) ?? null;
       const canRenewEffective = row?.canRenewEffective ?? false;
       if (row?.controlMode === "ai" && row.recommendedAction === "renew" && canRenewEffective) {
         const newSalary = roundMoney(row.renewalSalaryPreview ?? entry.salary) ?? entry.salary;

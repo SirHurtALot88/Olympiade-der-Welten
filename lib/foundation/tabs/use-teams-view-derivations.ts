@@ -13,7 +13,6 @@ import {
   EMPTY_TEAM_HISTORY_COLUMNS,
   EMPTY_TEAM_HISTORY_POINT_RANK_MAPS,
   EMPTY_TEAMS_VIEW_ROWS,
-  resolveCurrentAreaRanksByTeamId,
   resolveShouldBuildTeamsOverviewTable,
   resolveShouldBuildTeamsPlayerRatings,
   shouldBuildTeamsView,

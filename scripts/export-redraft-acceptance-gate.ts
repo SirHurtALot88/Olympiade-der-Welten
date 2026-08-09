@@ -191,7 +191,6 @@ function main() {
   if (!save) throw new Error("active_save_missing");
   const gameState: GameState = save.gameState;
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
-  const teamById = new Map(gameState.teams.map((team) => [team.teamId, team]));
   const identityByTeamId = new Map(gameState.teamIdentities.map((identity) => [identity.teamId, identity]));
   const rosterByTeam = groupBy(gameState.rosters, (roster) => roster.teamId);
   const rosterByPlayer = groupBy(gameState.rosters, (roster) => roster.playerId);

@@ -10,7 +10,7 @@ import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-co
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { getFatiguePerformancePenaltyPercent } from "@/lib/fatigue/fatigue-calibration";
-import { calculateTeamRecovery, getInjuryRiskBand, getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import { calculateTeamRecovery, getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
   buildPlayerRatingContractRows,
   type PlayerRatingContractRow,

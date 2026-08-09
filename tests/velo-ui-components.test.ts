@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const veloUiPath = path.join(process.cwd(), "components/foundation/velo-ui");
 const globalsPath = path.join(process.cwd(), "app/globals.css");
-const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
 const teamsDetailPanelPath =
   path.join(process.cwd(), "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx");
 

@@ -232,7 +232,7 @@ function auditAiPowerUsage(input: {
 
     // Formkarten VOR der Kapitaenswahl — ein Aufruf, damit der Audit dieselbe Kopplung misst
     // wie das Spiel (keine Kapitaene in Disziplinen mit negativer Formbilanz).
-    const { preview, modifiers } = buildAiLegacyLineupPreviewWithModifiers(context, "sqlite");
+    const { modifiers } = buildAiLegacyLineupPreviewWithModifiers(context, "sqlite");
     let selectedForTeam = 0;
 
     for (const side of ["d1", "d2"] as const) {

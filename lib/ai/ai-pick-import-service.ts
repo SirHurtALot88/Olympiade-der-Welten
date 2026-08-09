@@ -1,4 +1,4 @@
-import type { GameState, Player, RosterEntry, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { runAiPickAuditReset } from "@/lib/ai/ai-pick-audit-reset-service";
@@ -557,7 +557,6 @@ export async function runAiPickImportReplace(params: RunAiPickImportParams): Pro
   blockingReasons.push(...replayPreview.blockingReasons);
 
   const importableTransfers = replayPreview.rows.filter((entry) => entry.status === "ready");
-  const blockedImportTransfers = replayPreview.rows.filter((entry) => entry.status === "blocked");
 
   let resetExecution = resetPreviewResult.resetExecution;
   let targetAfterState = targetResolved.save.gameState;

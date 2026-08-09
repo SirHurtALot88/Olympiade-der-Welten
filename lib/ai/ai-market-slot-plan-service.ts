@@ -1,13 +1,10 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
-  resolveTeamLiquidityBufferTarget,
-  resolveTeamSpendableCashForPlanning,
   usesSingleCashPlanningPolicy,
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { resolveTransferBuyAffordabilityCash } from "@/lib/market/transfermarkt-local-service";
 import {
-  isTeamRosterBelowOpt,
   projectExpectedSalaryAtPlannerTarget,
   resolveCombinedLiquidityReserve,
   resolveMarketPlannerCashBuffer,

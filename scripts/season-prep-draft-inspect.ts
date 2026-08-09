@@ -10,7 +10,7 @@ import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
-import type { GameState, RosterEntry, TeamControlSettings, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, RosterEntry, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager, withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";

@@ -286,10 +286,6 @@ function toGeneratorAttributes(player: Player): PlayerGeneratorAttributes | null
     : null;
 }
 
-function getPlayerMwChangeFix(player: Player) {
-  const value = (player as Player & { mwChangeFix?: number | null }).mwChangeFix;
-  return isFiniteNumber(value) ? value : null;
-}
 
 function buildCalculatedEconomyByPlayer(gameState: GameState) {
   const formulaSources = loadPlayerFormulaSources();

@@ -309,30 +309,7 @@ function getPlayerSeedValue(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-/** Returns the highest single core stat value. */
-function getMaxAxisValue(player: Player): number {
-  const coreValues = Object.values(player.coreStats ?? {}).filter(isFiniteNumber);
-  if (coreValues.length > 0) return Math.max(...coreValues);
-  const disciplineValues = Object.values(player.disciplineRatings ?? {}).filter(
-    (value): value is number => isFiniteNumber(value),
-  );
-  if (disciplineValues.length > 0) return Math.max(...disciplineValues);
-  return 35;
-}
 
-/** Specialist-weighted ability estimate for headroom checks. */
-function getSpecialistAbilityEstimate(player: Player): number {
-  const coreValues = Object.values(player.coreStats ?? {}).filter(isFiniteNumber);
-  if (coreValues.length === 0) return getMaxAxisValue(player);
-  const sorted = [...coreValues].sort((left, right) => right - left);
-  while (sorted.length < 4) sorted.push(sorted[sorted.length - 1] ?? 35);
-  return (
-    (sorted[0] ?? 35) * 0.45 +
-    (sorted[1] ?? 35) * 0.30 +
-    (sorted[2] ?? 35) * 0.15 +
-    (sorted[3] ?? 35) * 0.10
-  );
-}
 
 /**
  * Talent traits: raw ceiling, nothing to do with work ethic.

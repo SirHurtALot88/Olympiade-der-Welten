@@ -301,48 +301,8 @@ type NlTeamsBoardSortDir = "asc" | "desc";
 
 type NlTeamsBoardSort = { key: NlTeamsBoardSortKey; dir: NlTeamsBoardSortDir };
 
-const NL_TEAMS_BOARD_SORTS: Array<{
-  key: Exclude<NlTeamsBoardSortKey, NlAxisKey>;
-  label: string;
-  defaultDir: NlTeamsBoardSortDir;
-  title: string;
-}> = [
-  { key: "rank", label: "Rang", defaultDir: "asc", title: "Nach Gesamtrang sortieren" },
-  { key: "points", label: "Punkte", defaultDir: "desc", title: "Nach Saisonpunkten sortieren" },
-  { key: "cash", label: "Cash", defaultDir: "desc", title: "Nach Cash sortieren" },
-  { key: "mw", label: "MW", defaultDir: "desc", title: "Nach Team-Marktwert sortieren" },
-  { key: "salary", label: "Gehalt", defaultDir: "desc", title: "Nach Gehaltsblock sortieren" },
-  { key: "roster", label: "Kader", defaultDir: "desc", title: "Nach Kadergröße sortieren" },
-  { key: "medals", label: "Medaillen", defaultDir: "desc", title: "Nach Gold/Silber/Bronze sortieren" },
-];
 
-function isNlAxisSortKey(key: NlTeamsBoardSortKey): key is NlAxisKey {
-  return key === "pow" || key === "spe" || key === "men" || key === "soc";
-}
 
-function getBoardSortValue(row: TeamsViewRow, key: NlTeamsBoardSortKey): number | null {
-  if (isNlAxisSortKey(key)) {
-    return getAxisRank(row, key);
-  }
-  switch (key) {
-    case "rank":
-      return getBoardRank(row);
-    case "points":
-      return row.points;
-    case "cash":
-      return row.cash;
-    case "mw":
-      return row.marketValueTotal;
-    case "salary":
-      return row.salaryTotal;
-    case "roster":
-      return row.rosterCount;
-    case "medals":
-      return row.goldCount * 1_000_000 + row.silverCount * 1_000 + row.bronzeCount;
-    default:
-      return null;
-  }
-}
 
 // === Disziplin-Profil: Einzeldisziplinen-Radar + Breakdown (#46) ==========
 // Ergänzt die vier POW/SPE/MEN/SOC-Achsen um die realen Einzeldisziplinen
@@ -695,24 +655,15 @@ export default function FoundationTeamsNewLook({
   fieldRaceRecentForm,
   fieldRacePlayedMatchdayCount,
   filteredSelectedRosterTableRows,
-  teamRosterRoleFilter,
-  setTeamRosterRoleFilter,
-  teamRosterRoleFilterOptions,
-  teamRosterFocusMode,
-  setTeamRosterFocusMode,
-  teamRosterFocusOptions,
   playerRatingsById,
   leaguePlayerHeatPools,
   openTeamProfileById,
   openPlayerDrawerById,
-  scheduleActiveManagerTeam,
   getPlayerPortraitModel,
   getRosterEntryDisplayMarketValue,
   getRosterEntryDisplaySalary,
-  getRosterEntryCurrentSeasonSalary,
   getPlayerDisplayMarketValueDelta,
   getRosterEntrySalaryDelta,
-  formatMoney,
   formatDisplayMoney,
   selectedTeamRosterActionsAvailable,
   selectedTeamRosterActionHint,
@@ -739,8 +690,7 @@ export default function FoundationTeamsNewLook({
     setSyncedRosterTab(selectedTeamDetailTab);
     setRosterMode(defaultRosterModeForTab(selectedTeamDetailTab));
   }
-  const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
-  const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
+  const [boardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [disciplineSort, setDisciplineSort] = useState<"strength" | "category">("strength");
   // Saison-Kapitän: welcher Kandidat ist gerade zum Bestätigen ausgewählt +
   // welcher Führungs-Breakdown ist aufgeklappt. Beim Team-Wechsel (ohne Remount)
@@ -762,7 +712,6 @@ export default function FoundationTeamsNewLook({
   const disciplineCardRef = useRef<HTMLDivElement | null>(null);
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
-  const leagueCardRef = useRef<HTMLDivElement | null>(null);
 
   const teamCount = gameState.teams.length;
   const heroRow = useMemo(
@@ -793,38 +742,7 @@ export default function FoundationTeamsNewLook({
     return Number.isFinite(value) ? value : null;
   }
 
-  function getBoardSortValueLocal(row: TeamsViewRow, key: NlTeamsBoardSortKey): number | null {
-    if (isNlAxisSortKey(key)) {
-      return getAxisStrengthValue(row.team.teamId, key);
-    }
-    return getBoardSortValue(row, key);
-  }
 
-  const boardRows = useMemo(() => {
-    const base = [...sortedTeamsViewRows].sort(compareBoardRows);
-    if (boardSort.key === "rank" && boardSort.dir === "asc") {
-      return base;
-    }
-    const factor = boardSort.dir === "asc" ? 1 : -1;
-    return base.sort((left, right) => {
-      const leftValue = getBoardSortValueLocal(left, boardSort.key);
-      const rightValue = getBoardSortValueLocal(right, boardSort.key);
-      if (leftValue == null && rightValue == null) {
-        return compareBoardRows(left, right);
-      }
-      if (leftValue == null) {
-        return 1;
-      }
-      if (rightValue == null) {
-        return -1;
-      }
-      if (leftValue !== rightValue) {
-        return (leftValue - rightValue) * factor;
-      }
-      return compareBoardRows(left, right);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardSort, sortedTeamsViewRows, teamAxisStrengthById]);
 
   // Mini-Tabellen-Vorschau der Rang-Kachel: echte Nachbar-Zeilen um das
   // eigene Team herum (Rang · Team · Punkte), immer nach Gesamtrang geordnet
@@ -1021,33 +939,11 @@ export default function FoundationTeamsNewLook({
     node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   }
 
-  function handleBoardSortToggle(key: NlTeamsBoardSortKey, defaultDir: NlTeamsBoardSortDir) {
-    setBoardSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: defaultDir },
-    );
-  }
 
-  function handleHeroAxisSortSelect(key: NlAxisKey) {
-    // Team-Stärke: stärkstes Team zuerst (absteigend), analog zum MW.
-    setBoardSort({ key, dir: "desc" });
-    scrollToSection(leagueCardRef);
-  }
 
   // Portal: eine Hero-Kachel (MW/Cash) klicken → Teamtabelle danach sortieren
   // und dorthin scrollen. „Klick MW → alle Teams nach Marktwert sortiert."
-  function handleHeroBoardSortSelect(key: NlTeamsBoardSortKey, dir: NlTeamsBoardSortDir) {
-    setBoardSort({ key, dir });
-    scrollToSection(leagueCardRef);
-  }
 
-  const leaderPoints = useMemo(
-    () =>
-      boardRows.reduce(
-        (max, row) => (row.points != null && Number.isFinite(row.points) && row.points > max ? row.points : max),
-        0,
-      ),
-    [boardRows],
-  );
 
   // „Verträge & Auslauf" — Vertragsübersicht des gewählten Kaders (unten im
   // Teams-Reiter, ersetzt die entfernte „Alle Teams"-Tabelle). Restlaufzeit aus
@@ -1579,207 +1475,12 @@ export default function FoundationTeamsNewLook({
   // Hover-Karte pro Teamtabellen-Zeile: Mini-Radar aus den aktuellen
   // Bereichs-Rängen + Saison-Sparklines aus `historicalPointsBySeason`
   // (echte Snapshot-Punkte/-Ränge, chronologisch) plus Live-Saison.
-  function renderBoardHoverCard(row: TeamsViewRow) {
-    const radarAxes =
-      teamCount > 0
-        ? NL_TEAMS_AXES.flatMap(({ key }) => {
-            const rank = getAxisRank(row, key);
-            if (!isFiniteNumber(rank)) {
-              return [];
-            }
-            return [{ key, value: Math.max(0, teamCount - rank + 1) }];
-          })
-        : [];
-    const historicalSeasons = row.historicalPointsBySeason ?? [];
-    const seasonPointsSpark = [...historicalSeasons.map((entry) => entry.points), row.points].filter(isFiniteNumber);
-    const seasonRankSpark =
-      teamCount > 0
-        ? [...historicalSeasons.map((entry) => entry.rank), row.rank]
-            .filter(isFiniteNumber)
-            .map((rank) => teamCount - rank + 1)
-        : [];
-    // Ökonomie-Trajektorie je Team: echte Snapshot-Endwerte + Live-Wert.
-    // Fehlende Felder werden herausgefiltert (kein Fake).
-    const economySeasons = row.historicalEconomyBySeason ?? [];
-    const marketValueSpark = [...economySeasons.map((entry) => entry.marketValueTotal), row.marketValueTotal].filter(
-      isFiniteNumber,
-    );
-    const cashSpark = [...economySeasons.map((entry) => entry.cash), row.cash].filter(isFiniteNumber);
-    const hasPointsTrend = seasonPointsSpark.length >= 2;
-    const hasEconomyTrend = marketValueSpark.length >= 2 || cashSpark.length >= 2;
-    const hasTrend = hasPointsTrend || hasEconomyTrend;
-    if (radarAxes.length === 0 && !hasTrend) {
-      return null;
-    }
-    return (
-      // A11y-Fix (T-079): war fest `aria-hidden="true"`, obwohl die Karte
-      // per Tastatur-Fokus (`onFocusCapture` auf `.nl-teams-boardrow`, s.u.)
-      // genauso geöffnet wird wie per Maus-Hover — SR bekam den Inhalt nie.
-      // Da die Karte ohnehin nur bei `hoveredBoardTeamId === row.team.teamId`
-      // gemountet wird (siehe `renderBoardRow`), reicht ein aussagekräftiges
-      // `role`/`aria-label` ohne zusätzliches `hidden`-Attribut.
-      <div className="nl-teams-board-hover" role="dialog" aria-label={`${row.teamName} — Formkurve`}>
-        <span className="nl-teams-board-hover-title">{row.teamName}</span>
-        <div className="nl-teams-board-hover-body">
-          {radarAxes.length > 0 ? (
-            <NlRadar axes={radarAxes} max={teamCount} className="nl-teams-board-hover-radar" />
-          ) : null}
-          {hasTrend ? (
-            <div className="nl-teams-board-hover-trends">
-              <span className="nl-teams-board-hover-caption nl-tnum">
-                {historicalSeasons.length + 1} Saisons
-                {isFiniteNumber(row.historicalBestRank) ? ` · Best #${formatNlNumber(row.historicalBestRank, 0)}` : ""}
-              </span>
-              {hasPointsTrend ? (
-                <span className="nl-teams-board-hover-trend">
-                  <small>Punkte</small>
-                  <NlSparkline points={seasonPointsSpark} tone="accent" />
-                </span>
-              ) : null}
-              {/* Ton = Richtung der gezeichneten Serie selbst (letzter minus erster Wert) —
-                  vorher trugen die Linien fest verdrahtete good/warn-Farben ohne Bedeutung. */}
-              {seasonRankSpark.length >= 2 ? (
-                <span className="nl-teams-board-hover-trend">
-                  <small>Rang (oben = besser)</small>
-                  <NlSparkline
-                    points={seasonRankSpark}
-                    tone={nlTrendToneFromDelta(seasonRankSpark[seasonRankSpark.length - 1] - seasonRankSpark[0])}
-                  />
-                </span>
-              ) : null}
-              {marketValueSpark.length >= 2 ? (
-                <span className="nl-teams-board-hover-trend">
-                  <small>Marktwert</small>
-                  <NlSparkline
-                    points={marketValueSpark}
-                    tone={nlTrendToneFromDelta(marketValueSpark[marketValueSpark.length - 1] - marketValueSpark[0])}
-                  />
-                </span>
-              ) : null}
-              {cashSpark.length >= 2 ? (
-                <span className="nl-teams-board-hover-trend">
-                  <small>Cash</small>
-                  <NlSparkline
-                    points={cashSpark}
-                    tone={nlTrendToneFromDelta(cashSpark[cashSpark.length - 1] - cashSpark[0])}
-                  />
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
 
   // Aktive Sortierung als Zeilenwert: zeigt in jeder Zeile genau den Wert, nach
   // dem gerade sortiert wird, wenn er nicht ohnehin schon in der Zeile steht
   // (Rang/Punkte/Cash/Medaillen/Achsen sind bereits sichtbar). So sieht man
   // beim Sortieren nach MW/Gehalt/Kader auch die zugehörige Zahl.
-  function renderBoardSortValue(row: TeamsViewRow) {
-    const key = boardSort.key;
-    if (key === "mw") {
-      return (
-        <span className="nl-teams-board-sortval nl-tnum" title="Team-Marktwert">
-          <small>MW</small>
-          {formatNlMoney(row.marketValueTotal)}
-        </span>
-      );
-    }
-    if (key === "salary") {
-      return (
-        <span className="nl-teams-board-sortval nl-tnum" title="Gehaltsblock">
-          <small>Gehalt</small>
-          {formatNlMoney(row.salaryTotal)}
-        </span>
-      );
-    }
-    if (key === "roster") {
-      return (
-        <span className="nl-teams-board-sortval nl-tnum" title="Kadergröße">
-          <small>Kader</small>
-          {formatNlNumber(row.rosterCount, 0)}
-        </span>
-      );
-    }
-    return null;
-  }
 
-  function renderBoardRow(row: TeamsViewRow) {
-    const isSelected = row.team.teamId === selectedTeam.teamId;
-    const boardRank = getBoardRank(row);
-    const medalKind = boardRank === 1 ? "gold" : boardRank === 2 ? "silver" : boardRank === 3 ? "bronze" : null;
-    const logo = getTeamLogoModel(row.team, { variant: "thumb" });
-    return (
-      <li
-        key={row.team.teamId}
-        className={`nl-teams-boardrow${isSelected ? " is-selected" : ""}${medalKind ? " is-podium" : ""}`}
-        style={getSeasonV2TeamTagStyle(row.teamCode)}
-        onMouseEnter={() => setHoveredBoardTeamId(row.team.teamId)}
-        onMouseLeave={() => setHoveredBoardTeamId((prev) => (prev === row.team.teamId ? null : prev))}
-        onFocusCapture={() => setHoveredBoardTeamId(row.team.teamId)}
-        onBlurCapture={() => setHoveredBoardTeamId((prev) => (prev === row.team.teamId ? null : prev))}
-      >
-        {hoveredBoardTeamId === row.team.teamId ? renderBoardHoverCard(row) : null}
-        <button
-          type="button"
-          className="nl-teams-boardrow-main"
-          onClick={() => {
-            // Zeile anklicken = dieses Team in den Fokus holen (Hero oben wird
-            // sein Profil) und nach oben scrollen. Ein separater „Profil"-Knopf
-            // ist damit überflüssig.
-            scheduleActiveManagerTeam(row.team.teamId, "manual_select");
-            scrollToSection(heroCardRef);
-          }}
-          title={`${row.teamName} in den Fokus holen`}
-        >
-          <span className="nl-teams-board-rank">
-            {medalKind ? (
-              <NlMedalBadge kind={medalKind} title={`Rang ${boardRank}`} />
-            ) : (
-              <span className="nl-teams-board-ranknum nl-tnum">{boardRank != null ? boardRank : "—"}</span>
-            )}
-          </span>
-          <span className="nl-teams-board-team">
-            <BudgetedMediaImage
-              src={logo.src}
-              alt={`${row.teamName} Logo`}
-              className="nl-teams-board-crest"
-              width={30}
-              height={30}
-              loading="lazy"
-              fallback={<span className="nl-teams-board-crest nl-teams-board-crest-fallback">{logo.initials}</span>}
-            />
-            <span className="nl-teams-board-team-copy">
-              <span className="nl-teams-board-teamname">{row.teamName}</span>
-              <span className="nl-teams-board-teamcode">{row.teamCode}</span>
-            </span>
-          </span>
-          <span className="nl-teams-board-points">
-            <span className="nl-teams-board-points-value nl-tnum">{formatNlNumber(row.points, 1)}</span>
-            <NlProgressBar
-              value={row.points ?? 0}
-              max={leaderPoints > 0 ? leaderPoints : 1}
-              tone="accent"
-              showValue={false}
-              className="nl-teams-board-points-bar"
-              title={`Punkte relativ zum Spitzenreiter (${formatNlNumber(leaderPoints, 1)})`}
-            />
-          </span>
-          {renderAxisRankBadges(row, row.team.teamId, row.teamName, true)}
-          <span className="nl-teams-board-meta">
-            {renderBoardSortValue(row)}
-            {row.goldCount > 0 ? <NlMedalBadge kind="gold" count={row.goldCount} /> : null}
-            {row.silverCount > 0 ? <NlMedalBadge kind="silver" count={row.silverCount} /> : null}
-            {row.bronzeCount > 0 ? <NlMedalBadge kind="bronze" count={row.bronzeCount} /> : null}
-            <span className="nl-teams-board-cash nl-tnum" title="Cash">
-              {row.cash != null ? formatNlMoney(row.cash) : "—"}
-            </span>
-          </span>
-        </button>
-      </li>
-    );
-  }
 
   // Hover-Portal für die CASH-Kachel: kompakte GuV-Projektion (alle Teams).
   // Reuse der generischen RANG-Hover-Klassen (rein CSS, additiv zum onClick).

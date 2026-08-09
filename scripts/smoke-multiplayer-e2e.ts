@@ -14,7 +14,6 @@ import type {
   ServerToClientEvents,
 } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
-import { isRoomArenaReady } from "@/lib/room/arena-sync-state";
 import { ROOM_FLOW_STEPS } from "@/lib/room/room-flow-controller";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
