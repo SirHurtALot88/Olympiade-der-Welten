@@ -121,6 +121,24 @@ const AXIS_TALENT_JUMP_MV = 6;
 /** Match-Fatigue, bis zu der ein Spieler als frisch zaehlt — dieselbe Grenze wie fatigue_management. */
 const AXIS_FRESH_FATIGUE_CAP = 45;
 
+/**
+ * Steht der Kaderaufbau eines neuen Spiels noch aus?
+ *
+ * Gebraucht, um zwei Zustaende zu trennen, die beide „keine Kaderzeilen" heissen und doch das
+ * Gegenteil bedeuten: „der Liga-Draft ist noch nicht gelaufen" (jedes Team bekommt einen Kader)
+ * gegen „dieses Team hat keinen" (die kaderbezogenen Achsen sind fuer es sinnlos).
+ *
+ * Der Neues-Spiel-Ablauf haelt genau das fest. Solange sein `fill_roster`-Schritt offen ist,
+ * ist ein leerer Kader eine Reihenfolge und kein Befund.
+ */
+function isRosterFillPending(gameState: GameState): boolean {
+  const flow = gameState.seasonState.newGameFlow;
+  if (!flow?.active || flow.dismissed) return false;
+  // Nur „open" heisst ausstehend. „completed" und „skipped" heissen beide: der Kaderaufbau
+  // findet nicht (mehr) statt — ein leerer Kader ist dann ein echter Befund.
+  return (flow.steps ?? []).some((step) => step.stepId === "fill_roster" && step.status === "open");
+}
+
 function talentJumpCount(gameState: GameState, teamId: string): number {
   const rosterIds = new Set(
     gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
@@ -314,13 +332,18 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
      * dauerhaft aus der Sponsorwahl aller 31 KI-Teams in Saison 1.
      *
      * Der Deckel selbst ist richtig — zwei Karten auf derselben Achse waeren keine Wahl. Falsch
-     * war die Frage: Vor dem Draft hat NIEMAND einen Kader, und jedes Team bekommt einen. Ein
-     * leerer Ligabestand heisst „noch nicht ausgelost", nicht „dieses Team kann die Achse nicht
-     * bewegen". Genau diese beiden Faelle trennt die Bedingung jetzt: Sobald irgendein Team
-     * Kaderzeilen hat, gilt wieder die scharfe Pruefung je Team.
+     * war die Frage: Waehrend des Spielaufbaus hat NIEMAND einen Kader, und jedes Team bekommt
+     * einen. Ein leerer Kader heisst dort „noch nicht ausgelost", nicht „dieses Team kann die
+     * Achse nicht bewegen".
+     *
+     * Woran das haengt: am `fill_roster`-Schritt des Neues-Spiel-Ablaufs, nicht daran, ob die
+     * Liga zufaellig gerade leer aussieht. Ein erster Versuch hatte auf `rosters.length === 0`
+     * geprueft — das trifft aber auch den echten Fall „EIN Team ohne Kader", wenn ihn jemand
+     * isoliert betrachtet, und genau den soll die Achse weiterhin ausschliessen. Der Ablauf sagt
+     * es dagegen eindeutig: Solange der Kaderaufbau aussteht, ist ein leerer Kader kein Befund.
      */
     offerable: (gameState, teamId) =>
-      gameState.rosters.length === 0 || gameState.rosters.some((entry) => entry.teamId === teamId),
+      isRosterFillPending(gameState) || gameState.rosters.some((entry) => entry.teamId === teamId),
   },
 };
 
