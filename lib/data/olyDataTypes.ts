@@ -374,6 +374,18 @@ export type ObjectiveRewardApplyLogRecord = {
     totalCashDelta: number;
     totalBoardConfidenceDelta: number;
     appliedTeams: number;
+    /**
+     * Cash-Wirkung JE TEAM, so wie sie gebucht wurde.
+     *
+     * Vorher trug der Log nur Summen. Wer nachrechnen wollte, wer wie viel bekommen hat, musste die
+     * Abrechnung aus dem Spielstand NEU herleiten — und traf dabei nicht mehr denselben Zustand:
+     * die Ziele werden am Saisonende NACH Sponsor, Apron und Gebäuden gebucht, also gegen einen
+     * anderen Cash-Stand als den, den ein Nachrechner vor dem Apply sieht. Genau daran ist die
+     * Cashflow-Invariante aufgelaufen. Der Log nennt die Zahlen jetzt selbst.
+     *
+     * Ältere Spielstände führen das Feld nicht; fehlend heisst „nicht protokolliert", nicht „null".
+     */
+    cashDeltaByTeamId?: Record<string, number>;
   };
   createdAt: string;
 };
@@ -1740,6 +1752,13 @@ export type TeamSeasonObjectiveRecord = {
    * nicht; fehlend bedeutet "verbindlich".
    */
   optional?: boolean;
+  /**
+   * Der ausgewiesene Wert ist eine HOCHRECHNUNG: das Ziel hängt an Cash, und die Einnahmen der
+   * Saison (Sponsor, Apron, Gebäude) werden erst am Saisonende gebucht. Die Oberfläche schreibt
+   * das dazu, und bis zur Abrechnung kann der Status höchstens "gefährdet" sein. Ältere
+   * Spielstände führen das Feld nicht; fehlend bedeutet "steht fest".
+   */
+  provisional?: boolean;
 };
 
 export type TeamBoardConfidenceRecord = {

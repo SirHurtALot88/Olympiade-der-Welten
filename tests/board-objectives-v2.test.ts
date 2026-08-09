@@ -222,51 +222,90 @@ describe("getNetTransferBalanceObjective (finance)", () => {
   // Cash-Reserve (eigener Block unten). Deshalb laufen diese Fälle mit seasonNum 2 (seasonScale 1.15).
   const team = { teamId: "T", budget: 200 } as unknown as Parameters<typeof getNetTransferBalanceObjective>[0]["team"];
 
-  it("does not auto-fail a modest net-buy for a neutral/low cash-priority board (target 0)", () =>
+  /**
+   * Baut ein Ligafeld aus vorgegebenen Netto-Transferbilanzen. „T" ist das geprüfte Team.
+   */
+  function ligaFeld(bilanzen: Record<string, number>): Map<string, TeamManagementSnapshotRow> {
+    return new Map(
+      Object.entries(bilanzen).map(([teamId, transferNet]) => [
+        teamId,
+        financeRowFor(teamId, { transferNet, cash: 100 }),
+      ]),
+    );
+  }
+  function financeRowFor(teamId: string, input: { transferNet: number; cash: number }): TeamManagementSnapshotRow {
+    return { teamId, transferNet: input.transferNet, cash: input.cash } as TeamManagementSnapshotRow;
+  }
+
+  /**
+   * GEMELDET VON CHRIS, am Live-Save nachgemessen: die festen Marken dieses Ziels („Transferbilanz
+   * ≥ 1,4M", „Transferausgaben unter 8M halten") trafen in Saison 2 auf Netto-Ausgaben von 210 bis
+   * 340 Mio — sechs Teams, alle „verfehlt". Der Grund: JEDER Saisonwechsel ist eine Kaufsaison, die
+   * Liga verkauft und kauft geschlossen neu. Eine absolute Marke misst dann den Umbau, nicht die
+   * Wirtschaftsführung.
+   *
+   * Seither entscheidet der Ligavergleich — und der trägt auch dann, wenn ALLE viel ausgeben.
+   */
+  it("wertet die Transferbilanz gegen die Liga, damit ein ligaweiter Umbau nicht alle scheitern laesst", () =>
     withV2(() => {
-      // Regression for the net-transfer auto-fail bug: cashPriority 5 -> surplus target 0. A modest
-      // net-buy (transferNet -5) must NOT be an automatic failure; it becomes a soft overspend ceiling
-      // (max(8, cash*0.15) = 15) with netSpend 5 <= 15 -> completed.
+      // Eine Liga mitten im Umbau: alle dreistellig im Minus. „T" gibt am wenigsten aus.
+      const umbauLiga = ligaFeld({ T: -120, A: -200, B: -260, C: -320 });
       const objective = getNetTransferBalanceObjective({
         team,
-        row: financeRow({ transferNet: -5, cash: 100 }),
+        row: umbauLiga.get("T")!,
+        rowsByTeamId: umbauLiga,
         profile: profileWithCashPriority(5),
         seasonNum: 2,
       });
-      expect(objective.targetValue).toBe(15);
+
+      // Unter dem alten 8M-Deckel waeren −120 Mio hoffnungslos verfehlt gewesen.
       expect(objective.status).toBe("completed");
+      expect(objective.currentValue).toBe(1);
+      expect(typeof objective.targetValue).toBe("number");
+      expect(String(objective.detail)).toContain("von 4");
     }));
 
-  it("keeps an at_risk band and only fails reckless overspend past the ceiling (target 0)", () =>
+  it("laesst dasselbe Team im sparsamen Feld durchfallen", () =>
     withV2(() => {
-      const cash = 100; // ceiling = 15; at_risk up to 15 * 1.15 = 17.25
-      const atRisk = getNetTransferBalanceObjective({
-        team,
-        row: financeRow({ transferNet: -16, cash }),
-        profile: profileWithCashPriority(5),
-        seasonNum: 2,
-      });
-      expect(atRisk.status).toBe("at_risk");
-      const failed = getNetTransferBalanceObjective({
-        team,
-        row: financeRow({ transferNet: -30, cash }),
-        profile: profileWithCashPriority(5),
-        seasonNum: 2,
-      });
-      expect(failed.status).toBe("failed");
-    }));
-
-  it("still demands a real surplus for a cash-focused board (target > 0)", () =>
-    withV2(() => {
-      // cashPriority 8 -> (8-5)*1.2 = 3.6, mal seasonScale 1.15 (Season 2) = 4.1.
+      // Dieselben −120 Mio, aber jetzt ist „T" das teuerste Team der Liga. Acht Teams, damit der
+      // „gefährdet"-Streifen (10% der Liga, mindestens 2 Plätze) das Schlusslicht nicht mehr deckt.
+      const sparsameLiga = ligaFeld({ T: -120, A: -5, B: -8, C: 4, D: -12, E: -3, F: 7, G: -20 });
       const objective = getNetTransferBalanceObjective({
         team,
-        row: financeRow({ transferNet: 12, cash: 100 }),
-        profile: profileWithCashPriority(8),
+        row: sparsameLiga.get("T")!,
+        rowsByTeamId: sparsameLiga,
+        profile: profileWithCashPriority(5),
         seasonNum: 2,
       });
-      expect(objective.targetValue).toBe(4.1);
-      expect(objective.status).toBe("completed");
+
+      expect(objective.status).toBe("failed");
+      expect(objective.currentValue).toBe(8);
+      expect(objective.penaltyCash ?? 0).toBeGreaterThan(0);
+    }));
+
+  it("verlangt von einem sparsamen Vorstand einen besseren Rang als von einem gelassenen", () =>
+    withV2(() => {
+      const liga = ligaFeld({ T: -100, A: -50, B: -150, C: -200 });
+      const streng = getNetTransferBalanceObjective({
+        team,
+        row: liga.get("T")!,
+        rowsByTeamId: liga,
+        profile: profileWithCashPriority(10),
+        seasonNum: 2,
+      });
+      const gelassen = getNetTransferBalanceObjective({
+        team,
+        row: liga.get("T")!,
+        rowsByTeamId: liga,
+        profile: profileWithCashPriority(0),
+        seasonNum: 2,
+      });
+
+      expect(Number(streng.targetValue)).toBeLessThan(Number(gelassen.targetValue));
+      // Derselbe Rang 2 von 4: dem strengen Vorstand reicht das nicht, dem gelassenen schon.
+      expect(streng.currentValue).toBe(2);
+      expect(streng.status).not.toBe("completed");
+      expect(gelassen.status).toBe("completed");
     }));
 
   // FAIRNESS-REGRESSION (Draft-Saison): In S1 kauft jedes Team seinen kompletten Kader ein. Der reale

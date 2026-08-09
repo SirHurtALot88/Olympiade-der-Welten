@@ -783,14 +783,20 @@ beforeAll(async () => {
   const objectiveRewardLogsBefore = new Set(
     (prizeSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).map((log) => log.id),
   );
-  const objectiveRewardApplied = (afterPrizeGameState.seasonState.objectiveRewardApplyLogs ?? []).some(
+  const neueZielLogs = (afterPrizeGameState.seasonState.objectiveRewardApplyLogs ?? []).filter(
     (log) => !objectiveRewardLogsBefore.has(log.id),
   );
-  if (objectiveRewardApplied) {
-    const settlement = buildTeamSeasonObjectiveSettlement(prizeSave.gameState);
-    for (const [teamId, summary] of Object.entries(settlement.byTeamId)) {
-      if (!summary?.cashDelta) continue;
-      addPrizePhaseBooking(teamId, summary.cashDelta, "season_end:board_objectives", "objectiveRewardApplyLogs");
+  // GELESEN, NICHT NACHGERECHNET: der Log traegt seit der Liga-Kalibrierung der Finanzziele die
+  // Aufteilung je Team selbst (`cashDeltaByTeamId`). Vorher stand hier eine zweite Herleitung aus
+  // `prizeSave.gameState` — dem Zustand VOR dem Apply. Das ging nur so lange gut, wie die Ziele
+  // gegen feste Marken gewertet wurden: seit sie an Cash und an der Frage „ist die Saison schon
+  // abgerechnet" haengen, liefert der Vorher-Zustand eine ANDERE Abrechnung als die, die wirklich
+  // gebucht wurde (die Ziele laufen am Saisonende NACH Sponsor, Apron und Gebaeuden). Genau diese
+  // Differenz — eine Board-Strafe von 4 — ist der Invariante als „Cash ohne Beleg" aufgefallen.
+  for (const log of neueZielLogs) {
+    for (const [teamId, cashDelta] of Object.entries(log.payload.cashDeltaByTeamId ?? {})) {
+      if (!cashDelta) continue;
+      addPrizePhaseBooking(teamId, cashDelta, "season_end:board_objectives", "objectiveRewardApplyLogs");
     }
   }
 

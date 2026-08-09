@@ -2975,6 +2975,19 @@ function FoundationTeamsDetailPanel({
                             <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
                               {formatObjectiveStatusLabel(objective.status)}
                             </span>
+                            {/* „Hochrechnung": das Ziel hängt an Cash, und Sponsor/Apron/Gebäude sind
+                                noch nicht gebucht. Ohne diesen Hinweis las sich ein Zwischenstand wie
+                                ein Ergebnis — genau die Verwechslung, die das Finanzziel ligaweit als
+                                verfehlt ausgewiesen hat. */}
+                            {objective.provisional ? (
+                              <span
+                                className="pill"
+                                data-objective-provisional="true"
+                                title="Die Einnahmen der Saison (Sponsor, Apron, Gebäude) werden erst am Saisonende gebucht. Bis dahin ist dieser Wert eine Hochrechnung und das Ziel kann nicht verfehlt sein."
+                              >
+                                Hochrechnung
+                              </span>
+                            ) : null}
                             {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
                             {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
                           </div>
