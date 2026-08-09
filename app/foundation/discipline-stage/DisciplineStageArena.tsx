@@ -1752,6 +1752,16 @@ export default function DisciplineStageArena({
     setReplayingDisciplineId(null);
   }, [disciplineId, mode, seed]);
 
+  // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als gebucht — nach einem
+  // Reload mitten im Spieltag zeigt der Status sonst nichts, und ein Replay der Disziplin wuerde
+  // erneut buchen wollen. Steht bewusst VOR `disciplineEnded`, das diese Quelle jetzt braucht.
+  const activeSideScoredInSave =
+    matchdayPanel?.d1?.disciplineId === disciplineId
+      ? scoringProgress?.d1.scored ?? false
+      : matchdayPanel?.d2?.disciplineId === disciplineId
+        ? scoringProgress?.d2.scored ?? false
+        : false;
+
   /**
    * Endscreen-Sichtbarkeit. `arenaEnded` allein reichte nicht: es wird bei JEDEM
    * Disziplin-Wechsel zurueckgesetzt, also verschwanden Topspieler, Highlights und
@@ -1759,9 +1769,24 @@ export default function DisciplineStageArena({
    * `endedDisciplineIds` haelt den Abschluss ueber den Wechsel hinweg (dieselbe
    * Quelle, aus der das Spieltags-Panel seine Reveals speist) — damit bleibt eine
    * abgeschlossene Disziplin abgeschlossen.
+   *
+   * GEMELDET VON CHRIS: „der spieltag abschliessen button in der arena ist weg, jetzt kann man
+   * wieder den 2. diszi nicht abschliessen."
+   *
+   * Beide bisherigen Quellen sind SITZUNGSZUSTAND: `arenaEnded` und `endedDisciplineIds` starten
+   * nach jedem Neuladen leer. Wer den Spieltag verlaesst und zurueckkommt — auf Chris' Save mit
+   * gewerteter Staffel und offenem Takeshi —, sah die Buehne auf einer laengst gewerteten Disziplin
+   * („Disziplin gewertet"), aber der Block darunter fehlte komplett. In dem Block stecken BEIDE
+   * Auswege: „Weiter zu Disziplin 2 →" und „Spieltag abschliessen". Ohne ihn gibt es keinen
+   * gefuehrten Weg zur zweiten Disziplin, und der Spieltag haengt.
+   *
+   * Der Spielstand weiss es die ganze Zeit besser: `scoringProgress` sagt je Seite, ob gewertet
+   * wurde. Diese Quelle ueberlebt den Reload — deshalb zaehlt sie jetzt mit.
    */
   const disciplineEnded =
-    arenaEnded || (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId);
+    arenaEnded ||
+    (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId) ||
+    (activeSideScoredInSave && replayingDisciplineId !== disciplineId);
 
   /**
    * Buchungszustand je Disziplin. Der Zieleinlauf loest die Wertung aus; bis sie durch
@@ -1772,15 +1797,6 @@ export default function DisciplineStageArena({
     Record<string, "pending" | "booked" | "failed">
   >({});
   const commitInFlightRef = useRef<Set<string>>(new Set());
-  // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als
-  // gebucht — nach einem Reload mitten im Spieltag zeigt der Status sonst nichts,
-  // und ein Replay der Disziplin würde erneut buchen wollen.
-  const activeSideScoredInSave =
-    matchdayPanel?.d1?.disciplineId === disciplineId
-      ? scoringProgress?.d1.scored ?? false
-      : matchdayPanel?.d2?.disciplineId === disciplineId
-        ? scoringProgress?.d2.scored ?? false
-        : false;
   const commitState = commitStateByDiscipline[disciplineId] ?? (activeSideScoredInSave ? "booked" : null);
 
   const commitFinishedDiscipline = useCallback(
