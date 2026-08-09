@@ -833,8 +833,13 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "review_matchday_results",
-      label: "Spieltagsergebnis anschauen",
-      cta: "Weiter: Ergebnis anschauen",
+      // Halber Spieltag (D1 gebucht, D2 offen): der nächste Schritt ist nicht das
+      // Anschauen eines fertigen Ergebnisses, sondern Disziplin 2 in der Arena —
+      // das Ziel des Schritts ist ohnehin die Arena. Der Header-CTA erzählte sonst
+      // die Fertig-Geschichte („Spieltagsergebnis anschauen"), während der
+      // Spielplan korrekt „läuft" sagte.
+      label: advanceBlockedByMissingD2 ? "Disziplin 2 spielen" : "Spieltagsergebnis anschauen",
+      cta: advanceBlockedByMissingD2 ? "Weiter: Disziplin 2 spielen" : "Weiter: Ergebnis anschauen",
       status: hasResults ? "ready" : "blocked",
       targetView: "matchdayArena",
       // Die "Spieltagsergebnis"-Sektion ist entfernt — sie wiederholte, was Arena und

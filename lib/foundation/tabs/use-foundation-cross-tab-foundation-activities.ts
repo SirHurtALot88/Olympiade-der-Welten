@@ -50,6 +50,8 @@ export function useFoundationCrossTabFoundationActivities(input: {
   liveSyncStatus?: "connected" | "syncing" | "reconnecting" | "disconnected" | "idle";
   fetchSlowWarning?: boolean;
   showIdleReady?: boolean;
+  /** Saison läuft bereits — hängengebliebene Preseason-Banner werden unterdrückt. */
+  preseasonWindowOver?: boolean;
 }) {
   return useMemo(
     () =>
@@ -57,6 +59,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
         isSaveBusy: input.isSaveBusy,
         aiPreseasonBusy: input.aiPreseasonBusy,
         aiPreseasonRun: input.aiPreseasonDisplayRun,
+        preseasonWindowOver: input.preseasonWindowOver,
         aiLineupEnsureBusy: input.aiLineupEnsureBusy,
         aiLineupEnsure: input.aiLineupEnsureBusy
           ? {
@@ -122,6 +125,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
       input.marketBuyBusy,
       input.marketSellBusy,
       input.newGameBusy,
+      input.preseasonWindowOver,
       input.preSeasonWorkflowBusy,
       input.rosterFillBusy,
       input.seasonStartResetBusy,

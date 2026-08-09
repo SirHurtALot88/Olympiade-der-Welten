@@ -157,6 +157,11 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     });
   } else if (
     input.aiPreseasonRun &&
+    // Saison läuft bereits (erster Spieltag gewertet): der gespeicherte Preseason-Lauf
+    // ist Geschichte — sein „blockiert"-Banner wäre eine Dauermeldung ohne Handlung
+    // (der Markt selbst sagt längst „Transferfenster geschlossen · Saison läuft").
+    // Die Rohdaten des Laufs bleiben unangetastet; nur die Leiste zeigt ihn nicht mehr.
+    !input.preseasonWindowOver &&
     (input.aiPreseasonRun.status === "failed" ||
       // Blocker allein reichen NICHT für das rote "blockiert"-Banner: Ein Setup-Draft lässt
       // immer erwartete Aktionen blockiert (Einsatzliste/Training laufen erst NACH dem Kader-Draft).
