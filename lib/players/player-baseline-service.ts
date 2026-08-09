@@ -223,6 +223,22 @@ function createSeasonZeroEconomyReferenceFromPlayer(
   options?: {
     computedAt?: string;
     source?: SeasonZeroEconomyReference["source"];
+    /**
+     * Ein bereits VERBINDLICH gerechneter Marktwert, der nicht neu ermittelt werden soll.
+     *
+     * Hintergrund: Fuer denselben Spieler gibt es zwei Rechenwege. Der Import rechnet
+     * LIGA-RELATIV (`calculateImportedPlayerEconomy` ueber
+     * `computeLeagueMarketValueMapFromPlayers`) — das ist der Wert, der im Spiel landet. Diese
+     * Funktion rechnet dagegen eigenstaendig ueber `resolvePlayerEconomyContract`
+     * (`calculated_preview`). Beide sind fuer sich richtig und liefern trotzdem
+     * unterschiedliche Zahlen; am importierten Beispiel gemessen 72,74 gegen 72,75.
+     *
+     * Zwei Waehrungen fuer dieselbe Groesse sind derselbe Fehlertyp, den `fd818a6` beim Buyout
+     * beseitigt hat („eine Regel statt zweier"). Wo ein verbindlicher Wert schon vorliegt, wird
+     * er uebernommen statt ueberstimmt — der zweite Weg bleibt fuer alle Faelle, in denen es
+     * keinen gibt (Rekonstruktion, Seed, Altbestand).
+     */
+    marketValueOverride?: number | null;
   },
 ): SeasonZeroEconomyReference {
   const storedMarketValue = roundBaselineMoney(player.marketValue);
@@ -243,9 +259,14 @@ function createSeasonZeroEconomyReferenceFromPlayer(
     rosterEntry: null,
   });
 
+  const uebernommenerMarktwert =
+    options?.marketValueOverride != null && Number.isFinite(options.marketValueOverride)
+      ? roundBaselineMoney(options.marketValueOverride)
+      : null;
+
   return {
     source: options?.source ?? "season_0_computed",
-    marketValue: roundBaselineMoney(economy.marketValue),
+    marketValue: uebernommenerMarktwert ?? roundBaselineMoney(economy.marketValue),
     salary: roundBaselineMoney(economy.expectedSalary ?? economy.salary),
     purchasePrice: roundBaselineMoney(economy.purchasePrice),
     salaryMarketValue: roundBaselineMoney(economy.salaryMarketValue),
@@ -380,12 +401,20 @@ export function createPlayerBaselineFromPlayer(
     importedAt?: string;
     sourceFile?: string | null;
     reconstructionWarning?: PlayerBaselineRecord["reconstructionWarning"];
+    /**
+     * Verbindlicher Marktwert des Aufrufers — gesetzt vom Charakter-Import, der ihn
+     * liga-relativ rechnet und damit den Wert liefert, der im Spiel gilt. Ohne diese Angabe
+     * rechnet die Baseline wie bisher selbst (Rekonstruktion, Seed, Altbestand).
+     * Begruendung im Detail bei `createSeasonZeroEconomyReferenceFromPlayer`.
+     */
+    marketValueOverride?: number | null;
   },
 ): PlayerBaselineRecord {
   const createdAt = options?.createdAt ?? new Date().toISOString();
   const seasonZeroEconomy = createSeasonZeroEconomyReferenceFromPlayer(player, {
     computedAt: createdAt,
     source: options?.reconstructionWarning ? "season_0_reconstructed" : "season_0_computed",
+    marketValueOverride: options?.marketValueOverride ?? null,
   });
   return normalizePlayerBaselineRecord({
     playerId: player.id,

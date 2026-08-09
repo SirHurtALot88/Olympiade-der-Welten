@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-09",
+  "seite": "Import · Spielerkatalog",
+  "text": "Ein importierter Spieler bekommt im Baseline-Katalog nicht mehr einen zweiten, minimal abweichenden Marktwert: der Katalog rechnete eigenständig nach, statt den liga-relativ ermittelten Wert des Imports zu übernehmen — den Wert also, der im Spiel tatsächlich gilt.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

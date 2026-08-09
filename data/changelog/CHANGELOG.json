@@ -219,6 +219,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Import · Spielerkatalog",
+      "pr": null,
+      "text": "Ein importierter Spieler bekommt im Baseline-Katalog nicht mehr einen zweiten, minimal abweichenden Marktwert: der Katalog rechnete eigenständig nach, statt den liga-relativ ermittelten Wert des Imports zu übernehmen — den Wert also, der im Spiel tatsächlich gilt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Arena · Vor dem Anpfiff",
       "pr": null,
       "text": "Die Infotafel vor dem Spieltag kommt wieder — und zwar vor jedem, nicht nur vor dem ersten. Gemeldet war: „die kommt glaub ich nur beim ersten spieltag, danach nie wieder gesehen“. Stimmte: sie hing an der Bedingung „mindestens ein Team der Liga ist noch nicht bereit“ und war damit kein Vorspiel-, sondern ein Blockade-Bildschirm. Am ersten Spieltag fehlten noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel blieb weg, obwohl ihre Überschrift „Vor dem Anpfiff“ lautet. Jetzt zählt nur noch, ob der Spieltag wirklich noch nicht begonnen hat. Damit sie keine Sackgasse ist, hat sie einen Knopf „Zur Bühne“ bekommen; er erscheint, sobald die Liga vollzählig bereit ist. Wer ihn drückt, landet beim Hin- und Herwechseln nicht wieder auf der Tafel — beim nächsten Spieltag kommt sie von selbst zurück.",
