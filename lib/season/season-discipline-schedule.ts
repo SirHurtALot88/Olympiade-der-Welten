@@ -428,23 +428,78 @@ export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, sav
  * zu grosszuegige `matchdayResults.some(...)`-Pruefung.
  */
 export function isMatchdayResultFullyCommitted(gameState: GameState, matchdayId: string): boolean {
+  return getMatchdayScoringProgress(gameState, matchdayId).completion === "complete";
+}
+
+export type MatchdayScoringSideProgress = {
+  /** Geplante Disziplin dieser Seite (aus dem Spielplan; notfalls aus den gebuchten Zeilen). */
+  disciplineId: string | null;
+  displayName: string | null;
+  /** Steht die Seite ueberhaupt im Spielplan dieses Spieltags? */
+  required: boolean;
+  /** Sind fuer die Seite Disziplin-Ergebnisse im Save gebucht? */
+  scored: boolean;
+};
+
+export type MatchdayScoringProgress = {
+  /** Existiert eine `matchdayResults`-Zeile (auch fuer einen erst halb gebuchten Spieltag)? */
+  hasResult: boolean;
+  d1: MatchdayScoringSideProgress;
+  d2: MatchdayScoringSideProgress;
+  /**
+   * none     → kein Ergebnis gebucht (Spieltag steht noch bevor).
+   * partial  → mindestens eine geplante Seite fehlt noch (typisch: D1 gebucht, D2 offen).
+   * complete → alle geplanten Seiten sind gebucht.
+   */
+  completion: "none" | "partial" | "complete";
+};
+
+/**
+ * DIE eine Zustandsfrage des Spieltags — dreiwertig statt boolesch.
+ *
+ * `matchdayResults` bekommt schon nach dem D1-Teil-Commit eine Zeile (die Arena bucht D1 und
+ * D2 einzeln); "es gibt ein Ergebnis" und "der Spieltag ist fertig" sind deshalb ZWEI
+ * verschiedene Aussagen, und der Zustand dazwischen ("teilweise gewertet") ist ein normaler
+ * Spielzustand, kein Fehlerfall. Spielplan, Arena und Spieltagsergebnis lesen diesen Zustand
+ * hier — nicht jeweils eine eigene, zweiwertige Naeherung, die den halben Spieltag mal als
+ * "fertig" (Ergebnis-Seite) und mal als "nichts gestartet" (Arena nach Reload) erzaehlt.
+ */
+export function getMatchdayScoringProgress(gameState: GameState, matchdayId: string): MatchdayScoringProgress {
   const result = (gameState.seasonState.matchdayResults ?? []).find(
     (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === matchdayId,
   );
-  if (!result) return false;
 
   const scheduleEntry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
-  const requiredSides: Array<"d1" | "d2"> = [];
-  if (scheduleEntry?.discipline1?.disciplineId) requiredSides.push("d1");
-  if (scheduleEntry?.discipline2?.disciplineId) requiredSides.push("d2");
-  // Ohne (oder mit unvollstaendigem) Schedule bleibt es bei der alten, grosszuegigen Regel --
-  // sonst haengt ein Altstand ohne `disciplineSchedule` unbegruendet fest.
-  if (requiredSides.length === 0) return true;
+  const resultRows = result
+    ? (gameState.seasonState.disciplineResults ?? []).filter((entry) => entry.matchdayResultId === result.id)
+    : [];
+  const scoredRowFor = (side: "d1" | "d2") => resultRows.find((entry) => entry.disciplineSide === side) ?? null;
+  const disciplineNameById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.name] as const));
 
-  const committedSides = new Set(
-    (gameState.seasonState.disciplineResults ?? [])
-      .filter((entry) => entry.matchdayResultId === result.id)
-      .map((entry) => entry.disciplineSide),
-  );
-  return requiredSides.every((side) => committedSides.has(side));
+  const buildSide = (side: "d1" | "d2"): MatchdayScoringSideProgress => {
+    const slot = side === "d1" ? scheduleEntry?.discipline1 : scheduleEntry?.discipline2;
+    const scoredRow = scoredRowFor(side);
+    const disciplineId = slot?.disciplineId ?? scoredRow?.disciplineId ?? null;
+    return {
+      disciplineId,
+      displayName:
+        slot?.displayName ?? (disciplineId ? disciplineNameById.get(disciplineId) ?? disciplineId : null),
+      required: Boolean(slot?.disciplineId),
+      scored: scoredRow != null,
+    };
+  };
+  const d1 = buildSide("d1");
+  const d2 = buildSide("d2");
+
+  let completion: MatchdayScoringProgress["completion"];
+  if (!result) {
+    completion = "none";
+  } else {
+    const requiredSides = [d1, d2].filter((side) => side.required);
+    // Ohne (oder mit unvollstaendigem) Schedule bleibt es bei der alten, grosszuegigen Regel --
+    // sonst haengt ein Altstand ohne `disciplineSchedule` unbegruendet fest.
+    completion = requiredSides.length === 0 || requiredSides.every((side) => side.scored) ? "complete" : "partial";
+  }
+
+  return { hasResult: Boolean(result), d1, d2, completion };
 }

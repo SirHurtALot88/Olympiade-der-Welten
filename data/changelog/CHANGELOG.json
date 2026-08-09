@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Der festgesessene Apron-Snapshot im laufenden Spielstand ist reparierbar, und jede Saison rechnet ihre Linien nachweislich neu. Der Zeitpunkt-Fix kam erst, nachdem Season 2 schon gespielt war: die vor dem Kaderbau eingefrorenen Linien (Median 45,0 statt real 69,8) waren damit festgeschrieben, und die Abrechnung hätte 29 Zahler mit 550,7 Mio getroffen — 2 Empfänger hätten je 275,4 Mio bekommen, bei Kassenständen von 0 bis 36 Mio. Ein neues Reparaturskript (scripts/repariere-apron-linien.ts) rechnet die Linien mit derselben Funktion wie das Spiel neu und schreibt nur, wenn seit dem ersten gewerteten Spieltag kein einziger Transfer stattfand — nur dann ist die Neuberechnung exakt der Stand vom Fensterschluss und keine mitten in der Saison verschobene Grenze. Für den laufenden Spielstand heißt das: 8 statt 29 Zahler, Topf 50,7 statt 550,7 Mio, 24 Empfänger zu je 2,1 Mio. Außerdem trägt jeder Linien-Snapshot jetzt einen Herkunftsvermerk (Fensterschluss oder Reparatur) — ein von einem alten Build zu früh eingefrorener Stand ist damit künftig von außen erkennbar, statt erraten werden zu müssen. Ein Snapshot ohne Vermerk wird in einer bereits gespielten Saison bewusst nicht automatisch ersetzt: eine wandernde Grenze mitten in der Saison wäre schlimmer als der einmalige manuelle Eingriff.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Liga · Archivierte Saisons",
       "pr": null,
       "text": "Der Bereichs-Rückfall in der archivierten Tabelle trug seine Punkte in die falsche Disziplin ein: statt in die erste Disziplin des Bereichs landeten sie in der mit dem größten Kader — Gewichtheben statt TDM, Climbing statt Staffel, I-Spy statt Schach, während die eigentliche Spalte leer blieb; nur SOC sah zufällig richtig aus, weil Basketball dort beides ist.",
@@ -161,6 +170,42 @@
       "text": "Die große Spielerkarte ist neu geordnet: OVR, PPs und MVS stehen jetzt in EINER Zeile statt in zweien — der Liga-Rang klebt dafür nicht mehr im Wert (\"79,9 · #20\"), sondern steht als eigene kleine Zeile im Chip. Darunter neu: die Saison-PPs je Achse (POW/SPE/MEN/SOC samt Ligarang, dieselbe Quelle wie die Ranks-Spalten), mit der Kopfzeile \"PPs je Achse\", damit sie nicht mit den Achswerten direkt darunter verwechselt wird — die stehen wie bisher als farbige Attribut-Chips da. CA und PO bleiben Sterne, PPs und MVS bleiben auch bei 0 oder ohne Wertung sichtbar. Gilt überall, wo die große Karte hängt: Home-Top-6, Team-Profil-Kader, Teams-Portraits und Teams-Detail.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Arena · Spielplan",
+      "pr": null,
+      "text": "Ein halb gewerteter Spieltag (Disziplin 1 gebucht, Disziplin 2 offen) erzählt jetzt überall dieselbe Geschichte. Vorher sagte der Spielplan korrekt „läuft“, das Spieltagsergebnis präsentierte den Tag aber als fertig (Tagessieger-Reveal, Medaillen-Podium, MVPs — nirgends „vorläufig“), und die Arena behauptete nach einem Neuladen das Gegenteil („Läuft, sobald die erste Etappe startet“, Wertung folgt), obwohl die Staffel längst im Saisonstand stand. Es gibt jetzt EINE geteilte Zustandsfrage mit drei Antworten (nichts gewertet / teilweise / vollständig, getMatchdayScoringProgress — dieselbe Quelle, die schon den Spieltagswechsel bewacht). Das Spieltagsergebnis zeigt im Teil-Zustand einen klaren Zwischenstands-Hinweis, nennt den Führenden „Zwischenführung · vorläufig“ statt Tagessieger, hält Gold-Reveal und Tages-Podium zurück und beschriftet die noch offene Disziplin beim Namen („Takeshi steht noch aus“) statt mit einem stummen „—“. Die Arena erkennt die gebuchte Disziplin jetzt auch nach einem Neuladen: sie öffnet direkt auf der noch offenen Disziplin 2, markiert Disziplin 1 im Auswahlmenü als „✓ gewertet“, zeigt die Spieltags-Wertung mit den echten D1-Punkten statt „Wertung folgt“ — und bucht eine bereits gewertete Disziplin nie ein zweites Mal. Der Weiter-Knopf oben führt im Teil-Zustand zu „Disziplin 2 spielen“ statt zur Fertig-Erzählung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Home",
+      "pr": null,
+      "text": "Home zählt die gewerteten Spieltage wieder richtig. Mitten in Season 2 (vier Spieltage gewertet, Rang und Punkte im Kopf korrekt) behauptete dieselbe Seite darunter „Noch keine Form — erst 0 Spieltage“, „verbleibend 10 Spieltage“ (richtig: 6) und erklärte GuV und Ø-Punkte mit „ab Spieltag 1“. Ursache war kein fehlender Spielstand, sondern ein leeres Platzhalter-Punkte-Ledger: ist die teure Saison-Ableitung auf Home aus Performance-Gründen abgeschaltet, liefert sie ein leeres Sentinel-Ledger — und genau das wurde dem Feld-Rennen-Ledger als „vorberechnet“ untergeschoben, der damit für keinen Spieltag Punkte fand. Jetzt rechnet der Feld-Rennen-Ledger in diesem Fall selbst aus dem Spielstand (dieselbe Rechnung wie die Ableitung); Form-Strip, Ø Punkte/Spieltag und „verbleibend“ stimmen damit wieder mit Teams und Leaders überein. Der GuV-Chip sagt mitten in der Saison außerdem „noch keine Buchung“ statt fälschlich „ab Spieltag 1“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltagsergebnis · Highlights",
+      "pr": null,
+      "text": "Die Highlight-Karten sprechen Deutsch statt Datenbank. Unten auf dem Spieltagsergebnis standen rohe Enum-Codes samt englischer Engine-Sätze („BEST_PLAYER_DISCIPLINE — Top player in Staffel“). Nach dem Muster der Preseason-Blocker-Übersetzung gibt es jetzt eine deutsche Typ-Karte (Bester Spieler / Stärkstes Team / Knappstes Duell / Ohne Aufstellung / Verletzung), der Inhaltssatz wird aus den gespeicherten Daten gebaut („Veloria Spinblade in Staffel — 129,6 Score“), und ein künftiger unbekannter Highlight-Typ erscheint nie roh, sondern als generische deutsche Karte mit Konsolen-Warnung. Dieselbe Übersetzung nutzt auch der Highlights-Block in der Arena.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Statuszeile · Settings",
+      "pr": null,
+      "text": "Zwei hängengebliebene Meldungen aufgeräumt. 1) Das Banner „Preseason-Markt blockiert · 22/31 Teams“ klebte am Spieltag 4 noch auf jeder Seite, obwohl der Markt selbst längst „Transferfenster geschlossen · Saison läuft“ meldet — sobald die Saison läuft (erster Spieltag gewertet), wird der alte Preseason-Lauf nicht mehr als Dauer-Blocker angezeigt; seine Rohdaten bleiben unangetastet. 2) Die Save-Karte in den Settings behauptete „Dieser Save enthält keine abgeschlossene Season · S1-Endstand nein / S2-Start nein“, während Saisonstand, Teams und Leaders das komplette Season-1-Archiv zeigen. Die Erkennung zählt jetzt abgeschlossene Saison-Archive mit, und eine laufende Season 2 gilt folgerichtig als „S1-Endstand ja / S2-Start ja“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {

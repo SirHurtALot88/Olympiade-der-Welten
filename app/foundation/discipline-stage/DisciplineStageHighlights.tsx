@@ -1,6 +1,7 @@
 "use client";
 
 import type { DisciplineHighlightCandidate } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 
 export type DisciplineStageHighlightMeta = { code: string; name: string; logoUrl: string | null };
 
@@ -24,8 +25,17 @@ function describe(
   teamMetaById: Map<string, DisciplineStageHighlightMeta>,
   playerNameById: Map<string, string>,
 ): string {
-  if (candidate.shortSummary && candidate.shortSummary.trim()) {
-    return candidate.shortSummary.trim();
+  // Deutscher Satz aus dem Payload (geteilter Formatter mit dem Spieltagsergebnis) —
+  // der rohe `shortSummary` der Engine ist englisch ("Top player in Staffel") und
+  // stand hier vorher wörtlich im Spieler-UI.
+  const display = formatMatchdayHighlight({
+    highlightType: candidate.highlightType,
+    shortSummary: candidate.shortSummary ?? null,
+    payload: candidate.payload,
+    disciplineName: null,
+  });
+  if (display.value !== "—" && display.value !== (candidate.shortSummary ?? "").trim()) {
+    return display.value;
   }
   const teamCode = candidate.teamId ? teamMetaById.get(candidate.teamId)?.code ?? candidate.teamId : null;
   const playerName = candidate.playerId ? playerNameById.get(candidate.playerId) ?? null : null;

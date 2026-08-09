@@ -149,6 +149,38 @@ export function resolveScenarioMetaLabel(meta?: SaveSummary["scenarioMeta"] | nu
   }
 }
 
+/** Saison-Nummer aus einer Season-ID („season-2" → 2), sonst null. */
+function parseSeasonNumberFromId(seasonId?: string | null): number | null {
+  const match = /^season-(\d+)$/.exec(seasonId ?? "");
+  const nummer = match ? Number.parseInt(match[1]!, 10) : NaN;
+  return Number.isFinite(nummer) ? nummer : null;
+}
+
+/**
+ * Enthält der Save eine ABGESCHLOSSENE Season?
+ *
+ * Primär das persistierte Flag — aber ältere Meta-Datensätze tragen es noch
+ * falsch (`hasFinalStandings` prüfte früher nur die laufende Saison, nicht das
+ * Archiv; inzwischen an der Quelle behoben, `lib/persistence/scenario-meta.ts`).
+ * Deshalb der logische Schluss dahinter: Läuft bereits Season ≥ 2, ist die
+ * Vorsaison zwingend abgeschlossen und archiviert — genau das zeigen
+ * Saisonstand, Teams („ggü. Season 1") und Leaders aus demselben Save an.
+ */
+export function saveContainsCompletedSeason(meta?: SaveSummary["scenarioMeta"] | null): boolean {
+  if (!meta) return false;
+  if (meta.containsFinalStandings) return true;
+  const seasonNumber = parseSeasonNumberFromId(meta.activeSeasonId);
+  return seasonNumber != null && seasonNumber >= 2;
+}
+
+/** Hat der Save Season 2 erreicht (als S2-Start-Szenario oder weil Season ≥ 2 läuft)? */
+export function saveHasReachedSeasonTwo(meta?: SaveSummary["scenarioMeta"] | null): boolean {
+  if (!meta) return false;
+  if (meta.scenarioType === "season2_start") return true;
+  const seasonNumber = parseSeasonNumberFromId(meta.activeSeasonId);
+  return seasonNumber != null && seasonNumber >= 2;
+}
+
 export function buildScenarioWarning(meta?: SaveSummary["scenarioMeta"] | null) {
   if (!meta) return "Alte Save-Struktur ohne Scenario-Meta.";
   if (meta.scenarioType === "sandbox_multiseason_test") {
@@ -157,10 +189,14 @@ export function buildScenarioWarning(meta?: SaveSummary["scenarioMeta"] | null) 
   if (meta.scenarioType === "sandbox_snapshot") {
     return "Sandbox-Snapshot: stabiler Rücksprungpunkt, nicht aktiv beschreiben.";
   }
-  if (meta.scenarioType === "ai_redraft_test" && !meta.containsFinalStandings) {
+  if (meta.scenarioType === "ai_redraft_test" && !saveContainsCompletedSeason(meta)) {
     return "Dieser Save ist ein Redraft-Testsave ohne abgeschlossene Season.";
   }
-  if (!meta.containsFinalStandings && meta.scenarioType !== "fresh_start" && meta.scenarioType !== "season2_start") {
+  if (
+    !saveContainsCompletedSeason(meta) &&
+    meta.scenarioType !== "fresh_start" &&
+    meta.scenarioType !== "season2_start"
+  ) {
     return "Dieser Save enthält keine abgeschlossene Season.";
   }
   return null;
