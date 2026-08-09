@@ -92,11 +92,14 @@ describe("gameplay flow scan contract", () => {
     expect(packageText).toContain("@tanstack/react-virtual");
     // "LegacyLineupVirtualCardGrid" pinnte nur einen nie genutzten Import aus
     // der toten Geschwisterdatei LegacyLineupVirtualTableBody.tsx — beide sind
-    // mit dem Dead-Code-Cleanup entfernt. Die echte Virtualisierung der
-    // Spieler-Tabelle läuft über useRowVirtualWindow / expertPlayerTableVirtualWindow
-    // (siehe Assertion unten), die davon unberührt bleibt.
+    // mit dem Dead-Code-Cleanup entfernt.
+    //
+    // Die Zusage auf "expertPlayerTableVirtualWindow" ist mit dem Ausbau des
+    // Expertenmodus (Entscheidung Chris, 2026-08-09) ebenfalls gestrichen. Sie hat nie
+    // eine laufende Virtualisierung belegt, sondern nur einen Namen im Quelltext:
+    // `visibleExpertPlayerRows` wurde berechnet und nie gerendert, der Viewport-Ref war
+    // an kein Element gehaengt. Es geht also keine Virtualisierung verloren, die es gab.
     expect(lineupText).toContain("scheduleHoveredCandidate");
-    expect(lineupText).toContain("expertPlayerTableVirtualWindow");
     // NOTE: react-virtual / useVirtualizer is now only used by the players
     // table and legacy lineup table — SeasonStandingsNewLook.tsx (and no other
     // file under app/foundation/season-v2/) uses "standingsTableVirtualWindow"

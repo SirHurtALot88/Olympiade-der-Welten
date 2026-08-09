@@ -661,26 +661,24 @@ describe("legacy lineup validator", () => {
 
 describe("legacy lineup draft ui contract", () => {
   /**
-   * OFFEN — bewusst uebersprungen statt weichgespuelt, weil hier eine ENTSCHEIDUNG fehlt.
+   * ENTSCHIEDEN (Chris, 2026-08-09): Der Expertenmodus ist bewusst weg — Variante (b).
    *
-   * Die Zusage unten prueft unter anderem auf `{showExpertBackupPanels ? (` im Quelltext. Dieses
-   * JSX gibt es nicht mehr. Die Konstante selbst steht weiterhin da
-   * (`LegacyLineupLabClient.tsx:5765`, `const showExpertBackupPanels = isExpertModeEnabled;`) —
-   * nachgemessen wird sie von KEINER Stelle gelesen. Der Expertenmodus schaltet damit ins Leere.
+   * Der Befund war: `showExpertBackupPanels` stand noch da, wurde aber von KEINER Stelle
+   * gelesen; ebenso wenig der Schalter dahinter — `setIsExpertModeEnabled` hatte nie einen
+   * Aufrufer, der Viewport-Ref war nie an ein Element gehaengt, die virtualisierten
+   * Expertenzeilen wurden nie gerendert. Der Modus schaltete komplett ins Leere.
    *
-   * Das ist kein veralteter Test, sondern ein Feature-Verlust mit zurueckgebliebenem Schalter.
-   * Zwei saubere Aufloesungen, beide brauchen eine fachliche Entscheidung:
-   *   a) Die Panels kommen zurueck — dann greift die Zusage unten wieder unveraendert.
-   *   b) Sie sind bewusst weg — dann gehoert die tote Konstante geloescht und diese Zusage
-   *      ersatzlos gestrichen.
+   * Der ganze Cluster ist entfernt (Storage-Key, Preference-Loader, State, Ref, Virtual-Window,
+   * Hoehen-Effekt, Persist-Effekt, tote Konstante) — samt der Zusage, die hier auf
+   * `{showExpertBackupPanels ? (` geprueft hat.
    *
-   * Bis dahin waere ein dauerhaft roter Test das schlechteste Ergebnis: Er kostet bei jedem Lauf
-   * Aufmerksamkeit, ohne dass jemand etwas daraus ableitet. Uebersprungen bleibt der Befund
-   * sichtbar und nachlesbar.
+   * Dieser Test bleibt uebersprungen, aber aus einem UNABHAENGIGEN Grund: dem groesseren
+   * Feature-Verlust im "classic"-Draft-Baum, den die NOTE unten beschreibt. Der Expertenmodus
+   * war nur ein Teil der roten Zusagen, nicht ihre Ursache.
    */
   it.skip("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
     // NOTE (investigated, not fixed): several of the lineupText assertions
-    // below (showExpertBackupPanels JSX, legacy-lineup-main-flow,
+    // below (legacy-lineup-main-flow,
     // legacy-lineup-captain-strip, legacy-lineup-progress-track,
     // legacy-lineup-quick-assign-row, legacy-lineup-draft-flow-chip,
     // role="tablist", legacy-lineup-team-tactics-form, "Vorschlag bewusst
@@ -701,7 +699,6 @@ describe("legacy lineup draft ui contract", () => {
     // nirgends gelesenes Flag ohne jeden Aufrufer — beide Flags sind mit dem
     // Dead-Code-Cleanup entfernt. Der Rest dieses Blocks bleibt unangetastet,
     // s. NOTE oben zum größeren, unabhängigen Feature-Verlust.
-    expect(lineupText).toContain("{showExpertBackupPanels ? (");
     expect(lineupText).toContain('className="legacy-lineup-main-flow"');
     expect(lineupText).toContain("legacy-lineup-captain-strip");
     expect(lineupText).toContain("Vorschlag bewusst setzen");
