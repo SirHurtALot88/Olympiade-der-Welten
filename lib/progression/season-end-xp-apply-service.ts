@@ -648,6 +648,12 @@ function buildPreviewPlayer(input: {
           toValue: entry.after,
           cost: 0,
           source: "organic_season_progression" as const,
+          // Herkunft mitschreiben, sonst ist sie nach dem Saisonabschluss verloren: Der
+          // Breakdown existiert nur hier, im Save landete bisher allein das Ergebnis.
+          originTraining: entry.training,
+          originSpillover: entry.spillover,
+          originPerformance: entry.performance,
+          originRegression: entry.regression,
         })),
     );
     warnings.push(...organicProgression.warnings.map((warning) => `${input.player.id}:${warning}`));

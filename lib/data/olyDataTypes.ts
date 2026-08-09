@@ -421,6 +421,21 @@ export type PlayerProgressionSpendUpgradeRecord = {
   toValue: number;
   cost: number;
   source: "manual_xp_spend_preview" | "season_end_regression" | "organic_season_progression";
+  /**
+   * Herkunft der Änderung je Attribut, wie sie die organische Progression berechnet hat
+   * (`OrganicProgressionAttributeBreakdown`). Bisher wurde nur `fromValue`/`toValue`
+   * festgehalten — in der Trainingshistorie stand danach eine Zahl ohne Erklärung, und ein
+   * Zuwachs aus Spieltags-Leistungen sah aus wie ein Erfolg des Trainingsplans.
+   *
+   * Optional, weil die Felder erst ab dieser Version geschrieben werden: Für Saisons, die
+   * vorher abgeschlossen wurden, gibt es die Aufteilung nicht mehr — sie ließe sich nur
+   * schätzen. Die Historie fällt dort auf die Saison-Summen aus `organicMeta` zurück.
+   * Nur bei `source: "organic_season_progression"` gesetzt.
+   */
+  originTraining?: number;
+  originSpillover?: number;
+  originPerformance?: number;
+  originRegression?: number;
 };
 
 export type PlayerProgressionEconomySnapshot = {

@@ -19,6 +19,14 @@ export type PlayerTrainingHistoryRow = {
     fromValue: number;
     toValue: number;
     delta: number;
+    /**
+     * Herkunft je Attribut — `null`, wenn die Saison vor der Einführung der Felder
+     * abgeschlossen wurde. Dann zeigt die Historie nur die Saison-Summen.
+     * Spillover zählt zum Training: er IST Trainingsbudget, nur umgeleitet.
+     */
+    training: number | null;
+    performance: number | null;
+    regression: number | null;
   }>;
   timestamp: string;
 };
@@ -102,12 +110,23 @@ export function buildPlayerTrainingHistoryRows(input: {
         classHistory,
         organicSnapshot: input.organicSnapshot,
       });
-      const upgrades = event.upgrades.map((upgrade) => ({
-        attribute: upgrade.attribute,
-        fromValue: upgrade.fromValue,
-        toValue: upgrade.toValue,
-        delta: Number((upgrade.toValue - upgrade.fromValue).toFixed(1)),
-      }));
+      const upgrades = event.upgrades.map((upgrade) => {
+        const hatHerkunft =
+          typeof upgrade.originTraining === "number" ||
+          typeof upgrade.originPerformance === "number" ||
+          typeof upgrade.originRegression === "number";
+        return {
+          attribute: upgrade.attribute,
+          fromValue: upgrade.fromValue,
+          toValue: upgrade.toValue,
+          delta: Number((upgrade.toValue - upgrade.fromValue).toFixed(1)),
+          training: hatHerkunft
+            ? Number(((upgrade.originTraining ?? 0) + (upgrade.originSpillover ?? 0)).toFixed(1))
+            : null,
+          performance: hatHerkunft ? Number((upgrade.originPerformance ?? 0).toFixed(1)) : null,
+          regression: hatHerkunft ? Number((upgrade.originRegression ?? 0).toFixed(1)) : null,
+        };
+      });
 
       const isOrganic = event.source === "organic_season_progression";
       const trainingClass =

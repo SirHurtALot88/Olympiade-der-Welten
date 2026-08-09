@@ -31,8 +31,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePhase"] }): GameState {
+function gameState(input?: {
+  completed?: boolean;
+  gamePhase?: GameState["gamePhase"];
+  /**
+   * Ist das Sponsorgeld der Saison gebucht? Der Schritt „Finanzen" (`season_rewards`) haelt die
+   * Kette an, solange nicht — die Saisonende-Abrechnung ist erzwungen ("natürlich muss die
+   * auszahlung und das ganze cash thema erzwungen sein ohne das kommt man nicht in die neue
+   * season!"). Die Ketten-Tests hier pruefen etwas anderes und starten deshalb mit gebuchtem
+   * Geld; der Riegel selbst hat seinen eigenen Test.
+   */
+  sponsorPaid?: boolean;
+}): GameState {
   const completed = input?.completed ?? false;
+  const sponsorPaid = input?.sponsorPaid ?? true;
   return {
     ...(input?.gamePhase ? { gamePhase: input.gamePhase } : {}),
     season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: completed ? 2 : 1, matchdayIds: ["md-1", "md-2"] },
@@ -45,6 +57,21 @@ function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePha
       standings: { "team-1": { points: 3, rank: 1 }, "team-2": { points: 0, rank: 2 } },
       lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-1", matchdayId: "md-2", teamId: "team-1", status: "submitted", entries: [], createdAt: "2026-06-11T00:00:00.000Z", updatedAt: "2026-06-11T00:00:00.000Z" }],
       formCards: [{ cardId: "form-1", seasonId: "season-1", teamId: "team-1", playerId: "player-1", type: "buff", value: 1 } as never],
+      sponsorPayoutLogs: sponsorPaid
+        ? [
+            {
+              id: "sponsor-payout-1",
+              saveId: "save-1",
+              seasonId: "season-1",
+              teamId: "team-1",
+              phase: "season_end" as const,
+              componentId: null,
+              cashDelta: 10,
+              action: "apply" as const,
+              createdAt: "2026-06-11T00:00:00.000Z",
+            },
+          ]
+        : [],
     },
     matchdayState: { matchdayId: completed ? "md-2" : "md-1", status: completed ? "resolved" : "planning", pendingTeamIds: completed ? [] : ["team-1"], resolvedFixtureIds: completed ? ["fixture-2"] : [] },
     teams: [
@@ -78,7 +105,11 @@ function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePha
   };
 }
 
-function save(input?: { completed?: boolean; gamePhase?: GameState["gamePhase"] }): PersistedSaveGame {
+function save(input?: {
+  completed?: boolean;
+  gamePhase?: GameState["gamePhase"];
+  sponsorPaid?: boolean;
+}): PersistedSaveGame {
   return {
     saveId: "save-1",
     name: "Test Save",
