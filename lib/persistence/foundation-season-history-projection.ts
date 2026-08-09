@@ -52,6 +52,9 @@ export type FoundationSeasonHistoryTeamEntry = {
   salaryTotalEnd: number | null;
   marketValueEnd: number | null;
   marketValueSeasonEnd: number | null;
+  cashSeasonEnd: number | null;
+  salarySeasonEnd: number | null;
+  rosterSeasonEnd: number | null;
   marketValueTotalEnd: number | null;
   guv: number | null;
 };
@@ -99,6 +102,9 @@ function projiziereTeam(record: {
   salaryTotalEnd?: number | null;
   salaryEnd?: number | null;
   marketValueSeasonEnd?: number | null;
+  cashSeasonEnd?: number | null;
+  salarySeasonEnd?: number | null;
+  rosterSeasonEnd?: number | null;
   marketValueTotalEnd?: number | null;
   marketValueEnd?: number | null;
   guv?: number | null;
@@ -124,6 +130,12 @@ function projiziereTeam(record: {
     salaryTotalEnd: zahlOderNull(record.salaryTotalEnd),
     marketValueEnd: zahlOderNull(record.marketValueEnd),
     marketValueSeasonEnd: zahlOderNull(record.marketValueSeasonEnd),
+    // Gemeinsam mit dem MW eingefroren — ohne diese drei Zeilen kaeme der
+    // Saisonstand nie im Browser an und die Historie fiele weiter auf die
+    // spaeter ueberschriebenen Felder zurueck.
+    cashSeasonEnd: zahlOderNull(record.cashSeasonEnd),
+    salarySeasonEnd: zahlOderNull(record.salarySeasonEnd),
+    rosterSeasonEnd: zahlOderNull(record.rosterSeasonEnd),
     marketValueTotalEnd: zahlOderNull(record.marketValueTotalEnd),
     guv: zahlOderNull(record.guv),
   };
@@ -212,6 +224,9 @@ export function alsSchnappschussErsatz(
         salaryTotalEnd: team.salaryTotalEnd,
         marketValueEnd: team.marketValueEnd,
         marketValueSeasonEnd: team.marketValueSeasonEnd,
+        cashSeasonEnd: team.cashSeasonEnd,
+        salarySeasonEnd: team.salarySeasonEnd,
+        rosterSeasonEnd: team.rosterSeasonEnd,
         marketValueTotalEnd: team.marketValueTotalEnd,
         guv: team.guv,
       } as unknown as SeasonSnapshotRecord["finalStandings"][number];

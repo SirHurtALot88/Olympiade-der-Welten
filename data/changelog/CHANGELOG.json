@@ -282,6 +282,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Team · Historie",
+      "pr": null,
+      "text": "Cash, Gehalt und Marktwert einer abgeschlossenen Saison standen nebeneinander, stammten aber aus drei verschiedenen Momenten — zwei davon sogar aus der Folgesaison. Jetzt werden alle vier Größen gemeinsam eingefroren: nach dem Trainings-Apply und vor dem ersten Verkauf. Wo dieser Stand fehlt, sagt die Zeile das, statt eine falsche Zahl zu zeigen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Teams · Teamprofil",
       "pr": null,
       "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",

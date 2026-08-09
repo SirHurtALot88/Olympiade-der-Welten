@@ -519,8 +519,12 @@ export function useFoundationCrossTabTeamsRoster(input: {
                * (Eintrittsstand der Folgesaison) — deshalb darf hier nichts vorab zusammengefasst
                * werden.
                */
-              cash: teamEintrag.cashEnd ?? teamEintrag.cashTotal,
-              salaryTotal: teamEintrag.salaryTotalEnd ?? teamEintrag.salaryEnd,
+              // Dieselbe Rangfolge wie im Snapshot-Pfad oben: der gemeinsam
+              // eingefrorene Saisonstand zuerst, die spaeter ueberschriebenen
+              // Felder nur als Rueckfall fuer Altsaisons.
+              cash: teamEintrag.cashSeasonEnd ?? teamEintrag.cashEnd ?? teamEintrag.cashTotal,
+              salaryTotal:
+                teamEintrag.salarySeasonEnd ?? teamEintrag.salaryTotalEnd ?? teamEintrag.salaryEnd,
               marketValue:
                 teamEintrag.marketValueSeasonEnd ??
                 teamEintrag.marketValueTotalEnd ??
@@ -599,9 +603,21 @@ export function useFoundationCrossTabTeamsRoster(input: {
             ppSpe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", areaPoints.spe),
             ppMen: resolveSeasonDisciplineAreaTotal(disciplineValues, "men", areaPoints.men),
             ppSoc: resolveSeasonDisciplineAreaTotal(disciplineValues, "soc", areaPoints.soc),
-            cash: teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
-            salaryTotal: teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
-            // Saisonend-Marktwert NACH Trainings-Apply/Neuberechnung zuerst — siehe all-time-table.ts.
+            // ALLE DREI SPALTEN AUS DEMSELBEN MOMENT.
+            //
+            // Die eingefrorenen `*SeasonEnd`-Felder zuerst: sie entstehen gemeinsam am
+            // Ende von `player_development` — nach Trainings-Apply und MW-Neuberechnung,
+            // vor dem ersten Verkauf. Die alten Felder dahinter bezeichnen andere
+            // Zeitpunkte: `cashEnd` den Stand NACH den Verkäufen, `salaryTotalEnd` und
+            // `marketValueTotalEnd` sogar den Eintrittsstand der FOLGE-Saison (der
+            // Eintritts-Patch überschreibt sie). Die Zeile zeigte dadurch drei Spalten
+            // mit drei Zeitpunkten, zwei davon aus der falschen Saison.
+            //
+            // Die Rückfallkette bleibt, damit Altsaisons ohne Freeze weiter etwas
+            // anzeigen — nur eben nachrangig.
+            cash: teamSnapshot.cashSeasonEnd ?? teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
+            salaryTotal:
+              teamSnapshot.salarySeasonEnd ?? teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
             marketValue:
               teamSnapshot.marketValueSeasonEnd ??
               teamSnapshot.marketValueTotalEnd ??

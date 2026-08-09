@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
-import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonSnapshotTeamRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -864,14 +864,35 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
     };
   }
 
+  /**
+   * NOTBEHELF, UND ER GIBT SICH ALS SOLCHER ZU ERKENNEN.
+   *
+   * Hier entsteht ein Snapshot erst beim `next_season_setup` — also NACH der
+   * Verkaufsphase und teilweise nach dem Kauffenster. Genau so ist auf dem
+   * Live-Spielstand ein Datensatz entstanden, der drei Tage nach 49 Verkaeufen
+   * gebaut wurde und dessen Cash-Wert die Verkaufserloese enthielt.
+   *
+   * Die Wirtschaftsfelder werden deshalb ausdruecklich NICHT eingefroren: eine
+   * Zahl, die den Saisonstand behauptet, ihn aber nicht zeigt, ist schlimmer als
+   * gar keine. Die Historie faellt dann sichtbar auf „—" zurueck statt still auf
+   * einen Wert aus der Folge-Saison.
+   *
+   * `economySnapshotSource` haelt den Ursprung fest, damit spaeter niemand raten
+   * muss, warum ein Datensatz die eingefrorenen Felder nicht hat.
+   */
+  const markiereHerkunft = (records: SeasonSnapshotTeamRecord[]) =>
+    records.map((record) => ({ ...record, economySnapshotSource: "post_sell_fallback" as const }));
+  const fallbackSnapshot = {
+    ...snapshotPreview.snapshot,
+    status: snapshotPreview.seasonCompleted ? ("completed" as const) : ("partial" as const),
+    finalStandings: markiereHerkunft(snapshotPreview.snapshot.finalStandings ?? []),
+    teamSnapshots: markiereHerkunft(snapshotPreview.snapshot.teamSnapshots ?? []),
+  };
   const nextGameState: GameState = {
     ...save.gameState,
     seasonState: {
       ...save.gameState.seasonState,
-      seasonSnapshots: upsertSeasonSnapshotRecord(save.gameState.seasonState.seasonSnapshots, {
-        ...snapshotPreview.snapshot,
-        status: snapshotPreview.seasonCompleted ? "completed" : "partial",
-      }),
+      seasonSnapshots: upsertSeasonSnapshotRecord(save.gameState.seasonState.seasonSnapshots, fallbackSnapshot),
     },
   };
 
