@@ -20,7 +20,7 @@
  */
 import { formatGermanDate, formatGermanDateTime } from "@/lib/utils/format-datetime";
 
-export const APP_VERSION = "0.4.43";
+export const APP_VERSION = "0.4.44";
 
 /**
  * NEXT_PUBLIC_OLY_BUILD_SHA wird als VOLLER Commit-SHA erwartet (nicht

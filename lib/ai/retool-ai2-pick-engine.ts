@@ -364,13 +364,44 @@ export function buildRetoolAi2BudgetPlan(input: {
   let reserveTargetMaxScaled = reserveTargetMax;
   const softCashRatio = clamp(0.25 + (finances / 10) * 0.5, 0.25, 0.75);
   const cashToKnownSalaryRatio = rosterSalaryKnown > 0 ? cash / rosterSalaryKnown : cashRunwayRatio;
+  /**
+   * ANTI-HORTUNG — aber im Rahmen der Haltung, nicht an ihr vorbei.
+   *
+   * Die Absicht dieses Blocks ist richtig: Ein Team, das auf Geld sitzt und gleichzeitig
+   * Kaderlöcher hat, soll die Reserve lockern statt weiter zu horten. Umgesetzt war er aber
+   * als UNBEDINGTER Übersteuerer — er setzte `reservePolicy = "aggressive"` und zog die
+   * Reserveziele auf ihre Böden (3/4/5), sobald `cash / rosterSalaryKnown` die weiche Grenze
+   * riss und der Kader unter dem Optimum lag.
+   *
+   * Damit hat er genau die Rechnung zunichtegemacht, die direkt darüber steht: `aggression01`,
+   * `caution01` und `spendPostureScore` werden sorgfältig aus Identität und Strategieprofil
+   * hergeleitet — und dann verworfen. Ein bewusst sparsames Team (C-C: cashPriority 10,
+   * saveDiscipline „high", finances 10) verhielt sich anschließend exakt wie ein
+   * ausgabefreudiges (M-M: cashPriority 3, spendAggression „high"), sobald sein Kontostand
+   * bequem über der bekannten Gehaltslast lag. Das ist der Moment, in dem ein
+   * cash-konservatives Team gerade NICHT bis auf den Boden ausgeben soll.
+   *
+   * Zwei Änderungen, beide minimal:
+   *
+   *  1. Die Lockerung wird mit der Haltung GEWICHTET. Wer auf Sparen steht, gibt weniger frei;
+   *     wer ohnehin ausgeben will, bekommt die volle Lockerung. Ganz ohne Wirkung bleibt sie
+   *     auch beim sparsamsten Team nicht — untätiges Geld neben Kaderlöchern ist auch dort
+   *     ein Fehler, nur ein kleinerer.
+   *  2. Die POLITIK wird nicht mehr erzwungen. Ein ausgeglichenes Team rückt eine Stufe nach
+   *     oben; ein bewusst konservatives bleibt konservativ und behält damit sein höheres
+   *     Reserveziel. Die Haltung entscheidet weiterhin die Rechnung darüber.
+   */
   if (cashToKnownSalaryRatio > softCashRatio + 0.05 && missingToOptimum > 0) {
     const hoardExcess = clamp((cashToKnownSalaryRatio - softCashRatio) / Math.max(softCashRatio, 0.01), 0, 1.5);
-    const relief = clamp(0.4 + hoardExcess * 0.45, 0.4, 0.85);
+    // -1 (maximal vorsichtig) → 0.15, 0 (ausgeglichen) → 0.5, +1 (maximal offensiv) → 1.
+    const postureWeight = clamp(0.5 + spendPostureScore * 0.5, 0.15, 1);
+    const relief = clamp((0.4 + hoardExcess * 0.45) * postureWeight, 0.1, 0.85);
     reserveTargetMinScaled = clamp(reserveTargetMin * (1 - relief), 3, reserveTargetMin);
     reserveTargetBaseScaled = clamp(reserveTargetBase * (1 - relief), 4, reserveTargetBase);
     reserveTargetMaxScaled = clamp(reserveTargetMax * (1 - relief), 5, reserveTargetMax);
-    reservePolicy = "aggressive";
+    if (reservePolicy === "balanced") {
+      reservePolicy = "aggressive";
+    }
   }
   const reserveTarget =
     reservePolicy === "aggressive"

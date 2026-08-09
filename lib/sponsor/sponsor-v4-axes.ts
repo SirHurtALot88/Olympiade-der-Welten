@@ -299,7 +299,28 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     offset: -40,
     baseline: () => 0,
     metric: (gameState, teamId) => freshSharePct(gameState, teamId),
-    offerable: (gameState, teamId) => gameState.rosters.some((entry) => entry.teamId === teamId),
+    /**
+     * „Hat dieses Team einen Kader?" — aber nicht zum Zeitpunkt des Spielaufbaus.
+     *
+     * BEFUND: Die Angebote eines neuen Spiels entstehen in `buildNewGameStateFromBaseline`, und
+     * dort ist `rosters: []` — der Liga-Draft laeuft erst im spaeteren Flow-Schritt
+     * `fill_roster`. Diese Achse fiel damit fuer JEDES Team aus dem Angebot. Zusammen mit dem
+     * Saison-1-Ausschluss von `wachstum` blieben nur drei angebotsfaehige Achsen uebrig, und der
+     * Deckel `min(5, 1 + Achsen)` in `rollSponsorOfferSlate` lieferte 4 statt 5 Karten.
+     *
+     * Der Schaden bleibt: Direkt nach dem Seeden unterschreiben die KI-Teams
+     * (`chooseSponsorOfferForAiTeams`), und unterschriebene Angebote werden nie neu gebaut
+     * (`ensureSeasonSponsorOffers` uebergeht Teams mit Vertrag). Eine ganze Achse fehlte damit
+     * dauerhaft aus der Sponsorwahl aller 31 KI-Teams in Saison 1.
+     *
+     * Der Deckel selbst ist richtig — zwei Karten auf derselben Achse waeren keine Wahl. Falsch
+     * war die Frage: Vor dem Draft hat NIEMAND einen Kader, und jedes Team bekommt einen. Ein
+     * leerer Ligabestand heisst „noch nicht ausgelost", nicht „dieses Team kann die Achse nicht
+     * bewegen". Genau diese beiden Faelle trennt die Bedingung jetzt: Sobald irgendein Team
+     * Kaderzeilen hat, gilt wieder die scharfe Pruefung je Team.
+     */
+    offerable: (gameState, teamId) =>
+      gameState.rosters.length === 0 || gameState.rosters.some((entry) => entry.teamId === teamId),
   },
 };
 

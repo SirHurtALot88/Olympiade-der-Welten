@@ -470,24 +470,25 @@ describe("Retool AI2 pick engine", () => {
       sponsorSupport: 28,
     });
 
-    // KNOWN REGRESSION (left red intentionally, do not weaken): both plans
-    // collapse to reserveTarget=3 / reservePolicy="aggressive" because of the
-    // unconditional "cash hoarding" override in
-    // lib/ai/retool-ai2-pick-engine.ts (~lines 365-373): whenever
-    // `cash / rosterSalaryKnown` clears `softCashRatio + 0.05` AND the roster
-    // is below `optimum`, it force-sets `reservePolicy = "aggressive"` and
-    // scales reserveTargetMin/Base/Max down to their floor (3/4/5), with no
-    // explanatory comment. Both fixtures here (cash=180, rosterSalaryKnown=45,
-    // missingToOptimum>0) trip that override regardless of how
-    // finance/cash-priority-heavy the team identity or strategy profile is —
-    // it completely overrides the aggression01/caution01/spendPostureScore
-    // computation the rest of the function carefully derives from those
-    // signals, so a deliberately thrifty, cash-hoarding team (C-C:
-    // cashPriority 10, saveDiscipline "high", finances 10) gets force-flipped
-    // to "aggressive" exactly like a spend-happy team (M-M) once its bank
-    // balance is comfortably above its known payroll — which is precisely
-    // when a genuinely cash-conservative team should keep hoarding, not
-    // spend down to a floor.
+    // BEHOBEN (war: „KNOWN REGRESSION, left red intentionally"). Der Befund, den dieser
+    // Test festgehalten hat: Beide Pläne kollabierten auf reserveTarget=3 /
+    // reservePolicy="aggressive" wegen des UNBEDINGTEN Anti-Hortungs-Übersteuerers in
+    // lib/ai/retool-ai2-pick-engine.ts. Sobald `cash / rosterSalaryKnown` die weiche
+    // Grenze riss UND der Kader unter dem Optimum lag, wurde `reservePolicy` fest auf
+    // "aggressive" gesetzt und Min/Base/Max auf ihre Böden (3/4/5) gezogen — ohne
+    // Kommentar und ohne Rücksicht auf aggression01/caution01/spendPostureScore, die die
+    // Funktion direkt darüber aus Identität und Strategieprofil herleitet.
+    //
+    // Beide Fixtures hier (cash=180, rosterSalaryKnown=45, missingToOptimum>0) rissen die
+    // Grenze, egal wie finanz- und sparlastig Identität und Profil waren. Ein bewusst
+    // sparsames Team (C-C: cashPriority 10, saveDiscipline "high", finances 10) verhielt
+    // sich damit exakt wie ein ausgabefreudiges (M-M) — ausgerechnet in dem Moment, in dem
+    // ein cash-konservatives Team weiter horten und nicht bis auf den Boden ausgeben soll.
+    //
+    // Die Anti-Hortung selbst war richtig gedacht und bleibt: Sie ist jetzt nur mit der
+    // Haltung GEWICHTET (postureWeight), und die Politik wird nicht mehr erzwungen — ein
+    // ausgeglichenes Team rückt eine Stufe hoch, ein konservatives bleibt konservativ.
+    // Die Zusagen unten sind damit wieder das, was sie beschreiben.
     expect(cashCreatorPlan.reserveTarget).toBeGreaterThan(mayhemPlan.reserveTarget);
     expect(cashCreatorPlan.allowedBudgetForSearch).toBeLessThan(mayhemPlan.allowedBudgetForSearch);
     expect(cashCreatorPlan.reservePolicy).toBe("conservative");

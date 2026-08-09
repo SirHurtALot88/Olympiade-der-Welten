@@ -292,7 +292,28 @@ function derivePpsByAreaFromDisciplineValues(
   };
 }
 
-function resolveDisplayAreaPoints(ledgerValue: number, disciplineFallback: number) {
+/**
+ * WELCHER ZEITPUNKT GILT FÜR DIE ACHSPUNKTE — und zwar derselbe wie für die Disziplin-Spalten
+ * daneben.
+ *
+ * BEFUND: Diese Funktion las `preferStandingDisciplineValues` nie. Sie nahm den Live-Ledger-Wert,
+ * sobald er `> 0` war. Die Disziplin-Spalten derselben Zeile beachten das Flag aber sehr wohl
+ * (`mergeSeasonDisciplineValues` bekommt `ledgerValues: null`, wenn es gesetzt ist). Beim Blick
+ * auf eine ARCHIVIERTE Saison standen deshalb Snapshot-Disziplinwerte neben den PPs der
+ * LAUFENDEN Saison — zwei Zeitpunkte in einer Zeile, gemessen am Live-Spielstand: Snapshot 11/12
+ * gegen laufende 4,2/3,8.
+ *
+ * Das ist dieselbe Fehlerklasse, die den Saison-Snapshot-Umbau ausgelöst hat („in der teams
+ * tabelle sind MW und Cash auch noch zum falschen zeitpunkt") — nur an einer anderen Lesestelle.
+ *
+ * Mit gesetztem Flag gilt jetzt ausschliesslich der Snapshot-Stand. Der Rückfall auf den
+ * abgeleiteten Disziplinwert bleibt derselbe Ausdruck; er ist unter dem Flag ohnehin schon
+ * rein aus `standing.disciplineValues` gebildet.
+ */
+function resolveDisplayAreaPoints(ledgerValue: number, disciplineFallback: number, preferStandingValues: boolean) {
+  if (preferStandingValues) {
+    return disciplineFallback;
+  }
   if (ledgerValue > 0) {
     return ledgerValue;
   }
@@ -516,11 +537,15 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       ledgerValues: preferStandingDisciplineValues ? null : seasonPointsSummary?.pointsByDiscipline ?? null,
     });
     const fallbackPpsByArea = derivePpsByAreaFromDisciplineValues(disciplineValues);
-    const displayPpsPow = resolveDisplayAreaPoints(ppsPow, fallbackPpsByArea.pow);
-    const displayPpsSpe = resolveDisplayAreaPoints(ppsSpe, fallbackPpsByArea.spe);
-    const displayPpsMen = resolveDisplayAreaPoints(ppsMen, fallbackPpsByArea.men);
-    const displayPpsSoc = resolveDisplayAreaPoints(ppsSoc, fallbackPpsByArea.soc);
-    const displayPpsTotal = resolveDisplayAreaPoints(hasCurrentPps ? ppsTotal : 0, fallbackPpsByArea.total);
+    const displayPpsPow = resolveDisplayAreaPoints(ppsPow, fallbackPpsByArea.pow, preferStandingDisciplineValues);
+    const displayPpsSpe = resolveDisplayAreaPoints(ppsSpe, fallbackPpsByArea.spe, preferStandingDisciplineValues);
+    const displayPpsMen = resolveDisplayAreaPoints(ppsMen, fallbackPpsByArea.men, preferStandingDisciplineValues);
+    const displayPpsSoc = resolveDisplayAreaPoints(ppsSoc, fallbackPpsByArea.soc, preferStandingDisciplineValues);
+    const displayPpsTotal = resolveDisplayAreaPoints(
+      hasCurrentPps ? ppsTotal : 0,
+      fallbackPpsByArea.total,
+      preferStandingDisciplineValues,
+    );
     disciplineValues.bonuspunkte =
       hasCurrentPps && seasonPointsSummary != null && seasonPointsSummary.mutatorPpsBonus > 0
         ? roundValue(seasonPointsSummary.mutatorPpsBonus, 1)
