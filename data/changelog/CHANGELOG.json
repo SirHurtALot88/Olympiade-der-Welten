@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Liga · Archivierte Saisons",
+      "pr": null,
+      "text": "Der Bereichs-Rückfall in der archivierten Tabelle trug seine Punkte in die falsche Disziplin ein: statt in die erste Disziplin des Bereichs landeten sie in der mit dem größten Kader — Gewichtheben statt TDM, Climbing statt Staffel, I-Spy statt Schach, während die eigentliche Spalte leer blieb; nur SOC sah zufällig richtig aus, weil Basketball dort beides ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Arena · Disziplinen",
       "pr": null,
       "text": "Das Disziplin-Feld und die Rangliste daneben enden wieder auf einer Linie: die Höhenmessung war zirkulär — die Tabelle richtete sich an der Arena aus, während die Arena über das Flex-Layout auf die Höhe der Tabelle gedehnt wurde, was in Disziplinen mit langer Rangliste unter dem Feld tote Fläche stehen ließ.",
