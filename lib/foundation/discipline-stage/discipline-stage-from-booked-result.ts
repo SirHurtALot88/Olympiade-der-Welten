@@ -84,27 +84,50 @@ export function buildDisciplineStageTeamsFromBookedResult(
       (links, rechts) => (links.slotIndex ?? 0) - (rechts.slotIndex ?? 0),
     );
 
+    const teamScore = round1(teamErgebnis.totalScore ?? 0);
+    const players = eigene.map((eintrag) => ({
+      playerId: eintrag.playerId ?? null,
+      val: round1(eintrag.finalPlayerScore ?? 0),
+      name: namensregister.get(eintrag.playerId) ?? eintrag.playerId,
+      portraitUrl: portraitById.get(eintrag.playerId) ?? null,
+      mods: [] as StagePreviewTeam["players"][number]["mods"],
+      pointsAwarded: null,
+    }));
+
+    /**
+     * REST-ABGLEICH — ohne ihn zeigte die Bühne eine Rechnung, die nicht aufgeht.
+     *
+     * Die gebuchten Spieler-Scores tragen NICHT die Team-Effekte (Intensität, Team-Power,
+     * Team-PPs); die stecken nur im Team-Score. Auf Chris' Spielstand summieren sich Spineshard
+     * (29,3) und Myrth (9,9) auf 39,2, während das Team mit 47,8 gewertet wurde — der Kopf hätte
+     * 47,8 gemeldet und die Bahnen darunter 39,2. Genau so einen stillen Widerspruch soll diese
+     * Anzeige nicht mehr produzieren.
+     *
+     * Der Unterschied landet deshalb beschriftet auf dem letzten Slot, wie es der Vorschau-Weg in
+     * `discipline-stage-from-preview.ts` schon tut. „Team" ist dabei ehrlich: es IST ein
+     * Team-Effekt, nur ohne die feinere Aufschlüsselung, die nur die Vorschau kennt.
+     */
+    const spielerSumme = round1(players.reduce((summe, spieler) => summe + spieler.val, 0));
+    const rest = round1(teamScore - spielerSumme);
+    if (Math.abs(rest) >= 0.05 && players.length > 0) {
+      const letzter = players[players.length - 1]!;
+      letzter.mods.push({ k: "Team", sign: rest < 0 ? -1 : 1, amt: Math.abs(rest) });
+    }
+
     return {
       teamId: teamErgebnis.teamId,
       code: meta?.code ?? teamErgebnis.teamId,
       name: meta?.name ?? teamErgebnis.teamId,
       logoUrl: meta?.logoUrl ?? null,
       rank: teamErgebnis.rank ?? 0,
-      score: round1(teamErgebnis.totalScore ?? 0),
+      score: teamScore,
       teamPoints: null,
       // Kein Eintrag trotz gebuchtem Team-Ergebnis heisst: keine Aufstellung eingereicht. Dieselbe
       // Aussage, die die Vorschau über ihr `missingLineup`-Flag trifft.
       missingLineup: eigene.length === 0,
       captainPlayerId: null,
       captainName: null,
-      players: eigene.map((eintrag) => ({
-        playerId: eintrag.playerId ?? null,
-        val: round1(eintrag.finalPlayerScore ?? 0),
-        name: namensregister.get(eintrag.playerId) ?? eintrag.playerId,
-        portraitUrl: portraitById.get(eintrag.playerId) ?? null,
-        mods: [],
-        pointsAwarded: null,
-      })),
+      players,
     };
   });
 }

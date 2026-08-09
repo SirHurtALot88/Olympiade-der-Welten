@@ -108,6 +108,24 @@ describe("Arena zeigt die gebuchte Aufstellung", () => {
     expect(teams![0].players.map((p) => p.val)).toEqual([29.3, 9.9]);
   });
 
+  /**
+   * Die gebuchten Spieler-Scores tragen die Team-Effekte (Intensität, Team-Power, Team-PPs) NICHT
+   * — die stecken nur im Team-Score. Ohne Abgleich meldete der Kopf 47,8 und die Bahnen darunter
+   * 39,2. Genau so einen stillen Widerspruch soll diese Anzeige nicht mehr erzeugen.
+   */
+  it("die Bahnen summieren sich auf den Team-Score, der Rest steht beschriftet", () => {
+    const team = buildDisciplineStageTeamsFromBookedResult(baueSpielstand(), "staffel", META, new Map())![0];
+    const netto = team.players.reduce(
+      (summe, spieler) => summe + spieler.val + spieler.mods.reduce((m, mod) => m + mod.sign * mod.amt, 0),
+      0,
+    );
+    expect(netto).toBeCloseTo(team.score, 1);
+    // 47,8 − (29,3 + 9,9) = 8,6, beschriftet auf dem letzten Slot.
+    const teamMod = team.players.at(-1)!.mods.find((mod) => mod.k === "Team");
+    expect(teamMod).toBeDefined();
+    expect(teamMod!.amt).toBeCloseTo(8.6, 1);
+  });
+
   it("sortiert die Bahnen nach Slot, nicht nach Leistung", () => {
     // Die Leistungen liegen absichtlich in umgekehrter Reihenfolge im Spielstand (Myrth zuerst).
     const teams = buildDisciplineStageTeamsFromBookedResult(baueSpielstand(), "staffel", META, new Map());
