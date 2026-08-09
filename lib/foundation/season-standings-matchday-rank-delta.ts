@@ -61,19 +61,33 @@ function rankTeamsByPoints(
   );
 }
 
+/** Vorher-/Nachher-Rang der letzten Wertung samt Bewegung — eine Rechnung, zwei Abnehmer. */
+export type StandingsMatchdayRankPair = {
+  /** Saisonrang VOR der zuletzt gewerteten Runde (aus `matchdayBaselinePoints`). */
+  previousRank: number;
+  /** Saisonrang nach der Wertung (aus `points`), nach derselben Regel gerechnet. */
+  currentRank: number;
+  /** previousRank − currentRank: > 0 = Plätze gutgemacht, < 0 = abgerutscht. */
+  delta: number;
+};
+
 /**
- * Δ Rang je Team gegenüber dem Stand vor der letzten Wertung.
- * > 0 = Plätze gutgemacht, < 0 = abgerutscht, 0 = Platz gehalten.
+ * Vorher- und Nachher-Rang je Team gegenüber dem Stand vor der letzten Wertung.
  *
  * `null` (für ALLE Teams), solange noch nichts gewertet wurde: ohne Baseline gibt
  * es keinen "Stand davor". Dann lieber gar keine Angabe als ein erfundenes ±0 —
  * "keine Bewegung" und "noch keine Daten" dürfen nicht gleich aussehen.
+ *
+ * Neben dem Δ (Saisonstand-Spalte) braucht die Spieltags-Wertung auch den
+ * AUSGANGSRANG selbst („12 → 9"). Beides entsteht hier aus EINER Rechnung —
+ * zwei Stellen, die Vorher-Rangliste je selbst bauen, drifteten bei der ersten
+ * abweichenden Gleichstandsregel auseinander.
  */
-export function buildStandingsMatchdayRankDelta(
+export function buildStandingsMatchdayRankPair(
   teams: StandingsRankDeltaTeam[],
   standings: Record<string, StandingRecord | undefined> | null | undefined,
-): Map<string, number | null> {
-  const result = new Map<string, number | null>();
+): Map<string, StandingsMatchdayRankPair | null> {
+  const result = new Map<string, StandingsMatchdayRankPair | null>();
   if (teams.length === 0) {
     return result;
   }
@@ -109,7 +123,28 @@ export function buildStandingsMatchdayRankDelta(
   for (const team of teams) {
     const before = previousRanks.get(team.teamId);
     const now = currentRanks.get(team.teamId);
-    result.set(team.teamId, before != null && now != null ? before - now : null);
+    result.set(
+      team.teamId,
+      before != null && now != null ? { previousRank: before, currentRank: now, delta: before - now } : null,
+    );
+  }
+  return result;
+}
+
+/**
+ * Δ Rang je Team gegenüber dem Stand vor der letzten Wertung.
+ * > 0 = Plätze gutgemacht, < 0 = abgerutscht, 0 = Platz gehalten.
+ *
+ * Dieselbe Rechnung wie `buildStandingsMatchdayRankPair`, nur auf das Δ verengt —
+ * der Saisonstand braucht ausschließlich die Bewegung.
+ */
+export function buildStandingsMatchdayRankDelta(
+  teams: StandingsRankDeltaTeam[],
+  standings: Record<string, StandingRecord | undefined> | null | undefined,
+): Map<string, number | null> {
+  const result = new Map<string, number | null>();
+  for (const [teamId, pair] of buildStandingsMatchdayRankPair(teams, standings)) {
+    result.set(teamId, pair == null ? null : pair.delta);
   }
   return result;
 }

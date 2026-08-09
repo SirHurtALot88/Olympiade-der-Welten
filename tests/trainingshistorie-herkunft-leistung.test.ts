@@ -67,23 +67,33 @@ describe("Trainingshistorie · die Posten ergeben den Saldo", () => {
   });
 });
 
-describe("Trainingshistorie · die Tabelle zeigt die Herkunft", () => {
-  it("rendert vier Zeilen statt einer", () => {
+/**
+ * Seit der Saison-Listen-Überarbeitung (WUNSCH VON CHRIS: „das müsste wo die summe steht pro
+ * season sein und dann ausklappbar dass man training leistung regression sehen kann") stehen
+ * die drei Posten nicht mehr als vier feste Zeilen der laufenden Saison, sondern als
+ * aufklappbare Herkunfts-Zeilen unter JEDER Saison-Summenzeile. Der Vertrag bleibt derselbe:
+ * die Herkunft wird gezeigt, nicht saldiert versteckt.
+ */
+describe("Trainingshistorie · die Saison-Liste zeigt die Herkunft", () => {
+  it("führt die drei Posten als aufklappbare Zeilen unter der Saison-Summenzeile", () => {
     const zeilen = drawer.slice(
-      drawer.indexOf("const SEASON_TRAINING_FORECAST_ROWS"),
-      drawer.indexOf("function SeasonTrainingForecastSummary"),
+      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
+      drawer.indexOf("function formatSeasonNetTotal"),
     );
-    for (const key of ["total", "training", "performance", "regression"]) {
+    for (const key of ["training", "performance", "regression"]) {
       expect(zeilen).toContain(`key: "${key}"`);
     }
     expect(zeilen).toContain('label: "Leistung"');
     expect(zeilen).toContain('label: "Alterung"');
+    // Die Summenzeile selbst bleibt die Hauptsache (eine je Saison, data-row="total").
+    expect(drawer).toContain('<tr data-row="total" data-testid="player-drawer-training-season-row">');
+    expect(drawer).toContain("SEASON_TRAINING_ORIGIN_ROWS.map(");
   });
 
-  it("nimmt die Zellwerte aus den neuen Feldern", () => {
+  it("nimmt die Zellwerte aus den Herkunfts-Feldern", () => {
     const zeilen = drawer.slice(
-      drawer.indexOf("const SEASON_TRAINING_FORECAST_ROWS"),
-      drawer.indexOf("function SeasonTrainingForecastSummary"),
+      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
+      drawer.indexOf("function formatSeasonNetTotal"),
     );
     expect(zeilen).toContain("cell.training");
     expect(zeilen).toContain("cell.performance");
@@ -100,10 +110,18 @@ describe("Trainingshistorie · die Tabelle zeigt die Herkunft", () => {
   });
 
   it("nennt die Leistung auch in der Bildunterschrift", () => {
-    const bildunterschrift = drawer.slice(
-      drawer.indexOf("Saison-Forecast: kumulierte projizierte Attributänderung"),
-    );
+    const bildunterschrift = drawer.slice(drawer.indexOf("Eine Zeile je Saison:"));
     expect(bildunterschrift.slice(0, 900)).toContain("Leistung");
+  });
+
+  it("hält Prognose und gebuchte Werte auseinander", () => {
+    // Die laufende Saison ist eine Hochrechnung, abgeschlossene Saisons sind Tatsachen —
+    // beide stehen in derselben Liste und tragen deshalb ein Status-Badge.
+    expect(drawer).toContain("player-drawer-training-season-badge");
+    const flattened = drawer.replace(/\s+/g, " ");
+    expect(flattened).toContain("? `Prognose ${entry.matchdaysPlayed}/${entry.totalMatchdays}` : \"gebucht\"");
+    // Ist die Saison bereits gebucht, fällt ihre Prognose weg statt daneben zu stehen.
+    expect(drawer).toContain("!bookedSeasonIds.has(input.forecast.seasonId)");
   });
 });
 
@@ -112,11 +130,13 @@ describe("Trainingshistorie · die Tabelle zeigt die Herkunft", () => {
  * auch nicht im tooltipp - gesamtwert ist ok sollte aber dann im tooltipp wenigstens gesplittet
  * ausgewiesen werden."
  *
- * Die abgeschlossenen Saisons stehen in der Trainingshistorie-Tabelle. Die Aufteilung war dort
- * doppelt verloren: je Attribut wurde sie nie in den Spielstand geschrieben (nur `fromValue`/
- * `toValue`), und die Saison-Summen lagen zwar in `organicMeta`, wurden aber nirgends angezeigt.
+ * Die abgeschlossenen Saisons stehen inzwischen in derselben Saison-Liste. Die Aufteilung war
+ * doppelt verloren: je Attribut wurde sie vor #470 nie in den Spielstand geschrieben (nur
+ * `fromValue`/`toValue`), und die Saison-Summen lagen zwar in `organicMeta`, wurden aber
+ * nirgends angezeigt. Heute stehen die Saison-Summen in den aufklappbaren Herkunfts-Zeilen;
+ * fehlt die Aufteilung je Attribut, sagt die Zeile es, statt Zahlen zu erfinden.
  */
-describe("Trainingshistorie · abgeschlossene Saisons zeigen die Herkunft im Tooltip", () => {
+describe("Trainingshistorie · abgeschlossene Saisons zeigen die Herkunft beim Aufklappen", () => {
   it("schreibt die Herkunft je Attribut in den Spielstand", () => {
     const zweig = applyService.slice(
       applyService.indexOf("plannedUpgrades.push("),
@@ -147,23 +167,26 @@ describe("Trainingshistorie · abgeschlossene Saisons zeigen die Herkunft im Too
     expect(historie).toContain("(upgrade.originTraining ?? 0) + (upgrade.originSpillover ?? 0)");
   });
 
-  it("splittet den Netto-Wert der Saison im Tooltip", () => {
-    expect(drawer).toContain("title={formatTrainingOriginSeasonTooltip(row)}");
-    const helfer = drawer.slice(
-      drawer.indexOf("function formatTrainingOriginSeasonTooltip"),
-      drawer.indexOf("function formatTrainingOriginAttributeTooltip"),
+  it("liest die Saison-Summen aus organicMeta und leitet die Alterung als Rest auf Netto ab", () => {
+    // Vorher stand der Split nur im Tooltip — jetzt sind es die sichtbaren Herkunfts-Zeilen.
+    // Die Quelle ist unverändert: `organicMeta` über die Historienzeilen; die Alterung steht
+    // im Save nicht als Saison-Summe und bleibt der Rest auf Netto.
+    const builder = drawer.slice(
+      drawer.indexOf("function buildTrainingSeasonEntries"),
+      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
     );
-    expect(helfer).toContain("Training ${formatSignedOrigin(training)}");
-    expect(helfer).toContain("+ Leistung ${formatSignedOrigin(performance)}");
-    // Die Alterung steht im Save nicht als Saison-Summe — sie ist der Rest auf Netto.
-    expect(helfer).toContain("row.netSetpoints - (training ?? 0) - (performance ?? 0)");
+    expect(builder).toContain("const training = row.trainingSetpoints");
+    expect(builder).toContain("const performance = row.performanceSetpoints");
+    expect(builder).toContain("row.netSetpoints - (training ?? 0) - (performance ?? 0)");
   });
 
-  it("splittet auch die Attributzelle und sagt es, wenn die Daten fehlen", () => {
-    expect(drawer).toContain("title={formatTrainingOriginAttributeTooltip(attribute, upgrade, row)}");
-    const helfer = drawer.slice(drawer.indexOf("function formatTrainingOriginAttributeTooltip"));
-    expect(helfer.slice(0, 1400)).toContain("Leistung ${formatSignedOrigin(upgrade.performance)}");
-    // Eine leere Angabe wäre schlechter als der ehrliche Hinweis auf die Saison-Summen.
-    expect(helfer.slice(0, 1400)).toContain("Saison-Summen");
+  it("sagt es, wenn die Aufteilung je Attribut fehlt, statt Zahlen zu erfinden", () => {
+    // Für Saisons, die vor der Herkunfts-Mitschrift abgeschlossen wurden, gibt es die
+    // Aufteilung je Attribut nicht — die aufgeklappte Saison sagt das an Ort und Stelle.
+    expect(drawer).toContain("player-drawer-training-origin-missing");
+    const flattened = drawer.replace(/\s+/g, " ");
+    expect(flattened).toContain("Aufteilung je Attribut wurde für diese Saison nicht festgehalten");
+    // Und fehlen sogar die Saison-Summen, wird auch das gesagt statt geraten.
+    expect(flattened).toContain("wurde beim Abschluss dieser Saison nicht festgehalten");
   });
 });

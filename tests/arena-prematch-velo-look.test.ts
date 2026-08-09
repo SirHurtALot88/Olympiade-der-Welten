@@ -114,9 +114,17 @@ describe("Vor dem Start behauptet keine Wertung eine Reihenfolge", () => {
 });
 
 describe("Eine Rangquelle (A1: Kopf ‚Rang 19' vs. Zeile 22)", () => {
+  /**
+   * Zustandsbewusst nachgezogen (Meldung von Chris, Spieltag 4): `standings.rank` trägt nach
+   * der BUCHUNG bereits den Stand NACH dem Spieltag — als „vorher" gelesen war die S-Rang-Spalte
+   * entartet („7 → 7" bei allen 32 Teams). Kanonisch bleibt die Quelle trotzdem
+   * `seasonState.standings`: vor der Buchung ihr `rank` (A1 unverändert), nach der Buchung die
+   * Baseline-Rangliste derselben Records (`buildStandingsMatchdayRankPair`, dieselbe Rechnung
+   * wie die Rang-Bewegung des Saisonstands).
+   */
   it("der Saison-Rang der Wertung kommt kanonisch aus seasonState.standings", () => {
     expect(ARENA).toContain("const canonicalStandings = gameState.seasonState?.standings ?? {};");
-    expect(ARENA).toContain("currentRank: canonicalRankOf(r.teamId) ?? s?.currentRank ?? null");
+    expect(ARENA).toContain("currentRank: pair != null ? pair.previousRank : canonicalRankOf(r.teamId) ?? s?.currentRank ?? null");
   });
 
   it("‚Dein Umfeld' liest dieselbe Quelle und erklärt die Startplätze, statt eine frische Wertung zu suggerieren", () => {

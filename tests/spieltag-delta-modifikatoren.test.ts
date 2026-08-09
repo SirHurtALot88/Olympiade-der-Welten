@@ -14,6 +14,9 @@
  * Basis-Leistung (`entry.baseValue`, vor allen Modifikatoren) und einmal nach dem Endstand
  * (`teamResult.score`). Δ = Basis-Rang − End-Rang; positiv heißt „nach vorn gekommen".
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 type Werte = { d1Base: number; d1Score: number; d2Base: number; d2Score: number };
@@ -105,5 +108,44 @@ describe("Δ Modifikatoren", () => {
 
   it("liefert null, solange nichts aufgedeckt ist", () => {
     expect(berechneDelta(LIGA, false, false)).toBeNull();
+  });
+});
+
+/**
+ * ANZEIGE-VERTRAG, NACHGEZOGEN (Meldung von Chris, Spieltag 4): der Chip stand als nackter
+ * Pfeil („▲3") am Spieltagsrang und las sich wie eine Rangänderung — die gibt es dort aber
+ * nicht, der Spieltagsrang ist einmalig. Die Zusicherung aus #474 („kleiner Pfeil-Chip neben
+ * dem Spieltags-Rang") ist damit bewusst angepasst, nicht aufgeweicht: der Chip BLEIBT am
+ * Spieltagsrang (seine Bezugsgröße), trägt aber das Label „Mod" samt Rahmen. Die
+ * Saisonrang-Bewegung (nackter Pfeil) steht an der S-Rang-Spalte — beide müssen ohne
+ * Nachdenken unterscheidbar sein, durch Ort, Form und Beschriftung, nicht erst per Tooltip.
+ */
+describe("Anzeige: Mod-Chip am Spieltagsrang, Saisonrang-Bewegung am S-Rang", () => {
+  const read = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
+  const panel = read("app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx");
+  const arena = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+
+  it("der Modifikator-Chip sitzt in der Rang-Zelle und trägt das Label Mod", () => {
+    const rangZelle = panel.slice(panel.indexOf("gridColumn: COL.rank"), panel.indexOf("Saison-Rang vor → nach"));
+    expect(rangZelle).toContain("modifierRankByTeam?.get(row.teamId)");
+    expect(rangZelle).toContain('Mod {hoch ? "▲" : "▼"}');
+  });
+
+  it("die Saisonrang-Bewegung hängt an der S-Rang-Zelle und erscheint schon nach Disziplin 1", () => {
+    const sRangZelle = panel.slice(panel.indexOf("Saison-Rang vor → nach"), panel.indexOf("gridColumn: COL.crest"));
+    expect(sRangZelle).toContain("const seasonShown = d1Revealed || d2Revealed;");
+    expect(sRangZelle).toContain("row.currentRank - afterRank");
+    // Erster Spieltag ohne Vorgänger: erklärt statt versteckt (Chris' 0-Regel).
+    expect(sRangZelle).toContain("noch keinen vorherigen Saisonrang");
+  });
+
+  it("die Kopfzeile verspricht die Bewegung am S-Rang, nicht mehr pauschal am Rang", () => {
+    expect(panel).toContain("S-Rang: Saisonrang");
+    expect(panel).not.toContain("Rang <b style={{ color: \"var(--nl-ink)\" }}>vor</b> → <b style={{ color: \"var(--nl-ink)\" }}>nach</b> dem Spieltag · beide Disziplinen");
+  });
+
+  it("die Arena nimmt den Ausgangsrang nach der Buchung aus der Standings-Baseline (dieselbe Quelle wie der Saisonstand)", () => {
+    expect(arena).toContain("buildStandingsMatchdayRankPair");
+    expect(arena).toContain("matchdayBaselineId === matchdayId");
   });
 });

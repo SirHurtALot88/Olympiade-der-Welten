@@ -32,9 +32,11 @@ describe("Trainings-Forecast in den Diszi-Zeilen", () => {
     );
     expect(chip).toContain("!foggedBand && disciplineTrainingDeltaById[entry.id]");
 
+    // Der Disziplinen-Block hängt seit der Saison-Liste als `forecastExtras` an der
+    // aufgeklappten laufenden Saison — das Fog-Gatter steht am Prop-Aufruf.
     const summary = DRAWER.slice(
-      DRAWER.indexOf("<SeasonTrainingForecastSummary"),
-      DRAWER.indexOf("data.trainingHistoryRows.length > 0"),
+      DRAWER.indexOf("forecastExtras={"),
+      DRAWER.indexOf("player-drawer-discipline-forecast-list"),
     );
     expect(summary).toContain("!disciplineStatFogged && movedTrainingDisciplines.length > 0");
   });
