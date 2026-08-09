@@ -31,6 +31,14 @@ import {
   isBoardObjectivesV2Enabled,
 } from "@/lib/board/board-objectives-config";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import {
+  buildLeagueMetricStanding,
+  capProvisionalObjectiveStatus,
+  isCashDistress,
+  resolveLeagueRankTarget,
+  statusForLeagueRank,
+} from "@/lib/board/board-objective-league-calibration";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -115,6 +123,12 @@ type ObjectiveDraft = {
   rankTarget?: boolean;
   /** In der Vergabe zum Zusatzziel herabgestuft: bringt Bonus, kostet aber nichts. */
   optional?: boolean;
+  /**
+   * Der angezeigte Wert ist eine HOCHRECHNUNG, kein Ergebnis: das Ziel hängt an Cash, und die
+   * Einnahmen der Saison (Sponsor, Apron, Gebäude) sind noch nicht gebucht. Solange das gilt, kann
+   * das Ziel nicht „verfehlt" sein — siehe `capProvisionalObjectiveStatus`.
+   */
+  provisional?: boolean;
 };
 
 type AxisKey = "pow" | "spe" | "men" | "soc";
@@ -244,67 +258,102 @@ function getRelativeMetricRank(input: {
   };
 }
 
-function getSeasonNumber(seasonId: string | number | null | undefined): number {
-  if (seasonId == null) return 1;
-  const normalized = typeof seasonId === "string" ? seasonId : String(seasonId);
-  const match = normalized.match(/season[-_](\d+)/i);
-  return match ? parseInt(match[1], 10) : 1;
+/**
+ * Sind die EINNAHMEN dieser Saison schon auf den Konten?
+ *
+ * Sponsor, Apron und Gebäude werden am Saisonende in einem Rutsch gebucht
+ * (`cash-prize-apply-service.ts` schreibt dabei seinen `cashPrizeApplyLog`). Vorher zeigt jeder
+ * Cash-Stand nur die Ausgabenseite einer Saison, und jedes Ziel, das an Cash hängt, wertet gegen
+ * eine Zahl, die es am Ende so nicht mehr gibt. Genau dieser Log ist deshalb der Schalter zwischen
+ * „Hochrechnung" und „steht fest".
+ *
+ * Bewusst NICHT über die Spielphase entschieden: die Phase sagt, wo der Spieler in der Kette steht,
+ * nicht, ob gebucht wurde — und im Live-Save von Chris war beides schon einmal auseinandergelaufen.
+ */
+function hasSeasonIncomeBeenBooked(gameState: GameState): boolean {
+  return (gameState.seasonState.cashPrizeApplyLogs ?? []).some((log) => log.seasonId === gameState.season.id);
+}
+
+/**
+ * Gehaltsquote eines Teams: `Gehalt / (Cash + Gehalt)`. `null`, wenn eine der beiden Größen fehlt.
+ *
+ * Als ABSOLUTE Marke ist diese Zahl unbrauchbar (siehe Kopfkommentar in
+ * `board-objective-league-calibration.ts`): Cash fällt über die ganze Saison und wird erst am Ende
+ * wieder aufgefüllt. Als LIGA-VERGLEICH trägt sie, weil alle Teams denselben Kalender haben.
+ */
+function getSalaryRatio(row: TeamManagementSnapshotRow): number | null {
+  const salaryTotal = row.salaryTotal ?? 0;
+  const cash = row.cash ?? null;
+  if (salaryTotal <= 0 || cash == null) return null;
+  return salaryTotal / Math.max(1, cash + salaryTotal);
 }
 
 function buildSalaryPressureObjective(input: {
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
-  seasonId?: string;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  /** `false` = die Einnahmen der Saison sind noch nicht gebucht, der Wert ist eine Hochrechnung. */
+  settled: boolean;
 }): ObjectiveDraft {
-  const seasonNumber = getSeasonNumber(input.seasonId);
-  // S1: teams can legitimately spend 90%+ building their roster from scratch.
-  // Target loosens gradually as the league economy (salary factors) grows.
-  const targetRatio =
-    seasonNumber <= 1 ? 0.93 :
-    seasonNumber === 2 ? 0.78 :
-    seasonNumber === 3 ? 0.68 :
-    0.62;
-  const penaltyThreshold =
-    seasonNumber <= 1 ? 0.98 :
-    seasonNumber === 2 ? 0.88 :
-    seasonNumber === 3 ? 0.80 :
-    0.75;
-  const confidencePenalty =
-    seasonNumber <= 1 ? -0.05 :
-    seasonNumber === 2 ? -0.25 :
-    -0.4;
-
+  // Anspruch des Vorstands auf Finanzdisziplin. Dieselbe Skala, die auch Cashpuffer und
+  // Transferdeckel benutzen — ein sparsamer Vorstand ist auf allen drei Feldern sparsam.
+  const demand = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
+  const standing = buildLeagueMetricStanding({
+    teamId: input.row.teamId,
+    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: getSalaryRatio(row) })),
+    direction: "lower_is_better",
+  });
+  const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand });
+  const rawStatus = statusForLeagueRank({ rank: standing.rank, targetRank: target.targetRank, teamCount: standing.teamCount });
   const salaryTotal = input.row.salaryTotal ?? 0;
   const cash = input.row.cash ?? null;
-  const salaryRatio = salaryTotal > 0 && cash != null ? salaryTotal / Math.max(1, cash + salaryTotal) : null;
-  const targetSalaryAtCurrentCash = cash != null && cash > 0 ? roundValue((targetRatio / (1 - targetRatio)) * cash, 1) : 0;
-  const reductionNeeded = salaryRatio != null ? roundValue(Math.max(0, salaryTotal - targetSalaryAtCurrentCash), 1) : null;
-  const salaryRankCheap = [...input.rowsByTeamId.values()]
-    .sort((left, right) => (left.salaryTotal ?? Number.POSITIVE_INFINITY) - (right.salaryTotal ?? Number.POSITIVE_INFINITY))
-    .findIndex((row) => row.teamId === input.row.teamId) + 1;
-  const teamCount = input.rowsByTeamId.size;
-  const currentPercent = salaryRatio == null ? null : roundValue(salaryRatio * 100, 1);
-  const targetPercent = roundValue(targetRatio * 100, 0);
-  const detail =
-    salaryRatio == null
-      ? "Formel: Gehalt / (Cash + Gehalt). Es fehlen Cash- oder Gehaltsdaten."
-      : `Formel: Gehalt / (Cash + Gehalt). Aktuell ${currentPercent}% bei ${formatObjectiveMoney(salaryTotal)} Gehalt und ${formatObjectiveMoney(cash)} Cash. Ziel ${targetPercent}% bedeutet bei aktuellem Cash max. ${formatObjectiveMoney(targetSalaryAtCurrentCash)} Gehalt.`;
-  const actionHint =
-    reductionNeeded != null && reductionNeeded > 0
-      ? `Du musst ca. ${formatObjectiveMoney(reductionNeeded)} Gehalt freimachen: teure Spieler verkaufen, auslaufende Verträge günstiger verlängern oder nur Spieler mit starkem MW/Gehalt-Ratio kaufen. Gehaltsrang: #${salaryRankCheap}/${teamCount} von billig nach teuer.`
-      : `Erfüllt. Weiter auf günstige Verlängerungen und gute MW/Gehalt-Ratios achten. Gehaltsrang: #${salaryRankCheap}/${teamCount} von billig nach teuer.`;
+  // Ein Konto im Minus ist eine Tatsache, kein Zwischenstand — siehe `isCashDistress`. Es sticht den
+  // Liga-Vergleich und nimmt dem Ziel den Hochrechnungs-Vorbehalt.
+  const cashDistress = isCashDistress(cash);
+  const provisional = !input.settled && !cashDistress;
+  const status = cashDistress ? ("failed" satisfies TeamSeasonObjectiveStatus) : provisional ? capProvisionalObjectiveStatus(rawStatus) : rawStatus;
+
+  const currentPercent = standing.value == null ? null : roundValue(standing.value * 100, 1);
+  const medianPercent = standing.median == null ? null : roundValue(standing.median * 100, 1);
+
+  const leagueDetail =
+    standing.rank == null
+      ? "Formel: Gehalt / (Cash + Gehalt), verglichen mit der Liga. Es fehlen Cash- oder Gehaltsdaten."
+      : `Formel: Gehalt / (Cash + Gehalt), verglichen mit der Liga. Aktuell ${currentPercent}% bei ` +
+        `${formatObjectiveMoney(salaryTotal)} Gehalt und ${formatObjectiveMoney(cash)} Cash — Rang ${standing.rank} von ` +
+        `${standing.teamCount}, Ligamedian ${medianPercent}%. Gefordert ist ein Platz ${target.bandPhrase} ` +
+        `(Rang ${target.targetRank} oder besser).` +
+        (provisional
+          ? " Hochrechnung: Sponsor, Apron und Gebäude werden erst am Saisonende gebucht, bis dahin fällt Cash bei allen Teams."
+          : "");
 
   return {
     objectiveId: "finance-salary-ratio",
     category: "finance",
-    label: `Gehaltsdruck auf ${targetPercent}% senken`,
-    detail,
-    actionHint,
-    targetValue: `<= ${targetPercent}%`,
-    currentValue: salaryRatio == null ? null : `${currentPercent}%`,
-    status: statusForMax(salaryRatio, targetRatio),
-    penaltyCash: salaryRatio != null && salaryRatio > penaltyThreshold ? 4 : undefined,
-    boardConfidenceDelta: salaryRatio != null && salaryRatio <= targetRatio ? 0.3 : confidencePenalty,
+    // Das Label nennt die EINHEIT der beiden Zahlen darunter ("Ligarang"), damit „Ist 29 · Ziel 18"
+    // auf der Zielkarte nicht wie eine Prozent- oder Geldangabe gelesen wird.
+    label: `Gehaltsquote: Ligarang ${target.bandPhrase}`,
+    detail: cashDistress
+      ? `Das Konto steht bei ${formatObjectiveMoney(cash)} und damit im Minus. Der Ligavergleich der Gehaltsquote ` +
+        `ist dann zweitrangig — der Vorstand erwartet zuerst ein gedecktes Konto. ${leagueDetail}`
+      : leagueDetail,
+    actionHint: cashDistress
+      ? "Zuerst das Konto decken: Verkäufe vorziehen oder Gehalt abbauen, bevor der Vorstand über die Quote redet."
+      : standing.rank != null && standing.rank > target.targetRank
+        ? `Du liegst ${standing.rank - target.targetRank} Plätze hinter der Marke: teure Spieler verkaufen, auslaufende Verträge günstiger verlängern oder nur Spieler mit starkem MW/Gehalt-Ratio kaufen.`
+        : "Erfüllt. Weiter auf günstige Verlängerungen und gute MW/Gehalt-Ratios achten.",
+    // Rang als ZAHL, nicht als Satz: der Analytics-Raum bildet daraus den Abstand zur Marke
+    // ("noch 11 Plaetze"), und der ist bei einer Rangskala richtungsfrei und immer richtig. Als Text
+    // ("Rang 29 (95,5%)") war die Groesse fuer ihn nicht auswertbar.
+    targetValue: target.targetRank,
+    currentValue: standing.rank,
+    status,
+    // Malus nur, wenn das Ziel wirklich verfehlt ist — vor der Abrechnung nur bei gedecktem Konto
+    // ausgeschlossen, denn ein Minus bleibt ein Minus.
+    penaltyCash: status === "failed" ? 4 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" ? -0.4 : status === "at_risk" ? -0.15 : 0,
+    provisional,
     source: "roster_salary_active_cash",
   };
 }
@@ -589,28 +638,43 @@ export function getTransferSpendCeilingObjective(input: {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
-  seasonId: string | number | null;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   if (cashPriority < 7) return null;
-  // In Season 1 kaufen die Teams ihren KOMPLETTEN Kader ein — ein Netto-Transferausgaben-Deckel würde genau
-  // diesen notwendigen Aufbau bestrafen. Deshalb wird das Ziel in S1 nicht gestellt (ab S2 wieder).
-  if (getSeasonNumber(input.seasonId) <= 1) return null;
 
+  // GEMESSEN am Live-Save: der feste Deckel stand in Saison 2 bei fünf Teams gegen Netto-Ausgaben
+  // von 218 bis 281 Mio — alle fünf „verfehlt". Der bisherige S1-Ausweg („in Saison 1 kauft jedes
+  // Team seinen kompletten Kader") griff zu kurz: JEDER Saisonwechsel ist eine Kaufsaison, die Liga
+  // verkauft und kauft geschlossen neu. Ein Deckel, der einen ligaweiten Umbau bestraft, misst den
+  // Umbau, nicht die Ausgabendisziplin. Also wird gegen die Liga gewertet: wer im Vergleich zu den
+  // anderen 31 Teams zurückhaltend eingekauft hat, hat das Ziel erfüllt — auch in einem Sommer, in
+  // dem alle viel ausgegeben haben.
   const netSpend = Math.max(0, -(input.row.transferNet ?? 0));
-  // Cap scales with the team's declared budget/finances discipline: financially disciplined
-  // (high cashPriority) boards tolerate less net spend before flagging it as a concern.
-  const cap = roundValue(Math.max(4, input.team.budget * (cashPriority >= 9 ? 0.12 : 0.2)), 1);
-  const status = statusForMax(netSpend, cap);
+  const standing = buildLeagueMetricStanding({
+    teamId: input.row.teamId,
+    values: [...input.rowsByTeamId.values()].map((row) => ({
+      teamId: row.teamId,
+      value: Math.max(0, -(row.transferNet ?? 0)),
+    })),
+    direction: "lower_is_better",
+  });
+  const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand: cashPriority });
+  const status = statusForLeagueRank({ rank: standing.rank, targetRank: target.targetRank, teamCount: standing.teamCount });
 
   return {
     objectiveId: "finance-transfer-ceiling",
     category: "finance",
-    label: `Netto-Transferausgaben unter ${formatObjectiveMoney(cap)}`,
-    detail: `Formel: max(4, Budget * ${cashPriority >= 9 ? "12%" : "20%"}). Aktuell ${formatObjectiveMoney(netSpend)} Netto-Ausgaben.`,
+    label: `Netto-Transferausgaben: Ligarang ${target.bandPhrase}`,
+    detail:
+      standing.rank == null
+        ? "Netto-Transferausgaben im Ligavergleich. Es fehlen Transferdaten."
+        : `Netto-Transferausgaben im Ligavergleich: ${formatObjectiveMoney(netSpend)} — Rang ${standing.rank} von ` +
+          `${standing.teamCount} (sparsamste zuerst), Ligamedian ${formatObjectiveMoney(standing.median)}. ` +
+          `Gefordert ist ein Platz ${target.bandPhrase} (Rang ${target.targetRank} oder besser).`,
     actionHint: "Transferausgaben im Rahmen halten: Verkäufe priorisieren, teure Neuzugänge nur bei klarem Mehrwert.",
-    targetValue: `<= ${formatObjectiveMoney(cap)}`,
-    currentValue: netSpend,
+    targetValue: target.targetRank,
+    currentValue: standing.rank,
     status,
     penaltyCash: status === "failed" ? 3 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.25 : status === "at_risk" ? -0.1 : status === "failed" ? -0.4 : 0,
@@ -839,6 +903,7 @@ export function getSportTargetV2(input: {
 export function getNetTransferBalanceObjective(input: {
   team: Team;
   row: TeamManagementSnapshotRow;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   profile: TeamStrategyProfile | null;
   seasonNum: number;
 }): ObjectiveDraft {
@@ -873,54 +938,45 @@ export function getNetTransferBalanceObjective(input: {
       source: "board_v2_net_transfer_balance",
     };
   }
-  const seasonScale = Math.min(1 + (input.seasonNum - 1) * 0.15, 1.6);
-  const target = roundValue(
-    Math.max(0, BOARD_V2_NET_TRANSFER.baseTargetM + (cashPriority - 5) * BOARD_V2_NET_TRANSFER.perCashPriorityM) * seasonScale,
-    1,
-  );
+  // AB SAISON 2 gegen die LIGA statt gegen eine feste Zahl.
+  //
+  // Vorher standen hier zwei feste Marken, und beide sind am Live-Save gescheitert: der
+  // Überschuss-Zweig verlangte „Transferbilanz ≥ 1,4M" von einem Team bei −322, der Deckel-Zweig
+  // „Transferausgaben unter 8M" von fünf Teams bei 218 bis 340. Der Grund ist derselbe wie beim
+  // Gehaltsziel: JEDER Saisonwechsel ist eine Kaufsaison — die Liga verkauft und kauft geschlossen
+  // neu. Eine absolute Marke misst dann den Umbau, nicht die Wirtschaftsführung.
+  //
+  // Der Ligavergleich misst, was das Ziel meinen soll: „führst du deine Transferkasse besser oder
+  // schlechter als die anderen?" In einem Sommer, in dem alle viel ausgeben, kann man das immer
+  // noch gewinnen — und in einem ruhigen Sommer immer noch verlieren.
   const current = roundValue(input.row.transferNet ?? 0, 1);
+  const standing = buildLeagueMetricStanding({
+    teamId: input.row.teamId,
+    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: row.transferNet ?? 0 })),
+    // Höhere (weniger negative) Netto-Bilanz ist die bessere Wirtschaftsführung.
+    direction: "higher_is_better",
+  });
+  const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand: cashPriority });
+  const status = statusForLeagueRank({ rank: standing.rank, targetRank: target.targetRank, teamCount: standing.teamCount });
 
-  if (target > 0) {
-    // Cash-focused board: it genuinely demands a transfer surplus. statusForMin keeps the at_risk band
-    // (>= 85% of target) so a near-miss is not a hard fail.
-    const status = statusForMin(input.row.transferNet ?? null, target);
-    return {
-      objectiveId: "finance-net-transfer-balance",
-      category: "finance",
-      label: `Transferbilanz ≥ ${target}M`,
-      targetValue: target,
-      currentValue: current,
-      status,
-      rewardCash: 4,
-      penaltyCash: 3,
-      boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
-      source: "board_v2_net_transfer_balance",
-    };
-  }
-
-  // Neutral/low cash-priority board (target 0): a positive surplus is NOT demanded — normal
-  // squad-building net spend is expected. Instead of the old hard binary (any net-buy → failed), treat
-  // it as a soft ceiling on overspend via a statusForMax band with a real at_risk zone. A modest net-buy
-  // within the cash-scaled ceiling is completed; only reckless overspend past the ceiling+15% fails.
-  const netSpend = roundValue(Math.max(0, -(input.row.transferNet ?? 0)), 1);
-  const ceiling = roundValue(
-    Math.max(
-      BOARD_V2_NET_TRANSFER.overspendCeilingFloorM,
-      (input.row.cash ?? 0) * BOARD_V2_NET_TRANSFER.overspendCeilingCashFraction,
-    ),
-    1,
-  );
-  const status = statusForMax(netSpend, ceiling);
   return {
     objectiveId: "finance-net-transfer-balance",
     category: "finance",
-    label: `Transferausgaben unter ${ceiling}M halten`,
-    detail: `Aktuelle Netto-Ausgaben ${netSpend}M (Netto-Transfer ${current}M).`,
-    targetValue: ceiling,
-    currentValue: netSpend,
+    label: `Transferbilanz: Ligarang ${target.bandPhrase}`,
+    detail:
+      standing.rank == null
+        ? "Netto-Transferbilanz im Ligavergleich. Es fehlen Transferdaten."
+        : `Netto-Transferbilanz im Ligavergleich: ${formatObjectiveMoney(current)} — Rang ${standing.rank} von ` +
+          `${standing.teamCount}, Ligamedian ${formatObjectiveMoney(standing.median)}. Gefordert ist ` +
+          `ein Platz ${target.bandPhrase} (Rang ${target.targetRank} oder besser).`,
+    actionHint:
+      "Die Bilanz zählt, nicht der Verzicht: Verkäufe zum richtigen Zeitpunkt wiegen teure Neuzugänge auf.",
+    targetValue: target.targetRank,
+    currentValue: standing.rank,
     status,
+    rewardCash: status === "completed" ? 4 : undefined,
     penaltyCash: status === "failed" ? 3 : undefined,
-    boardConfidenceDelta: status === "completed" ? 0.2 : status === "failed" ? -0.4 : status === "at_risk" ? -0.1 : 0,
+    boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
     source: "board_v2_net_transfer_balance",
   };
 }
@@ -1141,21 +1197,71 @@ function getDevelopmentObjective(gameState: GameState, row: TeamManagementSnapsh
   };
 }
 
-function getFormColorObjective(gameState: GameState, team: Team): ObjectiveDraft {
-  const colors = new Set(
-    (gameState.seasonState.formCards ?? [])
-      .filter((card) => card.seasonId === gameState.season.id && card.teamId === team.teamId)
-      .map((card) => card.cardColor),
+/**
+ * FORMKARTEN-AUSBEUTE im Ligavergleich.
+ *
+ * VORHER: „Formfarben abdecken — 3+ Farben". Am Live-Save gemessen: 32 von 32 Teams erfüllt. Genau
+ * die Sorte Ziel, die der V2-Umbau laut eigenem Kommentar abschaffen sollte (`cash-positive`,
+ * `roster >= N`) — es fragt nicht nach Leistung, sondern danach, ob überhaupt gespielt wurde.
+ *
+ * JETZT wird der NENNWERT der AUSGESPIELTEN Karten gezählt und gegen die Liga gestellt. Das ist die
+ * Größe, die auf dem Spieltag wirkt, und sie trennt die Teams tatsächlich: wer seine Karten setzt
+ * statt sie verfallen zu lassen, steht vorn.
+ *
+ * GEZÄHLT WIRD ÜBER `buildSeasonFormCardBonusByTeamId` — dieselbe Quelle, aus der die Spalte
+ * „Formkarten" im Saisonstand kommt. Das ist keine Bequemlichkeit: die Karten liegen paarweise im
+ * Spielstand (zu jeder +8 gehört eine −8 desselben Spielers), die reine Summe über `formCards` ist
+ * deshalb per Konstruktion 0. Nur die Zuordnung über die Aufstellungen (`lineupDrafts`) weiss, WELCHE
+ * Karte wirklich aufs Feld kam. Eine zweite eigene Rechnung hier hätte still 0 für die ganze Liga
+ * gemeldet — nachgemessen am Live-Save genau so passiert.
+ *
+ * SOLANGE NIEMAND GESPIELT HAT, steht das Ziel auf „offen" statt auf „erfüllt". Über den Rang
+ * allein wäre am ersten Spieltag die ganze Liga bei 0 gleichauf — also alle auf Rang 1 und alle
+ * erfüllt. Das wäre der alte Fehler in neuem Gewand.
+ */
+function getFormColorObjective(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+}): ObjectiveDraft {
+  const bonusByTeamId = buildSeasonFormCardBonusByTeamId(input.gameState, input.gameState.season.id);
+  // Teams ohne Eintrag haben noch keine Karte gespielt — das ist eine 0, keine Lücke: sie hatten
+  // dieselbe Gelegenheit wie alle anderen.
+  const valueByTeamId = new Map<string, number>(
+    input.gameState.teams.map((team) => [team.teamId, bonusByTeamId.get(team.teamId)?.total ?? 0]),
   );
-  const target = 3;
+  const gespielteKarten = [...bonusByTeamId.values()].reduce((sum, entry) => sum + entry.cards, 0);
+
+  const standing = buildLeagueMetricStanding({
+    teamId: input.team.teamId,
+    values: [...valueByTeamId.entries()].map(([teamId, value]) => ({ teamId, value })),
+    direction: "higher_is_better",
+  });
+  const target = resolveLeagueRankTarget({
+    teamCount: standing.teamCount,
+    demand: input.identity?.ambition ?? 5,
+  });
+  const status =
+    gespielteKarten === 0
+      ? ("open" satisfies TeamSeasonObjectiveStatus)
+      : statusForLeagueRank({ rank: standing.rank, targetRank: target.targetRank, teamCount: standing.teamCount });
+
   return {
     objectiveId: "roster-form-color-cover",
     category: "roster",
-    label: "Formfarben abdecken",
-    targetValue: `${target}+ Farben`,
-    currentValue: colors.size,
-    status: colors.size >= target ? "completed" : colors.size >= 2 ? "at_risk" : "open",
-    boardConfidenceDelta: colors.size >= target ? 0.2 : 0,
+    label: `Formkarten-Ausbeute: Ligarang ${target.bandPhrase}`,
+    detail:
+      gespielteKarten === 0
+        ? "Nennwert der in dieser Saison ausgespielten Formkarten, verglichen mit der Liga. Es wurde noch keine Karte gespielt."
+        : `Nennwert der ausgespielten Formkarten: ${formatObjectiveMoney(standing.value)} — Rang ${standing.rank} von ` +
+          `${standing.teamCount}, Ligamedian ${formatObjectiveMoney(standing.median)}. Gefordert ist ` +
+          `ein Platz ${target.bandPhrase} (Rang ${target.targetRank} oder besser).`,
+    actionHint:
+      "Formkarten wirken am Spieltag: starke Karten dort setzen, wo die Disziplin zum Spieler passt, statt sie verfallen zu lassen.",
+    targetValue: target.targetRank,
+    currentValue: gespielteKarten === 0 ? null : standing.rank,
+    status,
+    boardConfidenceDelta: status === "completed" ? 0.2 : status === "failed" ? -0.2 : 0,
     source: "season_formcards",
   };
 }
@@ -1409,33 +1515,60 @@ function getPlayerTop20Objective(input: {
 function getRebuildCashObjective(input: {
   team: Team;
   row: TeamManagementSnapshotRow;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-  seasonId: string | number | null;
+  /** `false` = die Einnahmen der Saison sind noch nicht gebucht, der Wert ist eine Hochrechnung. */
+  settled: boolean;
 }): ObjectiveDraft | null {
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   const ambition = input.identity?.ambition ?? 5;
   if (cashPriority < 8 && ambition > 4) return null;
-  // In Season 1 bauen die Teams ihren Kader noch KOMPLETT auf und müssen dafür fast ihr gesamtes Cash
-  // ausgeben — 65 % des Budgets als Puffer zu verlangen ist da unerfüllbar. Deshalb S1 nur ein kleiner
-  // Liquiditätspuffer (~20-30). Ab Season 2 (Kader steht) gilt wieder das reguläre 65 %-Ziel.
-  const seasonNumber = getSeasonNumber(input.seasonId);
-  const target =
-    seasonNumber <= 1
-      ? roundValue(Math.min(30, Math.max(20, input.team.budget * 0.1)), 1)
-      : roundValue(Math.max(0, input.team.budget * 0.65), 1);
-  const status = statusForMin(input.row.cash, target);
+
+  // GEMESSEN am Live-Save: die alte feste Marke „65 % des Budgets" traf drei Teams mit 8,7 / 35,6 /
+  // −1,2 Cash gegen Vorgaben von 159,3 / 136,5 / 195 — allesamt unerreichbar, weil Cash mitten in
+  // der Saison am Boden liegt und die Einnahmen erst am Ende kommen. Der Puffer wird deshalb gegen
+  // die LIGA gemessen: wer im Vergleich zu den anderen 31 Teams liquide dasteht, hat den Puffer.
+  const standing = buildLeagueMetricStanding({
+    teamId: input.row.teamId,
+    values: [...input.rowsByTeamId.values()].map((row) => ({ teamId: row.teamId, value: row.cash ?? null })),
+    direction: "higher_is_better",
+  });
+  const target = resolveLeagueRankTarget({ teamCount: standing.teamCount, demand: cashPriority });
+  const rawStatus = statusForLeagueRank({ rank: standing.rank, targetRank: target.targetRank, teamCount: standing.teamCount });
+  // Wie beim Gehaltsziel: ein Konto im Minus ist keine Hochrechnung, sondern ein Befund.
+  const cashDistress = isCashDistress(input.row.cash);
+  const provisional = !input.settled && !cashDistress;
+  const status = cashDistress
+    ? ("failed" satisfies TeamSeasonObjectiveStatus)
+    : provisional
+      ? capProvisionalObjectiveStatus(rawStatus)
+      : rawStatus;
 
   return {
     objectiveId: "finance-rebuild-cash-buffer",
     category: "finance",
-    label: cashPriority >= 8 ? "Cashpuffer halten" : "Rebuild-Kosten klein halten",
-    targetValue: `>= ${target}`,
-    currentValue: input.row.cash,
+    // Das Label nennt jetzt IMMER die gemessene Größe. Vorher hiess dasselbe Ziel bei niedriger
+    // cashPriority „Rebuild-Kosten klein halten" — gemessen wurde aber der Cashbestand, nicht die
+    // Kosten. Wer das Label las, suchte eine Ausgabengrenze, die es nie gab.
+    label: `Cashpuffer: Ligarang ${target.bandPhrase}`,
+    detail:
+      standing.rank == null
+        ? "Cashbestand im Ligavergleich. Es fehlen Cash-Daten."
+        : `Cashbestand im Ligavergleich: ${formatObjectiveMoney(standing.value)} — Rang ${standing.rank} von ` +
+          `${standing.teamCount}, Ligamedian ${formatObjectiveMoney(standing.median)}. Gefordert ist ` +
+          `ein Platz ${target.bandPhrase} (Rang ${target.targetRank} oder besser).` +
+          (provisional ? " Hochrechnung: die Einnahmen der Saison sind noch nicht gebucht." : "") +
+          (cashDistress ? " Das Konto steht im Minus — der Puffer ist damit unabhängig vom Rang verfehlt." : ""),
+    actionHint:
+      "Liquide bleiben heisst nicht sparen um jeden Preis: Verkäufe zum richtigen Zeitpunkt, keine Gehälter, die den Puffer über die Saison aufzehren.",
+    targetValue: target.targetRank,
+    currentValue: standing.rank,
     status,
     rewardCash: status === "completed" ? 3 : undefined,
     penaltyCash: status === "failed" ? 2 : undefined,
     boardConfidenceDelta: status === "completed" ? 0.35 : status === "failed" ? -0.45 : -0.1,
+    provisional,
     source: "team_identity_finance_rebuild",
   };
 }
@@ -1785,6 +1918,8 @@ function buildTeamObjectives(input: {
     : 4;
   const seasonNum = resolveSeasonNumberFromState(gameState) ?? 1;
   const isInitialSeason = seasonNum === 1;
+  // Eine Quelle für „Hochrechnung oder Ergebnis" — beide cash-abhängigen Finanzziele lesen sie.
+  const seasonIncomeBooked = hasSeasonIncomeBeenBooked(gameState);
   // C-C and high-profit teams have a transfer target that scales up over seasons.
   const isHighProfitTeam = team.shortCode === "C-C" || (profile?.bias.sellForProfitAggression ?? 0) >= 8;
   const transferProfitTarget = isHighProfitTeam
@@ -1839,13 +1974,13 @@ function buildTeamObjectives(input: {
         targetRankOverride: boardV2 ? sportTarget.rank : null,
       }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
-      getTransferSpendCeilingObjective({ team, identity, profile, row, seasonId: gameState.season.id }),
+      getTransferSpendCeilingObjective({ team, identity, profile, row, rowsByTeamId }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
       // From the balancing branch: V2 replaces the tautological "cash > 0" with a real
       // net-transfer-balance goal; V1 keeps the plain cash-positive objective (so no duplicate with the
       // standalone cash-positive that origin/main added — this conditional subsumes it).
       boardV2
-        ? getNetTransferBalanceObjective({ team, row, profile, seasonNum })
+        ? getNetTransferBalanceObjective({ team, row, rowsByTeamId, profile, seasonNum })
         : {
             objectiveId: "finance-cash-positive",
             category: "finance",
@@ -1857,13 +1992,13 @@ function buildTeamObjectives(input: {
             boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
             source: "active_local_team_cash",
           },
-      buildSalaryPressureObjective({ row, rowsByTeamId, seasonId: gameState.season.id }),
+      buildSalaryPressureObjective({ row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
       transferObjective,
       // From the balancing branch: V2 adds a composition-quality (non-reserve share) roster goal. The old
       // V1 "roster >= N" objective (getRosterTarget) was removed on origin/main, so V1 now has no roster
       // objective here — null is filtered out of the slate below.
       boardV2 ? getRosterQualityCompositionObjective({ gameState, team, identity }) : null,
-      getFormColorObjective(gameState, team),
+      getFormColorObjective({ gameState, team, identity }),
       getNextMatchdayTop10Objective(gameState, team),
       getMatchdayMedalObjective({ gameState, team, identity, profile, rowsByTeamId }),
       getFacilityObjective(gameState, team, profile),
@@ -1872,7 +2007,7 @@ function buildTeamObjectives(input: {
       getPlayerTop20Objective({ gameState, team, identity, profile }),
       getPlayerTop50Objective({ gameState, team, identity, profile }),
       getTopPlayerObjective({ gameState, team, identity, profile }),
-      getRebuildCashObjective({ team, row, identity, profile, seasonId: gameState.season.id }),
+      getRebuildCashObjective({ team, row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
     ].filter((objective): objective is ObjectiveDraft => Boolean(objective)),
   });
@@ -1967,6 +2102,10 @@ function mergeStoredTeamObjectives(input: {
       // Ob ein Ziel verbindlich oder nur ein Zusatzziel ist, entscheidet die Vergabe bei jedem
       // Refresh neu — der gespeicherte Stand darf das nicht einfrieren.
       optional: generatedObjective.optional,
+      // Dasselbe gilt für „Hochrechnung": der eingefrorene Stand stammt aus einem Moment, in dem die
+      // Einnahmen noch nicht gebucht waren. Bliebe er stehen, trüge das Ziel den Hinweis auch noch
+      // in der Abrechnung, in der es längst feststeht.
+      provisional: generatedObjective.provisional,
       source: appendObjectiveSource(storedObjective.source, "status_refresh"),
     });
   }
@@ -2378,6 +2517,14 @@ export function applyTeamSeasonObjectiveRewards(
             totalCashDelta: settlement.totals.cashDelta,
             totalBoardConfidenceDelta: settlement.totals.boardConfidenceDelta,
             appliedTeams: Object.keys(settlement.byTeamId).length,
+            // Die Aufteilung je Team gehört in den Beleg, nicht in eine spätere Nachrechnung —
+            // siehe Kommentar am Typ. `settlement` ist genau die Grundlage, aus der oben `nextTeams`
+            // gebaut wurde, also protokolliert der Log das GEBUCHTE und nicht etwas Ähnliches.
+            cashDeltaByTeamId: Object.fromEntries(
+              Object.values(settlement.byTeamId)
+                .filter((summary) => summary.cashDelta !== 0)
+                .map((summary) => [summary.teamId, summary.cashDelta] as const),
+            ),
           },
           createdAt: new Date().toISOString(),
         },

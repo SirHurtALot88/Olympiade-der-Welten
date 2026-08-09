@@ -188,8 +188,12 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     }),
     step({
       stepId: "apply_rewards",
-      label: "Preisgeld & Finanzen",
-      cta: "Weiter: Preisgeld & Finanzen",
+      // Der Schritt fuehrt zur Saisonabrechnung — Sponsorgeld abzueglich Gehaelter, Apron, Gebaeude,
+      // Kreditraten, Vorstandsziele. Preisgeld ist davon KEIN Teil: die Tabelle ist ein
+      // Vergleichswert (`CASH_PRIZE_BENCHMARK_ONLY`) und wird nicht ausgezahlt. Der alte Name
+      // versprach eine Zahlung, die es nie gab.
+      label: "Saisonabrechnung",
+      cta: "Weiter: Saisonabrechnung",
       status: !hasSeasonHistory && isFirstSeason ? "completed" : cashApplied ? "completed" : "ready",
       targetView: "prize",
       teamId: activeTeamId,

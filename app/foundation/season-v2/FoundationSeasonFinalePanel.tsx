@@ -192,22 +192,36 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
      * sie gleichzusetzen war der Fehler, an dem ein Spielstand mit unveraendertem Cash
      * als „erledigt" dastand und der Knopf nicht mehr anfassbar war.
      */
+    /**
+     * GEMELDET VON CHRIS: „Preisgeld soll nicht ausgezahlt werden hab ich auch nie gesagt."
+     *
+     * Der Schritt hiess „Sponsoren & Preisgeld buchen" und versprach damit eine Auszahlung, die es
+     * nicht gibt: die Preisgeld-Tabelle ist ein Vergleichswert, kein Zahlungsvorgang
+     * (`CASH_PRIZE_BENCHMARK_ONLY` — Team-Cash bleibt davon unberührt, und die Preisgeld-Seite
+     * schreibt das auch schon so hin). Der Name nennt jetzt, was wirklich passiert.
+     *
+     * Und er nennt es VOLLSTÄNDIG. „Sponsoren buchen" war die zweite Untertreibung: seit der
+     * GuV-Vereinheitlichung läuft an dieser Stelle die komplette Saisonabrechnung — Sponsorgeld,
+     * Gehälter, Apron, Gebäude, Kreditraten, Vorstandsziele und zuletzt der Insolvenz-Backstop
+     * (`season-end-tail-settlement.ts`). Wer nur „Sponsoren" liest, rechnet mit einer Buchung und
+     * bekommt sieben.
+     */
     {
       key: "prize",
-      title: "Sponsoren & Preisgeld buchen",
+      title: "Saisonabrechnung buchen",
       detail:
         seasonEndPayoutStatus === "paid"
-          ? "Ist gebucht — Sponsorgeld abzüglich Gehälter steht auf dem Konto."
+          ? "Ist gebucht — Sponsorgeld abzüglich Gehälter, dazu Apron, Gebäude, Kreditraten und Vorstandsziele."
           : seasonEndPayoutStatus === "pending_payout"
             ? "Der Schritt lief, aber das Geld ist nie geflossen — das war ein Fehler und ist behoben. Jetzt nachbuchen."
-            : "Sponsorgeld wird abzüglich Gehälter gutgeschrieben.",
+            : "Sponsorgeld abzüglich Gehälter wird gutgeschrieben, dazu Apron, Gebäude, Kreditraten und Vorstandsziele. Das Preisgeld ist ein Vergleichswert und wird nicht ausgezahlt.",
       state:
         seasonEndPayoutStatus === "paid" ? "done" : busy ? "busy" : "ready",
       action:
         seasonEndPayoutStatus === "paid" || readOnly
           ? null
           : {
-              label: seasonEndPayoutStatus === "pending_payout" ? "Jetzt nachbuchen" : "Sponsoren buchen",
+              label: seasonEndPayoutStatus === "pending_payout" ? "Jetzt nachbuchen" : "Abrechnung buchen",
               onClick: onApplyPrize,
             },
     },
