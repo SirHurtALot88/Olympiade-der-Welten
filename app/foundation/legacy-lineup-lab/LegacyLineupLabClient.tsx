@@ -2334,12 +2334,67 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   // Mirrors the v2 focus board's own candidate-tab + search filtering exactly (same helper,
   // same source list), so keyboard digit-shortcuts always match what the user visually sees
   // there instead of a separately-computed "spotlight" list.
+  /**
+   * Eigene, UNGEFILTERTE Basis für das Fokus-Board.
+   *
+   * Das Board hat oben eigene Reiter — Alle / Sofort / Alternative / Blockiert —
+   * und filtert damit selbst. `teamdeckFilterMode` steht aber standardmäßig auf
+   * "free", und der wirft in `buildTeamdeckCandidateEntries` jeden Spieler mit
+   * `availabilityBlocker` komplett aus der Liste. Ergebnis: Der Reiter
+   * "Blockiert" konnte NIE etwas zeigen, "Alle" zeigte nicht alle, und
+   * verletzte oder gesperrte Spieler verschwanden spurlos aus dem Kader —
+   * gemeldet von Chris ("ich habe hier 3 spieler eingesetzt - 3 sind auf der
+   * bank sichtbar - wo sind die übrigen 3???").
+   *
+   * Deshalb baut das Board seine Liste mit Modus "all" und überlässt das
+   * Filtern seinen eigenen Reitern. Die klassische Ansicht behält
+   * `teamdeckFilterMode` unverändert — dort ist der Modus eine sichtbare
+   * Auswahl des Spielers, keine stille Vorfilterung.
+   */
+  const focusV2CandidateEntries: TeamdeckCandidateEntry[] = useMemo(
+    () =>
+      uiVariant === "focusV2"
+        ? buildTeamdeckCandidateEntries({
+            activeSlot,
+            selections,
+            activeSlotCandidateSummary,
+            activeSlotCandidateByActivePlayerId,
+            matchdayRosterCards,
+            playerBestSlotSummaryByActivePlayerId,
+            context,
+            focusedDisciplineSide,
+            teamdeckFilterMode: "all",
+            teamdeckSortMode,
+          })
+        : [],
+    [
+      activeSlot,
+      activeSlotCandidateByActivePlayerId,
+      activeSlotCandidateSummary,
+      context,
+      focusedDisciplineSide,
+      matchdayRosterCards,
+      playerBestSlotSummaryByActivePlayerId,
+      selections,
+      teamdeckSortMode,
+      uiVariant,
+    ],
+  );
+  const focusV2CandidateGroups: TeamdeckCandidateGroup[] = useMemo(
+    () =>
+      buildTeamdeckCandidateGroups({
+        teamdeckCandidateEntries: focusV2CandidateEntries,
+        showOnlyTopSlotCandidates: false,
+        teamdeckFilterMode: "all",
+      }),
+    [focusV2CandidateEntries],
+  );
   const focusV2VisibleCandidates = useMemo(() => {
     if (uiVariant !== "focusV2") {
       return [];
     }
-    return filterLegacyLineupCandidateEntries(teamdeckCandidateGroups, focusV2CandidateTab, playerFilter);
-  }, [focusV2CandidateTab, playerFilter, teamdeckCandidateGroups, uiVariant]);
+    return filterLegacyLineupCandidateEntries(focusV2CandidateGroups, focusV2CandidateTab, playerFilter);
+  }, [focusV2CandidateGroups, focusV2CandidateTab, playerFilter, uiVariant]);
   const activeSlotSpotlightGroups = useMemo(() => {
     return teamdeckCandidateGroups
       .filter((group) => group.key !== "blocked" && group.entries.length > 0)
@@ -5851,7 +5906,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         slotPreviewByKey={slotPreviewByKey}
         slotRoleByKey={slotRoleByKey}
         slotIssuesByKey={slotIssuesByKey}
-        candidateGroups={teamdeckCandidateGroups}
+        candidateGroups={focusV2CandidateGroups}
         candidateTab={focusV2CandidateTab}
         onCandidateTabChange={setFocusV2CandidateTab}
         playerBestSlotSummaryByActivePlayerId={playerBestSlotSummaryByActivePlayerId}

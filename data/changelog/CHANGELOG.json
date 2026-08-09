@@ -50,6 +50,15 @@
       "datum": "2026-08-08",
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
+      "text": "Im Fokus-Board fehlten Spieler auf der Bank: Wer verletzt oder gesperrt war, verschwand komplett aus der Kandidatenliste, statt unter „Blockiert\" zu stehen — der Reiter zeigte deshalb dauerhaft 0. Jetzt ist jeder Spieler des Kaders auffindbar, und „Blockiert\" zeigt, wer warum nicht kann.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
       "text": "Kleinere Klarheits-Korrekturen an der Einsatzliste (die Struktur bleibt, wie sie ist): der rote \"Spieler fehlt\"-Alarm für einen einfach noch nicht bearbeiteten Slot heißt jetzt neutral \"Offen\" — Rot bleibt echten Blockern vorbehalten (doppelt gewählter Spieler, verletzter Spieler, der aktive Slot). Fatigue-Kosten zeigen bei einer leeren Liste \"0\" statt \"−0\", Rivalen-Teamnamen laufen seltener in \"Wicked ...\" ab, Attribut-Noten (z. B. \"SPE B\") tragen ihre Notenskala jetzt im Tooltip, und der Formplan-Karten-Deck-Hinweis erklärt in einer Zeile, was eine aktivierte Karte kostet und bewirkt.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
