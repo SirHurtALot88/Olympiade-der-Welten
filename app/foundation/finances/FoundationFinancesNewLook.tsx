@@ -649,7 +649,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
           ? "Die Apron-Abrechnung dieser Saison ist bereits gebucht."
           : apron.frozenLines
             ? "Linien für diese Saison eingefroren — gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
-            : "Linien noch nicht eingefroren — sie können sich bis zum Saisonende verschieben. Alles hier ist eine Hochrechnung."}
+            : "Linien noch nicht eingefroren — sie wandern bis zum ersten Spieltag mit dem Median mit, solange noch Kader gebaut werden. Alles hier ist eine Hochrechnung."}
         {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
       </p>
 

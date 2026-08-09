@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
-import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
+import { resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -130,8 +130,11 @@ export function resolveTeamApronAmbition(gameState: GameState, teamId: string): 
  * Berechnung (haelt die Funktion auch isoliert testbar, ohne den Einfrier-Schritt zu durchlaufen).
  */
 export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: string): number {
-  const frozen = gameState.seasonState.apronLinesSnapshot;
-  const lines: ApronLines = frozen && frozen.seasonId === gameState.season.id ? frozen : computeApronLines(gameState);
+  // Dieselbe eine Quelle wie Anzeige und Abrechnung (`resolveSeasonApronLines`): während des
+  // Kaderbaus die mitwandernde Linie, ab dem ersten abgerechneten Spieltag die eingefrorene.
+  // Wichtig gerade hier — die KI kauft in genau dieser Aufbauphase, und vorher rechnete sie gegen
+  // eine Grenze, die ihre eigenen Käufe längst überholt hatten.
+  const lines: ApronLines = resolveSeasonApronLines(gameState);
   const ambition = resolveTeamApronAmbition(gameState, teamId);
   if (ambition >= 8) return lines.line2;
   if (ambition >= 6) return lines.line1 + (lines.line2 - lines.line1) * 0.4;
