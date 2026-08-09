@@ -1091,6 +1091,16 @@ function renderTopDisciplineCell(
   isScoutedProfile: boolean,
   scoutingLevel: number,
   newLookEnabled = false,
+  /**
+   * Projizierte Auswirkung des Saison-Trainings auf DIESE Disziplin (`disciplineTrainingDeltaById`).
+   *
+   * GEMELDET VON CHRIS: „im bereich Top Disziplinen fehlen noch die verbesserungen die oben drin
+   * sind also Staffel 91 (+2) sind dort nicht zu sehen." Die Achsen-Zeilen weiter oben zeigten das
+   * „+2" laengst, diese Tabelle nicht — sie bekam den Wert schlicht nie uebergeben. Dieselbe Zahl,
+   * dieselbe Quelle, damit beide Ansichten nicht verschiedene Wahrheiten ueber denselben Spieler
+   * erzaehlen.
+   */
+  trainingDelta: number | null = null,
 ): ReactNode {
   switch (columnId) {
     case "discipline": {
@@ -1123,7 +1133,21 @@ function renderTopDisciplineCell(
       const barPercent = Math.max(0, Math.min(100, row.value ?? 0));
       return (
         <span className="player-drawer-disc-table-stat">
-          <span className="player-drawer-disc-table-stat-value">{formatDisciplineValue(row.value, row.upgradeDelta)}</span>
+          <span className="player-drawer-disc-table-stat-value">
+            {formatDisciplineValue(row.value, row.upgradeDelta)}
+            {/* Steht bewusst NACH dem Scouting-Zweig oben: der kehrt vorher zurueck, ein verdeckter
+                Spieler kann hier also gar nicht ankommen. Eine exakte Veraenderung wuerde sonst das
+                Klassen-Band aushebeln, das daneben absichtlich unscharf ist — dieselbe Regel wie bei
+                den Achsen-Zeilen. */}
+            {trainingDelta ? (
+              <em className={`player-drawer-axis-discipline-forecast ${getDeltaToneClass(trainingDelta)}`}
+                title={`Saison-Forecast: ${trainingDelta > 0 ? "+" : ""}${trainingDelta} aus dem bisher gesammelten Training — gebucht wird erst am Saisonende, und nur wenn sich bei den anderen Spielern nichts verschiebt.`}
+              >
+                {trainingDelta > 0 ? "+" : ""}
+                {trainingDelta}
+              </em>
+            ) : null}
+          </span>
           {newLookEnabled ? (
             <NlProgressBar
               className="player-drawer-disc-table-progress"
@@ -2967,7 +2991,7 @@ export default function PlayerDetailDrawer({
                                 key={`discipline-breakdown-${entry.id}-${columnId}`}
                                 className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                               >
-                                {renderTopDisciplineCell(entry, columnId, disciplineStatFogged, scoutingLevel, true)}
+                                {renderTopDisciplineCell(entry, columnId, disciplineStatFogged, scoutingLevel, true, disciplineTrainingDeltaById[entry.id] ?? null)}
                               </td>
                             ))}
                           </tr>

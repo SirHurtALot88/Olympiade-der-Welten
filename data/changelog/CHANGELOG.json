@@ -399,6 +399,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Spielerprofil · Details",
+      "pr": null,
+      "text": "Im Spielerprofil zeigt die Tabelle „Top-Disziplinen“ jetzt dieselbe Trainings-Verbesserung wie die Achsen-Übersicht darüber. Gemeldet war: „im bereich Top Disziplinen fehlen noch die verbesserungen die oben drin sind, also Staffel 91 (+2) sind dort nicht zu sehen“. Beide Ansichten stehen im selben Reiter und zeigen dieselben Werte — aber nur oben stand der Saison-Forecast dabei, unten fehlte er. Jetzt steht er an beiden Stellen, mit derselben Farbe und demselben Hinweistext. Bei verdeckten Spielern bleibt es wie bisher bei der groben Klassen-Angabe ohne exakte Zahl, und wo sich nichts verändert, steht weiterhin nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Spieler · Trainingshistorie",
       "pr": null,
       "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
