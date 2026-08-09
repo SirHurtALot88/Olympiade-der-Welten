@@ -539,10 +539,16 @@ export function normalizeGameEncyclopediaTerm(term: string) {
   );
 }
 
+/** Wortliste eines normalisierten Begriffs ("zins-range" → ["zins", "range"]). */
+function gameEncyclopediaWords(value: string): string[] {
+  return value.split(/[^a-z0-9]+/).filter(Boolean);
+}
+
 export function getGameEncyclopediaEntry(term: string | null | undefined) {
   if (!term) return null;
   const normalized = normalizeGameEncyclopediaTerm(term);
   const compact = normalized.replace(/[^a-z0-9]/g, "");
+  const termWords = new Set(gameEncyclopediaWords(normalized));
 
   return (
     GAME_ENCYCLOPEDIA_ENTRIES.find((entry) => {
@@ -553,10 +559,20 @@ export function getGameEncyclopediaEntry(term: string | null | undefined) {
       [entry.id, entry.term, ...entry.aliases]
         .map((value) => normalizeGameEncyclopediaTerm(value))
         // Only fuzzy-match values with real length: a 2-char term like "CA"/"PO"
-        // would otherwise substring-match unrelated labels ("Cash" → CA). Short
-        // terms still resolve exactly via the first find() above.
+        // would otherwise match unrelated labels ("Cash" → CA). Short terms
+        // still resolve exactly via the first find() above.
         .filter((value) => value.replace(/[^a-z0-9]/g, "").length >= 3)
-        .some((value) => normalized.includes(value) || compact.includes(value.replace(/[^a-z0-9]/g, ""))),
+        // Fuzzy = GANZE Wörter, keine Substrings (W1-Befund 2): der alte
+        // includes()-Match ließ "Zins-Range" die "Rang"-Erklärung treffen und
+        // gab der Disziplin-Spalte "speed-schach" (SCH/Schach) den
+        // POW/SPE/MEN/SOC-Achsen-Tooltip, weil "spe" irgendwo im String vorkam.
+        // Jetzt matcht ein Alias nur, wenn jedes seiner Wörter als eigenes Wort
+        // im gesuchten Begriff steht ("PP POW" → Alias "pow" ✓, "speed-schach"
+        // → Alias "spe" ✗).
+        .some((value) => {
+          const valueWords = gameEncyclopediaWords(value);
+          return valueWords.length > 0 && valueWords.every((word) => termWords.has(word));
+        }),
     ) ??
     null
   );

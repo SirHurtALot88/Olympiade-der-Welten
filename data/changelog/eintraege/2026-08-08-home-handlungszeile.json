@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Spieltag · Home",
+  "text": "Home hat jetzt eine Handlungszeile ganz oben (»Einsatzliste füllen — 9 Plätze offen« mit echtem Knopf) statt dreier nicht klickbarer »Lineup fehlt«-Hinweise; die OVR-Werte auf den großen Spielerkarten sind wieder vollständig (»77,0 · #48« statt »77,0 …«), PPs/MVS bleiben auch bei 0 sichtbar und erklären sich per Tooltip, und im Board-Kasten steht ein Kapitän-Hinweis mit Draht ins Office. Das Office selbst ist eingedampft: Kapitänwahl als Vergleichstabelle mit Leadership-Balken, Board-Kontext und kompakte Notizen — die fünffach parallelen Aufgaben-Spalten sind weg.",
+  "gewicht": "grundlegend",
+  "version": "0.4"
+}

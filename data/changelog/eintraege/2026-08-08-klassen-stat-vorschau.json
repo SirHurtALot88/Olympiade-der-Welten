@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Team · Training",
+  "text": "Die Klassenliste im Training zeigt jetzt pro Klasse, WELCHE Werte sie für diesen Spieler verbessert: z. B. »Mage: +Intelligence 2,0 · +Will 1,4 · +Determination 0,6«, mit allen zwölf Attributen im Tooltip. Das ist keine neue Rechnung — es sind exakt die Beiträge, aus denen die Klassen-Schätzung schon immer summiert wurde, jetzt vor der Summierung sichtbar gemacht (ein Test erzwingt: Summe der Beiträge = Gesamtwert). Werte sind Schätzungen für die laufende Saison, keine Garantie — das sagt der Tooltip dazu.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

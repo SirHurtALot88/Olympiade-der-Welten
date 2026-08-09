@@ -12,6 +12,9 @@
  * - VeloIntensityRail: Push / Normal / Conserve selection rails (Training, filters)
  * - VeloAttributeFocusTags: training weight gain/loss tags
  * - VeloStarRating / VeloPotentialStars: class/potential display
+ * - VeloPendingRanking: Leerzustand fuer Wertungen OHNE Daten — leere Podest-Slots
+ *   („Noch zu vergeben") statt erfundener Rangfolge/Alphabet-Medaillen (Arena Pre-Matchday,
+ *   Ranks-PP-Board am Saisonstart). Eine leere Rangliste behauptet hier NIE eine Reihenfolge.
  *
  * Prefer `.velo-*` classes; feature aliases (e.g. `training-v2-rider-orbit`) stay for legacy CSS.
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
@@ -27,6 +30,11 @@ export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/componen
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";
 export { buildTrainingModeSegments, VeloIntensityRail, type VeloIntensitySegment } from "@/components/foundation/velo-ui/VeloIntensityRail";
 export { NlAbilityStars, type NlAbilityStarsProps } from "@/components/foundation/velo-ui/NlAbilityStars";
+export {
+  VeloPendingRanking,
+  type VeloPendingRankingProps,
+  type VeloPendingRankingSlot,
+} from "@/components/foundation/velo-ui/VeloPendingRanking";
 export { VeloPotentialStars } from "@/components/foundation/velo-ui/VeloPotentialStars";
 export { VeloRangeBar, type VeloRangeBarProps } from "@/components/foundation/velo-ui/VeloRangeBar";
 export { VeloSplitMeter, type VeloSplitMeterProps } from "@/components/foundation/velo-ui/VeloSplitMeter";

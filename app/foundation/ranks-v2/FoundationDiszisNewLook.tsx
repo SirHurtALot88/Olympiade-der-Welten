@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type * as React from "react";
 
 import {
@@ -89,8 +89,11 @@ function slotAxis(slot: ScheduleSlot): NlAxisKey | null {
 }
 
 const DISCIPLINE_CONFIG_COLUMNS: NlTableColumn<DisciplineRow>[] = [
-  { key: "originalOrder", label: "Original", sortable: true, align: "right", width: "88px", tooltip: "Original-Reihenfolge aus dem Draftboard" },
-  { key: "displayOrder", label: "Reihenfolge", sortable: true, align: "right", width: "100px", tooltip: "Neue Reihenfolge" },
+  // W4-Befund 4: die zwei Nummernspalten erklären, was sie praktisch bedeuten —
+  // "Original" ist der feste Draftboard-Platz, "Reihenfolge" die pro Saison neu
+  // ausgeloste Spiel-Reihenfolge, nach der auch der Spielplan oben sortiert.
+  { key: "originalOrder", label: "Original", sortable: true, align: "right", width: "88px", tooltip: "Fester Platz der Disziplin im ursprünglichen Draftboard — ändert sich nie und dient nur dem Wiedererkennen" },
+  { key: "displayOrder", label: "Reihenfolge", sortable: true, align: "right", width: "100px", tooltip: "In welcher Reihenfolge die Disziplinen DIESE Saison drankommen — wird pro Saison neu ausgelost (siehe Spielplan oben)" },
   { key: "name", label: "Disziplin", sortable: true },
   { key: "playerCount", label: "Spieler", sortable: true, width: "180px", tooltip: "Spieleranzahl pro Disziplin" },
   { key: "mutator1", label: "Mutator 1", sortable: true },
@@ -132,7 +135,9 @@ function ScheduleMatchdayCard({ row, isCurrent }: { row: ScheduleRow; isCurrent:
         <ScheduleSlotRow slot={discipline1} />
         <ScheduleSlotRow slot={discipline2} />
       </div>
-      {row.sourceStatus ? <footer className="nl-diszis-md-card-foot muted">{row.sourceStatus as React.ReactNode}</footer> : null}
+      {/* W4-Befund 1: der technische Quelle-Status ("season_seed") stand hier
+          zehnmal als Karten-Fußzeile — er lebt jetzt einmal im
+          "Details"-Aufklappen der Karte, nicht mehr im Spieler-UI. */}
     </article>
   );
 }
@@ -147,6 +152,24 @@ export default function FoundationDiszisNewLook({
   toggleTableSort,
 }: FoundationDiszisPanelProps) {
   const activeFilter = NL_DISZIS_FILTERS.find((entry) => entry.id === disciplineCategoryFilter) ?? NL_DISZIS_FILTERS[0];
+
+  // W4-Befund 1: Seed-/Debug-Infos (QUELLE season_seed, Schedule-Seed-Zeile)
+  // wandern hinter ein "Details"-Aufklappen — standardmäßig zu.
+  const [scheduleDetailsOpen, setScheduleDetailsOpen] = useState(false);
+
+  // W4-Befund 2: solange KEIN Spieltag gewertet ist, wäre "ausstehend" 40-mal
+  // dieselbe Information — dann trägt sie EIN Satz über der Tabelle und die
+  // Zellen zeigen nur den Mutator-Namen. Sobald die erste Wertung da ist,
+  // kehren die Treffer-/ausstehend-Stände je Zelle zurück.
+  const anyMutatorResolved = useMemo(
+    () =>
+      visibleDisciplineConfigRows.some((row) =>
+        [row.mutatorInfo1, row.mutatorInfo2].some(
+          (info) => (info as FoundationDisciplineMutatorInfo | null | undefined)?.resolved,
+        ),
+      ),
+    [visibleDisciplineConfigRows],
+  );
 
   const totalPlayers = useMemo(
     () => visibleDisciplineConfigRows.reduce((sum, row) => sum + (Number(row.playerCount) || 0), 0),
@@ -233,10 +256,14 @@ export default function FoundationDiszisNewLook({
           return (
             <span className="nl-diszis-mutator" title={`${info.label} — ${hitTitle}`}>
               {info.label}
-              <br />
-              <small className={info.resolved && info.hitCount > 0 ? undefined : "muted"}>
-                {info.resolved ? `${formatNlNumber(info.hitCount, 0)} Treffer` : "ausstehend"}
-              </small>
+              {anyMutatorResolved ? (
+                <>
+                  <br />
+                  <small className={info.resolved && info.hitCount > 0 ? undefined : "muted"}>
+                    {info.resolved ? `${formatNlNumber(info.hitCount, 0)} Treffer` : "ausstehend"}
+                  </small>
+                </>
+              ) : null}
             </span>
           );
         }
@@ -263,7 +290,18 @@ export default function FoundationDiszisNewLook({
         className="nl-diszis-schedule-card"
         eyebrow="Saison-Spielplan"
         title="Spieltag-Ablauf"
-        actions={<StatChip label="Quelle" value={scheduleSourceStatus} />}
+        actions={
+          <button
+            type="button"
+            className="nl-diszis-details-toggle"
+            aria-expanded={scheduleDetailsOpen}
+            onClick={() => setScheduleDetailsOpen((current) => !current)}
+            title="Technische Details zum Spielplan (Quelle, Seed) ein-/ausblenden"
+            data-testid="nl-diszis-details-toggle"
+          >
+            Details {scheduleDetailsOpen ? "▾" : "▸"}
+          </button>
+        }
         data-testid="foundation-diszis-schedule"
       >
         <div id="foundation-diszis-schedule" style={{ scrollMarginTop: 16 }}>
@@ -286,7 +324,14 @@ export default function FoundationDiszisNewLook({
             <NlEmptyState title="Noch kein Saison-Matchday-Plan verfügbar." />
           )}
         </div>
-        {scheduleSourceNote ? <p className="muted">{scheduleSourceNote}</p> : null}
+        {scheduleDetailsOpen ? (
+          <div className="nl-diszis-details muted" data-testid="nl-diszis-details">
+            <p>
+              Quelle: <code>{scheduleSourceStatus}</code>
+            </p>
+            {scheduleSourceNote ? <p>{scheduleSourceNote}</p> : null}
+          </div>
+        ) : null}
       </NlCard>
 
       <NlCard
@@ -344,6 +389,13 @@ export default function FoundationDiszisNewLook({
               className="nl-ranks-metric-chart"
             />
           </div>
+        ) : null}
+
+        {!anyMutatorResolved && visibleDisciplineConfigRows.length > 0 ? (
+          <p className="nl-diszis-mutator-hint" data-testid="nl-diszis-mutator-hint">
+            Noch kein Spieltag gewertet — die Mutator-Spalten zeigen die ausgelosten Mutatoren, Treffer erscheinen
+            nach der ersten Wertung.
+          </p>
         ) : null}
 
         {visibleDisciplineConfigRows.length > 0 ? (

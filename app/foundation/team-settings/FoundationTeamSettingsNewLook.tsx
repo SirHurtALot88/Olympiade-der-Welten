@@ -7,7 +7,7 @@ import {
   type AiActionBreakdownEntry,
   deriveBlockedBreakdownFromReasons,
 } from "@/lib/ai/ai-action-breakdown";
-import type { AiPreseasonAutomationRunRecord } from "@/lib/data/olyDataTypes";
+import type { AiPreseasonAutomationRunRecord, MappingWarning } from "@/lib/data/olyDataTypes";
 
 import {
   NlCard,
@@ -65,6 +65,10 @@ const NL_TEAMSETTINGS_SECTION_ITEMS: Array<{ id: NlTeamSettingsSection; label: s
   { id: "control", label: "Spielmodus & KI" },
   { id: "strategy", label: "Identity & Strategie" },
 ];
+
+/** W5 (Befund 4): Deckel für die aufgeklappte Import-Warnungen-Liste — bei vielen Warnungen
+ * (z. B. 200 unmappte Spieler) wäre die Karte sonst selbst wieder eine Scroll-Wand. */
+const IMPORT_WARNINGS_DISPLAY_CAP = 25;
 
 /** Beschriftetes Formularfeld (Label oben, Control darunter). */
 function NlField({
@@ -382,6 +386,18 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   const [selectedSaveIdsForDeletion, setSelectedSaveIdsForDeletion] = useState<Set<string>>(new Set());
   const [saveDeleteMessage, setSaveDeleteMessage] = useState<string | null>(null);
 
+  // W5 (Audit „welt", Befund 1 — hoch): der 32-Klub-Picker fürs "Neues Spiel erstellen" lag
+  // ungefragt mitten in den Settings des LAUFENDEN Saves, mit einem vorausgewählten Team und
+  // "DEIN TEAM ✓"-Badge — im Kontext eines Saves, in dem Chris ein ANDERES Team steuert, liest
+  // sich das wie die aktuelle Zuordnung. Jetzt eingeklappt hinter einen expliziten Klick statt
+  // standardmäßig offen — die Verwechslungsgefahr (falscher Klick auf "Neues Spiel erstellen")
+  // ist real und destruktiv genug, dass sie nicht die Standardansicht sein darf.
+  const [newGameWizardOpen, setNewGameWizardOpen] = useState(false);
+
+  // W5 (Befund 4): "WARNUNGEN 200" ohne Weg zu den Warnungen — jetzt aufklappbar, mit den echten
+  // Meldungen (Typ + Text) statt nur der nackten Zahl. Kappt bei vielen Warnungen (siehe unten).
+  const [importWarningsOpen, setImportWarningsOpen] = useState(false);
+
   // One-click "Neues Spiel erstellen": `runNewGameSetup(false)` verlangt einen
   // bereits validierten Preview. Um den bequemen Ein-Klick-Flow zu erreichen,
   // ohne die Service-Semantik zu ändern, merken wir uns die Erstell-Absicht und
@@ -508,12 +524,38 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
   function renderNewGameWizard() {
     return (
-      <section className="nl-teamsettings-subpanel nl-newgame" data-testid="new-game-setup-wizard">
+      <section
+        className={`nl-teamsettings-subpanel nl-newgame${newGameWizardOpen ? "" : " is-eingeklappt"}`}
+        data-testid="new-game-setup-wizard"
+      >
         <header className="nl-teamsettings-subhead">
-          <h4>Neues Spiel starten</h4>
-          <span className="nl-teamsettings-hint">Single-Player · Baseline · Startbudget</span>
+          <div className="nl-newgame-subhead-lead">
+            <h4>Neues Spiel starten</h4>
+            <span className="nl-teamsettings-hint">Single-Player · Baseline · Startbudget</span>
+          </div>
+          {/* Befund 1: standardmaessig eingeklappt — der 32-Klub-Picker mit vorausgewaehltem
+              Team gehoert nicht ungefragt in die Settings des laufenden Saves. */}
+          <button
+            type="button"
+            className="nl-newgame-wizard-toggle"
+            onClick={() => setNewGameWizardOpen((open) => !open)}
+            aria-expanded={newGameWizardOpen}
+            data-testid="new-game-wizard-toggle"
+          >
+            {newGameWizardOpen ? "Einklappen" : "Neuen Spielstand einrichten"}
+          </button>
         </header>
 
+        {!newGameWizardOpen ? (
+          <p className="nl-newgame-collapsed-hint muted">
+            Legt einen komplett NEUEN Spielstand mit frischer Season 1 an und wechselt darauf um — dein
+            aktueller Save ({activeSaveName}) bleibt dabei erhalten, ist danach aber nicht mehr aktiv. Nur
+            nötig, wenn wirklich ein neues Spiel beginnen soll.
+          </p>
+        ) : null}
+
+        {newGameWizardOpen ? (
+        <>
         {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. */}
         <div className="nl-newgame-hero">
           <div className="nl-newgame-hero-lead">
@@ -831,6 +873,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             ) : null}
           </section>
         ) : null}
+        </>
+        ) : null}
       </section>
     );
   }
@@ -1102,6 +1146,23 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             >
               {seasonStartResetBusy ? "Lädt..." : "Season-Start-Reset prüfen"}
             </button>
+          </div>
+
+          {freshSeasonStartMessage ? <p className="nl-teamsettings-msg is-good">{freshSeasonStartMessage}</p> : null}
+          {renderSeasonStartResetFeed()}
+
+          {/* W5 (Befund 2): destruktive Aktionen standen bisher im normalen Button-Fluss neben
+              harmlosen — jetzt eine eigene, klar abgesetzte Gefahrenzone mit Erklärung. Die
+              Zwei-Stufen-Semantik (erst "prüfen", dann erst hier "ausführen" freigeschaltet)
+              bleibt unverändert — sie stand nur bisher optisch nicht dafür. */}
+          <div className="nl-teamsettings-dangerzone" data-testid="nl-teamsettings-dangerzone">
+            <div className="nl-teamsettings-dangerzone-head">
+              <strong>Gefahrenzone</strong>
+              <span className="nl-teamsettings-note">
+                Setzt den Spielstand unwiderruflich zurück. Erst „Season-Start-Reset prüfen" oben zeigt, was
+                entfernt würde — erst danach lässt sich hier ausführen.
+              </span>
+            </div>
             <button
               type="button"
               className="nl-teamsettings-btn is-danger"
@@ -1131,9 +1192,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               Season-Start-Reset ausführen
             </button>
           </div>
-
-          {freshSeasonStartMessage ? <p className="nl-teamsettings-msg is-good">{freshSeasonStartMessage}</p> : null}
-          {renderSeasonStartResetFeed()}
 
           <div className="nl-teamsettings-actions is-compact">
             <button
@@ -1323,8 +1381,50 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <NlMetric label="Spieler" value={gameState.mappingReport.importedPlayerCount} />
             <NlMetric label="Teams" value={gameState.mappingReport.teamCount} />
             <NlMetric label="Gemappt" value={gameState.mappingReport.matchedRosterCount} />
-            <NlMetric label="Warnungen" value={gameState.mappingReport.warnings.length} />
+            <NlMetric
+              label="Warnungen"
+              value={gameState.mappingReport.warnings.length}
+              sub="Daten-Mapping beim Import"
+            />
           </div>
+          {/* Befund 4: "WARNUNGEN 200" stand ohne Weg zu den Warnungen da — jetzt mit einer
+              Erklärung, wofür sie stehen, und den echten Meldungen zum Nachlesen statt nur der
+              Zahl. Gekappt bei vielen Einträgen, damit die Karte nicht selbst zur 200-Zeilen-Wand wird. */}
+          {gameState.mappingReport.warnings.length > 0 ? (
+            <div className="nl-teamsettings-import-warnings">
+              <button
+                type="button"
+                className="nl-teamsettings-import-warnings-toggle"
+                onClick={() => setImportWarningsOpen((open) => !open)}
+                aria-expanded={importWarningsOpen}
+                data-testid="nl-teamsettings-import-warnings-toggle"
+              >
+                {importWarningsOpen ? "Warnungen einklappen" : `${gameState.mappingReport.warnings.length} Warnungen anzeigen`}
+              </button>
+              {importWarningsOpen ? (
+                <>
+                  <p className="nl-teamsettings-note">
+                    Meldungen aus dem Daten-Mapping beim Import (Rohdaten → Spielstand) — z. B. Spieler ohne
+                    Teamzuordnung oder unbekannte Team-Codes. Reine Diagnose, keine Spielaktion nötig.
+                  </p>
+                  <ul className="nl-teamsettings-import-warnings-list">
+                    {gameState.mappingReport.warnings
+                      .slice(0, IMPORT_WARNINGS_DISPLAY_CAP)
+                      .map((warning: MappingWarning, index: number) => (
+                      <li key={`${warning.type}-${index}`} className="nl-teamsettings-import-warning-item">
+                        {warning.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {gameState.mappingReport.warnings.length > IMPORT_WARNINGS_DISPLAY_CAP ? (
+                    <p className="nl-teamsettings-note">
+                      … und {gameState.mappingReport.warnings.length - IMPORT_WARNINGS_DISPLAY_CAP} weitere.
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </NlCard>
       </>
     );
@@ -2445,8 +2545,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <div className="nl-teamsettings-header-copy">
             <span className="nl-teamsettings-eyebrow">Control Room · {canonicalSeasonLabel}</span>
             <h2 className="nl-teamsettings-title">Team-Einstellungen</h2>
+            {/* Befund 3 (Audit „welt"): Doku-Diktion ("Der Spielmodus ist die einzige Wahrheit für
+                Ownership...") durch eine Erklärung ersetzt, die sagt, wofür die Seite gut ist. */}
             <p className="nl-teamsettings-note">
-              Der Spielmodus ist die einzige Wahrheit für Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
+              Spielstände verwalten, festlegen, welche Teams du selbst steuerst, und KI- sowie
+              Strategie-Verhalten einstellen.
             </p>
             <StatChipRow className="nl-teamsettings-header-chips" aria-label="Team-Einstellungen Kennzahlen">
               <StatChip

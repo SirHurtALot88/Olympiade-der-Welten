@@ -394,6 +394,7 @@ import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/Foundat
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
 import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
+import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -10050,8 +10051,19 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "lineup",
         kicker: "Heute wichtig",
-        title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
-        detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
+        // S1: die Karte ist jetzt die Handlungszeile der Home-Ansicht — Titel
+        // benennt die Handlung, das Detail erklärt die Konsequenz (der alte
+        // kryptische Zwei-Wort-Text ist raus).
+        title:
+          homeNextMatchdayStatus.openSlots > 0
+            ? `Einsatzliste füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
+            : "Einsatzliste steht",
+        detail:
+          homeNextMatchdayStatus.openSlots > 0
+            ? homeNextMatchdayStatus.requiredSlots > 0
+              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Einsatzliste startet der Spieltag nicht.`
+              : "Ohne Einsatzliste startet der Spieltag nicht."
+            : "Alles gesetzt — weiter in die Arena.",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
         urgency: homeNextMatchdayStatus.openSlots > 0 ? 0 : 2,
@@ -11882,6 +11894,10 @@ export function useFoundationShellRouterBodyScope({
     onOpenTeam: openTeamProfileById,
   };
 
+  // Vorsaison-Podium (W1): nur relevant, wenn das PP-Board leer startet — die
+  // Ableitung selbst ist billig (Top-3 der letzten archivierten Saison).
+  const ranksPreviousSeasonPodium = useMemo(() => buildPreviousSeasonPodium(gameState), [gameState]);
+
   const foundationRanksHostProps: FoundationRanksHostProps = {
     sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
     ppAreaRankClassMaps,
@@ -11890,6 +11906,9 @@ export function useFoundationShellRouterBodyScope({
     toggleTableSort,
     openTeamProfileById,
     ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
+    // W1 (Muster 3): echtes Vorsaison-Podium für den PP-Board-Saisonstart —
+    // derselbe Snapshot-Datenweg wie die Ewige Tabelle, keine zweite Quelle.
+    previousSeasonPodium: ranksPreviousSeasonPodium,
     renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
       renderMetricBar(value, {
         tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],

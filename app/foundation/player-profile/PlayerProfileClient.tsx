@@ -71,13 +71,35 @@ export default function PlayerProfileClient({
   const [subTabsStuck, setSubTabsStuck] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const suppressScrollRef = useRef(false);
+  // D3-Fix: ein per Klick gewählter Tab MUSS immer scrollen, komplett
+  // unabhängig vom Zustand von `suppressScrollRef`. Vorher konnte ein
+  // Scroll-Beobachtungs-Update, das kurz vor dem Klick lief, das Flag
+  // "true" hinterlassen (mehrere Sektionen rauschen während eines schnellen
+  // Scrolls durch den Beobachtungs-Streifen, jede setzt das Flag neu) — der
+  // nächste Klick verbrauchte dann fälschlich dieses fremde Flag und
+  // scrollte gar nicht mehr, obwohl der Tab-Reiter bereits als aktiv
+  // markiert war. Ergebnis: der Reiter "leuchtet", die Seite bewegt sich
+  // nicht — genau der Audit-Befund D3 ("man weiß nie, wo man ist").
+  // Der explizite Klick-Ref gewinnt in jedem Fall gegen das Beobachtungs-Flag.
+  const explicitSelectRef = useRef(false);
   const activeTabRef = useRef(activeTab);
   const onTabChangeRef = useRef(onTabChange);
   activeTabRef.current = activeTab;
   onTabChangeRef.current = onTabChange;
 
+  const handleTabSelect = (id: PlayerProfileTabId) => {
+    explicitSelectRef.current = true;
+    onTabChange(id);
+  };
+
   useEffect(() => {
-    if (suppressScrollRef.current) {
+    const explicit = explicitSelectRef.current;
+    explicitSelectRef.current = false;
+    if (explicit) {
+      // Nutzer-Klick: Flag der Scroll-Beobachtung ist hier irrelevant und
+      // wird verworfen, damit es keinen späteren Klick mehr blockieren kann.
+      suppressScrollRef.current = false;
+    } else if (suppressScrollRef.current) {
       // Tab-Wechsel kam aus der Scroll-Beobachtung — nicht zurückscrollen.
       suppressScrollRef.current = false;
       return;
@@ -118,47 +140,77 @@ export default function PlayerProfileClient({
         ([tab, anchorId]) => [anchorId, tab],
       ),
     );
-    const elements = [...tabByAnchorId.keys()]
-      .map((anchorId) => document.getElementById(anchorId))
-      .filter((element): element is HTMLElement => element != null);
-    if (elements.length === 0) {
-      return;
+
+    let intersectionObserver: IntersectionObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
+
+    // D3-Fix: `PlayerDetailDrawer` lädt per `next/dynamic` (ssr:false) — sein
+    // Chunk kommt asynchron NACH diesem Effekt an. Ein einmaliger
+    // `getElementById`-Scan direkt beim Effekt-Start fand die sechs
+    // Anker-Sektionen deshalb regelmäßig noch nicht (`elements.length === 0`),
+    // brach VORHER kommentarlos ab, und die Reiter-Aktiv-Markierung blieb für
+    // den Rest der Sitzung tot — reproduzierbar am laufenden Server (kein
+    // Einzelfall, jede Navigation zu einem neuen Spieler traf dasselbe
+    // Zeitfenster). Ein `MutationObserver` versucht erneut, sobald der Drawer
+    // seinen Chunk gerendert hat, und schaltet sich danach selbst ab.
+    function attach(): boolean {
+      const elements = [...tabByAnchorId.keys()]
+        .map((anchorId) => document.getElementById(anchorId))
+        .filter((element): element is HTMLElement => element != null);
+      if (elements.length === 0) {
+        return false;
+      }
+
+      const intersecting = new Map<string, number>();
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              intersecting.set(entry.target.id, entry.boundingClientRect.top);
+            } else {
+              intersecting.delete(entry.target.id);
+            }
+          }
+          if (intersecting.size === 0) {
+            return;
+          }
+          // Innerhalb des Lese-Bands gewinnt die unterste (zuletzt erreichte) Sektion.
+          let nextAnchorId: string | null = null;
+          let nextTop = Number.NEGATIVE_INFINITY;
+          for (const [anchorId, top] of intersecting) {
+            if (top > nextTop) {
+              nextTop = top;
+              nextAnchorId = anchorId;
+            }
+          }
+          const nextTab = nextAnchorId ? tabByAnchorId.get(nextAnchorId) : undefined;
+          if (nextTab && nextTab !== activeTabRef.current) {
+            suppressScrollRef.current = true;
+            onTabChangeRef.current(nextTab);
+          }
+        },
+        { rootMargin: "-15% 0px -65% 0px", threshold: 0 },
+      );
+      for (const element of elements) {
+        intersectionObserver.observe(element);
+      }
+      return true;
     }
 
-    const intersecting = new Map<string, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            intersecting.set(entry.target.id, entry.boundingClientRect.top);
-          } else {
-            intersecting.delete(entry.target.id);
-          }
+    if (!attach() && typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => {
+        if (attach()) {
+          mutationObserver?.disconnect();
+          mutationObserver = null;
         }
-        if (intersecting.size === 0) {
-          return;
-        }
-        // Innerhalb des Lese-Bands gewinnt die unterste (zuletzt erreichte) Sektion.
-        let nextAnchorId: string | null = null;
-        let nextTop = Number.NEGATIVE_INFINITY;
-        for (const [anchorId, top] of intersecting) {
-          if (top > nextTop) {
-            nextTop = top;
-            nextAnchorId = anchorId;
-          }
-        }
-        const nextTab = nextAnchorId ? tabByAnchorId.get(nextAnchorId) : undefined;
-        if (nextTab && nextTab !== activeTabRef.current) {
-          suppressScrollRef.current = true;
-          onTabChangeRef.current(nextTab);
-        }
-      },
-      { rootMargin: "-15% 0px -65% 0px", threshold: 0 },
-    );
-    for (const element of elements) {
-      observer.observe(element);
+      });
+      mutationObserver.observe(document.body, { childList: true, subtree: true });
     }
-    return () => observer.disconnect();
+
+    return () => {
+      intersectionObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
   }, [data.playerId]);
 
   return (
@@ -171,7 +223,7 @@ export default function PlayerProfileClient({
         <NlSubTabs
           items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
           activeId={activeTab}
-          onSelect={(id) => onTabChange(id as PlayerProfileTabId)}
+          onSelect={(id) => handleTabSelect(id as PlayerProfileTabId)}
           aria-label="Profil-Unterbereiche"
         />
       </div>

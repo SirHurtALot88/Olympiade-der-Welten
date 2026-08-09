@@ -303,9 +303,6 @@ function LoanBurdenChart({
         {hasIncome && incomeX != null ? (
           <g className="nl-credits-burden-marker">
             <line x1={incomeX} y1={BURDEN_BAR_Y - 6} x2={incomeX} y2={BURDEN_BAR_Y + BURDEN_BAR_H + 6} />
-            <text x={incomeX} y={BURDEN_BAR_Y - 9} textAnchor="middle">
-              Einnahmen
-            </text>
           </g>
         ) : null}
       </svg>
@@ -321,6 +318,17 @@ function LoanBurdenChart({
           <span className="nl-credits-burden-legend-label">Summe</span>
           <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(total)}</span>
         </span>
+        {/* K3 (Audit „markt"): die Einnahmen-Referenzlinie im Balken lief als rotierter/
+            gestauchter SVG-Text am rechten Kartenrand aus dem Layout (preserveAspectRatio="none"
+            verzerrt Text nicht-uniform). Jetzt derselbe gestrichelte-Linie-Marker als Legendenpunkt
+            neben den Balken-Segmenten — lesbar, nie abgeschnitten. */}
+        {hasIncome ? (
+          <span className="nl-credits-burden-legend-item">
+            <span className="nl-credits-burden-legend-marker" aria-hidden="true" />
+            <span className="nl-credits-burden-legend-label">Einnahmen (Referenz)</span>
+            <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(safeRevenue)}</span>
+          </span>
+        ) : null}
         {hasIncome ? (
           <span className={`nl-credits-burden-badge ${covered ? "is-good" : "is-risk"}`}>{covered ? "Gedeckt" : "Deckungslücke"}</span>
         ) : isDanger ? (
@@ -478,36 +486,49 @@ function LoanOfferCard({
       data-testid="nl-credits-offer-card"
       data-lender-type={offer.lenderType}
     >
+      {/* K2 (Audit „markt"): das "Bestes Angebot"-Badge landete früher mitten im Anbieternamen,
+          weil Name + Badges eine einzige Flex-Reihe teilten und der Name beim Umbruch dazwischen
+          riss. Jetzt zwei getrennte Gruppen: Identität (Wappen + Name, einzeilig mit Ellipsis)
+          links, Badges rechts — bricht die Gruppe im Ganzen um, nie mitten im Namen. */}
       <div className="nl-credits-offer-header">
-        {offer.lenderType === "bank" ? (
-          <span className="nl-credits-offer-crest is-bank" aria-hidden="true">
-            ₤
+        <span className="nl-credits-offer-identity">
+          {offer.lenderType === "bank" ? (
+            <span className="nl-credits-offer-crest is-bank" aria-hidden="true">
+              ₤
+            </span>
+          ) : (
+            <span className="nl-credits-offer-crest is-team">
+              {teamLogo?.src ? (
+                <BudgetedMediaImage
+                  className="nl-credits-offer-crest-img"
+                  src={teamLogo.src}
+                  alt=""
+                  width={28}
+                  height={28}
+                  loading="lazy"
+                  fetchPriority="low"
+                  fallback={<span aria-hidden="true">{teamLogo.initials}</span>}
+                />
+              ) : (
+                <span aria-hidden="true">{teamLogo?.initials ?? "?"}</span>
+              )}
+            </span>
+          )}
+          <span className="nl-credits-offer-name" title={offer.lenderName}>
+            {offer.lenderName}
           </span>
-        ) : (
-          <span className="nl-credits-offer-crest is-team">
-            {teamLogo?.src ? (
-              <BudgetedMediaImage
-                className="nl-credits-offer-crest-img"
-                src={teamLogo.src}
-                alt=""
-                width={28}
-                height={28}
-                loading="lazy"
-                fetchPriority="low"
-                fallback={<span aria-hidden="true">{teamLogo.initials}</span>}
-              />
-            ) : (
-              <span aria-hidden="true">{teamLogo?.initials ?? "?"}</span>
-            )}
-          </span>
-        )}
-        <span className="nl-credits-offer-name">{offer.lenderName}</span>
-        {isBest ? <span className="nl-credits-offer-best-badge">Bestes Angebot</span> : null}
-        {offer.lenderType === "team" && offer.relationshipValue != null ? (
-          <span className="nl-credits-offer-badge" title="Beziehung zum Verleiher-Team">
-            Beziehung {offer.relationshipValue > 0 ? `+${offer.relationshipValue}` : offer.relationshipValue}
-          </span>
-        ) : null}
+        </span>
+        <span className="nl-credits-offer-badges">
+          {isBest ? <span className="nl-credits-offer-best-badge">Bestes Angebot</span> : null}
+          {offer.lenderType === "team" && offer.relationshipValue != null ? (
+            <span
+              className="nl-credits-offer-badge"
+              title={`Beziehung zum Verleiher-Team, Skala -5 (feindselig) bis +5 (freundschaftlich) — ab -4 leiht das Team gar nichts. Höhere Werte senken den Zinssatz.`}
+            >
+              Beziehung {offer.relationshipValue > 0 ? `+${offer.relationshipValue}` : offer.relationshipValue}
+            </span>
+          ) : null}
+        </span>
       </div>
 
       <div className="nl-credits-offer-rate nl-tnum" style={{ color: NL_TONE_VAR[amountTone] }}>
@@ -812,6 +833,20 @@ export default function FoundationCreditsNewLook({
   const team = model.status === "ready" ? model.team : null;
   const maxAmount = Math.max(0, team?.maxOfferAmount ?? 0);
 
+  // K4 (Audit „markt") + Chris: der Admin-Vorschau-Schalter ist ein Entwicklerwerkzeug und
+  // gehört nicht in die normale Spieler-Oberfläche. Gleiche Konvention wie die Arena-Dev-Chrome
+  // (`DisciplineStageArena.tsx`): standardmäßig unsichtbar, nur mit `?dev` in der URL oder dem
+  // localStorage-Flag erscheint er wieder. Lesen im Effect (nicht beim ersten Render) vermeidet
+  // einen SSR-Hydration-Mismatch. `adminOverride` selbst bleibt unverändert `false`, solange der
+  // Schalter nie sichtbar/bedienbar war — kein Verhaltens-, nur ein Sichtbarkeits-Fix.
+  const [devMode, setDevMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasQuery = new URLSearchParams(window.location.search).has("dev");
+    const hasFlag = window.localStorage.getItem("oly-credits-dev") === "1";
+    if (hasQuery || hasFlag) setDevMode(true);
+  }, []);
+
   const [amount, setAmount] = useState<number>(() => Math.round((maxAmount / 2) * 10) / 10);
   const [amountInput, setAmountInput] = useState<string>(() => formatNlNumber(Math.round((maxAmount / 2) * 10) / 10, 1));
   const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
@@ -1018,7 +1053,16 @@ export default function FoundationCreditsNewLook({
             />
             <div className="nl-credits-gauge-stats">
               <StatChip label="Cash" value={formatNlMoney(team.cash)} tone="neutral" />
-              <StatChip label="Zins-Range" value={rateRange} tone="neutral" />
+              {/* K5 (Audit „markt"): ohne explizites `title` griff hier der Lexikon-Fuzzy-Match
+                  ("Zins-Range" enthält "range", das Substring-matched auf "Rang") und zeigte die
+                  falsche Erklärung — derselbe Substring-Bug-Typ wie SCH/Schach in den Ranks. Fix
+                  hier: eigener, korrekter Tooltip statt Fuzzy-Match. */}
+              <StatChip
+                label="Zins-Range"
+                value={rateRange}
+                tone="neutral"
+                title="Zinsspanne je nach Laufzeit: kürzere Laufzeit → höherer Satz, längere Laufzeit → niedrigerer Satz (Minimum bis Maximum eurer wählbaren Laufzeiten)."
+              />
             </div>
           </div>
         </NlCard>
@@ -1041,23 +1085,25 @@ export default function FoundationCreditsNewLook({
         </NlCard>
       ) : null}
 
-      <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
-        <label className="nl-credits-admin-toggle-label">
-          <input
-            type="checkbox"
-            checked={adminOverride}
-            onChange={(event) => onToggleAdminOverride(event.target.checked)}
-            data-testid="nl-credits-admin-toggle-input"
-          />
-          <span>Admin-Vorschau: Kredite trotz Season-1- &amp; Phasen-Sperre freischalten</span>
-        </label>
-        {adminOverride ? (
-          <p className="nl-credits-admin-toggle-note">
-            Admin-Modus aktiv — nur zum Testen/Ansehen. In Singleplayer-Spielständen kannst du hier
-            Angebote und Abläufe unabhängig von Saison und Spielphase durchspielen.
-          </p>
-        ) : null}
-      </div>
+      {devMode ? (
+        <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
+          <label className="nl-credits-admin-toggle-label">
+            <input
+              type="checkbox"
+              checked={adminOverride}
+              onChange={(event) => onToggleAdminOverride(event.target.checked)}
+              data-testid="nl-credits-admin-toggle-input"
+            />
+            <span>Admin-Vorschau: Kredite trotz Season-1- &amp; Phasen-Sperre freischalten</span>
+          </label>
+          {adminOverride ? (
+            <p className="nl-credits-admin-toggle-note">
+              Admin-Modus aktiv — nur zum Testen/Ansehen. In Singleplayer-Spielständen kannst du hier
+              Angebote und Abläufe unabhängig von Saison und Spielphase durchspielen.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {team && team.canBorrow ? (
         <>

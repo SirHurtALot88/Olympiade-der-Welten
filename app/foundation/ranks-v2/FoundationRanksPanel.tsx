@@ -3,6 +3,7 @@
 import type * as React from "react";
 
 import FoundationRanksNewLook from "@/app/foundation/ranks-v2/FoundationRanksNewLook";
+import type { PreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { SortState } from "@/lib/foundation/tabs/cockpit-types";
 import type { Team } from "@/lib/data/olyDataTypes";
 
@@ -37,6 +38,12 @@ export interface FoundationRanksPanelProps {
    * Fallback.
    */
   ownTeamId?: string | null;
+  /**
+   * Echtes Podium der letzten abgeschlossenen Saison (W1, Muster 3): wird nur
+   * im Saisonstart-Leerzustand (alle PPs = 0) gerendert — statt
+   * Alphabet-Medaillen. `null`/undefined = keine Vorsaison, nichts erfinden.
+   */
+  previousSeasonPodium?: PreviousSeasonPodium | null;
   renderPpAreaMetricCell: (
     value: number,
     formBonus: number,

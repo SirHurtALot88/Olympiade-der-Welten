@@ -38,13 +38,25 @@ const CSS = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 // wird die Konstante mit abgesenkt.
 // Nach S2/T1 (Inbox-Gruppen, Teams „Liste & Verträge": tote Vertragslisten-Styles raus): 220.
 // Nach M3 (Finanzen: „Dein Team"-Chip auf --nl-accent-text, gemessen war er 3,28:1): 219.
-const ACCENT_ALS_TEXT_OBERGRENZE = 219;
+// Nach W1/W4 (Ranks: „Dein Team"-Tag 3,18:1 + Team-Hover; Spielplan: „· läuft"-Tag 3,40:1)
+// und den parallel gemergten Seitenpaketen: 213.
+// Darin enthalten: M1 (Markt: „Deal prüfen"-Primäraktion 3,28:1, Sekundäraktion
+// is-active, Erweitert-Toggle-Hover — alle drei auf --nl-accent-text, −3).
+// Nach T7 (Gebäude: Arena-Karten-Hinweis „Basis × Beliebtheit" 3,72:1, −1): 212.
+// Nach W3 (Sponsoren: Liga-Tabelle ersetzt das Karten-Raster, „Dein Team"-Tag
+// jetzt auf --nl-accent-text statt --nl-accent, tote Karten-Styles raus): 211.
+const ACCENT_ALS_TEXT_OBERGRENZE = 211;
 
 // Stand nach Paket F1. NIE erhöhen — `--nl-mut-2` ist Deko (Linien, Icons).
 // Informationstragender Sekundärtext nimmt `color: var(--nl-mut)` (6,8:1);
 // `--nl-mut-2` liegt mit 3,7:1 auf Panel unter der Schwelle.
 // Nach T1 (tote Vertragslisten-Styles raus): 77.
-const MUT2_ALS_TEXT_OBERGRENZE = 77;
+// Nach T3 (Spielerliste: Podium-Kennzahllabel, PPs-Erklärzeile, Free-Agent-
+// Status, Saison-Gehaltszeile, Alltime-Saisonanzahl — alle fünf trugen echte
+// Information, nicht Deko): 72.
+// Nach W3 (Sponsoren: Liga-Tabelle ersetzt das Karten-Raster — zwei tote
+// mut-2-Stellen raus, eine neue für den leeren Sponsor-Zellenzustand): 71.
+const MUT2_ALS_TEXT_OBERGRENZE = 71;
 
 const zaehle = (re: RegExp) => (CSS.match(re) ?? []).length;
 

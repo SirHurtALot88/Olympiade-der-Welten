@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Team · Training",
+  "text": "Training ist jetzt eine Steuer-Tabelle statt acht Riesenkarten: eine Zeile pro Spieler mit Intensität (L/M/H als Klick-Segment, aktiver Modus gefüllt), Netto-Forecast mit Vergleichsbalken, Belastung und Klassen-Vorschlag — die Seite ist ~1.200 px hoch statt ~5.000. Die 13er-Klassenliste öffnet pro Zeile auf »Alle 13 Klassen«, der Bestwert trägt Gold, die aktive Klasse bleibt markiert. Oben gibt es nur noch EINE Kennzahlen-Zeile: Klick auf Leicht/Mittel/Hart zeigt die Team-Vorschau direkt in denselben Kacheln mit sichtbarer »Simulation«-Marke — geschrieben wird erst über »Übernehmen«. »Wie kommt das zustande?« ist ein Info-Link statt achtmal roter Primärknopf, und der Schein-Unterreiter »Forecast« (er zeigte dieselbe Seite) ist weg.",
+  "gewicht": "grundlegend",
+  "version": "0.4"
+}

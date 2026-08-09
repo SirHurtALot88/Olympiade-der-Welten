@@ -65,7 +65,7 @@
  * `.is-new-look .nl-ridge-*`.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
@@ -755,6 +755,103 @@ export default function FoundationPlayersTableNewLook({
    */
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
+  /**
+   * T3/P1 (Team-Audit): "Beim Scrollen nach rechts verliert man die
+   * Namensspalte." Vgl./Bild/Name bleiben stehen (`position: sticky`), aber
+   * ihre Breite ist NICHT fest — Bild folgt der Zeilenhöhe (aspect-ratio),
+   * die Namensspalte dem Spielernamen. Feste px-Werte in CSS würden also je
+   * nach Preset/Zeileninhalt daneben liegen. Stattdessen wird nach jedem
+   * Layout aus dem echten DOM gemessen (Kopf-Zellen, weil deren Breite exakt
+   * die Spaltenbreite der ganzen Tabelle ist — Auto-Layout gibt allen Zeilen
+   * derselben Spalte dieselbe Breite) und als `left`-Offset inline gesetzt.
+   */
+  // Callback-Ref statt `useRef` + Effekt-ohne-Deps: liefert ein verlässliches
+  // Re-Trigger-Signal genau dann, wenn die Tabelle wirklich ein-/aushängt
+  // (Leerzustand ⇄ echte Tabelle), statt bei jedem Render neu zu messen.
+  const [tableEl, setTableEl] = useState<HTMLTableElement | null>(null);
+  const [stickyOffsets, setStickyOffsets] = useState<{ image: number; name: number }>({ image: 44, name: 116 });
+
+  useLayoutEffect(() => {
+    const table = tableEl;
+    if (!table) {
+      return;
+    }
+    function recomputeStickyOffsets() {
+      const compareCell = table?.querySelector<HTMLElement>(".nl-players-td-compare, .nl-players-th-sticky-compare");
+      const imageCell = table?.querySelector<HTMLElement>(".nl-players-td-image, .nl-players-th-sticky-image");
+      if (!compareCell || !imageCell) {
+        return;
+      }
+      const compareWidth = compareCell.getBoundingClientRect().width;
+      const imageWidth = imageCell.getBoundingClientRect().width;
+      setStickyOffsets((current) => {
+        const next = { image: compareWidth, name: compareWidth + imageWidth };
+        if (Math.abs(current.image - next.image) < 0.5 && Math.abs(current.name - next.name) < 0.5) {
+          return current;
+        }
+        return next;
+      });
+    }
+    recomputeStickyOffsets();
+    const observer = new ResizeObserver(() => recomputeStickyOffsets());
+    observer.observe(table);
+    // Perf (2984-Spieler-Liga, "Alle 300 anzeigen"): der Observer selbst reagiert
+    // laufend auf echte Größenänderungen — er muss NICHT bei jedem Render neu
+    // aufgebaut werden. Ein leeres Deps-Array (statt "jeden Render") maß beim
+    // 40-Schritt-Scroll-Sweep über 1,9s Long-Task-Zeit, weil jede Zeilen-Neu-
+    // messung + Observer-Neuaufbau pro Commit lief. Einziger Wiederaufbau-Grund:
+    // die Tabelle existiert/verschwindet (Leerzustand vs. echte Tabelle).
+    return () => observer.disconnect();
+  }, [tableEl]);
+
+  /**
+   * T3/P1: Scroll-Affordanz — ohne sichtbaren Hinweis am rechten Rand wusste
+   * niemand, dass hinter dem Viewport noch Spalten liegen (Audit-Befund
+   * wörtlich: "Kein sichtbarer Scroll-Hinweis am rechten Rand"). Der Kanten-
+   * schatten an der Namensspalte (CSS) markiert die Sticky-Grenze IMMER; der
+   * Verlaufsschleier ganz rechts blendet sich aus, sobald wirklich ans Ende
+   * gescrollt wurde — reiner Zustand aus dem echten `scrollLeft`, nichts
+   * Erfundenes.
+   */
+  const [tableShellEl, setTableShellEl] = useState<HTMLDivElement | null>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  useLayoutEffect(() => {
+    const shell = tableShellEl;
+    if (!shell) {
+      return;
+    }
+    function computeScrollAffordance() {
+      if (!shell) return;
+      setCanScrollRight(shell.scrollWidth - shell.clientWidth - shell.scrollLeft > 4);
+    }
+    // Perf (2984-Spieler-Liga, "Alle 300 anzeigen"): natives `scroll` feuert
+    // beim horizontalen Ziehen weit öfter als einmal pro Frame — ohne rAF-
+    // Bündelung löste jedes Event einen State-Check auf einer 300-Zeilen-
+    // Tabelle aus. `rafId` verwirft überzählige Events zwischen zwei Frames,
+    // maximal ein Recompute pro Frame.
+    let rafId: number | null = null;
+    function onScroll() {
+      if (rafId != null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        computeScrollAffordance();
+      });
+    }
+    computeScrollAffordance();
+    shell.addEventListener("scroll", onScroll, { passive: true });
+    const observer = new ResizeObserver(() => computeScrollAffordance());
+    observer.observe(shell);
+    return () => {
+      shell.removeEventListener("scroll", onScroll);
+      if (rafId != null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+    // Perf: derselbe Grund wie beim Sticky-Offset-Effekt oben — Observer/Scroll-
+    // Listener einmal je Shell-Instanz aufbauen (Dep = die Shell selbst über
+    // den Callback-Ref), nicht bei jedem Render neu.
+  }, [tableShellEl]);
+
   // Gespeicherte Spalten-Präferenzen beim Mount nachladen (rein clientseitig).
   useEffect(() => {
     const stored = readColumnPreferences(getActiveSaveIdFromLocation());
@@ -1110,6 +1207,24 @@ export default function FoundationPlayersTableNewLook({
     [queryChipFilteredRows, visibleCount],
   );
   const hasMoreRows = queryChipFilteredRows.length > visibleRows.length;
+
+  /**
+   * T3/P2 (Team-Audit): "PPs-Spalte dauerhaft rot markiert, enthält aber nur
+   * '—'". Das ist keine einzelne fehlende Zeile — VOR dem ersten gespielten
+   * Spieltag der Saison hat die komplette Liga noch keinen PPs-/MVS-Wert
+   * (leerer Heat-Pool). In genau diesem Fall bekommen Kopf UND Körperzellen
+   * `.is-season-pending` (globals.css): die laute feste Akzent-/Bronze-Fläche
+   * weicht einer neutralen, erklärten Fläche statt eine noch nicht
+   * existierende Zahl wie einen Fehler aussehen zu lassen (Chris: "bei 0 wird
+   * erklärt, nicht versteckt" — NICHT ausgeblendet, nur nicht mehr laut rot).
+   * Ein einzelner Free-Agent ohne PPs bei sonst gefüllter Liga bleibt bewusst
+   * in der normalen Akzent-Färbung — das ist ein echter Datenpunkt ("dieser
+   * Spieler hat 0"), kein Saison-Zustand.
+   */
+  const ppsSeasonPending = leaguePlayerHeatPools.pps.length === 0;
+  const mvsSeasonPending = leaguePlayerHeatPools.mvs.length === 0;
+  const PPS_PENDING_HINT = "Noch keine PPs — die ganze Liga steht bei 0, Werte füllen sich ab Spieltag 1.";
+  const MVS_PENDING_HINT = "Noch kein MVS — die ganze Liga steht bei 0, Werte füllen sich ab Spieltag 1.";
 
   // Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query-Chips) aktiv? Genutzt für den
   // Leerzustand UND (unten) für die "Filter aktiv"-Anzeige im Analyse-Hub.
@@ -1473,7 +1588,7 @@ export default function FoundationPlayersTableNewLook({
         className={`nl-players-row${isCompareSelected ? " is-compare-selected" : ""}`}
         onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
       >
-        <td className="nl-players-td-compare">
+        <td className="nl-players-td-compare" style={{ left: 0 }}>
           <input
             type="checkbox"
             className="nl-players-compare-checkbox"
@@ -1491,7 +1606,7 @@ export default function FoundationPlayersTableNewLook({
             }
           />
         </td>
-        <td className="nl-players-td-image">
+        <td className="nl-players-td-image" style={{ left: stickyOffsets.image }}>
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
             <PlayerStarFrame tier={getPlayerStarTier(row.ovrRank)} shape="rounded">
               {portrait.src ? (
@@ -1517,7 +1632,7 @@ export default function FoundationPlayersTableNewLook({
             </PlayerStarFrame>
           </FoundationPlayerPortraitPreview>
         </td>
-        <td className={`nl-players-td-name${sortCellClass("name")}`}>
+        <td className={`nl-players-td-name${sortCellClass("name")}`} style={{ left: stickyOffsets.name }}>
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
             {/* Stern + Namens-Button sind Geschwister in der `nl-players-name-line`
                 (Buttons dürfen nicht verschachtelt werden) — beide teilen weiter
@@ -1688,9 +1803,10 @@ export default function FoundationPlayersTableNewLook({
           // Blau-Stufe bei Spitzenwerten). Die Heat-Klasse bleibt unten am
           // Element (harmlos, überschrieben) — der ligaweite Rang steht
           // stattdessen weiterhin explizit im `#N`-Chip.
-          className={`nl-players-td-metric nl-players-td-pps${sortCellClass("pps")} ${
-            row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
-          }`}
+          className={`nl-players-td-metric nl-players-td-pps${sortCellClass("pps")}${
+            ppsSeasonPending ? " is-season-pending" : ""
+          } ${row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""}`}
+          title={ppsSeasonPending ? PPS_PENDING_HINT : undefined}
         >
           <span className="nl-ptable-metric-cell">
             <button
@@ -1698,7 +1814,11 @@ export default function FoundationPlayersTableNewLook({
               className={`nl-players-pps-toggle${isPpsExpanded ? " is-expanded" : ""}`}
               aria-expanded={isPpsExpanded}
               aria-controls={ppsDetailId}
-              title={`PPs-Aufschlüsselung für ${row.player.name} ${isPpsExpanded ? "schließen" : "öffnen"}`}
+              title={
+                ppsSeasonPending
+                  ? PPS_PENDING_HINT
+                  : `PPs-Aufschlüsselung für ${row.player.name} ${isPpsExpanded ? "schließen" : "öffnen"}`
+              }
               onClick={(event) => {
                 event.stopPropagation();
                 setExpandedPlayerId((current) => (current === row.player.id ? null : row.player.id));
@@ -1729,9 +1849,10 @@ export default function FoundationPlayersTableNewLook({
           // `nl-ptable-mvs-cell` trägt die feste bronzene Spalten-Identität
           // (CSS) — überschreibt den wertabhängigen Heat-Hintergrund aus
           // demselben Grund wie bei PPs oben (Verwechslungsgefahr mit PPs).
-          className={`nl-players-td-metric nl-ptable-mvs-cell${sortCellClass("mvs")} ${
-            row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""
-          }`}
+          className={`nl-players-td-metric nl-ptable-mvs-cell${sortCellClass("mvs")}${
+            mvsSeasonPending ? " is-season-pending" : ""
+          } ${row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}`}
+          title={mvsSeasonPending ? MVS_PENDING_HINT : undefined}
         >
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</span>
@@ -2515,8 +2636,37 @@ export default function FoundationPlayersTableNewLook({
             </div>
           }
         >
-          <div className="nl-players-table-shell">
-            <table className="nl-players-table nl-tnum">
+          {/* T3/P3 (Team-Audit): "Spaltengruppen als Reiter statt 19-Spalten-
+              Endlosscroll" — dieselben benannten Views wie im "Spalten"-Menü,
+              hier aber als sichtbare Reiterleiste über der Tabelle statt
+              versteckt im Popover. Eine Quelle (`NL_PLAYERS_COLUMN_PRESETS`),
+              zwei Zugänge. "Saison" bündelt genau die Spalten, die am
+              Spieltag 1 noch leer sind (PPs/MVS/Einsätze). */}
+          <div className="nl-players-colgroups" role="tablist" aria-label="Spaltengruppen">
+            {NL_PLAYERS_COLUMN_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                role="tab"
+                aria-selected={activeColumnPreset === preset.id}
+                className={`nl-players-colgroup-tab${activeColumnPreset === preset.id ? " is-active" : ""}`}
+                onClick={() => applyColumnPreset(preset.id)}
+                title={
+                  preset.id === "saison"
+                    ? "PPs, MVS und Einsätze — füllen sich ab Spieltag 1"
+                    : `Spaltengruppe „${preset.label}" anzeigen`
+                }
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div
+            className="nl-players-table-shell"
+            ref={setTableShellEl}
+          >
+            {canScrollRight ? <div className="nl-players-scroll-fade" aria-hidden="true" /> : null}
+            <table className="nl-players-table nl-tnum" ref={setTableEl}>
               <thead>
                 <tr>
                   {renderedColumns.map((entry) => {
@@ -2539,21 +2689,36 @@ export default function FoundationPlayersTableNewLook({
                     }
                     const { column } = entry;
                     const axis = getAxisByColumnId(column.id);
+                    // T3/P1: Vgl./Bild/Name bleiben beim horizontalen Scrollen
+                    // stehen — Kopf UND Körperzellen (siehe `renderRow`) teilen
+                    // sich dieselben gemessenen `stickyOffsets`.
+                    const isSticky =
+                      column.id === "compare" || column.id === "image" || column.id === "name";
+                    const stickyLeft =
+                      column.id === "compare" ? 0 : column.id === "image" ? stickyOffsets.image : stickyOffsets.name;
+                    // T3/P2: leerer Liga-Pool (kein einziger Wert diese Saison) →
+                    // gedämpfte Kopfzelle statt der lauten Akzent-/Bronze-Fläche.
+                    const isSeasonPending =
+                      (column.id === "pps" && ppsSeasonPending) || (column.id === "mvs" && mvsSeasonPending);
+                    const pendingHint = column.id === "pps" ? PPS_PENDING_HINT : column.id === "mvs" ? MVS_PENDING_HINT : undefined;
                     return (
                       <th
                         key={entry.key}
                         scope="col"
                         className={`nl-players-th is-${column.align ?? "left"}${
                           column.highlight ? ` is-highlight-${column.highlight}` : ""
-                        }${axis ? ` nl-players-th-axis${expandedAxes[axis.key] ? " is-group-open" : ""}` : ""}${sortCellClass(column.sortKey)}`}
+                        }${axis ? ` nl-players-th-axis${expandedAxes[axis.key] ? " is-group-open" : ""}` : ""}${sortCellClass(column.sortKey)}${
+                          isSticky ? ` nl-players-th-sticky nl-players-th-sticky-${column.id}` : ""
+                        }${isSeasonPending ? " is-season-pending" : ""}`}
                         aria-sort={ariaSortFor(column.sortKey)}
+                        style={isSticky ? { left: stickyLeft } : undefined}
                       >
                         {axis ? (
                           renderAxisColumnHeader(axis, column)
                         ) : column.sortKey ? (
-                          renderSortHeader(column.sortKey, column.label, column.tooltip)
+                          renderSortHeader(column.sortKey, column.label, pendingHint ?? column.tooltip)
                         ) : (
-                          <span title={column.tooltip}>{column.label}</span>
+                          <span title={pendingHint ?? column.tooltip}>{column.label}</span>
                         )}
                       </th>
                     );
@@ -2562,6 +2727,16 @@ export default function FoundationPlayersTableNewLook({
               </thead>
               <tbody>{visibleRows.flatMap((row) => renderRow(row))}</tbody>
             </table>
+          </div>
+          {/* T3/P6 (Team-Audit): "B-Buckets/Abkürzungen nirgends erklärt" — eine
+              feste Legende unter der Tabelle statt "man muss jeden Kopf einzeln
+              hovern". Deckt genau die Kürzel ab, die nicht selbsterklärend sind
+              (Team/Klasse/Rasse/Gehalt/Vertrag brauchen keine Erklärung). */}
+          <div className="nl-players-legend">
+            <b>OVR</b> Gesamtstärke (0–100) · <b>PPs</b> Performance-Punkte der laufenden Saison ·{" "}
+            <b>MVS</b> Marktwert-Score · <b>MW</b> Marktwert · <b>VK-Wert</b> Verkaufspreis (MW × Verkaufsfaktor) ·{" "}
+            <b>CA/PO</b> Fähigkeit (Current Ability) / Potenzial als Sterne · <b>Alltime</b> Einsätze / PPs
+            über alle Saisons (Saisonanzahl im Tooltip) · <b>#N</b>-Chip neben PPs/OVR/MVS ist der ligaweite Rang.
           </div>
           {hasMoreRows ? (
             <div className="nl-players-more">

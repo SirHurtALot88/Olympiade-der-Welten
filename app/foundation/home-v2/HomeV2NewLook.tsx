@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useEffect, useRef } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -283,8 +282,10 @@ export default function HomeV2NewLook({
   inboxOpenCount,
   inboxCriticalCount = 0,
   todayCards,
+  captainSummary,
   onContinue,
   onOpenLineup,
+  onOpenArena,
   onOpenTeams,
   onOpenSeason,
   onOpenOffice,
@@ -294,12 +295,32 @@ export default function HomeV2NewLook({
   onOpenBoardObjectives,
   onOpenPlayer,
 }: HomeV2ClientProps) {
-  const visibleTodayCards = todayCards.slice(0, 3);
+  // S1 · „Heute wichtig" ist EINE Handlungszeile statt drei Karten: die Karten 2
+  // und 3 wiederholten nur, was Hero-KPIs (Rang) und Entscheidungen-Karte
+  // (Aufgaben-Zähler) ohnehin tragen — „jede Zahl genau einmal". Die dringendste
+  // Karte (Urgency-Sortierung der Quelle bleibt unverändert) wird zum Band mit
+  // echtem Button; vorher stand „Lineup fehlt" dreimal auf der Seite und war
+  // nirgends klickbar (Audit H2).
+  const primaryTodayCard = todayCards[0] ?? null;
   // `no_active_team` / `season_started_no_results` are filtered by the host
   // (see HOME_HIDDEN_WARNING_KEYS in lib/foundation/tabs/cockpit-ui-helpers.ts)
   // BEFORE the raw keys are mapped to German labels, so `warnings` here is
-  // already the display-ready list.
-  const relevantWarnings = warnings;
+  // already the display-ready list. S1 dazu: Chips, deren Inhalt bereits die
+  // Handlungszeile trägt (Einsatzliste), fallen weg — sonst steht dieselbe
+  // Aufgabe wieder doppelt auf der Seite.
+  const bandCoversLineup = primaryTodayCard?.key === "lineup";
+  const LINEUP_WARNING_KEYS = ["missing_lineups", "lineup_not_submitted"];
+  const relevantWarnings = warnings.filter(
+    (warning) => !(bandCoversLineup && LINEUP_WARNING_KEYS.includes(warning.key)),
+  );
+  // Klickziel je Warnungs-Schlüssel (Audit H2: „nichts davon sieht klickbar aus").
+  const warningTargets: Record<string, (() => void) | undefined> = {
+    missing_lineups: onOpenLineup,
+    lineup_not_submitted: onOpenLineup,
+    unused_negative_formcards: onOpenLineup,
+    formcard_pool_missing: onOpenLineup,
+    formcards_open: onOpenLineup,
+  };
 
   // T-103: Spieltag-Rail war rein dekorativ (kein Auto-Scroll auf den
   // aktuellen Spieltag). Beim Mount auf `.is-current` scrollen, damit lange
@@ -367,19 +388,34 @@ export default function HomeV2NewLook({
   const pointsPerMatchday = points != null && playedMatchdayCount > 0 ? points / playedMatchdayCount : null;
   const remainingMatchdayCount = scheduleItems.length > 0 ? scheduleItems.length - playedMatchdayCount : null;
 
-  // Gleiche Ziel-Zuordnung wie im bestehenden HomeV2Client.
-  const handleTodayCardClick = (key: string) => {
-    if (key === "lineup") {
+  // Gleiche Ziel-Zuordnung wie im bestehenden HomeV2Client. S1-Ergänzung: steht
+  // die Einsatzliste bereits (tone "ready"), führt der nächste Schritt in die
+  // Arena — vorher zeigte die Karte „direkt Arena spielen" und öffnete trotzdem
+  // die Einsatzliste.
+  const handleTodayCardClick = (card: Pick<HomeV2TodayCard, "key" | "tone">) => {
+    if (card.key === "lineup") {
+      if (card.tone === "ready" && onOpenArena) {
+        onOpenArena();
+        return;
+      }
       onOpenLineup();
       return;
     }
-    if (key === "team") {
+    if (card.key === "team") {
       onOpenSeason();
       return;
     }
-    if (key === "tasks") {
+    if (card.key === "tasks") {
       onOpenInbox();
     }
+  };
+
+  // Button-Beschriftung der Handlungszeile — benennt das ZIEL, nicht nur „öffnen".
+  const nextBandCtaLabel = (card: Pick<HomeV2TodayCard, "key" | "tone">): string => {
+    if (card.key === "lineup") return card.tone === "ready" && onOpenArena ? "Arena öffnen" : "Einsatzliste öffnen";
+    if (card.key === "tasks") return "Inbox öffnen";
+    if (card.key === "team") return "Zum Saisonstand";
+    return "Öffnen";
   };
 
   return (
@@ -469,8 +505,23 @@ export default function HomeV2NewLook({
           ) : null}
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} onClick={onOpenOffice} title="Gewinn und Verlust — zum Front Office" />
-            <StatChip label="Saisonpunkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Saison-Punktestand — identisch zum Saisonstand" />
+            {/* S1/H7: leere Werte werden erklärt, nicht nur als „—" gezeigt. */}
+            <StatChip
+              label="GuV"
+              value={formatNlMoney(animatedGuv ?? guv)}
+              tone={getGuvTone(guv)}
+              onClick={onOpenOffice}
+              sub={guv == null ? "ab Spieltag 1" : undefined}
+              title={guv == null ? "Gewinn und Verlust — noch keine Buchung, füllt sich ab Spieltag 1" : "Gewinn und Verlust — zum Front Office"}
+            />
+            <StatChip
+              label="Saisonpunkte"
+              value={formatNlNumber(animatedPoints ?? points, 1)}
+              tone="accent"
+              onClick={onOpenSeason}
+              sub={points == null ? "ab Spieltag 1" : undefined}
+              title={points == null ? "Saison-Punktestand — erste Wertung an Spieltag 1" : "Saison-Punktestand — identisch zum Saisonstand"}
+            />
             <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
             <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
             {hasActiveLoan ? (
@@ -510,11 +561,53 @@ export default function HomeV2NewLook({
         </NlCard>
       ) : null}
 
+      {/* --- Nächster Schritt (S1): die dringendste Aufgabe als Handlungszeile
+          mit echtem Button — dieselbe Quelle wie vorher die „Heute wichtig"-
+          Karten (todayCards, Urgency-sortiert), nur noch genau EINMAL. --- */}
+      {primaryTodayCard ? (
+        <NlCard
+          className={`nl-home-next-band nl-bento-item nl-bento-span-12 ${nlToneClass(getTodayCardTone(primaryTodayCard.tone))}`}
+          data-testid="nl-home-next-band"
+        >
+          <div className="nl-home-next-band-body">
+            <div className="nl-home-next-band-copy">
+              <span className="nl-home-next-band-kicker">
+                <span className="nl-home-section-icon">{getTodayCardIcon(primaryTodayCard.key)}</span>
+                Heute wichtig · Nächster Schritt
+              </span>
+              <h3 className="nl-home-next-band-title">{primaryTodayCard.title}</h3>
+              <p className="nl-home-next-band-detail">{primaryTodayCard.detail}</p>
+            </div>
+            <button
+              type="button"
+              className="nl-home-next-band-cta"
+              onClick={() => handleTodayCardClick(primaryTodayCard)}
+              data-testid="nl-home-next-band-cta"
+            >
+              {nextBandCtaLabel(primaryTodayCard)} →
+            </button>
+          </div>
+        </NlCard>
+      ) : null}
+
       {relevantWarnings.length > 0 ? (
         <div className="nl-home-warning-row nl-bento-item nl-bento-span-12" aria-label="Hinweise">
-          {relevantWarnings.slice(0, 3).map((warning) => (
-            <span key={warning} className={`nl-home-warning-chip ${nlToneClass("warn")}`}>{warning}</span>
-          ))}
+          {relevantWarnings.slice(0, 3).map((warning) => {
+            const target = warningTargets[warning.key];
+            return target ? (
+              <button
+                key={warning.key}
+                type="button"
+                className={`nl-home-warning-chip ${nlToneClass("warn")}`}
+                onClick={target}
+                title={`${warning.label} — zur passenden Ansicht`}
+              >
+                {warning.label} →
+              </button>
+            ) : (
+              <span key={warning.key} className={`nl-home-warning-chip ${nlToneClass("warn")}`}>{warning.label}</span>
+            );
+          })}
           {relevantWarnings.length > 3 ? (
             <button
               type="button"
@@ -568,35 +661,10 @@ export default function HomeV2NewLook({
         </nav>
       ) : null}
 
-      {/* --- Heute wichtig: klickbare Entscheidungs-Karten als Bento-
-          Kacheln (erste Karte breiter/„primär", die übrigen kompakt) --- */}
-      <div className="nl-home-section-head nl-bento-item nl-bento-span-12 nl-bento-head" aria-label="Heute wichtig">
-        <span className="nl-home-section-icon"><IconBolt /></span>
-        <h3 className="nl-home-section-title">Heute wichtig</h3>
-      </div>
-      {visibleTodayCards.map((card, index) => (
-        <div
-          key={card.key}
-          className={`nl-reveal nl-bento-item ${index === 0 ? "nl-bento-span-6" : "nl-bento-span-3"}`}
-          style={{ "--nl-reveal-i": index } as CSSProperties}
-        >
-              <NlCard
-                interactive
-                onClick={() => handleTodayCardClick(card.key)}
-                className={`nl-home-today-card ${nlToneClass(getTodayCardTone(card.tone))}${index === 0 ? " is-primary" : ""}`}
-                eyebrow={
-                  <span className="nl-home-today-kicker">
-                    {getTodayCardIcon(card.key)}
-                    {index + 1}. {card.kicker}
-                  </span>
-                }
-                title={card.title}
-                data-testid={`nl-home-today-card-${card.key}`}
-              >
-                <p className="nl-home-today-detail">{card.detail}</p>
-              </NlCard>
-            </div>
-          ))}
+      {/* Die frühere „Heute wichtig"-Kartenreihe (drei Kacheln) ist bewusst
+          entfallen: Karte 1 ist jetzt die Handlungszeile oben (nl-home-next-band),
+          Karte „Teamzustand" wiederholte die Rang-KPI aus dem Hero, Karte
+          „Aufgaben" den Zähler der Entscheidungen-Karte — jede Zahl genau einmal. */}
 
       {/* --- Top-Kader: Top-6 Portraitkarten (volle Bento-Breite) --- */}
       <section className="nl-home-section nl-bento-item nl-bento-span-12" aria-label="Top-Kader">
@@ -761,6 +829,30 @@ export default function HomeV2NewLook({
           ) : (
             <p className="nl-home-empty-note">Noch keine Board-Ziele hinterlegt.</p>
           )}
+          {/* S1 (Mockup homeV2): Kapitän-Hinweis mit Draht ins Office — dieselbe
+              Quelle wie die Kapitänwahl dort, keine zweite Leadership-Rechnung. */}
+          {captainSummary ? (
+            <div className="nl-home-captain-row" data-testid="nl-home-captain-row">
+              <span className="nl-home-captain-copy nl-tnum">
+                {captainSummary.captainName ? (
+                  <>
+                    Kapitän: <strong>{captainSummary.captainName}</strong>
+                    {captainSummary.captainLeadership != null
+                      ? ` (Leadership ${formatNlNumber(captainSummary.captainLeadership, 1)})`
+                      : ""}
+                    {captainSummary.challengerName && captainSummary.challengerLeadership != null
+                      ? ` — ${captainSummary.challengerName} hätte stärkere Führungswerte (${formatNlNumber(captainSummary.challengerLeadership, 1)}).`
+                      : ""}
+                  </>
+                ) : (
+                  <>Noch kein Kapitän ernannt — Leadership puffert Moral und Vorstands-Druck.</>
+                )}
+              </span>
+              <button type="button" className="nl-home-captain-check" onClick={onOpenOffice}>
+                Kapitän prüfen
+              </button>
+            </div>
+          ) : null}
         </NlCard>
 
         {/* --- Liga-Kurzkarte: Rang + Punkte, klick -> Saisonstand ---- */}

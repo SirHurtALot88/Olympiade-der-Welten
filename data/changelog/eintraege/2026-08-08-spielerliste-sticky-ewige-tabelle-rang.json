@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-08",
+    "seite": "Spieler",
+    "text": "Die Namensspalte bleibt beim horizontalen Scrollen stehen — vorher standen Zahlen ohne Spielernamen da. Die vier Spalten-Presets sind jetzt eine sichtbare Reiterleiste über der Tabelle statt im Spalten-Menü versteckt, dazu ein neuer fünfter Reiter Saison, der genau die am Spieltag 1 noch leeren Spalten (PPs, MVS, Einsätze) bündelt. Diese Spalten bleiben sichtbar (Chris' Regel: erklären statt verstecken), verlieren aber ihre laute rote/blaue Spaltenfläche, solange die ganze Liga noch bei 0 steht — ein Tooltip erklärt, dass sie sich ab Spieltag 1 füllen. Eine Legende unter der Tabelle erklärt die Abkürzungen einmal sichtbar.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Team · Ewige Tabelle",
+    "text": "Bei erst einer archivierten Saison waren Ø Rang und Bester Rang spaltenweise identisch — jetzt heißt es dann schlicht Rang, eine Spalte statt zwei (ab der zweiten archivierten Saison kommen beide zurück). Die Verlauf-Kacheln sagen jetzt, was sie zeigen, z. B. Top 8 nach Punkte · dein Team ergänzt, statt den Cut stillschweigend vorauszusetzen. Der Kopf erklärt jetzt, dass die Saisons-Spalte die laufende Saison mitzählt, auch wenn sie gerade erst begonnen hat.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

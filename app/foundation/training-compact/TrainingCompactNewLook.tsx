@@ -14,7 +14,6 @@ import {
   NlDeltaChip,
   NlEmptyState,
   NlFatigueGauge,
-  NlWhatIfSlider,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -35,24 +34,32 @@ import type {
 import {
   TrainingBudgetBreakdownDisclosure,
   buildTrainingClassGainRanking,
-  buildTrainingClassSuggestion,
   buildTrainingIntensityProjection,
   formatSignedPercent,
   getDevelopmentTone,
+  type TrainingClassGainEstimate,
 } from "@/app/foundation/training-facilities-v2/training-view-shared";
 
 /**
- * "Neuer Look" Training — flag-gated, additiv (nur wenn `useNewLook` aktiv ist).
+ * "Neuer Look" Training — Steuer-Tabelle (Paket T5) + Klassen-Stat-Vorschau (Paket T6).
  *
  * Konsumiert exakt dieselben Props wie `TrainingCompactClient` und ruft nur die
  * echten Handler auf (`onSetTrainingMode`, `onSetTrainingClass`,
  * `onSetDevelopmentFilter`, `onOpenPlayerDetails`, `onOpenFacilities`, `onOpenTeams`).
  *
- * Bewusst weggelassen (keine echten Daten/Handler dafür):
- * - kein Compare-Panel (reines Erklär-Panel, im neuen Look ersetzt durch die
- *   Team-Intensitäts-Vorschau aus denselben `trainingModeOptions`-Werten),
- * - kein numerischer Potential-Wert pro Attribut in den Props — der Cap-Marker
- *   nutzt daher den echten `ceilingState`/`headroomLabel` (capped/closing).
+ * Aufbau nach Audit-Befunden TR1–TR6 (Mockup `trainingCompact.html`):
+ * - EINE Steuer-Tabelle statt acht Riesenkarten: pro Spieler eine Zeile mit der
+ *   täglichen Entscheidung (Intensität als Segment), Netto-Forecast, Belastung
+ *   und Klassen-Vorschlag. Die 13er-Klassenliste öffnet nur auf Aufklappen.
+ * - EINE KPI-Zeile: die Team-Modus-Vorschau ersetzt die Ist-Zahlen live und
+ *   trägt dann sichtbar die Marke „Simulation" — geschrieben wird erst über
+ *   „Übernehmen" (TR3). Die Simulation nutzt dieselbe Semantik wie die
+ *   Ist-Zahlen (angewendetes Training, gleiche Residual-Decke) — kein zweiter
+ *   Zahlenbezug.
+ * - „Wie kommt das zustande?" ist ein Info-Link im Detail, kein roter
+ *   Primärknopf ×8 (TR2).
+ * - Der „Forecast"-Unterreiter ist konsolidiert (TR4, FoundationShellRouterBody):
+ *   er war nur ein Scroll-Anker auf dieselbe Seite.
  */
 
 const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string; hint: string }> = [
@@ -138,7 +145,6 @@ function NlTrainingGlyph({ kind }: { kind: NlTrainingGlyphKind }) {
   }
 }
 
-
 function getToneBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
   if (tone === "growth") return "steigt";
   if (tone === "regression") return "kann fallen";
@@ -147,14 +153,13 @@ function getToneBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
 
 /**
  * #49/Deklutter — Badge-Tooltip erklärt nur noch den Schwellenwert hinter dem
- * Label; die volle Zahlen-Begründung steht bereits immer sichtbar im
- * Kern-Takeaway direkt darunter (`getCoreTakeaway`) — keine zweite,
- * abweichend formulierte Kopie derselben Netto-/Druck-Zahlen mehr im Tooltip.
+ * Label; die volle Zahlen-Begründung steht im Kern-Takeaway der aufgeklappten
+ * Zeile (`getCoreTakeaway`).
  */
 function getToneBadgeTooltip(tone: ReturnType<typeof getDevelopmentTone>): string {
-  if (tone === "growth") return "Netto-Forecast ≥ +2 SP. Begründung im Kurztext darunter.";
-  if (tone === "regression") return "Netto-Forecast negativ oder Rückschritt-Risiko hoch. Begründung im Kurztext darunter.";
-  return "Netto-Forecast 0 bis +2 SP. Begründung im Kurztext darunter.";
+  if (tone === "growth") return "Netto-Forecast ≥ +2 SP. Begründung in der aufgeklappten Zeile.";
+  if (tone === "regression") return "Netto-Forecast negativ oder Rückschritt-Risiko hoch. Begründung in der aufgeklappten Zeile.";
+  return "Netto-Forecast 0 bis +2 SP. Begründung in der aufgeklappten Zeile.";
 }
 
 /** Sanftes Scrollen respektiert `prefers-reduced-motion` statt es zu ignorieren. */
@@ -201,8 +206,8 @@ function sortTrainingPlayerRows(rows: TrainingPlayerRowView[], sortKey: Training
 }
 
 /**
- * Haupt-Takeaway pro Spieler (immer sichtbar): Netto-Delta + Hauptgrund.
- * Nutzt dieselben echten Forecast-Felder wie die bisherige "Warum?"-Disclosure.
+ * Haupt-Takeaway pro Spieler (in der aufgeklappten Zeile): Netto-Delta + Hauptgrund.
+ * Nutzt dieselben echten Forecast-Felder wie die "Wie kommt das zustande?"-Disclosure.
  */
 function getCoreTakeaway(row: TrainingPlayerRowView): string {
   if (row.organicForecast.netSetpoints < 0) {
@@ -302,113 +307,6 @@ function getPotentialTone(multiplier: number): "high" | "good" | "neutral" | "lo
 }
 
 /**
- * D1/D2 — Pro-Spieler, pro-Intensität Trainings-Prognose. Zeigt für Leicht/Mittel/Hart
- * den erwarteten Zuwachs "durch Training" (potentialgetrieben, daher pro Spieler
- * unterschiedlich) plus die konstante Regression und den projizierten Netto-Wert.
- */
-function NlTrainingIntensityProjection({
-  row,
-  trainingModeOptions,
-  readOnly,
-  demandMode,
-  onSelectMode,
-}: {
-  row: TrainingPlayerRowView;
-  trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
-  readOnly: boolean;
-  demandMode: PlayerTrainingMode | null;
-  onSelectMode: (mode: PlayerTrainingMode) => void;
-}) {
-  const projection = useMemo(
-    () => buildTrainingIntensityProjection(row, trainingModeOptions),
-    [row, trainingModeOptions],
-  );
-  const potentialMultiplier = row.modifiers.potentialTrainingMultiplier;
-  const potentialTone = getPotentialTone(potentialMultiplier);
-  const best = projection.reduce((max, entry) => Math.max(max, entry.trainingGain), 0.01);
-  /**
-   * Die Netto-Formel stand bis zuletzt als dreizeiliger Fliesstext UNTER jeder
-   * Intensitaets-Karte — bei mehreren Spielern nebeneinander also x-mal derselbe
-   * Absatz, der die Karten deutlich in die Hoehe zog. Die Herleitung gibt es
-   * ohnehin ausfuehrlich hinter „Wie kommt das zustande?"
-   * (`training-view-shared.tsx`); hier reicht sie als Tooltip an der
-   * Ueberschrift. Der Text selbst bleibt unveraendert erhalten.
-   */
-  const currentProjection = projection.find((entry) => entry.isCurrent) ?? projection[0];
-  const netFormulaHint = `Netto = Training − Regression ${formatNlSignedNumber(
-    projection[0]?.regression ?? 0,
-    1,
-  )} (konstant) − Potential-Decke. Die Decke schneidet Zuwachs an fast vollen Attributen ab und wächst mit der Intensität — deshalb bringt mehr Training nicht 1:1 mehr Netto.${
-    currentProjection ? ` Aktuell (${currentProjection.label}): Decke −${formatNlNumber(currentProjection.ceilingLoss, 1)} SP.` : ""
-  } Schritt für Schritt unter „Wie kommt das zustande?".`;
-
-  return (
-    <div
-      className="nl-training-intensity is-selectable"
-      data-testid="nl-training-intensity"
-      role="radiogroup"
-      aria-label="Trainingsintensität wählen"
-    >
-      <div className="nl-training-intensity-head">
-        <span className="nl-training-intensity-title" title={netFormulaHint}>
-          Intensität {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
-        </span>
-        <span
-          className={`nl-training-potential is-${potentialTone}`}
-          title="Potential-Trainingsspeed: höheres Potential ⇒ mehr Zuwachs pro Intensität. Dieser Faktor steckt in jeder Prognose unten."
-        >
-          <NlTrainingGlyph kind="signature" /> Potential ×{formatNlNumber(potentialMultiplier, 2)}
-        </span>
-      </div>
-      <div className="nl-training-intensity-rows">
-        {projection.map((entry) => (
-          <button
-            type="button"
-            key={`intensity-${row.player.id}-${entry.mode}`}
-            className={`nl-training-intensity-row${entry.isCurrent ? " is-current" : ""}${
-              demandMode === entry.mode && !entry.isCurrent ? " is-demand" : ""
-            }`}
-            role="radio"
-            aria-checked={entry.isCurrent}
-            disabled={readOnly}
-            onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen · Netto ${formatNlSignedNumber(entry.net, 1)} SP = Training +${formatNlNumber(entry.trainingGain, 1)}${entry.performanceGain ? ` + Performance +${formatNlNumber(entry.performanceGain, 1)}` : ""} − Regression ${formatNlNumber(Math.abs(entry.regression), 1)} − Potential-Decke ${formatNlNumber(entry.ceilingLoss, 1)} · Fatigue-Last ${formatNlNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
-          >
-            <span className="nl-training-intensity-label">
-              {entry.label}
-              {entry.isCurrent ? <span className="nl-training-intensity-current">aktiv</span> : null}
-              {demandMode === entry.mode && !entry.isCurrent ? (
-                <span className="nl-training-intensity-demand">will</span>
-              ) : null}
-            </span>
-            <span className="nl-training-intensity-bar" aria-hidden="true">
-              <span
-                className="nl-training-intensity-fill"
-                style={{ width: `${Math.min(100, (entry.trainingGain / best) * 100)}%` }}
-              />
-            </span>
-            <span className="nl-training-intensity-gain nl-tnum" title="Erwarteter Zuwachs durch Training bei dieser Intensität">
-              +{formatNlNumber(entry.trainingGain, 1)} <small>Training</small>
-            </span>
-            <span
-              className={`nl-training-intensity-recovery nl-tnum${entry.recoveryDeltaPct < 0 ? " is-negative" : entry.recoveryDeltaPct > 0 ? " is-positive" : ""}`}
-              title="Erholungs-Tempo dieser Intensität (Erholungs-Rate, nicht Fatigue-Last) — Erholung ↔ Verletzungsrisiko-Trade-off"
-            >
-              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Erholung</small>
-            </span>
-            <NlDeltaChip
-              value={entry.net}
-              format={(n) => `${formatNlSignedNumber(n, 1)} SP`}
-              className="nl-training-intensity-net"
-            />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
  * Ton-Klasse einer Trainingsklasse — nach ihrer KLASSENFARBE.
  *
  * GEMELDET VON CHRIS: „vllt kannst du die noch in der passenden Farbe einrahmen damit man sie besser
@@ -424,6 +322,11 @@ function NlTrainingIntensityProjection({
  *
  * Die Route selbst bleibt unangetastet: sie ist Spiellogik (Route-Bonus) und keine Farbe. Klassen
  * ohne hinterlegte Farbe bleiben ungefärbt, statt sich eine fünfte auszudenken.
+ *
+ * WICHTIG (TR5/Achsenfarben-Kollision): Die Klassenfarbe sitzt NUR als schmaler Identitäts-Rahmen
+ * links an der Zeile — Werte und Balken bleiben einfarbig, die Bewertung trägt ausschließlich
+ * der Gold-Rang des Bestwerts (Muster-2-Skala, nie die Teamfarbe). So sagt Rot hier „Berserker",
+ * nie „schlecht".
  */
 const CLASS_COLOR_TONE: Record<string, string> = {
   red: " nl-tone-pow",
@@ -438,13 +341,56 @@ function classRankingClassTone(className: string | null | undefined) {
 }
 
 /**
+ * T6 · Klassen-Stat-Vorschau: welche Attribute eine Trainingsklasse für DIESEN Spieler
+ * verbessert — die Top-Beiträge aus `entry.attributeGains`, also exakt die Summanden,
+ * aus denen `estimatedGain` summiert wird (eine Rechnung, keine zweite Formel; Invariante
+ * per Test: `roundTo(Σ gain, 1) === estimatedGain`).
+ *
+ * Bewusst EINFARBIG (kein Achsfarben-Ton, kein Grün): direkt daneben sitzt die Klassenfarbe
+ * als Identitäts-Rahmen — eine zweite Farbcodierung auf denselben Pixeln würde kollidieren
+ * (TR5). Werte sind Schätzungen, keine Garantie — das sagt der Tooltip ausdrücklich.
+ */
+function NlTrainingClassAttributePreview({
+  entry,
+  attributeLabelByKey,
+}: {
+  entry: TrainingClassGainEstimate;
+  attributeLabelByKey: Map<string, string>;
+}) {
+  if (entry.attributeGains.length === 0) return null;
+  const label = (key: string) => attributeLabelByKey.get(key) ?? key;
+  const top = entry.attributeGains.slice(0, 3);
+  const rest = entry.attributeGains.slice(3);
+  const fullList = entry.attributeGains
+    .map((gain) => `${label(gain.attribute)} +${formatNlNumber(gain.gain, 1)}`)
+    .join(" · ");
+  return (
+    <span
+      className="nl-training-class-attrs nl-tnum"
+      data-testid="nl-training-class-attr-preview"
+      title={`${entry.label} verteilt das Trainingsbudget so über die Attribute (Schätzung, keine Garantie): ${fullList}. Die Summe dieser Beiträge IST die Brutto-Schätzung der Klasse (${formatNlNumber(entry.estimatedGain, 1)} SP) — gleiche Rechnung, nur vor der Summierung abgegriffen.`}
+    >
+      {top.map((gain) => (
+        <span className="nl-training-class-attr-tag" key={`${entry.className}-${gain.attribute}`}>
+          +{label(gain.attribute)} {formatNlNumber(gain.gain, 1)}
+        </span>
+      ))}
+      {rest.length > 0 ? <span className="nl-training-class-attr-more">+{rest.length} weitere</span> : null}
+    </span>
+  );
+}
+
+/**
  * Klassen nach geschätztem Trainings-SP-Zugewinn (siehe `buildTrainingClassGainRanking` für die
- * Herleitung). Die aktuell trainierte Klasse ist klar markiert („aktiv").
+ * Herleitung). Die aktuell trainierte Klasse ist klar markiert („aktiv"), der Bestwert trägt Gold
+ * (Muster-2-Rangskala — nie die Teamfarbe). Seit T6 zeigt jede Klasse zusätzlich, WELCHE Attribute
+ * sie für diesen Spieler verbessert (`NlTrainingClassAttributePreview`).
  *
  * GEMELDET VON CHRIS: „ich würde gerne beim Training nicht nur die besten 4 Klassen sehen, sondern
  * alle!" Vorher stand hier `limit: 4`. Die Beschränkung nahm dem Vergleich genau das, wofür er da
  * ist: welche Klasse für DIESEN Spieler die richtige ist, sieht man erst, wenn auch die schlechten
  * Optionen danebenstehen — und die vier besten sind bei ähnlichen Werten ohnehin austauschbar.
+ * Seit T5 öffnet die Liste pro Tabellenzeile auf Aufklappen (Audit TR1) — alle 13 bleiben drin.
  */
 function NlTrainingClassRanking({
   row,
@@ -464,6 +410,10 @@ function NlTrainingClassRanking({
     () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 99, includeCurrent: true }),
     [row, trainingClassOptions],
   );
+  const attributeLabelByKey = useMemo(
+    () => new Map(row.attributeForecast.map((entry) => [entry.attributeKey as string, entry.attribute])),
+    [row.attributeForecast],
+  );
   if (ranking.length === 0) return null;
   const best = ranking.reduce((max, entry) => Math.max(max, entry.estimatedGain), 0.01);
 
@@ -476,7 +426,7 @@ function NlTrainingClassRanking({
     >
       <span
         className="nl-training-class-ranking-title"
-        title={`Netto-vergleichbar: verankert am echten Netto-Forecast deiner aktuellen Klasse (${formatNlSignedNumber(row.organicForecast.netSetpoints, 1)} SP, nach Performance − Regression). Jede andere Klasse zeigt, wo dein Netto läge, wenn du sie trainierst (Delta aus Klassen-Attributgewichtung, Potential-Decke, Signature-/Weak-Affinität und Route-Bonus). Der Balken zeigt das relative Brutto-Trainingsbudget.`}
+        title={`Netto-vergleichbar: verankert am echten Netto-Forecast deiner aktuellen Klasse (${formatNlSignedNumber(row.organicForecast.netSetpoints, 1)} SP, nach Performance − Regression). Jede andere Klasse zeigt, wo dein Netto läge, wenn du sie trainierst (Delta aus Klassen-Attributgewichtung, Potential-Decke, Signature-/Weak-Affinität und Route-Bonus). Der Balken zeigt das relative Brutto-Trainingsbudget, die Attribut-Tags dessen Verteilung. Alles Schätzungen, keine Garantie.`}
       >
         Alle Klassen · Netto-SP{" "}
         {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
@@ -488,7 +438,7 @@ function NlTrainingClassRanking({
             key={`class-rank-${row.player.id}-${entry.className}`}
             className={`nl-training-class-ranking-row is-route-framed${classRankingClassTone(entry.className)}${
               entry.isCurrent ? " is-current" : ""
-            }`}
+            }${entry.rank === 1 ? " is-top" : ""}`}
             role="radio"
             aria-checked={entry.isCurrent}
             disabled={readOnly}
@@ -506,6 +456,7 @@ function NlTrainingClassRanking({
                   +8% Fokus
                 </span>
               ) : null}
+              <NlTrainingClassAttributePreview entry={entry} attributeLabelByKey={attributeLabelByKey} />
             </span>
             <span className="nl-training-class-ranking-bar" aria-hidden="true">
               <span
@@ -521,45 +472,26 @@ function NlTrainingClassRanking({
   );
 }
 
+/**
+ * Aufgeklappter Detail-Bereich einer Tabellenzeile — trägt alles, was nicht die
+ * tägliche Entscheidung ist: Kern-Takeaway, Saison-Stand, Hinweis-Chips,
+ * Klassen-Rangliste (mit T6-Stat-Vorschau), Attribut-Forecast und die
+ * „Wie kommt das zustande?"-Herleitung (als Info-Link, TR2).
+ */
 function NlTrainingPlayerCard({
   row,
   trainingModeReadOnly,
-  trainingModeOptions,
   trainingClassOptions,
-  onSetTrainingMode,
   onSetTrainingClass,
-  onOpenPlayerDetails,
 }: {
   row: TrainingPlayerRowView;
   trainingModeReadOnly: boolean;
-  trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
   trainingClassOptions: TrainingCompactClientProps["trainingClassOptions"];
-  onSetTrainingMode: TrainingCompactClientProps["onSetTrainingMode"];
   onSetTrainingClass: TrainingCompactClientProps["onSetTrainingClass"];
-  onOpenPlayerDetails: TrainingCompactClientProps["onOpenPlayerDetails"];
 }) {
   const [showAllAttributes, setShowAllAttributes] = useState(false);
-  const tone = getDevelopmentTone(row);
-  const classSuggestion = useMemo(
-    () => buildTrainingClassSuggestion(row, trainingClassOptions),
-    [row, trainingClassOptions],
-  );
-  // Der Vorschlag (Signatur-Attribut-Fit) darf nur erscheinen, wenn er auch die SP-Gewinn-Rangliste
-  // ("Beste Klassen") direkt darunter anführt — sonst widerspricht der Chip der Liste und wirkt sinnlos
-  // (z. B. Vorschlag "Overseer", der in der Top-Rangliste gar nicht auftaucht). Kein Sinn ⇒ kein Chip.
-  const showClassSuggestion = useMemo(() => {
-    if (!classSuggestion) return false;
-    const ranking = buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 99, includeCurrent: true });
-    const best = ranking.find((entry) => entry.rank === 1);
-    if (!best || best.isCurrent) return false;
-    if (best.className !== classSuggestion.className) return false;
-    const currentGain = ranking.find((entry) => entry.isCurrent)?.estimatedGain ?? 0;
-    return best.estimatedGain > currentGain + 0.3;
-  }, [classSuggestion, row, trainingClassOptions]);
-  // Label der Klasse, die aktuell tatsächlich trainiert wird (row.trainingClass — kann von
-  // row.player.className abweichen, siehe "Trainingsklasse"-Select unten). Wird explizit als
-  // "Trainiert:"-Seite im Vorschlags-Chip gezeigt, damit die Klasse nicht mit der oben gezeigten
-  // Statprofil-Entwicklung (classBefore/classAfter) verwechselt werden kann.
+  const potentialMultiplier = row.modifiers.potentialTrainingMultiplier;
+  const potentialTone = getPotentialTone(potentialMultiplier);
   const currentTrainingClassLabel = useMemo(
     () => trainingClassOptions.find((option) => option.value === row.trainingClass)?.label ?? row.trainingClass,
     [row.trainingClass, trainingClassOptions],
@@ -582,127 +514,34 @@ function NlTrainingPlayerCard({
   const hasDemand = demand != null && demand.status !== "fulfilled";
   const hasTraitBoost = row.traitBoosts.length > 0 || row.modifiers.traitModifierPct !== 0;
   const isHighRisk = row.forecast.regressionRisk === "high";
-  const portrait = getPlayerPortraitModel(row.player);
-  // Hover-Steckbrief (#Portrait-Hover): dieselbe `FoundationPlayerPortraitPreview`-Instanz
-  // wie in `FoundationPlayersTableNewLook`/`FoundationPlayersLeaderPodium` — trägt hier den
-  // eigens dafür vorgesehenen `context="training"`-Preset (CA/PO/Forecast, siehe
-  // `buildTrainingOverlayStats`), damit der Popup-Inhalt NICHT dieselben Zahlen doppelt
-  // zeigt, die die Karte selbst schon als Sterne/Chips/Balken darstellt. Diese Trainingsseite
-  // ist ausschließlich der eigene, steuerbare Kader — kein Fog-of-War nötig (identisch zum
-  // bereits bestehenden `known` auf den `NlAbilityStars` weiter unten).
-  const portraitPreviewProps: Omit<FoundationPlayerPortraitPreviewProps, "children"> = {
-    playerId: row.player.id,
-    name: row.player.name,
-    portraitUrl: portrait.previewSrc ?? portrait.src,
-    portraitInitials: portrait.initials || getInitials(row.player.name),
-    playerOvr: null,
-    playerMvs: row.playerMvs,
-    playerPps: row.playerPps,
-    pow: row.player.coreStats.pow ?? null,
-    spe: row.player.coreStats.spe ?? null,
-    men: row.player.coreStats.men ?? null,
-    soc: row.player.coreStats.soc ?? null,
-    variant: "team",
-    context: "training",
-    playerClassName: row.player.className,
-    subMeta:
-      row.organicForecast.classBefore === row.organicForecast.classAfter
-        ? row.player.className
-        : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`,
-    contextData: {
-      training: {
-        caRating: row.developmentStars.currentAbilityRating,
-        poDisplay: row.developmentStars.potentialStars ?? formatNlNumber(row.developmentStars.potentialRating, 0),
-        netSetpoints: row.organicForecast.netSetpoints,
-        regressionRisk: row.forecast.regressionRisk,
-        trainingModeLabel: getTrainingModePresentation(row.mode).label,
-        traitModifierPct: row.modifiers.traitModifierPct,
-      },
-    },
-  };
 
   return (
-    <article
-      className={`nl-training-player nl-training-tone-${tone}`}
-      id={`training-player-${row.player.id}`}
-      data-testid="nl-training-player-card"
-    >
-      <header className="nl-training-player-head">
-        <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-          <span className="nl-training-player-avatar">
-            <OptimizedMediaImage
-              className="nl-training-player-avatar-media"
-              src={portrait.previewSrc ?? portrait.src}
-              alt={`${row.player.name} Portrait`}
-              fallbackLabel={portrait.initials || getInitials(row.player.name)}
-              onErrorClassName="nl-training-player-avatar-media"
-              loading="lazy"
-            />
-          </span>
-        </FoundationPlayerPortraitPreview>
-        <div className="nl-training-player-copy">
-          {onOpenPlayerDetails ? (
-            <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-              <button
-                type="button"
-                className="nl-training-player-name-button"
-                data-testid="training-player-profile-button"
-                title={`${row.player.name} Profil öffnen`}
-                onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
-              >
-                {row.player.name}
-              </button>
-            </FoundationPlayerPortraitPreview>
-          ) : (
-            <strong className="nl-training-player-name">{row.player.name}</strong>
-          )}
-          <small
-            className="nl-training-player-class"
-            title={
-              row.organicForecast.classBefore === row.organicForecast.classAfter
-                ? undefined
-                : `Statprofil-Entwicklung über die Saison (nicht die Trainingsklasse): ${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`
-            }
-          >
-            {row.organicForecast.classBefore === row.organicForecast.classAfter
-              ? row.player.className
-              : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
-          </small>
-          {row.developmentStars.currentAbilityStars != null ||
-          row.developmentStars.currentAbilityRating != null ||
-          row.developmentStars.potentialStars != null ||
-          row.developmentStars.potentialRating != null ? (
-            <NlAbilityStars
-              caStars={row.developmentStars.currentAbilityStars}
-              caScore={row.developmentStars.currentAbilityRating}
-              poStars={row.developmentStars.potentialStars}
-              poScore={row.developmentStars.potentialRating}
-              known
-              compact
-              className="nl-training-player-stars"
-              label="Fähigkeiten"
-            />
-          ) : null}
-        </div>
-        {/* Fatigue-Gauge im Karten-Kopf. Auf dieser Seite entscheidet man ueber die
-            Trainings-INTENSITAET, und genau die kostet Regeneration — der aktuelle
-            Erschoepfungsstand gehoert damit neben die Entscheidung, statt nur im
-            Spieler-Drawer und in der Einsatzliste zu stehen. Dasselbe geteilte
-            `NlFatigueGauge` wie dort (gleiche Schwellen, gleicher Ton-Verlauf),
-            damit ein Spieler nicht auf zwei Seiten unterschiedlich „muede" aussieht. */}
-        <span className="nl-training-player-head-meta">
-          <NlFatigueGauge
-            value={row.player.fatigue}
-            className="nl-training-player-fatigue"
-            title={`Fatigue ${formatNlNumber(row.player.fatigue, 0)}/100 · Verletzungsrisiko bei ${row.modeConfig.label}: ${row.modeConfig.fatigueRisk}. ${row.fatigueWarning}`}
+    <div className="nl-training-detail" data-testid="nl-training-player-detail">
+      <div className="nl-training-detail-head">
+        {row.developmentStars.currentAbilityStars != null ||
+        row.developmentStars.currentAbilityRating != null ||
+        row.developmentStars.potentialStars != null ||
+        row.developmentStars.potentialRating != null ? (
+          <NlAbilityStars
+            caStars={row.developmentStars.currentAbilityStars}
+            caScore={row.developmentStars.currentAbilityRating}
+            poStars={row.developmentStars.potentialStars}
+            poScore={row.developmentStars.potentialRating}
+            known
+            compact
+            className="nl-training-player-stars"
+            label="Fähigkeiten"
           />
-          <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(tone)}>
-            {getToneBadgeLabel(tone)}
-          </span>
+        ) : null}
+        <span
+          className={`nl-training-potential is-${potentialTone}`}
+          title="Potential-Trainingsspeed: höheres Potential ⇒ mehr Zuwachs pro Intensität. Dieser Faktor steckt in jeder Prognose dieser Zeile."
+        >
+          <NlTrainingGlyph kind="signature" /> Potential ×{formatNlNumber(potentialMultiplier, 2)}
         </span>
-      </header>
+      </div>
 
-      {/* Kern-Takeaway: Netto-Delta + Hauptgrund, immer sichtbar (de-nested). */}
+      {/* Kern-Takeaway: Netto-Delta + Hauptgrund. */}
       <div className="nl-training-takeaway" data-testid="nl-training-takeaway">
         <NlDeltaChip
           value={row.organicForecast.netSetpoints}
@@ -744,42 +583,9 @@ function NlTrainingPlayerCard({
         </small>
       ) : null}
 
-      <NlTrainingIntensityProjection
-        row={row}
-        trainingModeOptions={trainingModeOptions}
-        readOnly={trainingModeReadOnly}
-        demandMode={demand && demand.status !== "fulfilled" ? demand.preferredMode : null}
-        onSelectMode={(mode) => onSetTrainingMode(row.player.id, mode)}
-      />
-      <NlTrainingClassRanking
-        row={row}
-        trainingClassOptions={trainingClassOptions}
-        readOnly={trainingModeReadOnly}
-        onSelectClass={(className) => onSetTrainingClass(row.player.id, className)}
-      />
-
-      {/* EINE Chip-Zeile fuer Hinweise UND Affinitaeten. Vorher waren das zwei
-          Container untereinander, wodurch schon bei einem einzelnen Trait-Chip
-          („★ 0%") eine fast leere Zeile ueber den Affinitaeten stand. Beides sind
-          kurze Pillen derselben Art — sie fliessen jetzt gemeinsam um, und die
-          Karte spart je nach Fuellung eine ganze Zeile. */}
-      {showRecommendation ||
-      hasTraitBoost ||
-      hasDemand ||
-      isHighRisk ||
-      showClassSuggestion ||
-      row.modifiers.signatureAttributes.length > 0 ||
-      row.modifiers.weakAttribute ? (
+      {/* EINE Chip-Zeile fuer Hinweise UND Affinitaeten. */}
+      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || row.modifiers.signatureAttributes.length > 0 || row.modifiers.weakAttribute ? (
         <div className="nl-training-chip-row" aria-label="Trainings-Hinweise und Affinitäten">
-          {showClassSuggestion && classSuggestion ? (
-            <span
-              className="nl-training-chip is-class-suggest"
-              data-testid="training-class-suggestion"
-              title={`Klassen-Vorschlag: ${classSuggestion.label} passt am besten zu den Signature-Attributen ${classSuggestion.attributes.join(" + ")}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`}
-            >
-              <NlTrainingGlyph kind="signature" /> Trainiert: {currentTrainingClassLabel} → Vorschlag: {classSuggestion.label}
-            </span>
-          ) : null}
           {showRecommendation && recommendedPresentation ? (
             <span
               className="nl-training-chip is-recommend"
@@ -838,6 +644,13 @@ function NlTrainingPlayerCard({
         </div>
       ) : null}
 
+      <NlTrainingClassRanking
+        row={row}
+        trainingClassOptions={trainingClassOptions}
+        readOnly={trainingModeReadOnly}
+        onSelectClass={(className) => onSetTrainingClass(row.player.id, className)}
+      />
+
       <div className="nl-training-forecast" data-testid="nl-training-forecast-bars" aria-label="Attribut-Forecast">
         {visibleForecast.map((entry) => (
           <NlTrainingForecastBar key={`${row.player.id}-${entry.attributeKey}`} entry={entry} scaleMax={scaleMax} />
@@ -853,12 +666,12 @@ function NlTrainingPlayerCard({
         ) : null}
       </div>
 
-      {/* Nur die Detail-Berechnung bleibt einklappbar (identische echte Werte). */}
+      {/* Detail-Berechnung („Wie kommt das zustande?") — als Info-Link gestylt (TR2),
+          identische echte Werte wie die Tabelle. */}
       <TrainingBudgetBreakdownDisclosure row={row} />
 
-      {/* Intensität + Klasse werden oben direkt in den Prognose-Zeilen gewählt
-          (klickbar). Hier nur noch der Vollzugriff auf alle Klassen als Fallback,
-          falls die Wunsch-Klasse nicht unter den Top-3 ist. */}
+      {/* Klassen werden oben in der Rangliste gewählt; das Select bleibt als
+          tastaturfreundlicher Vollzugriff (identischer Handler, keine zweite Logik). */}
       <footer className="nl-training-player-controls">
         <div className="nl-training-player-foot">
           <label className="nl-training-class-select">
@@ -876,130 +689,265 @@ function NlTrainingPlayerCard({
               ))}
             </select>
           </label>
+          <small className="nl-training-detail-classnote">Trainiert aktuell: {currentTrainingClassLabel}</small>
         </div>
       </footer>
-    </article>
+    </div>
   );
 }
 
+/** Kurzlabel je Intensität für die Tabellen-Segmente (L/M/H wie im Mockup). */
+const MODE_SHORT_LABEL: Record<PlayerTrainingMode, string> = {
+  leicht: "L",
+  mittel: "M",
+  hart: "H",
+};
+
 /**
- * What-if-Vorschau (FM26-Stil): der Manager zieht die Team-Intensität über die
- * diskreten Stufen (Leicht/Mittel/Hart) und sieht LIVE, wie sich der projizierte
- * Team-Trainings-Zuwachs, das Netto-SP und die Belastung verschieben würden —
- * OHNE zu committen. Es ruft KEINE Handler auf; erst die echte Intensitäts-Rail
- * darüber schreibt einen Modus.
- *
- * Datenquelle (keine neue Spielmathematik):
- *  - `teamProjectionByMode` = bereits im View berechnete, potentialgewichtete
- *    Summe der pro-Spieler-`buildTrainingIntensityProjection` (trainingGain + net).
- *  - Baseline (`baselineNet`) = aktueller echter Team-Netto-Forecast (`teamKpis.net`).
- *  - `baselineTrainingBudget` = aktuelle echte Summe `organicForecast.trainingSetpoints`.
- *  - `regressionTotal` = konstanter Team-Regressions-Drag (intensitätsunabhängig,
- *    siehe `buildTrainingIntensityProjection`) — bewusst als Kontext gezeigt.
+ * Eine Zeile der Steuer-Tabelle: die tägliche Entscheidung (Intensität) sitzt
+ * direkt in der Zeile, alles Erklärende klappt auf. Schreibt NUR über die
+ * echten Handler (`onSetTrainingMode` beim Segment-Klick).
  */
-function NlTrainingWhatIf({
+function NlTrainingPlayerRow({
+  row,
+  worstAbsNet,
+  expanded,
+  onToggleExpanded,
+  trainingModeReadOnly,
   trainingModeOptions,
-  teamProjectionByMode,
-  squadSize,
-  baselineNet,
-  baselineTrainingBudget,
-  regressionTotal,
-  disabled,
+  trainingClassOptions,
+  onSetTrainingMode,
+  onSetTrainingClass,
+  onOpenPlayerDetails,
 }: {
+  row: TrainingPlayerRowView;
+  worstAbsNet: number;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  trainingModeReadOnly: boolean;
   trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
-  teamProjectionByMode: Map<
-    PlayerTrainingMode,
-    { trainingGain: number; performanceGain: number; regression: number; ceilingLoss: number; net: number }
-  >;
-  squadSize: number;
-  baselineNet: number;
-  baselineTrainingBudget: number;
-  regressionTotal: number;
-  disabled: boolean;
+  trainingClassOptions: TrainingCompactClientProps["trainingClassOptions"];
+  onSetTrainingMode: TrainingCompactClientProps["onSetTrainingMode"];
+  onSetTrainingClass: TrainingCompactClientProps["onSetTrainingClass"];
+  onOpenPlayerDetails: TrainingCompactClientProps["onOpenPlayerDetails"];
 }) {
-  const [modeIndex, setModeIndex] = useState<number>(() => {
-    const mid = trainingModeOptions.findIndex((option) => option.value === "mittel");
-    return mid >= 0 ? mid : 0;
-  });
+  const tone = getDevelopmentTone(row);
+  const projection = useMemo(
+    () => buildTrainingIntensityProjection(row, trainingModeOptions),
+    [row, trainingModeOptions],
+  );
+  const ranking = useMemo(
+    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 99, includeCurrent: true }),
+    [row, trainingClassOptions],
+  );
+  const demand = row.trainingDemand;
+  const demandMode = demand && demand.status !== "fulfilled" ? demand.preferredMode : null;
+  const net = row.organicForecast.netSetpoints;
+  const netBarPct = worstAbsNet > 0 ? Math.min(100, (Math.abs(net) / worstAbsNet) * 100) : 0;
+  const currentTrainingClassLabel =
+    trainingClassOptions.find((option) => option.value === row.trainingClass)?.label ?? row.trainingClass;
+  const trainsOtherClass = row.trainingClass !== row.player.className;
 
-  if (trainingModeOptions.length === 0 || squadSize === 0) return null;
+  // Klassen-Vorschlag aus DERSELBEN Rangliste, die die aufgeklappte Zeile zeigt —
+  // ein Chip, der der Liste widerspricht, wäre ein Muster-4-Loch.
+  const bestClass = ranking.find((entry) => entry.rank === 1) ?? null;
+  const currentClass = ranking.find((entry) => entry.isCurrent) ?? null;
+  const suggestsSwitch =
+    bestClass != null &&
+    currentClass != null &&
+    !bestClass.isCurrent &&
+    bestClass.estimatedGain > currentClass.estimatedGain + 0.3;
 
-  const clampedIndex = Math.min(Math.max(0, modeIndex), trainingModeOptions.length - 1);
-  const option = trainingModeOptions[clampedIndex];
-  const projected =
-    teamProjectionByMode.get(option.value) ?? {
-      trainingGain: option.trainingSetpoints * squadSize,
-      performanceGain: 0,
-      regression: regressionTotal,
-      ceilingLoss: 0,
-      net: baselineNet,
-    };
-  const netDelta = projected.net - baselineNet;
-  const trainingDelta = projected.trainingGain - baselineTrainingBudget;
-  const fatigue = option.fatigueLoad * squadSize;
-  const valueText = `${option.label}: projizierter Trainings-Zuwachs +${formatNlNumber(
-    projected.trainingGain,
-    1,
-  )} SP (${formatNlSignedNumber(trainingDelta, 1)} SP), Netto ${formatNlSignedNumber(
-    projected.net,
-    1,
-  )} SP (${formatNlSignedNumber(netDelta, 1)} SP gegenüber aktuell)`;
+  const portrait = getPlayerPortraitModel(row.player);
+  // Hover-Steckbrief (#Portrait-Hover): dieselbe `FoundationPlayerPortraitPreview`-Instanz
+  // wie in `FoundationPlayersTableNewLook` — trägt den `context="training"`-Preset
+  // (CA/PO/Forecast), damit der Popup-Inhalt NICHT dieselben Zahlen doppelt zeigt,
+  // die die Zeile selbst schon darstellt. Diese Trainingsseite ist ausschließlich
+  // der eigene, steuerbare Kader — kein Fog-of-War nötig.
+  const portraitPreviewProps: Omit<FoundationPlayerPortraitPreviewProps, "children"> = {
+    playerId: row.player.id,
+    name: row.player.name,
+    portraitUrl: portrait.previewSrc ?? portrait.src,
+    portraitInitials: portrait.initials || getInitials(row.player.name),
+    playerOvr: null,
+    playerMvs: row.playerMvs,
+    playerPps: row.playerPps,
+    pow: row.player.coreStats.pow ?? null,
+    spe: row.player.coreStats.spe ?? null,
+    men: row.player.coreStats.men ?? null,
+    soc: row.player.coreStats.soc ?? null,
+    variant: "team",
+    context: "training",
+    playerClassName: row.player.className,
+    subMeta:
+      row.organicForecast.classBefore === row.organicForecast.classAfter
+        ? row.player.className
+        : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`,
+    contextData: {
+      training: {
+        caRating: row.developmentStars.currentAbilityRating,
+        poDisplay: row.developmentStars.potentialStars ?? formatNlNumber(row.developmentStars.potentialRating, 0),
+        netSetpoints: row.organicForecast.netSetpoints,
+        regressionRisk: row.forecast.regressionRisk,
+        trainingModeLabel: getTrainingModePresentation(row.mode).label,
+        traitModifierPct: row.modifiers.traitModifierPct,
+      },
+    },
+  };
 
   return (
-    <NlWhatIfSlider
-      label="What-if: Team auf einen Modus ziehen"
-      value={clampedIndex}
-      min={0}
-      max={trainingModeOptions.length - 1}
-      step={1}
-      onChange={setModeIndex}
-      disabled={disabled}
-      formatValue={() => option.label}
-      valueText={valueText}
-      stops={trainingModeOptions.map((entry) => entry.label)}
-      hint="Live-Vorschau — verändert nichts. Zum Übernehmen die Intensitäts-Leiste oben nutzen."
-    >
-      <StatChipRow aria-label="What-if-Prognose: projizierter Trainings-Zuwachs, Netto, Belastung">
-        <StatChip
-          label="Trainings-Zuwachs"
-          value={`+${formatNlNumber(projected.trainingGain, 1)} SP`}
-          sub={`${formatNlSignedNumber(trainingDelta, 1)} SP ggü. aktuell`}
-          tone="accent"
-          title="Projizierter Team-Trainings-Zuwachs, wenn alle Spieler auf diesen Modus trainierten (Summe der pro-Spieler-Prognose, potentialgewichtet)."
-        />
-        <StatChip
-          label="Potential-Decke"
-          value={`−${formatNlNumber(Math.abs(projected.ceilingLoss), 1)} SP`}
-          sub="Zuwachs über der Decke verpufft"
-          tone="risk"
-          title="Der Teil des Trainings, der bei diesem Modus NICHT im Netto landet, weil er auf Attribute nahe ihrer Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
-        />
-        <StatChip
-          label="Netto"
-          value={`${formatNlSignedNumber(projected.net, 1)} SP`}
-          sub="Training + Performance − Regression − Decke"
-          tone={projected.net >= 0 ? "good" : "risk"}
-          title="Projizierter Team-Netto-Forecast bei diesem Modus = Trainings-Zuwachs + Performance − Regression − Potential-Decke. Positiv = Kader wächst im Schnitt."
-        />
-        <StatChip
-          label="Belastung"
-          value={formatNlNumber(fatigue, 0)}
-          sub="Fatigue-Last (Verletzungsrisiko)"
-          tone="risk"
-          title="Aufsummierte Fatigue-Last dieses Modus über den Kader — höhere Intensität kostet mehr Regeneration."
-        />
-      </StatChipRow>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-        <NlDeltaChip
-          value={netDelta}
-          format={(n) => `${formatNlSignedNumber(n, 1)} SP Netto ggü. aktuell`}
-          title="Veränderung des Team-Netto-Forecasts gegenüber der aktuellen Aufstellung (kein zweiter Netto-Wert, sondern die Differenz zum Ist-Zustand)."
-        />
-        <small className="nl-tnum" style={{ color: "var(--nl-mut)" }}>
-          Regression konstant {formatNlSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig) · Decke wächst mit der Intensität
-        </small>
-      </div>
-    </NlWhatIfSlider>
+    <>
+      <tr
+        className={`nl-training-row${expanded ? " is-expanded" : ""}`}
+        data-tone={tone}
+        id={`training-player-${row.player.id}`}
+        data-testid="nl-training-player-row"
+      >
+        <td className="nl-training-row-player">
+          <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
+            <span className="nl-training-row-avatar">
+              <OptimizedMediaImage
+                className="nl-training-row-avatar-media"
+                src={portrait.previewSrc ?? portrait.src}
+                alt={`${row.player.name} Portrait`}
+                fallbackLabel={portrait.initials || getInitials(row.player.name)}
+                onErrorClassName="nl-training-row-avatar-media"
+                loading="lazy"
+              />
+            </span>
+          </FoundationPlayerPortraitPreview>
+          <span className="nl-training-row-copy">
+            {onOpenPlayerDetails ? (
+              <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
+                <button
+                  type="button"
+                  className="nl-training-row-name-button"
+                  data-testid="training-player-profile-button"
+                  title={`${row.player.name} Profil öffnen`}
+                  onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
+                >
+                  {row.player.name}
+                </button>
+              </FoundationPlayerPortraitPreview>
+            ) : (
+              <strong className="nl-training-row-name">{row.player.name}</strong>
+            )}
+            <small
+              className="nl-training-row-sub"
+              title={
+                trainsOtherClass
+                  ? `Klasse ${row.player.className} — trainiert aktuell als ${currentTrainingClassLabel} (Trainingsklasse, nicht Statprofil).`
+                  : `Klasse ${row.player.className} — trainiert die eigene Klasse.`
+              }
+            >
+              {row.player.className}
+              {trainsOtherClass ? ` · trainiert ${currentTrainingClassLabel}` : " · aktiv"}
+              {row.roleTag ? ` · ${row.roleTag}` : ""}
+            </small>
+          </span>
+        </td>
+        <td className="nl-training-row-modes">
+          <span
+            className="nl-training-row-seg"
+            role="radiogroup"
+            aria-label={`Trainingsintensität für ${row.player.name}`}
+          >
+            {projection.map((entry) => (
+              <button
+                type="button"
+                key={`row-mode-${row.player.id}-${entry.mode}`}
+                className={`nl-training-row-seg-btn${entry.isCurrent ? " is-current" : ""}${
+                  demandMode === entry.mode && !entry.isCurrent ? " is-demand" : ""
+                }`}
+                role="radio"
+                aria-checked={entry.isCurrent}
+                disabled={trainingModeReadOnly}
+                onClick={() => onSetTrainingMode(row.player.id, entry.mode as PlayerTrainingMode)}
+                title={`${entry.label} wählen · Netto ${formatNlSignedNumber(entry.net, 1)} SP = Training +${formatNlNumber(entry.trainingGain, 1)}${entry.performanceGain ? ` + Performance +${formatNlNumber(entry.performanceGain, 1)}` : ""} − Regression ${formatNlNumber(Math.abs(entry.regression), 1)} − Potential-Decke ${formatNlNumber(entry.ceilingLoss, 1)} · Fatigue-Last ${formatNlNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)}${
+                  demandMode === entry.mode && demand ? ` · Spielerwunsch (${demand.label})` : ""
+                }`}
+              >
+                <span className="nl-training-row-seg-mode">{MODE_SHORT_LABEL[entry.mode as PlayerTrainingMode] ?? entry.label}</span>
+                <span className="nl-training-row-seg-gain nl-tnum">+{formatNlNumber(entry.trainingGain, 1)}</span>
+              </button>
+            ))}
+          </span>
+          {demandMode ? (
+            <small className="nl-training-row-demand" title={demand ? `${demand.label} — ${demand.detail}` : undefined}>
+              will {getTrainingModePresentation(demandMode).label}
+            </small>
+          ) : null}
+        </td>
+        <td className="nl-training-row-net">
+          <NlDeltaChip
+            value={net}
+            format={(n) => `${formatNlSignedNumber(n, 1)} SP`}
+            title="Netto-Forecast über die Saison: Training + Performance − Regression über alle 12 Attribute. Begründung in der aufgeklappten Zeile."
+          />
+          <span className="nl-training-row-netbar" aria-hidden="true">
+            <span
+              className={`nl-training-row-netbar-fill${net < 0 ? " is-risk" : " is-good"}`}
+              style={{ width: `${Math.max(netBarPct, net === 0 ? 0 : 3)}%` }}
+            />
+          </span>
+        </td>
+        <td className="nl-training-row-load">
+          <NlFatigueGauge
+            value={row.player.fatigue}
+            className="nl-training-row-fatigue"
+            title={`Fatigue ${formatNlNumber(row.player.fatigue, 0)}/100 · Verletzungsrisiko bei ${row.modeConfig.label}: ${row.modeConfig.fatigueRisk}. ${row.fatigueWarning}`}
+          />
+          <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(tone)}>
+            {getToneBadgeLabel(tone)}
+          </span>
+        </td>
+        <td className="nl-training-row-suggest">
+          {suggestsSwitch && bestClass ? (
+            <span
+              className="nl-training-chip is-class-suggest"
+              data-testid="training-class-suggestion"
+              title={`Beste Klasse laut Schätzung: ${bestClass.label} (Netto ca. ${formatNlSignedNumber(bestClass.netComparableGain, 1)} SP statt ${formatNlSignedNumber(currentClass?.netComparableGain ?? net, 1)} SP als ${currentTrainingClassLabel}). Details und Auswahl in der aufgeklappten Klassenliste.`}
+            >
+              <NlTrainingGlyph kind="signature" /> Vorschlag: {bestClass.label}
+            </span>
+          ) : (
+            <span
+              className="nl-training-chip is-neutral"
+              title={
+                bestClass && bestClass.isCurrent
+                  ? `${currentTrainingClassLabel} ist laut Schätzung bereits die beste Trainingsklasse für diesen Spieler.`
+                  : `Keine Klasse verspricht deutlich mehr als ${currentTrainingClassLabel} (Unterschied unter 0,3 SP) — Wechsel lohnt aktuell nicht.`
+              }
+            >
+              {currentTrainingClassLabel} passt
+            </span>
+          )}
+        </td>
+        <td className="nl-training-row-expand">
+          <button
+            type="button"
+            className="nl-training-row-expander"
+            aria-expanded={expanded}
+            onClick={onToggleExpanded}
+            title="Alle Klassen mit Stat-Vorschau, Attribut-Forecast und Herleitung auf-/zuklappen"
+          >
+            Alle {trainingClassOptions.length} Klassen {expanded ? "▴" : "▾"}
+          </button>
+        </td>
+      </tr>
+      {expanded ? (
+        <tr className="nl-training-detail-row" data-testid="nl-training-detail-row">
+          <td colSpan={6}>
+            <NlTrainingPlayerCard
+              row={row}
+              trainingModeReadOnly={trainingModeReadOnly}
+              trainingClassOptions={trainingClassOptions}
+              onSetTrainingClass={onSetTrainingClass}
+            />
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
@@ -1025,6 +973,13 @@ export default function TrainingCompactNewLook({
 }: TrainingCompactClientProps) {
   const trainingModeReadOnly = managementLocked;
   const [sortKey, setSortKey] = useState<TrainingSortKey>("default");
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  /**
+   * TR3 — EINE KPI-Zeile: `simulationMode` ist die What-if-Vorschau. Gesetzt ersetzt sie
+   * die Ist-Zahlen der KPI-Zeile LIVE (sichtbare Marke „Simulation"), geschrieben wird
+   * erst über den expliziten „Übernehmen"-Knopf. `null` = Ist-Zustand.
+   */
+  const [simulationMode, setSimulationMode] = useState<PlayerTrainingMode | null>(null);
   const sortedPlayerRows = useMemo(() => sortTrainingPlayerRows(playerRows, sortKey), [playerRows, sortKey]);
   const modeSegments = useMemo(
     () =>
@@ -1058,24 +1013,44 @@ export default function TrainingCompactNewLook({
     playerRows.length > 0 && playerRows.every((row) => row.mode === playerRows[0].mode) ? playerRows[0].mode : null;
 
   // Team-Vorschau je Intensität: echte, potentialgewichtete Summe der pro-Spieler-Prognose
-  // (nicht der flache Konstant-Wert) — so unterscheidet sich das Team-Budget zwischen Kadern.
+  // (`buildTrainingIntensityProjection`) — keine neue Spielmathematik. `appliedTrainingGain`
+  // läuft mit, damit die Simulation der KPI-Zeile dieselbe Semantik zeigt wie der Ist-Zustand
+  // (angewendetes Training, nicht das Roh-Budget).
   const teamProjectionByMode = useMemo(() => {
     const totals = new Map<
       PlayerTrainingMode,
-      { trainingGain: number; performanceGain: number; regression: number; ceilingLoss: number; net: number }
+      {
+        trainingGain: number;
+        appliedTrainingGain: number;
+        performanceGain: number;
+        regression: number;
+        ceilingLoss: number;
+        net: number;
+        fatigueLoad: number;
+      }
     >();
     for (const option of trainingModeOptions) {
-      totals.set(option.value, { trainingGain: 0, performanceGain: 0, regression: 0, ceilingLoss: 0, net: 0 });
+      totals.set(option.value, {
+        trainingGain: 0,
+        appliedTrainingGain: 0,
+        performanceGain: 0,
+        regression: 0,
+        ceilingLoss: 0,
+        net: 0,
+        fatigueLoad: 0,
+      });
     }
     for (const row of playerRows) {
       for (const entry of buildTrainingIntensityProjection(row, trainingModeOptions)) {
         const bucket = totals.get(entry.mode);
         if (bucket) {
           bucket.trainingGain += entry.trainingGain;
+          bucket.appliedTrainingGain += entry.appliedTrainingGain;
           bucket.performanceGain += entry.performanceGain;
           bucket.regression += entry.regression;
           bucket.ceilingLoss += entry.ceilingLoss;
           bucket.net += entry.net;
+          bucket.fatigueLoad += entry.fatigueLoad;
         }
       }
     }
@@ -1091,7 +1066,7 @@ export default function TrainingCompactNewLook({
         right.organicForecast.netSetpoints - left.organicForecast.netSetpoints,
     )[0] ?? null;
 
-  // #48 — Team-Summe für die Header-Kacheln (Performance/Trainings-Zugewinn/Regression/
+  // #48 — Team-Summe für die KPI-Zeile (Performance/Trainings-Zugewinn/Regression/
   // Potential-Decke/Netto). Aufsummiert aus den echten, bereits angewendeten Attribut-
   // Forecast-Feldern; der Netto-Wert ist die Summe der pro-Spieler `netSetpoints` (jedes
   // Attribut an seiner Potential-Decke gekappt). Weil Training/Performance/Regression VOR
@@ -1117,21 +1092,44 @@ export default function TrainingCompactNewLook({
     return { performance, training, regression, ceiling, net };
   }, [playerRows]);
 
-  // What-if-Baseline: aktuelles echtes Team-Trainingsbudget (Summe der bereits
-  // angewendeten `organicForecast.trainingSetpoints`) — Vergleichswert für die
-  // Live-Vorschau, keine neue Berechnung.
-  const currentTeamTrainingBudget = useMemo(
-    () => playerRows.reduce((sum, row) => sum + row.organicForecast.trainingSetpoints, 0),
+  // TR3 — die KPI-Zeile zeigt entweder den Ist-Zustand (`teamKpis`) oder die Simulation des
+  // gewählten Modus — in IDENTISCHER Semantik (angewendetes Training; Decke als Residuum
+  // derselben Kette). Es gibt keine zweite KPI-Reihe mehr.
+  const simulated = simulationMode ? teamProjectionByMode.get(simulationMode) ?? null : null;
+  const displayKpis = simulated
+    ? {
+        performance: simulated.performanceGain,
+        training: simulated.appliedTrainingGain,
+        regression: simulated.regression,
+        ceiling: simulated.net - (simulated.performanceGain + simulated.appliedTrainingGain + simulated.regression),
+        net: simulated.net,
+      }
+    : teamKpis;
+  const simulationLabel = simulationMode
+    ? trainingModeOptions.find((option) => option.value === simulationMode)?.label ?? simulationMode
+    : null;
+
+  const applySimulation = () => {
+    if (!simulationMode || trainingModeReadOnly) return;
+    for (const row of playerRows) {
+      onSetTrainingMode(row.player.id, simulationMode);
+    }
+    setSimulationMode(null);
+  };
+
+  // Skala für die Netto-Balken der Tabelle: |Netto| relativ zum betragsstärksten Wert des Kaders.
+  const worstAbsNet = useMemo(
+    () => playerRows.reduce((max, row) => Math.max(max, Math.abs(row.organicForecast.netSetpoints)), 0),
     [playerRows],
   );
 
-  // Hero-Zähler (#Wave2) für die 4 Header-Kacheln — reine Zähl-Animation,
-  // keine neue Berechnung (identische Summen wie `teamKpis`).
-  const animatedTeamPerformance = useCountUp(teamKpis.performance);
-  const animatedTeamTraining = useCountUp(teamKpis.training);
-  const animatedTeamRegression = useCountUp(teamKpis.regression);
-  const animatedTeamCeiling = useCountUp(teamKpis.ceiling);
-  const animatedTeamNet = useCountUp(teamKpis.net);
+  // Hero-Zähler (#Wave2) für die KPI-Kacheln — reine Zähl-Animation, keine neue
+  // Berechnung (identische Summen wie `displayKpis`; animiert auch den Ist↔Simulation-Wechsel).
+  const animatedTeamPerformance = useCountUp(displayKpis.performance);
+  const animatedTeamTraining = useCountUp(displayKpis.training);
+  const animatedTeamRegression = useCountUp(displayKpis.regression);
+  const animatedTeamCeiling = useCountUp(displayKpis.ceiling);
+  const animatedTeamNet = useCountUp(displayKpis.net);
 
   return (
     <section
@@ -1159,51 +1157,82 @@ export default function TrainingCompactNewLook({
           </div>
         }
       >
-        {/* #48 — 5 Kacheln: Performance, Trainings-Zugewinn, Regression, Potential-Decke, Netto.
-            Performance/Training/Regression summieren die angewendeten Attribut-Forecast-Felder VOR
-            der Kappung; die Potential-Decke ist der an den Attribut-Obergrenzen verpuffte Zuwachs.
-            Damit gilt exakt: Performance + Training − Regression − Decke = Netto. */}
-        <StatChipRow aria-label="Trainings-Kennzahlen: Performance, Trainings-Zugewinn, Regression, Potential-Decke, Netto">
-          <StatChip
-            label="Performance"
-            value={`+${formatNlNumber(animatedTeamPerformance ?? teamKpis.performance, 1)} SP`}
-            sub="aus Matchday-Ergebnissen"
-            tone="pow"
-            title="SP-Zuwachs aus echten Matchday-Ergebnissen (Score, Rang, Beitrag) über den ganzen Kader — unabhängig von der Trainingsintensität."
-          />
-          <StatChip
-            label="Trainings-Zugewinn"
-            value={`+${formatNlNumber(animatedTeamTraining ?? teamKpis.training, 1)} SP`}
-            sub="aus Trainingsintensität"
-            tone="accent"
-            title="SP-Zuwachs durch Training über den ganzen Kader — abhängig von Trainingsintensität (Leicht/Mittel/Hart), Potential und Facility-Boni."
-          />
-          <StatChip
-            label="Regression"
-            value={`−${formatNlNumber(Math.abs(animatedTeamRegression ?? teamKpis.regression), 1)} SP`}
-            sub="Alterung & Marktwert-Druck"
-            tone="risk"
-            title="SP-Verlust, den der Kader automatisch durch Alterung, Marktwert-Druck und Belastung verliert — muss durch Training + Performance ausgeglichen werden."
-          />
-          <StatChip
-            label="Potential-Decke"
-            value={`−${formatNlNumber(Math.abs(animatedTeamCeiling ?? teamKpis.ceiling), 1)} SP`}
-            sub="Zuwachs über der Decke verpufft"
-            tone="risk"
-            title="Der Teil des Trainings, der NICHT im Netto landet, weil er auf Attribute nahe ihrer gescouteten Potential-Obergrenze verteilt und dort abgeschnitten wird. Höhere Intensität ⇒ mehr Verpuffung."
-          />
-          <StatChip
-            label="Netto"
-            value={`${formatNlSignedNumber(animatedTeamNet ?? teamKpis.net, 1)} SP`}
-            sub="Performance + Training − Regression − Decke"
-            tone={teamKpis.net >= 0 ? "good" : "risk"}
-            title="Performance + Trainings-Zugewinn − Regression − Potential-Decke über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."
-          />
-        </StatChipRow>
+        {/* TR3 — EINE KPI-Zeile. Performance/Training/Regression summieren die angewendeten
+            Attribut-Forecast-Felder VOR der Kappung; die Potential-Decke ist das Residuum,
+            damit exakt gilt: Performance + Training − Regression − Decke = Netto. Bei aktiver
+            Simulation zeigen dieselben Kacheln die Vorschau des gewählten Modus (identische
+            Semantik) und tragen die Marke „Simulation". */}
+        <div className={`nl-training-kpiline${simulated ? " is-simulating" : ""}`} data-testid="nl-training-kpiline">
+          {simulated && simulationLabel ? (
+            <div className="nl-training-simbar" data-testid="training-simulation-flag">
+              <span className="nl-training-simflag">Simulation · alle auf {simulationLabel} — nichts übernommen</span>
+              <NlDeltaChip
+                value={displayKpis.net - teamKpis.net}
+                format={(n) => `${formatNlSignedNumber(n, 1)} SP Netto ggü. Ist`}
+                title="Differenz des Team-Netto-Forecasts zwischen der Simulation und dem aktuellen Ist-Zustand."
+              />
+              <span className="nl-training-sim-actions">
+                <button
+                  type="button"
+                  className="nl-training-inline-button is-apply"
+                  disabled={trainingModeReadOnly}
+                  onClick={applySimulation}
+                  title={`Alle ${playerRows.length} angezeigten Spieler wirklich auf ${simulationLabel} stellen.`}
+                >
+                  Übernehmen
+                </button>
+                <button
+                  type="button"
+                  className="nl-training-inline-button"
+                  onClick={() => setSimulationMode(null)}
+                  title="Simulation verwerfen — die KPI-Zeile zeigt wieder den Ist-Zustand."
+                >
+                  Verwerfen
+                </button>
+              </span>
+            </div>
+          ) : null}
+          <StatChipRow aria-label="Trainings-Kennzahlen: Performance, Trainings-Zugewinn, Regression, Potential-Decke, Netto">
+            <StatChip
+              label="Performance"
+              value={`+${formatNlNumber(animatedTeamPerformance ?? displayKpis.performance, 1)} SP`}
+              sub={simulated ? `Simulation · alle ${simulationLabel}` : "aus Matchday-Ergebnissen"}
+              tone="pow"
+              title="SP-Zuwachs aus echten Matchday-Ergebnissen (Score, Rang, Beitrag) über den ganzen Kader — unabhängig von der Trainingsintensität."
+            />
+            <StatChip
+              label="Trainings-Zugewinn"
+              value={`+${formatNlNumber(animatedTeamTraining ?? displayKpis.training, 1)} SP`}
+              sub={simulated ? `Simulation · alle ${simulationLabel}` : "aus Trainingsintensität"}
+              tone="accent"
+              title="Auf die Attribute angewendeter SP-Zuwachs durch Training über den ganzen Kader — abhängig von Trainingsintensität (Leicht/Mittel/Hart), Potential und Facility-Boni."
+            />
+            <StatChip
+              label="Regression"
+              value={`−${formatNlNumber(Math.abs(animatedTeamRegression ?? displayKpis.regression), 1)} SP`}
+              sub="Alterung & Marktwert-Druck"
+              tone="risk"
+              title="SP-Verlust, den der Kader automatisch durch Alterung, Marktwert-Druck und Belastung verliert — muss durch Training + Performance ausgeglichen werden. Intensitätsunabhängig."
+            />
+            <StatChip
+              label="Potential-Decke"
+              value={`${formatNlSignedNumber(animatedTeamCeiling ?? displayKpis.ceiling, 1)} SP`}
+              sub="Decken-Kappung ± Spillover"
+              tone={displayKpis.ceiling < 0 ? "risk" : "neutral"}
+              title="Restglied der Kette: Netto − (Performance + Training − Regression). Negativ = Zuwachs verpufft an den Potential-Obergrenzen; positiv = Spillover auf Nebenstats hat mehr aufgefangen als die Decke gekappt hat. Damit gilt exakt: Performance + Training − Regression + Decke = Netto."
+            />
+            <StatChip
+              label="Netto"
+              value={`${formatNlSignedNumber(animatedTeamNet ?? displayKpis.net, 1)} SP`}
+              sub="Performance + Training − Regression ± Decke"
+              tone={displayKpis.net >= 0 ? "good" : "risk"}
+              title="Team-Netto-Forecast über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."
+            />
+          </StatChipRow>
+        </div>
         <p className="nl-training-topline">
           Regeneration Ø {formatNlNumber(summary.recoveryBeforeTraining, 1)} → {formatNlNumber(summary.recoveryAfterTraining, 1)} ·
-          Leicht {summary.lightModeCount} · Hart {summary.hardModeCount} · Top:{" "}
-          <strong>{topGrowth?.player.name ?? "—"}</strong>
+          Top: <strong>{topGrowth?.player.name ?? "—"}</strong>
           {topGrowth ? ` (${formatNlSignedNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Risiko:{" "}
           <strong>{topRisk?.player.name ?? "—"}</strong>
           {topRisk ? ` (Druck ${formatNlNumber(topRisk.forecast.regressionPressure, 0)})` : ""} ·{" "}
@@ -1224,53 +1253,32 @@ export default function TrainingCompactNewLook({
             {developmentSummary.regression} Risiko
           </button>
         </p>
-        {managementLockedReason ? <p className="nl-training-locked">{managementLockedReason}</p> : null}
-      </NlCard>
-
-      <NlCard
-        className="nl-training-global-card"
-        eyebrow="Team-Intensität"
-        title="Alle Spieler auf einen Modus"
-        data-testid="training-global-mode-rail"
-      >
-        <VeloIntensityRail
-          ariaLabel="Trainingsmodus für alle Spieler"
-          segments={modeSegments}
-          activeValue={uniformTeamMode ?? ""}
-          disabled={trainingModeReadOnly}
-          onSelect={(value) => {
-            playerRows.forEach((row) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode));
-          }}
-        />
-        <div className="nl-training-team-preview" aria-label="Team-Effekt Vorschau">
-          <small>
-            Aktuell: Leicht {teamModeCounts.leicht} · Mittel {teamModeCounts.mittel} · Hart {teamModeCounts.hart}
-          </small>
-          {trainingModeOptions.map((option) => {
-            const team = teamProjectionByMode.get(option.value);
-            return (
-              <small key={`team-preview-${option.value}`} className="nl-tnum">
-                Alle {option.label}: +{formatNlNumber(team?.trainingGain ?? option.trainingSetpoints * playerRows.length, 1)}{" "}
-                durch Training{" "}
-                {team && team.performanceGain ? `+ ${formatNlNumber(team.performanceGain, 1)} Performance ` : ""}
-                − {formatNlNumber(Math.abs(team?.regression ?? 0), 1)} Regression − {formatNlNumber(team?.ceilingLoss ?? 0, 1)}{" "}
-                Decke · Netto {formatNlSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
-                {formatNlNumber(option.fatigueLoad * playerRows.length, 0)}
-              </small>
-            );
-          })}
-        </div>
-        <div className="nl-training-team-preview" style={{ marginTop: "12px" }}>
-          <NlTrainingWhatIf
-            trainingModeOptions={trainingModeOptions}
-            teamProjectionByMode={teamProjectionByMode}
-            squadSize={playerRows.length}
-            baselineNet={teamKpis.net}
-            baselineTrainingBudget={currentTeamTrainingBudget}
-            regressionTotal={teamKpis.regression}
+        {/* Team-Intensität als Vorschau-Schalter (TR3): Klick simuliert, „Übernehmen" schreibt. */}
+        <div className="nl-training-mode-block" data-testid="training-global-mode-rail">
+          <div className="nl-training-mode-head">
+            <span className="nl-training-mode-title">Alle auf einen Modus — erst Vorschau, dann übernehmen</span>
+            <small className="nl-training-mode-counts nl-tnum">
+              Aktuell: Leicht {teamModeCounts.leicht} · Mittel {teamModeCounts.mittel} · Hart {teamModeCounts.hart}
+            </small>
+          </div>
+          <VeloIntensityRail
+            ariaLabel="Trainingsmodus für alle Spieler simulieren"
+            segments={modeSegments}
+            activeValue={simulationMode ?? uniformTeamMode ?? ""}
             disabled={trainingModeReadOnly}
+            onSelect={(value) => {
+              // Vorschau, kein Schreibzugriff: erst „Übernehmen" ruft die echten Handler.
+              setSimulationMode(value === uniformTeamMode ? null : (value as PlayerTrainingMode));
+            }}
           />
+          <small className="nl-training-mode-hint">
+            Klick zeigt die Vorschau in der KPI-Zeile oben (Marke „Simulation") — verändert nichts, bis du übernimmst.
+            {playerRows.length !== allPlayerCount
+              ? ` Gilt für die ${playerRows.length} gefilterten von ${allPlayerCount} Spielern.`
+              : ""}
+          </small>
         </div>
+        {managementLockedReason ? <p className="nl-training-locked">{managementLockedReason}</p> : null}
       </NlCard>
 
       <div className="nl-training-filter-row" id="training-development-filters" role="group" aria-label="Entwicklungsfilter">
@@ -1314,20 +1322,51 @@ export default function TrainingCompactNewLook({
           action={onOpenTeams ? { label: "Teams öffnen", onClick: onOpenTeams } : undefined}
         />
       ) : (
-        <div className="nl-training-grid">
-          {sortedPlayerRows.map((row) => (
-            <NlTrainingPlayerCard
-              key={row.entryId}
-              row={row}
-              trainingModeReadOnly={trainingModeReadOnly}
-              trainingModeOptions={trainingModeOptions}
-              trainingClassOptions={trainingClassOptions}
-              onSetTrainingMode={onSetTrainingMode}
-              onSetTrainingClass={onSetTrainingClass}
-              onOpenPlayerDetails={onOpenPlayerDetails}
-            />
-          ))}
-        </div>
+        <NlCard className="nl-training-table-card" data-testid="nl-training-table-card">
+          <div className="nl-training-table-scroll">
+            <table className="nl-training-table" data-testid="nl-training-table">
+              <thead>
+                <tr>
+                  <th scope="col">Spieler</th>
+                  <th scope="col" title="Trainingsintensität — die tägliche Entscheidung. Zahl = erwarteter Trainings-Zuwachs (SP) bei dieser Stufe.">
+                    Intensität
+                  </th>
+                  <th scope="col" title="Netto-Forecast über die Saison: Training + Performance − Regression. Balkenlänge = |Netto| relativ zum betragsstärksten Wert des Kaders.">
+                    Netto / Saison
+                  </th>
+                  <th scope="col" title="Aktuelle Fatigue (0–100) und Entwicklungs-Tendenz.">
+                    Belastung
+                  </th>
+                  <th scope="col" title="Beste Trainingsklasse laut Schätzung — Details in der aufgeklappten Klassenliste.">
+                    Klassen-Vorschlag
+                  </th>
+                  <th scope="col">
+                    <span className="nl-training-table-sr">Details</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPlayerRows.map((row) => (
+                  <NlTrainingPlayerRow
+                    key={row.entryId}
+                    row={row}
+                    worstAbsNet={worstAbsNet}
+                    expanded={expandedEntryId === row.entryId}
+                    onToggleExpanded={() =>
+                      setExpandedEntryId((current) => (current === row.entryId ? null : row.entryId))
+                    }
+                    trainingModeReadOnly={trainingModeReadOnly}
+                    trainingModeOptions={trainingModeOptions}
+                    trainingClassOptions={trainingClassOptions}
+                    onSetTrainingMode={onSetTrainingMode}
+                    onSetTrainingClass={onSetTrainingClass}
+                    onOpenPlayerDetails={onOpenPlayerDetails}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </NlCard>
       )}
     </section>
   );
