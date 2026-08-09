@@ -805,11 +805,25 @@ function formatFormCardColorLabel(color: LegacyFormCardOption["color"]) {
 
 const formCardColorOrder: LegacyFormCardOption["color"][] = ["red", "green", "blue", "yellow"];
 
+/**
+ * GEMELDET VON CHRIS: „in der einsatzliste sind die farben von pow spe men soc beim dropdown
+ * der formkarten weg bitte wieder hinuzfügen"
+ *
+ * Die Farbe war nie weg — sie kam nur nie an. Alle vier Bereiche trugen DENSELBEN neutralen
+ * Punkt `●`, und die Farbe hing allein an `style={{ color }}` der `<option>`. Genau das ist
+ * die eine CSS-Eigenschaft, die native Auswahlmenüs nicht mitmachen: Chrome und Safari auf
+ * macOS zeichnen das Aufklappmenü über das Betriebssystem und ignorieren die Angabe. Übrig
+ * blieben vier identische graue Punkte.
+ *
+ * Farbige Emoji-Kreise tragen ihre Farbe im Zeichen selbst und überleben deshalb jedes
+ * native Menü. Die `color`-Angabe bleibt zusätzlich stehen — wo sie wirkt (Firefox, Linux),
+ * färbt sie weiterhin die ganze Zeile.
+ */
 const formCardColorIcon: Record<LegacyFormCardOption["color"], string> = {
-  red: "●",
-  green: "●",
-  blue: "●",
-  yellow: "●",
+  red: "🔴",
+  green: "🟢",
+  blue: "🔵",
+  yellow: "🟡",
 };
 
 // Bereichs-Hex der Formkarten (POW=rot, SPE=grün, MEN=blau, SOC=gelb) — identisch zu

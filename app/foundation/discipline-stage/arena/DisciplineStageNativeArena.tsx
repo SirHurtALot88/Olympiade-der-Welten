@@ -3247,11 +3247,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   };
 
   return (
-    // `alignItems: stretch` (statt flex-start): die Ladder-Spalte rechts bekommt
-    // dieselbe Hoehe wie die Arena-Hauptspalte links, statt nur so hoch zu sein wie
-    // ihr Inhalt. Zusammen mit der abgeleiteten Zeilenhoehe (LADDER_ROW_H) endet die
-    // Tabelle damit in jeder Disziplin buendig mit der Arena.
-    <div style={{ display: "flex", gap: 14, alignItems: "stretch", flexWrap: "wrap" }}>
+    /**
+     * GEMELDET VON CHRIS: „climbing bitte gleiche höhe wie die tabelle rechts daneben -
+     * das gilt für alle disziplinen das soll auf einer linie sein"
+     *
+     * Hier stand `alignItems: "stretch"` mit der Absicht, die Ladder auf die Hoehe der
+     * Arena zu bringen. Genau das hat die Messung aber zirkulaer gemacht:
+     *
+     *   Ladder-Hoehe  ←  gemessene Hoehe der Hauptspalte
+     *   Hauptspalte    ←  (stretch) Hoehe der Zeile
+     *   Zeile          ←  die HOEHERE von beiden
+     *
+     * Beim ersten Bild ist `ladderMaxH` noch null, die Ladder also so hoch wie ihr
+     * Inhalt (Kopf + N Zeilen a 25px Rueckfallwert, s. LADDER_ROW_H). Ist sie damit
+     * hoeher als die Arena, zieht `stretch` die HAUPTSPALTE auf dieses Mass — und der
+     * ResizeObserver misst anschliessend nicht mehr die Arena, sondern die aufgeblasene
+     * Spalte. Der Zustand rastet ein: beide Kaesten sind gleich hoch, aber die Arena hat
+     * unten tote Flaeche, weil ihr Inhalt dort laengst zu Ende ist. Sichtbar wird das
+     * als „das Feld steht nicht auf einer Linie mit der Tabelle".
+     *
+     * `flex-start` bricht den Kreis: die Hauptspalte ist wieder so hoch wie ihr Inhalt,
+     * und genau das misst der Observer. Die Ladder bekommt ihre Hoehe ohnehin explizit
+     * ueber `height: ladderMaxH` — dafuer war `stretch` nie noetig, es hat nur die
+     * Messgrundlage verdorben.
+     */
+    <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
       <style>{`
         @keyframes olyFlash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
         @keyframes olyShakeHard{0%,100%{transform:translate(0,0)}15%{transform:translate(-5px,3px)}30%{transform:translate(4px,-4px)}45%{transform:translate(-4px,2px)}60%{transform:translate(3px,-2px)}80%{transform:translate(-2px,1px)}}

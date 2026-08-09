@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
+      "text": "Das Disziplin-Feld und die Rangliste daneben enden wieder auf einer Linie: die Höhenmessung war zirkulär — die Tabelle richtete sich an der Arena aus, während die Arena über das Flex-Layout auf die Höhe der Tabelle gedehnt wurde, was in Disziplinen mit langer Rangliste unter dem Feld tote Fläche stehen ließ.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Überall · Statuszeile",
       "pr": null,
       "text": "Der Preseason-Banner zeigte unter „Grund anzeigen“ rohe Enum-Codes wie „roster_after_market_plan_below_player_min“ — auf jeder Seite. Alle Blocker-Codes sind jetzt deutsche Klartextsätze, ein unbekannter Code bekommt künftig einen lesbaren Ersatztext statt durchzurutschen, und „482 Setup-Aktionen“ heißt jetzt „Team-Einstellungen“.",
@@ -116,6 +125,15 @@
       "text": "Der Apron-Ausweis nennt jetzt Namen: In der Karte Apron & Kredite steht neu die Liste Apron liga-weit — wer zahlt, wer bekommt. Vorher hieß es nur 28 Zahler · 3 Empfänger · Topf 428,7 — jetzt steht jedes Team mit Ligarang, geglätteter Bemessungsgrundlage, Abstand zur 1. Linie und dem Betrag da, den es nach der Hochrechnung zahlt (rot, mit Deckel-Marke, wenn der Deckel die Abgabe begrenzt) oder bekommt (grün). Dein Team ist hervorgehoben und immer sichtbar. Damit es ein Game bleibt und kein Excel, zeigt die Liste zuerst die Extreme — größte Zahler, dein Team, alle Empfänger — und der Aufklapp-Knopf trägt die Zwischensumme der übrigen Zahler, damit die Rechnung auch zugeklappt aufgeht. Die Summenprobe steht im Klartext darüber: was die Zahler einzahlen, was die Empfänger daraus erhalten, und was wegen des Empfänger-Deckels verfällt — es wird nie mehr ausgeschüttet als eingesammelt. Alles aus derselben Hochrechnung wie die Karte selbst, nichts neu gerechnet.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Einsatzliste · Formkarten",
+      "pr": null,
+      "text": "Die Bereichsfarben (POW/SPE/MEN/SOC) sind im Formkarten-Dropdown wieder zu sehen: bisher trugen alle vier denselben grauen Punkt und die Farbe hing allein an einer CSS-Angabe, die native Auswahlmenüs in Chrome und Safari ignorieren — jetzt steht ein farbiger Kreis im Text selbst, der jedes Betriebssystem-Menü übersteht.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
