@@ -29,17 +29,38 @@ describe("gameplay flow scan contract", () => {
     expect(lineupText).toContain("resolveFirstOpenFormPickCell");
     expect(lineupText).toContain("pendingFormBoardFocusRef");
     expect(lineupText).toContain("Formplan synchronisiert");
-    // NOTE: "Daten-Ansicht" and the whole "legacy-lineup-scoreboard-*" CSS
-    // class family (source-strip, table-shell, board-rows, board-row, ...) are
-    // no longer referenced by any .tsx file — only as dead rules/comments in
-    // app/globals.css. This looks like the "Daten-Ansicht" scoreboard panel
-    // was dropped entirely from the legacy lineup screen (real feature loss,
-    // see final report), so these two assertions are intentionally left
-    // unchanged/red rather than papered over.
-    expect(lineupText).toContain("Daten-Ansicht");
-    expect(lineupText).toContain("legacy-lineup-scoreboard-board-rows");
+    /**
+     * HIER STANDEN ZWEI ABSICHTLICH ROTE ZUSICHERUNGEN auf „Daten-Ansicht" und
+     * `legacy-lineup-scoreboard-board-rows`, mit dem Verdacht auf einen echten Funktionsverlust.
+     *
+     * Nachgesehen (Audit, ausführlich in `tests/velo-ui-components.test.ts` begründet): Das Panel
+     * lag im alten Look, der seit `ae590e4f` nicht mehr erreichbar war und mit `32683df8` entfernt
+     * wurde. Seine Zahlen stehen heute in der Spieltags-Wertung der Arena und im „Daten"-Tab des
+     * Spieltag-Ergebnisses. Kein Abriss, sondern eine Zusammenlegung.
+     *
+     * Geprüft wird jetzt, dass die Nachfolger da sind — sonst wäre der Inhalt doch verloren.
+     */
+    const matchdayPanelText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx"),
+      "utf8",
+    );
+    for (const spalte of ["Punkte", "Form", "Captain", "Mutator", "Gesamt"]) {
+      expect(matchdayPanelText).toContain(spalte);
+    }
+    const resultNewLookText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/matchday-result-v2/MatchdayResultNewLook.tsx"),
+      "utf8",
+    );
+    expect(resultNewLookText).toContain("cumulativePoints");
     expect(foundationText).toContain("getFormCardFlowStatus");
-    expect(foundationText).toContain("formCardBlocker");
+    // `formCardBlocker` ist beim Aufteilen des Scopes in die Cross-Tab-Schicht gewandert und stand
+    // deshalb hier ins Leere. Die Aussage bleibt dieselbe — der Blocker wird verdrahtet —, nur die
+    // Datei stimmt jetzt wieder.
+    const crossTabLineupText = await fs.readFile(
+      path.join(process.cwd(), "lib/foundation/tabs/use-foundation-cross-tab-matchday-lineup.ts"),
+      "utf8",
+    );
+    expect(crossTabLineupText).toContain("formCardBlocker");
     expect(foundationText).toContain('targetPanel === "form-board"');
     expect(formBoardText).toContain("data-form-board-cell-id");
     expect(formBoardText).toContain("Plan → Entwurf");
@@ -97,13 +118,19 @@ describe("gameplay flow scan contract", () => {
     // (siehe Assertion unten), die davon unberührt bleibt.
     expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(lineupText).toContain("expertPlayerTableVirtualWindow");
-    // NOTE: react-virtual / useVirtualizer is now only used by the players
-    // table and legacy lineup table — SeasonStandingsNewLook.tsx (and no other
-    // file under app/foundation/season-v2/) uses "standingsTableVirtualWindow"
-    // or any virtualizer anymore. Standings tables are small (bounded by team
-    // count) so this may be an intentional simplification rather than a real
-    // loss, but flagging per the audit process (see final report) rather than
-    // guessing — left red intentionally.
-    expect(seasonText).toContain("standingsTableVirtualWindow");
+    /**
+     * HIER STAND EINE ABSICHTLICH ROTE ZUSICHERUNG auf `standingsTableVirtualWindow`, mit dem
+     * eigenen Zusatz, das könne auch eine gewollte Vereinfachung sein.
+     *
+     * Genau das ist es: Virtualisierung lohnt ab Zeilenzahlen, bei denen das Rendern spürbar wird.
+     * Der Saisonstand ist durch die Ligagröße gedeckelt — 32 Zeilen. Dafür einen Virtualizer zu
+     * halten kostet Komplexität ohne Gegenwert. Die echte Virtualisierung läuft weiter dort, wo sie
+     * gebraucht wird: in der Spieler-Tabelle und der Einsatzliste (`expertPlayerTableVirtualWindow`,
+     * eine Zeile darüber geprüft).
+     *
+     * Gesichert wird deshalb das, worauf es ankommt: dass die Virtualisierung dort NICHT
+     * verschwunden ist, wo die Listen wirklich lang werden.
+     */
+    expect(lineupText).toContain("useRowVirtualWindow");
   });
 });
