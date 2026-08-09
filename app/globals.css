@@ -74057,6 +74057,66 @@ span.nl-facility-ampel-chip {
   margin-top: var(--nl-s3);
 }
 
+/* --- Brackets links, Filter rechts (unter den Kennzahl-Kacheln) ------------ */
+/* Der Filter stand vorher als eigene Karte unter dem Bracket-Block und schob die
+   Spielerliste weit nach unten, während neben den Balken Platz frei blieb.
+   `minmax(0, …)` in beiden Spalten: ohne das erzwingt der Inhalt (breite
+   Select-Felder, lange Preset-Namen) eine Mindestbreite und sprengt das Raster. */
+.is-new-look .nl-players-brackets-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-players-brackets-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  min-width: 0;
+}
+
+/* Eingebettet: kein eigener Rahmen, keine eigene Fläche — die umgebende Karte
+   bringt beides schon mit. Nur eine linke Kante trennt die beiden Spalten. */
+.is-new-look .nl-pquery-embedded {
+  min-width: 0;
+  margin-top: 0;
+  padding-left: var(--nl-s4);
+  border-left: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-pquery-embedded-eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-pquery-embedded-title {
+  margin: 0 0 var(--nl-s3);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+/* Schmaler Bildschirm: wieder untereinander, sonst quetschen sich Balken und
+   Filter-Felder gegenseitig unlesbar. Die trennende Kante wandert nach oben. */
+@media (max-width: 1200px) {
+  .is-new-look .nl-players-brackets-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .is-new-look .nl-pquery-embedded {
+    padding-left: 0;
+    padding-top: var(--nl-s3);
+    border-left: 0;
+    border-top: 1px solid var(--nl-line);
+  }
+}
+
 .is-new-look .nl-pquery-builder {
   display: flex;
   flex-wrap: wrap;

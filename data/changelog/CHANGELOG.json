@@ -300,6 +300,15 @@
     },
     {
       "datum": "2026-08-08",
+      "seite": "Spieler · Verzeichnis",
+      "pr": null,
+      "text": "Der Filter „Bedingungen\" stand als eigene Karte unter den Marktwert-Balken und schob die Spielerliste weit nach unten, obwohl daneben Platz frei war. Jetzt liegt er rechts neben den Balken, direkt unter den Kennzahl-Kacheln. Auf schmalen Bildschirmen rutscht er wieder darunter.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
       "seite": "Spieler",
       "pr": null,
       "text": "Die Namensspalte bleibt beim horizontalen Scrollen stehen — vorher standen Zahlen ohne Spielernamen da. Die vier Spalten-Presets sind jetzt eine sichtbare Reiterleiste über der Tabelle statt im Spalten-Menü versteckt, dazu ein neuer fünfter Reiter Saison, der genau die am Spieltag 1 noch leeren Spalten (PPs, MVS, Einsätze) bündelt. Diese Spalten bleiben sichtbar (Chris' Regel: erklären statt verstecken), verlieren aber ihre laute rote/blaue Spaltenfläche, solange die ganze Liga noch bei 0 steht — ein Tooltip erklärt, dass sie sich ab Spieltag 1 füllen. Eine Legende unter der Tabelle erklärt die Abkürzungen einmal sichtbar.",
