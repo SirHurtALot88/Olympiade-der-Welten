@@ -1579,15 +1579,29 @@ export type SponsorPayoutLogRecord = {
 };
 
 /**
- * APRON — die zu SAISONBEGINN eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+ * APRON — die beim SCHLIESSEN DES KAUFFENSTERS eingefrorenen Gehaltslinien (siehe
+ * lib/season/apron-service.ts und `freezeApronLinesAtBuyWindowClose` in apron-settlement-service.ts).
  * Bewusst NICHT am Saisonende berechnet: sonst kauft man blind gegen eine Grenze, die sich durch die
- * eigenen Käufe verschiebt. `medianSalary`/`line1`/`line2` sind fix für die gesamte Saison, egal wie
- * sich die Gehälter danach noch verschieben (Verletzungsersatz, Nachverpflichtungen etc.).
+ * eigenen Käufe verschiebt. Und bewusst NICHT mehr am Ende des Preseason-Workflows: das Kauffenster
+ * der neuen Saison öffnet ERST DANACH — eine dort eingefrorene Linie misst die ausgedünnten
+ * Nach-Verkaufs-Kader und gilt dann für eine Liga, die es so nicht mehr gibt (gemessener Schaden:
+ * Median 45,0 eingefroren, Liga-Median nach dem Fenster 63,9 → 29 von 32 Teams über der Linie,
+ * 3 Empfänger teilen 428,7). `medianSalary`/`line1`/`line2` sind ab dem Einfrieren fix für die
+ * gesamte Saison, egal wie sich die Gehälter danach noch verschieben (Verletzungsersatz etc.).
  */
 export type ApronLinesSnapshot = {
   seasonId: string;
   frozenAtMatchdayId: string;
   createdAt: string;
+  /**
+   * "buy_window_close" = beim Schließen des Kauffensters eingefroren (erste Wertung des ersten
+   * Spieltags — der einzige Zeitpunkt, den der Code seit dem Timing-Fix schreibt). Fehlt das Feld,
+   * stammt der Snapshot von einem älteren Stand, der VOR dem Kauffenster der Saison einfror
+   * (Preseason-Workflow/New-Game); solche verfrühten Snapshots ersetzt
+   * `freezeApronLinesAtBuyWindowClose` genau einmal, wenn das Fenster nachweislich erst jetzt
+   * schließt — danach ist auch dieser Snapshot unantastbar.
+   */
+  frozenAtEvent?: "buy_window_close";
   medianSalary: number;
   line1: number;
   line2: number;
@@ -2511,6 +2525,48 @@ export type TeamDisciplineRankSnapshotRecord = {
   };
 };
 
+/**
+ * HERKUNFTSVERMERK der Teamstärke-Ränge im Saison-Schnappschuss.
+ *
+ * GEMELDET VON CHRIS: „die snapshots für die ranking änderungen [müssen] sich auf den season 1 lauf
+ * beziehen vor verkäufen! … da ist N-N zb 32. das kann nicht der stand während der saison gewesen
+ * sein". Befund: `buildSeasonSnapshotRecord` rechnete die Ränge beim Saisonabschluss aus dem
+ * LIVE-Kader — der lag im echten Spielstand vier Tage nach dem letzten Spieltag, nach 49 Verkäufen.
+ *
+ * Deshalb steht am Datensatz jetzt, WOHER die Ränge stammen:
+ *   - `matchday_capture`: bei der Wertung des letzten Spieltags festgehalten (der Soll-Weg),
+ *   - `season_end_live`: Rückfall für Altstände ohne festgehaltenen Satz — Live-Kader beim
+ *     Saisonabschluss, also potenziell nach Verkäufen,
+ *   - `transfer_history_reconstruction`: rückwirkend aus der Transferhistorie rekonstruiert
+ *     (scripts/repariere-s1-teamstaerke-snapshot.ts).
+ */
+export type TeamDisciplineRankSnapshotMeta = {
+  source: "matchday_capture" | "season_end_live" | "transfer_history_reconstruction";
+  /** Spieltag, dessen Kaderstand die Ränge abbilden (bei `season_end_live` null). */
+  matchdayId?: string | null;
+  /** Zeitpunkt, zu dem der Kaderstand galt bzw. festgehalten wurde. */
+  capturedAt?: string | null;
+  note?: string | null;
+};
+
+/**
+ * Bei jeder Spieltagswertung festgehaltene Teamstärke-Ränge — der jeweils letzte gewinnt.
+ *
+ * Ein Eintrag pro Saison (Upsert über `seasonId`). Der Saison-Schnappschuss übernimmt diesen Satz,
+ * statt beim Saisonabschluss neu aus dem Live-Kader zu rechnen — zwischen letztem Spieltag und
+ * Abschluss liegen sonst Verkäufe/Vertragsenden, die die Saisonränge verfälschen (siehe
+ * TeamDisciplineRankSnapshotMeta). Muster: matchdayResolveSnapshots, nur pro Saison statt pro
+ * Spieltag. Einträge vergangener Saisons bleiben als kleines Audit-Archiv stehen.
+ */
+export type TeamStrengthRankCaptureRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  capturedAt: string;
+  records: TeamDisciplineRankSnapshotRecord[];
+};
+
 export type SeasonSnapshotRecord = {
   snapshotId?: string;
   seasonId: string;
@@ -2524,6 +2580,8 @@ export type SeasonSnapshotRecord = {
   teamSnapshots?: SeasonSnapshotTeamRecord[];
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
+  /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
+  teamDisciplineRankSnapshotMeta?: TeamDisciplineRankSnapshotMeta;
   matchdayResults?: MatchdayResultRecord[];
   disciplineResults?: DisciplineResultRecord[];
   playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];
@@ -2966,6 +3024,12 @@ export type SeasonState = {
    * beim Schreiben ersetzt, damit der Save nicht mit Vorschauen zulaeuft.
    */
   matchdayResolveSnapshots?: MatchdayResolveSnapshotRecord[];
+  /**
+   * Teamstärke-Ränge, festgehalten bei der Wertung eines Spieltags (Standings-Apply) — ein Eintrag
+   * pro Saison, der jeweils letzte Spieltag gewinnt. Quelle der `teamDisciplineRankSnapshots` im
+   * Saison-Schnappschuss; siehe TeamStrengthRankCaptureRecord.
+   */
+  teamStrengthRankCaptures?: TeamStrengthRankCaptureRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
   /**
    * NUR ANZEIGEFRACHT, NIEMALS QUELLE. Schlanke Fassung der abgeschlossenen Saisons fuer den

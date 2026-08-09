@@ -12047,7 +12047,8 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-radius: var(--nl-r-pill);
   border: 1px solid color-mix(in srgb, var(--nl-risk) 62%, transparent);
   background: color-mix(in srgb, var(--nl-risk) 16%, transparent);
-  color: var(--nl-risk);
+  /* Text auf Risk-Tint → Lesbarkeits-Stufe (G4: roher Risk-Ton maß 4,09:1). */
+  color: var(--nl-risk-text, var(--nl-risk));
   font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -38246,6 +38247,10 @@ button.market-v2-bucket-card.is-selected {
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
+  /* Bronze als TEXT — siehe Token-Block im "Neuer Look" (--nl-bronze-text dort): rohes Bronze
+     misst als Schrift bis 3,58:1. Hier gespiegelt, weil die Portrait-Karten-Regeln unten auch
+     AUSSERHALB von .is-new-look gelten. */
+  --nl-bronze-text: color-mix(in srgb, var(--nl-bronze) 62%, #ffffff);
   --nl-diamond: #7fe6f5;
 }
 
@@ -38522,6 +38527,14 @@ button.market-v2-bucket-card.is-selected {
   color: var(--nl-star-tone);
 }
 
+/* Bronze ist das einzige Metall, das als SCHRIFT unter 4,5:1 fällt (gemessen 3,58:1 am
+   8px-OVR-Label der Teams-Ansicht; Silber/Gold/Diamant liegen auf demselben Grund bei
+   7,1–7,8:1) — darum bekommt nur Bronze die Text-Stufe. Rahmen/Ring der Kachel bleiben
+   im rohen Bronze, die Metall-Identität bleibt sichtbar. */
+.foundation-player-portrait-stat.is-star-tier-bronze small {
+  color: var(--nl-bronze-text, #e0b080);
+}
+
 /* --- Star-Tier an den Rang-Chips der Spielertabelle ---------------------- */
 .is-new-look .nl-ptable-metric-rank.is-star-tier-bronze {
   --nl-star-tone: var(--nl-bronze);
@@ -38547,6 +38560,12 @@ button.market-v2-bucket-card.is-selected {
   background: color-mix(in srgb, var(--nl-star-tone) 18%, transparent);
   color: var(--nl-star-tone);
   font-weight: 800;
+}
+
+/* Dieselbe Bronze-Text-Stufe wie am Portrait-Stat-Label (s. o.): roher Bronze-Ton misst auf
+   dem 18%-Bronze-Wasch nur 4,41:1 — Rand und Wasch bleiben Bronze, nur die Ziffer wird lesbar. */
+.is-new-look .nl-ptable-metric-rank.is-star-tier-bronze {
+  color: var(--nl-bronze-text, #e0b080);
 }
 
 /* Bisher-aufgelaufen-Zeile der Trainingskarte — bewusst ruhiger als die
@@ -39107,8 +39126,12 @@ button.market-v2-bucket-card.is-selected {
    diese Zeile durchgehend zurückgenommen — flacherer Ton, kleinere Zahl — und trägt als
    einzige den Ligarang (`#4`). */
 .foundation-player-portrait-pps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Flex statt starrer Viertel (Prinzip aus #458): „1,1 #187" braucht mehr Breite
+     als „8,2 #4" — nach Inhalt verteilt bleiben Wert und Rang auch bei
+     dreistelligen Rängen nebeneinander, statt einzeln in die gestapelte Form zu
+     kippen. Die Kopfzeile nimmt die volle Breite. */
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin: 0;
   padding: 0;
@@ -39120,11 +39143,18 @@ button.market-v2-bucket-card.is-selected {
   gap: 0;
   justify-items: center;
   text-align: center;
+  flex: 1 1 auto;
   min-width: 0;
-  padding: 3px;
+  /* Horizontal bewusst enger als die Kennzahl-Chips: vier Chips mit „1,1 #187"-
+     breiten Inhalten müssen auf 220-px-Home-Karten nebeneinander bleiben. */
+  padding: 3px 2px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.foundation-player-portrait-pps-chip .foundation-player-portrait-metric-line {
+  column-gap: 2px;
 }
 
 .foundation-player-portrait-pps-chip.is-pow {
@@ -39163,10 +39193,100 @@ button.market-v2-bucket-card.is-selected {
 }
 
 .foundation-player-portrait-pps-chip em {
-  font-size: 0.5rem;
+  font-size: 0.48rem;
   font-style: normal;
   line-height: 1.1;
   color: rgba(196, 208, 228, 0.62);
+}
+
+/* --- Kartenumbau „OVR PPS MVS in EINE Zeile" (Chris) --------------------------------
+   1. Der Liga-Rang steht als eigene kleine Zeile im Chip (`<em>#20</em>`) statt im Wert
+      („79,9 · #20") — erst dadurch passen drei Chips nebeneinander, ohne dass der
+      #458/#463-Grundsatz kippt (nichts Abgeschnittenes: die Werte bleiben voll sichtbar,
+      Chips wachsen weiter nach Inhalt).
+   2. Bei GENAU drei Kennzahl-Chips (Kader: OVR/PPs/MVS) wird der Umbruch abgeschaltet;
+      Kontexte mit mehr Chips (Markt 4-6, Lineup 5) behalten ihn.
+   3. Die Saison-PPs-Zeile trägt eine Kopfzeile „PPs je Achse", weil direkt darunter
+      dieselben vier Kürzel als ATTRIBUTE stehen — zwei Größen unter einem Namen wären
+      sonst nur durch Nachdenken zu trennen. Die Chips selbst behalten die Achsenfarbe
+      (Kategorie, keine Bewertung); der Rang bleibt eine Zahl — dasselbe Prinzip wie auf
+      der Teams-Seite. ---------------------------------------------------------------- */
+.foundation-player-portrait-stat em {
+  font-size: 0.48rem;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* Wert + Rang in EINER Zeile („79,9 #20" / „8,2 #4") mit automatischem Rückfall:
+   flex-wrap lässt NUR den Rang unter den Wert rutschen, wenn der Chip zu schmal
+   wird (dreistellige Ränge am 210-px-Grid-Minimum) — kein Abschneiden, keine
+   manuelle Umschaltung. Chris: „rank neben punkte, wir wollen platz sparen". */
+.foundation-player-portrait-metric-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 3px;
+  row-gap: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.foundation-player-portrait-stats[data-stat-count="3"] {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.foundation-player-portrait-stats[data-stat-count="3"] .foundation-player-portrait-stat {
+  /* Nach Inhalt verteilen (Prinzip aus #458): der OVR-Chip mit „74,8 #61" bekommt
+     die Breite, die die schmalen „—"-Chips nicht brauchen — sonst kippte der Rang
+     schon bei Chris' echten Werten in die gestapelte Form. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.foundation-player-portrait-stats[data-stat-count="3"] .foundation-player-portrait-stat strong {
+  overflow: visible;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+}
+
+.foundation-player-portrait-pps-caption {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.48rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgba(218, 229, 245, 0.72);
+  margin-bottom: -1px;
+}
+
+.foundation-player-portrait-pps-caption::before,
+.foundation-player-portrait-pps-caption::after {
+  content: "";
+  flex: 1 1 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(218, 229, 245, 0), rgba(218, 229, 245, 0.28));
+}
+
+.foundation-player-portrait-pps-caption::after {
+  background: linear-gradient(90deg, rgba(218, 229, 245, 0.28), rgba(218, 229, 245, 0));
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-pps-caption {
+  font-size: 0.44rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat em {
+  font-size: 0.46rem;
 }
 
 .foundation-player-portrait-economy-stat {
@@ -44467,11 +44587,26 @@ button.foundation-team-portrait-card {
   --nl-good: #4cc56b;
   --nl-warn: #e0a53a;
   --nl-risk: #e5615a;
+  /* --nl-risk-text = der Risiko-Ton als TEXT auf risiko-getönten Flächen
+     (Chips/Pills mit color-mix(risk 14–18%, transparent) als Grund). Der rohe
+     Risk-Ton maß dort 3,97:1 („1 kritisch"), 4,09:1 („⚔ Rivale") und 4,44:1
+     (Delta-Chip) — gleiche Mechanik wie --nl-accent-text: derselbe Farbton,
+     in der Helligkeit angehoben (gemessen ≥ 5:1 auf allen Risk-Tint-Gründen).
+     Linien und Flächen bleiben bei --nl-risk. */
+  --nl-risk-text: #f0837c;
   /* Medaillen (Podest / Top-3-Rahmen) — metallisch, theme-übergreifend lesbar. Silber ist
      bewusst HELL (nicht --nl-mut, das als „deaktiviert" liest); Bronze löst das rgb-Literal ab. */
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
+  /* --nl-bronze-text = Bronze als TEXT — gleiche Mechanik wie --nl-accent-text/--nl-risk-text:
+     derselbe Farbton, in der Helligkeit angehoben. GEMESSEN: rohes Bronze trägt als Schrift nur
+     3,58:1 auf dem Portrait-Stat-Grund (OVR-Label, Teams-Ansicht) und 4,41:1 auf dem
+     Star-Tier-Rang-Chip — als einziges Metall unter 4,5:1 (Silber 7,25:1, Gold 7,10:1,
+     Diamant 7,81:1 auf demselben Grund, darum brauchen die drei KEIN Text-Token). Die Mischung
+     62 % Bronze + Weiß ist dieselbe, die die MVS-Kopfzeile der Spielertabelle bereits nutzt —
+     eine Stufe, keine zweite Zahl. Rahmen, Ringe und Flächen bleiben bei --nl-bronze. */
+  --nl-bronze-text: color-mix(in srgb, var(--nl-bronze) 62%, #ffffff);
   /* Vierte, höchste Stufe der ligaweiten Top-Riege (Top 3) — es gab bisher
      nur Gold/Silber/Bronze. Bewusst ein kühles Eis-Cyan statt eines weiteren
      Metalltons, damit Diamant sich auf einen Blick von Gold unterscheidet. */
@@ -44586,6 +44721,9 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-tone-risk {
   --nl-tone: var(--nl-risk);
+  /* Als TEXT auf risk-getönten Flächen braucht auch der Risiko-Ton die
+     Lesbarkeits-Stufe (siehe --nl-risk-text im Token-Block). */
+  --nl-tone-text: var(--nl-risk-text, var(--nl-risk));
 }
 .is-new-look .nl-tone-neutral {
   --nl-tone: var(--nl-mut);
@@ -44929,7 +45067,8 @@ button.foundation-team-portrait-card {
   opacity: 0.6;
 }
 .is-new-look .nl-table-sort-th.is-active {
-  color: var(--nl-accent);
+  /* G4: aktive Sortierspalte — Teamfarbe als Text über die Lesbarkeits-Stufe. */
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 .is-new-look .nl-table-sort-th.is-active b {
   opacity: 1;
@@ -45024,7 +45163,7 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-delta-chip.is-risk {
   background: color-mix(in srgb, var(--nl-risk) 14%, transparent);
-  color: var(--nl-risk);
+  color: var(--nl-risk-text, var(--nl-risk));
 }
 
 /* --- NlProgressBar ------------------------------------------------ */
@@ -45526,7 +45665,9 @@ button.foundation-team-portrait-card {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--nl-accent);
+  /* Kontrast-Audit (Durchklick G4): Teamfarbe als TEXT → --nl-accent-text
+     (roher Akzent lag mit S-C-Rot bei 3,72:1 auf dem Kartengrund). */
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-home-card-eyebrow-icon svg {
@@ -45660,7 +45801,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-home-card-link {
   font-size: 12px;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   white-space: nowrap;
 }
 
@@ -45669,7 +45810,7 @@ button.foundation-team-portrait-card {
   background: transparent;
   padding: 0;
   font-size: 12px;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   cursor: pointer;
   white-space: nowrap;
 }
@@ -45689,7 +45830,8 @@ button.foundation-team-portrait-card {
   padding: 2px 8px;
   border-radius: var(--nl-r-pill);
   background: color-mix(in srgb, var(--nl-tone) 18%, transparent);
-  color: var(--nl-tone);
+  /* Text auf getönter Fläche → Text-Stufe des Tons (G4: Risk maß 3,97:1). */
+  color: var(--nl-tone-text, var(--nl-tone));
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -45977,7 +46119,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-inbox-filter-chip.is-active .nl-inbox-filter-count {
   border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-inbox-toggle-row {
@@ -52147,7 +52289,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-ident-line > span {
-  color: var(--nl-mut-2);
+  /* G4: Rasse/Klasse/Laufzeit sind Information, keine Deko (gemessen 3,60:1). */
+  color: var(--nl-mut);
 }
 
 /* --- Farbbilanz des Kaders: wovon habe ich wie viele --- */
@@ -52545,7 +52688,8 @@ button.foundation-team-portrait-card {
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
-  color: var(--nl-mut-2);
+  /* G4: Stufen-Labels der Scouting-Leiter tragen Information (gemessen 3,76:1). */
+  color: var(--nl-mut);
   transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
 }
 
@@ -53483,7 +53627,7 @@ button.foundation-team-portrait-card {
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   font-size: inherit;
   cursor: pointer;
   text-align: left;
@@ -54820,7 +54964,9 @@ button.foundation-team-portrait-card {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--nl-accent-text, var(--nl-mut));
+  /* G5: In Teamfarbe (bei S-C: Rot) las sich die Rechnung wie eine Fehler-/
+     Debug-Zeile. Es ist eine Erklärung → ruhiger Sekundärtext. */
+  color: var(--nl-mut);
   opacity: 0.9;
 }
 
@@ -58241,7 +58387,9 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-standings-sort-th.is-active {
-  color: var(--nl-accent);
+  /* G4: aktive Sortierspalte ist Information — Teamfarbe als Text nur über
+     die Lesbarkeits-Stufe (roh gemessen 3,89:1 auf dem Tabellenkopf). */
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-standings-sort-th.is-active b {
@@ -59604,7 +59752,9 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-lineup-hud-metric.is-primary strong {
   font-size: 18px;
-  color: var(--nl-accent);
+  /* 18px-Kennzahl (erwartete Punkte) ist Information, kein Ornament —
+     Teamfarbe als Text läuft über --nl-accent-text (G4, gemessen 3,72:1). */
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-lineup-hud-metric.is-risk-hoch strong {
@@ -59693,7 +59843,10 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-lineup-btn.is-primary {
   background: var(--nl-accent-soft);
   border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
-  color: var(--nl-accent);
+  /* F1-Präzedenz „Tinte auf Akzent-Soft-Fläche": accentTextFor zielt auf das
+     Panel, nicht auf die Soft-Fläche — Akzent-Text stand hier bei 3,28:1
+     (S-C). Der Teamton sitzt in Grund und Rahmen, die Schrift ist Tinte. */
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-lineup-btn.is-primary.is-ready {
@@ -60050,7 +60203,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-lineup-slot-player.is-empty-label strong {
-  color: var(--nl-mut-2);
+  /* G4: „Offen" sagt dem Spieler, dass hier etwas zu tun ist — kein Ornament. */
+  color: var(--nl-mut);
   font-weight: 600;
 }
 
@@ -60142,7 +60296,7 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-lineup-chip.is-accent {
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
 }
 
@@ -60448,7 +60602,8 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-lineup-candidate-tabs button.is-active {
   background: var(--nl-accent-soft);
   border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
-  color: var(--nl-accent);
+  /* F1-Präzedenz: Tinte auf Akzent-Soft (Akzent-Text maß hier 3,28:1). */
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-lineup-candidate-search {
@@ -61777,7 +61932,7 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 /* --- Sortierbare Teamtabelle ---------------------------------------- */
@@ -63803,7 +63958,7 @@ span.nl-facility-ampel-chip {
   border-radius: var(--nl-r-pill);
   border: 1px solid var(--nl-line-2);
   background: transparent;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -63920,7 +64075,10 @@ span.nl-facility-ampel-chip {
   padding: 0 6px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  color: var(--nl-accent-text);
+  /* G4: Der Tag sitzt auf der akzent-getönten „Dein Team"-Zeile — accentTextFor
+     zielt auf das Panel und maß hier nur 4,34:1. F1-Präzedenz: Tinte auf
+     Akzent-Fläche, der Teamton bleibt im Rahmen. */
+  color: var(--nl-ink);
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
@@ -64634,7 +64792,8 @@ span.nl-facility-ampel-chip {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--nl-mut-2, var(--nl-mut));
+  /* „Auslastung" ist Information, kein Ornament (G4, gemessen 3,60:1 auf Karte). */
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-credits-gauge-sub {
@@ -65227,7 +65386,8 @@ span.nl-facility-ampel-chip {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 0.62rem;
-  color: var(--nl-mut-2);
+  /* Informationstragend (Bereichsname im Brotkrumen) → --nl-mut, nicht Deko-Stufe. */
+  color: var(--nl-mut);
 }
 
 .is-new-look .foundation-shell-breadcrumb-crumb.is-view {
@@ -65237,7 +65397,7 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look .foundation-shell-breadcrumb-crumb.is-context {
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   font-weight: 600;
 }
 
@@ -65743,8 +65903,9 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-players-th.is-highlight-mvs {
   background: color-mix(in srgb, var(--nl-bronze) 18%, var(--nl-panel-2));
   /* Aufgehelltes Bronze: der Grundton (#cd7f32) trägt als 10px-Versalie auf getöntem Dunkel
-     zu wenig — die Farbe bleibt Bronze, die Schrift wird lesbar. */
-  color: color-mix(in srgb, var(--nl-bronze) 62%, #ffffff);
+     zu wenig — die Farbe bleibt Bronze, die Schrift wird lesbar. Seit dem Kontrast-Befund am
+     OVR-Label ist die Mischung als Token vereinheitlicht (--nl-bronze-text, gleiche Stufe). */
+  color: var(--nl-bronze-text, #e0b080);
   box-shadow: inset 0 -2px 0 var(--nl-bronze);
 }
 
@@ -68977,7 +69138,8 @@ span.nl-facility-ampel-chip {
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
-  color: var(--nl-mut-2);
+  /* G4: Stufen-Labels der Scouting-Leiter tragen Information (gemessen 3,76:1). */
+  color: var(--nl-mut);
   transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
 }
 
@@ -69211,7 +69373,7 @@ span.nl-facility-ampel-chip {
 
 .is-new-look .nl-scout-shortlist-status-pill.is-focus {
   border-color: color-mix(in srgb, var(--nl-accent) 50%, var(--nl-line-2));
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-scout-shortlist-status-pill.is-ready {
@@ -69254,12 +69416,13 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look .nl-scout-shortlist-potential-pill.is-low {
-  color: var(--nl-mut-2);
+  /* „Niedrig" ist eine Bewertung, keine Deko — lesbarer Sekundärtext (G4). */
+  color: var(--nl-mut);
   opacity: 0.8;
 }
 
 .is-new-look .nl-scout-shortlist-potential-pill.is-unknown {
-  color: var(--nl-mut-2);
+  color: var(--nl-mut);
   opacity: 0.6;
 }
 
@@ -69815,7 +69978,8 @@ span.nl-facility-ampel-chip {
   margin: 0;
   font-size: 11px;
   line-height: 1.5;
-  color: var(--nl-mut-2);
+  /* Erklärtext trägt Information → --nl-mut (G4, gemessen 3,60:1). */
+  color: var(--nl-mut);
 }
 
 /* --- Sub-Tabs-Aktion in der Karten-Kopfzeile -------------------------- */
@@ -71619,7 +71783,7 @@ span.nl-facility-ampel-chip {
 
 .is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-recurring {
   border-color: color-mix(in srgb, var(--nl-accent) 40%, transparent);
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
 }
 
 .is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-once {
@@ -74196,7 +74360,8 @@ span.nl-facility-ampel-chip {
   appearance: none;
   border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
   background: var(--nl-accent-soft);
-  color: var(--nl-accent);
+  /* F1-Präzedenz: Tinte auf Akzent-Soft (Akzent-Text maß hier 3,28:1). */
+  color: var(--nl-ink);
   border-radius: var(--nl-r-pill);
   padding: 7px 14px;
   font-size: 12.5px;
@@ -75803,6 +75968,80 @@ span.nl-facility-ampel-chip {
 
 .is-new-look .nl-fin-commit-loan-values {
   color: var(--nl-mut);
+}
+
+/* --- Apron liga-weit: wer zahlt, wer bekommt (Chris-Wunsch, Ausweis je Team) ---
+   Volle Breite unter den beiden Verpflichtungs-Spalten. Farb-Wahrheit wie im
+   Rest der Seite: Einnahme (Ausgleich) grün, Abgabe rot — Ton über nl-tone-
+   Klassen, nie der Team-Akzent. */
+.is-new-look .nl-fin-apron-league-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s4);
+  padding-top: var(--nl-s3);
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-fin-apron-lg-summary {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-apron-lg-table {
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-fin-apron-lg-dist {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-apron-lg-netto {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.is-new-look .nl-fin-apron-lg-netto.nl-tone-good,
+.is-new-look .nl-fin-apron-lg-netto.nl-tone-risk {
+  color: var(--nl-tone);
+  font-weight: 700;
+}
+
+.is-new-look .nl-fin-apron-lg-netto.nl-tone-neutral {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-apron-lg-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-apron-lg-deckel {
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 55%, transparent);
+  color: var(--nl-warn);
+  font-size: 9px;
+}
+
+.is-new-look .nl-fin-apron-lg-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* Basis-Optik kommt von nl-rankdrawer-more (geteilter „Alle … anzeigen"-Knopf). */
+.is-new-look .nl-fin-apron-lg-more {
+  margin-top: 2px;
 }
 
 /* --- Liga · Finanzvergleich (unten in der Finanzen-View) ------------ */

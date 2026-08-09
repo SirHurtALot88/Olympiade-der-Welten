@@ -9277,8 +9277,8 @@ export function useFoundationShellRouterBodyScope({
     if (!payload.silent) {
       setFoundationActionFeedback({
         tone: "success",
-        title: "Lineup gespeichert",
-        detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
+        title: "Einsatzliste gespeichert",
+        detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Einsatzlisten werden bei Bedarf nachgezogen.`,
       });
     }
     void reloadLiveSeasonState("manual_apply", { compactReload: true });
@@ -10179,6 +10179,18 @@ export function useFoundationShellRouterBodyScope({
           caRating: developmentInsight.currentRating,
           poRangeMin: developmentInsight.potentialRangeDisplay?.min ?? null,
           poRangeMax: developmentInsight.potentialRangeDisplay?.max ?? null,
+          // Saison-PPs je Achse samt Ligarang — direkt aus der Rating-Zeile
+          // (`ppPow`/`ppPowRank`/…), derselben Quelle wie die Ranks-Spalten.
+          axisPps: {
+            pow: rating?.ppPow ?? null,
+            powRank: rating?.ppPowRank ?? null,
+            spe: rating?.ppSpe ?? null,
+            speRank: rating?.ppSpeRank ?? null,
+            men: rating?.ppMen ?? null,
+            menRank: rating?.ppMenRank ?? null,
+            soc: rating?.ppSoc ?? null,
+            socRank: rating?.ppSocRank ?? null,
+          },
         };
       });
     },

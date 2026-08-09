@@ -2446,10 +2446,10 @@ export default function FoundationPlayersTableNewLook({
             />
             {ownTeamId != null ? (
               <StatChip
-                label="Wishlist"
+                label="Wunschliste"
                 value={formatNlNumber(wishlistSelectionCount, 0)}
                 tone="warn"
-                title="Spieler der aktuellen Auswahl auf deiner Transfermarkt-Wishlist"
+                title="Spieler der aktuellen Auswahl auf deiner Wunschliste im Transfermarkt"
               />
             ) : null}
           </StatChipRow>

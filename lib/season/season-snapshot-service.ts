@@ -15,7 +15,10 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
-import { buildTeamDisciplineRankSnapshotRecords } from "@/lib/foundation/team-discipline-rank-engine";
+import {
+  buildTeamDisciplineRankSnapshotRecords,
+  findTeamStrengthRankCapture,
+} from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -552,7 +555,31 @@ function buildSeasonSnapshotRecord(
       ? "partial"
       : "missing_source";
   const archivedAt = new Date().toISOString();
-  const teamDisciplineRankSnapshots = buildTeamDisciplineRankSnapshotRecords(gameState);
+  /**
+   * Teamstärke-Ränge: den bei der LETZTEN SPIELTAGSWERTUNG festgehaltenen Satz übernehmen, nicht
+   * neu aus dem Live-Kader rechnen. GEMELDET VON CHRIS: „die snapshots für die ranking änderungen
+   * [müssen] sich auf den season 1 lauf beziehen vor verkäufen! da ist N-N zb 32. … das kann nicht
+   * der stand während der saison gewesen sein" — im echten Spielstand lagen zwischen letztem
+   * Spieltag und Saisonabschluss vier Tage und 49 Verkäufe; der Live-Kader zum Abschluss war der
+   * Nach-Ausverkauf-Stand. Rückfall für Spielstände ohne festgehaltenen Satz bleibt die bisherige
+   * Live-Rechnung — dann sagt es der Herkunftsvermerk (`season_end_live`).
+   */
+  const teamStrengthRankCapture = findTeamStrengthRankCapture(gameState, seasonId);
+  const teamDisciplineRankSnapshots = teamStrengthRankCapture
+    ? structuredClone(teamStrengthRankCapture.records)
+    : buildTeamDisciplineRankSnapshotRecords(gameState);
+  const teamDisciplineRankSnapshotMeta: SeasonSnapshotRecord["teamDisciplineRankSnapshotMeta"] =
+    teamStrengthRankCapture
+      ? {
+          source: "matchday_capture",
+          matchdayId: teamStrengthRankCapture.matchdayId,
+          capturedAt: teamStrengthRankCapture.capturedAt,
+        }
+      : {
+          source: "season_end_live",
+          matchdayId: null,
+          capturedAt: archivedAt,
+        };
 
   return {
     snapshotId: buildSnapshotId(seasonId),
@@ -574,6 +601,7 @@ function buildSeasonSnapshotRecord(
     transferSnapshots,
     gmAssignments,
     teamDisciplineRankSnapshots,
+    teamDisciplineRankSnapshotMeta,
     warnings,
   };
 }

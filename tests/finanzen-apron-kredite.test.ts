@@ -20,6 +20,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { computeApronSettlement } from "@/lib/season/apron-service";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
@@ -139,6 +141,172 @@ describe("Apron-Ausweisung: beide Linien einzeln, aus derselben Projektion wie d
     if (apron.distanceLine1 <= 0) expect(apron.zone).toBe("unter_linie_1");
     else if (apron.distanceLine2 <= 0) expect(apron.zone).toBe("zwischen_den_linien");
     else expect(apron.zone).toBe("ueber_linie_2");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Apron liga-weit: wer zahlt, wer bekommt (Chris: „…ein ausweis vom   */
+/* APRON was die teams dadurch zahlen müssen oder einnehmen")          */
+/* ------------------------------------------------------------------ */
+
+describe("Apron liga-weit: jede Zeile ist die benannte Projektionszeile — nichts neu gerechnet", () => {
+  const gameState = buildGameState();
+  const team = readyTeam(gameState);
+  const league = team.apron!.league;
+  const projection = buildApronProjection({
+    gameState,
+    rankByTeamId: new Map(
+      gameState.teams.map(
+        (entry) => [entry.teamId, gameState.seasonState.standings?.[entry.teamId]?.rank ?? null] as const,
+      ),
+    ),
+  });
+
+  it("alle Teams stehen drin, mit Name und Kürzel aus gameState.teams", () => {
+    expect(league.length).toBe(gameState.teams.length);
+    for (const teamEntry of gameState.teams) {
+      const row = league.find((entry) => entry.teamId === teamEntry.teamId);
+      expect(row, `${teamEntry.teamId} fehlt im Liga-Ausweis`).toBeDefined();
+      expect(row!.teamName).toBe(teamEntry.name);
+      expect(row!.teamCode).toBe(teamEntry.shortCode);
+    }
+  });
+
+  it("jede Zahl ist das round1 der Projektionszeile (eine Quelle, keine zweite Rechnung)", () => {
+    for (const row of league) {
+      const source = projection.byTeamId.get(row.teamId)!;
+      expect(row.salaryBasis).toBe(round1(source.salary));
+      expect(row.abgabe).toBe(round1(source.abgabe));
+      expect(row.ausgleich).toBe(round1(source.ausgleich));
+      expect(row.nettoDelta).toBe(round1(source.nettoDelta));
+      expect(row.gedeckelt).toBe(source.gedeckelt);
+      expect(row.rank).toBe(source.rank);
+      // Abstand = dieselbe Anzeige-Subtraktion wie beim eigenen Team.
+      expect(row.distanceLine1).toBeCloseTo(round1(source.salary - projection.lines.line1), 5);
+    }
+  });
+
+  it("Rollen decken sich mit den Aggregaten der Karte (Zahler/Empfänger-Zählung der Engine)", () => {
+    expect(league.filter((row) => row.rolle === "zahler").length).toBe(team.apron!.zahlerCount);
+    expect(league.filter((row) => row.rolle === "empfaenger").length).toBe(team.apron!.empfaengerCount);
+    expect(team.apron!.gedeckeltCount).toBe(league.filter((row) => row.gedeckelt).length);
+  });
+
+  it("die eigene Zeile trägt dieselben Zahlen wie die eigene Karte darüber", () => {
+    const eigene = league.find((row) => row.teamId === "team-1")!;
+    expect(eigene.salaryBasis).toBe(team.apron!.salaryBasis);
+    expect(eigene.abgabe).toBe(team.apron!.abgabe);
+    expect(eigene.ausgleich).toBe(team.apron!.ausgleich);
+    expect(eigene.nettoDelta).toBe(team.apron!.nettoDelta);
+    expect(eigene.distanceLine1).toBe(team.apron!.distanceLine1);
+  });
+
+  it("Sortierung erzählt die Richtung: Zahler (größte zuerst) → Neutrale → Empfänger", () => {
+    const ordnung = { zahler: 0, neutral: 1, empfaenger: 2 } as const;
+    for (let index = 1; index < league.length; index += 1) {
+      const vorher = league[index - 1]!;
+      const jetzt = league[index]!;
+      expect(ordnung[vorher.rolle]).toBeLessThanOrEqual(ordnung[jetzt.rolle]);
+      if (vorher.rolle === "zahler" && jetzt.rolle === "zahler") {
+        expect(vorher.abgabe).toBeGreaterThanOrEqual(jetzt.abgabe);
+      }
+    }
+  });
+
+  it("Summenprobe (ungerundet, an der Projektion): Σ Abgaben == Topf == Σ Ausgleiche, Σ Netto == 0", () => {
+    const rows = [...projection.byTeamId.values()];
+    const sumAbgabe = rows.reduce((sum, row) => sum + row.abgabe, 0);
+    const sumAusgleich = rows.reduce((sum, row) => sum + row.ausgleich, 0);
+    expect(sumAbgabe).toBeCloseTo(projection.topf, 6);
+    // Vollständige Ausschüttung (kein Empfänger-Deckel, Nutzer-Entscheidung PR #468):
+    // der ganze Topf geht zu gleichen Kopfteilen an die Empfänger, nichts verfällt.
+    expect(sumAusgleich).toBeCloseTo(projection.topf, 6);
+    expect(rows.reduce((sum, row) => sum + row.nettoDelta, 0)).toBeCloseTo(0, 6);
+  });
+
+  it("Summenprobe (gerundet, an den Anzeige-Zeilen): höchstens die dokumentierte Anzeigerundung Abstand", () => {
+    const toleranz = league.length * 0.05 + 0.05;
+    const sumAbgabe = league.reduce((sum, row) => sum + row.abgabe, 0);
+    const sumAusgleich = league.reduce((sum, row) => sum + row.ausgleich, 0);
+    expect(Math.abs(sumAbgabe - team.apron!.topf)).toBeLessThanOrEqual(toleranz);
+    expect(Math.abs(sumAusgleich - team.apron!.topf)).toBeLessThanOrEqual(toleranz);
+  });
+
+  it("Markup: Farben sagen die Wahrheit — Empfänger good (grün), Zahler risk (rot), nie der Akzent", () => {
+    expect(MARKUP).toMatch(/rolle === "empfaenger" \? "good" : rolle === "zahler" \? "risk" : "neutral"/);
+  });
+
+  it("Markup: das eigene Team ist markiert (is-active-row + Dein-Team-Chip), ohne die Liste zu durchsuchen", () => {
+    expect(MARKUP).toContain('rowClassName={(row) => (row.teamId === ownTeamId ? "is-active-row" : undefined)}');
+    expect(MARKUP).toContain('{row.teamId === ownTeamId ? <span className="nl-fin-league-you">Dein Team</span> : null}');
+  });
+
+  it("Markup: kollabiert kommen die Extreme zuerst, der Aufklapp-Knopf trägt die Zwischensumme", () => {
+    expect(MARKUP).toContain("APRON_LEAGUE_TOP_ZAHLER");
+    expect(MARKUP).toContain("Alle ${apron.league.length} Teams anzeigen");
+    expect(MARKUP).toContain("weitere Zahler zahlen zusammen");
+  });
+
+  it("Markup: Deckel- und Rundungshinweis stehen an der Anzeige, die Ausschüttung ist der ganze Topf", () => {
+    expect(MARKUP).toContain("Der Topf enthält nur die begrenzten Beträge");
+    expect(MARKUP).toContain("verteilt wird ungerundet");
+    // Vollständige Verteilung steht im Klartext — und KEIN Verfall-Text mehr (der Empfänger-
+    // Deckel ist zurückgebaut; die Anzeige darf keinen behaupten).
+    expect(MARKUP).toContain("teilen ihn vollständig");
+    expect(MARKUP).not.toContain("verfallen");
+    expect(MARKUP).not.toContain("Empfänger-Deckel");
+    // Der Kopfanteil je Empfänger kommt aus einer Empfänger-Zeile des View-Models (eine Quelle,
+    // keine zweite Rechnung in der UI).
+    expect(MARKUP).toContain('apron.league.find((row) => row.rolle === "empfaenger")?.ausgleich');
+  });
+});
+
+describe("Deckel: die naive Satz-Summe geht nicht auf — der Topf ist die Summe der GEDECKELTEN Abgaben", () => {
+  it("Erhaltung mit Abgaben-Deckel: Σ Abgaben = Topf = Σ Ausgleiche (voll verteilt, gleiche Kopfteile)", () => {
+    const settlement = computeApronSettlement({
+      lines: { line1: 10, line2: 20 },
+      salaryFactor: 1.24, // Konjunkturhebel k = 1
+      teams: [
+        { teamId: "big", salary: 40, rankShare: 4 },
+        { teamId: "low-a", salary: 5, rankShare: 10 },
+        { teamId: "low-b", salary: 4, rankShare: 1 },
+      ],
+    });
+    const big = settlement.rows.find((row) => row.teamId === "big")!;
+    // Naive Satz-Summe: 10 × 0,8 + 20 × 1,6 = 40 — der Abgaben-Deckel (0,5 × 4 = 2) begrenzt
+    // sie. Der Topf (2) geht vollständig zu gleichen Kopfteilen an beide Empfänger — je 1,
+    // unabhängig von ihren Wertungsanteilen (kein Empfänger-Deckel, Nutzer-Entscheidung PR #468).
+    expect(big.rohAbgabe).toBeCloseTo(40, 9);
+    expect(big.abgabe).toBeCloseTo(2, 9);
+    expect(settlement.topf).toBeCloseTo(2, 9);
+    const sumAbgabe = settlement.rows.reduce((sum, row) => sum + row.abgabe, 0);
+    const sumAusgleich = settlement.rows.reduce((sum, row) => sum + row.ausgleich, 0);
+    expect(sumAbgabe).toBeCloseTo(settlement.topf, 9);
+    const lowA = settlement.rows.find((row) => row.teamId === "low-a")!;
+    const lowB = settlement.rows.find((row) => row.teamId === "low-b")!;
+    expect(lowA.ausgleich).toBeCloseTo(1, 9);
+    expect(lowB.ausgleich).toBeCloseTo(1, 9);
+    expect(sumAusgleich).toBeCloseTo(settlement.topf, 9);
+    expect(settlement.rows.reduce((sum, row) => sum + row.nettoDelta, 0)).toBeCloseTo(0, 9);
+    // Rollen-Flag der Engine: streng unter der 1. Linie = Empfänger, der Zahler nicht.
+    expect(lowA.istEmpfaenger).toBe(true);
+    expect(big.istEmpfaenger).toBe(false);
+  });
+
+  it("das Empfänger-Flag bleibt auch bei leerem Topf gesetzt (k = 0), damit die UI die Rolle benennen kann", () => {
+    const settlement = computeApronSettlement({
+      lines: { line1: 10, line2: 20 },
+      salaryFactor: 0.9, // unter APRON_KONJUNKTUR_FACTOR_MIN → niemand zahlt
+      teams: [
+        { teamId: "big", salary: 40, rankShare: 4 },
+        { teamId: "low-a", salary: 5, rankShare: 10 },
+      ],
+    });
+    expect(settlement.topf).toBe(0);
+    expect(settlement.zahlerCount).toBe(0);
+    const empfaenger = settlement.rows.find((row) => row.teamId === "low-a")!;
+    expect(empfaenger.istEmpfaenger).toBe(true);
+    expect(empfaenger.ausgleich).toBe(0);
   });
 });
 
