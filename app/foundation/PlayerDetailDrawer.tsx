@@ -2086,6 +2086,40 @@ export default function PlayerDetailDrawer({
     [compareCandidates, compareTeamCodeByPlayerId],
   );
 
+  /**
+   * Projizierte Auswirkung des Saison-Trainings je Disziplin, als Nachschlagetabelle für die
+   * Diszi-Zeilen. Nur Werte ≠ 0 landen darin — eine „(+0)"-Marke wäre Rauschen an jeder Zeile.
+   *
+   * Diese drei useMemo standen früher HINTER dem `if (!data) return null;` und liefen damit
+   * bedingt — ein Rules-of-Hooks-Verstoß: Kippt `data` an einer gemounteten Instanz zwischen
+   * null und einem Wert (der Drawer wird genau so benutzt, siehe useFocusTrap oben), ändert
+   * sich die Zahl der Hook-Aufrufe zwischen zwei Renders und React wirft. Deshalb stehen sie
+   * jetzt VOR dem Ausstieg und greifen null-sicher auf `data?.…` zu — bei `data == null` sind
+   * die Ergebnisse leer und werden nie gerendert, bei vorhandenem `data` sind sie identisch
+   * zu vorher.
+   */
+  const disciplineTrainingDeltaById = useMemo<Record<string, number>>(() => {
+    const rows = data?.disciplineTrainingForecast?.rowsByDisciplineId;
+    if (!rows) {
+      return {};
+    }
+    const byId: Record<string, number> = {};
+    for (const row of Object.values(rows)) {
+      if (row.delta !== 0) {
+        byId[row.disciplineId] = row.delta;
+      }
+    }
+    return byId;
+  }, [data?.disciplineTrainingForecast]);
+  const movedTrainingDisciplines = useMemo(
+    () => selectMovedDisciplines(data?.disciplineTrainingForecast),
+    [data?.disciplineTrainingForecast],
+  );
+  const disciplineLabelById = useMemo(
+    () => new Map((data?.disciplineValues ?? []).map((entry) => [entry.id, entry.label] as const)),
+    [data?.disciplineValues],
+  );
+
   if (!data) {
     return null;
   }
@@ -2107,31 +2141,6 @@ export default function PlayerDetailDrawer({
   const isActivePlayer = !isFreeAgent && !isScoutedProfile;
   const abilitiesKnown = isActivePlayer || data.teamHumanControlled === true;
   const disciplineStatFogged = isScoutedProfile || !abilitiesKnown;
-  /**
-   * Projizierte Auswirkung des Saison-Trainings je Disziplin, als Nachschlagetabelle für die
-   * Diszi-Zeilen. Nur Werte ≠ 0 landen darin — eine „(+0)"-Marke wäre Rauschen an jeder Zeile.
-   */
-  const disciplineTrainingDeltaById = useMemo<Record<string, number>>(() => {
-    const rows = data.disciplineTrainingForecast?.rowsByDisciplineId;
-    if (!rows) {
-      return {};
-    }
-    const byId: Record<string, number> = {};
-    for (const row of Object.values(rows)) {
-      if (row.delta !== 0) {
-        byId[row.disciplineId] = row.delta;
-      }
-    }
-    return byId;
-  }, [data.disciplineTrainingForecast]);
-  const movedTrainingDisciplines = useMemo(
-    () => selectMovedDisciplines(data.disciplineTrainingForecast),
-    [data.disciplineTrainingForecast],
-  );
-  const disciplineLabelById = useMemo(
-    () => new Map(data.disciplineValues.map((entry) => [entry.id, entry.label] as const)),
-    [data.disciplineValues],
-  );
   const scoutingLevel = data.scoutingLevel ?? 0;
   const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
   const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
