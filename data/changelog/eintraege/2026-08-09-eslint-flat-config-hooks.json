@@ -1,0 +1,9 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Teams · Spielerkarte",
+    "text": "Zwei versteckte Absturz-Fallen entschärft, bevor sie je jemanden erwischt haben. Das Teams-Detail und die große Spielerkarte riefen einen Teil ihrer React-Bausteine nur unter einer Bedingung auf — das ging bisher nur deshalb gut, weil die Bedingung im laufenden Spiel praktisch nie kippt. Wäre sie je gekippt, wäre die jeweilige Ansicht kommentarlos mit einem Fehler abgestürzt. Beide Stellen sind jetzt so umgebaut, dass die Bausteine immer in derselben Reihenfolge laufen; sichtbar ändert sich dadurch nichts. Zusätzlich wacht ab jetzt ein automatischer Prüfer (ESLint) über den gesamten Code und schlägt sofort Alarm, wenn so eine Falle wieder eingebaut würde — der Prüfstand dafür existierte bisher nur dem Namen nach.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]

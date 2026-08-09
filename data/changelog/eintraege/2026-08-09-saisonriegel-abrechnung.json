@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-09",
+  "seite": "Saisonende · Abrechnung",
+  "text": "Die Saisonende-Buchung prüft jetzt, dass die angeforderte Saison die aktuelle ist: ein veralteter „Sponsoren buchen“-Aufruf mit der Saison-ID der Vorsaison (alter Tab, Doppelklick im Rennen mit „Neue Saison starten“) rutschte vorher an allen Duplikat-Wachen vorbei und buchte die komplette Saisonende-Abrechnung der neuen Saison schon an deren Spieltag 1 — Sponsorgeld und Gehaltsabzug zur Unzeit, und am echten Saisonende wären alle Zahlungen übersprungen worden.",
+  "gewicht": "spielblockierend",
+  "version": "0.4"
+}

@@ -425,13 +425,19 @@ export default function FoundationRanksNewLook({
                   <span className="nl-ranks-value">
                     <span className="nl-ranks-value-number nl-tnum">
                       {formatNlNumber(value, 1)}
+                      {/* BUGFIX (Durchklick): vorher stand der Formkarten-Wert als nackte Klammer
+                          direkt neben den PPs — „9,6 (−120,9)" las sich wie ein Bonus, der größer
+                          ist als der Gesamtwert. Es sind aber zwei Skalen: PPs (ein- bis
+                          zweistellig) gegen die Summe der Formkarten-SCORE-Modifikatoren
+                          (Wettkampf-Score-Skala, ±100 je Einsatz). Deshalb trägt der Wert jetzt
+                          seine Einheit sichtbar im Label statt nur im Tooltip. */}
                       {formBonus !== 0 ? (
                         <small
                           className="nl-ranks-formbonus"
-                          title={`Formkartenbonus ${activeMetric.label}: ${formBonus > 0 ? "+" : ""}${formatNlNumber(formBonus, 1)}`}
+                          title={`Formkarten wirkten diese Saison mit ${formBonus > 0 ? "+" : ""}${formatNlNumber(formBonus, 1)} auf die Wettkampf-Scores (${activeMetric.label}). Das ist die Score-Skala (±100 je Einsatz), keine PPs — deshalb kann die Zahl größer sein als die PPs daneben. In den PPs steckt die Wirkung bereits über die Platzierungen.`}
                         >
-                          ({formBonus > 0 ? "+" : ""}
-                          {formatNlNumber(formBonus, 1)})
+                          Form-Score {formBonus > 0 ? "+" : ""}
+                          {formatNlNumber(formBonus, 1)}
                         </small>
                       ) : null}
                     </span>

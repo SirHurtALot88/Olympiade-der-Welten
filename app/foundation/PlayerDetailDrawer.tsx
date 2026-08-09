@@ -2086,6 +2086,40 @@ export default function PlayerDetailDrawer({
     [compareCandidates, compareTeamCodeByPlayerId],
   );
 
+  /**
+   * Projizierte Auswirkung des Saison-Trainings je Disziplin, als Nachschlagetabelle für die
+   * Diszi-Zeilen. Nur Werte ≠ 0 landen darin — eine „(+0)"-Marke wäre Rauschen an jeder Zeile.
+   *
+   * Diese drei useMemo standen früher HINTER dem `if (!data) return null;` und liefen damit
+   * bedingt — ein Rules-of-Hooks-Verstoß: Kippt `data` an einer gemounteten Instanz zwischen
+   * null und einem Wert (der Drawer wird genau so benutzt, siehe useFocusTrap oben), ändert
+   * sich die Zahl der Hook-Aufrufe zwischen zwei Renders und React wirft. Deshalb stehen sie
+   * jetzt VOR dem Ausstieg und greifen null-sicher auf `data?.…` zu — bei `data == null` sind
+   * die Ergebnisse leer und werden nie gerendert, bei vorhandenem `data` sind sie identisch
+   * zu vorher.
+   */
+  const disciplineTrainingDeltaById = useMemo<Record<string, number>>(() => {
+    const rows = data?.disciplineTrainingForecast?.rowsByDisciplineId;
+    if (!rows) {
+      return {};
+    }
+    const byId: Record<string, number> = {};
+    for (const row of Object.values(rows)) {
+      if (row.delta !== 0) {
+        byId[row.disciplineId] = row.delta;
+      }
+    }
+    return byId;
+  }, [data?.disciplineTrainingForecast]);
+  const movedTrainingDisciplines = useMemo(
+    () => selectMovedDisciplines(data?.disciplineTrainingForecast),
+    [data?.disciplineTrainingForecast],
+  );
+  const disciplineLabelById = useMemo(
+    () => new Map((data?.disciplineValues ?? []).map((entry) => [entry.id, entry.label] as const)),
+    [data?.disciplineValues],
+  );
+
   if (!data) {
     return null;
   }
@@ -2107,31 +2141,6 @@ export default function PlayerDetailDrawer({
   const isActivePlayer = !isFreeAgent && !isScoutedProfile;
   const abilitiesKnown = isActivePlayer || data.teamHumanControlled === true;
   const disciplineStatFogged = isScoutedProfile || !abilitiesKnown;
-  /**
-   * Projizierte Auswirkung des Saison-Trainings je Disziplin, als Nachschlagetabelle für die
-   * Diszi-Zeilen. Nur Werte ≠ 0 landen darin — eine „(+0)"-Marke wäre Rauschen an jeder Zeile.
-   */
-  const disciplineTrainingDeltaById = useMemo<Record<string, number>>(() => {
-    const rows = data.disciplineTrainingForecast?.rowsByDisciplineId;
-    if (!rows) {
-      return {};
-    }
-    const byId: Record<string, number> = {};
-    for (const row of Object.values(rows)) {
-      if (row.delta !== 0) {
-        byId[row.disciplineId] = row.delta;
-      }
-    }
-    return byId;
-  }, [data.disciplineTrainingForecast]);
-  const movedTrainingDisciplines = useMemo(
-    () => selectMovedDisciplines(data.disciplineTrainingForecast),
-    [data.disciplineTrainingForecast],
-  );
-  const disciplineLabelById = useMemo(
-    () => new Map(data.disciplineValues.map((entry) => [entry.id, entry.label] as const)),
-    [data.disciplineValues],
-  );
   const scoutingLevel = data.scoutingLevel ?? 0;
   const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
   const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
@@ -2376,12 +2385,23 @@ export default function PlayerDetailDrawer({
             </>
 
         <div className="player-drawer-body">
-          <section className="player-drawer-section player-drawer-hero-surface" id="player-drawer-profile">
+          {/* BUGFIX (Durchklick, Reiter-Markierung): die Anker `#player-drawer-profile` und
+              `#player-drawer-axis` waren INEINANDER verschachtelt (Achsen-Block im Profil-
+              <section>). Der Scroll-Beobachter in `PlayerProfileClient` hält Sektionen als
+              „intersecting"-Menge mit dem beim ÜBERGANG gemessenen top — solange das Profil
+              den Achsen-Block ENTHÄLT, bleibt es für dessen gesamte Höhe in der Menge und
+              gewinnt beim Hochscrollen mit seinem veralteten top gegen den frisch (negativ)
+              gemessenen Achsen-top: die Pille zeigt „Stats", während „Details"-Inhalt im
+              Leseband steht. Fix: die Anker sind jetzt GESCHWISTER in derselben Hero-Karte
+              (die Karte selbst trägt keinen Anker mehr) — der Inhalt und sein Aussehen sind
+              unverändert, nur die Anker-Rechtecke überlappen nicht mehr. */}
+          <section className="player-drawer-section player-drawer-hero-surface">
             {/* Einheitliches Kopf-Layout für ALLE Spieler (auch Free Agents):
                 Profil-Karte mit CA/PO-Sternstapel + KPI-Grid (OVR/PPs/MVS).
                 Free Agents sehen dieselbe Struktur — CA/PO als geschätzte Range
                 (`fogged`), OVR/PPs/MVS als "—" (keine Liga-Leistung vor dem
                 Kauf). So sieht das Profil unabhängig vom Einstieg gleich aus. */}
+            <div className="player-drawer-section-block" id="player-drawer-profile">
               <div className="player-drawer-top-grid">
                 <div className="player-drawer-profile-stack">
                   <div className={`player-drawer-profile-card${variant === "page" ? " is-compact" : ""}`}>
@@ -2463,8 +2483,8 @@ export default function PlayerDetailDrawer({
                   })}
                 </div>
               </div>
-            {showCompactAxisStrip ? axisStrip : null}
-            {isScoutedProfile && visibleScoutedAttributeChips.length ? (
+              {showCompactAxisStrip ? axisStrip : null}
+              {isScoutedProfile && visibleScoutedAttributeChips.length ? (
               <div className="player-drawer-chip-row player-drawer-scout-attribute-row">
                 {visibleScoutedAttributeChips.map((entry) => (
                   <span
@@ -2484,7 +2504,8 @@ export default function PlayerDetailDrawer({
                   </span>
                 ))}
               </div>
-            ) : null}
+              ) : null}
+            </div>
             {showFullAxisGrid ? (
               <div className="player-drawer-section-block" id="player-drawer-axis">
                 {variant === "page" ? (

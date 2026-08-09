@@ -208,10 +208,12 @@ export function ManagerOfficeClient({
     ? selectedTeamGeneralManager.assignment.source === "board_replacement" ||
       selectedTeamGeneralManager.assignment.dismissalReason
       ? "Board-Wechsel · neuer GM"
-      : (selectedBoardConfidence?.pressure ?? 0) >= 8
-        ? `Hot Seat · Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`
+      : // Formatfix (Durchklick): Druck ist eine 1-Nachkommastellen-Größe — roh interpoliert
+        // stand hier „Druck 8.4/10" (JS-Punkt statt Hauskomma).
+        (selectedBoardConfidence?.pressure ?? 0) >= 8
+        ? `Hot Seat · Druck ${formatLocalePoints(selectedBoardConfidence?.pressure, 1)}/10`
         : (selectedBoardConfidence?.pressure ?? 0) >= 6
-          ? `Board schaut hin · Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`
+          ? `Board schaut hin · Druck ${formatLocalePoints(selectedBoardConfidence?.pressure, 1)}/10`
           : selectedTeamGeneralManager.profile.title
     : null;
 

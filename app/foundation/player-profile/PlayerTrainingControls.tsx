@@ -46,13 +46,40 @@ function getDemandStatusLabel(status: PlayerDemandStatus) {
   }
 }
 
+/**
+ * Wie viel der ZUWÄCHSE stammt aus echten Spieltags-Leistungen statt aus dem Trainingsplan?
+ *
+ * GEWÜNSCHT VON CHRIS: „ich will nur dass im tooltipp im spielerprofil bei training sichtbar ist
+ * wie viel performance anteil in seinen verbesserungen steckt."
+ *
+ * Bezugsgröße sind bewusst nur die ZUWÄCHSE (Training + Performance), NICHT das Netto. Das Netto
+ * enthält die Regression, und ein Spieler mit starkem Alterungsdruck kann netto fallen, obwohl
+ * Performance kräftig beigetragen hat — ein Anteil an einer negativen Summe wäre schlicht
+ * unlesbar. „Von dem, was dazukam, stammt X % aus Leistung" ist die Frage, die sich stellt.
+ */
+function buildPerformanceShare(row: TrainingPlayerRowView) {
+  const training = row.attributeForecast.reduce((sum, entry) => sum + Math.max(0, entry.training), 0);
+  const performance = row.attributeForecast.reduce((sum, entry) => sum + Math.max(0, entry.performance), 0);
+  const zuwachs = training + performance;
+  return {
+    training,
+    performance,
+    // Ohne Zuwachs gibt es keinen Anteil — dann `null` statt einer erfundenen 0 %.
+    sharePct: zuwachs > 0.05 ? (performance / zuwachs) * 100 : null,
+  };
+}
+
 function buildStatForecastTooltip(row: TrainingPlayerRowView) {
   const appliedTraining = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
   const appliedPerformance = row.attributeForecast.reduce((sum, entry) => sum + entry.performance, 0);
   const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+  const anteil = buildPerformanceShare(row);
   return [
     "Netto = Summe aller Attribut-Deltas nach Regression, Training und Performance.",
     `Angewendet: Training ${formatNlSignedNumber(appliedTraining, 1)} · Performance ${formatNlSignedNumber(appliedPerformance, 1)} · Regression ${formatNlSignedNumber(appliedRegression, 1)}`,
+    anteil.sharePct != null
+      ? `Davon aus echten Spieltags-Leistungen: ${formatNlNumber(anteil.sharePct, 0)} % der Zuwächse (Regression nicht eingerechnet).`
+      : "Noch keine Zuwächse — der Performance-Anteil lässt sich erst beziffern, wenn etwas dazukommt.",
     `Trainingsbudget +${formatNlNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitäts- und Potential-Multiplikatoren. Schritt-für-Schritt unten unter "Wie kommt das zustande?".`,
   ].join("\n");
 }
@@ -95,6 +122,7 @@ export default function PlayerTrainingControls({
   const tone = getDevelopmentTone(row);
   const appliedPerformanceSetpoints = row.organicForecast.performanceSetpoints;
   const statForecastTooltip = buildStatForecastTooltip(row);
+  const performanceShare = buildPerformanceShare(row);
   // T-009: Es gibt keinen Season-Phasen-Lock mehr für die Trainingsintensität
   // (siehe lib/foundation/game-phase-action-policy.ts,
   // isTrainingIntensityLockedForSeason() liefert dauerhaft `false`). Training
@@ -139,9 +167,25 @@ export default function PlayerTrainingControls({
             {formatNlNumber(row.organicForecast.netSetpoints, 1)}
           </strong>
         </div>
-        <div title="Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet). Details unter 'Wie kommt das zustande?'.">
+        {/* Der Performance-Anteil steht bewusst HIER, am Training-Feld: die Frage „wie viel davon
+            habe ich mir auf dem Platz verdient und wie viel kommt aus dem Trainingsplan?" stellt
+            sich genau beim Training. Am Performance-Feld selbst waere sie tautologisch. */}
+        <div
+          title={
+            `Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet).\n` +
+            (performanceShare.sharePct != null
+              ? `Von den tatsaechlichen Zuwaechsen stammen ${formatNlNumber(performanceShare.sharePct, 0)} % aus echten Spieltags-Leistungen ` +
+                `(+${formatNlNumber(performanceShare.performance, 1)}) und ${formatNlNumber(100 - performanceShare.sharePct, 0)} % aus dem Training ` +
+                `(+${formatNlNumber(performanceShare.training, 1)}). Regression ist dabei nicht eingerechnet.\n`
+              : `Noch keine Zuwaechse — der Performance-Anteil laesst sich erst beziffern, wenn etwas dazukommt.\n`) +
+            `Details unter 'Wie kommt das zustande?'.`
+          }
+        >
           <span>Training</span>
           <strong>+{formatNlNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+          {performanceShare.sharePct != null ? (
+            <small className="muted nl-tnum">{formatNlNumber(performanceShare.sharePct, 0)} % aus Leistung</small>
+          ) : null}
         </div>
         <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training. Vergleich zu Saison-PPs/MVS unten.">
           <span>Performance</span>

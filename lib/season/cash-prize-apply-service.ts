@@ -2,6 +2,8 @@ import type { CashPrizeApplyLogRecord, GameState } from "@/lib/data/olyDataTypes
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { applyFormCardPenaltyWithRerank } from "@/lib/season/form-card-penalty-service";
+import { isSeasonComplete } from "@/lib/season/season-completion-state";
 import { resolveSeasonGuvByTeam } from "@/lib/finance/season-guv-resolver";
 import { applySeasonEndTail } from "@/lib/season/season-end-tail-settlement";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewResult } from "@/lib/season/prize-money-preview";
@@ -235,10 +237,35 @@ async function prepareCashPrizeApply(
   const duplicateDetected = existingAuditLog != null && (phase === "matchday" || sponsorPayoutSettled);
   const staleApplyLogWithoutPayout = existingAuditLog != null && !duplicateDetected;
   const plannedChanges = toPlannedChanges(preview.items);
+  /**
+   * DER SAISON-RIEGEL — die angeforderte Saison muss die Saison des Spielstands sein.
+   *
+   * BEFUND (Saisonende-Prüfung am Live-Abbild, nachgestellt): Alle Idempotenz-Wachen dieses
+   * Schritts prüfen `params.seasonId` (Audit-Log, `hasSeasonEndSponsorPayout`), aber die Buchung
+   * selbst (`applySponsorSettlement`, `applyApronSettlement`, `applySeasonEndTail`) läuft immer auf
+   * `gameState.season.id` — der AKTUELLEN Saison. Ein Aufruf mit der Saison-ID der VORSAISON, nach
+   * dem Saisonwechsel abgeschickt (veralteter Tab, Doppelklick im Rennen mit „Neue Saison
+   * starten"), rutschte deshalb an jeder Wache vorbei (das alte Log trägt einen anderen
+   * `matchdayId`) und buchte die KOMPLETTE Saisonende-Abrechnung der NEUEN Saison an deren
+   * Spieltag 1: Sponsorgeld und Gehaltsabzug zur Unzeit — und die Team-Idempotenz der
+   * Sponsor-Abrechnung überspringt dann am ECHTEN Saisonende der neuen Saison alle Zahlungen.
+   * Gemessen am Testabbild: −299,5 netto an Spieltag 1 von Season 3, ausgelöst durch einen
+   * „season-2"-Aufruf.
+   *
+   * Auf allen legitimen Wegen (Saisonende-Panel, Cockpit-Abschluss, Nachbuchen) ist die
+   * angeforderte Saison immer die aktuelle — die Phasen des Saisonendes laufen VOR dem
+   * `next_season_setup`, erst der wechselt `season.id`. Ein Mismatch ist also immer ein
+   * veralteter Aufruf und wird blockiert statt umgedeutet.
+   */
+  const currentSeasonId = source === "sqlite" ? resolveLocalSave(persistence, scope.saveId).gameState.season.id : null;
+  const staleSeasonScope = source === "sqlite" && phase === "season_end" && currentSeasonId !== scope.seasonId;
   const blockingReasons =
     source === "prisma"
       ? ["Prisma/Supabase mode is read-only. Cash Apply is only allowed in the local SQLite test save."]
-      : buildBlockingReasons(preview, duplicateDetected, phase);
+      : [
+          ...buildBlockingReasons(preview, duplicateDetected, phase),
+          ...(staleSeasonScope ? [`stale_season_scope:${scope.seasonId}_is_not_current_${currentSeasonId}`] : []),
+        ];
   const warnings = buildWarnings(preview, duplicateDetected, phase);
   if (staleApplyLogWithoutPayout) {
     // Sichtbar machen, dass hier ein alter Lauf nachgeholt wird, statt es still zu tun.
@@ -559,17 +586,59 @@ export async function executeCashPrizeApply(
     };
   }
 
+  /**
+   * FORMKARTEN-STRAFE VOR DER LIGA-ABRECHNUNG — auch auf DIESEM Weg.
+   *
+   * Der Saisonabschluss im Cockpit (`season-completion-service`) wendet die Strafe (Punktabzug +
+   * Re-Rank, `applyFormCardPenaltyWithRerank`) VOR Sponsor-/Apron-Abrechnung und Snapshot an —
+   * genau damit die rang-basierten Payouts die bestrafte Endtabelle sehen. Dieser Weg hier ist
+   * aber der, den das Saisonende-Panel im normalen Spielverlauf benutzt („Sponsoren buchen") —
+   * und er kannte die Strafe nicht: Sponsorgeld, Apron und der später eingefrorene Snapshot
+   * rechneten auf der UNbestraften Tabelle. Der Rückfall im Preseason-Workflow
+   * (`applyFormCardPenaltyToStandings`) läuft erst bei `next_season_setup`, zieht nur Punkte ab
+   * (kein Re-Rank) und liegt HINTER allen Payouts — dieselbe Wirkungslosigkeit, die Audit R2/V4
+   * für den alten Completion-Pfad dokumentiert.
+   *
+   * Deshalb hier, nach Blocker- und Token-Prüfung und vor der Buchung: Strafe anwenden,
+   * persistieren, Vorschau auf der bestraften Tabelle NEU bauen. Idempotent über
+   * `formCardPenaltyAppliedSeasonIds` — wer zuerst kommt (Cockpit oder Panel), straft; der andere
+   * lässt es. Nur am Saisonende: bei `phase === "matchday"` gibt es keine Endtabelle zu strafen.
+   *
+   * ZUSÄTZLICH an `isSeasonComplete` gebunden (dieselbe Lesart wie der Cockpit-Abschluss): dieser
+   * Endpoint ist auch ein Benchmark-Werkzeug und kann mitten in einer Saison aufgerufen werden
+   * (siehe tests/economy-cashflow-invariant.test.ts, Mini-Saison nach 2 Spieltagen). Eine noch
+   * laufende Saison darf nicht für „unbenutzte" Karten bestraft werden, die der Spieler an den
+   * verbleibenden Spieltagen noch einsetzen kann.
+   */
+  let effective = prepared;
+  const saveForPenalty = resolveLocalSave(persistence, params.saveId);
+  if (
+    (params.phase === "matchday" ? "matchday" : "season_end") === "season_end" &&
+    isSeasonComplete(saveForPenalty.gameState)
+  ) {
+    const penalty = applyFormCardPenaltyWithRerank(saveForPenalty.gameState, params.seasonId);
+    if (penalty.applied) {
+      persistence.saveSingleplayerState(saveForPenalty.saveId, penalty.gameState);
+      effective = await prepareCashPrizeApply({ ...params, execute: true, dryRun: false }, persistence);
+      if (effective.blockingReasons.length > 0) {
+        // Konservativ: erzeugt die bestrafte Tabelle neue Blocker (z. B. ein nicht auflösbarer
+        // Gleichstand), wird NICHT auf dem alten Stand gebucht, sondern blockiert gemeldet.
+        return buildResult(effective, { applied: false, auditLogId: effective.existingAuditLog?.id ?? null });
+      }
+    }
+  }
+
   const auditLog = writeLocalCashPrizeApply({
     persistence,
     saveId: params.saveId,
-    preview: prepared.preview,
-    idempotencyKey: prepared.idempotencyKey,
+    preview: effective.preview,
+    idempotencyKey: effective.idempotencyKey,
     matchdayId: params.matchdayId ?? resolveLocalSave(persistence, params.saveId).gameState.matchdayState.matchdayId,
     phase: params.phase === "matchday" ? "matchday" : "season_end",
   });
 
   return {
-    ...buildResult(prepared, { applied: true, auditLogId: auditLog.id }),
+    ...buildResult(effective, { applied: true, auditLogId: auditLog.id }),
     ok: true,
     dryRun: false,
     canApply: true,

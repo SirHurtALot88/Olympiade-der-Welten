@@ -161,11 +161,11 @@ export function computeApronLines(gameState: GameState): ApronLines {
  * Ergebnissen).
  */
 export function hasSeasonBeenPlayed(gameState: GameState): boolean {
-  const seasonId = gameState.season.id;
-  const hatErgebnis = (gameState.seasonState.matchdayResults ?? []).some(
+  const seasonId = gameState.season?.id;
+  const hatErgebnis = (gameState.seasonState?.matchdayResults ?? []).some(
     (result) => result.seasonId === seasonId,
   );
-  const hatTabellenbuchung = (gameState.seasonState.standingsApplyLogs ?? []).some(
+  const hatTabellenbuchung = (gameState.seasonState?.standingsApplyLogs ?? []).some(
     (log) => log.seasonId === seasonId,
   );
   return hatErgebnis || hatTabellenbuchung;
@@ -191,8 +191,8 @@ export function hasSeasonBeenPlayed(gameState: GameState): boolean {
  * nicht für die Aufbauphase davor. Ab dem ersten Spieltag steht die Grenze fest.
  */
 export function resolveSeasonApronLines(gameState: GameState): ApronLines {
-  const snapshot = gameState.seasonState.apronLinesSnapshot;
-  const passtZurSaison = snapshot?.seasonId === gameState.season.id;
+  const snapshot = gameState.seasonState?.apronLinesSnapshot;
+  const passtZurSaison = snapshot?.seasonId === gameState.season?.id;
   if (passtZurSaison && snapshot && hasSeasonBeenPlayed(gameState)) {
     return snapshot;
   }

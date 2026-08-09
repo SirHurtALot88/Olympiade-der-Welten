@@ -34,6 +34,7 @@ import {
   TRACK_ROUND_MS,
 } from "../DisciplineStageNativeArena";
 import { TeamFrame, HighlightRing, tokenRadius } from "./benchmark";
+import { fmt1 } from "../../stage-format";
 import type { DisciplineFieldProps, RT } from "./types";
 
 export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactNode {
@@ -588,7 +589,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                         const relC = relColor(t.rel);
                         return (
                           <g style={{ fontVariantNumeric: "tabular-nums" }}>
-                            <title>{`abgeleitet · K ${k} · D ${d} · A ${a} · KDA ${kda.toFixed(1)} · HS ${hs}% · PTS ${pts.toFixed(1)}`}</title>
+                            <title>{`abgeleitet · K ${k} · D ${d} · A ${a} · KDA ${fmt1(kda)} · HS ${hs}% · PTS ${fmt1(pts)}`}</title>
                             {/* Beziehung: Zeilen-Band + linke Kante (mine=blau/ally=grün/rival=rot) */}
                             {relC ? (
                               <>
@@ -607,10 +608,11 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                             </text>
                             {/* rechts: KDA (farbcodiert) · PTS (Wertungs-Headline); HS% im Steckbrief/Tooltip */}
                             <text x={x1 - 52} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs} fontWeight={800} fill={kdaCol}>
-                              {kda.toFixed(1)}
+                              {/* Formatfix (Durchklick): Hauskomma statt toFixed-Punkt. */}
+                              {fmt1(kda)}
                             </text>
                             <text x={x1 - 6} y={yy} dominantBaseline="middle" textAnchor="end" fontSize={fs + 0.5} fontWeight={800} fill="var(--nl-accent)">
-                              {pts.toFixed(1)}
+                              {fmt1(pts)}
                             </text>
                           </g>
                         );

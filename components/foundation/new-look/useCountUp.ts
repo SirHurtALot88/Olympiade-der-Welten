@@ -53,7 +53,13 @@ export function useCountUp(target: number | null | undefined, opts?: UseCountUpO
 
     const tick = (now: number) => {
       if (cancelled) return;
-      const progress = Math.min(1, (now - start) / durationMs);
+      // BUGFIX (Durchklick, Saisonstand): `now` ist der Frame-Zeitstempel des rAF-Callbacks
+      // und kann VOR dem oben per `performance.now()` gemessenen `start` liegen (der Frame
+      // begann, bevor der Effect lief — unter Last um zig Millisekunden). Ohne Klammer wurde
+      // `progress` negativ und `eased = 1 − (1 − p)³` damit ebenfalls — der Zähler zeigte
+      // NEGATIVE Zwischenwerte („Rang #−2", „MW −15,7 Mio"), und wenn der Main-Thread danach
+      // sekundenlang blockiert war, blieb genau dieser unmögliche Zustand stehen.
+      const progress = Math.min(1, Math.max(0, (now - start) / durationMs));
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplay(safeTarget * eased);
       if (progress < 1) {

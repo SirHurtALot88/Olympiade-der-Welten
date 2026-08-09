@@ -72,7 +72,12 @@ describe("K3 — Einnahmen-Marker als Legendenpunkt statt abgeschnittenem SVG-Te
 
   it("Einnahmen stehen jetzt als eigener Legendenpunkt mit echtem Wert", () => {
     expect(MARKUP).toContain('<span className="nl-credits-burden-legend-marker" aria-hidden="true" />');
-    expect(MARKUP).toContain("Einnahmen (Referenz)");
+    // Durchklick-Fix „eine Quelle pro Größe": das nackte „Einnahmen (Referenz)" kollidierte mit
+    // „Einnahmen (Saison)" der Finanzen-Seite (61,6 vs. 64,1 Mio — beides richtig, zwei Größen).
+    // Die Kredit-Zahl heißt jetzt nach ihrer echten Rolle: Bemessungsgrundlage des Kreditsystems
+    // aus der Vorsaison-Sponsor-Abrechnung.
+    expect(MARKUP).toContain("Einnahmen-Bemessung (Sponsor Vorsaison)");
+    expect(MARKUP).not.toContain(">Einnahmen (Referenz)<");
     expect(MARKUP).toContain("{formatNlMoney(safeRevenue)}");
   });
 });

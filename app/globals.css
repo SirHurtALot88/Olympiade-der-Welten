@@ -47398,10 +47398,13 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-ranks-formbonus {
+  /* Formkarten-SCORE-Summe (andere Skala als die PPs daneben) — bewusst gedämpft
+     statt grün: das ist eine Einordnung, kein PP-Bonus (und kann negativ sein;
+     vorher stand auch „−120,9" in Bonus-Grün). */
   margin-left: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--nl-good);
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-ranks-value-bar .nl-progress-track {

@@ -57,6 +57,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Arena · Disziplin-Bühne",
+      "pr": null,
+      "text": "Zwei Testlücken geschlossen, die seit Längerem offen standen und echte Fehler verdecken konnten. Zum einen konnte die Disziplin-Bühne beim Laden abstürzen: solange der Spielstand noch nicht vollständig da war, griff die Bereitschaftsprüfung auf die Teamliste zu, die es in dem Moment noch gar nicht gab. Dieselbe Schwäche steckte an drei weiteren Stellen und ist überall abgesichert. Zum anderen fehlte eine Testdatei, die bei einem früheren Umbau versehentlich mitgelöscht worden war, während der Test sie weiter lud — sie ist wieder da. Damit laufen alle Arena- und Bühnen-Prüfungen wieder vollständig durch, und rote Tests bedeuten künftig wieder einen echten Fehler statt Altlast.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Überall · Statuszeile",
       "pr": null,
       "text": "Der Preseason-Banner zeigte unter „Grund anzeigen“ rohe Enum-Codes wie „roster_after_market_plan_below_player_min“ — auf jeder Seite. Alle Blocker-Codes sind jetzt deutsche Klartextsätze, ein unbekannter Code bekommt künftig einen lesbaren Ersatztext statt durchzurutschen, und „482 Setup-Aktionen“ heißt jetzt „Team-Einstellungen“.",
@@ -156,6 +165,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Teams · Spielerkarte",
+      "pr": null,
+      "text": "Zwei versteckte Absturz-Fallen entschärft, bevor sie je jemanden erwischt haben. Das Teams-Detail und die große Spielerkarte riefen einen Teil ihrer React-Bausteine nur unter einer Bedingung auf — das ging bisher nur deshalb gut, weil die Bedingung im laufenden Spiel praktisch nie kippt. Wäre sie je gekippt, wäre die jeweilige Ansicht kommentarlos mit einem Fehler abgestürzt. Beide Stellen sind jetzt so umgebaut, dass die Bausteine immer in derselben Reihenfolge laufen; sichtbar ändert sich dadurch nichts. Zusätzlich wacht ab jetzt ein automatischer Prüfer (ESLint) über den gesamten Code und schlägt sofort Alarm, wenn so eine Falle wieder eingebaut würde — der Prüfstand dafür existierte bisher nur dem Namen nach.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Finanzen",
       "pr": null,
       "text": "Der Apron-Ausweis nennt jetzt Namen: In der Karte Apron & Kredite steht neu die Liste Apron liga-weit — wer zahlt, wer bekommt. Vorher hieß es nur 28 Zahler · 3 Empfänger · Topf 428,7 — jetzt steht jedes Team mit Ligarang, geglätteter Bemessungsgrundlage, Abstand zur 1. Linie und dem Betrag da, den es nach der Hochrechnung zahlt (rot, mit Deckel-Marke, wenn der Deckel die Abgabe begrenzt) oder bekommt (grün). Dein Team ist hervorgehoben und immer sichtbar. Damit es ein Game bleibt und kein Excel, zeigt die Liste zuerst die Extreme — größte Zahler, dein Team, alle Empfänger — und der Aufklapp-Knopf trägt die Zwischensumme der übrigen Zahler, damit die Rechnung auch zugeklappt aufgeht. Die Summenprobe steht im Klartext darüber: was die Zahler einzahlen, was die Empfänger daraus erhalten, und was wegen des Empfänger-Deckels verfällt — es wird nie mehr ausgeschüttet als eingesammelt. Alles aus derselben Hochrechnung wie die Karte selbst, nichts neu gerechnet.",
@@ -168,6 +186,15 @@
       "seite": "Einsatzliste · Formkarten",
       "pr": null,
       "text": "Die Bereichsfarben (POW/SPE/MEN/SOC) sind im Formkarten-Dropdown wieder zu sehen: bisher trugen alle vier denselben grauen Punkt und die Farbe hing allein an einer CSS-Angabe, die native Auswahlmenüs in Chrome und Safari ignorieren — jetzt steht ein farbiger Kreis im Text selbst, der jedes Betriebssystem-Menü übersteht.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Formkarten-Übernutzungs-Strafe (Punktabzug plus Neu-Einordnung der Endtabelle) greift jetzt auch auf dem normalen Spielerweg über „Sponsoren buchen“ — vorher lief sie nur im Cockpit-Saisonabschluss, sodass Sponsor- und Apron-Abrechnung sowie der eingefrorene Saison-Schnappschuss auf der unbestraften Tabelle rechneten; sie greift zudem nur bei wirklich beendeter Saison, damit eine laufende Saison nicht für Karten bestraft wird, die noch gespielt werden können.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"
@@ -318,6 +345,15 @@
     },
     {
       "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Saisonende-Buchung prüft jetzt, dass die angeforderte Saison die aktuelle ist: ein veralteter „Sponsoren buchen“-Aufruf mit der Saison-ID der Vorsaison (alter Tab, Doppelklick im Rennen mit „Neue Saison starten“) rutschte vorher an allen Duplikat-Wachen vorbei und buchte die komplette Saisonende-Abrechnung der neuen Saison schon an deren Spieltag 1 — Sponsorgeld und Gehaltsabzug zur Unzeit, und am echten Saisonende wären alle Zahlungen übersprungen worden.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
       "seite": "Sponsoren · Neues Spiel",
       "pr": null,
       "text": "Beim Start eines neuen Spiels gibt es wieder fünf Sponsorenangebote statt vier: die Achse „Frische“ fiel aus dem Angebot, weil die Karten erzeugt werden, bevor der Liga-Draft die Kader angelegt hat — besonders ärgerlich, weil die KI-Teams unmittelbar danach unterschreiben und ihre Verträge nie neu gebaut werden, die Achse also der gesamten Liga für Saison 1 fehlte.",
@@ -348,6 +384,69 @@
       "seite": "Markt · Freie Spieler",
       "pr": null,
       "text": "Negative Eigenschaften verschwinden nicht mehr spurlos aus der Freie-Spieler-Liste: bei Scouting-Stufe 0 fehlte nicht nur der Trait, sondern auch der Hinweis „N verborgen“ — ein Spieler mit schlechten Eigenschaften sah damit aus wie einer ohne, was eine falsche Sicherheit erzeugte statt einer sichtbaren Lücke.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand (Ranks)",
+      "pr": null,
+      "text": "Im PP-Board stand der Formkarten-Wert als nackte Klammer neben den PPs („9,6 (−120,9)“) — der „Bonus“ wirkte größer als der Gesamtwert, dabei sind es zwei Skalen (PPs gegen Score-Modifikatoren). Der Wert heißt jetzt sichtbar „Form-Score“, steht gedämpft statt in Bonus-Grün und erklärt seine Skala im Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Auf derselben Seite standen „Ganze Rangliste · 314 Spieler“ (PP-Kategorien) und „340 Spieler“ (OVR/Training) als nackte Zahlen nebeneinander. Beide stimmen — sie meinen verschiedene Mengen: nur Spieler mit Wertung gegen alle gemeldeten. Das Label sagt das jetzt: „314 von 340 gemeldeten mit Wertung“ bzw. „alle 340 gemeldeten Spieler“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Kredite nannten „Einnahmen (Referenz) 64,1 Mio“, die Finanzen daneben „Einnahmen (Saison) 61,6 Mio“ — dieselbe Vokabel für zwei absichtlich verschiedene Größen. Die Kredit-Zahl heißt jetzt nach ihrer echten Rolle „Einnahmen-Bemessung (Sponsor Vorsaison)“: es ist die Bemessungsgrundlage des Kreditrahmens aus der abgerechneten Vorsaison, keine laufende Saison-Hochrechnung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Scouting",
+      "pr": null,
+      "text": "Die Kopf-Kachel „Budget 2,5 Mio“ zeigte in Wahrheit das aktuelle Team-Cash, nicht das Startbudget (205). Sie heißt jetzt „Cash · verfügbar am Markt“ — die Zahl, mit der am Transfermarkt wirklich bezahlt wird.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand",
+      "pr": null,
+      "text": "Beim Seitenaufbau standen sekundenlang unmögliche Werte wie „Rang #−2“ und „MW −15,7 Mio“ in den „Dein Team“-Kacheln: die Zähler-Animation konnte mit negativem Fortschritt starten (rAF-Zeitstempel vor dem Animationsstart) und fror unter Last genau dort ein. Der Zähler klemmt Fortschritt jetzt bei 0 ab, und die Saisonstand-Kacheln zeigen Rang, Punkte und Marktwert ab dem ersten Frame fest — wie die Finanzen-Kopfzahlen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Mehrere Seiten",
+      "pr": null,
+      "text": "Zahlen, die am Haus-Formatierer vorbei liefen, schrieben Punkt statt Komma („95.5%“ im Arena-Treemap, „Druck 3.4 · Board 8.4“ auf Home, im Team-Dossier und in der Inbox) oder zwei Nachkommastellen neben 1-Nachkommastellen-Geldwerten („+54,27“ bei den Marktwert-/Gehalts-Deltas der Spieler-Tabelle). Alle laufen jetzt über die Haus-Formatierer mit de-DE-Komma und einer Nachkommastelle; der Disziplin-Bühnen-Formatierer fmt1 formatiert zentral de-DE.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Spieler-Detail",
+      "pr": null,
+      "text": "Die Reiter-Pille im Spieler-Profil sprang an der Grenze „Stats“/„Details“ um eins daneben, weil der „Details“-Anker im DOM innerhalb des „Stats“-Ankers steckte und der Scroll-Beobachter beim Hochscrollen den veralteten Messwert des äußeren Ankers gewinnen ließ. Die Anker sind jetzt Geschwister in derselben Karte — Inhalt und Optik unverändert, nur die Markierung stimmt jetzt.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"

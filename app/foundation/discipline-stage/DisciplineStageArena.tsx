@@ -849,6 +849,38 @@ export default function DisciplineStageArena({
         mutatorByTeam.set(tr.teamId, cur);
       }
     }
+    /**
+     * ROHDATEN FÜR „Δ MODIFIKATOREN" — je Team und Disziplin-Seite die BASIS-Summe (Leistung vor
+     * allen Modifikatoren, `entry.baseValue`) und der ENDSTAND (`teamResult.score`).
+     *
+     * Bewusst nur die Summen und NICHT die fertigen Ränge: welche Seite aufgedeckt ist, weiß allein
+     * das Panel (`d1Revealed`/`d2Revealed`), und die Aufdeck-Regel liegt dort für Punkte, Form,
+     * Captain und Mutator schon zentral. Zwei Stellen, die dieselbe Regel je selbst auslegen,
+     * laufen früher oder später auseinander — genau daran krankte die Bühne zuletzt.
+     *
+     * Wozu das gut ist: das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain,
+     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. `matchday-arena-presenter.ts` rechnet
+     * diese Zahl bis heute (`baseRank`/`rankDelta`), aber die Funktion dort ruft niemand mehr auf —
+     * sie entstand und verschwand ungesehen. Auf Wunsch von Chris zurückgeholt.
+     */
+    const modifierBaseByTeam = new Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }>();
+    for (const dp of preview.disciplinePreviews ?? []) {
+      const seite = dp.disciplineId === d1?.disciplineId ? "d1" : dp.disciplineId === d2?.disciplineId ? "d2" : null;
+      if (!seite) continue;
+      for (const tr of dp.teamResults ?? []) {
+        const cur = modifierBaseByTeam.get(tr.teamId) ?? { d1Base: 0, d1Score: 0, d2Base: 0, d2Score: 0 };
+        const basisSumme = (tr.entries ?? []).reduce((summe, e) => summe + (e.baseValue ?? 0), 0);
+        if (seite === "d1") {
+          cur.d1Base += basisSumme;
+          cur.d1Score += tr.score ?? 0;
+        } else {
+          cur.d2Base += basisSumme;
+          cur.d2Score += tr.score ?? 0;
+        }
+        modifierBaseByTeam.set(tr.teamId, cur);
+      }
+    }
+
     // Spieler je Team und Disziplin-Seite für die ausklappbaren Spalten der Spieltags-
     // Wertung. Quelle sind dieselben Resolve-Entries wie oben — kein zweiter Rechenweg.
     // `pp` ist der dem Spieler gutgeschriebene Player-Point-Anteil, `score` sein
@@ -973,7 +1005,7 @@ export default function DisciplineStageArena({
       d1DisciplineId: d1?.disciplineId ?? null,
       d2DisciplineId: d2?.disciplineId ?? null,
     });
-    return { d1, d2, standings, mutatorByTeam, playersByTeam, modifiersByTeam, teamResults };
+    return { d1, d2, standings, mutatorByTeam, modifierBaseByTeam, playersByTeam, modifiersByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
 
   /**
@@ -2357,6 +2389,7 @@ export default function DisciplineStageArena({
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
             onHoverTeam={previewTeam}
             mutatorByTeam={matchdayPanel.mutatorByTeam}
+            modifierBaseByTeam={matchdayPanel.modifierBaseByTeam}
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
           />

@@ -37,7 +37,6 @@ import {
   formatNlNumber,
   formatNlMoney,
   nlToneClass,
-  useCountUp,
   type NlBarChartBar,
   type NlRankingDrawerRow,
   type NlTone,
@@ -704,12 +703,17 @@ export default function SeasonStandingsNewLook({
   const ownGapToLeaderLabel =
     ownGapToLeader == null ? "—" : ownGapToLeader <= 0 ? "Spitze" : formatNlNumber(ownGapToLeader, 1);
 
-  // Hero-/KPI-Zähler (#Wave2): nur die eigenen Team-Kennzahlen zählen hoch —
-  // Board, Podium-Zeilen und Tabelle bleiben unverändert (viele Zeilen, kein
-  // Zähler pro Zeile). Respektiert prefers-reduced-motion via `useCountUp`.
-  const animatedOwnRank = useCountUp(selectedTeamSummary?.rank ?? null);
-  const animatedOwnPoints = useCountUp(selectedTeamSummary?.points ?? null);
-  const animatedOwnMarketValue = useCountUp(selectedTeamSummary?.marketValueTotal ?? null);
+  // BUGFIX (Durchklick, „Saisonstand-Kacheln zählen durch negative Zwischenwerte hoch"):
+  // die drei „Dein Team"-Chips liefen vorher über `useCountUp`. Beim Seitenaufbau stand
+  // dadurch sekundenlang „Rang #−2" / „MW −15,7 Mio" auf dem Schirm (rAF-Zeitstempel vor
+  // dem Animationsstart → negativer Fortschritt; unter Last fror genau dieser Frame ein —
+  // Klammer inzwischen in `useCountUp` selbst). Ein Rang ist außerdem eine Ordnungszahl:
+  // jeder Zwischenstand („#0", „#11" auf dem Weg zu „#23") ist ein Zustand, den es nicht
+  // gibt. Gleiches Vorgehen wie Markt-Audit F1 auf der Finanzen-Seite („Geldzahlen stehen
+  // ab dem ersten Frame fest"): keine Zähler-Animation auf Rang/Punkten/Marktwert.
+  const animatedOwnRank = selectedTeamSummary?.rank ?? null;
+  const animatedOwnPoints = selectedTeamSummary?.points ?? null;
+  const animatedOwnMarketValue = selectedTeamSummary?.marketValueTotal ?? null;
 
   /**
    * Daten-Modus-Balkenchart: folgt standardmäßig `points`, schwenkt aber
