@@ -862,6 +862,17 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
         {apron.gedeckeltCount > 0
           ? `${apron.gedeckeltCount === 1 ? "1 Zahler ist" : `${apron.gedeckeltCount} Zahler sind`} durch den Deckel begrenzt (höchstens der halbe rangabhängige Wertungsanteil): sie zahlen weniger, als ihr Überschuss nach den Linien-Sätzen ergäbe. Der Topf enthält nur die begrenzten Beträge. `
           : ""}
+        {(() => {
+          // Gedeckelt auf 0,0: das Team steht über den Linien, der Deckel drückt seine
+          // Abgabe aber auf null — in der Tabelle "neutral". Die Fußnote benennt den
+          // Fall, statt ihn stumm in die Zahler-Zählung zu mischen (vorher "18 Zahler").
+          const gedeckeltOhneAbgabe = apron.league.filter((row) => row.gedeckelt && row.rolle !== "zahler").length;
+          return gedeckeltOhneAbgabe > 0
+            ? gedeckeltOhneAbgabe === 1
+              ? "1 weiteres Team trägt das Deckel-Abzeichen, zahlt dank Deckel aber 0,0 und bleibt neutral. "
+              : `${formatNlNumber(gedeckeltOhneAbgabe, 0)} weitere Teams tragen das Deckel-Abzeichen, zahlen dank Deckel aber 0,0 und bleiben neutral. `
+            : "";
+        })()}
         Beträge auf 0,1 Mio gerundet, verteilt wird ungerundet — die Summe der gerundeten Zeilen kann darum minimal von Topf und Ausschüttung abweichen.
       </p>
     </section>

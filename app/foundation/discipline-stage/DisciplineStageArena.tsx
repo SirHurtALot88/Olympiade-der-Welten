@@ -52,7 +52,7 @@ import DisciplineStageMatchdayPanel, {
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
-import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { getMatchdayScoringProgress, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
   buildMatchdayLineupRevision,
@@ -1008,22 +1008,42 @@ export default function DisciplineStageArena({
     return { d1, d2, standings, mutatorByTeam, modifierBaseByTeam, playersByTeam, modifiersByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
 
+  /**
+   * Buchungszustand des Spieltags aus dem SAVE (nicht aus Session-State): welche
+   * Disziplin-Seite ist bereits gewertet? Das ist die Antwort auf den Reload
+   * mitten im Spieltag — `endedDisciplineIds` (Session) ist dann leer, aber die
+   * D1-Buchung steht längst im Spielstand. Dieselbe Quelle benutzen Spielplan
+   * („läuft") und Spieltagsergebnis („Zwischenstand"); ohne sie erzählte die
+   * Arena nach dem Reload „nichts gestartet", während D1 gebucht war.
+   */
+  const scoringProgress = useMemo(
+    () => (matchdayId ? getMatchdayScoringProgress(gameState, matchdayId) : null),
+    [gameState, matchdayId],
+  );
+
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
   // hart kodierten Default ("staffel"). Sonst zeigt die Arena eine Disziplin ohne
   // Preview-Daten → vereinfachtes Modell statt der bestätigten Einsatzliste, und es
   // wirkt wie der falsche Spieltag. Einmal pro Spieltag ausrichten (respektiert
   // manuelle Dropdown-Auswahl); beim Spieltagswechsel richtet es neu aus.
+  //
+  // Halber Spieltag: ist D1 laut Save schon gebucht und D2 offen, richtet die
+  // Bühne auf D2 aus — der Spieler soll nach einem Reload dort weitermachen, wo
+  // der Spieltag wirklich steht, nicht vor der bereits gewerteten Staffel.
   const alignedMatchdayRef = useRef<string | null | undefined>(null);
   useEffect(() => {
     const d1Id = matchdayPanel?.d1?.disciplineId ?? null;
     const d2Id = matchdayPanel?.d2?.disciplineId ?? null;
     if (!d1Id && !d2Id) return;
     if (alignedMatchdayRef.current === matchdayId) return;
-    if (disciplineId !== d1Id && disciplineId !== d2Id && d1Id) {
-      setDisciplineId(d1Id);
+    // Bevorzugte Start-Disziplin: die erste noch UNGEWERTETE Seite des Spieltags.
+    const preferred =
+      scoringProgress?.d1.scored && !scoringProgress?.d2.scored && d2Id ? d2Id : d1Id ?? d2Id;
+    if (preferred && disciplineId !== preferred && disciplineId !== d2Id) {
+      setDisciplineId(preferred);
     }
     alignedMatchdayRef.current = matchdayId;
-  }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId]);
+  }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId, scoringProgress]);
 
   // Spieltags-Disziplinen (d1/d2) DIREKT aus dem Saison-Spielplan — unabhängig von der Engine-Preview.
   // `matchdayPanel` liefert dieselbe Info, ist aber an `preview` gekoppelt (frühes `if (!preview) return null`).
@@ -1326,16 +1346,22 @@ export default function DisciplineStageArena({
    * ersten gewerteten Ergebnis gibt es keine Zeilen, keine Rangzahlen und keine
    * Medaillen-Optik, sondern den erklärenden Platzhalter (VeloPendingRanking).
    */
+  // Eine im SAVE gebuchte Seite ist aufgedeckt — unabhängig vom Session-Zustand.
+  // Das ist kein Spoiler: die Wertung steht bereits im Saisonstand. Ohne diese
+  // Klausel zeigte die Arena nach einem Reload mitten im Spieltag („D1 gebucht,
+  // D2 offen") wieder „Wertung folgt", als wäre nichts gelaufen.
   const panelD1Revealed = Boolean(
     matchdayPanel &&
-      (Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId)) ||
+      (scoringProgress?.d1.scored ||
+        Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId)) ||
         (matchdayPanel.d2?.disciplineId === disciplineId &&
           matchdayPanel.teamResults.some((row) => row.d1Points != null))),
   );
   const panelD2Revealed = Boolean(
     matchdayPanel &&
-      matchdayPanel.d2?.disciplineId === disciplineId &&
-      Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId)),
+      (scoringProgress?.d2.scored ||
+        (matchdayPanel.d2?.disciplineId === disciplineId &&
+          Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId)))),
   );
 
   /**
@@ -1737,7 +1763,16 @@ export default function DisciplineStageArena({
     Record<string, "pending" | "booked" | "failed">
   >({});
   const commitInFlightRef = useRef<Set<string>>(new Set());
-  const commitState = commitStateByDiscipline[disciplineId] ?? null;
+  // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als
+  // gebucht — nach einem Reload mitten im Spieltag zeigt der Status sonst nichts,
+  // und ein Replay der Disziplin würde erneut buchen wollen.
+  const activeSideScoredInSave =
+    matchdayPanel?.d1?.disciplineId === disciplineId
+      ? scoringProgress?.d1.scored ?? false
+      : matchdayPanel?.d2?.disciplineId === disciplineId
+        ? scoringProgress?.d2.scored ?? false
+        : false;
+  const commitState = commitStateByDiscipline[disciplineId] ?? (activeSideScoredInSave ? "booked" : null);
 
   const commitFinishedDiscipline = useCallback(
     (finishedDisciplineId: string) => {
@@ -1751,6 +1786,9 @@ export default function DisciplineStageArena({
       // Nur die beiden Spieltags-Disziplinen werden gewertet. Ein freies Nachspielen
       // ausserhalb des Spieltags-Paars bleibt folgenlos.
       if (!side) return;
+      // Bereits im Save gebucht (z. B. D1 nach einem Reload erneut abgespielt):
+      // NICHT noch einmal buchen — gebucht wird der erste, verbindliche Durchlauf.
+      if (scoringProgress && scoringProgress[side].scored) return;
       if (commitInFlightRef.current.has(finishedDisciplineId)) return;
       if (commitStateByDiscipline[finishedDisciplineId] === "booked") return;
       commitInFlightRef.current.add(finishedDisciplineId);
@@ -1770,7 +1808,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline],
+    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline, scoringProgress],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
@@ -2102,11 +2140,25 @@ export default function DisciplineStageArena({
             onChange={(event) => setDisciplineId(event.target.value)}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
           >
-            {disciplineSelectOptions.map((discipline, index) => (
-              <option key={discipline.id} value={discipline.id}>
-                {devMode || matchdayDisciplineOptions.length === 0 ? discipline.name : `${index + 1}. ${discipline.name}`}
-              </option>
-            ))}
+            {disciplineSelectOptions.map((discipline, index) => {
+              // Buchungszustand aus dem Save direkt am Auswahl-Eintrag: nach einem
+              // Reload mitten im Spieltag sieht man so sofort, dass Disziplin 1
+              // bereits gewertet ist und nur Disziplin 2 noch aussteht.
+              const scored =
+                scoringProgress?.d1.disciplineId === discipline.id
+                  ? scoringProgress.d1.scored
+                  : scoringProgress?.d2.disciplineId === discipline.id
+                    ? scoringProgress.d2.scored
+                    : false;
+              const scoredSuffix = scored ? " · ✓ gewertet" : "";
+              return (
+                <option key={discipline.id} value={discipline.id}>
+                  {devMode || matchdayDisciplineOptions.length === 0
+                    ? `${discipline.name}${scoredSuffix}`
+                    : `${index + 1}. ${discipline.name}${scoredSuffix}`}
+                </option>
+              );
+            })}
           </select>
         </label>
       </div>

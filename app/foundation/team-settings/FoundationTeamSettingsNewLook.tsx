@@ -37,6 +37,10 @@ import type {
   TeamStrategyDraftMap,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { SaveSummary } from "@/lib/persistence/types";
+import {
+  saveContainsCompletedSeason,
+  saveHasReachedSeasonTwo,
+} from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { resolveOwnerDisplayLabel } from "@/lib/foundation/team-control-settings";
 import { formatGermanDateTime, formatGermanSaveTimestamp } from "@/lib/utils/format-datetime";
 
@@ -1289,11 +1293,15 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     Angelegt {formatGermanDateTime(save.createdAt)} · {createdByLabel ?? "Urheber unbekannt"}
                   </span>
                   <div className="nl-teamsettings-flag-row">
-                    <span className={`nl-teamsettings-status${meta?.containsFinalStandings ? " is-good" : " is-warn"}`}>
-                      S1-Endstand {meta?.containsFinalStandings ? "ja" : "nein"}
+                    {/* Nicht das rohe (ggf. veraltete) Flag: ein Save mitten in Season 2 HAT
+                        einen S1-Endstand — Saisonstand/Teams/Leaders zeigen genau dieses
+                        Archiv. Die Herleitung teilt sich beide Chips mit buildScenarioWarning
+                        (saveContainsCompletedSeason / saveHasReachedSeasonTwo). */}
+                    <span className={`nl-teamsettings-status${saveContainsCompletedSeason(meta) ? " is-good" : " is-warn"}`}>
+                      S1-Endstand {saveContainsCompletedSeason(meta) ? "ja" : "nein"}
                     </span>
-                    <span className={`nl-teamsettings-status${meta?.scenarioType === "season2_start" ? " is-good" : ""}`}>
-                      S2-Start {meta?.scenarioType === "season2_start" ? "ja" : "nein"}
+                    <span className={`nl-teamsettings-status${saveHasReachedSeasonTwo(meta) ? " is-good" : ""}`}>
+                      S2-Start {saveHasReachedSeasonTwo(meta) ? "ja" : "nein"}
                     </span>
                     {meta?.isStableTestPoint ? <span className="nl-teamsettings-status is-good">Stable Testpoint</span> : null}
                     {meta?.scenarioType === "sandbox_multiseason_test" ? (

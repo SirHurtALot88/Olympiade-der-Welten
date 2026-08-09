@@ -1,6 +1,7 @@
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 // Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
+import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 
 export type DisciplineCategory =
   | "power"
@@ -1595,7 +1596,7 @@ export type SponsorPayoutLogRecord = {
 
 /**
  * APRON — die beim SCHLIESSEN DES KAUFFENSTERS eingefrorenen Gehaltslinien (siehe
- * lib/season/apron-service.ts und `freezeApronLinesAtBuyWindowClose` in apron-settlement-service.ts).
+ * lib/season/apron-service.ts und `ensureSeasonApronLinesFrozen` in apron-settlement-service.ts).
  * Bewusst NICHT am Saisonende berechnet: sonst kauft man blind gegen eine Grenze, die sich durch die
  * eigenen Käufe verschiebt. Und bewusst NICHT mehr am Ende des Preseason-Workflows: das Kauffenster
  * der neuen Saison öffnet ERST DANACH — eine dort eingefrorene Linie misst die ausgedünnten
@@ -1609,14 +1610,27 @@ export type ApronLinesSnapshot = {
   frozenAtMatchdayId: string;
   createdAt: string;
   /**
-   * "buy_window_close" = beim Schließen des Kauffensters eingefroren (erste Wertung des ersten
-   * Spieltags — der einzige Zeitpunkt, den der Code seit dem Timing-Fix schreibt). Fehlt das Feld,
-   * stammt der Snapshot von einem älteren Stand, der VOR dem Kauffenster der Saison einfror
-   * (Preseason-Workflow/New-Game); solche verfrühten Snapshots ersetzt
-   * `freezeApronLinesAtBuyWindowClose` genau einmal, wenn das Fenster nachweislich erst jetzt
-   * schließt — danach ist auch dieser Snapshot unantastbar.
+   * HERKUNFT des Snapshots — ohne den Vermerk war ein von einem Alt-Build zu früh eingefrorener
+   * Stand von außen nicht von einem gültigen zu unterscheiden (so festgesessen auf Chris' Save,
+   * Median 45,0 gegen real 69,8):
+   *   - "buy_window_close" = von `ensureSeasonApronLinesFrozen` geschrieben. Solange die Saison
+   *     nicht gespielt ist, wird bei jedem Aufruf nachgeführt; endgültig ist der letzte Stand vor
+   *     dem ersten gewerteten Spieltag — dem Schließen des Kauffensters, dem einzigen Zeitpunkt,
+   *     den der Code seit dem Timing-Fix (#467) festschreibt.
+   *   - "recompute_repair" = per `scripts/repariere-apron-linien.ts` neu berechnet, nachdem ein
+   *     Alt-Build-Snapshot in einer bereits gespielten Saison festsaß; `note` nennt Zeitpunkt und
+   *     Grund.
+   * Fehlt das Feld, stammt der Snapshot von einem älteren Build, der VOR dem Kauffenster der
+   * Saison einfror (Preseason-Workflow/New-Game). Solche Snapshots werden in einer bereits
+   * gespielten Saison BEWUSST NICHT automatisch ersetzt: eine Grenze, die mitten in der Saison
+   * wandert, ist genau das, wovor das Einfrieren schützt. Die Heilung läuft ausschließlich über
+   * das Reparaturskript, das vorher nachweist, dass seit dem ersten gewerteten Spieltag keine
+   * Transfers stattfanden — nur dann ist die Neuberechnung der Stand vom Fensterschluss und keine
+   * Schätzung.
    */
-  frozenAtEvent?: "buy_window_close";
+  frozenAtEvent?: "buy_window_close" | "recompute_repair";
+  /** Freitext-Herkunftsvermerk (Reparaturskript: Zeitpunkt und Grund der Neuberechnung). */
+  note?: string;
   medianSalary: number;
   line1: number;
   line2: number;
@@ -3053,6 +3067,14 @@ export type SeasonState = {
    * traegt absichtlich weniger Felder als das Original, und ein Rueckschreiben waere Datenverlust.
    */
   foundationSeasonHistory?: FoundationSeasonHistoryEntry[];
+  /**
+   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — Geschwister der Saison-Historie oben: der fertige
+   * Feld-Rennen-Ledger (gewertete Spieltage je Team), serverseitig auf dem vollen Save
+   * gerechnet, weil die Anfangsladung `matchdayResults`/`disciplineResults` auf den aktiven
+   * Spieltag beschneidet und ein Browser-Neubau sonst „0 gespielte Spieltage" ergibt
+   * (siehe `foundation-field-race-projection`). Wird nie zurueckgeschrieben.
+   */
+  foundationFieldRace?: FoundationFieldRaceProjection;
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;

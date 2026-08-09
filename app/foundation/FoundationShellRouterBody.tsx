@@ -3017,13 +3017,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       ))}
                     </select>
                   </label>
-                  <span className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}>
-                    {isViewingArchivedRanksSeason ? "Archiv" : "Live"}
+                  {/* Wie auf dem Saisonstand (G5): Klartext statt der halbenglischen
+                      Status-Flag-Reihe „Live · Aktive Season · lokale Results" — die
+                      technische Quelle bleibt als Tooltip erreichbar. */}
+                  <span
+                    className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}
+                    title={seasonOverviewSourceLabel}
+                  >
+                    {isViewingArchivedRanksSeason ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
                   </span>
                   {ranksArchiveMissing ? (
-                    <span className="pill is-warning">Rank-Archiv fehlt · Live-Fallback</span>
+                    <span className="pill is-warning">Rang-Archiv fehlt — es zählt der laufende Stand</span>
                   ) : null}
-                  <span className="muted ranks-season-source">{seasonOverviewSourceLabel}</span>
                   {/* W1-Befund 7: Zustand und Aktion trennen — "alles gefüllt"
                       ist ein Status (Pill), nur "nachpicken" ist ein Button. */}
                   {!readMeta.readOnly && readMeta.source !== "prisma" && runBulkAiTeamsRefill ? (

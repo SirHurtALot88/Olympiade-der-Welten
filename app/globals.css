@@ -79093,6 +79093,24 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
+/* Zwischenstands-Hinweis des halb gewerteten Spieltags (D1 gebucht, D2 offen):
+   dieselbe Aussage wie "Spieltag N · läuft" im Spielplan, als Status-Banner über
+   den vorläufigen Zahlen. Warnton bewusst gedämpft — es ist ein Zustand, kein Fehler. */
+.nl-result-partial-note {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--nl-ink);
+  background: color-mix(in srgb, var(--nl-warn) 12%, var(--nl-panel));
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line));
+}
+
+.nl-result-partial-note strong {
+  color: var(--nl-warn);
+  font-weight: 800;
+}
+
 /* =====================================================================================
    S1 · Home-Umbau: Handlungszeile, klickbare Hinweise, Kapitän-Hinweis,
    vollständige OVR-Werte auf den Spielerkarten

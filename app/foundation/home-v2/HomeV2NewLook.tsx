@@ -527,8 +527,16 @@ export default function HomeV2NewLook({
               value={formatNlMoney(animatedGuv ?? guv)}
               tone={getGuvTone(guv)}
               onClick={onOpenOffice}
-              sub={guv == null ? "ab Spieltag 1" : undefined}
-              title={guv == null ? "Gewinn und Verlust — noch keine Buchung, füllt sich ab Spieltag 1" : "Gewinn und Verlust — zum Front Office"}
+              // Zustandsbewusste Erklärung: „ab Spieltag 1" nur, solange wirklich noch
+              // kein Spieltag gewertet ist — mitten in der Saison wäre der Satz falsch.
+              sub={guv == null ? (playedMatchdayCount > 0 ? "noch keine Buchung" : "ab Spieltag 1") : undefined}
+              title={
+                guv == null
+                  ? playedMatchdayCount > 0
+                    ? "Gewinn und Verlust — für diese Saison ist noch keine Buchung erfasst"
+                    : "Gewinn und Verlust — noch keine Buchung, füllt sich ab Spieltag 1"
+                  : "Gewinn und Verlust — zum Front Office"
+              }
             />
             <StatChip
               label="Saisonpunkte"
