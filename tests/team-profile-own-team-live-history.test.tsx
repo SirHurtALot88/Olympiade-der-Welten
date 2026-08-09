@@ -1,5 +1,4 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import React from "react";
 import { renderToString } from "react-dom/server";
 
 import { useFoundationCrossTabTeamsRoster } from "@/lib/foundation/tabs/use-foundation-cross-tab-teams-roster";

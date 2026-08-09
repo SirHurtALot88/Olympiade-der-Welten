@@ -1,4 +1,4 @@
-import type { GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
 // Gender-/Quota-Logik (z.B. D-P): Nicht-humanoide Kreaturen (Tiere, Drachen, ...) zaehlen
 // NICHT in das Frauen-Limit hinein und sind unabhaengig vom Geschlecht erlaubt.

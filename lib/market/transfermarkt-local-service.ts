@@ -49,7 +49,6 @@ import {
   buildScoutedDisciplineTiers,
   getScoutedNumericEstimate,
   getScoutedTraitView,
-  getTransfermarktScoutingDisclosure,
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
@@ -89,14 +88,6 @@ function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
-const LOCAL_SELL_WINDOW_PHASES = new Set<NonNullable<GameState["gamePhase"]>>([
-  "season_completed",
-  "season_review",
-  "season_rewards",
-  "player_development",
-  "season_end_management",
-  "transfer_sell_phase",
-]);
 
 const LOCAL_SYSTEM_SELL_SOURCES = new Set([
   "ai_preseason_market_sell",
@@ -1420,7 +1411,7 @@ function buildCompactFreeAgentItem(input: {
   playerPotentialById: Map<string, NonNullable<GameState["playerPotential"]>[number]>;
   browseEntry?: TransfermarktFreeAgentBrowseIndexEntry;
 }): TransfermarktFreeAgentItem {
-  const { gameState, player, playerPotentialById, browseEntry } = input;
+  const { player, playerPotentialById, browseEntry } = input;
   const marketValue = browseEntry?.marketValue ?? getPlayerMarketValue(player);
   const salary = browseEntry?.salary ?? getPlayerSalary(player);
   /**
@@ -2985,7 +2976,6 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
   const team = teamContext?.team ?? null;
   const activePlayer = gameState.rosters.find((entry) => entry.id === params.activePlayerId) ?? null;
   const player = activePlayer ? playersById.get(activePlayer.playerId) ?? null : null;
-  const rosterPlayers = teamContext?.rosterPlayers ?? [];
   const cashBefore = teamContext?.cash ?? null;
   const salePlayer = activePlayer ? playersById.get(activePlayer.playerId) ?? null : null;
   const saleEconomy = resolvePlayerEconomyContract({ player: salePlayer, rosterEntry: activePlayer });

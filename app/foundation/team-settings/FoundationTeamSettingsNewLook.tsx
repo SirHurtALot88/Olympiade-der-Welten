@@ -285,7 +285,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     formatFoundationSaveModeLabel,
     formatIdentityWeight,
     formatLocalePoints,
-    formatMoney,
     formatScenarioTypeLabel,
     formatShortSaveId,
     formatTeamControlModeLabel,

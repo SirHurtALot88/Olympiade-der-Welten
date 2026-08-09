@@ -29,13 +29,6 @@ export type GamePhaseActionGate = {
   warnings: string[];
 };
 
-const PRESEASON_MANAGEMENT_PHASES = new Set<GamePhase>([
-  "season_end_management",
-  "transfer_sell_phase",
-  "transfer_buy_phase",
-  "lineup_setup",
-  "next_season_ready",
-]);
 
 const PROGRESSION_PHASES = new Set<GamePhase>([
   "season_completed",

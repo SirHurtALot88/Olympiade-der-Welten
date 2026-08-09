@@ -105,9 +105,6 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
   const items = data?.items ?? [];
   const notes = data?.notes ?? [];
   const warnings = data?.warnings ?? [];
-  const scope = data?.scope;
-  const source = data?.source ?? null;
-  const teamContext = data?.teamContext ?? null;
   const hasActiveFilters = Boolean(filters.search.trim());
   const columns = useMemo(() => getTransfermarktBaseColumns(), []);
   const mode = getTransfermarktLabMode({

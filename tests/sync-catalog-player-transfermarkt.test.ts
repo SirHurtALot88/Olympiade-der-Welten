@@ -45,7 +45,7 @@ describe("sync catalog player to transfermarkt", () => {
     () => {
       const result = buildPlayerFromBrief(vipWalBrief);
       syncImportedCharacterPersistence(result);
-      const { player, economy } = result;
+      const { economy } = result;
 
       const row = getDatabase()
         .prepare("SELECT payload_json FROM player_catalog WHERE player_id = ?")

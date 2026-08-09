@@ -71,10 +71,8 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
     reducedMotion,
     W,
     H,
-    N,
     geo,
     layout,
-    tokenPos,
     rt,
     sorted,
     now,
@@ -116,7 +114,6 @@ export default function CourtField(props: DisciplineFieldProps): ReactNode {
   const { gRefs, ghostRefs } = useTokenGlide({ ...props, tokenPos: localTokenPos });
 
   const courtL = cx - baseHalf;
-  const courtR = cx + baseHalf;
   const courtT = hoopY - 26;
   const courtBot = baseY + 22;
   const courtBoxH = courtBot - courtT;

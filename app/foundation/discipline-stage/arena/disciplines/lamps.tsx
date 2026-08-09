@@ -43,7 +43,6 @@ export default function LampsField(props: DisciplineFieldProps): ReactNode {
     reducedMotion,
     W,
     H,
-    layout,
     finalMax,
     rt,
     sorted,

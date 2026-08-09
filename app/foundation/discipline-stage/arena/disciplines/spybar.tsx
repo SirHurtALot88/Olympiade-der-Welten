@@ -24,7 +24,6 @@ const BOT_LANE = 592;
 const CENTER_X = FIELD_W / 2;
 const CENTER_Y = (TOP_LANE + BOT_LANE) / 2;
 const TARGET_N = 40; // Ziele im Sektor
-const ROUND_MS = 5000;
 // Deutlich größere, lesbare Späher-Token (Host-geo.r war zu klein). Eigenes Team etwas größer.
 const R_BASE = 18;
 const R_OWN = 22;
@@ -45,7 +44,6 @@ const COLORS = {
 export default function SpybarField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
-    skinAccent,
     env,
     reducedMotion,
     W,
@@ -54,8 +52,6 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
     finalMax,
     rt,
     sorted,
-    round,
-    done,
     now,
     hoverIdx,
     highlightIdxs,
@@ -410,7 +406,6 @@ export default function SpybarField(props: DisciplineFieldProps): ReactNode {
 
       {/* Späh-Balken (hinter jedem Token) — SVG-Lines */}
       {rt.map((t) => {
-        const className = t.rel ? `beam b-${t.rel}` : "beam";
         const strokeColor =
           t.rel === "mine"
             ? "rgba(74,157,255,.5)"

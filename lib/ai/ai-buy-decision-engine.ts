@@ -44,9 +44,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function round(value: number) {
-  return Math.round(value * 10) / 10;
-}
 
 function getPlayerAxis(player: Player | null): "pow" | "spe" | "men" | "soc" | null {
   if (!player) return null;

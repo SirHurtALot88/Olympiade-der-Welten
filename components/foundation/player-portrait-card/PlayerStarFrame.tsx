@@ -6,7 +6,6 @@ import {
   getPlayerStarTierClassName,
   getPlayerStarTierLabel,
   isHoloPlayerStarTier,
-  resolveLeagueRankFromPool,
   type PlayerStarTier,
 } from "@/lib/foundation/player-star-tier";
 

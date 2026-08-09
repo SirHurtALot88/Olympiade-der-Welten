@@ -44,10 +44,6 @@ function hasSeasonEndPayoutLog(gameState: GameState, seasonId: string, teamId: s
   );
 }
 
-function getCurrentSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
 
 function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
   const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);

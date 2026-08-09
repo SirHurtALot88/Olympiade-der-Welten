@@ -196,7 +196,6 @@ function main() {
   const save = persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
   const gameState = save.gameState;
   const schedule = getSeasonDisciplineSchedule(gameState).slice(0, 10);
-  const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const controlByTeamId = new Map(
     Object.values(gameState.seasonState.teamControlSettings ?? {}).map((settings) => [settings.teamId, settings] as const),

@@ -13,7 +13,7 @@ import {
   isCashHoardingTeam,
   syncPreseasonTransferBudgets,
 } from "@/lib/ai/ai-budget-deploy-service";
-import { getTeamCashSalarySoftTarget, isTeamOverCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
+import { isTeamOverCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
 import {
   buildLeagueMarketAnchors,
   classifyMarketTier,
@@ -579,8 +579,6 @@ async function main() {
     ...spotTeams.map((code) => {
       const row = teamRows.find((entry) => String(entry.teamCode).toUpperCase() === code);
       if (!row) return `| ${code} | — | — | — | — | — | — | — | — |`;
-      const tops = topPickPricesForTeam(buyTransfers, String(row.teamId), 2);
-      const top2Label = tops.length > 0 ? tops.map((value) => value.toFixed(1)).join(" / ") : "—";
       return `| ${code} | ${row.rosterAfter}/${row.playerOpt} | ${row.cashAfter} | ${row.cashSalaryAfter} | ${row.buyCount} | ${row.avgPickMW} | ${row.maxPickMW} | ${row.reachedOpt ? "yes" : "no"} | ${row.hoardingAfter ? "HOARD" : "ok"} |`;
     }),
     "",

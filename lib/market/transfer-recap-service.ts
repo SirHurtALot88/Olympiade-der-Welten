@@ -1,9 +1,9 @@
-import type { GameState, Player, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { listTransferHistory, type TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
+import { listTransferHistory } from "@/lib/market/transfer-history-read-service";
 import { calculateTransfermarktFit, hasMercenaryTrait, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 

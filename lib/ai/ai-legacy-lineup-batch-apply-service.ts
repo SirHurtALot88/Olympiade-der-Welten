@@ -17,7 +17,7 @@ import {
   getFormCardColorForDisciplineCategory,
   seededUnitInterval,
 } from "@/lib/lineups/legacy-lineup-modifiers";
-import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyMutatorTraitOption, LegacyRosterPlayerRef, LegacyTeamPowerOption } from "@/lib/lineups/legacy-lineup-types";
+import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyTeamPowerOption } from "@/lib/lineups/legacy-lineup-types";
 import {
   calculateLocalLegacyLineupPreviewFromContext,
   loadLocalLegacyLineupContextFromGameState,

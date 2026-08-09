@@ -493,10 +493,6 @@ describe("foundation performance architecture helpers", () => {
 
   it("wires marketSellBusy into the teams detail panel", async () => {
     const foundationText = await readFoundationOrchestratorSource(root);
-    const shellRouterBodyText = await fs.readFile(
-      path.join(root, "app/foundation/FoundationShellRouterBody.tsx"),
-      "utf8",
-    );
     const foundationSurfaceText = await readFoundationSurfaceSource(root);
     const pageStateText = await fs.readFile(
       path.join(root, "lib/foundation/tabs/use-foundation-page-state.ts"),

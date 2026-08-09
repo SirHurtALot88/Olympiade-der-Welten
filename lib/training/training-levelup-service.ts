@@ -205,9 +205,6 @@ function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -232,9 +229,6 @@ function hasTrait(player: Player, values: string[]) {
   return values.some((value) => tokens.includes(value.toLowerCase()));
 }
 
-function pushUnique<T>(target: T[], value: T) {
-  if (!target.includes(value)) target.push(value);
-}
 
 function stableTrainingAllocationHash(value: string) {
   let hash = 2166136261;

@@ -12,7 +12,6 @@ import type {
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   buildSponsorOfferPresentation,
-  buildSponsorRankTierRows,
   getSponsorComponentKindLabel,
   type SponsorChallengeDifficulty,
 } from "@/lib/sponsor/sponsor-offer-presenter";

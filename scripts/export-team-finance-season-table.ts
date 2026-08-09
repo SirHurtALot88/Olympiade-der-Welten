@@ -1,7 +1,6 @@
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { collectTeamFatigueInjuryMetrics, buildPlayerAvailabilityByPlayerId } from "@/lib/season/long-run-fatigue-collect";

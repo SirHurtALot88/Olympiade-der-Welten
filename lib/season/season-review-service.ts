@@ -2,7 +2,6 @@ import type {
   DisciplineResultRecord,
   GameState,
   Player,
-  PlayerDisciplinePerformanceRecord,
   PlayerProgressionSpendEventRecord,
   RosterPromisedRole,
   Team,

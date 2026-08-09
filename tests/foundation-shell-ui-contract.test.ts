@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
+import { readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 const root = process.cwd();
 

@@ -50,7 +50,6 @@ vi.mock("@/lib/persistence/persistence-service", () => ({
   }),
 }));
 
-const SAVE_ID = "save-formcard-transfer";
 const SEASON_ID = "season-1";
 
 function createTeam(teamId: string, partial?: Partial<Team>): Team {

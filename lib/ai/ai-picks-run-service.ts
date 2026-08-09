@@ -1,4 +1,4 @@
-import type { GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveRosterTargets, deriveSeason1TargetRosterSize } from "@/lib/foundation/roster-limits";
@@ -45,7 +45,6 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 import { isLongRunContext } from "@/lib/season/long-run-profile";
 import { planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
 
-const LEGAL_MINIMUM_ROSTER_SIZE = 7;
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
 
 export type AiPicksRunParams = {
@@ -606,11 +605,6 @@ function isColdSteelThemeBreaker(playerClass: string | null | undefined, race: s
   return tokens.some((token) => token === "demon" || token === "monster" || token === "chaos" || token === "undead");
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
 
 function sortCountEntries(map: Map<string, number>) {
   return [...map.entries()]
@@ -862,32 +856,6 @@ function shouldStopSeason1ExecutePick(input: {
   return input.rosterCount >= input.targetRosterSize && !input.spendDownRequired;
 }
 
-function shouldStopTeamExecuteLoop(input: {
-  runMode: AiNeedsPicksRunMode;
-  rosterCount: number;
-  targetRosterSize: number | null;
-  playerMax: number | null;
-  previewTeam: AiPicksRunTeamResult;
-  remainingCash: number | null;
-  remainingSalary: number | null;
-}) {
-  if (input.targetRosterSize == null) {
-    return false;
-  }
-  if (input.runMode === "season1_optimum_execute") {
-    return shouldStopSeason1ExecutePick({
-      rosterCount: input.rosterCount,
-      targetRosterSize: input.targetRosterSize,
-      playerMax: input.playerMax,
-      spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
-        input.previewTeam,
-        input.remainingCash,
-        input.remainingSalary,
-      ),
-    });
-  }
-  return input.rosterCount >= input.targetRosterSize;
-}
 
 function getExistingAutoTransfers(gameState: GameState, teamId: string) {
   return gameState.transferHistory.filter(

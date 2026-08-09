@@ -4,7 +4,6 @@ import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { db } from "@/src/server/db";
 
-type CompareStatus = "PASS" | "WARN" | "FAIL";
 
 type SaveLike = {
   saveId: string;

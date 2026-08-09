@@ -1,6 +1,6 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
-import { getAiManagerMarketSpendableCash, resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { ContractShape, GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -14,7 +14,6 @@ import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiati
 import {
   createLocalTransfermarktRunContext,
   listLocalTransfermarktFreeAgents,
-  previewLocalTransfermarktBuy,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { listTransfermarktFreeAgents } from "@/lib/market/transfermarkt-read-service";
@@ -339,15 +338,6 @@ function expandSemanticTokens(values: string[]) {
   return expanded;
 }
 
-function getTeamMarketValueTotal(gameState: GameState, teamId: string) {
-  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  return gameState.rosters
-    .filter((entry) => entry.teamId === teamId)
-    .reduce((sum, entry) => {
-      const player = playersById.get(entry.playerId) ?? null;
-      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue ?? 0);
-    }, 0);
-}
 
 function getRosterEconomyContext(
   gameState: GameState,
@@ -631,9 +621,6 @@ function buildNeedSummary(input: {
   return `${rosterLabel} · ${budgetLabel} · Fokus: ${axisLabel}.`;
 }
 
-function getPlayerById(gameState: GameState, playerId: string) {
-  return gameState.players.find((entry) => entry.id === playerId) ?? null;
-}
 
 function buildRosterByTeamId(gameState: GameState) {
   const rosterByTeamId = new Map<string, GameState["rosters"]>();
@@ -678,27 +665,6 @@ function getCandidatePrimaryAxis(item: TransfermarktFreeAgentItem): "pow" | "spe
   return axisValues[0]?.[0] ?? "pow";
 }
 
-function matchesHardNoGoCandidate(profile: TeamStrategyProfile | null, item: TransfermarktFreeAgentItem) {
-  if (!profile || profile.hardNoGos.length === 0) {
-    return false;
-  }
-
-  const tokens = getCombinedCandidateTokens(item);
-  const normalizedRace = normalizeTransfermarktToken(item.race);
-  return profile.hardNoGos.some((entry) => {
-    const normalized = normalizeTransfermarktToken(entry);
-    if (!normalized) {
-      return false;
-    }
-    if (normalized.includes("nonhuman") && normalizedRace !== "human") {
-      return true;
-    }
-    if (normalized.includes("human") && normalized.includes("anti") && normalizedRace === "human") {
-      return true;
-    }
-    return tokens.some((token) => token === normalized || token.includes(normalized) || normalized.includes(token));
-  });
-}
 
 function buildCheapCandidateScore(input: {
   item: TransfermarktFreeAgentItem;

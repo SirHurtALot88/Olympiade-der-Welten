@@ -6,8 +6,6 @@ import { describe, expect, it } from "vitest";
 import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 const root = process.cwd();
-const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
-const foundationShellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
 
 async function readFoundationSurfaceSourceLocal() {
   return readFoundationSurfaceSource(root);
@@ -244,11 +242,10 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps the team profile relationship cards alive", async () => {
-    const [clientText, teamsRosterHookText, teamProfileText, cssText] = await Promise.all([
+    const [clientText, teamsRosterHookText, teamProfileText] = await Promise.all([
       readFoundationOrchestratorSource(root),
       fs.readFile(teamsRosterHookPath, "utf8"),
       fs.readFile(teamProfileNewLookPath, "utf8"),
-      fs.readFile(globalsPath, "utf8"),
     ]);
 
     expect(clientText).toContain("buildTeamDetailDrawerData");

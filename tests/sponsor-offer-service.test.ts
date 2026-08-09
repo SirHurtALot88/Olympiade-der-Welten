@@ -12,7 +12,6 @@ import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
-import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 function createTeam(partial: Partial<Team> = {}): Team {

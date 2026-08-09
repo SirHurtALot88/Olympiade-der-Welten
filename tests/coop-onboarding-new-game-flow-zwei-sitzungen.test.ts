@@ -245,7 +245,7 @@ describe("Koop-Onboarding: zwei Sitzungen am newGameFlow (Fix: byParticipant)", 
   }, AUFBAU_ZEITGRENZE_MS);
 
   it("4) ai-preseason-manual-team-guard: beide Teams bleiben unabhaengig vom Flow-Zustand geschuetzt", async () => {
-    const { saveId, roomCode, chris, franky, chrisTeam, frankyTeam } = await baueRaum();
+    const { saveId, roomCode, franky, chrisTeam, frankyTeam } = await baueRaum();
     const { POST } = await import("@/app/api/singleplayer-state/route");
 
     expect(

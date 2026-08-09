@@ -31,11 +31,7 @@ import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import {
   createLocalTransfermarktRunContext,
-  executeLocalTransfermarktBuy,
-  executeLocalTransfermarktSell,
   flushLocalTransfermarktRunContext,
-  listLocalTransfermarktFreeAgents,
-  previewLocalTransfermarktSell,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { assessPlayerMorale, evaluatePromisedRoleAttendanceOutcome } from "@/lib/morale/player-morale-service";
@@ -751,112 +747,8 @@ function getTeamRecentFinancePressure(input: {
   };
 }
 
-function getCashRecoverySellCandidates(runContext: LocalTransfermarktRunContext, teamId: string) {
-  return runContext.save.gameState.rosters
-    .filter((entry) => entry.teamId === teamId)
-    .map((entry) => {
-      const preview = previewLocalTransfermarktSell({
-        saveId: runContext.save.saveId,
-        seasonId: runContext.save.gameState.season.id,
-        teamId,
-        activePlayerId: entry.id,
-        transferSource: "admin_preseason_cash_recovery_sell",
-        localRunContext: runContext,
-      });
-      return { entry, preview };
-    })
-    .filter((candidate) => candidate.preview.canSell && (candidate.preview.salePrice ?? 0) > 0)
-    .sort(
-      (left, right) =>
-        ((right.preview.salePrice ?? 0) + (right.preview.salaryReduction ?? 0) * 2) -
-          ((left.preview.salePrice ?? 0) + (left.preview.salaryReduction ?? 0) * 2) ||
-        (right.preview.salaryReduction ?? 0) - (left.preview.salaryReduction ?? 0),
-    );
-}
 
-function buyCheapestReplacementAfterRecoverySale(input: {
-  runContext: LocalTransfermarktRunContext;
-  teamId: string;
-  minCashAfterBuy: number;
-}) {
-  const freeAgents = listLocalTransfermarktFreeAgents({
-    saveId: input.runContext.save.saveId,
-    seasonId: input.runContext.save.gameState.season.id,
-    teamId: input.teamId,
-    mode: "ai_preview",
-    limit: 10_000,
-    localRunContext: input.runContext,
-  }).items
-    .filter((candidate) => candidate.marketValue != null && candidate.marketValue >= 0)
-    .sort(
-      (left, right) =>
-        (left.marketValue ?? Number.POSITIVE_INFINITY) - (right.marketValue ?? Number.POSITIVE_INFINITY) ||
-        (left.salary ?? Number.POSITIVE_INFINITY) - (right.salary ?? Number.POSITIVE_INFINITY),
-    );
 
-  for (const candidate of freeAgents) {
-    const teamCash = getTeamCash(input.runContext.save.gameState, input.teamId);
-    const price = candidate.marketValue ?? Number.POSITIVE_INFINITY;
-    if (teamCash - price < input.minCashAfterBuy) continue;
-    const result = executeLocalTransfermarktBuy({
-      saveId: input.runContext.save.saveId,
-      seasonId: input.runContext.save.gameState.season.id,
-      teamId: input.teamId,
-      playerId: candidate.playerId,
-      contractLength: 1,
-      promisedRole: "prospect",
-      transferSource: "admin_preseason_cash_recovery_replacement_buy",
-      localRunContext: input.runContext,
-      deferPersist: true,
-    });
-    if (result.canBuy && result.transferCreated) return true;
-  }
-
-  return false;
-}
-
-function buyCheapestRecoveryReplacements(input: {
-  runContext: LocalTransfermarktRunContext;
-  teamId: string;
-  count: number;
-  maxTotalSpend: number;
-}) {
-  const freeAgents = listLocalTransfermarktFreeAgents({
-    saveId: input.runContext.save.saveId,
-    seasonId: input.runContext.save.gameState.season.id,
-    teamId: input.teamId,
-    mode: "ai_preview",
-    limit: 10_000,
-    localRunContext: input.runContext,
-  }).items
-    .filter((candidate) => candidate.marketValue != null && candidate.marketValue >= 0)
-    .sort(
-      (left, right) =>
-        (left.marketValue ?? Number.POSITIVE_INFINITY) - (right.marketValue ?? Number.POSITIVE_INFINITY) ||
-        (left.salary ?? Number.POSITIVE_INFINITY) - (right.salary ?? Number.POSITIVE_INFINITY),
-    );
-
-  const selected = freeAgents.slice(0, input.count);
-  const totalSpend = selected.reduce((sum, candidate) => sum + (candidate.marketValue ?? 0), 0);
-  if (selected.length < input.count || totalSpend > input.maxTotalSpend) return false;
-
-  for (const candidate of selected) {
-    const result = executeLocalTransfermarktBuy({
-      saveId: input.runContext.save.saveId,
-      seasonId: input.runContext.save.gameState.season.id,
-      teamId: input.teamId,
-      playerId: candidate.playerId,
-      contractLength: 1,
-      promisedRole: "prospect",
-      transferSource: "admin_preseason_cash_recovery_replacement_buy",
-      localRunContext: input.runContext,
-      deferPersist: true,
-    });
-    if (!result.canBuy || !result.transferCreated) return false;
-  }
-
-  return true;
-}
 
 function getFastFreeAgentCandidates(gameState: GameState) {
   const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
@@ -1198,67 +1090,6 @@ function refillTeamsToMinimum(input: {
   return { bought, unresolved };
 }
 
-function sellBatchWithCheapReplacements(input: {
-  runContext: LocalTransfermarktRunContext;
-  teamId: string;
-  minCashAfterBuys: number;
-}) {
-  const cashBefore = getTeamCash(input.runContext.save.gameState, input.teamId);
-  const candidates = getCashRecoverySellCandidates(input.runContext, input.teamId);
-  const freeAgents = listLocalTransfermarktFreeAgents({
-    saveId: input.runContext.save.saveId,
-    seasonId: input.runContext.save.gameState.season.id,
-    teamId: input.teamId,
-    mode: "ai_preview",
-    limit: 10_000,
-    localRunContext: input.runContext,
-  }).items
-    .filter((candidate) => candidate.marketValue != null && candidate.marketValue >= 0)
-    .sort(
-      (left, right) =>
-        (left.marketValue ?? Number.POSITIVE_INFINITY) - (right.marketValue ?? Number.POSITIVE_INFINITY) ||
-        (left.salary ?? Number.POSITIVE_INFINITY) - (right.salary ?? Number.POSITIVE_INFINITY),
-    );
-
-  const maxBatch = Math.min(5, candidates.length, freeAgents.length);
-  for (let count = 1; count <= maxBatch; count += 1) {
-    const saleTotal = candidates.slice(0, count).reduce((sum, candidate) => sum + (candidate.preview.salePrice ?? 0), 0);
-    const buyTotal = freeAgents.slice(0, count).reduce((sum, candidate) => sum + (candidate.marketValue ?? 0), 0);
-    if (cashBefore + saleTotal - buyTotal < input.minCashAfterBuys) continue;
-
-    const beforeBatchSave = structuredClone(input.runContext.save);
-    const beforeDeferredWrites = input.runContext.deferredWrites;
-    let ok = true;
-    for (const candidate of candidates.slice(0, count)) {
-      const result = executeLocalTransfermarktSell({
-        saveId: input.runContext.save.saveId,
-        seasonId: input.runContext.save.gameState.season.id,
-        teamId: input.teamId,
-        activePlayerId: candidate.entry.id,
-        transferSource: "admin_preseason_cash_recovery_sell",
-        localRunContext: input.runContext,
-        deferPersist: true,
-      });
-      ok = ok && result.canSell && result.transferCreated;
-      if (!ok) break;
-    }
-    if (ok) {
-      ok = buyCheapestRecoveryReplacements({
-        runContext: input.runContext,
-        teamId: input.teamId,
-        count,
-        maxTotalSpend: Number.POSITIVE_INFINITY,
-      });
-    }
-    if (ok && getTeamCash(input.runContext.save.gameState, input.teamId) >= input.minCashAfterBuys) {
-      return count;
-    }
-    input.runContext.save = beforeBatchSave;
-    input.runContext.deferredWrites = beforeDeferredWrites;
-  }
-
-  return 0;
-}
 
 function runPreseasonCashRecovery(
   run: AdminSeasonSimulationRunState,

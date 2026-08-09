@@ -15,7 +15,7 @@ import {
 } from "@/lib/lineups/matchday-slot-roles";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
-import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   LegacyLineupDraft,
   LegacyLineupEntryInput,

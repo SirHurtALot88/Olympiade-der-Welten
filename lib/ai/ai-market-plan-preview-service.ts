@@ -9,7 +9,6 @@ import {
 import {
   buildAiTransfermarktSellPreview,
   type AiSellPreviewCandidate,
-  type AiSellPreviewResult,
   type AiSellPreviewTeamEntry,
 } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import {
@@ -35,7 +34,6 @@ import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-ser
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
-  buildLeagueMarketAnchors,
   resolvePlannerSpendableCash,
 } from "@/lib/ai/ai-market-slot-plan-service";
 import { resolveMarketQualityProfile } from "@/lib/ai/ai-market-quality-profile-service";
@@ -204,23 +202,6 @@ function isKnownPositiveMoney(value: number | null | undefined): value is number
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-function getPreviewCashBuffer(input: {
-  salaryTotal: number | null | undefined;
-  rosterAfterSell: number | null;
-  playerMin: number | null;
-  wantedCount: number;
-  plannedBuyCount: number;
-  strategySummary: string;
-}) {
-  const salaryBase = Math.max(0, input.salaryTotal ?? 0);
-  const longContractHint = /bindet|loyal|lang|contract|vertrag|mentor/i.test(input.strategySummary);
-  const missingMin =
-    input.rosterAfterSell != null && input.playerMin != null
-      ? Math.max(0, input.playerMin - input.rosterAfterSell)
-      : 0;
-  const remainingBuys = Math.max(0, input.wantedCount - input.plannedBuyCount - 1);
-  return Math.max(longContractHint ? 10 : 6, salaryBase * 0.08, missingMin * 2, remainingBuys * 2);
-}
 
 function chooseBuyCandidates(
   team: AiTransferPreviewTeamEntry,
@@ -297,7 +278,6 @@ function chooseBuyCandidates(
 
   if (qualityProfile && wantedCount > 0 && gameState) {
     const faPrices = gameState.players.map((player) => player.marketValue ?? player.displayMarketValue ?? null);
-    const anchors = buildLeagueMarketAnchors(faPrices);
     const missingToMin =
       playerMin != null && rosterAfterSell != null ? Math.max(0, playerMin - rosterAfterSell) : 0;
     const rosterGap =

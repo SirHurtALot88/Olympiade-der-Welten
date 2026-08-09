@@ -9,7 +9,6 @@ import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-match
 import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
-import { formatSignedPercent } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
@@ -38,7 +37,6 @@ import {
   potentialScoreToStars,
   shouldShowPotentialRangeStars,
 } from "@/lib/progression/player-potential-service";
-import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { resolveOrganicRegressionCombinedTotal } from "@/lib/training/organic-season-progression";
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
@@ -190,13 +188,6 @@ function formatTrainingClassDirection(
   return `${currentClass} → ${trainingClass}`;
 }
 
-function formatOrganicNetSubline(input: {
-  appliedTrainingSetpoints: number;
-  appliedPerformanceSetpoints: number;
-  regressionCombinedTotal: number;
-}) {
-  return `Training ${formatSignedSetpoints(input.appliedTrainingSetpoints)} · Performance ${formatSignedSetpoints(input.appliedPerformanceSetpoints)} · Regression ${formatSignedSetpoints(input.regressionCombinedTotal)}`;
-}
 
 
 function formatRoleTag(value: string | null | undefined) {
@@ -381,86 +372,10 @@ function formatSourceFreeDetail(value: string | null | undefined) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatDevelopmentTrend(value: string | null | undefined) {
-  switch (value) {
-    case "strong_positive":
-      return "stark positiv";
-    case "positive":
-      return "positiv";
-    case "neutral":
-      return "Stagnation";
-    case "negative":
-      return "leicht negativ";
-    case "strong_negative":
-      return "Regression-Risiko";
-    default:
-      return "—";
-  }
-}
 
-function formatRegressionRisk(value: string | null | undefined) {
-  switch (value) {
-    case "none":
-      return "kein";
-    case "low":
-      return "niedrig";
-    case "medium":
-      return "mittel";
-    case "high":
-      return "hoch";
-    default:
-      return "—";
-  }
-}
 
-function formatDevelopmentRoute(value: string | null | undefined) {
-  switch (value) {
-    case "star_growth":
-      return "Star-Entwicklung";
-    case "core_growth":
-      return "Core-Entwicklung";
-    case "depth_growth":
-      return "Breite entwickeln";
-    case "prospect_growth":
-      return "Talent-Entwicklung";
-    case "maintenance":
-      return "Niveau halten";
-    case "stagnation_watch":
-      return "Stagnation beobachten";
-    case "free_agent_ambient":
-      return "Markt-Entwicklung";
-    default:
-      return "—";
-  }
-}
 
-function formatDevelopmentLevelTrend(value: string | null | undefined) {
-  switch (value) {
-    case "growth":
-      return "Entwicklung";
-    case "stable":
-      return "stabil";
-    case "stagnation":
-      return "Stagnation";
-    case "regression":
-      return "Regression";
-    default:
-      return "—";
-  }
-}
 
-function getDevelopmentLevelTrendClass(value: string | null | undefined) {
-  switch (value) {
-    case "growth":
-      return " is-positive";
-    case "regression":
-      return " is-negative";
-    case "stagnation":
-      return " is-warning";
-    default:
-      return " is-neutral";
-  }
-}
 
 function getAffinityIcon(value: string | null | undefined) {
   if (value === "signature") return "★";
@@ -696,10 +611,6 @@ function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
   return null;
 }
 
-function formatScoutPotentialRange(data: PlayerDetailDrawerData["scoutPotential"]) {
-  if (!data?.potentialRange) return "—";
-  return `${data.potentialRange.min}-${data.potentialRange.max}`;
-}
 
 function formatDevelopmentRange(data: PlayerDetailDrawerData["developmentInsight"]) {
   if (!data?.potentialRangeDisplay) return "—";
@@ -1052,11 +963,6 @@ function PlayerCaPoStarStack({
   );
 }
 
-function formatCompactSeasonLabel(value: string | null | undefined) {
-  const canonical = getCanonicalSeasonLabel({ seasonName: value ?? null });
-  const match = canonical.match(/Season\s+(\d+)/i);
-  return match?.[1] ?? canonical;
-}
 
 type TopDisciplineColumnId = "discipline" | "value" | "seasonPps" | "prevSeasonPps" | "allTimePps";
 type TopDisciplineSortDirection = "asc" | "desc";
@@ -2233,6 +2139,10 @@ export default function PlayerDetailDrawer({
   const [compareRosterGameState, setCompareRosterGameState] = useState<GameState | null>(null);
   const [compareRosterSaveId, setCompareRosterSaveId] = useState<string | null>(null);
   const [compareRosterLoading, setCompareRosterLoading] = useState(false);
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt: `compareRosterError` wird gesetzt und nie gelesen —
+   * schlaegt der Kader-Vergleich fehl, merkt die Oberflaeche es nicht an.
+   */
   const [compareRosterError, setCompareRosterError] = useState(false);
   // Fetch-Guard als Ref statt State: `compareRosterLoading` selbst darf NICHT im
   // Dependency-Array stehen — das würde beim synchronen `setCompareRosterLoading(true)`
@@ -2417,7 +2327,6 @@ export default function PlayerDetailDrawer({
   const abilitiesKnown = isActivePlayer || data.teamHumanControlled === true;
   const disciplineStatFogged = isScoutedProfile || !abilitiesKnown;
   const scoutingLevel = data.scoutingLevel ?? 0;
-  const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
   const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
   const showScoutedDevelopmentSection = !isScoutedProfile || scoutingLevel >= 3;
   const showScoutedDeepDevelopmentDetails = !isScoutedProfile || scoutingLevel >= 5;

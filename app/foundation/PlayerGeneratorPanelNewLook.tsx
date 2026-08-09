@@ -34,7 +34,6 @@ import {
   NlCard,
   NlDeltaChip,
   NlEmptyState,
-  NlProgressBar,
   NlRadar,
   NlSubTabs,
   StatChip,

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildExplicitSlotSequence,
-  buildLegacyCompareSlotPlan,
 } from "@/lib/ai/market-pick-engine/explicit-slot-sequence";
 import {
   buildPlannerEnvelope,

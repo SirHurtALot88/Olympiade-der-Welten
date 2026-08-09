@@ -5,7 +5,6 @@ import type {
   SeasonState,
   Team,
   TeamControlMode,
-  TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
@@ -14,7 +13,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
-import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 import {
   buildOwnershipForPreset,

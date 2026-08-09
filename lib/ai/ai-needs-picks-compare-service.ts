@@ -18,7 +18,6 @@ import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   MERCENARY_NEGATIVE_FIT_PENALTY_REASON,
   applyMercenaryNegativeFitPenaltyToFinalPickScore,
-  calculateTransfermarktFit,
   getMercenaryNegativeFitPenalty,
   hasMercenaryTrait,
 } from "@/lib/market/transfermarkt-fit";
@@ -48,7 +47,6 @@ import {
   resolveSeason1BonusDraftSteps,
   resolveMinPickPriceForPlan,
   resolveSeason1DraftSalaryForRatio,
-  resolveSeason1DraftSpendBudget,
   resolveSeason1LaneSpendPool,
   resolveSeason1TargetCashLeft,
   type Season1DraftSpendPlan,
@@ -2687,7 +2685,6 @@ function shouldContinueSeason1OptimumDraft(input: {
 }) {
   const playerOpt = input.playerOpt;
   const playerMax = input.playerMax ?? input.playerOpt;
-  const playerMin = input.playerMin ?? input.playerOpt;
   const softTarget =
     input.cashStrategy.softTargetCashSalaryRatio ??
     input.cashStrategy.season1SpendPlan?.softTargetCashSalaryRatio ??
@@ -3513,16 +3510,6 @@ function normalizeTeamCode(value: string | null | undefined) {
   return String(value ?? "").trim().toUpperCase();
 }
 
-function getBudgetStatus(team: Team) {
-  if (!Number.isFinite(team.cash) || !Number.isFinite(team.budget) || team.budget <= 0) {
-    return "unknown" as const;
-  }
-
-  const ratio = team.cash / team.budget;
-  if (ratio <= 0.18) return "critical" as const;
-  if (ratio <= 0.4) return "tight" as const;
-  return "healthy" as const;
-}
 
 function getRosterEntriesForTeam(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId);
@@ -5803,8 +5790,6 @@ function buildCashStrategy(input: {
       : season1OptimumMode
         ? roundValue(Math.max(currentCash, 0), 2)
         : roundValue(Math.max(currentCash - (reservedCashForMinimum ?? 0) - reservedCashForDepth, 0), 2);
-  const currentCashRatio =
-    currentCash != null && startingCash != null && startingCash > 0 ? currentCash / startingCash : financesValue;
   const prizeTrendBias =
     input.expectedPrizeSignal.prizeSourceStatus === "missing_source"
       ? 0
@@ -6916,7 +6901,6 @@ function scoreCandidate(input: {
   const cached = player != null ? input.staticScoreCache?.get(player.id) : undefined;
 
   const normalizedClass = cached?.normalizedClass ?? normalizeToken(player?.className ?? input.recommendation.className);
-  const normalizedRace = normalizeToken(player?.race ?? input.recommendation.race);
   const playerRole = cached?.playerRole ?? (player ? getPlayerRoleTag(player, candidateAxis) : "depth");
   const rawTier = cached?.rawTier ?? classifyCandidateTier({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
@@ -7978,6 +7962,16 @@ function buildTeamEntry(input: {
       simulatedRosterCount: simulatedRosterCount ?? rosterCount ?? 0,
       simulatedSalaryTotal: remainingSalary,
     });
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt (Dead-Code-Durchgang 2026-08-09):
+   *
+   * `spendableCash` wird hier gesetzt und im Verlauf (Z. 8211) nach jedem Schritt neu berechnet —
+   * aber nie gelesen. Die Grenze, wie viel ein Team in diesem Schritt ueberhaupt ausgeben darf,
+   * wird also ermittelt und verworfen; der Planer entscheidet ohne sie.
+   *
+   * Das ist eine fallengelassene Schranke, kein toter Code. Loeschen wuerde die Absicht
+   * unsichtbar machen, deshalb bleibt sie stehen, bis geklaert ist, wo sie greifen soll.
+   */
   let spendableCash: number | null = resolveStepSpendableCash();
 
   const initialOpenNeeds = buildOpenNeeds({
@@ -8415,8 +8409,6 @@ function buildTeamEntry(input: {
         const player = getPlayerById(input.context.gameState, entry.playerId);
         const price = entry.price ?? entry.marketValue ?? null;
         const cashAfter = remainingCash != null && price != null ? roundValue(remainingCash - price, 2) : remainingCash;
-        const spendableAfter =
-          pickAffordableCash != null && price != null ? roundValue(pickAffordableCash - price, 2) : pickAffordableCash;
         const minimumSlotsAfter = Math.max(playerMin - ((simulatedRosterCount ?? 0) + 1), 0);
         const targetSlotsAfter =
           season1OptimumMode && targetRosterSize != null && simulatedRosterCount != null

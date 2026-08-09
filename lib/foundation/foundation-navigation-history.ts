@@ -29,7 +29,6 @@ export type FoundationRoomUrlParams = {
 
 const HISTORY_STATE_KEY = "foundationNav";
 
-const ROOM_URL_PARAM_KEYS = ["roomCode", "participantId", "userId", "seatToken", "saveId"] as const;
 
 /**
  * Liest den in localStorage hinterlegten Seat-Token (gleicher Schluessel wie

@@ -125,7 +125,6 @@ function buildBorrowLenderState(input?: {
   lenderFinances?: number;
   seasonId?: string;
 }): GameState {
-  const seasonId = input?.seasonId ?? "season-3";
   const borrower = createTeam({ teamId: BORROWER_ID, name: "Cash Creators", cash: input?.borrowerCash ?? 30 });
   const lender = createTeam({ teamId: FRIENDLY_LENDER_ID, name: "Death Peaches", cash: input?.lenderCash ?? 100 });
   return createGameState({

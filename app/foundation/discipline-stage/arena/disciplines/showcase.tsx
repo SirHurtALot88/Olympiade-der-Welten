@@ -9,7 +9,7 @@
 // =====================================================================================
 "use client";
 
-import React, { type ReactNode } from "react";
+import { type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
 
@@ -22,16 +22,12 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
     reducedMotion,
     W,
     H,
-    N,
     geo,
     layout,
-    finalMax,
     tokenPos,
     rt,
     sorted,
-    done,
     now,
-    fieldNorm,
     openHover,
     scheduleHoverClose,
     onOpenTeam,
@@ -56,10 +52,6 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
   // dB scale: 60 dB (floor) to 120 dB (top of hype wall)
   const dbMin = 60;
   const dbMax = 120;
-  const dbOf = (score: number): number => {
-    const norm = finalMax > 0 ? Math.min(1, score / finalMax) : 0;
-    return Math.round(dbMin + norm * (dbMax - dbMin));
-  };
 
   // Position tokens based on score (higher score = higher on hype wall)
   const posTokenBy = (t: RT, score: number): { x: number; y: number } => {
@@ -476,8 +468,6 @@ export default function ShowcaseField(props: DisciplineFieldProps): ReactNode {
             const cn = 22;
             for (let i = 0; i <= cn; i += 1) {
               const x = (i / cn) * W;
-              const seed = `crowd-${i}`;
-              const hash = seed.charCodeAt(0) + seed.charCodeAt(1) * 256;
               const h = H - 14 - ((i * 47) % 30);
               crowdPts.push(`${x},${h}`, `${x + W / cn / 2},${H - 6}`);
             }

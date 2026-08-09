@@ -5,7 +5,7 @@ import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
 import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { createLineupDraftId } from "@/lib/lineups/lineup-discipline-contract";
-import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
 import { prepareGameStateForMatchdayResolve } from "@/lib/lineups/matchday-lineup-auto-prep";
@@ -23,7 +23,6 @@ import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import {
   type LegacyMatchdayResolvePreview,
-  type ResolvePreviewStatus,
 } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { decideResolvePreviewToBook } from "@/lib/resolve/resolve-preview-submission";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";

@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   inspectRankToPointsSheet,
-  inspectPrizeMoneySheet,
   inspectSeasonStandingsSheet,
 } from "@/lib/standings/season-standings-sheet";
 import { analyzePrizeMoneySheet } from "@/lib/season/prize-money-sheet";

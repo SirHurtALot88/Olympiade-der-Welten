@@ -39,7 +39,6 @@ export default function KdaField(props: DisciplineFieldProps): ReactNode {
     N,
     geo,
     finalMax,
-    fieldNorm,
     rt,
     sorted,
     done,

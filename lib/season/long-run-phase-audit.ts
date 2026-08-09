@@ -2,7 +2,6 @@ import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getSeasonEconomyFactorWindow, SEASON_ECONOMY_FACTOR_WINDOW_SIZE } from "@/lib/season/season-economy-factors";
@@ -10,7 +9,6 @@ import { buildTransferFinanceAudit, isTransferFinanceViolationForSeason } from "
 import { isDraftBuySource } from "@/lib/season/transfer-standings-balance";
 import { findSeasonOneForbiddenBuySources } from "@/lib/season/transfer-season-policy";
 import {
-  buildPlayerAvailabilityByPlayerId,
   countSeasonInjuryEvents,
   listNonRosterAvailabilityEntries,
 } from "@/lib/season/long-run-fatigue-collect";
@@ -100,9 +98,6 @@ function isFemale(gender: string) {
   return ["female", "f", "weiblich", "w"].includes(gender.toLowerCase());
 }
 
-function isMale(gender: string) {
-  return ["male", "m", "männlich"].includes(gender.toLowerCase());
-}
 
 function auditIdentityTeams(gameState: GameState): PhaseAuditCheck[] {
   const checks: PhaseAuditCheck[] = [];

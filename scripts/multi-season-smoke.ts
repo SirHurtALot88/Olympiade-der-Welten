@@ -541,7 +541,6 @@ async function runOneSeason(
   }
 
   log(`Season ${seasonIndex + 1}: running season completion…`);
-  const beforeCompletion = requireValue(persistence.getSaveById(saveId), "Save missing before completion.");
   const completion = await runLocalSeasonCompletion(
     {
       saveId,

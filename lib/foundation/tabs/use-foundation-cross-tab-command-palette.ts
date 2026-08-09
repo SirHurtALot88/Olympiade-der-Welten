@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 
 import { GAME_ENCYCLOPEDIA_ENTRIES } from "@/lib/ui/game-encyclopedia";
-import type { GameInboxItem, GameState, Team } from "@/lib/data/olyDataTypes";
+import type { GameInboxItem, GameState } from "@/lib/data/olyDataTypes";
 import {
   foundationAdminViews,
   foundationPrimaryViews,

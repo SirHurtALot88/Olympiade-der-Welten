@@ -158,7 +158,7 @@ describe("Formplan-Persistenz: Karten und Push-Ziel stoeren sich nicht", () => {
   }
 
   it("speichert ein Push-Ziel auch ohne Karten", () => {
-    const { persistence, params, disciplineId } = setup();
+    const { params, disciplineId } = setup();
     const saved = saveLocalLegacyFormCardPlan({
       ...params,
       disciplineSide: "d1",
@@ -205,7 +205,7 @@ describe("Formplan-Persistenz: Karten und Push-Ziel stoeren sich nicht", () => {
   }, SETUP_TIMEOUT_MS);
 
   it("entfernt das Push-Ziel nur bei explizitem null — und raeumt den leeren Plan dann auf", () => {
-    const { persistence, params, disciplineId } = setup();
+    const { params, disciplineId } = setup();
     saveLocalLegacyFormCardPlan({
       ...params,
       disciplineSide: "d1",

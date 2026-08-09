@@ -1052,52 +1052,6 @@ function getCheapThemePriority(candidate: Candidate, target: TeamThemeCompositio
   return 0;
 }
 
-function selectScoringPool(input: {
-  planningPool: Candidate[];
-  cap: number;
-  themeTarget: TeamThemeCompositionTarget | null;
-  phase: ChunkedRedraftPhase;
-  identity: TeamIdentity | null | undefined;
-}) {
-  if (input.planningPool.length <= input.cap) return input.planningPool;
-  const indexed = input.planningPool.map((candidate, index) => ({
-    candidate,
-    index,
-    themePriority: getCheapThemePriority(candidate, input.themeTarget),
-    identityFit: getIdentityFit(candidate, input.identity),
-    premiumAxisFit: computePreferredAxisFit(candidate, input.identity),
-    salary: candidate.salary ?? 0,
-  }));
-  const baseShare = input.themeTarget && input.phase !== "phase_c_depth_luxury" ? 0.68 : 0.82;
-  const baseLimit = Math.max(80, Math.floor(input.cap * baseShare));
-  const selected = new Map<string, Candidate>();
-  const fitRows = [...indexed].sort((left, right) => {
-    const leftScore = left.premiumAxisFit * 0.50 + left.identityFit * 0.45 + left.themePriority * 8 - left.salary * 0.4;
-    const rightScore = right.premiumAxisFit * 0.50 + right.identityFit * 0.45 + right.themePriority * 8 - right.salary * 0.4;
-    if (rightScore !== leftScore) return rightScore - leftScore;
-    return compareByDeterministicPlayerTie(left.candidate.player.id, right.candidate.player.id, "fit_pool");
-  });
-  for (const row of fitRows.slice(0, baseLimit)) {
-    selected.set(row.candidate.player.id, row.candidate);
-  }
-  const themedRows = indexed
-    .filter((row) => row.themePriority > 0)
-    .sort((left, right) => {
-      if (right.themePriority !== left.themePriority) return right.themePriority - left.themePriority;
-      if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
-      if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
-      return left.index - right.index;
-    });
-  for (const row of themedRows) {
-    if (selected.size >= input.cap) break;
-    selected.set(row.candidate.player.id, row.candidate);
-  }
-  for (const row of indexed) {
-    if (selected.size >= input.cap) break;
-    selected.set(row.candidate.player.id, row.candidate);
-  }
-  return [...selected.values()];
-}
 
 function getRoleMarketCeiling(input: {
   role: DraftPickRole;
@@ -1344,18 +1298,6 @@ function getRosterPlayers(gameState: GameState, roster: RosterEntry[]) {
   return roster.map((entry) => playersById.get(entry.playerId)).filter((player): player is Player => Boolean(player));
 }
 
-function getCandidateTeamFit(input: {
-  gameState: GameState;
-  team: GameState["teams"][number];
-  roster: RosterEntry[];
-  candidate: Candidate;
-}) {
-  return getCandidateTeamFitFromRosterPlayers({
-    team: input.team,
-    rosterPlayers: getRosterPlayers(input.gameState, input.roster),
-    candidate: input.candidate,
-  });
-}
 
 function getCandidateTeamFitFromRosterPlayers(input: {
   team: GameState["teams"][number];
@@ -1371,20 +1313,6 @@ function getCandidateTeamFitFromRosterPlayers(input: {
   }).teamFit ?? 0;
 }
 
-function isAllowedByStandardFit(input: {
-  gameState: GameState;
-  team: GameState["teams"][number];
-  roster: RosterEntry[];
-  candidate: Candidate;
-}) {
-  const teamFit = getCandidateTeamFit(input);
-  const mercenary = hasMercenaryTrait(input.candidate.player);
-  return {
-    allowed: teamFit >= 0 || mercenary,
-    teamFit,
-    mercenary,
-  };
-}
 
 function isMercenaryMarketTeam(team: GameState["teams"][number]) {
   return team.teamId === "W-L" || team.shortCode === "W-L" || /wrecking legionnaires/i.test(team.name ?? "");
@@ -4911,7 +4839,6 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         candidateCount: fitLegalCandidates.length,
       });
       const affordableCandidates = fitLegalCandidates;
-      const qualitySafeCandidates = affordableCandidates;
       const budgetSafeCandidates = affordableCandidates.filter((candidate) => getCandidateCashCost(candidate) <= phasePlan.maxRecommendedSpend);
       const usingPhaseAMinimumFallback = phaseAMinimumGuard && budgetSafeCandidates.length > 0;
       const planningPool = usingPhaseAMinimumFallback ? budgetSafeCandidates : affordableCandidates;
