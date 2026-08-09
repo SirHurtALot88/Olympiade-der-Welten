@@ -61,6 +61,14 @@ export type FoundationActivityInput = {
   isSaveBusy: boolean;
   aiPreseasonBusy: boolean;
   aiPreseasonRun: FoundationActivityPreseasonRunSnapshot | null;
+  /**
+   * True, sobald die Saison wirklich läuft (erster Spieltag gewertet bzw.
+   * currentMatchday > 1). Ein liegen gebliebener Preseason-Lauf („blockiert"/
+   * „abgebrochen") ist dann keine handelbare Meldung mehr — das Kauffenster ist
+   * zu, niemand kann den Lauf noch fortsetzen. Das Banner dazu wird ab hier
+   * unterdrückt statt saisonlang auf jeder Seite zu kleben.
+   */
+  preseasonWindowOver?: boolean;
   aiLineupEnsureBusy: boolean;
   aiLineupEnsure: FoundationActivityLineupEnsureSnapshot | null;
   adminSimulationBusy: boolean;

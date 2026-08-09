@@ -189,7 +189,15 @@ describe("Apron liga-weit: jede Zeile ist die benannte Projektionszeile — nich
   it("Rollen decken sich mit den Aggregaten der Karte (Zahler/Empfänger-Zählung der Engine)", () => {
     expect(league.filter((row) => row.rolle === "zahler").length).toBe(team.apron!.zahlerCount);
     expect(league.filter((row) => row.rolle === "empfaenger").length).toBe(team.apron!.empfaengerCount);
-    expect(team.apron!.gedeckeltCount).toBe(league.filter((row) => row.gedeckelt).length);
+    // Zustandsbewusst: gezählt werden nur gedeckelte ZAHLER — ein Team, dessen
+    // Abgabe der Deckel auf 0,0 drückt, steht in der Tabelle als "neutral" und
+    // gehört nicht in die "N Zahler sind durch den Deckel begrenzt"-Fußnote.
+    expect(team.apron!.gedeckeltCount).toBe(
+      league.filter((row) => row.gedeckelt && row.rolle === "zahler").length,
+    );
+    // Gegenprobe: gedeckelte Nicht-Zahler existieren höchstens zusätzlich — der
+    // Zähler darf nie GRÖSSER sein als die Menge aller gedeckelten Zeilen.
+    expect(team.apron!.gedeckeltCount).toBeLessThanOrEqual(league.filter((row) => row.gedeckelt).length);
   });
 
   it("die eigene Zeile trägt dieselben Zahlen wie die eigene Karte darüber", () => {

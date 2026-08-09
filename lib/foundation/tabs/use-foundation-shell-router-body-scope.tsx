@@ -138,6 +138,7 @@ import {
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { hydriereFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 import {
   buildFieldRaceLedger,
   countPlayedFieldRaceMatchdays,
@@ -8118,12 +8119,36 @@ export function useFoundationShellRouterBodyScope({
   // sanktionierten Helper `buildFieldRaceLedger` (dieselbe Quelle) nachgezogen
   // — ohne die teure Voll-Derivation zu erzwingen.
   const fieldRaceLedger = useMemo(() => {
+    /**
+     * Serverseitige Projektion ZUERST: sie ist auf dem VOLLEN Save gerechnet und faehrt
+     * mit jedem kompakten Payload mit (foundation-field-race-projection). Der Browser
+     * haelt oft nur den beschnittenen Stand (matchdayResults/disciplineResults nur fuer
+     * den aktiven Spieltag) — jeder lokale (Nach-)Bau, auch der der Derivationen,
+     * zaehlt darauf hoechstens EINEN gespielten Spieltag und meldete auf Home mitten
+     * in der Saison „erst 0 Spieltage" / „verbleibend 10".
+     */
+    const projection = gameState.seasonState.foundationFieldRace;
+    if (projection && projection.seasonId === gameState.season.id && projection.matchdays.length > 0) {
+      return hydriereFieldRaceProjection(projection);
+    }
     const shared = seasonDerivations.fieldRaceLedger;
     if (shared.matchdays.length > 0) {
       return shared;
     }
-    // On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build).
-    return buildFieldRaceLedger(gameState, gameState.season.id, seasonDerivations.ledger);
+    /**
+     * On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build) — aber NUR,
+     * wenn es wirklich eines ist. Ist `useSeasonDerivations` auf der aktiven Ansicht
+     * deaktiviert (z. B. Home), liefert es das EMPTY-Sentinel: ein Ledger-Objekt mit
+     * null Punkt-Einträgen. Das wurde hier vorher als „vorberechnet" durchgereicht,
+     * und `buildFieldRaceLedger` fand darin für KEINEN Spieltag Punkte — Home meldete
+     * mitten in der Saison „erst 0 Spieltage", „verbleibend 10", leere Form, während
+     * Teams/Leaders (mit aktiven Derivationen bzw. direkter Zählung) korrekt 4 sagten.
+     * Ohne den Parameter rechnet `buildFieldRaceLedger` das Punkte-Ledger selbst aus
+     * dem GameState — dieselbe Rechnung, die auch die Derivationen ausführen.
+     */
+    const precomputedLedger =
+      seasonDerivations.ledger.pointEntries.length > 0 ? seasonDerivations.ledger : undefined;
+    return buildFieldRaceLedger(gameState, gameState.season.id, precomputedLedger);
   }, [seasonDerivations.fieldRaceLedger, seasonDerivations.ledger, gameState]);
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
@@ -11241,6 +11266,20 @@ export function useFoundationShellRouterBodyScope({
     liveSyncStatus,
     showIdleReady: gameState.season.id !== "loading",
     fetchSlowWarning,
+    /**
+     * Saison läuft bereits: exakt das Gegenstück zum Preseason-Kauffenster
+     * (`isEarlySeasonTransferSetup` in transfer-window-policy.ts — offen nur bei
+     * currentMatchday ≤ 1 UND ohne gebuchtes Ergebnis). Ab dann ist ein liegen
+     * gebliebener „Preseason-Markt blockiert"-Lauf nicht mehr handelbar und sein
+     * Banner wird von der Aktivitätsleiste unterdrückt — der Markt selbst meldet
+     * längst „Transferfenster geschlossen · Saison läuft".
+     */
+    preseasonWindowOver:
+      (gameState.gamePhase ?? "season_active") === "season_active" &&
+      ((gameState.season.currentMatchday ?? 1) > 1 ||
+        (gameState.seasonState.matchdayResults ?? []).some(
+          (result) => result.seasonId === gameState.season.id,
+        )),
   });
 
   const isAdminView = activeView === "admin";

@@ -1,6 +1,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
 import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
+import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -136,6 +137,14 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * Schnappschuesse beim naechsten Speichern ueberschreiben.
        */
       foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
+      /**
+       * Geschwister-Projektion fuers laufende Feld-Rennen: der Browser kann die gewerteten
+       * Spieltage aus dem kompakten Payload nicht mehr selbst zaehlen (matchdayResults/
+       * disciplineResults sind hier auf den aktiven Spieltag beschnitten) — Home meldete
+       * deshalb mitten in der Saison „erst 0 Spieltage". Die fertige Antwort faehrt mit,
+       * gerechnet auf dem vollen Save; zurueckgeschrieben wird sie nie (s. u.).
+       */
+      foundationFieldRace: projiziereFieldRace(gameState),
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
@@ -237,6 +246,9 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
        * veralten lassen. Beim naechsten Ausliefern wird sie ohnehin frisch gebaut.
        */
       foundationSeasonHistory: undefined,
+      // Dieselbe Regel wie die Saison-Historie darueber: reine Anzeigefracht, faehrt nur
+      // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
+      foundationFieldRace: undefined,
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

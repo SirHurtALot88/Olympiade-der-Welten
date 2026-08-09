@@ -418,7 +418,11 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
           zahlerCount: apronProjection.zahlerCount,
           empfaengerCount: apronProjection.empfaengerCount,
           league: apronLeague,
-          gedeckeltCount: apronLeague.filter((row) => row.gedeckelt).length,
+          // Nur Teams, die WIRKLICH zahlen: die Fußnote formuliert „N Zahler sind durch
+          // den Deckel begrenzt" — ein gedeckeltes Team, dessen Abgabe der Deckel auf
+          // 0,0 drückt, wird in der Tabelle als „neutral" geführt und darf hier nicht
+          // als Zahler mitgezählt werden (vorher: 18 statt 17).
+          gedeckeltCount: apronLeague.filter((row) => row.gedeckelt && row.rolle === "zahler").length,
         }
       : null;
 

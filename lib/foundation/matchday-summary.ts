@@ -1,6 +1,8 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
+import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
 
@@ -46,6 +48,8 @@ export type MatchdaySummaryHighlight = {
   id: string;
   label: string;
   value: string;
+  /** Kurz-Glyphe fürs Badge der Highlight-Karte (aus der deutschen Typ-Map). */
+  glyph: string;
   source: string;
 };
 
@@ -56,6 +60,15 @@ export type MatchdaySummary = {
   d1: { disciplineId: string | null; disciplineName: string | null };
   d2: { disciplineId: string | null; disciplineName: string | null };
   hasResult: boolean;
+  /**
+   * Dreiwertiger Spieltags-Zustand aus `getMatchdayScoringProgress` — derselben
+   * Quelle, die auch der Spielplan ("läuft") und der Spieltagswechsel lesen:
+   * none = nichts gewertet, partial = z. B. nur D1 gebucht, complete = beide
+   * geplanten Disziplinen gebucht. `hasResult` allein kann den mittleren
+   * Zustand nicht ausdrücken — genau daraus entstand der "TAGESSIEGER auf
+   * halber Strecke".
+   */
+  completion: "none" | "partial" | "complete";
   teamRows: MatchdaySummaryTeamRow[];
   topTeams: MatchdaySummaryTeamRow[];
   bottomTeams: MatchdaySummaryTeamRow[];
@@ -122,6 +135,10 @@ export function buildMatchdaySummary(
     (gameState.seasonState.matchdayResults ?? []).find(
       (entry) => entry.seasonId === seasonId && entry.matchdayId === matchdayId && entry.status === "preview_applied",
     ) ?? null;
+  // Dreiwertiger Spieltags-Zustand (none/partial/complete) aus der EINEN geteilten
+  // Quelle — kennt zusätzlich die GEPLANTEN Disziplinen aus dem Spielplan, sodass
+  // eine noch ungewertete Seite (D2 am halben Spieltag) trotzdem beim Namen steht.
+  const scoringProgress = getMatchdayScoringProgress(gameState, matchdayId ?? "");
 
   if (!result) {
     warnings.push("missing_matchday_result");
@@ -129,9 +146,10 @@ export function buildMatchdaySummary(
       seasonId,
       matchdayId: matchdayId ?? "—",
       matchdayNumber,
-      d1: { disciplineId: null, disciplineName: null },
-      d2: { disciplineId: null, disciplineName: null },
+      d1: { disciplineId: scoringProgress.d1.disciplineId, disciplineName: scoringProgress.d1.displayName },
+      d2: { disciplineId: scoringProgress.d2.disciplineId, disciplineName: scoringProgress.d2.displayName },
       hasResult: false,
+      completion: "none",
       teamRows: gameState.teams.map((team) => ({
         teamId: team.teamId,
         teamName: team.name,
@@ -211,8 +229,17 @@ export function buildMatchdaySummary(
     scoreByTeam.set(row.teamId, current);
   }
 
-  const d1DisciplineId = disciplineRows.find((entry) => entry.disciplineSide === "d1")?.disciplineId ?? null;
-  const d2DisciplineId = disciplineRows.find((entry) => entry.disciplineSide === "d2")?.disciplineId ?? null;
+  // Gebuchte Zeilen zuerst, Spielplan als Rückfall: so trägt am halben Spieltag
+  // auch die noch ungewertete Seite ihren Namen ("Takeshi steht noch aus")
+  // statt eines stummen "—".
+  const d1DisciplineId =
+    disciplineRows.find((entry) => entry.disciplineSide === "d1")?.disciplineId ??
+    scoringProgress.d1.disciplineId ??
+    null;
+  const d2DisciplineId =
+    disciplineRows.find((entry) => entry.disciplineSide === "d2")?.disciplineId ??
+    scoringProgress.d2.disciplineId ??
+    null;
 
   const teamRows = gameState.teams
     .map<MatchdaySummaryTeamRow>((team) => {
@@ -282,16 +309,30 @@ export function buildMatchdaySummary(
     d1: { disciplineId: d1DisciplineId, disciplineName: d1DisciplineId ? disciplinesById.get(d1DisciplineId)?.name ?? d1DisciplineId : null },
     d2: { disciplineId: d2DisciplineId, disciplineName: d2DisciplineId ? disciplinesById.get(d2DisciplineId)?.name ?? d2DisciplineId : null },
     hasResult: Boolean(result),
+    completion: scoringProgress.completion,
     teamRows,
     topTeams: teamRows.slice(0, 5),
     bottomTeams: [...teamRows].filter((row) => row.matchdayRank != null).slice(-5).reverse(),
     topPlayers,
-    highlights: highlights.slice(0, 8).map((highlight) => ({
-      id: highlight.id,
-      label: highlight.highlightType,
-      value: highlight.shortSummary ?? "—",
-      source: "seasonState.disciplineHighlights",
-    })),
+    // Deutsche Klartexte statt Enum-Name + englischem Engine-Satz — die Rohdaten
+    // (`highlightType`/`shortSummary`) bleiben im Save unangetastet.
+    highlights: highlights.slice(0, 8).map((highlight) => {
+      const display = formatMatchdayHighlight({
+        highlightType: highlight.highlightType,
+        shortSummary: highlight.shortSummary,
+        payload: highlight.payload,
+        disciplineName: highlight.disciplineId
+          ? disciplinesById.get(highlight.disciplineId)?.name ?? highlight.disciplineId
+          : null,
+      });
+      return {
+        id: highlight.id,
+        label: display.label,
+        value: display.value,
+        glyph: display.glyph,
+        source: "seasonState.disciplineHighlights",
+      };
+    }),
     warnings: Array.from(new Set(warnings)),
   };
 }
