@@ -47871,9 +47871,48 @@ button.foundation-team-portrait-card {
   outline-offset: 1px;
 }
 
-.is-new-look .nl-leaders-empty {
+/* W2 · Leaders-Saisonstart (Muster 3): „Noch zu vergeben" (VeloPendingRanking)
+   plus Vorsaison-Brücke — ersetzt die frühere Leertext-Zeile in sechs leeren
+   Riesen-Karten. Layout wie das Ranks-PP-Board (`.nl-ranks-pending`);
+   die Podium-Optik teilt sich die Rezeptur mit `.nl-ranks-prev-podium`
+   (Selektoren dort erweitert — eine Rezeptur, keine Kopie). */
+.is-new-look .nl-leaders-pending {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: var(--nl-s4, 20px);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-leaders-pending {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Team-Zeile im Leaders-Vorsaison-Podium ist NICHT interaktiv (die Seite kennt
+   nur Spieler-Navigation) — deshalb eigene, hover-freie Variante statt der
+   Button-Rezeptur von `.nl-ranks-prev-podium-team`. */
+.is-new-look .nl-leaders-prev-podium-team {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-leaders-prev-podium-team strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-leaders-prev-podium-team small {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-leaders-prev-podium-foot {
   margin: 0;
-  padding: var(--nl-s2);
   font-size: 12px;
   color: var(--nl-mut);
 }
@@ -68645,10 +68684,9 @@ span.nl-facility-ampel-chip {
   flex-shrink: 0;
 }
 
-.is-new-look .nl-records-champions-chart {
-  margin-top: var(--nl-s3);
-  max-width: 100%;
-}
+/* `.nl-records-champions-chart` entfernt (W2): der Balkenchart des
+   Medaillenspiegels explodierte bei 1 Saison zu einem ~2.500-px-Goldbalken —
+   die Medaillen-Zeilen tragen dieselbe Information. */
 
 /* --- Rekord-Karten-Grid (Kaderwert / Ablöse / Board / MW-Sprung) ---- */
 .is-new-look .nl-records-grid {
@@ -79410,7 +79448,10 @@ span.nl-facility-ampel-chip {
   }
 }
 
-.is-new-look .nl-ranks-prev-podium {
+/* Geteilt mit dem Leaders-Saisonstart (W2, `.nl-leaders-prev-podium`) — eine
+   Rezeptur für beide Vorsaison-Podien, keine Kopie. */
+.is-new-look .nl-ranks-prev-podium,
+.is-new-look .nl-leaders-prev-podium {
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-lg);
   background: var(--nl-panel-2);
@@ -79419,7 +79460,8 @@ span.nl-facility-ampel-chip {
   gap: 10px;
 }
 
-.is-new-look .nl-ranks-prev-podium-eyebrow {
+.is-new-look .nl-ranks-prev-podium-eyebrow,
+.is-new-look .nl-leaders-prev-podium-eyebrow {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -79427,7 +79469,8 @@ span.nl-facility-ampel-chip {
   color: var(--nl-accent-text);
 }
 
-.is-new-look .nl-ranks-prev-podium-list {
+.is-new-look .nl-ranks-prev-podium-list,
+.is-new-look .nl-leaders-prev-podium-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -79435,7 +79478,8 @@ span.nl-facility-ampel-chip {
   gap: 6px;
 }
 
-.is-new-look .nl-ranks-prev-podium-row {
+.is-new-look .nl-ranks-prev-podium-row,
+.is-new-look .nl-leaders-prev-podium-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -79477,7 +79521,8 @@ span.nl-facility-ampel-chip {
   font-size: 11px;
 }
 
-.is-new-look .nl-ranks-prev-podium-value {
+.is-new-look .nl-ranks-prev-podium-value,
+.is-new-look .nl-leaders-prev-podium-value {
   color: var(--nl-mut);
   font-size: 12.5px;
 }

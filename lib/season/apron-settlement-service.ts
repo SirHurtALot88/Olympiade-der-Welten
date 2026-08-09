@@ -22,6 +22,7 @@ import {
   apronWertungsanteil,
   computeApronLines,
   computeApronSettlement,
+  hasSeasonBeenPlayed,
   type ApronLines,
   type ApronTeamRow,
 } from "@/lib/season/apron-service";
@@ -38,18 +39,28 @@ function getCurrentSalaryFactor(gameState: GameState): number {
 // ── Einfrieren zu Saisonbeginn ────────────────────────────────────────────────────────────────
 
 /**
- * Friert die Apron-Linien für die AKTUELLE Saison ein, falls noch nicht geschehen. Idempotent: ein
- * bereits vorhandener Snapshot für `gameState.season.id` wird nie überschrieben — das ist die ganze
- * Absicherung gegen "man kauft gegen eine Grenze, die sich durch die eigenen Käufe verschiebt".
+ * Schreibt die Apron-Linien der AKTUELLEN Saison in den Spielstand — und FÜHRT SIE NACH, solange
+ * noch kein Spieltag abgerechnet ist.
+ *
+ * FRÜHER war diese Funktion streng einmalig: der erste Snapshot einer Saison blieb stehen. Die
+ * Begründung — man soll nicht gegen eine Grenze kaufen, die die eigenen Käufe verschieben — ist
+ * richtig, aber der Zeitpunkt war falsch. Der einzige Aufruf im Saisonübergang lief, BEVOR der
+ * Kaderbau der neuen Saison begann; der Kommentar hier behauptete, das Transferfenster sei
+ * „bereits durchlaufen". Auf Chris' Spielstand kamen danach noch alle 106 Zugänge der Saison
+ * (717,5 Mio Gehalt, Median 45,0 → 69,8) und rissen 28 von 32 Teams über die eingefrorene Linie.
+ *
+ * JETZT gilt: solange `hasSeasonBeenPlayed` falsch ist, wird bei jedem Aufruf neu gerechnet. Der
+ * letzte Aufruf vor dem ersten Spieltag setzt damit den endgültigen Stand — und genau dort steht
+ * jetzt ein Aufruf (`legacy-matchday-result-apply-service.ts`, unmittelbar bevor das erste Ergebnis
+ * geschrieben wird). Ab da ist der Snapshot unantastbar.
  *
  * Aufrufstellen: `lib/game/new-game-setup-service.ts` (Season 1 — Rosters noch leer, greift der
- * Referenz-Gehalt-Fallback aus `computeApronLines`) und `lib/season/preseason-workflow-service.ts`
- * (Season-Übergang, unmittelbar bevor `gamePhase` auf `season_active` schaltet, also NACH dem
- * Transferfenster — der Gehaltsstand, gegen den die neue Saison antritt, steht dann fest).
+ * Referenz-Gehalt-Fallback), `lib/season/preseason-workflow-service.ts` (Saisonübergang) und
+ * `lib/resolve/legacy-matchday-result-apply-service.ts` (das Einrasten).
  */
 export function ensureSeasonApronLinesFrozen(gameState: GameState): GameState {
   const existing = gameState.seasonState.apronLinesSnapshot;
-  if (existing && existing.seasonId === gameState.season.id) {
+  if (existing && existing.seasonId === gameState.season.id && hasSeasonBeenPlayed(gameState)) {
     return gameState;
   }
   const lines = computeApronLines(gameState);

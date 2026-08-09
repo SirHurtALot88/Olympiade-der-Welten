@@ -105,6 +105,29 @@ export type LeagueLeaderCategory = {
 
 export const LEAGUE_LEADER_DEFAULT_LIMIT = 5;
 
+/**
+ * Saisonstart-/Leerzustand einer Kategorie (Muster 3, Paket W2) — die EINE Quelle
+ * für die Frage „trägt diese Wertung schon etwas Reihbares?".
+ *
+ * Eine Kategorie ist „pending", wenn sie keine echte Wertung trägt: entweder gar
+ * keine Einträge (die Quelle liefert `null`, z. B. PPs vor dem ersten Ledger-
+ * Eintrag) oder ausnahmslos 0-Werte — dann wäre jede „Rangfolge" nur das
+ * Alphabet aus dem Tiebreaker von `buildCategory`. Ein einziger Wert ≠ 0 macht
+ * die Wertung echt, ausdrücklich auch ein negativer (Training/Most Improved
+ * können unter 0 liegen): das ist das Spieler-Pendant zur Ranks-Regel „0 PPs
+ * UND 0 Formbonus" — ein Spieler mit 0,0 in einer Liste, in der andere echte
+ * Werte tragen, hat einen echten (letzten) Rang und ist KEIN Leerzustand.
+ *
+ * Verbraucher: Leaders-Kachelgrid (kollabiert pending-Kategorien zu einem
+ * VeloPendingRanking), Own-Team-Footprint und Saison-Bestwerte (beide dürfen
+ * aus einer Alphabet-Liste keine Top-5-Slots/„Bestwerte" zählen — sonst
+ * vergibt die Seite am Saisonstart Medaillen an Spieler mit 0 PPs).
+ */
+export function isLeagueLeaderCategoryPending(category: LeagueLeaderCategory): boolean {
+  const entries = category.fullEntries ?? category.entries;
+  return entries.length === 0 || entries.every((entry) => entry.value === 0);
+}
+
 type LeaderCandidateRow = {
   playerId: string;
   name: string;

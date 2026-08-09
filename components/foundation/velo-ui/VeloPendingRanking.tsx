@@ -13,6 +13,9 @@ import type { ReactNode } from "react";
  * Verwender:
  * - Arena (S3): „Spieltags-Wertung folgt" vor dem ersten gewerteten Ergebnis.
  * - Ranks/PP-Board (W1): Saisonstart-Leerzustand statt Alphabet-Medaillen.
+ * - Leaders (W2): Kategorien ohne Wertung kollabieren zu EINEM „Noch zu
+ *   vergeben"-Block (ein Slot je Kategorie, Achsen mit Farbpunkt) statt sechs
+ *   leerer Riesen-Karten.
  *
  * Bewusst rein presentational — Zahlen/Slots kommen vollständig vom Aufrufer,
  * die Komponente erfindet nichts.

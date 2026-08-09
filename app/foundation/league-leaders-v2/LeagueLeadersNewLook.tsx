@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
-  NlBarChart,
   NlCard,
   NlMedalBadge,
   NlRankingDrawer,
@@ -12,18 +11,27 @@ import {
   NlTable,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
+  formatNlSignedMoney,
   nlToneClass,
   type NlRankingDrawerRow,
   type NlTableColumn,
   type NlTableSortDirection,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloPendingRanking, type VeloPendingRankingSlot } from "@/components/foundation/velo-ui";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { LeagueLeaderCategory, LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
+import {
+  isLeagueLeaderCategoryPending,
+  type LeagueLeaderCategory,
+  type LeagueLeaderEntry,
+  type LeagueLeaderTone,
+} from "@/lib/foundation/league-leaders-service";
+import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import { getPlayerStarTier, type PlayerStarTier } from "@/lib/foundation/player-star-tier";
 import {
@@ -96,6 +104,65 @@ const NL_LEADER_TONE_MAP: Record<LeagueLeaderTone, NlTone> = {
   // Der Aufsteiger sticht bewusst mit dem Akzent heraus und nicht mit "good" wie Training:
   // Training ist eine Prognose, Most Improved ist bereits geliefert.
   improved: "accent",
+};
+
+/**
+ * Leerzustands-Slots je Kategorie — freigegebener Entwurf `leagueLeaders-v2.html`,
+ * Abschnitt „Noch zu vergeben": Kurzzeichen im gestrichelten Ring, voller Name als
+ * Unterzeile (Audit-Befund 5: PPS/MVS standen unerklärt), Achs-Kategorien mit
+ * ihrem Farbpunkt (dieselben Tokens wie überall: --nl-pow/--nl-spe/--nl-men/--nl-soc).
+ * Unbekannte Kategorie-IDs fallen auf ihr eigenes Label zurück — nichts erfunden.
+ */
+const NL_LEADERS_PENDING_SLOT_CONFIG: Record<string, { ring: ReactNode; label: string; dotColor?: string }> = {
+  pps: { ring: "PPS", label: "Punktebeitrag gesamt" },
+  pow: {
+    ring: (
+      <>
+        PP
+        <br />
+        POW
+      </>
+    ),
+    label: "Power-Achse",
+    dotColor: "var(--nl-pow)",
+  },
+  spe: {
+    ring: (
+      <>
+        PP
+        <br />
+        SPE
+      </>
+    ),
+    label: "Speed-Achse",
+    dotColor: "var(--nl-spe)",
+  },
+  men: {
+    ring: (
+      <>
+        PP
+        <br />
+        MEN
+      </>
+    ),
+    label: "Mental-Achse",
+    dotColor: "var(--nl-men)",
+  },
+  soc: {
+    ring: (
+      <>
+        PP
+        <br />
+        SOC
+      </>
+    ),
+    label: "Social-Achse",
+    dotColor: "var(--nl-soc)",
+  },
+  mvs: { ring: "MVS", label: "Marktwert-Score" },
+  ovr: { ring: "OVR", label: "Gesamtstärke" },
+  training: { ring: "SP", label: "Trainings-Fortschritt" },
+  mostImproved: { ring: "MI", label: "Most Improved" },
 };
 
 function getLeaderInitials(name: string): string {
@@ -343,6 +410,50 @@ export default function LeagueLeadersNewLook({
     [foundationGameState, categories, selectedTeamId],
   );
 
+  // W2 · Saisonstart (Muster 3): Kategorien ohne echte Wertung fliegen aus dem
+  // Kachelgrid und kollabieren zu EINEM VeloPendingRanking („Noch zu vergeben")
+  // — statt sechs leerer Riesen-Karten mit demselben Satz (Audit-Befund 3).
+  // Gefüllte Kategorien rücken dadurch automatisch nach vorn. Die Erkennung
+  // (`isLeagueLeaderCategoryPending`) ist dieselbe Quelle, die auch Footprint
+  // und Saison-Bestwerte vor Alphabet-Medaillen schützt.
+  const { filledCategories, pendingCategories } = useMemo(() => {
+    const filled: LeagueLeaderCategory[] = [];
+    const pending: LeagueLeaderCategory[] = [];
+    for (const category of categories) {
+      (isLeagueLeaderCategoryPending(category) ? pending : filled).push(category);
+    }
+    return { filledCategories: filled, pendingCategories: pending };
+  }, [categories]);
+
+  /** Gemeldete Spieler = größte vorhandene Ranglistenlänge — keine neue Quelle. */
+  const gemeldeteSpieler = useMemo(
+    () => categories.reduce((max, category) => Math.max(max, (category.fullEntries ?? category.entries).length), 0),
+    [categories],
+  );
+
+  const pendingSlots = useMemo<VeloPendingRankingSlot[]>(
+    () =>
+      pendingCategories.map((category) => {
+        const config = NL_LEADERS_PENDING_SLOT_CONFIG[category.id];
+        return {
+          key: category.id,
+          ring: config?.ring ?? category.label,
+          label: config?.label ?? category.label,
+          dotColor: config?.dotColor ?? null,
+        };
+      }),
+    [pendingCategories],
+  );
+
+  // Vorsaison-Brücke neben dem leeren Podest — NUR wenn es wirklich eine
+  // abgeschlossene Vorsaison gibt (`buildPreviousSeasonPodium` liefert sonst
+  // null, nichts wird erfunden). Exakt derselbe Snapshot-Datenweg wie das
+  // Ranks-PP-Board (W1) und die Ewige Tabelle — keine zweite Quelle.
+  const previousSeasonPodium = useMemo(
+    () => (pendingCategories.length > 0 && foundationGameState ? buildPreviousSeasonPodium(foundationGameState) : null),
+    [pendingCategories.length, foundationGameState],
+  );
+
   return (
     <section
       className="nl-leaders"
@@ -390,15 +501,18 @@ export default function LeagueLeadersNewLook({
       ) : subTab === "achievements" ? (
         <LeagueAchievementsPanel achievements={achievements} onOpenPlayer={onOpenPlayer} />
       ) : (
+      <>
       <div className="nl-leaders-grid">
-        {categories.map((category) => {
+        {filledCategories.map((category) => {
           const tone = NL_LEADER_TONE_MAP[category.tone] ?? "accent";
           const leader = category.entries.length > 0 ? category.entries[0] : null;
           const topValue = leader != null && Number.isFinite(leader.value) ? leader.value : 0;
-          // Vor dem ersten Spieltag sind Performance-Kategorien (PP POW/SPE/MEN/…)
-          // bei allen Spielern 0 — dann lieber EIN "noch keine Werte"-Hinweis als
-          // eine Liste aus fuenf Nullen. OVR/CA sind nie 0, greift also nur dort.
-          const hasData = leader != null && Number.isFinite(topValue) && topValue > 0;
+          // Nur gefüllte Kategorien erreichen dieses Grid — die Pending-Erkennung
+          // (`isLeagueLeaderCategoryPending`, s. o.) hat leere/0-Wertungen bereits
+          // in den „Noch zu vergeben"-Block kollabiert. Ein Leader mit Wert 0 in
+          // einer sonst echten Wertung (z. B. Training mit negativen Werten) ist
+          // ein echter Rang 1 und KEIN Leerzustand.
+          const hasData = leader != null;
           const chasers = category.entries.slice(1);
           const median = getCategoryMedian(category);
           const statDecimals = getCategoryStatDecimals(category.id);
@@ -448,9 +562,7 @@ export default function LeagueLeadersNewLook({
                   </span>
                   <span className="nl-leaders-hero-value nl-tnum">{leader.displayValue}</span>
                 </button>
-              ) : (
-                <p className="nl-leaders-empty">Noch keine Werte diese Saison — erscheint nach dem ersten Spieltag.</p>
-              )}
+              ) : null}
 
               {hasData && chasers.length > 0 ? (
                 <div className="nl-leaders-list">
@@ -547,6 +659,68 @@ export default function LeagueLeadersNewLook({
           );
         })}
       </div>
+      {pendingCategories.length > 0 ? (
+        <div className="nl-leaders-pending" data-testid="nl-leaders-pending">
+          <VeloPendingRanking
+            eyebrow={seasonLabel}
+            title="Noch zu vergeben"
+            note={
+              seasonAwards.matchdaysPlayed > 0
+                ? `${
+                    seasonAwards.matchdaysPlayed === 1
+                      ? "Ein Spieltag ist bereits gewertet"
+                      : `${formatNlNumber(seasonAwards.matchdaysPlayed, 0)} Spieltage sind bereits gewertet`
+                  }, doch in diesen Kategorien trägt noch kein Spieler einen Wert. Ohne Werte wäre jede Reihenfolge nur das Alphabet — deshalb bleibt das Podest bewusst leer, bis echte Werte da sind.`
+                : "Diese Auszeichnungen entstehen aus gespielten Wettbewerben — noch ist kein Spieltag gewertet. Ohne Werte stünde hier bewusst niemand oben, jede Reihenfolge wäre nur das Alphabet. Erste Wertung nach dem ersten Ergebnis an Spieltag 1."
+            }
+            slots={pendingSlots}
+            meta={`${formatNlNumber(gemeldeteSpieler, 0)} Spieler gemeldet · ${formatNlNumber(
+              pendingCategories.length,
+              0,
+            )} von ${formatNlNumber(categories.length, 0)} Kategorien noch ohne Wertung`}
+            data-testid="nl-leaders-pending-ranking"
+          />
+          {previousSeasonPodium && previousSeasonPodium.entries.length > 0 ? (
+            <aside
+              className="nl-leaders-prev-podium"
+              data-testid="nl-leaders-prev-podium"
+              aria-label={`Vorsaison-Podium ${previousSeasonPodium.seasonLabel}`}
+            >
+              <span className="nl-leaders-prev-podium-eyebrow">
+                Vorsaison · Endstand {previousSeasonPodium.seasonLabel}
+              </span>
+              <ol className="nl-leaders-prev-podium-list">
+                {previousSeasonPodium.entries.map((entry) => (
+                  <li key={entry.teamId} className="nl-leaders-prev-podium-row">
+                    <NlMedalBadge
+                      kind={entry.rank === 1 ? "gold" : entry.rank === 2 ? "silver" : "bronze"}
+                      title={`Endrang ${entry.rank} · ${previousSeasonPodium.seasonLabel}`}
+                    />
+                    <span className="nl-leaders-prev-podium-team">
+                      <strong>{entry.teamName}</strong>
+                      <small>{entry.teamCode}</small>
+                    </span>
+                    <span className="nl-leaders-prev-podium-value nl-tnum">
+                      {entry.points != null
+                        ? `${formatNlNumber(entry.points, 0)} Punkte`
+                        : entry.rank === 1
+                          ? "Meister"
+                          : entry.rank === 2
+                            ? "Vize"
+                            : "Dritter"}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <p className="nl-leaders-prev-podium-foot">
+                Bis die ersten Werte dieser Saison da sind, trägt die Vorsaison die Seite — die vollen Bestenlisten
+                stehen in den Reitern „Rekorde“ und „🏆 Legendäre Spieler“.
+              </p>
+            </aside>
+          ) : null}
+        </div>
+      ) : null}
+      </>
       )}
 
       {subTab === "leaders" && seasonAwards.awards.length > 0 ? (
@@ -649,11 +823,13 @@ function LeagueRecordsPanel({
     );
   }
 
-  const topChampions = records.champions.slice(0, 5);
-  const championBars = records.champions
-    .filter((row) => row.gold > 0)
-    .slice(0, 6)
-    .map((row) => ({ label: row.teamCode, value: row.gold, tone: "warn" as NlTone }));
+  // Medaillenspiegel: NUR Teams mit mindestens einer Medaille bekommen eine
+  // Zeile und einen Rang — Teams ohne Medaille in einer „Rangliste" wären wieder
+  // nur Alphabet (vorher standen Rang 4/5 ohne jede Medaille da). Der Rest wird
+  // als ein ehrlicher Satz gezählt statt gelistet (freigegebener Entwurf).
+  const medalists = records.champions.filter((row) => row.gold + row.silver + row.bronze > 0);
+  const topChampions = medalists.slice(0, 8);
+  const teamsOhneMedaille = records.champions.length - medalists.length;
   const recentSeasonChampions = records.seasonChampions.slice(0, 8);
 
   return (
@@ -684,13 +860,18 @@ function LeagueRecordsPanel({
                 </li>
               ))}
             </ol>
-            {championBars.length > 0 ? (
-              <NlBarChart
-                bars={championBars}
-                format={(value) => formatNlNumber(value, 0)}
-                aria-label="Titel je Team"
-                className="nl-records-champions-chart"
-              />
+            {/* Der frühere NlBarChart hing an der Container-Höhe und explodierte
+                bei 1 Saison zu einem ~2.500-px-Goldbalken (Audit-Befund 2) —
+                „wenige Saisons" ist hier der Normalfall, die Medaillen-Zeilen
+                oben tragen dieselbe Information bereits vollständig. */}
+            {teamsOhneMedaille > 0 ? (
+              <p className="nl-records-empty-text">
+                {medalists.length > topChampions.length
+                  ? `… und ${formatNlNumber(medalists.length - topChampions.length, 0)} weitere Teams mit Medaille. `
+                  : ""}
+                Alle weiteren {formatNlNumber(teamsOhneMedaille, 0)} Teams sind noch ohne Medaille — der Spiegel wächst
+                mit jedem Saisonende.
+              </p>
             ) : null}
           </>
         ) : (
@@ -707,7 +888,7 @@ function LeagueRecordsPanel({
               ? `${records.peakSquadMarketValue.teamCode} · ${records.peakSquadMarketValue.seasonLabel}`
               : null
           }
-          value={records.peakSquadMarketValue ? formatNlNumber(records.peakSquadMarketValue.value, 0) : null}
+          value={records.peakSquadMarketValue ? formatNlMoney(records.peakSquadMarketValue.value) : null}
           tone="accent"
         />
         <RecordCard
@@ -718,7 +899,7 @@ function LeagueRecordsPanel({
               ? `${records.recordTransferFee.fromTeamName ?? "—"} → ${records.recordTransferFee.toTeamName ?? "—"} · ${records.recordTransferFee.seasonLabel}`
               : null
           }
-          value={records.recordTransferFee ? formatNlNumber(records.recordTransferFee.amount, 0) : null}
+          value={records.recordTransferFee ? formatNlMoney(records.recordTransferFee.amount) : null}
           tone="warn"
           onClick={records.recordTransferFee ? () => onOpenPlayer(records.recordTransferFee!.playerId) : undefined}
         />
@@ -738,10 +919,10 @@ function LeagueRecordsPanel({
           holder={records.biggestMwJump ? records.biggestMwJump.playerName : null}
           sub={
             records.biggestMwJump
-              ? `${formatNlNumber(records.biggestMwJump.fromValue, 0)} → ${formatNlNumber(records.biggestMwJump.toValue, 0)} · ${records.biggestMwJump.seasonLabel}`
+              ? `${formatNlMoney(records.biggestMwJump.fromValue)} → ${formatNlMoney(records.biggestMwJump.toValue)} · ${records.biggestMwJump.seasonLabel}`
               : null
           }
-          value={records.biggestMwJump ? `+${formatNlNumber(records.biggestMwJump.delta, 0)}` : null}
+          value={records.biggestMwJump ? formatNlSignedMoney(records.biggestMwJump.delta) : null}
           tone="spe"
           onClick={records.biggestMwJump ? () => onOpenPlayer(records.biggestMwJump!.playerId) : undefined}
         />
@@ -1205,6 +1386,16 @@ function LegendCriteriaPanel({
   const zeigeLegenden = bewertung.legends.length > 0;
   const liste = zeigeLegenden ? bewertung.legends : bewertung.anwaerter;
 
+  // Audit-Befund 6: 10 Anwärter × 5 Kriterienzeilen, fast alle identisch auf 0/5.
+  // Standard: nur Anwärter mit mindestens einem erfüllten Kriterium ausgeklappt
+  // (ersatzweise die ersten drei, wenn noch niemand eines erfüllt) — der Rest
+  // hinter einem Knopf mit ehrlicher Zählung statt einer halben Seite Wiederholung.
+  const [alleAnwaerterSichtbar, setAlleAnwaerterSichtbar] = useState(false);
+  const mitFortschritt = liste.filter((kandidat) => kandidat.erfuellteAnzahl > 0);
+  const standardListe = zeigeLegenden ? liste : mitFortschritt.length > 0 ? mitFortschritt : liste.slice(0, 3);
+  const sichtbareListe = alleAnwaerterSichtbar ? liste : standardListe;
+  const verborgeneAnwaerter = liste.length - sichtbareListe.length;
+
   return (
     <NlCard
       className="nl-legend-criteria-card"
@@ -1222,7 +1413,7 @@ function LegendCriteriaPanel({
       </p>
 
       <ol className="nl-legend-candidates" data-testid="legend-candidates">
-        {liste.map((kandidat) => (
+        {sichtbareListe.map((kandidat) => (
           <li key={kandidat.playerId} className="nl-legend-candidate">
             <button type="button" className="nl-legend-candidate-head" onClick={() => onOpenPlayer(kandidat.playerId)}>
               <strong>{kandidat.playerName}</strong>
@@ -1247,6 +1438,16 @@ function LegendCriteriaPanel({
           </li>
         ))}
       </ol>
+      {verborgeneAnwaerter > 0 ? (
+        <button
+          type="button"
+          className="nl-rankdrawer-more"
+          data-testid="legend-candidates-show-all"
+          onClick={() => setAlleAnwaerterSichtbar(true)}
+        >
+          {formatNlNumber(verborgeneAnwaerter, 0)} weitere Anwärter anzeigen — bisher ohne erfülltes Kriterium
+        </button>
+      ) : null}
     </NlCard>
   );
 }

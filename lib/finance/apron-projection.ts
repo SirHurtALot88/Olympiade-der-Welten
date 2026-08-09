@@ -32,8 +32,9 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   apronWertungsanteil,
-  computeApronLines,
   computeApronSettlement,
+  hasSeasonBeenPlayed,
+  resolveSeasonApronLines,
   type ApronLines,
 } from "@/lib/season/apron-service";
 
@@ -59,10 +60,10 @@ export type ApronProjectionTeamRow = {
 export type ApronProjection = {
   lines: ApronLines;
   /**
-   * `true` = die zu Saisonbeginn EINGEFRORENEN Linien (der Normalfall, und die, gegen die am
-   * Saisonende wirklich abgerechnet wird). `false` = kein Snapshot für diese Saison vorhanden,
-   * die Linien wurden aus dem aktuellen Gehaltsstand abgeleitet — dann kann sich die Grenze bis
-   * zum Saisonende noch verschieben, und der Hover sagt das.
+   * `true` = der erste Spieltag ist abgerechnet, die Linien stehen fest, und genau gegen sie wird
+   * am Saisonende gebucht. `false` = die Saison läuft noch im Kaderbau (KI-Vorsaisonkäufe,
+   * Spieler-Picks, organische Nachkäufe); die Linien wandern bis zum ersten Spieltag mit dem
+   * Median mit, und der Hover sagt das.
    */
   frozenLines: boolean;
   salaryFactor: number;
@@ -92,13 +93,15 @@ export function buildApronProjection(input: {
   rankByTeamId: Map<string, number | null>;
 }): ApronProjection {
   const { gameState } = input;
-  const snapshot = gameState.seasonState.apronLinesSnapshot;
-  const frozenLines = snapshot?.seasonId === gameState.season.id;
-  // Dieselbe Reihenfolge wie in `ai-cash-salary-target-service.ts`: eingefrorene Linien, sonst
-  // die aus dem aktuellen Stand abgeleiteten. Ohne Snapshot gar nichts zu zeigen wäre die
-  // Alternative — dann bliebe der Hover in Season 1 vor dem ersten Einfrieren leer, obwohl die
-  // Grenze rechnerisch längst bestimmbar ist.
-  const lines: ApronLines = frozenLines && snapshot ? snapshot : computeApronLines(gameState);
+  // Eine Quelle für „welche Linie gilt gerade": eingefroren ab dem ersten abgerechneten Spieltag,
+  // davor am aktuellen Median. Vorher stand hier (und in `ai-cash-salary-target-service.ts`)
+  // dieselbe Auswahl doppelt und ohne die Aufbauphase-Regel — die Anzeige zeigte während des
+  // Kaderbaus eine Grenze, die der Gehaltsstand daneben längst überholt hatte.
+  const lines: ApronLines = resolveSeasonApronLines(gameState);
+  // „Eingefroren" heisst jetzt: der erste Spieltag ist abgerechnet, ab da ist die Grenze fest.
+  // Vorher hiess es nur „ein Snapshot existiert" — der lag aber schon vor dem Kaderbau vor, also
+  // meldete die Anzeige „eingefroren", waehrend die Liga die Linie noch reihenweise ueberholte.
+  const frozenLines = hasSeasonBeenPlayed(gameState);
   const salaryFactor = getCurrentSalaryFactor(gameState);
 
   const teams = gameState.teams.map((team) => ({

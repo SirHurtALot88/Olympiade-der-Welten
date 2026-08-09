@@ -149,6 +149,56 @@ export function computeApronLines(gameState: GameState): ApronLines {
   };
 }
 
+// ── Wann die Linien endgültig sind ─────────────────────────────────────────────────────────────
+
+/**
+ * Hat die laufende Saison schon STATTGEFUNDEN — ist also mindestens ein Spieltag abgerechnet?
+ *
+ * Zwei Zeugen, weil beide getrennt geschrieben werden und ein reparierter Spielstand den einen
+ * verlieren kann, ohne den anderen: das Spieltag-Ergebnis und die Tabellen-Buchung. Der aktive
+ * Spieltag TAUGT NICHT als Signal — `matchdayState.matchdayId` steht schon auf Spieltag 1, bevor
+ * irgendetwas gespielt wurde (auf Chris' Save standen so 106 Zugänge unter „Spieltag 1", bei null
+ * Ergebnissen).
+ */
+export function hasSeasonBeenPlayed(gameState: GameState): boolean {
+  const seasonId = gameState.season.id;
+  const hatErgebnis = (gameState.seasonState.matchdayResults ?? []).some(
+    (result) => result.seasonId === seasonId,
+  );
+  const hatTabellenbuchung = (gameState.seasonState.standingsApplyLogs ?? []).some(
+    (log) => log.seasonId === seasonId,
+  );
+  return hatErgebnis || hatTabellenbuchung;
+}
+
+/**
+ * DIE LINIEN, DIE GERADE GELTEN — die einzige Stelle, die das entscheidet.
+ *
+ * Solange nicht gespielt wurde, wandern sie mit dem Median mit; ab dem ersten abgerechneten
+ * Spieltag gilt der eingefrorene Stand.
+ *
+ * WARUM ÜBERHAUPT MITWANDERN: Der Kopfkommentar dieser Datei nennt es als Kern des Entwurfs — die
+ * Linien hängen am Median und nicht an einer festen Zahl, „damit die Linien mitwandern, wenn die
+ * ganze Liga aufrüstet". Der Einfrier-Schritt lief bislang am Ende des Saisonübergangs, also BEVOR
+ * der Kaderbau der neuen Saison überhaupt begann. Auf Chris' Spielstand lagen zwischen dem
+ * Einfrieren (06:05:23) und dem ersten Zugang 99 Sekunden; danach kamen ALLE 106 Zugänge der Saison
+ * über 717,5 Mio Gehalt. Der Median sprang von 45,0 auf 69,8 — die eingefrorene 2. Linie stand bei
+ * 56,2, und 28 von 32 Teams lagen darüber. Eine Grenze, die fast jeder reißt, unterscheidet nichts
+ * mehr; die Abrechnung hätte 29 Zahler mit zusammen 587,4 Mio getroffen.
+ *
+ * WARUM TROTZDEM EINFRIEREN: Die ursprüngliche Sorge bleibt richtig — man darf nicht gegen eine
+ * Grenze kaufen, die sich durch die eigenen Käufe verschiebt. Nur gilt das für die laufende Saison,
+ * nicht für die Aufbauphase davor. Ab dem ersten Spieltag steht die Grenze fest.
+ */
+export function resolveSeasonApronLines(gameState: GameState): ApronLines {
+  const snapshot = gameState.seasonState.apronLinesSnapshot;
+  const passtZurSaison = snapshot?.seasonId === gameState.season.id;
+  if (passtZurSaison && snapshot && hasSeasonBeenPlayed(gameState)) {
+    return snapshot;
+  }
+  return computeApronLines(gameState);
+}
+
 // ── Wertungsanteil (für den Deckel) ────────────────────────────────────────────────────────────
 
 const WERTUNGS_GEWICHTE = sponsorWertungsGewichte();

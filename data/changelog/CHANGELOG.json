@@ -2,6 +2,60 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-09",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Die Apron-Linien wurden zu früh festgezurrt — und trafen dadurch fast die ganze Liga statt der Großausgeber. Sie hängen am Median-Gehalt (Linie 1 = Median × 1,10, Linie 2 = × 1,25) und sollen mitwandern, wenn die Liga aufrüstet. Festgehalten wurden sie aber schon am Ende des Saisonübergangs, also bevor der Kaderbau der neuen Saison überhaupt begann: in Season 2 lagen zwischen dem Einfrieren und dem ersten Zugang 99 Sekunden, danach kamen alle 106 Zugänge der Saison über 717,5 Mio Gehalt. Der Median sprang von 45,0 auf 69,8, die eingefrorene 2. Linie stand weiter bei 56,2 — 28 von 32 Teams darüber, und die Abrechnung am Saisonende hätte 29 Zahler mit zusammen 587,4 Mio getroffen. Jetzt wandern die Linien so lange mit, wie noch kein Spieltag abgerechnet ist, und rasten erst mit dem ersten Spieltag ein: KI-Vorsaisonkäufe, deine eigenen Picks und die organischen Nachkäufe zählen alle noch mit hinein. Ab dem ersten Spieltag steht die Grenze fest wie zuvor — wer während der Saison einkauft, zieht sie nicht mehr mit sich. Für den laufenden Spielstand heißt das: 2 statt 28 Teams über Linie 2, die Abrechnung träfe 8 Zahler mit 50,7 Mio und verteilt an 24 Empfänger. Die Finanzen-Seite weist die Linien außerdem ehrlich als noch wandernd aus, solange gebaut wird, statt sie als eingefroren zu melden.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Am Saisonstart dominierten sechs leere Riesen-Karten mit sechsmal demselben Satz die Leaders-Seite. Kategorien ohne Wertung kollabieren jetzt zu einem einzigen „Noch zu vergeben“-Block mit leeren Podest-Ringen und Erklärung, wann die erste Wertung entsteht; daneben steht das echte Podium der Vorsaison mit Punkten. Gefüllte Kategorien wie OVR und Training rücken nach vorn.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Die 0-Punkte-Listen am Saisonstart waren intern nach Alphabet gereiht — dadurch konnten „Dein Team“-Kopfzeile, Saison-Bestwerte („Bester PPs-Wert 0,0“) und das Top-5-Achievement Platzierungen an Spieler mit 0 PPs vergeben. Wertungen ohne echte Werte zählen jetzt nirgends mehr als Rangliste.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Der All-Time-Medaillenspiegel malte bei einer archivierten Saison einen rund 2.500 Pixel hohen Goldbalken und listete Teams ohne Medaille als Rang 4 und 5. Der Balkenchart ist weg — die Medaillen-Zeilen tragen dieselbe Information —, gelistet wird nur, wer eine Medaille hat, der Rest steht als ein Satz darunter.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Geldbeträge im Rekorde-Reiter tragen jetzt ihre Einheit: aus „Rekord-Transferablöse 65“ wurde „65,3 Mio“, Kaderwert und Marktwert-Sprung ebenso.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "„Auf dem Weg zur Legende“ zeigte zehn Anwärter mit je fünf fast identischen 0/5-Kriterienzeilen. Ausgeklappt sind nur noch Anwärter mit mindestens einem erfüllten Kriterium, der Rest steht hinter einem Knopf mit ehrlicher Zählung.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-08",
       "seite": "Ewige Tabelle",
       "pr": "#461",
