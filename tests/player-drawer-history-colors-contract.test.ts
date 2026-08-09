@@ -25,9 +25,26 @@ describe("Trainingshistorie: Grün/Rot-Töne sind verdrahtet", () => {
   });
 
   it("die Forecast-Zellen setzen die Ton-Klasse über getDeltaToneClass", () => {
-    // Verdrahtung im JSX: kumulierte Zellen und Netto-Zelle tragen den Delta-Ton.
-    expect(drawerSource).toMatch(/is-attribute-col \$\{getDeltaToneClass\(cell\.cumulative\)\}/);
-    expect(drawerSource).toMatch(/getDeltaToneClass\(forecast\.netCumulative\)/);
+    // Verdrahtung im JSX: Attributzellen und Summenspalte tragen den Delta-Ton.
+    //
+    // Die Tabelle rendert seit der Herkunfts-Aufschlüsselung VIER Zeilen (Σ / Training /
+    // Leistung / Alterung) aus einem Zeilen-Beschreiber statt einer fest verdrahteten Zeile.
+    // Damit stehen `cell.cumulative` und `forecast.netCumulative` nicht mehr wörtlich im JSX,
+    // sondern in den Zeilen-Beschreibern — die Verdrahtung selbst ist unverändert und wird
+    // hier weiterhin geprüft, nur an ihrer neuen Stelle.
+    expect(drawerSource).toMatch(/is-attribute-col \$\{getDeltaToneClass\(value\)\}/);
+    expect(drawerSource).toMatch(/<td className=\{getDeltaToneClass\(total\)\}>/);
+    expect(drawerSource).toMatch(/cell: \(cell: PlayerSeasonTrainingForecast\["attributes"\]\[number\]\) => cell\.cumulative/);
+    expect(drawerSource).toMatch(/total: \(forecast: PlayerSeasonTrainingForecast\) => forecast\.netCumulative/);
+  });
+
+  it("jede Herkunftszeile bekommt denselben Delta-Ton wie die Summenzeile", () => {
+    // Sonst wäre die Legende „Grün = Zuwachs, Rot = Rückgang" nur für die Σ-Zeile wahr, und
+    // ausgerechnet die Alterung — die einzige durchweg negative — bliebe farblos.
+    for (const key of ["training", "performance", "regression"] as const) {
+      expect(drawerSource).toContain(`key: "${key}"`);
+      expect(drawerSource).toContain(`cell.${key}`);
+    }
   });
 });
 

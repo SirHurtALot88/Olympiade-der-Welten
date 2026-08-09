@@ -182,6 +182,24 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-09",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Die Saisonende-Abrechnung ist jetzt erzwungen: solange Preisgeld, Sponsorgeld und Apron nicht gebucht sind, hält der Schritt „Finanzen“ die Saisonende-Kette an — vorher war er überspringbar und man kam bis in die neue Saison, ohne dass je Geld geflossen wäre, weshalb in der Saisonbilanz Sponsoreinnahme und Gehaltsabzug fehlten und der eingefrorene Kontostand einen Stand festhielt, den es nie gab.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-08",
       "seite": "Ewige Tabelle",
       "pr": "#461",

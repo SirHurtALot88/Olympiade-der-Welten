@@ -17212,6 +17212,26 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Herkunftszeilen (Training / Leistung / Alterung): Die erste Spalte ist ein <th scope="row">,
+   damit die Zeile auch für Screenreader beschriftet ist. `team-table th` bringt allerdings die
+   Kopfzeilen-Optik mit (Sticky, Versalien, kräftige Farbe) — hier explizit zurückgenommen, sonst
+   sähe jede Datenzeile aus wie ein zweiter Tabellenkopf. */
+.player-drawer-matchday-training-table th.player-drawer-training-origin-label {
+  position: static;
+  top: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--nl-mut, #93a3bd);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.player-drawer-matchday-training-table tbody tr[data-row="total"] th.player-drawer-training-origin-label {
+  color: inherit;
+  font-weight: 600;
+}
+
 .player-drawer-matchday-training-cell {
   border-radius: 4px;
   font-weight: 600;

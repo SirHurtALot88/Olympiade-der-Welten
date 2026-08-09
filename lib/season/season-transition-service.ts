@@ -14,6 +14,7 @@ import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progr
 import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
+import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
 
 // Audit R2/V1: Phasen, die der Saisonübergang NICHT auf "season_review" zurücksetzen darf (der User ist im
@@ -93,6 +94,35 @@ export function resolveGamePhase(gameState: Pick<GameState, "gamePhase">): GameP
   return gameState.gamePhase ?? "season_active";
 }
 
+/**
+ * DER FINANZ-RIEGEL VOR DER SPIELERENTWICKLUNG.
+ *
+ * GEMELDET VON CHRIS: „natürlich muss die auszahlung und das ganze cash thema erzwungen sein
+ * ohne das kommt man nicht in die neue season!"
+ *
+ * Der Schritt „Finanzen" (`season_rewards`) hat bisher nur die Phase weitergeschaltet. Die
+ * eigentliche Buchung — Sponsorgeld, Preisgeld, Apron-Abrechnung, Kredite — läuft über den
+ * eigenen, bestätigten Weg (`cash-prize-apply-service`) und war damit ÜBERSPRINGBAR: ein Klick
+ * weiter, und die Kette lief bis in die neue Saison, ohne dass je Geld geflossen wäre. In der
+ * Saisonbilanz fehlten dann Sponsoreinnahme und Gehaltsabzug, und der eingefrorene Cash-Stand
+ * (`cashSeasonEnd`, direkt vor den Verkäufen) hielt einen Kontostand fest, den es so nie gab.
+ *
+ * Warum GENAU hier und nicht direkt vor der Verkaufsphase: Der Freeze der Saisonwerte hängt am
+ * Ende von `player_development`, also eine Station HINTER diesem Schritt. Ein Riegel erst vor
+ * `transfer_sell_phase` käme zu spät — der Kontostand wäre dann schon eingefroren, bevor das
+ * Sponsorgeld drauf ist.
+ *
+ * Warum `getSeasonEndPayoutStatus` und nicht das Audit-Log: „der Schritt wurde ausgelöst" und
+ * „das Geld liegt auf dem Konto" sind zwei verschiedene Dinge (siehe
+ * `season-end-sponsor-payout-status.ts`) — und der Unterschied ist auf einem echten Spielstand
+ * schon einmal aufgetreten. `pending_payout` zählt hier als NICHT erledigt.
+ */
+export const SEASON_REWARDS_PENDING_REASON = "season_end_cash_settlement_pending";
+
+export function isSeasonEndCashSettlementPending(gameState: GameState): boolean {
+  return getSeasonEndPayoutStatus(gameState, gameState.season.id) !== "paid";
+}
+
 function parseSeasonNumber(gameState: GameState) {
   const idNumber = gameState.season.id.match(/(\d+)$/)?.[1];
   const nameNumber = gameState.season.name.match(/(\d+)$/)?.[1];
@@ -137,9 +167,15 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
   const lineupCount = save.gameState.seasonState.lineupDrafts?.length ?? 0;
   const formCardCount = save.gameState.seasonState.formCards?.length ?? 0;
   const formCardUsageAudit = buildFormCardSeasonUsageAudit(save.gameState, save.gameState.season.id);
+  const cashSettlementPending = isSeasonEndCashSettlementPending(save.gameState);
 
   return SEASON_TRANSITION_STEPS.map((stepId, index) => {
-    const blockingReasons = stepId === "season_check" && !seasonComplete ? ["last_matchday_not_completed"] : [];
+    const blockingReasons =
+      stepId === "season_check" && !seasonComplete
+        ? ["last_matchday_not_completed"]
+        : stepId === "season_rewards" && cashSettlementPending
+          ? [SEASON_REWARDS_PENDING_REASON]
+          : [];
     const warnings = [
       stepId === "season_rewards" ? "uses_existing_prize_facility_cash_sources_only" : null,
       stepId === "season_rewards" && formCardUsageAudit.unusedNegativeCards > 0
@@ -156,8 +192,9 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
     const previewByStep: Record<SeasonTransitionStepId, string> = {
       season_check: seasonComplete ? "Letzter Spieltag ist abgeschlossen." : "Letzter Spieltag ist noch nicht abgeschlossen.",
       season_review: `Rückblick liest Saisonstand, ${transferCount} Transfers und Kaderdaten.`,
-      season_rewards:
-        formCardUsageAudit.unusedCards > 0
+      season_rewards: cashSettlementPending
+        ? "Preisgeld, Sponsorgeld, Facility-Unterhalt und Apron sind noch nicht gebucht. Erst die Saisonende-Abrechnung ausführen — danach geht es weiter."
+        : formCardUsageAudit.unusedCards > 0
           ? `Preview liest Preisgeld, Sponsor, Facilities; Formkarten offen: ${formCardUsageAudit.unusedCards} (${formCardUsageAudit.unusedNegativeCards} negative = ${formCardUsageAudit.negativePenaltyPoints} Strafpunkte, positive verfallen).`
           : "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income. Alle Formkarten wurden verbraucht.",
       player_development: `Preview berechnet die organische Saisonende-Entwicklung für ${rosterCount} aktive Spieler (identisch zum Apply, ohne Attribut-Writes bis zur Bestätigung).`,
@@ -354,6 +391,27 @@ function computeSeasonTransitionAdvance(
         dryRun: false,
         applied: false,
         blockingReasons: [...new Set([...preview.blockingReasons, "last_matchday_not_completed"])],
+      },
+    };
+  }
+
+  /**
+   * DER RIEGEL GREIFT HIER, nicht nur in der Vorschau.
+   *
+   * `buildStepPreviews` setzt zwar `canApply: false`, aber diese Funktion hat die
+   * Schritt-Blocker nie gelesen — sie prueft nur `canCompleteSeason`. Ein Aufruf der Route
+   * (oder die Mehrfach-Schleife weiter unten) waere also glatt durchgelaufen, waehrend die
+   * Oberflaeche den Knopf ausgraut. Ein Riegel, der nur den Knopf sperrt, ist keiner.
+   */
+  if (currentStep === "season_rewards" && isSeasonEndCashSettlementPending(save.gameState)) {
+    return {
+      status: "blocked",
+      preview: {
+        ...preview,
+        ok: false,
+        dryRun: false,
+        applied: false,
+        blockingReasons: [...new Set([...preview.blockingReasons, SEASON_REWARDS_PENDING_REASON])],
       },
     };
   }

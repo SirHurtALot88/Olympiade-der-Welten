@@ -6,6 +6,7 @@ import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-ser
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
+import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import { formatSignedPercent } from "@/lib/foundation/tabs/foundation-format-render-helpers";
@@ -62,6 +63,7 @@ import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { round1ByMathRound } from "@/lib/foundation/foundation-number-utils";
 import { selectMovedDisciplines } from "@/lib/foundation/player-discipline-training-forecast";
 
 function formatValue(value: number | null | undefined, digits = 0) {
@@ -1590,18 +1592,121 @@ function formatMatchdayDelta(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${formatValue(value, 1)}`;
 }
 
+function formatSignedOrigin(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value > 0 ? "+" : ""}${formatValue(value, 1)}`;
+}
+
 /**
- * Kumulierte Trainings-Prognose der laufenden Saison: eine Zeile, je Attribut die projizierte
- * kumulierte Änderung seit Saisonstart (kein Spieltag-Verlauf mehr). Grün = Zuwachs, Rot = Rückgang;
- * Tooltip zeigt zusätzlich den projizierten Attributwert. Real gebucht wird erst am Saisonende.
+ * GEMELDET VON CHRIS: „auch in der historie weil dort in der spieler ansicht steht es auch nicht
+ * im tooltipp - gesamtwert ist ok sollte aber dann im tooltipp wenigstens gesplittet ausgewiesen
+ * werden."
+ *
+ * Die Netto-Spalte der abgeschlossenen Saisons zeigt eine einzige Zahl. Die Saison-Summen für
+ * Training und Leistung liegen im Save (`organicMeta`) und wurden bisher nirgends angezeigt; die
+ * Regression ergibt sich als Rest, weil netto = Training + Leistung + Regression gilt.
  */
+function formatTrainingOriginSeasonTooltip(row: PlayerTrainingHistoryRow) {
+  if (row.netSetpoints == null) return undefined;
+  const training = row.trainingSetpoints;
+  const performance = row.performanceSetpoints;
+  if (training == null && performance == null) {
+    return `Netto ${formatSignedOrigin(row.netSetpoints)} — Aufteilung nach Training und Leistung liegt für diese Saison nicht im Spielstand.`;
+  }
+  const regression = row.netSetpoints - (training ?? 0) - (performance ?? 0);
+  return [
+    `Netto ${formatSignedOrigin(row.netSetpoints)} =`,
+    `Training ${formatSignedOrigin(training)}`,
+    `+ Leistung ${formatSignedOrigin(performance)}`,
+    `+ Alterung ${formatSignedOrigin(regression)}`,
+  ].join(" ");
+}
+
+/**
+ * Dasselbe je Attribut. Die Aufteilung wird erst seit dieser Version mitgeschrieben
+ * (`originTraining`/`originPerformance`/`originRegression` am Upgrade-Datensatz) — für früher
+ * abgeschlossene Saisons gibt es sie nicht mehr und der Tooltip bleibt beim reinen Wertverlauf
+ * plus dem Hinweis, dass die Saison-Summen in der Netto-Spalte stehen.
+ */
+function formatTrainingOriginAttributeTooltip(
+  attribute: string,
+  upgrade: PlayerTrainingHistoryRow["upgrades"][number] | null,
+  row: PlayerTrainingHistoryRow,
+) {
+  if (!upgrade) return undefined;
+  const verlauf = `${attribute}: ${formatValue(upgrade.fromValue, 1)} → ${formatValue(upgrade.toValue, 1)} (${formatSignedOrigin(upgrade.delta)})`;
+  if (upgrade.training == null && upgrade.performance == null && upgrade.regression == null) {
+    const saison = formatTrainingOriginSeasonTooltip(row);
+    return saison
+      ? `${verlauf} · Aufteilung je Attribut erst ab Saison-Abschlüssen dieser Version — Saison-Summen: ${saison}`
+      : verlauf;
+  }
+  return [
+    verlauf,
+    `Training ${formatSignedOrigin(upgrade.training)}`,
+    `Leistung ${formatSignedOrigin(upgrade.performance)}`,
+    `Alterung ${formatSignedOrigin(upgrade.regression)}`,
+  ].join(" · ");
+}
+
+/**
+ * Kumulierte Trainings-Prognose der laufenden Saison: je Attribut die projizierte kumulierte
+ * Änderung seit Saisonstart (kein Spieltag-Verlauf mehr). Grün = Zuwachs, Rot = Rückgang;
+ * Tooltip zeigt zusätzlich den projizierten Attributwert. Real gebucht wird erst am Saisonende.
+ *
+ * GEMELDET VON CHRIS: „hier in der trainingshistorie soll nicht nur training gezeigt werden
+ * sondern auch die verbesserung durch performance!" — richtig, und die Tabelle hat das
+ * verschwiegen: sie zeigte nur die SALDIERTE Zeile. Ein Spieler wächst aber aus drei Quellen,
+ * und wer sie nicht auseinanderhält, liest jeden Zuwachs als Erfolg seines Trainingsplans.
+ * Jetzt steht die Herkunft daneben: Training (Budget inkl. Spillover auf Nebenstats),
+ * Leistung (was er sich auf dem Platz erspielt hat) und Alterung als Gegenposten.
+ */
+const SEASON_TRAINING_FORECAST_ROWS = [
+  {
+    key: "total",
+    label: "Σ Saison",
+    tooltip: "Kumulierte projizierte Attributänderung dieser Saison — Training + Leistung + Alterung.",
+    total: (forecast: PlayerSeasonTrainingForecast) => forecast.netCumulative,
+    cell: (cell: PlayerSeasonTrainingForecast["attributes"][number]) => cell.cumulative,
+    strong: true,
+  },
+  {
+    key: "training",
+    label: "Training",
+    tooltip:
+      "Anteil aus dem Trainings-Budget der bisherigen Spieltage — inklusive Spillover auf die nicht fokussierten Attribute.",
+    total: (forecast: PlayerSeasonTrainingForecast) => forecast.trainingTotal + forecast.spilloverTotal,
+    cell: (cell: PlayerSeasonTrainingForecast["attributes"][number]) => cell.training,
+    strong: false,
+  },
+  {
+    key: "performance",
+    label: "Leistung",
+    tooltip:
+      "Anteil aus den Spieltags-Leistungen: was der Spieler sich durch Einsätze erspielt hat, unabhängig vom Trainingsplan.",
+    total: (forecast: PlayerSeasonTrainingForecast) => forecast.performanceTotal,
+    cell: (cell: PlayerSeasonTrainingForecast["attributes"][number]) => cell.performance,
+    strong: false,
+  },
+  {
+    key: "regression",
+    label: "Alterung",
+    tooltip:
+      "Gegenposten aus Alterung und Marktwertdruck — zieht jede Saison ab, unabhängig von Training und Leistung.",
+    total: (forecast: PlayerSeasonTrainingForecast) => forecast.regressionTotal,
+    cell: (cell: PlayerSeasonTrainingForecast["attributes"][number]) => cell.regression,
+    strong: false,
+  },
+] as const;
+
 function SeasonTrainingForecastSummary({ forecast }: { forecast: PlayerSeasonTrainingForecast }) {
   return (
     <div className="table-shell player-drawer-matchday-training-shell">
       <table className="team-table player-drawer-matchday-training-table" data-testid="player-drawer-season-training-forecast">
         <thead>
           <tr>
-            <th title="Kumulierte projizierte Attributänderung dieser Saison">Σ Saison</th>
+            <th title="Herkunft der projizierten Attributänderung">Herkunft</th>
+            <th title="Kumulierte projizierte Attributänderung dieser Saison">Σ</th>
             {PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => (
               <th key={`stf-head-${attribute}`} title={attribute} className="is-attribute-col">
                 {formatTrainingAttributeLabel(attribute)}
@@ -1610,20 +1715,35 @@ function SeasonTrainingForecastSummary({ forecast }: { forecast: PlayerSeasonTra
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className={getDeltaToneClass(forecast.netCumulative)}>
-              <strong>{formatMatchdayDelta(forecast.netCumulative)}</strong>
-            </td>
-            {forecast.attributes.map((cell) => (
-              <td
-                key={`stf-${cell.attribute}`}
-                className={`is-attribute-col ${getDeltaToneClass(cell.cumulative)}`}
-                title={`${cell.attribute}: kumuliert ${formatMatchdayDelta(cell.cumulative)} · Prognose-Wert ${formatValue(cell.projectedValue, 1)}`}
-              >
-                {formatMatchdayDelta(cell.cumulative)}
-              </td>
-            ))}
-          </tr>
+          {SEASON_TRAINING_FORECAST_ROWS.map((row) => {
+            const total = round1ByMathRound(row.total(forecast));
+            return (
+              <tr key={`stf-row-${row.key}`} data-row={row.key}>
+                <th scope="row" className="player-drawer-training-origin-label" title={row.tooltip}>
+                  {row.label}
+                </th>
+                <td className={getDeltaToneClass(total)}>
+                  {row.strong ? <strong>{formatMatchdayDelta(total)}</strong> : formatMatchdayDelta(total)}
+                </td>
+                {forecast.attributes.map((cell) => {
+                  const value = row.cell(cell);
+                  return (
+                    <td
+                      key={`stf-${row.key}-${cell.attribute}`}
+                      className={`is-attribute-col ${getDeltaToneClass(value)}`}
+                      title={
+                        row.key === "total"
+                          ? `${cell.attribute}: kumuliert ${formatMatchdayDelta(cell.cumulative)} · Prognose-Wert ${formatValue(cell.projectedValue, 1)}`
+                          : `${cell.attribute} · ${row.label}: ${formatMatchdayDelta(value)}`
+                      }
+                    >
+                      {formatMatchdayDelta(value)}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -3624,11 +3744,14 @@ export default function PlayerDetailDrawer({
               {data.seasonTrainingForecast && data.seasonTrainingForecast.attributes.length > 0 ? (
                 <div className="player-drawer-matchday-training" data-testid="player-drawer-matchday-training">
                   <p className="player-drawer-matchday-training-caption muted">
-                    Saison-Forecast: kumulierte projizierte Attributänderung dieser Saison auf Basis des
-                    bis heute ({data.seasonTrainingForecast.matchdaysPlayed}{" "}
-                    {data.seasonTrainingForecast.matchdaysPlayed === 1 ? "Spieltag" : "Spieltage"})
-                    gesammelten Trainings. Grün = Zuwachs, Rot = Rückgang. Real gebucht werden die Werte
-                    erst am Saisonende.
+                    Saison-Forecast: kumulierte projizierte Attributänderung dieser Saison nach{" "}
+                    {data.seasonTrainingForecast.matchdaysPlayed} von{" "}
+                    {data.seasonTrainingForecast.totalMatchdays} Spieltagen, aufgeschlüsselt nach
+                    Herkunft — <strong>Training</strong> (gesammeltes Budget inkl. Spillover),{" "}
+                    <strong>Leistung</strong> (was er sich auf dem Platz erspielt hat) und{" "}
+                    <strong>Alterung</strong> als Gegenposten. Grün = Zuwachs, Rot = Rückgang. Die drei
+                    Posten ergeben die Σ-Zeile, solange kein Attribut-Ceiling den Zuwachs kappt. Real
+                    gebucht werden die Werte erst am Saisonende.
                   </p>
                   <SeasonTrainingForecastSummary forecast={data.seasonTrainingForecast} />
                   {/* Der Forecast darüber steht in ATTRIBUTEN. Was ein Manager davon wissen will,
@@ -3724,7 +3847,10 @@ export default function PlayerDetailDrawer({
                         );
                       case "net":
                         return (
-                          <span className={getDeltaToneClass(row.netSetpoints)}>
+                          <span
+                            className={getDeltaToneClass(row.netSetpoints)}
+                            title={formatTrainingOriginSeasonTooltip(row)}
+                          >
                             {row.netSetpoints != null ? `${row.netSetpoints > 0 ? "+" : ""}${formatValue(row.netSetpoints, 1)}` : "—"}
                           </span>
                         );
@@ -3737,11 +3863,7 @@ export default function PlayerDetailDrawer({
                         return (
                           <span
                             className={getDeltaToneClass(upgrade?.delta ?? null)}
-                            title={
-                              upgrade
-                                ? `${attribute}: ${formatValue(upgrade.fromValue, 1)} → ${formatValue(upgrade.toValue, 1)}`
-                                : undefined
-                            }
+                            title={formatTrainingOriginAttributeTooltip(attribute, upgrade, row)}
                           >
                             {upgrade ? `${upgrade.delta > 0 ? "+" : ""}${formatValue(upgrade.delta, 1)}` : "—"}
                           </span>
