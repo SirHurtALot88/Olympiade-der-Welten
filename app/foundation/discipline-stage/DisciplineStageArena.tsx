@@ -16,6 +16,7 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import { buildDisciplineStageTeamsFromBookedResult } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
@@ -1124,16 +1125,40 @@ export default function DisciplineStageArena({
     : null;
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
+  /**
+   * Bahnen aus ECHTEN Daten — Vorschau bevorzugt, sonst das gebuchte Ergebnis.
+   *
+   * GEMELDET VON CHRIS: Die Bühne zeigte für S-C in der Staffel Tahra (+40,7) und Chad (+40,2),
+   * Rang 28 mit 80,9 Pkt. Gebucht waren Spineshard (29,3) und Myrth (9,9), Rang 31 mit 47,8 —
+   * Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi. Dasselbe
+   * bei V-D, wo die Bühne Queen Butterfly an die Spitze stellte und das Team in Wahrheit Vierter
+   * wurde.
+   *
+   * Ursache war der stille Rückfall auf `buildDisciplineStageModel`: das Modell liest die
+   * Aufstellung nicht, es sucht sich pro Team selbst die stärksten Spieler. Am gemeldeten
+   * Spielstand nachgerechnet wählt es für S-C in der Staffel genau Tahra (41,7) und Chad (41,2).
+   * Als Vorschau ist das richtig — als Ergebnis-Anzeige erfindet es Tatsachen.
+   *
+   * Deshalb gibt es jetzt eine zweite echte Quelle: ist die Disziplin gewertet, kommen die Bahnen
+   * aus `disciplineResults` + `playerDisciplinePerformances`. Das Modell bleibt dem Test-/
+   * Random-Modus vorbehalten.
+   */
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
-    if (!disc || disc.teamResults.length === 0) {
-      return null;
+    if (disc && disc.teamResults.length > 0) {
+      return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
     }
-    return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
-  }, [preview, disciplineId, teamMetaById, portraitById]);
+    return buildDisciplineStageTeamsFromBookedResult(gameState, disciplineId, teamMetaById, portraitById);
+  }, [preview, disciplineId, teamMetaById, portraitById, gameState]);
 
-  // Echt-Modus nutzt die Engine, wenn Daten für diese Disziplin vorliegen.
+  // Echt-Modus nutzt IMMER echte Daten. Fehlen sie, wird nichts erfunden — siehe
+  // `realDataMissing` unten, das statt der Bühne eine ehrliche Meldung zeigt.
   const useEngine = mode === "real" && engineTeams !== null;
+  /**
+   * Echt-Modus ohne echte Daten. Vorher lief die Bühne hier mit dem Modell weiter und sah aus wie
+   * ein Ergebnis; jetzt ist der Zustand benannt und wird angezeigt statt kaschiert.
+   */
+  const realDataMissing = mode === "real" && engineTeams === null;
 
   // Random-Test: 2 Mutator-Traits werden für die Disziplin bestimmt.
   const mutatorTraits = useMemo(
@@ -2033,7 +2058,15 @@ export default function DisciplineStageArena({
               border: "1px solid var(--nl-line)",
             }}
           >
-            {previewState === "loading" ? "Engine lädt …" : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
+            {/* Der frühere Text „Vereinfachte Ansicht (keine Engine-Aufstellung)" verschwieg das
+                Entscheidende: die gezeigten Spieler sind dann NICHT die aufgestellten, sondern eine
+                Schätzung des Modells. Chris las die Bühne deshalb als Ergebnis — mit Namen, die gar
+                nicht gespielt hatten. Jetzt steht dran, was es ist. */}
+            {previewState === "loading"
+              ? "Engine lädt …"
+              : realDataMissing
+                ? "Vorschau mit GESCHÄTZTER Aufstellung — nicht das Ergebnis"
+                : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
           </span>
           {previewState === "unavailable" ? (
             <button
