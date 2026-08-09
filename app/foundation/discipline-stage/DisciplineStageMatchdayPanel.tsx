@@ -106,6 +106,18 @@ export type DisciplineStageMatchdayPanelProps = {
   /** Mutator-PP (0,3er) je Team, spielergenau — separat vom Team-PP ausgewiesen. */
   mutatorByTeam?: Map<string, MatchdayPanelMutatorEntry> | null;
   /**
+   * Rohdaten für „Δ Modifikatoren": je Team und Disziplin-Seite die BASIS-Summe (Leistung vor allen
+   * Modifikatoren) und der ENDSTAND. Die Ränge daraus baut das Panel selbst — nur hier ist bekannt,
+   * welche Seite aufgedeckt ist.
+   *
+   * Das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain, Formkarten und Mutatoren an
+   * PLÄTZEN gebracht haben. Beim Umbau auf den neuen Look ging die Zahl verloren
+   * (`matchday-arena-presenter.ts` rechnet sie bis heute, ohne dass sie jemand anzeigt). Auf Wunsch
+   * von Chris zurückgeholt — sie beantwortet „hat meine Aufstellung überhaupt etwas gebracht?",
+   * was aus Punkten allein nicht ablesbar ist.
+   */
+  modifierBaseByTeam?: Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }> | null;
+  /**
    * Eingesetzte Spieler je Team und Disziplin-Seite, nach PP absteigend. Speist die
    * ausklappbaren Disziplin-Spalten. Fehlt die Prop, bleiben die Spaltenköpfe reine
    * Beschriftung (kein Aufklappen).
@@ -442,6 +454,7 @@ export default function DisciplineStageMatchdayPanel({
   onOpenTeam,
   onHoverTeam,
   mutatorByTeam,
+  modifierBaseByTeam,
   playersByTeam,
   modifiersByTeam,
 }: DisciplineStageMatchdayPanelProps) {
@@ -553,6 +566,42 @@ export default function DisciplineStageMatchdayPanel({
       row.projectedRank = derivedProjectedRanks.get(row.teamId) ?? null;
     }
   }
+
+  /**
+   * Δ MODIFIKATOREN — zwei Ranglisten über dieselbe Liga: einmal nach der reinen Basis-Leistung,
+   * einmal nach dem Endstand. Der Unterschied ist genau das, was Fatigue, Captain, Formkarten und
+   * Mutatoren an PLÄTZEN bewegt haben.
+   *
+   * Nur AUFGEDECKTE Seiten zählen — dieselbe Regel wie bei Punkten, Form, Captain und Mutator
+   * weiter oben. Eine verdeckte Disziplin darf auch hier nichts verraten.
+   *
+   * Beide Ranglisten nutzen dieselbe Sortier- und Gleichstandsregel; täten sie das nicht, entstünde
+   * ein Δ aus der Sortierung statt aus den Modifikatoren.
+   */
+  const modifierRankByTeam = (() => {
+    if (!modifierBaseByTeam || modifierBaseByTeam.size === 0) return null;
+    if (!d1Revealed && !d2Revealed) return null;
+    const basis = new Map<string, number>();
+    const endstand = new Map<string, number>();
+    for (const [teamId, werte] of modifierBaseByTeam) {
+      basis.set(teamId, (d1Revealed ? werte.d1Base : 0) + (d2Revealed ? werte.d2Base : 0));
+      endstand.set(teamId, (d1Revealed ? werte.d1Score : 0) + (d2Revealed ? werte.d2Score : 0));
+    }
+    const rangliste = (werte: Map<string, number>) =>
+      new Map(
+        [...werte.entries()]
+          .sort((links, rechts) => rechts[1] - links[1] || links[0].localeCompare(rechts[0], "de"))
+          .map(([teamId], index) => [teamId, index + 1] as const),
+      );
+    const basisRang = rangliste(basis);
+    const endRang = rangliste(endstand);
+    const ergebnis = new Map<string, { baseRank: number; rankDelta: number }>();
+    for (const [teamId, rang] of endRang) {
+      const vorher = basisRang.get(teamId) ?? rang;
+      ergebnis.set(teamId, { baseRank: vorher, rankDelta: vorher - rang });
+    }
+    return ergebnis;
+  })();
 
   sortMatchdayPanelRows(rows, tableSort);
 
@@ -832,9 +881,36 @@ export default function DisciplineStageMatchdayPanel({
                 {/* Tagesrang — nur die Leistung DIESES Spieltags. */}
                 <div
                   title={`Spieltags-Rang ${matchdayRank ?? "–"} — nur nach der Leistung dieses Spieltags`}
-                  style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
+                  style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}
                 >
                   <RankBadge rank={matchdayRank} />
+                  {/* Δ MODIFIKATOREN — was Aufstellung, Form, Captain und Mutatoren an PLAETZEN
+                      gebracht haben. Steht bewusst NEBEN dem Spieltags-Rang: es ist die Antwort auf
+                      „gegenueber welchem Rang?", und die Bezugsgroesse ist genau dieser hier. Bei 0
+                      bleibt die Zelle leer statt eine Null zu zeigen — „nichts bewegt" ist keine
+                      Information, die Platz verdient. */}
+                  {(() => {
+                    const mod = modifierRankByTeam?.get(row.teamId);
+                    if (!mod || mod.rankDelta === 0) return null;
+                    const hoch = mod.rankDelta > 0;
+                    return (
+                      <span
+                        title={
+                          `Ohne Fatigue, Captain, Formkarten und Mutatoren waere dieses Team auf Rang ` +
+                          `${mod.baseRank} gelandet — ${hoch ? "gutgemacht" : "verloren"}: ` +
+                          `${Math.abs(mod.rankDelta)} ${Math.abs(mod.rankDelta) === 1 ? "Platz" : "Plaetze"}`
+                        }
+                        style={{
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          color: hoch ? "var(--nl-good)" : "var(--nl-risk)",
+                        }}
+                      >
+                        {hoch ? "▲" : "▼"}
+                        {Math.abs(mod.rankDelta)}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Saison-Rang vor → nach */}
