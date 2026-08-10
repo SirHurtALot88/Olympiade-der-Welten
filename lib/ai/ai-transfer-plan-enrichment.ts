@@ -3,6 +3,7 @@ import {
   getWeakestSameAxisOvrRank,
   type AiBuyDecisionResult,
 } from "@/lib/ai/ai-buy-decision-engine";
+import { estimateMarginalApronLevy } from "@/lib/ai/ai-apron-cost-service";
 import {
   adjustSellScoreForDoctrine,
   compareStrategicBuyCandidates,
@@ -131,6 +132,9 @@ export function annotateBuyRecommendations(input: {
       doctrine: input.doctrine,
       coversNeedAxis: input.coversNeedAxis?.(candidate, player) ?? Boolean(candidate.needMatchLabel),
       isTrashCandidate: (candidate.overallRecommendationScore ?? candidate.score ?? 0) < 28,
+      // Was dieser eine Zugang das Team an Apron-Abgabe kosten würde — je Kandidat verschieden,
+      // weil die Abgabe an der Linie bricht und nicht linear am Gehalt hängt.
+      apronMarginalLevy: estimateMarginalApronLevy(input.gameState, input.teamId, candidate.salary),
     });
 
     return applyBuyDecisionToRecommendation(candidate, decision);

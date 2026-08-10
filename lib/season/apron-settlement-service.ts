@@ -23,17 +23,13 @@ import {
   computeApronLines,
   computeApronSettlement,
   hasSeasonBeenPlayed,
+  resolveApronSalaryFactor,
   type ApronLines,
   type ApronTeamRow,
 } from "@/lib/season/apron-service";
 
 function roundCash(value: number): number {
   return Number(value.toFixed(1));
-}
-
-function getCurrentSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
 }
 
 // ── Einfrieren zu Saisonbeginn ────────────────────────────────────────────────────────────────
@@ -141,7 +137,7 @@ export function previewApronSettlement(gameState: GameState): ApronSettlementPre
 
   const overviewRows = buildTeamSeasonOverviewRows({ gameState });
   const rankByTeamId = new Map(overviewRows.map((row) => [row.teamId, row.rank] as const));
-  const salaryFactor = getCurrentSalaryFactor(gameState);
+  const salaryFactor = resolveApronSalaryFactor(gameState);
 
   const teams = gameState.teams.map((team) => {
     const finalRank = rankByTeamId.get(team.teamId) ?? null;

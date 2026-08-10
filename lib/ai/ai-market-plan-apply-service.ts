@@ -15,6 +15,7 @@ import {
 } from "@/lib/ai/ai-market-plan-preview-service";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { resolveMarketPlannerCashBuffer } from "@/lib/ai/ai-team-cash-reserve-service";
+import { estimateApronLevyAtSalary, getTeamApronSalaryBase } from "@/lib/ai/ai-apron-cost-service";
 import { getBudgetStatus } from "@/lib/ai/ai-transfermarkt-preview-service";
 import { assessTeamSellRunwayPressure } from "@/lib/ai/team-sell-runway-pressure";
 import {
@@ -554,6 +555,10 @@ function getTeamCashBuffer(gameState: GameState, teamId: string, coverageFallbac
   return resolveMarketPlannerCashBuffer(gameState, teamId, { coverageFallback });
 }
 
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 function buildFinalBuyGate(input: {
   gameState: GameState;
   team: AiMarketPlanTeamEntry;
@@ -626,6 +631,14 @@ function buildFinalBuyGate(input: {
   });
   const watchPlayerIds = buildScoutingWatchPlayerIds(input.gameState, input.team.teamId);
   const blockedCandidateIds = new Set<string>();
+  /**
+   * Gehalt, das die bereits gewählten Zugänge dieses Laufs zusätzlich auf die Apron-Grundlage legen.
+   * MUSS mitlaufen: `getTeamApronSalaryBase` liest den GameState, und der ändert sich während der
+   * Planung nicht. Ohne diesen Zähler bekäme jeder Zugang die Abgabe des ERSTEN — vier teure Käufe
+   * hintereinander sähen aus wie einer, und genau das Aufsummieren ist der Fall, den Chris meint.
+   */
+  let apronSalaryAdded = 0;
+  const apronBaseSalary = getTeamApronSalaryBase(input.gameState, input.team.teamId);
 
   while (picked.length < input.allowedBuyCount) {
     const sorted = rankFinalBuyCandidates({
@@ -671,7 +684,24 @@ function buildFinalBuyGate(input: {
         marketValue: candidate.marketValue,
         score: candidateRecommendationScore(candidate),
       });
-    const cashAfter = cashRemaining != null && price != null ? cashRemaining - price : candidate.cashAfter;
+    /**
+     * DIE LUXUSSTEUER, DIE GENAU DIESER ZUGANG AUSLÖST (Meldung von Chris: die KI muss vor dem Kauf
+     * wissen, dass ein teurer Spieler sie Abgabe kostet). Nicht linear zum Gehalt: unter der Linie 0,
+     * darüber der Zonensatz — deshalb wird sie je Kandidat und auf dem MITLAUFENDEN Stand gerechnet,
+     * nicht einmal pauschal fürs Team.
+     */
+    const apronLevy = round2(
+      Math.max(
+        0,
+        estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded + (candidate.salary ?? 0)) -
+          estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded),
+      ),
+    );
+    // Was der Zugang wirklich kostet. Vorher prüfte der Puffer gegen den nackten Kaufpreis und sah
+    // die Abgabe nicht — ein Team konnte sich exakt an der Puffergrenze einkaufen und die Saison
+    // dann mit einer Abgabe abschliessen, für die kein Cash mehr eingeplant war.
+    const effectiveCost = price != null ? price + apronLevy : null;
+    const cashAfter = cashRemaining != null && effectiveCost != null ? cashRemaining - effectiveCost : candidate.cashAfter;
     const rosterAfter = rosterBase + picked.length + 1;
     const buffer = getTeamCashBuffer(input.gameState, input.team.teamId, coverageFallback);
     const duplicateClaim = input.claimedPlayerIds.has(candidate.playerId);
@@ -681,7 +711,9 @@ function buildFinalBuyGate(input: {
       hardNoGo && !convergenceCoverageFill ? "team_hard_no_go" : null,
       belowUpgradeFloor ? `below_upgrade_floor:${price}<${effectiveMinUpgradeBuyPrice}` : null,
       trashFillerAtOpt ? "trash_filler_blocked_at_opt" : null,
-      cashBlocked ? `cash_buffer_failed:${Math.round((cashAfter ?? -999) * 100) / 100}<${Math.round(buffer * 100) / 100}` : null,
+      cashBlocked
+        ? `cash_buffer_failed:${Math.round((cashAfter ?? -999) * 100) / 100}<${Math.round(buffer * 100) / 100}${apronLevy > 0 ? `:apron_levy=${apronLevy}` : ""}`
+        : null,
     ].filter((entry): entry is string => Boolean(entry));
     const accepted = reasons.length === 0;
     rows.push({
@@ -706,6 +738,8 @@ function buildFinalBuyGate(input: {
       }),
       cashBefore: cashRemaining,
       price,
+      apronLevy,
+      effectiveCost,
       cashAfter,
       cashBuffer: buffer,
       score: candidate.overallRecommendationScore ?? candidate.score ?? null,
@@ -722,6 +756,7 @@ function buildFinalBuyGate(input: {
     const raceToken = getCandidateToken(candidate, input.playersById, "race");
     if (classToken) classCounts.set(classToken, (classCounts.get(classToken) ?? 0) + 1);
     if (raceToken) raceCounts.set(raceToken, (raceCounts.get(raceToken) ?? 0) + 1);
+    apronSalaryAdded += candidate.salary ?? 0;
     if (cashAfter != null) cashRemaining = cashAfter;
   }
 
