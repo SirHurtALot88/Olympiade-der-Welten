@@ -694,6 +694,41 @@ function LineupRow({
  * Disziplin. Kanonische Ratings kommen aus dem Rating-Contract (row), damit OVR/
  * Rang exakt zur geöffneten Spieler-Karte passen. Klick → onSelectPlayer.
  */
+/**
+ * PLATZ JE SPIELER IM FELD DIESER DISZIPLIN.
+ *
+ * GEMELDET VON CHRIS: „es waere gut auf den portriats zu sehen welchen rank und wie viel score sie
+ * in der aktiven diszi hatten."
+ *
+ * Gerankt wird ueber ALLE Teams hinweg — ein Platz „innerhalb der eigenen vier Spieler" waere keine
+ * Auskunft, sondern eine Verwechslungsgefahr. Grundlage sind ausschliesslich die BEREITS
+ * AUFGEDECKTEN Ergebnisse (`liveResultsByTeam` traegt genau die), also dieselbe Quelle, aus der die
+ * Buehne ihre Reihenfolge nimmt. Nichts wird nachgerechnet und nichts vorweggenommen: solange erst
+ * die Haelfte geworfen hat, ist der Platz ausdruecklich der Platz unter den bisher Aufgedeckten,
+ * und der Nenner sagt das auch.
+ *
+ * Gleichstand teilt sich den Platz (1-2-2-4) — zwei identische Wuerfe duerfen nicht dadurch
+ * getrennt werden, in welcher Reihenfolge ihre Teams im Objekt stehen.
+ */
+function buildDisciplineRankByPlayerId(liveResultsByTeam: StageLiveResultsByTeam | undefined): {
+  rankByPlayerId: Map<string, number>;
+  fieldSize: number;
+} {
+  const alle: Array<{ playerId: string; net: number }> = [];
+  for (const eintraege of Object.values(liveResultsByTeam ?? {})) {
+    for (const eintrag of eintraege ?? []) {
+      if (typeof eintrag.net !== "number" || !Number.isFinite(eintrag.net)) continue;
+      alle.push({ playerId: eintrag.playerId, net: eintrag.net });
+    }
+  }
+  const rankByPlayerId = new Map<string, number>();
+  for (const eintrag of alle) {
+    const besser = alle.filter((anderer) => anderer.net > eintrag.net).length;
+    rankByPlayerId.set(eintrag.playerId, besser + 1);
+  }
+  return { rankByPlayerId, fieldSize: alle.length };
+}
+
 function DisciplinePortraitCard({
   gameState,
   playerId,
@@ -702,6 +737,8 @@ function DisciplinePortraitCard({
   seasonPps,
   unavailable,
   liveResult,
+  disciplineRank,
+  disciplineFieldSize,
   onSelectPlayer,
 }: {
   gameState: GameState;
@@ -711,6 +748,10 @@ function DisciplinePortraitCard({
   seasonPps?: number | null;
   unavailable?: boolean;
   liveResult?: StageLivePlayerResult | null;
+  /** Platz im FELD dieser Disziplin (über alle Teams), abgeleitet aus den bereits aufgedeckten Ergebnissen. */
+  disciplineRank?: number | null;
+  /** Wie viele Ergebnisse bisher aufgedeckt sind — der Nenner zum Rang. */
+  disciplineFieldSize?: number | null;
   onSelectPlayer?: ((playerId: string) => void) | null;
 }) {
   const player = findPlayer(gameState, playerId);
@@ -753,8 +794,42 @@ function DisciplinePortraitCard({
           // Spieler war in dieser Disziplin schon dran → sofort zeigen, was er
           // GEHOLT hat (Netto) + die Boni/Abzüge (Basis → Mods) und die Player Points.
           <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, fontVariantNumeric: "tabular-nums" }}>
+            {/* GEMELDET VON CHRIS: „es waere gut auf den portriats zu sehen welchen rank und wie
+                viel score sie in der aktiven diszi hatten". Der Score stand schon da („Geholt"),
+                der Platz im Feld fehlte. Er wird NICHT neu gerechnet, sondern aus denselben
+                aufgedeckten Ergebnissen abgeleitet, aus denen die Buehne ihre Reihenfolge nimmt
+                — siehe `buildDisciplineRankByPlayerId`. */}
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-              <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>Geholt</span>
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                {disciplineRank != null ? (
+                  <span
+                    data-discipline-rank={disciplineRank}
+                    title={
+                      disciplineFieldSize != null
+                        ? `Platz ${disciplineRank} von ${disciplineFieldSize} bisher aufgedeckten Ergebnissen in ${discLabel}`
+                        : `Platz ${disciplineRank} in ${discLabel}`
+                    }
+                    style={{
+                      color:
+                        disciplineRank === 1
+                          ? "var(--nl-gold)"
+                          : disciplineRank === 2
+                            ? "var(--nl-silver)"
+                            : disciplineRank === 3
+                              ? "var(--nl-bronze)"
+                              : "var(--nl-mut)",
+                      fontWeight: 900,
+                    }}
+                  >
+                    #{disciplineRank}
+                    {disciplineFieldSize != null ? (
+                      <span style={{ color: "var(--nl-mut-2)", fontWeight: 700 }}>/{disciplineFieldSize}</span>
+                    ) : null}
+                  </span>
+                ) : (
+                  "Geholt"
+                )}
+              </span>
               <span style={{ color: "var(--accent, var(--nl-accent))", fontWeight: 800, fontSize: 13, flex: "none" }}>{fmt1(liveResult.net)}</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "1px 7px", lineHeight: 1.35 }}>
@@ -810,6 +885,9 @@ function TeamBody({
     for (const r of liveResultsByTeam?.[teamId] ?? []) map.set(r.playerId, r);
     return map;
   }, [liveResultsByTeam, teamId]);
+
+  // Platz im Feld dieser Disziplin — ueber ALLE Teams, siehe `buildDisciplineRankByPlayerId`.
+  const disciplineRanking = useMemo(() => buildDisciplineRankByPlayerId(liveResultsByTeam), [liveResultsByTeam]);
 
   // Roster-IDs des Teams (einmal) — Basis für Rating-Lookup und Ersatzbank.
   const rosterIds = useMemo(
@@ -1018,6 +1096,8 @@ function TeamBody({
                     seasonPps={seasonPpsById.get(pid) ?? null}
                     unavailable={isUnavailable(pid)}
                     liveResult={liveByPlayerId.get(pid) ?? null}
+                    disciplineRank={disciplineRanking.rankByPlayerId.get(pid) ?? null}
+                    disciplineFieldSize={disciplineRanking.fieldSize || null}
                     onSelectPlayer={onSelectPlayer}
                   />
                 );
@@ -1035,6 +1115,8 @@ function TeamBody({
                 seasonPps={seasonPpsById.get(pid) ?? null}
                 unavailable={isUnavailable(pid)}
                 liveResult={liveByPlayerId.get(pid) ?? null}
+                disciplineRank={disciplineRanking.rankByPlayerId.get(pid) ?? null}
+                disciplineFieldSize={disciplineRanking.fieldSize || null}
                 onSelectPlayer={onSelectPlayer}
               />
             ))}

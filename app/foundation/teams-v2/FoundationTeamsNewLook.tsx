@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildExpectedSellValueByPlayerId } from "@/lib/market/transfermarkt-expected-sell-value";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -133,6 +134,12 @@ type NlTeamsPortraitModel = {
 export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
+  /**
+   * Erwarteter Verkaufserloes je Spieler aus dem SERVER-Slice. Optional und bewusst nachrangig
+   * behandelt: ein leeres Feld laesst die lokale Rueckfallebene stehen (siehe
+   * `sellValueByPlayerId` unten).
+   */
+  sliceSellValueByPlayerId?: Record<string, { expectedSellValue: number }> | null;
   /**
    * Aktiver Team-Unterreiter aus dem Host. Steuert historisch die
    * Standard-Ansicht der Kaderprofil-Karte — die startet jedoch bewusst
@@ -649,6 +656,7 @@ function TeamsKpiHoverPortal({ panelId, ariaLabel, chip, children }: TeamsKpiHov
 export default function FoundationTeamsNewLook({
   selectedTeam,
   gameState,
+  sliceSellValueByPlayerId,
   selectedTeamDetailTab,
   sortedTeamsViewRows,
   selectedTeamsHistoryData,
@@ -971,6 +979,29 @@ export default function FoundationTeamsNewLook({
       );
   }, [filteredSelectedRosterTableRows, getRosterEntryDisplaySalary, heroIsOwnTeam]);
 
+  /**
+   * Erwarteter Verkaufserloes je Kaderspieler — EIN Batch-Lauf fuer alle Zeilen (der
+   * Sale-Factor-Kontext ist je GameState gecacht); ein Aufruf pro Karte waere bei einem
+   * vollen Kader zu teuer.
+   */
+  /**
+   * Erwarteter Verkaufserloes je Kaderspieler.
+   *
+   * QUELLE IST DER SERVER-SLICE, sobald er da ist. Die lokale Rechnung bleibt nur Rueckfallebene:
+   * der Verkaufsfaktor haengt an den gewerteten Spieltagen, und die sind im kompakten
+   * Client-Payload auf den aktiven Spieltag beschnitten — clientseitig steht deshalb bei JEDEM
+   * Spieler Faktor 1,0 und damit VK == MW (am gemeldeten Spielstand 339 von 339 Zeilen, siehe
+   * `use-foundation-cross-tab-player-directory.ts`). Dieselbe Regel wie in der Spielerliste:
+   * ein leeres Slice-Feld darf die lokale Ebene NICHT verdraengen.
+   */
+  const sellValueByPlayerId = useMemo(() => {
+    const ausSlice = sliceSellValueByPlayerId ?? null;
+    if (ausSlice && Object.keys(ausSlice).length > 0) {
+      return new Map(Object.entries(ausSlice));
+    }
+    return buildExpectedSellValueByPlayerId(gameState);
+  }, [gameState, sliceSellValueByPlayerId]);
+
   // KPIs: Ausläufer (Restlaufzeit ≤ 1), Ø-Restlaufzeit, Gehaltslast p.a. (eigenes Team).
   const contractSummary = useMemo(() => {
     const expiringCount = contractRows.filter((row) => row.expiring).length;
@@ -1141,6 +1172,17 @@ export default function FoundationTeamsNewLook({
           const portrait = getPlayerPortraitModel(player);
           const marketValue = getRosterEntryDisplayMarketValue(entry, player);
           const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
+          // GEMELDET VON CHRIS: „neben MW fehlt noch gehalt! bitte die breite nutzen und darunter
+          // die aenderung von MW zum aktuellen VK bzw VK wird angezeigt und diff zum MW".
+          //
+          // Gehalt steht wie ueberall unter dem Nebel-Vorbehalt: echte Zahlen nur beim eigenen
+          // Team (dieselbe Regel wie in `contractRows`). Bei fremden Teams bleibt die Kachel leer
+          // statt eine Zahl zu erfinden.
+          const salaryRaw = getRosterEntryDisplaySalary(entry, player);
+          const salary = heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null;
+          const sellValue = sellValueByPlayerId.get(player.id)?.expectedSellValue ?? null;
+          const sellValueDelta =
+            isFiniteNumber(sellValue) && isFiniteNumber(marketValue) ? sellValue - marketValue : null;
           const subMeta = formatPlayerIdentitySubMeta(player);
           return (
             <FoundationPlayerPortraitCard
@@ -1194,7 +1236,35 @@ export default function FoundationTeamsNewLook({
                         ? "text-negative"
                         : "",
                 },
+                {
+                  label: "Gehalt",
+                  value: salary != null ? formatNlMoney(salary) : "—",
+                  title:
+                    salary != null
+                      ? "Gehalt — aktuelles Jahresgehalt aus dem laufenden Vertrag"
+                      : "Gehalt — nur fuer das eigene Team sichtbar",
+                },
               ]}
+              footerSlot={
+                // VK unter der Zeile, mit dem Abstand zum Marktwert. Seit der Wert aus dem
+                // Server-Slice kommt, steht er IMMER da — auch bei Differenz 0, denn dann ist die
+                // 0 eine Aussage („noch kein Verkaufsfaktor verdient") und kein Artefakt der
+                // beschnittenen Client-Daten. Nur ohne jeden Wert bleibt die Zeile weg.
+                sellValue != null && sellValueDelta != null ? (
+                  <div className="nl-teams-portrait-sellvalue" title="VK — erwarteter Verkaufserloes, und wie weit er ueber oder unter dem Marktwert liegt">
+                    <span className="nl-teams-portrait-sellvalue-label">VK</span>
+                    <span className="nl-teams-portrait-sellvalue-value">{formatNlMoney(sellValue)}</span>
+                    <span
+                      className={`nl-teams-portrait-sellvalue-delta ${
+                        sellValueDelta > 0.005 ? "text-positive" : sellValueDelta < -0.005 ? "text-negative" : ""
+                      }`}
+                    >
+                      {sellValueDelta > 0.005 ? "+" : ""}
+                      {formatNlNumber(sellValueDelta, 2)}
+                    </span>
+                  </div>
+                ) : null
+              }
             />
           );
         })}

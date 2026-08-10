@@ -164,11 +164,26 @@ export function buildHomePlayerCardsFromRoster(input: {
         ppSoc: rating?.ppSoc ?? seasonPerformance?.pointsByArea.soc ?? null,
       };
     })
+    /**
+     * NACH OVR, absteigend.
+     *
+     * GEMELDET VON CHRIS: „home top 6 sollten doch nach OVR geordnet sein".
+     *
+     * Vorher entschied zuerst der Rollen-Tag (`star|core|starter` nach vorn), dann die
+     * Saison-PPs, dann MVS — OVR kam als LETZTES Kriterium und kam damit praktisch nie zum Zug.
+     * Im Live-Save stand deshalb Tahra mit OVR 59,9 auf Platz 4 vor Spineshard mit 74,1: sie
+     * hatte einen Punkt mehr gesammelt. Unter der Überschrift „Deine besten 6" liest sich das
+     * wie ein Fehler, und der Rollen-Tag machte es vollends unlesbar — er sagt nichts über
+     * Stärke, sondern nur, wie das Team den Spieler einsortiert hat.
+     *
+     * PPs und MVS bleiben als Gleichstand-Brecher: bei gleichem OVR ist der besser, der in
+     * dieser Saison mehr geliefert hat. Spieler ohne OVR landen hinten (nicht vorn) — deshalb
+     * `NEGATIVE_INFINITY` und nicht 0.
+     */
     .sort((left, right) => {
-      const leftRoleScore = /star|core|starter/i.test(left.entry.roleTag ?? "") ? 1 : 0;
-      const rightRoleScore = /star|core|starter/i.test(right.entry.roleTag ?? "") ? 1 : 0;
-      if (rightRoleScore !== leftRoleScore) {
-        return rightRoleScore - leftRoleScore;
+      const ovrDelta = (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY);
+      if (ovrDelta !== 0) {
+        return ovrDelta;
       }
 
       const ppsDelta = (right.playerPps ?? Number.NEGATIVE_INFINITY) - (left.playerPps ?? Number.NEGATIVE_INFINITY);
@@ -176,12 +191,7 @@ export function buildHomePlayerCardsFromRoster(input: {
         return ppsDelta;
       }
 
-      const mvsDelta = (right.playerMvs ?? Number.NEGATIVE_INFINITY) - (left.playerMvs ?? Number.NEGATIVE_INFINITY);
-      if (mvsDelta !== 0) {
-        return mvsDelta;
-      }
-
-      return (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY);
+      return (right.playerMvs ?? Number.NEGATIVE_INFINITY) - (left.playerMvs ?? Number.NEGATIVE_INFINITY);
     })
     .slice(0, 6);
 }

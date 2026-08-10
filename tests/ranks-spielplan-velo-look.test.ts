@@ -40,7 +40,7 @@ const CSS = quelle("app/globals.css");
 describe("Jede im Markup benutzte Klasse der neuen Familien existiert in globals.css", () => {
   const tokens = new Set<string>();
   for (const match of ROUTER.matchAll(
-    /(?:ranks-color-legend|ranks-heatstrip|ranks-axis-group|ranks-group-row|ranks-group-cell|ranks-table-scrollwrap|ranks-own-tag|ranks-own-pinned)[a-z0-9-]*(?<!-)/g,
+    /(?:ranks-color-legend|ranks-heatstrip|ranks-axis-group|ranks-group-row|ranks-group-cell|ranks-table-scrollwrap|ranks-own-tag)[a-z0-9-]*(?<!-)/g,
   )) {
     tokens.add(match[0]);
   }
@@ -64,7 +64,6 @@ describe("Jede im Markup benutzte Klasse der neuen Familien existiert in globals
       "ranks-axis-group-toggle",
       "ranks-group-cell",
       "ranks-own-tag",
-      "ranks-own-pinned-row",
       "nl-ranks-pending",
       "nl-ranks-prev-podium-row",
       "nl-diszis-details-toggle",
@@ -171,10 +170,32 @@ describe("Heat-Stufen der Matrix: voll deckend und rechnerisch >= 4,5:1", () => 
 /* ------------------------------------------------------------------ */
 
 describe("Eigene Zeile ist verankert", () => {
-  it("die eigene Zeile wird zusätzlich oben angepinnt (Original bleibt im Feld)", () => {
-    expect(ROUTER).toContain("pinnedOwnRankRow");
-    expect(ROUTER).toContain('isPinned ? `pinned-${row.team.teamId}` : row.team.teamId');
-    expect(ROUTER).toContain("steht auch unten im Feld");
+  /**
+   * GEMELDET VON CHRIS: „kannst du oben das eigene team entfernen? das irritiert auf jeden fall
+   * wenn man mal 4 teams zb steuern würde."
+   *
+   * Oben an der Tabelle hing eine KOPIE der eigenen Zeile. Sie setzte genau ein eigenes Team
+   * voraus — gepinnt wurde `activeManagerTeamId`, also das gerade ausgewählte. Wer mehrere Teams
+   * steuert, sah eins davon doppelt und die anderen nicht, und die Auszeichnung sprang je nach
+   * Auswahl auf ein anderes Team.
+   *
+   * Die eigenen Teams bleiben auffindbar, aber ueber Merkmale, die mit JEDER Anzahl funktionieren:
+   * Chip an der Zeile, Akzentlinie, Besitzer-Toenung. Diese Zeilen halten fest, dass die Kopie
+   * nicht zurueckkommt.
+   */
+  it("pinnt keine Kopie der eigenen Zeile mehr ueber die Tabelle", () => {
+    expect(ROUTER).not.toContain("pinnedOwnRankRow");
+    expect(ROUTER).not.toContain("steht auch unten im Feld");
+    expect(ROUTER).not.toContain("ranks-own-pinned-row");
+    expect(CSS).not.toContain("ranks-own-pinned");
+  });
+
+  it("markiert stattdessen jede gesteuerte Zeile an Ort und Stelle", () => {
+    // Der Chip haengt am Team-Vergleich, nicht an einer gepinnten Sonderzeile.
+    expect(ROUTER).toContain('row.team.teamId === activeManagerTeamId ? (');
+    expect(ROUTER).toContain('<span className="ranks-own-tag">Dein Team</span>');
+    // Und die Besitzer-Toenung trifft ALLE gesteuerten Teams, nicht nur das aktive.
+    expect(ROUTER).toContain("getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId])");
   });
 
   it("der Dein-Team-Chip in der Matrix: volle Tinte auf akzent-getöntem Grund (gemessen war Akzent-Text dort 3,55:1)", () => {

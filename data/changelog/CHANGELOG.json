@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-10",
+      "seite": "Arena · Team-Karte",
+      "pr": null,
+      "text": "Auf den Portraits der Team-Karte fehlten Rahmen und Holo-Schimmer. Die Stufe war da — der OVR-Rang steht sichtbar auf den Karten —, aber das Arena-Raster macht die Karte selbst unsichtbar (kein Rahmen, kein Schatten, durchsichtiger Grund), und die sichtbare Kachel darin schneidet mit ihrem eigenen Radius alles ab, was die Karte drumherum zeichnen wollte. Ring, Schein und Holo hängen jetzt an der Kachel; die Stufe kommt unverändert aus dem OVR-Rang. Dazu neu: auf jedem Portrait steht der Platz im Feld dieser Disziplin neben dem geholten Score — gerechnet über alle Teams und nur aus den bereits aufgedeckten Ergebnissen, mit dem Nenner daneben.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "KI · Transfermarkt",
       "pr": null,
       "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
@@ -30,6 +39,33 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "Home · Top-Kader",
+      "pr": null,
+      "text": "Die „besten 6\" waren nicht die besten: sortiert wurde zuerst nach Rollen-Tag, dann nach Saison-PPs und MVS — OVR kam als letztes Kriterium und entschied praktisch nie. Im Spielstand stand deshalb ein Spieler mit OVR 59,9 auf Platz 4 vor einem mit 74,1, weil er einen Punkt mehr gesammelt hatte. Sortiert wird jetzt nach OVR; bei Gleichstand entscheiden die Saison-PPs, danach MVS. Der Rollen-Tag fällt raus — er sagt nichts über Stärke, nur darüber, wie das Team den Spieler einsortiert hat.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Kader · Portraits",
+      "pr": null,
+      "text": "Unter dem Portrait stand nur der Marktwert. Jetzt teilen sich MW und Gehalt die Breite, und darunter steht der erwartete Verkaufserlös mit seinem Abstand zum Marktwert. Das Gehalt bleibt wie überall dem eigenen Team vorbehalten. Die VK-Zeile erscheint nur, wenn sich der Verkaufserlös wirklich vom Marktwert unterscheidet: der Verkaufsfaktor hängt an den gewerteten Spieltagen, und ohne sie fällt VK exakt auf den Marktwert zurück — eine Zeile „VK = MW, Differenz 0\" wäre dann keine Auskunft, sondern ein Artefakt.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Kader · Portraits",
+      "pr": null,
+      "text": "Der Verkaufserlös unter dem Portrait kommt jetzt aus derselben serverseitigen Quelle wie in der Spielerliste. Vorher stand nur die lokale Rückfallebene zur Verfügung, und die fällt im kompakten Client-Payload auf VK = MW zusammen, weil der Verkaufsfaktor an den gewerteten Spieltagen hängt — die Zeile musste deshalb ausgeblendet werden, sobald sie nichts Neues sagte. Sie steht jetzt immer: eine Differenz von 0 heisst dann „noch kein Verkaufsfaktor verdient\" und ist eine Aussage, kein Artefakt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "KI · Transfermarkt",
       "pr": null,
       "text": "Die teuren Teams wussten beim Verkaufen nicht, dass sie ueber der Apron-Linie stehen. Die Verkaufsbewertung sah Verkaufswert, Marktwert, Restlaufzeit, Teamcash und Raenge — die Lage zur Linie kam in keiner einzigen Begruendung vor. Hell Raisers zahlten 16,6 und kannten als Verkaufsgruende nur negatives Cash und schwache Leistung. Jetzt baut jedes Team ueber seiner Gehaltsdecke gezielt ab: es kennt den noetigen Betrag, waehlt danach aus und hoert auf, sobald er erreicht ist. Verankert ist das an der AMBITIONSDECKE, nicht an der ersten Linie — ein Titelanwaerter soll die Abgabe zahlen und den Kader behalten. Auf dem Spielstand bauen damit 4 Teams ueber zusammen 18,9 Gehalt ab statt 8 Teams ueber 62,5. Bewertet wird die Ersparnis am ERLOES, nicht am Gehalt: bei Hell Raisers ranken die gehaltsschweren Ergaenzungsspieler oben (6,1 Gehalt bei 16,8 Marktwert) und die Stars unten (11,8 bei 39,8) — abgegeben wird der Steuerposten, nicht der beste Spieler. Der Zeitpunkt steht im Begruendungstext, weil er zaehlt: die Apron-Abrechnung ist beim Verkaufen schon gebucht, ein Abbau senkt die Abgabe der NAECHSTEN Saison, geschaetzt auf den Linien der laufenden.",
@@ -48,9 +84,27 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "Ranks · Teamstärke pro Diszi",
+      "pr": null,
+      "text": "Über der Matrix hing eine Kopie der eigenen Zeile. Sie setzte genau ein eigenes Team voraus — gepinnt wurde das gerade ausgewählte —, und wer mehrere Teams steuert, sah eins davon doppelt und die anderen nicht. Die Kopie ist weg. Die eigenen Teams bleiben auffindbar, aber über Merkmale, die mit jeder Anzahl funktionieren: der „Dein Team\"-Chip an der Zeile, die Akzentlinie und die Besitzer-Tönung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Spieler · Detail",
       "pr": null,
       "text": "Die Sportliche Historie zeigt abgeschlossene Saisons wieder mit Zahlen statt „—“: PPs, OVR, MVS und die vier Achsen stehen jetzt auch für Season 1 in der Zeile. Damit haben die OVR/PPS/MVS-Kacheln wieder ihren Verlauf — wo vorher „Kein Verlauf“ stand, steht jetzt das Delta zur Vorsaison. Die Daten waren nie weg, sie kamen nur nicht im Browser an.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spielstände",
+      "pr": null,
+      "text": "Einen anderen Spielstand aktiv zu setzen lud ihn zweimal komplett aus der Datenbank. Der erste Ladevorgang diente nur der Frage „gibt es den Save überhaupt\" — dafür wurden 15 MB JSON aus sechs Tabellen geparst. Der zweite kam obendrauf, weil die Umschaltung selbst den Zeitstempel des Spielstands schreibt und damit den Sitzungs-Cache verwirft, der gerade erst gefüllt worden war. An der Live-Datenbank gemessen: 4166 ms vorher, 2105 ms nachher. Die Existenz wird jetzt mit einer einzeiligen Abfrage geprüft.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"
@@ -62,6 +116,15 @@
       "text": "Die Top-Spieler unter der Spieltags-Wertung zeigten nur die gerade laufende Disziplin. Unter einer Tabelle, die beide Disziplinen zusammenfasst, stand damit eine Spielerliste aus nur einer Haelfte: wer in Disziplin 1 ueberragend war und in Disziplin 2 nicht antrat, verschwand nach dem Wechsel spurlos aus der Liste, obwohl seine Punkte in der Tabelle direkt darueber weiterzaehlten. Jetzt rechnet die Liste den ganzen Spieltag: beide Disziplinen zusammen, je Spieler summiert (Score, Player-Points, Mutator-Aufschlag), wer in beiden antrat steht einmal da. Die Aufdeck-Regel bleibt unangetastet — mitgezaehlt wird nur, was auch die Wertung darueber schon freigibt; waehrend Disziplin 1 laeuft, stehen dort nur deren Spieler.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Abgeschlossene Saisons zeigten in Training, Leistung und Alterung das BUDGET vor Verteilung und Ceiling-Kappung, die laufende Saison daneben die tatsächlich angekommenen Attribut-Änderungen. Zwei verschiedene Größen unter demselben Namen, direkt untereinander — an einer Spielerin nachgemessen stand für S1 „Leistung +8,1\" gegen S2 „+1,8\", obwohl ihr Leistungs-Budget mit 8,10 zu 8,16 praktisch unverändert war. Der Unterschied war die Ceiling-Kappung, nicht ihre Leistung. Gezeigt wird jetzt überall dasselbe: was beim Charakter ankommt. Wo die Herkunft je Attribut fehlt, bleiben die drei Posten leer, statt ersatzweise das Budget auszuweisen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
