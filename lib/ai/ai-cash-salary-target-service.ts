@@ -2,8 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
-import { resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
-import { getTeamApronSalaryBase } from "@/lib/ai/ai-apron-cost-service";
+import { getTeamApronSalaryBase, resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));

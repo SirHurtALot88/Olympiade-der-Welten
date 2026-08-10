@@ -33,6 +33,7 @@ import { assessTeamSellRunwayPressure, estimateBuyoutLikelihood, isAttractivePro
 import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
+import { apronReliefFuerGehalt, buildApronAbbauZiel } from "@/lib/ai/apron-abbau-ziel";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
@@ -903,6 +904,24 @@ function buildCandidate(
     pushKeep(
       "high_board_confidence",
       `statische Board-Confidence ${identity?.boardConfidence ?? "?"} — Kaderzusammenhalt bevorzugen`,
+    );
+  }
+
+  /**
+   * APRON: „senkt die Abgabe der NAECHSTEN Saison".
+   *
+   * Der Zeitpunkt gehoert in den Text und nicht nur in den Code. Die Apron-Abrechnung ist zu diesem
+   * Moment bereits gebucht (sie laeuft in `runSeasonCompletion`, das Verkaufsfenster oeffnet erst
+   * danach) — ohne die Jahreszahl im Satz liest sich die eben gezahlte Abgabe wie ein Verkaufsgrund,
+   * den die KI ignoriert hat. Und „Schaetzung", weil gegen die Linien der ABGELAUFENEN Saison
+   * gerechnet wird: die der naechsten frieren erst nach dem Kaderbau ein.
+   */
+  const apronZiel = buildApronAbbauZiel(context.gameState, team.teamId);
+  const apronRelief = apronReliefFuerGehalt(apronZiel, economy.expectedSalary);
+  if (apronRelief > 0) {
+    pushSell(
+      "apron_levy_relief",
+      `senkt die Apron-Abgabe der naechsten Saison um rund ${roundValue(apronRelief, 1)} (Schaetzung auf den Linien dieser Saison)`,
     );
   }
 

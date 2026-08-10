@@ -28,20 +28,18 @@
  * jede Hochrechnung geraten.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
-import { apronLevyForSalary, resolveApronSalaryFactor, resolveSeasonApronLines } from "@/lib/season/apron-service";
+import {
+  apronLevyForSalary,
+  getTeamApronSalaryBase,
+  resolveApronSalaryFactor,
+  resolveSeasonApronLines,
+} from "@/lib/season/apron-service";
+import { resolveTeamApronSalaryCeiling } from "@/lib/ai/ai-cash-salary-target-service";
+
+export { getTeamApronSalaryBase };
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-/**
- * Die Gehaltssumme, gegen die der Apron dieses Team bemisst. Eigene Funktion statt eines direkten
- * Aufrufs, damit jede Apron-Frage der KI nachweislich dieselbe Grundlage nimmt — genau hier lag der
- * Fehler, den diese Änderung mit behebt (die Decken-Prüfung maß auf der ECHTEN Vertragssumme).
- */
-export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
-  return getTeamDisplaySalaryTotal(gameState, teamId);
 }
 
 /** Abgabe, die dieses Team bei der gegebenen Gehaltssumme zahlen würde (ohne Deckel, siehe apron-service). */
@@ -75,6 +73,43 @@ export function estimateMarginalApronLevy(
   const vorher = estimateApronLevyAtSalary(gameState, basis);
   const nachher = estimateApronLevyAtSalary(gameState, basis + zusatz);
   return round2(Math.max(0, nachher - vorher));
+}
+
+/**
+ * DIE ANDERE RICHTUNG: was ein Team an Abgabe SPART, wenn es dieses Gehalt abgibt.
+ *
+ * GEMELDET VON CHRIS: „wissen die teuren teams denn zb beim verkaufen am ende der season dass sie
+ * wie H-R und M-M stark über den aprons sind um ggf. zu reagieren und zu senken? weil sie müssen ja
+ * im besten Falle drumherum arbeiten." — Sie wussten es nicht. Die Verkaufsbewertung sah nicht
+ * einmal das Gehalt des Spielers; verkauft wurde aus Cash-Not oder sportlichen Gründen, die Abgabe
+ * kam in keiner Begründung vor.
+ *
+ * Nicht symmetrisch zum Kauf, und das ist der Punkt: die Ersparnis fällt DIGITAL an. Ein Team 2 über
+ * der Grenze spart mit einem 10er Gehalt nur die 2, die es überragt; ein Team 20 darüber spart die
+ * vollen 10. Deshalb gerechnet und nicht am Gehalt geschätzt.
+ *
+ * GEKLEMMT AN DER AMBITIONSDECKE, nicht an Linie 1 — der Fehler, den diese Klemme verhindert, stammt
+ * aus der Gegenprüfung des Entwurfs: ohne sie erzeugt die Ersparnis Verkaufsdruck bis hinunter zu
+ * Linie 1, also genau in der Zone, die `resolveTeamApronSalaryCeiling` einem Titelanwärter
+ * ausdrücklich zugesteht („die höhere Abgabe ist eingepreist"). Ein Ambition-9-Team würde Stars
+ * abgeben, um eine Abgabe zu vermeiden, für die es sich bewusst entschieden hat. Gemessen bei Hell
+ * Raisers: volle Abgabe 16,6, Ersparnis bis zur Decke aber nur 9,7.
+ */
+export function estimateApronReliefFromShedding(
+  gameState: GameState,
+  teamId: string,
+  sheddedExpectedSalary: number | null | undefined,
+): number {
+  const weg = Number(sheddedExpectedSalary ?? 0);
+  if (!Number.isFinite(weg) || weg <= 0) return 0;
+  const basis = getTeamApronSalaryBase(gameState, teamId);
+  const decke = resolveTeamApronSalaryCeiling(gameState, teamId);
+  // Unter die Decke zählt kein Abbau mehr — dort ist die Abgabe gewollt.
+  const zielBasis = Math.max(basis - weg, decke);
+  if (zielBasis >= basis) return 0;
+  const vorher = estimateApronLevyAtSalary(gameState, basis);
+  const nachher = estimateApronLevyAtSalary(gameState, zielBasis);
+  return round2(Math.max(0, vorher - nachher));
 }
 
 /**

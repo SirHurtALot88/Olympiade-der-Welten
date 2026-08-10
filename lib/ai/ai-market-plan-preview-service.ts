@@ -28,6 +28,7 @@ import {
   isUnifiedPickEnabledForMarket,
 } from "@/lib/ai/unified-pick-planner-service";
 import { computeCompositeSellScore, selectCompositeSellCandidates } from "@/lib/ai/ai-composite-sell-score";
+import { buildApronAbbauZiel } from "@/lib/ai/apron-abbau-ziel";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
@@ -362,6 +363,20 @@ function chooseSellCandidates(
     : null;
   const cashPressureScore = sellRunway?.cashPressureScore ?? 0;
   const gmArchetype = getTeamGeneralManager(gameState, team.teamId)?.profile?.archetype ?? null;
+  /**
+   * EINMAL je Team, nicht je Spieler: `buildApronAbbauZiel` laeuft ueber alle Kader-Eintraege, um
+   * die geglaettete Gehaltssumme zu bilden. Je Kandidat gebaut waere das quadratisch.
+   */
+  const apronZiel = buildApronAbbauZiel(gameState, team.teamId);
+  /**
+   * BEWUSSTE VEREINFACHUNG: alle Kandidaten werden gegen dieselbe Ausgangsbasis bewertet, obwohl
+   * nach dem ersten apron-getriebenen Verkauf weniger zu sparen waere. Die Bewertung laeuft VOR der
+   * Auswahl (sie liefert erst die Reihenfolge), eine mitlaufende Basis gaebe es also nur um den
+   * Preis einer zweiten Bewertungsrunde. Die MENGE begrenzt statt dessen der mitlaufende Zaehler in
+   * `selectCompositeSellCandidates`; ungenau bleibt hier nur die Reihenfolge zweier ohnehin
+   * gleichrangiger Kandidaten.
+   */
+  const apronRestBasis = apronZiel.basis;
   const previewByPlayerId = new Map(sourceCandidates.map((candidate) => [candidate.playerId, candidate] as const));
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
@@ -388,6 +403,10 @@ function chooseSellCandidates(
         teamCash: teamState.cash ?? 0,
         teamSalaryTotal: salaryTotal,
         cashPressureScore,
+        // Der Apron rechnet auf dem GEGLAETTETEN Gehalt, die Cash-Planung daneben auf dem echten.
+        expectedSalary: economy.expectedSalary ?? null,
+        apronZiel,
+        apronRestBasis,
         explanation: team.explanation,
         sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
         gmArchetype,
@@ -430,6 +449,9 @@ function chooseSellCandidates(
         candidate: {
           ...candidate,
           purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
+          // Traegt die Apron-Groesse mit bis in die Auswahlschleife — dort sinkt die Apron-Basis um
+          // dieses Feld und NICHT um `salary` (echte Saisonrate, andere Bemessungsgrundlage).
+          expectedSalary: economy.expectedSalary ?? null,
           strategicSellScore: composite.total,
           sellPriority: composite.total,
           sellPriorityScore: composite.total,
@@ -464,6 +486,7 @@ function chooseSellCandidates(
       allowProfitSellsBelowMin:
         (identity?.boardConfidence ?? 0) < 7 ||
         teamHasCashBufferRebuildFocus(gameState, team.teamId),
+      apronZiel,
     }),
     (candidate) => candidate.activePlayerId,
   );
