@@ -6,15 +6,18 @@
  * bitte erhöhen auf den 3 Stufen!"
  *
  * WAS GEMESSEN WURDE (`scripts/export-injury-balance-audit.ts` gegen den echten Spielstand, 32
- * Teams, 10 Spieltage): Last 10 → 63 Verletzungen je Saison, Last 14 → 166, Last 15 → 199 (der
- * Ziel-Korridor „~200" der ursprünglichen Kalibrierung). Dass der Korridor verfehlt war, lag nicht
+ * Teams, 10 Spieltage): Last 10 → 63 Verletzungen je Saison, Last 15 → 199 (der
+ * Ziel-Korridor „~200" der ursprünglichen Kalibrierung), Last 16 → 236. Dass der Korridor verfehlt
+ * war, lag nicht
  * an der Last, sondern an der Risikokurve: sie wurde nach jener Kalibrierung zweimal abgeflacht
  * (Schutzzone bis 25, Anker bei 50 von 10 % auf 3 %), ohne dass die Last nachzog.
  *
- * ENDSTAND nach Chris' Ansage („erhöhe mal um 30% … ich meine von 10 auf 13 usw", dann „ok dann
- * mach 14 als standard"): 14.
+ * ENDSTAND nach Chris' Ansage: 16 — „weil man kann ja die gebäude zur erholung noch pimpen". Die
+ * Erholung haengt am Reha-Ausbau (flacher Aufschlag 0/2/4/6/9/12 auf die Basis 20) und am
+ * Trainingsmodus („leicht" × 1,2) — voll ausgebaut und schonend trainiert stehen bis zu 38,4
+ * Erholung gegen 16 Last. Die Last ist damit eine Entscheidung, keine Pauschalsteuer.
  *
- * Dieser Test hält NICHT die Zahl 14 fest — die darf sich beim Nachtunen ändern. Er hält fest, was
+ * Dieser Test hält NICHT die Zahl 16 fest — die darf sich beim Nachtunen ändern. Er hält fest, was
  * an der Änderung strukturell ist: dass alle drei Stufen mitwachsen und ihr Verhältnis erhalten
  * bleibt, und dass die Last überhaupt in den Bereich reicht, in dem die Risikokurve greift.
  */
@@ -75,7 +78,7 @@ describe("Die Last reicht jetzt bis in die Risikozone", () => {
    *
    * Die Regel lautet „bis zu einer Fatigue von 25 sollte die Wahrscheinlichkeit einfach 0 % sein"
    * (siehe `fatigue-calibration.ts`). Sie haelt, solange die HÖCHSTE Stufe aus dem Stand unter 25
-   * bleibt: 14 × 1,4 = 19,6. Ab einer Basis über 17,8 (17,8 × 1,4 = 24,9) waere das nicht mehr so —
+   * bleibt: 16 × 1,4 = 22,4. Ab einer Basis über 17,8 (17,8 × 1,4 = 24,9) waere das nicht mehr so —
    * dann traege ein frischer Spieler beim Pushen Risiko. Dieser Test ist die Bremse dagegen.
    */
   it("aus dem Stand bleibt JEDE Stufe risikofrei — auch Pushen", () => {
