@@ -1374,6 +1374,94 @@ export default function DisciplineStageArena({
   );
 
   /**
+   * TOP-SPIELER DES GANZEN SPIELTAGS — beide Disziplinen zusammengerechnet.
+   *
+   * GEMELDET VON CHRIS: „die top player unten unter der spieltagstabelle sollen die für den gesamten
+   * spieltag sein! also beides zusammen."
+   *
+   * URSACHE: `topPlayers` weiter oben liest `engineDiscipline.topPlayers` — und `engineDiscipline`
+   * ist die EINE gerade laufende Disziplin (`preview.disciplinePreviews.find(d => d.disciplineId ===
+   * disciplineId)`). Unter der Spieltags-Wertung, die beide Disziplinen zusammenfasst, stand damit
+   * eine Spielerliste aus nur einer Hälfte. Wer in D1 überragend war und in D2 nicht mitmachte,
+   * verschwand nach dem Wechsel spurlos.
+   *
+   * AUFGEDECKT WIRD NUR, WAS AUFGEDECKT IST: die Liste zieht ausschliesslich die Disziplinen heran,
+   * die `panelD1Revealed`/`panelD2Revealed` freigeben — dieselbe Regel, gegen die auch die
+   * Spieltags-Wertung darüber rechnet. Während D1 läuft, stehen hier nur D1-Spieler; D2 kommt dazu,
+   * sobald D2 gewertet ist. Eine Liste, die D2 vorwegnimmt, wäre ein Spoiler.
+   *
+   * SUMMIERT, nicht aneinandergehängt: ein Spieler, der in beiden Disziplinen antrat, steht EINMAL
+   * da, mit der Summe seiner Player-Points und Scores. Der Mutator-Aufschlag summiert sich mit.
+   */
+  const matchdayTopPlayers = useMemo(() => {
+    // Auf eine Nachkommastelle, wie ueberall in der Buehne (`fmt1` zeigt genau so viel).
+    const round1 = (value: number) => Math.round(value * 10) / 10;
+    if (!useEngine || !preview) return null;
+    const revealedIds = new Set<string>();
+    if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) revealedIds.add(matchdayPanel.d1.disciplineId);
+    if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) revealedIds.add(matchdayPanel.d2.disciplineId);
+    if (revealedIds.size === 0) return null;
+
+    type Sammel = { row: DisciplineStageTopPlayer; id: string | null };
+    const proSpieler = new Map<string, Sammel>();
+    for (const dp of preview.disciplinePreviews ?? []) {
+      if (!revealedIds.has(dp.disciplineId)) continue;
+      for (const pp of dp.topPlayers) {
+        const punkte = resolveAwardedPlayerPoints({
+          pointsAwarded: pp.pointsAwarded,
+          mutatorPpsBonus: pp.mutatorPpsBonus,
+        });
+        const vorhanden = pp.playerId ? proSpieler.get(pp.playerId) : null;
+        if (vorhanden) {
+          vorhanden.row.score = round1(vorhanden.row.score + pp.finalPlayerScore);
+          vorhanden.row.points = punkte == null && vorhanden.row.points == null ? null : round1((vorhanden.row.points ?? 0) + (punkte ?? 0));
+          vorhanden.row.mutatorPoints =
+            pp.mutatorPpsBonus == null && vorhanden.row.mutatorPoints == null
+              ? null
+              : round1((vorhanden.row.mutatorPoints ?? 0) + (pp.mutatorPpsBonus ?? 0));
+          vorhanden.row.isMvp = vorhanden.row.isMvp || Boolean(pp.isMvpCandidate);
+          continue;
+        }
+        const meta = teamMetaById.get(pp.teamId);
+        proSpieler.set(pp.playerId, {
+          id: pp.playerId,
+          row: {
+            rank: 0,
+            name: pp.playerName,
+            teamCode: meta?.code ?? pp.teamId,
+            logoUrl: meta?.logoUrl ?? null,
+            portraitUrl: portraitById.get(pp.playerId) ?? null,
+            score: pp.finalPlayerScore,
+            points: punkte,
+            mutatorPoints: pp.mutatorPpsBonus ?? null,
+            isMvp: Boolean(pp.isMvpCandidate),
+            isOwn: pp.teamId === ownTeamId,
+            ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
+          },
+        });
+      }
+    }
+    const sortiert = [...proSpieler.values()].sort(
+      (a, b) => (b.row.points ?? -1) - (a.row.points ?? -1) || b.row.score - a.row.score,
+    );
+    const top = sortiert.slice(0, 12);
+    top.forEach((e, i) => {
+      e.row.rank = i + 1;
+    });
+    return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
+  }, [
+    useEngine,
+    preview,
+    panelD1Revealed,
+    panelD2Revealed,
+    matchdayPanel,
+    teamMetaById,
+    portraitById,
+    ownTeamId,
+    ratingByPlayerId,
+  ]);
+
+  /**
    * S3 · Expliziter Pre-Matchday-Zustand („vor dem Anpfiff").
    *
    * Erkennung aus ECHTEN Daten, nicht aus UI-Zustand geraten:
@@ -2503,9 +2591,13 @@ export default function DisciplineStageArena({
               (Rang vor→nach inkl. Δ, D1/D2, Mutator, Gesamt). Statt der früheren vier
               Einzeltabellen (Disziplin-Ergebnis, Spieltag-Gesamt, Standings-Delta) bleibt
               hier nur die Topspieler-Tabelle + die Highlights. */}
+          {/* Unter der Spieltags-Wertung gehoert die Liste des GANZEN Spieltags hin (beide
+              Disziplinen zusammen) — siehe `matchdayTopPlayers`. `topPlayers` (nur die laufende
+              Disziplin) bleibt der Rueckfall, solange die Engine noch keine aufgedeckte Seite
+              liefert. */}
           <DisciplineStageTopPlayers
-            players={topPlayers.rows}
-            playerIdByRow={topPlayers.ids}
+            players={(matchdayTopPlayers ?? topPlayers).rows}
+            playerIdByRow={(matchdayTopPlayers ?? topPlayers).ids}
             onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
           />
           <DisciplineStageHighlights
