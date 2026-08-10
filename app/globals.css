@@ -67358,6 +67358,21 @@ span.nl-facility-ampel-chip {
   max-width: 100%;
 }
 
+/* Vergleich zur Vorsaison in der Live-Zeile: „12,5 (+4,2)". Kleiner und blasser als der Wert
+   selbst — die Saisonzahl bleibt die Hauptaussage, das Delta ist die Einordnung dahinter.
+   Die Farbe kommt aus .text-positive/.text-negative und ueberschreibt die Blaesse bewusst. */
+.team-history-delta {
+  font-size: 0.82em;
+  font-weight: 600;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.team-history-delta.text-positive,
+.team-history-delta.text-negative {
+  opacity: 0.95;
+}
+
 /* --- Responsive ------------------------------------------------------ */
 @media (max-width: 900px) {
   .is-new-look .nl-teamprofile-hero {
@@ -79931,4 +79946,29 @@ span.nl-facility-ampel-chip {
   background: var(--nl-panel-2);
   color: var(--nl-mut);
   font-size: 12.5px;
+}
+
+/* Summenzeile „All Time" unter den Saisons der Team-Historie: die Zeile ist keine Saison, deshalb
+   grenzt sie eine kraeftigere Oberkante ab und traegt keine Zebra-/Live-Toenung. */
+.team-history-alltime-row > td {
+  border-top: 2px solid var(--nl-border-strong, rgba(255, 255, 255, 0.22));
+  padding-top: 0.55rem;
+  background: transparent;
+}
+
+.team-history-alltime-label {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.86em;
+  opacity: 0.85;
+}
+
+.team-history-alltime-value {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.team-history-alltime-of {
+  opacity: 0.55;
+  font-weight: 500;
 }

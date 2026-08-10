@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
       "text": "Ein Einsatz kostet jetzt deutlich mehr Fatigue: die Last steigt von 10 auf 16 und zieht alle drei Intensitaetsstufen mit (schonen 7,5 → 12, normal 10 → 16, pushen 14 → 22,4). Das Verhaeltnis zwischen den Stufen bleibt exakt gleich, die austarierte Abwaegung Score gegen Fatigue also auch. Grund: Verletzungen waren praktisch verschwunden — am Spielstand gemessen 38 in Saison 1 und ganze 5 in Saison 2, bei 87 Prozent aller Wuerfe mit einem Risiko von exakt null. Die Ursache lag nicht am Zufall (Ist und Erwartung deckten sich fast exakt), sondern daran, dass die Fatigue nie dort ankam, wo die Risikokurve greift: mit Last 10 blieb ein Spieler nach zwei Einsaetzen bei 20 und damit unter der Schutzzone von 25 — mit 16 sind es 32, und die Kurve greift. Die Kurve war nach der urspruenglichen Kalibrierung zweimal abgeflacht worden, ohne dass die Last nachgezogen wurde. Mit dem Simulator des Spiels gegengerechnet (32 Teams, 10 Spieltage): Last 10 ergibt 63 Verletzungen je Saison, Last 16 dann 236. Diese Zahl gilt fuer ein Team, das NICHTS tut — die Erholung laesst sich ausbauen: das Reha-Zentrum gibt je Stufe einen flachen Aufschlag (bis +12 auf die Basis 20), der Trainingsmodus multipliziert obendrauf (leicht mal 1,2). Voll ausgebaut und schonend trainiert stehen bis zu 38,4 Erholung gegen 16 Last. Ein frischer Spieler traegt weiterhin auf KEINER Stufe Risiko, auch beim Pushen nicht (22,4 bleibt unter 25) — spuerbar wird erst der Dauereinsatz. Kadertiefe zaehlt wieder: 15 statt 8 von 32 Teams geraten im Lauf einer Saison mindestens einmal in Aufstellungs-Not, 21 Teams haben mindestens einmal zwei Verletzte gleichzeitig.",
@@ -12,11 +21,11 @@
     },
     {
       "datum": "2026-08-10",
-      "seite": "KI · Transfermarkt",
+      "seite": "Team · Historie",
       "pr": null,
-      "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
+      "text": "Die laufende Saison zeigt jetzt hinter jedem Wert den Vergleich zur Vorsaison — „POW 12,5 (+4,2)“, ebenso bei Punkten, PPs, Cash, Gehalt und Marktwert. Grün heißt besser, beim Gehaltsblock bleibt die Zahl bewusst farblos, weil mehr Gehalt weder gut noch schlecht ist. Darunter steht neu eine All-Time-Zeile: die PPs über alle Saisons zusammen und der Platz des Teams in dieser Wertung. Beides gibt es im Team-Profil wie im Team-Drawer.",
       "quelle": "gepflegt",
-      "gewicht": null,
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {
@@ -35,6 +44,15 @@
       "text": "Die KI kaufte, ohne die Luxussteuer zu kennen. Der Apron erreichte sie bisher nur als pauschale Cash-Bremse, die greift, NACHDEM ein Team seine Gehaltsdecke gerissen hat — ein Zugang mit 2 Gehalt und einer mit 14 waren fuer die Kaufentscheidung damit gleich teuer. Jetzt rechnet sie vor jedem Kauf den Grenzpreis aus: was kostet genau dieser Spieler zusaetzlich an Abgabe. Auf dem Spielstand von Saison 2 kostet derselbe Zugang mit Gehalt 14 die Hell Raisers 18,5 zusaetzlich und die Cash Creators gar nichts. Die Abgabe geht in die Cash-Pruefung ein (vorher wurde nur der nackte Kaufpreis geprueft) und in die Rangfolge der Kandidaten, gewichtet am Anteil der Abloese — 2 Abgabe auf einen 40er Transfer sind ein Rundungsfehler, 2 auf einen 6er ein Drittel Aufschlag. Ein Mindestkader-Notkauf setzt sich weiterhin durch, die Steuer kann ihn verzoegern, nicht verhindern. Das Gehalt der bereits gewaehlten Zugaenge laeuft dabei mit, sonst bekaemen vier teure Kaeufe hintereinander alle die Abgabe des ersten. Mitgenommen: die KI prueste ihre Gehaltsdecke gegen die echte Vertragssumme, waehrend der Apron die geglaettete besteuert — bei 4 von 32 Teams widersprachen sich die beiden Zahlen, im Extremfall um 18,0.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieler · Detail",
+      "pr": null,
+      "text": "Die Sportliche Historie zeigt abgeschlossene Saisons wieder mit Zahlen statt „—“: PPs, OVR, MVS und die vier Achsen stehen jetzt auch für Season 1 in der Zeile. Damit haben die OVR/PPS/MVS-Kacheln wieder ihren Verlauf — wo vorher „Kein Verlauf“ stand, steht jetzt das Delta zur Vorsaison. Die Daten waren nie weg, sie kamen nur nicht im Browser an.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
