@@ -25,6 +25,7 @@ import {
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import type { TeamsAreaRank } from "@/lib/foundation/tabs/teams-view-derivations";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { leseSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { resolveTeamSellProfit } from "@/lib/foundation/team-transfer-history-helpers";
 import {
   computeTeamSeasonAverageMatchdayFatigue,
@@ -288,6 +289,24 @@ export function shouldBuildFoundationTeamProfileData(teamProfileTeamId: string |
   return Boolean(teamProfileTeamId);
 }
 
+/**
+ * Summe der PPs über alle Zeilen der Team-Historie — also GENAU das, was in der PPs-Spalte
+ * darüber steht, live inklusive.
+ *
+ * Bewusst aus den fertigen Zeilen und nicht aus der ligaweiten Rangliste: die Summenzeile steht
+ * unmittelbar unter den Saisons und muss sich nachrechnen lassen. Die Rangliste dient nur der
+ * EINORDNUNG (welcher Platz), sie kann bei der laufenden Saison auf eine andere Quelle
+ * zurückfallen als die Zeile — dann wäre eine Summe von dort um Zehntel danebengelaufen und die
+ * Tabelle widerspräche sich selbst.
+ */
+function summiereHistorienPps(zeilen: TeamDetailDrawerHistoryRow[]): number | null {
+  const werte = zeilen.map((zeile) => zeile.pps).filter((wert): wert is number => typeof wert === "number" && Number.isFinite(wert));
+  if (werte.length === 0) {
+    return null;
+  }
+  return roundViewNumber(werte.reduce((summe, wert) => summe + wert, 0), 1);
+}
+
 export function useFoundationCrossTabTeamsRoster(input: {
   shouldBuildTeamsView: boolean;
   shouldBuildHomeV2Overview: boolean;
@@ -340,6 +359,54 @@ export function useFoundationCrossTabTeamsRoster(input: {
       input.seasonStandRowsSeasonId,
     ],
   );
+
+  /**
+   * GEWÜNSCHT: „es wäre cool ne all time spalte mit den PPs All Time zu haben + rank" — auf
+   * Nachfrage als Summenzeile unter den Saisons der Team-Historie.
+   *
+   * Die PPs einer Saison sind die Disziplinpunkte des Teams (`disciplinePoints` im Schnappschuss,
+   * `ppsTotal` in der laufenden Saison). All Time ist ihre Summe über alle Saisons inklusive der
+   * laufenden — und der Rang die Position des Teams in genau dieser Summe.
+   *
+   * LIGAWEIT, nicht je Team gerechnet: für einen Rang braucht es alle Teams. Gelesen wird über
+   * `leseSaisonHistorie`, also die volle Fassung auf dem Server und die mitgefahrene Kurzfassung im
+   * Browser — sonst stünde hier dieselbe Falle wie bei der Spielerhistorie, wo die Anfangsladung
+   * die Schnappschüsse streicht und die Zahl still auf null fiele.
+   */
+  const allTimePpsByTeamId = useMemo(() => {
+    const summen = new Map<string, number>();
+    const addiere = (teamId: string | null | undefined, wert: number | null | undefined) => {
+      if (!teamId || typeof wert !== "number" || !Number.isFinite(wert)) {
+        return;
+      }
+      summen.set(teamId, (summen.get(teamId) ?? 0) + wert);
+    };
+
+    for (const eintrag of leseSaisonHistorie(input.gameState)) {
+      // Die laufende Saison steckt bereits in liveSeasonStandRows — ein archivierter Eintrag mit
+      // derselben Season-ID (Teil-Snapshot) wuerde sie sonst doppelt zaehlen.
+      if (eintrag.seasonId === input.gameState.season.id) {
+        continue;
+      }
+      for (const team of eintrag.teams) {
+        addiere(team.teamId, team.disciplinePoints);
+      }
+    }
+    for (const zeile of liveSeasonStandRows) {
+      addiere(zeile.teamId, zeile.ppsTotal);
+    }
+
+    const rangfolge = [...summen.entries()].sort((links, rechts) => rechts[1] - links[1]);
+    const raenge = new Map<string, number>();
+    rangfolge.forEach(([teamId], index) => {
+      // Gleichstand teilt sich den Rang — zwei Teams mit derselben Summe stehen beide auf #7.
+      const vorher = index > 0 ? rangfolge[index - 1] : null;
+      const rang = vorher != null && vorher[1] === summen.get(teamId) ? raenge.get(vorher[0])! : index + 1;
+      raenge.set(teamId, rang);
+    });
+
+    return { summen, raenge, teamCount: rangfolge.length };
+  }, [input.gameState, liveSeasonStandRows]);
 
   const selectedRosterTableRows = useMemo(() => {
     if (!shouldBuildSelectedRosterTableRows) {
@@ -804,6 +871,9 @@ export function useFoundationCrossTabTeamsRoster(input: {
           objectives: [],
           teamCaptain: null,
           history,
+          allTimePps: summiereHistorienPps(history),
+          allTimePpsRank: allTimePpsByTeamId.raenge.get(team.teamId) ?? null,
+          allTimePpsTeamCount: allTimePpsByTeamId.teamCount > 0 ? allTimePpsByTeamId.teamCount : null,
           players: [],
         };
       }
@@ -1053,6 +1123,9 @@ export function useFoundationCrossTabTeamsRoster(input: {
             }
           : null,
         history,
+        allTimePps: summiereHistorienPps(history),
+        allTimePpsRank: allTimePpsByTeamId.raenge.get(team.teamId) ?? null,
+        allTimePpsTeamCount: allTimePpsByTeamId.teamCount > 0 ? allTimePpsByTeamId.teamCount : null,
         players: rosterCards,
       };
       if (scope === "full") {

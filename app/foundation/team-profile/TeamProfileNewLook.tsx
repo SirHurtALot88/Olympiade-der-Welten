@@ -2403,6 +2403,7 @@ export default function TeamProfileNewLook({
               shellClassName="team-drawer-history-table-shell nl-teamprofile-history-shell"
               axisToneVariant="drawer"
               rows={data.history}
+              allTime={{ pps: data.allTimePps, rank: data.allTimePpsRank, teamCount: data.allTimePpsTeamCount }}
               renderCell={(columnId: string, row: TeamDetailDrawerHistoryRow) => {
                 if (columnId === "season") {
                   return (
