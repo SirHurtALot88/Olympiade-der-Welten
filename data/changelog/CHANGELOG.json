@@ -3,11 +3,29 @@
   "eintraege": [
     {
       "datum": "2026-08-10",
+      "seite": "Arena · Team-Karte",
+      "pr": null,
+      "text": "Auf den Portraits der Team-Karte fehlten Rahmen und Holo-Schimmer. Die Stufe war da — der OVR-Rang steht sichtbar auf den Karten —, aber das Arena-Raster macht die Karte selbst unsichtbar (kein Rahmen, kein Schatten, durchsichtiger Grund), und die sichtbare Kachel darin schneidet mit ihrem eigenen Radius alles ab, was die Karte drumherum zeichnen wollte. Ring, Schein und Holo hängen jetzt an der Kachel; die Stufe kommt unverändert aus dem OVR-Rang. Dazu neu: auf jedem Portrait steht der Platz im Feld dieser Disziplin neben dem geholten Score — gerechnet über alle Teams und nur aus den bereits aufgedeckten Ergebnissen, mit dem Nenner daneben.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Home · Top-Kader",
       "pr": null,
       "text": "Die „besten 6\" waren nicht die besten: sortiert wurde zuerst nach Rollen-Tag, dann nach Saison-PPs und MVS — OVR kam als letztes Kriterium und entschied praktisch nie. Im Spielstand stand deshalb ein Spieler mit OVR 59,9 auf Platz 4 vor einem mit 74,1, weil er einen Punkt mehr gesammelt hatte. Sortiert wird jetzt nach OVR; bei Gleichstand entscheiden die Saison-PPs, danach MVS. Der Rollen-Tag fällt raus — er sagt nichts über Stärke, nur darüber, wie das Team den Spieler einsortiert hat.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Kader · Portraits",
+      "pr": null,
+      "text": "Unter dem Portrait stand nur der Marktwert. Jetzt teilen sich MW und Gehalt die Breite, und darunter steht der erwartete Verkaufserlös mit seinem Abstand zum Marktwert. Das Gehalt bleibt wie überall dem eigenen Team vorbehalten. Die VK-Zeile erscheint nur, wenn sich der Verkaufserlös wirklich vom Marktwert unterscheidet: der Verkaufsfaktor hängt an den gewerteten Spieltagen, und ohne sie fällt VK exakt auf den Marktwert zurück — eine Zeile „VK = MW, Differenz 0\" wäre dann keine Auskunft, sondern ein Artefakt.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.4"
     },
     {

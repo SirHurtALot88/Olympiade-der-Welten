@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-10",
+  "seite": "Arena · Team-Karte",
+  "text": "Auf den Portraits der Team-Karte fehlten Rahmen und Holo-Schimmer. Die Stufe war da — der OVR-Rang steht sichtbar auf den Karten —, aber das Arena-Raster macht die Karte selbst unsichtbar (kein Rahmen, kein Schatten, durchsichtiger Grund), und die sichtbare Kachel darin schneidet mit ihrem eigenen Radius alles ab, was die Karte drumherum zeichnen wollte. Ring, Schein und Holo hängen jetzt an der Kachel; die Stufe kommt unverändert aus dem OVR-Rang. Dazu neu: auf jedem Portrait steht der Platz im Feld dieser Disziplin neben dem geholten Score — gerechnet über alle Teams und nur aus den bereits aufgedeckten Ergebnissen, mit dem Nenner daneben.",
+  "gewicht": "grundlegend",
+  "version": "0.4"
+}

@@ -77524,6 +77524,94 @@ span.nl-facility-ampel-chip {
     0 8px 18px rgba(8, 14, 26, 0.28);
 }
 
+/* --- Star-Tier und Holo auf den Arena-Kacheln ---------------------------
+   GEMELDET VON CHRIS (Team-Karte in der Arena): „holo effekte und rahmen fehlen
+   hier noch".
+
+   Sie fehlten nicht, weil die Karte keine Stufe hatte — der OVR-Rang steht ja
+   sichtbar drauf (#21, #46, #50). Sie fehlten, weil das Arena-Raster oben die
+   Karte selbst unsichtbar macht: `border: 0; background: transparent;
+   box-shadow: none;`. Genau daran haengen Rahmenschein und Glanz. Und was man
+   in diesem Raster wirklich SIEHT, ist nicht die Karte, sondern die Kachel
+   darin (`.foundation-player-portrait-hero.is-rail-tile`) — die hat ihren
+   eigenen Radius und `overflow: hidden`, schneidet also alles ab, was die
+   Karte drumherum zeichnen wollte.
+
+   Deshalb bekommt hier die KACHEL, was sonst die Karte traegt: den Ring in der
+   Farbe der Stufe, den Schein nach aussen und den wandernden Holo-Streifen.
+   Die Stufe selbst wird nicht neu erfunden — sie kommt weiter aus
+   `is-star-tier-*`/`is-star-holo` am Kartenknoten, hier wird sie nur an der
+   Stelle sichtbar gemacht, an der man sie sehen kann. */
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-bronze .foundation-player-portrait-hero.is-rail-tile,
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-silver .foundation-player-portrait-hero.is-rail-tile,
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-gold .foundation-player-portrait-hero.is-rail-tile,
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-diamond .foundation-player-portrait-hero.is-rail-tile {
+  outline: 2px solid var(--nl-star-tone);
+  outline-offset: -2px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--nl-star-tone) 30%, transparent),
+    0 8px 18px rgba(8, 14, 26, 0.28);
+}
+
+/* Diamant und Gold duerfen deutlicher strahlen — dieselbe Abstufung wie auf der
+   grossen Karte, nur eine Nummer kleiner, weil die Kachel selbst kleiner ist. */
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-gold .foundation-player-portrait-hero.is-rail-tile {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 65%, transparent),
+    0 0 18px color-mix(in srgb, var(--nl-star-tone) 42%, transparent),
+    0 8px 18px rgba(8, 14, 26, 0.28);
+}
+
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-tier-diamond .foundation-player-portrait-hero.is-rail-tile {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--nl-star-tone) 70%, transparent),
+    0 0 22px color-mix(in srgb, var(--nl-star-tone) 50%, transparent),
+    0 8px 18px rgba(8, 14, 26, 0.28);
+}
+
+/* Der Holo-Streifen liegt UEBER dem Portrait, aber UNTER den Overlay-Zahlen
+   (die tragen ihren eigenen z-index) — Werte bleiben lesbar. Gleiche Technik
+   und gleiche Kurve wie auf der grossen Karte, nur an der Kachel aufgehaengt. */
+.dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-holo .foundation-player-portrait-hero.is-rail-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 38%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 47%,
+      color-mix(in srgb, #ffffff 70%, transparent) 50%,
+      color-mix(in srgb, var(--nl-star-tone) 55%, transparent) 53%,
+      transparent 62%,
+      transparent 100%
+    ),
+    linear-gradient(
+      210deg,
+      color-mix(in srgb, var(--nl-star-tone) 26%, transparent) 0%,
+      transparent 45%,
+      color-mix(in srgb, var(--nl-diamond) 18%, transparent) 100%
+    );
+  background-size: 260% 260%, 180% 180%;
+  background-position: 120% 0%, 0% 0%;
+  animation: nlStarHoloSweep 4.6s var(--nl-ease, ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dstage-portrait-rail-grid .foundation-player-portrait-card.is-star-holo .foundation-player-portrait-hero.is-rail-tile::after {
+    animation: none;
+    background-position: 50% 50%, 50% 50%;
+    opacity: 0.3;
+  }
+}
+
 .dstage-portrait-rail-grid .foundation-player-portrait-hero.is-rail-tile .home-v2-player-portrait {
   width: 100%;
   height: 100%;
@@ -79910,4 +79998,40 @@ span.nl-facility-ampel-chip {
   background: var(--nl-panel-2);
   color: var(--nl-mut);
   font-size: 12.5px;
+}
+
+
+/* --- VK-Zeile unter den Kader-Portraits ---------------------------------
+   GEMELDET VON CHRIS: „neben MW fehlt noch gehalt! bitte die breite nutzen und
+   darunter die aenderung von MW zum aktuellen VK bzw VK wird angezeigt und diff
+   zum MW".
+
+   MW und Gehalt teilen sich jetzt die Breite (zwei Kacheln der `economyStats`),
+   der Verkaufserloes steht als eigene Zeile darunter — Label links, Wert
+   rechtsbuendig, der Abstand zum Marktwert direkt daneben in seiner Farbe. */
+.is-new-look .nl-teams-portrait-sellvalue {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-teams-portrait-sellvalue-label {
+  color: var(--nl-mut, #93a3bd);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-teams-portrait-sellvalue-value {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--nl-ink, #e8eefc);
+}
+
+.is-new-look .nl-teams-portrait-sellvalue-delta {
+  font-weight: 800;
 }

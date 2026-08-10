@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-10",
+  "seite": "Kader · Portraits",
+  "text": "Unter dem Portrait stand nur der Marktwert. Jetzt teilen sich MW und Gehalt die Breite, und darunter steht der erwartete Verkaufserlös mit seinem Abstand zum Marktwert. Das Gehalt bleibt wie überall dem eigenen Team vorbehalten. Die VK-Zeile erscheint nur, wenn sich der Verkaufserlös wirklich vom Marktwert unterscheidet: der Verkaufsfaktor hängt an den gewerteten Spieltagen, und ohne sie fällt VK exakt auf den Marktwert zurück — eine Zeile „VK = MW, Differenz 0\" wäre dann keine Auskunft, sondern ein Artefakt.",
+  "gewicht": "grundlegend",
+  "version": "0.4"
+}

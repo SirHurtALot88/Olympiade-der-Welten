@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildExpectedSellValueByPlayerId } from "@/lib/market/transfermarkt-expected-sell-value";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -971,6 +972,13 @@ export default function FoundationTeamsNewLook({
       );
   }, [filteredSelectedRosterTableRows, getRosterEntryDisplaySalary, heroIsOwnTeam]);
 
+  /**
+   * Erwarteter Verkaufserloes je Kaderspieler — EIN Batch-Lauf fuer alle Zeilen (der
+   * Sale-Factor-Kontext ist je GameState gecacht); ein Aufruf pro Karte waere bei einem
+   * vollen Kader zu teuer.
+   */
+  const sellValueByPlayerId = useMemo(() => buildExpectedSellValueByPlayerId(gameState), [gameState]);
+
   // KPIs: Ausläufer (Restlaufzeit ≤ 1), Ø-Restlaufzeit, Gehaltslast p.a. (eigenes Team).
   const contractSummary = useMemo(() => {
     const expiringCount = contractRows.filter((row) => row.expiring).length;
@@ -1141,6 +1149,17 @@ export default function FoundationTeamsNewLook({
           const portrait = getPlayerPortraitModel(player);
           const marketValue = getRosterEntryDisplayMarketValue(entry, player);
           const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
+          // GEMELDET VON CHRIS: „neben MW fehlt noch gehalt! bitte die breite nutzen und darunter
+          // die aenderung von MW zum aktuellen VK bzw VK wird angezeigt und diff zum MW".
+          //
+          // Gehalt steht wie ueberall unter dem Nebel-Vorbehalt: echte Zahlen nur beim eigenen
+          // Team (dieselbe Regel wie in `contractRows`). Bei fremden Teams bleibt die Kachel leer
+          // statt eine Zahl zu erfinden.
+          const salaryRaw = getRosterEntryDisplaySalary(entry, player);
+          const salary = heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null;
+          const sellValue = sellValueByPlayerId.get(player.id)?.expectedSellValue ?? null;
+          const sellValueDelta =
+            isFiniteNumber(sellValue) && isFiniteNumber(marketValue) ? sellValue - marketValue : null;
           const subMeta = formatPlayerIdentitySubMeta(player);
           return (
             <FoundationPlayerPortraitCard
@@ -1194,7 +1213,34 @@ export default function FoundationTeamsNewLook({
                         ? "text-negative"
                         : "",
                 },
+                {
+                  label: "Gehalt",
+                  value: salary != null ? formatNlMoney(salary) : "—",
+                  title:
+                    salary != null
+                      ? "Gehalt — aktuelles Jahresgehalt aus dem laufenden Vertrag"
+                      : "Gehalt — nur fuer das eigene Team sichtbar",
+                },
               ]}
+              footerSlot={
+                // VK unter der Zeile, mit dem Abstand zum Marktwert. Bewusst NUR, wenn er sich vom
+                // MW unterscheidet: der Verkaufsfaktor haengt an den gewerteten Spieltagen, und die
+                // sind im kompakten Client-Payload auf den aktiven Spieltag beschnitten. Ohne echten
+                // Faktor faellt VK exakt auf den Marktwert zurueck — eine Zeile „VK = MW, Diff 0"
+                // waere dann keine Auskunft, sondern ein Artefakt der Datenlage.
+                sellValue != null && sellValueDelta != null && Math.abs(sellValueDelta) >= 0.01 ? (
+                  <div className="nl-teams-portrait-sellvalue" title="VK — erwarteter Verkaufserloes, und wie weit er ueber oder unter dem Marktwert liegt">
+                    <span className="nl-teams-portrait-sellvalue-label">VK</span>
+                    <span className="nl-teams-portrait-sellvalue-value">{formatNlMoney(sellValue)}</span>
+                    <span
+                      className={`nl-teams-portrait-sellvalue-delta ${sellValueDelta > 0 ? "text-positive" : "text-negative"}`}
+                    >
+                      {sellValueDelta > 0 ? "+" : ""}
+                      {formatNlNumber(sellValueDelta, 2)}
+                    </span>
+                  </div>
+                ) : null
+              }
             />
           );
         })}
