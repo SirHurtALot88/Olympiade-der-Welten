@@ -362,6 +362,14 @@ function chooseSellCandidates(
     ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
     : null;
   const cashPressureScore = sellRunway?.cashPressureScore ?? 0;
+  /**
+   * Schulden-Gehalts-Frühwarnung (siehe `schuldenlast-fruehwarnung.ts`): senkt unten die
+   * Verkaufsschwelle graduell mit und hält die Auswahl-Schleife am Laufen, bis die kommende
+   * Saisonend-Abbuchung (Gehalt + Kreditrate) aus Cash + Umsatz gedeckt wäre. Der Cash-Druck allein
+   * stoppt schon bei „Kasse wieder positiv plus kleine Reserve" — für ein Team wie Mayhem Mavericks
+   * (Kreditrate 32,7 bei Umsatz 88,6 im gemessenen Spielstand) bliebe damit genau die Rate ungedeckt.
+   */
+  const schuldenlast = sellRunway?.schuldenlast ?? null;
   const gmArchetype = getTeamGeneralManager(gameState, team.teamId)?.profile?.archetype ?? null;
   /**
    * EINMAL je Team, nicht je Spieler: `buildApronAbbauZiel` laeuft ueber alle Kader-Eintraege, um
@@ -407,6 +415,7 @@ function chooseSellCandidates(
         expectedSalary: economy.expectedSalary ?? null,
         apronZiel,
         apronRestBasis,
+        schuldenlastScore: schuldenlast?.score ?? 0,
         explanation: team.explanation,
         sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
         gmArchetype,
@@ -487,6 +496,7 @@ function chooseSellCandidates(
         (identity?.boardConfidence ?? 0) < 7 ||
         teamHasCashBufferRebuildFocus(gameState, team.teamId),
       apronZiel,
+      schuldenlast,
     }),
     (candidate) => candidate.activePlayerId,
   );

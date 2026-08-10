@@ -155,6 +155,8 @@ export type CompositeSellScoreInput = {
   apronZiel?: ApronAbbauZiel | null;
   /** Bereits verplanter Abbau: die Basis, ab der DIESER Verkauf noch etwas spart. */
   apronRestBasis?: number | null;
+  /** Schulden-Gehalts-Frühwarnung des Teams (0–1). Fehlt sie, bleibt die Schwelle unverändert. */
+  schuldenlastScore?: number | null;
   explanation?: string;
   sellForProfitAggression?: number | null;
   /** GM archetype for direct identity hooks (e.g. bargain_hunter → flip_shop + stronger loss resistance). */
@@ -182,10 +184,21 @@ export type CompositeSellScoreResult = {
 export function resolveEffectiveSellThreshold(input: {
   teamProfile: CompositeSellTeamProfile;
   cashPressureScore: number;
+  /**
+   * Schulden-Gehalts-Frühwarnung (0–1, siehe `schuldenlast-fruehwarnung.ts`). Senkt die Schwelle
+   * ZUSÄTZLICH zum Cash-Druck und mit demselben Hebel (×8): der Cash-Druck steht bei allen Teams
+   * mit leerer Kasse auf 1 und unterscheidet dort nichts mehr — erst dieser Wert trennt am
+   * gemessenen Spielstand Mayhem Mavericks (0,37 → −3) von Vigorous Vikings (0 → ±0). Der Floor
+   * bleibt unangetastet: die Frühwarnung erhöht Bereitschaft, sie erzwingt keinen Verkauf.
+   */
+  schuldenlastScore?: number;
 }) {
   const base = BASE_THRESHOLD[input.teamProfile];
   const floor = input.teamProfile === "flip_shop" ? 18 : 22;
-  return Math.max(floor, base - Math.round(input.cashPressureScore * 8));
+  return Math.max(
+    floor,
+    base - Math.round(input.cashPressureScore * 8) - Math.round((input.schuldenlastScore ?? 0) * 8),
+  );
 }
 
 export function computeCompositeSellScore(input: CompositeSellScoreInput): CompositeSellScoreResult {
@@ -328,6 +341,7 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
     threshold: resolveEffectiveSellThreshold({
       teamProfile,
       cashPressureScore: input.cashPressureScore,
+      schuldenlastScore: input.schuldenlastScore ?? 0,
     }),
     teamProfile,
     components: {
@@ -370,6 +384,12 @@ export function selectCompositeSellCandidates<
      * wenn der Cash-Druck schon geloest waere.
      */
     apronZiel?: ApronAbbauZiel | null;
+    /**
+     * Schulden-Gehalts-Frühwarnung des Teams (siehe `schuldenlast-fruehwarnung.ts`). Ist sie aktiv
+     * (score > 0), läuft die Auswahl weiter, bis die kommende Saisonend-Abbuchung gedeckt ist —
+     * dieselbe Mechanik wie beim `apronZiel`, nur mit der Kreditrate statt der Apron-Linie als Ziel.
+     */
+    schuldenlast?: { score: number; kreditrate: number; umsatz: number } | null;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -429,6 +449,23 @@ export function selectCompositeSellCandidates<
     return true;
   };
 
+  /**
+   * FRÜHWARNUNGS-ZIEL: Cash + Umsatz muss die kommende Abbuchung (Gehalt + Kreditrate) decken.
+   * Gerechnet wird BEWUSST auf `projectedSalary` (der echten, front-/back-loadeten Summe) und nicht
+   * auf der Apron-Basis: abgebucht wird am Saisonende die echte Summe — dieselbe Trennung wie bei
+   * den Cash-Zielen (`ai-cash-salary-target-service.ts`). Beide Zähler laufen mit, jeder Verkauf
+   * hilft doppelt (Erlös rein, Gehalt raus), die Schleife konvergiert deshalb schnell: Mayhem
+   * Mavericks (Fehlbetrag 51,8 am gemessenen Spielstand) ist nach einem Verkauf mehr gedeckt, statt
+   * bei „Cash wieder positiv plus kleine Reserve" stehen zu bleiben und mit ungedeckter Kreditrate
+   * in die nächste Saison zu gehen. KEIN Zwangsverkauf: die Schleife wählt nur aus Kandidaten, die
+   * die Schwelle ohnehin gerissen haben, und der `hardMin`-Schutz oben bleibt unberührt — reichen
+   * die Kandidaten nicht, endet sie einfach.
+   */
+  const istSchuldenlastGedeckt = () =>
+    input.schuldenlast == null ||
+    input.schuldenlast.score <= 0 ||
+    projectedCash + input.schuldenlast.umsatz >= projectedSalary + input.schuldenlast.kreditrate;
+
   for (const entry of sorted) {
     if (
       hardMin != null &&
@@ -442,6 +479,7 @@ export function selectCompositeSellCandidates<
       selected.length > 0 &&
       isCashPressureResolved() &&
       istApronZielErreicht() &&
+      istSchuldenlastGedeckt() &&
       !input.allowProfitSellsBelowMin
     ) {
       break;

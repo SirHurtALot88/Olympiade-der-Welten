@@ -31,7 +31,15 @@ export type AiSellReasonCode =
    * dieser Grund haengt gar nicht am Spieler, sondern an der LAGE DES TEAMS zu seiner Apron-Decke.
    * Derselbe Spieler ist bei einem Team weit darueber ein Steuerposten und bei einem darunter keiner.
    */
-  | "apron_levy_relief";
+  | "apron_levy_relief"
+  /**
+   * Schulden-Gehalts-Frühwarnung (siehe `schuldenlast-fruehwarnung.ts`): das Team traegt Kredit-
+   * Restschuld UND Cash + Umsatz decken die naechste Saisonend-Abbuchung (Gehalt + Kreditrate)
+   * nicht. BEWUSST GETRENNT von `cash_runway_pressure` (Kasse HEUTE zu knapp) und `negative_cash`
+   * (Kasse schon im Minus): dieser Grund warnt VOR dem Minus — Chris' „es kann sein dass wir eher
+   * spieler verkaufen muessen am ende der season weil wir schulden haben und sehr hohes gehalt".
+   */
+  | "debt_salary_runway";
 
 export type AiKeepReasonCode =
   | "low_wage_burden"
@@ -73,6 +81,7 @@ const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }
   { code: "roster_quality_floor", patterns: ["unteres Kader-Drittel", "Qualität upgraden"] },
   { code: "overpaid_for_output", patterns: ["teurer als für diese Leistung üblich"] },
   { code: "apron_levy_relief", patterns: ["senkt die Apron-Abgabe"] },
+  { code: "debt_salary_runway", patterns: ["Restschuld und Gehaltslast übersteigen"] },
 ];
 
 const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }> = [

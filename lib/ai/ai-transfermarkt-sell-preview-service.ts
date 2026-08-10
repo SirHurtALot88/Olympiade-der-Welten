@@ -707,7 +707,25 @@ function buildCandidate(
     if (cashPressureProfitAttractive) {
       pushSell("profit_window", "Verkaufspreis liegt über Marktwert — lukrativer Exit möglich");
     }
-  } else if (proactiveOfferGate && proactiveProfitAttractive) {
+  }
+
+  /**
+   * SCHULDEN-GEHALTS-FRÜHWARNUNG (siehe `schuldenlast-fruehwarnung.ts`) — bewusst AUSSERHALB des
+   * `cashPressureGate`: sie soll gerade dann warnen, wenn die Kasse heute noch nicht brennt, die
+   * kommende Saisonend-Abbuchung (Gehalt + Kreditrate) aber schon absehbar ungedeckt ist. Die
+   * Star-Protection bleibt respektiert — dieselbe Grenze wie beim Cash-Druck: warnen und Bereitschaft
+   * erhöhen ja, den Star-Kern dafür aufbrechen nein.
+   */
+  const schuldenlast = sellRunway.schuldenlast;
+  if (schuldenlast.score > 0 && !starProtection) {
+    pushSell(
+      "debt_salary_runway",
+      `Restschuld und Gehaltslast übersteigen die Einnahmen — der nächsten Saisonend-Abrechnung fehlen rund ${roundValue(schuldenlast.fehlbetrag, 1)}, frühe Verkäufe verhindern den Engpass`,
+    );
+  }
+
+  // `proactiveOfferGate` schliesst `cashPressureGate` bereits aus — kein zusätzlicher Wächter nötig.
+  if (proactiveOfferGate && proactiveProfitAttractive) {
     pushSell(
       "profit_window",
       teamWeakness.isWeakTeam
@@ -862,6 +880,10 @@ function buildCandidate(
     (expiringCoreDecisionPressure ? 10 : 0) +
     buyoutLikelihood * 12 +
     (cashPressureGate && !starProtection ? Math.round(sellRunway.cashPressureScore * 14) : 0) +
+    // Frühwarnungs-Bonus mit demselben Hebel (×14) wie der Cash-Druck darüber: graduell (0,08–0,37
+    // am gemessenen Spielstand → +1 bis +5), damit Mayhem Mavericks lauter gedrängt wird als ein
+    // Team mit kleiner Rate — und 0 für die 24 Teams ohne Frühwarnfall.
+    (schuldenlast.score > 0 && !starProtection ? Math.round(schuldenlast.score * 14) : 0) +
     (cashPressureGate && cashPressureProfitAttractive ? 10 : 0) +
     // Premium-graded proactive strong-offer bonus: bigger premiums over market value pull harder,
     // and weaker teams get a modest extra nudge on top — never enough to force a sale on its own.
