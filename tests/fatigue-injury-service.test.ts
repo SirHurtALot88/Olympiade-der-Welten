@@ -253,7 +253,12 @@ describe("fatigue injury service", () => {
     expect(bookkeeping.injuryStatus).toBe("injured");
     // Einsatz-Zweig: +Load. Waere er als "nicht verfuegbar" eingestuft worden, stuende
     // hier stattdessen der abgezogene Erholungswert.
-    expect(bookkeeping.fatigue).toBe(83 + MATCHDAY_FATIGUE_LOAD);
+    //
+    // GEKLEMMT gerechnet, nicht roh: der Startwert 83 stammt aus einer Zeit mit Last 10, und
+    // Fatigue ist bei 100 gedeckelt. Mit der auf 19,5 angehobenen Last liefe `83 + Load` auf
+    // 102,5 und damit ueber den Deckel — die Zusicherung wuerde an der Balance-Zahl scheitern
+    // statt an dem, was sie prueft (Einsatz-Zweig statt Erholungs-Zweig).
+    expect(bookkeeping.fatigue).toBe(Math.min(100, 83 + MATCHDAY_FATIGUE_LOAD));
   });
 
   it("nimmt die Sperre zurueck, sobald beide Disziplinen des Spieltags gebucht sind", () => {

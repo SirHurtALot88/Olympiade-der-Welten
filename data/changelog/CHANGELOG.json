@@ -12,6 +12,24 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Ein Einsatz kostet jetzt deutlich mehr Fatigue: die Last steigt von 10 auf 16 und zieht alle drei Intensitaetsstufen mit (schonen 7,5 → 12, normal 10 → 16, pushen 14 → 22,4). Das Verhaeltnis zwischen den Stufen bleibt exakt gleich, die austarierte Abwaegung Score gegen Fatigue also auch. Grund: Verletzungen waren praktisch verschwunden — am Spielstand gemessen 38 in Saison 1 und ganze 5 in Saison 2, bei 87 Prozent aller Wuerfe mit einem Risiko von exakt null. Die Ursache lag nicht am Zufall (Ist und Erwartung deckten sich fast exakt), sondern daran, dass die Fatigue nie dort ankam, wo die Risikokurve greift: mit Last 10 blieb ein Spieler nach zwei Einsaetzen bei 20 und damit unter der Schutzzone von 25 — mit 16 sind es 32, und die Kurve greift. Die Kurve war nach der urspruenglichen Kalibrierung zweimal abgeflacht worden, ohne dass die Last nachgezogen wurde. Mit dem Simulator des Spiels gegengerechnet (32 Teams, 10 Spieltage): Last 10 ergibt 63 Verletzungen je Saison, Last 16 dann 236. Diese Zahl gilt fuer ein Team, das NICHTS tut — die Erholung laesst sich ausbauen: das Reha-Zentrum gibt je Stufe einen flachen Aufschlag (bis +12 auf die Basis 20), der Trainingsmodus multipliziert obendrauf (leicht mal 1,2). Voll ausgebaut und schonend trainiert stehen bis zu 38,4 Erholung gegen 16 Last. Ein frischer Spieler traegt weiterhin auf KEINER Stufe Risiko, auch beim Pushen nicht (22,4 bleibt unter 25) — spuerbar wird erst der Dauereinsatz. Kadertiefe zaehlt wieder: 15 statt 8 von 32 Teams geraten im Lauf einer Saison mindestens einmal in Aufstellungs-Not, 21 Teams haben mindestens einmal zwei Verletzte gleichzeitig.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Home · Top-Kader",
       "pr": null,
       "text": "Die „besten 6\" waren nicht die besten: sortiert wurde zuerst nach Rollen-Tag, dann nach Saison-PPs und MVS — OVR kam als letztes Kriterium und entschied praktisch nie. Im Spielstand stand deshalb ein Spieler mit OVR 59,9 auf Platz 4 vor einem mit 74,1, weil er einen Punkt mehr gesammelt hatte. Sortiert wird jetzt nach OVR; bei Gleichstand entscheiden die Saison-PPs, danach MVS. Der Rollen-Tag fällt raus — er sagt nichts über Stärke, nur darüber, wie das Team den Spieler einsortiert hat.",
