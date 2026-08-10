@@ -115,6 +115,19 @@ describe("foundation initial compact state", () => {
     expect(byId.get("p-2")?.attributeSheetStats).toBeUndefined();
   });
 
+  it("keeps every matchday result in the compact payload but still trims the discipline results", () => {
+    // Die schmale Verzeichniszeile je Spieltag muss mitfahren: an ihr erkennt
+    // `getCurrentSeasonMatchdayResultIds`, welche Ergebnisse zur laufenden Saison
+    // gehoeren. Beschnitten kannte der Browser nur den aktiven Spieltag und die
+    // Saisonziele zaehlten alles Vorherige nicht mit. Die schwere Fracht — die
+    // Disziplin-Ergebnisse — bleibt weiterhin auf den aktiven Spieltag beschnitten.
+    const existing = createGameState();
+    const compact = compactFoundationInitialGameState(existing);
+
+    expect(compact.seasonState.matchdayResults).toEqual(existing.seasonState.matchdayResults);
+    expect(compact.seasonState.disciplineResults?.map((result) => result.id)).toEqual(["disc-md-2"]);
+  });
+
   it("strips persisted season derivations from compact payloads", () => {
     const existing = createGameState();
     existing.seasonState.persistedSeasonDerivations = {
