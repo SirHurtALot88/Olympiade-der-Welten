@@ -427,8 +427,12 @@ async function executeAiPreseasonBackgroundWork(input: {
      * umgeht Kapazitaet, Distress-Gate und die S1-Sperre, weil er unfreiwillig ist) und deckt exakt
      * den Fehlbetrag; Cash steht danach auf 0, die Restschuld laeuft im normalen Kreditsystem.
      *
-     * Er steht bewusst am ENDE: erst wenn Markt, Fuellung und Verletzungs-Topup fertig sind, steht
-     * der Kontostand fest, mit dem das Team in die Saison geht.
+     * HIER ist der Zeitpunkt richtig, am SAISONENDE war er falsch: dort hat das Team noch nichts
+     * tun koennen (Chris: „nicht am ende einer season!"). Am Saisonende wird ein Minus deshalb nur
+     * noch festgestellt, siehe `collectNegativeCashTeams`.
+     *
+     * Er steht bewusst am ENDE der Kette: erst wenn Markt, Fuellung und Verletzungs-Topup fertig
+     * sind, steht der Kontostand fest, mit dem das Team in die Saison geht.
      */
     const vorAusgleich = persistence.getSaveById(saveId);
     let notkredite: Array<{ teamId: string; principal: number }> = [];

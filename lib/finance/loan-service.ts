@@ -839,10 +839,9 @@ export function applyLoanSettlement(
       const delta = cashDeltaByTeamId.get(team.teamId) ?? 0;
       if (delta === 0) return team;
       const rawNext = roundCash(team.cash + delta);
-      // KEIN Clamp auf 0 mehr: das würde Geld aus dem Nichts erzeugen (der frühere Bug). Ein negativer
-      // Zwischenstand (z. B. weil der Gehaltsabzug das Team schon vorher unter 0 gedrückt hat) bleibt
-      // negativ und wird am Ende der Season-Completion vom Zahlungsunfähigkeits-Backstop
-      // (applyInsolvencyBackstop) in einen echten Notkredit umgewandelt.
+      // KEIN Clamp auf 0: das wuerde Geld aus dem Nichts erzeugen. Ein negativer Stand bleibt negativ
+      // — auch ueber das Saisonende hinaus. Das Team muss ihn selbst aufloesen (verkaufen, leihen),
+      // siehe `collectNegativeCashTeams`.
       return { ...team, cash: rawNext };
     }),
     seasonState: {
@@ -856,7 +855,7 @@ export function applyLoanSettlement(
   return { ok: true, applied: true, duplicateDetected: false, preview, gameState: nextGameState };
 }
 
-/** Laufzeit (Saisons) des Notkredits im Zahlungsunfähigkeits-Backstop. */
+/** Laufzeit (Saisons) des Notkredits im Zahlungsunfähigkeits-Ausgleich des KAUFFENSTERS. */
 export const INSOLVENCY_BACKSTOP_TERM_SEASONS = 4;
 
 export type InsolvencyBackstopResult = {
@@ -866,12 +865,27 @@ export type InsolvencyBackstopResult = {
 };
 
 /**
- * Zahlungsunfähigkeits-Backstop: KEIN Team darf die Saison mit negativem Cash beenden — aber es darf auch
- * kein Geld aus dem Nichts entstehen (der frühere `Math.max(0, …)`-Clamp). Stattdessen nimmt jedes Team mit
- * negativem Cash automatisch einen NOTKREDIT über exakt den Fehlbetrag auf (Cash danach = 0), der über das
- * bestehende Kreditsystem verzinst zurückgezahlt wird. Der Notkredit umgeht Kapazitäts-, Distress- und
- * S1-Gate (er ist unfreiwillig). Läuft als letzter Cash-berührender Schritt der Season-Completion, NACHDEM
- * Sponsor/Gehalt, Kredit-Raten, Gebäude und Ziel-Rewards verbucht sind.
+ * ZAHLUNGSUNFÄHIGKEITS-AUSGLEICH — NUR AM ENDE DES KAUFFENSTERS, NICHT AM SAISONENDE.
+ *
+ * CHRIS' REGEL, zweimal geschärft:
+ *   (1) „d-p darf negativ in die neue Saison gehen das ist ok! Nur nach dem kaufen und kredite
+ *       aufnehmen darf es nicht mehr negativ sein."
+ *   (2) „den kredit sollen sie ja erst aufnehmen wenn sie schon verkauft haben und dann entweder
+ *       einen brauchen zum kaufen von neuen spielern oder dann das minus ausgleichen müssen aber
+ *       nicht am ende einer season!"
+ *
+ * DER ZEITPUNKT IST DIE GANZE REGEL. Am Saisonende hat ein Team noch nichts tun können — dort ein
+ * Minus wegzukreditieren nimmt ihm die Entscheidung ab und lässt eine halbe Liga auf exakt 0,0
+ * stehen (gemessen: 9 von 32 nach Saison 2, 164,2 Mio ungefragte Kreditsumme). Am Ende des
+ * Kauffensters ist es umgekehrt: da HAT das Team verkauft, gekauft und den regulären Kredit-Pass
+ * hinter sich. Was dann noch fehlt, ist ein echter Fehlbetrag, mit dem es nicht in die Saison gehen
+ * kann.
+ *
+ * Kein `Math.max(0, …)`-Clamp: der Fehlbetrag wird zu einer verzinsten Restschuld im normalen
+ * Kreditsystem (`emergency: true` umgeht Kapazitäts-, Distress- und S1-Gate, weil er unfreiwillig
+ * ist). Es entsteht kein Geld aus dem Nichts.
+ *
+ * Für das Saisonende gibt es `collectNegativeCashTeams` — feststellen statt ausgleichen.
  */
 export function applyInsolvencyBackstop(input: { gameState: GameState; saveId: string }): InsolvencyBackstopResult {
   let gameState = input.gameState;
@@ -898,6 +912,56 @@ export function applyInsolvencyBackstop(input: { gameState: GameState; saveId: s
   }
 
   return { gameState, emergencyLoans, warnings };
+}
+
+export type NegativeCashTeam = { teamId: string; shortfall: number };
+
+export type NegativeCashReport = {
+  teams: NegativeCashTeam[];
+  warnings: string[];
+};
+
+/**
+ * WER DIE SAISON IM MINUS BEENDET — nur festgestellt, nicht ausgeglichen.
+ *
+ * ENTSCHEIDUNG VON CHRIS (2026-08): „teams können auch ins negative gehen und müssen das dann mit
+ * verkäufen und krediten wieder auffüllen! es darf nicht einfach geld erschummelt und auf 0 gesetzt
+ * werden."
+ *
+ * AM SAISONENDE LIEF BISHER DERSELBE AUSGLEICH wie am Ende des Kauffensters
+ * (`applyInsolvencyBackstop`): jedes Team mit negativem Cash bekam ungefragt einen Bank-Kredit über
+ * exakt den Fehlbetrag, Cash danach 0. Gedacht war er als das kleinere Übel gegenüber einem
+ * `Math.max(0, …)`-Clamp — der Fehlbetrag blieb ja als verzinste Restschuld stehen.
+ *
+ * AM SAISONENDE IST DER ZEITPUNKT ABER FALSCH. Dort hat das Team noch nichts tun können — es hat
+ * weder verkauft noch gekauft. Nach der Abrechnung von Saison 2 standen deshalb 9 von 32 Teams auf
+ * exakt 0,0 und kein einziges im Minus, zusammen 164,2 Mio Kreditsumme, die niemand beantragt hatte.
+ * Eine halbe Liga auf demselben glatten Wert ist kein Spielstand, den man liest, sondern einer, dem
+ * man misstraut.
+ *
+ * Am Ende des KAUFFENSTERS bleibt der Ausgleich dagegen bestehen (`applyInsolvencyBackstop` oben):
+ * da hat das Team verkauft, gekauft und den regulären Kredit-Pass hinter sich.
+ *
+ * DIE MECHANIK, DIE JETZT GREIFT, GIBT ES BEREITS: negatives Cash blockiert Käufe
+ * (`evaluateAiBuyDecision`), erzwingt Notverkäufe (`ergaenzeNotverkaeufe`) und treibt den
+ * Verkaufsdruck (`resolveCashPressureScore` gibt bei negativem Cash den Höchstwert). Der Weg zurück
+ * ist also gebaut — er wurde nur nie betreten, weil der Backstop vorher zumachte.
+ *
+ * Diese Funktion ändert NICHTS am Zustand. Sie liefert die Liste, damit der Saisonabschluss sie als
+ * Warnung ausweisen kann.
+ */
+export function collectNegativeCashTeams(gameState: GameState): NegativeCashReport {
+  const teams: NegativeCashTeam[] = [];
+  for (const team of gameState.teams) {
+    if (team.cash >= -0.01) continue;
+    teams.push({ teamId: team.teamId, shortfall: roundCash(-team.cash) });
+  }
+  return {
+    teams,
+    warnings: teams.map(
+      (entry) => `negatives_cash_am_saisonende:${entry.teamId}:${entry.shortfall}`,
+    ),
+  };
 }
 
 export type EarlyPayoffQuote = {

@@ -540,7 +540,7 @@ function writeLocalCashPrizeApply(input: {
       seasonId: beforeTail.gameState.season.id,
       execute: true,
     });
-    if (tail.loanSettlementApplied || tail.objectiveRewardsApplied || tail.emergencyLoans.length > 0) {
+    if (tail.loanSettlementApplied || tail.objectiveRewardsApplied) {
       input.persistence.saveSingleplayerState(beforeTail.saveId, tail.gameState);
     }
   }
