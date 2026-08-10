@@ -44,6 +44,27 @@ import {
   extractSeasonNumber,
   getCurrentSeasonNumber,
 } from "@/lib/foundation/season-history-clamp";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+
+/**
+ * Die Saison-Schnappschuesse fuer die Spieler-Auswertungen dieses Moduls — voll auf dem Server,
+ * aus der mitgefahrenen Kurzfassung wiederaufgebaut im Browser.
+ *
+ * GEMELDET (zwei Symptome, eine Ursache): „bitte prüfe dass die S1 snapshots mit den punkten usw in
+ * den historien verfügbar ist" und „in den kacheln steht kein verlauf obwohl jasper in season 1
+ * auch dabei war".
+ *
+ * `clampSeasonSnapshotsToCurrentSeason` liest per Vorgabe `seasonState.seasonSnapshots` — und die
+ * streicht `compactFoundationInitialGameState` fuer den Browser. Ohne Schnappschuss faellt die
+ * Historie auf eine Platzhalterzeile zurueck (jede Spalte „—"), und weil das Delta der
+ * OVR/PPS/MVS-Kacheln gegen genau diese Zeile rechnet, steht dort „Kein Verlauf". Am Live-Save
+ * nachgemessen: voll pps 10,7 / ovr 70,8 / mvs 13, kompaktiert ueberall null.
+ *
+ * Andere Ansichten (Ewige Tabelle, Ranks-Podium) hatten diesen Rueckfall laengst; dem Drawer fehlte er.
+ */
+function schnappschuesseFuerSpielerhistorie(gameState: GameState) {
+  return clampSeasonSnapshotsToCurrentSeason(gameState, leseSaisonSchnappschuesse(gameState));
+}
 import { buildPlayerAttributeHistoryRows, type PlayerAttributeHistoryRow } from "@/lib/foundation/player-attribute-history";
 import {
   aggregatePlayerInjuryHistoryBySeason,
@@ -1098,7 +1119,7 @@ function buildDisciplineValuesFromPlayer(
   const seasonPlayerCountByDisciplineId = gameState ? buildSeasonDisciplinePlayerCountMap(gameState) : null;
 
   if (gameState) {
-    for (const snapshot of clampSeasonSnapshotsToCurrentSeason(gameState)) {
+    for (const snapshot of schnappschuesseFuerSpielerhistorie(gameState)) {
       const snapshotPerformance = resolveSnapshotPlayerPerformanceRow(gameState, snapshot, player.id);
       if (!snapshotPerformance) continue;
       for (const entry of snapshotPerformance.disciplineBreakdown ?? []) {
@@ -1318,7 +1339,7 @@ function buildAxisRankContext(input: {
   playerId: string;
   referenceSeasonId: string | null | undefined;
 }) {
-  const snapshots = clampSeasonSnapshotsToCurrentSeason(input.gameState)
+  const snapshots = schnappschuesseFuerSpielerhistorie(input.gameState)
     .filter((snapshot) => snapshotHasPlayerPerformance(input.gameState, snapshot, input.playerId))
     .sort(compareSeasonSnapshotsDesc);
   const currentSnapshot = input.referenceSeasonId
@@ -1598,7 +1619,7 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
     gameState,
     rosterPurchasePrice,
   });
-  const sortedSnapshots = clampSeasonSnapshotsToCurrentSeason(gameState).sort((left, right) =>
+  const sortedSnapshots = schnappschuesseFuerSpielerhistorie(gameState).sort((left, right) =>
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
   let previousSeasonEndMarketValue: number | null = null;
@@ -1830,7 +1851,7 @@ function mergeSeasonHistoryWithTransferFallback(
 }
 
 function findLatestArchivedPlayerPerformance(gameState: GameState, playerId: string) {
-  return clampSeasonSnapshotsToCurrentSeason(gameState)
+  return schnappschuesseFuerSpielerhistorie(gameState)
     .filter((snapshot) => snapshot.seasonId !== gameState.season.id)
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
     .map((snapshot) => {
@@ -1912,7 +1933,7 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
       .map((row) => [row.seasonId as string, row] as const),
   );
 
-  const snapshotSeasons = clampSeasonSnapshotsToCurrentSeason(input.gameState).sort((left, right) =>
+  const snapshotSeasons = schnappschuesseFuerSpielerhistorie(input.gameState).sort((left, right) =>
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
 

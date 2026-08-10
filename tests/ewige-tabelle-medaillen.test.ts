@@ -237,11 +237,85 @@ describe("Der Schnappschuss-Ersatz selbst", () => {
 
   it("schleppt die schweren Anhaenge nicht mit — sie sind der Grund fuers Streichen", () => {
     const [ersatz] = alsSchnappschussErsatz(
-      [{ seasonId: "season-1", seasonName: "S1", status: null, entryRosterPatchedAt: null, teams: [], transfers: [] }],
+      [
+        {
+          seasonId: "season-1",
+          seasonName: "S1",
+          status: null,
+          entryRosterPatchedAt: null,
+          teams: [],
+          players: [],
+          transfers: [],
+        },
+      ],
       [],
     );
     expect(ersatz?.playerPerformances).toEqual([]);
     expect(ersatz?.matchdayResults).toBeUndefined();
+  });
+
+  /**
+   * `playerPerformances` stand hier bis 2026-08-10 fest auf `[]` — und genau daran blieb die
+   * Spielerhistorie haengen: die Sportliche Historie zeigte fuer Season 1 in jeder Spalte „—" und
+   * die OVR/PPS/MVS-Kacheln „Kein Verlauf", obwohl der Schnappschuss 333 vollstaendige Zeilen trug.
+   *
+   * Die Spielerzeilen fahren jetzt mit. Was weiterhin NICHT mitfaehrt, ist die Aufschluesselung je
+   * Disziplin — sie macht den Grossteil der Groesse aus (gemessen 647 KiB gegen 88 KiB je Saison).
+   */
+  it("nimmt die Spielerzeilen mit, aber ohne die Aufschluesselung je Disziplin", () => {
+    const [ersatz] = alsSchnappschussErsatz(
+      [
+        {
+          seasonId: "season-1",
+          seasonName: "S1",
+          status: null,
+          entryRosterPatchedAt: null,
+          teams: [],
+          players: [
+            {
+              playerId: "player-1",
+              playerName: "Vega",
+              teamId: "S-C",
+              teamCode: "S-C",
+              teamName: "Stronghold Crusaders",
+              appearances: 9,
+              totalContribution: null,
+              totalPoints: 10.7,
+              averageContribution: null,
+              averageFinalScore: null,
+              powPoints: 7.4,
+              spePoints: 0.6,
+              menPoints: null,
+              socPoints: null,
+              ovr: 70.8,
+              ovrRank: 12,
+              pps: 10.7,
+              ppsRank: 53,
+              mvs: 13,
+              mvsRank: 47,
+              marketValue: null,
+              purchasePrice: null,
+              salary: null,
+              contractLength: null,
+              bestDisciplineLabel: null,
+            },
+          ],
+          transfers: [],
+        },
+      ],
+      [],
+    );
+
+    expect(ersatz?.playerPerformances).toHaveLength(1);
+    const zeile = ersatz?.playerPerformances?.[0] as unknown as Record<string, unknown>;
+    expect(zeile.playerId).toBe("player-1");
+    expect(zeile.pps).toBe(10.7);
+    expect(zeile.ovr).toBe(70.8);
+    expect(zeile.mvs).toBe(13);
+    expect(zeile.powPoints).toBe(7.4);
+    // Ohne die Achsenpunkte wuerde `resolveSnapshotPlayerPerformanceRow` die Zeile fuer
+    // metrik-arm halten und in die Neuherleitung fallen, die hier mangels Rohdaten scheitert.
+    expect(zeile.disciplineBreakdown).toEqual([]);
   });
 
   it("aus keiner Historie wird kein Archiv erfunden", () => {

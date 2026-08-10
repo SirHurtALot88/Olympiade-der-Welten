@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "Team · Historie",
+      "pr": null,
+      "text": "Die laufende Saison zeigt jetzt hinter jedem Wert den Vergleich zur Vorsaison — „POW 12,5 (+4,2)“, ebenso bei Punkten, PPs, Cash, Gehalt und Marktwert. Grün heißt besser, beim Gehaltsblock bleibt die Zahl bewusst farblos, weil mehr Gehalt weder gut noch schlecht ist. Darunter steht neu eine All-Time-Zeile: die PPs über alle Saisons zusammen und der Platz des Teams in dieser Wertung. Beides gibt es im Team-Profil wie im Team-Drawer.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Home · Top-Kader",
       "pr": null,
       "text": "Die „besten 6\" waren nicht die besten: sortiert wurde zuerst nach Rollen-Tag, dann nach Saison-PPs und MVS — OVR kam als letztes Kriterium und entschied praktisch nie. Im Spielstand stand deshalb ein Spieler mit OVR 59,9 auf Platz 4 vor einem mit 74,1, weil er einen Punkt mehr gesammelt hatte. Sortiert wird jetzt nach OVR; bei Gleichstand entscheiden die Saison-PPs, danach MVS. Der Rollen-Tag fällt raus — er sagt nichts über Stärke, nur darüber, wie das Team den Spieler einsortiert hat.",
@@ -78,6 +87,15 @@
       "seite": "Ranks · Teamstärke pro Diszi",
       "pr": null,
       "text": "Über der Matrix hing eine Kopie der eigenen Zeile. Sie setzte genau ein eigenes Team voraus — gepinnt wurde das gerade ausgewählte —, und wer mehrere Teams steuert, sah eins davon doppelt und die anderen nicht. Die Kopie ist weg. Die eigenen Teams bleiben auffindbar, aber über Merkmale, die mit jeder Anzahl funktionieren: der „Dein Team\"-Chip an der Zeile, die Akzentlinie und die Besitzer-Tönung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieler · Detail",
+      "pr": null,
+      "text": "Die Sportliche Historie zeigt abgeschlossene Saisons wieder mit Zahlen statt „—“: PPs, OVR, MVS und die vier Achsen stehen jetzt auch für Season 1 in der Zeile. Damit haben die OVR/PPS/MVS-Kacheln wieder ihren Verlauf — wo vorher „Kein Verlauf“ stand, steht jetzt das Delta zur Vorsaison. Die Daten waren nie weg, sie kamen nur nicht im Browser an.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.4"

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
+import { formatNlNumber, formatNlSignedNumber } from "@/components/foundation/new-look";
 import type { TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import {
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -36,6 +37,53 @@ const TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS: GlobalTableColumnConfig[] = [
   { id: "topBuy", label: "Top Einkauf", dataKey: "topBuy", defaultWidth: 160, minWidth: 120, group: "detail" },
   { id: "topSell", label: "Top Verkauf", dataKey: "topSell", defaultWidth: 160, minWidth: 120, group: "detail" },
 ];
+
+/**
+ * GEWÜNSCHT: „hier hätte ich auch gerne in season 2 den vergleich zu s1 dahinter also
+ * POW 12,5 (+4,2) auch bei gehalt mw usw" — und auf Nachfrage: überall gleich, also auch im
+ * Team-Drawer, nicht nur im Team-Profil. Deshalb sitzt die Rechnung HIER in der geteilten
+ * Tabelle und nicht in einer der beiden Ansichten.
+ *
+ * Nur an der LIVE-Zeile. Die archivierten Saisons stehen für sich; ein Delta an jeder Zeile wäre
+ * eine zweite, konkurrierende Lesart derselben Tabelle.
+ *
+ * `richtung` steuert allein die FARBE, nie das Vorzeichen:
+ *   higher   mehr ist besser (Punkte, PPs, Achsen, Cash, MW)
+ *   lower    weniger ist besser (Verletzungen, Fatigue)
+ *   neutral  keine Wertung — ein größerer Gehaltsblock kann ein stärkerer Kader oder eine Last sein
+ */
+type VergleichsRichtung = "higher" | "lower" | "neutral";
+
+const VORSAISON_VERGLEICH: Record<
+  string,
+  { lies: (row: TeamDetailDrawerHistoryRow) => number | null | undefined; digits: number; richtung: VergleichsRichtung }
+> = {
+  // Rang invertiert: von #20 auf #12 ist eine VERBESSERUNG um 8 Plätze, also (+8).
+  rank: { lies: (row) => (row.rank == null ? null : -row.rank), digits: 0, richtung: "higher" },
+  points: { lies: (row) => row.points, digits: 1, richtung: "higher" },
+  pps: { lies: (row) => row.pps, digits: 1, richtung: "higher" },
+  pow: { lies: (row) => row.ppPow, digits: 1, richtung: "higher" },
+  spe: { lies: (row) => row.ppSpe, digits: 1, richtung: "higher" },
+  men: { lies: (row) => row.ppMen, digits: 1, richtung: "higher" },
+  soc: { lies: (row) => row.ppSoc, digits: 1, richtung: "higher" },
+  cash: { lies: (row) => row.cash, digits: 1, richtung: "higher" },
+  salary: { lies: (row) => row.salaryTotal, digits: 2, richtung: "neutral" },
+  mw: { lies: (row) => row.marketValue, digits: 2, richtung: "higher" },
+  injuriesCount: { lies: (row) => row.injuriesCount, digits: 0, richtung: "lower" },
+  averageFatigue: { lies: (row) => row.averageFatigue, digits: 1, richtung: "lower" },
+};
+
+function istZahl(wert: number | null | undefined): wert is number {
+  return typeof wert === "number" && Number.isFinite(wert);
+}
+
+function vergleichsKlasse(delta: number, richtung: VergleichsRichtung) {
+  if (richtung === "neutral") {
+    return "";
+  }
+  const gut = richtung === "higher" ? delta > 0 : delta < 0;
+  return gut ? " text-positive" : " text-negative";
+}
 
 type TeamHistoryAxisToneVariant = "drawer" | "teams-v2";
 
@@ -78,6 +126,11 @@ type TeamDrawerHistoryTableProps = {
   renderCell: (columnId: string, row: TeamDetailDrawerHistoryRow) => ReactNode;
   getHeaderClassName?: (columnId: string) => string | undefined;
   getRowClassName?: (row: TeamDetailDrawerHistoryRow) => string | undefined;
+  /**
+   * Summenzeile unter den Saisons: PPs über alle Saisons und der Rang des Teams darin.
+   * Fehlt sie oder ist die Summe leer, entfaellt die Zeile — eine Zeile mit „—" traegt nichts bei.
+   */
+  allTime?: { pps: number | null; rank: number | null; teamCount: number | null } | null;
 };
 
 export default function TeamDrawerHistoryTable({
@@ -88,6 +141,7 @@ export default function TeamDrawerHistoryTable({
   renderCell,
   getHeaderClassName,
   getRowClassName,
+  allTime = null,
 }: TeamDrawerHistoryTableProps) {
   const [expandedAreas, setExpandedAreas] = useState<Record<SeasonDisciplineAreaId, boolean>>({
     pow: false,
@@ -118,6 +172,34 @@ export default function TeamDrawerHistoryTable({
 
     return [...TEAM_DRAWER_HISTORY_PREFIX_COLUMNS, ...axisColumns, ...TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS];
   }, [expandedAreas]);
+
+  /** Jüngste abgeschlossene Saison — Bezugspunkt für das Delta an der Live-Zeile. */
+  const vorsaisonZeile = useMemo(() => rows.find((row) => !row.isLive) ?? null, [rows]);
+
+  function renderVorsaisonDelta(columnId: string, row: TeamDetailDrawerHistoryRow) {
+    if (!row.isLive || vorsaisonZeile == null || vorsaisonZeile === row) {
+      return null;
+    }
+    const regel = VORSAISON_VERGLEICH[columnId];
+    if (!regel) {
+      return null;
+    }
+    const aktuell = regel.lies(row);
+    const vorher = regel.lies(vorsaisonZeile);
+    if (!istZahl(aktuell) || !istZahl(vorher)) {
+      return null;
+    }
+    const delta = aktuell - vorher;
+    // Unterhalb der angezeigten Genauigkeit waere "(+0,0)" nur Rauschen.
+    if (Math.abs(delta) < (regel.digits >= 2 ? 0.005 : regel.digits === 1 ? 0.05 : 0.5)) {
+      return null;
+    }
+    return (
+      <small className={`team-history-delta${vergleichsKlasse(delta, regel.richtung)}`}>
+        {` (${formatNlSignedNumber(delta, regel.digits)})`}
+      </small>
+    );
+  }
 
   const tableId = "teamDrawerHistoryTable";
   const { visibleColumns, getTableColumnWidth, startTableColumnResize, resetTableColumnWidth, getTableHeaderDragProps } =
@@ -195,10 +277,42 @@ export default function TeamDrawerHistoryTable({
                   className={getColumnAxisClass(column.id, axisToneVariant) ?? getHeaderClassName?.(column.id) ?? undefined}
                 >
                   {renderCell(column.id, row)}
+                  {renderVorsaisonDelta(column.id, row)}
                 </td>
               ))}
             </tr>
           ))}
+          {allTime != null && typeof allTime.pps === "number" && Number.isFinite(allTime.pps) ? (
+            <tr className="team-history-alltime-row">
+              {visibleColumns.map((column) => {
+                if (column.id === "season") {
+                  return (
+                    <td key="alltime-season" className="team-history-alltime-label">
+                      <strong>All Time</strong>
+                    </td>
+                  );
+                }
+                if (column.id === "pps") {
+                  return (
+                    <td key="alltime-pps" className="team-history-alltime-value">
+                      <strong>{formatNlNumber(allTime.pps, 1)}</strong>
+                    </td>
+                  );
+                }
+                if (column.id === "rank" && allTime.rank != null) {
+                  return (
+                    <td key="alltime-rank" className="team-history-alltime-value">
+                      <strong>{`#${allTime.rank}`}</strong>
+                      {allTime.teamCount != null ? (
+                        <small className="team-history-alltime-of">{` / ${allTime.teamCount}`}</small>
+                      ) : null}
+                    </td>
+                  );
+                }
+                return <td key={`alltime-${column.id}`} />;
+              })}
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </div>

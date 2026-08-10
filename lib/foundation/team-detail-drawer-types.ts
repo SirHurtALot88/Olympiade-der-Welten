@@ -196,5 +196,15 @@ export type TeamDetailDrawerData = {
     traitSignals: string[];
   } | null;
   history: TeamDetailDrawerHistoryRow[];
+  /**
+   * GEWÜNSCHT: „es wäre cool ne all time spalte mit den PPs All Time zu haben + rank" — als
+   * Summenzeile unter den Saisons der Historie.
+   *
+   * Summe der Disziplinpunkte über ALLE Saisons inklusive der laufenden, dazu die Position des
+   * Teams in genau dieser Summe. Ligaweit gerechnet, weil ein Rang alle Teams braucht.
+   */
+  allTimePps: number | null;
+  allTimePpsRank: number | null;
+  allTimePpsTeamCount: number | null;
   players: TeamDetailDrawerPlayerCard[];
 };

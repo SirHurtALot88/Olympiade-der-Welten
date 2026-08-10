@@ -2855,6 +2855,11 @@ function FoundationTeamsDetailPanel({
                     {selectedTeamsHistoryData?.history?.length ? (
                       <TeamDrawerHistoryTable
                         rows={selectedTeamsHistoryData.history}
+                        allTime={{
+                          pps: selectedTeamsHistoryData.allTimePps,
+                          rank: selectedTeamsHistoryData.allTimePpsRank,
+                          teamCount: selectedTeamsHistoryData.allTimePpsTeamCount,
+                        }}
                         getRowClassName={(row) => (row.isLive ? "is-live" : undefined)}
                         renderCell={(columnId, row) => {
                           if (columnId === "season") {

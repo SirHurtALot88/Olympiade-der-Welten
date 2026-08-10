@@ -22,8 +22,13 @@
  * waere endgueltig und stillschweigend. Die Projektion liegt darum in einem eigenen Feld, das
  * nirgends zurueckgeschrieben wird: sie ist reine Anzeigefracht, keine Quelle.
  */
-import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
+import type {
+  GameState,
+  SeasonSnapshotPlayerPerformanceRecord,
+  SeasonSnapshotRecord,
+} from "@/lib/data/olyDataTypes";
 
+import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 /**
@@ -59,6 +64,52 @@ export type FoundationSeasonHistoryTeamEntry = {
   guv: number | null;
 };
 
+/**
+ * Eine Spielerzeile einer abgeschlossenen Saison — die Fracht, aus der der Spieler-Drawer seine
+ * „Sportliche Historie" und die Verlaufs-Deltas der OVR/PPS/MVS-Kacheln baut.
+ *
+ * GEMELDET: „bitte prüfe dass die S1 snapshots mit den punkten usw in den historien verfügbar ist"
+ * und „in den kacheln steht kein verlauf obwohl jasper in season 1 auch dabei war".
+ *
+ * BEFUND: auch hier fehlten keine Daten — der Saison-1-Schnappschuss traegt 333 vollstaendige
+ * Leistungszeilen. Am Live-Spielstand nachgemessen (Vega, S-C): auf dem vollen Save zeigt die
+ * Historie pps 10,7 / ovr 70,8 / mvs 13, nach `compactFoundationInitialGameState` steht in jeder
+ * Spalte „—". Die Team-Projektion oben half nicht, weil sie `playerPerformances` ausdruecklich leer
+ * liess. Ohne Vorsaison-Zeile ist auch jedes Delta null, und die Kachel schreibt „Kein Verlauf".
+ *
+ * OHNE `disciplineBreakdown`, BEWUSST: der Aufschluesselung je Disziplin verdankt die volle Zeile
+ * den Grossteil ihrer Groesse (gemessen 647 KiB gegen 88 KiB fuer diese Fassung, je Saison). Die
+ * Achsen kommen ueber `powPoints`…`socPoints` mit, und genau die zeigt die Historie. Wer die
+ * Aufschluesselung braucht, muss den vollen Schnappschuss lesen — also serverseitig.
+ */
+export type FoundationSeasonHistoryPlayerEntry = {
+  playerId: string;
+  playerName: string | null;
+  teamId: string | null;
+  teamCode: string | null;
+  teamName: string | null;
+  appearances: number | null;
+  totalContribution: number | null;
+  totalPoints: number | null;
+  averageContribution: number | null;
+  averageFinalScore: number | null;
+  powPoints: number | null;
+  spePoints: number | null;
+  menPoints: number | null;
+  socPoints: number | null;
+  ovr: number | null;
+  ovrRank: number | null;
+  pps: number | null;
+  ppsRank: number | null;
+  mvs: number | null;
+  mvsRank: number | null;
+  marketValue: number | null;
+  purchasePrice: number | null;
+  salary: number | null;
+  contractLength: number | null;
+  bestDisciplineLabel: string | null;
+};
+
 export type FoundationSeasonHistoryEntry = {
   seasonId: string;
   seasonName: string | null;
@@ -69,6 +120,8 @@ export type FoundationSeasonHistoryEntry = {
    */
   entryRosterPatchedAt: string | null;
   teams: FoundationSeasonHistoryTeamEntry[];
+  /** Siehe FoundationSeasonHistoryPlayerEntry — ohne sie bleibt die Spielerhistorie im Browser leer. */
+  players: FoundationSeasonHistoryPlayerEntry[];
   /** Nur Top-Zu- und -Abgang je Team; die Historienzeile zeigt nicht mehr. */
   transfers: Array<{
     type: string;
@@ -141,6 +194,37 @@ function projiziereTeam(record: {
   };
 }
 
+function projiziereSpieler(record: SeasonSnapshotPlayerPerformanceRecord): FoundationSeasonHistoryPlayerEntry {
+  const alsUnbekannt = record as unknown as Record<string, unknown>;
+  return {
+    playerId: record.playerId,
+    playerName: textOderNull(record.playerName),
+    teamId: textOderNull(record.teamId),
+    teamCode: textOderNull(record.teamCode),
+    teamName: textOderNull(record.teamName),
+    appearances: zahlOderNull(record.appearances),
+    totalContribution: zahlOderNull(record.totalContribution),
+    totalPoints: zahlOderNull(record.totalPoints),
+    averageContribution: zahlOderNull(record.averageContribution),
+    averageFinalScore: zahlOderNull(record.averageFinalScore),
+    powPoints: zahlOderNull(record.powPoints),
+    spePoints: zahlOderNull(record.spePoints),
+    menPoints: zahlOderNull(record.menPoints),
+    socPoints: zahlOderNull(record.socPoints),
+    ovr: zahlOderNull(alsUnbekannt.ovr),
+    ovrRank: zahlOderNull(alsUnbekannt.ovrRank),
+    pps: zahlOderNull(alsUnbekannt.pps),
+    ppsRank: zahlOderNull(alsUnbekannt.ppsRank),
+    mvs: zahlOderNull(alsUnbekannt.mvs),
+    mvsRank: zahlOderNull(alsUnbekannt.mvsRank),
+    marketValue: zahlOderNull(alsUnbekannt.marketValue),
+    purchasePrice: zahlOderNull(alsUnbekannt.purchasePrice),
+    salary: zahlOderNull(alsUnbekannt.salary),
+    contractLength: zahlOderNull(alsUnbekannt.contractLength),
+    bestDisciplineLabel: textOderNull(record.bestDisciplineLabel),
+  };
+}
+
 export function projiziereSaisonHistorie(
   snapshots: readonly SeasonSnapshotRecord[] | undefined,
 ): FoundationSeasonHistoryEntry[] {
@@ -150,6 +234,7 @@ export function projiziereSaisonHistorie(
     status: snapshot.status ?? null,
     entryRosterPatchedAt: snapshot.entryRosterPatchedAt ?? null,
     teams: resolveSeasonSnapshotTeamRecords(snapshot).map((record) => projiziereTeam(record as never)),
+    players: getSnapshotPlayerPerformances(snapshot).map(projiziereSpieler),
     transfers: (snapshot.transferSnapshots ?? []).map((entry) => ({
       type: String(entry.type),
       playerId: entry.playerId ?? null,
@@ -188,9 +273,15 @@ export function leseSaisonHistorie(gameState: GameState): FoundationSeasonHistor
  * kann. Bewusst KEINE zweite Medaillen-Implementierung — Gold bleibt „Rang 1 in einer archivierten
  * Saison", gezaehlt an genau einer Stelle.
  *
- * WAS DIESE SAETZE NICHT SIND: ein Ersatz fuer das Archiv. Die schweren Anhaenge (Spielerleistungen,
- * Spieltags- und Disziplinergebnisse) fehlen und bleiben leer. Sie taugen fuer die Ewige Tabelle,
- * nicht als Quelle — und sie werden nirgends zurueckgeschrieben.
+ * WAS DIESE SAETZE NICHT SIND: ein Ersatz fuer das Archiv. Die schweren Anhaenge (Spieltags- und
+ * Disziplinergebnisse) fehlen und bleiben leer. Sie taugen fuer die Ewige Tabelle, nicht als
+ * Quelle — und sie werden nirgends zurueckgeschrieben.
+ *
+ * NACHTRAG: `playerPerformances` stand hier bis 2026-08-10 fest auf `[]`, und genau daran blieb die
+ * Spielerhistorie haengen — die Sportliche Historie zeigte fuer jede abgeschlossene Saison „—" und
+ * die OVR/PPS/MVS-Kacheln „Kein Verlauf", obwohl der Schnappschuss vollstaendig war. Die Zeilen
+ * kommen jetzt aus der Projektion; sie tragen alles ausser `disciplineBreakdown` (Begruendung am
+ * Typ oben). Der Vorbehalt bleibt: keine Quelle, nur Anzeige.
  */
 export function alsSchnappschussErsatz(
   historie: readonly FoundationSeasonHistoryEntry[] | undefined,
@@ -231,6 +322,34 @@ export function alsSchnappschussErsatz(
         guv: team.guv,
       } as unknown as SeasonSnapshotRecord["finalStandings"][number];
     }),
-    playerPerformances: [],
+    playerPerformances: (eintrag.players ?? []).map(
+      (spieler) =>
+        ({
+          ...spieler,
+          seasonId: eintrag.seasonId,
+          // Die Aufschluesselung je Disziplin faehrt bewusst nicht mit. Leer statt fehlend, damit
+          // `resolveSnapshotPlayerPerformanceRow` die Zeile ueber ihre Achsenpunkte als vollwertig
+          // erkennt und nicht in die Neuherleitung faellt (die hier mangels Rohdaten scheitern wuerde).
+          disciplineBreakdown: [],
+          warnings: [],
+        }) as unknown as NonNullable<SeasonSnapshotRecord["playerPerformances"]>[number],
+    ),
   }));
+}
+
+/**
+ * Die Saison-Schnappschuesse einer bereits geladenen Ansicht: die vollen, wenn sie da sind
+ * (Server), sonst die aus der Kurzfassung wiederaufgebauten (Browser).
+ *
+ * Geschwister von `leseSaisonHistorie`, nur eine Ebene tiefer — Letztere liefert die
+ * Historien-Eintraege, diese die schnappschussfoermigen Saetze, auf denen die bestehenden
+ * Spieler-Auswertungen unveraendert laufen. Damit muss keine Ansicht wissen, auf welcher Seite
+ * sie ausgefuehrt wird.
+ */
+export function leseSaisonSchnappschuesse(gameState: GameState): SeasonSnapshotRecord[] {
+  const voll = gameState.seasonState.seasonSnapshots;
+  if (voll != null && voll.length > 0) {
+    return [...voll];
+  }
+  return alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams);
 }
