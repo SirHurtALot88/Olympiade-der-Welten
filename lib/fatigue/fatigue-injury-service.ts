@@ -47,14 +47,15 @@ function envNumber(name: string, fallback: number) {
 }
 
 /**
- * LAST JE EINSATZ — 2026-08 von 10 auf 13 angehoben (Owner-Entscheidung: „+30 %").
+ * LAST JE EINSATZ — 2026-08 von 10 auf 14 angehoben (Owner-Entscheidung).
  *
  * GEMELDET VON CHRIS: „ich habe das gefühl es ist zu einfach auch mit 9 spielern verletzungen zu
  * vermeiden! sonst muss ein einsatz auf allen 3 stufen etwas mehr kosten." — und nach dem
- * Simulations-Sweep unten: „erhöhe mal um 30% auf allen Stufen … ich meine von 10 auf 13 usw."
+ * Simulations-Sweep unten: „erhöhe mal um 30% auf allen Stufen … ich meine von 10 auf 13 usw" —
+ * und final: „ok dann mach 14 als standard".
  *
  * Angehoben wird die BASIS; alle drei Intensitätsstufen skalieren automatisch mit (siehe
- * `INTENSITY_FATIGUE_MULT`): schonen 7,5 → 9,75, normal 10 → 13, pushen 14 → 18,2. Das Verhältnis
+ * `INTENSITY_FATIGUE_MULT`): schonen 7,5 → 10,5, normal 10 → 14, pushen 14 → 19,6. Das Verhältnis
  * zwischen den Stufen bleibt exakt erhalten, die 2026-07 austarierte Score-je-Fatigue-Abwägung
  * also auch.
  *
@@ -64,7 +65,7 @@ function envNumber(name: string, fallback: number) {
  * (beides in `fatigue-calibration.ts` dokumentiert). Beide Änderungen waren richtig — ein frischer
  * Spieler soll sich nicht grundlos verletzen. Nur hat danach niemand die LAST nachgezogen, und
  * damit fiel die Verletzungszahl mit durch: mit Last 10 stand ein Spieler nach ZWEI Einsätzen bei
- * Fatigue 20, also unter der Schutzzone — Risiko exakt null. Mit 13 sind es 26, und die Kurve
+ * Fatigue 20, also unter der Schutzzone — Risiko exakt null. Mit 14 sind es 28, und die Kurve
  * greift.
  *
  * GEMESSEN, mit `scripts/export-injury-balance-audit.ts` gegen den echten Spielstand (32 Teams,
@@ -72,7 +73,8 @@ function envNumber(name: string, fallback: number) {
  *
  *   Last 10 →  63 Verletzungen   (die Kalibrierung oben nannte für Last 10 noch 234/184
  *                                 — derselbe Simulator, aber die alte, steilere Kurve)
- *   Last 13 → 124  ← hier
+ *   Last 13 → 124
+ *   Last 14 → 166  ← hier
  *   Last 15 → 199   (Ziel-Korridor „~200" der ursprünglichen Kalibrierung)
  *   Last 18 → 321      Last 20 → 378
  *
@@ -80,25 +82,26 @@ function envNumber(name: string, fallback: number) {
  * Trainingsmodus-Erholung nicht (`base_recovery_20_plus_facilities` steht in seiner eigenen
  * Annahmen-Liste) und besetzt beide Disziplinen an JEDEM Spieltag, während real auch halb
  * gewertete Spieltage vorkamen. Auf Chris' echte Saison 1 (38 Verletzungen bei Last 10)
- * hochgerechnet liegt 13 bei rund 75.
+ * hochgerechnet liegt 14 bei rund 100.
  *
- * BEWUSST UNTER DEM KORRIDOR. 13 verdoppelt die Verletzungszahl, holt den alten Korridor „~200"
- * aber nicht ein — ein erster, messbarer Schritt statt eines Sprungs. Der Kopfkommentar hält die
- * ganze Kurve fest, damit der nächste Schritt keine neue Messung braucht.
+ * BEWUSST KNAPP UNTER DEM KORRIDOR. 14 verzweieinhalbfacht die Verletzungszahl und liegt damit
+ * dicht unter dem alten Korridor „~200" (den träfe 15). Der Kopfkommentar hält die ganze Kurve
+ * fest, damit ein weiterer Schritt keine neue Messung braucht.
  *
- * DIE SCHUTZZONE BLEIBT LÜCKENLOS: die höchste Stufe kommt aus dem Stand auf 18,2 und damit unter
- * die 25 — ein frischer Spieler trägt auf KEINER Stufe Risiko, auch beim Pushen nicht. (Bei einer
- * Basis über 17,8 wäre das nicht mehr so: 17,8 × 1,4 = 24,9 ist die Obergrenze, bis zu der Chris'
- * Regel „bis 25 soll die Wahrscheinlichkeit einfach 0 % sein" für alle drei Stufen hält.)
+ * DIE SCHUTZZONE BLEIBT LÜCKENLOS: die höchste Stufe kommt aus dem Stand auf 19,6 (14 × 1,4) und
+ * damit unter die 25 — ein frischer Spieler trägt auf KEINER Stufe Risiko, auch beim Pushen nicht.
+ * Ab einer Basis über 17,8 wäre das nicht mehr so (17,8 × 1,4 = 24,9 ist die Obergrenze, bis zu der
+ * Chris' Regel „bis 25 soll die Wahrscheinlichkeit einfach 0 % sein" für alle drei Stufen hält) —
+ * ein Test in `tests/fatigue-last-drei-stufen.test.ts` ist die Bremse dagegen.
  *
- * GEWOLLTE NEBENWIRKUNG: Kadertiefe zählt wieder. 12 von 32 Teams geraten mindestens einmal in
+ * GEWOLLTE NEBENWIRKUNG: Kadertiefe zählt wieder. 15 von 32 Teams geraten mindestens einmal in
  * Aufstellungs-Not (bei Last 10 waren es 8) — spürbar, aber noch nicht erdrückend; bei Last 18
  * wären es 21, bei 20 dann 25.
  *
  * WEITER TUNEN ohne Code-Änderung: `OLY_FATIGUE_MATCHDAY_LOAD`, und der Sweep oben ist mit
  * `OLY_FATIGUE_MATCHDAY_LOAD=<n> npx tsx scripts/export-injury-balance-audit.ts` reproduzierbar.
  */
-export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 13);
+export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 14);
 export const BASE_MATCHDAY_RECOVERY = 20;
 
 /**
