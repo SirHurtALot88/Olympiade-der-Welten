@@ -144,6 +144,22 @@ function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; u
 }
 
 /**
+ * DIE GEHALTSSUMME, GEGEN DIE DER APRON EIN TEAM BEMISST — die geglättete (siehe Kopfkommentar).
+ *
+ * Eigene Funktion statt eines direkten `getTeamDisplaySalaryTotal`-Aufrufs, damit jede Apron-Frage
+ * im Baum nachweislich dieselbe Grundlage nimmt. Genau hier lag ein Fehler: die KI prüfte ihre
+ * Gehaltsdecke gegen die ECHTE Vertragssumme, während besteuert wird, was diese Funktion liefert.
+ *
+ * Sie steht in der SAISON-Ebene und nicht bei der KI, obwohl die KI ihr Hauptnutzer ist: sie gehört
+ * zur Definition des Apron, nicht zu seiner Verwendung. Praktisch entscheidet das auch die
+ * Importrichtung — die KI-Decke (`resolveTeamApronSalaryCeiling`) baut auf dieser Zahl auf, und ein
+ * Zuhause bei der KI hätte einen Zyklus ergeben.
+ */
+export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
+  return getTeamDisplaySalaryTotal(gameState, teamId);
+}
+
+/**
  * Bestimmt die Apron-Linien aus dem AKTUELL gültigen Gehaltsstand des GameState. Wird zu
  * Saisonbeginn EINMAL aufgerufen und das Ergebnis eingefroren (siehe apron-settlement-service.ts) —
  * diese Funktion selbst kennt "Saisonbeginn" nicht, sie liest nur, was gerade da ist.
