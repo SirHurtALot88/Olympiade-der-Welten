@@ -32,7 +32,7 @@ describe("Saisonende-Fenster: geteilte Phasenliste", () => {
   it("erkennt die Phasen, in denen Kader-Entscheidungen offenstehen", () => {
     expect(isSeasonEndRosterPhase(stateWithPhase("season_review"))).toBe(true);
     expect(isSeasonEndRosterPhase(stateWithPhase("transfer_sell_phase"))).toBe(true);
-    expect(isSeasonEndRosterPhase(stateWithPhase("preseason_management"))).toBe(true);
+    expect(isSeasonEndRosterPhase(stateWithPhase("season_end_management"))).toBe(true);
   });
 
   it("schweigt während der laufenden Saison", () => {

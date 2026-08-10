@@ -4,7 +4,6 @@ import type {
   LineupDraft,
   Player,
   PlayerAvailabilityStateRecord,
-  PlayerInjuryHistoryRecord,
   PlayerInjuryRiskRollRecord,
   PlayerInjuryStatus,
 } from "@/lib/data/olyDataTypes";
@@ -475,7 +474,7 @@ export function getPlayerAvailabilityView(
   };
 }
 
-export function buildPlayerAvailabilityMap(gameState: GameState, seasonId: string, matchdayId: string) {
+export function buildPlayerAvailabilityMap(gameState: GameState, matchdayId: string) {
   return new Map(
     gameState.rosters.map((roster) => [
       roster.playerId,

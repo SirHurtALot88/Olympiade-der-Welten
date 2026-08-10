@@ -38,6 +38,18 @@ function loadFromCold(saveId: string) {
   return repository.getSaveById(saveId);
 }
 
+
+/**
+ * ZEITLIMIT: Diese Suite laedt dreimal einen kompletten Spielstand kalt aus SQLite. Nachgemessen
+ * braucht jeder Fall rund 3,6 s — gegen das vitest-Standardlimit von 5 s sind das 72 % des
+ * Budgets. Unter Last (Volllauf, mehrere Dateien parallel) riss es regelmaessig, und der Test
+ * sah aus wie ein Flake, obwohl er inhaltlich nie etwas anderes gemessen hat.
+ *
+ * 30 s sind kein Freibrief, sondern Luft fuer den langsamsten Fall: Eine echte Verlangsamung
+ * (Faktor 8) faellt weiterhin auf.
+ */
+const KALT_RELOAD_TIMEOUT_MS = 30_000;
+
 describe("save-repository cold load", () => {
   it("#1: behält einen zugewiesenen Saison-Kapitän über einen Kalt-Reload", () => {
     const repository = createSaveRepository();
@@ -76,7 +88,7 @@ describe("save-repository cold load", () => {
     );
     expect(persistedCaptain?.playerId).toBe(rosterPlayerId);
     expect(persistedCaptain?.source).toBe("manual_assignment");
-  });
+  }, KALT_RELOAD_TIMEOUT_MS);
 
   it("#8: behält erledigt/verworfen-Status von Inbox-Items über einen Kalt-Reload", () => {
     const repository = createSaveRepository();
@@ -114,7 +126,7 @@ describe("save-repository cold load", () => {
     const override = loaded!.gameState.gameInboxItems?.find((item) => item.itemId === dismissed.itemId);
     expect(override).toBeDefined();
     expect(override!.status).toBe("dismissed");
-  });
+  }, KALT_RELOAD_TIMEOUT_MS);
 
   it("bleibt rückwärtskompatibel: ein Save ohne die neuen Felder lädt weiterhin", () => {
     const repository = createSaveRepository();
@@ -127,5 +139,5 @@ describe("save-repository cold load", () => {
     // Ohne persistierte Overrides bleibt das Verhalten wie bisher (undefined statt Fehler).
     expect(loaded!.gameState.teamCaptains ?? []).toEqual([]);
     expect(loaded!.gameState.gameInboxItems ?? []).toEqual([]);
-  });
+  }, KALT_RELOAD_TIMEOUT_MS);
 });

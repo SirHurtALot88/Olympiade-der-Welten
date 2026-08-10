@@ -78,8 +78,36 @@ function hashSeed(input: string) {
   return hash >>> 0;
 }
 
+/**
+ * Lawinenschritt (murmur3 `fmix32`) — sorgt dafuer, dass JEDES Bit des Hashes den Ausgang beeinflusst.
+ *
+ * GEMELDET VON CHRIS: „es soll ne positive und ne negative sein aber beide sind random und
+ * unabhaengig voneinander bei den formkarten". Waren sie nicht. Nachgemessen ueber 20.000 Spieler:
+ * die beiden Werte waren in 100,0 % der Faelle IDENTISCH — jeder Spieler bekam ein exakt
+ * gespiegeltes Paar (+8/−8, +4/−4, …). Im Live-Save steht genau das: 680 Karten, Summe 0.
+ *
+ * URSACHE, und es ist kein Zufall, sondern eine Kollision. `hashSeed(seed) % 4` behaelt nur die
+ * untersten ZWEI Bits des FNV-1a-Hashes. Modulo 4 haengt der Schritt `h ← (h ⊕ c) · 16777619` aber
+ * nur an den untersten zwei Bits jedes Zeichens, und 16777619 ≡ 3 (mod 4). Rechnet man die
+ * Zeichenfolgen von „:positive" und „:negative" in dieser Arithmetik durch, laufen die beiden
+ * Zustaende nach dem VIERTEN Zeichen zusammen — und die restlichen Zeichen sind identisch, also
+ * bleiben sie es bis zum Schluss. Zwei verschiedene Seeds, garantiert dasselbe Ergebnis.
+ *
+ * Der Hash selbst ist in Ordnung; kaputt war, ihn auf zwei Bits einzudampfen. `fmix32` verruehrt
+ * die oberen Bits nach unten, bevor der Modulo greift.
+ */
+function avalanche(hash: number) {
+  let mixed = hash >>> 0;
+  mixed ^= mixed >>> 16;
+  mixed = Math.imul(mixed, 0x85ebca6b);
+  mixed ^= mixed >>> 13;
+  mixed = Math.imul(mixed, 0xc2b2ae35);
+  mixed ^= mixed >>> 16;
+  return mixed >>> 0;
+}
+
 function pickDeterministicCardValue(seed: string) {
-  const index = hashSeed(seed) % FORM_CARD_VALUES.length;
+  const index = avalanche(hashSeed(seed)) % FORM_CARD_VALUES.length;
   return FORM_CARD_VALUES[index] ?? 0;
 }
 

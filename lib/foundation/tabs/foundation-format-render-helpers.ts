@@ -103,7 +103,7 @@ export function formatGamePhaseLabel(phase?: string | null) {
   if (phase === "season_active") return "Saison läuft";
   if (phase === "season_review") return "Saisonrückblick";
   if (phase === "season_completed") return "Saison abgeschlossen";
-  if (phase === "preseason_management") return "Preseason-Management";
+  if (phase === "season_end_management") return "Training / Ziele";
   if (phase === "transfer_sell_phase") return "Verkaufsfenster";
   if (phase === "transfer_buy_phase") return "Kaufphase";
   if (phase === "lineup_setup") return "Lineup Setup";
@@ -149,6 +149,38 @@ export function resolveScenarioMetaLabel(meta?: SaveSummary["scenarioMeta"] | nu
   }
 }
 
+/** Saison-Nummer aus einer Season-ID („season-2" → 2), sonst null. */
+function parseSeasonNumberFromId(seasonId?: string | null): number | null {
+  const match = /^season-(\d+)$/.exec(seasonId ?? "");
+  const nummer = match ? Number.parseInt(match[1]!, 10) : NaN;
+  return Number.isFinite(nummer) ? nummer : null;
+}
+
+/**
+ * Enthält der Save eine ABGESCHLOSSENE Season?
+ *
+ * Primär das persistierte Flag — aber ältere Meta-Datensätze tragen es noch
+ * falsch (`hasFinalStandings` prüfte früher nur die laufende Saison, nicht das
+ * Archiv; inzwischen an der Quelle behoben, `lib/persistence/scenario-meta.ts`).
+ * Deshalb der logische Schluss dahinter: Läuft bereits Season ≥ 2, ist die
+ * Vorsaison zwingend abgeschlossen und archiviert — genau das zeigen
+ * Saisonstand, Teams („ggü. Season 1") und Leaders aus demselben Save an.
+ */
+export function saveContainsCompletedSeason(meta?: SaveSummary["scenarioMeta"] | null): boolean {
+  if (!meta) return false;
+  if (meta.containsFinalStandings) return true;
+  const seasonNumber = parseSeasonNumberFromId(meta.activeSeasonId);
+  return seasonNumber != null && seasonNumber >= 2;
+}
+
+/** Hat der Save Season 2 erreicht (als S2-Start-Szenario oder weil Season ≥ 2 läuft)? */
+export function saveHasReachedSeasonTwo(meta?: SaveSummary["scenarioMeta"] | null): boolean {
+  if (!meta) return false;
+  if (meta.scenarioType === "season2_start") return true;
+  const seasonNumber = parseSeasonNumberFromId(meta.activeSeasonId);
+  return seasonNumber != null && seasonNumber >= 2;
+}
+
 export function buildScenarioWarning(meta?: SaveSummary["scenarioMeta"] | null) {
   if (!meta) return "Alte Save-Struktur ohne Scenario-Meta.";
   if (meta.scenarioType === "sandbox_multiseason_test") {
@@ -157,10 +189,14 @@ export function buildScenarioWarning(meta?: SaveSummary["scenarioMeta"] | null) 
   if (meta.scenarioType === "sandbox_snapshot") {
     return "Sandbox-Snapshot: stabiler Rücksprungpunkt, nicht aktiv beschreiben.";
   }
-  if (meta.scenarioType === "ai_redraft_test" && !meta.containsFinalStandings) {
+  if (meta.scenarioType === "ai_redraft_test" && !saveContainsCompletedSeason(meta)) {
     return "Dieser Save ist ein Redraft-Testsave ohne abgeschlossene Season.";
   }
-  if (!meta.containsFinalStandings && meta.scenarioType !== "fresh_start" && meta.scenarioType !== "season2_start") {
+  if (
+    !saveContainsCompletedSeason(meta) &&
+    meta.scenarioType !== "fresh_start" &&
+    meta.scenarioType !== "season2_start"
+  ) {
     return "Dieser Save enthält keine abgeschlossene Season.";
   }
   return null;
@@ -372,22 +408,84 @@ export function formatChancePercent(value: number | null | undefined) {
   return `${formatWholeNumber(value)}%`;
 }
 
-export function formatNegotiationSignalLabel(value: string) {
-  const labels: Record<string, string> = {
-    Ambitious_reagiert_bei_schwachem_Angebot_kritischer: "Ambitionierter Spieler erwartet ein stärkeres Signal.",
-    contract_length_override_in_effect: "Mehrjahresvertrag weicht vom Standard ab.",
-    low_team_fit_reduces_acceptance: "Teamfit senkt die Zusagechance.",
-    market_bracket_factor_preview_pending: "Marktwertklasse wird im Vertragsrisiko nur als Preview berücksichtigt.",
-    negotiation_cancelled_after_contact: "Abgebrochene Verhandlung bleibt als schlechte Erfahrung gespeichert.",
-    negotiation_rejected_bad_experience: "Abgelehntes Angebot bleibt als schlechte Erfahrung gespeichert.",
-    offer_below_expected_salary: "Angebot liegt unter der Gehaltserwartung.",
-    preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
-    salary_source_missing: "Gehaltserwartung fehlt.",
-    trait_salary_factor_source_missing: "Trait-Gehaltseffekt noch nicht final aus Quelle belegt.",
-  };
+/**
+ * F5: DIE Übersetzung der Verhandlungs-Signalcodes — die einzige.
+ *
+ * Vorher existierte diese Funktion dreifach (hier, `TransfermarktV2Client`,
+ * `use-market-buy-derivations`) mit driftenden Maps, und der gemeinsame
+ * Fallback `value.replaceAll("_", " ")` stellte unübersetzte Codes als
+ * kaputten Text ins Spiel („morale former team hostile"). Jetzt: eine Map
+ * für alle im Code emittierten Signal-Codes (Test:
+ * `tests/negotiation-signal-label.test.ts` greppt die Emitter), und der
+ * Fallback zeigt NIE rohen Code — generischer deutscher Hinweis plus
+ * `console.warn`, damit der fehlende Eintrag auffällt statt durchzurutschen.
+ */
+const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
+  Ambitious_reagiert_bei_schwachem_Angebot_kritischer: "Ambitionierter Spieler erwartet ein stärkeres Signal.",
+  active_player_duplicate: "Spieler ist doppelt im Kader gelistet.",
+  active_player_not_active: "Spieler ist nicht aktiv.",
+  active_player_not_found: "Spieler wurde nicht gefunden.",
+  active_player_not_in_save: "Spieler gehört nicht zu diesem Spielstand.",
+  active_player_not_in_season: "Spieler ist in dieser Saison nicht gemeldet.",
+  active_player_not_in_team: "Spieler gehört nicht zu diesem Team.",
+  active_player_referenced_in_lineup: "Spieler steht noch in einer Einsatzliste.",
+  active_player_salary_missing: "Gehalt des Spielers fehlt.",
+  contract_length_override_in_effect: "Mehrjahresvertrag weicht vom Standard ab.",
+  defiance_surcharge_pending: "Trotz-Aufschlag: die letzte Runde macht dieses Angebot teurer.",
+  high_priority_player_demand_failed: "Eine wichtige Spieler-Forderung ist gescheitert.",
+  insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
+  local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
+  low_team_fit_reduces_acceptance: "Schwacher Teamfit drückt die Zusage.",
+  market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschätzt.",
+  market_value_missing: "Marktwert fehlt.",
+  mercenary_negative_fit_morale_risk: "Söldner-Mentalität: schwacher Fit drückt die Moral.",
+  morale_exit_risk: "Moral im Keller — Abgangsrisiko.",
+  morale_former_team_hostile: "Ehemaliges Team ist feindselig — Moral-Risiko.",
+  morale_former_team_loyal_return: "Rückkehr zum Ex-Team — Loyalität stützt die Moral.",
+  morale_limits_contract_length: "Niedrige Moral begrenzt die Vertragslänge.",
+  morale_refuses_extension_risk: "Moral-Risiko: Spieler könnte die Verlängerung verweigern.",
+  negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
+  negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
+  offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
+  offer_salary_missing: "Angebotsgehalt fehlt.",
+  player_attribute_missing: "Spielerdaten unvollständig — ein Attribut fehlt.",
+  player_not_found: "Spieler wurde nicht gefunden.",
+  player_not_free_agent_in_scope: "Spieler ist gerade kein freier Zugang.",
+  player_sold_this_season_cooldown_override: "Verkaufs-Sperre dieser Saison per Admin-Freigabe umgangen.",
+  player_sold_this_season_unavailable: "Frisch verkaufte Spieler sind diese Saison gesperrt.",
+  preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
+  previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
+  prisma_sell_buyout_schedule_approximated: "Buyout-Staffel ist näherungsweise berechnet.",
+  recently_sold_same_preseason: "Gerade erst verkauft — Rückkauf in derselben Preseason gesperrt.",
+  recently_sold_same_preseason_override: "Rückkauf-Sperre der Preseason per Admin-Freigabe umgangen.",
+  retreat_after_counter_affront: "Nach dem Affront zieht sich der Spieler aus der Verhandlung zurück.",
+  roster_limit_reached: "Kader ist bereits voll.",
+  salary_demand_missing: "Gehaltsforderung fehlt.",
+  salary_source_missing: "Gehaltsbasis fehlt.",
+  sale_price_missing: "Verkaufspreis fehlt.",
+  save_not_found: "Spielstand wurde nicht gefunden.",
+  season_not_found: "Saison wurde nicht gefunden.",
+  season_not_in_save: "Saison gehört nicht zu diesem Spielstand.",
+  sell_only_at_season_end: "Verkäufe sind nur zum Saisonende möglich.",
+  team_not_found: "Team wurde nicht gefunden.",
+  team_readiness_would_get_worse: "Verkauf würde die Team-Bereitschaft verschlechtern.",
+  team_season_state_not_found: "Saison-Daten des Teams fehlen.",
+  team_would_fall_under_player_min: "Team fiele unter die Mindest-Kadergröße.",
+  team_would_fall_under_player_opt: "Team fiele unter die empfohlene Kadergröße.",
+  trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
+};
 
-  return labels[value] ?? value.replaceAll("_", " ");
+export function formatNegotiationSignalLabel(value: string) {
+  const label = NEGOTIATION_SIGNAL_LABELS[value];
+  if (label) {
+    return label;
+  }
+  // NIE rohen Code anzeigen — der frühere replaceAll("_", " ")-Fallback
+  // stellte Enum-Namen als kaputten Fließtext ins Spiel.
+  if (typeof console !== "undefined") {
+    console.warn(`[negotiation-signal] Code ohne deutsche Übersetzung: ${value} — Eintrag in NEGOTIATION_SIGNAL_LABELS ergänzen.`);
+  }
+  return "Verhandlungs-Hinweis (noch ohne Übersetzung — bitte melden).";
 }
 
 export function getNegotiationFactorTone(value: string, fallback: "positive" | "negative" | "neutral") {

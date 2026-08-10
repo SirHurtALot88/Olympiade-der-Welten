@@ -74,17 +74,6 @@ function countPreseasonPremiumBuys(input: {
   return { starPlus, corePlus, q75Plus };
 }
 
-function getPreseasonMarketBuySpend(gameState: GameState, seasonId: string, teamId: string) {
-  return gameState.transferHistory
-    .filter(
-      (entry) =>
-        entry.seasonId === seasonId &&
-        entry.toTeamId === teamId &&
-        entry.transferType === "buy" &&
-        entry.source === "ai_preseason_market_buy",
-    )
-    .reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
-}
 
 export function getLeagueMarketAnchorsForState(gameState: GameState, anchors?: LeagueMarketAnchors) {
   return (

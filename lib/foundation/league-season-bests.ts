@@ -1,7 +1,8 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { LeagueLeaderCategory } from "@/lib/foundation/league-leaders-service";
+import { isLeagueLeaderCategoryPending, type LeagueLeaderCategory } from "@/lib/foundation/league-leaders-service";
 import { getPlayerDisplayMarketValue } from "@/lib/foundation/player-display-market-value";
-import { formatNlNumber, type NlTone } from "@/components/foundation/new-look/nl-tones";
+import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+import { type NlTone } from "@/components/foundation/new-look/nl-tones";
 
 /**
  * "Saison-Bestwerte (laufend)" + Own-Team-Leaderboard-Footprint.
@@ -112,7 +113,10 @@ export function buildLeagueSeasonBests(input: {
 
   for (const config of SEASON_BEST_CATEGORY_CONFIG) {
     const category = categories.find((candidate) => candidate.id === config.id);
-    const leader = category?.entries[0] ?? null;
+    // Pending-Kategorien (Saisonstart: keine oder ausnahmslos 0-Werte) liefern
+    // keinen „Bestwert" — deren Platz 1 wäre nur der alphabetisch Erste
+    // (isLeagueLeaderCategoryPending, eine Quelle mit dem Kachelgrid).
+    const leader = category != null && !isLeagueLeaderCategoryPending(category) ? category.entries[0] ?? null : null;
     if (!leader) {
       continue;
     }
@@ -136,7 +140,9 @@ export function buildLeagueSeasonBests(input: {
         label: "Höchster Kaderwert",
         holderName: peakSquad.teamName,
         holderSub: peakSquad.teamCode,
-        displayValue: formatNlNumber(peakSquad.total, 0),
+        // Geld heißt app-weit „… Mio" (Befund 7: „65" ohne Einheit) — gleiche
+        // Formatierung wie formatNlMoney überall sonst.
+        displayValue: formatNlMoney(peakSquad.total),
         tone: "accent",
         playerId: null,
         isOwn: peakSquad.teamId === selectedTeamId,
@@ -152,7 +158,12 @@ export function buildOwnTeamLeaderboardFootprint(input: {
   selectedTeamId: string | null;
 }): OwnTeamLeaderboardFootprint {
   const { categories, selectedTeamId } = input;
-  const trackedCategories = categories.filter((category) => category.entries.length > 0).length;
+  // Nur Kategorien mit ECHTER Wertung zählen (isLeagueLeaderCategoryPending):
+  // am Saisonstart stehen PPs/MVS-Listen sonst voller 0-Werte in Alphabet-
+  // Reihenfolge, und der Footprint würde daraus „2× Top-5" oder gar
+  // „Liga-Anführer" machen — Medaillen an Spieler mit 0 PPs.
+  const rankedCategories = categories.filter((category) => !isLeagueLeaderCategoryPending(category));
+  const trackedCategories = rankedCategories.filter((category) => category.entries.length > 0).length;
 
   if (selectedTeamId == null) {
     return {
@@ -170,7 +181,7 @@ export function buildOwnTeamLeaderboardFootprint(input: {
   let leaderCount = 0;
   let bestPlacement: OwnTeamLeaderboardFootprint["bestPlacement"] = null;
 
-  for (const category of categories) {
+  for (const category of rankedCategories) {
     const ownEntries = category.entries.filter(
       (entry) => entry.teamId != null && entry.teamId === selectedTeamId,
     );

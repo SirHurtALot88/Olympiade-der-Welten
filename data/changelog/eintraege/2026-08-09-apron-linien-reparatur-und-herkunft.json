@@ -1,0 +1,9 @@
+[
+  {
+    "datum": "2026-08-09",
+    "seite": "Finanzen · Apron",
+    "text": "Der festgesessene Apron-Snapshot im laufenden Spielstand ist reparierbar, und jede Saison rechnet ihre Linien nachweislich neu. Der Zeitpunkt-Fix kam erst, nachdem Season 2 schon gespielt war: die vor dem Kaderbau eingefrorenen Linien (Median 45,0 statt real 69,8) waren damit festgeschrieben, und die Abrechnung hätte 29 Zahler mit 550,7 Mio getroffen — 2 Empfänger hätten je 275,4 Mio bekommen, bei Kassenständen von 0 bis 36 Mio. Ein neues Reparaturskript (scripts/repariere-apron-linien.ts) rechnet die Linien mit derselben Funktion wie das Spiel neu und schreibt nur, wenn seit dem ersten gewerteten Spieltag kein einziger Transfer stattfand — nur dann ist die Neuberechnung exakt der Stand vom Fensterschluss und keine mitten in der Saison verschobene Grenze. Für den laufenden Spielstand heißt das: 8 statt 29 Zahler, Topf 50,7 statt 550,7 Mio, 24 Empfänger zu je 2,1 Mio. Außerdem trägt jeder Linien-Snapshot jetzt einen Herkunftsvermerk (Fensterschluss oder Reparatur) — ein von einem alten Build zu früh eingefrorener Stand ist damit künftig von außen erkennbar, statt erraten werden zu müssen. Ein Snapshot ohne Vermerk wird in einer bereits gespielten Saison bewusst nicht automatisch ersetzt: eine wandernde Grenze mitten in der Saison wäre schlimmer als der einmalige manuelle Eingriff.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  }
+]

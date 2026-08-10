@@ -37,11 +37,11 @@ import {
   formatNlNumber,
   formatNlMoney,
   nlToneClass,
-  useCountUp,
   type NlBarChartBar,
   type NlRankingDrawerRow,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import {
   getSeasonV2TeamTagStyle,
   type SeasonStandingsV2ClientProps,
@@ -226,6 +226,17 @@ function formatArchivedAt(value: string | null): string | null {
 }
 
 /**
+ * Tooltip für eine Top-Spieler-Kachel (Daten-Modus + Board-Streifen). Chris'
+ * Regel „bei 0 wird erklärt, nicht versteckt": das „—" bei PPs ist vor
+ * Spieltag 1 der Normalfall (noch keine Punkte vergeben), nicht `null` als
+ * Datenfehler — der Tooltip sagt das, statt den Strich unkommentiert stehen
+ * zu lassen.
+ */
+function buildTopPlayerTitle(player: { name: string; pps: number | null }): string {
+  return player.pps == null ? `${player.name} öffnen — PPs füllen sich ab Spieltag 1` : `${player.name} öffnen`;
+}
+
+/**
  * Rang-Bänder der Bereichsspalten im Saisonstand: Top 3 grün, 4–6 gelb, 7–10 rot,
  * ab 11 keine Hinterlegung. Bewusst absolute Ränge statt Perzentilen — so sieht man
  * auf einen Blick, wer in einer Achse wirklich vorne bzw. hinten dran ist, unabhängig
@@ -317,6 +328,24 @@ function renderLeagueRankSuffix(
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
+}
+
+/**
+ * S5/S4 (Audit Spieltag): `row.points` ist vor dem ersten gewerteten Spieltag
+ * `null` (bewusst — "noch keine Wertung") und die Tabelle zeigt dafür „—".
+ * `getAreaValue` (POW/SPE/MEN/SOC) liefert in genau derselben Situation aber
+ * eine echte `0`, weil die Bereichs-Summe leerer Disziplinwerte technisch 0
+ * ist — die Spalte zeigte also für alle 32 Teams farbige Nullen, während die
+ * Punkte-Spalte daneben ehrlich „—" sagte. Zwei Antworten auf dieselbe Frage
+ * ("gibt es diese Saison schon eine Wertung?"). `row.points` bleibt die EINE
+ * Quelle für "diese Zeile hat noch keine Saison-Wertung" — bei `null` zeigen
+ * auch die Achsen-Spalten „—" statt einer erfundenen Null.
+ */
+function formatSeasonAreaValue(row: SeasonV2StandingsRow, value: number | null, digits: number): string {
+  if (row.points == null) {
+    return "—";
+  }
+  return formatNlNumber(value, digits);
 }
 
 function getBarPercent(value: number | null | undefined, max: number): number {
@@ -520,6 +549,21 @@ export default function SeasonStandingsNewLook({
 
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
 
+  /**
+   * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
+   * Vor Spieltag 1 ist `row.points` überall `null` — die Ränge 1–32 sind dann
+   * der ENDSTAND DER VORSAISON (deckungsgleich mit der Ewigen Tabelle), also
+   * die Startplätze der neuen Saison. Das ist eine legitime Reihenfolge, sie
+   * muss nur gesagt werden (die Arena macht es vor: „die Reihenfolge sind die
+   * Startplätze aus dem Endstand der Vorsaison"). Was dagegen NICHT geht:
+   * Gold/Silber/Bronze für 0 Punkte — Medaillen-Optik gibt es erst, wenn
+   * mindestens ein Team eine echte Saison-Wertung trägt.
+   */
+  const hasSeasonScoring = useMemo(
+    () => boardRows.some((row) => row.points != null && Number.isFinite(row.points)),
+    [boardRows],
+  );
+
   const displayBoardRows = useMemo(() => {
     if (boardSort === "rank") {
       return boardRows;
@@ -596,6 +640,18 @@ export default function SeasonStandingsNewLook({
 
   const topPlayersStrip = useMemo(() => topPlayers.slice(0, 10), [topPlayers]);
 
+  /**
+   * „Top-Spieler der Saison" mit zehn Zeilen voller „—" ist keine Rangliste,
+   * sondern eine Behauptung. Stehen ALLE Kandidaten ohne PPs da (vor dem
+   * ersten gewerteten Spieltag), rendert stattdessen das geteilte
+   * Leerzustand-Primitive `VeloPendingRanking` — dasselbe, das Arena, Ranks,
+   * Ergebnisseite und Leaders für exakt diese Situation benutzen.
+   */
+  const topPlayersPending = useMemo(
+    () => topPlayersStrip.length > 0 && topPlayersStrip.every((player) => player.pps == null),
+    [topPlayersStrip],
+  );
+
   const leaderPoints = useMemo(
     () =>
       boardRows.reduce(
@@ -644,13 +700,20 @@ export default function SeasonStandingsNewLook({
     }
     return leaderPoints - selectedTeamSummary.points;
   }, [selectedTeamSummary, leaderPoints]);
+  const ownGapToLeaderLabel =
+    ownGapToLeader == null ? "—" : ownGapToLeader <= 0 ? "Spitze" : formatNlNumber(ownGapToLeader, 1);
 
-  // Hero-/KPI-Zähler (#Wave2): nur die eigenen Team-Kennzahlen zählen hoch —
-  // Board, Podium-Zeilen und Tabelle bleiben unverändert (viele Zeilen, kein
-  // Zähler pro Zeile). Respektiert prefers-reduced-motion via `useCountUp`.
-  const animatedOwnRank = useCountUp(selectedTeamSummary?.rank ?? null);
-  const animatedOwnPoints = useCountUp(selectedTeamSummary?.points ?? null);
-  const animatedOwnMarketValue = useCountUp(selectedTeamSummary?.marketValueTotal ?? null);
+  // BUGFIX (Durchklick, „Saisonstand-Kacheln zählen durch negative Zwischenwerte hoch"):
+  // die drei „Dein Team"-Chips liefen vorher über `useCountUp`. Beim Seitenaufbau stand
+  // dadurch sekundenlang „Rang #−2" / „MW −15,7 Mio" auf dem Schirm (rAF-Zeitstempel vor
+  // dem Animationsstart → negativer Fortschritt; unter Last fror genau dieser Frame ein —
+  // Klammer inzwischen in `useCountUp` selbst). Ein Rang ist außerdem eine Ordnungszahl:
+  // jeder Zwischenstand („#0", „#11" auf dem Weg zu „#23") ist ein Zustand, den es nicht
+  // gibt. Gleiches Vorgehen wie Markt-Audit F1 auf der Finanzen-Seite („Geldzahlen stehen
+  // ab dem ersten Frame fest"): keine Zähler-Animation auf Rang/Punkten/Marktwert.
+  const animatedOwnRank = selectedTeamSummary?.rank ?? null;
+  const animatedOwnPoints = selectedTeamSummary?.points ?? null;
+  const animatedOwnMarketValue = selectedTeamSummary?.marketValueTotal ?? null;
 
   /**
    * Daten-Modus-Balkenchart: folgt standardmäßig `points`, schwenkt aber
@@ -925,12 +988,19 @@ export default function SeasonStandingsNewLook({
       <div className="nl-standings-areas" role="group" aria-label={`Bereichspunkte ${row.teamName}`}>
         {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
           const value = getAreaValue(row, group.id);
+          // S5/S4: dieselbe „—" statt farbiger Null wie in der Daten-Tabelle —
+          // eine Quelle (row.points), zwei Ansichten.
+          const displayValue = formatSeasonAreaValue(row, value, 0);
+          const areaTitle =
+            row.points == null
+              ? `${group.label}: noch keine Wertung — füllt sich ab Spieltag 1`
+              : `${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`;
           return (
             <span
               key={group.id}
               className={`nl-standings-area ${nlToneClass(group.id)}`}
-              title={`${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`}
-              aria-label={`${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`}
+              title={areaTitle}
+              aria-label={areaTitle}
             >
               <span className="nl-standings-area-label">{group.label}</span>
               <NlProgressBar
@@ -947,7 +1017,7 @@ export default function SeasonStandingsNewLook({
                 teamName={row.teamName}
                 entries={teamTopPlayersByColumn?.get(row.teamId)?.[group.id]}
               >
-                <span className="nl-standings-area-value nl-tnum">{formatNlNumber(value, 0)}</span>
+                <span className="nl-standings-area-value nl-tnum">{displayValue}</span>
               </StandingsTopPlayersHover>
             </span>
           );
@@ -984,7 +1054,7 @@ export default function SeasonStandingsNewLook({
                 <span className="nl-standings-group-label">{group.label}</span>
                 {/* Rang des Bereichs — dieselbe Auskunft wie eine Zeile tiefer je Disziplin. */}
                 <span className="nl-standings-group-total nl-tnum">
-                  {formatNlNumber(areaValue, 1)}
+                  {formatSeasonAreaValue(row, areaValue, 1)}
                   {renderLeagueRankSuffix(areaRanksByTeam[group.id]?.get(row.teamId), group.label, areaValue)}
                 </span>
               </div>
@@ -1132,8 +1202,13 @@ export default function SeasonStandingsNewLook({
 
   function renderBoardRow(row: SeasonV2StandingsRow, revealIndex: number) {
     const isExpanded = expandedTeamId === row.teamId;
-    const isPodium = row.rank != null && row.rank >= 1 && row.rank <= 3;
-    const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
+    // G2: Medaillen und Podium-Glow nur, wenn es überhaupt eine Saison-Wertung
+    // gibt. Vor Spieltag 1 ist Rang 1–3 nur der Startplatz aus der Vorsaison —
+    // Gold für 0 Punkte wäre eine erfundene Auszeichnung.
+    const isPodium = hasSeasonScoring && row.rank != null && row.rank >= 1 && row.rank <= 3;
+    const medalKind = !hasSeasonScoring
+      ? null
+      : row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
 
     return (
       <li
@@ -1152,7 +1227,16 @@ export default function SeasonStandingsNewLook({
         >
           <span className="nl-standings-rank">
             {medalKind ? (
-              <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
+              // S5/S6 (Audit Spieltag): NlMedalBadge zeigt ohne `count` nur den
+              // reinen Farbpunkt — Gold/Silber/Bronze sind ohne Zahl nicht sicher
+              // zu unterscheiden (und für Farbfehlsichtige gar nicht). `count` wäre
+              // hier semantisch falsch (das ist "Anzahl Medaillen", nicht der
+              // Rang) — die Rangzahl steht deshalb als eigenes Element daneben,
+              // exakt dieselbe Klasse wie bei Rang 4 aufwärts.
+              <>
+                <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
+                <span className="nl-standings-ranknum nl-tnum">{row.rank}</span>
+              </>
             ) : (
               <span className="nl-standings-ranknum nl-tnum">{row.rank ?? "—"}</span>
             )}
@@ -1234,49 +1318,6 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
-   * KPI-Kacheln über der Daten-Tabelle: Rang/Punkte/Rückstand/MW des
-   * eigenen Teams — nur wenn ein eigenes Team in dieser Saison existiert.
-   */
-  function renderDatenKpis() {
-    if (!selectedTeamSummary) {
-      return null;
-    }
-    const gapLabel =
-      ownGapToLeader == null ? "—" : ownGapToLeader <= 0 ? "Spitze" : formatNlNumber(ownGapToLeader, 1);
-    return (
-      <StatChipRow className="nl-standings-daten-kpis" label="Dein Team" aria-label="Deine Kennzahlen im Datenmodus">
-        <StatChip
-          label="Dein Rang"
-          value={
-            selectedTeamSummary.rank != null ? `#${formatNlNumber(animatedOwnRank ?? selectedTeamSummary.rank, 0)}` : "—"
-          }
-          tone="accent"
-          onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
-          title="Punkte-Rangliste"
-        />
-        <StatChip
-          label="Punkte"
-          value={formatNlNumber(animatedOwnPoints ?? selectedTeamSummary.points, 1)}
-          onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
-          title="Punkte-Rangliste"
-        />
-        <StatChip
-          label="Rückstand auf #1"
-          value={gapLabel}
-          tone={ownGapToLeader != null && ownGapToLeader <= 0 ? "good" : "neutral"}
-          title="Punkte-Rückstand auf den aktuellen Spitzenreiter"
-        />
-        <StatChip
-          label="MW"
-          value={formatNlMoney(animatedOwnMarketValue ?? selectedTeamSummary.marketValueTotal)}
-          onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
-          title="Marktwert-Rangliste"
-        />
-      </StatChipRow>
-    );
-  }
-
-  /**
    * Balkenchart über der Daten-Tabelle: `points` je Team, schwenkt bei
    * aktiver POW/SPE/MEN/SOC-Spaltensortierung auf die Bereichspunkte
    * dieser Spalte um (`datenChartMetric`/`datenChartBars`, s.o.).
@@ -1308,6 +1349,9 @@ export default function SeasonStandingsNewLook({
     if (topPlayersStrip.length === 0) {
       return null;
     }
+    if (topPlayersPending) {
+      return renderTopPlayersPendingCard();
+    }
     return (
       <div className="nl-standings-daten-players">
         <p className="nl-standings-daten-players-eyebrow">Top-Spieler der Saison</p>
@@ -1318,7 +1362,7 @@ export default function SeasonStandingsNewLook({
                 type="button"
                 className="nl-standings-player"
                 onClick={() => onOpenPlayer(player.playerId)}
-                title={`${player.name} öffnen`}
+                title={buildTopPlayerTitle(player)}
               >
                 <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
                 {/* `player.rank` ist der ligaweite PPs-Rang dieser Liste (sortiert
@@ -1356,8 +1400,17 @@ export default function SeasonStandingsNewLook({
   function renderDatenMode() {
     return (
       <>
-        {renderDatenKpis()}
-        <div className="nl-standings-daten-chartrow">
+        {/* S5/S3 (Audit Spieltag): `.nl-standings-daten-chartrow` reserviert per
+            CSS zwei Spalten (Chart minmax(300px,0.58fr) + Spieler-Raster 1fr) —
+            fehlt der Chart (vor Spieltag 1 gibt es noch keine Punkte,
+            `datenChartHasData` false), bleibt die Chart-Spalte leer, ABER das
+            Grid reserviert ihre ~300px trotzdem. Das Spieler-Raster bekam dadurch
+            nur noch ~400px für fünf feste Spalten (gemessen: 76px/Spalte) — zu
+            wenig für Name+Team, die Kopie-Spalte kollabierte auf 0px. Ergebnis:
+            zehn Kacheln mit nur Rang + Initialen-Kreis + rotem „—", kein Name,
+            kein Wert lesbar — genau der „kryptische" Befund. Ohne Chart bekommt
+            die Zeile jetzt eine einzige volle Spalte (`.is-chart-empty`). */}
+        <div className={`nl-standings-daten-chartrow${datenChartHasData ? "" : " is-chart-empty"}`}>
           {renderDatenChart()}
           {renderDatenTopPlayers()}
         </div>
@@ -1495,7 +1548,10 @@ export default function SeasonStandingsNewLook({
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
             // Nur eine Hinterlegung — die Zahl behält ihre Achsenfarbe (POW rot, SPE grün …).
-            const bandClass = getAreaRankBandClass(areaRanksByTeam[group.id]?.get(row.teamId));
+            // S5/S4: ohne Saison-Wertung (row.points null) ist JEDES Team auf dem
+            // schlechtesten gemeinsamen Rang (buildValueRanks-Kommentar) — keine
+            // Hinterlegung ohne echten Unterschied.
+            const bandClass = row.points == null ? "" : getAreaRankBandClass(areaRanksByTeam[group.id]?.get(row.teamId));
             return (
               <td
                 key={group.id}
@@ -1508,7 +1564,7 @@ export default function SeasonStandingsNewLook({
                   teamName={row.teamName}
                   entries={teamTopPlayersByColumn?.get(row.teamId)?.[group.id]}
                 >
-                  {formatNlNumber(areaValue, 1)}
+                  {formatSeasonAreaValue(row, areaValue, 1)}
                 </StandingsTopPlayersHover>
               </td>
             );
@@ -1589,6 +1645,9 @@ export default function SeasonStandingsNewLook({
               >
                 <span className="nl-standings-podium-medal">
                   <NlMedalBadge kind={medalKind} title={`Platz ${index + 1} nach Punkten`} />
+                  {/* S5/S6: derselbe Farbpunkt-ohne-Zahl-Befund wie in der Liste
+                      darunter — Platz 1/2/3 stehen explizit, nicht nur als Farbe. */}
+                  <span className="nl-standings-podium-ranknum nl-tnum">#{index + 1}</span>
                 </span>
                 <span className="nl-standings-podium-copy">
                   <span className="nl-standings-podium-name">{row.teamName}</span>
@@ -1611,9 +1670,35 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Leerzustand für „Top-Spieler der Saison": alle Kandidaten stehen bei „—"
+   * (keine PPs vor dem ersten gewerteten Spieltag) — statt zehn leerer Zeilen
+   * mit #1–#10 das geteilte `VeloPendingRanking` (wie Arena/Ranks/Leaders).
+   */
+  function renderTopPlayersPendingCard() {
+    return (
+      <VeloPendingRanking
+        className="nl-standings-players-pending"
+        eyebrow="Spieler-Highlights"
+        title="Top-Spieler — noch zu vergeben"
+        note="Die Top-Spieler der Saison entstehen aus PPs gespielter Wettbewerbe — die erste Wertung gibt es an Spieltag 1. Bis dahin steht hier bewusst keine Reihenfolge."
+        slots={[
+          { key: "gold", ring: "1.", label: "Noch zu vergeben" },
+          { key: "silver", ring: "2.", label: "Noch zu vergeben" },
+          { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
+        ]}
+        meta={`${formatNlNumber(standingsRows.length, 0)} Teams gemeldet · alle Spieler starten bei 0 PPs`}
+        data-testid="nl-standings-top-players-pending"
+      />
+    );
+  }
+
   function renderTopPlayersStrip() {
     if (topPlayersStrip.length === 0) {
       return null;
+    }
+    if (topPlayersPending) {
+      return renderTopPlayersPendingCard();
     }
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Spieler-Highlights" title="Top-Spieler der Saison">
@@ -1624,7 +1709,7 @@ export default function SeasonStandingsNewLook({
                 type="button"
                 className="nl-standings-player"
                 onClick={() => onOpenPlayer(player.playerId)}
-                title={`${player.name} öffnen`}
+                title={buildTopPlayerTitle(player)}
               >
                 <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
                 {/* `player.rank` ist der ligaweite PPs-Rang dieser Liste (sortiert
@@ -1934,7 +2019,15 @@ export default function SeasonStandingsNewLook({
     <div className="nl-standings" data-testid="nl-season-standings" data-new-look="true" ref={rootRef}>
       <NlCard
         className="nl-standings-header-card"
-        eyebrow={`${sourceBadgeLabel} · ${isArchived ? "Archiv" : "Live"} · ${sourceLabel}`}
+        eyebrow={
+          /* Durchklick-Test (G5): „SPIELSTAND: AKTIV · LIVE · AKTIVE SEASON ·
+             LOKALE RESULTS" war eine halbenglische Status-Flag-Reihe als erste
+             Zeile der Seite. Der Spieler bekommt Klartext; die technische
+             Quelle bleibt als Tooltip erreichbar. */
+          <span title={`${sourceBadgeLabel} · ${sourceLabel}`}>
+            {isArchived ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+          </span>
+        }
         title={`Saisonstand — ${selectedSeasonLabel}`}
         actions={
           <>
@@ -1969,6 +2062,12 @@ export default function SeasonStandingsNewLook({
             aria-label="Saisonstand Ansicht"
             className="nl-standings-subtabs"
           />
+          {/* S5/S2 (Audit Spieltag): „Dein Team" stand hier UND nochmal 80px
+              darunter als eigene Kachel-Zeile (`renderDatenKpis`, nur im
+              Daten-Modus) — dieselben Zahlen (Rang/Punkte/MW), doppelte
+              Fläche. Eine Zeile, ein Ort: die einzige echte Zusatzgröße aus
+              der zweiten Zeile ("Rückstand auf #1") zieht hierher, der Rest
+              entfällt. */}
           {selectedTeamSummary ? (
             <StatChipRow label="Dein Team" className="nl-standings-own-chips" aria-label="Dein Team im Saisonstand">
               <StatChip
@@ -1989,6 +2088,12 @@ export default function SeasonStandingsNewLook({
                 title="Punkte-Rangliste"
               />
               <StatChip
+                label="Rückstand auf #1"
+                value={ownGapToLeaderLabel}
+                tone={ownGapToLeader != null && ownGapToLeader <= 0 ? "good" : "neutral"}
+                title="Punkte-Rückstand auf den aktuellen Spitzenreiter"
+              />
+              <StatChip
                 label="MW"
                 value={formatNlMoney(animatedOwnMarketValue ?? selectedTeamSummary.marketValueTotal)}
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
@@ -2005,6 +2110,16 @@ export default function SeasonStandingsNewLook({
             </StatChipRow>
           ) : null}
         </div>
+        {/* G2 „beschriften statt löschen": vor der ersten Wertung ist die
+            Reihenfolge der Tabelle der Endstand der Vorsaison (= Startplätze).
+            Das steht hier EINMAL, sichtbar in allen drei Ansichten — dieselbe
+            Erklärung, die die Arena für ihr Umfeld bereits mitliefert. */}
+        {!hasSeasonScoring && !isArchived && boardRows.length > 0 ? (
+          <p className="nl-standings-preseason-note" data-testid="nl-standings-preseason-note">
+            Noch kein Spieltag gewertet — die Reihenfolge ist der Endstand der Vorsaison
+            (deine Startplätze). Punkte, Achsenwerte und Medaillen füllen sich ab Spieltag 1.
+          </p>
+        ) : null}
       </NlCard>
 
       {isLoading && boardRows.length === 0 ? (

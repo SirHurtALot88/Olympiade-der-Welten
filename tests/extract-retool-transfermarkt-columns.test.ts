@@ -1,3 +1,19 @@
+/**
+ * DIESER TEST BRAUCHT EINE DATEI, DIE NICHT IM REPO LIEGT.
+ *
+ * `SOURCE_PATH` zeigt auf einen Download-Ordner eines bestimmten Rechners. Auf jedem anderen
+ * — CI, ein frischer Checkout, ein zweiter Arbeitsplatz — schlaegt schon `fs.readFile` mit
+ * ENOENT fehl. Der Test war damit dauerhaft rot, ohne je etwas ueber den Code auszusagen.
+ *
+ * Dauerhaft rot ist die schlechteste aller Zustaende: Er kostet bei jedem Volllauf Aufmerksamkeit
+ * und stumpft gegen echte Fehlschlaege ab. Deshalb laeuft er jetzt nur noch, WENN die Quelldatei
+ * wirklich da ist, und meldet sonst sichtbar „uebersprungen" statt „kaputt".
+ *
+ * Geloescht wird er bewusst NICHT: Auf dem Rechner, auf dem die Retool-Ausleitung liegt, ist er
+ * weiterhin die einzige Absicherung des Extraktionsskripts. Wer ihn dauerhaft laufen lassen will,
+ * muesste die Quelldatei (oder einen zugeschnittenen Auszug daraus) ins Repo legen und
+ * `SOURCE_PATH` darauf zeigen lassen.
+ */
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -12,22 +28,9 @@ import {
 } from "@/scripts/extract-retool-transfermarkt-columns";
 
 const SOURCE_PATH = "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json";
+const QUELLE_VORHANDEN = existsSync(SOURCE_PATH);
 
-/**
- * DIESER TEST BRAUCHT EINE DATEI, DIE ES NUR AUF EINEM RECHNER GIBT.
- *
- * `SOURCE_PATH` zeigt in den Downloads-Ordner eines bestimmten Macs, auf einen Retool-Export mit
- * „(7)" im Namen — ein Zwischenstand aus einer einmaligen Datenuebernahme. Ueberall sonst schlug er
- * mit `ENOENT` fehl: in der CI, in jedem frischen Checkout, auf jedem anderen Geraet. Drei
- * Fehlschlaege, die nie etwas ueber das Spiel ausgesagt haben.
- *
- * Geloescht wird er trotzdem nicht — liegt die Datei da, prueft er echtes Verhalten des
- * Extraktions-Skripts. Er sagt jetzt nur ehrlich, dass er ohne sie nichts pruefen kann, statt rot zu
- * leuchten. Wer die Uebernahme erneut fahren will, legt die Datei hin und der Test lebt wieder.
- */
-const sourceAvailable = existsSync(SOURCE_PATH);
-
-describe.skipIf(!sourceAvailable)("extract retool transfermarkt columns", () => {
+describe.skipIf(!QUELLE_VORHANDEN)("extract retool transfermarkt columns", () => {
   it("finds transfermarkt table components in the Retool JSON", async () => {
     const rawJson = await fs.readFile(SOURCE_PATH, "utf8");
     const parsed = JSON.parse(rawJson) as {

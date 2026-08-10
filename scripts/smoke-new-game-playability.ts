@@ -11,7 +11,8 @@
  *  1. Ein neues Spiel lässt sich aus der Baseline bauen.
  *  2. Es startet in `season_active`, Saison 1, Spieltag 1 (offener Spieltag = Saisonstart-Setup).
  *  3. Die Arena ist erreichbar: `set_lineup` ist NICHT phasen-blockiert.
- *  4. Das Saisonstart-Setup bleibt offen: Kaufen/Verkaufen/Training/Sponsor erlaubt, Transferfenster offen.
+ *  4. Das Saisonstart-Setup bleibt offen: Kaufen/Training/Sponsor erlaubt, Transferfenster offen.
+ *     Verkaufen ist hier bewusst GESPERRT — das gehoert ans Saisonende.
  *  5. Sponsor-Angebote sind für das menschliche Team vorhanden (sonst hängt "Sponsor wählen").
  *  6. Der Flow hat keine Sackgasse: es gibt immer einen nicht-blockierten nächsten Schritt.
  *  7. Ab Minimum-Kader (7) gilt `fill_roster` als erledigt (kein ewiges "Kader auffüllen").
@@ -64,11 +65,14 @@ function main() {
   const lineupGate = evaluateGamePhaseAction(gameState, "set_lineup");
   check("Einsatzliste/Arena erreichbar", lineupGate.allowed, lineupGate.allowed ? "set_lineup erlaubt" : `blockiert: ${lineupGate.reason}`);
 
-  // 4) Saisonstart-Setup bleibt offen.
-  for (const action of ["buy_players", "sell_players"] as const) {
-    const gate = evaluateGamePhaseAction(gameState, action);
-    check(`Setup-Aktion ${action}`, gate.allowed, gate.allowed ? "erlaubt" : `blockiert: ${gate.reason}`);
-  }
+  // 4) Saisonstart-Setup bleibt offen — als KAUFPHASE.
+  // Verkaufen gehoert ans Saisonende, nicht hierher (`transfer-window-policy`): der Saisonstart
+  // oeffnet nur das Kaufen. Beide Richtungen werden geprueft, damit weder das Kaufen zufaellt
+  // noch das Verkaufen wieder mit aufgeht.
+  const buyGate = evaluateGamePhaseAction(gameState, "buy_players");
+  check("Setup-Aktion buy_players", buyGate.allowed, buyGate.allowed ? "erlaubt" : `blockiert: ${buyGate.reason}`);
+  const sellGate = evaluateGamePhaseAction(gameState, "sell_players");
+  check("Verkaufen im Saisonstart gesperrt", !sellGate.allowed, sellGate.allowed ? "OFFEN — gehoert ans Saisonende!" : `gesperrt: ${sellGate.reason}`);
   const window = getTransferWindowStatus(gameState);
   check("Transferfenster offen", Boolean(window?.open), `label=${window?.label ?? "—"}`);
 

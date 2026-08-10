@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 
 import FoundationPlayerPortraitCard, {
   type FoundationPlayerPortraitEconomyStat,
@@ -21,6 +21,7 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  nlTrendToneFromDelta,
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
@@ -181,11 +182,13 @@ function getObjectiveProgressTone(status: "open" | "completed" | "failed" | "at_
   return "neutral";
 }
 
-/** Ton für den Beliebtheitsfaktor (1.0 = Liga-Durchschnitt, siehe team-beliebtheit.ts). */
+/** Ton für den Beliebtheitsfaktor (1.0 = Liga-Durchschnitt, siehe team-beliebtheit.ts).
+ * Mittelfeld = neutral, nicht `accent`: eine Skala mit `risk` darf die
+ * Teamfarbe nicht tragen (F2-Regel), sonst kollidiert Bewertung mit Identität. */
 function getBeliebtheitTone(value: number): NlTone {
   if (value >= 1.1) return "good";
   if (value <= 0.9) return "risk";
-  return "accent";
+  return "neutral";
 }
 
 /**
@@ -199,12 +202,12 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → blau(elite). Vorher sprang
-  // sie von gelb (40–59) direkt auf blau (60–79) und zeigte grün erst ab 80 —
-  // die grüne "fähig"-Stufe fehlte damit praktisch immer. Jetzt ist die reale
-  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) grün, blau bleibt als
-  // oberste Elite-Stufe (≥80) erhalten.
-  if (rating >= 80) return "accent";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → GOLD (Elite ≥80).
+  // Die Elite-Stufe war vorher `accent` (blau) — seit Paket F2 gilt: eine
+  // Skala mit `risk` trägt nie die Teamfarbe, die Spitzen-Stufe ist das
+  // theme-feste Gold (wie die Rang-Skala in quartile-tone.ts). Die reale
+  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
+  if (rating >= 80) return "gold";
   if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";
@@ -240,6 +243,105 @@ type NlTeamProfileDepthFallbackRow = {
   label: string;
   cells: Array<{ playerId: string; playerName: string; rating: number } | null>;
 };
+
+type NlTeamProfileDepthGroup = {
+  axis: NlAxisKey;
+  label: "POW" | "SPE" | "MEN" | "SOC";
+  rows: NlTeamProfileDepthRow[];
+  thinCount: number;
+};
+
+/**
+ * Gruppiert die Depth-Chart nach Achse (POW → SPE → MEN → SOC), damit die 20
+ * Disziplinen nicht als eine lange Liste stehen. Innerhalb einer Achse bleibt
+ * die `displayOrder` aus `buildTeamDepthChart` erhalten — hier wird nur
+ * zusammengefasst, nicht umsortiert.
+ *
+ * Achsen ohne Disziplin fallen raus statt als leere Gruppe zu erscheinen: das
+ * tritt nur auf, wenn der Disziplinen-Katalog eine Achse gar nicht bedient, und
+ * eine leere aufklappbare Gruppe wäre dann bloß eine Sackgasse.
+ */
+export function groupDepthRowsByAxis(rows: NlTeamProfileDepthRow[]): NlTeamProfileDepthGroup[] {
+  return NL_TEAMPROFILE_AXES.map(({ key, label }) => {
+    const axisRows = rows.filter((row) => row.axis === key);
+    return {
+      axis: key,
+      label,
+      rows: axisRows,
+      thinCount: axisRows.filter((row) => row.isThin).length,
+    };
+  }).filter((group) => group.rows.length > 0);
+}
+
+/**
+ * Achsen-Zusammenfassung für den zugeklappten Gruppenkopf: der Schnitt der Achse
+ * und die stärksten Spieler darin.
+ *
+ * Bewusst aus den VOLLEN `disciplineRatings` gerechnet und nicht aus den Zellen
+ * der Depth-Zeilen: dort stehen je Disziplin nur die besten sechs. Ein Spieler,
+ * der in zwei der fünf Disziplinen einer Achse auftaucht und in den anderen drei
+ * schwach ist, käme aus diesen Zellen mit dem Schnitt seiner zwei guten Werte
+ * heraus — also zu gut. Über alle fünf Disziplinen gemittelt stimmt die
+ * Rangfolge.
+ */
+type NlTeamProfileAxisSummary = {
+  /** Schnitt über alle Kaderspieler und alle Disziplinen dieser Achse. */
+  avgRating: number | null;
+  /** Stärkste Spieler der Achse, nach ihrem Achsen-Schnitt. */
+  topPlayers: Array<{ playerId: string; playerName: string; rating: number }>;
+};
+
+export function buildTeamAxisSummaries(
+  gameState: GameState,
+  teamId: string,
+): Record<NlAxisKey, NlTeamProfileAxisSummary> | null {
+  const rosterPlayerIds = new Set(
+    gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
+  );
+  if (rosterPlayerIds.size === 0) {
+    return null;
+  }
+  const rosterPlayers = gameState.players.filter((player) => rosterPlayerIds.has(player.id));
+  if (rosterPlayers.length === 0) {
+    return null;
+  }
+
+  const disciplineIdsByAxis = new Map<NlAxisKey, string[]>();
+  for (const discipline of gameState.disciplines) {
+    const axis = DISCIPLINE_CATEGORY_TO_AXIS[discipline.category];
+    disciplineIdsByAxis.set(axis, [...(disciplineIdsByAxis.get(axis) ?? []), discipline.id]);
+  }
+
+  const summaries = {} as Record<NlAxisKey, NlTeamProfileAxisSummary>;
+  for (const { key } of NL_TEAMPROFILE_AXES) {
+    const disciplineIds = disciplineIdsByAxis.get(key) ?? [];
+    const perPlayer = rosterPlayers
+      .map((player) => {
+        const ratings = disciplineIds
+          .map((id) => player.disciplineRatings[id])
+          .filter((rating): rating is number => isFiniteNumber(rating));
+        if (ratings.length === 0) {
+          return null;
+        }
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          rating: ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length,
+        };
+      })
+      .filter((entry): entry is { playerId: string; playerName: string; rating: number } => entry != null)
+      .sort((left, right) => right.rating - left.rating);
+
+    summaries[key] = {
+      avgRating:
+        perPlayer.length > 0
+          ? perPlayer.reduce((sum, entry) => sum + entry.rating, 0) / perPlayer.length
+          : null,
+      topPlayers: perPlayer.slice(0, 6),
+    };
+  }
+  return summaries;
+}
 
 function buildTeamDepthChart(gameState: GameState, teamId: string): NlTeamProfileDepthRow[] | null {
   const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
@@ -513,6 +615,11 @@ export default function TeamProfileNewLook({
   gameState: gameStateProp = null,
 }: TeamProfileNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamProfileRosterMode>("portraits");
+  // Gespeichert wird das ZUgeklappte, nicht das Aufgeklappte: so startet die
+  // Karte vollständig offen (derselbe Anblick wie vor der Gruppierung — es
+  // verschwindet nichts, was vorher da war), und eine neu hinzukommende Achse
+  // ist automatisch sichtbar statt versteckt.
+  const [collapsedDepthAxes, setCollapsedDepthAxes] = useState<readonly NlAxisKey[]>([]);
 
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
@@ -782,6 +889,16 @@ export default function TeamProfileNewLook({
     [foundationGameState, data.teamId],
   );
 
+  const depthChartGroups = useMemo(
+    () => (depthChart != null ? groupDepthRowsByAxis(depthChart) : null),
+    [depthChart],
+  );
+
+  const depthAxisSummaries = useMemo(
+    () => (foundationGameState ? buildTeamAxisSummaries(foundationGameState, data.teamId) : null),
+    [foundationGameState, data.teamId],
+  );
+
   const depthChartFallback = useMemo<NlTeamProfileDepthFallbackRow[] | null>(() => {
     if (foundationGameState || visiblePlayers.length === 0) {
       return null;
@@ -1008,6 +1125,68 @@ export default function TeamProfileNewLook({
           />
         ))}
       </div>
+    );
+  }
+
+  /**
+   * Eine Disziplin-Zeile der Depth-Chart. Ausgelagert, weil die Zeilen seit der
+   * Achsen-Gruppierung aus vier getrennten <tbody> heraus gerendert werden —
+   * inline stünde derselbe Block sonst mehrfach verschachtelt im Tabellenkörper.
+   */
+  function renderDepthRow(row: NlTeamProfileDepthRow) {
+    return (
+      <tr key={row.disciplineId} className={`nl-teamprofile-depth-row${row.isThin ? " is-thin" : ""}`}>
+        <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
+          <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+          {row.disciplineLabel}
+        </td>
+        <td
+          className="nl-teamprofile-depth-slots"
+          title={
+            row.slotsNeeded != null
+              ? `${row.capableCount} von ${row.slotsNeeded} Slots mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} besetzbar`
+              : `${row.capableCount} Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR}`
+          }
+        >
+          {row.slotsNeeded != null
+            ? `${row.capableCount}/${row.slotsNeeded}`
+            : formatNlNumber(row.capableCount, 0)}
+        </td>
+        {row.cells.map((cell, index) => (
+          <td key={index} className="nl-teamprofile-depth-cell-wrap">
+            {cell != null ? (
+              <button
+                type="button"
+                className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
+                onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
+                title={`${cell.playerName} · ${row.disciplineLabel} ${formatNlNumber(cell.rating, 0)}`}
+              >
+                <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
+                <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                  {formatNlNumber(cell.rating, 0)}
+                </span>
+                {cell.injuryStatus === "injured" || cell.injuryStatus === "recovering" ? (
+                  <span
+                    className="nl-teamprofile-depth-badge is-injury"
+                    title={cell.injuryStatus === "injured" ? "Verletzt" : "In Reha"}
+                  >
+                    V
+                  </span>
+                ) : cell.fatigue != null && cell.fatigue >= DEPTH_FATIGUE_WARN_THRESHOLD ? (
+                  <span
+                    className="nl-teamprofile-depth-badge is-fatigue"
+                    title={`Erschöpfung ${formatNlNumber(cell.fatigue, 0)}`}
+                  >
+                    M
+                  </span>
+                ) : null}
+              </button>
+            ) : (
+              <span className="nl-teamprofile-depth-cell is-empty">—</span>
+            )}
+          </td>
+        ))}
+      </tr>
     );
   }
 
@@ -1512,6 +1691,41 @@ export default function TeamProfileNewLook({
         </div>
       </NlCard>
 
+      <div ref={rosterCardRef} className="nl-teamprofile-anchor">
+        <NlCard
+          className="nl-teamprofile-roster-card"
+          eyebrow="Kaderprofil"
+          title="Kader"
+          data-testid="nl-teamprofile-roster"
+          actions={
+            <NlSubTabs
+              items={NL_TEAMPROFILE_ROSTER_MODE_ITEMS.map((item) => ({
+                ...item,
+                count: visiblePlayers.length,
+              }))}
+              activeId={rosterMode}
+              onSelect={(id) => setRosterMode(id as NlTeamProfileRosterMode)}
+              aria-label="Kader-Ansicht wählen"
+              className="nl-teamprofile-roster-subtabs"
+            />
+          }
+        >
+          <p className="nl-teamprofile-roster-summary nl-tnum">
+            Ø OVR {formatNlNumber(teamSummary.avgOvr, 1)} · Ø Gehalt {formatNlNumber(teamSummary.avgSalary, 2)} ·{" "}
+            {teamSummary.expiringCount} laufen aus · {teamSummary.issueCount} Hinweise
+          </p>
+          {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
+        </NlCard>
+      </div>
+
+      {/*
+        CHRIS: „1. ist das viel zu groß und soll unter die spieler!"
+
+        Der Saison-Verlauf stand VOR dem Kader und nahm mit vier grossen Kacheln fast einen
+        ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbei.
+        Die Spieler sind das, wofuer man diese Seite oeffnet; der Verlauf ist der Rueckblick
+        danach. Deshalb steht er jetzt darunter.
+      */}
       {developmentSeries != null ? (
         <div ref={developmentCardRef} className="nl-teamprofile-anchor">
           <NlCard
@@ -1569,13 +1783,21 @@ export default function TeamProfileNewLook({
                     />
                   ) : null}
                 </header>
-                {developmentSeries.pointBars.length > 0 ? (
+                {developmentSeries.pointBars.length >= 2 ? (
                   <NlBarChart
                     bars={developmentSeries.pointBars}
                     format={(value) => formatNlNumber(value, 0)}
                     className="nl-teamprofile-development-bars"
                     aria-label={`Punkte pro Saison von ${data.teamName}`}
                   />
+                ) : developmentSeries.pointBars.length === 1 ? (
+                  // Ein Datenpunkt ist kein Verlauf (Chris-Befund auf der Teams-Seite,
+                  // gleiche Kachel): Wert + Einordnung statt eines einzelnen Riesenbalkens.
+                  <p className="nl-teamprofile-empty">
+                    Erst eine Saison mit Punkten ({developmentSeries.pointBars[0].label}:{" "}
+                    {formatNlNumber(developmentSeries.pointBars[0].value, 0)}) — der Verlauf entsteht ab der
+                    zweiten.
+                  </p>
                 ) : (
                   <p className="nl-teamprofile-empty">Keine Punktedaten vorhanden.</p>
                 )}
@@ -1598,9 +1820,11 @@ export default function TeamProfileNewLook({
                   ) : null}
                 </header>
                 {developmentSeries.marketValueSpark.length >= 2 ? (
+                  // Ton aus der RICHTUNG — dieselbe Quelle wie der Delta-Chip darüber,
+                  // kein fest verdrahtetes Grün mehr für fallende Kurven.
                   <NlSparkline
                     points={developmentSeries.marketValueSpark}
-                    tone="good"
+                    tone={nlTrendToneFromDelta(seasonDeltas?.marketValueDelta)}
                     className="nl-teamprofile-development-spark"
                     aria-label={`Marktwert-Verlauf von ${data.teamName} über ${developmentRows.length} Saisons`}
                   />
@@ -1630,7 +1854,7 @@ export default function TeamProfileNewLook({
                 {developmentSeries.cashSpark.length >= 2 ? (
                   <NlSparkline
                     points={developmentSeries.cashSpark}
-                    tone="good"
+                    tone={nlTrendToneFromDelta(seasonDeltas?.cashDelta)}
                     className="nl-teamprofile-development-spark"
                     aria-label={`Cash-Verlauf von ${data.teamName} über ${developmentRows.length} Saisons`}
                   />
@@ -1666,33 +1890,6 @@ export default function TeamProfileNewLook({
           </NlCard>
         </div>
       ) : null}
-
-      <div ref={rosterCardRef} className="nl-teamprofile-anchor">
-        <NlCard
-          className="nl-teamprofile-roster-card"
-          eyebrow="Kaderprofil"
-          title="Kader"
-          data-testid="nl-teamprofile-roster"
-          actions={
-            <NlSubTabs
-              items={NL_TEAMPROFILE_ROSTER_MODE_ITEMS.map((item) => ({
-                ...item,
-                count: visiblePlayers.length,
-              }))}
-              activeId={rosterMode}
-              onSelect={(id) => setRosterMode(id as NlTeamProfileRosterMode)}
-              aria-label="Kader-Ansicht wählen"
-              className="nl-teamprofile-roster-subtabs"
-            />
-          }
-        >
-          <p className="nl-teamprofile-roster-summary nl-tnum">
-            Ø OVR {formatNlNumber(teamSummary.avgOvr, 1)} · Ø Gehalt {formatNlNumber(teamSummary.avgSalary, 2)} ·{" "}
-            {teamSummary.expiringCount} laufen aus · {teamSummary.issueCount} Hinweise
-          </p>
-          {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
-        </NlCard>
-      </div>
 
       {depthChart != null || depthChartFallback != null ? (
         <NlCard
@@ -1737,65 +1934,96 @@ export default function TeamProfileNewLook({
                     <th>6.</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {depthChart.map((row) => (
-                    <tr
-                      key={row.disciplineId}
-                      className={`nl-teamprofile-depth-row${row.isThin ? " is-thin" : ""}`}
-                    >
-                      <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
-                        <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
-                        {row.disciplineLabel}
-                      </td>
-                      <td
-                        className="nl-teamprofile-depth-slots"
-                        title={
-                          row.slotsNeeded != null
-                            ? `${row.capableCount} von ${row.slotsNeeded} Slots mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} besetzbar`
-                            : `${row.capableCount} Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR}`
-                        }
-                      >
-                        {row.slotsNeeded != null
-                          ? `${row.capableCount}/${row.slotsNeeded}`
-                          : formatNlNumber(row.capableCount, 0)}
-                      </td>
-                      {row.cells.map((cell, index) => (
-                        <td key={index} className="nl-teamprofile-depth-cell-wrap">
-                          {cell != null ? (
+                {(depthChartGroups ?? []).map((group) => {
+                  const isCollapsed = collapsedDepthAxes.includes(group.axis);
+                  const groupBodyId = `nl-teamprofile-depth-axis-${group.axis}`;
+                  const axisSummary = depthAxisSummaries?.[group.axis] ?? null;
+                  return (
+                    <Fragment key={group.axis}>
+                      {/* Kopf und Disziplinen liegen in zwei getrennten <tbody>: so trägt
+                          genau ein Element die Id, auf die `aria-controls` zeigt, und der
+                          zugeklappte Block bleibt im DOM (nur `hidden`), statt zu
+                          verschwinden — ein aria-controls ins Leere wäre kaputt. */}
+                      <tbody className="nl-teamprofile-depth-groupbody">
+                        <tr
+                          className={`nl-teamprofile-depth-grouprow ${nlToneClass(group.axis)}${isCollapsed ? " is-collapsed" : ""}`}
+                        >
+                          {/* Der Kopf folgt demselben Spaltenraster wie die Disziplin-Zeilen:
+                              Achse links, Schnitt in der Fähig-Spalte, darunter die stärksten
+                              Spieler der Achse in den Rängen 1.–6. So steht die Achsen-Übersicht
+                              auch zugeklappt da — vorher blieb dort eine leere Zeile, in der
+                              nichts als der Name der Achse zu lesen war. */}
+                          <th scope="colgroup" className="nl-teamprofile-depth-groupcell">
                             <button
                               type="button"
-                              className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
-                              onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
-                              title={`${cell.playerName} · ${row.disciplineLabel} ${formatNlNumber(cell.rating, 0)}`}
+                              className="nl-teamprofile-depth-grouptoggle"
+                              aria-expanded={!isCollapsed}
+                              aria-controls={groupBodyId}
+                              onClick={() =>
+                                setCollapsedDepthAxes((current) =>
+                                  current.includes(group.axis)
+                                    ? current.filter((axis) => axis !== group.axis)
+                                    : [...current, group.axis],
+                                )
+                              }
                             >
-                              <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
-                              <span className="nl-teamprofile-depth-cell-rating nl-tnum">
-                                {formatNlNumber(cell.rating, 0)}
+                              <span className="nl-teamprofile-depth-groupcaret" aria-hidden="true">
+                                {isCollapsed ? "▸" : "▾"}
                               </span>
-                              {cell.injuryStatus === "injured" || cell.injuryStatus === "recovering" ? (
+                              <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+                              <span className="nl-teamprofile-depth-grouplabel">{group.label}</span>
+                              <span className="nl-teamprofile-depth-groupcount nl-tnum">
+                                {formatNlNumber(group.rows.length, 0)} Disziplinen
+                              </span>
+                              {/* Der Engpass-Zähler steht im Kopf und nicht nur in den Zeilen:
+                                  zugeklappt wäre er sonst weg — und genau er ist der Grund, eine
+                                  Achse überhaupt aufzuklappen. */}
+                              {group.thinCount > 0 ? (
                                 <span
-                                  className="nl-teamprofile-depth-badge is-injury"
-                                  title={cell.injuryStatus === "injured" ? "Verletzt" : "In Reha"}
+                                  className="nl-teamprofile-depth-groupthin nl-tnum"
+                                  title={`${group.thinCount} von ${group.rows.length} Disziplinen dieser Achse haben weniger Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} als Slots`}
                                 >
-                                  V
-                                </span>
-                              ) : cell.fatigue != null && cell.fatigue >= DEPTH_FATIGUE_WARN_THRESHOLD ? (
-                                <span
-                                  className="nl-teamprofile-depth-badge is-fatigue"
-                                  title={`Erschöpfung ${formatNlNumber(cell.fatigue, 0)}`}
-                                >
-                                  M
+                                  {formatNlNumber(group.thinCount, 0)} dünn
                                 </span>
                               ) : null}
                             </button>
-                          ) : (
-                            <span className="nl-teamprofile-depth-cell is-empty">—</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
+                          </th>
+                          <td
+                            className="nl-teamprofile-depth-groupavg nl-tnum"
+                            title={`Schnitt über alle Kaderspieler in den ${group.rows.length} ${group.label}-Disziplinen`}
+                          >
+                            {axisSummary?.avgRating != null ? `Ø ${formatNlNumber(axisSummary.avgRating, 0)}` : "—"}
+                          </td>
+                          {[0, 1, 2, 3, 4, 5].map((index) => {
+                            const top = axisSummary?.topPlayers[index] ?? null;
+                            return (
+                              <td key={index} className="nl-teamprofile-depth-cell-wrap">
+                                {top != null ? (
+                                  <button
+                                    type="button"
+                                    className={`nl-teamprofile-depth-cell is-axis ${nlToneClass(getDepthRatingTone(top.rating))}`}
+                                    onClick={() => onOpenPlayer(top.playerId, top.playerId)}
+                                    title={`${top.playerName} · ${group.label} im Schnitt ${formatNlNumber(top.rating, 0)} über ${group.rows.length} Disziplinen`}
+                                  >
+                                    <span className="nl-teamprofile-depth-cell-name">{top.playerName}</span>
+                                    <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                                      {formatNlNumber(top.rating, 0)}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <span className="nl-teamprofile-depth-cell is-empty">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tbody>
+                      <tbody id={groupBodyId} hidden={isCollapsed}>
+                        {group.rows.map((row) => renderDepthRow(row))}
+                      </tbody>
+                    </Fragment>
+                  );
+                })}
               </table>
             </div>
           ) : depthChartFallback != null ? (

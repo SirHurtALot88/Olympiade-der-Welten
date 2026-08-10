@@ -16,11 +16,10 @@ import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-se
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
-import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
 import { applySeasonEndRosterStressLedger } from "@/lib/ai/season-roster-stress-service";
 import { applySeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
-import type { GameState, Player, RosterEntry, TeamControlSettings, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { applyFacilitySeasonEndFinance, previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -31,18 +30,16 @@ import {
   findSeasonOneForbiddenBuySources,
   formatSeasonTransferCountsLabel,
   isMarketBuyTransferEntry,
-  isSeasonOne,
   isTransferActionAllowed,
 } from "@/lib/season/transfer-season-policy";
 import { isDraftBuySource } from "@/lib/season/transfer-standings-balance";
-import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { isVdWomenOnlyEligiblePlayer } from "@/lib/ai/team-theme-composition-service";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktSell,
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
-import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerAvailabilityByPlayerId,
@@ -63,7 +60,6 @@ import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetup
 import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
-import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { applyLoanSettlement } from "@/lib/finance/loan-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
@@ -740,15 +736,6 @@ async function runCanonicalPreseasonStart(saveId: string, seasonId: string, pers
   };
 }
 
-function getSeasonMaxRequiredSlots(gameState: GameState) {
-  const counts = (gameState.seasonState.disciplineSchedule ?? [])
-    .filter((entry) => entry.seasonId === gameState.season.id || !entry.seasonId)
-    .flatMap((entry) => [entry.discipline1?.playerCount ?? 0, entry.discipline2?.playerCount ?? 0])
-    .map((value) => Number(value ?? 0))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  if (counts.length === 0) return 8;
-  return Math.max(7, Math.max(...counts) * 2);
-}
 
 function getPreseasonCoverageRiskRows(gameState: GameState) {
   return getTeamsNeedingConvergence(gameState).map((entry) => {
@@ -1106,7 +1093,6 @@ function runFullChurnSeasonStart(saveId: string, seasonId: string, persistence: 
   });
   const afterRedraft = persistence.getSaveById(saveId);
   if (!afterRedraft) throw new Error("Full-churn save missing after redraft.");
-  const playersById = new Map(afterRedraft.gameState.players.map((player) => [player.id, player]));
   const rosteredPlayerIds = afterRedraft.gameState.rosters.map((entry) => entry.playerId);
   const duplicatePlayers = Array.from(rosteredPlayerIds.reduce((map, playerId) => map.set(playerId, (map.get(playerId) ?? 0) + 1), new Map<string, number>()))
     .filter(([, count]) => count > 1)

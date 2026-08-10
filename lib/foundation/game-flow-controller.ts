@@ -9,7 +9,6 @@ import {
 } from "@/lib/foundation/form-card-flow";
 import {
   getTeamMatchdayLineupDraft,
-  isTeamMatchdayLineupComplete,
   isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";
@@ -20,6 +19,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
+import { isLegacySeasonCompletedFlagSet } from "@/lib/season/season-completion-state";
 
 export type GameFlowPhase =
   | "preseason"
@@ -97,7 +97,7 @@ function derivePreseasonPhase(gameState: GameState): GameFlowPhase | null {
   if (gamePhase === "season_completed" || gamePhase === "season_review") return "season_review";
   if (gamePhase === "season_rewards" || gamePhase === "player_development") return "season_end";
   if (
-    gamePhase === "preseason_management" ||
+    gamePhase === "season_end_management" ||
     gamePhase === "transfer_sell_phase" ||
     gamePhase === "transfer_buy_phase" ||
     gamePhase === "lineup_setup" ||
@@ -188,8 +188,12 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     }),
     step({
       stepId: "apply_rewards",
-      label: "Preisgeld & Finanzen",
-      cta: "Weiter: Preisgeld & Finanzen",
+      // Der Schritt fuehrt zur Saisonabrechnung — Sponsorgeld abzueglich Gehaelter, Apron, Gebaeude,
+      // Kreditraten, Vorstandsziele. Preisgeld ist davon KEIN Teil: die Tabelle ist ein
+      // Vergleichswert (`CASH_PRIZE_BENCHMARK_ONLY`) und wird nicht ausgezahlt. Der alte Name
+      // versprach eine Zahlung, die es nie gab.
+      label: "Saisonabrechnung",
+      cta: "Weiter: Saisonabrechnung",
       status: !hasSeasonHistory && isFirstSeason ? "completed" : cashApplied ? "completed" : "ready",
       targetView: "prize",
       teamId: activeTeamId,
@@ -832,8 +836,13 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "review_matchday_results",
-      label: "Spieltagsergebnis anschauen",
-      cta: "Weiter: Ergebnis anschauen",
+      // Halber Spieltag (D1 gebucht, D2 offen): der nächste Schritt ist nicht das
+      // Anschauen eines fertigen Ergebnisses, sondern Disziplin 2 in der Arena —
+      // das Ziel des Schritts ist ohnehin die Arena. Der Header-CTA erzählte sonst
+      // die Fertig-Geschichte („Spieltagsergebnis anschauen"), während der
+      // Spielplan korrekt „läuft" sagte.
+      label: advanceBlockedByMissingD2 ? "Disziplin 2 spielen" : "Spieltagsergebnis anschauen",
+      cta: advanceBlockedByMissingD2 ? "Weiter: Disziplin 2 spielen" : "Weiter: Ergebnis anschauen",
       status: hasResults ? "ready" : "blocked",
       targetView: "matchdayArena",
       // Die "Spieltagsergebnis"-Sektion ist entfernt — sie wiederholte, was Arena und
@@ -920,7 +929,7 @@ const SEASON_BRIEFING_END_GAME_PHASES = new Set<GamePhase>([
 ]);
 
 const SEASON_BRIEFING_PRESEASON_GAME_PHASES = new Set<GamePhase>([
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",
@@ -935,7 +944,7 @@ export function shouldAutoOpenSeasonBriefing(
     return false;
   }
 
-  if (gameState.season.isCompleted === true) {
+  if (isLegacySeasonCompletedFlagSet(gameState)) {
     return false;
   }
 

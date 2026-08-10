@@ -852,7 +852,6 @@ describe("ai needs picks compare service", () => {
 
     const team = result.teams[0]!;
     const pick = team.plannedPicks[0]!;
-    const plannedLane = team.budgetLanes.find((entry) => entry.lane === pick.lane);
     expect(pick.playerName).toBe("Arcane Broker");
     expect(team.sequentialStateSnapshots[0]?.cashAfter ?? -1).toBeGreaterThanOrEqual(0);
     if (pick.budgetStretchApplied) {

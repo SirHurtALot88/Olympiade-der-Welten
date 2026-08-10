@@ -1588,10 +1588,15 @@ export default function LineupNewLook({
                   }}
                   title={`${rival.teamName}: Saison-Rang #${rival.rank} · ${rivalStrengthLabel(rival.relationship)}`}
                 >
-                  <strong className="nl-tnum" style={{ color: "var(--nl-accent)" }}>
+                  <strong className="nl-tnum" style={{ color: "var(--nl-accent-text, var(--nl-accent))" }}>
                     #{rival.rank}
                   </strong>
-                  <span style={{ maxWidth: "9ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rival.teamName}</span>
+                  {/* S6/L4 (Audit Spieltag): 9ch schnitt praktisch jeden Teamnamen ab
+                      (Median 14, Maximum 21 Zeichen) — "Wicked ..." ohne sichtbaren
+                      Rest. 15ch deckt die meisten Namen vollständig; die Ellipse bleibt
+                      als Sicherheitsnetz für die wenigen Ausreißer, der volle Name steht
+                      ohnehin im Tooltip der Pille. */}
+                  <span style={{ maxWidth: "15ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rival.teamName}</span>
                   {/* Stärke als 1–3 Schwerter (nur Deko, Erklärung im Tooltip). */}
                   <em style={{ fontStyle: "normal", color: "var(--nl-mut-2)" }} aria-hidden="true">
                     {"⚔".repeat(Math.min(3, Math.max(1, Math.round(Math.abs(rival.relationship) - 1))))}
@@ -1982,7 +1987,21 @@ export default function LineupNewLook({
                       </span>
                     ) : null}
                     {issue ? (
-                      <span className="nl-lineup-chip is-risk" title={issue.detail}>
+                      // S6/L2 (Audit Spieltag): vorher lief JEDES Slot-Issue hart auf
+                      // `is-risk` (rot) — unabhängig vom eigentlichen `issue.tone` aus
+                      // `buildSlotIssuesByKey`. Ergebnis: der Normalzustand "Slot noch
+                      // offen" (9× pro Spieltag) sah aus wie ein Fehler, genau wie ein
+                      // echter Blocker (Doppelwahl, verletzter Spieler). Jetzt folgt die
+                      // Farbe dem Ton: "blocked" bleibt rot (echte Blocker + der aktive
+                      // "Hier weiter"-Slot), "warning" wird gelb-warn — außer beim leeren,
+                      // nicht-aktiven Slot ("Offen") selbst: der ist der Normalfall vor
+                      // dem Ausfüllen und bleibt bewusst ohne Alarmfarbe.
+                      <span
+                        className={`nl-lineup-chip${
+                          issue.tone === "blocked" ? " is-risk" : !player && issue.tone === "warning" ? "" : " is-warn"
+                        }`}
+                        title={issue.detail}
+                      >
                         {issue.label}
                       </span>
                     ) : null}
@@ -2144,10 +2163,17 @@ export default function LineupNewLook({
           />
           {/* Fatigue-Kosten (Feature 2): Summe der Zusatz-Ermüdung dieses Spieltags
               (matchdayPreviewCards.totalFatigue). Ton über die kanonischen Fatigue-
-              Schwellen (≥40 warn, ≥65 risk). */}
+              Schwellen (≥40 warn, ≥65 risk).
+              S6/L4 (Audit Spieltag): das "−" kam bisher fest vor die Zahl, auch bei
+              0 (leere Einsatzliste) — sichtbares "−0" statt einer echten Null. Das
+              Minus ist nur bei einer echten Kosten-Summe > 0 eine Aussage. */}
           <StatChip
             label="Fatigue-Kosten"
-            value={`−${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
+            value={
+              matchdayPreviewCards.totalFatigue > 0
+                ? `−${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`
+                : formatNlNumber(matchdayPreviewCards.totalFatigue, 1)
+            }
             tone={fatigueTone(matchdayPreviewCards.totalFatigue)}
             title={`Ermüdung, die dieser Spieltag kostet: ${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
           />

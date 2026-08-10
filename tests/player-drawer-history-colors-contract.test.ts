@@ -17,17 +17,34 @@ const drawerSource = readFileSync(join(root, "app/foundation/PlayerDetailDrawer.
 const cssSource = readFileSync(join(root, "app/globals.css"), "utf8");
 
 describe("Trainingshistorie: Grün/Rot-Töne sind verdrahtet", () => {
-  it("globals.css färbt is-positive/is-negative in Forecast- und Trainingshistorie-Tabelle mit nl-good/nl-risk", () => {
+  it("globals.css färbt is-positive/is-negative in der Saison-Listen-Tabelle mit nl-good/nl-risk", () => {
+    // Seit der Saison-Liste rendern laufende UND abgeschlossene Saisons in derselben
+    // `.player-drawer-matchday-training-table`; die frühere zweite Tabelle
+    // (`.player-drawer-training-history-table`) ist mitsamt ihren Regeln entfallen —
+    // beidseitig, damit keine CSS-Klasse still durchfällt.
     expect(cssSource).toMatch(/\.player-drawer-matchday-training-table td\.is-positive[\s\S]{0,200}?--nl-good/);
     expect(cssSource).toMatch(/\.player-drawer-matchday-training-table td\.is-negative[\s\S]{0,200}?--nl-risk/);
-    expect(cssSource).toMatch(/\.player-drawer-training-history-table \.is-positive[\s\S]{0,200}?--nl-good/);
-    expect(cssSource).toMatch(/\.player-drawer-training-history-table \.is-negative[\s\S]{0,200}?--nl-risk/);
+    expect(cssSource).not.toMatch(/\.player-drawer-training-history-table \.is-positive/);
+    expect(drawerSource).not.toContain("player-drawer-training-history-table");
   });
 
-  it("die Forecast-Zellen setzen die Ton-Klasse über getDeltaToneClass", () => {
-    // Verdrahtung im JSX: kumulierte Zellen und Netto-Zelle tragen den Delta-Ton.
+  it("Summen- und Herkunftszellen setzen die Ton-Klasse über getDeltaToneClass", () => {
+    // Verdrahtung im JSX: die Saison-Summenzeile (Σ + Attributzellen) und die aufklappbaren
+    // Herkunfts-Zeilen tragen den Delta-Ton — die Legende „Grün = Zuwachs, Rot = Rückgang"
+    // gilt über alle Zeilen.
     expect(drawerSource).toMatch(/is-attribute-col \$\{getDeltaToneClass\(cell\.cumulative\)\}/);
-    expect(drawerSource).toMatch(/getDeltaToneClass\(forecast\.netCumulative\)/);
+    expect(drawerSource).toMatch(/is-attribute-col \$\{getDeltaToneClass\(value\)\}/);
+    expect(drawerSource).toMatch(/className=\{getDeltaToneClass\(total\)\}/);
+    expect(drawerSource).toMatch(/<td className=\{getDeltaToneClass\(rowTotal\)\}>/);
+  });
+
+  it("jede Herkunftszeile bekommt denselben Delta-Ton wie die Summenzeile", () => {
+    // Sonst wäre die Legende „Grün = Zuwachs, Rot = Rückgang" nur für die Σ-Zeile wahr, und
+    // ausgerechnet die Alterung — die einzige durchweg negative — bliebe farblos.
+    for (const key of ["training", "performance", "regression"] as const) {
+      expect(drawerSource).toContain(`key: "${key}"`);
+      expect(drawerSource).toContain(`cell.${key}`);
+    }
   });
 });
 

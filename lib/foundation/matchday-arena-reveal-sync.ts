@@ -64,7 +64,6 @@ export function canAdvanceFoundationArenaReveal(
   limits: FoundationArenaRevealLimits,
 ): boolean {
   const { slotsPhaseIndex, finalPhaseIndex, resultPhaseIndex } = FOUNDATION_ARENA_REVEAL_LIMITS;
-  const activeSide = getFoundationArenaActiveSide(state);
   const maxSlotRevealCount = getFoundationArenaMaxSlotRevealCount(state, limits);
   const revealedSlotCount = getFoundationArenaRevealedSlotCount(state, limits);
   const activeDisciplineSlotsComplete = revealedSlotCount >= maxSlotRevealCount;
@@ -83,7 +82,7 @@ export function advanceFoundationArenaReveal(
   state: FoundationArenaRevealState,
   limits: FoundationArenaRevealLimits,
 ): FoundationArenaRevealState | null {
-  const { slotsPhaseIndex, finalPhaseIndex, resultPhaseIndex } = FOUNDATION_ARENA_REVEAL_LIMITS;
+  const { slotsPhaseIndex } = FOUNDATION_ARENA_REVEAL_LIMITS;
 
   if (state.phaseIndex < 0) {
     return {

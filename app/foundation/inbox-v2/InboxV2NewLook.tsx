@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } fro
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, formatNlNumber, nlToneClass, useCountUp, type NlTone } from "@/components/foundation/new-look";
 import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
-import { INBOX_LANES, groupInboxItemsByLane } from "@/lib/foundation/inbox-lanes";
+import {
+  INBOX_URGENCY_GROUPS,
+  groupInboxItemsByUrgency,
+  resolveInboxConsequence,
+  resolveInboxUrgencyGroup,
+} from "@/lib/foundation/inbox-urgency-groups";
 
 /**
  * "Neuer Look" Entscheidungs-Triage fuer Inbox V2 (flag-gated, additive).
@@ -193,9 +198,11 @@ function getCategoryMeta(category: string) {
 }
 
 function getSeverityTone(severity: InboxV2Item["severity"]): NlTone {
+  // Info-Stufe = neutral, nicht `accent`: die Skala enthält `risk`, und die
+  // Teamfarbe darf nie wie eine Dringlichkeits-Stufe aussehen (F2-Regel).
   if (severity === "critical") return "risk";
   if (severity === "warning") return "warn";
-  return "accent";
+  return "neutral";
 }
 
 function getStatusLabel(item: InboxV2Item): string | null {
@@ -283,24 +290,37 @@ export default function InboxV2NewLook({
     }
   }, [mode, isExternallyFiltered]);
 
+  // Pill-Zähler = offene HANDLUNGEN je Kategorie (Kritisch/Heute/Kann warten) — dieselbe
+  // Zählbasis wie der Kopf („N offen" = Entscheidungen). Berichte und Erledigtes zählen nicht
+  // mit, sonst stünden am Kopf und an den Pills wieder zwei verschiedene Wahrheiten.
+  const openActionableItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const group = resolveInboxUrgencyGroup(item);
+        return group === "critical" || group === "today" || group === "later";
+      }),
+    [items],
+  );
+
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const item of items) {
+    for (const item of openActionableItems) {
       const key = item.category.toLowerCase();
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
-  }, [items]);
+  }, [openActionableItems]);
 
-  // Wenn der Host bereits vorfiltert (externer Handler), nichts doppelt
-  // filtern; sonst lokal nach der gewählten Kategorie einschränken.
+  // EIN Filtersystem (Audit I1): Die Ansicht filtert IMMER selbst nach der aktiven Kategorie.
+  // Ein externer Handler hält nur noch den Zustand (URL-Sync, Command-Palette) — er bekommt die
+  // VOLLE Liste geliefert, damit die Zähler aller Kategorien stimmen.
   const displayedItems = useMemo(() => {
-    if (isExternallyFiltered || activeCategoryFilter === "ALL") {
+    if (activeCategoryFilter === "ALL") {
       return items;
     }
     const wanted = activeCategoryFilter.toLowerCase();
     return items.filter((item) => item.category.toLowerCase() === wanted);
-  }, [items, isExternallyFiltered, activeCategoryFilter]);
+  }, [items, activeCategoryFilter]);
 
   const firstCriticalItem = useMemo(
     () => displayedItems.find((item) => item.severity === "critical") ?? null,
@@ -509,20 +529,14 @@ export default function InboxV2NewLook({
   };
 
   /**
-   * DIE DREI RÄUME (docs/INBOX_KONZEPT.md). Sobald die Ableitung eine `lane` mitliefert, ersetzt
-   * das Spaltenraster den Modus-Umschalter: „Jetzt handeln", „Im Blick behalten" und
-   * „Berichte & Momente" stehen gleichzeitig da. Dringlichkeit ist dann POSITION statt nur Farbe —
-   * genau das war die Beschwerde („alles gleich wichtig, alles führt an denselben Ort").
-   *
-   * Ohne `lane` bleibt es bei der bisherigen einspaltigen Liste; kein Mount bricht dadurch weg.
+   * DRINGLICHKEITS-GRUPPEN (Mockup `inboxV2.html`, ersetzt die frühere Spalten-/Listen-Weiche):
+   * Kritisch → Heute sinnvoll → Kann warten → Berichte → Erledigt (eingeklappt). Dringlichkeit
+   * ist POSITION, nicht nur Farbe — und das eine kritische Item steht rot markiert ganz oben
+   * (Audit I3). Die Zuordnung kommt aus `inbox-urgency-groups.ts` (React-frei, getestet).
    */
-  const laneLayout = displayedItems.some((item) => item.lane != null);
-  const lanes = useMemo(
-    () => groupInboxItemsByLane(displayedItems, (item) => item.lane ?? "act"),
-    [displayedItems],
-  );
+  const urgencyGroups = useMemo(() => groupInboxItemsByUrgency(displayedItems), [displayedItems]);
 
-  /** Eine Karte, ein Renderer — im Raster wie in der Liste, damit sie sich nie auseinanderleben. */
+  /** Eine Karte, ein Renderer — in jeder Gruppe dieselbe Anatomie, damit sie sich nie auseinanderleben. */
   const renderItemCard = (item: InboxV2Item, index: number) => {
     const meta = getCategoryMeta(item.category);
     const CategoryIcon = meta.icon;
@@ -531,6 +545,8 @@ export default function InboxV2NewLook({
     const isSelected = selectedItemId === item.id;
     const isAutoResolving = isAutoResolvingInboxItemId(item.id);
     const cadenceLabel = getCadenceLabel(item);
+    const isCritical = item.status === "open" && item.severity === "critical";
+    const consequence = resolveInboxConsequence(item);
     const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
     return (
       <li
@@ -542,7 +558,7 @@ export default function InboxV2NewLook({
         <NlCard
           interactive
           onClick={() => activateItem(item.id)}
-          className={`nl-inbox-card ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          className={`nl-inbox-card ${nlToneClass(severityTone)}${isCritical ? " is-critical" : ""}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
           data-testid={`nl-inbox-card-${item.id}`}
         >
           <div className="nl-inbox-card-row">
@@ -551,6 +567,7 @@ export default function InboxV2NewLook({
             </span>
             <div className="nl-inbox-card-copy">
               <span className="nl-inbox-card-meta">
+                {isCritical ? <span className="nl-inbox-critical-tag">Kritisch</span> : null}
                 <span className="nl-inbox-card-category">{meta.label}</span>
                 {cadenceLabel ? (
                   <span className={`nl-inbox-cadence-tag nl-inbox-cadence-${cadenceLabel.cadence}`}>{cadenceLabel.text}</span>
@@ -569,6 +586,14 @@ export default function InboxV2NewLook({
               </span>
               <strong className="nl-inbox-card-title">{item.title}</strong>
               {item.detail ? <p className="nl-inbox-card-detail">{item.detail}</p> : null}
+
+              {/* Konsequenz statt Kategorie-Label: nur wo die Folge eine belegte Spielregel
+                  ist (inbox-urgency-groups.ts) — nie eine erfundene Drohung. */}
+              {consequence ? (
+                <p className="nl-inbox-card-consequence">
+                  Wenn du nichts tust: <em>{consequence}</em>
+                </p>
+              ) : null}
 
               {/* Das Ziel steht VOR dem Klick da — man sieht, wo man landet, statt es zu erraten. */}
               {item.targetLabel ? <span className="nl-inbox-card-target">→ {item.targetLabel}</span> : null}
@@ -624,26 +649,45 @@ export default function InboxV2NewLook({
     );
   };
 
-  const renderLanes = () => (
-    <div className="nl-inbox-lanes" aria-label="Inbox — drei Räume">
-      {INBOX_LANES.map((lane) => {
-        const laneItems = lanes[lane.id];
-        return (
-          <section key={lane.id} className={`nl-inbox-lane nl-inbox-lane-${lane.id}`} aria-label={lane.title}>
-            <header className="nl-inbox-lane-head">
-              <h3 className="nl-inbox-lane-title">
-                {lane.title}
-                <span className="nl-inbox-lane-count nl-tnum">{laneItems.length}</span>
-              </h3>
-              <p className="nl-inbox-lane-question">{lane.question}</p>
-            </header>
-            {laneItems.length === 0 ? (
-              <p className="nl-inbox-lane-empty">{lane.emptyText}</p>
-            ) : (
-              <ul className="nl-inbox-list" aria-label={lane.title}>
-                {laneItems.map((item, index) => renderItemCard(item, index))}
+  /**
+   * Dringlichkeits-Gruppen untereinander: leere Gruppen entfallen komplett (keine
+   * „Alles erledigt"-Sektionen neben offenen Aufgaben mehr), Erledigtes steht als
+   * eingeklappter Block am Ende statt als gleichrangige Karten.
+   */
+  const renderUrgencyGroups = () => (
+    <div className="nl-inbox-groups" aria-label="Inbox — nach Dringlichkeit">
+      {INBOX_URGENCY_GROUPS.map((group) => {
+        const groupItems = urgencyGroups[group.id];
+        if (groupItems.length === 0) {
+          return null;
+        }
+        if (group.id === "resolved") {
+          return (
+            <details key={group.id} className="nl-inbox-done-block" data-testid="nl-inbox-done-block">
+              <summary className="nl-inbox-done-summary">
+                {group.title} <span className="nl-tnum">({formatNlNumber(groupItems.length, 0)})</span> — einblenden
+              </summary>
+              <ul className="nl-inbox-list" aria-label={group.title}>
+                {groupItems.map((item, index) => renderItemCard(item, index))}
               </ul>
-            )}
+            </details>
+          );
+        }
+        return (
+          <section
+            key={group.id}
+            className={`nl-inbox-group nl-inbox-group-${group.id}`}
+            aria-label={group.title}
+            data-testid={`nl-inbox-group-${group.id}`}
+          >
+            <header className={`nl-inbox-group-head ${nlToneClass(group.tone)}`}>
+              <h3 className="nl-inbox-group-title">{group.title}</h3>
+              <span className="nl-inbox-group-line" aria-hidden="true" />
+              <span className="nl-inbox-group-count nl-tnum">{formatNlNumber(groupItems.length, 0)}</span>
+            </header>
+            <ul className="nl-inbox-list" aria-label={group.title}>
+              {groupItems.map((item, index) => renderItemCard(item, index))}
+            </ul>
           </section>
         );
       })}
@@ -681,9 +725,9 @@ export default function InboxV2NewLook({
         </div>
       </header>
 
-      {/* Der Modus-Umschalter versteckte konstruktionsbedingt immer die eine Hälfte. In der
-          Räume-Ansicht ist alles gleichzeitig sichtbar — die Leiste hat dort nichts mehr zu tun. */}
-      {laneLayout ? null : (
+      {/* Der Modus-Umschalter existiert nur noch, wenn ein Mount ihn wirklich bedienen kann.
+          Ohne Handler war die Leiste ein toter Ein-Tab-Balken — weg damit (Audit I1). */}
+      {onModeChange ? (
         <NlSubTabs
           className="nl-inbox-mode-tabs"
           items={modeTabs}
@@ -691,12 +735,14 @@ export default function InboxV2NewLook({
           onSelect={(id) => onModeChange?.(id as InboxV2Mode)}
           aria-label="Inbox Modus"
         />
-      )}
+      ) : null}
 
       <div className="nl-inbox-filter-row" role="group" aria-label="Inbox Kategorien">
         {categoryFilters.map((filter) => {
           const isActive = activeCategoryFilter === filter.value;
-          const count = filter.value === "ALL" ? items.length : categoryCounts.get(filter.value) ?? 0;
+          // "Alle" zählt dieselbe Basis wie der Kopf: offene Handlungen. Nicht `items.length`,
+          // sonst meldet die Pille „14", während der Kopf ehrlich „11 offen" sagt.
+          const count = filter.value === "ALL" ? openActionableItems.length : categoryCounts.get(filter.value) ?? 0;
           // Kategorien ohne Einträge werden ausgeblendet (kein toter Chip),
           // "ALL" und der aktive Chip bleiben immer sichtbar.
           if (filter.value !== "ALL" && !isActive && count === 0) {
@@ -751,17 +797,24 @@ export default function InboxV2NewLook({
       ) : null}
 
       {displayedItems.length === 0 ? (
-        <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
-          <p className="nl-inbox-empty-text">{emptyText}</p>
-        </NlCard>
-      ) : laneLayout ? (
-        renderLanes()
+        activeCategoryFilter !== "ALL" && items.length > 0 ? (
+          // Gefilterte Leere ist KEIN „Alles erledigt" (Audit I2): sagen, was los ist,
+          // und den Weg zurück anbieten.
+          <NlCard className="nl-inbox-empty-card" title="Keine Einträge in dieser Kategorie" eyebrow="Inbox">
+            <p className="nl-inbox-empty-text">Der aktive Kategorie-Filter trifft gerade nichts.</p>
+            <button type="button" className="nl-inbox-card-action" onClick={() => handleCategoryFilter("ALL")}>
+              Alle anzeigen
+            </button>
+          </NlCard>
+        ) : (
+          <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
+            <p className="nl-inbox-empty-text">{emptyText}</p>
+          </NlCard>
+        )
       ) : mode === "chronicle" ? (
         renderChronicleMagazine()
       ) : (
-        <ul className="nl-inbox-list" aria-label="Inbox Eintraege">
-          {displayedItems.map((item, index) => renderItemCard(item, index))}
-        </ul>
+        renderUrgencyGroups()
       )}
     </div>
   );

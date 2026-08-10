@@ -474,6 +474,92 @@ export function useFoundationCrossTabTeamsRoster(input: {
         [...currentSeasonTransfers]
           .filter((entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId)
           .sort((left, right) => (right.fee ?? 0) - (left.fee ?? 0))[0] ?? null;
+      /**
+       * ERSATZ FUER DEN BROWSER. Die Anfangsladung streicht `seasonSnapshots` (siehe
+       * `foundation-initial-compact-state`), also stand hier im Browser eine leere Liste und jede
+       * vergangene Saison fiel auf eine Platzhalterzeile mit `rank: null` zurueck — das war das
+       * „—" in der Saison-Verlauf-Karte. Die mitgefahrene Kurzfassung traegt genau die Felder der
+       * Historienzeile.
+       *
+       * Was sie NICHT traegt, bleibt null: Disziplinwerte und Durchschnittsmuedigkeit brauchen
+       * Spieltags- und Disziplinergebnisse der alten Saison, und die faehrt niemand mit. Sie waren
+       * im Browser aber ohnehin schon leer — hier wird nichts schlechter, nur Rang, Punkte, Cash,
+       * Gehalt, Marktwert und GuV werden endlich gefuellt.
+       */
+      const projizierteHistorie = (input.gameState.seasonState.seasonSnapshots ?? []).length > 0
+        ? []
+        : (input.gameState.seasonState.foundationSeasonHistory ?? []).map((eintrag) => {
+            const teamEintrag = eintrag.teams.find((entry) => entry.teamId === team.teamId) ?? null;
+            if (!teamEintrag) {
+              return null;
+            }
+            const topBuy =
+              [...eintrag.transfers]
+                .filter((entry) => entry.type === "buy" && entry.toTeamId === team.teamId)
+                .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0))[0] ?? null;
+            const topSell =
+              [...eintrag.transfers]
+                .filter((entry) => entry.type === "sell" && entry.fromTeamId === team.teamId)
+                .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0))[0] ?? null;
+            return {
+              seasonId: eintrag.seasonId,
+              seasonName: eintrag.seasonName ?? getCanonicalSeasonLabel({ seasonId: eintrag.seasonId }),
+              isLive: false,
+              rank: teamEintrag.rank,
+              points: teamEintrag.points,
+              pps: teamEintrag.disciplinePoints,
+              ppPow: teamEintrag.disciplinePointsByArea.pow,
+              ppSpe: teamEintrag.disciplinePointsByArea.spe,
+              ppMen: teamEintrag.disciplinePointsByArea.men,
+              ppSoc: teamEintrag.disciplinePointsByArea.soc,
+              /**
+               * Die Kurzfassung traegt die Rohwerte des Schnappschusses, die Auswahl trifft die
+               * Ansicht. Genau diese Reihenfolge stand vorher in der Projektion und ist die der
+               * Historienzeile: SAISONABSCHLUSS. Die Ewige Tabelle waehlt bewusst anders
+               * (Eintrittsstand der Folgesaison) — deshalb darf hier nichts vorab zusammengefasst
+               * werden.
+               */
+              // Dieselbe Rangfolge wie im Snapshot-Pfad oben: der gemeinsam
+              // eingefrorene Saisonstand zuerst, die spaeter ueberschriebenen
+              // Felder nur als Rueckfall fuer Altsaisons.
+              cash: teamEintrag.cashSeasonEnd ?? teamEintrag.cashEnd ?? teamEintrag.cashTotal,
+              salaryTotal:
+                teamEintrag.salarySeasonEnd ?? teamEintrag.salaryTotalEnd ?? teamEintrag.salaryEnd,
+              marketValue:
+                teamEintrag.marketValueSeasonEnd ??
+                teamEintrag.marketValueTotalEnd ??
+                teamEintrag.marketValueEnd,
+              guv: teamEintrag.guv,
+              topBuyPlayer: topBuy?.playerName ?? null,
+              topBuyPlayerId: topBuy?.playerId ?? null,
+              topBuyAmount: topBuy?.amount ?? null,
+              topSellPlayer: topSell?.playerName ?? null,
+              topSellPlayerId: topSell?.playerId ?? null,
+              topSellAmount: topSell?.amount ?? null,
+              topSellProfit:
+                topSell?.playerId != null
+                  ? resolveTeamSellProfit(input.gameState, team.teamId, topSell.playerId, topSell.amount ?? 0)
+                  : null,
+              /**
+               * Verletzungen gehen OHNE Schnappschuss: `seasonState.injuryEvents` faehrt in der
+               * Anfangsladung mit (am Live-Spielstand 2498 Eintraege) und traegt die Saison-ID
+               * selbst. Also wird die Spalte hier genauso gezaehlt wie im Schnappschuss-Pfad.
+               */
+              injuriesCount: (() => {
+                const anzahl = countTeamSeasonInjuries(input.gameState, team.teamId, eintrag.seasonId);
+                return anzahl > 0 ? anzahl : null;
+              })(),
+              /**
+               * Bleibt leer, und das ist keine Nachlaessigkeit: die Durchschnittsmuedigkeit
+               * braucht die Spieltagsergebnisse der alten Saison, und die faehrt niemand mit —
+               * sie sind der Grund, warum die Schnappschuesse ueberhaupt gestrichen werden.
+               */
+              averageFatigue: null,
+              disciplineValues: {},
+            } satisfies TeamDetailDrawerHistoryRow;
+          })
+          .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
       const archivedHistoryRows = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
         .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de", { numeric: true }))
         .map((snapshot) => {
@@ -517,9 +603,21 @@ export function useFoundationCrossTabTeamsRoster(input: {
             ppSpe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", areaPoints.spe),
             ppMen: resolveSeasonDisciplineAreaTotal(disciplineValues, "men", areaPoints.men),
             ppSoc: resolveSeasonDisciplineAreaTotal(disciplineValues, "soc", areaPoints.soc),
-            cash: teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
-            salaryTotal: teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
-            // Saisonend-Marktwert NACH Trainings-Apply/Neuberechnung zuerst — siehe all-time-table.ts.
+            // ALLE DREI SPALTEN AUS DEMSELBEN MOMENT.
+            //
+            // Die eingefrorenen `*SeasonEnd`-Felder zuerst: sie entstehen gemeinsam am
+            // Ende von `player_development` — nach Trainings-Apply und MW-Neuberechnung,
+            // vor dem ersten Verkauf. Die alten Felder dahinter bezeichnen andere
+            // Zeitpunkte: `cashEnd` den Stand NACH den Verkäufen, `salaryTotalEnd` und
+            // `marketValueTotalEnd` sogar den Eintrittsstand der FOLGE-Saison (der
+            // Eintritts-Patch überschreibt sie). Die Zeile zeigte dadurch drei Spalten
+            // mit drei Zeitpunkten, zwei davon aus der falschen Saison.
+            //
+            // Die Rückfallkette bleibt, damit Altsaisons ohne Freeze weiter etwas
+            // anzeigen — nur eben nachrangig.
+            cash: teamSnapshot.cashSeasonEnd ?? teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
+            salaryTotal:
+              teamSnapshot.salarySeasonEnd ?? teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
             marketValue:
               teamSnapshot.marketValueSeasonEnd ??
               teamSnapshot.marketValueTotalEnd ??
@@ -629,7 +727,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
         disciplineValues: {},
       });
       const archivedHistoryRowsBySeasonId = new Map(
-        archivedHistoryRows
+        [...archivedHistoryRows, ...projizierteHistorie]
           .filter((row) => row.seasonId !== input.gameState.season.id)
           .map((row) => [row.seasonId, row] as const),
       );

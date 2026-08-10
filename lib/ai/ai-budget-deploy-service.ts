@@ -13,10 +13,6 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { getTeamOptTarget } from "@/lib/ai/ai-market-plan-convergence-service";
 import {
-  getLeagueMarketAnchorsForState,
-  resolveMarketQualityProfile,
-} from "@/lib/ai/ai-market-quality-profile-service";
-import {
   getTeamPlannerRosterTarget,
   projectExpectedSalaryAtPlannerTarget,
   resolveTeamCashRunwayReserve,
@@ -125,8 +121,6 @@ export function estimateUpgradeBuyFloorMw(gameState: GameState, teamId: string) 
   const avgMw = teamMw / rosterCount;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const ambition = identity?.ambition ?? 5;
-  const profile = resolveMarketQualityProfile({ gameState, teamId, rosterCount });
-  const anchors = getLeagueMarketAnchorsForState(gameState);
   const baseFloor = round(Math.max(avgMw * 1.35, 22), 2);
   let floor = baseFloor;
   if (ambition >= 7) floor = round(Math.max(baseFloor, 32), 2);

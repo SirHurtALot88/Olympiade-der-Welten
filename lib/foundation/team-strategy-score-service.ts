@@ -123,7 +123,6 @@ export function buildTeamStrategyScores(input: {
   const boardConfidence = toScore(identity?.boardConfidence);
   const harmony = toScore(identity?.harmony);
   const manners = toScore(identity?.manners);
-  const popularity = toScore(identity?.popularity);
   const cooperation = toScore(identity?.cooperation);
   const axisFocus = axisSpecialization(identity);
   const themeSignals = hasThemeSignals(profile) ? 18 : 0;

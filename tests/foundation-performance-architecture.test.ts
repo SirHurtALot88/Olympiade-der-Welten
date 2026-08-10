@@ -493,10 +493,6 @@ describe("foundation performance architecture helpers", () => {
 
   it("wires marketSellBusy into the teams detail panel", async () => {
     const foundationText = await readFoundationOrchestratorSource(root);
-    const shellRouterBodyText = await fs.readFile(
-      path.join(root, "app/foundation/FoundationShellRouterBody.tsx"),
-      "utf8",
-    );
     const foundationSurfaceText = await readFoundationSurfaceSource(root);
     const pageStateText = await fs.readFile(
       path.join(root, "lib/foundation/tabs/use-foundation-page-state.ts"),
@@ -605,13 +601,32 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(marketSellHostText).toContain("use-market-sell-derivations");
-    expect(marketSellHostText).toContain('data-testid="transfer-sell-page"');
     const marketBuyHostText = await fs.readFile(
       path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx"),
       "utf8",
     );
     expect(marketBuyHostText).toContain("use-market-buy-derivations");
-    expect(marketBuyHostText).toContain('data-testid="transfer-offer-page"');
+
+    /**
+     * DIE TESTIDS STEHEN NICHT MEHR IN DEN HOSTS. Seit „Kauf und Verkauf auf einer Huelle" (#345)
+     * reichen beide Hosts ihre Testid als PROP `testId` an `FoundationDecisionSurface` durch, die
+     * daraus das `data-testid` rendert. Im DOM steht danach unveraendert dasselbe.
+     *
+     * Vorher stand hier auf beiden Seiten `toContain('data-testid="…"')` — als Text im Quelltext
+     * gesucht. Auf der Kaufseite schlug das seitdem fehl. Auf der Verkaufsseite bestand es weiter,
+     * aber aus dem falschen Grund: die Zeichenkette taucht dort nur noch in einem KOMMENTAR auf,
+     * der den Umzug erklaert. Eine Zusicherung, die ein Kommentar erfuellt, sichert nichts.
+     *
+     * Geprueft wird darum die Kette, auf die es ankommt: beide Hosts reichen ihre Testid durch,
+     * und die Huelle macht daraus wirklich ein `data-testid`.
+     */
+    expect(marketSellHostText).toContain('testId="transfer-sell-page"');
+    expect(marketBuyHostText).toContain('testId="transfer-offer-page"');
+    const decisionSurfaceText = await fs.readFile(
+      path.join(root, "app/foundation/decision-surface/FoundationDecisionSurface.tsx"),
+      "utf8",
+    );
+    expect(decisionSurfaceText).toContain("data-testid={testId}");
     const transfermarktV2Text = await fs.readFile(
       path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
       "utf8",
@@ -629,16 +644,34 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     const resultHostText = `${resultHostShellText}\n${resultHostNewLookText}`;
-    // NOTE: "use-matchday-result-derivations" (lib/foundation/tabs/use-matchday-result-derivations.ts)
-    // is no longer imported by either file above — it appears to be orphaned dead
-    // code. Its `matchdaySummaryTab` state was inlined directly into
-    // use-foundation-shell-router-body-scope.tsx instead, but that value is only
-    // destructured (never consumed) in FoundationShellRouterBody.tsx, and
-    // MatchdayResultNewLook.tsx has no "Spieltag/Saison" sub-tab toggle anymore.
-    // This looks like a possible real feature loss (see final report), so this
-    // assertion is intentionally left unchanged/red rather than papered over.
-    expect(resultHostText).toContain("use-matchday-result-derivations");
+    /**
+     * HIER STAND EINE ABSICHTLICH ROTE ZUSICHERUNG auf „use-matchday-result-derivations", mit dem
+     * Verdacht, der Umschalter „Spieltag / Saisonstand" sei verlorengegangen. Nachgesehen: er ist
+     * nicht verloren, er ist ueberfluessig geworden.
+     *
+     * Der alte Host (`32683df8^`) hatte zwei Knoepfe. Unter „Saisonstand" lag eine zweite Tabelle
+     * mit Tagesrang, Tagespunkten, D1/D2-Score, Rang vorher und nachher, Δ Rang und kumulierten
+     * Punkten. Genau diese Spalten zeigt `MatchdayResultNewLook` heute in EINER Tabelle — es gibt
+     * nichts mehr, zwischen dem man umschalten koennte.
+     *
+     * Der Hook war seit #211 von niemandem mehr importiert, sein Zustand hing nur noch als
+     * durchgereichte, nirgends gelesene Prop in der Wurzel. Beides ist jetzt entfernt. Statt der
+     * toten Verdrahtung sichert dieser Test, dass die Zusammenlegung haelt: beide Haelften des
+     * frueheren Umschalters muessen in derselben Tabelle stehen.
+     */
     expect(resultHostText).toContain('id="foundation-matchday-result"');
+    for (const spalte of [
+      "matchdayRank",
+      "matchdayPoints",
+      "d1Score",
+      "d2Score",
+      "seasonRankBeforeMatchday",
+      "seasonRankAfterMatchday",
+      "rankDelta",
+      "cumulativePoints",
+    ]) {
+      expect(resultHostNewLookText).toContain(spalte);
+    }
     const historyHostText = await fs.readFile(
       path.join(root, "app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost.tsx"),
       "utf8",
@@ -657,15 +690,33 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     const seasonPreviewHostText = `${seasonPreviewHostShellText}\n${seasonPreviewNewLookText}`;
-    // NOTE: "use-season-preview-derivations" (lib/foundation/tabs/use-season-preview-derivations.ts,
-    // which built the sortable/resizable/pinnable standings-preview column
-    // system) is no longer imported anywhere — it appears to be orphaned dead
-    // code. SeasonPreviewNewLook.tsx sorts with its own simple
-    // `compareProjectionRows` and has no column visibility/pinning UI anymore.
-    // This looks like a possible real feature loss (see final report), so this
-    // assertion is intentionally left unchanged/red rather than papered over.
-    expect(seasonPreviewHostText).toContain("use-season-preview-derivations");
+    /**
+     * AUCH HIER STAND EINE ABSICHTLICH ROTE ZUSICHERUNG, auf „use-season-preview-derivations".
+     * Der Hook baute ein Spaltensystem: sortieren per Kopfzeile, Breite ziehen, links und rechts
+     * anheften, Spalten aus- und einblenden. `SeasonPreviewNewLook` hat davon nichts mehr, es
+     * sortiert fest ueber `compareProjectionRows`.
+     *
+     * Nachgesehen: die DATEN sind vollstaendig geblieben — aktuelle Punkte, Matchday-Score und
+     * -Rang, Punkte-Delta, Punkte nachher, Vorschau-Rang, aktueller Rang, Result-Status. Verloren
+     * ist nur die BEDIENUNG der Spalten. Das ist eine Design-Entscheidung des neuen Looks, keine
+     * Panne, und die schlankere Tabelle bleibt. Der Hook war seit dem Umbau von niemandem mehr
+     * importiert und ist entfernt; wer das Spaltensystem zurueckwill, holt ihn aus der Historie.
+     *
+     * Gesichert wird darum das, was bleiben muss: die Vorschau zeigt weiterhin alle Kennzahlen.
+     */
     expect(seasonPreviewHostText).toContain('id="standings-preview"');
+    for (const kennzahl of [
+      "currentPoints",
+      "currentRank",
+      "matchdayScore",
+      "matchdayRank",
+      "pointsDelta",
+      "projectedPoints",
+      "projectedRank",
+      "resultStatus",
+    ]) {
+      expect(seasonPreviewNewLookText).toContain(kennzahl);
+    }
     const seasonHostText = await fs.readFile(
       path.join(root, "app/foundation/season-v2/FoundationSeasonV2Host.tsx"),
       "utf8",
@@ -704,18 +755,29 @@ describe("foundation performance architecture helpers", () => {
     expect(persistenceActionsText).toContain("applyCompactSeasonArchiveSentinelIfNeeded");
     expect(persistenceActionsText).toContain("invalidatePlayerProfileSessionCache");
     expect(persistenceActionsText).toContain("invalidatePlayerAttributeSheetCache");
-    // NOTE: `homeV2OverviewHeavyReady` (the state gating
-    // `enableTopPlayerForecasts` for the HQ home-v2 overview) was present in
-    // use-foundation-shell-router-body-scope.tsx before commit fd984c8
-    // ("fix(foundation): restore shell router scope so /foundation loads
-    // again") and was dropped by that commit's large refactor along with its
-    // wiring into buildFoundationHqOfficeDerivations. It is not referenced
-    // anywhere in app/ or lib/ anymore (only in this test's own local fixture
-    // data above and in use-foundation-cross-tab-player-directory.ts's now-
-    // unused function signatures). This looks like a real accidental feature
-    // loss (see final report), so this assertion is intentionally left
-    // unchanged/red rather than papered over.
-    expect(foundationText).toContain("homeV2OverviewHeavyReady");
+    /**
+     * `homeV2OverviewHeavyReady` staffelt den Aufbau der HQ-Uebersicht: erst das Geruest, die
+     * teuren Liga-Heat-Pools danach im Leerlauf. Bei `fd984c8` fiel die Sperre aus dem Scope, die
+     * Auswertung in `shouldBuildFoundationLeagueHeatPools` blieb stehen und fiel auf `?? true`
+     * zurueck — seither rechnete die Seite sofort mit. Dasselbe galt fuer `homeV2Tab`: ohne ihn
+     * zaehlte jeder HQ-Unterreiter als Uebersicht und baute die Pools mit auf.
+     *
+     * Die frueher hier stehende Zusicherung suchte den Namen im Orchestrator-Quelltext und war
+     * seitdem rot. Sie prueft jetzt die Stelle, an der die Sperre wirklich sitzt, und beide
+     * Haelften der Verdrahtung.
+     *
+     * Nicht wiederhergestellt: `enableTopPlayerForecasts` hing an derselben Sperre, laeuft aber
+     * ueber `FoundationHomeV2Host` — und der wird nur noch von `FoundationShellRouterHomeV2`
+     * gerendert, den niemand mehr aufruft. Der lebende HQ-Pfad geht ueber `FoundationHomeV2Panel`.
+     * Diese Haelfte haette also nichts bewirkt.
+     */
+    const shellScopeText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
+      "utf8",
+    );
+    expect(shellScopeText).toContain("const [homeV2OverviewHeavyReady, setHomeV2OverviewHeavyReady] = useState(false)");
+    expect(shellScopeText).toContain("requestIdleCallback(() => setHomeV2OverviewHeavyReady(true), { timeout: 1500 })");
+    expect(shellScopeText).toMatch(/homeV2Tab,\n\s*homeV2OverviewHeavyReady,/);
     // player-profile-session-cache is imported by use-foundation-persistence-actions.ts
     // (already read above as persistenceActionsText), not by the orchestrator directly.
     expect(persistenceActionsText).toContain("player-profile-session-cache");
@@ -796,7 +858,14 @@ describe("foundation performance architecture helpers", () => {
       path.join(root, "lib/foundation/tabs/use-foundation-page-state.ts"),
       "utf8",
     );
+    // 233 -> 237, bewusst angehoben statt heimlich durchgerutscht: „Verkauf: eine Buyout-Regel,
+    // ehrlicher MW-Vergleich, Sprung nach oben — plus Board-Bilanz per Zeilenklick" (#416) hat
+    // genau vier Zustaende ergaenzt, die zusammengehoeren — marketSellPeekBusy, -Error, -Preview
+    // und -Subject. Das ist die Vorschau, die beim Klick auf eine Board-Zeile laedt: laeuft gerade,
+    // ging schief, das Ergebnis, und fuer wen. Der Nachtrag blieb damals aus, seither war diese
+    // Ratsche rot. Die vier gehoerten laengerfristig eher in die Ansicht, die sie verbraucht, als
+    // in die Wurzel — aber das ist ein eigener Umbau, kein Nachtragen einer Zahl.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(233);
+    expect(useStateCallCount).toBeLessThanOrEqual(237);
   });
 });

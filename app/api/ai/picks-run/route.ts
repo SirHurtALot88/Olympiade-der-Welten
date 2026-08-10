@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     teamScope?: "ai" | "all";
     teamIds?: string[] | null;
     allowSetupAllTeams?: boolean;
+    includeManualTeams?: boolean;
     stepsPerTeam?: number | null;
     runMode?: "default" | "season1_optimum_execute" | null;
   };
@@ -100,6 +101,11 @@ export async function POST(request: Request) {
       teamScope: body.teamScope === "all" ? "all" : "ai",
       ...(teamIds ? { teamIds } : {}),
       allowSetupAllTeams: body.allowSetupAllTeams ?? false,
+      // Darf der Lauf ein menschlich gesteuertes Team anfassen? Standard NEIN. Der Client darf das
+      // setzen (die Nachpick-Knoepfe brauchen es fuer das EIGENE Team), aber `callerWritableTeamIds`
+      // darunter ist serverseitig berechnet und begrenzt jeden Lauf auf die Teams, die der
+      // Aufrufer schreiben darf — fremde Koop-Teilnehmer bleiben damit auch hier geschuetzt.
+      includeManualTeams: body.includeManualTeams ?? false,
       stepsPerTeam: body.stepsPerTeam ?? parseOptionalNumber(searchParams.get("stepsPerTeam")),
       runMode: body.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default",
       ...(callerWritableTeamIds ? { callerWritableTeamIds } : {}),

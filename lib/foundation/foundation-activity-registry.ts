@@ -45,6 +45,35 @@ function getPreseasonModeLabel(mode: FoundationActivityPreseasonRunSnapshot["mod
   return "Preseason";
 }
 
+/**
+ * Gründe, die eine Aktion zwar verhindern, aber KEINE Störung sind: eine
+ * Schutzregel hat planmäßig gegriffen.
+ *
+ * `ai_training_change_cadence_throttled` ist der Anti-Cheese-Riegel aus
+ * `ai-manager-apply-service.ts` — die KI darf ihre Trainingseinstellungen nur
+ * alle `AI_TRAINING_MIDSEASON_CADENCE_MATCHDAYS` aufgelösten Spieltage ändern,
+ * sonst würde sie jeden Spieltag umstellen und die Entwicklungsbalance der Liga
+ * zerfahren. An den Spieltagen dazwischen weist die Drossel pro Team vier
+ * Trainings-Aktionen ab (Fokus, Intensität, Modi, Klassen). Bei 31 KI-Teams
+ * sind das 124 „Blocker" — die die Aktivitätsleiste als roten Alarm zeigte,
+ * obwohl nichts hängt, sondern eine Regel funktioniert.
+ *
+ * Solche Gründe zählen hier nicht mit: weder für die Entscheidung, ob das rote
+ * Banner erscheint, noch in der Gründe-Liste. In der Aktions-Übersicht bleiben
+ * sie unverändert stehen — dort ist „gedrosselt" die richtige Auskunft darüber,
+ * warum eine geplante Aktion nicht ausgeführt wurde.
+ */
+const EXPECTED_PRESEASON_BLOCKING_REASONS = ["ai_training_change_cadence_throttled"] as const;
+
+function isExpectedPreseasonBlocker(reason: string): boolean {
+  return EXPECTED_PRESEASON_BLOCKING_REASONS.some((expected) => reason.includes(expected));
+}
+
+/** Blocker ohne die planmäßig gegriffenen Schutzregeln — nur echte Störungen. */
+export function getRealPreseasonBlockingReasons(run: FoundationActivityPreseasonRunSnapshot): string[] {
+  return run.blockingReasons.filter((reason) => !isExpectedPreseasonBlocker(reason));
+}
+
 function buildPreseasonStats(
   run: FoundationActivityPreseasonRunSnapshot,
   aiTeamsCount: number,
@@ -59,10 +88,17 @@ function buildPreseasonStats(
     stats.push({ label: "Verkäufe", value: `${run.transferSellsApplied}` });
   }
   if (run.managerActionsApplied > 0) {
-    stats.push({ label: "Setup-Aktionen", value: `${run.managerActionsApplied}` });
+    // „Setup-Aktionen" war Entwickler-Vokabular mitten im Spieler-Banner
+    // („482 SETUP-AKTIONEN") — gemeint sind die Team-Einstellungen (Training,
+    // Aufstellung, Strategie), die die KI für ihre Teams gesetzt hat.
+    stats.push({ label: "Team-Einstellungen", value: `${run.managerActionsApplied}` });
   }
-  if (run.blockingReasons.length > 0) {
-    stats.push({ label: "blockiert", value: `${run.blockingReasons.length}`, tone: "warning" });
+  // Gezählt wird, was wirklich hakt. Die planmäßig gegriffenen Schutzregeln stehen sonst als
+  // dreistellige Warnzahl in der Leiste („124 blockiert"), obwohl sie nur belegen, dass die
+  // Trainings-Kadenzdrossel ihre Arbeit tut.
+  const realBlockingReasons = getRealPreseasonBlockingReasons(run);
+  if (realBlockingReasons.length > 0) {
+    stats.push({ label: "blockiert", value: `${realBlockingReasons.length}`, tone: "warning" });
   }
   return stats;
 }
@@ -121,20 +157,30 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     });
   } else if (
     input.aiPreseasonRun &&
+    // Saison läuft bereits (erster Spieltag gewertet): der gespeicherte Preseason-Lauf
+    // ist Geschichte — sein „blockiert"-Banner wäre eine Dauermeldung ohne Handlung
+    // (der Markt selbst sagt längst „Transferfenster geschlossen · Saison läuft").
+    // Die Rohdaten des Laufs bleiben unangetastet; nur die Leiste zeigt ihn nicht mehr.
+    !input.preseasonWindowOver &&
     (input.aiPreseasonRun.status === "failed" ||
       // Blocker allein reichen NICHT für das rote "blockiert"-Banner: Ein Setup-Draft lässt
       // immer erwartete Aktionen blockiert (Einsatzliste/Training laufen erst NACH dem Kader-Draft).
       // Nur wenn der Lauf zusätzlich NICHT alle Teams abgeschlossen hat, hängt er echt fest.
-      (input.aiPreseasonRun.blockingReasons.length > 0 &&
+      //
+      // Gezählt werden dabei nur ECHTE Blocker: eine planmäßig gegriffene Schutzregel (etwa die
+      // Trainings-Kadenzdrossel) ist keine Störung und darf das Banner nicht auslösen — sonst
+      // meldet die Leiste Alarm dafür, dass eine Regel funktioniert.
+      (getRealPreseasonBlockingReasons(input.aiPreseasonRun).length > 0 &&
         input.aiPreseasonRun.aiTeamsCompleted < input.aiPreseasonRun.aiTeamsTotal))
   ) {
     // Der Lauf ist NICHT mehr aktiv, aber abgebrochen/blockiert stehengeblieben: persistente
     // rote Zeile mit den echten Gründen, damit man oben sofort sieht WARUM (Debugging).
     const run = input.aiPreseasonRun;
     const failed = run.status === "failed";
-    const reasons = run.blockingReasons.slice(0, 8);
-    if (run.blockingReasons.length > 8) {
-      reasons.push(`… +${run.blockingReasons.length - 8} weitere`);
+    const realReasons = getRealPreseasonBlockingReasons(run);
+    const reasons = realReasons.slice(0, 8);
+    if (realReasons.length > 8) {
+      reasons.push(`… +${realReasons.length - 8} weitere`);
     }
     activities.push({
       id: "ai-preseason-blocked",

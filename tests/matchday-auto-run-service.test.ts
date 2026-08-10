@@ -35,13 +35,6 @@ function findPlayerPreview(
   return null;
 }
 
-function findPlayerFinalScore(
-  preview: LegacyMatchdayResolvePreview,
-  teamId: string,
-  playerId: string,
-): number | null {
-  return findPlayerPreview(preview, teamId, playerId)?.finalPlayerScore ?? null;
-}
 
 function createInMemoryPersistence(gameState: GameState, cloneOnRead = false): PersistenceService {
   let save: PersistedSaveGame = {

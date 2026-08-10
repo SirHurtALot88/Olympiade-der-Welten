@@ -1,4 +1,4 @@
-import type { GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveRosterTargets, deriveSeason1TargetRosterSize } from "@/lib/foundation/roster-limits";
@@ -45,7 +45,6 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 import { isLongRunContext } from "@/lib/season/long-run-profile";
 import { planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
 
-const LEGAL_MINIMUM_ROSTER_SIZE = 7;
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
 
 export type AiPicksRunParams = {
@@ -57,6 +56,25 @@ export type AiPicksRunParams = {
   teamScope?: "ai" | "all";
   teamIds?: string[] | null;
   allowSetupAllTeams?: boolean;
+  /**
+   * Darf dieser Lauf auch MENSCHLICH gesteuerte Teams bedienen? Standard: NEIN.
+   *
+   * `allowSetupAllTeams` hat diesen Schutz frueher implizit mit abgeschaltet — `chooseTeams`
+   * ermittelte den Kontrollmodus und las ihn im Setup-Fall dann nicht mehr. Damit konnte ein
+   * Wartungslauf (z. B. der Preseason-Kauf-Batch) den Kader des Spielers umbauen, ohne dass es
+   * irgendwo hingeschrieben stand.
+   *
+   * Die beiden Faelle sind jetzt getrennt: `allowSetupAllTeams` heisst weiterhin „der Lauf darf
+   * ueber die ganze Liga gehen", und NUR dieses Flag hebt zusaetzlich den Control-Mode-Schutz auf.
+   * Gesetzt wird es dort, wo ein menschliches Team absichtlich bedient wird:
+   *   - der erstmalige Liga-Draft (frischer Spielstand: jedes Team bekommt seinen Startkader),
+   *   - die manuellen Nachpick-Knoepfe (der Spieler hat sie fuer sein Team selbst gedrueckt),
+   *   - Simulationen/Audits, die eine ganze Saison ohne Menschen durchrechnen.
+   * Im Koop bleibt darueber hinaus `callerWritableTeamIds` massgeblich: es begrenzt jeden Lauf auf
+   * die Teams, die der Aufrufer ueberhaupt schreiben darf — fremde Teilnehmer sind damit auch dann
+   * geschuetzt, wenn dieses Flag gesetzt ist.
+   */
+  includeManualTeams?: boolean;
   // Server-computed (never client-supplied) set of team ids the calling participant is actually
   // allowed to write — AI/passive-controlled teams plus the caller's own team(s); see
   // `resolveAiBulkTeamWriteScope`. When provided, further restricts whatever `chooseTeams` would
@@ -587,11 +605,6 @@ function isColdSteelThemeBreaker(playerClass: string | null | undefined, race: s
   return tokens.some((token) => token === "demon" || token === "monster" || token === "chaos" || token === "undead");
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
 
 function sortCountEntries(map: Map<string, number>) {
   return [...map.entries()]
@@ -843,32 +856,6 @@ function shouldStopSeason1ExecutePick(input: {
   return input.rosterCount >= input.targetRosterSize && !input.spendDownRequired;
 }
 
-function shouldStopTeamExecuteLoop(input: {
-  runMode: AiNeedsPicksRunMode;
-  rosterCount: number;
-  targetRosterSize: number | null;
-  playerMax: number | null;
-  previewTeam: AiPicksRunTeamResult;
-  remainingCash: number | null;
-  remainingSalary: number | null;
-}) {
-  if (input.targetRosterSize == null) {
-    return false;
-  }
-  if (input.runMode === "season1_optimum_execute") {
-    return shouldStopSeason1ExecutePick({
-      rosterCount: input.rosterCount,
-      targetRosterSize: input.targetRosterSize,
-      playerMax: input.playerMax,
-      spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
-        input.previewTeam,
-        input.remainingCash,
-        input.remainingSalary,
-      ),
-    });
-  }
-  return input.rosterCount >= input.targetRosterSize;
-}
 
 function getExistingAutoTransfers(gameState: GameState, teamId: string) {
   return gameState.transferHistory.filter(
@@ -2489,17 +2476,27 @@ function buildTraceParity(input: {
   };
 }
 
-function chooseTeams(gameState: GameState, teamScope: "ai" | "all", allowSetupAllTeams: boolean, teamIds?: string[] | null) {
+function chooseTeams(
+  gameState: GameState,
+  teamScope: "ai" | "all",
+  allowSetupAllTeams: boolean,
+  teamIds?: string[] | null,
+  includeManualTeams = false,
+) {
   const requestedTeamIds = new Set((teamIds ?? []).map((teamId) => teamId.trim()).filter(Boolean));
   return gameState.teams.filter((team) => {
     if (requestedTeamIds.size > 0 && !requestedTeamIds.has(team.teamId)) {
       return false;
     }
     const controlMode = getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
-    if (teamScope === "all" && allowSetupAllTeams) {
-      return true;
+    // HIER stand `if (teamScope === "all" && allowSetupAllTeams) return true;` — der Kontrollmodus
+    // wurde eine Zeile vorher sauber ermittelt und dann nicht mehr gelesen. Ein Setup-Lauf gab
+    // damit JEDES Team frei, auch das des Spielers. Der Schutz haengt jetzt an einem eigenen,
+    // ausdruecklichen Flag statt als Nebenwirkung an „Lauf ueber die ganze Liga".
+    if (controlMode !== "ai") {
+      return teamScope === "all" && allowSetupAllTeams && includeManualTeams;
     }
-    return controlMode === "ai";
+    return true;
   });
 }
 
@@ -3570,6 +3567,8 @@ export async function runAiPicksExecutePreview(
 
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const allowSetupAllTeams = Boolean(params.allowSetupAllTeams);
+  // Standard NEIN: nur ausdrueckliche Aufrufer duerfen ein menschlich gesteuertes Team bedienen.
+  const includeManualTeams = Boolean(params.includeManualTeams);
   const runMode: AiNeedsPicksRunMode = params.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default";
   const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 14 : 5;
   const baseStepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), DRAFT_MAX_STEPS_CAP));
@@ -3598,7 +3597,7 @@ export async function runAiPicksExecutePreview(
     });
   }
   const localRunContext = previewRunContext;
-  const scopedTeams = chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds);
+  const scopedTeams = chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds, includeManualTeams);
   const callerWritableTeamIds = params.callerWritableTeamIds ? new Set(params.callerWritableTeamIds) : null;
   const skippedTeamIds = callerWritableTeamIds
     ? scopedTeams.filter((team) => !callerWritableTeamIds.has(team.teamId)).map((team) => team.teamId)
@@ -3853,7 +3852,9 @@ export async function runAiPicksExecutePreview(
     }
 
     const activeControlMode = getActiveControlMode(latestSave.gameState, latestTeam.teamId);
-    if (activeControlMode !== "ai" && !(teamScope === "all" && allowSetupAllTeams)) {
+    // Zweiter Riegel im Execute (der Kontrollmodus kann sich zwischen Preview und Execute geaendert
+    // haben). Gleiche Regel wie in `chooseTeams`: der Setup-Bypass allein reicht NICHT mehr.
+    if (activeControlMode !== "ai" && !(teamScope === "all" && allowSetupAllTeams && includeManualTeams)) {
       executedTeams.push({
         ...previewTeam,
         controlMode: activeControlMode,

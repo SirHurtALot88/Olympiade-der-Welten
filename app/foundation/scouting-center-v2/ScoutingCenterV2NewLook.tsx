@@ -8,7 +8,6 @@ import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingRep
 import ScoutingShortlistBoard from "@/app/foundation/scouting-center-v2/ScoutingShortlistBoard";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
-  NlBarChart,
   NlCard,
   NlGauge,
   NlProgressBar,
@@ -16,11 +15,8 @@ import {
   NlSubTabs,
   StatChip,
   StatChipRow,
-  NL_AXIS_LABELS,
-  formatNlNumber,
   type NlAxisKey,
   type NlRadarAxis,
-  type NlTone,
 } from "@/components/foundation/new-look";
 import { VeloStarRating } from "@/components/foundation/velo-ui/VeloStarRating";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
@@ -280,19 +276,27 @@ export default function ScoutingCenterV2NewLook({
           items={[
             { id: "overview", label: "Übersicht", count: queueEntries.length || undefined },
             { id: "reports", label: "Scouting Report" },
-            { id: "recommended", label: "Empfehlungen", count: readyToBuyEntries.length || undefined },
           ]}
         />
       ) : null}
 
       {activeTab === "overview" || activeTab === "recommended" ? (
         <StatChipRow className="nl-scout-stats" aria-label="Scouting-Kennzahlen">
-          {/* #31 — Header-StatChips als Portale: Budget → Markt, Stufe → Facilities. */}
+          {/* #31 — Header-StatChips als Portale: Cash → Markt, Stufe → Facilities. */}
+          {/* BUGFIX (Durchklick): die Kachel hieß „Budget", zeigte aber das aktuelle Team-Cash
+              (`selectedStandingRow.cash`, z. B. 2,5 Mio) — das Team-BUDGET wäre der Startwert
+              (`team.budget`, z. B. 205) und für eine Kaufentscheidung wertlos. Die Kachel heißt
+              jetzt, was sie zeigt: das am Markt verfügbare Cash. */}
           <StatChip
-            label="Budget"
+            label="Cash"
             value={recruitmentBudget}
             tone="accent"
-            title={draftContextNote ? `${draftContextNote} · Zum Transfermarkt` : "Zum Transfermarkt"}
+            sub="verfügbar am Markt"
+            title={
+              draftContextNote
+                ? `${draftContextNote} · Aktuelles Team-Cash — damit wird am Transfermarkt bezahlt. Zum Transfermarkt`
+                : "Aktuelles Team-Cash — damit wird am Transfermarkt bezahlt. Zum Transfermarkt"
+            }
             onClick={onOpenMarket}
           />
           <StatChip
@@ -309,7 +313,7 @@ export default function ScoutingCenterV2NewLook({
             sub={scoutingFacilityLabel}
             title={
               onOpenFacilities
-                ? "Zu den Facilities — Scouting Office upgraden für schnellere Enthüllung."
+                ? "Zu den Gebäuden — Scouting Office upgraden für schnellere Enthüllung."
                 : "Progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar."
             }
             onClick={onOpenFacilities}
@@ -317,7 +321,14 @@ export default function ScoutingCenterV2NewLook({
         </StatChipRow>
       ) : null}
 
-      {activeTab === "overview" ? (
+      {/*
+        S3 (Audit „markt"): der eigene "Empfehlungen"-Reiter bestand am Saisonstart aus einer
+        einzigen "Kaufbereit"-Karte plus zwei Zeilen Erklärtext — als eigener Reiter kaum
+        tragfähig. Gefaltet in die Übersicht (Nav-Item entfernt oben); `activeTab === "recommended"`
+        bleibt als Fallback für alte Deep-Links (`?tab=recommended`) erhalten und zeigt jetzt
+        dieselbe Übersicht statt einer leeren Seite.
+      */}
+      {activeTab === "overview" || activeTab === "recommended" ? (
         <>
           <NlCard className="nl-scout-office-card" eyebrow="Scouting Office" title="Slots & Speed pro Spieltag">
             {scoutingFacilityLevel <= 0 ? (
@@ -408,6 +419,69 @@ export default function ScoutingCenterV2NewLook({
           </NlCard>
 
           <NlCard
+            className="nl-scout-recommend-card"
+            eyebrow="Empfehlungen"
+            title="Nächste Schritte"
+            data-testid="scouting-recommendations"
+          >
+            <p className="nl-scout-muted">
+              Voll gescoutete Wishlist-Spieler sind kaufbereit. Der Fokus in der Übersicht scoutet den nächsten Kandidaten
+              automatisch weiter.
+            </p>
+
+            {focusEntry ? (
+              <div className="nl-scout-focus-strip">
+                <span className="nl-scout-eyebrow">Aktueller Fokus</span>
+                {/* #70 — Live-Fortschritts-Strip mit ETA: echtes certainty% + Fokus-ETA. */}
+                <NlProgressBar
+                  value={Math.max(0, Math.min(100, focusEntry.certainty))}
+                  max={100}
+                  label="Fokus-Intel bis Vollbild"
+                  tone="accent"
+                  format={(value) => `${Math.round(value)}%${focusEtaLabel ? ` · noch ${focusEtaLabel}` : ""}`}
+                  className="nl-scout-focus-progress"
+                />
+                <NlScoutPortraitCard
+                  entry={focusEntry}
+                  statusLabel={`${focusEntry.certainty}% Intel`}
+                  statusTone="focus"
+                  etaLabel={focusEtaLabel}
+                  onOpenPlayer={onOpenPlayer}
+                  onOpenReport={() => {
+                    onSelectReportPlayer?.(focusEntry.playerId);
+                    setActiveTab("reports");
+                  }}
+                />
+              </div>
+            ) : null}
+
+            {readyToBuyEntries.length > 0 ? (
+              <>
+                <span className="nl-scout-eyebrow">Kaufbereit</span>
+                <div className="nl-scout-ready-grid">
+                  {readyToBuyEntries.map((entry) => (
+                    <NlScoutPortraitCard
+                      key={entry.playerId}
+                      entry={entry}
+                      statusLabel="Kaufbereit"
+                      statusTone="ready"
+                      radarAxes={getReadyRadarAxes(entry.playerId)}
+                      marketValueLabel={getReadyMarketValueLabel(entry.playerId)}
+                      onOpenPlayer={onOpenPlayer}
+                      onOpenReport={() => {
+                        onSelectReportPlayer?.(entry.playerId);
+                        setActiveTab("reports");
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="nl-scout-muted nl-scout-recommend-empty">Noch niemand vollständig gescoutet.</p>
+            )}
+          </NlCard>
+
+          <NlCard
             className="nl-scout-queue-card"
             eyebrow="Scouting-Warteschlange"
             title="Wishlist — per Drag & Drop sortieren"
@@ -462,52 +536,15 @@ export default function ScoutingCenterV2NewLook({
 
       {activeTab === "reports" ? (
         <NlCard className="nl-scout-report-card">
-          {/* #19 — Top-6-Impact als Vorher/Nachher-Balkendiagramm (Spiegel), echte report.axisImpact-Werte. */}
-          {report && report.axisImpact.length > 0 ? (
-            <div className="nl-scout-impact-mirror" aria-label="Top-6 Achsen-Impact vorher und nach dem Kauf">
-              <div className="nl-scout-impact-head">
-                <span className="nl-scout-eyebrow">Top-6 Achsen-Impact (dein Team)</span>
-                {report.axisImpactComposite.before != null && report.axisImpactComposite.after != null ? (
-                  <span className="nl-scout-impact-summary nl-tnum">
-                    Ø {formatNlNumber(report.axisImpactComposite.before, 1)} → {formatNlNumber(report.axisImpactComposite.after, 1)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="nl-scout-impact-charts">
-                <div className="nl-scout-impact-chart">
-                  <span className="nl-scout-impact-chart-label">Vorher</span>
-                  <NlBarChart
-                    bars={report.axisImpact.map((row) => ({
-                      label: NL_AXIS_LABELS[row.axis as NlAxisKey] ?? row.axis,
-                      value: row.before ?? Number.NaN,
-                      tone: row.axis as NlTone,
-                    }))}
-                    max={100}
-                    format={(value) => formatNlNumber(value, 1)}
-                    aria-label="Top-6 Achsen-Schnitt vorher"
-                  />
-                </div>
-                <div className="nl-scout-impact-chart">
-                  <span className="nl-scout-impact-chart-label">Mit Kauf</span>
-                  <NlBarChart
-                    bars={report.axisImpact.map((row) => ({
-                      label: NL_AXIS_LABELS[row.axis as NlAxisKey] ?? row.axis,
-                      value: row.after ?? Number.NaN,
-                      tone: row.axis as NlTone,
-                    }))}
-                    max={100}
-                    format={(value) => formatNlNumber(value, 1)}
-                    aria-label="Top-6 Achsen-Schnitt mit Kauf"
-                  />
-                </div>
-              </div>
-              {!report.impactIsExact ? (
-                <small className="nl-scout-muted">
-                  Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
-                </small>
-              ) : null}
-            </div>
-          ) : null}
+          {/*
+            S1 (Audit „markt"): hier stand vorher zusätzlich ein bildschirmfüllendes
+            Vorher/Nachher-Balkendiagramm (acht Balken) über dem Spielerkopf — bevor man wusste,
+            wessen Report man überhaupt sieht. `ScoutingReportPanel` zeigt den Spielerkopf ZUERST
+            und trägt dieselben `report.axisImpact`-Werte bereits als kompakte Chip-Zeile
+            ("Top-6 Impact (dein Team)", `scouting-report-axis-impact-row`) — eine Quelle, ein
+            Zehntel der Fläche. Die Balken-Spiegelung war eine zweite Darstellung derselben Zahlen,
+            keine zusätzliche Information; ersatzlos raus statt neu gebaut.
+          */}
           <ScoutingReportPanel
             report={report}
             onOpenPlayer={onOpenPlayer}
@@ -535,71 +572,6 @@ export default function ScoutingCenterV2NewLook({
               </div>
             </div>
           ) : null}
-        </NlCard>
-      ) : null}
-
-      {activeTab === "recommended" ? (
-        <NlCard
-          className="nl-scout-recommend-card"
-          eyebrow="Empfehlungen"
-          title="Nächste Schritte"
-          data-testid="scouting-recommendations"
-        >
-          <p className="nl-scout-muted">
-            Voll gescoutete Wishlist-Spieler sind kaufbereit. Der Fokus in der Übersicht scoutet den nächsten Kandidaten
-            automatisch weiter.
-          </p>
-
-          {focusEntry ? (
-            <div className="nl-scout-focus-strip">
-              <span className="nl-scout-eyebrow">Aktueller Fokus</span>
-              {/* #70 — Live-Fortschritts-Strip mit ETA: echtes certainty% + Fokus-ETA. */}
-              <NlProgressBar
-                value={Math.max(0, Math.min(100, focusEntry.certainty))}
-                max={100}
-                label="Fokus-Intel bis Vollbild"
-                tone="accent"
-                format={(value) => `${Math.round(value)}%${focusEtaLabel ? ` · noch ${focusEtaLabel}` : ""}`}
-                className="nl-scout-focus-progress"
-              />
-              <NlScoutPortraitCard
-                entry={focusEntry}
-                statusLabel={`${focusEntry.certainty}% Intel`}
-                statusTone="focus"
-                etaLabel={focusEtaLabel}
-                onOpenPlayer={onOpenPlayer}
-                onOpenReport={() => {
-                  onSelectReportPlayer?.(focusEntry.playerId);
-                  setActiveTab("reports");
-                }}
-              />
-            </div>
-          ) : null}
-
-          {readyToBuyEntries.length > 0 ? (
-            <>
-              <span className="nl-scout-eyebrow">Kaufbereit</span>
-              <div className="nl-scout-ready-grid">
-                {readyToBuyEntries.map((entry) => (
-                  <NlScoutPortraitCard
-                    key={entry.playerId}
-                    entry={entry}
-                    statusLabel="Kaufbereit"
-                    statusTone="ready"
-                    radarAxes={getReadyRadarAxes(entry.playerId)}
-                    marketValueLabel={getReadyMarketValueLabel(entry.playerId)}
-                    onOpenPlayer={onOpenPlayer}
-                    onOpenReport={() => {
-                      onSelectReportPlayer?.(entry.playerId);
-                      setActiveTab("reports");
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="nl-scout-muted nl-scout-recommend-empty">Noch niemand vollständig gescoutet.</p>
-          )}
         </NlCard>
       ) : null}
 

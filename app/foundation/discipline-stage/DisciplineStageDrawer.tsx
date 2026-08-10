@@ -913,7 +913,6 @@ function TeamBody({
   };
 
   const secondaryRail = "color-mix(in srgb, var(--accent2) 70%, transparent)";
-  const section1Tint = "color-mix(in srgb, var(--accent) 5%, var(--nl-panel))";
   const section2Tint = "color-mix(in srgb, var(--accent2) 5%, var(--nl-panel))";
   const hasLineupContext = Boolean(schedule || draft) || fieldedIds.length > 0;
 

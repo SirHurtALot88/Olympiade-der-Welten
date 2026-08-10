@@ -2,7 +2,6 @@ import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getSeasonEconomyFactorWindow, SEASON_ECONOMY_FACTOR_WINDOW_SIZE } from "@/lib/season/season-economy-factors";
@@ -10,7 +9,6 @@ import { buildTransferFinanceAudit, isTransferFinanceViolationForSeason } from "
 import { isDraftBuySource } from "@/lib/season/transfer-standings-balance";
 import { findSeasonOneForbiddenBuySources } from "@/lib/season/transfer-season-policy";
 import {
-  buildPlayerAvailabilityByPlayerId,
   countSeasonInjuryEvents,
   listNonRosterAvailabilityEntries,
 } from "@/lib/season/long-run-fatigue-collect";
@@ -100,9 +98,6 @@ function isFemale(gender: string) {
   return ["female", "f", "weiblich", "w"].includes(gender.toLowerCase());
 }
 
-function isMale(gender: string) {
-  return ["male", "m", "männlich"].includes(gender.toLowerCase());
-}
 
 function auditIdentityTeams(gameState: GameState): PhaseAuditCheck[] {
   const checks: PhaseAuditCheck[] = [];
@@ -181,6 +176,28 @@ function auditDraftPackage(save: PersistedSaveGame, context: LongRunPhaseAuditCo
   const cashMismatch: string[] = [];
   const unpaidRoster: string[] = [];
 
+  /**
+   * SPONSORENGELD ZAEHLT MIT, SONST MELDET DER AUDIT EINEN FEHLER, DEN ES NICHT GIBT.
+   *
+   * Die Pruefung unten rechnet „ausgegeben = Budget minus Cash" und unterstellt damit, dass Cash
+   * beim Budget startet und waehrend des Drafts nur SINKT. Das stimmt nicht: Sponsoren zahlen schon
+   * in der Draftphase aus (`sponsor-settlement-service`, protokolliert in `sponsorPayoutLogs`).
+   *
+   * GEMESSEN am Sandbox-Lauf (fresh-season-1, 32 Teams): genau 10 Teams hatten eine Auszahlung, und
+   * genau diese 10 meldete der Audit als Cash/Fee-Mismatch — neun davon auf den Cent identisch mit
+   * der Auszahlung (W-W 17.7, V-V 19.3, V-D 17.8, S-S 17.3, R-L 17.1, N-W 20.1, L-R 18.9, H-R 19.7,
+   * D-P 19.5). Die uebrigen 22 Teams stimmten exakt. Es war also nie Geld aus dem Nichts, sondern
+   * eine Einnahme, die die Formel nicht kannte.
+   *
+   * Der Audit lief deshalb seit jeher RED und blockierte den Sandbox-Lauf nach Saison 1.
+   */
+  const sponsorEinnahmeByTeam = new Map<string, number>();
+  for (const log of gameState.seasonState?.sponsorPayoutLogs ?? []) {
+    if (!log?.teamId) continue;
+    if (log.seasonId && log.seasonId !== seasonId) continue;
+    sponsorEinnahmeByTeam.set(log.teamId, (sponsorEinnahmeByTeam.get(log.teamId) ?? 0) + (log.cashDelta ?? 0));
+  }
+
   for (const team of gameState.teams) {
     const identity = identityByTeam.get(team.teamId);
     const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
@@ -204,7 +221,10 @@ function auditDraftPackage(save: PersistedSaveGame, context: LongRunPhaseAuditCo
     const draftFees = teamDraftBuys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
     const budget = team.budget ?? 0;
     const cash = team.cash ?? 0;
-    const spent = budget - cash;
+    // Einnahmen der Draftphase gegenrechnen, sonst sieht eine Sponsorenzahlung wie ein fehlender
+    // Cash-Abzug aus (siehe sponsorEinnahmeByTeam oben).
+    const sponsorEinnahme = sponsorEinnahmeByTeam.get(team.teamId) ?? 0;
+    const spent = budget + sponsorEinnahme - cash;
     if (Math.abs(spent - draftFees) > Math.max(2, budget * 0.02)) {
       cashMismatch.push(`${team.shortCode}:${round(spent)}/${round(draftFees)}`);
     }

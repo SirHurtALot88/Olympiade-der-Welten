@@ -1,4 +1,4 @@
-import type { ContractYearSalary, Player, PlayerGeneratorAttributes, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { contractShapeLabel } from "@/lib/foundation/contract-shape-label";
 import {
@@ -130,7 +130,6 @@ export type PlayerEconomyContract = {
 
 type ImportedMarketValueSource = Extract<PlayerEconomyMarketValueSource, "imported_display" | "imported_raw">;
 type ImportedSalarySource = Extract<PlayerEconomySalarySource, "imported_display" | "imported_raw">;
-type ImportedPurchasePriceSource = Extract<PlayerEconomyPurchasePriceSource, "imported_display" | "imported_raw">;
 
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -224,7 +223,6 @@ export function resolvePlayerEconomyContract(input: {
   const legacyDisplayMarketValue = normalizeStoredEconomyValue(player?.displayMarketValue);
   const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
   const rosterPurchasePrice = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.purchasePrice));
-  const rosterCurrentValue = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.currentValue));
   const rosterContractSalaries = resolveRosterContractSalaries(rosterEntry);
   const rosterSalary = rosterContractSalaries.currentSeasonSalary;
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);

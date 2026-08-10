@@ -274,8 +274,10 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-top-player-card");
     expect(fileText).toContain("legacy-lineup-result-team-card");
     expect(fileText).toContain("D1 / D2 Lineup-Zonen");
-    expect(fileText).toContain("Expert Modus");
-    expect(fileText).toContain("legacy-lineup-expert-mode-v1");
+    // "Expert Modus" / "legacy-lineup-expert-mode-v1": mit dem Ausbau des Expertenmodus
+    // gestrichen (Entscheidung Chris, 2026-08-09). Der Modus schaltete ins Leere —
+    // `setIsExpertModeEnabled` hatte nie einen Aufrufer, die Panels dahinter gab es
+    // nicht mehr. Der ganze Cluster ist entfernt, damit auch diese beiden Zusagen.
     // formatWeightInfo war ein toter Formatierer ohne Aufrufer; die folgenden
     // fünf Strings/Namen (legacy-lineup-focus-switch bis legacy-lineup-slot-fit-pill)
     // waren schon vor dem Dead-Code-Cleanup nicht mehr im Quelltext — Teil des

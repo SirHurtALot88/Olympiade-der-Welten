@@ -58,10 +58,6 @@ function teamCode(gameState: GameState, teamId: string | null | undefined) {
   return gameState.teams.find((team) => team.teamId === teamId)?.shortCode ?? teamId;
 }
 
-function teamName(gameState: GameState, teamId: string | null | undefined) {
-  if (!teamId) return "";
-  return gameState.teams.find((team) => team.teamId === teamId)?.name ?? teamId;
-}
 
 function writeCsv(file: string, rows: Record<string, CsvValue>[]) {
   const headers = Array.from(rows.reduce((set, row) => {

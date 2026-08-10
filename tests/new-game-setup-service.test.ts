@@ -113,7 +113,23 @@ describe("new-game-setup-service", () => {
 
     const offers = getTeamSponsorOffers(gameState, "M-M");
     expect(offers).toHaveLength(5);
-    expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
+    // Fünf Karten, und das war lange nicht so: Die Angebote entstehen hier, wo `rosters` noch
+    // leer ist (der Liga-Draft läuft erst im Flow-Schritt `fill_roster`). Die Achse
+    // `kaderpflege` fragte „hat dieses Team einen Kader?" und fiel deshalb für JEDES Team aus
+    // dem Angebot; mit dem Saison-1-Ausschluss von `wachstum` blieben drei Achsen übrig und der
+    // Deckel `min(5, 1 + Achsen)` lieferte 4 Karten. Schlimmer als die fehlende Karte war, dass
+    // `chooseSponsorOfferForAiTeams` direkt danach läuft: Alle 31 KI-Teams unterschrieben aus
+    // dem verkürzten Slate, und unterschriebene Angebote werden nie neu gebaut.
+    //
+    // Archetypen: In Saison 1 sind genau ZWEI erreichbar, nicht drei. Der Archetyp folgt der
+    // Achse (`SPONSOR_AXIS_ARCHETYPE`), und `performance` hängt allein an `wachstum` — der
+    // Marktwert-Achse, die in Saison 1 bewusst ausgeschlossen ist, weil ihr die Vorsaison als
+    // Messbasis fehlt. Die vier verbleibenden Achsen verteilen sich auf `identity` (ausbau,
+    // entwicklung) und `security` (soliditaet, kaderpflege). Die frühere Erwartung von drei
+    // Archetypen war also nie erfüllbar, seit `wachstum` in Saison 1 entfällt — sie hat den
+    // Kartenmangel mit verdeckt, statt ihn zu zeigen.
+    const archetypen = new Set(offers.map((offer) => offer.archetype));
+    expect(archetypen).toEqual(new Set(["identity", "security"]));
     expect(offers.every((offer) => offer.seasonId === gameState.season.id)).toBe(true);
 
     // Deterministic: rebuilding from the same baseline input yields identical offer ids, not a

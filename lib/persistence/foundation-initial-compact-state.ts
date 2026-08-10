@@ -1,5 +1,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
+import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
+import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -124,6 +126,25 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
       ...gameState.seasonState,
       persistedSeasonDerivations: undefined,
       seasonSnapshots: undefined,
+      /**
+       * Ersatz fuer die gestrichenen Schnappschuesse — siehe
+       * `foundation-season-history-projection`. Ohne das zeigte die Saison-Verlauf-Karte fuer jede
+       * vergangene Saison „—", weil die Historie mangels Schnappschuss auf Platzhalterzeilen mit
+       * `rank: null` zurueckfiel. Die Daten waren nie weg, sie kamen nur nie im Browser an.
+       *
+       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz vergleicht nur die Anzahl der
+       * Eintraege, eine gleich lange Kurzfassung kaeme also durch und wuerde die vollen
+       * Schnappschuesse beim naechsten Speichern ueberschreiben.
+       */
+      foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
+      /**
+       * Geschwister-Projektion fuers laufende Feld-Rennen: der Browser kann die gewerteten
+       * Spieltage aus dem kompakten Payload nicht mehr selbst zaehlen (matchdayResults/
+       * disciplineResults sind hier auf den aktiven Spieltag beschnitten) — Home meldete
+       * deshalb mitten in der Saison „erst 0 Spieltage". Die fertige Antwort faehrt mit,
+       * gerechnet auf dem vollen Save; zurueckgeschrieben wird sie nie (s. u.).
+       */
+      foundationFieldRace: projiziereFieldRace(gameState),
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
@@ -217,6 +238,17 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
         incoming.seasonState.seasonSnapshots,
         existing.seasonState.seasonSnapshots,
       ),
+      /**
+       * FAELLT HIER RAUS, IMMER. Die Kurzfassung der Saisonhistorie faehrt nur zum Browser hinaus
+       * (siehe `compactFoundationInitialGameState`); zurueck darf sie nicht. Sie ist eine
+       * Projektion aus `seasonSnapshots`, also abgeleitet — im Spielstand haette sie nichts zu
+       * suchen ausser Gewicht, und jede Aenderung an den echten Schnappschuessen wuerde sie still
+       * veralten lassen. Beim naechsten Ausliefern wird sie ohnehin frisch gebaut.
+       */
+      foundationSeasonHistory: undefined,
+      // Dieselbe Regel wie die Saison-Historie darueber: reine Anzeigefracht, faehrt nur
+      // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
+      foundationFieldRace: undefined,
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

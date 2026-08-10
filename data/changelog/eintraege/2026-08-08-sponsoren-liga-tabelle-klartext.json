@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Welt · Sponsoren",
+  "text": "Die Liga-Sponsorenübersicht war ein Raster aus 32 Karten mit beidseitig gestutzten Namen ('Zero…' / 'Jaguar La…') — jetzt eine sortierbare Tabelle mit vollen Team- und Sponsornamen, Spaltenköpfe klickbar. Modell-Jargon ist raus: 'EV-NEUTRAL' heisst jetzt 'ausgewogenes Bonus/Malus-Profil', der rohe Vertrags-Schlüssel 'identity special' heisst 'Identitäts-Paket', und die Sponsorsystem-Kennzeichnung ist eine stille Fußnote statt einer auffälligen Pille. Geldbeträge tragen jetzt durchgängig die Einheit 'Mio' (Cash/Saison, Ø-Angebotswert, Liga-Spalte, Apron-Linien — vorher stand dort nackt '63,5'). Die KPI 'Ø-Angebotswert · N Angebote' blieb sichtbar, obwohl bei laufendem Vertrag gar keine Angebotskarten angezeigt werden — der Chip erklärt jetzt, dass ein Vertrag läuft und neue Angebote erst zum Saisonende kommen, statt auf unsichtbare Angebote zu verweisen. Die Kommerz-Rating-Treiber (Historie/Kader/Prestige) zeigen jetzt ihre Skala (.../100).",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

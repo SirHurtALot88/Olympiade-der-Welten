@@ -18,7 +18,6 @@ import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   MERCENARY_NEGATIVE_FIT_PENALTY_REASON,
   applyMercenaryNegativeFitPenaltyToFinalPickScore,
-  calculateTransfermarktFit,
   getMercenaryNegativeFitPenalty,
   hasMercenaryTrait,
 } from "@/lib/market/transfermarkt-fit";
@@ -48,7 +47,6 @@ import {
   resolveSeason1BonusDraftSteps,
   resolveMinPickPriceForPlan,
   resolveSeason1DraftSalaryForRatio,
-  resolveSeason1DraftSpendBudget,
   resolveSeason1LaneSpendPool,
   resolveSeason1TargetCashLeft,
   type Season1DraftSpendPlan,
@@ -152,6 +150,17 @@ export type AiNeedsPicksCompareParams = {
   draftSeed?: string | null;
   gameState?: GameState | null;
   localRunContext?: LocalTransfermarktRunContext | null;
+  /**
+   * Erloes der Verkaeufe, die im SELBEN Plan vorgesehen sind — Geld, das das Team gleich haben
+   * wird, aber noch nicht auf dem Konto hat.
+   *
+   * GEMELDET: „warum blockieren überhaupt teams?"
+   *
+   * Gemessen: A-A fordert 2 Picks an und bekommt 1, weil `season1_draft_spend_budget` 0 ergibt —
+   * das Budget rechnete mit 8.94 Mio, obwohl das Team nach den Verkaeufen desselben Plans 94.39
+   * hat. Ein Team, das verkauft, um zu kaufen, durfte das erloeste Geld nicht sehen.
+   */
+  zusaetzlichesCash?: number | null;
 };
 
 export type AiNeedsPicksOpenNeed = {
@@ -2676,7 +2685,6 @@ function shouldContinueSeason1OptimumDraft(input: {
 }) {
   const playerOpt = input.playerOpt;
   const playerMax = input.playerMax ?? input.playerOpt;
-  const playerMin = input.playerMin ?? input.playerOpt;
   const softTarget =
     input.cashStrategy.softTargetCashSalaryRatio ??
     input.cashStrategy.season1SpendPlan?.softTargetCashSalaryRatio ??
@@ -3502,16 +3510,6 @@ function normalizeTeamCode(value: string | null | undefined) {
   return String(value ?? "").trim().toUpperCase();
 }
 
-function getBudgetStatus(team: Team) {
-  if (!Number.isFinite(team.cash) || !Number.isFinite(team.budget) || team.budget <= 0) {
-    return "unknown" as const;
-  }
-
-  const ratio = team.cash / team.budget;
-  if (ratio <= 0.18) return "critical" as const;
-  if (ratio <= 0.4) return "tight" as const;
-  return "healthy" as const;
-}
 
 function getRosterEntriesForTeam(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId);
@@ -4392,6 +4390,15 @@ export function buildTeamNeedsFingerprint(input: {
 
 const FINGERPRINT_AXIS_MIN_STAT = 35;
 const FINGERPRINT_DISCIPLINE_MIN_SCORE = 42;
+/**
+ * Ab hier ist ein Spieler zu gut, um ihn wegen fehlender Profil-Passung zu uebersehen.
+ *
+ * 72 ist im Projekt die wiederkehrende „gehoert zur Spitze"-Schwelle — dieselbe Zahl steht in
+ * `ai-player-training-class-service` (Prospect), `ai-manager-apply-service` (Youth) und
+ * `ai-legacy-lineup-batch-apply-service` (Top-Half-Druck). Sie hier zu wiederholen ist bewusst:
+ * eine eigene Zahl an dieser Stelle waere eine zweite Meinung darueber, was „Spitze" heisst.
+ */
+const FINGERPRINT_ALWAYS_INCLUDE_OVR = 72;
 const FINGERPRINT_IDENTITY_TOP_N = 40;
 const FINGERPRINT_IDENTITY_MAX_SAME_CLASS = 4;
 
@@ -4419,6 +4426,30 @@ export function buildNeedsFingerprintActivePool(input: {
 
     // Always include cheap fills (reserve safety)
     if (price != null && price < AI_CHEAP_FILL_MARKET_VALUE_CAP) {
+      active.push(rec);
+      continue;
+    }
+
+    /**
+     * SPITZENSPIELER FIELEN AUS DEM POOL.
+     *
+     * Bis hierher kam ein Kandidat nur durch drei Tore: billige Auffuellung, Treffer gegen den
+     * Bedarfs-Fingerabdruck (Achse / Disziplin / Rolle) oder das Identitaets-Sicherheitsnetz —
+     * und das Netz greift nur bei Kandidaten MIT `staticScoreCache`-Eintrag und wertet nach
+     * Identitaetspassung, nie nach Spielstaerke.
+     *
+     * Ein starker Spieler, der teuer, nicht auf der gesuchten Achse und (noch) nicht gecached
+     * ist, wurde damit gar nicht erst betrachtet — unabhaengig davon, wie gut er ist. Der
+     * einzige spielstaerke-nahe Begriff in dieser Datei (`isStar`/`isSuperstar` in
+     * `classifyCandidateTier`) haengt am PREIS-Perzentil, nicht am OVR, und wird hier ohnehin
+     * nicht gelesen.
+     *
+     * Ein Kader baut sich aber nicht nur aus Passung. Wer deutlich ueber dem Feld steht, gehoert
+     * in die engere Wahl, auch wenn er gerade keine Luecke schliesst — die Bewertung danach darf
+     * ihn immer noch ablehnen. Ausgeschlossen zu werden, bevor er ueberhaupt bewertet wird, ist
+     * etwas anderes.
+     */
+    if ((rec.ovr ?? 0) >= FINGERPRINT_ALWAYS_INCLUDE_OVR) {
       active.push(rec);
       continue;
     }
@@ -5591,9 +5622,18 @@ function buildCashStrategy(input: {
   playerMin: number;
   expectedPrizeSignal: ComparePrizeSignal;
   runMode?: AiNeedsPicksRunMode | null;
+  /** Siehe `AiNeedsPicksCompareParams.zusaetzlichesCash`. */
+  zusaetzlichesCash?: number | null;
 }) : AiNeedsPicksCashStrategy {
   const financeConfig = RETOOL_AI_PACKAGE_SCORING_CONFIG.financePosture;
-  const currentCash = Number.isFinite(input.team.cash) ? input.team.cash : null;
+  // Die geplanten Verkaufserloese gehoeren zum verfuegbaren Geld dieses Plans: das Team verkauft
+  // und kauft im selben Zug. Ohne diesen Zuschlag bemisst sich das Ausgabebudget am Kontostand
+  // VOR den Verkaeufen — bei A-A 8.94 statt 94.39, und das Budget fiel damit auf 0.
+  const zusaetzlichesCash =
+    typeof input.zusaetzlichesCash === "number" && Number.isFinite(input.zusaetzlichesCash)
+      ? Math.max(0, input.zusaetzlichesCash)
+      : 0;
+  const currentCash = Number.isFinite(input.team.cash) ? input.team.cash + zusaetzlichesCash : null;
   // Spend-corridor reference must be "cash at the start of THIS planning call", not the frozen
   // season-1 starting budget: at S1 draft time team.cash === team.budget (fresh save, no prior
   // transfers), so this is a no-op for the draft. Reusing the same season1_optimum_execute mode
@@ -5750,8 +5790,6 @@ function buildCashStrategy(input: {
       : season1OptimumMode
         ? roundValue(Math.max(currentCash, 0), 2)
         : roundValue(Math.max(currentCash - (reservedCashForMinimum ?? 0) - reservedCashForDepth, 0), 2);
-  const currentCashRatio =
-    currentCash != null && startingCash != null && startingCash > 0 ? currentCash / startingCash : financesValue;
   const prizeTrendBias =
     input.expectedPrizeSignal.prizeSourceStatus === "missing_source"
       ? 0
@@ -6863,7 +6901,6 @@ function scoreCandidate(input: {
   const cached = player != null ? input.staticScoreCache?.get(player.id) : undefined;
 
   const normalizedClass = cached?.normalizedClass ?? normalizeToken(player?.className ?? input.recommendation.className);
-  const normalizedRace = normalizeToken(player?.race ?? input.recommendation.race);
   const playerRole = cached?.playerRole ?? (player ? getPlayerRoleTag(player, candidateAxis) : "depth");
   const rawTier = cached?.rawTier ?? classifyCandidateTier({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
@@ -7864,6 +7901,8 @@ function buildTeamEntry(input: {
   excludedPlayerIds?: string[];
   runMode: AiNeedsPicksRunMode;
   draftSeed?: string | null;
+  /** Siehe `AiNeedsPicksCompareParams.zusaetzlichesCash`. */
+  zusaetzlichesCash?: number | null;
 }): AiNeedsPicksCompareTeamEntry | null {
   const team = input.context.gameState.teams.find((entry) => entry.teamId === input.previewTeam.teamId) ?? null;
   if (!team) {
@@ -7923,6 +7962,16 @@ function buildTeamEntry(input: {
       simulatedRosterCount: simulatedRosterCount ?? rosterCount ?? 0,
       simulatedSalaryTotal: remainingSalary,
     });
+  /**
+   * BEFUND, bewusst NICHT weggeraeumt (Dead-Code-Durchgang 2026-08-09):
+   *
+   * `spendableCash` wird hier gesetzt und im Verlauf (Z. 8211) nach jedem Schritt neu berechnet —
+   * aber nie gelesen. Die Grenze, wie viel ein Team in diesem Schritt ueberhaupt ausgeben darf,
+   * wird also ermittelt und verworfen; der Planer entscheidet ohne sie.
+   *
+   * Das ist eine fallengelassene Schranke, kein toter Code. Loeschen wuerde die Absicht
+   * unsichtbar machen, deshalb bleibt sie stehen, bis geklaert ist, wo sie greifen soll.
+   */
   let spendableCash: number | null = resolveStepSpendableCash();
 
   const initialOpenNeeds = buildOpenNeeds({
@@ -8003,6 +8052,7 @@ function buildTeamEntry(input: {
     playerMin,
     expectedPrizeSignal,
     runMode: input.runMode,
+    zusaetzlichesCash: input.zusaetzlichesCash ?? null,
   });
   const gmProfileForPickLoop = getTeamGeneralManager(input.context.gameState, team.teamId)?.profile ?? null;
   const lanePhilosophyForPickLoop = applyGmBiasToLaneAppetite(
@@ -8359,8 +8409,6 @@ function buildTeamEntry(input: {
         const player = getPlayerById(input.context.gameState, entry.playerId);
         const price = entry.price ?? entry.marketValue ?? null;
         const cashAfter = remainingCash != null && price != null ? roundValue(remainingCash - price, 2) : remainingCash;
-        const spendableAfter =
-          pickAffordableCash != null && price != null ? roundValue(pickAffordableCash - price, 2) : pickAffordableCash;
         const minimumSlotsAfter = Math.max(playerMin - ((simulatedRosterCount ?? 0) + 1), 0);
         const targetSlotsAfter =
           season1OptimumMode && targetRosterSize != null && simulatedRosterCount != null
@@ -9729,6 +9777,7 @@ export async function buildAiNeedsPicksCompare(
         excludedPlayerIds: params.excludedPlayerIds ?? undefined,
         runMode: params.runMode ?? "default",
         draftSeed: params.draftSeed ?? null,
+        zusaetzlichesCash: params.zusaetzlichesCash ?? null,
       }),
     );
 

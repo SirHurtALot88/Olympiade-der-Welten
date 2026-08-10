@@ -1,4 +1,4 @@
-import type { GameState, Player, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";

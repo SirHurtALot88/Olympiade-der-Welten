@@ -38,6 +38,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -570,8 +571,41 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   }
 
   const scopedTeamIds = unique(input.targetTeamIds ?? []);
-  const scopeTeam = (teamIds: string[]) =>
-    scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+
+  /**
+   * GEMELDET: „Was zur hölle ist passiert mit meinem save am season ende, dass ich plötzlich 3 neue
+   * spieler habe? Wieso wird für mich gepickt und gedraftet???"
+   *
+   * Weil `scopeTeam` nur nach den angeforderten Team-IDs filterte und NIE nach dem Kontrollmodus.
+   * Zwei Pfade dieser Datei zogen den Modus von Hand nach (Kredite, Vorab-Abloesung), die
+   * Kaufpfade nicht: der Preseason-Draft-Batch (`batchTeamIds`) reichte schlicht ALLE Teams weiter,
+   * inklusive des menschlich gesteuerten — und `chooseTeams` liess sie wegen
+   * `allowSetupAllTeams` durch. Ergebnis: das Spiel hat fuer den Spieler eingekauft.
+   *
+   * Der Modus wird EINMAL aufgeloest und in `scopeTeam` erzwungen, statt an jedem Aufrufer
+   * wiederholt zu werden — sonst haengt der Schutz wieder daran, dass ihn jemand nicht vergisst.
+   * Damit ist er fuer JEDEN Pfad dieser Session verbindlich: Kaeufe, Verkaeufe, Konvergenz,
+   * Rescue, Kredite. Das deckt auch den Koop-Fall ab, wo mehrere Teams manuell gesteuert sind —
+   * kein Teilnehmer bekommt seinen Kader von der Automatik umgebaut.
+   */
+  const manualTeamIds = (() => {
+    const gameState = readLiveSave()?.gameState;
+    if (!gameState) return new Set<string>();
+    return new Set(
+      gameState.teams
+        .filter((team) => {
+          const controlMode =
+            getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
+          return controlMode !== "ai";
+        })
+        .map((team) => team.teamId),
+    );
+  })();
+
+  const scopeTeam = (teamIds: string[]) => {
+    const scoped = scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
+    return scoped.filter((teamId) => !manualTeamIds.has(teamId));
+  };
 
   const excludeBuyPlayerIds = new Set<string>();
   const excludeSellPlayerIds = new Set<string>();
@@ -599,7 +633,31 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // how much it sells or buys, which naturally produces a heterogeneous per-team result. No new
   // roster floor is introduced — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc.
   const isSeasonEndSellPhase = input.phase === "season_end";
-  const isPreseasonBuyPhase = input.phase === "preseason";
+
+  /**
+   * GEMELDET: „käufe erst NACH saisonübergang!!! … eigentlich müsste hier nur verkauft werden auch
+   * von den AI teams"
+   *
+   * `input.phase` sagt nur, was der AUFRUFER vorhat — `phase: "preseason"` steht in
+   * `ai-market-plan-convergence-service` fest verdrahtet. Ob der Spielstand ueberhaupt schon in der
+   * neuen Saison ist, hat niemand gefragt. Die KI konnte deshalb mitten in der Saisonende-Kette
+   * einkaufen, waehrend fuer den Menschen dort seit #429 nur Verkaufen offen ist.
+   *
+   * Massstab ist jetzt der Spielstand selbst: `isSeasonEndPhase` deckt genau die Stationen der
+   * alten Saison ab (`season_completed` bis `next_season_ready`, abgeleitet aus der Kette, nicht
+   * aufgezaehlt). Solange der Uebergang nicht durch ist, verkauft die KI nur — danach kauft sie
+   * wie bisher. Bewusst NICHT `isTransferBuyPhaseOpen` (die Regel des Menschen): die haette die
+   * KI zusaetzlich auf „vor dem 1. Spieltag" eingeengt, und der Preseason-Workflow laeuft zum Teil
+   * noch vor dem Umschalten auf `season_active` — die KI wuerde dann gar nicht mehr kaufen.
+   */
+  const liveGameStateForPhase = readLiveSave()?.gameState ?? null;
+  const saveStehtNochInDerAltenSaison = liveGameStateForPhase
+    ? isSeasonEndPhase(liveGameStateForPhase.gamePhase)
+    : false;
+  const isPreseasonBuyPhase = input.phase === "preseason" && !saveStehtNochInDerAltenSaison;
+  if (input.phase === "preseason" && saveStehtNochInDerAltenSaison) {
+    warnings.push(`ai_buys_deferred_until_after_season_transition:${liveGameStateForPhase?.gamePhase ?? "?"}`);
+  }
 
   // Sell-cap mechanism removed entirely (2026-07-04, explicit user correction — see
   // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc and
@@ -643,7 +701,108 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // ausgenommen). Das geliehene Cash wird in die Session (persist + sessionRunContext.save) geschrieben,
   // damit die anschließende Kaufschleife das erhöhte Budget sieht. Nur im Organic-Pfad, damit es sich
   // nicht mit dem Batch-Hook (der bereits über runAiPicksExecutePreview leiht) doppelt.
-  if (useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun) {
+  /**
+   * CHRIS: „du kannst ja bei organic dann einen kredit zyklus ergänzen, der dann ab season 2
+   * greift" — deshalb steht der Pass jetzt in einer Funktion und laeuft ZWEIMAL.
+   *
+   * WARUM ZWEIMAL: vor den Kaufzyklen liest sich fast jedes Team als `cash_sufficient` — das Geld
+   * ist ja noch da. Erst danach steht fest, wer sich leergekauft hat und trotzdem unter seinem Ziel
+   * steht. Am Klon von Chris' Spielstand gemessen, ab demselben Zustand nach dem Saisonwechsel:
+   * ein Durchgang ergab 2 Kredite, zwei Durchgaenge 8 — und ein Team weniger unter dem Optimum.
+   *
+   * Saison 1 ist unberuehrt: `resolveAiLoanDecision` sperrt sie hart (`season_one_no_loans`), der
+   * zweite Durchgang findet dort also genauso wenig wie der erste.
+   */
+  /**
+   * EIN KREDIT NUR GEGEN EINEN ECHTEN KAUFPLAN.
+   *
+   * CHRIS: „kredite sollten eigentlich nur für investitionen oder negatives cash ausgleichen
+   * aufgenommen werden! sonst kosten die unfassbar viel und machen andere teams nur noch reicher"
+   *
+   * BEFUND, am Spielstand gemessen: von 223.4 Mio geliehenem Geld blieben 134.7 Mio unangetastet auf
+   * den Konten liegen — rund 60 Prozent. Die Kredite kamen ueberwiegend von anderen Teams zu 8 bis 17
+   * Prozent Zins; das Geld wanderte also innerhalb der Liga von den Klammen zu den Reichen, ohne dass
+   * ein einziger Spieler den Verein wechselte. B-P zahlte 47.7 Gesamtkosten auf 36.6 nie genutzte Mio.
+   *
+   * URSACHE: `resolveAiLoanDecision` schaetzt den Bedarf aus der Kaderluecke mal einem angenommenen
+   * Spielerpreis. Niemand fragte, ob der kaufende Planer das Geld ueberhaupt ausgeben WUERDE.
+   *
+   * Deshalb wird der Plan hier vorher geprobt — derselbe Planer, dieselben Kandidaten, nur mit dem
+   * hypothetischen Cash nach Kreditaufnahme. Plant er nichts, gibt es keinen Kredit; plant er weniger
+   * als beantragt, wird auf die geplanten Ausgaben gedeckelt (plus einem kleinen Aufschlag, weil
+   * Preise zwischen Plan und Ausfuehrung leicht steigen koennen).
+   *
+   * Die Liquiditaets-Ausnahme bleibt unberuehrt: wer negatives Cash ausgleicht, braucht keinen
+   * Kaufplan — das Minus IST der Grund. Nur der bedarfsgetriebene Kredit muss sich rechtfertigen.
+   */
+  const KREDIT_AUFSCHLAG = 1.3;
+  const deckleKreditAufKaufplan = (
+    gameState: GameState,
+    teamId: string,
+    entscheidung: { loanAmount: number; reason?: string | null },
+  ): { loanAmount: number } | null => {
+    const liquiditaet = typeof entscheidung.reason === "string" && entscheidung.reason.includes("liquidity");
+    if (liquiditaet) return { loanAmount: entscheidung.loanAmount };
+    const team = gameState.teams.find((entry) => entry.teamId === teamId);
+    if (!team) return { loanAmount: entscheidung.loanAmount };
+    let geplant = 0;
+    try {
+      const probeState: GameState = {
+        ...gameState,
+        teams: gameState.teams.map((entry) =>
+          entry.teamId === teamId ? { ...entry, cash: (entry.cash ?? 0) + entscheidung.loanAmount } : entry,
+        ),
+      };
+      const probeTeam = probeState.teams.find((entry) => entry.teamId === teamId)!;
+      const spielerNachId = new Map<string, Player>(probeState.players.map((player) => [player.id, player]));
+      const startingSquad = probeState.rosters
+        .filter((entry) => entry.teamId === teamId)
+        .map((entry) => spielerNachId.get(entry.playerId))
+        .filter((player): player is Player => Boolean(player));
+      const rosterIds = new Set(startingSquad.map((player) => player.id));
+      const freeAgents = listLocalTransfermarktFreeAgents({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId,
+        mode: "ai_preview",
+        localRunContext: sessionRunContext,
+        fullPool: true,
+      }).items;
+      const candidates: Player[] = [];
+      for (const item of freeAgents) {
+        if (rosterIds.has(item.playerId)) continue;
+        const player = spielerNachId.get(item.playerId);
+        if (player) candidates.push(player);
+      }
+      const plan = planOrganicDraftForTeam({
+        gameState: probeState,
+        team: probeTeam,
+        identity: probeState.teamIdentities.find((entry) => entry.teamId === teamId),
+        startingSquad,
+        candidates,
+        draftSeed: saltOrganicSeed(`${input.saveId}:${teamId}`),
+      });
+      // Was der Plan tatsaechlich ausgibt: Startkapital der Probe minus dem, was am Ende uebrig ist.
+      // `finalCash` ist im Buy-Planner exakt Startcash minus Summe der Kaufpreise (draft-builder.ts:
+      // pro Kauf nur `cash -= price`), es fliessen also keine Einnahmen oder Gehaltsposten ein.
+      const probeCash = (probeTeam.cash ?? 0);
+      geplant = plan.decisions.length === 0 ? 0 : Math.max(probeCash - plan.finalCash, 0);
+    } catch (error) {
+      // Die Probe ist eine Zusatzpruefung, kein Tor: faellt sie aus (fehlender RunContext, leerer
+      // Marktcache), bleibt es beim bisherigen Verhalten statt den Kredit faelschlich zu blocken.
+      // Der Rueckfall wird aber GEMELDET — sonst ist ein Programmierfehler im Planer nicht vom
+      // Normalbetrieb zu unterscheiden und die Deckelung waere still wieder ausgeschaltet.
+      warnings.push(`ai_loan_probe_failed:${teamId}:${error instanceof Error ? error.name : "unknown"}`);
+      return { loanAmount: entscheidung.loanAmount };
+    }
+    const eigenes = Math.max(team.cash ?? 0, 0);
+    const luecke = Math.max(geplant * KREDIT_AUFSCHLAG - eigenes, 0);
+    if (luecke <= 0) return null;
+    return { loanAmount: Math.min(entscheidung.loanAmount, Math.ceil(luecke * 10) / 10) };
+  };
+
+  const fuehreKreditPassAus = () => {
+    if (!(useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun)) return;
     const borrowSave = readLiveSave();
     if (borrowSave) {
       const borrowTeamIds = scopeTeam(borrowSave.gameState.teams.map((team) => team.teamId)).filter(
@@ -654,15 +813,23 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         if (!current) break;
         const loanDecision = resolveAiLoanDecision(current.gameState, teamId);
         if (!loanDecision.shouldBorrow) continue;
+        const geprueft = deckleKreditAufKaufplan(current.gameState, teamId, loanDecision);
+        if (!geprueft) {
+          warnings.push(`ai_loan_skipped_no_plan:${teamId}:${loanDecision.loanAmount}`);
+          continue;
+        }
+        if (geprueft.loanAmount < loanDecision.loanAmount) {
+          warnings.push(`ai_loan_capped:${teamId}:${loanDecision.loanAmount}->${geprueft.loanAmount}`);
+        }
         // Günstigstes Angebot (Bank oder Team); buildLoanOffers ist aufsteigend nach Zinssatz sortiert
         // und enthält immer die Bank, es gibt also mindestens ein Angebot.
-        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+        const offers = buildLoanOffers(current.gameState, teamId, geprueft.loanAmount, loanDecision.termSeasons);
         const bestOffer = offers[0] ?? null;
         const loanResult = originateLoan(
           current.gameState,
           {
             borrowerTeamId: teamId,
-            principal: loanDecision.loanAmount,
+            principal: geprueft.loanAmount,
             termSeasons: loanDecision.termSeasons,
             lenderType: bestOffer?.lenderType ?? "bank",
             lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
@@ -676,10 +843,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
           sessionRunContext.save = persisted;
         }
-        warnings.push(`ai_loan_borrow:${teamId}:${loanDecision.loanAmount}:${loanDecision.termSeasons}s`);
+        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s`);
       }
     }
-  }
+  };
+
+  fuehreKreditPassAus();
 
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();
@@ -940,6 +1109,11 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // season_end session is sell-only end to end and must not perform any buy, rescue or otherwise.
   const OPT_GAP_RESCUE_THRESHOLD = 1;
   const OPT_GAP_RESCUE_MAX_CYCLES = 2;
+  // Zweiter Kredit-Durchgang: jetzt ist die Kasse leer und die Luecke sichtbar (Begruendung oben bei
+  // `fuehreKreditPassAus`). Er steht VOR der Opt-Luecken-Rettung, damit die das geliehene Geld noch
+  // ausgeben kann — danach waere es nur Zinslast ohne Gegenwert.
+  fuehreKreditPassAus();
+
   const rescueSave = isPreseasonBuyPhase && !usePreseasonS1DraftBatch ? readLiveSave() : null;
   if (rescueSave) {
     const rescueCandidates = scopeTeam(

@@ -22,6 +22,8 @@ export type ContractDissolutionActionResult = {
     decision: ContractDissolutionDecision;
     salePrice: number;
     waivedBuyout: number;
+    /** Der NICHT erlassene Rest — das ist die Zahl, die das Team wirklich zahlt. */
+    payableBuyout: number;
   };
 };
 
@@ -122,6 +124,7 @@ export function executeLocalContractDissolution(input: {
       decision: input.decision,
       salePrice: offer.salePrice,
       waivedBuyout: offer.waivedBuyout,
+      payableBuyout: offer.payableBuyout,
     },
   };
 }

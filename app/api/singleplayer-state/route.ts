@@ -13,8 +13,6 @@ import type {
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import {
-  DEFAULT_ACTIVE_OWNER_ID,
-  buildTeamControlSettingsMap,
   withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";

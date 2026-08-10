@@ -106,6 +106,18 @@ export type DisciplineStageMatchdayPanelProps = {
   /** Mutator-PP (0,3er) je Team, spielergenau — separat vom Team-PP ausgewiesen. */
   mutatorByTeam?: Map<string, MatchdayPanelMutatorEntry> | null;
   /**
+   * Rohdaten für „Δ Modifikatoren": je Team und Disziplin-Seite die BASIS-Summe (Leistung vor allen
+   * Modifikatoren) und der ENDSTAND. Die Ränge daraus baut das Panel selbst — nur hier ist bekannt,
+   * welche Seite aufgedeckt ist.
+   *
+   * Das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain, Formkarten und Mutatoren an
+   * PLÄTZEN gebracht haben. Beim Umbau auf den neuen Look ging die Zahl verloren
+   * (`matchday-arena-presenter.ts` rechnet sie bis heute, ohne dass sie jemand anzeigt). Auf Wunsch
+   * von Chris zurückgeholt — sie beantwortet „hat meine Aufstellung überhaupt etwas gebracht?",
+   * was aus Punkten allein nicht ablesbar ist.
+   */
+  modifierBaseByTeam?: Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }> | null;
+  /**
    * Eingesetzte Spieler je Team und Disziplin-Seite, nach PP absteigend. Speist die
    * ausklappbaren Disziplin-Spalten. Fehlt die Prop, bleiben die Spaltenköpfe reine
    * Beschriftung (kein Aufklappen).
@@ -442,6 +454,7 @@ export default function DisciplineStageMatchdayPanel({
   onOpenTeam,
   onHoverTeam,
   mutatorByTeam,
+  modifierBaseByTeam,
   playersByTeam,
   modifiersByTeam,
 }: DisciplineStageMatchdayPanelProps) {
@@ -553,6 +566,42 @@ export default function DisciplineStageMatchdayPanel({
       row.projectedRank = derivedProjectedRanks.get(row.teamId) ?? null;
     }
   }
+
+  /**
+   * Δ MODIFIKATOREN — zwei Ranglisten über dieselbe Liga: einmal nach der reinen Basis-Leistung,
+   * einmal nach dem Endstand. Der Unterschied ist genau das, was Fatigue, Captain, Formkarten und
+   * Mutatoren an PLÄTZEN bewegt haben.
+   *
+   * Nur AUFGEDECKTE Seiten zählen — dieselbe Regel wie bei Punkten, Form, Captain und Mutator
+   * weiter oben. Eine verdeckte Disziplin darf auch hier nichts verraten.
+   *
+   * Beide Ranglisten nutzen dieselbe Sortier- und Gleichstandsregel; täten sie das nicht, entstünde
+   * ein Δ aus der Sortierung statt aus den Modifikatoren.
+   */
+  const modifierRankByTeam = (() => {
+    if (!modifierBaseByTeam || modifierBaseByTeam.size === 0) return null;
+    if (!d1Revealed && !d2Revealed) return null;
+    const basis = new Map<string, number>();
+    const endstand = new Map<string, number>();
+    for (const [teamId, werte] of modifierBaseByTeam) {
+      basis.set(teamId, (d1Revealed ? werte.d1Base : 0) + (d2Revealed ? werte.d2Base : 0));
+      endstand.set(teamId, (d1Revealed ? werte.d1Score : 0) + (d2Revealed ? werte.d2Score : 0));
+    }
+    const rangliste = (werte: Map<string, number>) =>
+      new Map(
+        [...werte.entries()]
+          .sort((links, rechts) => rechts[1] - links[1] || links[0].localeCompare(rechts[0], "de"))
+          .map(([teamId], index) => [teamId, index + 1] as const),
+      );
+    const basisRang = rangliste(basis);
+    const endRang = rangliste(endstand);
+    const ergebnis = new Map<string, { baseRank: number; rankDelta: number }>();
+    for (const [teamId, rang] of endRang) {
+      const vorher = basisRang.get(teamId) ?? rang;
+      ergebnis.set(teamId, { baseRank: vorher, rankDelta: vorher - rang });
+    }
+    return ergebnis;
+  })();
 
   sortMatchdayPanelRows(rows, tableSort);
 
@@ -672,8 +721,12 @@ export default function DisciplineStageMatchdayPanel({
         <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
           Spieltags-Wertung · Saisonstand
         </div>
+        {/* Die Kopfzeile muss sagen, was die Spalten wirklich zeigen: die Saisonrang-Bewegung
+            steht am S-Rang; der Spieltagsrang ist einmalig und traegt nur den Mod-Chip. Vorher
+            versprach „Rang vor → nach dem Spieltag" eine Bewegung, die an der Rang-Spalte nie
+            existierte (dort stand das Modifikator-Δ aus #474). */}
         <div style={{ fontSize: 11.5, color: "var(--nl-mut)" }}>
-          Rang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · beide Disziplinen gemeinsam gewertet · <span style={{ color: "var(--nl-warn)" }}>◆ Mutator-PP</span> dem Spieler gutgeschrieben
+          S-Rang: Saisonrang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · Rang: nur dieser Spieltag, <b style={{ color: "var(--nl-ink)" }}>Mod ▲▼</b> = Plätze durch Fatigue, Form, Captain &amp; Mutatoren · <span style={{ color: "var(--nl-warn)" }}>◆ Mutator-PP</span> dem Spieler gutgeschrieben
         </div>
       </div>
 
@@ -771,8 +824,6 @@ export default function DisciplineStageMatchdayPanel({
             const meta = teamMetaById.get(row.teamId);
             const isOwn = row.teamId === ownTeamId;
             const accent = floorTeamAccent(teamPrimaryColor(meta?.code));
-            // Rang-Δ (vor → nach) nur zeigen, wenn der finale Rang aufgedeckt ist.
-            const rankDelta = d2Revealed && row.currentRank != null && row.projectedRank != null ? row.currentRank - row.projectedRank : null;
             // Spieltags-Summe, Mutator-PP und Gesamt kommen aus der Zeile (oben berechnet),
             // damit die Gesamt-Spalte exakt der Sortierschlüssel ist.
             const { sum, mutPp, total } = row;
@@ -832,36 +883,113 @@ export default function DisciplineStageMatchdayPanel({
                 {/* Tagesrang — nur die Leistung DIESES Spieltags. */}
                 <div
                   title={`Spieltags-Rang ${matchdayRank ?? "–"} — nur nach der Leistung dieses Spieltags`}
-                  style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums" }}
+                  // Badge oben, Mod-Chip darunter: nebeneinander sprengte das Paar die 56-px-Spalte
+                  // und der Chip legte sich über den Vorher-Rang der S-Rang-Spalte.
+                  style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, fontVariantNumeric: "tabular-nums" }}
                 >
                   <RankBadge rank={matchdayRank} />
+                  {/* Δ MODIFIKATOREN — was Aufstellung, Form, Captain und Mutatoren an PLAETZEN
+                      gebracht haben. Steht bewusst NEBEN dem Spieltags-Rang: es ist die Antwort auf
+                      „gegenueber welchem Rang?", und die Bezugsgroesse ist genau dieser hier. Bei 0
+                      bleibt die Zelle leer statt eine Null zu zeigen — „nichts bewegt" ist keine
+                      Information, die Platz verdient.
+
+                      GEMELDET VON CHRIS (Spieltag 4): der nackte Pfeil („▲3") las sich wie eine
+                      Rangaenderung — die gibt es beim Spieltagsrang aber nicht, er ist einmalig.
+                      Der Chip traegt deshalb das Label „Mod" samt Rahmen: die Saisonrang-Bewegung
+                      (nackter Pfeil an der S-Rang-Spalte) und der Modifikator-Effekt muessen ohne
+                      Nachdenken unterscheidbar sein, nicht erst per Tooltip. */}
+                  {(() => {
+                    const mod = modifierRankByTeam?.get(row.teamId);
+                    if (!mod || mod.rankDelta === 0) return null;
+                    const hoch = mod.rankDelta > 0;
+                    const ton = hoch ? "var(--nl-good)" : "var(--nl-risk)";
+                    return (
+                      <span
+                        title={
+                          `Δ Modifikatoren — ohne Fatigue, Captain, Formkarten und Mutatoren waere dieses Team ` +
+                          `im Tagesranking auf Rang ${mod.baseRank} gelandet — ${hoch ? "gutgemacht" : "verloren"}: ` +
+                          `${Math.abs(mod.rankDelta)} ${Math.abs(mod.rankDelta) === 1 ? "Platz" : "Plaetze"}. ` +
+                          `Kein Saisonrang: die Saisonrang-Bewegung steht in der S-Rang-Spalte.`
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 2,
+                          fontSize: 9,
+                          fontWeight: 800,
+                          lineHeight: "14px",
+                          padding: "0 4px",
+                          borderRadius: 5,
+                          whiteSpace: "nowrap",
+                          color: ton,
+                          background: `color-mix(in srgb, ${ton} 12%, transparent)`,
+                          border: `1px solid color-mix(in srgb, ${ton} 40%, transparent)`,
+                        }}
+                      >
+                        Mod {hoch ? "▲" : "▼"}
+                        {Math.abs(mod.rankDelta)}
+                      </span>
+                    );
+                  })()}
                 </div>
 
-                {/* Saison-Rang vor → nach */}
-                <div style={{ gridColumn: COL.seasonRank, gridRow: 1, display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}>
-                  <RankBadge rank={row.currentRank} dim={d2Revealed} />
-                  {d2Revealed ? (
-                    <>
-                      <span style={{ color: "var(--nl-mut)", fontSize: 11 }}>→</span>
-                      <RankBadge rank={row.projectedRank} />
-                      {/* Rang-Aenderung gehoert neben den Rang, nicht neben den Teamnamen —
-                          sie beschreibt schliesslich den Rang. */}
-                      {rankDelta != null && rankDelta !== 0 ? (
-                        <span
-                          title={`${rankDelta > 0 ? "Plätze gutgemacht" : "Plätze verloren"}: ${Math.abs(rankDelta)}`}
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: 900,
-                            fontVariantNumeric: "tabular-nums",
-                            color: rankDelta > 0 ? "var(--nl-good)" : "var(--nl-risk)",
-                          }}
-                        >
-                          {rankDelta > 0 ? `▲${rankDelta}` : `▼${Math.abs(rankDelta)}`}
-                        </span>
+                {/* Saison-Rang vor → nach — die Rangänderung gehört an DIESE Spalte, nicht an den
+                    Spieltagsrang: der Spieltagsrang ist einmalig (er entsteht nur aus den Punkten
+                    dieses Tages) und hat kein "vorher". GEMELDET VON CHRIS (Spieltag 4): die
+                    Pfeile standen am Spieltagsrang, und nach D1 fehlte die Saisonrang-Bewegung
+                    ganz — dabei hatte der halbe Spieltag längst echte Punkte gebracht.
+
+                    Ausgangswert ist der Saisonrang nach dem VORIGEN gewerteten Spieltag (bei
+                    gebuchtem Spieltag aus der Standings-Baseline, siehe DisciplineStageArena).
+                    Solange D2 verdeckt ist, ist das Ziel ein ZWISCHENSTAND aus den aufgedeckten
+                    Disziplinen — kein Spoiler, er rechnet nur mit dem, was sichtbar ist. */}
+                {(() => {
+                  const seasonShown = d1Revealed || d2Revealed;
+                  const afterRank = seasonShown ? row.projectedRank : null;
+                  const rankDelta = afterRank != null && row.currentRank != null ? row.currentRank - afterRank : null;
+                  const zwischenstand = seasonShown && !d2Revealed;
+                  // Bei 0 wird erklärt, nicht versteckt: "Platz gehalten" und "erster Spieltag,
+                  // kein Vorgänger" sind zwei verschiedene Aussagen und stehen beide im Tooltip.
+                  const title = !seasonShown
+                    ? `Saisonrang ${row.currentRank ?? "–"} — Stand vor dem Spieltag`
+                    : row.currentRank == null
+                      ? "Erster gewerteter Spieltag der Saison — es gibt noch keinen vorherigen Saisonrang, darum steht hier keine Veränderung."
+                      : afterRank == null
+                        ? `Saisonrang ${row.currentRank} vor dem Spieltag — der Stand danach ist noch nicht berechenbar`
+                        : `Saisonrang ${row.currentRank} → ${afterRank}${
+                            rankDelta === 0 ? " — Platz gehalten (keine Bewegung, keine fehlenden Daten)" : ""
+                          }${zwischenstand ? " · Zwischenstand nach Disziplin 1 — Disziplin 2 steht noch aus" : ""}`;
+                  return (
+                    <div
+                      title={title}
+                      style={{ gridColumn: COL.seasonRank, gridRow: 1, display: "flex", alignItems: "center", gap: 4, fontVariantNumeric: "tabular-nums" }}
+                    >
+                      <RankBadge rank={row.currentRank} dim={afterRank != null} />
+                      {afterRank != null ? (
+                        <>
+                          <span style={{ color: "var(--nl-mut)", fontSize: 11 }}>→</span>
+                          <RankBadge rank={afterRank} />
+                          {/* Pfeil nach oben = besser geworden (kleinerer Rang). Bei 0 kein Chip —
+                              die Erklärung steht im Tooltip der Zelle. */}
+                          {rankDelta != null && rankDelta !== 0 ? (
+                            <span
+                              title={`${rankDelta > 0 ? "Plätze gutgemacht" : "Plätze verloren"}: ${Math.abs(rankDelta)}`}
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 900,
+                                fontVariantNumeric: "tabular-nums",
+                                color: rankDelta > 0 ? "var(--nl-good)" : "var(--nl-risk)",
+                              }}
+                            >
+                              {rankDelta > 0 ? `▲${rankDelta}` : `▼${Math.abs(rankDelta)}`}
+                            </span>
+                          ) : null}
+                        </>
                       ) : null}
-                    </>
-                  ) : null}
-                </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Wappen — laeuft ueber den GANZEN Team-Block (Team-Zeile + Disziplin-
                     Zeilen). `contain` statt `cover`: bei dieser Hoehe wuerde `cover` einem
@@ -1213,6 +1341,7 @@ export default function DisciplineStageMatchdayPanel({
           <span>🔒</span>
           <span>
             Disziplin 2 {d2 ? `(${d2.displayName})` : ""} und der finale Saison-Rang bleiben verdeckt, bis der Spieltag komplett ausgewertet ist – kein Spoiler.
+            {d1Revealed ? " Der S-Rang zeigt bis dahin den Zwischenstand nach Disziplin 1 — gerechnet nur aus dem, was schon aufgedeckt ist." : ""}
           </span>
         </div>
       ) : null}

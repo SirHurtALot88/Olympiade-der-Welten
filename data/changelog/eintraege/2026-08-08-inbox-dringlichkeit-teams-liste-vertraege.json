@@ -1,0 +1,30 @@
+[
+  {
+    "datum": "2026-08-08",
+    "seite": "Inbox",
+    "text": "Die Inbox hat jetzt EIN Filtersystem und sortiert nach Dringlichkeit: Kritisch → Heute sinnvoll → Kann warten → Berichte, Erledigtes eingeklappt. Das kritische Item ist rot markiert und steht ganz oben (vorher sagte der Kopf 1 kritisch, aber keine Karte war als kritisch erkennbar), die äußeren Kategorie-Reiter mit ihren leeren Alles-erledigt-Seiten sind weg, der Kopf-Zähler zählt dieselbe Basis wie Home, und das Kritisch-Badge ist von 3,1:1 auf gemessene 7,1:1 angehoben.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Teams",
+    "text": "Der Kader hat zwei Ansichten: Portraits bleiben Standard (und sind entrümpelt — Vertragsdetails raus, Kürzel mit Tooltips, nichts mehr abgeschnitten), die Tabelle heißt jetzt Liste & Verträge und trägt die Kaderplanung: Auslauf-Kennzahlen und Gehaltslast-Projektion über der Tabelle, Läuft-aus als beschrifteter Chip statt unerklärter Goldfärbung. Der Verträge-Reiter bleibt für die tiefen Werkzeuge (Buyout, Board-Vorschlag) bestehen.",
+    "gewicht": "grundlegend",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Teams · Team-Profil",
+    "text": "Saison-Verlauf sagt die Wahrheit: Die Marktwert- und Cash-Sparklines färben sich nach der Richtung aus derselben Quelle wie der Delta-Chip (vorher leuchtete ein Cash-Absturz von 91 auf 7 Mio grün), und die Punkte-Kachel zeigt bei einer einzigen Saison Wert plus Einordnung statt eines einzelnen riesigen Balkens — der Höhen-Deckel gilt jetzt auch auf der Teams-Seite.",
+    "gewicht": "behebung",
+    "version": "0.4"
+  },
+  {
+    "datum": "2026-08-08",
+    "seite": "Teams",
+    "text": "Im Disziplin-Profil bedeutet eine Farbe nur noch eines: Die Balken tragen die Kategoriefarbe (POW/SPE/MEN/SOC, wie das Radar daneben), der Liga-Rang bleibt die Zahl — mit Medaille für die Top-3 und dezentem Risiko-Ton fürs Schlussviertel. Vorher stand ein grüner Kategorie-Punkt neben einem grünen Quartil-Balken, und Grün hieß zweierlei.",
+    "gewicht": "feinschliff",
+    "version": "0.4"
+  }
+]

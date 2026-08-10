@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 
@@ -34,40 +34,65 @@ import { buildPlayerDrawerDataFromGameState } from "@/lib/foundation/player-deta
  * `liveRatingsById`, dieselbe Priorisierung wie in TeamBody/Arena) ihn beheben.
  */
 
+/**
+ * DIE FIXTURE DIESER SUITE LIEGT NICHT MEHR IM REPO.
+ *
+ * `fresh-season-1-1785739623457.json.gz` ist ein Auto-Export-Artefakt (Zeitstempel im Namen),
+ * das einmal versehentlich eingecheckt und in Commit `cbbd6ce` wieder geloescht wurde. Seitdem
+ * bricht diese Datei schon beim EINSAMMELN ab — der Ladeaufruf steht auf Modulebene, also
+ * scheitert nicht ein Test, sondern die ganze Suite mit ENOENT.
+ *
+ * Sie laeuft jetzt nur noch, wenn die Fixture da ist, und meldet sonst sichtbar
+ * „uebersprungen". Das ist ehrlicher als ein Dauerrot, das nichts ueber den Code aussagt.
+ *
+ * Warum nicht einfach eine neue Fixture erzeugen: Die Suite braucht einen Spielstand mit
+ * ECHTER Spieltags-Historie (der kompakte Payload muss etwas zu streichen haben) UND einem
+ * Spieler, dessen lokal nachgerechnetes OVR um mehr als 5 Punkte vom kanonischen abweicht.
+ * Das laesst sich nicht aus dem Stand konstruieren, sondern faellt in einem gelaufenen Save an.
+ * Wer die Suite dauerhaft zurueckhaben will, legt einen solchen Save unter dem Namen unten ab.
+ */
 const REPO_ROOT = process.cwd();
 const FIXTURE_FILE = "fresh-season-1-1785739623457.json.gz";
+const FIXTURE_PATH = join(REPO_ROOT, "data/online-saves", FIXTURE_FILE);
+const FIXTURE_VORHANDEN = existsSync(FIXTURE_PATH);
 
 function loadFixtureGameState(): GameState {
-  const raw = gunzipSync(readFileSync(join(REPO_ROOT, "data/online-saves", FIXTURE_FILE))).toString("utf8");
+  const raw = gunzipSync(readFileSync(FIXTURE_PATH)).toString("utf8");
   const parsed = JSON.parse(raw) as { gameState?: GameState } | GameState;
   return ("gameState" in parsed ? parsed.gameState : parsed) as GameState;
 }
 
-const fullGameState = loadFixtureGameState();
-const compactGameState = compactFoundationInitialGameState(fullGameState);
+// Ohne Fixture wird hier NICHTS geladen und nichts gerechnet — die Suite darunter ist
+// uebersprungen, die Platzhalter werden nie angefasst.
+const fullGameState = FIXTURE_VORHANDEN ? loadFixtureGameState() : ({} as GameState);
+const compactGameState = FIXTURE_VORHANDEN
+  ? compactFoundationInitialGameState(fullGameState)
+  : ({} as GameState);
 
 // Sanity: die Fixture hat tatsächlich Saison-Historie, die der kompakte Payload streicht
 // (sonst würde diese Suite gar nichts Aussagekräftiges messen).
-const activeMatchdayId = fullGameState.matchdayState.matchdayId;
-const completedMatchdayResultCount = (fullGameState.seasonState.matchdayResults ?? []).filter(
-  (r) => r.matchdayId !== activeMatchdayId,
-).length;
+const activeMatchdayId = FIXTURE_VORHANDEN ? fullGameState.matchdayState.matchdayId : null;
+const completedMatchdayResultCount = FIXTURE_VORHANDEN
+  ? (fullGameState.seasonState.matchdayResults ?? []).filter((r) => r.matchdayId !== activeMatchdayId).length
+  : 0;
 
 // Kanonische Ratings: buildPlayerRatingContractMap auf dem VOLLEN Save — exakt das, was
 // der Server für `/api/season/ratings-slice` rechnet (getSeasonDerivations ->
 // computeSeasonDerivationsFresh -> buildPlayerRatingContractMap(gameState, ledger)), und
 // damit dieselbe Zahl, die Kader/Spielerprofil/Ranglisten anzeigen.
-const canonicalRatingByPlayerId = buildPlayerRatingContractMap(fullGameState);
+const canonicalRatingByPlayerId = FIXTURE_VORHANDEN
+  ? buildPlayerRatingContractMap(fullGameState)
+  : new Map<string, PlayerRatingContractRow>();
 
-const examplePlayerId = Array.from(
-  new Set((fullGameState.rosters ?? []).map((r) => r.playerId).filter(Boolean)),
-).find((pid) => {
+const examplePlayerId = !FIXTURE_VORHANDEN
+  ? undefined
+  : Array.from(new Set((fullGameState.rosters ?? []).map((r) => r.playerId).filter(Boolean))).find((pid) => {
   const canonical = canonicalRatingByPlayerId.get(pid)?.ovrNormalized;
   const compact = buildPlayerRatingContractMap(compactGameState).get(pid)?.ovrNormalized;
   return canonical != null && compact != null && Math.abs(canonical - compact) > 5;
 });
 
-describe("Diszi-Bühne: kanonische Saison-OVR statt lokaler Neuberechnung auf dem kompakten Payload", () => {
+describe.skipIf(!FIXTURE_VORHANDEN)("Diszi-Bühne: kanonische Saison-OVR statt lokaler Neuberechnung auf dem kompakten Payload", () => {
   it("fixture hat echte, vom kompakten Payload gestrichene Spieltags-Historie", () => {
     expect(completedMatchdayResultCount).toBeGreaterThan(0);
     expect(compactGameState.seasonState.matchdayResults ?? []).toHaveLength(

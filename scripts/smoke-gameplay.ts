@@ -939,6 +939,10 @@ async function main() {
             // deckt beide Beschriftungen ab ("Disziplin (Spieltag)" bzw. Admin-Variante).
             "Disziplin (",
             "Lineup bestätigen",
+            // Vor dem Anpfiff rendert die Arena nicht die Buehne, sondern den
+            // Startbereitschafts-Zustand. Vorher stand dort eine alphabetisch
+            // erfundene Rangliste mit Medaillen — der Zustand ist neu, nicht der Reiter.
+            "Vor dem Anpfiff",
           ]),
           "Arena öffnet.",
         );
@@ -973,8 +977,29 @@ async function main() {
             hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
           "Lanes oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
-        assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        // Fehlt die Einsatzliste, kann der Spieltag nicht starten — die Arena zeigt dann
+        // bewusst KEINE Buehnensteuerung, sondern den Vor-dem-Anpfiff-Zustand mit genau
+        // einer Handlung. Die beiden Zusagen unten forderten bisher unbedingt Step- und
+        // Reset-Knopf und schrieben damit den alten Zustand fest, in dem die Buehne auch
+        // ohne startbaren Spieltag Steuerung (und eine alphabetisch erfundene Rangliste)
+        // anzeigte. Sie pruefen jetzt den Zustand, der wirklich da ist.
+        const preMatchVisible = await page
+          .locator("[data-arena-prematch='true']")
+          .isVisible()
+          .catch(() => false);
+        if (preMatchVisible) {
+          const lineupCtaVisible = await page
+            .getByTestId("arena-prematch-lineup-cta")
+            .isVisible()
+            .catch(() => false);
+          assertStep(step, lineupCtaVisible, "Vor dem Anpfiff: Weg zur Einsatzliste sichtbar.");
+          // Die Gegenprobe gehoert dazu: waere hier doch Steuerung sichtbar, haetten wir
+          // den Zustand nur uebermalt statt ihn zu loesen.
+          assertStep(step, !stepButtonVisible && !resetButtonVisible, "Vor dem Anpfiff: keine Buehnensteuerung.");
+        } else {
+          assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
+          assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        }
       },
     }));
 
@@ -1031,11 +1056,19 @@ async function main() {
         run: async (step) => {
           await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
           await page.locator("#foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
-          const lightSegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
-          const visible = await lightSegment.isVisible().catch(() => false);
-          if (visible) {
-            await lightSegment.click();
-            step.details.push("Training mode segment clicked on testsave.");
+          // Seit Paket T5 ist die Team-Rail (.velo-intensity-segment) nur noch eine
+          // VORSCHAU (Simulation) — geschrieben wird pro Spieler über die
+          // Zeilen-Segmente der Steuer-Tabelle. Der Write-Smoke klickt deshalb
+          // zuerst ein Zeilen-Segment; die alte Rail bleibt als Fallback für
+          // Legacy-Ansichten.
+          const rowSegment = page.locator(".nl-training-row-seg-btn").first();
+          const legacySegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
+          if (await rowSegment.isVisible().catch(() => false)) {
+            await rowSegment.click();
+            step.details.push("Training row intensity segment clicked on testsave.");
+          } else if (await legacySegment.isVisible().catch(() => false)) {
+            await legacySegment.click();
+            step.details.push("Training mode segment clicked on testsave (legacy rail).");
           } else {
             step.warnings.push("No training intensity segment visible — skipped.");
           }

@@ -13,3 +13,16 @@ export function formatNlMoney(value: number | null | undefined): string {
   const normalized = Math.round(value * 10) === 0 ? 0 : value;
   return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(normalized)} Mio`;
 }
+
+/**
+ * Vorzeichenbehaftetes Geldformat ("+4,2 Mio" / "-4,2 Mio" / "0,0 Mio") für Salden-Rechnungen,
+ * in denen die Richtung Teil der Aussage ist (Transfersaldo: Käufe negativ, Verkäufe positiv).
+ * Gleiche Rundung/Einheit wie `formatNlMoney`, nie "+0,0" oder "-0,0".
+ */
+export function formatNlSignedMoney(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
+  return `${normalized > 0 ? "+" : ""}${formatNlMoney(normalized)}`;
+}

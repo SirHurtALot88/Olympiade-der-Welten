@@ -17,9 +17,7 @@ vi.mock("@/lib/ai/chunked-redraft-topup-service", () => ({
 }));
 
 import {
-  getTeamHardMinRequired,
   getTeamOptTarget,
-  getTeamsBelowHardMin,
   resolveActiveConvergencePickEngine,
   runEmergencyRosterRepairForTeams,
   runMarketPlanConvergence,

@@ -36,6 +36,8 @@ export type FoundationDisciplineStageHostProps = {
   // Öffnet die volle Team-Karte — nötig, damit der „Volles Profil"-Button im
   // Team-Drawer der Bühne nicht ins Leere läuft (S3).
   onOpenTeam?: ((teamId: string) => void) | null;
+  // Öffnet die Einsatzliste — CTA des Pre-Matchday-Zustands („Einsatzliste öffnen →").
+  onOpenLineup?: (() => void) | null;
   /**
    * Kanonische, ligaweite OVR/Rang-Karte (Server-Slice auf dem VOLLEN Save) — dieselbe
    * Quelle wie Kader/Spielerprofil/Ranglisten. Fehlt sie (z. B. `dev-arena`-Vorschau ohne

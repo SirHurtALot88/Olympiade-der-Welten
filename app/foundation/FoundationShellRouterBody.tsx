@@ -3,14 +3,14 @@
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
 import dynamic from "next/dynamic";
-import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketSell, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
-import { NlCard, StatChip, NlCountUpValue, nlToneClass, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
+import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, type CSSProperties } from "react";
 import {
   buildTeamShellThemeVars,
@@ -31,28 +31,13 @@ import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation
 import type { RoomParticipant } from "@/types/game";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
 import {
-  BudgetedMediaImage,
-  ClassColorChip,
-  ClassIcon,
-  ColumnVisibilityManager,
-  DEFAULT_ACTIVE_OWNER_ID,
-  DisciplineIcon,
   FACILITY_CATALOG,
-  FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
-  FOUNDATION_SAVE_MODE_OPTIONS,
-  FoundationPlayerPortraitPreview,
   FoundationShell,
   FoundationSubNav,
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
-  HISTORY_ALL_SEASONS_FILTER,
-  NEW_GAME_PRESET_DEFAULTS,
-  NEW_GAME_VISIBLE_PRESET_IDS,
   PLAYER_PROFILE_TABS,
   PROGRESSION_CLASS_ORDER,
-  PlayerPortrait,
-  RaceIcon,
-  SEASON_TRANSITION_STATIC_STEPS,
   SPECIALIST_WING_VARIANTS,
   SortableHeader,
   TooltipHeading,
@@ -64,75 +49,41 @@ import {
   clampBiasValue,
   clampIdentityValue,
   deriveChrisFrankyTeamIdsFromSettings,
-  describeRoomFlowButton,
-  filterTeamsByControlScope,
-  formatActiveManagerTeamSource,
   formatCockpitReason,
-  formatContractShapeLabel,
   formatCsvList,
   formatDisciplineCategoryLabel,
-  formatDisplayMoney,
-  formatFeatureAuditStatus,
   formatFoundationSaveModeLabel,
-  formatGamePhaseLabel,
   formatHomeWarningLabel,
   formatIdentityWeight,
   formatLocalePoints,
   formatMoney,
-  formatMoraleContractIntentLabel,
-  formatObjectiveStatusLabel,
-  formatPpFormBonus,
-  formatPpsValue,
   formatScenarioTypeLabel,
   formatShortSaveId,
-  formatSignedDisplayMoney,
-  formatSignedNumber,
-  formatSignedTransfermarktCurrency,
   formatTeamControlModeLabel,
   formatTransfermarktCurrency,
-  formatWholeNumber,
   foundationSecondaryViews,
-  getClassColorClassName,
   getFoundationViewScrollTarget,
   getGameFlowStatusLabel,
-  getLineupDraftSideCounts,
   getOwnerTeamHighlightClass,
   getPlayerDisplayMarketValue,
   getPlayerDisplayMarketValueDelta,
-  getPlayerDisplaySalary,
-  getPlayerPortraitModel,
-  getPoolHeatClass,
   getRankHeatClass,
   getRanksMetricToneClass,
-  getResponsiveTableImageSize,
-  getRoomFlowStep,
   getRosterEntryDisplayMarketValue,
   getRosterEntryDisplaySalary,
-  getRosterEntryCurrentSeasonSalary,
   getRosterEntrySalaryDelta,
-  getSeasonCashHeatClass,
-  getTeamAxisRankTooltip,
-  getTeamHistoryRankToneClass,
   getTeamLogoModel,
-  getTeamsViewColumnTitle,
-  getTransferSourceLabel,
-  getTransferTypePillClass,
   getTransfermarktScoutingDisclosure,
   getViewSourceBadgeLabel,
   HOME_HIDDEN_WARNING_KEYS,
-  inferSaveTypeLabel,
   isTeamSetupDraftWishlistPhase,
   joinClassNames,
   normalizeFoundationSaveMode,
   normalizeTeamStrategyLevel,
   parseCsvList,
   prefetchFoundationPanel,
-  renderEconomyDelta,
-  renderMetricBar,
   resolveFoundationSaveMode,
   resolveScenarioMetaLabel,
-  roundViewNumber,
-  runAiTurn,
   scrollToFoundationTarget,
   setFoundationView,
   syncFoundationViewInUrl,
@@ -145,25 +96,21 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
-import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
-  DisciplineCategoryFilter,
   FacilityId,
   FoundationView,
   FoundationViewId,
   GameFlowView,
-  NewGamePresetId,
   PlayerProfileTabId,
   PlayerTableScope,
   SpecialistWingVariant,
-  TeamControlFilter,
-  TeamStrategyProfile,
 } from "@/app/foundation/foundation-page-client-exports";
 import type {
   AdminSeasonSimulationRunSummary,
   FoundationCommandItem,
   FoundationFlowCoachAction,
   FoundationFlowLoopStage,
+  PreSeasonWorkflowStepSummaryResponse,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { FoundationWarningInboxItem } from "@/lib/foundation/tabs/use-foundation-cross-tab-game-flow";
 import type { useFoundationCrossTabSeasonBriefing } from "@/lib/foundation/tabs/use-foundation-cross-tab-season-briefing";
@@ -171,13 +118,9 @@ import type {
   FoundationDisciplineLeaderEntry,
   FoundationDisciplineRankRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-discipline-ranks";
-import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import type { SeasonOverviewOption } from "@/lib/foundation/tabs/use-season-v2-panel-derivations";
 import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-format-render-helpers";
-import type { TeamOwner } from "@/lib/foundation/team-control-settings";
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
-import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
-import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
@@ -338,9 +281,18 @@ type SeasonBriefingDisciplineEntry = SeasonBriefingMatchdayEntry["disciplines"][
 type SeasonBriefingBigDisciplineSlot = SeasonBriefingData["bigDisciplines"][number];
 type SeasonBriefingFactorEntry = SeasonBriefingData["futureFactors"][number];
 type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
-// Matches the inline `areaRows` literal built for marketSellPlayerContext in
-// use-foundation-shell-router-body-scope.tsx (not a separately exported type).
-type MarketSellAreaRow = { key: string; value: number | null; tone: string };
+
+// W1 · Ranks-Matrix: Tooltips der Aggregat-Spalten. Die Disziplin-Spalten
+// bekommen ihren vollen Namen direkt aus `discipline.name`; nur die fünf
+// Aggregat-Kürzel brauchen eine feste Erklärung (vorher sagte der Hover nur
+// "Nach GEW sortieren", SCH bekam sogar den falschen Achsen-Tooltip).
+const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
+  totalRank: "TOT — Gesamtrang: Teamstärke über alle Disziplinen summiert und ligaweit gerankt. Rang 1 = stärkstes Team.",
+  powRank: "POW — Teamrank der Power-Achse (Summe der Power-Disziplinen).",
+  speRank: "SPE — Teamrank der Speed-Achse (Summe der Speed-Disziplinen).",
+  menRank: "MEN — Teamrank der Mental-Achse (Summe der Mental-Disziplinen).",
+  socRank: "SOC — Teamrank der Social-Achse (Summe der Social-Disziplinen).",
+};
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
   const [viewWidthMode] = useViewWidth();
@@ -349,24 +301,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   activeContextStatusChips,
   activeFlowCoach,
   activeFlowLoopIndex,
-  activeManagerArenaGapDetail,
   activeManagerTeamId,
-  activeManagerTeamSource,
-  activeMatchdaySummaryId,
   activeOwner,
-  activeOwnerId,
-  activeSaveGameMode,
   activeSaveId,
-  activeSaveIsInCurrentMode,
   activeSaveName,
-  activeSaveSummary,
-  activeScenarioWarning,
   activeTeamCriticalInboxItems,
-  activeTeamMatchdaySummaryRow,
+  activeTeamDecisionInboxItems,
   activeTeamOpenInboxItems,
   activeView,
   activeViewSourceBadge,
-  adjustTableColumnWidth,
   adminSimulationBusy,
   adminSimulationError,
   adminSimulationFullChurn,
@@ -374,28 +317,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   adminSimulationMode,
   adminSimulationRun,
   adminSimulationSeasonCount,
-  aiLineupApplyTeams,
-  aiTeams,
-  applyNewGamePreset,
   bootstrapError,
   bulkAiPicksRefillBusy,
   bulkAiPicksRefillMessage,
   bulkAiPicksProgress,
   runBulkAiTeamsRefill,
   underFilledAiTeamIds,
-  buildTeamDetailDrawerData,
   canonicalSeasonLabel,
-  cashApplyFeed,
-  changeFoundationSaveMode,
   closeCommandPalette,
   closeFacilityPanel,
   closeFoundationDrilldownPanel,
   closeMarketSellModal,
   closeSeasonBriefing,
   closeTeamProfile,
-  cockpitAiBatchApplyFeed,
-  cockpitAiIncludeWarningTeams,
-  cockpitAiOverwriteExisting,
   cockpitBusyKey,
   commandSearch,
   commandSearchInputRef,
@@ -407,17 +341,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   confirmTransfermarktSell,
   contractRenewalBusy,
   contractRenewalError,
-  contractRenewalMessage,
   contractRenewalNegotiation,
-  currentMatchdayDisciplineSchedule,
   currentMatchdayDisplayLabel,
-  currentSaveOwnership,
-  disciplineCategoryFilter,
-  disciplineConfigTableColumns,
   disciplineRanksColumns,
   effectiveActiveOwnerId,
-  enableAiLineupApplyForAiTeams,
-  exportSelectedTeamSettingsJson,
   facilityMaintenanceBusy,
   facilityMaintenanceError,
   facilityMaintenancePreview,
@@ -426,7 +353,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   facilityUpgradeError,
   facilityUpgradePreview,
   facilityUpgradeSuccess,
-  filteredTeamSettingsTeams,
   foundationActionFeedback,
   foundationActivities,
   foundationFacilityTarget,
@@ -434,7 +360,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationManageableTeamIds,
   foundationNavAttention,
   foundationPanel,
-  foundationSaveMode,
   foundationCockpitHostProps,
   foundationPrizeFinanceShellHostProps,
   foundationRanksHostProps,
@@ -448,19 +373,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationTeamsViewHostProps,
   foundationTrainingCompactHostProps,
   foundationWarningInboxItems,
-  freshSeasonStartMessage,
   gameFlowActionStep,
   matchdayAdvanceStep,
-  gameModeOwnershipChrisIds,
-  gameModeOwnershipLimits,
   gameState,
-  getBusyActionReason,
-  getCockpitBusyReason,
-  getReadOnlyActionReason,
-  getTableActivePreset,
   getTableColumnWidth,
   getTableHeaderDragProps,
-  getTeamLockedName,
   getViewClass,
   globalNextLabel,
   globalNextStatusClass,
@@ -468,16 +385,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   handleFormCardPlanSaved,
   handleHumanLineupSaved,
   handleManagerTeamSelect,
-  historyClassFilter,
-  historyFeed,
-  historyLoadingMore,
-  historySearch,
-  historySeasonFilter,
-  historySourceFilter,
-  historyTeamFilter,
-  historyTypeFilter,
   homeActiveTeamLogo,
   homeNextMatchdayStatus,
+  homeOpenTaskCount,
   homeTodayCards,
   homeV2BoardObjectives,
   homeV2Facilities,
@@ -495,14 +405,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   inboxIncludeDone,
   inboxV2Items,
   inboxV2SelectedItemId,
-  isFoundationBootstrapState,
   isMarketSellPanelOpen,
   isPending,
   isSaveBusy,
   isSelectedTeamManagementLocked,
   isTableColumnVisible,
   isTeamSwitchPending,
-  isTransferHistoryViewActive,
   isTransferMarketViewActive,
   isViewingArchivedSeason,
   leaguePlayerHeatPools,
@@ -514,54 +422,22 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   lineupDraftBoardView,
   lineupDraftBoardViewRequest,
   lineupFocusRequestKey,
-  loadMoreHistoryFeed,
-  loadSave,
-  localSeasonTransitionGate,
   managerTeamOptions,
   manualTeams,
-  marketBuyPreview,
-  marketFeed,
-  marketFocusPlayerId,
-  marketSelectedTeam,
   marketSellBusy,
   marketSellError,
   marketSellPreview,
   marketSellRiskAcknowledged,
   marketSellSubject,
   marketSellSuccess,
-  matchdayAdvanceFeed,
-  matchdayArenaBlockerSummary,
-  matchdayAutoRunFeed,
-  matchdayAutoRunIncludeWarningLineups,
-  matchdayAutoRunOverwriteExistingLineups,
-  matchdayAutoRunStopOnTie,
-  matchdayMvpForceReplaceExisting,
-  matchdayMvpScoringFeed,
-  matchdaySummary,
-  matchdaySummaryOptions,
-  matchdaySummaryTab,
-  moveTableColumn,
   navigateHomeTab,
   navigateToGameFlowStep,
   navigateToInboxItem,
   navigateToPrizeFinanceViewFromRouting,
   navigateToTeamPicker,
-  newGameBusy,
-  newGameChrisTeamIds,
-  newGameError,
-  newGameFrankyTeamIds,
-  newGamePresetId,
-  newGamePreview,
-  newGameSandbox,
-  newGameSaveName,
-  newGameSuccess,
-  openContractRenewalNegotiation,
   openFacilityPanel,
   openFoundationViewCommand,
-  openMarketOfferPanel,
-  openMarketSellModal,
   openPlayerDrawerById,
-  openPlayerProfileById,
   openPrizeFinanceView,
   openTeamDrawerById,
   openTeamProfileById,
@@ -570,8 +446,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   orderedDisciplines,
   originateLoanForActiveTeam,
   repayLoanEarlyForActiveTeam,
-  ownerQuickSwitchTeams,
-  passiveTeams,
   persistenceError,
   playerBracketCounts,
   playerClassFilter,
@@ -587,10 +461,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   playerScope,
   playerSeasonPerformanceMap,
   playerTeamFilter,
-  playersTableRows,
   postAdminSeasonSimulation,
-  ppAreaMetricPools,
-  ppAreaRankClassMaps,
   preSeasonWorkflowBusy,
   preSeasonWorkflowError,
   preSeasonWorkflowFeed,
@@ -600,22 +471,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   readMeta,
   readOnlyBannerMessage,
   readSourceLabel,
-  reloadPrizePreviewFeed,
-  reloadResolvePreview,
   reloadSeasonStandingsOverview,
-  reloadStandingsPreviewFeed,
   removeTransferWishlistEntry,
   requestContractRenewalPreview,
   resetTableColumnWidth,
   resetTableLayout,
-  resolvePreviewFeed,
   resolvedTeamControlSettings,
-  resultApplyFeed,
   roomActivityNotice,
   roomContext,
   roomLiveState,
-  rosterFillBusy,
-  rosterFillFeed,
   rosterPlayers,
   runFacilityMaintenancePreview,
   runFacilityUpgradePreview,
@@ -626,14 +490,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   runPreSeasonNextSeasonSetup,
   runSeasonTransition,
   runFoundationCommand,
-  runNewGameSetup,
-  runSaveAction,
-  runSeasonStartReset,
   savePlayerGeneratorDrafts,
-  saveSummaries,
   saveSyncError,
-  saveTeamSettings,
-  scheduleActiveManagerTeam,
   scoutingCenterTab,
   scoutingHubV2TargetSections,
   scoutingHubV2Visibility,
@@ -649,21 +507,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonBriefingScheduleReady,
   seasonBriefingTeamAxes,
   seasonBriefingTeamCash,
-  seasonCompletionFeed,
-  seasonDisciplineScheduleRows,
-  seasonHistorySnapshots,
   seasonOverviewOptions,
   seasonOverviewSeasonId,
   seasonOverviewSourceLabel,
-  seasonSnapshotFeed,
-  seasonStandRows,
   seasonStandingsLoading,
-  seasonStandingsMode,
-  seasonStartResetBusy,
-  seasonStartResetFeed,
-  seasonTransitionBusy,
-  seasonTransitionError,
-  seasonTransitionFeed,
   seasonV2ArchiveRows,
   seasonV2DisciplineLeaders,
   seasonV2GmRows,
@@ -675,7 +522,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2StandingsRows,
   seasonV2TeamTopPlayersByColumn,
   seasonV2TopPlayers,
-  selectTeamSettingsTeam,
   selectedBoardConfidence,
   selectedEncyclopediaEntry,
   selectedHqAxisSummary,
@@ -683,9 +529,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedHqGmStory,
   selectedHqInboxItems,
   selectedHqMoraleSummary,
-  selectedIdentity,
-  selectedIdentityAxisBias,
-  selectedIdentityDraft,
   selectedOpenObjectives,
   selectedRoster,
   selectedRosterTableRows,
@@ -696,7 +539,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   fieldRaceTotalTeams,
   homeFieldRaceRankMovement,
   selectedTeam,
-  selectedTeamAverageAxisStats,
+  selectedTeamTopSixAxisStats,
   selectedTeamCanManage,
   selectedTeamCaptainProfile,
   selectedTeamCaptainCandidates,
@@ -707,61 +550,26 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedTeamControl,
   selectedTeamDetailTab,
   selectedTeamGeneralManager,
-  selectedTeamGmAxisShares,
-  selectedTeamGmBiasHighlights,
-  selectedTeamHasUnsavedChanges,
   selectedTeamId,
-  selectedTeamObjectives,
   selectedTeamPlayerDemands,
   selectedTeamPowers,
-  selectedTeamRosterActionHint,
-  selectedTeamRosterActionsAvailable,
   selectedTeamScoutPipeline,
-  selectedTeamSettingsIndex,
-  selectedTeamStrategyDraft,
-  selectedTeamStrategyProfile,
   setActiveManagerTeam,
-  setActiveOwnerId,
   setActiveView,
   setAdminSimulationFullChurn,
   setAdminSimulationInjuries,
   setAdminSimulationMode,
   setAdminSimulationSeasonCount,
-  setCockpitAiIncludeWarningTeams,
-  setCockpitAiOverwriteExisting,
-  setCockpitBusyKey,
   setCommandSearch,
   setContractRenewalNegotiation,
-  setDisciplineCategoryFilter,
   setFoundationActionFeedback,
-  setFreshSeasonStartMessage,
-  setGameModeOwnershipChrisIds,
-  setGameModeOwnershipFrankyIds,
-  setGameState,
-  setHistoryClassFilter,
-  setHistoryPage,
-  setHistorySearch,
-  setHistorySeasonFilter,
-  setHistorySourceFilter,
-  setHistoryTeamFilter,
-  setHistoryTypeFilter,
   setInboxCategoryFilter,
   setInboxIncludeDismissed,
   setInboxIncludeDone,
   setInboxV2SelectedItemId,
   setLineupDraftBoardView,
   setLineupDraftBoardViewRequest,
-  setMarketFocusPlayerId,
   setMarketSellRiskAcknowledged,
-  setMatchdayAutoRunIncludeWarningLineups,
-  setMatchdayAutoRunOverwriteExistingLineups,
-  setMatchdayAutoRunStopOnTie,
-  setMatchdayMvpForceReplaceExisting,
-  setMatchdaySummaryTab,
-  setNewGamePreview,
-  setNewGameSandbox,
-  setNewGameSaveName,
-  setNewGameSoloTeam,
   setPlayerClassFilter,
   setPlayerProfileData,
   setPlayerProfileTab,
@@ -771,92 +579,34 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   setPlayerTrainingMode,
   setScoutingCenterTab,
   setSeasonOverviewSeasonId,
-  setSeasonStandingsMode,
   setSelectedEncyclopediaEntryId,
-  setSelectedMatchdaySummaryId,
   setSelectedTeamDetailTab,
   setShowCommandPalette,
-  setShowExtendedTeamPanels,
-  setShowSelectedRosterPpsBreakdown,
-  setShowTeamContractPreviewRows,
-  setShowTeamDisciplines,
-  setSoloPlayerTeam,
   setSpecialistWingVariantDraft,
   setTableColumnVisible,
-  setTeamContextFilter,
-  setTeamControlDraft,
-  setTeamControlMessage,
-  setTeamIdentityDraft,
-  setTeamIdentityMessage,
-  setTeamRosterFocusMode,
-  setTeamRosterRoleFilter,
-  setTeamSettingsSearch,
-  setTeamStrategyDraft,
-  setTeamStrategyMessage,
-  setTrainingDevelopmentFilter,
-  setWholeSeasonIncludeWarningLineups,
-  setWholeSeasonOverwriteExistingLineups,
-  setWholeSeasonStopOnTie,
-  shouldBuildTeamContracts,
-  shouldShowArenaBackToLineup,
   showCommandPalette,
   showCompactFlowCoach,
   showCompactHeader,
-  showExtendedTeamPanels,
   showFlowCoach,
-  showReadOnlyNotice,
-  showSelectedRosterPpsBreakdown,
-  showTeamContractPreviewRows,
-  showTeamDisciplines,
   sortedDisciplineRankRows,
   sortedPlayersTableRows,
-  sortedPpAreaRows,
   specialistWingVariantDraft,
-  standingsApplyFeed,
-  standingsPreviewFeed,
   startAdminSeasonSimulationRun,
   startTableColumnResize,
   tableSorts,
-  teamContextFilter,
-  teamControlDraft,
-  teamControlMessage,
-  teamIdentityMessage,
-  teamObjectiveOverview,
-  teamOwners,
   teamProfileData,
-  teamRosterFocusMode,
-  teamRosterRoleFilter,
-  teamSettingsSearch,
-  teamStrategyMessage,
-  toggleGameModeOwnershipTeam,
-  toggleNewGameTeam,
-  toggleScoutingWatch,
   teamBeliebtheit,
   toggleTableSort,
-  toggleTransferSellMarker,
-  toggleTransferWishlist,
   trainingFacilityEffectPreview,
   trainingFacilityRows,
   trainingFacilitySeasonEndFinance,
   trainingForecastSummary,
   trainingV2ModeOptions,
-  transferSeasonOptions,
-  transferWishlistEntriesForMarketV2,
   triggerGlobalNext,
   updateInboxItemStatus,
-  updateTeamControlDraft,
-  updateTeamIdentityDraft,
-  updateTeamStrategyDraft,
-  visibleDisciplineConfigColumns,
-  visibleDisciplineConfigRows,
   visibleDisciplineRanksColumns,
   visibleFoundationCommandItems,
   visibleInboxItems,
-  visiblePlayersTableColumns,
-  wholeSeasonDryRunFeed,
-  wholeSeasonIncludeWarningLineups,
-  wholeSeasonOverwriteExistingLineups,
-  wholeSeasonStopOnTie,
   } = props;
 
   // Rivalen-Hervorhebung (additiv): Team-IDs aller Rivalen des aktiven Teams.
@@ -898,7 +648,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     formatCockpitReason,
   };
 
-  const isTeamSettingsViewActive = activeView === "teamSettings";
 
   // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
@@ -985,12 +734,84 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   }, [teamThemeCode]);
 
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
-  const inboxAllBadgeCount =
-    Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
-      ? activeTeamOpenInboxItems.length
-      : null;
   const teamsRosterBadgeCount =
     Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
+
+  // ===== W1 · Ranks-Matrix: Achsen-Gruppen, Gruppenband, gepinnte eigene Zeile =====
+  // Chris' Entscheidung: Spalten werden nach POW/SPE/MEN/SOC gruppiert und je
+  // Gruppe ein-/ausgeblendet — der px-Spalten-Manager entfällt (bewusster Tausch
+  // Feinsteuerung gegen Klarheit). Sichtbarkeit läuft weiter über den
+  // bestehenden Tabellen-Store (isTableColumnVisible/setTableColumnVisible),
+  // damit die Wahl wie bisher pro Save erhalten bleibt.
+  const ranksCategoryLabels: Record<string, string> = {
+    power: "Power",
+    speed: "Speed",
+    mental: "Mental",
+    social: "Social",
+  };
+  const ranksAxisGroups = (() => {
+    const groups: Array<{
+      category: string;
+      label: string;
+      columns: FoundationTableColumn[];
+      anyVisible: boolean;
+    }> = [];
+    for (const column of disciplineRanksColumns as FoundationTableColumn[]) {
+      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
+      if (!discipline) {
+        continue;
+      }
+      let group = groups.find((candidate) => candidate.category === discipline.category);
+      if (!group) {
+        group = {
+          category: discipline.category,
+          label: ranksCategoryLabels[discipline.category] ?? discipline.category,
+          columns: [],
+          anyVisible: false,
+        };
+        groups.push(group);
+      }
+      group.columns.push(column);
+      if (isTableColumnVisible("disciplineRanksTable", column.id, column.visibleByDefault)) {
+        group.anyVisible = true;
+      }
+    }
+    return groups;
+  })();
+  // Gruppenband über den sichtbaren Spalten: Achsenfarbe lebt NUR noch hier —
+  // die Zellen darunter färben ausschließlich nach Rang (Legende darüber).
+  const ranksHeaderGroups = (() => {
+    const cells: Array<{ key: string; category: string; label: string; span: number }> = [];
+    for (const column of visibleDisciplineRanksColumns as FoundationTableColumn[]) {
+      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
+      const category = column.id === "team" ? "team" : (discipline?.category ?? "base");
+      const last = cells[cells.length - 1];
+      if (last && last.category === category) {
+        last.span += 1;
+      } else {
+        cells.push({
+          key: `ranks-group-${category}-${column.id}`,
+          category,
+          label:
+            category === "team"
+              ? ""
+              : category === "base"
+                ? "Teamranks"
+                : (ranksCategoryLabels[category] ?? category),
+          span: 1,
+        });
+      }
+    }
+    return cells;
+  })();
+  // Eigene Zeile zusätzlich oben anpinnen (W1-Befund 6): das Original bleibt an
+  // seiner sortierten Position, die gepinnte Kopie trägt "Rang X von N".
+  const pinnedOwnRankRow =
+    activeManagerTeamId != null
+      ? (sortedDisciplineRankRows.find(
+          (row: FoundationDisciplineRankRow) => row.team.teamId === activeManagerTeamId,
+        ) ?? null)
+      : null;
 
   return (
     (
@@ -1100,17 +921,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               activeId={homeV2Tab}
               onSelect={(id) => navigateHomeTab(id === "office" ? "office" : "overview")}
             />
-          ) : activeView === "seasonV2" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "table", label: "Datenansicht" },
-                { id: "gms", label: "Manager" },
-              ]}
-              activeId={seasonStandingsMode}
-              onSelect={(id) => setSeasonStandingsMode(id as "table" | "gms")}
-            />
-          ) : activeView === "playerProfile" ? (
+          ) : /* S5/S5 (Audit Spieltag): die Sidebar-Kopie "Datenansicht"/"Manager"
+                 kontrollierte hier nichts — `viewMode`/`onViewModeChange` wurden
+                 zwar bis in SeasonStandingsV2Client.tsx durchgereicht, aber nie
+                 gelesen. Der SICHTBARE Umschalter war "Daten"/"Board"/"Vereine"
+                 IM Panel (SeasonStandingsNewLook.tsx, eigener localStorage-
+                 Zustand) — zwei Tab-Ebenen, von denen nur eine echt etwas tat.
+                 Klick auf "Manager" hier änderte sichtbar gar nichts (Befund).
+                 Statt beide Ebenen zu synchronisieren (Race-Risiko zwischen zwei
+                 Zustandsquellen für dieselbe Frage), fällt die tote Ebene weg —
+                 "Vereine" im Panel selbst zeigt exakt denselben Manager-Inhalt. */
+          activeView === "playerProfile" ? (
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
@@ -1138,29 +959,21 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
             />
           ) : activeView === "inboxV2" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "ALL", label: "Alle", count: inboxAllBadgeCount },
-                { id: "task", label: "Aufgaben" },
-                { id: "warning", label: "Warnungen" },
-                { id: "transfer", label: "Transfers" },
-                { id: "finance", label: "Finanzen" },
-                { id: "training", label: "Training" },
-              ]}
-              activeId={inboxCategoryFilter}
-              onSelect={(id) => {
-                setInboxCategoryFilter(id);
-                syncFoundationViewInUrl("inboxV2", id === "ALL" ? null : id, null, { push: true });
-              }}
-            />
+            // EIN Filtersystem (Audit I1): Die äußeren Kategorie-Reiter sind weg — sie
+            // konkurrierten mit den Pills in der Inbox selbst und boten Kategorien an
+            // („Warnungen", „Finanzen"), die als leere „Alles erledigt"-Seiten neben
+            // „11 offen" endeten (Audit I2). Gefiltert wird nur noch in der Inbox.
+            null
           ) : activeView === "scoutingCenterV2" ? (
+            // S3 (Audit „markt"): der separate "Empfehlungen"-Reiter bestand am Saisonstart aus
+            // einer einzigen Karte plus Erklärtext — in die Übersicht gefaltet
+            // (ScoutingCenterV2NewLook rendert den Inhalt jetzt unter "overview"; ein alter
+            // `?tab=recommended`-Deep-Link fällt dort weiterhin auf denselben Inhalt zurück).
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
                 { id: "overview", label: "Übersicht" },
                 { id: "reports", label: "Scouting Report" },
-                { id: "recommended", label: "Empfehlungen" },
               ]}
               activeId={scoutingCenterTab}
               onSelect={(id) => {
@@ -1169,20 +982,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
             />
           ) : activeView === "trainingCompact" ? (
-            <FoundationSubNav
-              className="foundation-shell-subnav"
-              items={[
-                { id: "control", label: "Steuerung" },
-                { id: "forecast", label: "Forecast" },
-              ]}
-              activeId="control"
-              onSelect={(id) => {
-                // Auf tatsächlich existierende Anker scrollen (vorher zeigten die IDs
-                // ins Leere → Klick tat nichts).
-                const targetId = id === "forecast" ? "training-development-filters" : "foundation-training-compact";
-                document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-            />
+            // Steuerung/Forecast-Subnav entfernt (Audit TR4): „Forecast" war kein eigener
+            // Inhalt, sondern nur ein Scroll-Anker auf die Entwicklungsfilter derselben
+            // Seite — zwei Reiter, die dieselbe Kartenwand zeigten. Seit der Steuer-Tabelle
+            // (Paket T5) stehen Steuerung UND Forecast in einer Tabelle; ein Umschalter,
+            // der nichts umschaltet, verspricht nur einen Unterschied, den es nicht gibt.
+            null
           ) : activeView === "prize" ? (
             // LEGACY: Der "Preisgeld"-Untertab ist entfernt — Preisgeld wird nicht
             // mehr ausgezahlt/genutzt. Es gibt nur noch Sponsoren, daher kein
@@ -2000,26 +1805,65 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   : gameFlowActionStep.warnings[0]
                     ? formatCockpitReason(gameFlowActionStep.warnings[0])
                     : "Flow bereit — weiter zum nächsten Schritt.",
+              // S1: roher Schlüssel bleibt am Chip — die Home-Ansicht braucht ihn,
+              // um Band-Doppelungen zu filtern und Chips klickbar zu machen.
               warnings: (homeWarnings as string[])
                 .filter((warning: string) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
-                .map(formatHomeWarningLabel),
+                .map((warning: string) => ({ key: warning, label: formatHomeWarningLabel(warning) })),
               // Friction fix (Generalprobe #2): a fresh save starts with no
               // human-controlled team and no flow-blocker routes there — surface
               // a dedicated CTA instead of the silently-hidden `no_active_team` chip.
               showTeamPickerCta: manualTeams.length === 0,
               onOpenTeamPicker: navigateToTeamPicker,
               topPlayers: homeV2TopPlayers,
+              // F4: Radar = Office-Kopf = Markt-Vorschau (Ø Top-6 je Achse).
+              teamAxisAverages: selectedTeamTopSixAxisStats,
               leagueHeatPools: leaguePlayerHeatPools,
               facilities: homeV2Facilities,
               scheduleItems: homeV2ScheduleItems,
+              // G3: der echte Spielplan — scheduleItems ist nur das 4er-Fenster
+              // des Steppers und taugt nicht als Saisonlänge.
+              seasonMatchdayTotal: gameState.season.matchdayIds.length,
               inboxItems: homeV2InboxItems,
+              // F4: Zähler = volle Entscheidungsliste (identisch zur Inbox),
+              // die Item-Liste bleibt die Top-5-Anzeige.
+              inboxOpenCount: homeOpenTaskCount,
+              inboxCriticalCount: activeTeamCriticalInboxItems.length,
               todayCards: homeTodayCards,
+              // S1 (Mockup homeV2): Kapitän-Hinweis im Board-Block — dieselbe Quelle
+              // wie die Kapitänwahl im Office (Kandidatenliste), keine zweite Rechnung.
+              captainSummary: (() => {
+                const candidates = selectedTeamCaptainCandidates ?? [];
+                if (candidates.length === 0) return null;
+                const current =
+                  candidates.find(
+                    (candidate: { playerId: string }) => candidate.playerId === selectedTeamCaptainPlayerId,
+                  ) ?? null;
+                const best = candidates.reduce(
+                  (
+                    leader: { playerId: string; playerName: string; leadershipScore: number } | null,
+                    candidate: { playerId: string; playerName: string; leadershipScore: number },
+                  ) => (leader == null || candidate.leadershipScore > leader.leadershipScore ? candidate : leader),
+                  null,
+                );
+                const challenger =
+                  current && best && best.playerId !== current.playerId && best.leadershipScore > current.leadershipScore + 1
+                    ? best
+                    : null;
+                return {
+                  captainName: current?.playerName ?? null,
+                  captainLeadership: current?.leadershipScore ?? null,
+                  challengerName: challenger?.playerName ?? null,
+                  challengerLeadership: challenger?.leadershipScore ?? null,
+                };
+              })(),
               onContinue: triggerGlobalNext,
               // Alle Home-Schnellsprünge pushen einen History-Eintrag (wie die
               // Sidebar), damit „Zurück" von der Zielseite verlässlich wieder auf
               // Home führt statt auf den zuvor aktiven Tab.
               onOpenTeams: () => setFoundationView("teams", setActiveView, { push: true }),
               onOpenLineup: () => setFoundationView("lineup", setActiveView, { push: true }),
+              onOpenArena: () => setFoundationView("matchdayArena", setActiveView, { push: true }),
               onOpenMarket: () => setFoundationView("marketV2", setActiveView, { push: true }),
               onOpenTraining: () => setFoundationView("trainingCompact", setActiveView, { push: true }),
               onOpenOffice: () => navigateHomeTab("office"),
@@ -2075,7 +1919,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               currentMatchdayDisplayLabel,
               selectedTeamCanManage,
               isReadOnlyMode: readMeta.readOnly,
-              selectedTeamAverageAxisStats,
+              selectedTeamTopSixAxisStats,
               rosterPlayers,
               onNavigate: (view) => setFoundationView(view, setActiveView),
               onOpenTeam: (teamId) => openTeamDrawerById(teamId),
@@ -2319,7 +2163,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 items={inboxV2Items}
                 selectedItemId={inboxV2SelectedItemId ?? inboxV2Items[0]?.id ?? null}
                 onSelectItem={setInboxV2SelectedItemId}
-                openCount={activeTeamOpenInboxItems.length}
+                // F4-Regel „eine Quelle pro Größe": derselbe Zähler wie auf Home
+                // (`homeOpenTaskCount` = `activeTeamDecisionInboxItems.length`) —
+                // „offen" meint, was zu TUN ist; Berichte zählen nicht mit.
+                openCount={activeTeamDecisionInboxItems.length}
                 criticalCount={activeTeamCriticalInboxItems.length}
                 teamLabel={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
                 categoryFilter={inboxCategoryFilter}
@@ -2749,6 +2596,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             onCommitDiscipline={commitArenaDiscipline}
             onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+            // S3 Pre-Matchday: „Einsatzliste öffnen →" ist der Held vor dem Anpfiff.
+            // History-Push wie bei den Home-Schnellsprüngen, damit „Zurück" wieder
+            // in der Arena landet.
+            onOpenLineup={() => setFoundationView("lineup", setActiveView, { push: true })}
             roomContext={roomContext}
           />
               {/* Die "Spieltagsergebnis"-Sektion ist entfernt: sie wiederholte, was die
@@ -2796,6 +2647,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenDevelopment={() => setFoundationView("trainingCompact", setActiveView, { push: true })}
               onOpenRoster={() => setFoundationView("teams", setActiveView, { push: true })}
               onOpenTransferWindow={() => void runSeasonTransition("open_transfer_window")}
+              /* Ohne diese vier Zeilen ist jede Ablehnung des Servers auf dieser Seite
+                 unsichtbar — der Knopf tut dann scheinbar nichts. Siehe die Prop-Doku im
+                 Panel. */
+              workflowError={preSeasonWorkflowError}
+              workflowBlockingReasons={preSeasonWorkflowFeed?.blockingReasons ?? []}
+              sponsorChoicePending={Number(
+                preSeasonWorkflowFeed?.steps?.find(
+                  (step: PreSeasonWorkflowStepSummaryResponse) => step.stepId === "sponsor_choice",
+                )?.summary?.manualPending ?? 0,
+              )}
+              onOpenSponsors={() => openPrizeFinanceView()}
             />
           ) : null}
 
@@ -2828,8 +2690,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               }}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onOpenPlayer={(playerId) => void openPlayerDrawerById(playerId)}
-              viewMode={seasonStandingsMode}
-              onViewModeChange={setSeasonStandingsMode}
               onOpenRanks={() => setFoundationView("ranks", setActiveView)}
               // Der Knopf heisst "Sponsoren" (SeasonStandingsNewLook.tsx) — er muss auch dorthin
               // fuehren. Bis hierher zwang er die Preisgeld-Ansicht auf, die weder Namen noch
@@ -2895,33 +2755,40 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       ))}
                     </select>
                   </label>
-                  <span className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}>
-                    {isViewingArchivedRanksSeason ? "Archiv" : "Live"}
+                  {/* Wie auf dem Saisonstand (G5): Klartext statt der halbenglischen
+                      Status-Flag-Reihe „Live · Aktive Season · lokale Results" — die
+                      technische Quelle bleibt als Tooltip erreichbar. */}
+                  <span
+                    className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}
+                    title={seasonOverviewSourceLabel}
+                  >
+                    {isViewingArchivedRanksSeason ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
                   </span>
                   {ranksArchiveMissing ? (
-                    <span className="pill is-warning">Rank-Archiv fehlt · Live-Fallback</span>
+                    <span className="pill is-warning">Rang-Archiv fehlt — es zählt der laufende Stand</span>
                   ) : null}
-                  <span className="muted ranks-season-source">{seasonOverviewSourceLabel}</span>
+                  {/* W1-Befund 7: Zustand und Aktion trennen — "alles gefüllt"
+                      ist ein Status (Pill), nur "nachpicken" ist ein Button. */}
                   {!readMeta.readOnly && readMeta.source !== "prisma" && runBulkAiTeamsRefill ? (
-                    <button
-                      type="button"
-                      className="secondary-button inline-button"
-                      disabled={bulkAiPicksRefillBusy || (underFilledAiTeamIds?.length ?? 0) === 0}
-                      title={
-                        (underFilledAiTeamIds?.length ?? 0) === 0
-                          ? "Alle KI-Teams sind gefüllt"
-                          : "Alle nicht befüllten KI-Teams automatisch nachpicken"
-                      }
-                      onClick={() => void runBulkAiTeamsRefill()}
-                    >
-                      {bulkAiPicksRefillBusy
-                        ? bulkAiPicksProgress
-                          ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
-                          : "Wirbt an…"
-                        : (underFilledAiTeamIds?.length ?? 0) === 0
-                          ? "KI-Teams gefüllt"
+                    !bulkAiPicksRefillBusy && (underFilledAiTeamIds?.length ?? 0) === 0 ? (
+                      <span className="pill is-ready" title="Alle KI-Teams sind gefüllt — nichts zu tun">
+                        KI-Teams gefüllt
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary-button inline-button"
+                        disabled={bulkAiPicksRefillBusy}
+                        title="Alle nicht befüllten KI-Teams automatisch nachpicken"
+                        onClick={() => void runBulkAiTeamsRefill()}
+                      >
+                        {bulkAiPicksRefillBusy
+                          ? bulkAiPicksProgress
+                            ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
+                            : "Wirbt an…"
                           : `KI-Teams nachpicken (${underFilledAiTeamIds?.length ?? 0})`}
-                    </button>
+                      </button>
+                    )
                   ) : null}
                   {bulkAiPicksRefillBusy && bulkAiPicksProgress ? (
                     <span className="pill is-running ranks-draft-progress" title="KI-Draft läuft — Teams werden nacheinander besetzt">
@@ -2952,32 +2819,81 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   ) : null}
                 </div>
               </div>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={disciplineRanksColumns}
-                activePreset={getTableActivePreset("disciplineRanksTable")}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("disciplineRanksTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) => setTableColumnVisible("disciplineRanksTable", columnId, nextVisible)}
-                onMove={(columnId, direction) => moveTableColumn("disciplineRanksTable", columnId, direction, disciplineRanksColumns)}
-                getWidth={(column) => getTableColumnWidth("disciplineRanksTable", column)}
-                onStepWidth={(column, delta) => adjustTableColumnWidth("disciplineRanksTable", column, delta)}
-                onResetWidth={(column) => resetTableColumnWidth("disciplineRanksTable", column)}
-                onResetToDefault={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
-              />
+              {/* W1 (Chris' Entscheidung): Achsen-Gruppen statt px-Spalten-Manager.
+                  Je Gruppe ein Schalter, der alle Disziplin-Spalten der Achse
+                  ein-/ausblendet; "Standard" setzt das Tabellen-Layout zurück. */}
+              <div className="ranks-axis-groups" role="group" aria-label="Achsen-Gruppen ein- oder ausblenden" data-testid="ranks-axis-groups">
+                <span className="ranks-axis-groups-label">Achsen-Gruppen</span>
+                {ranksAxisGroups.map((group) => (
+                  <button
+                    key={group.category}
+                    type="button"
+                    className={joinClassNames(
+                      "ranks-axis-group-toggle",
+                      `is-${group.category}`,
+                      group.anyVisible && "is-active",
+                    )}
+                    aria-pressed={group.anyVisible}
+                    title={
+                      group.anyVisible
+                        ? `${group.label}-Disziplinen ausblenden (${group.columns.length} Spalten)`
+                        : `${group.label}-Disziplinen einblenden (${group.columns.length} Spalten)`
+                    }
+                    onClick={() =>
+                      group.columns.forEach((column) =>
+                        setTableColumnVisible("disciplineRanksTable", column.id, !group.anyVisible),
+                      )
+                    }
+                  >
+                    <span className="ranks-axis-group-dot" aria-hidden="true" />
+                    {group.label}
+                    <small className="nl-tnum">{group.columns.length}</small>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="ghost-button ranks-axis-groups-reset"
+                  onClick={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
+                  title="Alle Spalten, Reihenfolge und Breiten auf den Standard zurücksetzen"
+                >
+                  Standard
+                </button>
+              </div>
             </div>
             <section className="ranks-leader-grid" aria-label="Aktuelle Teamstärke Leader">
               {rankLeaderCards.map((entry: FoundationDisciplineLeaderEntry) => (
                 <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
                   <span>{entry.label}</span>
                   <strong>{entry.row?.team.name ?? "—"}</strong>
-                  <small>
-                    {entry.row ? `#1 · ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)} Punkte` : "keine Werte"}
+                  {/* „Stärke", nicht „Punkte": der Wert ist der Teamstärke-Score der Rank-Matrix
+                      (scorePack — Summe der Top-6-Disziplin-Ratings der Kader, team-discipline-
+                      rank-engine.ts), keine erspielte Größe. „Punkte" meint auf derselben Seite
+                      bereits die PPs des Saison-Rankings — ein Wort pro Größe. */}
+                  <small title="Teamstärke-Score aus den Disziplin-Ratings der Kader (Rank-Matrix) — nicht die erspielten PPs des Saison-Rankings">
+                    {entry.row ? `#1 · Stärke ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)}` : "keine Werte"}
                   </small>
                 </article>
               ))}
             </section>
+            {/* W1: Legende trennt die zwei Farbsysteme — Zellenfarbe = Rang,
+                Achsenfarbe lebt nur noch im Gruppenband über den Spalten. */}
+            <div className="ranks-color-legend" role="note" aria-label="Farb-Legende der Rank-Matrix" data-testid="ranks-color-legend">
+              <span className="ranks-color-legend-item">
+                <b>Zellenfarbe = Rang:</b>
+                <span className="ranks-heatstrip" role="img" aria-label="Heat-Skala: Rang 1 bis 3 grün, 4 bis 6 gelb, 7 bis 10 rot, ab 11 ruhig">
+                  <i className="rank-strong" />
+                  <i className="rank-mid" />
+                  <i className="rank-weak" />
+                  <i className="rank-muted" />
+                </span>
+                <span className="nl-tnum">1–3 · 4–6 · 7–10 · ab 11 ruhig</span>
+              </span>
+              <span className="ranks-color-legend-item">
+                <b>Farbband oben = Achse</b> (Power · Speed · Mental · Social) — Kürzel hovern zeigt den vollen Disziplinnamen.
+              </span>
+              <span className="ranks-color-legend-item is-scrollhint">Weitere Disziplinen rechts — die Tabelle scrollt, die Team-Spalte bleibt stehen.</span>
+            </div>
+            <div className="ranks-table-scrollwrap">
             <div className="table-shell">
               <table className="team-table ranks-table">
                 <colgroup>
@@ -2986,6 +2902,23 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   ))}
                 </colgroup>
                 <thead>
+                  {/* W1: Gruppenband — die EINZIGE Stelle mit Achsenfarbe. */}
+                  <tr className="ranks-group-row" data-testid="ranks-axis-group-row">
+                    {ranksHeaderGroups.map((group) => (
+                      <th
+                        key={group.key}
+                        colSpan={group.span}
+                        scope="colgroup"
+                        className={joinClassNames(
+                          "ranks-group-cell",
+                          `is-${group.category}`,
+                          group.category === "team" && "ranks-sticky-team",
+                        )}
+                      >
+                        {group.label}
+                      </th>
+                    ))}
+                  </tr>
                   <tr>
                     {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
                       const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
@@ -3007,7 +2940,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           style={{ width: `${getTableColumnWidth("disciplineRanksTable", column)}px`, minWidth: `${column.minWidth}px` }}
                         >
                           <div className="resizable-header-cell">
-                            <SortableHeader label={column.label} tableId="disciplineRanks" columnKey={column.dataKey} sortState={tableSorts.disciplineRanks} onToggle={toggleTableSort} />
+                            <SortableHeader
+                              label={column.label}
+                              tableId="disciplineRanks"
+                              columnKey={column.dataKey}
+                              sortState={tableSorts.disciplineRanks}
+                              onToggle={toggleTableSort}
+                              tooltip={
+                                discipline
+                                  ? `${discipline.name} — Teamstärke-Rang in dieser Disziplin (Top-6-Spieler je Team). Klick sortiert.`
+                                  : (RANKS_AGGREGATE_COLUMN_TOOLTIPS[column.id] ?? null)
+                              }
+                            />
                             <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("disciplineRanksTable", column, event)} onDoubleClick={() => resetTableColumnWidth("disciplineRanksTable", column)} />
                           </div>
                         </th>
@@ -3016,12 +2960,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => (
+                  {/* W1: eigene Zeile zusätzlich oben angepinnt — das Original
+                      bleibt an seiner sortierten Position weiter unten. */}
+                  {[
+                    ...(pinnedOwnRankRow ? [{ row: pinnedOwnRankRow, isPinned: true }] : []),
+                    ...sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => ({ row, isPinned: false })),
+                  ].map(({ row, isPinned }: { row: FoundationDisciplineRankRow; isPinned: boolean }) => (
                     <tr
-                      key={row.team.teamId}
+                      key={isPinned ? `pinned-${row.team.teamId}` : row.team.teamId}
                       className={joinClassNames(
                         "ranks-row-clickable",
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
+                        isPinned && "ranks-own-pinned-row",
                         activeTeamRivalIds.has(row.team.teamId) && "is-rival",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
@@ -3034,8 +2984,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                             <td key={column.id} className="ranks-sticky-team">
                               <span className="ranks-team-name-wrap">
                                 {row.team.name}
+                                {row.team.teamId === activeManagerTeamId ? (
+                                  <span className="ranks-own-tag">Dein Team</span>
+                                ) : null}
                                 {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
                               </span>
+                              {isPinned ? (
+                                <small className="ranks-own-pinned-note nl-tnum">
+                                  Rang {row.totalRank} von {gameState.teams.length} — steht auch unten im Feld
+                                </small>
+                              ) : null}
                             </td>
                           );
                         }
@@ -3100,6 +3058,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 </tbody>
               </table>
             </div>
+            </div>
           </section>
           <FoundationRanksHost {...foundationRanksHostProps} />
           </>
@@ -3110,8 +3069,32 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
-          {/* Der frühere Standalone-View `disciplineStage` ist entfallen — die Bühne
-              rendert jetzt im `matchdayArena`-View (siehe oben). */}
+          {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist
+              entfallen — die Bühne rendert jetzt im `matchdayArena`-View (siehe oben).
+              Wer diese Ansicht trotzdem ansteuert (alter Link/Lesezeichen), bekam bis
+              hierher eine komplett leere Fläche ohne Text, ohne Hinweis, ohne Weg
+              zurück — eine echte Sackgasse. `VeloPendingRanking` ist genau für erklärte
+              Leerzustände gebaut (siehe Arena-Pre-Matchday, S3) — hier ohne Slots, nur
+              Titel + Erklärung + ein echter Weg weiter in die Arena. */}
+          {activeView === "disciplineStage" ? (
+            <div className="foundation-discipline-stage-redirect" data-testid="foundation-discipline-stage-redirect">
+              <VeloPendingRanking
+                eyebrow="Disziplin-Bühne"
+                title="Diese Ansicht ist umgezogen"
+                note="Die Bühne läuft jetzt direkt in der Spieltags-Arena — als eigene Ansicht gibt es sie nicht mehr. Dort siehst du Startbereitschaft, laufende Disziplinen und die Spieltags-Wertung an einem Ort."
+                meta={
+                  <button
+                    type="button"
+                    className="nl-result-button is-primary"
+                    onClick={() => setFoundationView("matchdayArena", setActiveView, { push: true })}
+                  >
+                    Zur Arena →
+                  </button>
+                }
+                data-testid="discipline-stage-redirect-pending-ranking"
+              />
+            </div>
+          ) : null}
 
           <FoundationShellRouterPrize
             active={activeView === "prize"}
@@ -3169,7 +3152,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
               activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
           {activeView === "finances" ? (
-            <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} saveId={activeSaveId} />
+            <FoundationFinancesHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              saveId={activeSaveId}
+              onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+            />
           ) : null}
 
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}

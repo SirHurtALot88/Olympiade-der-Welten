@@ -6,7 +6,14 @@ function round1(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-/** Client-safe team salary total (no filesystem / prize-table reads). */
+/**
+ * Client-safe team salary total (no filesystem / prize-table reads).
+ *
+ * GEGLÄTTET: bevorzugt `contract.expectedSalary` — die Bemessungsgrundlage
+ * für Apron, Sponsor-Kalkulation und KI. Als CASHFLOW-Anzeige ist diese Zahl
+ * FALSCH: abgebucht wird am Saisonende `contract.salary` (Season-End-
+ * Resolution) — dafür gibt es `getTeamActualSalaryTotal` direkt darunter.
+ */
 export function getTeamDisplaySalaryTotal(gameState: GameState, teamId: string): number {
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const total = gameState.rosters
@@ -16,6 +23,27 @@ export function getTeamDisplaySalaryTotal(gameState: GameState, teamId: string):
       const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
       const salary = contract.expectedSalary ?? normalizeEconomyMoney(contract.salary) ?? 0;
       return sum + salary;
+    }, 0);
+  return round1(total);
+}
+
+/**
+ * F4 (eine Quelle pro Größe): die ECHTE Gehaltssumme — `contract.salary`,
+ * exakt das Feld, das die Season-End-Resolution abbucht
+ * (`sponsor-settlement-service.ts`: `resolvePlayerEconomyContract(...).salary`).
+ * Das ist die Zahl, die die Finanzen-Seite summiert; jede Anzeige, die
+ * „was kostet der Kader wirklich" meint (z. B. der Tilgung-vs-Cashflow-Chart
+ * der Kredite-Seite), nimmt DIESE Summe. Die Glättung oben bleibt exklusiv
+ * die Bemessungsgrundlage für Apron/Sponsor/KI.
+ */
+export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): number {
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const total = gameState.rosters
+    .filter((entry) => entry.teamId === teamId)
+    .reduce((sum, entry) => {
+      const player = playerById.get(entry.playerId) ?? null;
+      const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
+      return sum + (normalizeEconomyMoney(contract.salary) ?? 0);
     }, 0);
   return round1(total);
 }

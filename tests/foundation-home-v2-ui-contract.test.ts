@@ -4,7 +4,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
 const shellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
 const shellScopePath = path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 const shellRouterPath = path.join(root, "app/foundation/FoundationShellRouter.tsx");
@@ -80,8 +79,11 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain("nl-home-development-card");
     expect(fileText).not.toContain("Manager Overview V2");
     expect(fileText).not.toContain("HQ öffnen");
+    // S1: „Heute wichtig" ist EINE Handlungszeile mit echtem CTA-Button statt
+    // drei Karten — die Karten 2/3 wiederholten Hero-Rang und Aufgaben-Zähler.
     expect(fileText).toContain("Heute wichtig");
-    expect(fileText).toContain("nl-home-today-card");
+    expect(fileText).toContain("nl-home-next-band");
+    expect(fileText).toContain("nl-home-next-band-cta");
     expect(fileText).toContain("Gebäude");
     expect(fileText).toContain("Entscheidungen");
     expect(fileText).toContain('data-testid="foundation-home-v2"');

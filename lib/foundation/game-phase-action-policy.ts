@@ -1,4 +1,5 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
+import { hasFinalMatchdayResult } from "@/lib/season/season-completion-state";
 import {
   getTransferWindowStatus,
   isTransferBuyPhaseOpen,
@@ -28,20 +29,13 @@ export type GamePhaseActionGate = {
   warnings: string[];
 };
 
-const PRESEASON_MANAGEMENT_PHASES = new Set<GamePhase>([
-  "preseason_management",
-  "transfer_sell_phase",
-  "transfer_buy_phase",
-  "lineup_setup",
-  "next_season_ready",
-]);
 
 const PROGRESSION_PHASES = new Set<GamePhase>([
   "season_completed",
   "season_review",
   "season_rewards",
   "player_development",
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
   "transfer_buy_phase",
   "lineup_setup",
@@ -63,14 +57,6 @@ function isEarlySeasonSetup(gameState: GameState) {
 
 function isPreseasonManagementOpen(gameState: GameState) {
   return isTransferMarketPhaseOpen(gameState);
-}
-
-function isSeasonComplete(gameState: GameState) {
-  const lastMatchdayId = gameState.season.matchdayIds[gameState.season.matchdayIds.length - 1] ?? null;
-  if (!lastMatchdayId) return false;
-  return (gameState.seasonState.matchdayResults ?? []).some(
-    (result) => result.seasonId === gameState.season.id && result.matchdayId === lastMatchdayId,
-  );
 }
 
 export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseAction): GamePhaseActionGate {
@@ -119,7 +105,10 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     allowed = phase === "season_active" || phase === "lineup_setup";
     reason = allowed ? null : `phase_blocked:resolve_matchday:${phase}`;
   } else if (action === "complete_season") {
-    allowed = phase === "season_completed" || phase === "season_review" || isSeasonComplete(gameState);
+    // Bewusst die schwaechste Lesart (`hasFinalMatchdayResult`, nicht `isSeasonComplete`): die
+    // strenge Variante wuerde jede Phase ausserhalb `season_active` durchlassen — also auch die
+    // Vorsaison-Phasen der FOLGE-Saison, in denen der Saisonabschluss ein zweites Mal liefe.
+    allowed = phase === "season_completed" || phase === "season_review" || hasFinalMatchdayResult(gameState);
     reason = allowed ? null : `phase_blocked:complete_season:${phase}`;
   } else if (action === "apply_progression") {
     allowed = PROGRESSION_PHASES.has(phase);

@@ -31,8 +31,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePhase"] }): GameState {
+function gameState(input?: {
+  completed?: boolean;
+  gamePhase?: GameState["gamePhase"];
+  /**
+   * Ist das Sponsorgeld der Saison gebucht? Der Schritt „Finanzen" (`season_rewards`) haelt die
+   * Kette an, solange nicht — die Saisonende-Abrechnung ist erzwungen ("natürlich muss die
+   * auszahlung und das ganze cash thema erzwungen sein ohne das kommt man nicht in die neue
+   * season!"). Die Ketten-Tests hier pruefen etwas anderes und starten deshalb mit gebuchtem
+   * Geld; der Riegel selbst hat seinen eigenen Test.
+   */
+  sponsorPaid?: boolean;
+}): GameState {
   const completed = input?.completed ?? false;
+  const sponsorPaid = input?.sponsorPaid ?? true;
   return {
     ...(input?.gamePhase ? { gamePhase: input.gamePhase } : {}),
     season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: completed ? 2 : 1, matchdayIds: ["md-1", "md-2"] },
@@ -45,6 +57,21 @@ function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePha
       standings: { "team-1": { points: 3, rank: 1 }, "team-2": { points: 0, rank: 2 } },
       lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-1", matchdayId: "md-2", teamId: "team-1", status: "submitted", entries: [], createdAt: "2026-06-11T00:00:00.000Z", updatedAt: "2026-06-11T00:00:00.000Z" }],
       formCards: [{ cardId: "form-1", seasonId: "season-1", teamId: "team-1", playerId: "player-1", type: "buff", value: 1 } as never],
+      sponsorPayoutLogs: sponsorPaid
+        ? [
+            {
+              id: "sponsor-payout-1",
+              saveId: "save-1",
+              seasonId: "season-1",
+              teamId: "team-1",
+              phase: "season_end" as const,
+              componentId: null,
+              cashDelta: 10,
+              action: "apply" as const,
+              createdAt: "2026-06-11T00:00:00.000Z",
+            },
+          ]
+        : [],
     },
     matchdayState: { matchdayId: completed ? "md-2" : "md-1", status: completed ? "resolved" : "planning", pendingTeamIds: completed ? [] : ["team-1"], resolvedFixtureIds: completed ? ["fixture-2"] : [] },
     teams: [
@@ -78,7 +105,11 @@ function gameState(input?: { completed?: boolean; gamePhase?: GameState["gamePha
   };
 }
 
-function save(input?: { completed?: boolean; gamePhase?: GameState["gamePhase"] }): PersistedSaveGame {
+function save(input?: {
+  completed?: boolean;
+  gamePhase?: GameState["gamePhase"];
+  sponsorPaid?: boolean;
+}): PersistedSaveGame {
   return {
     saveId: "save-1",
     name: "Test Save",
@@ -146,7 +177,7 @@ describe("season transition service", () => {
       "season_review",
       "season_rewards",
       "player_development",
-      "preseason_management",
+      "season_end_management",
       "transfer_sell_phase",
       "transfer_buy_phase",
       "lineup_setup",
@@ -199,13 +230,13 @@ describe("season transition service", () => {
     const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
 
     expect(result.applied).toBe(true);
-    expect(result.gamePhase).toBe("preseason_management");
+    expect(result.gamePhase).toBe("season_end_management");
     // PERF: die vier Hops (season_review, season_rewards, player_development,
-    // preseason_management) laufen komplett im Speicher durch — geschrieben wird der Spielstand
+    // season_end_management) laufen komplett im Speicher durch — geschrieben wird der Spielstand
     // erst am Ende, EINMAL, nicht mehr nach jedem einzelnen Hop. Auf der Platte landet direkt die
     // Endphase, keine der Zwischenphasen ist je sichtbar (siehe `advanceSeasonTransitionToTransferWindow`,
     // PERF-Kommentar dort, fuer die Zeitmessung, die diesen Umbau ausgeloest hat).
-    expect(gespeichertePhasen()).toEqual(["preseason_management"]);
+    expect(gespeichertePhasen()).toEqual(["season_end_management"]);
     expect(saveSingleplayerState).toHaveBeenCalledTimes(1);
   });
 
@@ -220,7 +251,7 @@ describe("season transition service", () => {
    * Zaehler ab 0, gleiche fixe Zeit) — sonst wichen `transitionId` und die Progression-Event-IDs
    * allein durch den doppelten Aufruf voneinander ab, obwohl die Fachlogik identisch rechnet.
    */
-  it("liefert exakt denselben Endzustand wie der alte, schrittweise persistierende Ablauf", () => {
+  it("liefert exakt denselben Endzustand wie der alte, schrittweise persistierende Ablauf", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-11T00:00:00.000Z"));
 
@@ -236,13 +267,13 @@ describe("season transition service", () => {
       buildSeasonTransitionPreview(manualCurrent);
       for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length; hop += 1) {
         if (isTransferMarketPhaseOpen(manualCurrent.gameState)) break;
-        const step = advanceSeasonTransitionStep(manualCurrent, manualRun.persistence);
+        const step = await advanceSeasonTransitionStep(manualCurrent, manualRun.persistence);
         if (!("applied" in step) || !step.applied) break;
         const reloaded = manualRun.persistence.getSaveById(manualCurrent.saveId);
         if (!reloaded) break;
         manualCurrent = reloaded;
       }
-      expect(manualCurrent.gameState.gamePhase).toBe("preseason_management");
+      expect(manualCurrent.gameState.gamePhase).toBe("season_end_management");
 
       // Neuer Weg: dieselbe Ausgangslage, einmal gebatcht durchgereicht.
       uuidCounter = 0;
@@ -251,7 +282,7 @@ describe("season transition service", () => {
         batchedRun.persistence.getSaveById("save-1")!,
         batchedRun.persistence,
       );
-      expect(batchedResult.gamePhase).toBe("preseason_management");
+      expect(batchedResult.gamePhase).toBe("season_end_management");
       const batchedFinal = batchedRun.persistence.getSaveById("save-1");
       if (!batchedFinal) throw new Error("Batched run left no save behind.");
 
@@ -277,12 +308,12 @@ describe("season transition service", () => {
   it("bewegt sich nicht mehr, wenn das Fenster schon offen ist", () => {
     // Ein zweiter Klick darf nicht weiter in Richtung neue Saison rutschen — sonst schoebe
     // das versehentliche Doppeltippen den Spieler an seiner Transferrunde vorbei.
-    const sourceSave = save({ completed: true, gamePhase: "preseason_management" });
+    const sourceSave = save({ completed: true, gamePhase: "season_end_management" });
     const { persistence, saveSingleplayerState } = statefulPersistenceMock(sourceSave);
 
     const result = advanceSeasonTransitionToTransferWindow(sourceSave, persistence);
 
-    expect(result.gamePhase).toBe("preseason_management");
+    expect(result.gamePhase).toBe("season_end_management");
     expect(saveSingleplayerState).not.toHaveBeenCalled();
   });
 

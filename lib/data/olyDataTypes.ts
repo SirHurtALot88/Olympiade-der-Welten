@@ -1,4 +1,7 @@
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
+// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
+import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
+import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 
 export type DisciplineCategory =
   | "power"
@@ -24,6 +27,13 @@ export type GamePhase =
   | "season_review"
   | "season_rewards"
   | "player_development"
+  // Die Station des SAISONENDES (Training/Ziele, nach der Spielerentwicklung). Hiess bis 0.4.11
+  // ebenfalls `preseason_management` — derselbe Name wie der frische Spielaufbau, obwohl es der
+  // gegenteilige Zeitpunkt ist. Aus dieser Doppeldeutigkeit sind zwei Fehler entstanden (der
+  // Setup-Draft feuerte am Saisonende erneut, Client wie Server). Deshalb ein eigener Name.
+  | "season_end_management"
+  // Nur noch der FRISCHE Aufbau vor dem allerersten Spieltag. Neue Spiele legt
+  // `new-game-setup-service` in `season_active` an; diese Phase tragen nur noch Altstaende.
   | "preseason_management"
   | "transfer_sell_phase"
   | "transfer_buy_phase"
@@ -56,6 +66,15 @@ export type SeasonTransitionState = {
    * beim Saisonstart ein zweites Mal laeuft.
    */
   progressionAppliedForSeasonId?: string | null;
+  /**
+   * Saison-Id, fuer die die KI-Verkaeufe des Saisonendes bereits gelaufen sind.
+   *
+   * Derselbe Zweck wie `progressionAppliedForSeasonId` eine Zeile darueber, und aus demselben
+   * Grund noetig: der Schritt „Verkaeufe" schreibt jetzt selbst, also muss er sich merken, dass er
+   * fertig ist. Ohne den Marker verkauft die KI bei jedem erneuten Durchlauf der Station ein
+   * weiteres Mal Spieler — und ein Klick zurueck und wieder vor wuerde Kader leerraeumen.
+   */
+  aiSeasonEndSellsAppliedForSeasonId?: string | null;
 };
 
 export type ScenarioType =
@@ -366,6 +385,18 @@ export type ObjectiveRewardApplyLogRecord = {
     totalCashDelta: number;
     totalBoardConfidenceDelta: number;
     appliedTeams: number;
+    /**
+     * Cash-Wirkung JE TEAM, so wie sie gebucht wurde.
+     *
+     * Vorher trug der Log nur Summen. Wer nachrechnen wollte, wer wie viel bekommen hat, musste die
+     * Abrechnung aus dem Spielstand NEU herleiten — und traf dabei nicht mehr denselben Zustand:
+     * die Ziele werden am Saisonende NACH Sponsor, Apron und Gebäuden gebucht, also gegen einen
+     * anderen Cash-Stand als den, den ein Nachrechner vor dem Apply sieht. Genau daran ist die
+     * Cashflow-Invariante aufgelaufen. Der Log nennt die Zahlen jetzt selbst.
+     *
+     * Ältere Spielstände führen das Feld nicht; fehlend heisst „nicht protokolliert", nicht „null".
+     */
+    cashDeltaByTeamId?: Record<string, number>;
   };
   createdAt: string;
 };
@@ -414,6 +445,21 @@ export type PlayerProgressionSpendUpgradeRecord = {
   toValue: number;
   cost: number;
   source: "manual_xp_spend_preview" | "season_end_regression" | "organic_season_progression";
+  /**
+   * Herkunft der Änderung je Attribut, wie sie die organische Progression berechnet hat
+   * (`OrganicProgressionAttributeBreakdown`). Bisher wurde nur `fromValue`/`toValue`
+   * festgehalten — in der Trainingshistorie stand danach eine Zahl ohne Erklärung, und ein
+   * Zuwachs aus Spieltags-Leistungen sah aus wie ein Erfolg des Trainingsplans.
+   *
+   * Optional, weil die Felder erst ab dieser Version geschrieben werden: Für Saisons, die
+   * vorher abgeschlossen wurden, gibt es die Aufteilung nicht mehr — sie ließe sich nur
+   * schätzen. Die Historie fällt dort auf die Saison-Summen aus `organicMeta` zurück.
+   * Nur bei `source: "organic_season_progression"` gesetzt.
+   */
+  originTraining?: number;
+  originSpillover?: number;
+  originPerformance?: number;
+  originRegression?: number;
 };
 
 export type PlayerProgressionEconomySnapshot = {
@@ -1058,6 +1104,23 @@ export type TeamControlSettings = {
   aiTransferAutoApplyEnabled: boolean;
   aiSellPreviewEnabled: boolean;
   aiSellAutoApplyEnabled: boolean;
+  /**
+   * KREDIT-BUDGET, das dieses Team anderen Teams zur Verfuegung stellt (Mio).
+   *
+   * CHRIS: „wie kann man als spieler kredite an AI Teams anbieten? die picken ja direkt ihre
+   * spieler das heißt wenn ich z.B. C-C spiele wäre es gut wenn das geht, die sollen damit ihr geld
+   * verdienen! … sonst muss es eine möglichkeit geben, ein budget für kredite vorab festzulegen an
+   * dem andere teams sich bedienen können."
+   *
+   * Nur fuer von Hand gefuehrte Teams von Belang: KI-Teams entscheiden selbst und stellen ihr Geld
+   * ohnehin zur Verfuegung. Fuer ein manuell gefuehrtes Team ist ein Team-Kredit dagegen eine
+   * Entscheidung ueber das Geld des Spielers — ohne gesetztes Budget taucht es gar nicht erst als
+   * Geldgeber auf. `null`/`0` heisst also „verleihe nichts"; das ist der Startwert.
+   *
+   * Gegenzaehler ist die bereits verliehene Summe: es kann nie mehr als dieses Budget gleichzeitig
+   * draussen sein.
+   */
+  lendingBudget?: number | null;
   notes?: string | null;
   strategyLock?: string | null;
 };
@@ -1555,15 +1618,42 @@ export type SponsorPayoutLogRecord = {
 };
 
 /**
- * APRON — die zu SAISONBEGINN eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
+ * APRON — die beim SCHLIESSEN DES KAUFFENSTERS eingefrorenen Gehaltslinien (siehe
+ * lib/season/apron-service.ts und `ensureSeasonApronLinesFrozen` in apron-settlement-service.ts).
  * Bewusst NICHT am Saisonende berechnet: sonst kauft man blind gegen eine Grenze, die sich durch die
- * eigenen Käufe verschiebt. `medianSalary`/`line1`/`line2` sind fix für die gesamte Saison, egal wie
- * sich die Gehälter danach noch verschieben (Verletzungsersatz, Nachverpflichtungen etc.).
+ * eigenen Käufe verschiebt. Und bewusst NICHT mehr am Ende des Preseason-Workflows: das Kauffenster
+ * der neuen Saison öffnet ERST DANACH — eine dort eingefrorene Linie misst die ausgedünnten
+ * Nach-Verkaufs-Kader und gilt dann für eine Liga, die es so nicht mehr gibt (gemessener Schaden:
+ * Median 45,0 eingefroren, Liga-Median nach dem Fenster 63,9 → 29 von 32 Teams über der Linie,
+ * 3 Empfänger teilen 428,7). `medianSalary`/`line1`/`line2` sind ab dem Einfrieren fix für die
+ * gesamte Saison, egal wie sich die Gehälter danach noch verschieben (Verletzungsersatz etc.).
  */
 export type ApronLinesSnapshot = {
   seasonId: string;
   frozenAtMatchdayId: string;
   createdAt: string;
+  /**
+   * HERKUNFT des Snapshots — ohne den Vermerk war ein von einem Alt-Build zu früh eingefrorener
+   * Stand von außen nicht von einem gültigen zu unterscheiden (so festgesessen auf Chris' Save,
+   * Median 45,0 gegen real 69,8):
+   *   - "buy_window_close" = von `ensureSeasonApronLinesFrozen` geschrieben. Solange die Saison
+   *     nicht gespielt ist, wird bei jedem Aufruf nachgeführt; endgültig ist der letzte Stand vor
+   *     dem ersten gewerteten Spieltag — dem Schließen des Kauffensters, dem einzigen Zeitpunkt,
+   *     den der Code seit dem Timing-Fix (#467) festschreibt.
+   *   - "recompute_repair" = per `scripts/repariere-apron-linien.ts` neu berechnet, nachdem ein
+   *     Alt-Build-Snapshot in einer bereits gespielten Saison festsaß; `note` nennt Zeitpunkt und
+   *     Grund.
+   * Fehlt das Feld, stammt der Snapshot von einem älteren Build, der VOR dem Kauffenster der
+   * Saison einfror (Preseason-Workflow/New-Game). Solche Snapshots werden in einer bereits
+   * gespielten Saison BEWUSST NICHT automatisch ersetzt: eine Grenze, die mitten in der Saison
+   * wandert, ist genau das, wovor das Einfrieren schützt. Die Heilung läuft ausschließlich über
+   * das Reparaturskript, das vorher nachweist, dass seit dem ersten gewerteten Spieltag keine
+   * Transfers stattfanden — nur dann ist die Neuberechnung der Stand vom Fensterschluss und keine
+   * Schätzung.
+   */
+  frozenAtEvent?: "buy_window_close" | "recompute_repair";
+  /** Freitext-Herkunftsvermerk (Reparaturskript: Zeitpunkt und Grund der Neuberechnung). */
+  note?: string;
   medianSalary: number;
   line1: number;
   line2: number;
@@ -1673,6 +1763,13 @@ export type TeamSeasonObjectiveRecord = {
    * nicht; fehlend bedeutet "verbindlich".
    */
   optional?: boolean;
+  /**
+   * Der ausgewiesene Wert ist eine HOCHRECHNUNG: das Ziel hängt an Cash, und die Einnahmen der
+   * Saison (Sponsor, Apron, Gebäude) werden erst am Saisonende gebucht. Die Oberfläche schreibt
+   * das dazu, und bis zur Abrechnung kann der Status höchstens "gefährdet" sein. Ältere
+   * Spielstände führen das Feld nicht; fehlend bedeutet "steht fest".
+   */
+  provisional?: boolean;
 };
 
 export type TeamBoardConfidenceRecord = {
@@ -2278,6 +2375,22 @@ export type SeasonSnapshotTeamRecord = {
     soc: number | null;
   };
   cashEnd: number | null;
+  /**
+   * DER KONTOSTAND, MIT DEM DAS TEAM IN DIE NAECHSTE SAISON GEHT — eingefroren am Saisonstart,
+   * NACH Kaeufen, Kaderfuellung und Krediten.
+   *
+   * CHRIS' REGEL: „die snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison
+   * nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
+   *
+   * Warum ein EIGENES Feld statt `cashEnd` zu ueberschreiben: `cashEnd` ist der wahre
+   * Saison-Endstand (nach Sponsoren, vor dem Transferfenster) und die Bezugsgroesse des
+   * Abgleichs in `getSnapshotCashByTeam`. Wird er mit dem Stand nach den Kaeufen ueberschrieben,
+   * rechnet der Abgleich die Preseason-Ausgaben doppelt und meldet ein falsches
+   * `cash_reconciliation_delta_hard` — genau der Grund, aus dem
+   * `buildTeamEntryEconomyFromGameState` das Feld bisher gar nicht anfasste. Die Ansichten lesen
+   * jetzt `cashEntry` zuerst und fallen auf `cashEnd` zurueck, wo es fehlt (Altsaves).
+   */
+  cashEntry?: number | null;
   /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
   rosterEndPostSell?: number | null;
   rosterEnd: number;
@@ -2302,6 +2415,34 @@ export type SeasonSnapshotTeamRecord = {
    * in der die Entwicklung nicht lief), fallen die Ansichten auf `marketValueTotalEnd` zurueck.
    */
   marketValueSeasonEnd?: number | null;
+  /**
+   * Die uebrigen Momentwerte zum selben Zeitpunkt wie `marketValueSeasonEnd`:
+   * Ende `player_development`, also NACH dem Trainings-Apply und VOR dem ersten
+   * Verkauf des Transferfensters.
+   *
+   * Warum eigene Felder statt `cashEnd`/`salaryEnd`/`rosterEnd`: Die alten Felder
+   * bezeichnen andere Zeitpunkte und werden von spaeteren Patches ueberschrieben —
+   * `salaryEnd`/`rosterEnd` tragen nach `patchCompletedSeasonSnapshotAfterPreseasonBuy`
+   * den Eintrittsstand der FOLGE-Saison, `cashEnd` den Stand nach den Verkaeufen.
+   * Die Historie zeigte dadurch drei Spalten mit drei verschiedenen Zeitpunkten,
+   * zwei davon aus der falschen Saison (gemeldet von Chris).
+   *
+   * Alle drei werden wie `marketValueSeasonEnd` write-once gesetzt und danach nie
+   * wieder angefasst. `cashEnd` bleibt unveraendert bestehen — es ist die
+   * Bezugsgroesse des Cash-Abgleichs (`cash_reconciliation_delta_hard`).
+   */
+  cashSeasonEnd?: number | null;
+  salarySeasonEnd?: number | null;
+  rosterSeasonEnd?: number | null;
+  /** Zeitpunkt des Einfrierens — belegt, dass der Block wirklich vor der Verkaufsphase entstand. */
+  seasonEndFrozenAt?: string | null;
+  /**
+   * Woher der Snapshot stammt. `"post_sell_fallback"` markiert einen Datensatz, der
+   * NICHT beim Saisonabschluss entstand, sondern nachtraeglich beim
+   * `next_season_setup` — dann liegen die Verkaeufe bereits dahinter und die
+   * eingefrorenen Felder bleiben leer, statt eine falsche Zahl zu behaupten.
+   */
+  economySnapshotSource?: "season_completion" | "post_sell_fallback";
   transferCount: number;
   transferBuyCount: number;
   transferSellCount: number;
@@ -2443,6 +2584,48 @@ export type TeamDisciplineRankSnapshotRecord = {
   };
 };
 
+/**
+ * HERKUNFTSVERMERK der Teamstärke-Ränge im Saison-Schnappschuss.
+ *
+ * GEMELDET VON CHRIS: „die snapshots für die ranking änderungen [müssen] sich auf den season 1 lauf
+ * beziehen vor verkäufen! … da ist N-N zb 32. das kann nicht der stand während der saison gewesen
+ * sein". Befund: `buildSeasonSnapshotRecord` rechnete die Ränge beim Saisonabschluss aus dem
+ * LIVE-Kader — der lag im echten Spielstand vier Tage nach dem letzten Spieltag, nach 49 Verkäufen.
+ *
+ * Deshalb steht am Datensatz jetzt, WOHER die Ränge stammen:
+ *   - `matchday_capture`: bei der Wertung des letzten Spieltags festgehalten (der Soll-Weg),
+ *   - `season_end_live`: Rückfall für Altstände ohne festgehaltenen Satz — Live-Kader beim
+ *     Saisonabschluss, also potenziell nach Verkäufen,
+ *   - `transfer_history_reconstruction`: rückwirkend aus der Transferhistorie rekonstruiert
+ *     (scripts/repariere-s1-teamstaerke-snapshot.ts).
+ */
+export type TeamDisciplineRankSnapshotMeta = {
+  source: "matchday_capture" | "season_end_live" | "transfer_history_reconstruction";
+  /** Spieltag, dessen Kaderstand die Ränge abbilden (bei `season_end_live` null). */
+  matchdayId?: string | null;
+  /** Zeitpunkt, zu dem der Kaderstand galt bzw. festgehalten wurde. */
+  capturedAt?: string | null;
+  note?: string | null;
+};
+
+/**
+ * Bei jeder Spieltagswertung festgehaltene Teamstärke-Ränge — der jeweils letzte gewinnt.
+ *
+ * Ein Eintrag pro Saison (Upsert über `seasonId`). Der Saison-Schnappschuss übernimmt diesen Satz,
+ * statt beim Saisonabschluss neu aus dem Live-Kader zu rechnen — zwischen letztem Spieltag und
+ * Abschluss liegen sonst Verkäufe/Vertragsenden, die die Saisonränge verfälschen (siehe
+ * TeamDisciplineRankSnapshotMeta). Muster: matchdayResolveSnapshots, nur pro Saison statt pro
+ * Spieltag. Einträge vergangener Saisons bleiben als kleines Audit-Archiv stehen.
+ */
+export type TeamStrengthRankCaptureRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  capturedAt: string;
+  records: TeamDisciplineRankSnapshotRecord[];
+};
+
 export type SeasonSnapshotRecord = {
   snapshotId?: string;
   seasonId: string;
@@ -2456,6 +2639,8 @@ export type SeasonSnapshotRecord = {
   teamSnapshots?: SeasonSnapshotTeamRecord[];
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
+  /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
+  teamDisciplineRankSnapshotMeta?: TeamDisciplineRankSnapshotMeta;
   matchdayResults?: MatchdayResultRecord[];
   disciplineResults?: DisciplineResultRecord[];
   playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];
@@ -2898,7 +3083,28 @@ export type SeasonState = {
    * beim Schreiben ersetzt, damit der Save nicht mit Vorschauen zulaeuft.
    */
   matchdayResolveSnapshots?: MatchdayResolveSnapshotRecord[];
+  /**
+   * Teamstärke-Ränge, festgehalten bei der Wertung eines Spieltags (Standings-Apply) — ein Eintrag
+   * pro Saison, der jeweils letzte Spieltag gewinnt. Quelle der `teamDisciplineRankSnapshots` im
+   * Saison-Schnappschuss; siehe TeamStrengthRankCaptureRecord.
+   */
+  teamStrengthRankCaptures?: TeamStrengthRankCaptureRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
+  /**
+   * NUR ANZEIGEFRACHT, NIEMALS QUELLE. Schlanke Fassung der abgeschlossenen Saisons fuer den
+   * Browser, weil die Anfangsladung `seasonSnapshots` streicht (siehe
+   * `foundation-season-history-projection`). Wird nie in den Spielstand zurueckgeschrieben — sie
+   * traegt absichtlich weniger Felder als das Original, und ein Rueckschreiben waere Datenverlust.
+   */
+  foundationSeasonHistory?: FoundationSeasonHistoryEntry[];
+  /**
+   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — Geschwister der Saison-Historie oben: der fertige
+   * Feld-Rennen-Ledger (gewertete Spieltage je Team), serverseitig auf dem vollen Save
+   * gerechnet, weil die Anfangsladung `matchdayResults`/`disciplineResults` auf den aktiven
+   * Spieltag beschneidet und ein Browser-Neubau sonst „0 gespielte Spieltage" ergibt
+   * (siehe `foundation-field-race-projection`). Wird nie zurueckgeschrieben.
+   */
+  foundationFieldRace?: FoundationFieldRaceProjection;
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;

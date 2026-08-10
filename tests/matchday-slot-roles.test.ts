@@ -476,7 +476,6 @@ describe("matchday slot roles", () => {
         },
       },
     ];
-    const disciplineScores = [{ playerId: "p-1", disciplineId: "mini-dm", score: 65 }];
     const slotRoleModifier = calculateSideSlotRoleModifierTotal({
       disciplineId: "fechten",
       disciplineSide: "d1",

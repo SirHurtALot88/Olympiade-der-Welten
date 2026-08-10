@@ -16,6 +16,21 @@ const scenarioLabels: Record<ScenarioType, string> = {
 };
 
 export function hasFinalStandings(gameState: GameState) {
+  /**
+   * Ein abgeschlossener Saison-Schnappschuss IST ein Endstand. Vorher prüfte die
+   * Funktion nur die LAUFENDE Saison (Punkte + Ergebnis am letzten Spieltag) —
+   * ein Save mitten in Season 2 bekam damit „containsFinalStandings: false",
+   * obwohl sein komplettes Season-1-Archiv (`seasonSnapshots`, status
+   * "completed") im Spielstand liegt und Saisonstand/Teams/Leaders es anzeigen.
+   * Die Settings-Karte behauptete daraus „Dieser Save enthält keine
+   * abgeschlossene Season".
+   */
+  const hasCompletedArchive = (gameState.seasonState.seasonSnapshots ?? []).some(
+    (snapshot) => snapshot.status === "completed",
+  );
+  if (hasCompletedArchive) {
+    return true;
+  }
   const standings = gameState.seasonState.standings ?? {};
   const teamsWithPoints = Object.values(standings).filter((row) => (row.points ?? 0) > 0).length;
   const matchdayIds = gameState.season.matchdayIds ?? [];

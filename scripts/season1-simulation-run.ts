@@ -101,20 +101,6 @@ function toCsv(rows: Array<Record<string, unknown>>, headers: string[]) {
   ].join("\n");
 }
 
-function combinations<T>(items: T[], count: number): T[][] {
-  if (count === 0) return [[]];
-  if (items.length < count) return [];
-
-  const result: T[][] = [];
-  for (let index = 0; index <= items.length - count; index += 1) {
-    const head = items[index];
-    if (!head) continue;
-    for (const tail of combinations(items.slice(index + 1), count - 1)) {
-      result.push([head, ...tail]);
-    }
-  }
-  return result;
-}
 
 function sumScores(entries: CandidateEntry[]) {
   return entries.reduce((sum, entry) => sum + entry.score, 0);

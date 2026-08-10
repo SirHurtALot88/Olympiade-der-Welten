@@ -33,6 +33,24 @@ export type PlayerSeasonTrainingForecastCell = {
   cumulative: number;
   /** Projizierter Attributwert (Saisonstart-Wert + kumulierte Änderung). */
   projectedValue: number;
+  /**
+   * Herkunft der Änderung, aufgeschlüsselt je Attribut — dieselbe Quelle wie die
+   * Summen darunter (`attributeBreakdown`), nur nicht saldiert.
+   *
+   * Ohne diese Trennung stand in der Trainingshistorie nur eine Zahl, und die las
+   * sich, als käme sie ganz aus dem Trainingsplan. Ein Spieler wächst aber auch
+   * dadurch, dass er SPIELT (Performance-Anteil). Gemeldet von Chris: „hier in der
+   * trainingshistorie soll nicht nur training gezeigt werden sondern auch die
+   * verbesserung durch performance!"
+   *
+   * `training + performance + regression` ergibt `cumulative` — bis auf den Fall, dass
+   * das Attribut-Ceiling bindet: dann kappt die Projektion den Zuwachs und `cumulative`
+   * bleibt kleiner als die Summe der Posten.
+   */
+  training: number;
+  performance: number;
+  /** Gegenposten (Alterung/Marktwertdruck) — immer ≤ 0. */
+  regression: number;
 };
 
 export type PlayerSeasonTrainingForecast = {
@@ -137,8 +155,22 @@ export function buildPlayerSeasonTrainingForecast(input: {
   const cumulativeByAttr = Object.fromEntries(
     PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
   ) as Record<PlayerGeneratorAttributeName, number>;
+  // Trainings- und Leistungsanteil je Attribut mitnehmen. Der Spillover zählt zum
+  // Training: er IST Trainingsbudget, nur auf Nebenstats umgeleitet.
+  const trainingByAttr = Object.fromEntries(
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
+  ) as Record<PlayerGeneratorAttributeName, number>;
+  const performanceByAttr = Object.fromEntries(
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
+  ) as Record<PlayerGeneratorAttributeName, number>;
+  const regressionByAttr = Object.fromEntries(
+    PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0]),
+  ) as Record<PlayerGeneratorAttributeName, number>;
   for (const entry of projection.attributeBreakdown) {
     cumulativeByAttr[entry.attribute] = entry.delta;
+    trainingByAttr[entry.attribute] = (entry.training ?? 0) + (entry.spillover ?? 0);
+    performanceByAttr[entry.attribute] = entry.performance ?? 0;
+    regressionByAttr[entry.attribute] = entry.regression ?? 0;
   }
 
   const baseline = player.attributeSheetStats ?? null;
@@ -146,7 +178,14 @@ export function buildPlayerSeasonTrainingForecast(input: {
     const cumulative = round1(cumulativeByAttr[attribute]);
     const baseValue = baseline?.[attribute];
     const projectedValue = typeof baseValue === "number" ? round1(baseValue + cumulative) : cumulative;
-    return { attribute, cumulative, projectedValue };
+    return {
+      attribute,
+      cumulative,
+      projectedValue,
+      training: round1(trainingByAttr[attribute]),
+      performance: round1(performanceByAttr[attribute]),
+      regression: round1(regressionByAttr[attribute]),
+    };
   });
   const netCumulative = round1(attributes.reduce((sum, cell) => sum + cell.cumulative, 0));
 

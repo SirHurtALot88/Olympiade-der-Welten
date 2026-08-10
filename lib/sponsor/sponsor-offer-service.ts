@@ -30,7 +30,6 @@ import {
   buildOfferRankPayoutLadderPreview,
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";

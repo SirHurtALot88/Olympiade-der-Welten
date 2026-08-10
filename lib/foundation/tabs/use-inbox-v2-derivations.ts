@@ -67,6 +67,7 @@ export function useInboxV2Derivations(input: UseInboxV2DerivationsInput) {
           choices: mapInboxQuickActionsToChoices(item),
           lane: resolveInboxLane(item),
           targetLabel: resolveInboxTargetLabel(item),
+          source: item.source,
         }),
       ),
     [visibleInboxItems],

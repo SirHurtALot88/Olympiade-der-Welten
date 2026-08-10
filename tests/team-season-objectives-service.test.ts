@@ -665,7 +665,7 @@ describe("team season objectives service", () => {
     });
     gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
     gameState.seasonState.seasonId = "season-1";
-    gameState.gamePhase = "preseason_management";
+    gameState.gamePhase = "season_end_management";
 
     const overview = buildTeamObjectiveOverview(gameState);
     const board = overview.boardConfidence[team.teamId];
@@ -804,9 +804,11 @@ describe("team season objectives service", () => {
 
     expect(refreshed?.label).toBe(storedObjective.label);
     expect(refreshed?.status).toBe("failed");
-    // Refreshed from generated: salary/(cash+salary) with negative cash yields a >100% distress ratio
-    // (a "%" string), proving the stored placeholder value (50) was replaced by the live computed value.
-    expect(String(refreshed?.currentValue)).toContain("%");
+    // Aus dem Generator nachgezogen: das Gehaltsziel traegt seit der Liga-Kalibrierung den LIGARANG
+    // als Zahl. Der gespeicherte Platzhalter (50) ist damit ersetzt — in einer Ein-Team-Liga ist das
+    // Rang 1, und das Ziel steht trotzdem auf „verfehlt", weil das Konto im Minus ist.
+    expect(refreshed?.currentValue).toBe(1);
+    expect(String(refreshed?.detail)).toContain("im Minus");
     expect(refreshed?.source).toContain("saved_board_objective");
     expect(board?.warnings).toContain("board_confidence_source_saved_state");
   });
@@ -821,6 +823,28 @@ describe("team season objectives service", () => {
       { id: "fc-1", saveId: "save-1", seasonId: "season-3", teamId: "M-M", playerId: "p1", playerName: "p1", cardColor: "red", cardValue: 1, createdAt: "2026-06-13T10:00:00.000Z" },
       { id: "fc-2", saveId: "save-1", seasonId: "season-3", teamId: "M-M", playerId: "p2", playerName: "p2", cardColor: "green", cardValue: 1, createdAt: "2026-06-13T10:00:00.000Z" },
       { id: "fc-3", saveId: "save-1", seasonId: "season-3", teamId: "M-M", playerId: "p3", playerName: "p3", cardColor: "blue", cardValue: 1, createdAt: "2026-06-13T10:00:00.000Z" },
+    ];
+    // Das Kaderziel zaehlt seit der Liga-Kalibrierung den Nennwert der AUSGESPIELTEN Karten, nicht
+    // die blosse Anzahl abgedeckter Farben (die hatten am Live-Save 32 von 32 Teams erfuellt).
+    // „Ausgespielt" heisst: in einem Modifier-Slot der Aufstellung — dieselbe Zuordnung, aus der die
+    // Spalte „Formkarten" im Saisonstand kommt. Ohne diese Entwuerfe laegen die Karten nur auf der
+    // Hand, und das Ziel stuende zu Recht auf „offen".
+    gameState.seasonState.lineupDrafts = [
+      {
+        lineupId: "lineup-1",
+        saveId: "save-1",
+        seasonId: "season-3",
+        matchdayId: "md-1",
+        teamId: "M-M",
+        status: "resolved",
+        entries: [],
+        modifiers: {
+          d1: { primaryFormCardId: "fc-1", secondaryFormCardId: "fc-2" },
+          d2: { primaryFormCardId: "fc-3", secondaryFormCardId: null },
+        },
+        createdAt: "2026-06-13T10:00:00.000Z",
+        updatedAt: "2026-06-13T10:00:00.000Z",
+      },
     ];
     gameState.seasonState.disciplineSchedule = [
       {
@@ -1093,41 +1117,164 @@ describe("team season objectives build stability", () => {
 
     expect(serviceText).toContain("function resolveSeasonNumberFromState(gameState: GameState)");
     expect(serviceText).toContain("resolveSeasonNumberFromState(gameState)");
-    expect(serviceText.match(/function getSeasonNumber\(/g)?.length ?? 0).toBe(1);
+    // Der Sinn dieser Zeile ist „es gibt keine ZWEITE Saisonnummer-Herleitung neben
+    // `resolveSeasonNumberFromState`". Mit der Liga-Kalibrierung der Finanzziele sind die letzten
+    // Aufrufer von `getSeasonNumber` verschwunden (die Ziele fragen nicht mehr „welche Saison ist
+    // das", sondern „wo steht das Team im Feld"), also ist der Helfer ganz weg — die stärkste Form
+    // derselben Zusage. Erlaubt bleibt genau eine Definition, falls er je zurückkommt.
+    expect(serviceText.match(/function getSeasonNumber\(/g)?.length ?? 0).toBeLessThanOrEqual(1);
   });
 });
 
 describe("human board pressure + C-C eco rules", () => {
-  it("uses a softer S1 salary-ratio target so early roster building stays playable", async () => {
-    const fs = await import("node:fs/promises");
-    const servicePath = path.join(process.cwd(), "lib/board/team-season-objectives-service.ts");
-    const serviceText = await fs.readFile(servicePath, "utf8");
-
-    expect(serviceText).toContain("seasonNumber <= 1 ? 0.93");
-    expect(serviceText).toContain("seasonNumber <= 1 ? 0.98");
-    expect(serviceText).toContain("seasonNumber <= 1 ? -0.05");
-
-    const team = createTeam({ teamId: "S-1", shortCode: "S-1", cash: 10, humanControlled: true });
+  /**
+   * GEMELDET VON CHRIS, am Live-Save nachgemessen (Saison 2, Spieltag 4): das Finanzziel stand bei
+   * 21 Teams auf „verfehlt", bei 9 auf „gefährdet" und bei KEINEM auf „erfüllt". Die Ist-Werte
+   * reichten von 78,7% bis 99,9% gegen eine feste Marke von 78% — eine Vorgabe, die kein Team der
+   * Liga erreichen konnte.
+   *
+   * Der Grund war der Messzeitpunkt: die Quote ist `Gehalt / (Cash + Gehalt)`, und Cash fällt
+   * während der ganzen Saison, weil Sponsor, Apron und Gebäude erst am Saisonende gebucht werden.
+   *
+   * Dieser Test baut genau diese Lage nach — eine Liga, in der ALLE Teams hohe Gehaltsquoten haben —
+   * und hält fest, was seither gilt: gewertet wird gegen die Liga, also gibt es Gewinner UND
+   * Verlierer statt nur Verlierer.
+   */
+  it("wertet die Gehaltsquote gegen die Liga, damit eine teure Liga nicht geschlossen scheitert", () => {
+    const teamIds = ["T-A", "T-B", "T-C", "T-D", "T-E", "T-F", "T-G", "T-H"];
+    // Alle acht Teams stehen bei ~87% bis ~99% Gehaltsquote — unter der alten festen Marke von 78%
+    // wäre jedes einzelne davon „verfehlt".
+    const teams = teamIds.map((teamId, index) => createTeam({ teamId, shortCode: teamId, cash: 30 - index * 3 }));
     const gameState = createGameState({
-      teams: [team],
-      identities: [createIdentity("S-1")],
-      players: [createPlayer("s1")],
-      rosters: [createRoster("s1", { teamId: "S-1", salary: 190 })],
+      teams,
+      identities: teamIds.map((teamId) => createIdentity(teamId)),
+      players: teamIds.map((teamId) => createPlayer(`p-${teamId}`)),
+      rosters: teamIds.map((teamId) => createRoster(`p-${teamId}`, { teamId, salary: 200 })),
     });
-    gameState.season = {
-      id: "season-1",
-      name: "Season 1",
-      year: 2026,
-      currentMatchday: 1,
-      matchdayIds: ["md-1"],
+
+    const salaryObjectives = buildTeamObjectiveOverview(gameState).objectives.filter(
+      (entry) => entry.objectiveId === "finance-salary-ratio",
+    );
+
+    // Nicht jedes Team bekommt jedes Ziel — der Vorstand stellt je nach Anspruch 3 bis 5 Vorgaben
+    // und zeigt je Kategorie die druckvollste. Geprüft wird deshalb das Feld derer, die das
+    // Gehaltsziel tatsächlich tragen.
+    expect(salaryObjectives.length).toBeGreaterThan(1);
+
+    // 1) Die Marke ist ein LIGARANG, keine erfundene Prozentzahl — und ihr Nenner ist die ganze
+    //    Liga (8 Teams), nicht das kleinere Feld der Zielträger.
+    for (const ziel of salaryObjectives) {
+      // Rang als ZAHL — der Analytics-Raum bildet daraus den Abstand zur Marke.
+      expect(typeof ziel.targetValue).toBe("number");
+      expect(typeof ziel.currentValue).toBe("number");
+      expect(String(ziel.label)).toContain("Ligarang");
+      // Die Ligagroesse steht im Klartext, nicht im Zahlenfeld.
+      expect(String(ziel.detail)).toContain("von 8");
+    }
+
+    // 2) Die Rangfolge stimmt mit der Liquidität überein: mehr Cash bei gleichem Gehalt heisst
+    //    niedrigere Quote heisst besserer Rang. Genau das trug die alte feste Marke nicht.
+    const rangVon = (teamId: string) => {
+      const wert = salaryObjectives.find((entry) => entry.teamId === teamId)?.currentValue;
+      return typeof wert === "number" ? wert : null;
     };
-    gameState.seasonState.seasonId = "season-1";
+    const raenge = teamIds.map(rangVon).filter((rang): rang is number => rang != null);
+    expect(raenge.length).toBeGreaterThan(1);
+    expect([...raenge]).toEqual([...raenge].sort((links, rechts) => links - rechts));
 
-    const overview = buildTeamObjectiveOverview(gameState);
-    const salaryObjective = overview.objectives.find((entry) => entry.teamId === "S-1" && entry.objectiveId === "finance-salary-ratio");
+    // 3) Der Kern der Meldung: es kann NICHT die ganze Liga scheitern. Der Zielrang deckt einen
+    //    echten Teil des Feldes ab, also gibt es Plätze, die ihn erfüllen.
+    const zielRang = Number(salaryObjectives[0]?.targetValue);
+    expect(zielRang).toBeGreaterThanOrEqual(2);
+    expect(zielRang).toBeLessThan(8);
+  });
 
-    expect(salaryObjective?.targetValue).toBe("<= 93%");
-    expect(salaryObjective?.status).toBe("at_risk");
+  /**
+   * Die Gegenprobe zur Liga-Wertung: solange die Einnahmen der Saison nicht gebucht sind, ist der
+   * Cash-Stand eine Hochrechnung — und eine Hochrechnung kann nicht „verfehlt" sein. Der Malus
+   * fliesst ohnehin erst am Saisonende, aber Board-Vertrauen und KI-Neigung lesen den Status live.
+   */
+  it("meldet cash-abhaengige Finanzziele als Hochrechnung, solange die Saison nicht abgerechnet ist", () => {
+    const teamIds = ["H-A", "H-B", "H-C", "H-D", "H-E", "H-F", "H-G", "H-H"];
+    // H-A steht mit Abstand am schlechtesten da (wenigstes Cash bei gleichem Gehalt) und wäre nach
+    // der Abrechnung klar „verfehlt" — vorher darf es das nicht sein.
+    const gameState = createGameState({
+      teams: teamIds.map((teamId, index) => createTeam({ teamId, shortCode: teamId, cash: 2 + index * 60 })),
+      identities: teamIds.map((teamId) => createIdentity(teamId)),
+      players: teamIds.map((teamId) => createPlayer(`p-${teamId}`)),
+      rosters: teamIds.map((teamId) => createRoster(`p-${teamId}`, { teamId, salary: 200 })),
+    });
+
+    const offeneZiele = buildTeamObjectiveOverview(gameState).objectives.filter(
+      (entry) => entry.objectiveId === "finance-salary-ratio",
+    );
+    expect(offeneZiele.length).toBeGreaterThan(0);
+    // KEIN Team kann vor der Abrechnung an dieser Größe scheitern.
+    expect(offeneZiele.filter((entry) => entry.status === "failed")).toHaveLength(0);
+    for (const ziel of offeneZiele) {
+      expect(ziel.provisional).toBe(true);
+      expect(ziel.penaltyCash).toBeUndefined();
+      expect(String(ziel.detail)).toContain("Hochrechnung");
+    }
+    const schlechtestes = offeneZiele.find((entry) => entry.teamId === "H-A");
+
+    // Nach der Einnahmenbuchung faellt der Vorbehalt weg und das Ziel wird verbindlich gewertet.
+    const abgerechnet = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        cashPrizeApplyLogs: [
+          {
+            id: "cpa-1",
+            saveId: "save-1",
+            seasonId: gameState.season.id,
+            matchdayId: "md-1",
+            action: "apply" as const,
+            payload: { idempotencyKey: "k", totalTeams: 8, appliedTeams: 8, totalPrizeMoney: 0 },
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    };
+    const gebuchteZiele = buildTeamObjectiveOverview(abgerechnet).objectives.filter(
+      (entry) => entry.objectiveId === "finance-salary-ratio",
+    );
+    for (const ziel of gebuchteZiele) {
+      expect(ziel.provisional).toBeFalsy();
+      expect(String(ziel.detail)).not.toContain("Hochrechnung");
+    }
+    // Nach der Buchung wird verbindlich gewertet — das Schlusslicht faellt jetzt wirklich durch.
+    if (schlechtestes) {
+      const gebucht = gebuchteZiele.find((entry) => entry.teamId === "H-A");
+      expect(gebucht?.status).toBe("failed");
+      expect(gebucht?.penaltyCash ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * Ein Konto im Minus ist keine Hochrechnung, sondern ein Befund — es sticht den Ligavergleich
+   * auch dann, wenn das Team im Feld noch gut dasteht.
+   */
+  it("wertet ein Konto im Minus sofort als verfehlt, unabhaengig vom Ligarang", () => {
+    const gameState = createGameState({
+      teams: [
+        createTeam({ teamId: "M-A", shortCode: "M-A", cash: -8 }),
+        createTeam({ teamId: "M-B", shortCode: "M-B", cash: -400 }),
+        createTeam({ teamId: "M-C", shortCode: "M-C", cash: -500 }),
+      ],
+      identities: ["M-A", "M-B", "M-C"].map((teamId) => createIdentity(teamId)),
+      players: ["M-A", "M-B", "M-C"].map((teamId) => createPlayer(`p-${teamId}`)),
+      rosters: ["M-A", "M-B", "M-C"].map((teamId) => createRoster(`p-${teamId}`, { teamId, salary: 100 })),
+    });
+
+    const objective = buildTeamObjectiveOverview(gameState).objectives.find(
+      (entry) => entry.teamId === "M-A" && entry.objectiveId === "finance-salary-ratio",
+    );
+
+    // M-A ist das BESTE der drei Teams — und trotzdem verfehlt, weil das Konto im Minus steht.
+    expect(objective?.currentValue).toBe(1);
+    expect(objective?.status).toBe("failed");
+    expect(objective?.provisional).toBeFalsy();
   });
 
   it("adds board-confidence-budget-cut objective for human team with low confidence", () => {
@@ -1461,35 +1608,59 @@ describe("board goal targets: expectation, upset-avoidance, transfer ceiling, si
       identity: createIdentity("spender", { finances: 3 }),
       profile: null,
       row: createRow("spender", { transferNet: -50 }),
-      seasonId: "season-2",
+      rowsByTeamId: new Map([["spender", createRow("spender", { transferNet: -50 })]]),
     });
 
     expect(objective).toBeNull();
   });
 
-  it("getTransferSpendCeilingObjective flags a completed status under the cap and failed over it", () => {
+  /**
+   * VORHER stand hier ein fester Deckel (`max(4, Budget * 20%)`). Am Live-Save gemessen traf der in
+   * Saison 2 fünf Teams mit Netto-Ausgaben von 218 bis 281 Mio — alle fünf „verfehlt". Der Grund:
+   * JEDER Saisonwechsel ist eine Kaufsaison, die Liga verkauft und kauft geschlossen neu. Ein
+   * Deckel, der einen ligaweiten Umbau bestraft, misst den Umbau und nicht die Ausgabendisziplin.
+   *
+   * Seither entscheidet der Ligavergleich: sparsam heisst sparsam IM FELD.
+   */
+  it("getTransferSpendCeilingObjective wertet die Netto-Ausgaben gegen die Liga statt gegen einen festen Deckel", () => {
     const team = createTeam({ teamId: "disciplined", shortCode: "disciplined", budget: 100 });
     const identity = createIdentity("disciplined", { finances: 8 });
+    // Eine Liga im Umbau: alle geben dreistellig aus, „disciplined" mal als sparsamstes, mal als
+    // teuerstes Team desselben Feldes.
+    const sparsamesFeld = new Map([
+      ["disciplined", createRow("disciplined", { transferNet: -120 })],
+      ["a", createRow("a", { transferNet: -200 })],
+      ["b", createRow("b", { transferNet: -240 })],
+      ["c", createRow("c", { transferNet: -280 })],
+    ]);
+    const teuresFeld = new Map([
+      ["disciplined", createRow("disciplined", { transferNet: -280 })],
+      ["a", createRow("a", { transferNet: -120 })],
+      ["b", createRow("b", { transferNet: -130 })],
+      ["c", createRow("c", { transferNet: -140 })],
+    ]);
 
-    const underCap = getTransferSpendCeilingObjective({
+    const sparsam = getTransferSpendCeilingObjective({
       team,
       identity,
       profile: null,
-      row: createRow("disciplined", { transferNet: -5 }), // net spend 5, cap = max(4, 100*0.2)=20
-      seasonId: "season-2",
+      row: sparsamesFeld.get("disciplined")!,
+      rowsByTeamId: sparsamesFeld,
     });
-    const overCap = getTransferSpendCeilingObjective({
+    const verschwenderisch = getTransferSpendCeilingObjective({
       team,
       identity,
       profile: null,
-      row: createRow("disciplined", { transferNet: -60 }), // net spend 60, well above cap 20
-      seasonId: "season-2",
+      row: teuresFeld.get("disciplined")!,
+      rowsByTeamId: teuresFeld,
     });
 
-    expect(underCap?.status).toBe("completed");
-    expect(underCap?.currentValue).toBe(5);
-    expect(overCap?.status).toBe("failed");
-    expect(overCap?.penaltyCash ?? 0).toBeGreaterThan(0);
+    // 120 Mio Netto-Ausgaben wären unter dem alten Deckel von 20 hoffnungslos verfehlt gewesen —
+    // im Feld ist es der sparsamste Wert und damit erfüllt.
+    expect(sparsam?.status).toBe("completed");
+    expect(sparsam?.currentValue).toBe(1);
+    expect(verschwenderisch?.status).toBe("failed");
+    expect(verschwenderisch?.penaltyCash ?? 0).toBeGreaterThan(0);
   });
 
   it("getSignatureAxisWinObjective counts matchdays where the team ranked #1 in its signature axis", () => {
@@ -1738,8 +1909,19 @@ describe("Vergabe: höchstens ein verbindliches Rang-Ziel je Saison", () => {
     const objectives = buildTeamObjectiveOverview(buildTeamWithSecondRankGoal()).objectives.filter(
       (objective) => objective.teamId === "C-C" && objective.category !== "sponsor",
     );
-    // Ziele, deren Marke ein Rang ist (Liga-, Achsen- oder Disziplin-Rang).
-    const rankGoals = objectives.filter((objective) => /Top\s+\d+|Rang/i.test(String(objective.targetValue ?? "")));
+    // Ziele, deren Marke eine PLATZIERUNG ist (Liga-, Achsen- oder Disziplin-Rang) — also die,
+    // die um den einen verbindlichen Sportauftrag konkurrieren. Die Kategorien sind nicht
+    // dekorativ: alle Entwürfe mit `rankTarget` liegen in `sport` oder `player`.
+    //
+    // Bewusst NICHT „alles, wo ‚Rang' im Zielwert steht": seit die Finanz- und Kaderziele gegen die
+    // LIGA kalibriert werden (Gehaltsquote, Cashpuffer, Transferausgaben, Formkarten), tragen auch
+    // sie einen Rang als Marke. Der Rang ist dort aber eine Messlatte für eine Finanzgröße und kein
+    // Anspruch auf einen Tabellenplatz — die Ein-Rang-Ziel-Regel meint sie nie.
+    const rankGoals = objectives.filter(
+      (objective) =>
+        (objective.category === "sport" || objective.category === "player") &&
+        /Top\s+\d+|Rang/i.test(String(objective.targetValue ?? "")),
+    );
 
     expect(rankGoals.length).toBeGreaterThan(1);
     expect(rankGoals.filter((objective) => !objective.optional)).toHaveLength(1);

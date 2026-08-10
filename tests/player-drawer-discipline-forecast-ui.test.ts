@@ -32,9 +32,11 @@ describe("Trainings-Forecast in den Diszi-Zeilen", () => {
     );
     expect(chip).toContain("!foggedBand && disciplineTrainingDeltaById[entry.id]");
 
+    // Der Disziplinen-Block hängt seit der Saison-Liste als `forecastExtras` an der
+    // aufgeklappten laufenden Saison — das Fog-Gatter steht am Prop-Aufruf.
     const summary = DRAWER.slice(
-      DRAWER.indexOf("<SeasonTrainingForecastSummary"),
-      DRAWER.indexOf("data.trainingHistoryRows.length > 0"),
+      DRAWER.indexOf("forecastExtras={"),
+      DRAWER.indexOf("player-drawer-discipline-forecast-list"),
     );
     expect(summary).toContain("!disciplineStatFogged && movedTrainingDisciplines.length > 0");
   });
@@ -56,5 +58,34 @@ describe("Trainings-Forecast in den Diszi-Zeilen", () => {
     expect(CSS).toContain(".player-drawer-axis-discipline-forecast.is-negative");
     expect(CSS).toContain(".player-drawer-discipline-forecast-delta.is-positive");
     expect(CSS).toContain(".player-drawer-discipline-forecast-delta.is-negative");
+  });
+
+  /**
+   * GEMELDET: „veränderung der stats ist hier doppelt gemoppelt da steht 2x immer der diszi name."
+   *
+   * `DisciplineIcon` schreibt seine Beschriftung selbst hin — `showLabel` steht per Default auf
+   * `true`. Daneben stand nochmal derselbe Name, also „Basketball Basketball +1". Das Icon ist
+   * hier reines Bild; der Name kommt aus der Zeile, weil deren Typografie zum Rest der Liste passt.
+   */
+  it("nennt die Disziplin genau einmal je Zeile", () => {
+    const zeile = DRAWER.slice(
+      DRAWER.indexOf("player-drawer-discipline-forecast-list"),
+      DRAWER.indexOf("player-drawer-discipline-forecast-delta"),
+    );
+    expect(zeile).toContain("showLabel={false}");
+    // Genau eine sichtbare Beschriftung — die der Zeile.
+    expect(zeile.split("disciplineLabelById.get(row.disciplineId)").length - 1).toBe(2);
+  });
+
+  it("laesst dem Icon trotzdem seinen zugaenglichen Namen", () => {
+    // Ohne sichtbare Schrift ist `label` die `aria-label`/`title`-Quelle des Chips — die Prop
+    // darf also nicht mit der doppelten Beschriftung verschwinden.
+    const zeile = DRAWER.slice(
+      DRAWER.indexOf("player-drawer-discipline-forecast-list"),
+      DRAWER.indexOf("player-drawer-discipline-forecast-delta"),
+    );
+    expect(zeile).toContain("label={disciplineLabelById.get(row.disciplineId) ?? row.disciplineId}");
+    const icon = readFileSync(join(REPO_ROOT, "app/foundation/DisciplineIcon.tsx"), "utf8");
+    expect(icon).toContain('aria-label={showLabel ? undefined : resolvedLabel}');
   });
 });

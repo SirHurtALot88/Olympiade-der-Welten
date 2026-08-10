@@ -5,17 +5,15 @@ import type {
   SeasonState,
   Team,
   TeamControlMode,
-  TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
-import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { formatGermanDateTime } from "@/lib/utils/format-datetime";
 import {
   buildOwnershipForPreset,
@@ -461,8 +459,15 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // Save, waeren die Angebote nach altem Recht gebaut und der Save behauptete "V2" — Anzeige und
   // Abrechnung liefen auseinander. Der Vermerk bleibt danach fuer die gesamte Lebensdauer des
   // Spielstands stehen und traegt ihn auch ueber Saisonuebergaenge und Serverneustarts.
+  // Apron-Linien werden hier BEWUSST NICHT eingefroren (ein frueherer Stand tat es, mit leeren
+  // Rosters griff der Referenz-Gehalt-Fallback). Die Season-1-Kader entstehen erst im New-Game-Flow
+  // (first_transfers/fill_roster — das Kauffenster), und die Linie soll den Gehaltsstand messen,
+  // gegen den die Saison wirklich antritt. Eingefroren wird beim Schliessen des Kauffensters, mit
+  // der ersten Wertung des ersten Spieltags: `freezeApronLinesAtBuyWindowClose`
+  // (apron-settlement-service.ts) — dieselbe Regel wie bei jedem Saisonuebergang. Bis dahin rechnen
+  // Anzeige und KI-Kaufbremse mit der live abgeleiteten, als nicht-eingefroren markierten Linie.
   const baseGameStateWithSponsorSystem: GameState = withSeededSeasonEconomyFactorsForNewGame(
-    ensureSeasonApronLinesFrozen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+    stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers),
     input.saveId,
   );
 

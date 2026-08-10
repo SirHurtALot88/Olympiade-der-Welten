@@ -34,7 +34,6 @@ import {
   NlCard,
   NlDeltaChip,
   NlEmptyState,
-  NlProgressBar,
   NlRadar,
   NlSubTabs,
   StatChip,
@@ -68,19 +67,22 @@ const roleOptions: Array<{ value: PlayerGeneratorRoleIntent; label: string }> = 
   { value: "chaos", label: "Chaos" },
 ];
 
+// F5: sichtbare Skalen-Labels deutsch — die Enum-Werte bleiben englisch
+// (Persistenz/Service), Fantasy-Archetypen (Mage/Rogue …) bleiben als
+// Eigennamen bewusst englisch.
 const strengthOptions: Array<{ value: PlayerGeneratorStrengthTier; label: string }> = [
-  { value: "very_weak", label: "Very Weak" },
-  { value: "weak", label: "Weak" },
+  { value: "very_weak", label: "Sehr schwach" },
+  { value: "weak", label: "Schwach" },
   { value: "normal", label: "Normal" },
-  { value: "strong", label: "Strong" },
+  { value: "strong", label: "Stark" },
   { value: "elite", label: "Elite" },
-  { value: "legendary", label: "Legendary" },
+  { value: "legendary", label: "Legendär" },
 ];
 
 const randomnessOptions: Array<{ value: PlayerGeneratorRandomness; label: string }> = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
+  { value: "low", label: "Niedrig" },
+  { value: "medium", label: "Mittel" },
+  { value: "high", label: "Hoch" },
 ];
 
 const contractModeOptions: Array<{ value: NonNullable<PlayerGeneratorInput["contractMode"]>; label: string }> = [
@@ -907,6 +909,10 @@ export default function PlayerGeneratorPanelNewLook({
                 />
               </div>
             ))}
+            {/* F5: Mini-Erklärzeile — was der Bias tut, stand vorher nirgends. */}
+            <p className="nl-gen-muted">
+              Verschiebt die Gewichtung der vier Achsen bei gleicher Gesamtstärke — „Auto" lässt Archetyp und Rolle entscheiden.
+            </p>
           </NlCard>
 
           <NlCard className="nl-gen-card" eyebrow="Kontext" title="Zielteam & Identität">

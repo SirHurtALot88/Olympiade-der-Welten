@@ -29,17 +29,38 @@ describe("gameplay flow scan contract", () => {
     expect(lineupText).toContain("resolveFirstOpenFormPickCell");
     expect(lineupText).toContain("pendingFormBoardFocusRef");
     expect(lineupText).toContain("Formplan synchronisiert");
-    // NOTE: "Daten-Ansicht" and the whole "legacy-lineup-scoreboard-*" CSS
-    // class family (source-strip, table-shell, board-rows, board-row, ...) are
-    // no longer referenced by any .tsx file — only as dead rules/comments in
-    // app/globals.css. This looks like the "Daten-Ansicht" scoreboard panel
-    // was dropped entirely from the legacy lineup screen (real feature loss,
-    // see final report), so these two assertions are intentionally left
-    // unchanged/red rather than papered over.
-    expect(lineupText).toContain("Daten-Ansicht");
-    expect(lineupText).toContain("legacy-lineup-scoreboard-board-rows");
+    /**
+     * HIER STANDEN ZWEI ABSICHTLICH ROTE ZUSICHERUNGEN auf „Daten-Ansicht" und
+     * `legacy-lineup-scoreboard-board-rows`, mit dem Verdacht auf einen echten Funktionsverlust.
+     *
+     * Nachgesehen (Audit, ausführlich in `tests/velo-ui-components.test.ts` begründet): Das Panel
+     * lag im alten Look, der seit `ae590e4f` nicht mehr erreichbar war und mit `32683df8` entfernt
+     * wurde. Seine Zahlen stehen heute in der Spieltags-Wertung der Arena und im „Daten"-Tab des
+     * Spieltag-Ergebnisses. Kein Abriss, sondern eine Zusammenlegung.
+     *
+     * Geprüft wird jetzt, dass die Nachfolger da sind — sonst wäre der Inhalt doch verloren.
+     */
+    const matchdayPanelText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx"),
+      "utf8",
+    );
+    for (const spalte of ["Punkte", "Form", "Captain", "Mutator", "Gesamt"]) {
+      expect(matchdayPanelText).toContain(spalte);
+    }
+    const resultNewLookText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/matchday-result-v2/MatchdayResultNewLook.tsx"),
+      "utf8",
+    );
+    expect(resultNewLookText).toContain("cumulativePoints");
     expect(foundationText).toContain("getFormCardFlowStatus");
-    expect(foundationText).toContain("formCardBlocker");
+    // `formCardBlocker` ist beim Aufteilen des Scopes in die Cross-Tab-Schicht gewandert und stand
+    // deshalb hier ins Leere. Die Aussage bleibt dieselbe — der Blocker wird verdrahtet —, nur die
+    // Datei stimmt jetzt wieder.
+    const crossTabLineupText = await fs.readFile(
+      path.join(process.cwd(), "lib/foundation/tabs/use-foundation-cross-tab-matchday-lineup.ts"),
+      "utf8",
+    );
+    expect(crossTabLineupText).toContain("formCardBlocker");
     expect(foundationText).toContain('targetPanel === "form-board"');
     expect(formBoardText).toContain("data-form-board-cell-id");
     expect(formBoardText).toContain("Plan → Entwurf");
@@ -76,34 +97,43 @@ describe("gameplay flow scan contract", () => {
   });
 
   it("wires prep performance markers for lineup, season and arena", async () => {
-    const [lineupText, seasonText, packageText] = await Promise.all([
+    const [lineupText, playersTableText, packageText] = await Promise.all([
       fs.readFile(
         path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
         "utf8",
       ),
-      // SeasonStandingsV2Client.tsx is now a thin wrapper around SeasonStandingsNewLook.tsx.
       fs.readFile(
-        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsNewLook.tsx"),
+        path.join(process.cwd(), "app/foundation/players-table/FoundationPlayersTableBody.tsx"),
         "utf8",
       ),
       fs.readFile(path.join(process.cwd(), "package.json"), "utf8"),
     ]);
 
-    expect(packageText).toContain("@tanstack/react-virtual");
     // "LegacyLineupVirtualCardGrid" pinnte nur einen nie genutzten Import aus
     // der toten Geschwisterdatei LegacyLineupVirtualTableBody.tsx — beide sind
-    // mit dem Dead-Code-Cleanup entfernt. Die echte Virtualisierung der
-    // Spieler-Tabelle läuft über useRowVirtualWindow / expertPlayerTableVirtualWindow
-    // (siehe Assertion unten), die davon unberührt bleibt.
+    // mit dem Dead-Code-Cleanup entfernt.
     expect(lineupText).toContain("scheduleHoveredCandidate");
-    expect(lineupText).toContain("expertPlayerTableVirtualWindow");
-    // NOTE: react-virtual / useVirtualizer is now only used by the players
-    // table and legacy lineup table — SeasonStandingsNewLook.tsx (and no other
-    // file under app/foundation/season-v2/) uses "standingsTableVirtualWindow"
-    // or any virtualizer anymore. Standings tables are small (bounded by team
-    // count) so this may be an intentional simplification rather than a real
-    // loss, but flagging per the audit process (see final report) rather than
-    // guessing — left red intentionally.
-    expect(seasonText).toContain("standingsTableVirtualWindow");
+
+    /**
+     * HIER STAND EINE ABSICHTLICH ROTE ZUSICHERUNG auf `standingsTableVirtualWindow`, mit dem
+     * eigenen Zusatz, das könne auch eine gewollte Vereinfachung sein.
+     *
+     * Genau das ist es: Virtualisierung lohnt ab Zeilenzahlen, bei denen das Rendern spürbar wird.
+     * Der Saisonstand ist durch die Ligagröße gedeckelt — 32 Zeilen. Dafür einen Virtualizer zu
+     * halten kostet Komplexität ohne Gegenwert. Diese Begründung stammt aus `main` und bleibt.
+     *
+     * NACHTRAG (Merge, Entscheidung Chris 2026-08-09): Ihr Zusatz nannte als Gegenbeispiel „die
+     * Einsatzliste (`expertPlayerTableVirtualWindow`)". Das hat nie gestimmt — nachgemessen wurde
+     * `visibleExpertPlayerRows` zwar berechnet, aber NIE gerendert, der Viewport-Ref hing an keinem
+     * Element und `setIsExpertModeEnabled` hatte keinen Aufrufer. Dort lief keine Virtualisierung,
+     * die man hätte sichern können; der Expertenmodus ist mit diesem Zweig ausgebaut.
+     *
+     * Die Aussage, die der Test schützen soll, bleibt aber richtig und wird deshalb nicht
+     * gestrichen, sondern auf den Ort gezogen, wo die Virtualisierung TATSÄCHLICH läuft: die
+     * Spieler-Tabelle. Das ist die einzige Liste im Spiel, die wirklich lang wird (rund 3000
+     * Spieler), und sie ist auch die einzige verbliebene Nutzerin von `@tanstack/react-virtual`.
+     */
+    expect(packageText).toContain("@tanstack/react-virtual");
+    expect(playersTableText).toContain("useVirtualizer");
   });
 });

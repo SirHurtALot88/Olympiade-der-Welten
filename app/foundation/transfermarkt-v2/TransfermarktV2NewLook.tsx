@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
  * Platzhalter sind. Ein zu kleiner Wert rendert ein paar Karten zu viel, ein zu grosser laesst
  * beim schnellen Scrollen kurz eine Luecke; deshalb der Puffer darunter.
  */
-const NL_CANDIDATE_ROW_HEIGHT = 84;
+const NL_CANDIDATE_ROW_HEIGHT = 100; // M12: +1 Zeile (MW/Gehalt unter dem Namen) — nachgemessen ~100 px inkl. Abstand.
 /** Karten ober- und unterhalb des Sichtbereichs, die trotzdem gerendert werden. */
 const NL_CANDIDATE_OVERSCAN = 8;
 
@@ -307,13 +307,26 @@ type NlSquadAxisSummary = {
   disciplines: NlSquadDisciplineSummary[];
 };
 
+/**
+ * EIN Fensterstatus statt drei sich widersprechender Aussagen (M1): Ton, Titel,
+ * Badge und Detail kommen als EIN Urteil aus dem Client. Vorher stand hier ein
+ * hart codiertes „Transferfenster geschlossen" + „nur Ansicht" über jedem
+ * Freitext — auch über „kaufen ist offen".
+ */
+export type TransfermarktWindowStatus = {
+  tone: "open" | "sell" | "closed";
+  title: string;
+  badge: string;
+  detail: string;
+};
+
 export type TransfermarktV2NewLookProps = {
   // Kopf & Status
   teamName: string | null;
   teamShortCode: string | null;
   availabilityLabel: string;
-  /** Read-only-Hinweis bei geschlossenem Transferfenster; null = Fenster offen. */
-  marketWindowNotice: string | null;
+  /** Fensterstatus als EIN Urteil; null = beide Fenster offen, kein Banner. */
+  marketWindowStatus: TransfermarktWindowStatus | null;
   marketBusy: boolean;
   /** Erste Seite steht, der Rest wird noch nachgeholt — die Sortierung ist dann noch vorlaeufig. */
   marketCompleting?: boolean;
@@ -380,7 +393,11 @@ export type TransfermarktV2NewLookProps = {
   contractLength: number | null;
   onContractLengthChange: (length: number) => void;
   previewError: string | null;
+  /** Die Deal-Vorschau rechnet gerade — der Desk sagt das, statt alte Zahlen stehen zu lassen. */
+  previewBusy: boolean;
   buyPreviewCanBuy: boolean | null;
+  /** > 0 ⇒ die Ablöse ist heute nicht bezahlbar; genau dieser Betrag fehlt (Kassenzettel). */
+  previewMissingCash: number | null;
   previewPurchasePrice: number | null;
   previewSalaryLabel: string;
   previewCashBefore: number | null;
@@ -504,9 +521,12 @@ function formatNlBracketLabel(
 }
 
 function getNlFitTone(fit: number | null | undefined): NlTone {
+  // Bestwert→Schlusslicht-Skala (F2-Regel): Spitze Gold, dann good/warn/risk.
+  // Die zweite Stufe war vorher `accent` — Teamfarbe in einer Skala mit
+  // `risk` kollidiert bei roten Teams mit der Schlusslicht-Stufe.
   const value = fit ?? -99;
-  if (value >= 18) return "good";
-  if (value >= 10) return "accent";
+  if (value >= 18) return "gold";
+  if (value >= 10) return "good";
   if (value >= 0) return "warn";
   return "risk";
 }
@@ -819,7 +839,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     teamName,
     teamShortCode,
     availabilityLabel,
-    marketWindowNotice,
+    marketWindowStatus,
     marketBusy,
     marketCompleting = false,
     marketError,
@@ -873,7 +893,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     contractLength,
     onContractLengthChange,
     previewError,
+    previewBusy,
     buyPreviewCanBuy,
+    previewMissingCash,
     previewPurchasePrice,
     previewSalaryLabel,
     previewCashBefore,
@@ -932,6 +954,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
 
   // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
   const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
+
+  // M13 — Erweiterte Filter: Default eingeklappt (Filterberg nicht mehr vor der Liste).
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // F2 — Inline-Eingabe für "Suche speichern": nur ein Namensfeld, die Persistenz
   // selbst liegt im Client. Offen/zu + aktueller Entwurfsname.
@@ -1167,17 +1192,18 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
 
   return (
     <section className={`nl-market${buyModalOpen ? " is-offer-mode" : ""}`} data-new-look="true">
-      {marketWindowNotice ? (
+      {marketWindowStatus ? (
         <div
-          className="transfer-callout is-blocked nl-market-window-notice"
+          className={`nl-market-window-status is-${marketWindowStatus.tone}`}
           role="status"
           data-testid="nl-market-window-notice"
         >
-          <div className="transfer-callout-title">
-            <strong>Transferfenster geschlossen</strong>
-            <span className="transfer-status-pill is-blocked">nur Ansicht</span>
+          <span className="nl-market-window-status-dot" aria-hidden="true" />
+          <div className="nl-market-window-status-copy">
+            <strong className="nl-market-window-status-title">{marketWindowStatus.title}</strong>
+            <span className="nl-market-window-status-detail">{marketWindowStatus.detail}</span>
           </div>
-          <span>{marketWindowNotice}</span>
+          <span className="nl-market-window-status-badge">{marketWindowStatus.badge}</span>
         </div>
       ) : null}
 
@@ -1233,8 +1259,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 : "Kandidaten"
             }
             onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
-            title="Zur Wishlist springen"
-            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wishlist springen`}
+            title="Zur Wunschliste springen"
+            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wunschliste springen`}
           />
           <StatChip label="Filter aktiv" value={activeFilterCount} tone={activeFilterCount > 0 ? "warn" : "neutral"} />
         </StatChipRow>
@@ -1276,13 +1302,28 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               Reset
             </button>
           </div>
-          {/* F(neu) — Erweitert: Feineinstellungen (Achs-Mindestwerte, Fit-Toggle,
-              MW-Deckel, Value-Ratio). Auf Wunsch dauerhaft sichtbar statt hinter
-              einem Akkordeon. */}
-          <div className="nl-market-advanced is-static">
-            <span className="nl-market-advanced-title nl-market-eyebrow">
-              Erweitert{advancedActiveCount > 0 ? ` · ${advancedActiveCount} aktiv` : ""}
-            </span>
+          {/* M13 — Erweitert: Feineinstellungen (Achs-Mindestwerte, Fit-Toggle,
+              MW-Deckel, Value-Ratio) hinter einem Akkordeon, Default eingeklappt.
+              Der Filterberg (~500 px) stand sonst bei jedem Besuch zwischen
+              Team-Board und Kandidatenliste; aktive Filter bleiben über den
+              Zähler im Toggle sichtbar. */}
+          <div className={`nl-market-advanced${advancedOpen ? " is-open" : ""}`}>
+            <button
+              type="button"
+              className="nl-market-advanced-toggle"
+              aria-expanded={advancedOpen}
+              aria-controls="nl-market-advanced-panel"
+              onClick={() => setAdvancedOpen((current) => !current)}
+            >
+              <span className="nl-market-advanced-title">Erweiterte Filter</span>
+              {advancedActiveCount > 0 ? (
+                <span className="nl-market-advanced-count">{advancedActiveCount} aktiv</span>
+              ) : null}
+              <span className="nl-market-advanced-caret" aria-hidden="true">
+                {advancedOpen ? "▾" : "▸"}
+              </span>
+            </button>
+            {advancedOpen ? (
             <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
           {/*
             GEMELDET VON CHRIS: "Im Transfermarkt fehlt noch ein Feld, wo nach Bereich gesucht werden
@@ -1438,6 +1479,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             </label>
           </div>
             </div>
+            ) : null}
           </div>
           {/* F2 — Gespeicherte Suchen: Chips zum Anwenden, Löschen je Preset,
               "Suche speichern" mit Inline-Namensfeld. Persistenz liegt im Client. */}
@@ -1647,6 +1689,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         <ClassColorChip className={item.className} />
                         <span>{item.race}</span>
                       </small>
+                      {/* M12 — MW/Gehalt als eigene Zeile UNTER dem Namen statt als rechte Spalte:
+                          die Preisspalte hat vorher den Namen auf „Blacks…" gestutzt. */}
+                      <span className="nl-market-candidate-numbers nl-tnum">
+                        <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
+                        <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
+                      </span>
                       {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
                       <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
                         <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`} title={getGameTermShort("Fit") ?? undefined}>Fit {item.fitDisplay}</span>
@@ -1669,11 +1717,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         ) : null}
                       </span>
                     </span>
-                    <span className="nl-market-candidate-numbers nl-tnum">
-                      <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
-                      <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
-                      {/* CA/PO-Sterne entfernt — kanonisch nur in der Fokus-Karte (Phase-0-Dedup). */}
-                    </span>
+                    {/* MW/Gehalt stehen jetzt in der Copy-Spalte (M12) — hier keine rechte
+                        Preisspalte mehr, die dem Namen den Platz nimmt. */}
                     {/* Expliziter Expand-Toggle (Touch/Tastatur). stopPropagation, damit
                         Klick/Enter/Space nicht zusätzlich die Kachel-Auswahl auslöst. */}
                     <button
@@ -2190,12 +2235,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     disabled={Boolean(wishlistDisabledReason && !selectedPlayerWishlisted)}
                     title={
                       selectedPlayerWishlisted
-                        ? "Von der Wishlist nehmen — Scouting-Slot wird frei."
-                        : wishlistDisabledReason ?? "Spieler auf die Wishlist setzen und bevorzugt scouten."
+                        ? "Von der Wunschliste nehmen — Scouting-Slot wird frei."
+                        : wishlistDisabledReason ?? "Spieler auf die Wunschliste setzen und bevorzugt scouten."
                     }
                     onClick={onToggleSelectedWishlist}
                   >
-                    {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
+                    {selectedPlayerWishlisted ? "Von Wunschliste nehmen" : "Auf Wunschliste"}
                   </button>
                   <button
                     type="button"
@@ -2304,11 +2349,46 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             eyebrow="Deal-Desk"
             title="Deal-Vorschau"
             actions={
-              <span className={`nl-market-live-pill${buyPreviewCanBuy ? " is-ready" : ""}`}>
-                {buyPreviewCanBuy ? "bereit" : "prüfen"}
+              <span
+                className={`nl-market-live-pill${previewBusy ? " is-busy" : buyPreviewCanBuy ? " is-ready" : buyPreviewCanBuy === false ? " is-blocked" : ""}`}
+              >
+                {previewBusy ? "rechnet…" : buyPreviewCanBuy ? "bereit" : buyPreviewCanBuy === false ? "blockiert" : "wartet"}
               </span>
             }
           >
+            {/* M1 — der Desk sagt, ÜBER WEN er redet: Subjekt-Kopf mit Name + Herkunft.
+                Die Zahlen darunter gehören per Subjekt-Wächter im Client garantiert zu
+                genau diesem Spieler (Audit-Befund M2: stiller Spielerwechsel). */}
+            {selectedPlayer ? (
+              <div className="nl-market-deal-who" data-testid="nl-market-deal-subject">
+                {(() => {
+                  const dealPortrait = getTransfermarktPortraitModel(selectedPlayer);
+                  const dealPortraitSrc = dealPortrait.src
+                    ? appendMediaImageVariant(dealPortrait.src, "thumb") ?? dealPortrait.src
+                    : null;
+                  return (
+                    <span className="nl-market-deal-who-portrait" aria-hidden="true">
+                      {dealPortraitSrc ? (
+                        <OptimizedMediaImage src={dealPortraitSrc} alt="" width={40} height={40} className="nl-market-portrait-img" />
+                      ) : (
+                        <span className="nl-market-portrait-initials">{dealPortrait.initials}</span>
+                      )}
+                    </span>
+                  );
+                })()}
+                <span className="nl-market-deal-who-copy">
+                  <strong className="nl-market-deal-who-name">{selectedPlayer.name}</strong>
+                  <small className="nl-market-deal-who-sub">
+                    {selectedPlayer.className} · {selectedPlayer.race}
+                  </small>
+                </span>
+                <span className="nl-market-deal-who-source">aus Kandidatenliste gewählt</span>
+              </div>
+            ) : (
+              <p className="nl-market-muted">
+                Wähle links einen Kandidaten — der Deal-Desk rechnet immer für genau diesen Spieler.
+              </p>
+            )}
             {previewError ? <p className="nl-market-error">{formatGameFlowBlocker(previewError)}</p> : null}
             <div className="nl-market-pill-group" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
               {[1, 2, 3].map((length) => (
@@ -2383,33 +2463,65 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 />
               </div>
             ) : null}
-            <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
-              <NlMarketBeforeAfterRow
-                label="Cash"
-                before={previewCashBefore}
-                after={previewCashAfter}
-                format={(value) => formatTransfermarktCurrency(value)}
-              />
-              <NlMarketBeforeAfterRow
-                label="Gehalt"
-                before={previewTeamSalaryBefore}
-                after={previewTeamSalaryAfter}
-                format={(value) => formatTransfermarktCurrency(value)}
-                invert
-              />
-              <NlMarketBeforeAfterRow
-                label="Kader"
-                before={previewRosterBefore}
-                after={previewRosterAfter}
-                format={(value) => formatNlNumber(value, 0)}
-              />
-              <NlMarketBeforeAfterRow
-                label="MW"
-                before={previewMarketValueBefore}
-                after={previewMarketValueAfter}
-                format={(value) => formatTransfermarktCurrency(value)}
-              />
-            </div>
+            {/* M1 (Audit-Befund M3): Vorher stand hier bei blockiertem Deal ±0 auf jeder Zeile —
+                die Server-`*After`-Felder klemmen dann auf „nichts passiert". Die Zeilen tragen
+                jetzt die Kassenzettel-Hypothese („wenn der Kauf durchgeht", eine Quelle:
+                buildTransfermarktDealReceipt) und sagen ehrlich „rechnet…", solange noch keine
+                Vorschau für DIESEN Kandidaten da ist. */}
+            {previewCashAfter != null || previewTeamSalaryAfter != null || previewRosterAfter != null ? (
+              <>
+                <span className="nl-market-eyebrow nl-market-deal-section">Wenn der Kauf durchgeht</span>
+                <div className="nl-market-deal-rows" aria-label="Vorher-Nachher, wenn der Kauf durchgeht">
+                  <NlMarketBeforeAfterRow
+                    label="Cash"
+                    before={previewCashBefore}
+                    after={previewCashAfter}
+                    format={(value) => formatTransfermarktCurrency(value)}
+                  />
+                  <NlMarketBeforeAfterRow
+                    label="Gehalt p.a."
+                    before={previewTeamSalaryBefore}
+                    after={previewTeamSalaryAfter}
+                    format={(value) => formatTransfermarktCurrency(value)}
+                    invert
+                  />
+                  <NlMarketBeforeAfterRow
+                    label="Kader"
+                    before={previewRosterBefore}
+                    after={previewRosterAfter}
+                    format={(value) => formatNlNumber(value, 0)}
+                  />
+                  <NlMarketBeforeAfterRow
+                    label="Team-MW"
+                    before={previewMarketValueBefore}
+                    after={previewMarketValueAfter}
+                    format={(value) => formatTransfermarktCurrency(value)}
+                  />
+                </div>
+              </>
+            ) : selectedPlayer && previewBusy ? (
+              <p className="nl-market-deal-pending" role="status">
+                Die Deal-Vorschau für {selectedPlayer.name} rechnet — Vorher/Nachher erscheint gleich.
+              </p>
+            ) : selectedPlayer && !previewError ? (
+              <p className="nl-market-deal-pending" role="status">
+                Für {selectedPlayer.name} liegt noch keine Vorschau vor.
+              </p>
+            ) : null}
+            {/* Kassenzettel-Lücke: Der Kauf bucht heute genau die Ablöse ab — fehlt dafür Cash,
+                steht hier der Betrag, statt dass ±0-Zeilen so tun, als wäre nichts. */}
+            {previewMissingCash != null && previewMissingCash > 0 ? (
+              <div className="nl-market-deal-shortfall" role="status" data-testid="nl-market-deal-shortfall">
+                <strong className="nl-tnum">
+                  Noch nicht ausführbar — es fehlen {formatTransfermarktCurrency(previewMissingCash)}.
+                </strong>
+                <small className="nl-tnum">
+                  Ablöse {formatTransfermarktCurrency(previewPurchasePrice)} · Cash heute{" "}
+                  {formatTransfermarktCurrency(previewCashBefore)}
+                  {marketWindowStatus?.tone === "open" ? " · Verkaufen öffnet erst zur Saisonwende." : ""}
+                </small>
+              </div>
+            ) : null}
             {/* Phase-2 F3 — Mehrsaison-Budget-Leiste: die yearlySalarySchedule-Staffel (S+1/S+2 …) als
                 Balken-Chart, damit die einzelne Gehalts-Zeile zum echten Budgetplaner wird. Buyout-Kosten
                 (Restgehalt-Ablösung bei vorzeitigem Ausstieg) als Fußnote. Nur echte Preview-Felder. */}
@@ -2563,7 +2675,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
       <div className="nl-market-context-grid">
         <NlCard
           className="nl-market-wishlist-card"
-          eyebrow="Wishlist & Scouting"
+          eyebrow="Wunschliste & Scouting"
           title={
             scoutingPipelineCapacity?.draftSuspended
               ? `${wishlistEntries.length} gemerkt · Draft ohne Limit`
@@ -2573,7 +2685,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           }
         >
           {wishlistEntries.length > 0 ? (
-            <div className="nl-market-wishlist-strip" role="list" aria-label="Wishlist-Kandidaten">
+            <div className="nl-market-wishlist-strip" role="list" aria-label="Wunschlisten-Kandidaten">
               {wishlistEntries.map((entry) => {
                 const marketItem = marketItemsById.get(entry.playerId);
                 const portraitBase = marketItem
@@ -2636,7 +2748,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         <button
                           type="button"
                           className="nl-market-inline-action is-danger"
-                          title="Spieler von der Wishlist nehmen."
+                          title="Spieler von der Wunschliste nehmen."
                           onClick={() => onRemoveWishlist(entry.playerId)}
                         >
                           Entfernen
@@ -2649,7 +2761,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             </div>
           ) : (
             <p className="nl-market-muted">
-              Wishlist leer — merke Kandidaten im Markt, um sie später gezielt zu scouten.
+              Wunschliste leer — merke Kandidaten im Markt, um sie später gezielt zu scouten.
             </p>
           )}
         </NlCard>

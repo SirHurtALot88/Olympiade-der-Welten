@@ -20,6 +20,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
@@ -340,11 +341,6 @@ function getPlayerName(gameState: GameState, playerId: string) {
   return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
 
-function getTeamLabel(gameState: GameState, teamId: string | null | undefined) {
-  if (!teamId) return "—";
-  const team = gameState.teams.find((entry) => entry.teamId === teamId);
-  return team?.shortCode ?? team?.name ?? teamId;
-}
 
 function teamTrainingMissingCount(gameState: GameState, teamId: string) {
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
@@ -647,9 +643,11 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           severity: lineupSet ? "info" : team.teamId === input.activeTeamId ? "critical" : "warning",
           status: lineupSet ? "done" : "open",
           title: lineupSet ? "Lineup gesetzt" : "Lineup fehlt",
+          // Anzeigename statt rohem Bezeichner („season-2-matchday-1") — gleiche Regel wie bei
+          // den Ergebnis-Meldungen (`resolveMatchdayDisplayLabel`).
           description: lineupSet
-            ? `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist gesetzt.`
-            : `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
+            ? `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist gesetzt.`
+            : `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup öffnen",
@@ -1341,10 +1339,15 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         matchday: log.matchdayId ?? null,
         category: "finance",
         severity: "info",
-        title: prizeMatchdayLabel ? `Preisgeld ausgezahlt — ${prizeMatchdayLabel}` : "Preisgeld ausgezahlt",
+        // GEMELDET VON CHRIS: „Preisgeld soll nicht ausgezahlt werden hab ich auch nie gesagt."
+        // Die Karte hiess „Preisgeld ausgezahlt" und meldete damit eine Zahlung, die es nicht gibt:
+        // die Preisgeld-Tabelle ist ein Vergleichswert (`CASH_PRIZE_BENCHMARK_ONLY`), Team-Cash
+        // bleibt davon unberuehrt. Gebucht wird an dieser Stelle die Saisonabrechnung — Sponsorgeld
+        // abzueglich Gehaelter, Apron, Gebaeude, Kreditraten und Vorstandsziele.
+        title: prizeMatchdayLabel ? `Saisonabrechnung gebucht — ${prizeMatchdayLabel}` : "Saisonabrechnung gebucht",
         description: [
-          totalPrizeMoney != null ? `${totalPrizeMoney} Preisgeld` : null,
           appliedTeams != null ? `${appliedTeams} Teams` : null,
+          totalPrizeMoney != null ? `Preisgeld-Vergleichswert ${totalPrizeMoney} (nicht ausgezahlt)` : null,
         ]
           .filter(Boolean)
           .join(" · "),
@@ -1593,7 +1596,9 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         category: "news",
         severity: "warning",
         title: "Story Card: Board unter Hochspannung",
-        description: `${team.shortCode}: Board-Druck bei ${board.pressure}/10 — Vertrauen nur ${board.value}/10.`,
+        // Formatfix (Durchklick): Druck/Vertrauen sind 1-Nachkommastellen-Größen — roh
+        // interpoliert stand hier „8.4/10" (JS-Punkt statt Hauskomma).
+        description: `${team.shortCode}: Board-Druck bei ${formatLocalePoints(board.pressure, 1)}/10 — Vertrauen nur ${formatLocalePoints(board.value, 1)}/10.`,
         targetView: "teams",
         targetParams: { team: teamId, panel: "board-objectives" },
         source: "story:board_confidence_high_pressure",

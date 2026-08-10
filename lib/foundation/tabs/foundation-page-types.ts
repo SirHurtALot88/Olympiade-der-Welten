@@ -544,7 +544,7 @@ export type SeasonTransitionStepResponse = {
     | "season_review"
     | "season_rewards"
     | "player_development"
-    | "preseason_management"
+    | "season_end_management"
     | "transfer_sell_phase"
     | "transfer_buy_phase"
     | "lineup_setup"
@@ -826,8 +826,8 @@ export const SEASON_TRANSITION_STATIC_STEPS: SeasonTransitionStepResponse[] = [
     canApply: false,
   },
   {
-    stepId: "preseason_management",
-    label: "Pre-Season Management",
+    stepId: "season_end_management",
+    label: "Training / Ziele",
     status: "open",
     preview: "Training, Gebäude, Scouting und Management werden vorbereitet.",
     warnings: [],

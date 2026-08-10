@@ -30,6 +30,10 @@ describe("season transition ui contract", () => {
     expect(typeText).toContain('"season_review"');
     expect(typeText).toContain('"season_rewards"');
     expect(typeText).toContain('"player_development"');
+    // Beide Namen muessen im Typ stehen: `season_end_management` ist die Station des Saisonendes,
+    // `preseason_management` nur noch der frische Aufbau, den Altstaende tragen. Sie zu einem Namen
+    // zusammenzuziehen war genau der Fehler, den diese Trennung behebt.
+    expect(typeText).toContain('"season_end_management"');
     expect(typeText).toContain('"preseason_management"');
     expect(typeText).toContain('"transfer_sell_phase"');
     expect(typeText).toContain('"transfer_buy_phase"');

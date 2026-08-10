@@ -2,6 +2,1167 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-09",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Die Apron-Linien wurden zu früh festgezurrt — und trafen dadurch fast die ganze Liga statt der Großausgeber. Sie hängen am Median-Gehalt (Linie 1 = Median × 1,10, Linie 2 = × 1,25) und sollen mitwandern, wenn die Liga aufrüstet. Festgehalten wurden sie aber schon am Ende des Saisonübergangs, also bevor der Kaderbau der neuen Saison überhaupt begann: in Season 2 lagen zwischen dem Einfrieren und dem ersten Zugang 99 Sekunden, danach kamen alle 106 Zugänge der Saison über 717,5 Mio Gehalt. Der Median sprang von 45,0 auf 69,8, die eingefrorene 2. Linie stand weiter bei 56,2 — 28 von 32 Teams darüber, und die Abrechnung am Saisonende hätte 29 Zahler mit zusammen 587,4 Mio getroffen. Jetzt wandern die Linien so lange mit, wie noch kein Spieltag abgerechnet ist, und rasten erst mit dem ersten Spieltag ein: KI-Vorsaisonkäufe, deine eigenen Picks und die organischen Nachkäufe zählen alle noch mit hinein. Ab dem ersten Spieltag steht die Grenze fest wie zuvor — wer während der Saison einkauft, zieht sie nicht mehr mit sich. Für den laufenden Spielstand heißt das: 2 statt 28 Teams über Linie 2, die Abrechnung träfe 8 Zahler mit 50,7 Mio und verteilt an 24 Empfänger. Die Finanzen-Seite weist die Linien außerdem ehrlich als noch wandernd aus, solange gebaut wird, statt sie als eingefroren zu melden.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Der festgesessene Apron-Snapshot im laufenden Spielstand ist reparierbar, und jede Saison rechnet ihre Linien nachweislich neu. Der Zeitpunkt-Fix kam erst, nachdem Season 2 schon gespielt war: die vor dem Kaderbau eingefrorenen Linien (Median 45,0 statt real 69,8) waren damit festgeschrieben, und die Abrechnung hätte 29 Zahler mit 550,7 Mio getroffen — 2 Empfänger hätten je 275,4 Mio bekommen, bei Kassenständen von 0 bis 36 Mio. Ein neues Reparaturskript (scripts/repariere-apron-linien.ts) rechnet die Linien mit derselben Funktion wie das Spiel neu und schreibt nur, wenn seit dem ersten gewerteten Spieltag kein einziger Transfer stattfand — nur dann ist die Neuberechnung exakt der Stand vom Fensterschluss und keine mitten in der Saison verschobene Grenze. Für den laufenden Spielstand heißt das: 8 statt 29 Zahler, Topf 50,7 statt 550,7 Mio, 24 Empfänger zu je 2,1 Mio. Außerdem trägt jeder Linien-Snapshot jetzt einen Herkunftsvermerk (Fensterschluss oder Reparatur) — ein von einem alten Build zu früh eingefrorener Stand ist damit künftig von außen erkennbar, statt erraten werden zu müssen. Ein Snapshot ohne Vermerk wird in einer bereits gespielten Saison bewusst nicht automatisch ersetzt: eine wandernde Grenze mitten in der Saison wäre schlimmer als der einmalige manuelle Eingriff.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Liga · Archivierte Saisons",
+      "pr": null,
+      "text": "Der Bereichs-Rückfall in der archivierten Tabelle trug seine Punkte in die falsche Disziplin ein: statt in die erste Disziplin des Bereichs landeten sie in der mit dem größten Kader — Gewichtheben statt TDM, Climbing statt Staffel, I-Spy statt Schach, während die eigentliche Spalte leer blieb; nur SOC sah zufällig richtig aus, weil Basketball dort beides ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Spieltag",
+      "pr": null,
+      "text": "Nach einem Neuladen mitten im Spieltag hing die Arena fest. Gemeldet war: „der spieltag abschließen button in der arena ist weg, jetzt kann man wieder den 2. diszi nicht abschließen“. Die Bühne merkte sich nur innerhalb einer Sitzung, welche Disziplin schon gelaufen war — wer den Spieltag verließ und zurückkam, sah die Bühne auf der bereits gewerteten ersten Disziplin stehen, aber der Block darunter fehlte komplett. Und genau dort stecken beide Auswege: „Weiter zu Disziplin 2“ und „Spieltag abschließen“. Ohne ihn gab es keinen Weg zur zweiten Disziplin. Jetzt zieht die Bühne diese Information aus dem Spielstand statt aus dem Sitzungsgedächtnis — der weiß die ganze Zeit, welche Disziplin gewertet ist, und überlebt jedes Neuladen. Unverändert bleibt der Schutz davor, den Spieltag mit offener zweiter Disziplin abzuschließen: das ist Absicht, sonst würde jeder dort aufgestellte Spieler dauerhaft aus der Wertung fallen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplin-Bühne",
+      "pr": null,
+      "text": "Die Arena zeigte falsche Spieler und falsche Ränge. Gemeldet war: „ich hab hier platz 28 … bin aber hier letzter?“ — die Bühne führte für Stronghold Crusaders in der Staffel Tahra (+40,7) und Chad Thunderjaw (+40,2) auf, Rang 28 mit 80,9 Punkten. Gewertet wurde etwas völlig anderes: aufgestellt waren Spineshard (29,3) und Myrth (9,9), Team-Rang 31 mit 47,8. Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi's Castle. Dasselbe bei anderen Teams — bei V-D stellte die Bühne Queen Butterfly an die Spitze, während das Team in Wahrheit Vierter wurde. Die Ursache lag allein in der Anzeige, nicht in der Wertung: lagen der Bühne für eine Disziplin keine Engine-Daten vor, wich sie still auf ein schätzendes Modell aus, das die Aufstellung gar nicht liest, sondern sich pro Team selbst die stärksten Spieler heraussucht. Am gemeldeten Spielstand nachgerechnet wählt genau dieses Modell für S-C in der Staffel Tahra und Chad. Deine Punkte waren also immer korrekt gebucht — falsch war nur, was auf der Bühne stand. Jetzt holt die Arena die Bahnen aus dem gebuchten Ergebnis, sobald eine Disziplin gewertet ist: dieselben Spieler, Ränge und Scores, die auch in der Tabelle stehen. Und solange eine Disziplin noch nicht gelaufen ist, sagt der Hinweis oben unmissverständlich „Vorschau mit GESCHÄTZTER Aufstellung – nicht das Ergebnis“, statt wie bisher nur von einer vereinfachten Ansicht zu sprechen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
+      "text": "Disziplin-Feld und Rangliste enden jetzt wirklich auf einer Linie — im Browser nachgemessen: die Tabelle war zusätzlich um Polster und Rahmen höher als die Arena, weil ihre zugewiesene Höhe nur den Inhalt meinte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplinen",
+      "pr": null,
+      "text": "Das Disziplin-Feld und die Rangliste daneben enden wieder auf einer Linie: die Höhenmessung war zirkulär — die Tabelle richtete sich an der Arena aus, während die Arena über das Flex-Layout auf die Höhe der Tabelle gedehnt wurde, was in Disziplinen mit langer Rangliste unter dem Feld tote Fläche stehen ließ.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Disziplin-Bühne",
+      "pr": null,
+      "text": "Zwei Testlücken geschlossen, die seit Längerem offen standen und echte Fehler verdecken konnten. Zum einen konnte die Disziplin-Bühne beim Laden abstürzen: solange der Spielstand noch nicht vollständig da war, griff die Bereitschaftsprüfung auf die Teamliste zu, die es in dem Moment noch gar nicht gab. Dieselbe Schwäche steckte an drei weiteren Stellen und ist überall abgesichert. Zum anderen fehlte eine Testdatei, die bei einem früheren Umbau versehentlich mitgelöscht worden war, während der Test sie weiter lud — sie ist wieder da. Damit laufen alle Arena- und Bühnen-Prüfungen wieder vollständig durch, und rote Tests bedeuten künftig wieder einen echten Fehler statt Altlast.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Überall · Statuszeile",
+      "pr": null,
+      "text": "Der Preseason-Banner zeigte unter „Grund anzeigen“ rohe Enum-Codes wie „roster_after_market_plan_below_player_min“ — auf jeder Seite. Alle Blocker-Codes sind jetzt deutsche Klartextsätze, ein unbekannter Code bekommt künftig einen lesbaren Ersatztext statt durchzurutschen, und „482 Setup-Aktionen“ heißt jetzt „Team-Einstellungen“.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Vor Spieltag 1 zeigte der Saisonstand kommentarlos Rang 1–32 mit lauter „—“, das Board vergab sogar Gold/Silber/Bronze, und „Top-Spieler der Saison“ listete #1–#10 mit ausschließlich „—“ — während die Ergebnisseite daneben „bewusst keine Reihenfolge“ versprach. Die Reihenfolge ist der Endstand der Vorsaison (die Startplätze) und wird jetzt genau so beschriftet; Medaillen gibt es erst mit echten Punkten, und die leere Top-Spieler-Liste ist der geteilte „Noch zu vergeben“-Block wie in Arena und Ranks.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Die erste Zeile der Seite war eine halbenglische Status-Flag-Reihe („Spielstand: aktiv · Live · Aktive Season · lokale Results“). Dort steht jetzt „Liga-Wertung · Saison läuft“ bzw. „· Archiv“; die technische Quelle bleibt als Tooltip erreichbar.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Home",
+      "pr": null,
+      "text": "Die Saisonstand-Kachel rechnete „verbleibend 3 Spieltage“ vor Spieltag 1 einer Zehn-Spieltage-Saison — sie zählte auf dem 4er-Fenster des Spieltag-Steppers und wertete den aktuellen, ungespielten Spieltag als gespielt. Jetzt zählt der echte Spielplan (verbleibend 10), gespielt sind nur gewertete Spieltage, und der Ø-Punkte-Chip erklärt seinen Strich („ab Spieltag 1“).",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Überall · Lesbarkeit",
+      "pr": null,
+      "text": "Zwei Farbtöne rissen die Lesbarkeitsgrenze systematisch: die Teamfarbe als Schriftfarbe (Karten-Eyebrows, Links, Kennzahlen — mit S-C-Rot 3,3–3,9:1) und das gedämpfte Blau der Rasse/Klasse-Chips und Erklärtexte (3,6:1). Alle betroffenen Stellen laufen jetzt über die Lesbarkeits-Token (--nl-accent-text, --nl-mut, Tinte auf Teamfarb-Flächen), plus ein neues --nl-risk-text für rote Chips auf rotem Grund („1 kritisch“, „⚔ Rivale“). Nachgemessen mit vier Themes (S-C, S-S, G-G, Standard): alle betroffenen Texte über 4,5:1.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Historie",
+      "pr": null,
+      "text": "Die Historie überschrieb ihre Abschnitte mit „SEASON 2 · MANUAL_TRANSFER_WINDOW“ und hängte denselben Slug als Fußnote an jede Zeile. Daraus wurde „Season 2 · Transferfenster“ — und ein unbekannter Phasen-Slug fällt nie mehr roh ins UI.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Sponsoren",
+      "pr": null,
+      "text": "„Sponsorsystem V1 (alt)“ und der Button „Rohdaten zeigen“ waren Entwickler-Vokabular im Spieler-UI — jetzt „Klassisches/Neues Sponsormodell“ und „Rechenwerte zeigen“.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Zwischen den deutschen Bedarf-Chips stand „Status unknown“. Bekannte Zustände heißen jetzt „startklar“, „Kader zu klein“ usw.; ist der Status unbekannt, verschwindet der Chip, statt es auf Englisch zuzugeben.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Die Liga-Kredittabelle zeigte „38.3 · 13.4 %“ (Punkt statt Komma, ohne Einheit), während dieselbe Seite oben „38,9 Mio · 13,8 %“ schrieb — und „laufend seit season-2“ war ein roher Slug. Jetzt überall deutsches Zahlenformat mit „Mio“ und „seit Season 2“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Gebäude",
+      "pr": null,
+      "text": "Die Gebäudekarten sprachen halb Englisch („Season Cash Income“, „Recovery Modifier“, „F/E/D Youth Development Boost“) und die rote Arena-Zeile „Basis 0,0 Mio × 1 = 0,0 Mio“ wirkte wie Debug-Ausgabe. Der Katalog spricht jetzt Deutsch, die Arena-Rechnung ist ein erklärender Satz in ruhiger Farbe („Noch keine Einnahme — ab Level 1 gilt: Basis × Beliebtheit“), und der Academy-Chip zeigt den echten Entwicklungs-Boost statt des toten Upgrade-Rabatts.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Überall · Wortwahl",
+      "pr": null,
+      "text": "Terminologie vereinheitlicht: sichtbarer Spieltext sagt jetzt durchgängig „Wunschliste“ (statt gemischt „Wishlist“), „Einsatzliste“ (statt „Lineup“) und „Gebäude“ (statt „Facilities“). Der Home-Status sagt nicht mehr nackt „bereit“ über einer fehlenden Einsatzliste, sondern nennt den Flow-Schritt beim Namen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Teams · Spielerkarte",
+      "pr": null,
+      "text": "Zwei versteckte Absturz-Fallen entschärft, bevor sie je jemanden erwischt haben. Das Teams-Detail und die große Spielerkarte riefen einen Teil ihrer React-Bausteine nur unter einer Bedingung auf — das ging bisher nur deshalb gut, weil die Bedingung im laufenden Spiel praktisch nie kippt. Wäre sie je gekippt, wäre die jeweilige Ansicht kommentarlos mit einem Fehler abgestürzt. Beide Stellen sind jetzt so umgebaut, dass die Bausteine immer in derselben Reihenfolge laufen; sichtbar ändert sich dadurch nichts. Zusätzlich wacht ab jetzt ein automatischer Prüfer (ESLint) über den gesamten Code und schlägt sofort Alarm, wenn so eine Falle wieder eingebaut würde — der Prüfstand dafür existierte bisher nur dem Namen nach.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Der Apron-Ausweis nennt jetzt Namen: In der Karte Apron & Kredite steht neu die Liste Apron liga-weit — wer zahlt, wer bekommt. Vorher hieß es nur 28 Zahler · 3 Empfänger · Topf 428,7 — jetzt steht jedes Team mit Ligarang, geglätteter Bemessungsgrundlage, Abstand zur 1. Linie und dem Betrag da, den es nach der Hochrechnung zahlt (rot, mit Deckel-Marke, wenn der Deckel die Abgabe begrenzt) oder bekommt (grün). Dein Team ist hervorgehoben und immer sichtbar. Damit es ein Game bleibt und kein Excel, zeigt die Liste zuerst die Extreme — größte Zahler, dein Team, alle Empfänger — und der Aufklapp-Knopf trägt die Zwischensumme der übrigen Zahler, damit die Rechnung auch zugeklappt aufgeht. Die Summenprobe steht im Klartext darüber: was die Zahler einzahlen, was die Empfänger daraus erhalten, und was wegen des Empfänger-Deckels verfällt — es wird nie mehr ausgeschüttet als eingesammelt. Alles aus derselben Hochrechnung wie die Karte selbst, nichts neu gerechnet.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Einsatzliste · Formkarten",
+      "pr": null,
+      "text": "Die Bereichsfarben (POW/SPE/MEN/SOC) sind im Formkarten-Dropdown wieder zu sehen: bisher trugen alle vier denselben grauen Punkt und die Farbe hing allein an einer CSS-Angabe, die native Auswahlmenüs in Chrome und Safari ignorieren — jetzt steht ein farbiger Kreis im Text selbst, der jedes Betriebssystem-Menü übersteht.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Formkarten",
+      "pr": null,
+      "text": "Jeder Spieler bekam ein exakt gespiegeltes Kartenpaar — +8 und −8, +4 und −4 — und zwar immer: über 20.000 Ziehungen nachgemessen waren die beiden Werte in 100 % der Fälle betragsgleich. Im Live-Save steht genau das: 680 Karten der Saison, Nennwertsumme exakt 0. Das war kein Zufall, sondern eine Kollision: die Auswahl nahm nur die untersten zwei Bits des Hashes, und in dieser Rechnung laufen die Seeds für „positiv\" und „negativ\" nach dem vierten Zeichen zusammen. Beide Beträge werden jetzt getrennt gezogen, die Verteilung trifft alle 16 Kombinationen. Bestehende Saisons behalten ihre Karten — die Werte entstehen beim Saisonwechsel und stehen im Spielstand.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Formkarten-Übernutzungs-Strafe (Punktabzug plus Neu-Einordnung der Endtabelle) greift jetzt auch auf dem normalen Spielerweg über „Sponsoren buchen“ — vorher lief sie nur im Cockpit-Saisonabschluss, sodass Sponsor- und Apron-Abrechnung sowie der eingefrorene Saison-Schnappschuss auf der unbestraften Tabelle rechneten; sie greift zudem nur bei wirklich beendeter Saison, damit eine laufende Saison nicht für Karten bestraft wird, die noch gespielt werden können.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Home · Top-Kader",
+      "pr": null,
+      "text": "Die große Spielerkarte ist neu geordnet: OVR, PPs und MVS stehen jetzt in EINER Zeile statt in zweien — der Liga-Rang klebt dafür nicht mehr im Wert (\"79,9 · #20\"), sondern steht als eigene kleine Zeile im Chip. Darunter neu: die Saison-PPs je Achse (POW/SPE/MEN/SOC samt Ligarang, dieselbe Quelle wie die Ranks-Spalten), mit der Kopfzeile \"PPs je Achse\", damit sie nicht mit den Achswerten direkt darunter verwechselt wird — die stehen wie bisher als farbige Attribut-Chips da. CA und PO bleiben Sterne, PPs und MVS bleiben auch bei 0 oder ohne Wertung sichtbar. Gilt überall, wo die große Karte hängt: Home-Top-6, Team-Profil-Kader, Teams-Portraits und Teams-Detail.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Arena · Spielplan",
+      "pr": null,
+      "text": "Ein halb gewerteter Spieltag (Disziplin 1 gebucht, Disziplin 2 offen) erzählt jetzt überall dieselbe Geschichte. Vorher sagte der Spielplan korrekt „läuft“, das Spieltagsergebnis präsentierte den Tag aber als fertig (Tagessieger-Reveal, Medaillen-Podium, MVPs — nirgends „vorläufig“), und die Arena behauptete nach einem Neuladen das Gegenteil („Läuft, sobald die erste Etappe startet“, Wertung folgt), obwohl die Staffel längst im Saisonstand stand. Es gibt jetzt EINE geteilte Zustandsfrage mit drei Antworten (nichts gewertet / teilweise / vollständig, getMatchdayScoringProgress — dieselbe Quelle, die schon den Spieltagswechsel bewacht). Das Spieltagsergebnis zeigt im Teil-Zustand einen klaren Zwischenstands-Hinweis, nennt den Führenden „Zwischenführung · vorläufig“ statt Tagessieger, hält Gold-Reveal und Tages-Podium zurück und beschriftet die noch offene Disziplin beim Namen („Takeshi steht noch aus“) statt mit einem stummen „—“. Die Arena erkennt die gebuchte Disziplin jetzt auch nach einem Neuladen: sie öffnet direkt auf der noch offenen Disziplin 2, markiert Disziplin 1 im Auswahlmenü als „✓ gewertet“, zeigt die Spieltags-Wertung mit den echten D1-Punkten statt „Wertung folgt“ — und bucht eine bereits gewertete Disziplin nie ein zweites Mal. Der Weiter-Knopf oben führt im Teil-Zustand zu „Disziplin 2 spielen“ statt zur Fertig-Erzählung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Home",
+      "pr": null,
+      "text": "Home zählt die gewerteten Spieltage wieder richtig. Mitten in Season 2 (vier Spieltage gewertet, Rang und Punkte im Kopf korrekt) behauptete dieselbe Seite darunter „Noch keine Form — erst 0 Spieltage“, „verbleibend 10 Spieltage“ (richtig: 6) und erklärte GuV und Ø-Punkte mit „ab Spieltag 1“. Ursache war kein fehlender Spielstand, sondern ein leeres Platzhalter-Punkte-Ledger: ist die teure Saison-Ableitung auf Home aus Performance-Gründen abgeschaltet, liefert sie ein leeres Sentinel-Ledger — und genau das wurde dem Feld-Rennen-Ledger als „vorberechnet“ untergeschoben, der damit für keinen Spieltag Punkte fand. Jetzt rechnet der Feld-Rennen-Ledger in diesem Fall selbst aus dem Spielstand (dieselbe Rechnung wie die Ableitung); Form-Strip, Ø Punkte/Spieltag und „verbleibend“ stimmen damit wieder mit Teams und Leaders überein. Der GuV-Chip sagt mitten in der Saison außerdem „noch keine Buchung“ statt fälschlich „ab Spieltag 1“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltagsergebnis · Highlights",
+      "pr": null,
+      "text": "Die Highlight-Karten sprechen Deutsch statt Datenbank. Unten auf dem Spieltagsergebnis standen rohe Enum-Codes samt englischer Engine-Sätze („BEST_PLAYER_DISCIPLINE — Top player in Staffel“). Nach dem Muster der Preseason-Blocker-Übersetzung gibt es jetzt eine deutsche Typ-Karte (Bester Spieler / Stärkstes Team / Knappstes Duell / Ohne Aufstellung / Verletzung), der Inhaltssatz wird aus den gespeicherten Daten gebaut („Veloria Spinblade in Staffel — 129,6 Score“), und ein künftiger unbekannter Highlight-Typ erscheint nie roh, sondern als generische deutsche Karte mit Konsolen-Warnung. Dieselbe Übersetzung nutzt auch der Highlights-Block in der Arena.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Statuszeile · Settings",
+      "pr": null,
+      "text": "Zwei hängengebliebene Meldungen aufgeräumt. 1) Das Banner „Preseason-Markt blockiert · 22/31 Teams“ klebte am Spieltag 4 noch auf jeder Seite, obwohl der Markt selbst längst „Transferfenster geschlossen · Saison läuft“ meldet — sobald die Saison läuft (erster Spieltag gewertet), wird der alte Preseason-Lauf nicht mehr als Dauer-Blocker angezeigt; seine Rohdaten bleiben unangetastet. 2) Die Save-Karte in den Settings behauptete „Dieser Save enthält keine abgeschlossene Season · S1-Endstand nein / S2-Start nein“, während Saisonstand, Teams und Leaders das komplette Season-1-Archiv zeigen. Die Erkennung zählt jetzt abgeschlossene Saison-Archive mit, und eine laufende Season 2 gilt folgerichtig als „S1-Endstand ja / S2-Start ja“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Import · Spielerkatalog",
+      "pr": null,
+      "text": "Ein importierter Spieler bekommt im Baseline-Katalog nicht mehr einen zweiten, minimal abweichenden Marktwert: der Katalog rechnete eigenständig nach, statt den liga-relativ ermittelten Wert des Imports zu übernehmen — den Wert also, der im Spiel tatsächlich gilt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Arena · Vor dem Anpfiff",
+      "pr": null,
+      "text": "Die Infotafel vor dem Spieltag kommt wieder — und zwar vor jedem, nicht nur vor dem ersten. Gemeldet war: „die kommt glaub ich nur beim ersten spieltag, danach nie wieder gesehen“. Stimmte: sie hing an der Bedingung „mindestens ein Team der Liga ist noch nicht bereit“ und war damit kein Vorspiel-, sondern ein Blockade-Bildschirm. Am ersten Spieltag fehlten noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel blieb weg, obwohl ihre Überschrift „Vor dem Anpfiff“ lautet. Jetzt zählt nur noch, ob der Spieltag wirklich noch nicht begonnen hat. Damit sie keine Sackgasse ist, hat sie einen Knopf „Zur Bühne“ bekommen; er erscheint, sobald die Liga vollzählig bereit ist. Wer ihn drückt, landet beim Hin- und Herwechseln nicht wieder auf der Tafel — beim nächsten Spieltag kommt sie von selbst zurück.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "KI · Kaderplanung",
+      "pr": null,
+      "text": "Die KI-Teams unterscheiden sich wieder in ihrer Ausgabenhaltung: ein unbedingter Anti-Hortungs-Übersteuerer setzte jedes Team mit komfortabler Kasse und Kaderlücke auf die niedrigste Reserve und überschrieb damit die gesamte aus Identität und Strategieprofil hergeleitete Haltung — ein bewusst sparsames Team verhielt sich exakt wie ein ausgabefreudiges; die Lockerung wirkt jetzt gewichtet nach Haltung und erzwingt die Politik nicht mehr.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Am Saisonstart dominierten sechs leere Riesen-Karten mit sechsmal demselben Satz die Leaders-Seite. Kategorien ohne Wertung kollabieren jetzt zu einem einzigen „Noch zu vergeben“-Block mit leeren Podest-Ringen und Erklärung, wann die erste Wertung entsteht; daneben steht das echte Podium der Vorsaison mit Punkten. Gefüllte Kategorien wie OVR und Training rücken nach vorn.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Die 0-Punkte-Listen am Saisonstart waren intern nach Alphabet gereiht — dadurch konnten „Dein Team“-Kopfzeile, Saison-Bestwerte („Bester PPs-Wert 0,0“) und das Top-5-Achievement Platzierungen an Spieler mit 0 PPs vergeben. Wertungen ohne echte Werte zählen jetzt nirgends mehr als Rangliste.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Der All-Time-Medaillenspiegel malte bei einer archivierten Saison einen rund 2.500 Pixel hohen Goldbalken und listete Teams ohne Medaille als Rang 4 und 5. Der Balkenchart ist weg — die Medaillen-Zeilen tragen dieselbe Information —, gelistet wird nur, wer eine Medaille hat, der Rest steht als ein Satz darunter.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Geldbeträge im Rekorde-Reiter tragen jetzt ihre Einheit: aus „Rekord-Transferablöse 65“ wurde „65,3 Mio“, Kaderwert und Marktwert-Sprung ebenso.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "„Auf dem Weg zur Legende“ zeigte zehn Anwärter mit je fünf fast identischen 0/5-Kriterienzeilen. Ausgeklappt sind nur noch Anwärter mit mindestens einem erfüllten Kriterium, der Rest steht hinter einem Knopf mit ehrlicher Zählung.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "KI · Kaderplanung",
+      "pr": null,
+      "text": "Spitzenspieler fallen nicht mehr aus dem Kandidatenpool der KI: wer teuer, achsenfremd und noch nicht bewertet war, wurde gar nicht erst betrachtet — unabhängig davon, wie stark er ist; ab OVR 72 kommt er jetzt in die engere Wahl, die Bewertung danach darf ihn weiterhin ablehnen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Liga · Ranks",
+      "pr": null,
+      "text": "Die Teamstärke-Ränge einer abgeschlossenen Saison werden jetzt beim letzten gewerteten Spieltag festgehalten statt erst beim Saisonabschluss — vorher flossen die Verkäufe nach Saisonende in die Saisonränge ein und die Veränderungs-Spalte zeigte Sprünge wie „+24“, die es im Saisonlauf nie gab; dazu gibt es ein Reparaturskript, das den bestehenden Season-1-Snapshot aus der Transferhistorie rückwirkend korrigiert.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Saisonende",
+      "pr": null,
+      "text": "Der Schritt hiess „Sponsoren & Preisgeld buchen\" und die Inbox meldete danach „Preisgeld ausgezahlt\" — beides versprach eine Zahlung, die es nicht gibt: die Preisgeld-Tabelle ist ein Vergleichswert, das Team-Cash bleibt davon unberührt. Der Schritt heisst jetzt „Saisonabrechnung buchen\" und nennt auch, was wirklich passiert: Sponsorgeld abzüglich Gehälter, dazu Apron, Gebäude, Kreditraten und Vorstandsziele. „Sponsoren buchen\" war nämlich die zweite Untertreibung — an dieser Stelle laufen sieben Buchungen, nicht eine. Der Weg dorthin heisst im Ablauf ebenfalls „Saisonabrechnung\" statt „Preisgeld & Finanzen\".",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Cockpit · Saisonende",
+      "pr": null,
+      "text": "Die Saisonende-Abrechnung ist jetzt erzwungen: solange Preisgeld, Sponsorgeld und Apron nicht gebucht sind, hält der Schritt „Finanzen“ die Saisonende-Kette an — vorher war er überspringbar und man kam bis in die neue Saison, ohne dass je Geld geflossen wäre, weshalb in der Saisonbilanz Sponsoreinnahme und Gehaltsabzug fehlten und der eingefrorene Kontostand einen Stand festhielt, den es nie gab.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Saisonende · Abrechnung",
+      "pr": null,
+      "text": "Die Saisonende-Buchung prüft jetzt, dass die angeforderte Saison die aktuelle ist: ein veralteter „Sponsoren buchen“-Aufruf mit der Saison-ID der Vorsaison (alter Tab, Doppelklick im Rennen mit „Neue Saison starten“) rutschte vorher an allen Duplikat-Wachen vorbei und buchte die komplette Saisonende-Abrechnung der neuen Saison schon an deren Spieltag 1 — Sponsorgeld und Gehaltsabzug zur Unzeit, und am echten Saisonende wären alle Zahlungen übersprungen worden.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Die Rangänderung der Spieltags-Wertung stand an der falschen Spalte: Die Pfeile hingen am Spieltagsrang — der ist einmalig und hat gar kein „vorher“ —, während die S-Rang-Spalte nach der Buchung zweimal denselben Rang zeigte („7 → 7“ bei allen Teams). Jetzt zeigt der S-Rang die echte Saisonrang-Bewegung: Ausgangswert ist der Stand nach dem vorigen gewerteten Spieltag, und schon nach der ersten Disziplin steht dort der Zwischenstand. Der Pfeil am Spieltagsrang bleibt, heißt aber jetzt sichtbar „Mod“: Er zeigt, was Aufstellung, Form, Captain und Mutatoren an Plätzen gebracht haben. Die Kopfzeile erklärt beide.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Sponsoren · Neues Spiel",
+      "pr": null,
+      "text": "Beim Start eines neuen Spiels gibt es wieder fünf Sponsorenangebote statt vier: die Achse „Frische“ fiel aus dem Angebot, weil die Karten erzeugt werden, bevor der Liga-Draft die Kader angelegt hat — besonders ärgerlich, weil die KI-Teams unmittelbar danach unterschreiben und ihre Verträge nie neu gebaut werden, die Achse also der gesamten Liga für Saison 1 fehlte.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Teams · Saisonübersicht",
+      "pr": null,
+      "text": "Beim Blick auf eine abgeschlossene Saison stehen in der Teams-Tabelle nicht mehr zwei Zeitpunkte nebeneinander: die Achspunkte (POW/SPE/MEN/SOC) zeigten weiter den Stand der laufenden Saison, während die Disziplin-Spalten derselben Zeile korrekt den Snapshot lasen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spielerprofil · Details",
+      "pr": null,
+      "text": "Im Spielerprofil zeigt die Tabelle „Top-Disziplinen“ jetzt dieselbe Trainings-Verbesserung wie die Achsen-Übersicht darüber. Gemeldet war: „im bereich Top Disziplinen fehlen noch die verbesserungen die oben drin sind, also Staffel 91 (+2) sind dort nicht zu sehen“. Beide Ansichten stehen im selben Reiter und zeigen dieselben Werte — aber nur oben stand der Saison-Forecast dabei, unten fehlte er. Jetzt steht er an beiden Stellen, mit derselben Farbe und demselben Hinweistext. Bei verdeckten Spielern bleibt es wie bisher bei der groben Klassen-Angabe ohne exakte Zahl, und wo sich nichts verändert, steht weiterhin nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Die Trainingshistorie zeigt jetzt, WOHER die Entwicklung kommt: der Saison-Forecast bekommt eigene Zeilen für Training, Leistung und Alterung statt nur einer saldierten Zahl, und bei abgeschlossenen Saisons steht die Aufteilung im Tooltip — vorher las sich jeder Zuwachs so, als käme er ganz aus dem Trainingsplan, obwohl ein Teil davon schlicht daher kommt, dass der Spieler gespielt hat.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Die Trainingshistorie ist jetzt eine Liste über die Saisons hinweg: eine Summenzeile je Saison, und erst beim Aufklappen zeigt die Saison ihre Herkunft (Training, Leistung, Alterung). Die laufende Saison trägt das Badge „Prognose n/m“ — real gebucht wird erst am Saisonende —, abgeschlossene Saisons das Badge „gebucht“. Für Saisons, die vor der Herkunfts-Mitschrift abgeschlossen wurden, stehen die Saison-Summen in der Σ-Spalte, und die Liste sagt ehrlich, dass die Aufteilung je Attribut damals nicht festgehalten wurde. Die „Auswirkung auf die Disziplinen“ wandert mit in die aufgeklappte laufende Saison.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Freie Spieler",
+      "pr": null,
+      "text": "Negative Eigenschaften verschwinden nicht mehr spurlos aus der Freie-Spieler-Liste: bei Scouting-Stufe 0 fehlte nicht nur der Trait, sondern auch der Hinweis „N verborgen“ — ein Spieler mit schlechten Eigenschaften sah damit aus wie einer ohne, was eine falsche Sicherheit erzeugte statt einer sichtbaren Lücke.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand (Ranks)",
+      "pr": null,
+      "text": "Im PP-Board stand der Formkarten-Wert als nackte Klammer neben den PPs („9,6 (−120,9)“) — der „Bonus“ wirkte größer als der Gesamtwert, dabei sind es zwei Skalen (PPs gegen Score-Modifikatoren). Der Wert heißt jetzt sichtbar „Form-Score“, steht gedämpft statt in Bonus-Grün und erklärt seine Skala im Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Welt · Leaders",
+      "pr": null,
+      "text": "Auf derselben Seite standen „Ganze Rangliste · 314 Spieler“ (PP-Kategorien) und „340 Spieler“ (OVR/Training) als nackte Zahlen nebeneinander. Beide stimmen — sie meinen verschiedene Mengen: nur Spieler mit Wertung gegen alle gemeldeten. Das Label sagt das jetzt: „314 von 340 gemeldeten mit Wertung“ bzw. „alle 340 gemeldeten Spieler“.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Kredite nannten „Einnahmen (Referenz) 64,1 Mio“, die Finanzen daneben „Einnahmen (Saison) 61,6 Mio“ — dieselbe Vokabel für zwei absichtlich verschiedene Größen. Die Kredit-Zahl heißt jetzt nach ihrer echten Rolle „Einnahmen-Bemessung (Sponsor Vorsaison)“: es ist die Bemessungsgrundlage des Kreditrahmens aus der abgerechneten Vorsaison, keine laufende Saison-Hochrechnung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Markt · Scouting",
+      "pr": null,
+      "text": "Die Kopf-Kachel „Budget 2,5 Mio“ zeigte in Wahrheit das aktuelle Team-Cash, nicht das Startbudget (205). Sie heißt jetzt „Cash · verfügbar am Markt“ — die Zahl, mit der am Transfermarkt wirklich bezahlt wird.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Saisonstand",
+      "pr": null,
+      "text": "Beim Seitenaufbau standen sekundenlang unmögliche Werte wie „Rang #−2“ und „MW −15,7 Mio“ in den „Dein Team“-Kacheln: die Zähler-Animation konnte mit negativem Fortschritt starten (rAF-Zeitstempel vor dem Animationsstart) und fror unter Last genau dort ein. Der Zähler klemmt Fortschritt jetzt bei 0 ab, und die Saisonstand-Kacheln zeigen Rang, Punkte und Marktwert ab dem ersten Frame fest — wie die Finanzen-Kopfzahlen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Mehrere Seiten",
+      "pr": null,
+      "text": "Zahlen, die am Haus-Formatierer vorbei liefen, schrieben Punkt statt Komma („95.5%“ im Arena-Treemap, „Druck 3.4 · Board 8.4“ auf Home, im Team-Dossier und in der Inbox) oder zwei Nachkommastellen neben 1-Nachkommastellen-Geldwerten („+54,27“ bei den Marktwert-/Gehalts-Deltas der Spieler-Tabelle). Alle laufen jetzt über die Haus-Formatierer mit de-DE-Komma und einer Nachkommastelle; der Disziplin-Bühnen-Formatierer fmt1 formatiert zentral de-DE.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Team · Spieler-Detail",
+      "pr": null,
+      "text": "Die Reiter-Pille im Spieler-Profil sprang an der Grenze „Stats“/„Details“ um eins daneben, weil der „Details“-Anker im DOM innerhalb des „Stats“-Ankers steckte und der Scroll-Beobachter beim Hochscrollen den veralteten Messwert des äußeren Ankers gewinnen ließ. Die Anker sind jetzt Geschwister in derselben Karte — Inhalt und Optik unverändert, nur die Markierung stimmt jetzt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-09",
+      "seite": "Teams · Board-Ziele",
+      "pr": null,
+      "text": "Die Vorstandsziele hatten feste Marken, die kein Team der Liga erreichen konnte: „Gehaltsdruck auf 78% senken\" stand bei 22 Teams, die Ist-Werte reichten von 78,7% bis 99,9% — 21 Ziele verfehlt, 9 gefährdet, kein einziges erfüllt. Der Grund war der Messzeitpunkt: die Quote ist Gehalt geteilt durch Cash plus Gehalt, und Cash fällt die ganze Saison, weil Sponsor, Apron und Gebäude erst am Saisonende gebucht werden. Genauso beim Transferdeckel („unter 8 Mio\" gegen 218 bis 340 Mio Ausgaben) — jeder Saisonwechsel ist eine Kaufsaison, in der die ganze Liga neu einkauft. Gewertet wird jetzt gegen die Liga: fünf Ziele (Gehaltsquote, Cashpuffer, Transferausgaben, Transferbilanz, Formkarten) tragen einen Ligarang als Marke, gesetzt nach dem Anspruch des Vorstands zwischen oberem Viertel und unterem Viertel. Solange die Einnahmen der Saison nicht gebucht sind, steht auf cash-abhängigen Zielen „Hochrechnung\" und sie können nicht verfehlt sein — ein Konto im Minus bleibt davon ausgenommen, das ist ein Befund und keine Prognose. Das Kaderziel „Formfarben abdecken\" (32 von 32 Teams erfüllt) zählt jetzt den Nennwert der ausgespielten Formkarten, und „Rebuild-Kosten klein halten\" heisst wieder, was es misst: Cashpuffer.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Ewige Tabelle",
+      "pr": "#461",
+      "text": "Nach einer abgeschlossenen Saison blieben in der ewigen Tabelle alle Medaillen leer — kein Gold, kein Silber, kein Bronze, dazu kein Ø-Rang und keine Punkte der Vorsaison. Verloren war nie etwas: die Ränge lagen vollständig im Spielstand, sie kamen nur nicht im Browser an. Jetzt stehen die Medaillen wieder da, und ewige Tabelle und Saison-Historie zeigen bei Cash und Marktwert weiterhin jeweils den Stand, der zu ihnen gehört.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Vor dem Anpfiff erfindet die Arena kein Ergebnis mehr: statt 32 Schloss-Zeilen, 32× »keine Aufstellung« und einer alphabetisch durchnummerierten Wertung mit Medaillen-Optik zeigt sie jetzt einen eigenen Zustand — deine Einsatzliste als Held mit direktem Knopf, die zwei Disziplinen mit Mutatoren, leere Podeste (»Noch zu vergeben«) und dein Umfeld mit den echten Startplätzen aus der Vorsaison. Der Saison-Rang der Wertung kommt jetzt aus derselben Quelle wie Home und Saisonstand (vorher: Rang 19 im Kopf, Zeile 22 in der Tabelle).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Server · Spielstand-Export",
+      "pr": null,
+      "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Info · Changelog",
+      "pr": null,
+      "text": "Der Changelog-Reiter war eine 18.000-Pixel-Scroll-Wand ohne Sprungmarken. Jetzt startet nur die neueste Version aufgeklappt, ältere Versionen liegen hinter einem \"Anzeigen\"-Schalter, und eine Sprungleiste im Kopf springt direkt zu jeder Version. Die zuvor gemessenen 45-60 Sekunden Ladezeit lagen an der einmaligen Dev-Server-Kompilierung der riesigen gemeinsamen Seiten-Module, nicht an der Changelog-Komponente selbst — die lädt keine Daten nach und rendert warm in wenigen Sekunden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Transfermarkt & Kaufdialog",
+      "pr": null,
+      "text": "Der Deal-Desk ist jetzt verbindlich: Er trägt Namen und Porträt des Kandidaten im Kopf, und ein Wechsel in der Liste entwertet die alte Rechnung sofort — vorher rechnete der namenlose Desk still mit dem vorherigen Spieler weiter (Profil: Lotte Lance, Desk: Blacksmith). Die Vorher/Nachher-Zeilen zeigen unter \"Wenn der Kauf durchgeht\" echte Folgen statt ±0 auf jeder Zeile, und fehlt Cash, steht der Betrag da (\"Noch nicht ausführbar — es fehlen 4,3 Mio\") statt einer Rechnung, die so tut, als passiere nichts. \"MW\" heißt im Desk jetzt \"Team-MW\". Der Fensterstatus ist EINE Aussage (\"Kauffenster offen\" in Grün) statt \"geschlossen\" + \"kaufen ist offen\" + \"nur Ansicht\" übereinander. Kandidatennamen werden nicht mehr gestutzt (Preis steht unter dem Namen), der Filterberg startet eingeklappt, und \"Deal prüfen\" besteht den Kontrasttest. Im Kaufdialog: die Gehaltsverteilung je Saison steht bei Mehrjahresverträgen direkt am Angebot, \"Monatsgehalt\" heißt richtig \"Gehalt p.a. (Mio)\", es gibt nur noch EIN \"Abbrechen\" und einen Primärknopf pro Schritt, \"Stört ihn\" hat seinen Umlaut, und die Warnung vor dem Abbruch-Malus steht VOR dem Klick im Gegenangebots-Banner.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Im Fokus-Board fehlten Spieler auf der Bank: Wer verletzt oder gesperrt war, verschwand komplett aus der Kandidatenliste, statt unter „Blockiert\" zu stehen — der Reiter zeigte deshalb dauerhaft 0. Jetzt ist jeder Spieler des Kaders auffindbar, und „Blockiert\" zeigt, wer warum nicht kann.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Die Punkte eines aufgestellten Spielers sprangen nach oben, sobald die Vorschau nachlud — aus 72,8 wurden plötzlich 96,8. Mutator- und Team-Power-Bonus sind Werte für die ganze Disziplin-Seite, wurden aber jedem Slot einzeln voll gutgeschrieben und damit mehrfach gezählt. Jetzt bekommt jeder Spieler nur seinen eigenen Anteil.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Kleinere Klarheits-Korrekturen an der Einsatzliste (die Struktur bleibt, wie sie ist): der rote \"Spieler fehlt\"-Alarm für einen einfach noch nicht bearbeiteten Slot heißt jetzt neutral \"Offen\" — Rot bleibt echten Blockern vorbehalten (doppelt gewählter Spieler, verletzter Spieler, der aktive Slot). Fatigue-Kosten zeigen bei einer leeren Liste \"0\" statt \"−0\", Rivalen-Teamnamen laufen seltener in \"Wicked ...\" ab, Attribut-Noten (z. B. \"SPE B\") tragen ihre Notenskala jetzt im Tooltip, und der Formplan-Karten-Deck-Hinweis erklärt in einer Zeile, was eine aktivierte Karte kostet und bewirkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Betrieb · Spielstand einsetzen",
+      "pr": null,
+      "text": "Nach dem Einsetzen eines Spielstands konnte die App wieder nur lesen — „attempt to write a readonly database\". Das Skript eignete bisher nur die Datenbankdatei dem Dienst-Benutzer zu, nicht das Verzeichnis. SQLite legt beim Schreiben aber Begleitdateien daneben an und braucht dafür Schreibrecht im Ordner; fehlt es, meldet es genau diesen Fehler, obwohl die Datei selbst passt. Das Skript übereignet jetzt das ganze Datenverzeichnis.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen · Ewige Tabelle",
+      "pr": null,
+      "text": "Zwei Dinge am Saisonstart: Erstens steht am Ende des Kauffensters garantiert kein Team mehr im Minus — wer nach Käufen, Kaderfüllung und regulärem Kredit noch negativ ist, bekommt einen Notkredit über genau den Fehlbetrag. Mit Minus in die neue Saison zu gehen bleibt erlaubt, das löst sich jetzt im Fenster auf. Zweitens zeigen ewige Tabelle und Finanzen für eine abgeschlossene Saison den Stand, mit dem das Team wirklich weiterspielt: Marktwert und Cash nach den Käufen der Folgesaison statt des Kaders vom Saisonende, der seit der Verkaufsumstellung nur noch drei bis sieben Spieler groß war. Der Wert dafür wurde bisher nie geschrieben — die Funktion existierte, aber niemand rief sie auf.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Neue Karte Apron & Kredite: Beide Apron-Linien stehen einzeln da — Linie 1 und Linie 2 mit deinem Abstand in Mio, deine Bemessungsgrundlage als Marker im Korridor, dazu die Hochrechnung (Abgabe oder Ausgleich beim aktuellen Rang, Deckel-Hinweis, Netto) und der Liga-Kontext (Median, Zahler, Empfänger, Topf). Daneben die Kreditlast: volle Rate pro Saison, aufgeteilt in Zins (GuV-Ausgabe) und Tilgung (senkt die Restschuld), plus Restschuld und Restlaufzeit je Kredit — auch bei 0, damit klar ist, dass nichts fehlt. Obendrüber die Summe der festen Verpflichtungen: Gehälter + Kreditrate + Apron-Abgabe. Wichtig: Der Apron rechnet absichtlich auf der geglätteten Gehaltssumme (Verträge über die Laufzeit verteilt), die GuV bucht die echte — die Karte erklärt den Unterschied, statt ihn zu verstecken.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Farben sagen wieder die Wahrheit: Einnahmen sind grün, Ausgaben rot/orange — vorher färbte der rote Team-Akzent den Sponsor-Balken zur Blutung um, während die Gehälter blau daneben standen. Jede Kopfzahl zeigt ihre Herkunft (= Sponsor 63,5 / = Gehälter 52,1 + Unterhalt 0,6), die GuV ihre Rechnung. Und die Kopfzahlen stehen ab dem ersten Frame fest: Die Zähler-Animation, die sekundenlang Zwischenstände wie 62,1 statt 63,5 als endgültig zeigte, ist auf der Geldseite raus.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Cash-Abgleich und Saison-Verlauf laden jetzt das Saisonarchiv nach: Mitten in Season 2 behauptete die Seite, für Season 1 sei kein Saison-Start-Cash archiviert — dabei war er da, nur der schlanke Start-Payload hatte ihn nicht geladen. Jetzt erscheint der echte Abgleich (Saisonstart + GuV + sonstige Bewegungen = Cash), solange geladen wird steht lädt dran, und der Verlauf-Leertext unterscheidet ehrlich zwischen lädt noch, archiviert ohne vergleichbare GuV und wirklich keine Vorsaison.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Liga-Vergleich entwirrt: GuV p.a. und Cashflow p.a. waren für 26 von 32 Teams identische Zwillingsspalten. Jetzt gibt es eine GuV-Spalte, und nur bei Teams mit laufender Tilgung steht der echte Geldabfluss als beschriftete Zusatzzeile (nach Kreditraten −25,9) direkt in der Zelle. Außerdem: Transfersaldo mit konsistenten Vorzeichen (Käufe −84,2, Verkäufe +0,0, Saldo −84,2), Salary Factor heißt Gehaltsfaktor, der Dein-Team-Chip ist von 3,3:1 auf lesbaren Kontrast angehoben, und die Kreditzins-Ausgabenzeile heißt, was sie ist — Zins, nicht Rate. Der Teamvergleich unten bleibt, wie er ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Finanzen · Liga-Vergleich",
+      "pr": null,
+      "text": "Die Teams in der Finanz-Tabelle waren als Einzige nicht anklickbar — von überall sonst kommt man per Klick ins Teamprofil. Jetzt auch von hier.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Beim Start der neuen Saison hat der Kader-Füll-Lauf auch für manuell geführte Teams eingekauft — im laufenden Spielstand drei Zugänge für Stronghold Crusaders über zusammen 34,5 Mio. Der Dienst läuft über alle Teams des Spielstands und bekam beim Verdrahten in die Saisonstart-Kette die Schreibgrenze nicht mit, die jeder andere Schritt dieses Laufs hat. Er bekommt sie jetzt: dieselbe KI-Teamliste, die auch Marktplan und Manager-Aktionen benutzen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Gebäude",
+      "pr": null,
+      "text": "Nicht gebaute Gebäude trugen denselben roten Rahmen wie ein echtes Risiko-Gebäude — sieben von acht Karten sahen nach Problem aus, obwohl alles in Ordnung war; 'nicht gebaut' hat jetzt einen eigenen, neutral gestrichelten Rahmen. Unterhalt/Netto zeigten für nicht gebaute Gebäude hartkodiert '−0,0 Mio' (ein negatives Nichts) und färbten die Null grün oder rot — jetzt schlicht '0,0 Mio' in neutralem Ton. Die Kopf-Chips 'Recovery' und 'Trainingseffekt' quetschten mehrere Fakten ohne Einheit in eine Zeile; Recovery hat jetzt eine erklärende Sub-Zeile, Trainings-XP/Scouting/Analytics sind eigene Chips. Die sticky Aktionsleiste bekommt am Ende der Kartenliste reservierten Abstand, damit sie die letzte Kartenreihe nicht mehr überdeckt — während des Scrollens durch die Mitte der Seite überdeckt eine unten fixierte Leiste zwangsläufig kurzzeitig die jeweils unterste sichtbare Zeile, das ist unverändertes Verhalten sticky positionierter Leisten.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Home",
+      "pr": null,
+      "text": "Home hat jetzt eine Handlungszeile ganz oben (»Einsatzliste füllen — 9 Plätze offen« mit echtem Knopf) statt dreier nicht klickbarer »Lineup fehlt«-Hinweise; die OVR-Werte auf den großen Spielerkarten sind wieder vollständig (»77,0 · #48« statt »77,0 …«), PPs/MVS bleiben auch bei 0 sichtbar und erklären sich per Tooltip, und im Board-Kasten steht ein Kapitän-Hinweis mit Draht ins Office. Das Office selbst ist eingedampft: Kapitänwahl als Vergleichstabelle mit Leadership-Balken, Board-Kontext und kompakte Notizen — die fünffach parallelen Aufgaben-Spalten sind weg.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "HQ",
+      "pr": null,
+      "text": "Die HQ-Übersicht baut sich wieder gestaffelt auf: erst das Gerüst, die teure Liga-Auswertung hinter den Spieler-Kacheln kommt einen Wimpernschlag später nach. Diese Staffelung war bei einem Umbau still verlorengegangen — seither rechnete die Seite alles auf einmal, bevor sie das erste Mal zeichnete. Zusätzlich wird die Auswertung nur noch dort gebaut, wo sie auch gezeigt wird: der Reiter Büro ließ sie bisher unnötig mitlaufen. Angezeigt wird unverändert dasselbe, es steht nur früher etwas auf dem Schirm.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Inbox",
+      "pr": null,
+      "text": "Die Inbox hat jetzt EIN Filtersystem und sortiert nach Dringlichkeit: Kritisch → Heute sinnvoll → Kann warten → Berichte, Erledigtes eingeklappt. Das kritische Item ist rot markiert und steht ganz oben (vorher sagte der Kopf 1 kritisch, aber keine Karte war als kritisch erkennbar), die äußeren Kategorie-Reiter mit ihren leeren Alles-erledigt-Seiten sind weg, der Kopf-Zähler zählt dieselbe Basis wie Home, und das Kritisch-Badge ist von 3,1:1 auf gemessene 7,1:1 angehoben.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams",
+      "pr": null,
+      "text": "Der Kader hat zwei Ansichten: Portraits bleiben Standard (und sind entrümpelt — Vertragsdetails raus, Kürzel mit Tooltips, nichts mehr abgeschnitten), die Tabelle heißt jetzt Liste & Verträge und trägt die Kaderplanung: Auslauf-Kennzahlen und Gehaltslast-Projektion über der Tabelle, Läuft-aus als beschrifteter Chip statt unerklärter Goldfärbung. Der Verträge-Reiter bleibt für die tiefen Werkzeuge (Buyout, Board-Vorschlag) bestehen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams · Team-Profil",
+      "pr": null,
+      "text": "Saison-Verlauf sagt die Wahrheit: Die Marktwert- und Cash-Sparklines färben sich nach der Richtung aus derselben Quelle wie der Delta-Chip (vorher leuchtete ein Cash-Absturz von 91 auf 7 Mio grün), und die Punkte-Kachel zeigt bei einer einzigen Saison Wert plus Einordnung statt eines einzelnen riesigen Balkens — der Höhen-Deckel gilt jetzt auch auf der Teams-Seite.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams",
+      "pr": null,
+      "text": "Im Disziplin-Profil bedeutet eine Farbe nur noch eines: Die Balken tragen die Kategoriefarbe (POW/SPE/MEN/SOC, wie das Radar daneben), der Liga-Rang bleibt die Zahl — mit Medaille für die Top-3 und dezentem Risiko-Ton fürs Schlussviertel. Vorher stand ein grüner Kategorie-Punkt neben einem grünen Quartil-Balken, und Grün hieß zweierlei.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Kauffenster und Kredite",
+      "pr": null,
+      "text": "Die KI-Teams haben Kredite aufgenommen und das Geld dann nicht ausgegeben — von 223,4 Mio geliehenem Geld lagen 134,7 Mio unangetastet auf den Konten, bei vollem Zins und überwiegend an andere Teams gezahlt. Die Ursache lag nicht beim Kredit: für dasselbe Team gab es drei verschiedene Kaderziele. Der kaufende Planer hielt Barbarian Plunderers bei 8 von 8 für fertig, während Sitzung und Kreditprüfung 8 von 9 sahen und für den fehlenden Platz Geld liehen. Jetzt ist der Wert aus dem Identitäts-Blatt die verbindliche Untergrenze, die Trainer-Persönlichkeit darf nur noch daraufsatteln. Ein Kredit wird außerdem vorher gegen den echten Kaufplan geprüft: plant das Team nichts, gibt es keinen Kredit. Und die Qualitäts-Mischung beim Einkauf ist eingeschaltet — mehr Stars und gute Spieler statt Auffüllware. Gemessen am laufenden Spielstand: liegengebliebenes Geld von 134,7 auf 5,3 Mio, Kreditvolumen von 223,4 auf 65,9 Mio, sechs Spieler mehr in den Kadern und statt elf nur noch fünf Teams unter ihrem Optimum.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Kauffenster der neuen Saison",
+      "pr": null,
+      "text": "Die KI-Teams haben ihre Kader mit Auffüllware vollgemacht: Naive Nomads bekam sechs Zugänge, fünf davon unter 10 Mio, und saß dabei auf 98 Mio Cash. Schuld war ein zweiter Kauf-Lauf neben dem eigentlichen Marktplan, dessen Bewertung gar keine Qualität kennt — sie belohnt ein gutes Gehalts-Verhältnis und bestraft teure Spieler, sodass ein 9-Mio-Füller einen 40-Mio-Star schlägt. Ligaweit kamen so 74 Käufe zusammen, 52 davon unter 12 Mio. Dieser Lauf ist aus dem Kauffenster raus; der organische Planer kauft jetzt allein. Er erreicht dieselbe Kadergröße, gibt das Geld aber für Spieler aus, die etwas taugen: Naive Nomads holt stattdessen Nevara für 44,7, Nachtschatten für 25,7, Akali für 21,5 und Titania für 20,8. Der Aufbau-Lauf in Saison 1 und der ausdrückliche Handgriff im Admin bleiben unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Die Klassenliste im Training zeigt jetzt pro Klasse, WELCHE Werte sie für diesen Spieler verbessert: z. B. »Mage: +Intelligence 2,0 · +Will 1,4 · +Determination 0,6«, mit allen zwölf Attributen im Tooltip. Das ist keine neue Rechnung — es sind exakt die Beiträge, aus denen die Klassen-Schätzung schon immer summiert wurde, jetzt vor der Summierung sichtbar gemacht (ein Test erzwingt: Summe der Beiträge = Gesamtwert). Werte sind Schätzungen für die laufende Saison, keine Garantie — das sagt der Tooltip dazu.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Vier kleine Korrekturen auf der Kredite-Seite: das Bestes-Angebot-Badge lag mitten im Anbieternamen, jetzt bricht es sauber daneben um. Die Einnahmen-Referenz im Belastungsbalken lief als abgeschnittener Text aus der Karte, jetzt steht sie als Legendenpunkt daneben. Der Admin-Vorschau-Schalter für die Season-1-Sperre stand offen im Spieler-UI, er ist jetzt hinter einen Dev-Modus verschwunden. Und \"Zins-Range\" zeigte durch einen Substring-Treffer im Lexikon fälschlich die Erklärung von \"Rang\" — jetzt ein eigener, korrekter Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Scouting",
+      "pr": null,
+      "text": "Der Scouting Report zeigte zuerst ein bildschirmfüllendes Vorher/Nachher-Balkendiagramm und erst darunter, wessen Report das überhaupt ist — die Balken-Spiegelung war eine zweite Darstellung derselben Zahlen wie die kompakte Chip-Zeile weiter unten und ist raus, der Spielerkopf steht jetzt zuerst. CA, PO-Decke, Intel und Fee in der Shortlist-Tabelle sowie die Potenzial-Einstufung im Report (vorher roh \"low\") tragen jetzt Erklärungen auf Deutsch. Der eigene \"Empfehlungen\"-Reiter (eine Karte plus zwei Zeilen Text) ist in die Übersicht gefaltet.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Neues Spiel · Saison-1-Draft",
+      "pr": null,
+      "text": "Project Suicide startete eine neue Saison mit einem Konto im Minus, und die Saison-Vorprüfung ließ das Spiel dann nicht weiterlaufen. Grund war die Reihenfolge: Nula gehört per Sonderregel immer zu P-S und wird von P-S auch ganz normal bezahlt — nur wurde sie erst nach dem Draft verrechnet. Der Draft plante deshalb mit den vollen 300 Mio statt mit dem, was nach Nula übrig ist, gab 297,6 aus, und die 4,6 für Nula rissen das Konto danach ins Minus. Nula wird jetzt schon beim Anlegen des Spielstands gekauft, damit der Draft mit dem echten Rest rechnet. Am Kader von P-S und an Nulas Vertrag ändert sich nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Werkzeuge · Spielstand-Reparatur",
+      "pr": null,
+      "text": "Wer die Auffüllspieler aus einem laufenden Spielstand entfernt, stand bisher vor einem Problem: das Kauffenster läuft beim Saisonstart, mitten in der Saison feuert es nicht mehr. Die Teams hätten also Löcher im Kader und volles Konto behalten. Ein neues Werkzeug holt den Kauf nachträglich nach — genau den organischen Schritt, den die Saisonstart-Kette auch macht, und nur diesen. Manuell geführte Teams bleiben außen vor. Am Spielstand geprobt: 108 Zugänge für 2724,6 Mio, davon 49 starke und 44 mittlere, Kader von 234 auf 342, Teams unter Minimum von 20 auf 1. Ohne den Schalter --apply wird nichts geschrieben. Nachgebessert vor dem ersten Einsatz: das Werkzeug hätte auf einem echten Spielstand gar nichts gekauft. Das Kauffenster bricht nämlich ab, sobald die Saison schon Markttransfers kennt — ein Schutz dagegen, dass der Saisonstart zweimal einkauft. Genau dieser Fall liegt hier aber vor, denn die guten Zugänge bleiben ja absichtlich stehen. In der Probe fiel es nicht auf, weil dort alle Käufe der Saison zurückgesetzt waren. Bricht der Lauf jetzt ab, sagt er es deutlich, statt still mit null Zugängen dazustehen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Welt · Ranks",
+      "pr": null,
+      "text": "Die Rank-Matrix spricht jetzt eine Farbsprache: Die Achsenfarbe (Power rot, Speed grün, Mental blau, Social gold) lebt nur noch im schmalen Gruppenband über den Spalten, die Zellen färben ausschließlich nach Rang — und eine Legende erklärt beides (vorher hieß Grün mal 'Speed-Disziplin', mal 'guter Rang', ohne ein Wort dazu). Der px-Spalten-Manager ist durch Achsen-Gruppen-Schalter ersetzt: Power/Speed/Mental/Social lassen sich je Gruppe ein- und ausblenden, 'Standard' setzt alles zurück. Jedes Kürzel hat jetzt einen echten Tooltip (GEW = Gewichtheben, TOT = Gesamtrang …) — vorher sagte der Hover nur 'Nach GEW sortieren', und SCH bekam sogar die falsche Achsen-Erklärung (derselbe Substring-Fehler, der auf der Kreditseite 'Zins-Range' als 'Rang' erklärte — beides behoben, die Begriffssuche matcht nur noch ganze Wörter). Deine Zeile ist zusätzlich oben angepinnt (mit 'Rang 17 von 32'), die Zellwerte sind voll deckend und bestehen auf jeder Heat-Stufe den Kontrasttest, und 'KI-Teams gefüllt' ist ein Status-Chip statt eines Buttons, der nichts tut. Das PP-Board darunter erfindet am Saisonstart keine Rangliste mehr: Statt Gold/Silber/Bronze für die ersten drei Teams des Alphabets und 'Rang 22 von 32' aus reiner Alphabet-Position stehen dort leere Podest-Ringe ('Noch zu vergeben') mit Erklärung — und daneben das ECHTE Podium der Vorsaison (Zero Heroes, Mayhem Mavericks, Last Ride) aus dem Saisonarchiv.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Historie",
+      "pr": null,
+      "text": "Cash, Gehalt und Marktwert einer abgeschlossenen Saison standen nebeneinander, stammten aber aus drei verschiedenen Momenten — zwei davon sogar aus der Folgesaison. Jetzt werden alle vier Größen gemeinsam eingefroren: nach dem Trainings-Apply und vor dem ersten Verkauf. Wo dieser Stand fehlt, sagt die Zeile das, statt eine falsche Zahl zu zeigen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams · Teamprofil",
+      "pr": null,
+      "text": "Der Saison-Verlauf stand im Teamprofil über dem Kader und nahm fast einen ganzen Bildschirm ein — wer die Mannschaft ansehen wollte, musste erst daran vorbeiscrollen. Schuld war vor allem das Punkte-Diagramm, das ohne Höhenbegrenzung so hoch wuchs, wie Platz da war. Der Verlauf steht jetzt unter dem Kader und ist auf eine kompakte Höhe begrenzt; sein Inhalt bleibt vollständig.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teamprofil · Saison-Verlauf und Historie",
+      "pr": null,
+      "text": "Die Zeile der abgelaufenen Saison war überall leer — im Saison-Verlauf stand „Kein Rang-Verlauf vorhanden\", in der Historie-Tabelle war Season 1 durchgehend ein Strich. Der Verdacht lag auf kaputten Saison-Schnappschüssen; nachgezählt war aber keiner kaputt: alle 32 Teams standen mit Rang und Punkten drin. Sie kamen nur nie im Browser an. Die Anfangsladung streicht die Schnappschüsse nämlich weg, weil an ihnen sämtliche Spielerleistungen und Spieltagsergebnisse hängen — dreieinhalb Megabyte, die keine Ansicht am Stück braucht. Ohne sie fiel jede vergangene Saison auf eine leere Platzhalterzeile zurück. Jetzt fährt eine Kurzfassung mit: pro Saison und Team Rang, Punkte, PPS, Cash, Gehalt, Marktwert, GuV, Verletzungen und die größten Zu- und Abgänge. Das sind 53 Kilobyte statt dreieinhalb Megabyte. Leer bleibt nur die durchschnittliche Müdigkeit — die braucht die Spieltagsergebnisse, und genau die sind der Grund fürs Streichen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Der Saisonstand zeigte \"Dein Team\" zweimal direkt untereinander — jetzt nur noch einmal, samt Rückstand auf Platz 1. Die Daten-Tabelle scrollt jetzt sichtbar (Schatten am Rand) und die Team-Spalte bleibt beim Scrollen stehen, statt CASH/SPONSOREN wortlos aus dem Rahmen laufen zu lassen. Das \"Top-Spieler der Saison\"-Modul zeigte vor Spieltag 1 nur Initialen-Kreise ohne Namen (ein fehlendes CSS-Raster hatte die Namensspalte auf 0 Pixel zusammengedrückt) — jetzt stehen Name, Team und Hinweis sichtbar da. POW/SPE/MEN/SOC zeigten farbige Nullen, wo die Punkte-Spalte daneben ehrlich \"—\" sagte — jetzt einheitlich. Die Top-3 im Liga-Board hatten nur einen Farbpunkt statt einer Rangzahl.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Verwaltung · Settings",
+      "pr": null,
+      "text": "Der 32-Klub-Picker fürs \"Neues Spiel erstellen\" lag offen mitten in den Settings des laufenden Saves, mit vorausgewähltem Team und \"DEIN TEAM\"-Badge — Verwechslungsgefahr mit der echten Team-Zuordnung. Er ist jetzt standardmäßig eingeklappt. Der Season-Start-Reset steht jetzt in einer eigenen, klar markierten Gefahrenzone statt neben harmlosen Aktionen, \"Löschen\" je Spielstand ist räumlich von \"Klonen\"/\"Snapshot erstellen\" abgesetzt. Der Untertitel erklärt jetzt in Klartext, wofür die Seite gut ist, statt Modell-Doku zu zitieren. \"Warnungen 200\" lässt sich aufklappen und zeigt die echten Meldungen aus dem Daten-Mapping beim Import.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Spieler-Detail",
+      "pr": null,
+      "text": "Ein Klick auf einen Profil-Reiter (Stats/Details/Vertrag/…) konnte je nach Scroll-Zustand komplett wirkungslos bleiben — der Reiter leuchtete als aktiv, die Seite blieb stehen, wo sie war. Ursache war ein Wettlauf zwischen der Klick-Navigation und der Scroll-Beobachtung, die den aktiven Reiter beim freien Scrollen mitführt; ein Klick gewinnt jetzt immer. Zusätzlich hing die Scroll-Beobachtung selbst gelegentlich tot, weil sie einmalig nach den Anker-Abschnitten suchte, bevor die (asynchron nachladende) Detailkomponente sie überhaupt gerendert hatte — sie versucht es jetzt erneut, sobald die Abschnitte da sind. OVR/PPs/MVS standen ausserdem doppelt auf dem Bildschirm (Kopfzeile und Kennzahlen-Karten); die Kopfzeile zeigt jetzt nur noch Marktwert/Gehalt/Vertrag, die reichhaltigeren Karten (mit Rang, Vorsaison-Delta, Liga-Leaders-Link) bleiben die einzige Quelle.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieler · Verzeichnis",
+      "pr": null,
+      "text": "Der Filter „Bedingungen\" stand als eigene Karte unter den Marktwert-Balken und schob die Spielerliste weit nach unten, obwohl daneben Platz frei war. Jetzt liegt er rechts neben den Balken, direkt unter den Kennzahl-Kacheln. Auf schmalen Bildschirmen rutscht er wieder darunter.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieler",
+      "pr": null,
+      "text": "Die Namensspalte bleibt beim horizontalen Scrollen stehen — vorher standen Zahlen ohne Spielernamen da. Die vier Spalten-Presets sind jetzt eine sichtbare Reiterleiste über der Tabelle statt im Spalten-Menü versteckt, dazu ein neuer fünfter Reiter Saison, der genau die am Spieltag 1 noch leeren Spalten (PPs, MVS, Einsätze) bündelt. Diese Spalten bleiben sichtbar (Chris' Regel: erklären statt verstecken), verlieren aber ihre laute rote/blaue Spaltenfläche, solange die ganze Liga noch bei 0 steht — ein Tooltip erklärt, dass sie sich ab Spieltag 1 füllen. Eine Legende unter der Tabelle erklärt die Abkürzungen einmal sichtbar.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Bei erst einer archivierten Saison waren Ø Rang und Bester Rang spaltenweise identisch — jetzt heißt es dann schlicht Rang, eine Spalte statt zwei (ab der zweiten archivierten Saison kommen beide zurück). Die Verlauf-Kacheln sagen jetzt, was sie zeigen, z. B. Top 8 nach Punkte · dein Team ergänzt, statt den Cut stillschweigend vorauszusetzen. Der Kopf erklärt jetzt, dass die Saisons-Spalte die laufende Saison mitzählt, auch wenn sie gerade erst begonnen hat.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Welt · Spielplan",
+      "pr": null,
+      "text": "Die Technik-Strings sind aus dem Spielplan raus: 'QUELLE season_seed', zehnmal 'season_seed' als Karten-Fußzeile und die komplette Schedule-Seed-Zeile stecken jetzt hinter einem 'Details'-Aufklappen — wer sie braucht, findet sie, alle anderen sehen Spielplan statt Debug. Solange noch kein Spieltag gewertet ist, steht über dem Draftboard EIN Satz ('Treffer erscheinen nach der ersten Wertung') statt 40-mal 'ausstehend' in den Mutator-Spalten; sobald die erste Wertung da ist, kommen die Trefferzahlen je Zelle zurück. Das '· läuft'-Tag am aktuellen Spieltag besteht jetzt den Kontrasttest (vorher 3,4:1 — ausgerechnet die wichtigste Info der Karte war die leiseste), und die Spalten 'Original' und 'Reihenfolge' erklären im Tooltip, was sie praktisch bedeuten: fester Draftboard-Platz vs. die pro Saison neu ausgeloste Spiel-Reihenfolge.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Spieltag · Arena & Spieltagsergebnis",
+      "pr": null,
+      "text": "Zwei Leerzustände vor dem ersten Ergebnis eines Spieltags waren bisher irreführend statt leer: die alte Disziplin-Bühne (eigenständige Ansicht) zeigte gar nichts mehr an, weil sie in die Arena umgezogen ist — jetzt erklärt eine Karte mit Weg zurück, wohin. Und die Spieltagsergebnis-Seite erfand vor der ersten Wertung einen \"Tagessieger\" (alphabetisch erstes Team) samt 32 Zeilen aus lauter \"—\" — jetzt steht dort ehrlich \"Wertung folgt\", solange nichts gewertet ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Welt · Sponsoren",
+      "pr": null,
+      "text": "Die Liga-Sponsorenübersicht war ein Raster aus 32 Karten mit beidseitig gestutzten Namen ('Zero…' / 'Jaguar La…') — jetzt eine sortierbare Tabelle mit vollen Team- und Sponsornamen, Spaltenköpfe klickbar. Modell-Jargon ist raus: 'EV-NEUTRAL' heisst jetzt 'ausgewogenes Bonus/Malus-Profil', der rohe Vertrags-Schlüssel 'identity special' heisst 'Identitäts-Paket', und die Sponsorsystem-Kennzeichnung ist eine stille Fußnote statt einer auffälligen Pille. Geldbeträge tragen jetzt durchgängig die Einheit 'Mio' (Cash/Saison, Ø-Angebotswert, Liga-Spalte, Apron-Linien — vorher stand dort nackt '63,5'). Die KPI 'Ø-Angebotswert · N Angebote' blieb sichtbar, obwohl bei laufendem Vertrag gar keine Angebotskarten angezeigt werden — der Chip erklärt jetzt, dass ein Vertrag läuft und neue Angebote erst zum Saisonende kommen, statt auf unsichtbare Angebote zu verweisen. Die Kommerz-Rating-Treiber (Historie/Kader/Prestige) zeigen jetzt ihre Skala (.../100).",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Saison · Saisonende",
+      "pr": null,
+      "text": "Der Saisonwechsel meldete dauerhaft „Es fehlt noch eine Sponsorenwahl\", obwohl er trotzdem durchlief. Gemeint war der Vertrag für die kommende Saison — und den hat am Saisonende nie jemand, weil die Angebote dort erst erzeugt und erst in der neuen Saison gewählt werden. Der Schritt blockiert und warnt deshalb nicht mehr. Die echte Sponsorenpflicht beim Saisonabschluss bleibt: fehlt der Vertrag für die laufende Saison, geht es weiterhin nicht weiter, und die Saisonfinale-Seite führt dann direkt zu den Sponsoren.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Training ist jetzt eine Steuer-Tabelle statt acht Riesenkarten: eine Zeile pro Spieler mit Intensität (L/M/H als Klick-Segment, aktiver Modus gefüllt), Netto-Forecast mit Vergleichsbalken, Belastung und Klassen-Vorschlag — die Seite ist ~1.200 px hoch statt ~5.000. Die 13er-Klassenliste öffnet pro Zeile auf »Alle 13 Klassen«, der Bestwert trägt Gold, die aktive Klasse bleibt markiert. Oben gibt es nur noch EINE Kennzahlen-Zeile: Klick auf Leicht/Mittel/Hart zeigt die Team-Vorschau direkt in denselben Kacheln mit sichtbarer »Simulation«-Marke — geschrieben wird erst über »Übernehmen«. »Wie kommt das zustande?« ist ein Info-Link statt achtmal roter Primärknopf, und der Schein-Unterreiter »Forecast« (er zeigte dieselbe Seite) ist weg.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Transferhistorie · Team-Board",
+      "pr": null,
+      "text": "Auf dem Transferboard stand bei jedem einzelnen Team „Einnahmen 0,0 Mio\", als hätte die ganze Liga nur Geld ausgegeben. Verkauft worden war reichlich: 49 Verkäufe von 20 Teams. Sie tauchten nur nicht auf, weil das Transferfenster am Saisonwechsel auf zwei Saisons aufgeteilt wird — verkauft wird am letzten Spieltag der alten Saison, gekauft am ersten der neuen, und das Board gruppierte nach Saison. Damit zerschnitt es einen einzigen Vorgang: die Verkäufe, aus denen die Käufe bezahlt wurden, landeten in der Ansicht davor. Das Board gruppiert jetzt nach Transferfenster statt nach Saison, und jedes Team zeigt wieder Einnahmen, Ausgaben und eine echte Bilanz. An der gespeicherten Historie ändert sich nichts — dort steht weiterhin wahrheitsgemäß, wann ein Transfer passiert ist. Auslaufende Verträge bleiben bewusst bei ihrer Saison: das sind keine Transfers und bringen kein Geld.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Historie",
+      "pr": null,
+      "text": "Die Transferhistorie ist im Velo-Stil neu geordnet. Oben stehen jetzt Top-Käufe, Top-Verkäufe und die besten Gewinne als echte Top-5-Listen statt je einer Einzelkachel; ein Klick wählt den Deal im Spotlight. Darunter zeigt ein Team-Board alle 32 Teams auf gemeinsamer Skala, das eigene Team klar abgesetzt mit kumulierter Transferbilanz. Der Filterblock ist zu einem schmalen Streifen geschrumpft, die Fokus-Reiter sind weg — alles steht direkt da.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Historie",
+      "pr": null,
+      "text": "Bei „Alle Seasons“ fehlte der Knopf zum Nachladen. Dadurch waren nur die zuerst geholten Deals erreichbar — im laufenden Spielstand 100 von 551 — und die Bestenlisten rechneten stillschweigend nur auf diesem Ausschnitt. Nachladen geht jetzt auch dort.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Historie",
+      "pr": null,
+      "text": "Ein Klick auf einen Top-Deal, der auf einer anderen Seite der Liste lag, sprang sofort auf einen anderen Spieler zurück. Die Auswahl wurde gegen die gerade sichtbare Seite geprüft statt gegen alle gefilterten Deals. Der gewählte Deal bleibt jetzt stehen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Markt · Historie",
+      "pr": null,
+      "text": "Der Typ-Filter kannte „Abgänge“ nicht, obwohl Vertragsauflösungen in der Liste stehen. Der Eintrag fehlt nicht mehr.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Alle Seiten",
+      "pr": null,
+      "text": "Teamfarbe als Schrift ist jetzt überall auf eine lesbare Stufe angehoben (Navigations-Überschriften, Karten-Eyebrows, Buttons samt Leertaste-Hinweis) — vorher verschwand sie ohne Team-Theme mit 2,7:1 im Grund; ein Wächter-Test hält die Regel fest.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Teams · Spieler",
+      "pr": null,
+      "text": "Bewertungsfarben sind von der Teamfarbe getrennt: Bestwerte tragen jetzt Gold statt Vereinsblau — bei rotem Team-Theme sahen Rang 1 und Rang 31 vorher gleich aus; Disziplin-Profil und Spielerlisten-Chips nutzen dieselbe Skala.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Leaders · Spieler-Detail",
+      "pr": null,
+      "text": "Vier gemessene Kontrast-Ausreißer behoben: Podium-Namen bei den Legenden (1,15:1), Trend-Chip und Social-Zelle im Spieler-Detail, die unsichtbare leere Sternbahn und der OVR-Rang-Chip in der Spielerliste.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Home · Kredite · Einsatzliste",
+      "pr": null,
+      "text": "Eine Quelle pro Größe: Home zählt offene Entscheidungen jetzt wie die Inbox, Radar und Office zeigen dieselben Achsenwerte (Ø Top-6), der Kredite-Chart nutzt die echte Gehaltssumme statt der Glättung — das Deckungslücke-Badge wird dadurch korrekt zu Gedeckt —, und der Einsatzlisten-Zähler benennt Blocker statt einer zweiten Zahl.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-08",
+      "seite": "Transfermarkt · Home · Lexikon · Generator",
+      "pr": null,
+      "text": "Entwicklersprache raus: Verhandlungshinweise haben eine vollständige deutsche Übersetzung (nie mehr roher Code wie morale former team hostile), der Home-Stepper sagt Spieltag 2 statt season-2-matchday-1, das Lexikon schreibt echte Umlaute, und die Stärkeskala des Generators ist deutsch.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Das Ausgabebudget eines KI-Teams rechnete mit dem Kontostand vor den Verkäufen desselben Plans — ein Team, das für 118 Mio verkauft, um einzukaufen, durfte das Geld nicht sehen und stand mit Budget null da. Die Erlöse fließen jetzt in die Rechnung ein.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Server · Spielstand zurückspielen",
+      "pr": null,
+      "text": "Nach dem Einsetzen eines reparierten Spielstands war das Spiel eingefroren: „attempt to write a readonly database\". Die Datei wird als root in den Container kopiert, der Dienst läuft aber als eigener Benutzer — lesen ging, schreiben nicht. Das Skript setzt die Besitzrechte jetzt zurück, auf dem Hin- wie auf dem Rückweg.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "KI-Teams blieben zum Saisonstart auf dem Kader-Minimum stehen, obwohl Geld da war. Grund: in der neuen Saison lief nur der pflegende Marktplan, nicht der aufbauende Füll-Lauf aus Saison 1. Der ist jetzt im Kauffenster mit verdrahtet und füllt nach dem Marktlauf bis zum Optimum der Team-Identität — am Spielstand gemessen kein Team mehr unter dem Minimum statt sechs, und nur noch drei unter ihrem Optimum (alle drei aus Geldmangel).",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "KI-Teams mit zu kleinem Kader blieben unter dem Minimum stehen und blockierten den Preseason-Markt — obwohl Geld und freie Spieler reichlich da waren. Die Vorschlagsliste war auf drei Spieler fest verdrahtet, egal wie viele fehlten, und die Schrittzahl des Pick-Planers übernahm ungeprüft eine zu kleine Vorgabe. Beides richtet sich jetzt nach dem tatsächlichen Bedarf bis zum Kader-Minimum.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die Achsen-Kopfzeilen im Squad Depth Chart waren zugeklappt leer — jetzt steht dort der Schnitt der Achse und ihre stärksten Spieler auf den Plätzen 1 bis 6, in denselben Spalten wie die Disziplinen darunter. Gerechnet wird über alle fünf Disziplinen einer Achse, damit niemand nach oben rutscht, nur weil er in zweien davon stark ist.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "KI-Teams kauften mitten in der Saisonende-Kette und in der neuen Saison dann gar nicht mehr — der einzige automatische Marktlauf feuerte in der alten Saison und konnte in der Folgesaison nie auslösen. Jetzt gilt für die KI dieselbe Regel wie für dich: am Saisonende wird nur verkauft, gekauft wird im Kauffenster der neuen Saison, und der Verkaufserlös ist dort das Budget.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Finanzen · Kredite",
+      "pr": null,
+      "text": "KI-Teams haben noch nie einen Kredit aufgenommen — der einzige Aufruf dafür hing an einer Marktsitzung, die im laufenden Spiel gar nicht mehr mit Kaufabsicht startet. Im Kauffenster der neuen Saison wird jetzt zweimal geprüft: einmal vorher und einmal nachdem der Markt das Geld ausgegeben hat. Am Spielstand gemessen nehmen dadurch acht Teams einen Kredit auf, meist von einem anderen Team statt von der Bank. Neu ist außerdem: wer mit negativem Cash in die Saison geht, leiht sich das Minus weg, auch wenn der Kader eigentlich voll ist — sonst hätte er im reinen Kauffenster keinen Weg mehr heraus.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Ein KI-Team mit negativem Kontostand plante gar keine Verkäufe, wenn sein ganzer Kader aus dem Liga-Draft stammte: jeder Spieler trug die Marke „würde unter Einkauf verkauft\" und war damit gesperrt — und Kredite gibt es in Saison 1 nicht. Jetzt verkauft ein Team im Minus so lange, bis das Konto wieder im Plus ist: zuerst den größten Underperformer, solange sein Verlust im Verhältnis zum Erlös steht.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Markt · Preseason-Marktplan",
+      "pr": null,
+      "text": "Der Marktplan meldete Blockaden, die es gar nicht mehr gab: nachdem die Pick-Engine den Kaufplan ersetzt hatte, blieben Status, Vorschau und Blockierungsgründe auf dem alten Stand stehen. Ein Team, dessen Plan den Kader auf das Minimum bringt, stand trotzdem als „blockiert, Kader zu klein\" da. Beides wird jetzt nach dem Ersetzen neu berechnet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Server · Spielstand zurückspielen",
+      "pr": null,
+      "text": "Der Prüflauf beim Zurückspielen eines reparierten Spielstands brach immer mit „attempt to write a readonly database\" ab: die Prüfdatei landete wegen eines fehlenden Schrägstrichs im Wurzelverzeichnis des Containers statt in /tmp, und dort darf der Dienst die WAL-Seitendateien nicht anlegen. Jetzt läuft der Prüflauf durch, und der Spielstand lässt sich wieder einsetzen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
+      "text": "„Neue Saison starten\" brach mit „roundViewNumber is on the client\" ab und schrieb nichts: der Saison-Snapshot zog über die Ranglisten-Engine ein reines Anzeige-Modul in den Server hinein. Die beiden benötigten Rechenhelfer liegen jetzt in einem serverfähigen Modul, und ein Test läuft den Import-Graphen ab, damit so etwas nicht wieder unbemerkt hineinrutscht.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
+      "text": "„Neue Saison starten\" tat bei einer Ablehnung des Servers scheinbar gar nichts — der Grund landete nur im Cockpit und war auf der Saisonabschluss-Seite unsichtbar. Jetzt steht er dort, offene Blocker werden im Klartext genannt, und eine fehlende Sponsorenwahl führt mit einem Knopf direkt zu den Sponsoren statt in den Assistenten.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-07",
+      "seite": "Alle Seiten · Kopfbereich",
+      "pr": null,
+      "text": "Die Statuszeile ganz oben lässt sich jetzt wegklappen — eine Meldung, die tagelang stehen bleibt, hängt sonst dauerhaft über jeder Seite. Zugeklappt bleibt ein schmaler Knopf mit der Zahl der Meldungen, damit nichts spurlos verschwindet; ein Blocker bleibt daran auch weiterhin als solcher erkennbar. Der Zustand wird gemerkt.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Spieler · Profil (Karriere)",
+      "pr": null,
+      "text": "In der Trainings-Auswirkung auf die Disziplinen stand jeder Name doppelt — etwa „Basketball Basketball +1“. Das Disziplin-Icon schreibt seine Beschriftung selbst hin, daneben stand nochmal dieselbe. Jetzt steht der Name einmal da; das Icon bleibt als Bild erhalten und behält seinen Tooltip.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Spieltag · Kopfleiste",
+      "pr": null,
+      "text": "Oben stand mitten in der Saison dauerhaft „Preseason-Markt blockiert\" mit 124 Blockern — dahinter steckte keine Störung, sondern die Drossel, die KI-Teams davon abhält, ihr Training an jedem Spieltag umzustellen. Diese planmäßigen Abweisungen lösen keinen Alarm mehr aus und werden nicht mehr mitgezählt; echte Blockaden meldet die Leiste unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Der Squad Depth Chart listete alle 20 Disziplinen am Stück — die Achse war nur am farbigen Punkt zu erkennen. Jetzt stehen sie unter POW, SPE, MEN und SOC, mit den jeweils 5 Disziplinen direkt darunter. Jede Achse lässt sich zuklappen; im Kopf steht, wie viele ihrer Disziplinen zu dünn besetzt sind.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Saison · Saisonende",
+      "pr": "#432",
+      "text": "Das Saisonende kommt jetzt bis zum Ende durch. Vorher konnte man in einer Schleife hängenbleiben: die KI verkaufte, dadurch fielen Teams unter Kadermindestgröße, und der Liga-Draft hielt das für einen abgebrochenen Spielaufbau und kaufte erneut ganze Kader voll — auch für manuell geführte Teams. Ursache war ein Name für zwei gegenteilige Zeitpunkte: die erste Station des Saisonendes hieß genauso wie der frische Spielaufbau. Sie heißt jetzt eigenständig, alte Spielstände werden beim Laden umgeschrieben. Außerdem verkauft die Station „Verkäufe\" endlich wirklich: der Verkaufsdienst war fertig und getestet, wurde vom Saisonende-Assistenten aber nie aufgerufen — KI-Teams gingen mit unverändertem Kader und ohne frisches Geld in die neue Saison, und auf dem Markt lag nichts zu kaufen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-05",
       "seite": "Shell · Aktives Team",
       "pr": null,
@@ -15,6 +1176,42 @@
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Ein Klick auf eine Kaderzeile öffnet jetzt eine Verkaufs-Einschätzung als Seitenleiste: Verkaufspreis, Buyout, Netto-Erlös und die volle Board-Bilanz mit Dafür/Dagegen. Bisher bekam man die erst zu sehen, wenn man den Verkauf schon eingeleitet hatte — also genau bei den Spielern, bei denen man ohnehin entschieden hatte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Saison · Saisonabschluss",
+      "pr": null,
+      "text": "Am Saisonende stand „Transferfenster öffnen — verkaufen und kaufen sind freigeschaltet\", und Kaufen war dort tatsächlich schon offen. Der Schritt heißt jetzt „Verkäufe & Verträge öffnen\" und macht nur noch das auf: verkaufen und verlängern. Gekauft wird erst in der neuen Saison, vor dem 1. Spieltag — der Transfermarkt sagt in beiden Fenstern, welches gerade läuft.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Spieler · Liste",
+      "pr": null,
+      "text": "In den Spalten PPs, OVR und MVS stand ein Teil der Werte schwarz auf dunklem Grund und war praktisch unlesbar — gemessen bis hinunter zu 1,19:1. Die Spaltenfarbe hatte nur den Hintergrund der Heat-Skala ersetzt, deren dunkle Schrift blieb stehen. Alle Werte sind jetzt hell; keine Zelle liegt mehr unter 4,5:1.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Spieler · Liste",
+      "pr": null,
+      "text": "Die Kopfzeilen der Kennzahl-Spalten waren durchsichtig: beim Scrollen liefen die Zeilen darunter sichtbar durch die Beschriftung — im gemeldeten Fall stand eine Zahl mitten im Wort MVS. Der Farbton liegt jetzt deckend auf dem Panel, und Bronze ist so weit aufgehellt, dass die Beschriftung trägt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Spieler · Liste",
+      "pr": null,
+      "text": "Die aktive Sortierspalte hatte dunkle Schrift auf einem mittleren Schiefergrau (2,8:1). Ihr Wasch ist jetzt so hell, wie die Schrift es voraussetzt.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"
@@ -51,6 +1248,42 @@
       "seite": "Teams · Kader",
       "pr": null,
       "text": "Die Kader-Tabelle hat eine Spalte „PPs ges.\" bekommen: die Summe der Performance-Punkte dieser Saison samt Ligaplatz. Bisher standen dort nur die vier Bereiche einzeln, und die Summe musste man im Kopf bilden.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Bot ein unzufriedener Spieler an, seinen Vertrag aufzulösen, entfiel bisher der komplette Rest-Buyout und das Team kassierte den vollen Verkaufspreis — Annehmen war damit immer besser als ein regulärer Verkauf und gar keine Entscheidung. Der Spieler verzichtet jetzt nur anteilig: zwischen 30 % an der Moral-Schwelle und 60 % bei Moral 0. Den Rest zahlt das Team, und die Zeile zeigt Netto statt Brutto.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Der Charakter entscheidet mit, wie teuer ein Abgang wird: ein geld- oder egogetriebener Spieler will sein Geld und sitzt den Vertrag notfalls ab, ein loyaler geht sauber und günstig. Fragt er nach einer Ablehnung ein zweites Mal, laufen die beiden Naturen auseinander — der Bescheidene gibt mehr auf, der Harte weniger. Ablehnen ist damit keine sichere Bank mehr, um den Verzicht hochzutreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Eine abgelehnte Auflösung kostet den Spieler jetzt 20 statt 6 Moralpunkte. Wer den Wunsch abschlägt, bekommt eine spürbar schwächere Saison von ihm — vorher war die Ablehnung fast folgenlos.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-05",
+      "seite": "Teams · Vertragsauflösung",
+      "pr": null,
+      "text": "Die Vertragsauflösung sah noch aus wie vor dem Neuen Look — ein alter Panel-Block mit drei Textspalten zwischen lauter modernen Karten. Sie trägt jetzt dieselbe Hülle wie der Rest der Ansicht: Karte je Anfrage mit Bild und Chips, und ein geteilter Balken zeigt auf einen Blick, wie viel des Rest-Buyouts der Spieler erlässt und was am Team hängen bleibt. Der Netto-Betrag steht vorn, die Herleitung darunter.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"

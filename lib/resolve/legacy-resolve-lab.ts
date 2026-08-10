@@ -158,12 +158,10 @@ export function buildResolveLabTeamDetails(
   preview: LegacyMatchdayResolvePreview,
   readinessByTeamId: Map<string, LegacyMatchdayReadiness>,
 ): ResolveLabTeamDetail[] {
-  const previewByTeamId = new Map(preview.teamResults.map((team) => [team.teamId, team]));
   const previewDisciplineRows = preview.disciplinePreviews.flatMap((discipline) => discipline.teamResults);
 
   return contexts.map((context) => {
     const readiness = readinessByTeamId.get(context.team.id);
-    const teamPreview = previewByTeamId.get(context.team.id);
     const teamDisciplineRows = previewDisciplineRows.filter((row) => row.teamId === context.team.id);
 
     return {

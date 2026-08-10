@@ -75,6 +75,7 @@ const EMPTY_MATCHDAY_SUMMARY: MatchdaySummary = {
   d1: { disciplineId: null, disciplineName: null },
   d2: { disciplineId: null, disciplineName: null },
   hasResult: false,
+  completion: "none",
   teamRows: [],
   topTeams: [],
   bottomTeams: [],

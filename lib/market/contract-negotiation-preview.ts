@@ -1207,13 +1207,27 @@ function deriveAlignmentDemandDelta(alignment: string | null | undefined): numbe
   return delta;
 }
 
-function derivePlayerNatureDemandSignals(player: Player) {
+/**
+ * EXPORTIERT, weil die Vertragsaufloesung dieselbe Frage stellt: „was fuer ein Verhandler ist
+ * dieser Spieler?"
+ *
+ * Dort entscheidet der Wert die Gegenrichtung — ein geld-/egogetriebener Spieler verzichtet beim
+ * Abgang WENIGER auf seinen Rest-Buyout als ein bescheidener. Zweimal dieselbe Frage aus zwei
+ * Tabellen zu beantworten waere genau die Sorte Dublette, die im Verkauf gerade erst aufgeraeumt
+ * wurde (siehe contract-buyout-season-window).
+ */
+export function derivePlayerNatureDemandSignals(player: Player) {
   const demandEntries: NegotiationDemandBreakdownEntry[] = [];
   const reasons: string[] = [];
 
   // 1) Charakter (Traits)
+  // Defensiv gelesen: seit dem Export nutzt auch die Vertragsaufloesung diese Funktion, und ein
+  // Spieler ohne gepflegte Trait-Listen (aelterer Spielstand, Fixture) soll ein neutrales Wesen
+  // bekommen statt die Rechnung zu sprengen.
   const traitTokens = new Set(
-    [...player.traitsPositive, ...player.traitsNegative].map((trait) => normalizeTransfermarktToken(trait)),
+    [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map((trait) =>
+      normalizeTransfermarktToken(trait),
+    ),
   );
   let traitDelta = 0;
   for (const [token, weight] of Object.entries(NATURE_TRAIT_DEMAND)) {

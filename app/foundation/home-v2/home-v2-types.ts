@@ -1,5 +1,6 @@
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
+import type { FoundationPlayerPortraitAxisPps } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 
 export type HomeV2TopPlayerCard = {
   playerId: string;
@@ -27,6 +28,11 @@ export type HomeV2TopPlayerCard = {
   /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
   caStars?: number | string | null;
   poStars?: number | string | null;
+  /**
+   * Saison-PPs je Achse samt Ligarang — dieselbe Quelle wie die POW/SPE/MEN/SOC-Spalten
+   * der Ranks-Seite (`PlayerRatingContractRow.ppPow/…`), hier wird nichts nachgerechnet.
+   */
+  axisPps?: FoundationPlayerPortraitAxisPps | null;
 };
 
 export const HOME_V2_TOP_PLAYER_COUNT = 6;
@@ -58,6 +64,30 @@ export type HomeV2TodayCard = {
   title: string;
   detail: string;
   tone: "ready" | "warning" | "info";
+};
+
+/**
+ * S1: Flow-Warnung als Chip MIT rohem Schlüssel. Der Schlüssel macht zwei Dinge
+ * möglich, die mit dem fertig übersetzten Label allein nicht gehen: (a) Chips,
+ * deren Inhalt bereits die Handlungszeile trägt (Einsatzliste), werden nicht
+ * doppelt gezeigt, (b) Chips sind klickbar und führen zur passenden Ansicht.
+ */
+export type HomeV2WarningChip = {
+  key: string;
+  label: string;
+};
+
+/**
+ * S1 (Mockup homeV2): Kapitän-Hinweis im Board-Ziele-Block — dieselbe Quelle wie
+ * die Kapitänwahl im Office (`selectedTeamCaptainCandidates`), keine zweite
+ * Leadership-Berechnung. `challenger*` nur gesetzt, wenn ein Kandidat spürbar
+ * stärkere Führungswerte hat als der aktuelle Kapitän.
+ */
+export type HomeV2CaptainSummary = {
+  captainName: string | null;
+  captainLeadership: number | null;
+  challengerName: string | null;
+  challengerLeadership: number | null;
 };
 
 export type HomeV2BoardObjective = {
@@ -111,15 +141,37 @@ export type HomeV2ClientProps = {
   nextStepStatus: string;
   nextStepDetail: string;
   nextStepBlocked?: boolean;
-  warnings: string[];
+  warnings: HomeV2WarningChip[];
   topPlayers: HomeV2TopPlayerCard[];
+  /**
+   * F4 (eine Quelle pro Größe): Achsen-Zusammenfassung des Teams — Ø Top-6
+   * je Achse aus `computeTeamTopSixAxisStats`, dieselbe Zahl wie im
+   * Office-Kopf und in der Markt-Impact-Vorschau. Das Radar rechnet NICHT
+   * selbst aus den Portrait-Karten.
+   */
+  teamAxisAverages: { pow: number; spe: number; men: number; soc: number } | null;
   leagueHeatPools: LeaguePlayerHeatPools;
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
+  /**
+   * Länge des ECHTEN Spielplans (`gameState.season.matchdayIds.length`).
+   * `scheduleItems` ist nur das 4-Elemente-Fenster des Steppers — dessen Länge
+   * darf NIE als Saisonlänge gerechnet werden (Durchklick-Test G3: „verbleibend
+   * 3 Spieltage" vor Spieltag 1 einer Zehn-Spieltage-Saison).
+   */
+  seasonMatchdayTotal?: number | null;
   inboxItems: HomeV2InboxItem[];
+  /**
+   * F4 (eine Quelle pro Größe): Gesamtzahl der offenen Entscheidungen —
+   * dieselbe Liste, die die Inbox zählt. `inboxItems` ist nur die gekappte
+   * Anzeige (Top 5); ihre Länge darf NIE als Gesamtzahl gerendert werden.
+   */
+  inboxOpenCount: number;
   inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
   boardObjectives: HomeV2BoardObjective[];
+  /** S1: Kapitän-Hinweis im Board-Block (optional — ohne Daten bleibt die Zeile weg). */
+  captainSummary?: HomeV2CaptainSummary | null;
   /**
    * Friction fix (Generalprobe #2): true when no team is human-controlled yet
    * (fresh save) — surfaces a dedicated CTA instead of silently hiding the
@@ -130,6 +182,8 @@ export type HomeV2ClientProps = {
   onContinue: () => void;
   onOpenTeams: () => void;
   onOpenLineup: () => void;
+  /** S1: Ziel der Handlungszeile, wenn die Einsatzliste steht („Arena öffnen"). */
+  onOpenArena?: () => void;
   onOpenMarket: () => void;
   onOpenTraining: () => void;
   onOpenOffice: () => void;

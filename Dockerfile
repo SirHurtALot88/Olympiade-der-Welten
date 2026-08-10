@@ -44,8 +44,24 @@ ENV OLY_APP_SQLITE_PATH=/app/data/persistence/oly-app.sqlite
 # +1/+2-Verschiebung) wechselt automatisch zwischen MEZ/MESZ.
 ENV TZ=Europe/Berlin
 
+# `git` MUSS mit ins Laufzeit-Image.
+#
+# GEFUNDEN IM SERVER-LOG, alle 180 Sekunden, seit dem ersten Tag:
+#     [online-saves] Auto-Export-Fehler: Command failed: git add -- data/online-saves data/bug-reports
+#     /bin/sh: 1: git: not found
+#
+# Der Auto-Export (`lib/persistence/online-save-auto-export.ts`) schreibt die Spielstaende brav nach
+# `data/online-saves/` — und scheitert dann JEDES MAL beim Hochladen, weil das Laufzeit-Image kein
+# git hat. Der Export meldete dabei Erfolg ("exportiert: 8 Save(s)"), der Push-Fehler stand eine
+# Zeile darunter und wurde nie gelesen.
+#
+# Folge: ueber diesen Weg kam nie ein echter Spielstand ins Repo. In `data/online-saves/` lagen
+# ueber die gesamte Historie nur Smoke- und Audit-Saves aus Testumgebungen, und keine
+# Claude-Sitzung konnte einen Fehler am echten Stand nachstellen.
+#
+# Bewusst im runner-Stage und nicht nur im builder: gebraucht wird es zur LAUFZEIT.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ tzdata \
+  && apt-get install -y --no-install-recommends python3 make g++ tzdata git \
   && rm -rf /var/lib/apt/lists/* \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 oly

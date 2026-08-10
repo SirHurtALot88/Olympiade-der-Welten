@@ -1,3 +1,5 @@
+import { getPoolQuartileTone, type QuartileTone } from "@/lib/foundation/quartile-tone";
+
 export type LeaguePlayerHeatPools = {
   ovr: number[];
   mvs: number[];
@@ -80,31 +82,20 @@ export function formatLeaguePercentile(
   return `Top ${topPercent}%`;
 }
 
-export type LeagueHeatTone = "risk" | "warn" | "good" | "neutral";
+export type LeagueHeatTone = QuartileTone;
 
 /**
- * Bildet die Heat-Band-Bucket (`heat-band-1`..`heat-band-8`, siehe
- * `getPoolHeatClass`) auf einen `NlTone`-kompatiblen String ab, damit
- * `NlProgressBar` (`tone`-Prop) den Liga-Vergleich direkt einfärben kann,
- * ohne dass `player-league-heat.ts` selbst von UI-Komponenten abhängt.
+ * Ton eines Werts im Liga-Vergleich — seit Paket F2 die geteilte, theme-feste
+ * Rang-Skala Gold→good→warn→risk aus `lib/foundation/quartile-tone.ts`:
+ * dieselbe Skala wie das Disziplin-Profil in teams-v2, EINE Skala statt zwei
+ * ähnlicher. Vorher bildete diese Funktion die Heat-Bands auf eine eigene
+ * Drei-Stufen-Logik (risk/warn/good ohne Spitzen-Stufe) ab.
  */
 export function getPoolHeatTone(
   value: number | null | undefined,
   pool: Array<number | null | undefined>,
 ): LeagueHeatTone {
-  const heatClass = getPoolHeatClass(value, pool);
-  const match = heatClass.match(/heat-band-(\d)/);
-  const band = match ? Number(match[1]) : null;
-  if (band == null) {
-    return "neutral";
-  }
-  if (band <= 2) {
-    return "risk";
-  }
-  if (band <= 5) {
-    return "warn";
-  }
-  return "good";
+  return getPoolQuartileTone(value, pool);
 }
 
 export function getMetricBarPercent(

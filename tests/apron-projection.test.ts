@@ -41,11 +41,37 @@ describe("Apron-Hochrechnung deckt sich mit der Saisonende-Abrechnung", () => {
     expect(projection.empfaengerCount).toBe(settlement.empfaengerCount);
   });
 
-  it("benutzt die EINGEFRORENEN Linien, sobald es sie gibt", () => {
-    const gameState = ensureSeasonApronLinesFrozen(structuredClone(createSingleplayerGameState()));
+  /**
+   * FRÜHER lautete dieser Fall „benutzt die EINGEFRORENEN Linien, sobald es sie gibt". Der Snapshot
+   * allein taugt aber nicht als Signal: er entsteht im Saisonübergang, also noch VOR dem Kaderbau.
+   * Die Anzeige meldete dadurch „eingefroren", während die Liga die Linie reihenweise überholte
+   * (Chris' Save: Median 45,0 eingefroren, 69,8 tatsächlich, 28 von 32 Teams darüber).
+   *
+   * Verbindlich ist die Linie ab dem ersten abgerechneten Spieltag — und genau das prüft der Fall.
+   */
+  it("benutzt die EINGEFRORENEN Linien, sobald der erste Spieltag abgerechnet ist", () => {
+    const basis = ensureSeasonApronLinesFrozen(structuredClone(createSingleplayerGameState()));
+    const gameState = {
+      ...basis,
+      seasonState: {
+        ...basis.seasonState,
+        matchdayResults: [
+          ...(basis.seasonState.matchdayResults ?? []),
+          { id: "md-1-result", seasonId: basis.season.id, matchdayId: basis.matchdayState.matchdayId },
+        ],
+      },
+    } as typeof basis;
     const projection = buildApronProjection({ gameState, rankByTeamId: buildRankMap(gameState) });
     expect(projection.frozenLines).toBe(true);
     expect(projection.lines.line1).toBeCloseTo(gameState.seasonState.apronLinesSnapshot?.line1 ?? -1, 9);
+  });
+
+  it("während des Kaderbaus sind die Linien noch nicht verbindlich und sagen das", () => {
+    // Snapshot vorhanden, aber kein Spieltag abgerechnet: die Anzeige muss sich als vorläufig
+    // ausweisen, sonst liest man eine Grenze als fest, die noch mitwandert.
+    const gameState = ensureSeasonApronLinesFrozen(structuredClone(createSingleplayerGameState()));
+    const projection = buildApronProjection({ gameState, rankByTeamId: buildRankMap(gameState) });
+    expect(projection.frozenLines).toBe(false);
   });
 
   it("ohne Snapshot rechnet sie aus dem aktuellen Stand und sagt es", () => {

@@ -26,6 +26,7 @@ import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToCo
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 
 type DbClient = typeof db;
 
@@ -767,9 +768,20 @@ export class LegacyMatchdayResultApplyService {
       },
     );
 
-    const seasonState = save.gameState.seasonState;
+    /**
+     * HIER RASTEN DIE APRON-LINIEN EIN. Bis zu diesem Punkt wandern sie mit dem Median mit (siehe
+     * `resolveSeasonApronLines`), denn bis hier lief nur der Kaderbau: KI-Vorsaisonkäufe,
+     * Spieler-Picks, organische Nachkäufe. Sobald der erste Spieltag abgerechnet ist, steht die
+     * Grenze fest — ab dann soll niemand mehr die Linie durch eigene Käufe verschieben können.
+     *
+     * Der Aufruf steht bewusst VOR dem Schreiben des Ergebnisses: `ensureSeasonApronLinesFrozen`
+     * führt nur nach, solange `hasSeasonBeenPlayed` falsch ist. Eine Zeile später wäre das erste
+     * Ergebnis schon da und der veraltete Stand für immer festgeschrieben.
+     */
+    const gameStateMitLinien = ensureSeasonApronLinesFrozen(save.gameState);
+    const seasonState = gameStateMitLinien.seasonState;
     const nextGameState = {
-      ...save.gameState,
+      ...gameStateMitLinien,
       seasonState: {
         ...seasonState,
         matchdayResults: [

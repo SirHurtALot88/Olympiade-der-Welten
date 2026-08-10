@@ -16,6 +16,7 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import { buildDisciplineStageTeamsFromBookedResult } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
@@ -51,7 +52,8 @@ import DisciplineStageMatchdayPanel, {
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import { buildMatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
-import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { buildStandingsMatchdayRankPair } from "@/lib/foundation/season-standings-matchday-rank-delta";
+import { getMatchdayScoringProgress, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildMatchdayArenaBaseSessionKey,
   buildMatchdayLineupRevision,
@@ -62,7 +64,17 @@ import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
-import { getMatchdayLeagueLineupReadiness } from "@/lib/foundation/matchday-arena-readiness";
+import {
+  getMatchdayArenaReadiness,
+  getMatchdayLeagueLineupReadiness,
+  hasCurrentMatchdayResult,
+} from "@/lib/foundation/matchday-arena-readiness";
+import {
+  getLineupDraftSideCounts,
+  getTeamMatchdayLineupDraft,
+  getTeamRosterPlayerIds,
+} from "@/lib/foundation/matchday-lineup-readiness";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { preloadDisciplineField } from "@/app/foundation/discipline-stage/arena/disciplines/registry";
 import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
@@ -116,6 +128,12 @@ export type DisciplineStageArenaProps = {
     | null;
   onOpenPlayer?: ((playerId: string) => void) | null;
   onOpenTeam?: ((teamId: string) => void) | null;
+  /**
+   * Öffnet die Einsatzliste (S3): der Pre-Matchday-Zustand macht „deine Einsatzliste
+   * fehlt" zum Helden mit echtem CTA — ohne Handler (z. B. `dev-arena`) bleibt der
+   * Zustand rein informativ.
+   */
+  onOpenLineup?: (() => void) | null;
   /** Multiplayer-Room-Kontext — aktiviert Co-op-Ready-Gate + host-getriebenen Lockstep-Reveal. */
   roomContext?: FoundationRoomContext | null;
   /**
@@ -286,13 +304,6 @@ const ENV_VELODROME: StageEnv = {
   glow: { color: "hsl(215 64% 53%)", kind: "finish" },
   deco: [{ kind: "spotlights", color: "hsl(48 30% 88%)", count: 2 }],
 };
-const ENV_SKYLINE: StageEnv = {
-  sky: ["hsl(24 60% 6%)", "hsl(25 65% 14%)"],
-  stands: "hsl(24 40% 10%)",
-  surface: ["hsl(28 22% 16%)", "hsl(27 20% 12%)", "hsl(26 18% 8%)"],
-  line: "hsl(41 42% 84%)",
-  deco: [{ kind: "skyline", back: "hsl(24 50% 9%)", front: "hsl(24 77% 6%)", windows: "hsl(35 80% 60%)" }],
-};
 const ENV_JUNGLE: StageEnv = {
   sky: ["hsl(87 31% 6%)", "hsl(80 25% 10%)"],
   stands: "hsl(90 20% 9%)",
@@ -369,16 +380,6 @@ const ENV_POWER_STAGE: StageEnv = {
   line: "hsl(30 35% 68%)",
   glow: { color: "hsl(43 90% 80%)", kind: "spot" },
   deco: [{ kind: "spotlights", color: "hsl(43 90% 82%)", count: 2 }],
-};
-const ENV_CLIMBING_WALL: StageEnv = {
-  sky: ["hsl(180 12% 16%)", "hsl(180 12% 10%)"],
-  stands: "hsl(180 12% 13%)",
-  surface: ["hsl(194 40% 20%)", "hsl(195 38% 15%)", "hsl(195 38% 10%)"],
-  line: "hsl(175 13% 82%)",
-  deco: [
-    { kind: "holds", colors: ["hsl(194 57% 46%)", "hsl(38 80% 55%)", "hsl(350 60% 52%)"] },
-    { kind: "grid", color: "hsl(175 13% 70%)" },
-  ],
 };
 const ENV_FLOODLIT_STADIUM: StageEnv = {
   sky: ["hsl(135 15% 4%)", "hsl(139 18% 8%)"],
@@ -499,6 +500,7 @@ export default function DisciplineStageArena({
   onCommitDiscipline,
   onOpenPlayer,
   onOpenTeam,
+  onOpenLineup,
   roomContext,
   canonicalRatingByPlayerId,
 }: DisciplineStageArenaProps) {
@@ -646,6 +648,13 @@ export default function DisciplineStageArena({
   // Erlaubt manuelles Neuladen der Engine-Preview (Retry-Button), falls der erste Versuch
   // fehlschlägt/hängt — ohne den Retry säßen normale Spieler bei „unavailable" still fest.
   const [previewReloadNonce, setPreviewReloadNonce] = useState(0);
+  /**
+   * „Tafel gelesen, ab auf die Bühne." Bewusst NUR im Komponentenzustand und nicht im Spielstand:
+   * die Tafel soll vor JEDEM Spieltag einmal kommen (das war Chris' Anliegen), aber wer sie
+   * weggeklickt hat, soll beim Hin- und Herwechseln nicht wieder darauf landen. Ein neuer Spieltag
+   * mountet die Arena neu, damit steht der Merker wieder auf `false`.
+   */
+  const [preMatchdayDismissed, setPreMatchdayDismissed] = useState(false);
 
   /**
    * Stand der Aufstellungen dieses Spieltags. Teil des Cache-Schluessels UND Ausloeser des Effekts
@@ -775,12 +784,51 @@ export default function DisciplineStageArena({
       rankByTeam.set(b.teamId, { teamId: b.teamId, currentRank: b.currentRank, projectedRank: b.projectedRank ?? null, currentPoints: null, projectedPoints: null, pointsDelta: null });
     }
     for (const s of standingsItems) rankByTeam.set(s.teamId, s);
+    /**
+     * A1 (Audit Spieltag): der Saison-Rang VOR dem Spieltag kommt kanonisch aus
+     * `seasonState.standings` — derselben Quelle wie Home-KPI, Saisonstand und die
+     * Bahn-Reihenfolge der Bühne. Die Standings-/Briefing-Preview nummerierte bei
+     * 0 Punkten schlicht alphabetisch durch: dasselbe Team stand als „Rang 19" im
+     * Kopf und als Zeile 22 in der Wertung, und die ersten drei Teams des Alphabets
+     * bekamen Medaillen-Optik. Preview-Werte bleiben nur Rückfall, falls der lokale
+     * Spielstand (z. B. dev-arena ohne volles Save) keinen Rang trägt.
+     */
+    const canonicalStandings = gameState.seasonState?.standings ?? {};
+    const canonicalRankOf = (teamId: string): number | null => {
+      const rank = canonicalStandings[teamId]?.rank;
+      return typeof rank === "number" && Number.isFinite(rank) ? rank : null;
+    };
+    /**
+     * GEMELDET VON CHRIS (Spieltag 4): „auch nach D1 müsste es ja eine Rangänderung geben …
+     * ausgangsrang ist z. B. der von MD3" — und nach der Buchung von D2 stand in der S-Rang-Spalte
+     * bei allen 32 Teams „7 → 7", „22 → 22" usw.
+     *
+     * Ursache: Sobald der Spieltag GEBUCHT ist, trägt `standings[team].rank` bereits den Stand NACH
+     * diesem Spieltag — als „vorher" gelesen war das Paar zwangsläufig entartet (vorher == nachher).
+     * Der echte Ausgangsrang steckt in `matchdayBaselinePoints` (Punktestand VOR der Wertung,
+     * geschrieben von standings-apply für genau diesen Spieltag). Die Rangliste daraus baut
+     * `buildStandingsMatchdayRankPair` — DIESELBE Rechnung, aus der auch der Saisonstand seine
+     * Rang-Bewegung bezieht (eine Quelle pro Größe, sonst widersprechen sich zwei Seiten).
+     *
+     * Vor der Buchung (auch beim halb gewerteten Spieltag) bleibt `standings.rank` der Stand nach
+     * dem VORIGEN Spieltag und ist damit selbst der richtige „vorher"-Wert.
+     */
+    const bookedForThisMatchday =
+      matchdayId != null &&
+      results.some((r) => canonicalStandings[r.teamId]?.matchdayBaselineId === matchdayId);
+    const baselineRankPairByTeam = bookedForThisMatchday
+      ? buildStandingsMatchdayRankPair(
+          (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name })),
+          canonicalStandings,
+        )
+      : null;
     const standings: MatchdayPanelStandingRow[] = results.map((r) => {
       const s = rankByTeam.get(r.teamId);
+      const pair = baselineRankPairByTeam?.get(r.teamId) ?? null;
       return {
         teamId: r.teamId,
-        currentRank: s?.currentRank ?? null,
-        projectedRank: s?.projectedRank ?? null,
+        currentRank: pair != null ? pair.previousRank : canonicalRankOf(r.teamId) ?? s?.currentRank ?? null,
+        projectedRank: pair != null ? canonicalRankOf(r.teamId) ?? pair.currentRank : s?.projectedRank ?? null,
         currentPoints: s?.currentPoints ?? null,
         projectedPoints: s?.projectedPoints ?? null,
         pointsDelta: s?.pointsDelta ?? null,
@@ -810,6 +858,38 @@ export default function DisciplineStageArena({
         mutatorByTeam.set(tr.teamId, cur);
       }
     }
+    /**
+     * ROHDATEN FÜR „Δ MODIFIKATOREN" — je Team und Disziplin-Seite die BASIS-Summe (Leistung vor
+     * allen Modifikatoren, `entry.baseValue`) und der ENDSTAND (`teamResult.score`).
+     *
+     * Bewusst nur die Summen und NICHT die fertigen Ränge: welche Seite aufgedeckt ist, weiß allein
+     * das Panel (`d1Revealed`/`d2Revealed`), und die Aufdeck-Regel liegt dort für Punkte, Form,
+     * Captain und Mutator schon zentral. Zwei Stellen, die dieselbe Regel je selbst auslegen,
+     * laufen früher oder später auseinander — genau daran krankte die Bühne zuletzt.
+     *
+     * Wozu das gut ist: das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain,
+     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. `matchday-arena-presenter.ts` rechnet
+     * diese Zahl bis heute (`baseRank`/`rankDelta`), aber die Funktion dort ruft niemand mehr auf —
+     * sie entstand und verschwand ungesehen. Auf Wunsch von Chris zurückgeholt.
+     */
+    const modifierBaseByTeam = new Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }>();
+    for (const dp of preview.disciplinePreviews ?? []) {
+      const seite = dp.disciplineId === d1?.disciplineId ? "d1" : dp.disciplineId === d2?.disciplineId ? "d2" : null;
+      if (!seite) continue;
+      for (const tr of dp.teamResults ?? []) {
+        const cur = modifierBaseByTeam.get(tr.teamId) ?? { d1Base: 0, d1Score: 0, d2Base: 0, d2Score: 0 };
+        const basisSumme = (tr.entries ?? []).reduce((summe, e) => summe + (e.baseValue ?? 0), 0);
+        if (seite === "d1") {
+          cur.d1Base += basisSumme;
+          cur.d1Score += tr.score ?? 0;
+        } else {
+          cur.d2Base += basisSumme;
+          cur.d2Score += tr.score ?? 0;
+        }
+        modifierBaseByTeam.set(tr.teamId, cur);
+      }
+    }
+
     // Spieler je Team und Disziplin-Seite für die ausklappbaren Spalten der Spieltags-
     // Wertung. Quelle sind dieselben Resolve-Entries wie oben — kein zweiter Rechenweg.
     // `pp` ist der dem Spieler gutgeschriebene Player-Point-Anteil, `score` sein
@@ -934,25 +1014,45 @@ export default function DisciplineStageArena({
       d1DisciplineId: d1?.disciplineId ?? null,
       d2DisciplineId: d2?.disciplineId ?? null,
     });
-    return { d1, d2, standings, mutatorByTeam, playersByTeam, modifiersByTeam, teamResults };
+    return { d1, d2, standings, mutatorByTeam, modifierBaseByTeam, playersByTeam, modifiersByTeam, teamResults };
   }, [preview, gameState, matchdayId, briefingItems, standingsItems, ratingByPlayerId]);
+
+  /**
+   * Buchungszustand des Spieltags aus dem SAVE (nicht aus Session-State): welche
+   * Disziplin-Seite ist bereits gewertet? Das ist die Antwort auf den Reload
+   * mitten im Spieltag — `endedDisciplineIds` (Session) ist dann leer, aber die
+   * D1-Buchung steht längst im Spielstand. Dieselbe Quelle benutzen Spielplan
+   * („läuft") und Spieltagsergebnis („Zwischenstand"); ohne sie erzählte die
+   * Arena nach dem Reload „nichts gestartet", während D1 gebucht war.
+   */
+  const scoringProgress = useMemo(
+    () => (matchdayId ? getMatchdayScoringProgress(gameState, matchdayId) : null),
+    [gameState, matchdayId],
+  );
 
   // Bühne muss mit einer Disziplin DES aktuellen Spieltags starten, nicht mit dem
   // hart kodierten Default ("staffel"). Sonst zeigt die Arena eine Disziplin ohne
   // Preview-Daten → vereinfachtes Modell statt der bestätigten Einsatzliste, und es
   // wirkt wie der falsche Spieltag. Einmal pro Spieltag ausrichten (respektiert
   // manuelle Dropdown-Auswahl); beim Spieltagswechsel richtet es neu aus.
+  //
+  // Halber Spieltag: ist D1 laut Save schon gebucht und D2 offen, richtet die
+  // Bühne auf D2 aus — der Spieler soll nach einem Reload dort weitermachen, wo
+  // der Spieltag wirklich steht, nicht vor der bereits gewerteten Staffel.
   const alignedMatchdayRef = useRef<string | null | undefined>(null);
   useEffect(() => {
     const d1Id = matchdayPanel?.d1?.disciplineId ?? null;
     const d2Id = matchdayPanel?.d2?.disciplineId ?? null;
     if (!d1Id && !d2Id) return;
     if (alignedMatchdayRef.current === matchdayId) return;
-    if (disciplineId !== d1Id && disciplineId !== d2Id && d1Id) {
-      setDisciplineId(d1Id);
+    // Bevorzugte Start-Disziplin: die erste noch UNGEWERTETE Seite des Spieltags.
+    const preferred =
+      scoringProgress?.d1.scored && !scoringProgress?.d2.scored && d2Id ? d2Id : d1Id ?? d2Id;
+    if (preferred && disciplineId !== preferred && disciplineId !== d2Id) {
+      setDisciplineId(preferred);
     }
     alignedMatchdayRef.current = matchdayId;
-  }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId]);
+  }, [matchdayId, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, disciplineId, scoringProgress]);
 
   // Spieltags-Disziplinen (d1/d2) DIREKT aus dem Saison-Spielplan — unabhängig von der Engine-Preview.
   // `matchdayPanel` liefert dieselbe Info, ist aber an `preview` gekoppelt (frühes `if (!preview) return null`).
@@ -1093,16 +1193,40 @@ export default function DisciplineStageArena({
     : null;
 
   // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
+  /**
+   * Bahnen aus ECHTEN Daten — Vorschau bevorzugt, sonst das gebuchte Ergebnis.
+   *
+   * GEMELDET VON CHRIS: Die Bühne zeigte für S-C in der Staffel Tahra (+40,7) und Chad (+40,2),
+   * Rang 28 mit 80,9 Pkt. Gebucht waren Spineshard (29,3) und Myrth (9,9), Rang 31 mit 47,8 —
+   * Tahra stand an dem Spieltag nicht einmal in der Aufstellung, Chad lief in Takeshi. Dasselbe
+   * bei V-D, wo die Bühne Queen Butterfly an die Spitze stellte und das Team in Wahrheit Vierter
+   * wurde.
+   *
+   * Ursache war der stille Rückfall auf `buildDisciplineStageModel`: das Modell liest die
+   * Aufstellung nicht, es sucht sich pro Team selbst die stärksten Spieler. Am gemeldeten
+   * Spielstand nachgerechnet wählt es für S-C in der Staffel genau Tahra (41,7) und Chad (41,2).
+   * Als Vorschau ist das richtig — als Ergebnis-Anzeige erfindet es Tatsachen.
+   *
+   * Deshalb gibt es jetzt eine zweite echte Quelle: ist die Disziplin gewertet, kommen die Bahnen
+   * aus `disciplineResults` + `playerDisciplinePerformances`. Das Modell bleibt dem Test-/
+   * Random-Modus vorbehalten.
+   */
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
-    if (!disc || disc.teamResults.length === 0) {
-      return null;
+    if (disc && disc.teamResults.length > 0) {
+      return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
     }
-    return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
-  }, [preview, disciplineId, teamMetaById, portraitById]);
+    return buildDisciplineStageTeamsFromBookedResult(gameState, disciplineId, teamMetaById, portraitById);
+  }, [preview, disciplineId, teamMetaById, portraitById, gameState]);
 
-  // Echt-Modus nutzt die Engine, wenn Daten für diese Disziplin vorliegen.
+  // Echt-Modus nutzt IMMER echte Daten. Fehlen sie, wird nichts erfunden — siehe
+  // `realDataMissing` unten, das statt der Bühne eine ehrliche Meldung zeigt.
   const useEngine = mode === "real" && engineTeams !== null;
+  /**
+   * Echt-Modus ohne echte Daten. Vorher lief die Bühne hier mit dem Modell weiter und sah aus wie
+   * ein Ergebnis; jetzt ist der Zustand benannt und wird angezeigt statt kaschiert.
+   */
+  const realDataMissing = mode === "real" && engineTeams === null;
 
   // Random-Test: 2 Mutator-Traits werden für die Disziplin bestimmt.
   const mutatorTraits = useMemo(
@@ -1224,6 +1348,135 @@ export default function DisciplineStageArena({
   useEffect(() => {
     setEndedDisciplineIds(new Set());
   }, [matchdayId]);
+
+  /**
+   * Aufdeck-Stand der Spieltags-Wertung — als benannte Konstanten, weil daran jetzt
+   * auch hängt, OB die Wertung überhaupt als Tabelle rendert (S3/Muster 3): vor dem
+   * ersten gewerteten Ergebnis gibt es keine Zeilen, keine Rangzahlen und keine
+   * Medaillen-Optik, sondern den erklärenden Platzhalter (VeloPendingRanking).
+   */
+  // Eine im SAVE gebuchte Seite ist aufgedeckt — unabhängig vom Session-Zustand.
+  // Das ist kein Spoiler: die Wertung steht bereits im Saisonstand. Ohne diese
+  // Klausel zeigte die Arena nach einem Reload mitten im Spieltag („D1 gebucht,
+  // D2 offen") wieder „Wertung folgt", als wäre nichts gelaufen.
+  const panelD1Revealed = Boolean(
+    matchdayPanel &&
+      (scoringProgress?.d1.scored ||
+        Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId)) ||
+        (matchdayPanel.d2?.disciplineId === disciplineId &&
+          matchdayPanel.teamResults.some((row) => row.d1Points != null))),
+  );
+  const panelD2Revealed = Boolean(
+    matchdayPanel &&
+      (scoringProgress?.d2.scored ||
+        (matchdayPanel.d2?.disciplineId === disciplineId &&
+          Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId)))),
+  );
+
+  /**
+   * S3 · Expliziter Pre-Matchday-Zustand („vor dem Anpfiff").
+   *
+   * Erkennung aus ECHTEN Daten, nicht aus UI-Zustand geraten:
+   * - `arenaStartBlockedByLineups`: mindestens ein Team der Liga ist nicht bereit
+   *   (Aufstellung fehlt/unvollständig/nicht abgeschickt oder Formkarten offen) —
+   *   die Bühne DARF also noch gar nicht loslaufen.
+   * - `hasCurrentMatchdayResult`: für diesen Spieltag ist noch nichts gebucht
+   *   (auch kein halber Spieltag nach Disziplin 1).
+   * - `endedDisciplineIds` leer: in dieser Sitzung ist noch keine Disziplin gelaufen.
+   *
+   * Nur wenn ALLE drei zutreffen, ersetzt der Pre-Matchday-Screen die Bühne. Der
+   * Dev-/Test-Modus behält die rohe Bühne (Admin will die Disziplinen frei sehen).
+   */
+  const matchdayHasBookedResult = useMemo(() => hasCurrentMatchdayResult(gameState), [gameState]);
+  /**
+   * GEMELDET VON CHRIS: „diese infotafel vor dem spieltag kommt glaub ich nur beim ersten spieltag
+   * danach nie wieder gesehen."
+   *
+   * Stimmte. In der Bedingung stand `arenaStartBlockedByLineups` — also „mindestens ein Team der
+   * Liga ist noch nicht bereit". Damit war die Tafel kein Vorspiel-Bildschirm, sondern ein
+   * BLOCKADE-Bildschirm: sie erschien nur, solange jemand trödelte. Am ersten Spieltag fehlten
+   * noch Aufstellungen, ab dem zweiten hatten alle 32 Teams ihre fertig — und die Tafel war weg,
+   * obwohl ihre Überschrift „Vor dem Anpfiff" lautet und der Kommentar sie als „expliziten
+   * Pre-Matchday-Zustand" beschreibt. Bedingung und Absicht liefen auseinander.
+   *
+   * Jetzt zählt nur noch, ob der Spieltag WIRKLICH noch nicht begonnen hat: nichts gebucht, keine
+   * Disziplin gelaufen. Weil die Tafel damit auch dann kommt, wenn alle bereit sind, hat sie einen
+   * Weg nach vorn bekommen (`onStartStage` unten) — vorher war sie eine Sackgasse mit dem einzigen
+   * Ausgang „Einsatzliste öffnen", was genügte, solange sie nur bei Blockaden erschien.
+   */
+  const preMatchdayReady = !arenaStartBlockedByLineups;
+  const showPreMatchday =
+    mode === "real" &&
+    !devMode &&
+    !preMatchdayDismissed &&
+    !matchdayHasBookedResult &&
+    endedDisciplineIds.size === 0;
+
+  // Eigene Startbereitschaft (nur fürs eigene Team — Fog of War bleibt gewahrt,
+  // von fremden Teams ist nur der Bereit-Status sichtbar, keine Aufstellung).
+  const ownArenaReadiness = useMemo(
+    () => (ownTeamId ? getMatchdayArenaReadiness(gameState, ownTeamId) : null),
+    [gameState, ownTeamId],
+  );
+  const ownLineupSideCounts = useMemo(
+    () => getLineupDraftSideCounts(ownTeamId ? getTeamMatchdayLineupDraft(gameState, ownTeamId)?.entries ?? [] : []),
+    [gameState, ownTeamId],
+  );
+  const ownRosterCount = useMemo(
+    () => (ownTeamId ? getTeamRosterPlayerIds(gameState, ownTeamId).length : 0),
+    [gameState, ownTeamId],
+  );
+
+  // „Dein Umfeld": Saisonrang + Punkte aus der EINEN kanonischen Quelle
+  // (seasonState.standings — dieselbe wie Home-KPI, Saisonstand und Bahn-Reihenfolge).
+  // Vor dem ersten gewerteten Spieltag sind die Ränge die Startplätze der Vorsaison —
+  // das steht als Erklärung dran, statt eine frische Wertung zu suggerieren.
+  const preMatchContext = useMemo(() => {
+    const standings = gameState.seasonState?.standings ?? {};
+    const anyPoints = Object.values(standings).some((row) => ((row as { points?: number | null })?.points ?? 0) > 0);
+    const rows = (gameState.teams ?? [])
+      .filter((team) => {
+        const relation = teamRelationshipMap.get(team.teamId);
+        return team.teamId === ownTeamId || relation === "rival" || relation === "ally";
+      })
+      .map((team) => {
+        const entry = standings[team.teamId] as { rank?: number | null; points?: number | null } | undefined;
+        return {
+          teamId: team.teamId,
+          name: team.name,
+          code: team.shortCode,
+          rank: typeof entry?.rank === "number" && Number.isFinite(entry.rank) ? entry.rank : null,
+          points: entry?.points ?? null,
+          relation: team.teamId === ownTeamId ? ("mine" as const) : teamRelationshipMap.get(team.teamId) ?? null,
+        };
+      })
+      .sort((left, right) => (left.rank ?? 999) - (right.rank ?? 999) || left.name.localeCompare(right.name, "de-DE"));
+    return { anyPoints, rows };
+  }, [gameState.seasonState?.standings, gameState.teams, teamRelationshipMap, ownTeamId]);
+
+  // Mutatoren je Spieltags-Seite (aus der Resolve-Preview; fehlt sie, bleibt die
+  // Zeile weg — keine erfundenen Chips).
+  const preMatchMutatorsBySide = useMemo(() => {
+    const mutatorsFor = (disciplineIdForSide: string | null | undefined): string[] => {
+      if (!disciplineIdForSide || !preview) return [];
+      const dp = preview.disciplinePreviews.find((entry) => entry.disciplineId === disciplineIdForSide);
+      const slots = dp?.teamResults?.[0]?.mutatorSlots ?? [];
+      return slots.map((slot) => slot.label).filter((label): label is string => Boolean(label && label.trim()));
+    };
+    return {
+      d1: mutatorsFor(matchdaySides.d1?.disciplineId),
+      d2: mutatorsFor(matchdaySides.d2?.disciplineId),
+    };
+  }, [preview, matchdaySides]);
+
+  // Spieltags-Label ohne rohe IDs (F5): „Spieltag N" aus der Saisonzählung,
+  // notfalls aus der Slug-Nummer — nie der nackte Bezeichner.
+  const matchdayNumberLabel = useMemo(() => {
+    const current = (gameState.season as { currentMatchday?: number | null } | undefined)?.currentMatchday;
+    if (typeof current === "number" && Number.isFinite(current)) return `Spieltag ${current}`;
+    const slug = String(matchdayId ?? gameState.matchdayState?.matchdayId ?? "").match(/(\d+)\s*$/);
+    return slug ? `Spieltag ${slug[1]}` : "Spieltag";
+  }, [gameState.season, gameState.matchdayState?.matchdayId, matchdayId]);
 
   const payload = useMemo(() => {
     // Echter Season-Tabellenrang je Team → Bahn-/Turm-Reihenfolge in der Arena
@@ -1499,6 +1752,16 @@ export default function DisciplineStageArena({
     setReplayingDisciplineId(null);
   }, [disciplineId, mode, seed]);
 
+  // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als gebucht — nach einem
+  // Reload mitten im Spieltag zeigt der Status sonst nichts, und ein Replay der Disziplin wuerde
+  // erneut buchen wollen. Steht bewusst VOR `disciplineEnded`, das diese Quelle jetzt braucht.
+  const activeSideScoredInSave =
+    matchdayPanel?.d1?.disciplineId === disciplineId
+      ? scoringProgress?.d1.scored ?? false
+      : matchdayPanel?.d2?.disciplineId === disciplineId
+        ? scoringProgress?.d2.scored ?? false
+        : false;
+
   /**
    * Endscreen-Sichtbarkeit. `arenaEnded` allein reichte nicht: es wird bei JEDEM
    * Disziplin-Wechsel zurueckgesetzt, also verschwanden Topspieler, Highlights und
@@ -1506,9 +1769,24 @@ export default function DisciplineStageArena({
    * `endedDisciplineIds` haelt den Abschluss ueber den Wechsel hinweg (dieselbe
    * Quelle, aus der das Spieltags-Panel seine Reveals speist) — damit bleibt eine
    * abgeschlossene Disziplin abgeschlossen.
+   *
+   * GEMELDET VON CHRIS: „der spieltag abschliessen button in der arena ist weg, jetzt kann man
+   * wieder den 2. diszi nicht abschliessen."
+   *
+   * Beide bisherigen Quellen sind SITZUNGSZUSTAND: `arenaEnded` und `endedDisciplineIds` starten
+   * nach jedem Neuladen leer. Wer den Spieltag verlaesst und zurueckkommt — auf Chris' Save mit
+   * gewerteter Staffel und offenem Takeshi —, sah die Buehne auf einer laengst gewerteten Disziplin
+   * („Disziplin gewertet"), aber der Block darunter fehlte komplett. In dem Block stecken BEIDE
+   * Auswege: „Weiter zu Disziplin 2 →" und „Spieltag abschliessen". Ohne ihn gibt es keinen
+   * gefuehrten Weg zur zweiten Disziplin, und der Spieltag haengt.
+   *
+   * Der Spielstand weiss es die ganze Zeit besser: `scoringProgress` sagt je Seite, ob gewertet
+   * wurde. Diese Quelle ueberlebt den Reload — deshalb zaehlt sie jetzt mit.
    */
   const disciplineEnded =
-    arenaEnded || (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId);
+    arenaEnded ||
+    (endedDisciplineIds.has(disciplineId) && replayingDisciplineId !== disciplineId) ||
+    (activeSideScoredInSave && replayingDisciplineId !== disciplineId);
 
   /**
    * Buchungszustand je Disziplin. Der Zieleinlauf loest die Wertung aus; bis sie durch
@@ -1519,7 +1797,7 @@ export default function DisciplineStageArena({
     Record<string, "pending" | "booked" | "failed">
   >({});
   const commitInFlightRef = useRef<Set<string>>(new Set());
-  const commitState = commitStateByDiscipline[disciplineId] ?? null;
+  const commitState = commitStateByDiscipline[disciplineId] ?? (activeSideScoredInSave ? "booked" : null);
 
   const commitFinishedDiscipline = useCallback(
     (finishedDisciplineId: string) => {
@@ -1533,6 +1811,9 @@ export default function DisciplineStageArena({
       // Nur die beiden Spieltags-Disziplinen werden gewertet. Ein freies Nachspielen
       // ausserhalb des Spieltags-Paars bleibt folgenlos.
       if (!side) return;
+      // Bereits im Save gebucht (z. B. D1 nach einem Reload erneut abgespielt):
+      // NICHT noch einmal buchen — gebucht wird der erste, verbindliche Durchlauf.
+      if (scoringProgress && scoringProgress[side].scored) return;
       if (commitInFlightRef.current.has(finishedDisciplineId)) return;
       if (commitStateByDiscipline[finishedDisciplineId] === "booked") return;
       commitInFlightRef.current.add(finishedDisciplineId);
@@ -1552,7 +1833,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline],
+    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline, scoringProgress],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
@@ -1573,6 +1854,225 @@ export default function DisciplineStageArena({
         <div style={{ fontSize: 14 }}>
           Daten werden geladen … Falls dieser Hinweis bleibt, ist noch keine Saison mit Disziplinen aktiv.
         </div>
+      </div>
+    );
+  }
+
+  /**
+   * S3 · Vor dem Anpfiff: eigener Zustand statt leer durchlaufendem Live-Gerüst.
+   *
+   * Kein 32-Zeilen-Rundenstand, keine 32 Schloss-Zeilen, keine 32× „keine
+   * Aufstellung" — und vor allem: keine Rangliste, wo es noch nichts zu reihen
+   * gibt. Der Held ist die einzig handlungsrelevante Information (deine
+   * Einsatzliste), daneben der Gegner-/Disziplin-Kontext und „Dein Umfeld" aus
+   * dem kanonischen Saisonstand. `data-testid="arena-stage"` bleibt am Container:
+   * die Browser-Smokes warten darauf, dass die Arena gerendert hat — das gilt
+   * auch für ihren Pre-Matchday-Zustand.
+   */
+  if (showPreMatchday) {
+    const sideRequirements = ownArenaReadiness?.sideRequirements ?? null;
+    const totalRequired = sideRequirements?.totalRequired ?? 0;
+    const filledTotal = Math.min(ownLineupSideCounts.total, totalRequired > 0 ? totalRequired : ownLineupSideCounts.total);
+    const ownLineupComplete = Boolean(ownArenaReadiness?.isReady);
+    const missingRosterSlots = totalRequired > 0 ? Math.max(totalRequired - ownRosterCount, 0) : 0;
+    const pendingTeams = leagueLineupReadiness.pendingTeams;
+    const d1Meta = matchdaySides.d1;
+    const d2Meta = matchdaySides.d2;
+    const disciplineSubtitle = [d1Meta?.displayName, d2Meta?.displayName].filter(Boolean).join(" & ");
+    const slotCells = totalRequired > 0
+      ? Array.from({ length: totalRequired }, (_, index) => {
+          if (index < filledTotal) return "is-filled";
+          if (index >= ownRosterCount) return "is-void";
+          return "";
+        })
+      : [];
+    const formCardsBlocked =
+      ownArenaReadiness?.blocker === "missing_formcard_pool" ||
+      (ownArenaReadiness?.formCardsRequired === true && ownArenaReadiness?.isReady === false && ownArenaReadiness?.lineupSubmitted === true);
+    return (
+      <div className="arena-prematch" data-testid="arena-stage" data-arena-prematch="true">
+        <div>
+          <span className="arena-prematch-eyebrow">Arena · {matchdayNumberLabel}</span>
+          <h1 className="arena-prematch-title">Vor dem Anpfiff</h1>
+          {disciplineSubtitle ? <p className="arena-prematch-sub">{disciplineSubtitle}</p> : null}
+        </div>
+
+        <div className="arena-prematch-hero">
+          <div className="arena-prematch-hero-state">
+            <span className={`arena-prematch-statuspill${ownLineupComplete ? " is-ready" : ""}`}>
+              <span className="arena-prematch-statusdot" aria-hidden="true" />
+              {ownLineupComplete ? "Deine Einsatzliste steht" : "Noch nicht startklar"}
+            </span>
+            <h2 className="nl-tnum">
+              {ownLineupComplete
+                ? `Warten auf die Liga — ${leagueLineupReadiness.readyCount} von ${leagueLineupReadiness.totalCount} Teams bereit`
+                : totalRequired > 0
+                  ? `Deine Einsatzliste: ${filledTotal} von ${totalRequired} Plätzen besetzt`
+                  : "Deine Einsatzliste ist noch offen"}
+            </h2>
+            <p>
+              Der Spieltag startet, sobald alle {leagueLineupReadiness.totalCount} Teams ihre Einsatzliste
+              gespeichert und die Formkarten geklärt haben.
+              {missingRosterSlots > 0
+                ? ` Dein Kader hat ${ownRosterCount} Spieler für ${totalRequired} Plätze — ${missingRosterSlots === 1 ? "ein Platz bleibt" : `${missingRosterSlots} Plätze bleiben`} leer und ${missingRosterSlots === 1 ? "bringt" : "bringen"} keine Punkte.`
+                : ""}
+              {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Einsatzlisten-Editor geklärt." : ""}
+            </p>
+            {slotCells.length > 0 ? (
+              <div
+                className="arena-prematch-slotbar"
+                role="img"
+                aria-label={`${filledTotal} von ${totalRequired} Plätzen besetzt`}
+              >
+                {slotCells.map((cellClass, index) => (
+                  <span key={index} className={`arena-prematch-slot ${cellClass}`.trim()} />
+                ))}
+              </div>
+            ) : null}
+            <span className="arena-prematch-slotlegend nl-tnum">
+              {d1Meta ? `${d1Meta.displayName} ${Math.min(ownLineupSideCounts.d1, sideRequirements?.d1Required ?? ownLineupSideCounts.d1)}/${sideRequirements?.d1Required ?? "?"}` : null}
+              {d1Meta && d2Meta ? " · " : ""}
+              {d2Meta ? `${d2Meta.displayName} ${Math.min(ownLineupSideCounts.d2, sideRequirements?.d2Required ?? ownLineupSideCounts.d2)}/${sideRequirements?.d2Required ?? "?"}` : null}
+              {` · Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
+            </span>
+          </div>
+          <div className="arena-prematch-hero-actions">
+            {onOpenLineup ? (
+              ownLineupComplete ? (
+                <button type="button" className="arena-prematch-ghost" onClick={() => onOpenLineup()}>
+                  Einsatzliste prüfen
+                </button>
+              ) : (
+                <button type="button" className="arena-prematch-cta" onClick={() => onOpenLineup()} data-testid="arena-prematch-lineup-cta">
+                  Einsatzliste öffnen →
+                  {totalRequired > 0 ? <small className="nl-tnum">{totalRequired - filledTotal} von {totalRequired} Plätzen offen</small> : null}
+                </button>
+              )
+            ) : null}
+            {/* Der Weg nach vorn. Ohne ihn wäre die Tafel eine Sackgasse — was hinnehmbar war,
+                solange sie nur bei Blockaden erschien, aber nicht mehr, seit sie vor jedem
+                Spieltag kommt. Erscheint erst, wenn die ganze Liga bereit ist: vorher DARF die
+                Bühne nicht loslaufen, und ein Knopf, der dann nichts tut, wäre eine Lüge. */}
+            {preMatchdayReady ? (
+              <button
+                type="button"
+                className="arena-prematch-cta"
+                onClick={() => setPreMatchdayDismissed(true)}
+                data-testid="arena-prematch-start-cta"
+              >
+                Zur Bühne →
+                <small className="nl-tnum">Liga vollzählig bereit</small>
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="arena-prematch-disc-grid">
+          {([
+            { side: "d1" as const, meta: d1Meta, required: sideRequirements?.d1Required ?? null },
+            { side: "d2" as const, meta: d2Meta, required: sideRequirements?.d2Required ?? null },
+          ]).map(({ side, meta, required }) =>
+            meta ? (
+              <section key={side} className="arena-prematch-disc">
+                <div className="arena-prematch-disc-head">
+                  <h3>
+                    Disziplin {side === "d1" ? 1 : 2} · {meta.displayName}
+                  </h3>
+                  {required != null && required > 0 ? (
+                    <span className="arena-prematch-disc-badge nl-tnum">{required} Plätze</span>
+                  ) : null}
+                </div>
+                {preMatchMutatorsBySide[side].length > 0 ? (
+                  <div className="arena-prematch-mutrow">
+                    <span className="arena-prematch-mutlabel">Mutatoren</span>
+                    {preMatchMutatorsBySide[side].map((mutator) => (
+                      <span key={mutator} className="arena-prematch-mutchip">
+                        {mutator}
+                      </span>
+                    ))}
+                    <span className="arena-prematch-mutnote">
+                      ◆ Spieler mit passendem Trait bekommen Bonus-Score und Bonus-PP gutgeschrieben
+                    </span>
+                  </div>
+                ) : null}
+                {side === "d2" ? (
+                  <div className="arena-prematch-locknote">
+                    <span aria-hidden="true">🔒</span>
+                    <span>Ergebnis bleibt verdeckt, bis Disziplin 1 komplett gewertet ist — kein Spoiler.</span>
+                  </div>
+                ) : null}
+              </section>
+            ) : null,
+          )}
+        </div>
+
+        <VeloPendingRanking
+          eyebrow="Spieltags-Wertung"
+          title="Wertung folgt"
+          note={`Sobald die erste Etappe läuft, erscheint hier die Wertung aller ${leagueLineupReadiness.totalCount} Teams — beide Disziplinen gemeinsam. Bis dahin steht hier bewusst keine Reihenfolge: ohne Ergebnis gibt es keine Ränge und keine Medaillen.`}
+          slots={[
+            { key: "gold", ring: "1.", label: "Noch zu vergeben" },
+            { key: "silver", ring: "2.", label: "Noch zu vergeben" },
+            { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
+          ]}
+          meta={
+            <>
+              {leagueLineupReadiness.totalCount} Teams gemeldet · {leagueLineupReadiness.readyCount} Einsatzlisten bereit
+              {pendingTeams.length > 0 && pendingTeams.length <= 6
+                ? ` · es fehlen: ${pendingTeams.map((team) => team.teamName).join(" · ")}`
+                : ""}
+            </>
+          }
+          data-testid="arena-prematch-pending-ranking"
+        />
+
+        {preMatchContext.rows.length > 0 ? (
+          <section className="arena-prematch-ctx">
+            <h3>Dein Umfeld vor dem Spieltag</h3>
+            <p className="arena-prematch-ctx-note">
+              {preMatchContext.anyPoints
+                ? "Saisonstand vor diesem Spieltag — dieselbe Quelle wie die Saisontabelle."
+                : "Noch kein Spieltag gewertet — die Reihenfolge sind die Startplätze aus dem Endstand der Vorsaison."}
+            </p>
+            <div style={{ overflowX: "auto" }}>
+              <table className="nl-tnum">
+                <thead>
+                  <tr>
+                    <th className="is-num">Saisonrang</th>
+                    <th>Team</th>
+                    <th className="is-num">Punkte</th>
+                    <th aria-label="Beziehung" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {preMatchContext.rows.map((row) => (
+                    <tr
+                      key={row.teamId}
+                      className={row.relation === "mine" ? "is-own" : undefined}
+                      onClick={onOpenTeam ? () => onOpenTeam(row.teamId) : undefined}
+                      style={onOpenTeam ? { cursor: "pointer" } : undefined}
+                      title={onOpenTeam ? `${row.name} öffnen` : undefined}
+                    >
+                      <td className="is-num">{row.rank != null ? row.rank : "—"}</td>
+                      <td>
+                        {row.relation === "mine" ? "★ " : ""}
+                        {row.name} · {row.code}
+                      </td>
+                      <td className="is-num">{fmt1(row.points ?? 0)}</td>
+                      <td>
+                        {row.relation === "rival" ? (
+                          <span className="arena-prematch-rival-tag">✕ Rivale</span>
+                        ) : row.relation === "ally" ? (
+                          <span className="arena-prematch-ally-tag">Verbündet</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -1665,11 +2165,25 @@ export default function DisciplineStageArena({
             onChange={(event) => setDisciplineId(event.target.value)}
             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
           >
-            {disciplineSelectOptions.map((discipline, index) => (
-              <option key={discipline.id} value={discipline.id}>
-                {devMode || matchdayDisciplineOptions.length === 0 ? discipline.name : `${index + 1}. ${discipline.name}`}
-              </option>
-            ))}
+            {disciplineSelectOptions.map((discipline, index) => {
+              // Buchungszustand aus dem Save direkt am Auswahl-Eintrag: nach einem
+              // Reload mitten im Spieltag sieht man so sofort, dass Disziplin 1
+              // bereits gewertet ist und nur Disziplin 2 noch aussteht.
+              const scored =
+                scoringProgress?.d1.disciplineId === discipline.id
+                  ? scoringProgress.d1.scored
+                  : scoringProgress?.d2.disciplineId === discipline.id
+                    ? scoringProgress.d2.scored
+                    : false;
+              const scoredSuffix = scored ? " · ✓ gewertet" : "";
+              return (
+                <option key={discipline.id} value={discipline.id}>
+                  {devMode || matchdayDisciplineOptions.length === 0
+                    ? `${discipline.name}${scoredSuffix}`
+                    : `${index + 1}. ${discipline.name}${scoredSuffix}`}
+                </option>
+              );
+            })}
           </select>
         </label>
       </div>
@@ -1692,7 +2206,15 @@ export default function DisciplineStageArena({
               border: "1px solid var(--nl-line)",
             }}
           >
-            {previewState === "loading" ? "Engine lädt …" : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
+            {/* Der frühere Text „Vereinfachte Ansicht (keine Engine-Aufstellung)" verschwieg das
+                Entscheidende: die gezeigten Spieler sind dann NICHT die aufgestellten, sondern eine
+                Schätzung des Modells. Chris las die Bühne deshalb als Ergebnis — mit Namen, die gar
+                nicht gespielt hatten. Jetzt steht dran, was es ist. */}
+            {previewState === "loading"
+              ? "Engine lädt …"
+              : realDataMissing
+                ? "Vorschau mit GESCHÄTZTER Aufstellung — nicht das Ergebnis"
+                : "Vereinfachte Ansicht (keine Engine-Aufstellung)"}
           </span>
           {previewState === "unavailable" ? (
             <button
@@ -1753,7 +2275,7 @@ export default function DisciplineStageArena({
               ? "✓ Engine-echt"
               : previewState === "loading"
                 ? "Engine lädt …"
-                : "Vereinfacht (kein Lineup)"}
+                : "Vereinfacht (keine Einsatzliste)"}
           </span>
         ) : null}
         {mode === "random" ? (
@@ -1870,40 +2392,41 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
 
-      {mode === "real" && preview && matchdayPanel ? (
+      {/* Spieltags-Wertung NUR, wenn mindestens eine Disziplin aufgedeckt ist (S3/
+          Muster 3). Vorher rannte das Panel auch VOR dem Start leer durch: 32
+          Schloss-Zeilen plus ein „S-Rang", der bei 0 Punkten alphabetisch
+          durchnummeriert war und den ersten drei Teams des Alphabets Medaillen-
+          Optik gab. Ohne Wertung steht hier jetzt der erklärende Platzhalter —
+          eine leere Rangliste behauptet keine Reihenfolge.
+          Die Aufdeck-Logik selbst ist unverändert (panelD1Revealed/panelD2Revealed,
+          siehe Definition bei endedDisciplineIds). */}
+      {mode === "real" && preview && matchdayPanel && (panelD1Revealed || panelD2Revealed) ? (
         <div style={{ marginTop: 14 }}>
           <DisciplineStageMatchdayPanel
             teamResults={matchdayPanel.teamResults}
             standings={matchdayPanel.standings}
             d1={matchdayPanel.d1}
             d2={matchdayPanel.d2}
-            d1Revealed={
-              // Disziplin 1 gilt als aufgedeckt, sobald sie in DIESER Sitzung
-              // durchgelaufen ist — dann stehen Punkte, Form und Captain sofort
-              // in der Wertung, ohne dass man erst auf Disziplin 2 wechseln muss.
-              //
-              // Der Zweig ueber `d2 === disciplineId` bleibt als Faellback fuer den
-              // Wiedereinstieg (Arena neu geoeffnet, `endedDisciplineIds` leer,
-              // Disziplin 1 laengst gewertet). Er greift jetzt aber nur noch, wenn
-              // Disziplin 1 auch wirklich ein Ergebnis hat: vorher genuegte das
-              // blosse Anwaehlen von Disziplin 2 im Dropdown, um Aufstellung und
-              // Karten von Disziplin 1 zu zeigen, bevor sie gelaufen war.
-              Boolean(matchdayPanel.d1?.disciplineId && endedDisciplineIds.has(matchdayPanel.d1.disciplineId)) ||
-              (matchdayPanel.d2?.disciplineId === disciplineId &&
-                matchdayPanel.teamResults.some((row) => row.d1Points != null))
-            }
-            d2Revealed={
-              matchdayPanel.d2?.disciplineId === disciplineId
-                ? Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId))
-                : false
-            }
+            d1Revealed={panelD1Revealed}
+            d2Revealed={panelD2Revealed}
             teamMetaById={teamMetaById}
             ownTeamId={ownTeamId}
             onOpenTeam={(teamId) => openDrawerPinned({ kind: "team", teamId })}
             onHoverTeam={previewTeam}
             mutatorByTeam={matchdayPanel.mutatorByTeam}
+            modifierBaseByTeam={matchdayPanel.modifierBaseByTeam}
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
+          />
+        </div>
+      ) : mode === "real" ? (
+        <div style={{ marginTop: 14 }}>
+          <VeloPendingRanking
+            eyebrow="Spieltags-Wertung"
+            title="Wertung folgt"
+            note="Die Wertung aller Teams erscheint mit dem ersten gewerteten Ergebnis — beide Disziplinen gemeinsam, Rang vor → nach dem Spieltag. Bis dahin steht hier bewusst keine Reihenfolge."
+            meta={`${leagueLineupReadiness.totalCount} Teams gemeldet · ${leagueLineupReadiness.readyCount} Einsatzlisten bereit`}
+            data-testid="arena-stage-pending-ranking"
           />
         </div>
       ) : null}

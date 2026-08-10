@@ -1,9 +1,4 @@
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
-import {
-  applyAiMarketPlanLocally,
-  type AiMarketPlanApplyResult,
-  type AiMarketPlanApplyTeamResult,
-} from "@/lib/ai/ai-market-plan-apply-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import {
@@ -12,8 +7,7 @@ import {
 } from "@/lib/ai/chunked-redraft-topup-service";
 import type { AiEmergencyCashInjectionRecord, AiSeasonStrategy, GameState } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
-import { isSeasonOne, isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
-import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
@@ -46,13 +40,6 @@ export const PRESEASON_REPAIR_TEAM_CASH_FLOOR = 50;
 // buy again"; the Unified Pick Engine's own cash-tier caps / cheap_fill lane (unaffected by this
 // change) already ensures eco_round teams still only reach for lane-appropriate, economical picks
 // once admitted to convergence.
-const CONVERGENCE_BUY_STRATEGIES: AiSeasonStrategy[] = [
-  "roster_repair",
-  "depth_repair",
-  "win_now_push",
-  "cash_recovery",
-  "eco_round",
-];
 
 export type ConvergencePassId = "standard" | "escalated";
 
@@ -154,6 +141,11 @@ export function getTeamHardMinRequired(gameState: GameState, teamId: string) {
 }
 
 export function getTeamOptTarget(gameState: GameState, teamId: string) {
+  /**
+   * Die eine Zahl fuer „wie voll soll der Kader sein" — das Blatt-Opt aus der Team-Identitaet plus
+   * Kaderstress. Der organische Planer wird in `deriveUtilityWeights` auf denselben Wert als
+   * UNTERGRENZE gezogen, damit nicht zwei Instanzen verschiedene Zahlen fuer „fertig" halten.
+   */
   return resolvePlannerRosterTargets(gameState, teamId).playerOpt;
 }
 
@@ -237,53 +229,10 @@ export function getTeamsBelowMin(gameState: GameState) {
   }));
 }
 
-function getExistingMarketTransfers(gameState: GameState, seasonId: string) {
-  return gameState.transferHistory.filter(
-    (entry) =>
-      entry.seasonId === seasonId &&
-      (entry.source === "ai_preseason_market_buy" ||
-        entry.source === "ai_preseason_market_sell" ||
-        entry.source === "manual_transfer_window"),
-  );
-}
 
-function buildTeamFingerprint(team: AiMarketPlanApplyTeamResult) {
-  const buyIds = team.appliedBuyDetails.map((entry) => entry.playerId).sort().join(",");
-  const sellIds = team.appliedSellDetails.map((entry) => entry.playerId).sort().join(",");
-  const blockers = team.blockingReasons.slice().sort().join("|");
-  return `${team.result}:${buyIds}:${sellIds}:${blockers}`;
-}
 
-function buildRoundFingerprint(apply: AiMarketPlanApplyResult) {
-  return apply.teams
-    .map((team) => `${team.teamId}=${buildTeamFingerprint(team)}`)
-    .sort()
-    .join(";");
-}
 
-function collectAttemptedBuyPlayerIds(apply: AiMarketPlanApplyResult) {
-  const ids = new Set<string>();
-  for (const team of apply.teams) {
-    for (const step of [...team.appliedBuyDetails, ...team.plannedBuyDetails, ...team.skippedSteps]) {
-      if (step.stepType === "buy") ids.add(step.playerId);
-    }
-  }
-  for (const row of apply.buyGateRows ?? []) {
-    const playerId = typeof row.playerId === "string" ? row.playerId : null;
-    if (playerId) ids.add(playerId);
-  }
-  return [...ids];
-}
 
-function collectAttemptedSellPlayerIds(apply: AiMarketPlanApplyResult) {
-  const ids = new Set<string>();
-  for (const team of apply.teams) {
-    for (const step of [...team.appliedSellDetails, ...team.plannedSellDetails, ...team.skippedSteps]) {
-      if (step.stepType === "sell") ids.add(step.playerId);
-    }
-  }
-  return [...ids];
-}
 
 function resolveTeamStatus(input: {
   team: { result?: string; executedBuys?: number; executedSells?: number };
@@ -311,55 +260,6 @@ function resolveTeamStatus(input: {
 
 export { resolveTeamStatus };
 
-function mergeTeamResults(
-  existing: Map<string, ConvergenceTeamResult>,
-  apply: AiMarketPlanApplyResult,
-  gameState: GameState,
-  roundRecord: ConvergenceRoundRecord,
-  passIndex: number,
-  roundIndex: number,
-  exhaustedTeamIds: Set<string>,
-) {
-  const strategyMap = buildSeasonStrategyState(gameState);
-  for (const team of apply.teams) {
-    const rosterAfter =
-      gameState.rosters.filter((entry) => entry.teamId === team.teamId).length ??
-      team.rosterAfter ??
-      team.rosterBefore ??
-      0;
-    const hardMin = getTeamHardMinRequired(gameState, team.teamId);
-    const optTarget = getTeamOptTarget(gameState, team.teamId);
-    const needsConvergence = teamNeedsMarketConvergence(gameState, team.teamId);
-    const doctrineStrategy = strategyMap[team.teamId]?.seasonStrategy ?? "balanced_growth";
-    const previous = existing.get(team.teamId);
-    const status = resolveTeamStatus({
-      team,
-      rosterAfter,
-      hardMin,
-      optTarget,
-      needsConvergence,
-      exhausted: exhaustedTeamIds.has(team.teamId),
-    });
-    existing.set(team.teamId, {
-      teamId: team.teamId,
-      teamName: team.teamName,
-      status,
-      pickEngine: resolveActiveConvergencePickEngine(),
-      passes: Math.max(previous?.passes ?? 0, passIndex),
-      rounds: Math.max(previous?.rounds ?? 0, roundIndex),
-      appliedBuys: (previous?.appliedBuys ?? 0) + team.executedBuys,
-      appliedSells: (previous?.appliedSells ?? 0) + team.executedSells,
-      rosterAfter,
-      hardMin,
-      optTarget,
-      minRequired: hardMin,
-      doctrineStrategy,
-      blockingReasons: unique([...(previous?.blockingReasons ?? []), ...team.blockingReasons]),
-      warnings: unique([...(previous?.warnings ?? []), ...team.warnings.slice(0, 8)]),
-      roundHistory: [...(previous?.roundHistory ?? []), roundRecord],
-    });
-  }
-}
 
 export function resolveActiveConvergencePickEngine(): Exclude<ConvergencePickEngine, "repair"> {
   return isUnifiedPickEnabledForMarket() ? "unified" : "legacy";

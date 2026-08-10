@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 // team-settings markup live in FoundationTeamSettingsNewLook.tsx, and the
 // handlers/state live in use-foundation-shell-router-body-scope.tsx /
 // FoundationShellRouterBody.tsx.
-const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
 const teamSettingsNewLookPath = path.join(
   process.cwd(),
   "app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx",

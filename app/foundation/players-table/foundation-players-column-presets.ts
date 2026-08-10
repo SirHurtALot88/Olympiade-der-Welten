@@ -14,7 +14,6 @@
  * interaktive Kern-Affordanzen. Nur die Datenspalten sind umschaltbar.
  */
 
-import { getActiveSaveIdFromLocation } from "@/app/foundation/players-table/foundation-players-query-chips";
 
 /** Immer sichtbare Strukturspalten (nicht abschaltbar) — Identität + Kern-Interaktion. */
 export const NL_PLAYERS_STRUCTURAL_COLUMN_IDS: ReadonlyArray<string> = ["compare", "image", "name"];
@@ -51,8 +50,8 @@ export const NL_PLAYERS_HIDEABLE_COLUMN_IDS: ReadonlyArray<string> = [
 
 export type NlPlayersColumnVisibility = Record<string, boolean>;
 
-/** Aktives Preset — die 4 benannten Views plus "custom" für händisch abgewichene Auswahl. */
-export type NlPlayersColumnPresetId = "kompakt" | "scouting" | "finanzen" | "alles" | "custom";
+/** Aktives Preset — die 5 benannten Views plus "custom" für händisch abgewichene Auswahl. */
+export type NlPlayersColumnPresetId = "kompakt" | "scouting" | "finanzen" | "alles" | "saison" | "custom";
 
 export type NlPlayersColumnPreset = {
   id: Exclude<NlPlayersColumnPresetId, "custom">;
@@ -106,6 +105,17 @@ export const NL_PLAYERS_COLUMN_PRESETS: ReadonlyArray<NlPlayersColumnPreset> = [
     id: "alles",
     label: "Alles",
     visible: NL_PLAYERS_HIDEABLE_COLUMN_IDS,
+  },
+  {
+    id: "saison",
+    label: "Saison",
+    // T3 (P2/P3 aus dem Team-Audit): genau die Spalten, die am Spieltag 1 noch
+    // leer sind (PPs/MVS/Einsätze — vor dem ersten gespielten Spieltag gibt es
+    // ligaweit noch keinen einzigen Wert). Gebündelt statt einzeln über die
+    // ganze Tabelle verstreut, mit Hinweis in Kopf-Tooltip + gedämpfter Färbung
+    // (siehe `.is-season-pending` in globals.css) statt der lauten
+    // Akzent-Spaltenfarbe für Daten, die schlicht noch nicht existieren.
+    visible: ["pps", "mvs", "appearances"],
   },
 ];
 
@@ -177,6 +187,7 @@ export function readColumnPreferences(saveId: string | null | undefined): NlPlay
       presetRaw === "scouting" ||
       presetRaw === "finanzen" ||
       presetRaw === "alles" ||
+      presetRaw === "saison" ||
       presetRaw === "custom"
         ? presetRaw
         : "custom";

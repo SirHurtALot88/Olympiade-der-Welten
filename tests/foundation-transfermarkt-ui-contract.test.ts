@@ -6,8 +6,6 @@ import { describe, expect, it } from "vitest";
 import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 const root = process.cwd();
-const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
-const foundationShellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
 
 async function readFoundationSurfaceSourceLocal() {
   return readFoundationSurfaceSource(root);
@@ -79,9 +77,11 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Deal-Desk");
     expect(fileText).toContain("Deal-Vorschau");
     expect(fileText).toContain("Aktueller Kader");
-    expect(fileText).toContain("Wishlist & Scouting");
+    // G6 (Durchklick-Test, Terminologie): sichtbarer Spieltext sagt durchgängig
+    // „Wunschliste" — „Wishlist" lebt nur noch in Code-Bezeichnern weiter.
+    expect(fileText).toContain("Wunschliste & Scouting");
     expect(fileText).toContain("Deal prüfen");
-    expect(fileText).toContain("Auf Wishlist");
+    expect(fileText).toContain("Auf Wunschliste");
     expect(fileText).toContain("Beobachten");
     expect(fileText).toContain("nl-market-ca-stars");
     expect(fileText).toContain("axisStarsDisplay");
@@ -242,11 +242,10 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps the team profile relationship cards alive", async () => {
-    const [clientText, teamsRosterHookText, teamProfileText, cssText] = await Promise.all([
+    const [clientText, teamsRosterHookText, teamProfileText] = await Promise.all([
       readFoundationOrchestratorSource(root),
       fs.readFile(teamsRosterHookPath, "utf8"),
       fs.readFile(teamProfileNewLookPath, "utf8"),
-      fs.readFile(globalsPath, "utf8"),
     ]);
 
     expect(clientText).toContain("buildTeamDetailDrawerData");

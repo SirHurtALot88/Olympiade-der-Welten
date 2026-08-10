@@ -2,7 +2,6 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import type {
-  MultiplayerRoomStatus,
   OlyRoomState,
   RoomFlowButtonStatus,
   RoomFlowState,

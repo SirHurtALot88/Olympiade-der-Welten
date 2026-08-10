@@ -1,11 +1,16 @@
 // Geteilte Formatierung für die Disziplin-Bühne — vermeidet, dass fmt1/ampel
 // in mehreren Dateien auseinanderdriften (z.B. Ampel-Schwellen).
 
-/** Zahl mit max. 1 Nachkommastelle (nachlaufende .0 weg); nullish → "–". */
+/**
+ * Zahl mit max. 1 Nachkommastelle (nachlaufende ,0 weg); nullish → "–".
+ *
+ * Formatfix (Durchklick): vorher `toFixed(1)` — das lieferte „95.5" mit JS-Punkt,
+ * während der Rest des Hauses de-DE-Komma schreibt („95,5"). Jetzt derselbe
+ * Intl-Weg wie `formatNlNumber`/`formatLocalePoints`.
+ */
 export function fmt1(x: number | null | undefined): string {
   if (x == null || Number.isNaN(x)) return "–";
-  const v = Math.round(x * 10) / 10;
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(x);
 }
 
 /**

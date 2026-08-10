@@ -22,6 +22,7 @@ import {
   apronWertungsanteil,
   computeApronLines,
   computeApronSettlement,
+  hasSeasonBeenPlayed,
   type ApronLines,
   type ApronTeamRow,
 } from "@/lib/season/apron-service";
@@ -38,18 +39,36 @@ function getCurrentSalaryFactor(gameState: GameState): number {
 // ── Einfrieren zu Saisonbeginn ────────────────────────────────────────────────────────────────
 
 /**
- * Friert die Apron-Linien für die AKTUELLE Saison ein, falls noch nicht geschehen. Idempotent: ein
- * bereits vorhandener Snapshot für `gameState.season.id` wird nie überschrieben — das ist die ganze
- * Absicherung gegen "man kauft gegen eine Grenze, die sich durch die eigenen Käufe verschiebt".
+ * Schreibt die Apron-Linien der AKTUELLEN Saison in den Spielstand — und FÜHRT SIE NACH, solange
+ * noch kein Spieltag abgerechnet ist.
  *
- * Aufrufstellen: `lib/game/new-game-setup-service.ts` (Season 1 — Rosters noch leer, greift der
- * Referenz-Gehalt-Fallback aus `computeApronLines`) und `lib/season/preseason-workflow-service.ts`
- * (Season-Übergang, unmittelbar bevor `gamePhase` auf `season_active` schaltet, also NACH dem
- * Transferfenster — der Gehaltsstand, gegen den die neue Saison antritt, steht dann fest).
+ * FRÜHER war diese Funktion streng einmalig: der erste Snapshot einer Saison blieb stehen. Die
+ * Begründung — man soll nicht gegen eine Grenze kaufen, die die eigenen Käufe verschieben — ist
+ * richtig, aber der Zeitpunkt war falsch. Der einzige Aufruf im Saisonübergang lief, BEVOR der
+ * Kaderbau der neuen Saison begann; der Kommentar hier behauptete, das Transferfenster sei
+ * „bereits durchlaufen". Auf Chris' Spielstand kamen danach noch alle 106 Zugänge der Saison
+ * (717,5 Mio Gehalt, Median 45,0 → 69,8) und rissen 28 von 32 Teams über die eingefrorene Linie.
+ *
+ * JETZT gilt: solange `hasSeasonBeenPlayed` falsch ist, wird bei jedem Aufruf neu gerechnet. Der
+ * letzte Aufruf vor dem ersten Spieltag setzt damit den endgültigen Stand — und genau dort steht
+ * der EINZIGE Produktions-Aufruf (`legacy-matchday-result-apply-service.ts`, unmittelbar bevor das
+ * erste Ergebnis geschrieben wird). Ab da ist der Snapshot unantastbar. New-Game-Setup und
+ * Preseason-Workflow frieren BEWUSST NICHT mehr ein (siehe die dortigen Kommentare) — dadurch
+ * bekommt jede Saison ihre Linien aus ihren EIGENEN Kadern: ein Snapshot der Vorsaison überlebt
+ * den Übergang zwar im `seasonState`, fällt hier und in `resolveSeasonApronLines` aber am
+ * `seasonId`-Abgleich durch und wird spätestens mit dem ersten Spieltag der neuen Saison ersetzt.
+ *
+ * HERKUNFTSVERMERK: Jeder hier geschriebene Snapshot trägt `frozenAtEvent: "buy_window_close"`.
+ * Ein Snapshot OHNE den Vermerk stammt von einem Alt-Build (Einfrieren vor dem Kaderbau) — genau
+ * der Fall, der auf Chris' Save festsaß und von außen nicht von einem gültigen Stand zu
+ * unterscheiden war. Ein solcher Altstand in einer bereits gespielten Saison wird BEWUSST NICHT
+ * automatisch ersetzt (eine mitten in der Saison wandernde Grenze wäre schlimmer als der einmalige
+ * manuelle Eingriff); die Heilung läuft über `scripts/repariere-apron-linien.ts`, das vorher
+ * nachweist, dass seit dem ersten gewerteten Spieltag keine Transfers stattfanden.
  */
 export function ensureSeasonApronLinesFrozen(gameState: GameState): GameState {
   const existing = gameState.seasonState.apronLinesSnapshot;
-  if (existing && existing.seasonId === gameState.season.id) {
+  if (existing && existing.seasonId === gameState.season.id && hasSeasonBeenPlayed(gameState)) {
     return gameState;
   }
   const lines = computeApronLines(gameState);
@@ -61,6 +80,7 @@ export function ensureSeasonApronLinesFrozen(gameState: GameState): GameState {
         seasonId: gameState.season.id,
         frozenAtMatchdayId: gameState.matchdayState?.matchdayId ?? "",
         createdAt: new Date().toISOString(),
+        frozenAtEvent: "buy_window_close",
         medianSalary: lines.medianSalary,
         line1: lines.line1,
         line2: lines.line2,

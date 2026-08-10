@@ -7,6 +7,7 @@ import { sortFoundationTableRows } from "@/lib/foundation/foundation-table-sort"
 import { roundViewNumberByFactor as roundViewNumber } from "@/lib/foundation/foundation-number-utils";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import type { FoundationTransferHistoryResponse, SortState } from "@/lib/foundation/tabs/cockpit-types";
+import { ordneNachTransferfenster } from "@/lib/foundation/transfer-window-zuordnung";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 export const TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE = 50;
@@ -196,9 +197,27 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
     [historyFeed],
   );
 
+  /**
+   * GEMELDET: „der benchmark verkäufe aus S1 am ende! daher müssten alle teams auch schon
+   * verkäufe haben" — auf dem Board stand bei jedem Team „Einnahmen 0,0 Mio".
+   *
+   * Die Verkaeufe liegen am letzten Spieltag der alten Saison, die Kaeufe, die sie bezahlt haben,
+   * am ersten der neuen. Ein Fenster, zwei Saison-IDs. Am Live-Spielstand ausgezaehlt: 49
+   * Verkaeufe von 20 Teams, die in der Saison-2-Ansicht komplett fehlten.
+   *
+   * Die Zahl der Spieltage kommt aus dem Spielplan der laufenden Saison und dient als Untergrenze
+   * gegen Teilseiten — sonst gaelte bei einer halb geladenen Liste der hoechste geladene Spieltag
+   * als Saisonabschluss.
+   */
+  const transferFensterSaisonIdByEntry = useMemo(
+    () => ordneNachTransferfenster(historyFeed?.items ?? [], gameState.seasonState.schedule?.length ?? null),
+    [gameState.seasonState.schedule?.length, historyFeed],
+  );
+
   const transferHistoryRows = useMemo(() => {
     return (historyFeed?.items ?? [])
       .map((entry) => {
+        const fensterSaisonId = transferFensterSaisonIdByEntry.get(entry) ?? entry.seasonId;
         const player = historyPlayerById.get(entry.playerId) ?? null;
         const portrait = getPlayerPortraitMediaModel({
           id: entry.playerId,
@@ -221,7 +240,17 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
           player,
           portraitUrl: portrait.previewSrc ?? portrait.src,
           portraitInitials: portrait.initials,
-          seasonLabel: entry.seasonLabel ?? entry.seasonId,
+          /**
+           * Gruppiert wird nach TRANSFERFENSTER, nicht nach Saison — siehe
+           * `transfer-window-zuordnung`. Die Verkaeufe am Saisonende und die Kaeufe, die sie
+           * bezahlt haben, sind ein Vorgang und gehoeren zusammen; die `seasonId` im Spielstand
+           * bleibt davon unberuehrt und sagt weiter, WANN etwas passiert ist.
+           */
+          fensterSaisonId,
+          seasonLabel:
+            fensterSaisonId === entry.seasonId
+              ? entry.seasonLabel ?? entry.seasonId
+              : getCanonicalSeasonLabel({ seasonId: fensterSaisonId }),
           className: player?.className ?? null,
           race: player?.race ?? null,
           pow: player?.coreStats.pow ?? null,
@@ -242,7 +271,7 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
         const normalizedHistorySearch = deferredSearch.trim().toLowerCase();
         const matchesSeason =
           seasonFilter === HISTORY_ALL_SEASONS_FILTER ||
-          entry.seasonId === seasonFilter ||
+          entry.fensterSaisonId === seasonFilter ||
           entry.seasonLabel === seasonFilter;
         const matchesType = typeFilter === "ALL" || entry.type === typeFilter;
         const matchesTeam =
@@ -289,14 +318,19 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
   const transferHistorySeasonBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of historyFeed?.items ?? []) {
-      const label = entry.seasonLabel ?? entry.seasonId;
+      // Nach Fenster zaehlen, sonst weicht der Aufriss von der gefilterten Liste ab.
+      const fensterSaisonId = transferFensterSaisonIdByEntry.get(entry) ?? entry.seasonId;
+      const label =
+        fensterSaisonId === entry.seasonId
+          ? entry.seasonLabel ?? entry.seasonId
+          : getCanonicalSeasonLabel({ seasonId: fensterSaisonId });
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
 
     return Array.from(counts.entries()).sort(([left], [right]) =>
       left.localeCompare(right, "de", { numeric: true }),
     );
-  }, [historyFeed]);
+  }, [historyFeed, transferFensterSaisonIdByEntry]);
 
   const transferHistoryRequestedSeasonLabel = historyFeed?.saveContext?.requestedSeasonId ?? "Alle Seasons";
   const transferHistoryResolvedSeasonLabel =

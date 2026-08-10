@@ -72,10 +72,8 @@ export type UseFoundationMarketFeedActionsInput = {
 export function useFoundationMarketFeedActions(input: UseFoundationMarketFeedActionsInput) {
   const {
     activeSaveId,
-    activeView,
     gameStateSeasonId,
     readMeta,
-    isFoundationBootstrapState,
     marketTeamId,
     marketMaxValue,
     marketFeed,

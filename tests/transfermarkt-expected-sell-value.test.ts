@@ -76,9 +76,21 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
   };
 }
 
-function createGameState(input: { players: Player[]; rosters: RosterEntry[] }): GameState {
+/**
+ * `salarySettled` bildet die EINE Buyout-Regel ab, die #416 (`fd818a6`) eingefuehrt hat.
+ *
+ * Vorher gab es zwei Konventionen: Die Uebersichtsspalte zog pauschal ein Vertragsjahr ab
+ * („Laufzeit −1"), der Verkaufs-Flow rechnete mit der vollen Restlaufzeit. Jetzt entscheidet
+ * der SPIELSTAND: `resolveElapsedContractSeasonsForBuyout` zaehlt ein Jahr als verbraucht,
+ * sobald das Saisongehalt des Teams abgerechnet ist — erkennbar an einem
+ * `salary_deduct`-Eintrag in `sponsorPayoutLogs` fuer die laufende Saison.
+ *
+ * Ohne diesen Eintrag gilt die volle Restlaufzeit. Genau deshalb sind die Erwartungen hier
+ * nach dem Umbau von 20 auf 30 gewandert: Die Fixture trug nie eine solche Buchung.
+ */
+function createGameState(input: { players: Player[]; rosters: RosterEntry[]; salarySettled?: boolean }): GameState {
   return {
-    gamePhase: "preseason_management",
+    gamePhase: "season_end_management",
     season: {
       id: "season-1",
       name: "Season 1",
@@ -88,6 +100,21 @@ function createGameState(input: { players: Player[]; rosters: RosterEntry[] }): 
     },
     seasonState: {
       seasonId: "season-1",
+      sponsorPayoutLogs: input.salarySettled
+        ? [
+            {
+              id: "sponsor-payout-salary-1",
+              saveId: "save-1",
+              seasonId: "season-1",
+              teamId: "A-A",
+              phase: "season_end" as const,
+              componentId: "salary_deduct",
+              cashDelta: -10,
+              action: "apply" as const,
+              createdAt: "2026-08-09T00:00:00.000Z",
+            },
+          ]
+        : [],
       schedule: [],
       standings: {},
       playerDisciplinePerformances: [],
@@ -129,8 +156,9 @@ function createGameState(input: { players: Player[]; rosters: RosterEntry[] }): 
 }
 
 describe("buildExpectedSellValueByPlayerId", () => {
-  it("computes gross sale price minus END-OF-SEASON buyout (Laufzeit −1) for every rostered player", () => {
+  it("rechnet ohne abgerechnetes Saisongehalt mit der VOLLEN Restlaufzeit", () => {
     // Season start (keine gewerteten Performances) → Sale-Factor 1, Brutto = MW.
+    // Kein `salary_deduct` im Spielstand ⇒ kein Vertragsjahr verbraucht ⇒ 3 Restjahre à 10.
     const gameState = createGameState({
       players: [createPlayer("p1"), createPlayer("p2", { marketValue: 100, displayMarketValue: 100 })],
       rosters: [
@@ -144,19 +172,38 @@ describe("buildExpectedSellValueByPlayerId", () => {
     const p1 = byPlayerId.get("p1");
     expect(p1).toBeTruthy();
     expect(p1!.grossSalePrice).toBe(60);
-    // Saisonende-Sicht: das laufende Vertragsjahr ist verbraucht → nur noch 2 Restjahre à 10.
-    expect(p1!.buyoutCost).toBe(20);
-    expect(p1!.expectedSellValue).toBe(40);
+    expect(p1!.buyoutCost).toBe(30);
+    expect(p1!.expectedSellValue).toBe(30);
 
     const p2 = byPlayerId.get("p2");
     expect(p2).toBeTruthy();
     expect(p2!.grossSalePrice).toBe(100);
-    // Restlaufzeit 1 = "expiring": am Saisonende vertragslos → KEIN Buyout mehr.
-    expect(p2!.buyoutCost).toBe(0);
-    expect(p2!.expectedSellValue).toBe(100);
+    // Restlaufzeit 1, Gehalt noch nicht abgerechnet ⇒ dieses eine Jahr steht noch aus.
+    // „Auslaufend = kein Buyout" gilt erst, WENN das Jahr verbraucht ist (Test darunter).
+    expect(p2!.buyoutCost).toBe(5);
+    expect(p2!.expectedSellValue).toBe(95);
+  });
+
+  it("zaehlt ein Vertragsjahr als verbraucht, sobald das Saisongehalt abgerechnet ist", () => {
+    // Die andere Haelfte derselben Regel — und der Fall, den die alte, pauschale
+    // „Laufzeit −1"-Konvention frueher IMMER angenommen hat.
+    const gameState = createGameState({
+      players: [createPlayer("p1")],
+      rosters: [createRosterEntry("r1", "p1", { currentValue: 60, contractLength: 3, salary: 10 })],
+      salarySettled: true,
+    });
+
+    const p1 = buildExpectedSellValueByPlayerId(gameState).get("p1");
+    expect(p1).toBeTruthy();
+    expect(p1!.grossSalePrice).toBe(60);
+    // 3 Jahre minus das abgerechnete ⇒ 2 Restjahre à 10.
+    expect(p1!.buyoutCost).toBe(20);
+    expect(p1!.expectedSellValue).toBe(40);
   });
 
   it("charges no buyout for expiring contracts (Restlaufzeit 1) — the season-end tick clears them", () => {
+    // Mit abgerechnetem Saisongehalt ist das einzige Vertragsjahr verbraucht: der Spieler ist
+    // am Saisonende vertragslos, es gibt nichts mehr auszuzahlen.
     const gameState = createGameState({
       players: [createPlayer("p1")],
       rosters: [
@@ -166,6 +213,7 @@ describe("buildExpectedSellValueByPlayerId", () => {
           yearlySalarySchedule: [{ yearIndex: 1, seasonOffset: 0, label: "Season 1", salary: 12 }],
         }),
       ],
+      salarySettled: true,
     });
 
     const entry = buildExpectedSellValueByPlayerId(gameState).get("p1");
@@ -174,10 +222,18 @@ describe("buildExpectedSellValueByPlayerId", () => {
     expect(entry!.expectedSellValue).toBe(entry!.grossSalePrice);
   });
 
-  it("differs from the immediate sell flow by exactly the current contract year", () => {
-    // Der echte Verkaufs-Flow (previewLocalTransfermarktSell → resolveTransfermarktSellProceeds
-    // mit Default seasonsElapsed=0) rechnet weiterhin mit der VOLLEN Restlaufzeit; nur die
-    // Übersichtsspalte zieht das laufende Vertragsjahr ab.
+  it("stimmt mit dem Sofort-Verkauf ueberein — dieselbe Regel, nicht zwei", () => {
+    /**
+     * DIESER TEST HIESS FRUEHER „differs from the immediate sell flow by exactly the current
+     * contract year" und hielt genau die Doppel-Konvention fest, die #416 (`fd818a6`)
+     * abgeschafft hat: Uebersichtsspalte pauschal „Laufzeit −1", Verkaufs-Flow volle
+     * Restlaufzeit. Zwei Zahlen fuer dieselbe Frage — der Spieler sah in der Spalte einen
+     * anderen Preis als beim tatsaechlichen Verkauf.
+     *
+     * Beide lesen jetzt denselben Spielstand ueber `resolveElapsedContractSeasonsForBuyout`.
+     * Die Zusage ist deshalb umgedreht: Sie muessen GLEICH sein — vor der Gehaltsabrechnung
+     * wie danach.
+     */
     const rosterEntry = createRosterEntry("r1", "p1", {
       contractLength: 3,
       salary: 10,
@@ -196,10 +252,26 @@ describe("buildExpectedSellValueByPlayerId", () => {
       gameState,
     });
 
-    // Sofort-Verkauf: volle 3 Jahre (8+10+12=30); Spalte: nur Jahre 2+3 (10+12=22).
+    // Ohne Gehaltsabrechnung: beide sehen die vollen 3 Jahre (8+10+12=30).
     expect(immediateSell.buyoutCost).toBe(30);
-    expect(columnEntry.buyoutCost).toBe(22);
-    expect(immediateSell.buyoutCost - columnEntry.buyoutCost).toBe(8);
+    expect(columnEntry.buyoutCost).toBe(30);
+    expect(immediateSell.buyoutCost).toBe(columnEntry.buyoutCost);
+
+    // Mit Gehaltsabrechnung: beide sehen nur noch die Jahre 2+3 (10+12=22) — und immer noch
+    // dasselbe. Das ist der Punkt: Der Unterschied haengt am Spielstand, nicht am Aufrufer.
+    const abgerechnet = createGameState({
+      players: [createPlayer("p1")],
+      rosters: [rosterEntry],
+      salarySettled: true,
+    });
+    const spalteNachher = buildExpectedSellValueByPlayerId(abgerechnet).get("p1")!;
+    const sofortNachher = resolveTransfermarktSellProceeds({
+      rosterEntry,
+      grossSalePrice: spalteNachher.grossSalePrice,
+      gameState: abgerechnet,
+    });
+    expect(spalteNachher.buyoutCost).toBe(22);
+    expect(sofortNachher.buyoutCost).toBe(22);
   });
 
   it("nets can go negative for long contracts and low sale prices", () => {
@@ -211,9 +283,9 @@ describe("buildExpectedSellValueByPlayerId", () => {
     const entry = buildExpectedSellValueByPlayerId(gameState).get("p1");
     expect(entry).toBeTruthy();
     expect(entry!.grossSalePrice).toBe(10);
-    // Saisonende-Sicht: 3 statt 4 Restjahre à 8.
-    expect(entry!.buyoutCost).toBe(24);
-    expect(entry!.expectedSellValue).toBe(-14);
+    // Ohne Gehaltsabrechnung: volle 4 Restjahre à 8.
+    expect(entry!.buyoutCost).toBe(32);
+    expect(entry!.expectedSellValue).toBe(-22);
   });
 
   it("reports profit/loss against the actually paid purchase price — and null without one", () => {
@@ -235,17 +307,17 @@ describe("buildExpectedSellValueByPlayerId", () => {
     const byPlayerId = buildExpectedSellValueByPlayerId(gameState);
 
     const bought = byPlayerId.get("bought")!;
-    // Netto (80 − 10) minus gezahlte 50 → +20 Gewinn.
+    // Ohne Gehaltsabrechnung: volle 2 Restjahre à 10 ⇒ Netto (80 − 20) minus gezahlte 50 → +10.
     expect(bought.purchasePrice).toBe(50);
     expect(bought.profitVsPurchase).toBe(bought.expectedSellValue - 50);
-    expect(bought.profitVsPurchase).toBe(20);
+    expect(bought.profitVsPurchase).toBe(10);
 
     const homegrown = byPlayerId.get("homegrown")!;
     expect(homegrown.purchasePrice).toBeNull();
     expect(homegrown.profitVsPurchase).toBeNull();
 
     const loss = byPlayerId.get("loss")!;
-    // Netto (20 − 12) minus gezahlte 40 → −32 Verlust.
+    // Ohne Gehaltsabrechnung: volle 3 Restjahre à 6 ⇒ Netto (20 − 18) minus gezahlte 40.
     expect(loss.profitVsPurchase).toBe(loss.expectedSellValue - 40);
     expect(loss.profitVsPurchase).toBeLessThan(0);
   });

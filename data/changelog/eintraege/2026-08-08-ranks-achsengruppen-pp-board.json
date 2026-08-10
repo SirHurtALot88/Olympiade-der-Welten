@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-08",
+  "seite": "Welt · Ranks",
+  "text": "Die Rank-Matrix spricht jetzt eine Farbsprache: Die Achsenfarbe (Power rot, Speed grün, Mental blau, Social gold) lebt nur noch im schmalen Gruppenband über den Spalten, die Zellen färben ausschließlich nach Rang — und eine Legende erklärt beides (vorher hieß Grün mal 'Speed-Disziplin', mal 'guter Rang', ohne ein Wort dazu). Der px-Spalten-Manager ist durch Achsen-Gruppen-Schalter ersetzt: Power/Speed/Mental/Social lassen sich je Gruppe ein- und ausblenden, 'Standard' setzt alles zurück. Jedes Kürzel hat jetzt einen echten Tooltip (GEW = Gewichtheben, TOT = Gesamtrang …) — vorher sagte der Hover nur 'Nach GEW sortieren', und SCH bekam sogar die falsche Achsen-Erklärung (derselbe Substring-Fehler, der auf der Kreditseite 'Zins-Range' als 'Rang' erklärte — beides behoben, die Begriffssuche matcht nur noch ganze Wörter). Deine Zeile ist zusätzlich oben angepinnt (mit 'Rang 17 von 32'), die Zellwerte sind voll deckend und bestehen auf jeder Heat-Stufe den Kontrasttest, und 'KI-Teams gefüllt' ist ein Status-Chip statt eines Buttons, der nichts tut. Das PP-Board darunter erfindet am Saisonstart keine Rangliste mehr: Statt Gold/Silber/Bronze für die ersten drei Teams des Alphabets und 'Rang 22 von 32' aus reiner Alphabet-Position stehen dort leere Podest-Ringe ('Noch zu vergeben') mit Erklärung — und daneben das ECHTE Podium der Vorsaison (Zero Heroes, Mayhem Mavericks, Last Ride) aus dem Saisonarchiv.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

@@ -86,7 +86,7 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     // Nach dem letzten Spieltag setzt `advanceMatchday` genau diese Phase — das ist das Signal.
     expect(roomFlowSeasonContinues(spielstand({ phase: "season_completed", currentMatchday: 10 }))).toBe(false);
     expect(roomFlowSeasonContinues(spielstand({ phase: "season_review", currentMatchday: 10 }))).toBe(false);
-    expect(roomFlowSeasonContinues(spielstand({ phase: "preseason_management", currentMatchday: 1 }))).toBe(false);
+    expect(roomFlowSeasonContinues(spielstand({ phase: "season_end_management", currentMatchday: 1 }))).toBe(false);
   });
 
   it("schaltet den Raum vom Saisonstand auf die naechste Einsatzliste und zieht den Spieltag mit", () => {

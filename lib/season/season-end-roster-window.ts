@@ -14,7 +14,7 @@ export const SEASON_END_ROSTER_PHASES = new Set([
   "season_review",
   "season_rewards",
   "player_development",
-  "preseason_management",
+  "season_end_management",
   "transfer_sell_phase",
 ]);
 

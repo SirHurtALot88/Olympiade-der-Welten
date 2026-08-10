@@ -15,21 +15,26 @@ export function useFoundationCrossTabFlowCoach(input: {
       nextLabel: input.globalNextLabel,
       nextTitle: input.globalNextTitle,
     };
-    if (input.gameFlowPhase === "preseason_management" || input.gameFlowPhase === "transfer_sell_phase" || input.gameFlowPhase === "transfer_buy_phase") {
+    if (input.gameFlowPhase === "season_end_management" || input.gameFlowPhase === "transfer_sell_phase" || input.gameFlowPhase === "transfer_buy_phase") {
+      // Die Reihenfolge nennt das KAUFEN bewusst hinter dem Saisonstart: am Saisonende wird
+      // verkauft und verlaengert, gekauft wird in der neuen Saison vor dem 1. Spieltag
+      // (`lib/market/transfer-window-policy.ts`). Vorher stand hier „Sell → Buy → … → Saisonstart"
+      // und der Markt-Knopf bot „Kaufen/Verkaufen" an — beides schickte in ein Kauffenster, das
+      // an dieser Stelle gar nicht offen ist.
       const stepHint = input.preseasonWizardStepId
         ? `Aktueller Schritt: ${input.preseasonWizardStepId.replaceAll("_", " ")}`
-        : "Sell → Buy → Facilities (optional) → Training → Saisonstart";
+        : "Verkaufen/Verlängern → Facilities (optional) → Training → Saisonstart → dann Kaufen";
       return {
         ...base,
         kicker: "Preseason-Wizard",
-        title: "Saisonende durchspielen: Transfers, optionale Gebäude, Training, dann Start.",
+        title: "Saisonende durchspielen: Verkäufe und Verträge, optionale Gebäude, Training, dann Start.",
         detail: `${stepHint}. Leertaste führt Schritt für Schritt — Gebäude und überspringbare Schritte können acknowledged werden.`,
-        terms: ["Sell", "Buy", "Facilities", "Training"],
+        terms: ["Verkaufen", "Verlängern", "Facilities", "Training"],
         progressLabel: "Saisonvorbereitung",
         progressPct: 52,
         shortcut: "Space = nächster Preseason-Schritt",
         actions: [
-          { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen", tone: "primary" },
+          { label: "Transfermarkt", targetView: "marketV2", detail: "Verkaufen & verlängern", tone: "primary" },
           // "Plan setzen" passiert im Training-Tab (`trainingCompact`); `trainingV2`
           // ist der Gebäude-Tab und fuehrte hier auf die falsche Seite.
           { label: "Training", targetView: "trainingCompact", detail: "Plan setzen" },

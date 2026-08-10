@@ -28,7 +28,7 @@ import { resolveSlotRolesForDiscipline, type MatchdaySlotRoleDefinition } from "
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
-import { officialDisciplineWeightMatrix, playerGeneratorAttributeKeys, type PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
+import { playerGeneratorAttributeKeys, type PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
 import { playerGeneratorArchetypes, type PlayerGeneratorArchetypeConstraint } from "@/lib/player-generator/player-generator-archetypes";
 import {
   darkSupportArchetypes,

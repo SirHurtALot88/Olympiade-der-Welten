@@ -24,10 +24,10 @@ import type {
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
-import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
+import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
-import { deriveRosterTargets, getTeamPlayerMax } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
@@ -61,6 +61,7 @@ import {
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
 import type {
   PersistedSaveGame,
   SaveRepository,
@@ -632,7 +633,15 @@ function inferCompletedGamePhase(input: {
   matchdayState: MatchdayState;
 }): GamePhase | undefined {
   if (input.metadata?.gamePhase) {
-    return input.metadata.gamePhase;
+    // Altstand-Umschrift beim Laden: die Saisonende-Station hiess bis 0.4.11 `preseason_management`
+    // — derselbe Name wie der frische Spielaufbau. Hier faellt die Entscheidung EINMAL, damit alle
+    // Lesestellen danach eine eindeutige Phase sehen. Beide Ladewege (`loadSave`, Projektion) gehen
+    // durch diese Funktion, deshalb steht sie hier und nicht an den zwei Aufrufstellen.
+    return migrateLegacyPreseasonManagementPhase({
+      gamePhase: input.metadata.gamePhase,
+      seasonId: input.season.id,
+      matchdayResults: input.seasonState.matchdayResults,
+    });
   }
 
   const matchdayIds = input.season.matchdayIds ?? [];

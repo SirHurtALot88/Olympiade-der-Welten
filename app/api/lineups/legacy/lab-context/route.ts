@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
-import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -203,19 +203,6 @@ function resolveDefaultSqliteParamsFromSave(
   };
 }
 
-function resolveDefaultSqliteParams(input: {
-  saveId: string | null;
-  seasonId: string | null;
-  matchdayId: string | null;
-  teamId: string | null;
-}): LegacyLineupKeyParams {
-  const persistence = createPersistenceService();
-  const resolved = resolveLocalPersistedSave(persistence, input.saveId);
-  if (!resolved) {
-    throw new Error("No local save available for legacy lineup lab.");
-  }
-  return resolveDefaultSqliteParamsFromSave(resolved.save, input);
-}
 
 async function loadPrismaOptions(params: LegacyLineupKeyParams) {
   const saves = await db.save.findMany({

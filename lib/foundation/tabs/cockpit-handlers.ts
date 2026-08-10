@@ -7,8 +7,6 @@ import type {
   FoundationAiLineupBatchApplyResponse,
   FoundationApplySummary,
   FoundationAutoRosterFillResponse,
-  FoundationMatchdayAutoRunSummary,
-  FoundationMatchdayMvpScoringResponse,
   FoundationSeasonSnapshotSummary,
   FoundationView,
   FoundationWholeSeasonDryRunSummary,
@@ -399,6 +397,23 @@ export type CockpitSeasonTransitionHandlers = {
 /**
  * Season transition / completion / snapshot handlers (Strangler Phase 5.3+).
  */
+/**
+ * Die Blocker der Saisonende-Kette kommen als Schlüssel aus dem Service. Bis hierher landeten sie
+ * roh im Fehlerband („season_end_cash_settlement_pending") — das sagt niemandem, was zu tun ist.
+ * Übersetzt wird nur, was der Spieler auch selbst auflösen kann; alles andere bleibt unverändert
+ * stehen, damit ein neuer Schlüssel nicht stillschweigend verschwindet.
+ */
+const UEBERGANGS_BLOCKER_TEXTE: Record<string, string> = {
+  season_end_cash_settlement_pending:
+    "Die Saisonende-Abrechnung ist noch offen: Preisgeld, Sponsorgeld und Apron sind nicht gebucht. Erst „Saison abschließen“ ausführen — ohne das Geld stimmt die Saisonbilanz nicht.",
+  last_matchday_not_completed: "Der letzte Spieltag ist noch nicht abgeschlossen.",
+  season_transition_chain_complete: "Die Saisonende-Kette ist durch — weiter geht es über den Pre-Season-Workflow.",
+};
+
+function uebersetzeUebergangsBlocker(reason: string): string {
+  return UEBERGANGS_BLOCKER_TEXTE[reason] ?? reason;
+}
+
 export function createCockpitSeasonTransitionHandlers(
   deps: CockpitSeasonTransitionHandlersDeps,
 ): CockpitSeasonTransitionHandlers {
@@ -467,7 +482,11 @@ export function createCockpitSeasonTransitionHandlers(
       const payload = (await response.json()) as SeasonTransitionApiResponse;
       setSeasonTransitionFeed(payload.summary ?? null);
       if (!response.ok || payload.error) {
-        setSeasonTransitionError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Season Transition blockiert.");
+        setSeasonTransitionError(
+          payload.error ??
+            payload.blockingReasons?.map(uebersetzeUebergangsBlocker).join(" · ") ??
+            "Season Transition blockiert.",
+        );
       }
       if (action === "advance_step" && response.ok && payload.success) {
         // Die Phase steuert, was ueberhaupt anklickbar ist (Verkaeufe, Kaeufe, Aufstellung) —

@@ -38,12 +38,6 @@ type CandidateEntry = {
   score: number;
 };
 
-function requireValue<T>(value: T | null | undefined, message: string): T {
-  if (value == null) {
-    throw new Error(message);
-  }
-  return value;
-}
 
 function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));

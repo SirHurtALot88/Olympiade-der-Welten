@@ -418,8 +418,6 @@ export async function GET(request: Request) {
               const displayRank = hasCurrentPoints ? standing?.rank ?? startRank : budgetStartRank;
               const prizeSummary = localPrizeSummaryByTeamId?.get(team.teamId) ?? null;
               const liveSponsorCash = localSponsorIncome?.sponsorCashByTeamId.get(team.teamId) ?? null;
-              const liveFacilityIncome = localSponsorIncome?.facilityIncomeByTeamId.get(team.teamId) ?? null;
-              const teamSalaryTotal = localSalaryTotalByTeamId?.get(team.teamId) ?? 0;
               const liveGuv = localSeasonGuvByTeamId?.get(team.teamId) ?? null;
               return {
                 teamId: team.teamId,

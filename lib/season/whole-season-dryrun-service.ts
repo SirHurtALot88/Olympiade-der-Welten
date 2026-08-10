@@ -535,8 +535,6 @@ export async function runWholeSeasonDryRun(
       currentSave.gameState.seasonState.teamControlSettings,
     );
     const aiTeams = currentSave.gameState.teams.filter((team) => controlSettingsMap[team.teamId]?.controlMode === "ai");
-    const manualTeams = currentSave.gameState.teams.filter((team) => controlSettingsMap[team.teamId]?.controlMode === "manual");
-    const passiveTeams = currentSave.gameState.teams.filter((team) => controlSettingsMap[team.teamId]?.controlMode === "passive");
     const disabledAiTeams = aiTeams.filter((team) => !isAiLineupBatchApplyEnabled(controlSettingsMap[team.teamId])).length;
     const eligibleAiTeams = aiTeams.length - disabledAiTeams;
 

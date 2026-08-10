@@ -1,7 +1,10 @@
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 
 import { estimateUpgradeBuyFloorMw, isCashHoardingTeam, isStrategicHoardTeam } from "@/lib/ai/ai-budget-deploy-service";
-import { resolveTeamSpendableCashForPlanning } from "@/lib/ai/planner-cash-buffer-policy";
+import {
+  resolveTeamLiquidityBufferTarget,
+  resolveTeamSpendableCashForPlanning,
+} from "@/lib/ai/planner-cash-buffer-policy";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment, originateLoan } from "@/lib/finance/loan-service";
@@ -237,6 +240,55 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   if (isSeasonOne(seasonId)) return noLoan("season_one_no_loans");
 
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+
+  /**
+   * LIQUIDITAETS-KREDIT — der Fall, den Chris gemeldet hat: „Gerade auch bei teams wie D-P die mit
+   * negativem Cash rein gehen. Nach den Käufen darf man kein negatives Cash haben. Also müssten die
+   * einen Kredit aufnehmen oder nicht?"
+   *
+   * Seit die Verkaeufe am Saisonende stattfinden (#445) und das Kauffenster reines Kaufen ist, hat
+   * ein Team, das mit Minus in die neue Saison geht, dort KEINEN Weg mehr heraus: verkaufen darf es
+   * im Fenster nicht, und die bedarfsgetriebene Pruefung weiter unten laesst es abblitzen, sobald
+   * der Kader gross genug ist (`no_need`) — obwohl gerade das Geld fehlt. Das Minus bliebe die
+   * ganze Saison stehen, und mit ihm die Sperre gegen jeden Kauf (der Kauf-Puffer verlangt ein
+   * Konto ueber dem Liquiditaetspuffer).
+   *
+   * Deshalb qualifiziert negatives Cash fuer sich genommen. Der Betrag ist die kleinste Summe, die
+   * das Konto ueber den Liquiditaetspuffer hebt — kein Aufschlag fuer Kaeufe, das macht der
+   * bedarfsgetriebene Zweig. Er wird bewusst NICHT mit der Bereitschaft skaliert: ein halber Kredit
+   * liesse das Team im Minus stehen, also im selben Zustand, nur mit Zinsen. Auch die
+   * Hort-Persoenlichkeit zaehlt hier nicht — ein Team im Minus muss das aufloesen, unabhaengig
+   * davon, wie gern es sonst Geld hortet.
+   *
+   * Kapazitaet und Tragfaehigkeit gelten weiter: sagt die Bank nein, bleibt es ein Nein mit Grund.
+   */
+  const cash = team.cash ?? 0;
+  if (cash < 0) {
+    const puffer = resolveTeamLiquidityBufferTarget(gameState, teamId);
+    const bedarf = round(Math.abs(cash) + puffer, 1);
+    const kapazitaetsProbe = originateLoan(
+      gameState,
+      { borrowerTeamId: teamId, principal: bedarf, termSeasons: DEFAULT_TERM_SEASONS },
+      { execute: false },
+    );
+    if (kapazitaetsProbe.capacity <= 0) return noLoan("liquidity_no_capacity");
+    const betrag = round(Math.min(bedarf, kapazitaetsProbe.capacity), 1);
+    if (betrag <= 0) return noLoan("liquidity_no_capacity");
+    const laufzeit = resolveServiceableTermSeasons({
+      gameState,
+      teamId,
+      principal: betrag,
+      finances: identity?.finances ?? 5,
+    });
+    if (laufzeit == null) return noLoan("liquidity_debt_service_ceiling");
+    return {
+      shouldBorrow: true,
+      loanAmount: betrag,
+      termSeasons: laufzeit,
+      reason: "liquidity_negative_cash",
+    };
+  }
+
   const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
   const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
   // Trigger nur unter der wettbewerbsfähigen Zwischenstufe (Min + halber Weg zu Opt), NICHT schon unter

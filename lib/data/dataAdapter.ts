@@ -1,3 +1,4 @@
+import { ensureNulaOnProjectSuicide } from "@/lib/foundation/ensure-nula-on-project-suicide";
 import playerTeamMappingSource from "@/data/source/player-team-mapping.json";
 import teamIdentitiesSource from "@/data/source/team-identities.json";
 import teamsSource from "@/data/source/teams.json";
@@ -506,6 +507,23 @@ export function createSaveGameState(saveId = "save-dev-1", input?: OlySeedData):
     saveId,
     createdAt: now,
     updatedAt: now,
-    gameState: createGameStateFromSeed(input, { scheduleSeedId: saveId }),
+    // NULA GEHOERT SCHON BEIM ANLEGEN ZU P-S — nicht erst beim naechsten Laden.
+    //
+    // BEFUND (Sandbox-Lauf, in zwei Spielstaenden reproduziert): P-S landete nach dem Saison-1-Draft
+    // bei cash = -2.26, und die Saison-Vorpruefung blockierte mit `negative_cash`. Ursache war die
+    // Reihenfolge, nicht der Draft: ein frischer Spielstand wird angelegt und IM SPEICHER gedraftet,
+    // `ensureNulaOnProjectSuicide` lief aber erst beim naechsten Laden (`materializePersistedSave`,
+    // save-repository.ts). Der Draft sah also die vollen 300 statt der 295.37, verplante sie, und
+    // Nulas 4.63 wurden danach abgebucht.
+    //
+    //     Budget 300.00  -  Draft 297.63  -  Nula 4.63  =  -2.26
+    //
+    // Die Kaufsperre war dabei nie im Unrecht: zum Zeitpunkt des letzten Kaufs war das Geld noch da.
+    // CHRIS dazu: „P-S hat 300 aber kauft im Moment standardmaessig Nula das ist ok so!" — der Kauf
+    // bleibt also, er muss nur VOR dem Draft feststehen, damit dieser mit dem echten Rest plant.
+    //
+    // Der Transform ist persistenzfrei und idempotent (siehe seine Doku), der spaetere Lauf beim
+    // Laden wird dadurch schlicht zum No-op.
+    gameState: ensureNulaOnProjectSuicide(createGameStateFromSeed(input, { scheduleSeedId: saveId })),
   };
 }

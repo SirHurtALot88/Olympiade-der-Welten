@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const veloUiPath = path.join(process.cwd(), "components/foundation/velo-ui");
 const globalsPath = path.join(process.cwd(), "app/globals.css");
-const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
 const teamsDetailPanelPath =
   path.join(process.cwd(), "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx");
 
@@ -39,15 +38,38 @@ describe("velo ui rollout contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(lineupText).toContain("FoundationPlayerPortraitCard");
-    expect(lineupText).toContain("VeloImpactStrip");
-    // NOTE: "legacy-lineup-scoreboard-impact-strip" (part of the same
-    // "legacy-lineup-scoreboard-*" family checked in
-    // tests/gameplay-flow-scan-contract.test.ts) is no longer referenced by
-    // any .tsx file — only as a dead rule in app/globals.css. Looks like the
-    // same "Daten-Ansicht" scoreboard panel removal (real feature loss, see
-    // final report), left red intentionally.
-    expect(lineupText).toContain("legacy-lineup-scoreboard-impact-strip");
+    /**
+     * HIER STANDEN DREI ABSICHTLICH ROTE ZUSICHERUNGEN auf `FoundationPlayerPortraitCard`,
+     * `VeloImpactStrip` und `legacy-lineup-scoreboard-impact-strip` im LEGACY-Client, mit dem
+     * Verdacht, das „Daten-Ansicht"-Scoreboard sei ersatzlos verschwunden.
+     *
+     * Nachgesehen (Audit): Der Verdacht trägt nicht. Das Scoreboard lag im alten Look, und der war
+     * seit „'Neuer Look'-Toggle entfernen" (`ae590e4f`) hinter `if (newLook) return <LineupNewLook/>`
+     * gar nicht mehr erreichbar; `32683df8` hat den toten Zweig dann physisch entfernt. Sein Inhalt
+     * lebt weiter: Tagesrang, Saisonrang vorher→nachher, D1/D2, Form-, Captain- und Mutator-Beitrag
+     * stehen heute in `DisciplineStageMatchdayPanel`, die Netto-Werte je Etappe in
+     * `DisciplineStageResultTable`, die Gesamtsicht im „Daten"-Tab von `MatchdayResultNewLook`.
+     *
+     * Auch die Portrait-Karte ist nicht weg, sondern umgezogen: `LineupNewLook` zeigt Mini-Avatare
+     * mit Hover-Vorschau (`FoundationPlayerPortraitPreview`), und die rendert die volle
+     * `FoundationPlayerPortraitCard`. Der Test suchte sie nur in der falschen Datei.
+     *
+     * Geprüft wird deshalb jetzt die heutige Verdrahtung statt der alten Namen.
+     */
+    expect(lineupText).toContain("LineupNewLook");
+    const lineupNewLookText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"),
+      "utf8",
+    );
+    expect(lineupNewLookText).toContain("FoundationPlayerPortraitPreview");
+    expect(lineupNewLookText).toContain("NlPlayerAvatar");
+    const portraitPreviewText = await fs.readFile(
+      path.join(process.cwd(), "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"),
+      "utf8",
+    );
+    // Die Hover-Vorschau MUSS die volle Karte rendern — sonst wäre die Portrait-Darstellung im
+    // Lineup-Lab doch verloren, nur unauffälliger.
+    expect(portraitPreviewText).toContain("FoundationPlayerPortraitCard");
     expect(drawerText).toContain("player-drawer-axis-chip");
     expect(drawerText).toContain("player-drawer-scouting-disclosure");
     expect(cssText).toContain(".player-drawer-axis-orbit");

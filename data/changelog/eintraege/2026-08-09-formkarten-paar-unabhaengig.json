@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-09",
+  "seite": "Spieltag · Formkarten",
+  "text": "Jeder Spieler bekam ein exakt gespiegeltes Kartenpaar — +8 und −8, +4 und −4 — und zwar immer: über 20.000 Ziehungen nachgemessen waren die beiden Werte in 100 % der Fälle betragsgleich. Im Live-Save steht genau das: 680 Karten der Saison, Nennwertsumme exakt 0. Das war kein Zufall, sondern eine Kollision: die Auswahl nahm nur die untersten zwei Bits des Hashes, und in dieser Rechnung laufen die Seeds für „positiv\" und „negativ\" nach dem vierten Zeichen zusammen. Beide Beträge werden jetzt getrennt gezogen, die Verteilung trifft alle 16 Kombinationen. Bestehende Saisons behalten ihre Karten — die Werte entstehen beim Saisonwechsel und stehen im Spielstand.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

@@ -4,28 +4,20 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   buildGeneratedFormCardRecordsForSeason,
-  calculateFormModifierForSide,
-  calculateMutatorModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
-  getFormCardColorForDisciplineCategory,
   getTeamFormCardOptions,
   buildLegacyMutatorTraitOptionsForRoster,
   normalizeLineupDraftModifiers,
-  buildMatchdayMutatorTraitsBySide,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { getLocalModifierSourceBundle } from "@/lib/lineups/legacy-modifier-source-contract";
 import {
-  calculateTeamPowerModifierForSide,
   ensureLocalTeamPowersForSeason,
   getTeamPowerOptions,
 } from "@/lib/lineups/team-powers";
 import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, createLineupDraftId, formatLineupTeamStatusLabel, getSeasonCaptainDisciplineSideKeys, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
-import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { computeTeamDisciplineRankTable, computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
-import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import type { FormCardPlanRecord, GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type {
   LegacyInjuryRiskProjectionRef,

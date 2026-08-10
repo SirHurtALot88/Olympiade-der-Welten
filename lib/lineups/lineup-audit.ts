@@ -439,9 +439,17 @@ export function buildSlotIssuesByKey(input: {
       const issues: LineupSlotIssue[] = [];
 
       if (!selectedId) {
+        // S6/L2 (Audit Spieltag): ein leerer, noch nicht in Bearbeitung befindlicher
+        // Slot ist der NORMALZUSTAND jedes Spieltags vor dem Ausfüllen — vorher hieß
+        // er "Spieler fehlt" und wurde (Rendering-Bug in LineupNewLook.tsx: jedes
+        // Issue lief hart auf `is-risk`) rot wie ein echter Fehler dargestellt, 9×
+        // gleichzeitig auf der Seite. "Offen" deckt sich mit dem Label, das die Karte
+        // ohnehin schon zeigt ("Offen" / "Slot wählen") — der Best-Fit-Name steht
+        // bereits als eigene Zeile darunter, keine zweite Nennung nötig. Der aktive
+        // Slot ("Hier weiter") bleibt bewusst ein echter Blocker (tone "blocked").
         issues.push({
           tone: activeSlotKey === slot.key ? "blocked" : "warning",
-          label: activeSlotKey === slot.key ? "Hier weiter" : "Spieler fehlt",
+          label: activeSlotKey === slot.key ? "Hier weiter" : "Offen",
           detail: `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} wartet noch auf einen Spieler.`,
         });
       }
@@ -553,12 +561,18 @@ export function buildLineupSaveCta(input: {
     };
   }
 
+  // F4 (Befund L1): der CTA zählte hier BLOCKER-KATEGORIEN („Noch 1 offen"),
+  // direkt neben dem Ring, der SLOTS zählt („0/9 · 9 offen") — zwei Zähler,
+  // zwei Einheiten, dieselbe Wortwahl. Die Slot-Zahl ist die Quelle; der CTA
+  // erfindet keine eigene „Dinge"-Einheit mehr, sondern benennt den Blocker
+  // wörtlich (ein Blocker → sein Text, z. B. „9 Slots offen" — identisch mit
+  // dem Ring) oder zählt ausdrücklich „Blocker".
   const blockerCount = blockers.length;
   return {
     tone: blockers.some((entry) => entry.includes("Konflikt")) ? ("blocked" as const) : ("warning" as const),
-    label: blockerCount > 0 ? `Noch ${blockerCount} ${blockerCount === 1 ? "Ding" : "Dinge"} offen` : "Noch nicht bereit",
+    label: blockerCount === 1 ? blockers[0]! : blockerCount > 1 ? `${blockerCount} Blocker offen` : "Noch nicht bereit",
     detail: blockers.slice(0, 3).join(" · ") || "Bitte offene Punkte zuerst aufraeumen.",
-    buttonLabel: blockerCount > 0 ? `Noch ${blockerCount} offen` : "Noch nicht bereit",
+    buttonLabel: blockerCount === 1 ? blockers[0]! : blockerCount > 1 ? `${blockerCount} Blocker` : "Noch nicht bereit",
   };
 }
 

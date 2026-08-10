@@ -11,7 +11,7 @@ import {
   getTeamOutstandingDebt,
 } from "@/lib/finance/loan-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
-import { getTeamDisplaySalaryTotal, getTeamFacilityUpkeepTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamActualSalaryTotal, getTeamFacilityUpkeepTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
 
@@ -89,6 +89,46 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
       };
     });
 
+  /**
+   * Die Liga-Sicht: jeder Kredit im Spielstand, egal wer ihn hat.
+   *
+   * CHRIS: „der spieler soll im kredite tab ALLE kredite sehen können … welches team hat von
+   * welchem einen kredit genommen, laufzeit raten usw."
+   *
+   * Kein Filter auf `status`: beendete Kredite bleiben sichtbar, sonst verschwindet die Historie
+   * genau dann, wenn sie interessant wird. Sortiert nach „laeuft noch" und dann nach Restschuld,
+   * damit die dicksten offenen Posten oben stehen.
+   */
+  const teamNameById = new Map(gameState.teams.map((entry) => [entry.teamId, entry.name] as const));
+  const leagueLoans = (gameState.seasonState.loans ?? [])
+    .map((loan) => {
+      const lenderTeamId = loan.lenderType === "team" ? (loan.lenderTeamId ?? null) : null;
+      return {
+        id: loan.loanId,
+        borrowerTeamId: loan.borrowerTeamId,
+        borrowerName: teamNameById.get(loan.borrowerTeamId) ?? loan.borrowerTeamId,
+        lenderType: loan.lenderType,
+        lenderTeamId,
+        lenderName:
+          loan.lenderType === "team" ? (teamNameById.get(lenderTeamId ?? "") ?? "Team") : "Bank",
+        principal: loan.principalOriginal,
+        outstanding: loan.principalOutstanding,
+        interestRate: loan.interestRatePerSeason,
+        termSeasons: loan.termSeasons,
+        remainingSeasons: loan.seasonsRemaining,
+        installmentPerSeason: loan.installmentPerSeason,
+        status: loan.status,
+        originatedSeasonId: loan.originatedSeasonId ?? null,
+        missedPayments: loan.missedPayments ?? 0,
+        involvesOwnTeam: loan.borrowerTeamId === teamId || lenderTeamId === teamId,
+      };
+    })
+    .sort((left, right) => {
+      const laeuft = (row: { status: string }) => (row.status === "active" ? 0 : 1);
+      if (laeuft(left) !== laeuft(right)) return laeuft(left) - laeuft(right);
+      return right.outstanding - left.outstanding;
+    });
+
   const isPreseason = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
   const seasonOne = isSeasonOne(gameState.season.id);
   // Admin-Override (nur Vorschau/Test, siehe FoundationCreditsHost): ignoriert
@@ -114,10 +154,16 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   const creditUtilizationRatio =
     creditCapacityTotal > 0 ? Math.max(0, Math.min(1, outstandingDebt / creditCapacityTotal)) : 0;
 
-  // Tilgung-vs-Cashflow (Grafik-Welle 2): dieselben Helper, die auch die
-  // Sponsoren-/KI-Kalkulation nutzt — keine eigene Wirtschaftslogik hier.
+  // Tilgung-vs-Cashflow (Grafik-Welle 2, F4): der Chart zeigt CASHFLOW,
+  // also die ECHTE Gehaltssumme (`getTeamActualSalaryTotal` = contract.salary,
+  // das Feld, das die Season-End-Resolution abbucht) — dieselbe Zahl wie auf
+  // der Finanzen-Seite. Vorher stand hier die Apron-/Sponsor-GLÄTTUNG
+  // (`getTeamDisplaySalaryTotal`, expectedSalary): 64,1 gegen 52,1 Mio — und
+  // das „Deckungslücke"-Badge behauptete eine Lücke, die es im echten
+  // Cashflow nicht gab. Apron/Sponsor/KI rechnen intern unverändert mit der
+  // Glättung; nur diese Anzeige wechselt die Quelle.
   const annualLoanInstallment = getTeamAnnualLoanInstallment(gameState, teamId);
-  const annualSalaryTotal = getTeamDisplaySalaryTotal(gameState, teamId);
+  const annualSalaryTotal = getTeamActualSalaryTotal(gameState, teamId);
   const annualFacilityUpkeep = getTeamFacilityUpkeepTotal(gameState, teamId);
   const estimatedAnnualRevenue = estimateTeamAnnualRevenue(gameState, teamId);
 
@@ -134,6 +180,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
     minTermSeasons: MIN_TERM_SEASONS,
     maxTermSeasons: MAX_TERM_SEASONS,
     activeLoans,
+    leagueLoans,
     creditCapacityTotal,
     creditUtilizationRatio,
     annualLoanInstallment,

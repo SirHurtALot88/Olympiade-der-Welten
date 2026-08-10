@@ -16,6 +16,7 @@ import {
   nlToneClass,
   useCountUp,
 } from "@/components/foundation/new-look";
+import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
   MatchdaySummaryHighlight,
@@ -100,22 +101,14 @@ function renderRankMovement(row: MatchdaySummaryTeamRow) {
   );
 }
 
-/** Schlichtes, emoji-freies Glyphen-Badge pro Highlight-Kategorie. */
+/**
+ * Schlichtes, emoji-freies Glyphen-Badge pro Highlight-Kategorie. Die Glyphe
+ * kommt aus derselben deutschen Typ-Map wie Label und Satz
+ * (`lib/foundation/matchday-highlight-labels.ts`) — vorher riet hier eine
+ * Heuristik über den rohen Enum-Namen.
+ */
 function getHighlightGlyph(highlight: MatchdaySummaryHighlight): string {
-  const label = highlight.label.toLowerCase();
-  if (label.includes("mvp") || label.includes("spieler") || label.includes("player")) {
-    return "MVP";
-  }
-  if (label.includes("team") || label.includes("sieger") || label.includes("winner")) {
-    return "TOP";
-  }
-  if (label.includes("d1")) {
-    return "D1";
-  }
-  if (label.includes("d2")) {
-    return "D2";
-  }
-  return highlight.label.slice(0, 2).toUpperCase() || "•";
+  return highlight.glyph || "★";
 }
 
 export default function MatchdayResultNewLook(props: FoundationMatchdayResultShellHostProps) {
@@ -199,8 +192,32 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
       ? { src: getTeamLogoBrowserUrl(heroRow.teamId, null, { variant: "thumb" }), initials: heroRow.teamShortCode }
       : null;
   const heroPoints = useCountUp(heroRow?.matchdayPoints ?? null);
-  const championRow = matchdaySummary.topTeams[0] ?? boardRows[0] ?? null;
+  // S4/A5 (Audit Spieltag): `hasResult` ist die EINE Quelle dafür, ob für diesen
+  // Spieltag überhaupt schon gewertet wurde. Vorher fiel `championRow` ohne Ergebnis
+  // auf `boardRows[0]` zurück — und weil `teamRows` dann alphabetisch (nicht nach
+  // Rang) steht, bekam praktisch immer dasselbe Team ("Armageddon Aftermath")
+  // einen erfundenen "Tagessieger"-Kranz samt Gold-Reveal. Dieselbe Zustandsfrage
+  // wie in der Arena (S3 `showPreMatchday`), hier beantwortet aus dem Summary-Flag.
+  const hasResult = matchdaySummary.hasResult;
+  const championRow = hasResult ? (matchdaySummary.topTeams[0] ?? boardRows[0] ?? null) : null;
+  /**
+   * Dritter Zustand des Spieltags: TEILWEISE gewertet (z. B. nur D1 gebucht, D2
+   * steht aus). `completion` kommt aus `getMatchdayScoringProgress` — derselben
+   * Quelle, mit der Spielplan („läuft") und Spieltagswechsel rechnen. Vorher
+   * kannte diese Seite nur fertig/leer und verkaufte den halben Spieltag als
+   * Endergebnis: Tagessieger-Reveal, Tages-Podium mit Medaillen, nirgends
+   * „vorläufig". Jetzt gilt: Zwischenstände werden GEZEIGT (die D1-Punkte sind
+   * echt), aber als solche benannt — und die Finale-Inszenierung (Gold-Reveal,
+   * Medaillen-Podium) wartet, bis der Tag wirklich entschieden ist.
+   */
+  const isPartial = matchdaySummary.completion === "partial";
+  const d1Name = matchdaySummary.d1.disciplineName ?? "Disziplin 1";
+  const d2Name = matchdaySummary.d2.disciplineName ?? "Disziplin 2";
   const topPlayers = matchdaySummary.topPlayers.slice(0, 5);
+  const diagnoseWarnings = useMemo(
+    () => matchdaySummary.warnings.filter((warning) => warning !== "missing_matchday_result"),
+    [matchdaySummary.warnings],
+  );
 
   // Tages-Podium: die echten Rang-1-bis-3-Zeilen des gespeicherten Ergebnisses.
   const podiumRows = useMemo(
@@ -296,8 +313,11 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
 
   function renderBoardRow(row: MatchdaySummaryTeamRow) {
     const isActive = row.teamId === activeManagerTeamId;
-    const medalKind =
-      row.matchdayRank === 1 ? "gold" : row.matchdayRank === 2 ? "silver" : row.matchdayRank === 3 ? "bronze" : null;
+    // Medaillen-Optik nur für den entschiedenen Tag — im Zwischenstand sind die
+    // ersten drei Zeilen eine Momentaufnahme, keine Vergabe.
+    const medalKind = isPartial
+      ? null
+      : row.matchdayRank === 1 ? "gold" : row.matchdayRank === 2 ? "silver" : row.matchdayRank === 3 ? "bronze" : null;
     const logoSrc = getTeamLogoBrowserUrl(row.teamId, null, { variant: "thumb" });
 
     return (
@@ -425,7 +445,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
     >
       <NlCard
         className="nl-result-header-card"
-        eyebrow={`${sourceBadgeLabel} · ${matchdaySummary.seasonId} · Spieltag ${matchdaySummary.matchdayNumber ?? "—"}`}
+        eyebrow={`${sourceBadgeLabel} · ${matchdaySummary.seasonId} · Spieltag ${matchdaySummary.matchdayNumber ?? "—"}${isPartial ? " · läuft" : ""}`}
         title="Spieltagsergebnis"
         actions={
           <div className="nl-result-actions">
@@ -460,73 +480,110 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </div>
         }
       >
-        <div className="nl-result-hero">
-          <div className="nl-result-hero-stage">
-            {heroLogo ? (
-              <BudgetedMediaImage
-                src={heroLogo.src}
-                alt={`${heroRow?.teamName ?? selectedTeam?.name ?? "Team"} Logo`}
-                className="nl-result-hero-crest"
-                width={72}
-                height={72}
-                fallback={<span className="nl-result-hero-crest nl-result-hero-crest-fallback">{heroLogo.initials}</span>}
-              />
-            ) : (
-              <span className="nl-result-hero-crest nl-result-hero-crest-fallback">—</span>
-            )}
-            <div className="nl-result-hero-copy">
-              <span className="nl-result-hero-teamname">
-                {heroRow?.teamName ?? selectedTeam?.name ?? "Kein aktives Team"}
-              </span>
-              <span className="nl-result-hero-rankline">
-                <span className="nl-result-hero-ranklabel">Tagesrang</span>
-                <strong className="nl-result-hero-rank nl-tnum">
-                  {heroRow?.matchdayRank != null ? `#${heroRow.matchdayRank}` : "—"}
-                </strong>
-                {heroRow?.matchdayRank != null && heroRow.matchdayRank <= 3 ? (
-                  <NlMedalBadge
-                    kind={heroRow.matchdayRank === 1 ? "gold" : heroRow.matchdayRank === 2 ? "silver" : "bronze"}
-                    title={`Tagesrang ${heroRow.matchdayRank}`}
-                  />
-                ) : null}
-              </span>
-              <span className="nl-result-hero-points">
-                <strong className="nl-result-hero-points-value nl-tnum">
-                  {heroPoints != null ? formatNlNumber(heroPoints, 1) : "—"}
-                </strong>
-                <span className="nl-result-hero-points-label">Tagespunkte</span>
-              </span>
-              {heroRow ? renderRankMovement(heroRow) : null}
+        {hasResult && isPartial ? (
+          // Der Zwischenstands-Hinweis ist die EINE Aussage, die alle Zahlen dieser
+          // Seite einordnet — dieselbe Erzählung wie „Spieltag 4 · läuft" im
+          // Spielplan und „Etappe 1/2 gewertet" in der Arena.
+          <p className="nl-result-partial-note" data-testid="nl-result-partial-note" role="status">
+            <strong>Zwischenstand:</strong> {d1Name} ist gewertet, {d2Name} steht noch aus. Tagesränge
+            und Führung sind vorläufig — der Tagessieger wird erst nach beiden Disziplinen gekürt.
+          </p>
+        ) : null}
+        {hasResult ? (
+          <div className="nl-result-hero">
+            <div className="nl-result-hero-stage">
+              {heroLogo ? (
+                <BudgetedMediaImage
+                  src={heroLogo.src}
+                  alt={`${heroRow?.teamName ?? selectedTeam?.name ?? "Team"} Logo`}
+                  className="nl-result-hero-crest"
+                  width={72}
+                  height={72}
+                  fallback={<span className="nl-result-hero-crest nl-result-hero-crest-fallback">{heroLogo.initials}</span>}
+                />
+              ) : (
+                <span className="nl-result-hero-crest nl-result-hero-crest-fallback">—</span>
+              )}
+              <div className="nl-result-hero-copy">
+                <span className="nl-result-hero-teamname">
+                  {heroRow?.teamName ?? selectedTeam?.name ?? "Kein aktives Team"}
+                </span>
+                <span className="nl-result-hero-rankline">
+                  {/* Auf halber Strecke heißt der Rang beim wahren Namen: Zwischenrang. */}
+                  <span className="nl-result-hero-ranklabel">{isPartial ? "Zwischenrang" : "Tagesrang"}</span>
+                  <strong className="nl-result-hero-rank nl-tnum">
+                    {heroRow?.matchdayRank != null ? `#${heroRow.matchdayRank}` : "—"}
+                  </strong>
+                  {!isPartial && heroRow?.matchdayRank != null && heroRow.matchdayRank <= 3 ? (
+                    <NlMedalBadge
+                      kind={heroRow.matchdayRank === 1 ? "gold" : heroRow.matchdayRank === 2 ? "silver" : "bronze"}
+                      title={`Tagesrang ${heroRow.matchdayRank}`}
+                    />
+                  ) : null}
+                </span>
+                <span className="nl-result-hero-points">
+                  <strong className="nl-result-hero-points-value nl-tnum">
+                    {heroPoints != null ? formatNlNumber(heroPoints, 1) : "—"}
+                  </strong>
+                  <span className="nl-result-hero-points-label">Tagespunkte</span>
+                </span>
+                {heroRow ? renderRankMovement(heroRow) : null}
+              </div>
             </div>
-          </div>
-          <StatChipRow className="nl-result-hero-chips" aria-label="Spieltag-Kontext">
-            <StatChip
-              label="D1"
-              value={matchdaySummary.d1.disciplineName ?? "—"}
-              tone="accent"
-              sub={heroRow?.d1Score != null ? `${formatNlNumber(heroRow.d1Score, 1)} Score` : undefined}
-            />
-            <StatChip
-              label="D2"
-              value={matchdaySummary.d2.disciplineName ?? "—"}
-              tone="neutral"
-              sub={heroRow?.d2Score != null ? `${formatNlNumber(heroRow.d2Score, 1)} Score` : undefined}
-            />
-            {championRow ? (
+            <StatChipRow className="nl-result-hero-chips" aria-label="Spieltag-Kontext">
               <StatChip
-                label="Tagessieger"
-                value={championRow.teamName}
+                label="D1"
+                value={matchdaySummary.d1.disciplineName ?? "—"}
                 tone="accent"
-                sub={championRow.matchdayPoints != null ? `${formatNlNumber(championRow.matchdayPoints, 1)} Punkte` : undefined}
-                onClick={() => openTeamProfileById(championRow.teamId)}
-                title={`${championRow.teamName} öffnen`}
+                sub={heroRow?.d1Score != null ? `${formatNlNumber(heroRow.d1Score, 1)} Score` : undefined}
               />
-            ) : null}
-          </StatChipRow>
-        </div>
+              <StatChip
+                label="D2"
+                value={matchdaySummary.d2.disciplineName ?? "—"}
+                tone="neutral"
+                sub={
+                  heroRow?.d2Score != null
+                    ? `${formatNlNumber(heroRow.d2Score, 1)} Score`
+                    : isPartial
+                      ? "steht noch aus"
+                      : undefined
+                }
+              />
+              {championRow ? (
+                <StatChip
+                  // Halbzeit-Führung ist kein Sieg: das Label sagt, was die Zahl ist.
+                  label={isPartial ? "Zwischenführung" : "Tagessieger"}
+                  value={championRow.teamName}
+                  tone="accent"
+                  sub={
+                    championRow.matchdayPoints != null
+                      ? `${formatNlNumber(championRow.matchdayPoints, 1)} Punkte${isPartial ? " · vorläufig" : ""}`
+                      : undefined
+                  }
+                  onClick={() => openTeamProfileById(championRow.teamId)}
+                  title={`${championRow.teamName} öffnen`}
+                />
+              ) : null}
+            </StatChipRow>
+          </div>
+        ) : (
+          // A5 (Audit Spieltag): vorher standen hier dieselben Kacheln mit lauter
+          // "—" (Tagesrang, Tagespunkte, D1/D2 leer) — Nullwerte ohne Erklärung,
+          // wo in Wahrheit noch gar kein Ergebnis existiert. Chris' Regel „bei 0
+          // wird erklärt, nicht versteckt" gilt genauso fürs „noch nie": ein Satz
+          // statt eines Gerüsts aus Gedankenstrichen.
+          <p className="nl-result-pending-note" data-testid="nl-result-pending-note">
+            Für {heroRow?.teamName ?? selectedTeam?.name ?? "dein Team"} liegt für Spieltag{" "}
+            {matchdaySummary.matchdayNumber ?? "—"} noch kein Ergebnis vor. Die Wertung erscheint hier,
+            sobald beide Disziplinen in der Arena gewertet sind.
+          </p>
+        )}
       </NlCard>
 
-      {championRow && !tagessiegerDismissed ? (
+      {/* Der Gold-Reveal ist die Kür des FERTIGEN Spieltags — auf halber Strecke
+          gibt es keinen Tagessieger, also auch keinen Reveal (die Zwischenführung
+          steht als beschrifteter Chip im Kopf). */}
+      {championRow && !isPartial && !tagessiegerDismissed ? (
         <section
           className="nl-result-reveal"
           data-testid="nl-result-tagessieger-reveal"
@@ -597,7 +654,9 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         </section>
       ) : null}
 
-      {podiumRows.length > 0 ? (
+      {/* Medaillen-Podium erst, wenn der Tag entschieden ist — ein halber Spieltag
+          vergibt keine Tages-Medaillen (der Zwischenstand steht in der Tageswertung). */}
+      {podiumRows.length > 0 && !isPartial ? (
         <NlCard
           className="nl-result-podium-card"
           title="Tages-Podium"
@@ -617,18 +676,44 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
 
       <NlCard
         className="nl-result-board-card"
-        title="Tageswertung"
-        eyebrow={`${boardRows.length} Teams`}
+        title={isPartial ? "Tageswertung · Zwischenstand" : "Tageswertung"}
+        eyebrow={
+          hasResult
+            ? isPartial
+              ? `Nach ${d1Name} · ${d2Name} steht noch aus · ${boardRows.length} Teams`
+              : `${boardRows.length} Teams`
+            : "Noch keine Wertung"
+        }
         actions={
-          <NlSubTabs
-            items={NL_RESULT_MODE_ITEMS}
-            activeId={mode}
-            onSelect={(id) => setMode(id as NlResultMode)}
-            aria-label="Ergebnis-Ansicht"
-          />
+          hasResult ? (
+            <NlSubTabs
+              items={NL_RESULT_MODE_ITEMS}
+              activeId={mode}
+              onSelect={(id) => setMode(id as NlResultMode)}
+              aria-label="Ergebnis-Ansicht"
+            />
+          ) : null
         }
       >
-        {boardRows.length === 0 ? (
+        {/* A5 (Audit Spieltag): vorher rendierte diese Karte alle 32 Teams mit
+            lauter "—"-Zellen — ein Ergebnis-Skelett ohne Ergebnis (Muster 3, wie
+            die Arena vor S3). `VeloPendingRanking` ist dasselbe geteilte
+            Primitive wie dort: keine Zeilen, keine Ränge, keine Medaillen-Optik,
+            solange es nichts zu werten gibt. */}
+        {!hasResult ? (
+          <VeloPendingRanking
+            eyebrow="Spieltags-Wertung"
+            title="Wertung folgt"
+            note={`Sobald dieser Spieltag in der Arena gewertet ist, erscheint hier die Tageswertung aller ${boardRows.length} Teams. Bis dahin steht hier bewusst keine Reihenfolge.`}
+            slots={[
+              { key: "gold", ring: "1.", label: "Noch zu vergeben" },
+              { key: "silver", ring: "2.", label: "Noch zu vergeben" },
+              { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
+            ]}
+            meta={`${boardRows.length} Teams gemeldet`}
+            data-testid="nl-result-pending-ranking"
+          />
+        ) : boardRows.length === 0 ? (
           <p className="nl-result-empty-text">Für diesen Spieltag liegt noch kein gespeichertes Ergebnis vor.</p>
         ) : mode === "board" ? (
           <ol className="nl-result-board" aria-label="Tageswertung">
@@ -639,9 +724,21 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         )}
       </NlCard>
 
-      <NlCard className="nl-result-mvp-card" title="Tages-MVPs" eyebrow="Beste Einzelleistungen dieses Spieltags">
+      <NlCard
+        className="nl-result-mvp-card"
+        title="Tages-MVPs"
+        eyebrow={
+          isPartial
+            ? `Beste Einzelleistungen — vorläufig, ${d2Name} steht noch aus`
+            : "Beste Einzelleistungen dieses Spieltags"
+        }
+      >
         {topPlayers.length === 0 ? (
-          <p className="nl-result-empty-text">Für diesen Spieltag liegen noch keine Spieler-Wertungen vor.</p>
+          <p className="nl-result-empty-text">
+            {hasResult
+              ? "Für diesen Spieltag liegen noch keine Spieler-Wertungen vor."
+              : "Erscheint, sobald dieser Spieltag gewertet ist."}
+          </p>
         ) : (
           <>
             {mvpPlayer ? (
@@ -697,6 +794,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
       <NlCard
         className="nl-result-highlight-card"
         title="Highlights"
+        eyebrow={isPartial ? `Aus ${d1Name} — ${d2Name} steht noch aus` : undefined}
         actions={
           <button className="nl-result-button is-primary" type="button" onClick={() => void triggerGlobalNext()}>
             Weiter zum nächsten Schritt
@@ -726,11 +824,14 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         )}
       </NlCard>
 
-      {matchdaySummary.warnings.length ? (
+      {/* "missing_matchday_result" ist jetzt die primäre Aussage der ganzen Seite
+          (s.o.) statt eine Zeile im technischen Diagnose-Aufklapper — hier würde
+          sie nur denselben Sachverhalt ein zweites Mal, roh, wiederholen. */}
+      {diagnoseWarnings.length ? (
         <details className="nl-result-diagnose">
-          <summary>Details &amp; Diagnose ({matchdaySummary.warnings.length})</summary>
+          <summary>Details &amp; Diagnose ({diagnoseWarnings.length})</summary>
           <ul className="nl-result-diagnose-list">
-            {matchdaySummary.warnings.map((warning, index) => (
+            {diagnoseWarnings.map((warning, index) => (
               <li key={`nl-result-warning-${index}`}>{warning}</li>
             ))}
           </ul>

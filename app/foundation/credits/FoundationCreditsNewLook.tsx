@@ -273,7 +273,7 @@ function LoanBurdenChart({
   const ariaLabel =
     `Jährliche Belastung: ${formatNlMoney(installment)} Kreditrate, ${formatNlMoney(salary)} Gehälter, ` +
     `${formatNlMoney(upkeep)} Gebäude-Unterhalt, Summe ${formatNlMoney(total)}` +
-    (hasIncome ? `, Einnahmen ${formatNlMoney(safeRevenue)}` : "");
+    (hasIncome ? `, Einnahmen-Bemessung (Sponsor Vorsaison) ${formatNlMoney(safeRevenue)}` : "");
 
   return (
     <div className={`nl-credits-burden${isDanger ? " is-danger" : ""}`} data-testid="nl-credits-burden-chart">
@@ -303,9 +303,6 @@ function LoanBurdenChart({
         {hasIncome && incomeX != null ? (
           <g className="nl-credits-burden-marker">
             <line x1={incomeX} y1={BURDEN_BAR_Y - 6} x2={incomeX} y2={BURDEN_BAR_Y + BURDEN_BAR_H + 6} />
-            <text x={incomeX} y={BURDEN_BAR_Y - 9} textAnchor="middle">
-              Einnahmen
-            </text>
           </g>
         ) : null}
       </svg>
@@ -321,6 +318,27 @@ function LoanBurdenChart({
           <span className="nl-credits-burden-legend-label">Summe</span>
           <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(total)}</span>
         </span>
+        {/* K3 (Audit „markt"): die Einnahmen-Referenzlinie im Balken lief als rotierter/
+            gestauchter SVG-Text am rechten Kartenrand aus dem Layout (preserveAspectRatio="none"
+            verzerrt Text nicht-uniform). Jetzt derselbe gestrichelte-Linie-Marker als Legendenpunkt
+            neben den Balken-Segmenten — lesbar, nie abgeschnitten. */}
+        {/* BUGFIX (Durchklick, „eine Quelle pro Größe"): hier stand nackt „Einnahmen (Referenz)",
+            während die Finanzen-Seite eine ANDERE Zahl „Einnahmen (Saison)" nennt. Beides ist
+            gewollt verschieden: die Kredit-Referenz ist die Bemessungsgrundlage des Kreditsystems
+            (`estimateTeamAnnualRevenue` = abgerechnete Sponsor-Payouts der VORSAISON — dieselbe
+            Zahl, mit der auch der Kreditrahmen rechnet), die Finanzen-Zahl die laufende
+            Saison-Hochrechnung. Nach dem Vorbild „Gehälter (echt)/Bemessungsgrundlage" trägt die
+            Größe jetzt ihren eigenen Namen statt desselben Worts für zwei Zahlen. */}
+        {hasIncome ? (
+          <span
+            className="nl-credits-burden-legend-item"
+            title="Bemessungsgrundlage des Kreditsystems: abgerechnete Sponsor-Einnahmen der Vorsaison (mit derselben Zahl rechnet der Kreditrahmen). Bewusst NICHT die laufende Saison-Hochrechnung „Einnahmen (Saison)“ der Finanzen-Seite — die verschiebt sich unterjährig, die Bemessung nicht."
+          >
+            <span className="nl-credits-burden-legend-marker" aria-hidden="true" />
+            <span className="nl-credits-burden-legend-label">Einnahmen-Bemessung (Sponsor Vorsaison)</span>
+            <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(safeRevenue)}</span>
+          </span>
+        ) : null}
         {hasIncome ? (
           <span className={`nl-credits-burden-badge ${covered ? "is-good" : "is-risk"}`}>{covered ? "Gedeckt" : "Deckungslücke"}</span>
         ) : isDanger ? (
@@ -478,36 +496,49 @@ function LoanOfferCard({
       data-testid="nl-credits-offer-card"
       data-lender-type={offer.lenderType}
     >
+      {/* K2 (Audit „markt"): das "Bestes Angebot"-Badge landete früher mitten im Anbieternamen,
+          weil Name + Badges eine einzige Flex-Reihe teilten und der Name beim Umbruch dazwischen
+          riss. Jetzt zwei getrennte Gruppen: Identität (Wappen + Name, einzeilig mit Ellipsis)
+          links, Badges rechts — bricht die Gruppe im Ganzen um, nie mitten im Namen. */}
       <div className="nl-credits-offer-header">
-        {offer.lenderType === "bank" ? (
-          <span className="nl-credits-offer-crest is-bank" aria-hidden="true">
-            ₤
+        <span className="nl-credits-offer-identity">
+          {offer.lenderType === "bank" ? (
+            <span className="nl-credits-offer-crest is-bank" aria-hidden="true">
+              ₤
+            </span>
+          ) : (
+            <span className="nl-credits-offer-crest is-team">
+              {teamLogo?.src ? (
+                <BudgetedMediaImage
+                  className="nl-credits-offer-crest-img"
+                  src={teamLogo.src}
+                  alt=""
+                  width={28}
+                  height={28}
+                  loading="lazy"
+                  fetchPriority="low"
+                  fallback={<span aria-hidden="true">{teamLogo.initials}</span>}
+                />
+              ) : (
+                <span aria-hidden="true">{teamLogo?.initials ?? "?"}</span>
+              )}
+            </span>
+          )}
+          <span className="nl-credits-offer-name" title={offer.lenderName}>
+            {offer.lenderName}
           </span>
-        ) : (
-          <span className="nl-credits-offer-crest is-team">
-            {teamLogo?.src ? (
-              <BudgetedMediaImage
-                className="nl-credits-offer-crest-img"
-                src={teamLogo.src}
-                alt=""
-                width={28}
-                height={28}
-                loading="lazy"
-                fetchPriority="low"
-                fallback={<span aria-hidden="true">{teamLogo.initials}</span>}
-              />
-            ) : (
-              <span aria-hidden="true">{teamLogo?.initials ?? "?"}</span>
-            )}
-          </span>
-        )}
-        <span className="nl-credits-offer-name">{offer.lenderName}</span>
-        {isBest ? <span className="nl-credits-offer-best-badge">Bestes Angebot</span> : null}
-        {offer.lenderType === "team" && offer.relationshipValue != null ? (
-          <span className="nl-credits-offer-badge" title="Beziehung zum Verleiher-Team">
-            Beziehung {offer.relationshipValue > 0 ? `+${offer.relationshipValue}` : offer.relationshipValue}
-          </span>
-        ) : null}
+        </span>
+        <span className="nl-credits-offer-badges">
+          {isBest ? <span className="nl-credits-offer-best-badge">Bestes Angebot</span> : null}
+          {offer.lenderType === "team" && offer.relationshipValue != null ? (
+            <span
+              className="nl-credits-offer-badge"
+              title={`Beziehung zum Verleiher-Team, Skala -5 (feindselig) bis +5 (freundschaftlich) — ab -4 leiht das Team gar nichts. Höhere Werte senken den Zinssatz.`}
+            >
+              Beziehung {offer.relationshipValue > 0 ? `+${offer.relationshipValue}` : offer.relationshipValue}
+            </span>
+          ) : null}
+        </span>
       </div>
 
       <div className="nl-credits-offer-rate nl-tnum" style={{ color: NL_TONE_VAR[amountTone] }}>
@@ -812,6 +843,20 @@ export default function FoundationCreditsNewLook({
   const team = model.status === "ready" ? model.team : null;
   const maxAmount = Math.max(0, team?.maxOfferAmount ?? 0);
 
+  // K4 (Audit „markt") + Chris: der Admin-Vorschau-Schalter ist ein Entwicklerwerkzeug und
+  // gehört nicht in die normale Spieler-Oberfläche. Gleiche Konvention wie die Arena-Dev-Chrome
+  // (`DisciplineStageArena.tsx`): standardmäßig unsichtbar, nur mit `?dev` in der URL oder dem
+  // localStorage-Flag erscheint er wieder. Lesen im Effect (nicht beim ersten Render) vermeidet
+  // einen SSR-Hydration-Mismatch. `adminOverride` selbst bleibt unverändert `false`, solange der
+  // Schalter nie sichtbar/bedienbar war — kein Verhaltens-, nur ein Sichtbarkeits-Fix.
+  const [devMode, setDevMode] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasQuery = new URLSearchParams(window.location.search).has("dev");
+    const hasFlag = window.localStorage.getItem("oly-credits-dev") === "1";
+    if (hasQuery || hasFlag) setDevMode(true);
+  }, []);
+
   const [amount, setAmount] = useState<number>(() => Math.round((maxAmount / 2) * 10) / 10);
   const [amountInput, setAmountInput] = useState<string>(() => formatNlNumber(Math.round((maxAmount / 2) * 10) / 10, 1));
   const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
@@ -848,6 +893,12 @@ export default function FoundationCreditsNewLook({
   // #182: Liga-Kreditübersicht — welche Teams aktuell wie viel Kredit laufen
   // haben. Aggregiert aktive Kredite (`gameState.loans`) je Borrower-Team;
   // Rest reines Read-Modell, absteigend nach Restschuld sortiert.
+  /**
+   * Jeder einzelne Kredit der Liga — Quelle fuer die Detail-Tabelle weiter unten. Die Aufbereitung
+   * (Sortierung, Namen, „betrifft mich") steckt im View-Model, damit sie testbar bleibt.
+   */
+  const alleKredite = team?.leagueLoans ?? [];
+
   const leagueCreditRows = useMemo(() => {
     const loans = gameState.seasonState.loans ?? [];
     const byTeam = new Map<string, { outstanding: number; installment: number; count: number; missed: number }>();
@@ -1012,7 +1063,16 @@ export default function FoundationCreditsNewLook({
             />
             <div className="nl-credits-gauge-stats">
               <StatChip label="Cash" value={formatNlMoney(team.cash)} tone="neutral" />
-              <StatChip label="Zins-Range" value={rateRange} tone="neutral" />
+              {/* K5 (Audit „markt"): ohne explizites `title` griff hier der Lexikon-Fuzzy-Match
+                  ("Zins-Range" enthält "range", das Substring-matched auf "Rang") und zeigte die
+                  falsche Erklärung — derselbe Substring-Bug-Typ wie SCH/Schach in den Ranks. Fix
+                  hier: eigener, korrekter Tooltip statt Fuzzy-Match. */}
+              <StatChip
+                label="Zins-Range"
+                value={rateRange}
+                tone="neutral"
+                title="Zinsspanne je nach Laufzeit: kürzere Laufzeit → höherer Satz, längere Laufzeit → niedrigerer Satz (Minimum bis Maximum eurer wählbaren Laufzeiten)."
+              />
             </div>
           </div>
         </NlCard>
@@ -1035,23 +1095,25 @@ export default function FoundationCreditsNewLook({
         </NlCard>
       ) : null}
 
-      <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
-        <label className="nl-credits-admin-toggle-label">
-          <input
-            type="checkbox"
-            checked={adminOverride}
-            onChange={(event) => onToggleAdminOverride(event.target.checked)}
-            data-testid="nl-credits-admin-toggle-input"
-          />
-          <span>Admin-Vorschau: Kredite trotz Season-1- &amp; Phasen-Sperre freischalten</span>
-        </label>
-        {adminOverride ? (
-          <p className="nl-credits-admin-toggle-note">
-            Admin-Modus aktiv — nur zum Testen/Ansehen. In Singleplayer-Spielständen kannst du hier
-            Angebote und Abläufe unabhängig von Saison und Spielphase durchspielen.
-          </p>
-        ) : null}
-      </div>
+      {devMode ? (
+        <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
+          <label className="nl-credits-admin-toggle-label">
+            <input
+              type="checkbox"
+              checked={adminOverride}
+              onChange={(event) => onToggleAdminOverride(event.target.checked)}
+              data-testid="nl-credits-admin-toggle-input"
+            />
+            <span>Admin-Vorschau: Kredite trotz Season-1- &amp; Phasen-Sperre freischalten</span>
+          </label>
+          {adminOverride ? (
+            <p className="nl-credits-admin-toggle-note">
+              Admin-Modus aktiv — nur zum Testen/Ansehen. In Singleplayer-Spielständen kannst du hier
+              Angebote und Abläufe unabhängig von Saison und Spielphase durchspielen.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {team && team.canBorrow ? (
         <>
@@ -1241,6 +1303,87 @@ export default function FoundationCreditsNewLook({
           <NlEmptyState title="Aktuell hat kein Team einen laufenden Kredit." />
         )}
       </NlCard>
+
+      {/*
+        JEDER EINZELNE KREDIT DER LIGA.
+
+        CHRIS: „der spieler soll im kredite tab ALLE kredite sehen können mit allen infos die in der
+        liga aktiv oder abgelaufen sind … so dass man sehen kann welches team hat von welchem einen
+        kredit genommen, laufzeit raten usw."
+
+        Die Liste darueber fasst pro Team zusammen — man sieht WER Schulden hat, aber nicht BEI WEM
+        und zu welchen Konditionen. Genau das steht hier, inklusive der beendeten Kredite: eine
+        Historie, die verschwindet sobald sie interessant wird, ist keine.
+      */}
+      <NlCard
+        className="nl-credits-alle-card"
+        eyebrow="Liga"
+        title={`Alle Kredite · ${alleKredite.filter((row) => row.status === "active").length} laufend von ${alleKredite.length}`}
+      >
+        {alleKredite.length > 0 ? (
+          <div className="nl-credits-alle-wrap">
+            <table className="nl-credits-alle">
+              <thead>
+                <tr>
+                  <th scope="col">Schuldner</th>
+                  <th scope="col">Geldgeber</th>
+                  <th scope="col" className="nl-credits-alle-num">Summe</th>
+                  <th scope="col" className="nl-credits-alle-num">Offen</th>
+                  <th scope="col" className="nl-credits-alle-num">Zins</th>
+                  <th scope="col" className="nl-credits-alle-num">Laufzeit</th>
+                  <th scope="col" className="nl-credits-alle-num">Rate</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alleKredite.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={[
+                      "nl-credits-alle-row",
+                      row.involvesOwnTeam ? "is-own" : "",
+                      row.status === "active" ? "" : "is-done",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <td>
+                      {row.borrowerName}
+                      {row.involvesOwnTeam ? <span className="nl-credits-alle-du">du</span> : null}
+                    </td>
+                    <td>{row.lenderName}</td>
+                    {/* Durchklick-Test G5: dieselbe Seite zeigte oben „38,9 Mio · 13,8 %"
+                        und hier „38.3 · 13.4 %" — Punkt statt Komma, ohne Einheit.
+                        Geld läuft wie überall über formatNlMoney (de-DE + „Mio"). */}
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.principal)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.outstanding)}</td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlNumber(row.interestRate * 100, 1)} %</td>
+                    <td className="nl-credits-alle-num nl-tnum">
+                      {row.status === "active"
+                        ? `${row.remainingSeasons}/${row.termSeasons}`
+                        : `${row.termSeasons}`}
+                    </td>
+                    <td className="nl-credits-alle-num nl-tnum">{formatNlMoney(row.installmentPerSeason)}</td>
+                    <td>
+                      {row.status === "active" ? "laufend" : row.status === "defaulted" ? "geplatzt" : "beendet"}
+                      {row.missedPayments > 0 ? (
+                        <span className="nl-credits-alle-missed" title={`${row.missedPayments} verpasste Rate(n)`}>
+                          {row.missedPayments} verpasst
+                        </span>
+                      ) : null}
+                      {formatLoanSeasonLabel(row.originatedSeasonId) ? (
+                        <span className="nl-credits-alle-seit">seit {formatLoanSeasonLabel(row.originatedSeasonId)}</span>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <NlEmptyState title="In dieser Liga wurde noch kein Kredit aufgenommen." />
+        )}
+      </NlCard>
     </div>
   );
 }
@@ -1264,6 +1407,16 @@ function loanHistoryStatusLabel(status: NlCreditsHistoryRow["status"]): string {
   return status === "paid" ? "Getilgt" : "Ausgefallen";
 }
 
+/**
+ * Durchklick-Test G5: „laufend seit season-2" zeigte den rohen Saison-Slug.
+ * Aus `season-2` wird „Season 2"; ein unparsebarer Wert wird NICHT roh
+ * gerendert (F5-Regel), sondern der Zusatz entfällt (null).
+ */
+function formatLoanSeasonLabel(seasonId: string | null | undefined): string | null {
+  const nummer = seasonId?.match(/(\d+)\s*$/)?.[1];
+  return nummer ? `Season ${nummer}` : null;
+}
+
 const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
   { key: "season", label: "Saison" },
   { key: "lender", label: "Kreditgeber" },
@@ -1275,7 +1428,7 @@ const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
 function renderCreditsHistoryCell(row: NlCreditsHistoryRow, column: NlTableColumn<NlCreditsHistoryRow>) {
   switch (column.key) {
     case "season":
-      return row.originatedSeasonId;
+      return formatLoanSeasonLabel(row.originatedSeasonId) ?? "—";
     case "lender":
       return row.lenderName;
     case "principal":

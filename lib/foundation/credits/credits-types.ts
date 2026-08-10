@@ -72,6 +72,11 @@ export type TeamCreditState = {
   minTermSeasons: number;
   maxTermSeasons: number;
   activeLoans: ActiveLoan[];
+  /**
+   * ALLE Kredite der Liga — aktive und beendete, unabhaengig vom eigenen Team. Reine Anzeige,
+   * keine Aktionen. Sortiert: laufende zuerst, darin die groesste Restschuld oben.
+   */
+  leagueLoans: LeagueLoanRow[];
 
   /**
    * Rohe Bank-Gesamtkapazität (`creditLimit + outstandingDebt`, vor Abzug der
@@ -87,12 +92,50 @@ export type TeamCreditState = {
   creditUtilizationRatio: number;
   /** Summe der jährlichen Kreditraten aller aktiven Kredite (`getTeamAnnualLoanInstallment`) — Belastungs-Chart. */
   annualLoanInstallment: number;
-  /** Gehaltssumme des Kaders (`getTeamDisplaySalaryTotal`) — Belastungs-Chart. */
+  /** ECHTE Gehaltssumme des Kaders (`getTeamActualSalaryTotal`, F4) — Belastungs-Chart.
+   *  Cashflow-Zahl wie auf der Finanzen-Seite, NICHT die Apron-/Sponsor-Glättung. */
   annualSalaryTotal: number;
   /** Gebäude-Unterhalt aller gebauten Anlagen (`getTeamFacilityUpkeepTotal`) — Belastungs-Chart. */
   annualFacilityUpkeep: number;
   /** Einnahmen-Proxy (`estimateTeamAnnualRevenue`) — oft 0 vor Sponsorvertrag/Season 1, siehe dort. */
   estimatedAnnualRevenue: number;
+};
+
+/**
+ * EIN KREDIT IRGENDWO IN DER LIGA — fuer die Uebersicht im Kredite-Reiter.
+ *
+ * CHRIS: „der spieler soll im kredite tab ALLE kredite sehen können mit allen infos die in der liga
+ * aktiv oder abgelaufen sind … so dass man sehen kann welches team hat von welchem einen kredit
+ * genommen, laufzeit raten usw."
+ *
+ * Bewusst eine eigene Form neben `ActiveLoan`: dort geht es um die EIGENEN Kredite mit
+ * Handlungsmoeglichkeit (Ablose-Angebot), hier um die Liga-Sicht ohne Aktionen. Beide aus derselben
+ * Quelle (`seasonState.loans`), damit sie nicht auseinanderlaufen koennen.
+ */
+export type LeagueLoanRow = {
+  id: string;
+  /** Wer schuldet. */
+  borrowerTeamId: string;
+  borrowerName: string;
+  /** Wer verleiht — Bank oder ein Team. */
+  lenderType: "bank" | "team";
+  lenderTeamId: string | null;
+  lenderName: string;
+  /** Aufgenommene Summe. */
+  principal: number;
+  /** Was davon noch offen ist. 0 bei abbezahlten Krediten. */
+  outstanding: number;
+  interestRate: number;
+  termSeasons: number;
+  remainingSeasons: number;
+  installmentPerSeason: number;
+  status: string;
+  /** In welcher Saison aufgenommen — sonst ist bei alten Krediten nicht klar, woher sie stammen. */
+  originatedSeasonId: string | null;
+  /** Verpasste Raten; > 0 heisst, dass es klemmt. */
+  missedPayments: number;
+  /** Das eigene Team ist beteiligt (als Schuldner ODER als Verleiher). */
+  involvesOwnTeam: boolean;
 };
 
 /** Discriminated view model consumed by the Credits UI. */

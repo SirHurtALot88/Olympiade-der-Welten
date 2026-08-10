@@ -20,7 +20,6 @@ import {
 
 /** Weight given to the identity term vs. the roster-gap term in the needWeight blend. */
 const IDENTITY_WEIGHT = 0.5;
-const GAP_WEIGHT = 0.5;
 
 // ANPASSUNG B3 (flag-gated OLY_DRAFT_IDFIT): on a near-empty roster the gap term is a uniform 1.0
 // (ANCHORS[0]) for EVERY discipline, so the plain 0.5/0.5 blend adds a flat +0.5 sockel that plättet

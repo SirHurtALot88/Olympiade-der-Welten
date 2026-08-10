@@ -1,6 +1,7 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
-import { describeInboxTargetDestination } from "@/lib/foundation/inbox-target-labels";
+import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
+import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FoundationShellRouterCockpit,
@@ -67,8 +68,9 @@ import {
   formatTransfermarktRatio,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
+import { computeTeamTopSixAxisStats } from "@/lib/market/transfermarkt-roster-impact";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
-import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { LOCAL_TRANSFER_WINDOW_PHASE, getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import {
   getTransfermarktScoutingDisclosure,
   getTransfermarktScoutingVisibilityBuckets,
@@ -136,6 +138,7 @@ import {
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { hydriereFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 import {
   buildFieldRaceLedger,
   countPlayedFieldRaceMatchdays,
@@ -392,6 +395,7 @@ import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/Foundat
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
 import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
+import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -1117,7 +1121,6 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildHomeV2Overview = activeView === "homeV2";
   const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
   const shouldBuildDebugView = activeView === "debug";
-  const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
   const shouldBuildTeamsView = resolveShouldBuildTeamsView(activeView);
@@ -1130,6 +1133,34 @@ export function useFoundationShellRouterBodyScope({
   const shouldLoadSeasonManagementFeed = resolveShouldLoadSeasonManagementFeed(activeView as FoundationViewId, homeV2Tab);
   const shouldBuildGameFlow = shouldBuildFoundationGameFlow(activeView, homeV2Tab);
   const shouldBuildGameInbox = shouldBuildGameFlow;
+  /**
+   * Die HQ-Uebersicht malt zuerst, rechnet danach. Die Liga-Heat-Pools sind der teure Teil der
+   * Seite; frueher hingen sie an dieser Sperre und wurden erst gebaut, wenn der Browser Luft
+   * hatte. Beim Umbau in `fd984c8` fiel die Sperre heraus — `shouldBuildFoundationLeagueHeatPools`
+   * faellt ohne sie auf `?? true` zurueck, seither rechnet die Seite sofort mit.
+   *
+   * `false` bei jedem Wechsel: wer die HQ-Seite verlaesst und zurueckkommt, soll wieder erst das
+   * Geruest sehen. `requestIdleCallback` mit 1500 ms Deckel, damit es auch dann kommt, wenn der
+   * Browser nie zur Ruhe kommt; ohne `requestIdleCallback` ein `setTimeout(0)`.
+   */
+  const [homeV2OverviewHeavyReady, setHomeV2OverviewHeavyReady] = useState(false);
+  useEffect(() => {
+    setHomeV2OverviewHeavyReady(false);
+    if (activeView !== "homeV2") {
+      return;
+    }
+    const schedule =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => setHomeV2OverviewHeavyReady(true), { timeout: 1500 })
+        : window.setTimeout(() => setHomeV2OverviewHeavyReady(true), 0);
+    return () => {
+      if (typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(schedule);
+      } else {
+        window.clearTimeout(schedule);
+      }
+    };
+  }, [activeView]);
   const shouldLoadSeasonOverviewFeed =
     activeView === "seasonV2" ||
     activeView === "prize" ||
@@ -1149,7 +1180,11 @@ export function useFoundationShellRouterBodyScope({
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
-    activeView === "playerProfile";
+    activeView === "playerProfile" ||
+    // Finanzen: Cash-Abgleich und Saison-Verlauf lesen `seasonSnapshots` (Saisonstart-Cash der
+    // Vorsaison). Ohne diesen Load blieben beide Sektionen fälschlich auf „nicht archiviert",
+    // obwohl das Archiv existiert — nur der kompakte Initial-Payload hatte es gestrippt (M3-Befund F4).
+    activeView === "finances";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const shouldBuildSeasonStandRowsGate = shouldBuildSeasonStandRows({
     activeView: activeView as FoundationViewId,
@@ -3948,6 +3983,7 @@ export function useFoundationShellRouterBodyScope({
                 teamScope: "all",
                 teamIds: [teamId],
                 allowSetupAllTeams: true,
+          includeManualTeams: true,
               },
               roomContext,
             ),
@@ -6195,6 +6231,7 @@ export function useFoundationShellRouterBodyScope({
                   teamScope: "all",
                   teamIds: [teamId],
                   allowSetupAllTeams: true,
+          includeManualTeams: true,
                 },
                 roomContext,
               ),
@@ -8082,12 +8119,36 @@ export function useFoundationShellRouterBodyScope({
   // sanktionierten Helper `buildFieldRaceLedger` (dieselbe Quelle) nachgezogen
   // — ohne die teure Voll-Derivation zu erzwingen.
   const fieldRaceLedger = useMemo(() => {
+    /**
+     * Serverseitige Projektion ZUERST: sie ist auf dem VOLLEN Save gerechnet und faehrt
+     * mit jedem kompakten Payload mit (foundation-field-race-projection). Der Browser
+     * haelt oft nur den beschnittenen Stand (matchdayResults/disciplineResults nur fuer
+     * den aktiven Spieltag) — jeder lokale (Nach-)Bau, auch der der Derivationen,
+     * zaehlt darauf hoechstens EINEN gespielten Spieltag und meldete auf Home mitten
+     * in der Saison „erst 0 Spieltage" / „verbleibend 10".
+     */
+    const projection = gameState.seasonState.foundationFieldRace;
+    if (projection && projection.seasonId === gameState.season.id && projection.matchdays.length > 0) {
+      return hydriereFieldRaceProjection(projection);
+    }
     const shared = seasonDerivations.fieldRaceLedger;
     if (shared.matchdays.length > 0) {
       return shared;
     }
-    // On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build).
-    return buildFieldRaceLedger(gameState, gameState.season.id, seasonDerivations.ledger);
+    /**
+     * On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build) — aber NUR,
+     * wenn es wirklich eines ist. Ist `useSeasonDerivations` auf der aktiven Ansicht
+     * deaktiviert (z. B. Home), liefert es das EMPTY-Sentinel: ein Ledger-Objekt mit
+     * null Punkt-Einträgen. Das wurde hier vorher als „vorberechnet" durchgereicht,
+     * und `buildFieldRaceLedger` fand darin für KEINEN Spieltag Punkte — Home meldete
+     * mitten in der Saison „erst 0 Spieltage", „verbleibend 10", leere Form, während
+     * Teams/Leaders (mit aktiven Derivationen bzw. direkter Zählung) korrekt 4 sagten.
+     * Ohne den Parameter rechnet `buildFieldRaceLedger` das Punkte-Ledger selbst aus
+     * dem GameState — dieselbe Rechnung, die auch die Derivationen ausführen.
+     */
+    const precomputedLedger =
+      seasonDerivations.ledger.pointEntries.length > 0 ? seasonDerivations.ledger : undefined;
+    return buildFieldRaceLedger(gameState, gameState.season.id, precomputedLedger);
   }, [seasonDerivations.fieldRaceLedger, seasonDerivations.ledger, gameState]);
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
@@ -8377,27 +8438,14 @@ export function useFoundationShellRouterBodyScope({
 
   const selectedHqAxisSummary = null;
 
-  const selectedTeamAverageAxisStats = useMemo(() => {
-    if (rosterPlayers.length === 0) {
-      return null;
-    }
-    const totals = rosterPlayers.reduce(
-      (sum, { player }) => ({
-        pow: sum.pow + (player.coreStats.pow ?? 0),
-        spe: sum.spe + (player.coreStats.spe ?? 0),
-        men: sum.men + (player.coreStats.men ?? 0),
-        soc: sum.soc + (player.coreStats.soc ?? 0),
-      }),
-      { pow: 0, spe: 0, men: 0, soc: 0 },
-    );
-    const count = rosterPlayers.length;
-    return {
-      pow: totals.pow / count,
-      spe: totals.spe / count,
-      men: totals.men / count,
-      soc: totals.soc / count,
-    };
-  }, [rosterPlayers]);
+  // F4 (eine Quelle pro Größe): Office-Kopf und Home-Radar zeigen dieselbe
+  // Achsen-Zusammenfassung — Ø Top-6 je Achse über computeTeamTopSixAxisStats,
+  // dieselbe Basis wie die Markt-Impact-Vorschau. Vorher: Ganzkader-Schnitt
+  // hier gegen Top-6-Portrait-Schnitt im Radar (54/39/39/41 vs. 55/40/42/44).
+  const selectedTeamTopSixAxisStats = useMemo(
+    () => computeTeamTopSixAxisStats(rosterPlayers.map(({ player }) => player)),
+    [rosterPlayers],
+  );
 
   const {
     selectedRosterTableRows,
@@ -8679,6 +8727,11 @@ export function useFoundationShellRouterBodyScope({
     shouldBuildTeamHistory,
     showExtendedTeamPanels,
     selectedTeamDetailTab,
+    // Beide gehoerten schon immer hierher, kamen beim Umbau aber abhanden: ohne `homeV2Tab` gilt
+    // jeder HQ-Unterreiter als „Uebersicht" und baut die Heat-Pools mit, ohne `homeV2OverviewHeavyReady`
+    // rechnet die Uebersicht sofort statt im Leerlauf.
+    homeV2Tab,
+    homeV2OverviewHeavyReady,
     gameState,
     playerRatingsById,
     playerDirectorySlice,
@@ -9249,8 +9302,8 @@ export function useFoundationShellRouterBodyScope({
     if (!payload.silent) {
       setFoundationActionFeedback({
         tone: "success",
-        title: "Lineup gespeichert",
-        detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
+        title: "Einsatzliste gespeichert",
+        detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Einsatzlisten werden bei Bedarf nachgezogen.`,
       });
     }
     void reloadLiveSeasonState("manual_apply", { compactReload: true });
@@ -9414,10 +9467,25 @@ export function useFoundationShellRouterBodyScope({
       isFirstSeason &&
       seasonIntroHandled &&
       (gameFlowState.currentStepId === "scouting_facilities" || gameFlowState.currentStepId === "buy_players");
+    /**
+     * CHRIS' REGEL: „wir verkaufen als separaten schritt zum ende der saison und gekauft wird
+     * erst in der folgesaison."
+     *
+     * Vorher feuerte der Folgesaison-Ausloeser auf `gameFlowState.phase === "preseason"` —
+     * das sind die Stationen der Saisonende-Kette der ALTEN Saison (`derivePreseasonPhase`).
+     * Der KI-Marktlauf startete also mitten im Saisonende (wo nur verkauft werden darf) und in
+     * der NEUEN Saison nie wieder: dort ist die Flow-Phase nicht mehr „preseason", der einzige
+     * S2+-Kaufausloeser des Spiels lief damit ins Leere und die KI-Teams blieben nach ihren
+     * Saisonende-Verkaeufen dauerhaft ohne Zugaenge.
+     *
+     * Massstab ist jetzt DASSELBE Fenster wie beim Menschen: das Saisonstart-Setup der neuen
+     * Saison (`isEarlySeasonTransferSetup` via `getTransferWindowStatus`) — Saison aktiv,
+     * Spieltag 1 noch offen. Dort ist der Erloes der Saisonende-Verkaeufe das Kaufbudget.
+     * Der Run-Record (`aiPreseasonAutomationRuns[seasonId]`) haelt den Lauf wie bisher auf
+     * genau einmal pro Saison.
+     */
     const followingSeasonTrigger =
-      !isFirstSeason &&
-      gameFlowState.phase === "preseason" &&
-      gameFlowState.currentStepId === "buy_players";
+      !isFirstSeason && getTransferWindowStatus(gameState).isSeasonStartSetup;
     const runKey = `${activeSaveId}:${gameState.season.id}`;
 
     if (staleOrphanRun) {
@@ -9449,6 +9517,10 @@ export function useFoundationShellRouterBodyScope({
     aiTeams.length,
     gameFlowState.currentStepId,
     gameFlowState.phase,
+    // Das Saisonstart-Fenster (getTransferWindowStatus) haengt an Phase, Spieltag und
+    // Spieltagsstatus — der ganze gameState als Dep, damit der Ausloeser den Fensterwechsel
+    // nicht verpasst (die Wachen im Effekt verhindern Doppellaeufe).
+    gameState,
     gameState.season.id,
     gameState.season.name,
     isFoundationBootstrapState,
@@ -9610,7 +9682,23 @@ export function useFoundationShellRouterBodyScope({
       !activeSaveId ||
       activeSaveId === "loading-save" ||
       leagueSetupStatus !== "ready" ||
-      gameState.gamePhase !== "preseason_management"
+      gameState.gamePhase !== "preseason_management" ||
+      // GEMELDET: „die sind ja sogar mit 4.8. und 5.8. datiert die käufe! da sind sehr viele
+      // falsche käufe bei" — der Liga-Draft lief einen Tag nach dem Anlegen des Spielstands
+      // erneut und kaufte Kader voll, die laengst spielten (Quelle `ai_roster_fill`, 5.8.).
+      //
+      // Ursache war die Bedingung darueber: `preseason_management` galt hier als „frischer
+      // S1-Aufbau". Seit der Saisonende-Kette ist das aber die ERSTE STATION JEDES SAISONENDES —
+      // und genau dort stehen nach den KI-Verkaeufen reihenweise Teams unter Kadermindestgroesse.
+      // Beide Gates zusammen waren am Saisonende also praktisch immer erfuellt, und der
+      // Ref-Guard haelt nur pro Browser-Sitzung; jedes Neuladen scharfte ihn neu.
+      //
+      // Der belastbare Unterschied ist nicht die Phase, sondern ob ueberhaupt schon gespielt
+      // wurde: dieser Effekt existiert einzig, um einen ABGEBROCHENEN ERST-DRAFT zu Ende zu
+      // bringen. In dem Moment liegt noch kein einziges Spieltagsergebnis vor. An jedem
+      // Saisonende liegen welche vor — dort hat er nichts verloren, das Auffuellen uebernimmt
+      // die KI-Preseason.
+      (gameState.seasonState.matchdayResults ?? []).length > 0
     ) {
       return undefined;
     }
@@ -9649,6 +9737,7 @@ export function useFoundationShellRouterBodyScope({
                   teamScope: "all",
                   teamIds: chunk,
                   allowSetupAllTeams: true,
+          includeManualTeams: true,
                 },
                 roomContext,
               ),
@@ -9699,6 +9788,7 @@ export function useFoundationShellRouterBodyScope({
               confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
               teamScope: "all",
               allowSetupAllTeams: true,
+          includeManualTeams: true,
             },
             roomContext,
           ),
@@ -9938,24 +10028,29 @@ export function useFoundationShellRouterBodyScope({
     },
     [gameState, playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows, shouldBuildHomeV2Overview],
   );
+	  // F4 (eine Quelle pro Größe): Home zählt und listet dieselben Entscheidungen
+	  // wie die Inbox — `activeTeamDecisionInboxItems`, exakt die Liste hinter dem
+	  // Inbox-Zähler (FoundationInboxV2Host `openCount`). Vorher filterte Home hier
+	  // eigenständig (task/warning/critical über alle Team-Items) und zeigte dann
+	  // die Länge der auf 5 gekappten Liste als Gesamtzahl — „5 offen" auf Home
+	  // gegen „11 offen" in der Inbox.
+	  const homeOpenTaskCount = shouldBuildHomeV2Overview ? activeTeamDecisionInboxItems.length : 0;
 	  const homeTasks = useMemo(
 	    () => {
         if (!shouldBuildHomeV2Overview) {
           return [];
         }
-        return filterGameInboxItems(activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems, { includeDismissed: false, includeDone: false })
-	        .filter((item) => item.category === "task" || item.category === "warning" || item.severity === "critical")
-          .sort((left, right) => {
-            const severityOrder: Record<GameInboxItem["severity"], number> = {
-              critical: 0,
-              warning: 1,
-              info: 2,
-            };
-            return severityOrder[left.severity] - severityOrder[right.severity];
-          })
+        const severityOrder: Record<GameInboxItem["severity"], number> = {
+          critical: 0,
+          warning: 1,
+          info: 2,
+        };
+        // Anzeige-Auswahl (Top 5) — der Zähler oben nutzt die VOLLE Liste.
+        return [...activeTeamDecisionInboxItems]
+          .sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity])
 	        .slice(0, 5);
       },
-	    [activeTeamInboxItems, gameInboxItems, shouldBuildHomeV2Overview],
+	    [activeTeamDecisionInboxItems, shouldBuildHomeV2Overview],
 	  );
   const homeTodayCards = useMemo<Array<{
     key: string;
@@ -9981,8 +10076,19 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "lineup",
         kicker: "Heute wichtig",
-        title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
-        detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
+        // S1: die Karte ist jetzt die Handlungszeile der Home-Ansicht — Titel
+        // benennt die Handlung, das Detail erklärt die Konsequenz (der alte
+        // kryptische Zwei-Wort-Text ist raus).
+        title:
+          homeNextMatchdayStatus.openSlots > 0
+            ? `Einsatzliste füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
+            : "Einsatzliste steht",
+        detail:
+          homeNextMatchdayStatus.openSlots > 0
+            ? homeNextMatchdayStatus.requiredSlots > 0
+              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Einsatzliste startet der Spieltag nicht.`
+              : "Ohne Einsatzliste startet der Spieltag nicht."
+            : "Alles gesetzt — weiter in die Arena.",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
         urgency: homeNextMatchdayStatus.openSlots > 0 ? 0 : 2,
@@ -9999,20 +10105,21 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "tasks",
         kicker: "Aufgaben",
-        title: homeTasks.length > 0 ? `${homeTasks.length} Quest${homeTasks.length === 1 ? "" : "s"}` : "Keine offenen Quests",
+        // F4: Zähler = volle Entscheidungsliste (wie Inbox), nicht die Top-5.
+        title: homeOpenTaskCount > 0 ? `${homeOpenTaskCount} Quest${homeOpenTaskCount === 1 ? "" : "s"}` : "Keine offenen Quests",
         detail: homeTasks[0]?.title ?? "bereit für den nächsten Zug",
         tone: homeTasks.some((task) => task.severity === "critical")
           ? "warning"
-          : homeTasks.length > 0
+          : homeOpenTaskCount > 0
             ? "info"
             : "ready",
-        view: homeTasks.length > 0 ? "inboxV2" : "home",
-        urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeTasks.length > 0 ? 4 : 5,
+        view: homeOpenTaskCount > 0 ? "inboxV2" : "home",
+        urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeOpenTaskCount > 0 ? 4 : 5,
       },
     ];
     return cards.sort((left, right) => left.urgency - right.urgency);
     },
-    [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
+    [homeNextMatchdayStatus.openSlots, homeOpenTaskCount, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
   );
 	  const homeNewsItems = useMemo(() => {
 	    const sourceItems = activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems;
@@ -10097,6 +10204,18 @@ export function useFoundationShellRouterBodyScope({
           caRating: developmentInsight.currentRating,
           poRangeMin: developmentInsight.potentialRangeDisplay?.min ?? null,
           poRangeMax: developmentInsight.potentialRangeDisplay?.max ?? null,
+          // Saison-PPs je Achse samt Ligarang — direkt aus der Rating-Zeile
+          // (`ppPow`/`ppPowRank`/…), derselben Quelle wie die Ranks-Spalten.
+          axisPps: {
+            pow: rating?.ppPow ?? null,
+            powRank: rating?.ppPowRank ?? null,
+            spe: rating?.ppSpe ?? null,
+            speRank: rating?.ppSpeRank ?? null,
+            men: rating?.ppMen ?? null,
+            menRank: rating?.ppMenRank ?? null,
+            soc: rating?.ppSoc ?? null,
+            socRank: rating?.ppSocRank ?? null,
+          },
         };
       });
     },
@@ -10106,13 +10225,21 @@ export function useFoundationShellRouterBodyScope({
     if (!shouldBuildHomeV2Overview) {
       return [];
     }
-    const currentIndex = gameState.season.matchdayIds.indexOf(gameState.matchdayState.matchdayId);
-    return gameState.season.matchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => ({
-      matchdayId,
-      label: matchdayId,
-      isCurrent: offset === 0,
-      isPast: currentIndex >= 0 && gameState.season.matchdayIds.indexOf(matchdayId) < currentIndex,
-    }));
+    const allMatchdayIds = gameState.season.matchdayIds;
+    const currentIndex = allMatchdayIds.indexOf(gameState.matchdayState.matchdayId);
+    return allMatchdayIds.slice(Math.max(0, currentIndex), currentIndex + 4).map((matchdayId, offset) => {
+      // F5: nie den rohen Slug ("season-2-matchday-1") anzeigen — die Position
+      // in der kanonischen Spieltagsliste ist die Nummer; Rückfall auf die
+      // Slug-Endziffer, falls die ID nicht in der Liste steht.
+      const absoluteIndex = allMatchdayIds.indexOf(matchdayId);
+      const slugNumber = matchdayId.match(/(\d+)\s*$/)?.[1];
+      return {
+        matchdayId,
+        label: absoluteIndex >= 0 ? `Spieltag ${absoluteIndex + 1}` : slugNumber ? `Spieltag ${slugNumber}` : "Spieltag",
+        isCurrent: offset === 0,
+        isPast: currentIndex >= 0 && absoluteIndex < currentIndex,
+      };
+    });
   }, [gameState.matchdayState.matchdayId, gameState.season.matchdayIds, shouldBuildHomeV2Overview]);
   const homeV2BoardObjectives = useMemo(
     () => {
@@ -10159,14 +10286,17 @@ export function useFoundationShellRouterBodyScope({
       }),
     [selectedTeamFacilityState],
   );
+  // EIN Filtersystem (Audit I1): die Kategorie filtert nur noch in der Ansicht selbst
+  // (`InboxV2NewLook`, Pills mit echten Zählern). Hier wird deshalb NICHT mehr nach Kategorie
+  // vorgefiltert — sonst könnte die Ansicht die Zähler der übrigen Kategorien nicht kennen und
+  // ein leerer Filter würde wieder als „Alles erledigt" neben „11 offen" stehen (Audit I2).
   const visibleInboxItems = useMemo(
     () =>
       filterGameInboxItems(activeTeamInboxItems, {
-        category: inboxCategoryFilter,
         includeDone: inboxIncludeDone,
         includeDismissed: inboxIncludeDismissed,
       }),
-    [activeTeamInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone],
+    [activeTeamInboxItems, inboxIncludeDismissed, inboxIncludeDone],
   );
   const inboxV2Items = useMemo(
     () =>
@@ -10181,6 +10311,12 @@ export function useFoundationShellRouterBodyScope({
           item.ctaLabel && item.targetView
             ? [{ id: "open-target", label: item.ctaLabel, detail: describeInboxTargetDestination(item) }]
             : undefined,
+        // Dringlichkeits-Gruppierung + Ziel-Chip + Konsequenz-Zeile — dieselben Ableitungen
+        // wie in `use-inbox-v2-derivations` (FoundationInboxV2Host), damit beide Mounts
+        // identisch gruppieren.
+        lane: resolveInboxLane(item),
+        targetLabel: resolveInboxTargetLabel(item),
+        source: item.source,
       })),
     [visibleInboxItems],
   );
@@ -11130,6 +11266,20 @@ export function useFoundationShellRouterBodyScope({
     liveSyncStatus,
     showIdleReady: gameState.season.id !== "loading",
     fetchSlowWarning,
+    /**
+     * Saison läuft bereits: exakt das Gegenstück zum Preseason-Kauffenster
+     * (`isEarlySeasonTransferSetup` in transfer-window-policy.ts — offen nur bei
+     * currentMatchday ≤ 1 UND ohne gebuchtes Ergebnis). Ab dann ist ein liegen
+     * gebliebener „Preseason-Markt blockiert"-Lauf nicht mehr handelbar und sein
+     * Banner wird von der Aktivitätsleiste unterdrückt — der Markt selbst meldet
+     * längst „Transferfenster geschlossen · Saison läuft".
+     */
+    preseasonWindowOver:
+      (gameState.gamePhase ?? "season_active") === "season_active" &&
+      ((gameState.season.currentMatchday ?? 1) > 1 ||
+        (gameState.seasonState.matchdayResults ?? []).some(
+          (result) => result.seasonId === gameState.season.id,
+        )),
   });
 
   const isAdminView = activeView === "admin";
@@ -11327,7 +11477,13 @@ export function useFoundationShellRouterBodyScope({
         success?: boolean;
         error?: string;
         offers?: ContractDissolutionOffer[];
-        applied?: { playerName: string; decision: string; salePrice: number; waivedBuyout: number } | null;
+        applied?: {
+          playerName: string;
+          decision: string;
+          salePrice: number;
+          waivedBuyout: number;
+          payableBuyout?: number;
+        } | null;
       };
 
       setContractDissolutionOffers(payload.offers ?? []);
@@ -11351,8 +11507,10 @@ export function useFoundationShellRouterBodyScope({
         detail:
           applied.decision === "accepted"
             ? `${applied.playerName} geht. Erlös ${formatTransfermarktCurrency(applied.salePrice)}${
-                applied.waivedBuyout > 0
-                  ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
+                (applied.payableBuyout ?? 0) > 0
+                  ? ` · Buyout: ${formatTransfermarktCurrency(applied.waivedBuyout)} erlassen, ${formatTransfermarktCurrency(applied.payableBuyout ?? 0)} gezahlt`
+                  : applied.waivedBuyout > 0
+                    ? ` · Buyout von ${formatTransfermarktCurrency(applied.waivedBuyout)} entfällt`
                   : ""
               }.`
             : `${applied.playerName} erfüllt seinen Vertrag weiter — das kostet ihn Moral. Nächste Saison darf er erneut fragen.`,
@@ -11787,6 +11945,10 @@ export function useFoundationShellRouterBodyScope({
     onOpenTeam: openTeamProfileById,
   };
 
+  // Vorsaison-Podium (W1): nur relevant, wenn das PP-Board leer startet — die
+  // Ableitung selbst ist billig (Top-3 der letzten archivierten Saison).
+  const ranksPreviousSeasonPodium = useMemo(() => buildPreviousSeasonPodium(gameState), [gameState]);
+
   const foundationRanksHostProps: FoundationRanksHostProps = {
     sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
     ppAreaRankClassMaps,
@@ -11795,6 +11957,9 @@ export function useFoundationShellRouterBodyScope({
     toggleTableSort,
     openTeamProfileById,
     ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
+    // W1 (Muster 3): echtes Vorsaison-Podium für den PP-Board-Saisonstart —
+    // derselbe Snapshot-Datenweg wie die Ewige Tabelle, keine zweite Quelle.
+    previousSeasonPodium: ranksPreviousSeasonPodium,
     renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
       renderMetricBar(value, {
         tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],
@@ -11931,6 +12096,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveSummary,
     activeScenarioWarning,
     activeTeamCriticalInboxItems,
+    activeTeamDecisionInboxItems,
     activeTeamMatchdaySummaryRow,
     activeTeamOpenInboxItems,
     activeView,
@@ -12038,6 +12204,7 @@ export function useFoundationShellRouterBodyScope({
     historyVisibleRangeLabel,
     homeActiveTeamLogo,
     homeNextMatchdayStatus,
+    homeOpenTaskCount,
     homeTodayCards,
     homeV2BoardObjectives,
     homeV2Facilities,
@@ -12100,7 +12267,6 @@ export function useFoundationShellRouterBodyScope({
     matchdayMvpScoringFeed,
     matchdaySummary,
     matchdaySummaryOptions,
-    matchdaySummaryTab,
     moveTableColumn,
     navigateHomeTab,
     navigatePrizeFinanceTab,
@@ -12272,7 +12438,7 @@ export function useFoundationShellRouterBodyScope({
     fieldRaceTotalTeams,
     homeFieldRaceRankMovement,
     selectedTeam,
-    selectedTeamAverageAxisStats,
+    selectedTeamTopSixAxisStats,
     selectedTeamCanManage,
     selectedTeamCaptainProfile,
     selectedTeamCaptainCandidates,
@@ -12333,7 +12499,6 @@ export function useFoundationShellRouterBodyScope({
     setMatchdayAutoRunOverwriteExistingLineups,
     setMatchdayAutoRunStopOnTie,
     setMatchdayMvpForceReplaceExisting,
-    setMatchdaySummaryTab,
     setNewGamePreview,
     setNewGameSandbox,
     setNewGameSaveName,

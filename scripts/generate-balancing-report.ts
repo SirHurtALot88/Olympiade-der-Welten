@@ -37,12 +37,6 @@ function isEmergencyBuySource(source: string | null | undefined) {
   return /repair|topup|fallback/i.test(value);
 }
 
-function isPlannedMarketBuy(entry: TransferHistoryEntry) {
-  if (entry.transferType !== "buy") return false;
-  const source = String(entry.source ?? "");
-  if (isEmergencyBuySource(source)) return false;
-  return source === "ai_preseason_market_buy" || source.includes("season1") || source.includes("draft");
-}
 
 export function classifyPickFidelity(entry: TransferHistoryEntry) {
   if (entry.transferType !== "buy") return "other";
@@ -76,7 +70,7 @@ export function buildBalancingReportLines(input: {
     metrics: computeSeasonOrganicProgressionMetrics(gs, seasonId),
   }));
 
-  const peakCells = organicBySeason.map(({ metrics, seasonId }) => {
+  const peakCells = organicBySeason.map(({ metrics }) => {
     const hasData = metrics.playerCount > 0;
     if (!hasData) return "—";
     const status = isPeakNetOutsideCorridor(metrics.peakP90, metrics.playerCount) ? "RED" : "PASS";

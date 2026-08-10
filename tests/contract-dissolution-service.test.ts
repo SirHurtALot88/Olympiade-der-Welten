@@ -61,13 +61,41 @@ describe("Wer bietet eine Vertragsaufloesung an", () => {
     expect(offersFor(gameState(), { "p-star": DISSOLUTION_MORALE_THRESHOLD - 0.1 })).toHaveLength(1);
   });
 
-  it("weist den vollen Verkaufspreis und den entfallenden Buyout aus", () => {
+  /**
+   * GEMELDET: „buyout soll nicht zu 100% weg fallen sondern nur anteilig je nachdem was der
+   * spieler noch für forderungen stellt. sonst wäre das ja OP."
+   *
+   * Vorher entfiel der volle Rest-Buyout und das Team kassierte den ungekuerzten Preis —
+   * Annehmen war damit IMMER besser als ein regulaerer Verkauf, also gar keine Entscheidung.
+   */
+  it("erlaesst den Buyout nur anteilig und weist den zahlbaren Rest aus", () => {
     const offer = offersFor()[0];
     // Preis kommt aus derselben Rechnung wie der regulaere Verkauf.
     expect(offer.salePrice).toBe(40);
     // Restlaufzeit 3 -> nach dieser Saison bleiben 2 Jahre a 5.
-    expect(offer.waivedBuyout).toBe(10);
+    expect(offer.openBuyout).toBe(10);
     expect(offer.remainingContractLength).toBe(3);
+    // Moral 20 von 34: Grundverzicht 30 % + 30 % x (1 - 20/34) = 42,35 %.
+    expect(offer.waiverShare).toBeCloseTo(0.4235, 3);
+    expect(offer.waivedBuyout).toBeCloseTo(4.24, 2);
+    expect(offer.payableBuyout).toBeCloseTo(5.76, 2);
+    // Die Teile ergeben wieder das Ganze — sonst verschwindet Geld zwischen den Zahlen.
+    expect(offer.waivedBuyout + offer.payableBuyout).toBeCloseTo(offer.openBuyout, 2);
+  });
+
+  it("laesst einen unglueklicheren Spieler mehr aufgeben", () => {
+    const wenigerUngluecklich = offersFor(gameState(), { "p-star": 30 })[0];
+    const sehrUngluecklich = offersFor(gameState(), { "p-star": 5 })[0];
+    expect(sehrUngluecklich.waiverShare).toBeGreaterThan(wenigerUngluecklich.waiverShare);
+  });
+
+  it("bleibt schlechter als geschenkt und besser als ein regulaerer Verkauf", () => {
+    // Genau die Spanne, in der die Annahme eine Abwaegung ist statt eines Selbstlaeufers.
+    const offer = offersFor()[0];
+    const regulaer = offer.salePrice - offer.openBuyout;
+    const netto = offer.salePrice - offer.payableBuyout;
+    expect(netto).toBeGreaterThan(regulaer);
+    expect(netto).toBeLessThan(offer.salePrice);
   });
 
   it("fragt in derselben Saison nicht zweimal", () => {
@@ -96,7 +124,7 @@ describe("Wer bietet eine Vertragsaufloesung an", () => {
 });
 
 describe("Annahme", () => {
-  it("laesst den Spieler gehen und schreibt den vollen Preis gut", () => {
+  it("laesst den Spieler gehen und bucht Preis minus zahlbarem Buyout", () => {
     const before = gameState();
     const offer = offersFor(before)[0];
     const after = acceptContractDissolution({
@@ -111,7 +139,8 @@ describe("Annahme", () => {
       seasonState: { contractDissolutions: Array<{ decision: string; salePrice: number }> };
     };
 
-    expect(after.teams.find((team) => team.teamId === "C-C")?.cash).toBe(140);
+    // 100 + 40 - 5,76 zahlbarer Buyout. Vorher standen hier 140 — der Buyout fiel unter den Tisch.
+    expect(after.teams.find((team) => team.teamId === "C-C")?.cash).toBeCloseTo(134.24, 2);
     expect(after.rosters.some((entry) => entry.playerId === "p-star")).toBe(false);
     // Fremde Teams und der Rest des Kaders bleiben unangetastet.
     expect(after.teams.find((team) => team.teamId === "M-M")?.cash).toBe(50);
@@ -142,8 +171,13 @@ describe("Ablehnung", () => {
     expect(after.seasonState.contractDissolutions[0].decision).toBe("declined");
   });
 
-  it("kostet Moral — eine Ablehnung ist nicht folgenlos", () => {
-    expect(applyDeclinePenalty(20)).toBe(14);
+  /**
+   * GEMELDET: „bekommt dann noch mal einen großen Moral Malus von -20 oder so — damit seine
+   * leistung auch spürbar schlechter wird und man es nicht nutzt um zu wissen ja der spieler
+   * will eh raus dann kann ich ihn nächste saison abgeben".
+   */
+  it("kostet spuerbar Moral — eine Ablehnung ist teuer, nicht nur unangenehm", () => {
+    expect(applyDeclinePenalty(30)).toBe(10);
     // Nie unter null, sonst kippt die Moral-Skala.
     expect(applyDeclinePenalty(3)).toBe(0);
   });
@@ -165,7 +199,7 @@ describe("Ablehnung", () => {
       decidedAt: "2027-01-01T00:00:00.000Z",
     }) as unknown as { playerMoraleState: Array<{ playerId: string; morale: number }> };
 
-    expect(after.playerMoraleState.find((entry) => entry.playerId === "p-star")?.morale).toBe(14);
+    expect(after.playerMoraleState.find((entry) => entry.playerId === "p-star")?.morale).toBe(0);
     // Mitspieler bleiben unberuehrt.
     expect(after.playerMoraleState.find((entry) => entry.playerId === "p-happy")?.morale).toBe(70);
   });

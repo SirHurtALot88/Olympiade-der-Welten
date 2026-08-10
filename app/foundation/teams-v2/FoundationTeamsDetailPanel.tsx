@@ -12,6 +12,8 @@ import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+// Nur die Mapping-Funktion — die Karte selbst bleibt der dynamische Import weiter unten.
+import { buildAxisPpsFromRating } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@/lib/foundation/player-economy-contract";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
@@ -24,6 +26,7 @@ import type {
   TransfermarktSellSummary,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import FoundationRosterSellPeekDrawer from "@/app/foundation/teams-v2/FoundationRosterSellPeekDrawer";
+import { VeloSplitMeter } from "@/components/foundation/velo-ui";
 import {
   NlCard,
   NlEmptyState,
@@ -603,10 +606,6 @@ function FoundationTeamsDetailPanel({
   teamPicksRefillBusyTeamId,
   teamPicksRefillMessage,
 }: FoundationTeamsDetailPanelProps) {
-  if (!active) {
-    return null;
-  }
-
   const showLeagueLogos = teamsHydrationPhase === "full";
   const showSecondaryPanels = teamsHydrationPhase === "full";
   const [showDeferredTeamLogos, setShowDeferredTeamLogos] = useState(false);
@@ -625,6 +624,47 @@ function FoundationTeamsDetailPanel({
   const [expandedRosterPpsDisziId, setExpandedRosterPpsDisziId] = useState<string | null>(null);
   // Dasselbe Ausklapp-Muster für die Verträge-Tabelle (NlTable), Zustand je Spieler-ID.
   const [expandedContractPpsPlayerId, setExpandedContractPpsPlayerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showLeagueLogos) {
+      setShowDeferredTeamLogos(false);
+      return;
+    }
+
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) {
+        setShowDeferredTeamLogos(true);
+      }
+    };
+
+    if (typeof globalThis.requestIdleCallback === "function") {
+      const idleId = globalThis.requestIdleCallback(finish, { timeout: TEAMS_DEFERRED_LOGO_IDLE_MS });
+      return () => {
+        cancelled = true;
+        globalThis.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timerId = globalThis.setTimeout(finish, TEAMS_DEFERRED_LOGO_IDLE_MS);
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(timerId);
+    };
+  }, [showLeagueLogos, selectedTeam?.teamId]);
+
+  // Früher Ausstieg erst NACH allen Hooks (Rules of Hooks): Der Ausstieg stand
+  // früher ganz oben, VOR den useState/useEffect-Aufrufen. Das ging nur gut,
+  // weil der Shell-Router die Komponente bei Inaktivität komplett aushängt und
+  // `active` damit faktisch nie kippt — eine Landmine: Sobald irgendein Host
+  // `active` an einer gemounteten Instanz umschaltet, ändert sich die Zahl der
+  // Hook-Aufrufe zwischen zwei Renders und React wirft. Deshalb laufen jetzt
+  // erst alle Hooks, dann der Ausstieg. Für den (praktisch einzigen) Fall
+  // `active === true` ist das Verhalten identisch.
+  if (!active) {
+    return null;
+  }
+
   // Roster-Zeilen nach Spieler-ID (trägt ppPow/… + disciplinePpsByAxis) — Quelle
   // für die Achsen-/Disziplin-PPs der Verträge-Tabelle (join über playerId).
   const rosterRowByPlayerId = new Map(
@@ -732,34 +772,6 @@ function FoundationTeamsDetailPanel({
     </div>
   );
 
-  useEffect(() => {
-    if (!showLeagueLogos) {
-      setShowDeferredTeamLogos(false);
-      return;
-    }
-
-    let cancelled = false;
-    const finish = () => {
-      if (!cancelled) {
-        setShowDeferredTeamLogos(true);
-      }
-    };
-
-    if (typeof globalThis.requestIdleCallback === "function") {
-      const idleId = globalThis.requestIdleCallback(finish, { timeout: TEAMS_DEFERRED_LOGO_IDLE_MS });
-      return () => {
-        cancelled = true;
-        globalThis.cancelIdleCallback?.(idleId);
-      };
-    }
-
-    const timerId = globalThis.setTimeout(finish, TEAMS_DEFERRED_LOGO_IDLE_MS);
-    return () => {
-      cancelled = true;
-      globalThis.clearTimeout(timerId);
-    };
-  }, [showLeagueLogos, selectedTeam?.teamId]);
-
   const shouldShowTeamRowLogo = (teamId: string, rowIndex: number) =>
     showLeagueLogos &&
     (showDeferredTeamLogos ||
@@ -789,59 +801,126 @@ function FoundationTeamsDetailPanel({
                   Die Liste kommt vom Server — Preis und Anspruch werden dort gerechnet, damit die
                   Ansicht keinen veralteten Preis buchen kann. */}
               {rosterActionsEnabled && contractDissolutionOffers.length > 0 ? (
-                <section
-                  className="panel team-focus-panel"
+                <NlCard
+                  className="teams-dissolution-card"
                   id="team-focus-dissolution"
                   data-testid="teams-contract-dissolution"
+                  eyebrow="Kader · Saisonende"
+                  title={
+                    <>
+                      Vertragsauflösung auf Spielerwunsch
+                      <span className="teams-dissolution-count">
+                        {contractDissolutionOffers.length}{" "}
+                        {contractDissolutionOffers.length === 1 ? "Anfrage" : "Anfragen"}
+                      </span>
+                    </>
+                  }
                 >
-                  <div className="panel-header">
-                    <div>
-                      <h3>Vertragsauflösung auf Spielerwunsch</h3>
-                      <p className="muted">
-                        Diese Spieler bieten an, ihren Vertrag aufzulösen. Nimmst du an, kassierst du den vollen
-                        Verkaufspreis und der Rest-Buyout entfällt — den Zeitpunkt suchst du dir aber nicht aus.
-                        Lehnst du ab, erfüllt der Spieler seinen Vertrag und verliert weiter Moral.
-                      </p>
-                    </div>
-                  </div>
+                  {/* Kurz halten: die Herleitung steht in der Zeile selbst und in den Tooltips.
+                      Vier Zeilen Fließtext über drei Angeboten liest ohnehin niemand. */}
+                  <p className="nl-market-muted teams-dissolution-intro">
+                    Er verzichtet nur <b>anteilig</b> auf seinen Rest-Buyout — wie viel, hängt an Moral und Charakter.
+                    Den Zeitpunkt suchst du dir nicht aus; lehnst du ab, bricht seine Moral deutlich ein.
+                  </p>
                   <ul className="teams-dissolution-list">
                     {contractDissolutionOffers.map((offer) => {
                       const busy = contractDissolutionBusyPlayerId === offer.playerId;
                       const anyBusy = contractDissolutionBusyPlayerId != null;
+                      const zahlbar = offer.payableBuyout ?? 0;
+                      const netto = offer.salePrice - zahlbar;
+                      const offerPlayer =
+                        gameState.players.find((candidate) => candidate.id === offer.playerId) ?? null;
+                      const portrait = offerPlayer ? getPlayerPortraitModel(offerPlayer) : null;
                       return (
                         <li key={offer.playerId} className="teams-dissolution-item">
                           <div className="teams-dissolution-identity">
-                            <button
-                              type="button"
-                              className="nl-teams-playerlink is-inline"
-                              onClick={() => void openPlayerDrawerById(offer.playerId)}
-                              title={`${offer.playerName} öffnen`}
+                            {/* Kompaktes Bild statt der Hover-Vorschau: die Zeile ist eine
+                                Entscheidung, kein Spielerprofil — das oeffnet der Namensklick. */}
+                            <span className="teams-dissolution-portrait" aria-hidden="true">
+                              {portrait?.thumbSrc ?? portrait?.src ? (
+                                <BudgetedMediaImage
+                                  src={(portrait.thumbSrc ?? portrait.src) as string}
+                                  alt=""
+                                  width={44}
+                                  height={44}
+                                  fallbackLabel={portrait.initials}
+                                  fallback={<span className="teams-dissolution-portrait-fallback">{portrait.initials}</span>}
+                                />
+                              ) : (
+                                <span className="teams-dissolution-portrait-fallback">
+                                  {offer.playerName.slice(0, 2).toUpperCase()}
+                                </span>
+                              )}
+                            </span>
+                            <div className="teams-dissolution-identity-copy">
+                              <button
+                                type="button"
+                                className="nl-teams-playerlink is-inline"
+                                onClick={() => void openPlayerDrawerById(offer.playerId)}
+                                title={`${offer.playerName} öffnen`}
+                              >
+                                {offer.playerName}
+                              </button>
+                              <span className="teams-dissolution-chips">
+                                <span className="teams-dissolution-chip is-risk" title="Je unzufriedener, desto mehr gibt er auf.">
+                                  Moral {formatNlNumber(offer.morale, 1)}
+                                </span>
+                                <span className="teams-dissolution-chip" title="Restlaufzeit seines Vertrags.">
+                                  {offer.remainingContractLength}{" "}
+                                  {offer.remainingContractLength === 1 ? "Saison" : "Saisons"}
+                                </span>
+                                {offer.previouslyDeclined ? (
+                                  <span
+                                    className="teams-dissolution-chip is-warn"
+                                    title="Du hast schon einmal abgelehnt — das verschiebt seinen Verzicht, je nach Charakter in beide Richtungen."
+                                  >
+                                    fragt erneut
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Der geteilte Balken IST die neue Regel: er zeigt, wie viel des offenen
+                              Buyouts der Spieler liegen lässt und was am Team hängen bleibt. */}
+                          <div className="teams-dissolution-split">
+                            {offer.openBuyout > 0 ? (
+                              <VeloSplitMeter
+                                share={offer.waiverShare ?? 0}
+                                leadLabel="erlässt"
+                                leadValue={formatNlMoney(offer.waivedBuyout)}
+                                restLabel="du zahlst"
+                                restValue={formatNlMoney(zahlbar)}
+                                ariaLabel={`Rest-Buyout ${formatNlMoney(offer.openBuyout)}: ${formatNlMoney(offer.waivedBuyout)} erlassen, ${formatNlMoney(zahlbar)} zahlbar`}
+                              />
+                            ) : (
+                              <span className="nl-market-muted teams-dissolution-nobuyout">
+                                Vertrag läuft aus — kein offener Buyout.
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="teams-dissolution-money nl-tnum">
+                            <span
+                              className="teams-dissolution-net"
+                              title="Was nach Abzug des offenen Buyout-Rests wirklich ins Team-Cash geht."
                             >
-                              {offer.playerName}
-                            </button>
+                              <small>Netto</small>
+                              <strong>{formatNlMoney(netto)}</strong>
+                            </span>
                             <small className="muted">
-                              Moral {formatNlNumber(offer.morale, 1)} · Restlaufzeit {offer.remainingContractLength}{" "}
-                              {offer.remainingContractLength === 1 ? "Saison" : "Saisons"}
-                              {offer.previouslyDeclined ? " · hat schon einmal gefragt" : ""}
+                              {formatNlMoney(offer.salePrice)} Verkaufspreis
+                              {zahlbar > 0 ? ` − ${formatNlMoney(zahlbar)} Buyout` : ""}
                             </small>
                           </div>
-                          <div className="teams-dissolution-money nl-tnum">
-                            <span title="Was das Team bei Annahme bekommt.">
-                              Erlös <strong>{formatNlMoney(offer.salePrice)}</strong>
-                            </span>
-                            {offer.waivedBuyout > 0 ? (
-                              <small className="muted" title="Rest-Buyout, der bei Annahme entfällt.">
-                                Buyout {formatNlMoney(offer.waivedBuyout)} entfällt
-                              </small>
-                            ) : null}
-                          </div>
+
                           <div className="teams-dissolution-actions">
                             <button
                               type="button"
-                              className="nl-teams-action"
+                              className="primary-button nl-teams-action"
                               disabled={busy || anyBusy}
                               onClick={() => void onDecideContractDissolution?.(offer.playerId, "accepted")}
-                              title="Der Spieler geht, das Team kassiert den Verkaufspreis."
+                              title="Der Spieler geht; das Team kassiert den Verkaufspreis abzüglich des nicht erlassenen Buyout-Rests."
                             >
                               {busy ? "…" : "Auflösen"}
                             </button>
@@ -850,7 +929,7 @@ function FoundationTeamsDetailPanel({
                               className="nl-teams-action nl-teams-action-danger"
                               disabled={busy || anyBusy}
                               onClick={() => void onDecideContractDissolution?.(offer.playerId, "declined")}
-                              title="Der Spieler bleibt und erfüllt seinen Vertrag — kostet ihn Moral."
+                              title="Der Spieler bleibt und erfüllt seinen Vertrag — seine Moral bricht deutlich ein."
                             >
                               {busy ? "…" : "Ablehnen"}
                             </button>
@@ -859,7 +938,7 @@ function FoundationTeamsDetailPanel({
                       );
                     })}
                   </ul>
-                </section>
+                </NlCard>
               ) : null}
               <section className="panel team-focus-panel teams-primary-roster-panel" id="team-focus-roster">
                 <div className="panel-header team-focus-header">
@@ -2864,17 +2943,19 @@ function FoundationTeamsDetailPanel({
                     <div className="panel-header compact">
                       <div className="stack">
                         <h2>Board-Ziele</h2>
-                        <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
+                        <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Gebäude und Entwicklung.</p>
                       </div>
                       <div className="room-meta foundation-admin-meta">
+                        {/* Formatfix (Durchklick): Rating/Druck sind 1-Nachkommastellen-Größen —
+                            roh interpoliert stand hier „8.4/10" (JS-Punkt statt Hauskomma). */}
                         <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
-                          Board Rating {selectedBoardConfidence?.value ?? "—"}/10
+                          Board Rating {formatNlNumber(selectedBoardConfidence?.value, 1)}/10
                         </span>
                         <span
                           className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
                           title={TEAM_BOARD_PRESSURE_TOOLTIP}
                         >
-                          Druck {selectedBoardConfidence?.pressure ?? "—"}/10
+                          Druck {formatNlNumber(selectedBoardConfidence?.pressure, 1)}/10
                         </span>
                       </div>
                     </div>
@@ -2894,6 +2975,19 @@ function FoundationTeamsDetailPanel({
                             <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
                               {formatObjectiveStatusLabel(objective.status)}
                             </span>
+                            {/* „Hochrechnung": das Ziel hängt an Cash, und Sponsor/Apron/Gebäude sind
+                                noch nicht gebucht. Ohne diesen Hinweis las sich ein Zwischenstand wie
+                                ein Ergebnis — genau die Verwechslung, die das Finanzziel ligaweit als
+                                verfehlt ausgewiesen hat. */}
+                            {objective.provisional ? (
+                              <span
+                                className="pill"
+                                data-objective-provisional="true"
+                                title="Die Einnahmen der Saison (Sponsor, Apron, Gebäude) werden erst am Saisonende gebucht. Bis dahin ist dieser Wert eine Hochrechnung und das Ziel kann nicht verfehlt sein."
+                              >
+                                Hochrechnung
+                              </span>
+                            ) : null}
                             {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
                             {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
                           </div>
@@ -2938,6 +3032,7 @@ function FoundationTeamsDetailPanel({
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}
                           soc={player.coreStats.soc}
+                          axisPps={buildAxisPpsFromRating(ratings)}
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}
@@ -2999,6 +3094,7 @@ function FoundationTeamsDetailPanel({
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}
                           soc={player.coreStats.soc}
+                          axisPps={buildAxisPpsFromRating(ratings)}
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}
