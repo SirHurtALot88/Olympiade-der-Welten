@@ -24,7 +24,14 @@ export type AiSellReasonCode =
    * ist). Ein Spitzenspieler kann teuer und trotzdem angemessen bezahlt sein; ein Ergaenzungs-
    * spieler billig und trotzdem ueberbezahlt.
    */
-  | "overpaid_for_output";
+  | "overpaid_for_output"
+  /**
+   * Der Verkauf senkt die Apron-Abgabe des Teams. BEWUSST GETRENNT von `high_wage_burden` (kostet
+   * viel im Verhaeltnis zum Teambudget) und `overpaid_for_output` (kostet mehr, als er wert ist):
+   * dieser Grund haengt gar nicht am Spieler, sondern an der LAGE DES TEAMS zu seiner Apron-Decke.
+   * Derselbe Spieler ist bei einem Team weit darueber ein Steuerposten und bei einem darunter keiner.
+   */
+  | "apron_levy_relief";
 
 export type AiKeepReasonCode =
   | "low_wage_burden"
@@ -65,6 +72,7 @@ const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }
   { code: "cash_runway_pressure", patterns: ["Gehaltslast übersteigt verfügbares Cash", "Kein Verkauf in dieser Saison trotz enger Cash-Lage"] },
   { code: "roster_quality_floor", patterns: ["unteres Kader-Drittel", "Qualität upgraden"] },
   { code: "overpaid_for_output", patterns: ["teurer als für diese Leistung üblich"] },
+  { code: "apron_levy_relief", patterns: ["senkt die Apron-Abgabe"] },
 ];
 
 const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }> = [

@@ -123,7 +123,7 @@ export function useFoundationCrossTabGameFlow(input: {
 
   const flowCycleKey = `${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${gameFlowState.phase}:${input.activeManagerTeamId ?? "no-team"}`;
   const [flowCycleKeyState, setFlowCycleKeyState] = useState(flowCycleKey);
-  const [acknowledgedFlowStepIds, setAcknowledgedFlowStepIds] = useState<Set<string>>(() => new Set());
+  const [acknowledgedFlowStepIdsState, setAcknowledgedFlowStepIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (flowCycleKeyState === flowCycleKey) {
@@ -132,6 +132,32 @@ export function useFoundationCrossTabGameFlow(input: {
     setFlowCycleKeyState(flowCycleKey);
     setAcknowledgedFlowStepIds(new Set());
   }, [flowCycleKey, flowCycleKeyState]);
+
+  /**
+   * QUITTIERUNGEN GELTEN NUR FUER IHREN EIGENEN ZYKLUS.
+   *
+   * GEMELDET VON CHRIS: „die funktion ist quatsch man ist ja schon im naechsten spieltag, hier
+   * muesste man dann zur einsatzliste kommen" — und nachgeschoben: „er will zum naechsten spieltag
+   * schalten und dann haengt die einsatzliste wegen dem button". Das brach den Spielverlauf.
+   *
+   * Der Effekt oben leert die Quittierungen beim Zykluswechsel — aber Effekte laufen NACH dem
+   * Render. Im ersten Render des neuen Spieltags galten deshalb noch die Quittierungen des alten.
+   * Dort war „Einsatzliste stellen" bereits abgehakt, also fiel der Schritt aus der Auswahl
+   * (`gameFlowActionStep` filtert quittierte Schritte heraus). Uebrig blieb nur
+   * `advance_to_next_matchday` — im frischen Spieltag mangels Ergebnis BLOCKIERT. Genau dieser
+   * blockierte Knopf wurde zum Hauptknopf: „Zum naechsten Spieltag", nicht drueckbar, und der Weg
+   * zur Einsatzliste verschwunden. Der Spieltag liess sich aus dem normalen Verlauf nicht mehr
+   * spielen.
+   *
+   * Der Zyklusschluessel enthaelt Saison, Spieltag, Phase und Team — er weiss also schon im Render,
+   * dass ein neuer Zyklus laeuft. Also wird er auch im Render ausgewertet, statt auf den Effekt zu
+   * warten. Der Effekt bleibt: er raeumt den Zustand wirklich auf, damit die Menge nicht ewig
+   * mitwaechst.
+   */
+  const acknowledgedFlowStepIds = useMemo(
+    () => (flowCycleKeyState === flowCycleKey ? acknowledgedFlowStepIdsState : new Set<string>()),
+    [acknowledgedFlowStepIdsState, flowCycleKey, flowCycleKeyState],
+  );
 
   const activeTeamDecisionInboxItems = useMemo(() => {
     if (!shouldBuildInboxDerivations) {

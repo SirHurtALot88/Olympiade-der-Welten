@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
-import { resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
+import { getTeamApronSalaryBase, resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -141,8 +141,23 @@ export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: stri
   return lines.line1;
 }
 
+/**
+ * Gemessen wird auf der GEGLÄTTETEN Summe (`getTeamApronSalaryBase`), nicht auf `getTeamSalarySum`.
+ *
+ * DAS WAR EIN FEHLER, und zwar ein leiser: `getTeamSalarySum` liefert die ECHTE, front-/back-loadete
+ * Vertragssumme — die Zahl, die am Saisonende vom Konto geht. Der Apron bemisst aber die geglättete
+ * (siehe Kopfkommentar `apron-service.ts`). Die KI prüfte ihre Zurückhaltung also gegen eine andere
+ * Zahl, als die Abrechnung besteuert. Auf Chris' Spielstand (Saison 2, Spieltag 4) liefen die beiden
+ * Zahlen bei 4 von 32 Teams auseinander, im Extremfall um 18,0:
+ *   - Cold Steel: echt 63,6 (weit unter der Decke 81,0) → die KI sah freie Bahn, während die
+ *     geglättete Summe mit 81,6 über der 1. Linie stand und real 0,7 Abgabe kostete.
+ *   - Silver Soldiers und Last Ride ebenso; Project Suicide andersherum (echt 86,1 über der Decke,
+ *     geglättet 79,7 darunter) — die KI bremste dort ohne Grund.
+ * Die Cash-Ziele oben behalten `getTeamSalarySum` bewusst: sie planen den Cashflow, und abgebucht
+ * wird die echte Summe. Nur die APRON-Fragen wechseln die Grundlage.
+ */
 export function isTeamOverApronSalaryCeiling(gameState: GameState, teamId: string): boolean {
-  return getTeamSalarySum(gameState, teamId) > resolveTeamApronSalaryCeiling(gameState, teamId);
+  return getTeamApronSalaryBase(gameState, teamId) > resolveTeamApronSalaryCeiling(gameState, teamId);
 }
 
 /**
@@ -155,7 +170,8 @@ export function isTeamOverApronSalaryCeiling(gameState: GameState, teamId: strin
 export function resolveApronTighteningMultiplier(gameState: GameState, teamId: string): number {
   const ceiling = resolveTeamApronSalaryCeiling(gameState, teamId);
   if (ceiling <= 0) return 1;
-  const salary = getTeamSalarySum(gameState, teamId);
+  // Dieselbe Grundlage wie `isTeamOverApronSalaryCeiling` — siehe die Begründung dort.
+  const salary = getTeamApronSalaryBase(gameState, teamId);
   if (salary <= ceiling) return 1;
   const overshoot = (salary - ceiling) / ceiling;
   return clamp(1 - overshoot, 0.5, 1);

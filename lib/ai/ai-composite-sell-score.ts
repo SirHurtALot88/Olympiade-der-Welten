@@ -7,6 +7,7 @@ import {
   isBracketRankPoolEligible,
 } from "@/lib/market/transfermarkt-sale-factor";
 import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
+import { apronReliefFuerGehalt, type ApronAbbauZiel } from "@/lib/ai/apron-abbau-ziel";
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
@@ -40,6 +41,14 @@ const WEIGHTS: Record<
     mwDecline: number;
     performanceKeep: number;
     lossResistance: number;
+    /**
+     * Ersparnis an Apron-Abgabe, gemessen am ERLOES (siehe `computeCompositeSellScore`). In allen
+     * vier Profilen gleich gewichtet: die Steuer haengt an der Lage des TEAMS zur Linie, nicht an
+     * seiner Verkaufsphilosophie — ein Flip-Shop ueber der Decke spart genauso viel wie ein
+     * Harmony-Team ueber derselben Decke. Groessenordnung wie `mwDecline`/`performanceKeep`: genug,
+     * um Grenzkandidaten ueber die Schwelle zu heben, zu wenig, um die Kalibrierung umzuwerfen.
+     */
+    apronRelief: number;
   }
 > = {
   default: {
@@ -51,6 +60,7 @@ const WEIGHTS: Record<
     mwDecline: 10,
     performanceKeep: 12,
     lossResistance: 12,
+    apronRelief: 12,
   },
   flip_shop: {
     profit: 48,
@@ -61,6 +71,7 @@ const WEIGHTS: Record<
     mwDecline: 4,
     performanceKeep: 4.2,
     lossResistance: 12,
+    apronRelief: 12,
   },
   harmony: {
     profit: 30,
@@ -71,6 +82,7 @@ const WEIGHTS: Record<
     mwDecline: 10,
     performanceKeep: 13.8,
     lossResistance: 12,
+    apronRelief: 12,
   },
   development: {
     profit: 28,
@@ -81,6 +93,7 @@ const WEIGHTS: Record<
     mwDecline: 12,
     performanceKeep: 12,
     lossResistance: 12,
+    apronRelief: 12,
   },
 };
 
@@ -132,6 +145,16 @@ export type CompositeSellScoreInput = {
   teamCash: number;
   teamSalaryTotal: number;
   cashPressureScore: number;
+  /**
+   * Geglaettetes Gehalt DIESES Spielers (`resolvePlayerEconomyContract(...).expectedSalary`) — die
+   * Groesse, in der der Apron rechnet. NICHT `salary` daneben verwechseln: das ist die echte,
+   * front-/back-loadete Rate dieser Saison.
+   */
+  expectedSalary?: number | null;
+  /** Abbau-Ziel des TEAMS (einmal je Team gebaut, siehe `apron-abbau-ziel.ts`). Fehlt es, ist die Komponente 0. */
+  apronZiel?: ApronAbbauZiel | null;
+  /** Bereits verplanter Abbau: die Basis, ab der DIESER Verkauf noch etwas spart. */
+  apronRestBasis?: number | null;
   explanation?: string;
   sellForProfitAggression?: number | null;
   /** GM archetype for direct identity hooks (e.g. bargain_hunter → flip_shop + stronger loss resistance). */
@@ -152,6 +175,7 @@ export type CompositeSellScoreResult = {
     performanceKeep: number;
     boardCohesionKeep: number;
     lossResistance: number;
+    apronRelief: number;
   };
 };
 
@@ -259,9 +283,41 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
   const lossResistanceScale = input.gmArchetype === "bargain_hunter" ? 1.6 : 1;
   const lossResistance = round((baseLossResistance + freshBuyLossResistance) * lossResistanceScale);
 
+  /**
+   * APRON-ERSPARNIS — gemessen am ERLÖS, nicht am Gehalt.
+   *
+   * Wer 4 Abgabe spart und dafür 40 Verkaufserlös aufgibt, hat kaum etwas gewonnen; wer 4 spart und
+   * nur 8 bekommt, ist einen Steuerposten losgeworden. Das trifft genau den Spieler, den ein Team
+   * über seiner Decke abgeben SOLL — teuer im Gehalt, mager im Marktwert. Am Gehalt gemessen wäre
+   * es der teuerste Spieler, also oft der beste.
+   *
+   * Ohne Erlös (`0`) läuft das Verhältnis auf 1: eine Steuerersparnis, die nichts kostet, ist der
+   * klarste Fall überhaupt. `clamp01` hält den Ausschlag trotzdem im Rahmen.
+   *
+   * FEHLT DAS ZIEL, IST DIE KOMPONENTE 0 — Vorschauen ohne Ligakontext und alle Bestandstests
+   * verhalten sich damit unverändert.
+   */
+  const apronReliefBetrag = input.apronZiel
+    ? apronReliefFuerGehalt(input.apronZiel, input.expectedSalary, input.apronRestBasis ?? undefined)
+    : 0;
+  const apronErloes = expectedSell ?? currentMw ?? 0;
+  const apronRelief =
+    apronReliefBetrag > 0
+      ? round(clamp01(apronReliefBetrag / Math.max(apronErloes, 1)) * weights.apronRelief)
+      : 0;
+
   const total = round(
     clamp(
-      profit + financial + bracketLag + depthReplace + contract + mwDecline + performanceKeep + boardCohesionKeep + lossResistance,
+      profit +
+        financial +
+        bracketLag +
+        depthReplace +
+        contract +
+        mwDecline +
+        performanceKeep +
+        boardCohesionKeep +
+        lossResistance +
+        apronRelief,
       0,
       100,
     ),
@@ -284,11 +340,20 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
       performanceKeep,
       boardCohesionKeep: round(boardCohesionKeep),
       lossResistance,
+      apronRelief,
     },
   };
 }
 
-export function selectCompositeSellCandidates<T extends { expectedSellValue?: number | null; salary?: number | null; purchasePrice?: number | null }>(
+export function selectCompositeSellCandidates<
+  T extends {
+    expectedSellValue?: number | null;
+    salary?: number | null;
+    purchasePrice?: number | null;
+    /** Geglaettetes Gehalt — die Apron-Groesse. Getrennt von `salary` (echte Saisonrate) gefuehrt. */
+    expectedSalary?: number | null;
+  },
+>(
   input: {
     candidates: Array<{ candidate: T; score: number }>;
     teamCash: number;
@@ -300,6 +365,11 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
     /** Block sells that would drop the roster below hardMin unless cash emergency. */
     hardMin?: number;
     rosterCount?: number;
+    /**
+     * Abbau-Ziel des Teams. Ist es gesetzt und noch nicht erreicht, laeuft die Auswahl weiter, auch
+     * wenn der Cash-Druck schon geloest waere.
+     */
+    apronZiel?: ApronAbbauZiel | null;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -320,10 +390,33 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
 
   let projectedCash = input.teamCash;
   let projectedSalary = input.teamSalaryTotal;
+  /**
+   * ZWEITER ZAEHLER, UND ZWAR ZWINGEND — nicht Bequemlichkeit.
+   *
+   * `projectedSalary` fuehrt die ECHTE Gehaltssumme: `team.salaryTotal` wird in
+   * `ai-transfermarkt-sell-preview-service.ts` aus `resolvePlayerEconomyContract(...).salary`
+   * summiert (also front-/back-loaded), und das Dekrement unten nimmt dasselbe Feld. Der Apron
+   * bemisst aber die GEGLAETTETE Summe. Ein Vergleich `projectedSalary > decke` waere derselbe
+   * Aepfel-Birnen-Fehler, der schon in `isTeamOverApronSalaryCeiling` steckte — und er ist hier
+   * nicht theoretisch: am Spielstand gemessen kippt er bei 3 von 5 Abbau-Teams das Vorzeichen (Cold
+   * Steel echt 63,6 gegen Decke 81,0 spraenge nie an, obwohl geglaettet 81,6 darueber liegt; Mayhem
+   * Mavericks bekaeme scheinbaren Ueberschuss 20,4 statt 6,8 und wuerde um rund 13,6 ueberverkaufen).
+   *
+   * Deshalb laeuft die Apron-Basis getrennt mit und sinkt um `expectedSalary` statt um `salary`.
+   */
+  let projectedApronBase = input.apronZiel?.basis ?? 0;
   let projectedRoster = input.rosterCount ?? Number.POSITIVE_INFINITY;
   const hardMin = input.hardMin;
   const isCashEmergency = input.cashPressureScore >= 0.45;
   const selected: T[] = [];
+
+  /**
+   * Erreicht, sobald die Apron-Basis unter der Zielbasis liegt. `<=` waere hier falsch: bei einem
+   * Team, dessen Decke die 1. Linie IST, bedeutet „genau auf der Linie" zahlt nichts UND bekommt
+   * nichts — die Zielbasis traegt deshalb schon den Feinabstand (siehe `apron-abbau-ziel.ts`).
+   */
+  const istApronZielErreicht = () =>
+    input.apronZiel == null || input.apronZiel.ueberschuss <= 0 || projectedApronBase <= input.apronZiel.zielBasis;
 
   const isCashPressureResolved = () => {
     if (projectedCash < 0) return false;
@@ -345,12 +438,18 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
     ) {
       continue;
     }
-    if (selected.length > 0 && isCashPressureResolved() && !input.allowProfitSellsBelowMin) {
+    if (
+      selected.length > 0 &&
+      isCashPressureResolved() &&
+      istApronZielErreicht() &&
+      !input.allowProfitSellsBelowMin
+    ) {
       break;
     }
     selected.push(entry.candidate);
     projectedCash += entry.candidate.expectedSellValue ?? 0;
     projectedSalary = Math.max(0, projectedSalary - (entry.candidate.salary ?? 0));
+    projectedApronBase = Math.max(0, projectedApronBase - (entry.candidate.expectedSalary ?? 0));
     if (Number.isFinite(projectedRoster)) {
       projectedRoster -= 1;
     }

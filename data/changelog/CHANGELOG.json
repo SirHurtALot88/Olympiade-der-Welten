@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Die teuren Teams wussten beim Verkaufen nicht, dass sie ueber der Apron-Linie stehen. Die Verkaufsbewertung sah Verkaufswert, Marktwert, Restlaufzeit, Teamcash und Raenge — die Lage zur Linie kam in keiner einzigen Begruendung vor. Hell Raisers zahlten 16,6 und kannten als Verkaufsgruende nur negatives Cash und schwache Leistung. Jetzt baut jedes Team ueber seiner Gehaltsdecke gezielt ab: es kennt den noetigen Betrag, waehlt danach aus und hoert auf, sobald er erreicht ist. Verankert ist das an der AMBITIONSDECKE, nicht an der ersten Linie — ein Titelanwaerter soll die Abgabe zahlen und den Kader behalten. Auf dem Spielstand bauen damit 4 Teams ueber zusammen 18,9 Gehalt ab statt 8 Teams ueber 62,5. Bewertet wird die Ersparnis am ERLOES, nicht am Gehalt: bei Hell Raisers ranken die gehaltsschweren Ergaenzungsspieler oben (6,1 Gehalt bei 16,8 Marktwert) und die Stars unten (11,8 bei 39,8) — abgegeben wird der Steuerposten, nicht der beste Spieler. Der Zeitpunkt steht im Begruendungstext, weil er zaehlt: die Apron-Abrechnung ist beim Verkaufen schon gebucht, ein Abbau senkt die Abgabe der NAECHSTEN Saison, geschaetzt auf den Linien der laufenden.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Die KI kaufte, ohne die Luxussteuer zu kennen. Der Apron erreichte sie bisher nur als pauschale Cash-Bremse, die greift, NACHDEM ein Team seine Gehaltsdecke gerissen hat — ein Zugang mit 2 Gehalt und einer mit 14 waren fuer die Kaufentscheidung damit gleich teuer. Jetzt rechnet sie vor jedem Kauf den Grenzpreis aus: was kostet genau dieser Spieler zusaetzlich an Abgabe. Auf dem Spielstand von Saison 2 kostet derselbe Zugang mit Gehalt 14 die Hell Raisers 18,5 zusaetzlich und die Cash Creators gar nichts. Die Abgabe geht in die Cash-Pruefung ein (vorher wurde nur der nackte Kaufpreis geprueft) und in die Rangfolge der Kandidaten, gewichtet am Anteil der Abloese — 2 Abgabe auf einen 40er Transfer sind ein Rundungsfehler, 2 auf einen 6er ein Drittel Aufschlag. Ein Mindestkader-Notkauf setzt sich weiterhin durch, die Steuer kann ihn verzoegern, nicht verhindern. Das Gehalt der bereits gewaehlten Zugaenge laeuft dabei mit, sonst bekaemen vier teure Kaeufe hintereinander alle die Abgabe des ersten. Mitgenommen: die KI prueste ihre Gehaltsdecke gegen die echte Vertragssumme, waehrend der Apron die geglaettete besteuert — bei 4 von 32 Teams widersprachen sich die beiden Zahlen, im Extremfall um 18,0.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "Ranks · Teamstärke pro Diszi",
       "pr": null,
       "text": "Über der Matrix hing eine Kopie der eigenen Zeile. Sie setzte genau ein eigenes Team voraus — gepinnt wurde das gerade ausgewählte —, und wer mehrere Teams steuert, sah eins davon doppelt und die anderen nicht. Die Kopie ist weg. Die eigenen Teams bleiben auffindbar, aber über Merkmale, die mit jeder Anzahl funktionieren: der „Dein Team\"-Chip an der Zeile, die Akzentlinie und die Besitzer-Tönung.",
@@ -17,6 +35,15 @@
       "text": "Einen anderen Spielstand aktiv zu setzen lud ihn zweimal komplett aus der Datenbank. Der erste Ladevorgang diente nur der Frage „gibt es den Save überhaupt\" — dafür wurden 15 MB JSON aus sechs Tabellen geparst. Der zweite kam obendrauf, weil die Umschaltung selbst den Zeitstempel des Spielstands schreibt und damit den Sitzungs-Cache verwirft, der gerade erst gefüllt worden war. An der Live-Datenbank gemessen: 4166 ms vorher, 2105 ms nachher. Die Existenz wird jetzt mit einer einzeiligen Abfrage geprüft.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Arena · Spieltags-Wertung",
+      "pr": null,
+      "text": "Die Top-Spieler unter der Spieltags-Wertung zeigten nur die gerade laufende Disziplin. Unter einer Tabelle, die beide Disziplinen zusammenfasst, stand damit eine Spielerliste aus nur einer Haelfte: wer in Disziplin 1 ueberragend war und in Disziplin 2 nicht antrat, verschwand nach dem Wechsel spurlos aus der Liste, obwohl seine Punkte in der Tabelle direkt darueber weiterzaehlten. Jetzt rechnet die Liste den ganzen Spieltag: beide Disziplinen zusammen, je Spieler summiert (Score, Player-Points, Mutator-Aufschlag), wer in beiden antrat steht einmal da. Die Aufdeck-Regel bleibt unangetastet — mitgezaehlt wird nur, was auch die Wertung darueber schon freigibt; waehrend Disziplin 1 laeuft, stehen dort nur deren Spieler.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {
@@ -1178,6 +1205,15 @@
       "text": "Das Saisonende kommt jetzt bis zum Ende durch. Vorher konnte man in einer Schleife hängenbleiben: die KI verkaufte, dadurch fielen Teams unter Kadermindestgröße, und der Liga-Draft hielt das für einen abgebrochenen Spielaufbau und kaufte erneut ganze Kader voll — auch für manuell geführte Teams. Ursache war ein Name für zwei gegenteilige Zeitpunkte: die erste Station des Saisonendes hieß genauso wie der frische Spielaufbau. Sie heißt jetzt eigenständig, alte Spielstände werden beim Laden umgeschrieben. Außerdem verkauft die Station „Verkäufe\" endlich wirklich: der Verkaufsdienst war fertig und getestet, wurde vom Saisonende-Assistenten aber nie aufgerufen — KI-Teams gingen mit unverändertem Kader und ohne frisches Geld in die neue Saison, und auf dem Markt lag nichts zu kaufen.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-06",
+      "seite": "Spieltag",
+      "pr": null,
+      "text": "Nach dem Wechsel auf einen neuen Spieltag bot der große Weiter-Knopf noch einmal „Zum nächsten Spieltag\" an, ließ sich aber nicht drücken — und der Weg zur Einsatzliste war verschwunden, sodass der Spieltag feststeckte. Jetzt führt der Knopf dort hin, wo man hin muss: zur Aufstellung.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
       "version": "0.4"
     },
     {
