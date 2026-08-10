@@ -1744,12 +1744,30 @@ export function createSaveRepository(): SaveRepository {
       }));
     },
     setActiveSave(saveId: string, ownerId?: string | null) {
-      const existing = this.getSaveById(saveId);
-      if (!existing) {
+      const database = getDatabase();
+      // NUR EXISTENZ PRÜFEN, NICHT LADEN.
+      //
+      // Hier stand `this.getSaveById(saveId)`. Das materialisiert den KOMPLETTEN Spielstand —
+      // gemessen an Chris' Live-Datenbank rund 2,1 s je Durchgang (15 MB JSON aus sechs Tabellen,
+      // geparst und normalisiert). Gebraucht wurde davon nichts ausser der Antwort „gibt es den
+      // Save?".
+      //
+      // Schlimmer: der Rückgabewert am Ende lädt ein ZWEITES Mal kalt. Die Transaktion schreibt
+      // `saves.updated_at`, und genau darauf schlägt der Sitzungs-Cache an
+      // (`readSaveSessionCache` vergleicht `updated_at` UND `content_signature`) — der eben
+      // gefüllte Cache-Eintrag ist damit sofort ungültig. Ein Spielstand-Wechsel kostete also
+      // zweimal den vollen Ladeweg, hier gemessen ~4,5 s, auf dem Hetzner-Server entsprechend
+      // mehr. Gemeldet von Chris: „kann gerade auch mein altes save nicht wieder aktiv setzen".
+      //
+      // Der Cache-Vergleich bleibt bewusst wie er ist: `content_signature` ist ein GROBER
+      // Fingerabdruck (Saison, Spieltag, ein paar Zählerstände und letzte IDs) und taugt nicht als
+      // alleiniger Schlüssel — eine Änderung, die keinen dieser Werte bewegt, würde sonst still
+      // einen veralteten Stand ausliefern. Lieber einmal ehrlich laden als zweimal raten.
+      const exists = database.prepare("SELECT 1 FROM saves WHERE save_id = ?").get(saveId);
+      if (!exists) {
         return null;
       }
 
-      const database = getDatabase();
       const transaction = database.transaction(() => {
         const now = new Date().toISOString();
         if (ownerId) {

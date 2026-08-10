@@ -11,6 +11,15 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-10",
+      "seite": "Spielstände",
+      "pr": null,
+      "text": "Einen anderen Spielstand aktiv zu setzen lud ihn zweimal komplett aus der Datenbank. Der erste Ladevorgang diente nur der Frage „gibt es den Save überhaupt\" — dafür wurden 15 MB JSON aus sechs Tabellen geparst. Der zweite kam obendrauf, weil die Umschaltung selbst den Zeitstempel des Spielstands schreibt und damit den Sitzungs-Cache verwirft, der gerade erst gefüllt worden war. An der Live-Datenbank gemessen: 4166 ms vorher, 2105 ms nachher. Die Existenz wird jetzt mit einer einzeiligen Abfrage geprüft.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-09",
       "seite": "Finanzen · Apron",
       "pr": null,
