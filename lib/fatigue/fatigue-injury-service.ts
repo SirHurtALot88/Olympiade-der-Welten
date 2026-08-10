@@ -47,46 +47,60 @@ function envNumber(name: string, fallback: number) {
 }
 
 /**
- * LAST JE EINSATZ — 2026-08 von 10 auf 15 angehoben (Owner-Entscheidung).
+ * LAST JE EINSATZ — 2026-08 von 10 auf 19,5 angehoben (Owner-Entscheidung, zwei Schritte).
  *
  * GEMELDET VON CHRIS: „ich habe das gefühl es ist zu einfach auch mit 9 spielern verletzungen zu
- * vermeiden! sonst muss ein einsatz auf allen 3 stufen etwas mehr kosten." — Anheben der BASIS
- * skaliert automatisch alle drei Intensitätsstufen (siehe `INTENSITY_FATIGUE_MULT`): schonen
- * 7,5 → 11,25, normal 10 → 15, pushen 14 → 21. Das Verhältnis zwischen den Stufen bleibt exakt
- * erhalten, die 2026-07 austarierte Score-je-Fatigue-Abwägung also auch.
+ * vermeiden! sonst muss ein einsatz auf allen 3 stufen etwas mehr kosten." — dann, nach dem
+ * Simulations-Sweep unten: „gut dann erhöhe mal um 30% auf allen Stufen." 15 × 1,3 = 19,5.
+ *
+ * Angehoben wird die BASIS; alle drei Intensitätsstufen skalieren automatisch mit (siehe
+ * `INTENSITY_FATIGUE_MULT`): schonen 7,5 → 14,6, normal 10 → 19,5, pushen 14 → 27,3. Das
+ * Verhältnis zwischen den Stufen bleibt exakt erhalten, die 2026-07 austarierte
+ * Score-je-Fatigue-Abwägung also auch.
  *
  * WARUM ES NÖTIG WURDE — die Kalibrierung oben ist ÜBERHOLT, nicht falsch. Sie stammt aus einer
  * Zeit mit STEILERER Risikokurve. Danach wurde die Kurve zweimal auf Chris' Wunsch abgeflacht:
  * erst die Schutzzone bis Fatigue 25 (Risiko dort exakt 0), dann der Anker bei 50 von 10 % auf 3 %
  * (beides in `fatigue-calibration.ts` dokumentiert). Beide Änderungen waren richtig — ein frischer
  * Spieler soll sich nicht grundlos verletzen. Nur hat danach niemand die LAST nachgezogen, und
- * damit fiel die Verletzungszahl mit durch.
+ * damit fiel die Verletzungszahl mit durch: mit Last 10 stand ein Spieler nach ZWEI Einsätzen bei
+ * Fatigue 20, also unter der Schutzzone — Risiko exakt null.
  *
  * GEMESSEN, mit `scripts/export-injury-balance-audit.ts` gegen den echten Spielstand (32 Teams,
  * 10 Spieltage, Rotation nach niedrigster Fatigue):
  *
- *   Last 10 →  63 Verletzungen je Saison   (die Kalibrierung oben nannte für Last 10 noch 234/184
- *                                           — derselbe Simulator, aber die alte, steilere Kurve)
- *   Last 12 → 103      Last 14 → 166
- *   Last 15 → 199  ← trifft den Ziel-Korridor „~200" der ursprünglichen Kalibrierung
- *   Last 16 → 236      Last 18 → 321      Last 20 → 378
+ *   Last  10 →  63 Verletzungen   (die Kalibrierung oben nannte für Last 10 noch 234/184
+ *                                  — derselbe Simulator, aber die alte, steilere Kurve)
+ *   Last  15 → 199   (Ziel-Korridor „~200" der ursprünglichen Kalibrierung)
+ *   Last  18 → 321
+ *   Last 19,5 → 367  ← hier
+ *   Last  20 → 378
  *
- * Am echten Spielstand (Saison 1: 38 Verletzungen bei Last 10) hochgerechnet ergibt Last 15 rund
- * 120. Der Simulator läuft also etwa 1,7× heisser als die echte Saison — er kennt die
+ * Der Simulator läuft rund 1,7× heisser als die echte Saison — er kennt die
  * Trainingsmodus-Erholung nicht (`base_recovery_20_plus_facilities` steht in seiner eigenen
  * Annahmen-Liste) und besetzt beide Disziplinen an JEDEM Spieltag, während real auch halb
- * gewertete Spieltage vorkamen. 15 ist deshalb der vorsichtige Wert: er stellt auf der Skala der
- * URSPRÜNGLICHEN Kalibrierung den alten Korridor wieder her, ohne über ihn hinauszuschiessen.
+ * gewertete Spieltage vorkamen. Auf Chris' echte Saison 1 (38 Verletzungen bei Last 10)
+ * hochgerechnet liegt 19,5 bei rund 220.
  *
- * NEBENWIRKUNG, die gewollt ist: Kadertiefe zählt wieder. Bei Last 15 geraten 15 von 32 Teams
- * mindestens einmal in Aufstellungs-Not (bei Last 10 waren es 8) — genau der Druck, den ein
- * 9-Mann-Kader spüren SOLL. Ab Last 18 kippt das (21 von 32); dort wäre es keine Tiefe-Belohnung
- * mehr, sondern Unfähigkeit, überhaupt aufzustellen.
+ * ZWEI FOLGEN, BEIDE BENANNT UND BEIDE GEWOLLT:
+ *
+ * 1. KADERTIEFE ZÄHLT WIEDER — hart. 25 von 32 Teams geraten im Lauf einer Saison mindestens
+ *    einmal in Aufstellungs-Not (bei Last 10 waren es 8, bei 15 noch 15). Ein 9-Mann-Kader kommt
+ *    damit nicht mehr durch, und genau das war die Meldung.
+ *
+ * 2. PUSHEN IST NICHT MEHR GRATIS. 19,5 × 1,4 = 27,3 liegt ÜBER der Schutzzone von 25: ein
+ *    frischer Spieler, der einmal pusht, trägt jetzt ein kleines Risiko (~0,3 %), wo es bei
+ *    Last 15 noch exakt null war. Das ist die einzige Stelle, an der die Erhöhung Chris' Regel
+ *    „bis 25 soll die Wahrscheinlichkeit einfach 0 % sein" berührt — und sie berührt sie nur für
+ *    die HÖCHSTE Stufe. Schonen (14,6) und Normal (19,5) bleiben aus dem Stand risikofrei.
+ *    Vertretbar, weil Pushen ausdrücklich als „bewusste, sparsame Wette" entworfen ist (siehe
+ *    INTENSITY_FATIGUE_MULT): eine Wette ohne jedes Risiko wäre keine. Wer die Regel auch für
+ *    Pushen lückenlos halten will, müsste die Basis auf höchstens 17,8 setzen (17,8 × 1,4 = 24,9).
  *
  * WEITER TUNEN ohne Code-Änderung: `OLY_FATIGUE_MATCHDAY_LOAD`, und der Sweep oben ist mit
  * `OLY_FATIGUE_MATCHDAY_LOAD=<n> npx tsx scripts/export-injury-balance-audit.ts` reproduzierbar.
  */
-export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 15);
+export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 19.5);
 export const BASE_MATCHDAY_RECOVERY = 20;
 
 /**

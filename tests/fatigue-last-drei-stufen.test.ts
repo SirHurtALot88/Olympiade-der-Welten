@@ -6,10 +6,12 @@
  * bitte erhöhen auf den 3 Stufen!"
  *
  * WAS GEMESSEN WURDE (`scripts/export-injury-balance-audit.ts` gegen den echten Spielstand, 32
- * Teams, 10 Spieltage): bei Last 10 fallen 63 Verletzungen je Saison, bei 15 sind es 199 — der
- * Ziel-Korridor „~200", den die ursprüngliche Kalibrierung nennt. Dass er verfehlt war, lag nicht
- * an der Last, sondern an der Risikokurve: sie wurde nach jener Kalibrierung zweimal abgeflacht
- * (Schutzzone bis 25, Anker bei 50 von 10 % auf 3 %), ohne dass die Last nachgezogen wurde.
+ * Teams, 10 Spieltage): Last 10 → 63 Verletzungen je Saison, Last 15 → 199 (der Ziel-Korridor
+ * „~200" der ursprünglichen Kalibrierung), Last 19,5 → 367. Dass der Korridor verfehlt war, lag
+ * nicht an der Last, sondern an der Risikokurve: sie wurde nach jener Kalibrierung zweimal
+ * abgeflacht (Schutzzone bis 25, Anker bei 50 von 10 % auf 3 %), ohne dass die Last nachzog.
+ *
+ * ENDSTAND nach Chris' zweiter Ansage („gut dann erhöhe mal um 30% auf allen Stufen"): 19,5.
  *
  * Dieser Test hält NICHT die Zahl 15 fest — die darf sich beim Nachtunen ändern. Er hält fest, was
  * an der Änderung strukturell ist: dass alle drei Stufen mitwachsen und ihr Verhältnis erhalten
@@ -66,12 +68,36 @@ describe("Die Last reicht jetzt bis in die Risikozone", () => {
     expect(nachZwei).toBeGreaterThan(SCHUTZZONE);
   });
 
-  it("ein Einsatz allein bleibt risikofrei — die Schutzzone bleibt erhalten", () => {
-    // Chris' eigene Regel („bis 25 soll die Wahrscheinlichkeit einfach 0 % sein") darf die
-    // Erhöhung nicht aushebeln: EIN Einsatz aus dem Stand kostet weiterhin nichts.
+  it("schon EIN normaler Einsatz bringt einen frischen Spieler dicht an die Schutzzone", () => {
+    // Bei Last 10 lag ein Einsatz bei 10 — Lichtjahre von 25 entfernt. Jetzt zählt jeder Einsatz.
+    expect(MATCHDAY_FATIGUE_LOAD).toBeGreaterThan(SCHUTZZONE * 0.7);
+  });
+
+  /**
+   * DIE STELLE, AN DER DIE ERHÖHUNG CHRIS\' EIGENE REGEL BERÜHRT — bewusst und nur hier.
+   *
+   * Die Regel lautet „bis zu einer Fatigue von 25 sollte die Wahrscheinlichkeit einfach 0 % sein"
+   * (siehe `fatigue-calibration.ts`). Bei Last 15 hielt sie für ALLE drei Stufen: selbst Pushen
+   * kam aus dem Stand nur auf 21. Bei 19,5 sind es 27,3 — Pushen aus dem Stand trägt jetzt ein
+   * kleines Risiko.
+   *
+   * Vertretbar, weil Pushen ausdrücklich als „bewusste, sparsame Wette" entworfen ist: eine Wette
+   * ohne jedes Risiko wäre keine. Für Schonen und Normal bleibt die Regel lückenlos, und das hält
+   * dieser Test fest — kippt auch das, ist es keine Nebenwirkung mehr, sondern ein Regelbruch.
+   */
+  it("aus dem Stand bleiben Schonen und Normal risikofrei", () => {
+    for (const stufe of ["conserve", "normal"] as const) {
+      const einer = projectMatchdayInjuryRisk({ player: NEUTRAL, currentFatigue: 0, intensity: stufe });
+      expect(einer.fatigueBeforeRoll).toBeLessThanOrEqual(SCHUTZZONE);
+      expect(einer.riskPercent).toBe(0);
+    }
+  });
+
+  it("Pushen aus dem Stand ist die Wette, die es sein soll — kleines Risiko, nicht null", () => {
     const einer = projectMatchdayInjuryRisk({ player: NEUTRAL, currentFatigue: 0, intensity: "push" });
-    expect(einer.fatigueBeforeRoll).toBeLessThanOrEqual(SCHUTZZONE);
-    expect(einer.riskPercent).toBe(0);
+    expect(einer.riskPercent).toBeGreaterThan(0);
+    // Klein bleiben muss es trotzdem: ein einzelner Push darf kein Glücksspiel sein.
+    expect(einer.riskPercent).toBeLessThan(1);
   });
 
   it("Dauereinsatz wird spürbar: nach vier Einsätzen liegt echtes Risiko an", () => {
@@ -85,7 +111,7 @@ describe("Die Last reicht jetzt bis in die Risikozone", () => {
 
 describe("Die Last bleibt ohne Code-Änderung nachstellbar", () => {
   it("die Umgebungsvariable bleibt der Tuning-Knopf", () => {
-    // Der Sweep, aus dem die 15 stammt, faehrt genau darueber:
+    // Der Sweep, aus dem die Zahl stammt, faehrt genau darueber:
     // OLY_FATIGUE_MATCHDAY_LOAD=<n> npx tsx scripts/export-injury-balance-audit.ts
     const quelle = readFileSync(join(process.cwd(), "lib/fatigue/fatigue-injury-service.ts"), "utf8");
     expect(quelle).toContain('envNumber("OLY_FATIGUE_MATCHDAY_LOAD"');
