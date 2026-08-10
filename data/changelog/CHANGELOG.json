@@ -20,6 +20,15 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-10",
+      "seite": "Arena · Spieltags-Wertung",
+      "pr": null,
+      "text": "Die Top-Spieler unter der Spieltags-Wertung zeigten nur die gerade laufende Disziplin. Unter einer Tabelle, die beide Disziplinen zusammenfasst, stand damit eine Spielerliste aus nur einer Haelfte: wer in Disziplin 1 ueberragend war und in Disziplin 2 nicht antrat, verschwand nach dem Wechsel spurlos aus der Liste, obwohl seine Punkte in der Tabelle direkt darueber weiterzaehlten. Jetzt rechnet die Liste den ganzen Spieltag: beide Disziplinen zusammen, je Spieler summiert (Score, Player-Points, Mutator-Aufschlag), wer in beiden antrat steht einmal da. Die Aufdeck-Regel bleibt unangetastet — mitgezaehlt wird nur, was auch die Wertung darueber schon freigibt; waehrend Disziplin 1 laeuft, stehen dort nur deren Spieler.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-09",
       "seite": "Finanzen · Apron",
       "pr": null,
