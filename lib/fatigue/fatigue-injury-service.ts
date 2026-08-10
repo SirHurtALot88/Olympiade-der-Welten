@@ -46,7 +46,47 @@ function envNumber(name: string, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 10);
+/**
+ * LAST JE EINSATZ — 2026-08 von 10 auf 15 angehoben (Owner-Entscheidung).
+ *
+ * GEMELDET VON CHRIS: „ich habe das gefühl es ist zu einfach auch mit 9 spielern verletzungen zu
+ * vermeiden! sonst muss ein einsatz auf allen 3 stufen etwas mehr kosten." — Anheben der BASIS
+ * skaliert automatisch alle drei Intensitätsstufen (siehe `INTENSITY_FATIGUE_MULT`): schonen
+ * 7,5 → 11,25, normal 10 → 15, pushen 14 → 21. Das Verhältnis zwischen den Stufen bleibt exakt
+ * erhalten, die 2026-07 austarierte Score-je-Fatigue-Abwägung also auch.
+ *
+ * WARUM ES NÖTIG WURDE — die Kalibrierung oben ist ÜBERHOLT, nicht falsch. Sie stammt aus einer
+ * Zeit mit STEILERER Risikokurve. Danach wurde die Kurve zweimal auf Chris' Wunsch abgeflacht:
+ * erst die Schutzzone bis Fatigue 25 (Risiko dort exakt 0), dann der Anker bei 50 von 10 % auf 3 %
+ * (beides in `fatigue-calibration.ts` dokumentiert). Beide Änderungen waren richtig — ein frischer
+ * Spieler soll sich nicht grundlos verletzen. Nur hat danach niemand die LAST nachgezogen, und
+ * damit fiel die Verletzungszahl mit durch.
+ *
+ * GEMESSEN, mit `scripts/export-injury-balance-audit.ts` gegen den echten Spielstand (32 Teams,
+ * 10 Spieltage, Rotation nach niedrigster Fatigue):
+ *
+ *   Last 10 →  63 Verletzungen je Saison   (die Kalibrierung oben nannte für Last 10 noch 234/184
+ *                                           — derselbe Simulator, aber die alte, steilere Kurve)
+ *   Last 12 → 103      Last 14 → 166
+ *   Last 15 → 199  ← trifft den Ziel-Korridor „~200" der ursprünglichen Kalibrierung
+ *   Last 16 → 236      Last 18 → 321      Last 20 → 378
+ *
+ * Am echten Spielstand (Saison 1: 38 Verletzungen bei Last 10) hochgerechnet ergibt Last 15 rund
+ * 120. Der Simulator läuft also etwa 1,7× heisser als die echte Saison — er kennt die
+ * Trainingsmodus-Erholung nicht (`base_recovery_20_plus_facilities` steht in seiner eigenen
+ * Annahmen-Liste) und besetzt beide Disziplinen an JEDEM Spieltag, während real auch halb
+ * gewertete Spieltage vorkamen. 15 ist deshalb der vorsichtige Wert: er stellt auf der Skala der
+ * URSPRÜNGLICHEN Kalibrierung den alten Korridor wieder her, ohne über ihn hinauszuschiessen.
+ *
+ * NEBENWIRKUNG, die gewollt ist: Kadertiefe zählt wieder. Bei Last 15 geraten 15 von 32 Teams
+ * mindestens einmal in Aufstellungs-Not (bei Last 10 waren es 8) — genau der Druck, den ein
+ * 9-Mann-Kader spüren SOLL. Ab Last 18 kippt das (21 von 32); dort wäre es keine Tiefe-Belohnung
+ * mehr, sondern Unfähigkeit, überhaupt aufzustellen.
+ *
+ * WEITER TUNEN ohne Code-Änderung: `OLY_FATIGUE_MATCHDAY_LOAD`, und der Sweep oben ist mit
+ * `OLY_FATIGUE_MATCHDAY_LOAD=<n> npx tsx scripts/export-injury-balance-audit.ts` reproduzierbar.
+ */
+export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 15);
 export const BASE_MATCHDAY_RECOVERY = 20;
 
 /**
