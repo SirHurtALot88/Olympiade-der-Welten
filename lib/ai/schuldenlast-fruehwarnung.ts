@@ -45,7 +45,10 @@ export type SchuldenlastFruehwarnung = {
   umsatz: number;
   /** Was der kommenden Saisonend-Abbuchung an Deckung fehlt. 0 = alles gedeckt oder Bagatelle. */
   fehlbetrag: number;
-  /** Was das Team im Notfall noch leihen könnte (`computeBorrowingCapacity`). 0 = am Maximum. */
+  /**
+   * Was das Team im Notfall noch leihen könnte (`computeBorrowingCapacity`). 0 = am Maximum.
+   * NUR für den Begründungstext — dieser Wert steuert bewusst keine Entscheidung, siehe unten.
+   */
   kreditrahmen: number;
   /** 0–1: ungedeckter Anteil der Abbuchung. Erhöht Verkaufsbereitschaft, erzwingt nie Verkäufe. */
   score: number;
@@ -102,10 +105,21 @@ export function resolveSchuldenlastDruck(input: {
   // Lücke −0,4 zurück, also exakt auf den wirkungslosen Zustand von vorher.
   //
   // Fachlich ist das auch richtig so: sich Geld zu leihen, um eine KREDITRATE zu zahlen, ist die
-  // Schuldenspirale, gegen die diese Warnung überhaupt existiert. Der Rahmen zählt für KÄUFE
-  // (Chris: „ob ein team überhaupt noch kredit zur Not nehmen kann für Käufe"), und genau dort
-  // wird er verwendet: `selectCompositeSellCandidates` liest ihn, um zu entscheiden, ob ein Team
-  // nahe der Kader-Mindestgröße einen Spieler abgeben darf, den es ersetzen müsste.
+  // Schuldenspirale, gegen die diese Warnung überhaupt existiert.
+  //
+  // WO DER RAHMEN STATTDESSEN LANDET: ausschliesslich im Begründungstext der Verkaufsvorschau
+  // („noch X Kreditrahmen" bzw. „der Kreditrahmen ist ausgeschöpft"). Er wird gemessen und
+  // ausgewiesen, aber er steuert KEINE Entscheidung — jeder Versuch, ihn ins Verhalten zu ziehen,
+  // erstickte in der Messung entweder das Signal (Abzug von der Lücke: 8 → 2 Teams, Mayhem
+  // Mavericks zurück auf einen Verkauf und Lücke −0,4) oder lief ins Leere: eine
+  // Nachbesetzbarkeits-Prüfung HINTER dem hardMin-Schutz ist unerreichbar, weil dieser bereits
+  // greift, sobald der Cash-Druck gelöst ist.
+  //
+  // EINE VARIANTE BLEIBT OFFEN und ist bewusst nicht gebaut: als Ausnahme INNERHALB der
+  // hardMin-Bedingung wäre die Prüfung erreichbar und würde Teams mit Cash-Druck unter 0,45
+  // erlauben, an der Mindestgrösse noch einen profitablen Verkauf zu machen. Für die acht am
+  // Spielstand gewarnten Teams (alle Cash-Druck >= 0,95) hätte sie nichts geändert — deshalb
+  // fehlt ihr die Messgrundlage, an der sich ihre Kalibrierung prüfen liesse.
   const bagatellgrenze = Math.max(1, salaryTotal * 0.05);
   const fehlbetrag = roherFehlbetrag >= bagatellgrenze ? round1(roherFehlbetrag) : 0;
 

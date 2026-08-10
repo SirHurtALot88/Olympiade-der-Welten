@@ -202,10 +202,15 @@ export function resolveEffectiveSellThreshold(input: {
    * ≥ 0,95, also alle am Boden; die Senkung fiel bei allen achten restlos hinein. Mayhem Mavericks
    * verkaufte mit Warnung exakt dasselbe wie ohne (ein Spieler, Lücke −0,4).
    *
-   * MIT MITGESENKTEM BODEN greift es dort, wo es klemmt, und nur dort: Mayhem Mavericks 1 → 3
-   * Verkäufe (Lücke −0,4 → +33,5), Lost Kingdom 0 → 1 (−17,2 → +7,5, es verkaufte vorher gar
-   * nichts). Die fünf übrigen gewarnten Teams ändern sich nicht — sie waren nach ihrem ersten
-   * Verkauf ohnehin gedeckt.
+   * MIT MITGESENKTEM BODEN greift es dort, wo es klemmt: Mayhem Mavericks 1 → 2 Verkäufe
+   * (Lücke −0,4 → +21,4), Lost Kingdom 0 → 1 (−17,2 → +7,5, es verkaufte vorher gar nichts).
+   *
+   * DIE SENKUNG REICHT NICHT IMMER, und das gehört hierher, weil es sonst niemand merkt: Hell
+   * Raisers bleibt mit −9,7 ungedeckt, vor wie nach der Änderung. Bei Schwelle 20 (Score 0,224)
+   * qualifiziert dort nur ein Kandidat (29,4); die beiden nächsten liegen mit 19,2 und 18,8 knapp
+   * darunter, und die Schleife läuft ins Leere. Zwischen „gewarnt, aber ohne passende Kandidaten"
+   * und dem Notverkauf (`ergaenzeNotverkaeufe`, greift erst bei NEGATIVEM Cash) klafft eine Lücke.
+   * Fünf der übrigen sechs gewarnten Teams sind nach ihrem ersten Verkauf gedeckt.
    *
    * DIE UNTERGRENZE IST KEINE NEUE ZAHL: gesenkt wird höchstens bis 18, der Boden, den das
    * `flip_shop`-Profil ohnehin schon hat. Tiefer als die aggressivste Verkaufsrolle des Systems
@@ -409,7 +414,7 @@ export function selectCompositeSellCandidates<
      * (score > 0), läuft die Auswahl weiter, bis die kommende Saisonend-Abbuchung gedeckt ist —
      * dieselbe Mechanik wie beim `apronZiel`, nur mit der Kreditrate statt der Apron-Linie als Ziel.
      */
-    schuldenlast?: { score: number; kreditrate: number; umsatz: number; kreditrahmen?: number } | null;
+    schuldenlast?: { score: number; kreditrate: number; umsatz: number } | null;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -476,8 +481,16 @@ export function selectCompositeSellCandidates<
    * auch richtig. Falsch war nur, dass die Ausnahme bestehen blieb, nachdem die Verkäufe den
    * Notfall längst behoben hatten. Gemessen bei Mayhem Mavericks (Kader 10, Mindestgröße 8): nach
    * zwei Verkäufen stehen 51,6 in der Kasse — der Notfall ist vorbei, die Ausnahme galt aber
-   * weiter und liess einen dritten Verkauf auf sieben Spieler durch. Dieselbe eingefrorene
-   * Ausnahme lässt Pirate Crew 5 seiner 11 Spieler abgeben.
+   * weiter und liess einen dritten Verkauf auf sieben Spieler durch.
+   *
+   * LIGAWEIT GEMESSEN trifft das nicht nur die gewarnten Teams — vier weitere hörten auf, sich zu
+   * zerlegen, und blieben trotzdem gedeckt: Zero Heroes 3 → 1 Verkauf (Kader 9 → 8 statt 9 → 6),
+   * Death Peaches 4 → 2 (10 → 8 statt 10 → 6), Vigorous Vikings 3 → 2, Black Panthers 2 → 1. Die
+   * übrigen 26 Teams bleiben unverändert. Kein Team bleibt in Not stecken: die Ausnahme schaltet
+   * erst ab, wenn `projectedCash >= max(8, 18 % Gehalt)` erreicht ist.
+   *
+   * NICHT betroffen ist das `flip_shop`-Profil (u. a. Pirate Crew, 5 von 11 Verkäufen): es steigt
+   * ganz oben mit eigenem Rückgabepfad aus und betritt diese Schleife samt Kaderschutz nie.
    *
    * `isCashPressureResolved` rechnete schon immer auf `projectedCash`, war also von Anfang an
    * dynamisch. Nur diese eine Zeile war es nicht.
