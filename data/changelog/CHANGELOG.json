@@ -25,8 +25,8 @@
       "pr": null,
       "text": "Die laufende Saison zeigt jetzt hinter jedem Wert den Vergleich zur Vorsaison — „POW 12,5 (+4,2)“, ebenso bei Punkten, PPs, Cash, Gehalt und Marktwert. Grün heißt besser, beim Gehaltsblock bleibt die Zahl bewusst farblos, weil mehr Gehalt weder gut noch schlecht ist. Darunter steht neu eine All-Time-Zeile: die PPs über alle Saisons zusammen und der Platz des Teams in dieser Wertung. Beides gibt es im Team-Profil wie im Team-Drawer.",
       "quelle": "gepflegt",
-      "gewicht": null,
-      "version": null
+      "gewicht": "grundlegend",
+      "version": "0.4"
     },
     {
       "datum": "2026-08-10",
@@ -53,7 +53,7 @@
       "text": "Die Sportliche Historie zeigt abgeschlossene Saisons wieder mit Zahlen statt „—“: PPs, OVR, MVS und die vier Achsen stehen jetzt auch für Season 1 in der Zeile. Damit haben die OVR/PPS/MVS-Kacheln wieder ihren Verlauf — wo vorher „Kein Verlauf“ stand, steht jetzt das Delta zur Vorsaison. Die Daten waren nie weg, sie kamen nur nicht im Browser an.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
-      "version": null
+      "version": "0.4"
     },
     {
       "datum": "2026-08-10",
