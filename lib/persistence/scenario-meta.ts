@@ -12,6 +12,7 @@ const scenarioLabels: Record<ScenarioType, string> = {
   sandbox_multiseason_test: "Oly Sandbox Multi-Season Test",
   manager_multiplayer_test: "Manager Multiplayer Test",
   sandbox_snapshot: "Sandbox Snapshot",
+  gameplay_smoke_readonly: "CI Gameplay Smoke (read-only)",
 };
 
 export function hasFinalStandings(gameState: GameState) {

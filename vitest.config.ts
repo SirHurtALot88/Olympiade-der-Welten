@@ -37,6 +37,25 @@ export default defineConfig({
     // alle Testdateien eines Workers eine Datenbank auf der Platte — gemessen: eine einzige
     // zusaetzliche LEERE Testdatei faerbte zwei unbeteiligte Dateien rot, weil sich dadurch die
     // Verteilung auf die Worker verschob. Begruendung im Detail in der Setup-Datei.
+    /**
+     * 5 s (vitest-Default) ist fuer diese Suite die falsche Grenze.
+     *
+     * Ein grosser Teil der Tests hier ist integrationsnah: sie bootstrappen einen kompletten
+     * 32-Team-Spielstand samt SQLite-Datei. Einzeln gemessen liegen die schwersten davon bei rund
+     * 5,1-5,7 s — also genau AUF der Grenze; unter paralleler Last kippen sie darueber. Ergebnis
+     * waren 13 Fehlschlaege in 5 Dateien, die allesamt „Test timed out in 5000ms" hiessen und mit
+     * dem Spiel nichts zu tun hatten. Beim Einzellauf derselben Dateien verschwand ein Teil davon
+     * wieder — das klassische Bild eines zu knappen Timeouts, nicht eines echten Fehlers.
+     *
+     * Dass 5 s zu knapp ist, war im Code laengst anerkannt: die schwersten Tests tragen seit jeher
+     * eigene `}, 20000)`- bzw. `}, 60000)`-Angaben. Nur bekamen sie eben nicht alle eine. Statt die
+     * Zahl weiter einzeln nachzutragen, steht die realistische Grenze jetzt an einer Stelle.
+     *
+     * KEIN Verlust an Aussagekraft: die Performance-Zusicherungen dieser Suite messen selbst
+     * (z. B. `useStateCallCount <= 233` in foundation-performance-architecture) und haengen nicht am
+     * Test-Timeout. Ein echter Haenger faellt weiterhin auf — nur 15 s spaeter.
+     */
+    testTimeout: 20_000,
     setupFiles: ["tests/setup/sqlite-pro-testdatei.ts"],
     env: {
       // Der Online-Save-Auto-Export (lib/persistence/online-save-auto-export.ts) läuft per Default
