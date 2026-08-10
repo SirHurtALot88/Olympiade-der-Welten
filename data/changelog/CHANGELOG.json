@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Die KI kaufte, ohne die Luxussteuer zu kennen. Der Apron erreichte sie bisher nur als pauschale Cash-Bremse, die greift, NACHDEM ein Team seine Gehaltsdecke gerissen hat — ein Zugang mit 2 Gehalt und einer mit 14 waren fuer die Kaufentscheidung damit gleich teuer. Jetzt rechnet sie vor jedem Kauf den Grenzpreis aus: was kostet genau dieser Spieler zusaetzlich an Abgabe. Auf dem Spielstand von Saison 2 kostet derselbe Zugang mit Gehalt 14 die Hell Raisers 18,5 zusaetzlich und die Cash Creators gar nichts. Die Abgabe geht in die Cash-Pruefung ein (vorher wurde nur der nackte Kaufpreis geprueft) und in die Rangfolge der Kandidaten, gewichtet am Anteil der Abloese — 2 Abgabe auf einen 40er Transfer sind ein Rundungsfehler, 2 auf einen 6er ein Drittel Aufschlag. Ein Mindestkader-Notkauf setzt sich weiterhin durch, die Steuer kann ihn verzoegern, nicht verhindern. Das Gehalt der bereits gewaehlten Zugaenge laeuft dabei mit, sonst bekaemen vier teure Kaeufe hintereinander alle die Abgabe des ersten. Mitgenommen: die KI prueste ihre Gehaltsdecke gegen die echte Vertragssumme, waehrend der Apron die geglaettete besteuert — bei 4 von 32 Teams widersprachen sich die beiden Zahlen, im Extremfall um 18,0.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-09",
       "seite": "Finanzen · Apron",
       "pr": null,
