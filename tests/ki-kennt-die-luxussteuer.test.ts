@@ -117,7 +117,10 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
   });
 
   it("die Grundlage steht an genau einer Stelle (die Umstellung wäre eine Zeile)", () => {
-    const dienst = readFileSync(join(process.cwd(), "lib/ai/ai-apron-cost-service.ts"), "utf8");
+    // Sie wohnt in der SAISON-Ebene und nicht bei der KI: sie gehört zur Definition des Apron, nicht
+    // zu seiner Verwendung. Praktisch entscheidet das auch die Importrichtung — die KI-Decke baut
+    // auf dieser Zahl auf, ein Zuhause bei der KI ergäbe einen Zyklus.
+    const dienst = readFileSync(join(process.cwd(), "lib/season/apron-service.ts"), "utf8");
     const rumpf = dienst.slice(dienst.indexOf("export function getTeamApronSalaryBase"));
     expect(rumpf).toContain("return getTeamDisplaySalaryTotal(gameState, teamId);");
   });
