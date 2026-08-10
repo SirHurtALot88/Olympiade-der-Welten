@@ -27,6 +27,12 @@ export type AiBuyDecisionInput = {
   doctrine: TransferDoctrineProfile;
   coversNeedAxis: boolean;
   isTrashCandidate: boolean;
+  /**
+   * Die Luxussteuer, die GENAU DIESER Zugang zusätzlich auslöst (`estimateMarginalApronLevy`).
+   * Optional, damit der reine Sport-Vergleich (Tests, Vorschau-Ansichten ohne Ligakontext) ohne
+   * Spielstand auskommt — fehlt sie, verhält sich die Entscheidung wie vorher.
+   */
+  apronMarginalLevy?: number | null;
 };
 
 export type AiBuyDecisionResult = {
@@ -162,6 +168,28 @@ export function evaluateAiBuyDecision(input: AiBuyDecisionInput): AiBuyDecisionR
   }
 
   const price = input.price ?? input.marketValue;
+
+  /**
+   * LUXUSSTEUER ALS PREISBESTANDTEIL (Meldung von Chris: die KI muss vor dem Kauf wissen, dass ein
+   * teurer Zugang sie Abgabe kostet).
+   *
+   * Gewichtet wird der ANTEIL an der Ablöse, nicht der absolute Betrag: 2 Abgabe auf einen 40er
+   * Transfer sind ein Rundungsfehler, 2 Abgabe auf einen 6er Ergänzungsspieler sind ein Drittel
+   * Aufschlag. So trifft die Bremse den Fall, um den es geht — der Zugang, der ein Team über die
+   * Linie schiebt, ohne dafür Gegenwert zu liefern.
+   *
+   * GEDECKELT BEI 18 und NIE blockierend: eine Mindestkader-Lücke bringt bis zu 42 Kauf-Absicht ein,
+   * die Steuer darf einen Notkauf also verzögern, aber nicht verhindern. Das ist dieselbe Linie, die
+   * `resolveApronTighteningMultiplier` mit seinem Boden bei 0,5 schon zieht: ein Team DARF die Linie
+   * reissen, wenn der Kader es zwingend braucht — es soll es nur nicht aus Versehen tun.
+   */
+  const apronLevy = Number(input.apronMarginalLevy ?? 0);
+  if (Number.isFinite(apronLevy) && apronLevy > 0) {
+    const levyShare = price != null && price > 0 ? apronLevy / price : 1;
+    passIntentScore += clamp(Math.round(levyShare * 60), 1, 18);
+    reasonToPass.push(`Luxussteuer: +${Math.round(apronLevy * 100) / 100} Abgabe je Saison`);
+  }
+
   const strategicGate = passesStrategicBuyGate({
     score: input.score,
     price,

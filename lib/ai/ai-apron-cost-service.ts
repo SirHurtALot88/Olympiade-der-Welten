@@ -1,0 +1,94 @@
+/**
+ * WAS EIN KAUF AN LUXUSSTEUER KOSTET — die Zahl, die der KI bisher fehlte.
+ *
+ * GEMELDET VON CHRIS: „für den planner oder pick agent muss das berücksichtigt werden dass AI weiß
+ * oh wenn ich jetzt noch nen teuren spieler kaufe muss ich luxussteuer zahlen! das ist sau wichtig."
+ *
+ * WAS VORHER DA WAR — und warum es nicht reichte: der Apron erreichte die KI ausschließlich über die
+ * Cash-Reserve (`ai-team-cash-reserve-service.ts` skaliert die Rücklage mit
+ * `resolveApronTighteningMultiplier`). Das ist eine ZUSTANDS-Bremse: sie greift, NACHDEM ein Team
+ * seine Decke gerissen hat, und sie wirkt auf alle Käufe gleich. Was fehlte, war der Preis des
+ * EINZELNEN Zugangs — die Frage „was kostet mich genau DIESER Spieler zusätzlich zu seinem
+ * Kaufpreis?". Ohne sie sind ein Zugang mit 2 Gehalt und einer mit 14 Gehalt für die Kaufentscheidung
+ * gleich teuer, obwohl der zweite ein Team über die Linie schiebt und der erste nicht.
+ *
+ * BEMESSUNGSGRUNDLAGE: `getTeamDisplaySalaryTotal` — die GEGLÄTTETE Summe, also exakt die Zahl, gegen
+ * die die Abrechnung am Saisonende bemisst (siehe Kopfkommentar von `apron-service.ts`, und
+ * `sponsor-team-salary-display.ts`, das sie selbst schon als „die Bemessungsgrundlage für Apron,
+ * Sponsor-Kalkulation und KI" ausweist). Der ZUGANG geht mit `candidate.salary` ein: ein Spieler ohne
+ * Vertrag hat noch keine Front-/Back-Loading-Verteilung, sein `salary` IST damit sein
+ * `expectedSalary` (`resolvePlayerEconomyContract` fällt ohne Roster-Eintrag auf dieselbe Quelle
+ * zurück). Für einen frischen Zugang sind beide Zahlen also dieselbe — die Grundlage bleibt sauber.
+ *
+ * DIE ABGABE IST WIEDERKEHREND, DER KAUFPREIS EINMALIG. Diese Datei liefert die Abgabe EINER Saison.
+ * Wer sie mit dem Kaufpreis verrechnet, vergleicht damit bewusst konservativ (ein Vertrag über
+ * mehrere Jahre kostet die Abgabe mehrfach) — die KI unterschätzt die Steuer also eher, als dass sie
+ * sie überschätzt. Ein Aufschlag über die Restlaufzeit wäre die genauere, aber auch die viel
+ * zittrigere Zahl: die Linien wandern jede Saison mit dem Median, und über drei Saisons hinweg ist
+ * jede Hochrechnung geraten.
+ */
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { apronLevyForSalary, resolveApronSalaryFactor, resolveSeasonApronLines } from "@/lib/season/apron-service";
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Die Gehaltssumme, gegen die der Apron dieses Team bemisst. Eigene Funktion statt eines direkten
+ * Aufrufs, damit jede Apron-Frage der KI nachweislich dieselbe Grundlage nimmt — genau hier lag der
+ * Fehler, den diese Änderung mit behebt (die Decken-Prüfung maß auf der ECHTEN Vertragssumme).
+ */
+export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
+  return getTeamDisplaySalaryTotal(gameState, teamId);
+}
+
+/** Abgabe, die dieses Team bei der gegebenen Gehaltssumme zahlen würde (ohne Deckel, siehe apron-service). */
+export function estimateApronLevyAtSalary(gameState: GameState, salary: number): number {
+  const lines = resolveSeasonApronLines(gameState);
+  return apronLevyForSalary({
+    salary,
+    line1: lines.line1,
+    line2: lines.line2,
+    salaryFactor: resolveApronSalaryFactor(gameState),
+  });
+}
+
+/**
+ * DIE ZAHL, UM DIE ES GEHT: was ein Zugang mit `additionalSalary` Gehalt dieses Team ZUSÄTZLICH an
+ * Abgabe kostet — Abgabe nachher minus Abgabe vorher.
+ *
+ * Sie ist absichtlich nicht linear: ein Team weit unter der Linie zahlt für denselben Zugang 0, ein
+ * Team knapp darunter zahlt nur den Teil, der über die Linie ragt, und ein Team über der 2. Linie
+ * zahlt den doppelten Satz. Genau diese Nichtlinearität ist der Grund, warum eine pauschale
+ * Cash-Bremse den Fall nicht abdeckt.
+ */
+export function estimateMarginalApronLevy(
+  gameState: GameState,
+  teamId: string,
+  additionalSalary: number | null | undefined,
+): number {
+  const zusatz = Number(additionalSalary ?? 0);
+  if (!Number.isFinite(zusatz) || zusatz <= 0) return 0;
+  const basis = getTeamApronSalaryBase(gameState, teamId);
+  const vorher = estimateApronLevyAtSalary(gameState, basis);
+  const nachher = estimateApronLevyAtSalary(gameState, basis + zusatz);
+  return round2(Math.max(0, nachher - vorher));
+}
+
+/**
+ * Was der Zugang WIRKLICH kostet: Kaufpreis plus die Abgabe, die er auslöst. Der Wert, gegen den die
+ * Kauf-Schranke ihren Cash-Puffer prüft — vorher prüfte sie gegen den nackten Preis und übersah die
+ * Steuer vollständig.
+ */
+export function resolveApronAdjustedBuyCost(input: {
+  gameState: GameState;
+  teamId: string;
+  price: number | null;
+  candidateSalary: number | null;
+}): { price: number; levy: number; total: number } {
+  const price = Number.isFinite(Number(input.price)) ? Number(input.price) : 0;
+  const levy = estimateMarginalApronLevy(input.gameState, input.teamId, input.candidateSalary);
+  return { price, levy, total: round2(price + levy) };
+}

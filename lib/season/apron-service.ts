@@ -104,6 +104,20 @@ export function apronKonjunkturhebel(salaryFactor: number): number {
   return clamp01((salaryFactor - APRON_KONJUNKTUR_FACTOR_MIN) / (APRON_KONJUNKTUR_FACTOR_MAX - APRON_KONJUNKTUR_FACTOR_MIN));
 }
 
+/**
+ * Der Salary Factor der laufenden Saison — die Eingangsgröße des Hebels oben.
+ *
+ * Stand vorher wortgleich zweimal im Baum (`apron-settlement-service.ts`, `apron-projection.ts`); mit
+ * der KI-Anbindung wäre es die dritte Kopie geworden. Abrechnung, Hochrechnung und Kaufentscheidung
+ * MÜSSEN denselben Faktor lesen, sonst kauft die KI gegen eine andere Steuer, als am Saisonende
+ * gebucht wird. Fallback 1, nicht 0: ein 0-Faktor machte die Abgabe unsichtbar statt sie nur zu
+ * dämpfen.
+ */
+export function resolveApronSalaryFactor(gameState: GameState): number {
+  const factor = gameState.seasonState?.seasonEconomyFactors?.[0]?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
 // ── Eingefrorene Linien ────────────────────────────────────────────────────────────────────────
 
 export type ApronLines = {
@@ -267,6 +281,37 @@ export type ApronSettlement = {
 };
 
 /**
+ * DIE ABGABE EINES EINZELNEN GEHALTS, vor dem Deckel — die eine Stelle, an der die Zonen-Arithmetik
+ * steht. `computeApronSettlement` unten benutzt sie, und die KI benutzt sie, um VOR einem Kauf zu
+ * wissen, was der Kauf sie an Abgabe kosten wird (`lib/ai/ai-apron-cost-service.ts`).
+ *
+ * Herausgelöst, weil die KI sonst die Formel nachbauen müsste: zwei Formeln für dieselbe Zahl driften
+ * auseinander, sobald jemand einen Satz oder eine Zone anfasst — und dann kauft die KI gegen eine
+ * Steuer, die es so nicht mehr gibt.
+ *
+ * OHNE DECKEL, und zwar bewusst: der Deckel (`APRON_CAP_SHARE_OF_RANK_PAYOUT` × Wertungsanteil)
+ * hängt am ENDRANG der Saison, den zum Kaufzeitpunkt niemand kennt. Er kann die Abgabe nur SENKEN,
+ * nie erhöhen — die KI rechnet also mit der Obergrenze und irrt damit höchstens in Richtung
+ * Zurückhaltung. Laut Kalibrierung greift er bei den vorkommenden Rangverteilungen ohnehin nie.
+ */
+export function apronLevyForSalary(input: {
+  salary: number;
+  line1: number;
+  line2: number;
+  salaryFactor: number;
+  /** Nur für die Kalibrierung (siehe `computeApronSettlement`); sonst weglassen. */
+  rateZone1?: number;
+  rateZone2?: number;
+}): number {
+  if (!Number.isFinite(input.salary) || input.salary <= 0) return 0;
+  const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
+  const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
+  const ueberLinie1 = Math.max(0, Math.min(input.salary, input.line2) - input.line1);
+  const ueberLinie2 = Math.max(0, input.salary - input.line2);
+  return (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * apronKonjunkturhebel(input.salaryFactor);
+}
+
+/**
  * Bemessen wird der GEHALTSÜBERSCHUSS: der Teil zwischen 1. und 2. Linie zum ersten Satz, alles über
  * der 2. Linie zum zweiten. Der Deckel begrenzt die Abgabe auf höchstens die Hälfte dessen, was das
  * Team selbst aus dem Wertungstopf bekommen hat — wer viel zahlt und trotzdem hinten landet, wird
@@ -294,7 +339,6 @@ export function computeApronSettlement(input: {
   capShareOfRankPayout?: number;
 }): ApronSettlement {
   const { line1, line2 } = input.lines;
-  const k = apronKonjunkturhebel(input.salaryFactor);
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
   const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
   const capShareOfRankPayout = input.capShareOfRankPayout ?? APRON_CAP_SHARE_OF_RANK_PAYOUT;
@@ -302,7 +346,15 @@ export function computeApronSettlement(input: {
   const partial = input.teams.map((team) => {
     const ueberLinie1 = Math.max(0, Math.min(team.salary, line2) - line1);
     const ueberLinie2 = Math.max(0, team.salary - line2);
-    const rohAbgabe = (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * k;
+    // Dieselbe Formel, die die KI vor dem Kauf befragt — herausgelöst, damit es nur eine gibt.
+    const rohAbgabe = apronLevyForSalary({
+      salary: team.salary,
+      line1,
+      line2,
+      salaryFactor: input.salaryFactor,
+      rateZone1,
+      rateZone2,
+    });
     const deckel = capShareOfRankPayout * Math.max(0, team.rankShare);
     const abgabe = Math.max(0, Math.min(rohAbgabe, deckel));
     return { ...team, ueberLinie1, ueberLinie2, rohAbgabe, deckel, abgabe };

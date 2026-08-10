@@ -35,6 +35,7 @@ import {
   computeApronSettlement,
   hasSeasonBeenPlayed,
   resolveSeasonApronLines,
+  resolveApronSalaryFactor,
   type ApronLines,
 } from "@/lib/season/apron-service";
 
@@ -75,11 +76,6 @@ export type ApronProjection = {
   byTeamId: Map<string, ApronProjectionTeamRow>;
 };
 
-function getCurrentSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
-
 /**
  * Baut die Hochrechnung für ALLE Teams auf einmal. Das ist keine Bequemlichkeit, sondern
  * notwendig: Topf und Ausschüttung eines Teams hängen daran, was die anderen 31 zahlen und wie
@@ -104,7 +100,7 @@ export function buildApronProjection(input: {
   // Vorher hiess es nur „ein Snapshot existiert" — der lag aber schon vor dem Kaderbau vor, also
   // meldete die Anzeige „eingefroren", waehrend die Liga die Linie noch reihenweise ueberholte.
   const frozenLines = hasSeasonBeenPlayed(gameState);
-  const salaryFactor = getCurrentSalaryFactor(gameState);
+  const salaryFactor = resolveApronSalaryFactor(gameState);
 
   const teams = gameState.teams.map((team) => ({
     teamId: team.teamId,
