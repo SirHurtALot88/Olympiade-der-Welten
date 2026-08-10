@@ -196,10 +196,41 @@ describe("Die Frühwarnung erhöht Verkaufsbereitschaft, erzwingt aber nie einen
     const mit = resolveEffectiveSellThreshold({ teamProfile: "default", cashPressureScore: 0, schuldenlastScore: 0.369 });
     expect(ohne).toBe(30);
     expect(mit).toBe(27);
-    // Der Floor bleibt der Floor — auch beide Signale zusammen reißen ihn nicht.
+  });
+
+  /**
+   * HIER STAND EINE ZUSICHERUNG, DIE DAS SIGNAL WIRKUNGSLOS MACHTE: „der Floor bleibt der Floor —
+   * auch beide Signale zusammen reißen ihn nicht", geprüft mit `toBe(22)`.
+   *
+   * Am Spielstand nachgemessen war das keine Sicherheitsleine, sondern der Grund, warum gar nichts
+   * passierte. Der Cash-Druck zieht bereits −8 ab, und 30 − 8 = 22 IST der Floor. Jedes Team mit
+   * leerer Kasse steht damit schon dort — und das sind exakt die Teams, um die es geht: ALLE ACHT
+   * gewarnten Teams lagen bei Cash-Druck ≥ 0,95. Mayhem Mavericks verkaufte mit Warnung genau
+   * dasselbe wie ohne (ein Spieler, Deckungslücke −0,4).
+   */
+  it("bei leerer Kasse senkt sie den Floor mit — sonst wäre sie dort wirkungslos", () => {
+    // Der Fall, um den es geht: Cash-Druck steht schon auf 1, die Schwelle liegt schon am Floor.
+    const nurCashDruck = resolveEffectiveSellThreshold({ teamProfile: "default", cashPressureScore: 1 });
+    expect(nurCashDruck).toBe(22);
+
+    // M-M am gemessenen Stand (0,369) — die Schwelle geht unter den bisherigen Floor.
+    expect(
+      resolveEffectiveSellThreshold({ teamProfile: "default", cashPressureScore: 1, schuldenlastScore: 0.369 }),
+    ).toBe(19);
+  });
+
+  it("tiefer als das aggressivste Verkaufsprofil geht auch die lauteste Warnung nicht", () => {
+    // 18 ist keine neue Zahl: es ist der Floor, den `flip_shop` ohnehin schon hat.
     expect(
       resolveEffectiveSellThreshold({ teamProfile: "default", cashPressureScore: 1, schuldenlastScore: 1 }),
-    ).toBe(22);
+    ).toBe(18);
+    expect(resolveEffectiveSellThreshold({ teamProfile: "flip_shop", cashPressureScore: 1 })).toBe(18);
+  });
+
+  it("ohne Warnung bleibt jeder Floor exakt da, wo er war", () => {
+    expect(resolveEffectiveSellThreshold({ teamProfile: "default", cashPressureScore: 1 })).toBe(22);
+    expect(resolveEffectiveSellThreshold({ teamProfile: "harmony", cashPressureScore: 1 })).toBe(22);
+    expect(resolveEffectiveSellThreshold({ teamProfile: "flip_shop", cashPressureScore: 1 })).toBe(18);
   });
 
   it("die Auswahl läuft weiter, bis die kommende Abbuchung gedeckt ist (M-M-Zahlen)", () => {

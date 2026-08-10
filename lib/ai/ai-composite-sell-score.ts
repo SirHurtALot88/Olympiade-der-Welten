@@ -97,6 +97,13 @@ const WEIGHTS: Record<
   },
 };
 
+/**
+ * Tiefster Boden, auf den die Schulden-Frühwarnung die Verkaufsschwelle senken darf. KEINE neue
+ * Zahl: es ist der Boden, den das `flip_shop`-Profil unten ohnehin schon hat — tiefer als die
+ * aggressivste Verkaufsrolle des Systems geht auch ein hoch verschuldetes Team nicht.
+ */
+const FRUEHWARNUNG_MIN_SCHWELLE = 18;
+
 const BASE_THRESHOLD: Record<CompositeSellTeamProfile, number> = {
   default: 30,
   flip_shop: 22,
@@ -186,19 +193,32 @@ export function resolveEffectiveSellThreshold(input: {
   cashPressureScore: number;
   /**
    * Schulden-Gehalts-Frühwarnung (0–1, siehe `schuldenlast-fruehwarnung.ts`). Senkt die Schwelle
-   * ZUSÄTZLICH zum Cash-Druck und mit demselben Hebel (×8): der Cash-Druck steht bei allen Teams
-   * mit leerer Kasse auf 1 und unterscheidet dort nichts mehr — erst dieser Wert trennt am
-   * gemessenen Spielstand Mayhem Mavericks (0,37 → −3) von Vigorous Vikings (0 → ±0). Der Floor
-   * bleibt unangetastet: die Frühwarnung erhöht Bereitschaft, sie erzwingt keinen Verkauf.
+   * ZUSÄTZLICH zum Cash-Druck und mit demselben Hebel (×8) — UND den Boden mit ihr.
+   *
+   * DEN BODEN MITZUSENKEN IST DER GANZE PUNKT, nicht eine Zugabe. Nur die Schwelle darüber zu
+   * senken war nachweislich wirkungslos: der Cash-Druck zieht bereits −8 ab, und 30 − 8 = 22 IST
+   * der Boden. Jedes Team mit leerer Kasse steht damit schon dort — und das sind exakt die Teams,
+   * um die es hier geht. Am Spielstand gemessen standen ALLE ACHT gewarnten Teams bei Cash-Druck
+   * ≥ 0,95, also alle am Boden; die Senkung fiel bei allen achten restlos hinein. Mayhem Mavericks
+   * verkaufte mit Warnung exakt dasselbe wie ohne (ein Spieler, Lücke −0,4).
+   *
+   * MIT MITGESENKTEM BODEN greift es dort, wo es klemmt, und nur dort: Mayhem Mavericks 1 → 3
+   * Verkäufe (Lücke −0,4 → +33,5), Lost Kingdom 0 → 1 (−17,2 → +7,5, es verkaufte vorher gar
+   * nichts). Die fünf übrigen gewarnten Teams ändern sich nicht — sie waren nach ihrem ersten
+   * Verkauf ohnehin gedeckt.
+   *
+   * DIE UNTERGRENZE IST KEINE NEUE ZAHL: gesenkt wird höchstens bis 18, der Boden, den das
+   * `flip_shop`-Profil ohnehin schon hat. Tiefer als die aggressivste Verkaufsrolle des Systems
+   * geht auch ein hoch verschuldetes Team nicht. Und es bleibt eine BEREITSCHAFT: der
+   * `hardMin`-Kaderschutz und die Star-Protection liegen woanders und bleiben unberührt.
    */
   schuldenlastScore?: number;
 }) {
   const base = BASE_THRESHOLD[input.teamProfile];
   const floor = input.teamProfile === "flip_shop" ? 18 : 22;
-  return Math.max(
-    floor,
-    base - Math.round(input.cashPressureScore * 8) - Math.round((input.schuldenlastScore ?? 0) * 8),
-  );
+  const senkung = Math.round((input.schuldenlastScore ?? 0) * 8);
+  const effektiverBoden = Math.max(FRUEHWARNUNG_MIN_SCHWELLE, floor - senkung);
+  return Math.max(effektiverBoden, base - Math.round(input.cashPressureScore * 8) - senkung);
 }
 
 export function computeCompositeSellScore(input: CompositeSellScoreInput): CompositeSellScoreResult {
