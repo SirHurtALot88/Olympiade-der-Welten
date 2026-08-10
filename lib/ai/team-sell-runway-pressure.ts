@@ -1,4 +1,5 @@
 import { PRESEASON_CASH_PRESSURE_THRESHOLD } from "@/lib/ai/preseason-cash-recovery-service";
+import { getTeamCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
 function clamp(value: number, min: number, max: number) {
@@ -11,7 +12,36 @@ export function countTeamSeasonSells(gameState: GameState, teamId: string, seaso
   ).length;
 }
 
-/** 0–1 pressure signal — raises sell intent but never forces a minimum sell count. */
+/**
+ * Aufschlag fuer eine absolut duenne Kasse, unabhaengig von der Gehaltsquote.
+ *
+ * Die Quote allein reicht nicht: ein Team mit 5 Gehalt und 4 Cash steht quotenmaessig glaenzend da,
+ * kann aber keinen einzigen Transfer stemmen. Bewusst klein und gedeckelt — er ergaenzt die Quote,
+ * er ersetzt sie nicht.
+ */
+const KNAPPE_KASSE_AUFSCHLAG = 0.15;
+
+/**
+ * 0–1 pressure signal — raises sell intent but never forces a minimum sell count.
+ *
+ * NEU BERECHNET (gemeldet aus der Gegenpruefung der Apron-Verkaufslogik). Die alte Formel addierte
+ * vier Ja/Nein-Merkmale mit festen Gewichten, und drei davon trafen in der heutigen Oekonomie fast
+ * immer zu. Am Spielstand gemessen: `salaryExceedsCash` 31/32, `tightCashRunway` 31/32,
+ * `lowSellActivity` 32/32 — **31 der 32 Teams landeten bei 0,92 oder 1,00**. Ein Signal, das fuer
+ * alle gleich laut ist, unterscheidet nichts mehr; die „Emergency"-Schwelle bei 0,45 war damit
+ * bedeutungslos, und weil sie in `selectCompositeSellCandidates` den `hardMin`-Schutz aussetzt, war
+ * dieser Schutz ligaweit faktisch abgeschaltet.
+ *
+ * ZWEITER, SCHAERFERER FEHLER — DAS VORZEICHEN STAND KOPF: drei der fuenf Summanden waren mit
+ * `cash > 0` bewacht. Ein Team im MINUS verlor damit 0,52 + 0,28 + 0,18 und bekam nur die 0,35 fuer
+ * negatives Cash. Gemessen: Project Suicide, als einziges Team der Liga im Minus (−1,2), hatte mit
+ * 0,47 den NIEDRIGSTEN Druckwert der ganzen Liga — unter allen 31 Teams mit Guthaben.
+ *
+ * DIE NEUE RECHNUNG misst die Kasse an dem Ziel, das dieses Team ohnehin schon hat:
+ * `getTeamCashSalarySoftTarget` (0,25–0,75 je nach Finance-Wert). Kein neuer erfundener Grenzwert,
+ * sondern die Zahl, gegen die die Cash-Planung des Teams sowieso arbeitet — Druck heisst jetzt „wie
+ * weit unter meinem eigenen Ziel stehe ich". Negatives Cash ist per Definition der Hoechstwert.
+ */
 export function assessTeamSellRunwayPressure(input: {
   gameState: GameState;
   team: Team;
@@ -21,24 +51,20 @@ export function assessTeamSellRunwayPressure(input: {
   const cash = input.team.cash ?? 0;
   const salaryTotal = Math.max(0, input.salaryTotal);
   const seasonSells = countTeamSeasonSells(input.gameState, input.team.teamId, input.seasonId);
+
+  // Die Merkmale bleiben im Rueckgabewert: `salaryExceedsCash` liest die Verkaufsvorschau fuer eine
+  // Begruendung, `lowCashBuffer` die Markt-Anwendung. Nur ihre Rolle als Summanden entfaellt.
   const salaryExceedsCash = cash > 0 && salaryTotal > cash * 0.85;
   const tightCashRunway = cash > 0 && salaryTotal > 0 && cash < Math.max(12, salaryTotal * 0.95);
   const lowSellActivity = seasonSells === 0 && salaryTotal > 0 && cash < salaryTotal * 1.15;
-  const lowCashBuffer =
-    cash > 0 && cash < PRESEASON_CASH_PRESSURE_THRESHOLD && salaryTotal > 0;
+  const lowCashBuffer = cash > 0 && cash < PRESEASON_CASH_PRESSURE_THRESHOLD && salaryTotal > 0;
 
-  const cashPressureScore = round(
-    clamp(
-      (salaryExceedsCash ? 0.52 : 0) +
-        (tightCashRunway ? 0.28 : 0) +
-        (lowSellActivity ? 0.12 : 0) +
-        (lowCashBuffer ? 0.18 : 0) +
-        (cash <= 0 && salaryTotal > 0 ? 0.35 : 0),
-      0,
-      1,
-    ),
-    3,
-  );
+  const cashPressureScore = resolveCashPressureScore({
+    gameState: input.gameState,
+    teamId: input.team.teamId,
+    cash,
+    salaryTotal,
+  });
 
   return {
     seasonSells,
@@ -48,6 +74,33 @@ export function assessTeamSellRunwayPressure(input: {
     lowCashBuffer,
     cashPressureScore,
   };
+}
+
+/**
+ * Der eigentliche Druckwert — eigene Funktion, damit er ohne einen kompletten Spielstand pruefbar
+ * ist.
+ *
+ * `lowSellActivity` geht BEWUSST NICHT EIN. Das Merkmal ist wahr, solange ein Team in dieser Saison
+ * noch nichts verkauft hat, also am Saisonanfang bei allen 32 Teams. Es misst „hat noch nicht
+ * gehandelt", nicht „ist in Not" — als Summand hat es nur den Sockel aller Teams gemeinsam angehoben
+ * und damit exakt die Unterscheidung gekostet, um die es hier geht.
+ */
+export function resolveCashPressureScore(input: {
+  gameState: GameState;
+  teamId: string;
+  cash: number;
+  salaryTotal: number;
+}): number {
+  if (input.salaryTotal <= 0) return 0;
+  // Kein Guthaben ist die schlimmste Lage, die es gibt — hier stand der Fehler frueher auf dem Kopf.
+  if (input.cash < 0) return 1;
+
+  const ziel = getTeamCashSalarySoftTarget(input.gameState, input.teamId);
+  const quote = input.cash / input.salaryTotal;
+  // 1 bei leerer Kasse, 0 sobald das eigene Ziel erreicht ist, linear dazwischen.
+  const kern = ziel > 0 ? clamp((ziel - quote) / ziel, 0, 1) : 0;
+  const knappeKasse = input.cash < PRESEASON_CASH_PRESSURE_THRESHOLD ? KNAPPE_KASSE_AUFSCHLAG : 0;
+  return round(clamp(kern + knappeKasse, 0, 1), 3);
 }
 
 function round(value: number, digits = 3) {

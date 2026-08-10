@@ -49,7 +49,10 @@ function usesPlannerSalaryBufferCap(seasonId: string) {
 
 /** Ziel-Cash/Gehalt nach Finance: 0.25 (sparsam) bis 0.75 (finance-stark). */
 export function getTeamCashSalarySoftTarget(gameState: GameState, teamId: string) {
-  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  // `?? []`: die Funktion wird inzwischen auch aus der Verkaufs-Druckmessung gerufen, und die laeuft
+  // gegen Zustaende ohne Identitaeten (Tests, reparierte Spielstaende). Ohne den Schutz waere das
+  // ein Absturz statt eines Rueckfalls auf den neutralen Finance-Wert 5.
+  const identity = (gameState.teamIdentities ?? []).find((entry) => entry.teamId === teamId);
   const finances = identity?.finances ?? 5;
   return round(clamp(0.25 + (finances / 10) * 0.5, 0.25, 0.75), 3);
 }
