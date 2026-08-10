@@ -1644,14 +1644,33 @@ function buildTrainingSeasonEntries(input: {
     const hasPerAttributeOrigin = row.upgrades.some(
       (upgrade) => upgrade.training != null || upgrade.performance != null || upgrade.regression != null,
     );
-    const training = row.trainingSetpoints;
-    const performance = row.performanceSetpoints;
-    // Die Alterung steht im Save nicht als Saison-Summe — sie ist der Rest auf Netto
-    // (netto = Training + Leistung + Alterung), dieselbe Ableitung wie zuvor im Tooltip.
-    const regression =
-      row.netSetpoints != null && (training != null || performance != null)
-        ? round1ByMathRound(row.netSetpoints - (training ?? 0) - (performance ?? 0))
+    /**
+     * NETTO, NICHT BUDGET.
+     *
+     * GEMELDET VON CHRIS: „aber das was da stehen sollte egal ob s1 oder s2 sollten doch netto
+     * werte sein die wirklich beim charakter auch ankommen!"
+     *
+     * Hier standen `trainingSetpoints`/`performanceSetpoints` — das BUDGET vor Verteilung und
+     * Ceiling-Kappung. Die laufende Saison zeigt daneben die Summe der tatsaechlichen
+     * Attribut-Deltas. Zwei verschiedene Groessen unter demselben Namen, direkt untereinander:
+     * an Lyraeth Vael nachgemessen stand fuer S1 „Leistung +8,1" (Budget) gegen S2 „+1,8"
+     * (angekommen) — und ihr Leistungs-Budget war mit 8,10 zu 8,16 praktisch unveraendert. Der
+     * Unterschied ist die Ceiling-Kappung, nicht ihre Leistung. So gelesen sieht jede Saison
+     * eines gereiften Spielers wie ein Einbruch aus.
+     *
+     * Gezeigt wird jetzt in BEIDEN Faellen, was beim Charakter ankommt: die Summe der
+     * Attribut-Deltas. Fehlt die Herkunft je Attribut (Saisons, die vor der Mitschrift
+     * abgeschlossen wurden — im gemeldeten Spielstand alle 339 Ereignisse aus S1), bleiben die
+     * drei Posten LEER. Das Budget an ihrer Stelle auszuweisen waere genau die Verwechslung,
+     * die hier behoben wird; die Σ-Zeile traegt die Saison ohnehin.
+     */
+    const summiereHerkunft = (auswahl: "training" | "performance" | "regression") =>
+      hasPerAttributeOrigin
+        ? round1ByMathRound(row.upgrades.reduce((summe, upgrade) => summe + (upgrade[auswahl] ?? 0), 0))
         : null;
+    const training = summiereHerkunft("training");
+    const performance = summiereHerkunft("performance");
+    const regression = summiereHerkunft("regression");
     entries.push({
       key: row.eventId,
       seasonId: row.seasonId,

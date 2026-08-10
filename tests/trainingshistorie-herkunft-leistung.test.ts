@@ -167,17 +167,41 @@ describe("Trainingshistorie · abgeschlossene Saisons zeigen die Herkunft beim A
     expect(historie).toContain("(upgrade.originTraining ?? 0) + (upgrade.originSpillover ?? 0)");
   });
 
-  it("liest die Saison-Summen aus organicMeta und leitet die Alterung als Rest auf Netto ab", () => {
-    // Vorher stand der Split nur im Tooltip — jetzt sind es die sichtbaren Herkunfts-Zeilen.
-    // Die Quelle ist unverändert: `organicMeta` über die Historienzeilen; die Alterung steht
-    // im Save nicht als Saison-Summe und bleibt der Rest auf Netto.
+  /**
+   * GEMELDET VON CHRIS: „aber das was da stehen sollte egal ob s1 oder s2 sollten doch netto
+   * werte sein die wirklich beim charakter auch ankommen!"
+   *
+   * Vorher zog die abgeschlossene Saison ihre drei Posten aus `trainingSetpoints`/
+   * `performanceSetpoints` — dem BUDGET vor Verteilung und Ceiling-Kappung —, waehrend die
+   * laufende Saison daneben die Summe der tatsaechlichen Attribut-Deltas zeigte. An Lyraeth Vael
+   * nachgemessen: S1 „Leistung +8,1" (Budget) gegen S2 „+1,8" (angekommen), bei einem
+   * Leistungs-Budget von 8,10 zu 8,16. Der Unterschied war die Ceiling-Kappung, nicht ihre
+   * Leistung — so gelesen sieht jede Saison eines gereiften Spielers wie ein Einbruch aus.
+   */
+  it("zeigt in beiden Faellen die angekommenen Netto-Werte, nicht das Budget", () => {
     const builder = drawer.slice(
       drawer.indexOf("function buildTrainingSeasonEntries"),
       drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
     );
-    expect(builder).toContain("const training = row.trainingSetpoints");
-    expect(builder).toContain("const performance = row.performanceSetpoints");
-    expect(builder).toContain("row.netSetpoints - (training ?? 0) - (performance ?? 0)");
+    // Summiert werden die Attribut-Deltas je Herkunft — dieselbe Groesse wie in der Prognose.
+    expect(builder).toContain("row.upgrades.reduce((summe, upgrade) => summe + (upgrade[auswahl] ?? 0), 0)");
+    // Und das Budget taucht als Quelle der drei Posten NICHT mehr auf.
+    expect(builder).not.toContain("const training = row.trainingSetpoints");
+    expect(builder).not.toContain("const performance = row.performanceSetpoints");
+  });
+
+  /**
+   * Fehlt die Herkunft je Attribut (Saisons vor der Mitschrift — im gemeldeten Spielstand alle
+   * 339 Ereignisse aus S1), bleiben die drei Posten LEER. Das Budget an ihrer Stelle
+   * auszuweisen waere genau die Verwechslung, die oben behoben wird.
+   */
+  it("laesst die Posten leer, statt ersatzweise das Budget zu zeigen", () => {
+    const builder = drawer.slice(
+      drawer.indexOf("function buildTrainingSeasonEntries"),
+      drawer.indexOf("const SEASON_TRAINING_ORIGIN_ROWS"),
+    );
+    expect(builder).toContain("hasPerAttributeOrigin");
+    expect(builder).toContain(": null;");
   });
 
   it("sagt es, wenn die Aufteilung je Attribut fehlt, statt Zahlen zu erfinden", () => {
