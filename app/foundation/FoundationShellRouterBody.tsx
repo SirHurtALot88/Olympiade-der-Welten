@@ -804,14 +804,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     }
     return cells;
   })();
-  // Eigene Zeile zusätzlich oben anpinnen (W1-Befund 6): das Original bleibt an
-  // seiner sortierten Position, die gepinnte Kopie trägt "Rang X von N".
-  const pinnedOwnRankRow =
-    activeManagerTeamId != null
-      ? (sortedDisciplineRankRows.find(
-          (row: FoundationDisciplineRankRow) => row.team.teamId === activeManagerTeamId,
-        ) ?? null)
-      : null;
+  // GEMELDET VON CHRIS: „kannst du oben das eigene team entfernen? das irritiert auf jeden fall
+  // wenn man mal 4 teams zb steuern würde."
+  //
+  // Hier stand eine Kopie der eigenen Zeile, oben an die Tabelle gepinnt. Sie setzte GENAU EIN
+  // eigenes Team voraus: gepinnt wurde `activeManagerTeamId`, also das gerade ausgewählte. Wer
+  // mehrere Teams steuert, sieht dann eins davon doppelt und die anderen nicht — eine Auszeichnung,
+  // die je nach Auswahl auf ein anderes Team springt und über die Ligatabelle nichts aussagt.
+  //
+  // Die eigenen Teams bleiben trotzdem auffindbar, und zwar auf einem Weg, der mit jeder Anzahl
+  // funktioniert: jede gesteuerte Zeile trägt weiter den „Dein Team"-Chip, die Akzentlinie über
+  // `is-active-team-row` und die Besitzer-Tönung aus `getOwnerTeamHighlightClass`.
 
   return (
     (
@@ -2960,18 +2963,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {/* W1: eigene Zeile zusätzlich oben angepinnt — das Original
-                      bleibt an seiner sortierten Position weiter unten. */}
-                  {[
-                    ...(pinnedOwnRankRow ? [{ row: pinnedOwnRankRow, isPinned: true }] : []),
-                    ...sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => ({ row, isPinned: false })),
-                  ].map(({ row, isPinned }: { row: FoundationDisciplineRankRow; isPinned: boolean }) => (
+                  {sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => (
                     <tr
-                      key={isPinned ? `pinned-${row.team.teamId}` : row.team.teamId}
+                      key={row.team.teamId}
                       className={joinClassNames(
                         "ranks-row-clickable",
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
-                        isPinned && "ranks-own-pinned-row",
                         activeTeamRivalIds.has(row.team.teamId) && "is-rival",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
@@ -2989,11 +2986,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 ) : null}
                                 {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
                               </span>
-                              {isPinned ? (
-                                <small className="ranks-own-pinned-note nl-tnum">
-                                  Rang {row.totalRank} von {gameState.teams.length} — steht auch unten im Feld
-                                </small>
-                              ) : null}
                             </td>
                           );
                         }
