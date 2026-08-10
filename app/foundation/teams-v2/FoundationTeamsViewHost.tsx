@@ -64,6 +64,8 @@ type FoundationTeamsViewHostProps = Omit<
   | "getTeamAxisRankTooltip"
 > & {
   activeView: string;
+  /** Erwarteter Verkaufserloes je Spieler aus dem Server-Slice — nur durchgereicht. */
+  sliceSellValueByPlayerId?: Record<string, { expectedSellValue: number }> | null;
   selectedTeamId: string | null;
   selectedTeam: Team;
   gameState: GameState;
@@ -285,6 +287,7 @@ export default function FoundationTeamsViewHost({
       <FoundationTeamsNewLook
         selectedTeam={selectedTeam}
         gameState={gameState}
+        sliceSellValueByPlayerId={(panelProps as { sliceSellValueByPlayerId?: FoundationTeamsNewLookProps["sliceSellValueByPlayerId"] }).sliceSellValueByPlayerId ?? null}
         selectedTeamDetailTab={selectedTeamDetailTab === "portraits" ? "portraits" : "roster"}
         onOpenSeason={onOpenSeason}
         sortedTeamsViewRows={sortedTeamsViewRows}

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-10",
+  "seite": "Kader · Portraits",
+  "text": "Der Verkaufserlös unter dem Portrait kommt jetzt aus derselben serverseitigen Quelle wie in der Spielerliste. Vorher stand nur die lokale Rückfallebene zur Verfügung, und die fällt im kompakten Client-Payload auf VK = MW zusammen, weil der Verkaufsfaktor an den gewerteten Spieltagen hängt — die Zeile musste deshalb ausgeblendet werden, sobald sie nichts Neues sagte. Sie steht jetzt immer: eine Differenz von 0 heisst dann „noch kein Verkaufsfaktor verdient\" und ist eine Aussage, kein Artefakt.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}
