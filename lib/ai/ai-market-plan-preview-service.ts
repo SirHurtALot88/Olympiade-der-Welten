@@ -496,6 +496,8 @@ function chooseSellCandidates(
         (identity?.boardConfidence ?? 0) < 7 ||
         teamHasCashBufferRebuildFocus(gameState, team.teamId),
       apronZiel,
+      // Der Kreditrahmen reist mit: nahe der Kader-Mindestgroesse entscheidet er, ob ein Team einen
+      // Spieler abgeben darf, den es ersetzen muesste (siehe `kannErsatzFinanzieren`).
       schuldenlast,
     }),
     (candidate) => candidate.activePlayerId,

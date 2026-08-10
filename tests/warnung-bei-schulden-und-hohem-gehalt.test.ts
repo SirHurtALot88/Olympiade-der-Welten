@@ -272,4 +272,30 @@ describe("Die Frühwarnung erhöht Verkaufsbereitschaft, erzwingt aber nie einen
     });
     expect(selektiert).toHaveLength(0);
   });
+
+  /**
+   * DER NOTFALL WAR EINGEFROREN. `isCashEmergency` setzt den Kaderschutz aus und wurde EINMAL am
+   * Anfang aus dem Cash von VOR dem ersten Verkauf berechnet. Am Spielstand liess das Mayhem
+   * Mavericks (Kader 10, Minimum 8) einen dritten Verkauf auf sieben Spieler durch, obwohl nach
+   * zwei Verkaeufen 51,6 in der Kasse standen und der Notfall laengst vorbei war.
+   */
+  it("der Notfall endet, sobald die Verkäufe ihn behoben haben — der Kaderschutz kommt zurück", () => {
+    const gross = (id: string, score: number) => ({
+      candidate: { id, expectedSellValue: 40, salary: 8, expectedSalary: 8, purchasePrice: 10 },
+      score,
+    });
+    const selektiert = selectCompositeSellCandidates({
+      candidates: [gross("p0", 60), gross("p1", 59), gross("p2", 58), gross("p3", 57)],
+      teamCash: 0,
+      teamSalaryTotal: 60,
+      // Leere Kasse: der Notfall gilt, der Kaderschutz ist zunaechst ausgesetzt.
+      cashPressureScore: 1,
+      teamProfile: "default",
+      hardMin: 8,
+      rosterCount: 9,
+    });
+    // Der erste Verkauf bringt 40 herein und behebt den Notfall. Danach schuetzt die Mindestgroesse
+    // wieder — frueher lief die Ausnahme weiter und der Kader waere unter 8 gefallen.
+    expect(selektiert).toHaveLength(1);
+  });
 });

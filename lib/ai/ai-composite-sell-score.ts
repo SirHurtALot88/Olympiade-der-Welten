@@ -409,7 +409,7 @@ export function selectCompositeSellCandidates<
      * (score > 0), läuft die Auswahl weiter, bis die kommende Saisonend-Abbuchung gedeckt ist —
      * dieselbe Mechanik wie beim `apronZiel`, nur mit der Kreditrate statt der Apron-Linie als Ziel.
      */
-    schuldenlast?: { score: number; kreditrate: number; umsatz: number } | null;
+    schuldenlast?: { score: number; kreditrate: number; umsatz: number; kreditrahmen?: number } | null;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -447,7 +447,6 @@ export function selectCompositeSellCandidates<
   let projectedApronBase = input.apronZiel?.basis ?? 0;
   let projectedRoster = input.rosterCount ?? Number.POSITIVE_INFINITY;
   const hardMin = input.hardMin;
-  const isCashEmergency = input.cashPressureScore >= 0.45;
   const selected: T[] = [];
 
   /**
@@ -468,6 +467,22 @@ export function selectCompositeSellCandidates<
     }
     return true;
   };
+
+  /**
+   * DER NOTFALL WIRD NACH JEDEM VERKAUF NEU BEWERTET — vorher stand er als `const` fest, berechnet
+   * aus dem Cash-Druck von VOR dem ersten Verkauf, und galt danach für den ganzen Lauf.
+   *
+   * Er setzt den `hardMin`-Kaderschutz aus, und das ist für ein Team, dem HEUTE das Geld fehlt,
+   * auch richtig. Falsch war nur, dass die Ausnahme bestehen blieb, nachdem die Verkäufe den
+   * Notfall längst behoben hatten. Gemessen bei Mayhem Mavericks (Kader 10, Mindestgröße 8): nach
+   * zwei Verkäufen stehen 51,6 in der Kasse — der Notfall ist vorbei, die Ausnahme galt aber
+   * weiter und liess einen dritten Verkauf auf sieben Spieler durch. Dieselbe eingefrorene
+   * Ausnahme lässt Pirate Crew 5 seiner 11 Spieler abgeben.
+   *
+   * `isCashPressureResolved` rechnete schon immer auf `projectedCash`, war also von Anfang an
+   * dynamisch. Nur diese eine Zeile war es nicht.
+   */
+  const isCashEmergency = () => input.cashPressureScore >= 0.45 && !isCashPressureResolved();
 
   /**
    * FRÜHWARNUNGS-ZIEL: Cash + Umsatz muss die kommende Abbuchung (Gehalt + Kreditrate) decken.
@@ -491,7 +506,7 @@ export function selectCompositeSellCandidates<
       hardMin != null &&
       Number.isFinite(projectedRoster) &&
       projectedRoster - 1 < hardMin &&
-      !isCashEmergency
+      !isCashEmergency()
     ) {
       continue;
     }

@@ -28,10 +28,12 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
+  computeBorrowingCapacity,
   estimateTeamAnnualRevenue,
   getTeamAnnualLoanInstallment,
   getTeamOwedOutstandingDebt,
 } from "@/lib/finance/loan-service";
+import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 
 export type SchuldenlastFruehwarnung = {
   teamId: string;
@@ -43,6 +45,8 @@ export type SchuldenlastFruehwarnung = {
   umsatz: number;
   /** Was der kommenden Saisonend-Abbuchung an Deckung fehlt. 0 = alles gedeckt oder Bagatelle. */
   fehlbetrag: number;
+  /** Was das Team im Notfall noch leihen könnte (`computeBorrowingCapacity`). 0 = am Maximum. */
+  kreditrahmen: number;
   /** 0–1: ungedeckter Anteil der Abbuchung. Erhöht Verkaufsbereitschaft, erzwingt nie Verkäufe. */
   score: number;
 };
@@ -90,6 +94,18 @@ export function resolveSchuldenlastDruck(input: {
   // ohnehin zusteuert, liegt im Schätzfehler. Am Spielstand trennt das genau richtig: Zero Heroes
   // (fehlen 3,6 bei Grenze 4,2) und Vigorous Vikings (1,4 bei 2,8) bleiben still, die acht echten
   // Fälle von Terrible Teachers (6,3) bis Mayhem Mavericks (51,8) schlagen an.
+  // DER KREDITRAHMEN GEHT HIER BEWUSST NICHT EIN — nachgemessen, nicht vermutet.
+  //
+  // Naheliegend wäre, ihn von der Lücke abzuziehen: wer noch leihen kann, muss ja nicht sofort
+  // verkaufen. Am Spielstand durchgerechnet löscht das die Warnung aus — statt acht Teams warnen
+  // noch zwei, und Mayhem Mavericks (Rahmen 16,4 gegen Lücke 51,8) fällt auf einen Verkauf und
+  // Lücke −0,4 zurück, also exakt auf den wirkungslosen Zustand von vorher.
+  //
+  // Fachlich ist das auch richtig so: sich Geld zu leihen, um eine KREDITRATE zu zahlen, ist die
+  // Schuldenspirale, gegen die diese Warnung überhaupt existiert. Der Rahmen zählt für KÄUFE
+  // (Chris: „ob ein team überhaupt noch kredit zur Not nehmen kann für Käufe"), und genau dort
+  // wird er verwendet: `selectCompositeSellCandidates` liest ihn, um zu entscheiden, ob ein Team
+  // nahe der Kader-Mindestgröße einen Spieler abgeben darf, den es ersetzen müsste.
   const bagatellgrenze = Math.max(1, salaryTotal * 0.05);
   const fehlbetrag = roherFehlbetrag >= bagatellgrenze ? round1(roherFehlbetrag) : 0;
 
@@ -118,11 +134,27 @@ export function buildSchuldenlastFruehwarnung(
   // der Liga → für niemanden eine Schulden-Frühwarnung, der teurere Umsatz-Proxy entfällt gleich mit.
   const hatKredite = (gameState.seasonState?.loans ?? []).some((loan) => loan.borrowerTeamId === teamId);
   if (!hatKredite) {
-    return { teamId, schuld: 0, kreditrate: 0, umsatz: 0, fehlbetrag: 0, score: 0 };
+    return { teamId, schuld: 0, kreditrate: 0, umsatz: 0, fehlbetrag: 0, kreditrahmen: 0, score: 0 };
   }
   const schuld = getTeamOwedOutstandingDebt(gameState, teamId);
   const kreditrate = getTeamAnnualLoanInstallment(gameState, teamId);
   const umsatz = estimateTeamAnnualRevenue(gameState, teamId);
+  // Dieselbe Rechnung wie das echte Kreditangebot (`buildLoanOffers`), damit die Frühwarnung nicht
+  // mit einem Rahmen argumentiert, den die Bank am Schalter gar nicht gewährt.
+  //
+  // Der Kader-Marktwert braucht `players` UND `rosters`; die Druckmessung läuft aber auch gegen
+  // Zustände, die beides nicht führen (Tests, reparierte Spielstände) — dieselbe Vorsicht wie der
+  // `?? []`-Schutz in `getTeamCashSalarySoftTarget`. Ohne Kader kein Teamwert und damit kein
+  // Rahmen: das ist die vorsichtigere Annahme (warnt eher) und nicht ein Absturz.
+  const hatKaderdaten = Array.isArray(gameState.players) && Array.isArray(gameState.rosters);
+  const kreditrahmen = hatKaderdaten
+    ? computeBorrowingCapacity({
+        cash: input.cash,
+        marketValueTotal: resolveTeamRosterMarketValue(gameState, teamId),
+        annualRevenue: umsatz,
+        currentOutstandingDebt: schuld,
+      })
+    : 0;
   const { score, fehlbetrag } = resolveSchuldenlastDruck({
     cash: input.cash,
     salaryTotal: input.salaryTotal,
@@ -130,5 +162,5 @@ export function buildSchuldenlastFruehwarnung(
     kreditrate,
     umsatz,
   });
-  return { teamId, schuld, kreditrate, umsatz, fehlbetrag, score };
+  return { teamId, schuld, kreditrate, umsatz, fehlbetrag, kreditrahmen, score };
 }

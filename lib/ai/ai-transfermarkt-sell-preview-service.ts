@@ -720,7 +720,15 @@ function buildCandidate(
   if (schuldenlast.score > 0 && !starProtection) {
     pushSell(
       "debt_salary_runway",
-      `Restschuld und Gehaltslast übersteigen die Einnahmen — der nächsten Saisonend-Abrechnung fehlen rund ${roundValue(schuldenlast.fehlbetrag, 1)}, frühe Verkäufe verhindern den Engpass`,
+      // Der Kreditrahmen steht bewusst IM Text: „noch X Kreditrahmen" heisst, die Luecke liesse
+      // sich zur Not ueberbruecken und ein abgegebener Platz waere nachbesetzbar; „kein
+      // Kreditrahmen mehr" heisst, es bleibt nur der Verkauf. Chris: „berücksichtigen ob ein team
+      // überhaupt noch kredit zur Not nehmen kann für Käufe und nicht schon am Maximum ist."
+      `Restschuld und Gehaltslast übersteigen die Einnahmen — der nächsten Saisonend-Abrechnung fehlen rund ${roundValue(schuldenlast.fehlbetrag, 1)}${
+        schuldenlast.kreditrahmen > 0
+          ? `, noch ${roundValue(schuldenlast.kreditrahmen, 1)} Kreditrahmen`
+          : `, und der Kreditrahmen ist ausgeschöpft`
+      }, frühe Verkäufe verhindern den Engpass`,
     );
   }
 
