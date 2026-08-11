@@ -1,11 +1,16 @@
+/**
+ * BROWSERSEITE der Team-Overview-Slice: nur Typen und reine Funktionen.
+ *
+ * Der Bau der Slice steht bewusst in `team-overview-slice-build.ts` — er liest die echte
+ * Abrechnung und damit ueber `prize-money-preview` die Persistenz (`node:fs`,
+ * `better-sqlite3`). Diese Datei hier importiert der Browser (`use-season-stand-rows.ts`,
+ * Shell-Router); stuenden beide zusammen, zoege der Client-Import den Server-Code mit in das
+ * Bundle. Genau daran ist der Next-Build einmal gescheitert („Module not found: Can't resolve
+ * 'fs'"). Beim Erweitern also darauf achten, auf welcher Seite der Trennlinie der neue Code
+ * landet.
+ */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildGameStateContentSignature } from "@/lib/foundation/season-derivations-signature";
-import {
-  buildTeamSeasonOverviewRows,
-  type TeamManagementSnapshotRow,
-} from "@/lib/foundation/team-management-overview";
-import { resolveSeasonGuvByTeam } from "@/lib/finance/season-guv-resolver";
-import { getLeagueSponsorIncome } from "@/lib/season/prize-money-preview";
+import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 
 export type TeamOverviewSliceRow = Omit<TeamManagementSnapshotRow, "team" | "roster" | "rosterPlayers"> & {
   team: Pick<TeamManagementSnapshotRow["team"], "teamId" | "name" | "shortCode" | "cash" | "budget">;
@@ -21,22 +26,6 @@ export type TeamOverviewSliceResponse = {
   };
   rows: TeamOverviewSliceRow[];
 };
-
-function serializeTeamOverviewRow(row: TeamManagementSnapshotRow): TeamOverviewSliceRow {
-  const { team, roster, rosterPlayers, ...rest } = row;
-  return {
-    ...rest,
-    team: {
-      teamId: team.teamId,
-      name: team.name,
-      shortCode: team.shortCode,
-      cash: team.cash,
-      budget: team.budget,
-    },
-    rosterCount: roster.length,
-    rosterPlayerIds: roster.map((entry) => entry.playerId),
-  };
-}
 
 export function hydrateTeamOverviewSliceRows(
   sliceRows: TeamOverviewSliceRow[],
@@ -75,85 +64,4 @@ export function hydrateTeamOverviewSliceRows(
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     };
   });
-}
-
-export function buildTeamOverviewSlice(input: {
-  gameState: GameState;
-  saveId: string;
-  seasonId?: string;
-  contentSignature?: string | null;
-}): TeamOverviewSliceResponse {
-  const seasonId = input.seasonId ?? input.gameState.season.id;
-  const contentSignature = input.contentSignature ?? buildGameStateContentSignature(input.gameState);
-
-  /**
-   * SPONSOREN UND GUV KOMMEN AUS DER ECHTEN ABRECHNUNG — dieselbe Quelle wie
-   * `app/api/season/standings-overview/route.ts` (`getLeagueSponsorIncome` +
-   * `resolveSeasonGuvByTeam`, die EINE GuV aus `lib/finance/season-end-guv.ts`).
-   *
-   * BEFUND (#493/#498): `buildTeamSeasonOverviewRows` liest Sponsor/GuV standardmäßig aus
-   * `gameState.seasonState.standings`, und die trägt beide Felder erst NACH der
-   * Saisonende-Buchung (`cash-prize-apply-service.ts`, Phase `season_end`). Diese Slice ist
-   * aber genau der Zeilen-Pfad, den der "Neuer Look"-Saisonstand für die LAUFENDE Saison im
-   * Browser tatsächlich nimmt (`hydrateTeamOverviewSliceRows`,
-   * `lib/foundation/tabs/use-season-stand-rows.ts:222`) — ohne diese Überlagerung blieben
-   * SPONSOREN und GUV dort leer, obwohl die Live-Vorschau längst Werte liefert. Nachgemessen
-   * am Saisonstand-Beleg (`buildTeamOverviewSlice` ohne Überlagerung: 0/32 Teams mit
-   * `sponsorTotal`/`guv`).
-   *
-   * Nur für die LAUFENDE Saison: eine archivierte `seasonId` hat keine Live-Vorschau (das
-   * `gameState` gehört zur aktuellen Saison) und läuft im Browser ohnehin nicht über diesen
-   * Pfad (`isArchivedSeasonView` in `use-season-stand-rows.ts` erzwingt dort den leichten
-   * Pfad mit dem Standings-Feed).
-   */
-  const isCurrentSeason = seasonId === input.gameState.season.id;
-  const standingsByTeamId = isCurrentSeason
-    ? (() => {
-        const sponsorIncome = getLeagueSponsorIncome(input.gameState, input.saveId);
-        const seasonGuvByTeamId = resolveSeasonGuvByTeam(input.gameState, {
-          sponsorCashByTeamId: sponsorIncome.sponsorCashByTeamId,
-        });
-        return Object.fromEntries(
-          input.gameState.teams.map((team) => {
-            const existing = input.gameState.seasonState.standings?.[team.teamId] ?? null;
-            const liveSponsorCash = sponsorIncome.sponsorCashByTeamId.get(team.teamId) ?? null;
-            const liveGuv = seasonGuvByTeamId.get(team.teamId) ?? null;
-            return [
-              team.teamId,
-              {
-                rank: existing?.rank ?? null,
-                points: existing?.points ?? null,
-                cash: team.cash,
-                cashFc: existing?.cashFc ?? null,
-                startplatz: existing?.startplatz ?? null,
-                rankDiff: existing?.rankDiff ?? null,
-                sponsorBasis: existing?.sponsorBasis ?? null,
-                sponsorRank: existing?.sponsorRank ?? null,
-                sponsorSeason: existing?.sponsorSeason ?? null,
-                sponsorTotal: liveSponsorCash ?? existing?.sponsorTotal ?? null,
-                guv: liveGuv?.guv ?? existing?.guv ?? null,
-                guvPosten: liveGuv?.posten ?? existing?.guvPosten ?? null,
-                cashTotal: existing?.cashTotal ?? null,
-              },
-            ] as const;
-          }),
-        );
-      })()
-    : undefined;
-
-  const rows = buildTeamSeasonOverviewRows({
-    gameState: input.gameState,
-    saveId: input.saveId,
-    seasonId,
-    standingsByTeamId,
-  });
-
-  return {
-    scope: {
-      saveId: input.saveId,
-      seasonId,
-      contentSignature,
-    },
-    rows: rows.map(serializeTeamOverviewRow),
-  };
 }
