@@ -150,6 +150,27 @@ export type FoundationSeasonHistoryEntry = {
    */
   entryRosterPatchedAt: string | null;
   teams: FoundationSeasonHistoryTeamEntry[];
+  /**
+   * DIE TEAMSTAERKE-RAENGE, SCHLANK — nur die fuenf Rangzahlen je Team.
+   *
+   * `buildSeasonRecap` baut daraus die Karte „Kraefteverschiebung" (Vergleich der Staerke-Raenge
+   * zweier aufeinanderfolgender Saisons). Ohne sie fiel die Karte im Browser stumm aus; am
+   * Live-Abbild in Saison 3 gemessen: Server 6 Archiv-Karten in der Inbox, Browser 5.
+   *
+   * OHNE `disciplineRanks` UND `scorePack`, bewusst: die beiden tragen den Grossteil des Gewichts
+   * (voll 27,9 KB je Saison, so 4,3 KB). Wer sie braucht, ist der Ranks-Reiter im Archivmodus —
+   * und der laedt ohnehin das volle Archiv nach (`use-season-archive-load`).
+   */
+  teamDisciplineRanks: Array<{
+    teamId: string;
+    teamCode: string | null;
+    teamName: string;
+    totalRank: number;
+    powRank: number;
+    speRank: number;
+    menRank: number;
+    socRank: number;
+  }>;
   /** Siehe FoundationSeasonHistoryPlayerEntry — ohne sie bleibt die Spielerhistorie im Browser leer. */
   players: FoundationSeasonHistoryPlayerEntry[];
   /** Nur Top-Zu- und -Abgang je Team; die Historienzeile zeigt nicht mehr. */
@@ -271,6 +292,16 @@ export function projiziereSaisonHistorie(
     archivedAt: textOderNull(snapshot.archivedAt),
     entryRosterPatchedAt: snapshot.entryRosterPatchedAt ?? null,
     teams: resolveSeasonSnapshotTeamRecords(snapshot).map((record) => projiziereTeam(record as never)),
+    teamDisciplineRanks: (snapshot.teamDisciplineRankSnapshots ?? []).map((record) => ({
+      teamId: record.teamId,
+      teamCode: textOderNull(record.teamCode),
+      teamName: record.teamName,
+      totalRank: record.totalRank,
+      powRank: record.powRank,
+      speRank: record.speRank,
+      menRank: record.menRank,
+      socRank: record.socRank,
+    })),
     players: getSnapshotPlayerPerformances(snapshot).map(projiziereSpieler),
     transfers: (snapshot.transferSnapshots ?? []).map((entry) => ({
       type: String(entry.type),
@@ -371,6 +402,9 @@ export function alsSchnappschussErsatz(
         isTop10: team.rank != null ? team.rank <= 10 : false,
       } as unknown as SeasonSnapshotRecord["finalStandings"][number];
     }),
+    teamDisciplineRankSnapshots: (eintrag.teamDisciplineRanks ?? []).map(
+      (record) => ({ ...record }) as unknown as NonNullable<SeasonSnapshotRecord["teamDisciplineRankSnapshots"]>[number],
+    ),
     playerPerformances: (eintrag.players ?? []).map(
       (spieler) =>
         ({
