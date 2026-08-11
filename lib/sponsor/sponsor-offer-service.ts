@@ -42,6 +42,7 @@ import {
   VERZICHT_ANTEIL_DER_LEITER,
   verteileLeihgabenAufSlate,
 } from "@/lib/sponsor/sponsor-leih-slate";
+import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
 import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
@@ -279,9 +280,11 @@ export function buildSponsorOffersForTeam(input: {
   // kann, haengt daran, was es ueberhaupt bekommt. Gerechnet wird gegen die niedrigste Sprosse —
   // also gegen das, was auf JEDEM Endrang sicher kommt —, damit auch ein Absturz die Karte nicht
   // unbezahlbar macht.
+  const startRangFuerMarke =
+    rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition;
   const leiterFuerDeckel = sponsorKurvenLeiter({
     shape: slate.entries[0]?.curveShape ?? "stetig",
-    startRank: rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition,
+    startRank: startRangFuerMarke,
     salaryFactor: getCurrentSponsorSalaryFactor(input.gameState),
   });
   const leihKarten = verteileLeihgabenAufSlate({
@@ -332,10 +335,16 @@ export function buildSponsorOffersForTeam(input: {
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
     }
-    const leihe = leihKarten[slotIndex]?.leihe ?? null;
+    const karte = leihKarten[slotIndex] ?? null;
+    const leihe = karte?.leihe ?? null;
     if (!leihe) {
       return offer;
     }
+    // DIE MARKE HAENGT AN DER GROESSE, nicht am Zufall: „die Karte mit dem groessten Versprechen
+    // traegt das groesste Risiko" (Bauvorlage, Kopplung Karte<->Risiko). Eine grosse Leihe setzt den
+    // eigenen Startblock, alles darunter einen Block tiefer — so ist der Einstieg auch mit einem
+    // mittelmaessigen Jahr zu halten, das fertige Stufe-5-Gebaeude nicht.
+    const haerte: "hart" | "mild" = karte!.groesse === "gross" ? "hart" : "mild";
     return {
       ...offer,
       sponsorLeihe: {
@@ -347,6 +356,8 @@ export function buildSponsorOffersForTeam(input: {
         leihwertJeSaison: leihe.leihwertJeSaison,
         startZustandPct: leihe.startZustandPct,
         katalogkostenEndstufe: leihe.katalogkostenEndstufe,
+        rangmarke: baueRangmarke({ startRang: startRangFuerMarke, haerte }),
+        rangmarkenHaerte: haerte,
       },
     };
   });

@@ -1295,6 +1295,16 @@ export type SponsorOfferLeihe = {
   leihwertJeSaison: number[];
   /** Zustand des Gebäudes bei Übergabe (0..100) — die Vertragsvariable aus E7. */
   startZustandPct: number;
+  /**
+   * DIE RANGMARKE: bis zu welchem Tabellenplatz das geliehene Gebäude wirkt. Bei Unterschrift
+   * eingefroren, relativ zum Startblock, nie darüber (Abschnitt 4.4). Darunter **ruht** das
+   * Gebäude — der Cash-Verzicht läuft trotzdem weiter, das ist der Preis des Risikos.
+   *
+   * Fehlt sie, wirkt die Leihe unbedingt (Angebote aus der Zeit vor Schritt 6).
+   */
+  rangmarke?: number;
+  /** Wie hart die Marke gesetzt ist: `hart` = eigener Startblock, `mild` = ein Block darunter. */
+  rangmarkenHaerte?: "mild" | "hart";
   /** Selbstbaukosten der zuletzt erreichten Stufe — Grundlage des Übernahmepreises. */
   katalogkostenEndstufe: number;
 };
