@@ -1,5 +1,12 @@
 # Formkarten, Sponsoren, Gebäude, Transfers und GuV bleiben im Saisonstand leer — Befund
 
+> **Nachgemessen am 11.08., Stand Spieltag 10 — zwei Aussagen unten sind widerlegt.**
+> Der fehlende Messschritt ist nachgeholt; das Ergebnis steht am Ende unter
+> „Nachmessung". Kurzfassung: **eine** der fünf Spalten war wirklich kaputt (Formkarten),
+> und zwar aus einem anderen Grund als hier vermutet. Die Behauptung, `form: null` in
+> `standings-overview/route.ts` erkläre die Formkarten-Spalte, ist falsch — die Spalte liest
+> dieses Feld überhaupt nicht.
+
 **Gemeldet von Chris** (Saisonstand, mit Bild): „schau dir bitte an dass endlich formkarten,
 sponsoren, gebäude, transfers und GuV korrekt im saisonstand ausgewiesen werden!"
 
@@ -74,3 +81,45 @@ im Finanzen-Reiter, und genau das war schon einmal ein Bugreport.
 Der Befund erklärt A vollständig und B nur zur Hälfte. Wer B ohne den fehlenden Messschritt
 „repariert", verdrahtet womöglich einen Pfad, der im Spiel gar nicht läuft — und die Spalte bleibt
 leer, obwohl der Code richtig aussieht. Erst messen, welcher Pfad greift.
+
+## Nachmessung (11.08., Spieltag 10)
+
+Der fehlende Messschritt ist nachgeholt: alle drei in Frage kommenden Zeilen-Pfade wurden am
+Live-Save gebaut und Spalte für Spalte ausgezählt — Pfad 1 die Server-Slice, im Browser
+hydriert; Pfad 2 der leichte Aufbau ohne Standings-Feed; Pfad 3 der volle Aufbau auf dem
+beschnittenen Browser-Stand.
+
+| Spalte | Pfad 1 (Slice) | Pfad 2 (leicht, ohne Feed) | Pfad 3 (voll auf Browser-Stand) |
+|---|---|---|---|
+| Formkarten | 14/32 → **32/32** | 14/32 → **32/32** | 14/32 → **32/32** |
+| Sponsoren | 32/32 | 0/32 | 32/32 |
+| Gebäude | 9/32 | 9/32 | 9/32 |
+| Transfers | 32/32 | 32/32 | 32/32 |
+| GuV | 32/32 | 0/32 | 32/32 |
+
+Damit korrigieren sich zwei Aussagen oben:
+
+**Widerlegt 1 — die Formkarten-Spalte liest `financeForm` gar nicht.** Sie rechnet im Browser
+über `buildSeasonFormCardBonusByTeamId` (`FoundationSeasonV2Host`), also über die
+Modifier-Slots der Aufstellungen. Das hart verdrahtete `form: null` in der Route ist ein
+anderes Feld und für diese Spalte belanglos.
+
+**Der wirkliche Grund** ist die Anfangsladung: sie beschneidet `lineupDrafts` auf den aktiven
+Spieltag. Gemessen 320 Aufstellungen gegen 32, dadurch 14 statt 32 Teams mit Bilanz — und
+diese 14 zählten die Karten eines einzigen von zehn Spieltagen. Auf einem Spieltag, an dem
+noch niemand gelegt hatte, war die Spalte komplett leer. Behoben über eine mitfahrende
+Projektion (`foundation-form-card-projection`), Muster wie Feld-Rennen und Saison-Historie:
+die Beschneidung bleibt (659 KB gegen 70 KB, +3,79 % Payload), die fertige Bilanz kostet
+1,9 KB (+0,012 %).
+
+**Widerlegt 2 — Sponsoren und GuV haben eine Quelle.** Die ursprüngliche Messung (0/32) fiel
+in einen Zeitpunkt, an dem noch keine Sponsorenverträge geschlossen waren. Mit Verträgen
+liefern sowohl die Slice als auch der volle Aufbau für alle 32 Teams Werte (S-C: Sponsor 66,6
+· GuV 17,7). Auch Gebäude und Transfers rechnen: 9 von 32 Teams haben Unterhalt > 0 (S-C:
+0,6), Transfers sind auf jedem Pfad vollständig.
+
+**Was offen bleibt:** Pfad 2 führt Sponsoren und GuV nicht mit, weil er sie ausschließlich aus
+`standing?.…` liest und der gespeicherte Stand diese Felder nicht kennt. Normalerweise füllt
+der Standings-Feed sie nach; ohne Feed bleiben beide Spalten dort leer. Das ist der einzige
+verbliebene Weg, auf dem die Meldung wieder auftreten könnte — und er ist ungemessen: ob
+und wann dieser Pfad im Spiel überhaupt greift, ist weiterhin nicht belegt.

@@ -2,6 +2,7 @@ import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 // Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
+import type { FoundationFormCardBonusProjection } from "@/lib/persistence/foundation-form-card-projection";
 
 export type DisciplineCategory =
   | "power"
@@ -3105,6 +3106,14 @@ export type SeasonState = {
    * (siehe `foundation-field-race-projection`). Wird nie zurueckgeschrieben.
    */
   foundationFieldRace?: FoundationFieldRaceProjection;
+  /**
+   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — dritte Schwester: die Formkarten-Bilanz der
+   * laufenden Saison, serverseitig auf dem vollen Save gerechnet, weil die Anfangsladung
+   * `lineupDrafts` auf den aktiven Spieltag beschneidet und der Browser sonst nur die Karten
+   * eines einzigen Spieltags zaehlt (siehe `foundation-form-card-projection`). Wird nie
+   * zurueckgeschrieben.
+   */
+  foundationFormCardBonus?: FoundationFormCardBonusProjection;
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;

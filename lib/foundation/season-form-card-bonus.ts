@@ -28,18 +28,71 @@ export type SeasonFormCardBonusEntry = {
   positive: number;
   /** Summe nur der negativen Nennwerte (≤ 0). */
   negative: number;
+  /**
+   * DER TANK — alle Karten dieser Saison, gespielt wie ungespielt.
+   *
+   * Chris: „in der formkarten spalte soll generell immer die summe stehen die AM ANFANG der
+   * saison den teams zur verfuegung stand ... dann weiss man wie viel luft noch im tank ist".
+   *
+   * Warum das noetig war, zeigt die Messung am Live-Save: die Karten kommen je Spieler als
+   * gespiegeltes Paar (+x und −x), jedes Team hat also `poolPositive === -poolNegative`, und
+   * die negativen werden zuerst abgeworfen (ungespielte negative Karten kosten am Saisonende
+   * Punkte, siehe `applyFormCardPenaltyWithRerank`). Die Summe der GESPIELTEN Nennwerte ist
+   * damit fast bauartbedingt ≤ 0 — gemessen bei allen 32 Teams. Als „wie stark war die Form
+   * dieses Teams" taugt sie nicht; sie sagt nur, wie viel Negatives schon abgeraeumt ist.
+   *
+   * ABGRENZUNG „am Saisonanfang": es gibt keinen historischen Anfangsbestand im Spielstand.
+   * Gezaehlt wird der HEUTIGE Kartensatz der Saison. Er entspricht dem Anfangsbestand, solange
+   * kein Transfer ungespielte Karten mitgenommen hat (`ensureLocalFormCardsForSeason` raeumt
+   * die Karten verkaufter Spieler ab, gespielte bleiben liegen). Ein geraten rekonstruierter
+   * Anfangsbestand waere schlechter als diese ehrliche Zahl.
+   */
+  poolCards: number;
+  /** Summe aller positiven Nennwerte der Saison — der volle Tank. */
+  poolPositive: number;
+  /** Summe aller negativen Nennwerte der Saison (≤ 0) — die Hypothek. */
+  poolNegative: number;
+  /** Noch nicht gespielte positive Nennwerte — „wie viel Luft ist noch im Tank". */
+  remainingPositive: number;
+  /** Noch nicht gespielte negative Nennwerte (≤ 0) — was am Saisonende noch Punkte kostet. */
+  remainingNegative: number;
+  /** Anzahl noch nicht gespielter Karten. */
+  remainingCards: number;
 };
 
 export type SeasonFormCardBonusByTeamId = Map<string, SeasonFormCardBonusEntry>;
 
 function createEmptyEntry(): SeasonFormCardBonusEntry {
-  return { total: 0, cards: 0, positive: 0, negative: 0 };
+  return {
+    total: 0,
+    cards: 0,
+    positive: 0,
+    negative: 0,
+    poolCards: 0,
+    poolPositive: 0,
+    poolNegative: 0,
+    remainingPositive: 0,
+    remainingNegative: 0,
+    remainingCards: 0,
+  };
 }
 
 export function buildSeasonFormCardBonusByTeamId(
   gameState: Pick<GameState, "seasonState">,
   seasonId: string,
 ): SeasonFormCardBonusByTeamId {
+  /**
+   * Vorfahrt fuer die mitgelieferte Bilanz (`foundation-form-card-projection`). Im Browser
+   * sind die `lineupDrafts` auf den aktiven Spieltag beschnitten — eine Neuberechnung fande
+   * hier bestenfalls die Karten EINES Spieltags und die Saisonstand-Spalte zeigte Striche.
+   * Die Projektion ist auf dem vollen Save gerechnet und deckt genau die laufende Saison ab;
+   * fuer jede andere `seasonId` (Archiv) faellt die Rechnung unveraendert unten durch.
+   */
+  const projektion = gameState.seasonState.foundationFormCardBonus;
+  if (projektion && projektion.seasonId === seasonId) {
+    return new Map(Object.entries(projektion.byTeamId));
+  }
+
   const result: SeasonFormCardBonusByTeamId = new Map();
   const formCards = gameState.seasonState.formCards ?? [];
   if (formCards.length === 0) {
@@ -65,12 +118,8 @@ export function buildSeasonFormCardBonusByTeamId(
       }
     }
   }
-  if (usedCardIds.size === 0) {
-    return result;
-  }
-
   for (const card of formCards) {
-    if (card.seasonId !== seasonId || !usedCardIds.has(card.id)) {
+    if (card.seasonId !== seasonId) {
       continue;
     }
     const value = card.cardValue;
@@ -78,6 +127,27 @@ export function buildSeasonFormCardBonusByTeamId(
       continue;
     }
     const entry = result.get(card.teamId) ?? createEmptyEntry();
+
+    // Der Tank zaehlt JEDE Karte der Saison — auch die noch ungespielten. Nur so beantwortet
+    // die Spalte die Frage „wie viel Luft ist noch drin" statt „wie viel Negatives ist schon weg".
+    entry.poolCards += 1;
+    if (value > 0) {
+      entry.poolPositive += value;
+    } else {
+      entry.poolNegative += value;
+    }
+
+    if (!usedCardIds.has(card.id)) {
+      entry.remainingCards += 1;
+      if (value > 0) {
+        entry.remainingPositive += value;
+      } else {
+        entry.remainingNegative += value;
+      }
+      result.set(card.teamId, entry);
+      continue;
+    }
+
     entry.total += value;
     entry.cards += 1;
     if (value > 0) {

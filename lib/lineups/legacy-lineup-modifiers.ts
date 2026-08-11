@@ -477,9 +477,11 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
   const existingSeasonCardIds = new Set(
     existing.filter((card) => card.seasonId === seasonId).map((card) => card.id),
   );
-  const missing = buildGeneratedFormCardRecordsForSeason(gameState, saveId, seasonId).filter(
-    (card) => !existingSeasonCardIds.has(card.id),
-  );
+  // EINMAL erzeugen, zweimal gebraucht (fehlende Karten unten, Wertkorrektur weiter unten).
+  // Der Lauf geht ueber alle Teams und Kader; ihn ein zweites Mal anzustossen kostete in diesem
+  // heissen Pfad messbar Zeit — die Aufstellungs-Testsuite lief dadurch in ihre Zeitgrenze.
+  const generatedForSeason = buildGeneratedFormCardRecordsForSeason(gameState, saveId, seasonId);
+  const missing = generatedForSeason.filter((card) => !existingSeasonCardIds.has(card.id));
 
   // Gegenstueck zum additiven Heilen: Karten, zu denen es KEINE Kaderzeile (Team, Spieler) mehr gibt,
   // fliegen wieder raus. Formkarten gehoeren laut Generator oben ausschliesslich einer bestehenden
@@ -508,7 +510,36 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
       .map((card) => card.id),
   );
 
-  if (missing.length === 0 && staleCardIds.size === 0) {
+  /**
+   * DRITTER Heilungsschritt: Werte, die noch aus der kaputten Ziehung stammen.
+   *
+   * Chris: „formkarten sind KEIN gespiegeltes paar sowohl positriv als auch negativ sind sie
+   * RANDOM!" — richtig, und der Generator zieht sie seit dem Avalanche-Fix (siehe `avalanche`)
+   * auch wirklich unabhaengig. Nur half das den Spielstaenden nicht, die vorher entstanden sind:
+   * die beiden Schritte oben ergaenzen FEHLENDE Karten und raeumen VERWAISTE ab, eine bereits
+   * vorhandene Karte behielt ihren alten Wert fuer immer. Am Live-Save nachgemessen: 510 von 680
+   * Karten trugen noch die alte Ziehung, und 266 von 266 Spielern hatten ein exakt gespiegeltes
+   * Paar (+8/−8, +4/−4, …) — 100 %. Frisch erzeugt sind es 31,5 %, und genau so viel erwartet man
+   * auch: bei vier Werten [0, 2, 4, 8] und zwei unabhaengigen Ziehungen fallen zwei von Null
+   * verschiedene Werte in 3 von 9 Faellen gleich aus.
+   *
+   * NUR UNGESPIELTE KARTEN. Eine gespielte Karte steckt im `lineupDraft` eines gelaufenen
+   * Spieltags und damit in dessen Wertung; ihren Nennwert nachtraeglich zu aendern wuerde
+   * vergangene Formmodifikatoren umschreiben. Dieselbe Grenze zieht schon das Aufraeumen oben.
+   */
+  const korrigiert = new Map<string, number>();
+  const generatedById = new Map(generatedForSeason.map((card) => [card.id, card] as const));
+  for (const card of existing) {
+    if (card.seasonId !== seasonId || staleCardIds.has(card.id) || playedCardIds.has(card.id)) {
+      continue;
+    }
+    const sollwert = generatedById.get(card.id)?.cardValue;
+    if (sollwert != null && sollwert !== card.cardValue) {
+      korrigiert.set(card.id, sollwert);
+    }
+  }
+
+  if (missing.length === 0 && staleCardIds.size === 0 && korrigiert.size === 0) {
     return gameState;
   }
 
@@ -516,7 +547,14 @@ export function ensureLocalFormCardsForSeason(gameState: GameState, saveId: stri
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      formCards: [...existing.filter((card) => !staleCardIds.has(card.id)), ...missing],
+      formCards: [
+        ...existing
+          .filter((card) => !staleCardIds.has(card.id))
+          .map((card) =>
+            korrigiert.has(card.id) ? { ...card, cardValue: korrigiert.get(card.id) as number } : card,
+          ),
+        ...missing,
+      ],
     },
   };
 }

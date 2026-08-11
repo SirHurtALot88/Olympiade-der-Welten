@@ -135,6 +135,10 @@ export default function FoundationSeasonV2Host({
     seasonHistorySnapshots,
     archivedSeasonDisciplineLeaderboards,
     boardConfidence,
+    // Archiv-Ansicht trägt ihre eigenen, abgeschlossenen Zahlen — der Meisterschaftskampf
+    // gehört nur zur LIVE-Saison und darf beim Blick in eine alte Saison nie erscheinen,
+    // selbst wenn die laufende Saison zufällig gerade im Zeitfenster steckt.
+    isViewingArchivedSeason,
   });
 
   return (
@@ -159,6 +163,7 @@ export default function FoundationSeasonV2Host({
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
       disciplineLeaders={model.disciplineLeaders}
+      titleRace={model.titleRace}
     />
   );
 }
