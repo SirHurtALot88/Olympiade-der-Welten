@@ -279,13 +279,15 @@ export type FacilitySeasonCash = {
  * Project Suicide (Cash 1,69) sah 0,0 statt 1,8 C Unterhalt, Stronghold Crusaders (Cash 0,13) 0,0
  * statt 1,5 C — also genau die klammen Teams, für die es zählt.
  *
- * `cashBefore` bleibt in der Signatur: es ist der Ausgangswert, den das Original ebenfalls führt,
- * und die Rundungskette hängt daran. Ausgeschlossen wird eine Zeile davon nicht mehr.
+ * `cashBefore` bleibt in der Signatur, ist aber bewusst OHNE Wirkung: die Aufrufer reichen ihn
+ * weiter, und ein entfernter Parameter würde nur so aussehen, als sei die Frage „reicht das Cash?"
+ * vergessen worden. Sie ist beantwortet — sie stellt sich nicht mehr.
  */
 export function computeFacilitySeasonCash(
   gameState: GameState,
   teamId: string,
-  _cashBefore: number | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  cashBefore: number | null,
 ): FacilitySeasonCash {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   const seasonId = gameState.season.id;

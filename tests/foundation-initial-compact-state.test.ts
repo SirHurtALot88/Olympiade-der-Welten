@@ -33,7 +33,17 @@ function createGameState(): GameState {
     matchdayState: { matchdayId: "md-2", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
     transferHistory: [{ id: "transfer-1" } as never],
     logs: [{ id: "log-1", message: "hello" } as never],
-    playerBaselines: [{ playerId: "p-1", attributes: { power: 50 } } as never],
+    playerBaselines: [
+      {
+        playerId: "p-1",
+        marketValue: 12.5,
+        salary: 2.5,
+        seasonZeroEconomy: { source: "season_0_computed", marketValue: 12.5, salary: 2.5 },
+        // Die schwere Fracht, die der kompakte Payload NICHT mitnimmt.
+        attributes: { power: 50 },
+        disciplineRatings: { basketball: 70 },
+      } as never,
+    ],
     baselineWriteGuardEvents: [{ id: "guard-1" } as never],
     players: [
       {
@@ -140,7 +150,44 @@ describe("foundation initial compact state", () => {
     expect(compact.seasonState.disciplineResults).toEqual(existing.seasonState.disciplineResults);
     // Der Berg bleibt beschnitten — das ist die andere Haelfte der Wahrheit.
     expect(compact.seasonState.seasonSnapshots).toBeUndefined();
-    expect(compact.playerBaselines).toBeUndefined();
+    expect(compact.seasonState.persistedSeasonDerivations).toBeUndefined();
+  });
+
+  it("ships the baselines SLIM — Wirtschaftsbezug ja, Attribute nein", () => {
+    /**
+     * FRUEHER WAREN `playerBaselines` GANZ GESTRICHEN (`toBeUndefined()`). Das war der
+     * gemessene Fehler: `getPlayerSeasonMarketValueReference` und
+     * `getPlayerSeasonZeroMarketValueReference` nehmen zuerst den Basislinien-Bezugswert und
+     * fallen ohne ihn auf den Katalogwert zurueck — eine ANDERE ZAHL, kein Leerzustand. Am
+     * Live-Abbild ueber 540 Spieler: 498 bzw. 165 abweichend, und bei 136 wurde aus einem
+     * echten Marktwert-Delta ein `null`.
+     */
+    const existing = createGameState();
+    const compact = compactFoundationInitialGameState(existing);
+    const baseline = compact.playerBaselines?.[0] as Record<string, unknown> | undefined;
+
+    expect(baseline?.playerId).toBe("p-1");
+    expect(baseline?.marketValue).toBe(12.5);
+    expect(baseline?.salary).toBe(2.5);
+    expect(baseline?.seasonZeroEconomy).toEqual({ source: "season_0_computed", marketValue: 12.5, salary: 2.5 });
+    // Das Gewicht bleibt draussen.
+    expect(baseline?.attributes).toBeUndefined();
+    expect(baseline?.disciplineRatings).toBeUndefined();
+    expect(compact.baselineWriteGuardEvents).toBeUndefined();
+  });
+
+  it("die schlanke Fassung darf die vollen Basislinien im Spielstand NIE ersetzen", () => {
+    /**
+     * Der gefaehrliche Teil der Umstellung: `incoming.playerBaselines ?? existing` genuegt
+     * nicht mehr, seit `incoming` nicht mehr `undefined` ist. Ohne diese Wache loeschte der
+     * naechste Speichervorgang Attribute, Disziplinwerte und Herkunft aller Basislinien.
+     */
+    const existing = createGameState();
+    const compact = compactFoundationInitialGameState(existing);
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compact);
+
+    expect(rehydrated.playerBaselines).toEqual(existing.playerBaselines);
+    expect((rehydrated.playerBaselines?.[0] as Record<string, unknown>)?.attributes).toEqual({ power: 50 });
   });
 
   it("counts the whole season's form cards on the compact payload", () => {

@@ -14,14 +14,6 @@ import {
   type SponsorSettlementRow,
 } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
-import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
-import {
-  calculateFacilitySeasonUpkeep,
-  getFacilityEfficiency,
-  getFacilityLevel,
-  getTeamFacilityState,
-} from "@/lib/facilities/facility-effects";
-import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -31,7 +23,6 @@ import type {
   FinanceApronLeagueRow,
   FinanceApronStatus,
   FinanceFacilityIncome,
-  FinanceFacilityIncomeRow,
   FinanceFacilityUpkeepRow,
   FinanceLoanCommitments,
   FinancePrizeIncome,
@@ -44,11 +35,6 @@ import type {
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Gleiche Rundung wie Cash-Werte im Kredit-/Sponsor-Service (1 Nachkommastelle). */
-/** 2-Nachkommastellen-Rundung — spiegelt `roundValue(x, 2)` im `facility-season-end-service`, damit die
- *  „paid vs. unpaid"-Schwelle (Cash + Einnahmen ≥ Upkeep) bit-genau zur echten Season-End-Resolution passt. */
-function round2(value: number): number {
-  return Number(value.toFixed(2));
-}
 
 type FacilitySeasonEndCash = {
   income: FinanceFacilityIncome | null;
