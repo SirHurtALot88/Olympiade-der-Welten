@@ -11,8 +11,8 @@
  *
  * SEITHER: die Beschneidung von `disciplineResults` ist ersatzlos entfallen (245 KB Ersparnis am
  * Live-Save, Herleitung in `compactFoundationInitialGameState`). Der Ledger bekommt im Browser
- * jetzt alle Spieltage und rechnet aus eigener Kraft richtig; `foundationMatchdayPoints` faehrt
- * noch mit, verliert den Vorrang aber, sobald der Spielstand die Spieltage deckt — also immer.
+ * jetzt alle Spieltage und rechnet aus eigener Kraft richtig; die Projektion
+ * `foundationMatchdayPoints` war daraufhin nachgemessen wirkungslos und ist ERSATZLOS ENTFERNT.
  * Die Hausregel „lieber leer als geraten" bleibt trotzdem gepflegt, siehe den letzten Fall.
  *
  * DIESER TEST prueft WERTE, nicht Quelltext, und er faehrt den echten kompakten Payload
@@ -241,7 +241,6 @@ describe("Spieltagsergebnis · Saison-Rang und Punktsumme ueberleben die Anfangs
       ...kompakt,
       seasonState: {
         ...kompakt.seasonState,
-        foundationMatchdayPoints: undefined,
         // Genau der alte Schnitt: nur die Zeilen des aktiven Spieltags (result-3).
         disciplineResults: (kompakt.seasonState.disciplineResults ?? []).filter(
           (row) => row.matchdayResultId === "result-3",
@@ -261,13 +260,20 @@ describe("Spieltagsergebnis · Saison-Rang und Punktsumme ueberleben die Anfangs
     expect(row?.matchdayPoints).not.toBeNull();
   });
 
-  it("faehrt nie in den Spielstand zurueck (reine Anzeigefracht)", async () => {
+  it("die Projektion ist weg — der kompakte Payload traegt sie nicht mehr", async () => {
     const { rehydrateGameStateAfterCompactPut } = await import("@/lib/persistence/foundation-initial-compact-state");
     const { gameState } = baueDreiSpieltage();
     const kompakt = compactFoundationInitialGameState(gameState);
-    expect(kompakt.seasonState.foundationMatchdayPoints?.matchdays).toHaveLength(3);
+    expect((kompakt.seasonState as Record<string, unknown>).foundationMatchdayPoints).toBeUndefined();
+    // Dafuer traegt er die Quelle selbst — daran haengt die Rechnung oben.
+    expect(kompakt.seasonState.disciplineResults).toEqual(gameState.seasonState.disciplineResults);
 
-    const zurueck = rehydrateGameStateAfterCompactPut(gameState, kompakt);
-    expect(zurueck.seasonState.foundationMatchdayPoints).toBeUndefined();
+    // Und ein alter Tab, der die Projektion noch mitschickt, bekommt sie nicht in den Spielstand.
+    const altesTab = {
+      ...kompakt,
+      seasonState: { ...kompakt.seasonState, foundationMatchdayPoints: { seasonId: "s1", matchdays: [] } },
+    } as unknown as GameState;
+    const zurueck = rehydrateGameStateAfterCompactPut(gameState, altesTab).seasonState as Record<string, unknown>;
+    expect(zurueck.foundationMatchdayPoints).toBeUndefined();
   });
 });

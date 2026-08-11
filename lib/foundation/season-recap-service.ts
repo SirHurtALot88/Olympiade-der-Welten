@@ -28,6 +28,7 @@
 import type { GameState, SeasonSnapshotRecord, SeasonSnapshotTeamRecord, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManagerProfile } from "@/lib/foundation/team-general-managers";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 export type SeasonRecapSlot =
@@ -300,8 +301,24 @@ export function buildSeasonRecap(input: {
   gameState: GameState;
   eigeneTeamIds?: Set<string> | null;
 }): SeasonRecap | null {
-  const snapshots = input.gameState.seasonState.seasonSnapshots ?? [];
-  const abgeschlossen = snapshots.filter((snapshot) => snapshot.status === "completed");
+  /**
+   * ÜBER `leseSaisonSchnappschuesse`, NICHT ÜBER `seasonSnapshots ?? []`.
+   *
+   * Hier stand die direkte Lesestelle, und im Browser lief sie garantiert leer: die Anfangsladung
+   * streicht `seasonSnapshots`, und der Sentinel stempelt eine LEERE LISTE an dieselbe Stelle —
+   * `?? []` greift bei `[]` nicht, also war die Liste immer leer und diese Funktion gab immer
+   * `null` zurück. Am Live-Abbild gemessen (Save `new-game-1785823388048-1hf25q`, Saison 2):
+   * volle Inbox 261 Karten, davon 36 `story:season_recap` und eine `champion_news`; im Browser
+   * 224 Karten und keine einzige davon.
+   *
+   * Nachgeladen wird das volle Archiv nur in ausgewählten Ansichten (`use-season-archive-load`) —
+   * der Rückblick sitzt in der Inbox, also auf Home/Cockpit, und die gehören nicht dazu. Die
+   * mitgefahrene Kurzfassung `foundationSeasonHistory` trägt genau das, was der Rückblick liest:
+   * Ränge, Punkte, Wirtschaftsfelder je Team und die Spielerzeilen.
+   */
+  const abgeschlossen = leseSaisonSchnappschuesse(input.gameState).filter(
+    (snapshot) => snapshot.status === "completed",
+  );
   const snapshot = abgeschlossen[abgeschlossen.length - 1] ?? null;
   if (!snapshot || !snapshot.archivedAt) return null;
   // Nur RÜCKBLICKEN: solange die abgeschlossene Saison noch die laufende ist, ist nichts vorbei.

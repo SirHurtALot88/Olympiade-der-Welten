@@ -496,6 +496,13 @@ export function buildSponsorRankTierRows(input: {
    */
   includeFloorRung?: boolean;
 }): SponsorRankTierRow[] {
+  // EINE LEERE LEITER IST KEINE LEITER. `buildOfferRankPayoutLadderPreview` liefert `[]`, wenn ein
+  // Angebot keine V3-Konditionen traegt — und `readLockedRankPayout([], rang)` gibt 0 zurueck. Ohne
+  // diese Wache entstuenden daraus neun Gewinnstufen, die ALLE denselben Betrag (`baseCash`) zeigen:
+  // eine erfundene flache Leiter, die es so nie gab. Lieber gar keine Stufen als falsche.
+  if (input.rankLadder.length === 0) {
+    return [];
+  }
   // Sockel = Payout am schlechtesten Rang (32); jede Gewinnstufe zeigt den Rang-Aufschlag darüber —
   // exakt `readLockedRankPayout(ladder, maxRank) − readLockedRankPayout(ladder, 32)`, wie das Settlement
   // (sponsor-settlement-service) den rankResidual berechnet.

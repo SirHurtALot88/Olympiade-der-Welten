@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -335,16 +336,18 @@ export async function GET(request: Request) {
             return new Map(
               localSave!.gameState.teams.map((team) => {
                 const roster = localSave!.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
-                let salaryTotal = 0;
                 let marketValueTotal = 0;
                 for (const entry of roster) {
                   const contract = resolvePlayerEconomyContract({
                     player: playerById.get(entry.playerId),
                     rosterEntry: entry,
                   });
-                  salaryTotal += contract.salary ?? 0;
                   marketValueTotal += contract.marketValue ?? 0;
                 }
+                // Gehaltssumme aus DER geteilten Funktion (`getTeamActualSalaryTotal`) — dieselbe,
+                // die der Saisonende-Apply abbucht und die der Finanzen-Reiter zeigt. Vorher stand
+                // hier eine eigene, ungerundete Schleife: derselbe Wert, aber eine dritte Rundung.
+                const salaryTotal = getTeamActualSalaryTotal(localSave!.gameState, team.teamId);
                 return [team.teamId, { rosterCount: roster.length, salaryTotal, marketValueTotal }] as const;
               }),
             );
@@ -370,7 +373,6 @@ export async function GET(request: Request) {
     const localPrizeSummaryByTeamId =
       source === "sqlite"
         ? (() => {
-            const playerById = new Map(localSave!.gameState.players.map((player) => [player.id, player] as const));
             const transferSummaryByTeamId = new Map<string, number>();
 
             for (const entry of localSave!.gameState.transferHistory) {
@@ -396,11 +398,9 @@ export async function GET(request: Request) {
             return new Map(
               buildTeamPrizeSummary(
                 localSave!.gameState.teams.map((team) => {
-                  const roster = localSave!.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
-                  const upkeep = roster.reduce((sum, entry) => {
-                    const player = playerById.get(entry.playerId);
-                    return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
-                  }, 0);
+                  // Auch hier die geteilte Gehaltssumme — der Preisgeld-Benchmark rechnete sonst
+                  // mit einer vierten Variante derselben Zahl.
+                  const upkeep = getTeamActualSalaryTotal(localSave!.gameState, team.teamId);
                   const standing = localSave!.gameState.seasonState.standings[team.teamId] ?? null;
                   const hasCurrentPoints = standing?.points != null && Number.isFinite(standing.points) && standing.points > 0;
                   const budgetStartRank = localStartRankByTeamId?.get(team.teamId) ?? 0;

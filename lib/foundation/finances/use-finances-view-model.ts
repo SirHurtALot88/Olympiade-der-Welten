@@ -5,10 +5,11 @@ import { useMemo } from "react";
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
-import { buildSeasonGuv, computeTeamLoanShareRows } from "@/lib/finance/season-end-guv";
+import { buildSeasonGuv, computeFacilitySeasonCash, computeTeamLoanShareRows } from "@/lib/finance/season-end-guv";
 import { roundValue as round1 } from "@/lib/foundation/foundation-number-utils";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
+  getSeasonSponsorCashByTeam,
   previewSponsorSettlement,
   type SponsorSettlementRow,
 } from "@/lib/sponsor/sponsor-settlement-service";
@@ -56,61 +57,18 @@ type FacilitySeasonEndCash = {
 };
 
 /**
- * Client-safe Nachbau von `previewFacilitySeasonEndFinance` (facility-season-end-service) — bewusst
- * OHNE dessen node:crypto/better-sqlite3-Importe (die sonst ins Client-Bundle gezogen würden). Nutzt
- * nur die client-safen Helfer `getFacilityLevel`/`getFacilityEfficiency`/`getFacilityLevelDefinition`/
- * `calculateFacilitySeasonUpkeep` und `computeTeamBeliebtheitFromGameState` (Arena-Skalierung),
- * exakt wie `buildRows`/`previewFacilitySeasonEndFinance` dort:
- *   - income = seasonIncome × efficiency × (Arena? Beliebtheit : 1) / 100
- *   - Upkeep gilt nur als BEZAHLT, wenn (Cash + Gesamteinnahmen − bisher bezahlt) ≥ Upkeep und nicht
- *     schon in dieser Saison bezahlt — sonst „will_disable_unpaid" (nicht cash-wirksam).
- * Der reale Cash-Effekt der Season-End-Resolution ist damit `income.total − paidUpkeep.total`.
+ * DER NACHBAU IST WEG. Hier stand bis zum Finanz-Audit (11.08.2026) eine zweite, wortgleiche Kopie
+ * der Gebäude-Season-End-Rechnung — im Dateikopf selbst als „bewusster Nachbau" ausgewiesen und
+ * damit ein bekannter Fall von zwei Rechenstellen für dieselbe Zahl. Sie ist ersatzlos durch
+ * `computeFacilitySeasonCash` (`lib/finance/season-end-guv.ts`) ersetzt, die dieselbe GuV ohnehin
+ * schon für die Liga rechnet und client-safe ist. Diese Hülle formt nur noch das Ergebnis in die
+ * Anzeige-Typen um.
  */
 function computeFacilitySeasonEndCash(gameState: GameState, teamId: string, cashBefore: number | null): FacilitySeasonEndCash {
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
-  const seasonId = gameState.season.id;
-  const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
-
-  // Reihenfolge = FACILITY_CATALOG (identisch zu buildRows), damit die Cash-gedeckelte
-  // „paid"-Entscheidung dieselben Gebäude in derselben Reihenfolge abarbeitet.
-  const rows = FACILITY_CATALOG.map((facility) => {
-    const effectLevel = getFacilityLevel(teamFacilities, facility.facilityId);
-    const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
-    const definition = getFacilityLevelDefinition(facility.facilityId, effectLevel);
-    const popularityFactor = facility.facilityId === "arena_upgrade" ? arenaPopularityFactor : 1;
-    return {
-      label: facility.label,
-      income: round2(((definition?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) / 100),
-      upkeep: round2(calculateFacilitySeasonUpkeep(facility.facilityId, teamFacilities)),
-      alreadyPaid: teamFacilities.facilities[facility.facilityId]?.lastPaidSeasonId === seasonId,
-    };
-  });
-
-  const incomeTotalRaw = round2(rows.reduce((sum, row) => sum + row.income, 0));
-  let cashAvailableForUpkeep = cashBefore == null ? null : round2(cashBefore + incomeTotalRaw);
-
-  const paidUpkeepRows: FinanceFacilityUpkeepRow[] = [];
-  let paidUpkeepTotalRaw = 0;
-  for (const row of rows) {
-    if (row.upkeep <= 0 || row.alreadyPaid) continue;
-    if (cashAvailableForUpkeep != null && cashAvailableForUpkeep < row.upkeep) continue; // will_disable_unpaid
-    if (cashAvailableForUpkeep != null) cashAvailableForUpkeep = round2(cashAvailableForUpkeep - row.upkeep);
-    paidUpkeepRows.push({ label: row.label, upkeep: round1(row.upkeep) });
-    paidUpkeepTotalRaw += row.upkeep;
-  }
-
-  const incomeRows: FinanceFacilityIncomeRow[] = rows
-    .filter((row) => row.income > 0)
-    .map((row) => ({ label: row.label, income: round1(row.income) }))
-    .sort((left, right) => right.income - left.income);
-  const incomeTotal = round1(incomeTotalRaw);
-
+  const cash = computeFacilitySeasonCash(gameState, teamId, cashBefore);
   return {
-    income: incomeTotal > 0 ? { total: incomeTotal, facilities: incomeRows } : null,
-    paidUpkeep: {
-      total: round1(paidUpkeepTotalRaw),
-      facilities: paidUpkeepRows.sort((left, right) => right.upkeep - left.upkeep),
-    },
+    income: cash.income > 0 ? { total: cash.income, facilities: cash.incomeRows } : null,
+    paidUpkeep: { total: cash.paidUpkeep, facilities: cash.upkeepRows },
   };
 }
 
@@ -148,13 +106,15 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // --- Sponsor (Vertrag) ------------------------------------------------
   // T-030: `total` und die `components`-Aufschlüsselung müssen aus derselben
   // Quelle stammen, sonst laufen Summe und Aufschlüsselung sichtbar
-  // auseinander (wirkt wie ein UI-Rechenfehler). Bevorzugt daher IMMER die
-  // Summe der aktuellen Vertragskomponenten (identische Quelle wie die
-  // Aufschlüsselung darunter). Nur wenn der aktuelle Vertrag keine
-  // (positiven) Komponenten mehr liefert (z. B. Vertrag ausgelaufen, aber es
-  // gibt noch ein abgerechnetes Payout-Log der Vorsaison) fällt `total` auf
-  // den `estimateTeamAnnualRevenue`-Proxy zurück — dann `totalIsEstimate:
-  // true`, siehe `FinanceSponsorIncome`-Doku.
+  // auseinander (wirkt wie ein UI-Rechenfehler).
+  //
+  // FINANZ-AUDIT 11.08.2026: `total` kommt jetzt aus `getSeasonSponsorCashByTeam` — DERSELBEN
+  // Funktion, die auch der GuV-Resolver, die Saisonstand-Route und die Liga-Tabelle lesen. Sie
+  // trägt gebuchte Logs UND den projizierten Rest. Vorher stand hier nur die Vorschau: sobald die
+  // Abrechnung gebucht war, lieferte sie für dieses Team nichts mehr, `sponsorComponentsTotal` fiel
+  // auf 0 und der Reiter zeigte statt der echten Einnahme den `estimateTeamAnnualRevenue`-Proxy —
+  // am Messkörper (`new-game-1785823388048-1hf25q`, Saison 2 abgerechnet) wich die GuV dieses
+  // Reiters dadurch je Team um 46 bis 96 C von der Saisonstand-GuV ab.
   const sponsorContract = getTeamSponsorContract(gameState, teamId);
   // WICHTIG: `component.rewardCash` ist laut `sponsor-offer-service` nur die
   // OBERGRENZE des Vertragsbausteins ("Cap für Anzeige"), nicht der zu erwartende
@@ -176,11 +136,10 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // es so nicht gibt. Die SUMME waere zwar dieselbe (Invariante Anzeige == Settlement gewahrt), die
   // Aufschluesselung aber gelogen.
   const isV3Contract = getSponsorV3Terms(sponsorContract) != null;
-  const sponsorComponents = !sponsorContract
+  const projizierteKomponenten = !sponsorContract
     ? []
     : isV3Contract
       ? sponsorSettlementRows
-          .filter((row) => FINANCE_SPONSOR_INCOME_COMPONENT_KINDS.includes(row.kind))
           // Auch NEGATIVE Zeilen gehoeren dazu: eine verfehlte Achse traegt −G/2 und die
           // Vorschuss-Verrechnung ist immer negativ. Wegzulassen hiesse, dem Team eine Einnahme
           // auszuweisen, die es nie bekommt.
@@ -193,13 +152,44 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
           if (!Number.isFinite(rewardCash) || rewardCash <= 0) return [];
           return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(rewardCash) }];
         });
-  const sponsorComponentsTotal = round1(sponsorComponents.reduce((sum, component) => sum + component.rewardCash, 0));
-  const estimatedSponsorRevenue = estimateTeamAnnualRevenue(gameState, teamId);
-  const sponsorTotalIsEstimate = sponsorComponentsTotal <= 0 && estimatedSponsorRevenue > 0;
-  const sponsorTotal = sponsorComponentsTotal > 0 ? sponsorComponentsTotal : estimatedSponsorRevenue;
+  // BEREITS GEBUCHTE ZEILEN GEHOEREN IN DIE AUFSCHLUESSELUNG. Nach dem Saisonende-Apply liefert die
+  // Vorschau für dieses Team nichts mehr; ohne diesen Block stünde eine Summe über einer leeren
+  // Liste. Die Komponenten-Art steckt in der Log-ID (`<offerId>:v3:<kind>`), der Gehaltsabzug und
+  // der Gehaltsfaktor-Ausgleich sind ausgenommen — sie sind Ausgaben, keine Sponsoreinnahme.
+  const gebuchteKomponenten = (gameState.seasonState.sponsorPayoutLogs ?? [])
+    .filter(
+      (log) =>
+        log.seasonId === gameState.season.id &&
+        log.teamId === teamId &&
+        log.componentId !== "salary_deduct" &&
+        log.componentId !== "salary_factor_repair" &&
+        Number.isFinite(log.cashDelta) &&
+        log.cashDelta !== 0,
+    )
+    .map((log) => {
+      const componentId = log.componentId ?? "";
+      const kind = (SPONSOR_COMPONENT_KIND_ORDER.find((entry) => componentId.endsWith(`:${entry}`)) ??
+        "base") as SponsorOfferComponentKind;
+      return {
+        kind,
+        label: `${getSponsorComponentKindLabel(kind)} (bereits gebucht)`,
+        rewardCash: round1(log.cashDelta),
+      };
+    });
+  const sponsorComponents = [...gebuchteKomponenten, ...projizierteKomponenten];
+  // DIE EINE Sponsor-Einnahme dieser Saison — dieselbe Zahl wie im Saisonstand und in der GuV.
+  const sponsorTotal = round1(getSeasonSponsorCashByTeam(gameState).get(teamId) ?? 0);
+  // Der Schätz-Proxy greift NUR noch, wenn es überhaupt keine Sponsor-Buchung und keinen Vertrag
+  // gibt. Vorher übernahm er auch dann, wenn die echte Abrechnung 0 oder negativ ausfiel — dann
+  // stand eine Schätzung in der GuV, wo eine gemessene Null hingehört (und die Cash-Zusage des
+  // Reiters, `cashSeasonStart + guv + otherCashMovements == cash`, brach genau daran).
+  const kenntSponsorBuchung = sponsorComponents.length > 0;
+  const estimatedSponsorRevenue = kenntSponsorBuchung ? 0 : estimateTeamAnnualRevenue(gameState, teamId);
+  const sponsorTotalIsEstimate = !kenntSponsorBuchung && estimatedSponsorRevenue > 0;
+  const sponsorAnzeigeTotal = kenntSponsorBuchung ? sponsorTotal : estimatedSponsorRevenue;
   const sponsor: FinanceSponsorIncome | null =
-    sponsorTotal > 0
-      ? { total: round1(sponsorTotal), components: sponsorComponents, totalIsEstimate: sponsorTotalIsEstimate }
+    kenntSponsorBuchung || sponsorAnzeigeTotal > 0
+      ? { total: round1(sponsorAnzeigeTotal), components: sponsorComponents, totalIsEstimate: sponsorTotalIsEstimate }
       : null;
 
   // --- Preisgeld (Liga-Pool) ---------------------------------------------

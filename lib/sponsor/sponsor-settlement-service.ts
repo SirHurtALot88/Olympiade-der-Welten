@@ -1,8 +1,8 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 import { buildMigratedSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-migration";
@@ -45,17 +45,17 @@ function hasSeasonEndPayoutLog(gameState: GameState, seasonId: string, teamId: s
 }
 
 
+/**
+ * Die Gehaltssumme, die am Saisonende wirklich abgebucht wird.
+ *
+ * EINE STELLE, NICHT ZWEI. Hier stand bis zum Finanz-Audit eine eigene Schleife über die Roster —
+ * inhaltlich dasselbe wie `getTeamActualSalaryTotal`, nur mit `Number(x.toFixed(1))` statt
+ * `Math.round(x*10)/10` gerundet. Am Live-Abbild (`new-game-1785823388048-1hf25q`) trennte genau
+ * diese Rundung ein Team um 0,1 C von der Zahl, die der Finanzen-Reiter zeigte. Es gibt jetzt nur
+ * noch die eine Funktion; wer das Gehalt braucht, ruft sie auf.
+ */
 function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
-  const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
-  if (rosterEntries.length === 0) {
-    return 0;
-  }
-  return roundCash(
-    rosterEntries.reduce((sum, entry) => {
-      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
-    }, 0),
-  );
+  return getTeamActualSalaryTotal(gameState, teamId);
 }
 
 /**
@@ -246,23 +246,72 @@ export function applySponsorSettlement(input: {
   return { gameState: nextGameState, preview, applied: payoutLogs.length > 0 };
 }
 
-export function getSeasonSponsorCashTotal(gameState: GameState): number {
+/**
+ * Log-Komponenten, die in `sponsorPayoutLogs` mitfahren, aber KEINE Sponsoreinnahme sind, sondern
+ * Gehalts-Buchungen. `salary_deduct` ist der saisonale Gehaltsabzug (siehe `applySponsorSettlement`),
+ * `salary_factor_repair` der Ausgleich aus `scripts/repariere-sponsor-gehaltsfaktor.ts` — beide
+ * korrigieren die AUSGABEN-Seite und dürfen die Sponsor-Einnahme nicht verfälschen.
+ */
+const NICHT_SPONSOR_KOMPONENTEN = new Set(["salary_deduct", "salary_factor_repair"]);
+
+/**
+ * DIE EINE SPONSOR-EINNAHME EINER SAISON, je Team — bereits gebucht plus projizierter Rest.
+ *
+ * WARUM ES DIESE FUNKTION GIBT (Finanz-Audit 11.08.2026). Drei Stellen brauchten dieselbe Größe und
+ * bildeten sie unterschiedlich:
+ *   - `getSeasonSponsorCashTotal` zählte gebuchte Logs nur, wenn `cashDelta > 0` war, den
+ *     projizierten Rest aber vorzeichenecht. Am aktiven Spielstand (`new-game-1786465783606-0kalpx`,
+ *     86 Vorschauzeilen, davon 3 negativ mit zusammen −8,8 C) sprang die Zahl im Moment des
+ *     Abrechnens von 2 533,8 auf 2 542,6 C — derselbe Sachverhalt, zwei Zahlen. Richtig ist die
+ *     vorzeichenechte Summe: der Kommentar in dieser Datei verlangte sie ausdrücklich, und ein
+ *     Vorschuss (Log `+Betrag`, Settlement-Zeile `−(Betrag + Gebühr)`) wäre sonst zweimal
+ *     gutgeschrieben.
+ *   - `season-guv-resolver` und `prize-money-preview` lasen NUR die Vorschau. Sobald die Abrechnung
+ *     gebucht war, überspringt `previewSponsorSettlement` diese Teams (Duplikat-Wache) und die
+ *     Sponsor-Einnahme fiel auf 0 — am Messkörper (`new-game-1785823388048-1hf25q`, Saison 2 bereits
+ *     abgerechnet) wies die GuV dadurch je Team 46 bis 96 C zu wenig aus (z. B. Zero Heroes −86,8
+ *     statt +5,1).
+ *
+ * Beide Zweige zusammen sind stabil über den Apply hinweg: was aus der Projektion verschwindet,
+ * taucht als Log wieder auf.
+ */
+export function getSeasonSponsorCashByTeam(gameState: GameState): Map<string, number> {
   const seasonId = gameState.season.id;
-  const allLogs = gameState.seasonState.sponsorPayoutLogs ?? [];
+  const byTeam = new Map<string, number>();
+  const add = (teamId: string, delta: number) => {
+    if (!Number.isFinite(delta) || delta === 0) return;
+    byTeam.set(teamId, (byTeam.get(teamId) ?? 0) + delta);
+  };
 
-  // Sum every sponsor payout log already applied this season (base_first + any season_end partials).
-  // Der Gehaltsabzug faehrt in derselben Logliste mit, gehoert aber nicht zur Sponsoreinnahme.
-  const alreadyPaid = allLogs
-    .filter((log) => log.seasonId === seasonId && log.componentId !== "salary_deduct" && log.cashDelta > 0)
-    .reduce((sum, log) => sum + log.cashDelta, 0);
+  // 1) Bereits gebucht: jedes Sponsor-Log dieser Saison, VORZEICHENECHT (base_first-Vorschuss,
+  //    season_end-Zeilen inklusive der negativen).
+  for (const log of gameState.seasonState.sponsorPayoutLogs ?? []) {
+    if (log.seasonId !== seasonId) continue;
+    if (NICHT_SPONSOR_KOMPONENTEN.has(log.componentId ?? "")) continue;
+    add(log.teamId, log.cashDelta);
+  }
 
-  // NEGATIVE ZEILEN GEHOEREN DAZU. Frueher wurde hier auf 0 geklammert — solange jede Zeile positiv
-  // war, fiel das nicht auf. Seit es Achsen und Vorschuesse gibt, ist es ein echter Fehler: eine
-  // verfehlte Achse traegt −G/2, und die Vorschuss-Verrechnung ist immer negativ. Zusammen mit dem
-  // Vorschuss-Log, das oben als Einnahme zaehlt, wurde derselbe Betrag zweimal gutgeschrieben und
-  // die Saisonsumme um Vorschuss plus Gebuehr plus verfehlte Achse zu hoch ausgewiesen.
-  const preview = previewSponsorSettlement(gameState, "season_end");
-  const projectedRemaining = preview.rows.reduce((sum, row) => sum + row.cashDelta, 0);
+  // 2) Projizierter Rest: alles, was noch nicht gebucht ist. `previewSponsorSettlement` lässt
+  //    bereits abgerechnete Teams aus, es kann also nichts doppelt zählen.
+  try {
+    for (const row of previewSponsorSettlement(gameState, "season_end").rows) {
+      add(row.teamId, row.cashDelta);
+    }
+  } catch {
+    // Ohne Verträge gibt es keine Vorschau — dann trägt nur der gebuchte Teil.
+  }
 
-  return roundCash(alreadyPaid + projectedRemaining);
+  for (const [teamId, value] of byTeam) {
+    byTeam.set(teamId, roundCash(value));
+  }
+  return byTeam;
+}
+
+/** Liga-Summe der Sponsor-Einnahme dieser Saison. Eine Herleitung, siehe `getSeasonSponsorCashByTeam`. */
+export function getSeasonSponsorCashTotal(gameState: GameState): number {
+  let total = 0;
+  for (const value of getSeasonSponsorCashByTeam(gameState).values()) {
+    total += value;
+  }
+  return roundCash(total);
 }

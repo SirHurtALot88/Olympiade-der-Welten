@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
+  applySeasonRankColumn,
   MATCHDAY_PANEL_DEFAULT_SORT,
   resolveMatchdayRanks,
   resolveProjectedRanksFromMatchday,
@@ -205,13 +203,53 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
     expect(reihenfolge(mitMutator)).toEqual(["R-L", "P-S", "T-T", "W-W", "C-C", "U-A"]);
   });
 
+  /**
+   * DIESER TEST LAS FRUEHER DEN QUELLTEXT.
+   *
+   * Er suchte im Panel nach den Zeichenketten `const alleAusDerEngine = rows.every(…)` und
+   * `if (row.projectedRank == null) {`. Das ist die Fehlerklasse "Test prueft Quelltext-Strings
+   * statt Werte": er waere gruen geblieben, wenn die Regel in eine tote Funktion gewandert
+   * waere, und er waere rot geworden, sobald jemand eine Variable umbenennt, ohne dass sich
+   * das Verhalten aendert. Seit dem Audit vom 11.08. steht die Regel als `applySeasonRankColumn`
+   * exportiert da und wird hier an WERTEN geprueft — inklusive Gegenprobe auf das alte
+   * Luecken-Fuellen.
+   */
   it("mischt nicht zwei Ranglisten in eine Spalte", () => {
-    // Die Panel-Logik fuellte frueher nur die LUECKEN: Teams mit gespeicherter Projektion behielten
-    // den Rang der Engine, der Rest bekam den abgeleiteten. Zwei je fuer sich stimmige Ranglisten,
-    // zusammen aber eine Reihenfolge, die keiner von beiden entspricht.
-    const panel = readFileSync(join(process.cwd(), "app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx"), "utf8");
-    expect(panel).toContain("const alleAusDerEngine = rows.every((row) => row.projectedRank != null)");
-    expect(panel).not.toContain("if (row.projectedRank == null) {");
+    // Vier Teams, aber nur zwei tragen eine Engine-Projektion. Genau die Lage, in der die alte
+    // Logik mischte: A/B behielten 1/2 aus der Engine, C/D bekamen aus der abgeleiteten Liste
+    // ebenfalls kleine Zahlen — Rang 1 und 2 waren danach doppelt vergeben.
+    const gemischt = [
+      { teamId: "A", currentPoints: 10, sum: 1, projectedRank: 1 as number | null },
+      { teamId: "B", currentPoints: 9, sum: 1, projectedRank: 2 as number | null },
+      { teamId: "C", currentPoints: 40, sum: 5, projectedRank: null as number | null },
+      { teamId: "D", currentPoints: 30, sum: 5, projectedRank: null as number | null },
+    ];
+
+    // GEGENPROBE — so sah die alte Regel aus (nur Luecken fuellen):
+    const alteRegel = gemischt.map((row) => ({ ...row }));
+    const abgeleitet = resolveProjectedRanksFromMatchday(alteRegel);
+    for (const row of alteRegel) {
+      if (row.projectedRank == null) row.projectedRank = abgeleitet.get(row.teamId) ?? null;
+    }
+    expect(alteRegel.map((row) => row.projectedRank)).toEqual([1, 2, 1, 2]);
+    // Rang 1 und 2 doppelt, 3 und 4 gar nicht — keine Ordnung, sondern zwei uebereinander.
+    expect(new Set(alteRegel.map((row) => row.projectedRank)).size).toBe(2);
+
+    // NEUE REGEL: unvollstaendige Engine-Daten → ALLE Raenge kommen aus einer Liste.
+    applySeasonRankColumn(gemischt);
+    expect(gemischt.map((row) => row.projectedRank)).toEqual([3, 4, 1, 2]);
+    expect(new Set(gemischt.map((row) => row.projectedRank)).size).toBe(4);
+  });
+
+  it("laesst eine VOLLSTAENDIGE Engine-Rangliste unangetastet", () => {
+    // Sind alle Raenge gebucht, ist die Engine die verbindliche Quelle — auch dann, wenn die
+    // abgeleitete Rechnung eine andere Reihenfolge ergaebe (hier: nach Punkten waere B vorn).
+    const ausDerEngine = [
+      { teamId: "A", currentPoints: 1, sum: 0, projectedRank: 1 as number | null },
+      { teamId: "B", currentPoints: 99, sum: 0, projectedRank: 2 as number | null },
+    ];
+    applySeasonRankColumn(ausDerEngine);
+    expect(ausDerEngine.map((row) => row.projectedRank)).toEqual([1, 2]);
   });
 
   it("macht die Saison-Rang-Spalte wieder sortierbar", () => {

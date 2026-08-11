@@ -2,11 +2,6 @@ import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 // Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
-import type { FoundationFormCardBonusProjection } from "@/lib/persistence/foundation-form-card-projection";
-import type { FoundationRecordBookProjection } from "@/lib/persistence/foundation-record-book-projection";
-import type { FoundationDisciplineTallyProjection } from "@/lib/persistence/foundation-discipline-tally-projection";
-import type { FoundationMatchdayPointsProjection } from "@/lib/persistence/foundation-matchday-points-projection";
-import type { FoundationPpAreaFormBonusProjection } from "@/lib/persistence/foundation-pp-area-form-bonus-projection";
 
 export type DisciplineCategory =
   | "power"
@@ -2432,6 +2427,21 @@ export type MatchdayResolveSnapshotRecord = {
   seasonId: string;
   matchdayId: string;
   signature: string;
+  /**
+   * Signatur NUR ueber die Aufstellungen, je Disziplin-Seite getrennt, plus die
+   * Verfuegbarkeit der auf DIESER Seite eingesetzten Spieler.
+   *
+   * Warum getrennt: Der D1-Commit schreibt die Fatigue der in D1 gelaufenen Spieler und
+   * veraendert damit die volle `signature` — der Snapshot waere ausgerechnet fuer den
+   * D2-Commit ungueltig. Fuer D2 zaehlt aber nur, ob sich an D2 etwas geaendert hat. Mit
+   * der seitenweisen Signatur laesst sich genau das pruefen, statt die Pruefung fuer den
+   * ganzen Spieltag auszuschalten (dabei ueberlebte auch ein laengst verfallener
+   * Snapshot und wurde als "Ergebnis" gezeigt).
+   *
+   * Alt-Snapshots ohne dieses Feld gelten als nicht mehr pruefbar und werden verworfen —
+   * lieber die gebuchte Wahrheit als eine huebschere Vorschau.
+   */
+  sideSignatures?: Record<"d1" | "d2", string>;
   previewStatus: string;
   readinessByTeamId: Record<
     string,
@@ -3211,46 +3221,18 @@ export type SeasonState = {
    */
   foundationFieldRace?: FoundationFieldRaceProjection;
   /**
-   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — dritte Schwester: die Formkarten-Bilanz der
-   * laufenden Saison, serverseitig auf dem vollen Save gerechnet, weil die Anfangsladung
-   * `lineupDrafts` auf den aktiven Spieltag beschneidet und der Browser sonst nur die Karten
-   * eines einzigen Spieltags zaehlt (siehe `foundation-form-card-projection`). Wird nie
-   * zurueckgeschrieben.
+   * HIER STANDEN FUENF WEITERE PROJEKTIONEN — `foundationFormCardBonus`, `foundationRecordBook`,
+   * `foundationDisciplineTally`, `foundationMatchdayPoints`, `foundationPpAreaFormBonus`. Sie sind
+   * ERSATZLOS ENTFERNT.
+   *
+   * Alle fuenf gab es nur, weil die Anfangsladung `disciplineResults` und `lineupDrafts` auf den
+   * aktiven Spieltag beschnitt. Seit `8ec6454b` fahren beide Listen vollstaendig mit; die Leser
+   * rechnen wieder selbst richtig. Nachgemessen an beiden aktiven Spielstaenden: mit und ohne
+   * Projektion Zeichen fuer Zeichen dasselbe Ergebnis.
+   *
+   * Kommt die Beschneidung je zurueck, kommen NICHT die Projektionen zurueck — dann waere der
+   * Schnitt selbst der Fehler. Siehe `compactFoundationInitialGameState`.
    */
-  foundationFormCardBonus?: FoundationFormCardBonusProjection;
-  /**
-   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — Geschwister der drei darueber: das fertige Rekordbuch der laufenden
-   * Saison, serverseitig auf dem vollen Save gerechnet. Im Browser stuenden sonst in JEDEM
-   * Eintrag Halter und Wert eines einzigen Spieltags, waehrend die Kartenueberschrift „aus 10
-   * gespielten Spieltagen" sie beglaubigt (siehe `foundation-record-book-projection`). Wird nie
-   * zurueckgeschrieben.
-   */
-  foundationRecordBook?: FoundationRecordBookProjection;
-  /**
-   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — dieselbe Bauart eine Ebene weiter: die Disziplin-Bilanz je Team
-   * (Siege, Top-5-Bereiche, laengste Top-3-Serie) der laufenden Saison, Grundlage der
-   * erweiterten Meilensteine. Aus demselben Grund wie oben: alles, was ueber mehrere Spieltage
-   * misst, sieht im Browser sonst nur einen (siehe `foundation-discipline-tally-projection`).
-   * Wird nie zurueckgeschrieben.
-   */
-  foundationDisciplineTally?: FoundationDisciplineTallyProjection;
-  /**
-   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — vierte Schwester: die Tagespunkte je gewertetem
-   * Spieltag und Team der laufenden Saison, serverseitig auf dem vollen Save gerechnet. Ohne
-   * sie konnte das Spieltags-Ergebnis den Saison-Rang VOR dem Spieltag nicht bilden (die
-   * `disciplineResults` sind auf den aktiven Spieltag beschnitten) und zeigte fuer alle 32
-   * Teams erfundene Raenge und Summen — siehe `foundation-matchday-points-projection`.
-   * Wird nie zurueckgeschrieben.
-   */
-  foundationMatchdayPoints?: FoundationMatchdayPointsProjection;
-  /**
-   * NUR ANZEIGEFRACHT, NIEMALS QUELLE — Zwillingsschwester von `foundationFormCardBonus`: die
-   * WIRKUNG der Formkarten (`formModifier`) je gewertetem Spieltag, Team und PP-Bereich,
-   * serverseitig auf dem vollen Save gerechnet. Ohne sie zeigte der Saisonstand die `(+x)`
-   * hinter jedem Bereichswert nur fuer den aktiven Spieltag — 14 statt 32 Teams, und bei
-   * denen falsch. Siehe `foundation-pp-area-form-bonus-projection`. Wird nie zurueckgeschrieben.
-   */
-  foundationPpAreaFormBonus?: FoundationPpAreaFormBonusProjection;
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;

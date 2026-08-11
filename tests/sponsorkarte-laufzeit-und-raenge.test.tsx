@@ -14,14 +14,19 @@
  * Spielstaenden dieses Containers war das Fenster leer, der abgeleitete Wert dagegen vorhanden
  * (z. B. 1.09 / 1.04 / 1.13) — die Zahl 1.00 war also nicht „der Faktor", sondern der Ersatzwert.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { SponsorOfferCardNewLook } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { SponsorSeasonRankTable } from "@/components/foundation/sponsor/SponsorSeasonRankTable";
-import { buildSponsorOfferTermForecast } from "@/lib/sponsor/sponsor-economy-calibration";
+import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import {
+  buildOfferRankPayoutLadderPreview,
+  buildSponsorOfferTermForecast,
+} from "@/lib/sponsor/sponsor-economy-calibration";
+import { buildSponsorOfferPresentation, buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter";
+import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 
 /** 32 Raenge, monoton fallend — grob wie eine echte Leiter, aber nachrechenbar. */
@@ -183,42 +188,141 @@ describe("Die Rangtabelle einer Vertragssaison", () => {
 });
 
 /**
- * Diese Gruppe prueft den QUELLTEXT der Karte, nicht ihr Rendering — die Karte braucht einen
- * vollstaendigen `GameState` (Liga-Tabelle, Sponsor-Praesentation), und ein dafuer gebauter
- * Kunst-Zustand wuerde mehr ueber die Attrappe aussagen als ueber die Karte. Was hier festgehalten
- * wird, sind die drei Zusagen aus der Meldung, jede an einer Stelle, die man nicht versehentlich
- * zurueckdreht.
+ * DIESE GRUPPE HAT FRUEHER DEN QUELLTEXT DER KARTE GELESEN (`readFileSync` + `toContain`) — mit der
+ * Begruendung, ein Kunst-`GameState` sage mehr ueber die Attrappe aus als ueber die Karte. Die
+ * Begruendung war richtig, die Schlussfolgerung falsch: es braucht keine Attrappe, sondern einen
+ * ECHTEN Spielstand (`createSingleplayerGameState` + `ensureSeasonSponsorOffers`) — genau den, aus
+ * dem der Browser die Karte auch fuellt.
+ *
+ * Warum die Umstellung noetig war: ein Quelltext-Test bleibt gruen ueber toter Anzeige. Er haette
+ * nicht gemerkt, wenn die Leiter im Aufklapper andere Betraege zeigt als die Abrechnung, wenn der
+ * Ausblick eine andere Zahl rendert als `buildSponsorOfferTermForecast` liefert, oder wenn die
+ * Rangtabelle gar nicht mehr im Aufklapper landet. Hier wird jetzt GERENDERT und die ZAHL
+ * verglichen — dieselbe Bauart wie `tests/kaderkarte-vk-definitionsgleichheit.test.tsx`.
  */
-describe("Der Mittelteil der Sponsorkarte wiederholt sich nicht mehr", () => {
-  const quelle = readFileSync(join(process.cwd(), "components/foundation/sponsor/SponsorOfferCardNewLook.tsx"), "utf8");
+describe("Der Mittelteil der Sponsorkarte zeigt die Zahlen, die die lib liefert", () => {
+  /** Ein echter Spielstand mit echten Angeboten — kein Kunst-Zustand. */
+  const gameState = ensureSeasonSponsorOffers(createSingleplayerGameState());
+  const alleAngebote = Object.values(gameState.seasonState.sponsorOffersByTeamId ?? {}).flat();
+  /** Die Karte formatiert mit einer Nachkommastelle; hier dieselbe Regel, damit Text == Zahl. */
+  const formatCash = (value: number) => value.toFixed(1);
 
-  it("zeigt die volle Gewinnstufen-Leiter unter V3 nur noch auf Abruf", () => {
-    expect(quelle).toContain('data-testid="sponsor-rank-ladder-disclosure"');
-    expect(quelle).toContain("Alle Gewinnstufen");
-    // Ohne V3-Block gibt es den Block darueber nicht — dort bleibt die Leiter die einzige Quelle
-    // fuer Meister- und Letzter-Betrag und muss sichtbar bleiben.
-    expect(quelle).toContain("presentation.v3 ? (");
+  function rendere(offer: SponsorOffer): string {
+    return renderToStaticMarkup(
+      <SponsorOfferCardNewLook
+        offer={offer}
+        gameState={gameState}
+        chooseBusy={false}
+        canManage={false}
+        onChoose={() => {}}
+        formatCash={formatCash}
+      />,
+    );
+  }
+
+  /** Text ohne Tags — so lassen sich gerenderte Betraege als Zahlen wiederfinden. */
+  function nurText(html: string): string {
+    return html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+  }
+
+  it("die Fixture traegt echte V3-Angebote — sonst prueft der Test nichts", () => {
+    expect(alleAngebote.length).toBeGreaterThan(100);
+    expect(alleAngebote.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
   });
+
+  it("die Gewinnstufen im Aufklapper sind die Betraege der Abrechnungsleiter — Stufe fuer Stufe", () => {
+    let geprueft = 0;
+    for (const offer of alleAngebote.slice(0, 12)) {
+      const html = rendere(offer);
+      const aufklapper = html.slice(html.indexOf('data-testid="sponsor-rank-ladder-disclosure"'));
+      expect(aufklapper, "die Leiter steht unter V3 nur noch auf Abruf").not.toBe("");
+      expect(aufklapper).toContain("Alle Gewinnstufen");
+
+      // Die Wahrheit: dieselbe Leiter, aus der das Settlement zahlt.
+      const stufen = buildSponsorRankTierRows({
+        baseCash: offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0,
+        rankLadder: buildOfferRankPayoutLadderPreview(gameState, offer),
+        includeFloorRung: true,
+      });
+      expect(stufen.length).toBeGreaterThan(5);
+      const text = nurText(aufklapper);
+      for (const stufe of stufen) {
+        expect(text, `Stufe "${stufe.label}" fehlt mit ${formatCash(stufe.absolutePayout)}`).toContain(
+          formatCash(stufe.absolutePayout),
+        );
+        geprueft += 1;
+      }
+    }
+    expect(geprueft).toBeGreaterThan(50);
+  }, 120_000);
 
   /**
-   * Ueberholt: die Kachel fiel zuerst nur bei exakt gleichem Betrag weg. „Basis braucht auch keine
-   * sau, man sieht ja platz 32 waere ja die basis!" — sie faellt unter V3 jetzt immer weg. Die
-   * Zusage steht in `salary-factor-season-eins.test.ts`; hier bleibt nur, dass die Kachel im
-   * V3-Zweig nicht wieder auftaucht.
+   * „Basis braucht auch keine sau, man sieht ja platz 32 waere ja die basis!" — unter V3 faellt die
+   * Basis-Kachel weg. Als WERT geprueft: es gibt genau so viele Kacheln wie Nicht-Basis-Komponenten,
+   * und der Basisbetrag steht stattdessen als „Garantiert auf jedem Platz" im V3-Block.
    */
-  it("zeigt unter V3 keine BASIS-Kachel mehr", () => {
-    expect(quelle).toContain('if (component.kind === "base" && presentation.v3) {');
-  });
+  it("zeigt unter V3 keine BASIS-Kachel — der Betrag steht als Garantie im V3-Block", () => {
+    let geprueft = 0;
+    for (const offer of alleAngebote.slice(0, 12)) {
+      const html = rendere(offer);
+      // Kacheln zaehlen: die Standard-Kacheln der Komponenten plus die Sonderziel-Kachel, die
+      // ausserhalb der Liste gerendert wird. Die Basis-Komponente darf KEINE Kachel bekommen.
+      const kacheln = (html.match(/class="nl-sponsor-reward-tile is-/g) ?? []).length;
+      const praesentation = buildSponsorOfferPresentation({ offer, gameState, teamId: offer.teamId });
+      const erwartet =
+        offer.components.filter(
+          (component) =>
+            component.kind !== "special" && component.kind !== "overperformance" && component.kind !== "base",
+        ).length +
+        (!praesentation.isChallenge && offer.components.some((component) => component.kind === "special") ? 1 : 0);
+      expect(kacheln).toBe(erwartet);
+      expect(html).not.toContain('class="nl-sponsor-reward-tile is-base');
 
-  it("macht jede Vertragssaison aufklappbar und haengt die Rangtabelle daran", () => {
-    expect(quelle).toContain("nl-sponsor-term-season-summary");
-    expect(quelle).toContain("<SponsorSeasonRankTable");
-    // Der Faktor steht im Aufklapp-Bereich, nicht mehr als „(Faktor 1.00)" hinter jeder Zeile.
-    expect(quelle).not.toContain("(Faktor {entry.salaryFactor.toFixed(2)})");
-  });
+      const garantie = nurText(html.slice(html.indexOf('data-testid="sponsor-v3-floor"')));
+      const leiter = buildOfferRankPayoutLadderPreview(gameState, offer);
+      expect(garantie).toContain(formatCash(Math.round(leiter[31]! * 10) / 10));
+      geprueft += 1;
+    }
+    expect(geprueft).toBe(12);
+  }, 120_000);
 
-  it("sagt im Klartext, wenn der Faktor nur fortgeschrieben ist", () => {
-    expect(quelle).toContain('entry.factorSource === "vorausgewuerfelt"');
-    expect(quelle).toContain("noch nicht gewürfelt");
-  });
+  it("jede Vertragssaison ist aufklappbar und traegt IHRE Rangtabelle mit IHREN Betraegen", () => {
+    const mehrjaehrig = alleAngebote.filter((offer) => (offer.termSeasons ?? 1) > 1).slice(0, 8);
+    expect(mehrjaehrig.length).toBeGreaterThan(0);
+
+    let geprueft = 0;
+    for (const offer of mehrjaehrig) {
+      const html = rendere(offer);
+      const ausblick = html.slice(html.indexOf('data-testid="sponsor-term-outlook"'));
+      const prognose = buildSponsorOfferTermForecast(gameState, offer);
+      expect(prognose.length).toBe(offer.termSeasons ?? 1);
+      // Eine aufklappbare Zeile je Vertragssaison.
+      expect(ausblick.split("nl-sponsor-term-season-summary").length - 1).toBe(prognose.length);
+
+      const text = nurText(ausblick);
+      for (const [index, eintrag] of prognose.entries()) {
+        expect(text).toContain(`Saison ${index + 1}/${offer.termSeasons}`);
+        // Der Betrag der Zeile …
+        expect(text).toContain(formatCash(eintrag.payoutAtCurrentRank));
+        // … und die Rangtabelle DIESER Saison: Meister- und Letzter-Betrag stehen darin.
+        expect(text).toContain(formatCash(eintrag.rankPayouts[0]!));
+        expect(text).toContain(formatCash(eintrag.rankPayouts[31]!));
+        geprueft += 1;
+      }
+    }
+    expect(geprueft).toBeGreaterThan(1);
+  }, 120_000);
+
+  it("sagt im Klartext, wenn der Faktor nur fortgeschrieben ist — und nennt ihn", () => {
+    // Season 1: `seasonEconomyFactors` ist leer, jede Vertragssaison ist "fortgeschrieben".
+    const offer = alleAngebote.find((entry) => (entry.termSeasons ?? 1) > 1)!;
+    const prognose = buildSponsorOfferTermForecast(gameState, offer);
+    expect(prognose.every((eintrag) => eintrag.factorSource === "fortgeschrieben")).toBe(true);
+
+    const text = nurText(rendere(offer));
+    expect(text).toContain("noch nicht gewürfelt");
+    expect(text).toContain(prognose[0]!.salaryFactor.toFixed(2));
+    // Die alte, irrefuehrende Form („(Faktor 1.00)" hinter jeder Zeile) darf nicht zurueckkommen.
+    expect(text).not.toContain(`(Faktor ${prognose[0]!.salaryFactor.toFixed(2)})`);
+  }, 120_000);
 });

@@ -1,12 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
-const PANEL = readFileSync(
-  join(process.cwd(), "app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx"),
-  "utf8",
-);
+import { ppText, scoreText } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 
 /**
  * „Z-H hat eine rote Formkarte gespielt −2. Warum steht in der D1-Zeile +−18? Da muss das
@@ -17,19 +11,16 @@ const PANEL = readFileSync(
  *
  * Die Team-Zeile war nicht betroffen, weil sie ihre Form-Zahl selbst zusammenbaute (mit
  * korrektem Vorzeichen). Genau diese Doppelung war das Problem: zwei Formatierungen für
- * dieselbe Größe, von denen nur eine richtig war. Jetzt gibt es nur noch eine.
+ * dieselbe Größe, von denen nur eine richtig war.
+ *
+ * AUDIT 11.08.2026 — dieser Test baute `ppText` selbst nach und prüfte den Vertrag
+ * anschließend über Quelltext-Strings (`expect(PANEL).toContain("{sumShown ? ppText(...)}")`).
+ * Das ist die Fehlerklasse „Test prüft Quelltext statt Werte": der Nachbau konnte richtig
+ * bleiben, während das Original driftet, und jede Umformatierung der Zelle machte ihn rot,
+ * ohne dass sich ein Wert geändert hätte. Beide Formatierer sind jetzt exportiert und werden
+ * hier an ihren Rückgabewerten geprüft.
  */
 describe("Spieltags-Wertung: Vorzeichen", () => {
-  /**
-   * Nachgebaut statt importiert: die Funktion ist modul-privat, und ein Export nur für den
-   * Test würde die Datei aufweichen. Der Vertrag steht darunter über den Quelltext.
-   */
-  const ppText = (value: number | null): string => {
-    if (value == null) return "–";
-    if (Math.abs(value) < 0.05) return "0";
-    return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
-  };
-
   it("setzt kein Plus vor eine negative Zahl", () => {
     expect(ppText(-18.4)).toBe("-18.4");
     expect(ppText(-2)).toBe("-2.0");
@@ -54,20 +45,28 @@ describe("Spieltags-Wertung: Vorzeichen", () => {
     expect(ppText(null)).toBe("–");
   });
 
-  it("baut die Funktion das Vorzeichen aus dem Wert, nicht fest davor", () => {
-    expect(PANEL).toContain('return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;');
-    expect(PANEL).not.toContain("return `+${value.toFixed(1)}`;");
+  /**
+   * Der Score-Formatierer trägt dieselbe Vorzeichenregel — er ist keine zweite, eigene
+   * Rechenstelle, sondern derselbe Text in Klammern. Sonst hätte die Reparatur der
+   * Einheiten-Verwechslung genau den Fehler wiederholt, den dieser Test bewacht.
+   */
+  it("der Score-Formatierer erbt dieselbe Vorzeichenregel", () => {
+    for (const value of [-18.4, -2, -0.6, 0, 0.02, 12.4, 0.3, 184.3]) {
+      expect(scoreText(value)).toBe(`(${ppText(value)})`);
+    }
+    expect(scoreText(-18.4)).not.toContain("+-");
+    // „nicht gewertet" bleibt in beiden derselbe Strich, ohne Klammern.
+    expect(scoreText(null)).toBe("–");
+    expect(ppText(null)).toBe("–");
   });
 
   /**
-   * Beide Form-Zellen (Team-Zeile und Disziplin-Zeile) laufen durch DIESELBE Funktion.
-   * Vorher baute die Team-Zeile ihre Zahl inline zusammen — deshalb stimmte dort das
-   * Vorzeichen und in der Disziplin-Zeile nicht.
+   * Und die beiden sind an jedem Wert voneinander unterscheidbar — das ist der Zweck der
+   * Klammer: Punkte und Score standen vorher in derselben Schreibweise nebeneinander.
    */
-  it("formatiert Team- und Disziplin-Zeile über dieselbe Funktion", () => {
-    expect(PANEL).toContain("{sumShown ? ppText(row.formPp) : lockCell}");
-    expect(PANEL).toContain("{ppText(values.form)}");
-    // Keine handgebaute Vorzeichen-Logik mehr daneben.
-    expect(PANEL).not.toContain('${row.formPp > 0 ? "+" : ""}');
+  it("Punkte und Score sind an jeder Zahl auseinanderzuhalten", () => {
+    for (const value of [26.4, 184.3, -11.4, 0]) {
+      expect(scoreText(value)).not.toBe(ppText(value));
+    }
   });
 });

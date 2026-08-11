@@ -123,17 +123,27 @@ export function buildDisciplineStageTeamsFromPreview(
       };
     });
 
-    // Team-Level-Effekte (Form-Card / Intensität / Team-Power / Team-PPs) sind
-    // nicht pro Spieler in den Entries, sondern auf Team-Ebene. Für den additiven
-    // Slot-Reveal verteilen wir sie GLEICHMÄSSIG auf die Slots — aber BESCHRIFTET,
-    // damit im Hover/Reveal transparent bleibt, woher die Punkte kommen.
+    // Team-Level-Effekte (Intensität / Team-Power) sind nicht pro Spieler in den
+    // Entries, sondern auf Team-Ebene. Für den additiven Slot-Reveal verteilen wir sie
+    // GLEICHMÄSSIG auf die Slots — aber BESCHRIFTET, damit im Hover/Reveal transparent
+    // bleibt, woher die Punkte kommen.
+    //
+    // HIER STAND EINE DRITTE ZEILE „Team-PPs" (`teamResult.teamPpsModifier`). Sie ist
+    // ersatzlos entfernt, aus zwei Gründen:
+    //  1. Sie konnte nie erscheinen. `calculateMutatorModifierForSide` und
+    //     `calculateMvpForcedMutatorModifierForSide` setzen `teamPpsModifier` an JEDEM
+    //     Rückgabepfad hart auf `null` (legacy-lineup-modifiers.ts); am Abbild gemessen:
+    //     64 von 64 gebuchten Team-Zeilen tragen `null`/`missing_source`.
+    //  2. Wäre das Feld je gefüllt worden, hätte diese Zeile eine PLAYER-POINT-Größe in
+    //     den SCORE geschrieben — zwei verschiedene Währungen in einer Summe. Die
+    //     Mutator-PPs laufen über `playerMutatorPpsBonuses`/`mutatorPpsBonus` und gehören
+    //     in die PP-Rechnung, nicht in den Disziplin-Score.
     if (players.length > 0) {
       // Form NICHT mehr team-weit gleichverteilen — sie ist bereits pro Spieler
       // (formShare, s. oben) berücksichtigt. Nur die echten Team-Effekte bleiben.
       const teamLevelMods: { k: string; value: number }[] = [
         { k: "Intensität", value: teamResult.intensityModifier ?? 0 },
         { k: "Team-Power", value: teamResult.teamPowerModifier ?? 0 },
-        { k: "Team-PPs", value: teamResult.teamPpsModifier ?? 0 },
       ];
       for (const teamMod of teamLevelMods) {
         if (Math.abs(teamMod.value) < 0.05) {

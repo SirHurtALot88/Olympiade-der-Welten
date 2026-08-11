@@ -1,4 +1,37 @@
-import { MATCHDAY_ARENA_PHASES, type MatchdayArenaPhaseId } from "@/lib/season/matchday-arena-presenter";
+/**
+ * Die Phasenkette der Arena — die eine Reihenfolge, in der die Buehne aufdeckt.
+ *
+ * Sie stand bis zum Audit vom 11.08.2026 in `lib/season/matchday-arena-presenter.ts`. Diese
+ * Datei war ein 714-Zeilen-Presenter, von dessen 16 Exporten genau EINER noch einen Aufrufer
+ * hatte: diese Konstante. Der Rest — die komplette Phasen-Zerlegung des Team-Scores samt
+ * Rangkarte — war nachweislich tot (nachgezaehlt ueber alle .ts/.tsx/.js/.mjs/.json des Repos:
+ * 0 Produktionsaufrufer, nur die eigene Testdatei). Zwei Kommentare im Produktivcode sagten es
+ * selbst („die Funktion dort ruft niemand mehr auf").
+ *
+ * Geloescht wurde er, weil er zwei nachgewiesene Rechenfehler enthielt und damit eine Falle
+ * fuer den naechsten war, der ihn wiederbelebt:
+ *   - Die Phasenkette (Slots -> Push -> Form -> Mutator -> Captain -> Power) enthielt weder
+ *     einen Fatigue- noch einen Moral-Term; am Live-Abbild blieben im Mittel 14,5 Punkte
+ *     unerklaerter Rest bei 32 von 32 Teams.
+ *   - `buildArenaTeamRankMap` sortierte bei Gleichstand nach Teamname; die Engine benutzt
+ *     `rankDescendingSharedTies` (Gleichstand teilt den besseren Rang) — gemessen 1 von 32
+ *     Raengen verschieden.
+ * Wer die Zerlegung zurueckholen will, holt sie aus der Resolve-Vorschau
+ * (`lib/foundation/discipline-stage/discipline-stage-from-preview.ts`), die auf `teamResult.score`
+ * abschliesst — nicht aus einer zweiten Rechenstelle.
+ */
+export const MATCHDAY_ARENA_PHASES = [
+  { id: "slots", label: "Slots" },
+  { id: "push", label: "Intensität" },
+  { id: "form", label: "Form" },
+  { id: "mutator", label: "Mutator" },
+  { id: "captain", label: "Kapitän" },
+  { id: "power", label: "Team-Power" },
+  { id: "final", label: "Finale" },
+  { id: "result", label: "Ergebnis" },
+] as const;
+
+export type MatchdayArenaPhaseId = (typeof MATCHDAY_ARENA_PHASES)[number]["id"];
 
 export type FoundationArenaDisciplinePhase = "d1" | "d2" | "total";
 export type FoundationArenaDisciplineSide = "d1" | "d2";

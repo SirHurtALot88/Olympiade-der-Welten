@@ -56,7 +56,7 @@ import {
   type EternalPlayerStatus,
 } from "@/lib/foundation/eternal-player-table";
 import { buildLeagueLegends } from "@/lib/foundation/league-legend-criteria";
-import { leseRekordbuch } from "@/lib/persistence/foundation-record-book-projection";
+import { buildLeagueRecordBook } from "@/lib/foundation/league-record-book";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildLeagueAchievements,
@@ -1062,14 +1062,16 @@ function RecordBookSection({
   onOpenPlayer: (playerId: string) => void;
 }) {
   /**
-   * `leseRekordbuch` statt `buildLeagueRecordBook`: diese Karte laeuft im Browser auf dem
-   * KOMPAKTEN Payload, und der traegt `disciplineResults` nur fuer den aktiven Spieltag. Ein
-   * Eigenbau darauf lieferte in jedem Eintrag Halter und Wert eines einzigen Spieltags —
-   * beglaubigt von der eigenen Ueberschrift „aus 10 gespielten Spieltagen". Der Leser nimmt die
-   * serverseitige Projektion, sobald sie mehr Spieltage abdeckt als der vorliegende Stand
-   * (`foundation-record-book-projection`).
+   * WIEDER DER EIGENBAU — und diesmal traegt er.
+   *
+   * Diese Karte laeuft im Browser. Solange die Anfangsladung `disciplineResults` auf den aktiven
+   * Spieltag beschnitt, lieferte ein Eigenbau in jedem Eintrag Halter und Wert eines EINZIGEN
+   * Spieltags, beglaubigt von der eigenen Ueberschrift „aus 10 gespielten Spieltagen". Dagegen
+   * fuhr eine fertige Projektion mit (`foundationRecordBook`). Seit `8ec6454b` fahren die
+   * `disciplineResults` vollstaendig mit; die Projektion war danach nachgemessen wirkungslos und
+   * ist entfernt. Es gibt wieder genau eine Rechenstelle.
    */
-  const buch = useMemo(() => leseRekordbuch(gameState), [gameState]);
+  const buch = useMemo(() => buildLeagueRecordBook(gameState), [gameState]);
   const alle = [...buch.spieltagsSuperlative, ...buch.serien];
 
   if (alle.length === 0) {

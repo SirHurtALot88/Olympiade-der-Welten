@@ -585,6 +585,7 @@ import {
   getDefaultTableWidths,
   getFoundationViewScrollTarget,
   getOwnerTeamHighlightClass,
+  getPlayerPortraitInitials,
   getPlayerPortraitModel,
   getRanksMetricToneClass,
   getRawFoundationTeamParam,
@@ -963,21 +964,14 @@ function pickRatingsForPlayerIds<T>(ratingsById: Map<string, T>, playerIds: stri
   return picked;
 }
 
-function getPlayerPortraitBrowserUrl(playerId: string, portraitUrl?: string | null, portraitPath?: string | null) {
-  if (portraitUrl?.startsWith("http://") || portraitUrl?.startsWith("https://") || (portraitUrl?.startsWith("/") && !portraitUrl.startsWith("/Users/"))) {
-    return portraitUrl;
-  }
-
-  if (portraitPath?.startsWith("/") && !portraitPath.startsWith("/Users/")) {
-    return portraitPath;
-  }
-
-  if (portraitPath?.startsWith("/Users/")) {
-    return `/api/media/player-portrait/${encodeURIComponent(playerId)}`;
-  }
-
-  return null;
-}
+// Hier stand bis zum Audit vom 11.08. eine zweite, aeltere Kopie von
+// `getPlayerPortraitBrowserUrl` — ohne statischen Portrait-Index und ohne
+// Varianten-Suffixe. Sie hatte in dieser Datei keinen einzigen Aufrufer (die
+// Datei nutzt ausschliesslich `getPlayerPortraitModel`), waere aber genau in
+// dem Moment falsch geworden, in dem jemand Bilder nach `public/portraits/`
+// legt und `npm run portraits:index` laeuft: dann liefert das Modell in
+// `lib/data/mediaAssets.ts` einen statischen Pfad und diese Kopie weiter null.
+// Ersatzlos entfernt — es gibt genau eine Portrait-Rechenstelle.
 
 function WarningList({
   title,
@@ -10914,7 +10908,7 @@ export function useFoundationShellRouterBodyScope({
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,
@@ -10939,7 +10933,7 @@ export function useFoundationShellRouterBodyScope({
   const seasonV2PlayerRows = useMemo(() => {
     return sortedSeasonTopPlayerRows.map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,

@@ -2,11 +2,6 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
 import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
-import { projiziereFormkartenBilanz } from "@/lib/persistence/foundation-form-card-projection";
-import { projiziereRekordbuch } from "@/lib/persistence/foundation-record-book-projection";
-import { projiziereDisziplinBilanz } from "@/lib/persistence/foundation-discipline-tally-projection";
-import { projiziereSpieltagsPunkte } from "@/lib/persistence/foundation-matchday-points-projection";
-import { projizierePpAreaFormBonus } from "@/lib/persistence/foundation-pp-area-form-bonus-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -58,26 +53,65 @@ function resolveHumanRosterPlayerIds(gameState: GameState): Set<string> {
 }
 
 /**
- * Append-only archive guard for compact-load round-trips.
+ * Der Schluessel, an dem ein Archiv-Eintrag wiedererkannt wird.
  *
- * The Foundation compact load strips `seasonSnapshots`/`standingsApplyLogs` to
- * `undefined`, and the client re-stamps an EMPTY sentinel `[]` (see
- * `apply-compact-season-archive-sentinel`). A naive `incoming ?? existing`
- * (and even `preserveIfUnchangedFromCompact`, whose compact baseline is
- * `undefined` — `"[]" !== undefined`) would let that `[]` clobber the durable
- * DB archive on the next gameplay PUT — wiping every prior-season snapshot.
+ * Beide Archive tragen eine eigene Kennung (`snapshotId` bei den Saison-Schnappschuessen, `id` bei
+ * den Standings-Buchungen). Faellt beides aus, dient der Inhalt selbst als Schluessel — dann ist ein
+ * Eintrag hoechstens sich selbst gleich, und die Wache haelt ihn erst recht fest.
+ */
+function archiveEntryKey(entry: unknown): string {
+  if (entry && typeof entry === "object") {
+    const record = entry as Record<string, unknown>;
+    for (const field of ["snapshotId", "id", "seasonId"] as const) {
+      const value = record[field];
+      if (typeof value === "string" && value.length > 0) {
+        return `${field}:${value}`;
+      }
+    }
+  }
+  return `json:${stableJson(entry)}`;
+}
+
+/**
+ * ARCHIVSCHUTZ FUER DIE PUT-RUNDREISE — schuetzt den INHALT, nicht die Anzahl.
  *
- * These archives are APPEND-ONLY (they only grow, one entry per completed
- * season / applied matchday). So the safe rule is: only accept the incoming
- * array when it has AT LEAST as many entries as the persisted one; otherwise
- * keep the durable copy. This blocks both the empty sentinel and any partial
- * fetch from shrinking the archive, while still accepting legitimate growth
- * (a freshly-completed season adds a snapshot → incoming is longer → wins).
+ * Die kompakte Anfangsladung streicht `seasonSnapshots`/`standingsApplyLogs` auf `undefined`, und
+ * der Browser stempelt an dieselbe Stelle eine LEERE LISTE (`apply-compact-season-archive-sentinel`).
+ * Ein naives `incoming ?? existing` liesse dieses `[]` beim naechsten Spiel-PUT das dauerhafte
+ * Archiv ueberschreiben — jede vergangene Saison waere weg.
+ *
+ * DIE ALTE WACHE VERGLICH NUR LAENGEN (`incomingLength >= existingLength ? incoming : existing`).
+ * Gemessen am Live-Abbild `new-game-1785823388048-1hf25q`: eine gleich lange, inhaltlich
+ * ausgeraeumte Liste kam anstandslos durch — `finalStandings` 32 -> 0 Zeilen, 3.546.497 B ->
+ * 3.249.724 B, und die Wache meldete nichts. Heute schreibt niemand so eine Liste; der Code
+ * verliess sich aber darauf, dass das so bleibt.
+ *
+ * DIE REGEL, DIE JETZT GILT: dieser Weg darf das Archiv nur WACHSEN lassen. Ein Eintrag, der im
+ * Spielstand liegt, bleibt Zeichen fuer Zeichen erhalten; neue Eintraege werden angehaengt. Das ist
+ * keine Verschaerfung ins Blaue, sondern genau die Zusage, die der Client ohnehin gibt: er verfasst
+ * Schnappschuesse nie (siehe `buildAutoPersistContentSignature` in `use-foundation-persist`, wo
+ * `seasonSnapshots` aus der Aenderungserkennung genommen ist, weil „der Client Schnappschuesse nie
+ * verfasst"). Geschrieben werden sie ausschliesslich serverseitig ueber
+ * `persistGameStateWithMaterializedDerivations` — dieser Weg hier ist nur der Browser-PUT und kommt
+ * an dieser Wache gar nicht vorbei.
+ *
+ * Reihenfolge: die bestehenden Eintraege behalten ihre, neue haengen hinten an. Damit ist das
+ * Ergebnis bei unveraendertem Eingang identisch mit dem Bestand — die Rundreise bleibt Identitaet.
  */
 function preserveAppendOnlyArchive<T extends unknown[] | undefined>(incoming: T, existing: T): T {
-  const incomingLength = incoming?.length ?? 0;
-  const existingLength = existing?.length ?? 0;
-  return incomingLength >= existingLength ? incoming : existing;
+  if (existing === undefined || existing.length === 0) {
+    return incoming ?? existing;
+  }
+  if (incoming === undefined) {
+    return existing;
+  }
+
+  const bekannteSchluessel = new Set(existing.map(archiveEntryKey));
+  // Bestehende Eintraege gewinnen IMMER — auch wenn der Eingang einen gleichnamigen mitbringt.
+  // Genau das ist der Unterschied zur Laengen-Wache: eine ausgeraeumte Fassung desselben
+  // Schnappschusses kommt hier nicht mehr durch.
+  const zusaetzlich = incoming.filter((entry) => !bekannteSchluessel.has(archiveEntryKey(entry)));
+  return (zusaetzlich.length === 0 ? existing : [...existing, ...zusaetzlich]) as T;
 }
 
 function mergeKeyedCollection<T>(
@@ -97,12 +131,6 @@ function mergeKeyedCollection<T>(
 
 /** Slim initial Foundation payload: strips heavy history and non-active matchday slices. */
 export function compactFoundationInitialGameState(gameState: GameState): GameState {
-  const activeMatchdayId = gameState.matchdayState.matchdayId;
-  const activeMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
-    (result) => result.matchdayId === activeMatchdayId,
-  );
-  const activeMatchdayResultIds = new Set(activeMatchdayResults.map((result) => result.id));
-
   // Keep the OWN team's attribute sheets in the compact payload so whole-roster
   // forecasts (training-SP, per-intensity/-class gain, season-end preview) work
   // immediately — opponent sheets remain stripped and hydrate on demand.
@@ -137,63 +165,26 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * vergangene Saison „—", weil die Historie mangels Schnappschuss auf Platzhalterzeilen mit
        * `rank: null` zurueckfiel. Die Daten waren nie weg, sie kamen nur nie im Browser an.
        *
-       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz vergleicht nur die Anzahl der
-       * Eintraege, eine gleich lange Kurzfassung kaeme also durch und wuerde die vollen
-       * Schnappschuesse beim naechsten Speichern ueberschreiben.
+       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz laesst dieses Feld ueber die
+       * PUT-Rundreise nur WACHSEN und haelt jeden vorhandenen Eintrag Zeichen fuer Zeichen fest
+       * (siehe `preserveAppendOnlyArchive`). Eine Kurzfassung unter demselben Namen waere trotzdem
+       * falsch: sie wuerde ab dem naechsten Laden als „das Archiv" gelesen und jede Ansicht, die
+       * die schweren Anhaenge braucht, still auf Luecken rechnen lassen. Ein eigenes Feld sagt
+       * ehrlich, was es ist.
        */
       foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
       /**
-       * Geschwister-Projektion fuers laufende Feld-Rennen: der Browser kann die gewerteten
-       * Spieltage aus dem kompakten Payload nicht mehr selbst zaehlen (matchdayResults/
-       * disciplineResults sind hier auf den aktiven Spieltag beschnitten) — Home meldete
-       * deshalb mitten in der Saison „erst 0 Spieltage". Die fertige Antwort faehrt mit,
-       * gerechnet auf dem vollen Save; zurueckgeschrieben wird sie nie (s. u.).
+       * Geschwister-Projektion fuers laufende Feld-Rennen — die EINZIGE, die stehen bleibt.
+       *
+       * Sie entstand aus demselben Grund wie die fuenf entfernten (beschnittene
+       * `matchdayResults`/`disciplineResults`), traegt aber inzwischen einen anderen: Home baut
+       * die Voll-Derivationen bewusst NICHT (`shouldLoadSeasonDerivations` deckt Home nicht ab),
+       * und ohne sie meldete die Kachel „erst 0 Spieltage". Die Projektion ist dort die billige
+       * Antwort, nicht die einzig richtige. Nachgemessen am Live-Abbild (S2/MD10 und S1/MD2):
+       * Projektion und Eigenbau liefern Zeichen fuer Zeichen dasselbe Ledger — sie verfaelscht
+       * also nichts, sie erspart nur die Rechnung.
        */
       foundationFieldRace: projiziereFieldRace(gameState),
-      /**
-       * Dritte Schwester derselben Bauart: die Saisonstand-Spalte „Formkarten" zaehlt die
-       * gespielten Karten ueber die Modifier-Slots der Aufstellungen — und die stehen unten
-       * auf den aktiven Spieltag beschnitten. Gemessen: voll 32 von 32 Teams mit Bilanz,
-       * kompakt 14 von 32, und diese 14 mit den Karten nur EINES von zehn Spieltagen.
-       * Die Beschneidung bleibt (659 KB gegen 70 KB), die fertige Bilanz faehrt mit (1,9 KB).
-       */
-      foundationFormCardBonus: projiziereFormkartenBilanz(gameState),
-      /**
-       * Vierte Schwester, gleiche Bauart: das Spieltags-Ergebnis bildet „Rang vorher/nachher"
-       * und die Summe der Saisonpunkte, indem es die Punkt-Eintraege ueber alle bisherigen
-       * Spieltage summiert. Unten fallen dafuer die `disciplineResults` weg (gemessen 640
-       * Zeilen voll gegen 64 kompakt), und ohne sie bucht der Ledger einen Spieltag bewusst
-       * gar nicht erst — die Summe VOR dem Spieltag war damit fuer jedes Team 0 und alle 32
-       * Zeilen zeigten erfundene Raenge (Z-H „Rang vorher 32" statt 1). Die fertigen
-       * Tagespunkte je Spieltag fahren mit, 32 Zahlen pro Spieltag.
-       */
-      foundationMatchdayPoints: projiziereSpieltagsPunkte(gameState),
-      /**
-       * Geschwister derselben Bauart: das fertige Rekordbuch. Gemessen am Live-Save zeigte der
-       * Browser in ALLEN sieben Eintraegen Halter und Wert eines EINZIGEN Spieltags (164,6 Sir
-       * Quacksalot wurde zu 112,7 Lyraeth Vael usw.), waehrend die Ueberschrift „aus 10
-       * gespielten Spieltagen" sie beglaubigte. Ursache sind wieder die beschnittenen
-       * `disciplineResults` unten — ueber sie faellt auch der Punkte-Ledger auf einen Spieltag
-       * zurueck.
-       */
-      foundationRecordBook: projiziereRekordbuch(gameState),
-      /**
-       * Und dieselbe Ursache ein Stockwerk weiter: die erweiterten Meilensteine messen ueber
-       * mehrere Spieltage („Top 5 in allen vier Bereichen", „drei Spieltage in Folge Top 3")
-       * und sahen im Browser nur einen — gemessen „0 von 4 Bereichen" statt 2 und „0 von 3"
-       * statt 2. Die Bilanz faehrt fuer ALLE Teams mit, weil der Reiter gegen das jeweils
-       * aktive Managerteam misst und das ohne neue Auslieferung wechseln kann.
-       */
-      foundationDisciplineTally: projiziereDisziplinBilanz(gameState),
-      /**
-       * Zwillingsschwester von `foundationFormCardBonus`: die trug den NENNWERT der Formkarten,
-       * diese die WIRKUNG (`formModifier`) — die `(+x)` hinter jedem PP-Bereichswert im
-       * Saisonstand, an der auch die Sortierung der Spalte „Form" haengt. Sie stand am selben
-       * beschnittenen Payload, war aber nie mitrepariert worden. Gemessen: voll 32 von 32 Teams
-       * mit Bilanz, kompakt 14 — Wicked Wizards 181,8 -> 69,6, Nunchuck Ninjas sogar 133,6 ->
-       * 184,3. Siehe `foundation-pp-area-form-bonus-projection`.
-       */
-      foundationPpAreaFormBonus: projizierePpAreaFormBonus(gameState),
       standingsApplyLogs: undefined,
       /**
        * FAEHRT VOLLSTAENDIG MIT — die Beschneidung ist ERSATZLOS ENTFALLEN.
@@ -221,10 +212,20 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * Rechnungen wieder von selbst stimmt, statt einzeln durch eine Projektion abgesichert
        * werden zu muessen. Der Handel ist eindeutig.
        *
-       * Die Projektionen darueber bleiben vorerst stehen und sind damit wirkungslos: ihre Leser
-       * entscheiden den Vorrang je Spieltag an der Deckung, und die liegt jetzt immer beim
-       * Spielstand selbst. Sie kosten zusammen 22 KB und sind der naechste Aufraeumschritt —
-       * bewusst getrennt, damit dieser Schnitt hier fuer sich geprueft werden kann.
+       * DIE FUENF PROJEKTIONEN DAZU SIND ERSATZLOS ENTFERNT (foundationMatchdayPoints,
+       * foundationRecordBook, foundationDisciplineTally, foundationPpAreaFormBonus,
+       * foundationFormCardBonus). Nachgewiesen, nicht angenommen: an beiden aktiven Spielstaenden
+       * (S2/MD10 mit 640 Disziplin-Zeilen und 320 Aufstellungen, S1/MD2 mit 64/63) liefert jeder
+       * ihrer Leser mit und ohne Projektion Zeichen fuer Zeichen dasselbe Ergebnis — und dasselbe
+       * wie der Server auf dem vollen Spielstand.
+       *
+       * Weg mussten sie nicht nur wegen der 22 KB. `buildSeasonFormCardBonusByTeamId` gab der
+       * Projektion BEDINGUNGSLOS Vorrang (`if (projektion && projektion.seasonId === seasonId)
+       * return …`) — kein Deckungsvergleich, kein Zurueckfallen. Die Projektion entsteht beim
+       * LADEN; wer waehrend der Sitzung eine Formkarte legte, rechnete danach gegen einen
+       * veralteten Stand, bis er neu lud. Eine zweite Rechenstelle fuer dieselbe Zahl, die den
+       * frischeren Wert ueberstimmt — genau die Fehlerklasse, gegen die die Projektionen einmal
+       * gebaut wurden.
        */
       disciplineResults: gameState.seasonState.disciplineResults ?? [],
       /**
@@ -322,10 +323,9 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       ...incoming.seasonState,
       persistedSeasonDerivations:
         incoming.seasonState.persistedSeasonDerivations ?? existing.seasonState.persistedSeasonDerivations,
-      // Append-only archives: the compact client re-stamps an empty sentinel `[]`,
-      // which the old `incoming ?? existing` guard let clobber the durable DB
-      // archive (wiping every prior-season snapshot). Only accept incoming when it
-      // is at least as long as the persisted copy (see preserveAppendOnlyArchive).
+      // Append-only-Archive: der kompakte Client stempelt eine leere Liste `[]` an diese
+      // Stelle. Die Wache haelt jeden vorhandenen Eintrag unveraendert fest und laesst nur
+      // NEUE hinzukommen — siehe `preserveAppendOnlyArchive`.
       seasonSnapshots: preserveAppendOnlyArchive(
         incoming.seasonState.seasonSnapshots,
         existing.seasonState.seasonSnapshots,
@@ -341,11 +341,21 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       // Dieselbe Regel wie die Saison-Historie darueber: reine Anzeigefracht, faehrt nur
       // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
       foundationFieldRace: undefined,
-      foundationFormCardBonus: undefined,
-      foundationMatchdayPoints: undefined,
-      foundationRecordBook: undefined,
-      foundationDisciplineTally: undefined,
-      foundationPpAreaFormBonus: undefined,
+      /**
+       * DIE FUENF ENTFERNTEN PROJEKTIONEN WERDEN HIER WEITER AUSGERAEUMT — und das ist kein
+       * Ueberbleibsel, sondern Absicht: ein Browser-Tab, der noch die alte Auslieferung im
+       * Speicher hat, schickt sie beim naechsten Speichern zurueck. Ohne diese Zeilen landeten
+       * sie dauerhaft im Spielstand und waeren ab dann eine zweite, nie wieder aufgefrischte
+       * Wahrheit. Die Felder selbst sind aus dem Typ verschwunden, deshalb der Umweg ueber
+       * `undefined` auf einem aufgeweiteten Objekt.
+       */
+      ...({
+        foundationFormCardBonus: undefined,
+        foundationMatchdayPoints: undefined,
+        foundationRecordBook: undefined,
+        foundationDisciplineTally: undefined,
+        foundationPpAreaFormBonus: undefined,
+      } as Record<string, undefined>),
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

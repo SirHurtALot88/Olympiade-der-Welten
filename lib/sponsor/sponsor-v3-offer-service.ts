@@ -188,6 +188,52 @@ export function resetSponsorV3PrizeCurveCache(): void {
 
 const RARITY_FALLBACK: SponsorRarity = "magisch";
 
+/**
+ * DER RARITÄTS-WERTFAKTOR EINER KARTE — die eine Stelle, die "Rarität wirkt genau einmal" ausdrueckt.
+ *
+ * Eine Gebaeude-Karte traegt ihre Rarität im KURS (`Verzicht = Leihwert / Kurs`) und startet deshalb
+ * auf dem untersten Faktor; eine reine Cash-Karte traegt sie in der HOEHE der Leiter. Die Regel stand
+ * bis hierher an zwei Stellen woertlich gleich (Unterschrift und Saisonwechsel) — genau die Bauart
+ * "zwei Rechenstellen fuer dieselbe Zahl". Sie steht jetzt einmal.
+ */
+export function sponsorV3WertFaktorFuerKarte(input: { rarity: string; leihVerzicht?: number | null }): number {
+  return (input.leihVerzicht ?? 0) > 0
+    ? SPONSOR_V3_WERT_BY_RARITY["gewöhnlich"]
+    : sponsorV3WertFaktorFor(input.rarity);
+}
+
+/**
+ * DER SOCKEL, DEN DIESE KARTE WIRKLICH HAT.
+ *
+ * `sponsorSockelFuerStartrang` liefert den NACKTEN Liga-Sockel des Startrangs. Die eingefrorene
+ * Leiter eines Vertrags steht aber nie darauf: sie ist mit dem Raritaets-Wertfaktor skaliert und um
+ * den Gebaeude-Verzicht abgesenkt (siehe `buildSponsorV3Terms` und `rerollSponsorV3TermsForNewSeason`
+ * — beide bauen Leiter UND Netz `floor` nach genau dieser Formel).
+ *
+ * Wer den nackten Sockel gegen `terms.anchor` haelt, vergleicht zwei verschiedene Waehrungen. GEMESSEN
+ * ueber die 160 Angebote des Live-Abbilds vom 11.08.2026: Ø 9,76 C Abweichung, groesste 30,2 C
+ * (gewoehnliche Gebaeude-Karte, Verzicht 25,4, Startrang 23 — nackter Sockel 43,2, echter 13,1).
+ *
+ * `anchor − sockel` ist damit EXAKT der Wertungsanteil, den `getSponsorTermMultiplier` in den
+ * Folgesaisons zusammenschrumpfen laesst — nachgemessen ueber alle 160 Angebote eines frischen
+ * Spielstands gegen `rerollSponsorV3TermsForNewSeason` selbst: Abweichung 0 (siehe
+ * tests/sponsor-ki-laufzeit-sockel.test.ts).
+ *
+ * BEWUSST NICHT AUF 0 GEKLAMMERT. Bei einer grossen Leihe auf einem vorderen Startrang kann der
+ * Verzicht den skalierten Sockel uebersteigen (gemessen: 5 von 160 Angeboten, tiefster Wert −3,5 C).
+ * Genau dort greift dann `terms.floor` und haelt die Leiter unten — aber der Drehpunkt der EROSION
+ * bleibt der ungeklammerte Wert; ein Clamp hier machte den Wertungsanteil zu klein und damit den
+ * gerechneten Erosionsverlust zu gering (gemessen: bis 0,21 C daneben). Wer den Sockel als GELD
+ * lesen will (Versicherungswert), klammert an seiner eigenen Stelle.
+ */
+export function sponsorV3EingefrorenerSockel(
+  terms: Pick<SponsorV3ContractTerms, "startRank" | "rarity" | "leihVerzicht">,
+): number {
+  const wertFaktor = sponsorV3WertFaktorFuerKarte(terms);
+  const verzicht = Math.max(0, terms.leihVerzicht ?? 0);
+  return sponsorSockelFuerStartrang(terms.startRank) * wertFaktor - verzicht;
+}
+
 export function buildSponsorV3Terms(input: {
   gameState: GameState;
   offer: SponsorOffer;
@@ -252,7 +298,7 @@ export function buildSponsorV3Terms(input: {
   // nieder; eine Cash-Karte startet dort ebenfalls und ihre Rarität hebt die Leiter. Damit ist eine
   // Cash-Karte derselben Rarität nie schlechter als eine Gebäude-Karte, und der Unterschied zwischen
   // ihnen ist genau das, was man dafuer bekommt.
-  const wertFaktor = (input.leihVerzicht ?? 0) > 0 ? SPONSOR_V3_WERT_BY_RARITY["gewöhnlich"] : sponsorV3WertFaktorFor(rarity);
+  const wertFaktor = sponsorV3WertFaktorFuerKarte({ rarity, leihVerzicht: input.leihVerzicht });
   const baseLadder = sponsorKurvenLeiter({
     shape: input.curveShape,
     startRank: input.startRank,
@@ -353,14 +399,26 @@ export function rerollSponsorV3TermsForNewSeason(
     ) {
       return terms;
     }
+    // `terms.baseLadder ?? []` WAR HIER EINE WACHE, DIE NICHT WACHT: eine leere Liste ist nicht
+    // nullish, und selbst wenn sie es waere, machte `?? []` aus einer fehlenden Leiter eine leere.
+    // Skaliert man die, kommt `[]` heraus, `sponsorV3Anchor([], …)` liefert 0 — und der Vertrag
+    // traegt danach eine Leiter ohne Sprossen und einen Anker von 0. `getSponsorV3Terms` erkennt so
+    // ein Objekt spaeter nicht mehr als V3-Konditionen an; der Vertrag faellt beim Abrechnen still
+    // auf die nachgebaute Benchmark zurueck, und das Team bekommt eine ganz andere Zahl als auf
+    // seiner Karte steht. Dieser Zweig laeuft NUR beim Saisonwechsel und NUR fuer Altvertraege — er
+    // wird also von keinem gewoehnlichen Spieldurchlauf beruehrt. Passiert etwas hier, bleibt die
+    // eingefrorene Leiter stehen, statt sie durch eine leere zu ersetzen.
+    if (terms.baseLadder?.length !== 32 || terms.rankLadder?.length !== 32) {
+      return terms;
+    }
     const altSockel = sponsorSockelFuerStartrang(terms.startRank);
     const skala = input.newSalaryFactor / alterFaktor;
     const skaliere = (leiter: number[]) => leiter.map((wert) => altSockel + (wert - altSockel) * skala);
-    const skalierteBasis = skaliere(terms.baseLadder ?? []);
+    const skalierteBasis = skaliere(terms.baseLadder);
     return {
       ...terms,
       baseLadder: skalierteBasis,
-      rankLadder: skaliere(terms.rankLadder ?? []),
+      rankLadder: skaliere(terms.rankLadder),
       anchor: sponsorV3Anchor(skalierteBasis, sponsorV3AnchorWeights(terms.startRank)),
       salaryFactor: input.newSalaryFactor,
     };
@@ -368,8 +426,7 @@ export function rerollSponsorV3TermsForNewSeason(
   // Wertfaktor und Sockel muessen beim Neubau DIESELBEN sein wie bei der Unterschrift, sonst
   // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit — und die
   // Einmal-Regel (Rarität wirkt als Hoehe ODER als Kurs, nie beides) gilt hier genauso.
-  const wertFaktor =
-    (terms.leihVerzicht ?? 0) > 0 ? SPONSOR_V3_WERT_BY_RARITY["gewöhnlich"] : sponsorV3WertFaktorFor(terms.rarity);
+  const wertFaktor = sponsorV3WertFaktorFuerKarte(terms);
   const sockel = sponsorSockelFuerStartrang(terms.startRank) * wertFaktor;
   const newBaseLadderRaw = sponsorKurvenLeiter({
     shape: terms.curveShape,

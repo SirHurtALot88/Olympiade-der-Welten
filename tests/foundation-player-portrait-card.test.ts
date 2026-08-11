@@ -181,7 +181,12 @@ describe("foundation player portrait preview ui contract", () => {
 
     const [previewText, foundationText, teamsText, marketText] = await Promise.all([
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
+      // AUDIT 11.08.2026: hier stand `app/foundation/FoundationShellRouterBody.tsx`. Die
+      // Spieler-Tabelle ist laengst in den Shell-Router-Hook gewandert
+      // (`lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx`), die alte Datei
+      // enthaelt seit Commit c579624a keine einzige Erwaehnung mehr — der Fall war seither
+      // dauerhaft rot. Geprueft wird jetzt die Datei, in der die Vorschau wirklich haengt.
+      fs.readFile(path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
       // TransfermarktV2Client.tsx ist ein dünner Wrapper — das Markt-Markup liegt im NewLook.
       fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2NewLook.tsx"), "utf8"),

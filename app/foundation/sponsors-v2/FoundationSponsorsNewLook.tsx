@@ -30,6 +30,7 @@ import {
   sortLeagueSponsorRows,
   type LeagueSponsorSort,
 } from "@/lib/sponsor/sponsor-offer-presenter";
+import { readContractRankPayoutLadder } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
   getTeamDisplaySalaryTotal,
@@ -729,7 +730,14 @@ export default function FoundationSponsorsNewLook({
     // zusaetzlich als Textzeile zu wiederholen.
     const baseRow = settlementRows.find((entry) => entry.kind === "base") ?? null;
     const otherRows = settlementRows.filter((entry) => entry.kind !== "base" && entry.kind !== "rank");
-    const rankLadder = contract?.lockedRankPayoutLadder ?? null;
+    // `contract?.lockedRankPayoutLadder ?? null` REICHTE HIER NICHT: `buildOfferRankPayoutLadderPreview`
+    // liefert `[]`, wenn ein Angebot keine V3-Konditionen traegt, und `sponsor-offer-service.ts` friert
+    // genau dieses `[]` im Vertrag ein. `[]` ist nicht nullish — der `null`-Zweig war toter Code, und
+    // weiter unten entschied `leagueDetail.rankLadder ? …` auf eine WAHRE leere Liste. Ergebnis: das
+    // Fenster oeffnete den Zusammensetzungs-Block und zeigte darin nichts, statt zuzugeben, dass es die
+    // Leiter nicht kennt ("Für diesen Vertrag liegt keine Auszahlungs-Aufschlüsselung vor").
+    // `readContractRankPayoutLadder` beantwortet beide Faelle gleich.
+    const rankLadder = readContractRankPayoutLadder(contract);
     const baseCash = contract?.components.find((entry) => entry.kind === "base")?.rewardCash ?? 0;
     return { row, contract, baseRow, otherRows, rankLadder, baseCash };
   }, [leagueDetailTeamId, leagueSponsorRows, gameState]);

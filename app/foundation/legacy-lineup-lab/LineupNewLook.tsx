@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEven
 import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-board-props";
 import type { LineupRosterShortfall } from "@/lib/lineups/lineup-roster-shortfall";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
   FATIGUE_HIGH,
@@ -294,7 +295,7 @@ function NlPlayerAvatar({
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const initials = name.slice(0, 2).toUpperCase();
+  const initials = getPlayerPortraitInitials(name);
   const showImg = Boolean(portraitUrl) && !failed;
   return (
     <span
@@ -345,7 +346,7 @@ function wrapNlPortraitPreview(node: ReactNode, player: NlPortraitPlayer, disabl
       playerId={player.id}
       name={player.name}
       portraitUrl={player.portraitUrl}
-      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      portraitInitials={getPlayerPortraitInitials(player.name)}
       playerOvr={player.playerOvr ?? null}
       playerMvs={null}
       playerPps={player.playerPps}

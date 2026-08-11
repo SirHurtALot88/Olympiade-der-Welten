@@ -15,7 +15,7 @@ import type { CSSProperties } from "react";
 
 import type { GameInboxItem, GameState, Player, Team, TeamControlSettings, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { AI_PRESEASON_RUN_STALE_MS } from "@/lib/ai/ai-preseason-run-timing";
-import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitInitials, getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import {
   DEFAULT_ACTIVE_OWNER_ID,
   withNormalizedTeamControlSettings,
@@ -909,6 +909,10 @@ export const trainingModeConfigs: Record<
 export function getPlayerPortraitModel(player: Pick<Player, "id" | "name" | "portraitUrl" | "portraitPath">) {
   return getPlayerPortraitMediaModel(player);
 }
+
+// Dasselbe Kuerzel wie im Portrait-Modell, fuer die Faelle OHNE Spieler-Objekt (eine Zeile
+// kennt nur einen Namen). Nur durchgereicht — es gibt genau eine Regel, in `mediaAssets.ts`.
+export { getPlayerPortraitInitials };
 
 export const TEAM_ROSTER_PORTRAIT_LOADING = {
   loading: "lazy",

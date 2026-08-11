@@ -11,6 +11,7 @@ import type {
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
 import { buildSeasonRecap } from "@/lib/foundation/season-recap-service";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
@@ -1263,7 +1264,17 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     );
   }
 
-  const latestCompletedSnapshot = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
+  /**
+   * ÜBER `leseSaisonSchnappschuesse`, NICHT ÜBER `seasonSnapshots ?? []`.
+   *
+   * Die Inbox läuft im Browser (`useFoundationGameInboxItems`), und dort ist `seasonSnapshots`
+   * hinter dem Sentinel IMMER eine leere Liste — `?? []` greift daran nicht. Die Champion-Karte
+   * konnte deshalb nie entstehen. Nachgeladen wird das volle Archiv nur in ausgewählten Ansichten
+   * (`use-season-archive-load`), und Home/Cockpit — wo die Inbox sitzt — gehören nicht dazu.
+   * Am Live-Abbild gemessen: voll 261 Inbox-Karten, im Browser 224; es fehlten genau die eine
+   * `champion_news` und 36 `story:season_recap`.
+   */
+  const latestCompletedSnapshot = [...leseSaisonSchnappschuesse(input.gameState)]
     .reverse()
     .find((snapshot) => snapshot.status === "completed");
   const champion = latestCompletedSnapshot?.finalStandings?.find((row) => row.rank === 1);

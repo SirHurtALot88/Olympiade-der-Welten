@@ -13,10 +13,10 @@
  * SEITHER: die Beschneidung von `disciplineResults` ist ersatzlos entfallen — am Live-Save trug
  * sie 245 KB zur Ersparnis bei und war damit den Preis nicht wert (Herleitung samt Messung steht
  * in `compactFoundationInitialGameState`). Der Browser hat die Zeilen jetzt selbst, also rechnet
- * er aus EIGENER KRAFT richtig; die Projektion `foundationRecordBook` faehrt zwar noch mit, ihr
- * Leser gibt aber dem Spielstand den Vorrang, sobald der die Spieltage deckt — und das tut er
- * jetzt immer. Der Fall, der frueher „ohne Projektion rechnet derselbe Stand nachweislich falsch"
- * hiess, prueft deshalb unten die umgekehrte Aussage.
+ * er aus EIGENER KRAFT richtig. Die Projektionen `foundationRecordBook`/`foundationDisciplineTally`
+ * sind daraufhin ERSATZLOS ENTFERNT; dieser Test haelt fest, dass der Eigenbau auf dem kompakten
+ * Payload dieselben Zahlen liefert wie auf dem vollen Spielstand — er ist damit die Gegenprobe zur
+ * Entfernung.
  *
  * DIESER TEST PRUEFT WERTE, KEINE QUELLTEXT-ZEILEN, und er laeuft wirklich durch den kompakten
  * Payload: derselbe Spielstand einmal voll und einmal durch `compactFoundationInitialGameState`
@@ -32,7 +32,6 @@ import {
   compactFoundationInitialGameState,
   rehydrateGameStateAfterCompactPut,
 } from "@/lib/persistence/foundation-initial-compact-state";
-import { leseRekordbuch } from "@/lib/persistence/foundation-record-book-projection";
 
 type Eingabe = {
   matchday: number;
@@ -181,8 +180,8 @@ describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
   });
 
   it("das Rekordbuch zeigt im Browser dieselben Werte wie auf dem Server", () => {
-    const server = leseRekordbuch(voll);
-    const browser = leseRekordbuch(kompakt);
+    const server = buildLeagueRecordBook(voll);
+    const browser = buildLeagueRecordBook(kompakt);
 
     expect(alsPaare(server)).toEqual({
       "best-single-performance": "200,0 · Spieler p1",
@@ -197,7 +196,7 @@ describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
     expect(browser.matchdaysPlayed).toBe(3);
   });
 
-  it("auch ohne Projektion rechnet derselbe Browser-Stand aus eigener Kraft richtig", () => {
+  it("der Browser-Stand rechnet ohne jede Projektion aus eigener Kraft richtig", () => {
     /**
      * FRUEHER HIESS DIESER FALL „ohne Projektion rechnet derselbe Browser-Stand nachweislich
      * falsch" und hielt genau das fest: der Eigenbau auf dem beschnittenen Payload lieferte
@@ -205,11 +204,13 @@ describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
      * und „+20,0 · Team A" statt „+90,0 · Team B" — also drei plausible falsche Zahlen, keine
      * leeren Felder. Dafuer wurde `foundationRecordBook` gebaut.
      *
-     * Die Praemisse ist weg: `disciplineResults` fahren vollstaendig mit. Damit ist der
-     * Eigenbau nicht mehr das Gegenbeispiel, sondern der Beweis — der Browser braucht die
-     * Projektion nicht mehr, um auf die Serverwerte zu kommen. Genau das steht hier jetzt,
-     * mit denselben ausgeschriebenen Zahlen wie im Fall darueber.
+     * Die Praemisse ist weg: `disciplineResults` fahren vollstaendig mit, und die Projektion
+     * ist entfernt. Was hier steht, ist deshalb die Gegenprobe zur Entfernung: der kompakte
+     * Payload traegt KEIN `foundationRecordBook` mehr und kommt trotzdem auf die Serverwerte.
      */
+    expect((kompakt.seasonState as Record<string, unknown>).foundationRecordBook).toBeUndefined();
+    expect((kompakt.seasonState as Record<string, unknown>).foundationDisciplineTally).toBeUndefined();
+
     const ohneProjektion = buildLeagueRecordBook(kompakt);
     expect(alsPaare(ohneProjektion)["best-single-performance"]).toBe("200,0 · Spieler p1");
     expect(alsPaare(ohneProjektion)["best-team-discipline"]).toBe("200,0 · Team A");
@@ -246,12 +247,29 @@ describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
     expect(disziplinNah(kompakt)).toEqual(disziplinNah(voll));
   });
 
-  it("die Projektionen sind reine Anzeigefracht und fallen beim Zurueckschreiben raus", () => {
-    expect(kompakt.seasonState.foundationRecordBook).toBeTruthy();
-    expect(kompakt.seasonState.foundationDisciplineTally).toBeTruthy();
+  it("ein alter Browser-Tab kann die entfernten Projektionen nicht in den Spielstand schreiben", () => {
+    /**
+     * Wer die alte Auslieferung noch im Speicher hat, schickt die Felder beim naechsten
+     * Speichern zurueck. Sie duerfen im Spielstand nicht landen — dort waeren sie eine zweite,
+     * nie wieder aufgefrischte Wahrheit.
+     */
+    const altesTab = {
+      ...kompakt,
+      seasonState: {
+        ...kompakt.seasonState,
+        foundationRecordBook: { seasonId: "s1", spieltagsSuperlative: [], serien: [], matchdaysPlayed: 99 },
+        foundationDisciplineTally: { seasonId: "s1", matchdaysPlayed: 99, byTeamId: {} },
+        foundationMatchdayPoints: { seasonId: "s1", matchdays: [] },
+        foundationPpAreaFormBonus: { seasonId: "s1", matchdays: [] },
+        foundationFormCardBonus: { seasonId: "s1", byTeamId: {}, unusedCardIds: [] },
+      },
+    } as unknown as GameState;
 
-    const zurueck = rehydrateGameStateAfterCompactPut(voll, kompakt);
-    expect(zurueck.seasonState.foundationRecordBook).toBeUndefined();
-    expect(zurueck.seasonState.foundationDisciplineTally).toBeUndefined();
+    const zurueck = rehydrateGameStateAfterCompactPut(voll, altesTab).seasonState as Record<string, unknown>;
+    expect(zurueck.foundationRecordBook).toBeUndefined();
+    expect(zurueck.foundationDisciplineTally).toBeUndefined();
+    expect(zurueck.foundationMatchdayPoints).toBeUndefined();
+    expect(zurueck.foundationPpAreaFormBonus).toBeUndefined();
+    expect(zurueck.foundationFormCardBonus).toBeUndefined();
   });
 });

@@ -22,9 +22,10 @@
  * bleiben". Auf dem Server stimmt das, im Browser seit dem kompakten Payload nicht mehr — der
  * beschneidet sie auf den aktiven Spieltag. Alles, was über MEHRERE Spieltage misst, sah damit
  * nur einen: gemessen am Live-Save meldete „Breit aufgestellt" 0 statt 2 von 4 Bereichen und
- * „Lauf" eine längste Serie von 0 statt 2. Die Disziplin-Kennzahlen kommen deshalb jetzt aus
- * `leseDisziplinBilanz` — selbst gerechnet, wo der Stand die Spieltage trägt, sonst aus der
- * serverseitigen Projektion (`foundation-discipline-tally-projection`).
+ * „Lauf" eine längste Serie von 0 statt 2. Dagegen fuhr eine Zeit lang die fertige Bilanz als
+ * Projektion mit (`foundationDisciplineTally`); seit `8ec6454b` fahren die `disciplineResults`
+ * selbst wieder vollständig mit, die Projektion war danach nachgemessen wirkungslos und ist
+ * entfernt. Gerechnet wird wieder an genau einer Stelle: `buildSeasonDisciplineTallyByTeamId`.
  *
  * BEWUSST KEIN PREISGELD. Preisgeld wird in diesem Spiel nie ausgezahlt, es ist ausschliesslich
  * Benchmark — ein Meilenstein darauf wäre ein Ziel, das kein Geld bewegt. Gewertet werden
@@ -34,11 +35,11 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import type { NlTone } from "@/components/foundation/new-look/nl-tones";
 import { buildLeagueSeasonAwards } from "@/lib/foundation/league-season-awards";
 import {
+  buildSeasonDisciplineTallyByTeamId,
   laengsteSpieltagsSerie,
   leereDisziplinBilanz,
   spieltagNummerAusId,
 } from "@/lib/foundation/season-discipline-tally";
-import { leseDisziplinBilanz } from "@/lib/persistence/foundation-discipline-tally-projection";
 
 export type ExtendedAchievement = {
   id: string;
@@ -72,11 +73,11 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
   );
 
   /**
-   * Die Disziplin-Kennzahlen kommen NICHT mehr direkt aus `gameState.seasonState.disciplineResults`
-   * — die trägt der Browser nur für den aktiven Spieltag. `leseDisziplinBilanz` entscheidet an
-   * der Abdeckung, ob der vorliegende Stand reicht oder die serverseitige Projektion gilt.
+   * Die Disziplin-Kennzahlen entstehen aus `gameState.seasonState.disciplineResults` — und die
+   * müssen dafür VOLLSTÄNDIG vorliegen, auch im Browser. Solange die Anfangsladung sie auf den
+   * aktiven Spieltag beschnitt, war jede Kennzahl über mehrere Spieltage zu klein (siehe Kopf).
    */
-  const disziplinBilanz = leseDisziplinBilanz(gameState).get(teamId) ?? leereDisziplinBilanz(teamId);
+  const disziplinBilanz = buildSeasonDisciplineTallyByTeamId(gameState).get(teamId) ?? leereDisziplinBilanz(teamId);
   const disziplinName = new Map((gameState.disciplines ?? []).map((d) => [d.id, d.name] as const));
 
   const ergebnisse: ExtendedAchievement[] = [];

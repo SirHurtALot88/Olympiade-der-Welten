@@ -1,91 +1,20 @@
-export type ArenaRankTier = "elite" | "strong" | "mid" | "weak" | "poor" | "unknown";
+/**
+ * ARENA-STAT-VISUALS — Einfaerbung und Noten fuer Kernwerte. Keine Buchung, keine Rechnung,
+ * die in den Spielstand geht.
+ *
+ * Hier stand bis zum Audit vom 11.08.2026 eine zweite Haelfte: `ArenaRankTier`,
+ * `getArenaRankPercentile`, `getArenaRankTierFromPercentile`, `getArenaRankTier`,
+ * `resolveArenaRankPoolSize`, `buildArenaRankPoolSizes`, `resolveArenaEntryRankPools`,
+ * `getArenaFocusEntryCardTier` samt `ARENA_RANK_TIER_TOP_SHARE`. Ueber alle
+ * .ts/.tsx/.js/.mjs/.json des Repos nachgezaehlt: 0 Aufrufer ausserhalb der eigenen
+ * Testdatei. Geloescht statt konserviert — toter Code mit eigener Rangrechnung ist eine
+ * Einladung, die Raenge ein zweites Mal (und anders) zu rechnen als die Engine.
+ *
+ * Lebendig sind nur noch die beiden Funktionen unten; ihre Aufrufer sind
+ * `components/foundation/velo-ui/VeloStatOrbitChip.tsx` und `VeloAxisRail.tsx`.
+ */
+
 export type ArenaAxisValueTier = "high" | "good" | "mid" | "low" | "muted";
-
-/** Top-share cutoffs — intentionally wide so colors track relative strength, not fixed ranks. */
-export const ARENA_RANK_TIER_TOP_SHARE = {
-  elite: 0.125,
-  strong: 0.325,
-  mid: 0.575,
-  weak: 0.825,
-} as const;
-
-export type ArenaRankPoolContext = {
-  slotPoolSize: number;
-  totalPoolSize: number;
-};
-
-export type ArenaRankPoolState = {
-  slotPoolSizeByIndex: Map<number, number>;
-  totalPoolSize: number;
-  slotPoolFallback: number;
-  totalPoolFallback: number;
-};
-
-export function getArenaRankPercentile(rank: number, poolSize: number) {
-  const pool = Math.max(poolSize, 1);
-  return rank / pool;
-}
-
-export function getArenaRankTierFromPercentile(percentile: number): ArenaRankTier {
-  if (!Number.isFinite(percentile) || percentile <= 0) {
-    return "unknown";
-  }
-  if (percentile <= ARENA_RANK_TIER_TOP_SHARE.elite) return "elite";
-  if (percentile <= ARENA_RANK_TIER_TOP_SHARE.strong) return "strong";
-  if (percentile <= ARENA_RANK_TIER_TOP_SHARE.mid) return "mid";
-  if (percentile <= ARENA_RANK_TIER_TOP_SHARE.weak) return "weak";
-  return "poor";
-}
-
-export function getArenaRankTier(
-  rank: number | null | undefined,
-  poolSize: number | null | undefined,
-): ArenaRankTier {
-  if (rank == null || !Number.isFinite(rank) || rank <= 0) {
-    return "unknown";
-  }
-  const pool = poolSize != null && Number.isFinite(poolSize) && poolSize > 0 ? poolSize : 32;
-  return getArenaRankTierFromPercentile(getArenaRankPercentile(rank, pool));
-}
-
-export function resolveArenaRankPoolSize(
-  actualCount: number | null | undefined,
-  configuredFallback: number,
-): number {
-  if (actualCount != null && Number.isFinite(actualCount) && actualCount > 0) {
-    return actualCount;
-  }
-  return Math.max(configuredFallback, 1);
-}
-
-export function buildArenaRankPoolSizes(
-  candidates: Array<{ slotIndex: number; baseScore: number | null }>,
-): Pick<ArenaRankPoolState, "slotPoolSizeByIndex" | "totalPoolSize"> {
-  const valid = candidates.filter(
-    (candidate) => candidate.baseScore != null && Number.isFinite(candidate.baseScore),
-  );
-  const slotPoolSizeByIndex = new Map<number, number>();
-  for (const slotIndex of new Set(valid.map((candidate) => candidate.slotIndex))) {
-    slotPoolSizeByIndex.set(
-      slotIndex,
-      valid.filter((candidate) => candidate.slotIndex === slotIndex).length,
-    );
-  }
-  return {
-    slotPoolSizeByIndex,
-    totalPoolSize: valid.length,
-  };
-}
-
-export function resolveArenaEntryRankPools(
-  slotIndex: number,
-  state: ArenaRankPoolState,
-): ArenaRankPoolContext {
-  return {
-    slotPoolSize: resolveArenaRankPoolSize(state.slotPoolSizeByIndex.get(slotIndex), state.slotPoolFallback),
-    totalPoolSize: resolveArenaRankPoolSize(state.totalPoolSize, state.totalPoolFallback),
-  };
-}
 
 /**
  * MEASURED per-axis core-stat distribution (POW/SPE/MEN/SOC pooled) from the real
@@ -134,34 +63,4 @@ export function getCoreStatGrade(value: number | null | undefined): CoreStatGrad
   if (value >= 30) return "C";
   if (value >= 20) return "D";
   return "F";
-}
-
-export type ArenaRankFields = {
-  rankInSlotBase: number | null;
-  rankTotalBase: number | null;
-  rankInSlotBoosted: number | null;
-  rankTotalBoosted: number | null;
-};
-
-export function getArenaFocusEntryCardTier(
-  entry: ArenaRankFields,
-  pools: ArenaRankPoolContext,
-): ArenaRankTier {
-  const percentiles: number[] = [];
-  if (entry.rankInSlotBoosted != null && Number.isFinite(entry.rankInSlotBoosted) && entry.rankInSlotBoosted > 0) {
-    percentiles.push(getArenaRankPercentile(entry.rankInSlotBoosted, pools.slotPoolSize));
-  }
-  if (entry.rankTotalBoosted != null && Number.isFinite(entry.rankTotalBoosted) && entry.rankTotalBoosted > 0) {
-    percentiles.push(getArenaRankPercentile(entry.rankTotalBoosted, pools.totalPoolSize));
-  }
-  if (entry.rankInSlotBase != null && Number.isFinite(entry.rankInSlotBase) && entry.rankInSlotBase > 0) {
-    percentiles.push(getArenaRankPercentile(entry.rankInSlotBase, pools.slotPoolSize));
-  }
-  if (entry.rankTotalBase != null && Number.isFinite(entry.rankTotalBase) && entry.rankTotalBase > 0) {
-    percentiles.push(getArenaRankPercentile(entry.rankTotalBase, pools.totalPoolSize));
-  }
-  if (percentiles.length === 0) {
-    return "unknown";
-  }
-  return getArenaRankTierFromPercentile(Math.min(...percentiles));
 }

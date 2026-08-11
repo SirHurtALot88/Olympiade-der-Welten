@@ -119,19 +119,27 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     }
   });
 
-  it("(b) facility income is on the income side; only PAID upkeep is charged (symmetry)", () => {
-    // Plenty of cash → the fan_shop upkeep (0.8) is actually paid.
+  /**
+   * NACHGEZOGEN AM 11.08.2026 (Finanz-Audit). Dieser Test verlangte bis dahin, dass ein Team ohne
+   * Cash den Gebäude-Unterhalt NICHT zahlt („will_disable_unpaid"). Diese Regel gibt es in der
+   * Buchung nicht mehr: `facility-season-end-service.buildRows` bucht den Unterhalt inzwischen
+   * IMMER ab und lässt das Cash notfalls ins Minus laufen — der Notkredit-Backstop fängt es danach
+   * auf („Unterhalt ist PFLICHT und kann nicht umgangen werden"). Der Nachbau im Finanzen-Reiter
+   * hing noch an der alten Regel und zeigte klammen Teams zu geringe Ausgaben; am aktiven
+   * Spielstand (`new-game-1786465783606-0kalpx`) traf das 3 von 32 Teams (Project Suicide: 0,0
+   * statt 1,8 C). Die Symmetrie-Aussage bleibt: Einnahme UND Unterhalt stehen beide da.
+   */
+  it("(b) facility income is on the income side; upkeep is charged even when cash is short", () => {
     const richModel = buildFinancesViewModel(buildGameState({ teamCash: 200, salary: 20 }), "team-1");
     if (richModel.status !== "ready") throw new Error("expected ready");
     expect(richModel.team.income.facilityIncome?.total).toBe(7.8);
     expect(richModel.team.expenses.facilityUpkeep.total).toBe(0.8);
 
-    // Effectively no cash → upkeep can no longer be paid, but the income is still collected.
-    // This is the asymmetry the old model got wrong (income missing, gross upkeep charged).
+    // Kein Cash → der Unterhalt geht trotzdem ab, genau wie in der echten Season-End-Buchung.
     const brokeModel = buildFinancesViewModel(buildGameState({ teamCash: -50, salary: 20 }), "team-1");
     if (brokeModel.status !== "ready") throw new Error("expected ready");
     expect(brokeModel.team.income.facilityIncome?.total).toBe(7.8);
-    expect(brokeModel.team.expenses.facilityUpkeep.total).toBe(0);
+    expect(brokeModel.team.expenses.facilityUpkeep.total).toBe(0.8);
   });
 
   it("(c) salary source is contract.salary (settlement field), not expectedSalary", () => {

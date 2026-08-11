@@ -52,6 +52,24 @@ export function readLockedRankPayout(ladder: number[], finalRank: number | null 
 }
 
 /**
+ * DIE EINGEFRORENE LEITER EINES VERTRAGS — oder `null`, wenn es keine gibt.
+ *
+ * `contract.lockedRankPayoutLadder` ist NICHT nur "da oder nicht da": `buildOfferRankPayoutLadderPreview`
+ * liefert `[]` fuer ein Angebot ohne V3-Konditionen, und `sponsor-offer-service.ts` friert genau
+ * dieses `[]` beim Unterschreiben im Vertrag ein. Jeder Aufrufer, der mit `?? null` gegen das Fehlen
+ * wacht, laesst die leere Liste durch — `[]` ist nicht nullish, der `null`-Zweig wird toter Code, und
+ * `readLockedRankPayout([], rang)` antwortet mit einer erfundenen 0 statt mit "weiss ich nicht".
+ *
+ * Diese Funktion ist die eine Stelle, die beide Faelle gleich beantwortet.
+ */
+export function readContractRankPayoutLadder(
+  contract: { lockedRankPayoutLadder?: number[] } | null | undefined,
+): number[] | null {
+  const ladder = contract?.lockedRankPayoutLadder;
+  return Array.isArray(ladder) && ladder.length > 0 ? ladder : null;
+}
+
+/**
  * DIE UMSCHALTSTELLE DER ANZEIGE. Diese eine Funktion liefert sowohl die in der Karte angezeigten
  * Gewinnstufen als auch die beim Unterschreiben eingefrorene Leiter — deshalb gibt es keine zweite
  * Sign-Logik daneben, die auseinanderdriften koennte.

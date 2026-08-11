@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
-import { leseSpieltagsPunkteJeSpieltag } from "@/lib/persistence/foundation-matchday-points-projection";
+import { baueSpieltagsPunkteJeSpieltag } from "@/lib/foundation/season-matchday-points";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
@@ -194,16 +194,21 @@ export function buildMatchdaySummary(
   warnings.push(...ledger.warnings);
 
   /**
-   * TAGESPUNKTE JE SPIELTAG — der Spielstand, wo er die Disziplin-Ergebnisse wirklich hat,
-   * sonst die mitgefahrene Projektion (`foundation-matchday-points-projection`).
+   * TAGESPUNKTE JE SPIELTAG, gerechnet auf dem Stand, der vorliegt.
    *
-   * Hier wurde frueher unmittelbar ueber `ledger.pointEntries` summiert. Das geht nur auf dem
-   * vollen Save auf: im Browser sind die `disciplineResults` auf den aktiven Spieltag
-   * beschnitten, und einen Spieltag ohne Disziplin-Ergebnis bucht der Ledger bewusst nicht
+   * Hier wurde frueher unmittelbar ueber `ledger.pointEntries` summiert. Das ging nur auf dem
+   * vollen Save auf: die Anfangsladung beschnitt die `disciplineResults` auf den aktiven
+   * Spieltag, und einen Spieltag ohne Disziplin-Ergebnis bucht der Ledger bewusst nicht
    * (`skipped_matchdays_without_discipline_results`). Die Summe VOR dem Spieltag war damit
    * fuer jedes Team 0 — und der „Rang vorher" fuer alle 32 Teams frei erfunden.
+   *
+   * Dagegen fuhr eine Zeit lang die fertige Antwort als Projektion mit
+   * (`foundationMatchdayPoints`). Sie ist entfernt, weil die `disciplineResults` seit `8ec6454b`
+   * wieder vollstaendig mitfahren — die Rechnung unten deckt damit von selbst alle Spieltage.
+   * Der Unterschied zwischen „bekannt und leer" und „unbekannt" bleibt erhalten; daran haengt
+   * die `missing_matchday_points`-Warnung ein paar Zeilen weiter.
    */
-  const punkteJeSpieltag = leseSpieltagsPunkteJeSpieltag(gameState, seasonId, ledger);
+  const punkteJeSpieltag = baueSpieltagsPunkteJeSpieltag(gameState, seasonId, ledger);
 
   /**
    * WELCHE SPIELTAGE MUESSEN DAFUER VORLIEGEN: jeder gewertete Spieltag der Saison bis

@@ -200,9 +200,18 @@ describe("foundation initial compact state", () => {
       remainingPositive: 0,
     });
 
-    // Reine Anzeigefracht: darf nie in den Spielstand zurueckwandern.
-    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compact);
-    expect(rehydrated.seasonState.foundationFormCardBonus).toBeUndefined();
+    // Die Projektion ist entfernt — der Payload traegt sie nicht mehr, und ein alter
+    // Browser-Tab, der sie noch mitschickt, bekommt sie nicht in den Spielstand.
+    expect((compact.seasonState as Record<string, unknown>).foundationFormCardBonus).toBeUndefined();
+    const altesTab = {
+      ...compact,
+      seasonState: {
+        ...compact.seasonState,
+        foundationFormCardBonus: { seasonId: "season-1", byTeamId: {}, unusedCardIds: [] },
+      },
+    } as unknown as typeof existing;
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, altesTab);
+    expect((rehydrated.seasonState as Record<string, unknown>).foundationFormCardBonus).toBeUndefined();
   });
 
   it("strips persisted season derivations from compact payloads", () => {

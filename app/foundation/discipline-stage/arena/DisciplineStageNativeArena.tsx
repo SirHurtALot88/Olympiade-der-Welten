@@ -4,6 +4,10 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer,
 import { createPortal } from "react-dom";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
+import {
+  ARENA_LADDER_PAD_Y,
+  resolveArenaLadderRowHeight,
+} from "@/lib/matchday-arena/arena-ladder-metrics";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
@@ -3088,20 +3092,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
    * unlesbar, ueber ~34px zerfaellt die Liste optisch. Passt die Zeilenzahl auch
    * bei Minimalhoehe nicht, bleibt der Innen-Scroll als ehrlicher Notnagel.
    */
-  const LADDER_ROW_MIN_H = 17;
-  const LADDER_ROW_MAX_H = 34;
-  const LADDER_PAD_Y = 10; // padding des Ladder-Containers, oben + unten je 10px
-  const LADDER_BORDER_Y = 1; // 1px Rahmen, oben + unten
-  const LADDER_ROW_H = useMemo(() => {
-    if (ladderMaxH == null || ladderHeadH <= 0) return 25;
-    // Der Container rechnet seit dem Hoehen-Fix mit `border-box`: `ladderMaxH` ist die
-    // AUSSENhoehe. Fuer die Zeilen bleibt davon der Innenraum — also abzueglich Polster UND
-    // Rahmen. Der Rahmen fehlte hier, was die Zeilen um 2px zu hoch ansetzte und die Liste
-    // ueber den unteren Rand schob.
-    const available = ladderMaxH - ladderHeadH - LADDER_PAD_Y * 2 - LADDER_BORDER_Y * 2;
-    if (available <= 0) return LADDER_ROW_MIN_H;
-    return Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N));
-  }, [ladderMaxH, ladderHeadH, N]);
+  // Die Rechnung selbst liegt in `lib/matchday-arena/arena-ladder-metrics.ts` — dort ist sie
+  // ueber WERTE pruefbar (vitest faehrt ohne jsdom; ein Flex-Layout gibt es im Test nicht).
+  const LADDER_PAD_Y = ARENA_LADDER_PAD_Y;
+  const LADDER_ROW_H = useMemo(
+    () => resolveArenaLadderRowHeight({ ladderMaxH, ladderHeadH, rowCount: N }),
+    [ladderMaxH, ladderHeadH, N],
+  );
   const ladderRows = trackLadder ? [...rtRef.current].sort((a, b) => a.seasonRank - b.seasonRank) : ladderList;
 
   // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen

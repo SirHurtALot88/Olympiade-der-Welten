@@ -24,29 +24,8 @@ import {
   type SeasonGuv,
   type SeasonGuvParts,
 } from "@/lib/finance/season-end-guv";
-import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
-
-/**
- * Sponsor-Abrechnung beim aktuellen Rang je Team. Vorzeichenecht summiert und nur für Teams MIT
- * Vertrag — exakt wie der Apply (`sponsor-settlement-service`). Negative Zeilen (verfehlte Achse,
- * Vorschuss-Verrechnung) gehören dazu; sie wegzufiltern hätte die Einnahme geschönt.
- */
-function buildSponsorCashByTeam(gameState: GameState): Map<string, number> {
-  const byTeam = new Map<string, number>();
-  const contracted = new Set(
-    gameState.teams.filter((team) => getTeamSponsorContract(gameState, team.teamId)).map((team) => team.teamId),
-  );
-  try {
-    for (const row of previewSponsorSettlement(gameState).rows) {
-      if (!contracted.has(row.teamId)) continue;
-      byTeam.set(row.teamId, (byTeam.get(row.teamId) ?? 0) + row.cashDelta);
-    }
-  } catch {
-    // Ohne Verträge gibt es keine Vorschau — die Sponsor-Zeile steht dann bei 0 und sagt das auch.
-  }
-  return byTeam;
-}
+import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
 export type SeasonGuvResolveOptions = {
   /** Vorberechnete Sponsor-Abrechnung je Team (z. B. aus `getLeagueSponsorIncome`), spart die Vorschau. */
@@ -57,12 +36,18 @@ export type SeasonGuvResolveOptions = {
   salaryTotalByTeamId?: Map<string, number> | null;
 };
 
+/**
+ * Gehaltssumme je Team — DIESELBE Funktion, die auch abgebucht wird.
+ *
+ * VORHER stand hier `entry.salary` roh aus dem Roster. Das ist ein anderer Wert: bei geformten
+ * Verträgen (`front_loaded`/`back_loaded`) trägt `yearlySalarySchedule[0]` die Rate DIESER Saison,
+ * `entry.salary` dagegen das verhandelte Jahresmittel. Am Live-Abbild
+ * (`new-game-1785823388048-1hf25q`, 340 Rosterverträge, davon 142 mit abweichendem Jahr 1) wichen
+ * 27 von 32 Teams ab, bis zu 8,6 C je Team (Mayhem Mavericks 107,7 gebucht gegen 99,1 angezeigt).
+ * Die Liga-Tabelle wies damit andere Kosten aus, als am Saisonende wirklich abgingen.
+ */
 function buildSalaryTotalByTeam(gameState: GameState): Map<string, number> {
-  const byTeam = new Map<string, number>();
-  for (const entry of gameState.rosters) {
-    byTeam.set(entry.teamId, (byTeam.get(entry.teamId) ?? 0) + (entry.salary ?? 0));
-  }
-  return byTeam;
+  return new Map(gameState.teams.map((team) => [team.teamId, getTeamActualSalaryTotal(gameState, team.teamId)] as const));
 }
 
 /** Die Rohgrößen aller Teams — eine Beschaffung, danach nur noch Nachschlagen. */
@@ -70,7 +55,7 @@ export function resolveSeasonGuvPartsByTeam(
   gameState: GameState,
   options?: SeasonGuvResolveOptions,
 ): Map<string, SeasonGuvParts> {
-  const sponsorCash = options?.sponsorCashByTeamId ?? buildSponsorCashByTeam(gameState);
+  const sponsorCash = options?.sponsorCashByTeamId ?? getSeasonSponsorCashByTeam(gameState);
   const salaryTotals = options?.salaryTotalByTeamId ?? buildSalaryTotalByTeam(gameState);
   const objectiveSettlement = (() => {
     try {

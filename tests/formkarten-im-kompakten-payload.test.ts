@@ -232,20 +232,19 @@ describe("Formkarten im kompakten Browser-Payload", () => {
     });
   });
 
-  it("PP-Formbonus: die Projektion einer anderen Saison springt nicht ein", () => {
+  it("PP-Formbonus: eine mitgeschickte Projektion schlaegt nirgends mehr durch", () => {
     const browser = alsBrowserPayload(vollerSpielstand());
-    browser.seasonState.foundationPpAreaFormBonus = {
-      seasonId: "season-99",
+    // Ein alter Browser-Tab schickt das entfernte Feld noch mit — beide Faelle, gleiche Saison
+    // und Fremdsaison. Keiner darf die Rechnung anfassen.
+    (browser.seasonState as Record<string, unknown>).foundationPpAreaFormBonus = {
+      seasonId: SEASON,
       matchdays: [{ matchdayId: "md-1", bonusByTeamId: { "A-A": { pow: 999 } } }],
     };
 
-    // Die Fremdsaison darf nicht einspringen — der Browser rechnet aus seinen eigenen,
-    // jetzt vollstaendigen Daten und kommt auf denselben Wert wie der volle Spielstand.
-    //
     // FRUEHER STAND HIER `{ total: 4, pow: 0, spe: 4, ... }`: der beschnittene Payload gab
     // nur den aktiven Spieltag her, also war der „Rest ohne Projektion" ein Bruchteil der
-    // Wahrheit. Dass 999 aus `season-99` nicht durchschlaegt, ist unveraendert die Aussage
-    // dieses Falls — nur die richtige Zahl daneben ist jetzt die volle.
+    // Wahrheit. Jetzt rechnet der Browser aus seinen eigenen, vollstaendigen Daten und kommt
+    // auf denselben Wert wie der volle Spielstand.
     expect(buildPpAreaFormBonusByTeamId(browser, SEASON)["A-A"]).toEqual({
       total: 54.5,
       pow: 38,
@@ -302,11 +301,7 @@ describe("Formkarten im kompakten Browser-Payload", () => {
   });
 
   it("Formkarten-Nutzung: die Nullwert-Karte bleibt ungespielt und ohne Strafe", () => {
-    // Sie faehrt bewusst nicht in `unusedCardIds` mit — der Leser darf sie deshalb trotzdem
-    // nicht als gespielt fuehren.
     const browser = alsBrowserPayload(vollerSpielstand());
-    const projektion = browser.seasonState.foundationFormCardBonus;
-    expect(projektion?.unusedCardIds).not.toContain("card-A-null");
     // 4 Karten je Team-Zeile heisst: die Nullwert-Karte zaehlt nirgends mit (sie wird vorher
     // gefiltert), und die drei gespielten plus die eine offene ergeben die Bilanz.
     expect(buildFormCardSeasonUsageAudit(browser, SEASON).rows.find((row) => row.teamId === "A-A")).toMatchObject({
@@ -318,14 +313,25 @@ describe("Formkarten im kompakten Browser-Payload", () => {
     });
   });
 
-  it("beide Projektionen sind reine Anzeigefracht und fahren nie in den Spielstand zurueck", () => {
+  it("beide Projektionen sind weg und kommen auch aus einem alten Tab nicht zurueck", () => {
     const voll = vollerSpielstand();
     const browser = alsBrowserPayload(voll);
-    expect(browser.seasonState.foundationPpAreaFormBonus?.seasonId).toBe(SEASON);
-    expect(browser.seasonState.foundationFormCardBonus?.unusedCardIds?.length).toBeGreaterThan(0);
+    // Der kompakte Payload traegt sie nicht mehr — dafuer die Quellen selbst, vollstaendig.
+    expect((browser.seasonState as Record<string, unknown>).foundationPpAreaFormBonus).toBeUndefined();
+    expect((browser.seasonState as Record<string, unknown>).foundationFormCardBonus).toBeUndefined();
+    expect(browser.seasonState.disciplineResults).toEqual(voll.seasonState.disciplineResults);
+    expect(browser.seasonState.lineupDrafts?.length).toBe(voll.seasonState.lineupDrafts?.length);
 
-    const zurueck = rehydrateGameStateAfterCompactPut(voll, browser);
-    expect(zurueck.seasonState.foundationPpAreaFormBonus).toBeUndefined();
-    expect(zurueck.seasonState.foundationFormCardBonus).toBeUndefined();
+    const altesTab = {
+      ...browser,
+      seasonState: {
+        ...browser.seasonState,
+        foundationPpAreaFormBonus: { seasonId: SEASON, matchdays: [] },
+        foundationFormCardBonus: { seasonId: SEASON, byTeamId: {}, unusedCardIds: ["x"] },
+      },
+    } as unknown as GameState;
+    const zurueck = rehydrateGameStateAfterCompactPut(voll, altesTab).seasonState as Record<string, unknown>;
+    expect(zurueck.foundationPpAreaFormBonus).toBeUndefined();
+    expect(zurueck.foundationFormCardBonus).toBeUndefined();
   });
 });

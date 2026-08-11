@@ -121,31 +121,18 @@ export function buildPpAreaFormBonusByTeamId(
   gameState: GameState,
   seasonId: string,
 ): Record<string, PpAreaFormBonusTotals> {
-  const ausSpielstand = berechnePpAreaFormBonusJeSpieltag(gameState, seasonId);
-
   /**
-   * VORRANG JE SPIELTAG, NICHT PER `??`. Die mitgelieferte Projektion
-   * (`foundation-pp-area-form-bonus-projection`) ist auf dem VOLLEN Save gerechnet und deckt
-   * die ganze laufende Saison; der Browser kennt davon nur den aktiven Spieltag. `??` waere
-   * hier gleich doppelt falsch: eine leere Map ist nicht nullish (daran ist eine fruehere
-   * Reparatur schon einmal gescheitert, siehe `leseSaisonSchnappschuesse`), und ein
-   * Entweder-Oder waere zu grob — wer den naechsten Spieltag gerade gespielt hat, hat dessen
-   * Disziplin-Ergebnisse lokal, die Projektion stammt aber vom Laden. Also gewinnt der
-   * Spielstand fuer die Spieltage, die er selbst deckt, und die Projektion fuellt den Rest.
+   * DIE EINE QUELLE: `disciplineResult.formModifier` aus dem vorliegenden Spielstand.
+   *
+   * Hier mischte sich bis hierher eine servergerechnete Projektion
+   * (`seasonState.foundationPpAreaFormBonus`) je Spieltag darunter, weil die Anfangsladung die
+   * `disciplineResults` auf den aktiven Spieltag beschnitt — der Saisonstand zeigte die `(+x)`
+   * hinter jedem PP-Bereichswert sonst nur fuer 14 von 32 Teams, und bei denen falsch. Seit
+   * `8ec6454b` fahren die `disciplineResults` vollstaendig mit; an beiden aktiven Spielstaenden
+   * nachgemessen liefert die Rechnung mit und ohne Projektion Zeichen fuer Zeichen dasselbe.
+   * Die Projektion ist entfernt.
    */
-  const zusammen = new Map<string, Map<string, PpAreaFormBonusByArea>>();
-  const projektion = gameState.seasonState.foundationPpAreaFormBonus;
-  if (projektion && projektion.seasonId === seasonId) {
-    for (const eintrag of projektion.matchdays) {
-      zusammen.set(
-        eintrag.matchdayId,
-        new Map(Object.entries(eintrag.bonusByTeamId).map(([teamId, bereiche]) => [teamId, { ...bereiche }] as const)),
-      );
-    }
-  }
-  for (const [matchdayId, jeTeam] of ausSpielstand) {
-    zusammen.set(matchdayId, jeTeam);
-  }
+  const zusammen = berechnePpAreaFormBonusJeSpieltag(gameState, seasonId);
 
   const totalsByTeamId = new Map<string, PpAreaFormBonusTotals>();
   for (const jeTeam of zusammen.values()) {

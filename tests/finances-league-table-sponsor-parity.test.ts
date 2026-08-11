@@ -109,8 +109,14 @@ describe("finances: league table ↔ detail view sponsor parity", () => {
     // Ansicht mitgezählt werden (er zahlte im Settlement 84 — läge er drin, wäre die Summe > 150).
     expect(detailSponsorTotal).toBeLessThan(100);
 
-    // Die Tabelle weist Sponsor + Gebäude-Einnahmen aus; ohne Gebäude ist das exakt die Sponsorsumme.
-    expect(leagueRow.incomeAnnual).toBe(detailSponsorTotal);
+    // NACHGEZOGEN AM 11.08.2026: die Tabelle rechnet nicht mehr ihre eigene p.a.-Näherung, sondern
+    // liest DIE GuV (`resolveSeasonGuvByTeam`) — dieselbe, die auch die Detailansicht zeigt. Ihre
+    // Einnahmenseite ist damit die volle GuV-Einnahme (Sponsor + Gebäude + Apron + Vorstandsziele),
+    // nicht mehr nur die Sponsorsumme. Verglichen wird deshalb gegen `totalIncome` der
+    // Detailansicht — die schärfere Zusicherung, denn sie deckt jede Einnahmenart ab.
+    expect(leagueRow.incomeAnnual).toBe(model.team.totalIncome);
+    expect(leagueRow.expensesAnnual).toBe(model.team.totalExpenses);
+    expect(leagueRow.guv).toBe(model.team.guv);
   });
 
   it("carries logo data for every team so the comparison table can render crests", () => {
