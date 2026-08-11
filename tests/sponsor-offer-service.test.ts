@@ -199,16 +199,41 @@ describe("sponsor offer service", () => {
 });
 
 describe("ai sponsor choice — oekonomisch kann sie nichts falsch machen", () => {
-  // DIE ZENTRALE ZUSAGE DES ENTWURFS, an der ECHTEN Angebotserzeugung gemessen: alle fuenf Karten
-  // eines Slates haben denselben Erwartungswert. Die Wahl ist eine Risiko-Entscheidung, nie ein
-  // Etat-Upgrade — und deshalb kann die KI-Wahl (und die des Spielers) den Etat nicht verschieben.
-  it("alle Karten eines Slates haben denselben Erwartungswert (bis auf Rundung)", () => {
+  /**
+   * DIE ZENTRALE ZUSAGE DES ENTWURFS, an der ECHTEN Angebotserzeugung gemessen — und seit den
+   * Gebaeude-Karten (Bauvorlage E1) praeziser formuliert als vorher.
+   *
+   * Bis dahin galt: alle fuenf Karten haben denselben Cash-Erwartungswert. Das kann seit E1 gar
+   * nicht mehr stimmen, und zwar absichtlich nicht — eine Gebaeude-Karte zahlt WENIGER Cash und
+   * stellt dafuer ein Gebaeude („viel Cash pur, oder weniger Cash plus Gebäude"). Roh gemessen
+   * spreizen die EVs deshalb um bis zu 4,3 C.
+   *
+   * Die Zusage selbst ist damit nicht weg, sie ist nur eine Ebene tiefer gerutscht: rechnet man den
+   * Cash-Verzicht wieder hinzu — also das, wofuer die Karte weniger zahlt —, ist die Spreizung
+   * gemessen EXAKT 0. Kein Slot ist ein Etat-Upgrade, keiner eine Etat-Kuerzung; wer weniger Cash
+   * nimmt, bekommt genau dafuer Gegenwert. Genau das kann die Wahl (der KI wie des Spielers) nicht
+   * zu einer Etat-Entscheidung machen.
+   *
+   * Deshalb steht hier `toBe(0)` statt einer Toleranz: die Gleichheit ist konstruktiv, nicht
+   * numerisch — der Verzicht wird von jeder Sprosse derselben Leiter abgezogen, und der
+   * Erwartungswert ist ein gewichtetes Mittel dieser Leiter mit Gewichtssumme 1.
+   */
+  it("alle Karten eines Slates haben denselben Erwartungswert — Cash plus Gegenwert", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     for (const team of gameState.teams) {
       const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
-      const values = offers.map((offer) => estimateExpectedPayout(offer));
+      const values = offers.map(
+        (offer) => estimateExpectedPayout(offer) + (getSponsorV3Terms(offer)?.leihVerzicht ?? 0),
+      );
       const spread = Math.max(...values) - Math.min(...values);
       expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.1);
+
+      // Und die Gegenprobe im selben Test: OHNE den Verzicht spreizen sie sehr wohl — sonst waere
+      // die Gebäude-Karte gratis und die Zeile oben eine leere Zusicherung.
+      const rohe = offers.map((offer) => estimateExpectedPayout(offer));
+      if (offers.some((offer) => offer.sponsorLeihe != null)) {
+        expect(Math.max(...rohe) - Math.min(...rohe), `${team.teamId}: Gebäude-Karte kostet nichts`).toBeGreaterThan(0.1);
+      }
     }
   });
 });

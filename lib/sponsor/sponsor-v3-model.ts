@@ -441,6 +441,16 @@ export type SponsorV3ContractTerms = {
   /** Absolute Untergrenze (Sicherheitsnetz), mit dem Vertrag eingefroren. */
   floor: number;
   /**
+   * DER CASH-VERZICHT DER GEBAEUDE-KARTE, der in dieser Leiter BEREITS steckt — dokumentarisch und
+   * fuer den Mehrjahres-Roll, der die Leiter neu baut und ihn dabei wieder abziehen muss.
+   *
+   * Entscheidung E1 der Bauvorlage: es wird NICHTS abgezogen, die Gebaeude-Karte hat schlicht eine
+   * niedrigere Leiter. Deshalb steht der Verzicht hier als Zahl und NICHT als Settlement-Zeile —
+   * eine zweite Buchung waere genau der Abzug, den Chris nicht wollte, und sie koennte gegen die
+   * Anzeige driften. Fehlt das Feld, ist es eine reine Cash-Karte.
+   */
+  leihVerzicht?: number;
+  /**
    * Die Achse dieses Vertrags (V4). Fehlt bei Altvertraegen und bei der Basis-Karte — dann laeuft
    * die Auszahlung ueber `goalKey`/`goalP` wie zuvor.
    */
@@ -479,12 +489,22 @@ export function buildSponsorV3TermsCore(input: {
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
   tiltScale?: number;
   anchorSigma?: number;
+  /**
+   * Cash-Verzicht einer Gebaeude-Karte (E1): wird von JEDER Sprosse der Basisleiter abgezogen,
+   * BEVOR Anker und Tilt gerechnet werden. Damit ist die Karte durchgaengig eine Karte mit
+   * niedrigerer Leiter — Erwartungswert, Boden, Vorschussbasis und Anzeige stimmen automatisch
+   * ueberein, ohne dass irgendeine Rechenstelle den Verzicht kennen muesste.
+   */
+  leihVerzicht?: number;
 }): SponsorV3ContractTerms {
   // Kopie statt Referenz: die zurueckgegebenen Konditionen duerfen nicht am Array des Aufrufers
   // haengen, das sich (bei `sponsorKurvenLeiter`, das jedes Mal neu rechnet) ohnehin unterscheidet,
   // aber bei einer wiederverwendeten Konstante wie `sponsorV3BenchmarkLadder`-Ergebnissen sonst
   // implizit geteilt waere.
-  const baseLadder = [...input.baseLadder];
+  // Der Leih-Verzicht senkt die Leiter, statt spaeter eine Zeile abzuziehen (E1). Geklammert bei 0:
+  // eine negative Sprosse waere eine Karte, die Geld KOSTET, und die gibt es im Modell nicht.
+  const leihVerzicht = Number.isFinite(input.leihVerzicht) ? Math.max(0, input.leihVerzicht ?? 0) : 0;
+  const baseLadder = input.baseLadder.map((wert) => Math.max(0, wert - leihVerzicht));
   const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
@@ -530,6 +550,9 @@ export function buildSponsorV3TermsCore(input: {
     ...(input.curveShape != null ? { curveShape: input.curveShape } : {}),
     ...(axis != null ? { axis } : {}),
     ...(advance != null ? { advance } : {}),
+    // Nur setzen, wenn es ihn gibt: eine reine Cash-Karte soll das Feld gar nicht tragen, damit man
+    // im Spielstand auf einen Blick sieht, welche Karte ein Gebaeude gekostet hat.
+    ...(leihVerzicht > 0 ? { leihVerzicht } : {}),
   };
 }
 

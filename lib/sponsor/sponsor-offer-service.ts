@@ -37,6 +37,7 @@ import {
   mapSponsorCardToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
+import { leihRaritaet, verteileLeihgabenAufSlate } from "@/lib/sponsor/sponsor-leih-slate";
 import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
@@ -256,6 +257,27 @@ export function buildSponsorOffersForTeam(input: {
     // Ausbauspielraum, kein Kaderwert), wird nicht angeboten, statt als wertlose Karte dazuliegen.
     offerableAxes: sponsorV4OfferableAxes(input.gameState, input.teamId),
   });
+  // DIE GEBÄUDE-LEIHE AUF DIE FUENF KARTEN (Bauvorlage E1/E8). Platz 1 bleibt reines Geld, Platz 2
+  // ist der guenstige Einstieg, die uebrigen folgen ihrer Rarität — die Regel und ihre gemessene
+  // Begruendung stehen in `sponsor-leih-slate.ts`.
+  //
+  // Als eigener Bestand zaehlt bewusst der GESPEICHERTE Stand, nicht der ueber `getTeamFacilityState`
+  // gelesene: der traegt bereits laufende Leihgaben mit. Ein Team, dem gerade ein Trainingszentrum
+  // Stufe 4 geliehen ist, bekaeme sonst naechste Saison gar kein Trainingszentrum mehr angeboten —
+  // ausgerechnet dann nicht, wenn die Leihe auslaeuft.
+  const eigeneStufen = Object.fromEntries(
+    Object.entries(input.gameState.seasonState.teamFacilities?.[input.teamId]?.facilities ?? {}).map(
+      ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
+    ),
+  );
+  const leihKarten = verteileLeihgabenAufSlate({
+    seasonId: input.gameState.season.id,
+    teamId: input.teamId,
+    raritaeten: slate.entries.map((entry) => leihRaritaet(entry.rarity)),
+    laufzeiten: slate.entries.map((entry) => entry.termSeasons),
+    eigeneStufen,
+  });
+
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage =
@@ -295,7 +317,23 @@ export function buildSponsorOffersForTeam(input: {
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
     }
-    return offer;
+    const leihe = leihKarten[slotIndex]?.leihe ?? null;
+    if (!leihe) {
+      return offer;
+    }
+    return {
+      ...offer,
+      sponsorLeihe: {
+        facilityId: leihe.facilityId,
+        raritaet: leihe.raritaet,
+        kurs: leihe.kurs,
+        stufenreihe: leihe.stufenreihe,
+        verzichtJeSaison: leihe.verzichtJeSaison,
+        leihwertJeSaison: leihe.leihwertJeSaison,
+        startZustandPct: leihe.startZustandPct,
+        katalogkostenEndstufe: leihe.katalogkostenEndstufe,
+      },
+    };
   });
 
   // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
@@ -313,6 +351,9 @@ export function buildSponsorOffersForTeam(input: {
     curveShapes: slate.entries.map((entry) => entry.curveShape),
     goldenSlots: slate.goldenCardSlots,
     advanceSlots: slate.entries.map((entry) => entry.advance === true),
+    // E1: KEINE Abzugszeile — der Verzicht senkt hier die Leiter, und zwar bevor Anker und Tilt
+    // gerechnet werden. Die Gebäude-Karte ist danach durchgaengig eine Karte, die weniger zahlt.
+    leihVerzichte: leihKarten.map((karte) => karte.verzichtErsteSaison),
     teamId: input.teamId,
     startRank,
   });
@@ -493,6 +534,9 @@ export function chooseSponsorOffer(input: {
     // einem Angebot moeglich, das VOR dem V3-Umbau erzeugt und erst jetzt unterschrieben wurde —,
     // holt die Leiter-Migration (`sponsor-v3-migration.ts`) es beim naechsten Laden nach.
     ...(offer.sponsorV3 ? { sponsorV3: offer.sponsorV3 } : {}),
+    // Der Leih-Block wandert 1:1 mit. Er ist ab hier die Quelle fuer den Stufen-Aufstieg beim
+    // Saisonwechsel und fuer den Uebernahmepreis am Vertragsende.
+    ...(offer.sponsorLeihe ? { sponsorLeihe: offer.sponsorLeihe } : {}),
   };
 
   let nextGameState: GameState = {
@@ -505,6 +549,37 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
+
+  // DIE LEIHGABE WIRD MIT DER UNTERSCHRIFT WIRKSAM. Sie landet in `sponsorLeihgabenByTeamId` und
+  // NICHT in `teamFacilities` — `getTeamFacilityState` legt sie beim Lesen darueber (Schritt 3).
+  // Stuende sie im eigenen Bestand, waere der Rueckfall am Vertragsende ein Loeschvorgang, und ein
+  // vergessener Loeschvorgang verschenkt ein Gebäude auf Dauer.
+  if (offer.sponsorLeihe) {
+    const leihe = offer.sponsorLeihe;
+    const bisher = nextGameState.seasonState.sponsorLeihgabenByTeamId?.[input.teamId] ?? [];
+    nextGameState = {
+      ...nextGameState,
+      seasonState: {
+        ...nextGameState.seasonState,
+        sponsorLeihgabenByTeamId: {
+          ...(nextGameState.seasonState.sponsorLeihgabenByTeamId ?? {}),
+          [input.teamId]: [
+            // Ein Team hat hoechstens einen Sponsor, also hoechstens eine laufende Leihe aus einem
+            // Sponsorvertrag. Eine aeltere aus DERSELBEN Saison waere ein Doppelabschluss (den der
+            // Re-Sign-Guard oben ausschliesst) — sie wird trotzdem ersetzt statt gestapelt.
+            ...bisher.filter((eintrag) => eintrag.seasonId !== nextGameState.season.id),
+            {
+              facilityId: leihe.facilityId,
+              stufe: leihe.stufenreihe[0] ?? 1,
+              zustandPct: leihe.startZustandPct,
+              seasonId: nextGameState.season.id,
+              offerId: offer.offerId,
+            },
+          ],
+        },
+      },
+    };
+  }
   // Sponsorengeld flieszt grundsaetzlich am Saisonende (sponsor-settlement-service). Frueher wurde
   // beim Unterschreiben IMMER die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
   // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des

@@ -199,6 +199,8 @@ export function buildSponsorV3Terms(input: {
   golden?: boolean;
   /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
   withAdvance?: boolean;
+  /** Cash-Verzicht der Gebaeude-Karte (E1) — senkt die Leiter, statt eine Abzugszeile zu buchen. */
+  leihVerzicht?: number;
 }): SponsorV3ContractTerms {
   const card = sponsorV3CardByKey(input.cardKey);
   const goalKey = card.goal
@@ -228,6 +230,13 @@ export function buildSponsorV3Terms(input: {
     // SPONSOR_BODEN statt SPONSOR_V3_FLOOR_C: der neue Sockel reicht bei Startrang 1 bis 18 hinunter,
     // das alte Netz (32) saesse fuer diese Leiter zu tief.
     floor: SPONSOR_BODEN,
+    // GEMESSEN, damit die Groessenordnung nicht geraten ist: die niedrigste Sprosse ueber alle
+    // Kurvenformen und Startraenge liegt bei 52,1 C, das Netz bei 43 — es bleiben 9,1 C Luft. Der
+    // groesste Verzicht der ERSTEN Saison ist 4,3 C, passt also immer. In Vertragsjahr 3 kann eine
+    // teure Leihe 11,9 C erreichen; dort faengt das Netz einen Teil des Verzichts ab, ein
+    // abgestuerztes Team zahlt dann weniger als die Karte kostet. Anzeige und Settlement bleiben
+    // trotzdem deckungsgleich, weil beide dieselbe geklammerte Leiter lesen.
+    leihVerzicht: input.leihVerzicht,
   });
 }
 
@@ -316,7 +325,15 @@ export function rerollSponsorV3TermsForNewSeason(
   const multiplier = getSponsorTermMultiplier(input.contractYear);
   // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
   // der nach Startrang eingefrorene Wert, unveraendert durch Erosion oder Salary-Factor-Wechsel.
-  const baseLadder = newBaseLadderRaw.map((value) => sockel + multiplier * (value - sockel));
+  //
+  // UND DER LEIH-VERZICHT MUSS WIEDER AB: die Leiter wird hier NEU gebaut, der in der alten Leiter
+  // steckende Verzicht (E1) waere sonst ab Vertragsjahr 2 verschwunden — die Gebaeude-Karte zahlte
+  // dann wie eine reine Cash-Karte und behielte das Gebaeude gratis. Abgezogen wird der EINGEFRORENE
+  // Betrag; dass er mit der Leihstufe steigt, traegt Schritt 7 der Bauvorlage nach.
+  const verzicht = Math.max(0, terms.leihVerzicht ?? 0);
+  const baseLadder = newBaseLadderRaw.map((value) =>
+    Math.max(0, sockel + multiplier * (value - sockel) - verzicht),
+  );
   const weights = sponsorV3AnchorWeights(terms.startRank);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, terms.tilt);
@@ -353,6 +370,8 @@ export function applySponsorV3ToOffers(input: {
   goldenSlots?: number[];
   /** Slots, die einen Vorschuss zahlen. */
   advanceSlots?: boolean[];
+  /** Cash-Verzicht je Angebot (E1) — 0/null bei den reinen Cash-Karten. */
+  leihVerzichte?: (number | null)[];
   teamId?: string;
   startRank: number;
 }): SponsorOffer[] {
@@ -373,6 +392,7 @@ export function applySponsorV3ToOffers(input: {
       teamId: input.teamId,
       golden: input.goldenSlots?.includes(index) === true,
       withAdvance: input.advanceSlots?.[index] === true,
+      leihVerzicht: input.leihVerzichte?.[index] ?? 0,
     });
     const ladder = sponsorV3GuaranteedLadder(terms);
     const floor = ladder[31]!;
