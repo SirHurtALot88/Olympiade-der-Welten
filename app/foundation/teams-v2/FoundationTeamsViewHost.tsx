@@ -64,8 +64,12 @@ type FoundationTeamsViewHostProps = Omit<
   | "getTeamAxisRankTooltip"
 > & {
   activeView: string;
-  /** Erwarteter Verkaufserloes je Spieler aus dem Server-Slice — nur durchgereicht. */
-  sliceSellValueByPlayerId?: Record<string, { expectedSellValue: number }> | null;
+  /**
+   * Erwarteter Verkaufserloes je Spieler aus dem Server-Slice — nur durchgereicht. Derselbe Typ
+   * wie `FoundationTeamsNewLookProps["sliceSellValueByPlayerId"]` (nicht dupliziert, um nicht
+   * wieder auseinanderzulaufen — siehe die Herleitung dort).
+   */
+  sliceSellValueByPlayerId?: FoundationTeamsNewLookProps["sliceSellValueByPlayerId"];
   selectedTeamId: string | null;
   selectedTeam: Team;
   gameState: GameState;
