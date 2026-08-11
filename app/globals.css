@@ -54761,6 +54761,46 @@ button.foundation-team-portrait-card {
   font-size: 7.5px;
 }
 
+/* CA/PO-Sterne-Spalte (T7): Sterne statt Zahl, konsistent zur Kaderliste. */
+.is-new-look .nl-training-row-ability {
+  white-space: nowrap;
+}
+
+/* Gehalt-/Vertrags-Spalten (T7, Chris: "damit man weiß welche Spieler mit
+   langem Vertrag man entwickeln sollte") — gleiches Zellmuster wie
+   `.nl-players-money`/`.nl-players-contract` in der Kaderliste. */
+.is-new-look .nl-training-row-salary {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.is-new-look .nl-training-row-contract {
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-row-contract-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+}
+
+/* Auslaufender Vertrag (Restlaufzeit 1) farblich betont — die Restlaufzeit
+   soll auf einen Blick lesbar sein, nicht nur die Zahl. */
+.is-new-look .nl-training-row-contract-value.is-expiring {
+  color: var(--nl-warn);
+  font-weight: 700;
+}
+
+.is-new-look .nl-training-row-contract-shape {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-training-chip.is-neutral {
   color: var(--nl-mut);
   border-color: var(--nl-line-2);

@@ -29,17 +29,15 @@ describe("player league heat", () => {
 describe("player portrait stat presets", () => {
   const heatPools = createEmptyLeaguePlayerHeatPools();
 
-  it("builds training overlay stats with forecast", () => {
+  it("builds training overlay stats with forecast only (CA/PO come from the shared ability-stars slot, not text)", () => {
     const stats = buildTrainingOverlayStats({
-      caRating: 72,
-      poDisplay: "4.5",
       netSetpoints: 1.2,
       regressionRisk: "high",
       trainingModeLabel: "Intensiv",
     });
 
-    expect(stats.map((entry) => entry.label)).toEqual(["CA", "PO", "Forecast"]);
-    expect(stats[2].value).toContain("+");
+    expect(stats.map((entry) => entry.label)).toEqual(["Forecast"]);
+    expect(stats[0].value).toContain("+");
   });
 
   it("builds market overlay stats with fit and economy", () => {
@@ -102,8 +100,6 @@ describe("player portrait stat presets", () => {
       density: "compact",
       contextData: {
         training: {
-          caRating: 70,
-          poDisplay: "4",
           netSetpoints: 0.5,
           regressionRisk: "low",
           trainingModeLabel: "Mittel",
