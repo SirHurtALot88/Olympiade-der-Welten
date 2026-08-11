@@ -7,21 +7,24 @@
  *
  * Der Directory-Slice rechnet SERVERSEITIG auf dem vollständigen Save. Der
  * Foundation-Client hält dagegen den kompakten Payload
- * (`compactFoundationInitialGameState`): dort sind `matchdayResults` /
- * `disciplineResults` auf den AKTIVEN Spieltag beschnitten und
- * `persistedSeasonDerivations` entfernt. Ein clientseitig gebauter
- * `buildSeasonPointsLedger` kennt daher nur diesen einen Spieltag.
+ * (`compactFoundationInitialGameState`).
  *
- * Am echten Spielstand (Spieltag 10, 32 Teams) gemessen:
+ * HIER STAND, `matchdayResults`/`disciplineResults` seien darin „auf den AKTIVEN
+ * Spieltag beschnitten" — das stimmt seit `8ec6454b` NICHT MEHR, beide fahren
+ * vollständig mit. Am Live-Abbild nachgemessen (Spieltag 10, 32 Teams): der
+ * clientseitig frisch gebaute Ledger kommt auf dieselben 2534 Punkteinträge und
+ * dieselben 340 Ratings wie der Server. Der alte Befund lautete 2449 gegen 254
+ * Einträge; er ist Geschichte. Wer diesen Absatz noch als Warnung liest, baut
+ * eine Wache gegen einen Fehler, den es nicht mehr gibt.
  *
- *   VOLL     Ledger: 2449 Punkteinträge, 330 Spieler mit Disziplin-PPs
- *   KOMPAKT  Ledger:  254 Punkteinträge — und je Team nur die 2 Disziplinen
- *            des aktiven Spieltags; die anderen 18 stehen auf 0.
+ * `persistedSeasonDerivations` fährt weiterhin NICHT mit (5,5 MB) — der Browser
+ * rechnet die Ableitungen dann eben frisch, und zwar nachgemessen auf dieselben
+ * Zahlen. Das kostet Zeit, keine Richtigkeit.
  *
- * Sobald der Slice da ist, ist er deshalb die alleinige Quelle: fehlt ein
- * Spieler dort, hat er in dieser Saison keine PPs geholt — dann bleibt es leer,
- * statt auf den beschnittenen Ledger zurückzufallen. Der Ledger bleibt nur
- * Fallback für Pfade ohne Slice (Home-V2-/Markt-Kacheln, oder Slice-Fehler).
+ * Der Slice bleibt trotzdem die bevorzugte Quelle, solange er da ist: er ist
+ * bereits gerechnet. Fehlt ein Spieler dort, hat er in dieser Saison keine PPs
+ * geholt — dann bleibt es leer. Der Ledger ist der Fallback für Pfade ohne Slice
+ * (Home-V2-/Markt-Kacheln, oder Slice-Fehler).
  */
 
 export type PlayerDirectoryDisciplinePointsSlice = {
