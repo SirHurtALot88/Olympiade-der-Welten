@@ -220,7 +220,18 @@ export function buildSponsorV3Terms(input: {
   // Entscheidung ueber neu erzeugte Angebote ist. Der Kern wird auch von der Migration und von den
   // Vergleichsskripten gerufen, die eine gegebene Leiter unveraendert bewerten sollen — ein Faktor
   // dort verschoebe rueckwirkend die Zahlen von Altvertraegen.
-  const wertFaktor = sponsorV3WertFaktorFor(rarity);
+  //
+  // DIE RARITÄT WIRKT AUF JEDER KARTE GENAU EINMAL — auf der Cash-Karte als Hoehe, auf der
+  // Gebaeude-Karte als Kurs. Sonst greift sie doppelt zu, und das war messbar: bei praktisch
+  // GLEICHEM Gebaeudewert (Ø 12,4 gegen 12,8) trug die legendaere Gebaeude-Karte 69,3 C
+  // Erwartungswert, die gewoehnliche 48,9 — 20 C mehr Cash fuer dasselbe Gebaeude. Chris: „achte
+  // darauf dass bei gebäude deals dann nicht MEHR cash UND dicke gebäude angebote rein kommen."
+  //
+  // Der Verzicht steckt bereits die Rarität: `Verzicht = Leihwert / Kurs`, und der Kurs IST die
+  // Rarität (1,4 .. 3,0). Eine legendaere Gebaeude-Karte bekommt ihr Gebaeude also fuer ein Drittel
+  // des Cash-Verzichts einer gewoehnlichen — das ist ihr Vorteil, und er reicht. Die Leiter bleibt
+  // dafuer auf der magischen Mitte, egal wie selten die Karte ist.
+  const wertFaktor = (input.leihVerzicht ?? 0) > 0 ? 1 : sponsorV3WertFaktorFor(rarity);
   const baseLadder = sponsorKurvenLeiter({
     shape: input.curveShape,
     startRank: input.startRank,
@@ -333,8 +344,9 @@ export function rerollSponsorV3TermsForNewSeason(
     };
   }
   // Wertfaktor und Sockel muessen beim Neubau DIESELBEN sein wie bei der Unterschrift, sonst
-  // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit.
-  const wertFaktor = sponsorV3WertFaktorFor(terms.rarity);
+  // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit — und die
+  // Einmal-Regel (Rarität wirkt als Hoehe ODER als Kurs, nie beides) gilt hier genauso.
+  const wertFaktor = (terms.leihVerzicht ?? 0) > 0 ? 1 : sponsorV3WertFaktorFor(terms.rarity);
   const sockel = sponsorSockelFuerStartrang(terms.startRank) * wertFaktor;
   const newBaseLadderRaw = sponsorKurvenLeiter({
     shape: terms.curveShape,

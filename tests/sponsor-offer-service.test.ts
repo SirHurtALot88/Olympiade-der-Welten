@@ -225,9 +225,14 @@ describe("ai sponsor choice — oekonomisch kann sie nichts falsch machen", () =
     const gameState = ensureSeasonSponsorOffers(createGameState());
     for (const team of gameState.teams) {
       const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
+      // DIE RARITÄT WIRKT JE KARTE GENAU EINMAL, und die Normierung bildet das ab: auf der reinen
+      // Cash-Karte als Hoehe (durch den Wertfaktor teilen), auf der Gebäude-Karte als Kurs (den
+      // Verzicht hinzurechnen — er enthaelt die Rarität schon, `Leihwert / Kurs`). Beides durch
+      // BEIDE Regler zu rechnen waere der doppelte Zugriff, den es hier gerade nicht geben soll.
       const values = offers.map((offer) => {
         const terms = getSponsorV3Terms(offer)!;
-        return (estimateExpectedPayout(offer) + (terms.leihVerzicht ?? 0)) / sponsorV3WertFaktorFor(terms.rarity);
+        const ev = estimateExpectedPayout(offer);
+        return offer.sponsorLeihe ? ev + (terms.leihVerzicht ?? 0) : ev / sponsorV3WertFaktorFor(terms.rarity);
       });
       const spread = Math.max(...values) - Math.min(...values);
       expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.2);

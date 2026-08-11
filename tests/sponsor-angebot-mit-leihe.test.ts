@@ -130,7 +130,9 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     const terms = getSponsorV3Terms(mitLeihe)!;
     const verzicht = terms.leihVerzicht!;
 
-    const wertFaktor = sponsorV3WertFaktorFor(terms.rarity);
+    // Eine Gebäude-Karte traegt KEINEN Raritaets-Wertfaktor auf der Leiter — die Rarität steckt bei
+    // ihr im Kurs und damit im Verzicht. Genau das wird hier mitgeprueft.
+    const wertFaktor = 1;
     const ungeschmaelert = sponsorKurvenLeiter({
       shape: terms.curveShape!,
       startRank: terms.startRank,
@@ -195,6 +197,34 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
         .map((angebot) => angebot.sponsorLeihe?.facilityId)
         .filter((facilityId): facilityId is string => facilityId != null);
       expect(new Set(gebaeude).size, `${teamId}: ${gebaeude.join(", ")}`).toBe(gebaeude.length);
+    }
+  });
+
+  it("greift bei Gebaeude-Karten NICHT doppelt zu — mehr Cash UND dickeres Gebaeude gibt es nicht", () => {
+    // Chris: „achte darauf dass bei gebäude deals dann nicht MEHR cash UND dicke gebäude angebote
+    // rein kommen." Gemessen war es genau das: bei praktisch gleichem Gebaeudewert (Ø 12,4 gegen
+    // 12,8) trug die legendäre Gebäude-Karte 69,3 C Erwartungswert, die gewöhnliche 48,9. Die
+    // Rarität hob die Leiter UND verbilligte das Gebäude.
+    //
+    // Der Nachweis hier ist strukturell statt statistisch: die Leiter einer Gebäude-Karte darf den
+    // Wertfaktor gar nicht tragen. Was der Rarität bleibt, ist der Kurs — dieselbe Stufe kostet
+    // weniger Verzicht, und mehr ist es nicht.
+    const gameState = baueSpielstand();
+    for (let index = 1; index <= 12; index += 1) {
+      const teamId = index === 1 ? "M-M" : `T-${index}`;
+      for (const angebot of buildSponsorOffersForTeam({ gameState, teamId })) {
+        if (!angebot.sponsorLeihe) continue;
+        const terms = getSponsorV3Terms(angebot)!;
+        const roh = sponsorKurvenLeiter({
+          shape: terms.curveShape!,
+          startRank: terms.startRank,
+          salaryFactor: terms.salaryFactor,
+        });
+        expect(terms.baseLadder[0], `${teamId}/${angebot.rarity}: Leiter traegt den Wertfaktor`).toBeCloseTo(
+          roh[0]! - (terms.leihVerzicht ?? 0),
+          6,
+        );
+      }
     }
   });
 
