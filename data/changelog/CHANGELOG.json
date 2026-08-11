@@ -3,11 +3,83 @@
   "eintraege": [
     {
       "datum": "2026-08-11",
+      "seite": "Formkarten",
+      "pr": null,
+      "text": "Formkarten werden seit einiger Zeit richtig gezogen: die positive und die negative Karte eines Spielers sind unabhaengig voneinander. Bestehende Spielstaende hatten davon nichts — die Selbstheilung ergaenzte nur FEHLENDE Karten und raeumte verwaiste ab, eine bereits vorhandene behielt ihren alten Wert fuer immer. Im laufenden Spielstand trugen deshalb 510 von 680 Karten noch die alte, kaputte Ziehung, und alle 266 Spieler mit Kartenpaar hatten ein exakt gespiegeltes (+8 zu -8, +4 zu -4). Jetzt werden ungespielte Karten beim naechsten Laden auf die heutige Ziehung nachgezogen. Bereits gespielte Karten bleiben unangetastet: sie stecken in der Wertung eines gelaufenen Spieltags, ihren Wert nachtraeglich zu aendern wuerde vergangene Ergebnisse umschreiben. In einer laufenden Saison bleibt der gespielte Teil also gespiegelt — vollstaendig zufaellig ist erst eine Saison, die neu beginnt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand · Spalte Formkarten",
+      "pr": null,
+      "text": "Die Spalte \"Formkarten\" zeigte Striche oder viel zu kleine Zahlen. Sie zaehlt die gespielten Karten ueber die Modifier-Slots der Aufstellungen — und die kamen im Browser nur fuer den gerade aktiven Spieltag an. Gemessen am Live-Save: statt 32 von 32 Teams hatten nur 14 ueberhaupt eine Bilanz, und diese 14 zaehlten die Karten eines einzigen von zehn Spieltagen. An einem Spieltag, an dem noch niemand gelegt hatte, war die Spalte komplett leer. Die Aufstellungen bleiben beschnitten — sie sind schwer und wachsen mit jedem Spieltag (659 KB gegen 70 KB) — aber die fertige Formkarten-Bilanz faehrt jetzt mit, auf dem vollen Spielstand gerechnet und 1,9 KB gross. Die Spalte nennt damit wieder die ganze Saison. Archiv-Saisonen bleiben unveraendert leer statt geraten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand · Formkarten und Rest",
+      "pr": null,
+      "text": "Die Spalte \"Formkarten\" zeigte die Summe der bereits gespielten Kartenwerte. Das war eine Zahl, die kaum etwas verriet: Formkarten kommen je Spieler als gespiegeltes Paar (+8 und -8), und die Minuskarten wirft man zuerst ab, weil ungespielte Minuskarten am Saisonende Punkte kosten. Die Summe lag deshalb bei allen 32 Teams des Spielstands bei null oder darunter — sie sagte nur, wie viel Negatives schon abgeraeumt war, nicht wie stark ein Team in Form gehen konnte. Jetzt steht dort der volle Tank der Saison: die Summe aller positiven Kartenwerte, gespielt wie ungespielt. Daneben steht neu die Spalte \"Rest\" mit dem, was davon noch ungespielt ist — wie viel Luft also noch drin ist. Beide Spalten sind sortierbar, und der Hover nennt Tank, Rest, gespielte Karten und offene Minuskarten samt ihrer Strafe am Saisonende. Ein leerer Tank zeigt 0, ein Team ganz ohne Karten weiterhin einen Strich: kein Tank ist etwas anderes als ein leergefahrener.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Team · Historie",
       "pr": null,
       "text": "Die Cash-Spalte einer abgeschlossenen Saison zeigte den Kontostand NACH der Verkaufsphase am Saisonende — also die Spitze direkt nach dem Ausverkauf. Lost Kingdom stand dort mit 137,4, hatte vor den fuenf Verkaeufen aber nur 9,4 und ging mit 25,6 in die neue Saison; der Vergleich zur laufenden Zeile las sich dadurch wie ein Absturz um 168. Jetzt steht dort der Eintrittsstand der Folgesaison, also das Geld, mit dem das Team wirklich losgespielt hat — dieselbe Zahl, die die Ewige Tabelle schon ausweist. Gehalt und Marktwert bleiben auf dem Saisonabschluss; der Spaltenkopf sagt beim Ueberfahren, welcher Zeitpunkt gemeint ist.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand",
+      "pr": null,
+      "text": "Am letzten Spieltag, solange er noch läuft, hebt der Saisonstand jetzt alle Teams hervor, die den Titel rechnerisch noch holen können (goldener Rand, Tag „Titelchance\") und zeigt darüber eine Kopfzeile mit Anzahl der Kandidaten und ihrem Rückstand auf die Spitze. Ist der Titel schon rechnerisch entschieden, steht dort stattdessen nur ein Satz dazu, ohne Zeilen-Hervorhebung. Außerhalb des letzten Spieltags und im Archiv ändert sich nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Der Performance-Anteil im Trainings-Ausblick stand auf +0, obwohl der Spieler Einsaetze und Punkte hatte — besonders auffaellig beim Wechsel der Trainingsklasse, weil die Zeile dabei neu gerechnet wird. Der Motor war nie kaputt: die Performance verteilt sich klassenunabhaengig auf die Stats der Disziplin, in der die Punkte angefallen sind. Es fehlte im Browser nur die schmale Liste der gewerteten Spieltage, an der die Leistungszeilen haengen — ohne sie fiel jede einzelne durchs Sieb. Seit die Liste vollstaendig mitfaehrt, rechnet der Ausblick im Browser exakt dieselben Werte wie der Server, nachgemessen an fuenf Spielern ohne jede Abweichung.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Team-Historie · Teamprofil & Kader",
+      "pr": null,
+      "text": "In der aufklappbaren Disziplin-Historie eines Teams (POW/SPE/MEN/SOC → einzelne Disziplinen wie SHO für Showcase) stand die Reihenfolge der Disziplin-Spalten bislang nach einer festen Katalog-Zahl, nicht nach der tatsächlich für die laufende Saison ausgelosten Spielerzahl je Disziplin — beide können auseinanderlaufen, weil der Saison-Spielplan die Spielerzahl pro Disziplin jede Saison neu würfelt. Die Spaltenreihenfolge richtet sich jetzt nach der echten Saison-Zahl.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Spielerliste · Disziplin-PPs",
+      "pr": null,
+      "text": "Der Saison-Ledger im Browser konnte eine falsche Punktzahl zeigen. Seit die Spieltags-Verzeichniszeilen vollstaendig zum Browser mitfahren (noetig, damit die Saisonziele wieder alle Spieltage zaehlen), kamen dort auch alle Leistungszeilen durch — nur die zugehoerigen Disziplin-Ergebnisse fehlen im Browser weiterhin, weil sie die schwere Fracht sind. Ohne Disziplin-Ergebnis gibt es keine Teamwertung, und die Punkte fielen still auf den Rohbeitrag zurueck: im Testfall 33,3 Punkte, wo der volle Spielstand 4,9 sagt. Jetzt gilt eine klare Grenze: ein Spieltag ohne Disziplin-Ergebnisse wird gar nicht gebucht. Wo die Zahl nicht sicher ist, steht wieder ein Strich. Ein leeres Feld faellt auf und laesst sich reparieren, eine falsche Zahl wird geglaubt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Fatigue · Verletzungen",
+      "pr": null,
+      "text": "Chris hatte als Zielwert ausgegeben: ohne Reha-Zentrum und ohne Frische-Boosts sollen ligaweit rund 150-200 Verletzungen pro Saison anfallen. Eine Saison-Simulation über die echte Spiel-Engine (32 Team-Kader in der Größe des laufenden Spielstands, alle zehn Spieltage) zeigt, dass die aktuelle Einstellung genau dort liegt — im Schnitt rund 190, über mehrere durchgerechnete Saisons stabil zwischen 177 und 199. Nichts wurde an der Belastung pro Einsatz verändert; die Zahl saß bereits im gewünschten Rahmen. Wer in Reha-Ausbau oder schonendes Training investiert, drückt die Zahl für sein Team weiterhin spürbar darunter — das bleibt unverändert der Sinn dieser Gebäude.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
