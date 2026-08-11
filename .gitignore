@@ -71,3 +71,5 @@ scratchpad/
 # damit node die Pakete aufloest — gehoeren aber nie ins Repo.
 _probe*.mjs
 _probe*.ts
+
+scripts/_tmp-*.ts
