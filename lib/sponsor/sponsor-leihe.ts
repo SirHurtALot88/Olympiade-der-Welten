@@ -19,7 +19,10 @@ import {
   getFacilityLevelDefinition,
   type FacilityId,
 } from "@/lib/facilities/facility-catalog";
-import { FACILITY_CONDITION_FULL, clampFacilityCondition } from "@/lib/facilities/facility-condition";
+import {
+  calculateFacilityMaintenanceCost,
+  clampFacilityCondition,
+} from "@/lib/facilities/facility-condition";
 
 /**
  * Die vier Raritaeten in Chris' Reihenfolge — gewöhnlich → magisch → selten → legendär.
@@ -106,10 +109,22 @@ export function berechneCashVerzicht(input: {
  * SCHLECHTEREN Preis (sie kostet ja weniger Verzicht). Die beste Karte waere die teuerste — genau
  * verkehrt herum.
  *
- * Danach zaehlt der ZUSTAND. Chris: „nach 3 jahren in der übergabe bitte auch den zustand
- * berücksichtigen den das gebäude haben könnte so dass es dann evtl weniger wert wäre, die upgrade
- * stufen dort hin kosten natürlich immer gleich viel." Ein drei Saisons altes Gebaeude steht bei
- * rund 50 Zustand — man uebernimmt es guenstiger und erbt die Reparatur.
+ * DER ZUSTAND WIRKT ALS REPARATURLAST, NICHT ALS PROZENTRABATT.
+ *
+ * Chris: „bei zustand 50 gilt das zwar für die aktuelle stufe aber der kaufpreis in summe für zb
+ * stufe 4 ist ja deutlich höher sonst wäre der rabatt zu krass wenn man für 20 mio n gebäude stufe
+ * 4 oder so kaufen könnte." Und frueher schon: „die upgrade stufen dort hin kosten natürlich immer
+ * gleich viel."
+ *
+ * Der erste Entwurf multiplizierte den Restpreis mit dem Zustand — Reha Stufe 4 waere bei Zustand
+ * 50 fuer 21,3 zu haben gewesen, bei einem Selbstbau von 77. Das ist zu billig, und es widerspricht
+ * der eigenen Regel: die Stufen kosten, was sie kosten; abgenutzt ist nicht dasselbe wie „halb so
+ * viele Stufen".
+ *
+ * Richtig ist der Abzug der REPARATUR, die der Kaeufer erbt — dieselbe Rechnung, die er auch
+ * zahlen muesste, wenn er das Gebaeude schon haette (`calculateFacilityMaintenanceCost`). Damit
+ * bleibt der Preis an die Bausubstanz gebunden und der Zustand kostet genau so viel, wie er
+ * tatsaechlich kostet. Reha Stufe 4 bei Zustand 50: 42,6 − 5,3 = 37,3 statt 21,3.
  */
 export function berechneUebernahmepreis(input: {
   facilityId: FacilityId;
@@ -124,9 +139,12 @@ export function berechneUebernahmepreis(input: {
     (summe, stufe) => summe + berechneLeihwert(input.facilityId, stufe),
     0,
   );
-  const rest = Math.max(0, katalog - angerechnet);
-  const zustand = clampFacilityCondition(input.zustandPct) / FACILITY_CONDITION_FULL;
-  return rundeAufZehntel(rest * zustand);
+  const reparatur = calculateFacilityMaintenanceCost({
+    facilityId: input.facilityId,
+    level: input.stufe,
+    conditionPct: clampFacilityCondition(input.zustandPct),
+  });
+  return rundeAufZehntel(Math.max(0, katalog - angerechnet - reparatur));
 }
 
 /**

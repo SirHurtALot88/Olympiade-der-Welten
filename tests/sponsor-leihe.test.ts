@@ -90,13 +90,24 @@ describe("Uebernahmepreis", () => {
     }
   });
 
-  it("wird durch den Zustand guenstiger — ein altes Gebaeude ist weniger wert", () => {
+  it("zieht den Zustand als Reparaturlast ab, nicht als Prozentrabatt", () => {
+    // Der erste Entwurf multiplizierte den Restpreis mit dem Zustand: Stufe 4 waere bei Zustand 50
+    // fuer 21,3 zu haben gewesen, bei einem Selbstbau von 77. Zu billig — und im Widerspruch zur
+    // Regel, dass die Aufstiegsstufen immer gleich viel kosten. Abgezogen wird jetzt genau die
+    // Reparatur, die der Kaeufer erbt.
     const basis = { facilityId: "recovery_center" as const, stufe: 4, gehalteneStufen: [2, 3, 4] };
     const neu = berechneUebernahmepreis({ ...basis, zustandPct: 100 });
     const gebraucht = berechneUebernahmepreis({ ...basis, zustandPct: 50 });
-    expect(gebraucht).toBeCloseTo(neu / 2, 1);
-    // Ein kaputtes Gebaeude ist geschenkt — man erbt dafuer die volle Reparatur.
-    expect(berechneUebernahmepreis({ ...basis, zustandPct: 0 })).toBe(0);
+    const kaputt = berechneUebernahmepreis({ ...basis, zustandPct: 0 });
+
+    // Der Zustand macht guenstiger, aber nicht dramatisch.
+    expect(gebraucht).toBeLessThan(neu);
+    expect(gebraucht).toBeGreaterThan(neu * 0.8);
+    // Und selbst ein ruinierter Bau kostet noch den Grossteil — man kauft die Stufen, nicht den Lack.
+    expect(kaputt).toBeGreaterThan(neu * 0.7);
+    // Die Groessenordnung, die Chris gesetzt hat: ein Stufe-4-Gebaeude ist nie fuer ein Viertel
+    // seiner Bausumme zu haben.
+    expect(gebraucht).toBeGreaterThan(berechneKatalogkosten("recovery_center", 4) * 0.4);
   });
 
   it("faellt nie unter null, auch wenn lange geliehen wurde", () => {
