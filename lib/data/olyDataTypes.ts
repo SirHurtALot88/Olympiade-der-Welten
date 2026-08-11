@@ -1268,6 +1268,22 @@ export type TeamFacilityCollection = {
   facilities: Record<string, TeamFacilityRecord>;
 };
 
+/**
+ * Ein vom Sponsor geliehenes Gebäude. `zustandPct` ist die Vertragsvariable: derselbe Gebäudetyp
+ * auf derselben Stufe kann neu oder gebraucht verliehen werden und ist dann verschieden wertvoll.
+ * `ruht` schaltet die Leihe ab, wenn die Rangmarke des Vertrags gerissen ist — der Cash-Verzicht
+ * laeuft dabei weiter.
+ */
+export type SponsorLeihgabeRecord = {
+  facilityId: string;
+  stufe: number;
+  zustandPct: number;
+  ruht?: boolean;
+  /** Der Vertrag, aus dem die Leihe stammt — fuer Anzeige und Aufraeumen beim Vertragsende. */
+  seasonId: string;
+  offerId?: string;
+};
+
 export type FacilityEventRecord = {
   eventId: string;
   seasonId: string;
@@ -2975,6 +2991,14 @@ export type SeasonState = {
   teamStrategyProfiles?: Record<string, TeamStrategyProfile>;
   aiPreseasonAutomationRuns?: Record<string, AiPreseasonAutomationRunRecord>;
   teamFacilities?: Record<string, TeamFacilityCollection>;
+  /**
+   * GELIEHENE GEBÄUDE aus laufenden Sponsorvertraegen, je Team. Sie liegen NEBEN dem eigenen
+   * Bestand, nicht darin: `getTeamFacilityState` legt sie beim Lesen darueber (Maximum aus eigen
+   * und geliehen), sodass jede Wirkungsrechnung sie sieht, ohne von der Leihe zu wissen. Endet der
+   * Vertrag oder reisst die Rangmarke, faellt das Team auf den eigenen Bestand zurueck — deshalb
+   * darf die Leihe nie in `teamFacilities` geschrieben werden.
+   */
+  sponsorLeihgabenByTeamId?: Record<string, SponsorLeihgabeRecord[]>;
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
