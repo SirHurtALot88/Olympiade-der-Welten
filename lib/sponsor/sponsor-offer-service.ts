@@ -15,6 +15,7 @@ import type {
   TeamSponsorContract,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+import { getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
@@ -857,6 +858,18 @@ const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
 const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 3;
 
 /**
+ * WIE OFT EINE LEIHE VORAUSSICHTLICH WIRKT — die Uptime der Rangmarke, und sie ist GESCHAETZT.
+ *
+ * #490 nennt fuer die milde Marke ~90 % und fuer die harte ~70-80 %; gemessen ist das nicht (die
+ * Bauvorlage fuehrt es als offenen Punkt 2). Die Zahlen stehen hier als das, was sie sind: eine
+ * Annahme, die die KI-Wahl vorsichtig macht statt sie zu praezisieren. Schwanken die Raenge in
+ * dieser Liga staerker, ist die harte Marke schlechter als hier unterstellt — dann bevorzugt die KI
+ * grosse Karten zu oft, und der Messlauf (Schritt 9) findet es.
+ */
+const SPONSOR_AI_UPTIME_MILD = 0.9;
+const SPONSOR_AI_UPTIME_HART = 0.75;
+
+/**
  * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
  *
  * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
@@ -918,12 +931,35 @@ function scoreOfferForAi(input: {
    * Downside-Term unwirksam — exakt dasselbe Verhalten wie vor dieser Aenderung.
    */
   ecoIntent01?: number;
+  /**
+   * Eigene Gebäudestufen dieses Teams. Ohne sie bleibt der Leih-Term unwirksam — dasselbe
+   * Verhalten wie vor seiner Einfuehrung, damit bestehende Aufrufer nichts merken.
+   */
+  eigeneFacilityStufen?: Readonly<Record<string, number>>;
 }): number {
   const { offer, profile, identity, cashPressure } = input;
   const terms = getSponsorV3Terms(offer);
   const axisKey = terms?.axis?.key as SponsorV4AxisKey | undefined;
 
   let score = 0;
+
+  // WAS DIE KARTE ÜBERHAUPT ZAHLT — und bis hierher stand das NICHT in der Rechnung.
+  //
+  // Der Befund kam aus einer Messung, nicht aus der Codeinspektion: nach Einfuehrung des
+  // Gebaeude-Terms unten waehlten 26 von 32 Teams die groesste Gebaeude-Karte, auch bei Kasse −30.
+  // Grund war nicht der neue Term, sondern eine Luecke, die er sichtbar gemacht hat: KEINER der
+  // Terme hier mass die absolute Hoehe der Karte. Der Kurven-Term rechnet `fitValue − anchor`, also
+  // eine FORM; der Achsen-Term einen Zusatz; der Rest Risiko. Solange alle Karten eines Slates auf
+  // denselben Erwartungswert normiert waren (bis E1/E10), war das genau richtig — die Hoehe war
+  // konstant und haette in jedem Vergleich denselben Summanden addiert.
+  //
+  // Seit eine Gebaeude-Karte weniger zahlt (E1) und eine legendaere mehr (E10), ist die Hoehe eine
+  // ECHTE Unterscheidung. Ohne sie sah die KI nur noch den Nutzen des Gebaeudes und nie seinen
+  // Preis. `terms.anchor` ist per Konstruktion der Erwartungswert der Karte — genau die Groesse, die
+  // hier fehlte, und in derselben Einheit wie der Gebaeude-Term weiter unten.
+  if (terms) {
+    score += terms.anchor;
+  }
 
   if (axisKey && terms) {
     const fit = estimateAxisFitForAi({
@@ -988,6 +1024,40 @@ function scoreOfferForAi(input: {
   // fuer die Messung, die diese Formel ersetzt hat).
   if (terms && (input.ecoIntent01 ?? 0) > 0) {
     score -= (input.ecoIntent01 ?? 0) * SPONSOR_AI_ECO_DOWNSIDE_WEIGHT * sponsorV3DownsideShortfall(terms);
+  }
+
+  // DAS GEBÄUDE — bis hierher bewertete die KI es GAR NICHT.
+  //
+  // Der Befund, und er ist unangenehm: die Punkte oben rechnen ausschliesslich in Cash. Eine
+  // Gebäude-Karte hat eine niedrigere Leiter (E1), also war sie fuer die KI schlicht eine
+  // schlechtere Karte — was sie trotzdem oft gewaehlt hat, lag am Achsen-Term, nicht am Gebäude.
+  // Sie hat also fuer den richtigen Preis das Falsche gekauft.
+  //
+  // WAS DAS GEBÄUDE WERT IST, ist bereits gerechnet: `leihwertJeSaison` ist genau die Groesse, in
+  // der die Karte bepreist wurde (`Verzicht = Leihwert / Kurs`). Sie hier zu addieren macht die
+  // Rechnung geschlossen — die KI zahlt Cash und bekommt Gegenwert, und der Vergleich zwischen
+  // reiner Cash-Karte und Gebäude-Karte wird zu dem, was er sein soll: eine Abwaegung.
+  //
+  // DREI ABSCHLAEGE, damit daraus kein blinder Gebäude-Hunger wird:
+  //
+  //   RANGMARKE — das Gebäude wirkt nur, solange das Team ueber der Marke steht. Eine harte Marke
+  //   ist ein echtes Risiko; #490 schaetzt die Uptime auf 70-80 % (mild ~90 %), gemessen ist sie
+  //   nicht (Abschnitt 7, Punkt 2). Die Schaetzung steht hier als das, was sie ist.
+  //
+  //   ZUSTAND — eine gewoehnliche Leihe startet bei 70 % und wirkt entsprechend schwaecher. Der
+  //   Wirkungsgrad ist dieselbe Kurve, die auch das Spiel rechnet.
+  //
+  //   EIGENER BESTAND — wer das Gebäude selbst schon hoeher hat, bekommt vom Overlay (`max`) gar
+  //   nichts. So eine Karte ist fuer dieses Team wertlos, egal wie gut sie aussieht.
+  if (offer.sponsorLeihe) {
+    const leihe = offer.sponsorLeihe;
+    const eigeneStufe = input.eigeneFacilityStufen?.[leihe.facilityId] ?? 0;
+    const geliehene = leihe.stufenreihe[0] ?? 0;
+    if (geliehene > eigeneStufe) {
+      const uptime = leihe.rangmarkenHaerte === "hart" ? SPONSOR_AI_UPTIME_HART : SPONSOR_AI_UPTIME_MILD;
+      const wirkungsgrad = getFacilityEfficiencyPct(leihe.startZustandPct) / 100;
+      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad;
+    }
   }
 
   // Markenpassung bleibt als milder Flavour-Term: sie bewegt kein Geld, soll aber bei aehnlicher
@@ -1086,8 +1156,17 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       seasonStrategy: seasonStrategyByTeamId[team.teamId]?.seasonStrategy,
       cashPressure,
     });
+    // Der EIGENE Bestand, nicht der ueber `getTeamFacilityState` gelesene: Letzterer traegt eine
+    // laufende Leihe mit, und dann bewertete die KI ein Angebot gegen ein Gebaeude, das sie in der
+    // naechsten Saison gar nicht mehr hat.
+    const eigeneFacilityStufen = Object.fromEntries(
+      Object.entries(nextGameState.seasonState.teamFacilities?.[team.teamId]?.facilities ?? {}).map(
+        ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
+      ),
+    );
     const scoreArgs = {
       profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
+      eigeneFacilityStufen,
     };
     const bestOffer = [...offers].sort(
       (left, right) =>

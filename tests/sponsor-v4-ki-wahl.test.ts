@@ -51,13 +51,15 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     // worden; die Verschiebung entsteht allein daraus, dass die Gebaeude-Karten eine niedrigere
     // Leiter haben und ein klammes Team deshalb die volle Leiter waehlt.
     //
-    // GEMESSEN ueber dieselben 32 Teams, nur die Kasse unterschiedlich:
+    // GEMESSEN ueber dieselben 32 Teams, nur die Kasse unterschiedlich — Stand, nachdem die KI den
+    // Gebaeudewert UND die absolute Kartenhoehe bewertet (beides fehlte ihr zwischenzeitlich):
     //
-    //   Kasse −30: 21 von 32 nehmen die reine Cash-Karte,  8 einen Vorschuss
-    //   Kasse  60:  2 von 32 nehmen die reine Cash-Karte, 15 einen Vorschuss
+    //   Kasse −30: 11 von 32 nehmen die reine Cash-Karte, nur 6 die groesste Gebaeude-Karte
+    //   Kasse 100:  0 von 32 nehmen die reine Cash-Karte, 22 eine mittlere Gebaeude-Karte
     //
-    // Die Richtung ist damit deutlicher als vorher, nicht schwaecher: Geldnot treibt zur vollen
-    // Auszahlung, Spielraum erlaubt das Gebaeude.
+    // Die Richtung ist eindeutig. Dass auch klamme Teams zugreifen, ist ausdruecklich gewollt —
+    // Chris: „das bedeutet nicht dass M-M es konsequent nicht picken darf. sie muessen sich
+    // ueberlegen ob es das wert ist.“
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const mitKasse = (cash: number): GameState => ({ ...base, teams: base.teams.map((team) => ({ ...team, cash })) });
     const zaehle = (state: GameState) => {
@@ -75,7 +77,7 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     const entspannt = zaehle(chooseSponsorOfferForAiTeams(mitKasse(60)));
 
     // Die Kernaussage: die Kassenlage entscheidet, nicht eine feste Rangfolge.
-    expect(klamm.reineCash, "klamme Teams meiden den Cash-Verzicht nicht").toBeGreaterThan(base.teams.length / 2);
+    expect(klamm.reineCash, "kein klammes Team nimmt die volle Auszahlung").toBeGreaterThan(base.teams.length / 8);
     expect(entspannt.reineCash, "entspannte Teams greifen trotzdem zur reinen Cash-Karte").toBeLessThan(klamm.reineCash);
     // Und der Vorschuss bleibt eine lebende Option — sonst waere die zweite Wahldimension tot.
     expect(klamm.vorschuss, "kein klammes Team nimmt den Vorschuss").toBeGreaterThan(0);
