@@ -52,6 +52,10 @@ export function getFacilityConditionStatus(conditionPct: number | null | undefin
   const condition = clampFacilityCondition(conditionPct);
   if (condition <= 0) return "broken" as const;
   if (condition < 40) return "critical" as const;
+  // Die Grenze zwischen "abgenutzt" und "alternd" IST die Wirkschwelle — alles darunter kostet
+  // Leistung, alles darueber nicht. Vorher lag "alternd" bei 70..89 und spannte damit ueber die
+  // Schwelle hinweg: ein Gebaeude bei 75 hiess "alternd" und wirkte trotzdem voll, eines bei 85
+  // hiess dasselbe und wirkte auch voll — der Status sagte nichts.
   if (condition < FACILITY_CONDITION_WARNING) return "worn" as const;
   if (condition < 90) return "aging" as const;
   return "good" as const;

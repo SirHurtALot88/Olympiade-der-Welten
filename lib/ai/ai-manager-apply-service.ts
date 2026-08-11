@@ -25,6 +25,7 @@ import {
 import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
+import { FACILITY_CONDITION_WARNING } from "@/lib/facilities/facility-condition";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 import { chooseSpecialistWingVariantForTeam } from "@/lib/facilities/specialist-wing-variant-choice";
@@ -277,6 +278,25 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
     const maintenancePlans = teamPlan.buildingPlan.filter((row) => {
       if (row.action === "downgrade_or_ignore_if_no_cash") return false;
       const maintenance = getMaintenance(row.teamId, row.buildingType);
+      /**
+       * SOLANGE DAS GEBAEUDE VOLL WIRKT, WIRD NICHT REPARIERT.
+       *
+       * Die KI reparierte bisher alles, was nicht exakt auf 100 stand — der einzige
+       * zustandsbezogene Blocker war `facility_condition_already_full`. Die Wirkung haengt aber
+       * gar nicht am Zustand, solange er ueber der Schwelle liegt (`getFacilityEfficiencyPct`:
+       * volle Leistung bis 80). Am Live-Abbild gemessen: alle 12 Gebaeude der Liga standen auf
+       * Zustand 92, also bei voller Wirkung — der naechste Vorsaison-Lauf haette dafuer Geld
+       * ausgegeben, ohne dass ein einziger Punkt Wirkung zurueckgekommen waere.
+       *
+       * Seit der Verschleiss von 8 auf im Mittel 17 je Saison gestiegen ist, waere aus der
+       * Kleinigkeit ein Dauerposten geworden.
+       *
+       * Das ist die UNTERGRENZE, nicht die fertige Abwaegung: wann sich eine Reparatur unterhalb
+       * der Schwelle lohnt, haengt an Nutzen, Kosten und Kassenlage und steht in
+       * `docs/GEBAEUDE_REPARATUR_STRATEGIE.md`. Hier faellt nur das weg, was nachweislich nichts
+       * bringt.
+       */
+      if ((maintenance.conditionPct ?? 0) >= FACILITY_CONDITION_WARNING) return false;
       return maintenance.ok || (!maintenance.blockingReasons.includes("facility_not_built") && !maintenance.blockingReasons.includes("facility_condition_already_full"));
     });
     const downgradePlans = teamPlan.buildingPlan.filter((row) => row.action === "downgrade_or_ignore_if_no_cash" && row.currentLevel > 0);
