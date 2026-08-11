@@ -28,12 +28,33 @@ import { sponsorV3AnchorWeights } from "@/lib/sponsor/sponsor-v3-model";
 /** Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell. */
 const SPONSOR_LIGA_RANKS = 32;
 
+/**
+ * DER EINE REGLER FUER DIE HOEHE DER GANZEN AUSSCHUETTUNG.
+ *
+ * Er skaliert Sockel, Wertungstopf und Sicherheitsnetz GEMEINSAM — also jede Sprosse jeder Karte um
+ * denselben Faktor. Genau deshalb gibt es ihn: die Hoehe der Liga-Auszahlung ist eine einzige
+ * Entscheidung und sollte auch an einer einzigen Zahl haengen. Wer stattdessen die drei Konstanten
+ * unten einzeln anfasst, verschiebt unweigerlich auch ihr VERHAELTNIS zueinander — und damit die
+ * Verteilung zwischen Spitze und Tabellenende, obwohl er nur die Summe meinte.
+ *
+ * WARUM 1,1: der Messlauf (`scripts/messlauf-sponsoren-gebaeude.ts`) ergab bei 1,0 eine Deckung von
+ * 84 % — Σ Sponsorgeld 1694,6 C gegen Σ Gehaelter 2020,0 C. Davon waren rund zwei Drittel der
+ * bewusst gewaehlte Cash-Verzicht fuer Gebaeude (195,9 C); ohne ihn lag die Deckung bei 94 %. Das
+ * verbleibende Drittel war eine Leiter, die auch ohne Gebaeude knapp unter der Selbstdeckung lag.
+ * Chris' Entscheidung: „dann würde ich sagen musst du deine Cash Ausschüttung um 10 % erhöhen."
+ *
+ * Was das bewirkt und was NICHT: die Liga kann ihre Gehaelter jetzt aus reinen Cash-Sponsoren
+ * decken. Wer Gebaeude leiht, bleibt darunter — das ist kein Rest-Fehler, sondern das Rubberband,
+ * das Chris ausdruecklich will („wenn die teams overspenden bei den gehältern ist das gewollt").
+ */
+export const SPONSOR_AUSSCHUETTUNG = 1.1;
+
 /** Sockel fuer Startrang 1 (Titelverteidiger) — er muss sich alles erspielen. */
-export const SPONSOR_SOCKEL_MIN = 18;
+export const SPONSOR_SOCKEL_MIN = 18 * SPONSOR_AUSSCHUETTUNG;
 /** Sockel fuer Startrang 32 (Schlusslicht) — die Absicherung nach unten. */
-export const SPONSOR_SOCKEL_MAX = 48;
+export const SPONSOR_SOCKEL_MAX = 48 * SPONSOR_AUSSCHUETTUNG;
 /** Wertungstopf der Liga bei Salary Factor 1,0. */
-export const SPONSOR_WERTUNGSTOPF = 1030;
+export const SPONSOR_WERTUNGSTOPF = 1030 * SPONSOR_AUSSCHUETTUNG;
 /**
  * Kruemmung der Rangverteilung des Wertungstopfs. > 1 heisst: die Spitze bekommt ueberproportional
  * mehr als eine lineare Verteilung, das Mittelfeld entsprechend weniger — passend zu einer Liga, in
@@ -48,7 +69,7 @@ export const SPONSOR_WERTUNG_KURVE = 1.35;
  * `floor`) — er steht NICHT in den Formeln unten, damit die Ankerarithmetik von `sponsorKurvenLeiter`
  * linear und exakt bleibt (ein Clamp in der Leiter selbst wuerde die Ankernormierung verfaelschen).
  */
-export const SPONSOR_BODEN = 43;
+export const SPONSOR_BODEN = 43 * SPONSOR_AUSSCHUETTUNG;
 
 const clampRank = (rank: number): number =>
   Math.max(1, Math.min(SPONSOR_LIGA_RANKS, Math.round(Number.isFinite(rank) ? rank : SPONSOR_LIGA_RANKS)));
