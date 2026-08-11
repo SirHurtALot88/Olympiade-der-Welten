@@ -39,6 +39,19 @@ const TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS: GlobalTableColumnConfig[] = [
 ];
 
 /**
+ * Erklärtexte am Spaltenkopf — nur dort, wo die Spalte einen anderen Zeitpunkt meint, als der
+ * Kopf vermuten lässt. Cash steht auf dem EINTRITTSSTAND der Folgesaison (siehe die Begründung in
+ * `use-foundation-cross-tab-teams-roster.ts`), Gehalt und MW auf dem Saisonabschluss. Ohne diesen
+ * Hinweis liest man die drei Spalten als einen Moment — und genau die Verwechslung hat die
+ * Cash-Spalte vorher ausgelöst.
+ */
+const TEAM_DRAWER_HISTORY_SPALTEN_HINWEIS: Record<string, string> = {
+  cash: "Kontostand zu Beginn der Folgesaison — nach Verkäufen, Käufen und Kaderfüllung. Nicht der Stand am Saisonende.",
+  salary: "Gehaltssumme am Saisonende, vor dem ersten Verkauf.",
+  mw: "Marktwert am Saisonende, nach dem Trainings-Apply und vor dem ersten Verkauf.",
+};
+
+/**
  * GEWÜNSCHT: „hier hätte ich auch gerne in season 2 den vergleich zu s1 dahinter also
  * POW 12,5 (+4,2) auch bei gehalt mw usw" — und auf Nachfrage: überall gleich, also auch im
  * Team-Drawer, nicht nur im Team-Profil. Deshalb sitzt die Rechnung HIER in der geteilten
@@ -247,6 +260,7 @@ export default function TeamDrawerHistoryTable({
                   key={column.id}
                   {...(column.draggable === false ? {} : getTableHeaderDragProps(column))}
                   className={axisClassName ?? undefined}
+                  title={TEAM_DRAWER_HISTORY_SPALTEN_HINWEIS[column.id]}
                   style={{ width: `${getTableColumnWidth(column)}px`, minWidth: `${column.minWidth}px` }}
                 >
                   <div className="table-header-cell">

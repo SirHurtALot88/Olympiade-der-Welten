@@ -17,6 +17,13 @@
  * Neu: ein gemeinsamer, write-once eingefrorener Block (`cashSeasonEnd`, `salarySeasonEnd`,
  * `rosterSeasonEnd`, `marketValueSeasonEnd`) zum Ende von `player_development` — nach dem
  * Trainings-Apply, vor dem ersten Verkauf.
+ *
+ * NACHTRAG ZU CASH. An L-K fiel auf, dass der Saisonabschluss für den Kontostand die falsche Frage
+ * beantwortet: die Zeile trug 137,4, das Team hatte vor dem Ausverkauf 9,4 und ging mit 25,6 in die
+ * Folgesaison. Chris' Entscheidung: die Cash-Spalte zeigt `cashEntry` — den Eintrittsstand der
+ * Folgesaison, dieselbe Wahl wie in der Ewigen Tabelle. Gehalt und Marktwert bleiben auf dem
+ * eingefrorenen Saisonabschluss; die Spalten stehen damit bewusst auf zwei Zeitpunkten, und der
+ * Spaltenkopf sagt es an.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -32,6 +39,7 @@ const historyReader = readFileSync(
   "utf8",
 );
 const projection = readFileSync(join(root, "lib/persistence/foundation-season-history-projection.ts"), "utf8");
+const allTimeReader = readFileSync(join(root, "lib/foundation/all-time-table.ts"), "utf8");
 
 describe("Saison-Snapshot · ein Zeitpunkt für alle Momentwerte", () => {
   it("friert Cash, Gehalt und Kadergröße gemeinsam mit dem Marktwert ein", () => {
@@ -98,17 +106,32 @@ describe("Saison-Snapshot · Notbehelf gibt sich zu erkennen", () => {
 });
 
 describe("Saison-Snapshot · die Historie liest den eingefrorenen Stand", () => {
-  it("bevorzugt die SeasonEnd-Felder in beiden Lesepfaden", () => {
-    const treffer = historyReader.match(/cashSeasonEnd \?\? teamSnapshot\.cashEnd|cashSeasonEnd \?\? teamEintrag\.cashEnd/g);
-    expect(treffer?.length).toBe(2);
+  it("bevorzugt die SeasonEnd-Felder bei Gehalt und Marktwert in beiden Lesepfaden", () => {
     expect(historyReader).toMatch(/salarySeasonEnd \?\? teamSnapshot\.salaryTotalEnd/);
     expect(historyReader).toMatch(/salarySeasonEnd \?\? teamEintrag\.salaryTotalEnd/);
+    expect(historyReader).toMatch(/marketValueSeasonEnd \?\?\s*teamSnapshot\.marketValueTotalEnd/);
+    expect(historyReader).toMatch(/marketValueSeasonEnd \?\?\s*teamEintrag\.marketValueTotalEnd/);
+  });
+
+  it("liest Cash dagegen als Eintrittsstand der Folgesaison", () => {
+    // BEWUSSTE AUSNAHME, gemeldet an L-K: `cashSeasonEnd`/`cashEnd` ist der Stand am
+    // Saisonende — bei `cashEnd` sogar NACH der Verkaufsphase, also die Spitze direkt nach
+    // dem Ausverkauf (L-K: 137,4 statt der 9,4, die das Team vorher hatte). Die Historie
+    // zeigt deshalb `cashEntry`, dasselbe Feld wie die Ewige Tabelle: das Geld, mit dem das
+    // Team wirklich losgespielt hat.
+    const treffer = historyReader.match(/cashEntry \?\?\s*teamSnapshot\.cashSeasonEnd|cashEntry \?\?\s*teamEintrag\.cashSeasonEnd/g);
+    expect(treffer?.length).toBe(2);
+    expect(allTimeReader).toMatch(/cash: record\.cashEntry \?\? record\.cashEnd/);
   });
 
   it("behält die Rückfallkette für Altsaisons ohne Freeze", () => {
     // Saison 1 hat keinen Freeze und bekommt auch keinen — rückrechnen ginge nur über
-    // Schätzungen. Sie zeigt weiter ihre alten Werte, statt leer zu laufen.
-    expect(historyReader).toMatch(/cashSeasonEnd \?\? teamSnapshot\.cashEnd \?\? teamSnapshot\.cashTotal/);
+    // Schätzungen. Sie zeigt weiter ihre alten Werte, statt leer zu laufen. Ohne
+    // Eintritts-Patch (letzte archivierte Saison vor der nächsten Vorbereitung) greift
+    // zuerst der eingefrorene Saisonabschluss, erst danach die überschriebenen Altfelder.
+    expect(historyReader).toMatch(
+      /cashEntry \?\?\s*teamSnapshot\.cashSeasonEnd \?\?\s*teamSnapshot\.cashEnd \?\?\s*teamSnapshot\.cashTotal/,
+    );
   });
 
   it("reicht die neuen Felder bis in den Browser durch", () => {
