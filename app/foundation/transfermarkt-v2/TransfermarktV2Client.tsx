@@ -722,7 +722,9 @@ export default function TransfermarktV2Client({
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewVersionRef = useRef(0);
-  const candidateButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  // New Look rendert die Kandidaten-Karte als `<div role="button">`, kein `<button>` — der Typ
+  // hier folgt dem tatsaechlich gerenderten Element (siehe `setCandidateButtonRef` unten).
+  const candidateButtonRefs = useRef<Map<string, HTMLElement>>(new Map());
   const shouldFocusSelectedCandidateRef = useRef(false);
   const wishlistClickTimerRef = useRef<number | null>(null);
   const buyModalRef = useRef<HTMLDivElement | null>(null);
@@ -1012,7 +1014,8 @@ export default function TransfermarktV2Client({
     [marketItems, selectedPlayerId, visibleItems],
   );
   /**
-   * ALLE sichtbaren Kandidaten werden gerendert — die Auslagerung uebernimmt der Browser.
+   * ALLE sichtbaren Kandidaten werden hier durchgereicht — die Auslagerung uebernimmt
+   * `TransfermarktV2NewLook` selbst.
    *
    * Vorher wuchs ein Praefix-Fenster alle 90 ms um 24 Karten, bis der ganze Bestand drin war
    * (gemessen: 1887 Karten). Das hatte zwei Nachteile auf einmal: es dauerte fast eine Minute,
@@ -1021,11 +1024,14 @@ export default function TransfermarktV2Client({
    * Leere lief. Am Ende standen trotzdem alle 1887 im DOM; das Fenster hat nur den Weg dorthin
    * in eine Zitterpartie verwandelt.
    *
-   * Statt eines JS-Fensters uebernimmt jetzt `content-visibility: auto` auf der Karte (siehe
-   * globals.css): der Browser ueberspringt Layout und Zeichnen fuer alles ausserhalb des
-   * Scroll-Bereichs. Bewusst SO und nicht als eigener Virtualisierer: Tastaturnavigation,
-   * `scrollIntoView` und die Karten-Refs arbeiten weiter auf einer vollstaendigen Liste — ein
-   * Fenster-Virtualisierer haette genau die Wege gebrochen, die gerade erst repariert wurden.
+   * `content-visibility: auto` auf der Karte wurde danach versucht und nachgemessen wirkungslos
+   * (0 von 1533 Karten uebersprungen). Der New Look hat inzwischen einen eigenen
+   * Fenster-Virtualisierer (`sichtbaresFenster`/`fensterStart` in TransfermarktV2NewLook.tsx):
+   * nur der sichtbare Ausschnitt plus Puffer wird gemountet. Tastaturnavigation, `scrollIntoView`
+   * und die Karten-Refs (`candidateButtonRefs`) arbeiten deshalb NICHT mehr auf einer
+   * vollstaendigen Liste, sondern nur auf dem gerenderten Fenster — der Virtualisierer zieht die
+   * Auswahl bewusst ins Fenster (siehe Kommentar dort bei `auswahlIndex`), sonst zeigt die Ref-Map
+   * ins Leere.
    */
   const renderedVisibleItems = visibleItems;
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
@@ -1322,6 +1328,21 @@ export default function TransfermarktV2Client({
   function selectCandidateFromKeyboard(playerId: string) {
     shouldFocusSelectedCandidateRef.current = true;
     setSelectedPlayerId(playerId);
+  }
+
+  /**
+   * Registrierung der Kandidaten-Karten-Refs — ohne sie zeigt `candidateButtonRefs` ins Leere und
+   * der Fokus-/Scroll-Effekt unten (der die Pfeiltasten-Navigation sichtbar macht) findet nichts
+   * zum Fokussieren. Ging beim Ausbau des Legacy-Zweigs verloren (Commit 32683df8): der New Look
+   * hat nie eine eigene Registrierung bekommen. Wird per Ref-Callback an jeder gerenderten Karte
+   * in `TransfermarktV2NewLook` aufgerufen (`onCandidateCardRef`).
+   */
+  function setCandidateButtonRef(playerId: string, node: HTMLElement | null) {
+    if (node) {
+      candidateButtonRefs.current.set(playerId, node);
+      return;
+    }
+    candidateButtonRefs.current.delete(playerId);
   }
 
   function moveCandidateSelection(key: "ArrowDown" | "ArrowUp" | "Home" | "End") {
@@ -2321,6 +2342,7 @@ export default function TransfermarktV2Client({
         marketCompleting={marketCompleting}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}
+        onCandidateCardRef={setCandidateButtonRef}
         onSelectCandidate={(playerId) => {
           shouldFocusSelectedCandidateRef.current = false;
           setSelectedPlayerId(playerId);

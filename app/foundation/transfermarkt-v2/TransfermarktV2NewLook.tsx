@@ -376,6 +376,10 @@ export type TransfermarktV2NewLookProps = {
   totalVisibleCount: number;
   selectedPlayerId: string | null;
   onSelectCandidate: (playerId: string) => void;
+  // Registriert das gerenderte Karten-Element beim Client, damit dessen Tastatur-Fokus-/
+  // Scroll-Effekt (`candidateButtonRefs`) die Karte findet — ohne das laeuft `focus()`/
+  // `scrollIntoView()` dort ins Leere, weil die Map nie befuellt wird.
+  onCandidateCardRef?: (playerId: string, node: HTMLElement | null) => void;
   selectedPlayer: TransfermarktFreeAgentItem | null;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   // Aktionen am selektierten Kandidaten
@@ -878,6 +882,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     totalVisibleCount,
     selectedPlayerId,
     onSelectCandidate,
+    onCandidateCardRef,
     selectedPlayer,
     onOpenPlayerDetails,
     onOpenDeal,
@@ -1630,6 +1635,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   data-testid="transfer-candidate-card"
                   className={`nl-market-candidate${isSelected ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`}
                   aria-selected={isSelected}
+                  ref={(node) => onCandidateCardRef?.(item.playerId, node)}
                   onClick={() => onSelectCandidate(item.playerId)}
                   onKeyDown={(event) => handleNlSelectKeyDown(event, () => onSelectCandidate(item.playerId))}
                 >
