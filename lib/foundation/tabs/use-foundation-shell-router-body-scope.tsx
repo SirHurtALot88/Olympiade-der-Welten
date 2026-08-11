@@ -229,7 +229,12 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
-import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
+import type {
+  SponsorNegotiationProfile,
+  SponsorLeihgabeRecord,
+  TeamFacilityRecord,
+  TeamSponsorContract,
+} from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddPlayerToTransferWishlist,
@@ -2668,14 +2673,19 @@ export function useFoundationShellRouterBodyScope({
   }
 
   /**
-   * Player-Generator Phase 2 — "Als Free Agent übernehmen". Mirrors
-   * `chooseTeamSponsor`'s fetch-then-`loadSave` pattern 1:1: POST the
-   * mutation to the guarded route (which loads/writes the save directly via
-   * persistence, independent of this client's in-memory `gameState`), then
-   * refetch so `gameState.players` picks up the newly inserted free agent.
-   * The committed draft is intentionally left in the saved-drafts list
-   * (the user can delete it manually) — re-committing it is harmless, it
-   * just mints another free agent with a fresh id rather than erroring.
+   * Player-Generator Phase 2 — "Als Free Agent übernehmen". POST the mutation to the guarded
+   * route (which loads/writes the save directly via persistence, independent of this client's
+   * in-memory `gameState`), then refetch so `gameState.players` picks up the newly inserted free
+   * agent. The committed draft is intentionally left in the saved-drafts list (the user can
+   * delete it manually) — re-committing it is harmless, it just mints another free agent with a
+   * fresh id rather than erroring.
+   *
+   * Der `loadSave` bleibt hier bewusst stehen (anders als seit Kurzem bei `chooseTeamSponsor`/
+   * `handleSponsorUebernahme`): die Antwort traegt nur eine Zusammenfassung
+   * (playerId/Name/Werte), nicht den vollen neuen `Player`-Datensatz — ohne Reload wuerde der neue
+   * Free Agent in `gameState.players` schlicht fehlen. `/api/player-generator/commit` gibt seit
+   * Kurzem trotzdem `saveVersion` zurueck (fuer den generischen Konflikt-Check unabhaengig vom
+   * jeweiligen Aufrufer), der nachfolgende `loadSave` uebernimmt sie ohnehin gleich mit.
    */
   async function commitPlayerGeneratorDraft(
     draft: PlayerGeneratorDraft,
@@ -4241,6 +4251,11 @@ export function useFoundationShellRouterBodyScope({
   // offenen Transferfenster, sonst schickt seine Checkliste in einen gesperrten Kader.
   const { runSeasonCompletion, runSeasonTransition } = seasonEndTransitionHandlers;
 
+  // `/api/ai/preseason-background` gibt seit Kurzem `saveVersion` zurueck (siehe die Route), aber
+  // der `reloadAfterMarketRosterApply()`-Reload unten BLEIBT bewusst stehen: der Lauf ruehrt an
+  // Manager-Aktionen, Draft/Markt fuer ALLE KI-Teams, Kredite und Season-Snapshots — praktisch der
+  // "halbe Spielstand" aendert sich, nicht ein einzelnes bekanntes Feld wie bei Training/Team-
+  // Identity. Ein per-Feld-Patch waere hier so umfangreich wie der Reload selbst, nur fehleranfaelliger.
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
       return null;
@@ -4889,6 +4904,12 @@ export function useFoundationShellRouterBodyScope({
     return result;
   }
 
+  // `/api/admin/season-simulation` gibt seit Kurzem `saveVersion` mit jedem `tick` zurueck, aber
+  // der `loadSave` unten beim Abschluss BLEIBT bewusst stehen: der Lauf simuliert 1-5 GANZE
+  // Saisons (Markt, Matchdays, XP, Facilities, Vertraege, Snapshots — siehe
+  // `lib/admin/season-simulation-runner.ts`), also praktisch den gesamten Spielstand. Ein
+  // Admin-Werkzeug, das absichtlich riesige Teile ueberschreibt — dieselbe Kategorie wie der
+  // KI-Preseason-Lauf, nicht wie ein einzelnes Feld.
   async function postAdminSeasonSimulation(action: "start" | "tick" | "pause" | "resume" | "cancel" | "status") {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -5785,14 +5806,70 @@ export function useFoundationShellRouterBodyScope({
           source: readMeta.source,
         })),
       });
-      const payload = (await response.json()) as { success?: boolean; error?: string; summary?: { contract?: { name?: string } } };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        saveVersion?: number;
+        summary?: {
+          contract?: TeamSponsorContract | null;
+          teamCash?: number | null;
+          sponsorLeihgabe?: SponsorLeihgabeRecord[] | null;
+          sponsorPayoutLogs?: GameState["seasonState"]["sponsorPayoutLogs"];
+          sponsorBrandHistory?: string[] | null;
+        };
+      };
       if (!response.ok || payload.error) {
         setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
       updateNewGameFlowStepStatus("choose_sponsor", "completed");
-      await loadSave(activeSaveId);
+
+      // KEIN volles `loadSave` mehr: die Route liefert jetzt alles, was `chooseSponsorOffer`
+      // ausser dem Vertrag noch schreibt (Vorschuss-Cash, Sponsor-Leihgabe, Payout-Log,
+      // Marken-Historie — siehe `app/api/sponsor/choose/route.ts`), und die neue `saveVersion`.
+      // Ein Reload hier war der zweite gemeldete Fehler: er ersetzt den GESAMTEN lokalen
+      // Spielstand und verwirft damit jede noch ungespeicherte Aenderung auf einer anderen Karte
+      // (z. B. ein gerade gesetzter Trainingsmodus) — siehe Commit "Zwei Fehler beim Blaettern".
+      // Wuerde hier eines der gepatchten Felder fehlen, kaeme der naechste generische PUT (voller
+      // gameState-Ueberschreiber) und wuerfe den serverseitig berechneten Wert wieder zurueck —
+      // deshalb muessen ALLE oben genannten Felder mitgepatcht werden, nicht nur der Vertrag.
+      setGameState((current) => ({
+        ...current,
+        teams:
+          payload.summary?.teamCash != null
+            ? applyTeamCashPatch(current.teams, { teamId: selectedTeam.teamId, cash: payload.summary.teamCash })
+            : current.teams,
+        seasonState: {
+          ...current.seasonState,
+          ...(payload.summary?.contract != null
+            ? {
+                sponsorContractsByTeamId: {
+                  ...current.seasonState.sponsorContractsByTeamId,
+                  [selectedTeam.teamId]: payload.summary.contract,
+                },
+              }
+            : {}),
+          ...(payload.summary?.sponsorLeihgabe != null
+            ? {
+                sponsorLeihgabenByTeamId: {
+                  ...current.seasonState.sponsorLeihgabenByTeamId,
+                  [selectedTeam.teamId]: payload.summary.sponsorLeihgabe,
+                },
+              }
+            : {}),
+          ...(payload.summary?.sponsorPayoutLogs != null ? { sponsorPayoutLogs: payload.summary.sponsorPayoutLogs } : {}),
+          ...(payload.summary?.sponsorBrandHistory != null
+            ? {
+                sponsorBrandHistoryByTeamId: {
+                  ...current.seasonState.sponsorBrandHistoryByTeamId,
+                  [selectedTeam.teamId]: payload.summary.sponsorBrandHistory,
+                },
+              }
+            : {}),
+        },
+        saveVersion: payload.saveVersion ?? current.saveVersion,
+      }));
       await reloadSeasonManagementOverview();
     } catch {
       setSponsorChoiceMessage("Sponsor konnte nicht gewählt werden.");
@@ -5802,11 +5879,12 @@ export function useFoundationShellRouterBodyScope({
   }
 
   /**
-   * Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags — mirrors `chooseTeamSponsor`'s
-   * fetch-then-`loadSave` pattern 1:1 (POST /api/sponsor/uebernahme → `nimmUebernahmeAn`/
-   * `lehneUebernahmeAb`, siehe `lib/sponsor/sponsor-leih-lifecycle.ts`). Busy-Marker ist die
-   * `facilityId`, nicht die `offerId` wie bei `chooseTeamSponsor` — ein Übernahmeangebot hat
-   * keine eigene Angebots-ID, das Gebäude selbst identifiziert es eindeutig je Team.
+   * Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags (POST /api/sponsor/uebernahme →
+   * `nimmUebernahmeAn`/`lehneUebernahmeAb`, siehe `lib/sponsor/sponsor-leih-lifecycle.ts`).
+   * Busy-Marker ist die `facilityId`, nicht die `offerId` wie bei `chooseTeamSponsor` — ein
+   * Übernahmeangebot hat keine eigene Angebots-ID, das Gebäude selbst identifiziert es eindeutig
+   * je Team. Patcht wie `chooseTeamSponsor` nur die bekannten geänderten Felder aus der Antwort
+   * statt eines vollen `loadSave` — siehe Begründung dort.
    */
   async function handleSponsorUebernahme(facilityId: string, action: "annehmen" | "ablehnen") {
     if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
@@ -5832,7 +5910,16 @@ export function useFoundationShellRouterBodyScope({
           source: readMeta.source,
         })),
       });
-      const payload = (await response.json()) as { success?: boolean; error?: string };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        saveVersion?: number;
+        summary?: {
+          offeneAngebote?: NonNullable<GameState["seasonState"]["sponsorUebernahmeAngeboteByTeamId"]>[string];
+          teamCash?: number | null;
+          facility?: { facilityId: string; data: TeamFacilityRecord | null } | null;
+        };
+      };
       if (!response.ok || payload.error) {
         setSponsorUebernahmeMessage(
           payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
@@ -5842,7 +5929,41 @@ export function useFoundationShellRouterBodyScope({
       setSponsorUebernahmeMessage(
         action === "annehmen" ? `Gebäude für ${selectedTeam.shortCode} übernommen.` : `Übernahmeangebot für ${selectedTeam.shortCode} abgelehnt.`,
       );
-      await loadSave(activeSaveId);
+
+      // KEIN volles `loadSave` mehr — dieselbe Begruendung wie bei `chooseTeamSponsor`: die Route
+      // liefert jetzt die neue `saveVersion` und den kompletten Rest dessen, was `nimmUebernahmeAn`
+      // bzw. `lehneUebernahmeAb` aendern (offene Angebote, bei "annehmen" zusaetzlich Kasse und das
+      // uebernommene Gebaeude). Ein Reload wuerde ungespeicherte Aenderungen auf einer anderen
+      // Karte verwerfen (siehe Commit "Zwei Fehler beim Blaettern").
+      setGameState((current) => ({
+        ...current,
+        teams:
+          payload.summary?.teamCash != null
+            ? applyTeamCashPatch(current.teams, { teamId: selectedTeam.teamId, cash: payload.summary.teamCash })
+            : current.teams,
+        seasonState: {
+          ...current.seasonState,
+          sponsorUebernahmeAngeboteByTeamId: {
+            ...current.seasonState.sponsorUebernahmeAngeboteByTeamId,
+            [selectedTeam.teamId]: payload.summary?.offeneAngebote ?? [],
+          },
+          ...(payload.summary?.facility?.data
+            ? {
+                teamFacilities: {
+                  ...current.seasonState.teamFacilities,
+                  [selectedTeam.teamId]: {
+                    ...(current.seasonState.teamFacilities?.[selectedTeam.teamId] ?? { facilities: {} }),
+                    facilities: {
+                      ...(current.seasonState.teamFacilities?.[selectedTeam.teamId]?.facilities ?? {}),
+                      [payload.summary.facility.facilityId]: payload.summary.facility.data,
+                    },
+                  },
+                },
+              }
+            : {}),
+        },
+        saveVersion: payload.saveVersion ?? current.saveVersion,
+      }));
       await reloadSeasonManagementOverview();
     } catch {
       setSponsorUebernahmeMessage(action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden.");

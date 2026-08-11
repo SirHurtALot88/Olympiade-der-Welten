@@ -121,8 +121,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });
     }
 
+    let persisted = null as ReturnType<typeof persistence.saveSingleplayerState> | null;
     if (!dryRun) {
-      persistence.saveSingleplayerState(saveId, result.gameState);
+      persisted = persistence.saveSingleplayerState(saveId, result.gameState);
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         teamId,
@@ -134,12 +135,30 @@ export async function POST(request: Request) {
       });
     }
 
+    // `saveVersion` mitgeben: `saveSingleplayerState` zaehlt sie bei JEDEM Schreiben hoch (siehe
+    // `persistence-service.ts`), egal ob ueber diese Route oder den generischen PUT. Ohne sie in
+    // der Antwort merkt der Client die neue Version nicht und der naechste generische PUT rechnet
+    // noch mit der alten -> 409 "Save-Konflikt erkannt" fuer eine Aenderung, die er selbst gemacht
+    // hat (GEMELDET von Chris beim Trainings-Speichern).
     return NextResponse.json({
       success: true,
+      saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
       summary: {
         applied: !dryRun,
         contract: result.contract,
         offers: getTeamSponsorOffers(result.gameState, teamId),
+        // Die drei folgenden Felder sind der REST dessen, was `chooseSponsorOffer` neben dem
+        // Vertrag noch aendert (Vorschuss-Cash, Sponsor-Leihgabe, Payout-Log, Marken-Historie).
+        // Der Aufrufer verzichtet jetzt auf ein volles `loadSave` (das verwirft ungespeicherte
+        // lokale Aenderungen anderswo — siehe Commit "Zwei Fehler beim Blaettern") und patcht
+        // stattdessen NUR diese bekannten Felder in sein lokales gameState. Fehlte hier auch nur
+        // eines, wuerde der naechste generische PUT (voller gameState-Ueberschreiber) den
+        // serverseitig berechneten Wert wieder zuruecksetzen — deshalb muss diese Liste
+        // vollstaendig bleiben, wenn `chooseSponsorOffer` je ein weiteres Feld schreibt.
+        teamCash: result.gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? null,
+        sponsorLeihgabe: result.gameState.seasonState.sponsorLeihgabenByTeamId?.[teamId] ?? null,
+        sponsorPayoutLogs: result.gameState.seasonState.sponsorPayoutLogs ?? null,
+        sponsorBrandHistory: result.gameState.seasonState.sponsorBrandHistoryByTeamId?.[teamId] ?? null,
       },
     });
   } catch (error) {

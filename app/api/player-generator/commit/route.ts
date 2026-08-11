@@ -94,8 +94,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });
     }
 
+    let persisted = null as ReturnType<typeof persistence.saveSingleplayerState> | null;
     if (!dryRun) {
-      persistence.saveSingleplayerState(saveId, result.gameState);
+      persisted = persistence.saveSingleplayerState(saveId, result.gameState);
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         teamId: null,
@@ -107,8 +108,14 @@ export async function POST(request: Request) {
       });
     }
 
+    // `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`. Der Aufrufer
+    // (`commitPlayerGeneratorDraft`) macht danach weiterhin ein volles `loadSave`, aber aus einem
+    // ANDEREN Grund als Versions-Sync: die Antwort hier traegt nur eine Zusammenfassung
+    // (playerId/Name/Werte), nicht den vollen neuen `Player`-Datensatz — `gameState.players`
+    // braucht den Reload, um den neu erzeugten Free Agent ueberhaupt zu sehen.
     return NextResponse.json({
       success: true,
+      saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
       summary: {
         applied: !dryRun,
         playerId: result.playerId,

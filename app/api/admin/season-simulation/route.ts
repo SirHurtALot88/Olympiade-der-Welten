@@ -9,6 +9,7 @@ import {
   type AdminSeasonSimulationMode,
 } from "@/lib/admin/season-simulation-runner";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,15 @@ export async function POST(request: Request) {
           return NextResponse.json({ ok: false, run, error: roomCheck.reason }, { status: roomCheck.status });
         }
       }
-      return NextResponse.json({ ok: true, run: await tickAdminSeasonSimulation(runId) });
+      const tickedRun = await tickAdminSeasonSimulation(runId);
+      // `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`. Nur ein
+      // `apply`-Tick schreibt real ueber `saveSingleplayerState` (siehe Kommentar oben); ein
+      // `dry_run`-Tick schreibt ausschliesslich in die In-Memory-Kopie des Runners
+      // (`createSingleSavePersistenceHarness`, season-simulation-runner.ts) und laesst den echten
+      // Save unangetastet — die real gelesene Version bleibt in dem Fall unveraendert, das
+      // Mitschicken ist also harmlos.
+      const saveVersion = tickedRun ? createPersistenceService().getSaveById(tickedRun.saveId)?.gameState.saveVersion ?? null : null;
+      return NextResponse.json({ ok: true, run: tickedRun, saveVersion });
     }
     if (action === "pause") {
       return NextResponse.json({ ok: true, run: setAdminSeasonSimulationStatus(runId, "paused") });

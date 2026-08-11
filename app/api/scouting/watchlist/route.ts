@@ -129,8 +129,9 @@ export async function POST(request: Request) {
       );
     }
 
+    let persisted = null as ReturnType<typeof persistence.saveSingleplayerState> | null;
     if (!dryRun) {
-      persistence.saveSingleplayerState(saveId, nextGameState);
+      persisted = persistence.saveSingleplayerState(saveId, nextGameState);
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         teamId,
@@ -142,10 +143,12 @@ export async function POST(request: Request) {
       });
     }
 
+    // `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`.
     return NextResponse.json({
       success: true,
       applied: !dryRun,
       watchlist: getScoutingWatchlistForTeam(nextGameState, teamId),
+      saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
     });
   } catch (error) {
     return NextResponse.json(
