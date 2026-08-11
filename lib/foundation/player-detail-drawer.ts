@@ -1062,12 +1062,25 @@ function buildBaselineAttributeDeltas(
 ): PlayerDetailDrawerData["baselineAttributeDeltas"] {
   if (!player) return [];
   const baseline = gameState.playerBaselines?.find((entry) => entry.playerId === player.id) ?? null;
-  if (!baseline) return [];
+  /**
+   * `baseline.attributes` MUSS mitgeprueft werden, nicht nur die Zeile selbst.
+   *
+   * Der kompakte Foundation-Payload traegt die Basislinien seit dem Audit vom 11.08. SCHLANK:
+   * Wirtschaftsbezug ja (die Marktwert-Anzeige rechnet darauf), Attribute nein (die holt der
+   * Drawer ohnehin ueber `hydrate-player-attribute-sheet` nach). Ohne diese Wache warf
+   * `Object.prototype.hasOwnProperty.call(undefined, key)` — und zwar mitten im Aufbau des
+   * Spieler-Drawers.
+   *
+   * Ein leeres Ergebnis ist hier genau richtig und auch nicht neu: als die Basislinien noch
+   * ganz gestrichen waren, lief diese Funktion aus demselben Grund in `return []`.
+   */
+  const baselineAttributes = baseline?.attributes ?? null;
+  if (!baseline || !baselineAttributes) return [];
   const latestEvent = progressionEvents[0] ?? null;
   return buildAttributeStats(player).map((entry) => {
     const key = entry.key as keyof NonNullable<Player["attributeSheetStats"]>;
-    const baselineValue = Object.prototype.hasOwnProperty.call(baseline.attributes, key)
-      ? baseline.attributes[key as keyof typeof baseline.attributes] ?? null
+    const baselineValue = Object.prototype.hasOwnProperty.call(baselineAttributes, key)
+      ? baselineAttributes[key as keyof typeof baselineAttributes] ?? null
       : null;
     const currentValue = player.attributeSheetStats?.[key] ?? null;
     const delta =

@@ -198,6 +198,20 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     seasonState: {
       ...gameState.seasonState,
       persistedSeasonDerivations: undefined,
+      /**
+       * DIE VORBERECHNUNG DES SPIELTAGS BLEIBT AUF DEM SERVER — 0,72 MB, die der Browser nie
+       * anfasst.
+       *
+       * `matchdayResolveSnapshots` ist ein Rechen-Cache: `writeMatchdayResolveSnapshot` rechnet den
+       * Spieltag EINMAL, damit Arena-Buehne und beide Disziplin-Buchungen aus demselben Ergebnis
+       * lesen. Beide Leser (`matchday-arena-base-service`, `matchday-auto-run-service`) laufen
+       * serverseitig auf dem vollen Save; im Browser liest das Feld nachweislich niemand. Am
+       * Live-Abbild gemessen fuhr es trotzdem mit: 0,715 MB, bei jedem Laden.
+       *
+       * Verlorengehen kann es dabei nicht — siehe die Wache in
+       * `rehydrateGameStateAfterCompactPut`: der Spielstand behaelt seine Vorberechnung.
+       */
+      matchdayResolveSnapshots: undefined,
       seasonSnapshots: undefined,
       /**
        * Ersatz fuer die gestrichenen Schnappschuesse — siehe
@@ -377,6 +391,15 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       ...incoming.seasonState,
       persistedSeasonDerivations:
         incoming.seasonState.persistedSeasonDerivations ?? existing.seasonState.persistedSeasonDerivations,
+      /**
+       * Die Spieltags-Vorberechnung des SPIELSTANDS gewinnt immer — sie faehrt gar nicht erst zum
+       * Browser hinaus (s. o.), also hat ein eingehender Wert hier nichts zu suchen. Ginge sie beim
+       * Speichern verloren, muesste der naechste Arena-Aufruf neu rechnen — und genau das Neurechnen
+       * war die Ursache dafuer, dass dieselbe Disziplin zwischen Buehne und Buchung zweimal
+       * unterschiedlich herauskam (siehe `matchday-resolve-snapshot`).
+       */
+      matchdayResolveSnapshots:
+        existing.seasonState.matchdayResolveSnapshots ?? incoming.seasonState.matchdayResolveSnapshots,
       // Append-only-Archive: der kompakte Client stempelt eine leere Liste `[]` an diese
       // Stelle. Die Wache haelt jeden vorhandenen Eintrag unveraendert fest und laesst nur
       // NEUE hinzukommen — siehe `preserveAppendOnlyArchive`.

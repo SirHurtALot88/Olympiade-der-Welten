@@ -176,6 +176,26 @@ describe("foundation initial compact state", () => {
     expect(compact.baselineWriteGuardEvents).toBeUndefined();
   });
 
+  it("die Spieltags-Vorberechnung bleibt auf dem Server und ueberlebt jedes Speichern", () => {
+    /**
+     * `matchdayResolveSnapshots` ist ein reiner Rechen-Cache des Servers (0,72 MB am
+     * Live-Abbild). Beide Leser laufen serverseitig; im Browser liest das Feld nachweislich
+     * niemand. Es faehrt deshalb nicht mehr mit — darf aber beim Zurueckschreiben auch nicht
+     * verlorengehen, sonst rechnet der naechste Arena-Aufruf neu, und genau das Neurechnen war
+     * die Ursache dafuer, dass Buehne und Buchung auseinanderliefen.
+     */
+    const existing = createGameState();
+    existing.seasonState.matchdayResolveSnapshots = [
+      { id: "resolve-1", saveId: "save-1", seasonId: "season-1", matchdayId: "md-2", payload: { preview: {} } } as never,
+    ];
+
+    const compact = compactFoundationInitialGameState(existing);
+    expect(compact.seasonState.matchdayResolveSnapshots).toBeUndefined();
+
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compact);
+    expect(rehydrated.seasonState.matchdayResolveSnapshots).toEqual(existing.seasonState.matchdayResolveSnapshots);
+  });
+
   it("die schlanke Fassung darf die vollen Basislinien im Spielstand NIE ersetzen", () => {
     /**
      * Der gefaehrliche Teil der Umstellung: `incoming.playerBaselines ?? existing` genuegt

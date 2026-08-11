@@ -130,7 +130,11 @@ describe.skipIf(!FIXTURE_VORHANDEN)("Diszi-Bühne: kanonische Saison-OVR statt l
     // Ein kompakter Payload ist er trotzdem — der Berg bleibt weg, und genau deshalb ist die
     // kanonische Karte weiter die bevorzugte Quelle.
     expect(compactGameState.seasonState.persistedSeasonDerivations).toBeUndefined();
-    expect(compactGameState.playerBaselines).toBeUndefined();
+    // `playerBaselines` fahren seit dem Audit vom 11.08. SCHLANK mit statt gar nicht: der
+    // Wirtschaftsbezug wird von der Marktwert-Anzeige gebraucht (ohne ihn zeigte sie fuer 498
+    // von 540 gepruefte Spieler eine andere Zahl), die Attribute nicht.
+    expect(compactGameState.playerBaselines?.length).toBe(fullGameState.playerBaselines?.length);
+    expect((compactGameState.playerBaselines?.[0] as Record<string, unknown> | undefined)?.attributes).toBeUndefined();
   });
 
   it("die rein lokale Rechnung auf dem kompakten Payload trifft die kanonische OVR — bei JEDEM Kaderspieler", () => {
