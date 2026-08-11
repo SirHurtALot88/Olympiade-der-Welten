@@ -5,7 +5,10 @@ import {
   buildExpectedSellValueByPlayerId,
   type ExpectedSellValueEntry,
 } from "@/lib/market/transfermarkt-expected-sell-value";
-import { resolveTeamsPortraitSellValueDisplay } from "@/lib/foundation/teams-portrait-sell-value";
+import {
+  buildTeamsPortraitMwValueText,
+  resolveTeamsPortraitSellValueDisplay,
+} from "@/lib/foundation/teams-portrait-sell-value";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -1248,18 +1251,7 @@ export default function FoundationTeamsNewLook({
               economyStats={[
                 {
                   label: "MW",
-                  value:
-                    marketValue != null
-                      ? `${formatNlMoney(marketValue)}${
-                          sellValueDisplay
-                            ? ` (VK ${formatNlNumber(sellValueDisplay.vkValue, 1)}${
-                                sellValueDisplay.vkDeltaVsMarketValue != null
-                                  ? ` ${sellValueDisplay.vkDeltaVsMarketValue > 0 ? "+" : ""}${formatNlNumber(sellValueDisplay.vkDeltaVsMarketValue, 2)}`
-                                  : ""
-                              })`
-                            : ""
-                        }`
-                      : "—",
+                  value: buildTeamsPortraitMwValueText({ marketValue, sellValueDisplay }),
                   title: sellValueDisplay
                     ? `MW — Marktwert (mit Delta zur Vorwoche). ${sellValueDisplay.tooltip}`
                     : "MW — Marktwert (mit Delta zur Vorwoche)",

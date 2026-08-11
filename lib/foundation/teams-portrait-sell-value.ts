@@ -1,3 +1,5 @@
+import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import type { ExpectedSellValueEntry } from "@/lib/market/transfermarkt-expected-sell-value";
 
 /**
@@ -42,4 +44,29 @@ export function resolveTeamsPortraitSellValueDisplay(input: {
       : ` Kein offener Buyout mehr — Netto bei Verkauf jetzt entspricht dem Brutto.`);
 
   return { vkValue, vkDeltaVsMarketValue, tooltip };
+}
+
+/**
+ * Der zusammengesetzte MW-Zellentext der Kader-Portraitkarte: MW als Leitzahl, dahinter in
+ * Klammern der VK-Preis (Brutto) samt seinem Abstand zum Marktwert — EINE Funktion, die
+ * `FoundationTeamsNewLook.tsx` UND der Definitions-Gleichheit-Test (`kaderkarte-vk-definitions-
+ * gleichheit.test.ts`) aufrufen, damit der Test die tatsächlich gerenderte Zahl prüft und nicht
+ * eine zweite, im Test nachgebaute Formatierung.
+ */
+export function buildTeamsPortraitMwValueText(input: {
+  marketValue: number | null;
+  sellValueDisplay: TeamsPortraitSellValueDisplay | null;
+}): string {
+  const { marketValue, sellValueDisplay } = input;
+  if (marketValue == null) {
+    return "—";
+  }
+  if (!sellValueDisplay) {
+    return formatNlMoney(marketValue);
+  }
+  const deltaText =
+    sellValueDisplay.vkDeltaVsMarketValue != null
+      ? ` ${sellValueDisplay.vkDeltaVsMarketValue > 0 ? "+" : ""}${formatNlNumber(sellValueDisplay.vkDeltaVsMarketValue, 2)}`
+      : "";
+  return `${formatNlMoney(marketValue)} (VK ${formatNlNumber(sellValueDisplay.vkValue, 1)}${deltaText})`;
 }
