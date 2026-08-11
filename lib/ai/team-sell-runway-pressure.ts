@@ -1,5 +1,6 @@
 import { PRESEASON_CASH_PRESSURE_THRESHOLD } from "@/lib/ai/preseason-cash-recovery-service";
 import { getTeamCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
+import { buildSchuldenlastFruehwarnung } from "@/lib/ai/schuldenlast-fruehwarnung";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
 function clamp(value: number, min: number, max: number) {
@@ -66,6 +67,18 @@ export function assessTeamSellRunwayPressure(input: {
     salaryTotal,
   });
 
+  /**
+   * ZWEITES, GETRENNTES SIGNAL — bewusst KEIN Summand im `cashPressureScore`. Der misst die Kasse
+   * von heute und steht bei allen Teams mit leerer Kasse ohnehin auf 1; dort eingerechnet würde die
+   * Frühwarnung gleich wieder in der Sättigung verschwinden, gegen die dieser Wert gerade erst neu
+   * gerechnet wurde. Sie beantwortet die ANDERE Frage: reicht Cash + Umsatz für die nächste
+   * Saisonend-Abbuchung (Gehalt + Kreditrate), oder muss dieses Team eher verkaufen?
+   */
+  const schuldenlast = buildSchuldenlastFruehwarnung(input.gameState, input.team.teamId, {
+    cash,
+    salaryTotal,
+  });
+
   return {
     seasonSells,
     salaryExceedsCash,
@@ -73,6 +86,7 @@ export function assessTeamSellRunwayPressure(input: {
     lowSellActivity,
     lowCashBuffer,
     cashPressureScore,
+    schuldenlast,
   };
 }
 

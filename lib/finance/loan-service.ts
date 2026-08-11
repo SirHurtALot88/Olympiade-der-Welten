@@ -4,6 +4,7 @@ import type { GameState, LoanApplyLogRecord, LoanOriginationLogRecord, LoanRecor
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -212,7 +213,17 @@ export function estimateTeamAnnualRevenue(gameState: GameState, teamId: string):
     for (const log of logs) {
       totalsBySeasonId.set(log.seasonId, (totalsBySeasonId.get(log.seasonId) ?? 0) + log.cashDelta);
     }
-    const latestSeasonId = [...totalsBySeasonId.keys()].sort().at(-1);
+    // SORTIERT WIRD NACH SAISON-NUMMER, NICHT ALPHABETISCH.
+    //
+    // Hier stand `.sort()` ohne Vergleichsfunktion, also die Standard-Textsortierung. Bis
+    // „season-9" geht das gut; ab „season-10" gewinnt dauerhaft „season-9", weil „9" > „1" ist.
+    // Der Umsatz-Schaetzwert waere ab Saison 10 auf den Einnahmen von Saison 9 eingefroren — fuer
+    // immer, still, und ohne dass irgendetwas rot wird. Er bestimmt den Kreditrahmen
+    // (`computeBorrowingCapacity`) und seit der Schulden-Fruehwarnung auch, ob ein Team
+    // Verkaufsdruck bekommt; ein eingefrorener Wert verzerrt beides.
+    const latestSeasonId = [...totalsBySeasonId.keys()]
+      .sort((left, right) => parseSeasonNumber(left) - parseSeasonNumber(right))
+      .at(-1);
     if (latestSeasonId) {
       return roundCash(totalsBySeasonId.get(latestSeasonId) ?? 0);
     }

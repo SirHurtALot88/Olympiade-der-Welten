@@ -317,6 +317,34 @@ describe("estimateTeamAnnualRevenue", () => {
     const gameState = createGameState();
     expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBe(0);
   });
+
+  /**
+   * DIE SORTIER-BOMBE, gemeldet aus der Gegenpruefung der Schulden-Fruehwarnung.
+   *
+   * Die "letzte" Saison wurde per `.sort()` OHNE Vergleichsfunktion bestimmt, also als Text. Bis
+   * "season-9" faellt das nicht auf; ab "season-10" gewinnt dauerhaft "season-9", weil "9" > "1"
+   * ist. Der Schaetzwert waere ab Saison 10 fuer immer auf den Einnahmen von Saison 9 eingefroren —
+   * still, ohne Fehlermeldung, und er bestimmt den Kreditrahmen UND den Verkaufsdruck.
+   */
+  it("nimmt die hoechste SAISONNUMMER, nicht die alphabetisch letzte (season-10 schlaegt season-9)", () => {
+    const gameState = createGameState({
+      sponsorPayoutLogs: [
+        { id: "p1", saveId: "s", seasonId: "season-9", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 20, action: "apply", createdAt: "2034-01-01T00:00:00.000Z" },
+        { id: "p2", saveId: "s", seasonId: "season-10", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 95, action: "apply", createdAt: "2035-01-01T00:00:00.000Z" },
+      ],
+    });
+    expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBeCloseTo(95, 1);
+  });
+
+  it("bleibt auch bei zweistelligen Saisons untereinander richtig (season-12 schlaegt season-11)", () => {
+    const gameState = createGameState({
+      sponsorPayoutLogs: [
+        { id: "p1", saveId: "s", seasonId: "season-11", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 30, action: "apply", createdAt: "2036-01-01T00:00:00.000Z" },
+        { id: "p2", saveId: "s", seasonId: "season-12", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 70, action: "apply", createdAt: "2037-01-01T00:00:00.000Z" },
+      ],
+    });
+    expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBeCloseTo(70, 1);
+  });
 });
 
 function baseLoan(): LoanRecord {

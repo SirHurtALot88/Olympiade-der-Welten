@@ -362,6 +362,14 @@ function chooseSellCandidates(
     ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
     : null;
   const cashPressureScore = sellRunway?.cashPressureScore ?? 0;
+  /**
+   * Schulden-Gehalts-Frühwarnung (siehe `schuldenlast-fruehwarnung.ts`): senkt unten die
+   * Verkaufsschwelle graduell mit und hält die Auswahl-Schleife am Laufen, bis die kommende
+   * Saisonend-Abbuchung (Gehalt + Kreditrate) aus Cash + Umsatz gedeckt wäre. Der Cash-Druck allein
+   * stoppt schon bei „Kasse wieder positiv plus kleine Reserve" — für ein Team wie Mayhem Mavericks
+   * (Kreditrate 32,7 bei Umsatz 88,6 im gemessenen Spielstand) bliebe damit genau die Rate ungedeckt.
+   */
+  const schuldenlast = sellRunway?.schuldenlast ?? null;
   const gmArchetype = getTeamGeneralManager(gameState, team.teamId)?.profile?.archetype ?? null;
   /**
    * EINMAL je Team, nicht je Spieler: `buildApronAbbauZiel` laeuft ueber alle Kader-Eintraege, um
@@ -407,6 +415,7 @@ function chooseSellCandidates(
         expectedSalary: economy.expectedSalary ?? null,
         apronZiel,
         apronRestBasis,
+        schuldenlastScore: schuldenlast?.score ?? 0,
         explanation: team.explanation,
         sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
         gmArchetype,
@@ -487,6 +496,7 @@ function chooseSellCandidates(
         (identity?.boardConfidence ?? 0) < 7 ||
         teamHasCashBufferRebuildFocus(gameState, team.teamId),
       apronZiel,
+      schuldenlast,
     }),
     (candidate) => candidate.activePlayerId,
   );
@@ -496,6 +506,7 @@ function chooseSellCandidates(
     bewertet: scored,
     teamCash: teamState?.cash ?? 0,
     teamSalaryTotal: salaryTotal,
+    schuldenlast,
   });
 }
 
@@ -540,16 +551,51 @@ export function ergaenzeNotverkaeufe(input: {
   bewertet: Array<{ candidate: AiSellPreviewCandidate; score: number }>;
   teamCash: number;
   teamSalaryTotal: number;
+  /**
+   * Schulden-Gehalts-Fruehwarnung des Teams (siehe `schuldenlast-fruehwarnung.ts`). Fehlt sie,
+   * verhaelt sich die Funktion exakt wie zuvor — nur negatives Cash loest dann aus.
+   */
+  schuldenlast?: { score: number; kreditrate: number; umsatz: number } | null;
 }): AiSellPreviewCandidate[] {
-  if (input.teamCash >= 0) return input.regulaer;
+  const erloes = (candidate: AiSellPreviewCandidate) => candidate.expectedSellValue ?? 0;
+  const erloesRegulaer = input.regulaer.reduce((summe, candidate) => summe + erloes(candidate), 0);
+  const gehaltRegulaer = input.regulaer.reduce((summe, candidate) => summe + (candidate.salary ?? 0), 0);
+
+  /**
+   * ZWEITER AUSLOESER — DIE LUECKE, DIE DAS AUDIT GEFUNDEN HAT.
+   *
+   * Bis hierher sprang der Notverkauf nur bei NEGATIVEM Cash an. Zwischen „gewarnt, aber die
+   * regulaere Auswahl fand keine passenden Kandidaten" und „schon im Minus" klaffte damit ein Loch,
+   * und genau darin sass Hell Raisers am gemessenen Spielstand: Cash 0, Fruehwarnung 0,224, nach
+   * dem einen regulaeren Verkauf immer noch 9,7 zu wenig fuer die naechste Abrechnung — und
+   * niemand, der nachlegt. Die beiden naechsten Kandidaten lagen mit 19,2 und 18,8 knapp unter der
+   * gesenkten Schwelle 20.
+   *
+   * Das Ziel ist ein anderes als beim Cash-Notverkauf und muss es sein: dort geht es um die Kasse
+   * von HEUTE (Reserve), hier um die Deckung der NAECHSTEN Abbuchung. Alles andere — Reihenfolge
+   * nach Dringlichkeit, die Verhaeltnismaessigkeits-Schranke, „Erloes muss positiv sein" — bleibt
+   * dasselbe. Ein Verkauf, der mehr Teamwert aufgibt als er Geld bringt, wandert auch hier ans Ende.
+   */
+  const schuldenlast = input.schuldenlast;
+  const deckungslueckeAktiv =
+    schuldenlast != null &&
+    schuldenlast.score > 0 &&
+    input.teamCash + erloesRegulaer + schuldenlast.umsatz <
+      input.teamSalaryTotal - gehaltRegulaer + schuldenlast.kreditrate;
+
+  if (input.teamCash >= 0 && !deckungslueckeAktiv) return input.regulaer;
 
   // Dieselbe Reserve-Definition wie im Blocker weiter unten — sonst raeumt der Notverkauf zwar das
   // Minus ab, und `cash_after_market_plan_below_reserve` blockiert danach trotzdem weiter.
   const reserve = Math.max(1, input.teamSalaryTotal * 0.05);
-  const erloes = (candidate: AiSellPreviewCandidate) => candidate.expectedSellValue ?? 0;
 
-  let cash = input.teamCash + input.regulaer.reduce((summe, candidate) => summe + erloes(candidate), 0);
-  if (cash >= reserve) return input.regulaer;
+  let cash = input.teamCash + erloesRegulaer;
+  let gehalt = Math.max(0, input.teamSalaryTotal - gehaltRegulaer);
+  /** Erreicht, wenn BEIDE Ziele erfuellt sind: Kassen-Reserve und (falls gewarnt) Deckung. */
+  const zielErreicht = () =>
+    cash >= reserve &&
+    (!deckungslueckeAktiv || cash + (schuldenlast?.umsatz ?? 0) >= gehalt + (schuldenlast?.kreditrate ?? 0));
+  if (zielErreicht()) return input.regulaer;
 
   const schonDrin = new Set(input.regulaer.map((candidate) => candidate.activePlayerId));
   // Verlust = was der Verkauf gegenueber dem Einkaufspreis kostet. Genau die Groesse, die der
@@ -586,10 +632,13 @@ export function ergaenzeNotverkaeufe(input: {
 
   const notverkaeufe: AiSellPreviewCandidate[] = [];
   for (const candidate of kandidaten) {
-    if (cash >= reserve) break;
+    if (zielErreicht()) break;
     if (erloes(candidate) <= 0) continue;
     notverkaeufe.push(candidate);
     cash += erloes(candidate);
+    // Jeder Verkauf hilft doppelt: Erloes herein UND Gehalt heraus. Ohne die zweite Haelfte
+    // verkaufte die Schleife zu viel, weil sie die Abbuchung unveraendert gross weiterrechnete.
+    gehalt = Math.max(0, gehalt - (candidate.salary ?? 0));
   }
 
   return [...input.regulaer, ...notverkaeufe];
