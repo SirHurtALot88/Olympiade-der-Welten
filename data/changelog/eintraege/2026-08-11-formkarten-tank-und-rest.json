@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-11",
+  "seite": "Saisonstand · Formkarten und Rest",
+  "text": "Die Spalte \"Formkarten\" zeigte die Summe der bereits gespielten Kartenwerte. Das war eine Zahl, die kaum etwas verriet: Formkarten kommen je Spieler als gespiegeltes Paar (+8 und -8), und die Minuskarten wirft man zuerst ab, weil ungespielte Minuskarten am Saisonende Punkte kosten. Die Summe lag deshalb bei allen 32 Teams des Spielstands bei null oder darunter — sie sagte nur, wie viel Negatives schon abgeraeumt war, nicht wie stark ein Team in Form gehen konnte. Jetzt steht dort der volle Tank der Saison: die Summe aller positiven Kartenwerte, gespielt wie ungespielt. Daneben steht neu die Spalte \"Rest\" mit dem, was davon noch ungespielt ist — wie viel Luft also noch drin ist. Beide Spalten sind sortierbar, und der Hover nennt Tank, Rest, gespielte Karten und offene Minuskarten samt ihrer Strafe am Saisonende. Ein leerer Tank zeigt 0, ein Team ganz ohne Karten weiterhin einen Strich: kein Tank ist etwas anderes als ein leergefahrener.",
+  "gewicht": "normal",
+  "version": "0.4"
+}

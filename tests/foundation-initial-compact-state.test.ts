@@ -166,11 +166,13 @@ describe("foundation initial compact state", () => {
     expect(
       buildSeasonFormCardBonusByTeamId(compact, compact.season.id).get("H-R"),
     ).toEqual(buildSeasonFormCardBonusByTeamId(existing, existing.season.id).get("H-R"));
-    expect(buildSeasonFormCardBonusByTeamId(compact, compact.season.id).get("H-R")).toEqual({
+    expect(buildSeasonFormCardBonusByTeamId(compact, compact.season.id).get("H-R")).toMatchObject({
       total: 5,
       cards: 2,
       positive: 8,
       negative: -3,
+      poolPositive: 8,
+      remainingPositive: 0,
     });
 
     // Reine Anzeigefracht: darf nie in den Spielstand zurueckwandern.

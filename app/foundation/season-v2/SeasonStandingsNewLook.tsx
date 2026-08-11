@@ -48,6 +48,7 @@ import {
   type SeasonV2StandingsRow,
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
+import type { SeasonFormCardBonusEntry } from "@/lib/foundation/season-form-card-bonus";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -152,6 +153,7 @@ type NlTableSortKey =
   | "bonus"
   | SeasonDisciplineAreaId
   | "formCards"
+  | "formCardsLeft"
   | "mw"
   | "cash"
   | "sponsor"
@@ -170,6 +172,7 @@ function getTableSortValue(
   row: SeasonV2StandingsRow,
   key: NlTableSortKey,
   formCardTotalByTeamId?: Map<string, number> | null,
+  formCardLeftByTeamId?: Map<string, number> | null,
 ): number | string {
   switch (key) {
     case "rank":
@@ -183,10 +186,14 @@ function getTableSortValue(
       return bonus != null && Number.isFinite(bonus) ? bonus : Number.NEGATIVE_INFINITY;
     }
     case "formCards": {
-      // Teams ohne gespielte Karte sortieren ans Ende der Absteigend-Sicht (kein
-      // stiller 0-Wert, der eine gespielte ±0-Bilanz vortäuschen würde).
+      // Teams ohne Formkarten sortieren ans Ende der Absteigend-Sicht (kein stiller
+      // 0-Wert, der einen leeren Tank vortäuschen würde, den es gar nicht gibt).
       const total = formCardTotalByTeamId?.get(row.teamId);
       return total != null && Number.isFinite(total) ? total : Number.NEGATIVE_INFINITY;
+    }
+    case "formCardsLeft": {
+      const left = formCardLeftByTeamId?.get(row.teamId);
+      return left != null && Number.isFinite(left) ? left : Number.NEGATIVE_INFINITY;
     }
     case "mw":
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
@@ -582,9 +589,16 @@ export default function SeasonStandingsNewLook({
   }, [boardRows, boardSort]);
 
   /**
-   * Formkarten-Nennwert-Summe je Team (nur Teams, die überhaupt Karten gespielt
-   * haben). Muss VOR `sortedTableRows` stehen — die Sortierung nach der
-   * Formkarten-Spalte liest diese Karte bereits im Render.
+   * Formkarten-Tank je Team: was die Saison an positivem Nennwert hergibt, und was davon
+   * noch ungespielt ist. Muss VOR `sortedTableRows` stehen — die Sortierung nach beiden
+   * Formkarten-Spalten liest diese Karten bereits im Render.
+   *
+   * Chris: „in der formkarten spalte soll generell immer die summe stehen die AM ANFANG der
+   * saison den teams zur verfuegung stand ... dann weiss man wie viel luft noch im tank ist".
+   * Vorher stand hier `entry.total`, die Summe der GESPIELTEN Nennwerte — eine Zahl, die
+   * bauartbedingt fast immer ≤ 0 ist (die Karten kommen als gespiegeltes Paar +x/−x, und die
+   * negativen wirft man zuerst ab, weil ungespielte negative Karten am Saisonende Punkte
+   * kosten). Am Live-Save galt das fuer alle 32 Teams.
    */
   const formCardTotalByTeamId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -592,16 +606,27 @@ export default function SeasonStandingsNewLook({
       return totals;
     }
     for (const [teamId, entry] of teamFormCardBonusByTeamId) {
-      totals.set(teamId, entry.total);
+      totals.set(teamId, entry.poolPositive);
     }
     return totals;
+  }, [teamFormCardBonusByTeamId]);
+
+  const formCardLeftByTeamId = useMemo(() => {
+    const left = new Map<string, number>();
+    if (!teamFormCardBonusByTeamId) {
+      return left;
+    }
+    for (const [teamId, entry] of teamFormCardBonusByTeamId) {
+      left.set(teamId, entry.remainingPositive);
+    }
+    return left;
   }, [teamFormCardBonusByTeamId]);
 
   const sortedTableRows = useMemo(() => {
     const direction = tableSort.dir === "asc" ? 1 : -1;
     return [...boardRows].sort((left, right) => {
-      const leftValue = getTableSortValue(left, tableSort.key, formCardTotalByTeamId);
-      const rightValue = getTableSortValue(right, tableSort.key, formCardTotalByTeamId);
+      const leftValue = getTableSortValue(left, tableSort.key, formCardTotalByTeamId, formCardLeftByTeamId);
+      const rightValue = getTableSortValue(right, tableSort.key, formCardTotalByTeamId, formCardLeftByTeamId);
       let result =
         typeof leftValue === "string" || typeof rightValue === "string"
           ? String(leftValue).localeCompare(String(rightValue), "de-DE")
@@ -1431,6 +1456,7 @@ export default function SeasonStandingsNewLook({
               <th>{renderTableSortHeader("points", "Punkte")}</th>
               <th>{renderTableSortHeader("bonus", "Bonus")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
+              <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
@@ -1471,28 +1497,71 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
-   * Spalte „Formkarten": Summe der NENNWERTE aller in dieser Saison
-   * ausgespielten Formkarten (+8 zählt 8, −4 zählt −4, einfach aufsummiert).
-   * Teams ohne gespielte Karte zeigen „—" statt einer 0 — das ist ein
-   * Unterschied: keine Karte gespielt ≠ Karten mit Bilanz ±0.
+   * Der gemeinsame Erklaertext beider Formkarten-Spalten. Bewusst EIN Text: die zwei Zahlen
+   * gehoeren zusammen (voller Tank / davon noch drin), und wer die eine antippt, will meist
+   * die andere gleich mitlesen.
+   */
+  function buildFormCardTitle(row: SeasonV2StandingsRow, entry: SeasonFormCardBonusEntry) {
+    const teile = [
+      `${row.teamName}: Formkarten-Tank ${formatNlNumber(entry.poolPositive, 0)}`,
+      `davon noch ungespielt ${formatNlNumber(entry.remainingPositive, 0)}`,
+      `gespielt ${entry.cards} von ${entry.poolCards} Karten`,
+    ];
+    if (entry.remainingNegative < 0) {
+      // Ungespielte negative Karten kosten am Saisonende Punkte
+      // (`applyFormCardPenaltyWithRerank`) — das gehoert sichtbar an die Zahl.
+      teile.push(`offene Minuskarten ${formatNlNumber(entry.remainingNegative, 0)} (kosten am Saisonende Punkte)`);
+    }
+    return teile.join(" · ");
+  }
+
+  /**
+   * Spalte „Formkarten": der volle Tank der Saison — die Summe der POSITIVEN Nennwerte aller
+   * Karten des Teams, gespielt wie ungespielt.
+   *
+   * Vorher stand hier die Summe der bereits gespielten Nennwerte. Die war als Kennzahl
+   * unbrauchbar: Karten kommen je Spieler als gespiegeltes Paar (+x und −x), und die negativen
+   * wirft man zuerst ab, weil ungespielte Minuskarten am Saisonende Punkte kosten. Die Summe
+   * lag deshalb bei allen 32 Teams des Live-Saves bei ≤ 0 und sagte nur, wie viel Negatives
+   * schon abgeraeumt war — nicht, wie stark ein Team in Form gehen konnte.
+   *
+   * Teams ganz ohne Karten zeigen „—" statt einer 0: kein Tank ≠ leerer Tank.
    */
   function renderFormCardCell(row: SeasonV2StandingsRow) {
     const entry = teamFormCardBonusByTeamId?.get(row.teamId) ?? null;
-    if (!entry || entry.cards === 0) {
+    if (!entry || entry.poolCards === 0) {
       return (
-        <td className="nl-standings-td-formcards" title={`Keine Formkarte gespielt — ${row.teamName}`}>
+        <td className="nl-standings-td-formcards" title={`Keine Formkarten in dieser Saison — ${row.teamName}`}>
           —
         </td>
       );
     }
-    const total = entry.total;
-    const sign = total > 0 ? " is-pos" : total < 0 ? " is-neg" : "";
     return (
-      <td
-        className={`nl-standings-td-formcards${sign}`}
-        title={`${row.teamName}: ${entry.cards} gespielte Formkarten · positiv ${formatNlNumber(entry.positive, 0)} · negativ ${formatNlNumber(entry.negative, 0)} · Summe ${formatNlNumber(total, 0)}`}
-      >
-        {`${total > 0 ? "+" : total === 0 ? "±" : ""}${formatNlNumber(total, 0)}`}
+      <td className="nl-standings-td-formcards" title={buildFormCardTitle(row, entry)}>
+        {formatNlNumber(entry.poolPositive, 0)}
+      </td>
+    );
+  }
+
+  /**
+   * Spalte „Rest": wie viel vom Tank noch ungespielt ist — „wie viel Luft noch drin ist".
+   * Ein leerer Tank zeigt bewusst „0" und nicht „—": das Team HAT Karten gehabt und sie
+   * ausgegeben, das ist eine Aussage. „—" bleibt den Teams ohne Karten vorbehalten.
+   */
+  function renderFormCardLeftCell(row: SeasonV2StandingsRow) {
+    const entry = teamFormCardBonusByTeamId?.get(row.teamId) ?? null;
+    if (!entry || entry.poolCards === 0) {
+      return (
+        <td className="nl-standings-td-formcards" title={`Keine Formkarten in dieser Saison — ${row.teamName}`}>
+          —
+        </td>
+      );
+    }
+    const anteil = entry.poolPositive > 0 ? entry.remainingPositive / entry.poolPositive : 0;
+    const tank = anteil >= 0.5 ? " is-pos" : anteil > 0 ? "" : " is-neg";
+    return (
+      <td className={`nl-standings-td-formcards${tank}`} title={buildFormCardTitle(row, entry)}>
+        {formatNlNumber(entry.remainingPositive, 0)}
       </td>
     );
   }
@@ -1544,6 +1613,7 @@ export default function SeasonStandingsNewLook({
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
+          {renderFormCardLeftCell(row)}
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
@@ -1605,7 +1675,7 @@ export default function SeasonStandingsNewLook({
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={17} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={18} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>
