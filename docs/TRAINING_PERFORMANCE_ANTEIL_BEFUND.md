@@ -11,8 +11,11 @@ Auf seinem Screenshot: „+ Performance-Anteil **+0**", daneben im selben Toolti
 Saison-PPs 1,2 · MVS 4". Ein Spieler mit Einsätzen und Punkten, dessen Spielpraxis im Forecast mit
 null zu Buche schlägt.
 
-**Status: Ursache belegt, Fix bewusst nicht gebaut.** Der naheliegende Fix macht es schlimmer
-(Abschnitt „Was der billige Fix kaputt macht"). Der tragfähige Weg steht unten.
+**Status: ERLEDIGT (11.08.).** Nicht auf dem unten vorgeschlagenen Weg — der Anteil kam über den
+Saisonziel-Fix (#496) zurück, der die Spieltags-Verzeichniszeilen vollständig zum Browser
+mitschickt. Das ist genau der „billige Fix", den dieser Befund verworfen hatte; sein Schaden am
+Saison-Ledger ist inzwischen getrennt repariert. Details unten unter „Auflösung". Der serverseitige
+Deltas-Weg wurde daraufhin **nicht** gebaut — er wäre unnötige Arbeit geworden.
 
 ---
 
@@ -112,3 +115,49 @@ Sterne) aus derselben Quelle kommen. Beides ist Arbeit, aber keine Unsicherheit.
 - Voll vs. kompakt: `buildOrganicSeasonProgression` auf beiden Ständen, oben tabelliert.
 - Falscher Ledger nach dem billigen Fix: `tests/foundation-players-discipline-pps-source.test.ts`
   meldet beim Gegenprobe-Lauf `mini-dm: 33,3` statt der erwarteten 4,9.
+
+---
+
+## Auflösung (11.08.)
+
+Der Befund empfahl, `buildPerformanceDeltas` serverseitig zu rechnen und die Deltas mitzuschicken.
+Vor dem Bauen wurde nachgemessen — und der Anteil war schon zurück.
+
+`getPerformanceIndex` (`organic-season-progression.ts:627`) siebt die Leistungszeilen über die
+Spieltags-Ids aus `seasonState.matchdayResults`. Genau diese Liste fährt seit dem Saisonziel-Fix
+(#496) vollständig mit, weil die Vorstandsziele sonst nur den aktiven Spieltag zählten. Damit füllt
+sich derselbe Index, der hier leer war.
+
+Gemessen am Live-Abbild (`new-game-1785823388048-1hf25q`, Saison 2, 10 gewertete Spieltage), fünf
+Spieler des eigenen Kaders, `buildOrganicSeasonProgression` auf beiden Ständen:
+
+| Spieler | voller Save | kompakter Payload |
+|---|---|---|
+| Malarik | 3,26 | **3,26** |
+| Vega | 2,92 | **2,92** |
+| Highpriestess Caladriel | 4,60 | **4,60** |
+| Dralak | 4,09 | **4,09** |
+| Spineshard | 4,33 | **4,33** |
+
+Nicht „nah dran" — identisch. Der Grund ist derselbe, den dieser Befund oben schon belegt hat: die
+Performance-Verteilung ist klassenunabhängig und braucht nur die Leistungszeilen, und die fuhren
+immer schon mit. Es fehlte allein die Id-Liste, an der sie hängen.
+
+### Der vorhergesagte Schaden trat ein — und ist repariert
+
+Dieser Befund hatte den billigen Fix mit einer konkreten Messung verworfen: der clientseitige
+Saison-Ledger fange dann an, Disziplin-PPs ohne Grundlage zu rechnen — **33,3 statt 4,9**, weil ihm
+die beschnittenen `disciplineResults` fehlen und er auf den Rohbeitrag zurückfällt. Genau das ist
+mit #496 eingetreten und war kurzzeitig live.
+
+Repariert über eine Grenze im Ledger selbst: ein Spieltag, zu dem **kein einziges**
+Disziplin-Ergebnis vorliegt, wird nicht gebucht. Das ist keine Notlösung für den kompakten Payload,
+sondern die ehrliche Regel — ohne Disziplin-Ergebnisse ist ein Spieltag nicht gewertet. Auf dem
+vollen Save ändert sie nachweislich nichts (335 Spieler, Punktsumme 3126,30, mit und ohne Änderung
+identisch). Der Test `tests/foundation-players-discipline-pps-source.test.ts` hält beide Seiten fest.
+
+### Was offen bleibt
+
+Der Forecast bleibt eine Prognose. Dass die Browser-Zahl dem Saisonende-Apply exakt entspricht, ist
+damit **nicht** gezeigt — dafür müssten auch Potenzialsatz und Sterne nachweislich aus derselben
+Quelle kommen. Ungemessen.
