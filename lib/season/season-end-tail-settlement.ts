@@ -1,6 +1,11 @@
 /**
  * DER GEMEINSAME SCHWANZ DER SAISONENDE-BUCHUNG — Kredite, Vorstandsziele, Zahlungsunfähigkeit.
  *
+ * ACHTUNG BEIM LESEN DER HISTORIE UNTEN: der dritte Schritt hiess frueher „Insolvenz-Backstop" und
+ * NAHM einen Notkredit auf. Er tut das nicht mehr — er stellt nur noch fest, wer im Minus steht
+ * (siehe Schritt 3 unten und `collectNegativeCashTeams`). Der Ausgleich per Notkredit lebt weiter,
+ * aber am Ende des KAUFFENSTERS, nicht hier.
+ *
  * WARUM ES DIESE DATEI GIBT. Es gab zwei Wege, eine Saison abzurechnen:
  *
  *   A) `runLocalSeasonCompletion` (Cockpit, „Saison abschliessen") — vollständig.
@@ -16,8 +21,8 @@
  *
  * Hier steht der Schwanz jetzt EINMAL, und beide Wege rufen ihn auf. Reihenfolge wie in A, weil sie
  * begründet ist: Kredite vor Gebäuden (die Rate ist fällig, bevor Unterhalt bezahlt wird), Ziele
- * danach, und der Backstop ganz zuletzt — er ist der einzige Schritt, der garantieren soll, dass
- * hinterher kein Team negatives Cash hat, und das kann er nur, wenn alle anderen Cash-Bewegungen
+ * danach, und die Zahlungsunfähigkeits-Feststellung ganz zuletzt — sie soll den Stand melden, mit
+ * dem das Team wirklich in die Pause geht, und das kann sie nur, wenn alle anderen Cash-Bewegungen
  * schon gebucht sind.
  *
  * IDEMPOTENZ: jeder Teilschritt prüft sein eigenes Log (`loanApplyLogs`, `objectiveRewardApplyLogs`)
@@ -27,13 +32,14 @@
 
 import { applyTeamSeasonObjectiveRewards } from "@/lib/board/team-season-objectives-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { applyInsolvencyBackstop, applyLoanSettlement } from "@/lib/finance/loan-service";
+import { applyLoanSettlement, collectNegativeCashTeams } from "@/lib/finance/loan-service";
 
 export type SeasonEndTailResult = {
   gameState: GameState;
   loanSettlementApplied: boolean;
   objectiveRewardsApplied: boolean;
-  emergencyLoans: Array<{ teamId: string; principal: number }>;
+  /** Teams, die die Saison im Minus beenden. NUR festgestellt — der Ausgleich ist ihre Aufgabe. */
+  negativeCashTeams: Array<{ teamId: string; shortfall: number }>;
   warnings: string[];
 };
 
@@ -88,25 +94,19 @@ export function applySeasonEndTail(input: SeasonEndTailInput): SeasonEndTailResu
     warnings.push(...(result.warnings ?? []));
   }
 
-  // 3) Zahlungsunfähigkeit. LETZTER Cash-Schritt: nach Sponsor/Gehalt, Raten, Gebäude und Zielen
-  // darf kein Team negatives Cash behalten. Statt das Cash auf 0 zu klemmen (das wäre Geldschöpfung)
-  // nimmt jedes betroffene Team einen Notkredit über den Fehlbetrag auf — echte Restschuld im
-  // bestehenden Kreditsystem, Cash danach 0.
-  let emergencyLoans: Array<{ teamId: string; principal: number }> = [];
-  if (input.execute) {
-    const insolvency = applyInsolvencyBackstop({ gameState, saveId: input.saveId });
-    if (insolvency.emergencyLoans.length > 0) {
-      gameState = insolvency.gameState;
-      emergencyLoans = insolvency.emergencyLoans;
-    }
-    warnings.push(...(insolvency.warnings ?? []));
-  }
+  // 3) Zahlungsunfähigkeit wird FESTGESTELLT, nicht ausgeglichen. Früher nahm hier jedes Team mit
+  // negativem Cash ungefragt einen Notkredit über den Fehlbetrag auf (Cash danach 0) — auf dem
+  // gespielten Stand standen dadurch 9 von 32 Teams auf exakt 0,0 und keines im Minus. Chris:
+  // „teams können auch ins negative gehen und müssen das dann mit verkäufen und krediten wieder
+  // auffüllen! es darf nicht einfach geld erschummelt und auf 0 gesetzt werden."
+  const negativeCash = collectNegativeCashTeams(gameState);
+  warnings.push(...negativeCash.warnings);
 
   return {
     gameState,
     loanSettlementApplied,
     objectiveRewardsApplied,
-    emergencyLoans,
+    negativeCashTeams: negativeCash.teams,
     warnings: Array.from(new Set(warnings)),
   };
 }
