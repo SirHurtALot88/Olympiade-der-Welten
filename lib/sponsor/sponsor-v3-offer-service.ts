@@ -262,7 +262,50 @@ export function rerollSponsorV3TermsForNewSeason(
   input: { newSalaryFactor: number; contractYear: SponsorTermSeasons },
 ): SponsorV3ContractTerms {
   if (!terms.curveShape) {
-    return terms;
+    /**
+     * ALTVERTRAEGE OHNE KURVENFORM — hier lief ein Leck, kein Sonderfall.
+     *
+     * Frueher gab dieser Zweig die eingefrorene Leiter unveraendert zurueck: die Kurve laesst
+     * sich ohne `curveShape` nicht neu bauen, also blieb alles stehen. Nur blieb damit auch der
+     * GEHALTSFAKTOR stehen — und der ist der Konjunkturmassstab der Saison, nicht eine
+     * Eigenschaft des Vertrags. Ein Mehrjahresvertrag zahlte deshalb Saison fuer Saison auf dem
+     * Niveau seines Unterschriftsjahres weiter.
+     *
+     * Gemessen am Live-Spielstand (Saison 2, echter Faktor 1,19): 10 von 32 Vertraegen steckten
+     * noch auf 1,0 fest, zusammen 129,6 C zu wenig — Z-H allein 17,4. Die Einmalreparatur
+     * (`scripts/repariere-sponsor-gehaltsfaktor.ts`) hatte das fuer Saison 1 nachgebucht; hier
+     * lief es unbemerkt weiter, weil ein Altvertrag den Fehler bei JEDEM Saisonwechsel neu
+     * erzeugt.
+     *
+     * Die Leiter wird deshalb umgerechnet statt neu gebaut, mit derselben Rechnung wie das
+     * Reparaturskript: nur der Wertungsanteil OBERHALB des Sockels haengt am Gehaltsfaktor, der
+     * Sockel selbst ist nach Startrang eingefroren und bleibt unberuehrt.
+     *
+     * BEWUSST OHNE Erosion: dieser Zweig hat noch nie erodiert, und zwei Aenderungen auf einmal
+     * waeren an einem laufenden Spielstand nicht mehr auseinanderzuhalten. Hier wird der eine
+     * belegte Fehler behoben, sonst nichts.
+     */
+    const alterFaktor = terms.salaryFactor;
+    if (
+      !Number.isFinite(alterFaktor) ||
+      alterFaktor <= 0 ||
+      alterFaktor === input.newSalaryFactor ||
+      !Number.isFinite(input.newSalaryFactor) ||
+      input.newSalaryFactor <= 0
+    ) {
+      return terms;
+    }
+    const altSockel = sponsorSockelFuerStartrang(terms.startRank);
+    const skala = input.newSalaryFactor / alterFaktor;
+    const skaliere = (leiter: number[]) => leiter.map((wert) => altSockel + (wert - altSockel) * skala);
+    const skalierteBasis = skaliere(terms.baseLadder ?? []);
+    return {
+      ...terms,
+      baseLadder: skalierteBasis,
+      rankLadder: skaliere(terms.rankLadder ?? []),
+      anchor: sponsorV3Anchor(skalierteBasis, sponsorV3AnchorWeights(terms.startRank)),
+      salaryFactor: input.newSalaryFactor,
+    };
   }
   const sockel = sponsorSockelFuerStartrang(terms.startRank);
   const newBaseLadderRaw = sponsorKurvenLeiter({

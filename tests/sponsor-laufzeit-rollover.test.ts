@@ -94,14 +94,31 @@ describe("rerollSponsorV3TermsForNewSeason — Konjunktur-Kopplung (Nutzervorgab
 });
 
 describe("rerollSponsorV3TermsForNewSeason — Altvertraege", () => {
-  it("ein Vertrag ohne curveShape wird unveraendert weitergerollt (kein Wurf, kein Absturz)", () => {
+  /**
+   * Dieser Test hielt frueher fest, dass ein Altvertrag KOMPLETT unveraendert zurueckkommt.
+   * Gemeint war damit "kein Kurvenwurf, kein Absturz" — mitgeschuetzt wurde aber auch der
+   * eingefrorene Gehaltsfaktor, und genau daraus wurde ein Leck: 10 von 32 Vertraegen des
+   * Live-Spielstands steckten auf Faktor 1,0 fest, waehrend die Saison mit 1,19 lief
+   * (zusammen 129,6 C zu wenig, jede Saison neu). Die urspruengliche Zusicherung bleibt
+   * erhalten, nur praeziser: kein Wurf, kein Absturz, Kurvenform bleibt weg — aber die
+   * Konjunktur zieht mit.
+   */
+  it("laeuft ohne curveShape durch, ohne zu werfen oder abzustuerzen", () => {
     const terms = buildTerms(START_RANK, SHAPE, 1.0);
     const { curveShape: _curveShape, ...withoutShape } = terms;
     const result = rerollSponsorV3TermsForNewSeason(withoutShape as SponsorV3ContractTerms, {
       newSalaryFactor: 0.5,
       contractYear: 3,
     });
-    expect(result).toEqual(withoutShape);
+
+    expect(result.curveShape).toBeUndefined();
+    expect(result.startRank).toBe(withoutShape.startRank);
+    expect(result.tilt).toBe(withoutShape.tilt);
+    expect(result.baseLadder).toHaveLength(withoutShape.baseLadder.length);
+    expect(result.baseLadder.every((wert) => Number.isFinite(wert))).toBe(true);
+    // Bei halbiertem Faktor faellt der Wertungsanteil, ohne dass eine neue Kurve gewuerfelt wird.
+    expect(result.salaryFactor).toBe(0.5);
+    expect(result.baseLadder[0]!).toBeLessThan(withoutShape.baseLadder[0]!);
   });
 });
 
@@ -150,5 +167,52 @@ describe("Rendite-Erosion hat Zaehne (Umsetzungsplan D, Messpunkt 3)", () => {
     const ev2yr = signed.anchor + year2.anchor;
     const ev1yrEach = buildTerms(START_RANK, SHAPE, f1).anchor + buildTerms(START_RANK, SHAPE, f2).anchor;
     expect(ev2yr).toBeLessThan(ev1yrEach);
+  });
+});
+
+describe("rerollSponsorV3TermsForNewSeason — Altvertraege ohne Kurvenform", () => {
+  /**
+   * DAS LECK. Ein Altvertrag ohne `curveShape` kam frueher unveraendert zurueck — samt seinem
+   * eingefrorenen Gehaltsfaktor. Der Faktor ist aber der Konjunkturmassstab der SAISON, keine
+   * Eigenschaft des Vertrags. Gemessen am Live-Spielstand (Saison 2, echter Faktor 1,19): 10 von
+   * 32 Vertraegen steckten auf 1,0 fest, zusammen 129,6 C zu wenig. Ein Altvertrag erzeugte den
+   * Fehler bei JEDEM Saisonwechsel neu — die Einmalreparatur half nur fuer eine Saison.
+   */
+  function altvertragOhneKurve(startRank: number, salaryFactor: number): SponsorV3ContractTerms {
+    const { curveShape: _weg, ...ohneKurve } = buildTerms(startRank, SHAPE, salaryFactor);
+    return ohneKurve as SponsorV3ContractTerms;
+  }
+
+  it("zieht den Gehaltsfaktor der neuen Saison nach, statt auf dem Unterschriftsjahr stehen zu bleiben", () => {
+    const alt = altvertragOhneKurve(START_RANK, 1.0);
+    const rolled = rerollSponsorV3TermsForNewSeason(alt, { newSalaryFactor: 1.19, contractYear: 2 });
+
+    expect(rolled.salaryFactor).toBe(1.19);
+    // Der Wertungsanteil oberhalb des Sockels skaliert mit dem Faktor — dieselbe Rechnung wie das
+    // Reparaturskript: neu = sockel + (alt - sockel) * (neuerFaktor / alterFaktor).
+    const sockel = sponsorSockelFuerStartrang(START_RANK);
+    rolled.baseLadder.forEach((wert, index) => {
+      const erwartet = sockel + (alt.baseLadder[index]! - sockel) * 1.19;
+      expect(wert, `Rang ${index + 1}`).toBeCloseTo(erwartet, 6);
+    });
+    // Und der Vertrag zahlt danach mehr als vorher — der eigentliche Schaden.
+    expect(rolled.baseLadder[0]!).toBeGreaterThan(alt.baseLadder[0]!);
+  });
+
+  it("laesst den Sockel unberuehrt — er haengt am Startrang, nicht an der Konjunktur", () => {
+    const alt = altvertragOhneKurve(20, 1.0);
+    const rolled = rerollSponsorV3TermsForNewSeason(alt, { newSalaryFactor: 1.19, contractYear: 2 });
+    const sockel = sponsorSockelFuerStartrang(20);
+    // Der letzte Rang liegt am dichtesten am Sockel; sein Abstand skaliert, der Sockel selbst nicht.
+    const abstandVorher = alt.baseLadder[31]! - sockel;
+    const abstandNachher = rolled.baseLadder[31]! - sockel;
+    expect(abstandNachher).toBeCloseTo(abstandVorher * 1.19, 6);
+    expect(rolled.startRank).toBe(20);
+  });
+
+  it("laesst einen Vertrag in Ruhe, wenn sich der Faktor nicht geaendert hat", () => {
+    const alt = altvertragOhneKurve(START_RANK, 1.19);
+    const rolled = rerollSponsorV3TermsForNewSeason(alt, { newSalaryFactor: 1.19, contractYear: 2 });
+    expect(rolled).toBe(alt);
   });
 });
