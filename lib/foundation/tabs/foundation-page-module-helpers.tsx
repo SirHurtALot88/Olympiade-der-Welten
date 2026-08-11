@@ -1142,15 +1142,40 @@ export function withNormalizedLocalTeamSettings(gameState: GameState): GameState
  * - `applyCompactSeasonArchiveSentinelIfNeeded`: bei einem kompakten Payload das serverseitig
  *   gestrippte Saisonarchiv durch ein leeres Sentinel-Array ersetzen, statt `undefined` stehen zu
  *   lassen (siehe `apply-compact-season-archive-sentinel.ts`).
+ *
+ * DER VORSTANDSWERT BLEIBT BEI EINEM KOMPAKTEN PAYLOAD STEHEN, WIE ER GELIEFERT WURDE.
+ *
+ * `refreshTeamObjectiveState` rechnet zweierlei: die ZIELE und die `boardConfidence`. Die Ziele
+ * stimmen auch auf dem gekürzten Payload (am Live-Abbild gemessen: 216 == 216 bzw. 441 == 441
+ * Einträge, null Inhalts- und null Statusabweichung). Die `boardConfidence` nicht — sie hängt über
+ * `captainDamp = leadership / 40` an `selectTeamCaptain`, und dessen `leadershipScore` liest
+ * `attributeSheetStats`, die der kompakte Payload für alle fremden Teams streicht. Ohne Block fällt
+ * die Rechnung still auf `player.coreStats` zurück (`?? player.coreStats.soc`) und liefert deshalb
+ * IMMER eine Zahl, nie ein „weiß ich nicht". Gemessen: 31 von 32 Teams bekamen im Browser einen
+ * anderen Kapitän oder Wert (M-M 73,2 -> 58,3), einzig das MENSCHLICHE Team blieb richtig, weil
+ * dessen Blöcke mitfahren. Die gefühlte Pressure lag dadurch für 22 bis 31 von 32 Teams um 0,2 bis
+ * 0,6 zu hoch — und beim nächsten Speichern wäre das in den Spielstand gefahren, wo
+ * `getBoardReplacementProbability` (GM-Entlassung), `gm-pressure-behavior` (KI-Panik) und die
+ * Slate-Größe der nächsten Zielrunde es lesen. Der Server rechnet den Vorstand auf VOLLEN Daten;
+ * der gespeicherte Stand stimmte deshalb bisher exakt (Σ|gespeichert − voll| = 0,00).
  */
 export function normalizeLoadedFoundationGameState(
   gameState: GameState,
   options: { compactInitial?: boolean; isPrismaSource?: boolean } = {},
 ): GameState {
+  const compactInitial = options.compactInitial ?? true;
   const normalizedGameState = options.isPrismaSource ? gameState : withNormalizedLocalTeamSettings(gameState);
-  return applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), {
-    compactInitial: options.compactInitial ?? true,
-  });
+  const refreshedGameState = refreshTeamObjectiveState(normalizedGameState);
+  const withServerBoardConfidence = compactInitial
+    ? {
+        ...refreshedGameState,
+        seasonState: {
+          ...refreshedGameState.seasonState,
+          boardConfidence: normalizedGameState.seasonState.boardConfidence,
+        },
+      }
+    : refreshedGameState;
+  return applyCompactSeasonArchiveSentinelIfNeeded(withServerBoardConfidence, { compactInitial });
 }
 
 export function buildTeamIdentityDraftMap(teams: Team[], teamIdentities: TeamIdentity[]) {
