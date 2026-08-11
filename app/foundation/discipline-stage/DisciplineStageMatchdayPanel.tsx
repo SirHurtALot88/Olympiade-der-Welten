@@ -405,27 +405,40 @@ export function resolveMatchdayRanks<T extends { teamId: string; total: number }
 /**
  * Projizierter Saison-Rang nach diesem Spieltag, aus den Arena-Ergebnissen.
  *
- * GEMELDET VON CHRIS (nach Spieltag 10): „ich weiß nicht ob da vllt noch die bonus punkte nicht
- * berücksichtigt werden oder so aber das war eindeutig falsch weil ich schon dachte schade für M-M
- * dass sie es nicht geschafft haben aufs treppchen und plötzlich sind sie doch 2."
+ * ES GILT `sum`, NICHT `total` — also die Disziplin-Punkte OHNE den Mutator-Aufschlag.
  *
- * Genau das war es. Gerechnet wurde mit `sum` — nur den beiden Disziplin-Punkten. Die Gesamt-Spalte
- * daneben zeigt aber `total`, und das ist `sum + mutPp`: der Mutator-Bonus des Spieltags gehört
- * dazu und wird in der Saisontabelle auch gewertet (dort die Spalte BONUS). Die Projektion ordnete
- * die Teams also nach einer anderen Zahl als der, die am Ende gebucht wird — und wer viel Bonus
- * holte, stand im Endstand-Bildschirm zu tief.
+ * Vorgeschichte: Chris meldete nach Spieltag 10, der Endstand-Bildschirm zeige eine andere
+ * Reihenfolge als die Saisontabelle („M-M war dort noch platz 4 … plötzlich sind sie doch 2"),
+ * und vermutete die Bonuspunkte. Die Reparatur nahm daraufhin `total` (= `sum + mutPp`). Das
+ * war die falsche der beiden genannten Ursachen: gebucht wird der Mutator-Aufschlag NICHT.
+ *
+ * Am Live-Abbild nachgemessen (Save `new-game-1785823388048-1hf25q`, Saison 2, Spieltag 10,
+ * 32 Teams): `standings[team].points` == Σ `rank_to_points(playerCount, rank)` über alle zehn
+ * gewerteten Spieltage, Abweichung 0,0 bei 32 von 32 Teams — der Mutator-Aufschlag (Σ 17,7 an
+ * diesem Spieltag, 26 Teams betroffen) steckt dort nirgends drin. Er ist ein SPIELER-Punkt
+ * (`lib/foundation/player-points-total.ts`: „1:1 dem Spieler gutgeschrieben und NICHT im Anteil
+ * enthalten") und geht nur in die PP-Summen der Spieler und Kader ein.
+ *
+ * Mit `total` projiziert, wichen 6 von 32 Rängen vom gebuchten Endstand ab (P-S/R-L 8↔9,
+ * W-W/T-T 15↔16, U-A/C-C 31↔32). Mit `sum` sind es 0 von 32. Dieselbe Größe verwenden auch die
+ * beiden anderen Stellen, die einen Saison-Rang bilden: `standings-apply-service` bucht
+ * `pointsDelta` aus der Rang→Punkte-Tabelle, und `buildMatchdaySummary` bildet „Rang vorher /
+ * nachher" über `basePoints` (`foundation-matchday-points-projection`) — beide ohne Mutator.
+ *
+ * Die Gesamt-Spalte daneben zeigt weiterhin `total`: das ist die PP-Ausbeute des Tages und damit
+ * die richtige Zahl für den TAGESRANG (`resolveMatchdayRanks`). Zwei verschiedene Fragen, zwei
+ * verschiedene Zahlen — der Saison-Rang muss die gebuchte nehmen.
  *
  * Formkarten- und Captain-Beitrag sind bereits in den Disziplin-Punkten enthalten (siehe die
- * Tooltips weiter unten) und dürfen deshalb NICHT noch einmal addiert werden. Nur der Mutator-PP
- * steht daneben.
+ * Tooltips weiter unten) und dürfen ohnehin nicht noch einmal addiert werden.
  */
 export function resolveProjectedRanksFromMatchday<
-  T extends { teamId: string; currentPoints: number | null; total: number; projectedRank: number | null },
+  T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
 >(rows: T[]): Map<string, number> {
   const projected = rows
     .map((row) => ({
       teamId: row.teamId,
-      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.total : null,
+      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.sum : null,
     }))
     .filter((entry): entry is { teamId: string; points: number } => entry.points != null);
 
