@@ -254,7 +254,24 @@ export function buildSeasonSeededDisciplineSchedule(input: {
     input.matchdayIds && input.matchdayIds.length >= requiredMatchdays
       ? input.matchdayIds.slice(0, requiredMatchdays)
       : Array.from({ length: requiredMatchdays }, (_, index) => `${input.seasonId}-matchday-${index + 1}`);
-  const maxCombinedPlayerCount = input.maxCombinedPlayerCount ?? 10;
+  /**
+   * KEIN DECKEL MEHR — Chris: „der spielplan soll nichts deckeln! auch 12 soll möglich sein! das
+   * soll ja dann der vorteil sein für teams die bereit sind auch mal 12 oder 13 spieler zu picken!"
+   *
+   * Der Standardwert war 10. Damit fielen die groessten Paarungen weg, obwohl sie moeglich sind:
+   * der Disziplin-Pool traegt je viermal 2, 3, 4, 5 und 6 Spieler — die beiden groessten ergeben
+   * zusammen 12. Gemessen an der Saison des Live-Spielstands schob der Deckel genau eine Paarung
+   * um (Spieltag 9/10 tauschten, mit Warnung `season_schedule_pair_over_roster_limit`); die
+   * uebrigen acht blieben gleich. Ein grosser Spieltag ist damit nicht mehr ein Ausrutscher, den
+   * die Ersatzregel durchwinkt, sondern eine regulaere Auslosung.
+   *
+   * Der Sinn dahinter ist ein Spielvorteil, kein Zufall: wer einen breiten Kader haelt, kann an
+   * einem 12er-Spieltag alle Plaetze besetzen, waehrend ein schmaler Kader passen muss. Der
+   * Deckel nahm genau diese Entscheidung aus dem Spiel.
+   *
+   * Der Parameter bleibt, damit Tests und Sonderlaeufe weiterhin eng fuehren koennen.
+   */
+  const maxCombinedPlayerCount = input.maxCombinedPlayerCount ?? Number.POSITIVE_INFINITY;
   const paired = buildSeededDisciplinePairs({
     disciplines: input.disciplines,
     seed: scheduleSeed,

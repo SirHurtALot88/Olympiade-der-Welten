@@ -49,6 +49,7 @@ import {
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusEntry } from "@/lib/foundation/season-form-card-bonus";
+import { buildValueRanks as buildTeamValueRanks } from "@/lib/season/season-value-ranks";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -283,31 +284,17 @@ function getAreaRankBandClass(rank: number | undefined): string {
  * "bester Rang für alle" würde eine komplett unbespielte Spalte lauter #1
  * ausweisen, obwohl niemand etwas geholt hat.
  */
+/**
+ * Duenne Huelle um `buildValueRanks` aus `lib/season/season-value-ranks` — die Rechnung selbst
+ * liegt dort, weil die Sponsoren-Ziele denselben Rang lesen muessen wie diese Tabelle. Liefe die
+ * Zielpruefung auf einer eigenen Rechnung, koennte sie einem Spieler eine Zielmarke verweigern,
+ * die seine eigene Tabelle bestaetigt.
+ */
 function buildValueRanks(
   rows: SeasonV2StandingsRow[],
   getValue: (row: SeasonV2StandingsRow) => number | null | undefined,
 ): Map<string, number> {
-  const ranked = new Map<string, number>();
-  const scored = rows
-    .map((row) => ({ teamId: row.teamId, value: getValue(row) }))
-    .filter(
-      (entry): entry is { teamId: string; value: number } =>
-        typeof entry.value === "number" && Number.isFinite(entry.value),
-    )
-    .sort((a, b) => b.value - a.value);
-  let groupStart = 0;
-  while (groupStart < scored.length) {
-    let groupEnd = groupStart;
-    while (groupEnd + 1 < scored.length && scored[groupEnd + 1].value === scored[groupStart].value) {
-      groupEnd += 1;
-    }
-    const worstRank = groupEnd + 1;
-    for (let index = groupStart; index <= groupEnd; index += 1) {
-      ranked.set(scored[index].teamId, worstRank);
-    }
-    groupStart = groupEnd + 1;
-  }
-  return ranked;
+  return buildTeamValueRanks(rows, (row) => row.teamId, getValue);
 }
 
 /**

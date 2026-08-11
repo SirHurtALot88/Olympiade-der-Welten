@@ -1,16 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { buildSponsorOffersForTeam } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 import {
   SPONSOR_V4_AXIS_PBAR,
   SPONSOR_V4_AXIS_SIZE_BY_RARITY,
+  buildSponsorV3TermsCore,
+  sponsorV3CardByKey,
   sponsorV3Settle,
   sponsorV4AxisSizeFor,
+  type SponsorV3Rarity,
+  type SponsorV4AxisKey,
+  type SponsorV4AxisTerms,
 } from "@/lib/sponsor/sponsor-v3-model";
-import { getSponsorV3Terms, sponsorV3SettlementParts } from "@/lib/sponsor/sponsor-v3-offer-service";
+import {
+  getSponsorV3SalaryFactor, getSponsorV3Terms, sponsorV3SettlementParts,
+} from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_BODEN, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
+import {
+  LEIH_ZIEL_ACHSENRANG,
+  LEIH_ZIEL_FRISCHE,
+} from "@/lib/sponsor/sponsor-leih-ziele";
 import {
   SPONSOR_V4_AXIS_KEYS,
   buildSponsorV4AxisTerms,
@@ -30,6 +42,59 @@ function withCash(gameState: GameState, teamId: string, cash: number): GameState
 }
 
 /**
+ * Baut eine Achsen-Karte DIREKT — ohne den Umweg ueber `buildSponsorOffersForTeam`.
+ *
+ * WARUM DIESER UMWEG NOETIG WURDE: seit dem Leih-Ziel-Umbau (siehe Kopfkommentar unten) erzeugt
+ * `buildSponsorOffersForTeam` fuer KEIN Team mehr ein Angebot mit einer Achsen-Komponente — jede
+ * Gebaeude-Karte traegt jetzt eines der zwei Leih-Ziele statt einer Achse. Die vier Tests in diesem
+ * Block pruefen aber Eigenschaften der ACHSEN-RECHENSCHICHT selbst (`buildSponsorV3TermsCore` mit
+ * `axis`/`axisSize`, `buildSponsorV4AxisTerms`), und die traegt weiterhin Altvertraege. Diese
+ * Hilfsfunktion baut deshalb dieselben zwei Bausteine, die auch der (inzwischen tote) Live-Pfad
+ * benutzte, direkt zusammen: `buildSponsorV4AxisTerms` fuer die Konditionen, `buildSponsorV3TermsCore`
+ * mit gesetztem `axis`/`axisSize` fuer die Karte, und dieselbe `targetValue`-Kodierung, die
+ * `sponsorV4AxisTermsFromComponent` (sponsor-objective-evaluator.ts) auch aus einem echten Angebot
+ * gelesen haette.
+ */
+function bauteAchsenKarte(input: {
+  gameState: GameState;
+  teamId: string;
+  startRank: number;
+  rarity: SponsorV3Rarity;
+  achse?: SponsorV4AxisKey;
+}): {
+  terms: ReturnType<typeof buildSponsorV3TermsCore>;
+  component: SponsorOfferComponent;
+  axis: SponsorV4AxisTerms;
+} {
+  const achse = input.achse ?? "soliditaet";
+  const axis = buildSponsorV4AxisTerms(input.gameState, input.teamId, achse);
+  const salaryFactor = getSponsorV3SalaryFactor(input.gameState);
+  const baseLadder = sponsorKurvenLeiter({ shape: "stetig", startRank: input.startRank, salaryFactor });
+  const terms = buildSponsorV3TermsCore({
+    baseLadder,
+    startRank: input.startRank,
+    rarity: input.rarity,
+    card: sponsorV3CardByKey("achse"),
+    goalKey: sponsorV4AxisSpecialKey(achse),
+    salaryFactor,
+    floor: SPONSOR_BODEN,
+    axis,
+    axisSize: sponsorV4AxisSizeFor(input.rarity),
+  });
+  const component: SponsorOfferComponent = {
+    componentId: "axis-target",
+    kind: "special",
+    specialKey: sponsorV4AxisSpecialKey(achse),
+    label: `Zielachse · ${achse}`,
+    targetValue: `axisbase:${axis.baseline};axisscale:${axis.scale};axisoffset:${axis.offset}`,
+    stages: undefined,
+    rewardCash: 0,
+    penaltyCash: undefined,
+  };
+  return { terms, component, axis };
+}
+
+/**
  * DIE ACHSEN sind das, was V4 von V3 unterscheidet. In V3 unterschieden sich die fuenf Karten eines
  * Slates ausschliesslich im Risikoprofil um dieselbe Rangleiter; der Ausschlag lag bei 1 bis 3 C
  * gegen eine Faktorschwankung von 30 C, die Wahl war damit praktisch belanglos.
@@ -37,43 +102,42 @@ function withCash(gameState: GameState, teamId: string, cash: number): GameState
  * Eine Achse misst den eigenen Zuwachs gegen die eigene, bei Angebotserzeugung eingefrorene
  * Ausgangslage. Genau daraus folgen die beiden Zusagen, die hier gepruefte werden: der Hebel ist fuer
  * den Tabellenletzten so gross wie fuer den Meister, und er ist gross genug, um spuerbar zu sein.
+ *
+ * EHRLICHER STAND (2026-08-11): die fuenf Achsen werden bei NEUEN Angeboten nicht mehr vergeben —
+ * Gebaeude-Karten tragen seither eines der zwei Leih-Ziele aus `sponsor-leih-ziele.ts`
+ * (`leih_frische`, `leih_achsenrang`), fest bepreist und OHNE Sockelabzug. Die Rechenschicht hier
+ * (`sponsor-v4-axes.ts`, `SPONSOR_V4_AXIS_*` in `sponsor-v3-model.ts`) bleibt trotzdem vollstaendig
+ * erhalten und richtig: Altvertraege, die noch eine Achse eingefroren haben, rechnen unveraendert
+ * danach weiter (Invariante 3, `docs/SPONSOREN_BAUVORLAGE.md`), und diese Tests sichern genau das
+ * ab — deshalb bauen sie ihre Achsen-Konditionen ab jetzt DIREKT ueber `buildSponsorV3TermsCore` und
+ * `buildSponsorV4AxisTerms`, statt sie (nicht mehr vorhandenen) neuen Angeboten zu entnehmen. Was
+ * jeder Test behauptet, ist unveraendert dasselbe — nur die Herkunft der Konditionen hat sich
+ * geaendert.
  */
 describe("Sponsor-Achsen: der Hebel gehoert allen gleich", () => {
   it("zahlt fuer denselben Erfuellungsgrad denselben Betrag — egal ob Rang 1 oder Rang 32", () => {
+    // Direkt gebaut statt ueber `buildSponsorOffersForTeam` bezogen (siehe Erklaerung oben) — sonst
+    // dasselbe Vorgehen: fuer jede Rarity Spitze (Startrang 1) gegen Keller (Startrang 32) vergleichen.
     const gameState = baseState();
-    const [strong, weak] = [gameState.teams[0]!, gameState.teams[gameState.teams.length - 1]!];
-    const offersStrong = buildSponsorOffersForTeam({ gameState, teamId: strong.teamId });
-    const offersWeak = buildSponsorOffersForTeam({ gameState, teamId: weak.teamId });
+    const teamId = gameState.teams[0]!.teamId;
 
-    const axisTermsOf = (offers: ReturnType<typeof buildSponsorOffersForTeam>) =>
-      offers.map((offer) => getSponsorV3Terms(offer)).filter((terms) => terms?.axis != null);
-
-    const strongAxes = axisTermsOf(offersStrong);
-    const weakAxes = axisTermsOf(offersWeak);
-    expect(strongAxes.length).toBeGreaterThan(0);
-    expect(weakAxes.length).toBeGreaterThan(0);
-
-    // Der Achsenbetrag haengt NUR an der Rarity, nie am Rang. Bei gleicher Rarity ist er identisch —
-    // das ist der ganze Mechanismus hinter "jedes Team hat Chancen".
     let verglichen = 0;
-    for (const rarity of Object.keys(SPONSOR_V4_AXIS_SIZE_BY_RARITY)) {
-      const s = strongAxes.find((terms) => terms!.rarity === rarity);
-      const w = weakAxes.find((terms) => terms!.rarity === rarity);
-      if (!s || !w) continue;
+    for (const rarity of Object.keys(SPONSOR_V4_AXIS_SIZE_BY_RARITY) as SponsorV3Rarity[]) {
+      const spitze = bauteAchsenKarte({ gameState, teamId, startRank: 1, rarity });
+      const keller = bauteAchsenKarte({ gameState, teamId, startRank: 32, rarity });
       verglichen += 1;
-      expect(s.goalSize, `Rarity ${rarity}: Spitze und Keller muessen denselben Hebel tragen`).toBe(w.goalSize);
+      // Der Achsenbetrag haengt NUR an der Rarity, nie am Rang. Bei gleicher Rarity ist er identisch —
+      // das ist der ganze Mechanismus hinter "jedes Team hat Chancen".
+      expect(spitze.terms.goalSize, `Rarity ${rarity}: Spitze und Keller muessen denselben Hebel tragen`)
+        .toBe(keller.terms.goalSize);
     }
-    // Ohne diese Zusicherung waere der Test gruen, wenn die beiden Slates zufaellig keine Rarity
-    // teilen — er haette dann nichts geprueft.
-    expect(verglichen, "keine gemeinsame Rarity gefunden — der Test hat nichts verglichen").toBeGreaterThan(0);
+    expect(verglichen, "keine Rarity geprueft").toBeGreaterThan(0);
   });
 
   it("ist EV-neutral bepreist — voll erfuellt und voll verfehlt liegen symmetrisch um die Leiter", () => {
     const gameState = baseState();
     const teamId = gameState.teams[3]!.teamId;
-    const terms = buildSponsorOffersForTeam({ gameState, teamId })
-      .map((offer) => getSponsorV3Terms(offer))
-      .find((entry) => entry?.axis != null)!;
+    const { terms } = bauteAchsenKarte({ gameState, teamId, startRank: 10, rarity: "magisch" });
 
     expect(terms.goalP).toBe(SPONSOR_V4_AXIS_PBAR);
     const ladderOnly = sponsorV3Settle({ ...terms, goalSize: 0 }, 10, 0);
@@ -99,6 +163,36 @@ describe("Sponsor-Achsen: der Hebel gehoert allen gleich", () => {
     }
     // Golden vergroessert den Hebel, aendert aber nichts an der Bepreisung.
     expect(sponsorV4AxisSizeFor("magisch", true)).toBeGreaterThan(sponsorV4AxisSizeFor("magisch"));
+  });
+});
+
+/**
+ * NEU (2026-08-11): NEU ERZEUGTE Angebote tragen keine Achse mehr — das ist der eigentliche
+ * Umbau, den dieser Testlauf festnagelt. Anders als die Bloecke oben (die die Rechenschicht direkt
+ * pruefen) geht dieser Test bewusst ueber `buildSponsorOffersForTeam`: er behauptet nicht, dass die
+ * Achsen-Rechnung nicht mehr FUNKTIONIEREN KANN, sondern dass sie am Live-Pfad nicht mehr LAEUFT.
+ */
+describe("Sponsor-Achsen: neu erzeugte Angebote tragen keine Achse mehr", () => {
+  it("keine Karte eines neuen Slates traegt `axis` — Gebaeude-Karten tragen stattdessen ein Leih-Ziel", () => {
+    const gameState = baseState();
+    const teamId = gameState.teams[0]!.teamId;
+    const offers = buildSponsorOffersForTeam({ gameState, teamId });
+    expect(offers.length).toBeGreaterThan(0);
+
+    let gebaeudeKarten = 0;
+    for (const offer of offers) {
+      const terms = getSponsorV3Terms(offer)!;
+      expect(terms.axis, `Angebot ${offer.offerId} traegt noch eine Achse`).toBeUndefined();
+
+      const leihe = offer.sponsorLeihe;
+      if (!leihe) continue; // die reine Cash-Karte (Platz 0) traegt bewusst kein Gebaeude.
+      gebaeudeKarten += 1;
+      expect([LEIH_ZIEL_FRISCHE, LEIH_ZIEL_ACHSENRANG], `Angebot ${offer.offerId}`).toContain(terms.goalKey);
+      expect(terms.goalP, `Angebot ${offer.offerId}: kein Sockelabzug auf dem Leih-Ziel`).toBe(0);
+    }
+    // Ohne diese Zusicherung waere der Test gruen, auch wenn zufaellig keine Gebaeude-Karte im Slate
+    // laege — er haette dann die zweite Haelfte seiner Aussage nie geprueft.
+    expect(gebaeudeKarten, "keine Gebaeude-Karte im Slate gefunden").toBeGreaterThan(0);
   });
 });
 
@@ -132,12 +226,10 @@ describe("Sponsor-Achsen: gemessen gegen die eingefrorene eigene Ausgangslage", 
   it("liest im Settlement dieselbe Zahl wie die Karte — eine Rechenstelle, kein zweiter Weg", () => {
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;
-    const offer = buildSponsorOffersForTeam({ gameState, teamId })
-      .find((entry) => getSponsorV3Terms(entry)?.axis != null)!;
-    const terms = getSponsorV3Terms(offer)!;
-    const component = offer.components.find((entry) => entry.kind === "special")!;
+    const { terms, component } = bauteAchsenKarte({ gameState, teamId, startRank: 5, rarity: "selten" });
 
-    // Der Evaluator (Settlement-Pfad) und die Achsen-Messung (Anzeige-Pfad) muessen uebereinstimmen.
+    // Der Evaluator (Settlement-Pfad) und die Achsen-Messung (Anzeige-Pfad) muessen uebereinstimmen —
+    // beide lesen dieselben, im `targetValue` eingefrorenen Konditionen.
     const viaEvaluator = evaluateSpecialComponentStage(gameState, teamId, component);
     const viaAxis = evaluateSponsorV4Axis(gameState, teamId, terms.axis!);
     expect(viaEvaluator.fraction).toBeCloseTo(viaAxis.fraction, 9);
@@ -154,10 +246,7 @@ describe("Sponsor-Achsen: gemessen gegen die eingefrorene eigene Ausgangslage", 
   it("traegt die Konditionen im Vertrag, nicht in einer Tabelle nebenan", () => {
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;
-    const offer = buildSponsorOffersForTeam({ gameState, teamId })
-      .find((entry) => getSponsorV3Terms(entry)?.axis != null)!;
-    const terms = getSponsorV3Terms(offer)!;
-    const component = offer.components.find((entry) => entry.kind === "special")!;
+    const { terms, component } = bauteAchsenKarte({ gameState, teamId, startRank: 5, rarity: "gewöhnlich" });
 
     expect(component.specialKey).toBe(sponsorV4AxisSpecialKey(terms.axis!.key));
     // Basis, Skala und Nullpunkt stehen im targetValue — deshalb kann eine spaetere Kalibrierung

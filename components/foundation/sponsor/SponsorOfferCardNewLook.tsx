@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { buildLeihPresentationForOffer } from "@/lib/sponsor/sponsor-leih-presenter";
 
 import type {
   GameState,
@@ -237,6 +238,10 @@ export function SponsorOfferCardNewLook({
   const offerModules = describeSponsorOfferModules(offer);
   const offerPerk = offerModules.find((module) => module.kind === "perk") ?? null;
   const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
+  // Die Gebäude-Leihe kommt fertig gerechnet aus der lib — die Karte formatiert nur. Jede Zahl
+  // stammt aus derselben Quelle wie der Verzicht in der Leiter; eine zweite Rechnung hier waere
+  // genau der Weg, auf dem Anzeige und Abrechnung in diesem Projekt schon auseinandergelaufen sind.
+  const leihe = buildLeihPresentationForOffer(offer);
   // "overperformance" wird als eigene Zeile unter der Rang-Leiter gerendert (nicht als generische Kachel),
   // fließt aber weiter in die Gesamt-Summe (totalCash) ein.
   const standardComponents = offer.components.filter(
@@ -387,6 +392,48 @@ export function SponsorOfferCardNewLook({
             Sockel steht mit dem Startrang bei Unterschrift fest, der Wertungsanteil schwankt jede Saison
             neu mit dem Salary Factor.
           </p>
+        </div>
+      ) : null}
+
+      {/* DAS GEBÄUDE — die eigentliche Entscheidung dieser Karte.
+          Es steht bewusst VOR den Cash-Kacheln: wer diese Karte waehlt, waehlt sie wegen des
+          Gebaeudes, und die niedrigere Auszahlung darunter ist die Folge, nicht der Anlass. Die
+          Zeile „steckt bereits in der Auszahlung" ist keine Hoeflichkeit, sondern die Absicherung
+          gegen das naheliegende Missverstaendnis, der Verzicht komme noch obendrauf. */}
+      {leihe ? (
+        <div className="nl-sponsor-leihe" data-testid="sponsor-leihe-panel">
+          <div className="nl-sponsor-leihe-head">
+            <strong>
+              {leihe.facilityName} · Stufe {leihe.stufe}
+            </strong>
+            <span className="nl-sponsor-leihe-zustand nl-tnum">
+              {Math.round(leihe.zustandPct)} % Zustand
+              {leihe.unterWirkschwelle ? ` · Wirkung ${Math.round(leihe.wirkungsgradPct)} %` : ""}
+            </span>
+          </div>
+          <small>
+            Geliehen — der Sponsor traegt den Unterhalt. Dafuer zahlt diese Karte{" "}
+            <strong className="nl-tnum">{formatCash(leihe.verzichtDieseSaison)}</strong> weniger je Saison; das
+            steckt in der Auszahlung unten bereits drin und wird nicht noch einmal abgezogen.
+          </small>
+          {leihe.stufenreihe.length > 1 ? (
+            <small>
+              Ueber die Laufzeit: Stufe {leihe.stufenreihe.join(" → ")}
+              {" · Verzicht "}
+              {leihe.verzichtJeSaison.map((wert) => formatCash(wert)).join(" → ")}
+            </small>
+          ) : null}
+          {leihe.markenStatus ? (
+            <small className={leihe.ruht ? "nl-sponsor-leihe-ruht" : undefined}>
+              Bedingung: Top {leihe.rangmarke} halten ({leihe.rangmarkenHaerte === "hart" ? "hart" : "mild"}) —
+              darunter ruht das Gebaeude, der Verzicht laeuft weiter. {leihe.markenStatus}
+            </small>
+          ) : null}
+          <small>
+            Am Vertragsende uebernehmbar fuer ca.{" "}
+            <span className="nl-tnum">{formatCash(leihe.uebernahmepreisJetzt)}</span> statt{" "}
+            <span className="nl-tnum">{formatCash(leihe.katalogkostenEndstufe)}</span> Selbstbau.
+          </small>
         </div>
       ) : null}
 

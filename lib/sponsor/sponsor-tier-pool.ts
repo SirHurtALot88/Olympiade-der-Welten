@@ -217,7 +217,14 @@ export function rollSponsorOfferSlate(input: {
     : SPONSOR_V4_AXIS_KEYS
   ).slice();
   const requestedSlotCount = input.slotCount ?? 5;
-  const slotCount = Math.max(1, Math.min(requestedSlotCount, 1 + axisPool.length));
+  // DIE SLOT-ZAHL HAENGT NICHT MEHR AN DEN ACHSEN. Sie tat es, solange jede Karte ausser der Basis
+  // eine eigene Achse trug — zwei Karten auf derselben Achse waeren keine Wahl gewesen, sondern zwei
+  // Preise fuer dasselbe. Seit die Gebaeude-Karten die zwei Leih-Ziele tragen (Frische, Achsen-Rang)
+  // unterscheiden sie sich ueber Gebaeude, Groesse und Rarität; ein Team mit wenig bespielbaren
+  // Achsen bekam sonst weniger Karten als die anderen, ausgerechnet ohne dass die Achsen noch etwas
+  // entscheiden. Der `axisPool` bleibt fuer die Achsen-Zuordnung stehen (Altvertrags-Anzeige und die
+  // Basis-Karte lesen sie weiter), deckelt aber nichts mehr.
+  const slotCount = Math.max(1, requestedSlotCount);
 
   // Ziehung OHNE ZURUECKLEGEN ueber eine deterministische Sortierung: jede Achse bekommt einen
   // stabilen Wurf, sortiert wird danach. Eine Achse bleibt je Saison uebrig — das rotiert den Slate

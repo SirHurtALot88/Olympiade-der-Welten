@@ -79,7 +79,7 @@ function effectiveIncomeFor(
  * erfundenen Zahlen.
  */
 const TIP_ZUSTAND = `Zustand zeigt, wie fit ein Gebäude ist (100% = neuwertig). Jede Saison nutzt es sich ab. Ab ${FACILITY_CONDITION_WARNING}% Zustand arbeitet es mit voller Effizienz — darunter sinkt die Effizienz proportional, bei 0% fällt das Gebäude komplett aus.`;
-const TIP_UNTERHALT = `Unterhalt sind die laufenden Kosten pro Saison, um ein Gebäude in Betrieb zu halten. Wird der Unterhalt nicht gezahlt, verschleißt das Gebäude deutlich schneller (−${FACILITY_SEASON_DECAY_UNPAID} statt −${FACILITY_SEASON_DECAY_PAID} Zustandspunkte pro Saison).`;
+const TIP_UNTERHALT = `Unterhalt sind die laufenden Kosten pro Saison, um ein Gebäude in Betrieb zu halten. Der Verschleiß schwankt von Gebäude zu Gebäude um rund −${FACILITY_SEASON_DECAY_PAID} Zustandspunkte pro Saison. Wird der Unterhalt nicht gezahlt, ist es doppelt so viel (rund −${FACILITY_SEASON_DECAY_UNPAID}).`;
 const TIP_WARTUNG = `Wartung stellt den Zustand eines Gebäudes wieder auf 100% her. Je schlechter der Zustand, desto teurer die Wartung. Fällt der Zustand unter ${FACILITY_CONDITION_WARNING}%, sinkt die Effizienz — Effekte und Einnahmen wirken dann nur noch anteilig.`;
 const TIP_AUSBAU = "Ausbau-Kosten fallen einmalig beim Upgrade auf die jeweilige Stufe an. Grün = bereits erreichte Stufen, hervorgehoben = nächste Stufe.";
 const TIP_EFFIZIENZ = `Wie stark das Gebäude aktuell wirkt. 100%, solange der Zustand mindestens ${FACILITY_CONDITION_WARNING}% beträgt — darunter sinkt die Effizienz proportional mit dem Zustand.`;

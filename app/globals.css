@@ -55839,6 +55839,42 @@ button.foundation-team-portrait-card {
   border-radius: var(--nl-r-sm);
 }
 
+/* GEBÄUDE-LEIHE auf der Sponsorkarte. Bewusst dieselbe Kachelform wie die Challenge daneben —
+   ein eigenes Aussehen fuer jede Kartenart waere genau die Unuebersichtlichkeit, die der
+   Sponsoren-Rework abschaffen soll. Die Akzentfarbe unterscheidet sie: Gebäude ist Zugewinn,
+   nicht Warnung. */
+.is-new-look .nl-sponsor-leihe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 40%, transparent);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-sponsor-leihe small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-leihe-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-sponsor-leihe-zustand {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+/* Ruht die Leihe, muss man das SEHEN — der Verzicht laeuft ja weiter. */
+.is-new-look .nl-sponsor-leihe-ruht {
+  color: var(--nl-warn);
+}
+
 .is-new-look .nl-sponsor-challenge {
   display: flex;
   flex-direction: column;

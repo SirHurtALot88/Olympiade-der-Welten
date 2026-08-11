@@ -27,6 +27,7 @@ import {
 } from "@/components/foundation/new-look";
 import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import type {
   TeamDetailDrawerData,
@@ -638,6 +639,16 @@ export default function TeamProfileNewLook({
   const werdegangSeries = useMemo(
     () => (foundationGameState ? buildTeamCareerSeries(foundationGameState, data.teamId) : null),
     [data.teamId, foundationGameState],
+  );
+
+  /**
+   * Spielerzahl je Disziplin DIESER Saison — fuer die Reihenfolge der Disziplin-Unterspalten
+   * in der History-Tabelle (siehe `TeamDrawerHistoryTable`-Prop-Kommentar / Chris' Meldung zu
+   * SHO). Ohne `foundationGameState` bleibt die Tabelle bei der statischen Katalog-Reihenfolge.
+   */
+  const seasonPlayerCountByDisciplineId = useMemo(
+    () => (foundationGameState ? buildSeasonDisciplinePlayerCountMap(foundationGameState) : null),
+    [foundationGameState],
   );
 
   const visiblePlayers = useMemo(() => [...data.players].sort(comparePlayersByOvr), [data.players]);
@@ -2404,6 +2415,7 @@ export default function TeamProfileNewLook({
               axisToneVariant="drawer"
               rows={data.history}
               allTime={{ pps: data.allTimePps, rank: data.allTimePpsRank, teamCount: data.allTimePpsTeamCount }}
+              seasonPlayerCountByDisciplineId={seasonPlayerCountByDisciplineId}
               renderCell={(columnId: string, row: TeamDetailDrawerHistoryRow) => {
                 if (columnId === "season") {
                   return (

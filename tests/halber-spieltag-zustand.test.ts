@@ -172,9 +172,15 @@ describe("Feld-Rennen-Projektion: gewertete Spieltage kommen im kompakten Payloa
     const { gameState, teamB } = baueHalbenSpieltag();
     const compact = compactFoundationInitialGameState(gameState);
 
-    // Die Quellen sind wirklich beschnitten (nur der aktive Spieltag) …
-    expect((compact.seasonState.matchdayResults ?? []).map((r) => r.matchdayId)).toEqual(["matchday-2"]);
-    // … aber die Projektion zählt beide gewerteten Spieltage.
+    // Die schwere Quelle ist wirklich beschnitten (nur der aktive Spieltag) — die schmale
+    // Verzeichniszeile je Spieltag faehrt seit dem Saisonziel-Fix dagegen vollstaendig mit,
+    // weil die Vorstandsziele sonst nur den aktiven Spieltag zaehlten.
+    expect([...new Set((compact.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId))]).toEqual(["result-2"]);
+    expect((compact.seasonState.matchdayResults ?? []).map((r) => r.matchdayId)).toEqual([
+      "matchday-1",
+      "matchday-2",
+    ]);
+    // … und die Projektion zählt beide gewerteten Spieltage.
     const projection = compact.seasonState.foundationFieldRace;
     expect(projection).toBeTruthy();
     const ledger = hydriereFieldRaceProjection(projection!);

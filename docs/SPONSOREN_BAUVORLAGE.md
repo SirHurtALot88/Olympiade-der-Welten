@@ -1,6 +1,11 @@
 # Sponsoren-Rework — Bauvorlage
 
-Stand: 2026-08-11 · Status: **Bauvorlage zur Abnahme. Kein Produktionscode geändert.**
+Stand: 2026-08-11 (zweite Fassung) · Status: **abgenommen, Umsetzung freigegeben.**
+
+> **Lies zuerst Abschnitt −1.** Er trägt acht Entscheidungen von Chris, die Teile der Vorlage
+> umkehren — unter anderem fällt der 60-%-Leih-Abzug ersatzlos weg, die Rarität wird zum
+> Umwandlungskurs, Einnahmegebäude sind wieder verleihbar, es bleibt bei fünf Angeboten statt
+> drei, und die Abnutzung der Gebäude wird Teil von Leihe und Übernahme.
 
 Dieses Dokument macht aus vier bisher nebeneinander stehenden Quellen EINE widerspruchsfreie
 Vorlage:
@@ -21,6 +26,71 @@ Ist-Zustand als Delta-Basis (gemessen am Code auf `main`, `lib/sponsor/`, 24 Dat
 (`sponsor-curve-shapes.ts`), je Angebot 2–3 `components` plus 2–4 `moduleIds`, dazu Rarity,
 Golden-Los, Vorschuss, Laufzeit-Würfel, fünf Zielachsen und ein Challenge-Slot. Das ist Chris'
 „total unübersichtlich".
+
+---
+
+## −1. Entscheidungen vom 11.08. — diese Fassung schlägt alles Folgende
+
+Nach der Abnahme-Prüfung hat Chris acht Punkte präzisiert oder umgekehrt. **Wo unten etwas anderes
+steht, gilt dieser Abschnitt.** Die überholten Stellen sind einzeln benannt, damit niemand gegen die
+alte Fassung baut.
+
+| # | Entscheidung | Was unten hinfällig wird |
+|---|---|---|
+| **E1** | **Kein Abzug — zwei Sorten Sponsor.** Nicht eine Karte mit Abschlag, sondern: viel Cash pur, oder weniger Cash plus Gebäude. Chris: „Teams nehmen bewusst in kauf weniger cash zu bekommen um gute gebäude zu leihen." | §1 (Abzugszeile), §2, §4.2 komplett, §6 Schritt 2 Fixpunkte, §8 W3 |
+| **E2** | **Die Rarität IST der Kurs.** Vier Stufen in der Reihenfolge gewöhnlich → magisch → selten → legendär, Umwandlung **1,4 · 1,8 · 2,3 · 3,0** (Enden von Chris gesetzt, Zwischenstufen geometrisch). Der Kurs ändert nicht die Höhe der Zahlung, sondern wie viel Gebäude man für denselben Verzicht bekommt. | §1 („Rarity-Farbe entfällt"), §5.1 |
+| **E3** | **Gerechnet wird rückwärts.** Die Karte bietet eine konkrete Gebäudestufe an, daraus folgt der Preis: `Verzicht = Leihwert(Stufe) / Kurs`. Nie umgekehrt — sonst kommt ein Betrag zwischen zwei Stufen heraus, mit dem niemand etwas anfangen kann. Basis ist der **Leihwert je Saison**, nicht die Katalog-Baukosten. | §4.2 |
+| **E4** | **Einnahmegebäude sind wieder verleihbar.** Fan Shop und Arena bleiben drin. Chris: „Wenn man zb nen sponsor bekommt der einem nen fan shop leiht ist das ja quasi auch free money." Dass der Shop sich selbst trägt, ist der Reiz, nicht das Schlupfloch — der Ertrag steckt bereits im Leihwert und damit im Preis, und die Rangmarke macht ihn bedingt. Auflage: bei Einnahmegebäuden auf den **erwarteten Saisonertrag** rechnen statt auf die Leihwert-Formel (Fan Shop identisch, Arena nicht). | §0 Invariante 4, §4.3, §8 W4 |
+| **E5** | **Negative Margen sind gewollt — der Rubberband der Liga.** Chris: „wenn die teams overspenden bei den gehältern ist das gewollt. dann müssen sie in folgejahren mit den problemen leben! … schwache teams können auch mal entspannt durch segeln und top teams müssen sehr auf ihren spend achten." Die Sponsorhöhen bleiben unangetastet. Bezahlbarkeit ist **kein** Freigabekriterium mehr — sie bleibt reine Information auf der Karte. Und: **keine Sperre**, keine bevormundende Warnung. Wer knapp ist, darf trotzdem zugreifen und über Verkäufe oder Kredit gegenfinanzieren. | §6 Schritt 9 („kein Team unter 0 gezwungen"), §7.5 |
+| **E6** | **Keine Migration.** Chris startet mit den Sponsoren ein neues Spiel. Rückwärtskompatibilität ist keine Freigabebedingung mehr; alte Saves sollen laden können, ohne dass Sonderpfade für Altformate gebaut und getestet werden. | §5.2 und §5.3 komplett, §6 Schritt 4 Wächter-Kante, Schritt 5 Altvertrags-Regression |
+| **E7** | **Abnutzung ist Teil der Leihe** — und existiert bereits im Code (`lib/facilities/facility-condition.ts`): Neuzustand 100, Verfall 8 je Saison bei bezahltem Unterhalt (22 unbezahlt), volle Wirkung bis 70, darunter linear fallend, bei 0 zählt das Gebäude als Stufe 0. Chris will den Zustand als **Vertragsvariable**: derselbe Gebäudetyp auf derselben Stufe kann neu oder gebraucht verliehen werden — zwei Karten, gleiche Stufe, verschiedener Wert, ohne eine neue Zahl zu erfinden. Und der **Übernahmepreis richtet sich nach dem Zustand**: `(Katalogkosten − angerechneter Leihwert) × Zustand/100`. Die Aufstiegsstufen selbst kosten unverändert immer gleich viel. Die Folgelast gehört sichtbar auf die Karte: nach der Übernahme zahlt der Käufer den Unterhalt, und wer ihn nicht zahlt, verliert 22 statt 8 Punkte je Saison. | neu — §4.5 ergänzen |
+| **E8** | **Wieder fünf Angebote statt drei.** Chris: „wenn wir dann wieder genug verschiedene möglichkeiten haben lohnen auch wieder die 5 statt 3 sponsoren." Nicht die Zahl war das Problem, sondern was auf den Karten stand: fünf Karten mit je 2–4 aufgesetzten Modulen und elf Kurvenformen. Mit klarer Unterscheidung (Cash gegen Gebäude, Rarität als Kurs, Zustand als Güte) sind fünf eine Auswahl statt eines Rätsels. **Auflage aus der Messung:** die fünf müssen die Preisspanne abdecken. Zwölf von 32 Teams können nur die reine Cash-Karte bezahlen — ein Slate aus fünf teuren Karten wäre für die halbe Liga eine Scheinauswahl. Mindestens eine Karte ohne Verzicht und eine gewöhnliche Gebäude-Karte im unteren Preisband gehören immer dazu. | §7 W8, §1 („drei Karten"), §6 Schritt 4 |
+
+### Nachtrag vom 11.08., abends — zwei Regler statt einem
+
+Nach der ersten Umsetzung von Schritt 4 hat Chris zwei Dinge nachgeschoben, die beide gegen die
+gerade gebaute Fassung stehen:
+
+| # | Entscheidung | Was hinfällig wird |
+|---|---|---|
+| **E9** | **Größe und Rarität sind getrennte Regler.** „es soll ja verschiedene stufen geben von gebäude sponsoren, manche wollen zb 30 für die gebäude manche nur 5 dafür sind manche stärker manche schwächer." Die erste Fassung koppelte die Startstufe an die Rarität (1/2/2/3) — gemessen lag der Verzicht damit über **alle** Karten zwischen 0,5 und 4,3 C, also praktisch gleich teuer. Die beiden Achsen taten dasselbe und hoben sich auf: eine seltenere Karte stieg höher ein, bekam ihre Stufe aber auch billiger. Jetzt gilt: **Größe** = wie viel Gebäude (Stufe 1 / 3 / 5), **Rarität** = wie gut der Handel dafür ist (Kurs 1,4 / 1,8 / 2,3 / 3,0). Gemessen über eine Liga: **0,8 bis 25,4 C**. | E7s „Startstufe je Rarität"; `STARTSTUFE_JE_RARITAET` |
+| **E10** | **Die Rarität bewegt auch den reinen Cash-Wert — aber je Karte nur EINMAL.** „ein legendärer cash sponsor der nur cash gibt kann teils mehr wert haben als ein guter magischer sponsor mit nem top gebäude angebot an reinem wert." Die Rarität skaliert deshalb die **ganze Leiter** (`SPONSOR_V3_WERT_BY_RARITY`, ±11 % um die magische Mitte = 6 bis 12 C). Gemessen: in **17 von 32** Slates schlägt die reine Cash-Karte jede Gebäude-Karte am reinen Erwartungswert. **Nachtrag auf Chris' Einwand („nicht MEHR cash UND dicke gebäude angebote"): der Wertfaktor gilt NUR für reine Cash-Karten.** Auf einer Gebäude-Karte steckt die Rarität schon im Kurs (`Verzicht = Leihwert / Kurs`); beides zusammen war ein doppelter Zugriff, und er war messbar — bei praktisch gleichem Gebäudewert (Ø 12,4 gegen 12,8) trug die legendäre Karte 69,3 C Erwartungswert, die gewöhnliche 48,9. Nach der Einmal-Regel bleiben 5,9 C Unterschied, und die sind genau der gewollte Effekt: dasselbe Gebäude für weniger Verzicht. | Invariante „alle Karten eines Slates haben denselben Erwartungswert" |
+
+**Was E10 kostet, offen benannt:** Die EV-Parität war der Grund, warum die KI-Wahl ökonomisch nie
+falsch sein konnte. Sie gilt nicht mehr — eine Wahl kann jetzt objektiv falsch sein, und das ist
+gewollt („eine Wahl ohne falsche Antwort ist keine Wahl"). Was bleibt und weiter getestet wird, ist
+die schwächere Zusage: rechnet man beide Regler heraus (Verzicht hinzu, durch den Wertfaktor
+geteilt), ist die Spreizung eines Slates **0,076 C** — es gibt keinen dritten, versteckten Regler.
+
+**Zwei Folgeänderungen, ohne die E9 nicht funktioniert:**
+1. **Das Sicherheitsnetz sinkt mit der Karte.** `SPONSOR_BODEN` = 43 C fest, niedrigste Sprosse
+   52,1 C — es blieben 9,1 C Luft. Ein Verzicht von 25 C wäre am Tabellenende vollständig vom Netz
+   aufgefangen worden: Gebäude geschenkt. Der Boden ist jetzt `SPONSOR_BODEN × Wertfaktor − Verzicht`.
+2. **Ein Deckel aus der eigenen Leiter.** Höchstens die Hälfte der garantierten Saisonzahlung
+   (`VERZICHT_ANTEIL_DER_LEITER`); reicht sie nicht, wird die Karte eine Größe kleiner statt
+   unbezahlbar. Starke Teams können sich mehr Gebäude leisten als schwache — derselbe Rubberband.
+
+**Noch offen aus diesem Nachtrag:** Chris' Einwand „der vorschuss an sich bringt nicht viel weil
+alle kosten und einnahmen immer am saisonende sind" ist zutreffend und **nicht** umgesetzt. Der
+Vorschuss steht ohnehin auf der Abriss-Liste von Schritt 8; bis dahin bleibt er wirkungsarm, aber
+nicht schädlich.
+
+**Ebenfalls entschieden, von Chris an Fable delegiert:** Die Gewinnkurven **variieren nicht**. Feste,
+unterscheidbare Formen je Cash-Karte (flach / mittel / steil); Gebäude-Karten tragen gar keine Kurve.
+Begründung: drei stabile Formen kann ein Spieler lernen, einen Würfel darauf nicht — und die
+Fallenfreiheit (Q1: 6–7 von 11 Kurven waren Fallen) müsste sonst je Wurf garantiert werden statt einmal.
+
+**Ebenfalls korrigiert:** Die Übernahmeformel aus §4.5 („Katalogkosten − gezahlte Abzüge") hat unter
+dem Kurs-Modell einen Konstruktionsfehler — je seltener die Karte, desto weniger Verzicht wurde
+gezahlt, desto teurer die Übernahme. Die beste Karte bekäme den schlechtesten Preis. Richtig ist die
+Anrechnung dessen, was der Sponsor **bereitgestellt** hat: `Katalogkosten − Σ Leihwert der gehaltenen
+Saisons`, raritätsunabhängig, danach mit dem Zustand aus E7 multipliziert.
+
+**Der 19-%-Einbruch (bisher §6 Schritt 0 und §7.1) ist aufgeklärt und damit erledigt.** 371,3 C davon
+waren eine Einmal-Reparaturbuchung aus Saison 1. Dabei kam ein aktives Leck zutage: Mehrjahres-Verträge
+ohne Kurvenform behielten beim Saisonwechsel ihren eingefrorenen Gehaltsfaktor, 10 von 32 Verträgen
+steckten auf 1,0 fest statt auf 1,19 — zusammen 129,6 C zu wenig, und der Fehler entstand bei jedem
+Saisonwechsel neu. Behoben in `rerollSponsorV3TermsForNewSeason`.
 
 ---
 
@@ -426,20 +496,42 @@ nach dem Muster, mit dem heute `sponsorV3`-Blöcke Alt und Neu trennen. Zusätzl
 
 | # | Schritt | Betroffene Dateien | Abnahme |
 |---|---|---|---|
-| **0** | **Messbasis: den 19-%-Einbruch erklären** (Abschnitt 7) — Sponsorsummen S1/S2 je Team und Komponente aus dem Live-Save-Abbild ziehen (`git fetch origin live-save`, Kopie via `OLY_APP_SQLITE_PATH`, siehe CLAUDE.md), Verursacher beziffern (Erosion? verfehlte Achsen −p·G? Vorschuss-Verrechnung? Salary Factor?) | neues Skript unter `scripts/`, kein Produktionscode | Ursache in C beziffert, BEVOR ein Leih-Abzug live geht |
-| 1 | **Achsen-Rang-Rechnung in die lib** — `buildValueRanks` (~40 Zeilen, pure, inkl. Gleichstands-Regel) aus `app/foundation/season-v2/SeasonStandingsNewLook.tsx` nach `lib/season/` (neu, z. B. `season-value-ranks.ts`); Standings importiert von dort | `SeasonStandingsNewLook.tsx`, neue lib-Datei, neuer Test | Saisonstand rendert unverändert (bestehender Test `saisonstand-rang-hinter-pps.test.ts` grün) |
-| 2 | **Leih-Rechenschicht, pure** — Leihwert-Formel, 60-%-Abzug, Übernahmepreis, verleihbare Gebäude (nur Effektgebäude), Stufenreihen, Rangmarken-Ableitung aus dem Startblock, Ziel-Latten-Bänder | neu `lib/sponsor/sponsor-leihe.ts` + Test | Fixpunkte aus dieser Vorlage zahlenidentisch (TZ 3,6/7,2/12,8; Übernahme 64,4 und 37,2; Fan Shop/Arena nicht verleihbar) |
-| 3 | **Gebäude-Overlay** — effektive Stufe `max(eigen, Leihe)`, Leihstatus im Season-State, Rangmarken-Schaltung beim Spieltags-Abschluss, anteilige Saisonwirkung, Timeline-Meldung bei Statuswechsel | `lib/facilities/facility-effects.ts`, Matchday-Advance-Pfad, `olyDataTypes`, Tests | Ohne Leih-Daten im Save exakt heutiges Verhalten (Regressionstest); mit synthetischem Leih-Datensatz schaltet die Marke |
-| 4 | **Angebotserzeugung: 3 Karten** — Slate auf die drei Archetypen mit fester Kurve/Laufzeit, Gebäude-+Markenwahl über die Branchenkette (nur oberhalb eigener Stufe), Leih-Block einfrieren; Wächter in `ensureSeasonSponsorOffers` auf das neue Format | `sponsor-tier-pool.ts`, `sponsor-offer-service.ts`, `sponsor-v3-offer-service.ts`, `sponsor-brand-catalog.ts`, `olyDataTypes` | Neues Spiel: 3 Angebote je Team, drei Kurvenformen, kein Achsen-/Vorschuss-/Golden-Feld; FOSD-Fallen-Test über den 3er-Satz (Prüfstands-Muster aus Q1): 0 Fallen; Alt-Save: alte 5er-Angebote werden beim nächsten Ensure-Lauf ersetzt |
-| 5 | **Settlement** — Leih-Abzug- und Bonus-Zeile im `season_end`-Settlement (dieselbe Buchung wie `salary_deduct`, Invariante 1); Untergrenze schützt nur den Leiterwert | `sponsor-settlement-service.ts`, ggf. Parts-Builder in `sponsor-v3-offer-service.ts`, Tests | Altverträge zahlen zeichenidentisch weiter (Regressionstest); Anzeige-==-Settlement-Test für den neuen Pfad („Kasse ändert sich um exakt den angezeigten Betrag", Muster aus Q1/P-Tabelle) |
-| 6 | **Die zwei Ziele** — Frische (binär, 70 %/≤ 45) und Achsen-Rang (Bänder, liest Schritt 1); Auswertung am Saisonende, Anzeige der Latte + Ist auf der Karte | `sponsor-leihe.ts` (Latten), `sponsor-objective-evaluator.ts` (neuer Zweig), Presenter | je Zieltyp ein Test; kein Ziel für Geldgeber-Karten |
-| 7 | **Mehrjahres-Roll + Übernahme** — gehaltene-Saison-Zählung (≥ 6/10), Leihstufen-Aufstieg beim Saisonwechsel, Übernahme-Angebot am Vertragsende (Preisformel aus Schritt 2), Rückfall auf eigene Stufe | `sponsor-contract-lifecycle.ts`, `lib/season/preseason-workflow-service.ts`, API-Route + UI für die Übernahme | 3-Saisons-Testlauf: Stufenreihe 2→3→4 bei gehaltenen, 2→2→3 bei einer gerissenen Saison; Übernahmepreis == Formel |
-| 8 | **KI-Wahl + Karte + Analytics-Umwidmung** — neue Wahlheuristik; `SponsorOfferCardNewLook` auf die neue Anatomie; Analytics-Stufentexte auf das Bonus-Ziel | `sponsor-offer-service.ts` (`scoreOfferForAi`), `SponsorOfferCardNewLook.tsx`, `FoundationSponsorsNewLook.tsx`, `sponsor-offer-presenter.ts`, `facility-catalog.ts`, `analytics-live-progress.ts` | KI-Verteilung über die drei Karten plausibel (kein Archetyp > 70 % liga-weit); Karte zeigt ≤ 5 Zahlen + 2 Grafiken |
-| 9 | **Messlauf vor Freigabe** — eine volle KI-Saison über den echten Pfad: Uptime je Marke, Bonus-Quoten je Zieltyp, Liga-Bilanz Σ Sponsoren − Σ Gehälter, Zahl zahlungsunfähiger Teams | neues Skript unter `scripts/` | Σ Sponsoren deckt Σ Gehälter bei sf 1,0; kein Team unter 0 gezwungen; Ergebnisse zurück in Abschnitt 7 |
+| ~~0~~ | **ERLEDIGT (11.08.).** Der Einbruch war zu 84 % eine Einmal-Reparaturbuchung aus Saison 1 (371,3 C). Dabei kam ein aktives Leck zutage: Altverträge ohne Kurvenform behielten beim Saisonwechsel ihren eingefrorenen Gehaltsfaktor — 10 von 32 Verträgen steckten auf 1,0 statt 1,19, zusammen 129,6 C zu wenig, und der Fehler entstand jede Saison neu. Behoben in `rerollSponsorV3TermsForNewSeason`. | — | — |
+| ~~1~~ | **ERLEDIGT (11.08.).** `buildValueRanks` liegt in `lib/season/season-value-ranks.ts`, der Saisonstand importiert von dort. | `SeasonStandingsNewLook.tsx`, neue lib-Datei, neuer Test | Saisonstand rendert unverändert (bestehender Test `saisonstand-rang-hinter-pps.test.ts` grün) |
+| ~~2~~ | **ERLEDIGT (11.08.).** `lib/sponsor/sponsor-leihe.ts` — Leihwert, Kurs, Stufenreihe, Übernahmepreis. Abweichend von der Zeile unten: **kein 60-%-Abzug** (E1) und Einnahmegebäude **sind** verleihbar (E4). | neu `lib/sponsor/sponsor-leihe.ts` + Test | Fixpunkte aus dieser Vorlage zahlenidentisch (TZ 3,6/7,2/12,8; Übernahme 64,4 und 37,2; Fan Shop/Arena nicht verleihbar) |
+| ~~2b~~ | **ERLEDIGT (11.08.).** Anfangszustand je Rarität (70/85/95/100); der Zustand wirkt auf Leistung und Übernahmepreis — Letzteres als **Reparaturlast**, nicht als Prozentrabatt (Korrektur zu E7 auf Chris' Einwand). | `sponsor-leihe.ts`, `olyDataTypes` (Leih-Datensatz), Test | Zwei Karten mit identischem Gebäude und identischer Stufe, aber verschiedenem Zustand, ergeben verschiedene Übernahmepreise und verschiedene Wirkung ab Saison 2 |
+| ~~3~~ | **ERLEDIGT (11.08.).** `getTeamFacilityState` legt die Leihe beim Lesen über den eigenen Bestand (`max(eigen, Leihe)`); sie landet nie in `teamFacilities`. | `lib/facilities/facility-effects.ts`, Matchday-Advance-Pfad, `olyDataTypes`, Tests | Ohne Leih-Daten im Save exakt heutiges Verhalten (Regressionstest); mit synthetischem Leih-Datensatz schaltet die Marke |
+| ~~4~~ | **ERLEDIGT (11.08.).** Angebotserzeugung mit Gebäuden: `sponsor-leih-slate.ts` verteilt die Leihgaben auf das bestehende 5er-Slate — Platz 1 bleibt immer reines Geld, Platz 2 ist der Einstieg (immer Stufe 1, gedeckelt auf den gemessenen Median-Spielraum 2,5 C), die übrigen folgen ihrer Rarität in Stufe *und* Anfangszustand (70/85/95/100). Der Verzicht wird nach E1 **nicht gebucht, sondern von jeder Sprosse der Basisleiter abgezogen**, bevor Anker und Tilt entstehen (`leihVerzicht` in `buildSponsorV3TermsCore`); der Mehrjahres-Roll zieht ihn beim Neubau der Leiter wieder ab. Die Unterschrift kopiert den Leih-Block in den Vertrag und legt die Leihgabe in `sponsorLeihgabenByTeamId` — nie in `teamFacilities`. **Nicht** angefasst: der Umbau auf drei Archetypen und der Abriss von Achse/Vorschuss/Golden (siehe Notiz unter der Tabelle). | `sponsor-leih-slate.ts` (neu), `sponsor-offer-service.ts`, `sponsor-v3-offer-service.ts`, `sponsor-v3-model.ts`, `olyDataTypes` | grün: `sponsor-leih-slate`, `sponsor-angebot-mit-leihe`; **gemessen**: EV-Spreizung roh 4,3 C, mit zurückgerechnetem Verzicht **exakt 0** — kein Slot ist ein Etat-Upgrade. KI ungeändert, Verhalten trotzdem richtig: bei Kasse −30 nehmen 21/32 die reine Cash-Karte, bei Kasse 60 nur 2/32 |
+| ~~5~~ | **ERLEDIGT (11.08.).** Es gibt bewusst KEINE Leih-Abzugszeile — der Verzicht steckt seit Schritt 4 in der Leiter, eine zweite Buchung wäre Doppelzahlung. Nachgewiesen statt behauptet: `sponsor-gebaeudekarte-anzeige-gleich-settlement.test.ts` prüft, dass keine Zeile mit Leih-/Gebäude-Bezug entsteht, dass die Kasse sich um exakt die Summe der angezeigten Zeilen ändert, und dass die Gebäude-Karte messbar weniger zahlt als die reine Cash-Karte desselben Slates. Die Bonus-Zeile der Rangmarke ist gegenstandslos: die Marke schaltet das **Gebäude**, nie das Geld (Abschnitt 4.4). | `sponsor-settlement-service.ts` (unverändert), neuer Test | grün |
+| ~~6~~ | **ERLEDIGT (11.08.).** (a) Die **Rangmarke** (`sponsor-rangmarke.ts`): Blöcke aus derselben Leiter, die die Karte ohnehin zeigt; hart = eigener Startblock (nur große Karten), mild = ein Block darunter; nie darüber. Sie schaltet in `standings-apply-service`, wo der Tabellenplatz entsteht. Geld ist nie betroffen. Dabei gefunden: `blockFuerRang` las die Blockliste falsch herum, der Meister hätte „Top 28" bekommen. (b) Die **zwei Ziele** (`sponsor-leih-ziele.ts`): Frische binär bei 70 % / Fatigue ≤ 45, Achsen-Rang mit drei Bändern aus dem eigenen Rang bei Unterschrift. **Fest bepreist mit `p = 0`** — kein Sockelabzug, wer verfehlt verliert nichts. Das ist der eigentliche Unterschied zur Achse: die zog −p·G immer ab, über die Liga waren das in S1 −89,7 C bei 0 von 27 erreichten Zielen. Nur Gebäude-Karten tragen ein Ziel; die reine Cash-Karte bewusst keins. | `sponsor-rangmarke.ts`, `sponsor-leih-ziele.ts` (beide neu), `sponsor-objective-evaluator.ts`, `sponsor-v3-model.ts`, `standings-apply-service.ts` | `sponsor-rangmarke.test.ts` (16) und `sponsor-leih-ziele.test.ts` (11) grün |
+| ~~7~~ | **ERLEDIGT (11.08.).** `sponsor-leih-lifecycle.ts` + Einbau in `advanceSponsorContractsForNewSeason`: die Leihe steigt beim Saisonwechsel eine Stufe laut eingefrorener Reihe, altert im Takt „Unterhalt bezahlt" — und **der Verzicht wächst auf den Preis der neuen Stufe**, sonst stiege das Gebäude jedes Jahr zum Preis von Jahr 1. Am Vertragsende fällt die Leihe weg (ein Weglassen, kein Löschen — sie stand nie in `teamFacilities`) und wird durch ein **Übernahmeangebot** ersetzt: annehmen schreibt das Gebäude mit seinem abgenutzten Zustand in den eigenen Bestand und bucht den Preis ab, ohne Kassen-Sperre (E5). **Noch ohne UI/API** — die kommt mit Schritt 8. | — gehaltene-Saison-Zählung (≥ 6/10), Leihstufen-Aufstieg beim Saisonwechsel, Übernahme-Angebot am Vertragsende (Preisformel aus Schritt 2), Rückfall auf eigene Stufe | `sponsor-contract-lifecycle.ts`, `lib/season/preseason-workflow-service.ts`, API-Route + UI für die Übernahme | 3-Saisons-Testlauf: Stufenreihe 2→3→4 bei gehaltenen, 2→2→3 bei einer gerissenen Saison; Übernahmepreis == Formel |
+| ~~8~~ | **ERLEDIGT (11.08.).** (a) **KI-Wahl**: sie bewertete das Gebäude gar nicht und die absolute Kartenhöhe auch nicht — beides nachgetragen, dazu ein Abschlag „ein Gebäude zahlt keine Gehälter" bei Geldnot. (b) **Achsen-Abriss**: neu erzeugte Angebote tragen keine V4-Achse mehr; die Rechenschicht bleibt für Altverträge stehen (Invariante 3). Die Kartenzahl hängt seither nicht mehr an den bespielbaren Achsen — sie ist immer 5. (c) **Karte**: die Gebäude-Leihe steht als eigener Block auf der Angebotskarte (Gebäude, Stufe, Zustand, Verzicht mit dem Hinweis „steckt schon in der Auszahlung", Stufenreihe, Rangmarke, geschätzter Übernahmepreis) — gerechnet in `sponsor-leih-presenter.ts`, die Karte formatiert nur. (d) **Übernahme**: API-Route `/api/sponsor/uebernahme` und Bedienpanel, ohne Kassen-Sperre (E5). **Offen geblieben:** Vorschuss und Golden-Los sind NICHT abgerissen — Chris' Einwand („der vorschuss bringt nicht viel") ist zutreffend, aber der Abriss ist reine Vereinfachung ohne Funktionsgewinn und wäre im selben Zug mit dem Achsen-Abriss nicht mehr auseinanderzuhalten gewesen. | `sponsor-offer-service.ts`, `sponsor-tier-pool.ts`, `sponsor-leih-presenter.ts` (neu), `SponsorOfferCardNewLook.tsx`, `FoundationSponsorsNewLook.tsx`, neue API-Route | s. Schritt 9 |
+| ~~9~~ | **ERLEDIGT (11.08.), Kriterium erfüllt.** `scripts/messlauf-sponsoren-gebaeude.ts`. Der erste Lauf ergab **84 % Deckung** (Σ Sponsorgeld 1694,6 C gegen Σ Gehälter 2020,0 C). Die Gegenrechnung zeigte die Aufteilung: 195,9 C davon waren der bewusst gewählte Cash-Verzicht für Gebäude, ohne ihn lag die Deckung bei 94 % — rund ein Drittel der Lücke war also eine Leiter, die auch ohne Gebäude knapp unter der Selbstdeckung lag. **Chris' Entscheidung: „dann würde ich sagen musst du deine Cash Ausschüttung um 10 % erhöhen."** Umgesetzt als EIN Regler (`SPONSOR_AUSSCHUETTUNG = 1.1` in `sponsor-liga-leiter.ts`), der Sockel, Wertungstopf und Sicherheitsnetz gemeinsam skaliert — einzeln verstellt würde sich sonst ihr Verhältnis zueinander und damit die Verteilung zwischen Spitze und Tabellenende verschieben. Danach: **Deckung 92 %, ohne Gebäude-Verzicht 102 %.** Die Liga kann ihre Gehälter aus reinen Cash-Sponsoren decken; wer Gebäude leiht, bleibt darunter — das ist das Rubberband, nicht ein Rest-Fehler. **Weiterhin nicht gemessen:** die Uptime der Rangmarken über die Spieltage und die Erfüllungsquote der zwei Ziele — beides braucht eine gespielte Saison. | `sponsor-liga-leiter.ts`, `scripts/messlauf-sponsoren-gebaeude.ts` | s. o. |
 
 Schritte 1–3 sind in Alt-Saves reine No-ops, Schritte 4–8 greifen nur für neue
 Angebote/Verträge — jeder Schritt ist einzeln mergebar, ohne dass ein laufender Spielstand
 kippt.
+
+**Warum Schritt 7 vorgezogen wurde (erledigt, hier als Begründung erhalten):** Nachgemessen im
+Code, nicht vermutet — `sponsorLeihgabenByTeamId` wird an genau zwei Stellen berührt: geschrieben
+bei der Unterschrift (`chooseSponsorOffer`), gelesen im Overlay (`getTeamFacilityState`). Es gibt
+**keine** Stelle, die eine Leihgabe altern lässt, ihre Stufe hochzieht oder sie am Vertragsende
+entfernt. Eine einmal unterschriebene Leihe bleibt also **auf ewig** bestehen, auf ihrer
+Anfangsstufe und in ihrem Anfangszustand — der Verzicht wird dagegen jede Saison neu fällig. Das ist
+für eine Testsaison unschädlich, aber es darf nicht in ein neues Spiel, das über mehrere Saisons
+laufen soll. Schritt 7 wurde deshalb VOR 6 und 8 gebaut.
+
+**Was Schritt 4 bewusst NICHT getan hat, und warum es hier steht statt unter den Tisch zu fallen:**
+Die ursprüngliche Fassung des Schritts verlangte zusätzlich den Umbau des Slates auf drei feste
+Archetypen und die Abschaffung von Achse, Vorschuss und Golden-Los. Das ist nicht passiert. Grund
+ist Chris' Vorgabe vom 11.08. („wir sollten uns nicht im kleinteiligen balancing verlieren … ich
+würde es bevorzugen wenn wir das erstmal rein bekommen weil wir eh schauen müssen wie es dann ist
+wenn man mal tests berechnet MIT den gebäude sponsoren etc"): das Gebäude-System soll erst laufen
+und gemessen werden, bevor ein funktionierendes Achsen-System daneben abgerissen wird. Beides in
+einem Schritt wäre zudem nicht mehr auseinanderzuhalten — genau die Lage, aus der der 19-%-Einbruch
+entstanden ist. Der Abriss bleibt offen und gehört sachlich zu Schritt 8 (Karte + KI-Wahl), wo die
+Anzeige ohnehin neu gebaut wird. Ebenfalls offen aus Schritt 4: der FOSD-Fallen-Test über den
+Kurvensatz (Abschnitt 7, Punkt 9).
 
 ---
 

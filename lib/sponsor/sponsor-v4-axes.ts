@@ -1,4 +1,13 @@
 /**
+ * NUR NOCH FUER ALTVERTRAEGE. Neu erzeugte Angebote tragen seit dem Gebäude-Umbau keine Achse mehr:
+ * Gebäude-Karten fuehren stattdessen eines der zwei Leih-Ziele (`sponsor-leih-ziele.ts`, Frische und
+ * Achsen-Rang, fest bepreist mit p = 0), die reine Cash-Karte gar keins. Die Rechnung hier bleibt
+ * vollstaendig erhalten und wird weiter getestet, weil bereits unterschriebene Vertraege nach altem
+ * Recht abgerechnet werden (Invariante 3 in `docs/SPONSOREN_BAUVORLAGE.md`) — sie ist ab jetzt aber
+ * Bestandspflege und keine Erzeugungslogik mehr. Der folgende Kommentar beschreibt das Modell aus
+ * der Zeit, als sie es noch war.
+ */
+/**
  * SPONSOR-ACHSEN (V4) — WOFUER EIN SPONSOR BEZAHLT, AUSSER FUER DEN TABELLENPLATZ.
  *
  * Warum es sie gibt: bis V3 unterschieden sich die fuenf Karten eines Slates ausschliesslich im

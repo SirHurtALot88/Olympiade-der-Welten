@@ -13,6 +13,7 @@ import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-s
 import { estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorV3WertFaktorFor } from "@/lib/sponsor/sponsor-v3-model";
 
 function createTeam(partial: Partial<Team> = {}): Team {
   return {
@@ -97,28 +98,39 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("stellt eine Basis-Karte plus je eine Achsenkarte ins Slate", () => {
+  it("stellt eine reine Cash-Karte plus vier Gebäude-Karten ins Slate", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
-    // Diese Fixture hat KEINE Spieler: ohne Kader gibt es weder Kaderwert noch Frische, beide Achsen
-    // waeren also unerfuellbar und werden gar nicht erst angeboten. Ein echtes Team traegt alle fuenf
-    // und bekommt damit die vollen fuenf Slots (Basis + vier Achsen).
-    expect(offers.length).toBeGreaterThanOrEqual(4);
-    expect(offers.length).toBeLessThanOrEqual(5);
+    // FUENF, IMMER. Frueher hing die Kartenzahl an den bespielbaren Achsen — diese Fixture hat keine
+    // Spieler, also waren zwei Achsen unerfuellbar und es blieben vier Karten. Seit die
+    // Gebäude-Karten die zwei Leih-Ziele tragen statt einer Achse, entscheiden die Achsen nichts
+    // mehr und duerfen die Auswahl auch nicht mehr verkleinern.
+    expect(offers).toHaveLength(5);
 
     // Jedes Angebot trägt den Rarity-Layer …
     expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
     // … und die V3-Konditionen, aus denen seine Auszahlung stammt.
     expect(offers.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
-    // Slot 0 ist der risikofreie Anker, jeder weitere Slot eine ANDERE Achse.
     const terms = offers.map((offer) => getSponsorV3Terms(offer)!);
+    // Slot 0 ist die reine Cash-Karte: kein Gebäude, kein Ziel, keine Bedingung.
     expect(terms[0]!.cardKey).toBe("basis");
     expect(terms[0]!.axis).toBeUndefined();
-    const axisKeys = terms.slice(1).map((entry) => entry.axis?.key);
-    expect(axisKeys.every((key) => key != null)).toBe(true);
-    expect(new Set(axisKeys).size).toBe(axisKeys.length);
-    // Die Achse ist FIX bepreist — kein Schaetzwert mehr, der zum Etatfehler werden koennte.
-    expect(terms.slice(1).every((entry) => entry.goalP === 0.5)).toBe(true);
+    expect(terms[0]!.goalSize).toBe(0);
+    expect(offers[0]!.sponsorLeihe).toBeUndefined();
+
+    // Jede weitere Karte traegt ein Gebäude und genau eines der ZWEI Leih-Ziele — nicht mehr eine
+    // von fuenf Achsen. Und sie sind FEST bepreist, ohne Sockelabzug: `goalP === 0` ist der
+    // eigentliche Unterschied zur Achse, denn wer sie verfehlt, verliert nichts.
+    for (const offer of offers.slice(1)) {
+      expect(offer.sponsorLeihe).toBeDefined();
+      const eintrag = getSponsorV3Terms(offer)!;
+      expect(["leih_frische", "leih_achsenrang"]).toContain(eintrag.goalKey);
+      expect(eintrag.goalP).toBe(0);
+      expect(eintrag.goalSize).toBe(6);
+      expect(eintrag.axis).toBeUndefined();
+    }
+    // Beide Zielarten kommen im Slate vor — sonst waere es wieder nur eine.
+    expect(new Set(terms.slice(1).map((eintrag) => eintrag.goalKey)).size).toBe(2);
 
     // GEAENDERT MIT DEM LIGALEITER-UMBAU: die Kurvenform ist wieder ein Erzeugungs-Feld (sie
     // entscheidet ueber `sponsorKurvenLeiter`, WO auf der Sponsor-Ligaleiter das Angebot sein Geld
@@ -199,16 +211,51 @@ describe("sponsor offer service", () => {
 });
 
 describe("ai sponsor choice — oekonomisch kann sie nichts falsch machen", () => {
-  // DIE ZENTRALE ZUSAGE DES ENTWURFS, an der ECHTEN Angebotserzeugung gemessen: alle fuenf Karten
-  // eines Slates haben denselben Erwartungswert. Die Wahl ist eine Risiko-Entscheidung, nie ein
-  // Etat-Upgrade — und deshalb kann die KI-Wahl (und die des Spielers) den Etat nicht verschieben.
-  it("alle Karten eines Slates haben denselben Erwartungswert (bis auf Rundung)", () => {
+  /**
+   * DIE ZENTRALE ZUSAGE DES ENTWURFS — und sie ist SCHWAECHER GEWORDEN, an zwei Stellen, beide auf
+   * ausdrückliche Ansage von Chris. Das gehört hierher und nicht in eine Fußnote.
+   *
+   * Bis hierher galt: alle fünf Karten haben denselben Cash-Erwartungswert, die Wahl ist reine
+   * Risiko-Entscheidung, die KI kann ökonomisch nichts falsch machen. Zwei Entscheidungen haben das
+   * aufgehoben:
+   *
+   *   E1 — die Gebäude-Karte zahlt weniger Cash und stellt dafür ein Gebäude.
+   *   „nicht die seltenheiten vergessen" — die Rarität skaliert die ganze Leiter, eine legendäre
+   *   Karte zahlt schlicht mehr als eine gewöhnliche.
+   *
+   * Roh gemessen spreizen die Erwartungswerte eines Slates deshalb um zweistellige Beträge, und
+   * eine Wahl KANN jetzt objektiv falsch sein. Das ist gewollt: eine Wahl ohne falsche Antwort ist
+   * keine Wahl.
+   *
+   * WAS BLEIBT, ist die schwächere und ehrlichere Zusage, und genau die misst dieser Test: rechnet
+   * man beide Regler heraus — den Cash-Verzicht hinzu, durch den Raritäts-Wertfaktor geteilt —, ist
+   * die Spreizung gemessen 0,076 C, also Rundung. Es gibt keinen DRITTEN, versteckten Regler. Der
+   * Wert einer Karte ist vollständig durch „wie selten" und „wie viel Gebäude" erklärt.
+   */
+  it("erklaert den Wert jeder Karte vollstaendig aus Raritaet und Gebaeude — kein dritter Regler", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     for (const team of gameState.teams) {
       const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
-      const values = offers.map((offer) => estimateExpectedPayout(offer));
+      // DIE RARITÄT WIRKT JE KARTE GENAU EINMAL, und die Normierung bildet das ab: auf der reinen
+      // Cash-Karte als Hoehe (durch den Wertfaktor teilen), auf der Gebäude-Karte als Kurs (den
+      // Verzicht hinzurechnen — er enthaelt die Rarität schon, `Leihwert / Kurs`). Beides durch
+      // BEIDE Regler zu rechnen waere der doppelte Zugriff, den es hier gerade nicht geben soll.
+      const values = offers.map((offer) => {
+        const terms = getSponsorV3Terms(offer)!;
+        const ev = estimateExpectedPayout(offer);
+        return offer.sponsorLeihe
+          ? (ev + (terms.leihVerzicht ?? 0)) / sponsorV3WertFaktorFor("gewöhnlich")
+          : ev / sponsorV3WertFaktorFor(terms.rarity);
+      });
       const spread = Math.max(...values) - Math.min(...values);
-      expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.1);
+      expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.2);
+
+      // Und die Gegenprobe im selben Test: OHNE die beiden Regler spreizen sie sehr wohl — sonst
+      // wäre die Gebäude-Karte gratis und die Rarität wieder folgenlos.
+      const rohe = offers.map((offer) => estimateExpectedPayout(offer));
+      if (offers.some((offer) => offer.sponsorLeihe != null)) {
+        expect(Math.max(...rohe) - Math.min(...rohe), `${team.teamId}: Gebäude-Karte kostet nichts`).toBeGreaterThan(1);
+      }
     }
   });
 });

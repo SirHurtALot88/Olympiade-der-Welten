@@ -15,6 +15,7 @@ import type {
   TeamSponsorContract,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+import { getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
@@ -30,13 +31,26 @@ import {
   buildOfferRankPayoutLadderPreview,
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
   mapSponsorCardToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
+import {
+  leihRaritaet,
+  VERZICHT_ANTEIL_DER_LEITER,
+  verteileLeihgabenAufSlate,
+} from "@/lib/sponsor/sponsor-leih-slate";
+import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
+import {
+  baueLeihZielKomponente,
+  LEIH_ZIEL_ACHSENRANG,
+  LEIH_ZIEL_FRISCHE,
+  type LeihAchse,
+  type LeihZielKey,
+} from "@/lib/sponsor/sponsor-leih-ziele";
 import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
@@ -103,6 +117,8 @@ function buildOfferSkeleton(input: {
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
+  /** Eines der zwei Leih-Ziele — nur auf Gebaeude-Karten gesetzt. */
+  leihZiel?: { key: LeihZielKey; achse?: LeihAchse } | null;
 }): SponsorOffer {
   const { team, identity, profile, cardKey, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
@@ -138,12 +154,28 @@ function buildOfferSkeleton(input: {
   // einloest.
   let specialComponent: SponsorOfferComponent | null = null;
 
+  // DIE ZWEI LEIH-ZIELE LOESEN DIE ACHSE AB, aber nur auf Gebaeude-Karten. Chris wollte „ein paar
+  // wesentliche" Ziele statt fuenf Achsen; die reine Cash-Karte traegt bewusst gar keins — sie ist
+  // die Karte fuer planbares Geld, und ein Bonus mit Bedingung waere dort das Gegenteil.
+  //
+  // WELCHES der beiden, entscheidet der Slot und nicht der Zufall: eine feste Zuordnung kann ein
+  // Spieler lernen, einen Wuerfel darauf nicht. Gerade Plaetze tragen die Frische (von jedem Team ab
+  // Spieltag 1 ueber Rotation steuerbar), ungerade den Achsen-Rang.
+  if (input.leihZiel) {
+    specialComponent = baueLeihZielKomponente({
+      gameState,
+      teamId: team.teamId,
+      key: input.leihZiel.key,
+      achse: input.leihZiel.achse,
+    });
+  }
+
   // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
   // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
   // ist damit fuer jedes Team erfuellbar. Die Konditionen wandern in den `targetValue`, damit Karte,
   // Anzeige und Settlement dieselbe Zahl lesen und ein spaeterer Zustandswechsel den Vertrag nicht
   // nachtraeglich verschiebt.
-  if (input.axisKey) {
+  if (input.axisKey && !input.leihZiel) {
     const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
     specialComponent = {
       componentId: "axis-target",
@@ -256,6 +288,40 @@ export function buildSponsorOffersForTeam(input: {
     // Ausbauspielraum, kein Kaderwert), wird nicht angeboten, statt als wertlose Karte dazuliegen.
     offerableAxes: sponsorV4OfferableAxes(input.gameState, input.teamId),
   });
+  // DIE GEBÄUDE-LEIHE AUF DIE FUENF KARTEN (Bauvorlage E1/E8). Platz 1 bleibt reines Geld, Platz 2
+  // ist der guenstige Einstieg, die uebrigen folgen ihrer Rarität — die Regel und ihre gemessene
+  // Begruendung stehen in `sponsor-leih-slate.ts`.
+  //
+  // Als eigener Bestand zaehlt bewusst der GESPEICHERTE Stand, nicht der ueber `getTeamFacilityState`
+  // gelesene: der traegt bereits laufende Leihgaben mit. Ein Team, dem gerade ein Trainingszentrum
+  // Stufe 4 geliehen ist, bekaeme sonst naechste Saison gar kein Trainingszentrum mehr angeboten —
+  // ausgerechnet dann nicht, wenn die Leihe auslaeuft.
+  const eigeneStufen = Object.fromEntries(
+    Object.entries(input.gameState.seasonState.teamFacilities?.[input.teamId]?.facilities ?? {}).map(
+      ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
+    ),
+  );
+  //
+  // DER DECKEL KOMMT AUS DER EIGENEN LEITER, nicht aus einer festen Zahl: was ein Team verzichten
+  // kann, haengt daran, was es ueberhaupt bekommt. Gerechnet wird gegen die niedrigste Sprosse —
+  // also gegen das, was auf JEDEM Endrang sicher kommt —, damit auch ein Absturz die Karte nicht
+  // unbezahlbar macht.
+  const startRangFuerMarke =
+    rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition;
+  const leiterFuerDeckel = sponsorKurvenLeiter({
+    shape: slate.entries[0]?.curveShape ?? "stetig",
+    startRank: startRangFuerMarke,
+    salaryFactor: getCurrentSponsorSalaryFactor(input.gameState),
+  });
+  const leihKarten = verteileLeihgabenAufSlate({
+    seasonId: input.gameState.season.id,
+    teamId: input.teamId,
+    raritaeten: slate.entries.map((entry) => leihRaritaet(entry.rarity)),
+    laufzeiten: slate.entries.map((entry) => entry.termSeasons),
+    eigeneStufen,
+    verzichtDeckel: Math.min(...leiterFuerDeckel) * VERZICHT_ANTEIL_DER_LEITER,
+  });
+
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage =
@@ -272,8 +338,25 @@ export function buildSponsorOffersForTeam(input: {
         ] ?? goalSlotIndexes[0]!
       : -1;
 
+  // WELCHES ZIEL AUF WELCHER KARTE — fest je Slot, nicht gewuerfelt. Eine stabile Zuordnung kann ein
+  // Spieler lernen, einen Wuerfel darauf nicht. Die Achse des Rang-Ziels folgt dem Slot aus
+  // demselben Grund.
+  //
+  // Platz 2 (Index 1) ist der guenstige Einstieg und traegt die FRISCHE — das Ziel, das jedes Team
+  // ab Spieltag 1 ueber Rotation steuern kann, ganz ohne Etat. Die teureren Plaetze wechseln sich
+  // ab. (Der Kommentar hier stand einmal genau andersherum als der Code darunter; der Code hatte
+  // recht, der Kommentar nicht.)
+  const LEIH_ACHSEN: LeihAchse[] = ["pow", "spe", "men", "soc"];
+  const leihZielFuer = (slotIndex: number): { key: LeihZielKey; achse?: LeihAchse } | null => {
+    if (!leihKarten[slotIndex]?.leihe) return null;
+    return slotIndex % 2 === 0
+      ? { key: LEIH_ZIEL_ACHSENRANG, achse: LEIH_ACHSEN[Math.floor(slotIndex / 2) % LEIH_ACHSEN.length]! }
+      : { key: LEIH_ZIEL_FRISCHE };
+  };
+
   const built = slate.entries.map((entry, slotIndex) => {
     const offer = buildOfferSkeleton({
+      leihZiel: leihZielFuer(slotIndex),
       gameState: input.gameState,
       team,
       identity,
@@ -295,7 +378,31 @@ export function buildSponsorOffersForTeam(input: {
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
     }
-    return offer;
+    const karte = leihKarten[slotIndex] ?? null;
+    const leihe = karte?.leihe ?? null;
+    if (!leihe) {
+      return offer;
+    }
+    // DIE MARKE HAENGT AN DER GROESSE, nicht am Zufall: „die Karte mit dem groessten Versprechen
+    // traegt das groesste Risiko" (Bauvorlage, Kopplung Karte<->Risiko). Eine grosse Leihe setzt den
+    // eigenen Startblock, alles darunter einen Block tiefer — so ist der Einstieg auch mit einem
+    // mittelmaessigen Jahr zu halten, das fertige Stufe-5-Gebaeude nicht.
+    const haerte: "hart" | "mild" = karte!.groesse === "gross" ? "hart" : "mild";
+    return {
+      ...offer,
+      sponsorLeihe: {
+        facilityId: leihe.facilityId,
+        raritaet: leihe.raritaet,
+        kurs: leihe.kurs,
+        stufenreihe: leihe.stufenreihe,
+        verzichtJeSaison: leihe.verzichtJeSaison,
+        leihwertJeSaison: leihe.leihwertJeSaison,
+        startZustandPct: leihe.startZustandPct,
+        katalogkostenEndstufe: leihe.katalogkostenEndstufe,
+        rangmarke: baueRangmarke({ startRang: startRangFuerMarke, haerte }),
+        rangmarkenHaerte: haerte,
+      },
+    };
   });
 
   // DIE EINZIGE STELLE, AN DER EIN ANGEBOT BETRAEGE BEKOMMT.
@@ -313,6 +420,10 @@ export function buildSponsorOffersForTeam(input: {
     curveShapes: slate.entries.map((entry) => entry.curveShape),
     goldenSlots: slate.goldenCardSlots,
     advanceSlots: slate.entries.map((entry) => entry.advance === true),
+    // E1: KEINE Abzugszeile — der Verzicht senkt hier die Leiter, und zwar bevor Anker und Tilt
+    // gerechnet werden. Die Gebäude-Karte ist danach durchgaengig eine Karte, die weniger zahlt.
+    leihVerzichte: leihKarten.map((karte) => karte.verzichtErsteSaison),
+    leihZielKeys: leihKarten.map((_, slotIndex) => leihZielFuer(slotIndex)?.key ?? null),
     teamId: input.teamId,
     startRank,
   });
@@ -493,6 +604,9 @@ export function chooseSponsorOffer(input: {
     // einem Angebot moeglich, das VOR dem V3-Umbau erzeugt und erst jetzt unterschrieben wurde —,
     // holt die Leiter-Migration (`sponsor-v3-migration.ts`) es beim naechsten Laden nach.
     ...(offer.sponsorV3 ? { sponsorV3: offer.sponsorV3 } : {}),
+    // Der Leih-Block wandert 1:1 mit. Er ist ab hier die Quelle fuer den Stufen-Aufstieg beim
+    // Saisonwechsel und fuer den Uebernahmepreis am Vertragsende.
+    ...(offer.sponsorLeihe ? { sponsorLeihe: offer.sponsorLeihe } : {}),
   };
 
   let nextGameState: GameState = {
@@ -505,6 +619,37 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
+
+  // DIE LEIHGABE WIRD MIT DER UNTERSCHRIFT WIRKSAM. Sie landet in `sponsorLeihgabenByTeamId` und
+  // NICHT in `teamFacilities` — `getTeamFacilityState` legt sie beim Lesen darueber (Schritt 3).
+  // Stuende sie im eigenen Bestand, waere der Rueckfall am Vertragsende ein Loeschvorgang, und ein
+  // vergessener Loeschvorgang verschenkt ein Gebäude auf Dauer.
+  if (offer.sponsorLeihe) {
+    const leihe = offer.sponsorLeihe;
+    const bisher = nextGameState.seasonState.sponsorLeihgabenByTeamId?.[input.teamId] ?? [];
+    nextGameState = {
+      ...nextGameState,
+      seasonState: {
+        ...nextGameState.seasonState,
+        sponsorLeihgabenByTeamId: {
+          ...(nextGameState.seasonState.sponsorLeihgabenByTeamId ?? {}),
+          [input.teamId]: [
+            // Ein Team hat hoechstens einen Sponsor, also hoechstens eine laufende Leihe aus einem
+            // Sponsorvertrag. Eine aeltere aus DERSELBEN Saison waere ein Doppelabschluss (den der
+            // Re-Sign-Guard oben ausschliesst) — sie wird trotzdem ersetzt statt gestapelt.
+            ...bisher.filter((eintrag) => eintrag.seasonId !== nextGameState.season.id),
+            {
+              facilityId: leihe.facilityId,
+              stufe: leihe.stufenreihe[0] ?? 1,
+              zustandPct: leihe.startZustandPct,
+              seasonId: nextGameState.season.id,
+              offerId: offer.offerId,
+            },
+          ],
+        },
+      },
+    };
+  }
   // Sponsorengeld flieszt grundsaetzlich am Saisonende (sponsor-settlement-service). Frueher wurde
   // beim Unterschreiben IMMER die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
   // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des
@@ -756,6 +901,27 @@ const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
 const SPONSOR_AI_ECO_DOWNSIDE_WEIGHT = 3;
 
 /**
+ * WIE OFT EINE LEIHE VORAUSSICHTLICH WIRKT — die Uptime der Rangmarke, und sie ist GESCHAETZT.
+ *
+ * #490 nennt fuer die milde Marke ~90 % und fuer die harte ~70-80 %; gemessen ist das nicht (die
+ * Bauvorlage fuehrt es als offenen Punkt 2). Die Zahlen stehen hier als das, was sie sind: eine
+ * Annahme, die die KI-Wahl vorsichtig macht statt sie zu praezisieren. Schwanken die Raenge in
+ * dieser Liga staerker, ist die harte Marke schlechter als hier unterstellt — dann bevorzugt die KI
+ * grosse Karten zu oft, und der Messlauf (Schritt 9) findet es.
+ */
+const SPONSOR_AI_UPTIME_MILD = 0.9;
+const SPONSOR_AI_UPTIME_HART = 0.75;
+
+/**
+ * WIE VIEL EIN GEBÄUDE FUER EIN KLAMMES TEAM NOCH WERT IST. Nicht null — ein starkes Reha-Zentrum
+ * hilft auch einem armen Team, und Chris hat ausdruecklich gesagt, dass ein klammes Team eine gute
+ * Gebäude-Karte trotzdem nehmen darf („sie muessen sich ueberlegen ob es das wert ist"). Aber
+ * deutlich weniger als die Haelfte, denn der Cash fehlt sofort und das Gebäude wirkt erst ueber die
+ * Saison.
+ */
+const SPONSOR_AI_LEIHWERT_BEI_GELDNOT = 0.4;
+
+/**
  * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
  *
  * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
@@ -817,12 +983,35 @@ function scoreOfferForAi(input: {
    * Downside-Term unwirksam — exakt dasselbe Verhalten wie vor dieser Aenderung.
    */
   ecoIntent01?: number;
+  /**
+   * Eigene Gebäudestufen dieses Teams. Ohne sie bleibt der Leih-Term unwirksam — dasselbe
+   * Verhalten wie vor seiner Einfuehrung, damit bestehende Aufrufer nichts merken.
+   */
+  eigeneFacilityStufen?: Readonly<Record<string, number>>;
 }): number {
   const { offer, profile, identity, cashPressure } = input;
   const terms = getSponsorV3Terms(offer);
   const axisKey = terms?.axis?.key as SponsorV4AxisKey | undefined;
 
   let score = 0;
+
+  // WAS DIE KARTE ÜBERHAUPT ZAHLT — und bis hierher stand das NICHT in der Rechnung.
+  //
+  // Der Befund kam aus einer Messung, nicht aus der Codeinspektion: nach Einfuehrung des
+  // Gebaeude-Terms unten waehlten 26 von 32 Teams die groesste Gebaeude-Karte, auch bei Kasse −30.
+  // Grund war nicht der neue Term, sondern eine Luecke, die er sichtbar gemacht hat: KEINER der
+  // Terme hier mass die absolute Hoehe der Karte. Der Kurven-Term rechnet `fitValue − anchor`, also
+  // eine FORM; der Achsen-Term einen Zusatz; der Rest Risiko. Solange alle Karten eines Slates auf
+  // denselben Erwartungswert normiert waren (bis E1/E10), war das genau richtig — die Hoehe war
+  // konstant und haette in jedem Vergleich denselben Summanden addiert.
+  //
+  // Seit eine Gebaeude-Karte weniger zahlt (E1) und eine legendaere mehr (E10), ist die Hoehe eine
+  // ECHTE Unterscheidung. Ohne sie sah die KI nur noch den Nutzen des Gebaeudes und nie seinen
+  // Preis. `terms.anchor` ist per Konstruktion der Erwartungswert der Karte — genau die Groesse, die
+  // hier fehlte, und in derselben Einheit wie der Gebaeude-Term weiter unten.
+  if (terms) {
+    score += terms.anchor;
+  }
 
   if (axisKey && terms) {
     const fit = estimateAxisFitForAi({
@@ -887,6 +1076,66 @@ function scoreOfferForAi(input: {
   // fuer die Messung, die diese Formel ersetzt hat).
   if (terms && (input.ecoIntent01 ?? 0) > 0) {
     score -= (input.ecoIntent01 ?? 0) * SPONSOR_AI_ECO_DOWNSIDE_WEIGHT * sponsorV3DownsideShortfall(terms);
+  }
+
+  // DAS GEBÄUDE — bis hierher bewertete die KI es GAR NICHT.
+  //
+  // Der Befund, und er ist unangenehm: die Punkte oben rechnen ausschliesslich in Cash. Eine
+  // Gebäude-Karte hat eine niedrigere Leiter (E1), also war sie fuer die KI schlicht eine
+  // schlechtere Karte — was sie trotzdem oft gewaehlt hat, lag am Achsen-Term, nicht am Gebäude.
+  // Sie hat also fuer den richtigen Preis das Falsche gekauft.
+  //
+  // WAS DAS GEBÄUDE WERT IST, ist bereits gerechnet: `leihwertJeSaison` ist genau die Groesse, in
+  // der die Karte bepreist wurde (`Verzicht = Leihwert / Kurs`). Sie hier zu addieren macht die
+  // Rechnung geschlossen — die KI zahlt Cash und bekommt Gegenwert, und der Vergleich zwischen
+  // reiner Cash-Karte und Gebäude-Karte wird zu dem, was er sein soll: eine Abwaegung.
+  //
+  // DREI ABSCHLAEGE, damit daraus kein blinder Gebäude-Hunger wird:
+  //
+  //   RANGMARKE — das Gebäude wirkt nur, solange das Team ueber der Marke steht. Eine harte Marke
+  //   ist ein echtes Risiko; #490 schaetzt die Uptime auf 70-80 % (mild ~90 %), gemessen ist sie
+  //   nicht (Abschnitt 7, Punkt 2). Die Schaetzung steht hier als das, was sie ist.
+  //
+  //   ZUSTAND — eine gewoehnliche Leihe startet bei 70 % und wirkt entsprechend schwaecher. Der
+  //   Wirkungsgrad ist dieselbe Kurve, die auch das Spiel rechnet.
+  //
+  //   EIGENER BESTAND — wer das Gebäude selbst schon hoeher hat, bekommt vom Overlay (`max`) gar
+  //   nichts. So eine Karte ist fuer dieses Team wertlos, egal wie gut sie aussieht.
+  if (offer.sponsorLeihe) {
+    const leihe = offer.sponsorLeihe;
+    const eigeneStufe = input.eigeneFacilityStufen?.[leihe.facilityId] ?? 0;
+    const geliehene = leihe.stufenreihe[0] ?? 0;
+    if (geliehene > eigeneStufe) {
+      const uptime = leihe.rangmarkenHaerte === "hart" ? SPONSOR_AI_UPTIME_HART : SPONSOR_AI_UPTIME_MILD;
+      const wirkungsgrad = getFacilityEfficiencyPct(leihe.startZustandPct) / 100;
+      // EIN GEBÄUDE ZAHLT KEINE GEHÄLTER, und das ist der vierte und wichtigste Abschlag.
+      //
+      // Ohne ihn ist eine Gebäude-Karte IMMER das bessere Geschaeft, und zwar konstruktionsbedingt:
+      // der Verzicht ist `Leihwert / Kurs`, das Gebäude also je nach Rarität das 1,4- bis 3,0-fache
+      // des aufgegebenen Cash wert. Fuer ein Team mit voller Kasse stimmt diese Rechnung auch. Fuer
+      // eines, das am Saisonende seine Gehaelter nicht zahlen kann, stimmt sie nicht: ein
+      // Trainingszentrum laesst sich nicht ausschuetten. Gemessen zeigte sich genau das — ohne
+      // diesen Abschlag griff KEIN einziges der 32 Teams zur reinen Cash-Karte, auch bei Kasse −30.
+      //
+      // Die Schwelle ist dieselbe wie ueberall sonst in dieser Datei (`cashPressure >= 7`), damit es
+      // nicht einen zweiten Klammheits-Begriff gibt.
+      const cashNutzbar = cashPressure >= 7 ? SPONSOR_AI_LEIHWERT_BEI_GELDNOT : 1;
+      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad * cashNutzbar;
+    }
+
+    // DAS BONUS-ZIEL DER KARTE. Es ist mit `p = 0` bepreist, also reines Aufwaerts — wer es
+    // verfehlt, verliert nichts. Genau deshalb darf es hier NICHT gegen 0,5 gerechnet werden wie
+    // frueher die Achse, sondern mit dem geschaetzten Erfuellungsgrad mal der Praemie.
+    if (terms?.goalKey === LEIH_ZIEL_FRISCHE || terms?.goalKey === LEIH_ZIEL_ACHSENRANG) {
+      const tiefe = profile?.bias.rosterDepthPreference ?? 5;
+      // Frische haengt an Rotation und damit an Kadertiefe; der Achsen-Rang an nichts, was die KI
+      // vor der Saison kennt — dort bleibt es bei der neutralen Haelfte.
+      const chance =
+        terms.goalKey === LEIH_ZIEL_FRISCHE
+          ? Math.max(0.2, Math.min(0.8, 0.2 + 0.06 * tiefe + (input.rosterSize ?? 0 > (identity?.playerOpt ?? 14) ? 0.1 : 0)))
+          : 0.5;
+      score += chance * terms.goalSize;
+    }
   }
 
   // Markenpassung bleibt als milder Flavour-Term: sie bewegt kein Geld, soll aber bei aehnlicher
@@ -985,8 +1234,17 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       seasonStrategy: seasonStrategyByTeamId[team.teamId]?.seasonStrategy,
       cashPressure,
     });
+    // Der EIGENE Bestand, nicht der ueber `getTeamFacilityState` gelesene: Letzterer traegt eine
+    // laufende Leihe mit, und dann bewertete die KI ein Angebot gegen ein Gebaeude, das sie in der
+    // naechsten Saison gar nicht mehr hat.
+    const eigeneFacilityStufen = Object.fromEntries(
+      Object.entries(nextGameState.seasonState.teamFacilities?.[team.teamId]?.facilities ?? {}).map(
+        ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
+      ),
+    );
     const scoreArgs = {
       profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
+      eigeneFacilityStufen,
     };
     const bestOffer = [...offers].sort(
       (left, right) =>

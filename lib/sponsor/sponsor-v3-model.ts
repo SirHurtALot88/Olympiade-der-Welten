@@ -236,6 +236,41 @@ export function sponsorV3CardByKey(key: string): SponsorV3Card {
   );
 }
 
+/**
+ * DIE RARITÄT IST WIEDER EIN WERT-REGLER, NICHT NUR EINE RISIKOFORM.
+ *
+ * Chris: „nicht die seltenheiten vergessen — ein legendärer cash sponsor der nur cash gibt kann
+ * teils mehr wert haben als ein guter magischer sponsor mit nem top gebäude angebot an reinem wert."
+ *
+ * Bis hierher waren ALLE Karten eines Slates auf denselben Erwartungswert normiert; die Rarität
+ * aenderte nur die STEILHEIT (`SPONSOR_V3_TILT_BY_RARITY`) und die Zielpraemie. Eine legendäre
+ * Cash-Karte war damit exakt so viel wert wie eine gewoehnliche — sie verteilte ihr Geld nur anders
+ * ueber die Tabelle. Genau das widerspricht dem Satz oben: eine legendäre Karte SOLL mehr zahlen.
+ *
+ * Der Faktor wirkt auf die ganze Leiter, also auf jede Sprosse gleich. Er ist bewusst klein
+ * gehalten (±11 % um die magische Mitte): bei Leitern zwischen 52 und 107 C sind das 6 bis 12 C
+ * Unterschied — dieselbe Groessenordnung wie eine mittlere Gebaeude-Leihe. Damit ist Chris' Satz
+ * woertlich erfuellt: die legendäre Cash-Karte kann eine magische Gebaeude-Karte an reinem Cash
+ * schlagen, aber sie muss es nicht — es haengt daran, wie gross das Gebaeude ist.
+ *
+ * WAS DAS AUFGIBT, offen benannt: die Zusage „alle Karten eines Slates haben denselben
+ * Erwartungswert" gilt nicht mehr. Sie war der Grund, warum die KI-Wahl oekonomisch nie falsch sein
+ * konnte. Ab jetzt KANN sie falsch sein — was der Auftraggeber ausdruecklich will, denn eine Wahl
+ * ohne falsche Antwort ist keine Wahl. Was bleibt, ist die schwaechere und ehrlichere Zusage: der
+ * Wert einer Karte ist vollstaendig durch Rarität und Gebaeude erklaert, es gibt keinen versteckten
+ * dritten Regler (`tests/sponsor-offer-service.test.ts` nagelt genau das fest).
+ */
+export const SPONSOR_V3_WERT_BY_RARITY: Record<SponsorV3Rarity, number> = {
+  "gewöhnlich": 0.89,
+  magisch: 1.0,
+  selten: 1.05,
+  "legendär": 1.11,
+};
+
+export function sponsorV3WertFaktorFor(rarity: string): number {
+  return SPONSOR_V3_WERT_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V3_WERT_BY_RARITY.magisch;
+}
+
 /** Tilt-Staerke dieser Rarity, hart auf [−0,3, +0,3] geklammert. */
 export function sponsorV3TiltFor(rarity: string): number {
   const beta = SPONSOR_V3_TILT_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V3_TILT_BY_RARITY.magisch;
@@ -441,6 +476,16 @@ export type SponsorV3ContractTerms = {
   /** Absolute Untergrenze (Sicherheitsnetz), mit dem Vertrag eingefroren. */
   floor: number;
   /**
+   * DER CASH-VERZICHT DER GEBAEUDE-KARTE, der in dieser Leiter BEREITS steckt — dokumentarisch und
+   * fuer den Mehrjahres-Roll, der die Leiter neu baut und ihn dabei wieder abziehen muss.
+   *
+   * Entscheidung E1 der Bauvorlage: es wird NICHTS abgezogen, die Gebaeude-Karte hat schlicht eine
+   * niedrigere Leiter. Deshalb steht der Verzicht hier als Zahl und NICHT als Settlement-Zeile —
+   * eine zweite Buchung waere genau der Abzug, den Chris nicht wollte, und sie koennte gegen die
+   * Anzeige driften. Fehlt das Feld, ist es eine reine Cash-Karte.
+   */
+  leihVerzicht?: number;
+  /**
    * Die Achse dieses Vertrags (V4). Fehlt bei Altvertraegen und bei der Basis-Karte — dann laeuft
    * die Auszahlung ueber `goalKey`/`goalP` wie zuvor.
    */
@@ -474,17 +519,38 @@ export function buildSponsorV3TermsCore(input: {
   axis?: SponsorV4AxisTerms | null;
   /** Hebelgroesse der Achse (Rarity, ggf. Golden). Nur wirksam mit `axis`. */
   axisSize?: number;
+  /**
+   * EIN FEST BEPREISTES ZIEL — die zwei Leih-Ziele (Frische, Achsen-Rang). Sie loesen die Achse ab
+   * und unterscheiden sich in einem Punkt grundsaetzlich von ihr: `p = 0`, also KEIN Sockelabzug.
+   * Wer sie verfehlt, verliert nichts.
+   *
+   * Das ist keine Nachlaessigkeit, sondern die Lehre aus der Messung: das alte Modell zog −p·G immer
+   * ab und zahlte bei Erfolg +G — ueber die ganze Liga ergab die Zielzeile in Saison 1 −89,7 C bei
+   * 0 von 27 erreichten Zielen. Eine Zeile, die praktisch nur kostet, ist kein Ziel, sondern eine
+   * Steuer. Setzt `axis` ausser Kraft, falls beides gesetzt waere.
+   */
+  festesZiel?: { key: string; size: number } | null;
   /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
   withAdvance?: boolean;
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
   tiltScale?: number;
   anchorSigma?: number;
+  /**
+   * Cash-Verzicht einer Gebaeude-Karte (E1): wird von JEDER Sprosse der Basisleiter abgezogen,
+   * BEVOR Anker und Tilt gerechnet werden. Damit ist die Karte durchgaengig eine Karte mit
+   * niedrigerer Leiter — Erwartungswert, Boden, Vorschussbasis und Anzeige stimmen automatisch
+   * ueberein, ohne dass irgendeine Rechenstelle den Verzicht kennen muesste.
+   */
+  leihVerzicht?: number;
 }): SponsorV3ContractTerms {
   // Kopie statt Referenz: die zurueckgegebenen Konditionen duerfen nicht am Array des Aufrufers
   // haengen, das sich (bei `sponsorKurvenLeiter`, das jedes Mal neu rechnet) ohnehin unterscheidet,
   // aber bei einer wiederverwendeten Konstante wie `sponsorV3BenchmarkLadder`-Ergebnissen sonst
   // implizit geteilt waere.
-  const baseLadder = [...input.baseLadder];
+  // Der Leih-Verzicht senkt die Leiter, statt spaeter eine Zeile abzuziehen (E1). Geklammert bei 0:
+  // eine negative Sprosse waere eine Karte, die Geld KOSTET, und die gibt es im Modell nicht.
+  const leihVerzicht = Number.isFinite(input.leihVerzicht) ? Math.max(0, input.leihVerzicht ?? 0) : 0;
+  const baseLadder = input.baseLadder.map((wert) => Math.max(0, wert - leihVerzicht));
   const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
@@ -502,16 +568,26 @@ export function buildSponsorV3TermsCore(input: {
     advanceAmount > 0
       ? { amount: advanceAmount, fee: Math.round(advanceAmount * SPONSOR_V4_ADVANCE_FEE_RATE * 10) / 10 }
       : null;
-  const hasGoal = axis == null && input.card.goal && input.goalKey != null;
-  const goalP = axis != null ? SPONSOR_V4_AXIS_PBAR : hasGoal ? sponsorV3GoalProbability(input.goalKey, input.startRank) : 0;
+  const festesZiel = input.festesZiel ?? null;
+  const hasGoal = festesZiel == null && axis == null && input.card.goal && input.goalKey != null;
+  const goalP =
+    festesZiel != null
+      ? 0
+      : axis != null
+        ? SPONSOR_V4_AXIS_PBAR
+        : hasGoal
+          ? sponsorV3GoalProbability(input.goalKey, input.startRank)
+          : 0;
   const goalSize =
-    axis != null
-      ? (Number.isFinite(input.axisSize) && (input.axisSize ?? 0) > 0
-          ? input.axisSize!
-          : sponsorV4AxisSizeFor(input.rarity))
-      : hasGoal
-        ? sponsorV3GoalSizeFor(input.rarity)
-        : 0;
+    festesZiel != null
+      ? festesZiel.size
+      : axis != null
+        ? (Number.isFinite(input.axisSize) && (input.axisSize ?? 0) > 0
+            ? input.axisSize!
+            : sponsorV4AxisSizeFor(input.rarity))
+        : hasGoal
+          ? sponsorV3GoalSizeFor(input.rarity)
+          : 0;
   return {
     version: 3,
     rankLadder,
@@ -522,14 +598,17 @@ export function buildSponsorV3TermsCore(input: {
     cardName: input.card.name,
     rarity: input.rarity,
     startRank: clampRank(input.startRank),
-    goalKey: axis != null ? `axis_v4_${axis.key}` : input.goalKey,
+    goalKey: festesZiel != null ? festesZiel.key : axis != null ? `axis_v4_${axis.key}` : input.goalKey,
     goalP,
     goalSize,
     salaryFactor: input.salaryFactor,
     floor: input.floor,
     ...(input.curveShape != null ? { curveShape: input.curveShape } : {}),
-    ...(axis != null ? { axis } : {}),
+    ...(axis != null && festesZiel == null ? { axis } : {}),
     ...(advance != null ? { advance } : {}),
+    // Nur setzen, wenn es ihn gibt: eine reine Cash-Karte soll das Feld gar nicht tragen, damit man
+    // im Spielstand auf einen Blick sieht, welche Karte ein Gebaeude gekostet hat.
+    ...(leihVerzicht > 0 ? { leihVerzicht } : {}),
   };
 }
 

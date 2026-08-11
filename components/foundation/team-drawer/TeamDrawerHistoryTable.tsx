@@ -7,6 +7,7 @@ import type { TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-dr
 import {
   SEASON_DISCIPLINE_AREA_GROUPS,
   SEASON_DISCIPLINE_LABELS,
+  buildSeasonAwareDisciplineAreaGroups,
   isSeasonDisciplineKey,
   type SeasonDisciplineAreaId,
 } from "@/lib/season/season-discipline-area-groups";
@@ -144,6 +145,17 @@ type TeamDrawerHistoryTableProps = {
    * Fehlt sie oder ist die Summe leer, entfaellt die Zeile — eine Zeile mit „—" traegt nichts bei.
    */
   allTime?: { pps: number | null; rank: number | null; teamCount: number | null } | null;
+  /**
+   * Spielerzahl je Disziplin-ID DIESER Saison (`buildSeasonDisciplinePlayerCountMap(gameState)`)
+   * — bestimmt die Reihenfolge der Disziplin-Unterspalten beim Aufklappen einer Achse.
+   *
+   * GEMELDET VON CHRIS: „Showcase hat 6 Spieler in der Season und trotzdem ist SHO nur 2."
+   * Der Saison-Spielplan wuerfelt die Spielerzahl pro Disziplin JEDE Saison neu aus — dieselbe
+   * Zahl, die auch die echte Punkteverteilung steuert. Ohne diese Prop faellt die Tabelle auf
+   * die statische Katalog-Reihenfolge (`SEASON_DISCIPLINE_AREA_GROUPS`) zurueck, die nur noch
+   * zufaellig mit der ausgelosten Saison uebereinstimmt.
+   */
+  seasonPlayerCountByDisciplineId?: Map<string, number | null | undefined> | null;
 };
 
 export default function TeamDrawerHistoryTable({
@@ -155,6 +167,7 @@ export default function TeamDrawerHistoryTable({
   getHeaderClassName,
   getRowClassName,
   allTime = null,
+  seasonPlayerCountByDisciplineId = null,
 }: TeamDrawerHistoryTableProps) {
   const [expandedAreas, setExpandedAreas] = useState<Record<SeasonDisciplineAreaId, boolean>>({
     pow: false,
@@ -163,8 +176,16 @@ export default function TeamDrawerHistoryTable({
     soc: false,
   });
 
+  const disciplineAreaGroups = useMemo(
+    () =>
+      seasonPlayerCountByDisciplineId
+        ? buildSeasonAwareDisciplineAreaGroups(seasonPlayerCountByDisciplineId)
+        : SEASON_DISCIPLINE_AREA_GROUPS,
+    [seasonPlayerCountByDisciplineId],
+  );
+
   const tableColumns = useMemo(() => {
-    const axisColumns = SEASON_DISCIPLINE_AREA_GROUPS.flatMap((group) => {
+    const axisColumns = disciplineAreaGroups.flatMap((group) => {
       const items: GlobalTableColumnConfig[] = [TEAM_DRAWER_HISTORY_AXIS_COLUMN[group.id]];
       if (expandedAreas[group.id]) {
         items.push(
@@ -184,7 +205,7 @@ export default function TeamDrawerHistoryTable({
     });
 
     return [...TEAM_DRAWER_HISTORY_PREFIX_COLUMNS, ...axisColumns, ...TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS];
-  }, [expandedAreas]);
+  }, [expandedAreas, disciplineAreaGroups]);
 
   /** Jüngste abgeschlossene Saison — Bezugspunkt für das Delta an der Live-Zeile. */
   const vorsaisonZeile = useMemo(() => rows.find((row) => !row.isLive) ?? null, [rows]);

@@ -24,6 +24,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { buildSponsorV4AxisTerms } from "@/lib/sponsor/sponsor-v4-axes";
 import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
+import { SPONSOR_LEIH_BONUS } from "@/lib/sponsor/sponsor-leih-ziele";
 import { SPONSOR_BODEN, sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { SPONSOR_CURVE_SHAPE_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
@@ -36,6 +37,8 @@ import {
   sponsorV3LadderValue,
   sponsorV3Settle,
   sponsorV3TiltedLadder,
+  sponsorV3WertFaktorFor,
+  SPONSOR_V3_WERT_BY_RARITY,
   sponsorV4AxisSizeFor,
   SPONSOR_V3_CARDS,
   type SponsorV3CardKey,
@@ -199,21 +202,62 @@ export function buildSponsorV3Terms(input: {
   golden?: boolean;
   /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
   withAdvance?: boolean;
+  /** Cash-Verzicht der Gebaeude-Karte (E1) — senkt die Leiter, statt eine Abzugszeile zu buchen. */
+  leihVerzicht?: number;
+  /** Traegt diese Karte eines der zwei Leih-Ziele? Dann fest bepreist und OHNE Sockelabzug. */
+  leihZielKey?: string | null;
 }): SponsorV3ContractTerms {
   const card = sponsorV3CardByKey(input.cardKey);
   const goalKey = card.goal
     ? input.offer.components.find((component) => component.kind === "special")?.specialKey ?? null
     : null;
   const rarity = input.offer.rarity ?? RARITY_FALLBACK;
+  // Bei gesetztem Leih-Ziel wird die Achse gar nicht erst gebaut. Vorher lief
+  // `buildSponsorV4AxisTerms` (und damit `buildTeamSeasonOverviewRows` samt Rang-Rechnung) bei JEDER
+  // Gebaeude-Karte durch, nur damit `buildSponsorV3TermsCore` das Ergebnis anschliessend verwirft —
+  // funktional harmlos, aber vier verworfene Ligarechnungen je Team und Saison.
   const axis =
-    input.axisKey && input.teamId
+    input.axisKey && input.teamId && !input.leihZielKey
       ? buildSponsorV4AxisTerms(input.gameState, input.teamId, input.axisKey)
       : null;
   const salaryFactor = getSponsorV3SalaryFactor(input.gameState);
   // DIE SPONSOR-LIGALEITER statt der Preisgeldkurve (Umbau): Sockel nach Startrang + Wertungstopf
   // nach Endrang, die Kurvenform entscheidet nur noch, WO auf dieser Leiter das Geld liegt. Die
   // Preisgeldkurve selbst (`getSponsorV3PrizeCurve`) wird im Live-Pfad nicht mehr gebraucht.
-  const baseLadder = sponsorKurvenLeiter({ shape: input.curveShape, startRank: input.startRank, salaryFactor });
+  // DER RARITÄTS-WERTFAKTOR sitzt hier und NICHT in `buildSponsorV3TermsCore`, weil er eine
+  // Entscheidung ueber neu erzeugte Angebote ist. Der Kern wird auch von der Migration und von den
+  // Vergleichsskripten gerufen, die eine gegebene Leiter unveraendert bewerten sollen — ein Faktor
+  // dort verschoebe rueckwirkend die Zahlen von Altvertraegen.
+  //
+  // DIE RARITÄT WIRKT AUF JEDER KARTE GENAU EINMAL — auf der Cash-Karte als Hoehe, auf der
+  // Gebaeude-Karte als Kurs. Sonst greift sie doppelt zu, und das war messbar: bei praktisch
+  // GLEICHEM Gebaeudewert (Ø 12,4 gegen 12,8) trug die legendaere Gebaeude-Karte 69,3 C
+  // Erwartungswert, die gewoehnliche 48,9 — 20 C mehr Cash fuer dasselbe Gebaeude. Chris: „achte
+  // darauf dass bei gebäude deals dann nicht MEHR cash UND dicke gebäude angebote rein kommen."
+  //
+  // Der Verzicht steckt bereits die Rarität: `Verzicht = Leihwert / Kurs`, und der Kurs IST die
+  // Rarität (1,4 .. 3,0). Eine legendaere Gebaeude-Karte bekommt ihr Gebaeude also fuer ein Drittel
+  // des Cash-Verzichts einer gewoehnlichen — das ist ihr Vorteil, und er reicht. Die Leiter bleibt
+  // dafuer auf der magischen Mitte, egal wie selten die Karte ist.
+  //
+  // WARUM DIE GEBÄUDE-KARTE AUF DEN UNTERSTEN FAKTOR GESETZT WIRD und nicht auf 1,0: der erste
+  // Entwurf nahm die magische Mitte, und damit war eine GEWOEHNLICHE Gebäude-Karte (Faktor 1,0)
+  // ladderseitig BESSER als eine gewoehnliche Cash-Karte (Faktor 0,89). Bei einer kleinen Leihe mit
+  // rund 1 C Verzicht bekam man also mehr Cash UND ein Gebäude — derselbe doppelte Zugriff, nur in
+  // die andere Richtung. Gemessen schlug das voll durch: die reine Cash-Karte wurde von 0 bis 1 von
+  // 32 Teams gewaehlt.
+  //
+  // Die Regel, die beides zugleich haelt: die Rarität ADDIERT immer, nie ersetzt sie. Die
+  // Gebäude-Karte startet auf dem untersten Faktor, ihre Rarität schlaegt sich vollstaendig im Kurs
+  // nieder; eine Cash-Karte startet dort ebenfalls und ihre Rarität hebt die Leiter. Damit ist eine
+  // Cash-Karte derselben Rarität nie schlechter als eine Gebäude-Karte, und der Unterschied zwischen
+  // ihnen ist genau das, was man dafuer bekommt.
+  const wertFaktor = (input.leihVerzicht ?? 0) > 0 ? SPONSOR_V3_WERT_BY_RARITY["gewöhnlich"] : sponsorV3WertFaktorFor(rarity);
+  const baseLadder = sponsorKurvenLeiter({
+    shape: input.curveShape,
+    startRank: input.startRank,
+    salaryFactor,
+  }).map((wert) => wert * wertFaktor);
   return buildSponsorV3TermsCore({
     baseLadder,
     startRank: input.startRank,
@@ -223,11 +267,25 @@ export function buildSponsorV3Terms(input: {
     curveShape: input.curveShape,
     axis,
     axisSize: axis ? sponsorV4AxisSizeFor(rarity, input.golden === true) : undefined,
+    festesZiel: input.leihZielKey ? { key: input.leihZielKey, size: SPONSOR_LEIH_BONUS } : null,
     withAdvance: input.withAdvance === true,
     salaryFactor,
     // SPONSOR_BODEN statt SPONSOR_V3_FLOOR_C: der neue Sockel reicht bei Startrang 1 bis 18 hinunter,
     // das alte Netz (32) saesse fuer diese Leiter zu tief.
-    floor: SPONSOR_BODEN,
+    //
+    // DAS NETZ SINKT MIT DER KARTE, und das ist keine Feinheit, sondern die Bedingung dafuer, dass
+    // grosse Gebaeude-Karten ueberhaupt existieren koennen. Gemessen: die niedrigste Sprosse ueber
+    // alle Kurvenformen und Startraenge liegt bei 52,1 C, das feste Netz bei 43 — es blieben nur
+    // 9,1 C Luft. Ein Verzicht von 15 oder 25 C (Gebaeude auf Stufe 4/5, siehe
+    // `STARTSTUFE_JE_GROESSE`) waere am unteren Ende der Tabelle vollstaendig vom Netz aufgefangen
+    // worden: das Team haette das Gebaeude bekommen, aber nichts dafuer bezahlt. Ein absolutes Netz
+    // passt zu einer Karte, die alle gleich viel zahlt; sobald eine Karte bewusst weniger zahlt,
+    // muss ihr Netz mitsinken, sonst hebelt es genau die Entscheidung aus, um die es geht.
+    // Das Netz traegt denselben Wertfaktor wie die Leiter — sonst waere es fuer eine gewoehnliche
+    // Karte relativ hoeher als fuer eine legendaere und wuerde ihr den Wertunterschied unten wieder
+    // zurueckgeben.
+    floor: Math.max(0, SPONSOR_BODEN * wertFaktor - Math.max(0, input.leihVerzicht ?? 0)),
+    leihVerzicht: input.leihVerzicht,
   });
 }
 
@@ -262,18 +320,74 @@ export function rerollSponsorV3TermsForNewSeason(
   input: { newSalaryFactor: number; contractYear: SponsorTermSeasons },
 ): SponsorV3ContractTerms {
   if (!terms.curveShape) {
-    return terms;
+    /**
+     * ALTVERTRAEGE OHNE KURVENFORM — hier lief ein Leck, kein Sonderfall.
+     *
+     * Frueher gab dieser Zweig die eingefrorene Leiter unveraendert zurueck: die Kurve laesst
+     * sich ohne `curveShape` nicht neu bauen, also blieb alles stehen. Nur blieb damit auch der
+     * GEHALTSFAKTOR stehen — und der ist der Konjunkturmassstab der Saison, nicht eine
+     * Eigenschaft des Vertrags. Ein Mehrjahresvertrag zahlte deshalb Saison fuer Saison auf dem
+     * Niveau seines Unterschriftsjahres weiter.
+     *
+     * Gemessen am Live-Spielstand (Saison 2, echter Faktor 1,19): 10 von 32 Vertraegen steckten
+     * noch auf 1,0 fest, zusammen 129,6 C zu wenig — Z-H allein 17,4. Die Einmalreparatur
+     * (`scripts/repariere-sponsor-gehaltsfaktor.ts`) hatte das fuer Saison 1 nachgebucht; hier
+     * lief es unbemerkt weiter, weil ein Altvertrag den Fehler bei JEDEM Saisonwechsel neu
+     * erzeugt.
+     *
+     * Die Leiter wird deshalb umgerechnet statt neu gebaut, mit derselben Rechnung wie das
+     * Reparaturskript: nur der Wertungsanteil OBERHALB des Sockels haengt am Gehaltsfaktor, der
+     * Sockel selbst ist nach Startrang eingefroren und bleibt unberuehrt.
+     *
+     * BEWUSST OHNE Erosion: dieser Zweig hat noch nie erodiert, und zwei Aenderungen auf einmal
+     * waeren an einem laufenden Spielstand nicht mehr auseinanderzuhalten. Hier wird der eine
+     * belegte Fehler behoben, sonst nichts.
+     */
+    const alterFaktor = terms.salaryFactor;
+    if (
+      !Number.isFinite(alterFaktor) ||
+      alterFaktor <= 0 ||
+      alterFaktor === input.newSalaryFactor ||
+      !Number.isFinite(input.newSalaryFactor) ||
+      input.newSalaryFactor <= 0
+    ) {
+      return terms;
+    }
+    const altSockel = sponsorSockelFuerStartrang(terms.startRank);
+    const skala = input.newSalaryFactor / alterFaktor;
+    const skaliere = (leiter: number[]) => leiter.map((wert) => altSockel + (wert - altSockel) * skala);
+    const skalierteBasis = skaliere(terms.baseLadder ?? []);
+    return {
+      ...terms,
+      baseLadder: skalierteBasis,
+      rankLadder: skaliere(terms.rankLadder ?? []),
+      anchor: sponsorV3Anchor(skalierteBasis, sponsorV3AnchorWeights(terms.startRank)),
+      salaryFactor: input.newSalaryFactor,
+    };
   }
-  const sockel = sponsorSockelFuerStartrang(terms.startRank);
+  // Wertfaktor und Sockel muessen beim Neubau DIESELBEN sein wie bei der Unterschrift, sonst
+  // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit — und die
+  // Einmal-Regel (Rarität wirkt als Hoehe ODER als Kurs, nie beides) gilt hier genauso.
+  const wertFaktor =
+    (terms.leihVerzicht ?? 0) > 0 ? SPONSOR_V3_WERT_BY_RARITY["gewöhnlich"] : sponsorV3WertFaktorFor(terms.rarity);
+  const sockel = sponsorSockelFuerStartrang(terms.startRank) * wertFaktor;
   const newBaseLadderRaw = sponsorKurvenLeiter({
     shape: terms.curveShape,
     startRank: terms.startRank,
     salaryFactor: input.newSalaryFactor,
-  });
+  }).map((wert) => wert * wertFaktor);
   const multiplier = getSponsorTermMultiplier(input.contractYear);
   // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
   // der nach Startrang eingefrorene Wert, unveraendert durch Erosion oder Salary-Factor-Wechsel.
-  const baseLadder = newBaseLadderRaw.map((value) => sockel + multiplier * (value - sockel));
+  //
+  // UND DER LEIH-VERZICHT MUSS WIEDER AB: die Leiter wird hier NEU gebaut, der in der alten Leiter
+  // steckende Verzicht (E1) waere sonst ab Vertragsjahr 2 verschwunden — die Gebaeude-Karte zahlte
+  // dann wie eine reine Cash-Karte und behielte das Gebaeude gratis. Abgezogen wird der EINGEFRORENE
+  // Betrag; dass er mit der Leihstufe steigt, traegt Schritt 7 der Bauvorlage nach.
+  const verzicht = Math.max(0, terms.leihVerzicht ?? 0);
+  const baseLadder = newBaseLadderRaw.map((value) =>
+    Math.max(0, sockel + multiplier * (value - sockel) - verzicht),
+  );
   const weights = sponsorV3AnchorWeights(terms.startRank);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, terms.tilt);
@@ -310,6 +424,10 @@ export function applySponsorV3ToOffers(input: {
   goldenSlots?: number[];
   /** Slots, die einen Vorschuss zahlen. */
   advanceSlots?: boolean[];
+  /** Cash-Verzicht je Angebot (E1) — 0/null bei den reinen Cash-Karten. */
+  leihVerzichte?: (number | null)[];
+  /** Leih-Ziel je Angebot — null bei Karten ohne Gebaeude. */
+  leihZielKeys?: (string | null)[];
   teamId?: string;
   startRank: number;
 }): SponsorOffer[] {
@@ -330,6 +448,8 @@ export function applySponsorV3ToOffers(input: {
       teamId: input.teamId,
       golden: input.goldenSlots?.includes(index) === true,
       withAdvance: input.advanceSlots?.[index] === true,
+      leihVerzicht: input.leihVerzichte?.[index] ?? 0,
+      leihZielKey: input.leihZielKeys?.[index] ?? null,
     });
     const ladder = sponsorV3GuaranteedLadder(terms);
     const floor = ladder[31]!;

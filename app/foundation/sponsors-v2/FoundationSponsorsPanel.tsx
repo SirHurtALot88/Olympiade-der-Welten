@@ -5,6 +5,8 @@ import type { GameState, SponsorCommercialRating, SponsorOffer, TeamSponsorContr
 
 export type FoundationSponsorsPanelProps = {
   gameState: GameState;
+  /** Eigenes Team — trägt die offenen Gebäude-Übernahmeangebote (`sponsorUebernahmeAngeboteByTeamId`). */
+  selectedTeamId: string | null;
   selectedTeamName: string;
   selectedTeamCommercialRating: SponsorCommercialRating | null;
   selectedTeamSponsorContract: TeamSponsorContract | null;
@@ -14,6 +16,11 @@ export type FoundationSponsorsPanelProps = {
   selectedTeamCanManage: boolean;
   formatMoney: (value: number) => string;
   chooseTeamSponsor: (offerId: string) => void | Promise<void>;
+  /** Status/Meldung für ein laufendes Übernahme-Annehmen/Ablehnen — eigener Kanal, keine Angebotswahl. */
+  sponsorUebernahmeMessage: string | null;
+  /** `facilityId` des Angebots, das gerade bearbeitet wird — nicht die `offerId` wie bei `sponsorChoiceBusy`. */
+  sponsorUebernahmeBusy: string | null;
+  handleSponsorUebernahme: (facilityId: string, action: "annehmen" | "ablehnen") => void | Promise<void>;
   prizeFinanceTab: "sponsors" | "prize";
 };
 

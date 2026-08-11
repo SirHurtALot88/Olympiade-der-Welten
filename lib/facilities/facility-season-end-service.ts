@@ -273,7 +273,13 @@ export function applyFacilitySeasonEndFinance(
     eventIds.push(eventId);
     const previous = nextFacilities.facilities[row.facilityId];
     const previousConditionPct = getFacilityEfficiency(teamFacilities, row.facilityId).conditionPct;
-    const nextConditionPct = degradeFacilityCondition(previousConditionPct, true);
+    // Saatwort aus Saison, Team und Gebaeude: derselbe Spielstand ergibt zweimal denselben
+    // Verschleiss, zwei Gebaeude desselben Teams aber verschiedenen.
+    const nextConditionPct = degradeFacilityCondition(
+      previousConditionPct,
+      true,
+      `${save.gameState.season.id}:${teamId}:${row.facilityId}`,
+    );
     nextFacilities.facilities[row.facilityId] = {
       ...previous,
       // Deaktivierung nur noch durch Verfall (condition <= 0), nie durch Nichtzahlung.

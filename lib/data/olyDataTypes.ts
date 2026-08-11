@@ -1268,6 +1268,79 @@ export type TeamFacilityCollection = {
   facilities: Record<string, TeamFacilityRecord>;
 };
 
+/**
+ * Ein vom Sponsor geliehenes Gebäude. `zustandPct` ist die Vertragsvariable: derselbe Gebäudetyp
+ * auf derselben Stufe kann neu oder gebraucht verliehen werden und ist dann verschieden wertvoll.
+ * `ruht` schaltet die Leihe ab, wenn die Rangmarke des Vertrags gerissen ist — der Cash-Verzicht
+ * laeuft dabei weiter.
+ */
+/**
+ * DER LEIH-BLOCK EINER SPONSOR-KARTE — bei der Erzeugung eingefroren, bei der Unterschrift 1:1 in
+ * den Vertrag kopiert. Fehlt er, ist es eine reine Cash-Karte.
+ *
+ * Strukturell (keine Importe aus `lib/sponsor`) gehalten, damit der Datentyp nicht an der
+ * Rechenschicht haengt; gebaut wird er ausschliesslich von `verteileLeihgabenAufSlate`.
+ */
+export type SponsorOfferLeihe = {
+  facilityId: string;
+  /** ASCII-Schreibweise der Rarität, wie in `lib/sponsor/sponsor-leihe.ts`. */
+  raritaet: "gewoehnlich" | "magisch" | "selten" | "legendaer";
+  /** Umwandlungskurs dieser Rarität (1,4 / 1,8 / 2,3 / 3,0). */
+  kurs: number;
+  /** Gebäudestufe je Vertragsjahr. */
+  stufenreihe: number[];
+  /** Cash-Verzicht je Vertragsjahr — steckt bereits in der Leiter (E1), ist KEINE Abzugszeile. */
+  verzichtJeSaison: number[];
+  /** Was der Sponsor je Vertragsjahr bereitstellt — Anrechnungsbasis der Übernahme. */
+  leihwertJeSaison: number[];
+  /** Zustand des Gebäudes bei Übergabe (0..100) — die Vertragsvariable aus E7. */
+  startZustandPct: number;
+  /**
+   * DIE RANGMARKE: bis zu welchem Tabellenplatz das geliehene Gebäude wirkt. Bei Unterschrift
+   * eingefroren, relativ zum Startblock, nie darüber (Abschnitt 4.4). Darunter **ruht** das
+   * Gebäude — der Cash-Verzicht läuft trotzdem weiter, das ist der Preis des Risikos.
+   *
+   * Fehlt sie, wirkt die Leihe unbedingt (Angebote aus der Zeit vor Schritt 6).
+   */
+  rangmarke?: number;
+  /** Wie hart die Marke gesetzt ist: `hart` = eigener Startblock, `mild` = ein Block darunter. */
+  rangmarkenHaerte?: "mild" | "hart";
+  /** Selbstbaukosten der zuletzt erreichten Stufe — Grundlage des Übernahmepreises. */
+  katalogkostenEndstufe: number;
+};
+
+export type SponsorLeihgabeRecord = {
+  facilityId: string;
+  stufe: number;
+  zustandPct: number;
+  ruht?: boolean;
+  /** Der Vertrag, aus dem die Leihe stammt — fuer Anzeige und Aufraeumen beim Vertragsende. */
+  seasonId: string;
+  offerId?: string;
+};
+
+/**
+ * DAS ANGEBOT AM VERTRAGSENDE: das geliehene Gebäude behalten, zum Preis aus
+ * `berechneUebernahmepreis` (Katalogkosten − bereitgestellter Leihwert − geerbte Reparatur).
+ *
+ * Es entsteht beim Saisonwechsel, wenn ein Sponsorvertrag mit Leihe auslaeuft, und verschwindet,
+ * sobald das Team zugreift oder ablehnt. Nimmt es niemand an, faellt das Gebäude ersatzlos weg —
+ * das Team steht wieder auf seinem eigenen Bestand.
+ */
+export type SponsorUebernahmeAngebot = {
+  teamId: string;
+  /** Saison, in der das Angebot auf dem Tisch liegt. */
+  seasonId: string;
+  facilityId: string;
+  /** Die zuletzt geliehene Stufe — die bekommt man, keine andere. */
+  stufe: number;
+  /** Zustand bei der Uebergabe. Nach drei Saisons Verschleiss ist das der halbe Preisunterschied. */
+  zustandPct: number;
+  preis: number;
+  /** Der Vertrag, aus dem die Leihe stammte. */
+  offerId?: string;
+};
+
 export type FacilityEventRecord = {
   eventId: string;
   seasonId: string;
@@ -1456,6 +1529,12 @@ export type SponsorV3ContractTermsRecord = {
    * Fehlt beim Standard-Profil und bei Altvertraegen.
    */
   advance?: { amount: number; fee: number };
+  /**
+   * Cash-Verzicht der Gebäude-Karte (E1), der in dieser Leiter BEREITS steckt. Dokumentarisch —
+   * und die Grundlage dafür, dass der Mehrjahres-Roll ihn beim Neubau der Leiter wieder abzieht.
+   * Fehlt bei reinen Cash-Karten und bei Altverträgen.
+   */
+  leihVerzicht?: number;
 };
 
 /**
@@ -1513,6 +1592,11 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
+  /**
+   * DIE GEBÄUDE-LEIHE DIESER KARTE (E1). Gesetzt heisst: weniger Cash, dafür ein Gebäude. Der
+   * Verzicht steckt bereits in der Leiter (`sponsorV3.leihVerzicht`) — hier steht, wofür.
+   */
+  sponsorLeihe?: SponsorOfferLeihe;
   /** SPONSORSYSTEM V3: eingefrorene Konditionen. Jedes erzeugte Angebot traegt sie. */
   sponsorV3?: SponsorV3ContractTermsRecord;
   /** LEGACY, nur noch gelesen: V2-Konditionen aus Spielstaenden von vor dem V3-Umbau. */
@@ -1572,6 +1656,12 @@ export type TeamSponsorContract = {
   teamQualityRankAtSign?: number;
   /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
   isGolden?: boolean;
+  /**
+   * Die Gebäude-Leihe dieses Vertrags, 1:1 vom Angebot übernommen. Sie ist die Quelle für die
+   * Leihgabe im Season-State, für den Stufen-Aufstieg beim Saisonwechsel und für den
+   * Übernahmepreis am Vertragsende.
+   */
+  sponsorLeihe?: SponsorOfferLeihe;
   /**
    * LOCKED-AT-SIGNING Rang-Payout-Leiter: `lockedRankPayoutLadder[finalRank - 1]` = die volle
    * getSponsorPayoutForFinalRankAndTier-Summe für diesen Endrang, berechnet mit dem Anker + salaryFactor
@@ -2975,6 +3065,16 @@ export type SeasonState = {
   teamStrategyProfiles?: Record<string, TeamStrategyProfile>;
   aiPreseasonAutomationRuns?: Record<string, AiPreseasonAutomationRunRecord>;
   teamFacilities?: Record<string, TeamFacilityCollection>;
+  /**
+   * GELIEHENE GEBÄUDE aus laufenden Sponsorvertraegen, je Team. Sie liegen NEBEN dem eigenen
+   * Bestand, nicht darin: `getTeamFacilityState` legt sie beim Lesen darueber (Maximum aus eigen
+   * und geliehen), sodass jede Wirkungsrechnung sie sieht, ohne von der Leihe zu wissen. Endet der
+   * Vertrag oder reisst die Rangmarke, faellt das Team auf den eigenen Bestand zurueck — deshalb
+   * darf die Leihe nie in `teamFacilities` geschrieben werden.
+   */
+  sponsorLeihgabenByTeamId?: Record<string, SponsorLeihgabeRecord[]>;
+  /** Offene Übernahme-Angebote aus ausgelaufenen Leihverträgen (siehe `SponsorUebernahmeAngebot`). */
+  sponsorUebernahmeAngeboteByTeamId?: Record<string, SponsorUebernahmeAngebot[]>;
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
