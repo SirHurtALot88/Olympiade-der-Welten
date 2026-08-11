@@ -188,13 +188,20 @@ describe("Spielerliste: Herkunft der Disziplin-PPs", () => {
     expect(fullSummary?.pointsByDiscipline["mini-dm"]).toBeCloseTo(4.9, 5);
 
     const compactGameState = compactFoundationInitialGameState(gameState);
-    // Der Kompakt-Payload behält nur den AKTIVEN Spieltag (matchday-2, unausgewertet).
-    expect(compactGameState.seasonState.matchdayResults).toHaveLength(0);
+    // Die Spieltags-Verzeichniszeilen fahren seit dem Saisonziel-Fix vollstaendig mit — die
+    // schwere Fracht der Disziplin-Ergebnisse bleibt auf den aktiven Spieltag beschnitten,
+    // und der (unausgewertete) aktive Spieltag traegt keine.
+    expect(compactGameState.seasonState.matchdayResults).toHaveLength(1);
     expect(compactGameState.seasonState.disciplineResults).toHaveLength(0);
     expect(compactGameState.seasonState.persistedSeasonDerivations).toBeUndefined();
 
+    // KERN DER REGRESSION: ohne die Deckungsgrenze im Ledger kaemen die vollstaendig
+    // mitgelieferten Leistungszeilen hier alle durch, ihr Disziplin-Ergebnis fehlte aber —
+    // die Punkte fielen auf den ROHBEITRAG zurueck und der Ledger meldete 33,3 statt 4,9.
+    // Ein Spieltag ohne Disziplin-Ergebnisse wird deshalb gar nicht gebucht.
     const compactLedger = buildSeasonPointsLedger(compactGameState);
     expect(compactLedger.playerSummariesByPlayerId.get(playerId)).toBeUndefined();
+    expect(compactLedger.hasResultSource).toBe(false);
 
     // Und genau so entstand das Bild aus dem Bugreport: überall "—" (= 0 PPs).
     const compactRow = buildRowFromPointsByDiscipline(compactGameState, null);
