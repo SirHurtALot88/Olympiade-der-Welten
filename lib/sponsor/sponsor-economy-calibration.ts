@@ -16,11 +16,10 @@
 import type { GameState, SponsorOffer, SponsorTermSeasons } from "@/lib/data/olyDataTypes";
 import {
   getSponsorV3Terms,
+  rerollSponsorV3TermsForNewSeason,
   sponsorV3ExpectedPayout,
   sponsorV3GuaranteedLadder,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { sponsorSockelFuerStartrang, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
-import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 
 /**
  * ABSOLUTE UNTERGRENZE der Sponsor-Oekonomie. Sie ist als Sicherheitsnetz geblieben (Guardrail aus
@@ -126,25 +125,37 @@ export function buildSponsorOfferTermForecast(gameState: GameState, offer: Spons
   }
   const termSeasons = offer.termSeasons ?? 1;
   const window = gameState.seasonState.seasonEconomyFactors ?? [];
-  const sockel = sponsorSockelFuerStartrang(terms.startRank);
   const rankIndex = Math.max(0, Math.min(31, Math.round(terms.startRank) - 1));
+
   return Array.from({ length: termSeasons }, (_, seasonIndex) => {
     const vorausgewuerfelt = window.find((entry) => entry.horizonIndex === seasonIndex)?.factor;
     const hatEigenenFaktor = typeof vorausgewuerfelt === "number" && Number.isFinite(vorausgewuerfelt);
     const factor = hatEigenenFaktor ? vorausgewuerfelt : terms.salaryFactor;
-    const ladder = sponsorKurvenLeiter({ shape: terms.curveShape!, startRank: terms.startRank, salaryFactor: factor });
     const contractYear = Math.max(1, Math.min(3, seasonIndex + 1)) as SponsorTermSeasons;
-    const multiplier = getSponsorTermMultiplier(contractYear);
-    // Dieselbe Erosion, mit der `payoutAtCurrentRank` rechnet — nur eben fuer JEDEN Rang, damit
-    // Hover-Tabelle und Zeilenbetrag garantiert dieselbe Zahl zeigen (eine Quelle, nicht zwei).
-    const erodiert = (rohwert: number) =>
-      Math.round(Math.max(terms.floor, sockel + multiplier * (rohwert - sockel)) * 10) / 10;
+
+    // DIE VORSCHAU RECHNET NICHT SELBST — sie ruft genau die Funktion, die beim Saisonwechsel
+    // tatsaechlich laeuft, und liest deren Leiter ab.
+    //
+    // WARUM DAS HIER STEHT UND NICHT NUR EIN KOMMENTAR IST: vorher baute diese Funktion die Leiter
+    // mit `sponsorKurvenLeiter` NEU und wandte Erosion und Boden von Hand an. Das ging so lange gut,
+    // wie zwischen der rohen Ligaleiter und der Vertragsleiter nichts weiter lag. Mit dem
+    // Raritaets-Wertfaktor (E10) liegt dort etwas: die Vorschau zeigte fuer eine legendaere Karte
+    // exakt 1/1,11 = 90,1 % der Betraege, die die Gewinnstufen-Leiter daneben auswies — auf der
+    // GLEICHEN Sprosse standen 57,7 und 64,1. Der Tilt der Karte fehlte ihr ebenfalls schon vorher.
+    //
+    // Eine zweite Rechenstelle findet solche Abweichungen nie von selbst; sie treibt nur langsam
+    // auseinander. Deshalb ist der Weg jetzt derselbe wie in der Wirklichkeit, und ein kuenftiger
+    // Regler an der Leiter kann die Vorschau gar nicht mehr vergessen.
+    const jahresTerms = rerollSponsorV3TermsForNewSeason(terms, { newSalaryFactor: factor, contractYear });
+    const leiter = sponsorV3GuaranteedLadder(jahresTerms);
+    const runde = (wert: number) => Math.round(wert * 10) / 10;
+
     return {
       seasonYear: seasonIndex + 1,
       salaryFactor: factor,
       factorSource: hatEigenenFaktor ? ("vorausgewuerfelt" as const) : ("fortgeschrieben" as const),
-      payoutAtCurrentRank: erodiert(ladder[rankIndex] ?? sockel),
-      rankPayouts: Array.from({ length: 32 }, (_, index) => erodiert(ladder[index] ?? sockel)),
+      payoutAtCurrentRank: runde(leiter[rankIndex] ?? jahresTerms.floor),
+      rankPayouts: leiter.map(runde),
     };
   });
 }
