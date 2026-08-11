@@ -21,6 +21,7 @@
  */
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import {
   NlRadar,
   StatChip,
@@ -201,6 +202,10 @@ export default function PlayerHeroNewLook({
             className={heroPortraitClassName}
             src={data.portraitUrl}
             alt={data.name}
+            // Ein Kuerzel fuer alle Ansichten: ohne `fallbackLabel` leitet OptimizedMediaImage es
+            // aus dem Alt-Text ab und schreibt bei einteiligen Namen zwei Zeichen ("Umbros" ->
+            // "UM"), waehrend das Portrait-Modell ueberall sonst "U" sagt.
+            fallbackLabel={getPlayerPortraitInitials(data.name)}
             title={heroStarTierLabel ?? undefined}
             width={220}
             height={220}

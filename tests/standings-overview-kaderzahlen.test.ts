@@ -23,6 +23,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
 
@@ -37,21 +38,26 @@ type Zeile = {
 let saveId: string;
 let zeilen: Zeile[];
 
-/** Dieselbe Definition wie im Team-Management — nicht im Test nachgebaut, sondern importiert. */
+/**
+ * Dieselbe Definition wie im Team-Management — nicht im Test nachgebaut, sondern importiert.
+ *
+ * NACHGEZOGEN AM 11.08.2026 (Finanz-Audit): die Gehaltssumme kommt aus `getTeamActualSalaryTotal`,
+ * der EINEN Funktion, die auch der Saisonende-Apply abbucht und die der Finanzen-Reiter zeigt. Hier
+ * stand vorher eine eigene Schleife mit zwei Nachkommastellen — bei A-A 52,62 gegen die 52,6, die
+ * wirklich gebucht werden. Genau ein solcher Zweitweg ist der Grund für diesen Test.
+ */
 function kaderzahlenAusSpielstand(teamId: string) {
   const gameState = createPersistenceService().getSaveById(saveId)!.gameState;
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const roster = gameState.rosters.filter((entry) => entry.teamId === teamId);
-  let salaryTotal = 0;
   let marketValueTotal = 0;
   for (const entry of roster) {
     const contract = resolvePlayerEconomyContract({ player: playerById.get(entry.playerId), rosterEntry: entry });
-    salaryTotal += contract.salary ?? 0;
     marketValueTotal += contract.marketValue ?? 0;
   }
   return {
     rosterCount: roster.length,
-    salaryTotal: Number(salaryTotal.toFixed(2)),
+    salaryTotal: getTeamActualSalaryTotal(gameState, teamId),
     marketValueTotal: Number(marketValueTotal.toFixed(2)),
   };
 }

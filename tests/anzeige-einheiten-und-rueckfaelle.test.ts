@@ -50,6 +50,37 @@ describe("Portraits · das Initialen-Kuerzel ist ueberall dasselbe", () => {
     expect(getPlayerPortraitInitials("Riley Le Rouge")).toBe("RL");
   });
 
+  /**
+   * Es gab noch eine DRITTE Formel: `OptimizedMediaImage` leitet sein Platzhalter-Kuerzel
+   * aus dem Alt-Text ab, wenn kein `fallbackLabel` mitkommt. Bei mehrteiligen Namen ergibt
+   * das dasselbe, bei EINTEILIGEN nicht — und einteilig sind die meisten Spieler dieses
+   * Spiels. Sichtbar wurde es genau dann, wenn ein Spieler zwar eine Portrait-URL hat, das
+   * Bild aber nicht laedt: dieselbe Karte zeigte dann "UM", wo eine Karte ganz ohne URL "U"
+   * zeigt. Seit dem Audit reichen Portrait-Karte, Spieler-Hero und Kauf-Modal ihr
+   * `fallbackLabel` durch, damit dieser Zweig gar nicht mehr greift.
+   */
+  it("die Alt-Text-Ableitung von OptimizedMediaImage weicht bei einteiligen Namen ab", () => {
+    // Nachbau von `deriveInitialsFromAlt` (app/foundation/OptimizedMediaImage.tsx).
+    const ausAltText = (alt: string) => {
+      const words = alt
+        .replace(/\b(Logo|Wappen|Crest|Platzhalter|Portrait|Porträt|Foto|Bild)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      if (words.length === 0) return "?";
+      if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+      return words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("") || "?";
+    };
+
+    // Einteilig → auseinander. Das ist der Regelfall im Kader.
+    expect(ausAltText("Umbros")).toBe("UM");
+    expect(getPlayerPortraitInitials("Umbros")).toBe("U");
+    expect(ausAltText("Umbros")).not.toBe(getPlayerPortraitInitials("Umbros"));
+    // Mehrteilig → gleich. Deshalb fiel es lange nicht auf.
+    expect(ausAltText("Riley Le Rouge")).toBe(getPlayerPortraitInitials("Riley Le Rouge"));
+  });
+
   it("das Portrait-Modell benutzt genau dieses Kuerzel", () => {
     for (const name of ["Umbros", "Riley Le Rouge", "Lakshmi Ekelmann"]) {
       const model = getPlayerPortraitMediaModel({

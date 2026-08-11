@@ -129,6 +129,45 @@ function mergeKeyedCollection<T>(
   return [...preservedFromExisting, ...incoming];
 }
 
+/**
+ * DIE BASISLINIEN SCHLANK, ABER NICHT WEG — der Saison-0-Bezugswert faehrt mit.
+ *
+ * BEFUND (am Live-Abbild gemessen, Save `new-game-1785823388048-1hf25q`): `playerBaselines` waren
+ * fuer den Browser komplett gestrichen (`undefined`, 4,63 MB gespart). Sie sind aber KEINE reine
+ * Historie — die Marktwert-Anzeige rechnet auf ihnen. `getPlayerSeasonMarketValueReference` und
+ * `getPlayerSeasonZeroMarketValueReference` (`player-display-market-value`) nehmen zuerst den
+ * Basislinien-Bezugswert und fallen ohne ihn auf den Katalogwert des Spielers zurueck. Das ist
+ * kein Leerzustand, sondern eine ANDERE ZAHL. Ueber 540 gepruefte Spieler (alle Kaderspieler plus
+ * 200 freie):
+ *
+ *   getPlayerSeasonZeroMarketValueReference  498 von 540 abweichend (Sofia 7,89 -> 8,05)
+ *   getPlayerSeasonMarketValueReference      165 von 540 abweichend (Zed 53,94 -> 53,84)
+ *   getPlayerDisplayMarketValueDelta         136 von 540 abweichend — und dort wurde aus einem
+ *                                            echten kleinen Delta ein `null`, also „keine
+ *                                            Veraenderung" statt einer Veraenderung.
+ *
+ * Was die Anzeige braucht, ist winzig: `seasonZeroEconomy` plus `marketValue`/`salary`. Was das
+ * Gewicht ausmacht, sind `attributes` und `disciplineRatings` — und die liest im Browser niemand
+ * (der Spieler-Drawer holt seine Attribute ueber `hydrate-player-attribute-sheet` nach). Also
+ * faehrt die schlanke Zeile mit; gemessen bleiben davon rund 0,6 MB der 4,63 MB uebrig.
+ *
+ * ZURUECKGESCHRIEBEN WIRD SIE NIE (siehe `rehydrateGameStateAfterCompactPut`): der Browser
+ * verfasst keine Basislinien, und die schlanke Fassung darf die volle im Spielstand niemals
+ * ersetzen — das waere genau der stille Datenverlust, gegen den `baselineWriteGuardEvents` steht.
+ */
+function schlankeBasislinien(gameState: GameState): GameState["playerBaselines"] {
+  const baselines = gameState.playerBaselines;
+  if (!baselines) return undefined;
+  return baselines.map((baseline) => ({
+    playerId: baseline.playerId,
+    marketValue: baseline.marketValue,
+    salary: baseline.salary,
+    seasonZeroEconomy: baseline.seasonZeroEconomy,
+    createdAt: baseline.createdAt,
+    reconstructionWarning: baseline.reconstructionWarning,
+  })) as GameState["playerBaselines"];
+}
+
 /** Slim initial Foundation payload: strips heavy history and non-active matchday slices. */
 export function compactFoundationInitialGameState(gameState: GameState): GameState {
   // Keep the OWN team's attribute sheets in the compact payload so whole-roster
@@ -140,7 +179,8 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
 
   return {
     ...gameState,
-    playerBaselines: undefined,
+    // Siehe `schlankeBasislinien`: die Marktwert-Anzeige rechnet darauf, die Attribute nicht.
+    playerBaselines: schlankeBasislinien(gameState),
     baselineWriteGuardEvents: undefined,
     transferHistory: gameState.transferHistory,
     logs: [],
@@ -310,7 +350,21 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
 
   return {
     ...incoming,
-    playerBaselines: incoming.playerBaselines ?? existing.playerBaselines,
+    /**
+     * DIE BASISLINIEN DES SPIELSTANDS GEWINNEN IMMER — hier stand `incoming ?? existing`.
+     *
+     * Solange die Anfangsladung sie ganz strich, war das dasselbe: der Browser schickte
+     * `undefined` zurueck, also gewann `existing`. Seit die SCHLANKE Fassung mitfaehrt (siehe
+     * `schlankeBasislinien`) ist `incoming` nicht mehr nullish — mit `??` haette der naechste
+     * Speichervorgang die vollen Basislinien durch die Kurzfassung ersetzt und `attributes`,
+     * `disciplineRatings`, Traits und Herkunft dauerhaft geloescht. Genau der stille Datenverlust,
+     * gegen den `baselineWriteGuardEvents` steht.
+     *
+     * Der Client verfasst Basislinien nie: sie entstehen im `player-baseline-service`, im
+     * Datenadapter und in der Server-Migration. Nur wenn der Spielstand gar keine hat, darf ein
+     * eingehender Satz sie erstmalig setzen.
+     */
+    playerBaselines: existing.playerBaselines ?? incoming.playerBaselines,
     baselineWriteGuardEvents: incoming.baselineWriteGuardEvents ?? existing.baselineWriteGuardEvents,
     transferHistory: preserveIfUnchangedFromCompact(
       incoming.transferHistory,

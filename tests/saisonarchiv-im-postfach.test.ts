@@ -72,6 +72,19 @@ function mitAbgeschlossenerVorsaison(): GameState {
     playerPerformances: [],
     playerPerformanceSnapshots: [],
     transferSnapshots: [],
+    // Die Teamstärke-Ränge — Grundlage der Karte „Kräfteverschiebung".
+    teamDisciplineRankSnapshots: teams.map((team, index) => ({
+      teamId: team.teamId,
+      teamCode: team.shortCode,
+      teamName: team.name,
+      totalRank: index + 1,
+      powRank: index + 1,
+      speRank: index + 1,
+      menRank: index + 1,
+      socRank: index + 1,
+      // Die schwere Fracht, die die Kurzfassung bewusst NICHT mitnimmt.
+      disciplineRanks: { basketball: index + 1 },
+    })),
     warnings: [],
   } as unknown as SeasonSnapshotRecord;
 
@@ -80,6 +93,32 @@ function mitAbgeschlossenerVorsaison(): GameState {
     // Der Rueckblick zeigt nur eine ABGESCHLOSSENE Saison, nie die laufende.
     season: { ...basis.season, id: "season-1" },
     seasonState: { ...basis.seasonState, seasonSnapshots: [snapshot] },
+  };
+}
+
+/** Zwei archivierte Saisons — erst dann gibt es eine Kräfteverschiebung zu zeigen. */
+function mitZweiSaisons(): GameState {
+  const basis = mitAbgeschlossenerVorsaison();
+  const erste = basis.seasonState.seasonSnapshots![0]!;
+  const raenge = (erste as unknown as { teamDisciplineRankSnapshots: Array<Record<string, unknown>> })
+    .teamDisciplineRankSnapshots;
+  const zweite = {
+    ...JSON.parse(JSON.stringify(erste)),
+    snapshotId: "season-snapshot__season-1",
+    seasonId: "season-1",
+    seasonName: "Season 1",
+    archivedAt: "2026-08-10T06:05:19.451Z",
+    // Team 0 rutscht von Stärke-Rang 1 auf 4, Team 3 kommt von 4 auf 1.
+    teamDisciplineRankSnapshots: raenge.map((record, index) => ({
+      ...record,
+      totalRank: index === 0 ? 4 : index === 3 ? 1 : record.totalRank,
+    })),
+  } as unknown as SeasonSnapshotRecord;
+
+  return {
+    ...basis,
+    season: { ...basis.season, id: "season-2" },
+    seasonState: { ...basis.seasonState, seasonSnapshots: [erste, zweite] },
   };
 }
 
@@ -99,6 +138,29 @@ describe("Saisonarchiv im Postfach", () => {
     // Genau die vier Felder, an denen die Karten unten haengen.
     expect(historie[0]?.archivedAt).toBe(ARCHIVIERT_AM);
     expect(historie[0]?.teams[0]).toMatchObject({ startplatz: 6, rankDiff: 5, transferNet: -149.7 });
+  });
+
+  it("die Kraefteverschiebung entsteht im Browser — die Staerke-Raenge fahren schlank mit", () => {
+    const voll = mitZweiSaisons();
+    const browser = wieImBrowser(voll);
+
+    const raenge = (browser.seasonState.foundationSeasonHistory ?? [])[1]?.teamDisciplineRanks ?? [];
+    expect(raenge).toHaveLength(8);
+    expect(raenge[0]).toMatchObject({ totalRank: 4, powRank: 1 });
+    // Die schwere Fracht bleibt draussen — die Kurzfassung ist eine Kurzfassung.
+    expect(raenge[0]).not.toHaveProperty("disciplineRanks");
+
+    const karte = (gameState: GameState) =>
+      buildSeasonRecap({ gameState, eigeneTeamIds: new Set([gameState.teams[0]!.teamId]) })?.entries.find(
+        (entry) => entry.slot === "kraefteverschiebung",
+      ) ?? null;
+
+    const server = karte(voll);
+    expect(server?.title).toBe("Kräfteverschiebung");
+    // Team 0 verliert 3 Plätze (1 -> 4), Team 3 gewinnt 3 (4 -> 1).
+    expect(server?.description).toContain("auf Stärke-Rang 4");
+    expect(server?.description).toContain("auf Stärke-Rang 1");
+    expect(karte(browser)).toEqual(server);
   });
 
   it("der Saison-Rueckblick entsteht im Browser mit denselben Texten wie auf dem Server", () => {
