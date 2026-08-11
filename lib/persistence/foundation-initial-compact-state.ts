@@ -195,9 +195,38 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        */
       foundationPpAreaFormBonus: projizierePpAreaFormBonus(gameState),
       standingsApplyLogs: undefined,
-      disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
-        activeMatchdayResultIds.has(result.matchdayResultId),
-      ),
+      /**
+       * FAEHRT VOLLSTAENDIG MIT — die Beschneidung ist ERSATZLOS ENTFALLEN.
+       *
+       * ANSAGE VON CHRIS: „bitte keine gekuerzten spielstaende". Die Messung gibt ihm recht,
+       * und zwar deutlicher als erwartet. Am Live-Save (Saison 2, Spieltag 10) gemessen:
+       *
+       *   voller Spielstand                33,16 MB
+       *   gekuerzt                         15,19 MB   (18,4 MB gespart)
+       *   davon durch `disciplineResults`   271,5 KB -> 26,8 KB, also 245 KB
+       *   davon durch `lineupDrafts`        658,5 KB -> 69,7 KB, also 589 KB
+       *
+       * Diese beiden Felder zusammen tragen 834 KB zur Ersparnis bei — 4,5 % von dem, was die
+       * Kuerzung insgesamt einspart. Der Berg liegt woanders (persistedSeasonDerivations 5,7 MB,
+       * seasonSnapshots 3,5 MB, injuryEvents 2,3 MB, playerBaselines 4,7 MB); die bleiben
+       * beschnitten.
+       *
+       * Bezahlt haben wir diese 834 KB mit sechs Fehlern, die alle dieselbe Bauart hatten: eine
+       * Ansicht rechnet im Browser selbst und bekommt dabei nicht etwa ein leeres Feld, sondern
+       * eine FALSCHE ZAHL. Spieltags-Ergebnis (32 von 32 Zeilen falsch), Rekordbuch (7 von 7
+       * Haltern falsch), Meilensteine, PP-Formbonus (nur 14 von 32 Teams, Werte teils zu hoch),
+       * Formkarten-Alarm der Inbox (605 gemeldete Strafpunkte, in Wahrheit null), Saisonziele.
+       *
+       * 834 KB auf 15,19 MB sind +5,5 % Ladelast. Das ist der Preis dafuer, dass jede dieser
+       * Rechnungen wieder von selbst stimmt, statt einzeln durch eine Projektion abgesichert
+       * werden zu muessen. Der Handel ist eindeutig.
+       *
+       * Die Projektionen darueber bleiben vorerst stehen und sind damit wirkungslos: ihre Leser
+       * entscheiden den Vorrang je Spieltag an der Deckung, und die liegt jetzt immer beim
+       * Spielstand selbst. Sie kosten zusammen 22 KB und sind der naechste Aufraeumschritt —
+       * bewusst getrennt, damit dieser Schnitt hier fuer sich geprueft werden kann.
+       */
+      disciplineResults: gameState.seasonState.disciplineResults ?? [],
       /**
        * FAEHRT VOLLSTAENDIG MIT — bewusst nicht auf den aktiven Spieltag beschnitten.
        *
@@ -214,9 +243,8 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * ganze Saison als offen.
        */
       matchdayResults: gameState.seasonState.matchdayResults ?? [],
-      lineupDrafts: (gameState.seasonState.lineupDrafts ?? []).filter(
-        (draft) => draft.matchdayId === activeMatchdayId,
-      ),
+      /** Ebenfalls vollstaendig — siehe die Herleitung bei `disciplineResults` (589 KB). */
+      lineupDrafts: gameState.seasonState.lineupDrafts ?? [],
     },
   };
 }
