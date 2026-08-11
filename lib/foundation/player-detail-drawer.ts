@@ -133,7 +133,10 @@ import {
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
-import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
+import {
+  resolvePlayerPotentialRecordFromGameState,
+  resolvePlayerPotentialScoreFromGameState,
+} from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -2659,6 +2662,9 @@ export function buildPlayerDrawerDataFromGameState(input: {
   });
   const trainingHistoryRows = buildPlayerTrainingHistoryRows({
     progressionEvents: rawProgressionEvents,
+    // Potenzial-Drift je Saison sichtbar machen — derselbe Record, aus dem auch PO-Sterne und
+    // Attribut-Decken kommen (eine Quelle, siehe `resolvePlayerPotentialScoreFromGameState`).
+    potentialRecord: resolvePlayerPotentialRecordFromGameState({ gameState: input.gameState, playerId: player.id }),
     classHistory: player.classHistory ?? [],
     organicSnapshot: player.lastOrganicProgression ?? null,
     currentTrainingClass: player.trainingClass ?? player.className ?? null,

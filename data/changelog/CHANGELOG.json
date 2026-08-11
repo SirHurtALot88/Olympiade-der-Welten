@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-11",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Das Potenzial eines Spielers driftet an jedem Saisonende leicht — um ein bis drei Punkte, gerichtet durch seinen Wachstums-Ausblick. Das war schon immer so, stand aber nirgends: am Live-Spielstand nachgemessen sind 1586 Spieler hoch- und 1367 heruntergedriftet, ohne dass es irgendwo zu sehen war. Wer sich fragte, warum ein Spieler in der Folgesaison vom gleichen Trainingsbudget weniger mitnimmt, fand keine Antwort. Die Trainingshistorie zeigt den Übergang jetzt direkt in der Saisonzeile (\"PO 78→77\", grün bei Anstieg, rot bei Rückgang); aufgeklappt steht dabei, dass es die Obergrenze der nächsten Saison meint und keine Bewertung der abgelaufenen. Der Spielstand hält nur den jeweils letzten Übergang fest — ältere Saisons sagen das offen, statt eine Zahl zu erfinden.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Spieler · Potenzial",
       "pr": null,
       "text": "Ein Spieler hatte zwei Potenzialwerte: das beim Import einmalig gesetzte Feld am Spieler und den Wert des Potenzial-Modells, den Training, PO-Sterne und Saisonende tatsächlich pflegen. Am Live-Spielstand nachgemessen wichen beide bei allen 2984 Spielern ab (Median 16 Punkte, Lyraeth Vael 65,74 gegen 77) — je nach Ansicht sah man also eine andere Zahl, als das Training rechnete. Jetzt gibt es nur noch eine Quelle: den Modellwert. Kaderkarten, Spielerprofil, Markt, KI-Entscheidungen und Trainings-Beschleuniger lesen alle denselben Wert; das alte Import-Feld ist als Altfeld stillgelegt.",

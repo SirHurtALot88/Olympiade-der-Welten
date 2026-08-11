@@ -17279,6 +17279,30 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-style: solid;
 }
 
+/* Potenzial-Drift der Saison (PO vorher→nachher). Steht bewusst in der ZUGEKLAPPTEN Zeile:
+   er erklärt, warum die Folgesaison anders ausfällt, und darf dafür nicht hinter dem Klick
+   liegen. Monospace-Ziffern, damit die Pfeile über die Saisons hinweg untereinander stehen. */
+.player-drawer-training-season-potential {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--nl-mut, #93a3bd);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.player-drawer-training-season-potential.is-positive {
+  color: var(--nl-pos, #4ade80);
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.player-drawer-training-season-potential.is-negative {
+  color: var(--nl-neg, #f87171);
+  background: rgba(248, 113, 113, 0.12);
+}
+
 /* Aufgeklappte Herkunfts-Zeilen: eingerückt unter ihrer Saison, damit die Hierarchie
    (Saison → Posten) auch ohne Rahmen lesbar ist. */
 .player-drawer-training-origin-row th.player-drawer-training-origin-label {
