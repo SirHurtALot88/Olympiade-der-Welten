@@ -10,6 +10,14 @@
  * gegen kompakt: 164,6 Sir Quacksalot -> 112,7 Lyraeth Vael, 606,9 Lost Kingdom -> 413,7 Nunchuck
  * Ninjas, „Breit aufgestellt" 2 von 4 Bereichen -> 0 von 4, „Lauf" 2 von 3 -> 0 von 3.
  *
+ * SEITHER: die Beschneidung von `disciplineResults` ist ersatzlos entfallen — am Live-Save trug
+ * sie 245 KB zur Ersparnis bei und war damit den Preis nicht wert (Herleitung samt Messung steht
+ * in `compactFoundationInitialGameState`). Der Browser hat die Zeilen jetzt selbst, also rechnet
+ * er aus EIGENER KRAFT richtig; die Projektion `foundationRecordBook` faehrt zwar noch mit, ihr
+ * Leser gibt aber dem Spielstand den Vorrang, sobald der die Spieltage deckt — und das tut er
+ * jetzt immer. Der Fall, der frueher „ohne Projektion rechnet derselbe Stand nachweislich falsch"
+ * hiess, prueft deshalb unten die umgekehrte Aussage.
+ *
  * DIESER TEST PRUEFT WERTE, KEINE QUELLTEXT-ZEILEN, und er laeuft wirklich durch den kompakten
  * Payload: derselbe Spielstand einmal voll und einmal durch `compactFoundationInitialGameState`
  * gedreht. Die erwarteten Zahlen stehen ausserdem ausgeschrieben da — ein Test, der nur „beide
@@ -152,14 +160,24 @@ const voll = spielstand(EINGABEN);
 const kompakt = compactFoundationInitialGameState(voll);
 
 describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
-  it("der kompakte Payload beschneidet die Disziplin-Ergebnisse wirklich", () => {
-    // Ohne diese Vorbedingung misst der Rest des Tests nichts.
+  it("der kompakte Payload traegt die Disziplin-Ergebnisse ALLER Spieltage", () => {
+    // Ohne diese Vorbedingung misst der Rest des Tests nichts: die Marken liegen bewusst auf
+    // Spieltag 1 und 2, und der Browser muss sie sehen koennen.
+    //
+    // FRUEHER STAND HIER `toHaveLength(2)` und „genau ein Spieltag" — der Payload war auf den
+    // aktiven Spieltag beschnitten. Genau daraus entstand der gemeldete Fehler: alle sieben
+    // Eintraege zeigten Halter und Wert eines einzigen Spieltags, waehrend die Ueberschrift
+    // „aus 10 gespielten Spieltagen" sie beglaubigte.
     expect(voll.seasonState.disciplineResults).toHaveLength(6);
-    expect(kompakt.seasonState.disciplineResults).toHaveLength(2);
-    expect(new Set((kompakt.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId)).size).toBe(1);
-    // `matchdayResults` fahren voll mit — daher stimmt „aus N Spieltagen" auch im Browser und
-    // beglaubigte bisher Zahlen aus einem einzigen.
+    expect(kompakt.seasonState.disciplineResults).toHaveLength(6);
+    expect(new Set((kompakt.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId)).size).toBe(3);
+    // `matchdayResults` fahren ebenfalls voll mit — daher stimmt „aus N Spieltagen" und deckt
+    // sich jetzt mit dem, woraus die Werte wirklich entstehen.
     expect(kompakt.seasonState.matchdayResults).toHaveLength(3);
+    // Gegenprobe, dass ueberhaupt noch beschnitten wird — sonst pruefte diese Suite den
+    // kompakten Payload nur noch dem Namen nach.
+    expect(kompakt.seasonState.persistedSeasonDerivations).toBeUndefined();
+    expect(kompakt.seasonState.seasonSnapshots).toBeUndefined();
   });
 
   it("das Rekordbuch zeigt im Browser dieselben Werte wie auf dem Server", () => {
@@ -179,14 +197,26 @@ describe("Rekordbuch und Meilensteine kommen im Browser an", () => {
     expect(browser.matchdaysPlayed).toBe(3);
   });
 
-  it("ohne Projektion rechnet derselbe Browser-Stand nachweislich falsch", () => {
-    // Der Eigenbau auf dem beschnittenen Stand — genau der Fehler, den die Projektion behebt.
+  it("auch ohne Projektion rechnet derselbe Browser-Stand aus eigener Kraft richtig", () => {
+    /**
+     * FRUEHER HIESS DIESER FALL „ohne Projektion rechnet derselbe Browser-Stand nachweislich
+     * falsch" und hielt genau das fest: der Eigenbau auf dem beschnittenen Payload lieferte
+     * „50,0 · Spieler p3" statt „200,0 · Spieler p1", „50,0 · Team A" statt „200,0 · Team A"
+     * und „+20,0 · Team A" statt „+90,0 · Team B" — also drei plausible falsche Zahlen, keine
+     * leeren Felder. Dafuer wurde `foundationRecordBook` gebaut.
+     *
+     * Die Praemisse ist weg: `disciplineResults` fahren vollstaendig mit. Damit ist der
+     * Eigenbau nicht mehr das Gegenbeispiel, sondern der Beweis — der Browser braucht die
+     * Projektion nicht mehr, um auf die Serverwerte zu kommen. Genau das steht hier jetzt,
+     * mit denselben ausgeschriebenen Zahlen wie im Fall darueber.
+     */
     const ohneProjektion = buildLeagueRecordBook(kompakt);
-    expect(alsPaare(ohneProjektion)["best-single-performance"]).toBe("50,0 · Spieler p3");
-    expect(alsPaare(ohneProjektion)["best-team-discipline"]).toBe("50,0 · Team A");
-    expect(alsPaare(ohneProjektion)["best-form-boost"]).toBe("+20,0 · Team A");
-    // Und die Ueberschrift haette trotzdem „aus 3 gespielten Spieltagen" gesagt.
+    expect(alsPaare(ohneProjektion)["best-single-performance"]).toBe("200,0 · Spieler p1");
+    expect(alsPaare(ohneProjektion)["best-team-discipline"]).toBe("200,0 · Team A");
+    expect(alsPaare(ohneProjektion)["best-form-boost"]).toBe("+90,0 · Team B");
     expect(ohneProjektion.matchdaysPlayed).toBe(3);
+    // Und deckungsgleich mit dem vollen Spielstand, Eintrag fuer Eintrag.
+    expect(alsPaare(ohneProjektion)).toEqual(alsPaare(buildLeagueRecordBook(voll)));
   });
 
   it("die erweiterten Meilensteine messen im Browser ueber alle Spieltage", () => {

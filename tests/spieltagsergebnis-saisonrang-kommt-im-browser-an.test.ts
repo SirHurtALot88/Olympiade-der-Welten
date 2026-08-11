@@ -9,6 +9,12 @@
  * Summe vorher war fuer jedes Team 0. Gemessen: Z-H Rang vorher 1 gegen 32, Summe 160,3 gegen
  * 20,7; 32 von 32 Zeilen abweichend.
  *
+ * SEITHER: die Beschneidung von `disciplineResults` ist ersatzlos entfallen (245 KB Ersparnis am
+ * Live-Save, Herleitung in `compactFoundationInitialGameState`). Der Ledger bekommt im Browser
+ * jetzt alle Spieltage und rechnet aus eigener Kraft richtig; `foundationMatchdayPoints` faehrt
+ * noch mit, verliert den Vorrang aber, sobald der Spielstand die Spieltage deckt — also immer.
+ * Die Hausregel „lieber leer als geraten" bleibt trotzdem gepflegt, siehe den letzten Fall.
+ *
  * DIESER TEST prueft WERTE, nicht Quelltext, und er faehrt den echten kompakten Payload
  * (`compactFoundationInitialGameState`) — genau den Weg, auf dem der Fehler entstand. Ein von
  * Hand nachgebauter „Browser-Zustand" haette die Beschneidung nie reproduziert.
@@ -159,18 +165,26 @@ function zeile(gameState: GameState, teamId: string) {
 }
 
 describe("Spieltagsergebnis · Saison-Rang und Punktsumme ueberleben die Anfangsladung", () => {
-  it("beschneidet die Anfangsladung wirklich (sonst prueft der Test nichts)", () => {
+  it("die Anfangsladung traegt alle Disziplin-Ergebnisse (sonst prueft der Test nichts)", () => {
     const { gameState } = baueDreiSpieltage();
     const kompakt = compactFoundationInitialGameState(gameState);
 
-    // 3 Spieltage x 2 Seiten x 3 Teams = 18 voll, davon ueberlebt nur der aktive Spieltag.
+    // 3 Spieltage x 2 Seiten x 3 Teams = 18, und alle 18 fahren mit.
+    //
+    // FRUEHER STAND HIER `toHaveLength(6)`: nur der aktive Spieltag ueberlebte, der Ledger
+    // meldete die Luecke als „skipped_matchdays_without_discipline_results:2" — und die
+    // Ansicht zeigte trotzdem Zahlen (32 von 32 Zeilen falsch). Die Beschneidung ist
+    // entfallen, also darf diese Luecke gar nicht mehr entstehen.
     expect(gameState.seasonState.disciplineResults).toHaveLength(18);
-    expect(kompakt.seasonState.disciplineResults).toHaveLength(6);
-    // Der Ledger meldet die Luecke selbst — genau der Zustand, in dem die Ansicht frueher
-    // trotzdem Zahlen zeigte.
-    expect(buildMatchdaySummary(kompakt, { matchdayId: "matchday-3" }).warnings).toContain(
+    expect(kompakt.seasonState.disciplineResults).toHaveLength(18);
+    expect(new Set((kompakt.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId)).size).toBe(3);
+    expect(buildMatchdaySummary(kompakt, { matchdayId: "matchday-3" }).warnings).not.toContain(
       "skipped_matchdays_without_discipline_results:2",
     );
+
+    // Gegenprobe, dass der Payload trotzdem ein kompakter ist — der Berg bleibt weg.
+    expect(kompakt.seasonState.persistedSeasonDerivations).toBeUndefined();
+    expect(kompakt.seasonState.seasonSnapshots).toBeUndefined();
   });
 
   it("liefert im Browser dieselben Raenge und Summen wie auf dem vollen Spielstand", () => {
@@ -215,9 +229,26 @@ describe("Spieltagsergebnis · Saison-Rang und Punktsumme ueberleben die Anfangs
     // Die Hausregel aus `season-points-ledger`: ein sichtbar leeres Feld ist reparierbar,
     // eine falsche Zahl wird geglaubt. Ein alter Payload (oder eine gescheiterte Projektion)
     // darf deshalb keine Raenge mehr zeigen — vorher stand hier die erfundene Zahl.
+    //
+    // FRUEHER REICHTE DAFUER der kompakte Payload wie er ist: er beschnitt die
+    // `disciplineResults` selbst auf den aktiven Spieltag. Das tut er nicht mehr, also wird
+    // dieser Zustand hier von Hand hergestellt — und zwar bewusst, denn er ist nicht
+    // ausgestorben: ein Browser-Tab, der noch einen aelteren Payload haelt, sieht genau das.
+    // Die Regel muss ihn ueberleben.
     const { gameState, teamA } = baueDreiSpieltage();
-    const ohneProjektion = compactFoundationInitialGameState(gameState);
-    ohneProjektion.seasonState = { ...ohneProjektion.seasonState, foundationMatchdayPoints: undefined };
+    const kompakt = compactFoundationInitialGameState(gameState);
+    const ohneProjektion: GameState = {
+      ...kompakt,
+      seasonState: {
+        ...kompakt.seasonState,
+        foundationMatchdayPoints: undefined,
+        // Genau der alte Schnitt: nur die Zeilen des aktiven Spieltags (result-3).
+        disciplineResults: (kompakt.seasonState.disciplineResults ?? []).filter(
+          (row) => row.matchdayResultId === "result-3",
+        ),
+      },
+    };
+    expect(ohneProjektion.seasonState.disciplineResults).toHaveLength(6);
 
     const summary = buildMatchdaySummary(ohneProjektion, { matchdayId: "matchday-3" });
     expect(summary.warnings).toContain("missing_matchday_points:2");

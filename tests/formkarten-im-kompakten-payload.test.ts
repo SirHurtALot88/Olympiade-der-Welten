@@ -175,10 +175,16 @@ describe("Formkarten im kompakten Browser-Payload", () => {
     const voll = vollerSpielstand();
     const browser = alsBrowserPayload(voll);
 
-    // Vorbedingung des Fehlers: die Disziplin-Ergebnisse SIND beschnitten. Ohne diese Zeile
-    // koennte der Test gruen sein, weil gar nichts beschnitten wurde.
+    // Vorbedingung, damit der Test ueberhaupt etwas misst: der Browser bekommt ALLE
+    // Disziplin-Ergebnisse, also auch die der zurueckliegenden Spieltage 1 und 2.
+    //
+    // FRUEHER STAND HIER `toBe(2)` — der Payload war auf den aktiven Spieltag beschnitten,
+    // und genau daraus entstand der gemeldete Fehler (am Live-Save: nur 14 von 32 Teams mit
+    // Bilanz, Wicked Wizards 181,8 -> 69,6). Die Beschneidung ist entfallen; der Test misst
+    // jetzt, dass der Browser AUS EIGENER KRAFT auf die Serverwerte kommt.
     expect(voll.seasonState.disciplineResults?.length).toBe(8);
-    expect(browser.seasonState.disciplineResults?.length).toBe(2);
+    expect(browser.seasonState.disciplineResults?.length).toBe(8);
+    expect(new Set((browser.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId)).size).toBe(3);
 
     const erwartet = {
       "A-A": { total: 54.5, pow: 38, spe: 16.5, men: 0, soc: 0 },
@@ -233,11 +239,17 @@ describe("Formkarten im kompakten Browser-Payload", () => {
       matchdays: [{ matchdayId: "md-1", bonusByTeamId: { "A-A": { pow: 999 } } }],
     };
 
-    // Bleibt der Rest, den der beschnittene Payload selbst hergibt — der aktive Spieltag.
+    // Die Fremdsaison darf nicht einspringen — der Browser rechnet aus seinen eigenen,
+    // jetzt vollstaendigen Daten und kommt auf denselben Wert wie der volle Spielstand.
+    //
+    // FRUEHER STAND HIER `{ total: 4, pow: 0, spe: 4, ... }`: der beschnittene Payload gab
+    // nur den aktiven Spieltag her, also war der „Rest ohne Projektion" ein Bruchteil der
+    // Wahrheit. Dass 999 aus `season-99` nicht durchschlaegt, ist unveraendert die Aussage
+    // dieses Falls — nur die richtige Zahl daneben ist jetzt die volle.
     expect(buildPpAreaFormBonusByTeamId(browser, SEASON)["A-A"]).toEqual({
-      total: 4,
-      pow: 0,
-      spe: 4,
+      total: 54.5,
+      pow: 38,
+      spe: 16.5,
       men: 0,
       soc: 0,
     });
@@ -247,9 +259,14 @@ describe("Formkarten im kompakten Browser-Payload", () => {
     const voll = vollerSpielstand();
     const browser = alsBrowserPayload(voll);
 
-    // Vorbedingung: die Aufstellungen SIND beschnitten (nur der aktive Spieltag bleibt).
+    // Vorbedingung: der Browser bekommt ALLE Aufstellungen, also auch die der Spieltage 1
+    // und 2, auf denen A-A seine beiden negativen Karten gelegt hat.
+    //
+    // FRUEHER STAND HIER `toBe(1)`: nur der aktive Spieltag fuhr mit, A-A wirkte deshalb
+    // mit zwei ungespielten negativen Karten dazustehen — daher der Formkarten-Alarm der
+    // Inbox mit 605 gemeldeten Strafpunkten, die es in Wahrheit nicht gab.
     expect(voll.seasonState.lineupDrafts?.length).toBe(4);
-    expect(browser.seasonState.lineupDrafts?.length).toBe(1);
+    expect(browser.seasonState.lineupDrafts?.length).toBe(4);
 
     const vollZeile = buildFormCardSeasonUsageAudit(voll, SEASON).rows.find((row) => row.teamId === "A-A")!;
     const browserZeile = buildFormCardSeasonUsageAudit(browser, SEASON).rows.find((row) => row.teamId === "A-A")!;

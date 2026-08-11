@@ -24,7 +24,11 @@ import {
   hydriereFieldRaceProjection,
   projiziereFieldRace,
 } from "@/lib/persistence/foundation-field-race-projection";
-import { countPlayedFieldRaceMatchdays, getFieldRaceSeasonForm } from "@/lib/foundation/build-field-race-ledger";
+import {
+  buildFieldRaceLedger,
+  countPlayedFieldRaceMatchdays,
+  getFieldRaceSeasonForm,
+} from "@/lib/foundation/build-field-race-ledger";
 import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 
 function baueHalbenSpieltag() {
@@ -168,19 +172,31 @@ describe("Spieltagsergebnis benennt den Zwischenstand statt eines Tagessiegers a
 });
 
 describe("Feld-Rennen-Projektion: gewertete Spieltage kommen im kompakten Payload an", () => {
-  it("der kompakte Payload trägt die fertige Antwort, obwohl er die Quellen beschneidet", () => {
+  it("der kompakte Payload trägt beide gewerteten Spieltage — in der Projektion UND in den Quellen", () => {
     const { gameState, teamB } = baueHalbenSpieltag();
     const compact = compactFoundationInitialGameState(gameState);
 
-    // Die schwere Quelle ist wirklich beschnitten (nur der aktive Spieltag) — die schmale
-    // Verzeichniszeile je Spieltag faehrt seit dem Saisonziel-Fix dagegen vollstaendig mit,
-    // weil die Vorstandsziele sonst nur den aktiven Spieltag zaehlten.
-    expect([...new Set((compact.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId))]).toEqual(["result-2"]);
+    /**
+     * FRUEHER STAND HIER `toEqual(["result-2"])`: die Disziplin-Ergebnisse waren auf den
+     * aktiven Spieltag beschnitten, der Browser konnte die gewerteten Spieltage nicht mehr
+     * selbst zaehlen und Home meldete mitten in der Saison „erst 0 Spieltage". Dafuer wurde
+     * `foundationFieldRace` gebaut.
+     *
+     * Die Beschneidung ist entfallen (589/245 KB gegen sechs falsch rechnende Ansichten,
+     * Herleitung in `compactFoundationInitialGameState`). Geprueft werden deshalb jetzt
+     * BEIDE Wege — die mitfahrende Projektion wie bisher, und daneben der Eigenbau des
+     * Browsers, der auf dieselbe Zahl kommen muss.
+     */
+    expect([...new Set((compact.seasonState.disciplineResults ?? []).map((r) => r.matchdayResultId))]).toEqual([
+      "result-1",
+      "result-2",
+    ]);
     expect((compact.seasonState.matchdayResults ?? []).map((r) => r.matchdayId)).toEqual([
       "matchday-1",
       "matchday-2",
     ]);
-    // … und die Projektion zählt beide gewerteten Spieltage.
+
+    // Die Projektion zählt beide gewerteten Spieltage.
     const projection = compact.seasonState.foundationFieldRace;
     expect(projection).toBeTruthy();
     const ledger = hydriereFieldRaceProjection(projection!);
@@ -188,6 +204,13 @@ describe("Feld-Rennen-Projektion: gewertete Spieltage kommen im kompakten Payloa
     const form = getFieldRaceSeasonForm(ledger, teamB.teamId);
     expect(form).toHaveLength(2);
     expect(form.every((row) => row.played)).toBe(true);
+
+    // … und der Eigenbau auf demselben Payload ebenfalls: keine „erst 0 Spieltage" mehr.
+    const eigenbau = buildFieldRaceLedger(compact, compact.season.id);
+    expect(countPlayedFieldRaceMatchdays(eigenbau)).toBe(2);
+    const eigenbauForm = getFieldRaceSeasonForm(eigenbau, teamB.teamId);
+    expect(eigenbauForm).toHaveLength(2);
+    expect(eigenbauForm.every((row) => row.played)).toBe(true);
   });
 
   it("die Projektion fährt nur hinaus — der Compact-PUT-Roundtrip wirft sie weg", () => {
