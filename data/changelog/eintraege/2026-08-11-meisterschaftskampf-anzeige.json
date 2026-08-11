@@ -1,0 +1,8 @@
+{
+  "datum": "2026-08-11",
+  "seite": "Saisonstand",
+  "text": "Am letzten Spieltag, solange er noch läuft, hebt der Saisonstand jetzt alle Teams hervor, die den Titel rechnerisch noch holen können (goldener Rand, Tag „Titelchance\") und zeigt darüber eine Kopfzeile mit Anzahl der Kandidaten und ihrem Rückstand auf die Spitze. Ist der Titel schon rechnerisch entschieden, steht dort stattdessen nur ein Satz dazu, ohne Zeilen-Hervorhebung. Außerhalb des letzten Spieltags und im Archiv ändert sich nichts.",
+  "gewicht": "feinschliff",
+  "pr": null,
+  "version": "0.4"
+}

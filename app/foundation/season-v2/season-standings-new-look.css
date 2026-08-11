@@ -293,3 +293,54 @@
 .is-new-look .nl-standings-players-pending {
   min-width: 0;
 }
+
+/* ------------------------------------------------------------------ *
+ * Meisterschaftskampf am letzten Spieltag (Chris' Wunsch, `lib/season/title-race.ts`):
+ * Zeilen-Hervorhebung 1:1 nach dem Muster von `.is-rival` (globals.css Z. 12092/12098 —
+ * roter linker Rand + zarter Ring bzw. Kantenakzent in der Tabelle), hier aber in Gold
+ * (`--nl-gold`, dieselbe Medaillen-/Podium-Farbe) statt Rivalen-Rot, damit "Titelchance"
+ * nicht mit "Rivale" verwechselt wird. Beide Hervorhebungen können auf derselben Zeile
+ * gleichzeitig stehen (additive Klassen, kein Konflikt).
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-row.is-title-contender {
+  border-left-color: var(--nl-gold);
+  box-shadow: var(--nl-e1), inset 0 0 0 1px color-mix(in srgb, var(--nl-gold) 45%, transparent);
+}
+
+.is-new-look .nl-standings-table-row.is-title-contender > td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-gold);
+}
+
+/* Text-Tag am Teamnamen, analog zu `.rival-tag` (globals.css Z. 12040) — ohne ihn wüsste
+ * niemand, WARUM die Zeile leuchtet (Glow allein ist mit is-selected/is-rival/is-podium
+ * schon dreifach belegt). Gold statt Risk-Ton, sonst identisches Chip-Vokabular. Gold
+ * braucht (anders als Risk) kein eigenes Text-Token — --nl-gold misst bereits ≥ 7:1 auf
+ * getönten Flächen (siehe Kommentar bei --nl-gold in globals.css). */
+.is-new-look .nl-standings-titlerace-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-gold) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-gold) 16%, transparent);
+  color: var(--nl-gold);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* Kopfzeile über der Tabelle — gleiche Typografie wie die Preseason-Note (beide Notizen
+ * teilen sich denselben Platz, nie gleichzeitig sichtbar). */
+.is-new-look .nl-standings-titlerace-note {
+  margin: var(--nl-s2) 0 0;
+  font-size: var(--nl-fs-md);
+  line-height: 1.5;
+  color: var(--nl-mut);
+  max-width: 72ch;
+}

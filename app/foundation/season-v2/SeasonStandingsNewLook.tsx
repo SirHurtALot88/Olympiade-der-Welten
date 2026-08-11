@@ -57,6 +57,11 @@ import {
   type SeasonDisciplineAreaId,
   type SeasonDisciplineKey,
 } from "@/lib/season/season-discipline-area-groups";
+import {
+  MAX_PLAYERS_PER_MATCHDAY,
+  MAX_POINTS_PER_MATCHDAY,
+  POINTS_PER_PARTICIPATING_PLAYER,
+} from "@/lib/season/title-race";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -66,8 +71,12 @@ import {
  * Layout zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - kein "Titelrennen"-Hero,
  * - keine Auf-/Abstiegszonen (kein Zonen-Konzept im Datenmodell).
+ *
+ * Meisterschaftskampf (Chris' Wunsch, `lib/season/title-race.ts`): NUR am letzten Spieltag,
+ * solange er noch läuft — der Host rechnet das Zeitfenster fertig vor und reicht das Ergebnis
+ * über `titleRace` durch (`null` = kein Fenster, auch im Archiv). Diese Komponente bekommt nur
+ * das fertige Ergebnis, kein `gameState`.
  *
  * Rang-Movement pro Spieltag (Wave D · D4): `row.fieldRaceRankDelta` trägt
  * jetzt die Δ-Rang-Bewegung gegenüber dem LETZTEN Spieltag aus dem bereits
@@ -506,6 +515,7 @@ export default function SeasonStandingsNewLook({
   archiveRows,
   disciplineLeaders,
   rivalTeamIds,
+  titleRace,
   teamTopPlayersByColumn,
   teamFormCardBonusByTeamId,
   onChangeSeason,
@@ -516,6 +526,14 @@ export default function SeasonStandingsNewLook({
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
+  /**
+   * Zeilen-Hervorhebung NUR, wenn der Titel noch offen ist. Ist die Meisterschaft rechnerisch
+   * entschieden (`contenderIds.size <= 1` — nur noch der Führende selbst „im Rennen"), läse eine
+   * einzelne golden leuchtende Zeile absurd; dafür gibt es stattdessen die Kopfzeilen-Notiz mit
+   * dem anderen Text (`renderTitleRaceNote`).
+   */
+  const isTitleContender = (teamId: string) =>
+    titleRace != null && titleRace.leaderId != null && titleRace.contenderIds.size > 1 && titleRace.contenderIds.has(teamId);
   // Start bewusst deterministisch mit dem Standard (SSR/Client identisch, keine
   // Hydration-Warnung); die gespeicherte Präferenz zieht direkt nach dem Mount nach.
   const [mode, setMode] = useState<NlStandingsMode>(NL_STANDINGS_DEFAULT_MODE);
@@ -1238,7 +1256,7 @@ export default function SeasonStandingsNewLook({
     return (
       <li
         key={row.teamId}
-        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
+        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}${isTitleContender(row.teamId) ? " is-title-contender" : ""}`}
         style={{ ...getSeasonV2TeamTagStyle(row.teamCode), "--nl-reveal-i": Math.min(revealIndex, 14) } as CSSProperties}
       >
         <div
@@ -1297,6 +1315,11 @@ export default function SeasonStandingsNewLook({
               <span className="nl-standings-teamname">
                 {row.teamName}
                 {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+                {isTitleContender(row.teamId) ? (
+                  <span className="nl-standings-titlerace-tag" title="Kann den Titel am letzten Spieltag noch holen">
+                    Titelchance
+                  </span>
+                ) : null}
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </span>
@@ -1571,7 +1594,7 @@ export default function SeasonStandingsNewLook({
     return (
       <Fragment key={row.teamId}>
         <tr
-          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isExpanded ? " is-expanded" : ""}`}
+          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isExpanded ? " is-expanded" : ""}${isTitleContender(row.teamId) ? " is-title-contender" : ""}`}
           onClick={() => toggleExpanded(row.teamId)}
         >
           <td className="nl-standings-td-caret">
@@ -1606,6 +1629,11 @@ export default function SeasonStandingsNewLook({
               <span className="nl-standings-teamname">
                 {row.teamName}
                 {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+                {isTitleContender(row.teamId) ? (
+                  <span className="nl-standings-titlerace-tag" title="Kann den Titel am letzten Spieltag noch holen">
+                    Titelchance
+                  </span>
+                ) : null}
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </button>
@@ -1811,6 +1839,71 @@ export default function SeasonStandingsNewLook({
           ))}
         </ol>
       </NlCard>
+    );
+  }
+
+  /**
+   * Kopfzeile über der Tabelle für den Meisterschaftskampf am letzten Spieltag
+   * (Chris' Wunsch, `lib/season/title-race.ts`). `titleRace` ist nur in diesem einen
+   * Zeitfenster gesetzt — außerhalb (und im Archiv) rendert diese Funktion `null`,
+   * genau wie die Preseason-Note nie außerhalb ihres eigenen Fensters erscheint.
+   * Beide Notizen können nie gleichzeitig auftauchen (vor Spieltag 1 läuft nie
+   * gleichzeitig schon der letzte Spieltag).
+   *
+   * `leaderId == null` (keine gewertete Mannschaft im übergebenen Stand) wird wie
+   * "kein Fenster" behandelt — ohne Führenden gibt es nichts zu zeigen.
+   */
+  function renderTitleRaceNote() {
+    if (!titleRace || titleRace.leaderId == null) {
+      return null;
+    }
+
+    const leaderRow = boardRows.find((row) => row.teamId === titleRace.leaderId) ?? null;
+    const contenderCount = titleRace.contenderIds.size;
+
+    // Titel rechnerisch entschieden (nur noch der Führende selbst "im Rennen"): eine einzelne
+    // "Titelchance"-Zeile läse sich absurd — hier gibt es nur die Kopfzeile, mit anderem Text,
+    // und KEINE Zeilen-Hervorhebung (siehe `isTitleContender`).
+    if (contenderCount <= 1) {
+      return (
+        <p className="nl-standings-titlerace-note" data-testid="nl-standings-titlerace-note">
+          Letzter Spieltag — die Meisterschaft ist entschieden: {leaderRow?.teamName ?? "Der Spitzenreiter"} ist
+          rechnerisch nicht mehr einzuholen.
+        </p>
+      );
+    }
+
+    const contenderRows = boardRows
+      .filter((row) => titleRace.contenderIds.has(row.teamId))
+      .map((row) => ({ row, gap: titleRace.gapByTeamId.get(row.teamId) ?? 0 }))
+      .sort((left, right) => left.gap - right.gap);
+
+    // Die Konstanten hinter der Obergrenze (Spieleranzahl × Punkte je Spieler) sind bewusst KEINE
+    // eigenen Zahlen im sichtbaren Text — nur die fertige Obergrenze selbst steht in der
+    // Kopfzeile. Die Herleitung ("12 Spieler × 3,3") steht NUR im Tooltip der Chips als
+    // Begründung, sonst würde die Zeile mit Zwischenwerten überladen.
+    const maxPointsLabel = formatNlNumber(MAX_POINTS_PER_MATCHDAY, 1);
+    const maxPointsTooltip = `maximal ${maxPointsLabel} Punkte sind am letzten Spieltag noch zu holen (${formatNlNumber(MAX_PLAYERS_PER_MATCHDAY, 0)} Spieler × ${formatNlNumber(POINTS_PER_PARTICIPATING_PLAYER, 1)})`;
+
+    return (
+      <>
+        <p className="nl-standings-titlerace-note" data-testid="nl-standings-titlerace-note">
+          Letzter Spieltag — Meisterschaftskampf: {contenderCount} Teams können noch Meister werden (maximal{" "}
+          {maxPointsLabel} Punkte sind noch zu holen).
+        </p>
+        <StatChipRow className="nl-standings-titlerace-chips" aria-label="Teams im Meisterschaftskampf">
+          {contenderRows.map(({ row, gap }) => (
+            <StatChip
+              key={row.teamId}
+              label={row.teamCode}
+              value={gap <= 0 ? "Spitze" : `−${formatNlNumber(gap, 1)}`}
+              tone={gap <= 0 ? "good" : "accent"}
+              onClick={() => onOpenTeam(row.teamId)}
+              title={`${row.teamName} — ${maxPointsTooltip}`}
+            />
+          ))}
+        </StatChipRow>
+      </>
     );
   }
 
@@ -2190,6 +2283,10 @@ export default function SeasonStandingsNewLook({
             (deine Startplätze). Punkte, Achsenwerte und Medaillen füllen sich ab Spieltag 1.
           </p>
         ) : null}
+        {/* Meisterschaftskampf-Kopfzeile: kann nie gleichzeitig mit der Preseason-Note oben
+            erscheinen (die eine braucht "noch keine Wertung", die andere "letzter Spieltag,
+            noch nicht durchgespielt" — beide Fenster schließen sich gegenseitig aus). */}
+        {renderTitleRaceNote()}
       </NlCard>
 
       {isLoading && boardRows.length === 0 ? (
