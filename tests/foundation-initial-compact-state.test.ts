@@ -5,6 +5,7 @@ import {
   compactFoundationInitialGameState,
   rehydrateGameStateAfterCompactPut,
 } from "@/lib/persistence/foundation-initial-compact-state";
+import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 
 function createGameState(): GameState {
   return {
@@ -126,6 +127,55 @@ describe("foundation initial compact state", () => {
 
     expect(compact.seasonState.matchdayResults).toEqual(existing.seasonState.matchdayResults);
     expect(compact.seasonState.disciplineResults?.map((result) => result.id)).toEqual(["disc-md-2"]);
+  });
+
+  it("ships the form-card balance so the compact payload counts the whole season", () => {
+    // Die Saisonstand-Spalte "Formkarten" zaehlt die gespielten Karten ueber die
+    // Modifier-Slots der Aufstellungen — und die bleiben (zu Recht, 659 KB gegen 70 KB) auf
+    // den aktiven Spieltag beschnitten. Am Live-Save gemessen: voll 32 von 32 Teams mit
+    // Bilanz, kompakt 14 von 32, und diese 14 mit den Karten nur EINES von zehn Spieltagen.
+    // Die fertige Bilanz faehrt deshalb mit; beide Seiten muessen dieselbe Zahl nennen.
+    const existing = createGameState();
+    existing.seasonState.formCards = [
+      { id: "c-alt", seasonId: "season-1", teamId: "H-R", cardValue: 8 } as never,
+      { id: "c-aktiv", seasonId: "season-1", teamId: "H-R", cardValue: -3 } as never,
+    ];
+    existing.seasonState.lineupDrafts = [
+      {
+        lineupId: "lineup-md-1",
+        matchdayId: "md-1",
+        teamId: "H-R",
+        saveId: "save-1",
+        seasonId: "season-1",
+        modifiers: { d1: { primaryFormCardId: "c-alt" } },
+      } as never,
+      {
+        lineupId: "lineup-md-2",
+        matchdayId: "md-2",
+        teamId: "H-R",
+        saveId: "save-1",
+        seasonId: "season-1",
+        modifiers: { d1: { primaryFormCardId: "c-aktiv" } },
+      } as never,
+    ];
+
+    const compact = compactFoundationInitialGameState(existing);
+
+    // Beschnitten ist die Quelle weiterhin — nur der aktive Spieltag md-2 bleibt.
+    expect(compact.seasonState.lineupDrafts).toHaveLength(1);
+    expect(
+      buildSeasonFormCardBonusByTeamId(compact, compact.season.id).get("H-R"),
+    ).toEqual(buildSeasonFormCardBonusByTeamId(existing, existing.season.id).get("H-R"));
+    expect(buildSeasonFormCardBonusByTeamId(compact, compact.season.id).get("H-R")).toEqual({
+      total: 5,
+      cards: 2,
+      positive: 8,
+      negative: -3,
+    });
+
+    // Reine Anzeigefracht: darf nie in den Spielstand zurueckwandern.
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compact);
+    expect(rehydrated.seasonState.foundationFormCardBonus).toBeUndefined();
   });
 
   it("strips persisted season derivations from compact payloads", () => {

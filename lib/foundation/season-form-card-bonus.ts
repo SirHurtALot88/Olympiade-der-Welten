@@ -40,6 +40,18 @@ export function buildSeasonFormCardBonusByTeamId(
   gameState: Pick<GameState, "seasonState">,
   seasonId: string,
 ): SeasonFormCardBonusByTeamId {
+  /**
+   * Vorfahrt fuer die mitgelieferte Bilanz (`foundation-form-card-projection`). Im Browser
+   * sind die `lineupDrafts` auf den aktiven Spieltag beschnitten — eine Neuberechnung fande
+   * hier bestenfalls die Karten EINES Spieltags und die Saisonstand-Spalte zeigte Striche.
+   * Die Projektion ist auf dem vollen Save gerechnet und deckt genau die laufende Saison ab;
+   * fuer jede andere `seasonId` (Archiv) faellt die Rechnung unveraendert unten durch.
+   */
+  const projektion = gameState.seasonState.foundationFormCardBonus;
+  if (projektion && projektion.seasonId === seasonId) {
+    return new Map(Object.entries(projektion.byTeamId));
+  }
+
   const result: SeasonFormCardBonusByTeamId = new Map();
   const formCards = gameState.seasonState.formCards ?? [];
   if (formCards.length === 0) {

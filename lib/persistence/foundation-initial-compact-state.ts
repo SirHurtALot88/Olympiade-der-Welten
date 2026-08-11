@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
 import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
+import { projiziereFormkartenBilanz } from "@/lib/persistence/foundation-form-card-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -145,6 +146,14 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * gerechnet auf dem vollen Save; zurueckgeschrieben wird sie nie (s. u.).
        */
       foundationFieldRace: projiziereFieldRace(gameState),
+      /**
+       * Dritte Schwester derselben Bauart: die Saisonstand-Spalte „Formkarten" zaehlt die
+       * gespielten Karten ueber die Modifier-Slots der Aufstellungen — und die stehen unten
+       * auf den aktiven Spieltag beschnitten. Gemessen: voll 32 von 32 Teams mit Bilanz,
+       * kompakt 14 von 32, und diese 14 mit den Karten nur EINES von zehn Spieltagen.
+       * Die Beschneidung bleibt (659 KB gegen 70 KB), die fertige Bilanz faehrt mit (1,9 KB).
+       */
+      foundationFormCardBonus: projiziereFormkartenBilanz(gameState),
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
@@ -264,6 +273,7 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       // Dieselbe Regel wie die Saison-Historie darueber: reine Anzeigefracht, faehrt nur
       // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
       foundationFieldRace: undefined,
+      foundationFormCardBonus: undefined,
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

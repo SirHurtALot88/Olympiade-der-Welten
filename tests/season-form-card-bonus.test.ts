@@ -85,4 +85,45 @@ describe("buildSeasonFormCardBonusByTeamId", () => {
       negative: 0,
     });
   });
+
+  it("prefers the shipped balance over beschnittene Aufstellungen", () => {
+    // Genau die Lage im Browser: von zehn Spieltagen ist nur der aktive uebrig, seine
+    // Aufstellung traegt eine einzige Karte. Ohne die mitgelieferte Bilanz zaehlte die
+    // Saisonstand-Spalte diesen einen Spieltag und meldete "1 Karte" statt der ganzen Saison.
+    const gameState = makeGameState({
+      formCards: [{ id: "c1", seasonId: "S1", teamId: "A-A", cardValue: 8 }],
+      lineupDrafts: [{ seasonId: "S1", modifiers: { d1: { primaryFormCardId: "c1" } } }],
+    });
+    (gameState.seasonState as { foundationFormCardBonus?: unknown }).foundationFormCardBonus = {
+      seasonId: "S1",
+      byTeamId: { "A-A": { total: -8, cards: 15, positive: 34, negative: -42 } },
+    };
+
+    expect(buildSeasonFormCardBonusByTeamId(gameState, "S1").get("A-A")).toEqual({
+      total: -8,
+      cards: 15,
+      positive: 34,
+      negative: -42,
+    });
+  });
+
+  it("ignoriert die mitgelieferte Bilanz fuer eine andere Saison", () => {
+    // Die Projektion deckt nur die laufende Saison ab. Beim Blick ins Archiv darf sie nicht
+    // einspringen, sonst stuende unter einer alten Saison die Bilanz der aktuellen.
+    const gameState = makeGameState({
+      formCards: [{ id: "c1", seasonId: "S1", teamId: "A-A", cardValue: 8 }],
+      lineupDrafts: [{ seasonId: "S1", modifiers: { d1: { primaryFormCardId: "c1" } } }],
+    });
+    (gameState.seasonState as { foundationFormCardBonus?: unknown }).foundationFormCardBonus = {
+      seasonId: "S2",
+      byTeamId: { "A-A": { total: 999, cards: 99, positive: 999, negative: 0 } },
+    };
+
+    expect(buildSeasonFormCardBonusByTeamId(gameState, "S1").get("A-A")).toEqual({
+      total: 8,
+      cards: 1,
+      positive: 8,
+      negative: 0,
+    });
+  });
 });
