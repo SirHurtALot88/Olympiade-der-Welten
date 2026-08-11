@@ -1309,6 +1309,28 @@ export type SponsorLeihgabeRecord = {
   offerId?: string;
 };
 
+/**
+ * DAS ANGEBOT AM VERTRAGSENDE: das geliehene Gebäude behalten, zum Preis aus
+ * `berechneUebernahmepreis` (Katalogkosten − bereitgestellter Leihwert − geerbte Reparatur).
+ *
+ * Es entsteht beim Saisonwechsel, wenn ein Sponsorvertrag mit Leihe auslaeuft, und verschwindet,
+ * sobald das Team zugreift oder ablehnt. Nimmt es niemand an, faellt das Gebäude ersatzlos weg —
+ * das Team steht wieder auf seinem eigenen Bestand.
+ */
+export type SponsorUebernahmeAngebot = {
+  teamId: string;
+  /** Saison, in der das Angebot auf dem Tisch liegt. */
+  seasonId: string;
+  facilityId: string;
+  /** Die zuletzt geliehene Stufe — die bekommt man, keine andere. */
+  stufe: number;
+  /** Zustand bei der Uebergabe. Nach drei Saisons Verschleiss ist das der halbe Preisunterschied. */
+  zustandPct: number;
+  preis: number;
+  /** Der Vertrag, aus dem die Leihe stammte. */
+  offerId?: string;
+};
+
 export type FacilityEventRecord = {
   eventId: string;
   seasonId: string;
@@ -3041,6 +3063,8 @@ export type SeasonState = {
    * darf die Leihe nie in `teamFacilities` geschrieben werden.
    */
   sponsorLeihgabenByTeamId?: Record<string, SponsorLeihgabeRecord[]>;
+  /** Offene Übernahme-Angebote aus ausgelaufenen Leihverträgen (siehe `SponsorUebernahmeAngebot`). */
+  sponsorUebernahmeAngeboteByTeamId?: Record<string, SponsorUebernahmeAngebot[]>;
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
