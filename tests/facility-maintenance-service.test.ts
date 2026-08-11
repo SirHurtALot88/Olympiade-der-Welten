@@ -104,7 +104,8 @@ describe("facility maintenance service", () => {
     expect(preview.ok).toBe(true);
     expect(preview.conditionPct).toBe(50);
     expect(preview.nextConditionPct).toBe(100);
-    expect(preview.efficiencyPct).toBe(71.43);
+    // Zustand 50 von der Schwelle 80 → 62,5 % Effizienz (frueher 71,43 bei Schwelle 70).
+    expect(preview.efficiencyPct).toBe(62.5);
     expect(preview.nextEfficiencyPct).toBe(100);
     expect(preview.maintenanceCost).toBe(3.38);
     expect(preview.cashAfter).toBe(96.62);
