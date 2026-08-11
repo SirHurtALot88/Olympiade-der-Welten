@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-11",
+  "seite": "Technik · Spielstand",
+  "text": "Der Spielstand trug zwei Dinge mit sich, die keine Auskunft gaben. Erstens: Jeder eingesetzte Spieler würfelt pro Spieltag gegen das Verletzungsrisiko — im gemessenen Stand 5032-mal, davon 4988-mal ohne Verletzung. Auf diesen gesunden Würfen standen Ausfalldauer und Genesungszeiten trotzdem mit, immer leer, und gelesen wurden sie nie. Zweitens: Die Spielerwerte eines abgeschlossenen Saison-Schnappschusses lagen zweimal Zeichen für Zeichen identisch nebeneinander. Beides ist raus, zusammen 1,38 MB von 33,16 MB. Nichts davon wird irgendwo angezeigt oder gerechnet — gegengeprüft an Spieltags-Belastung, Verletzungshistorie, Verletzungszähler und Archiv-Spielerwerten, überall null Abweichung. Die gesunden Würfe selbst bleiben ausdrücklich erhalten: sie tragen die Belastung vor dem Spieltag und sind die einzige Quelle des Belastungs-Schnitts. Bestehende Spielstände werden beim nächsten Speichern von selbst kleiner.",
+  "gewicht": "feinschliff",
+  "version": "0.4"
+}

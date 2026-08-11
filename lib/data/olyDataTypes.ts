@@ -1933,22 +1933,43 @@ export type PlayerAvailabilityStateRecord = {
   injuryRiskLastRoll?: PlayerInjuryRiskRollRecord;
 };
 
+/**
+ * Ein Wuerfelwurf gegen das Verletzungsrisiko — einer je eingesetztem Spieler und Spieltag.
+ *
+ * ZWEI DINGE IN EINEM TYP: bei `result: "healthy"` (am Live-Spielstand 4988 von 5032 Zeilen) ist
+ * das eine BELASTUNGS-MESSUNG — `fatigueBefore` speist den Spieltags-Schnitt in
+ * `computePlayerSeasonAverageMatchdayFatigue`. Erst bei `result: "injured"` wird daraus ein
+ * Verletzungs-Datensatz mit Ausfall- und Genesungs-Angaben.
+ *
+ * Die Felder der zweiten Haelfte sind deshalb optional: auf gesunden Zeilen standen sie
+ * ausnahmslos auf `null` bzw. `1` und wurden von keiner Lesestelle je angesehen
+ * (`injuryEventToPlayerHistoryRecord` verwirft alles ausser `injured` sofort). Sie werden beim
+ * Speichern weggelassen, siehe `lib/persistence/save-payload-slimming.ts` — 593 KB, die keine
+ * Auskunft trugen.
+ */
 export type InjuryEventRecord = {
   eventId: string;
   seasonId: string;
   matchdayId: string;
   teamId: string;
   playerId: string;
+  /** Belastung vor dem Spieltag — der Grund, warum auch gesunde Wuerfe aufbewahrt werden. */
   fatigueBefore: number;
   riskPercent: number;
   roll: number;
   result: "healthy" | "injured";
-  unavailableForMatchdays: 1;
+  /** Nur bei `injured` gespeichert; fehlt sie, ist sie `1` (der einzige je geschriebene Wert). */
+  unavailableForMatchdays?: 1;
   unavailableUntil?: string | null;
   normalRecovery?: number | null;
   injuryRecovery?: number | null;
   fatigueAfterRecovery?: number | null;
-  source: "fatigue_injury_risk_v1" | "fatigue_injury_rehearsal_v1";
+  /**
+   * Fehlt das Feld, ist es `fatigue_injury_risk_v1` — der Standard steht in
+   * `INJURY_EVENT_DEFAULT_SOURCE`, nicht tausendfach im Spielstand. Proben-Wuerfe
+   * (`fatigue_injury_rehearsal_v1`) behalten ihre Angabe.
+   */
+  source?: "fatigue_injury_risk_v1" | "fatigue_injury_rehearsal_v1";
   timestamp: string;
 };
 

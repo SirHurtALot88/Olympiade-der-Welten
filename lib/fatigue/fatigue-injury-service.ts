@@ -21,6 +21,7 @@ import {
   type InjuryRiskBand,
 } from "@/lib/fatigue/fatigue-calibration";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+import { slimInjuryEvent } from "@/lib/persistence/save-payload-slimming";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
@@ -1012,7 +1013,14 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
         fatigueBeforeRoll,
         injuryRehearsal: input.injuryRehearsal,
       });
-    const event: InjuryEventRecord = {
+    /**
+     * Ein gesunder Wurf ist eine BELASTUNGS-MESSUNG, kein Verletzungs-Datensatz — er bekommt die
+     * Ausfall- und Genesungsfelder deshalb gar nicht erst. Sie standen dort ausnahmslos auf
+     * `null` bzw. `1`, wurden von keiner Lesestelle je angesehen und kosteten im Live-Spielstand
+     * 593 KB. Siehe `slimInjuryEvent` in `lib/persistence/save-payload-slimming.ts`, das
+     * bestehende Spielstaende beim naechsten Speichern auf denselben Stand bringt.
+     */
+    const event: InjuryEventRecord = slimInjuryEvent({
       eventId: buildInjuryEventId({
         saveId: input.saveId,
         seasonId: input.seasonId,
@@ -1035,7 +1043,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       fatigueAfterRecovery: null,
       source: roll.source,
       timestamp: input.timestamp,
-    };
+    });
     newEvents.push(event);
     if (roll.result === "injured") {
       const historyRecord = injuryEventToPlayerHistoryRecord(event, gameState);

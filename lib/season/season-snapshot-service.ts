@@ -597,7 +597,11 @@ function buildSeasonSnapshotRecord(
     playerDisciplinePerformances: structuredClone(seasonPlayerPerformances),
     disciplineHighlights: structuredClone(seasonDisciplineHighlights),
     playerPerformances,
-    playerPerformanceSnapshots: playerPerformances,
+    // `playerPerformanceSnapshots` stand hier bis 2026-08-11 als byte-identischer Zwilling
+    // DERSELBEN Variablen daneben (im Live-Spielstand 333 Eintraege, 647 KB, doppelt). Alle
+    // Lesestellen fuehren beide Arrays zusammen und bevorzugen das Pflichtfeld — der Zwilling
+    // trug also nichts bei. Er wird nicht mehr geschrieben; alte Schnappschuesse, in denen NUR
+    // das Altfeld gefuellt ist, werden weiter gelesen.
     transferSnapshots,
     gmAssignments,
     teamDisciplineRankSnapshots,
@@ -836,7 +840,6 @@ export function createSeasonSnapshot(
         playerDisciplinePerformances: [],
         disciplineHighlights: [],
         playerPerformances: [],
-        playerPerformanceSnapshots: [],
         transferSnapshots: [],
         warnings: [],
       },

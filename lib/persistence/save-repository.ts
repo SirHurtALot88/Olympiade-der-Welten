@@ -61,6 +61,7 @@ import {
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { slimGameStateForWrite } from "@/lib/persistence/save-payload-slimming";
 import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
 import type {
   PersistedSaveGame,
@@ -1514,11 +1515,15 @@ function createPersistedSaveRecord(input: {
     ...(normalizedGameState.baselineWriteGuardEvents ?? []),
     ...guardedBaselineWrite.events,
   ]);
-  const guardedGameState: GameState = {
+  // Zuletzt vor dem Schreiben: Felder ohne Auskunft fallen weg (leere Verletzungs-Nachwehen auf
+  // gesunden Wuerfen, der byte-identische Zwilling der Saison-Spielerwerte). Beim SCHREIBEN und
+  // nicht beim Lesen — so kostet es einmal ein paar Millisekunden statt bei jedem Laden, und
+  // bestehende Spielstaende schrumpfen beim naechsten Speichern von selbst.
+  const guardedGameState: GameState = slimGameStateForWrite({
     ...normalizedGameState,
     playerBaselines: guardedBaselineWrite.baselines,
     baselineWriteGuardEvents,
-  };
+  });
 
   const upsertSave = database.prepare(`
     INSERT INTO saves (
