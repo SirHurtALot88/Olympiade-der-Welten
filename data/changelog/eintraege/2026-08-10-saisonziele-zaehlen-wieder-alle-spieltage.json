@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-10",
+  "seite": "Vorstand · Saisonziele",
+  "text": "Die Saisonziele zaehlten im Browser nur den gerade aktiven Spieltag mit. Wer schon vier Top-20-Platzierungen gesammelt hatte, las auf der Karte trotzdem \"0/3, bestes Rank #33\" — das Ziel war laengst erfuellt, die Anzeige verschwieg es. Ursache war die Kurzfassung des Spielstands, die zum Browser faehrt: sie schnitt die Spieltags-Ergebnisliste auf den aktiven Spieltag zusammen, und die Ziel-Rechnung erkennt genau an dieser Liste, welche Leistungen zur laufenden Saison gehoeren. Alles Vorherige fiel damit durchs Raster, ebenso die Zaehlung der verbleibenden Spieltage. Jetzt faehrt die Liste vollstaendig mit — sie ist eine schmale Zeile je Spieltag und kostet 0,03 Prozent des Payloads; die schwere Fracht der Disziplin-Ergebnisse bleibt unveraendert beschnitten.",
+  "gewicht": "normal",
+  "version": "0.4"
+}

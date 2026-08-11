@@ -149,7 +149,22 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
       ),
-      matchdayResults: activeMatchdayResults,
+      /**
+       * FAEHRT VOLLSTAENDIG MIT — bewusst nicht auf den aktiven Spieltag beschnitten.
+       *
+       * Diese Liste ist kein Datenberg, sondern ein Verzeichnis: eine schmale Zeile je
+       * gewertetem Spieltag (gemessen 10 Zeilen = 4,7 KB, +0,027 % des Payloads). Die
+       * schwere Fracht sind `disciplineResults` und die bleiben beschnitten.
+       *
+       * Beschnitten war sie trotzdem teuer: `getCurrentSeasonMatchdayResultIds` in
+       * `team-season-objectives-service` erkennt an ihr, welche Ergebnisse zur laufenden
+       * Saison gehoeren, und wirft alles weg, was nicht drinsteht. Im Browser blieb davon
+       * genau ein Spieltag uebrig — also zaehlten die Saisonziele nur den aktiven mit.
+       * Gemessen am Live-Save: Server 4/3 Top-20 (erfuellt), Browser 0/3, bestes Rank #33.
+       * `getRemainingMatchdays` verrechnete sich aus demselben Grund und meldete fast die
+       * ganze Saison als offen.
+       */
+      matchdayResults: gameState.seasonState.matchdayResults ?? [],
       lineupDrafts: (gameState.seasonState.lineupDrafts ?? []).filter(
         (draft) => draft.matchdayId === activeMatchdayId,
       ),

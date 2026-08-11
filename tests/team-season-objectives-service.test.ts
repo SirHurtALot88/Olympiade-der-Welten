@@ -20,6 +20,7 @@ import {
   refreshTeamObjectiveState,
   resolveBoardDisposition,
 } from "@/lib/board/team-season-objectives-service";
+import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -1017,6 +1018,49 @@ describe("team season objectives service", () => {
 
     expect(top20Goal?.status).toBe("completed");
     expect(top20Goal?.currentValue).toContain("erfuellt");
+  });
+
+  it("counts every played matchday for the 3x-Top-20 goal, also on the compact browser payload", () => {
+    // Der Browser bekommt nicht den vollen Spielstand, sondern die Kurzfassung aus
+    // `compactFoundationInitialGameState`. Solange die dort `matchdayResults` auf den
+    // aktiven Spieltag beschnitt, kannte `getCurrentSeasonMatchdayResultIds` im Browser
+    // nur noch ein einziges Ergebnis — und `getPlayerPeakSummary` warf jede Leistung der
+    // uebrigen Spieltage weg. Am Live-Save gemessen: Server „4/3, bestes Rank #3"
+    // (erfuellt), Browser „0/3, bestes Rank #33". Die Karte log den Spieler um sein
+    // erreichtes Ziel. Der Test haelt beide Seiten aneinander, nicht nur eine Zahl.
+    const team = createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 100 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("M-M", { ambition: 9, boardConfidence: 6 })],
+      players: [createPlayer("m1")],
+      rosters: [createRoster("m1", { teamId: "M-M" })],
+    });
+    gameState.season.matchdayIds = ["md-1", "md-2", "md-3", "md-4", "md-5", "md-6", "md-7", "md-8"];
+    // Aktiv ist md-1 (siehe `matchdayState`) — md-2 und md-3 sind genau die Spieltage,
+    // die die Kurzfassung frueher wegschnitt. Am aktiven Spieltag steht bewusst ein
+    // Rang ausserhalb der Top 20, damit der Beschnitt sichtbar bei 0 landet.
+    gameState.seasonState.matchdayResults = [
+      createMatchdayResult("result-1", "md-1"),
+      createMatchdayResult("result-2", "md-2"),
+      createMatchdayResult("result-3", "md-3"),
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      createPlayerPerformance("perf-1", { matchdayResultId: "result-1", teamId: "M-M", playerId: "m1", rankInDiscipline: 25 }),
+      createPlayerPerformance("perf-2", { matchdayResultId: "result-2", teamId: "M-M", playerId: "m1", rankInDiscipline: 5 }),
+      createPlayerPerformance("perf-3", { matchdayResultId: "result-3", teamId: "M-M", playerId: "m1", rankInDiscipline: 7 }),
+    ];
+
+    const findeZiel = (state: GameState) =>
+      buildTeamObjectiveOverview(state).objectives.find(
+        (objective) => objective.teamId === "M-M" && objective.objectiveId === "player-top20-repeat",
+      );
+
+    const vollesZiel = findeZiel(gameState);
+    const kompaktesZiel = findeZiel(compactFoundationInitialGameState(gameState));
+
+    expect(vollesZiel?.currentValue).toBe("2/3, bestes Rank #5");
+    expect(kompaktesZiel?.currentValue).toBe(vollesZiel?.currentValue);
+    expect(kompaktesZiel?.status).toBe(vollesZiel?.status);
   });
 
   it("pushes AI buying urgency when a repeat Top-20 player goal is still open", () => {
