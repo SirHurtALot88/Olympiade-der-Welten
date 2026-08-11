@@ -26,14 +26,18 @@ import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-v
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
-import { shouldLoadSeasonArchiveForView } from "@/lib/foundation/tabs/use-season-archive-load";
+import {
+  shouldRequestSeasonArchiveLoad,
+  uebernimmGeladenesSaisonarchiv,
+} from "@/lib/foundation/tabs/use-season-archive-load";
+import { withCompactSeasonArchiveSentinel } from "@/lib/foundation/apply-compact-season-archive-sentinel";
+import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 import { makePlayer, makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
 
 const MARKUP = quelle("app/foundation/finances/FoundationFinancesNewLook.tsx");
 const CSS = quelle("app/globals.css");
-const SCOPE = quelle("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 
 function round1(value: number): number {
   return Number(value.toFixed(1));
@@ -364,10 +368,58 @@ describe("Kredit-Verpflichtungen: eine Zerlegung für Karte, Ausgabenzeile und G
 /* Saisonarchiv-Load + ehrliche Leerzustände (Markt-Audit F4)          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * DIESER BLOCK PRÜFTE BIS HIERHER NICHTS.
+ *
+ * Er hielt `shouldLoadSeasonArchiveForView("finances") === true` fest — eine Funktion, die in der
+ * Produktion NIEMAND aufrief — und daneben eine Quelltext-Regex auf die zweite, inline
+ * ausgeschriebene Liste im Shell-Router. Beide blieben grün, während der Effekt dahinter tot war:
+ * sein Gate stand auf `seasonSnapshots !== undefined`, und hinter dem Sentinel
+ * (`withCompactSeasonArchiveSentinel`) steht dort im Browser immer `[]`. Der Nachladepfad konnte
+ * also nie feuern, und selbst wenn — der Übernahme-Ausdruck `previous ?? geladen` hätte das
+ * Ergebnis wieder verworfen (`[]` ist nicht nullish).
+ *
+ * Jetzt wird die WIRKUNG geprüft: der echte Browser-Zustand entsteht über die echte Kompaktierung
+ * plus den echten Sentinel, und darauf laufen genau die beiden Funktionen, die der Effekt aufruft.
+ */
 describe("Saisonarchiv: Finanzen lädt es nach, und solange sagt die UI „lädt“, nicht „nicht archiviert“", () => {
-  it("die Finanzen-View ist im Archiv-Load-Gate (beide Listen)", () => {
-    expect(shouldLoadSeasonArchiveForView("finances")).toBe(true);
-    expect(SCOPE).toMatch(/shouldLoadSeasonArchive =[\s\S]{0,900}activeView === "finances"/);
+  const schnappschuss = (seasonId: string) =>
+    ({ snapshotId: `snap-${seasonId}`, seasonId, seasonName: seasonId, archivedAt: "", finalStandings: [] }) as never;
+
+  it("hinter dem Sentinel fordert die Finanzen-View das Archiv wirklich an", () => {
+    const voll = buildGameState({ seasonSnapshots: [schnappschuss("season-1")] });
+    const browser = withCompactSeasonArchiveSentinel(compactFoundationInitialGameState(voll));
+
+    // Der Zustand, in dem der Effekt tatsächlich läuft: NICHT `undefined`, sondern die leere Liste.
+    expect(browser.seasonState.seasonSnapshots).toEqual([]);
+    expect(browser.seasonState.seasonSnapshots !== undefined).toBe(true);
+
+    expect(
+      shouldRequestSeasonArchiveLoad({
+        activeView: "finances",
+        seasonSnapshots: browser.seasonState.seasonSnapshots,
+      }),
+    ).toBe(true);
+  });
+
+  it("nach dem einen Abruf wird nicht wieder geholt — auch nicht bei ehrlich null Saisons", () => {
+    expect(
+      shouldRequestSeasonArchiveLoad({
+        activeView: "finances",
+        seasonSnapshots: [],
+        seasonArchiveFetchCompleted: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("das nachgeladene Archiv landet auch hinter dem Sentinel im Zustand", () => {
+    const geladen = [schnappschuss("season-1")];
+    // Der Sentinel-Fall: das war der zweite tote `??`-Ausdruck.
+    expect(uebernimmGeladenesSaisonarchiv([], geladen)).toHaveLength(1);
+    expect(uebernimmGeladenesSaisonarchiv(undefined, geladen)).toHaveLength(1);
+    // Ein parallel eingetroffener, bereits gefüllter Stand wird nicht überschrieben.
+    const parallel = [schnappschuss("season-1"), schnappschuss("season-2")];
+    expect(uebernimmGeladenesSaisonarchiv(parallel, geladen)).toHaveLength(2);
   });
 
   it("archivePending unterscheidet „noch nicht geladen“ (undefined) von „geladen und leer“ ([])", () => {

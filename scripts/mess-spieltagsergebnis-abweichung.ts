@@ -1,14 +1,27 @@
 /* eslint-disable no-console */
 /**
- * Messung: Spieltags-Ergebnis (Rang vorher/nachher/Delta, Summe PP) auf dem VOLLEN Save
- * gegen den kompakten Browser-Payload.
+ * Messung: Spieltags-Ergebnis (Rang vorher/nachher/Delta, Summe der Saisonpunkte) auf dem
+ * VOLLEN Save gegen den kompakten Browser-Payload — und derselbe Durchgriff in die Inbox,
+ * die `rankDelta` als „+3 Plaetze" ausschreibt.
  *
- *   OLY_APP_SQLITE_PATH=/tmp/abbild.sqlite npx tsx <dieses Skript> [--save <id>] [--matchday <id>]
+ * Das ist das Werkzeug, mit dem der Befund zu `foundation-matchday-points-projection`
+ * entstanden ist: vor der Reparatur wichen 32 von 32 Zeilen ab, danach 0 von 32.
+ *
+ * Ein Abbild bekommt man ueber den Branch `live-save`:
+ *   git show origin/live-save:data/online-saves/hetzner-live.sqlite.gz > abbild.gz
+ *   gunzip -c abbild.gz > /tmp/abbild.sqlite
+ *
+ * Nutzung (bitte immer auf eine KOPIE zeigen lassen):
+ *   OLY_APP_SQLITE_PATH=/tmp/abbild.sqlite npx tsx scripts/mess-spieltagsergebnis-abweichung.ts \
+ *     [--save <saveId>] [--matchday <matchdayId>]
+ *
+ * `OLY_MESS_TEAM=<teamId>` schraenkt die Inbox-Zeilen auf ein Team ein.
  */
 import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+import { buildGameInboxItems } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -71,6 +84,18 @@ async function main() {
     );
   }
   console.log(`\nAbweichende Zeilen: ${abweichend} von ${a.teamRows.length}`);
+
+  // Durchgriff in die Inbox: der Spieltag-Recap formatiert `teamRow.rankDelta`.
+  const recapText = (zustand: typeof voll) =>
+    buildGameInboxItems({ gameState: zustand, saveId: save.saveId, hostMode: true })
+      .filter((item) => item.itemId.includes("matchday_recap"))
+      .filter((item) => (process.env.OLY_MESS_TEAM ? item.teamId === process.env.OLY_MESS_TEAM : true))
+      .slice(0, 3)
+      .map((item) => `${item.teamId}: ${item.description}`);
+  console.log("\nInbox voll   :");
+  for (const zeile of recapText(voll)) console.log(`  ${zeile}`);
+  console.log("Inbox kompakt:");
+  for (const zeile of recapText(kompakt)) console.log(`  ${zeile}`);
 }
 
 main().catch((error) => {

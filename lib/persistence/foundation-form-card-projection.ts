@@ -34,7 +34,79 @@ import {
 export type FoundationFormCardBonusProjection = {
   seasonId: string;
   byTeamId: Record<string, SeasonFormCardBonusEntry>;
+  /**
+   * DIE NOCH NICHT GESPIELTEN KARTEN DER SAISON, namentlich.
+   *
+   * GEMELDET (Chris, Inbox): eine Warnung „Negative Formkarten offen — am Saisonende drohen 18
+   * Strafpunkte" fuer Karten, die laengst gespielt sind. `buildFormCardSeasonUsageAudit` leitet
+   * „gespielt" aus den `lineupDrafts` ab, und die sind unten auf den aktiven Spieltag
+   * beschnitten (320 voll, 32 kompakt). Gemessen am Live-Save: voll 438 von 532 Karten gespielt
+   * und NULL offene negative, im Browser 25 gespielt und 262 offene negative (605 Strafpunkte,
+   * fuer S-C 8 Karten / 18 Punkte). Eine Warnung vor einer Strafe, die es nicht gibt.
+   *
+   * WARUM DIE OFFENEN UND NICHT DIE GESPIELTEN: es sind die wenigeren (94 gegen 438) — und vor
+   * allem koennen sie im Lauf der Sitzung nur WENIGER werden. Wer waehrend der Sitzung eine
+   * Karte legt, streicht sie aus dieser Liste; die Projektion vom Ladezeitpunkt kann dadurch nie
+   * zu wenig anzeigen. Andersherum (gespielte Karten mitschicken) waere die Liste vom Laden
+   * schon nach dem naechsten Kartenzug zu kurz.
+   *
+   * OHNE DIE NULLWERT-KARTEN (der leere Platz im Kartenpaar eines Spielers): sie sind nie
+   * spielbar und werden ueberall vorher weggefiltert. Sie mitzuschicken hat 242 statt 94
+   * Eintraege gekostet, 13,0 KB statt 5,1 KB — der Leser blendet sie spiegelbildlich aus.
+   */
+  unusedCardIds: string[];
 };
+
+/** Karten-Ids, die in den Aufstellungen dieser Saison in einem Modifier-Slot stecken. */
+function sammleGespielteKartenIds(gameState: Pick<GameState, "seasonState">, seasonId: string): Set<string> {
+  const gespielt = new Set<string>();
+  for (const draft of gameState.seasonState.lineupDrafts ?? []) {
+    if (draft.seasonId !== seasonId) {
+      continue;
+    }
+    const modifiers = draft.modifiers;
+    for (const cardId of [
+      modifiers?.d1?.primaryFormCardId,
+      modifiers?.d1?.secondaryFormCardId,
+      modifiers?.d2?.primaryFormCardId,
+      modifiers?.d2?.secondaryFormCardId,
+    ]) {
+      if (cardId) {
+        gespielt.add(cardId);
+      }
+    }
+  }
+  return gespielt;
+}
+
+/**
+ * Die in dieser Saison gespielten Karten-Ids einer bereits geladenen Ansicht.
+ *
+ * VORRANG PER MENGENVEREINIGUNG, NICHT PER `??`. Auf dem Server gibt es keine Projektion und es
+ * bleibt bei den Aufstellungen; im Browser sind die Aufstellungen beschnitten, dafuer sagt die
+ * Projektion, welche Karten am Ladezeitpunkt noch offen waren. Beide Seiten koennen nur
+ * ZUSAETZLICHE gespielte Karten kennen, nie weniger — also ist die Vereinigung die richtige
+ * Antwort und `??` (oder ein Entweder-Oder) waere zu grob: wer waehrend der Sitzung eine Karte
+ * legt, wuerde sonst bis zum naechsten Laden als „offen" gefuehrt.
+ */
+export function leseGespielteFormkartenIds(gameState: GameState, seasonId: string): Set<string> {
+  const gespielt = sammleGespielteKartenIds(gameState, seasonId);
+
+  const projektion = gameState.seasonState.foundationFormCardBonus;
+  if (!projektion || projektion.seasonId !== seasonId || !Array.isArray(projektion.unusedCardIds)) {
+    return gespielt;
+  }
+
+  const offenLautProjektion = new Set(projektion.unusedCardIds);
+  for (const card of gameState.seasonState.formCards ?? []) {
+    // Nullwert-Karten stehen absichtlich nicht in der Projektion (s. o.) — sie hier als
+    // „gespielt" zu fuehren waere still falsch, auch wenn heute jeder Leser sie wegfiltert.
+    if (card.seasonId === seasonId && card.cardValue !== 0 && !offenLautProjektion.has(card.id)) {
+      gespielt.add(card.id);
+    }
+  }
+  return gespielt;
+}
 
 export function projiziereFormkartenBilanz(gameState: GameState): FoundationFormCardBonusProjection | undefined {
   try {
@@ -43,7 +115,11 @@ export function projiziereFormkartenBilanz(gameState: GameState): FoundationForm
     if (bilanz.size === 0) {
       return undefined;
     }
-    return { seasonId, byTeamId: Object.fromEntries(bilanz) };
+    const gespielt = sammleGespielteKartenIds(gameState, seasonId);
+    const unusedCardIds = (gameState.seasonState.formCards ?? [])
+      .filter((card) => card.seasonId === seasonId && card.cardValue !== 0 && !gespielt.has(card.id))
+      .map((card) => card.id);
+    return { seasonId, byTeamId: Object.fromEntries(bilanz), unusedCardIds };
   } catch {
     // Defensiv wie die Geschwister-Projektionen: eine kaputte Projektion darf die
     // Compact-Auslieferung nie zu Fall bringen — dann eben clientseitiger Fallback.

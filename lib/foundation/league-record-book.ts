@@ -15,6 +15,17 @@
  * ÜBERGANG INS ARCHIV: `season-snapshot-service` archiviert genau diese beiden Listen 1:1. Jeder
  * Rekord hier ist später aus denselben Feldern im Snapshot reproduzierbar — ein Resolver, zwei
  * Datenlagen, kein Persistenz-Umbau. Deshalb wird hier auch nichts gespeichert.
+ *
+ * NICHT DIREKT AUS EINER ANSICHT AUFRUFEN — `leseRekordbuch` nehmen.
+ * Hier stand einmal, `disciplineResults` blieben „die ganze Saison im State". Auf dem Server
+ * stimmt das, im Browser seit dem kompakten Payload nicht mehr: er beschneidet sie auf den
+ * aktiven Spieltag, und darüber fällt auch der Punkte-Ledger auf einen Spieltag zurück (er bucht
+ * bewusst keinen Spieltag ohne Disziplin-Ergebnisse). Am Live-Save gemessen war damit JEDER der
+ * sieben Einträge falsch — 164,6 Sir Quacksalot wurde zu 112,7 Lyraeth Vael —, während die
+ * Kartenüberschrift „aus 10 gespielten Spieltagen" ihn beglaubigte, weil `matchdayResults`
+ * vollständig mitfahren. Die Ansichten lesen deshalb über
+ * `lib/persistence/foundation-record-book-projection.ts`: dieselbe Rechnung, aber serverseitig
+ * auf dem vollen Save, wenn der vorliegende Stand die Spieltage nicht trägt.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";

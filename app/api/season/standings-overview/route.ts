@@ -314,24 +314,45 @@ export async function GET(request: Request) {
     // dieselbe Quelle, aus der auch gebucht wird.
     const localSponsorIncome =
       source === "sqlite" ? getLeagueSponsorIncome(localSave!.gameState, localSave!.saveId) : null;
-    const localSalaryTotalByTeamId =
+    /**
+     * KADERZAHLEN JE TEAM — Kadergroesse, Gehaltssumme und Marktwertsumme in EINEM Durchlauf.
+     *
+     * Vorher rechnete diese Stelle nur die Gehaltssumme (fuer den GuV-Resolver unten), waehrend
+     * `rosterCount`/`salaryTotal`/`marketValueTotal` in der Antwort hart auf `null` standen — die
+     * Zahlen lagen also im selben Scope und wurden trotzdem nicht ausgeliefert. Am Saisonstand fiel
+     * das nicht auf, weil `SeasonStandingsNewLook` seine Zeilen aus `seasonStandRows` bezieht; jeder
+     * andere Konsument der Route bekam einen Strich. Am Live-Abbild gemessen (Save
+     * `new-game-1785823388048-1hf25q`): 0 von 32 Teams mit einem dieser drei Werte, herleitbar sind
+     * 32 von 32 (A-A: 12 Spieler, 57,55 Gehalt, 219,57 Marktwert).
+     *
+     * Dieselbe Definition wie im Team-Management (`getRosterDisplaySalary` bzw. der Marktwert aus
+     * `resolvePlayerEconomyContract`) — keine zweite Herleitung.
+     */
+    const localRosterTotalsByTeamId =
       source === "sqlite"
         ? (() => {
             const playerById = new Map(localSave!.gameState.players.map((player) => [player.id, player] as const));
             return new Map(
-              localSave!.gameState.teams.map((team) => [
-                team.teamId,
-                localSave!.gameState.rosters
-                  .filter((entry) => entry.teamId === team.teamId)
-                  .reduce(
-                    (sum, entry) =>
-                      sum + (resolvePlayerEconomyContract({ player: playerById.get(entry.playerId), rosterEntry: entry }).salary ?? 0),
-                    0,
-                  ),
-              ] as const),
+              localSave!.gameState.teams.map((team) => {
+                const roster = localSave!.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+                let salaryTotal = 0;
+                let marketValueTotal = 0;
+                for (const entry of roster) {
+                  const contract = resolvePlayerEconomyContract({
+                    player: playerById.get(entry.playerId),
+                    rosterEntry: entry,
+                  });
+                  salaryTotal += contract.salary ?? 0;
+                  marketValueTotal += contract.marketValue ?? 0;
+                }
+                return [team.teamId, { rosterCount: roster.length, salaryTotal, marketValueTotal }] as const;
+              }),
             );
           })()
         : null;
+    const localSalaryTotalByTeamId = localRosterTotalsByTeamId
+      ? new Map([...localRosterTotalsByTeamId].map(([teamId, totals]) => [teamId, totals.salaryTotal] as const))
+      : null;
 
     /**
      * DIE EINE GuV je Team (`lib/finance/season-end-guv.ts`) — einmal fuer die Liga gerechnet.
@@ -419,6 +440,7 @@ export async function GET(request: Request) {
               const prizeSummary = localPrizeSummaryByTeamId?.get(team.teamId) ?? null;
               const liveSponsorCash = localSponsorIncome?.sponsorCashByTeamId.get(team.teamId) ?? null;
               const liveGuv = localSeasonGuvByTeamId?.get(team.teamId) ?? null;
+              const rosterTotals = localRosterTotalsByTeamId?.get(team.teamId) ?? null;
               return {
                 teamId: team.teamId,
                 teamName: team.name,
@@ -462,11 +484,27 @@ export async function GET(request: Request) {
                 guv: liveGuv?.guv ?? standing?.guv ?? null,
                 guvPosten: liveGuv?.posten ?? null,
                 cashTotal: standing?.cashTotal ?? prizeSummary?.cashTotal ?? null,
+                /**
+                 * `form` BLEIBT BEWUSST NULL, und zwar in beiden Zweigen und auch im
+                 * Archiv-Zweig (`buildArchivedSeasonStandingsOverviewItems`).
+                 *
+                 * Es gibt im ganzen Spielstand keinen Schreiber dafuer: `StandingRecord`
+                 * (`lib/data/olyDataTypes.ts`) kennt das Feld gar nicht, am Live-Abbild
+                 * gemessen sind es 0 von 32 Teams. Der einzige verwandte Wert im Spiel ist
+                 * der Formkarten-Bonus (`buildPpAreaFormBonusByTeamId`) — das sind
+                 * PPS-Punkte aus Modifier-Slots, eine andere Groesse als eine
+                 * Form-Kennzahl. Sie hier einzusetzen waere eine erfundene Zahl, und ein
+                 * Strich ist ehrlicher (Hausregel, `lib/foundation/season-points-ledger.ts`).
+                 *
+                 * Wer `financeForm` (`lib/foundation/team-management-overview.ts`) gefuellt
+                 * sehen will, braucht zuerst eine definierte Form-Kennzahl samt Schreiber —
+                 * nicht einen Leser mehr.
+                 */
                 form: null,
                 transfers: prizeSummary?.transfers ?? null,
-                rosterCount: null,
-                salaryTotal: null,
-                marketValueTotal: null,
+                rosterCount: rosterTotals?.rosterCount ?? null,
+                salaryTotal: rosterTotals ? roundValue(rosterTotals.salaryTotal, 2) : null,
+                marketValueTotal: rosterTotals ? roundValue(rosterTotals.marketValueTotal, 2) : null,
                 disciplineValues: localDiscipline?.disciplineValues ?? (row ? extractSeasonStandingsDisciplineValues(row) : {}),
                 warnings: Array.from(new Set([...(row?.warnings ?? []), ...(localDiscipline?.warnings ?? [])])),
               };
@@ -490,6 +528,15 @@ export async function GET(request: Request) {
                 cashTotal: row.cashTotal,
                 form: row.form,
                 transfers: row.transfers,
+                /**
+                 * BLEIBEN IM TABELLEN-ZWEIG NULL, weil es hier keinen Kader gibt. Diese Zweig
+                 * liest die Saisonstand-Tabelle (`inspectSeasonStandingsSheet`) und dazu aus der
+                 * DB nur `teamSeasonState` mit `cash` — Rosters und Spieler werden gar nicht
+                 * geladen. Kadergroesse, Gehalts- und Marktwertsumme sind daraus nicht
+                 * herleitbar; sie aus dem lokalen Spielstand zu ziehen waere eine andere Saison
+                 * und damit eine erfundene Zahl (Hausregel, `lib/foundation/season-points-ledger.ts`).
+                 * Der `sqlite`-Zweig oben fuellt sie.
+                 */
                 rosterCount: null,
                 salaryTotal: null,
                 marketValueTotal: null,

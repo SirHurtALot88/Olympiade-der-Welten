@@ -230,11 +230,16 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
 import type {
+  SeasonSnapshotRecord,
   SponsorNegotiationProfile,
   SponsorLeihgabeRecord,
   TeamFacilityRecord,
   TeamSponsorContract,
 } from "@/lib/data/olyDataTypes";
+import {
+  shouldRequestSeasonArchiveLoad,
+  uebernimmGeladenesSaisonarchiv,
+} from "@/lib/foundation/tabs/use-season-archive-load";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddPlayerToTransferWishlist,
@@ -1175,21 +1180,6 @@ export function useFoundationShellRouterBodyScope({
     activeView === "allTimeTable";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
-  const shouldLoadSeasonArchive =
-    activeView === "season" ||
-    activeView === "seasonV2" ||
-    activeView === "prize" ||
-    activeView === "ranks" ||
-    activeView === "leagueLeaders" ||
-    activeView === "allTimeTable" ||
-    activeView === "teams" ||
-    activeView === "teamProfile" ||
-    activeView === "players" ||
-    activeView === "playerProfile" ||
-    // Finanzen: Cash-Abgleich und Saison-Verlauf lesen `seasonSnapshots` (Saisonstart-Cash der
-    // Vorsaison). Ohne diesen Load blieben beide Sektionen fälschlich auf „nicht archiviert",
-    // obwohl das Archiv existiert — nur der kompakte Initial-Payload hatte es gestrippt (M3-Befund F4).
-    activeView === "finances";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const shouldBuildSeasonStandRowsGate = shouldBuildSeasonStandRows({
     activeView: activeView as FoundationViewId,
@@ -5231,57 +5221,90 @@ export function useFoundationShellRouterBodyScope({
     );
   }, [tableColumnPreferences]);
 
+  /**
+   * SAISONARCHIV NACHLADEN — der Effekt, der nie feuern konnte.
+   *
+   * Das Gate stand auf `gameState.seasonState.seasonSnapshots !== undefined`. Hinter dem Sentinel
+   * (`withCompactSeasonArchiveSentinel`) steht dort im Browser aber IMMER `[]`, also war die
+   * Bedingung immer wahr und der Effekt kehrte jedes Mal an dieser Stelle um. Der Kommentar unter
+   * dem Ladepfad („eternal skeleton", „degrade to their honest empty-state") beschrieb einen
+   * Zustand, den es nie gab. Am Live-Abbild gemessen (Save `new-game-1785823388048-1hf25q`):
+   * volle 1 archivierte Saison, im Browser `seasonSnapshots === []` und Gate → Abbruch.
+   *
+   * Entschieden wird jetzt ueber `shouldRequestSeasonArchiveLoad`. Die Ansichtsliste stand hier
+   * ausserdem ein zweites Mal woertlich ausgeschrieben (`const shouldLoadSeasonArchive = …`) und
+   * wich vom Helfer ab — kein `diszis`, dafuer `teams` bedingungslos und `players`. Sie ist
+   * ersatzlos weg, es gibt nur noch die eine Rechenstelle im Helfer; die Aufloesung der Abweichung
+   * ist dort begruendet. Der Helfer behandelt `[]` ausdruecklich als „noch nicht geholt"; gegen
+   * Dauerfeuer schuetzt `seasonArchiveFetchCompleted`, hier der bereits vorhandene
+   * `fullSeasonArchiveLoadKeyRef`.
+   *
+   * GEHOLT WIRD DER SCHNITT, NICHT DER GANZE SPIELSTAND. Vorher stand hier
+   * `loadSave(…, { compactInitial: false })` — und das ist genau der Vorgang, den `e37f3513` als
+   * Ursache stillen Datenverlusts benennt: `loadSave` ersetzt ueber `commitFreshlyLoadedGameState`
+   * den GESAMTEN React-State und setzt die Autosave-Inhaltssignatur auf den geladenen Stand; eine
+   * noch nicht geschriebene Aenderung gilt danach als gespeichert und ist weg. Das Gate zu
+   * reparieren und den vollen Load stehen zu lassen haette diesen Vorgang erst scharf gemacht.
+   *
+   * `/api/season/snapshots` liefert genau die Schnappschuesse dieses Saves und nichts sonst. Die
+   * Route war fertig und lebendig, nur rief sie niemand: `FOUNDATION_SEASON_SNAPSHOTS_ENDPOINT`
+   * stand unbenutzt in dieser Datei. Uebernommen wird ausschliesslich `seasonSnapshots`, alles
+   * andere im Zustand bleibt unangetastet.
+   */
   useEffect(() => {
-    if (!shouldLoadSeasonArchive || isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
-      return;
-    }
-
-    if (gameState.seasonState.seasonSnapshots !== undefined) {
-      fullSeasonArchiveLoadKeyRef.current = null;
+    if (isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
       return;
     }
 
     const archiveLoadKey = `${activeSaveId}:${gameState.season.id}:season-archive-full`;
-    if (fullSeasonArchiveLoadKeyRef.current === archiveLoadKey) {
+    if (
+      !shouldRequestSeasonArchiveLoad({
+        activeView: activeView as FoundationViewId,
+        seasonSnapshots: gameState.seasonState.seasonSnapshots,
+        showExtendedTeamPanels,
+        seasonArchiveFetchCompleted: fullSeasonArchiveLoadKeyRef.current === archiveLoadKey,
+      })
+    ) {
       return;
     }
 
     fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
-    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false })
-      .then((nextGameState) => {
-        if (!nextGameState) {
-          // Full-save load returned nothing — clear the key so a later render
-          // can retry instead of leaving archive-gated views (Ewige Tabelle)
-          // on a loading skeleton that never resolves.
+    void fetch(`${FOUNDATION_SEASON_SNAPSHOTS_ENDPOINT}?saveId=${encodeURIComponent(activeSaveId)}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          // Fehlgeschlagen: Schluessel raeumen, damit ein spaeterer Render es erneut versuchen kann,
+          // statt archiv-gebundene Ansichten (Ewige Tabelle) auf einem Skelett stehen zu lassen.
           fullSeasonArchiveLoadKeyRef.current = null;
           return;
         }
-        // Materialize an archive even when the save carries none: `?? []` flips
-        // `hasArchive` true so archive-gated views degrade to their honest
-        // empty-state ("keine archivierten Saisons") instead of an eternal
-        // skeleton. A real archive is used verbatim; a concurrently-loaded one
-        // is never clobbered.
-        const loadedSnapshots = nextGameState.seasonState.seasonSnapshots ?? [];
+        const payload = (await response.json()) as { ok?: boolean; seasonSnapshots?: SeasonSnapshotRecord[] };
+        if (!payload?.ok || !Array.isArray(payload.seasonSnapshots)) {
+          fullSeasonArchiveLoadKeyRef.current = null;
+          return;
+        }
+        const loadedSnapshots = payload.seasonSnapshots;
         setGameState((previous) => ({
           ...previous,
           seasonState: {
             ...previous.seasonState,
-            seasonSnapshots: previous.seasonState.seasonSnapshots ?? loadedSnapshots,
+            seasonSnapshots: uebernimmGeladenesSaisonarchiv(previous.seasonState.seasonSnapshots, loadedSnapshots),
           },
         }));
-        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || gameState.season.id);
       })
       .catch(() => {
         fullSeasonArchiveLoadKeyRef.current = null;
       });
   }, [
     activeSaveId,
-    foundationSaveMode,
+    activeView,
     gameState.season.id,
     gameState.seasonState.seasonSnapshots,
     isFoundationBootstrapState,
     seasonOverviewSeasonId,
-    shouldLoadSeasonArchive,
+    showExtendedTeamPanels,
   ]);
 
   useEffect(() => {

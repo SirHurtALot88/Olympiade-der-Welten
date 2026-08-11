@@ -8,6 +8,7 @@ import type {
   LegacyDisciplineScoreRef,
   LegacyRosterPlayerRef,
 } from "@/lib/lineups/legacy-lineup-types";
+import { leseGespielteFormkartenIds } from "@/lib/persistence/foundation-form-card-projection";
 
 const FORM_CARD_VALUES = [0, 2, 4, 8] as const;
 
@@ -615,8 +616,23 @@ export type FormCardSeasonUsageAuditTeam = {
   negativePenaltyPoints: number;
 };
 
+/**
+ * Saisonweite Karten-Bilanz je Team — wie viel ist gespielt, wie viel liegt noch offen, und was
+ * kostet das am Saisonende.
+ *
+ * LIEST DIE GESPIELTEN KARTEN NICHT DIREKT AUS DEN AUFSTELLUNGEN, sondern ueber
+ * `leseGespielteFormkartenIds`. Grund: im Browser sind die `lineupDrafts` auf den aktiven
+ * Spieltag beschnitten (320 voll, 32 kompakt), und diese Funktion zaehlte dort 262 „offene"
+ * negative Karten statt null — die Inbox warnte vor 605 Strafpunkten, die es nicht gab. Auf dem
+ * Server (kein kompakter Payload, keine Projektion) ist die Menge Zeichen fuer Zeichen dieselbe
+ * wie vorher; die Strafabrechnung am Saisonende rechnet also unveraendert auf den Aufstellungen.
+ *
+ * Bewusst NICHT umgestellt ist `buildFormCardUsageMap` selbst: die Kartenauswahl braucht dort
+ * `excludeLineupId` (die gerade bearbeitete Aufstellung gibt ihre Karten wieder frei), und die
+ * Projektion kennt keine Aufstellungs-Ids.
+ */
 export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: string) {
-  const usage = buildFormCardUsageMap(gameState, seasonId);
+  const usage = leseGespielteFormkartenIds(gameState, seasonId);
   const rows = [...gameState.teams]
     .sort((left, right) => left.teamId.localeCompare(right.teamId))
     .map((team): FormCardSeasonUsageAuditTeam => {

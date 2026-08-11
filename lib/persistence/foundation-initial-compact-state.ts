@@ -3,6 +3,10 @@ import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-a
 import { projiziereSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { projiziereFieldRace } from "@/lib/persistence/foundation-field-race-projection";
 import { projiziereFormkartenBilanz } from "@/lib/persistence/foundation-form-card-projection";
+import { projiziereRekordbuch } from "@/lib/persistence/foundation-record-book-projection";
+import { projiziereDisziplinBilanz } from "@/lib/persistence/foundation-discipline-tally-projection";
+import { projiziereSpieltagsPunkte } from "@/lib/persistence/foundation-matchday-points-projection";
+import { projizierePpAreaFormBonus } from "@/lib/persistence/foundation-pp-area-form-bonus-projection";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -154,6 +158,42 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * Die Beschneidung bleibt (659 KB gegen 70 KB), die fertige Bilanz faehrt mit (1,9 KB).
        */
       foundationFormCardBonus: projiziereFormkartenBilanz(gameState),
+      /**
+       * Vierte Schwester, gleiche Bauart: das Spieltags-Ergebnis bildet „Rang vorher/nachher"
+       * und die Summe der Saisonpunkte, indem es die Punkt-Eintraege ueber alle bisherigen
+       * Spieltage summiert. Unten fallen dafuer die `disciplineResults` weg (gemessen 640
+       * Zeilen voll gegen 64 kompakt), und ohne sie bucht der Ledger einen Spieltag bewusst
+       * gar nicht erst — die Summe VOR dem Spieltag war damit fuer jedes Team 0 und alle 32
+       * Zeilen zeigten erfundene Raenge (Z-H „Rang vorher 32" statt 1). Die fertigen
+       * Tagespunkte je Spieltag fahren mit, 32 Zahlen pro Spieltag.
+       */
+      foundationMatchdayPoints: projiziereSpieltagsPunkte(gameState),
+      /**
+       * Geschwister derselben Bauart: das fertige Rekordbuch. Gemessen am Live-Save zeigte der
+       * Browser in ALLEN sieben Eintraegen Halter und Wert eines EINZIGEN Spieltags (164,6 Sir
+       * Quacksalot wurde zu 112,7 Lyraeth Vael usw.), waehrend die Ueberschrift „aus 10
+       * gespielten Spieltagen" sie beglaubigte. Ursache sind wieder die beschnittenen
+       * `disciplineResults` unten — ueber sie faellt auch der Punkte-Ledger auf einen Spieltag
+       * zurueck.
+       */
+      foundationRecordBook: projiziereRekordbuch(gameState),
+      /**
+       * Und dieselbe Ursache ein Stockwerk weiter: die erweiterten Meilensteine messen ueber
+       * mehrere Spieltage („Top 5 in allen vier Bereichen", „drei Spieltage in Folge Top 3")
+       * und sahen im Browser nur einen — gemessen „0 von 4 Bereichen" statt 2 und „0 von 3"
+       * statt 2. Die Bilanz faehrt fuer ALLE Teams mit, weil der Reiter gegen das jeweils
+       * aktive Managerteam misst und das ohne neue Auslieferung wechseln kann.
+       */
+      foundationDisciplineTally: projiziereDisziplinBilanz(gameState),
+      /**
+       * Zwillingsschwester von `foundationFormCardBonus`: die trug den NENNWERT der Formkarten,
+       * diese die WIRKUNG (`formModifier`) — die `(+x)` hinter jedem PP-Bereichswert im
+       * Saisonstand, an der auch die Sortierung der Spalte „Form" haengt. Sie stand am selben
+       * beschnittenen Payload, war aber nie mitrepariert worden. Gemessen: voll 32 von 32 Teams
+       * mit Bilanz, kompakt 14 — Wicked Wizards 181,8 -> 69,6, Nunchuck Ninjas sogar 133,6 ->
+       * 184,3. Siehe `foundation-pp-area-form-bonus-projection`.
+       */
+      foundationPpAreaFormBonus: projizierePpAreaFormBonus(gameState),
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
         activeMatchdayResultIds.has(result.matchdayResultId),
@@ -274,6 +314,10 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
       foundationFieldRace: undefined,
       foundationFormCardBonus: undefined,
+      foundationMatchdayPoints: undefined,
+      foundationRecordBook: undefined,
+      foundationDisciplineTally: undefined,
+      foundationPpAreaFormBonus: undefined,
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,
