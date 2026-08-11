@@ -62,11 +62,15 @@ describe("Die KI wiegt Gebäude gegen Cash ab", () => {
     expect(Math.max(klamm.klein, klamm.mittel, klamm.gross)).toBeLessThan(base.teams.length * 0.75);
   });
 
-  it("waehlt bei voller Kasse fast immer ein Gebäude", () => {
+  it("waehlt bei voller Kasse ueberwiegend ein Gebäude, ohne die Cash-Karte totzulegen", () => {
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const reich = waehle(base, 100);
     // Wer Spielraum hat, soll ihn benutzen — sonst waere die ganze Gebäude-Seite tot.
-    expect(reich.reineCash).toBeLessThan(base.teams.length / 4);
+    expect(reich.gross + reich.mittel + reich.klein).toBeGreaterThan(base.teams.length / 2);
+    // Aber die reine Cash-Karte bleibt eine lebende Option. Gemessen 8 von 32; sie war
+    // zwischenzeitlich bei 0, weil eine gewoehnliche Gebäude-Karte ladderseitig BESSER war als eine
+    // gewoehnliche Cash-Karte — genau die Verzerrung, die der Grundfaktor jetzt verhindert.
+    expect(reich.reineCash).toBeGreaterThan(0);
   });
 
   it("bewertet ein Gebäude nicht, das das Team selbst schon hoeher hat", () => {

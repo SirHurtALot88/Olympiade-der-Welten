@@ -1,4 +1,5 @@
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
+import { istLeihZiel, werteLeihZiel } from "@/lib/sponsor/sponsor-leih-ziele";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
@@ -690,6 +691,18 @@ export function evaluateSpecialComponentStage(
   component: SponsorOfferComponent,
 ): SponsorObjectiveStageResult {
   const key = component.specialKey ?? "";
+
+  // DIE ZWEI LEIH-ZIELE (Frische, Achsen-Rang) — binaer und ohne Sockelabzug. Sie stehen VOR der
+  // Achse, weil sie sie ersetzen; ein Neuvertrag traegt nie beides.
+  if (istLeihZiel(key)) {
+    const stand = werteLeihZiel(gameState, teamId, component);
+    return {
+      fraction: stand.fraction,
+      stageIndex: stand.fraction > 0 ? 0 : -1,
+      metric: stand.metric,
+      reachedLabel: stand.reachedLabel,
+    };
+  }
 
   // V4-ACHSE: gemessen gegen die im Vertrag eingefrorene EIGENE Ausgangslage, nie gegen die Liga.
   // Die Konditionen stehen im targetValue, damit Anzeige und Settlement dieselbe Zahl lesen und ein

@@ -38,6 +38,7 @@ import {
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { berechneKatalogkosten } from "@/lib/sponsor/sponsor-leihe";
 import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -48,6 +49,7 @@ import {
 } from "@/lib/facilities/analytics-live-progress";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import {
   SPONSOR_CURVE_FAMILIES,
   SPONSOR_CURVE_SHAPES,
@@ -174,6 +176,115 @@ function SponsorBoardTargetsPanel({ gameState, teamId }: { gameState: GameState;
               <span className="nl-sponsor-boardtarget-status" style={{ flex: "0 0 auto", color: NL_TONE_VAR[meta.tone], fontWeight: 600 }}>
                 {meta.label}
               </span>
+            </li>
+          );
+        })}
+      </ul>
+    </NlCard>
+  );
+}
+
+/**
+ * GEBÄUDE-ÜBERNAHME AM VERTRAGSENDE — die offenen Angebote aus `sponsorUebernahmeAngeboteByTeamId`
+ * (siehe `lib/sponsor/sponsor-leih-lifecycle.ts`). Eine ausgelaufene Leihe verschwindet aus dem
+ * Bestand und wird durch genau so ein Angebot ersetzt: annehmen übernimmt das Gebäude im
+ * aktuellen (abgenutzten) Zustand und bucht den Preis ab, ablehnen lässt es fallen — beides endgültig.
+ *
+ * KEIN KASSEN-GUARD (E5, docs/SPONSOREN_BAUVORLAGE.md): das Team darf beim Übernehmen ins Minus
+ * gehen, absichtlich ohne Sperre oder bevormundende Warnung — dieselbe Regel wie in
+ * `nimmUebernahmeAn` selbst, hier nur nicht noch einmal auf der Anzeigeseite nachgebaut.
+ *
+ * Der Katalogkosten-Vergleich (Selbstbau derselben Stufe) ist derselbe Aufruf, den auch die
+ * laufende Karte für `katalogkostenEndstufe` nutzt (`sponsor-leih-presenter.ts`) — hier direkt aus
+ * `sponsor-leihe.ts`, weil es kein `SponsorOfferLeihe`-Objekt mehr gibt, sobald die Leihe zum
+ * Übernahmeangebot geworden ist (der Vertrag ist zu diesem Zeitpunkt schon weg).
+ */
+function SponsorUebernahmePanel({
+  gameState,
+  teamId,
+  formatCash,
+  busyFacilityId,
+  canManage,
+  onDecide,
+}: {
+  gameState: GameState;
+  teamId: string | null;
+  formatCash: (value: number) => string;
+  busyFacilityId: string | null;
+  canManage: boolean;
+  onDecide: (facilityId: string, action: "annehmen" | "ablehnen") => void | Promise<void>;
+}) {
+  const angebote = teamId ? (gameState.seasonState.sponsorUebernahmeAngeboteByTeamId?.[teamId] ?? []) : [];
+  if (angebote.length === 0) {
+    return null;
+  }
+  return (
+    <NlCard
+      className="nl-sponsor-uebernahme-card"
+      eyebrow="Leihvertrag ausgelaufen"
+      title="Gebäude-Übernahme"
+      data-testid="nl-sponsor-uebernahme-card"
+    >
+      <p className="nl-sponsor-uebernahme-hint">
+        Diese Gebäude waren geliehen — der Sponsorvertrag ist ausgelaufen. Übernimm sie zum Preis unten (im
+        aktuellen, abgenutzten Zustand) oder lass sie fallen. Beides ist endgültig.
+      </p>
+      <ul
+        className="nl-sponsor-uebernahme-list"
+        style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.6rem" }}
+      >
+        {angebote.map((angebot) => {
+          const facilityLabel = FACILITY_CATALOG_BY_ID[angebot.facilityId as FacilityId]?.label ?? angebot.facilityId;
+          const katalogkosten = berechneKatalogkosten(angebot.facilityId as FacilityId, angebot.stufe);
+          const busy = busyFacilityId === angebot.facilityId;
+          return (
+            <li
+              key={angebot.facilityId}
+              className="nl-sponsor-uebernahme-row"
+              data-testid="nl-sponsor-uebernahme-row"
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.6rem 0.8rem",
+                borderRadius: "var(--nl-r-md)",
+                border: "1px solid var(--nl-line)",
+                background: "var(--nl-panel-2)",
+              }}
+            >
+              <div className="nl-sponsor-uebernahme-copy" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <strong>{facilityLabel}</strong>
+                <div className="nl-sponsor-uebernahme-meta" style={{ opacity: 0.75, fontSize: 12 }}>
+                  Stufe {angebot.stufe} · Zustand {Math.round(angebot.zustandPct)} %
+                </div>
+              </div>
+              <div className="nl-sponsor-uebernahme-price nl-tnum" style={{ flex: "0 0 auto", textAlign: "right" }}>
+                <div style={{ fontWeight: 700 }}>{formatCash(angebot.preis)}</div>
+                <div style={{ opacity: 0.65, fontSize: 12 }} title="Was der Selbstbau derselben Stufe kosten würde">
+                  Selbstbau {formatCash(katalogkosten)}
+                </div>
+              </div>
+              <div className="nl-sponsor-uebernahme-actions" style={{ flex: "0 0 auto", display: "flex", gap: "0.4rem" }}>
+                <button
+                  type="button"
+                  className="primary-button inline-button nl-sponsor-uebernahme-accept"
+                  data-testid="sponsor-uebernahme-accept"
+                  disabled={busy || !canManage}
+                  onClick={() => void onDecide(angebot.facilityId, "annehmen")}
+                >
+                  {busy ? "Speichert…" : "Übernehmen"}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button inline-button nl-sponsor-uebernahme-decline"
+                  data-testid="sponsor-uebernahme-decline"
+                  disabled={busy || !canManage}
+                  onClick={() => void onDecide(angebot.facilityId, "ablehnen")}
+                >
+                  Ablehnen
+                </button>
+              </div>
             </li>
           );
         })}
@@ -422,6 +533,7 @@ function ActiveContractHero({
 
 export default function FoundationSponsorsNewLook({
   gameState,
+  selectedTeamId,
   selectedTeamName,
   selectedTeamCommercialRating,
   selectedTeamSponsorContract,
@@ -431,6 +543,9 @@ export default function FoundationSponsorsNewLook({
   selectedTeamCanManage,
   formatMoney: formatMoneyProp,
   chooseTeamSponsor,
+  sponsorUebernahmeMessage,
+  sponsorUebernahmeBusy,
+  handleSponsorUebernahme,
 }: FoundationSponsorsPanelProps) {
   // "Neuer Look" Hooks laufen unconditionally vor jedem Return (dieser
   // Component hat kein weiteres Flag-Gate mehr — er wird nur gerendert,
@@ -1032,6 +1147,24 @@ export default function FoundationSponsorsNewLook({
             {formatSponsorChoiceMessage(sponsorChoiceMessage)}
           </div>
         ) : null}
+
+        {sponsorUebernahmeMessage ? (
+          <div className="nl-sponsor-banner" role="status" data-testid="nl-sponsor-uebernahme-banner">
+            {formatSponsorChoiceMessage(sponsorUebernahmeMessage)}
+          </div>
+        ) : null}
+
+        {/* Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags — unabhängig vom aktuellen
+            Vertrags-/Angebotsstand sichtbar, denn das Angebot lebt in einem eigenen Feld
+            (`sponsorUebernahmeAngeboteByTeamId`) und nicht in Kontrakt oder Angebotsliste. */}
+        <SponsorUebernahmePanel
+          gameState={gameState}
+          teamId={selectedTeamId}
+          formatCash={formatSponsorMoney}
+          busyFacilityId={sponsorUebernahmeBusy}
+          canManage={selectedTeamCanManage}
+          onDecide={handleSponsorUebernahme}
+        />
 
         {selectedTeamSponsorContract ? (
           <>

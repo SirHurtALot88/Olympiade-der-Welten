@@ -14,8 +14,9 @@
  *   5. Die Uptime der Rangmarken — wie viele Teams ihre Marke am Ende halten.
  *
  * NICHT GEMESSEN, und das ist kein Versehen:
- *   - Die Bonus-Quoten je Zieltyp. Die zwei Ziele (Frische, Achsen-Rang) sind noch nicht gebaut;
- *     sie ersetzen das V4-Achsensystem und gehoeren in denselben Schritt wie dessen Abriss.
+ *   - Wie oft die zwei Ziele ueberhaupt erfuellbar aussehen. Gemessen wird die VERTEILUNG der
+ *     Zieltypen; die tatsaechliche Erfuellungsquote braucht eine gespielte Saison und steht deshalb
+ *     unter „nicht gemessen".
  *   - Der Verlauf ueber die Spieltage. Dieses Skript rechnet den Saisonabschluss gegen einen
  *     Endstand, nicht zehn Spieltage durch — die Uptime unten ist deshalb eine MOMENTAUFNAHME am
  *     Endrang, nicht der Anteil aktiver Spieltage. #490s Schaetzung (mild ~90 %, hart ~70-80 %)
@@ -134,6 +135,19 @@ async function main() {
     tiefstand = Math.min(tiefstand, team.cash);
   }
 
+  const ziele: Record<string, number> = {};
+  for (const team of gewaehlt.teams) {
+    const key = getSponsorV3Terms(getTeamSponsorContract(gewaehlt, team.teamId))?.goalKey ?? "kein Ziel";
+    ziele[key] = (ziele[key] ?? 0) + 1;
+  }
+  zeile(
+    "Zielarten der Vertraege",
+    Object.entries(ziele)
+      .sort((links, rechts) => rechts[1] - links[1])
+      .map(([key, anzahl]) => `${key} ${anzahl}`)
+      .join(" · "),
+  );
+
   console.log("\nLIGA-BILANZ (Saisonabschluss, ohne Gehaltsabzug in derselben Buchung)");
   zeile("Σ Sponsorgeld", `${sponsorSumme.toFixed(1)} C`);
   zeile("Σ Gehaelter", `${gehaelter.toFixed(1)} C`);
@@ -148,7 +162,8 @@ async function main() {
   console.log(
     "\nHINWEIS: die Uptime oben ist eine MOMENTAUFNAHME am Endstand, nicht der Anteil aktiver\n" +
       "Spieltage. #490s Schaetzung (mild ~90 %, hart ~70-80 %) bleibt ungeprueft — dafuer braucht es\n" +
-      "einen echten Spieltags-Durchlauf.\n",
+      "einen echten Spieltags-Durchlauf. Dasselbe gilt fuer die Erfuellungsquote der zwei Ziele:\n" +
+      "welche Zielart wie oft VERGEBEN wird, steht oben; wie oft sie GEHOLT wird, nicht.\n",
   );
 }
 

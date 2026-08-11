@@ -53,19 +53,28 @@ describe("sponsor offer slate (rarity + Modellkurven)", () => {
     expect(axes.length).toBe(SPONSOR_V4_AXIS_KEYS.length - 1);
   });
 
-  it("bietet keine Achse an, die dieses Team gar nicht bewegen kann", () => {
-    // GEFILTERT STATT GEKLAMMERT: waere eine unerfuellbare Achse im Slate, stuende dort eine Karte,
-    // die dieses Team niemals einloest — genau die wertlose Option, die V3 bei den Sonderzielen
-    // bereits abgeschafft hat.
+  it("bietet keine Achse an, die dieses Team gar nicht bewegen kann — deckelt aber die Kartenzahl nicht mehr", () => {
+    // GEFILTERT STATT GEKLAMMERT bleibt: eine unerfuellbare Achse waere eine Karte, die dieses Team
+    // niemals einloest.
+    //
+    // GEAENDERT hat sich, was daraus FOLGT. Frueher bestimmte die Zahl der bespielbaren Achsen auch
+    // die Zahl der Karten (1 Basis + je eine Achse), ein Team mit zwei Achsen bekam also drei statt
+    // fuenf Angebote. Seit die Gebaeude-Karten die zwei Leih-Ziele tragen statt einer Achse
+    // unterscheiden sie sich ueber Gebaeude, Groesse und Rarität — die Achsen entscheiden nichts
+    // mehr, duerfen die Auswahl also auch nicht mehr verkleinern.
     const slate = rollSponsorOfferSlate({
       seasonId: "season-slate",
       teamId: "M-M",
       qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxRarity: "legendär", targetRarity: "selten" }),
       offerableAxes: ["ausbau", "soliditaet"],
     });
-    // 1 Basis + 2 verfuegbare Achsen: mehr Slots gibt es nicht zu vergeben.
-    expect(slate.entries).toHaveLength(3);
-    expect(slate.entries.slice(1).map((entry) => entry.axisKey).sort()).toEqual(["ausbau", "soliditaet"]);
+    expect(slate.entries).toHaveLength(5);
+    // Die zugeteilten Achsen stammen weiterhin ausschliesslich aus der erlaubten Liste.
+    for (const eintrag of slate.entries.slice(1)) {
+      if (eintrag.axisKey != null) {
+        expect(["ausbau", "soliditaet"]).toContain(eintrag.axisKey);
+      }
+    }
   });
 
   it("wuerfelt deterministisch — zweimal dasselbe Team ergibt dasselbe Slate", () => {

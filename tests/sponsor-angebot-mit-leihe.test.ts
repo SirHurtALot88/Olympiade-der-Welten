@@ -130,9 +130,11 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     const terms = getSponsorV3Terms(mitLeihe)!;
     const verzicht = terms.leihVerzicht!;
 
-    // Eine Gebäude-Karte traegt KEINEN Raritaets-Wertfaktor auf der Leiter — die Rarität steckt bei
-    // ihr im Kurs und damit im Verzicht. Genau das wird hier mitgeprueft.
-    const wertFaktor = 1;
+    // Eine Gebäude-Karte traegt IMMER den untersten Wertfaktor, egal wie selten sie ist — ihre
+    // Rarität steckt vollstaendig im Kurs und damit im Verzicht. Waere es die magische Mitte (1,0),
+    // haette eine gewoehnliche Gebäude-Karte eine HOEHERE Leiter als eine gewoehnliche Cash-Karte:
+    // mehr Geld UND ein Gebäude, also derselbe doppelte Zugriff in die andere Richtung.
+    const wertFaktor = sponsorV3WertFaktorFor("gewöhnlich");
     const ungeschmaelert = sponsorKurvenLeiter({
       shape: terms.curveShape!,
       startRank: terms.startRank,
@@ -220,8 +222,8 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
           startRank: terms.startRank,
           salaryFactor: terms.salaryFactor,
         });
-        expect(terms.baseLadder[0], `${teamId}/${angebot.rarity}: Leiter traegt den Wertfaktor`).toBeCloseTo(
-          roh[0]! - (terms.leihVerzicht ?? 0),
+        expect(terms.baseLadder[0], `${teamId}/${angebot.rarity}: Leiter traegt den Raritaets-Faktor`).toBeCloseTo(
+          roh[0]! * sponsorV3WertFaktorFor("gewöhnlich") - (terms.leihVerzicht ?? 0),
           6,
         );
       }

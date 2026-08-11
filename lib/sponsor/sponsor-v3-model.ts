@@ -519,6 +519,17 @@ export function buildSponsorV3TermsCore(input: {
   axis?: SponsorV4AxisTerms | null;
   /** Hebelgroesse der Achse (Rarity, ggf. Golden). Nur wirksam mit `axis`. */
   axisSize?: number;
+  /**
+   * EIN FEST BEPREISTES ZIEL — die zwei Leih-Ziele (Frische, Achsen-Rang). Sie loesen die Achse ab
+   * und unterscheiden sich in einem Punkt grundsaetzlich von ihr: `p = 0`, also KEIN Sockelabzug.
+   * Wer sie verfehlt, verliert nichts.
+   *
+   * Das ist keine Nachlaessigkeit, sondern die Lehre aus der Messung: das alte Modell zog −p·G immer
+   * ab und zahlte bei Erfolg +G — ueber die ganze Liga ergab die Zielzeile in Saison 1 −89,7 C bei
+   * 0 von 27 erreichten Zielen. Eine Zeile, die praktisch nur kostet, ist kein Ziel, sondern eine
+   * Steuer. Setzt `axis` ausser Kraft, falls beides gesetzt waere.
+   */
+  festesZiel?: { key: string; size: number } | null;
   /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
   withAdvance?: boolean;
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
@@ -557,16 +568,26 @@ export function buildSponsorV3TermsCore(input: {
     advanceAmount > 0
       ? { amount: advanceAmount, fee: Math.round(advanceAmount * SPONSOR_V4_ADVANCE_FEE_RATE * 10) / 10 }
       : null;
-  const hasGoal = axis == null && input.card.goal && input.goalKey != null;
-  const goalP = axis != null ? SPONSOR_V4_AXIS_PBAR : hasGoal ? sponsorV3GoalProbability(input.goalKey, input.startRank) : 0;
+  const festesZiel = input.festesZiel ?? null;
+  const hasGoal = festesZiel == null && axis == null && input.card.goal && input.goalKey != null;
+  const goalP =
+    festesZiel != null
+      ? 0
+      : axis != null
+        ? SPONSOR_V4_AXIS_PBAR
+        : hasGoal
+          ? sponsorV3GoalProbability(input.goalKey, input.startRank)
+          : 0;
   const goalSize =
-    axis != null
-      ? (Number.isFinite(input.axisSize) && (input.axisSize ?? 0) > 0
-          ? input.axisSize!
-          : sponsorV4AxisSizeFor(input.rarity))
-      : hasGoal
-        ? sponsorV3GoalSizeFor(input.rarity)
-        : 0;
+    festesZiel != null
+      ? festesZiel.size
+      : axis != null
+        ? (Number.isFinite(input.axisSize) && (input.axisSize ?? 0) > 0
+            ? input.axisSize!
+            : sponsorV4AxisSizeFor(input.rarity))
+        : hasGoal
+          ? sponsorV3GoalSizeFor(input.rarity)
+          : 0;
   return {
     version: 3,
     rankLadder,
@@ -577,13 +598,13 @@ export function buildSponsorV3TermsCore(input: {
     cardName: input.card.name,
     rarity: input.rarity,
     startRank: clampRank(input.startRank),
-    goalKey: axis != null ? `axis_v4_${axis.key}` : input.goalKey,
+    goalKey: festesZiel != null ? festesZiel.key : axis != null ? `axis_v4_${axis.key}` : input.goalKey,
     goalP,
     goalSize,
     salaryFactor: input.salaryFactor,
     floor: input.floor,
     ...(input.curveShape != null ? { curveShape: input.curveShape } : {}),
-    ...(axis != null ? { axis } : {}),
+    ...(axis != null && festesZiel == null ? { axis } : {}),
     ...(advance != null ? { advance } : {}),
     // Nur setzen, wenn es ihn gibt: eine reine Cash-Karte soll das Feld gar nicht tragen, damit man
     // im Spielstand auf einen Blick sieht, welche Karte ein Gebaeude gekostet hat.

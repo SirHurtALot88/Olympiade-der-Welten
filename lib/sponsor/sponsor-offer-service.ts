@@ -45,6 +45,13 @@ import {
 } from "@/lib/sponsor/sponsor-leih-slate";
 import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
 import {
+  baueLeihZielKomponente,
+  LEIH_ZIEL_ACHSENRANG,
+  LEIH_ZIEL_FRISCHE,
+  type LeihAchse,
+  type LeihZielKey,
+} from "@/lib/sponsor/sponsor-leih-ziele";
+import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
   sponsorV3DownsideShortfall,
@@ -110,6 +117,8 @@ function buildOfferSkeleton(input: {
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
   specialMode?: "standard" | "challenge";
+  /** Eines der zwei Leih-Ziele — nur auf Gebaeude-Karten gesetzt. */
+  leihZiel?: { key: LeihZielKey; achse?: LeihAchse } | null;
 }): SponsorOffer {
   const { team, identity, profile, cardKey, rarity, gameState, commercialRating, slotIndex, teamQualityRank, specialMode } = input;
   // Der Marken- und der Sonderziel-Katalog sind noch nach den drei alten Archetypen verschlagwortet; die
@@ -145,12 +154,28 @@ function buildOfferSkeleton(input: {
   // einloest.
   let specialComponent: SponsorOfferComponent | null = null;
 
+  // DIE ZWEI LEIH-ZIELE LOESEN DIE ACHSE AB, aber nur auf Gebaeude-Karten. Chris wollte „ein paar
+  // wesentliche" Ziele statt fuenf Achsen; die reine Cash-Karte traegt bewusst gar keins — sie ist
+  // die Karte fuer planbares Geld, und ein Bonus mit Bedingung waere dort das Gegenteil.
+  //
+  // WELCHES der beiden, entscheidet der Slot und nicht der Zufall: eine feste Zuordnung kann ein
+  // Spieler lernen, einen Wuerfel darauf nicht. Gerade Plaetze tragen die Frische (von jedem Team ab
+  // Spieltag 1 ueber Rotation steuerbar), ungerade den Achsen-Rang.
+  if (input.leihZiel) {
+    specialComponent = baueLeihZielKomponente({
+      gameState,
+      teamId: team.teamId,
+      key: input.leihZiel.key,
+      achse: input.leihZiel.achse,
+    });
+  }
+
   // V4-ACHSENKARTE: die Zielkomponente ist die Achse selbst. Kein Katalogwurf, kein
   // Wahrscheinlichkeitsband — eine Achse misst den eigenen Zuwachs gegen die eigene Ausgangslage und
   // ist damit fuer jedes Team erfuellbar. Die Konditionen wandern in den `targetValue`, damit Karte,
   // Anzeige und Settlement dieselbe Zahl lesen und ein spaeterer Zustandswechsel den Vertrag nicht
   // nachtraeglich verschiebt.
-  if (input.axisKey) {
+  if (input.axisKey && !input.leihZiel) {
     const axisTerms = buildSponsorV4AxisTerms(gameState, team.teamId, input.axisKey);
     specialComponent = {
       componentId: "axis-target",
@@ -313,8 +338,25 @@ export function buildSponsorOffersForTeam(input: {
         ] ?? goalSlotIndexes[0]!
       : -1;
 
+  // WELCHES ZIEL AUF WELCHER KARTE — fest je Slot, nicht gewuerfelt. Eine stabile Zuordnung kann ein
+  // Spieler lernen, einen Wuerfel darauf nicht. Die Achse des Rang-Ziels folgt dem Slot aus
+  // demselben Grund.
+  //
+  // Platz 2 (Index 1) ist der guenstige Einstieg und traegt die FRISCHE — das Ziel, das jedes Team
+  // ab Spieltag 1 ueber Rotation steuern kann, ganz ohne Etat. Die teureren Plaetze wechseln sich
+  // ab. (Der Kommentar hier stand einmal genau andersherum als der Code darunter; der Code hatte
+  // recht, der Kommentar nicht.)
+  const LEIH_ACHSEN: LeihAchse[] = ["pow", "spe", "men", "soc"];
+  const leihZielFuer = (slotIndex: number): { key: LeihZielKey; achse?: LeihAchse } | null => {
+    if (!leihKarten[slotIndex]?.leihe) return null;
+    return slotIndex % 2 === 0
+      ? { key: LEIH_ZIEL_ACHSENRANG, achse: LEIH_ACHSEN[Math.floor(slotIndex / 2) % LEIH_ACHSEN.length]! }
+      : { key: LEIH_ZIEL_FRISCHE };
+  };
+
   const built = slate.entries.map((entry, slotIndex) => {
     const offer = buildOfferSkeleton({
+      leihZiel: leihZielFuer(slotIndex),
       gameState: input.gameState,
       team,
       identity,
@@ -381,6 +423,7 @@ export function buildSponsorOffersForTeam(input: {
     // E1: KEINE Abzugszeile — der Verzicht senkt hier die Leiter, und zwar bevor Anker und Tilt
     // gerechnet werden. Die Gebäude-Karte ist danach durchgaengig eine Karte, die weniger zahlt.
     leihVerzichte: leihKarten.map((karte) => karte.verzichtErsteSaison),
+    leihZielKeys: leihKarten.map((_, slotIndex) => leihZielFuer(slotIndex)?.key ?? null),
     teamId: input.teamId,
     startRank,
   });
@@ -870,6 +913,15 @@ const SPONSOR_AI_UPTIME_MILD = 0.9;
 const SPONSOR_AI_UPTIME_HART = 0.75;
 
 /**
+ * WIE VIEL EIN GEBÄUDE FUER EIN KLAMMES TEAM NOCH WERT IST. Nicht null — ein starkes Reha-Zentrum
+ * hilft auch einem armen Team, und Chris hat ausdruecklich gesagt, dass ein klammes Team eine gute
+ * Gebäude-Karte trotzdem nehmen darf („sie muessen sich ueberlegen ob es das wert ist"). Aber
+ * deutlich weniger als die Haelfte, denn der Cash fehlt sofort und das Gebäude wirkt erst ueber die
+ * Saison.
+ */
+const SPONSOR_AI_LEIHWERT_BEI_GELDNOT = 0.4;
+
+/**
  * DER ZIELRANG, GEGEN DEN DIE KURVENFORM PASSEN MUSS.
  *
  * Der Startrang allein waere die Wahl eines Teams ohne Plan — ein Team, das aufsteigen will, darf
@@ -1056,7 +1108,33 @@ function scoreOfferForAi(input: {
     if (geliehene > eigeneStufe) {
       const uptime = leihe.rangmarkenHaerte === "hart" ? SPONSOR_AI_UPTIME_HART : SPONSOR_AI_UPTIME_MILD;
       const wirkungsgrad = getFacilityEfficiencyPct(leihe.startZustandPct) / 100;
-      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad;
+      // EIN GEBÄUDE ZAHLT KEINE GEHÄLTER, und das ist der vierte und wichtigste Abschlag.
+      //
+      // Ohne ihn ist eine Gebäude-Karte IMMER das bessere Geschaeft, und zwar konstruktionsbedingt:
+      // der Verzicht ist `Leihwert / Kurs`, das Gebäude also je nach Rarität das 1,4- bis 3,0-fache
+      // des aufgegebenen Cash wert. Fuer ein Team mit voller Kasse stimmt diese Rechnung auch. Fuer
+      // eines, das am Saisonende seine Gehaelter nicht zahlen kann, stimmt sie nicht: ein
+      // Trainingszentrum laesst sich nicht ausschuetten. Gemessen zeigte sich genau das — ohne
+      // diesen Abschlag griff KEIN einziges der 32 Teams zur reinen Cash-Karte, auch bei Kasse −30.
+      //
+      // Die Schwelle ist dieselbe wie ueberall sonst in dieser Datei (`cashPressure >= 7`), damit es
+      // nicht einen zweiten Klammheits-Begriff gibt.
+      const cashNutzbar = cashPressure >= 7 ? SPONSOR_AI_LEIHWERT_BEI_GELDNOT : 1;
+      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad * cashNutzbar;
+    }
+
+    // DAS BONUS-ZIEL DER KARTE. Es ist mit `p = 0` bepreist, also reines Aufwaerts — wer es
+    // verfehlt, verliert nichts. Genau deshalb darf es hier NICHT gegen 0,5 gerechnet werden wie
+    // frueher die Achse, sondern mit dem geschaetzten Erfuellungsgrad mal der Praemie.
+    if (terms?.goalKey === LEIH_ZIEL_FRISCHE || terms?.goalKey === LEIH_ZIEL_ACHSENRANG) {
+      const tiefe = profile?.bias.rosterDepthPreference ?? 5;
+      // Frische haengt an Rotation und damit an Kadertiefe; der Achsen-Rang an nichts, was die KI
+      // vor der Saison kennt — dort bleibt es bei der neutralen Haelfte.
+      const chance =
+        terms.goalKey === LEIH_ZIEL_FRISCHE
+          ? Math.max(0.2, Math.min(0.8, 0.2 + 0.06 * tiefe + (input.rosterSize ?? 0 > (identity?.playerOpt ?? 14) ? 0.1 : 0)))
+          : 0.5;
+      score += chance * terms.goalSize;
     }
   }
 

@@ -31,16 +31,27 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     }
   });
 
-  it("waehlt nicht liga-weit dieselbe Achse — sonst waere die Bewertung blind", () => {
-    // Der eigentliche Nachweis, dass die Passungs-Schaetzung wirkt: die 32 Teams haben
-    // unterschiedliche Profile, also muessen sie auch unterschiedliche Achsen waehlen. Eine KI, die
-    // nur nach Rarity oder nach Slot-Reihenfolge griffe, landete bei allen auf derselben.
+  it("waehlt nicht liga-weit dasselbe Gebaeude und dieselbe Kartengroesse — sonst waere die Bewertung blind", () => {
+    // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
+    // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`) — `terms.axis` ist bei keinem neuen
+    // Vertrag mehr gesetzt, die alte Messgroesse dieses Tests ist damit tot. Die Passungsfrage
+    // steckt jetzt in der Gebaeude-Leihe: WELCHES Gebaeude und WIE GROSS. Der Nachweis, dass die
+    // Bewertung nicht blind ist, bleibt derselbe wie vorher — nur an der neuen Stelle gemessen: die
+    // 32 Teams haben unterschiedliche Profile, also muessen sie auch unterschiedliche Gebaeude und
+    // unterschiedliche Kartengroessen waehlen. Eine KI, die nur nach Rarity oder Slot-Reihenfolge
+    // griffe, landete bei allen auf demselben.
     const after = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(createSingleplayerGameState()));
-    const gewaehlteAchsen = after.teams
-      .map((team) => getSponsorV3Terms(getTeamSponsorContract(after, team.teamId))?.axis?.key)
-      .filter((key) => key != null);
-    expect(gewaehlteAchsen.length).toBeGreaterThan(0);
-    expect(new Set(gewaehlteAchsen).size, "alle Teams auf derselben Achse — die Wahl ist blind").toBeGreaterThan(1);
+    const gewaehlteGebaeude = after.teams
+      .map((team) => getTeamSponsorContract(after, team.teamId)?.sponsorLeihe?.facilityId)
+      .filter((facilityId): facilityId is string => facilityId != null);
+    const gewaehlteGroessen = after.teams
+      .map((team) => getTeamSponsorContract(after, team.teamId)?.sponsorLeihe?.stufenreihe?.[0])
+      .filter((stufe): stufe is number => stufe != null);
+
+    expect(gewaehlteGebaeude.length).toBeGreaterThan(0);
+    expect(new Set(gewaehlteGebaeude).size, "alle Teams auf demselben Gebaeude — die Wahl ist blind").toBeGreaterThan(1);
+    expect(gewaehlteGroessen.length).toBeGreaterThan(0);
+    expect(new Set(gewaehlteGroessen).size, "alle Teams auf derselben Kartengroesse — die Wahl ist blind").toBeGreaterThan(1);
   });
 
   it("greift bei Geldnot zur Liquiditaet — und seit den Gebaeude-Karten vor allem zur reinen Cash-Karte", () => {

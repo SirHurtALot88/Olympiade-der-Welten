@@ -1037,7 +1037,7 @@ export function useFoundationShellRouterBodyScope({
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
-    setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, marketSellSubject,
+    setContractRenewalError, contractRenewalNegotiation, setContractRenewalNegotiation, sponsorChoiceBusy, setSponsorChoiceBusy, sponsorChoiceMessage, setSponsorChoiceMessage, sponsorUebernahmeBusy, setSponsorUebernahmeBusy, sponsorUebernahmeMessage, setSponsorUebernahmeMessage, marketSellSubject,
     setMarketSellSubject, marketSellRiskAcknowledged, setMarketSellRiskAcknowledged, marketContractLengthDraft, setMarketContractLengthDraft, marketContractShapeDraft, setMarketContractShapeDraft, marketOfferedSalaryDraft, setMarketOfferedSalaryDraft, marketAiTeamScope,
     setMarketAiTeamScope, marketAiPreviewBusy, setMarketAiPreviewBusy, marketAiPreviewError, setMarketAiPreviewError, marketAiPreviewFeed, setMarketAiPreviewFeed, marketAiPreviewSelectedTeamId, setMarketAiPreviewSelectedTeamId, marketAiSellTeamScope,
     setMarketAiSellTeamScope, marketAiSellPreviewBusy, setMarketAiSellPreviewBusy, marketAiSellPreviewError, setMarketAiSellPreviewError, marketAiSellPreviewFeed, setMarketAiSellPreviewFeed, marketAiSellPreviewSelectedTeamId, setMarketAiSellPreviewSelectedTeamId, marketAiPlanTeamScope,
@@ -5798,6 +5798,56 @@ export function useFoundationShellRouterBodyScope({
       setSponsorChoiceMessage("Sponsor konnte nicht gewählt werden.");
     } finally {
       setSponsorChoiceBusy(null);
+    }
+  }
+
+  /**
+   * Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags — mirrors `chooseTeamSponsor`'s
+   * fetch-then-`loadSave` pattern 1:1 (POST /api/sponsor/uebernahme → `nimmUebernahmeAn`/
+   * `lehneUebernahmeAb`, siehe `lib/sponsor/sponsor-leih-lifecycle.ts`). Busy-Marker ist die
+   * `facilityId`, nicht die `offerId` wie bei `chooseTeamSponsor` — ein Übernahmeangebot hat
+   * keine eigene Angebots-ID, das Gebäude selbst identifiziert es eindeutig je Team.
+   */
+  async function handleSponsorUebernahme(facilityId: string, action: "annehmen" | "ablehnen") {
+    if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!canManageTeamId(selectedTeam.teamId)) {
+      showTeamManagementLockedNotice(selectedTeam.name);
+      return;
+    }
+    setSponsorUebernahmeBusy(facilityId);
+    setSponsorUebernahmeMessage(null);
+    try {
+      const response = await fetch("/api/sponsor/uebernahme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: selectedTeam.teamId,
+          facilityId,
+          action,
+          dryRun: false,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { success?: boolean; error?: string };
+      if (!response.ok || payload.error) {
+        setSponsorUebernahmeMessage(
+          payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
+        );
+        return;
+      }
+      setSponsorUebernahmeMessage(
+        action === "annehmen" ? `Gebäude für ${selectedTeam.shortCode} übernommen.` : `Übernahmeangebot für ${selectedTeam.shortCode} abgelehnt.`,
+      );
+      await loadSave(activeSaveId);
+      await reloadSeasonManagementOverview();
+    } catch {
+      setSponsorUebernahmeMessage(action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden.");
+    } finally {
+      setSponsorUebernahmeBusy(null);
     }
   }
 
@@ -11871,6 +11921,7 @@ export function useFoundationShellRouterBodyScope({
     prizeFinanceTab,
     sponsorsPanelProps: {
       gameState,
+      selectedTeamId: selectedTeam?.teamId ?? null,
       selectedTeamName: selectedTeam?.name ?? "Team",
       selectedTeamCommercialRating,
       selectedTeamSponsorContract,
@@ -11880,6 +11931,9 @@ export function useFoundationShellRouterBodyScope({
       selectedTeamCanManage,
       formatMoney,
       chooseTeamSponsor,
+      sponsorUebernahmeMessage,
+      sponsorUebernahmeBusy,
+      handleSponsorUebernahme,
       prizeFinanceTab,
     },
     prizePanelBaseProps: {
