@@ -13,6 +13,7 @@ import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-s
 import { estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { SPONSOR_RARITY_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { sponsorV3WertFaktorFor } from "@/lib/sponsor/sponsor-v3-model";
 
 function createTeam(partial: Partial<Team> = {}): Team {
   return {
@@ -200,39 +201,42 @@ describe("sponsor offer service", () => {
 
 describe("ai sponsor choice — oekonomisch kann sie nichts falsch machen", () => {
   /**
-   * DIE ZENTRALE ZUSAGE DES ENTWURFS, an der ECHTEN Angebotserzeugung gemessen — und seit den
-   * Gebaeude-Karten (Bauvorlage E1) praeziser formuliert als vorher.
+   * DIE ZENTRALE ZUSAGE DES ENTWURFS — und sie ist SCHWAECHER GEWORDEN, an zwei Stellen, beide auf
+   * ausdrückliche Ansage von Chris. Das gehört hierher und nicht in eine Fußnote.
    *
-   * Bis dahin galt: alle fuenf Karten haben denselben Cash-Erwartungswert. Das kann seit E1 gar
-   * nicht mehr stimmen, und zwar absichtlich nicht — eine Gebaeude-Karte zahlt WENIGER Cash und
-   * stellt dafuer ein Gebaeude („viel Cash pur, oder weniger Cash plus Gebäude"). Roh gemessen
-   * spreizen die EVs deshalb um bis zu 4,3 C.
+   * Bis hierher galt: alle fünf Karten haben denselben Cash-Erwartungswert, die Wahl ist reine
+   * Risiko-Entscheidung, die KI kann ökonomisch nichts falsch machen. Zwei Entscheidungen haben das
+   * aufgehoben:
    *
-   * Die Zusage selbst ist damit nicht weg, sie ist nur eine Ebene tiefer gerutscht: rechnet man den
-   * Cash-Verzicht wieder hinzu — also das, wofuer die Karte weniger zahlt —, ist die Spreizung
-   * gemessen EXAKT 0. Kein Slot ist ein Etat-Upgrade, keiner eine Etat-Kuerzung; wer weniger Cash
-   * nimmt, bekommt genau dafuer Gegenwert. Genau das kann die Wahl (der KI wie des Spielers) nicht
-   * zu einer Etat-Entscheidung machen.
+   *   E1 — die Gebäude-Karte zahlt weniger Cash und stellt dafür ein Gebäude.
+   *   „nicht die seltenheiten vergessen" — die Rarität skaliert die ganze Leiter, eine legendäre
+   *   Karte zahlt schlicht mehr als eine gewöhnliche.
    *
-   * Deshalb steht hier `toBe(0)` statt einer Toleranz: die Gleichheit ist konstruktiv, nicht
-   * numerisch — der Verzicht wird von jeder Sprosse derselben Leiter abgezogen, und der
-   * Erwartungswert ist ein gewichtetes Mittel dieser Leiter mit Gewichtssumme 1.
+   * Roh gemessen spreizen die Erwartungswerte eines Slates deshalb um zweistellige Beträge, und
+   * eine Wahl KANN jetzt objektiv falsch sein. Das ist gewollt: eine Wahl ohne falsche Antwort ist
+   * keine Wahl.
+   *
+   * WAS BLEIBT, ist die schwächere und ehrlichere Zusage, und genau die misst dieser Test: rechnet
+   * man beide Regler heraus — den Cash-Verzicht hinzu, durch den Raritäts-Wertfaktor geteilt —, ist
+   * die Spreizung gemessen 0,076 C, also Rundung. Es gibt keinen DRITTEN, versteckten Regler. Der
+   * Wert einer Karte ist vollständig durch „wie selten" und „wie viel Gebäude" erklärt.
    */
-  it("alle Karten eines Slates haben denselben Erwartungswert — Cash plus Gegenwert", () => {
+  it("erklaert den Wert jeder Karte vollstaendig aus Raritaet und Gebaeude — kein dritter Regler", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     for (const team of gameState.teams) {
       const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
-      const values = offers.map(
-        (offer) => estimateExpectedPayout(offer) + (getSponsorV3Terms(offer)?.leihVerzicht ?? 0),
-      );
+      const values = offers.map((offer) => {
+        const terms = getSponsorV3Terms(offer)!;
+        return (estimateExpectedPayout(offer) + (terms.leihVerzicht ?? 0)) / sponsorV3WertFaktorFor(terms.rarity);
+      });
       const spread = Math.max(...values) - Math.min(...values);
-      expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.1);
+      expect(spread, `${team.teamId}: EV-Spreizung ${spread.toFixed(3)} — ${values.join(" / ")}`).toBeLessThanOrEqual(0.2);
 
-      // Und die Gegenprobe im selben Test: OHNE den Verzicht spreizen sie sehr wohl — sonst waere
-      // die Gebäude-Karte gratis und die Zeile oben eine leere Zusicherung.
+      // Und die Gegenprobe im selben Test: OHNE die beiden Regler spreizen sie sehr wohl — sonst
+      // wäre die Gebäude-Karte gratis und die Rarität wieder folgenlos.
       const rohe = offers.map((offer) => estimateExpectedPayout(offer));
       if (offers.some((offer) => offer.sponsorLeihe != null)) {
-        expect(Math.max(...rohe) - Math.min(...rohe), `${team.teamId}: Gebäude-Karte kostet nichts`).toBeGreaterThan(0.1);
+        expect(Math.max(...rohe) - Math.min(...rohe), `${team.teamId}: Gebäude-Karte kostet nichts`).toBeGreaterThan(1);
       }
     }
   });

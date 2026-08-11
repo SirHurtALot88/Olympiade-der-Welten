@@ -21,7 +21,7 @@ import {
   getTeamSponsorContract,
 } from "@/lib/sponsor/sponsor-offer-service";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { sponsorV3GuaranteedLadder } from "@/lib/sponsor/sponsor-v3-model";
+import { sponsorV3GuaranteedLadder, sponsorV3WertFaktorFor } from "@/lib/sponsor/sponsor-v3-model";
 import { sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
 
 function baueSpielstand(partial?: Partial<GameState>): GameState {
@@ -119,14 +119,18 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
 
   it("macht die Gebaeude-Karte messbar aermer als dieselbe Karte ohne Leihe", () => {
     // Der eigentliche Nachweis, exakt statt ungefaehr: die Basisleiter des Angebots muss Sprosse
-    // fuer Sprosse genau um den Verzicht unter der ungeschmaelerten Ligaleiter derselben Form,
-    // desselben Startrangs und desselben Gehaltsfaktors liegen.
+    // fuer Sprosse genau um den Verzicht unter der Ligaleiter derselben Form, desselben Startrangs
+    // und desselben Gehaltsfaktors liegen — nachdem der Raritaets-Wertfaktor angewandt ist. Die
+    // beiden Regler sind hier in ihrer Reihenfolge festgenagelt: erst skaliert die Rarität die ganze
+    // Leiter, dann geht der Verzicht als ABSOLUTER Betrag ab. Andersherum haenge der Preis eines
+    // Gebaeudes an der Rarität der Karte, obwohl das Gebaeude dasselbe ist.
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     const mitLeihe = angebote.find((angebot) => angebot.sponsorLeihe != null)!;
     const terms = getSponsorV3Terms(mitLeihe)!;
     const verzicht = terms.leihVerzicht!;
 
+    const wertFaktor = sponsorV3WertFaktorFor(terms.rarity);
     const ungeschmaelert = sponsorKurvenLeiter({
       shape: terms.curveShape!,
       startRank: terms.startRank,
@@ -134,13 +138,86 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     });
     expect(terms.baseLadder).toHaveLength(ungeschmaelert.length);
     terms.baseLadder.forEach((wert, index) => {
-      expect(wert).toBeCloseTo(ungeschmaelert[index]! - verzicht, 6);
+      expect(wert).toBeCloseTo(ungeschmaelert[index]! * wertFaktor - verzicht, 6);
     });
 
-    // Und der Verzicht kommt wirklich an: die niedrigste Sprosse liegt ueber dem Sicherheitsnetz,
-    // wird also nicht davon aufgefangen (gemessen: 9,1 C Luft, groesster Erst-Saison-Verzicht 4,3 C).
-    expect(Math.min(...sponsorV3GuaranteedLadder(terms))).toBeGreaterThan(terms.floor);
-    expect(verzicht).toBeLessThan(9.1);
+    // UND DAS NETZ FRISST DEN VERZICHT NICHT AUF. Das ist keine Formalie: das feste Netz lag bei
+    // 43 C, die niedrigste Sprosse ueberhaupt bei 52,1 — es gab also nur 9,1 C Luft. Solange die
+    // Karten hoechstens 4,3 C kosteten, fiel das nicht auf; mit Gebaeuden bis Stufe 5 kosten sie bis
+    // 25,4 C, und ein festes Netz haette dem Team am Tabellenende das Gebaeude geschenkt. Das Netz
+    // sinkt deshalb mit der Karte, und genau das wird hier gemessen.
+    for (const angebot of angebote) {
+      const kartenTerms = getSponsorV3Terms(angebot)!;
+      const kartenVerzicht = kartenTerms.leihVerzicht ?? 0;
+      expect(
+        Math.min(...sponsorV3GuaranteedLadder(kartenTerms)),
+        `Verzicht ${kartenVerzicht} vom Netz aufgefangen`,
+      ).toBeGreaterThan(kartenTerms.floor);
+    }
+  });
+
+  it("spannt die Preisspanne wirklich auf — kleine und grosse Gebaeude im selben Slate", () => {
+    // Chris: „manche wollen zb 30 für die gebäude manche nur 5 dafür sind manche stärker manche
+    // schwächer." Die erste Fassung koppelte die Stufe an die Rarität und lag damit ueber ALLE
+    // Karten zwischen 0,5 und 4,3 C — fuenf Karten, die praktisch dasselbe kosteten. Groesse und
+    // Rarität sind jetzt getrennte Regler; gemessen ueber eine ganze Liga: 0,8 bis 25,4 C.
+    const gameState = baueSpielstand();
+    const verzichte: number[] = [];
+    for (let index = 1; index <= 12; index += 1) {
+      const teamId = index === 1 ? "M-M" : `T-${index}`;
+      for (const angebot of buildSponsorOffersForTeam({ gameState, teamId })) {
+        if (angebot.sponsorLeihe) verzichte.push(getSponsorV3Terms(angebot)!.leihVerzicht ?? 0);
+      }
+    }
+    // Der billigste Einstieg bleibt bezahlbar, die teuerste Karte tut wirklich weh.
+    expect(Math.min(...verzichte)).toBeLessThan(2.5);
+    expect(Math.max(...verzichte)).toBeGreaterThan(12);
+    // Und die Stufen kommen tatsaechlich vor, nicht nur die Preise.
+    const stufen = new Set<number>();
+    for (let index = 1; index <= 12; index += 1) {
+      const teamId = index === 1 ? "M-M" : `T-${index}`;
+      for (const angebot of buildSponsorOffersForTeam({ gameState, teamId })) {
+        if (angebot.sponsorLeihe) stufen.add(angebot.sponsorLeihe.stufenreihe[0]!);
+      }
+    }
+    expect(stufen).toContain(1);
+    expect(stufen).toContain(3);
+    expect(stufen).toContain(5);
+  });
+
+  it("bietet dasselbe Gebaeude nicht zweimal im selben Slate an", () => {
+    // Zwei Karten mit demselben Reha-Zentrum auf verschiedenen Stufen sind zwei Preise fuer
+    // dieselbe Sache, keine Auswahl zwischen zweien.
+    const gameState = baueSpielstand();
+    for (let index = 1; index <= 12; index += 1) {
+      const teamId = index === 1 ? "M-M" : `T-${index}`;
+      const gebaeude = buildSponsorOffersForTeam({ gameState, teamId })
+        .map((angebot) => angebot.sponsorLeihe?.facilityId)
+        .filter((facilityId): facilityId is string => facilityId != null);
+      expect(new Set(gebaeude).size, `${teamId}: ${gebaeude.join(", ")}`).toBe(gebaeude.length);
+    }
+  });
+
+  it("laesst die Rarität den reinen Cash-Wert bewegen — nicht nur die Risikoform", () => {
+    // Chris: „ein legendärer cash sponsor der nur cash gibt kann teils mehr wert haben als ein guter
+    // magischer sponsor mit nem top gebäude angebot an reinem wert." Vorher waren alle Karten eines
+    // Slates auf denselben Erwartungswert normiert — eine legendäre Karte verteilte ihr Geld nur
+    // anders, sie zahlte nicht mehr. Jetzt skaliert die Rarität die ganze Leiter.
+    const gameState = baueSpielstand();
+    const angebot = buildSponsorOffersForTeam({ gameState, teamId: "M-M" })[0]!;
+    const terms = getSponsorV3Terms(angebot)!;
+
+    const roh = sponsorKurvenLeiter({
+      shape: terms.curveShape!,
+      startRank: terms.startRank,
+      salaryFactor: terms.salaryFactor,
+    });
+    const faktor = sponsorV3WertFaktorFor(terms.rarity);
+    expect(terms.baseLadder[0]).toBeCloseTo(roh[0]! * faktor, 6);
+    // Und die Regler zeigen in die richtige Richtung.
+    expect(sponsorV3WertFaktorFor("legendär")).toBeGreaterThan(sponsorV3WertFaktorFor("selten"));
+    expect(sponsorV3WertFaktorFor("selten")).toBeGreaterThan(sponsorV3WertFaktorFor("magisch"));
+    expect(sponsorV3WertFaktorFor("magisch")).toBeGreaterThan(sponsorV3WertFaktorFor("gewöhnlich"));
   });
 
   it("erzeugt KEINE zusaetzliche Komponente — sonst zahlte das Team doppelt", () => {

@@ -36,6 +36,7 @@ import {
   sponsorV3LadderValue,
   sponsorV3Settle,
   sponsorV3TiltedLadder,
+  sponsorV3WertFaktorFor,
   sponsorV4AxisSizeFor,
   SPONSOR_V3_CARDS,
   type SponsorV3CardKey,
@@ -215,7 +216,16 @@ export function buildSponsorV3Terms(input: {
   // DIE SPONSOR-LIGALEITER statt der Preisgeldkurve (Umbau): Sockel nach Startrang + Wertungstopf
   // nach Endrang, die Kurvenform entscheidet nur noch, WO auf dieser Leiter das Geld liegt. Die
   // Preisgeldkurve selbst (`getSponsorV3PrizeCurve`) wird im Live-Pfad nicht mehr gebraucht.
-  const baseLadder = sponsorKurvenLeiter({ shape: input.curveShape, startRank: input.startRank, salaryFactor });
+  // DER RARITÄTS-WERTFAKTOR sitzt hier und NICHT in `buildSponsorV3TermsCore`, weil er eine
+  // Entscheidung ueber neu erzeugte Angebote ist. Der Kern wird auch von der Migration und von den
+  // Vergleichsskripten gerufen, die eine gegebene Leiter unveraendert bewerten sollen — ein Faktor
+  // dort verschoebe rueckwirkend die Zahlen von Altvertraegen.
+  const wertFaktor = sponsorV3WertFaktorFor(rarity);
+  const baseLadder = sponsorKurvenLeiter({
+    shape: input.curveShape,
+    startRank: input.startRank,
+    salaryFactor,
+  }).map((wert) => wert * wertFaktor);
   return buildSponsorV3TermsCore({
     baseLadder,
     startRank: input.startRank,
@@ -229,13 +239,19 @@ export function buildSponsorV3Terms(input: {
     salaryFactor,
     // SPONSOR_BODEN statt SPONSOR_V3_FLOOR_C: der neue Sockel reicht bei Startrang 1 bis 18 hinunter,
     // das alte Netz (32) saesse fuer diese Leiter zu tief.
-    floor: SPONSOR_BODEN,
-    // GEMESSEN, damit die Groessenordnung nicht geraten ist: die niedrigste Sprosse ueber alle
-    // Kurvenformen und Startraenge liegt bei 52,1 C, das Netz bei 43 — es bleiben 9,1 C Luft. Der
-    // groesste Verzicht der ERSTEN Saison ist 4,3 C, passt also immer. In Vertragsjahr 3 kann eine
-    // teure Leihe 11,9 C erreichen; dort faengt das Netz einen Teil des Verzichts ab, ein
-    // abgestuerztes Team zahlt dann weniger als die Karte kostet. Anzeige und Settlement bleiben
-    // trotzdem deckungsgleich, weil beide dieselbe geklammerte Leiter lesen.
+    //
+    // DAS NETZ SINKT MIT DER KARTE, und das ist keine Feinheit, sondern die Bedingung dafuer, dass
+    // grosse Gebaeude-Karten ueberhaupt existieren koennen. Gemessen: die niedrigste Sprosse ueber
+    // alle Kurvenformen und Startraenge liegt bei 52,1 C, das feste Netz bei 43 — es blieben nur
+    // 9,1 C Luft. Ein Verzicht von 15 oder 25 C (Gebaeude auf Stufe 4/5, siehe
+    // `STARTSTUFE_JE_GROESSE`) waere am unteren Ende der Tabelle vollstaendig vom Netz aufgefangen
+    // worden: das Team haette das Gebaeude bekommen, aber nichts dafuer bezahlt. Ein absolutes Netz
+    // passt zu einer Karte, die alle gleich viel zahlt; sobald eine Karte bewusst weniger zahlt,
+    // muss ihr Netz mitsinken, sonst hebelt es genau die Entscheidung aus, um die es geht.
+    // Das Netz traegt denselben Wertfaktor wie die Leiter — sonst waere es fuer eine gewoehnliche
+    // Karte relativ hoeher als fuer eine legendaere und wuerde ihr den Wertunterschied unten wieder
+    // zurueckgeben.
+    floor: Math.max(0, SPONSOR_BODEN * wertFaktor - Math.max(0, input.leihVerzicht ?? 0)),
     leihVerzicht: input.leihVerzicht,
   });
 }
@@ -316,12 +332,15 @@ export function rerollSponsorV3TermsForNewSeason(
       salaryFactor: input.newSalaryFactor,
     };
   }
-  const sockel = sponsorSockelFuerStartrang(terms.startRank);
+  // Wertfaktor und Sockel muessen beim Neubau DIESELBEN sein wie bei der Unterschrift, sonst
+  // veraendert der Saisonwechsel den Vertrag inhaltlich. Der Sockel skaliert deshalb mit.
+  const wertFaktor = sponsorV3WertFaktorFor(terms.rarity);
+  const sockel = sponsorSockelFuerStartrang(terms.startRank) * wertFaktor;
   const newBaseLadderRaw = sponsorKurvenLeiter({
     shape: terms.curveShape,
     startRank: terms.startRank,
     salaryFactor: input.newSalaryFactor,
-  });
+  }).map((wert) => wert * wertFaktor);
   const multiplier = getSponsorTermMultiplier(input.contractYear);
   // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt
   // der nach Startrang eingefrorene Wert, unveraendert durch Erosion oder Salary-Factor-Wechsel.

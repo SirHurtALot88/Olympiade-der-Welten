@@ -30,14 +30,18 @@ import {
   buildOfferRankPayoutLadderPreview,
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
   mapSponsorCardToArchetype,
   rollSponsorOfferSlate,
 } from "@/lib/sponsor/sponsor-tier-pool";
-import { leihRaritaet, verteileLeihgabenAufSlate } from "@/lib/sponsor/sponsor-leih-slate";
+import {
+  leihRaritaet,
+  VERZICHT_ANTEIL_DER_LEITER,
+  verteileLeihgabenAufSlate,
+} from "@/lib/sponsor/sponsor-leih-slate";
 import {
   sponsorV3AnchorWeights,
   sponsorV3CardByKey,
@@ -270,12 +274,23 @@ export function buildSponsorOffersForTeam(input: {
       ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
     ),
   );
+  //
+  // DER DECKEL KOMMT AUS DER EIGENEN LEITER, nicht aus einer festen Zahl: was ein Team verzichten
+  // kann, haengt daran, was es ueberhaupt bekommt. Gerechnet wird gegen die niedrigste Sprosse —
+  // also gegen das, was auf JEDEM Endrang sicher kommt —, damit auch ein Absturz die Karte nicht
+  // unbezahlbar macht.
+  const leiterFuerDeckel = sponsorKurvenLeiter({
+    shape: slate.entries[0]?.curveShape ?? "stetig",
+    startRank: rows.find((entry) => entry.teamId === input.teamId)?.startplatz ?? qualityRank.leaguePosition,
+    salaryFactor: getCurrentSponsorSalaryFactor(input.gameState),
+  });
   const leihKarten = verteileLeihgabenAufSlate({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
     raritaeten: slate.entries.map((entry) => leihRaritaet(entry.rarity)),
     laufzeiten: slate.entries.map((entry) => entry.termSeasons),
     eigeneStufen,
+    verzichtDeckel: Math.min(...leiterFuerDeckel) * VERZICHT_ANTEIL_DER_LEITER,
   });
 
   const usedParentBrandIds: string[] = [];

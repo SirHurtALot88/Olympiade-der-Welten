@@ -46,12 +46,38 @@ export const VERLEIHBARE_GEBAEUDE: readonly FacilityId[] = [
   "specialist_wing",
 ];
 
-/** Startstufe je Rarität: bessere Karten steigen hoeher ein. */
-const STARTSTUFE_JE_RARITAET: Record<SponsorLeihRaritaet, number> = {
-  gewoehnlich: 1,
-  magisch: 2,
-  selten: 2,
-  legendaer: 3,
+/**
+ * DIE GROESSE EINER KARTE — die zweite Achse neben der Rarität, und die wichtigere von beiden.
+ *
+ * Chris: „es soll ja verschiedene stufen geben von gebäude sponsoren, manche wollen zb 30 für die
+ * gebäude manche nur 5 dafür sind manche stärker manche schwächer."
+ *
+ * Die erste Fassung koppelte die Startstufe an die Rarität (1/2/2/3) — damit lag der Verzicht ueber
+ * ALLE Karten zwischen 0,5 und 4,3 C, gemessen. Das ist keine Spanne, das ist Rauschen: fuenf
+ * Karten, die praktisch dasselbe kosten. Die beiden Achsen taten dasselbe und hoben sich gegenseitig
+ * auf, denn eine seltenere Karte stieg zwar hoeher ein, bekam ihre Stufe aber auch billiger.
+ *
+ * Jetzt sind sie getrennt und messen Verschiedenes:
+ *
+ *   GROESSE  = WIE VIEL Gebaeude auf der Karte steht (Stufe 1 / 3 / 5).
+ *   RARITÄT  = WIE GUT der Handel dafuer ist (Kurs 1,4 / 1,8 / 2,3 / 3,0).
+ *
+ * Damit spannt der Katalog echte 0,5 bis 25,4 C auf — Chris' „5 bis 30" —, und die vier Ecken der
+ * Matrix sind wirklich verschiedene Angebote: die kleine legendaere Karte kostet fast nichts und
+ * bringt fast nichts, die grosse gewoehnliche frisst die halbe Saisonzahlung und stellt dafuer ein
+ * fertiges Gebaeude auf Hoechststufe.
+ *
+ * WARUM „gross" AUF 5 STARTET UND DAMIT NICHT MEHR WAECHST: das ist der Vertragscharakter, nicht ein
+ * vergessener Aufstieg. Eine grosse Karte leiht ein FERTIGES Gebaeude — sofort volle Wirkung, kein
+ * Aufbau. Die mittlere ist die Karte mit Entwicklung (3 → 4 → 5). Wer Aufstieg will, nimmt mittel;
+ * wer sofort will, zahlt gross.
+ */
+export type SponsorLeihGroesse = "klein" | "mittel" | "gross";
+
+const STARTSTUFE_JE_GROESSE: Record<SponsorLeihGroesse, number> = {
+  klein: 1,
+  mittel: 3,
+  gross: 5,
 };
 
 /**
@@ -84,6 +110,20 @@ const ZUSTAND_JE_RARITAET: Record<SponsorLeihRaritaet, number> = {
  * Rarität. Alle anderen sieben Gebaeude liegen auf Stufe 1 zwischen 0,5 und 1,7 C und passen immer.
  */
 export const EINSTIEG_VERZICHT_DECKEL = 2.5;
+
+/**
+ * WIE VIEL VON DER GARANTIERTEN SAISONZAHLUNG EINE KARTE HOECHSTENS KOSTEN DARF.
+ *
+ * Die grossen Karten sollen weh tun — das ist Chris' ausdrueckliche Absicht („Teams nehmen bewusst
+ * in kauf weniger cash zu bekommen"). Eine Karte, die MEHR verlangt als die Haelfte dessen, was das
+ * Team auf jedem Endrang sicher bekommt, waere aber keine Entscheidung mehr, sondern ein Ruin mit
+ * Ansage: sie liesse selbst dem Meister zu wenig fuer die Gehaelter.
+ *
+ * Der Deckel ist RELATIV, weil die Leitern sich unterscheiden (gemessen: niedrigste Sprosse 52,1 C
+ * bei Startrang 32, 75,1 C bei Startrang 1). Ein starkes Team kann sich also mehr Gebaeude leisten
+ * als ein schwaches — genau der Rubberband, den Chris beschrieben hat.
+ */
+export const VERZICHT_ANTEIL_DER_LEITER = 0.5;
 
 function avalanche(hash: number) {
   let mixed = hash >>> 0;
@@ -123,10 +163,38 @@ export type SponsorSlateKarte = {
   slotIndex: number;
   raritaet: SponsorLeihRaritaet;
   /** Null bei der reinen Cash-Karte. */
+  groesse: SponsorLeihGroesse | null;
+  /** Null bei der reinen Cash-Karte. */
   leihe: (SponsorLeihAngebot & { startZustandPct: number }) | null;
   /** Cash-Verzicht der ersten Saison — 0 bei der reinen Cash-Karte. */
   verzichtErsteSaison: number;
 };
+
+/**
+ * WELCHE GROESSE AUF WELCHEN PLATZ. Nicht gewuerfelt, sondern verteilt — ein Slate, in dem der Wurf
+ * dreimal „mittel" ergibt, waere wieder die Scheinauswahl, gegen die diese Datei gebaut ist.
+ *
+ * Platz 2 ist immer klein (der Einstieg). Die uebrigen bekommen der Reihe nach gross und mittel,
+ * damit beide Enden der Spanne IMMER im Slate stehen; erst ein vierter Gebaeude-Platz wuerfelt frei.
+ * Welcher der Plaetze welche Groesse zieht, haengt am Saatwort — die Reihenfolge ist also nicht jede
+ * Saison dieselbe.
+ */
+function verteileGroessen(anzahlGebaeudeplaetze: number, wurf: number): SponsorLeihGroesse[] {
+  if (anzahlGebaeudeplaetze <= 0) return [];
+  const groessen: SponsorLeihGroesse[] = ["klein"];
+  const rest: SponsorLeihGroesse[] = ["gross", "mittel", "mittel", "gross"];
+  for (let index = 1; index < anzahlGebaeudeplaetze; index += 1) {
+    groessen.push(rest[(index - 1) % rest.length]!);
+  }
+  // Die Gebaeude-Plaetze ab Index 1 rotieren um den Wurf, damit nicht immer derselbe Platz die
+  // grosse Karte traegt. Platz 0 der Liste (der Einstieg) bleibt fest.
+  const drehbar = groessen.slice(1);
+  if (drehbar.length > 1) {
+    const versatz = wurf % drehbar.length;
+    return [groessen[0]!, ...drehbar.slice(versatz), ...drehbar.slice(0, versatz)];
+  }
+  return groessen;
+}
 
 /**
  * Verteilt Gebäude auf die Karten eines Slates.
@@ -142,40 +210,87 @@ export function verteileLeihgabenAufSlate(input: {
   /** Gebäude, die das Team schon auf dieser Stufe oder hoeher hat — die lohnen als Leihe nicht. */
   eigeneStufen?: Readonly<Record<string, number>>;
   verleihbar?: readonly FacilityId[];
+  /**
+   * Was dieses Team hoechstens verzichten darf — vom Aufrufer aus der eigenen Leiter abgeleitet
+   * (`VERZICHT_ANTEIL_DER_LEITER`). Ohne Angabe gilt kein Deckel; die grossen Karten koennen dann
+   * jede Groesse annehmen, die der Katalog hergibt.
+   */
+  verzichtDeckel?: number;
 }): SponsorSlateKarte[] {
   const verleihbar = input.verleihbar ?? VERLEIHBARE_GEBAEUDE;
   const eigene = input.eigeneStufen ?? {};
+  const deckel = Number.isFinite(input.verzichtDeckel) ? input.verzichtDeckel! : Number.POSITIVE_INFINITY;
+
+  // Die Groessen haengen am Slate als Ganzem, nicht am einzelnen Platz — nur so laesst sich zusagen,
+  // dass beide Enden der Preisspanne vorkommen.
+  const groessen = verteileGroessen(
+    Math.max(0, input.raritaeten.length - 1),
+    avalanche(hashSeed(`${input.seasonId}:${input.teamId}:leihgroessen`)),
+  );
+
+  // Ein Gebaeude kommt im Slate hoechstens EINMAL vor. Zwei Karten mit demselben Reha-Zentrum, nur
+  // auf verschiedenen Stufen, sind keine Auswahl zwischen zwei Sachen, sondern zwei Preise fuer
+  // dieselbe — genau die Sorte Scheinauswahl, die diese Datei sonst gerade verhindert.
+  const vergeben = new Set<string>();
 
   return input.raritaeten.map((raritaet, slotIndex) => {
     // Platz 1 bleibt immer reines Geld — die Karte fuer Teams ohne Spielraum.
     if (slotIndex === 0) {
-      return { slotIndex, raritaet, leihe: null, verzichtErsteSaison: 0 };
+      return { slotIndex, raritaet, groesse: null, leihe: null, verzichtErsteSaison: 0 };
     }
 
     const saat = `${input.seasonId}:${input.teamId}:leihe:${slotIndex}`;
     const wurf = avalanche(hashSeed(saat));
+    const gewuenschteGroesse = groessen[slotIndex - 1] ?? "mittel";
 
     // Gebäude waehlen: bevorzugt eines, das dem Team ueberhaupt etwas bringt. Ein Gebaeude, das
     // das Team selbst schon hoeher gebaut hat, waere eine tote Karte.
-    // Platz 2 ist der guenstige Einstieg: immer Stufe 1, egal wie selten die Karte ist.
-    const startStufe = slotIndex === 1 ? 1 : STARTSTUFE_JE_RARITAET[raritaet];
-    const brauchbare = verleihbar.filter((facilityId) => (eigene[facilityId] ?? 0) < startStufe);
-    const bezahlbare =
-      slotIndex === 1
-        ? brauchbare.filter(
-            (facilityId) =>
-              berechneCashVerzicht({ facilityId, stufe: startStufe, raritaet }) <= EINSTIEG_VERZICHT_DECKEL,
-          )
-        : brauchbare;
-    const auswahl = bezahlbare.length > 0 ? bezahlbare : brauchbare.length > 0 ? brauchbare : verleihbar;
-    const facilityId = auswahl[wurf % auswahl.length]!;
+    const brauchbareFuer = (stufe: number) => {
+      const frei = verleihbar.filter(
+        (facilityId) => (eigene[facilityId] ?? 0) < stufe && !vergeben.has(facilityId),
+      );
+      // Sind alle schon vergeben (mehr Plaetze als Gebaeude), zaehlt nur noch die eigene Stufe —
+      // eine Wiederholung ist besser als eine leere Karte.
+      return frei.length > 0 ? frei : verleihbar.filter((facilityId) => (eigene[facilityId] ?? 0) < stufe);
+    };
 
+    // Der Einstiegsdeckel gilt nur fuer Platz 2; der Leiter-Deckel fuer jede Gebaeude-Karte.
+    const obergrenze = slotIndex === 1 ? Math.min(deckel, EINSTIEG_VERZICHT_DECKEL) : deckel;
+
+    // Die gewuenschte Groesse wird HERUNTERGESTUFT, wenn sie das Team ueberfordert — lieber eine
+    // kleinere echte Karte als eine grosse, die niemand nehmen kann. Die Reihenfolge ist die der
+    // Groessen selbst, damit der Rueckfall vorhersagbar bleibt.
+    const kandidaten: SponsorLeihGroesse[] =
+      gewuenschteGroesse === "gross"
+        ? ["gross", "mittel", "klein"]
+        : gewuenschteGroesse === "mittel"
+          ? ["mittel", "klein"]
+          : ["klein"];
+
+    let groesse: SponsorLeihGroesse = kandidaten[kandidaten.length - 1]!;
+    let startStufe = STARTSTUFE_JE_GROESSE[groesse];
+    let facilityId = brauchbareFuer(startStufe)[0] ?? verleihbar[0]!;
+
+    for (const kandidat of kandidaten) {
+      const stufe = STARTSTUFE_JE_GROESSE[kandidat];
+      const brauchbare = brauchbareFuer(stufe);
+      const bezahlbare = brauchbare.filter(
+        (id) => berechneCashVerzicht({ facilityId: id, stufe, raritaet }) <= obergrenze,
+      );
+      if (bezahlbare.length === 0) continue;
+      groesse = kandidat;
+      startStufe = stufe;
+      facilityId = bezahlbare[wurf % bezahlbare.length]!;
+      break;
+    }
+
+    vergeben.add(facilityId);
     const laufzeit = input.laufzeiten?.[slotIndex] ?? (slotIndex === 1 ? 2 : 3);
-
     const angebot = baueLeihAngebot({ facilityId, raritaet, startStufe, laufzeit });
     return {
       slotIndex,
       raritaet,
+      groesse,
       leihe: { ...angebot, startZustandPct: ZUSTAND_JE_RARITAET[raritaet] },
       verzichtErsteSaison: angebot.verzichtJeSaison[0] ?? 0,
     };

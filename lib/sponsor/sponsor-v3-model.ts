@@ -236,6 +236,41 @@ export function sponsorV3CardByKey(key: string): SponsorV3Card {
   );
 }
 
+/**
+ * DIE RARITÄT IST WIEDER EIN WERT-REGLER, NICHT NUR EINE RISIKOFORM.
+ *
+ * Chris: „nicht die seltenheiten vergessen — ein legendärer cash sponsor der nur cash gibt kann
+ * teils mehr wert haben als ein guter magischer sponsor mit nem top gebäude angebot an reinem wert."
+ *
+ * Bis hierher waren ALLE Karten eines Slates auf denselben Erwartungswert normiert; die Rarität
+ * aenderte nur die STEILHEIT (`SPONSOR_V3_TILT_BY_RARITY`) und die Zielpraemie. Eine legendäre
+ * Cash-Karte war damit exakt so viel wert wie eine gewoehnliche — sie verteilte ihr Geld nur anders
+ * ueber die Tabelle. Genau das widerspricht dem Satz oben: eine legendäre Karte SOLL mehr zahlen.
+ *
+ * Der Faktor wirkt auf die ganze Leiter, also auf jede Sprosse gleich. Er ist bewusst klein
+ * gehalten (±11 % um die magische Mitte): bei Leitern zwischen 52 und 107 C sind das 6 bis 12 C
+ * Unterschied — dieselbe Groessenordnung wie eine mittlere Gebaeude-Leihe. Damit ist Chris' Satz
+ * woertlich erfuellt: die legendäre Cash-Karte kann eine magische Gebaeude-Karte an reinem Cash
+ * schlagen, aber sie muss es nicht — es haengt daran, wie gross das Gebaeude ist.
+ *
+ * WAS DAS AUFGIBT, offen benannt: die Zusage „alle Karten eines Slates haben denselben
+ * Erwartungswert" gilt nicht mehr. Sie war der Grund, warum die KI-Wahl oekonomisch nie falsch sein
+ * konnte. Ab jetzt KANN sie falsch sein — was der Auftraggeber ausdruecklich will, denn eine Wahl
+ * ohne falsche Antwort ist keine Wahl. Was bleibt, ist die schwaechere und ehrlichere Zusage: der
+ * Wert einer Karte ist vollstaendig durch Rarität und Gebaeude erklaert, es gibt keinen versteckten
+ * dritten Regler (`tests/sponsor-offer-service.test.ts` nagelt genau das fest).
+ */
+export const SPONSOR_V3_WERT_BY_RARITY: Record<SponsorV3Rarity, number> = {
+  "gewöhnlich": 0.89,
+  magisch: 1.0,
+  selten: 1.05,
+  "legendär": 1.11,
+};
+
+export function sponsorV3WertFaktorFor(rarity: string): number {
+  return SPONSOR_V3_WERT_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V3_WERT_BY_RARITY.magisch;
+}
+
 /** Tilt-Staerke dieser Rarity, hart auf [−0,3, +0,3] geklammert. */
 export function sponsorV3TiltFor(rarity: string): number {
   const beta = SPONSOR_V3_TILT_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V3_TILT_BY_RARITY.magisch;

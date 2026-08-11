@@ -46,6 +46,35 @@ alte Fassung baut.
 | **E7** | **Abnutzung ist Teil der Leihe** — und existiert bereits im Code (`lib/facilities/facility-condition.ts`): Neuzustand 100, Verfall 8 je Saison bei bezahltem Unterhalt (22 unbezahlt), volle Wirkung bis 70, darunter linear fallend, bei 0 zählt das Gebäude als Stufe 0. Chris will den Zustand als **Vertragsvariable**: derselbe Gebäudetyp auf derselben Stufe kann neu oder gebraucht verliehen werden — zwei Karten, gleiche Stufe, verschiedener Wert, ohne eine neue Zahl zu erfinden. Und der **Übernahmepreis richtet sich nach dem Zustand**: `(Katalogkosten − angerechneter Leihwert) × Zustand/100`. Die Aufstiegsstufen selbst kosten unverändert immer gleich viel. Die Folgelast gehört sichtbar auf die Karte: nach der Übernahme zahlt der Käufer den Unterhalt, und wer ihn nicht zahlt, verliert 22 statt 8 Punkte je Saison. | neu — §4.5 ergänzen |
 | **E8** | **Wieder fünf Angebote statt drei.** Chris: „wenn wir dann wieder genug verschiedene möglichkeiten haben lohnen auch wieder die 5 statt 3 sponsoren." Nicht die Zahl war das Problem, sondern was auf den Karten stand: fünf Karten mit je 2–4 aufgesetzten Modulen und elf Kurvenformen. Mit klarer Unterscheidung (Cash gegen Gebäude, Rarität als Kurs, Zustand als Güte) sind fünf eine Auswahl statt eines Rätsels. **Auflage aus der Messung:** die fünf müssen die Preisspanne abdecken. Zwölf von 32 Teams können nur die reine Cash-Karte bezahlen — ein Slate aus fünf teuren Karten wäre für die halbe Liga eine Scheinauswahl. Mindestens eine Karte ohne Verzicht und eine gewöhnliche Gebäude-Karte im unteren Preisband gehören immer dazu. | §7 W8, §1 („drei Karten"), §6 Schritt 4 |
 
+### Nachtrag vom 11.08., abends — zwei Regler statt einem
+
+Nach der ersten Umsetzung von Schritt 4 hat Chris zwei Dinge nachgeschoben, die beide gegen die
+gerade gebaute Fassung stehen:
+
+| # | Entscheidung | Was hinfällig wird |
+|---|---|---|
+| **E9** | **Größe und Rarität sind getrennte Regler.** „es soll ja verschiedene stufen geben von gebäude sponsoren, manche wollen zb 30 für die gebäude manche nur 5 dafür sind manche stärker manche schwächer." Die erste Fassung koppelte die Startstufe an die Rarität (1/2/2/3) — gemessen lag der Verzicht damit über **alle** Karten zwischen 0,5 und 4,3 C, also praktisch gleich teuer. Die beiden Achsen taten dasselbe und hoben sich auf: eine seltenere Karte stieg höher ein, bekam ihre Stufe aber auch billiger. Jetzt gilt: **Größe** = wie viel Gebäude (Stufe 1 / 3 / 5), **Rarität** = wie gut der Handel dafür ist (Kurs 1,4 / 1,8 / 2,3 / 3,0). Gemessen über eine Liga: **0,8 bis 25,4 C**. | E7s „Startstufe je Rarität"; `STARTSTUFE_JE_RARITAET` |
+| **E10** | **Die Rarität bewegt auch den reinen Cash-Wert.** „ein legendärer cash sponsor der nur cash gibt kann teils mehr wert haben als ein guter magischer sponsor mit nem top gebäude angebot an reinem wert." Die Rarität skaliert deshalb die **ganze Leiter** (`SPONSOR_V3_WERT_BY_RARITY`, ±11 % um die magische Mitte = 6 bis 12 C). Gemessen: in **17 von 32** Slates schlägt die reine Cash-Karte jede Gebäude-Karte am reinen Erwartungswert. | Invariante „alle Karten eines Slates haben denselben Erwartungswert" |
+
+**Was E10 kostet, offen benannt:** Die EV-Parität war der Grund, warum die KI-Wahl ökonomisch nie
+falsch sein konnte. Sie gilt nicht mehr — eine Wahl kann jetzt objektiv falsch sein, und das ist
+gewollt („eine Wahl ohne falsche Antwort ist keine Wahl"). Was bleibt und weiter getestet wird, ist
+die schwächere Zusage: rechnet man beide Regler heraus (Verzicht hinzu, durch den Wertfaktor
+geteilt), ist die Spreizung eines Slates **0,076 C** — es gibt keinen dritten, versteckten Regler.
+
+**Zwei Folgeänderungen, ohne die E9 nicht funktioniert:**
+1. **Das Sicherheitsnetz sinkt mit der Karte.** `SPONSOR_BODEN` = 43 C fest, niedrigste Sprosse
+   52,1 C — es blieben 9,1 C Luft. Ein Verzicht von 25 C wäre am Tabellenende vollständig vom Netz
+   aufgefangen worden: Gebäude geschenkt. Der Boden ist jetzt `SPONSOR_BODEN × Wertfaktor − Verzicht`.
+2. **Ein Deckel aus der eigenen Leiter.** Höchstens die Hälfte der garantierten Saisonzahlung
+   (`VERZICHT_ANTEIL_DER_LEITER`); reicht sie nicht, wird die Karte eine Größe kleiner statt
+   unbezahlbar. Starke Teams können sich mehr Gebäude leisten als schwache — derselbe Rubberband.
+
+**Noch offen aus diesem Nachtrag:** Chris' Einwand „der vorschuss an sich bringt nicht viel weil
+alle kosten und einnahmen immer am saisonende sind" ist zutreffend und **nicht** umgesetzt. Der
+Vorschuss steht ohnehin auf der Abriss-Liste von Schritt 8; bis dahin bleibt er wirkungsarm, aber
+nicht schädlich.
+
 **Ebenfalls entschieden, von Chris an Fable delegiert:** Die Gewinnkurven **variieren nicht**. Feste,
 unterscheidbare Formen je Cash-Karte (flach / mittel / steil); Gebäude-Karten tragen gar keine Kurve.
 Begründung: drei stabile Formen kann ein Spieler lernen, einen Würfel darauf nicht — und die
