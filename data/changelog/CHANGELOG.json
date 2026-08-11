@@ -66,6 +66,15 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "Finanzen · Saisonabrechnung",
+      "pr": null,
+      "text": "Nach der Saisonabrechnung stand die halbe Liga auf exakt 0,0 Cash. Kein Zufall: der Insolvenz-Ausgleich lief am Saisonende mit und gab jedem Team im Minus ungefragt einen Bank-Kredit ueber genau den Fehlbetrag. Nach Saison 2 traf das NEUN von 32 Teams — Lost Kingdom 31,2, Mayhem Mavericks 27,6, Death Peaches 21,7, Terrible Teachers 20,5, Hell Raisers 18,4, Royal Court 16,7, Pirate Crew 16,6, Wrecking Legionnaires 6,8, Vigorous Vikings 4,7, zusammen 164,2 Mio Kreditsumme, die niemand beantragt hatte. Gedacht war der Ausgleich als das kleinere Uebel gegenueber einem Clamp auf 0 (der Fehlbetrag blieb ja als verzinste Restschuld stehen), aber der ZEITPUNKT war falsch: am Saisonende hat ein Team noch nichts tun koennen, es hat weder verkauft noch gekauft. Jetzt wird am Saisonende nur noch FESTGESTELLT, wer im Minus steht — der Stand bleibt negativ und das Team muss sich selbst befreien. Der Weg dahin war laengst gebaut und wurde nur nie betreten, weil der Ausgleich vorher zumachte: negatives Cash blockiert Kaeufe, erzwingt Notverkaeufe und setzt den Verkaufsdruck auf den Hoechstwert. Am Ende des KAUFFENSTERS bleibt der Ausgleich unveraendert bestehen — da hat das Team verkauft, gekauft und den regulaeren Kredit-Pass hinter sich, und was dann noch fehlt, ist ein echter Fehlbetrag, mit dem es nicht in die Saison starten kann.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "KI · Transfermarkt",
       "pr": null,
       "text": "Die teuren Teams wussten beim Verkaufen nicht, dass sie ueber der Apron-Linie stehen. Die Verkaufsbewertung sah Verkaufswert, Marktwert, Restlaufzeit, Teamcash und Raenge — die Lage zur Linie kam in keiner einzigen Begruendung vor. Hell Raisers zahlten 16,6 und kannten als Verkaufsgruende nur negatives Cash und schwache Leistung. Jetzt baut jedes Team ueber seiner Gehaltsdecke gezielt ab: es kennt den noetigen Betrag, waehlt danach aus und hoert auf, sobald er erreicht ist. Verankert ist das an der AMBITIONSDECKE, nicht an der ersten Linie — ein Titelanwaerter soll die Abgabe zahlen und den Kader behalten. Auf dem Spielstand bauen damit 4 Teams ueber zusammen 18,9 Gehalt ab statt 8 Teams ueber 62,5. Bewertet wird die Ersparnis am ERLOES, nicht am Gehalt: bei Hell Raisers ranken die gehaltsschweren Ergaenzungsspieler oben (6,1 Gehalt bei 16,8 Marktwert) und die Stars unten (11,8 bei 39,8) — abgegeben wird der Steuerposten, nicht der beste Spieler. Der Zeitpunkt steht im Begruendungstext, weil er zaehlt: die Apron-Abrechnung ist beim Verkaufen schon gebucht, ein Abbau senkt die Abgabe der NAECHSTEN Saison, geschaetzt auf den Linien der laufenden.",
@@ -89,6 +98,15 @@
       "text": "Über der Matrix hing eine Kopie der eigenen Zeile. Sie setzte genau ein eigenes Team voraus — gepinnt wurde das gerade ausgewählte —, und wer mehrere Teams steuert, sah eins davon doppelt und die anderen nicht. Die Kopie ist weg. Die eigenen Teams bleiben auffindbar, aber über Merkmale, die mit jeder Anzahl funktionieren: der „Dein Team\"-Chip an der Zeile, die Akzentlinie und die Besitzer-Tönung.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Vorstand · Saisonziele",
+      "pr": null,
+      "text": "Die Saisonziele zaehlten im Browser nur den gerade aktiven Spieltag mit. Wer schon vier Top-20-Platzierungen gesammelt hatte, las auf der Karte trotzdem \"0/3, bestes Rank #33\" — das Ziel war laengst erfuellt, die Anzeige verschwieg es. Ursache war die Kurzfassung des Spielstands, die zum Browser faehrt: sie schnitt die Spieltags-Ergebnisliste auf den aktiven Spieltag zusammen, und die Ziel-Rechnung erkennt genau an dieser Liste, welche Leistungen zur laufenden Saison gehoeren. Alles Vorherige fiel damit durchs Raster, ebenso die Zaehlung der verbleibenden Spieltage. Jetzt faehrt die Liste vollstaendig mit — sie ist eine schmale Zeile je Spieltag und kostet 0,03 Prozent des Payloads; die schwere Fracht der Disziplin-Ergebnisse bleibt unveraendert beschnitten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {
@@ -125,6 +143,15 @@
       "text": "Abgeschlossene Saisons zeigten in Training, Leistung und Alterung das BUDGET vor Verteilung und Ceiling-Kappung, die laufende Saison daneben die tatsächlich angekommenen Attribut-Änderungen. Zwei verschiedene Größen unter demselben Namen, direkt untereinander — an einer Spielerin nachgemessen stand für S1 „Leistung +8,1\" gegen S2 „+1,8\", obwohl ihr Leistungs-Budget mit 8,10 zu 8,16 praktisch unverändert war. Der Unterschied war die Ceiling-Kappung, nicht ihre Leistung. Gezeigt wird jetzt überall dasselbe: was beim Charakter ankommt. Wo die Herkunft je Attribut fehlt, bleiben die drei Posten leer, statt ersatzweise das Budget auszuweisen.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Teams mit Krediten merkten nicht, dass es so nicht weitergeht. Der Verkaufsdruck der KI misst die Kasse von HEUTE gegen das eigene Cash-Ziel — Schulden gehen dort gar nicht ein. Am Spielstand standen deshalb acht Teams mit leerer Kasse gleichauf beim Hoechstwert 1,00, darunter Mayhem Mavericks (Restschuld 90,2, Kreditrate 32,7, Gehalt 107,7 — der kommenden Abrechnung fehlen 51,8) genauso wie Vigorous Vikings, denen 1,4 fehlen. Ein Signal, das beide gleich laut anschreit, sagt der KI nicht, wer wirklich mehr verkaufen muss. Jetzt gibt es dafuer eine eigene Fruehwarnung: sie misst die naechste Saisonend-Abbuchung (Gehalt plus Kreditrate) gegen ihre Deckung (Cash plus Jahresumsatz) und meldet den ungedeckten Anteil. Beide Seiten von Chris' Bedingung sind noetig — ein Team mit Schulden aber schlankem Gehalt deckt seine kleine Abbuchung aus dem Umsatz und bleibt still (Riptide Rivers hat 25,1 uebrig), ein Team mit hohem Gehalt ohne Schulden kann sich notfalls ueber einen Kredit befreien, waehrend genau diese Tuer einem verschuldeten Team halb zu ist. Am echten Stand loesen 8 von 32 Teams aus, mit acht VERSCHIEDENEN Werten von 0,08 bis 0,37 — und zwar mitten in der Gruppe, die der Cash-Druck nicht mehr trennen konnte: von den 14 verschuldeten Teams sitzen 9 dort auf exakt 1,00. Die Warnung senkt die Verkaufsschwelle, haelt die Auswahl am Laufen bis die Abbuchung gedeckt waere, und steht als eigener Grund im Begruendungstext. Sie erzwingt nie einen Verkauf: der Kader-Mindestschutz bleibt unberuehrt. Seit das Saisonende keinen Zwangs-Notkredit mehr vergibt, ist das die einzige Stelle, die der KI VOR dem Minus sagt, dass sie handeln sollte.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {

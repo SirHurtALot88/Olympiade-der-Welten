@@ -22,7 +22,7 @@ import {
   hasFacilitySeasonEndFinanceApplied,
   previewFacilitySeasonEndFinance,
 } from "@/lib/facilities/facility-season-end-service";
-import { applyInsolvencyBackstop, applyLoanSettlement, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
+import { applyLoanSettlement, collectNegativeCashTeams, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -538,29 +538,27 @@ async function runLocalSeasonCompletionUnsafe(
 
   const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterFacilityFinanceSave;
 
-  // Zahlungsunfähigkeits-Backstop: LETZTER Cash-Schritt. Nach Sponsor/Gehalt, Kredit-Raten, Gebäude-Unterhalt
-  // und Ziel-Rewards darf kein Team negatives Cash haben. Statt Cash auf 0 zu klemmen (Geldschöpfung) nimmt
-  // jedes negative Team einen Notkredit über den Fehlbetrag auf → Cash danach = 0, echte Restschuld im
-  // bestehenden Kreditsystem.
-  const insolvency =
-    !dryRun && blockingReasons.size === 0
-      ? applyInsolvencyBackstop({ gameState: afterObjectiveSave.gameState, saveId: afterObjectiveSave.saveId })
-      : { gameState: afterObjectiveSave.gameState, emergencyLoans: [] as Array<{ teamId: string; principal: number }>, warnings: [] as string[] };
-  let afterInsolvencySave = afterObjectiveSave;
-  if (insolvency.emergencyLoans.length > 0) {
-    persistence.saveSingleplayerState(afterObjectiveSave.saveId, insolvency.gameState);
-    afterInsolvencySave = resolveLocalSave(persistence, initialSave.saveId);
-  }
+  // ZAHLUNGSUNFÄHIGKEIT WIRD FESTGESTELLT, NICHT AUSGEGLICHEN.
+  //
+  // Früher nahm hier jedes Team mit negativem Cash ungefragt einen Notkredit über den Fehlbetrag auf
+  // (Cash danach = 0). Auf dem gespielten Stand standen dadurch nach der Abrechnung von Saison 2
+  // NEUN von 32 Teams auf exakt 0,0 und kein einziges im Minus — zusammen 164,2 Mio Kreditsumme, die
+  // niemand beantragt hatte. Chris: „teams können auch ins negative gehen und müssen das dann mit
+  // verkäufen und krediten wieder auffüllen! es darf nicht einfach geld erschummelt und auf 0
+  // gesetzt werden."
+  //
+  // Der Weg zurück ist längst gebaut: negatives Cash blockiert Käufe, erzwingt Notverkäufe und setzt
+  // den Verkaufsdruck auf den Höchstwert. Er wurde nur nie betreten, weil der Backstop vorher
+  // zumachte. Dieser Schritt schreibt deshalb NICHTS mehr — er weist nur aus, wer im Minus steht.
+  const negativeCash = collectNegativeCashTeams(afterObjectiveSave.gameState);
+  const afterInsolvencySave = afterObjectiveSave;
   addStep(
     steps,
     {
       key: "insolvency_backstop",
       label: "Zahlungsunfähigkeit",
-      status: insolvency.emergencyLoans.length > 0 ? "applied" : "skipped",
-      warnings: [
-        ...insolvency.warnings,
-        ...insolvency.emergencyLoans.map((loan) => `emergency_loan:${loan.teamId}:${loan.principal}`),
-      ],
+      status: negativeCash.teams.length > 0 ? "already_done" : "skipped",
+      warnings: negativeCash.warnings,
       blockingReasons: [],
       auditId: null,
     },
