@@ -380,4 +380,70 @@ describe("Formkarten bei Kauf und Verkauf", () => {
       before.negativePenaltyPoints - Math.abs(negativeCard.cardValue) * 0.5,
     );
   });
+  it("zieht ungespielte Karten aus der alten, gespiegelten Ziehung nach — gespielte bleiben unangetastet", () => {
+    // Chris: „formkarten sind KEIN gespiegeltes paar sowohl positriv als auch negativ sind sie
+    // RANDOM!". Der Generator zieht seit dem Avalanche-Fix wirklich unabhaengig, aber die
+    // Selbstheilung ergaenzte bisher nur FEHLENDE und raeumte VERWAISTE Karten ab — eine bereits
+    // vorhandene behielt ihren alten Wert fuer immer. Am Live-Save: 510 von 680 Karten trugen noch
+    // die alte Ziehung, 266 von 266 Spielern hatten ein exakt gespiegeltes Paar.
+    const saveId = "save-formcards-alte-ziehung";
+    const withCards = ensureLocalFormCardsForSeason(baseGameState(), saveId, SEASON_ID);
+
+    // Eine Karte gilt als gespielt (steckt in der Wertung eines gelaufenen Spieltags) ...
+    const gespielteKarte = cardsOf(withCards, "A-A", "p-a1").find((card) => card.id.endsWith(":positive"))!;
+    const draft: LineupDraft = {
+      lineupId: "lineup-a-md1",
+      saveId,
+      seasonId: SEASON_ID,
+      matchdayId: "matchday-1",
+      teamId: "A-A",
+      status: "resolved",
+      entries: [],
+      modifiers: {
+        d1: {
+          primaryFormCardId: gespielteKarte.id,
+          secondaryFormCardId: null,
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+        d2: {
+          primaryFormCardId: null,
+          secondaryFormCardId: null,
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+      },
+      createdAt: "2026-06-10T12:00:00.000Z",
+      updatedAt: "2026-06-10T12:00:00.000Z",
+    };
+
+    // ... und beide Karten tragen manipulierte Werte, wie sie aus der alten Ziehung stammen wuerden.
+    const ungespielteKarte = cardsOf(withCards, "A-A", "p-a1").find((card) => card.id.endsWith(":negative"))!;
+    const verstellt = {
+      ...withCards,
+      seasonState: {
+        ...withCards.seasonState,
+        lineupDrafts: [draft],
+        formCards: (withCards.seasonState.formCards ?? []).map((card) => {
+          if (card.id === gespielteKarte.id) return { ...card, cardValue: 999 };
+          if (card.id === ungespielteKarte.id) return { ...card, cardValue: -999 };
+          return card;
+        }),
+      },
+    };
+
+    const healed = ensureLocalFormCardsForSeason(verstellt, saveId, SEASON_ID);
+    const danach = cardsOf(healed, "A-A", "p-a1");
+
+    // Die gespielte Karte behaelt ihren Wert: sie steckt in einem gelaufenen Spieltag, ihn
+    // nachtraeglich zu aendern wuerde vergangene Formmodifikatoren umschreiben.
+    expect(danach.find((card) => card.id === gespielteKarte.id)!.cardValue).toBe(999);
+    // Die ungespielte wird auf die heutige, unabhaengige Ziehung zurueckgeholt.
+    expect(danach.find((card) => card.id === ungespielteKarte.id)!.cardValue).toBe(ungespielteKarte.cardValue);
+    expect(danach.find((card) => card.id === ungespielteKarte.id)!.cardValue).not.toBe(-999);
+  });
 });
