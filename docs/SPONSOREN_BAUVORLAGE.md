@@ -1,6 +1,11 @@
 # Sponsoren-Rework — Bauvorlage
 
-Stand: 2026-08-11 · Status: **Bauvorlage zur Abnahme. Kein Produktionscode geändert.**
+Stand: 2026-08-11 (zweite Fassung) · Status: **abgenommen, Umsetzung freigegeben.**
+
+> **Lies zuerst Abschnitt −1.** Er trägt acht Entscheidungen von Chris, die Teile der Vorlage
+> umkehren — unter anderem fällt der 60-%-Leih-Abzug ersatzlos weg, die Rarität wird zum
+> Umwandlungskurs, Einnahmegebäude sind wieder verleihbar, es bleibt bei fünf Angeboten statt
+> drei, und die Abnutzung der Gebäude wird Teil von Leihe und Übernahme.
 
 Dieses Dokument macht aus vier bisher nebeneinander stehenden Quellen EINE widerspruchsfreie
 Vorlage:
@@ -21,6 +26,42 @@ Ist-Zustand als Delta-Basis (gemessen am Code auf `main`, `lib/sponsor/`, 24 Dat
 (`sponsor-curve-shapes.ts`), je Angebot 2–3 `components` plus 2–4 `moduleIds`, dazu Rarity,
 Golden-Los, Vorschuss, Laufzeit-Würfel, fünf Zielachsen und ein Challenge-Slot. Das ist Chris'
 „total unübersichtlich".
+
+---
+
+## −1. Entscheidungen vom 11.08. — diese Fassung schlägt alles Folgende
+
+Nach der Abnahme-Prüfung hat Chris acht Punkte präzisiert oder umgekehrt. **Wo unten etwas anderes
+steht, gilt dieser Abschnitt.** Die überholten Stellen sind einzeln benannt, damit niemand gegen die
+alte Fassung baut.
+
+| # | Entscheidung | Was unten hinfällig wird |
+|---|---|---|
+| **E1** | **Kein Abzug — zwei Sorten Sponsor.** Nicht eine Karte mit Abschlag, sondern: viel Cash pur, oder weniger Cash plus Gebäude. Chris: „Teams nehmen bewusst in kauf weniger cash zu bekommen um gute gebäude zu leihen." | §1 (Abzugszeile), §2, §4.2 komplett, §6 Schritt 2 Fixpunkte, §8 W3 |
+| **E2** | **Die Rarität IST der Kurs.** Vier Stufen in der Reihenfolge gewöhnlich → magisch → selten → legendär, Umwandlung **1,4 · 1,8 · 2,3 · 3,0** (Enden von Chris gesetzt, Zwischenstufen geometrisch). Der Kurs ändert nicht die Höhe der Zahlung, sondern wie viel Gebäude man für denselben Verzicht bekommt. | §1 („Rarity-Farbe entfällt"), §5.1 |
+| **E3** | **Gerechnet wird rückwärts.** Die Karte bietet eine konkrete Gebäudestufe an, daraus folgt der Preis: `Verzicht = Leihwert(Stufe) / Kurs`. Nie umgekehrt — sonst kommt ein Betrag zwischen zwei Stufen heraus, mit dem niemand etwas anfangen kann. Basis ist der **Leihwert je Saison**, nicht die Katalog-Baukosten. | §4.2 |
+| **E4** | **Einnahmegebäude sind wieder verleihbar.** Fan Shop und Arena bleiben drin. Chris: „Wenn man zb nen sponsor bekommt der einem nen fan shop leiht ist das ja quasi auch free money." Dass der Shop sich selbst trägt, ist der Reiz, nicht das Schlupfloch — der Ertrag steckt bereits im Leihwert und damit im Preis, und die Rangmarke macht ihn bedingt. Auflage: bei Einnahmegebäuden auf den **erwarteten Saisonertrag** rechnen statt auf die Leihwert-Formel (Fan Shop identisch, Arena nicht). | §0 Invariante 4, §4.3, §8 W4 |
+| **E5** | **Negative Margen sind gewollt — der Rubberband der Liga.** Chris: „wenn die teams overspenden bei den gehältern ist das gewollt. dann müssen sie in folgejahren mit den problemen leben! … schwache teams können auch mal entspannt durch segeln und top teams müssen sehr auf ihren spend achten." Die Sponsorhöhen bleiben unangetastet. Bezahlbarkeit ist **kein** Freigabekriterium mehr — sie bleibt reine Information auf der Karte. Und: **keine Sperre**, keine bevormundende Warnung. Wer knapp ist, darf trotzdem zugreifen und über Verkäufe oder Kredit gegenfinanzieren. | §6 Schritt 9 („kein Team unter 0 gezwungen"), §7.5 |
+| **E6** | **Keine Migration.** Chris startet mit den Sponsoren ein neues Spiel. Rückwärtskompatibilität ist keine Freigabebedingung mehr; alte Saves sollen laden können, ohne dass Sonderpfade für Altformate gebaut und getestet werden. | §5.2 und §5.3 komplett, §6 Schritt 4 Wächter-Kante, Schritt 5 Altvertrags-Regression |
+| **E7** | **Abnutzung ist Teil der Leihe** — und existiert bereits im Code (`lib/facilities/facility-condition.ts`): Neuzustand 100, Verfall 8 je Saison bei bezahltem Unterhalt (22 unbezahlt), volle Wirkung bis 70, darunter linear fallend, bei 0 zählt das Gebäude als Stufe 0. Chris will den Zustand als **Vertragsvariable**: derselbe Gebäudetyp auf derselben Stufe kann neu oder gebraucht verliehen werden — zwei Karten, gleiche Stufe, verschiedener Wert, ohne eine neue Zahl zu erfinden. Und der **Übernahmepreis richtet sich nach dem Zustand**: `(Katalogkosten − angerechneter Leihwert) × Zustand/100`. Die Aufstiegsstufen selbst kosten unverändert immer gleich viel. Die Folgelast gehört sichtbar auf die Karte: nach der Übernahme zahlt der Käufer den Unterhalt, und wer ihn nicht zahlt, verliert 22 statt 8 Punkte je Saison. | neu — §4.5 ergänzen |
+| **E8** | **Wieder fünf Angebote statt drei.** Chris: „wenn wir dann wieder genug verschiedene möglichkeiten haben lohnen auch wieder die 5 statt 3 sponsoren." Nicht die Zahl war das Problem, sondern was auf den Karten stand: fünf Karten mit je 2–4 aufgesetzten Modulen und elf Kurvenformen. Mit klarer Unterscheidung (Cash gegen Gebäude, Rarität als Kurs, Zustand als Güte) sind fünf eine Auswahl statt eines Rätsels. **Auflage aus der Messung:** die fünf müssen die Preisspanne abdecken. Zwölf von 32 Teams können nur die reine Cash-Karte bezahlen — ein Slate aus fünf teuren Karten wäre für die halbe Liga eine Scheinauswahl. Mindestens eine Karte ohne Verzicht und eine gewöhnliche Gebäude-Karte im unteren Preisband gehören immer dazu. | §7 W8, §1 („drei Karten"), §6 Schritt 4 |
+
+**Ebenfalls entschieden, von Chris an Fable delegiert:** Die Gewinnkurven **variieren nicht**. Feste,
+unterscheidbare Formen je Cash-Karte (flach / mittel / steil); Gebäude-Karten tragen gar keine Kurve.
+Begründung: drei stabile Formen kann ein Spieler lernen, einen Würfel darauf nicht — und die
+Fallenfreiheit (Q1: 6–7 von 11 Kurven waren Fallen) müsste sonst je Wurf garantiert werden statt einmal.
+
+**Ebenfalls korrigiert:** Die Übernahmeformel aus §4.5 („Katalogkosten − gezahlte Abzüge") hat unter
+dem Kurs-Modell einen Konstruktionsfehler — je seltener die Karte, desto weniger Verzicht wurde
+gezahlt, desto teurer die Übernahme. Die beste Karte bekäme den schlechtesten Preis. Richtig ist die
+Anrechnung dessen, was der Sponsor **bereitgestellt** hat: `Katalogkosten − Σ Leihwert der gehaltenen
+Saisons`, raritätsunabhängig, danach mit dem Zustand aus E7 multipliziert.
+
+**Der 19-%-Einbruch (bisher §6 Schritt 0 und §7.1) ist aufgeklärt und damit erledigt.** 371,3 C davon
+waren eine Einmal-Reparaturbuchung aus Saison 1. Dabei kam ein aktives Leck zutage: Mehrjahres-Verträge
+ohne Kurvenform behielten beim Saisonwechsel ihren eingefrorenen Gehaltsfaktor, 10 von 32 Verträgen
+steckten auf 1,0 fest statt auf 1,19 — zusammen 129,6 C zu wenig, und der Fehler entstand bei jedem
+Saisonwechsel neu. Behoben in `rerollSponsorV3TermsForNewSeason`.
 
 ---
 
