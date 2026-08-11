@@ -40,12 +40,50 @@ export function clampFacilityCondition(value: number | null | undefined) {
   return Math.max(0, Math.min(FACILITY_CONDITION_FULL, roundValue(value)));
 }
 
+/**
+ * WIRKUNGS-UNTERGRENZE, solange das Gebaeude ueberhaupt steht.
+ *
+ * Chris: „ein fan shop sollte sich auch noch minimal rentieren wenn er schon sehr angeschlagen
+ * ist."
+ *
+ * Ohne Untergrenze lief die Wirkung linear gegen null — und ein Einnahmegebaeude wurde dabei zum
+ * Zuschussgeschaeft: Fan Shop Stufe 3 traegt 11,70 bei voller Wirkung gegen 1,40 Unterhalt, bei
+ * Zustand 10 nur noch 1,46 (netto +0,06) und bei Zustand 5 schon −0,67. Ein Gebaeude, das Geld
+ * KOSTET, weil es alt ist, waere eine Falle: die einzige richtige Antwort waere Abreissen, und
+ * dafuer gibt es keinen Grund im Spiel.
+ *
+ * Mit 25 % Untergrenze traegt derselbe Shop auch im schlimmsten Zustand noch 2,93 gegen 1,40
+ * Unterhalt — er rentiert sich minimal, genau wie gefordert, und bleibt trotzdem ein klarer
+ * Anreiz zur Reparatur (statt 11,70). Bei Zustand 0 zaehlt das Gebaeude weiterhin als Stufe 0,
+ * die Untergrenze greift dort also nicht.
+ */
+export const FACILITY_EFFICIENCY_FLOOR = 25;
+
+/**
+ * KOSTENFAKTOR DER REPARATUR — Chris: „die reparatur sollte sich auf jeden fall lohnen."
+ *
+ * Vorher 0,45. Damit rechnete sich die Reparatur eines Fan Shops Stufe 3 in einer Saison ERST
+ * unterhalb von Zustand 30 (bei 40 kostete sie 6,21 gegen 5,85 entgangenen Ertrag — ein Minus).
+ * Man haette also nur ein fast totes Gebaeude repariert, und genau das ist die falsche Reihenfolge.
+ *
+ * Mit 0,30 dreht sich das: ab dem Punkt, an dem spuerbar Wirkung fehlt, ist die Reparatur die
+ * bessere Wahl (Zustand 60: Kosten 2,76 gegen 2,93 entgangen; Zustand 40: 4,14 gegen 5,85). Ganz
+ * dicht unter der Schwelle rechnet sie sich weiterhin nicht — dort fehlt aber auch kaum etwas,
+ * und ein sofortiges Nachpolieren waere Verschwendung, nicht Sorgfalt.
+ */
+export const FACILITY_MAINTENANCE_COST_FACTOR = 0.3;
+
 export function getFacilityEfficiencyPct(conditionPct: number | null | undefined) {
   const condition = clampFacilityCondition(conditionPct);
   if (condition >= FACILITY_CONDITION_WARNING) {
     return FACILITY_CONDITION_FULL;
   }
-  return roundValue((condition / FACILITY_CONDITION_WARNING) * FACILITY_CONDITION_FULL);
+  if (condition <= 0) {
+    return 0;
+  }
+  return roundValue(
+    Math.max(FACILITY_EFFICIENCY_FLOOR, (condition / FACILITY_CONDITION_WARNING) * FACILITY_CONDITION_FULL),
+  );
 }
 
 export function getFacilityConditionStatus(conditionPct: number | null | undefined) {
@@ -72,7 +110,7 @@ export function calculateFacilityMaintenanceCost(input: {
   const definition = getFacilityLevelDefinition(input.facilityId, input.level);
   const missingConditionShare = (FACILITY_CONDITION_FULL - clampFacilityCondition(input.conditionPct)) / 100;
   const costBase = Math.max(definition?.upgradeCost ?? 0, definition?.seasonUpkeep ?? 0);
-  return roundValue(Math.max(1, costBase * missingConditionShare * 0.45));
+  return roundValue(Math.max(1, costBase * missingConditionShare * FACILITY_MAINTENANCE_COST_FACTOR));
 }
 
 /**
