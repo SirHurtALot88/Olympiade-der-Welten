@@ -139,6 +139,17 @@ function buildGameState(input?: {
     teamIdentities: [identity],
     players,
     disciplines: [],
+    // Potenzial läuft seit der Vereinheitlichung NUR über den Record (hiddenPotentialScore);
+    // das Fixture-Feld player.potential wird hier in Records übersetzt, damit die Tests
+    // dieselbe Absicht („hohes/niedriges Potenzial") über die eine gültige Quelle ausdrücken.
+    playerPotential: players.map((player) => ({
+      playerId: player.id,
+      potentialBand: "medium" as const,
+      hiddenPotentialScore: player.potential,
+      confidence: 0,
+      source: "generated" as const,
+      modelVersion: 8,
+    })),
     rosters: players.map((player, index) => ({
       id: `r${index + 1}`,
       teamId: "T-1",

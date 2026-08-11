@@ -39,6 +39,7 @@ import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/lega
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 
 function roundScore(value: number) {
   return Number(value.toFixed(2));
@@ -527,7 +528,8 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       race: player.race,
       displayMarketValue: getImportedPlayerDisplayMarketValue(player),
       displaySalary: getImportedPlayerDisplaySalary(player),
-      potential: player.potential ?? null,
+      // Eine Quelle: Potenzial aus dem Record statt aus dem Import-Altfeld player.potential.
+      potential: resolvePlayerPotentialScoreFromGameState({ gameState: normalizedGameState, playerId: player.id }),
       ovr: player.ovr ?? player.rating ?? null,
       pps: player.pps ?? null,
       fatigue,

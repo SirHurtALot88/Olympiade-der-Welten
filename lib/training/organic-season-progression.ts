@@ -31,6 +31,7 @@ import {
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
   resolvePlayerPotentialRecordFromGameState,
+  resolvePlayerPotentialScoreFromGameState,
   type AttributeHeadroomState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
@@ -515,10 +516,13 @@ export function getPerformanceGapAccelerator(potentialTrainingMultiplier: number
 }
 
 function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
-  const record = resolvePlayerPotentialRecordFromGameState({ gameState, playerId: player.id });
-  const potential =
-    record?.hiddenPotentialScore ??
-    (isFiniteNumber(player.potential) && player.potential > 0 ? player.potential : null);
+  // NUR der Potenzial-Record zählt (eine Quelle). Der frühere Fallback auf das Import-Altfeld
+  // `player.potential` bedeutete: je nachdem, ob ein Record existierte, rechnete das Training
+  // mit einer ANDEREN Zahl als die PO-Anzeige — am Live-Spielstand nachgemessen wichen beide
+  // Werte bei allen 2984 Spielern ab (Median +16,1; bei 2761 Spielern hing der Beschleuniger
+  // von der Quellenwahl ab, Delta bis 0,45). Ohne Record gibt es keine erfundene Ersatzzahl,
+  // sondern neutral 1,0.
+  const potential = resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id });
   if (potential == null) return 1;
   const currentAbility = isFiniteNumber(player.rating) ? player.rating : potential;
   const gap = Math.max(0, potential - currentAbility);
@@ -924,7 +928,10 @@ export function buildOrganicSeasonProgression(input: {
       secondaryTrainingClass: null,
       trainingMode: normalizeTrainingMode(input.player.trainingMode),
       fatigueLoad: 0,
-      potentialRating: isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null,
+      // Auch im Leer-Ergebnis dieselbe eine Potenzial-Quelle wie im Normalpfad (Record,
+      // nicht das Import-Altfeld player.potential) — sonst meldet der Report hier eine
+      // andere Zahl, als der Multiplikator eine Zeile tiefer verrechnet.
+      potentialRating: resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: input.player.id }),
       potentialTrainingMultiplier: getPotentialTrainingMultiplierFromRecord(input.gameState, input.player),
       performanceGapAccelerator: getPerformanceGapAccelerator(
         getPotentialTrainingMultiplierFromRecord(input.gameState, input.player),
@@ -999,7 +1006,7 @@ export function buildOrganicSeasonProgression(input: {
     normalizeProgressionClassName(input.player.className) ??
     calculateDynamicClassName(attributesBefore, input.gameState.seasonState.adminBalancingConfig);
   const secondaryTrainingClass = getSecondaryTrainingClass(input.player, input.facilities);
-  const potentialRating = resolvePlayerPotentialRecordFromGameState({ gameState: input.gameState, playerId: input.player.id })?.hiddenPotentialScore ?? null;
+  const potentialRating = resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: input.player.id });
   const starSnapshot = buildPlayerStarScoutingSnapshot({
     gameState: input.gameState,
     player: input.player,

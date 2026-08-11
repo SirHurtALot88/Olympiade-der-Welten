@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-11",
+      "seite": "Spieler · Potenzial",
+      "pr": null,
+      "text": "Ein Spieler hatte zwei Potenzialwerte: das beim Import einmalig gesetzte Feld am Spieler und den Wert des Potenzial-Modells, den Training, PO-Sterne und Saisonende tatsächlich pflegen. Am Live-Spielstand nachgemessen wichen beide bei allen 2984 Spielern ab (Median 16 Punkte, Lyraeth Vael 65,74 gegen 77) — je nach Ansicht sah man also eine andere Zahl, als das Training rechnete. Jetzt gibt es nur noch eine Quelle: den Modellwert. Kaderkarten, Spielerprofil, Markt, KI-Entscheidungen und Trainings-Beschleuniger lesen alle denselben Wert; das alte Import-Feld ist als Altfeld stillgelegt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-10",
       "seite": "Arena · Team-Karte",
       "pr": null,

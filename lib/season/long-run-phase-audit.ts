@@ -23,6 +23,7 @@ import {
 } from "@/lib/season/long-run-organic-progression-audit";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { isSoftPhaseAuditRed } from "@/lib/season/long-run-soft-blockers";
 
@@ -459,7 +460,13 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
   const rostered = gameState.rosters
     .map((entry) => playerById.get(entry.playerId))
     .filter((player): player is NonNullable<typeof player> => Boolean(player));
-  const potViolations = rostered.filter((player) => (player.potential ?? 0) < (player.rating ?? 0));
+  // Geprüft wird die EINE Potenzial-Quelle (Record-Score), nicht das Import-Altfeld
+  // player.potential — das driftet nach dem Import nicht mit und meldete hier sonst
+  // Verstöße bzw. Entwarnung auf Basis einer Zahl, mit der kein System mehr rechnet.
+  const potViolations = rostered.filter((player) => {
+    const potential = resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id });
+    return potential != null && potential < (player.rating ?? 0);
+  });
   checks.push(
     potViolations.length > 0
       ? check("training_potential", "RED", `${potViolations.length} Spieler Potential < Rating`)
@@ -688,11 +695,11 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
 
   const potentialRecords = gameState.playerPotential ?? [];
   const potentialByPlayer = new Map(potentialRecords.map((record) => [record.playerId, record.hiddenPotentialScore]));
-  const parityMismatches = rostered.filter((player) => {
-    const hidden = potentialByPlayer.get(player.id);
-    if (hidden == null || player.potential == null) return false;
-    return Math.abs(hidden - player.potential) > 8;
-  });
+  // Die frühere Parity-Prüfung player.potential ↔ hiddenPotentialScore ist entfallen:
+  // player.potential ist als Import-Altfeld dokumentiert (olyDataTypes), wird von keinem
+  // Gameplay-/UI-Leser mehr gelesen und driftet konstruktionsbedingt (nur der Record wird
+  // vom Saisonende-Modell gepflegt) — die Warnung hätte ab Saison 2 auf jedem Save
+  // dauerhaft gefeuert, ohne dass es etwas zu reparieren gäbe.
   // PO is a ceiling and must never sit below the player's current ability
   // (see lib/progression/player-potential-service.ts deriveHiddenPotentialScore).
   // Guard here too so a future regression in the generator surfaces here.
@@ -703,25 +710,15 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
     if (currentAbilityScore == null) return false;
     return hidden < currentAbilityScore;
   });
-  const hasParityMismatch = parityMismatches.length > rostered.length * 0.2;
   const hasPoBelowCa = poBelowCaViolations.length > 0;
   checks.push(
-    hasParityMismatch || hasPoBelowCa
+    hasPoBelowCa
       ? check(
           "potential_field_parity",
           "WARN",
-          [
-            hasParityMismatch
-              ? `${parityMismatches.length} Spieler: player.potential weicht >8 von hiddenPotentialScore ab`
-              : null,
-            hasPoBelowCa
-              ? `${poBelowCaViolations.length} Spieler: hiddenPotentialScore < CA (Potential-Ceiling unter aktueller Fähigkeit)`
-              : null,
-          ]
-            .filter((entry): entry is string => entry != null)
-            .join(" | "),
+          `${poBelowCaViolations.length} Spieler: hiddenPotentialScore < CA (Potential-Ceiling unter aktueller Fähigkeit)`,
         )
-      : check("potential_field_parity", "PASS", "Potential-Felder plausibel, PO >= CA"),
+      : check("potential_field_parity", "PASS", "Potential-Quelle plausibel, PO >= CA"),
   );
 
   return checks;

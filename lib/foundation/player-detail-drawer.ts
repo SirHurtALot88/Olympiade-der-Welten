@@ -109,7 +109,7 @@ import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerDevelopmentInsight,
-  buildPlayerScoutPotential,
+  buildPlayerScoutPotentialFromGameState,
   type PlayerDevelopmentInsight,
   type PlayerScoutPotential,
 } from "@/lib/progression/player-potential-service";
@@ -133,6 +133,7 @@ import {
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -934,29 +935,40 @@ function ownedPotentialRevealsExact(facilityScoutingLevel: number | null | undef
   return normalizeScoutingLevelValue(facilityScoutingLevel) >= OWNED_EXACT_POTENTIAL_SCOUTING_LEVEL;
 }
 
-// T-024 (Fog-of-War-Leak) + Progressive-PO-Reveal: player.potential ist der exakte,
-// interne Hidden-Score.
+// T-024 (Fog-of-War-Leak) + Progressive-PO-Reveal: der exakte, interne Hidden-Score.
 //  - Fremdspieler (visibility "scouted") bekommen ihn NIE roh, sondern über die
-//    effectiveScoutingLevel-Bandbreite (buildPlayerScoutPotential) — unverändertes
-//    Bestandsverhalten.
+//    effectiveScoutingLevel-Bandbreite (buildPlayerScoutPotentialFromGameState) —
+//    unverändertes Bestandsverhalten.
 //  - EIGENE Spieler ("exact") bekommen den exakten Score erst ab scouting_office L5;
 //    darunter greift DIESELBE getScoutingUncertainty()-Bandbreite (reuse), nur aus
 //    dem reinen Facility-Level abgeleitet (L0 ±16 grob, L1 ±10, L2 ±8, L3 ±6, L4 ±4).
 //    Das Band verengt sich damit monoton mit dem Scouting-Ausbau.
+// Quelle ist der Potenzial-Record (hiddenPotentialScore), NICHT das Import-Altfeld
+// player.potential: das wich am Live-Spielstand bei allen Spielern vom Modell ab
+// (Lyraeth Vael 65,74 vs. 77) — der Spieler sah damit bei Scouting L5 eine andere
+// Zahl, als das Training tatsächlich verrechnete.
 function maskPotentialForVisibility(
-  player: Pick<Player, "potential">,
-  visibility: AttributeVisibility,
-  scoutingLevel: number | null | undefined,
-  scoutPotential: PlayerScoutPotential | null,
-  ownedFacilityScoutingLevel?: number | null,
+  input: {
+    gameState: GameState;
+    player: Player;
+    visibility: AttributeVisibility;
+    scoutingLevel: number | null | undefined;
+    scoutPotential: PlayerScoutPotential | null;
+    ownedFacilityScoutingLevel?: number | null;
+  },
 ): { potential: number | null; scoutPotential: PlayerScoutPotential | null } {
+  const { gameState, player, visibility, scoutingLevel, scoutPotential, ownedFacilityScoutingLevel } = input;
   if (visibility === "exact") {
     if (ownedPotentialRevealsExact(ownedFacilityScoutingLevel)) {
-      return { potential: player.potential ?? null, scoutPotential };
+      return {
+        potential: resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }),
+        scoutPotential,
+      };
     }
     return {
       potential: null,
-      scoutPotential: buildPlayerScoutPotential({
+      scoutPotential: buildPlayerScoutPotentialFromGameState({
+        gameState,
         player,
         scoutingLevel: normalizeScoutingLevelValue(ownedFacilityScoutingLevel),
       }),
@@ -964,7 +976,7 @@ function maskPotentialForVisibility(
   }
   return {
     potential: null,
-    scoutPotential: buildPlayerScoutPotential({ player, scoutingLevel }),
+    scoutPotential: buildPlayerScoutPotentialFromGameState({ gameState, player, scoutingLevel }),
   };
 }
 
@@ -2565,15 +2577,16 @@ export function buildPlayerDrawerDataFromGameState(input: {
     spentXP: player.spentXP ?? 0,
     lifetimeXP: player.lifetimeXP ?? null,
   });
-  // T-024: player.potential (exakter Hidden-Score) und der davon abgeleitete scoutPotential
+  // T-024: der exakte Hidden-Score (Potenzial-Record) und der davon abgeleitete scoutPotential
   // werden bei nicht-exakter Visibility durch eine scoutingLevel-Bandbreite ersetzt.
-  const maskedPotential = maskPotentialForVisibility(
+  const maskedPotential = maskPotentialForVisibility({
+    gameState: input.gameState,
     player,
-    attributeVisibility,
+    visibility: attributeVisibility,
     scoutingLevel,
-    progressionForecast.scoutPotential,
-    facilityScoutingLevel,
-  );
+    scoutPotential: progressionForecast.scoutPotential,
+    ownedFacilityScoutingLevel: facilityScoutingLevel,
+  });
   // Progressive-PO-Reveal auch für die "eigenen" Potential-Anzeigen (Achsen-PO-
   // Sterne, Achsen-Decke, Attribut-Ceilings, PO-Sterne im Header): Diese Felder
   // zeigen den exakten Hidden-PO als Sterne und werden – wie der exakte PO-Score –
@@ -3247,8 +3260,16 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     injuryHistoryRows: [],
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
     // T-024: gleiche Kopplung an attributeVisibility wie im Hauptpfad — der exakte Hidden-Score
-    // wird bei nicht-exakter Visibility unterdrückt statt roh durchgereicht.
-    potential: attributeVisibility === "exact" ? catalogPlayer?.potential ?? rosterPlayer?.potential ?? null : null,
+    // wird bei nicht-exakter Visibility unterdrückt statt roh durchgereicht. Quelle ist auch
+    // hier der Potenzial-Record, nicht das Import-Altfeld player.potential des Katalogs;
+    // ohne GameState (reiner Legacy-Kontext) lieber null als eine abweichende Ersatzzahl.
+    potential:
+      attributeVisibility === "exact"
+        ? resolvePlayerPotentialScoreFromGameState({
+            gameState: input.context.gameState ?? null,
+            playerId: input.playerId,
+          })
+        : null,
     scoutPotential: null,
     developmentInsight: null,
     organicProgression: detailPlayer?.lastOrganicProgression ?? null,

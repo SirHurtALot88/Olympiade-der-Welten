@@ -23,6 +23,7 @@ import {
   usesSingleCashPlanningPolicy,
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
@@ -489,7 +490,9 @@ function buildContractActions(save: PersistedSaveGame, preview: AiLeagueManageme
       role,
       salary: roster.salary ?? player.displaySalary ?? player.salaryDemand ?? 0,
       contractLength: roster.contractLength,
-      youth: (player.potential ?? 0) >= 72,
+      // Eine Quelle: Record-Score statt Import-Altfeld player.potential (wich am
+      // Live-Spielstand ligaweit ab, Median +16,1).
+      youth: (resolvePlayerPotentialScoreFromGameState({ gameState: save.gameState, playerId: player.id }) ?? 0) >= 72,
     });
     const sellStrategy: AiManagerContractStrategy = strategy === "market_test" ? "sell_if_offer" : "wait_and_see";
     const cash = getTeamCash(save.gameState, roster.teamId);

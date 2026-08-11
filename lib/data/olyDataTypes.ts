@@ -1025,6 +1025,17 @@ export type Player = {
   flavorDe: string;
   fatigue: number;
   form: number;
+  /**
+   * ALTFELD — NICHT mehr als Potenzial-Quelle lesen. Wird nur einmalig beim Import
+   * (`character-import-service`: max(rating, Top-3-Ø) + 4) bzw. beim Generator-Commit
+   * gesetzt und danach nie gepflegt. Das Saisonende-Modell driftet ausschließlich
+   * `playerPotential[].hiddenPotentialScore`; am Live-Spielstand (2026-08, n=2984) wichen
+   * dadurch ALLE Spieler ab (Median +16,1 Punkte, hiddenPotentialScore fast immer höher).
+   * Die eine gültige Quelle ist `gameState.playerPotential[].hiddenPotentialScore`,
+   * aufgelöst über `resolvePlayerPotentialScoreFromGameState`
+   * (lib/scouting/player-attribute-ceiling-service.ts). Das Feld bleibt nur für
+   * Persistenz-Roundtrips und Alt-Saves ohne Records bestehen.
+   */
   potential: number;
 };
 

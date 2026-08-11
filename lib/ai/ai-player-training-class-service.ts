@@ -1,5 +1,6 @@
 import type { GameState, Player, RosterEntry, PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import type { AiManagementTrainingFocus } from "@/lib/ai/ai-team-management-preview-service";
 import {
   CLASS_PROGRESSION_WEIGHTS,
@@ -122,6 +123,8 @@ function pickSignatureAlignedClass(input: {
 
 function pickClassFromPool(input: {
   player: Player;
+  /** Potenzial-Score aus dem Record (eine Quelle), vom Aufrufer aufgelöst; null = unbekannt. */
+  potentialScore: number | null;
   focus: AiManagementTrainingFocus;
   rosterRank: number;
   gmPowBias: number;
@@ -132,7 +135,10 @@ function pickClassFromPool(input: {
   const natural = normalizeProgressionClassName(input.player.className);
   const reasons: string[] = [];
   const age = resolvePlayerAge(input.player);
-  const isProspect = (age != null && age <= 22) || (input.player.potential ?? 0) >= 72;
+  // Eine Quelle: der Record-Score statt des Import-Altfelds player.potential (wich am
+  // Live-Spielstand ligaweit ab, Median +16,1) — sonst stuft die KI andere Spieler als
+  // "Prospect" ein, als das Potenzial-Modell tatsächlich führt.
+  const isProspect = (age != null && age <= 22) || (input.potentialScore ?? 0) >= 72;
   const isVeteran = age != null && age >= 30;
   const isStarter = input.rosterRank <= 4;
 
@@ -215,6 +221,7 @@ export function buildTeamPlayerTrainingClassPlans(input: {
       const rosterRank = rosterRankByPlayerId.get(player.id) ?? rosterEntries.length;
       const resolved = pickClassFromPool({
         player,
+        potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: player.id }),
         focus: input.trainingFocus,
         rosterRank,
         gmPowBias,

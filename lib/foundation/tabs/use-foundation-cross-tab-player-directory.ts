@@ -374,7 +374,9 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           roster,
           team,
           seasonPerformance,
-          potentialScore: potentialRecord?.hiddenPotentialScore ?? player.potential ?? null,
+          // Bewusst OHNE player.potential-Fallback: das Altfeld wich am Live-Spielstand
+          // ligaweit vom Modell ab; lieber kein PO-Stern als ein falscher.
+          potentialScore: potentialRecord?.hiddenPotentialScore ?? null,
           playerOvr: playerRating?.ovrNormalized ?? null,
           ovrRank: playerRating?.ovrRank ?? null,
           playerMvs: playerRating?.mvs ?? null,

@@ -14,6 +14,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
 
@@ -633,7 +634,13 @@ export function buildDoctrineSeasonReview(gameState: GameState) {
         moraleNote: "nicht im Doctrine-Block geschrieben",
         // XP-System abgeschafft: kein currentXP-Signal mehr im Doctrine-Review (immer 0).
         xp: 0,
-        regressionRisk: player.potential < rating ? "high" : player.potential - rating < 10 ? "medium" : "low",
+        // Eine Quelle: Record-Score statt Import-Altfeld player.potential (wich am
+        // Live-Spielstand ligaweit ab); ohne Record kein erfundenes Risiko → "low".
+        regressionRisk: (() => {
+          const potential = resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id });
+          if (potential == null) return "low" as const;
+          return potential < rating ? ("high" as const) : potential - rating < 10 ? ("medium" as const) : ("low" as const);
+        })(),
         contractStatus: roster.contractStatus ?? "active",
         keepSellRenew: valueRatio < 2 ? "watch" : roster.contractLength <= 1 ? "renew" : "keep",
         salaryValue: valueRatio >= 5 ? "cheap" : valueRatio >= 2 ? "fair" : "expensive",
@@ -712,7 +719,11 @@ export function buildManagerDecisionJournalPreview(gameState: GameState): AiMana
 export function buildIdentityGuardAudit(gameState: GameState): AiIdentityGuardResult[] {
   const result: AiIdentityGuardResult[] = [];
   const candidateByTeam: Record<string, Player | null> = {
-    "M-M": gameState.players.find((player) => (player.marketValue ?? 0) < 10 && (player.potential ?? 0) > (player.rating ?? 0)) ?? null,
+    "M-M": gameState.players.find(
+      (player) =>
+        (player.marketValue ?? 0) < 10 &&
+        (resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }) ?? 0) > (player.rating ?? 0),
+    ) ?? null,
     "W-W": gameState.players.find((player) => player.className !== "Mage" && player.race !== "Construct" && (player.rating ?? 0) > 70) ?? null,
     "C-C": gameState.players.find((player) => (player.marketValue ?? 0) > 80) ?? null,
   };
