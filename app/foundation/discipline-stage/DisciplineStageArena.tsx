@@ -1884,6 +1884,8 @@ export default function DisciplineStageArena({
   const [commitStateByDiscipline, setCommitStateByDiscipline] = useState<
     Record<string, "pending" | "booked" | "failed">
   >({});
+  /** Warum die Buchung abgelehnt wurde — je Disziplin. `null`, solange es keinen Grund gibt. */
+  const [commitFailureReason, setCommitFailureReason] = useState<Record<string, string | null>>({});
   const commitInFlightRef = useRef<Set<string>>(new Set());
   const commitState = commitStateByDiscipline[disciplineId] ?? (activeSideScoredInSave ? "booked" : null);
 
@@ -1913,9 +1915,15 @@ export default function DisciplineStageArena({
       void onCommitDiscipline(side, preview)
         .then(() => {
           setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "booked" }));
+          setCommitFailureReason((prev) => ({ ...prev, [finishedDisciplineId]: null }));
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          // Der Grund wurde hier bislang verschluckt: „Die Wertung ist fehlgeschlagen" stand
+          // ohne jede Angabe da, und niemand — auch nicht der Entwickler — konnte sehen, WARUM.
+          const reason = error instanceof Error && error.message ? error.message : null;
           setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+          setCommitFailureReason((prev) => ({ ...prev, [finishedDisciplineId]: reason }));
+          console.error("[Arena] Buchung der Disziplin fehlgeschlagen", finishedDisciplineId, error);
         })
         .finally(() => {
           commitInFlightRef.current.delete(finishedDisciplineId);
@@ -2476,7 +2484,9 @@ export default function DisciplineStageArena({
               ? matchdayPanel?.d2?.disciplineId === disciplineId
                 ? "Spieltag gewertet — beide Disziplinen stehen im Saisonstand."
                 : "Gewertet — die Platzierungspunkte stehen im Saisonstand."
-              : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
+              : commitFailureReason[disciplineId]
+                ? `Die Punkte wurden nicht gebucht — ${commitFailureReason[disciplineId]}`
+                : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
         </div>
       ) : null}
 
