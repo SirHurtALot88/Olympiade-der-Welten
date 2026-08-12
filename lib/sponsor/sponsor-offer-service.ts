@@ -824,7 +824,20 @@ const SPONSOR_AI_CURVE_FIT_WEIGHT = 3;
 const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
 
 /**
- * GEWICHT DES ECO-DOWNSIDE-TERMS. Kalibriert an `eco-messung.ts` (6 Seeds x 32 Teams) UND an
+ * GEWICHT DES ECO-DOWNSIDE-TERMS.
+ *
+ * ACHTUNG, DIESE KALIBRIERUNG IST HISTORISCH: sie wurde gegen den SPONSOR-VORSCHUSS gefahren, den es
+ * nicht mehr gibt (Begruendung in sponsor-v3-model.ts). Alles unten, was von einer "Vorschuss-Karte",
+ * der Spalte `mitVorschuss/32` oder dem Vorschuss-Term `+0,25 * Betrag` spricht, beschreibt einen
+ * Zustand vor dem Ausbau und ist NICHT mehr nachmessbar.
+ *
+ * WAS DAVON HEUTE NOCH GILT: der Wert bleibt bei 3 — bewusst unveraendert, damit der Vorschuss-Ausbau
+ * die KI-Wahl nicht zusaetzlich verschiebt. Was WEGGEFALLEN ist, ist die OBERGRENZE: sie kam allein
+ * daraus, dass der Vorschuss-Term um dieselben Angebote konkurrierte und der Test ab Gewicht 3,5
+ * umkippte. Diese Konkurrenz gibt es nicht mehr, das Gewicht ist nach oben also nicht mehr gebunden.
+ * Wer es neu setzen will, muss neu messen — die Tabelle unten taugt dafuer nicht mehr.
+ *
+ * URSPRUENGLICHE KALIBRIERUNG (Stand vor dem Ausbau): `eco-messung.ts` (6 Seeds x 32 Teams) UND
  * `tests/sponsor-v4-ki-wahl.test.ts` ("greift bei Geldnot zum Vorschuss": alle 32 Teams auf Kasse −30,
  * Schwelle: > 8 von 32 muessen trotzdem die Vorschuss-Karte nehmen) — nicht am Gefuehl.
  *
@@ -866,8 +879,8 @@ const SPONSOR_AI_TERM_INSURANCE_SHARE = 0.02;
  * an, OHNE die Testgrenze zu beruehren (das Testszenario hat nie ein Druck-7-Team) — und genau das
  * erklaert den staerkeren Effekt bei GLEICHEM Gewicht 3.
  *
- * `tests/sponsor-v4-ki-wahl.test.ts` bleibt die tatsaechliche Kalibrierungsgrenze: der bestehende
- * Vorschuss-Term (`+0,25 * advance.amount`) und der Eco-Downside-Term konkurrieren um dieselben
+ * `tests/sponsor-v4-ki-wahl.test.ts` war die tatsaechliche Kalibrierungsgrenze: der damalige
+ * Vorschuss-Term (`+0,25 * Betrag`) und der Eco-Downside-Term konkurrierten um dieselben
  * Angebote, eine Vorschuss-Karte ist nicht zwangslaeufig die bodenstaerkste. Zwischen Gewicht 3 und 3,5
  * kippt die Konkurrenz (10 → 6 von 32). Gewicht 3 ist damit das groesste mit komfortabler Marge (2 ueber
  * der Schwelle), nicht das theoretisch staerkste.
