@@ -82,7 +82,7 @@ async function main() {
   // (Genau darauf bin ich beim ersten Anlauf hereingefallen: 1 Spieler je Team, alle Spieltage
   // scheiterten an "Only 0/3 players available".)
   console.log("--- Liga-Draft ---");
-  const nachDraft = kickoffLeagueSetupDraft({ persistence, saveId });
+  const nachDraft = kickoffLeagueSetupDraft({ persistence, saveId, logPrefix: "[abnahme]" });
   if (!nachDraft) {
     fehler.push("Liga-Draft nicht angelaufen — ohne Kader ist der Rest des Laufs wertlos");
   }
