@@ -1,3 +1,4 @@
+import { wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
 import type {
   ContractNegotiationDraft,
   ContractShape,
@@ -724,6 +725,8 @@ export function recommendContractOfferForPlayer(input: {
   apronHeadroom?: number | null;
   /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
   backLoadedShare?: number | null;
+  /** Nenner zu `backLoadedShare` — der Mix-Riegel braucht MIX_RIEGEL_MINDESTZAHL. */
+  mehrjahresVertraege?: number | null;
 }): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
@@ -996,35 +999,18 @@ export function recommendContractOfferForPlayer(input: {
   //
   // Chris' Vorgabe war beides: „das muss die AI berücksichtigen" UND „es sollen ja nicht alle top
   // teams dann nur back loaded nehmen […] dann hast du irgendwann nen sehr teuren gehaltspeak […]
-  // der mix machts." Deshalb zwei eng gefasste Regeln statt eines Schalters.
-  //
-  // (1) Ueber der Apron-Linie wird NICHT front-geloadet. Die Abgabe ist damit nicht zu umgehen (sie
-  //     bemisst sich absichtlich auf der geglaetteten Zahl), aber front-loaded legt die hoehere
-  //     ECHTE Zahlung genau in die Saison, in der die Abgabe ohnehin faellig wird. Am Abbild
-  //     gemessen taten das fuenf von acht Teams ueber der Linie (M-M: geglaettet 81,6, echt 95,9).
-  // (2) Der Mix-Riegel: ist schon die Haelfte der laufenden Mehrjahresvertraege back-loaded, wird
-  //     nicht noch einer draufgelegt — sonst schiebt das Team seine Last gesammelt in eine spaetere
-  //     Saison. Dann lieber balanced.
-  //
-  // Beide greifen nur, wenn die Lage bekannt ist; ohne die Angaben bleibt alles wie bisher.
-  const apronUeberLinie = input.apronHeadroom != null && input.apronHeadroom <= 0;
-  const backLoadLastig = input.backLoadedShare != null && input.backLoadedShare >= 0.5;
-  const mehrjaehrig = contractLength >= 2;
-
-  if (apronUeberLinie && mehrjaehrig && contractShape === "front_loaded") {
-    // AUSGEGLICHEN, NICHT BACK-LOADED. Erst stand hier `back_loaded`, wenn das Team noch nicht
-    // back-load-lastig war. Chris hat das gestoppt: „achtung deine messwerte schieben alles extrem
-    // richtung backloaded das gefaellt mir gar nicht." Er hat recht — am Abbild sind 57 % der
-    // Mehrjahresvertraege in Saison 1 front-loaded, die Regel haette also breit in Richtung
-    // back-loaded gedrueckt. Sie nimmt jetzt nur die teure Rate aus der Saison heraus, in der die
-    // Abgabe ohnehin faellig wird, und schiebt sie NICHT gesammelt nach hinten.
-    contractShape = "balanced";
-    reasons.push("Ueber der Apron-Linie: nicht zusaetzlich frueh zahlen, wenn die Abgabe ohnehin faellig wird.");
-  }
-  if (backLoadLastig && mehrjaehrig && contractShape === "back_loaded") {
-    contractShape = "balanced";
-    reasons.push("Schon ueberwiegend back-loaded: ein weiterer wuerde den Gehaltsberg spaeter aufbauen.");
-  }
+  // der mix machts." Die Regel selbst steht in `contract-shape-context.ts` — DORT und nicht hier,
+  // weil es drei Formwaehler im Spiel gibt (Kaufvorschau, Fast-Batch, Verlaengerung) und alle drei
+  // dieselbe Regel brauchen. Ohne die Angaben verhaelt sich die Empfehlung unveraendert.
+  const apronUndMix = wendeApronUndMixAn({
+    form: contractShape,
+    laufzeit: contractLength,
+    apronHeadroom: input.apronHeadroom,
+    backLoadedShare: input.backLoadedShare,
+    mehrjahresVertraege: input.mehrjahresVertraege,
+  });
+  contractShape = apronUndMix.form;
+  if (apronUndMix.grund) reasons.push(apronUndMix.grund);
 
   return {
     contractLength: clamp(Math.round(contractLength), 1, 5),

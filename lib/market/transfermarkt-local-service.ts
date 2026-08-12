@@ -2395,6 +2395,11 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           isFirstSeason: gameState.season.id === "season-1",
           gmArchetype: getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null,
           highValue: (marketValueReference ?? 0) >= 35,
+          // ZWEITER Aufrufer derselben Empfehlung — der Fast-Batch-Pfad. Er wurde beim ersten Umbau
+          // uebersehen; ueber ihn laeuft der S1-Draft, und im Live-Abbild stammen ALLE 329-334
+          // `ai_roster_fill`-Kaeufe beider Spielstaende aus Saison 1. Ohne diese Zeilen bliebe der
+          // mengenstaerkste Kaufstrom apron-blind.
+          ...getContractShapeTeamContext(gameState, params.teamId),
         })
       : null;
   const contractLength = hasExplicitContractLength

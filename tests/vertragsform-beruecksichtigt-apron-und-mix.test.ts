@@ -25,6 +25,7 @@ import { describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
+import { MIX_RIEGEL_MINDESTZAHL, wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
 import type { Player } from "@/lib/data/olyDataTypes";
 
 const gameState = createFreshSeasonOneGameState();
@@ -39,7 +40,11 @@ const teurerSpieler: Player = [...gameState.players].sort(
  * Marktwert, langer Kerndeal, offensives Profil. Ohne diesen Aufbau prüfte der Test nichts —
  * die Apron-Regel greift ausschliesslich dort, wo sonst front-geloadet würde.
  */
-function frontLoadLage(extra?: { apronHeadroom?: number; backLoadedShare?: number }) {
+function frontLoadLage(extra?: {
+  apronHeadroom?: number;
+  backLoadedShare?: number;
+  mehrjahresVertraege?: number;
+}) {
   const marktwert = 40;
   return {
     player: teurerSpieler,
@@ -108,8 +113,49 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
       dealRole: "core",
       isFirstSeason: false,
       backLoadedShare: 0.75,
+      mehrjahresVertraege: 8,
     } as never);
     expect(engMitRiegel.contractShape).toBe("balanced");
+  });
+
+  it("der Mix-Riegel braucht einen Mindestnenner — 2 von 2 ist kein Gehaltsberg", () => {
+    // Fables Befund: ohne Mindestnenner triggerte der Riegel am Abbild real bei D-P (2/2) und
+    // A-A (4/4). Bei so wenigen Vertraegen sagt der Anteil nichts ueber eine Zukunftslast aus.
+    const knapp = wendeApronUndMixAn({
+      form: "back_loaded",
+      laufzeit: 3,
+      backLoadedShare: 1,
+      mehrjahresVertraege: MIX_RIEGEL_MINDESTZAHL - 1,
+    });
+    expect(knapp.form).toBe("back_loaded");
+
+    const genug = wendeApronUndMixAn({
+      form: "back_loaded",
+      laufzeit: 3,
+      backLoadedShare: 1,
+      mehrjahresVertraege: MIX_RIEGEL_MINDESTZAHL,
+    });
+    expect(genug.form).toBe("balanced");
+  });
+
+  it("die gemeinsame Regel verschiebt nur — sie erzeugt aus keiner Eingabe back_loaded", () => {
+    // Die Zusicherung, auf die es Chris ankommt, an der Regel selbst statt nur ueber die Vorschau.
+    for (const form of ["front_loaded", "back_loaded", "balanced"] as const) {
+      for (const headroom of [-30, -0.1, 0, 5, 50]) {
+        for (const anteil of [0, 0.49, 0.5, 1]) {
+          const ergebnis = wendeApronUndMixAn({
+            form,
+            laufzeit: 3,
+            apronHeadroom: headroom,
+            backLoadedShare: anteil,
+            mehrjahresVertraege: 10,
+          });
+          if (form !== "back_loaded") {
+            expect(ergebnis.form, `${form}/${headroom}/${anteil}`).not.toBe("back_loaded");
+          }
+        }
+      }
+    }
   });
 
   it("bei Einjahresvertraegen aendert die Lage nichts — dort gibt es keine Verteilung", () => {
@@ -128,9 +174,10 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
       apronHeadroom: -20,
       backLoadedShare: 0.9,
     } as never);
-    if (ohne.contractLength === 1) {
-      expect(mit.contractShape).toBe(ohne.contractShape);
-    }
-    expect(mit.contractLength).toBe(ohne.contractLength);
+    // Der Aufbau MUSS einen Einjahresvertrag liefern, sonst prueft der Fall nichts. Fable hatte
+    // zurecht bemaengelt, dass die Zusicherung vorher konditional war und leer durchlaufen konnte.
+    expect(ohne.contractLength).toBe(1);
+    expect(mit.contractLength).toBe(1);
+    expect(mit.contractShape).toBe(ohne.contractShape);
   });
 });

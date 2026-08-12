@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  getContractShapeTeamContext,
+  wendeApronUndMixAn,
+  type ContractShapeTeamContext,
+} from "@/lib/market/contract-shape-context";
 import type {
   ContractEventRecord,
   ContractShape,
@@ -623,6 +628,17 @@ function buildAiRenewalCashGate(input: {
   };
 }
 
+/**
+ * DER DRITTE FORMWAEHLER — und der mengenstaerkste. Kaufvorschau und Fast-Batch waehlen die Form
+ * beim Kauf; DIESE Stelle waehlt sie bei jeder Verlaengerung, und davon gibt es mehr: im
+ * Live-Abbild sind 121 von 176 KI-Verlaengerungen mehrjaehrig (Saison 2), also mehr
+ * Mehrjahresvertraege als der gesamte Transfermarkt derselben Saison hergibt. Genau hier binden
+ * Top-Teams ihre teuren Stars neu.
+ *
+ * Beim ersten Umbau blieb diese Stelle apron-blind — aufgedeckt in Fables Audit zu PR #508. Die
+ * Cash-Logik unten ist unveraendert; sie darf weiterhin front- wie back-loaded empfehlen. Erst
+ * danach laeuft `wendeApronUndMixAn` als gemeinsamer Riegel darueber.
+ */
 function chooseAiRenewalContractShape(input: {
   team: Team | null;
   entry: RosterEntry;
@@ -630,6 +646,7 @@ function chooseAiRenewalContractShape(input: {
   renewalSalary: number | null;
   cashGate: ReturnType<typeof buildAiRenewalCashGate>;
   profile: TeamStrategyProfile | null;
+  shapeContext: ContractShapeTeamContext | null;
 }): ContractShape {
   if (input.recommendedLength <= 1) return "balanced";
 
@@ -651,11 +668,24 @@ function chooseAiRenewalContractShape(input: {
   const futureReliefProfile = wageSensitivity >= 7 || longContractPreference >= 7 || sellForProfitAggression >= 7;
   const cashPreservationProfile = cashPriority >= 7 || shortContractPreference >= 7;
 
-  if (tightNow && cashPreservationProfile) return "back_loaded";
-  if (strongCashBuffer && futureReliefProfile) return "front_loaded";
-  if (cashPriority >= 8 && !strongCashBuffer) return "back_loaded";
-  if (wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10) return "front_loaded";
-  return "balanced";
+  const ausCashLage: ContractShape =
+    tightNow && cashPreservationProfile
+      ? "back_loaded"
+      : strongCashBuffer && futureReliefProfile
+        ? "front_loaded"
+        : cashPriority >= 8 && !strongCashBuffer
+          ? "back_loaded"
+          : wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10
+            ? "front_loaded"
+            : "balanced";
+
+  return wendeApronUndMixAn({
+    form: ausCashLage,
+    laufzeit: input.recommendedLength,
+    apronHeadroom: input.shapeContext?.apronHeadroom,
+    backLoadedShare: input.shapeContext?.backLoadedShare,
+    mehrjahresVertraege: input.shapeContext?.mehrjahresVertraege,
+  }).form;
 }
 
 function buildToken(input: {
@@ -864,6 +894,7 @@ function buildPreviewRow(input: {
           renewalSalary: moraleAdjustedRenewalSalary,
           cashGate: renewalCashGate,
           profile: teamStrategyProfile,
+          shapeContext: getContractShapeTeamContext(save.gameState, entry.teamId),
         })
       : "balanced";
   const marketValueForBad =
