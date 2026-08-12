@@ -439,6 +439,13 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       getPlayerAvailabilityView(normalizedGameState, entry.playerId, params.teamId, params.matchdayId),
     ] as const),
   );
+  // Wer NICHT einsatzfaehig ist, darf nicht mehr AUFGESTELLT werden — das ist die Auswahlliste.
+  // Die Disziplinwerte (`disciplineScores`) haengen bewusst NICHT daran: eine bereits abgegebene
+  // Aufstellung muss wertbar bleiben, auch wenn ein darin stehender Spieler inzwischen verletzt
+  // ist. Sonst blockiert eine in D1 zugezogene Verletzung die Wertung von D2 desselben Spieltags
+  // (`missing_scores`) — der Spieltag haengt dann dauerhaft. Der Server-Pfad
+  // (`legacy-lineup-context-loader.ts`) fuehrt die Werte ebenfalls ungefiltert mit; der
+  // Verletzungs-Abschlag kommt getrennt ueber `injuryByPlayerId`.
   const selectableActivePlayers = activePlayers.filter(({ entry }) => !availabilityByPlayerId.get(entry.playerId)?.isUnavailable);
   const existingDraft = getStoredDraft(normalizedGameState, params);
   const existingDraftLineupId = existingDraft?.lineupId ?? null;
@@ -605,7 +612,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         upkeep: entry.upkeep,
         marketValue: entry.currentValue ?? entry.purchasePrice ?? null,
       })),
-      disciplineScores: selectableActivePlayers.flatMap(({ player }) =>
+      disciplineScores: activePlayers.flatMap(({ player }) =>
         requiredDisciplineIds.map((disciplineId) => ({
           playerId: player.id,
           disciplineId,
