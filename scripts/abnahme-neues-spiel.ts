@@ -28,6 +28,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
+import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
@@ -314,6 +316,50 @@ async function main() {
   // zu (Chris' Regel). Hier steht, was danach im Archiv liegt.
   const schnappschuesse = (gameState.seasonState.seasonSnapshots ?? []) as { seasonId?: string }[];
   console.log(`  Schnappschuesse im Archiv: ${schnappschuesse.length} (${schnappschuesse.map((eintrag) => eintrag.seasonId).join(", ")})`);
+
+  // ---------------------------------------------------------------- Kauffenster der neuen Saison
+  //
+  // HIER LAG DER KUENSTLICHE TEIL MEINES LAUFS, und Chris hat es sofort gesehen: "in deinem kauf
+  // ist auf jeden fall noch n fake lauf drin weil organic wuerde so nicht picken". Stimmt. Der
+  // Lauf hat die Kader ueber den Liga-Draft gefuellt und danach NIE wieder eingekauft — waehrend
+  // im echten Spiel der Preseason-Hintergrundlauf `runAiPicksExecutePreview` je Team faehrt
+  // (`app/api/ai/preseason-background/route.ts`, `runMode: "season1_optimum_execute"`,
+  // 12 Schritte je Team). Genau dieser Lauf fuellt die Kader nach den Verkaeufen wieder auf.
+  //
+  // Ohne ihn war die Meldung "11 Teams unter 6 Spielern" eine Aussage ueber mein Skript, nicht
+  // ueber das Spiel. Jetzt laeuft derselbe Weg wie in der Anwendung — mit denselben Parametern,
+  // je Team einzeln, damit ein Team, das haengt, die anderen nicht mitreisst.
+  console.log("\n--- Kauffenster der neuen Saison (KI-Picks) ---");
+  const kiTeams = gameState.teams
+    .filter((team) => {
+      const modus = gameState.seasonState.teamControlSettings?.[team.teamId]?.controlMode;
+      return modus !== "manual" && !team.humanControlled;
+    })
+    .map((team) => team.teamId);
+  let gepickt = 0;
+  for (const teamId of kiTeams) {
+    const lauf = await runAiPicksExecutePreview(
+      {
+        source: "sqlite",
+        saveId,
+        seasonId: persistence.getSaveById(saveId)!.gameState.season.id,
+        dryRun: false,
+        confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+        teamScope: "ai",
+        teamIds: [teamId],
+        stepsPerTeam: 12,
+        runMode: "season1_optimum_execute",
+        draftSeed: `${saveId}:preseason:${teamId}`,
+      },
+      persistence,
+    ).catch((error) => {
+      auffaellig.push(`KI-Picks ${teamId}: ${(error as Error).message.slice(0, 120)}`);
+      return null;
+    });
+    if (lauf) gepickt += 1;
+  }
+  console.log(`  KI-Pick-Laeufe: ${gepickt} von ${kiTeams.length} Teams`);
+  gameState = persistence.getSaveById(saveId)!.gameState;
 
   // ---------------------------------------------------------------- Bloecke 1+2: Kaeufe/Verkaeufe
   console.log("\n=== KAEUFE UND VERKAEUFE ===");
