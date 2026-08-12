@@ -100,6 +100,8 @@ export function ensureNulaOnProjectSuicide(gameState: GameState): GameState {
     contractLength: NULA_MAX_CONTRACT_LENGTH,
     contractStatus: "active",
     salary: Math.max(0, nula.salaryDemand),
+    // UNTERSCHRIFTSPFAD: der feste Nula-Vertrag.
+    negotiatedAnnualSalary: Math.max(0, nula.salaryDemand),
     upkeep: existing?.upkeep ?? 0,
     purchasePrice: price,
     currentValue: price,

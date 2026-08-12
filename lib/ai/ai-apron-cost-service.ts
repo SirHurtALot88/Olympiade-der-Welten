@@ -12,13 +12,14 @@
  * Kaufpreis?". Ohne sie sind ein Zugang mit 2 Gehalt und einer mit 14 Gehalt für die Kaufentscheidung
  * gleich teuer, obwohl der zweite ein Team über die Linie schiebt und der erste nicht.
  *
- * BEMESSUNGSGRUNDLAGE: `getTeamDisplaySalaryTotal` — die GEGLÄTTETE Summe, also exakt die Zahl, gegen
- * die die Abrechnung am Saisonende bemisst (siehe Kopfkommentar von `apron-service.ts`, und
- * `sponsor-team-salary-display.ts`, das sie selbst schon als „die Bemessungsgrundlage für Apron,
- * Sponsor-Kalkulation und KI" ausweist). Der ZUGANG geht mit `candidate.salary` ein: ein Spieler ohne
- * Vertrag hat noch keine Front-/Back-Loading-Verteilung, sein `salary` IST damit sein
- * `expectedSalary` (`resolvePlayerEconomyContract` fällt ohne Roster-Eintrag auf dieselbe Quelle
- * zurück). Für einen frischen Zugang sind beide Zahlen also dieselbe — die Grundlage bleibt sauber.
+ * BEMESSUNGSGRUNDLAGE: `getTeamApronSalaryBase` — seit dem 12.08.2026 die Summe der bei
+ * UNTERSCHRIFT VERHANDELTEN Jahresgehälter, also exakt die Zahl, gegen die die Abrechnung am
+ * Saisonende bemisst (Kopfkommentar von `apron-service.ts`). Sie wird hier nicht nachgebaut,
+ * sondern importiert und weiterexportiert — eine Rechenstelle, keine zweite.
+ * Der ZUGANG geht mit `candidate.salary` ein: ein Spieler ohne Vertrag hat noch keine Front-/
+ * Back-Loading-Verteilung und kein Verhandlungs-Benchmark; sein `salary` ist die Zahl, die bei
+ * einer Unterschrift zum Benchmark WÜRDE. Für einen frischen Zugang ist die Grundlage damit
+ * dieselbe wie nach der Unterschrift.
  *
  * DIE ABGABE IST WIEDERKEHREND, DER KAUFPREIS EINMALIG. Diese Datei liefert die Abgabe EINER Saison.
  * Wer sie mit dem Kaufpreis verrechnet, vergleicht damit bewusst konservativ (ein Vertrag über
@@ -31,6 +32,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   apronLevyForSalary,
   getTeamApronSalaryBase,
+  resolveApronDecisionSalaryFactor,
   resolveApronSalaryFactor,
   resolveSeasonApronLines,
 } from "@/lib/season/apron-service";
@@ -42,14 +44,22 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Abgabe, die dieses Team bei der gegebenen Gehaltssumme zahlen würde (ohne Deckel, siehe apron-service). */
-export function estimateApronLevyAtSalary(gameState: GameState, salary: number): number {
+/**
+ * Abgabe, die dieses Team bei der gegebenen Gehaltssumme zahlen würde (ohne Deckel, siehe apron-service).
+ *
+ * `salaryFactor` überschreibt den Faktor der LAUFENDEN Saison für Fragen, die eine ANDERE Saison
+ * betreffen (Verkäufe wirken auf die nächste — siehe `estimateApronReliefFromShedding`). Weglassen
+ * heisst „laufende Saison", und das ist für den KAUF der richtige Wert: gekauft wird ausschliesslich
+ * in der bereits gestarteten neuen Saison (`isEarlySeasonTransferSetup`), deren Abgabe an ihrem Ende
+ * gebucht wird. Kein zweiter Lesepfad und keine zweite Formel — nur ein durchgereichter Faktor.
+ */
+export function estimateApronLevyAtSalary(gameState: GameState, salary: number, salaryFactor?: number): number {
   const lines = resolveSeasonApronLines(gameState);
   return apronLevyForSalary({
     salary,
     line1: lines.line1,
     line2: lines.line2,
-    salaryFactor: resolveApronSalaryFactor(gameState),
+    salaryFactor: salaryFactor ?? resolveApronSalaryFactor(gameState),
   });
 }
 
@@ -94,6 +104,11 @@ export function estimateMarginalApronLevy(
  * ausdrücklich zugesteht („die höhere Abgabe ist eingepreist"). Ein Ambition-9-Team würde Stars
  * abgeben, um eine Abgabe zu vermeiden, für die es sich bewusst entschieden hat. Gemessen bei Hell
  * Raisers: volle Abgabe 16,6, Ersparnis bis zur Decke aber nur 9,7.
+ *
+ * GERECHNET AUF DEM FAKTOR DER SAISON, DIE DER VERKAUF TRIFFT (`resolveApronDecisionSalaryFactor`).
+ * Verkauft wird in der Saisonende-Kette, die Abgabe der abgelaufenen Saison ist da längst gebucht —
+ * gespart wird die der NÄCHSTEN. Deren Faktor steht im selben Fenster schon fest; ihn nicht zu lesen
+ * war der gemessene Fehler (siehe `apron-abbau-ziel.ts`).
  */
 export function estimateApronReliefFromShedding(
   gameState: GameState,
@@ -107,8 +122,9 @@ export function estimateApronReliefFromShedding(
   // Unter die Decke zählt kein Abbau mehr — dort ist die Abgabe gewollt.
   const zielBasis = Math.max(basis - weg, decke);
   if (zielBasis >= basis) return 0;
-  const vorher = estimateApronLevyAtSalary(gameState, basis);
-  const nachher = estimateApronLevyAtSalary(gameState, zielBasis);
+  const { factor } = resolveApronDecisionSalaryFactor(gameState);
+  const vorher = estimateApronLevyAtSalary(gameState, basis, factor);
+  const nachher = estimateApronLevyAtSalary(gameState, zielBasis, factor);
   return round2(Math.max(0, vorher - nachher));
 }
 

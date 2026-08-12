@@ -483,6 +483,13 @@ describe("transfermarkt local service", () => {
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.roleTag).toBe("prospect");
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.promisedRole).toBe("rotation");
 
+    // UNTERSCHRIFTSPFAD (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3): jeder Kauf schreibt das
+    // verhandelte Jahresgehalt an den Vertrag — es ist die Bemessungsgrundlage der Apron. Ein
+    // Pfad, der es vergisst, besteuerte seine Vertraege stillschweigend anders als alle anderen.
+    const gekaufterVertrag = afterState.rosters.find((entry) => entry.playerId === "fa-1");
+    expect(gekaufterVertrag?.negotiatedAnnualSalary).toBe(result.offeredSalary ?? result.salary);
+    expect(gekaufterVertrag?.negotiatedAnnualSalary).toBeGreaterThan(0);
+
     // Der Kauf-Endpunkt soll den bereits berechneten Folgezustand nicht neu vom Server holen
     // müssen — `executeLocalTransfermarktBuy` liefert ihn also selbst mit zurück, identisch mit dem,
     // was tatsächlich persistiert wurde (inkl. der vom Persistenz-Layer vergebenen saveVersion).

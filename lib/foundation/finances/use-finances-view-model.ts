@@ -14,7 +14,7 @@ import {
   type SponsorSettlementRow,
 } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
-import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
+import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-source";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -273,13 +273,16 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   };
 
   // --- Board-Objective-cashDelta (T-108 c) --------------------------------
-  // Netto-cashDelta, den die Engine über `buildTeamSeasonObjectiveSettlement` tatsächlich verbucht
-  // (Prämien completed − Strafen failed). Wir ZEIGEN nur diesen Netto-Wert und duplizieren die
-  // Objective-Logik NICHT (der Board-Service ist die einzige Quelle; ein separater Doppelzahlungs-
-  // Bug in den Sponsor-Komponenten wird andernorts im Service selbst behoben, nicht hier gespiegelt).
-  const objectiveCashDelta = round1(
-    buildTeamSeasonObjectiveSettlement(gameState).byTeamId[teamId]?.cashDelta ?? 0,
-  );
+  // Netto-cashDelta, den die Engine tatsächlich verbucht (Prämien completed − Strafen failed). Wir
+  // ZEIGEN nur diesen Netto-Wert und duplizieren die Objective-Logik NICHT.
+  //
+  // Quelle ist `getObjectiveCashByTeam` — DIESELBE, die auch `resolveSeasonGuvForTeam` liest. Vorher
+  // rief diese Stelle `buildTeamSeasonObjectiveSettlement` selbst auf: zwei Rechenstellen für
+  // dieselbe Zahl, und beide rechneten für längst gebuchte Saisons neu gegen den inzwischen
+  // veränderten Kontostand. Die F2-Parität (`buildFinancesViewModel.guv == resolveSeasonGuvForTeam`)
+  // hängt daran, dass hier und dort dieselbe Quelle steht.
+  const objectiveCash = getObjectiveCashByTeam(gameState);
+  const objectiveCashDelta = round1(objectiveCash.byTeamId.get(teamId) ?? 0);
   const objectiveReward = objectiveCashDelta > 0 ? objectiveCashDelta : null;
   const objectivePenalty = objectiveCashDelta < 0 ? round1(-objectiveCashDelta) : null;
 
@@ -416,6 +419,7 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     apronFrozenLines: apronProjection?.frozenLines ?? true,
     apronGebucht,
     objectiveCashDelta,
+    boardzieleGebucht: objectiveCash.gebucht && objectiveCash.quelle === "beleg",
     salaryTotal,
     loanInterest: loanInterestTotal,
     loanPrincipal: loanPrincipalTotal,

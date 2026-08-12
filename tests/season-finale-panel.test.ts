@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import type { GamePhase } from "@/lib/data/olyDataTypes";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
+
 const read = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
 const PANEL = read("app/foundation/season-v2/FoundationSeasonFinalePanel.tsx");
 const BODY = read("app/foundation/FoundationShellRouterBody.tsx");
@@ -34,10 +37,42 @@ describe("Saisonabschluss: eine Bühne statt des Cockpits", () => {
   });
 
   it("erscheint nur, wenn die Saison auch durch ist", () => {
-    // Mitten in der Saison wäre ein Abschluss-Block Unsinn und würde die Tabelle verdecken.
-    expect(BODY).toContain(
-      'activeView === "seasonV2" && (gameState.gamePhase === "season_completed" || gameState.gamePhase === "season_review")',
-    );
+    /*
+     * NACHGEZOGEN (P1/Topf a, Begruendung im Test statt im PR-Text):
+     * Die alte Zusicherung nannte die zwei Phasen `season_completed || season_review` woertlich
+     * im Quelltext. Diese Aussage gilt NACHWEISLICH nicht mehr: das Gate wurde bewusst
+     * VERBREITERT auf `isSeasonEndPhase(...)` (FoundationShellRouterBody.tsx, Kommentar an der
+     * Stelle: „Sichtbar in JEDER Saisonende-Phase, nicht nur in den ersten beiden. Vorher stand
+     * hier `season_completed || season_review` — die Liste verschwand also genau dann, wenn der
+     * Spieler ueber den Rueckblick hinaus war"). Die alte Fassung war der Fehler, nicht die neue.
+     *
+     * Und der Vertrag wird jetzt am WERT geprueft, nicht an einer Zeichenkette: welche Phasen
+     * das Panel zeigen, entscheidet `isSeasonEndPhase` — eine abgeleitete Menge aus der
+     * Saisonende-Kette. Eine zweite handgezaehlte Liste an dieser Stelle waere genau die
+     * Doppelquelle, die den Bildschirm zuletzt hat verschwinden lassen.
+     */
+    const saisonende: GamePhase[] = [
+      "season_completed",
+      "season_review",
+      "season_rewards",
+      "player_development",
+      "season_end_management",
+      "transfer_sell_phase",
+      "transfer_buy_phase",
+      "lineup_setup",
+      "next_season_ready",
+    ];
+    for (const phase of saisonende) {
+      expect(isSeasonEndPhase(phase), `${phase} gehoert zum Saisonende`).toBe(true);
+    }
+    // Mitten in der Saison waere ein Abschluss-Block Unsinn und wuerde die Tabelle verdecken.
+    expect(isSeasonEndPhase("season_active")).toBe(false);
+    expect(isSeasonEndPhase("preseason_management")).toBe(false);
+    expect(isSeasonEndPhase(null)).toBe(false);
+    expect(isSeasonEndPhase(undefined)).toBe(false);
+
+    // Und das Panel haengt wirklich an DIESER Frage (eine Quelle, keine zweite Liste).
+    expect(BODY).toContain('activeView === "seasonV2" && isSeasonEndPhase(gameState.gamePhase)');
   });
 
   /**

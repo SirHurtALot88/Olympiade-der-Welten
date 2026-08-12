@@ -46,10 +46,30 @@ type TeamManagementTransferSummary = {
   transferNet: number;
 };
 
-function buildTransferSummaryByTeamIdFromHistory(gameState: GameState) {
+/**
+ * Transfersaldo je Team — MIT SAISONFILTER.
+ *
+ * Ohne den Filter summierte diese Rechnung die GESAMTE Transferhistorie und lieferte damit den
+ * Alle-Zeiten-Saldo in eine Zeile, die eine SAISON beschreibt. Im Saisonstand stand die Zahl
+ * direkt neben Sponsoren, Gehaeltern und GuV — alles Saisonwerte — und war dadurch nicht als
+ * andere Groesse erkennbar.
+ *
+ * Gemessen am Abnahme-Spielstand (Saison 2, Spieltag 4): Wrecking Legionnaires zeigte
+ * −251,47, der Saldo der laufenden Saison ist aber −43,48 (322,21 Kaeufe gegen 70,74 Verkaeufe
+ * ueber BEIDE Saisons; in Saison 2 allein ein Kauf ueber 43,48). Project Suicide −270,34 statt
+ * −50,17, Cold Steel −341,55 statt −108,95. Der Loewenanteil stammt aus dem Liga-Draft der
+ * Saison 1, der jeden Grundstock-Spieler als Kauf schreibt.
+ *
+ * `seasonId = null` behaelt bewusst das alte Verhalten (alle Saisons) — dafuer gibt es Aufrufer
+ * ohne Saisonbezug.
+ */
+function buildTransferSummaryByTeamIdFromHistory(gameState: GameState, seasonId: string | null = null) {
   const summary = new Map<string, TeamManagementTransferSummary>();
 
   for (const entry of gameState.transferHistory ?? []) {
+    if (seasonId != null && entry.seasonId !== seasonId) {
+      continue;
+    }
     const fee = typeof entry.fee === "number" && Number.isFinite(entry.fee) ? entry.fee : 0;
 
     if (entry.transferType === "buy" && entry.toTeamId) {
@@ -403,7 +423,9 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
     needScoreByTeamId = {},
     transferSummaryByTeamId = {},
   } = input;
-  const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState);
+  // Diese Zeilen beschreiben GENAU EINE Saison (`seasonId`) — der Transfersaldo muss sich auf
+  // dieselbe beziehen, sonst steht ein Alle-Zeiten-Wert zwischen lauter Saisonwerten.
+  const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState, seasonId);
   const seasonSnapshots = gameState.seasonState.seasonSnapshots ?? [];
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const rostersByTeamId = new Map<string, RosterEntry[]>();
@@ -831,7 +853,12 @@ export function buildLightweightTeamSeasonStandRows(input: {
     }
     rostersByTeamId.set(rosterEntry.teamId, [rosterEntry]);
   }
-  const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState);
+  // Erstanstrich derselben Saisonzeilen — gleicher Saisonbezug wie im vollen Aufbau, sonst
+  // springt die Spalte beim Nachladen von einem Alle-Zeiten-Wert auf den Saisonwert.
+  const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(
+    gameState,
+    gameState.season.id,
+  );
 
   return gameState.teams
     .map((team) => {

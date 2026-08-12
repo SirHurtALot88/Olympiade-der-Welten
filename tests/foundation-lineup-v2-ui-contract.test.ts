@@ -3,6 +3,13 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  buildTeamdeckCandidateGroups,
+  getTeamdeckCandidateGroupMeta,
+  type TeamdeckCandidateEntry,
+  type TeamdeckCandidateQualityKey,
+} from "@/lib/lineups/lineup-candidate-model";
+
 /**
  * Vertrag der Einsatzliste.
  *
@@ -46,7 +53,17 @@ describe("foundation lineup ui contract", () => {
     // Der Props-Vertrag kommt aus lib/, nicht mehr aus einer Client-Komponente.
     expect(lineupText).toContain('from "@/lib/lineups/legacy-lineup-board-props"');
 
-    expect(clientText).toContain("candidateGroups={teamdeckCandidateGroups}");
+    /*
+     * NACHGEZOGEN (P1 / „String nirgends"): hier stand `candidateGroups={teamdeckCandidateGroups}`.
+     * Nachgemessen: `teamdeckCandidateGroups` gibt es weiter (LegacyLineupLabClient.tsx), an die
+     * gerenderte Ansicht geht aber `focusV2CandidateGroups` — beide kommen aus DERSELBEN
+     * Funktion `buildTeamdeckCandidateGroups` (`lib/lineups/lineup-candidate-model.ts`), die
+     * Fokus-Fassung nur mit `teamdeckFilterMode: "all"`. Das ist keine Entfernung, sondern eine
+     * ausdrueckliche Reparatur (Kommentar an Z. 2313 ff.: Chris' „ich habe hier 3 spieler
+     * eingesetzt - 3 sind auf der bank sichtbar - wo sind die uebrigen 3???" — der Modus "free"
+     * warf blockierte Spieler ganz aus der Liste). Der Wert-Test dazu steht unten.
+     */
+    expect(clientText).toContain("candidateGroups={focusV2CandidateGroups}");
     expect(clientText).toContain("nextOpenSlotKey");
     expect(clientText).toContain("Formkarten");
     expect(clientText).toContain("assignFormCardToCell");
@@ -62,6 +79,31 @@ describe("foundation lineup ui contract", () => {
 
     expect(routingText).toContain('return "lineup"');
     expect(routingText).toContain("lineup-v2");
+  });
+
+  it("die Kandidatenliste der Ansicht verliert blockierte Spieler nicht", () => {
+    // WERT statt Zeichenkette: genau die Zusicherung, an der der oben genannte Befund hing.
+    const entry = (playerId: string, groupKey: TeamdeckCandidateQualityKey) =>
+      ({
+        player: { activePlayerId: playerId, name: playerId },
+        groupKey,
+        groupMeta: getTeamdeckCandidateGroupMeta(groupKey),
+      }) as unknown as TeamdeckCandidateEntry;
+    const entries = [
+      entry("sofort-1", "instant"),
+      entry("alternativ-1", "alternative"),
+      entry("gesperrt-1", "blocked"),
+    ];
+
+    const gruppen = buildTeamdeckCandidateGroups({
+      teamdeckCandidateEntries: entries,
+      showOnlyTopSlotCandidates: false,
+      teamdeckFilterMode: "all",
+    });
+
+    expect(gruppen.map((group) => group.key)).toEqual(["instant", "alternative", "blocked"]);
+    expect(gruppen.find((group) => group.key === "blocked")?.entries).toHaveLength(1);
+    expect(gruppen.reduce((sum, group) => sum + group.totalCount, 0)).toBe(entries.length);
   });
 
   it("hat die nicht gerenderte Focus-Board-Komponente wirklich entfernt", async () => {

@@ -33,6 +33,10 @@ import {
   getPlayerStarTierClassName,
 } from "@/lib/foundation/player-star-tier";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
+import {
+  beschreibeSpieltagsVerletzungsMarke,
+  type SpieltagsVerletzungsMarke,
+} from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 
 export type MatchdayPanelTeamResult = {
   teamId: string;
@@ -129,7 +133,46 @@ export type DisciplineStageMatchdayPanelProps = {
    * Preview — die Wertung zeigt also das, was tatsaechlich angewandt wurde.
    */
   modifiersByTeam?: Map<string, MatchdayTeamModifiers> | null;
+  /**
+   * Verletzungsbuchungen DIESES Spieltags je Team (Wunsch von Chris). Nur Teams mit einer
+   * Buchung stehen darin — wer fehlt, bekommt keine Marke.
+   */
+  injuryMarksByTeam?: Map<string, SpieltagsVerletzungsMarke> | null;
 };
+
+/**
+ * DIE VERLETZUNGS-MARKE — sie zeigt SPIELER, nicht Punkte.
+ *
+ * In dieser Tabelle tragen die Nachbarspalten PUNKTE und SCORE (der Form-Score steht sogar
+ * bewusst in Klammern, damit ihn niemand für Punkte hält). Eine nackte Zahl daneben würde in
+ * dieselbe Reihe gelesen. Deshalb steht hinter der Zahl das Wort „Spieler", und Titel wie
+ * aria-Label sagen es noch einmal aus.
+ */
+function InjuryMark({ mark }: { mark: SpieltagsVerletzungsMarke }) {
+  const beschriftung = `${mark.betroffeneSpieler} Spieler`;
+  return (
+    <span
+      title={beschreibeSpieltagsVerletzungsMarke(mark)}
+      aria-label={`Verletzt an diesem Spieltag: ${beschriftung}`}
+      data-testid="matchday-injury-mark"
+      data-team-id={mark.teamId}
+      data-injured-players={mark.betroffeneSpieler}
+      style={{
+        flex: "none",
+        fontSize: 9.5,
+        fontWeight: 800,
+        color: "var(--nl-risk)",
+        background: "color-mix(in srgb, var(--nl-risk) 14%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--nl-risk) 45%, transparent)",
+        borderRadius: 6,
+        padding: "1px 5px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      🩹 {beschriftung}
+    </span>
+  );
+}
 
 // Farbe der Form-Chips nach Richtung: positiv gruen, negativ rot, sonst neutral. Genau
 // diese Richtung ist die Aussage — z. B. "Team ging mit negativer Form in eine Diszi,
@@ -575,6 +618,7 @@ export default function DisciplineStageMatchdayPanel({
   modifierBaseByTeam,
   playersByTeam,
   modifiersByTeam,
+  injuryMarksByTeam,
 }: DisciplineStageMatchdayPanelProps) {
   // Ausgeklappte Disziplin-Spalte (null = keine). Hook steht vor jedem fruehen Return.
   // `null` heisst hier "noch nichts angefasst" — dann entscheidet `autoExpandedSide` unten.
@@ -1139,6 +1183,10 @@ export default function DisciplineStageMatchdayPanel({
                       {meta?.name && meta?.code ? (
                         <span style={{ flex: "none", fontSize: 10.5, fontWeight: 700, color: "var(--nl-mut)" }}>{meta.code}</span>
                       ) : null}
+                      {(() => {
+                        const marke = injuryMarksByTeam?.get(row.teamId) ?? null;
+                        return marke && marke.betroffeneSpieler > 0 ? <InjuryMark mark={marke} /> : null;
+                      })()}
                       {row.missingLineup ? (
                         <span
                           title="Team hat keine Aufstellung eingereicht — 0 Punkte sind kein echtes Ergebnis"

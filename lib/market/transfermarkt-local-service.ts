@@ -2582,6 +2582,10 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
         yearlySalarySchedule,
         salary,
         upkeep: salary,
+        // UNTERSCHRIFTSPFAD: KI-Massenkauf (Draft, Kaderauffuellung, Redraft-Topup laufen hier
+        // durch). `salary` ist das verhandelte JAHRESGEHALT — die Raten entstehen erst in
+        // `yearlySalarySchedule`.
+        negotiatedAnnualSalary: salary,
         purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",
@@ -2697,6 +2701,10 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         yearlySalarySchedule: preview.yearlySalarySchedule,
         salary: preview.offeredSalary ?? preview.salary,
         upkeep: preview.offeredSalary ?? preview.salary,
+        // UNTERSCHRIFTSPFAD: Transferkauf und Free-Agent-Signing, Mensch wie KI (alle
+        // `executeLocalTransfermarktBuy`-Aufrufer). Das VERHANDELTE Gehalt ist `offeredSalary` —
+        // faellt es weg, ist es das Formel-Gehalt, weil dann nicht verhandelt wurde.
+        negotiatedAnnualSalary: preview.offeredSalary ?? preview.salary,
         purchasePrice: preview.purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",

@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { previewNewGameSetup } from "@/lib/game/new-game-setup-service";
+
 // FoundationPageClient.tsx is now a 25-line wrapper; the New Game wizard and
 // team-settings markup live in FoundationTeamSettingsNewLook.tsx, and the
 // handlers/state live in use-foundation-shell-router-body-scope.tsx /
@@ -31,15 +33,40 @@ describe("new game setup UI contract", () => {
     expect(source).toContain("Online 4v4");
     expect(source).toContain("/api/new-game");
     expect(source).toContain("NEW_GAME_VISIBLE_PRESET_IDS");
-    // NOTE: "new-game-solo-team-select" no longer exists anywhere in the repo.
-    // The wizard's only team-select control now is the unified multi-select
-    // "new-game-ownership-picker" clubgrid (1-4 teams) — there's no separate
-    // "solo" single-team variant anymore. This looks like an intentional
-    // consolidation (matches the "single ownership UI" theme of the next test
-    // below) rather than a hard loss, but left red rather than guessed at —
-    // see final report.
-    expect(source).toContain('data-testid="new-game-solo-team-select"');
+    /*
+     * NACHGEZOGEN (P1 / „String nirgends"): hier stand
+     * `data-testid="new-game-solo-team-select"`. Nachgemessen: das war ein zweites,
+     * SEPARATES Einzel-Dropdown, das nur bei `newGamePresetId === "solo_1"` erschien; es ist
+     * in Commit `170b0b4b` mit dem Umbau auf den einheitlichen Klub-Raster entfallen. Die
+     * FÄHIGKEIT (genau ein Team selbst steuern) ist NICHT weg — sie steckt im Raster
+     * `new-game-ownership-picker` (`toggleNewGameTeam("chris", …)`, „Dieses Team steuerst du
+     * selbst (bis zu 4 Teams)"). Zwei Bedienelemente für dieselbe Auswahl wären zwei
+     * Zustandsquellen; die Konsolidierung ist die Reparatur, nicht der Verlust.
+     * Der Nachweis läuft unten am WERT statt an einer Zeichenkette.
+     */
     expect(source).toContain('data-testid="new-game-ownership-picker"');
+    expect(source).toContain('toggleNewGameTeam("chris"');
+  });
+
+  it("ein Solo-Spielstand mit GENAU EINEM eigenen Team ist weiterhin möglich", () => {
+    // Der Wert-Nachweis zur Konsolidierung oben: der Aufbau akzeptiert eine Ein-Team-Auswahl,
+    // stellt genau ein Team unter eigene Steuerung und überlässt den Rest der KI.
+    const vorschau = previewNewGameSetup({ presetId: "custom", chrisTeamIds: ["M-M"], frankyTeamIds: [] });
+
+    expect(vorschau.chrisTeamIds).toEqual(["M-M"]);
+    expect(vorschau.counts.chris).toBe(1);
+    expect(vorschau.counts.franky).toBe(0);
+    expect(vorschau.blockers).toEqual([]);
+    // "manual" = vom Menschen gesteuert (die KI-Teams tragen "ai") — gemessen, nicht angenommen.
+    expect(vorschau.teams.find((team) => team.teamId === "M-M")?.controlMode).toBe("manual");
+    expect(vorschau.teams.find((team) => team.teamId === "M-M")?.ownerLabel).toBe("Chris");
+    expect(vorschau.aiTeamIds).toHaveLength(vorschau.counts.total - 1);
+    expect(vorschau.aiTeamIds).not.toContain("M-M");
+
+    // Und die Mehrfachauswahl desselben Rasters funktioniert genauso (1–4 Teams).
+    const vier = previewNewGameSetup({ presetId: "custom", chrisTeamIds: ["M-M", "D-P", "P-S", "V-W"], frankyTeamIds: [] });
+    expect(vier.counts.chris).toBe(4);
+    expect(vier.blockers).toEqual([]);
   });
 
   it("uses game mode as the single ownership UI in team settings", () => {
