@@ -11500,6 +11500,9 @@ export function useFoundationShellRouterBodyScope({
     liveSyncStatus,
     showIdleReady: gameState.season.id !== "loading",
     fetchSlowWarning,
+    // Der laufende Liga-Draft — dieselbe Quelle, aus der auch das Banner
+    // „Liga wird erstellt …" in FoundationShellRouterBody liest.
+    leagueSetupStatus,
     /**
      * Saison läuft bereits: exakt das Gegenstück zum Preseason-Kauffenster
      * (`isEarlySeasonTransferSetup` in transfer-window-policy.ts — offen nur bei

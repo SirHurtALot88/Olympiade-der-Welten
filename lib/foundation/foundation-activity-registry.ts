@@ -119,6 +119,31 @@ function buildPreseasonDetail(run: FoundationActivityPreseasonRunSnapshot, aiTea
 export function buildFoundationActivities(input: FoundationActivityInput): FoundationActivityItem[] {
   const activities: FoundationActivityItem[] = [];
 
+  /**
+   * DER LIGA-DRAFT STEHT GANZ VORNE, weil er der einzige Vorgang ist, der DIREKT nach dem Anlegen
+   * eines Spiels laeuft — und der einzige, waehrend dessen der Spieler noch gar nichts anderes tun
+   * kann. Solange er laeuft, ist „Bereit" schlicht falsch: die Kader der Liga entstehen gerade erst.
+   *
+   * Ein gescheiterter Draft bleibt ebenfalls stehen. Er ist handelbar (der Wiederholen-Knopf sitzt
+   * im Banner), und ohne Meldung sieht ein halb gefuellter Kader wie ein Spielfehler aus statt wie
+   * ein abgebrochener Hintergrundlauf.
+   */
+  if (input.leagueSetupStatus === "in_progress") {
+    activities.push({
+      id: "league-setup",
+      label: "Liga wird erstellt",
+      detail: "KI-Teams werden befüllt — das dauert etwa eine Minute",
+      tone: "running",
+    });
+  } else if (input.leagueSetupStatus === "failed") {
+    activities.push({
+      id: "league-setup-failed",
+      label: "Liga-Aufbau abgebrochen",
+      detail: "Kader sind unvollständig — im Banner wiederholen",
+      tone: "blocked",
+    });
+  }
+
   if (input.isSaveBusy) {
     activities.push({
       id: "save-load",

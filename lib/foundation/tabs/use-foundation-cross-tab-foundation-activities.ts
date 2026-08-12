@@ -49,6 +49,8 @@ export function useFoundationCrossTabFoundationActivities(input: {
   marketAiPreviewBusy?: boolean;
   liveSyncStatus?: "connected" | "syncing" | "reconnecting" | "disconnected" | "idle";
   fetchSlowWarning?: boolean;
+  /** Liga-Draft eines frisch angelegten Spiels — siehe FoundationActivityInput. */
+  leagueSetupStatus?: "in_progress" | "ready" | "failed" | null;
   showIdleReady?: boolean;
   /** Saison läuft bereits — hängengebliebene Preseason-Banner werden unterdrückt. */
   preseasonWindowOver?: boolean;
@@ -99,6 +101,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
         marketAiPreviewBusy: input.marketAiPreviewBusy,
         liveSyncStatus: input.liveSyncStatus,
         fetchSlowWarning: input.fetchSlowWarning,
+        leagueSetupStatus: input.leagueSetupStatus,
         showIdleReady: input.showIdleReady,
       }),
     [
@@ -120,6 +123,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
       input.facilityUpgradeBusy,
       input.fetchSlowWarning,
       input.isSaveBusy,
+      input.leagueSetupStatus,
       input.liveSyncStatus,
       input.marketAiPreviewBusy,
       input.marketBuyBusy,

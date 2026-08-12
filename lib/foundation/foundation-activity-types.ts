@@ -92,5 +92,19 @@ export type FoundationActivityInput = {
   marketAiPreviewBusy?: boolean;
   liveSyncStatus?: "connected" | "syncing" | "reconnecting" | "disconnected" | "idle";
   fetchSlowWarning?: boolean;
+  /**
+   * Der Whole-League-Draft eines frisch angelegten Spiels — `seasonState.leagueSetupStatus`.
+   *
+   * GEMELDET VON CHRIS: „es hat einfach gedauert obwohl die anzeige oben auf fertig stand".
+   * Genau so war es: der Draft laeuft nach dem Anlegen ~40-60 Sekunden im Hintergrund und fuellt
+   * die Kader aller KI-Teams, waehrend diese Leiste unbeirrt „Bereit — Alle Aktionen
+   * abgeschlossen" meldete. Sie kannte das Feld schlicht nicht. Wer in dieser Minute in den Kader
+   * schaut, sieht halb leere Teams und eine Anzeige, die sagt, es sei alles fertig — die
+   * schlimmste Kombination, weil sie die Wartezeit als Fehler aussehen laesst.
+   *
+   * Das Banner „Liga wird erstellt …" in `FoundationShellRouterBody` liest dasselbe Feld schon
+   * lange; hier fehlte es. Zwei Anzeigen zum selben Vorgang, und nur eine wusste Bescheid.
+   */
+  leagueSetupStatus?: "in_progress" | "ready" | "failed" | null;
   showIdleReady?: boolean;
 };
