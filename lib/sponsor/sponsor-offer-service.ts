@@ -45,6 +45,13 @@ import {
 } from "@/lib/sponsor/sponsor-leih-slate";
 import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
 import {
+  ACADEMY_RATING_GRENZE,
+  sponsorLeihPassungFuerTeam,
+} from "@/lib/sponsor/sponsor-leih-passung";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
+import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import {
   baueLeihZielKomponente,
   LEIH_ZIEL_ACHSENRANG,
   LEIH_ZIEL_FRISCHE,
@@ -423,7 +430,6 @@ export function buildSponsorOffersForTeam(input: {
     axisKeys: slate.entries.map((entry) => entry.axisKey ?? null),
     curveShapes: slate.entries.map((entry) => entry.curveShape),
     goldenSlots: slate.goldenCardSlots,
-    advanceSlots: slate.entries.map((entry) => entry.advance === true),
     // E1: KEINE Abzugszeile — der Verzicht senkt hier die Leiter, und zwar bevor Anker und Tilt
     // gerechnet werden. Die Gebäude-Karte ist danach durchgaengig eine Karte, die weniger zahlt.
     leihVerzichte: leihKarten.map((karte) => karte.verzichtErsteSaison),
@@ -654,43 +660,16 @@ export function chooseSponsorOffer(input: {
       },
     };
   }
-  // Sponsorengeld flieszt grundsaetzlich am Saisonende (sponsor-settlement-service). Frueher wurde
-  // beim Unterschreiben IMMER die halbe Basisrate ausgezahlt; das Settlement zahlte danach nur noch
-  // die zweite Haelfte. Das hatte zwei Nachteile: die angezeigte Saison-Summe sackte im Moment des
-  // Abschlusses ab (ohne dass der Vertrag weniger wert war), und am Saisonende kam entsprechend
-  // wenig nach — obwohl genau dann Gehaelter und Transfers zu bezahlen sind.
+  // DAS UNTERSCHREIBEN BEWEGT KEIN GELD. Sponsorengeld flieszt ausnahmslos am Saisonende
+  // (sponsor-settlement-service). Frueher wurde beim Unterschreiben IMMER die halbe Basisrate
+  // ausgezahlt; das Settlement zahlte danach nur noch die zweite Haelfte. Das hatte zwei Nachteile:
+  // die angezeigte Saison-Summe sackte im Moment des Abschlusses ab (ohne dass der Vertrag weniger
+  // wert war), und am Saisonende kam entsprechend wenig nach — obwohl genau dann Gehaelter und
+  // Transfers zu bezahlen sind.
   //
-  // VORSCHUSS-KARTEN sind die bewusste Ausnahme und genau deshalb eine Entscheidung: wer sie waehlt,
-  // holt sich Liquiditaet fuers Transferfenster und zahlt dafuer eine Gebuehr. Der Vorschuss wird am
-  // Saisonende samt Gebuehr wieder verrechnet — er ist vorgezogenes eigenes Geld, kein Zuschuss.
-  const advance = offer.sponsorV3?.advance ?? null;
-  if (advance && advance.amount > 0) {
-    nextGameState = {
-      ...nextGameState,
-      teams: nextGameState.teams.map((team) =>
-        team.teamId === input.teamId
-          ? { ...team, cash: Math.round((team.cash + advance.amount) * 10) / 10 }
-          : team,
-      ),
-      seasonState: {
-        ...nextGameState.seasonState,
-        sponsorPayoutLogs: [
-          {
-            id: `sponsor-payout:${nextGameState.season.id}:${input.teamId}:advance:${randomUUID()}`,
-            saveId: input.saveId ?? "",
-            seasonId: nextGameState.season.id,
-            teamId: input.teamId,
-            phase: "base_first" as const,
-            componentId: "v4_advance",
-            cashDelta: advance.amount,
-            action: "apply" as const,
-            createdAt: new Date().toISOString(),
-          },
-          ...(nextGameState.seasonState.sponsorPayoutLogs ?? []),
-        ],
-      },
-    };
-  }
+  // Danach blieben VORSCHUSS-KARTEN als bewusste Ausnahme stehen; auch die sind jetzt weg. Damit
+  // gibt es wieder genau EINEN Zahlungszeitpunkt, und die Anzeige kann gegen keine zweite Buchung
+  // driften — die Begruendung steht in sponsor-v3-model.ts.
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
@@ -992,6 +971,17 @@ function scoreOfferForAi(input: {
    * Verhalten wie vor seiner Einfuehrung, damit bestehende Aufrufer nichts merken.
    */
   eigeneFacilityStufen?: Readonly<Record<string, number>>;
+  /**
+   * Was dieses Team von einem GEBÄUDETYP hat (sponsor-leih-passung.ts). Optional: fehlt es, wird der
+   * Leihwert wie zuvor ungewichtet gezaehlt — bestehende Aufrufer und Tests merken nichts.
+   */
+  leihPassung?: {
+    beliebtheit: number;
+    entwicklerGrad: number;
+    /** Anteil Kader mit Rating < 45; `null`, solange es keinen Kader gibt (Saison 1 vor dem Draft). */
+    academyBerechtigtAnteil: number | null;
+    kaderLuecke: number;
+  };
 }): number {
   const { offer, profile, identity, cashPressure } = input;
   const terms = getSponsorV3Terms(offer);
@@ -1083,15 +1073,14 @@ function scoreOfferForAi(input: {
     score += insuranceValue - erosionLoss;
   }
 
-  // Der Vorschuss ist fuer ein klammes Team echtes Geld zur richtigen Zeit und fuer ein reiches nur
-  // eine Gebuehr. Genau dieser Unterschied ist der Sinn der zweiten Dimension.
-  if (terms?.advance) {
-    score += cashPressure >= 7 ? terms.advance.amount * 0.25 : -terms.advance.fee;
-  }
-
-  // SPARABSICHT: der Vorschuss-Term oben waehlt nur, welche Karte UEBERHAUPT einen Vorschuss traegt —
-  // nicht welche den hoechsten Boden hat. Ein Team mit echter Sparabsicht (klamm und/oder in der
-  // seltenen Eco-Round-Doktrin) soll stattdessen die Karte mit der GERINGSTEN erwarteten Abwaertsseite
+  // KEIN VORSCHUSS-TERM MEHR. Hier stand die Bewertung der zweiten Dimension (`+0,25 * Betrag` bei
+  // Kassendruck >= 7, sonst `−Gebuehr`). Da keine Karte mehr frueher zahlt, gibt es nichts zu
+  // bewerten — die Kassenlage wirkt jetzt ausschliesslich ueber die SPARABSICHT unten, die ohnehin
+  // die inhaltlich richtige Frage stellt: welche Karte traegt bei knapper Kasse am wenigsten
+  // Abwaertsrisiko?
+  //
+  // SPARABSICHT: ein Team mit echter Sparabsicht (klamm und/oder in der
+  // seltenen Eco-Round-Doktrin) soll die Karte mit der GERINGSTEN erwarteten Abwaertsseite
   // bevorzugen, siehe `sponsorV3DownsideShortfall` fuer die Begruendung dieser Groesse. `ecoIntent01`
   // ist fuer jedes Team mit `cashPressure == 3` (entspannte Kasse, keine Eco-Round-Doktrin) exakt 0 —
   // fuer diese Teams ist dieser Term dann exakt 0, unveraendertes Verhalten (siehe `resolveEcoIntent01`
@@ -1142,7 +1131,29 @@ function scoreOfferForAi(input: {
       // Die Schwelle ist dieselbe wie ueberall sonst in dieser Datei (`cashPressure >= 7`), damit es
       // nicht einen zweiten Klammheits-Begriff gibt.
       const cashNutzbar = cashPressure >= 7 ? SPONSOR_AI_LEIHWERT_BEI_GELDNOT : 1;
-      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad * cashNutzbar;
+      // DER FUENFTE ABSCHLAG: PASST DER GEBÄUDETYP UEBERHAUPT ZU DIESEM TEAM?
+      //
+      // `leihwertJeSaison` ist fuer jedes Nicht-Einnahmegebaeude `Katalogkosten / 5 + Unterhalt` —
+      // eine Zahl ueber den SELBSTBAU, die nicht weiss, welches Gebaeude sie bepreist. Ohne die
+      // Passung waren eine Academy und ein Analytics Room bei gleichem Leihwert dasselbe Angebot,
+      // auch fuer ein Team, das seine Spieler durchreicht bzw. als KI gar keine Anzeige liest.
+      // Chris: „was machen die mit ner academy? ob das dann was bringt ist ja auch fraglich."
+      // Jeder Faktor ist aus dem nachgelesenen Effekt abgeleitet, siehe sponsor-leih-passung.ts.
+      const passung = input.leihPassung
+        ? sponsorLeihPassungFuerTeam({
+            facilityId: leihe.facilityId,
+            stufe: geliehene,
+            beliebtheit: input.leihPassung.beliebtheit,
+            entwicklerGrad: input.leihPassung.entwicklerGrad,
+            langeVertraege: profile?.bias.longContractPreference ?? 5,
+            kurzeVertraege: profile?.bias.shortContractPreference ?? 5,
+            verkaufsneigung: profile?.bias.sellForProfitAggression ?? 5,
+            kaderTiefeNeigung: profile?.bias.rosterDepthPreference ?? 5,
+            academyBerechtigtAnteil: input.leihPassung.academyBerechtigtAnteil,
+            kaderLuecke: input.leihPassung.kaderLuecke,
+          })
+        : 1;
+      score += (leihe.leihwertJeSaison[0] ?? 0) * uptime * wirkungsgrad * cashNutzbar * passung;
     }
 
     // DAS BONUS-ZIEL DER KARTE. Es ist mit `p = 0` bepreist, also reines Aufwaerts — wer es
@@ -1229,6 +1240,8 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
   // Fuer die Liga EINMAL berechnen, nicht je Team — `buildSeasonStrategyState` ist eine reine
   // Funktion ueber den gesamten `gameState` und liefert die Doktrin aller Teams in einem Rutsch.
   const seasonStrategyByTeamId = buildSeasonStrategyState(nextGameState);
+  // Einmal je Liga statt je Kadereintrag: die Academy-Berechtigung unten braucht nur das Rating.
+  const ratingByPlayerId = new Map(nextGameState.players.map((player) => [player.id, player.rating]));
 
   for (const team of nextGameState.teams) {
     if (getTeamSponsorContract(nextGameState, team.teamId)) {
@@ -1264,9 +1277,33 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
         ([facilityId, eintrag]) => [facilityId, eintrag?.level ?? 0],
       ),
     );
+    // WAS DIESES TEAM VON EINEM GEBÄUDETYP HAT. Alle vier Groessen stehen bereits, BEVOR der Draft
+    // laeuft — bis auf die kaderabhaengigen, und genau die sind hier als „unbekannt" gefuehrt statt
+    // als 0: in einem neuen Spiel unterschreiben die KI-Teams ihren Sponsor mit noch leeren Kadern
+    // (gemessen: 1 Spieler in der ganzen Liga), und ein Anteil „0 von 0 berechtigten Spielern" waere
+    // kein Befund, sondern eine Falschaussage ueber jedes Team der Liga.
+    const kader = nextGameState.rosters.filter((entry) => entry.teamId === team.teamId);
+    const berechtigt = kader.filter(
+      (entry) => (ratingByPlayerId.get(entry.playerId) ?? Number.POSITIVE_INFINITY) < ACADEMY_RATING_GRENZE,
+    ).length;
+    const leihPassung = {
+      beliebtheit: computeTeamBeliebtheitFromGameState(nextGameState, team.teamId).value,
+      entwicklerGrad: getTeamDevelopmentTendency({
+        team,
+        identity,
+        profile,
+        gmArchetype: getTeamGeneralManager(nextGameState, team.teamId)?.profile?.archetype ?? null,
+      }).score,
+      academyBerechtigtAnteil: kader.length > 0 ? berechtigt / kader.length : null,
+      // OHNE KADER GIBT ES KEINE KADERLUECKE, sondern gar keine Aussage. Rechnete man hier
+      // `playerOpt − 0`, bekaeme in Saison 1 JEDES Team dieselbe maximale Luecke (gemessen: 8 bis 14)
+      // — ein konstanter Zuschlag fuer alle statt einer Unterscheidung, und der Reha-/Scouting-Term
+      // haenge an einer Zahl, die nur sagt, dass der Draft noch nicht gelaufen ist.
+      kaderLuecke: rosterSize > 0 ? Math.max(0, (identity?.playerOpt ?? 0) - rosterSize) : 0,
+    };
     const scoreArgs = {
       profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
-      eigeneFacilityStufen,
+      eigeneFacilityStufen, leihPassung,
     };
     const bestOffer = [...offers].sort(
       (left, right) =>

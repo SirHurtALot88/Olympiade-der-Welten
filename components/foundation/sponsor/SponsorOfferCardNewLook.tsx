@@ -466,17 +466,9 @@ export function SponsorOfferCardNewLook({
                 <strong className="nl-tnum">+{formatCash(presentation.v3.goal.payout)}</strong>
               </li>
             ) : null}
-            {presentation.v3.advance ? (
-              /* Die zweite Wahldimension. Ohne diese Zeile stuende der Vorschuss nirgends auf der
-                 Karte — der Mensch waehlte dann schlechter informiert als die KI, die ihn bewertet. */
-              <li data-testid="sponsor-v3-advance">
-                <span>
-                  Vorschuss bei Unterschrift{" "}
-                  <em>(Gebuehr {formatCash(presentation.v3.advance.fee)}, am Saisonende verrechnet)</em>
-                </span>
-                <strong className="nl-tnum">+{formatCash(presentation.v3.advance.amount)}</strong>
-              </li>
-            ) : null}
+            {/* Hier stand die Vorschuss-Zeile ("Vorschuss bei Unterschrift"). Es gibt keinen
+                Vorschuss mehr — jede Karte zahlt vollstaendig am Saisonende, deshalb braucht die
+                Karte auch keinen Hinweis auf einen zweiten Zahlungszeitpunkt. */}
           </ul>
           <div className="nl-sponsor-v2-range nl-tnum" data-testid="sponsor-v3-range">
             Spanne {formatCash(presentation.v3.minPayout)} – {formatCash(presentation.v3.maxPayout)}

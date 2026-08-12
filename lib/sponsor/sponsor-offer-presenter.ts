@@ -70,13 +70,6 @@ export type SponsorV3Presentation = {
     probability: number;
     difficultyLabel: string;
   } | null;
-  /**
-   * Vorschuss-Konditionen, falls die Karte einen zahlt: `amount` kommt bei Unterschrift, `fee` wird
-   * am Saisonende zusammen mit dem Vorschuss verrechnet. Ohne diese Felder waere die zweite
-   * Wahldimension nur fuer die KI sichtbar — der Mensch saehe die Karte nicht, die ihm Liquiditaet
-   * im Transferfenster verschafft.
-   */
-  advance: { amount: number; fee: number } | null;
   /** Bestwert der Karte: Titel plus erreichtes Sonderziel. */
   maxPayout: number;
   /** Schlechtestwert: letzter Platz, Ziel verfehlt. */
@@ -410,9 +403,6 @@ export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presen
           difficultyLabel: terms.goalP >= 0.55 ? "Leicht" : terms.goalP >= 0.35 ? "Mittel" : "Hart",
         }
       : null,
-    advance: terms.advance
-      ? { amount: roundOfferCash(terms.advance.amount), fee: roundOfferCash(terms.advance.fee) }
-      : null,
     maxPayout: roundOfferCash(sponsorV3Settle(terms, 1, 1)),
     minPayout: roundOfferCash(sponsorV3Settle(terms, 32, 0)),
   };
@@ -548,14 +538,16 @@ export type SponsorPayoutBreakdown<T extends SponsorPayoutBreakdownRow> = {
  * WELCHE SETTLEMENT-ZEILEN DAS DETAILFENSTER ZEIGT — und dass KEINE unter den Tisch faellt.
  *
  * Diese Auswahl stand als zwei Filterzeilen in `FoundationSponsorsNewLook`, und genau daran
- * verschwand die VORSCHUSS-VERRECHNUNG: `sponsorV3SettlementParts` hat fuer sie kein eigenes Kind
- * und vergibt ebenfalls `kind: "base"`. `find(kind === "base")` nahm nur die erste Basiszeile
- * (Saisonbasis), `filter(kind !== "base" && kind !== "rank")` warf die zweite weg. Ein echter, in
- * `projectedCash` enthaltener ABZUG stand damit nirgends im Fenster: gemessen am Save `s2`,
- * Team L-R (Rang 6) — Leitersprosse 76,1, sichtbare Zeilen 82,1, tatsaechliche Auszahlung 66,7; die
- * Luecke von 15,4 war exakt Vorschuss 14,7 + Gebuehr 0,7.
+ * verschwand seinerzeit die Vorschuss-Verrechnung: sie hatte kein eigenes Kind und trug ebenfalls
+ * `kind: "base"`. `find(kind === "base")` nahm nur die erste Basiszeile (Saisonbasis),
+ * `filter(kind !== "base" && kind !== "rank")` warf die zweite weg. Ein echter, in `projectedCash`
+ * enthaltener ABZUG stand damit nirgends im Fenster: gemessen am Save `s2`, Team L-R (Rang 6) —
+ * Leitersprosse 76,1, sichtbare Zeilen 82,1, tatsaechliche Auszahlung 66,7.
  *
- * Ausgeschlossen wird deshalb nach IDENTITAET nur, was das Fenster ohnehin schon anders zeigt: die
+ * Den Vorschuss gibt es inzwischen nicht mehr (sponsor-v3-model.ts), diese Auswahl aber schon: sie
+ * ist die Zusage, dass eine KUENFTIGE Zeilenart nicht wieder still aus dem Fenster faellt. Deshalb
+ * filtert sie nach IDENTITAET statt nach Kind — ausgeschlossen wird nur, was das Fenster ohnehin
+ * schon anders zeigt: die
  * eine Basiszeile oben und — nur wenn die Gewinnstufen-Leiter wirklich gerendert wird — die
  * Rang-Zeile, die diese Leiter grafisch ersetzt. Alles andere landet in der Liste, egal welches
  * Kind es traegt; kuenftige Zeilenarten ueberleben die Auswahl damit automatisch.

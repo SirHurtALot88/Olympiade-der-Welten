@@ -70,14 +70,11 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const mitKasse = (cash: number): GameState => ({ ...base, teams: base.teams.map((team) => ({ ...team, cash })) });
     const zaehle = (state: GameState) => {
-      let vorschuss = 0;
       let reineCash = 0;
       for (const team of state.teams) {
-        const contract = getTeamSponsorContract(state, team.teamId);
-        if (getSponsorV3Terms(contract)?.advance != null) vorschuss += 1;
-        if (contract?.sponsorLeihe == null) reineCash += 1;
+        if (getTeamSponsorContract(state, team.teamId)?.sponsorLeihe == null) reineCash += 1;
       }
-      return { vorschuss, reineCash };
+      return { reineCash };
     };
 
     const klamm = zaehle(chooseSponsorOfferForAiTeams(mitKasse(-30)));
@@ -86,9 +83,10 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     // Die Kernaussage: die Kassenlage entscheidet, nicht eine feste Rangfolge.
     expect(klamm.reineCash, "kein klammes Team nimmt die volle Auszahlung").toBeGreaterThan(base.teams.length / 8);
     expect(entspannt.reineCash, "entspannte Teams greifen trotzdem zur reinen Cash-Karte").toBeLessThan(klamm.reineCash);
-    // Und der Vorschuss bleibt eine lebende Option — sonst waere die zweite Wahldimension tot.
-    expect(klamm.vorschuss, "kein klammes Team nimmt den Vorschuss").toBeGreaterThan(0);
-    expect(entspannt.vorschuss).toBeGreaterThan(base.teams.length / 4);
+    // FRUEHER STAND HIER AUSSERDEM, dass klamme Teams zum VORSCHUSS greifen. Diese zweite
+    // Wahldimension gibt es nicht mehr (sponsor-v3-model.ts): Sponsorgeld kommt ausnahmslos am
+    // Saisonende. Die Kassenlage wirkt seither ausschliesslich ueber die Kartenhoehe und den
+    // Gebaeude-Verzicht — genau das, was die beiden Zusicherungen oben messen.
   });
 
   /**

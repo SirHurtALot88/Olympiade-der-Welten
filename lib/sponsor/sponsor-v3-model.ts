@@ -98,33 +98,23 @@ export const SPONSOR_V4_AXIS_PBAR = 0.5;
 export const SPONSOR_V4_GOLDEN_AXIS_MULT = 1.25;
 
 /**
- * DIE ZWEITE WAHLDIMENSION: Vorschuss statt Saisonende.
+ * ES GIBT KEINEN SPONSOR-VORSCHUSS MEHR — Sponsorgeld flieszt AUSSCHLIESSLICH am Saisonende.
  *
- * Warum es sie braucht: die Achse allein macht die Wahl inhaltlich, aber alle Angebote zahlen zum
- * selben Zeitpunkt. Liquiditaet ist fuer ein klammes Team real wertvoll — die Alternative ist ein
- * Kredit zu 7 bis 20 Prozent Zins — und fuer ein reiches wertlos. Damit haengt die richtige Wahl an
- * der eigenen Lage statt an einer Rangfolge, die fuer alle gleich waere.
+ * Frueher stand hier eine zweite Wahldimension: manche Karten zahlten `SPONSOR_V4_ADVANCE_SHARE`
+ * (35 %) des Leiterbodens schon bei Unterschrift aus und verrechneten den Betrag samt einer Gebuehr
+ * von 5 % am Saisonende wieder. Gedacht war das als Liquiditaetsoption fuer klamme Teams.
  *
- * Der Vorschuss ist ein VORGEZOGENER TEIL der eigenen Auszahlung, kein Geschenk: er wird am
- * Saisonende samt Gebuehr wieder verrechnet. Die Gebuehr liegt bewusst unter dem Kreditzins — der
- * Sponsor ist der guenstigste Kredit im Spiel, aber eben nicht gratis.
+ * WARUM ES WEG IST (Entscheidung Chris): zwei Zahlungszeitpunkte fuer dieselbe Auszahlung erzeugen
+ * genau die Rechenprobleme, die sie ueber Monate erzeugt haben — der Vorschuss wurde von der
+ * Saisonauszahlung abgezogen, tauchte aber im Sponsoren-Detailfenster nicht auf (Leitersprosse 50,0,
+ * angezeigte Auszahlung 39,8; die Luecke von 10,2 war Vorschuss 9,7 + Gebuehr 0,5). Dazu kam ein
+ * zweiter, struktureller Fehler: `rerollSponsorV3TermsForNewSeason` spreadet die Konditionen und
+ * nahm das `advance`-Feld in die Folgesaison mit — ein Mehrjahresvertrag wurde ab Jahr 2 also Saison
+ * fuer Saison um einen Vorschuss ERLEICHTERT, den er in dieser Saison nie ausgezahlt bekam
+ * (gemessen am Save `s2`: 2 von 9 Vorschussvertraegen, zusammen 37,5 C + 1,9 C Gebuehr).
+ *
+ * Eine Auszahlung, ein Zeitpunkt: damit kann keine Anzeige gegen keine Buchung driften.
  */
-export type SponsorV4AdvanceTerms = {
-  /** Bei Unterschrift ausgezahlt. */
-  amount: number;
-  /** Gebuehr, am Saisonende zusammen mit dem Vorschuss verrechnet. */
-  fee: number;
-};
-
-/** Anteil des Leiterbodens, der als Vorschuss ausgezahlt wird. */
-export const SPONSOR_V4_ADVANCE_SHARE = 0.35;
-/**
- * Gebuehr auf den Vorschuss. Sie MUSS unter dem guenstigsten Bankkredit liegen (MIN_INTEREST_RATE =
- * 0,07 je Saison, lib/finance/loan-service.ts) — sonst waere die Vorschusskarte strikt schlechter
- * als ein Kredit und damit keine Option, sondern eine Falle. 5 Prozent lassen genug Abstand, ohne
- * den Vorschuss zum Selbstlaeufer zu machen.
- */
-export const SPONSOR_V4_ADVANCE_FEE_RATE = 0.05;
 
 export function sponsorV4AxisSizeFor(rarity: string, golden = false): number {
   const base = SPONSOR_V4_AXIS_SIZE_BY_RARITY[rarity as SponsorV3Rarity] ?? SPONSOR_V4_AXIS_SIZE_BY_RARITY.magisch;
@@ -490,11 +480,6 @@ export type SponsorV3ContractTerms = {
    * die Auszahlung ueber `goalKey`/`goalP` wie zuvor.
    */
   axis?: SponsorV4AxisTerms;
-  /**
-   * Vorschuss-Konditionen (V4). Fehlt beim Standard-Profil und bei Altvertraegen — dann kommt die
-   * ganze Auszahlung am Saisonende.
-   */
-  advance?: SponsorV4AdvanceTerms;
 };
 
 /**
@@ -530,15 +515,13 @@ export function buildSponsorV3TermsCore(input: {
    * Steuer. Setzt `axis` ausser Kraft, falls beides gesetzt waere.
    */
   festesZiel?: { key: string; size: number } | null;
-  /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
-  withAdvance?: boolean;
   /** Nur fuer Sensitivitaets-Laeufe: skaliert die Rarity-Tilts global. Default 1. */
   tiltScale?: number;
   anchorSigma?: number;
   /**
    * Cash-Verzicht einer Gebaeude-Karte (E1): wird von JEDER Sprosse der Basisleiter abgezogen,
    * BEVOR Anker und Tilt gerechnet werden. Damit ist die Karte durchgaengig eine Karte mit
-   * niedrigerer Leiter — Erwartungswert, Boden, Vorschussbasis und Anzeige stimmen automatisch
+   * niedrigerer Leiter — Erwartungswert, Boden und Anzeige stimmen automatisch
    * ueberein, ohne dass irgendeine Rechenstelle den Verzicht kennen muesste.
    */
   leihVerzicht?: number;
@@ -559,15 +542,6 @@ export function buildSponsorV3TermsCore(input: {
   // Erfolgswahrscheinlichkeit. Beides landet in denselben zwei Feldern, damit das Settlement genau
   // eine Rechnung kennt: `Auszahlung = Leiter + Erfuellung*G − p*G`.
   const axis = input.axis ?? null;
-  // Der Vorschuss haengt am LEITERBODEN, nicht am Erwartungswert: er ist der Teil der Auszahlung,
-  // der auf jedem Endrang sicher kommt. Auf mehr darf kein Vorschuss laufen, sonst koennte ein
-  // Absturz den Vertrag ins Minus drehen.
-  const ladderFloor = Math.max(input.floor, Math.min(...rankLadder));
-  const advanceAmount = input.withAdvance === true ? Math.round(ladderFloor * SPONSOR_V4_ADVANCE_SHARE * 10) / 10 : 0;
-  const advance: SponsorV4AdvanceTerms | null =
-    advanceAmount > 0
-      ? { amount: advanceAmount, fee: Math.round(advanceAmount * SPONSOR_V4_ADVANCE_FEE_RATE * 10) / 10 }
-      : null;
   const festesZiel = input.festesZiel ?? null;
   const hasGoal = festesZiel == null && axis == null && input.card.goal && input.goalKey != null;
   const goalP =
@@ -605,7 +579,6 @@ export function buildSponsorV3TermsCore(input: {
     floor: input.floor,
     ...(input.curveShape != null ? { curveShape: input.curveShape } : {}),
     ...(axis != null && festesZiel == null ? { axis } : {}),
-    ...(advance != null ? { advance } : {}),
     // Nur setzen, wenn es ihn gibt: eine reine Cash-Karte soll das Feld gar nicht tragen, damit man
     // im Spielstand auf einen Blick sieht, welche Karte ein Gebaeude gekostet hat.
     ...(leihVerzicht > 0 ? { leihVerzicht } : {}),

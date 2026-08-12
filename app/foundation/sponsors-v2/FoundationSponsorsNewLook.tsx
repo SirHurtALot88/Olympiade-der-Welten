@@ -602,8 +602,8 @@ export default function FoundationSponsorsNewLook({
     const map = new Map<string, number>();
     try {
       for (const row of previewSponsorSettlement(gameState).rows) {
-        // Saldiert, nicht geklammert: die Vorschuss-Verrechnung ist negativ und die Achse kann
-        // es sein. Wer nur die positiven Zeilen zaehlt, zeigt eine Projektion, die es nicht gibt.
+        // Saldiert, nicht geklammert: eine verfehlte Achse traegt eine NEGATIVE Zeile. Wer nur
+        // die positiven zaehlt, zeigt eine Projektion, die es nicht gibt.
         map.set(row.teamId, (map.get(row.teamId) ?? 0) + row.cashDelta);
       }
     } catch {
@@ -753,7 +753,7 @@ export default function FoundationSponsorsNewLook({
       settlementRows = [];
     }
     // Aufbau des Fensters spiegelt die Rechnung: Basis -> Gewinnstufen (grafisch) -> alles Weitere
-    // (Verbesserung, Sonderziele, Vorschuss-Verrechnung) -> Summe. Die Rang-Zeile wird durch die
+    // (Verbesserung, Sonderziele) -> Summe. Die Rang-Zeile wird durch die
     // Leiter ersetzt, statt sie zusaetzlich als Textzeile zu wiederholen.
     //
     // `contract?.lockedRankPayoutLadder ?? null` REICHTE HIER NICHT: `buildOfferRankPayoutLadderPreview`
@@ -1443,7 +1443,7 @@ export default function FoundationSponsorsNewLook({
                     </div>
                   ) : null}
 
-                  {/* Sonderziele/Verbesserung/Vorschuss darunter: damit sichtbar wird, woraus sich
+                  {/* Sonderziele/Verbesserung darunter: damit sichtbar wird, woraus sich
                       die Summe unten zusammensetzt — auch die Posten, die ABZIEHEN. */}
                   {leagueDetail.otherRows.length > 0 ? (
                     <div className="nl-sponsor-league-detail-section">

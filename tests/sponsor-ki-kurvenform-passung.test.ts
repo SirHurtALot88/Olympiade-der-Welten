@@ -3,14 +3,14 @@
  *
  * Seit PR #360 entscheidet die Kurvenform (`offer.curveShape` / `terms.baseLadder`), WO auf der
  * Sponsor-Ligaleiter das Geld eines Vertrags liegt (sponsor-liga-leiter.ts). Alle 11 Formen sind auf
- * denselben Erwartungswert beim STARTRANG normiert — eine Bewertung, die nur Achse, Vorschuss und
+ * denselben Erwartungswert beim STARTRANG normiert — eine Bewertung, die nur Achse und
  * Markenpassung liest (wie vor diesem Umbau), kann sie nicht unterscheiden und waehlt de facto
  * zufaellig unter ihnen. Beobachtet wurde das als grobe Fehlgriffe: ein Titelfavorit signiert eine
  * Mittelfeldkurve, ein Schlusslicht eine Titelkurve.
  *
  * Dieser Test isoliert genau das Kriterium: fuenf synthetische Angebote mit IDENTISCHEM Archetyp,
- * OHNE Achse und OHNE Vorschuss — die einzige Achse, auf der sie sich unterscheiden koennen, ist die
- * Kurvenform. Ohne den Passungsterm aus `scoreOfferForAi` waeren Achsen-, Vorschuss- und
+ * OHNE Achse — die einzige Achse, auf der sie sich unterscheiden koennen, ist die
+ * Kurvenform. Ohne den Passungsterm aus `scoreOfferForAi` waeren Achsen- und
  * Archetyp-Term fuer alle fuenf exakt 0 bzw. gleich, und der deterministische Tiebreak
  * (`offerId.length % 7`) entschiede — bei den hier gleich langen `offerId`s ein Patt, das der Sortierung
  * die ERSTE Kurve im Array zufallen liesse (hier bewusst "titeljaeger"). Das ist exakt die Fehlwahl,

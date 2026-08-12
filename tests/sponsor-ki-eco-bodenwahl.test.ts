@@ -4,14 +4,15 @@
  * `resolveAiSponsorArchetypePreference` (sponsor-offer-service.ts) gibt bei `cashPressure >= 7` bereits
  * "security" zurueck — der Sparwunsch existiert seit langem. Das Problem: `offer.archetype` kommt aus
  * `mapSponsorCardToArchetype(cardKey, axisKey)`, also aus Karte und Achse — NIE aus der Kurvenform. Die
- * Sicherheitspraeferenz erreicht die Leiter damit nicht; der bestehende Vorschuss-Term (+0,25 x
- * `advance.amount` bei `cashPressure >= 7`) waehlt zwar, welche Karte UEBERHAUPT einen Vorschuss traegt,
+ * Sicherheitspraeferenz erreicht die Leiter damit nicht; der frueher hier wirksame Vorschuss-Term
+ * (+0,25 x Betrag bei `cashPressure >= 7`) waehlte zwar, welche Karte UEBERHAUPT einen Vorschuss trug,
  * aber nicht welche den hoechsten Boden hat.
  *
  * Dieser Test isoliert genau das fehlende Kriterium — der `ecoIntent01`-gewichtete
  * `sponsorV3DownsideShortfall`-Term — mit demselben Muster wie
  * `tests/sponsor-ki-kurvenform-passung.test.ts`: fuenf synthetische Angebote mit IDENTISCHEM Archetyp,
- * OHNE Achse und OHNE Vorschuss, damit nur die Kurvenform ueber die Wahl entscheiden kann.
+ * OHNE Achse, damit nur die Kurvenform ueber die Wahl entscheiden kann. (Den Vorschuss gibt es
+ * inzwischen gar nicht mehr — sponsor-v3-model.ts —, die Aufbauten hier sind dadurch nur eindeutiger.)
  */
 import { describe, expect, it } from "vitest";
 
@@ -56,8 +57,7 @@ function buildBareOffer(input: { teamId: string; seasonId: string; curveShape: S
 
 /**
  * Ersetzt die Angebote EINES Teams durch die fuenf isolierten Kurvenformen bei festem `startRank`, ohne
- * Achse und ohne Vorschuss (`basis`-Karten, `withAdvance` nicht gesetzt) — damit bleiben Achsen- und
- * Vorschuss-Term auf allen fuenf Angeboten exakt 0 bzw. gleich, und nur Kurvenform-Passung und
+ * Achse (`basis`-Karten) — damit bleibt der Achsen-Term auf allen fuenf Angeboten exakt 0, und nur Kurvenform-Passung und
  * Eco-Downside-Term koennen die Wahl entscheiden.
  */
 function withIsolatedCurveOffers(base: GameState, teamId: string, startRank: number): GameState {

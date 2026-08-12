@@ -6,6 +6,8 @@
  * BEFUND: es fehlte kein Geld. Die Pruefung rechnete „ausgegeben = Budget minus Cash" und unterstellte
  * damit, dass Cash beim Budget startet und waehrend des Drafts nur sinkt. Sponsoren zahlen aber schon
  * in der Draftphase einen Vorschuss aus (`sponsorPayoutLogs`, Komponente `v4_advance`, rund 35 Prozent
+ * — DIESEN VORSCHUSS GIBT ES NICHT MEHR, siehe sponsor-v3-model.ts; die Logs leben aber in laufenden
+ * Spielständen weiter, und der Audit muss sie weiterhin richtig lesen
  * der Basiszahlung).
  *
  * GEMESSEN am Sandbox-Lauf (fresh-season-1-1786177854562, 32 Teams): genau 10 Teams hatten eine
