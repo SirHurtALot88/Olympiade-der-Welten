@@ -29,8 +29,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
-import { buildContractDissolutionOffers } from "@/lib/morale/contract-dissolution-service";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { buildContractDissolutionOffers, buildTeamMoraleMap } from "@/lib/morale/contract-dissolution-service";
 import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { FACILITY_CATALOG_BY_ID } from "@/lib/facilities/facility-catalog";
@@ -381,25 +380,15 @@ function buildContractDissolutionInboxTasks(input: {
 
   const seasonId = input.gameState.season.id;
   // Moral aus derselben Quelle wie Profil und Kader-Ansicht — `buildContractDissolutionOffers`
-  // leitet sie bewusst nicht selbst ab, damit die Zahlen nicht auseinanderlaufen.
-  const moraleByPlayerId: Record<string, number> = {};
-  for (const entry of input.roster) {
-    const assessment = assessPlayerMorale({
-      gameState: input.gameState,
-      playerId: entry.playerId,
-      teamId: input.team.teamId,
-    });
-    if (assessment?.morale != null && Number.isFinite(assessment.morale)) {
-      moraleByPlayerId[entry.playerId] = assessment.morale;
-    }
-  }
-
+  // leitet sie bewusst nicht selbst ab, damit die Zahlen nicht auseinanderlaufen. Die Bruecke
+  // steht neben der Angebots-Funktion (`buildTeamMoraleMap`), damit Inbox, API-Route und
+  // KI-Entscheidung nicht drei Kopien derselben Schleife pflegen.
   const offers = buildContractDissolutionOffers({
     gameState: input.gameState,
     teamId: input.team.teamId,
     seasonId,
     saveId: input.saveId,
-    moraleByPlayerId,
+    moraleByPlayerId: buildTeamMoraleMap(input.gameState, input.team.teamId),
   });
   if (offers.length === 0) {
     return [];

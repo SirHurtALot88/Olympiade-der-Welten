@@ -32,6 +32,24 @@ import { getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/
  * is whatever `applyFatigueAndInjuryAfterMatchday` just wrote (derived exclusively from the
  * availability state, which carries no training fatigue). Because that value is re-derived every
  * matchday, adding the FULL accumulated training fatigue here is idempotent across matchdays.
+ *
+ * `deferredPlayerIds` — DIE TEIL-BUCHUNG JE DISZIPLIN.
+ * Die ganze Idempotenz oben haengt an einer einzigen Voraussetzung: `player.fatigue` ist beim
+ * Eintritt die frisch abgeleitete REINE Match-Fatigue. Seit die Arena je Disziplin bucht, gilt
+ * das nicht mehr fuer jeden: Wer erst in D2 antritt, wird vom D1-Commit gar nicht angefasst
+ * (keine Last, keine Erholung — siehe `collectPendingLaterSideKeys`). Sein `player.fatigue`
+ * traegt noch den Vor-Spieltags-Wert, in dem die Trainingsfatigue der VORIGEN Spieltage bereits
+ * steckt. Legte der D1-Commit die neue Gesamtsumme obendrauf, bekam er die Trainingsschicht ein
+ * zweites Mal — GEMESSEN in `tests/matchday-auto-run-service.test.ts` exakt eine Schicht zuviel
+ * (2,2 Punkte bei Modus "hart" auf 10 Spieltage), und ueber die Fallback-Kette
+ * `getPlayerCurrentFatigue` (Availability fehlt -> `player.fatigue`) wanderte der Fehler beim
+ * D2-Commit in `playerAvailabilityState` und damit in den Verletzungswurf.
+ *
+ * Solche Spieler werden hier deshalb UEBERSPRUNGEN: ihr Spieltag ist noch nicht gebucht. Ihre
+ * Trainingsschicht schlaegt beim Commit ihrer eigenen Seite auf — dort steht `player.fatigue`
+ * wieder auf reiner Match-Fatigue, und `modeByMatchday[matchdayId]` sorgt weiterhin dafuer, dass
+ * die Schicht je Spieltag genau EINMAL gezaehlt wird, egal in wie vielen Teilschritten gebucht
+ * wurde.
  */
 
 function roundValue(value: number, digits = 2) {
@@ -57,8 +75,11 @@ export function accumulateMatchdayTrainingProgress(input: {
   gameState: GameState;
   seasonId: string;
   matchdayId: string;
+  /** Spieler, die diese Teil-Buchung ausgelassen hat (siehe Kopfkommentar). */
+  deferredPlayerIds?: ReadonlySet<string> | null;
 }): GameState {
   const { gameState, seasonId, matchdayId } = input;
+  const deferredPlayerIds = input.deferredPlayerIds ?? null;
   const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
   if (rosteredPlayerIds.size === 0) return gameState;
   const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
@@ -84,6 +105,10 @@ export function accumulateMatchdayTrainingProgress(input: {
   let mutated = false;
   const nextPlayers = gameState.players.map((player) => {
     if (!rosteredPlayerIds.has(player.id)) return player;
+    // Sein Spieltag ist noch nicht gebucht — weder Last noch Erholung, `player.fatigue` ist
+    // nicht die reine Match-Fatigue. Hier anzusetzen hiesse, die Trainingsschicht ein zweites
+    // Mal aufzuschlagen. Er kommt beim Commit seiner eigenen Disziplin-Seite dran.
+    if (deferredPlayerIds?.has(player.id)) return player;
 
     const previousAccumulator =
       player.seasonTrainingAccumulator && player.seasonTrainingAccumulator.seasonId === seasonId

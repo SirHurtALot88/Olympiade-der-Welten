@@ -1010,7 +1010,17 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
    * beide Seiten an. Ohne Angabe: ganzer Spieltag wie bisher.
    */
   commitThroughSide?: "d1" | "d2";
-}): { gameState: GameState; injuryEvents: InjuryEventRecord[] } {
+}): {
+  gameState: GameState;
+  injuryEvents: InjuryEventRecord[];
+  /**
+   * Spieler, die diese (Teil-)Buchung GAR NICHT angefasst hat, weil sie erst auf der noch
+   * offenen Disziplin-Seite antreten: weder Last noch Erholung, und damit steht ihre
+   * `player.fatigue` noch auf dem Vor-Spieltags-Wert statt auf reiner Match-Fatigue.
+   * `accumulateMatchdayTrainingProgress` MUSS sie deshalb ueberspringen — siehe dort.
+   */
+  deferredPlayerIds: Set<string>;
+} {
   const gameState = restorePreMatchdayAvailability({
     gameState: input.gameState,
     seasonId: input.seasonId,
@@ -1051,6 +1061,10 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   const playerIndexById = new Map(nextPlayers.map((player, index) => [player.id, index] as const));
   const playerNameById = new Map(gameState.players.map((player) => [player.id, player.name] as const));
   const newEvents: InjuryEventRecord[] = [];
+  // Wird genau dort gefuellt, wo der Recovery-Loop einen Spieler der offenen Seite auslaesst —
+  // nicht aus `pendingLaterSideKeys` abgeleitet, denn ein verletzter Spieler aus dieser Menge
+  // bekommt sehr wohl seine Erholung und ist damit NICHT ausgelassen.
+  const deferredPlayerIds = new Set<string>();
 
   for (const roster of gameState.rosters) {
     const playerIndex = playerIndexById.get(roster.playerId);
@@ -1065,7 +1079,10 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       { matchdayBookkeeping: true },
     );
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
-    if (pendingLaterSideKeys.has(usedKey) && !view.isUnavailable) continue;
+    if (pendingLaterSideKeys.has(usedKey) && !view.isUnavailable) {
+      deferredPlayerIds.add(roster.playerId);
+      continue;
+    }
     const recovery = calculatePlayerRecovery(gameState, roster.teamId, player.trainingMode);
     const currentFatigue = getPlayerCurrentFatigue(
       { ...gameState, players: nextPlayers, seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability } },
@@ -1164,6 +1181,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
 
   return {
     injuryEvents: newEvents,
+    deferredPlayerIds,
     gameState: {
       ...gameState,
       players: nextPlayers,

@@ -119,9 +119,14 @@ describe("Saison-Snapshot · die Historie liest den eingefrorenen Stand", () => 
     // dem Ausverkauf (L-K: 137,4 statt der 9,4, die das Team vorher hatte). Die Historie
     // zeigt deshalb `cashEntry`, dasselbe Feld wie die Ewige Tabelle: das Geld, mit dem das
     // Team wirklich losgespielt hat.
-    const treffer = historyReader.match(/cashEntry \?\?\s*teamSnapshot\.cashSeasonEnd|cashEntry \?\?\s*teamEintrag\.cashSeasonEnd/g);
+    // `cashCarryOver` darf dazwischenstehen (Kontostand an der Saisongrenze, nach der
+    // Vertragsalterung und vor den Kaeufen) — was hier festgehalten wird, ist: `cashEntry` ZUERST,
+    // und der Saisonend-Stand erst als Rueckfall dahinter.
+    const treffer = historyReader.match(
+      /cashEntry \?\?\s*(?:teamSnapshot\.cashCarryOver \?\?\s*)?teamSnapshot\.cashSeasonEnd|cashEntry \?\?\s*(?:teamEintrag\.cashCarryOver \?\?\s*)?teamEintrag\.cashSeasonEnd/g,
+    );
     expect(treffer?.length).toBe(2);
-    expect(allTimeReader).toMatch(/cash: record\.cashEntry \?\? record\.cashEnd/);
+    expect(allTimeReader).toMatch(/cash: record\.cashEntry \?\? (?:record\.cashCarryOver \?\? )?record\.cashEnd/);
   });
 
   it("behält die Rückfallkette für Altsaisons ohne Freeze", () => {
@@ -130,7 +135,7 @@ describe("Saison-Snapshot · die Historie liest den eingefrorenen Stand", () => 
     // Eintritts-Patch (letzte archivierte Saison vor der nächsten Vorbereitung) greift
     // zuerst der eingefrorene Saisonabschluss, erst danach die überschriebenen Altfelder.
     expect(historyReader).toMatch(
-      /cashEntry \?\?\s*teamSnapshot\.cashSeasonEnd \?\?\s*teamSnapshot\.cashEnd \?\?\s*teamSnapshot\.cashTotal/,
+      /cashEntry \?\?\s*(?:teamSnapshot\.cashCarryOver \?\?\s*)?teamSnapshot\.cashSeasonEnd \?\?\s*teamSnapshot\.cashEnd \?\?\s*teamSnapshot\.cashTotal/,
     );
   });
 

@@ -24,6 +24,7 @@
 // damit Angebot und regulaerer Verkauf nicht auseinanderlaufen.
 
 import type { GameState, Player, RosterEntry, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { derivePlayerNatureDemandSignals } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -86,6 +87,27 @@ type OfferInput = {
   /** Moral je Spieler. Wird hier NICHT neu abgeleitet — sonst driftet sie von der Anzeige weg. */
   moraleByPlayerId: Record<string, number>;
 };
+
+/**
+ * Moral je Kaderspieler eines Teams — die Bruecke zu `buildContractDissolutionOffers`.
+ *
+ * Die Angebots-Funktion leitet die Moral bewusst NICHT selbst ab, damit ihr Wert nicht von dem
+ * wegdriftet, was in der Oberflaeche steht. Diese Schleife stand deshalb frueher DREIMAL: in
+ * `contract-dissolution-local-service` (Route), in `game-inbox-service` (Inbox) — und waere mit
+ * der KI-Entscheidung ein viertes Mal entstanden. Sie gehoert hierher, neben die Funktion, die
+ * ihr Ergebnis verlangt.
+ */
+export function buildTeamMoraleMap(gameState: GameState, teamId: string): Record<string, number> {
+  const moraleByPlayerId: Record<string, number> = {};
+  for (const rosterEntry of gameState.rosters ?? []) {
+    if (rosterEntry.teamId !== teamId) continue;
+    const assessment = assessPlayerMorale({ gameState, playerId: rosterEntry.playerId, teamId });
+    if (assessment?.morale != null && Number.isFinite(assessment.morale)) {
+      moraleByPlayerId[rosterEntry.playerId] = assessment.morale;
+    }
+  }
+  return moraleByPlayerId;
+}
 
 function readDissolutionLog(gameState: GameState): ContractDissolutionRecord[] {
   return ((gameState.seasonState as { contractDissolutions?: ContractDissolutionRecord[] })

@@ -13,6 +13,12 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
+import {
+  applyAiContractDissolutions,
+  type AiDissolutionDecision,
+  type AiDissolutionRenewalSignal,
+} from "@/lib/morale/ai-contract-dissolution-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
@@ -38,6 +44,11 @@ import {
 } from "@/lib/morale/player-morale-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+
+// Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
+// gewandert (siehe dort), damit die KI-Aufloesung sie nutzen kann, ohne einen Import-Zyklus mit
+// diesem Dienst zu bauen. Aufrufer und Tests behalten ihren bisherigen Importpfad.
+export { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 
 export type ContractRenewalAction = "renew" | "release";
 
@@ -373,68 +384,6 @@ export function resolveContractRenewalTco(input: {
     renewalYearCost,
     minRiskPremium,
     score: exitBias.score + (renewCheaper ? 0.15 : 0) + (underMin ? 0.35 : 0),
-  };
-}
-
-/**
- * Sell-parity for contract exits: exit cash (MW × factor) below purchase price is a realized cash loss
- * (e.g. bought for 20, exit fee 15 → −5). Bias toward a short renewal when eating that loss is
- * worse than bridging one more season — same spirit as lossResistance on market sells, no hard gate.
- */
-export function resolveContractExitRenewBias(input: {
-  exitProfitLoss: number | null;
-  exitPurchasePrice: number | null;
-  exitValue: number | null;
-  renewalSalary: number | null;
-  currentSalary: number | null;
-  ratingValue: number;
-  badValueContract: boolean;
-}): {
-  score: number;
-  shouldBiasRenew: boolean;
-  preferRenewOverExit: boolean;
-  exitLossAbs: number;
-  renewalYearCost: number;
-} {
-  const empty = {
-    score: 0,
-    shouldBiasRenew: false,
-    preferRenewOverExit: false,
-    exitLossAbs: 0,
-    renewalYearCost: 0,
-  };
-  if (input.badValueContract) {
-    return empty;
-  }
-  const purchasePrice = input.exitPurchasePrice;
-  const exitValue = input.exitValue;
-  if (purchasePrice == null || purchasePrice <= 0 || exitValue == null) {
-    return empty;
-  }
-  if (exitValue + 0.005 >= purchasePrice) {
-    return empty;
-  }
-  const exitLossAbs = Math.max(0, purchasePrice - exitValue);
-  const renewalYearCost = roundMoney(input.renewalSalary ?? input.currentSalary ?? 0) ?? 0;
-  const lossRatio = exitLossAbs / purchasePrice;
-  const bracketScale = Math.max(6, purchasePrice * 0.15);
-  const relativePart = clamp01(lossRatio / 0.35);
-  const absolutePart = clamp01(exitLossAbs / bracketScale);
-  const combined = 0.3 * relativePart + 0.7 * absolutePart;
-  const ratingScale = input.ratingValue < 22 ? 0.35 : input.ratingValue < 30 ? 0.65 : 1;
-  // Bridge TCO: one season salary is cheaper than realizing the exit write-down → renew and hope.
-  const tcoFavorsRenew =
-    renewalYearCost > 0 &&
-    exitLossAbs >= renewalYearCost * 0.9 &&
-    input.ratingValue >= 28;
-  const score = Math.min(1, combined * ratingScale + (tcoFavorsRenew ? 0.28 : 0));
-  const shouldBiasRenew = score >= 0.22 || tcoFavorsRenew;
-  return {
-    score,
-    shouldBiasRenew,
-    preferRenewOverExit: tcoFavorsRenew,
-    exitLossAbs,
-    renewalYearCost,
   };
 }
 
@@ -1241,6 +1190,8 @@ export type SeasonEndContractTickComputation = {
   releasedPlayers: number;
   renewedPlayers: number;
   contractEventsWritten: number;
+  /** Entscheidungen der KI ueber Vertragsaufloesungen auf Spielerwunsch (leer, wenn keine anlagen). */
+  dissolutions: AiDissolutionDecision[];
 };
 
 /**
@@ -1265,12 +1216,49 @@ export function computeSeasonEndContractTick(
       releasedPlayers: 0,
       renewedPlayers: 0,
       contractEventsWritten: 0,
+      dissolutions: [],
     };
   }
 
   const preview = previewOverride ?? previewSeasonEndContracts(save);
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
-  const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
+
+  /**
+   * VERTRAGSAUFLOESUNGEN DER KI — VOR der Alterung, aus demselben Dienst wie beim Menschen.
+   *
+   * Der Preis eines Angebots rechnet mit `contractLength - 1` (das laufende Vertragsjahr ist zum
+   * Saisonende gespielt). Liefe die Entscheidung NACH der Alterung, waere der Vertrag bereits
+   * fortgeschrieben und der Rest-Buyout um ein Jahr zu klein. Sie steht deshalb hier — und nicht
+   * in `buildNextSeasonGameState`, wo der Tick im Sim-Pfad schon gelaufen waere.
+   *
+   * Die Angebote sind an dieser Stelle einmalig: `buildContractDissolutionOffers` sperrt einen
+   * Spieler nach der Entscheidung fuer die laufende Saison, und dieser Tick laeuft je Saison genau
+   * einmal (`hasSeasonEndContractTickApplied`, oben).
+   *
+   * Was die KI von der Vertrags-Vorschau uebernimmt, ist die Frage „wollte das Team ihn ueberhaupt
+   * behalten?" — bei einem auslaufenden Vertrag ist genau das der Unterschied zwischen Ablehnen
+   * (er bleibt und wird verlaengert) und Ablehnen ohne Wirkung (er geht ein paar Zeilen weiter
+   * unten mit demselben Erloes durch `buildContractExitValue`).
+   */
+  const renewalSignals = new Map<string, AiDissolutionRenewalSignal>(
+    preview.rows.map((row) => [
+      `${row.teamId}:${row.playerId}`,
+      {
+        wouldRenew: row.recommendedAction === "renew" && row.canRenewEffective,
+        renewalSalary: row.renewalSalaryPreview,
+        renewalLength: row.recommendedLength,
+      },
+    ]),
+  );
+  const dissolutionRun = applyAiContractDissolutions({
+    gameState: save.gameState,
+    saveId: save.saveId,
+    seasonId: save.gameState.season.id,
+    decidedAt: new Date().toISOString(),
+    renewalSignals,
+  });
+  const sourceState = dissolutionRun.gameState;
+  const playersById = new Map(sourceState.players.map((player) => [player.id, player] as const));
   const nextRosters: RosterEntry[] = [];
   const contractEvents: ContractEventRecord[] = [];
   const transferHistory: TransferHistoryEntry[] = [];
@@ -1278,7 +1266,7 @@ export function computeSeasonEndContractTick(
   const teamReleaseCounts = new Map<string, number>();
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
-  for (const entry of save.gameState.rosters) {
+  for (const entry of sourceState.rosters) {
     const tick = statusAfterSeasonTick(entry);
     if (tick.nextStatus === "out_of_contract") {
       const row = rowsByRosterId.get(entry.id);
@@ -1303,8 +1291,8 @@ export function computeSeasonEndContractTick(
           annualSalary: newSalary,
           contractLength: renewLength,
           shape: contractShape,
-          seasonIdBase: save.gameState.season.id,
-          seasonLabelBase: getSeasonLabel(save.gameState),
+          seasonIdBase: sourceState.season.id,
+          seasonLabelBase: getSeasonLabel(sourceState),
         }).yearlySalarySchedule;
         nextRosters.push({
           ...entry,
@@ -1317,7 +1305,7 @@ export function computeSeasonEndContractTick(
         });
         contractEvents.push(
           buildContractEvent({
-            seasonId: save.gameState.season.id,
+            seasonId: sourceState.season.id,
             teamId: entry.teamId,
             playerId: entry.playerId,
             eventType: "contract_renewed",
@@ -1353,7 +1341,7 @@ export function computeSeasonEndContractTick(
         });
         contractEvents.push(
           buildContractEvent({
-            seasonId: save.gameState.season.id,
+            seasonId: sourceState.season.id,
             teamId: entry.teamId,
             playerId: entry.playerId,
             eventType: "contract_renewed",
@@ -1369,14 +1357,14 @@ export function computeSeasonEndContractTick(
 
       teamReleaseCounts.set(entry.teamId, releaseCount + 1);
 
-      const exit = buildContractExitValue(save.gameState, playerForExit, entry);
+      const exit = buildContractExitValue(sourceState, playerForExit, entry);
       const source: ContractEventRecord["source"] = row?.controlMode === "ai" ? "ai_contract_expiry" : "manual_contract_expiry";
       if (exit.exitValue != null) {
         cashDeltaByTeamId.set(entry.teamId, (cashDeltaByTeamId.get(entry.teamId) ?? 0) + exit.exitValue);
       }
       transferHistory.push(
         buildContractExitTransferHistory({
-          gameState: save.gameState,
+          gameState: sourceState,
           entry,
           player: playerForExit,
           exit,
@@ -1385,7 +1373,7 @@ export function computeSeasonEndContractTick(
       );
       contractEvents.push(
         buildContractEvent({
-          seasonId: save.gameState.season.id,
+          seasonId: sourceState.season.id,
           teamId: entry.teamId,
           playerId: entry.playerId,
           eventType: "contract_expired_exit",
@@ -1427,8 +1415,8 @@ export function computeSeasonEndContractTick(
   const tickLog = buildSeasonEndContractTickLog({ save, renewedPlayers, releasedPlayers, contractEventsWritten });
 
   const gameState: GameState = {
-    ...save.gameState,
-    teams: save.gameState.teams.map((team) => {
+    ...sourceState,
+    teams: sourceState.teams.map((team) => {
       const cashDelta = cashDeltaByTeamId.get(team.teamId) ?? 0;
       return cashDelta === 0
         ? team
@@ -1438,29 +1426,29 @@ export function computeSeasonEndContractTick(
           };
     }),
     rosters: nextRosters,
-    transferHistory: [...transferHistory, ...save.gameState.transferHistory],
+    transferHistory: [...transferHistory, ...sourceState.transferHistory],
     seasonState: {
-      ...save.gameState.seasonState,
-      contractEvents: [...contractEvents, ...(save.gameState.seasonState.contractEvents ?? [])],
-      preSeasonWorkflowLogs: [tickLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
+      ...sourceState.seasonState,
+      contractEvents: [...contractEvents, ...(sourceState.seasonState.contractEvents ?? [])],
+      preSeasonWorkflowLogs: [tickLog, ...(sourceState.seasonState.preSeasonWorkflowLogs ?? [])],
     },
     logs: [
       {
-        id: `contract-season-end:${save.gameState.season.id}:${randomUUID()}`,
+        id: `contract-season-end:${sourceState.season.id}:${randomUUID()}`,
         type: "season",
-        message: `Vertragslaufzeiten fuer ${save.gameState.season.name} fortgeschrieben.`,
+        message: `Vertragslaufzeiten fuer ${sourceState.season.name} fortgeschrieben.`,
         createdAt: new Date().toISOString(),
       },
-      ...save.gameState.logs,
+      ...sourceState.logs,
     ],
   };
-  const relationshipEvents = buildPromisedRoleRelationshipEvents(save.gameState);
+  const relationshipEvents = buildPromisedRoleRelationshipEvents(sourceState);
   const relationshipEventIds = new Set(relationshipEvents.map((event) => event.eventId));
   const gameStateWithRelationshipEvents: GameState = {
     ...gameState,
     playerRelationshipEvents: [
       ...relationshipEvents,
-      ...(save.gameState.playerRelationshipEvents ?? []).filter((event) => !relationshipEventIds.has(event.eventId)),
+      ...(sourceState.playerRelationshipEvents ?? []).filter((event) => !relationshipEventIds.has(event.eventId)),
     ],
   };
 
@@ -1472,6 +1460,7 @@ export function computeSeasonEndContractTick(
     releasedPlayers,
     renewedPlayers,
     contractEventsWritten,
+    dissolutions: dissolutionRun.decisions,
   };
 }
 
@@ -1519,6 +1508,7 @@ export function applySeasonEndContractTick(
 
   saveGameStateWithContractEvents(save, computation.gameState, persistence);
 
+  const dissolutionsAccepted = computation.dissolutions.filter((entry) => entry.decision === "accepted").length;
   return {
     ...preview,
     dryRun: false,
@@ -1527,6 +1517,15 @@ export function applySeasonEndContractTick(
     releasedPlayers: computation.releasedPlayers,
     renewedPlayers: computation.renewedPlayers,
     contractEventsWritten: computation.contractEventsWritten,
+    warnings:
+      computation.dissolutions.length > 0
+        ? Array.from(
+            new Set([
+              ...preview.warnings,
+              `ai_contract_dissolutions:${dissolutionsAccepted}/${computation.dissolutions.length}`,
+            ]),
+          )
+        : preview.warnings,
   };
 }
 

@@ -874,6 +874,10 @@ export class LegacyMatchdayResultApplyService {
       gameState: injuryResult.gameState,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
+      // Wen die Teil-Buchung ausgelassen hat, den laesst auch die Trainings-Akkumulation aus:
+      // seine `player.fatigue` steht noch auf dem Vor-Spieltags-Wert, nicht auf reiner
+      // Match-Fatigue. Sonst schlaegt die Trainingsschicht bei ihm zweimal auf.
+      deferredPlayerIds: injuryResult.deferredPlayerIds,
     });
 
     const objectiveStartedAt = performance.now();

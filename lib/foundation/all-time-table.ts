@@ -263,7 +263,11 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         marketValue: snapshot.entryRosterPatchedAt
           ? (record.marketValueTotalEnd ?? record.marketValueEnd ?? record.marketValueSeasonEnd ?? null)
           : (record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null),
-        cash: record.cashEntry ?? record.cashEnd ?? record.cashTotal ?? null,
+        // `cashCarryOver` steht zwischen den beiden: der Kontostand an der Saisongrenze (nach der
+        // Vertragsalterung, vor den Kaeufen). Fehlt der Eintritts-Patch noch, ist das die naechste
+        // ehrliche Antwort auf „womit ging das Team weiter" — `cashEnd` liegt eine Vertragsrunde
+        // davor und `cashTotal` ist nur eine Prognose.
+        cash: record.cashEntry ?? record.cashCarryOver ?? record.cashEnd ?? record.cashTotal ?? null,
       });
     }
 

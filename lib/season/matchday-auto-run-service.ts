@@ -1,5 +1,4 @@
 import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { type GameState, type LineupDraftModifiers, type TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
@@ -744,17 +743,17 @@ export async function runLocalMatchdayAutoRun(
     return result;
   }
 
-  // Per-Spieltag: AI-Trainingsmodi anhand der AKTUELLEN Fatigue neu bewerten (Fatigue-Schoner),
-  // BEVOR die AI-Aufstellung gebaut wird — so self-managen AI-Teams ihre Fatigue auch im echten
-  // Spiel. Nur beim echten Ausfuehren (execute); ein Dry-Run-Preview veraendert den Spielstand nicht.
-  // Nur AI-Teams; menschlich gesteuerte Teams bleiben unangetastet.
-  // Beim D2-Commit liegt bereits ein Teil-Ergebnis vor — die Neubewertung lief dann schon
-  // beim D1-Commit und darf nicht ein zweites Mal auf die inzwischen veraenderte Fatigue
-  // schauen, sonst haengt der Trainingsmodus davon ab, in wie vielen Schritten gebucht wurde.
-  if (!dryRun && existingMatchdayResult == null) {
-    reevaluateAiTrainingModesForMatchday({ saveId: scope.saveId, persistence });
-  }
-
+  // HIER STAND FRUEHER DIE NEUBEWERTUNG DER KI-TRAININGSMODI — und genau hier war sie falsch.
+  //
+  // Sie schrieb `players[].trainingMode` unmittelbar vor dem Buchen, also NACH der Vorschau,
+  // die die Arena dem Spieler gezeigt hat. Der Modus zieht die Moral mit (erfuellter oder
+  // verfehlter Trainingswunsch, `training-mode-demand-service`), die Moral zieht ihren
+  // Multiplikator in den Score — und gebucht wurde damit ein anderer Zustand als der gezeigte.
+  // Gemessen: 280 von 320 Spielerzeilen abweichend, Ø 0,16, max 1,0 Punkte.
+  //
+  // Die Neubewertung sitzt jetzt im Spieltagswechsel (`writeLocalMatchdayAdvance`), also
+  // BEVOR fuer den neuen Spieltag ueberhaupt eine Zahl entsteht. Vorschau und Buchung sehen
+  // seither denselben Trainingsmodus.
   const aiBatchResult = applyAiLegacyLineupBatchLocally({
     ...scope,
     dryRun: !params.execute,

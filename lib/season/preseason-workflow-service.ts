@@ -16,7 +16,11 @@ import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipl
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
-import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
+import {
+  buildSeasonSnapshotDryRun,
+  patchSeasonSnapshotCashCarryOver,
+  upsertSeasonSnapshotRecord,
+} from "@/lib/season/season-snapshot-service";
 import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { buildCaptainRecordForPlayer } from "@/lib/morale/team-captain-service";
@@ -512,9 +516,31 @@ function buildNextSeasonGameState(
   // für frisch freigesetzte Free Agents, Sponsoren, Kader-Neuaufbau), damit diese auf dem gealterten
   // Kader/Cash aufsetzen und nichts doppelt zählen.
   const contractTick = computeSeasonEndContractTick(inputSave);
-  const save: PersistedSaveGame = contractTick.applied
+  const saveNachVertragsalterung: PersistedSaveGame = contractTick.applied
     ? { ...inputSave, gameState: contractTick.gameState }
     : inputSave;
+  /**
+   * DIE BUCHUNGSGRENZE ZWISCHEN DEN SAISONS — hier und nirgends sonst.
+   *
+   * Der Schnappschuss haelt `cashEnd` fest, wo Chris es haben will: nach der kompletten
+   * Saisonabrechnung, vor der Oeffnung des Transfermarkts. Die Vertragsalterung eine Zeile darueber
+   * bucht danach aber noch einmal auf die Kasse — und zwar auf die ALTE Saison: auslaufende
+   * Vertraege gehen als `contract_exit` mit der alten `seasonId` in die Transferhistorie, ihr
+   * Abloesewert landet erst jetzt auf `team.cash` (am Live-Abbild: 54 Abgaenge, +1085,24 C, 0,7 s
+   * nach dem Schnappschuss). Wer den Kontostand der Folgesaison auf `cashEnd` verankert, verankert
+   * ihn also auf einer Zahl, die das Team so nie mitgenommen hat.
+   *
+   * Genau hier ist der einzige Punkt, an dem jede Buchung der alten Saison durch ist und noch keine
+   * der neuen stattgefunden hat (Sponsor-`base_first`, Kaderfuellung und Kaeufe der neuen Saison
+   * kommen alle weiter unten und tragen die NEUE `seasonId`). Deshalb steht der Schnitt hier.
+   */
+  const carryOver = patchSeasonSnapshotCashCarryOver(
+    saveNachVertragsalterung.gameState,
+    saveNachVertragsalterung.gameState.season.id,
+  );
+  const save: PersistedSaveGame = carryOver.patched
+    ? { ...saveNachVertragsalterung, gameState: carryOver.gameState }
+    : saveNachVertragsalterung;
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
@@ -655,6 +681,11 @@ function buildNextSeasonGameState(
         : contractTick.alreadyApplied
           ? "season_end_contract_tick_already_applied"
           : null,
+      // Annahmequote der KI bei den Vertragsaufloesungen — die Kontrollzahl, an der man sieht, ob
+      // die Abwaegung noch abwaegt (0/x oder x/x heisst: sie tut es nicht).
+      contractTick.dissolutions.length > 0
+        ? `ai_contract_dissolutions:${contractTick.dissolutions.filter((entry) => entry.decision === "accepted").length}/${contractTick.dissolutions.length}`
+        : null,
       "season_mutator_state_reset_lineup_modifiers_cleared",
     ].filter((entry): entry is string => Boolean(entry)),
     affectedEntities: [

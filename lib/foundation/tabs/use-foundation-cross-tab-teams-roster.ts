@@ -588,6 +588,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
               // Rueckfall.
               cash:
                 teamEintrag.cashEntry ??
+                teamEintrag.cashCarryOver ??
                 teamEintrag.cashSeasonEnd ??
                 teamEintrag.cashEnd ??
                 teamEintrag.cashTotal,
@@ -694,12 +695,16 @@ export function useFoundationCrossTabTeamsRoster(input: {
              * beantwortet die Frage „womit ging das Team in die nächste Saison". Die Spalten
              * stehen also bewusst auf zwei Zeitpunkten — der Spaltenkopf sagt es an.
              *
-             * RÜCKFALLKETTE, in dieser Reihenfolge: ohne Eintritts-Patch (letzte archivierte
-             * Saison vor der nächsten Vorbereitung, Altsaves) der eingefrorene Saisonabschluss,
-             * erst danach die überschriebenen Altfelder.
+             * RÜCKFALLKETTE, in dieser Reihenfolge: fehlt der Eintritts-Patch (die letzte
+             * archivierte Saison vor der nächsten Vorbereitung, Altsaves), kommt `cashCarryOver` —
+             * der Kontostand an der Saisongrenze, nach der Vertragsalterung und vor den Käufen.
+             * Das ist von allen verbleibenden Feldern das nächste an „womit ging das Team in die
+             * nächste Saison"; erst danach der eingefrorene Saisonabschluss und ganz zuletzt die
+             * überschriebenen Altfelder.
              */
             cash:
               teamSnapshot.cashEntry ??
+              teamSnapshot.cashCarryOver ??
               teamSnapshot.cashSeasonEnd ??
               teamSnapshot.cashEnd ??
               teamSnapshot.cashTotal ??
