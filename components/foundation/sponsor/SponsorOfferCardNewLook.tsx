@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { buildLeihPresentationForOffer } from "@/lib/sponsor/sponsor-leih-presenter";
+import { SponsorLeihePanel } from "@/components/foundation/sponsor/SponsorLeihePanel";
 
 import type {
   GameState,
@@ -400,42 +401,7 @@ export function SponsorOfferCardNewLook({
           Gebaeudes, und die niedrigere Auszahlung darunter ist die Folge, nicht der Anlass. Die
           Zeile „steckt bereits in der Auszahlung" ist keine Hoeflichkeit, sondern die Absicherung
           gegen das naheliegende Missverstaendnis, der Verzicht komme noch obendrauf. */}
-      {leihe ? (
-        <div className="nl-sponsor-leihe" data-testid="sponsor-leihe-panel">
-          <div className="nl-sponsor-leihe-head">
-            <strong>
-              {leihe.facilityName} · Stufe {leihe.stufe}
-            </strong>
-            <span className="nl-sponsor-leihe-zustand nl-tnum">
-              {Math.round(leihe.zustandPct)} % Zustand
-              {leihe.unterWirkschwelle ? ` · Wirkung ${Math.round(leihe.wirkungsgradPct)} %` : ""}
-            </span>
-          </div>
-          <small>
-            Geliehen — der Sponsor traegt den Unterhalt. Dafuer zahlt diese Karte{" "}
-            <strong className="nl-tnum">{formatCash(leihe.verzichtDieseSaison)}</strong> weniger je Saison; das
-            steckt in der Auszahlung unten bereits drin und wird nicht noch einmal abgezogen.
-          </small>
-          {leihe.stufenreihe.length > 1 ? (
-            <small>
-              Ueber die Laufzeit: Stufe {leihe.stufenreihe.join(" → ")}
-              {" · Verzicht "}
-              {leihe.verzichtJeSaison.map((wert) => formatCash(wert)).join(" → ")}
-            </small>
-          ) : null}
-          {leihe.markenStatus ? (
-            <small className={leihe.ruht ? "nl-sponsor-leihe-ruht" : undefined}>
-              Bedingung: Top {leihe.rangmarke} halten ({leihe.rangmarkenHaerte === "hart" ? "hart" : "mild"}) —
-              darunter ruht das Gebaeude, der Verzicht laeuft weiter. {leihe.markenStatus}
-            </small>
-          ) : null}
-          <small>
-            Am Vertragsende uebernehmbar fuer ca.{" "}
-            <span className="nl-tnum">{formatCash(leihe.uebernahmepreisJetzt)}</span> statt{" "}
-            <span className="nl-tnum">{formatCash(leihe.katalogkostenEndstufe)}</span> Selbstbau.
-          </small>
-        </div>
-      ) : null}
+      {leihe ? <SponsorLeihePanel leihe={leihe} formatCash={formatCash} variant="offer" /> : null}
 
       {presentation.isChallenge && presentation.special ? (
         <div className="nl-sponsor-challenge" data-testid="sponsor-challenge-panel">

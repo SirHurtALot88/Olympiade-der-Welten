@@ -24,6 +24,7 @@ import {
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import {
   buildSponsorOfferPresentation,
+  buildSponsorPayoutBreakdown,
   computeSponsorCostCoverage,
   getSponsorComponentKindLabel,
   getSponsorCoverageTone,
@@ -50,6 +51,8 @@ import {
 } from "@/lib/facilities/analytics-live-progress";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { buildLeihPresentationForContract } from "@/lib/sponsor/sponsor-leih-presenter";
+import { SponsorLeihePanel } from "@/components/foundation/sponsor/SponsorLeihePanel";
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import {
   SPONSOR_CURVE_FAMILIES,
@@ -449,6 +452,27 @@ function ActiveContractHero({
     [gameState, contract.teamId],
   );
 
+  /**
+   * DIE GEBAEUDE-LEIHE DES LAUFENDEN VERTRAGS.
+   *
+   * `buildLeihPresentationForContract` gab es lange — aufgerufen hat sie niemand. Die Leihe war
+   * damit nur SICHTBAR, solange man noch waehlte; nach der Unterschrift verschwand das Gebaeude
+   * aus der Sponsorseite. Chris: „gebäude seh ich auch nicht".
+   *
+   * `sponsorLeihgabenByTeamId` traegt den LAUFENDEN Zustand (Verschleiss, Ruhezustand); ohne ihn
+   * zeigte die Karte den Anfangszustand und behauptete damit eine Wirkung, die das Gebaeude
+   * womoeglich gar nicht mehr hat. Der Rang entscheidet ausserdem, ob die Leihe gerade ruht.
+   */
+  const laufendeLeihe = useMemo(
+    () =>
+      buildLeihPresentationForContract({
+        contract,
+        leihgaben: gameState.seasonState.sponsorLeihgabenByTeamId?.[contract.teamId] ?? [],
+        aktuellerRang: gameState.seasonState.standings?.[contract.teamId]?.rank ?? null,
+      }),
+    [contract, gameState.seasonState.sponsorLeihgabenByTeamId, gameState.seasonState.standings],
+  );
+
   return (
     <NlCard className={`nl-sponsor-hero is-${contract.archetype}`} data-testid="nl-sponsor-active-contract">
       <div className="nl-sponsor-hero-main">
@@ -526,6 +550,9 @@ function ActiveContractHero({
             </span>
           ) : null}
         </div>
+      ) : null}
+      {laufendeLeihe ? (
+        <SponsorLeihePanel leihe={laufendeLeihe} formatCash={formatCash} variant="contract" />
       ) : null}
     </NlCard>
   );
@@ -726,10 +753,9 @@ export default function FoundationSponsorsNewLook({
       settlementRows = [];
     }
     // Aufbau des Fensters spiegelt die Rechnung: Basis -> Gewinnstufen (grafisch) -> alles Weitere
-    // (Verbesserung, Sonderziele) -> Summe. Die Rang-Zeile wird durch die Leiter ersetzt, statt sie
-    // zusaetzlich als Textzeile zu wiederholen.
-    const baseRow = settlementRows.find((entry) => entry.kind === "base") ?? null;
-    const otherRows = settlementRows.filter((entry) => entry.kind !== "base" && entry.kind !== "rank");
+    // (Verbesserung, Sonderziele, Vorschuss-Verrechnung) -> Summe. Die Rang-Zeile wird durch die
+    // Leiter ersetzt, statt sie zusaetzlich als Textzeile zu wiederholen.
+    //
     // `contract?.lockedRankPayoutLadder ?? null` REICHTE HIER NICHT: `buildOfferRankPayoutLadderPreview`
     // liefert `[]`, wenn ein Angebot keine V3-Konditionen traegt, und `sponsor-offer-service.ts` friert
     // genau dieses `[]` im Vertrag ein. `[]` ist nicht nullish — der `null`-Zweig war toter Code, und
@@ -738,8 +764,14 @@ export default function FoundationSponsorsNewLook({
     // Leiter nicht kennt ("Für diesen Vertrag liegt keine Auszahlungs-Aufschlüsselung vor").
     // `readContractRankPayoutLadder` beantwortet beide Faelle gleich.
     const rankLadder = readContractRankPayoutLadder(contract);
+    // KEINE ZEILE DARF UNTER DEN TISCH FALLEN — welche Zeile wo steht, entscheidet die eine
+    // geteilte Auswahl im Presenter (`buildSponsorPayoutBreakdown`), nicht mehr ein Filter hier.
+    const { baseRow, otherRows, otherRowsLabel } = buildSponsorPayoutBreakdown({
+      settlementRows,
+      showsRankLadder: rankLadder != null,
+    });
     const baseCash = contract?.components.find((entry) => entry.kind === "base")?.rewardCash ?? 0;
-    return { row, contract, baseRow, otherRows, rankLadder, baseCash };
+    return { row, contract, baseRow, otherRows, otherRowsLabel, rankLadder, baseCash };
   }, [leagueDetailTeamId, leagueSponsorRows, gameState]);
 
   const sortedLeagueSponsorRows = useMemo(
@@ -1411,12 +1443,12 @@ export default function FoundationSponsorsNewLook({
                     </div>
                   ) : null}
 
-                  {/* Sonderziele/Verbesserung darunter: damit sichtbar wird, woraus sich die Summe
-                      unten zusammensetzt. */}
+                  {/* Sonderziele/Verbesserung/Vorschuss darunter: damit sichtbar wird, woraus sich
+                      die Summe unten zusammensetzt — auch die Posten, die ABZIEHEN. */}
                   {leagueDetail.otherRows.length > 0 ? (
                     <div className="nl-sponsor-league-detail-section">
                       <div className="nl-sponsor-league-detail-section-head">
-                        <span>Sonderziele</span>
+                        <span>{leagueDetail.otherRowsLabel}</span>
                       </div>
                       <ul className="nl-sponsor-league-detail-list">
                         {leagueDetail.otherRows.map((component, index) => (
