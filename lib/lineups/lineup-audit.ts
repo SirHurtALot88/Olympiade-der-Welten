@@ -408,6 +408,55 @@ export function buildLineupMiniAudit(input: {
   };
 }
 
+
+/**
+ * DER FRISCHERE ERSATZ FUER EINEN MUEDEN SLOT — der Hinweis nennt einen NAMEN, keine Ermahnung.
+ *
+ * GEMELDET VON CHRIS: „um mehr anreiz zu schaffen spieler für rotation zu holen -> können wir in
+ * der einsatzliste einen hinweis einbauen wenn spieler hohe fatigue hat dass alternativ noch ein
+ * rotationsspieler gezeigt wird der ‚frischer' ist?"
+ *
+ * WARUM DAS NOETIG WAR: der Hinweis „eher rotieren" gab es schon, aber er sagte nur, DASS man
+ * rotieren soll — nie MIT WEM. Wer 12 Spieler hat, muss die Liste selbst durchsehen; wer keinen
+ * frischen Ersatz hat, bekam denselben Satz und lief ins Leere. Ein benannter Vorschlag beantwortet
+ * beides: er zeigt den Spieler, oder er erscheint gar nicht — und dieses Ausbleiben ist selbst die
+ * Auskunft „du hast niemanden, hol dir Rotation".
+ *
+ * WER IN FRAGE KOMMT, bewusst eng:
+ *   - nicht schon in einem anderen Slot gesetzt (sonst waere es eine Doppelwahl),
+ *   - nicht verletzt und nicht in Erholung — wir empfehlen keine Schonung durch einen Angeschlagenen,
+ *   - kann die Disziplin ueberhaupt (ein Wert in `disciplineScores` fuer genau diese Disziplin),
+ *   - SELBST NICHT ERHOEHT MUEDE (`isElevatedFatigue`) — ein Tausch von 62 auf 51 ist kein Ausweg,
+ *   - und mindestens `FRISCHER_MINDESTABSTAND` Punkte frischer, damit der Hinweis nicht bei
+ *     Marginalien auftaucht.
+ * Bei mehreren Treffern gewinnt der frischeste; bei gleicher Fatigue der fuer diese Disziplin bessere.
+ */
+const FRISCHER_MINDESTABSTAND = 15;
+
+export function findeFrischerenErsatz(input: {
+  disciplineId: string;
+  selectedId: string;
+  selectedFatigue: number | null | undefined;
+  playerOptions: LegacyLineupLabPlayerOption[];
+  belegteIds: Set<string>;
+}): { name: string; fatigue: number } | null {
+  const muede = input.selectedFatigue ?? 0;
+  const treffer = input.playerOptions
+    .filter((option) => option.activePlayerId !== input.selectedId)
+    .filter((option) => !input.belegteIds.has(option.activePlayerId))
+    .filter((option) => option.injuryStatus !== "injured" && option.injuryStatus !== "recovering")
+    .filter((option) => typeof option.disciplineScores[input.disciplineId] === "number")
+    .filter((option) => !isElevatedFatigue(option.fatigueCount))
+    .filter((option) => muede - (option.fatigueCount ?? 0) >= FRISCHER_MINDESTABSTAND)
+    .sort((left, right) => {
+      const fatigueDiff = (left.fatigueCount ?? 0) - (right.fatigueCount ?? 0);
+      if (fatigueDiff !== 0) return fatigueDiff;
+      return (right.disciplineScores[input.disciplineId] ?? 0) - (left.disciplineScores[input.disciplineId] ?? 0);
+    })[0];
+
+  return treffer ? { name: treffer.name, fatigue: Math.round(treffer.fatigueCount ?? 0) } : null;
+}
+
 /** Vormals `slotIssuesByKey` (useMemo). */
 export function buildSlotIssuesByKey(input: {
   slots: LegacyLineupLabSlot[];
@@ -474,10 +523,21 @@ export function buildSlotIssuesByKey(input: {
         });
       }
       if (isElevatedFatigue(selectedOption?.fatigueCount)) {
+        const ersatz = selectedId
+          ? findeFrischerenErsatz({
+              disciplineId: slot.disciplineId,
+              selectedId,
+              selectedFatigue: selectedOption?.fatigueCount,
+              playerOptions,
+              belegteIds: new Set(Object.values(selections).filter(Boolean)),
+            })
+          : null;
         issues.push({
           tone: "warning",
           label: "Fatigue-Risiko",
-          detail: `${formatFatigueImpactDetail(selectedOption?.fatigueCount)}: eher rotieren oder Team-Einsatz senken.`,
+          detail: ersatz
+            ? `${formatFatigueImpactDetail(selectedOption?.fatigueCount)}: frischer waere ${ersatz.name} (Fatigue ${ersatz.fatigue}).`
+            : `${formatFatigueImpactDetail(selectedOption?.fatigueCount)}: eher rotieren oder Team-Einsatz senken.`,
         });
       }
       const firstWarning = slotPreview?.projected.warnings[0];
