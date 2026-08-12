@@ -80168,3 +80168,36 @@ span.nl-facility-ampel-chip {
   opacity: 0.55;
   font-weight: 500;
 }
+
+/* Gebaeude-Spalte der Liga-Sponsorenuebersicht.
+   Zwei Zeilen in einer Zelle: Name mit Stufe oben, Selbstbauwert darunter — der Wert steht
+   rechtsbuendig unter dem Namen, damit die Spalte beim Ueberfliegen als EINE Groesse liest und
+   nicht mit der Cash-Spalte daneben verwechselt wird. */
+.nl-sponsor-league-gebaeude {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.25;
+}
+.nl-sponsor-league-gebaeude-name {
+  font-size: 0.82em;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+.nl-sponsor-league-gebaeude-wert {
+  font-weight: 700;
+}
+/* Eine ruhende Leihe wirkt gerade NICHT — sie darf nicht wie voller Gegenwert aussehen. */
+.nl-sponsor-league-gebaeude.is-ruht {
+  opacity: 0.55;
+}
+.nl-sponsor-league-gebaeude-ruht {
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nl-warn, #d9a441);
+}
+.nl-sponsor-league-gebaeude.is-leer {
+  color: var(--nl-mut);
+}

@@ -734,9 +734,33 @@ export default function FoundationSponsorsNewLook({
         // Vertrag erbt `variantKey` vom Angebot (sponsor-offer-service), daher
         // ist das der verlaessliche Golden-Indikator auf Vertragsebene.
         isGolden: contract?.variantKey === "premium_elite",
+        /**
+         * DIE GEBAEUDE-LEIHE — bis hierher stand in dieser Uebersicht nur Cash, und genau daran
+         * ist die Liste unlesbar geworden.
+         *
+         * GEMELDET VON CHRIS an Last Ride: "39 mio ... das passt gar nicht so ein starkes team und
+         * der sponsor steht hier so schlecht". Nachgemessen war die Karte kein Fehlgriff, sondern
+         * ein TAUSCH: weniger Cash gegen eine Academy auf Stufe 5, die im Selbstbau 132 kosten
+         * wuerde. Die Spalte zeigte davon die eine Haelfte und verschwieg die andere — eine
+         * Gebaeude-Karte MUSS in einer reinen Cash-Spalte nach Fehlgriff aussehen.
+         *
+         * Chris' Schluss daraus, woertlich: "dann würde es auch sinn machen weniger cash zu
+         * bekommen wenn man dafür 30m gegenwert in gebäuden hat".
+         *
+         * Gerechnet wird NICHT hier. `buildLeihPresentationForContract` ist dieselbe Stelle, aus
+         * der auch die Vertragskarte liest — inklusive Verschleiss und Ruhezustand, denn eine
+         * ruhende Leihe als Gegenwert auszuweisen waere schlimmer als sie wegzulassen.
+         */
+        leihe: contract
+          ? buildLeihPresentationForContract({
+              contract,
+              leihgaben: gameState.seasonState.sponsorLeihgabenByTeamId?.[team.teamId] ?? [],
+              aktuellerRang: teamRankByTeamId.get(team.teamId) ?? null,
+            })
+          : null,
       };
     });
-  }, [gameState, apronLines]);
+  }, [gameState, apronLines, teamRankByTeamId]);
   // Komponenten-Aufschluesselung des geoeffneten Teams — dieselbe Quelle wie das echte
   // Season-End-Settlement, damit das Fenster nicht eine andere Zahl zeigt als die Uebersicht.
   const leagueDetail = useMemo(() => {
@@ -806,6 +830,23 @@ export default function FoundationSponsorsNewLook({
       tooltip: "Voraussichtliche Auszahlung beim aktuellen Rang",
     },
     {
+      /**
+       * DIE ZWEITE HAELFTE DER KARTE. Eine Gebaeude-Karte zahlt weniger Cash — steht daneben
+       * nicht, WOFUER, sieht sie zwangslaeufig nach Fehlgriff aus (Chris an Last Ride: "der
+       * sponsor steht hier so schlecht", tatsaechlich eine Academy auf Stufe 5).
+       *
+       * BEWUSST EINE EIGENE SPALTE UND KEINE SUMME MIT DEM CASH: der Cash ist ein Betrag JE
+       * SAISON, die Selbstbaukosten sind einmalig. Die beiden zu addieren ergibt eine Zahl, die
+       * nichts bedeutet — ich habe genau diesen Fehler in einer Zwischenmeldung schon einmal
+       * gemacht (71,5 + 132 = "203,5") und er hat mehr verwirrt als erklaert.
+       */
+      key: "gebaeude",
+      label: "Gebäude",
+      align: "right",
+      tooltip:
+        "Geliehenes Gebäude des Sponsors: Stufe und was der Selbstbau kosten würde. Der niedrigere Cash ist der Preis dafür.",
+    },
+    {
       key: "coverage",
       label: "Fixkosten-Deckung",
       align: "right",
@@ -867,6 +908,32 @@ export default function FoundationSponsorsNewLook({
             {row.projectedCash != null ? formatSponsorMoney(row.projectedCash) : "—"}
           </span>
         );
+      case "gebaeude": {
+        if (!row.leihe) {
+          // Kein Gebaeude ist eine Aussage, keine Luecke: diese Karte zahlt dafuer vollen Cash.
+          return <span className="nl-sponsor-league-gebaeude is-leer">—</span>;
+        }
+        const leihe = row.leihe;
+        return (
+          <span
+            className={`nl-sponsor-league-gebaeude${leihe.ruht ? " is-ruht" : ""}`}
+            title={
+              `${leihe.facilityName} Stufe ${leihe.stufe} · Selbstbau ${formatSponsorMoney(leihe.katalogkostenEndstufe)}` +
+              ` · Zustand ${Math.round(leihe.zustandPct)} %` +
+              (leihe.stufenreihe.length > 1 ? ` · über die Laufzeit Stufe ${leihe.stufenreihe.join(" → ")}` : "") +
+              (leihe.markenStatus ? ` · ${leihe.markenStatus}` : "")
+            }
+          >
+            <span className="nl-sponsor-league-gebaeude-name">
+              {leihe.facilityName} L{leihe.stufe}
+            </span>
+            <span className="nl-tnum nl-sponsor-league-gebaeude-wert">
+              {formatSponsorMoney(leihe.katalogkostenEndstufe)}
+            </span>
+            {leihe.ruht ? <span className="nl-sponsor-league-gebaeude-ruht">ruht</span> : null}
+          </span>
+        );
+      }
       case "coverage":
         // Deckungsgrad: traegt der Sponsor die laufenden Kosten? Unter 100 % zahlt das Team drauf.
         // Die Farbe ist NICHT der einzige Traeger — der Prozentwert steht daneben.
