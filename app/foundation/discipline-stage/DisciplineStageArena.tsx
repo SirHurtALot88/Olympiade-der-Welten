@@ -2642,8 +2642,59 @@ export default function DisciplineStageArena({
             // zurück → Diszi 2 startet frisch. Der Matchday-Advance erscheint erst auf der letzten
             // Disziplin (d2 bzw. Ein-Disziplin-Spieltag / Dev-Modus).
             const secondDisciplineId = matchdaySides.d2?.disciplineId ?? null;
+
+            /**
+             * GEMELDET VON CHRIS: „aber MD4 hat nicht gescored und blocked auch so dass ich nicht
+             * weiter komme und abschliessen kann das ist mein problem, nicht dass dort keine punkte
+             * sind."
+             *
+             * BEFUND am Spielstand (Saison 1, Spieltag 4): D1 (Wettessen) mit 32 Ergebniszeilen
+             * gebucht, D2 (Mini-DM) mit NULL — obwohl alle 32 Aufstellungen fuer D2 vorlagen
+             * (64 Eintraege). Die Arena war fuer D2 gelaufen (`arenaEnded`), die BUCHUNG aber nicht
+             * durchgekommen.
+             *
+             * DIE ALTE BEDINGUNG FRAGTE NUR, WELCHE SEITE ANGEZEIGT WIRD (`activeDisciplineSide ===
+             * "d1"`), nie ob sie GEWERTET ist. Stand man auf D2 und war D2 ungewertet, fiel die
+             * Ansicht deshalb in den Zweig darunter und behauptete „Beide Disziplinen sind gewertet"
+             * samt Abschluss-Knopf — der dann blockte, weil der Save es besser wusste. Genau die
+             * Sackgasse, die Chris beschreibt: die Arena sagt fertig, der Spieltagswechsel sagt nein,
+             * und einen Weg zurueck zur Wertung bot die Seite nicht an.
+             *
+             * MASSGEBLICH IST JETZT DER SAVE (`scoringProgress`), nicht die angezeigte Seite:
+             *   - die eigene Seite ist ungewertet  → sagen, dass die Buchung fehlt (kein Abschluss)
+             *   - die ANDERE Seite ist ungewertet  → dorthin fuehren, egal auf welcher man steht
+             *   - beide gewertet                   → erst dann der Abschluss-Knopf
+             */
+            const eigeneSeiteGewertet = activeSideScoredInSave;
+            const andereSeiteGewertet =
+              activeDisciplineSide === "d1" ? (scoringProgress?.d2.scored ?? false) : (scoringProgress?.d1.scored ?? false);
+            const andereSeiteGeplant =
+              activeDisciplineSide === "d1" ? (scoringProgress?.d2.required ?? false) : (scoringProgress?.d1.required ?? false);
+
+            // Die eigene Seite ist durchgelaufen, aber NICHT im Save gelandet. Das ist der Fall, in
+            // dem die Seite bisher „beide gewertet" behauptete. Statt eines Knopfes, der blockt,
+            // steht hier, was wirklich fehlt.
+            if (!devMode && !eigeneSeiteGewertet) {
+              return (
+                <div
+                  role="alert"
+                  data-testid="arena-side-not-booked"
+                  style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--nl-warn, var(--nl-mut))" }}>
+                    Diese Disziplin ist gelaufen, aber noch <strong>nicht gewertet</strong> — der Spieltag lässt sich
+                    deshalb nicht abschliessen. Disziplin neu starten, um die Wertung nachzuholen.
+                  </span>
+                </div>
+              );
+            }
+
             const guideToSecondDiscipline =
-              !devMode && activeDisciplineSide === "d1" && secondDisciplineId != null && secondDisciplineId !== disciplineId;
+              !devMode &&
+              secondDisciplineId != null &&
+              secondDisciplineId !== disciplineId &&
+              andereSeiteGeplant &&
+              !andereSeiteGewertet;
             if (guideToSecondDiscipline) {
               const secondName =
                 matchdayDisciplineOptions.find((option) => option.id === secondDisciplineId)?.name ?? "Disziplin 2";
