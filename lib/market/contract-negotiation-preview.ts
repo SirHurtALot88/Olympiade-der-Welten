@@ -716,6 +716,14 @@ export function recommendContractOfferForPlayer(input: {
   gmArchetype?: string | null;
   /** Good/core player signal (e.g. rank <= 40 or high market value) — drives the culture_keeper floor. */
   highValue?: boolean | null;
+  /**
+   * `line1 − Apron-Bemessung` des Teams. Negativ heisst: ueber der ersten Apron-Linie.
+   * Siehe `contract-shape-context.ts` — die Abgabe selbst laesst sich damit NICHT umgehen, wohl
+   * aber die echte Zahlung dieser Saison, die on top zur Abgabe faellig wird.
+   */
+  apronHeadroom?: number | null;
+  /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
+  backLoadedShare?: number | null;
 }): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
@@ -982,6 +990,38 @@ export function recommendContractOfferForPlayer(input: {
   if (input.gmArchetype === "culture_keeper" && input.highValue) {
     contractLength = Math.max(contractLength, cashComfortable ? 4 : 3);
     reasons.push("Culture Keeper: guter Spieler wird langfristig gebunden.");
+  }
+
+  // DIE APRON-LAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
+  //
+  // Chris' Vorgabe war beides: „das muss die AI berücksichtigen" UND „es sollen ja nicht alle top
+  // teams dann nur back loaded nehmen […] dann hast du irgendwann nen sehr teuren gehaltspeak […]
+  // der mix machts." Deshalb zwei eng gefasste Regeln statt eines Schalters.
+  //
+  // (1) Ueber der Apron-Linie wird NICHT front-geloadet. Die Abgabe ist damit nicht zu umgehen (sie
+  //     bemisst sich absichtlich auf der geglaetteten Zahl), aber front-loaded legt die hoehere
+  //     ECHTE Zahlung genau in die Saison, in der die Abgabe ohnehin faellig wird. Am Abbild
+  //     gemessen taten das fuenf von acht Teams ueber der Linie (M-M: geglaettet 81,6, echt 95,9).
+  // (2) Der Mix-Riegel: ist schon die Haelfte der laufenden Mehrjahresvertraege back-loaded, wird
+  //     nicht noch einer draufgelegt — sonst schiebt das Team seine Last gesammelt in eine spaetere
+  //     Saison. Dann lieber balanced.
+  //
+  // Beide greifen nur, wenn die Lage bekannt ist; ohne die Angaben bleibt alles wie bisher.
+  const apronUeberLinie = input.apronHeadroom != null && input.apronHeadroom <= 0;
+  const backLoadLastig = input.backLoadedShare != null && input.backLoadedShare >= 0.5;
+  const mehrjaehrig = contractLength >= 2;
+
+  if (apronUeberLinie && mehrjaehrig && contractShape === "front_loaded") {
+    contractShape = backLoadLastig ? "balanced" : "back_loaded";
+    reasons.push(
+      backLoadLastig
+        ? "Ueber der Apron-Linie und schon back-load-lastig: ausgeglichen statt frueh teuer."
+        : "Ueber der Apron-Linie: nicht zusaetzlich frueh zahlen, wenn die Abgabe ohnehin faellig wird.",
+    );
+  }
+  if (backLoadLastig && mehrjaehrig && contractShape === "back_loaded") {
+    contractShape = "balanced";
+    reasons.push("Schon ueberwiegend back-loaded: ein weiterer wuerde den Gehaltsberg spaeter aufbauen.");
   }
 
   return {
