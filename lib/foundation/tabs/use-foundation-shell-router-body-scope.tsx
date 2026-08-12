@@ -325,6 +325,8 @@ import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-
 import type { FoundationStateContextValue } from "@/lib/foundation/foundation-state-context";
 import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
+import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -10812,6 +10814,26 @@ export function useFoundationShellRouterBodyScope({
           salaryTotal: row.salaryTotal ?? null,
           guv: row.guv ?? null,
           sponsorTotal: row.sponsorTotal ?? null,
+          /**
+           * DREI SPALTEN, DIE NUR DAS TOTE MODELL BEFUELLT HAT.
+           *
+           * `useSeasonV2PanelModel` setzt `buildingCost`, `transferNet` und `guvPosten` — es
+           * haengt aber am `FoundationSeasonV2Host`, der nirgends gerendert wird. Gerendert wird
+           * diese Zeile hier, und ihr fehlten die drei Felder. Weil sie am Client optional sind,
+           * gab es keinen Typfehler; `formatNlMoney(undefined)` schreibt „—", und das las sich wie
+           * eine Aussage statt wie ein Ausfall.
+           *
+           * Gemessen am Abnahme-Spielstand (Saison 2): 24 von 32 Teams haben einen
+           * Gebaeude-Unterhalt > 0 (1,4 bis 4,8), die Spalte zeigte trotzdem in allen 32 Zeilen
+           * „—". `guvPosten` fehlte ebenso, weshalb das GuV-Hover in den dokumentierten
+           * Rueckfallzweig lief und „Gebaeude" als REST (`guv − sponsor + gehaelter`) auswies —
+           * genau der Zweig, der laut `lib/finance/guv-breakdown.ts` „keinen Fehler in `guv`
+           * sichtbar machen" kann. Mit den Posten zeigt das Hover wieder die EINE GuV, die Chris
+           * verlangt hat („ich will endlich dass ueberall die GuV das gleiche ausweist").
+           */
+          buildingCost: computeTeamBuildingCost(gameState, row.teamId),
+          transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
+          guvPosten: row.guvPosten ?? null,
           marketValueTotal: row.marketValueTotal ?? null,
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
@@ -10904,6 +10926,30 @@ export function useFoundationShellRouterBodyScope({
             }),
           }),
     [gameState, isViewingArchivedSeason, playerDirectorySlice, playerRatingsById, seasonPointsLedger],
+  );
+  /**
+   * DIESELBE FEHLERKLASSE, ZWEITER FALL: die Formkarten-Bilanz je Team.
+   *
+   * Gebaut wurde sie ausschliesslich im `FoundationSeasonV2Host` — und der wird nirgends
+   * gerendert (importiert schon, gerendert nie; gemessen: `<FoundationShellRouterSeasonV2` kommt
+   * in keiner Datei vor). Der gerenderte Pfad laeuft ueber `FoundationShellRouterBody` →
+   * `FoundationSeasonV2Panel` → `SeasonStandingsV2Client`, und dort kam der Prop nie an. Weil er
+   * am Client optional ist, gab es dafuer keinen Typfehler — und weil beide Spalten bei fehlender
+   * Karte bewusst „—" zeigen, sah der Ausfall aus wie eine Aussage („dieses Team hat keine
+   * Karten") statt wie ein Fehler.
+   *
+   * Gemessen am Abnahme-Spielstand (Saison 2, Spieltag 4): serverseitig 680 Karten und alle 32
+   * Teams mit positivem Tank, im Browser dagegen in jeder Zeile „—" mit dem Titel „Keine
+   * Formkarten in dieser Saison". Die Daten fuhren vollstaendig mit (680 `cardValue` im Payload
+   * nachgezaehlt) — es fehlte nur die Verdrahtung.
+   *
+   * Kein Archiv-Sonderfall noetig, anders als oben: die Rechnung filtert `formCards` und
+   * `lineupDrafts` selbst nach `seasonId`. Eine Archiv-Saison ohne erhaltene Aufstellungen
+   * liefert deshalb eine leere Karte — und genau dann ist „—" die richtige Anzeige.
+   */
+  const seasonV2FormCardBonusByTeamId = useMemo(
+    () => buildSeasonFormCardBonusByTeamId(gameState, seasonOverviewSeasonId),
+    [gameState, seasonOverviewSeasonId],
   );
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
@@ -12611,6 +12657,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2SelectedTeamSummary,
     seasonV2StandingsRows,
     seasonV2TeamTopPlayersByColumn,
+    seasonV2FormCardBonusByTeamId,
     seasonV2TopPlayers,
     selectTeamSettingsTeam,
     selectedBoardConfidence,
