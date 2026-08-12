@@ -361,10 +361,22 @@ describe("team season objectives service", () => {
       standings: { "M-M": { points: 130, rank: 2 }, "C-C": { points: 80, rank: 14 } },
       transferHistory: [
         {
+          // DER VERKAUF GEHOERT IN DIE SAISON, UM DIE ES GEHT.
+          //
+          // Hier stand `season-2`, waehrend der Spielstand in `season-3` steht (siehe
+          // `createGameState`). Der Test war trotzdem gruen, weil der Transfersaldo damals ueber
+          // ALLE Saisons summierte — ein Verkauf aus der Vorsaison erfuellte also das Saisonziel
+          // der laufenden. Das ist kein Randfall, sondern hat das Ziel unbrauchbar gemacht:
+          // `teamSeasonObjectives` werden je Saison gestellt und je Saison mit rewardCash/
+          // penaltyCash abgerechnet (`objective.seasonId === gameState.season.id`), und der
+          // Alle-Zeiten-Saldo traegt den Liga-Draft mit, der jeden Grundstock-Spieler als Kauf
+          // schreibt. Am Abnahme-Spielstand gemessen: Alle-Zeiten-Saldo −251 bis −341 je Team,
+          // Saisonsaldo −43 bis −109. Ein Ziel „Transfergewinn von 15M erzielen" waere gegen den
+          // Alle-Zeiten-Saldo fuer JEDES Team dauerhaft unerreichbar gewesen.
           id: "sell-c1",
           playerId: "x",
-          seasonId: "season-2",
-          seasonLabel: "Season 2",
+          seasonId: "season-3",
+          seasonLabel: "Season 3",
           transferType: "sell",
           fromTeamId: "C-C",
           toTeamId: null,
@@ -394,6 +406,49 @@ describe("team season objectives service", () => {
     // Season 3 → C-C transfer target is 15 (seasonal scaling)
     expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
+    // Und die Zahl selbst ist die der Saison, nicht die Historie.
+    expect(ccTransfer?.currentValue).toBe(16);
+  });
+
+  /**
+   * DIE GEGENPROBE ZUR SAISONBINDUNG: derselbe Verkauf, nur in der VORSAISON gebucht.
+   *
+   * Er darf das Ziel der laufenden Saison nicht erfuellen — sonst startet ein Team, das einmal gut
+   * verkauft hat, jede weitere Saison mit einem bereits erledigten Transferziel.
+   */
+  it("laesst einen Verkauf aus der Vorsaison das Transferziel der laufenden Saison NICHT erfuellen", () => {
+    const teams = [createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" })];
+    const gameState = createGameState({
+      teams,
+      identities: [createIdentity("C-C", { finances: 10, ambition: 5 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+      standings: { "C-C": { points: 80, rank: 14 } },
+      transferHistory: [
+        {
+          id: "sell-c1-vorsaison",
+          playerId: "x",
+          seasonId: "season-2",
+          seasonLabel: "Season 2",
+          transferType: "sell",
+          fromTeamId: "C-C",
+          toTeamId: null,
+          fee: 16,
+          salary: 0,
+          marketValue: 10,
+          remainingContractLength: 1,
+          happenedAt: "2026-06-12T00:00:00.000Z",
+          source: "ai_preseason_market_sell",
+        },
+      ],
+    });
+
+    const ccTransfer = buildTeamObjectiveOverview(gameState).objectives.find(
+      (objective) => objective.teamId === "C-C" && objective.objectiveId === "transfer-profit",
+    );
+    expect(ccTransfer?.targetValue).toBe(15);
+    expect(ccTransfer?.currentValue).toBe(0);
+    expect(ccTransfer?.status).toBe("failed");
   });
 
   it("keeps bottom-table sport objectives realistic even for ambitious teams", () => {
