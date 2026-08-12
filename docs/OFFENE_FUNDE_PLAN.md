@@ -560,3 +560,71 @@ P6-Doku-Zeilen (c, g, h, i) beiläufig in den jeweiligen PRs.
    über 13 der 64 roten Tests).
 3. P5: Portrait-Voll-Migration ins Repo ja/nein; kurzfristig die Peacock-Datei vom Mac.
 4. P6f, falls „Form" als echte Kennzahl gewünscht ist statt Leseweg-Entfernung.
+
+---
+
+## P7 — Die Topspieler-Liste der Arena zeigt weiter nur EINE Disziplin
+
+**Gemeldet (Chris):** „die top players in der arena ganz unten zeigen immer noch 1 diszi und nicht
+beide! dort sollen alle aus beiden diszis drin sein damit man den besten des spieltags sehen kann!"
+
+**Der Stand, nachgesehen — die Reparatur EXISTIERT bereits:**
+`matchdayTopPlayers` (`DisciplineStageArena.tsx:1416`) summiert beide Disziplinen, zählt einen
+Spieler, der in beiden antrat, EINMAL mit der Summe seiner Punkte, und deckt nur auf, was
+aufgedeckt ist. Die Anzeigestelle (`:2619`) nimmt sie auch: `(matchdayTopPlayers ?? topPlayers)`.
+
+**Verdacht, wo es trotzdem kippt — und er zeigt auf eine Änderung von gestern:**
+`matchdayTopPlayers` gibt `null` zurück, sobald `preview` fehlt (`:1419`), und fällt dann auf
+`topPlayers` zurück — und das ist die EINE laufende Disziplin. Genau diese Rückfall-Lage ist seit
+gestern häufiger: `readMatchdayResolveSnapshot` liefert bewusst `null`, sobald BEIDE Seiten gebucht
+sind (Commit `697e2a4d`, damit das Gebuchte gewinnt statt eines veralteten Zwischenstands). Wer die
+Arena eines fertig gebuchten Spieltags öffnet, hat damit womöglich keine Vorschau mehr — und sieht
+die halbe Liste.
+
+**Zu prüfen, bevor repariert wird:** Ist `preview` im fertig gebuchten Spieltag wirklich `null`?
+Wenn ja, braucht die Liste eine Quelle, die ohne Vorschau auskommt — die gebuchten
+`disciplineResults`/`playerDisciplinePerformances` tragen beide Disziplinen vollständig.
+
+**Abnahme (Wert, nicht Augenschein):** Auf einem Spielstand mit zwei gebuchten Disziplinen enthält
+die Liste Spieler AUS BEIDEN, ein in beiden angetretener Spieler steht genau einmal mit der Summe
+seiner Punkte, und die Summe stimmt mit dem Ledger überein. Zusätzlich: solange erst eine Disziplin
+aufgedeckt ist, stehen NUR deren Spieler da (kein Spoiler).
+
+**Dateien:** `app/foundation/discipline-stage/DisciplineStageArena.tsx`,
+`lib/foundation/discipline-stage/*`, `lib/foundation/matchday-resolve-snapshot.ts` (nur lesend).
+
+**Gefahr:** Die Spoiler-Regel darf nicht fallen. Und die Liste darf nicht zwei Quellen bekommen,
+die verschieden rechnen — sonst ist es Fehlerklasse 1.
+
+---
+
+## P8 — Verletzte Spieler in der Score-Tabelle sichtbar machen
+
+**Gewünscht (Chris):** „es wäre gut wenn man in der score tabelle vllt noch sehen kann wenn ein
+team einen verletzten spieler hat! das wäre gut"
+
+Das ist ein FEATURE, kein Fehler — entsprechend ohne Befund, aber mit denselben Anforderungen an
+die Zahl dahinter.
+
+**Datenlage, geprüft:** `seasonState.injuryEvents` fährt vollständig mit (5032 Einträge gemessen,
+NICHT beschnitten — die gegenteilige Annahme im Audit-Plan war falsch). Die Verletzungswirkung ist
+außerdem je Spielerzeile gebucht (`injuryApplied`/`injuryAdjustedValue` in den
+`playerDisciplinePerformances`).
+
+**Zu entscheiden vor dem Bau:** Was genau soll die Marke sagen?
+  (a) „dieses Team hat GERADE einen verletzten Spieler im Kader" (Zustand), oder
+  (b) „an DIESEM Spieltag ist ein Spieler dieses Teams verletzt angetreten oder ausgefallen"
+      (Ereignis).
+(b) ist die für die Spieltags-Wertung ehrlichere Aussage — sie erklärt, warum ein Team schwächer
+abgeschnitten hat. (a) ist der Blick nach vorn. Im Zweifel (b), mit dem Zustand im Tooltip.
+
+**Abnahme:** Die Marke erscheint für genau die Teams, die am gemessenen Spieltag eine
+Verletzungsbuchung tragen — abgeglichen gegen die Rohdaten, nicht gegen die eigene Ableitung. Kein
+Team ohne Buchung bekommt eine Marke, keins mit Buchung bleibt ohne.
+
+**Dateien:** `app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx` und die
+Verletzungs-Ableitung dazu.
+
+**Gefahr:** Eine dritte Rechenstelle für „ist verletzt". Es gibt bereits
+`lib/foundation/player-injury-history.ts` und die gebuchten Zeilen — die Marke muss aus einer davon
+kommen, nicht aus einer neuen Heuristik.
