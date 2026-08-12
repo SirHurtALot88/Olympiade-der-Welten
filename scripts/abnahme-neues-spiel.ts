@@ -29,6 +29,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
+import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { advanceSeasonTransitionStep } from "@/lib/season/season-transition-service";
@@ -98,6 +99,27 @@ async function main() {
     await new Promise((fertig) => setTimeout(fertig, 1000));
   }
   gameState = persistence.getSaveById(saveId)!.gameState;
+
+  // ---------------------------------------------------------------- Sponsoren
+  //
+  // OHNE SPONSOREN IST DIE FINANZPRUEFUNG WERTLOS — genau das hat Chris zurueckgefragt: "wie
+  // willst du die finanzen pruefen wenn kein team sponsoren in S1 hatte?". Er hat recht.
+  //
+  // Die Angebote entstehen NICHT von selbst: `ensureSeasonSponsorOffers` erzeugt sie erst, wenn
+  // sie jemand anfordert — im Browser tut das die Sponsoren-Ansicht, im kopflosen Lauf niemand.
+  // Gemessen: vor dem Aufruf 0 Teams mit Angeboten, danach 32 mit je 5. Der Lauf muss also tun,
+  // was ein Spieler tut, sonst misst er eine Liga ohne Einnahmenseite.
+  console.log("--- Sponsoren ---");
+  const mitSponsoren = chooseSponsorOfferForAiTeams(persistence.getSaveById(saveId)!.gameState);
+  persistence.saveSingleplayerState(saveId, mitSponsoren, {} as never);
+  gameState = persistence.getSaveById(saveId)!.gameState;
+  const vertraegeS1 = Object.keys(
+    (gameState.seasonState as unknown as Record<string, Record<string, unknown>>).sponsorContractsByTeamId ?? {},
+  ).length;
+  console.log(`  Teams mit Sponsorvertrag: ${vertraegeS1} von 32`);
+  if (vertraegeS1 < 32) {
+    fehler.push(`Nur ${vertraegeS1} von 32 Teams haben einen Sponsorvertrag — ohne Einnahmenseite ist die Finanzpruefung wertlos`);
+  }
 
   const startKasse = new Map(gameState.teams.map((team) => [team.teamId, team.cash] as const));
   const startKader = new Map<string, number>();
@@ -279,6 +301,62 @@ async function main() {
     }
   }
   console.log(`Kasse: min ${z(Math.min(...kasseJetzt.values()))} / max ${z(Math.max(...kasseJetzt.values()))} | negativ: ${pleite} Teams`);
+
+  // Was wurde tatsaechlich gebucht? Nach Komponente aufgeschluesselt — eine Gesamtsumme verdeckt,
+  // wenn eine ganze Seite fehlt (genau so ist mir die fehlende Sponsoreinnahme durchgerutscht).
+  const buchungen = ((gameState.seasonState as unknown as Record<string, unknown>).sponsorPayoutLogs ?? []) as {
+    componentId?: string;
+    cashDelta?: number;
+  }[];
+  const jeKomponente = new Map<string, { anzahl: number; summe: number }>();
+  for (const eintrag of buchungen) {
+    // Nur das Suffix (`base`/`rank`/`special`/`salary_deduct`) — der volle Vertragsschluessel
+    // erzeugt 32 Einzelzeilen und verdeckt genau das Muster, das man sehen will.
+    const schluessel = (eintrag.componentId ?? "?").split(":").pop() ?? "?";
+    const wert = jeKomponente.get(schluessel) ?? { anzahl: 0, summe: 0 };
+    wert.anzahl += 1;
+    wert.summe += eintrag.cashDelta ?? 0;
+    jeKomponente.set(schluessel, wert);
+  }
+  console.log("Saisonende-Buchungen nach Komponente:");
+  for (const [schluessel, wert] of [...jeKomponente].sort((a, b) => b[1].anzahl - a[1].anzahl)) {
+    console.log(`  ${schluessel.padEnd(18)} ${String(wert.anzahl).padStart(3)} Zeilen  Summe ${z(wert.summe)}`);
+  }
+  // EINNAHME GEGEN ABZUG, getrennt gezaehlt. Vorsicht mit der Erkennung: die Komponenten heissen
+  // NICHT "sponsor…", sondern tragen den ganzen Vertragsschluessel
+  // (`season-1:N-N:security:gewoehnlich:1:v3:base`). Meine erste Fassung suchte nach dem Wort
+  // "sponsor" im Schluessel, fand es nie und meldete "die Einnahmenseite fehlt" — obwohl sie da
+  // war. Deshalb wird jetzt am VORZEICHEN unterschieden, nicht am Namen.
+  const einnahme = buchungen.filter((eintrag) => (eintrag.cashDelta ?? 0) > 0);
+  const abzug = buchungen.filter((eintrag) => (eintrag.cashDelta ?? 0) < 0);
+  const einnahmeSumme = einnahme.reduce((summe, eintrag) => summe + (eintrag.cashDelta ?? 0), 0);
+  const abzugSumme = abzug.reduce((summe, eintrag) => summe + (eintrag.cashDelta ?? 0), 0);
+  console.log(
+    `  davon EINNAHMEN ${einnahme.length} Zeilen / ${z(einnahmeSumme)}` +
+      `  ·  ABZUEGE ${abzug.length} Zeilen / ${z(abzugSumme)}` +
+      `  ·  netto ${z(einnahmeSumme + abzugSumme)}`,
+  );
+  const teamsMitEinnahme = new Set(
+    (buchungen as { teamId?: string; cashDelta?: number }[])
+      .filter((eintrag) => (eintrag.cashDelta ?? 0) > 0)
+      .map((eintrag) => eintrag.teamId)
+      .filter(Boolean),
+  );
+  console.log(`  Teams mit Sponsor-Einnahme: ${teamsMitEinnahme.size} von 32`);
+  if (einnahme.length === 0) {
+    fehler.push("Keine Sponsor-EINNAHME gebucht — nur Abzuege. Die Einnahmenseite fehlt.");
+  } else if (teamsMitEinnahme.size < 32) {
+    auffaellig.push(`Nur ${teamsMitEinnahme.size} von 32 Teams haben eine Sponsor-Einnahme gebucht`);
+  }
+
+  const apron = ((gameState.seasonState as unknown as Record<string, unknown>).apronSettlementLogs ?? []) as {
+    cashDelta?: number;
+  }[];
+  const apronSumme = apron.reduce((summe, eintrag) => summe + (eintrag.cashDelta ?? 0), 0);
+  console.log(`Apron: ${apron.length} Zeilen, Summe ${apronSumme.toFixed(4)} (der Topf verteilt nur um, muss 0 sein)`);
+  if (apron.length > 0 && Math.abs(apronSumme) > 0.05) {
+    fehler.push(`Apron-Summe ${apronSumme.toFixed(4)} statt 0 — der Topf verteilt nicht nur um`);
+  }
   if (pleite > 8) auffaellig.push(`${pleite} von 32 Teams stehen im Minus (tiefstes ${z(tiefstes)})`);
 
   // ---------------------------------------------------------------- Fazit
