@@ -24,6 +24,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { buildApronProjection } from "@/lib/finance/apron-projection";
 import { computeTeamTopSixAxisStats } from "@/lib/market/transfermarkt-roster-impact";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { buildLineupSaveCta } from "@/lib/lineups/lineup-audit";
@@ -140,6 +141,28 @@ function gameStateWithSalaries(entries: Array<{ salary: number; expectedSalary: 
   } as never;
 }
 
+/**
+ * Vorlage fuer die Apron-Bemessung: verhandeltes, gezahltes und Formel-Gehalt gehen bewusst
+ * auseinander (21 / 20 / 42), damit die Pruefung unterscheiden kann, welche Groesse gemessen wird.
+ */
+function gameStateWithNegotiatedSalaries(): GameState {
+  const basis = gameStateWithSalaries([
+    { salary: 7.8, expectedSalary: 14 },
+    { salary: 4.2, expectedSalary: 14 },
+    { salary: 8, expectedSalary: 14 },
+  ]) as unknown as GameState & { rosters: Array<Record<string, unknown>>; players: Array<Record<string, unknown>> };
+  return {
+    ...basis,
+    rosters: basis.rosters.map((entry, index) => ({
+      ...entry,
+      contractLength: 3,
+      contractShape: index === 0 ? "front_loaded" : index === 1 ? "back_loaded" : "balanced",
+      negotiatedAnnualSalary: 6 + index,
+    })),
+    players: basis.players.map((player) => ({ ...player, expectedSalary: 14, displayMarketValue: 60 })),
+  } as never;
+}
+
 describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
   it("summiert contract.salary — die Rate, die JETZT fällig wird", () => {
     // Front-loaded Vertrag: jetzt 13,34 fällig, Formel-Mittel 9,74.
@@ -168,9 +191,41 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
     );
   });
 
-  it("Apron und Sponsor bleiben auf der Glättung (Bemessungsgrundlage)", () => {
-    expect(quelle("lib/season/apron-service.ts")).toContain("getTeamDisplaySalaryTotal");
-    expect(quelle("lib/finance/apron-projection.ts")).toContain("getTeamDisplaySalaryTotal");
+  /**
+   * HIER STAND, DIE APRON RECHNE AUF DER GLAETTUNG — das gilt nicht mehr, und zwar mit Absicht.
+   *
+   * Chris hat entschieden, die Abgabe am VERHANDELTEN Jahresgehalt zu bemessen statt am
+   * geglaetteten Formelwert („ja!", docs/APRON_UND_VERTRAGSFORMEN.md Schritt 3) — damit gutes
+   * Verhandeln ueberhaupt zaehlt. Die alte Zusicherung war eine Zeichenketten-Pruefung
+   * (`toContain("getTeamDisplaySalaryTotal")`) und ist an der Entscheidung zerbrochen, ohne dass
+   * sie je etwas ueber eine ZAHL gesagt haette: das Wort steht in `apron-service.ts` bis heute im
+   * Kommentar, und die Pruefung waere dort auch dann gruen geblieben, wenn die Rechnung laengst
+   * eine andere Groesse naehme.
+   *
+   * Sie ist deshalb durch eine Wertpruefung ersetzt. Der Punkt des Pakets — EINE Quelle je
+   * Groesse — bleibt und wird jetzt schaerfer geprueft: die Apron-Hochrechnung muss das
+   * VERHANDELTE Gehalt messen, nicht das GEZAHLTE und nicht den FORMELWERT. Die drei Begriffe
+   * gehen in der Vorlage bewusst auseinander, sonst beweist der Test nichts.
+   */
+  it("die Apron-Hochrechnung misst das verhandelte Gehalt — geprüft an der Zahl, nicht am Quelltext", () => {
+    const state = gameStateWithNegotiatedSalaries();
+    // Vorbedingung: die drei Gehaltsbegriffe unterscheiden sich wirklich.
+    const verhandelt = 6 + 7 + 8; // 21
+    const gezahlt = 7.8 + 4.2 + 8; // 20
+    const formel = 14 * 3; // 42
+    expect(new Set([verhandelt, gezahlt, formel]).size).toBe(3);
+
+    const projektion = buildApronProjection({
+      gameState: state,
+      rankByTeamId: new Map([["T1", 1]]),
+    });
+    const zeile = projektion.byTeamId.get("T1");
+    expect(zeile?.salary).toBeCloseTo(verhandelt, 2);
+    expect(zeile?.salary).not.toBeCloseTo(gezahlt, 2);
+    expect(zeile?.salary).not.toBeCloseTo(formel, 2);
+  });
+
+  it("die Sponsor-Anzeige bleibt auf der Glättung — dort ist sie die Bemessungsgrundlage", () => {
     expect(quelle("lib/sponsor/sponsor-team-salary-display.ts")).toContain(
       "contract.expectedSalary ?? normalizeEconomyMoney(contract.salary)",
     );
