@@ -31,6 +31,10 @@ import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
+import {
+  applyPreSeasonNextSeasonSetup,
+  buildPreSeasonWorkflowPreview,
+} from "@/lib/season/preseason-workflow-service";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { advanceSeasonTransitionStep } from "@/lib/season/season-transition-service";
 
@@ -265,6 +269,51 @@ async function main() {
     }
   }
   gameState = persistence.getSaveById(saveId)!.gameState;
+
+  // ---------------------------------------------------------------- Neue Saison starten
+  //
+  // Die Kette endet bei `next_season_ready` und wartet auf eine Bestaetigung
+  // (`next_season_apply_requires_preseason_confirm`) — das ist der Knopf, den ein Spieler drueckt.
+  // Ohne ihn gibt es keine Saison 2, und damit auch keine Kaufphase, in der sich die Kader wieder
+  // fuellen. Der Lauf holt sich das Token aus der Vorschau, statt eins zu erfinden.
+  console.log("\n--- Neue Saison starten ---");
+  const vorSaison2 = persistence.getSaveById(saveId)!;
+  const vorschau = await buildPreSeasonWorkflowPreview(vorSaison2, persistence).catch((error) => {
+    fehler.push(`Preseason-Vorschau warf: ${(error as Error).message.slice(0, 160)}`);
+    return null;
+  });
+  const token = vorschau?.steps.find((schritt) => schritt.stepId === "next_season_setup")?.confirmToken ?? null;
+  if (!token) {
+    fehler.push("Kein Bestaetigungs-Token fuer den Saisonstart — die neue Saison ist von hier nicht erreichbar");
+  } else {
+    const gestartet = await applyPreSeasonNextSeasonSetup(vorSaison2, token, persistence).catch((error) => {
+      fehler.push(`Saisonstart warf: ${(error as Error).message.slice(0, 160)}`);
+      return null;
+    });
+    if (gestartet && gestartet.applied !== true) {
+      fehler.push(`Saisonstart nicht angewandt: ${(gestartet.blockingReasons ?? []).slice(0, 3).join(" | ")}`);
+    }
+  }
+  gameState = persistence.getSaveById(saveId)!.gameState;
+  console.log(`  Saison jetzt: ${gameState.season.id} | Phase ${gameState.gamePhase}`);
+
+  // Sponsoren der NEUEN Saison — dieselbe Frage wie in Saison 1: picken die Teams wieder?
+  const mitSponsoren2 = chooseSponsorOfferForAiTeams(gameState);
+  persistence.saveSingleplayerState(saveId, mitSponsoren2, {} as never);
+  gameState = persistence.getSaveById(saveId)!.gameState;
+  const vertraege2 = Object.entries(
+    (gameState.seasonState as unknown as Record<string, Record<string, { seasonId?: string }>>).sponsorContractsByTeamId ?? {},
+  );
+  const inNeuerSaison = vertraege2.filter(([, vertrag]) => vertrag?.seasonId === gameState.season.id).length;
+  console.log(`  Sponsorvertraege in ${gameState.season.id}: ${inNeuerSaison} von 32`);
+  if (inNeuerSaison < 32) {
+    fehler.push(`Nur ${inNeuerSaison} von 32 Teams haben in ${gameState.season.id} einen Sponsorvertrag`);
+  }
+
+  // Der zweite Schnappschuss: das Transferfenster S1/S2 ist erst nach den Kaeufen der neuen Saison
+  // zu (Chris' Regel). Hier steht, was danach im Archiv liegt.
+  const schnappschuesse = (gameState.seasonState.seasonSnapshots ?? []) as { seasonId?: string }[];
+  console.log(`  Schnappschuesse im Archiv: ${schnappschuesse.length} (${schnappschuesse.map((eintrag) => eintrag.seasonId).join(", ")})`);
 
   // ---------------------------------------------------------------- Bloecke 1+2: Kaeufe/Verkaeufe
   console.log("\n=== KAEUFE UND VERKAEUFE ===");
