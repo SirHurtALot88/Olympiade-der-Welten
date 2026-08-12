@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-12",
+  "seite": "Spieltag · Arena",
+  "text": "Eine Disziplin konnte durchlaufen, ohne je gewertet zu werden — ohne Fehlermeldung, ohne Hinweis. Gemeldet als „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme\". Zwei stille Fehler steckten dahinter, beide im Buchungsweg. ERSTENS loeste die Buchung die Spieltags-Seite ausschliesslich ueber die Engine-Preview auf. Faellt die aus, war die Seite nicht bestimmbar und die Buchung kehrte kommentarlos zurueck: die Disziplin lief, im Spielstand landete nichts, nicht einmal ein Fehlerzustand. Fuer die ANZEIGE gab es den Rueckfall auf den Spielplan laengst — er wurde eingefuehrt, weil bei ausgefallener Preview der Weg zur zweiten Disziplin verschwand; die Buchung blieb auf der alten Quelle stehen. Sie zieht jetzt dieselbe, und der Spielplan braucht die Engine gar nicht. ZWEITENS galt „hat keinen Fehler geworfen\" als „gebucht\". Die Buchung wirft in keinem ihrer Fehlerfaelle: im Lesemodus und ohne Lauf-Handler liefert sie nichts zurueck, bei blockierter Wertung ein Ergebnis mit dem Vermerk, dass nicht gebucht wurde. Alles davon wurde als Erfolg vermerkt — der Endscreen sagte „im Saisonstand\", der Spielstand hatte nichts. Gewertet wird jetzt das Ergebnis selbst. Am gemeldeten Stand waren dadurch 32 Aufstellungen fuer die zweite Disziplin vorhanden, aber null Ergebniszeilen.",
+  "gewicht": "wichtig",
+  "version": "0.4"
+}
