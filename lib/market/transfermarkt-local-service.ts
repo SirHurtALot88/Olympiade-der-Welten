@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
+import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildGameStateContentSignature, getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-limits";
@@ -1155,6 +1156,10 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     isFirstSeason: gameState.season.id === "season-1",
     gmArchetype: recommendedGmArchetype,
     highValue: (marketValueReference ?? 0) >= 35,
+    // Apron-Lage und bisheriger Vertragsmix des Teams. Beide Wege der KI landen hier: der
+    // Marktplan gibt die Form ausdruecklich mit, der Fuell-Lauf (`ai_roster_fill`) uebergibt
+    // keine und faellt genau auf diese Empfehlung zurueck.
+    ...getContractShapeTeamContext(gameState, params.teamId),
   });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
@@ -2390,6 +2395,11 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           isFirstSeason: gameState.season.id === "season-1",
           gmArchetype: getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null,
           highValue: (marketValueReference ?? 0) >= 35,
+          // ZWEITER Aufrufer derselben Empfehlung — der Fast-Batch-Pfad. Er wurde beim ersten Umbau
+          // uebersehen; ueber ihn laeuft der S1-Draft, und im Live-Abbild stammen ALLE 329-334
+          // `ai_roster_fill`-Kaeufe beider Spielstaende aus Saison 1. Ohne diese Zeilen bliebe der
+          // mengenstaerkste Kaufstrom apron-blind.
+          ...getContractShapeTeamContext(gameState, params.teamId),
         })
       : null;
   const contractLength = hasExplicitContractLength

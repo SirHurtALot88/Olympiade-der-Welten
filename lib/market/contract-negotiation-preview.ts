@@ -1,3 +1,4 @@
+import { wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
 import type {
   ContractNegotiationDraft,
   ContractShape,
@@ -716,6 +717,16 @@ export function recommendContractOfferForPlayer(input: {
   gmArchetype?: string | null;
   /** Good/core player signal (e.g. rank <= 40 or high market value) — drives the culture_keeper floor. */
   highValue?: boolean | null;
+  /**
+   * `line1 − Apron-Bemessung` des Teams. Negativ heisst: ueber der ersten Apron-Linie.
+   * Siehe `contract-shape-context.ts` — die Abgabe selbst laesst sich damit NICHT umgehen, wohl
+   * aber die echte Zahlung dieser Saison, die on top zur Abgabe faellig wird.
+   */
+  apronHeadroom?: number | null;
+  /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
+  backLoadedShare?: number | null;
+  /** Nenner zu `backLoadedShare` — der Mix-Riegel braucht MIX_RIEGEL_MINDESTZAHL. */
+  mehrjahresVertraege?: number | null;
 }): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
@@ -983,6 +994,23 @@ export function recommendContractOfferForPlayer(input: {
     contractLength = Math.max(contractLength, cashComfortable ? 4 : 3);
     reasons.push("Culture Keeper: guter Spieler wird langfristig gebunden.");
   }
+
+  // DIE APRON-LAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
+  //
+  // Chris' Vorgabe war beides: „das muss die AI berücksichtigen" UND „es sollen ja nicht alle top
+  // teams dann nur back loaded nehmen […] dann hast du irgendwann nen sehr teuren gehaltspeak […]
+  // der mix machts." Die Regel selbst steht in `contract-shape-context.ts` — DORT und nicht hier,
+  // weil es drei Formwaehler im Spiel gibt (Kaufvorschau, Fast-Batch, Verlaengerung) und alle drei
+  // dieselbe Regel brauchen. Ohne die Angaben verhaelt sich die Empfehlung unveraendert.
+  const apronUndMix = wendeApronUndMixAn({
+    form: contractShape,
+    laufzeit: contractLength,
+    apronHeadroom: input.apronHeadroom,
+    backLoadedShare: input.backLoadedShare,
+    mehrjahresVertraege: input.mehrjahresVertraege,
+  });
+  contractShape = apronUndMix.form;
+  if (apronUndMix.grund) reasons.push(apronUndMix.grund);
 
   return {
     contractLength: clamp(Math.round(contractLength), 1, 5),

@@ -44,6 +44,7 @@ import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
 import { getPlayerScoutCertainty } from "@/lib/scouting/facility-scout-pipeline-service";
 import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
@@ -2036,6 +2037,9 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         teamRosterMin: team.currentState.playerMin,
         teamRosterOpt: team.currentState.playerOpt,
         isFirstSeason: preview.scope.seasonId === "season-1",
+        // Apron-Lage und Vertragsmix — dieselbe Quelle wie im Fuell-Lauf, damit beide Kaufwege
+        // dieselbe Form empfehlen.
+        ...getContractShapeTeamContext(preflightGameState, team.teamId),
       });
       const buyPreview = previewLocalTransfermarktBuy({
         saveId: preview.scope.saveId,

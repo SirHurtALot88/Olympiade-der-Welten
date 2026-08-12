@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  getContractShapeTeamContext,
+  wendeApronUndMixAn,
+  type ContractShapeTeamContext,
+} from "@/lib/market/contract-shape-context";
 import type {
   ContractEventRecord,
   ContractShape,
@@ -772,6 +777,20 @@ function resolveSalaryFactorGefaelle(factors: readonly number[]): number {
  *
  * Exportiert, weil die Regel sonst nur beim Saisonwechsel liefe und von keinem Test beruehrt wuerde
  * — genau die Fehlerklasse, die im Apron-Horizont schon einmal zugeschlagen hat.
+ *
+ * NACHGETRAGEN (PR #508): DER MIX-RIEGEL ALS LETZTE INSTANZ — und NUR er.
+ * Chris' Vorgabe: „es sollen ja nicht alle top teams dann nur back loaded nehmen […] dann hast du
+ * irgendwann nen sehr teuren gehaltspeak das muss auch vermieden werden, der mix machts." Der
+ * Kopfkommentar oben argumentiert, dass keine Monokultur ENTSTEHT (Schwelle schweigt in ~60 % der
+ * Fenster, Cash-Wache trennt, Einjahresvertraege formlos) — das ist eine Begruendung, kein Riegel.
+ * Chris hat ausdruecklich einen Riegel verlangt, also steht hier einer: hat ein Team schon die
+ * Haelfte seiner mindestens vier Mehrjahresvertraege back-loaded, wird der naechste ausgeglichen.
+ *
+ * DIE APRON-REGEL AUS #508 LAEUFT HIER BEWUSST NICHT MIT. Der Kopfkommentar oben entscheidet
+ * begruendet und gemessen, dass die Apron in dieser Wahl nichts zu suchen hat; diese Entscheidung
+ * ist juenger als #508 und wird hier nicht still ueberstimmt. Auf den KAUFWEGEN greift sie weiter
+ * (`contract-negotiation-preview.ts`), dort spricht der Kommentar oben nicht. Ob sie auch bei
+ * Verlaengerungen gelten soll, ist eine Entscheidung fuer Chris und in der Triage-Quittung notiert.
  */
 export function chooseAiRenewalContractShape(input: {
   team: Team | null;
@@ -782,6 +801,8 @@ export function chooseAiRenewalContractShape(input: {
   profile: TeamStrategyProfile | null;
   /** Faktoren der Saisons, die dieser Vertrag bezahlt (Jahr 1 zuerst). Fehlt/zu kurz = keine Vorausschau. */
   termSalaryFactors?: readonly number[];
+  /** Bisheriger Vertragsmix des Teams. Fehlt = kein Riegel, Verhalten unveraendert. */
+  shapeContext?: ContractShapeTeamContext | null;
 }): ContractShape {
   if (input.recommendedLength <= 1) return "balanced";
 
@@ -809,16 +830,38 @@ export function chooseAiRenewalContractShape(input: {
   // 2. Konjunktur-Vorausschau. Steht VOR den Profil-Regeln und uebersteuert sie (Kopfkommentar,
   //    Rangfolge 2). Ohne nennenswertes Gefaelle schweigt sie und laesst die Profile entscheiden.
   const gefaelle = resolveSalaryFactorGefaelle(input.termSalaryFactors ?? []);
-  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) return "back_loaded";
+  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) {
+    // Auch die Faktor-Regel laeuft durch den Mix-Riegel: die Abnahme von #507 stellte 14 von 216
+    // Vertraegen auf back_loaded — genau die Haeufung, die Chris begrenzt sehen wollte.
+    return wendeApronUndMixAn({
+      form: "back_loaded",
+      laufzeit: input.recommendedLength,
+      backLoadedShare: input.shapeContext?.backLoadedShare,
+      mehrjahresVertraege: input.shapeContext?.mehrjahresVertraege,
+    }).form;
+  }
   if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && cash >= input.cashGate.requiredReserve + 10) {
     return "front_loaded";
   }
 
   // 3. Profil-Neigungen.
-  if (strongCashBuffer && futureReliefProfile) return "front_loaded";
-  if (cashPriority >= 8 && !strongCashBuffer) return "back_loaded";
-  if (wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10) return "front_loaded";
-  return "balanced";
+  const ausRangfolge: ContractShape =
+    strongCashBuffer && futureReliefProfile
+      ? "front_loaded"
+      : cashPriority >= 8 && !strongCashBuffer
+        ? "back_loaded"
+        : wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10
+          ? "front_loaded"
+          : "balanced";
+
+  // 4. Mix-Riegel als letzte Instanz. Er VERSCHIEBT nur nach `balanced` und erzeugt nie
+  //    `back_loaded` — die Rangfolge oben bleibt in jeder anderen Hinsicht unangetastet.
+  return wendeApronUndMixAn({
+    form: ausRangfolge,
+    laufzeit: input.recommendedLength,
+    backLoadedShare: input.shapeContext?.backLoadedShare,
+    mehrjahresVertraege: input.shapeContext?.mehrjahresVertraege,
+  }).form;
 }
 
 function buildToken(input: {
@@ -1028,6 +1071,7 @@ function buildPreviewRow(input: {
           cashGate: renewalCashGate,
           profile: teamStrategyProfile,
           termSalaryFactors: resolveContractTermSalaryFactors(save.gameState, recommendedLength),
+          shapeContext: getContractShapeTeamContext(save.gameState, entry.teamId),
         })
       : "balanced";
   const marketValueForBad =
