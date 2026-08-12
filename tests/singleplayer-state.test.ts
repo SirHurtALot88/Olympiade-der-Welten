@@ -411,7 +411,6 @@ describe("singleplayer game state", () => {
     expect(persistence.listSaves().length).toBe(2);
     expect(persistence.getSaveById(first.save.saveId)?.saveId).toBe(first.save.saveId);
     expect(persistence.getActiveSave()?.saveId).toBe(fresh.saveId);
-    expect(fresh.gameState.transferHistory).toHaveLength(0);
     expect(fresh.gameState.contracts).toHaveLength(0);
     // Sonderregel/Easter-Egg (lib/foundation/ensure-nula-on-project-suicide.ts): Nula ist das
     // Maskottchen von Project Suicide und gehört IMMER zu P-S — aber nicht gratis. Die Regel läuft
@@ -423,6 +422,16 @@ describe("singleplayer game state", () => {
     const mascotEntry = fresh.gameState.rosters[0]!;
     expect(mascotEntry.teamId).toBe("P-S");
     expect(mascotEntry.playerId).toBe("player-2311-nula");
+    // Und die Sonderregel BUCHT: „nula ist Sonderregel dennoch muessen auch die teams ihren markt
+    // schliessen". Sie bewegt Cash, also steht sie im Hauptbuch — der einzige Eintrag, den ein
+    // frischer Spielstand hat. Vorher stand hier `toHaveLength(0)`: die Zahlung fand statt, die
+    // Buchung fehlte, und P-S war das einzige Team, dessen Kasse in keiner Abstimmung aufging.
+    expect(fresh.gameState.transferHistory).toHaveLength(1);
+    const mascotBuchung = fresh.gameState.transferHistory[0]!;
+    expect(mascotBuchung.transferType).toBe("buy");
+    expect(mascotBuchung.toTeamId).toBe("P-S");
+    expect(mascotBuchung.playerId).toBe("player-2311-nula");
+    expect(mascotBuchung.fee).toBeCloseTo(mascotEntry.purchasePrice ?? 0, 2);
     expect(
       fresh.gameState.teams
         .filter((team) => team.teamId !== "P-S")

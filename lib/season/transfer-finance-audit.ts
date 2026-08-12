@@ -17,6 +17,8 @@ export type TransferFinanceTeamSeasonRow = {
   netSponsorCash: number;
   /** Mid-Season-Sponsor-Event-Cash (auto-settle `sponsorEvents`, nicht in sponsorPayoutLogs). */
   netSponsorEventCash: number;
+  /** Apron-Abrechnung der Saison (`apronSettlementLogs.cashDelta`, direkt auf team.cash gebucht). */
+  netApronCash: number;
   /** T-029: Kredit-Cashflows der Saison (loanOriginationLogs + loanApplyLogs, beide Seiten bei Team-Krediten). */
   netLoanCash: number;
   /** T-029: Gebäude-Cashflows der Saison (facilityEvents-Ledger, `-cost` je Event). */
@@ -181,6 +183,25 @@ function getSeasonSponsorEventCashByTeam(gameState: GameState, seasonId: string)
 }
 
 /**
+ * Apron-Cashflows einer Saison, pro Team aggregiert (`apronSettlementLogs`). Die Saison-End-Abrechnung
+ * der Apron-Linien (`apron-settlement-service.ts`) schreibt `team.cash + log.cashDelta` — Abgabe
+ * (`kind: "levy"`, negativ) und Ausschüttung aus dem Topf (`kind: "payout"`, positiv) — und legt je
+ * Team/Saison einen Log ab. Dieser reale Kanal fehlte in der Cash-Abstimmung komplett: am Live-Abbild
+ * (`new-game-1785823388048-1hf25q`) trägt er je Team und Saison zwischen −16,60 und +2,80 C bei
+ * (32 Logs je Saison, Summe über die Liga 0,00 — der Topf verteilt nur um) und lief damit vollständig
+ * als Rest-Delta mit. Dieselbe Sorte Lücke wie zuvor bei sponsorEvents/Objective-Rewards, deshalb
+ * hier nach demselben Muster.
+ */
+function getSeasonApronCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const log of gameState.seasonState.apronSettlementLogs ?? []) {
+    if (log.seasonId !== seasonId) continue;
+    map.set(log.teamId, round((map.get(log.teamId) ?? 0) + log.cashDelta));
+  }
+  return map;
+}
+
+/**
  * Board-Objective-Reward-Cashflows einer Saison, pro Team aggregiert. Am Saisonende bucht
  * `applyTeamSeasonObjectiveRewards` (team-season-objectives-service.ts, execute:true) für jedes Team
  * `team.cash += settlement.byTeamId[teamId].cashDelta` — erfüllte Board-Ziele zahlen `rewardCash`,
@@ -256,6 +277,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const loanCashByTeam = getSeasonLoanCashByTeam(gameState, seasonId);
     const facilityCashByTeam = getSeasonFacilityCashByTeam(gameState, seasonId);
     const sponsorEventCashByTeam = getSeasonSponsorEventCashByTeam(gameState, seasonId);
+    const apronCashByTeam = getSeasonApronCashByTeam(gameState, seasonId);
     const objectiveRewardCashByTeam = getSeasonObjectiveRewardCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
@@ -279,6 +301,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
       const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
       const netSponsorEventCash = sponsorEventCashByTeam.get(teamId) ?? 0;
+      const netApronCash = apronCashByTeam.get(teamId) ?? 0;
       const netObjectiveRewardCash = objectiveRewardCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
@@ -293,6 +316,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       // gar nicht abgezogen, obwohl er im Snapshot-`cashEnd` steckt; genau die Formel-Lücke, die dieses
       // Tool eigentlich schließen soll. Vorzeichen wie die anderen Gutschriften: `cashEnd` enthält das
       // Reward-Cash bereits (team.cash += cashDelta), also subtrahieren, damit die Reconciliation aufgeht.
+      // Und: Apron-Abrechnung (`apronSettlementLogs`) — derselbe blinde Fleck, ebenfalls direkt auf
+      // team.cash gebucht und bis dahin gar nicht abgezogen.
       const cashReconciliationDelta =
         cashStart != null && cashEnd != null
           ? round(
@@ -301,6 +326,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
                 netTransferCash -
                 netSponsorCash -
                 netSponsorEventCash -
+                netApronCash -
                 netLoanCash -
                 netFacilityCash -
                 netObjectiveRewardCash,
@@ -320,6 +346,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         salaryPaidOut,
         netSponsorCash,
         netSponsorEventCash,
+        netApronCash,
         netLoanCash,
         netFacilityCash,
         netObjectiveRewardCash,

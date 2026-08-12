@@ -1,8 +1,18 @@
-import type { GameState, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type { GameState, RosterEntry, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 /** Sonderregel/Easter-Egg: Nula ist das Maskottchen von Project Suicide. */
 const NULA_PLAYER_ID = "player-2311-nula";
 const NULA_TEAM_ID = "P-S";
+
+/**
+ * Quellen-/Phasenmarken der Sonderregel-Buchungen. Eigene `phase` (NICHT `manual_transfer_window`),
+ * damit die Fensterzuordnung (`transfer-window-zuordnung.ts`) den Eintrag nicht in die Folgesaison
+ * schiebt — der Kauf gehört zu der Saison, in der er stattfindet.
+ */
+const NULA_TRANSFER_PHASE = "mascot_rule";
+export const NULA_BUY_TRANSFER_SOURCE = "nula_mascot_rule_buy";
+export const NULA_SELL_TRANSFER_SOURCE = "nula_mascot_rule_sell";
 /**
  * Maximale Vertragslänge. Verlängerungen clampen im contract-renewal-service auf [1,5]; das Maskottchen
  * bekommt immer die 5, damit es nie aus dem Vertrag läuft und P-S nie verlässt.
@@ -37,6 +47,15 @@ function adjustTeamCash(teams: Team[], teamId: string, delta: number): Team[] {
  * dem normalen Transfermarkt: bei einem Team-zu-Team-Transfer wechselt der Preis den Besitzer, beim
  * Free-Agent-Kauf verlässt er wie üblich das System. gameState.contracts wird nicht angefasst (der
  * Live-Signing-Pfad nutzt es nicht — die Vertragsdaten leben am RosterEntry).
+ *
+ * ENTSCHEIDUNG DES EIGENTÜMERS: „nula ist Sonderregel dennoch muessen auch die teams ihren markt
+ * schliessen". Die Sonderregel bleibt — aber sie BUCHT. Jede Cash-Bewegung hier schreibt an
+ * DERSELBEN Stelle ihren `transferHistory`-Eintrag (P-S: `buy`, abgebendes Team: `sell`), damit es
+ * nicht zwei Stellen gibt: eine, die zahlt, und eine, die Buch führt. Vorher fehlte die Buchung
+ * komplett — am Live-Abbild war P-S deshalb das einzige Team, dessen Kasse über zwei Saisons um
+ * genau den Nula-Preis (−4,63 C) nicht aufging. Die IDs sind deterministisch (siehe
+ * `buildNulaTransferHistory`), damit der Transform idempotent bleibt: er läuft bei JEDEM Laden
+ * (`materializePersistedSave`) und darf die Historie nie ein zweites Mal beschreiben.
  *
  * Bewusst NICHT über executeLocalTransfermarktBuy: der Kauf-Helper ist persistenz-/kontextbehaftet und
  * würde an genau den Randfällen scheitern, die hier funktionieren müssen (Nula bereits im Besitz eines
@@ -91,5 +110,87 @@ export function ensureNulaOnProjectSuicide(gameState: GameState): GameState {
   // Jeden vorhandenen Nula-Eintrag entfernen (löst sie vom bisherigen Team) und den bezahlten P-S-Eintrag anhängen.
   const rosters = gameState.rosters.filter((entry) => entry.playerId !== NULA_PLAYER_ID);
   rosters.push(nextEntry);
-  return { ...gameState, teams, rosters };
+
+  return {
+    ...gameState,
+    teams,
+    rosters,
+    transferHistory: buildNulaTransferHistory({ gameState, nula, price, sellerTeamId }),
+  };
+}
+
+/**
+ * Die Buchung zum Kauf oben — an derselben Stelle, an der das Geld fließt.
+ *
+ * Kein Preis (0) ⇒ keine Cash-Bewegung ⇒ auch keine Buchung; ein Null-Fee-`buy` wäre für das
+ * Finanz-Audit sonst ein `zero_fee_buy`-Verstoß.
+ *
+ * Die ID trägt die laufende Nummer des Kaufs INNERHALB der Saison (`…:<n>:buy`). Damit gilt beides:
+ * wird derselbe gespeicherte Stand mehrfach materialisiert, entsteht immer dieselbe ID und der
+ * Eintrag wird genau einmal geschrieben — verlässt Nula P-S aber wirklich und die Regel kauft sie in
+ * derselben Saison erneut, ist die Nummer eine andere und der zweite Kauf wird auch wirklich
+ * gebucht, statt still unter einer schon vergebenen ID zu verschwinden.
+ */
+function buildNulaTransferHistory(input: {
+  gameState: GameState;
+  nula: GameState["players"][number];
+  price: number;
+  sellerTeamId: string | null;
+}): TransferHistoryEntry[] {
+  const { gameState, nula, price, sellerTeamId } = input;
+  const history = gameState.transferHistory ?? [];
+  if (price <= 0) return history;
+
+  const seasonId = gameState.season.id;
+  const seasonLabel = getCanonicalSeasonLabel({ seasonId, seasonName: gameState.season.name });
+  const happenedAt = new Date().toISOString();
+  const lfd = history.filter((entry) => entry.seasonId === seasonId && entry.source === NULA_BUY_TRANSFER_SOURCE).length;
+  const common = {
+    playerId: NULA_PLAYER_ID,
+    playerName: nula.name,
+    seasonId,
+    seasonLabel,
+    matchdayId: gameState.matchdayState?.matchdayId ?? null,
+    phase: NULA_TRANSFER_PHASE,
+    fee: price,
+    marketValue: price,
+    salary: Math.max(0, nula.salaryDemand),
+    happenedAt,
+  } as const;
+
+  const entries: TransferHistoryEntry[] = [
+    {
+      ...common,
+      id: `nula-mascot-rule:${seasonId}:${lfd}:buy`,
+      source: NULA_BUY_TRANSFER_SOURCE,
+      transferType: "buy",
+      // `fromTeamId: null` wie im regulären Kaufpfad (executeLocalTransfermarktBuy). Trüge der
+      // Kauf-Eintrag das abgebende Team, zählten Auswertungen, die „Verkäufe" als
+      // `fromTeamId === teamId` lesen (z. B. league-achievements-extended.ts), ihn ein zweites Mal
+      // als Verkauf — die Abgeber-Seite steht vollständig im Verkaufs-Eintrag unten.
+      fromTeamId: null,
+      toTeamId: NULA_TEAM_ID,
+      netCashImpact: -price,
+      remainingContractLength: NULA_MAX_CONTRACT_LENGTH,
+    },
+  ];
+  // Team-zu-Team: das abgebende Team bekommt den Preis gutgeschrieben — also braucht es auch
+  // die Gegenbuchung, sonst schlösse dessen Kasse nicht mehr auf.
+  if (sellerTeamId && sellerTeamId !== NULA_TEAM_ID) {
+    entries.push({
+      ...common,
+      id: `nula-mascot-rule:${seasonId}:${lfd}:sell`,
+      source: NULA_SELL_TRANSFER_SOURCE,
+      transferType: "sell",
+      fromTeamId: sellerTeamId,
+      toTeamId: null,
+      buyoutCost: 0,
+      netCashImpact: price,
+      remainingContractLength: 0,
+    });
+  }
+
+  const known = new Set(history.map((entry) => entry.id));
+  const fresh = entries.filter((entry) => !known.has(entry.id));
+  return fresh.length > 0 ? [...fresh, ...history] : history;
 }

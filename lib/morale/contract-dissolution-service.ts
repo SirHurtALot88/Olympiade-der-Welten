@@ -23,10 +23,11 @@
 // hier. Die PREISRECHNUNG wird von dort uebernommen (`buildTransfermarktSaleFactorBreakdown`),
 // damit Angebot und regulaerer Verkauf nicht auseinanderlaufen.
 
-import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { derivePlayerNatureDemandSignals } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 /** Moral-Schwelle, ab der ein Spieler ueber einen Wechsel nachdenkt (siehe getContractIntent). */
 export const DISSOLUTION_MORALE_THRESHOLD = 34;
@@ -193,6 +194,10 @@ export const DISSOLUTION_HARD_NEGOTIATOR_THRESHOLD = 1.02;
 export const DISSOLUTION_WAIVER_MIN = 0.15;
 export const DISSOLUTION_WAIVER_MAX = 0.75;
 
+/** Marken der Aufloesungs-Buchung im Hauptbuch (`transferHistory`), siehe acceptContractDissolution. */
+export const CONTRACT_DISSOLUTION_TRANSFER_SOURCE = "contract_dissolution_accepted";
+export const CONTRACT_DISSOLUTION_TRANSFER_PHASE = "contract_dissolution";
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -272,6 +277,18 @@ type DecisionInput = {
  * Der `payableBuyout` ist der Kern der Meldung: vorher floss der Verkaufspreis ungekuerzt aufs
  * Konto, egal wie lang und teuer der Vertrag noch lief. Annehmen war damit nie falsch. Aeltere
  * Angebote ohne das Feld (im Zustand gespeicherte Zeilen) verhalten sich unveraendert.
+ *
+ * DIE BUCHUNG GEHOERT HIERHER. Die Aufloesung bewegte Cash (`salePrice − payableBuyout`), schrieb
+ * aber nur ihren eigenen Log (`contractDissolutions`) — und der ist kein Hauptbuch: keine
+ * Finanz-Abstimmung liest ihn. Am Live-Abbild war das die einzige Luecke bei Stronghold Crusaders:
+ * zwei angenommene Aufloesungen ueber 30,15 C Verkaufserloes minus 5,51 C Rest-Buyout ⇒ +24,64 C,
+ * die in keiner Historie standen. Jetzt entsteht der `transferHistory`-Eintrag an DERSELBEN Stelle
+ * wie die Zahlung, mit `netCashImpact` = tatsaechliche Kassenwirkung.
+ *
+ * Bewusst `contract_exit` und nicht `sell`: die Aufloesung ist ein beendeter Vertrag, kein
+ * Marktverkauf. Ein `sell` wuerde zusaetzlich die Wiederkauf-Sperre der Saison ausloesen
+ * (`transfer-sold-cooldown.ts` wertet nur `transferType === "sell"`), was hier niemand entschieden
+ * hat. Eigene `phase`, damit die Fensterzuordnung den Eintrag bei seiner Saison laesst.
  */
 export function acceptContractDissolution(input: DecisionInput): GameState {
   const { gameState, offer } = input;
@@ -281,14 +298,41 @@ export function acceptContractDissolution(input: DecisionInput): GameState {
     team.teamId === offer.teamId ? { ...team, cash: roundMoney((team.cash ?? 0) + kassenwirkung) } : team,
   );
 
+  const rosterEntry = gameState.rosters.find(
+    (entry) => entry.teamId === offer.teamId && entry.playerId === offer.playerId,
+  );
   const rosters = gameState.rosters.filter(
     (entry) => !(entry.teamId === offer.teamId && entry.playerId === offer.playerId),
   );
+
+  const buchung: TransferHistoryEntry = {
+    id: `contract-dissolution:${input.seasonId}:${offer.teamId}:${offer.playerId}`,
+    playerId: offer.playerId,
+    playerName: offer.playerName,
+    seasonId: input.seasonId,
+    seasonLabel: getCanonicalSeasonLabel({ seasonId: input.seasonId, seasonName: gameState.season?.name }),
+    matchdayId: gameState.matchdayState?.matchdayId ?? null,
+    phase: CONTRACT_DISSOLUTION_TRANSFER_PHASE,
+    source: CONTRACT_DISSOLUTION_TRANSFER_SOURCE,
+    transferType: "contract_exit",
+    fromTeamId: offer.teamId,
+    toTeamId: null,
+    fee: offer.salePrice,
+    buyoutCost: offer.payableBuyout ?? 0,
+    netCashImpact: kassenwirkung,
+    salary: roundMoney(rosterEntry?.salary ?? 0),
+    marketValue: offer.salePrice,
+    remainingContractLength: 0,
+    happenedAt: input.decidedAt,
+  };
+  const history = gameState.transferHistory ?? [];
+  const transferHistory = history.some((entry) => entry.id === buchung.id) ? history : [buchung, ...history];
 
   return {
     ...gameState,
     teams,
     rosters,
+    transferHistory,
     seasonState: {
       ...gameState.seasonState,
       contractDissolutions: [
