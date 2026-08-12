@@ -1863,10 +1863,13 @@ export default function DisciplineStageArena({
   // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als gebucht — nach einem
   // Reload mitten im Spieltag zeigt der Status sonst nichts, und ein Replay der Disziplin wuerde
   // erneut buchen wollen. Steht bewusst VOR `disciplineEnded`, das diese Quelle jetzt braucht.
+  // Dieselbe Quelle wie die Buchung unten (`matchdaySides`, also Panel mit Spielplan-Rueckfall).
+  // Mit `matchdayPanel` allein galt bei ausgefallener Preview jede Seite als UNgewertet — der
+  // Endscreen verschwand, und ein Replay haette erneut buchen wollen.
   const activeSideScoredInSave =
-    matchdayPanel?.d1?.disciplineId === disciplineId
+    matchdaySides.d1?.disciplineId === disciplineId
       ? scoringProgress?.d1.scored ?? false
-      : matchdayPanel?.d2?.disciplineId === disciplineId
+      : matchdaySides.d2?.disciplineId === disciplineId
         ? scoringProgress?.d2.scored ?? false
         : false;
 
@@ -1910,15 +1913,43 @@ export default function DisciplineStageArena({
   const commitFinishedDiscipline = useCallback(
     (finishedDisciplineId: string) => {
       if (!onCommitDiscipline) return;
+      /**
+       * SEITE AUS `matchdaySides`, NICHT AUS `matchdayPanel` — DAS WAR DER STILLE BUCHUNGSVERLUST.
+       *
+       * GEMELDET VON CHRIS: „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme."
+       * Am Spielstand (Saison 1, Spieltag 4): Mini-DM gelaufen, aber NULL Ergebniszeilen, waehrend
+       * alle 32 Aufstellungen dafuer vorlagen.
+       *
+       * `matchdayPanel` haengt an der Engine-Preview (`if (!preview) return null`). Faellt die aus —
+       * Netzfehler, leeres Ergebnis, Timeout —, war `side` hier `null`, und die Buchung kehrte
+       * KOMMENTARLOS zurueck: Disziplin laeuft durch, nichts landet im Save, keine Fehlermeldung,
+       * nicht einmal ein `failed`-Zustand. Der Spieltag haengt danach an einer Sperre, deren Grund
+       * nirgends steht.
+       *
+       * Fuer die ANZEIGE gibt es den Rueckfall auf den Spielplan laengst (`matchdaySides` =
+       * Panel, sonst `scheduleSides`) — er wurde damals eingefuehrt, weil bei ausgefallener Preview
+       * der gefuehrte Weg zur zweiten Disziplin verschwand. Die BUCHUNG blieb auf der alten,
+       * preview-gebundenen Quelle stehen. Sie zieht jetzt dieselbe: der Spielplan steht lokal im
+       * gameState und braucht die Engine gar nicht.
+       */
       const side =
-        matchdayPanel?.d1?.disciplineId === finishedDisciplineId
+        matchdaySides.d1?.disciplineId === finishedDisciplineId
           ? "d1"
-          : matchdayPanel?.d2?.disciplineId === finishedDisciplineId
+          : matchdaySides.d2?.disciplineId === finishedDisciplineId
             ? "d2"
             : null;
       // Nur die beiden Spieltags-Disziplinen werden gewertet. Ein freies Nachspielen
       // ausserhalb des Spieltags-Paars bleibt folgenlos.
-      if (!side) return;
+      //
+      // Laesst sich die Seite AUCH ueber den Spielplan nicht bestimmen, ist das kein freies
+      // Nachspielen mehr, sondern ein echter Ausfall — er wird als `failed` vermerkt, damit die
+      // Arena ihn zeigen kann, statt still nichts zu tun.
+      if (!side) {
+        if (matchdaySides.d1 == null && matchdaySides.d2 == null) {
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+        }
+        return;
+      }
       // Bereits im Save gebucht (z. B. D1 nach einem Reload erneut abgespielt):
       // NICHT noch einmal buchen — gebucht wird der erste, verbindliche Durchlauf.
       if (scoringProgress && scoringProgress[side].scored) return;
@@ -1931,8 +1962,25 @@ export default function DisciplineStageArena({
       // Buchens vorfindet; bewegte sich dazwischen etwas an den Aufstellungen, landete im
       // Saisonstand etwas anderes als das, was ueber den Schirm gelaufen war.
       void onCommitDiscipline(side, preview)
-        .then(() => {
-          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "booked" }));
+        .then((ergebnis) => {
+          /**
+           * „NICHT GEWORFEN" HEISST NICHT „GEBUCHT" — die zweite Haelfte desselben Befunds.
+           *
+           * `commitArenaDiscipline` wirft in KEINEM seiner Fehlerfaelle: im Lesemodus und ohne
+           * Lauf-Handler gibt es `null` zurueck, und bei einer blockierten Wertung (Gleichstand,
+           * fehlende Aufstellung, was auch immer der Lauf meldet) das Ergebnis mit
+           * `summary.standingsApplyAllowed === false`. Alles davon landete hier im `then` und wurde
+           * als „booked" vermerkt: der Endscreen sagte „im Saisonstand", im Save stand nichts.
+           *
+           * Gewertet wird deshalb das ERGEBNIS, nicht das Ausbleiben eines Fehlers.
+           */
+          const gebucht =
+            ergebnis != null &&
+            (ergebnis as { summary?: { standingsApplyAllowed?: boolean } }).summary?.standingsApplyAllowed === true;
+          setCommitStateByDiscipline((prev) => ({
+            ...prev,
+            [finishedDisciplineId]: gebucht ? "booked" : "failed",
+          }));
         })
         .catch(() => {
           setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
@@ -1941,7 +1989,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline, scoringProgress],
+    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".

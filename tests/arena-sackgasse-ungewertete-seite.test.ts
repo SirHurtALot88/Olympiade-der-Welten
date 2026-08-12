@@ -78,3 +78,53 @@ describe("Arena: ungewertete Seite führt nicht in die Sackgasse", () => {
     expect(progress).toContain("result_apply_incomplete_missing_d2_for_current_matchday");
   });
 });
+
+/**
+ * DIE URSACHE DAHINTER — ZWEI STILLE FEHLER IM BUCHUNGSWEG.
+ *
+ * Die Sackgasse oben war die Folge. Dass Mini-DM ueberhaupt ungewertet blieb, hatte zwei Gruende,
+ * die beide OHNE Fehlermeldung ablaufen:
+ *
+ * 1. DIE SEITE WURDE NUR UEBER `matchdayPanel` AUFGELOEST. Das haengt an der Engine-Preview
+ *    (`if (!preview) return null`). Faellt die aus, war `side` null und die Buchung kehrte
+ *    kommentarlos zurueck — Disziplin laeuft, nichts landet im Save, kein `failed`-Zustand. Fuer
+ *    die ANZEIGE gab es den Spielplan-Rueckfall (`matchdaySides`) laengst; die BUCHUNG blieb auf
+ *    der preview-gebundenen Quelle stehen.
+ *
+ * 2. „NICHT GEWORFEN" GALT ALS „GEBUCHT". `commitArenaDiscipline` wirft in keinem Fehlerfall: im
+ *    Lesemodus und ohne Lauf-Handler gibt es `null`, bei blockierter Wertung das Ergebnis mit
+ *    `summary.standingsApplyAllowed === false`. Alles davon lief ins `then` und wurde als gebucht
+ *    vermerkt — der Endscreen sagte „im Saisonstand", der Save hatte nichts.
+ */
+describe("Arena: der Buchungsweg scheitert nicht mehr still", () => {
+  const COMMIT = ARENA.slice(
+    ARENA.indexOf("const commitFinishedDiscipline"),
+    ARENA.indexOf("// S2: Doppel-Klick-Schutz"),
+  );
+
+  it("loest die Seite ueber den Spielplan-Rueckfall auf, nicht nur ueber die Engine-Preview", () => {
+    expect(COMMIT).toContain("matchdaySides.d1?.disciplineId === finishedDisciplineId");
+    expect(COMMIT).toContain("matchdaySides.d2?.disciplineId === finishedDisciplineId");
+    // Genau die Form, die den stillen Abbruch verursachte.
+    expect(COMMIT).not.toContain("matchdayPanel?.d1?.disciplineId === finishedDisciplineId");
+  });
+
+  it("vermerkt einen echten Ausfall, statt still nichts zu tun", () => {
+    // Laesst sich die Seite auch ueber den Spielplan nicht bestimmen, ist das kein freies
+    // Nachspielen mehr — es muss sichtbar werden.
+    expect(COMMIT).toContain('"failed"');
+    expect(COMMIT).toContain("matchdaySides.d1 == null && matchdaySides.d2 == null");
+  });
+
+  it("wertet das ERGEBNIS der Buchung, nicht das Ausbleiben eines Fehlers", () => {
+    expect(COMMIT).toContain("standingsApplyAllowed");
+    expect(COMMIT).toContain("gebucht ? \"booked\" : \"failed\"");
+  });
+
+  it("auch der Gewertet-Zustand liest den Spielplan-Rueckfall", () => {
+    // Sonst gilt bei ausgefallener Preview jede Seite als ungewertet: Endscreen weg, Replay
+    // wuerde erneut buchen wollen.
+    const gewertet = ARENA.slice(ARENA.indexOf("const activeSideScoredInSave"));
+    expect(gewertet.slice(0, 400)).toContain("matchdaySides.d1?.disciplineId === disciplineId");
+  });
+});
