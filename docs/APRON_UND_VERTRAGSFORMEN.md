@@ -1,10 +1,10 @@
 # Apron und Vertragsformen — Messung und Plan (12.08.2026)
 
 > **Stand nach Chris' Entscheid (12.08., nachmittags):** (1) Apron-Bemessung wird auf das
-> verhandelte Gehalt umgestellt — „ja!" (Schritt 3 ist damit beauftragt, mit der verschärften
-> Bemessungsregel aus Abschnitt 6.0). (2) Die KI darf faktorschwache Saisons scharf ausnutzen —
+> verhandelte Gehalt umgestellt — „ja!" (Schritt 3 ist damit beauftragt, mit der dort
+> verschärften Bemessungsregel). (2) Die KI darf faktorschwache Saisons scharf ausnutzen —
 > „ja, wenn sie es hin bekommt" (Schritt 1 wie geplant). (3) Die Formwahl-Schwellen hat Chris an
-> Fable delegiert — Herleitung mit Messwerten in **Abschnitt 6**.
+> Fable delegiert — Herleitung mit Messwerten in **Abschnitt 5**.
 
 Anlass (Chris, wörtlich): *„vllt kannst du dir mit fable das thema mit apron und vertraegen noch
 mal anschauen. dass teams versuchen gute vertraege zu verhandeln und zb je nach salary factors mal
@@ -254,7 +254,7 @@ Verweis auf die Bemessung (1.3), damit kein späterer Agent die Form „gegen di
   kippen).
 
 **Balance-Anteil — an Fable delegiert (Chris: „kann ich nicht abschätzen frag fable"):**
-Schwellen, Horizont, Vorrangordnung und Kontrollzahl sind in **Abschnitt 6** mit Messwerten
+Schwellen, Horizont, Vorrangordnung und Kontrollzahl sind in **Abschnitt 5** mit Messwerten
 hergeleitet und damit Teil des Bauauftrags.
 
 ### Schritt 3 — BEAUFTRAGT (Chris: „ja!"): Apron-Bemessung auf das verhandelte Gehalt
@@ -308,7 +308,137 @@ Migration).
 
 ---
 
-## 5. Kurzbericht
+## 5. Die Formwahl-Schwellen — Herleitung statt Bauchgefühl (Antwort auf Chris' Punkt 3)
+
+Alle Zahlen aus demselben Abbild (12.08., 08:43 UTC) bzw. aus der Roll-Verteilung des Faktors
+(uniform 0,82–1,24, unabhängig je Saison, `season-economy-factors.ts:25–26`). Messskript:
+Wegwerf-Replikat der Formwahl-Logik über die realen Kader, Cash-Stände und Strategieprofile
+beider Saves (beim Bau gilt: EINE Stelle — das Replikat ist Spec, kein Vorbild).
+
+### 6.0 Die Entscheidungsgröße (vorab, damit A–D dieselbe Sprache sprechen)
+
+**Gefälle Δ = Mittel(Endhälfte) − Mittel(Anfangshälfte) der Vertragsjahre** (2 Jahre: f₂−f₁;
+3 Jahre: f₃−f₁, Mitteljahr zählt nicht; 4 Jahre: Mittel(f₃,f₄) − Mittel(f₁,f₂)). Das passt
+exakt zur Gewichtsrampe von `buildShapeWeights` (linear, symmetrisch um die Laufzeitmitte —
+das Mitteljahr trägt Gewicht ≈ 1 und wird von der Form kaum bewegt). Ein simples
+„f nächste Saison minus Mittel vom Rest" hätte am Messkörper versagt: es verdünnt den
+1,24-Ausreißer in Jahr 4 auf Δ=−0,12, die Hälften-Statistik zeigt ihn korrekt mit **+0,22**.
+Vertragsjahr i wird auf `window[i]` abgebildet (Renewal läuft in der Preseason, VOR dem
+Fenster-Vorrücken — Jahr 1 ist `window[1]`; dieselbe Horizont-Wahrheit wie in Schritt 1).
+
+### A) Schwelle: **|Δ| ≥ 0,15** — und warum nicht 0,10 oder 0,20
+
+Drei unabhängige Anker, alle gemessen:
+
+1. **Signal muss größer sein als das Verschobene.** Der Wertungsanteil ist linear in f
+   (`apronWertungsanteil`, bei f=1): Rang 1 = 82,7 · Rang 8 = 58,6 · Rang 16 = 33,9 ·
+   Rang 24 = 13,3 · Rang 32 = 0. Bei |Δf|=0,15 ist die Einnahmendifferenz zwischen den
+   Vertragsjahren also **12,4 (Rang 1) / 5,1 (Rang 16) / 2,0 (Rang 24)**. Eine einzelne
+   Formentscheidung verschiebt ±10/20/30 % eines Jahresgehalts — am Abbild bei mittlerem
+   Jahresgehalt mehrjähriger Verträge von 6,65 (`1hf25q`) bzw. 4,87 (`0kalpx`) sind das
+   **0,49–1,99 je Vertrag**. Bei T=0,15 ist der Einnahmen-Swing für die obere Tabellenhälfte
+   das 2,5- bis 8-fache des Verschobenen — die Richtung ist Signal. Bei T=0,10 fällt der Swing
+   eines Rang-24-Teams (1,3) unter die verschobene Summe selbst — dort dreht man Verträge für
+   einen Effekt, der kleiner ist als die Drehung.
+2. **Auslösehäufigkeit** (500 000 Ziehungen aus der echten Roll-Spanne):
+   P(|Δ| ≥ T) je Laufzeit —
+
+   | T | 2 Jahre | 3 Jahre | 4 Jahre |
+   |---|---|---|---|
+   | 0,10 | 58 % | 59 % | 43 % |
+   | **0,15** | **41 %** | **42 %** | **23 %** |
+   | 0,20 | 28 % | 28 % | 11 % |
+
+   Das Fenster ist **liga-global** — feuert die Regel, feuert sie für alle 32 Teams zugleich.
+   Bei T=0,10 überstimmte sie die Profile in der Mehrzahl aller Fenster (Monokultur-Gefahr,
+   siehe D); bei T=0,20 nutzte ausgerechnet die Laufzeit mit dem größten Hebel (4 Jahre, ±30 %)
+   die Regel fast nie (11 %). T=0,15 lässt die Regel in ~40 % der Fenster sprechen und in ~60 %
+   schweigen — Profile bleiben der Normalfall.
+3. **Kostenseite ist klein, aber nicht null:** früh gebundenes Geld kostet schlimmstenfalls den
+   Kreditzins (7–20 %/Saison, `loan-service.ts:77`) auf die verschobene Summe — auf 1,33
+   verschobene Einheiten also ≤ 0,27/Saison. Deshalb braucht die Schwelle keine Kostenmarge,
+   sondern nur Rauschabstand; das eigentliche Kostenrisiko fängt die Cash-Wache in C ab.
+
+   Ehrlich gesagt: innerhalb von ~0,12–0,18 ist die Wahl Geschmackssache — 0,15 ist die Mitte.
+   NICHT vertretbar sind < 0,10 (Anker 1 kippt für die halbe Liga) und > 0,20 (Anker 2 macht
+   die 4-Jahres-Laufzeit taub). Als benannte Konstante bauen, damit die Kontrollmessung (D) sie
+   nachjustieren kann, ohne den Code zu verstehen.
+
+### B) Horizont: **alle Vertragsjahre, Jahr i ↔ `window[i]`** — gleichgewichtet über die Hälften
+
+Das Fenster trägt 5 Saisons; bei Laufzeiten bis 4 ist **jede Vertragssaison bekannt** (Renewal
+in der Preseason: Jahre 1–4 = window[1..4]). Der Faktor der vierten Saison zählt daher **voll
+mit, in seiner Hälfte gleichgewichtet** — nicht abgewertet: die Werte sind deterministisch
+vorausgewürfelt, es gibt keine Unsicherheit, die eine Abwertung rechtfertigte (anders als bei
+den Apron-LINIEN, die wirklich unbekannt sind — Schritt 1). Der Messkörper zeigt, warum das
+wichtig ist: `1hf25q` hat [0,87, 0,83, 0,91, **1,24**] vor sich — erst das voll gezählte Jahr 4
+hebt Δ auf +0,22 und schiebt die dicke Rate korrekt in die 1,24-Saison (Wertungstopf dort +43 %
+gegenüber 0,87). Einzige Ausnahme: Vertragsjahre jenseits des Fensters (nur Laufzeit ≥ 5;
+am Abbild 9 von 262 mehrjährigen Verträgen, 3,4 %) bekommen das Mittel der bekannten Jahre —
+neutral, kein Raten.
+
+### C) Vorrang: **Kassenklemme > Faktor > Profil-Neigung** — Bestätigung mit Begründung
+
+Die Vorgabe des Koordinators ist richtig, und zwar quantitativ: Front-Loading aus
+Konjunkturgründen bringt pro Vertrag ≤ ~2 Ausrichtungsgewinn, eine erzwungene Kreditaufnahme
+kostet 7–20 %/Saison auf die GESAMTE Lücke und ein gerissener Cash-Gate blockiert Renewals
+(`ai_cash_buffer_required`). Konkrete Ordnung im Code (Einfügung in
+`chooseAiRenewalContractShape`, bestehende Zeilen bleiben):
+
+1. `tightNow && cashPreservationProfile → back_loaded` — **unverändert erste Regel.**
+2. **NEU:** |Δ| ≥ 0,15 → `back_loaded` bei Δ > 0; `front_loaded` bei Δ < 0 **nur mit** der
+   bestehenden Cash-Wache `cash ≥ requiredReserve + 10` (dieselbe Schwelle wie die heutige
+   `wageSensitivity ≥ 8`-Regel — keine zweite erfundene Zahl).
+3. Danach die vier bestehenden Profil-Regeln unverändert, dann `balanced`.
+
+**Der Faktor ÜBERSTIMMT die Profil-Neigungen in klaren Fällen** (deshalb Position 2, nicht 5):
+`cashPriority`/`wageSensitivity`/`long-`/`shortContractPreference`/`sellForProfitAggression`
+sind Geschmack ohne Informationsgehalt über die Zukunft; das Fenster ist bekannte Arithmetik.
+Dass daraus keine Monokultur wird, sichern drei Dinge, alle gemessen: die Schwelle schweigt in
+~60 % der Fenster (A2), die Cash-Wache trennt die Teams nach ihrer echten Kassenlage, und
+Einjahresverträge (124/340 bzw. 297/343 am Abbild) haben nie eine Form. Grenze der Regel, offen
+benannt: sie richtet sich nach dem LIGA-Wetter; der teamindividuelle Rangverlauf (Rang 1 = 82,7
+Wertungsanteil vs Rang 24 = 13,3) bleibt außen vor — ihn zu prognostizieren wäre Raterei.
+
+### D) Kontrollzahl: bimodal, mit zwei scharfen Sofort-Vorhersagen
+
+Die Regel ist absichtlich **bimodal** — die Kontrollzahl muss das abbilden, sonst misst man
+Rauschen:
+
+- **Flaches Fenster** (|Δ| < 0,15 für alle Laufzeiten): **exakt 0 Flips.** Jeder einzelne ist
+  ein Befund.
+- **Steiles Fenster:** 40–75 % der mehrjährigen Renewals der betroffenen Laufzeiten drehen auf
+  die angezeigte Form (gedeckelt durch Cash-Wache und bereits passende Formen).
+- **Über viele Saisongrenzen gemittelt: 10–30 % der mehrjährigen Neuabschlüsse.** Untergrenze
+  aus A2 × Anteil aktuell nicht-passender Formen; dauerhaft < 5 % hieße, die Cash-Wache oder die
+  Laufzeitenverteilung frisst die Regel (Befund, nicht Nachjustier-Einladung); dauerhaft > 40 %
+  hieße, sie überstimmt den Geschmack öfter als sie schweigt (dito).
+- **Monokultur-Wache bleibt:** keine Form > 70 % der mehrjährigen Bestandsverträge (heutige
+  Referenz `1hf25q`: 178/102/60).
+
+**Zwei exakte Vorhersagen für die Abnahme des Bau-Ergebnisses**, aus der Simulation über die
+realen Kader/Kassen/Profile (Population: Bestandsverträge ≥ 2 Jahre als Proxy für die
+Renewal-Population — die echte zieht andere Laufzeiten, das ist der dokumentierte Rest-Fehler):
+
+| Save | nächstes Renewal-Fenster | Δ (2J / 3J / 4J) | erwartete Flips bei T=0,15 |
+|---|---|---|---|
+| `1hf25q` | [0,87, 0,83, 0,91, 1,24] | −0,04 / +0,04 / **+0,22** | **14 von 216 (6,5 %)** — ausschließlich Laufzeit ≥ 4, alle → back_loaded |
+| `0kalpx` | [1,03, 1,05, 1,02, 1,21] | +0,02 / −0,01 / +0,08 | **1 von 46 (2,2 %)** — ein Fünfjahresvertrag |
+
+Weicht die gebaute Regel an genau diesen Saves von diesen Zahlen ab, ist die Implementierung
+falsch — nicht die Schwelle.
+
+**Was sich ohne gespielte Saisons NICHT beantworten lässt** (ausdrücklich): ob die
+Cash-Ausrichtung am Ende wirklich Kredite/Klemmen reduziert. Die Flip-Quote misst nur, DASS die
+Regel wirkt, nicht, dass sie NÜTZT. Der ehrliche Endmaßstab ist ein Langlauf-A/B mit
+geskriptetem Faktor-Muster (`OLY_LONG_RUN_SALARY_FACTOR_PATTERN`, z. B. 1,20/0,85 alternierend,
+gleiche Seeds): Summe gezahlter Kreditzinsen, Anzahl `ai_cash_buffer_required`-Blockaden und
+Zwangsverkäufe je Liga-Saison, mit/ohne Regel. DARAN wird nachjustiert — nicht an der
+Flip-Quote, und nicht durch Drehen der Schwelle, bis die Kontrollzahl passt.
+
+---
+
+## 6. Kurzbericht
 
 1. **Die These trägt in der Größenordnung:** Apron-Abgaben teurer Teams sind 12–17 % einer
    Jahresgehaltssumme (Spitze 16,6 bei 97,7), eine mittlere Verhandlungs-Marge ist 0,47 je
@@ -325,8 +455,17 @@ Migration).
 4. **Formwahl + Salary Factor** (Chris' Kernidee) ist als **Cash-Timing** sinnvoll, nicht als
    Apron-Trick: Einnahmen skalieren mit f (~±12 je Team zwischen f=0,83 und f=1,19),
    Gehaltszahlungen nicht; die Form kann 3–8,5 je Team und Saisongrenze in Hoch-f-Saisons
-   schieben. Kleine Regel in `chooseAiRenewalContractShape` (Schritt 2), Schwellen sind
-   Balance-Sache.
-5. **Balance-Fragen für Chris:** (a) Darf die KI k=0-Saisons scharf ausnutzen? (b) Bias-Schwellen
-   der Formwahl. (c) Soll die Apron-Bemessung auf das verhandelte Durchschnittsgehalt wechseln
-   (Schritt 3 — nur als Vorlage, nicht gebaut)?
+   schieben. Kleine Regel in `chooseAiRenewalContractShape` (Schritt 2).
+5. **Alle drei Balance-Fragen sind entschieden** (Kopfnote): KI darf k=0-Saisons scharf
+   ausnutzen (Chris); Apron-Bemessung wechselt auf das verhandelte Gehalt (Chris; Schritt 3 mit
+   der Benchmark-Persistierung — `annualSalary` wie es heute steht, wäre nach dem ersten
+   Saisonwechsel formabhängig und damit das Schlupfloch); Formwahl-Schwellen von Fable
+   hergeleitet (Abschnitt 5): **Gefälle-Statistik über die Hälften der Vertragsjahre,
+   Schwelle |Δ| ≥ 0,15, alle bekannten Vertragsjahre gleichgewichtet, Vorrang
+   Kassenklemme > Faktor > Profil, Kontrollzahl bimodal** (0 Flips in flachen Fenstern; 10–30 %
+   der mehrjährigen Neuabschlüsse im Langlauf-Mittel; exakte Abnahme-Vorhersagen: 14/216 bei
+   `1hf25q`, 1/46 bei `0kalpx`). Endgültiger Nutzen-Nachweis nur im Langlauf-A/B mit
+   geskriptetem Faktor-Muster — nicht an der Flip-Quote nachjustieren.
+6. **Bau-Reihenfolge:** Schritt 0 (Messgrundlage) → Schritt 1 (Faktor-Horizont) → Schritt 2
+   (Formwahl) → Schritt 3 (Bemessungsumstellung, ändert die Grundlage von Schritt 1 — deshalb
+   zuletzt, mit Vorher/Nachher-Tabelle an Chris vor dem Produktivgang).
