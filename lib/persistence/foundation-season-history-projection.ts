@@ -60,6 +60,8 @@ export type FoundationSeasonHistoryTeamEntry = {
   cashEnd: number | null;
   cashTotal: number | null;
   cashEntry: number | null;
+  /** Kontostand an der Saisongrenze — nach der Vertragsalterung, vor den Kaeufen der Folgesaison. */
+  cashCarryOver: number | null;
   salaryEnd: number | null;
   salaryTotalEnd: number | null;
   marketValueEnd: number | null;
@@ -203,6 +205,7 @@ function projiziereTeam(record: {
   cashEnd?: number | null;
   cashTotal?: number | null;
   cashEntry?: number | null;
+  cashCarryOver?: number | null;
   salaryTotalEnd?: number | null;
   salaryEnd?: number | null;
   marketValueSeasonEnd?: number | null;
@@ -233,6 +236,10 @@ function projiziereTeam(record: {
     cashEnd: zahlOderNull(record.cashEnd),
     cashTotal: zahlOderNull(record.cashTotal),
     cashEntry: zahlOderNull(record.cashEntry),
+    // Ohne diese Zeile kaeme der Grenzstand nie im Browser an und die Historie fiele im Fenster
+    // zwischen Saisonwechsel und Kauffenster auf `cashEnd` zurueck — den Stand VOR den
+    // auslaufenden Vertraegen.
+    cashCarryOver: zahlOderNull(record.cashCarryOver),
     salaryEnd: zahlOderNull(record.salaryEnd),
     salaryTotalEnd: zahlOderNull(record.salaryTotalEnd),
     marketValueEnd: zahlOderNull(record.marketValueEnd),
@@ -381,6 +388,7 @@ export function alsSchnappschussErsatz(
         cashEnd: team.cashEnd,
         cashTotal: team.cashTotal,
         cashEntry: team.cashEntry,
+        cashCarryOver: team.cashCarryOver,
         salaryEnd: team.salaryEnd,
         salaryTotalEnd: team.salaryTotalEnd,
         marketValueEnd: team.marketValueEnd,

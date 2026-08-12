@@ -492,28 +492,57 @@ function computeSeasonTransitionAdvance(
           `season_end_progression_deferred:${batch.blockingReasons.join("|")}`,
         ];
       } else {
-        /**
-         * SAISONEND-MARKTWERT EINFRIEREN — genau hier, und nirgends sonst.
-         *
-         * Chris: „MW Werte können gerne NACH Apply von Training und MW-Neuberechnung übernommen
-         * werden, weil Training soll übernommen werden bevor Spieler verkauft werden." An dieser
-         * Stelle ist beides passiert (`runSeasonEndProgressionBatch` rechnet Entwicklung UND
-         * Marktwerte neu) und das Transferfenster ist noch zu. Der Snapshot selbst entstand
-         * frueher in der Kette und traegt deshalb noch den Vor-Entwicklungs-Stand.
-         */
-        const eingefroren = patchSeasonSnapshotMarketValueAfterProgression(
-          batch.save.gameState,
-          abgeschlosseneSaisonId,
-        );
-        progressionSave = eingefroren.patched ? { ...batch.save, gameState: eingefroren.gameState } : batch.save;
-        progressionWarnings = eingefroren.patched
-          ? batch.warnings
-          : [...batch.warnings, `season_end_market_value_freeze_skipped:${abgeschlosseneSaisonId}`];
+        progressionSave = batch.save;
+        progressionWarnings = batch.warnings;
         entwicklungGelaufen = true;
       }
     } catch (error) {
       progressionWarnings = [
         `season_end_progression_failed:${error instanceof Error ? error.message : "unknown"}`,
+      ];
+    }
+  }
+
+  /**
+   * DEN SAISONSTAND EINFRIEREN — am Ende von `player_development`, IMMER.
+   *
+   * Chris' Regel: „der richtige snapshot Wert fuer marktwert und Cash am ende von season 1 ist nach
+   * MD10 aber vor Eroeffnung des transfermarktes! quasi in dem Schritt wo die Sponsoren gebucht
+   * werden gehaelter abgehen etc. am ende davon wird der snapshot fuer die history gemacht."
+   *
+   * Dieser Hop ist genau dieser Punkt: die Abrechnung liegt hinter uns (der Riegel auf
+   * `season_rewards` laesst niemanden ohne sie hierher), die Entwicklung ist gerechnet — und die
+   * naechste Phase (`season_end_management`) OEFFNET den Transfermarkt
+   * (`TRANSFER_SELL_PHASES`, transfer-window-policy.ts). Was danach eingefroren wird, ist der Stand
+   * nach den ersten Verkaeufen.
+   *
+   * Fuer den MARKTWERT hatte Chris denselben Punkt gewaehlt: „MW Werte können gerne NACH Apply von
+   * Training und MW-Neuberechnung übernommen werden, weil Training soll übernommen werden bevor
+   * Spieler verkauft werden." Genau das ist hier passiert — `runSeasonEndProgressionBatch` (oben)
+   * rechnet Entwicklung UND Marktwerte neu, und verkauft ist noch nichts.
+   *
+   * WARUM AUSSERHALB DES ERFOLGSZWEIGS. Der Freeze hing bisher IM `else` der Entwicklung — er lief
+   * also nur, wenn die Entwicklung in genau diesem Hop erfolgreich rechnete. Drei reale Faelle
+   * fielen damit durch:
+   *   • Die Entwicklung lief in einem frueheren Anlauf schon (`progressionAppliedForSeasonId`) —
+   *     dann ueberspringt der Block oben alles, inklusive Freeze.
+   *   • Sie meldet Blocker (`season_end_progression_deferred`).
+   *   • Sie wirft.
+   * In allen dreien blieb nur das Netz eine Station spaeter (`transfer_sell_phase`) — und da ist
+   * der Markt schon offen. Der Freeze ist write-once je Feld und legt bei Bedarf selbst einen
+   * Schnappschuss an; ihn immer laufen zu lassen kostet nichts und schliesst das Fenster.
+   */
+  if (currentStep === "player_development") {
+    const eingefroren = patchSeasonSnapshotMarketValueAfterProgression(
+      progressionSave.gameState,
+      abgeschlosseneSaisonId,
+    );
+    if (eingefroren.patched) {
+      progressionSave = { ...progressionSave, gameState: eingefroren.gameState };
+    } else {
+      progressionWarnings = [
+        ...progressionWarnings,
+        `season_end_market_value_freeze_skipped:${abgeschlosseneSaisonId}`,
       ];
     }
   }

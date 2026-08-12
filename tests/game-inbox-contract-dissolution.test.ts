@@ -77,7 +77,9 @@ describe("Inbox: Vertragsauflösung auf Spielerwunsch", () => {
   });
 
   it("holt die Moral aus derselben Quelle wie Kader und Profil", () => {
-    expect(INBOX).toContain("assessPlayerMorale({");
+    // Dieselbe Bruecke wie API-Route und KI-Entscheidung — eine eigene Schleife hier waere die
+    // dritte Kopie derselben Rechnung. Den WERT prueft `contract-dissolution-wiring.test.ts`.
+    expect(INBOX).toContain("moraleByPlayerId: buildTeamMoraleMap(input.gameState, input.team.teamId)");
     expect(INBOX).toContain("buildContractDissolutionOffers({");
   });
 });

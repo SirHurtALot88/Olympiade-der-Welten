@@ -17,6 +17,8 @@ export type TransferFinanceTeamSeasonRow = {
   netSponsorCash: number;
   /** Mid-Season-Sponsor-Event-Cash (auto-settle `sponsorEvents`, nicht in sponsorPayoutLogs). */
   netSponsorEventCash: number;
+  /** Apron-Abrechnung der Saison (`apronSettlementLogs.cashDelta`, direkt auf team.cash gebucht). */
+  netApronCash: number;
   /** T-029: Kredit-Cashflows der Saison (loanOriginationLogs + loanApplyLogs, beide Seiten bei Team-Krediten). */
   netLoanCash: number;
   /** T-029: Gebäude-Cashflows der Saison (facilityEvents-Ledger, `-cost` je Event). */
@@ -96,11 +98,31 @@ function seasonsFromHistory(gameState: GameState) {
   return [...ids].sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
 }
 
+/**
+ * DER ANKERPUNKT DES ABGLEICHS — das Geld an der SAISONGRENZE, nicht das am Ende der Abrechnung.
+ *
+ * `cashCarryOver` GEHT VOR `cashEnd`, und der Unterschied ist kein Rundungsrauschen. `cashEnd` ist
+ * der Stand, den Chris in der Historie sehen will: nach Sponsoren, Gehaeltern, Gebaeuden, Apron,
+ * Krediten und Vorstandszielen — und VOR der Oeffnung des Transfermarkts. Danach bucht der
+ * Saisonwechsel aber noch einmal auf dieselbe Saison: die Vertragsalterung
+ * (`computeSeasonEndContractTick`) laesst auslaufende Vertraege auslaufen und schreibt den
+ * Abloesewert als `contract_exit` mit der ALTEN `seasonId` in die Transferhistorie.
+ *
+ * Dieses Geld steht damit auf der KANAL-Seite der alten Saison, aber nicht in `cashEnd`. Die
+ * Rechnung `cashEnd(N) → Kanaele(N+1) → cashEnd(N+1)` ging deshalb systematisch daneben: am
+ * Live-Abbild `new-game-1785823388048-1hf25q` bei 19 von 32 Teams, bis 112,9 C, und die
+ * Gegenbewegung tauchte in der Vorsaison mit umgekehrtem Vorzeichen wieder auf (Summe beider
+ * unter 0,10 C). Es war nie ein Cash-Leck, sondern ein falscher Ankerpunkt.
+ *
+ * `patchSeasonSnapshotCashCarryOver` setzt `cashCarryOver` genau an der Grenze — nach der
+ * Vertragsalterung, vor der ersten Buchung der neuen Saison. Altstaende ohne das Feld fallen auf
+ * `cashEnd` zurueck und verhalten sich exakt wie bisher.
+ */
 function getSnapshotCashByTeam(gameState: GameState, seasonId: string) {
   const snapshot = gameState.seasonState.seasonSnapshots?.find((entry) => entry.seasonId === seasonId);
   const map = new Map<string, number>();
   for (const row of snapshot?.finalStandings ?? []) {
-    map.set(row.teamId, row.cashEnd ?? row.cashTotal ?? 0);
+    map.set(row.teamId, row.cashCarryOver ?? row.cashEnd ?? row.cashTotal ?? 0);
   }
   return map;
 }
@@ -181,6 +203,25 @@ function getSeasonSponsorEventCashByTeam(gameState: GameState, seasonId: string)
 }
 
 /**
+ * Apron-Cashflows einer Saison, pro Team aggregiert (`apronSettlementLogs`). Die Saison-End-Abrechnung
+ * der Apron-Linien (`apron-settlement-service.ts`) schreibt `team.cash + log.cashDelta` — Abgabe
+ * (`kind: "levy"`, negativ) und Ausschüttung aus dem Topf (`kind: "payout"`, positiv) — und legt je
+ * Team/Saison einen Log ab. Dieser reale Kanal fehlte in der Cash-Abstimmung komplett: am Live-Abbild
+ * (`new-game-1785823388048-1hf25q`) trägt er je Team und Saison zwischen −16,60 und +2,80 C bei
+ * (32 Logs je Saison, Summe über die Liga 0,00 — der Topf verteilt nur um) und lief damit vollständig
+ * als Rest-Delta mit. Dieselbe Sorte Lücke wie zuvor bei sponsorEvents/Objective-Rewards, deshalb
+ * hier nach demselben Muster.
+ */
+function getSeasonApronCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const log of gameState.seasonState.apronSettlementLogs ?? []) {
+    if (log.seasonId !== seasonId) continue;
+    map.set(log.teamId, round((map.get(log.teamId) ?? 0) + log.cashDelta));
+  }
+  return map;
+}
+
+/**
  * Board-Objective-Reward-Cashflows einer Saison, pro Team aggregiert. Am Saisonende bucht
  * `applyTeamSeasonObjectiveRewards` (team-season-objectives-service.ts, execute:true) für jedes Team
  * `team.cash += settlement.byTeamId[teamId].cashDelta` — erfüllte Board-Ziele zahlen `rewardCash`,
@@ -190,19 +231,36 @@ function getSeasonSponsorEventCashByTeam(gameState: GameState, seasonId: string)
  * Sponsor-Vertrags-Spiegel-Ziele tragen im Settlement bereits `cashDelta = 0` (siehe
  * `buildTeamSeasonObjectiveSettlement`), damit gibt es keine Doppelzählung mit `netSponsorCash`.
  *
- * WICHTIG (Rekonstruktion): Der Apply-Log trägt NUR die Saison-Summe (`payload.totalCashDelta`), keine
- * Per-Team-Aufschlüsselung, und `finalStandings` im Snapshot hält den Betrag ebenfalls nicht. Die
- * einzige deterministische Per-Team-Quelle ist daher, das Settlement neu zu rechnen — das aber immer
- * `gameState.season.id` abbildet. Deshalb wird der Kanal nur für die AKTUELLE Saison und nur dann
- * rekonstruiert, wenn für sie ein Apply-Log existiert (= Rewards wurden real gebucht; die Ziele sind
- * dann eingefroren, Recompute == gebuchter Wert). Für abgeschlossene Vor-Saisons bleibt der Kanal
- * bewusst 0 — mangels persistierter Per-Team-Daten nicht rekonstruierbar, ohne die Reward-Auszahlung
- * bzw. das Log-Schema zu ändern.
+ * DER LOG NENNT DIE ZAHLEN SELBST — und wurde trotzdem nicht gelesen.
+ *
+ * Der Kommentar an dieser Stelle lautete: „Der Apply-Log trägt NUR die Saison-Summe
+ * (`payload.totalCashDelta`), keine Per-Team-Aufschlüsselung." Das stimmt nicht mehr:
+ * `ObjectiveRewardApplyLogRecord.payload.cashDeltaByTeamId` steht seit der Cashflow-Invariante im
+ * Log und hält genau die gebuchten Beträge je Team (am Live-Abbild `new-game-1785823388048-1hf25q`
+ * für Saison 2: 30 Einträge zwischen −7 und +11 C). Die Folge der veralteten Annahme: für jede
+ * ABGESCHLOSSENE Saison blieb der Kanal auf 0, obwohl das Geld längst geflossen war — ein Rest in
+ * genau dieser Höhe in jeder Vorsaison-Zeile.
+ *
+ * Deshalb: zuerst der Log. Nur wo er das Feld nicht führt (ältere Spielstände), bleibt es beim
+ * Neurechnen des Settlements — und das kann weiterhin ausschliesslich die AKTUELLE Saison
+ * abbilden (`buildTeamSeasonObjectiveSettlement` liest immer `gameState.season.id`), weshalb der
+ * Rückfall für Vorsaisons weiterhin 0 liefert statt einer erfundenen Zahl.
  */
 function getSeasonObjectiveRewardCashByTeam(gameState: GameState, seasonId: string) {
   const map = new Map<string, number>();
-  const hasApplyLog = (gameState.seasonState.objectiveRewardApplyLogs ?? []).some((log) => log.seasonId === seasonId);
-  if (!hasApplyLog || seasonId !== gameState.season.id) {
+  const applyLog = (gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId);
+  if (!applyLog) {
+    return map;
+  }
+  const gebucht = applyLog.payload?.cashDeltaByTeamId;
+  if (gebucht && Object.keys(gebucht).length > 0) {
+    for (const [teamId, cashDelta] of Object.entries(gebucht)) {
+      if (!Number.isFinite(cashDelta) || cashDelta === 0) continue;
+      map.set(teamId, round(cashDelta));
+    }
+    return map;
+  }
+  if (seasonId !== gameState.season.id) {
     return map;
   }
   try {
@@ -256,6 +314,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const loanCashByTeam = getSeasonLoanCashByTeam(gameState, seasonId);
     const facilityCashByTeam = getSeasonFacilityCashByTeam(gameState, seasonId);
     const sponsorEventCashByTeam = getSeasonSponsorEventCashByTeam(gameState, seasonId);
+    const apronCashByTeam = getSeasonApronCashByTeam(gameState, seasonId);
     const objectiveRewardCashByTeam = getSeasonObjectiveRewardCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
@@ -279,6 +338,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
       const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
       const netSponsorEventCash = sponsorEventCashByTeam.get(teamId) ?? 0;
+      const netApronCash = apronCashByTeam.get(teamId) ?? 0;
       const netObjectiveRewardCash = objectiveRewardCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
@@ -293,6 +353,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       // gar nicht abgezogen, obwohl er im Snapshot-`cashEnd` steckt; genau die Formel-Lücke, die dieses
       // Tool eigentlich schließen soll. Vorzeichen wie die anderen Gutschriften: `cashEnd` enthält das
       // Reward-Cash bereits (team.cash += cashDelta), also subtrahieren, damit die Reconciliation aufgeht.
+      // Und: Apron-Abrechnung (`apronSettlementLogs`) — derselbe blinde Fleck, ebenfalls direkt auf
+      // team.cash gebucht und bis dahin gar nicht abgezogen.
       const cashReconciliationDelta =
         cashStart != null && cashEnd != null
           ? round(
@@ -301,6 +363,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
                 netTransferCash -
                 netSponsorCash -
                 netSponsorEventCash -
+                netApronCash -
                 netLoanCash -
                 netFacilityCash -
                 netObjectiveRewardCash,
@@ -320,6 +383,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         salaryPaidOut,
         netSponsorCash,
         netSponsorEventCash,
+        netApronCash,
         netLoanCash,
         netFacilityCash,
         netObjectiveRewardCash,

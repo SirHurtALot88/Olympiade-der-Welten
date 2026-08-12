@@ -447,10 +447,13 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
       // erst am anfang der Saison nach den Käufen stattfinden für die ewige Tabelle / Finanzen."
       // Das ist derselbe Zeitpunkt, den die Sparkline ohnehin meint (Cash-Ende von Saison N =
       // Start von N+1) — nur eben NACH Kaeufen, Fuellung und Krediten statt davor. Fehlt das Feld
-      // (Altsaves, oder die Folgesaison hat ihr Kauffenster noch vor sich), bleibt es beim alten
-      // Wert. Der Abgleich in `getSnapshotCashByTeam` liest weiterhin `cashEnd` und ist davon
-      // unberuehrt.
-      const cash = row.cashEntry ?? row.cashEnd ?? row.cashTotal ?? null;
+      // (Altsaves, oder die Folgesaison hat ihr Kauffenster noch vor sich), kommt `cashCarryOver`:
+      // der Kontostand an der Saisongrenze, nach der Vertragsalterung und vor den Kaeufen. Genau
+      // dieser Rueckfall war die Ursache dafuer, dass `cashSeasonStart` (und damit
+      // `otherCashMovements` weiter unten) daneben lag — `cashEnd` liegt VOR den auslaufenden
+      // Vertraegen und ist damit nicht das Geld, mit dem die Saison begann.
+      // Der Abgleich in `getSnapshotCashByTeam` verankert auf derselben Groesse.
+      const cash = row.cashEntry ?? row.cashCarryOver ?? row.cashEnd ?? row.cashTotal ?? null;
       return {
         seasonId: snapshot.seasonId,
         seasonName: snapshot.seasonName,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
+import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
 import {
   loadLocalLegacyLineupContext,
@@ -148,6 +149,14 @@ function topUpRostersForLineupMinimum(gameState: GameState, saveId = "test-save"
       rosterCounter += 1;
     }
   }
+  // Ein Kaderplatz im echten Spiel entsteht ueber den Markt, und der zieht
+  // `applyDefaultTrainingFieldsToRosteredPlayers` nach: ein Spieler im Kader HAT einen
+  // Trainingsmodus. Diese Testhilfe schiebt Roster-Eintraege von Hand hinein und liess das
+  // Feld bisher leer. Das fiel nur deshalb nie auf, weil die KI-Trainingsmodus-Neubewertung
+  // frueher mitten im Auto-Run lief und die Luecke nebenbei zustopfte — genau der Aufruf, der
+  // dort falsch sass (er aenderte den Zustand ZWISCHEN gezeigter Vorschau und Buchung). Jetzt
+  // stopft ihn die Vorbereitung, so wie es das Spiel auch tut.
+  Object.assign(gameState, applyDefaultTrainingFieldsToRosteredPlayers(gameState));
 }
 
 describe("matchday auto-run manual-team policy", () => {

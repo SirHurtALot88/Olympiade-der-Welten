@@ -1,7 +1,24 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+/**
+ * Die Moralrechnung selbst hat eigene Tests. Hier zaehlt nur, dass die Bruecke GENAU DAS
+ * durchreicht, was `assessPlayerMorale` fuer die Spieler DIESES Teams liefert — und sonst nichts.
+ */
+vi.mock("@/lib/morale/player-morale-service", async () => {
+  const echt = await vi.importActual<typeof import("@/lib/morale/player-morale-service")>(
+    "@/lib/morale/player-morale-service",
+  );
+  return {
+    ...echt,
+    assessPlayerMorale: (input: { playerId: string; teamId: string }) =>
+      input.playerId === "p-stumm" ? null : { morale: input.playerId === "p-sauer" ? 12.5 : 71 },
+  };
+});
+
+const { buildTeamMoraleMap } = await import("@/lib/morale/contract-dissolution-service");
 
 const REPO_ROOT = process.cwd();
 const read = (relativePath: string) => readFileSync(join(REPO_ROOT, relativePath), "utf8");
@@ -20,9 +37,24 @@ const CSS = read("app/globals.css");
 describe("Vertragsaufloesung: Verdrahtung", () => {
   it("holt die Moral aus derselben Quelle wie das Spielerprofil", () => {
     // buildContractDissolutionOffers leitet die Moral bewusst nicht selbst ab — sonst
-    // driftet der Wert von der Anzeige weg. Der lokale Dienst ist die Bruecke.
-    expect(LOCAL_SERVICE).toContain("assessPlayerMorale({");
+    // driftet der Wert von der Anzeige weg. Die Bruecke ist `buildTeamMoraleMap`; sie steht
+    // neben der Angebots-Funktion, weil sie inzwischen von DREI Seiten gebraucht wird
+    // (Route, Inbox, KI-Entscheidung) und als Kopie dreimal auseinanderlaufen wuerde.
     expect(LOCAL_SERVICE).toContain("moraleByPlayerId: buildTeamMoraleMap(gameState, teamId)");
+  });
+
+  it("reicht genau die Moral des eigenen Kaders durch — keine fremden Spieler, keine erfundenen Werte", () => {
+    const gameState = {
+      rosters: [
+        { teamId: "C-C", playerId: "p-sauer" },
+        { teamId: "C-C", playerId: "p-froh" },
+        { teamId: "C-C", playerId: "p-stumm" },
+        { teamId: "M-M", playerId: "p-fremd" },
+      ],
+    } as never;
+    // p-stumm hat keine belastbare Moral -> steht bewusst NICHT drin (statt als 0 zu erscheinen,
+    // was ihn faelschlich unter die Aufloesungs-Schwelle brechen wuerde).
+    expect(buildTeamMoraleMap(gameState, "C-C")).toEqual({ "p-sauer": 12.5, "p-froh": 71 });
   });
 
   it("rechnet das Angebot auf dem Server neu, statt es entgegenzunehmen", () => {

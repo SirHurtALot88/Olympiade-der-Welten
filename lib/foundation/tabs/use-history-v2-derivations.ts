@@ -24,6 +24,9 @@ function getTransferSourceLabel(source: string | null | undefined) {
     auto_roster_fill: "Setup / Auto Roster Fill",
     ai_roster_fill: "Setup / AI Roster Fill",
     smoke_setup: "Smoke/Setup",
+    contract_dissolution_accepted: "Vertragsaufloesung",
+    nula_mascot_rule_buy: "Nula-Sonderregel (Kauf)",
+    nula_mascot_rule_sell: "Nula-Sonderregel (Abgabe)",
   };
 
   return labels[source] ?? source.replaceAll("_", " ");

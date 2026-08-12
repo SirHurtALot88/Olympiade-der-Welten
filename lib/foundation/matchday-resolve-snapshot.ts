@@ -10,6 +10,7 @@ import {
   buildLegacyMatchdayResolvePreviewPayload,
   type LegacyMatchdayResolvePreviewPayload,
 } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 
 export type MatchdayResolveScope = {
   saveId: string;
@@ -211,6 +212,51 @@ export function readMatchdayResolveSnapshot(
     return null;
   }
   return { record, payload };
+}
+
+export type MatchdayPreviewToBook = {
+  preview: LegacyMatchdayResolvePreview;
+  /** `snapshot`: die Vorberechnung der Arena. `live`: frisch gerechnet, weil keine gueltige vorlag. */
+  source: "snapshot" | "live";
+};
+
+/**
+ * DIE EINE RECHENSTELLE DES SPIELTAGS.
+ *
+ * Wer diesen Spieltag bucht — die Arena ueber `matchday-auto-run-service` oder das Cockpit
+ * ueber `/api/resolve/legacy-matchday-apply` — nimmt seine Zahlen von hier. Vorher hatte
+ * jeder Weg seine eigene: die Arena buchte die Vorberechnung, das Cockpit rechnete beim
+ * Buchen frisch. Beide Wege stehen dem Spieler offen, und sie lieferten verschiedene
+ * Ergebnisse.
+ *
+ * GEMESSEN am Live-Abbild vom 12.08.2026: derselbe Ausgangszustand, einmal ueber die Arena
+ * gebucht, einmal ueber das Cockpit, verglichen werden die GEBUCHTEN Zeilen. Zwischen
+ * "Aufstellung gespeichert" und "gebucht" lag eine gewoehnliche Trainingswoche — die
+ * Spielerwerte bewegen sich, die Aufstellungen nicht, die Vorberechnung bleibt gueltig:
+ *   - `new-game-1784747079649-n90y4m`, Spieltag 1: 60 von 64 Disziplin-Zeilen verschieden,
+ *     max 5,10 Score, 21 vertauschte Raenge, 125 von 160 Spielerzeilen (max 3,20).
+ *   - `new-game-1785823388048-1hf25q`, Saison 2, Spieltag 9: 63 von 64 Zeilen, max 6,70,
+ *     22 vertauschte Raenge, 172 von 224 Spielerzeilen (max 2,70).
+ *   Danach beide Male: 0 Zeilen, 0 Raenge, 0 Spielerzeilen.
+ *
+ * Wie weit eine liegende Vorberechnung vom frisch Gerechneten wegdriften kann, zeigen die
+ * drei Vorberechnungen, die im Abbild tatsaechlich liegen (je 64 Zeilen): 64/64 verschieden
+ * bei max 29,1 Score (`…0kalpx`), 64/64 bei max 17,5 (`…1hf25q`), 63/64 bei max 52,5 und
+ * 33 vertauschten Raengen (`…h0z7cl`). In zwei dieser drei Faelle war die Vorberechnung
+ * Zeile fuer Zeile das, was auch GEBUCHT wurde — die Arena-Zahl also die gespielte.
+ *
+ * Die Gueltigkeitspruefung der Vorberechnung steckt in `readMatchdayResolveSnapshot`:
+ * gebuchte Seiten stechen sie aus, geaenderte Aufstellungen verwerfen sie. Fehlt sie,
+ * bleibt es beim frisch gerechneten Ergebnis — fuer beide Wege gleichermassen.
+ */
+export function resolveMatchdayPreviewToBook(input: {
+  gameState: GameState;
+  scope: MatchdayResolveScope;
+  livePreview: LegacyMatchdayResolvePreview;
+}): MatchdayPreviewToBook {
+  const snapshot = readMatchdayResolveSnapshot(input.gameState, input.scope);
+  if (!snapshot) return { preview: input.livePreview, source: "live" };
+  return { preview: snapshot.payload.preview, source: "snapshot" };
 }
 
 /**

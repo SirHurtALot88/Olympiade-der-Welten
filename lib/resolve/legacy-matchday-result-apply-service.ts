@@ -26,6 +26,7 @@ import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToCo
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 
 type DbClient = typeof db;
@@ -68,6 +69,12 @@ export type ApplyLegacyMatchdayResultParams = LegacyMatchdayScopeParams & {
 export type PrepareLegacyMatchdayResultApplyResult = {
   source: LegacyMatchdayApplySource;
   preview: ReturnType<typeof buildLegacyMatchdayResolvePreview>;
+  /**
+   * Woher die gebuchten Zahlen stammen: `snapshot` = die Vorberechnung, die auch die Arena
+   * bucht; `live` = frisch gerechnet, weil keine gueltige Vorberechnung vorlag. Beide
+   * Buchungswege gehen durch dieselbe Auswahl (`resolveMatchdayPreviewToBook`).
+   */
+  previewSource: "snapshot" | "live";
   readinessByTeamId: Record<
     string,
     {
@@ -396,20 +403,20 @@ export async function prepareLegacyMatchdayResultApply(
       ? await loadAllContextsForPrisma(client, params, loader)
       : loadAllContextsForSqlite(params, persistence, localLoader));
   const contextLoadMs = elapsedSince(contextStartedAt);
-  if (source === "sqlite") {
-    const save = resolveLocalSave(persistence, params.saveId);
+  const localSave = source === "sqlite" ? resolveLocalSave(persistence, params.saveId) : null;
+  if (localSave) {
     // Idempotenz unter forceReplace: existiert bereits ein Ergebnis, trägt der Save die
     // NACH-Spieltags-Fatigue -> Roll-Map muss den Vor-Spieltags-Stand rekonstruieren, damit
     // die Injury-Performance-Multiplikatoren (und damit die Vorschau-Scores) beim Re-Apply
     // identisch zum ersten Apply bleiben.
-    const hasExistingResultForReplay = (save.gameState.seasonState.matchdayResults ?? []).some(
+    const hasExistingResultForReplay = (localSave.gameState.seasonState.matchdayResults ?? []).some(
       (result) =>
         result.saveId === params.saveId &&
         result.seasonId === params.seasonId &&
         result.matchdayId === params.matchdayId,
     );
     const injuryRollMap = buildMatchdayInjuryRollMap({
-      gameState: save.gameState,
+      gameState: localSave.gameState,
       saveId: params.saveId,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
@@ -418,7 +425,29 @@ export async function prepareLegacyMatchdayResultApply(
     attachMatchdayInjuryPerformanceToContexts(contexts, injuryRollMap);
   }
   const resolveStartedAt = performance.now();
-  const preview = options?.preloadedPreview ?? buildLegacyMatchdayResolvePreview(contexts, options?.resolveOptions);
+  /**
+   * EINE RECHENSTELLE FUER DEN SPIELTAG — die der Arena.
+   *
+   * Bis hierher rechnete dieser Pfad (Cockpit, `/api/resolve/legacy-matchday-apply`) beim
+   * Buchen frisch, waehrend der Arena-Weg (`matchday-auto-run-service`) die Vorberechnung
+   * buchte. Beide Wege stehen dem Spieler offen und lieferten fuer denselben Spieltag
+   * verschiedene Zahlen — gemessen am Live-Abbild bis 52,5 Punkte Score und 33 vertauschte
+   * Raenge auf 64 Zeilen (Belege in `resolveMatchdayPreviewToBook`).
+   *
+   * Jetzt fragen beide dieselbe Stelle. Gibt es keine gueltige Vorberechnung, faellt sie fuer
+   * beide gleichermassen auf das frisch gerechnete Ergebnis zurueck. Eine mitgelieferte
+   * `preloadedPreview` (Arena/Auto-Run, der die Auswahl schon getroffen hat) sticht wie bisher.
+   */
+  const livePreview = options?.preloadedPreview ?? buildLegacyMatchdayResolvePreview(contexts, options?.resolveOptions);
+  const previewToBook =
+    options?.preloadedPreview || !localSave
+      ? { preview: livePreview, source: "live" as const }
+      : resolveMatchdayPreviewToBook({
+          gameState: localSave.gameState,
+          scope: { saveId: params.saveId, seasonId: params.seasonId, matchdayId: params.matchdayId },
+          livePreview,
+        });
+  const preview = previewToBook.preview;
   const resolvePreviewMs = elapsedSince(resolveStartedAt);
 
   const readinessStartedAt = performance.now();
@@ -449,9 +478,9 @@ export async function prepareLegacyMatchdayResultApply(
 
   const existingStartedAt = performance.now();
   const existingResultId =
-    source === "sqlite"
+    localSave
       ? (
-          resolveLocalSave(persistence, params.saveId).gameState.seasonState.matchdayResults ?? []
+          localSave.gameState.seasonState.matchdayResults ?? []
         ).find(
           (result) =>
             result.saveId === params.saveId &&
@@ -483,6 +512,7 @@ export async function prepareLegacyMatchdayResultApply(
   return {
     source,
     preview,
+    previewSource: previewToBook.source,
     readinessByTeamId,
     writePayload,
     existingResultId,
@@ -844,6 +874,10 @@ export class LegacyMatchdayResultApplyService {
       gameState: injuryResult.gameState,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
+      // Wen die Teil-Buchung ausgelassen hat, den laesst auch die Trainings-Akkumulation aus:
+      // seine `player.fatigue` steht noch auf dem Vor-Spieltags-Wert, nicht auf reiner
+      // Match-Fatigue. Sonst schlaegt die Trainingsschicht bei ihm zweimal auf.
+      deferredPlayerIds: injuryResult.deferredPlayerIds,
     });
 
     const objectiveStartedAt = performance.now();

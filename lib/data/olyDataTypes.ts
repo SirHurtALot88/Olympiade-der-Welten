@@ -2496,6 +2496,28 @@ export type SeasonSnapshotTeamRecord = {
    * jetzt `cashEntry` zuerst und fallen auf `cashEnd` zurueck, wo es fehlt (Altsaves).
    */
   cashEntry?: number | null;
+  /**
+   * DER KONTOSTAND AN DER SAISONGRENZE — das Geld, das ein Team wirklich in die neue Saison
+   * mitgenommen hat. Eingefroren im `next_season_setup`, unmittelbar NACH der Vertragsalterung
+   * (`computeSeasonEndContractTick`) und BEVOR die neue Saison-ID gesetzt ist.
+   *
+   * WOZU EIN DRITTER CASH-WERT. Zwischen `cashEnd` (Ende der Saisonabrechnung, vor dem
+   * Transfermarkt — Chris' Regel) und `cashEntry` (nach den Kaeufen der Folgesaison) liegen
+   * Buchungen, die auf die ALTE Saison gebucht werden, aber erst beim Saisonwechsel stattfinden:
+   * die auslaufenden Vertraege. Ihr Ablösewert (`contract_exit`, `transferHistory` mit der ALTEN
+   * `seasonId`) landet auf `team.cash`, nachdem der Schnappschuss laengst steht.
+   *
+   * Gemessen am Live-Abbild `new-game-1785823388048-1hf25q`: 54 `ai_contract_expiry`-Abgaenge,
+   * zusammen +1085,24 C, gebucht 0,7 s NACH `createSeasonSnapshot`. Genau dieser Betrag war die
+   * Luecke, die `buildTransferFinanceAudit` als `cash_reconciliation_delta_hard` der FOLGE-Saison
+   * meldete (bis 112,9 C bei 19 von 32 Teams) — das Audit verankerte Saison N+1 auf `cashEnd`,
+   * und das ist nicht das Geld, mit dem das Team gestartet ist.
+   *
+   * `cashEnd` bleibt deshalb, was Chris will (Stand vor Marktoeffnung, das zeigt die Historie),
+   * und dieses Feld ist die Buchungsgrenze fuer den Abgleich. Write-once: einmal gesetzt, nie
+   * wieder angefasst.
+   */
+  cashCarryOver?: number | null;
   /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
   rosterEndPostSell?: number | null;
   rosterEnd: number;

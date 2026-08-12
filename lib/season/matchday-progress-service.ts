@@ -1,5 +1,6 @@
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -367,6 +368,30 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   // kippen: der Wechsel ist bereits persistiert, die Aufstellungen holt der naechste
   // Aufruf nach.
   if (prepared.nextMatchdayId) {
+    // DER TRAININGSMODUS STEHT, BEVOR IRGENDEINE VORSCHAU GERECHNET WIRD.
+    //
+    // Die Neubewertung der KI-Trainingsmodi (Fatigue-Schoner) lief frueher mitten im
+    // `matchday-auto-run-service` — also NACH der Vorschau, die die Arena dem Spieler
+    // gezeigt hatte, und direkt VOR dem Buchen. Genau die Bauart einer zweiten
+    // Rechenstelle: der Modus wanderte, die Moral wanderte mit (Trainingswunsch erfuellt
+    // oder nicht, siehe `training-mode-demand-service`), und der Moral-Multiplikator
+    // wanderte in den Score. GEMESSEN in der Fixture von
+    // `tests/matchday-auto-run-service.test.ts`: 280 von 320 gebuchten Spielerzeilen
+    // wichen von der gezeigten Vorschau ab, im Mittel um 0,16, maximal um 1,0 Punkte —
+    // Verletzte wie Gesunde gleichermassen.
+    //
+    // Hier ist der richtige Ort: der vorige Spieltag ist abgerechnet, seine Fatigue steht
+    // (das ist genau das Signal, auf das der Schoner schauen soll), und der neue Spieltag
+    // hat noch keine Aufstellung, keine Vorberechnung und keine gezeigte Zahl. Ab hier
+    // sehen KI-Aufstellung, Arena-Vorschau, Buchung und Fatigue-Akkumulation DENSELBEN
+    // Modus. Der Aufruf steht bewusst VOR dem Aufstellungs-Batch darunter, denn die
+    // Aufstell-/Schon-Entscheidung liest den Modus mit.
+    try {
+      reevaluateAiTrainingModesForMatchday({ saveId: save.saveId, persistence });
+    } catch {
+      // Ein Fehlschlag darf den Spieltagswechsel niemals kippen — der Wechsel ist
+      // bereits persistiert. Ohne Neubewertung bleibt der bisherige Modus stehen.
+    }
     try {
       // `persistence` MUSS durchgereicht werden: ohne zweites Argument faellt
       // applyAiLegacyLineupBatchLocally auf ihre eigene createPersistenceService()
