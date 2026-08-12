@@ -254,17 +254,57 @@ describe("chunked redraft topup service", () => {
     expect(themeScore.themeTier).toBe("avoid");
   });
 
+  /**
+   * BEFUND, heute nachgemessen (P1/Cluster 2, „inverser Contract, der FEUERT"):
+   *
+   * Alle Treffer dieses Verbots liegen in EINEM spaeter dazugekommenen Block —
+   * dem Minimum-Survival-Budget-Fallback (`lib/ai/chunked-redraft-topup-service.ts`,
+   * Z. 4085–4185, Warnung `minimum_survival_budget_fallback`). Gemessen:
+   *
+   *   Z. 4108  candidate.quality * 0.18    ← ECHTER Verstoss: positiver Qualitaets-Term
+   *   Z. 4112  candidate.marketValue * 1.65   (NEGATIV, Kostenterm)
+   *   Z. 4159  candidate.marketValue * 0.75   (NEGATIV, Kostenterm)
+   *   Z. 4091/4182  left.marketValue …        (Guenstigst-zuerst-Sortierung)
+   *
+   * Die drei letzten sind KEINE „Attraktivitaet nach Marktwert" — sie ziehen den Preis ab
+   * bzw. sortieren guenstigste zuerst; das Verbot als Zeichenketten-Suche kann das nicht
+   * unterscheiden. Deshalb sind sie hier ausdruecklich benannt statt stumm entfernt.
+   *
+   * Z. 4108 dagegen belohnt Qualitaet direkt und widerspricht der eigenen Protokollzeile des
+   * Dienstes (`qualitySafe=not_used_for_pick`, Z. 4969). Er entscheidet, welche Kandidaten in
+   * die Fallback-Auswahlliste kommen (`fallbackSource.sort(...).slice(0, fallbackLimit)`) —
+   * die endgueltige Reihung darunter (Z. 4153) kommt ohne Qualitaet aus.
+   *
+   * NICHT im Test „gruen gemacht": den Term zu streichen ist eine BALANCE-Aenderung am
+   * KI-Draft und braucht die Langlauf-Messung (die ihrerseits blockiert ist, s. Bericht).
+   * Der Fall geht als Befund an Chris; solange bleibt diese Zeile bewusst ROT.
+   */
   it("does not use OVR, MVS or market value as draft attractiveness score", () => {
     const serviceText = fs.readFileSync(path.join(process.cwd(), "lib/ai/chunked-redraft-topup-service.ts"), "utf8");
 
-    expect(serviceText).not.toContain("premiumSignal");
-    expect(serviceText).not.toContain("candidate.quality *");
-    expect(serviceText).not.toContain("input.candidate.quality *");
-    expect(serviceText).not.toContain("marketValue *");
-    expect(serviceText).not.toContain("right.quality");
-    expect(serviceText).not.toContain("left.marketValue");
-    expect(serviceText).not.toContain("candidateQuality: input.candidate.quality");
-    expect(serviceText).not.toContain("return roundValue(candidate.quality");
+    // Der Survival-Fallback wird HERAUSGESCHNITTEN, nicht das Verbot gelockert: seine
+    // Kostenterme sind benannt (Kopfkommentar), fuer den Rest der Datei gilt das Verbot
+    // unveraendert weiter. Die beiden Marken werden mitgeprueft, damit der Schnitt nicht
+    // eines Tages still die ganze Datei verschluckt.
+    const blockStart = serviceText.indexOf("const survivalCandidatePool =");
+    const blockEnd = serviceText.indexOf("teamWarnings.push(`minimum_survival_budget_fallback:");
+    expect(blockStart).toBeGreaterThan(0);
+    expect(blockEnd).toBeGreaterThan(blockStart);
+    const ohneSurvivalFallback = serviceText.slice(0, blockStart) + serviceText.slice(blockEnd);
+
+    expect(ohneSurvivalFallback).not.toContain("premiumSignal");
+    expect(ohneSurvivalFallback).not.toContain("right.quality");
+    expect(ohneSurvivalFallback).not.toContain("input.candidate.quality *");
+    expect(ohneSurvivalFallback).not.toContain("marketValue *");
+    expect(ohneSurvivalFallback).not.toContain("left.marketValue");
+    expect(ohneSurvivalFallback).not.toContain("candidateQuality: input.candidate.quality");
+    expect(ohneSurvivalFallback).not.toContain("return roundValue(candidate.quality");
+    expect(ohneSurvivalFallback).not.toContain("candidate.quality *");
+
+    // BLEIBT ROT (Befund oben): der Qualitaets-Term IM Fallback. Kein Test-Nachzug —
+    // die Reparatur ist eine Balance-Aenderung und braucht Chris' Entscheid.
+    const survivalFallback = serviceText.slice(blockStart, blockEnd);
+    expect(survivalFallback).not.toContain("candidate.quality *");
   });
 
   it("keeps draft score variance stable per save but different between fresh redraft saves", () => {

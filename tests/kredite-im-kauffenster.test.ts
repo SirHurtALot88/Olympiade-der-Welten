@@ -198,12 +198,21 @@ describe("Kauffenster der neuen Saison: die KI nimmt Kredite auf", () => {
      */
     expect(originateLoan).toHaveBeenCalledTimes(2);
     const markt = applyAiMarketPlanLocally.mock.invocationCallOrder[0]!;
-    const fuellung = runAutoRosterFillForMatchdaySetup.mock.invocationCallOrder[0]!;
+    /*
+     * NACHGEZOGEN: Anker war frueher der FUELL-LAUF. Diese Aussage gilt NACHWEISLICH nicht mehr —
+     * er ist per Eigentuemer-Entscheid aus dem Kauffenster entfernt (Commit 6a685998, „keine
+     * filler mehr! VERBOT"), der Mock lief nie und der Vergleich fiel mit „expected value must be
+     * number, received undefined". Der letzte KAUFENDE Schritt der Kette ist jetzt das
+     * Verletzungs-Topup; genau dort muss das geliehene Geld noch wirken koennen.
+     */
+    const letzterKauf = applyAiInjuryDepthTopup.mock.invocationCallOrder[0]!;
     // Erster Kredit vor dem Markt — sonst waere das geliehene Geld beim Kaufen nicht da.
     expect(originateLoan.mock.invocationCallOrder[0]!).toBeLessThan(markt);
-    // Zweiter zwischen Markt und Fuellung — danach kaeme das Geld zu spaet und waere reine Zinslast.
+    // Zweiter zwischen Markt und letztem Kauf — danach kaeme das Geld zu spaet und waere reine Zinslast.
     expect(originateLoan.mock.invocationCallOrder[1]!).toBeGreaterThan(markt);
-    expect(originateLoan.mock.invocationCallOrder[1]!).toBeLessThan(fuellung);
+    expect(originateLoan.mock.invocationCallOrder[1]!).toBeLessThan(letzterKauf);
+    // Und der Fuell-Lauf gehoert nicht mehr in diese Kette — meldet auch seine Rueckkehr.
+    expect(runAutoRosterFillForMatchdaySetup).not.toHaveBeenCalled();
   });
 
   it("schreibt den Kredit in den Spielstand, nicht nur ins Protokoll", async () => {

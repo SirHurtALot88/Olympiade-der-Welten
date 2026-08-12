@@ -14,7 +14,7 @@
  * (`standingsByTeamId`), nicht über einen eigenen Aufruf.
  */
 
-import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
+import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-source";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
 import {
@@ -57,13 +57,13 @@ export function resolveSeasonGuvPartsByTeam(
 ): Map<string, SeasonGuvParts> {
   const sponsorCash = options?.sponsorCashByTeamId ?? getSeasonSponsorCashByTeam(gameState);
   const salaryTotals = options?.salaryTotalByTeamId ?? buildSalaryTotalByTeam(gameState);
-  const objectiveSettlement = (() => {
-    try {
-      return buildTeamSeasonObjectiveSettlement(gameState).byTeamId;
-    } catch {
-      return {} as Record<string, { cashDelta?: number }>;
-    }
-  })();
+  // Vorstandsziele: BELEG vor Nachrechnung. Sobald die Ziele gebucht sind, trägt
+  // `objectiveRewardApplyLogs[].payload.cashDeltaByTeamId` genau die Aufteilung, mit der `team.cash`
+  // fortgeschrieben wurde. Vorher rechnete diese Stelle bei jedem Aufruf neu — und weil mehrere
+  // Ziele gegen den LEBENDEN Kontostand werten, wanderte die GuV-Zeile mit jeder späteren Buchung
+  // (am Abbild `1hf25q` gemessen: 5 von 32 Teams wichen vom Beleg ab, bis zu 4,0 C).
+  // Siehe `lib/board/objective-settlement-cash-source.ts`.
+  const objectiveCash = getObjectiveCashByTeam(gameState);
 
   // Apron EINMAL für die ganze Liga: die Abrechnung ist ein Umverteilungstopf, ein einzelnes Team
   // lässt sich daraus gar nicht isoliert rechnen.
@@ -98,7 +98,8 @@ export function resolveSeasonGuvPartsByTeam(
       apronFrozenLines: apron?.frozenLines ?? false,
       apronGedeckelt: apronRow?.gedeckelt ?? false,
       apronGebucht,
-      objectiveCashDelta: objectiveSettlement[team.teamId]?.cashDelta ?? 0,
+      objectiveCashDelta: objectiveCash.byTeamId.get(team.teamId) ?? 0,
+      boardzieleGebucht: objectiveCash.gebucht && objectiveCash.quelle === "beleg",
       salaryTotal: salaryTotals.get(team.teamId) ?? 0,
       loanInterest: loans.interest,
       loanPrincipal: loans.principal,
