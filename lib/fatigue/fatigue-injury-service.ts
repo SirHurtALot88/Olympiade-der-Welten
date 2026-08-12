@@ -805,6 +805,75 @@ function buildInjuryHighlight(event: InjuryEventRecord, playerName: string, matc
 }
 
 /**
+ * Bis zu welcher Disziplin-Seite hat ein FRUEHERER Apply dieses Spieltags die Ausdauer
+ * schon fortgeschrieben?
+ *
+ * Der Spielstand sagt es selbst: Fuer jeden eingesetzten (und verfuegbaren) Spieler legt
+ * `applyFatigueAndInjuryAfterMatchday` einen Verletzungswurf als `injuryEvent` ab, und die
+ * Events eines Spieltags werden bei jedem Commit komplett ersetzt. Wer also fuer diesen
+ * Spieltag ein Event hat, hat seine Belastung bereits aufgeschrieben bekommen.
+ *
+ * Traegt kein einziger Spieler, der NUR in D2 laeuft, ein Event, dann kam der bisherige
+ * Stand aus einem reinen D1-Commit — und nur dessen Belastung darf zurueckgenommen werden.
+ * Ohne Events (Alt-Spielstand, gekappte Historie) bleibt es beim bisherigen Verhalten
+ * „ganzer Spieltag".
+ */
+function getAlreadyAppliedMatchdaySide(
+  gameState: GameState,
+  seasonId: string,
+  matchdayId: string,
+): "d1" | "d2" {
+  const bookedKeys = new Set(
+    (gameState.seasonState.injuryEvents ?? [])
+      .filter((event) => event.seasonId === seasonId && event.matchdayId === matchdayId)
+      .map((event) => `${event.teamId}::${event.playerId}`),
+  );
+  if (bookedKeys.size === 0) {
+    return "d2";
+  }
+  const d1Keys = new Set(
+    collectMatchdayUses(gameState, seasonId, matchdayId, "d1").map((use) => `${use.teamId}::${use.playerId}`),
+  );
+  const d2OnlyKeys = collectMatchdayUses(gameState, seasonId, matchdayId, "d2")
+    .map((use) => `${use.teamId}::${use.playerId}`)
+    .filter((key) => !d1Keys.has(key));
+  return d2OnlyKeys.some((key) => bookedKeys.has(key)) ? "d2" : "d1";
+}
+
+/**
+ * Wer laeuft an diesem Spieltag noch, ist aber auf der schon gebuchten Seite nicht dabei?
+ *
+ * Sein Spieltag ist NICHT vorbei: Nach dem D1-Commit steht D2 noch aus. Erholung waere
+ * hier falsch (er hat sich nicht ausgeruht, er ist noch nicht gelaufen) und Belastung
+ * ebenso (die kommt mit seiner eigenen Disziplin). Er bleibt deshalb unangetastet, bis
+ * seine Seite gebucht wird — und braucht dann auch keine Ruecknahme.
+ *
+ * Nebenbei loest das die Klemmung an der Null: Ein frischer Spieler (Ausdauer 0) rutschte
+ * beim D1-Commit auf 0 (Erholung, geklemmt), und keine Ruecknahme der Welt kann daraus
+ * spaeter wieder seinen echten Ausgangswert machen.
+ */
+function collectPendingLaterSideKeys(
+  gameState: GameState,
+  seasonId: string,
+  matchdayId: string,
+  committedSide: "d1" | "d2",
+): Set<string> {
+  if (committedSide === "d2") {
+    return new Set<string>();
+  }
+  const committedKeys = new Set(
+    collectMatchdayUses(gameState, seasonId, matchdayId, committedSide).map(
+      (use) => `${use.teamId}::${use.playerId}`,
+    ),
+  );
+  return new Set(
+    collectMatchdayUses(gameState, seasonId, matchdayId, "d2")
+      .map((use) => `${use.teamId}::${use.playerId}`)
+      .filter((key) => !committedKeys.has(key)),
+  );
+}
+
+/**
  * Rekonstruiert den VOR-Spieltags-Stand der Fatigue (Ausdauer) je Spieler für einen
  * forceReplace-Re-Apply desselben Spieltags.
  *
@@ -835,11 +904,27 @@ function restorePreMatchdayAvailability(input: {
   }
   // Key -> intensity, so the inversion subtracts the SAME intensity-scaled load the first apply
   // added. Without this the replay would over/under-subtract and break idempotency.
+  //
+  // ENTSCHEIDEND IST DIE SEITE, DIE SCHON GEBUCHT IST — nicht der ganze Spieltag. Die Arena
+  // bucht je Disziplin: Der D1-Commit gibt NUR den D1-Spielern Belastung, alle uebrigen
+  // (auch die, die gleich in D2 laufen) bekommen Erholung. Der D2-Commit setzt danach auf
+  // den Vor-Spieltags-Stand zurueck. Nahm die Ruecknahme den ganzen Spieltag als Einsatz an,
+  // zog sie den D2-Spielern eine Last ab, die ihnen nie aufgeschrieben worden war — und
+  // ihre bereits abgezogene Erholung blieb zusaetzlich stehen. Ergebnis: Der D2-Spieler ging
+  // mit `F - Erholung` statt `F` in seinen Verletzungswurf, also rund 35-40 Ausdauerpunkte zu
+  // frisch. Unter der Schutzzone (Risiko 0 % bis 25) heisst das: kein Wurf trifft mehr, kein
+  // Same-Day-Malus, keine Verletzung. Im echten Spielstand exakt so gemessen: 1398 D2-Wuerfe,
+  // 0 Verletzungen, mittlere `fatigueBefore` 12,1 gegen 24,5 auf D1.
+  const appliedThroughSide = getAlreadyAppliedMatchdaySide(gameState, seasonId, matchdayId);
   const usedIntensityByKey = new Map<string, MatchdayIntensityStage>(
-    collectMatchdayUses(gameState, seasonId, matchdayId).map(
+    collectMatchdayUses(gameState, seasonId, matchdayId, appliedThroughSide).map(
       (use) => [`${use.teamId}::${use.playerId}`, use.intensity] as const,
     ),
   );
+  // Wer erst auf der NOCH OFFENEN Seite laeuft, wurde vom bisherigen Commit gar nicht
+  // angefasst (siehe `collectPendingLaterSideKeys`) — an ihm gibt es folglich auch nichts
+  // zurueckzunehmen.
+  const pendingLaterSideKeys = collectPendingLaterSideKeys(gameState, seasonId, matchdayId, appliedThroughSide);
 
   // Pass 1: Den einzigen Verletzungs-Status-Wechsel, den der Recovery-Loop an Spieltag N
   // vornimmt ("injured" -> "recovering", wenn `injuryUntilMatchday === matchdayId`),
@@ -886,6 +971,11 @@ function restorePreMatchdayAvailability(input: {
       // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet -> zurücknehmen.
       const intensity = usedIntensityByKey.get(useKey) ?? "normal";
       return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player, intensity)) };
+    }
+    if (pendingLaterSideKeys.has(useKey) && !view.isUnavailable) {
+      // Startet erst auf der offenen Seite: unangetastet stehen gelassen, also auch nichts
+      // zurueckzunehmen. Er steht bereits auf dem Vor-Spieltags-Wert.
+      return entry;
     }
     // Bank oder verletzt/unavailable: erster Apply hat Recovery abgezogen -> wieder aufaddieren.
     const recovery = calculatePlayerRecovery(gameState, entry.teamId, player.trainingMode);
@@ -934,6 +1024,16 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     input.commitThroughSide ?? "d2",
   );
   const usedPlayerKeys = new Set(usedPlayers.map((use) => `${use.teamId}::${use.playerId}`));
+  // Wer erst in der noch offenen Disziplin antritt, bleibt bei dieser Teil-Buchung komplett
+  // aussen vor: keine Last (die kommt mit seiner Seite) und KEINE Erholung (er hat sich nicht
+  // ausgeruht, er ist noch nicht gelaufen). So steht er beim naechsten Commit noch exakt auf
+  // seinem Vor-Spieltags-Wert, und sein Verletzungswurf findet auf der richtigen Ausdauer statt.
+  const pendingLaterSideKeys = collectPendingLaterSideKeys(
+    gameState,
+    input.seasonId,
+    input.matchdayId,
+    input.commitThroughSide ?? "d2",
+  );
   const nextMatchdayId = getNextMatchdayId(gameState, input.matchdayId);
   const injuryRollMap =
     input.precomputedInjuryRolls ??
@@ -965,6 +1065,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       { matchdayBookkeeping: true },
     );
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
+    if (pendingLaterSideKeys.has(usedKey) && !view.isUnavailable) continue;
     const recovery = calculatePlayerRecovery(gameState, roster.teamId, player.trainingMode);
     const currentFatigue = getPlayerCurrentFatigue(
       { ...gameState, players: nextPlayers, seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability } },

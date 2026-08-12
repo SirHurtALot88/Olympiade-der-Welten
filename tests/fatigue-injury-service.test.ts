@@ -507,6 +507,173 @@ describe("fatigue injury service", () => {
     expect(benchAvailability.blocker).toBeNull();
   });
 
+  /**
+   * DIE STAFFEL-BUCHUNG DER ARENA (erst D1, dann D2) DARF DEN D2-SPIELER NICHT VERJUENGEN.
+   *
+   * Der D1-Commit schreibt NUR den D1-Spielern Belastung auf; wer erst in D2 laeuft, gilt
+   * fuer ihn als „nicht im Einsatz" und bekommt Erholung abgezogen. Der D2-Commit setzt
+   * danach auf den Vor-Spieltags-Stand zurueck — nahm diese Ruecknahme aber den GANZEN
+   * Spieltag als Einsatz an, zog sie dem D2-Spieler zusaetzlich eine Last ab, die ihm nie
+   * gutgeschrieben worden war. Er ging mit `F - Erholung - Last + Last = F - Erholung` in
+   * seinen Verletzungswurf statt mit `F + Last`.
+   *
+   * Was der Spieler davon merkt: Der Wurf findet auf einem viel zu frischen Wert statt
+   * (hier: 42 statt 96), faellt deshalb „gesund" aus, und der Same-Day-Malus
+   * (INJURY_PERFORMANCE_MULTIPLIER) landet nie in der gebuchten Wertung — D2-Spieler
+   * konnten sich faktisch nicht verletzen und liefen mit vollen Punkten durch.
+   */
+  it("bucht D1 und D2 nacheinander mit demselben Ausdauer- und Verletzungsergebnis wie ein Komplett-Commit", () => {
+    const injuredCandidate = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+
+    function createStagedGameState(): GameState {
+      // d1-runner laeuft in D1, der Verletzungskandidat NUR in D2 — beide mit fatigue 80.
+      const gameState = createGameState("d1-runner", 80);
+      gameState.players.push({
+        id: injuredCandidate,
+        name: "D2 Runner",
+        className: "Runner",
+        race: "Human",
+        marketValue: 10,
+        salary: 2,
+        fatigue: 80,
+        attributes: {},
+        disciplineRatings: {},
+      } as never);
+      gameState.rosters.push({
+        teamId: "A-A",
+        playerId: injuredCandidate,
+        role: "core",
+        joinedSeasonId: "season-1",
+      } as never);
+      gameState.seasonState.lineupDrafts?.[0]?.entries.push({
+        disciplineId: "spurt",
+        disciplineSide: "d2",
+        slotIndex: 1,
+        playerId: injuredCandidate,
+        activePlayerId: `active-${injuredCandidate}`,
+      });
+      // Ein FRISCHER D2-Starter (Ausdauer 0) und ein Bankspieler: der frische deckt die
+      // Klemmung an der Null ab (eine abgezogene Erholung liesse sich dort nie wieder
+      // zurueckrechnen), der Bankspieler die unveraenderte Erholungsrechnung.
+      for (const [id, fatigueValue, side] of [
+        ["d2-fresh", 0, "d2"],
+        ["bench-0", 60, null],
+      ] as const) {
+        gameState.players.push({
+          id,
+          name: id,
+          className: "Runner",
+          race: "Human",
+          marketValue: 10,
+          salary: 2,
+          fatigue: fatigueValue,
+          attributes: {},
+          disciplineRatings: {},
+        } as never);
+        gameState.rosters.push({ teamId: "A-A", playerId: id, role: "bench", joinedSeasonId: "season-1" } as never);
+        if (side) {
+          gameState.seasonState.lineupDrafts?.[0]?.entries.push({
+            disciplineId: "spurt",
+            disciplineSide: side,
+            slotIndex: 2,
+            playerId: id,
+            activePlayerId: `active-${id}`,
+          });
+        }
+      }
+      // Wie im echten Spielstand: jeder Spieler traegt bereits einen Verfuegbarkeitssatz.
+      // Ohne ihn liefe die Ruecknahme ins Leere und der Fehler bliebe im Test unsichtbar.
+      gameState.seasonState.playerAvailabilityState = gameState.rosters.map((roster) => ({
+        playerId: roster.playerId,
+        teamId: roster.teamId,
+        fatigue: gameState.players.find((player) => player.id === roster.playerId)?.fatigue ?? 0,
+        injuryStatus: "healthy" as const,
+      }));
+      return gameState;
+    }
+
+    const applyParams = {
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    };
+    const load = MATCHDAY_FATIGUE_LOAD;
+
+    // (1) Komplett-Commit in einem Rutsch — der Massstab.
+    const full = applyFatigueAndInjuryAfterMatchday({ gameState: createStagedGameState(), ...applyParams });
+    const fullD2Event = full.injuryEvents.find((event) => event.playerId === injuredCandidate);
+    expect(fullD2Event?.fatigueBefore).toBe(80 + load);
+    expect(fullD2Event?.result).toBe("injured");
+
+    // (2) Dieselbe Buchung in zwei Schritten, wie die Arena sie ausfuehrt.
+    const stagedD1 = applyFatigueAndInjuryAfterMatchday({
+      gameState: createStagedGameState(),
+      ...applyParams,
+      commitThroughSide: "d1",
+    });
+    // Nach D1 steht der D2-Spieler unveraendert da: sein Spieltag hat noch nicht stattgefunden,
+    // also weder Last noch Erholung. (Vorher bekam er hier Erholung gutgeschrieben — genau die
+    // liess ihn spaeter zu frisch in seinen Verletzungswurf gehen.)
+    const d2AfterD1 = getPlayerAvailabilityView(stagedD1.gameState, injuredCandidate, "A-A", "md-1", {
+      matchdayBookkeeping: true,
+    }).fatigue;
+    expect(d2AfterD1).toBe(80);
+    // Der D1-Spieler dagegen traegt seine Last bereits.
+    expect(
+      getPlayerAvailabilityView(stagedD1.gameState, "d1-runner", "A-A", "md-1", { matchdayBookkeeping: true }).fatigue,
+    ).toBe(Math.min(100, 80 + load));
+
+    const stagedD2 = applyFatigueAndInjuryAfterMatchday({
+      gameState: stagedD1.gameState,
+      ...applyParams,
+      commitThroughSide: "d2",
+      isMatchdayReplay: true,
+    });
+
+    // Der Wurf des D2-Spielers steht auf dem Vor-Spieltags-Stand PLUS Last — nicht auf dem
+    // um die Erholung gesenkten Zwischenstand.
+    const stagedD2Event = stagedD2.injuryEvents.find((event) => event.playerId === injuredCandidate);
+    expect(stagedD2Event?.fatigueBefore).toBe(80 + load);
+    expect(stagedD2Event?.riskPercent).toBe(fullD2Event?.riskPercent);
+    expect(stagedD2Event?.roll).toBe(fullD2Event?.roll);
+    // ... und damit faellt er genauso aus wie im Komplett-Commit: verletzt, also mit Malus.
+    expect(stagedD2Event?.result).toBe("injured");
+
+    // Die Roll-Map, aus der die Wertung ihren Same-Day-Malus zieht, sagt dasselbe.
+    const stagedRollMap = buildMatchdayInjuryRollMap({
+      gameState: stagedD1.gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      isMatchdayReplay: true,
+    });
+    expect(stagedRollMap.get(`A-A::${injuredCandidate}`)?.fatigueBefore).toBe(80 + load);
+    expect(stagedRollMap.get(`A-A::${injuredCandidate}`)?.result).toBe("injured");
+
+    // Endstand der Ausdauer: gestaffelt wie am Stueck (kein F - Erholung, kein F + 2*Last).
+    for (const playerId of ["d1-runner", injuredCandidate, "d2-fresh", "bench-0"]) {
+      const staged = getPlayerAvailabilityView(stagedD2.gameState, playerId, "A-A", "md-1", {
+        matchdayBookkeeping: true,
+      }).fatigue;
+      const complete = getPlayerAvailabilityView(full.gameState, playerId, "A-A", "md-1", {
+        matchdayBookkeeping: true,
+      }).fatigue;
+      expect(staged, playerId).toBe(complete);
+    }
+    for (const playerId of ["d1-runner", injuredCandidate]) {
+      expect(
+        getPlayerAvailabilityView(stagedD2.gameState, playerId, "A-A", "md-1", { matchdayBookkeeping: true }).fatigue,
+      ).toBe(Math.min(100, 80 + load));
+    }
+    // Der frische D2-Starter kommt auf genau seine Spieltagslast — nicht auf „Last minus
+    // Erholung" und auch nicht auf einen aus der Null herbeigerechneten Wert.
+    expect(
+      getPlayerAvailabilityView(stagedD2.gameState, "d2-fresh", "A-A", "md-1", { matchdayBookkeeping: true }).fatigue,
+    ).toBe(load);
+  });
+
   it("is idempotent under a forceReplace re-apply of the same matchday for used and benched players", () => {
     // Vor-Spieltags-Stand: used-0 (Einsatz, fatigue 20), bench-0 (Bank, fatigue 60).
     const gameState = createGameState("used-0", 20);

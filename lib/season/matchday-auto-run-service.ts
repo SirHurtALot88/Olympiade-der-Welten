@@ -18,7 +18,7 @@ import {
   LegacyMatchdayResultApplyService,
   type LegacyMatchdayCommitThroughSide,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
-import { readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import {
@@ -821,10 +821,17 @@ export async function runLocalMatchdayAutoRun(
   // Ausgangsstand nicht exakt, und dieselbe Disziplin kam zweimal anders heraus.
   // Fehlt der Snapshot (Feld war unvollstaendig, Aufstellungen nachtraeglich
   // geaendert), bleibt es beim bisherigen Live-Ergebnis.
-  const resolveSnapshot = readMatchdayResolveSnapshot(postAiSave.gameState, scope);
-  const currentResolve: ResolvePreviewEnvelope = resolveSnapshot
-    ? { ...liveResolve, preview: resolveSnapshot.payload.preview }
-    : liveResolve;
+  //
+  // Die Auswahl selbst steht in `resolveMatchdayPreviewToBook` — und dort steht sie fuer
+  // BEIDE Buchungswege. Das Cockpit (`/api/resolve/legacy-matchday-apply`) ruft dieselbe
+  // Funktion, statt wie vorher beim Buchen eine zweite, eigene Rechnung zu fahren.
+  const previewToBook = resolveMatchdayPreviewToBook({
+    gameState: postAiSave.gameState,
+    scope,
+    livePreview: liveResolve.preview,
+  });
+  const currentResolve: ResolvePreviewEnvelope =
+    previewToBook.source === "snapshot" ? { ...liveResolve, preview: previewToBook.preview } : liveResolve;
   let activeResolve = currentResolve;
   let lineupSummary = buildDryRunLineupSummary({
     gameState: postAiSave.gameState,
