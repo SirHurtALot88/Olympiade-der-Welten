@@ -52,6 +52,11 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { SPONSOR_WERTUNGSTOPF, sponsorWertungsGewichte } from "@/lib/sponsor/sponsor-liga-leiter";
+import {
+  SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
+  getSeasonEconomyFactorWindow,
+  isBeforeSeasonEconomyFactorAdvance,
+} from "@/lib/season/season-economy-factors";
 
 export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
@@ -105,6 +110,34 @@ export function apronKonjunkturhebel(salaryFactor: number): number {
 }
 
 /**
+ * EIN LESER FÜR ALLE APRON-FAKTOREN — kein zweiter Nachbau des Fensters.
+ *
+ * Das Fenster (5 Saisons Vorausschau, deterministisch je Save) gehört `season-economy-factors.ts`;
+ * hier wird nur ein HORIZONT daraus gezogen. Der Zugriff läuft bewusst über
+ * `getSeasonEconomyFactorWindow` und sucht `horizonIndex` explizit statt über den Array-Index — die
+ * Reihenfolge im gespeicherten Zustand ist keine Zusage, die Normierung dort ist es.
+ *
+ * OHNE GESPEICHERTES FENSTER KEIN ERSATZWURF: `getSeasonEconomyFactorWindow` würfelt ein
+ * vollständiges Fenster nach, wenn keins (oder ein unvollständiges) im Spielstand steht. Für die
+ * Abgabe wäre das die falsche Antwort — der dokumentierte Apron-Fallback ist 1 (siehe unten), also
+ * eine gedämpfte Steuer, nicht ein zufälliger Konjunkturwert. Jeder geladene Spielstand trägt das
+ * Fenster ohnehin vollständig (`withSeededSeasonEconomyFactors`, save-repository.ts) — der Fall
+ * betrifft nur konstruierte Zustände.
+ */
+function readApronFactorHorizon(gameState: GameState, horizonIndex: number): number | null {
+  const gespeichert = gameState.seasonState?.seasonEconomyFactors ?? [];
+  if (gespeichert.length < SEASON_ECONOMY_FACTOR_WINDOW_SIZE) return null;
+  const seasonId = gameState.season?.id ?? "";
+  const window = getSeasonEconomyFactorWindow({
+    saveId: seasonId,
+    seasonId,
+    seasonState: gameState.seasonState,
+  });
+  const factor = window.find((entry) => entry.horizonIndex === horizonIndex)?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : null;
+}
+
+/**
  * Der Salary Factor der laufenden Saison — die Eingangsgröße des Hebels oben.
  *
  * Stand vorher wortgleich zweimal im Baum (`apron-settlement-service.ts`, `apron-projection.ts`); mit
@@ -112,10 +145,60 @@ export function apronKonjunkturhebel(salaryFactor: number): number {
  * MÜSSEN denselben Faktor lesen, sonst kauft die KI gegen eine andere Steuer, als am Saisonende
  * gebucht wird. Fallback 1, nicht 0: ein 0-Faktor machte die Abgabe unsichtbar statt sie nur zu
  * dämpfen.
+ *
+ * DIES IST DER FAKTOR DER ABRECHNUNG. Wer über eine KÜNFTIGE Saison entscheidet (verkaufen,
+ * verlängern), nimmt `resolveApronDecisionSalaryFactor` — siehe dort.
  */
 export function resolveApronSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState?.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+  return readApronFactorHorizon(gameState, 0) ?? 1;
+}
+
+/**
+ * Der Salary Factor der KOMMENDEN Saison (`horizonIndex 1`) — kein Schätzwert, ein bereits
+ * gewürfelter und dem Spieler auf den Sponsorkarten schon gezeigter Wert
+ * (`buildSponsorOfferTermForecast`).
+ *
+ * Fallback ist bewusst der AKTUELLE Faktor und nicht 1: fehlt der Horizont, ist „so wie jetzt" die
+ * ehrlichere Annahme als „neutrale Konjunktur" — 1 läge mitten in der Spanne 0,82–1,24 und würde
+ * eine Aussage erfinden, die der Spielstand nicht hergibt.
+ */
+export function resolveApronSalaryFactorForNextSeason(gameState: GameState): number {
+  return readApronFactorHorizon(gameState, 1) ?? resolveApronSalaryFactor(gameState);
+}
+
+/** Welcher Horizont hinter `resolveApronDecisionSalaryFactor` steckt — für Begründungstexte. */
+export type ApronDecisionSalaryFactor = {
+  factor: number;
+  /** 0 = laufende Saison, 1 = kommende Saison. */
+  horizonIndex: 0 | 1;
+};
+
+/**
+ * DER FAKTOR, GEGEN DEN EINE KADER-ENTSCHEIDUNG RECHNEN MUSS — gemessener Fehler, nicht Kosmetik.
+ *
+ * Verkäufe und Verlängerungen laufen in der Saisonende-Kette; das Faktor-Fenster rückt aber erst in
+ * deren letztem Schritt (`next_season_setup`) vor. Wer dort `resolveApronSalaryFactor` liest,
+ * bekommt den Faktor der ABGELAUFENEN Saison — während die Abgabe, die der Verkauf beeinflusst,
+ * erst in der NÄCHSTEN anfällt, deren Faktor im selben Fenster bereits steht.
+ *
+ * GEMESSEN am Abbild (Save `1hf25q`, Saison 2 abgerechnet, f=1,19 → k=0,83; nächste Saison f=0,87 →
+ * k=0): `buildApronAbbauZiel("Hell Raisers").reliefBisZiel` stand auf 9,67, real ist es 0,00. Die KI
+ * hätte Spieler verkauft, um eine Abgabe zu vermeiden, die es nachweislich nicht geben wird (drei
+ * kommende Saisons liegen mit 0,87/0,83/0,91 unter der k=0-Schwelle 0,95).
+ *
+ * AB DEM SAISONSTART GILT WIEDER `horizonIndex 0`: gekauft wird ausschliesslich in der neuen Saison
+ * vor ihrem ersten Spieltag (`isEarlySeasonTransferSetup`, transfer-window-policy.ts). Dort ist das
+ * Fenster bereits vorgerückt und die Abgabe, die der Zugang auslöst, fällt am Ende genau dieser
+ * Saison an — `horizonIndex 0` ist dann der richtige Wert und bleibt es.
+ *
+ * NUR EIN ZWEITER LESEHORIZONT DERSELBEN QUELLE, keine zweite Formel: die Abgabe rechnet weiter
+ * `apronLevyForSalary`, die Abrechnung weiter `resolveApronSalaryFactor`.
+ */
+export function resolveApronDecisionSalaryFactor(gameState: GameState): ApronDecisionSalaryFactor {
+  if (isBeforeSeasonEconomyFactorAdvance(gameState.gamePhase)) {
+    return { factor: resolveApronSalaryFactorForNextSeason(gameState), horizonIndex: 1 };
+  }
+  return { factor: resolveApronSalaryFactor(gameState), horizonIndex: 0 };
 }
 
 // ── Eingefrorene Linien ────────────────────────────────────────────────────────────────────────

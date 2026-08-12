@@ -983,13 +983,18 @@ function buildCandidate(
    * danach) — ohne die Jahreszahl im Satz liest sich die eben gezahlte Abgabe wie ein Verkaufsgrund,
    * den die KI ignoriert hat. Und „Schaetzung", weil gegen die Linien der ABGELAUFENEN Saison
    * gerechnet wird: die der naechsten frieren erst nach dem Kaderbau ein.
+   *
+   * DER BENUTZTE SALARY FACTOR STEHT IM SATZ. Er entscheidet ueber die Groessenordnung (unter 0,95
+   * ist die Abgabe null), und genau an dieser Stelle wurde vorher der Faktor der falschen Saison
+   * gelesen — ein Wert, den man im Text nennt, laesst sich gegen die Sponsorkarte pruefen.
    */
   const apronZiel = buildApronAbbauZiel(context.gameState, team.teamId);
   const apronRelief = apronReliefFuerGehalt(apronZiel, economy.expectedSalary);
   if (apronRelief > 0) {
+    const faktorSaison = apronZiel.salaryFactorHorizonIndex === 1 ? "naechste Saison" : "laufende Saison";
     pushSell(
       "apron_levy_relief",
-      `senkt die Apron-Abgabe der naechsten Saison um rund ${roundValue(apronRelief, 1)} (Schaetzung auf den Linien dieser Saison)`,
+      `senkt die Apron-Abgabe der naechsten Saison um rund ${roundValue(apronRelief, 1)} (Schaetzung auf den Linien dieser Saison, Salary Factor ${roundValue(apronZiel.salaryFactor, 2)} der ${faktorSaison})`,
     );
   }
 

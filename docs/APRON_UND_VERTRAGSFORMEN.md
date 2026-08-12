@@ -1,5 +1,11 @@
 # Apron und Vertragsformen — Messung und Plan (12.08.2026)
 
+> **Stand nach Chris' Entscheid (12.08., nachmittags):** (1) Apron-Bemessung wird auf das
+> verhandelte Gehalt umgestellt — „ja!" (Schritt 3 ist damit beauftragt, mit der verschärften
+> Bemessungsregel aus Abschnitt 6.0). (2) Die KI darf faktorschwache Saisons scharf ausnutzen —
+> „ja, wenn sie es hin bekommt" (Schritt 1 wie geplant). (3) Die Formwahl-Schwellen hat Chris an
+> Fable delegiert — Herleitung mit Messwerten in **Abschnitt 6**.
+
 Anlass (Chris, wörtlich): *„vllt kannst du dir mit fable das thema mit apron und vertraegen noch
 mal anschauen. dass teams versuchen gute vertraege zu verhandeln und zb je nach salary factors mal
 back loaded oder front loaded machen um die gehaelter auch zu managen. Weil apron vermeiden kann
@@ -216,10 +222,10 @@ Faktor. Die Begründungstexte der KI müssen den benutzten Faktor nennen.
 - Unit-Test mit konstruiertem GameState + gesetztem Fenster (`patternFactors`), damit der Pfad
   nicht nur beim Saisonwechsel läuft (Fehlerklasse „nur Saisonwechsel-Code, nie getestet").
 
-**Balance-Anteil (Chris entscheidet):** Mit dem Fix hält eine KI in k=0-Saisons bewusst teure
-Kader und baut erst vor Hoch-f-Saisons ab. Das ist dieselbe Information, die der Spieler auf den
-Sponsorkarten sieht — aber OB die KI so scharf timen soll (oder z. B. mit einem gedämpften
-Mittel aus window[1..3] rechnet), ist eine Spielgefühl-Frage, keine technische.
+**Balance-Anteil — ENTSCHIEDEN (Chris: „ja, wenn sie es hin bekommt"):** Die KI darf scharf
+timen — in k=0-Saisons bewusst teure Kader halten und erst vor Hoch-f-Saisons abbauen. Es ist
+dieselbe Information, die der Spieler auf den Sponsorkarten sieht. Kein gedämpftes Mittel,
+window[1] direkt.
 
 ### Schritt 2 — Formwahl mit Faktor-Vorausschau (Chris' Wunsch, korrekt eingeordnet)
 
@@ -247,26 +253,50 @@ Verweis auf die Bemessung (1.3), damit kein späterer Agent die Form „gegen di
 - Summen-Invariante: `Σ schedule == annualSalary × Laufzeit` exakt (gilt heute, darf nicht
   kippen).
 
-**Balance-Anteil (Chris entscheidet):** Ab welchem Faktor-Gefälle der Bias greift und wie stark
-er die Profil-Präferenzen übersteuert. Der gemessene Nutzen ist moderat (3–8,5 je Team und
-Saisongrenze bei voller Ausnutzung) — wenn Chris das den Aufwand nicht wert ist, ist Streichen
-dieses Schritts ein legitimes Ergebnis; Schritt 1 lohnt unabhängig davon.
+**Balance-Anteil — an Fable delegiert (Chris: „kann ich nicht abschätzen frag fable"):**
+Schwellen, Horizont, Vorrangordnung und Kontrollzahl sind in **Abschnitt 6** mit Messwerten
+hergeleitet und damit Teil des Bauauftrags.
 
-### Schritt 3 — NUR ALS ENTSCHEIDUNGSVORLAGE: Soll Verhandeln die Apron-Basis bewegen?
+### Schritt 3 — BEAUFTRAGT (Chris: „ja!"): Apron-Bemessung auf das verhandelte Gehalt
 
 Heute bemisst die Apron das Formel-Gehalt: ein Team, das seinen ganzen Kader 10 % unter Formel
 verhandelt, zahlt trotzdem die volle Abgabe (Beispiel Cold Steel, 1.3 — zahlt 3,18 bei echter
-Summe UNTER Linie 1). Das ist konsistent („Steuer auf Kaderqualität, nicht auf Buchhaltung"),
-aber es widerspricht Chris' Intuition, dass gute Verträge auch der Apron helfen.
+Summe UNTER Linie 1). Chris hat entschieden, das zu ändern: Verhandeln soll die Apron bewegen,
+die Vertragsform weiterhin **nicht** (sein eigener Zusatz: zwingend Laufzeit-Durchschnitt, nie
+Jahreszahlung; die Wächter-Invariante „Formwechsel ändert die Abgabe um 0,00" muss überleben).
 
-**Das ist eine reine Design-/Balance-Entscheidung.** Falls Chris die Bemessung ändern will, ist
-die einzig saubere Variante: Basis = `annualSalary` (verhandelter **Laufzeit-Durchschnitt**,
-`resolveRosterContractSalaries().annualSalary`), NICHT die Jahreszahlung — sonst wird die Form
-doch zum Apron-Gaming-Werkzeug und die dokumentierte Anti-Gaming-Entscheidung fällt unbemerkt.
-**Invariante dann:** Formwechsel-Experiment (Schritt 0b) muss weiterhin Delta 0,00 liefern;
-Cold Steel würde zum Empfänger, Mayhem zahlte mehr — beides vorab als Vorher/Nachher-Tabelle
-über alle 32 Teams vorlegen, nicht einfach umstellen. **Ohne Chris' ausdrücklichen Entscheid
-wird hier nichts gebaut.**
+**⚠ Die naheliegende Umsetzung ist FALSCH — vorab gemessen und durchgerechnet:**
+`resolveRosterContractSalaries().annualSalary` sieht aus wie der Laufzeit-Durchschnitt, ist es
+aber nur bei Unterschrift. `advanceRosterContractSchedule`
+(`contract-renewal-service.ts:186–203`) überschreibt `entry.salary` bei jedem Saisonwechsel mit
+der Jahr-1-Zahlung der Rest-Schedule, und `annualSalary` bevorzugt genau dieses Feld
+(`player-economy-contract.ts:59–63`, `storedSalary ?? scheduleAverage`). Ein Jahr nach
+Unterschrift ist `annualSalary` eines geformten Vertrags also die **formabhängige Jahreszahlung**
+— das Schlupfloch wäre wieder offen. Auch der Durchschnitt der **Rest**-Schedule ist nicht
+form-immun: ein 3-Jahres-front_loaded (1,2/1,0/0,8) hätte über die Laufzeit die Basen 1,0a /
+0,9a / 0,8a = Σ 2,7a, balanced dagegen 3,0a — Front-Loading senkte die Steuersumme um 10 %.
+
+**Die einzig saubere Basis ist das bei Unterschrift verhandelte Jahres-Benchmark, persistiert.**
+`RosterEntry` trägt heute kein solches Feld (geprüft: nur `salary` + `yearlySalarySchedule`) —
+es muss neu geschrieben werden (`negotiatedAnnualSalary` o. ä.), und zwar an **jedem**
+Unterschriftspfad: Renewal, Transferkauf, Draft/Erstbestückung. Migration für Bestandsverträge:
+Durchschnitt der Rest-Schedule (exakt für balanced und frische Verträge; für mittendrin
+geformte die bestmögliche Näherung — Anzahl der Betroffenen vorab am Abbild zählen und
+ausweisen). Fehlerklassen-Wachen: „Feld, das niemand schreibt" ist hier die Hauptgefahr — je
+Unterschriftspfad ein Wert-Test, dass das Feld gesetzt ist (am Abbild: 0 Verträge ohne Feld nach
+Migration).
+
+**Invarianten:**
+- Formwechsel-Experiment (Schritt 0b) liefert weiterhin Delta 0,00 — **zusätzlich auch nach
+  einem simulierten Saisonwechsel** (`advanceRosterContractSchedule` auf der Wegwerf-Kopie,
+  dann erneut flippen und abrechnen). Ohne diese Verschärfung bliebe die Jahr-1-Falle unentdeckt.
+- Vorher/Nachher-Tabelle der Abgaben/Ausgleiche über alle 32 Teams beider Saves an Chris, bevor
+  produktiv umgestellt wird (erwartete Richtung, gemessen an 1.3: Cold Steel wird vom Zahler
+  (3,18) zum Empfänger; Mayhem Mavericks zahlt auf Basis ~107,7 statt 94,1 spürbar mehr).
+- Ligasumme der Abrechnung bleibt 0,00 (der Topf verteilt nur um — unabhängig von der Basis).
+- Reihenfolge-Hinweis: Schritt 3 ändert die Grundlage, auf der Schritt 1 rechnet — erst
+  Schritt 1 (Horizont), dann Schritt 3 (Basis), sonst misst man den Horizont-Fix gegen eine
+  Basis, die sich gleich darauf ändert.
 
 ### Was ausdrücklich NICHT gebaut wird
 

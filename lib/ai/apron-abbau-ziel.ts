@@ -24,13 +24,22 @@
  * `hasSeasonBeenPlayed`). Der Fehler dieser Schätzung ist einseitig: steigen die Linien, war der
  * Abbau zu grosszügig. Er ist aber durch die Decke gedeckelt (grösster Fall im Save: 7,3) und durch
  * die Bagatellgrenze unten weiter gedämpft. Brauchbar als obere Schranke, nicht als Punktschätzung.
+ *
+ * DER FAKTOR IST ES NICHT — und war hier ein echter Fehler. Anders als die Linien ist der Salary
+ * Factor der nächsten Saison zum Verkaufszeitpunkt BEKANNT (Fenster mit 5 Saisons Vorausschau, dem
+ * Spieler auf den Sponsorkarten längst gezeigt). Gelesen wurde trotzdem der Faktor der abgelaufenen
+ * Saison, weil das Fenster erst im letzten Schritt der Saisonende-Kette vorrückt. Gemessen am Abbild
+ * (`1hf25q`): `reliefBisZiel` von Hell Raisers stand auf 9,67, real 0,00 — die kommende Saison liegt
+ * mit f=0,87 unter der k=0-Schwelle, die Abgabe, gegen die verkauft wurde, gibt es gar nicht. Seit
+ * der Reparatur kommt der Faktor aus `resolveApronDecisionSalaryFactor` (derselbe Fenster-Leser,
+ * nur der richtige Horizont). Ein Schätzfehler bleiben die LINIEN, nicht mehr der Faktor.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolveTeamApronSalaryCeiling } from "@/lib/ai/ai-cash-salary-target-service";
 import {
   apronLevyForSalary,
   getTeamApronSalaryBase,
-  resolveApronSalaryFactor,
+  resolveApronDecisionSalaryFactor,
   resolveSeasonApronLines,
 } from "@/lib/season/apron-service";
 
@@ -71,7 +80,13 @@ export type ApronAbbauZiel = {
   reliefBisZiel: number;
   line1: number;
   line2: number;
+  /** Der Faktor, gegen den gerechnet wurde — der der Saison, die der Abbau trifft. */
   salaryFactor: number;
+  /**
+   * Welcher Horizont das war: 1 = kommende Saison (Regelfall in der Saisonende-Kette), 0 = laufende.
+   * Gehört in die Begründungstexte, damit der ausgewiesene Nutzen nachprüfbar bleibt.
+   */
+  salaryFactorHorizonIndex: 0 | 1;
 };
 
 function round2(value: number): number {
@@ -92,7 +107,8 @@ function round2(value: number): number {
  */
 export function buildApronAbbauZiel(gameState: GameState, teamId: string): ApronAbbauZiel {
   const lines = resolveSeasonApronLines(gameState);
-  const salaryFactor = resolveApronSalaryFactor(gameState);
+  const { factor: salaryFactor, horizonIndex: salaryFactorHorizonIndex } =
+    resolveApronDecisionSalaryFactor(gameState);
   const basis = getTeamApronSalaryBase(gameState, teamId);
   const decke = resolveTeamApronSalaryCeiling(gameState, teamId);
   // Nur wer die 1. Linie als Decke hat, steht vor der Empfängerklippe.
@@ -111,6 +127,7 @@ export function buildApronAbbauZiel(gameState: GameState, teamId: string): Apron
     line1: lines.line1,
     line2: lines.line2,
     salaryFactor,
+    salaryFactorHorizonIndex,
   };
 }
 

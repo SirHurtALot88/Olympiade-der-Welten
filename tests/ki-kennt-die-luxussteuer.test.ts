@@ -70,14 +70,32 @@ describe("Die eine Abgaben-Formel", () => {
 });
 
 describe("Der Salary Factor kommt aus einer Quelle", () => {
+  /**
+   * VOLLSTÄNDIGES Fenster, weil `resolveApronSalaryFactor` seit der Horizont-Reparatur über
+   * `getSeasonEconomyFactorWindow` liest (eine Quelle, siehe apron-service.ts). Jeder geladene
+   * Spielstand trägt genau so ein Fenster (`withSeededSeasonEconomyFactors`, save-repository.ts) —
+   * die frühere Zweier-Attrappe war die Ausnahme, nicht der Normalfall.
+   */
+  function fenster(faktoren: number[]) {
+    return {
+      season: { id: "season-2" },
+      seasonState: {
+        seasonEconomyFactors: faktoren.map((factor, horizonIndex) => ({
+          seasonId: "season-2",
+          horizonIndex,
+          factor,
+        })),
+      },
+    } as never;
+  }
+
   it("liest den laufenden Faktor aus dem Saison-Fenster", () => {
-    const gs = { seasonState: { seasonEconomyFactors: [{ factor: 1.19 }, { factor: 0.87 }] } } as never;
-    expect(resolveApronSalaryFactor(gs)).toBe(1.19);
+    expect(resolveApronSalaryFactor(fenster([1.19, 0.87, 0.83, 0.91, 1.24]))).toBe(1.19);
   });
 
   it("fällt auf 1 zurück, nicht auf 0 — sonst wäre die Steuer für die KI unsichtbar", () => {
     expect(resolveApronSalaryFactor({ seasonState: {} } as never)).toBe(1);
-    expect(resolveApronSalaryFactor({ seasonState: { seasonEconomyFactors: [{ factor: 0 }] } } as never)).toBe(1);
+    expect(resolveApronSalaryFactor(fenster([0, 0.87, 0.83, 0.91, 1.24]))).toBe(1);
   });
 
   it("steht nicht mehr dreimal im Baum", () => {

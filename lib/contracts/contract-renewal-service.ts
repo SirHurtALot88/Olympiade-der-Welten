@@ -22,7 +22,10 @@ import {
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
-import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import {
+  getSeasonEconomyFactorWindow,
+  isBeforeSeasonEconomyFactorAdvance,
+} from "@/lib/season/season-economy-factors";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -595,12 +598,7 @@ function buildAiRenewalCashGate(input: {
   const cashPriority = bias?.cashPriority ?? 5;
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
   const identityFinances = identity?.finances ?? 5;
-  const salaryFactorCurrent =
-    getSeasonEconomyFactorWindow({
-      saveId: input.gameState.season.id,
-      seasonId: input.gameState.season.id,
-      seasonState: input.gameState.seasonState,
-    })[0]?.factor ?? 1;
+  const salaryFactorCurrent = readSeasonSalaryFactors(input.gameState)[0] ?? 1;
   const salaryIncrease = Math.max(0, (input.renewalSalary ?? input.currentSalary) - input.currentSalary);
   const baseReserve = 3 + salaryTotal * 0.08;
   const strategyReserve =
@@ -623,13 +621,103 @@ function buildAiRenewalCashGate(input: {
   };
 }
 
-function chooseAiRenewalContractShape(input: {
+/**
+ * DAS SALARY-FACTOR-FENSTER — ein Leser fuer diese Datei, eine Quelle fuer den ganzen Baum.
+ *
+ * `getSeasonEconomyFactorWindow` ist die einzige Stelle, die das Fenster kennt; hier wird es nur
+ * auf die nackten Faktoren (horizonIndex 0..4) heruntergebrochen. Kein zweiter Nachbau, kein
+ * direkter Griff in `seasonState.seasonEconomyFactors`.
+ */
+function readSeasonSalaryFactors(gameState: GameState): number[] {
+  return getSeasonEconomyFactorWindow({
+    saveId: gameState.season.id,
+    seasonId: gameState.season.id,
+    seasonState: gameState.seasonState,
+  })
+    .slice()
+    .sort((left, right) => left.horizonIndex - right.horizonIndex)
+    .map((entry) => entry.factor);
+}
+
+/**
+ * DIE FAKTOREN DER SAISONS, DIE DIESER VERTRAG BEZAHLT — Jahr 1 zuerst.
+ *
+ * Verlaengert wird in der Saisonende-Kette; das Faktor-Fenster rueckt erst in deren letztem Schritt
+ * vor (`next_season_setup`). Jahr 1 des neuen Vertrags ist dann `horizonIndex 1`, nicht 0 — genau
+ * dieselbe Verschiebung wie beim Apron (siehe `resolveApronDecisionSalaryFactor`). Laeuft die
+ * Bewertung dagegen in einer bereits gestarteten Saison, ist Jahr 1 der Horizont 0.
+ *
+ * Reicht das Fenster nicht ueber die volle Laufzeit (Vertrag laenger als die Vorausschau), wird
+ * NICHT extrapoliert: die vorhandenen Jahre entscheiden, der Rest bleibt unbekannt.
+ */
+function resolveContractTermSalaryFactors(gameState: GameState, contractLength: number): number[] {
+  const window = readSeasonSalaryFactors(gameState);
+  const offset = isBeforeSeasonEconomyFactorAdvance(gameState.gamePhase) ? 1 : 0;
+  return window.slice(offset, offset + Math.max(0, contractLength));
+}
+
+/**
+ * Ab diesem Gefaelle im Faktor-Fenster kippt die Vertragsform. Gemessen an der Spanne des Faktors
+ * (0,82–1,24, also 0,42 breit) ist 0,10 rund ein Viertel davon — klein genug, dass ein echter
+ * Konjunkturbogen greift, gross genug, dass Wuerfelrauschen zweier benachbarter Saisons es nicht
+ * ausloest. BALANCE-REGLER: Chris entscheidet, ob der Bias frueher oder spaeter greifen soll.
+ */
+export const AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE = 0.1;
+
+/**
+ * Faktor-Gefaelle ueber die Vertragslaufzeit: Mittel der frueheren Jahre minus Mittel der spaeteren.
+ * Positiv = die Einnahmen fallen im Verlauf des Vertrags, negativ = sie steigen.
+ *
+ * Bei ungerader Laufzeit gehoert das Mitteljahr zu KEINER Haelfte — es traegt nichts zum Gefaelle
+ * bei und wuerde beide Mittelwerte nur gleichsinnig verschieben.
+ */
+function resolveSalaryFactorGefaelle(factors: readonly number[]): number {
+  if (factors.length < 2) return 0;
+  const half = Math.floor(factors.length / 2);
+  const frueh = factors.slice(0, half);
+  const spaet = factors.slice(factors.length - half);
+  const mittel = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  return mittel(frueh) - mittel(spaet);
+}
+
+/**
+ * DIE VERTRAGSFORM EINER KI-VERLAENGERUNG.
+ *
+ * DIE APRON HAT HIER NICHTS ZU SUCHEN — nachgemessen, nicht vermutet: die Apron bemisst das
+ * GEGLAETTETE Formel-Gehalt (`contract.expectedSalary`, siehe Kopfkommentar von
+ * `lib/season/apron-service.ts`), nicht die Jahreszahlung. Ein Experiment am Spielstand hat die
+ * zehn mehrjaehrigen Vertraege des groessten Zahlers auf `front_loaded` gestellt: die echte
+ * Jahr-1-Gehaltssumme stieg um 10,5, die Apron-Abgabe aenderte sich um EXAKT 0,00. Wer hier eine
+ * Regel „Form gegen die Apron" einbaut, baut eine Regel ohne Wirkung — und bricht die
+ * Anti-Gaming-Entscheidung, die genau das verhindern soll. Ein Waechter-Test haelt die 0,00 fest.
+ *
+ * WAS DIE FORM WIRKLICH BEWEGT, IST CASH-TIMING. Gehaltszahlungen skalieren NICHT mit dem Salary
+ * Factor (es gibt keinen `salaryFactor` in `lib/player-formulas/`, abgebucht wird die nominale
+ * Schedule-Summe), die EINNAHMEN aber schon (Wertungstopf = 1133 × f, im Ligamittel rund ±12 je
+ * Team zwischen f=0,83 und f=1,19). Faellt das Fenster ueber die Laufzeit, ist frueh zahlen
+ * guenstiger; steigt es, spaeter. Die Form verschiebt real 10/20/30 % des Jahresgehalts bei 2/3/4
+ * Jahren Laufzeit.
+ *
+ * DER NUTZEN IST MODERAT und das ist so gemessen (3–8,5 je Team und Saisongrenze bei voller
+ * Ausnutzung) — deshalb steht die Regel GANZ HINTEN: sie fuellt nur die Faelle, in denen die
+ * Kassenlogik ohnehin `balanced` gesagt haette, und uebersteuert keine der bestehenden Regeln.
+ *
+ * LIQUIDITAET SCHLAEGT KONJUNKTUR: `front_loaded` bleibt einem Team verwehrt, dessen Kasse JETZT
+ * klemmt (`tightNow`). `back_loaded` ist dagegen auch fuer ein klammes Team unbedenklich — es
+ * entlastet das erste Jahr.
+ *
+ * Exportiert, weil die Regel sonst nur beim Saisonwechsel liefe und von keinem Test beruehrt wuerde
+ * — genau die Fehlerklasse, die im Apron-Horizont schon einmal zugeschlagen hat.
+ */
+export function chooseAiRenewalContractShape(input: {
   team: Team | null;
   entry: RosterEntry;
   recommendedLength: number;
   renewalSalary: number | null;
   cashGate: ReturnType<typeof buildAiRenewalCashGate>;
   profile: TeamStrategyProfile | null;
+  /** Faktoren der Saisons, die dieser Vertrag bezahlt (Jahr 1 zuerst). Fehlt/zu kurz = keine Vorausschau. */
+  termSalaryFactors?: readonly number[];
 }): ContractShape {
   if (input.recommendedLength <= 1) return "balanced";
 
@@ -655,6 +743,12 @@ function chooseAiRenewalContractShape(input: {
   if (strongCashBuffer && futureReliefProfile) return "front_loaded";
   if (cashPriority >= 8 && !strongCashBuffer) return "back_loaded";
   if (wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10) return "front_loaded";
+
+  // Konjunktur-Vorausschau, siehe Kopfkommentar: nur noch der Fall, den die Kassenregeln offen
+  // gelassen haben. Ohne nennenswertes Gefaelle bleibt es beim bisherigen `balanced`.
+  const gefaelle = resolveSalaryFactorGefaelle(input.termSalaryFactors ?? []);
+  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && !tightNow) return "front_loaded";
+  if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) return "back_loaded";
   return "balanced";
 }
 
@@ -864,6 +958,7 @@ function buildPreviewRow(input: {
           renewalSalary: moraleAdjustedRenewalSalary,
           cashGate: renewalCashGate,
           profile: teamStrategyProfile,
+          termSalaryFactors: resolveContractTermSalaryFactors(save.gameState, recommendedLength),
         })
       : "balanced";
   const marketValueForBad =
