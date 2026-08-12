@@ -1,5 +1,27 @@
 # Apron und Vertragsformen — Messung und Plan (12.08.2026)
 
+> **GEBAUT (12.08., abends) — Schritt 2 und Schritt 3 stehen im Code.** Beide Abnahmen sind
+> gemessen; **eine Abweichung ist offen und wird NICHT durch Drehen an Zahlen zugedeckt:**
+>
+> - **Schritt 2 (Formwahl):** Schwelle 0,15 als benannte Konstante, Gefälle = Endhälfte minus
+>   Anfangshälfte, alle Vertragsjahre voll gewichtet, Rangfolge Kassenklemme > Faktor > Profil.
+>   Abnahme an `1hf25q`: **14 von 216, ausschließlich Laufzeit ≥ 4, alle → `back_loaded`** — exakt
+>   Fables Vorhersage. Flaches Fenster: **0 Flips**, wie gefordert.
+> - **⚠ ABWEICHUNG an `0kalpx`: gemessen 0 von 46 statt der vorhergesagten 1 von 46.** Ursache
+>   eindeutig lokalisiert, es ist kein Schwellenproblem: Abschnitt 5 B schreibt für Vertragsjahre
+>   JENSEITS des Fensters *„das Mittel der bekannten Jahre"* vor, Fables Mess-Skript füllte
+>   stattdessen den LETZTEN bekannten Faktor fort (`f[i+1] ?? f[f.length-1]`). Bei `0kalpx`
+>   (Fenster [1,12 · 1,03 · 1,05 · 1,02 · 1,21]) entscheidet genau das über den einen
+>   Fünfjahresvertrag: Mittel-Füllung ⇒ Δ = +0,10 (unter der Schwelle, kein Flip), Letztwert-Füllung
+>   ⇒ Δ = +0,17 (Flip). An `1hf25q` sind beide Füllungen deckungsgleich (14/216). Gebaut ist die
+>   **im Dokument beschriebene Mittel-Füllung** — sie ist die neutrale, sie erfindet kein Gefälle.
+>   Wer die 1/46 will, ändert eine Zeile in `resolveContractTermSalaryFactors`; **das ist eine
+>   Entscheidung, keine Reparatur.**
+> - **Schritt 3 (Bemessung):** neues, persistiertes Feld `RosterEntry.negotiatedAnnualSalary`,
+>   geschrieben an jedem Unterschriftspfad, mit Lade-Backfill für Bestandsverträge. Der Wächter
+>   („Formwechsel ändert die Abgabe um 0,00") läuft jetzt **auch nach ein und nach zwei simulierten
+>   Saisonwechseln**. Liga-Wirkung siehe Abschnitt 7.
+
 > **Stand nach Chris' Entscheid (12.08., nachmittags):** (1) Apron-Bemessung wird auf das
 > verhandelte Gehalt umgestellt — „ja!" (Schritt 3 ist damit beauftragt, mit der dort
 > verschärften Bemessungsregel). (2) Die KI darf faktorschwache Saisons scharf ausnutzen —
@@ -469,3 +491,49 @@ Flip-Quote, und nicht durch Drehen der Schwelle, bis die Kontrollzahl passt.
 6. **Bau-Reihenfolge:** Schritt 0 (Messgrundlage) → Schritt 1 (Faktor-Horizont) → Schritt 2
    (Formwahl) → Schritt 3 (Bemessungsumstellung, ändert die Grundlage von Schritt 1 — deshalb
    zuletzt, mit Vorher/Nachher-Tabelle an Chris vor dem Produktivgang).
+
+---
+
+## 7. Was die Bemessungsumstellung an der Liga ändert — gemessen (12.08., abends)
+
+Abbild vom 12.08., 08:43 UTC. **Vorher** = Formel-Gehalt (`getTeamDisplaySalaryTotal`),
+**nachher** = verhandeltes Jahresgehalt (`getTeamNegotiatedSalaryTotal`). In beiden Läufen bilden
+**Linien UND Basis dieselbe Größe** — die Linien sind der Median genau der Zahl, gegen die
+verglichen wird; ein gemischter Vergleich wäre wertlos.
+
+| | `1hf25q` (f=1,19) | `0kalpx` (f=1,12) |
+|---|---|---|
+| Median vorher → nachher | 69,8 → **64,5** | 65,2 → **66,1** |
+| 1. Linie vorher → nachher | 76,8 → **71,0** | 71,7 → **72,7** |
+| Zahler vorher → nachher | 8 → **9** | 11 → **10** |
+| Topf vorher → nachher | 50,71 → **96,93** | 38,22 → **72,22** |
+| Ausgleich je Empfänger | 2,11 → **4,21** | 1,91 → **3,28** |
+| Ligasumme | 0,00 → **0,00** | 0,00 → **0,00** |
+
+**Die Abgabe verdoppelt sich fast** (+91 % bzw. +89 %) — das ist die eigentliche Nachricht und
+KEINE Nebenwirkung des Umbaus im engeren Sinn, sondern die Folge davon, dass die verhandelten
+Gehälter **weiter streuen** als die geglätteten Formel-Gehälter: der Median fällt (`1hf25q`
+69,8 → 64,5), die Spitzenzahler bleiben oben (Mayhem 94,1 → 99,1), also stehen mehr Teams weiter
+über der Linie. Wer das nicht will, dreht an den Linienfaktoren (1,10 / 1,25) oder den Sätzen
+(0,8 / 1,6) — **nicht** an der Bemessung.
+
+**Linien-Kipper `1hf25q` (6 von 32):** Zero Heroes L1 → **L2**; Nunchuck Ninjas, Wrecking
+Legionnaires, Terrible Teachers je **– → L1** (neue Zahler); **Cold Steel L1 → –** und **Silver
+Soldiers L1 → –** (vom Zahler zum Empfänger).
+
+**Der dokumentierte Sonderfall ist weg.** Vorher zahlten DREI Teams, obwohl ihre echte
+Gehaltssumme unter der 1. Linie (76,8) lag: Cold Steel (63,6 → Abgabe 3,18), Silver Soldiers
+(64,4 → 1,46), Last Ride (74,7 → 4,44). Nachher: **keiner** — Cold Steel und Silver Soldiers sind
+Empfänger (+4,21), Last Ride bleibt Zahler, liegt jetzt aber mit verhandelten 75,7 auch wirklich
+über der neuen Linie (71,0). Die Umstellung repariert also genau das Paradox, das sie sollte.
+
+Eine Korrektur zur Erwartung aus Schritt 3: dort stand, Mayhem werde „auf Basis ~107,7 statt 94,1"
+besteuert. **107,7 ist die Jahr-1-Zahlung**, nicht die Bemessungsgrundlage — die richtige Zahl ist
+das verhandelte Jahresgehalt **99,1**. Wäre 107,7 die Basis, wäre genau das Schlupfloch offen, das
+die Wächter-Invariante verhindert.
+
+**Migration, gezählt am Abbild:** 683 Verträge (340 + 343), **kein einziger** trug das Feld vorher.
+681 bekommen es aus dem Schedule-Durchschnitt, 2 aus `salary` (Verträge ohne Schedule). Von den 399
+geformten Verträgen sind **nur 6** überhaupt „mittendrin geformt" (Schedule-Mittel ≠ `salary`, alle
+in `1hf25q`) — nur dort ist der nachgetragene Wert eine Näherung statt exakt. Nach dem Backfill
+haben **0 Verträge** kein Feld.

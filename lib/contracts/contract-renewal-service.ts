@@ -186,7 +186,20 @@ function statusAfterSeasonTick(entry: RosterEntry): { nextLength: number; nextSt
   return { nextLength, nextStatus: "active" };
 }
 
-function advanceRosterContractSchedule(entry: RosterEntry, nextLength: number): Pick<RosterEntry, "salary" | "upkeep" | "yearlySalarySchedule"> {
+/**
+ * EIN SAISONWECHSEL FUER EINEN VERTRAG: die Schedule rueckt um ein Jahr vor, `salary` wird mit der
+ * neuen Jahr-1-Rate UEBERSCHRIEBEN.
+ *
+ * Genau dieses Ueberschreiben ist die Falle, die die Apron-Bemessung nicht beruehren darf: bei
+ * einem front_loaded-Vertrag ist `salary` nach dem ersten Saisonwechsel kleiner als das verhandelte
+ * Jahresgehalt. `negotiatedAnnualSalary` steht NICHT im Rueckgabetyp und wird deshalb vom Spread
+ * `{ ...entry, ...scheduleUpdate }` nicht angefasst — das ist beabsichtigt und der Grund, warum das
+ * Feld ueberhaupt existiert.
+ *
+ * Exportiert, damit der Waechter-Test einen Saisonwechsel simulieren kann, ohne die ganze
+ * Saisonende-Kette zu fahren — ohne ihn bliebe die Falle unsichtbar.
+ */
+export function advanceRosterContractSchedule(entry: RosterEntry, nextLength: number): Pick<RosterEntry, "salary" | "upkeep" | "yearlySalarySchedule"> {
   const existingSchedule = entry.yearlySalarySchedule ?? [];
   if (existingSchedule.length <= 1 || nextLength <= 0) {
     return {
@@ -647,37 +660,75 @@ function readSeasonSalaryFactors(gameState: GameState): number[] {
  * dieselbe Verschiebung wie beim Apron (siehe `resolveApronDecisionSalaryFactor`). Laeuft die
  * Bewertung dagegen in einer bereits gestarteten Saison, ist Jahr 1 der Horizont 0.
  *
- * Reicht das Fenster nicht ueber die volle Laufzeit (Vertrag laenger als die Vorausschau), wird
- * NICHT extrapoliert: die vorhandenen Jahre entscheiden, der Rest bleibt unbekannt.
+ * JAHRE JENSEITS DES FENSTERS bekommen das MITTEL DER BEKANNTEN Jahre — nicht den letzten Wert
+ * fortgeschrieben und nicht abgeschnitten. Das Fenster traegt 5 Saisons, betroffen sind also nur
+ * Laufzeiten ab 5 (am Abbild 9 von 262 mehrjaehrigen Vertraegen, 3,4 %). Das Mittel ist die
+ * neutrale Fuellung: es verschiebt keine der beiden Haelften gegenueber der anderen und erfindet
+ * damit kein Gefaelle. Den letzten Faktor fortzuschreiben waere die Behauptung, der Trend halte an
+ * — genau das Raten, das `docs/APRON_UND_VERTRAGSFORMEN.md` (Abschnitt 5 B) ausschliesst.
  */
-function resolveContractTermSalaryFactors(gameState: GameState, contractLength: number): number[] {
+export function resolveContractTermSalaryFactors(gameState: GameState, contractLength: number): number[] {
   const window = readSeasonSalaryFactors(gameState);
   const offset = isBeforeSeasonEconomyFactorAdvance(gameState.gamePhase) ? 1 : 0;
-  return window.slice(offset, offset + Math.max(0, contractLength));
+  const laufzeit = Math.max(0, Math.round(contractLength));
+  const bekannt = window.slice(offset, offset + laufzeit);
+  if (bekannt.length === 0 || bekannt.length >= laufzeit) return bekannt;
+  const mittel = bekannt.reduce((sum, value) => sum + value, 0) / bekannt.length;
+  return [...bekannt, ...Array.from({ length: laufzeit - bekannt.length }, () => mittel)];
 }
 
 /**
- * Ab diesem Gefaelle im Faktor-Fenster kippt die Vertragsform. Gemessen an der Spanne des Faktors
- * (0,82–1,24, also 0,42 breit) ist 0,10 rund ein Viertel davon — klein genug, dass ein echter
- * Konjunkturbogen greift, gross genug, dass Wuerfelrauschen zweier benachbarter Saisons es nicht
- * ausloest. BALANCE-REGLER: Chris entscheidet, ob der Bias frueher oder spaeter greifen soll.
+ * SCHWELLE DER FORMWAHL — 0,15, hergeleitet in `docs/APRON_UND_VERTRAGSFORMEN.md` Abschnitt 5 A,
+ * nicht geschaetzt. Drei gemessene Anker:
+ *
+ * 1. SIGNAL > VERSCHOBENES: der Wertungsanteil ist linear in f (Rang 1 = 82,7 · Rang 16 = 33,9 ·
+ *    Rang 24 = 13,3 bei f=1). Bei |Δ|=0,15 betraegt die Einnahmendifferenz zwischen den
+ *    Vertragsjahren 12,4 / 5,1 / 2,0 — die Form verschiebt dagegen nur 0,49–1,99 je Vertrag
+ *    (mittleres Jahresgehalt mehrjaehriger Vertraege 6,65 bzw. 4,87 × 10/20/30 %). Bei 0,10 faellt
+ *    der Swing eines Rang-24-Teams (1,3) UNTER das Verschobene — dort dreht man Vertraege fuer
+ *    einen Effekt, der kleiner ist als die Drehung.
+ * 2. AUSLOESEHAEUFIGKEIT (500 000 Ziehungen aus der echten Roll-Spanne 0,82–1,24):
+ *    P(|Δ| ≥ T) = 58/59/43 % bei T=0,10 · 41/42/23 % bei T=0,15 · 28/28/11 % bei T=0,20
+ *    (2/3/4 Jahre). Das Fenster ist LIGA-GLOBAL: feuert die Regel, feuert sie fuer alle 32 Teams
+ *    zugleich. 0,10 uebersteuerte die Profile in der Mehrzahl aller Fenster (Monokultur), 0,20
+ *    machte ausgerechnet die Laufzeit mit dem groessten Hebel (4 Jahre, ±30 %) fast taub (11 %).
+ * 3. KOSTENSEITE: frueh gebundenes Geld kostet schlimmstenfalls den Kreditzins (7–20 %/Saison) auf
+ *    die verschobene Summe, also ≤ 0,27/Saison — die Schwelle braucht keine Kostenmarge, nur
+ *    Rauschabstand. Das echte Kostenrisiko faengt die Cash-Wache in `chooseAiRenewalContractShape`.
+ *
+ * Benannte Konstante, damit die Kontrollmessung nachjustieren kann, ohne den Code zu verstehen.
+ * NICHT vertretbar sind < 0,10 (Anker 1 kippt fuer die halbe Liga) und > 0,20 (Anker 2).
+ * Nachjustiert wird am Langlauf-A/B (Kreditzinsen, `ai_cash_buffer_required`-Blockaden), NICHT an
+ * der Flip-Quote.
  */
-export const AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE = 0.1;
+export const AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE = 0.15;
 
 /**
- * Faktor-Gefaelle ueber die Vertragslaufzeit: Mittel der frueheren Jahre minus Mittel der spaeteren.
- * Positiv = die Einnahmen fallen im Verlauf des Vertrags, negativ = sie steigen.
+ * DAS GEFAELLE Δ = Mittel(ENDHAELFTE der Vertragsjahre) − Mittel(ANFANGSHAELFTE).
+ * Positiv = die Einnahmen STEIGEN ueber die Laufzeit (→ spaeter zahlen), negativ = sie fallen
+ * (→ frueh zahlen). Alle Vertragsjahre zaehlen VOLL, spaete Jahre werden NICHT abgewertet: die
+ * Faktoren sind deterministisch vorausgewuerfelt, es gibt keine Unsicherheit, die eine Abwertung
+ * rechtfertigte (anders als bei den Apron-LINIEN, die wirklich unbekannt sind).
  *
- * Bei ungerader Laufzeit gehoert das Mitteljahr zu KEINER Haelfte — es traegt nichts zum Gefaelle
- * bei und wuerde beide Mittelwerte nur gleichsinnig verschieben.
+ * WARUM DIE HAELFTEN-STATISTIK UND NICHT „naechste Saison gegen den Rest": die naive Variante
+ * verduennt einen spaeten Ausreisser. Am Messkoerper `1hf25q` (Vertragsjahre [0,87, 0,83, 0,91,
+ * 1,24]) liefert sie Δ = −0,12 und damit das FALSCHE VORZEICHEN; die Haelften-Statistik zeigt den
+ * 1,24-Jahrgang korrekt mit Δ = +0,22. Die Haelften passen ausserdem exakt zur Gewichtsrampe von
+ * `buildShapeWeights` (linear, symmetrisch um die Laufzeitmitte).
+ *
+ * Bei ungerader Laufzeit gehoert das Mitteljahr zu KEINER Haelfte — die Rampe bewegt es kaum
+ * (Gewicht ≈ 1), und es wuerde beide Mittelwerte nur gleichsinnig verschieben.
  */
 function resolveSalaryFactorGefaelle(factors: readonly number[]): number {
   if (factors.length < 2) return 0;
   const half = Math.floor(factors.length / 2);
-  const frueh = factors.slice(0, half);
-  const spaet = factors.slice(factors.length - half);
+  const anfang = factors.slice(0, half);
+  const ende = factors.slice(factors.length - half);
   const mittel = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  return mittel(frueh) - mittel(spaet);
+  // Auf 6 Stellen runden: die Faktoren tragen zwei Nachkommastellen, alles darunter ist
+  // Binaerbruch-Rauschen. Ohne das Runden entscheidet an der Schwelle die Reihenfolge der
+  // Subtraktion (1 − 1,15 = −0,14999999999999991) darueber, ob die Regel greift.
+  return Math.round((mittel(ende) - mittel(anfang)) * 1e6) / 1e6;
 }
 
 /**
@@ -698,13 +749,26 @@ function resolveSalaryFactorGefaelle(factors: readonly number[]): number {
  * guenstiger; steigt es, spaeter. Die Form verschiebt real 10/20/30 % des Jahresgehalts bei 2/3/4
  * Jahren Laufzeit.
  *
- * DER NUTZEN IST MODERAT und das ist so gemessen (3–8,5 je Team und Saisongrenze bei voller
- * Ausnutzung) — deshalb steht die Regel GANZ HINTEN: sie fuellt nur die Faelle, in denen die
- * Kassenlogik ohnehin `balanced` gesagt haette, und uebersteuert keine der bestehenden Regeln.
+ * RANGFOLGE: KASSENKLEMME > FAKTOR > PROFIL — entschieden und begruendet in
+ * `docs/APRON_UND_VERTRAGSFORMEN.md` Abschnitt 5 C, nicht nach Gefuehl gereiht.
+ *   1. `tightNow && cashPreservationProfile → back_loaded` bleibt die ERSTE Regel: eine erzwungene
+ *      Kreditaufnahme kostet 7–20 %/Saison auf die GESAMTE Luecke und ein gerissenes Cash-Gate
+ *      blockiert die Verlaengerung ganz (`ai_cash_buffer_required`) — das schlaegt jeden
+ *      Ausrichtungsgewinn von ≤ ~2 je Vertrag.
+ *   2. DANN der Faktor — und der UEBERSTIMMT die Profil-Neigungen. `cashPriority`,
+ *      `wageSensitivity`, `long-`/`shortContractPreference` und `sellForProfitAggression` sind
+ *      Geschmack ohne Informationsgehalt ueber die Zukunft; das Faktor-Fenster ist bekannte
+ *      Arithmetik. `front_loaded` nur mit der BESTEHENDEN Cash-Wache `cash ≥ requiredReserve + 10`
+ *      (dieselbe Schwelle wie die `wageSensitivity ≥ 8`-Regel darunter — bewusst keine zweite
+ *      erfundene Zahl); `back_loaded` braucht keine, es entlastet das erste Jahr.
+ *   3. Erst danach die vier Profil-Regeln, dann `balanced`.
  *
- * LIQUIDITAET SCHLAEGT KONJUNKTUR: `front_loaded` bleibt einem Team verwehrt, dessen Kasse JETZT
- * klemmt (`tightNow`). `back_loaded` ist dagegen auch fuer ein klammes Team unbedenklich — es
- * entlastet das erste Jahr.
+ * DASS DARAUS KEINE MONOKULTUR WIRD, sichern drei gemessene Dinge: die Schwelle schweigt in rund
+ * 60 % der Fenster (Anker 2 an der Konstante oben), die Cash-Wache trennt die Teams nach ihrer
+ * echten Kassenlage, und Einjahresvertraege (124/340 bzw. 297/343 am Abbild) haben nie eine Form.
+ * GRENZE DER REGEL, offen benannt: sie richtet sich nach dem LIGA-Wetter; der teamindividuelle
+ * Rangverlauf (Wertungsanteil Rang 1 = 82,7 gegen Rang 24 = 13,3) bleibt aussen vor — ihn
+ * vorherzusagen waere Raterei.
  *
  * Exportiert, weil die Regel sonst nur beim Saisonwechsel liefe und von keinem Test beruehrt wuerde
  * — genau die Fehlerklasse, die im Apron-Horizont schon einmal zugeschlagen hat.
@@ -739,16 +803,21 @@ export function chooseAiRenewalContractShape(input: {
   const futureReliefProfile = wageSensitivity >= 7 || longContractPreference >= 7 || sellForProfitAggression >= 7;
   const cashPreservationProfile = cashPriority >= 7 || shortContractPreference >= 7;
 
+  // 1. Kassenklemme — unveraendert die erste Regel.
   if (tightNow && cashPreservationProfile) return "back_loaded";
+
+  // 2. Konjunktur-Vorausschau. Steht VOR den Profil-Regeln und uebersteuert sie (Kopfkommentar,
+  //    Rangfolge 2). Ohne nennenswertes Gefaelle schweigt sie und laesst die Profile entscheiden.
+  const gefaelle = resolveSalaryFactorGefaelle(input.termSalaryFactors ?? []);
+  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) return "back_loaded";
+  if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && cash >= input.cashGate.requiredReserve + 10) {
+    return "front_loaded";
+  }
+
+  // 3. Profil-Neigungen.
   if (strongCashBuffer && futureReliefProfile) return "front_loaded";
   if (cashPriority >= 8 && !strongCashBuffer) return "back_loaded";
   if (wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10) return "front_loaded";
-
-  // Konjunktur-Vorausschau, siehe Kopfkommentar: nur noch der Fall, den die Kassenregeln offen
-  // gelassen haben. Ohne nennenswertes Gefaelle bleibt es beim bisherigen `balanced`.
-  const gefaelle = resolveSalaryFactorGefaelle(input.termSalaryFactors ?? []);
-  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && !tightNow) return "front_loaded";
-  if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) return "back_loaded";
   return "balanced";
 }
 
@@ -1393,6 +1462,10 @@ export function computeSeasonEndContractTick(
           ...entry,
           salary: newSalary,
           upkeep: newSalary,
+          // UNTERSCHRIFTSPFAD: KI-Verlaengerung. Das Verhandlungs-Benchmark ist das JAHRESGEHALT
+          // des neuen Vertrags, nicht dessen erste Rate — `newSalary` ist genau die Zahl, aus der
+          // `buildContractSalarySchedule` die Raten formt.
+          negotiatedAnnualSalary: newSalary,
           contractLength: renewLength,
           contractStatus: renewLength === 1 ? "expiring" : "active",
           contractShape,
@@ -1430,6 +1503,8 @@ export function computeSeasonEndContractTick(
           ...entry,
           salary: bridgeSalary,
           upkeep: bridgeSalary,
+          // UNTERSCHRIFTSPFAD: Brueckenverlaengerung ueber ein Jahr. Auch sie ist eine Unterschrift.
+          negotiatedAnnualSalary: bridgeSalary,
           contractLength: 1,
           contractStatus: "expiring",
           contractShape: "balanced",
@@ -1831,6 +1906,8 @@ export function applyContractRenewalAction(input: {
                 ...entry,
                 salary: newSalary ?? entry.salary,
                 upkeep: newSalary ?? entry.upkeep,
+                // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
+                negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
                 contractLength: nextLength,
                 contractShape: nextContractShape,
                 yearlySalarySchedule: nextContractSchedule,

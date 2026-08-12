@@ -829,6 +829,8 @@ function applyFastLocalBuy(input: {
           contractLength: input.contractLength ?? 1,
           salary,
           upkeep: salary,
+          // UNTERSCHRIFTSPFAD: Kauf in der Saisonsimulation.
+          negotiatedAnnualSalary: salary,
           purchasePrice,
           currentValue: marketValue,
           roleTag: "prospect",

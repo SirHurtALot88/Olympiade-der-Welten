@@ -34,13 +34,19 @@ import {
 } from "@/lib/season/apron-service";
 import { computeApronSettlement, apronWertungsanteil } from "@/lib/season/apron-service";
 import { isBeforeSeasonEconomyFactorAdvance } from "@/lib/season/season-economy-factors";
-import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import {
+  getTeamActualSalaryTotal,
+  getTeamNegotiatedSalaryTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
 import { resolveRosterContractSalaries } from "@/lib/foundation/player-economy-contract";
 import {
   AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE,
+  advanceRosterContractSchedule,
   chooseAiRenewalContractShape,
+  resolveContractTermSalaryFactors,
 } from "@/lib/contracts/contract-renewal-service";
 import { buildContractSalarySchedule } from "@/lib/market/contract-negotiation-preview";
+import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 
 const SEASON_ID = "season-2";
 
@@ -88,8 +94,15 @@ function bauLiga(input: {
         teamId,
         playerId,
         salary: gehalt,
+        // Wie an jedem Unterschriftspfad: das VERHANDELTE Jahresgehalt wird festgeschrieben.
+        negotiatedAnnualSalary: gehalt,
         contractLength: 3,
         contractShape: "balanced",
+        yearlySalarySchedule: buildContractSalarySchedule({
+          contractLength: 3,
+          annualSalary: gehalt,
+          shape: "balanced",
+        } as never).yearlySalarySchedule,
       } as RosterEntry);
     });
   });
@@ -272,6 +285,143 @@ describe("Der Waechter — die Vertragsform bewegt die Apron-Abgabe um 0,00", ()
     expect(abgabeDerLiga(vorher)).toBeGreaterThan(0);
     expect(abgabeDerLiga(nachher) - abgabeDerLiga(vorher)).toBe(0);
   });
+
+  /**
+   * DIE VERSCHAERFUNG: DERSELBE WAECHTER, ABER NACH EINEM SAISONWECHSEL.
+   *
+   * Ohne diesen Fall bliebe die Falle unsichtbar, die Schritt 3 des Plans beinahe zum Schlupfloch
+   * gemacht haette: `advanceRosterContractSchedule` UEBERSCHREIBT `entry.salary` bei jedem
+   * Saisonwechsel mit der Jahr-1-Rate der Rest-Schedule. Eine Bemessung auf `annualSalary` (das
+   * genau dieses Feld bevorzugt) oder auf den Durchschnitt der REST-Schedule waere im Moment der
+   * Unterschrift noch unauffaellig und ein Jahr spaeter formabhaengig — front_loaded senkte die
+   * Steuerbasis dauerhaft.
+   *
+   * Der Test macht das ausdruecklich sichtbar: er prueft ERST, dass die naheliegenden Basen nach
+   * dem Saisonwechsel wirklich auseinanderlaufen (sonst prueft er nichts), und DANN, dass die
+   * echte Apron-Basis und die Abgabe es nicht tun.
+   */
+  it("auch NACH einem Saisonwechsel bewegt ein Formwechsel die Abgabe um 0,00", () => {
+    const basis = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
+    const geformt: GameState = {
+      ...basis,
+      rosters: basis.rosters.map((entry) =>
+        entry.teamId === "team-1"
+          ? ({
+              ...entry,
+              contractShape: "front_loaded",
+              yearlySalarySchedule: buildContractSalarySchedule({
+                contractLength: 3,
+                annualSalary: entry.negotiatedAnnualSalary ?? entry.salary,
+                shape: "front_loaded",
+              } as never).yearlySalarySchedule,
+            } as RosterEntry)
+          : entry,
+      ),
+    };
+
+    /** Eine Saison weiterdrehen — genau der Schritt, den die Saisonende-Kette am Vertrag macht. */
+    function eineSaisonWeiter(gs: GameState): GameState {
+      return {
+        ...gs,
+        rosters: gs.rosters.map((entry) => {
+          const nextLength = Math.max(0, (entry.contractLength ?? 0) - 1);
+          return { ...entry, ...advanceRosterContractSchedule(entry, nextLength), contractLength: nextLength };
+        }),
+      };
+    }
+
+    const basisNachJahr1 = eineSaisonWeiter(basis);
+    const geformtNachJahr1 = eineSaisonWeiter(geformt);
+
+    // (0) DIE FALLE IST ECHT — Beleg 1: der Durchschnitt der REST-Schedule ist schon nach dem
+    //     ersten Saisonwechsel gesunken (3 Jahre 1,2/1,0/0,8 ⇒ Rest 1,0/0,8). Genau diese Basis
+    //     stand als „Laufzeit-Durchschnitt" zur Debatte.
+    const balancedEintrag = basisNachJahr1.rosters.find((entry) => entry.teamId === "team-1")!;
+    const geformterEintrag = geformtNachJahr1.rosters.find((entry) => entry.teamId === "team-1")!;
+    const restDurchschnitt = (entry: RosterEntry) => {
+      const schedule = entry.yearlySalarySchedule ?? [];
+      return schedule.reduce((sum, row) => sum + row.salary, 0) / Math.max(1, schedule.length);
+    };
+    expect(restDurchschnitt(geformterEintrag)).toBeLessThan(restDurchschnitt(balancedEintrag));
+
+    // (1) DAS VERHANDLUNGS-BENCHMARK UEBERLEBT den Saisonwechsel unveraendert.
+    expect(geformterEintrag.negotiatedAnnualSalary).toBe(balancedEintrag.negotiatedAnnualSalary);
+    expect(getTeamNegotiatedSalaryTotal(geformtNachJahr1, "team-1")).toBe(
+      getTeamNegotiatedSalaryTotal(basisNachJahr1, "team-1"),
+    );
+
+    // (2) UND DAMIT DIE ZUSICHERUNG: Basis, Linien und Abgabe bleiben Zahl fuer Zahl gleich.
+    expect(getTeamApronSalaryBase(geformtNachJahr1, "team-1")).toBe(
+      getTeamApronSalaryBase(basisNachJahr1, "team-1"),
+    );
+    expect(computeApronLines(geformtNachJahr1)).toEqual(computeApronLines(basisNachJahr1));
+    expect(abgabeDerLiga(basisNachJahr1)).toBeGreaterThan(0);
+    expect(abgabeDerLiga(geformtNachJahr1) - abgabeDerLiga(basisNachJahr1)).toBe(0);
+
+    // (3) Noch eine Saison weiter. JETZT schlaegt die Falle auch auf `entry.salary` durch (bei
+    //     drei Jahren ist Jahr 2 zufaellig die Durchschnittsrate, Jahr 3 nicht mehr) — und mit ihm
+    //     auf `resolveRosterContractSalaries().annualSalary`, die zweite naheliegende Basis.
+    const basisNachJahr2 = eineSaisonWeiter(basisNachJahr1);
+    const geformtNachJahr2 = eineSaisonWeiter(geformtNachJahr1);
+    expect(geformtNachJahr2.rosters.find((entry) => entry.teamId === "team-1")!.salary).toBeLessThan(
+      basisNachJahr2.rosters.find((entry) => entry.teamId === "team-1")!.salary,
+    );
+    expect(verhandelterDurchschnitt(geformtNachJahr2, "team-1")).toBeLessThan(
+      verhandelterDurchschnitt(basisNachJahr2, "team-1"),
+    );
+
+    // Die Zusage haelt trotzdem: Basis und Abgabe bleiben Zahl fuer Zahl gleich.
+    expect(getTeamApronSalaryBase(geformtNachJahr2, "team-1")).toBe(
+      getTeamApronSalaryBase(basisNachJahr2, "team-1"),
+    );
+    expect(abgabeDerLiga(geformtNachJahr2) - abgabeDerLiga(basisNachJahr2)).toBe(0);
+  });
+
+  /**
+   * DIE ANDERE HAELFTE DER UMSTELLUNG: das VERHANDELTE Gehalt muss die Abgabe jetzt WIRKLICH
+   * bewegen — sonst haette der Umbau nur die Quelle getauscht und nichts gewonnen.
+   */
+  it("wer unter Formel verhandelt, zahlt weniger Abgabe — das war vorher nicht so", () => {
+    const teuer = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
+    // Derselbe Kader, aber 20 % unter dem Formel-Gehalt verhandelt. `salaryDemand` (und damit
+    // `expectedSalary`, die ALTE Basis) bleibt unangetastet.
+    const guenstig: GameState = {
+      ...teuer,
+      rosters: teuer.rosters.map((entry) =>
+        entry.teamId === "team-1"
+          ? ({ ...entry, negotiatedAnnualSalary: (entry.negotiatedAnnualSalary ?? entry.salary) * 0.8 } as RosterEntry)
+          : entry,
+      ),
+    };
+
+    expect(getTeamApronSalaryBase(guenstig, "team-1")).toBeLessThan(getTeamApronSalaryBase(teuer, "team-1"));
+    expect(abgabeDerLiga(guenstig)).toBeLessThan(abgabeDerLiga(teuer));
+  });
+
+  /**
+   * MIGRATION: ein Bestandsvertrag ohne das Feld darf nicht anders besteuert werden als ein
+   * frisch unterschriebener mit demselben verhandelten Gehalt.
+   */
+  it("Bestandsvertraege ohne Feld werden aus der Schedule nachgetragen — gleiche Basis, gleiche Abgabe", () => {
+    const mitFeld = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
+    const ohneFeld: GameState = {
+      ...mitFeld,
+      rosters: mitFeld.rosters.map((entry) => {
+        const { negotiatedAnnualSalary: _entfernt, ...rest } = entry;
+        return rest as RosterEntry;
+      }),
+    };
+
+    expect(ohneFeld.rosters.every((entry) => entry.negotiatedAnnualSalary === undefined)).toBe(true);
+    expect(getTeamApronSalaryBase(ohneFeld, "team-1")).toBe(getTeamApronSalaryBase(mitFeld, "team-1"));
+    expect(abgabeDerLiga(ohneFeld)).toBe(abgabeDerLiga(mitFeld));
+
+    // Und der Lade-Backfill schreibt genau diesen Wert fest — idempotent.
+    const nachgetragen = withNegotiatedSalaryBenchmark(ohneFeld);
+    expect(nachgetragen.rosters.every((entry) => typeof entry.negotiatedAnnualSalary === "number")).toBe(true);
+    expect(getTeamApronSalaryBase(nachgetragen, "team-1")).toBe(getTeamApronSalaryBase(mitFeld, "team-1"));
+    expect(withNegotiatedSalaryBenchmark(nachgetragen)).toBe(nachgetragen);
+  });
 });
 
 describe("Schritt 2 — die Vertragsform folgt dem Faktor-Fenster", () => {
@@ -285,15 +435,21 @@ describe("Schritt 2 — die Vertragsform folgt dem Faktor-Fenster", () => {
     rosterUnderMin: false,
   };
 
-  function form(input: { faktoren: number[]; cash: number; requiredReserve?: number; laufzeit?: number }) {
+  function form(input: {
+    faktoren: number[];
+    cash: number;
+    requiredReserve?: number;
+    laufzeit?: number;
+    profile?: Parameters<typeof chooseAiRenewalContractShape>[0]["profile"];
+  }) {
     return chooseAiRenewalContractShape({
       team: { teamId: "team-1", name: "Team 1", cash: input.cash } as never,
       entry: ENTRY,
       recommendedLength: input.laufzeit ?? 3,
       renewalSalary: 10,
       cashGate: { ...CASH_GATE_LOCKER, cash: input.cash, requiredReserve: input.requiredReserve ?? 20 },
-      // Neutrales Profil: keine der bestehenden Kassenregeln greift, die neue Regel entscheidet.
-      profile: null,
+      // Neutrales Profil (Vorgabe), sofern der Test nicht ausdruecklich eines mitgibt.
+      profile: input.profile ?? null,
       termSalaryFactors: input.faktoren,
     });
   }
@@ -353,5 +509,118 @@ describe("Schritt 2 — die Vertragsform folgt dem Faktor-Fenster", () => {
   it("bei ungerader Laufzeit zaehlt das Mitteljahr zu keiner Haelfte", () => {
     // Mitteljahr extrem, Raender gleich → kein Gefaelle, also keine Formaenderung.
     expect(form({ faktoren: [1.0, 1.24, 1.0], cash: 200 })).toBe("balanced");
+  });
+
+  /**
+   * FABLES ENTSCHEIDUNG (docs/APRON_UND_VERTRAGSFORMEN.md, Abschnitt 5) — die vier Zahlen, an denen
+   * die Regel haengt. Jede einzelne ist eine WERT-Zusage, kein Quelltext-String.
+   */
+  it("die Schwelle ist die benannte 0,15 — nicht die vorlaeufige 0,10", () => {
+    expect(AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE).toBe(0.15);
+    // Was zwischen 0,10 und 0,15 liegt, loest jetzt ausdruecklich NICHT mehr aus.
+    expect(form({ faktoren: [1.12, 1.0], cash: 200 })).toBe("balanced");
+  });
+
+  /**
+   * DER MESSKOERPER `1hf25q`: Vertragsjahre [0,87, 0,83, 0,91, 1,24]. Die Haelften-Statistik sieht
+   * Δ = +0,22 und schiebt die dicke Rate in die 1,24-Saison. Die naive Rechnung „naechste Saison
+   * gegen den Rest" kaeme auf 0,87 − Mittel(0,83; 0,91; 1,24) = −0,12 und damit auf das
+   * GEGENTEILIGE Vorzeichen — sie wuerde front_loaded waehlen. Dieser Test haelt das Vorzeichen.
+   */
+  it("die Haelften-Statistik dreht den Messkoerper korrekt nach hinten — nicht nach vorn", () => {
+    const shape = form({ faktoren: [0.87, 0.83, 0.91, 1.24], cash: 200, laufzeit: 4 });
+    expect(shape).toBe("back_loaded");
+
+    // Kontrollrechnung beider Lesarten, damit der Befund im Test steht und nicht nur im Dokument.
+    const jahre = [0.87, 0.83, 0.91, 1.24];
+    const haelften = (jahre[2]! + jahre[3]!) / 2 - (jahre[0]! + jahre[1]!) / 2;
+    const naiv = jahre[0]! - (jahre[1]! + jahre[2]! + jahre[3]!) / 3;
+    expect(Math.round(haelften * 100) / 100).toBe(0.22);
+    expect(Math.round(naiv * 100) / 100).toBe(-0.12);
+    expect(Math.sign(haelften)).not.toBe(Math.sign(naiv));
+
+    // Und die Schedule zeigt es: das erste Jahr zahlt weniger als der Durchschnitt.
+    const plan = schedule("back_loaded", 10, 4);
+    expect(plan.yearlySalarySchedule[0]!.salary).toBeLessThan((plan.totalSalary ?? 0) / 4);
+    expect(plan.yearlySalarySchedule[3]!.salary).toBeGreaterThan((plan.totalSalary ?? 0) / 4);
+  });
+
+  it("spaete Vertragsjahre zaehlen VOLL — ohne Jahr 4 gaebe es die Drehung nicht", () => {
+    // Dieselben Jahre, nur ohne das letzte: Δ faellt auf +0,04 und die Regel schweigt.
+    expect(form({ faktoren: [0.87, 0.83, 0.91], cash: 200 })).toBe("balanced");
+    // Mit dem vierten Jahr kippt sie. Eine Abwertung spaeter Jahre haette dieses Signal geloescht.
+    expect(form({ faktoren: [0.87, 0.83, 0.91, 1.24], cash: 200, laufzeit: 4 })).toBe("back_loaded");
+  });
+
+  /**
+   * RANGFOLGE Kassenklemme > Faktor > Profil. Das Profil hier („wageSensitivity 9" bei dicker Kasse)
+   * saehe front_loaded vor — der Faktor ueberstimmt es.
+   */
+  it("der Faktor ueberstimmt die Profil-Neigungen", () => {
+    const profil = { bias: { wageSensitivity: 9, longContractPreference: 9 } } as never;
+    // Ohne Fenster entscheidet das Profil.
+    expect(form({ faktoren: [], cash: 200, profile: profil })).toBe("front_loaded");
+    // Steigendes Fenster: der Faktor gewinnt.
+    expect(form({ faktoren: [0.85, 1.2, 1.2], cash: 200, profile: profil })).toBe("back_loaded");
+    // Fallendes Fenster: dieselbe Richtung wie das Profil, aber jetzt aus dem Fenster begruendet.
+    expect(form({ faktoren: [1.2, 0.85, 0.85], cash: 200, profile: profil })).toBe("front_loaded");
+
+    // Und andersherum: ein sparsames Profil (cashPriority 9, Kasse ueber der Wache aber ohne
+    // dicken Puffer) wird von einem FALLENDEN Fenster nach vorn gezogen.
+    const sparsam = { bias: { cashPriority: 9 } } as never;
+    expect(form({ faktoren: [], cash: 35, requiredReserve: 20, profile: sparsam })).toBe("back_loaded");
+    expect(form({ faktoren: [1.2, 0.85, 0.85], cash: 35, requiredReserve: 20, profile: sparsam })).toBe("front_loaded");
+  });
+
+  it("die Kassenklemme bleibt VOR dem Faktor — ein klammes Sparprofil wird nie nach vorn gezogen", () => {
+    const sparsam = { bias: { cashPriority: 9 } } as never;
+    // cash 8 < requiredReserve 20 + 6 → tightNow, und cashPriority 9 ≥ 7 → Regel 1 greift zuerst.
+    expect(form({ faktoren: [1.2, 0.85, 0.85], cash: 8, requiredReserve: 20, profile: sparsam })).toBe("back_loaded");
+  });
+
+  it("front_loaded haengt an der BESTEHENDEN Cash-Wache requiredReserve + 10 — keine zweite Zahl", () => {
+    // Genau auf der Wache: erlaubt. Ein Zehntel darunter: verwehrt.
+    expect(form({ faktoren: [1.2, 0.85, 0.85], cash: 30, requiredReserve: 20 })).toBe("front_loaded");
+    expect(form({ faktoren: [1.2, 0.85, 0.85], cash: 29.9, requiredReserve: 20 })).toBe("balanced");
+    // back_loaded braucht keine Wache — es entlastet das erste Jahr.
+    expect(form({ faktoren: [0.85, 1.2, 1.2], cash: 0, requiredReserve: 20 })).toBe("back_loaded");
+  });
+});
+
+/**
+ * DER HORIZONT DER VERTRAGSJAHRE — Jahr i gegen `window[i]`, und was jenseits des Fensters gilt.
+ *
+ * Auch dieser Pfad laeuft im Spiel nur in der Saisonende-Kette; das Fenster wird deshalb von Hand
+ * gestellt statt eine Saison zu simulieren.
+ */
+describe("Schritt 2 — welche Faktoren ein Vertrag ueberhaupt sieht", () => {
+  const FENSTER = [1.19, 0.87, 0.83, 0.91, 1.24];
+
+  it("in der Preseason ist Vertragsjahr 1 der Horizont 1 — das Fenster rueckt erst danach vor", () => {
+    const preseason = bauLigaMitUeberzahler("transfer_sell_phase", FENSTER);
+    expect(resolveContractTermSalaryFactors(preseason, 4)).toEqual([0.87, 0.83, 0.91, 1.24]);
+
+    // In einer bereits gestarteten Saison ist Jahr 1 dagegen der Horizont 0.
+    const laufend = bauLigaMitUeberzahler("season_active", FENSTER);
+    expect(resolveContractTermSalaryFactors(laufend, 4)).toEqual([1.19, 0.87, 0.83, 0.91]);
+  });
+
+  it("Jahre jenseits des Fensters bekommen das MITTEL der bekannten — nicht den letzten Wert", () => {
+    const preseason = bauLigaMitUeberzahler("transfer_sell_phase", FENSTER);
+    const jahre = resolveContractTermSalaryFactors(preseason, 6);
+    expect(jahre).toHaveLength(6);
+    expect(jahre.slice(0, 4)).toEqual([0.87, 0.83, 0.91, 1.24]);
+    const mittel = (0.87 + 0.83 + 0.91 + 1.24) / 4;
+    expect(jahre[4]).toBeCloseTo(mittel, 10);
+    expect(jahre[5]).toBeCloseTo(mittel, 10);
+    // Ausdruecklich NICHT die Fortschreibung des letzten Faktors — das waere die Behauptung, der
+    // 1,24-Ausreisser halte an, und blaehte das Gefaelle kuenstlich auf (+0,39 statt +0,25).
+    expect(jahre[4]).not.toBe(1.24);
+  });
+
+  it("reicht das Fenster genau, wird nichts gefuellt", () => {
+    const preseason = bauLigaMitUeberzahler("transfer_sell_phase", FENSTER);
+    expect(resolveContractTermSalaryFactors(preseason, 2)).toEqual([0.87, 0.83]);
+    expect(resolveContractTermSalaryFactors(preseason, 4)).toHaveLength(4);
   });
 });
