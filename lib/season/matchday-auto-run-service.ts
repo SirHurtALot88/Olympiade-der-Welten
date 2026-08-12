@@ -19,7 +19,10 @@ import {
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
-import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import {
+  buildLegacyMatchdayResolvePreview,
+  getResolveStatusForSides,
+} from "@/lib/resolve/legacy-matchday-resolve-engine";
 import {
   type LegacyMatchdayResolvePreview,
 } from "@/lib/resolve/legacy-matchday-resolve-types";
@@ -872,6 +875,16 @@ export async function runLocalMatchdayAutoRun(
   result.summary.warningTeams = lineupSummary.warningTeams;
   result.summary.resolveReady = lineupSummary.resolveReady;
 
+  // Nur die Seiten, die dieser Lauf wirklich schreibt, duerfen ihn blockieren. Eine bereits
+  // gebuchte Seite wird beim Schreiben eingefroren (`frozenSides` im Result-Apply) — ihr neu
+  // gerechnetes Ergebnis landet nie im Spielstand. Sie durfte die Buchung der offenen Seite aber
+  // trotzdem abbrechen: Chris' Spieltag 4 kippte an der verworfenen D1-Rechnung auf
+  // `missing_scores`, und damit war D2 nicht mehr buchbar. Was nicht geschrieben wird,
+  // entscheidet auch nicht mit.
+  const offeneSeiten = new Set<"d1" | "d2">(
+    (["d1", "d2"] as const).filter((side) => !existingCommittedSides.has(side)),
+  );
+  const resolveStatusOffeneSeiten = getResolveStatusForSides(activeResolve.preview, offeneSeiten);
   const resolveBlockingReasons = [
     ...(lineupSummary.manualMissing > 0 ? ["missing_manual_lineup"] : []),
     ...(lineupSummary.passiveMissing > 0 ? ["passive_missing_lineup"] : []),
@@ -880,7 +893,7 @@ export async function runLocalMatchdayAutoRun(
     // gemeldet aus einem frischen Spielstand, in dem der KI-Kaderaufbau nicht durchgelaufen
     // war: 32 Teams "keine Aufstellung", alle 0 Punkte, Spieltag trotzdem verbraucht.
     ...(lineupSummary.aiMissing > 0 ? ["missing_ai_lineup"] : []),
-    ...(activeResolve.preview.status === "ready" ? [] : [`resolve_status:${activeResolve.preview.status}`]),
+    ...(resolveStatusOffeneSeiten === "ready" ? [] : [`resolve_status:${resolveStatusOffeneSeiten}`]),
   ];
   addStep(result, {
     key: "resolve_preview",

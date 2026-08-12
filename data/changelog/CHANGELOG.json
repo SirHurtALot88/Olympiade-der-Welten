@@ -32,6 +32,15 @@
       "datum": "2026-08-12",
       "seite": "Spieltag · Arena",
       "pr": null,
+      "text": "War die erste Disziplin eines Spieltags schon gewertet, wurde sie beim Werten der zweiten trotzdem noch einmal durchgerechnet — und konnte die zweite blockieren, obwohl ihr Ergebnis gar nicht mehr gespeichert wird. Jetzt entscheidet nur noch, was dieser Schritt wirklich schreibt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
       "text": "Verletzte sich ein Spieler in der ersten Disziplin, ließ sich die zweite Disziplin desselben Spieltags danach nicht mehr werten — der Spieltag hing fest und ließ sich nicht abschließen. Aufstellen darf ein Verletzter weiterhin nicht; eine bereits abgegebene Aufstellung wird jetzt aber normal gewertet.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
