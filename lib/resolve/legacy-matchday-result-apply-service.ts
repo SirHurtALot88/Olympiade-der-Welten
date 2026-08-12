@@ -9,7 +9,10 @@ import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState
 import { loadLegacyLineupContext, LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import type { LegacyLineupContextLoadResult, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildLegacyMatchdayReadiness } from "@/lib/resolve/legacy-matchday-readiness";
-import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import {
+  buildLegacyMatchdayResolvePreview,
+  getResolveStatusForSides,
+} from "@/lib/resolve/legacy-matchday-resolve-engine";
 import {
   mapLegacyMatchdayResolvePreviewToResultPayload,
   type DisciplineHighlightWritePayload,
@@ -501,8 +504,28 @@ export async function prepareLegacyMatchdayResultApply(
         )?.id ?? null;
   const existingLookupMs = elapsedSince(existingStartedAt);
 
+  // Bereits gebuchte Seiten werden beim Schreiben eingefroren (`frozenSides` weiter unten) — ihr
+  // neu gerechnetes Ergebnis landet nie im Spielstand. Sie duerfen die noch offene Seite deshalb
+  // auch nicht blockieren: Chris' Spieltag 4 kippte an der verworfenen D1-Rechnung auf
+  // `missing_scores`, und D2 war damit unbuchbar. Nur die Seiten, die dieser Lauf wirklich
+  // schreibt, entscheiden ueber die Freigabe.
+  //
+  // Eng gefuehrt, und zwar dreifach: nur im lokalen Pfad (nur dort gibt es das Einfrieren),
+  // nur wenn ueberhaupt schon eine Seite gebucht ist, und nur solange eine Seite offen ist.
+  // Ein voller Re-Apply (beide Seiten liegen vor) prueft weiterhin alles.
+  const committedSides = new Set<"d1" | "d2">(
+    localSave && existingResultId
+      ? (localSave.gameState.seasonState.disciplineResults ?? [])
+          .filter((entry) => entry.matchdayResultId === existingResultId)
+          .map((entry) => entry.disciplineSide)
+      : [],
+  );
+  const openSides = new Set<"d1" | "d2">((["d1", "d2"] as const).filter((side) => !committedSides.has(side)));
+  const gatingPreviewStatus =
+    committedSides.size > 0 && openSides.size > 0 ? getResolveStatusForSides(preview, openSides) : preview.status;
+
   const blockingReasons = buildBlockingReasons({
-    previewStatus: preview.status,
+    previewStatus: gatingPreviewStatus,
     hasExistingResult: Boolean(existingResultId),
     forceReplace: Boolean(params.forceReplace),
     allowIncompleteOverride: Boolean(params.allowIncompleteOverride),

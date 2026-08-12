@@ -2,10 +2,64 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Eine Disziplin konnte durchlaufen, ohne je gewertet zu werden — ohne Fehlermeldung, ohne Hinweis. Gemeldet als „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme\". Zwei stille Fehler steckten dahinter, beide im Buchungsweg. ERSTENS loeste die Buchung die Spieltags-Seite ausschliesslich ueber die Engine-Preview auf. Faellt die aus, war die Seite nicht bestimmbar und die Buchung kehrte kommentarlos zurueck: die Disziplin lief, im Spielstand landete nichts, nicht einmal ein Fehlerzustand. Fuer die ANZEIGE gab es den Rueckfall auf den Spielplan laengst — er wurde eingefuehrt, weil bei ausgefallener Preview der Weg zur zweiten Disziplin verschwand; die Buchung blieb auf der alten Quelle stehen. Sie zieht jetzt dieselbe, und der Spielplan braucht die Engine gar nicht. ZWEITENS galt „hat keinen Fehler geworfen\" als „gebucht\". Die Buchung wirft in keinem ihrer Fehlerfaelle: im Lesemodus und ohne Lauf-Handler liefert sie nichts zurueck, bei blockierter Wertung ein Ergebnis mit dem Vermerk, dass nicht gebucht wurde. Alles davon wurde als Erfolg vermerkt — der Endscreen sagte „im Saisonstand\", der Spielstand hatte nichts. Gewertet wird jetzt das Ergebnis selbst. Am gemeldeten Stand waren dadurch 32 Aufstellungen fuer die zweite Disziplin vorhanden, aber null Ergebniszeilen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Die Arena behauptete „Beide Disziplinen sind gewertet\", obwohl eine noch gar nicht gebucht war — und der Abschluss-Knopf darunter blockte dann. Gemeldet als „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme\". Am Spielstand nachgemessen: Wettessen mit 32 Ergebniszeilen gebucht, Mini-DM mit null, obwohl alle 32 Aufstellungen dafuer vorlagen. Die Disziplin war gelaufen, die Wertung nicht durchgekommen. Der Weiterfuehrungs-Block unter der Buehne entschied allein daran, WELCHE Seite gerade angezeigt wird, nie daran, ob sie gewertet ist: stand man auf der zweiten Disziplin und war sie ungewertet, fiel die Ansicht in den Abschluss-Zweig mit der falschen Auskunft. Eine Sackgasse — die Arena sagte fertig, der Spieltagswechsel sagte nein, und einen Weg zurueck zur Wertung bot die Seite nicht an. Massgeblich ist jetzt der SPIELSTAND: ist die eigene Seite ungewertet, sagt die Arena genau das und bietet keinen Abschluss an; ist die andere Seite offen, fuehrt sie dorthin, egal auf welcher man steht; der Abschluss-Knopf kommt erst, wenn beide gebucht sind. Der Schutz gegen halbe Spieltage im Spieltagswechsel bleibt unveraendert — ohne ihn fehlte jeder in der zweiten Disziplin aufgestellte Spieler dauerhaft in der Wertung.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Ein Spieltag liess sich nicht abschliessen, obwohl Punkte zu sehen waren. Gemeldet als „ich haenge in MD4 fest und die spieltagsdaten werden anscheinend nicht berechnet\". Am Spielstand gemessen war nur EINE der beiden Disziplinen gewertet: 32 Ergebniszeilen fuer Wettessen, null fuer Mini-DM. Die sichtbaren Punkte kamen also aus der ersten Haelfte. Der Spieltagswechsel blockte zu Recht — liesse er einen halben Spieltag durch, waere die zweite Disziplin danach nicht mehr nachholbar und alle Spieler, die dort antraten, fehlten fuer diesen Spieltag dauerhaft in den Leistungsdaten, sichtbar als zu niedrige Einsatzzahl in Moral und Gehaltsforderungen. Die Sperre bleibt deshalb, wie sie ist. Neu ist ein Reparaturskript, das die fehlende Seite NACHBUCHT, statt die Sperre zu umgehen — ueber denselben Weg, den die Arena geht, dessen Wiederaufnahme den Fall „erste Disziplin gebucht, zweite offen\" ausdruecklich kennt und nichts doppelt bucht. Am Abbild gefahren: Wertung springt von halb auf vollstaendig, alle 32 Teams bekommen ihre zweite Disziplin, und der Spieltagswechsel ist danach frei. Standard ist der Trockenlauf; geschrieben wird nur auf ausdrueckliche Anweisung, und der Spieltagswechsel selbst bleibt beim Spieler.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "War die erste Disziplin eines Spieltags schon gewertet, wurde sie beim Werten der zweiten trotzdem noch einmal durchgerechnet — und konnte die zweite blockieren, obwohl ihr Ergebnis gar nicht mehr gespeichert wird. Jetzt entscheidet nur noch, was dieser Schritt wirklich schreibt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Verletzte sich ein Spieler in der ersten Disziplin, ließ sich die zweite Disziplin desselben Spieltags danach nicht mehr werten — der Spieltag hing fest und ließ sich nicht abschließen. Aufstellen darf ein Verletzter weiterhin nicht; eine bereits abgegebene Aufstellung wird jetzt aber normal gewertet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-11",
       "seite": "Formkarten",
       "pr": null,
       "text": "Formkarten werden seit einiger Zeit richtig gezogen: die positive und die negative Karte eines Spielers sind unabhaengig voneinander. Bestehende Spielstaende hatten davon nichts — die Selbstheilung ergaenzte nur FEHLENDE Karten und raeumte verwaiste ab, eine bereits vorhandene behielt ihren alten Wert fuer immer. Im laufenden Spielstand trugen deshalb 510 von 680 Karten noch die alte, kaputte Ziehung, und alle 266 Spieler mit Kartenpaar hatten ein exakt gespiegeltes (+8 zu -8, +4 zu -4). Jetzt werden ungespielte Karten beim naechsten Laden auf die heutige Ziehung nachgezogen. Bereits gespielte Karten bleiben unangetastet: sie stecken in der Wertung eines gelaufenen Spieltags, ihren Wert nachtraeglich zu aendern wuerde vergangene Ergebnisse umschreiben. In einer laufenden Saison bleibt der gespielte Teil also gespiegelt — vollstaendig zufaellig ist erst eine Saison, die neu beginnt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude",
+      "pr": null,
+      "text": "Ein stark abgenutztes Einnahmegebaeude wurde bisher zum Zuschussgeschaeft: Ein Fan Shop auf Stufe 3 bringt bei voller Wirkung 11,70 gegen 1,40 Unterhalt — bei Zustand 5 aber nur noch 0,73, also ein Minus. Ein Gebaeude, das Geld kostet, WEIL es alt ist, waere eine Falle mit nur einer richtigen Antwort. Jetzt wirkt jedes stehende Gebaeude mindestens zu einem Viertel; derselbe Shop traegt damit auch im schlimmsten Zustand noch 2,93 und rentiert sich minimal. Bei Zustand 0 zaehlt es weiterhin als nicht vorhanden. Ausserdem lohnt sich die Reparatur jetzt frueher: vorher rechnete sie sich erst unterhalb von Zustand 30, man haette also nur fast tote Gebaeude instandgesetzt. Ab spuerbarem Wirkungsverlust ist sie jetzt die bessere Wahl.",
       "quelle": "gepflegt",
       "gewicht": null,
       "version": "0.4"
@@ -30,11 +84,38 @@
     },
     {
       "datum": "2026-08-11",
+      "seite": "Gebaeude",
+      "pr": null,
+      "text": "Gebaeude nutzen sich jetzt spuerbar ab. Bisher fielen feste 8 Zustandspunkte je Saison an — ein Neubau stand nach drei Jahren noch bei 76 Prozent und hatte nie an Wirkung verloren. Die Warnschwelle wurde damit praktisch nie erreicht, und die Wartung war eine Funktion ohne Anlass. Jetzt fallen im Mittel 17 Punkte je Saison, also rund die Haelfte ueber drei Saisons, und der Verschleiss schwankt von Gebaeude zu Gebaeude zwischen 12 und 22 — zwei gleich alte Gebaeude sind dadurch nicht mehr gleich gut. Gleichzeitig wirkt ein Gebaeude jetzt bis 80 Prozent Zustand mit voller Leistung statt bis 70; darunter faellt die Wirkung linear. Ein Neubau rutscht damit in seiner zweiten Saison unter die Schwelle und will gepflegt werden. Wer den Unterhalt nicht zahlt, verliert doppelt so schnell und steht nach rund drei Saisons vor einer Ruine.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude · Sponsoren",
+      "pr": null,
+      "text": "Das Fundament fuer geliehene Gebaeude steht: Ein Sponsor kann kuenftig ein Gebaeude bereitstellen, das sofort wirkt, ohne dass es dem Team gehoert. Solange der Vertrag laeuft und die vereinbarte Platzierung haelt, trainiert und erholt sich das Team auf der geliehenen Stufe; endet der Vertrag oder reisst die Bedingung, faellt es auf seinen eigenen Bestand zurueck — nie darunter. Wer selbst hoeher gebaut hat, verliert durch eine kleinere Leihgabe nichts. Neu ist auch, dass eine Leihgabe einen eigenen Zustand mitbringt: derselbe Gebaeudetyp auf derselben Stufe kann neuwertig oder abgenutzt verliehen werden und ist dann unterschiedlich viel wert. Sichtbar wird das alles erst mit den neuen Sponsorenkarten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Team · Historie",
       "pr": null,
       "text": "Die Cash-Spalte einer abgeschlossenen Saison zeigte den Kontostand NACH der Verkaufsphase am Saisonende — also die Spitze direkt nach dem Ausverkauf. Lost Kingdom stand dort mit 137,4, hatte vor den fuenf Verkaeufen aber nur 9,4 und ging mit 25,6 in die neue Saison; der Vergleich zur laufenden Zeile las sich dadurch wie ein Absturz um 168. Jetzt steht dort der Eintrittsstand der Folgesaison, also das Geld, mit dem das Team wirklich losgespielt hat — dieselbe Zahl, die die Ewige Tabelle schon ausweist. Gehalt und Marktwert bleiben auf dem Saisonabschluss; der Spaltenkopf sagt beim Ueberfahren, welcher Zeitpunkt gemeint ist.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude · KI-Teams",
+      "pr": null,
+      "text": "KI-Teams reparierten bisher jedes Gebaeude, das nicht exakt bei 100 Prozent stand — auch wenn es laengst noch mit voller Leistung arbeitete. Im laufenden Spielstand standen alle zwoelf Gebaeude der Liga bei 92 Prozent und damit bei voller Wirkung; der naechste Vorsaison-Lauf haette fuer jedes davon Geld ausgegeben, ohne dass ein einziger Punkt Leistung zurueckgekommen waere. Mit dem staerkeren Verschleiss waere daraus ein Dauerposten geworden. Jetzt wird erst repariert, wenn ein Gebaeude tatsaechlich unter die Wirkschwelle gefallen ist. Ausserdem passt die Zustandsanzeige wieder zur Schwelle: 'alternd' beginnt jetzt dort, wo die Leistung wieder vollstaendig ist, statt quer darueber hinweg zu spannen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {
@@ -75,6 +156,24 @@
     },
     {
       "datum": "2026-08-11",
+      "seite": "Spielplan",
+      "pr": null,
+      "text": "Der Spielplan begrenzte die kombinierte Spielerzahl eines Spieltags auf zehn. Der Disziplin-Pool traegt aber Disziplinen bis sechs Spieler — die beiden groessten ergeben zusammen zwoelf. Damit fiel genau die Entscheidung weg, um die es geht: einen breiten Kader zu halten, um an einem grossen Spieltag alle Plaetze besetzen zu koennen, waehrend ein schmaler Kader passen muss. Die Grenze war ohnehin nur halb wirksam, weil eine Ersatzregel sie riss, sobald kein passender Partner uebrig war. Jetzt gibt es keinen Standard-Deckel mehr: ein Zwoelfer-Spieltag ist eine regulaere Auslosung statt eines Ausrutschers.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Sponsoren",
+      "pr": null,
+      "text": "Mehrjahresvertraege aus aelteren Spielstaenden zahlten Saison fuer Saison auf dem Konjunkturniveau ihres Unterschriftsjahres weiter. Der Gehaltsfaktor ist aber der Massstab der laufenden Saison und keine Eigenschaft des Vertrags — beim Saisonwechsel haette er mitziehen muessen. Im laufenden Spielstand steckten dadurch 10 von 32 Vertraegen auf Faktor 1,0 fest, waehrend die Saison mit 1,19 lief: zusammen 129,6 C zu wenig, dem Tabellenersten allein 17,4. Eine frueher gebuchte Einmalreparatur hatte das nur fuer eine Saison ausgeglichen, der Fehler entstand danach bei jedem Saisonwechsel neu. Jetzt wird die eingefrorene Leiter beim Rollen umgerechnet: der Wertungsanteil folgt dem neuen Faktor, der nach Startrang eingefrorene Sockel bleibt unberuehrt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Fatigue · Verletzungen",
       "pr": null,
       "text": "Chris hatte als Zielwert ausgegeben: ohne Reha-Zentrum und ohne Frische-Boosts sollen ligaweit rund 150-200 Verletzungen pro Saison anfallen. Eine Saison-Simulation über die echte Spiel-Engine (32 Team-Kader in der Größe des laufenden Spielstands, alle zehn Spieltage) zeigt, dass die aktuelle Einstellung genau dort liegt — im Schnitt rund 190, über mehrere durchgerechnete Saisons stabil zwischen 177 und 199. Nichts wurde an der Belastung pro Einsatz verändert; die Zahl saß bereits im gewünschten Rahmen. Wer in Reha-Ausbau oder schonendes Training investiert, drückt die Zahl für sein Team weiterhin spürbar darunter — das bleibt unverändert der Sinn dieser Gebäude.",
@@ -98,6 +197,15 @@
       "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Wenn sich die Einsatzliste für einen Spieltag nicht aufbauen ließ, drehte sich die Seite scheinbar endlos — die Antwort war längst da, es gab nur nichts anzuzeigen, und der Grund stand nirgends. Jetzt steht dort, woran es liegt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
