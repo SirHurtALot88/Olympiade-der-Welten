@@ -1012,12 +1012,14 @@ export function recommendContractOfferForPlayer(input: {
   const mehrjaehrig = contractLength >= 2;
 
   if (apronUeberLinie && mehrjaehrig && contractShape === "front_loaded") {
-    contractShape = backLoadLastig ? "balanced" : "back_loaded";
-    reasons.push(
-      backLoadLastig
-        ? "Ueber der Apron-Linie und schon back-load-lastig: ausgeglichen statt frueh teuer."
-        : "Ueber der Apron-Linie: nicht zusaetzlich frueh zahlen, wenn die Abgabe ohnehin faellig wird.",
-    );
+    // AUSGEGLICHEN, NICHT BACK-LOADED. Erst stand hier `back_loaded`, wenn das Team noch nicht
+    // back-load-lastig war. Chris hat das gestoppt: „achtung deine messwerte schieben alles extrem
+    // richtung backloaded das gefaellt mir gar nicht." Er hat recht — am Abbild sind 57 % der
+    // Mehrjahresvertraege in Saison 1 front-loaded, die Regel haette also breit in Richtung
+    // back-loaded gedrueckt. Sie nimmt jetzt nur die teure Rate aus der Saison heraus, in der die
+    // Abgabe ohnehin faellig wird, und schiebt sie NICHT gesammelt nach hinten.
+    contractShape = "balanced";
+    reasons.push("Ueber der Apron-Linie: nicht zusaetzlich frueh zahlen, wenn die Abgabe ohnehin faellig wird.");
   }
   if (backLoadLastig && mehrjaehrig && contractShape === "back_loaded") {
     contractShape = "balanced";

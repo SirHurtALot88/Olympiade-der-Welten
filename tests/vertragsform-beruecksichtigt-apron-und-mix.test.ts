@@ -66,7 +66,9 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     // Negativer Spielraum = das Team liegt ueber der ersten Linie.
     const drueber = recommendContractOfferForPlayer(frontLoadLage({ apronHeadroom: -9.9 }) as never);
     expect(drueber.contractShape).not.toBe("front_loaded");
-    expect(drueber.contractShape).toBe("back_loaded");
+    // AUSGEGLICHEN, nicht back-loaded: die Regel nimmt die teure Rate aus der Abgabe-Saison heraus,
+    // schiebt sie aber nicht gesammelt nach hinten. „der mix machts."
+    expect(drueber.contractShape).toBe("balanced");
   });
 
   it("unter der Linie bleibt front-loaded erlaubt — die Regel greift nicht flaechendeckend", () => {
@@ -74,12 +76,15 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     expect(drunter.contractShape).toBe("front_loaded");
   });
 
-  it("ist das Team schon back-load-lastig, wird auch ueber der Linie nur ausgeglichen", () => {
-    // Chris' Einwand: sonst entsteht der Gehaltsberg in einer spaeteren Saison.
-    const lastig = recommendContractOfferForPlayer(
-      frontLoadLage({ apronHeadroom: -9.9, backLoadedShare: 0.6 }) as never,
-    );
-    expect(lastig.contractShape).toBe("balanced");
+  it("die Apron-Regel erzeugt NIE back-loaded — auch nicht bei leerem Back-Load-Anteil", () => {
+    // Chris: „achtung deine messwerte schieben alles extrem richtung backloaded das gefaellt mir
+    // gar nicht." Die Regel darf die Liga nicht in eine Richtung kippen.
+    for (const anteil of [0, 0.2, 0.6, 0.9]) {
+      const ergebnis = recommendContractOfferForPlayer(
+        frontLoadLage({ apronHeadroom: -9.9, backLoadedShare: anteil }) as never,
+      );
+      expect(ergebnis.contractShape, `backLoadedShare=${anteil}`).toBe("balanced");
+    }
   });
 
   it("der Mix-Riegel greift auch ohne Apron-Druck", () => {
