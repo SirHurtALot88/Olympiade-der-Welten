@@ -29,6 +29,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
+import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { advanceSeasonTransitionStep } from "@/lib/season/season-transition-service";
 
@@ -172,6 +173,37 @@ async function main() {
   const rangFalsch = sortiert.filter((team, index) => (stand[team.teamId]?.rank ?? 0) !== index + 1).length;
   console.log(`Tabellenraenge gegen unabhaengige Sortierung: ${rangFalsch} von 32 abweichend`);
   if (rangFalsch > 2) auffaellig.push(`Tabelle: ${rangFalsch} Raenge weichen von der reinen Punktsortierung ab (Gleichstandsregeln?)`);
+
+  // ---------------------------------------------------------------- Saisonende-Abrechnung
+  //
+  // DIE KETTE HAT HIER EIN TOR, UND ES IST EIN GUTES: der Schritt "Finanzen" ist blockiert,
+  // solange Sponsorgeld, Preisgeld, Gebaeudeunterhalt und Apron nicht gebucht sind
+  // (`season_end_cash_settlement_pending`). Frueher liess sich der Schritt einfach
+  // weiterklicken — dann lief die Kette bis in die neue Saison, OHNE dass je Geld geflossen
+  // waere, und der eingefrorene Kontostand hielt eine Zahl fest, die es nie gab.
+  // Der Abnahmelauf muss also dasselbe tun wie ein Spieler: erst abrechnen, dann weiter.
+  console.log("\n--- Saisonende-Abrechnung ---");
+  const abrechnung = await executeCashPrizeApply({
+    saveId,
+    seasonId,
+    source: "sqlite",
+    confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
+  } as never).catch((error) => {
+    fehler.push(`Saisonende-Abrechnung warf: ${(error as Error).message.slice(0, 160)}`);
+    return null;
+  });
+  if (abrechnung) {
+    const r = abrechnung as unknown as Record<string, unknown>;
+    console.log(`  gebucht: ${String(r.applied)}${r.blockingReasons && (r.blockingReasons as unknown[]).length ? `  << ${(r.blockingReasons as unknown[]).slice(0, 3).join(" | ")}` : ""}`);
+    if (r.applied !== true) fehler.push(`Saisonende-Abrechnung nicht gebucht: ${JSON.stringify(r.blockingReasons ?? r.warnings ?? "ohne Begruendung").slice(0, 160)}`);
+  }
+  const kasseNachAbrechnung = new Map(persistence.getSaveById(saveId)!.gameState.teams.map((t) => [t.teamId, t.cash] as const));
+  let bewegt = 0;
+  for (const [teamId, cash] of kasseNachAbrechnung) {
+    if (Math.abs(cash - (startKasse.get(teamId) ?? 0)) > 0.01) bewegt += 1;
+  }
+  console.log(`  Kassen bewegt: ${bewegt} von 32`);
+  if (bewegt === 0) fehler.push("Die Saisonende-Abrechnung hat keine einzige Kasse bewegt");
 
   // ---------------------------------------------------------------- Saisonwechsel
   console.log("\n--- Saisonwechsel ---");
