@@ -3548,7 +3548,21 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         setIsPreviewPanelOpen(false);
         setIsAiPreviewPanelOpen(false);
       }
-      setWarnings([...payload.contextWarnings, ...payload.contextErrors]);
+      /**
+       * GEMELDET VON CHRIS: die Einsatzliste laedt „einfach minutenlang".
+       *
+       * Die Route antwortet mit HTTP 200 und `context: null`, wenn der Spieltags-Kontext nicht
+       * gebaut werden kann — die Gruende stehen in `contextErrors`. Die landeten hier bisher in den
+       * WARNUNGEN, also in derselben unauffaelligen Zeile wie „Spieler X ist angeschlagen". Der
+       * Grund, warum die ganze Seite leer bleibt, stand damit zwischen Nebensaechlichkeiten.
+       *
+       * Ein Kontext, der nicht gebaut werden konnte, ist ein Fehler und gehoert in `errors`. Nur
+       * die echten Kontext-Warnungen bleiben Warnungen.
+       */
+      setWarnings(payload.contextWarnings);
+      if (payload.contextErrors.length > 0) {
+        setErrors(payload.contextErrors);
+      }
 
       const nextSelections: Record<string, string> = {};
       const nextCaptains: Record<"d1" | "d2", string> = { d1: "", d2: "" };

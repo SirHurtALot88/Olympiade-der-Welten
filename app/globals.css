@@ -59786,6 +59786,37 @@ button.foundation-team-portrait-card {
   text-align: center;
 }
 
+/* Kein Kontext, aber auch nicht mehr am Laden: der GRUND gehoert sichtbar auf den Schirm.
+   Vorher stand hier ein Skelett ohne sichtbaren Text — es sah nach „laedt" aus und blieb
+   minutenlang stehen, obwohl die Antwort laengst da war. */
+.is-new-look .nl-lineup-empty {
+  padding: var(--nl-s6);
+  color: var(--nl-fg, #e6ebf5);
+  text-align: center;
+}
+
+.is-new-look .nl-lineup-empty__title {
+  font-weight: 700;
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-lineup-empty__reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: var(--nl-bad, #f2777a);
+  font-size: 13px;
+  display: grid;
+  gap: 4px;
+}
+
+.is-new-look .nl-lineup-empty__hint {
+  color: var(--nl-mut);
+  font-size: 13px;
+  max-width: 52ch;
+  margin: 0 auto;
+}
+
 .is-new-look .nl-lineup-eyebrow {
   font-size: 10px;
   font-weight: 700;
