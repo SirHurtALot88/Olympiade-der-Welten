@@ -615,6 +615,22 @@ export type FormCardSeasonUsageAuditTeam = {
   negativePenaltyPoints: number;
 };
 
+/**
+ * Saisonweite Karten-Bilanz je Team — wie viel ist gespielt, wie viel liegt noch offen, und was
+ * kostet das am Saisonende.
+ *
+ * DIE GESPIELTEN KARTEN KOMMEN AUS `buildFormCardUsageMap` — derselben Quelle, aus der auch die
+ * Kartenauswahl und die Karten-Heilung lesen. Dazwischen lag eine Zeit lang der Umweg ueber
+ * `leseGespielteFormkartenIds` und die mitgelieferte Projektion `foundationFormCardBonus`: die
+ * Anfangsladung beschnitt die `lineupDrafts` auf den aktiven Spieltag (320 voll, 32 kompakt), und
+ * diese Funktion zaehlte im Browser 262 „offene" negative Karten statt null — die Inbox warnte vor
+ * 605 Strafpunkten, die es nicht gab.
+ *
+ * Seit `8ec6454b` fahren die `lineupDrafts` vollstaendig mit; die Projektion ist entfernt (sie war
+ * nachgemessen wirkungslos und ueberstimmte obendrein eine waehrend der Sitzung frisch gelegte
+ * Karte, weil sie vom Ladezeitpunkt stammte). Damit gibt es fuer „welche Karte ist gespielt" wieder
+ * genau eine Rechenstelle.
+ */
 export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: string) {
   const usage = buildFormCardUsageMap(gameState, seasonId);
   const rows = [...gameState.teams]
@@ -1006,6 +1022,20 @@ export function calculateMutatorModifierForSide(input: {
     playerMutatorBonuses,
     playerMutatorPpsBonuses,
     mutatorSlots,
+    /**
+     * IMMER `null` — und das ist kein Versehen, sondern die einzige richtige Antwort.
+     *
+     * Es gibt keinen team-weiten Mutator-PP-Topf. Mutator-Player-Points entstehen JE
+     * SPIELER (`playerMutatorPpsBonuses`, 0,3 pro Treffer) und werden auch je Spieler
+     * gutgeschrieben. Alle Rueckgabepfade dieser Datei setzen das Feld deshalb hart auf
+     * `null`/`missing_source` — am Live-Abbild nachgemessen: 64 von 64 gebuchten
+     * Team-Zeilen tragen `missing_source`.
+     *
+     * WER ES LIEST, DARF ES NIE IN EINEN SCORE RECHNEN. Genau das tat bis zu diesem Audit
+     * `discipline-stage-from-preview.ts` (Buehnen-Zeile „Team-PPs"): eine PP-Groesse waere
+     * dort in den Disziplin-Score gewandert. Die Zeile ist entfernt. Uebrig sind nur noch
+     * Diagnose-Anzeigen (Lineup-Lab, Cockpit-Audit), die den Status als solchen ausweisen.
+     */
     teamPpsModifier: null,
     teamPpsStatus: "missing_source",
     warnings,

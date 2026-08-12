@@ -8,6 +8,7 @@ import type { ContractAssessment } from "@/lib/foundation/tabs/use-teams-contrac
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -859,7 +860,7 @@ function FoundationTeamsDetailPanel({
                                 />
                               ) : (
                                 <span className="teams-dissolution-portrait-fallback">
-                                  {offer.playerName.slice(0, 2).toUpperCase()}
+                                  {getPlayerPortraitInitials(offer.playerName)}
                                 </span>
                               )}
                             </span>

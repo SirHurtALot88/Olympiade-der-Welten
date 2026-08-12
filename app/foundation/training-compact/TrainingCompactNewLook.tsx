@@ -16,6 +16,7 @@ import {
   NlFatigueGauge,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   formatNlSignedNumber,
   useCountUp,
@@ -24,6 +25,10 @@ import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments } from "@/
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import {
+  formatContractShapeLabel,
+  formatContractShapeShortLabel,
+} from "@/lib/foundation/player-economy-contract";
 
 import type { TrainingCompactClientProps } from "@/app/foundation/training-compact/TrainingCompactClient";
 import type {
@@ -747,6 +752,10 @@ function NlTrainingPlayerRow({
   const currentTrainingClassLabel =
     trainingClassOptions.find((option) => option.value === row.trainingClass)?.label ?? row.trainingClass;
   const trainsOtherClass = row.trainingClass !== row.player.className;
+  // Vertragsform-Kürzel (FL/BL) — dieselbe Ableitung wie die Kaderliste
+  // (`formatContractShapeShortLabel`), `null` bei "balanced" (kein Kürzel dort auch).
+  const contractShapeShort = formatContractShapeShortLabel(row.economy.contractShape);
+  const isContractExpiring = row.economy.contractLength != null && row.economy.contractLength <= 1;
 
   // Klassen-Vorschlag aus DERSELBEN Rangliste, die die aufgeklappte Zeile zeigt —
   // ein Chip, der der Liste widerspricht, wäre ein Muster-4-Loch.
@@ -761,9 +770,15 @@ function NlTrainingPlayerRow({
   const portrait = getPlayerPortraitModel(row.player);
   // Hover-Steckbrief (#Portrait-Hover): dieselbe `FoundationPlayerPortraitPreview`-Instanz
   // wie in `FoundationPlayersTableNewLook` — trägt den `context="training"`-Preset
-  // (CA/PO/Forecast), damit der Popup-Inhalt NICHT dieselben Zahlen doppelt zeigt,
+  // (Forecast), damit der Popup-Inhalt NICHT dieselben Zahlen doppelt zeigt,
   // die die Zeile selbst schon darstellt. Diese Trainingsseite ist ausschließlich
   // der eigene, steuerbare Kader — kein Fog-of-War nötig.
+  //
+  // CA/PO stehen NICHT mehr im Text-Preset (vorher "CA 45" als Zahl neben "PO"
+  // als Sterne — Chris' Screenshot-Befund): `newLook`+`caScore`/`poScore` aktiviert
+  // denselben `NlAbilityStars`-Slot, den auch die Kaderliste (`FoundationPlayersTableNewLook`)
+  // und die aufgeklappte Zeile dieser Tabelle (`NlTrainingPlayerCard`, s.u.) für CA/PO
+  // benutzen — dieselbe Quelle (`row.developmentStars`), eine Darstellung überall.
   const portraitPreviewProps: Omit<FoundationPlayerPortraitPreviewProps, "children"> = {
     playerId: row.player.id,
     name: row.player.name,
@@ -778,6 +793,10 @@ function NlTrainingPlayerRow({
     soc: row.player.coreStats.soc ?? null,
     variant: "team",
     context: "training",
+    newLook: true,
+    known: true,
+    caScore: row.developmentStars.currentAbilityRating,
+    poScore: row.developmentStars.potentialRating,
     playerClassName: row.player.className,
     subMeta:
       row.organicForecast.classBefore === row.organicForecast.classAfter
@@ -785,8 +804,6 @@ function NlTrainingPlayerRow({
         : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`,
     contextData: {
       training: {
-        caRating: row.developmentStars.currentAbilityRating,
-        poDisplay: row.developmentStars.potentialStars ?? formatNlNumber(row.developmentStars.potentialRating, 0),
         netSetpoints: row.organicForecast.netSetpoints,
         regressionRisk: row.forecast.regressionRisk,
         trainingModeLabel: getTrainingModePresentation(row.mode).label,
@@ -846,6 +863,16 @@ function NlTrainingPlayerRow({
             </small>
           </span>
         </td>
+        <td className="nl-training-row-ability">
+          <NlAbilityStars
+            caScore={row.developmentStars.currentAbilityRating}
+            poScore={row.developmentStars.potentialRating}
+            known
+            compact
+            stacked
+            label={`${row.player.name} Fähigkeiten`}
+          />
+        </td>
         <td className="nl-training-row-modes">
           <span
             className="nl-training-row-seg"
@@ -901,6 +928,26 @@ function NlTrainingPlayerRow({
             {getToneBadgeLabel(tone)}
           </span>
         </td>
+        <td className="nl-training-row-salary">
+          <span className="nl-tnum">{formatNlMoney(row.economy.salary)}</span>
+        </td>
+        <td className="nl-training-row-contract">
+          {row.economy.contractLength != null ? (
+            <span
+              className={`nl-training-row-contract-value${isContractExpiring ? " is-expiring" : ""}`}
+              title={
+                `${formatContractShapeLabel(row.economy.contractShape)} · noch ${row.economy.contractLength} ${
+                  row.economy.contractLength === 1 ? "Saison" : "Saisons"
+                }` + (isContractExpiring ? " — Vertrag läuft aus" : "")
+              }
+            >
+              {contractShapeShort ? <span className="nl-training-row-contract-shape">{contractShapeShort}</span> : null}
+              <span className="nl-tnum">{row.economy.contractLength}J</span>
+            </span>
+          ) : (
+            "—"
+          )}
+        </td>
         <td className="nl-training-row-suggest">
           {suggestsSwitch && bestClass ? (
             <span
@@ -937,7 +984,9 @@ function NlTrainingPlayerRow({
       </tr>
       {expanded ? (
         <tr className="nl-training-detail-row" data-testid="nl-training-detail-row">
-          <td colSpan={6}>
+          {/* 9 Spalten in der Kopfzeile: Spieler, CA/PO, Intensität, Netto/Saison,
+              Belastung, Gehalt, Vertrag, Klassen-Vorschlag, Details. */}
+          <td colSpan={9}>
             <NlTrainingPlayerCard
               row={row}
               trainingModeReadOnly={trainingModeReadOnly}
@@ -1328,6 +1377,9 @@ export default function TrainingCompactNewLook({
               <thead>
                 <tr>
                   <th scope="col">Spieler</th>
+                  <th scope="col" title="Fähigkeit (CA) und Potenzial (PO) als Sterne — dieselbe Skala wie überall sonst (Kaderliste, Profil).">
+                    CA/PO
+                  </th>
                   <th scope="col" title="Trainingsintensität — die tägliche Entscheidung. Zahl = erwarteter Trainings-Zuwachs (SP) bei dieser Stufe.">
                     Intensität
                   </th>
@@ -1336,6 +1388,12 @@ export default function TrainingCompactNewLook({
                   </th>
                   <th scope="col" title="Aktuelle Fatigue (0–100) und Entwicklungs-Tendenz.">
                     Belastung
+                  </th>
+                  <th scope="col" title="Aktuelles Saison-Gehalt (Vertragsjahr 1) — dieselbe Quelle wie die Kaderliste.">
+                    Gehalt
+                  </th>
+                  <th scope="col" title="Restlaufzeit in Saisons und Vertragsform (FL = Front-Loaded, BL = Back-Loaded, ohne Kürzel = ausgeglichen). Lange Restlaufzeit = lohnt sich eher zu entwickeln.">
+                    Vertrag
                   </th>
                   <th scope="col" title="Beste Trainingsklasse laut Schätzung — Details in der aufgeklappten Klassenliste.">
                     Klassen-Vorschlag

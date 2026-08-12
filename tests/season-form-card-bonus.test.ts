@@ -127,10 +127,17 @@ describe("buildSeasonFormCardBonusByTeamId", () => {
     });
   });
 
-  it("prefers the shipped balance over beschnittene Aufstellungen", () => {
-    // Genau die Lage im Browser: von zehn Spieltagen ist nur der aktive uebrig, seine
-    // Aufstellung traegt eine einzige Karte. Ohne die mitgelieferte Bilanz zaehlte die
-    // Saisonstand-Spalte diesen einen Spieltag und meldete "1 Karte" statt der ganzen Saison.
+  it("eine mitgeschickte Fremd-Bilanz ueberstimmt die Aufstellungen NICHT mehr", () => {
+    /**
+     * FRUEHER HIESS DIESER FALL „prefers the shipped balance over beschnittene Aufstellungen".
+     * Damals beschnitt die Anfangsladung die `lineupDrafts` auf den aktiven Spieltag, und die
+     * mitgelieferte Projektion `foundationFormCardBonus` hatte hier BEDINGUNGSLOS Vorfahrt.
+     *
+     * Beides ist weg: die `lineupDrafts` fahren seit `8ec6454b` vollstaendig mit, die Projektion
+     * ist entfernt. Was hier geprueft wird, ist die Gegenprobe — ein alter Browser-Tab, der das
+     * Feld noch mitschickt, darf die Spalte nicht mehr auf seinen Ladezeitpunkt einfrieren.
+     * Gezaehlt wird, was in den Aufstellungen steht: eine Karte, Nennwert 8.
+     */
     const gameState = makeGameState({
       formCards: [{ id: "c1", seasonId: "S1", teamId: "A-A", cardValue: 8 }],
       lineupDrafts: [{ seasonId: "S1", modifiers: { d1: { primaryFormCardId: "c1" } } }],
@@ -138,26 +145,6 @@ describe("buildSeasonFormCardBonusByTeamId", () => {
     (gameState.seasonState as { foundationFormCardBonus?: unknown }).foundationFormCardBonus = {
       seasonId: "S1",
       byTeamId: { "A-A": { total: -8, cards: 15, positive: 34, negative: -42 } },
-    };
-
-    expect(buildSeasonFormCardBonusByTeamId(gameState, "S1").get("A-A")).toMatchObject({
-      total: -8,
-      cards: 15,
-      positive: 34,
-      negative: -42,
-    });
-  });
-
-  it("ignoriert die mitgelieferte Bilanz fuer eine andere Saison", () => {
-    // Die Projektion deckt nur die laufende Saison ab. Beim Blick ins Archiv darf sie nicht
-    // einspringen, sonst stuende unter einer alten Saison die Bilanz der aktuellen.
-    const gameState = makeGameState({
-      formCards: [{ id: "c1", seasonId: "S1", teamId: "A-A", cardValue: 8 }],
-      lineupDrafts: [{ seasonId: "S1", modifiers: { d1: { primaryFormCardId: "c1" } } }],
-    });
-    (gameState.seasonState as { foundationFormCardBonus?: unknown }).foundationFormCardBonus = {
-      seasonId: "S2",
-      byTeamId: { "A-A": { total: 999, cards: 99, positive: 999, negative: 0 } },
     };
 
     expect(buildSeasonFormCardBonusByTeamId(gameState, "S1").get("A-A")).toMatchObject({

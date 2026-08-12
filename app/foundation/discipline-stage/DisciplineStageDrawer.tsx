@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitBrowserUrl, getPlayerPortraitInitials, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { NlProgressBar } from "@/components/foundation/new-look/NlProgressBar";
 import PlayerMark from "@/app/foundation/discipline-stage/arena/PlayerMark";
@@ -767,7 +767,7 @@ function DisciplinePortraitCard({
       playerId={player.id}
       name={player.name}
       portraitUrl={portraitUrl}
-      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      portraitInitials={getPlayerPortraitInitials(player.name)}
       playerOvr={row?.ovrNormalized ?? null}
       ovrRank={row?.ovrRank ?? null}
       playerPps={seasonPps ?? row?.ppsSeason ?? null}

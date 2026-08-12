@@ -2,9 +2,10 @@
  * Δ MODIFIKATOREN — was Aufstellung, Form, Captain und Mutatoren an PLÄTZEN gebracht haben.
  *
  * GEWÜNSCHT VON CHRIS: Das alte „Daten-Ansicht"-Scoreboard zeigte diese Zahl. Beim Umbau auf den
- * neuen Look ging sie verloren — `lib/season/matchday-arena-presenter.ts` rechnet `baseRank` und
- * `rankDelta` bis heute, aber die Funktion dort ruft keine Ansicht mehr auf. Die Zahl entstand und
- * verschwand ungesehen.
+ * neuen Look ging sie verloren. Es gab dafür einmal eine zweite Rechenstelle
+ * (`lib/season/matchday-arena-presenter.ts`, `baseRank`/`rankDelta`) — ohne Aufrufer, und mit
+ * einer anderen Gleichstandsregel als die Engine (`rankDescendingSharedTies`). Sie ist am
+ * 11.08.2026 gelöscht worden; die Zahl entsteht seither nur noch hier, aus den Rohsummen.
  *
  * Sie beantwortet eine Frage, die aus den Punkten allein nicht ablesbar ist: hat meine Aufstellung
  * überhaupt etwas gebracht? Ein Team kann Rang 12 werden, weil es mit Rang 12 hineinging — oder

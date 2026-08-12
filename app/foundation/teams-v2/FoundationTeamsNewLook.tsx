@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildExpectedSellValueByPlayerId } from "@/lib/market/transfermarkt-expected-sell-value";
+import {
+  buildExpectedSellValueByPlayerId,
+  type ExpectedSellValueEntry,
+} from "@/lib/market/transfermarkt-expected-sell-value";
+import {
+  buildTeamsPortraitMwValueText,
+  resolveTeamsPortraitSellValueDisplay,
+} from "@/lib/foundation/teams-portrait-sell-value";
 import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -138,8 +145,15 @@ export type FoundationTeamsNewLookProps = {
    * Erwarteter Verkaufserloes je Spieler aus dem SERVER-Slice. Optional und bewusst nachrangig
    * behandelt: ein leeres Feld laesst die lokale Rueckfallebene stehen (siehe
    * `sellValueByPlayerId` unten).
+   *
+   * Braucht `grossSalePrice`/`buyoutCost` zusaetzlich zu `expectedSellValue`: die Karte zeigt den
+   * BRUTTO-Preis (`grossSalePrice`, dieselbe Definition wie die "VK-Wert"-Spalte der
+   * Spielerliste) als Hauptzahl, Buyout/Netto nur noch im Tooltip.
    */
-  sliceSellValueByPlayerId?: Record<string, { expectedSellValue: number }> | null;
+  sliceSellValueByPlayerId?: Record<
+    string,
+    Pick<ExpectedSellValueEntry, "grossSalePrice" | "buyoutCost" | "expectedSellValue">
+  > | null;
   /**
    * Aktiver Team-Unterreiter aus dem Host. Steuert historisch die
    * Standard-Ansicht der Kaderprofil-Karte — die startet jedoch bewusst
@@ -1180,9 +1194,15 @@ export default function FoundationTeamsNewLook({
           // statt eine Zahl zu erfinden.
           const salaryRaw = getRosterEntryDisplaySalary(entry, player);
           const salary = heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null;
-          const sellValue = sellValueByPlayerId.get(player.id)?.expectedSellValue ?? null;
-          const sellValueDelta =
-            isFiniteNumber(sellValue) && isFiniteNumber(marketValue) ? sellValue - marketValue : null;
+          // DEFINITIONS-GLEICH mit der "VK-Wert"-Spalte der Spielerliste
+          // (`FoundationPlayersTableNewLook.tsx`, `row.sellPreview.grossSalePrice`): Brutto, nicht
+          // Netto. Diese Karte griff vorher auf `.expectedSellValue` (Netto = Brutto − Rest-Buyout)
+          // zu — zwei Felder DESSELBEN Eintrags, zwei Zahlen für denselben Spieler. Siehe
+          // `resolveTeamsPortraitSellValueDisplay` (lib/foundation/teams-portrait-sell-value.ts).
+          const sellEntry = sellValueByPlayerId.get(player.id) ?? null;
+          const sellValueDisplay = sellEntry
+            ? resolveTeamsPortraitSellValueDisplay({ entry: sellEntry, marketValue })
+            : null;
           const subMeta = formatPlayerIdentitySubMeta(player);
           return (
             <FoundationPlayerPortraitCard
@@ -1220,11 +1240,21 @@ export default function FoundationTeamsNewLook({
               // T2 (Chris: „es ist ein game und kein excel"): Die Portrait-Karte trägt keine
               // Vertragsdetails mehr — Gehalt und Laufzeit stehen genau einmal in der Ansicht
               // „Liste & Verträge". Übrig bleibt der Marktwert als Spieler-Kennzahl.
+              //
+              // NACHTRAG CHRIS zur VK-Anzeige: „mach dort lieber den MW hin und nur in klammern
+              // den aktuellen VK preis" — MW bleibt die Leitzahl, der VK-Preis (Brutto, dieselbe
+              // Definition wie die Spielerliste) steht dahinter in Klammern samt seinem Abstand
+              // zum Marktwert. Zusammen mit der Breiten-Vorgabe (MW+Gehalt füllen die Zeile, siehe
+              // `.foundation-player-portrait-economy:has(...)` in globals.css) ersetzt das die
+              // vorherige separate VK-Zeile (`nl-teams-portrait-sellvalue`) vollständig — kein
+              // drittes, leeres Grid-Feld mehr, kein eigener Footer mehr.
               economyStats={[
                 {
                   label: "MW",
-                  value: formatNlMoney(marketValue),
-                  title: "MW — Marktwert (mit Delta zur Vorwoche)",
+                  value: buildTeamsPortraitMwValueText({ marketValue, sellValueDisplay }),
+                  title: sellValueDisplay
+                    ? `MW — Marktwert (mit Delta zur Vorwoche). ${sellValueDisplay.tooltip}`
+                    : "MW — Marktwert (mit Delta zur Vorwoche)",
                   delta:
                     marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
                       ? `${marketValueDelta > 0 ? "+" : ""}${formatNlNumber(marketValueDelta, 2)}`
@@ -1245,26 +1275,6 @@ export default function FoundationTeamsNewLook({
                       : "Gehalt — nur fuer das eigene Team sichtbar",
                 },
               ]}
-              footerSlot={
-                // VK unter der Zeile, mit dem Abstand zum Marktwert. Seit der Wert aus dem
-                // Server-Slice kommt, steht er IMMER da — auch bei Differenz 0, denn dann ist die
-                // 0 eine Aussage („noch kein Verkaufsfaktor verdient") und kein Artefakt der
-                // beschnittenen Client-Daten. Nur ohne jeden Wert bleibt die Zeile weg.
-                sellValue != null && sellValueDelta != null ? (
-                  <div className="nl-teams-portrait-sellvalue" title="VK — erwarteter Verkaufserloes, und wie weit er ueber oder unter dem Marktwert liegt">
-                    <span className="nl-teams-portrait-sellvalue-label">VK</span>
-                    <span className="nl-teams-portrait-sellvalue-value">{formatNlMoney(sellValue)}</span>
-                    <span
-                      className={`nl-teams-portrait-sellvalue-delta ${
-                        sellValueDelta > 0.005 ? "text-positive" : sellValueDelta < -0.005 ? "text-negative" : ""
-                      }`}
-                    >
-                      {sellValueDelta > 0.005 ? "+" : ""}
-                      {formatNlNumber(sellValueDelta, 2)}
-                    </span>
-                  </div>
-                ) : null
-              }
             />
           );
         })}

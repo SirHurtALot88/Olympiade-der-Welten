@@ -29,17 +29,15 @@ describe("player league heat", () => {
 describe("player portrait stat presets", () => {
   const heatPools = createEmptyLeaguePlayerHeatPools();
 
-  it("builds training overlay stats with forecast", () => {
+  it("builds training overlay stats with forecast only (CA/PO come from the shared ability-stars slot, not text)", () => {
     const stats = buildTrainingOverlayStats({
-      caRating: 72,
-      poDisplay: "4.5",
       netSetpoints: 1.2,
       regressionRisk: "high",
       trainingModeLabel: "Intensiv",
     });
 
-    expect(stats.map((entry) => entry.label)).toEqual(["CA", "PO", "Forecast"]);
-    expect(stats[2].value).toContain("+");
+    expect(stats.map((entry) => entry.label)).toEqual(["Forecast"]);
+    expect(stats[0].value).toContain("+");
   });
 
   it("builds market overlay stats with fit and economy", () => {
@@ -102,8 +100,6 @@ describe("player portrait stat presets", () => {
       density: "compact",
       contextData: {
         training: {
-          caRating: 70,
-          poDisplay: "4",
           netSetpoints: 0.5,
           regressionRisk: "low",
           trainingModeLabel: "Mittel",
@@ -185,7 +181,12 @@ describe("foundation player portrait preview ui contract", () => {
 
     const [previewText, foundationText, teamsText, marketText] = await Promise.all([
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
+      // AUDIT 11.08.2026: hier stand `app/foundation/FoundationShellRouterBody.tsx`. Die
+      // Spieler-Tabelle ist laengst in den Shell-Router-Hook gewandert
+      // (`lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx`), die alte Datei
+      // enthaelt seit Commit c579624a keine einzige Erwaehnung mehr — der Fall war seither
+      // dauerhaft rot. Geprueft wird jetzt die Datei, in der die Vorschau wirklich haengt.
+      fs.readFile(path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
       // TransfermarktV2Client.tsx ist ein dünner Wrapper — das Markt-Markup liegt im NewLook.
       fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2NewLook.tsx"), "utf8"),

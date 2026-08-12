@@ -395,6 +395,15 @@ export default function FoundationPlayerPortraitCard({
       src={portraitUrl}
       placeholderSrc={portraitPlaceholderUrl}
       alt={name}
+      // DASSELBE Kuerzel wie im Zweig darunter. Ohne `fallbackLabel` leitet
+      // `OptimizedMediaImage` sein Platzhalter-Kuerzel selbst aus dem Alt-Text ab
+      // (`deriveInitialsFromAlt`) — bei einteiligen Namen sind das die ersten ZWEI Zeichen
+      // ("Umbros" -> "UM"), waehrend `portraitInitials` aus dem Portrait-Modell "U" sagt.
+      // Sichtbar wurde das genau dann, wenn ein Spieler zwar eine Portrait-URL hat, das Bild
+      // aber nicht laedt (fehlende Datei, 404 der Media-Route): dieselbe Karte zeigte dann ein
+      // anderes Kuerzel als eine Karte ohne URL. Gemessen am Live-Abbild vom 11.08. betraf
+      // das 2957 der 2984 Spieler beider aktiven Staende.
+      fallbackLabel={portraitInitials}
       // Intrinsische Maße = Anforderungsgröße beim Bild-Optimizer, nicht die Layoutgröße (die
       // kommt aus dem Raster, das Bild ist `object-fit: cover` auf 100 %). Mit den breiteren
       // Kader-Spalten reichten 280 px nicht mehr — das Portrait wurde hochskaliert und weich.

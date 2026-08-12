@@ -128,13 +128,35 @@ function createGameState(partial?: {
 }
 
 describe("scouting wishlist slots", () => {
-  it("uses 4 base slots plus 3 per scouting level", () => {
-    expect(getScoutingWishlistSlotsForLevel(0)).toBe(4);
-    expect(getScoutingWishlistSlotsForLevel(1)).toBe(7);
-    expect(getScoutingWishlistSlotsForLevel(3)).toBe(13);
-    expect(getScoutingWishlistSlotsForLevel(5)).toBe(19);
-    expect(getScoutingWishlistSlotLimit(createGameState({ scoutingLevel: 0 }), "M-M")).toBe(4);
-    expect(getScoutingWishlistSlotLimit(createGameState({ scoutingLevel: 3 }), "M-M")).toBe(13);
+  it("gibt 6 Grundplaetze plus 4 je Scouting-Stufe", () => {
+    // Chris: „erweiter die wunschliste mal um 2 slots + mehr slots mit den gebäudeupgrades pro
+    // stufe." Vorher 4 + 3 je Stufe (4 bis 19 Plaetze), jetzt 6 + 4 (6 bis 26).
+    //
+    // Die Zahlen stehen hier ABSICHTLICH ausgeschrieben statt aus den Konstanten gerechnet: sie
+    // sind eine Balancing-Entscheidung, keine Ableitung. Wer sie aendert, soll das hier sehen und
+    // nicht durch eine Formel hindurch, die sich stillschweigend mitzieht.
+    expect(getScoutingWishlistSlotsForLevel(0)).toBe(6);
+    expect(getScoutingWishlistSlotsForLevel(1)).toBe(10);
+    expect(getScoutingWishlistSlotsForLevel(3)).toBe(18);
+    expect(getScoutingWishlistSlotsForLevel(5)).toBe(26);
+    expect(getScoutingWishlistSlotLimit(createGameState({ scoutingLevel: 0 }), "M-M")).toBe(6);
+    expect(getScoutingWishlistSlotLimit(createGameState({ scoutingLevel: 3 }), "M-M")).toBe(18);
+  });
+
+  it("macht jede Ausbaustufe wertvoll, aber die spaeteren teurer je Platz", () => {
+    // Die Staffelung ist an den Baukosten des Scouting-Bueros gemessen (kumuliert 6/18/38/70/120 C).
+    // Jede Stufe gibt gleich viele Plaetze, kostet aber mehr — der erste Ausbau lohnt klar, der
+    // Vollausbau ist eine Entscheidung. Geprueft wird die Eigenschaft, nicht die Kostentabelle:
+    // gleiche Schrittweite auf allen Stufen.
+    const schritte = [1, 2, 3, 4, 5].map(
+      (stufe) => getScoutingWishlistSlotsForLevel(stufe) - getScoutingWishlistSlotsForLevel(stufe - 1),
+    );
+    expect(new Set(schritte).size, `ungleiche Schritte: ${schritte.join(", ")}`).toBe(1);
+    expect(schritte[0]).toBeGreaterThan(0);
+  });
+
+  it("klammert negative Stufen auf die Grundplaetze", () => {
+    expect(getScoutingWishlistSlotsForLevel(-1)).toBe(6);
   });
 
   // Bug 2026-07-31: "für den Draft müssen wir die Wishlist auf bis zu 15
@@ -226,23 +248,22 @@ describe("scouting wishlist slots", () => {
       })),
     });
     expect(isTeamSetupDraftWishlistPhase(postDraft, "M-M")).toBe(false);
-    expect(getScoutingWishlistSlotLimit(postDraft, "M-M")).toBe(7); // 4 Basis + 3 * Level 1
+    expect(getScoutingWishlistSlotLimit(postDraft, "M-M")).toBe(getScoutingWishlistSlotsForLevel(1));
   });
 
   it("blocks wishlist adds when regular slots are full", () => {
+    // Die Liste wird GENAU bis ans Limit gefuellt, statt eine feste Zahl Namen abzuschreiben — sonst
+    // prueft der Test nach der naechsten Slot-Aenderung nur noch, dass irgendeine Liste zu kurz ist.
+    const limit = getScoutingWishlistSlotsForLevel(1);
     const full = createGameState({
       scoutingLevel: 1,
-      wishlist: [
-        { playerId: "p-1", createdAt: "2026-06-25T00:00:00.000Z" },
-        { playerId: "p-2", createdAt: "2026-06-25T01:00:00.000Z" },
-        { playerId: "p-3", createdAt: "2026-06-25T02:00:00.000Z" },
-        { playerId: "p-4", createdAt: "2026-06-25T03:00:00.000Z" },
-        { playerId: "p-5", createdAt: "2026-06-25T04:00:00.000Z" },
-        { playerId: "p-6", createdAt: "2026-06-25T05:00:00.000Z" },
-        { playerId: "p-7", createdAt: "2026-06-25T06:00:00.000Z" },
-      ],
+      wishlist: Array.from({ length: limit }, (_, index) => ({
+        playerId: `p-${index + 1}`,
+        createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
+      })),
     });
     expect(canAddPlayerToTransferWishlist(full, "M-M").ok).toBe(false);
+    // Ein Spieler, der schon drauf steht, darf immer — er belegt keinen zusaetzlichen Platz.
     expect(canAddPlayerToTransferWishlist(full, "M-M", "p-1").ok).toBe(true);
   });
 
@@ -286,27 +307,19 @@ describe("scouting wishlist slots", () => {
       rosterCount: 10,
       seasonId: "season-1",
       gamePhase: "season_active",
-      wishlist: [
-        { playerId: "p-1", createdAt: "2026-06-25T00:00:00.000Z" },
-        { playerId: "p-2", createdAt: "2026-06-25T01:00:00.000Z" },
-        { playerId: "p-3", createdAt: "2026-06-25T02:00:00.000Z" },
-        { playerId: "p-4", createdAt: "2026-06-25T03:00:00.000Z" },
-        { playerId: "p-5", createdAt: "2026-06-25T04:00:00.000Z" },
-      ],
+      wishlist: Array.from({ length: getScoutingWishlistSlotsForLevel(0) + 1 }, (_, index) => ({
+        playerId: `p-${index + 1}`,
+        createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
+      })),
     });
-    expect(getActiveScoutingWishlistEntries(gameState, "M-M").map((entry) => entry.playerId)).toEqual([
-      "p-1",
-      "p-2",
-      "p-3",
-      "p-4",
-    ]);
+    // Genau ein Eintrag mehr als Plaetze — der aelteste Satz bleibt aktiv, der letzte faellt raus.
+    expect(getActiveScoutingWishlistEntries(gameState, "M-M").map((entry) => entry.playerId)).toEqual(
+      Array.from({ length: getScoutingWishlistSlotsForLevel(0) }, (_, index) => `p-${index + 1}`),
+    );
     const refreshed = refreshScoutPipeline(gameState, "M-M");
-    expect((refreshed.seasonState.scoutIntelByTeamId?.["M-M"] ?? []).map((entry) => entry.playerId)).toEqual([
-      "p-1",
-      "p-2",
-      "p-3",
-      "p-4",
-    ]);
+    expect((refreshed.seasonState.scoutIntelByTeamId?.["M-M"] ?? []).map((entry) => entry.playerId)).toEqual(
+      Array.from({ length: getScoutingWishlistSlotsForLevel(0) }, (_, index) => `p-${index + 1}`),
+    );
   });
 
   // Absicherung für die schon vorhandene Kappung beim Übergang vom Draft (15
@@ -314,19 +327,21 @@ describe("scouting wishlist slots", () => {
   // neu gebaut (Aufgabe: nur absichern).
   describe("trimTransferWishlistToSlotLimit (Kappung beim Übergang Draft → Scouting)", () => {
     it("keeps only the highest-priority entries up to the post-draft scouting limit", () => {
+      // Zwei Eintraege mehr als Plaetze, aus den Konstanten abgeleitet — die Kappung soll sichtbar
+      // greifen, ohne dass die Zahl im Test steht.
+      const nachDraftLimit = getScoutingWishlistSlotsForLevel(0);
       const gameState = createGameState({
-        scoutingLevel: 0, // 4 Slots nach dem Draft
+        scoutingLevel: 0,
         seasonId: "season-1",
         gamePhase: "season_active", // Draft vorbei, reguläre Scouting-Grenze gilt.
         wishlist: [
-          { playerId: "p-1", createdAt: "2026-06-25T00:00:00.000Z", priorityRank: 0 },
-          { playerId: "p-2", createdAt: "2026-06-25T01:00:00.000Z", priorityRank: 1 },
-          { playerId: "p-3", createdAt: "2026-06-25T02:00:00.000Z", priorityRank: 2 },
-          { playerId: "p-4", createdAt: "2026-06-25T03:00:00.000Z", priorityRank: 3 },
-          { playerId: "p-5", createdAt: "2026-06-25T04:00:00.000Z", priorityRank: 4 },
-          { playerId: "p-6", createdAt: "2026-06-25T05:00:00.000Z", priorityRank: 5 },
+          ...Array.from({ length: nachDraftLimit + 2 }, (_, index) => ({
+            playerId: `p-${index + 1}`,
+            createdAt: `2026-06-25T${String(index).padStart(2, "0")}:00:00.000Z`,
+            priorityRank: index,
+          })),
           // Team-fremder Eintrag, muss unabhängig von der Grenze erhalten bleiben.
-          { playerId: "other-1", createdAt: "2026-06-25T06:00:00.000Z", priorityRank: 0, teamId: "L-K" },
+          { playerId: "other-1", createdAt: "2026-06-25T23:00:00.000Z", priorityRank: 0, teamId: "L-K" },
         ],
       });
       const trimmed = trimTransferWishlistToSlotLimit(
@@ -334,12 +349,9 @@ describe("scouting wishlist slots", () => {
         gameState,
         "M-M",
       );
-      expect(trimmed.filter((entry) => entry.teamId === "M-M").map((entry) => entry.playerId)).toEqual([
-        "p-1",
-        "p-2",
-        "p-3",
-        "p-4",
-      ]);
+      expect(trimmed.filter((entry) => entry.teamId === "M-M").map((entry) => entry.playerId)).toEqual(
+        Array.from({ length: nachDraftLimit }, (_, index) => `p-${index + 1}`),
+      );
       expect(trimmed.some((entry) => entry.playerId === "other-1")).toBe(true);
     });
 

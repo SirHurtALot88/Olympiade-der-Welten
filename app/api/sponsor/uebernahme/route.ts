@@ -102,8 +102,9 @@ export async function POST(request: Request) {
       resultGameState = lehneUebernahmeAb({ gameState: save.gameState, teamId, facilityId });
     }
 
+    let persisted = null as ReturnType<typeof persistence.saveSingleplayerState> | null;
     if (!dryRun) {
-      persistence.saveSingleplayerState(saveId, resultGameState);
+      persisted = persistence.saveSingleplayerState(saveId, resultGameState);
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         teamId,
@@ -115,13 +116,26 @@ export async function POST(request: Request) {
       });
     }
 
+    // `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`. `teamCash`
+    // und `facility` sind der Rest dessen, was `nimmUebernahmeAn` neben den offenen Angeboten noch
+    // aendert (Kasse, uebernommenes Gebaeude); bei "ablehnen" bleiben beide `null`, weil
+    // `lehneUebernahmeAb` nichts daran anfasst.
     return NextResponse.json({
       success: true,
+      saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
       summary: {
         applied: !dryRun,
         action,
         angebot,
         offeneAngebote: resultGameState.seasonState.sponsorUebernahmeAngeboteByTeamId?.[teamId] ?? [],
+        teamCash: action === "annehmen" ? resultGameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? null : null,
+        facility:
+          action === "annehmen" && angebotVorher
+            ? {
+                facilityId: angebotVorher.facilityId,
+                data: resultGameState.seasonState.teamFacilities?.[teamId]?.facilities?.[angebotVorher.facilityId] ?? null,
+              }
+            : null,
       },
     });
   } catch (error) {

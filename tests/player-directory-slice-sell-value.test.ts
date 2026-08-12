@@ -217,7 +217,7 @@ function createGameState(): GameState {
 }
 
 describe("Spielerliste: der Verkaufswert kommt vom Server", () => {
-  it("belegt die Ursache — auf dem kompakten Client-Payload ist der Verkaufswert ueberall der Marktwert", () => {
+  it("der kompakte Client-Payload kommt auf denselben Verkaufswert wie der volle Save", () => {
     const gameState = createGameState();
 
     // Voller Save: das Bracket-Ranking greift, die Faktoren gehen auseinander.
@@ -229,17 +229,35 @@ describe("Spielerliste: der Verkaufswert kommt vom Server", () => {
     });
     expect(abweichendVoll.length).toBeGreaterThan(0);
 
-    // Kompakter Client-Payload: `matchdayResults` auf den aktiven Spieltag
-    // beschnitten, der noch nicht gewertet ist => kein Ranking => Faktor 1,0.
+    /**
+     * FRUEHER STAND HIER: `matchdayResults` toHaveLength(0) und daraus folgend in JEDER Zeile
+     * VK-Wert == Marktwert — der kompakte Payload beschnitt die Verzeichniszeilen auf den
+     * aktiven, noch nicht gewerteten Spieltag, also sah `hasCurrentSeasonSaleFactorRanking`
+     * null gewertete Ergebnisse, das Bracket-Ranking griff nicht und der Faktor blieb 1,0.
+     * Am gemeldeten Spielstand: voll 328 von 339 Spielern mit Abweichung, kompakt 0 von 339.
+     *
+     * Die Beschneidung ist entfallen (Verzeichniszeilen mit dem Saisonziel-Fix, die
+     * Disziplin-Ergebnisse mit der Messung in `compactFoundationInitialGameState`). Der
+     * Browser rankt also wieder selbst — und muss auf dieselben Werte kommen wie der Server.
+     */
     const compact = compactFoundationInitialGameState(createGameState());
-    expect(compact.seasonState.matchdayResults).toHaveLength(0);
-    const onCompact = buildExpectedSellValueByPlayerId(compact);
+    expect(compact.seasonState.matchdayResults).toHaveLength(1);
+
+    const onCompact = buildExpectedSellValueByPlayerId(compact, { saveId: SAVE_ID });
+    let abweichendKompakt = 0;
     for (const roster of compact.rosters) {
       const player = compact.players.find((entry) => entry.id === roster.playerId);
       const sell = onCompact.get(roster.playerId);
       expect(sell).toBeTruthy();
-      expect(sell!.grossSalePrice).toBeCloseTo(player!.marketValue ?? 0, 2);
+      // Zahl fuer Zahl dieselbe wie auf dem vollen Save.
+      expect(sell!.grossSalePrice).toBeCloseTo(onFullSave.get(roster.playerId)!.grossSalePrice, 4);
+      if (Math.abs(sell!.grossSalePrice - (player!.marketValue ?? 0)) >= 0.005) {
+        abweichendKompakt += 1;
+      }
     }
+    // Und der Kern der Meldung: es steht wieder ein Verkaufsfaktor in der Spalte, statt in
+    // jeder Zeile stumpf der Marktwert.
+    expect(abweichendKompakt).toBe(abweichendVoll.length);
   });
 
   it("liefert der Directory-Slice den auf dem vollen Save gerechneten Verkaufswert mit", () => {

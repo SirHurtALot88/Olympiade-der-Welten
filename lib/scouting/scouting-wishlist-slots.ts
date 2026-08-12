@@ -1,8 +1,32 @@
 import type { GameState, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
-export const SCOUTING_WISHLIST_BASE_SLOTS = 4;
-export const SCOUTING_WISHLIST_SLOTS_PER_LEVEL = 3;
+/**
+ * WIE VIELE SPIELER OHNE JEDES SCOUTING-BUERO AUF DIE WUNSCHLISTE PASSEN.
+ *
+ * Chris: „erweiter die wunschliste mal um 2 slots". Von 4 auf 6.
+ *
+ * Warum das mehr ist als eine Bequemlichkeit: vier Plaetze reichen nicht, um eine Position
+ * ueberhaupt zu VERGLEICHEN. Wer einen Ersatz fuer eine Achse sucht, hat schnell drei Kandidaten
+ * im Blick und will daneben noch ein, zwei Namen aus einem anderen Preisband — bei vier Plaetzen
+ * loescht man dafuer jedes Mal einen, den man eigentlich behalten wollte.
+ */
+export const SCOUTING_WISHLIST_BASE_SLOTS = 6;
+
+/**
+ * WIE VIELE PLAETZE JEDE STUFE DES SCOUTING-BUEROS DAZUGIBT.
+ *
+ * Chris: „+ mehr slots mit den gebäudeupgrades pro stufe". Von 3 auf 4.
+ *
+ * Die Zahl ist an den Baukosten gemessen, nicht geraten: das Buero kostet kumuliert 6 / 18 / 38 /
+ * 70 / 120 C. Mit 4 Plaetzen je Stufe kostet der erste Ausbau 6 C fuer vier Plaetze (1,5 C je
+ * Platz), der letzte 50 C fuer vier (12,5 C je Platz) — die Plaetze werden also mit jeder Stufe
+ * teurer, und das ist beabsichtigt: die ersten Ausbauten sollen sich klar lohnen, der Vollausbau
+ * eine Entscheidung sein.
+ *
+ * Endstand: 6 Plaetze ohne Buero, 26 bei Stufe 5 (vorher 4 und 19).
+ */
+export const SCOUTING_WISHLIST_SLOTS_PER_LEVEL = 4;
 export const SCOUTING_DRAFT_WISHLIST_SLOT_LIMIT = 999;
 
 /**

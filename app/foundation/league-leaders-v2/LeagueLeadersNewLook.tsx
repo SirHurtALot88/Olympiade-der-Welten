@@ -1061,6 +1061,16 @@ function RecordBookSection({
   gameState: GameState;
   onOpenPlayer: (playerId: string) => void;
 }) {
+  /**
+   * WIEDER DER EIGENBAU — und diesmal traegt er.
+   *
+   * Diese Karte laeuft im Browser. Solange die Anfangsladung `disciplineResults` auf den aktiven
+   * Spieltag beschnitt, lieferte ein Eigenbau in jedem Eintrag Halter und Wert eines EINZIGEN
+   * Spieltags, beglaubigt von der eigenen Ueberschrift „aus 10 gespielten Spieltagen". Dagegen
+   * fuhr eine fertige Projektion mit (`foundationRecordBook`). Seit `8ec6454b` fahren die
+   * `disciplineResults` vollstaendig mit; die Projektion war danach nachgemessen wirkungslos und
+   * ist entfernt. Es gibt wieder genau eine Rechenstelle.
+   */
   const buch = useMemo(() => buildLeagueRecordBook(gameState), [gameState]);
   const alle = [...buch.spieltagsSuperlative, ...buch.serien];
 

@@ -229,7 +229,17 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildFoundationNavAttention } from "@/lib/foundation/foundation-nav-attention";
-import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
+import type {
+  SeasonSnapshotRecord,
+  SponsorNegotiationProfile,
+  SponsorLeihgabeRecord,
+  TeamFacilityRecord,
+  TeamSponsorContract,
+} from "@/lib/data/olyDataTypes";
+import {
+  shouldRequestSeasonArchiveLoad,
+  uebernimmGeladenesSaisonarchiv,
+} from "@/lib/foundation/tabs/use-season-archive-load";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddPlayerToTransferWishlist,
@@ -575,6 +585,7 @@ import {
   getDefaultTableWidths,
   getFoundationViewScrollTarget,
   getOwnerTeamHighlightClass,
+  getPlayerPortraitInitials,
   getPlayerPortraitModel,
   getRanksMetricToneClass,
   getRawFoundationTeamParam,
@@ -953,21 +964,14 @@ function pickRatingsForPlayerIds<T>(ratingsById: Map<string, T>, playerIds: stri
   return picked;
 }
 
-function getPlayerPortraitBrowserUrl(playerId: string, portraitUrl?: string | null, portraitPath?: string | null) {
-  if (portraitUrl?.startsWith("http://") || portraitUrl?.startsWith("https://") || (portraitUrl?.startsWith("/") && !portraitUrl.startsWith("/Users/"))) {
-    return portraitUrl;
-  }
-
-  if (portraitPath?.startsWith("/") && !portraitPath.startsWith("/Users/")) {
-    return portraitPath;
-  }
-
-  if (portraitPath?.startsWith("/Users/")) {
-    return `/api/media/player-portrait/${encodeURIComponent(playerId)}`;
-  }
-
-  return null;
-}
+// Hier stand bis zum Audit vom 11.08. eine zweite, aeltere Kopie von
+// `getPlayerPortraitBrowserUrl` — ohne statischen Portrait-Index und ohne
+// Varianten-Suffixe. Sie hatte in dieser Datei keinen einzigen Aufrufer (die
+// Datei nutzt ausschliesslich `getPlayerPortraitModel`), waere aber genau in
+// dem Moment falsch geworden, in dem jemand Bilder nach `public/portraits/`
+// legt und `npm run portraits:index` laeuft: dann liefert das Modell in
+// `lib/data/mediaAssets.ts` einen statischen Pfad und diese Kopie weiter null.
+// Ersatzlos entfernt — es gibt genau eine Portrait-Rechenstelle.
 
 function WarningList({
   title,
@@ -1170,21 +1174,6 @@ export function useFoundationShellRouterBodyScope({
     activeView === "allTimeTable";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
-  const shouldLoadSeasonArchive =
-    activeView === "season" ||
-    activeView === "seasonV2" ||
-    activeView === "prize" ||
-    activeView === "ranks" ||
-    activeView === "leagueLeaders" ||
-    activeView === "allTimeTable" ||
-    activeView === "teams" ||
-    activeView === "teamProfile" ||
-    activeView === "players" ||
-    activeView === "playerProfile" ||
-    // Finanzen: Cash-Abgleich und Saison-Verlauf lesen `seasonSnapshots` (Saisonstart-Cash der
-    // Vorsaison). Ohne diesen Load blieben beide Sektionen fälschlich auf „nicht archiviert",
-    // obwohl das Archiv existiert — nur der kompakte Initial-Payload hatte es gestrippt (M3-Befund F4).
-    activeView === "finances";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const shouldBuildSeasonStandRowsGate = shouldBuildSeasonStandRows({
     activeView: activeView as FoundationViewId,
@@ -2668,14 +2657,19 @@ export function useFoundationShellRouterBodyScope({
   }
 
   /**
-   * Player-Generator Phase 2 — "Als Free Agent übernehmen". Mirrors
-   * `chooseTeamSponsor`'s fetch-then-`loadSave` pattern 1:1: POST the
-   * mutation to the guarded route (which loads/writes the save directly via
-   * persistence, independent of this client's in-memory `gameState`), then
-   * refetch so `gameState.players` picks up the newly inserted free agent.
-   * The committed draft is intentionally left in the saved-drafts list
-   * (the user can delete it manually) — re-committing it is harmless, it
-   * just mints another free agent with a fresh id rather than erroring.
+   * Player-Generator Phase 2 — "Als Free Agent übernehmen". POST the mutation to the guarded
+   * route (which loads/writes the save directly via persistence, independent of this client's
+   * in-memory `gameState`), then refetch so `gameState.players` picks up the newly inserted free
+   * agent. The committed draft is intentionally left in the saved-drafts list (the user can
+   * delete it manually) — re-committing it is harmless, it just mints another free agent with a
+   * fresh id rather than erroring.
+   *
+   * Der `loadSave` bleibt hier bewusst stehen (anders als seit Kurzem bei `chooseTeamSponsor`/
+   * `handleSponsorUebernahme`): die Antwort traegt nur eine Zusammenfassung
+   * (playerId/Name/Werte), nicht den vollen neuen `Player`-Datensatz — ohne Reload wuerde der neue
+   * Free Agent in `gameState.players` schlicht fehlen. `/api/player-generator/commit` gibt seit
+   * Kurzem trotzdem `saveVersion` zurueck (fuer den generischen Konflikt-Check unabhaengig vom
+   * jeweiligen Aufrufer), der nachfolgende `loadSave` uebernimmt sie ohnehin gleich mit.
    */
   async function commitPlayerGeneratorDraft(
     draft: PlayerGeneratorDraft,
@@ -4241,6 +4235,11 @@ export function useFoundationShellRouterBodyScope({
   // offenen Transferfenster, sonst schickt seine Checkliste in einen gesperrten Kader.
   const { runSeasonCompletion, runSeasonTransition } = seasonEndTransitionHandlers;
 
+  // `/api/ai/preseason-background` gibt seit Kurzem `saveVersion` zurueck (siehe die Route), aber
+  // der `reloadAfterMarketRosterApply()`-Reload unten BLEIBT bewusst stehen: der Lauf ruehrt an
+  // Manager-Aktionen, Draft/Markt fuer ALLE KI-Teams, Kredite und Season-Snapshots — praktisch der
+  // "halbe Spielstand" aendert sich, nicht ein einzelnes bekanntes Feld wie bei Training/Team-
+  // Identity. Ein per-Feld-Patch waere hier so umfangreich wie der Reload selbst, nur fehleranfaelliger.
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
       return null;
@@ -4889,6 +4888,12 @@ export function useFoundationShellRouterBodyScope({
     return result;
   }
 
+  // `/api/admin/season-simulation` gibt seit Kurzem `saveVersion` mit jedem `tick` zurueck, aber
+  // der `loadSave` unten beim Abschluss BLEIBT bewusst stehen: der Lauf simuliert 1-5 GANZE
+  // Saisons (Markt, Matchdays, XP, Facilities, Vertraege, Snapshots — siehe
+  // `lib/admin/season-simulation-runner.ts`), also praktisch den gesamten Spielstand. Ein
+  // Admin-Werkzeug, das absichtlich riesige Teile ueberschreibt — dieselbe Kategorie wie der
+  // KI-Preseason-Lauf, nicht wie ein einzelnes Feld.
   async function postAdminSeasonSimulation(action: "start" | "tick" | "pause" | "resume" | "cancel" | "status") {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -5210,57 +5215,90 @@ export function useFoundationShellRouterBodyScope({
     );
   }, [tableColumnPreferences]);
 
+  /**
+   * SAISONARCHIV NACHLADEN — der Effekt, der nie feuern konnte.
+   *
+   * Das Gate stand auf `gameState.seasonState.seasonSnapshots !== undefined`. Hinter dem Sentinel
+   * (`withCompactSeasonArchiveSentinel`) steht dort im Browser aber IMMER `[]`, also war die
+   * Bedingung immer wahr und der Effekt kehrte jedes Mal an dieser Stelle um. Der Kommentar unter
+   * dem Ladepfad („eternal skeleton", „degrade to their honest empty-state") beschrieb einen
+   * Zustand, den es nie gab. Am Live-Abbild gemessen (Save `new-game-1785823388048-1hf25q`):
+   * volle 1 archivierte Saison, im Browser `seasonSnapshots === []` und Gate → Abbruch.
+   *
+   * Entschieden wird jetzt ueber `shouldRequestSeasonArchiveLoad`. Die Ansichtsliste stand hier
+   * ausserdem ein zweites Mal woertlich ausgeschrieben (`const shouldLoadSeasonArchive = …`) und
+   * wich vom Helfer ab — kein `diszis`, dafuer `teams` bedingungslos und `players`. Sie ist
+   * ersatzlos weg, es gibt nur noch die eine Rechenstelle im Helfer; die Aufloesung der Abweichung
+   * ist dort begruendet. Der Helfer behandelt `[]` ausdruecklich als „noch nicht geholt"; gegen
+   * Dauerfeuer schuetzt `seasonArchiveFetchCompleted`, hier der bereits vorhandene
+   * `fullSeasonArchiveLoadKeyRef`.
+   *
+   * GEHOLT WIRD DER SCHNITT, NICHT DER GANZE SPIELSTAND. Vorher stand hier
+   * `loadSave(…, { compactInitial: false })` — und das ist genau der Vorgang, den `e37f3513` als
+   * Ursache stillen Datenverlusts benennt: `loadSave` ersetzt ueber `commitFreshlyLoadedGameState`
+   * den GESAMTEN React-State und setzt die Autosave-Inhaltssignatur auf den geladenen Stand; eine
+   * noch nicht geschriebene Aenderung gilt danach als gespeichert und ist weg. Das Gate zu
+   * reparieren und den vollen Load stehen zu lassen haette diesen Vorgang erst scharf gemacht.
+   *
+   * `/api/season/snapshots` liefert genau die Schnappschuesse dieses Saves und nichts sonst. Die
+   * Route war fertig und lebendig, nur rief sie niemand: `FOUNDATION_SEASON_SNAPSHOTS_ENDPOINT`
+   * stand unbenutzt in dieser Datei. Uebernommen wird ausschliesslich `seasonSnapshots`, alles
+   * andere im Zustand bleibt unangetastet.
+   */
   useEffect(() => {
-    if (!shouldLoadSeasonArchive || isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
-      return;
-    }
-
-    if (gameState.seasonState.seasonSnapshots !== undefined) {
-      fullSeasonArchiveLoadKeyRef.current = null;
+    if (isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
       return;
     }
 
     const archiveLoadKey = `${activeSaveId}:${gameState.season.id}:season-archive-full`;
-    if (fullSeasonArchiveLoadKeyRef.current === archiveLoadKey) {
+    if (
+      !shouldRequestSeasonArchiveLoad({
+        activeView: activeView as FoundationViewId,
+        seasonSnapshots: gameState.seasonState.seasonSnapshots,
+        showExtendedTeamPanels,
+        seasonArchiveFetchCompleted: fullSeasonArchiveLoadKeyRef.current === archiveLoadKey,
+      })
+    ) {
       return;
     }
 
     fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
-    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false })
-      .then((nextGameState) => {
-        if (!nextGameState) {
-          // Full-save load returned nothing — clear the key so a later render
-          // can retry instead of leaving archive-gated views (Ewige Tabelle)
-          // on a loading skeleton that never resolves.
+    void fetch(`${FOUNDATION_SEASON_SNAPSHOTS_ENDPOINT}?saveId=${encodeURIComponent(activeSaveId)}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          // Fehlgeschlagen: Schluessel raeumen, damit ein spaeterer Render es erneut versuchen kann,
+          // statt archiv-gebundene Ansichten (Ewige Tabelle) auf einem Skelett stehen zu lassen.
           fullSeasonArchiveLoadKeyRef.current = null;
           return;
         }
-        // Materialize an archive even when the save carries none: `?? []` flips
-        // `hasArchive` true so archive-gated views degrade to their honest
-        // empty-state ("keine archivierten Saisons") instead of an eternal
-        // skeleton. A real archive is used verbatim; a concurrently-loaded one
-        // is never clobbered.
-        const loadedSnapshots = nextGameState.seasonState.seasonSnapshots ?? [];
+        const payload = (await response.json()) as { ok?: boolean; seasonSnapshots?: SeasonSnapshotRecord[] };
+        if (!payload?.ok || !Array.isArray(payload.seasonSnapshots)) {
+          fullSeasonArchiveLoadKeyRef.current = null;
+          return;
+        }
+        const loadedSnapshots = payload.seasonSnapshots;
         setGameState((previous) => ({
           ...previous,
           seasonState: {
             ...previous.seasonState,
-            seasonSnapshots: previous.seasonState.seasonSnapshots ?? loadedSnapshots,
+            seasonSnapshots: uebernimmGeladenesSaisonarchiv(previous.seasonState.seasonSnapshots, loadedSnapshots),
           },
         }));
-        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || gameState.season.id);
       })
       .catch(() => {
         fullSeasonArchiveLoadKeyRef.current = null;
       });
   }, [
     activeSaveId,
-    foundationSaveMode,
+    activeView,
     gameState.season.id,
     gameState.seasonState.seasonSnapshots,
     isFoundationBootstrapState,
     seasonOverviewSeasonId,
-    shouldLoadSeasonArchive,
+    showExtendedTeamPanels,
   ]);
 
   useEffect(() => {
@@ -5785,14 +5823,70 @@ export function useFoundationShellRouterBodyScope({
           source: readMeta.source,
         })),
       });
-      const payload = (await response.json()) as { success?: boolean; error?: string; summary?: { contract?: { name?: string } } };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        saveVersion?: number;
+        summary?: {
+          contract?: TeamSponsorContract | null;
+          teamCash?: number | null;
+          sponsorLeihgabe?: SponsorLeihgabeRecord[] | null;
+          sponsorPayoutLogs?: GameState["seasonState"]["sponsorPayoutLogs"];
+          sponsorBrandHistory?: string[] | null;
+        };
+      };
       if (!response.ok || payload.error) {
         setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
       updateNewGameFlowStepStatus("choose_sponsor", "completed");
-      await loadSave(activeSaveId);
+
+      // KEIN volles `loadSave` mehr: die Route liefert jetzt alles, was `chooseSponsorOffer`
+      // ausser dem Vertrag noch schreibt (Vorschuss-Cash, Sponsor-Leihgabe, Payout-Log,
+      // Marken-Historie — siehe `app/api/sponsor/choose/route.ts`), und die neue `saveVersion`.
+      // Ein Reload hier war der zweite gemeldete Fehler: er ersetzt den GESAMTEN lokalen
+      // Spielstand und verwirft damit jede noch ungespeicherte Aenderung auf einer anderen Karte
+      // (z. B. ein gerade gesetzter Trainingsmodus) — siehe Commit "Zwei Fehler beim Blaettern".
+      // Wuerde hier eines der gepatchten Felder fehlen, kaeme der naechste generische PUT (voller
+      // gameState-Ueberschreiber) und wuerfe den serverseitig berechneten Wert wieder zurueck —
+      // deshalb muessen ALLE oben genannten Felder mitgepatcht werden, nicht nur der Vertrag.
+      setGameState((current) => ({
+        ...current,
+        teams:
+          payload.summary?.teamCash != null
+            ? applyTeamCashPatch(current.teams, { teamId: selectedTeam.teamId, cash: payload.summary.teamCash })
+            : current.teams,
+        seasonState: {
+          ...current.seasonState,
+          ...(payload.summary?.contract != null
+            ? {
+                sponsorContractsByTeamId: {
+                  ...current.seasonState.sponsorContractsByTeamId,
+                  [selectedTeam.teamId]: payload.summary.contract,
+                },
+              }
+            : {}),
+          ...(payload.summary?.sponsorLeihgabe != null
+            ? {
+                sponsorLeihgabenByTeamId: {
+                  ...current.seasonState.sponsorLeihgabenByTeamId,
+                  [selectedTeam.teamId]: payload.summary.sponsorLeihgabe,
+                },
+              }
+            : {}),
+          ...(payload.summary?.sponsorPayoutLogs != null ? { sponsorPayoutLogs: payload.summary.sponsorPayoutLogs } : {}),
+          ...(payload.summary?.sponsorBrandHistory != null
+            ? {
+                sponsorBrandHistoryByTeamId: {
+                  ...current.seasonState.sponsorBrandHistoryByTeamId,
+                  [selectedTeam.teamId]: payload.summary.sponsorBrandHistory,
+                },
+              }
+            : {}),
+        },
+        saveVersion: payload.saveVersion ?? current.saveVersion,
+      }));
       await reloadSeasonManagementOverview();
     } catch {
       setSponsorChoiceMessage("Sponsor konnte nicht gewählt werden.");
@@ -5802,11 +5896,12 @@ export function useFoundationShellRouterBodyScope({
   }
 
   /**
-   * Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags — mirrors `chooseTeamSponsor`'s
-   * fetch-then-`loadSave` pattern 1:1 (POST /api/sponsor/uebernahme → `nimmUebernahmeAn`/
-   * `lehneUebernahmeAb`, siehe `lib/sponsor/sponsor-leih-lifecycle.ts`). Busy-Marker ist die
-   * `facilityId`, nicht die `offerId` wie bei `chooseTeamSponsor` — ein Übernahmeangebot hat
-   * keine eigene Angebots-ID, das Gebäude selbst identifiziert es eindeutig je Team.
+   * Gebäude-Übernahme am Ende eines Sponsor-Leihvertrags (POST /api/sponsor/uebernahme →
+   * `nimmUebernahmeAn`/`lehneUebernahmeAb`, siehe `lib/sponsor/sponsor-leih-lifecycle.ts`).
+   * Busy-Marker ist die `facilityId`, nicht die `offerId` wie bei `chooseTeamSponsor` — ein
+   * Übernahmeangebot hat keine eigene Angebots-ID, das Gebäude selbst identifiziert es eindeutig
+   * je Team. Patcht wie `chooseTeamSponsor` nur die bekannten geänderten Felder aus der Antwort
+   * statt eines vollen `loadSave` — siehe Begründung dort.
    */
   async function handleSponsorUebernahme(facilityId: string, action: "annehmen" | "ablehnen") {
     if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
@@ -5832,7 +5927,16 @@ export function useFoundationShellRouterBodyScope({
           source: readMeta.source,
         })),
       });
-      const payload = (await response.json()) as { success?: boolean; error?: string };
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        saveVersion?: number;
+        summary?: {
+          offeneAngebote?: NonNullable<GameState["seasonState"]["sponsorUebernahmeAngeboteByTeamId"]>[string];
+          teamCash?: number | null;
+          facility?: { facilityId: string; data: TeamFacilityRecord | null } | null;
+        };
+      };
       if (!response.ok || payload.error) {
         setSponsorUebernahmeMessage(
           payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
@@ -5842,7 +5946,41 @@ export function useFoundationShellRouterBodyScope({
       setSponsorUebernahmeMessage(
         action === "annehmen" ? `Gebäude für ${selectedTeam.shortCode} übernommen.` : `Übernahmeangebot für ${selectedTeam.shortCode} abgelehnt.`,
       );
-      await loadSave(activeSaveId);
+
+      // KEIN volles `loadSave` mehr — dieselbe Begruendung wie bei `chooseTeamSponsor`: die Route
+      // liefert jetzt die neue `saveVersion` und den kompletten Rest dessen, was `nimmUebernahmeAn`
+      // bzw. `lehneUebernahmeAb` aendern (offene Angebote, bei "annehmen" zusaetzlich Kasse und das
+      // uebernommene Gebaeude). Ein Reload wuerde ungespeicherte Aenderungen auf einer anderen
+      // Karte verwerfen (siehe Commit "Zwei Fehler beim Blaettern").
+      setGameState((current) => ({
+        ...current,
+        teams:
+          payload.summary?.teamCash != null
+            ? applyTeamCashPatch(current.teams, { teamId: selectedTeam.teamId, cash: payload.summary.teamCash })
+            : current.teams,
+        seasonState: {
+          ...current.seasonState,
+          sponsorUebernahmeAngeboteByTeamId: {
+            ...current.seasonState.sponsorUebernahmeAngeboteByTeamId,
+            [selectedTeam.teamId]: payload.summary?.offeneAngebote ?? [],
+          },
+          ...(payload.summary?.facility?.data
+            ? {
+                teamFacilities: {
+                  ...current.seasonState.teamFacilities,
+                  [selectedTeam.teamId]: {
+                    ...(current.seasonState.teamFacilities?.[selectedTeam.teamId] ?? { facilities: {} }),
+                    facilities: {
+                      ...(current.seasonState.teamFacilities?.[selectedTeam.teamId]?.facilities ?? {}),
+                      [payload.summary.facility.facilityId]: payload.summary.facility.data,
+                    },
+                  },
+                },
+              }
+            : {}),
+        },
+        saveVersion: payload.saveVersion ?? current.saveVersion,
+      }));
       await reloadSeasonManagementOverview();
     } catch {
       setSponsorUebernahmeMessage(action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden.");
@@ -10770,7 +10908,7 @@ export function useFoundationShellRouterBodyScope({
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,
@@ -10795,7 +10933,7 @@ export function useFoundationShellRouterBodyScope({
   const seasonV2PlayerRows = useMemo(() => {
     return sortedSeasonTopPlayerRows.map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,

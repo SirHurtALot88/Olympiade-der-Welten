@@ -93,6 +93,11 @@ describe("buildTrainingPlayerRowView", () => {
           currentAbilityRating: 70,
           potentialRating: 80,
         },
+        economy: {
+          salary: 42,
+          contractLength: 3,
+          contractShape: "balanced",
+        },
         trainingDemand: null,
       },
       TRAINING_ATTRIBUTE_LABELS,

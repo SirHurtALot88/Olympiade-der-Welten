@@ -264,15 +264,29 @@ export type FacilitySeasonCash = {
 /**
  * Client-safer Nachbau von `previewFacilitySeasonEndFinance` — bewusst OHNE dessen
  * node:crypto/better-sqlite3-Importe, die sonst ins Client-Bundle wanderten. Identische Reihenfolge
- * (FACILITY_CATALOG) und identische „bezahlt oder nicht"-Schwelle, damit die Anzeige bit-genau zu dem
- * passt, was am Saisonende wirklich gebucht wird.
+ * (FACILITY_CATALOG) und identische Buchungsregel, damit die Anzeige bit-genau zu dem passt, was am
+ * Saisonende wirklich gebucht wird. `tests/finanzen-gebaeude-nachbau-gleich-original.test.ts` hält
+ * beide Wege aneinander.
  *
  * Vorher lebte diese Funktion privat im Finanzen-View-Model; sie steht jetzt hier, weil sie zur
  * gemeinsamen GuV gehört und nicht zu einer einzelnen Ansicht.
+ *
+ * UNTERHALT IST PFLICHT — GEMESSEN, NICHT VERMUTET. Bis zum Finanz-Audit (11.08.2026) sprang dieser
+ * Nachbau eine Unterhaltszeile über, wenn Cash + Einnahmen sie nicht mehr deckten
+ * („will_disable_unpaid"). Das Original hat diese Regel längst aufgegeben: `buildRows` bucht den
+ * Unterhalt immer ab und lässt das Cash notfalls ins Minus laufen (der Notkredit-Backstop fängt es
+ * danach auf). Am aktiven Spielstand (`new-game-1786465783606-0kalpx`) trennte das drei von 32 Teams:
+ * Project Suicide (Cash 1,69) sah 0,0 statt 1,8 C Unterhalt, Stronghold Crusaders (Cash 0,13) 0,0
+ * statt 1,5 C — also genau die klammen Teams, für die es zählt.
+ *
+ * `cashBefore` bleibt in der Signatur, ist aber bewusst OHNE Wirkung: die Aufrufer reichen ihn
+ * weiter, und ein entfernter Parameter würde nur so aussehen, als sei die Frage „reicht das Cash?"
+ * vergessen worden. Sie ist beantwortet — sie stellt sich nicht mehr.
  */
 export function computeFacilitySeasonCash(
   gameState: GameState,
   teamId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   cashBefore: number | null,
 ): FacilitySeasonCash {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
@@ -292,25 +306,22 @@ export function computeFacilitySeasonCash(
     };
   });
 
-  const incomeTotalRaw = round2(rows.reduce((sum, row) => sum + row.income, 0));
-  let cashAvailableForUpkeep = cashBefore == null ? null : round2(cashBefore + incomeTotalRaw);
-
   const upkeepRows: { label: string; upkeep: number }[] = [];
   let paidUpkeepTotalRaw = 0;
   for (const row of rows) {
     if (row.upkeep <= 0 || row.alreadyPaid) continue;
-    if (cashAvailableForUpkeep != null && cashAvailableForUpkeep < row.upkeep) continue; // will_disable_unpaid
-    if (cashAvailableForUpkeep != null) cashAvailableForUpkeep = round2(cashAvailableForUpkeep - row.upkeep);
-    upkeepRows.push({ label: row.label, upkeep: round1(row.upkeep) });
+    upkeepRows.push({ label: row.label, upkeep: round2(row.upkeep) });
     paidUpkeepTotalRaw += row.upkeep;
   }
 
+  // Rundung wie im Original (`roundValue`, 2 Nachkommastellen). Vorher stand hier `round1`; am
+  // aktiven Spielstand wies das für Silver Soldiers 10,2 statt 10,24 C Gebäude-Einnahme aus.
   return {
-    income: round1(incomeTotalRaw),
-    paidUpkeep: round1(paidUpkeepTotalRaw),
+    income: round2(rows.reduce((sum, row) => sum + row.income, 0)),
+    paidUpkeep: round2(paidUpkeepTotalRaw),
     incomeRows: rows
       .filter((row) => row.income > 0)
-      .map((row) => ({ label: row.label, income: round1(row.income) }))
+      .map((row) => ({ label: row.label, income: round2(row.income) }))
       .sort((left, right) => right.income - left.income),
     upkeepRows: upkeepRows.sort((left, right) => right.upkeep - left.upkeep),
   };

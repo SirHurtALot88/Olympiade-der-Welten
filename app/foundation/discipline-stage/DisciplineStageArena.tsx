@@ -16,7 +16,10 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
-import { buildDisciplineStageTeamsFromBookedResult } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
+import {
+  buildDisciplineStageTeamsFromBookedResult,
+  chooseDisciplineStageTeams,
+} from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
@@ -868,9 +871,11 @@ export default function DisciplineStageArena({
      * laufen früher oder später auseinander — genau daran krankte die Bühne zuletzt.
      *
      * Wozu das gut ist: das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain,
-     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. `matchday-arena-presenter.ts` rechnet
-     * diese Zahl bis heute (`baseRank`/`rankDelta`), aber die Funktion dort ruft niemand mehr auf —
-     * sie entstand und verschwand ungesehen. Auf Wunsch von Chris zurückgeholt.
+     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. Auf Wunsch von Chris zurückgeholt —
+     * hier aus den Rohsummen der Resolve-Vorschau, nicht aus einer zweiten Rangrechnung. Die gab
+     * es einmal (`lib/season/matchday-arena-presenter.ts`, `baseRank`/`rankDelta`); sie hatte
+     * keinen Aufrufer, sortierte bei Gleichstand nach Teamname statt wie die Engine nach
+     * `rankDescendingSharedTies` und ist am 11.08.2026 gelöscht worden.
      */
     const modifierBaseByTeam = new Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }>();
     for (const dp of preview.disciplinePreviews ?? []) {
@@ -1210,13 +1215,28 @@ export default function DisciplineStageArena({
    * Deshalb gibt es jetzt eine zweite echte Quelle: ist die Disziplin gewertet, kommen die Bahnen
    * aus `disciplineResults` + `playerDisciplinePerformances`. Das Modell bleibt dem Test-/
    * Random-Modus vorbehalten.
+   *
+   * NACHTRAG (gemessen, nicht vermutet): „Vorschau bevorzugt" war zu weit gefasst. Die Vorschau
+   * kann aus einem verfallenen Resolve-Snapshot stammen — am Spielstand
+   * `new-game-1785823388048-1hf25q` (S2, Spieltag 10) zeigte sie in 20 von 32 d1-Zeilen einen
+   * anderen Score als gebucht (max 0,70). Deshalb entscheidet jetzt
+   * `chooseDisciplineStageTeams`: die Vorschau gilt, solange sie das gebuchte Ergebnis TRIFFT
+   * (Score < 0,05, Rang exakt) — sonst gewinnt das Gebuchte. Lieber die karge Wahrheit als eine
+   * huebschere Zahl, die nie im Saisonstand stand.
    */
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
-    if (disc && disc.teamResults.length > 0) {
-      return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
-    }
-    return buildDisciplineStageTeamsFromBookedResult(gameState, disciplineId, teamMetaById, portraitById);
+    const previewTeams =
+      disc && disc.teamResults.length > 0
+        ? buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById)
+        : null;
+    const bookedTeams = buildDisciplineStageTeamsFromBookedResult(
+      gameState,
+      disciplineId,
+      teamMetaById,
+      portraitById,
+    );
+    return chooseDisciplineStageTeams({ previewTeams, bookedTeams }).teams;
   }, [preview, disciplineId, teamMetaById, portraitById, gameState]);
 
   // Echt-Modus nutzt IMMER echte Daten. Fehlen sie, wird nichts erfunden — siehe

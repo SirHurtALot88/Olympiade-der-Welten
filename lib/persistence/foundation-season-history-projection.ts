@@ -15,12 +15,19 @@
  *
  * WARUM EIN EIGENES FELD UND NICHT `seasonSnapshots` SELBST:
  *
- * Der Schutz des Archivs (`preserveAppendOnlyArchive`) vergleicht nur die ANZAHL der Eintraege —
- * eingehend gewinnt, sobald es mindestens so viele sind wie gespeichert. Eine schlanke Fassung
- * unter demselben Namen haette exakt dieselbe Anzahl, kaeme also durch und wuerde beim naechsten
- * Speichern die vollen Schnappschuesse dauerhaft durch die Kurzfassung ersetzen. Der Verlust
- * waere endgueltig und stillschweigend. Die Projektion liegt darum in einem eigenen Feld, das
- * nirgends zurueckgeschrieben wird: sie ist reine Anzeigefracht, keine Quelle.
+ * Sie ist eine KURZFASSUNG. Die schweren Anhaenge (Spieltags-, Disziplin- und
+ * Spielerleistungs-Zeilen) fehlen ihr, und jede Ansicht, die sie braucht, muss das merken
+ * koennen. Stuende sie unter dem Namen `seasonSnapshots`, waere sie ab dem naechsten Laden
+ * ununterscheidbar „das Archiv" — und jede Rechnung darauf haette still Luecken statt einer
+ * ehrlichen Leerstelle. Zurueckgeschrieben wird sie nirgends: reine Anzeigefracht, keine Quelle.
+ *
+ * (Der Archivschutz `preserveAppendOnlyArchive` haelt inzwischen jeden vorhandenen Eintrag
+ * Zeichen fuer Zeichen fest und liesse eine gleich lange Kurzfassung nicht mehr durch — das war
+ * frueher das zweite Argument an dieser Stelle. Das erste bleibt und traegt allein.)
+ *
+ * WER SIE ERWEITERT, DENKT AN DIE LESER: was `leseSaisonSchnappschuesse` nicht mitgibt, fehlt im
+ * Browser ersatzlos. Genau daran fielen `archivedAt`, `startplatz`, `rankDiff` und `transferNet`
+ * auf — siehe die Begruendungen an den Feldern.
  */
 import type {
   GameState,
@@ -62,6 +69,18 @@ export type FoundationSeasonHistoryTeamEntry = {
   rosterSeasonEnd: number | null;
   marketValueTotalEnd: number | null;
   guv: number | null;
+  /**
+   * DIE DREI ZAHLEN DES SAISON-RUECKBLICKS — nachgetragen, weil ohne sie zwei Karten fehlten.
+   *
+   * `buildSeasonRecap` bildet das persoenliche Zeugnis („Start als Nummer 25, Ende auf Platz 19 —
+   * 6 Plaetze gutgemacht. … Transferbilanz -149,7.") aus `startplatz`, `rankDiff` und
+   * `transferNet`, und die Liga-Karte „Kletterer & Absturz" ausschliesslich aus `rankDiff`. Die
+   * Kurzfassung trug keins der drei; am Live-Abbild gemessen blieb im Browser „Endplatz 19. Kasse
+   * 91,3 · Transferbilanz —." uebrig und die Kletterer-Karte fiel ganz aus.
+   */
+  startplatz: number | null;
+  rankDiff: number | null;
+  transferNet: number | null;
 };
 
 /**
@@ -115,11 +134,43 @@ export type FoundationSeasonHistoryEntry = {
   seasonName: string | null;
   status: string | null;
   /**
+   * WANN DIE SAISON ARCHIVIERT WURDE — und warum das mitfahren MUSS.
+   *
+   * Stand hier bis zu diesem Audit nicht drin, und `alsSchnappschussErsatz` stempelte deshalb
+   * `archivedAt: ""` in jeden nachgebauten Schnappschuss. Das ist kein harmloser Platzhalter:
+   * `buildSeasonRecap` steigt bei `!snapshot.archivedAt` sofort aus (`""` ist falsy), und
+   * `game-inbox-service` datiert die Champion-Karte damit (`archivedAt ?? createdAt` — `""` ist
+   * nicht nullish, die Karte bekaeme also ein unparsbares Datum und rutschte in der Sortierung
+   * ans Ende). Beide Ansichten blieben im Browser leer, obwohl die Kurzfassung mitfuhr.
+   */
+  archivedAt: string | null;
+  /**
    * Steuert die Marktwert-Auswahl der Ewigen Tabelle (gepatchter Eintrittsstand vs. Saisonende) —
    * ohne dieses Feld muesste sie raten, welcher der drei Marktwerte gemeint ist.
    */
   entryRosterPatchedAt: string | null;
   teams: FoundationSeasonHistoryTeamEntry[];
+  /**
+   * DIE TEAMSTAERKE-RAENGE, SCHLANK — nur die fuenf Rangzahlen je Team.
+   *
+   * `buildSeasonRecap` baut daraus die Karte „Kraefteverschiebung" (Vergleich der Staerke-Raenge
+   * zweier aufeinanderfolgender Saisons). Ohne sie fiel die Karte im Browser stumm aus; am
+   * Live-Abbild in Saison 3 gemessen: Server 6 Archiv-Karten in der Inbox, Browser 5.
+   *
+   * OHNE `disciplineRanks` UND `scorePack`, bewusst: die beiden tragen den Grossteil des Gewichts
+   * (voll 27,9 KB je Saison, so 4,3 KB). Wer sie braucht, ist der Ranks-Reiter im Archivmodus —
+   * und der laedt ohnehin das volle Archiv nach (`use-season-archive-load`).
+   */
+  teamDisciplineRanks: Array<{
+    teamId: string;
+    teamCode: string | null;
+    teamName: string;
+    totalRank: number;
+    powRank: number;
+    speRank: number;
+    menRank: number;
+    socRank: number;
+  }>;
   /** Siehe FoundationSeasonHistoryPlayerEntry — ohne sie bleibt die Spielerhistorie im Browser leer. */
   players: FoundationSeasonHistoryPlayerEntry[];
   /** Nur Top-Zu- und -Abgang je Team; die Historienzeile zeigt nicht mehr. */
@@ -161,6 +212,9 @@ function projiziereTeam(record: {
   marketValueTotalEnd?: number | null;
   marketValueEnd?: number | null;
   guv?: number | null;
+  startplatz?: number | null;
+  rankDiff?: number | null;
+  transferNet?: number | null;
 }): FoundationSeasonHistoryTeamEntry {
   const bereich = record.disciplinePointsByArea ?? {};
   return {
@@ -191,6 +245,9 @@ function projiziereTeam(record: {
     rosterSeasonEnd: zahlOderNull(record.rosterSeasonEnd),
     marketValueTotalEnd: zahlOderNull(record.marketValueTotalEnd),
     guv: zahlOderNull(record.guv),
+    startplatz: zahlOderNull(record.startplatz),
+    rankDiff: zahlOderNull(record.rankDiff),
+    transferNet: zahlOderNull(record.transferNet),
   };
 }
 
@@ -232,8 +289,19 @@ export function projiziereSaisonHistorie(
     seasonId: snapshot.seasonId,
     seasonName: snapshot.seasonName ?? null,
     status: snapshot.status ?? null,
+    archivedAt: textOderNull(snapshot.archivedAt),
     entryRosterPatchedAt: snapshot.entryRosterPatchedAt ?? null,
     teams: resolveSeasonSnapshotTeamRecords(snapshot).map((record) => projiziereTeam(record as never)),
+    teamDisciplineRanks: (snapshot.teamDisciplineRankSnapshots ?? []).map((record) => ({
+      teamId: record.teamId,
+      teamCode: textOderNull(record.teamCode),
+      teamName: record.teamName,
+      totalRank: record.totalRank,
+      powRank: record.powRank,
+      speRank: record.speRank,
+      menRank: record.menRank,
+      socRank: record.socRank,
+    })),
     players: getSnapshotPlayerPerformances(snapshot).map(projiziereSpieler),
     transfers: (snapshot.transferSnapshots ?? []).map((entry) => ({
       type: String(entry.type),
@@ -293,7 +361,9 @@ export function alsSchnappschussErsatz(
     snapshotId: `projektion-${eintrag.seasonId}`,
     seasonId: eintrag.seasonId,
     seasonName: eintrag.seasonName ?? eintrag.seasonId,
-    archivedAt: "",
+    // Hier stand `""` — siehe die Begruendung am Feld `archivedAt` des Historien-Eintrags: der
+    // Saison-Rueckblick stieg daran aus, die Champion-Karte bekam ein unparsbares Datum.
+    archivedAt: eintrag.archivedAt ?? "",
     status: (eintrag.status as SeasonSnapshotRecord["status"]) ?? undefined,
     entryRosterPatchedAt: eintrag.entryRosterPatchedAt,
     finalStandings: eintrag.teams.map((team) => {
@@ -320,8 +390,21 @@ export function alsSchnappschussErsatz(
         rosterSeasonEnd: team.rosterSeasonEnd,
         marketValueTotalEnd: team.marketValueTotalEnd,
         guv: team.guv,
+        startplatz: team.startplatz,
+        rankDiff: team.rankDiff,
+        transferNet: team.transferNet,
+        // Aus dem Rang abgeleitet, nicht mitgefahren: dieselbe Regel wie im echten
+        // Schnappschuss (`season-snapshot-service`), also keine zweite Rechenstelle.
+        isGold: team.rank === 1,
+        isSilver: team.rank === 2,
+        isBronze: team.rank === 3,
+        isTop5: team.rank != null ? team.rank <= 5 : false,
+        isTop10: team.rank != null ? team.rank <= 10 : false,
       } as unknown as SeasonSnapshotRecord["finalStandings"][number];
     }),
+    teamDisciplineRankSnapshots: (eintrag.teamDisciplineRanks ?? []).map(
+      (record) => ({ ...record }) as unknown as NonNullable<SeasonSnapshotRecord["teamDisciplineRankSnapshots"]>[number],
+    ),
     playerPerformances: (eintrag.players ?? []).map(
       (spieler) =>
         ({

@@ -31,7 +31,7 @@ import {
   buildOfferRankPayoutLadderPreview,
   getCurrentSponsorSalaryFactor,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { applySpotlightPerkToComponents, buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import {
@@ -60,7 +60,11 @@ import {
 } from "@/lib/sponsor/sponsor-v3-model";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
-import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
+import {
+  applySponsorV3ToOffers,
+  getSponsorV3Terms,
+  sponsorV3EingefrorenerSockel,
+} from "@/lib/sponsor/sponsor-v3-offer-service";
 import {
   buildSponsorV4AxisTerms,
   sponsorV4AxisLabel,
@@ -1049,15 +1053,33 @@ function scoreOfferForAi(input: {
 
   // LAUFZEIT-TERM (siehe SPONSOR_AI_TERM_INSURANCE_SHARE oben): erwarteter Erosionsverlust ueber die
   // Restlaufzeit gegen einen kleinen Versicherungswert fuer den eingefrorenen Sockel aufgewogen.
+  //
+  // DER SOCKEL MUSS DER SOCKEL DIESER KARTE SEIN, nicht der nackte Liga-Sockel des Startrangs.
+  // Bis hierher stand hier `sponsorSockelFuerStartrang(terms.startRank)` — ohne Raritaets-Wertfaktor
+  // und ohne Gebaeude-Verzicht, waehrend `terms.anchor` einen Zeile darunter beides enthaelt. Die
+  // Differenz `anchor − sockel` verglich damit zwei verschiedene Waehrungen. GEMESSEN ueber die 160
+  // Angebote des Live-Abbilds (11.08.2026): Ø 9,76 C zu hoher Sockel, groesste Abweichung 30,2 C
+  // (gewoehnliche Gebaeude-Karte, Verzicht 25,4 bei Startrang 23: gerechnet 43,2, echt 13,1). Beides
+  // in derselben Richtung falsch — der Wertungsanteil (und damit der Erosionsverlust) zu KLEIN, der
+  // Versicherungswert zu GROSS: die KI hielt Mehrjahresvertraege systematisch fuer besser, als sie
+  // sind, und zwar am staerksten bei genau den Karten mit dem groessten Verzicht.
+  //
+  // `sponsorV3EingefrorenerSockel` ist dieselbe Formel, aus der die Leiter und ihr Netz gebaut werden.
   if (terms && offer.termSeasons != null && offer.termSeasons > 1) {
-    const sockel = sponsorSockelFuerStartrang(terms.startRank);
+    const sockel = sponsorV3EingefrorenerSockel(terms);
     const wertungsanteil = Math.max(0, terms.anchor - sockel);
     let erosionLoss = 0;
     for (let year = 2; year <= offer.termSeasons; year += 1) {
       const contractYear = Math.max(1, Math.min(3, year)) as 1 | 2 | 3;
       erosionLoss += (1 - getSponsorTermMultiplier(contractYear)) * wertungsanteil;
     }
-    const insuranceValue = SPONSOR_AI_TERM_INSURANCE_SHARE * sockel * (offer.termSeasons - 1);
+    // Der Versicherungswert liest den Sockel als GELD — und Geld ist nicht negativ. Bei einer grossen
+    // Leihe auf einem vorderen Startrang uebersteigt der Verzicht den skalierten Sockel (gemessen: 5
+    // von 160 Angeboten, bis −3,5 C); dort haelt `terms.floor` die Leiter, nicht der Sockel. Ohne den
+    // Clamp bekaeme so eine Karte einen NEGATIVEN Versicherungswert, also einen Abschlag fuer eine
+    // Absicherung, die sie sehr wohl hat. Der Wertungsanteil oben bleibt ungeklammert — er ist der
+    // Drehpunkt der Erosion, kein Geldbetrag.
+    const insuranceValue = SPONSOR_AI_TERM_INSURANCE_SHARE * Math.max(0, sockel) * (offer.termSeasons - 1);
     score += insuranceValue - erosionLoss;
   }
 

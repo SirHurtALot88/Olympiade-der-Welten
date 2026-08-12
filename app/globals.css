@@ -39218,6 +39218,16 @@ button.market-v2-bucket-card.is-selected {
   gap: 4px;
 }
 
+/* GEMELDET VON CHRIS: „MW und gehalt sollen die ganze zeile ausfüllen" — mit nur zwei
+   `economyStats` (Teams-Kaderportraits: MW, Gehalt) blieb bei fest drei Spalten ein leeres
+   drittes Feld stehen, MW/Gehalt fuellten die Zeile nicht. `:has()` erkennt "genau zwei Kinder"
+   (das zweite Kind ist zugleich das letzte) rein aus der Kindanzahl — ohne neue Modifier-Klasse,
+   wirkt automatisch ueberall dort, wo ein Aufrufer nur zwei Kennzahlen uebergibt, und laesst
+   Aufrufer mit drei (Teams-Detailpanel, Team-Profil: MW/Gehalt/LZ) unberuehrt. */
+.foundation-player-portrait-economy:has(.foundation-player-portrait-economy-stat:nth-child(2):last-child) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* Saison-PPs je Achse — die zweite Achsenzeile, direkt unter dem Attribut-Orbit.
    BEWUSST DIESELBE 4er-Rasterung und dieselbe Achsenfarbe wie der Orbit darüber: die beiden
    Zeilen gehören zusammen und werden als Paar gelesen (oben das Attribut, darunter was der
@@ -54759,6 +54769,46 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-row-load .nl-training-row-fatigue .nl-gauge-label {
   font-size: 7.5px;
+}
+
+/* CA/PO-Sterne-Spalte (T7): Sterne statt Zahl, konsistent zur Kaderliste. */
+.is-new-look .nl-training-row-ability {
+  white-space: nowrap;
+}
+
+/* Gehalt-/Vertrags-Spalten (T7, Chris: "damit man weiß welche Spieler mit
+   langem Vertrag man entwickeln sollte") — gleiches Zellmuster wie
+   `.nl-players-money`/`.nl-players-contract` in der Kaderliste. */
+.is-new-look .nl-training-row-salary {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.is-new-look .nl-training-row-contract {
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-row-contract-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+}
+
+/* Auslaufender Vertrag (Restlaufzeit 1) farblich betont — die Restlaufzeit
+   soll auf einen Blick lesbar sein, nicht nur die Zahl. */
+.is-new-look .nl-training-row-contract-value.is-expiring {
+  color: var(--nl-warn);
+  font-weight: 700;
+}
+
+.is-new-look .nl-training-row-contract-shape {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-training-chip.is-neutral {
@@ -80053,40 +80103,11 @@ span.nl-facility-ampel-chip {
 
 
 
-/* --- VK-Zeile unter den Kader-Portraits ---------------------------------
-   GEMELDET VON CHRIS: „neben MW fehlt noch gehalt! bitte die breite nutzen und
-   darunter die aenderung von MW zum aktuellen VK bzw VK wird angezeigt und diff
-   zum MW".
-
-   MW und Gehalt teilen sich jetzt die Breite (zwei Kacheln der `economyStats`),
-   der Verkaufserloes steht als eigene Zeile darunter — Label links, Wert
-   rechtsbuendig, der Abstand zum Marktwert direkt daneben in seiner Farbe. */
-.is-new-look .nl-teams-portrait-sellvalue {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  width: 100%;
-  padding: 3px 6px 0;
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.is-new-look .nl-teams-portrait-sellvalue-label {
-  color: var(--nl-mut, #93a3bd);
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.is-new-look .nl-teams-portrait-sellvalue-value {
-  margin-left: auto;
-  font-weight: 800;
-  color: var(--nl-ink, #e8eefc);
-}
-
-.is-new-look .nl-teams-portrait-sellvalue-delta {
-  font-weight: 800;
-}
+/* Die vormalige eigene VK-Zeile unter den Kader-Portraits (`.nl-teams-portrait-sellvalue*`) ist
+   weg: Chris' Nachtrag zog den VK-Preis als Klammerzusatz in die MW-Kachel
+   (`.foundation-player-portrait-economy-stat`, siehe FoundationTeamsNewLook.tsx) — MW+Gehalt
+   fuellen jetzt zusammen die volle Breite (siehe `:has()`-Regel bei
+   `.foundation-player-portrait-economy` oben), keine separate Fusszeile mehr noetig. */
 
 /* Summenzeile „All Time" unter den Saisons der Team-Historie: die Zeile ist keine Saison, deshalb
    grenzt sie eine kraeftigere Oberkante ab und traegt keine Zebra-/Live-Toenung. */

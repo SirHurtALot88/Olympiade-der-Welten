@@ -17,11 +17,18 @@ import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-
  * hält den kompakten Payload (`compactFoundationInitialGameState`), der beide
  * Quellen beschneidet bzw. entfernt — der Rang fällt dort still auf `null`.
  *
+ * SEITHER: `matchdayResults` und `disciplineResults` fahren wieder vollständig
+ * mit (Herleitung samt Messung in `compactFoundationInitialGameState`), also
+ * rechnet der Browser den SAISON-Rang selbst richtig aus. Die `seasonSnapshots`
+ * bleiben gestrichen — sie sind der Berg (3,5 MB am Live-Save) — und damit
+ * bleibt der ALL-TIME-Rang ohne das Override leer. Genau deshalb existiert
+ * `buildPlayerDisciplineRankOverride` weiterhin; er ist nicht wirkungslos
+ * geworden wie die vier Spieltags-Projektionen.
+ *
  * DER TEST FÄHRT DIE GEGENPROBE: derselbe Aufruf einmal auf dem vollen Save,
- * einmal auf `compactFoundationInitialGameState(...)`. Ohne das Override
- * weichen die Ergebnisse ab (Rang verschwindet); mit dem serverseitig auf dem
- * VOLLEN Save berechneten `buildPlayerDisciplineRankOverride` stimmen sie
- * wieder überein.
+ * einmal auf `compactFoundationInitialGameState(...)`. Ohne das Override fehlt
+ * der All-Time-Rang; mit dem serverseitig auf dem VOLLEN Save berechneten
+ * `buildPlayerDisciplineRankOverride` stimmen beide Ränge wieder überein.
  */
 
 function createPlayer(id: string, name: string): Player {
@@ -308,21 +315,47 @@ describe("player detail drawer discipline rank override (bug-2026-08-04T13-23-39
     expect(basketball?.seasonPointsRank).not.toBe(basketball?.allTimePointsRank);
   });
 
-  it("compact payload WITHOUT override: both ranks silently vanish although the same call worked on the full save", () => {
+  it("compact payload WITHOUT override: the season rank comes out by itself, the all-time rank silently becomes the season rank", () => {
     const player = createPlayer("player-gronn", "Gronn");
     const rival = createPlayer("player-rival", "Rival");
     const fullGameState = createGameState(player, rival);
     const compactGameState = compactFoundationInitialGameState(fullGameState);
 
-    // Gegenprobe: kompakter Payload hat wirklich nichts mehr zu ranken.
-    expect(compactGameState.seasonState.matchdayResults ?? []).toHaveLength(0);
+    /**
+     * FRUEHER STAND HIER: `matchdayResults` toHaveLength(0) und BEIDE Ränge `null` — der
+     * kompakte Payload hatte nichts mehr zu ranken, beide Felder blieben sichtbar leer.
+     *
+     * Die eine Hälfte gilt nicht mehr: die Spieltags-Quellen fahren vollständig mit, also
+     * rankt der Saison-Ledger im Browser wieder und liefert dieselbe 2 wie der volle Save.
+     *
+     * BEFUND, DER FESTGEHALTEN GEHÖRT: die andere Hälfte ist dadurch von „leer" auf „falsch"
+     * gekippt. `buildDisciplineGlobalRankMaps` mischt den laufenden Saison-Ledger in die
+     * All-Time-Summen, sobald KEIN Schnappschuss der laufenden Saison da ist
+     * (player-detail-drawer.ts, `if (!hasCurrentSeasonSnapshot)`). Die `seasonSnapshots`
+     * bleiben gestrichen — der Berg, 3,5 MB am Live-Save —, also besteht die All-Time-Summe
+     * im Browser NUR aus der laufenden Saison: der All-Time-Rang ist eine Kopie des
+     * Saison-Rangs (2) statt der Wahrheit aus dem Vorsaison-Schnappschuss (1).
+     *
+     * Sichtbar wird das heute nirgends: die einzige Stelle, die `allTimePointsRank` rendert
+     * (PlayerDetailDrawer.tsx, Spalte "allTimePps"), bekommt ihre Daten ausschließlich über
+     * `buildHydratedPlayerDrawerData`, und der hängt das serverseitige Override immer an —
+     * siehe den Fall darunter. Der Rang ohne Override ist damit eine latente Falle, kein
+     * gemeldeter Fehler. Genau deshalb ist dieses Override NICHT wirkungslos geworden wie
+     * die vier Spieltags-Projektionen, und genau deshalb steht die falsche Zahl hier
+     * ausgeschrieben statt weggelassen: wer sie kleiner macht, merkt es.
+     */
+    expect(compactGameState.seasonState.matchdayResults ?? []).toHaveLength(1);
     expect(compactGameState.seasonState.seasonSnapshots).toBeUndefined();
 
     const data = buildPlayerDrawerDataFromGameState({ gameState: compactGameState, playerId: player.id, source: "sqlite" });
     const basketball = data?.disciplineValues.find((entry) => entry.id === "basketball");
 
-    expect(basketball?.seasonPointsRank).toBeNull();
-    expect(basketball?.allTimePointsRank).toBeNull();
+    // Saison-Rang: aus eigener Kraft richtig, deckungsgleich mit dem vollen Save.
+    expect(basketball?.seasonPointsRank).toBe(2);
+    // All-Time-Rang: NICHT die Wahrheit (dort steht 1), sondern die Kopie des Saison-Rangs.
+    expect(basketball?.allTimePointsRank).toBe(2);
+    const voll = buildPlayerDrawerDataFromGameState({ gameState: fullGameState, playerId: player.id, source: "sqlite" });
+    expect(voll?.disciplineValues.find((entry) => entry.id === "basketball")?.allTimePointsRank).toBe(1);
   });
 
   it("compact payload WITH the server-computed override: both ranks match the full-save result exactly", () => {

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-import { buildTeamOverviewSlice } from "@/lib/foundation/team-overview-slice";
+import { buildTeamOverviewSlice } from "@/lib/foundation/team-overview-slice-build";
 import { resolveSliceSave } from "@/lib/foundation/resolve-slice-save-context";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { resolveSessionOwnerId } from "@/lib/auth/session";

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { getPlayerPortraitMediaModel, getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitInitials, getPlayerPortraitMediaModel, getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import {
@@ -230,7 +230,7 @@ export function useSeasonV2PanelModel({
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = playerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,
@@ -257,7 +257,7 @@ export function useSeasonV2PanelModel({
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.map((row) => {
       const player = playerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,

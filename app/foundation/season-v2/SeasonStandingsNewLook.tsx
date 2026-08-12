@@ -328,6 +328,36 @@ function renderLeagueRankSuffix(
   );
 }
 
+/**
+ * DER BONUS STAND ZWEIMAL IN DERSELBEN ZEILE.
+ *
+ * `disciplineValues.bonuspunkte` ist der Mutator-Aufschlag der Saison
+ * (`season-points-ledger.ts`: `teamSummary.mutatorPpsBonus`). Derselbe Aufschlag steckt aber
+ * bereits in JEDER Disziplin-Spalte: der Ledger bucht je Spieler-Zeile
+ * `points = Anteil + mutatorPpsBonus` (`resolveAwardedPlayerPoints`) und summiert genau
+ * dieses `points` nach `pointsByDiscipline` — und daraus baut `mergeSeasonDisciplineValues`
+ * die 20 Disziplin-Spalten und die vier Bereichs-Spalten.
+ *
+ * Am Live-Abbild vom 11.08. nachgerechnet, beide aktiven Staende, alle 32 Teams:
+ * `Σ Disziplin-Spalten − Punkte-Spalte == Bonus-Spalte`, 32 von 32, Abweichung 0,0.
+ * Beispiel aus dem aktiven Save `new-game-1786465783606-0kalpx` (Saison 1, Spieltag 2):
+ * Pirate Crew — Punkte 20,5 · Bonus 0,3 · Σ Disziplinen 20,8. Betroffen 25 von 32 Teams
+ * (0,3–1,2); am Messkoerper `new-game-1785823388048-1hf25q` (Saison 2, Spieltag 10) 32 von 32
+ * mit bis zu 6,3 (B-B).
+ *
+ * Die Tabelle widersprach sich damit selbst: "Punkte + Bonus" ergibt die Disziplin-Summe und
+ * ist richtig — "Σ Disziplinen + Bonus" zaehlt den Aufschlag ein zweites Mal.
+ *
+ * Die BUCHUNG ist nachgemessen korrekt und bleibt unangetastet (0 von 32 Abweichung ueber
+ * zehn Spieltage). Geaendert ist allein die Beschriftung: "dav. Bonus" ist die uebliche
+ * Schreibweise fuer einen Posten, der in der Summe daneben schon enthalten ist — sie
+ * verbietet das Addieren, ohne eine Zahl anzufassen.
+ */
+const BONUS_DAVON_TITLE =
+  "Mutator-Aufschlag der Saison. DAVON-Posten: er steckt bereits in den Disziplin- und " +
+  "Bereichs-Spalten dieser Zeile und darf nicht noch einmal addiert werden. " +
+  "Es gilt: Punkte + Bonus = Summe der Disziplin-Spalten.";
+
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
@@ -923,13 +953,14 @@ export default function SeasonStandingsNewLook({
     return tableSort.dir === "asc" ? "↑" : "↓";
   }
 
-  function renderTableSortHeader(key: NlTableSortKey, label: string) {
+  function renderTableSortHeader(key: NlTableSortKey, label: string, title?: string) {
     return (
       <button
         type="button"
         className={`nl-standings-sort-th${tableSort.key === key ? " is-active" : ""}`}
         onClick={() => toggleTableSort(key)}
         aria-label={`Nach ${label} sortieren`}
+        title={title}
       >
         <span>{label}</span>
         <b aria-hidden="true">{tableSortArrow(key)}</b>
@@ -1168,7 +1199,7 @@ export default function SeasonStandingsNewLook({
           <span className="nl-standings-expand-title">Disziplinen nach Bereich</span>
           <div className="nl-standings-expand-meta">
             {bonusValue != null && Number.isFinite(bonusValue) ? (
-              <StatChip label="Bonus" value={formatNlNumber(bonusValue, 1)} tone="accent" title="Bonuspunkte der Saison" />
+              <StatChip label="dav. Bonus" value={formatNlNumber(bonusValue, 1)} tone="accent" title={BONUS_DAVON_TITLE} />
             ) : null}
             <StatChip
               label="Team"
@@ -1464,7 +1495,7 @@ export default function SeasonStandingsNewLook({
               <th className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
               <th className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
               <th>{renderTableSortHeader("points", "Punkte")}</th>
-              <th>{renderTableSortHeader("bonus", "Bonus")}</th>
+              <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (

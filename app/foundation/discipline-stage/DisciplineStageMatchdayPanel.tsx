@@ -193,10 +193,43 @@ function SideModifierChips({ side, label }: { side: MatchdayTeamSideModifiers | 
  * jede Spalte, die durch diese Funktion laeuft: Punkte, Form, Mutator und Gesamt, in
  * Team- wie in Disziplin-Zeilen.
  */
-function ppText(value: number | null): string {
+export function ppText(value: number | null): string {
   if (value == null) return "–";
   if (Math.abs(value) < 0.05) return "0";
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+}
+
+/**
+ * FORM UND CAPTAIN SIND KEINE PUNKTE — SIE SIND SCORE.
+ *
+ * `formModifier`/`captainBonus` kommen aus `lib/foundation/matchday-team-modifiers.ts` und
+ * sind dort ausdruecklich als „Beitrag zum Team-SCORE" dokumentiert. Die Punkte-Spalte
+ * daneben traegt PP: der Score entscheidet den Rang, der Rang schlaegt ueber
+ * `rank-to-points` in Punkte um. Zwischen beiden liegt also eine Rangtabelle, keine
+ * Addition.
+ *
+ * Beide Spalten liefen bis zum Audit vom 11.08. durch `ppText`, also durch dieselbe
+ * Formatierung wie die Punkte-Spalte. Gemessen am Live-Abbild, Spieltag `season-2-matchday-10`
+ * (Save `new-game-1785823388048-1hf25q`): bei 12 von 32 Teams war die Form-Zahl GROESSER als
+ * die komplette Punkte-Spalte — N-N stand mit „26,4“ Punkten und „+184,3“ Form in derselben
+ * Zeile, im Mittel Faktor 1,4. Gerechnet war nichts falsch, nur nebeneinandergestellt.
+ *
+ * Die Wahl: KLAMMERN plus Spaltenname mit „-Score“, keine Regelaenderung.
+ * - Die Klammer ist in genau diesem Panel schon die Score-Schreibweise: die Spieler-Chips
+ *   unter der Zeile schreiben „12,3 PP (48,7)“ — PP fett, Score in Klammern und gedaempft.
+ *   Die Spalte uebernimmt damit eine Konvention, die der Spieler hier bereits liest, statt
+ *   eine neue einzufuehren.
+ * - Der Kopf sagt zusaetzlich „Form-Score“ / „Captain-Score“, damit die Einheit auch dann
+ *   dasteht, wenn jemand nur die Ueberschrift liest.
+ * - Eine Umrechnung in PP waere die Alternative gewesen und ist bewusst NICHT gemacht:
+ *   sie gibt es nicht ohne Gegenrechnung des ganzen Spieltags (anderer Score → anderer
+ *   Rang aller 32 Teams → andere Punkte), und das waere eine zweite Rechenstelle fuer die
+ *   Buchung. Ausweisen darf die Spalte, umrechnen nicht.
+ */
+export function scoreText(value: number | null): string {
+  if (value == null) return "–";
+  if (Math.abs(value) < 0.05) return "(0)";
+  return `(${value > 0 ? "+" : ""}${value.toFixed(1)})`;
 }
 
 // Header, Team-Zeilen UND Disziplin-Zeilen teilen sich EXAKT dieses Raster (sonst driften
@@ -224,7 +257,13 @@ function ppText(value: number | null): string {
  * (Team-Zeile + Disziplin-Zeilen). Steckte es wie vorher in der Team-Spalte, koennte es
  * nur so hoch werden wie die erste Zeile.
  */
-const PANEL_GRID_COLUMNS = "56px 112px 56px 1fr 70px 76px 78px 92px 84px";
+// Form und Captain sind breiter als frueher (76/78 px), weil ihre Koepfe seit dem Audit
+// vom 11.08. die EINHEIT mittragen: "FORM-SCORE ▼" / "CAPTAIN-SCORE ▼" statt "FORM" /
+// "CAPTAIN". Bei 10,5 px Versalien mit 0,04em Sperrung braucht das laengste davon rund
+// 116 px, und `whiteSpace: "nowrap"` im Spaltenkopf laesst es nicht umbrechen — zu schmal
+// hiesse ueberlaufen, nicht umbrechen. Die Breite kommt aus der 1fr-Team-Spalte, die
+// ohnehin umbricht.
+const PANEL_GRID_COLUMNS = "56px 112px 56px 1fr 70px 100px 120px 92px 84px";
 
 /** Spaltenindizes (1-basiert) — die Zellen des Team-Blocks werden explizit gesetzt. */
 const COL = {
@@ -388,6 +427,36 @@ export function sortMatchdayPanelRows<T extends SortableRow>(rows: T[], sort: Ma
   });
 }
 
+/**
+ * DERSELBE SPIELTAG, ZWEI RANGLISTEN — DESHALB HEISST DIESE SPALTE NICHT MEHR "RANG".
+ *
+ * Es gibt an einem Spieltag zwei vertretbare Fragen, und beide wurden bis zum Audit vom
+ * 11.08. unter derselben Ueberschrift beantwortet:
+ *
+ *   1. "Wer hat heute die meisten PP geholt?"  — diese Spalte. Sie ordnet nach der
+ *      Gesamt-Spalte `total` = gebuchte Disziplin-Punkte + Mutator-Aufschlag, also nach
+ *      der PP-Ausbeute, die auch die Spieler-Chips darunter tragen.
+ *   2. "Wer hat heute die meisten Punkte auf die Saisontabelle bekommen?" — das ist der
+ *      Rang im Spieltags-Ergebnis (`lib/foundation/matchday-summary.ts`, `rankTeams` ueber
+ *      die gebuchten `matchdayPoints`). Der Mutator-Aufschlag wird NICHT gebucht, er faellt
+ *      dort also heraus.
+ *
+ * Beide sind richtig, aber sie sind nicht dieselbe Zahl. Am Live-Abbild vom 11.08. gemessen
+ * (Save `new-game-1785823388048-1hf25q`, `season-2-matchday-10`, 32 Teams) unterschieden sich
+ * 17 von 32 Zeilen: Hell Raisers standen hier auf 2 und im Spieltags-Ergebnis auf 3 (25,0
+ * Punkte + 1,2 Mutator), Last Ride umgekehrt auf 3 und 2 (25,6 + 0,3). Wer beide Ansichten
+ * nacheinander aufmacht, sieht denselben Spieltag zweimal anders sortiert.
+ *
+ * Repariert wird das NICHT durch Angleichen — dann verlaere eine der beiden Fragen ihre
+ * Antwort, und eine Buchung anzufassen kommt ohnehin nicht in Frage. Repariert wird es
+ * dadurch, dass die Spalte sagt, welche Frage sie beantwortet: "PP-Rang" statt "Rang",
+ * Bezugsgroesse im Titel, und die Kopfzeile nennt die andere Ansicht ausdruecklich.
+ */
+export const MATCHDAY_RANK_TITLE =
+  "Platzierung nach der PP-Ausbeute dieses Spieltags (Gesamt-Spalte: Punkte + Mutator-Aufschlag). " +
+  "Das Spieltags-Ergebnis ordnet nach den GEBUCHTEN Punkten, in denen der Mutator-Aufschlag nicht " +
+  "steckt — die beiden Reihenfolgen koennen deshalb auseinandergehen.";
+
 export function resolveMatchdayRanks<T extends { teamId: string; total: number }>(rows: T[]): Map<string, number> {
   const ranks = new Map<string, number>();
   const sorted = [...rows].sort((left, right) => right.total - left.total);
@@ -405,27 +474,40 @@ export function resolveMatchdayRanks<T extends { teamId: string; total: number }
 /**
  * Projizierter Saison-Rang nach diesem Spieltag, aus den Arena-Ergebnissen.
  *
- * GEMELDET VON CHRIS (nach Spieltag 10): „ich weiß nicht ob da vllt noch die bonus punkte nicht
- * berücksichtigt werden oder so aber das war eindeutig falsch weil ich schon dachte schade für M-M
- * dass sie es nicht geschafft haben aufs treppchen und plötzlich sind sie doch 2."
+ * ES GILT `sum`, NICHT `total` — also die Disziplin-Punkte OHNE den Mutator-Aufschlag.
  *
- * Genau das war es. Gerechnet wurde mit `sum` — nur den beiden Disziplin-Punkten. Die Gesamt-Spalte
- * daneben zeigt aber `total`, und das ist `sum + mutPp`: der Mutator-Bonus des Spieltags gehört
- * dazu und wird in der Saisontabelle auch gewertet (dort die Spalte BONUS). Die Projektion ordnete
- * die Teams also nach einer anderen Zahl als der, die am Ende gebucht wird — und wer viel Bonus
- * holte, stand im Endstand-Bildschirm zu tief.
+ * Vorgeschichte: Chris meldete nach Spieltag 10, der Endstand-Bildschirm zeige eine andere
+ * Reihenfolge als die Saisontabelle („M-M war dort noch platz 4 … plötzlich sind sie doch 2"),
+ * und vermutete die Bonuspunkte. Die Reparatur nahm daraufhin `total` (= `sum + mutPp`). Das
+ * war die falsche der beiden genannten Ursachen: gebucht wird der Mutator-Aufschlag NICHT.
+ *
+ * Am Live-Abbild nachgemessen (Save `new-game-1785823388048-1hf25q`, Saison 2, Spieltag 10,
+ * 32 Teams): `standings[team].points` == Σ `rank_to_points(playerCount, rank)` über alle zehn
+ * gewerteten Spieltage, Abweichung 0,0 bei 32 von 32 Teams — der Mutator-Aufschlag (Σ 17,7 an
+ * diesem Spieltag, 26 Teams betroffen) steckt dort nirgends drin. Er ist ein SPIELER-Punkt
+ * (`lib/foundation/player-points-total.ts`: „1:1 dem Spieler gutgeschrieben und NICHT im Anteil
+ * enthalten") und geht nur in die PP-Summen der Spieler und Kader ein.
+ *
+ * Mit `total` projiziert, wichen 6 von 32 Rängen vom gebuchten Endstand ab (P-S/R-L 8↔9,
+ * W-W/T-T 15↔16, U-A/C-C 31↔32). Mit `sum` sind es 0 von 32. Dieselbe Größe verwenden auch die
+ * beiden anderen Stellen, die einen Saison-Rang bilden: `standings-apply-service` bucht
+ * `pointsDelta` aus der Rang→Punkte-Tabelle, und `buildMatchdaySummary` bildet „Rang vorher /
+ * nachher" über `basePoints` (`foundation-matchday-points-projection`) — beide ohne Mutator.
+ *
+ * Die Gesamt-Spalte daneben zeigt weiterhin `total`: das ist die PP-Ausbeute des Tages und damit
+ * die richtige Zahl für den TAGESRANG (`resolveMatchdayRanks`). Zwei verschiedene Fragen, zwei
+ * verschiedene Zahlen — der Saison-Rang muss die gebuchte nehmen.
  *
  * Formkarten- und Captain-Beitrag sind bereits in den Disziplin-Punkten enthalten (siehe die
- * Tooltips weiter unten) und dürfen deshalb NICHT noch einmal addiert werden. Nur der Mutator-PP
- * steht daneben.
+ * Tooltips weiter unten) und dürfen ohnehin nicht noch einmal addiert werden.
  */
 export function resolveProjectedRanksFromMatchday<
-  T extends { teamId: string; currentPoints: number | null; total: number; projectedRank: number | null },
+  T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
 >(rows: T[]): Map<string, number> {
   const projected = rows
     .map((row) => ({
       teamId: row.teamId,
-      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.total : null,
+      points: row.currentPoints != null && Number.isFinite(row.currentPoints) ? row.currentPoints + row.sum : null,
     }))
     .filter((entry): entry is { teamId: string; points: number } => entry.points != null);
 
@@ -440,6 +522,42 @@ export function resolveProjectedRanksFromMatchday<
     lastRank = rank;
   });
   return ranks;
+}
+
+/**
+ * EINE RANGLISTE FUER DIE S-RANG-SPALTE — NIE ZWEI GEMISCHT.
+ *
+ * GEMELDET VON CHRIS (nach Spieltag 10): „das endergebnis was mir gezeigt wurde in MD10 hat
+ * nichts mit dem zu tun was nun hier steht — M-M war dort noch platz 4, H-R blieb auf 2, G-G
+ * waren 11. wenn alle spiele durch sind muss das ja auch das endergebnis sein!"
+ *
+ * Er hat recht, und der Fehler sass hier. Die Stelle fuellte NUR die LUECKEN: Teams mit
+ * gespeicherter Projektion behielten den Rang der Engine, alle anderen bekamen den aus den
+ * Arena-Ergebnissen abgeleiteten. Beides sind fuer sich stimmige Ranglisten — aber es sind
+ * ZWEI, jede ueber eine andere Teilmenge durchnummeriert. Zusammen in einer Spalte ergeben
+ * sie eine Reihenfolge, die keiner von beiden entspricht: Raenge doppelt vergeben, andere gar
+ * nicht, und die Endtabelle weicht von der Saisontabelle ab.
+ *
+ * Ein Rang ist nur als VOLLSTAENDIGE Ordnung eine Aussage. Also: entweder ALLE aus der Engine
+ * (dann ist der Spieltag uebernommen und sie ist die verbindliche Quelle) oder ALLE abgeleitet.
+ *
+ * Steht als eigene, exportierte Funktion da, damit ein Test die WERTE pruefen kann. Vorher
+ * war die Regel eine Zeile mitten im Panel und ihr Test las den Quelltext nach einem
+ * `if (row.projectedRank == null) {` ab — der waere auch ueber einer toten Funktion gruen
+ * geblieben (Fehlerklasse "Test prueft Quelltext-Strings statt Werte").
+ */
+export function applySeasonRankColumn<
+  T extends { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null },
+>(rows: T[]): T[] {
+  const alleAusDerEngine = rows.length > 0 && rows.every((row) => row.projectedRank != null);
+  if (alleAusDerEngine) {
+    return rows;
+  }
+  const abgeleitet = resolveProjectedRanksFromMatchday(rows);
+  for (const row of rows) {
+    row.projectedRank = abgeleitet.get(row.teamId) ?? null;
+  }
+  return rows;
 }
 
 export default function DisciplineStageMatchdayPanel({
@@ -543,29 +661,7 @@ export default function DisciplineStageMatchdayPanel({
   // auf die Eingangsreihenfolge zurück.
   // Tagesrang aus der Gesamt-Spalte — unabhaengig von der Saison-Tabelle.
   const matchdayRanks = resolveMatchdayRanks(rows);
-  const derivedProjectedRanks = resolveProjectedRanksFromMatchday(rows);
-  /**
-   * GEMELDET VON CHRIS (nach Spieltag 10): „das endergebnis was mir gezeigt wurde in MD10 hat
-   * nichts mit dem zu tun was nun hier steht — M-M war dort noch platz 4, H-R blieb auf 2, G-G
-   * waren 11. wenn alle spiele durch sind muss das ja auch das endergebnis sein!"
-   *
-   * Er hat recht, und der Fehler saß hier. Die Zeile füllte NUR die Lücken: Teams mit gespeicherter
-   * Projektion behielten den Rang der Engine, alle anderen bekamen den aus den Arena-Ergebnissen
-   * abgeleiteten. Beides sind für sich stimmige Ranglisten — aber es sind ZWEI, jede über eine
-   * andere Teilmenge durchnummeriert. Zusammen in einer Spalte ergeben sie eine Reihenfolge, die
-   * keiner der beiden entspricht: Ränge doppelt vergeben, andere gar nicht, und die Endtabelle
-   * weicht von der Saisontabelle ab.
-   *
-   * Ein Rang ist nur als vollständige Ordnung eine Aussage. Also: entweder ALLE aus der Engine
-   * (dann ist der Spieltag übernommen und sie ist die verbindliche Quelle) oder ALLE abgeleitet.
-   * Gemischt wird nicht mehr.
-   */
-  const alleAusDerEngine = rows.every((row) => row.projectedRank != null);
-  if (!alleAusDerEngine) {
-    for (const row of rows) {
-      row.projectedRank = derivedProjectedRanks.get(row.teamId) ?? null;
-    }
-  }
+  applySeasonRankColumn(rows);
 
   /**
    * Δ MODIFIKATOREN — zwei Ranglisten über dieselbe Liga: einmal nach der reinen Basis-Leistung,
@@ -726,7 +822,7 @@ export default function DisciplineStageMatchdayPanel({
             versprach „Rang vor → nach dem Spieltag" eine Bewegung, die an der Rang-Spalte nie
             existierte (dort stand das Modifikator-Δ aus #474). */}
         <div style={{ fontSize: 11.5, color: "var(--nl-mut)" }}>
-          S-Rang: Saisonrang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · Rang: nur dieser Spieltag, <b style={{ color: "var(--nl-ink)" }}>Mod ▲▼</b> = Plätze durch Fatigue, Form, Captain &amp; Mutatoren · <span style={{ color: "var(--nl-warn)" }}>◆ Mutator-PP</span> dem Spieler gutgeschrieben
+          S-Rang: Saisonrang <b style={{ color: "var(--nl-ink)" }}>vor</b> → <b style={{ color: "var(--nl-ink)" }}>nach</b> dem Spieltag · PP-Rang: nur dieser Spieltag, nach der <b style={{ color: "var(--nl-ink)" }}>Gesamt</b>-Spalte (Punkte + Mutator) — das Spieltags-Ergebnis ordnet nach den <b style={{ color: "var(--nl-ink)" }}>gebuchten Punkten</b> und kann deshalb abweichen · <b style={{ color: "var(--nl-ink)" }}>Mod ▲▼</b> = Plätze durch Fatigue, Form, Captain &amp; Mutatoren · <span style={{ color: "var(--nl-warn)" }}>◆ Mutator-PP</span> dem Spieler gutgeschrieben
         </div>
       </div>
 
@@ -748,7 +844,7 @@ export default function DisciplineStageMatchdayPanel({
           >
             {/* Kurze Beschriftungen: "Spieltag"/"Saison-Rang" waren fuer die
                 Spaltenbreiten zu lang und ueberlappten sich im Kopf. */}
-            {sortButton("matchday", "Rang", "Platzierung nur nach der Leistung dieses Spieltags", "left")}
+            {sortButton("matchday", "PP-Rang", MATCHDAY_RANK_TITLE, "left")}
             {sortButton("season", "S-Rang", "Saison-Rang vor dem Spieltag → projizierter Rang danach", "left")}
             {/* Wappen-Spalte — im Kopf ohne Beschriftung. */}
             <div />
@@ -807,13 +903,13 @@ export default function DisciplineStageMatchdayPanel({
             {sortButton("sum", "Punkte", "Spieltags-Punkte je Rang (Disziplin 1 + Disziplin 2)")}
             {sortButton(
               "form",
-              "Form",
-              "Beitrag der eingesetzten Formkarten in den aufgedeckten Disziplinen. Bereits in den Disziplin-Punkten enthalten — hier nur ausgewiesen, damit sichtbar ist, ob der Kartensatz gepasst hat. Die gespielten Karten stehen als Chips am Teamnamen.",
+              "Form-Score",
+              "Beitrag der eingesetzten Formkarten zum SCORE der aufgedeckten Disziplinen — nicht zu den Punkten. Der Score entscheidet den Rang, der Rang schlaegt in Punkte um; diese Zahl laesst sich deshalb NICHT zur Punkte-Spalte addieren. Sie steht in Klammern, wie der Score bei den Spieler-Chips darunter. Die gespielten Karten stehen als Chips am Teamnamen.",
             )}
             {sortButton(
               "captain",
-              "Captain",
-              "Beitrag des eingesetzten Captains in den aufgedeckten Disziplinen. Wie die Form bereits in den Disziplin-Punkten enthalten — hier ausgewiesen, damit sichtbar ist, was die Captain-Entscheidung gebracht hat. Steht kein Captain in der Diszi, bleibt die Zelle leer.",
+              "Captain-Score",
+              "Beitrag des eingesetzten Captains zum SCORE der aufgedeckten Disziplinen — dieselbe Einheit wie Form-Score, nicht Punkte. Auch diese Zahl laesst sich nicht zur Punkte-Spalte addieren; sie zeigt, was die Captain-Entscheidung im Score gebracht hat. Steht kein Captain in der Diszi, bleibt die Zelle leer.",
             )}
             {sortButton("mutator", "◆ Mutator", "Mutator-Bonus-PP (0,3er) — dem Spieler gutgeschrieben, separat vom Team-PP")}
             {sortButton("total", "Gesamt", "Gesamt = Spieltags-Punkte + Mutator-Bonus")}
@@ -882,7 +978,7 @@ export default function DisciplineStageMatchdayPanel({
               >
                 {/* Tagesrang — nur die Leistung DIESES Spieltags. */}
                 <div
-                  title={`Spieltags-Rang ${matchdayRank ?? "–"} — nur nach der Leistung dieses Spieltags`}
+                  title={`PP-Rang ${matchdayRank ?? "–"} — ${MATCHDAY_RANK_TITLE}`}
                   // Badge oben, Mod-Chip darunter: nebeneinander sprengte das Paar die 56-px-Spalte
                   // und der Chip legte sich über den Vorher-Rang der S-Rang-Spalte.
                   style={{ gridColumn: COL.rank, gridRow: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, fontVariantNumeric: "tabular-nums" }}
@@ -1095,7 +1191,7 @@ export default function DisciplineStageMatchdayPanel({
                   title={
                     row.formPp === 0
                       ? "Keine Formkarte in den aufgedeckten Disziplinen"
-                      : `Formkarten-Beitrag: ${ppText(row.formPp)} — bereits in den Disziplin-Punkten enthalten`
+                      : `Formkarten-Beitrag zum Score: ${scoreText(row.formPp)} — SCORE, nicht Punkte. Er hat den Rang in der Disziplin verschoben; die Punkte-Spalte daneben ist das Ergebnis dieses Rangs, keine Summe aus beidem.`
                   }
                   style={{
                     gridColumn: COL.form,
@@ -1112,7 +1208,7 @@ export default function DisciplineStageMatchdayPanel({
                           : "var(--nl-mut)",
                   }}
                 >
-                  {sumShown ? ppText(row.formPp) : lockCell}
+                  {sumShown ? scoreText(row.formPp) : lockCell}
                 </div>
 
                 {/* Captain-Beitrag der aufgedeckten Seiten. Gold wie der Captain-Chip am
@@ -1123,7 +1219,7 @@ export default function DisciplineStageMatchdayPanel({
                   title={
                     row.captainPp === 0
                       ? "Kein Captain in den aufgedeckten Disziplinen"
-                      : `Captain-Beitrag: ${row.captainPp > 0 ? "+" : ""}${row.captainPp.toFixed(1)} — bereits in den Disziplin-Punkten enthalten`
+                      : `Captain-Beitrag zum Score: ${scoreText(row.captainPp)} — SCORE, nicht Punkte. Er hat den Rang in der Disziplin verschoben; die Punkte-Spalte daneben ist das Ergebnis dieses Rangs, keine Summe aus beidem.`
                   }
                   style={{
                     gridColumn: COL.captain,
@@ -1135,11 +1231,7 @@ export default function DisciplineStageMatchdayPanel({
                     color: Math.abs(row.captainPp) > 0.05 ? "var(--nl-gold)" : "var(--nl-mut)",
                   }}
                 >
-                  {sumShown
-                    ? Math.abs(row.captainPp) < 0.05
-                      ? "–"
-                      : `${row.captainPp > 0 ? "+" : ""}${row.captainPp.toFixed(1)}`
-                    : lockCell}
+                  {sumShown ? (Math.abs(row.captainPp) < 0.05 ? "–" : scoreText(row.captainPp)) : lockCell}
                 </div>
 
                 {/* Mutator-Bonus (0,3er) — spielergenau, separat vom Team-PP. */}
@@ -1304,7 +1396,7 @@ export default function DisciplineStageMatchdayPanel({
                                 : "var(--nl-mut)",
                         }}
                       >
-                        {ppText(values.form)}
+                        {scoreText(values.form)}
                       </div>
                       <div
                         style={{
@@ -1313,7 +1405,7 @@ export default function DisciplineStageMatchdayPanel({
                           color: Math.abs(values.captain ?? 0) > 0.05 ? "var(--nl-gold)" : "var(--nl-mut)",
                         }}
                       >
-                        {values.captain == null || Math.abs(values.captain) < 0.05 ? "–" : ppText(values.captain)}
+                        {values.captain == null || Math.abs(values.captain) < 0.05 ? "–" : scoreText(values.captain)}
                       </div>
                       <div
                         style={{

@@ -45,8 +45,6 @@ export type PortraitOverlayStat = {
 };
 
 export type PlayerPortraitTrainingContextData = {
-  caRating?: number | null;
-  poDisplay?: string | null;
   netSetpoints?: number | null;
   regressionRisk?: string | null;
   trainingModeLabel?: string | null;
@@ -236,13 +234,22 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
   return stats;
 }
 
+/**
+ * Nur noch der Forecast-Chip — CA/PO standen hier vorher als eigener Text-Stat
+ * ("CA 45"), während dieselbe Karte PO direkt daneben schon als Sterne zeigte
+ * (Chris' Screenshot-Befund: CA Zahl, PO Sterne, zwei Sprachen für dieselbe
+ * Skala). `NlAbilityStars` (`abilityStarsRow` in `FoundationPlayerPortraitCard`)
+ * ist bereits der EINE geteilte Sterne-Slot für CA+PO auf jeder anderen
+ * Sterne-Oberfläche (Kaderliste, Home, Scouting) — der Trainings-Preset bekommt
+ * über `newLook`/`caScore`/`poScore` denselben Slot statt einer zweiten,
+ * text-basierten CA/PO-Darstellung. Ein Duplikat (Sterne + Zahl für denselben
+ * Wert) wäre nur wieder dieselbe Inkonsistenz in Klein.
+ */
 export function buildTrainingOverlayStats(data: PlayerPortraitTrainingContextData): PortraitOverlayStat[] {
   const net = data.netSetpoints;
   const netLabel =
     net == null || !Number.isFinite(net) ? "—" : `${net > 0 ? "+" : ""}${formatNumber(net, 1)}`;
   return [
-    stat("CA", formatNumber(data.caRating, 0)),
-    stat("PO", data.poDisplay ?? "—"),
     stat("Forecast", netLabel, {
       valueClass: net != null && net >= 0 ? "text-positive" : net != null && net < 0 ? "text-negative" : "",
     }),

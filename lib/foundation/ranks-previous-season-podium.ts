@@ -1,5 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { alsSchnappschussErsatz } from "@/lib/persistence/foundation-season-history-projection";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -36,12 +36,11 @@ export type PreviousSeasonPodium = {
 };
 
 export function buildPreviousSeasonPodium(gameState: GameState): PreviousSeasonPodium | null {
-  const rawSnapshots =
-    gameState.seasonState.seasonSnapshots ??
-    (gameState.seasonState.foundationSeasonHistory != null
-      ? alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams)
-      : undefined);
-  if (!rawSnapshots || rawSnapshots.length === 0) {
+  // Wie in `all-time-table.ts`: hier stand `seasonSnapshots ?? …`, und `??` greift nur bei
+  // `null`/`undefined`. Gestrichen wird aber mit einer LEEREN LISTE, also war der Ersatzzweig
+  // unerreichbar und das Vorsaison-Podium im Ranks-Reiter verschwand im Browser ganz.
+  const rawSnapshots = leseSaisonSchnappschuesse(gameState);
+  if (rawSnapshots.length === 0) {
     return null;
   }
 

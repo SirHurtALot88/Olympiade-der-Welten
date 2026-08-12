@@ -436,3 +436,72 @@ describe("Kapitän der Einsatzliste", () => {
     expect(team.captainName).toBeNull();
   });
 });
+
+/**
+ * `teamPpsModifier` WIRD GELESEN, ABER NIRGENDS GESCHRIEBEN.
+ *
+ * `lib/lineups/legacy-lineup-modifiers.ts` setzt das Feld an JEDEM Rueckgabepfad hart auf
+ * `null`/`missing_source` (gemessen am Live-Abbild: 64 von 64 gebuchten Team-Zeilen tragen
+ * `missing_source`). Die Buehne hatte dafuer trotzdem eine Team-Level-Zeile „Team-PPs" —
+ * eine Zeile, die nie erscheinen konnte, und die, wuerde das Feld je gefuellt, eine
+ * PLAYER-POINT-Groesse in den SCORE geschrieben haette. Zwei Waehrungen in einer Summe.
+ *
+ * Die Zeile ist entfernt. Diese Suite haelt beides fest: dass sie weg ist, und dass die
+ * Summe trotzdem exakt auf `teamResult.score` schliesst.
+ */
+describe("Team-PPs gehoeren nicht in den Score", () => {
+  const mitPps = makePreview([
+    {
+      ...makeTeam({
+        teamId: "T-PPS",
+        teamName: "PPS",
+        rank: 1,
+        score: 100,
+        teamPoints: 12,
+        entries: [
+          { playerId: "p1", playerName: "Eins", baseValue: 50, finalPlayerScore: 50 },
+          { playerId: "p2", playerName: "Zwei", baseValue: 50, finalPlayerScore: 50 },
+        ],
+      }),
+      // Genau der Fall, den es nie gab und geben darf: das Feld traegt eine PP-Groesse.
+      teamPpsModifier: 0.6,
+      teamPpsStatus: "ready" as const,
+    },
+  ]);
+
+  it("erzeugt keine Score-Zeile aus einer PP-Groesse", () => {
+    const [team] = buildDisciplineStageTeamsFromPreview(mitPps, new Map<string, StageTeamMeta>(), new Map());
+    const alleMods = team!.players.flatMap((spieler) => spieler.mods.map((mod) => mod.k));
+    expect(alleMods).not.toContain("Team-PPs");
+  });
+
+  it("die Netto-Summe trifft weiterhin exakt den Team-Score", () => {
+    const [team] = buildDisciplineStageTeamsFromPreview(mitPps, new Map<string, StageTeamMeta>(), new Map());
+    expect(stageTeamNetTotal(team!)).toBe(100);
+    // Waere die PP-Groesse eingeflossen, staende hier 100,6.
+    expect(stageTeamNetTotal(team!)).not.toBe(100.6);
+  });
+
+  it("echte Team-Score-Effekte bleiben beschriftet erhalten", () => {
+    const mitTeamPower = makePreview([
+      {
+        ...makeTeam({
+          teamId: "T-POW",
+          teamName: "Power",
+          rank: 1,
+          score: 106,
+          teamPoints: 12,
+          entries: [
+            { playerId: "p1", playerName: "Eins", baseValue: 50, finalPlayerScore: 50 },
+            { playerId: "p2", playerName: "Zwei", baseValue: 50, finalPlayerScore: 50 },
+          ],
+        }),
+        teamPowerModifier: 6,
+      },
+    ]);
+    const [team] = buildDisciplineStageTeamsFromPreview(mitTeamPower, new Map<string, StageTeamMeta>(), new Map());
+    const alleMods = team!.players.flatMap((spieler) => spieler.mods.map((mod) => mod.k));
+    expect(alleMods).toContain("Team-Power");
+    expect(stageTeamNetTotal(team!)).toBe(106);
+  });
+});

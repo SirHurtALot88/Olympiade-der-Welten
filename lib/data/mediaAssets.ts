@@ -180,15 +180,30 @@ export function getTeamLogoModel(
   return { src, initials };
 }
 
-export function getPlayerPortraitMediaModel(player: Pick<Player, "id" | "name" | "portraitUrl" | "portraitPath">) {
-  const src = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl, player.portraitPath);
-  const initials =
-    player.name
+/**
+ * DIE eine Regel fuer das Kuerzel, das anstelle eines fehlenden Portraits steht.
+ *
+ * Es gab hier zwei Formeln nebeneinander: diese (Anfangsbuchstaben der ersten
+ * zwei Namensteile) und ein `name.slice(0, 2).toUpperCase()` in Buehne, Drawer,
+ * Hover-Karte und Aufstellungs-Labor. Am Live-Abbild vom 11.08. unterschieden
+ * sie sich bei 2957 von 2984 Spielern — "Umbros" stand einmal als "U" und
+ * einmal als "UM" auf dem Schirm, derselbe Spieler in zwei Ansichten. Deshalb
+ * ist das Kuerzel jetzt exportiert und jede Stelle ruft dieselbe Funktion.
+ */
+export function getPlayerPortraitInitials(name: string) {
+  return (
+    name
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?";
+      .join("") || "?"
+  );
+}
+
+export function getPlayerPortraitMediaModel(player: Pick<Player, "id" | "name" | "portraitUrl" | "portraitPath">) {
+  const src = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl, player.portraitPath);
+  const initials = getPlayerPortraitInitials(player.name);
 
   return {
     src,

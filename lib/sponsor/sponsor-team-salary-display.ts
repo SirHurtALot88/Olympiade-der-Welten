@@ -42,8 +42,13 @@ export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): 
     .filter((entry) => entry.teamId === teamId)
     .reduce((sum, entry) => {
       const player = playerById.get(entry.playerId) ?? null;
-      const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      return sum + (normalizeEconomyMoney(contract.salary) ?? 0);
+      // KEIN zweites `normalizeEconomyMoney`. `contract.salary` ist bereits normalisiert
+      // (`resolvePlayerEconomyContract` schickt jeden Zweig durch `normalizeStoredEconomyValue`).
+      // Ein zweiter Durchlauf würde einen Betrag über 1000 ein zweites Mal durch 100 teilen und
+      // diese Anzeige um Faktor 100 von dem trennen, was der Saisonende-Apply abbucht. Am Abbild
+      // aller fünf Spielstände (1 689 Rosterverträge) liegt kein einziger über der Schwelle — der
+      // Zweig war also toter, aber falscher Code.
+      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
     }, 0);
   return round1(total);
 }

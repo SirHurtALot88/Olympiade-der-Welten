@@ -77,21 +77,28 @@ export function buildAllTimeTableFromSnapshots(
         lastSeasonRank: standings[0]?.rank ?? null,
         bestRank: ranks.length > 0 ? Math.min(...ranks) : null,
         worstRank: ranks.length > 0 ? Math.max(...ranks) : null,
+        /**
+         * `disciplinePointsByArea?.` MIT FRAGEZEICHEN — der Typ sagt „immer da", die Wirklichkeit
+         * nicht: ein Schnappschuss aus einer aelteren Fassung oder aus einem Reparaturskript kann
+         * das Feld nicht tragen. Ohne die Wache warf diese Zeile, und der Wurf traf nicht etwa die
+         * Ewige Tabelle allein — er kam ueber `buildTeamObjectiveOverview` aus dem
+         * `game-flow-controller`, also aus dem Aufbau der Startseite.
+         */
         historicalPow:
           standings.length > 0
-            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea.pow ?? 0), 0), 1)
+            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea?.pow ?? 0), 0), 1)
             : null,
         historicalSpe:
           standings.length > 0
-            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea.spe ?? 0), 0), 1)
+            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea?.spe ?? 0), 0), 1)
             : null,
         historicalMen:
           standings.length > 0
-            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea.men ?? 0), 0), 1)
+            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea?.men ?? 0), 0), 1)
             : null,
         historicalSoc:
           standings.length > 0
-            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea.soc ?? 0), 0), 1)
+            ? roundValue(standings.reduce((sum, entry) => sum + (entry.disciplinePointsByArea?.soc ?? 0), 0), 1)
             : null,
         hasHistory: standings.length > 0,
       };

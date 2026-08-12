@@ -15,9 +15,17 @@
  * - `standings[teamId]` — `startplatz`, `rank`, `sponsorSeason`, `guv`
  * - `transferHistory`, `rosters` (`promisedRole`), `teamCaptains`, `playerMoraleState`
  *
- * KEIN NEUER SCHREIBPFAD nötig: „einmal erreicht"-Zustände über Spieltage sind innerhalb der
- * Saison stabil, weil `disciplineResults` die ganze Saison im State bleiben, und über
- * Saisonwechsel hinweg reproduzierbar, weil der Snapshot sie 1:1 archiviert.
+ * KEIN NEUER SCHREIBPFAD nötig: „einmal erreicht"-Zustände über Spieltage sind über
+ * Saisonwechsel hinweg reproduzierbar, weil der Snapshot `disciplineResults` 1:1 archiviert.
+ *
+ * ACHTUNG, HIER STAND EINMAL DAS GEGENTEIL: „weil `disciplineResults` die ganze Saison im State
+ * bleiben". Auf dem Server stimmt das, im Browser seit dem kompakten Payload nicht mehr — der
+ * beschneidet sie auf den aktiven Spieltag. Alles, was über MEHRERE Spieltage misst, sah damit
+ * nur einen: gemessen am Live-Save meldete „Breit aufgestellt" 0 statt 2 von 4 Bereichen und
+ * „Lauf" eine längste Serie von 0 statt 2. Dagegen fuhr eine Zeit lang die fertige Bilanz als
+ * Projektion mit (`foundationDisciplineTally`); seit `8ec6454b` fahren die `disciplineResults`
+ * selbst wieder vollständig mit, die Projektion war danach nachgemessen wirkungslos und ist
+ * entfernt. Gerechnet wird wieder an genau einer Stelle: `buildSeasonDisciplineTallyByTeamId`.
  *
  * BEWUSST KEIN PREISGELD. Preisgeld wird in diesem Spiel nie ausgezahlt, es ist ausschliesslich
  * Benchmark — ein Meilenstein darauf wäre ein Ziel, das kein Geld bewegt. Gewertet werden
@@ -26,6 +34,12 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { NlTone } from "@/components/foundation/new-look/nl-tones";
 import { buildLeagueSeasonAwards } from "@/lib/foundation/league-season-awards";
+import {
+  buildSeasonDisciplineTallyByTeamId,
+  laengsteSpieltagsSerie,
+  leereDisziplinBilanz,
+  spieltagNummerAusId,
+} from "@/lib/foundation/season-discipline-tally";
 
 export type ExtendedAchievement = {
   id: string;
@@ -51,26 +65,6 @@ function median(values: number[]): number | null {
   return sortiert.length % 2 === 1 ? sortiert[mitte] : (sortiert[mitte - 1] + sortiert[mitte]) / 2;
 }
 
-/** Spieltags-Nummer aus `md-7` — für Serien braucht es die REIHENFOLGE, nicht nur die Menge. */
-function spieltagNummer(matchdayId: string): number {
-  const treffer = matchdayId.match(/(\d+)$/);
-  return treffer ? Number(treffer[1]) : 0;
-}
-
-/** Längste Folge aufeinanderfolgender Spieltage in einer Menge von Spieltags-Nummern. */
-function laengsteSerie(nummern: number[]): number {
-  const sortiert = [...new Set(nummern)].sort((links, rechts) => links - rechts);
-  let beste = 0;
-  let laufend = 0;
-  let vorher: number | null = null;
-  for (const nummer of sortiert) {
-    laufend = vorher != null && nummer === vorher + 1 ? laufend + 1 : 1;
-    vorher = nummer;
-    if (laufend > beste) beste = laufend;
-  }
-  return beste;
-}
-
 export function buildExtendedLeagueAchievements(gameState: GameState, teamId: string): ExtendedAchievement[] {
   const saisonResultIds = new Map(
     (gameState.seasonState.matchdayResults ?? [])
@@ -78,36 +72,33 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
       .map((result) => [result.id, result.matchdayId] as const),
   );
 
-  const eigeneDisziplinen = (gameState.seasonState.disciplineResults ?? []).filter(
-    (result) => result.teamId === teamId && saisonResultIds.has(result.matchdayResultId),
-  );
-  const disziplinKategorie = new Map((gameState.disciplines ?? []).map((d) => [d.id, d.category] as const));
+  /**
+   * Die Disziplin-Kennzahlen entstehen aus `gameState.seasonState.disciplineResults` — und die
+   * müssen dafür VOLLSTÄNDIG vorliegen, auch im Browser. Solange die Anfangsladung sie auf den
+   * aktiven Spieltag beschnitt, war jede Kennzahl über mehrere Spieltage zu klein (siehe Kopf).
+   */
+  const disziplinBilanz = buildSeasonDisciplineTallyByTeamId(gameState).get(teamId) ?? leereDisziplinBilanz(teamId);
   const disziplinName = new Map((gameState.disciplines ?? []).map((d) => [d.id, d.name] as const));
 
   const ergebnisse: ExtendedAchievement[] = [];
 
   // ============ DISZIPLINEN ============================================
-  const siege = eigeneDisziplinen.filter((result) => result.rank === 1);
+  const siege = disziplinBilanz.siege;
   ergebnisse.push({
     id: "disciplines-first-win",
     group: "disciplines",
     label: "Disziplinsieger",
     description: "Gewinne eine Disziplin an einem Spieltag.",
-    reached: siege.length > 0,
-    detail: siege.length > 0 ? `${siege.length}× gewonnen` : null,
-    progressLabel: siege.length > 0 ? null : "Noch kein Disziplinsieg",
-    targetLabel: siege.length > 0 ? null : "Ziel: 1 Disziplinsieg",
+    reached: siege > 0,
+    detail: siege > 0 ? `${siege}× gewonnen` : null,
+    progressLabel: siege > 0 ? null : "Noch kein Disziplinsieg",
+    targetLabel: siege > 0 ? null : "Ziel: 1 Disziplinsieg",
     tone: "good",
     playerId: null,
   });
 
   // Doppelschlag: beide Disziplinen DESSELBEN Spieltags gewonnen.
-  const siegeJeSpieltag = new Map<string, number>();
-  for (const sieg of siege) {
-    const matchdayId = saisonResultIds.get(sieg.matchdayResultId) ?? "";
-    siegeJeSpieltag.set(matchdayId, (siegeJeSpieltag.get(matchdayId) ?? 0) + 1);
-  }
-  const bestesSpieltagsDoppel = Math.max(0, ...siegeJeSpieltag.values());
+  const bestesSpieltagsDoppel = disziplinBilanz.bestesSpieltagsDoppel;
   ergebnisse.push({
     id: "disciplines-double",
     group: "disciplines",
@@ -122,50 +113,39 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
   });
 
   // Hausdisziplin: dieselbe Disziplin dreimal in einer Saison gewonnen.
-  const siegeJeDisziplin = new Map<string, number>();
-  for (const sieg of siege) {
-    siegeJeDisziplin.set(sieg.disciplineId, (siegeJeDisziplin.get(sieg.disciplineId) ?? 0) + 1);
-  }
-  const besteDisziplin = [...siegeJeDisziplin.entries()].sort((links, rechts) => rechts[1] - links[1])[0] ?? null;
-  const hausdisziplin = (besteDisziplin?.[1] ?? 0) >= 3;
+  const besteDisziplinSiege = disziplinBilanz.besteDisziplinSiege;
+  const besteDisziplinId = disziplinBilanz.besteDisziplinId;
+  const hausdisziplin = besteDisziplinSiege >= 3;
   ergebnisse.push({
     id: "disciplines-home-turf",
     group: "disciplines",
     label: "Hausdisziplin",
     description: "Gewinne dieselbe Disziplin dreimal in einer Saison.",
     reached: hausdisziplin,
-    detail: hausdisziplin && besteDisziplin ? disziplinName.get(besteDisziplin[0]) ?? besteDisziplin[0] : null,
-    progressLabel: hausdisziplin ? null : `Beste Disziplin: ${besteDisziplin?.[1] ?? 0} von 3 Siegen`,
+    detail: hausdisziplin && besteDisziplinId ? disziplinName.get(besteDisziplinId) ?? besteDisziplinId : null,
+    progressLabel: hausdisziplin ? null : `Beste Disziplin: ${besteDisziplinSiege} von 3 Siegen`,
     targetLabel: hausdisziplin ? null : "Ziel: 3 Siege in einer Disziplin",
     tone: "pow",
     playerId: null,
   });
 
   // Breit aufgestellt: Top-5 in Disziplinen ALLER vier Bereiche.
-  const bereicheMitTop5 = new Set(
-    eigeneDisziplinen
-      .filter((result) => (result.rank ?? Number.POSITIVE_INFINITY) <= 5)
-      .map((result) => disziplinKategorie.get(result.disciplineId))
-      .filter((kategorie): kategorie is NonNullable<typeof kategorie> => kategorie != null),
-  );
+  const bereicheMitTop5 = disziplinBilanz.bereicheMitTop5;
   ergebnisse.push({
     id: "disciplines-all-areas",
     group: "disciplines",
     label: "Breit aufgestellt",
     description: "Hole in einer Saison eine Top-5-Platzierung in allen vier Bereichen.",
-    reached: bereicheMitTop5.size >= 4,
-    detail: bereicheMitTop5.size >= 4 ? "Alle vier Bereiche" : null,
-    progressLabel: bereicheMitTop5.size >= 4 ? null : `${bereicheMitTop5.size} von 4 Bereichen`,
-    targetLabel: bereicheMitTop5.size >= 4 ? null : "Ziel: Top 5 in allen vier Bereichen",
+    reached: bereicheMitTop5 >= 4,
+    detail: bereicheMitTop5 >= 4 ? "Alle vier Bereiche" : null,
+    progressLabel: bereicheMitTop5 >= 4 ? null : `${bereicheMitTop5} von 4 Bereichen`,
+    targetLabel: bereicheMitTop5 >= 4 ? null : "Ziel: Top 5 in allen vier Bereichen",
     tone: "spe",
     playerId: null,
   });
 
   // ============ SERIEN =================================================
-  const spieltageMitTop3 = eigeneDisziplinen
-    .filter((result) => (result.rank ?? Number.POSITIVE_INFINITY) <= 3)
-    .map((result) => spieltagNummer(saisonResultIds.get(result.matchdayResultId) ?? ""));
-  const top3Serie = laengsteSerie(spieltageMitTop3);
+  const top3Serie = disziplinBilanz.top3Serie;
   ergebnisse.push({
     id: "streaks-run",
     group: "streaks",
@@ -186,13 +166,13 @@ export function buildExtendedLeagueAchievements(gameState: GameState, teamId: st
     const matchdayId = saisonResultIds.get(auftritt.matchdayResultId);
     if (!matchdayId) continue;
     const bisher = top10SpieltageJeSpieler.get(auftritt.playerId) ?? [];
-    bisher.push(spieltagNummer(matchdayId));
+    bisher.push(spieltagNummerAusId(matchdayId));
     top10SpieltageJeSpieler.set(auftritt.playerId, bisher);
   }
   let besteSpielerSerie = 0;
   let serienSpielerId: string | null = null;
   for (const [playerId, spieltage] of top10SpieltageJeSpieler.entries()) {
-    const serie = laengsteSerie(spieltage);
+    const serie = laengsteSpieltagsSerie(spieltage);
     if (serie > besteSpielerSerie) {
       besteSpielerSerie = serie;
       serienSpielerId = playerId;

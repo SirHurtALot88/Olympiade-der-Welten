@@ -1,8 +1,16 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 
 export type PpAreaKey = "total" | "pow" | "spe" | "men" | "soc";
 export type PpAreaFormBonusTotals = Record<PpAreaKey, number>;
+
+/**
+ * Die WIRKUNG der Formkarten je PP-Bereich — ohne `total`, das ist immer die Summe der vier
+ * Bereiche und wird beim Lesen gebildet. Bereiche ohne Wirkung fehlen absichtlich: an einem
+ * Spieltag spielt ein Team zwei Disziplinen, also stehen hier nie mehr als zwei Zahlen.
+ */
+export type PpAreaFormBonusByArea = Partial<Record<Exclude<PpAreaKey, "total">, number>>;
 
 export type PpAreaTotals = Record<Exclude<PpAreaKey, "total">, number | null> & { total: number | null };
 
@@ -33,28 +41,53 @@ function getPpAreaKeyForDisciplineCategory(category: string | null | undefined):
   return null;
 }
 
-export function buildPpAreaFormBonusByTeamId(
-  gameState: GameState,
+/**
+ * Die Formkarten-WIRKUNG der laufenden Saison, aufgeschluesselt je SPIELTAG und Team.
+ *
+ * Rechnet ausschliesslich auf dem, was der uebergebene Spielstand selbst hergibt — auf dem
+ * Server ist das die ganze Saison, im Browser nur der aktive Spieltag. Genau diese Grenze macht
+ * die Aufschluesselung sichtbar: ein Spieltag, zu dem hier ein (moeglicherweise leerer) Eintrag
+ * steht, ist GEDECKT; ein fehlender Spieltag ist UNBEKANNT und wird oben aus der mitgelieferten
+ * Projektion ergaenzt. Ohne diese Unterscheidung liesse sich „keine Karte gelegt" nicht von
+ * „Daten nicht da" trennen — und genau daran hat der Saisonstand ueberall 0 angezeigt.
+ */
+export function berechnePpAreaFormBonusJeSpieltag(
+  gameState: Pick<GameState, "seasonState" | "disciplines">,
   seasonId: string,
-): Record<string, PpAreaFormBonusTotals> {
+): Map<string, Map<string, PpAreaFormBonusByArea>> {
   const selectedSnapshot =
     (gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null;
   const matchdayResults =
     selectedSnapshot?.matchdayResults ??
     (gameState.seasonState.matchdayResults ?? []).filter((result) => result.seasonId === seasonId);
-  const resultIds = new Set(
-    matchdayResults
-      .filter((result) => result.status === "preview_applied")
-      .map((result) => result.id),
-  );
+  const gewertet = matchdayResults.filter((result) => result.status === "preview_applied");
+  const matchdayIdByResultId = new Map(gewertet.map((result) => [result.id, result.matchdayId] as const));
   const disciplineResults = selectedSnapshot?.disciplineResults ?? gameState.seasonState.disciplineResults ?? [];
   const disciplineCategoryById = new Map(
     gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const),
   );
-  const totalsByTeamId = new Map<string, PpAreaFormBonusTotals>();
+
+  const jeSpieltag = new Map<string, Map<string, PpAreaFormBonusByArea>>();
+  /**
+   * Ein Spieltag zaehlt erst dann als gedeckt, wenn wirklich Disziplin-Ergebnisse zu ihm
+   * vorliegen — die `matchdayResults` fahren im kompakten Payload vollstaendig mit, die
+   * `disciplineResults` nicht. Wuerde schon die blosse Kopfzeile als „gedeckt" gelten, wuerde
+   * der Browser neun leere Spieltage ueber die Projektion legen und waere wieder bei 0.
+   */
+  const gedeckt = new Set<string>();
+  for (const result of disciplineResults) {
+    const matchdayId = matchdayIdByResultId.get(result.matchdayResultId);
+    if (matchdayId != null) {
+      gedeckt.add(matchdayId);
+    }
+  }
+  for (const matchdayId of gedeckt) {
+    jeSpieltag.set(matchdayId, new Map<string, PpAreaFormBonusByArea>());
+  }
 
   for (const result of disciplineResults) {
-    if (resultIds.size > 0 && !resultIds.has(result.matchdayResultId)) {
+    const matchdayId = matchdayIdByResultId.get(result.matchdayResultId);
+    if (matchdayIdByResultId.size > 0 && matchdayId == null) {
       continue;
     }
 
@@ -68,10 +101,60 @@ export function buildPpAreaFormBonusByTeamId(
       continue;
     }
 
-    const current = totalsByTeamId.get(result.teamId) ?? createEmptyPpAreaFormBonusTotals();
-    current.total = Number((current.total + formModifier).toFixed(1));
-    current[areaKey] = Number((current[areaKey] + formModifier).toFixed(1));
-    totalsByTeamId.set(result.teamId, current);
+    // Ohne gewertete Spieltagskoepfe (Fixtures, Altstaende) bleibt der Ergebnis-Schluessel der
+    // Eimer — dann faellt die Rechnung auf genau die Summe von frueher zurueck.
+    const eimer = matchdayId ?? `result:${result.matchdayResultId}`;
+    let jeTeam = jeSpieltag.get(eimer);
+    if (!jeTeam) {
+      jeTeam = new Map<string, PpAreaFormBonusByArea>();
+      jeSpieltag.set(eimer, jeTeam);
+    }
+    const bereiche = jeTeam.get(result.teamId) ?? {};
+    bereiche[areaKey] = roundValue((bereiche[areaKey] ?? 0) + formModifier, 4);
+    jeTeam.set(result.teamId, bereiche);
+  }
+
+  return jeSpieltag;
+}
+
+export function buildPpAreaFormBonusByTeamId(
+  gameState: GameState,
+  seasonId: string,
+): Record<string, PpAreaFormBonusTotals> {
+  /**
+   * DIE EINE QUELLE: `disciplineResult.formModifier` aus dem vorliegenden Spielstand.
+   *
+   * Hier mischte sich bis hierher eine servergerechnete Projektion
+   * (`seasonState.foundationPpAreaFormBonus`) je Spieltag darunter, weil die Anfangsladung die
+   * `disciplineResults` auf den aktiven Spieltag beschnitt — der Saisonstand zeigte die `(+x)`
+   * hinter jedem PP-Bereichswert sonst nur fuer 14 von 32 Teams, und bei denen falsch. Seit
+   * `8ec6454b` fahren die `disciplineResults` vollstaendig mit; an beiden aktiven Spielstaenden
+   * nachgemessen liefert die Rechnung mit und ohne Projektion Zeichen fuer Zeichen dasselbe.
+   * Die Projektion ist entfernt.
+   */
+  const zusammen = berechnePpAreaFormBonusJeSpieltag(gameState, seasonId);
+
+  const totalsByTeamId = new Map<string, PpAreaFormBonusTotals>();
+  for (const jeTeam of zusammen.values()) {
+    for (const [teamId, bereiche] of jeTeam) {
+      const current = totalsByTeamId.get(teamId) ?? createEmptyPpAreaFormBonusTotals();
+      for (const areaKey of ["pow", "spe", "men", "soc"] as const) {
+        const wert = bereiche[areaKey];
+        if (wert == null || !Number.isFinite(wert)) continue;
+        current[areaKey] = roundValue(current[areaKey] + wert, 4);
+      }
+      totalsByTeamId.set(teamId, current);
+    }
+  }
+
+  // `total` ist immer die Summe der vier Bereiche — erst am Ende gerundet, damit die
+  // Spaltenwerte und ihre Summe nicht in der letzten Stelle auseinanderlaufen.
+  for (const totals of totalsByTeamId.values()) {
+    totals.total = roundValue(totals.pow + totals.spe + totals.men + totals.soc, 1);
+    totals.pow = roundValue(totals.pow, 1);
+    totals.spe = roundValue(totals.spe, 1);
+    totals.men = roundValue(totals.men, 1);
+    totals.soc = roundValue(totals.soc, 1);
   }
 
   return Object.fromEntries(totalsByTeamId.entries());

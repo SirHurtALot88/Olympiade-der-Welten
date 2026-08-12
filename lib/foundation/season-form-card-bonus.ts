@@ -82,17 +82,19 @@ export function buildSeasonFormCardBonusByTeamId(
   seasonId: string,
 ): SeasonFormCardBonusByTeamId {
   /**
-   * Vorfahrt fuer die mitgelieferte Bilanz (`foundation-form-card-projection`). Im Browser
-   * sind die `lineupDrafts` auf den aktiven Spieltag beschnitten — eine Neuberechnung fande
-   * hier bestenfalls die Karten EINES Spieltags und die Saisonstand-Spalte zeigte Striche.
-   * Die Projektion ist auf dem vollen Save gerechnet und deckt genau die laufende Saison ab;
-   * fuer jede andere `seasonId` (Archiv) faellt die Rechnung unveraendert unten durch.
+   * HIER STAND EINE ZWEITE RECHENSTELLE, UND SIE HATTE BEDINGUNGSLOS VORFAHRT.
+   *
+   * Solange die Anfangsladung `lineupDrafts` auf den aktiven Spieltag beschnitt, fand die
+   * Rechnung unten im Browser bestenfalls die Karten EINES Spieltags; dagegen fuhr die fertige
+   * Bilanz als `seasonState.foundationFormCardBonus` mit und wurde hier ohne jede Pruefung
+   * zurueckgegeben (`if (projektion && projektion.seasonId === seasonId) return …`).
+   *
+   * Das war doppelt schlecht: die Projektion entsteht beim LADEN, also ueberstimmte sie jede
+   * Karte, die waehrend der Sitzung noch gelegt wurde — die Spalte blieb bis zum naechsten
+   * Laden auf dem alten Stand. Seit `8ec6454b` fahren die `lineupDrafts` vollstaendig mit; an
+   * beiden aktiven Spielstaenden nachgemessen liefert die Rechnung unten mit und ohne
+   * Projektion dasselbe. Die Projektion ist entfernt, die Vorfahrt mit ihr.
    */
-  const projektion = gameState.seasonState.foundationFormCardBonus;
-  if (projektion && projektion.seasonId === seasonId) {
-    return new Map(Object.entries(projektion.byTeamId));
-  }
-
   const result: SeasonFormCardBonusByTeamId = new Map();
   const formCards = gameState.seasonState.formCards ?? [];
   if (formCards.length === 0) {

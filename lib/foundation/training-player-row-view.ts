@@ -66,6 +66,7 @@ type TrainingForecastRowInput = {
     currentAbilityRating: number | null;
     potentialRating: number | null;
   };
+  economy: TrainingPlayerRowView["economy"];
   trainingDemand: TrainingModeDemandView | null;
   potentialRecord?: PlayerPotentialRecord | null;
   adminBalancingConfig?: AdminBalancingConfigInput | null;
@@ -173,6 +174,7 @@ export function buildTrainingPlayerRowView(
       weakAttribute: attributeLabels[row.organicProgression.attributeAffinity.weakAttribute] ?? null,
     },
     developmentStars: row.developmentStars,
+    economy: row.economy,
     traitBoosts: (row.organicProgression.traitBreakdown ?? [])
       .filter((entry) => entry.known && entry.legacyTraitTrainingFactorPct != null && entry.legacyTraitTrainingFactorPct !== 0)
       .map((entry) => ({
