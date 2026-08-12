@@ -19,13 +19,29 @@
  * sind es 4 von 8. Sie front-loaden sich in die Enge hinein und tragen die Abgabe zusätzlich. Genau
  * das ist der behebbare Teil.
  *
- * DIESE DATEI HÄLT DIE REGEL — NICHT DIE AUFRUFER. Es gibt DREI unabhängige Formwähler im Spiel
- * (Kaufvorschau, Fast-Batch-Kauf, Verlängerung). Eine erste Fassung verdrahtete nur den ersten;
- * Fables Audit hat aufgedeckt, dass damit ausgerechnet die beiden mengenstärksten Ströme
- * apron-blind blieben — der S1-Draft (alle 329–334 `ai_roster_fill`-Käufe beider Spielstände) und
- * die Verlängerungen (121 von 176 mehrjährig in Saison 2, mehr Mehrjahresverträge als der gesamte
- * Transfermarkt). Deshalb steht die Regel jetzt in `wendeApronUndMixAn` und wird von allen drei
- * Stellen aufgerufen. Neue Formwähler gehören ebenfalls hierher.
+ * DIESE DATEI HÄLT DIE REGEL — NICHT DIE AUFRUFER. Es gibt DREI unabhängige Formwähler im Spiel,
+ * und alle drei rufen `wendeApronUndMixAn`. Neue Formwähler gehören ebenfalls hierher.
+ *
+ * WELCHE KAUFWEGE HEUTE WIRKLICH LAUFEN — nachgemessen, nicht aus Altbeständen geschlossen. Der
+ * Füll-Lauf (`auto-roster-fill-service.ts`) ist AB SAISON 2 VERBOTEN, die Sperre steht im Dienst
+ * selbst („keine filler mehr! VERBOT" — Chris); gepickt wird nur noch organisch. An den Transfers
+ * der Spielstände abzulesen: `ai_roster_fill` kommt AUSSCHLIESSLICH in Saison 1 vor (334 bzw. 329
+ * Zeilen), in Saison 2 stehen dort `ai_organic_squad_buy` (69) und `ai_preseason_market_buy` (33).
+ * Wer aus der blossen Menge der `ai_roster_fill`-Zeilen schliesst, dieser Weg sei der wichtigste,
+ * irrt doppelt: die Zeilen sind historisch, und ein Teil davon stammt aus dem verbotenen Dienst.
+ *
+ *   - `ai_organic_squad_buy` übergibt keine Form und fällt auf `recommendContractOfferForPlayer`
+ *     zurück (Slow-Path, `transfermarkt-local-service.ts:1144`).
+ *   - `ai_preseason_market_buy` holt die Form ausdrücklich aus derselben Empfehlung
+ *     (`ai-market-plan-apply-service.ts:2027`).
+ *   - Der organische Setup-Draft der Saison 1 läuft über den Fast-Batch
+ *     (`transfermarkt-local-service.ts:2402`) und BESCHRIFTET seine Transfers weiterhin mit
+ *     `ai_roster_fill` — daher rührt das Etikett, nicht vom verbotenen Dienst.
+ *   - Verlängerungen (`contract-renewal-service.ts`) sind der grösste Strom überhaupt: 121 von 176
+ *     KI-Verlängerungen mehrjährig in Saison 2.
+ *
+ * Eine erste Fassung verdrahtete nur den Slow-Path; Fables Audit hat aufgedeckt, dass Fast-Batch
+ * und Verlängerung apron-blind blieben.
  */
 import type { ContractShape, GameState } from "@/lib/data/olyDataTypes";
 import { getTeamApronSalaryBase, resolveSeasonApronLines } from "@/lib/season/apron-service";
@@ -96,7 +112,7 @@ type Lookup = {
 };
 
 /**
- * Der Fuell-Lauf ruft die Kaufvorschau je Kandidat auf, und jede Vorschau braucht diese Lage. Ohne
+ * Der organische Draft ruft die Kaufvorschau je Kandidat auf, und jede Vorschau braucht diese Lage. Ohne
  * Zwischenspeicher liefe die Liga-Median-Rechnung (`resolveSeasonApronLines`) pro Kandidat erneut.
  * Der Speicher haengt am GameState-Objekt: ein neuer Zustand bekommt eine neue Rechnung, ein
  * unveraenderter wird nicht zweimal vermessen.

@@ -2396,9 +2396,11 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           gmArchetype: getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null,
           highValue: (marketValueReference ?? 0) >= 35,
           // ZWEITER Aufrufer derselben Empfehlung — der Fast-Batch-Pfad. Er wurde beim ersten Umbau
-          // uebersehen; ueber ihn laeuft der S1-Draft, und im Live-Abbild stammen ALLE 329-334
-          // `ai_roster_fill`-Kaeufe beider Spielstaende aus Saison 1. Ohne diese Zeilen bliebe der
-          // mengenstaerkste Kaufstrom apron-blind.
+          // uebersehen. Ueber ihn laeuft der ORGANISCHE Setup-Draft der Saison 1
+          // (`runOrganicTeamDraftExecute`, Flag OLY_ORGANIC_SQUAD_BUILDER, Vorgabe an); dass dessen
+          // Transfers `ai_roster_fill` heissen, ist nur das Etikett — der gleichnamige Fuell-Dienst
+          // ist ab Saison 2 verboten und picken darf nur noch organisch. Ohne diese Zeilen bliebe
+          // der gesamte Erst-Draft apron- und mixblind.
           ...getContractShapeTeamContext(gameState, params.teamId),
         })
       : null;
