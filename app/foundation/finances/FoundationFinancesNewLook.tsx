@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
@@ -10,6 +10,7 @@ import {
   NL_TONE_VAR,
   NlCard,
   NlEmptyState,
+  NlSubTabs,
   NlTable,
   StatChip,
   StatChipRow,
@@ -32,6 +33,15 @@ import type {
   TeamFinancesState,
 } from "@/lib/foundation/finances/finances-types";
 import type { SalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
+import {
+  FINANCES_APRON_BLOCK_ORDER,
+  FINANCES_DEFAULT_TAB,
+  FINANCES_OVERVIEW_BLOCK_ORDER,
+  FINANCES_TABS,
+  type FinancesApronBlockId,
+  type FinancesOverviewBlockId,
+  type FinancesTabId,
+} from "@/lib/foundation/finances/finances-view-sections";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 
 export type FoundationFinancesNewLookProps = {
@@ -657,7 +667,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
           gerade behoben hat — deshalb wird der Unterschied erklärt, nicht versteckt. */}
       <p className="nl-fin-apron-basis-note muted" data-testid="nl-fin-apron-basis-note">
         Der Apron rechnet auf der <b>geglätteten</b> Gehaltssumme ({formatNlMoney(apron.salaryBasis)}): Verträge werden über ihre
-        Laufzeit verteilt, Front-/Backloading zählt nicht als Mehrausgabe. Die GuV oben bucht dagegen die <b>echte</b> Saisonsumme
+        Laufzeit verteilt, Front-/Backloading zählt nicht als Mehrausgabe. Die GuV in der Übersicht bucht dagegen die <b>echte</b> Saisonsumme
         ({formatNlMoney(actualSalaryTotal)}). Beide Zahlen sind absichtlich verschieden.
       </p>
     </div>
@@ -819,7 +829,8 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
 
   return (
     <section className="nl-fin-apron-league-block" aria-label="Apron liga-weit: wer zahlt, wer bekommt" data-testid="nl-fin-apron-league-block">
-      <h3 className="nl-fin-commit-section-title">Apron liga-weit — wer zahlt, wer bekommt</h3>
+      {/* Ohne eigene Überschrift: seit dem Umbau trägt die Karte des Apron-Reiters den Titel —
+          zwei Überschriften übereinander wären dieselbe Aussage doppelt. */}
       <p className="nl-fin-apron-lg-summary muted nl-tnum" data-testid="nl-fin-apron-lg-summary">
         {statusText} · {summenText}.
       </p>
@@ -952,7 +963,7 @@ function CommitmentSummary({ team }: { team: TeamFinancesState }) {
         value={team.apron ? formatNlMoney(apronAbgabe) : "—"}
         tone={apronAbgabe > 0 ? "warn" : "neutral"}
         sub={team.apron && !team.apron.gebucht ? "Hochrechnung" : undefined}
-        title="Apron-Abgabe beim aktuellen Rang (siehe Linien-Aufschlüsselung unten) — bis zur Buchung am Saisonende eine Hochrechnung."
+        title="Apron-Abgabe beim aktuellen Rang (Linien-Aufschlüsselung im Apron-Reiter) — bis zur Buchung am Saisonende eine Hochrechnung."
       />
       <StatChip
         label="Feste Verpflichtungen"
@@ -1197,6 +1208,192 @@ function FinanceLeagueTable({
 }
 
 /**
+ * Der Übersicht-Reiter: alle Blöcke außer dem Apron, in der Reihenfolge aus
+ * `FINANCES_OVERVIEW_BLOCK_ORDER`.
+ *
+ * Die Blöcke als Zuordnung Block-Id → Karte. Die REIHENFOLGE steht in
+ * `finances-view-sections.ts` (Daten), nicht in dieser Verschachtelung — so gibt es genau EINEN
+ * Ort, der sagt, was zuerst kommt, und ein Test kann ihn prüfen, ohne im Quelltext zu suchen.
+ *
+ * Eigene (exportierte) Komponente, damit die Anordnung PRÜFBAR ist: ein Test kann diesen Reiter
+ * für sich rendern und die Kartenfolge im Ergebnis lesen, statt im Quelltext nach Zeichenketten
+ * zu suchen.
+ */
+export function FinancesUebersichtTab({
+  team,
+  incomeLines,
+  expenseLines,
+  leagueTable,
+  activeManagerTeamId,
+  onOpenTeam,
+}: {
+  team: TeamFinancesState | null;
+  incomeLines: FinanceLineItem[];
+  expenseLines: FinanceLineItem[];
+  leagueTable: FinanceLeagueTableRow[];
+  activeManagerTeamId: string | null;
+  onOpenTeam: ((teamId: string) => void) | null;
+}) {
+  const uebersichtBloecke: Record<FinancesOverviewBlockId, ReactNode> = {
+    // CHRIS: „erst den liga team vergleich" — stand vorher als letzte Karte ganz unten.
+    "liga-vergleich": (
+      <FinanceLeagueTable leagueTable={leagueTable} activeManagerTeamId={activeManagerTeamId} onOpenTeam={onOpenTeam ?? null} />
+    ),
+    cashflow: team ? (
+      <NlCard className="nl-fin-flow-card" eyebrow="Cashflow" title="Einnahmen vs. Ausgaben" data-testid="nl-fin-flow-card">
+        <FinanceFlowChart incomeLines={incomeLines} expenseLines={expenseLines} />
+      </NlCard>
+    ) : null,
+    // Chris (M3): Kredite/Tilgung als Verpflichtungs-Karte. Der Apron-Teil dieser Karte ist in
+    // den eigenen Reiter gewandert; die Kopfzeile nennt die Apron-Abgabe weiterhin, weil sie zur
+    // Summe der festen Verpflichtungen gehört (dieselbe Zahl, keine zweite Rechnung).
+    kredite: team ? (
+      <NlCard
+        className="nl-fin-commitments-card"
+        eyebrow="Verpflichtungen"
+        title="Kredite & Tilgung"
+        data-testid="nl-fin-commitments-card"
+      >
+        <CommitmentSummary team={team} />
+        <div className="nl-fin-commit-columns">
+          <section className="nl-fin-commit-section" aria-label="Kredite und Tilgung">
+            <h3 className="nl-fin-commit-section-title">Kredite &amp; Tilgung</h3>
+            <LoanCommitmentsPanel loans={team.loanCommitments} />
+          </section>
+        </div>
+      </NlCard>
+    ) : null,
+    // Transfersaldo als Sonderposten — außerhalb der laufenden Betriebs-GuV, aber sichtbar (auch in S1).
+    transfers:
+      team && team.transfer ? (
+        <NlCard
+          className="nl-fin-transfer-card"
+          eyebrow="Transfers"
+          title="Sonderposten (nicht in der GuV)"
+          data-testid="nl-fin-transfer-card"
+        >
+          <TransferSpecialItem team={team} />
+        </NlCard>
+      ) : null,
+    // T-031: schließt die Lücke zwischen der GuV oben und dem tatsächlichen Cash-Delta der Saison.
+    "cash-abgleich": team ? (
+      <NlCard
+        className="nl-fin-reconciliation-card"
+        eyebrow="Cash-Abgleich"
+        title="Saisonstart → Cash aktuell"
+        data-testid="nl-fin-reconciliation-card"
+      >
+        <CashReconciliation team={team} />
+      </NlCard>
+    ) : null,
+    // T-107: Saison-für-Saison-Trend statt nur der laufenden Saison.
+    verlauf: team ? (
+      <NlCard className="nl-fin-history-card" eyebrow="Verlauf" title="GuV je Saison" data-testid="nl-fin-history-card">
+        <FinanceHistoryTrend history={team.history} archivePending={team.archivePending} />
+      </NlCard>
+    ) : null,
+    "einnahmen-ausgaben": team ? (
+      <div className="nl-fin-columns">
+        <NlCard
+          className="nl-fin-income-card"
+          eyebrow="Einnahmen"
+          title={`Summe ${formatNlMoney(team.totalIncome)}`}
+          data-testid="nl-fin-income-card"
+        >
+          {incomeLines.length > 0 ? (
+            <div className="nl-fin-col" role="list" aria-label="Einnahmen">
+              {incomeLines.map((line) => (
+                <FinanceLine
+                  key={line.key}
+                  label={line.label}
+                  amount={line.amount}
+                  share={team.totalIncome > 0 ? line.amount / team.totalIncome : 0}
+                  tone={line.tone}
+                  alpha={line.alpha}
+                  title={line.title}
+                />
+              ))}
+            </div>
+          ) : (
+            <NlEmptyState title="Keine Einnahmen für diese Saison bekannt." />
+          )}
+          {/* LEGACY: Preisgeld-Benchmark entfernt — es gibt nur noch Sponsor-Einnahmen. */}
+        </NlCard>
+
+        <NlCard
+          className="nl-fin-expense-card"
+          eyebrow="Ausgaben"
+          title={`Summe ${formatNlMoney(team.totalExpenses)}`}
+          data-testid="nl-fin-expense-card"
+        >
+          {expenseLines.length > 0 ? (
+            <div className="nl-fin-col" role="list" aria-label="Ausgaben">
+              {expenseLines.map((line) => (
+                <FinanceLine
+                  key={line.key}
+                  label={line.label}
+                  amount={line.amount}
+                  share={team.totalExpenses > 0 ? line.amount / team.totalExpenses : 0}
+                  tone={line.tone}
+                  alpha={line.alpha}
+                  title={line.title}
+                />
+              ))}
+            </div>
+          ) : (
+            <NlEmptyState title="Keine Ausgaben für diese Saison bekannt." />
+          )}
+        </NlCard>
+      </div>
+    ) : null,
+  };
+
+  return (
+    <>
+      {FINANCES_OVERVIEW_BLOCK_ORDER.map((blockId) => (
+        <Fragment key={blockId}>{uebersichtBloecke[blockId]}</Fragment>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Der Apron-Reiter (CHRIS: „das apron thema als eigenen reiter!") — die eigenen Linien und der
+ * liga-weite Ausweis, in der Reihenfolge aus `FINANCES_APRON_BLOCK_ORDER`. Beide Blöcke standen
+ * vorher in der Verpflichtungs-Karte der Übersicht; gerechnet wird unverändert dasselbe.
+ */
+export function FinancesApronTab({ team }: { team: TeamFinancesState }) {
+  // Chris (M3): Apron-Linien 1 & 2 einzeln — jetzt im eigenen Reiter statt mitten in der Übersicht.
+  const apronBloecke: Record<FinancesApronBlockId, ReactNode> = {
+    "apron-linien": (
+      <NlCard className="nl-fin-apron-card" eyebrow="Apron" title="Deine Apron-Linien" data-testid="nl-fin-apron-card">
+        <ApronLinesPanel apron={team.apron} actualSalaryTotal={team.expenses.salaries.total} />
+      </NlCard>
+    ),
+    // Chris: „…ein ausweis vom APRON was die teams dadurch zahlen müssen oder einnehmen" —
+    // liga-weit mit Namen; ohne Projektion erklärt das ApronLinesPanel oben bereits, warum nicht.
+    "apron-liga": team.apron ? (
+      <NlCard
+        className="nl-fin-apron-card"
+        eyebrow="Apron"
+        title="Liga-weit — wer zahlt, wer bekommt"
+        data-testid="nl-fin-apron-league-card"
+      >
+        <ApronLeagueList apron={team.apron} ownTeamId={team.teamId} />
+      </NlCard>
+    ) : null,
+  };
+
+  return (
+    <>
+      {FINANCES_APRON_BLOCK_ORDER.map((blockId) => (
+        <Fragment key={blockId}>{apronBloecke[blockId]}</Fragment>
+      ))}
+    </>
+  );
+}
+
+/**
  * "Neuer Look" Finanzen — Saison-Einnahmen/Ausgaben-Übersicht des eigenen
  * Teams. Read-only: kein Formular, keine Mutation (im Unterschied zu
  * Kredite) — reine Aufschlüsselung der bereits an anderer Stelle real
@@ -1204,10 +1401,12 @@ function FinanceLeagueTable({
  * Kreditraten, Transfer-Saldo — Preisgeld ist Legacy und entfällt), siehe
  * `use-finances-view-model.ts` für die Herleitung jeder Zeile.
  *
- * Unten zusätzlich die Liga-weite Finanzübersicht (`FinanceLeagueTable`,
- * `use-finances-league-table.ts`) — bewusste Balancing-Transparenz, analog
- * zur Liga-Kreditübersicht in `FoundationCreditsNewLook` (Story Liga-Kredit-
- * übersicht, siehe dort).
+ * ZWEI REITER (CHRIS: „auf der finanzseite bitte erst den liga team vergleich und das apron thema
+ * als eigenen reiter!"): „Übersicht" (`FinancesUebersichtTab`) und „Apron" (`FinancesApronTab`),
+ * umgeschaltet über `NlSubTabs` wie im Scouting-Center. Der Liga-Vergleich (`FinanceLeagueTable`,
+ * `use-finances-league-table.ts`) steht jetzt als ERSTE Karte der Übersicht statt als letzte —
+ * bewusste Balancing-Transparenz, analog zur Liga-Kreditübersicht in `FoundationCreditsNewLook`.
+ * Welcher Block wo und in welcher Reihenfolge steht, sagt `finances-view-sections.ts`.
  */
 export default function FoundationFinancesNewLook({
   teamName,
@@ -1220,6 +1419,13 @@ export default function FoundationFinancesNewLook({
   const team = model.status === "ready" ? model.team : null;
   const incomeLines = team ? buildIncomeLines(team) : [];
   const expenseLines = team ? buildExpenseLines(team) : [];
+
+  // CHRIS: „das apron thema als eigenen reiter!" — Sub-Tabs oben, gleiches Muster wie im
+  // Scouting-Center (`NlSubTabs`, die Seite hält `activeId` selbst). Ohne eigenes Team hätte der
+  // Apron-Reiter nichts zu zeigen; dann bleibt es bei der Übersicht (die Liga-Tabelle steht auch
+  // ohne eigenes Team).
+  const [activeTab, setActiveTab] = useState<FinancesTabId>(FINANCES_DEFAULT_TAB);
+  const sichtbarerReiter: FinancesTabId = team ? activeTab : "uebersicht";
 
   // BEWUSST KEINE Zähler-Animation auf den Kopfzahlen mehr (Markt-Audit F1): `useCountUp` zeigte
   // sekundenlang Zwischenstände (62,1 statt 63,5) als wären sie endgültig — wer in dem Moment
@@ -1246,7 +1452,7 @@ export default function FoundationFinancesNewLook({
               value={formatNlMoney(team.totalExpenses)}
               tone="risk"
               sub={expenseSub}
-              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditzins + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten; Kredit-Tilgung ist Bilanzbewegung, siehe Karte „Apron & Kredite“)"
+              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditzins + Vorstandsziel-Strafen der laufenden Saison (Transfersaldo separat als Sonderposten; Kredit-Tilgung ist Bilanzbewegung, siehe Karte „Kredite & Tilgung“)"
             />
             <StatChip
               label="GuV"
@@ -1281,132 +1487,27 @@ export default function FoundationFinancesNewLook({
       ) : null}
 
       {team ? (
-        <NlCard className="nl-fin-flow-card" eyebrow="Cashflow" title="Einnahmen vs. Ausgaben" data-testid="nl-fin-flow-card">
-          <FinanceFlowChart incomeLines={incomeLines} expenseLines={expenseLines} />
-        </NlCard>
+        <NlSubTabs
+          className="nl-fin-subtabs"
+          aria-label="Finanz-Bereiche"
+          activeId={sichtbarerReiter}
+          onSelect={(id) => setActiveTab(id as FinancesTabId)}
+          items={FINANCES_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+        />
       ) : null}
 
-      {/* Chris (M3): Apron-Linien 1 & 2 einzeln + Kredite/Tilgung in EINER Verpflichtungs-Karte. */}
-      {team ? (
-        <NlCard
-          className="nl-fin-commitments-card"
-          eyebrow="Verpflichtungen"
-          title="Apron & Kredite"
-          data-testid="nl-fin-commitments-card"
-        >
-          <CommitmentSummary team={team} />
-          <div className="nl-fin-commit-columns">
-            <section className="nl-fin-commit-section" aria-label="Apron-Linien">
-              <h3 className="nl-fin-commit-section-title">Apron-Linien</h3>
-              <ApronLinesPanel apron={team.apron} actualSalaryTotal={team.expenses.salaries.total} />
-            </section>
-            <section className="nl-fin-commit-section" aria-label="Kredite und Tilgung">
-              <h3 className="nl-fin-commit-section-title">Kredite &amp; Tilgung</h3>
-              <LoanCommitmentsPanel loans={team.loanCommitments} />
-            </section>
-          </div>
-          {/* Chris: „…ein ausweis vom APRON was die teams dadurch zahlen müssen oder einnehmen" —
-              liga-weit mit Namen; ohne Projektion erklärt das ApronLinesPanel oben bereits, warum nicht. */}
-          {team.apron ? <ApronLeagueList apron={team.apron} ownTeamId={team.teamId} /> : null}
-        </NlCard>
-      ) : null}
-
-      {/* Transfersaldo als Sonderposten — außerhalb der laufenden Betriebs-GuV, aber sichtbar (auch in S1). */}
-      {team && team.transfer ? (
-        <NlCard
-          className="nl-fin-transfer-card"
-          eyebrow="Transfers"
-          title="Sonderposten (nicht in der GuV)"
-          data-testid="nl-fin-transfer-card"
-        >
-          <TransferSpecialItem team={team} />
-        </NlCard>
-      ) : null}
-
-      {/* T-031: schließt die Lücke zwischen der GuV oben und dem tatsächlichen Cash-Delta der Saison. */}
-      {team ? (
-        <NlCard
-          className="nl-fin-reconciliation-card"
-          eyebrow="Cash-Abgleich"
-          title="Saisonstart → Cash aktuell"
-          data-testid="nl-fin-reconciliation-card"
-        >
-          <CashReconciliation team={team} />
-        </NlCard>
-      ) : null}
-
-      {/* T-107: Saison-für-Saison-Trend statt nur der laufenden Saison. */}
-      {team ? (
-        <NlCard
-          className="nl-fin-history-card"
-          eyebrow="Verlauf"
-          title="GuV je Saison"
-          data-testid="nl-fin-history-card"
-        >
-          <FinanceHistoryTrend history={team.history} archivePending={team.archivePending} />
-        </NlCard>
-      ) : null}
-
-      {team ? (
-        <div className="nl-fin-columns">
-          <NlCard
-            className="nl-fin-income-card"
-            eyebrow="Einnahmen"
-            title={`Summe ${formatNlMoney(team.totalIncome)}`}
-            data-testid="nl-fin-income-card"
-          >
-            {incomeLines.length > 0 ? (
-              <div className="nl-fin-col" role="list" aria-label="Einnahmen">
-                {incomeLines.map((line) => (
-                  <FinanceLine
-                    key={line.key}
-                    label={line.label}
-                    amount={line.amount}
-                    share={team.totalIncome > 0 ? line.amount / team.totalIncome : 0}
-                    tone={line.tone}
-                    alpha={line.alpha}
-                    title={line.title}
-                  />
-                ))}
-              </div>
-            ) : (
-              <NlEmptyState title="Keine Einnahmen für diese Saison bekannt." />
-            )}
-            {/* LEGACY: Preisgeld-Benchmark entfernt — es gibt nur noch Sponsor-Einnahmen. */}
-          </NlCard>
-
-          <NlCard
-            className="nl-fin-expense-card"
-            eyebrow="Ausgaben"
-            title={`Summe ${formatNlMoney(team.totalExpenses)}`}
-            data-testid="nl-fin-expense-card"
-          >
-            {expenseLines.length > 0 ? (
-              <div className="nl-fin-col" role="list" aria-label="Ausgaben">
-                {expenseLines.map((line) => (
-                  <FinanceLine
-                    key={line.key}
-                    label={line.label}
-                    amount={line.amount}
-                    share={team.totalExpenses > 0 ? line.amount / team.totalExpenses : 0}
-                    tone={line.tone}
-                    alpha={line.alpha}
-                    title={line.title}
-                  />
-                ))}
-              </div>
-            ) : (
-              <NlEmptyState title="Keine Ausgaben für diese Saison bekannt." />
-            )}
-          </NlCard>
-        </div>
-      ) : null}
-
-      <FinanceLeagueTable
-        leagueTable={leagueTable}
-        activeManagerTeamId={activeManagerTeamId}
-        onOpenTeam={onOpenTeam ?? null}
-      />
+      {sichtbarerReiter === "apron" && team ? (
+        <FinancesApronTab team={team} />
+      ) : (
+        <FinancesUebersichtTab
+          team={team}
+          incomeLines={incomeLines}
+          expenseLines={expenseLines}
+          leagueTable={leagueTable}
+          activeManagerTeamId={activeManagerTeamId}
+          onOpenTeam={onOpenTeam ?? null}
+        />
+      )}
     </div>
   );
 }

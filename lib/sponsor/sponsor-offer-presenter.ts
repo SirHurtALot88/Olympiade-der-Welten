@@ -526,6 +526,60 @@ export function buildSponsorRankTierRows(input: {
   ];
 }
 
+/**
+ * Eine Zeile der Settlement-Aufschluesselung, so viel davon, wie die Anzeige braucht.
+ * Strukturell gehalten, damit die Komponente ihre `SponsorSettlementRow` direkt uebergeben kann.
+ */
+export type SponsorPayoutBreakdownRow = {
+  kind: string;
+  cashDelta: number;
+};
+
+export type SponsorPayoutBreakdown<T extends SponsorPayoutBreakdownRow> = {
+  /** Die EINE Basiszeile, die oben als "Saisonbasis (garantiert)" steht. */
+  baseRow: T | null;
+  /** Alles Weitere, was das Fenster als Liste zeigen MUSS — inklusive der Posten, die abziehen. */
+  otherRows: T[];
+  /** Ueberschrift ueber dieser Liste; sie heisst nur "Sonderziele", wenn auch nur solche drinstehen. */
+  otherRowsLabel: string;
+};
+
+/**
+ * WELCHE SETTLEMENT-ZEILEN DAS DETAILFENSTER ZEIGT — und dass KEINE unter den Tisch faellt.
+ *
+ * Diese Auswahl stand als zwei Filterzeilen in `FoundationSponsorsNewLook`, und genau daran
+ * verschwand die VORSCHUSS-VERRECHNUNG: `sponsorV3SettlementParts` hat fuer sie kein eigenes Kind
+ * und vergibt ebenfalls `kind: "base"`. `find(kind === "base")` nahm nur die erste Basiszeile
+ * (Saisonbasis), `filter(kind !== "base" && kind !== "rank")` warf die zweite weg. Ein echter, in
+ * `projectedCash` enthaltener ABZUG stand damit nirgends im Fenster: gemessen am Save `s2`,
+ * Team L-R (Rang 6) — Leitersprosse 76,1, sichtbare Zeilen 82,1, tatsaechliche Auszahlung 66,7; die
+ * Luecke von 15,4 war exakt Vorschuss 14,7 + Gebuehr 0,7.
+ *
+ * Ausgeschlossen wird deshalb nach IDENTITAET nur, was das Fenster ohnehin schon anders zeigt: die
+ * eine Basiszeile oben und — nur wenn die Gewinnstufen-Leiter wirklich gerendert wird — die
+ * Rang-Zeile, die diese Leiter grafisch ersetzt. Alles andere landet in der Liste, egal welches
+ * Kind es traegt; kuenftige Zeilenarten ueberleben die Auswahl damit automatisch.
+ */
+export function buildSponsorPayoutBreakdown<T extends SponsorPayoutBreakdownRow>(input: {
+  settlementRows: readonly T[];
+  /** Zeigt das Fenster die Gewinnstufen-Leiter? Nur dann ist die Rang-Zeile schon sichtbar. */
+  showsRankLadder: boolean;
+}): SponsorPayoutBreakdown<T> {
+  const baseRow = input.settlementRows.find((entry) => entry.kind === "base") ?? null;
+  const otherRows = input.settlementRows.filter(
+    (entry) => entry !== baseRow && !(input.showsRankLadder && entry.kind === "rank"),
+  );
+  const hasSpecialRow = otherRows.some((entry) => entry.kind === "special");
+  const hasNonSpecialRow = otherRows.some((entry) => entry.kind !== "special");
+  const otherRowsLabel =
+    hasSpecialRow && hasNonSpecialRow
+      ? "Sonderziele & Verrechnungen"
+      : hasSpecialRow
+        ? "Sonderziele"
+        : "Verrechnungen";
+  return { baseRow, otherRows, otherRowsLabel };
+}
+
 /** Sortiermodi der Liga-Sponsorenübersicht (#78). */
 export type LeagueSponsorSort = "cash" | "sponsor" | "team" | "tier";
 

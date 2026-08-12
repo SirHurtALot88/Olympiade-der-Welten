@@ -76024,18 +76024,23 @@ span.nl-facility-ampel-chip {
   }
 }
 
-/* --- Verpflichtungen: Apron-Linien & Kredite (M3, Chris-Wunsch) ------ */
-.is-new-look .nl-fin-commit-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--nl-s4);
-  margin-top: var(--nl-s3);
+/* --- Reiter der Finanzen-Seite (Übersicht / Apron, Chris-Wunsch) ------
+   Die Pille bleibt so breit wie ihr Inhalt statt über die volle Spalte zu
+   ziehen — `.nl-fin` ist eine Flex-Spalte, die Kinder sonst streckt. */
+.is-new-look .nl-fin-subtabs {
+  align-self: flex-start;
 }
 
-@media (max-width: 900px) {
-  .is-new-look .nl-fin-commit-columns {
-    grid-template-columns: 1fr;
-  }
+/* --- Verpflichtungen: Apron-Linien & Kredite (M3, Chris-Wunsch) ------
+   `auto-fit` statt fester zwei Spalten: seit der Apron in seinen eigenen
+   Reiter gewandert ist, steht in beiden Karten nur noch EIN Abschnitt — der
+   soll die volle Breite bekommen, statt eine halbe Karte leer zu lassen.
+   Stehen wieder zwei Abschnitte nebeneinander, teilen sie sich wie zuvor. */
+.is-new-look .nl-fin-commit-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s3);
 }
 
 .is-new-look .nl-fin-commit-section {
@@ -76205,16 +76210,15 @@ span.nl-facility-ampel-chip {
 }
 
 /* --- Apron liga-weit: wer zahlt, wer bekommt (Chris-Wunsch, Ausweis je Team) ---
-   Volle Breite unter den beiden Verpflichtungs-Spalten. Farb-Wahrheit wie im
-   Rest der Seite: Einnahme (Ausgleich) grün, Abgabe rot — Ton über nl-tone-
-   Klassen, nie der Team-Akzent. */
+   Steht seit dem Reiter-Umbau als EINZIGER Inhalt in seiner eigenen Karte im
+   Apron-Reiter — darum ohne Trennlinie nach oben (die trennte ihn früher von
+   den Verpflichtungs-Spalten derselben Karte; jetzt hätte sie nichts zu
+   trennen). Farb-Wahrheit wie im Rest der Seite: Einnahme (Ausgleich) grün,
+   Abgabe rot — Ton über nl-tone-Klassen, nie der Team-Akzent. */
 .is-new-look .nl-fin-apron-league-block {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s3);
-  margin-top: var(--nl-s4);
-  padding-top: var(--nl-s3);
-  border-top: 1px solid var(--nl-line);
 }
 
 .is-new-look .nl-fin-apron-lg-summary {

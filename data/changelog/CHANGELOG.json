@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-12",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Finanzen-Seite ist neu geordnet. Der Liga-Team-Vergleich stand bisher ganz unten — man scrollte an sechs Karten vorbei, um zu sehen, wie die anderen Teams dastehen. Jetzt ist er die erste Karte. Und das Apron-Thema laeuft nicht mehr in der Hauptansicht mit, sondern hat einen eigenen Reiter: oben schaltet man zwischen Uebersicht und Apron um. Im Apron-Reiter stehen deine beiden Linien mit Abstand, Bemessungsgrundlage und Hochrechnung sowie der liga-weite Ausweis, wer zahlt und wer bekommt. In der Uebersicht bleibt die Verpflichtungs-Karte als Kredite & Tilgung stehen — mit derselben Kopfzeile wie bisher, in der die Apron-Abgabe als Teil der festen Verpflichtungen weiter auftaucht. Gerechnet wird nichts anders: alle Zahlen kommen unveraendert aus denselben Quellen wie zuvor, nur der Platz auf dem Bildschirm ist ein anderer.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
       "seite": "Spieltag · Arena",
       "pr": null,
       "text": "War die erste Disziplin eines Spieltags schon gewertet, wurde sie beim Werten der zweiten trotzdem noch einmal durchgerechnet — und konnte die zweite blockieren, obwohl ihr Ergebnis gar nicht mehr gespeichert wird. Jetzt entscheidet nur noch, was dieser Schritt wirklich schreibt.",
