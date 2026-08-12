@@ -21,6 +21,14 @@ import {
   chooseDisciplineStageTeams,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
+import {
+  spieltagsTopSpielerAusBuchung,
+  spieltagsTopSpielerAusVorschau,
+  summiereSpieltagsTopSpieler,
+  waehleSpieltagsTopSpielerZeilen,
+} from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
+import { buildMatchdayInjuryMarks } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
@@ -1386,11 +1394,20 @@ export default function DisciplineStageArena({
         (matchdayPanel.d2?.disciplineId === disciplineId &&
           matchdayPanel.teamResults.some((row) => row.d1Points != null))),
   );
+  /**
+   * D2 SPIEGELT D1 — die Zusatzbedingung `d2.disciplineId === disciplineId` ist WEG.
+   *
+   * Sie machte den Aufdeck-Stand davon abhängig, welche Disziplin gerade im Dropdown steht: wer
+   * D2 zu Ende gespielt und danach zu D1 zurückgeschaltet hat, sah D2 wieder verdeckt — und die
+   * Topspieler-Liste darunter fiel damit auf die EINE Disziplin zurück, genau das von Chris
+   * gemeldete Bild. Ein Spoiler war die Klausel nie: `endedDisciplineIds` enthält D2 erst,
+   * NACHDEM D2 in dieser Sitzung durchgelaufen ist. Was gelaufen ist, bleibt gelaufen — dieselbe
+   * Zusage, die `panelD1Revealed` schon immer gab.
+   */
   const panelD2Revealed = Boolean(
     matchdayPanel &&
       (scoringProgress?.d2.scored ||
-        (matchdayPanel.d2?.disciplineId === disciplineId &&
-          Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId)))),
+        Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId))),
   );
 
   /**
@@ -1412,63 +1429,82 @@ export default function DisciplineStageArena({
    *
    * SUMMIERT, nicht aneinandergehängt: ein Spieler, der in beiden Disziplinen antrat, steht EINMAL
    * da, mit der Summe seiner Player-Points und Scores. Der Mutator-Aufschlag summiert sich mit.
+   *
+   * GERECHNET WIRD NICHT HIER, sondern in `discipline-stage-matchday-top-players.ts` — und zwar
+   * an EINER Stelle für beide Quellen. Das ist der Unterschied zu vorher: die Liste hing an der
+   * Resolve-Vorschau, und die wird für einen fertig gebuchten Spieltag NEU gerechnet (der
+   * Snapshot gilt dann bewusst nicht mehr, `readMatchdayResolveSnapshot`). Am Live-Abbild
+   * gemessen (Saison 2, Spieltag 10) wichen dadurch 285 von 286 Spieler-Scores und 227 von 286
+   * Player-Points vom Gebuchten ab, und 4 der 12 angezeigten Namen standen dort zu Unrecht.
+   * Jetzt gilt je Disziplin das Gebuchte, sobald es gebucht ist; die laufende Disziplin kommt
+   * weiterhin aus der Vorschau.
    */
+  /**
+   * Der Saison-Ledger — die Stelle, die die gebuchten Player-Points ableitet. Eigenes Memo, weil
+   * er sonst bei jedem Aufdeck-Wechsel neu über alle Leistungszeilen der Saison liefe.
+   */
+  const seasonPointsLedger = useMemo(() => {
+    if (!seasonId) return null;
+    try {
+      return buildSeasonPointsLedger(gameState, seasonId);
+    } catch {
+      // Lässt sich zu einer Leistungszeile kein Punktwert ableiten, wirft der Ledger. Dann bleibt
+      // es bei der Vorschau — eine kargere Liste ist besser als eine leere Bühne.
+      return null;
+    }
+  }, [gameState, seasonId]);
+
+  /**
+   * VERLETZUNGS-MARKEN DER SPIELTAGS-WERTUNG (Wunsch von Chris).
+   *
+   * Kein Spoiler und deshalb NICHT an `panelD1Revealed`/`panelD2Revealed` gehängt: die Marke sagt
+   * nichts über Punkte oder Reihenfolge, sondern nur, dass es dieses Team an diesem Spieltag
+   * erwischt hat. Die Buchung dazu steht ohnehin schon im Spielstand.
+   */
+  const matchdayInjuryMarks = useMemo(
+    () => (seasonId && matchdayId ? buildMatchdayInjuryMarks(gameState, { seasonId, matchdayId }) : null),
+    [gameState, seasonId, matchdayId],
+  );
+
   const matchdayTopPlayers = useMemo(() => {
-    // Auf eine Nachkommastelle, wie ueberall in der Buehne (`fmt1` zeigt genau so viel).
-    const round1 = (value: number) => Math.round(value * 10) / 10;
-    if (!useEngine || !preview) return null;
+    if (!useEngine) return null;
     const revealedIds = new Set<string>();
     if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) revealedIds.add(matchdayPanel.d1.disciplineId);
     if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) revealedIds.add(matchdayPanel.d2.disciplineId);
     if (revealedIds.size === 0) return null;
 
-    type Sammel = { row: DisciplineStageTopPlayer; id: string | null };
-    const proSpieler = new Map<string, Sammel>();
-    for (const dp of preview.disciplinePreviews ?? []) {
-      if (!revealedIds.has(dp.disciplineId)) continue;
-      for (const pp of dp.topPlayers) {
-        const punkte = resolveAwardedPlayerPoints({
-          pointsAwarded: pp.pointsAwarded,
-          mutatorPpsBonus: pp.mutatorPpsBonus,
-        });
-        const vorhanden = pp.playerId ? proSpieler.get(pp.playerId) : null;
-        if (vorhanden) {
-          vorhanden.row.score = round1(vorhanden.row.score + pp.finalPlayerScore);
-          vorhanden.row.points = punkte == null && vorhanden.row.points == null ? null : round1((vorhanden.row.points ?? 0) + (punkte ?? 0));
-          vorhanden.row.mutatorPoints =
-            pp.mutatorPpsBonus == null && vorhanden.row.mutatorPoints == null
-              ? null
-              : round1((vorhanden.row.mutatorPoints ?? 0) + (pp.mutatorPpsBonus ?? 0));
-          vorhanden.row.isMvp = vorhanden.row.isMvp || Boolean(pp.isMvpCandidate);
-          continue;
-        }
-        const meta = teamMetaById.get(pp.teamId);
-        proSpieler.set(pp.playerId, {
-          id: pp.playerId,
-          row: {
-            rank: 0,
-            name: pp.playerName,
-            teamCode: meta?.code ?? pp.teamId,
-            logoUrl: meta?.logoUrl ?? null,
-            portraitUrl: portraitById.get(pp.playerId) ?? null,
-            score: pp.finalPlayerScore,
-            points: punkte,
-            mutatorPoints: pp.mutatorPpsBonus ?? null,
-            isMvp: Boolean(pp.isMvpCandidate),
-            isOwn: pp.teamId === ownTeamId,
-            ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
-          },
-        });
-      }
-    }
-    const sortiert = [...proSpieler.values()].sort(
-      (a, b) => (b.row.points ?? -1) - (a.row.points ?? -1) || b.row.score - a.row.score,
-    );
-    const top = sortiert.slice(0, 12);
-    top.forEach((e, i) => {
-      e.row.rank = i + 1;
+    const buchungsZeilen =
+      seasonId && matchdayId
+        ? spieltagsTopSpielerAusBuchung({ gameState, seasonId, matchdayId, ledger: seasonPointsLedger })
+        : [];
+    const { zeilen } = waehleSpieltagsTopSpielerZeilen({
+      vorschauZeilen: spieltagsTopSpielerAusVorschau(preview?.disciplinePreviews),
+      buchungsZeilen,
     });
-    return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
+    if (zeilen.length === 0) return null;
+
+    const summiert = summiereSpieltagsTopSpieler(zeilen, revealedIds);
+    if (summiert.length === 0) return null;
+
+    return {
+      rows: summiert.map((eintrag, index): DisciplineStageTopPlayer => {
+        const meta = teamMetaById.get(eintrag.teamId);
+        return {
+          rank: index + 1,
+          name: eintrag.playerName,
+          teamCode: meta?.code ?? eintrag.teamId,
+          logoUrl: meta?.logoUrl ?? null,
+          portraitUrl: portraitById.get(eintrag.playerId) ?? null,
+          score: eintrag.score,
+          points: eintrag.points,
+          mutatorPoints: eintrag.mutatorPoints,
+          isMvp: eintrag.isMvp,
+          isOwn: eintrag.teamId === ownTeamId,
+          ovrRank: ratingByPlayerId.get(eintrag.playerId)?.ovrRank ?? null,
+        };
+      }),
+      ids: summiert.map((eintrag) => eintrag.playerId as string | null),
+    };
   }, [
     useEngine,
     preview,
@@ -1479,6 +1515,10 @@ export default function DisciplineStageArena({
     portraitById,
     ownTeamId,
     ratingByPlayerId,
+    gameState,
+    seasonId,
+    matchdayId,
+    seasonPointsLedger,
   ]);
 
   /**
@@ -2573,6 +2613,7 @@ export default function DisciplineStageArena({
             modifierBaseByTeam={matchdayPanel.modifierBaseByTeam}
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
+            injuryMarksByTeam={matchdayInjuryMarks}
           />
         </div>
       ) : mode === "real" ? (

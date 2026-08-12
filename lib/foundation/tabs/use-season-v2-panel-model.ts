@@ -16,8 +16,13 @@ import { hasFinalMatchdayBeenPlayed } from "@/lib/season/season-completion-state
 import { buildTitleRace, type TitleRaceResult } from "@/lib/season/title-race";
 
 /** Gebäude-Unterhalt p.a. für ein Team — Summe der Season-Upkeeps aller gebauten
- * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak). */
-function computeTeamBuildingCost(gameState: GameState, teamId: string): number {
+ * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak).
+ *
+ * EXPORTIERT, weil die Saisonstand-Tabelle auf dem TATSAECHLICH gerenderten Pfad
+ * (`use-foundation-shell-router-body-scope.tsx` → `FoundationSeasonV2Panel`) dieselbe Zahl
+ * braucht. Dieses Modell hier haengt am nirgends gerenderten `FoundationSeasonV2Host`; waere
+ * die Rechnung dort privat geblieben, stuende sie zweimal im Code und driftete auseinander. */
+export function computeTeamBuildingCost(gameState: GameState, teamId: string): number {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   return FACILITY_CATALOG.reduce(
     (sum, entry) => sum + calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),

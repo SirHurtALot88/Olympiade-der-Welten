@@ -20,12 +20,59 @@ type EconomyPlayer = {
 
 type EconomyRosterEntry = {
   salary?: number | null;
+  negotiatedAnnualSalary?: number | null;
   purchasePrice?: number | null;
   currentValue?: number | null;
   contractLength?: number | null;
   contractShape?: "balanced" | "front_loaded" | "back_loaded" | null;
   yearlySalarySchedule?: ContractYearSalary[] | null;
 };
+
+/** Woher das Verhandlungs-Benchmark eines Vertrags stammt — fuer Migrations-Zaehlungen. */
+export type NegotiatedAnnualSalarySource = "persisted" | "schedule_average" | "stored_salary" | "missing";
+
+/**
+ * DAS VERHANDLUNGS-BENCHMARK EINES VERTRAGS — die Bemessungsgrundlage der Apron-Abgabe.
+ *
+ * WARUM NICHT `resolveRosterContractSalaries().annualSalary`, obwohl das so heisst: es bevorzugt
+ * `entry.salary`, und dieses Feld wird bei JEDEM Saisonwechsel von `advanceRosterContractSchedule`
+ * mit der Jahr-1-Rate der Rest-Schedule ueberschrieben. Ein Jahr nach Unterschrift ist
+ * `annualSalary` eines geformten Vertrags also die FORMABHAENGIGE Jahreszahlung — genau das
+ * Schlupfloch, das die Apron nicht haben darf. Nachgemessen, nicht vermutet.
+ *
+ * REIHENFOLGE:
+ *  1. Das persistierte Feld (`negotiatedAnnualSalary`) — bei Unterschrift geschrieben, danach
+ *     unveraendert. Der Normalfall.
+ *  2. Der Durchschnitt der GESPEICHERTEN Schedule. Das ist die MIGRATION fuer Bestandsvertraege:
+ *     exakt fuer balanced und fuer frisch unterschriebene geformte Vertraege (volle Schedule),
+ *     und die bestmoegliche Naeherung fuer einen mittendrin geformten Vertrag — dessen
+ *     Rest-Schedule ist um die bereits gezahlten Jahre gekuerzt. Wie viele Vertraege davon
+ *     betroffen sind, wird am Abbild gezaehlt und ausgewiesen.
+ *  3. `entry.salary` — Vertraege ganz ohne Schedule (Einjahres- und Prisma-projizierte).
+ */
+export function resolveNegotiatedAnnualSalary(
+  rosterEntry: EconomyRosterEntry | null | undefined,
+): { value: number | null; source: NegotiatedAnnualSalarySource } {
+  if (!rosterEntry) return { value: null, source: "missing" };
+
+  const persisted = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry.negotiatedAnnualSalary));
+  if (persisted != null && persisted > 0) {
+    return { value: roundTo2(persisted), source: "persisted" };
+  }
+
+  const schedule = rosterEntry.yearlySalarySchedule ?? [];
+  if (schedule.length > 0) {
+    const total = schedule.reduce(
+      (sum, row) => sum + (normalizeStoredEconomyValue(toFiniteNumber(row.salary)) ?? 0),
+      0,
+    );
+    return { value: roundTo2(total / schedule.length), source: "schedule_average" };
+  }
+
+  const stored = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry.salary));
+  if (stored == null) return { value: null, source: "missing" };
+  return { value: roundTo2(stored), source: "stored_salary" };
+}
 
 export type RosterContractSalaries = {
   /** Cash obligation for the current contract year (schedule year 1). */

@@ -2082,6 +2082,21 @@ export type RosterEntry = {
   contractShape?: ContractShape;
   yearlySalarySchedule?: ContractYearSalary[];
   salary: number;
+  /**
+   * DAS BEI UNTERSCHRIFT VERHANDELTE JAHRESGEHALT — die Bemessungsgrundlage der Apron.
+   *
+   * Persistiert und danach UNVERAENDERLICH, bis derselbe Vertrag neu unterschrieben wird. Genau
+   * darin liegt sein Zweck: `salary` wird bei JEDEM Saisonwechsel von
+   * `advanceRosterContractSchedule` mit der Jahr-1-Rate der Rest-Schedule ueberschrieben, und auch
+   * der Durchschnitt der REST-Schedule schrumpft bei einem front_loaded-Vertrag Jahr fuer Jahr
+   * (3 Jahre 1,2/1,0/0,8 ⇒ Basen 1,0a / 0,9a / 0,8a = Σ 2,7a statt 3,0a). Beide waeren
+   * formabhaengig — die Apron wuerde sich durch Front-Loading senken lassen.
+   *
+   * Optional, weil Bestandsvertraege das Feld nicht tragen; der Leser
+   * (`resolveNegotiatedAnnualSalary`) und der Lade-Backfill
+   * (`withNegotiatedSalaryBenchmark`) fuellen es aus dem Schedule-Durchschnitt nach.
+   */
+  negotiatedAnnualSalary?: number | null;
   upkeep: number;
   purchasePrice?: number | null;
   currentValue?: number | null;

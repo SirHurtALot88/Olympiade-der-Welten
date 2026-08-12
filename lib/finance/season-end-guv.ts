@@ -148,6 +148,16 @@ export type SeasonGuvParts = {
   apronGebucht?: boolean;
   /** Netto-Cash aus Vorstandszielen (Prämien − Strafen). */
   objectiveCashDelta?: number | null;
+  /**
+   * `true` = die Zahl kommt aus dem BUCHUNGSBELEG (`objectiveRewardApplyLogs[].payload
+   * .cashDeltaByTeamId`), nicht aus einer Nachrechnung.
+   *
+   * Anders als beim Apron ändert das NICHT, ob die Zeile zählt — Vorstandsziele zählen in beiden
+   * Fällen. Der Unterschied ist die Verlässlichkeit: solange die Saison läuft, ist die Zeile eine
+   * Hochrechnung, die mit der Kasse atmet (mehrere Ziele werten gegen den Liga-Cash-Rang). Nach der
+   * Buchung steht sie fest. Der Hover soll das benennen können, statt beides gleich auszusehen.
+   */
+  boardzieleGebucht?: boolean;
   /** Gehaltssumme der Saison, als positive Zahl. */
   salaryTotal?: number | null;
   /** Kreditzins der Saison (NUR Zins, nicht die Rate), als positive Zahl. */
@@ -200,7 +210,13 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
         .filter(Boolean)
         .join(" · "),
     },
-    { key: "boardziele", label: POSTEN_LABEL.boardziele, amount: objective, counted: true },
+    {
+      key: "boardziele",
+      label: POSTEN_LABEL.boardziele,
+      amount: objective,
+      counted: true,
+      note: parts.boardzieleGebucht === true ? "gebucht" : "Hochrechnung, noch nicht gebucht",
+    },
     { key: "gehaelter", label: POSTEN_LABEL.gehaelter, amount: ausgabe(parts.salaryTotal), counted: true },
     {
       key: "gebaeude_unterhalt",

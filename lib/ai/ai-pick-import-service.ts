@@ -346,6 +346,8 @@ function buildReplayPreview(input: {
           contractLength: Math.max(1, transfer.remainingContractLength || 1),
           salary: salaryReplay!,
           upkeep: salaryReplay!,
+          // UNTERSCHRIFTSPFAD (simuliert): Replay eines Picks im Vorschau-State.
+          negotiatedAnnualSalary: salaryReplay!,
           purchasePrice: purchasePriceReplay!,
           currentValue: purchasePriceReplay!,
           roleTag: "prospect",

@@ -25,7 +25,11 @@ import { computeApronSettlement } from "@/lib/season/apron-service";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import {
+  getTeamDisplaySalaryTotal,
+  getTeamNegotiatedSalaryTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamApronSalaryBase } from "@/lib/season/apron-service";
 import {
   shouldRequestSeasonArchiveLoad,
   uebernimmGeladenesSaisonarchiv,
@@ -125,10 +129,18 @@ describe("Apron-Ausweisung: beide Linien einzeln, aus derselben Projektion wie d
     expect(apron.distanceLine2).toBeCloseTo(round1(apron.salaryBasis - apron.line2), 5);
   });
 
-  it("die Bemessungsgrundlage IST die geglättete Gehaltssumme (getTeamDisplaySalaryTotal)", () => {
+  /**
+   * UMGESTELLT (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3 — Chris: „ja!"): die Bemessungsgrundlage
+   * ist das VERHANDELTE Jahresgehalt, nicht mehr das Formel-Gehalt aus Marktwert/Attributen. Der
+   * Test prueft beides — dass die Anzeige die neue Grundlage nimmt UND dass sie sich in diesem
+   * Fixture messbar von der alten unterscheidet; sonst wuerde er die Umstellung nicht bemerken.
+   */
+  it("die Bemessungsgrundlage IST die verhandelte Gehaltssumme — nicht mehr die geglättete", () => {
     const gameState = buildGameState();
     const apron = readyTeam(gameState).apron!;
-    expect(apron.salaryBasis).toBe(round1(getTeamDisplaySalaryTotal(gameState, "team-1")));
+    expect(apron.salaryBasis).toBe(round1(getTeamApronSalaryBase(gameState, "team-1")));
+    expect(apron.salaryBasis).toBe(round1(getTeamNegotiatedSalaryTotal(gameState, "team-1")));
+    expect(apron.salaryBasis).not.toBe(round1(getTeamDisplaySalaryTotal(gameState, "team-1")));
   });
 
   it("Netto == Ausgleich − Abgabe, und die GuV-Posten-Zeile trägt dieselbe Zahl", () => {

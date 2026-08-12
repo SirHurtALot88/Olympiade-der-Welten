@@ -11,17 +11,23 @@
  * Funktion `computeApronLines`, die die Liga-Gehaltssumme braucht). Die eigentliche Anwendung
  * (Cash-Aenderungen schreiben, Ledger fuehren) lebt in `lib/season/apron-settlement-service.ts`.
  *
- * BEMESSUNGSGRUNDLAGE: `getTeamDisplaySalaryTotal` (geglättet, `contract.expectedSalary`) — DIESELBE
- * Zahl, die die Sponsorenübersicht als "Gehälter" zeigt, NICHT die echte, front-/back-loaded
- * Vertragssumme (`resolvePlayerEconomyContract().salary`, wie sie `applySponsorSettlement` beim
- * Gehaltsabzug real bucht). Bewusst so, aus zwei Gründen: (1) die geglättete Zahl ist genau das, was
- * ein Team in der UI als seine Gehaltslast sieht — die Apron-Badges müssen gegen dieselbe Zahl
- * rechnen, sonst zeigt die Zeile eine Warnung, die der daneben stehende Betrag nicht erklärt. (2) sie
- * glättet gerade die Front-/Back-Loading-Spitzen weg, die sonst ein Team allein durch die zeitliche
- * Verteilung seiner Vertragsraten über oder unter die Linie schieben würden — der Apron soll echte
- * Mehrausgabe treffen, nicht Buchungstechnik. FOLGE, gemessen: ein Team KANN trotzdem eine echte
- * Vertragssumme weit über der Linie haben, während seine geglättete Zahl nur knapp darüber liegt
- * (Save-Beispiel Z-H: 97,7 echt gegen 83,3 geglättet).
+ * BEMESSUNGSGRUNDLAGE: `getTeamNegotiatedSalaryTotal` — die Summe der bei UNTERSCHRIFT
+ * VERHANDELTEN Jahresgehälter (`RosterEntry.negotiatedAnnualSalary`). Nicht die Jahreszahlung
+ * (`contract.salary`, die `applySponsorSettlement` real abbucht) und seit dem 12.08.2026 auch
+ * nicht mehr das FORMEL-Gehalt aus Marktwert/Attributen (`contract.expectedSalary`).
+ *
+ * WARUM UMGESTELLT (Chris: „ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3): das Formel-Gehalt
+ * hing weder an der Verhandlung noch an der Form. Ein Team, das seinen ganzen Kader 10 % unter
+ * Formel verhandelte, zahlte trotzdem die volle Abgabe — am Abbild zahlte Cold Steel 3,18 Abgabe,
+ * obwohl seine echte Gehaltssumme (63,6) UNTER der ersten Linie (76,8) lag, weil geglättet 81,6
+ * dastanden. Verhandeln soll die Apron bewegen.
+ *
+ * DIE ANTI-GAMING-ZUSAGE BLEIBT UNVERÄNDERT IN KRAFT — sie hängt jetzt nur an einem anderen Feld:
+ * „ein Formwechsel ändert die Apron-Abgabe um 0,00". Das verhandelte Jahresgehalt wird bei
+ * Unterschrift festgeschrieben und danach nie wieder angefasst; weder die Jahreszahlung noch der
+ * Durchschnitt der Rest-Schedule taugten dafür (beide sinken bei front_loaded über die Laufzeit —
+ * bei drei Jahren auf 2,7 statt 3,0 Jahresgehälter). Der Wächter-Test prüft die 0,00 ausdrücklich
+ * AUCH NACH EINEM SAISONWECHSEL, weil erst der die Falle sichtbar macht.
  *
  * SAETZE UND LINIENFAKTOREN, GEMESSEN GEGEN DEN GESPIELTEN SAVE (nicht die ursprüngliche Vorgabe):
  * ENDGÜLTIGE ENTSCHEIDUNG (Nutzer, nach drei Kalibrierungsrunden — siehe scripts/apron-kalibrierung.ts
@@ -50,8 +56,13 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { SPONSOR_WERTUNGSTOPF, sponsorWertungsGewichte } from "@/lib/sponsor/sponsor-liga-leiter";
+import {
+  SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
+  getSeasonEconomyFactorWindow,
+  isBeforeSeasonEconomyFactorAdvance,
+} from "@/lib/season/season-economy-factors";
 
 export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
@@ -105,6 +116,34 @@ export function apronKonjunkturhebel(salaryFactor: number): number {
 }
 
 /**
+ * EIN LESER FÜR ALLE APRON-FAKTOREN — kein zweiter Nachbau des Fensters.
+ *
+ * Das Fenster (5 Saisons Vorausschau, deterministisch je Save) gehört `season-economy-factors.ts`;
+ * hier wird nur ein HORIZONT daraus gezogen. Der Zugriff läuft bewusst über
+ * `getSeasonEconomyFactorWindow` und sucht `horizonIndex` explizit statt über den Array-Index — die
+ * Reihenfolge im gespeicherten Zustand ist keine Zusage, die Normierung dort ist es.
+ *
+ * OHNE GESPEICHERTES FENSTER KEIN ERSATZWURF: `getSeasonEconomyFactorWindow` würfelt ein
+ * vollständiges Fenster nach, wenn keins (oder ein unvollständiges) im Spielstand steht. Für die
+ * Abgabe wäre das die falsche Antwort — der dokumentierte Apron-Fallback ist 1 (siehe unten), also
+ * eine gedämpfte Steuer, nicht ein zufälliger Konjunkturwert. Jeder geladene Spielstand trägt das
+ * Fenster ohnehin vollständig (`withSeededSeasonEconomyFactors`, save-repository.ts) — der Fall
+ * betrifft nur konstruierte Zustände.
+ */
+function readApronFactorHorizon(gameState: GameState, horizonIndex: number): number | null {
+  const gespeichert = gameState.seasonState?.seasonEconomyFactors ?? [];
+  if (gespeichert.length < SEASON_ECONOMY_FACTOR_WINDOW_SIZE) return null;
+  const seasonId = gameState.season?.id ?? "";
+  const window = getSeasonEconomyFactorWindow({
+    saveId: seasonId,
+    seasonId,
+    seasonState: gameState.seasonState,
+  });
+  const factor = window.find((entry) => entry.horizonIndex === horizonIndex)?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : null;
+}
+
+/**
  * Der Salary Factor der laufenden Saison — die Eingangsgröße des Hebels oben.
  *
  * Stand vorher wortgleich zweimal im Baum (`apron-settlement-service.ts`, `apron-projection.ts`); mit
@@ -112,10 +151,60 @@ export function apronKonjunkturhebel(salaryFactor: number): number {
  * MÜSSEN denselben Faktor lesen, sonst kauft die KI gegen eine andere Steuer, als am Saisonende
  * gebucht wird. Fallback 1, nicht 0: ein 0-Faktor machte die Abgabe unsichtbar statt sie nur zu
  * dämpfen.
+ *
+ * DIES IST DER FAKTOR DER ABRECHNUNG. Wer über eine KÜNFTIGE Saison entscheidet (verkaufen,
+ * verlängern), nimmt `resolveApronDecisionSalaryFactor` — siehe dort.
  */
 export function resolveApronSalaryFactor(gameState: GameState): number {
-  const factor = gameState.seasonState?.seasonEconomyFactors?.[0]?.factor;
-  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+  return readApronFactorHorizon(gameState, 0) ?? 1;
+}
+
+/**
+ * Der Salary Factor der KOMMENDEN Saison (`horizonIndex 1`) — kein Schätzwert, ein bereits
+ * gewürfelter und dem Spieler auf den Sponsorkarten schon gezeigter Wert
+ * (`buildSponsorOfferTermForecast`).
+ *
+ * Fallback ist bewusst der AKTUELLE Faktor und nicht 1: fehlt der Horizont, ist „so wie jetzt" die
+ * ehrlichere Annahme als „neutrale Konjunktur" — 1 läge mitten in der Spanne 0,82–1,24 und würde
+ * eine Aussage erfinden, die der Spielstand nicht hergibt.
+ */
+export function resolveApronSalaryFactorForNextSeason(gameState: GameState): number {
+  return readApronFactorHorizon(gameState, 1) ?? resolveApronSalaryFactor(gameState);
+}
+
+/** Welcher Horizont hinter `resolveApronDecisionSalaryFactor` steckt — für Begründungstexte. */
+export type ApronDecisionSalaryFactor = {
+  factor: number;
+  /** 0 = laufende Saison, 1 = kommende Saison. */
+  horizonIndex: 0 | 1;
+};
+
+/**
+ * DER FAKTOR, GEGEN DEN EINE KADER-ENTSCHEIDUNG RECHNEN MUSS — gemessener Fehler, nicht Kosmetik.
+ *
+ * Verkäufe und Verlängerungen laufen in der Saisonende-Kette; das Faktor-Fenster rückt aber erst in
+ * deren letztem Schritt (`next_season_setup`) vor. Wer dort `resolveApronSalaryFactor` liest,
+ * bekommt den Faktor der ABGELAUFENEN Saison — während die Abgabe, die der Verkauf beeinflusst,
+ * erst in der NÄCHSTEN anfällt, deren Faktor im selben Fenster bereits steht.
+ *
+ * GEMESSEN am Abbild (Save `1hf25q`, Saison 2 abgerechnet, f=1,19 → k=0,83; nächste Saison f=0,87 →
+ * k=0): `buildApronAbbauZiel("Hell Raisers").reliefBisZiel` stand auf 9,67, real ist es 0,00. Die KI
+ * hätte Spieler verkauft, um eine Abgabe zu vermeiden, die es nachweislich nicht geben wird (drei
+ * kommende Saisons liegen mit 0,87/0,83/0,91 unter der k=0-Schwelle 0,95).
+ *
+ * AB DEM SAISONSTART GILT WIEDER `horizonIndex 0`: gekauft wird ausschliesslich in der neuen Saison
+ * vor ihrem ersten Spieltag (`isEarlySeasonTransferSetup`, transfer-window-policy.ts). Dort ist das
+ * Fenster bereits vorgerückt und die Abgabe, die der Zugang auslöst, fällt am Ende genau dieser
+ * Saison an — `horizonIndex 0` ist dann der richtige Wert und bleibt es.
+ *
+ * NUR EIN ZWEITER LESEHORIZONT DERSELBEN QUELLE, keine zweite Formel: die Abgabe rechnet weiter
+ * `apronLevyForSalary`, die Abrechnung weiter `resolveApronSalaryFactor`.
+ */
+export function resolveApronDecisionSalaryFactor(gameState: GameState): ApronDecisionSalaryFactor {
+  if (isBeforeSeasonEconomyFactorAdvance(gameState.gamePhase)) {
+    return { factor: resolveApronSalaryFactorForNextSeason(gameState), horizonIndex: 1 };
+  }
+  return { factor: resolveApronSalaryFactor(gameState), horizonIndex: 0 };
 }
 
 // ── Eingefrorene Linien ────────────────────────────────────────────────────────────────────────
@@ -129,12 +218,15 @@ export type ApronLines = {
 
 /**
  * Dieselbe Frisch-Save-Schranke wie `getSponsorV3LeagueSalaries` (Sponsorsystem), nur auf der
- * GEGLÄTTETEN Gehaltszahl (`getTeamDisplaySalaryTotal`) statt der echten — siehe Kopfkommentar,
- * warum der Apron geglättet rechnet. Schwelle und Referenzwert sind dieselben, keine zweite
- * erfundene Zahl: gemessene Summe unter 25 % der erwarteten (32 × Referenz) ⇒ Referenz je Team.
+ * BEMESSUNGSGRUNDLAGE des Apron — und die ist ausdrücklich `getTeamApronSalaryBase`, nicht ein
+ * zweiter Direktgriff auf irgendeine Gehaltssumme. LINIEN UND BASIS MÜSSEN DIESELBE GRÖSSE MESSEN:
+ * die Linien sind der Median genau der Zahl, gegen die anschließend verglichen wird. Ein Median
+ * aus dem Formel-Gehalt gegen eine Basis aus dem verhandelten Gehalt verschöbe die ganze Liga
+ * gegen ihre eigene Linie. Schwelle und Referenzwert sind dieselben wie beim Sponsorsystem, keine
+ * zweite erfundene Zahl: gemessene Summe unter 25 % der erwarteten (32 × Referenz) ⇒ Referenz je Team.
  */
 function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; usedReference: boolean } {
-  const measured = gameState.teams.map((team) => getTeamDisplaySalaryTotal(gameState, team.teamId));
+  const measured = gameState.teams.map((team) => getTeamApronSalaryBase(gameState, team.teamId));
   const teamCount = Math.max(1, measured.length);
   const measuredSum = measured.reduce((sum, value) => sum + value, 0);
   if (measuredSum >= teamCount * SPONSOR_V3_REFERENCE_SALARY_PER_TEAM * 0.25) {
@@ -144,19 +236,26 @@ function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; u
 }
 
 /**
- * DIE GEHALTSSUMME, GEGEN DIE DER APRON EIN TEAM BEMISST — die geglättete (siehe Kopfkommentar).
+ * DIE GEHALTSSUMME, GEGEN DIE DER APRON EIN TEAM BEMISST — das VERHANDELTE Gehalt.
  *
- * Eigene Funktion statt eines direkten `getTeamDisplaySalaryTotal`-Aufrufs, damit jede Apron-Frage
- * im Baum nachweislich dieselbe Grundlage nimmt. Genau hier lag ein Fehler: die KI prüfte ihre
+ * Eigene Funktion statt eines direkten Aufrufs, damit jede Apron-Frage im Baum nachweislich
+ * dieselbe Grundlage nimmt. Genau hier lag schon einmal ein Fehler: die KI prüfte ihre
  * Gehaltsdecke gegen die ECHTE Vertragssumme, während besteuert wird, was diese Funktion liefert.
  *
  * Sie steht in der SAISON-Ebene und nicht bei der KI, obwohl die KI ihr Hauptnutzer ist: sie gehört
  * zur Definition des Apron, nicht zu seiner Verwendung. Praktisch entscheidet das auch die
  * Importrichtung — die KI-Decke (`resolveTeamApronSalaryCeiling`) baut auf dieser Zahl auf, und ein
  * Zuhause bei der KI hätte einen Zyklus ergeben.
+ *
+ * UMGESTELLT (Chris: „ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3): früher
+ * `getTeamDisplaySalaryTotal` — das FORMEL-Gehalt aus Marktwert/Attributen, das weder an der
+ * Verhandlung noch an der Form hing. Die Anti-Gaming-Zusage bleibt trotzdem in voller Härte
+ * bestehen, sie hängt jetzt nur an einem anderen Feld: `getTeamNegotiatedSalaryTotal` summiert das
+ * bei Unterschrift verhandelte Jahresgehalt, nicht die Jahreszahlung — ein Formwechsel bewegt sie
+ * um 0,00, auch nach einem Saisonwechsel.
  */
 export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
-  return getTeamDisplaySalaryTotal(gameState, teamId);
+  return getTeamNegotiatedSalaryTotal(gameState, teamId);
 }
 
 /**

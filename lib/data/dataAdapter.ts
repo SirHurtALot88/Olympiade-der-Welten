@@ -367,6 +367,8 @@ export function buildRosterSeedData(): OlySeedData {
       contractLength: 2,
       salary: player.salaryDemand,
       upkeep: player.salaryDemand,
+      // UNTERSCHRIFTSPFAD: Erstbestueckung. Ohne Verhandlung ist das Formel-Gehalt das Benchmark.
+      negotiatedAnnualSalary: player.salaryDemand,
       purchasePrice: player.marketValue,
       currentValue: player.marketValue,
       roleTag,

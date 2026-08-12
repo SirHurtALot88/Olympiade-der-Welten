@@ -189,7 +189,7 @@ describe("Kauffenster: am Ende steht kein Team mehr im Minus", () => {
     expect(store.gameState!.teams.find((team) => team.teamId === "D-P")!.cash).toBe(0);
   });
 
-  it("laeuft NACH Markt, Fuellung und Verletzungs-Topup", async () => {
+  it("laeuft NACH Markt und Verletzungs-Topup — und der Fuell-Lauf ist raus", async () => {
     store.gameState = baueGameState("season_active", -4.2);
 
     await laufen();
@@ -197,11 +197,24 @@ describe("Kauffenster: am Ende steht kein Team mehr im Minus", () => {
     // Vorher waere der Kontostand noch gar nicht der, mit dem das Team in die Saison geht —
     // jeder spaetere Kauf koennte ihn wieder ins Minus ziehen.
     expect(applyInsolvencyBackstop.mock.invocationCallOrder[0]!).toBeGreaterThan(
-      runAutoRosterFillForMatchdaySetup.mock.invocationCallOrder[0]!,
+      applyAiMarketPlanLocally.mock.invocationCallOrder[0]!,
     );
     expect(applyInsolvencyBackstop.mock.invocationCallOrder[0]!).toBeGreaterThan(
       applyAiInjuryDepthTopup.mock.invocationCallOrder[0]!,
     );
+    /*
+     * NACHGEZOGEN: die alte Fassung verankerte die Reihenfolge zusaetzlich am FUELL-LAUF
+     * (`runAutoRosterFillForMatchdaySetup`). Diese Aussage gilt NACHWEISLICH nicht mehr — der
+     * Lauf ist per Eigentuemer-Entscheid aus dem Kauffenster entfernt (Commit 6a685998, Chris:
+     * „Du sollst auf den Organic Lauf umschalten und der soll picken" / „keine filler mehr!
+     * VERBOT"); die Sperre sitzt seither im Dienst selbst (nur noch season-1). Der Mock wurde
+     * darum nie aufgerufen, `invocationCallOrder[0]` war `undefined` und der Vergleich fiel mit
+     * „expected value must be number" — kein Befund am Produkt, ein liegengebliebener Test.
+     *
+     * Statt die Zeile ersatzlos zu streichen wird sie umgedreht: der Fuell-Lauf DARF hier nicht
+     * mehr vorkommen. Das ist die schaerfere Zusicherung — sie meldet auch die Rueckkehr.
+     */
+    expect(runAutoRosterFillForMatchdaySetup).not.toHaveBeenCalled();
   });
 
   it("laesst ein Team im Plus unangetastet", async () => {
@@ -244,7 +257,7 @@ describe("Kauffenster: der Snapshot der Vorsaison bekommt den Eintrittsstand", (
     expect(payload.run.warnings).toContain("snapshot_eintrittsstand_gesetzt:season-1");
   });
 
-  it("tut das ganz am Ende — nach Kaeufen, Fuellung und Zahlungsausgleich", async () => {
+  it("tut das ganz am Ende — nach Kaeufen, Verletzungs-Topup und Zahlungsausgleich", async () => {
     store.gameState = baueGameState("season_active", -4.2);
 
     await laufen();
@@ -252,7 +265,10 @@ describe("Kauffenster: der Snapshot der Vorsaison bekommt den Eintrittsstand", (
     // Sonst stuende im Snapshot ein Zwischenstand, nicht der, mit dem das Team wirklich startet.
     const patch = patchCompletedSeasonSnapshotAfterPreseasonBuy.mock.invocationCallOrder[0]!;
     expect(patch).toBeGreaterThan(applyAiMarketPlanLocally.mock.invocationCallOrder[0]!);
-    expect(patch).toBeGreaterThan(runAutoRosterFillForMatchdaySetup.mock.invocationCallOrder[0]!);
+    // NACHGEZOGEN: der Fuell-Lauf war hier der dritte Anker und ist per Eigentuemer-Entscheid
+    // aus dem Kauffenster raus (Commit 6a685998) — an seine Stelle tritt der letzte KAUFENDE
+    // Schritt der Kette, das Verletzungs-Topup. Begruendung ausfuehrlich oben.
+    expect(patch).toBeGreaterThan(applyAiInjuryDepthTopup.mock.invocationCallOrder[0]!);
     expect(patch).toBeGreaterThan(applyInsolvencyBackstop.mock.invocationCallOrder[0]!);
   });
 });

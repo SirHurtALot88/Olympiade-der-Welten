@@ -1,6 +1,44 @@
-import type { SeasonEconomyFactorRecord, SeasonState } from "@/lib/data/olyDataTypes";
+import type { GamePhase, SeasonEconomyFactorRecord, SeasonState } from "@/lib/data/olyDataTypes";
 
 export const SEASON_ECONOMY_FACTOR_WINDOW_SIZE = 5;
+
+/**
+ * Die Stationen der Saisonende-Kette — dort steht `horizonIndex 0` noch auf der ABGELAUFENEN Saison.
+ *
+ * WARUM ES DIESE LISTE BRAUCHT: das Fenster rueckt erst im LETZTEN Schritt der Kette vor
+ * (`next_season_setup` ruft `advanceSeasonEconomyFactorWindow` und setzt dabei die Phase auf
+ * `season_active`, siehe preseason-workflow-service.ts). Alles davor — Verkaeufe, Verlaengerungen,
+ * Ablösungen — entscheidet also ueber eine Saison, deren Faktor im Fenster schon als
+ * `horizonIndex 1` steht, waehrend `horizonIndex 0` noch die gerade abgerechnete Saison beschreibt.
+ * Wer in diesen Phasen `horizonIndex 0` liest, liest einen bekannten Wert der falschen Saison.
+ *
+ * NICHT in der Liste und mit Absicht: `season_active` (die neue Saison laeuft bereits, das Fenster
+ * ist schon vorgerueckt — dort ist `horizonIndex 0` richtig; in genau diesem Fenster wird auch
+ * gekauft, siehe `isEarlySeasonTransferSetup` in transfer-window-policy.ts), `lineup_setup`,
+ * `next_season_ready` (beide hinter dem Vorruecken) und `preseason_management` (nur noch der
+ * frische Aufbau vor dem allerersten Spieltag eines neuen Spiels).
+ */
+const PHASEN_VOR_DEM_FAKTOR_VORRUECKEN = new Set<GamePhase>([
+  "season_completed",
+  "season_review",
+  "season_rewards",
+  "player_development",
+  "season_end_management",
+  "transfer_sell_phase",
+  "transfer_buy_phase",
+]);
+
+/**
+ * Steht das Faktor-Fenster noch auf der ABGELAUFENEN Saison? Dann betrifft jede Entscheidung, die
+ * jetzt getroffen wird, die Saison auf `horizonIndex 1`.
+ *
+ * Hier und nicht bei der KI: es ist eine Aussage ueber das Fenster dieser Datei, nicht ueber die
+ * Verwendung. Ohne Phase (Altstaende) gilt `season_active` — dieselbe Annahme wie ueberall sonst im
+ * Baum.
+ */
+export function isBeforeSeasonEconomyFactorAdvance(gamePhase: GamePhase | string | null | undefined): boolean {
+  return PHASEN_VOR_DEM_FAKTOR_VORRUECKEN.has((gamePhase ?? "season_active") as GamePhase);
+}
 
 /**
  * Uniform shift added to BOTH the default per-season pattern AND the random roll range (both ends), so the
