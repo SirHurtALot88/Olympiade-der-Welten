@@ -37,6 +37,7 @@ import { apronReliefFuerGehalt, buildApronAbbauZiel } from "@/lib/ai/apron-abbau
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
+import { bewerteFatigueTiefenNot } from "@/lib/ai/ai-fatigue-depth-distress";
 import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 import { applyGmPressureDemandConcession, resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -221,7 +222,28 @@ function normalizeGameState(gameState: GameState) {
   return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(gameState));
 }
 
-function getBudgetPressure(team: Team, salaryTotal: number): AiSellPreviewBudgetPressure {
+/**
+ * FATIGUE-TIEFEN-NOT HEBT AUF "tight" — Chris: „wenn fatigue ihnen zu hoch ist ggf. spieler
+ * verkaufen um cash zu schaffen und günstigere spieler zu holen aber sich mehr dem eigenen opt zu
+ * nähern." Bis hierher kannte dieser Dienst Kadertiefe NUR als Bremse (`low_roster_depth`), nie als
+ * Auslöser: ein erschöpftes Team ohne Cash galt als „healthy" und verkaufte nichts — obwohl genau
+ * ihm das Geld fuer Ergaenzungen fehlt.
+ *
+ * BEWUSST NUR BIS "tight", NICHT "critical". Die Not ist eine Kader-, keine Zahlungsnot; „critical"
+ * ist fuer Teams reserviert, die ihre Gehaelter nicht decken. Ein cash-kritisches Team bleibt
+ * kritisch — die Not kann eine Einstufung nur ANHEBEN, nie absenken.
+ */
+function getBudgetPressure(
+  team: Team,
+  salaryTotal: number,
+  fatigueTiefenNot = false,
+): AiSellPreviewBudgetPressure {
+  const basis = getBudgetPressureAusCash(team, salaryTotal);
+  if (!fatigueTiefenNot) return basis;
+  return basis === "healthy" ? "tight" : basis;
+}
+
+function getBudgetPressureAusCash(team: Team, salaryTotal: number): AiSellPreviewBudgetPressure {
   if (!Number.isFinite(team.cash)) {
     return "unknown";
   }
@@ -588,7 +610,7 @@ function buildCandidate(
     warnings.push("Noch keine lokale Leistungs-Historie für diesen Spieler.");
   }
 
-  const budgetPressure = getBudgetPressure(team, salaryTotal);
+  const budgetPressure = getBudgetPressure(team, salaryTotal, bewerteFatigueTiefenNot(context.gameState, team.teamId).inNot);
   const boardPressure = clamp((10 - (identity?.boardConfidence ?? 5)) / 10, 0, 1);
   const teamSalaryPressure = team.cash > 0 ? clamp(salaryTotal / Math.max(team.cash, 1), 0, 3) / 3 : salaryTotal > 0 ? 1 : 0;
   const salaryShare = salary != null && salaryTotal > 0 ? clamp(salary / salaryTotal, 0, 1) : 0;
@@ -1320,7 +1342,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       playerOpt,
       targetRosterMin: playerMin,
       targetRosterOpt: playerOpt,
-      budgetPressure: getBudgetPressure(team, salaryTotal),
+      budgetPressure: getBudgetPressure(team, salaryTotal, bewerteFatigueTiefenNot(context.gameState, team.teamId).inNot),
       sellCandidates,
       keepCore,
       warnings,
