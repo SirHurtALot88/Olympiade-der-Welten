@@ -57230,6 +57230,33 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Verletzungs-Marke der Score-Tabelle. `flex: none` + `white-space: nowrap`, damit sie beim
+   Kuerzen des Teamnamens (ellipsis) nicht selbst abgeschnitten wird — eine halbe Marke waere
+   schlimmer als keine. */
+.is-new-look .nl-result-injury {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 15px;
+  white-space: nowrap;
+  color: var(--nl-risk);
+  background: color-mix(in srgb, var(--nl-risk) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 45%, transparent);
+}
+
+/* Name + Marke in EINER Zeile. Der Name behaelt sein eigenes ellipsis-Verhalten (deshalb bekommt
+   die Marke eine eigene Box daneben und nicht denselben Kasten). */
+.is-new-look .nl-result-teamline {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .is-new-look .nl-result-points {
   font-size: 14px;
   font-weight: 700;

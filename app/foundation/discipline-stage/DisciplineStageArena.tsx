@@ -28,6 +28,7 @@ import {
   waehleSpieltagsTopSpielerZeilen,
 } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import { buildMatchdayInjuryMarks } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
+import { replayNachArenaReset } from "@/lib/foundation/discipline-stage/discipline-stage-replay-gate";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
@@ -1469,8 +1470,17 @@ export default function DisciplineStageArena({
   const matchdayTopPlayers = useMemo(() => {
     if (!useEngine) return null;
     const revealedIds = new Set<string>();
-    if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) revealedIds.add(matchdayPanel.d1.disciplineId);
-    if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) revealedIds.add(matchdayPanel.d2.disciplineId);
+    // Die NAMEN der aufgedeckten Seiten wandern mit — sie stehen in der Ueberschrift der Liste,
+    // damit der summierten PP-Zahl anzusehen ist, worueber summiert wurde.
+    const revealedNames: string[] = [];
+    if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) {
+      revealedIds.add(matchdayPanel.d1.disciplineId);
+      revealedNames.push(matchdayPanel.d1.displayName || matchdayPanel.d1.disciplineId);
+    }
+    if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) {
+      revealedIds.add(matchdayPanel.d2.disciplineId);
+      revealedNames.push(matchdayPanel.d2.displayName || matchdayPanel.d2.disciplineId);
+    }
     if (revealedIds.size === 0) return null;
 
     const buchungsZeilen =
@@ -1504,6 +1514,7 @@ export default function DisciplineStageArena({
         };
       }),
       ids: summiert.map((eintrag) => eintrag.playerId as string | null),
+      disciplineNames: revealedNames,
     };
   }, [
     useEngine,
@@ -2519,6 +2530,19 @@ export default function DisciplineStageArena({
       </div>
       )}
 
+      <div
+        data-oly-debug="arena"
+        data-mode={mode}
+        data-discipline-id={disciplineId}
+        data-discipline-ended={String(disciplineEnded)}
+        data-engine-discipline={String(Boolean(engineDiscipline))}
+        data-active-side-scored={String(activeSideScoredInSave)}
+        data-sides={`${matchdaySides.d1?.disciplineId ?? "-"}|${matchdaySides.d2?.disciplineId ?? "-"}`}
+        data-progress={`${scoringProgress?.d1.disciplineId ?? "-"}:${String(scoringProgress?.d1.scored)}|${scoringProgress?.d2.disciplineId ?? "-"}:${String(scoringProgress?.d2.scored)}`}
+        data-panel-reveal={`${String(panelD1Revealed)}|${String(panelD2Revealed)}`}
+        data-md-top={String(Boolean(matchdayTopPlayers))}
+        hidden
+      />
       <DisciplineStageNativeArena
         key={`${disciplineId}-${mode}-${seed}`}
         slots={payload.slots}
@@ -2536,9 +2560,13 @@ export default function DisciplineStageArena({
           // Saisonstand; nach D2 wird der Spieltag zusaetzlich abgeschlossen.
           commitFinishedDiscipline(disciplineId);
         }}
-        onReset={() => {
+        onReset={(anlass) => {
           setArenaEnded(false);
-          setReplayingDisciplineId(disciplineId);
+          // NUR „↻ Neu" ist ein Nachspielen. Vorher galt auch der Mount als Replay — und weil
+          // `disciplineEnded` ein Replay bewusst nicht als abgeschlossen zaehlt, blieb der ganze
+          // Endscreen (Top-Spieler, Highlights, Weiter-Block) beim Oeffnen einer bereits
+          // gewerteten Disziplin unsichtbar. Siehe `discipline-stage-replay-gate.ts`.
+          setReplayingDisciplineId(replayNachArenaReset(anlass, disciplineId));
         }}
         onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
@@ -2707,6 +2735,9 @@ export default function DisciplineStageArena({
           <DisciplineStageTopPlayers
             players={(matchdayTopPlayers ?? topPlayers).rows}
             playerIdByRow={(matchdayTopPlayers ?? topPlayers).ids}
+            // Ohne Spieltags-Liste steht nur die laufende Disziplin drin — dann sagt die
+            // Ueberschrift auch genau die, statt eine Summe zu behaupten.
+            disciplineNames={matchdayTopPlayers?.disciplineNames ?? (model.disciplineName ? [model.disciplineName] : null)}
             onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
           />
           <DisciplineStageHighlights
