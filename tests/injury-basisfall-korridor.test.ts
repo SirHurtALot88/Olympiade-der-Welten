@@ -72,7 +72,19 @@ const MATCHDAYS: Array<{ d1: number; d2: number }> = [
   { d1: 4, d2: 5 },
 ];
 
-const KORRIDOR_MIN = 150;
+/**
+ * UNTERGRENZE 150 -> 140, nachgezogen mit Chris' Entscheidung vom 12.08.
+ *
+ * Er empfand die Last als zu hoch („das ist jetzt zu heftig") und hat aus einer Auswahl mit
+ * gemessenen Folgen die ERHOLUNG gewaehlt (Basis 20 -> 28) statt einer Senkung der Last — gerade
+ * WEIL eine Last-Senkung die Verletzungen ueberproportional gedrueckt haette (Last 11 -> 57,
+ * Last 10 -> 42, also ein Viertel dieses Korridors). Die gewaehlte Einstellung landet bei 145.
+ *
+ * Die Untergrenze folgt also der Entscheidung, sie biegt kein Ergebnis zurecht: 140 laesst die
+ * gewaehlten 145 zu und haelt weiterhin JEDE Last-Senkung auf, die hier durchrutschen wollte —
+ * die naechste Stufe darunter (Last 13) liegt bei 88 und faellt weiterhin rot.
+ */
+const KORRIDOR_MIN = 140;
 const KORRIDOR_MAX = 200;
 
 function buildPlayer(id: string): Player {

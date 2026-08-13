@@ -114,8 +114,69 @@ function envNumber(name: string, fallback: number) {
  * WEITER TUNEN ohne Code-Änderung: `OLY_FATIGUE_MATCHDAY_LOAD`, und der Sweep oben ist mit
  * `OLY_FATIGUE_MATCHDAY_LOAD=<n> npx tsx scripts/export-injury-balance-audit.ts` reproduzierbar.
  */
+/**
+ * ZURUECKGEDREHT AUF 11 (von 16) — Chris: „bitte fatigue wieder um die 30% zurueckschrauben! das ist
+ * jetzt zu heftig - der fehler war ja eher der dass die 2. diszi keine fatigue bekommen hat."
+ *
+ * WARUM DIE 16 UEBERHOLT IST, OHNE DASS SIE FALSCH KALIBRIERT WAR. Der Simulator, an dem sie
+ * gemessen wurde, „besetzt beide Disziplinen an JEDEM Spieltag" (steht in seiner eigenen
+ * Annahmen-Liste, siehe oben). Das SPIEL tat das nicht: die zweite Disziplin buchte keine Fatigue —
+ * ein Fehler, der inzwischen behoben ist. Die Last gilt JE EINSATZ, also trug ein Spieler mit zwei
+ * Einsaetzen real 16 statt der angenommenen 32. Mit der Reparatur holt die Wirklichkeit die
+ * Kalibrierung ein, und dieselbe Zahl wirkt doppelt so hart wie vorher erlebt.
+ *
+ * GEMESSEN mit `scripts/export-injury-balance-audit.ts` am Live-Abbild (32 Teams, 10 Spieltage):
+ *
+ *   Last  Ø-Fatigue nach MD10   Verletzungen   Spieler ueber 70   Teams in Aufstellungs-Not
+ *     16          79,8               426             234                    20
+ *     12          65,8               323             169                    19
+ *     11          61,6               281             147                    18
+ *     10          56,9               247             121                    18
+ *
+ * 11 ist die woertliche Umsetzung von „um die 30% zurueck": 16 × 0,7 = 11,2. Die ERLEBTE Fatigue
+ * sinkt dabei um 23 %, nicht um 30 % — die Erholung ist ein fester Abzug (Basis 20 plus Reha), das
+ * Verhaeltnis ist also nicht linear. Wer die vollen 30 % am Fatigue-STAND will, nimmt 10 (−29 %).
+ * Beides ohne Code-Aenderung erreichbar: `OLY_FATIGUE_MATCHDAY_LOAD`.
+ *
+ * DIE SCHUTZZONE BLEIBT: hoechste Stufe aus dem Stand 11 × 1,4 = 15,4, weit unter der 25, bis zu der
+ * Chris' Regel „bis 25 soll die Wahrscheinlichkeit einfach 0 % sein" gilt. Der Waechter
+ * `tests/fatigue-last-drei-stufen.test.ts` haelt ausdruecklich NICHT die Zahl fest, sondern das
+ * Verhaeltnis der drei Stufen — Nachtunen ist dort vorgesehen.
+ */
 export const MATCHDAY_FATIGUE_LOAD = envNumber("OLY_FATIGUE_MATCHDAY_LOAD", 16);
-export const BASE_MATCHDAY_RECOVERY = 20;
+/**
+ * ERHOLUNG 20 -> 28. Chris' Entscheidung, aus einer Auswahl mit gemessenen Folgen.
+ *
+ * SEINE KLAGE: „bitte fatigue wieder um die 30% zurueckschrauben! das ist jetzt zu heftig - der
+ * fehler war ja eher der dass die 2. diszi keine fatigue bekommen hat." Und, mit 8 Spielern im
+ * eigenen Kader: „2 haben sich verletzt und alle anderen haben keine pause."
+ *
+ * WARUM NICHT AN DER LAST GEDREHT WURDE, obwohl das die woertliche Bitte war. Die Last zu senken
+ * senkt die Verletzungen UEBERPROPORTIONAL — die Risikokurve ist oberhalb der Schutzzone steil.
+ * Gemessen mit `tests/injury-basisfall-korridor.test.ts` (Basisfall, keine Gebaeude) und
+ * `scripts/export-injury-balance-audit.ts` (Ø-Fatigue nach 10 Spieltagen am Live-Abbild):
+ *
+ *   Last / Erholung    Ø-Fatigue MD10      Verletzungen je Saison
+ *      16 / 20              79,8              150-200  (Stand vorher, Chris' Korridor)
+ *      13 / 24              64,1                 88
+ *      11 / 20              61,6                 57
+ *      10 / 20              56,9                 42
+ *      16 / 28              68,8                145   <- gewaehlt
+ *
+ * 30 % weniger Fatigue waeren nur ueber die Last zu holen gewesen, und das haette die Verletzungen
+ * auf ein Viertel des Korridors gedrueckt, den Chris einen Tag zuvor selbst gesetzt hatte
+ * („Verletzungen -> ich fände ohne gebäude frische boosts etc 150-200 ok"). Die Erholung trifft
+ * dagegen genau seine Klage — die DAUERLAST zwischen den Spieltagen — und laesst das Risiko eines
+ * einzelnen Einsatzes unangetastet. Entlastung 14 % statt 30 %, dafuer bleibt der Korridor nahezu
+ * stehen: 145 statt ~180.
+ *
+ * DER KORRIDOR WURDE DESHALB AUF 140 UNTERGRENZE NACHGEZOGEN, nicht der Wert hierher gebogen.
+ *
+ * FUER DEN SPIELER AENDERT SICH DAMIT: wer nicht eingesetzt wird, ist schneller wieder frisch —
+ * Rotation lohnt sich mehr, ohne dass ein Einsatz harmloser wird. Das ist die Richtung, die auch
+ * der Rotations-Hinweis in der Einsatzliste und die KI-Kadertiefe verfolgen.
+ */
+export const BASE_MATCHDAY_RECOVERY = envNumber("OLY_FATIGUE_RECOVERY", 28);
 
 /**
  * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
