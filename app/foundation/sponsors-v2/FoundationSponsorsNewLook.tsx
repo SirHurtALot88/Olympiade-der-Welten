@@ -52,6 +52,7 @@ import {
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { buildLeihPresentationForContract } from "@/lib/sponsor/sponsor-leih-presenter";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { SponsorLeihePanel } from "@/components/foundation/sponsor/SponsorLeihePanel";
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import {
@@ -829,6 +830,19 @@ export default function FoundationSponsorsNewLook({
       sortable: true,
       tooltip: "Voraussichtliche Auszahlung beim aktuellen Rang",
     },
+    /**
+     * DIE SPALTE HAENGT AM SELBEN SCHALTER WIE DAS MODELL.
+     *
+     * Chris hat die Gebaeude-Leihe abgeschaltet („Bitte entfernen auch die Gebäude aus der Spalte")
+     * — eine Spalte, die dann in allen 32 Zeilen „—" zeigt, ist kein Ausweis, sondern Rauschen.
+     *
+     * BEWUSST AM SCHALTER STATT GELOESCHT: `SPONSOR_GEBAEUDE_LEIHE_AKTIV` steuert damit BEIDES,
+     * Modell und Anzeige. Holt Chris die Leihen zurueck, ist die Spalte im selben Moment wieder
+     * da — und kann nicht vergessen werden, was bei zwei getrennten Schaltern der wahrscheinliche
+     * Ausgang waere.
+     */
+    ...(SPONSOR_GEBAEUDE_LEIHE_AKTIV
+      ? ([
     {
       /**
        * DIE ZWEITE HAELFTE DER KARTE. Eine Gebaeude-Karte zahlt weniger Cash — steht daneben
@@ -846,6 +860,8 @@ export default function FoundationSponsorsNewLook({
       tooltip:
         "Geliehenes Gebäude des Sponsors: Stufe und was der Selbstbau kosten würde. Der niedrigere Cash ist der Preis dafür.",
     },
+        ] as NlTableColumn<LeagueSponsorRow>[])
+      : []),
     {
       key: "coverage",
       label: "Fixkosten-Deckung",
