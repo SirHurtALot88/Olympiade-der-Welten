@@ -23,6 +23,7 @@ import {
   previewFacilitySeasonEndFinance,
 } from "@/lib/facilities/facility-season-end-service";
 import { applyLoanSettlement, collectNegativeCashTeams, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
+import { zieheSaisonstandGuvNach } from "@/lib/finance/season-guv-nachbuchung";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -538,6 +539,29 @@ async function runLocalSeasonCompletionUnsafe(
 
   const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterFacilityFinanceSave;
 
+  /**
+   * DIE GuV IM SAISONSTAND AUF DEN GEBUCHTEN STAND ZIEHEN — nach Sponsor, Apron, Gebäuden und
+   * Zielen, weil erst hier alles gebucht ist, was in ihr steht.
+   *
+   * `standings[team].guvPosten` entsteht viel früher, in `writeLocalCashPrizeApply`, und trägt dort
+   * nur Hochrechnungen — den Apron sogar als „noch nicht gebucht" und damit außerhalb der Summe.
+   * Am Abbild `1hf25q` hiess das bei L-K −33,4 statt der gebuchten −18,8. Die Herleitung steht in
+   * `season-guv-nachbuchung.ts`.
+   *
+   * Derselbe Aufruf steht am Ende von `applySeasonEndTail` — der andere Weg in dieselbe Abrechnung.
+   * Er leitet nur ab und ist idempotent, doppelt laufen schadet also nicht.
+   */
+  const guvNachbuchung = dryRun
+    ? { gameState: afterObjectiveSave.gameState, geaenderteTeams: [] as string[] }
+    : zieheSaisonstandGuvNach(afterObjectiveSave.gameState);
+  if (guvNachbuchung.geaenderteTeams.length > 0) {
+    persistence.saveSingleplayerState(afterObjectiveSave.saveId, guvNachbuchung.gameState);
+  }
+  // Ab hier auf dem nachgezogenen Stand weiterarbeiten — sonst schreibt der nächste Schritt, der
+  // den ganzen Spielstand speichert (die Beziehungs-Ereignisse), die Zeile wieder auf alt zurück.
+  const afterGuvNachbuchungSave =
+    guvNachbuchung.geaenderteTeams.length > 0 ? resolveLocalSave(persistence, initialSave.saveId) : afterObjectiveSave;
+
   // ZAHLUNGSUNFÄHIGKEIT WIRD FESTGESTELLT, NICHT AUSGEGLICHEN.
   //
   // Früher nahm hier jedes Team mit negativem Cash ungefragt einen Notkredit über den Fehlbetrag auf
@@ -550,8 +574,8 @@ async function runLocalSeasonCompletionUnsafe(
   // Der Weg zurück ist längst gebaut: negatives Cash blockiert Käufe, erzwingt Notverkäufe und setzt
   // den Verkaufsdruck auf den Höchstwert. Er wurde nur nie betreten, weil der Backstop vorher
   // zumachte. Dieser Schritt schreibt deshalb NICHTS mehr — er weist nur aus, wer im Minus steht.
-  const negativeCash = collectNegativeCashTeams(afterObjectiveSave.gameState);
-  const afterInsolvencySave = afterObjectiveSave;
+  const negativeCash = collectNegativeCashTeams(afterGuvNachbuchungSave.gameState);
+  const afterInsolvencySave = afterGuvNachbuchungSave;
   addStep(
     steps,
     {
