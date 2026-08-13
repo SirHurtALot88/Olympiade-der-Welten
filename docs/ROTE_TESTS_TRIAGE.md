@@ -270,22 +270,23 @@ Der zugehörige Test (`season-one-long-run-market-buy`) misst seit der Triage de
 statt der absoluten Zahl. Das bleibt richtig: ein frischer Spielstand startet bei 1, weil dieser
 eine echte Kauf schon stattgefunden hat.
 
-**4. Die KI-Vorschau in der Einsatzliste ist unerreichbar.** — ENTSCHIEDEN: Bedienung zurück
+**4. Die KI-Vorschau in der Einsatzliste ist unerreichbar.** — ENTSCHIEDEN und ERLEDIGT
 
 **Chris' Entscheidung:** „ki vorschau -> bedienung zurück".
 
-Der tote Cluster wird also NICHT entfernt, sondern wieder erreichbar gemacht. Die Grenze dabei:
+Der tote Cluster wurde also NICHT entfernt, sondern wieder erreichbar gemacht. Die Grenze dabei:
 nur der MENSCH arbeitet damit — der automatische Weg für KI-Teams läuft über
 `matchday-auto-run-service` und bleibt unberührt.
 
-**4. Die KI-Vorschau in der Einsatzliste ist unerreichbar.**
-In `LegacyLineupLabClient.tsx` stehen `handleAdoptAiPreview`, `handleAiPreview`,
-`handleAiBatchApply`, `handleOpenAiBatchDetails` und `handleSaveAiPreview` weiterhin im Code —
-**ohne einen einzigen Aufrufer**. Die Bedienelemente („Vorschlag übernehmen", „AI Vorschlag alle
-Teams", der Batch-Dialog) sind aus dem Markup verschwunden. Die Funktionen dahinter sind intakt,
-sie sind nur nicht mehr erreichbar. Der KI-Aufstellungsweg für KI-Teams läuft davon unberührt
-über `matchday-auto-run-service`.
-**Entscheidung:** Bedienung zurückholen oder den toten Cluster entfernen?
+**Umgesetzt** in `app/foundation/legacy-lineup-lab/LineupAiPreviewPanel.tsx`: beide Wege
+(Einzelteam und Stapel über alle KI-Teams), Probelauf bleibt Pflicht vor dem Speichern, rohe
+Status-Bezeichner werden übersetzt. Drei Verdrahtungstests halten den Zustand fest
+(`tests/lineup-ki-vorschau-bedienung.test.ts`) — nimmt man das Panel heraus, fallen sie rot.
+
+**Dabei aufgefallen und mitbehoben:** die Stapel-Schaltflächen hingen an `isReadOnly`, worin
+`isTeamManagementLocked` steckt. Damit waren sie ausgerechnet dann gesperrt, wenn ein KI-Team im
+Feld stand — im einzig sinnvollen Fall. Der Server kennt an dieser Route gar keine Teamprüfung,
+nur den Referenzmodus; die Anzeige spiegelt jetzt dieselbe Regel (`canRunAiBatchApply`).
 
 **5. Sollen die Manager der Liga andere sein als früher?** (→ oben, Punkt 4)
 Fünf Tests hängen an einer einzigen verschobenen GM-Zuweisung. Die Zuweisung ist deterministisch
@@ -303,10 +304,20 @@ inzwischen eine Formel, sobald der Spieler vollständige Attribute hat. Das Sign
 sich alle Zahlen und Ausreißer-Listen der Vergleichsansicht) — oder den Anspruch fallen lassen
 und den Test streichen?
 
-**7. Zwei Reste toter Gestaltung.** Kein Fehler, nur Aufräumen:
-`.season-v2-form-curve`, `.season-v2-mobile-card-grid` und `.season-v2-prize-preview` stehen
-weiterhin in `app/globals.css`, obwohl das zugehörige Markup mit dem alten Look ausgebaut wurde.
-Dasselbe gilt für `.legacy-matchday-player-card`. Soll ich die Regeln entfernen?
+**7. Zwei Reste toter Gestaltung.** — ERLEDIGT
+
+Vor dem Entfernen nachgemessen statt vermutet: `.season-v2-form-curve`,
+`.season-v2-mobile-card-grid`, `.season-v2-prize-preview`, `.legacy-matchday-player-card`,
+`.legacy-matchday-player-portrait`, `.is-active-slot-chip` und `.legacy-lineup-player-panel`
+haben **null** Fundstellen in `app/**`, `lib/**` und `components/**` — auch keine zusammengesetzte
+(`className={\`…-\${x}\`}`). Damit sind sie nicht „vermutlich tot", sondern unerreichbar.
+
+Entfernt wurden 39 vollständig tote Regeln, 10 gemischte Gruppen haben nur ihren toten Selektor
+verloren, ein dadurch leer gewordener `@media`-Rahmen fiel mit weg — 238 Zeilen weniger.
+
+Gemacht mit `postcss`, nicht mit Textersatz: der erste Versuch per Regex hat die schließende
+Klammer eines `@media`-Blocks mitgenommen (Klammernbilanz 11983/11982) und lebende Regeln auf
+Nachbarzeilen geklebt. Ein Parser kennt die Verschachtelung, eine Zeichenkettensuche nicht.
 
 ---
 
