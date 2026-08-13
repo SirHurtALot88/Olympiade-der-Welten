@@ -8,6 +8,7 @@ import type {
 import {
   baueUebernahmeAngebot,
   rolleLeihgabe,
+  vertragsjahrAus,
 } from "@/lib/sponsor/sponsor-leih-lifecycle";
 import {
   getSponsorV3SalaryFactor,
@@ -124,7 +125,11 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
     const newRemaining = remaining - 1;
     const terms = getSponsorV3Terms(contract);
     const termSeasons: SponsorTermSeasons = contract.termSeasons ?? ((remaining <= 3 ? remaining : 3) as SponsorTermSeasons);
-    const contractYear = Math.max(1, Math.min(3, termSeasons - newRemaining + 1)) as SponsorTermSeasons;
+    // Das erreichte Vertragsjahr kommt aus `vertragsjahrAus` — derselben Funktion, die auch die
+    // Leihstufe indiziert und die der Lade-Backfill des Gehaltsfaktors ruft. Hier stand bis zum
+    // Backfill dieselbe Formel noch einmal von Hand; zwei Ableitungen einer Zahl, die schon eine
+    // Heimat hatte.
+    const contractYear = vertragsjahrAus({ termSeasons, seasonsRemaining: newRemaining });
 
     // DIE LEIHE ROLLT MIT: eine Stufe weiter laut eingefrorener Reihe, eine Saison gealtert — und
     // der Verzicht waechst auf den Preis der NEUEN Stufe. Ohne diesen Nachtrag stiege das Gebaeude

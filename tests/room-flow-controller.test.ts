@@ -56,7 +56,28 @@ describe("room flow controller", () => {
     expect(joined.room.state.teamOwnership.filter((entry) => entry.controllerType === "ai")).toHaveLength(24);
     if (!chris || !franky) return;
 
-    expect(describeRoomFlowButton({ state: joined.room.state, participantId: chris.participantId }).label).toBe("Warten auf Chris");
+    /**
+     * HIER STAND „Warten auf Chris" — und genau das war der behobene Deadlock.
+     *
+     * Chris ist Host UND hat vier eigene Teams. Frueher fiel er als Host durch den
+     * Bereit-Zweig hindurch und bekam „Warten auf <sich selbst>" mit `canClick: false`,
+     * waehrend Franky „Warten auf Host" sah — niemand hatte einen klickbaren Knopf. Auf der
+     * Room-Seite fiel das nie auf (die hat einen zweiten, eigenen Bereit-Knopf); in der
+     * Foundation-Shell stand der Flow still. Gefunden vom Koop-Audit (Faelle B6/B7),
+     * ausfuehrlich begruendet in lib/room/room-flow-controller.ts.
+     *
+     * Die neue Zusage: massgeblich ist die Bereit-PFLICHT, nicht die Rolle. Wer eigene Teams
+     * hat, meldet sich selbst bereit — auch der Host. Und der Knopf muss KLICKBAR sein, sonst
+     * ist der Deadlock nur umbenannt.
+     */
+    const chrisKnopfVorher = describeRoomFlowButton({ state: joined.room.state, participantId: chris.participantId });
+    expect(chrisKnopfVorher.label).toBe("Ready: Room bereit machen");
+    expect(chrisKnopfVorher.canClick).toBe(true);
+    expect(chrisKnopfVorher.action).toBe("set_ready");
+    // Franky sieht ebenfalls seinen eigenen Bereit-Knopf, nicht „Warten auf Host".
+    const frankyKnopfVorher = describeRoomFlowButton({ state: joined.room.state, participantId: franky.participantId });
+    expect(frankyKnopfVorher.canClick).toBe(true);
+    expect(frankyKnopfVorher.action).toBe("set_ready");
     expect(startRoom(joined.room.roomCode, created.seat.seatToken).ok).toBe(false);
 
     expect(setParticipantReadyState(joined.room.roomCode, created.seat.seatToken, true).ok).toBe(true);

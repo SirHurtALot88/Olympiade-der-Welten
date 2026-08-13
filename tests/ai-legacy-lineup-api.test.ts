@@ -430,14 +430,44 @@ describe("ai legacy lineup preview api", () => {
       lineupId: "lineup-1",
       entries: [{ disciplineId: "tdm" }],
     });
+    /**
+     * MOCK-DRIFT, NACHGEZOGEN: die Vorlage lieferte einen Kontext OHNE `contextMeta`.
+     * Der echte Lader (`loadLocalLegacyLineupContextFromGameState`) setzt das Feld bei
+     * jedem Aufruf — `LegacyLineupLoadedContext` verlangt es sogar —, die Vorlage hier
+     * hatte es nie. Seit die Vollstaendigkeits-Pruefung
+     * (`isLegacyLineupDraftComplete`) die Disziplin-Ids daraus liest, warf die Route
+     * `Cannot read properties of undefined (reading 'd1DisciplineId')` und antwortete
+     * 500. Kein Fehler im Spiel — eine Vorlage, die einen Zustand nachstellte, den es
+     * so nie gab.
+     *
+     * Die Vorlage bildet jetzt den echten Fall ab: ein Entwurf, der die geforderten
+     * Slots BEIDER Seiten fuellt. Nur so bedeutet „skipped_existing" ueberhaupt etwas —
+     * mit einem halben Entwurf haette die Route ihn regulaer neu gerechnet.
+     */
     loadLocalLegacyLineupContext.mockReturnValue({
       ok: true,
       context: {
         teamId: "A-A",
         team: { name: "Alpha" },
+        contextMeta: {
+          saveId: "save-local",
+          seasonId: "season-1",
+          matchdayId: "matchday-1",
+          teamId: "A-A",
+          d1DisciplineId: "tdm",
+          d2DisciplineId: "fechten",
+        },
+        disciplinePlayerCounts: { tdm: 1, fechten: 1 },
+        rosterPlayers: [
+          { id: "player-1", name: "Player 1", injuryStatus: "healthy" },
+          { id: "player-2", name: "Player 2", injuryStatus: "healthy" },
+        ],
         existingDraft: {
           lineupId: "lineup-1",
-          entries: [{ disciplineId: "tdm" }],
+          entries: [
+            { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "player-1" },
+            { disciplineId: "fechten", disciplineSide: "d2", slotIndex: 0, playerId: "player-2" },
+          ],
         },
       },
     });
@@ -517,14 +547,44 @@ describe("ai legacy lineup preview api", () => {
       lineupId: "lineup-1",
       entries: [{ disciplineId: "tdm" }],
     });
+    /**
+     * MOCK-DRIFT, NACHGEZOGEN: die Vorlage lieferte einen Kontext OHNE `contextMeta`.
+     * Der echte Lader (`loadLocalLegacyLineupContextFromGameState`) setzt das Feld bei
+     * jedem Aufruf — `LegacyLineupLoadedContext` verlangt es sogar —, die Vorlage hier
+     * hatte es nie. Seit die Vollstaendigkeits-Pruefung
+     * (`isLegacyLineupDraftComplete`) die Disziplin-Ids daraus liest, warf die Route
+     * `Cannot read properties of undefined (reading 'd1DisciplineId')` und antwortete
+     * 500. Kein Fehler im Spiel — eine Vorlage, die einen Zustand nachstellte, den es
+     * so nie gab.
+     *
+     * Die Vorlage bildet jetzt den echten Fall ab: ein Entwurf, der die geforderten
+     * Slots BEIDER Seiten fuellt. Nur so bedeutet „skipped_existing" ueberhaupt etwas —
+     * mit einem halben Entwurf haette die Route ihn regulaer neu gerechnet.
+     */
     loadLocalLegacyLineupContext.mockReturnValue({
       ok: true,
       context: {
         teamId: "A-A",
         team: { name: "Alpha" },
+        contextMeta: {
+          saveId: "save-local",
+          seasonId: "season-1",
+          matchdayId: "matchday-1",
+          teamId: "A-A",
+          d1DisciplineId: "tdm",
+          d2DisciplineId: "fechten",
+        },
+        disciplinePlayerCounts: { tdm: 1, fechten: 1 },
+        rosterPlayers: [
+          { id: "player-1", name: "Player 1", injuryStatus: "healthy" },
+          { id: "player-2", name: "Player 2", injuryStatus: "healthy" },
+        ],
         existingDraft: {
           lineupId: "lineup-1",
-          entries: [{ disciplineId: "tdm" }],
+          entries: [
+            { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "player-1" },
+            { disciplineId: "fechten", disciplineSide: "d2", slotIndex: 0, playerId: "player-2" },
+          ],
         },
       },
     });
@@ -584,7 +644,17 @@ describe("ai legacy lineup preview api", () => {
     expect(body.error).toContain("read-only");
   });
 
-  it("skips manual and passive teams and only plans eligible ai teams", async () => {
+  /**
+   * WER WIRD IN RUHE GELASSEN — und wodurch.
+   *
+   * Der Test hiess frueher „skips manual and passive teams" und erwartete, dass `passive`
+   * und „KI mit abgeschaltetem Apply" IMMER uebersprungen werden. Diese Zusage gilt so
+   * nicht mehr, und die Aenderung ist bewusst (Quelltext von
+   * lib/ai/ai-legacy-lineup-batch-apply-service.ts): ein Team OHNE Aufstellung bekommt
+   * eine, sonst traete es leer an. Nur `manual` sperrt bedingungslos — dort sitzt ein
+   * Mensch am Tisch.
+   */
+  it("laesst manuelle Teams bedingungslos in Ruhe und schuetzt bestehende Aufstellungen nach Einstellung", async () => {
     createPersistenceService.mockReturnValue({
       bootstrapSingleplayerSave: () => ({
         save: {
@@ -663,7 +733,53 @@ describe("ai legacy lineup preview api", () => {
       getActiveSave: () => null,
     });
     getLocalLegacyLineupDraft.mockReturnValue(null);
-    loadLocalLegacyLineupContext.mockReturnValue({ ok: true, context: { teamId: "A-A", team: { name: "Alpha" } } });
+    /**
+     * DIE ZUSAGE ZU „passive" HAT SICH GEAENDERT, und der Test zog nicht nach.
+     *
+     * Frueher galt: `passive` wird immer uebersprungen. Heute gilt (belegt im Quelltext von
+     * lib/ai/ai-legacy-lineup-batch-apply-service.ts, Zeile ~1752 und ~1788): ein passives
+     * Team wird nur dann uebersprungen, wenn es SCHON eine vollstaendige Aufstellung hat.
+     * Fehlt sie, fuellt die KI sie — „ein passive-Team wuerde sonst mit leerer Einsatzliste
+     * antreten, weil niemand sie fuellt". Genau darin liegt der Unterschied zu `manual`:
+     * dort sperrt die Regel bedingungslos, weil ein Mensch am Tisch sitzt.
+     *
+     * Die Vorlage antwortet deshalb jetzt JE TEAM statt fuer alle gleich: C-C (passiv) hat
+     * eine fertige Aufstellung und wird in Ruhe gelassen, die uebrigen haben keine.
+     */
+    const kontextFuer = (teamId: string) => ({
+      teamId,
+      team: { name: teamId },
+      contextMeta: {
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        teamId,
+        d1DisciplineId: "tdm",
+        d2DisciplineId: "fechten",
+      },
+      disciplinePlayerCounts: { tdm: 1, fechten: 1 },
+      rosterPlayers: [
+        { id: `${teamId}-p1`, name: "Spieler 1", injuryStatus: "healthy" },
+        { id: `${teamId}-p2`, name: "Spieler 2", injuryStatus: "healthy" },
+      ],
+      // C-C (passiv) und D-D (KI, Apply ABGESCHALTET) haben bereits eine fertige
+      // Aufstellung — nur dann laesst der Batch sie in Ruhe. A-A (KI, Apply an) und B-B
+      // (manuell) haben keine.
+      existingDraft:
+        teamId === "C-C" || teamId === "D-D"
+          ? {
+              lineupId: `lineup-${teamId}`,
+              entries: [
+                { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: `${teamId}-p1` },
+                { disciplineId: "fechten", disciplineSide: "d2", slotIndex: 0, playerId: `${teamId}-p2` },
+              ],
+            }
+          : null,
+    });
+    loadLocalLegacyLineupContext.mockImplementation((params: { teamId: string }) => ({
+      ok: true,
+      context: kontextFuer(params.teamId),
+    }));
     buildAiLegacyLineupPreview.mockReturnValue({
       teamId: "A-A",
       teamCode: "A-A",
@@ -678,25 +794,59 @@ describe("ai legacy lineup preview api", () => {
     });
 
     const { POST } = await import("@/app/api/lineups/legacy/ai-batch-apply/route");
-    const response = await POST(
-      new Request("http://localhost/api/lineups/legacy/ai-batch-apply?saveId=save-local&seasonId=season-1&matchdayId=matchday-1", {
-        method: "POST",
-        body: JSON.stringify({ dryRun: true, includeWarningTeams: false }),
-      }),
-    );
-    const body = await response.json();
+    const laufen = async (overwriteExisting: boolean) => {
+      const response = await POST(
+        new Request(
+          "http://localhost/api/lineups/legacy/ai-batch-apply?saveId=save-local&seasonId=season-1&matchdayId=matchday-1",
+          {
+            method: "POST",
+            body: JSON.stringify({ dryRun: true, includeWarningTeams: false, overwriteExisting }),
+          },
+        ),
+      );
+      return { status: response.status, body: await response.json() };
+    };
+    const ergebnisVon = (body: { results: Array<{ teamId: string; result: string }> }, teamId: string) =>
+      body.results.find((entry) => entry.teamId === teamId)?.result;
 
-    expect(response.status).toBe(200);
-    expect(body.summary.totalTeams).toBe(4);
-    expect(body.summary.aiEligibleTeams).toBe(1);
-    expect(body.summary.skippedManual).toBe(1);
-    expect(body.summary.skippedPassive).toBe(1);
-    expect(body.summary.skippedDisabled).toBe(1);
-    expect(body.summary.readyToSave).toBe(1);
-    expect(body.summary.wouldSave).toBe(1);
-    expect(body.results.find((entry: { teamId: string }) => entry.teamId === "B-B")?.result).toBe("skipped_manual");
-    expect(body.results.find((entry: { teamId: string }) => entry.teamId === "C-C")?.result).toBe("skipped_passive");
-    expect(body.results.find((entry: { teamId: string }) => entry.teamId === "D-D")?.result).toBe("skipped_disabled");
-    expect(loadLocalLegacyLineupContext).toHaveBeenCalledTimes(1);
+    const ohneUeberschreiben = await laufen(false);
+    expect(ohneUeberschreiben.status).toBe(200);
+    expect(ohneUeberschreiben.body.summary.totalTeams).toBe(4);
+    expect(ohneUeberschreiben.body.summary.aiEligibleTeams).toBe(1);
+
+    // B-B ist MANUELL: bedingungslos in Ruhe gelassen — auch ohne Aufstellung. Fehlt sie,
+    // meldet der Aufloese-Schritt `missing_manual_lineup`; das ist der richtige Weg, nicht
+    // ein stiller KI-Griff in fremde Formkarten.
+    expect(ergebnisVon(ohneUeberschreiben.body, "B-B")).toBe("skipped_manual");
+    expect(ohneUeberschreiben.body.summary.skippedManual).toBe(1);
+
+    // C-C ist PASSIV MIT fertiger Aufstellung: nicht angefasst.
+    expect(ergebnisVon(ohneUeberschreiben.body, "C-C")).toBe("skipped_passive");
+    expect(ohneUeberschreiben.body.summary.skippedPassive).toBe(1);
+
+    // D-D ist KI mit ABGESCHALTETEM Apply und hat schon eine Aufstellung: ohne
+    // Ueberschreiben-Flagge stoppt bereits die allgemeine Bestandsschutz-Regel.
+    expect(ergebnisVon(ohneUeberschreiben.body, "D-D")).toBe("skipped_existing");
+
+    // A-A ist die einzige, die geplant wird.
+    expect(ohneUeberschreiben.body.summary.readyToSave).toBe(1);
+    expect(ohneUeberschreiben.body.summary.wouldSave).toBe(1);
+
+    /**
+     * UND JETZT DER PUNKT, AN DEM DIE EINSTELLUNG WIRKLICH ETWAS TUT.
+     *
+     * Mit `overwriteExisting` faellt der allgemeine Bestandsschutz. Uebrig bleibt nur noch
+     * die Einstellung des Teams selbst — und genau die muss D-D weiter schuetzen. Waere
+     * `skipped_disabled` kaputt, faende man es NUR in diesem Lauf: ohne die Flagge deckt
+     * die Bestandsschutz-Regel den Fehler zu.
+     */
+    const mitUeberschreiben = await laufen(true);
+    expect(mitUeberschreiben.status).toBe(200);
+    expect(ergebnisVon(mitUeberschreiben.body, "D-D")).toBe("skipped_disabled");
+    expect(mitUeberschreiben.body.summary.skippedDisabled).toBe(1);
+    // Und die anderen drei bleiben, was sie waren.
+    expect(ergebnisVon(mitUeberschreiben.body, "B-B")).toBe("skipped_manual");
+    expect(ergebnisVon(mitUeberschreiben.body, "C-C")).toBe("skipped_passive");
+    expect(mitUeberschreiben.body.summary.wouldSave).toBe(1);
   });
 });

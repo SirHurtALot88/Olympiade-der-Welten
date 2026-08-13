@@ -146,14 +146,28 @@ describe("Status — 'erledigt' muss belegt sein", () => {
       "kein PR angegeben",
       "kein Ergebnis angegeben",
       "Wirkung nicht bestaetigt",
+      // VIERTE LUECKE, NACHGEZOGEN: seit docs/BUGFIXING_AGENT.md („Changelog pflegen —
+      // Pflicht, sobald etwas gemergt wurde") zaehlt auch die fehlende `changelog:`-Zeile.
+      // Der Grund steht im Quelltext daneben: ein gemergter Fix, von dem niemand erfaehrt,
+      // ist fuer den Spieler von einem ungefixten nicht zu unterscheiden.
+      "keine changelog:-Zeile",
     ]);
 
     const vollstaendig = parseTriage(
       "bug-a",
-      "status: erledigt\ntitel: X\nergebnis: gefixt\npr: #1\nbestaetigt: live geprueft\n\nText.",
+      "status: erledigt\ntitel: X\nergebnis: gefixt\npr: #1\nchangelog: Der Kontostand aktualisiert sich sofort.\nbestaetigt: live geprueft\n\nText.",
       "x.md",
     );
     expect(findTriageGaps(vollstaendig)).toEqual([]);
+
+    // Und die Gegenrichtung: fehlt NUR der Changelog, ist er die einzige Luecke. Ohne diese
+    // Haelfte koennte die Zeile spurlos aus der Pruefung fallen und der Test bliebe gruen.
+    const ohneChangelog = parseTriage(
+      "bug-a",
+      "status: erledigt\ntitel: X\nergebnis: gefixt\npr: #1\nbestaetigt: live geprueft\n\nText.",
+      "x.md",
+    );
+    expect(findTriageGaps(ohneChangelog)).toEqual(["keine changelog:-Zeile"]);
   });
 
   it("ein abgelehntes Ticket braucht eine Begruendung", async () => {

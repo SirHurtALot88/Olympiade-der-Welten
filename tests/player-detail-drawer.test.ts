@@ -237,6 +237,35 @@ function createResultGameState(player: Player): GameState {
           status: "preview_applied",
         } as NonNullable<GameState["seasonState"]["matchdayResults"]>[number],
       ],
+      /**
+       * NACHGETRAGEN: ohne Disziplin-Ergebnisse ueberspringt der Punkte-Ledger den ganzen
+       * Spieltag (lib/foundation/season-points-ledger.ts, „ein Spieltag ohne
+       * Disziplin-Ergebnisse wird nicht gebucht" — die Regel kam gegen falsche PP-Zahlen im
+       * beschnittenen Browser-Payload). Die Vorlage trug nur `matchdayResults`; MVS fiel
+       * dadurch fuer jeden Spieler auf null, obwohl an der Schublade nichts kaputt ist. Ein
+       * echter Spielstand traegt zu jedem gewerteten Spieltag beides.
+       *
+       * Je Leistungszeile ein passendes Ergebnis (gleiche Kombination aus Spieltag, Team,
+       * Disziplin und Seite) — sonst greift dieselbe Filterung eine Ebene tiefer.
+       */
+      disciplineResults: [
+        ["dres-1", "result-1", "pow-d", "d1", 12.5],
+        ["dres-2", "result-1", "spe-d", "d2", 8.4],
+        ["dres-3", "result-2", "men-d", "d1", 7.1],
+      ].map(([id, matchdayResultId, disciplineId, disciplineSide, totalScore]) => ({
+        id,
+        matchdayResultId,
+        teamId: "team-1",
+        disciplineId,
+        disciplineSide,
+        rank: 1,
+        baseScore: 50,
+        totalScore,
+        formModifier: 0,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T10:00:00.000Z",
+      })) as NonNullable<GameState["seasonState"]["disciplineResults"]>,
       playerDisciplinePerformances: [
         {
           id: "perf-1",
@@ -458,6 +487,30 @@ describe("player detail drawer", () => {
         matchdayId: "matchday-1",
         status: "preview_applied",
       } as NonNullable<GameState["seasonState"]["matchdayResults"]>[number],
+    ];
+    /**
+     * NACHGETRAGEN: der Punkte-Ledger ueberspringt seit dem PP-Befund jeden Spieltag OHNE
+     * Disziplin-Ergebnis (lib/foundation/season-points-ledger.ts — „ein sichtbar leeres Feld
+     * ist reparierbar, eine falsche Zahl wird geglaubt"). Ohne diese Zeile fiel die
+     * Leistungszeile aus der Wertung, MVS wurde null, und die Zusicherung dieses Tests
+     * („S2 zeigt LIVE-Werte, auch wenn liveRatingsById leer ist") war rot, ohne dass an der
+     * Zusammenfuehrung etwas fehlte. Ein echter Spielstand traegt beides.
+     */
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "dres-s2-1",
+        matchdayResultId: "result-s2-1",
+        teamId: "team-1",
+        disciplineId: "pow-d",
+        disciplineSide: "d1",
+        rank: 1,
+        baseScore: 50,
+        totalScore: 12.5,
+        formModifier: 0,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T10:00:00.000Z",
+      } as NonNullable<GameState["seasonState"]["disciplineResults"]>[number],
     ];
     gameState.seasonState.playerDisciplinePerformances = [
       {

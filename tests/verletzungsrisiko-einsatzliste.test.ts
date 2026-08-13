@@ -21,10 +21,32 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import {
+  INTENSITY_FATIGUE_MULT,
+  MATCHDAY_FATIGUE_LOAD,
   buildMatchdayInjuryRollMap,
   getInjuryRiskPercent,
   projectMatchdayInjuryRisk,
 } from "@/lib/fatigue/fatigue-injury-service";
+import { FATIGUE_INJURY_RISK_ANCHORS } from "@/lib/fatigue/fatigue-calibration";
+
+/**
+ * DIE ZAHLEN DIESER SUITE KOMMEN AUS DEN KONSTANTEN, NICHT AUS EINEM ABGESCHRIEBENEN STAND.
+ *
+ * Die drei Pruefungen weiter unten nagelten frueher die Kalibrierung „Last 10" fest
+ * (`fatigueBeforeRoll === 10`, „bei 20 Vor-Fatigue traegt der Einsatz ueber die 25", und eine
+ * feste Liste `[0, 10]` fuer die Schutzzone). Chris hat die Last seither auf 16 gestellt und
+ * dafuer die Erholung von 20 auf 28 gezogen (#510) — die Zusicherungen waren damit rot, obwohl
+ * an der Schutzzone selbst nichts kaputt ist.
+ *
+ * Vorbild ist tests/fatigue-last-drei-stufen.test.ts: „Dieser Test haelt NICHT die Zahl fest —
+ * die darf sich beim Nachtunen aendern. Er haelt fest, was an der Aenderung strukturell ist."
+ * Genau so hier: die Schutzzone gilt fuer einen ausgeruhten Spieler auf ALLEN Stufen, sie ist
+ * nicht dauerhaft, und die Projektion liegt ueberall dort strikt ueber dem Risiko der aktuellen
+ * Fatigue, wo es ueberhaupt etwas zu unterschlagen gibt.
+ */
+/** Fatigue, bis zu der die Kurve ausdruecklich 0 % kennt (Chris: „bis 25 einfach 0 %"). */
+const SCHUTZZONE =
+  FATIGUE_INJURY_RISK_ANCHORS.find((anker) => anker.fatigue > 0 && anker.riskPercent === 0)?.fatigue ?? 25;
 import { buildGameInboxItems } from "@/lib/foundation/game-inbox-service";
 import { buildLegacyLineupLabPlayerOptions } from "@/lib/lineups/legacy-lineup-lab";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -179,22 +201,32 @@ describe("Einsatzlisten-Anzeige wuerfelt mit denselben Zahlen wie der Spieltag",
       const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 0, intensity });
       expect(projection.riskPercent, `Intensitaet ${intensity}`).toBe(0);
     }
-    // Konkrete Kalibrierung festnageln: Last 10 => Wurf bei Fatigue 10 => in der Schutzzone => 0 %.
+    // Die Zusicherung dahinter, aus den Konstanten statt aus einem Stand: aus der Ruhe heraus
+    // bleibt selbst die TEUERSTE Stufe unter der Schutzgrenze. Genau das ist die Bedingung, unter
+    // der „ausgeruht heisst 0 %" ueberhaupt haltbar ist — und genau die Grenze, an die eine
+    // kuenftige Last-Erhoehung stoesst.
     const normal = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 0, intensity: "normal" });
-    expect(normal.fatigueBeforeRoll).toBe(10);
+    expect(normal.fatigueBeforeRoll).toBe(MATCHDAY_FATIGUE_LOAD);
     expect(normal.riskPercent).toBe(0);
+    const teuerste = Math.max(...Object.values(INTENSITY_FATIGUE_MULT));
+    expect(MATCHDAY_FATIGUE_LOAD * teuerste).toBeLessThanOrEqual(SCHUTZZONE);
   });
 
-  it("und ab der zweiten/dritten Einsatz-Last endet die Schutzzone", () => {
+  it("und ab der zweiten Einsatz-Last endet die Schutzzone", () => {
     // Gegenprobe zum Test darueber: die Schutzzone darf nicht dauerhaft sein, sonst waere die
-    // Fatigue als Constraint erledigt. Bei 20 Vor-Fatigue traegt der Einsatz ueber die 25.
-    const stillProtected = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 10 });
-    expect(stillProtected.fatigueBeforeRoll).toBe(20);
+    // Fatigue als Constraint erledigt. Gerechnet aus der Last: knapp unter der Grenze noch 0,
+    // knapp darueber mehr als 0 — unabhaengig davon, wie die Last gerade steht.
+    const knappDrin = Math.max(0, SCHUTZZONE - MATCHDAY_FATIGUE_LOAD);
+    const stillProtected = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: knappDrin });
+    expect(stillProtected.fatigueBeforeRoll).toBe(knappDrin + MATCHDAY_FATIGUE_LOAD);
     expect(stillProtected.riskPercent).toBe(0);
 
-    const exposed = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: 20 });
-    expect(exposed.fatigueBeforeRoll).toBe(30);
+    const exposed = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: knappDrin + 1 });
+    expect(exposed.fatigueBeforeRoll).toBeGreaterThan(SCHUTZZONE);
     expect(exposed.riskPercent).toBeGreaterThan(0);
+
+    // Und der Weg dorthin ist kurz: EIN weiterer Einsatz aus der Ruhe heraus reicht schon.
+    expect(MATCHDAY_FATIGUE_LOAD * 2).toBeGreaterThan(SCHUTZZONE);
   });
 
   it("Intensitaet ordnet das Risiko: Schonen < Normal < Pushen", () => {
@@ -221,16 +253,22 @@ describe("Einsatzlisten-Anzeige wuerfelt mit denselben Zahlen wie der Spieltag",
    * dem Risiko der aktuellen Fatigue.
    */
   it("Projektion liegt immer ueber dem Risiko der aktuellen Fatigue", () => {
-    // Innerhalb der Schutzzone sind beide Seiten 0 — dort gibt es nichts zu unterschlagen. Geprueft
-    // wird deshalb ab der Fatigue, bei der die Einsatz-Last ueber die 25 traegt.
-    for (const fatigue of [20, 30, 55, 75]) {
+    // Innerhalb der Schutzzone sind beide Seiten 0 — dort gibt es nichts zu unterschlagen. Welche
+    // Fatigue-Werte das sind, ergibt sich aus der Last; frueher stand hier eine feste Liste, die
+    // beim naechsten Last-Wechsel wieder falsch waere.
+    for (const fatigue of [0, 10, 20, 30, 55, 75]) {
       const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: fatigue });
-      expect(projection.riskPercent, `Fatigue ${fatigue}`).toBeGreaterThan(getInjuryRiskPercent(fatigue));
+      const wurfLandetInDerSchutzzone = fatigue + MATCHDAY_FATIGUE_LOAD <= SCHUTZZONE;
+      if (wurfLandetInDerSchutzzone) {
+        expect(projection.riskPercent, `Fatigue ${fatigue} (Schutzzone)`).toBe(0);
+      } else {
+        expect(projection.riskPercent, `Fatigue ${fatigue}`).toBeGreaterThan(getInjuryRiskPercent(fatigue));
+      }
     }
-    for (const fatigue of [0, 10]) {
-      const projection = projectMatchdayInjuryRisk({ player: NEUTRAL_PLAYER, currentFatigue: fatigue });
-      expect(projection.riskPercent, `Fatigue ${fatigue}`).toBe(0);
-    }
+    // Damit dieser Test etwas beweist, muss die Stichprobe BEIDE Seiten treffen — sonst pruefte
+    // sie bei einer kuenftigen Kalibrierung womoeglich nur noch Nullen.
+    expect(MATCHDAY_FATIGUE_LOAD).toBeLessThanOrEqual(SCHUTZZONE);
+    expect(75 + MATCHDAY_FATIGUE_LOAD).toBeGreaterThan(SCHUTZZONE);
   });
 });
 
