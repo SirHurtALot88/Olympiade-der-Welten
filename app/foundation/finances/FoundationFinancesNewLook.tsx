@@ -657,8 +657,13 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
         {apron.gebucht
           ? "Die Apron-Abrechnung dieser Saison ist bereits gebucht."
           : apron.frozenLines
-            ? "Linien für diese Saison eingefroren — gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
-            : "Linien noch nicht eingefroren — sie wandern bis zum ersten Spieltag mit dem Median mit, solange noch Kader gebaut werden. Alles hier ist eine Hochrechnung."}
+            ? "Linien für diese Saison eingefroren — seit „Transfers finalisieren\" steht die Grenze, und genau gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
+            : "Linien noch nicht eingefroren — sie wandern mit dem Median mit, solange noch Kader gebaut werden. Mit „Transfers finalisieren\" stehen sie fest. Alles hier ist eine Hochrechnung."}
+        {/* Die haeufigste Erklaerung fuer eine Karte voller Nullen — sie gehoert daneben, sonst
+            liest sich der ausgeschaltete Hebel wie ein kaputter Apron. */}
+        {!apron.gebucht && apron.konjunkturhebel === 0
+          ? ` Abgabe in dieser Saison abgeschaltet: der Salary Factor liegt bei ${apron.salaryFactor.toLocaleString("de-DE", { maximumFractionDigits: 2 })} und damit unter 0,95 — unterhalb dieser Schwelle zahlt niemand, egal wie weit über den Linien.`
+          : ""}
         {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
       </p>
 
@@ -810,9 +815,11 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
 
   const statusText = apron.gebucht
     ? "Abrechnung dieser Saison bereits gebucht"
-    : apron.frozenLines
-      ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
-      : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";
+    : apron.konjunkturhebel === 0
+      ? "In dieser Saison gibt es keine Abgabe — der Salary Factor liegt unter 0,95"
+      : apron.frozenLines
+        ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
+        : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";
   // Summenprobe im Klartext: Topf und Kopfanteil kommen als FERTIGE Werte aus dem View-Model
   // (eine Quelle; der Kopfanteil ist der `ausgleich` einer Empfänger-Zeile, keine zweite
   // Rechnung). Der Topf wird VOLLSTÄNDIG zu gleichen Kopfteilen verteilt — kein Deckel auf der

@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Apron-Linien frieren jetzt mit „Transfers finalisieren\" ein statt erst mit dem ersten abgerechneten Spieltag. Solange Kader gebaut werden, sollen sie mit dem Median mitwandern — mit dem Finalisieren endet der Kaderbau der Saison, ab da steht die Grenze, und genau gegen sie wird am Saisonende gebucht. Die Finanzen-Seite und der GuV-Hover sagen den Zustand jetzt in BEIDE Richtungen: „Linien eingefroren\" steht ausdrücklich da, statt nur die Warnung wegzulassen — deren Fehlen war von „diese Ansicht kennt den Apron nicht\" nicht zu unterscheiden. Und eine Abgabe von 0 wird erklärt: am Spielstand nachgemessen liegt der Salary Factor dieser Saison bei 0,84 und damit unter der Schwelle 0,95, ab der die Abgabe überhaupt greift — deshalb zahlt hier kein einziges der 32 Teams etwas, obwohl Gehälter bis 99,3 gegen eine 2. Linie von 81,0 laufen. Das steht jetzt daneben, statt wie ein Fehler auszusehen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Team-Einstellungen",
       "pr": null,
       "text": "Wem ein Team gehört, wird ab jetzt genau einmal entschieden: beim Anlegen des Spielstands. Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\" — fertig. Vorher gab es dafür vier Bedienungen an drei Orten: zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen — er war es, der Spielstände erzeugte, in denen die KI alle 32 Klubs steuerte. Dropdown und zweites Raster sind ebenfalls weg; der Reiter heißt jetzt „KI-Verhalten\", zeigt die Zuordnung nur noch an und verweist fürs Ändern auf den einen Weg. Ohne angetippten Klub lässt sich gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet.",
@@ -62,6 +71,15 @@
       "text": "Ein neu angelegter Spielstand konnte damit enden, dass die KI alle 32 Teams steuert und keines dem Spieler gehört — man saß als Zuschauer in der eigenen Liga, und beim nächsten Spieltag wurde für einen aufgestellt. Grund waren zwei Knöpfe mit fast gleichem Namen: „Neues Spiel erstellen\" führt über den Klub-Assistenten und setzt die Steuerung korrekt, „Neues Spiel anlegen\" baute den Stand direkt aus dem Saatzustand — und der kennt keinen Spieler. An den vorhandenen Spielständen nachgemessen: alle über den Assistenten angelegten haben ein eigenes Team, beide über den zweiten Weg angelegten hatten keines. Die Klub-Auswahl geht jetzt auch diesen Weg mit; ohne Auswahl übernimmt der neue Stand das Team des laufenden.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Ranks",
+      "pr": null,
+      "text": "Die Disziplin-Spalten folgen jetzt der ausgewürfelten Saison statt dem Katalog. Der Spielplan legt jede Saison neu fest, wie viele Spieler eine Disziplin stellt — dieselbe Zahl, die auch die Punkte verteilt. Sortiert wurde bisher nach der Katalog-Zahl aus dem Startzustand, und am Spielstand nachgemessen wich jeder der vier Bereiche ab: im Power-Block stand Hockey an zweiter Stelle, obwohl es in dieser Saison nur drei Spieler stellt, während TDM mit fünf dahinter lag. Jeder Block beginnt jetzt mit seiner größten Disziplin dieser Saison. Neu daneben: eine Spalte „#\" links von TOT mit der Kadergröße — ein guter Rang bei acht Spielern heißt etwas anderes als bei vierzehn.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {
