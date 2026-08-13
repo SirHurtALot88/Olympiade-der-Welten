@@ -287,6 +287,7 @@ type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 // Aggregat-Kürzel brauchen eine feste Erklärung (vorher sagte der Hover nur
 // "Nach GEW sortieren", SCH bekam sogar den falschen Achsen-Tooltip).
 const RANKS_AGGREGATE_COLUMN_TOOLTIPS: Record<string, string> = {
+  rosterSize: "# — Spieler im Kader dieses Teams. Kein Rang, sondern die Kadergröße: ein guter Rang bei kleinem Kader heißt etwas anderes als bei vollem.",
   totalRank: "TOT — Gesamtrang: Teamstärke über alle Disziplinen summiert und ligaweit gerankt. Rang 1 = stärkstes Team.",
   powRank: "POW — Teamrank der Power-Achse (Summe der Power-Disziplinen).",
   speRank: "SPE — Teamrank der Speed-Achse (Summe der Speed-Disziplinen).",
@@ -2988,6 +2989,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 ) : null}
                                 {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
                               </span>
+                            </td>
+                          );
+                        }
+                        if (column.id === "rosterSize") {
+                          // Reine Auskunft, kein Rang — deshalb ohne Heat-Farbe. Die Zahl steht
+                          // neben den Raengen, damit „stark" und „duenn besetzt" unterscheidbar
+                          // bleiben.
+                          return (
+                            <td key={column.id} className="nl-tnum" title={`${row.team.name}: ${row.rosterSize} Spieler im Kader`}>
+                              {row.rosterSize}
                             </td>
                           );
                         }

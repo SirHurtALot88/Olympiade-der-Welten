@@ -24,6 +24,8 @@ import {
 
 export type FoundationDisciplineRankRow = {
   team: Team;
+  /** Anzahl Spieler im Kader — die Spalte „#" links von TOT. */
+  rosterSize: number;
   totalRank: number;
   powRank: number;
   speRank: number;
@@ -140,6 +142,13 @@ export function useFoundationCrossTabDisciplineRanks(input: {
       return [] as FoundationDisciplineRankRow[];
     }
 
+    // Kadergroesse je Team. Bewusst aus `rosters` und nicht aus einer zweiten Ableitung: das ist
+    // die Liste, aus der die Einsatzliste ihre Kandidaten nimmt.
+    const rosterSizeByTeamId = new Map<string, number>();
+    for (const eintrag of input.gameState.rosters ?? []) {
+      rosterSizeByTeamId.set(eintrag.teamId, (rosterSizeByTeamId.get(eintrag.teamId) ?? 0) + 1);
+    }
+
     const useArchivedRanks =
       isViewingArchivedRanksSeason && Boolean(selectedRanksSeasonSnapshot?.teamDisciplineRankSnapshots?.length);
 
@@ -163,6 +172,16 @@ export function useFoundationCrossTabDisciplineRanks(input: {
 
         return {
           team,
+          /**
+           * Kadergroesse — Chris: „vor TOT noch ne spalte wo wir die anzahl der spieler im team
+           * sehen koennten einfach als #".
+           *
+           * Gezaehlt werden die Kader-Eintraege dieses Teams, also dieselbe Menge, aus der die
+           * Einsatzliste schoepft. Ein Rang ohne diese Zahl daneben laesst offen, ob ein Team
+           * stark ist oder nur duenn besetzt — und genau das erklaert bei Chris gerade die
+           * leeren Slots am Spieltag.
+           */
+          rosterSize: rosterSizeByTeamId.get(rowCore.teamId) ?? 0,
           totalRank: rowCore.totalRank,
           powRank: rowCore.powRank,
           speRank: rowCore.speRank,
