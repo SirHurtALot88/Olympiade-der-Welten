@@ -81,9 +81,13 @@ describe("Einsatzliste: rohe Fehlercodes werden uebersetzt", () => {
       join(process.cwd(), "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"),
       "utf8",
     );
-    // Einmal die rote Statuszeile, einmal die Aufzaehlung im Leerzustand.
-    const treffer = ansicht.match(/uebersetzeLineupFehlerListe\(errors\)/g) ?? [];
-    expect(treffer.length).toBe(2);
+    // Einmal die rote Statuszeile, einmal die Aufzaehlung im Leerzustand — und seit der
+    // gesperrte Zustand aus der Fehlerzeile heraus ist (er ist kein Fehler, sondern ein Zustand;
+    // gemeldet als „hier darf dann kein blocker entstehen") noch einmal fuer den Hinweis.
+    // Geprueft wird die EIGENSCHAFT „jede Anzeigestelle uebersetzt", nicht der Name der Variablen
+    // — sonst faellt der Test bei jeder Umbenennung, ohne dass etwas kaputt waere.
+    const treffer = ansicht.match(/uebersetzeLineupFehler(?:Liste)?\(/g) ?? [];
+    expect(treffer.length).toBeGreaterThanOrEqual(3);
     // Und nirgends mehr die rohe Ausgabe.
     expect(ansicht).not.toMatch(/\{errors\.join\(/);
     expect(ansicht).not.toMatch(/\{errors\.map\(/);

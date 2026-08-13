@@ -27,7 +27,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
+import { uebersetzeLineupFehler } from "@/lib/lineups/lineup-fehlertexte";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 
 const TEAM = "P-C";
@@ -101,15 +101,19 @@ describe("Einsatzliste · gesperrt ist kein Fehler", () => {
   const datei = readFileSync(join(process.cwd(), "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"), "utf8");
 
   it("übersetzt den Sperr-Code in einen Satz", () => {
-    const text = formatGameFlowBlocker("lineup_draft_is_locked");
+    // Der Wortlaut gehoert `lib/lineups/lineup-fehlertexte.ts` (kam parallel ueber #514) — hier
+    // wird nur gepinnt, dass ueberhaupt uebersetzt wird. Zwei Tabellen fuer dieselben Codes waeren
+    // wieder zwei Quellen; meine eigene Fassung im allgemeinen Blocker-Woerterbuch ist deshalb
+    // beim Zusammenfuehren wieder herausgeflogen.
+    const text = uebersetzeLineupFehler("lineup_draft_is_locked");
     expect(text).not.toContain("_");
-    expect(text).toContain("gesperrt");
+    expect(text.length).toBeGreaterThan(20);
   });
 
   it("lässt keinen Rohcode mehr durch die Fehlerzeile", () => {
     // Vorher: `errors.join(" · ")` — der technische Bezeichner landete unübersetzt auf dem Schirm.
     expect(datei).not.toContain('{errors.join(" · ")}');
-    expect(datei).toContain("blockingErrors.map(formatGameFlowBlocker)");
+    expect(datei).toContain("uebersetzeLineupFehlerListe(blockingErrors)");
   });
 
   it("nimmt den gesperrten Zustand aus der roten Fehlerzeile heraus", () => {
@@ -124,7 +128,7 @@ describe("Einsatzliste · gesperrt ist kein Fehler", () => {
       "form_card_plan_matchday_missing",
       "form_card_plan_discipline_side_missing",
     ]) {
-      expect(formatGameFlowBlocker(code), `${code} ohne Übersetzung`).not.toBe(code.replaceAll("_", " "));
+      expect(uebersetzeLineupFehler(code), `${code} ohne Übersetzung`).not.toBe(code);
     }
   });
 });
