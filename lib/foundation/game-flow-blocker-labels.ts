@@ -24,6 +24,22 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   under_minimum_matchday_players: "Mindestens 7 aktive Spieler sind für den Spieltag nötig.",
   partial_lineup_allowed: "Das Team setzt alle verfügbaren Spieler ein — das zählt als vollständig, auch wenn nicht jeder Slot besetzt ist.",
   lineup_matchday_is_not_active: "Lineups lassen sich nur für den aktuell aktiven Matchday ändern.",
+  /**
+   * GEMELDET VON CHRIS (Screenshot Einsatzliste): in der roten Fehlerzeile stand blank
+   * `lineup_draft_is_locked` — der Rohcode aus `legacy-lineup-local-service`. Die Einsatzliste
+   * gibt ihre Fehlerliste ungefiltert aus; ohne Eintrag hier steht dort der technische
+   * Bezeichner, und der ist von einem Absturz nicht zu unterscheiden.
+   *
+   * Der Zustand selbst ist harmlos und richtig: die Liste ist abgegeben und der Spieltag läuft,
+   * deshalb ist sie zu. Das gehoert genau so dagestanden.
+   */
+  lineup_draft_is_locked:
+    "Diese Einsatzliste ist gesperrt — der Spieltag läuft bereits. Änderungen sind erst am nächsten Spieltag wieder möglich.",
+  lineup_not_operationally_ready:
+    "Einsatzliste noch nicht spielbereit — alle Slots füllen oder alle einsatzbereiten Kaderspieler aufstellen.",
+  form_cards_season_is_not_active: "Formkarten lassen sich nur in der laufenden Saison ändern.",
+  form_card_plan_matchday_missing: "Für diesen Spieltag ist keine Formkarten-Planung hinterlegt.",
+  form_card_plan_discipline_side_missing: "Der Formkarten-Plan nennt keine Disziplin-Seite (D1/D2).",
   preview_status_not_ready: "Die Vorschau ist noch nicht im Status bereit.",
   board_objectives_failed: "Mindestens ein Board-Ziel ist verfehlt.",
   board_objectives_at_risk: "Mindestens ein Board-Ziel steht unter Druck.",

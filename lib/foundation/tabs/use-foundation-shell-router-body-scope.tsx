@@ -10737,6 +10737,9 @@ export function useFoundationShellRouterBodyScope({
               playerDirectorySlice,
               seasonPointsLedger,
             }),
+            // Wer ANGETRETEN ist, steht in den Einsatz-Zeilen — nicht in den Punkten. Ohne sie
+            // fehlten die Teilnehmer ohne PPs in der Klammer am Disziplin-Kuerzel.
+            appearances: gameState.seasonState?.playerDisciplinePerformances ?? null,
           }),
     [gameState, isViewingArchivedSeason, playerDirectorySlice, playerRatingsById, seasonPointsLedger],
   );

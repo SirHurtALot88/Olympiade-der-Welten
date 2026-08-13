@@ -24,9 +24,11 @@ import {
  *   aufsummiert werden), Discipline-ID → Spaltenschlüssel über
  *   `normalizeLineupDisciplineFieldName` (z. B. "mini-dm" → "mini_dm").
  *
- * Nur Werte > 0 werden aufgenommen: vor dem ersten gewerteten Spieltag hat
- * niemand PPs — dann bleibt die Liste leer und das Hover-Panel zeigt ehrlich
- * "noch keine PPs" statt einer erfundenen Rangfolge aus lauter Nullen.
+ * Aus dem Ledger werden nur Werte > 0 aufgenommen: vor dem ersten gewerteten
+ * Spieltag hat niemand PPs — dann bleibt die Liste leer und das Hover-Panel zeigt
+ * ehrlich "noch keine PPs" statt einer erfundenen Rangfolge aus lauter Nullen.
+ * Die TEILNAHME an einer Disziplin kommt dagegen aus den Einsatz-Zeilen
+ * (`appearances`), nicht aus den Punkten — siehe dort, warum.
  */
 
 export type SeasonStandingsTopPlayerEntry = {
@@ -50,9 +52,12 @@ export type SeasonStandingsTopPlayersByTeam = Map<
 const TOP_PLAYERS_PER_AREA_COLUMN = 3;
 /**
  * Disziplin-Spalten beantworten eine ANDERE Frage: "wer war in dieser Disziplin
- * überhaupt dabei und was hat er geholt". Da wäre ein Top-3-Schnitt irreführend —
- * es sind ohnehin nur die Spieler mit PPs > 0, also die tatsächlichen Teilnehmer.
+ * überhaupt dabei und was hat er geholt". Da wäre ein Top-3-Schnitt irreführend.
  * Die Kappung ist reiner Panel-Schutz für Disziplinen mit sehr vielen Startern.
+ *
+ * Hier stand: "es sind ohnehin nur die Spieler mit PPs > 0, also die tatsächlichen
+ * Teilnehmer." Genau diese Gleichsetzung war der Fehler — wer angetreten ist und
+ * nichts geholt hat, ist trotzdem angetreten. Siehe `SeasonStandingsAppearanceInput`.
  */
 const TOP_PLAYERS_PER_DISCIPLINE_COLUMN = 12;
 
@@ -72,6 +77,34 @@ export type SeasonStandingsLedgerInput = {
   playerSummariesByPlayerId: Map<string, { pointsByDiscipline?: Record<string, number> }>;
 };
 
+/**
+ * Die tatsaechlichen Antritte dieser Saison — eine Zeile je Spieler und Disziplin-Einsatz.
+ *
+ * GEMELDET VON CHRIS (Saisonstand, „Disziplinen nach Bereich"): „hier sind in klammern bei den
+ * diszis teils 0 spieler ausgewiesen bitte pruefen und korrigieren".
+ *
+ * BEFUND, am Live-Spielstand nachgemessen (Save `…-0kalpx`, 352 Kombinationen aus Team ×
+ * angetretener Disziplin): in 22 Faellen (6 %) stand eine ZU KLEINE Zahl. Bei Pirate Crew etwa
+ * Wettessen „(4)" bei sechs Antritten und Football „(1)" bei zwei.
+ *
+ * Die Zahl kam aus `pointsByDiscipline` und zaehlte nur Spieler mit `points > 0`. Wer angetreten
+ * ist und nichts geholt hat, fiel heraus — waehrend der Tooltip daneben behauptete, so viele
+ * Spieler seien „hier im Einsatz" gewesen. Wieder zwei Groessen unter einem Namen: gezaehlt wurde
+ * PUNKTE-GEHOLT, behauptet wurde ANGETRETEN.
+ *
+ * Deshalb kommen die Teilnehmer jetzt aus den Einsatz-Zeilen selbst. Die PPs bleiben der WERT
+ * jedes Eintrags (dafuer ist der Ledger die Quelle) — er ist dann eben 0, und das ist die
+ * Wahrheit ueber diesen Einsatz, keine Luecke.
+ *
+ * (Nicht Teil des Befunds: Disziplinen, die die Liga noch nicht gespielt hat, zeigen weiterhin
+ * „(0) —". Gemessen gab es KEINEN Fall, in dem eine bereits bestrittene Disziplin auf 0 stand.)
+ */
+export type SeasonStandingsAppearanceInput = Array<{
+  teamId: string;
+  playerId: string;
+  disciplineId: string;
+}>;
+
 const AXIS_RATING_FIELDS: Array<{ key: SeasonDisciplineAreaId; field: "ppPow" | "ppSpe" | "ppMen" | "ppSoc" }> = [
   { key: "pow", field: "ppPow" },
   { key: "spe", field: "ppSpe" },
@@ -83,6 +116,8 @@ export function buildSeasonStandingsTopPlayersByTeam(input: {
   gameState: Pick<GameState, "players" | "rosters">;
   playerRatingsById: SeasonStandingsRatingsInput | null | undefined;
   seasonPointsLedger: SeasonStandingsLedgerInput | null | undefined;
+  /** Tatsaechliche Antritte dieser Saison — ohne sie fehlen die Teilnehmer ohne PPs. */
+  appearances?: SeasonStandingsAppearanceInput | null;
 }): SeasonStandingsTopPlayersByTeam {
   const result: SeasonStandingsTopPlayersByTeam = new Map();
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
@@ -127,6 +162,37 @@ export function buildSeasonStandingsTopPlayersByTeam(input: {
         }
         push(rosterEntry.teamId, columnKey, { playerId: player.id, playerName: player.name, value: points });
       }
+    }
+  }
+
+  /**
+   * Die Antritte OHNE Punkte nachtragen — sie fehlten bisher ganz (siehe
+   * `SeasonStandingsAppearanceInput`). Der Ledger bleibt die Quelle des WERTES, die Einsatz-Zeilen
+   * sind die Quelle der TEILNAHME. Wer schon ueber den Ledger drin ist, wird nicht verdoppelt.
+   */
+  if (input.appearances) {
+    const bereitsDrin = new Set<string>();
+    for (const [teamId, columns] of result) {
+      for (const [columnKey, entries] of Object.entries(columns)) {
+        for (const entry of entries ?? []) bereitsDrin.add(`${teamId}|${columnKey}|${entry.playerId}`);
+      }
+    }
+    for (const appearance of input.appearances) {
+      const columnKey = normalizeLineupDisciplineFieldName(appearance.disciplineId);
+      if (!isSeasonDisciplineKey(columnKey)) {
+        continue;
+      }
+      const schluessel = `${appearance.teamId}|${columnKey}|${appearance.playerId}`;
+      if (bereitsDrin.has(schluessel)) {
+        continue;
+      }
+      const player = playersById.get(appearance.playerId);
+      if (!player) {
+        continue;
+      }
+      bereitsDrin.add(schluessel);
+      // Wert 0: der Spieler war dabei und hat nichts geholt. Das IST die Auskunft.
+      push(appearance.teamId, columnKey, { playerId: player.id, playerName: player.name, value: 0 });
     }
   }
 
