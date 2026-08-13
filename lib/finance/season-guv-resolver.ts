@@ -17,6 +17,7 @@
 import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-source";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { getApronCashByTeam } from "@/lib/finance/apron-settlement-cash-source";
 import {
   buildSeasonGuv,
   computeFacilitySeasonCash,
@@ -70,11 +71,14 @@ export function resolveSeasonGuvPartsByTeam(
   const rankByTeamId = new Map<string, number | null>(
     gameState.teams.map((team) => [team.teamId, gameState.seasonState.standings?.[team.teamId]?.rank ?? null] as const),
   );
-  // Gebucht oder nur hochgerechnet? Entscheidet, ob der Apron in die GuV zaehlt (siehe
-  // `apronGebucht` in season-end-guv.ts).
-  const apronGebucht = (gameState.seasonState.apronSettlementLogs ?? []).some(
-    (log) => log.seasonId === gameState.season.id && log.phase === "season_end",
-  );
+  // Apron: BELEG vor Nachrechnung — dieselbe Regel wie eine Zeile darüber bei den Vorstandszielen.
+  // `gebucht` entscheidet, ob die Zeile in die GuV zaehlt (siehe `apronGebucht` in
+  // season-end-guv.ts); ist sie gebucht, kommt auch der BETRAG aus dem Log statt aus der
+  // Hochrechnung. Vorher entschied das Log nur ueber das Zaehlen, und der Betrag lief weiter mit
+  // der Projektion mit — die gegen die Kader und Raenge von JETZT rechnet, nicht gegen die vom
+  // Saisonende. Siehe `lib/finance/apron-settlement-cash-source.ts`.
+  const apronCash = getApronCashByTeam(gameState);
+  const apronGebucht = apronCash.gebucht;
   const apron = (() => {
     try {
       return buildApronProjection({ gameState, rankByTeamId });
@@ -93,7 +97,7 @@ export function resolveSeasonGuvPartsByTeam(
       sponsorCash: sponsorCash.get(team.teamId) ?? 0,
       facilityIncome: facilities.income,
       facilityUpkeep: facilities.paidUpkeep,
-      apronNetto: apronRow?.nettoDelta ?? 0,
+      apronNetto: apronCash.gebucht ? (apronCash.byTeamId.get(team.teamId) ?? 0) : (apronRow?.nettoDelta ?? 0),
       apronRank: apronRow?.rank ?? null,
       apronFrozenLines: apron?.frozenLines ?? false,
       apronGedeckelt: apronRow?.gedeckelt ?? false,

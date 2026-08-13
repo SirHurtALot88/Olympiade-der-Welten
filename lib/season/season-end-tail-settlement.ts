@@ -33,11 +33,14 @@
 import { applyTeamSeasonObjectiveRewards } from "@/lib/board/team-season-objectives-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { applyLoanSettlement, collectNegativeCashTeams } from "@/lib/finance/loan-service";
+import { zieheSaisonstandGuvNach } from "@/lib/finance/season-guv-nachbuchung";
 
 export type SeasonEndTailResult = {
   gameState: GameState;
   loanSettlementApplied: boolean;
   objectiveRewardsApplied: boolean;
+  /** Teams, deren eingefrorene GuV-Zeile auf den gebuchten Stand gezogen wurde. */
+  standingsGuvRefreshedTeams: string[];
   /** Teams, die die Saison im Minus beenden. NUR festgestellt — der Ausgleich ist ihre Aufgabe. */
   negativeCashTeams: Array<{ teamId: string; shortfall: number }>;
   warnings: string[];
@@ -102,10 +105,29 @@ export function applySeasonEndTail(input: SeasonEndTailInput): SeasonEndTailResu
   const negativeCash = collectNegativeCashTeams(gameState);
   warnings.push(...negativeCash.warnings);
 
+  /**
+   * 4) DIE GuV IM SAISONSTAND AUF DEN GEBUCHTEN STAND ZIEHEN.
+   *
+   * Muss ganz zum Schluss stehen und tut es nur deshalb: `standings[team].guvPosten` entsteht in
+   * `writeLocalCashPrizeApply`, also VOR Sponsor, Apron und diesem Schwanz hier. Alles, was danach
+   * gebucht wird, fehlte der gespeicherten Zeile dauerhaft — der Apron stand dort sogar als „noch
+   * nicht gebucht" und damit gar nicht in der Summe. Siehe `season-guv-nachbuchung.ts` für die
+   * Messung.
+   *
+   * OHNE `execute`-Sperre und ohne eigenes Idempotenz-Log: der Schritt bucht nichts, er leitet nur
+   * ab. Er muss auch dann laufen, wenn die Schritte 1 und 2 sich übersprungen haben — dann hat sie
+   * der andere Weg gebucht und die Zeile ist trotzdem alt.
+   */
+  const nachbuchung = input.execute ? zieheSaisonstandGuvNach(gameState) : null;
+  if (nachbuchung != null) {
+    gameState = nachbuchung.gameState;
+  }
+
   return {
     gameState,
     loanSettlementApplied,
     objectiveRewardsApplied,
+    standingsGuvRefreshedTeams: nachbuchung?.geaenderteTeams ?? [],
     negativeCashTeams: negativeCash.teams,
     warnings: Array.from(new Set(warnings)),
   };
