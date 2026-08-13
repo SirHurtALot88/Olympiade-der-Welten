@@ -186,10 +186,12 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     // `return getTeamDisplaySalaryTotal(gameState, teamId);` enthalten. Sie ist aus zwei Gründen
     // ersetzt worden.
     //
-    // ERSTENS ist die Aussage überholt. Chris hat entschieden, die Abgabe am VERHANDELTEN Gehalt
-    // zu bemessen statt am geglätteten Formelwert („ja!", docs/APRON_UND_VERTRAGSFORMEN.md,
-    // Schritt 3) — damit Verhandeln überhaupt zählt. Die Grundlage ist deshalb heute
-    // `getTeamNegotiatedSalaryTotal`.
+    // ERSTENS ist die Aussage überholt, und zwar inzwischen zweimal. Erst wanderte die Abgabe vom
+    // geglätteten Formelwert auf das VERHANDELTE Gehalt („ja!", docs/APRON_UND_VERTRAGSFORMEN.md,
+    // Schritt 3) — damit Verhandeln überhaupt zählt. Dann meldete Chris, auch das sei geglättet
+    // („die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet"): das verhandelte
+    // Jahresgehalt ist der Durchschnitt über die Laufzeit, nicht das, was in dieser Saison vom
+    // Konto geht. Die Grundlage ist deshalb heute `getTeamActualSalaryTotal`.
     //
     // ZWEITENS, und das ist der eigentliche Grund: eine Zeichenkette prüft nichts. Genau diese
     // Sorte Test war im Repo mehrfach über Wochen rot, ohne dass es auffiel, und eine andere
@@ -211,10 +213,12 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     const echteZahlung = getTeamSalarySum(gameState, TEAM_ID);
 
     // Vorbedingung: die drei Begriffe MÜSSEN sich unterscheiden, sonst prüft der Rest nichts.
-    expect(verhandelt).not.toBeCloseTo(geglaettet, 2);
-    expect(verhandelt).not.toBeCloseTo(echteZahlung, 2);
+    expect(echteZahlung).not.toBeCloseTo(geglaettet, 2);
+    expect(echteZahlung).not.toBeCloseTo(verhandelt, 2);
 
-    expect(grundlage).toBeCloseTo(verhandelt, 6);
+    // Besteuert wird, was in DIESER Saison wirklich gezahlt wird — dieselbe Zahl, gegen die die
+    // KI ihre Gehaltsdecke prüft und die der Saisonende-Apply abbucht.
+    expect(grundlage).toBeCloseTo(echteZahlung, 6);
   });
 });
 
