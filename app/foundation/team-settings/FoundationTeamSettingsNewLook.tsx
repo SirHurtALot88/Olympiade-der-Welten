@@ -66,7 +66,7 @@ type NlTeamSettingsSection = "saves" | "team" | "control" | "strategy";
 const NL_TEAMSETTINGS_SECTION_ITEMS: Array<{ id: NlTeamSettingsSection; label: string }> = [
   { id: "saves", label: "Spielstände & Start" },
   { id: "team", label: "Team-Fokus" },
-  { id: "control", label: "Spielmodus & KI" },
+  { id: "control", label: "KI-Verhalten" },
   { id: "strategy", label: "Identity & Strategie" },
 ];
 
@@ -291,7 +291,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     formatTransfermarktCurrency,
     foundationSaveMode,
     freshSeasonStartMessage,
-    gameModeOwnershipChrisIds,
     gameModeOwnershipLimits,
     gameState,
     getBusyActionReason,
@@ -366,7 +365,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     teamStrategyMessage,
     teamStrategySportsBiasAxisMap,
     teamStrategySportsBiasFieldLabels,
-    toggleGameModeOwnershipTeam,
     toggleNewGameTeam,
     updateTeamControlDraft,
     updateTeamIdentityDraft,
@@ -1737,7 +1735,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
       <NlCard
         className="nl-teamsettings-card"
         eyebrow="Steuerung"
-        title="Spielmodus & Team-Zuordnung"
+        title="KI-Verhalten"
         data-testid="nl-teamsettings-controls"
         actions={
           <div className="nl-teamsettings-actions is-compact">
@@ -1748,7 +1746,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 readMeta.readOnly
                   ? getReadOnlyActionReason("die Team-Control-Settings")
-                  : "Speichert Spielmodus-Zuordnung und AI-Automation in diesem Save."
+                  : "Speichert die AI-Automation in diesem Save."
               }
               onClick={saveTeamSettings}
             >
@@ -1771,8 +1769,10 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         }
       >
         <p className="nl-teamsettings-note">
-          Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere läuft als AI.
-          Änderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
+          Hier stellst du ein, wie sich die KI verhält. <strong>Wem ein Team gehört, wird hier
+          nicht mehr entschieden</strong> — das steht seit dem Anlegen des Spielstands fest, unter
+          „Spielstände &amp; Start". Änderungen erst mit &quot;Lokal speichern&quot; dauerhaft
+          schreiben.
         </p>
         {readMeta.readOnly ? (
           <p className="nl-teamsettings-msg is-warn">Warum nicht: {getReadOnlyActionReason("die Team-Control-Settings")}</p>
@@ -1793,97 +1793,54 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <span className={`nl-teamsettings-hint${readMeta.readOnly ? " is-warn" : ""}`}>Speichern: {readSourceLabel}</span>
         </div>
 
-        <section className="nl-teamsettings-subpanel" data-testid="game-mode-ownership-panel">
+        {/* HIER STAND DAS ZWEITE 32-KLUB-RASTER — die Team-Zuordnung des LAUFENDEN Spielstands.
+            Es ist ersatzlos entfallen.
+
+            GEMELDET VON CHRIS: „ich will keine spielstände mehr reparieren, hau es raus mach mir
+            nur einen sauber verknüpften weg für die zukunft damit ich sauber bin!"
+
+            Ich hatte es zunaechst als Reparaturweg fuer die kaputt angelegten Staende behalten
+            wollen. Das war der falsche Kompromiss: ein zweites Raster, das dem Klub-Picker unter
+            „Spielstaende & Start" zum Verwechseln aehnlich sieht, ist genau die Falle, aus der er
+            heraus wollte — und ein Reparaturweg ist nur noetig, solange etwas kaputt entstehen
+            kann. Seit der rohe Anlege-Knopf weg ist und ohne eigenen Klub kein Spiel mehr
+            entsteht, kann es das nicht mehr.
+
+            WEM EIN TEAM GEHOERT, wird ab jetzt GENAU EINMAL entschieden: beim Anlegen, unter
+            „Spielstaende & Start". Danach steht es fest. Die Zeile unten zeigt es weiterhin an —
+            sehen ja, aendern nein. */}
+        <section className="nl-teamsettings-subpanel" data-testid="game-mode-ownership-readonly">
           <header className="nl-teamsettings-subhead">
-            <h4>Team-Zuordnung im LAUFENDEN Spielstand</h4>
+            <h4>Wer steuert was</h4>
           </header>
-          {/* Dieses Raster sieht dem Klub-Picker unter „Spielstände & Start" zum Verwechseln
-              ähnlich — und genau das war das Problem: zwei fast gleiche 32-Karten-Raster in zwei
-              Reitern, eines legt ein NEUES Spiel an, eines ändert das laufende. Welches wofür ist,
-              stand nirgends. Deshalb sagt es jetzt beides ausdrücklich. */}
           <p className="nl-teamsettings-note">
-            <strong>Ändert diesen Spielstand, legt keinen neuen an.</strong> Ein neues Spiel
-            entsteht ausschließlich unter „Spielstände &amp; Start". Hier korrigierst du die
-            Zuordnung eines Standes, der schon läuft.{" "}
-            {activeSaveGameMode === "online_4v4"
-              ? "Wähle genau 4 Teams für Chris und 4 für Franky. Alle anderen Teams bleiben AI."
-              : activeSaveGameMode === "solo_1"
-                ? "Wähle genau 1 Team für dich. Alle anderen Teams bleiben AI."
-                : `Maximal ${gameModeOwnershipLimits.chrisMax} Chris-Team(s)${gameModeOwnershipLimits.frankyMax ? ` und ${gameModeOwnershipLimits.frankyMax} Franky-Team(s)` : ""}.`}
+            Festgelegt beim Anlegen des Spielstands unter „Spielstände &amp; Start" und danach
+            unveränderlich. Willst du andere Klubs steuern, leg dort ein neues Spiel an.
           </p>
-          {/* HIER STAND ZUSAETZLICH EIN DROPDOWN „Dein Team" — dieselbe Entscheidung wie das
-              Klub-Raster darunter, nur fuer den Solo-Fall, und damit die zweite Bedienung fuer
-              dieselbe Sache INNERHALB EINES REITERS.
-
-              GEMELDET VON CHRIS: „Glaube das macht aktuell nur probleme dass wir Spielstaende &
-              start + Team-Fokus + Spielmodus & KI haben … ich weiss gar nicht mehr was ich wo
-              einstellen muss".
-
-              Das Raster kann den Solo-Fall genauso (die Obergrenze ist dieselbe) — es bleibt als
-              einzige Bedienung stehen. */}
-          {(
-            <>
-              <div className="nl-teamsettings-metric-grid">
-                <NlMetric
-                  label="Chris"
-                  value={`${currentSaveOwnership.chrisTeamIds.length}/${gameModeOwnershipLimits.chrisMax}`}
-                  sub={currentSaveOwnership.chrisTeamIds.join(" · ") || "kein Team"}
-                />
-                <NlMetric
-                  label="Franky"
-                  value={`${currentSaveOwnership.frankyTeamIds.length}/${gameModeOwnershipLimits.frankyMax}`}
-                  sub={currentSaveOwnership.frankyTeamIds.join(" · ") || "kein Team"}
-                />
-                <NlMetric
-                  label="AI"
-                  value={Math.max(
-                    0,
-                    gameState.teams.length -
-                      currentSaveOwnership.chrisTeamIds.length -
-                      currentSaveOwnership.frankyTeamIds.length,
-                  )}
-                  sub="automatisch"
-                />
-              </div>
-              <div className="nl-teamsettings-team-grid" data-testid="game-mode-ownership-picker">
-                {[...gameState.teams]
-                  .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
-                  .map((team) => {
-                    const isChris = currentSaveOwnership.chrisTeamIds.includes(team.teamId);
-                    const isFranky = currentSaveOwnership.frankyTeamIds.includes(team.teamId);
-                    return (
-                      <article
-                        key={`game-mode-team-${team.teamId}`}
-                        className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
-                      >
-                        <div className="nl-teamsettings-team-card-main">
-                          <strong>{team.shortCode}</strong>
-                          <span>{team.name}</span>
-                        </div>
-                        <div className="nl-teamsettings-team-card-actions">
-                          <button
-                            type="button"
-                            className={`nl-teamsettings-btn is-small${isChris ? " is-primary" : ""}`}
-                            disabled={readMeta.readOnly || isFranky}
-                            onClick={() => toggleGameModeOwnershipTeam("chris", team.teamId)}
-                          >
-                            Chris
-                          </button>
-                          <button
-                            type="button"
-                            className={`nl-teamsettings-btn is-small${isFranky ? " is-primary" : ""}`}
-                            disabled={readMeta.readOnly || isChris || gameModeOwnershipLimits.frankyMax === 0}
-                            onClick={() => toggleGameModeOwnershipTeam("franky", team.teamId)}
-                          >
-                            Franky
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-              </div>
-            </>
-          )}
+          <div className="nl-teamsettings-metric-grid">
+            <NlMetric
+              label="Du steuerst"
+              value={currentSaveOwnership.chrisTeamIds.length}
+              sub={currentSaveOwnership.chrisTeamIds.join(" · ") || "kein Team"}
+            />
+            {gameModeOwnershipLimits.frankyMax > 0 ? (
+              <NlMetric
+                label="Franky"
+                value={currentSaveOwnership.frankyTeamIds.length}
+                sub={currentSaveOwnership.frankyTeamIds.join(" · ") || "kein Team"}
+              />
+            ) : null}
+            <NlMetric
+              label="KI"
+              value={Math.max(
+                0,
+                gameState.teams.length -
+                  currentSaveOwnership.chrisTeamIds.length -
+                  currentSaveOwnership.frankyTeamIds.length,
+              )}
+              sub="automatisch"
+            />
+          </div>
         </section>
 
         <section className="nl-teamsettings-subpanel" data-testid="ai-automation-panel">

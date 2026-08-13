@@ -1,7 +1,7 @@
 {
   "datum": "2026-08-13",
   "seite": "Team-Einstellungen",
-  "text": "Ein neues Spiel entsteht ab jetzt an genau einer Stelle: Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\". Vorher gab es dafür vier Bedienungen an drei Orten — zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen; er war es, der Spielstände ohne eigenes Team erzeugte. Ohne angetippten Klub lässt sich jetzt gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet. Das Raster im Spielmodus-Reiter bleibt als Reparaturweg für laufende Stände erhalten — es heißt jetzt deutlich „Team-Zuordnung im LAUFENDEN Spielstand\" und verweist fürs Anlegen auf den einen Weg.",
+  "text": "Wem ein Team gehört, wird ab jetzt genau einmal entschieden: beim Anlegen des Spielstands. Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\" — fertig. Vorher gab es dafür vier Bedienungen an drei Orten: zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen — er war es, der Spielstände erzeugte, in denen die KI alle 32 Klubs steuerte. Dropdown und zweites Raster sind ebenfalls weg; der Reiter heißt jetzt „KI-Verhalten\", zeigt die Zuordnung nur noch an und verweist fürs Ändern auf den einen Weg. Ohne angetippten Klub lässt sich gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet.",
   "gewicht": "grundlegend",
   "version": "0.4"
 }

@@ -69,28 +69,40 @@ describe("new game setup UI contract", () => {
     expect(vier.blockers).toEqual([]);
   });
 
-  it("uses game mode as the single ownership UI in team settings", () => {
+  /**
+   * Dieser Fall hiess frueher „uses game mode as the single ownership UI" und pinnte damit den
+   * KI-Reiter als Ort der Zuordnung. Genau das ist nicht mehr wahr — und zwar auf Ansage.
+   *
+   * GEMELDET VON CHRIS: „ich will keine spielstände mehr reparieren, hau es raus mach mir nur
+   * einen sauber verknüpften weg für die zukunft damit ich sauber bin!"
+   *
+   * Wem ein Team gehoert, wird ab jetzt GENAU EINMAL entschieden: beim Anlegen des Spielstands
+   * unter „Spielstaende & Start". Der KI-Reiter zeigt es nur noch an. Siehe
+   * `tests/ein-weg-zum-neuen-spielstand.test.ts` fuer den vollstaendigen Vertrag.
+   */
+  it("entscheidet die Zuordnung nur noch beim Anlegen — der KI-Reiter zeigt sie an", () => {
     const newLookSource = fs.readFileSync(teamSettingsNewLookPath, "utf8");
     const scopeSource = fs.readFileSync(shellRouterBodyScopePath, "utf8");
     const source = `${newLookSource}\n${scopeSource}`;
 
     expect(source).not.toContain('data-testid="current-save-ownership-cards"');
     expect(source).toContain('data-testid="foundation-active-game-mode"');
-    expect(source).toContain('data-testid="game-mode-ownership-panel"');
-    // Das Solo-Dropdown „Dein Team" ist entfallen: es war DIESELBE Entscheidung wie das
-    // Klub-Raster darunter, nur fuer den Solo-Fall — zwei Bedienungen fuer eine Sache in einem
-    // Reiter. Gemeldet von Chris als „ich weiss gar nicht mehr was ich wo einstellen muss".
-    // Gepinnt wird deshalb die EIGENSCHAFT: es gibt GENAU EINE Zuordnung, und das ist das Raster.
+    // Beide Bedienungen im KI-Reiter sind weg — Dropdown wie Raster.
     expect(source).not.toContain('data-testid="solo-player-team-select"');
-    expect(source).toContain('data-testid="game-mode-ownership-picker"');
-    expect(source).toContain("applyGameModeOwnership");
+    expect(source).not.toContain('data-testid="game-mode-ownership-picker"');
+    expect(source).not.toContain('data-testid="game-mode-ownership-panel"');
+    // Was bleibt: die Anzeige, und der Klub-Picker des einen Anlege-Wegs.
+    expect(newLookSource).toContain('data-testid="game-mode-ownership-readonly"');
+    expect(newLookSource).toContain("nl-newgame-clubgrid");
   });
 
   it("keeps Online 4v4 ownership preset visible in the client", () => {
     const source = fs.readFileSync(teamSettingsNewLookPath, "utf8");
     const pageTypesSource = fs.readFileSync(foundationPageTypesPath, "utf8");
 
-    expect(source).toContain('online_4v4');
+    // Der Modus lebt jetzt im Anlege-Assistenten (dort werden die Klubs verteilt), nicht mehr im
+    // KI-Reiter — die Voreinstellungen selbst sind unveraendert.
+    expect(`${source}\n${pageTypesSource}`).toContain('online_4v4');
     expect(pageTypesSource).toContain('["P-S", "D-P", "M-M", "V-W"]');
     expect(pageTypesSource).toContain('["M-S", "P-C", "C-S", "G-G"]');
   });

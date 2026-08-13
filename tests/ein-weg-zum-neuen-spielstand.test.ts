@@ -18,9 +18,10 @@
  * über diesen Weg angelegten manual=0/ai=32. (3) und (4) sind dieselbe Entscheidung zweimal,
  * innerhalb EINES Reiters.
  *
- * Übrig bleiben zwei Dinge mit klar verschiedenen Aufgaben: ANLEGEN (ein Weg, ein Knopf) und
- * KORRIGIEREN eines laufenden Standes (ein Raster). Das Korrigieren bleibt bewusst erhalten —
- * es ist der Reparaturweg für genau die Spielstände, die durch (2) kaputt entstanden sind.
+ * Übrig bleibt EINS: das Anlegen. Ein Weg, ein Knopf, eine Entscheidung — wem ein Team gehört,
+ * wird genau einmal festgelegt und steht danach fest. (3) und (4) sind ersatzlos entfallen; der
+ * KI-Reiter ZEIGT die Zuordnung nur noch an. Siehe den Nachtrag weiter unten, warum auch das
+ * Korrigieren weg ist.
  *
  * Warum Quelltext-Prüfungen: das Projekt fährt vitest ohne jsdom, für diesen Bildschirm gibt es
  * keinen Render-Pfad ohne kompletten GameState (siehe `new-game-setup-ui-contract.test.ts`).
@@ -61,26 +62,36 @@ describe("Neues Spiel · genau ein Weg", () => {
   });
 });
 
-describe("Spielmodus & KI · korrigiert, legt nicht an", () => {
+/**
+ * NACHTRAG — Chris: „ich will keine spielstände mehr reparieren, hau es raus mach mir nur einen
+ * sauber verknüpften weg für die zukunft damit ich sauber bin!"
+ *
+ * Ich hatte das Zuordnungs-Raster im KI-Reiter zunächst als Reparaturweg behalten. Das war der
+ * falsche Kompromiss: ein zweites 32-Karten-Raster, das dem Klub-Picker zum Verwechseln ähnlich
+ * sieht, IST die Falle — und einen Reparaturweg braucht nur, wo etwas kaputt entstehen kann. Seit
+ * der rohe Anlege-Knopf weg ist und ohne eigenen Klub kein Spiel mehr entsteht, kann es das nicht.
+ */
+describe("KI-Reiter · zeigt an, entscheidet nicht", () => {
   it("hat das doppelte Solo-Dropdown nicht mehr", () => {
     expect(ANSICHT).not.toContain('data-testid="solo-player-team-select"');
   });
 
-  it("behält genau EIN Raster für die Zuordnung", () => {
-    const raster = ANSICHT.match(/data-testid="game-mode-ownership-picker"/g) ?? [];
-    expect(raster).toHaveLength(1);
+  it("hat auch das zweite Klub-Raster nicht mehr", () => {
+    expect(ANSICHT).not.toContain('data-testid="game-mode-ownership-picker"');
+    expect(ANSICHT).not.toContain('data-testid="game-mode-ownership-panel"');
   });
 
-  /**
-   * Die beiden 32-Karten-Raster (neues Spiel / laufender Stand) sehen einander zum Verwechseln
-   * ähnlich. Welches wofür ist, muss dastehen — sonst ist es wieder dieselbe Falle.
-   */
-  it("sagt ausdrücklich, dass es den LAUFENDEN Stand ändert", () => {
-    expect(ANSICHT).toContain("Team-Zuordnung im LAUFENDEN Spielstand");
-    expect(ANSICHT).toContain("Ändert diesen Spielstand, legt keinen neuen an.");
+  it("zeigt die Zuordnung weiterhin — sehen ja, ändern nein", () => {
+    expect(ANSICHT).toContain('data-testid="game-mode-ownership-readonly"');
+    expect(ANSICHT).toContain("Wer steuert was");
   });
 
-  it("verweist für ein neues Spiel auf den einen Weg", () => {
-    expect(ANSICHT).toContain('entsteht ausschließlich unter „Spielstände &amp; Start"');
+  it("verweist für eine andere Zuordnung auf den einen Weg", () => {
+    expect(ANSICHT).toContain('Festgelegt beim Anlegen des Spielstands unter „Spielstände &amp; Start"');
+  });
+
+  it("heißt jetzt nach dem, was es noch tut", () => {
+    expect(ANSICHT).toContain('{ id: "control", label: "KI-Verhalten" }');
+    expect(ANSICHT).not.toContain('title="Spielmodus & Team-Zuordnung"');
   });
 });
