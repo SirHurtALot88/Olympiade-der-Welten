@@ -36,24 +36,42 @@ describe("foundation scouting and workflow portrait ui contract", () => {
     expect(cssText).toContain(".scouting-recommendations-section");
   });
 
-  it("uses compact lineup portrait cards in the legacy matchday pool", async () => {
-    const lineupText = await fs.readFile(legacyLineupPath, "utf8");
+  /**
+   * DIE ZUSICHERUNG HIESS FRUEHER „compact lineup portrait cards" und suchte
+   * `FoundationPlayerPortraitCard`, `density="compact"` und
+   * `legacy-matchday-player-card` in LegacyLineupLabClient.tsx.
+   *
+   * Der Spielerpool sieht heute anders aus, und zwar mit Absicht: gerendert wird
+   * `LineupNewLook.tsx`, und dort steht statt eines Karten-Rasters ein 22px-Avatar am
+   * Namen (Portrait, sonst Initialen) plus eine Hover-Vorschau. Die Vorschau reicht
+   * dieselbe geteilte Portraitkarte durch — `FoundationPlayerPortraitPreview` rendert
+   * intern `FoundationPlayerPortraitCard`. Es ist also nicht die Karte verschwunden,
+   * sondern das Raster; die Karte kommt jetzt beim Hovern.
+   *
+   * `legacy-matchday-player-card` gibt es nur noch als CSS-Regel ohne Benutzer —
+   * vermerkt in docs/ROTE_TESTS_TRIAGE.md.
+   *
+   * Was hier bleibt, ist die Zusage, die dem Spieler etwas verspricht: im Pool ist ein
+   * GESICHT zu sehen, mit Rueckfall auf Initialen, wenn kein Bild da ist, und die
+   * Vorschau erfindet keine eigene Kartendarstellung, sondern nimmt die geteilte.
+   */
+  it("der Einsatzlisten-Pool zeigt Portraits mit Initialen-Rueckfall und teilt sich die Portraitkarte", async () => {
+    const [poolText, previewText] = await Promise.all([
+      fs.readFile(path.join(root, "app/foundation/legacy-lineup-lab/LineupNewLook.tsx"), "utf8"),
+      fs.readFile(
+        path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"),
+        "utf8",
+      ),
+    ]);
 
-    // NOTE: FoundationPlayerPortraitCard is imported in LegacyLineupLabClient.tsx
-    // but never actually rendered there (no `<FoundationPlayerPortraitCard`
-    // usage in the file), and no other file under legacy-lineup-lab*/ renders
-    // it with density="compact" either. `legacy-matchday-player-card` is only
-    // referenced in app/globals.css (dead CSS) and `slotProjection` only in
-    // lib/foundation/player-portrait-stat-presets.ts's own definition — neither
-    // is consumed anywhere to build the described "legacy matchday pool"
-    // compact portrait cards. This looks like a real feature loss (see final
-    // report), so these assertions are intentionally left unchanged/red.
-    expect(lineupText).toContain("FoundationPlayerPortraitCard");
-    expect(lineupText).toContain('context="lineup"');
-    expect(lineupText).toContain('density="compact"');
-    expect(lineupText).toContain("legacy-matchday-player-card");
-    expect(lineupText).toContain("slotProjection");
-    expect(lineupText).toContain("interactive={false}");
+    // Portrait am Spieler, Initialen als Rueckfall — ohne den Rueckfall bleibt bei
+    // fehlendem Bild ein leerer Kreis stehen.
+    expect(poolText).toContain("getPlayerPortraitInitials");
+    expect(poolText).toContain("portraitUrl");
+    // Die Hover-Vorschau ist die GETEILTE, keine zweite Bauart daneben.
+    expect(poolText).toContain("FoundationPlayerPortraitPreview");
+    expect(previewText).toContain("FoundationPlayerPortraitCard");
+    expect(previewText).toContain("density");
   });
 
 });

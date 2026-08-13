@@ -865,7 +865,18 @@ describe("foundation performance architecture helpers", () => {
     // ging schief, das Ergebnis, und fuer wen. Der Nachtrag blieb damals aus, seither war diese
     // Ratsche rot. Die vier gehoerten laengerfristig eher in die Ansicht, die sie verbraucht, als
     // in die Wurzel — aber das ist ein eigener Umbau, kein Nachtragen einer Zahl.
+    // 237 -> 239, wieder bewusst statt heimlich: der Sponsoren-Rework (#501) hat genau zwei
+    // zusammengehoerende Zustaende ergaenzt — `sponsorUebernahmeBusy` und
+    // `sponsorUebernahmeMessage` (laeuft die Uebernahme gerade, und was ist dabei
+    // herausgekommen). Nachgezaehlt am Stand 0.4.94: 239, und der Diff von #501 an dieser
+    // Datei besteht aus genau diesen beiden `useState`-Zeilen. Es ist also kein
+    // schleichendes Zuwachsen, sondern ein benennbarer Zugang.
+    //
+    // DIESELBE ANMERKUNG WIE BEIM LETZTEN MAL, und sie wird mit jeder Runde staerker: die
+    // Uebernahme-Zustaende gehoeren naeher an die Sponsorenseite, die sie verbraucht, als
+    // in die Wurzel aller Foundation-Zustaende. Das ist ein eigener Umbau — die Ratsche
+    // haelt nur fest, dass er noch aussteht, statt ihn zu erzwingen.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(237);
+    expect(useStateCallCount).toBeLessThanOrEqual(239);
   });
 });

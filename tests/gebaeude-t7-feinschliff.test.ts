@@ -129,10 +129,25 @@ describe("F3: Recovery/Trainingseffekt-Chips sind Label + Wert + Klartext", () =
   });
 });
 
-describe("F5: Arena-Beliebtheits-Hinweis nutzt --nl-accent-text, nicht rohes --nl-accent", () => {
-  it("CSS-Regel zeigt auf --nl-accent-text", () => {
+/**
+ * F5 HIESS FRUEHER „nutzt --nl-accent-text statt rohem --nl-accent" und verlangte
+ * `var(--nl-accent-text` in der Regel. Das ist ueberholt, und zwar bewusst: mit G5
+ * wurde der Hinweis vom Teamfarben-Text auf den ruhigen Sekundaerton umgestellt
+ * („In Teamfarbe las sich die Rechnung wie eine Fehler-/Debug-Zeile. Es ist eine
+ * Erklaerung → ruhiger Sekundaertext", app/globals.css bei der Regel).
+ *
+ * Der BEFUND dahinter war nie „es muss --nl-accent-text sein", sondern „das rohe
+ * --nl-accent traegt als Text nicht" (gemessen 3,72:1 bei S-C). Genau das wird hier
+ * weiter geprueft — die Loesung dafuer darf sich aendern, der Fehler nicht
+ * zurueckkommen.
+ */
+describe("F5/G5: Arena-Beliebtheits-Hinweis benutzt nicht das rohe --nl-accent als Text", () => {
+  it("die Regel setzt eine Textfarbe und es ist nicht das rohe Akzent-Token", () => {
     const block = regel(".is-new-look .nl-facility-arena-popularity");
-    expect(block).toContain("var(--nl-accent-text");
-    expect(block).not.toContain("var(--nl-accent,");
+    expect(block).toMatch(/color:\s*var\(--nl-/);
+    // Der gemeldete Kontrastfehler: rohes --nl-accent als Schriftfarbe.
+    expect(block).not.toMatch(/color:\s*var\(--nl-accent[,)]/);
+    // G5: der Hinweis ist eine Erklaerung, kein Alarm — also der gedaempfte Ton.
+    expect(block).toContain("var(--nl-mut)");
   });
 });

@@ -94,21 +94,28 @@ import {
  * beiden Größen unterscheidbar bleiben.
  */
 
-type NlStandingsMode = "board" | "daten" | "vereine";
+export type NlStandingsMode = "board" | "daten" | "vereine";
 
 /**
  * Reihenfolge = Angebotsreihenfolge: „Daten" ist der Standard-Einstieg, „Board"
  * die erste Alternative daneben. Welche Ansicht zuletzt aktiv war, merkt sich
  * die App pro Team (s. `readStoredStandingsMode`) — so behält jeder Manager
  * seine eigene Präferenz, ohne dass der Standard für neue Spieler kippt.
+ *
+ * EXPORTIERT, damit die Zusicherung „der Saisonstand öffnet in der Datenansicht,
+ * es gibt ein Board, es gibt KEINE Karten-Ansicht" über WERTE prüfbar ist statt
+ * über eine Zeichenkette im Quelltext. Die alte Prüfung suchte nach dem Wortlaut
+ * `SEASON_V2_DEFAULT_MODE … "table"` und zerbrach an der reinen Umbenennung, ohne
+ * je etwas über die Ansicht selbst gesagt zu haben (vgl. tests/
+ * season-standings-v2-ui-contract.test.ts).
  */
-const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string }> = [
+export const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string }> = [
   { id: "daten", label: "Daten" },
   { id: "board", label: "Board" },
   { id: "vereine", label: "Vereine" },
 ];
 
-const NL_STANDINGS_DEFAULT_MODE: NlStandingsMode = "daten";
+export const NL_STANDINGS_DEFAULT_MODE: NlStandingsMode = "daten";
 
 /**
  * Merkzettel für die zuletzt genutzte Saisonstand-Ansicht. Der Schlüssel hängt

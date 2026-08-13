@@ -229,6 +229,25 @@ function NlThistTopList({
   );
 }
 
+/**
+ * Darstellung des Deal-Stroms. EXPORTIERT, damit die Zusicherung „es gibt einen
+ * Umschalter Timeline/Tabelle und er startet auf Timeline" über WERTE prüfbar ist.
+ *
+ * Die frühere Prüfung suchte `data-testid="transfer-history-layout-toggle"` im
+ * Quelltext. Der Umschalter selbst ist geblieben, nur rendert ihn seit dem Neuen
+ * Look die geteilte `NlSubTabs` — und die nimmt gar keine `data-testid` entgegen.
+ * Die Prüfung wäre also auch dann rot geblieben, wenn am Umschalter alles stimmt,
+ * und wäre grün geblieben, wenn jemand die zweite Darstellung entfernt hätte.
+ */
+export type TransferHistoryLayout = "timeline" | "table";
+
+export const TRANSFER_HISTORY_LAYOUT_ITEMS: Array<{ id: TransferHistoryLayout; label: string }> = [
+  { id: "timeline", label: "Timeline" },
+  { id: "table", label: "Tabelle" },
+];
+
+export const TRANSFER_HISTORY_DEFAULT_LAYOUT: TransferHistoryLayout = "timeline";
+
 export default function TransferHistoryV2NewLook({
   sourceBadgeLabel,
   saveName,
@@ -281,7 +300,7 @@ export default function TransferHistoryV2NewLook({
   selectedTransferId,
   onSelectTransfer,
 }: TransferHistoryV2NewLookProps) {
-  const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
+  const [historyLayout, setHistoryLayout] = useState<TransferHistoryLayout>(TRANSFER_HISTORY_DEFAULT_LAYOUT);
   // #73: Teambewegungs-Liste sortierbar über Sub-Tabs.
   // #2: Ohne Verkäufe im Scope ist "Erlös" durchgehend 0 (nur Käufe) — dann
   // standardmässig auf "Volumen" starten, damit kein Null-Bildschirm erscheint.
@@ -852,11 +871,8 @@ export default function TransferHistoryV2NewLook({
               className="nl-thist-layout-tabs"
               aria-label="Darstellung des Deal-Stroms"
               activeId={historyLayout}
-              onSelect={(id) => setHistoryLayout(id as "timeline" | "table")}
-              items={[
-                { id: "timeline", label: "Timeline" },
-                { id: "table", label: "Tabelle" },
-              ]}
+              onSelect={(id) => setHistoryLayout(id as TransferHistoryLayout)}
+              items={TRANSFER_HISTORY_LAYOUT_ITEMS}
             />
           }
         >
