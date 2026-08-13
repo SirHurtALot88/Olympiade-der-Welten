@@ -149,7 +149,8 @@ export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: stri
  *
  * DAS WAR EIN FEHLER, und zwar ein leiser: `getTeamSalarySum` liefert die ECHTE, front-/back-loadete
  * Vertragssumme — die Zahl, die am Saisonende vom Konto geht. Der Apron bemisst eine andere (seit
- * dem 12.08.2026 das VERHANDELTE Jahresgehalt, davor das geglättete Formel-Gehalt; siehe
+ * dem 13.08.2026 die REAL zu zahlende Jahressumme, davor das verhandelte Jahresgehalt und davor
+ * das geglättete Formel-Gehalt; siehe
  * Kopfkommentar `apron-service.ts`). Die KI prüfte ihre Zurückhaltung also gegen eine andere Zahl,
  * als die Abrechnung besteuert. Auf Chris' Spielstand (Saison 2, Spieltag 4) liefen die beiden
  * Zahlen bei 4 von 32 Teams auseinander, im Extremfall um 18,0 — Cold Steel sah bei echt 63,6 freie

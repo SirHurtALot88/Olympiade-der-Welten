@@ -491,10 +491,15 @@ describe("Finanzen-Umbau: die Audit-Befunde bleiben behoben", () => {
     expect(MARKUP).toContain("Salary Factor");
   });
 
-  it("die Apron-Karte erklärt geglättete vs. echte Gehaltssumme (der heikelste Punkt)", () => {
+  it("die Apron-Karte benennt die Bemessungsgrundlage — jetzt als DIESELBE wie die GuV", () => {
+    // BIS ZUM 13.08.2026 stand hier das Gegenteil: der Absatz musste erklaeren, warum Apron und
+    // GuV absichtlich VERSCHIEDENE Gehaltssummen zeigen (geglaettet vs. echt). Chris hat die
+    // Bemessung auf die real zu zahlende Jahressumme umgestellt — es gibt nur noch eine Zahl,
+    // und der Absatz sagt jetzt das. Die Zeile bleibt trotzdem Pflicht: sie traegt die Folge
+    // („frueh zahlen hebt die Bemessung"), die vorher die Anti-Gaming-Zusage abdeckte.
     expect(MARKUP).toContain("nl-fin-apron-basis-note");
-    expect(MARKUP).toMatch(/geglättete/);
-    expect(MARKUP).toContain("Beide Zahlen sind absichtlich verschieden");
+    expect(MARKUP).toMatch(/real zu zahlenden/);
+    expect(MARKUP).not.toContain("Beide Zahlen sind absichtlich verschieden");
     expect(MARKUP).toContain("actualSalaryTotal={team.expenses.salaries.total}");
   });
 
