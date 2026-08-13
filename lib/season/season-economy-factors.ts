@@ -67,7 +67,15 @@ function round2(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function parseSeasonNumber(seasonId: string) {
+/**
+ * Die laufende Nummer einer Saison aus ihrer Id ("season-3" → 3).
+ *
+ * Exportiert, weil das Fenster seine Horizonte nur relativ beschriftet ("Season +2"). Wer die
+ * Faktoren dem Spieler zeigt, braucht die ECHTE Saisonnummer ("Saison 5") — und die darf nicht
+ * daneben nochmal aus der Id geparst werden, sonst haetten zwei Stellen eine eigene Meinung
+ * darueber, was "die naechste Saison" heisst.
+ */
+export function parseSeasonNumber(seasonId: string) {
   const parsed = Number(seasonId.match(/(\d+)$/)?.[1] ?? 1);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }

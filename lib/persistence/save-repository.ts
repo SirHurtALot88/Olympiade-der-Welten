@@ -23,6 +23,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
@@ -1311,7 +1312,12 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // MIGRATION M2 (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3): das Verhandlungs-Benchmark am
   // Vertrag nachtragen, damit Bestandsvertraege nicht anders besteuert werden als neue. Ganz
   // aussen, damit es die fertigen Roster sieht; idempotent (setzt nur fehlende Felder).
+  // GEHALTSFAKTOR-BACKFILL (Chris: „salary factor muss bei allen sponsoren standardmäßig
+  // berücksichtigt werden"): jeder noch nicht abgerechnete Vertrag traegt danach den Faktor der
+  // LAUFENDEN Saison. Steht AUSSERHALB von M1, damit er auch die von M1 frisch gebauten Leitern
+  // sieht, und innerhalb des Faktor-Seeds, damit er den echten Saisonfaktor liest statt der 1,0.
   const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+    withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
@@ -1322,6 +1328,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     ),

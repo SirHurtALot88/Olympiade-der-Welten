@@ -106,6 +106,37 @@ function createGameState(input?: { gamePhase?: GameState["gamePhase"]; seasonId?
       schedule: [],
       standings: { "A-A": { points: 0 } },
       playerDisciplinePerformances: performances,
+      /**
+       * NACHGETRAGEN — sonst pruefte diese Vorlage etwas anderes, als sie behauptet.
+       *
+       * Seit der Regel „ein Spieltag ohne Disziplin-Ergebnisse wird nicht gebucht"
+       * (lib/foundation/season-points-ledger.ts, eingefuehrt gegen falsche PP-Zahlen im
+       * beschnittenen Browser-Payload) filtert der Ledger genau die Leistungszeilen weg,
+       * deren Spieltag kein `disciplineResults` traegt. Diese Vorlage trug nur
+       * `matchdayResults` — der Ledger blieb leer, MVS fiel fuer JEDEN Spieler auf null,
+       * und die Zusicherung „eingefroren heisst: Kaderaenderungen verschieben nichts" war
+       * rot, weil es gar nichts zu verschieben gab.
+       *
+       * Auf einem echten Spielstand traegt jeder gewertete Spieltag seine
+       * Disziplin-Ergebnisse (steht so im Quelltext der Regel). Die Vorlage bildet das
+       * jetzt nach, statt einen Zustand nachzustellen, den es im Spiel nicht gibt.
+       */
+      disciplineResults: [
+        {
+          id: "dres-1",
+          matchdayResultId: "result-1",
+          teamId: "A-A",
+          disciplineId: "d1",
+          disciplineSide: "d1" as const,
+          rank: 1,
+          baseScore: 800,
+          totalScore: performances.reduce((summe, entry) => summe + entry.scoreContribution, 0),
+          formModifier: 0,
+          readinessStatus: "ready",
+          warnings: [],
+          createdAt: "2026-06-10T12:00:00.000Z",
+        },
+      ],
       seasonSnapshots: [],
       matchdayResults: [
         {

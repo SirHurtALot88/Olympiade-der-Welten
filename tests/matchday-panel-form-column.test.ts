@@ -140,11 +140,25 @@ describe("Arena-Ladder: gleiche Hoehe wie die Arena, ohne Innen-Scroll", () => {
     expect(native).not.toContain("maxHeight: ladderMaxH");
   });
 
-  it("leitet die Zeilenhoehe aus der verfuegbaren Hoehe ab, statt sie fest zu setzen", () => {
-    expect(native).toContain("const LADDER_ROW_H = useMemo(");
-    expect(native).toContain("Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N))");
-    // Der Kopfblock wird gemessen, sonst muesste seine Hoehe geraten werden.
+  /**
+   * HIER STAND DIE RECHNUNG ALS ZEICHENKETTE
+   * (`toContain("Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N))")`).
+   * Sie ist zerbrochen, als die Rechnung nach `lib/matchday-arena/arena-ladder-metrics.ts`
+   * gewandert ist — obwohl sie dort seither ueber WERTE geprueft wird
+   * (tests/arena-tabelle-auf-einer-linie.test.ts: Polster- und Rahmenabzug, exakte
+   * Ausfuellung, Kappung nach oben und unten, Rueckfallwert).
+   *
+   * Die Zeichenketten-Fassung haette ohnehin nichts belegt: sie waere auch dann gruen
+   * geblieben, wenn `available` falsch berechnet worden waere, und sie kippte bei einer
+   * reinen Umbenennung. Hier bleibt nur, was sich HIER und nur hier sagen laesst: die
+   * Komponente rechnet nicht selbst, sondern benutzt die eine geteilte Stelle — und sie
+   * MISST den Kopfblock, statt seine Hoehe zu raten.
+   */
+  it("rechnet die Zeilenhoehe nicht selbst, sondern ueber die geteilte Stelle — und misst den Kopf", () => {
+    expect(native).toContain("resolveArenaLadderRowHeight");
     expect(native).toContain("ladderHeadRef");
+    // Kein zweiter, eigener Rechenweg neben der geteilten Stelle.
+    expect(native).not.toContain("Math.min(LADDER_ROW_MAX_H");
   });
 
   it("klebt nicht mehr per sticky, damit nichts gegenueber der Arena wandert", () => {

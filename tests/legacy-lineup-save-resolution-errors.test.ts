@@ -62,8 +62,18 @@ vi.mock("@/lib/room/room-gameplay-write-notifier", () => ({
 }));
 
 const buildAiLegacyLineupModifiers = vi.fn();
+/**
+ * MOCK-DRIFT, NACHGEZOGEN: die AI-Vorschau-Route ruft inzwischen
+ * `buildAiLegacyLineupPreviewWithModifiers` — Formkarten VOR der Kapitaenswahl, damit
+ * Vorschau und Apply dieselbe Kopplung zeigen. Der Modul-Mock kannte den Export nicht,
+ * vitest brach mit „No export is defined on the mock" ab, und die Zusicherung dieses
+ * Tests („eine gueltige saveId geht auf allen sechs Routen unveraendert durch") war rot,
+ * ohne dass an einer der Routen etwas fehlte.
+ */
+const buildAiLegacyLineupPreviewWithModifiers = vi.fn();
 vi.mock("@/lib/ai/ai-legacy-lineup-batch-apply-service", () => ({
   buildAiLegacyLineupModifiers,
+  buildAiLegacyLineupPreviewWithModifiers,
   applyAiLegacyLineupBatchLocally: vi.fn(),
 }));
 
@@ -87,6 +97,7 @@ describe("legacy lineup routes map SaveResolutionError instead of crashing", () 
     authorizeServerRoomWrite.mockReset();
     authorizeServerRoomWrite.mockReturnValue({ allowed: true, warnings: [] });
     buildAiLegacyLineupModifiers.mockReset();
+    buildAiLegacyLineupPreviewWithModifiers.mockReset();
     buildAiLegacyLineupPreview.mockReset();
   });
 
@@ -125,10 +136,32 @@ describe("legacy lineup routes map SaveResolutionError instead of crashing", () 
     });
 
     const { PUT } = await import("@/app/api/lineups/legacy/route");
-    const response = await PUT(
+
+    /**
+     * NEU DAZWISCHEN: der Abgabe-Riegel. Die Route speichert seit
+     * `describeLineupCommitment`/`confirmLock` erst nach ausdruecklicher Bestaetigung —
+     * ohne sie antwortet sie 409 und meldet zurueck, WAS eingesetzt wuerde. Dieser Test
+     * kannte den Riegel nicht, schickte keine Bestaetigung und kam deshalb nie bis zu der
+     * Stelle, die er pruefen wollte: die Uebersetzung des SaveResolutionError.
+     *
+     * Der Riegel wird hier gleich mitgeprueft, statt nur umgangen zu werden — sonst
+     * verschwaende dieser Test die Gelegenheit, ihn abzusichern.
+     */
+    const ohneBestaetigung = await PUT(
       new Request(
         "http://localhost/api/lineups/legacy?saveId=save-1&seasonId=season-1&matchdayId=matchday-1&teamId=A-A",
         { method: "PUT", body: JSON.stringify({ entries: [] }) },
+      ),
+    );
+    expect(ohneBestaetigung.status).toBe(409);
+    expect((await ohneBestaetigung.json()).error).toBe("lineup_lock_confirmation_required");
+    // Ohne Bestaetigung wird NICHT gespeichert — das ist der eigentliche Punkt des Riegels.
+    expect(saveLocalLegacyLineupDraft).not.toHaveBeenCalled();
+
+    const response = await PUT(
+      new Request(
+        "http://localhost/api/lineups/legacy?saveId=save-1&seasonId=season-1&matchdayId=matchday-1&teamId=A-A",
+        { method: "PUT", body: JSON.stringify({ entries: [], confirmLock: true }) },
       ),
     );
     const body = await response.json();
@@ -300,7 +333,8 @@ describe("legacy lineup routes map SaveResolutionError instead of crashing", () 
     const putResponse = await PUT(
       new Request(
         "http://localhost/api/lineups/legacy?saveId=save-1&seasonId=season-1&matchdayId=matchday-1&teamId=A-A",
-        { method: "PUT", body: JSON.stringify({ entries: [] }) },
+        // `confirmLock`: seit dem Abgabe-Riegel speichert die Route nur mit Bestaetigung.
+        { method: "PUT", body: JSON.stringify({ entries: [], confirmLock: true }) },
       ),
     );
     expect(putResponse.status).toBe(200);
@@ -366,6 +400,11 @@ describe("legacy lineup routes map SaveResolutionError instead of crashing", () 
       context: { teamId: "A-A", team: { name: "Alpha" }, matchdayId: "matchday-1", captainRule: { seasonCaptainSlots: 3 } },
     });
     buildAiLegacyLineupModifiers.mockReturnValue({ d1: {}, d2: {} });
+    buildAiLegacyLineupPreviewWithModifiers.mockImplementation(() => ({
+      preview: buildAiLegacyLineupPreview(),
+      modifiers: { d1: {}, d2: {} },
+      modifierPlanningMs: 0,
+    }));
     buildAiLegacyLineupPreview.mockReturnValue({
       d1: { disciplineSide: "d1", warnings: [], missingSlots: 0, selectedPlayers: 2, requiredPlayers: 2, expectedScore: 10, captainSelectionStatus: "ok", captainName: null },
       d2: { disciplineSide: "d2", warnings: [], missingSlots: 0, selectedPlayers: 2, requiredPlayers: 2, expectedScore: 10, captainSelectionStatus: "ok", captainName: null },

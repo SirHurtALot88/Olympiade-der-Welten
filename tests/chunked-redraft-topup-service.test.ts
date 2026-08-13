@@ -575,13 +575,35 @@ describe("chunked redraft topup service", () => {
 
   it("exports distinct manager AI plans for key identity teams", () => {
     const seed = loadFreshSeasonOneSeedData();
+    const angelegt = createSaveGameState("chunked-manager-ai-test-save", {
+      ...seed,
+      rosters: [],
+      contracts: [],
+      transferHistory: [],
+    });
+    /**
+     * DIE VORLAGE MUSS DEN KADER NOCHMAL LEEREN — und das ist ein Befund, kein Kunstgriff.
+     *
+     * `createSaveGameState` laesst seit dem P-S-Befund `ensureNulaOnProjectSuicide` ueber den
+     * frischen Spielstand laufen: P-S kauft Nula schon BEIM ANLEGEN, damit der Draft mit dem
+     * echten Rest plant (Chris: „P-S hat 300 aber kauft im Moment standardmaessig Nula das ist
+     * ok so!"). Ein frisch angelegter Spielstand hat damit genau EINEN Kadereintrag — auch
+     * wenn man `rosters: []` uebergibt.
+     *
+     * `runChunkedRedraftTopup` verlangt im Modus `full_clean_redraft` aber einen komplett
+     * leeren Kader und wirft sonst `full_clean_redraft_requires_empty_rosters:1`. Genau daran
+     * war dieser Test rot.
+     *
+     * KEIN SPIELERPROBLEM: `full_clean_redraft` wird im Spiel nirgends gefahren (Produktion
+     * nutzt `preseason_roster_repair` und `season1_initial_topup`; die Feature-Matrix fuehrt
+     * ihn ausdruecklich als `full_clean_redraft_from_empty_not_executed_by_design`). Betroffen
+     * ist ausser diesem Test nur `scripts/long-run-sandbox-s1-s6.ts`. Vermerkt in
+     * docs/ROTE_TESTS_TRIAGE.md — die Entscheidung, welche der beiden Regeln nachgibt, ist
+     * Chris'.
+     */
     const save: PersistedSaveGame = {
-      ...createSaveGameState("chunked-manager-ai-test-save", {
-        ...seed,
-        rosters: [],
-        contracts: [],
-        transferHistory: [],
-      }),
+      ...angelegt,
+      gameState: { ...angelegt.gameState, rosters: [] },
       name: "Chunked Manager AI Test",
       status: "active",
     };

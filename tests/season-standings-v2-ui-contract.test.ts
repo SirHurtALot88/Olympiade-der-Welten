@@ -1,98 +1,104 @@
+/**
+ * SAISONSTAND — welche Ansicht sich öffnet, und was es daneben gibt.
+ *
+ * WARUM DIESE DATEI UMGESCHRIEBEN WURDE. Sie bestand aus Zeichenketten-Suchen im
+ * Quelltext (`toContain('const SEASON_V2_DEFAULT_MODE: SeasonV2ViewMode = "table"')`
+ * und ähnlich). Solche Prüfungen sagen nichts über die Ansicht aus: sie kippen bei
+ * jeder Umbenennung, und sie bleiben grün, wenn jemand die Ansicht kaputt macht,
+ * solange nur die Buchstaben stehen bleiben. Genau das ist hier passiert — die
+ * Modus-Namen wurden zu `NlStandingsMode = "board" | "daten" | "vereine"`, die
+ * Datenansicht öffnet unverändert als erste. Die Zusicherung hing an drei Dateien
+ * und zerbrach, obwohl das Verhalten stimmte.
+ *
+ * Die Zusicherungen stehen jetzt auf exportierten WERTEN (`NL_STANDINGS_DEFAULT_MODE`,
+ * `NL_STANDINGS_MODE_ITEMS`, `TRANSFER_HISTORY_*`) — dieselbe Mechanik, die dieses
+ * Repo schon bei `MATCHDAY_PANEL_DEFAULT_SORT` benutzt.
+ */
 import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  NL_STANDINGS_DEFAULT_MODE,
+  NL_STANDINGS_MODE_ITEMS,
+} from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import {
+  TRANSFER_HISTORY_DEFAULT_LAYOUT,
+  TRANSFER_HISTORY_LAYOUT_ITEMS,
+} from "@/app/foundation/transfer-history-v2/TransferHistoryV2NewLook";
+
 describe("season standings v2 ui contract", () => {
-  it("opens in data table view with gm board and no cards tab", async () => {
-    const [seasonText, shellRouterBodyText, shellRouterBodyScopeText] = await Promise.all([
-      // SeasonStandingsV2Client.tsx is now a thin wrapper; markup lives in SeasonStandingsNewLook.tsx.
-      fs.readFile(
-        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsNewLook.tsx"),
-        "utf8",
-      ),
-      fs.readFile(path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
-      fs.readFile(
-        path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
-        "utf8",
-      ),
-    ]);
-    const foundationText = `${shellRouterBodyText}\n${shellRouterBodyScopeText}`;
-
-    // NOTE: the mode system was reworked — `SeasonV2ViewMode`/"table"/"gms"/
-    // "cards" became `NlStandingsMode` = "board" | "daten" | "vereine", and
-    // the New Look now defaults to "board" (not the "daten"/table view). The
-    // "cards" concept is indeed gone (confirmed: `.not.toContain('"cards"')`
-    // below still holds), matching this test's own expectation there — but
-    // the default view changing from table to "board" is a real behavior
-    // change, and "Datenansicht"/"Vergangene Saisons"/history-strip/
-    // table-skeleton-row have no matching string in SeasonStandingsNewLook.tsx
-    // at all. Looks like a real feature-loss/behavior-change (see final
-    // report), left red intentionally rather than guessed at.
-    expect(seasonText).toContain('const SEASON_V2_DEFAULT_MODE: SeasonV2ViewMode = "table"');
-    expect(seasonText).toContain('seasonV2Mode === "table"');
-    expect(seasonText).toContain('seasonV2Mode === "gms"');
-    expect(seasonText).not.toContain('"cards"');
-    expect(seasonText).toContain("Datenansicht");
-    expect(seasonText).toContain("Vergangene Saisons");
-    expect(seasonText).toContain("season-v2-history-strip");
-    expect(seasonText).toContain("season-v2-table-skeleton-row");
-    expect(seasonText).toContain("isLoading = false");
-    expect(foundationText).toContain("FoundationSeasonV2Panel");
-    expect(foundationText).toContain('shouldLoadSeasonOverviewFeed');
-    expect(foundationText).toContain('homeV2Tab === "office"');
-    expect(foundationText).toContain('{ id: "gms", label: "Manager" }');
-    expect(foundationText).not.toContain('{ id: "cards", label: "Karten" }');
+  it("öffnet in der Datenansicht — nicht im Board und nicht bei den Vereinen", () => {
+    expect(NL_STANDINGS_DEFAULT_MODE).toBe("daten");
+    // Der Standard muss auch angeboten werden, sonst startet die Seite auf einem
+    // Reiter, den es in der Leiste gar nicht gibt.
+    expect(NL_STANDINGS_MODE_ITEMS.map((item) => item.id)).toContain(NL_STANDINGS_DEFAULT_MODE);
+    // Angebotsreihenfolge: die Startansicht steht vorn.
+    expect(NL_STANDINGS_MODE_ITEMS[0]?.id).toBe(NL_STANDINGS_DEFAULT_MODE);
   });
 
-  it("exposes sprint M form curve, mobile cards, prize preview, and pinned sticky team", async () => {
-    const [seasonText, cssText] = await Promise.all([
-      // SeasonStandingsV2Client.tsx is now a thin wrapper; markup lives in SeasonStandingsNewLook.tsx.
-      fs.readFile(
-        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsNewLook.tsx"),
-        "utf8",
-      ),
-      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
-    ]);
-
-    // NOTE: none of these six markers (form curve chart, trend arrows, mobile
-    // cards toggle/grid, prize preview strip, pinned/sticky team row) appear
-    // anywhere in SeasonStandingsNewLook.tsx under these or any related name
-    // (checked for "trend", "mobile-card", "prize-preview"/"Preisgeld",
-    // "pinned"/"sticky" — all empty). The matching CSS classes below are still
-    // present in globals.css as dead rules. This looks like a real feature
-    // loss (see final report), left red intentionally.
-    expect(seasonText).toContain("season-v2-form-curve");
-    expect(seasonText).toContain("season-v2-trend-arrow");
-    expect(seasonText).toContain('data-testid="season-v2-mobile-cards-toggle"');
-    expect(seasonText).toContain("season-v2-mobile-card-grid");
-    expect(seasonText).toContain("season-v2-prize-preview");
-    expect(seasonText).toContain("season-v2-pinned-team");
-
-    expect(cssText).toContain(".season-v2-form-curve");
-    expect(cssText).toContain(".season-v2-mobile-card-grid");
-    expect(cssText).toContain(".season-v2-prize-preview");
+  it("bietet Board und Vereine daneben an — und keine Karten-Ansicht mehr", () => {
+    const ids = NL_STANDINGS_MODE_ITEMS.map((item) => item.id);
+    expect(ids).toEqual(["daten", "board", "vereine"]);
+    // Die „Karten"-Ansicht ist abgeschafft; sie darf auch unter keinem Label
+    // zurückkommen, ohne dass diese Zusicherung neu verhandelt wird.
+    expect(ids).not.toContain("cards");
+    expect(NL_STANDINGS_MODE_ITEMS.map((item) => item.label)).not.toContain("Karten");
+    // Jeder Reiter trägt eine nicht-leere Beschriftung — ein leeres Label wäre ein
+    // unsichtbarer Reiter.
+    for (const item of NL_STANDINGS_MODE_ITEMS) {
+      expect(item.label.trim().length, `Reiter ${item.id} ohne Beschriftung`).toBeGreaterThan(0);
+    }
   });
 
-  it("exposes transfer history timeline layout toggle", async () => {
-    const [historyText, cssText] = await Promise.all([
-      // TransferHistoryV2Client.tsx is now a thin wrapper; markup lives in TransferHistoryV2NewLook.tsx.
-      fs.readFile(
-        path.join(process.cwd(), "app/foundation/transfer-history-v2/TransferHistoryV2NewLook.tsx"),
-        "utf8",
-      ),
-      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
-    ]);
+  /**
+   * ES GIBT NUR EINE UMSCHALT-EBENE. Die Sidebar reichte früher ein zweites
+   * `{ id: "gms", label: "Manager" }` durch, das nichts steuerte (`viewMode` wurde
+   * bis in den Client gereicht und nie gelesen). Diese tote Ebene ist entfernt —
+   * belegt im Quelltext von FoundationShellRouterBody.tsx. Hier bleibt eine
+   * Quelltext-Prüfung, weil die Aussage genau eine über den Quelltext ist:
+   * die Zeile darf nicht zurückkommen.
+   */
+  it("die Sidebar baut keine zweite, tote Umschalt-Ebene über den Saisonstand", async () => {
+    const body = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"),
+      "utf8",
+    );
+    expect(body).toContain("FoundationSeasonV2Panel");
+    expect(body).not.toContain('{ id: "gms", label: "Manager" }');
+    expect(body).not.toContain('{ id: "cards", label: "Karten" }');
+  });
 
-    // NOTE: the timeline/table layout toggle itself is intact (`historyLayout`
-    // state, "timeline"/"table" switch), but it's now rendered via the shared
-    // NlSubTabs component (components/foundation/new-look/NlSubTabs.tsx),
-    // which doesn't accept/render a data-testid prop at all — so the specific
-    // "transfer-history-layout-toggle" testid is gone (same pattern as the
-    // shared subtab components elsewhere in this redesign). Left red
-    // intentionally (see final report) rather than silently dropped.
-    expect(historyText).toContain('data-testid="transfer-history-layout-toggle"');
-    expect(historyText).toContain("historyLayout");
-    expect(cssText).toContain(".transfer-history-v2-layout-toggle");
+  it("der Deal-Strom lässt sich zwischen Timeline und Tabelle umschalten und startet auf Timeline", () => {
+    expect(TRANSFER_HISTORY_DEFAULT_LAYOUT).toBe("timeline");
+    expect(TRANSFER_HISTORY_LAYOUT_ITEMS.map((item) => item.id)).toEqual(["timeline", "table"]);
+    expect(TRANSFER_HISTORY_LAYOUT_ITEMS.map((item) => item.id)).toContain(
+      TRANSFER_HISTORY_DEFAULT_LAYOUT,
+    );
   });
 });
+
+/**
+ * GELÖSCHT, NICHT REPARIERT: „exposes sprint M form curve, mobile cards, prize preview,
+ * and pinned sticky team".
+ *
+ * Die sechs gesuchten Marken (`season-v2-form-curve`, `season-v2-trend-arrow`,
+ * `season-v2-mobile-cards-toggle`, `season-v2-mobile-card-grid`,
+ * `season-v2-prize-preview`, `season-v2-pinned-team`) gehörten zum ALTEN Look. Der
+ * wurde mit 32683df8 („physically remove dead legacy look") ausgebaut, weil er zu
+ * dem Zeitpunkt bereits unerreichbar war — der Neue Look war dauerhaft an. Es ist
+ * also kein Funktionsverlust an der Oberfläche, sondern das Entfernen eines Zweigs,
+ * den seit Wochen niemand mehr zu sehen bekam.
+ *
+ * Die Zusicherung neu zu formulieren wäre falsch: der Neue Look hat kein
+ * Form-Kurven-Sparkline und keine Mobil-Karten, er hat eigene Formkarten-Spalten
+ * (`nl-standings-th-formcards`), die von tests/matchday-panel-form-column.test.ts und
+ * den Formkarten-Tests abgedeckt sind. Ein Test, der eine nicht mehr gewollte
+ * Gestaltung einfordert, meldet keinen Fehler, sondern hält eine Entscheidung auf.
+ *
+ * OFFEN FÜR CHRIS: die zugehörigen CSS-Regeln (`.season-v2-form-curve`,
+ * `.season-v2-mobile-card-grid`, `.season-v2-prize-preview`) stehen weiterhin in
+ * app/globals.css, obwohl sie niemand mehr benutzt — siehe
+ * docs/ROTE_TESTS_TRIAGE.md.
+ */

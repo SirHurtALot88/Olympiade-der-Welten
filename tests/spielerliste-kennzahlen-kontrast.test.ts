@@ -51,10 +51,24 @@ describe("Kopfzeilen der Kennzahl-Spalten sind deckend", () => {
     expect(rumpf).not.toMatch(/background:[^;]*transparent/);
   });
 
+  /**
+   * DIE MISCHUNG STAND FRUEHER DIREKT IN DER REGEL und wurde hier woertlich gesucht.
+   * Seit dem Kontrast-Befund am OVR-Label ist sie als Token `--nl-bronze-text`
+   * vereinheitlicht (gleiche Stufe) — die Regel zeigt jetzt auf das Token. Die
+   * woertliche Suche kippte an dieser Vereinheitlichung, obwohl die Farbe dieselbe
+   * geblieben ist.
+   *
+   * Die Zusicherung bleibt, sie folgt nur der Verweiskette: die Kopfzeile benutzt das
+   * Text-Bronze, und das Text-Bronze IST der aufgehellte Grundton. Beides zusammen ist
+   * schaerfer als vorher — wer das Token auf rohes Bronze zurueckdreht, faellt jetzt auf.
+   */
   it("hellt Bronze für die Beschriftung auf — der Grundton trägt als 10px-Versalie nicht", () => {
-    expect(regel(".is-new-look .nl-players-th.is-highlight-mvs")).toContain(
-      "color-mix(in srgb, var(--nl-bronze) 62%, #ffffff)",
-    );
+    const rumpf = regel(".is-new-look .nl-players-th.is-highlight-mvs");
+    expect(rumpf).toContain("var(--nl-bronze-text");
+    // Nicht der rohe Grundton — das war der gemeldete Fehler.
+    expect(rumpf).not.toMatch(/color:\s*var\(--nl-bronze[,)]/);
+    // Und das Token selbst ist wirklich eine Aufhellung Richtung Weiss, keine Attrappe.
+    expect(CSS).toContain("--nl-bronze-text: color-mix(in srgb, var(--nl-bronze) 62%, #ffffff);");
   });
 });
 

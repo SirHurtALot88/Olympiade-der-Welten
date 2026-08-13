@@ -1,5 +1,16 @@
 # Bekannte Test-Failures — Triage
 
+> **VERALTET. Der aktuelle Stand steht in [`ROTE_TESTS_TRIAGE.md`](./ROTE_TESTS_TRIAGE.md).**
+>
+> Dieses Dokument beschreibt eine Lage von 79 roten Dateien / 164 roten Tests bei 2.338 Tests
+> (Branch `claude/discipline-stage-tab`). Die Suite hat seither rund 6.600 Tests, und die
+> genannten Cluster sind zum grössten Teil aufgeloest oder anders begruendet. Wer nach dem
+> heutigen Stand sucht, liest die falsche Datei, wenn er hier weiterliest.
+>
+> Aufgehoben bleibt es als Protokoll: die Frage „echte Regression, veraltete Zusage oder
+> Umgebung?" wird hier zum ersten Mal gestellt, und die Antworten von damals sind der Grund,
+> warum manche der heutigen Zusagen so aussehen, wie sie aussehen.
+
 ## Triage-Runde 1 — Ergebnis (Test-Only, 0 Regressionen)
 
 **166 → 144 fehlgeschlagene Tests** (22 repariert), **ausschließlich Testdateien**

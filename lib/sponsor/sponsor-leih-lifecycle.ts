@@ -31,6 +31,7 @@ import type {
   GameState,
   SponsorLeihgabeRecord,
   SponsorOfferLeihe,
+  SponsorTermSeasons,
   SponsorUebernahmeAngebot,
   TeamSponsorContract,
 } from "@/lib/data/olyDataTypes";
@@ -42,11 +43,25 @@ import { altereLeihgabe, type SponsorLeihgabe } from "@/lib/sponsor/sponsor-leih
 /**
  * Welches Vertragsjahr laeuft gerade? 1 = Unterschriftssaison. Die Zahl indiziert die eingefrorene
  * `stufenreihe`, deshalb wird sie hier einmal zentral abgeleitet statt an drei Stellen gerechnet.
+ *
+ * SIE IST INZWISCHEN AUCH DIE ZAHL FUER DIE RENDITE-EROSION (`getSponsorTermMultiplier`): der
+ * Saisonwechsel (`advanceSponsorContractsForNewSeason`) und der Lade-Backfill des Gehaltsfaktors
+ * (`sponsor-salary-factor-backfill.ts`) haben die Formel `laufzeit − rest + 1` bis hierher je selbst
+ * geschrieben, obwohl diese Funktion daneben stand und laut ihrem eigenen Kommentar genau dafuer da
+ * war. Jetzt ruft beides hier an.
+ *
+ * Der Rueckgabetyp ist deshalb `SponsorTermSeasons` und auf 1..3 geklammert — die
+ * Erosions-Tabelle hat nur diese drei Eintraege, und ein `seasonsRemaining` von 0 (ausgelaufener
+ * Vertrag, der noch im Spielstand steht) haette sonst Jahr 4 ergeben und `undefined` als
+ * Multiplikator geliefert. Fuer die `stufenreihe`-Indizierung aendert die Klammer nichts: die Reihe
+ * ist selbst nie laenger als drei Stufen.
  */
-export function vertragsjahrAus(contract: Pick<TeamSponsorContract, "termSeasons" | "seasonsRemaining">): number {
+export function vertragsjahrAus(
+  contract: Pick<TeamSponsorContract, "termSeasons" | "seasonsRemaining">,
+): SponsorTermSeasons {
   const laufzeit = Math.max(1, contract.termSeasons ?? 1);
   const rest = Math.max(0, Math.min(laufzeit, contract.seasonsRemaining ?? laufzeit));
-  return Math.max(1, laufzeit - rest + 1);
+  return Math.max(1, Math.min(3, laufzeit - rest + 1)) as SponsorTermSeasons;
 }
 
 /**

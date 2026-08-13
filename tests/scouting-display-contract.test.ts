@@ -19,15 +19,20 @@ describe("scouting display contract", () => {
     ]);
 
     expect(scoutingText).toContain('data-testid="scouting-recommendations"');
-    // NOTE: FoundationSubNav is no longer embedded in per-panel screens — it
-    // was consolidated into a single top-level nav in FoundationShellRouterBody.tsx
-    // (app/foundation/foundation-page-client-exports.ts / .../shell/FoundationSubNav.tsx
-    // are the only other referencing files). tests/facilities-v2-ui-contract.test.ts
-    // explicitly asserts the *absence* of FoundationSubNav from its panel as
-    // the "New Look" behavior, so this looks like the same intentional
-    // consolidation here, but left red rather than silently inverted to a
-    // not.toContain (see final report).
-    expect(scoutingText).toContain("FoundationSubNav");
+    /**
+     * HIER STAND `toContain("FoundationSubNav")` — die Zusicherung ist UMGEDREHT, weil
+     * die Entscheidung umgedreht wurde: die Unternavigation liegt seit dem Neuen Look
+     * EINMAL in der Shell (FoundationShellRouterBody.tsx) und nicht mehr je Panel.
+     *
+     * Das ist keine Vermutung aus dem Ist-Zustand: drei weitere Zusicherungen fordern
+     * genau diese Abwesenheit bereits ein — tests/facilities-v2-ui-contract.test.ts:23,
+     * tests/foundation-v2-only-ui-contract.test.ts:35 und
+     * tests/saisonstand-kopf-tabelle-s5.test.ts:118 („kein FoundationSubNav mit
+     * Datenansicht/Manager mehr"). Diese Datei war die einzige, die noch das Gegenteil
+     * verlangte. Zwei Navigationsebenen fuer dieselbe Frage waren genau der Befund, der
+     * am Saisonstand zur toten Umschaltebene gefuehrt hat.
+     */
+    expect(scoutingText).not.toContain("FoundationSubNav");
     expect(scoutingText).not.toContain("scouting-top-disciplines");
     expect(reportText).toContain("VeloScoutMetric");
     expect(reportText).toContain('data-testid="scouting-report-disciplines"');

@@ -219,24 +219,59 @@ describe("cash prize apply service", () => {
     expect(result.blockingReasons[0]).toContain("read-only");
   });
 
-  it("blocks duplicate apply for the same save and season", async () => {
+  /**
+   * DER DUPLIKAT-RIEGEL WURDE BEWUSST ENTSCHAERFT — und dieser Test hielt noch die alte Regel.
+   *
+   * Frueher galt: ein vorhandenes Audit-Log ist ein Duplikat, Knopf zu. Das hat echten Schaden
+   * angerichtet (Begruendung im Quelltext von lib/season/cash-prize-apply-service.ts): solange
+   * der Schritt nur Tabellenspalten und das Log schrieb, konnte er als „erledigt" dastehen,
+   * ohne einen Cent zu bewegen — genau so entstand ein Spielstand, in dem alle 32 Teams
+   * unveraendertes Cash hatten. Der Riegel sperrte danach dauerhaft, der Spieler konnte die
+   * Buchung nie nachholen.
+   *
+   * Heute gilt: gesperrt wird nur, wenn das Sponsorgeld dieser Saison WIRKLICH ausgezahlt ist.
+   * Ist es das nicht, ist der zweite Druck kein Duplikat, sondern die ERSTE Buchung.
+   *
+   * Der Test prueft deshalb jetzt BEIDE Haelften. Nur die zweite allein waere zu schwach — sie
+   * bliebe gruen, wenn jemand den Riegel wieder auf „Log genuegt" zurueckdrehte, und genau das
+   * ist der Fehler, der schon einmal passiert ist.
+   */
+  const cashLogVorlage = {
+    id: "cash-log-1",
+    saveId: "save-local",
+    seasonId: "season-1",
+    matchdayId: "matchday-1",
+    action: "apply",
+    payload: {
+      idempotencyKey: "cash-prize-apply:save-local:season-1:matchday-1",
+      totalTeams: 2,
+      appliedTeams: 2,
+      totalPrizeMoney: 179.4,
+    },
+    createdAt: "2026-06-04T00:00:00.000Z",
+  };
+
+  it("ein Audit-Log ohne ausgezahltes Sponsorgeld sperrt NICHT — der zweite Druck ist die erste Buchung", async () => {
     const { save, persistence } = createPersistenceMock();
-    save.gameState.seasonState.cashPrizeApplyLogs = [
-          {
-            id: "cash-log-1",
-            saveId: "save-local",
-            seasonId: "season-1",
-            matchdayId: "matchday-1",
-            action: "apply",
-            payload: {
-          idempotencyKey: "cash-prize-apply:save-local:season-1:matchday-1",
-              totalTeams: 2,
-              appliedTeams: 2,
-              totalPrizeMoney: 179.4,
-        },
-        createdAt: "2026-06-04T00:00:00.000Z",
-      },
-    ];
+    save.gameState.seasonState.cashPrizeApplyLogs = [cashLogVorlage] as never;
+    save.gameState.seasonState.sponsorPayoutLogs = [];
+    mockHealthyPreview();
+
+    const result = await previewCashPrizeApply(
+      { saveId: "save-local", seasonId: "season-1", matchdayId: "matchday-1" },
+      persistence as never,
+    );
+
+    expect(result.duplicateDetected).toBe(false);
+    expect(result.blockingReasons).not.toContain("duplicate_apply_for_save_season_block");
+  });
+
+  it("mit ausgezahltem Sponsorgeld sperrt er — dann waere es wirklich eine Doppelbuchung", async () => {
+    const { save, persistence } = createPersistenceMock();
+    save.gameState.seasonState.cashPrizeApplyLogs = [cashLogVorlage] as never;
+    save.gameState.seasonState.sponsorPayoutLogs = [
+      { id: "payout-1", seasonId: "season-1", phase: "season_end", teamId: "W-W", amount: 52 },
+    ] as never;
     mockHealthyPreview();
 
     const result = await previewCashPrizeApply(
