@@ -60660,6 +60660,24 @@ button.foundation-team-portrait-card {
   margin-left: auto;
 }
 
+/* Die Zeile, die waehrend eines Drags an die Stelle des „Best Fit" tritt: sie nennt den Spieler
+   IN DER HAND und seine Zahl fuer GENAU DIESEN Slot. Sie ist kein Knopf (nichts anzuklicken,
+   solange die Maus haelt), deshalb `pointer-events: none` — sonst schluckte sie das dragover des
+   Slots darunter und die Ablage haette an ihrem eigenen Hinweis nicht mehr funktioniert. Der
+   durchgezogene Rahmen unterscheidet sie vom gestrichelten Vorschlag: hier steht eine Tatsache
+   ueber den gewaehlten Spieler, kein Angebot. */
+.is-new-look .nl-lineup-dragfit {
+  pointer-events: none;
+  cursor: inherit;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--nl-lineup-side-tone) 70%, transparent);
+  background: color-mix(in srgb, var(--nl-lineup-side-tone) 16%, transparent);
+}
+
+.is-new-look .nl-lineup-dragfit.is-empty {
+  opacity: 0.6;
+}
+
 .is-new-look .nl-lineup-slot-clear {
   position: absolute;
   top: 6px;

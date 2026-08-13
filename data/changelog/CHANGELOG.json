@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Einsatzliste · Slots",
+      "pr": null,
+      "text": "Wer einen Spieler ueber das Feld zog, sah an jedem Slot weiter den „Best Fit\" — den Vorschlag der Liste, also die Zahlen eines ANDEREN Spielers. Genau in dem Moment, in dem die Frage „was bringt DIESER hier?\" ansteht, beantwortete die Karte eine andere. Jetzt tritt waehrend des Ziehens an dieselbe Stelle eine Zeile mit dem Spieler in der Hand und seinem projizierten Wert fuer GENAU DIESEN Slot; danach steht der Vorschlag wieder da. Auf belegten Slots kommt das Delta gegen den, der gerade drin steht, dazu — die Antwort auf „lohnt der Tausch?\". Hat der Spieler fuer die Disziplin keinen Wert, sagt die Zeile das ausdruecklich, statt eine Luecke zu lassen. Beide Griffe zaehlen: aus dem Kader und aus einem belegten Slot heraus. Gerechnet wird dafuer nichts Neues — die Werte je Spieler und Slot lagen laengst vor und wurden bisher nur an dieser Stelle nicht gelesen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
       "text": "Ueber der Einsatzliste stand im Fehlerfall ein roher Fehlercode wie „lineup_draft_is_locked\" — ohne Grund und ohne Ausweg. Dahinter steckt kein Fehler, sondern eine gewollte Sperre: sobald ein Spieltag in der Arena gezeigt wurde, ist die Aufstellung festgenagelt, damit sich niemand nach dem Blick aufs Ergebnis noch nachbessern kann. Diese und die uebrigen Meldungen der Einsatzliste erscheinen jetzt als deutscher Satz, der den Grund nennt. Unbekannte Meldungen werden weiterhin unveraendert gezeigt statt gegen ein nichtssagendes „Unbekannter Fehler\" getauscht.",
