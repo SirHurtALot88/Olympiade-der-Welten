@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Ueber der Einsatzliste stand im Fehlerfall ein roher Fehlercode wie „lineup_draft_is_locked\" — ohne Grund und ohne Ausweg. Dahinter steckt kein Fehler, sondern eine gewollte Sperre: sobald ein Spieltag in der Arena gezeigt wurde, ist die Aufstellung festgenagelt, damit sich niemand nach dem Blick aufs Ergebnis noch nachbessern kann. Diese und die uebrigen Meldungen der Einsatzliste erscheinen jetzt als deutscher Satz, der den Grund nennt. Unbekannte Meldungen werden weiterhin unveraendert gezeigt statt gegen ein nichtssagendes „Unbekannter Fehler\" getauscht.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Team-Einstellungen · Neues Spiel",
       "pr": null,
       "text": "Ein neu angelegter Spielstand konnte damit enden, dass die KI alle 32 Teams steuert und keines dem Spieler gehört — man saß als Zuschauer in der eigenen Liga, und beim nächsten Spieltag wurde für einen aufgestellt. Grund waren zwei Knöpfe mit fast gleichem Namen: „Neues Spiel erstellen\" führt über den Klub-Assistenten und setzt die Steuerung korrekt, „Neues Spiel anlegen\" baute den Stand direkt aus dem Saatzustand — und der kennt keinen Spieler. An den vorhandenen Spielständen nachgemessen: alle über den Assistenten angelegten haben ein eigenes Team, beide über den zweiten Weg angelegten hatten keines. Die Klub-Auswahl geht jetzt auch diesen Weg mit; ohne Auswahl übernimmt der neue Stand das Team des laufenden.",

@@ -1,9 +1,9 @@
 "use client";
 
+import { uebersetzeLineupFehler, uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-board-props";
-import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { LineupRosterShortfall } from "@/lib/lineups/lineup-roster-shortfall";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
@@ -1482,7 +1482,7 @@ export default function LineupNewLook({
           <p className="nl-lineup-empty__title">Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
           {errors.length > 0 ? (
             <ul className="nl-lineup-empty__reasons">
-              {errors.map((reason) => (
+              {uebersetzeLineupFehlerListe(errors).map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
@@ -2341,11 +2341,11 @@ export default function LineupNewLook({
           der neutralen Statuszeile, nur echte Fehler bleiben rot. */}
       {blockingErrors.length > 0 ? (
         <div className="nl-lineup-status is-error" role="alert">
-          {blockingErrors.map(formatGameFlowBlocker).join(" · ")}
+          {uebersetzeLineupFehlerListe(blockingErrors).join(" · ")}
         </div>
       ) : lockedNotice ? (
         <div className="nl-lineup-status" role="status" data-testid="nl-lineup-locked-notice">
-          {formatGameFlowBlocker(lockedNotice)}
+          {uebersetzeLineupFehler(lockedNotice)}
         </div>
       ) : statusMessage ? (
         <div className="nl-lineup-status" role="status">
