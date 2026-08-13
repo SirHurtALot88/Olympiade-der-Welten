@@ -837,12 +837,19 @@ export default function FoundationTeamsNewLook({
     return { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected };
   }, [gameState, selectedTeam.teamId, heroRow]);
 
-  // MW-Hover (nur eigenes Team): Kaderspieler nach Marktwert absteigend.
-  // Reuse der Kadertabellen-Daten dieses Files (`getRosterEntryDisplayMarketValue`).
+  /**
+   * MW-Hover: Kaderspieler nach Marktwert absteigend — fuer JEDES Team.
+   *
+   * GEMELDET VON CHRIS: „die grafik soll auch von anderen teams verfuegbar sein! sowohl fuer MW
+   * als auch gehalt und Rang!" Hier stand ein Fog-of-War-Riegel (`if (!heroIsOwnTeam) return []`),
+   * der die Zusammensetzung auf das eigene Team beschraenkte; fremde Teams sahen nur die
+   * Kadersumme und darunter „Einzel-Marktwerte verdeckt". Der Riegel ist aufgehoben — die Werte
+   * liegen ohnehin in denselben Zeilen, aus denen die Kadertabelle und der Transfermarkt lesen,
+   * es war eine reine Anzeige-Sperre.
+   *
+   * Reuse der Kadertabellen-Daten dieses Files (`getRosterEntryDisplayMarketValue`).
+   */
   const heroMarketValueRows = useMemo(() => {
-    if (!heroIsOwnTeam) {
-      return [];
-    }
     return filteredSelectedRosterTableRows
       .map((row) => ({
         id: row.entry.id,
@@ -852,14 +859,11 @@ export default function FoundationTeamsNewLook({
       }))
       .filter((row) => isFiniteNumber(row.marketValue))
       .sort((left, right) => (right.marketValue ?? 0) - (left.marketValue ?? 0));
-  }, [heroIsOwnTeam, filteredSelectedRosterTableRows, getRosterEntryDisplayMarketValue]);
+  }, [filteredSelectedRosterTableRows, getRosterEntryDisplayMarketValue]);
 
-  // GEHALT-Hover (nur eigenes Team): Kaderspieler nach Gehalt absteigend, mit
-  // Vertragsform-Tag (FL/BL/STD) über `formatContractShapeShortLabel`.
+  // GEHALT-Hover: Kaderspieler nach Gehalt absteigend, mit Vertragsform-Tag (FL/BL/STD) über
+  // `formatContractShapeShortLabel` — fuer JEDES Team, siehe die Begruendung beim MW-Hover.
   const heroSalaryRows = useMemo(() => {
-    if (!heroIsOwnTeam) {
-      return [];
-    }
     return filteredSelectedRosterTableRows
       .map((row) => ({
         id: row.entry.id,
@@ -870,7 +874,7 @@ export default function FoundationTeamsNewLook({
       }))
       .filter((row) => isFiniteNumber(row.salary))
       .sort((left, right) => (right.salary ?? 0) - (left.salary ?? 0));
-  }, [heroIsOwnTeam, filteredSelectedRosterTableRows, getRosterEntryDisplaySalary]);
+  }, [filteredSelectedRosterTableRows, getRosterEntryDisplaySalary]);
 
   // Team-Entwicklung: Host liefert [Live, jüngste Saison, …] — für die
   // Verlaufs-Charts chronologisch drehen (älteste zuerst, Live zuletzt).
@@ -1636,9 +1640,6 @@ export default function FoundationTeamsNewLook({
             </li>
           ) : null}
         </ol>
-        {!heroIsOwnTeam ? (
-          <span className="nl-teams-rank-preview-title">Einzel-Marktwerte verdeckt (fremdes Team)</span>
-        ) : null}
       </>
     );
   }
@@ -1683,9 +1684,6 @@ export default function FoundationTeamsNewLook({
             </li>
           ) : null}
         </ol>
-        {!heroIsOwnTeam ? (
-          <span className="nl-teams-rank-preview-title">Einzel-Gehälter verdeckt (fremdes Team)</span>
-        ) : null}
       </>
     );
   }

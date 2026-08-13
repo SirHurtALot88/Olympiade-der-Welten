@@ -1153,6 +1153,35 @@ export default function LineupNewLook({
     event.dataTransfer.setData("application/x-nl-slot", slotKey);
   };
 
+  /**
+   * WER GERADE AM HAKEN HÄNGT — und was ER in jedem Slot brächte.
+   *
+   * GEMELDET VON CHRIS: „wenn ich einen spieler in der einsatzliste per drag and drop irgendwo rein
+   * ziehen will, müsste während des drags seine stats pro slot kommen, aktuell wird immernoch nur
+   * der beste spieler angezeigt."
+   *
+   * Genau so war es: die offenen Slots zeigten unverändert ihren „Best Fit" — den Vorschlag der
+   * Liste, nicht den Spieler in der Hand. Wer jemanden über das Feld zog, sah überall die Zahlen
+   * eines ANDEREN und musste raten, wo der eigene Griff etwas taugt.
+   *
+   * Die Zahlen dafür liegen längst vor: `playerBestSlotSummaryByActivePlayerId` rechnet jeden
+   * Spieler gegen JEDEN Slot (`lineup-candidate-model.ts`, volle Rangliste, nicht nur die Spitze)
+   * — inklusive `projectedDelta` gegen den Stand, der im Slot gerade projiziert ist. Hier wird
+   * nichts neu gerechnet, nur nachgeschlagen.
+   *
+   * Beide Griffe zählen: aus dem Kader (`dragCandidateId`) und aus einem belegten Slot heraus
+   * (`dragSourceSlotKey` → der Spieler, der dort steht). Der Umzug innerhalb des Feldes ist genau
+   * die Frage „wo steht er besser".
+   */
+  const dragPlayerId = dragCandidateId ?? (dragSourceSlotKey ? selections[dragSourceSlotKey] ?? null : null);
+  const dragPlayerName = dragPlayerId ? rosterCardByActivePlayerId.get(dragPlayerId)?.name ?? null : null;
+  const dragSlotFitByKey = useMemo(() => {
+    if (!dragPlayerId) return new Map<string, NlBestSlotEntry>();
+    return new Map(
+      (playerBestSlotSummaryByActivePlayerId.get(dragPlayerId) ?? []).map((entry) => [entry.slotKey, entry] as const),
+    );
+  }, [dragPlayerId, playerBestSlotSummaryByActivePlayerId]);
+
   // Slots akzeptieren nur Kandidaten-Drags (Zuweisung), keine Slot→Slot-Moves.
   const handleSlotDragOver = (event: ReactDragEvent<HTMLElement>, slotKey: string) => {
     if (!dndEnabled || !dragCandidateId) return;
@@ -2111,7 +2140,38 @@ export default function LineupNewLook({
                   />
                 ) : null}
 
-                {!player && topCandidate ? (
+                {/* WÄHREND DES ZIEHENS GILT DER SPIELER IN DER HAND, nicht der Vorschlag der
+                    Liste. Die Zeile steht auch auf BELEGTEN Slots — dort ist sie die Antwort auf
+                    „lohnt der Tausch?" und trägt deshalb das Delta gegen den, der gerade drin
+                    steht. Ohne Wert (keine Basis in dieser Disziplin) sagt sie das ausdrücklich,
+                    statt eine Lücke zu lassen, die wie ein Ladefehler aussieht. */}
+                {dragPlayerId ? (
+                  (() => {
+                    const dragFit = dragSlotFitByKey.get(slot.key) ?? null;
+                    const dragDelta = player ? dragFit?.projectedDelta ?? null : null;
+                    return (
+                      <div
+                        className={`nl-lineup-bestfit nl-lineup-dragfit${dragFit ? "" : " is-empty"}`}
+                        title={
+                          dragFit
+                            ? `${dragPlayerName ?? "Spieler"} in ${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1}: ${dragFit.fitSummary}`
+                            : `${dragPlayerName ?? "Spieler"} hat für diese Disziplin keinen Wert.`
+                        }
+                      >
+                        <small>Zieht</small>
+                        <strong>{dragPlayerName ?? "—"}</strong>
+                        <em className="nl-tnum">
+                          {formatNullableScore(dragFit?.projectedScore ?? null)}
+                          {dragDelta != null ? (
+                            <span className={dragDelta >= 0 ? "text-positive" : "text-negative"}>
+                              {` (${formatSignedScore(dragDelta, 1)})`}
+                            </span>
+                          ) : null}
+                        </em>
+                      </div>
+                    );
+                  })()
+                ) : !player && topCandidate ? (
                   <button
                     type="button"
                     className="nl-lineup-bestfit"
