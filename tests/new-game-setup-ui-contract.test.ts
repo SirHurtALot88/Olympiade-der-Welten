@@ -77,7 +77,11 @@ describe("new game setup UI contract", () => {
     expect(source).not.toContain('data-testid="current-save-ownership-cards"');
     expect(source).toContain('data-testid="foundation-active-game-mode"');
     expect(source).toContain('data-testid="game-mode-ownership-panel"');
-    expect(source).toContain('data-testid="solo-player-team-select"');
+    // Das Solo-Dropdown „Dein Team" ist entfallen: es war DIESELBE Entscheidung wie das
+    // Klub-Raster darunter, nur fuer den Solo-Fall — zwei Bedienungen fuer eine Sache in einem
+    // Reiter. Gemeldet von Chris als „ich weiss gar nicht mehr was ich wo einstellen muss".
+    // Gepinnt wird deshalb die EIGENSCHAFT: es gibt GENAU EINE Zuordnung, und das ist das Raster.
+    expect(source).not.toContain('data-testid="solo-player-team-select"');
     expect(source).toContain('data-testid="game-mode-ownership-picker"');
     expect(source).toContain("applyGameModeOwnership");
   });

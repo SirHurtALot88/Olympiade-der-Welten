@@ -99,10 +99,16 @@ describe("Neuer Spielstand · ein eigenes Team ist Pflicht", () => {
     expect(zaehleSteuerung(neu.gameState).manual).toBe(0);
   });
 
-  it("reicht die Klub-Auswahl vom Knopf bis in die Anfrage durch", async () => {
-    // Ohne diese eine Zeile im Knopf bliebe der Dienst wirkungslos.
+  /**
+   * Der Knopf, der diese Auswahl durchreichte, ist inzwischen ganz entfallen: er war der ZWEITE
+   * Weg, ein Spiel anzulegen, und damit der eigentliche Fehler (siehe
+   * `ein-weg-zum-neuen-spielstand.test.ts`). Der Dienst bleibt trotzdem richtig — er wird vom
+   * Assistenten und von der API bedient, und ein Aufrufer, der keine Auswahl mitgibt, darf
+   * weiterhin keinen Zuschauer-Save erzeugen. Genau das prüfen die Fälle darüber.
+   */
+  it("bleibt über die API ansprechbar, nicht nur über einen bestimmten Knopf", async () => {
     const fs = await import("node:fs");
-    const quelle = fs.readFileSync("app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx", "utf8");
-    expect(quelle).toContain('runSaveAction({ action: "create", name, manualTeamIds: newGameChrisTeamIds })');
+    const route = fs.readFileSync("app/api/singleplayer-state/route.ts", "utf8");
+    expect(route).toContain("persistence.createSave(body.name, ownerId, body.manualTeamIds ?? null)");
   });
 });

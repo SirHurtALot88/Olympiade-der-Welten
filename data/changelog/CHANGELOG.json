@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Team-Einstellungen",
+      "pr": null,
+      "text": "Ein neues Spiel entsteht ab jetzt an genau einer Stelle: Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\". Vorher gab es dafür vier Bedienungen an drei Orten — zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen; er war es, der Spielstände ohne eigenes Team erzeugte. Ohne angetippten Klub lässt sich jetzt gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet. Das Raster im Spielmodus-Reiter bleibt als Reparaturweg für laufende Stände erhalten — es heißt jetzt deutlich „Team-Zuordnung im LAUFENDEN Spielstand\" und verweist fürs Anlegen auf den einen Weg.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Spieltag · Einsatzliste",
       "pr": null,
       "text": "Ueber der Einsatzliste stand im Fehlerfall ein roher Fehlercode wie „lineup_draft_is_locked\" — ohne Grund und ohne Ausweg. Dahinter steckt kein Fehler, sondern eine gewollte Sperre: sobald ein Spieltag in der Arena gezeigt wurde, ist die Aufstellung festgenagelt, damit sich niemand nach dem Blick aufs Ergebnis noch nachbessern kann. Diese und die uebrigen Meldungen der Einsatzliste erscheinen jetzt als deutscher Satz, der den Grund nennt. Unbekannte Meldungen werden weiterhin unveraendert gezeigt statt gegen ein nichtssagendes „Unbekannter Fehler\" getauscht.",

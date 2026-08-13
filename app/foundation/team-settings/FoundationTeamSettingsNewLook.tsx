@@ -347,7 +347,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     setNewGamePreview,
     setNewGameSandbox,
     setNewGameSaveName,
-    setSoloPlayerTeam,
     setTeamControlDraft,
     setTeamControlMessage,
     setTeamIdentityDraft,
@@ -377,7 +376,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
   // Friction fix (Generalprobe #2): the HQ "Wähle dein Team" CTA deep-links via
   // `?view=teamSettings&tab=control`, so honor that tab on mount and open the
-  // "Spielmodus & KI" sub-tab (where `solo-player-team-select` lives) directly.
+  // "Spielmodus & KI" sub-tab (where the ownership picker lives) directly.
   const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>(() => {
     const tab = typeof window !== "undefined" ? parseFoundationTabFromUrl() : null;
     if (tab === "control" || tab === "team" || tab === "strategy" || tab === "saves") {
@@ -410,8 +409,25 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   // Kette und werden wie gehabt inline gezeigt.
   const [pendingNewGameCreate, setPendingNewGameCreate] = useState(false);
 
+  /**
+   * DER EINZIGE WEG, ein neues Spiel anzulegen.
+   *
+   * GEMELDET VON CHRIS: „saeuber die ganzen reiter dass es WIRKLICH nur noch einen weg gibt … team
+   * auswaehlen die human gesteuert sind durch anklicken und dann ‚Neues Spiel anlegen'".
+   *
+   * Der zweite Knopf in der Save-Karte ist deshalb ersatzlos entfallen; dieser hier traegt jetzt
+   * seinen Namen. Der Riegel unten ist der Kern: ohne angeklickten Klub gibt es kein Spiel. Ein
+   * Spielstand ohne eigenes Team macht einen zum Zuschauer der eigenen Liga — genau der Zustand,
+   * aus dem Chris nicht mehr herausfand („dann wird fuer mich gepickt"). Er lasst sich jetzt gar
+   * nicht mehr erzeugen, statt hinterher repariert werden zu muessen.
+   */
   async function handleCreateNewGame() {
     if (newGameBusy || readMeta.readOnly || pendingNewGameCreate) {
+      return;
+    }
+    // Der Riegel: ohne angeklickten Klub gibt es kein Spiel. Der Knopf ist in diesem Fall ohnehin
+    // gesperrt und ein Hinweis steht daneben — das hier ist die letzte Verteidigungslinie.
+    if (newGameChrisTeamIds.length === 0) {
       return;
     }
     if (newGamePreview && newGamePreview.blockers.length === 0) {
@@ -551,9 +567,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
         {!newGameWizardOpen ? (
           <p className="nl-newgame-collapsed-hint muted">
-            Legt einen komplett NEUEN Spielstand mit frischer Season 1 an und wechselt darauf um — dein
-            aktueller Save ({activeSaveName}) bleibt dabei erhalten, ist danach aber nicht mehr aktiv. Nur
-            nötig, wenn wirklich ein neues Spiel beginnen soll.
+            <strong>Der einzige Weg zu einem neuen Spielstand.</strong> Hier tippst du die Klubs an,
+            die du selbst steuerst — alle übrigen übernimmt die KI — und legst damit ein komplett
+            neues Spiel mit frischer Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt
+            erhalten, ist danach aber nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel
+            beginnen soll.
           </p>
         ) : null}
 
@@ -767,7 +785,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <button
             type="button"
             className="nl-teamsettings-btn"
-            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate}
+            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate || newGameChrisTeamIds.length === 0}
             title={
               readMeta.readOnly
                 ? getReadOnlyActionReason("das New-Game-Setup")
@@ -782,7 +800,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <button
             type="button"
             className="nl-teamsettings-btn is-primary nl-newgame-cta"
-            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate}
+            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate || newGameChrisTeamIds.length === 0}
             title={
               readMeta.readOnly
                 ? getReadOnlyActionReason("ein neues Spiel")
@@ -790,14 +808,25 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getBusyActionReason("Das New-Game-Setup")
                   : newGamePreview && newGamePreview.blockers.length > 0
                     ? `Noch offen: ${newGamePreview.blockers.map((reason: string) => formatCockpitReason(reason)).join(" · ")}`
-                    : "Prüft das Setup und erstellt anschließend direkt den neuen lokalen Spielstand."
+                    : newGameChrisTeamIds.length === 0
+                      ? "Tipp oben mindestens einen Klub an, den du selbst steuerst — ohne eigenes Team gibt es kein Spiel."
+                      : "Prüft das Setup und legt anschließend den neuen lokalen Spielstand an. Die angetippten Klubs steuerst du selbst, alle übrigen die KI."
             }
             onClick={() => void handleCreateNewGame()}
           >
-            {pendingNewGameCreate ? "Prüft & erstellt..." : newGameBusy ? "Arbeitet..." : "Neues Spiel erstellen"}
+            {pendingNewGameCreate ? "Prüft & legt an..." : newGameBusy ? "Arbeitet..." : "Neues Spiel anlegen"}
           </button>
         </div>
 
+        {/* Ein grauer Knopf ohne Grund ist dasselbe Uebel wie ein roher Fehlercode: die Regel
+            greift richtig, nur weiss niemand warum. Deshalb steht sie daneben, solange sie greift. */}
+        {newGameChrisTeamIds.length === 0 ? (
+          <p className="nl-teamsettings-msg is-warn" data-testid="new-game-needs-own-team">
+            <strong>Noch kein eigener Klub gewählt.</strong> Tipp oben die Karte des Klubs an, den du
+            selbst steuern willst (bis zu vier). Alle übrigen übernimmt die KI. Ohne eigenes Team
+            wäre der Spielstand reine Zuschauerei.
+          </p>
+        ) : null}
         {newGameError ? <p className="nl-teamsettings-msg is-risk">{newGameError}</p> : null}
         {newGameSuccess ? <p className="nl-teamsettings-msg is-good">{newGameSuccess}</p> : null}
         {newGamePreview ? (
@@ -1060,35 +1089,22 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
           {renderNewGameWizard()}
 
+          {/* HIER STAND EIN ZWEITER „Neues Spiel anlegen"-KNOPF — und er ist der Grund, warum
+              Spielstaende ohne eigenes Team entstanden.
+
+              GEMELDET VON CHRIS: „aktuell startet jedes game mit 0 manuellen spielern und ich weiss
+              gar nicht mehr was ich wo einstellen muss" und „saeuber die ganzen reiter dass es
+              WIRKLICH nur noch einen weg gibt".
+
+              Er sass zwanzig Zeilen unter dem Klub-Assistenten, hiess fast genauso wie dessen Knopf
+              („anlegen" gegen „erstellen") und baute den Spielstand roh aus dem Saatzustand — der
+              kennt keinen Spieler. An Chris' Spielstaenden nachgemessen: alle ueber den Assistenten
+              angelegten trugen manual=1/ai=31, beide ueber diesen Weg angelegten manual=0/ai=32.
+
+              Ihn zu reparieren haette den eigentlichen Fehler stehen lassen: ZWEI Wege fuer
+              dieselbe Sache. Der Assistent oben kann alles, was dieser konnte, und mehr — er ist
+              jetzt der einzige Weg. */}
           <div className="nl-teamsettings-actions">
-            <button
-              type="button"
-              className="nl-teamsettings-btn"
-              disabled={isSaveBusy || readMeta.readOnly}
-              title={
-                readMeta.readOnly
-                  ? getReadOnlyActionReason("einen neuen Save")
-                  : isSaveBusy
-                    ? getBusyActionReason("Die Save-Aktion")
-                    // Der Text sagte frueher „auf Basis des aktuellen Zustands". Das war schlicht
-                    // falsch: `createSave` baut ueber `loadSeedData()` ein FRISCHES Spiel und
-                    // schaltet darauf um. Gemeldet als „S1 MD 1 speichert er den save und nicht auf
-                    // dem aktuellen Stand wo ich gerade war" — der Knopf tat, was er tat, nur eben
-                    // nicht das, was danebenstand. Wer den laufenden Stand sichern will, nimmt
-                    // „Manuell speichern".
-                    : "Legt ein KOMPLETT NEUES Spiel an (frische Season 1) und schaltet darauf um. Dein laufender Spielstand bleibt erhalten, ist danach aber nicht mehr aktiv."
-              }
-              onClick={() => {
-                const name = `Neues Spiel ${formatGermanSaveTimestamp()}`;
-                // Die Klub-Auswahl von oben geht MIT. Ohne sie entstand ein Spielstand, in dem die
-                // KI alle 32 Teams steuerte — gemeldet als „ich waehle dort ein team aus aber dann
-                // wird fuer mich gepickt". Ist nichts gewaehlt, uebernimmt der Dienst das Team des
-                // laufenden Standes (siehe `createSave`), statt einen Zuschauer-Save anzulegen.
-                void runSaveAction({ action: "create", name, manualTeamIds: newGameChrisTeamIds });
-              }}
-            >
-              Neues Spiel anlegen
-            </button>
             <button
               type="button"
               className="nl-teamsettings-btn"
@@ -1779,38 +1795,33 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
         <section className="nl-teamsettings-subpanel" data-testid="game-mode-ownership-panel">
           <header className="nl-teamsettings-subhead">
-            <h4>Team-Zuordnung</h4>
+            <h4>Team-Zuordnung im LAUFENDEN Spielstand</h4>
           </header>
+          {/* Dieses Raster sieht dem Klub-Picker unter „Spielstände & Start" zum Verwechseln
+              ähnlich — und genau das war das Problem: zwei fast gleiche 32-Karten-Raster in zwei
+              Reitern, eines legt ein NEUES Spiel an, eines ändert das laufende. Welches wofür ist,
+              stand nirgends. Deshalb sagt es jetzt beides ausdrücklich. */}
           <p className="nl-teamsettings-note">
+            <strong>Ändert diesen Spielstand, legt keinen neuen an.</strong> Ein neues Spiel
+            entsteht ausschließlich unter „Spielstände &amp; Start". Hier korrigierst du die
+            Zuordnung eines Standes, der schon läuft.{" "}
             {activeSaveGameMode === "online_4v4"
               ? "Wähle genau 4 Teams für Chris und 4 für Franky. Alle anderen Teams bleiben AI."
               : activeSaveGameMode === "solo_1"
                 ? "Wähle genau 1 Team für dich. Alle anderen Teams bleiben AI."
                 : `Maximal ${gameModeOwnershipLimits.chrisMax} Chris-Team(s)${gameModeOwnershipLimits.frankyMax ? ` und ${gameModeOwnershipLimits.frankyMax} Franky-Team(s)` : ""}.`}
           </p>
-          {activeSaveGameMode === "solo_1" || (gameModeOwnershipLimits.chrisMax === 1 && gameModeOwnershipLimits.frankyMax === 0) ? (
-            <NlField label="Dein Team">
-              <select
-                data-testid="solo-player-team-select"
-                disabled={readMeta.readOnly}
-                value={gameModeOwnershipChrisIds[0] ?? ""}
-                onChange={(event) => {
-                  if (event.target.value) {
-                    setSoloPlayerTeam(event.target.value);
-                  }
-                }}
-              >
-                <option value="" disabled>
-                  Team wählen
-                </option>
-                {gameState.teams.map((team: Team) => (
-                  <option key={`solo-team-${team.teamId}`} value={team.teamId}>
-                    {team.name} ({team.shortCode})
-                  </option>
-                ))}
-              </select>
-            </NlField>
-          ) : (
+          {/* HIER STAND ZUSAETZLICH EIN DROPDOWN „Dein Team" — dieselbe Entscheidung wie das
+              Klub-Raster darunter, nur fuer den Solo-Fall, und damit die zweite Bedienung fuer
+              dieselbe Sache INNERHALB EINES REITERS.
+
+              GEMELDET VON CHRIS: „Glaube das macht aktuell nur probleme dass wir Spielstaende &
+              start + Team-Fokus + Spielmodus & KI haben … ich weiss gar nicht mehr was ich wo
+              einstellen muss".
+
+              Das Raster kann den Solo-Fall genauso (die Obergrenze ist dieselbe) — es bleibt als
+              einzige Bedienung stehen. */}
+          {(
             <>
               <div className="nl-teamsettings-metric-grid">
                 <NlMetric

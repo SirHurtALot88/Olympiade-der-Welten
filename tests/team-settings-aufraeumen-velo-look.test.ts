@@ -39,7 +39,11 @@ describe("Befund 1 — Neues-Spiel-Assistent standardmäßig eingeklappt", () =>
 
   it("im eingeklappten Zustand steht trotzdem ein erklärender Satz da (nichts verschwindet stumm)", () => {
     expect(HOST).toContain("nl-newgame-collapsed-hint");
-    expect(HOST).toContain("Legt einen komplett NEUEN Spielstand mit frischer Season 1 an");
+    // Der Wortlaut hat sich geaendert, seit der Assistent der EINZIGE Weg zu einem neuen
+    // Spielstand ist (der zweite, rohe Knopf darunter ist entfallen). Gepinnt wird deshalb die
+    // Eigenschaft „der eingeklappte Zustand erklaert sich", nicht der alte Satz.
+    expect(HOST).toContain("Der einzige Weg zu einem neuen Spielstand.");
+    expect(HOST).toContain("frischer Season 1");
   });
 
   it("der Umschalter ist erreichbar und beschriftet sein Ziel", () => {
