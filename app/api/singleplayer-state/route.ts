@@ -62,7 +62,12 @@ type RoomWriteContextFields = {
 };
 
 type SaveActionBody =
-  | { action: "create"; name: string }
+  /**
+   * `manualTeamIds`: die im Klub-Picker gewaehlten Teams. Ohne sie entstand ein Spielstand mit
+   * NULL eigenen Teams — gemeldet als „ich waehle dort ein team aus aber dann wird fuer mich
+   * gepickt". Siehe `createSave` in `lib/persistence/persistence-service.ts`.
+   */
+  | { action: "create"; name: string; manualTeamIds?: string[] }
   | { action: "clone"; sourceSaveId: string; name: string }
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }
@@ -423,7 +428,7 @@ export async function POST(request: Request) {
     // pointer and never blanket-archives/repoints the other player's active save. Auth off ->
     // ownerId null -> unchanged global behavior.
     const ownerId = await resolveSessionOwnerId();
-    save = persistence.createSave(body.name, ownerId);
+    save = persistence.createSave(body.name, ownerId, body.manualTeamIds ?? null);
   } else if (body.action === "clone") {
     const ownerId = await resolveSessionOwnerId();
     save = persistence.cloneSave(body.sourceSaveId, body.name, ownerId);

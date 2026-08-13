@@ -2035,7 +2035,12 @@ export type FoundationMatchdayMvpScoringResponse = {
 };
 
 export type SaveActionRequest =
-  | { action: "create"; name: string }
+  /**
+   * `manualTeamIds`: die im Klub-Picker gewaehlten Teams. Ohne sie entsteht ein Spielstand mit
+   * NULL eigenen Teams — gemeldet als „ich waehle dort ein team aus aber dann wird fuer mich
+   * gepickt". Siehe `createSave` in `lib/persistence/persistence-service.ts`.
+   */
+  | { action: "create"; name: string; manualTeamIds?: string[] }
   | { action: "clone"; sourceSaveId: string; name: string }
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }

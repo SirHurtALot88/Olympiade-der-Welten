@@ -63,6 +63,7 @@ import {
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { slimGameStateForWrite } from "@/lib/persistence/save-payload-slimming";
 import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
 import type {
   PersistedSaveGame,
@@ -1525,11 +1526,15 @@ function createPersistedSaveRecord(input: {
     ...(normalizedGameState.baselineWriteGuardEvents ?? []),
     ...guardedBaselineWrite.events,
   ]);
-  const guardedGameState: GameState = {
+  // Zuletzt vor dem Schreiben: Felder ohne Auskunft fallen weg (leere Verletzungs-Nachwehen auf
+  // gesunden Wuerfen, der byte-identische Zwilling der Saison-Spielerwerte). Beim SCHREIBEN und
+  // nicht beim Lesen — so kostet es einmal ein paar Millisekunden statt bei jedem Laden, und
+  // bestehende Spielstaende schrumpfen beim naechsten Speichern von selbst.
+  const guardedGameState: GameState = slimGameStateForWrite({
     ...normalizedGameState,
     playerBaselines: guardedBaselineWrite.baselines,
     baselineWriteGuardEvents,
-  };
+  });
 
   const upsertSave = database.prepare(`
     INSERT INTO saves (
@@ -1909,10 +1914,52 @@ export function createSaveRepository(): SaveRepository {
       }
 
       const database = getDatabase();
-      const activeRow = database.prepare("SELECT save_id FROM saves WHERE status = 'active'").get() as
-        | { save_id: string }
-        | undefined;
-      const activeSaveId = activeRow?.save_id ?? null;
+      /**
+       * GESCHUETZT IST GENAU DAS, WAS `getActiveSave` LIEFERT — und sonst nichts.
+       *
+       * GEMELDET VON CHRIS: „Kannst du das game für mich löschen? ich bekomme es nicht weg".
+       *
+       * Hier stand:
+       *
+       *     SELECT save_id FROM saves WHERE status = 'active'      ← ohne ORDER BY, mit .get()
+       *
+       * `getActiveSave` liest DIESELBE Tabelle, aber mit `ORDER BY updated_at DESC LIMIT 1` — also
+       * den ZULETZT BENUTZTEN. Ohne die Sortierung nimmt SQLite eine beliebige Zeile, faktisch die
+       * mit der kleinsten rowid, also den AELTESTEN. Riegel und Resolver waren sich damit uneinig,
+       * welcher Spielstand „der aktive" ist. Dass `saves.status` ein LEBENSZYKLUS ist und kein
+       * Ladezustand, macht es scharf: am Live-Spielstand nachgemessen tragen ALLE SIEBEN
+       * Spielstaende „active".
+       *
+       * Gemessen an Chris' Spielstand: der Riegel schuetzte `new-game-1784747079649-n90y4m`
+       * (rowid 18, vom 22.07.) — genau den, den er loswerden wollte. Geladen war
+       * `new-game-1786465783606-0kalpx` (zuletzt benutzt), und der war ungeschuetzt. Doppelt
+       * falsch also. Und weil die Schleife stillschweigend `continue` macht, passierte auf dem
+       * Schirm gar nichts: kein Fehler, keine Erklaerung, der Eintrag blieb einfach stehen.
+       *
+       * Geschuetzt sind ab jetzt beide Wege, die `getActiveSave` gehen kann: jeder gueltige
+       * Besitzer-Zeiger aus `active_saves` (im Mehrspieler-Save haengt an jedem ein Mitspieler)
+       * UND die globale Rueckfallebene, die ohne Zeiger greift. Nur Sortierung UND Tabelle
+       * zusammen ergeben dieselbe Antwort wie der Resolver.
+       */
+      const activeSaveIds = new Set<string>();
+      for (const row of database.prepare("SELECT save_id FROM active_saves").all() as Array<{
+        save_id: string;
+      }>) {
+        // Ein Zeiger auf einen archivierten Stand ist abgestanden — `getActiveSave` ignoriert ihn
+        // ebenfalls und faellt auf die globale Zeile zurueck.
+        const status = database.prepare("SELECT status FROM saves WHERE save_id = ?").get(row.save_id) as
+          | { status?: string }
+          | undefined;
+        if (status && status.status !== "archived") {
+          activeSaveIds.add(row.save_id);
+        }
+      }
+      const globalActiveRow = database
+        .prepare("SELECT save_id FROM saves WHERE status = 'active' ORDER BY updated_at DESC LIMIT 1")
+        .get() as { save_id: string } | undefined;
+      if (globalActiveRow) {
+        activeSaveIds.add(globalActiveRow.save_id);
+      }
 
       const existsStatement = database.prepare("SELECT 1 FROM saves WHERE save_id = ?");
       const deleteSaveStatement = database.prepare("DELETE FROM saves WHERE save_id = ?");
@@ -1921,9 +1968,9 @@ export function createSaveRepository(): SaveRepository {
       const deletedSaveIds: string[] = [];
       const transaction = database.transaction(() => {
         for (const saveId of requestedIds) {
-          // Never delete the currently active save — the UI is expected to prevent this
+          // Never delete a currently loaded save — the UI is expected to prevent this
           // selection up front, but this is the last line of defense against a broken app state.
-          if (saveId === activeSaveId) {
+          if (activeSaveIds.has(saveId)) {
             continue;
           }
           if (!existsStatement.get(saveId)) {

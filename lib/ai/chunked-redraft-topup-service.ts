@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { deriveRosterTargets, GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
@@ -234,6 +235,12 @@ type Candidate = {
   men: number;
   soc: number;
   pickScore: number;
+  /**
+   * Potenzial-Score aus dem Record (eine Quelle, siehe
+   * resolvePlayerPotentialScoreFromGameState) — im Pool-Builder aufgelöst, damit
+   * kein Scoring-Pfad mehr auf das abweichende Import-Altfeld player.potential greift.
+   */
+  potentialScore: number | null;
 };
 
 function getTopupPlayerMarketValue(player: Player) {
@@ -844,6 +851,7 @@ function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, 
         men,
         soc,
         pickScore: 0,
+        potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }),
       };
     })
     .filter((entry): entry is Candidate => Boolean(entry))
@@ -1189,7 +1197,7 @@ function getCheapMarketLaneScore(input: {
       : input.role === "value"
         ? marketValueSalaryRatio * 8 + needAxis * 0.65 + identityFit * 0.35 + premiumAxisFit * 0.35 + themePriority * 7
         : input.role === "prospect"
-          ? (input.candidate.player.potential ?? 0) * 0.75 + needAxis * 0.4 + identityFit * 0.35 + themePriority * 8 - salary * 0.4
+          ? (input.candidate.potentialScore ?? 0) * 0.75 + needAxis * 0.4 + identityFit * 0.35 + themePriority * 8 - salary * 0.4
           : input.role === "theme"
             ? themePriority * 22 + identityFit * 0.45 + premiumAxisFit * 0.32 + needAxis * 0.25
             : needAxis * 0.75 + marketValueSalaryRatio * 4 + identityFit * 0.35 + premiumAxisFit * 0.28 + themePriority * 6 - salary * 0.25;
@@ -1745,6 +1753,7 @@ function buildTeamReadinessScore(input: {
       men: getPlayerAxisValue(player, "men"),
       soc: getPlayerAxisValue(player, "soc"),
       pickScore: 0,
+      potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: player.id }),
     }))
     .map((candidate) => ({
       ...candidate,
@@ -2267,7 +2276,7 @@ function buildManagerMarketBoard(input: {
       playerId: candidate.player.id,
       name: candidate.player.name,
       currentRating: roundValue(candidate.quality, 2),
-      potentialRange: getPotentialRange(candidate.player.potential),
+      potentialRange: getPotentialRange(candidate.potentialScore),
       marketValue: candidate.marketValue,
       salary: candidate.salary,
       teamFit: roundValue(candidate.identityFit + candidate.classFit, 2),
@@ -2313,7 +2322,7 @@ function scoreCandidateForTeam(input: {
   const valueBias = toBias(input.strategyProfile?.bias?.valuePriority);
   const wageSensitivity = toBias(input.strategyProfile?.bias?.wageSensitivity);
   const depthBias = toBias(input.strategyProfile?.bias?.rosterDepthPreference);
-  const potentialScore = roundValue(input.candidate.player.potential ?? 0, 2);
+  const potentialScore = roundValue(input.candidate.potentialScore ?? 0, 2);
   if (input.counters) input.counters.themeScoreCalls += 1;
   const themeScore = calculateThemeCompositionScore({
     gameState: input.gameState,
@@ -4353,7 +4362,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             teamNeed: candidate.teamNeed,
             role: desiredDraftRole,
             currentRating: roundValue(candidate.quality, 2),
-            potentialRange: getPotentialRange(candidate.player.potential),
+            potentialRange: getPotentialRange(candidate.potentialScore),
             qualityTier: getQualityTier(candidate.quality),
             axisFitPow: roundValue(candidate.pow, 2),
             axisFitSpe: roundValue(candidate.spe, 2),
@@ -5118,7 +5127,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           teamNeed: candidate.teamNeed,
           role: desiredDraftRole,
           currentRating: roundValue(candidate.quality, 2),
-          potentialRange: getPotentialRange(candidate.player.potential),
+          potentialRange: getPotentialRange(candidate.potentialScore),
           qualityTier: getQualityTier(candidate.quality),
           axisFitPow: roundValue(candidate.pow, 2),
           axisFitSpe: roundValue(candidate.spe, 2),

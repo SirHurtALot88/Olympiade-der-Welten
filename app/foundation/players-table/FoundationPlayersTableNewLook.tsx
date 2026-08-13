@@ -1418,7 +1418,7 @@ export default function FoundationPlayersTableNewLook({
     const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
     // Echter Potenzial-Score (nicht die driftende player.potential-Kopie) → PO-Stern
     // stimmt mit Kader/Scouting/Profil überein.
-    const potential = row.potentialScore ?? row.player.potential ?? null;
+    const potential = row.potentialScore ?? null;
     return (
       <NlAbilityStars
         caScore={computeCurrentAbilityScore(row.player.coreStats)}
@@ -1553,8 +1553,8 @@ export default function FoundationPlayersTableNewLook({
       // NICHT `row.playerOvr` (liga-relativ), siehe `renderAbilityStars` oben.
       caScore: computeCurrentAbilityScore(row.player.coreStats),
       ...(playerOwned
-        ? { poScore: row.potentialScore ?? row.player.potential ?? null }
-        : { poScoreRange: getFoggedPoScoreRange(row.potentialScore ?? row.player.potential ?? null) }),
+        ? { poScore: row.potentialScore ?? null }
+        : { poScoreRange: getFoggedPoScoreRange(row.potentialScore ?? null) }),
     };
 
     const rowElement = (
@@ -2065,7 +2065,7 @@ export default function FoundationPlayersTableNewLook({
     const owned = (row.team?.humanControlled ?? false) || DEBUG_FORCE_PLAYER_VISIBILITY;
         const caScore = computeCurrentAbilityScore(row.player.coreStats);
         const caStars = caScore != null ? potentialScoreToStars(caScore) : null;
-        const potential = row.potentialScore ?? row.player.potential ?? null;
+        const potential = row.potentialScore ?? null;
         let poText = "—";
         if (owned) {
           if (potential != null) {
@@ -2808,8 +2808,9 @@ export default function FoundationPlayersTableNewLook({
  * - Auf-/Absteiger: Marktwert-Delta gegenüber der Baseline
  *   (`getPlayerDisplayMarketValueDelta`, dieselbe Quelle wie die
  *   Delta-Chips in der Tabellenzeile), Top 5 je Richtung.
- * - Größtes Potenzial-Polster: `player.potential − playerOvr`, Top 5 — nur eigene
- *   Spieler (`team.humanControlled`), da fremdes Potenzial verdeckt ist (Fog of War).
+ * - Größtes Potenzial-Polster: `row.potentialScore − playerOvr` (Record-Score, die
+ *   eine Potenzial-Quelle), Top 5 — nur eigene Spieler (`team.humanControlled`),
+ *   da fremdes Potenzial verdeckt ist (Fog of War).
  * - Spezialisierungs-Verteilung: Anzahl Spieler je stärkster Disziplin
  *   (`row.bestDiscipline`, dieselbe Quelle wie die "Beste Diszi"-Spalte).
  *
@@ -2933,7 +2934,7 @@ function FoundationPlayersHub({
         if (!row.team?.humanControlled) {
           return null;
         }
-        const potential = row.potentialScore ?? row.player.potential;
+        const potential = row.potentialScore ?? null;
         const ovr = row.playerOvr;
         if (potential == null || !Number.isFinite(potential) || ovr == null || !Number.isFinite(ovr)) {
           return null;

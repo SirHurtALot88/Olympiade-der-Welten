@@ -2,6 +2,42 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-13",
+      "seite": "Spielstände",
+      "pr": null,
+      "text": "Ein alter Spielstand ließ sich nicht löschen — der Knopf tat schlicht nichts, ohne Fehler und ohne Erklärung. Der Schutz vor dem Löschen des gerade geladenen Standes griff auf den falschen: er nahm irgendeinen der Stände mit dem Status „aktiv\", und diesen Status tragen alle sieben. Faktisch war das immer der älteste — und damit ausgerechnet der, den man loswerden will, während der wirklich geladene ungeschützt danebenlag. Geschützt ist jetzt genau der Stand, den das Spiel auch tatsächlich lädt, samt der Stände von Mitspielern; alle anderen lassen sich löschen, auch mehrere auf einmal.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Team-Einstellungen",
+      "pr": null,
+      "text": "Wem ein Team gehört, wird ab jetzt genau einmal entschieden: beim Anlegen des Spielstands. Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\" — fertig. Vorher gab es dafür vier Bedienungen an drei Orten: zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen — er war es, der Spielstände erzeugte, in denen die KI alle 32 Klubs steuerte. Dropdown und zweites Raster sind ebenfalls weg; der Reiter heißt jetzt „KI-Verhalten\", zeigt die Zuordnung nur noch an und verweist fürs Ändern auf den einen Weg. Ohne angetippten Klub lässt sich gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Ueber der Einsatzliste stand im Fehlerfall ein roher Fehlercode wie „lineup_draft_is_locked\" — ohne Grund und ohne Ausweg. Dahinter steckt kein Fehler, sondern eine gewollte Sperre: sobald ein Spieltag in der Arena gezeigt wurde, ist die Aufstellung festgenagelt, damit sich niemand nach dem Blick aufs Ergebnis noch nachbessern kann. Diese und die uebrigen Meldungen der Einsatzliste erscheinen jetzt als deutscher Satz, der den Grund nennt. Unbekannte Meldungen werden weiterhin unveraendert gezeigt statt gegen ein nichtssagendes „Unbekannter Fehler\" getauscht.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Team-Einstellungen · Neues Spiel",
+      "pr": null,
+      "text": "Ein neu angelegter Spielstand konnte damit enden, dass die KI alle 32 Teams steuert und keines dem Spieler gehört — man saß als Zuschauer in der eigenen Liga, und beim nächsten Spieltag wurde für einen aufgestellt. Grund waren zwei Knöpfe mit fast gleichem Namen: „Neues Spiel erstellen\" führt über den Klub-Assistenten und setzt die Steuerung korrekt, „Neues Spiel anlegen\" baute den Stand direkt aus dem Saatzustand — und der kennt keinen Spieler. An den vorhandenen Spielständen nachgemessen: alle über den Assistenten angelegten haben ein eigenes Team, beide über den zweiten Weg angelegten hatten keines. Die Klub-Auswahl geht jetzt auch diesen Weg mit; ohne Auswahl übernimmt der neue Stand das Team des laufenden.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-12",
       "seite": "Spieltag · Arena",
       "pr": null,
@@ -62,6 +98,33 @@
       "text": "Der Riegel gegen den Gehaltsberg misst jetzt Geld statt Vertragsformen. Bisher zaehlte er nur, wie viele Vertraege eines Teams back-loaded sind - ein Dreijahresvertrag im letzten Jahr galt dabei noch als kuenftige Last, obwohl seine teure Rate laengst faellig ist. Jetzt zaehlt der tatsaechlich gebundene Mehrbetrag spaeterer Vertragsjahre, gemessen an der heutigen Gehaltssumme. Das trifft andere Teams als vorher, und die richtigen: das Team mit dem groessten Berg der Liga blieb dem alten Riegel verborgen, weil nur 40 Prozent seiner Vertraege back-loaded waren.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Arena · Einsatzliste",
+      "pr": null,
+      "text": "Ein Team konnte rückwirkend „nicht startklar\" werden, weil ein Spieler GENESEN ist. Wer wegen Verletzungen nicht alle Slots besetzen konnte, galt trotzdem als bereit, solange alle einsatzbereiten Spieler aufgestellt waren — das stimmte beim Abgeben. Wechselte danach ein Verletzter auf „in Genesung\", zählte er wieder als einsatzbereit, stand aber nicht in der längst gesperrten Liste. Ergebnis: „Noch nicht startklar — 31/32 Teams bereit\", für einen Spieltag, der schon gespielt war. Eine gesperrte Aufstellung ist jetzt die Antwort und wird nicht mehr gegen den Stand von später geprüft; solange sie noch änderbar ist, bleibt der Hinweis scharf. Dazu sagt die Arena jetzt, WARUM eine Wertung nicht gebucht wurde, statt nur „fehlgeschlagen\" — und eine abgelehnte Buchung wird nicht länger als „gewertet\" gemeldet.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Arena · Gewichtheben",
+      "pr": null,
+      "text": "Im Endstand des Gewichthebens gehörten die Kilogramm dem falschen Team. Das Kürzel und der Heber-Name stimmten, der Score stimmte — nur die gestemmte Last passte nicht dazu: der Sieger der Disziplin stand mit dem niedrigsten Gewicht ganz unten. Die Hantel ist die Inszenierung des Scores und wird linear aus ihm abgeleitet; abgelegt war sie aber nach Listenposition, und die Team-Liste wird umsortiert, sobald Disziplin 1 gewertet ist. Ab dem Moment zeigten Bühne und Ableitung auf verschiedene Reihenfolgen — deshalb stimmte es während der Disziplin und erst danach nicht mehr. Die Zuordnung läuft jetzt über das Team-Kürzel; eine Umsortierung kann daran nichts mehr verschieben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Saisonstand · Einsatzliste",
+      "pr": null,
+      "text": "Zwei Stellen, an denen eine Größe gemessen und eine andere behauptet wurde. Erstens die Zahl in Klammern hinter jedem Disziplin-Kürzel im Saisonstand: sie sollte sagen, wie viele Spieler des Teams dort im Einsatz waren, zählte aber nur die mit Punkten. Wer angetreten ist und nichts geholt hat, fehlte — am Spielstand nachgemessen in 22 von 352 Fällen, etwa Wettessen mit „(4)\" bei sechs Antritten. Gezählt werden jetzt die Antritte selbst; die Punkte bleiben der Wert dahinter und sind dann eben 0. Zweitens die Einsatzliste: dort stand in Rot der technische Code „lineup_draft_is_locked\", direkt über dem gelben Hinweis, man könne so speichern und in die Arena. Gesperrt ist aber kein Fehler, sondern ein Zustand — der Spieltag läuft und die Liste ist abgegeben. Das steht jetzt als normaler Satz in der Statuszeile, und Rohcodes erscheinen dort nicht mehr.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
@@ -174,6 +237,24 @@
     },
     {
       "datum": "2026-08-11",
+      "seite": "Spieler · Trainingshistorie",
+      "pr": null,
+      "text": "Das Potenzial eines Spielers driftet an jedem Saisonende leicht — um ein bis drei Punkte, gerichtet durch seinen Wachstums-Ausblick. Das war schon immer so, stand aber nirgends: am Live-Spielstand nachgemessen sind 1586 Spieler hoch- und 1367 heruntergedriftet, ohne dass es irgendwo zu sehen war. Wer sich fragte, warum ein Spieler in der Folgesaison vom gleichen Trainingsbudget weniger mitnimmt, fand keine Antwort. Die Trainingshistorie zeigt den Übergang jetzt direkt in der Saisonzeile (\"PO 78→77\", grün bei Anstieg, rot bei Rückgang); aufgeklappt steht dabei, dass es die Obergrenze der nächsten Saison meint und keine Bewertung der abgelaufenen. Der Spielstand hält nur den jeweils letzten Übergang fest — ältere Saisons sagen das offen, statt eine Zahl zu erfinden.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Spieler · Potenzial",
+      "pr": null,
+      "text": "Ein Spieler hatte zwei Potenzialwerte: das beim Import einmalig gesetzte Feld am Spieler und den Wert des Potenzial-Modells, den Training, PO-Sterne und Saisonende tatsächlich pflegen. Am Live-Spielstand nachgemessen wichen beide bei allen 2984 Spielern ab (Median 16 Punkte, Lyraeth Vael 65,74 gegen 77) — je nach Ansicht sah man also eine andere Zahl, als das Training rechnete. Jetzt gibt es nur noch eine Quelle: den Modellwert. Kaderkarten, Spielerprofil, Markt, KI-Entscheidungen und Trainings-Beschleuniger lesen alle denselben Wert; das alte Import-Feld ist als Altfeld stillgelegt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Team-Historie · Teamprofil & Kader",
       "pr": null,
       "text": "In der aufklappbaren Disziplin-Historie eines Teams (POW/SPE/MEN/SOC → einzelne Disziplinen wie SHO für Showcase) stand die Reihenfolge der Disziplin-Spalten bislang nach einer festen Katalog-Zahl, nicht nach der tatsächlich für die laufende Saison ausgelosten Spielerzahl je Disziplin — beide können auseinanderlaufen, weil der Saison-Spielplan die Spielerzahl pro Disziplin jede Saison neu würfelt. Die Spaltenreihenfolge richtet sich jetzt nach der echten Saison-Zahl.",
@@ -197,6 +278,15 @@
       "text": "Der Spielplan begrenzte die kombinierte Spielerzahl eines Spieltags auf zehn. Der Disziplin-Pool traegt aber Disziplinen bis sechs Spieler — die beiden groessten ergeben zusammen zwoelf. Damit fiel genau die Entscheidung weg, um die es geht: einen breiten Kader zu halten, um an einem grossen Spieltag alle Plaetze besetzen zu koennen, waehrend ein schmaler Kader passen muss. Die Grenze war ohnehin nur halb wirksam, weil eine Ersatzregel sie riss, sobald kein passender Partner uebrig war. Jetzt gibt es keinen Standard-Deckel mehr: ein Zwoelfer-Spieltag ist eine regulaere Auslosung statt eines Ausrutschers.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Technik · Spielstand",
+      "pr": null,
+      "text": "Der Spielstand trug zwei Dinge mit sich, die keine Auskunft gaben. Erstens: Jeder eingesetzte Spieler würfelt pro Spieltag gegen das Verletzungsrisiko — im gemessenen Stand 5032-mal, davon 4988-mal ohne Verletzung. Auf diesen gesunden Würfen standen Ausfalldauer und Genesungszeiten trotzdem mit, immer leer, und gelesen wurden sie nie. Zweitens: Die Spielerwerte eines abgeschlossenen Saison-Schnappschusses lagen zweimal Zeichen für Zeichen identisch nebeneinander. Beides ist raus, zusammen 1,38 MB von 33,16 MB. Nichts davon wird irgendwo angezeigt oder gerechnet — gegengeprüft an Spieltags-Belastung, Verletzungshistorie, Verletzungszähler und Archiv-Spielerwerten, überall null Abweichung. Die gesunden Würfe selbst bleiben ausdrücklich erhalten: sie tragen die Belastung vor dem Spieltag und sind die einzige Quelle des Belastungs-Schnitts. Bestehende Spielstände werden beim nächsten Speichern von selbst kleiner.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {

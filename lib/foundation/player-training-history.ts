@@ -12,6 +12,21 @@ export type PlayerTrainingHistoryRow = {
   netSetpoints: number | null;
   trainingSetpoints: number | null;
   performanceSetpoints: number | null;
+  /**
+   * POTENZIAL-DRIFT DIESER SAISON — der Wert VOR und NACH dem Saisonende-Drift.
+   *
+   * GEMELDET VON CHRIS: „sollte potential sich nicht leicht über die seasons ändern können? was
+   * wäre da sinnvoll?" Es ändert sich längst: `applySeasonEndPotentialUpdate` driftet den Wert an
+   * jedem Saisonende um ±2 Punkte, gerichtet durch den Wachstums-Ausblick (breakout +1,
+   * regression_risk −1) und nie auf 0. Nur SEHEN konnte man es nirgends — am Live-Spielstand
+   * gemessen sind 1586 Spieler hoch- und 1367 heruntergedriftet, ohne dass es irgendwo stand.
+   *
+   * `null`, wenn für diese Saison kein Vorher-Wert festgehalten ist. Der Spielstand hält nur den
+   * JEWEILS LETZTEN Übergang (`lastSeasonSnapshot`), nicht die ganze Reihe — ältere Saisons
+   * bleiben deshalb leer, statt eine Zahl zu erfinden.
+   */
+  potentialBefore: number | null;
+  potentialAfter: number | null;
   traitModifierPct: number | null;
   attributeSummary: string;
   upgrades: Array<{
@@ -94,6 +109,14 @@ function resolveClassForSeason(input: {
 
 export function buildPlayerTrainingHistoryRows(input: {
   progressionEvents: PlayerProgressionSpendEventRecord[];
+  /**
+   * Potenzial-Record des Spielers. Liefert ueber `lastSeasonSnapshot` den PO-Wert VOR dem Drift
+   * der dort vermerkten Saison; der aktuelle `hiddenPotentialScore` ist der Wert danach.
+   */
+  potentialRecord?: {
+    hiddenPotentialScore?: number | null;
+    lastSeasonSnapshot?: { seasonId?: string | null; hiddenPotentialScore?: number | null } | null;
+  } | null;
   classHistory?: ClassHistoryEntry[];
   organicSnapshot?: OrganicProgressionSnapshot | null;
   currentTrainingClass?: string | null;
@@ -144,6 +167,16 @@ export function buildPlayerTrainingHistoryRows(input: {
         trainingMode,
         classBefore: organicMeta?.classBefore ?? classContext.classBefore,
         classAfter: organicMeta?.classAfter ?? classContext.classAfter,
+        // Der Drift gehoert GENAU an die Saison, fuer die er vermerkt ist — `lastSeasonSnapshot`
+        // haelt nur den letzten Uebergang, jede andere Saison bleibt leer.
+        potentialBefore:
+          input.potentialRecord?.lastSeasonSnapshot?.seasonId === event.seasonId
+            ? input.potentialRecord?.lastSeasonSnapshot?.hiddenPotentialScore ?? null
+            : null,
+        potentialAfter:
+          input.potentialRecord?.lastSeasonSnapshot?.seasonId === event.seasonId
+            ? input.potentialRecord?.hiddenPotentialScore ?? null
+            : null,
         netSetpoints: organicMeta?.netSetpoints ?? classContext.netSetpoints,
         trainingSetpoints: organicMeta?.trainingSetpoints ?? classContext.trainingSetpoints,
         performanceSetpoints: organicMeta?.performanceSetpoints ?? classContext.performanceSetpoints,

@@ -5,6 +5,7 @@ import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacili
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { MATCHDAY_FATIGUE_LOAD, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
 import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/training/class-progression-config";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
@@ -484,7 +485,11 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
       const rosterRank = rosterRankByPlayerId.get(player.id) ?? rosterEntries.length;
       const demand = buildTrainingModeDemand({
         context: demandContext,
-        player,
+        player: {
+          ...player,
+          // Eine Quelle: Potenzial aus dem Record statt aus dem Import-Altfeld player.potential.
+          potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: player.id }),
+        },
         rosterRank,
       });
       const resolved = resolveModeForPlayer({

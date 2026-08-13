@@ -1,5 +1,6 @@
 "use client";
 
+import { uebersetzeLineupFehler, uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-board-props";
@@ -1105,6 +1106,20 @@ export default function LineupNewLook({
   const [isRemovalHover, setIsRemovalHover] = useState(false);
   const dndEnabled = !isReadOnly && !isBusy;
 
+  /**
+   * „Die Aufstellung ist gesperrt" ist ein ZUSTAND, kein Fehler: der Spieltag laeuft, die Liste
+   * ist abgegeben, es gibt nichts zu reparieren. Sie gehoert deshalb in die neutrale Statuszeile
+   * und nicht in die rote Fehlerzeile — dort stand sie zuletzt direkt ueber dem gelben Hinweis
+   * „Du kannst so speichern und in die Arena" und widersprach ihm.
+   */
+  const { blockingErrors, lockedNotice } = useMemo(() => {
+    const locked = errors.find((code) => code === "lineup_draft_is_locked") ?? null;
+    return {
+      blockingErrors: errors.filter((code) => code !== "lineup_draft_is_locked"),
+      lockedNotice: locked,
+    };
+  }, [errors]);
+
   const clearDragState = () => {
     setDragCandidateId(null);
     setDragSourceSlotKey(null);
@@ -1467,7 +1482,7 @@ export default function LineupNewLook({
           <p className="nl-lineup-empty__title">Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
           {errors.length > 0 ? (
             <ul className="nl-lineup-empty__reasons">
-              {errors.map((reason) => (
+              {uebersetzeLineupFehlerListe(errors).map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
@@ -2310,9 +2325,27 @@ export default function LineupNewLook({
 
       {controlsSlot ? <div className="nl-lineup-controls">{controlsSlot}</div> : null}
 
-      {errors.length > 0 ? (
+      {/* GEMELDET VON CHRIS (Screenshot Einsatzliste): hier stand blank `lineup_draft_is_locked`
+          — der Rohcode aus dem Aufstellungs-Dienst, rot und als `role="alert"`. Zwei Dinge waren
+          daran falsch.
+
+          ERSTENS die Sprache: die Liste gab ihre Fehlerliste ungefiltert aus. Ein technischer
+          Bezeichner ist von einem Absturz nicht zu unterscheiden. Sie laeuft jetzt durch
+          dieselbe Uebersetzung wie jeder andere Blocker im Spiel.
+
+          ZWEITENS die Einstufung, und das ist der eigentliche Punkt: „gesperrt, weil der Spieltag
+          laeuft" ist ein ZUSTAND, kein Fehler — Chris dazu: „ich habe alle spieler eingesetzt die
+          ich einsetzen konnte daran duerfte es nicht haken hier an der stelle darf dann kein
+          blocker entstehen". Genau so stand es auf dem Schirm: eine rote Fehlerzeile direkt ueber
+          dem gelben Hinweis „Du kannst so speichern und in die Arena". Der Zustand steht jetzt in
+          der neutralen Statuszeile, nur echte Fehler bleiben rot. */}
+      {blockingErrors.length > 0 ? (
         <div className="nl-lineup-status is-error" role="alert">
-          {errors.join(" · ")}
+          {uebersetzeLineupFehlerListe(blockingErrors).join(" · ")}
+        </div>
+      ) : lockedNotice ? (
+        <div className="nl-lineup-status" role="status" data-testid="nl-lineup-locked-notice">
+          {uebersetzeLineupFehler(lockedNotice)}
         </div>
       ) : statusMessage ? (
         <div className="nl-lineup-status" role="status">

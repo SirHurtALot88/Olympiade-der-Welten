@@ -112,8 +112,15 @@ export type PersistenceService = {
   getSaveById(saveId: string): PersistedSaveGame | null;
   getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
-  /** `ownerId` (session user, auth-on only): threaded to the internal activate so creating a save moves ONLY that owner's active-save pointer, never another owner's. */
-  createSave(name: string, ownerId?: string | null): PersistedSaveGame;
+  /**
+   * `ownerId` (session user, auth-on only): threaded to the internal activate so creating a save
+   * moves ONLY that owner's active-save pointer, never another owner's.
+   *
+   * `manualTeamIds`: welche Teams der Spieler SELBST steuert. Ohne Angabe uebernimmt der neue
+   * Spielstand das Team des gerade geladenen Standes — siehe `createSave` in
+   * `persistence-service.ts`, dort steht auch warum ein Spielstand ohne eigenes Team keiner ist.
+   */
+  createSave(name: string, ownerId?: string | null, manualTeamIds?: string[] | null): PersistedSaveGame;
   createFreshSeasonOneSave(input?: {
     saveId?: string;
     name?: string;

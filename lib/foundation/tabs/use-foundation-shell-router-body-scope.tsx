@@ -4645,6 +4645,17 @@ export function useFoundationShellRouterBodyScope({
    *   den Server und wird dort gebucht, statt ein zweites Mal aufgeloest zu werden — sonst weicht
    *   das, was im Saisonstand landet, von dem ab, was der Spieler gesehen hat.
    */
+  /**
+   * Die Buchung einer Disziplin wurde abgelehnt — mit Begruendung. Eigener Typ, damit die Buehne
+   * „blockiert (mit Grund)" von einem echten Netz-/Serverfehler unterscheiden kann.
+   */
+  class DisciplineCommitBlockedError extends Error {
+    constructor(public readonly detail: string) {
+      super(detail);
+      this.name = "DisciplineCommitBlockedError";
+    }
+  }
+
   async function commitArenaDiscipline(
     side: "d1" | "d2",
     shownPreview: LegacyMatchdayResolvePreview | null = null,
@@ -4709,7 +4720,19 @@ export function useFoundationShellRouterBodyScope({
           ? [...new Set(blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")
           : "Die Wertung dieser Disziplin ist blockiert — bitte Cockpit pruefen.";
       setFoundationActionFeedback({ tone: "warning", title: "Punkte nicht gebucht", detail });
-      return result;
+      /**
+       * WERFEN, NICHT ZURUECKGEBEN.
+       *
+       * Hier stand `return result`. Die Arena wertet aber nur aus, OB der Aufruf durchging:
+       * `.then(() => "booked") / .catch(() => "failed")`. Ein normales Zurueckgeben landete
+       * deshalb im `then` — die Buehne meldete „Gewertet — die Platzierungspunkte stehen im
+       * Saisonstand", waehrend genau das nicht stimmte. Der Grund stand nur in einem
+       * Feedback-Banner an anderer Stelle.
+       *
+       * Der Grund reist jetzt IM Fehler mit, damit die Buehne ihn anzeigen kann, statt „Die
+       * Wertung ist fehlgeschlagen" ohne jede Angabe.
+       */
+      throw new DisciplineCommitBlockedError(detail);
     }
     if (side === "d2") {
       setFoundationActionFeedback({
@@ -10924,6 +10947,9 @@ export function useFoundationShellRouterBodyScope({
               playerDirectorySlice,
               seasonPointsLedger,
             }),
+            // Wer ANGETRETEN ist, steht in den Einsatz-Zeilen — nicht in den Punkten. Ohne sie
+            // fehlten die Teilnehmer ohne PPs in der Klammer am Disziplin-Kuerzel.
+            appearances: gameState.seasonState?.playerDisciplinePerformances ?? null,
           }),
     [gameState, isViewingArchivedSeason, playerDirectorySlice, playerRatingsById, seasonPointsLedger],
   );
