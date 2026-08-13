@@ -1,4 +1,9 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  beschreibeSpieltagsVerletzungsMarke,
+  buildMatchdayInjuryMarks,
+  type SpieltagsVerletzungsMarke,
+} from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -6,6 +11,34 @@ import { baueSpieltagsPunkteJeSpieltag } from "@/lib/foundation/season-matchday-
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
+
+/**
+ * DIE VERLETZUNGS-MARKE FAEHRT IN DER ZEILE MIT — NICHT ALS EIGENER PROP.
+ *
+ * GEWUENSCHT VON CHRIS: „es waere gut wenn man in der score tabelle vllt noch sehen kann wenn ein
+ * team einen verletzten spieler hat!"
+ *
+ * Die Marke gab es schon — aber nur in der Arena (`DisciplineStageMatchdayPanel`), also genau so
+ * lange, wie man auf der Buehne steht. Im Spieltagsergebnis, der Tabelle, auf die Chris nach dem
+ * Spieltag schaut, stand sie nirgends (nachgemessen: 0 Treffer auf
+ * `[class*="injur"],[data-testid*="injur"]`).
+ *
+ * Sie haengt deshalb jetzt an der ZEILE und nicht an einem zusaetzlichen Prop. Diese Codebasis hat
+ * eine Fehlerklasse „die Rechnung existiert, die Verdrahtung fehlt": ein optionaler Prop, der
+ * unterwegs verloren geht, faellt niemandem auf, weil die Anzeige dann einfach nichts zeigt. Ein
+ * Feld auf `MatchdaySummaryTeamRow` kann nicht verloren gehen — es kommt mit derselben Zeile an,
+ * die auch Punkte und Raenge traegt.
+ *
+ * GERECHNET WIRD NICHT HIER: `buildMatchdayInjuryMarks` ist die eine Rechenstelle, dieselbe, aus
+ * der auch die Arena-Marke kommt. Hier wird sie nur abgelesen.
+ */
+export type MatchdaySummaryTeamInjury = {
+  /** Betroffene SPIELER an diesem Spieltag (zugezogen + ausgefallen), nie Punkte. */
+  betroffeneSpieler: number;
+  /** Fertiger Klartext fuer Tooltip/Vorlesen — aus derselben Quelle wie die Arena-Marke. */
+  beschreibung: string;
+  marke: SpieltagsVerletzungsMarke;
+};
 
 export type MatchdaySummaryTeamRow = {
   teamId: string;
@@ -22,6 +55,8 @@ export type MatchdaySummaryTeamRow = {
   rankDirection: RankDirection;
   cumulativePointsBefore: number | null;
   cumulativePoints: number | null;
+  /** `null`, wenn dieses Team an diesem Spieltag keine Verletzungsbuchung hat. */
+  injury: MatchdaySummaryTeamInjury | null;
   warnings: string[];
 };
 
@@ -141,6 +176,28 @@ export function buildMatchdaySummary(
   // eine noch ungewertete Seite (D2 am halben Spieltag) trotzdem beim Namen steht.
   const scoringProgress = getMatchdayScoringProgress(gameState, matchdayId ?? "");
 
+  /**
+   * Verletzungsbuchungen DIESES Spieltags, je Team — die eine Rechenstelle
+   * (`buildMatchdayInjuryMarks`), aus der auch die Arena ihre Marke zieht.
+   *
+   * Bewusst NICHT an `hasResult` gehaengt: die Buchung steht im Spielstand, sobald der
+   * Verletzungswurf gefallen ist. Ein Spieltag ohne gewertetes Ergebnis kann trotzdem Ausfaelle
+   * tragen (`unavailableUntil` aus dem Vorspieltag) — die zu verschweigen waere kein Spoilerschutz,
+   * sondern eine Luecke.
+   */
+  const verletzungsMarken = matchdayId
+    ? buildMatchdayInjuryMarks(gameState, { seasonId, matchdayId })
+    : new Map<string, SpieltagsVerletzungsMarke>();
+  const injuryOf = (teamId: string): MatchdaySummaryTeamInjury | null => {
+    const marke = verletzungsMarken.get(teamId);
+    if (!marke || marke.betroffeneSpieler <= 0) return null;
+    return {
+      betroffeneSpieler: marke.betroffeneSpieler,
+      beschreibung: beschreibeSpieltagsVerletzungsMarke(marke),
+      marke,
+    };
+  };
+
   if (!result) {
     warnings.push("missing_matchday_result");
     return {
@@ -166,6 +223,7 @@ export function buildMatchdaySummary(
         rankDirection: "unknown",
         cumulativePointsBefore: null,
         cumulativePoints: null,
+        injury: injuryOf(team.teamId),
         warnings: ["missing_matchday_result"],
       })),
       topTeams: [],
@@ -297,6 +355,7 @@ export function buildMatchdaySummary(
         rankDirection: rankDirectionFromDelta(rankDelta),
         cumulativePointsBefore: seasonTotalsComplete ? roundValue(beforePoints.get(team.teamId) ?? 0, 1) : null,
         cumulativePoints: seasonTotalsComplete ? roundValue(afterPoints.get(team.teamId) ?? 0, 1) : null,
+        injury: injuryOf(team.teamId),
         warnings: Array.from(new Set(scores?.warnings ?? [])),
       };
     })
