@@ -40,10 +40,12 @@ export type GuvApronProjectionInput = {
   salary: number;
   line1: number;
   line2: number;
-  /** `true` = Linien vom Saisonbeginn (verbindlich), `false` = aus dem aktuellen Stand abgeleitet. */
+  /** `true` = Linien stehen fest (Transfers finalisiert), `false` = aus dem aktuellen Stand abgeleitet. */
   frozenLines: boolean;
   /** `true` = der Deckel (halber Wertungsanteil) begrenzt die Abgabe. */
   gedeckelt: boolean;
+  /** Konjunkturhebel k(f) der Saison. 0 = in dieser Saison gibt es gar keine Abgabe. */
+  konjunkturhebel?: number | null;
 };
 
 export type GuvBreakdownInput = {
@@ -106,7 +108,9 @@ function buildApronLines(apron: GuvApronProjectionInput, guv: number | null): st
   const zusaetze = [
     `Gehälter ${formatPlain(apron.salary)} (geglättet) gegen Linien ${formatPlain(apron.line1)} / ${formatPlain(apron.line2)}`,
     apron.gedeckelt ? "durch den Deckel begrenzt" : null,
-    apron.frozenLines ? null : "Linien noch nicht eingefroren",
+    // Beide Richtungen benennen: „eingefroren" darf nicht die blosse Abwesenheit einer Warnung sein.
+    apron.frozenLines ? "Linien eingefroren" : "Linien noch nicht eingefroren",
+    apron.konjunkturhebel === 0 ? "Konjunktur zu schwach: in dieser Saison keine Abgabe" : null,
   ].filter(Boolean);
   return [
     `Apron ${rangText}: ${formatSigned(apron.nettoDelta)}${mitApron}`,

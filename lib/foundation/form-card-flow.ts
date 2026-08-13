@@ -12,11 +12,23 @@ export function getActiveTeamLineupDraft(gameState: GameState, activeTeamId: str
   );
 }
 
+/**
+ * Hat DIESES Team seinen Formkarten-Pool der laufenden Saison? Das ist im ganzen Spiel die
+ * Definition von „hat die Transfers finalisiert" (siehe `activeTeamTransfersFinalized` unten).
+ *
+ * Herausgelöst, weil nicht nur der Flow danach fragt: der Apron friert seine Linien genau dann ein,
+ * wenn alle menschlichen Teams hier durch sind (`haveSeasonTransfersBeenFinalized`,
+ * lib/season/apron-service.ts). Zwei Nachbauten derselben Frage wären wieder der alte Fehler.
+ */
+export function teamHasFormCardPool(gameState: GameState, teamId: string) {
+  return (gameState.seasonState.formCards ?? []).some(
+    (card) => card.seasonId === gameState.season.id && card.teamId === teamId,
+  );
+}
+
 export function activeTeamHasFormCardPool(gameState: GameState, activeTeamId: string | null) {
   if (!activeTeamId) return false;
-  return (gameState.seasonState.formCards ?? []).some(
-    (card) => card.seasonId === gameState.season.id && card.teamId === activeTeamId,
-  );
+  return teamHasFormCardPool(gameState, activeTeamId);
 }
 
 /**

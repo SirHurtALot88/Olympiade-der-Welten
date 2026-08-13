@@ -1739,10 +1739,13 @@ export type ApronLinesSnapshot = {
    * HERKUNFT des Snapshots — ohne den Vermerk war ein von einem Alt-Build zu früh eingefrorener
    * Stand von außen nicht von einem gültigen zu unterscheiden (so festgesessen auf Chris' Save,
    * Median 45,0 gegen real 69,8):
-   *   - "buy_window_close" = von `ensureSeasonApronLinesFrozen` geschrieben. Solange die Saison
-   *     nicht gespielt ist, wird bei jedem Aufruf nachgeführt; endgültig ist der letzte Stand vor
-   *     dem ersten gewerteten Spieltag — dem Schließen des Kauffensters, dem einzigen Zeitpunkt,
-   *     den der Code seit dem Timing-Fix (#467) festschreibt.
+   *   - "transfers_finalized" = beim Bestätigen von „Transfers finalisieren" geschrieben. DAS ist
+   *     seit Chris' Meldung („ich habe nun transfers finalisiert -> apron müsste nun eingefroren
+   *     werden") der reguläre Zeitpunkt: mit dem Finalisieren endet der Kaderbau der Saison.
+   *   - "buy_window_close" = von `ensureSeasonApronLinesFrozen` geschrieben. Solange das
+   *     Kauffenster offen ist, wird bei jedem Aufruf nachgeführt; endgültig ist der letzte Stand
+   *     vor dem ersten gewerteten Spieltag. Bleibt der Vermerk für Spielstände ohne menschliches
+   *     Team (Simulation) und für den Fall, dass ein Spieltag ohne vorheriges Finalisieren läuft.
    *   - "recompute_repair" = per `scripts/repariere-apron-linien.ts` neu berechnet, nachdem ein
    *     Alt-Build-Snapshot in einer bereits gespielten Saison festsaß; `note` nennt Zeitpunkt und
    *     Grund.
@@ -1754,7 +1757,7 @@ export type ApronLinesSnapshot = {
    * Transfers stattfanden — nur dann ist die Neuberechnung der Stand vom Fensterschluss und keine
    * Schätzung.
    */
-  frozenAtEvent?: "buy_window_close" | "recompute_repair";
+  frozenAtEvent?: "transfers_finalized" | "buy_window_close" | "recompute_repair";
   /** Freitext-Herkunftsvermerk (Reparaturskript: Zeitpunkt und Grund der Neuberechnung). */
   note?: string;
   medianSalary: number;

@@ -100,6 +100,7 @@ export function resolveSeasonGuvPartsByTeam(
       apronNetto: apronCash.gebucht ? (apronCash.byTeamId.get(team.teamId) ?? 0) : (apronRow?.nettoDelta ?? 0),
       apronRank: apronRow?.rank ?? null,
       apronFrozenLines: apron?.frozenLines ?? false,
+      apronKonjunkturhebel: apron?.konjunkturhebel ?? null,
       apronGedeckelt: apronRow?.gedeckelt ?? false,
       apronGebucht,
       objectiveCashDelta: objectiveCash.byTeamId.get(team.teamId) ?? 0,
