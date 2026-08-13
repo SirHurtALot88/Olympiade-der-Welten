@@ -511,7 +511,7 @@ export default function FieldSvgInner(props: DisciplineFieldProps): React.ReactN
                 const hue = hueForIdx(t.idx);
                 const medal = t.roundMedal === 1 ? "var(--nl-gold)" : t.roundMedal === 2 ? "var(--nl-silver)" : t.roundMedal === 3 ? "var(--nl-bronze)" : null;
                 // Gewichtheben: Heber gerissen (auf Endgewicht) bzw. Champion an der Krone.
-                const bbOut = prim === "barbell" && barbellEliminated(t.idx);
+                const bbOut = prim === "barbell" && barbellEliminated(t.code);
                 const bbChamp = prim === "barbell" && done && (barbellRankMap[t.code] ?? 99) === 1;
                 // Bewegung: Die Token-Position setzt die rAF-Schleife oben imperativ aus
                 // `animScore` (Benchmark-Sync mit der Rangliste). Die Balken/Spuren unten
