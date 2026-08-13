@@ -17,6 +17,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { allowsSandboxTestWrites, getSandboxLocalWritePolicy } from "@/lib/persistence/sandbox-write-permissions";
 import { getDatabase, getDatabasePath, resetDatabaseForTests } from "@/lib/persistence/sqlite";
+import { invalidateSaveSessionCache } from "@/lib/persistence/save-session-cache";
 
 beforeEach(() => {
   resetDatabaseForTests();
@@ -382,6 +383,26 @@ describe("singleplayer game state", () => {
     });
 
     getDatabase().prepare("DELETE FROM game_metadata WHERE save_id = ?").run(first.save.saveId);
+    /**
+     * DER SITZUNGS-ZWISCHENSPEICHER MUSS HIER WEG — sonst prueft dieser Test ihn statt der
+     * Ableitung.
+     *
+     * `getSaveById` geht ueber `materializePersistedSaveCached`. Dessen Schluessel ist
+     * `updated_at` + `content_signature` aus der `saves`-Zeile. Das DELETE oben geht per
+     * rohem SQL an der `game_metadata`-Tabelle vorbei, ruehrt die `saves`-Zeile also NICHT an
+     * — der Zwischenspeicher trifft, und zurueck kommt der Stand VOR dem Loeschen, ohne dass
+     * `inferCompletedGamePhase` je laeuft.
+     *
+     * NACHGEMESSEN, damit das keine Vermutung bleibt: derselbe Aufruf liefert mit
+     * Zwischenspeicher `undefined`, direkt danach ohne ihn `season_completed`. An der
+     * Ableitung selbst fehlt nichts.
+     *
+     * IM SPIEL passiert das nicht: jeder regulaere Schreibweg zieht `updated_at` und
+     * `content_signature` nach, und ein zurueckgespielter Spielstand (pull-repaired-save.sh)
+     * kommt in einem frischen Prozess mit leerem Zwischenspeicher hoch. Der Fall existiert
+     * genau hier — beim Nachstellen eines Altstands per direktem SQL.
+     */
+    invalidateSaveSessionCache(first.save.saveId);
     const reloaded = persistence.getSaveById(first.save.saveId);
 
     expect(reloaded?.gameState.gamePhase).toBe("season_completed");
