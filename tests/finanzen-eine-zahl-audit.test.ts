@@ -170,9 +170,12 @@ describe("Finanzen: die Sponsor-Saisonsumme springt beim Abrechnen nicht", () =>
     expect(nachher).not.toBeCloseTo(vorher - summeNegativ, 2);
   });
 
-  it("zählt den Vorschuss nicht doppelt: Log +Betrag und Verrechnung −(Betrag+Gebühr) heben sich auf", () => {
-    // Der Vorschuss ist vorgezogenes eigenes Geld. Zählte man nur positive Logs, bliebe er als
-    // Einnahme stehen, obwohl die Settlement-Zeile ihn zurückrechnet.
+  it("summiert Logs VORZEICHENECHT — auch die negativen aus einem Altspielstand", () => {
+    // DIE ZAHLEN STAMMEN AUS DEM ALTEN VORSCHUSS-PAAR (Log +12, Verrechnung −13,2) und bleiben
+    // genau deshalb stehen: neu erzeugt wird so ein Paar nicht mehr (den Sponsor-Vorschuss gibt es
+    // nicht mehr, siehe sponsor-v3-model.ts), aber laufende Spielstände tragen es noch, und die
+    // Invariante gilt für jede negative Zeile — etwa den Sockelabzug eines verfehlten Ziels.
+    // Zählte man nur positive Logs, wiese die Saisonsumme Einnahmen aus, die es nicht gibt.
     const gameState = buildGameState({
       sponsorPayoutLogs: [
         {
@@ -206,7 +209,7 @@ describe("Finanzen: die Sponsor-Saisonsumme springt beim Abrechnen nicht", () =>
       .rows.filter((row) => row.teamId === "team-1")
       .reduce((sum, row) => sum + row.cashDelta, 0);
     expect(byTeam.get("team-1")).toBeCloseTo(gebuchterAnteil + projiziert, 1);
-    // Nur die Gebühr bleibt hängen — nicht der volle Vorschuss.
+    // Das negative Log senkt die Summe wirklich — es wird nicht auf 0 geklammert.
     expect(byTeam.get("team-1")).toBeLessThan(projiziert);
   });
 

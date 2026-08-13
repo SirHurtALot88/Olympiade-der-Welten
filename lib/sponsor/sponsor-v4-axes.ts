@@ -109,20 +109,23 @@ function facilityLevelHeadroom(gameState: GameState, teamId: string): number {
 /**
  * Nettofinanzposition: Kasse minus alles, was noch zurueckzuzahlen ist.
  *
- * DER SPONSOR-VORSCHUSS GEHOERT ZWINGEND DAZU. Er erhoeht bei Unterschrift die Kasse, wird aber am
- * Saisonende samt Gebuehr wieder verrechnet — er ist eine Verbindlichkeit wie ein Kredit. Zaehlte
- * man ihn nicht mit, waere die Kombination "Solidität + Vorschuss" ein Selbstlaeufer: das blosse
- * Unterschreiben haette die Nettoposition gegen die vorher eingefrorene Ausgangslage gehoben und die
- * Achse zu einem guten Teil ohne jede Leistung bezahlt. Gemessen waren das 5,2 C fuer 0,7 C Gebuehr.
+ * Hier stand frueher zusaetzlich der SPONSOR-VORSCHUSS als Verbindlichkeit. Er musste mitzaehlen,
+ * weil er bei Unterschrift die Kasse hob und am Saisonende samt Gebuehr wieder abgezogen wurde:
+ * ohne den Abzug waere "Solidität + Vorschuss" ein Selbstlaeufer gewesen — das blosse Unterschreiben
+ * haette die Achse zu einem guten Teil ohne jede Leistung bezahlt (gemessen 5,2 C fuer 0,7 C
+ * Gebuehr). Den Vorschuss gibt es nicht mehr, also gibt es auch diese Verbindlichkeit nicht mehr,
+ * und das Schlupfloch kann gar nicht erst entstehen: Unterschreiben bewegt kein Geld.
+ *
+ * BEWUSST AUCH FUER ALTVERTRAEGE: ein Vertrag aus einem laufenden Spiel kann das `advance`-Feld noch
+ * tragen. Es wird hier NICHT mehr gelesen, weil der Betrag auch nicht mehr zurueckgefordert wird —
+ * eine Schuld auszuweisen, die niemand mehr eintreibt, waere die Drift, die wir gerade abstellen.
  */
 function netFinancialPosition(gameState: GameState, teamId: string): number {
   const cash = gameState.teams.find((team) => team.teamId === teamId)?.cash ?? 0;
   const debt = (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
     .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
-  const advance = gameState.seasonState.sponsorContractsByTeamId?.[teamId]?.sponsorV3?.advance ?? null;
-  const advanceDebt = advance ? advance.amount + advance.fee : 0;
-  return cash - debt - advanceDebt;
+  return cash - debt;
 }
 
 /** Marktwert-Sprung, ab dem ein Spieler als entwickelt zaehlt — dieselbe Schwelle wie golden_talent_forge. */
@@ -280,7 +283,7 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     unit: "C",
     erklaerung:
       "Steh am Saisonende {ziel} besser da als beim Vertragsabschluss. Gerechnet wird Cash minus " +
-      "laufende Kredite minus Sponsor-Vorschuss — ein Vorschuss zählt also nicht als Guthaben.",
+      "laufende Kredite.",
     // Nullpunkt bei -10: ein Team darf ein moderates Minus fahren und liegt trotzdem nicht bei 0.
     // Ziel nachkalibriert 30 → 110 C (2026-08-03): bei 30 C lagen 9 von 10 gemessenen Vertraegen bei
     // voller Erfuellung (Ø 99,3 %, Rohmetrik-Median 44,7 C, Spanne 27,3–117,0 C). Bei 110 C liegt die

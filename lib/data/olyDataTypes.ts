@@ -1524,10 +1524,12 @@ export type SponsorV3ContractTermsRecord = {
    */
   axis?: { key: string; baseline: number; scale: number; offset: number };
   /**
-   * V4-Vorschuss: bei Unterschrift ausgezahlter Teil, am Saisonende samt Gebuehr verrechnet.
-   * Fehlt beim Standard-Profil und bei Altvertraegen.
+   * ENTFALLEN: `advance` (V4-Vorschuss, bei Unterschrift ausgezahlt und am Saisonende samt Gebuehr
+   * verrechnet). Sponsorgeld flieszt jetzt ausnahmslos am Saisonende — Begruendung in
+   * sponsor-v3-model.ts. Das Feld wird BEWUSST nicht neu deklariert: gespeicherte Vertraege aus
+   * laufenden Spielen tragen es noch, aber keine Rechenstelle liest es mehr, und ein Typ, der es
+   * weiter kennt, wuerde genau dazu einladen.
    */
-  advance?: { amount: number; fee: number };
   /**
    * Cash-Verzicht der Gebäude-Karte (E1), der in dieser Leiter BEREITS steckt. Dokumentarisch —
    * und die Grundlage dafür, dass der Mehrjahres-Roll ihn beim Neubau der Leiter wieder abzieht.

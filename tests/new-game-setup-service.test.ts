@@ -112,8 +112,12 @@ describe("new-game-setup-service", () => {
     expect(getTeamSponsorContract(gameState, "M-M")).toBeNull();
 
     const offers = getTeamSponsorOffers(gameState, "M-M");
-    expect(offers).toHaveLength(5);
-    // Fünf Karten, und das war lange nicht so: Die Angebote entstehen hier, wo `rosters` noch
+    // DREI Karten seit dem Gebäude-Schalter (Chris: „nur 3 Sponsoren statt 5"). Die Zahl fuenf kam
+    // aus der Gebäude-Bauvorlage; ohne Gebäude unterscheiden sich die Karten nur noch in Achse,
+    // Rarity, Kurvenform und Laufzeit, und drei davon sind eine Auswahl statt Fuellmaterial.
+    expect(offers).toHaveLength(3);
+    // Der eigentliche Befund dieses Falls ist unveraendert: es entsteht ueberhaupt ein VOLLER Slate.
+    // Die Angebote entstehen hier, wo `rosters` noch
     // leer ist (der Liga-Draft läuft erst im Flow-Schritt `fill_roster`). Die Achse
     // `kaderpflege` fragte „hat dieses Team einen Kader?" und fiel deshalb für JEDES Team aus
     // dem Angebot; mit dem Saison-1-Ausschluss von `wachstum` blieben drei Achsen übrig und der

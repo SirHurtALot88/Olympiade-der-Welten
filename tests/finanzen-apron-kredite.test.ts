@@ -517,6 +517,10 @@ describe("Jede im Finanzen-Markup benutzte Klasse existiert in globals.css", () 
     "nl-fin-header-card",
     "nl-fin-flow-card",
     "nl-fin-commitments-card",
+    // Karten des eigenen Apron-Reiters (Chris: „das apron thema als eigenen reiter!") — reine
+    // Anker, das Aussehen bringt NlCard mit.
+    "nl-fin-apron-card",
+    "nl-fin-apron-league-card",
     "nl-fin-transfer-card",
     "nl-fin-reconciliation-card",
     "nl-fin-reconciliation-hint",

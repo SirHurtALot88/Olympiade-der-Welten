@@ -263,9 +263,10 @@ const NICHT_SPONSOR_KOMPONENTEN = new Set(["salary_deduct", "salary_factor_repai
  *     projizierten Rest aber vorzeichenecht. Am aktiven Spielstand (`new-game-1786465783606-0kalpx`,
  *     86 Vorschauzeilen, davon 3 negativ mit zusammen −8,8 C) sprang die Zahl im Moment des
  *     Abrechnens von 2 533,8 auf 2 542,6 C — derselbe Sachverhalt, zwei Zahlen. Richtig ist die
- *     vorzeichenechte Summe: der Kommentar in dieser Datei verlangte sie ausdrücklich, und ein
- *     Vorschuss (Log `+Betrag`, Settlement-Zeile `−(Betrag + Gebühr)`) wäre sonst zweimal
- *     gutgeschrieben.
+ *     vorzeichenechte Summe: der Kommentar in dieser Datei verlangte sie ausdrücklich, und der
+ *     damalige Vorschuss (Log `+Betrag`, Settlement-Zeile `−(Betrag + Gebühr)`) wäre sonst zweimal
+ *     gutgeschrieben. Den Vorschuss gibt es nicht mehr; die vorzeichenechte Summe bleibt richtig,
+ *     weil das Settlement weiterhin negative Zeilen kennt (Sockelabzug eines verfehlten Ziels).
  *   - `season-guv-resolver` und `prize-money-preview` lasen NUR die Vorschau. Sobald die Abrechnung
  *     gebucht war, überspringt `previewSponsorSettlement` diese Teams (Duplikat-Wache) und die
  *     Sponsor-Einnahme fiel auf 0 — am Messkörper (`new-game-1785823388048-1hf25q`, Saison 2 bereits
@@ -283,8 +284,9 @@ export function getSeasonSponsorCashByTeam(gameState: GameState): Map<string, nu
     byTeam.set(teamId, (byTeam.get(teamId) ?? 0) + delta);
   };
 
-  // 1) Bereits gebucht: jedes Sponsor-Log dieser Saison, VORZEICHENECHT (base_first-Vorschuss,
-  //    season_end-Zeilen inklusive der negativen).
+  // 1) Bereits gebucht: jedes Sponsor-Log dieser Saison, VORZEICHENECHT (season_end-Zeilen
+  //    inklusive der negativen; in Altspielstaenden auch noch base_first-Vorschuesse, die dort
+  //    echtes, nicht mehr zurueckgefordertes Geld sind).
   for (const log of gameState.seasonState.sponsorPayoutLogs ?? []) {
     if (log.seasonId !== seasonId) continue;
     if (NICHT_SPONSOR_KOMPONENTEN.has(log.componentId ?? "")) continue;

@@ -202,11 +202,13 @@ export function getTeamAnnualLoanInterest(gameState: GameState, teamId: string):
  * dahin bleibt die marketValueTotal-Kappe die dominante Bremse für gut verdienende, aber junge Teams).
  */
 export function estimateTeamAnnualRevenue(gameState: GameState, teamId: string): number {
-  // Der Sponsor-Vorschuss ist VORGEZOGENE eigene Auszahlung, keine zusaetzliche Jahreseinnahme —
-  // er wird am Saisonende wieder verrechnet. Zaehlte er hier mit, wuerde er den Kreditrahmen der
-  // Folgesaison erhoehen, obwohl das Team dadurch keinen Cent mehr verdient hat.
+  // Hier stand ein Ausschluss fuer `v4_advance`: der Sponsor-Vorschuss war vorgezogene eigene
+  // Auszahlung und wurde am Saisonende wieder verrechnet, durfte den Kreditrahmen also nicht heben.
+  // Den Vorschuss gibt es nicht mehr, und die alten `v4_advance`-Logs in laufenden Spielstaenden
+  // werden auch nicht mehr zurueckgefordert — dieses Geld hat das Team schlicht verdient. Es hier
+  // weiter auszublenden hiesse, an einer Rueckzahlung festzuhalten, die nicht mehr stattfindet.
   const logs = (gameState.seasonState.sponsorPayoutLogs ?? []).filter(
-    (log) => log.teamId === teamId && log.componentId !== "v4_advance" && log.cashDelta > 0,
+    (log) => log.teamId === teamId && log.cashDelta > 0,
   );
   if (logs.length > 0) {
     const totalsBySeasonId = new Map<string, number>();

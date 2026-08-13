@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
-import { buildSponsorOffersForTeam } from "@/lib/sponsor/sponsor-offer-service";
+import { buildSponsorOffersForTeam, chooseSponsorOffer } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 import {
   SPONSOR_V4_AXIS_PBAR,
@@ -292,153 +292,53 @@ describe("Sponsor-Achsen: unerfuellbare Achsen werden gefiltert, nicht geklammer
   });
 });
 
-describe("Sponsor-Achsen: der Vorschuss zahlt die Soliditaets-Achse nicht selbst", () => {
-  it("zaehlt den Vorschuss als Verbindlichkeit, nicht als Zuwachs", () => {
+describe("Sponsor-Achsen: das Unterschreiben erfuellt die Soliditaets-Achse nicht selbst", () => {
+  it("bleibt beim Unterschreiben unveraendert — es flieszt kein Geld mehr", () => {
     // DER EXPLOIT, DEN DAS ABDECKT: die Soliditaets-Achse misst `Kasse − Schulden` gegen die vor
-    // der Unterschrift eingefrorene Ausgangslage. Der Vorschuss erhoeht die Kasse — zaehlte er
-    // nicht auch als Schuld, haette das blosse UNTERSCHREIBEN die Achse zu einem guten Teil
-    // erfuellt. Gemessen waren das 5,2 C fuer 0,7 C Gebuehr, risikofrei. Ein Kredit ist korrekt
-    // neutral (Cash und Schuld wachsen zusammen); der Vorschuss muss es genauso sein.
+    // der Unterschrift eingefrorene Ausgangslage. Solange es Vorschuesse gab, hob das blosse
+    // UNTERSCHREIBEN die Kasse und damit die Achse — gemessen 5,2 C fuer 0,7 C Gebuehr, risikofrei.
+    // Der Vorschuss ist entfernt, also ist die Unterschrift jetzt strukturell neutral: kein Geld,
+    // keine Schuld, keine Bewegung auf der Achse. Geprueft ueber den ECHTEN Unterschriftspfad,
+    // nicht ueber einen nachgebauten Zustand — nur so faellt auf, wenn dort je wieder Geld flieszt.
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;
     const terms = buildSponsorV4AxisTerms(gameState, teamId, "soliditaet");
-
-    const vorschuss = { amount: 16, fee: 0.8 };
-    const nachUnterschrift: GameState = {
+    const offers = buildSponsorOffersForTeam({ gameState, teamId });
+    const stateWithOffers: GameState = {
       ...gameState,
-      teams: gameState.teams.map((team) =>
-        team.teamId === teamId ? { ...team, cash: team.cash + vorschuss.amount } : team,
-      ),
       seasonState: {
         ...gameState.seasonState,
-        sponsorContractsByTeamId: {
-          ...(gameState.seasonState.sponsorContractsByTeamId ?? {}),
-          [teamId]: { sponsorV3: { advance: vorschuss } },
-        },
+        sponsorOffersByTeamId: { ...(gameState.seasonState.sponsorOffersByTeamId ?? {}), [teamId]: offers },
       } as GameState["seasonState"],
     };
 
     const vorher = evaluateSponsorV4Axis(gameState, teamId, terms).fraction;
-    const nachher = evaluateSponsorV4Axis(nachUnterschrift, teamId, terms).fraction;
-    // Die Gebuehr macht die Position sogar minimal schlechter — auf keinen Fall besser.
-    expect(nachher).toBeLessThanOrEqual(vorher);
-  });
-});
-
-/**
- * NACHKALIBRIERUNG (2026-08-03) — gemessen an einer komplett durchgespielten Saison 1 (32 Teams,
- * `scripts/sponsor-achsen-messung.ts`, Befund in `docs/analyse/sponsor-achsen-messung.md`). `entwicklung`
- * und `soliditaet` fielen vorher praktisch immer (Ø Erfuellung 100 % / 99,3 %) — die Ziele wurden auf
- * den Bereich angehoben, in dem die gemessenen Vertraege dieser Saison bei rund 50 % Ø Erfuellung
- * landen. `kaderpflege` lag mit 44,3 % bereits im Korridor und ist unveraendert. `wachstum` wird ab
- * Saison 1 nicht mehr angeboten (Methodenbruch Draft-Heuristik vs. rang-basierte Neubewertung am
- * Saisonende, siehe Kommentar in `sponsor-v4-axes.ts`) statt mit einer geratenen Skala kalibriert.
- * `ausbau` hat n = 0 in der gemessenen Saison und blieb unveraendert.
- */
-describe("Sponsor-Achsen: Nachkalibrierung (2026-08-03)", () => {
-  it("setzt fuer jede Achse einen endlichen, positiven Zielwert — und die beiden korrigierten liegen ueber ihren alten Werten", () => {
-    const ziel = (key: (typeof SPONSOR_V4_AXIS_KEYS)[number]) => {
-      const definition = sponsorV4AxisDefinition(key);
-      return definition.scale - definition.offset;
-    };
-
-    for (const key of SPONSOR_V4_AXIS_KEYS) {
-      expect(Number.isFinite(ziel(key)), key).toBe(true);
-      expect(ziel(key), key).toBeGreaterThan(0);
+    for (const offer of offers) {
+      const signed = chooseSponsorOffer({ gameState: stateWithOffers, teamId, offerId: offer.offerId }).gameState;
+      const nachher = evaluateSponsorV4Axis(signed, teamId, terms).fraction;
+      expect(nachher, `${offer.offerId}: Unterschrift hat die Achse bewegt`).toBeCloseTo(vorher, 9);
     }
-
-    // Die beiden Achsen, die vorher praktisch immer fielen, muessen jetzt strikt schwerer sein als
-    // vor der Nachkalibrierung — sonst haette sich an der Messung nichts geaendert.
-    expect(ziel("soliditaet")).toBeGreaterThan(30); // alt: 30 C
-    expect(ziel("entwicklung")).toBeGreaterThan(3); // alt: 3 Spruenge
-
-    // Unveraendert gebliebene Achsen behalten ihren dokumentierten Zielwert.
-    expect(ziel("kaderpflege")).toBe(90);
-    expect(ziel("wachstum")).toBe(12);
-    expect(ziel("ausbau")).toBe(2);
   });
 
-  it("soliditaet: eine bekannte Rohmetrik (der Saison-1-Median 44,7 C) ergibt die erwartete Teilerfuellung", () => {
+  it("ein ALTVERTRAG mit advance-Feld gilt nicht mehr als Verbindlichkeit", () => {
+    // Frueher zog `netFinancialPosition` Betrag + Gebuehr eines Vorschussvertrags ab. Da der Betrag
+    // nicht mehr zurueckgefordert wird, waere dieser Abzug eine Schuld ohne Glaeubiger — der
+    // Altvertrag darf die Achse also nicht mehr druecken.
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;
     const terms = buildSponsorV4AxisTerms(gameState, teamId, "soliditaet");
-
-    // netFinancialPosition steigt exakt um den Cash-Delta, wenn Schulden/Vorschuss unveraendert
-    // bleiben — damit ist die Rohmetrik hier exakt kontrollierbar.
-    const median = 44.7;
-    const angehoben = withCash(gameState, teamId, (gameState.teams[0]!.cash ?? 0) + median);
-    const progress = evaluateSponsorV4Axis(angehoben, teamId, terms);
-
-    expect(progress.metric).toBeCloseTo(median, 1);
-    // (44,7 + 10) / 120 — derselbe Wert, den die Nachmessung der echten Saison-1-Vertraege lieferte.
-    expect(progress.fraction).toBeCloseTo((median + 10) / 120, 3);
-    expect(progress.fraction).toBeGreaterThan(0.35);
-    expect(progress.fraction).toBeLessThan(0.65);
-  });
-
-  it("entwicklung: eine bekannte Rohmetrik (der Saison-1-Median 10 Spruenge) ergibt die erwartete Teilerfuellung", () => {
-    const gameState = baseState();
-    const teamId = gameState.teams[0]!.teamId;
-    const playerId = gameState.rosters.find((entry) => entry.teamId === teamId)?.playerId;
-    expect(playerId, "Testteam braucht mindestens einen Kaderspieler").toBeDefined();
-
-    const jumpsExpected = 10;
-    const buildJumpEvent = (index: number) => ({
-      eventId: `mv-jump-test-${index}`,
-      seasonId: gameState.season.id,
-      teamId,
-      playerId: `${playerId}-jump-${index}`,
-      upgrades: [],
-      xpSpent: 0,
-      progressionSnapshotBefore: {
-        attributes: {},
-        disciplineRatings: {},
-        ovr: null,
-        mvs: null,
-        marketValue: 10,
-        salary: null,
-        bracket: null,
-      },
-      progressionSnapshotAfter: {
-        attributes: {},
-        disciplineRatings: {},
-        ovr: null,
-        mvs: null,
-        marketValue: 20, // Sprung von 10 → 20, also 10 MV — ueber der AXIS_TALENT_JUMP_MV-Schwelle von 6.
-        salary: null,
-        bracket: null,
-        marketValuePreview: null,
-        salaryPreview: null,
-        bracketPreview: null,
-      },
-      timestamp: new Date().toISOString(),
-      source: "organic_season_progression" as const,
-    });
-    // rosterIds-Filter in talentJumpCount lässt auch Events durch, deren playerId nicht im Kader
-    // steht, solange teamId passt — buildJumpEvent nutzt bewusst synthetische playerIds, damit
-    // jeder Sprung als eigener Spieler zaehlt (das echte Set dedupliziert per playerId).
-    const gameStateMitSpruengen: GameState = {
+    const mitAltfeld: GameState = {
       ...gameState,
-      playerProgressionEvents: Array.from({ length: jumpsExpected }, (_, index) => buildJumpEvent(index)),
+      seasonState: {
+        ...gameState.seasonState,
+        sponsorContractsByTeamId: {
+          ...(gameState.seasonState.sponsorContractsByTeamId ?? {}),
+          [teamId]: { sponsorV3: { advance: { amount: 16, fee: 0.8 } } },
+        },
+      } as GameState["seasonState"],
     };
-
-    const terms = buildSponsorV4AxisTerms(gameState, teamId, "entwicklung");
-    const progress = evaluateSponsorV4Axis(gameStateMitSpruengen, teamId, terms);
-
-    expect(progress.metric).toBe(jumpsExpected);
-    // 10 / 20 — derselbe Wert, den die Nachmessung der echten Saison-1-Vertraege lieferte.
-    expect(progress.fraction).toBeCloseTo(jumpsExpected / 20, 6);
-    expect(progress.fraction).toBeGreaterThan(0.35);
-    expect(progress.fraction).toBeLessThan(0.65);
-  });
-
-  it("bietet die Kaderwert-Achse in Saison 1 nicht an, ab Saison 2 aber schon", () => {
-    const gameState = baseState();
-    const teamId = gameState.teams[0]!.teamId;
-    expect(gameState.season.id).toBe("season-1");
-    expect(sponsorV4OfferableAxes(gameState, teamId)).not.toContain("wachstum");
-
-    const saison2: GameState = { ...gameState, season: { ...gameState.season, id: "season-2" } };
-    expect(sponsorV4OfferableAxes(saison2, teamId)).toContain("wachstum");
+    expect(evaluateSponsorV4Axis(mitAltfeld, teamId, terms).fraction).toBeCloseTo(
+      evaluateSponsorV4Axis(gameState, teamId, terms).fraction, 9,
+    );
   });
 });

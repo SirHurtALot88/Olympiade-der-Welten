@@ -26,7 +26,7 @@ import {
   isInboxItemOwnedByTeam,
   normalizeInboxTargetView,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
-import { resolveGameFlowActionStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import { canAcknowledgeFlowStep, resolveGameFlowActionStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import {
   shouldBuildFoundationGameFlow,
   useFoundationGameInboxItems,
@@ -431,15 +431,11 @@ export function useFoundationCrossTabGameFlow(input: {
   ]);
 
   const acknowledgeFlowStep = (stepId: string) => {
-    const acknowledgeableStepIds = new Set([
-      "season_intro",
-      "review_previous_season",
-      "review_last_matchday",
-      "scouting_facilities",
-      "review_matchday_results",
-      "open_season_standings",
-    ]);
-    if (!acknowledgeableStepIds.has(stepId)) {
+    // Der Status entscheidet mit (siehe canAcknowledgeFlowStep) — deshalb wird der Schritt hier
+    // im aktuellen Flow nachgeschlagen. Steht er gar nicht mehr in der Liste (z. B. weil er durch
+    // die Aktion schon "completed" wurde), gilt allein die Anschau-Liste.
+    const stepEntry = gameFlowState.steps.find((entry) => entry.stepId === stepId) ?? null;
+    if (!canAcknowledgeFlowStep(stepEntry ?? { stepId, status: "ready" })) {
       return;
     }
     setAcknowledgedFlowStepIds((current) => {

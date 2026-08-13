@@ -125,8 +125,6 @@ export type SponsorSlateEntry = {
   rarity: SponsorRarity;
   /** Nur bei Achsenkarten gesetzt — die Sache, fuer die dieser Sponsor zahlt. */
   axisKey?: SponsorV4AxisKey;
-  /** Zahlt dieser Sponsor einen Teil schon bei Unterschrift aus? */
-  advance?: boolean;
   /**
    * WO auf der Sponsor-Ligaleiter (sponsor-liga-leiter.ts) dieses Angebot sein Geld hat — jeder
    * Slot bekommt eine ANDERE Form (Ziehung ohne Zuruecklegen), sonst waere die Formwahl stumpf: fuenf
@@ -326,27 +324,11 @@ export function rollSponsorOfferSlate(input: {
     return picked;
   });
 
-  // ZWEITE WAHLDIMENSION: zahlt der Sponsor einen Teil schon bei Unterschrift? Gewuerfelt je
-  // Achsen-Slot, aber MIT GARANTIEN — ein klammes Team muss immer eine Liquiditaetsoption finden,
-  // und ein reiches darf nie nur Gebuehrenkarten vorfinden. Ohne die Garantien haette der Wurf in
-  // rund einem Sechstel aller Slates alle Achsen auf dieselbe Seite gelegt.
-  const axisSlotCount = Math.max(0, slotCount - 1);
-  const advanceRaw = Array.from({ length: axisSlotCount }, (_, index) =>
-    getStableUnitHash(`sponsor-vorschuss:${index}:${input.seasonId}:${input.teamId}`));
-  // Wie viele Vorschuss-Karten es werden, ergibt der Wurf; WELCHE es werden, die Reihenfolge der
-  // Wuerfe. Die Zahl wird auf [1, Achsen − 2] geklammert, statt einzelne Wuerfe nachtraeglich
-  // umzudrehen — Umdrehen haette bei vier Achsen und drei Vorschuessen immer noch nur eine Karte
-  // ohne uebrig gelassen, die Garantie also nur scheinbar erfuellt.
-  const advanceWanted = advanceRaw.filter((value) => value < 0.5).length;
-  const advanceCount = axisSlotCount >= 3
-    ? Math.max(1, Math.min(axisSlotCount - 2, advanceWanted))
-    : advanceWanted;
-  const advanceOrder = advanceRaw
-    .map((value, index) => ({ value, index }))
-    .sort((left, right) => left.value - right.value)
-    .slice(0, advanceCount)
-    .map((entry) => entry.index);
-  const advanceRolls = Array.from({ length: axisSlotCount }, (_, index) => advanceOrder.includes(index));
+  // KEIN VORSCHUSS-WURF MEHR. Hier wuerfelte der Slate frueher aus, welche Achsen-Slots einen Teil
+  // ihrer Auszahlung schon bei Unterschrift zahlen. Sponsorgeld kommt jetzt ausnahmslos am
+  // Saisonende (Begruendung: sponsor-v3-model.ts) — die Karten unterscheiden sich damit nur noch in
+  // Achse, Rarity, Kurvenform und Laufzeit, und der Seed `sponsor-vorschuss:*` wird nicht mehr
+  // gezogen.
 
   // Slot 0 traegt die Basis-Karte: der risikofreie Anker, gegen den jede Achse gemessen wird.
   const entries: SponsorSlateEntry[] = Array.from({ length: slotCount }, (_, slot) => {
@@ -359,7 +341,6 @@ export function rollSponsorOfferSlate(input: {
       cardKey: "achse" as SponsorV3CardKey,
       rarity: rarities[slot] ?? fallbackRarity,
       axisKey: shuffledAxes[slot - 1]!,
-      advance: advanceRolls[slot - 1] === true,
       curveShape,
       termSeasons,
     };

@@ -98,14 +98,12 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("stellt eine reine Cash-Karte plus vier Gebäude-Karten ins Slate", () => {
+  it("stellt drei reine Cash-Karten ins Slate — die Gebäude-Leihe ist abgeschaltet", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
-    // FUENF, IMMER. Frueher hing die Kartenzahl an den bespielbaren Achsen — diese Fixture hat keine
-    // Spieler, also waren zwei Achsen unerfuellbar und es blieben vier Karten. Seit die
-    // Gebäude-Karten die zwei Leih-Ziele tragen statt einer Achse, entscheiden die Achsen nichts
-    // mehr und duerfen die Auswahl auch nicht mehr verkleinern.
-    expect(offers).toHaveLength(5);
+    // DREI, IMMER. Die Kartenzahl haengt nicht an den bespielbaren Achsen — diese Fixture hat keine
+    // Spieler, und trotzdem darf die Auswahl nicht kleiner werden.
+    expect(offers).toHaveLength(3);
 
     // Jedes Angebot trägt den Rarity-Layer …
     expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
@@ -118,19 +116,22 @@ describe("sponsor offer service", () => {
     expect(terms[0]!.goalSize).toBe(0);
     expect(offers[0]!.sponsorLeihe).toBeUndefined();
 
-    // Jede weitere Karte traegt ein Gebäude und genau eines der ZWEI Leih-Ziele — nicht mehr eine
-    // von fuenf Achsen. Und sie sind FEST bepreist, ohne Sockelabzug: `goalP === 0` ist der
-    // eigentliche Unterschied zur Achse, denn wer sie verfehlt, verliert nichts.
-    for (const offer of offers.slice(1)) {
-      expect(offer.sponsorLeihe).toBeDefined();
-      const eintrag = getSponsorV3Terms(offer)!;
-      expect(["leih_frische", "leih_achsenrang"]).toContain(eintrag.goalKey);
-      expect(eintrag.goalP).toBe(0);
-      expect(eintrag.goalSize).toBe(6);
-      expect(eintrag.axis).toBeUndefined();
+    /**
+     * HIER STAND DIE ALTE ZUSAGE: „jede weitere Karte traegt ein Gebäude und eines der zwei
+     * Leih-Ziele". Chris hat die Gebäude-Leihe abgeschaltet
+     * (`SPONSOR_GEBAEUDE_LEIHE_AKTIV`, siehe sponsor-leih-slate.ts) — gemessen war ihr
+     * Cash-Verzicht der groesste Streuungstreiber der Karten und liess starke Teams mit
+     * schwachen Sponsoren dastehen.
+     *
+     * Die neue Zusage ist die Umkehrung, und sie muss genauso hart gelten: KEINE Karte traegt
+     * eine Leihe. Ein Test, der das nur fuer die Plaetze 1 bis n-1 pruefte, haette den Fall
+     * uebersehen, in dem der Schalter nur einen Teil des Slates erreicht.
+     */
+    for (const offer of offers) {
+      expect(offer.sponsorLeihe).toBeUndefined();
+      expect(getSponsorV3Terms(offer)!.goalKey).not.toBe("leih_frische");
+      expect(getSponsorV3Terms(offer)!.goalKey).not.toBe("leih_achsenrang");
     }
-    // Beide Zielarten kommen im Slate vor — sonst waere es wieder nur eine.
-    expect(new Set(terms.slice(1).map((eintrag) => eintrag.goalKey)).size).toBe(2);
 
     // GEAENDERT MIT DEM LIGALEITER-UMBAU: die Kurvenform ist wieder ein Erzeugungs-Feld (sie
     // entscheidet ueber `sponsorKurvenLeiter`, WO auf der Sponsor-Ligaleiter das Angebot sein Geld
@@ -311,9 +312,12 @@ describe("sponsor board objectives", () => {
     const parentIdsByTeam = new Map<string, string[]>();
     for (const team of gameState.teams) {
       const offers = offersByTeam[team.teamId] ?? [];
-      // Ohne Kader faellt in dieser Fixture eine Achse aus dem Slate (siehe oben) — die Aussage
-      // dieses Tests ist die Marken-Verteilung, nicht die Slot-Zahl.
-      expect(offers.length, `Team ${team.teamId} ohne Angebote`).toBeGreaterThanOrEqual(4);
+      // Die Aussage dieses Tests ist die MARKEN-VERTEILUNG, nicht die Slot-Zahl. Genau deshalb
+      // stand hier eine fest verdrahtete 4 — ein Rest aus der Zeit mit fuenf Plaetzen, der beim
+      // Wechsel auf drei rot wurde, obwohl an der Marken-Verteilung nichts kaputt war. Jetzt
+      // reicht „ueberhaupt Angebote"; die Slot-Zahl prueft `tests/sponsor-drei-angebote.test.ts`,
+      // und zwar an genau einer Stelle.
+      expect(offers.length, `Team ${team.teamId} ohne Angebote`).toBeGreaterThan(0);
       parentIdsByTeam.set(
         team.teamId,
         offers.map((offer) => offer.sponsorParentBrandId).filter((id): id is string => Boolean(id)),

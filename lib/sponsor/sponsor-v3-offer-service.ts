@@ -246,8 +246,6 @@ export function buildSponsorV3Terms(input: {
   curveShape: SponsorCurveShape;
   teamId?: string;
   golden?: boolean;
-  /** Zahlt diese Karte einen Vorschuss bei Unterschrift? */
-  withAdvance?: boolean;
   /** Cash-Verzicht der Gebaeude-Karte (E1) — senkt die Leiter, statt eine Abzugszeile zu buchen. */
   leihVerzicht?: number;
   /** Traegt diese Karte eines der zwei Leih-Ziele? Dann fest bepreist und OHNE Sockelabzug. */
@@ -314,7 +312,6 @@ export function buildSponsorV3Terms(input: {
     axis,
     axisSize: axis ? sponsorV4AxisSizeFor(rarity, input.golden === true) : undefined,
     festesZiel: input.leihZielKey ? { key: input.leihZielKey, size: SPONSOR_LEIH_BONUS } : null,
-    withAdvance: input.withAdvance === true,
     salaryFactor,
     // SPONSOR_BODEN statt SPONSOR_V3_FLOOR_C: der neue Sockel reicht bei Startrang 1 bis 18 hinunter,
     // das alte Netz (32) saesse fuer diese Leiter zu tief.
@@ -479,8 +476,6 @@ export function applySponsorV3ToOffers(input: {
   curveShapes: SponsorCurveShape[];
   /** Slots, die das Golden-Los gezogen haben — dort ist der Achsenhebel groesser. */
   goldenSlots?: number[];
-  /** Slots, die einen Vorschuss zahlen. */
-  advanceSlots?: boolean[];
   /** Cash-Verzicht je Angebot (E1) — 0/null bei den reinen Cash-Karten. */
   leihVerzichte?: (number | null)[];
   /** Leih-Ziel je Angebot — null bei Karten ohne Gebaeude. */
@@ -504,7 +499,6 @@ export function applySponsorV3ToOffers(input: {
       curveShape,
       teamId: input.teamId,
       golden: input.goldenSlots?.includes(index) === true,
-      withAdvance: input.advanceSlots?.[index] === true,
       leihVerzicht: input.leihVerzichte?.[index] ?? 0,
       leihZielKey: input.leihZielKeys?.[index] ?? null,
     });
@@ -592,20 +586,12 @@ export function sponsorV3SettlementParts(input: {
         (terms.tilt === 0 ? "" : ` · ${tiltLabel} ${terms.tilt > 0 ? "+" : ""}${Math.round(terms.tilt * 100)} %`),
     },
   ];
-  if (terms.advance && terms.advance.amount > 0) {
-    // Der Vorschuss wurde bei Unterschrift ausgezahlt und wird hier zurueckgerechnet — er ist
-    // vorgezogenes eigenes Geld. Nur die Gebuehr bleibt als echter Abzug stehen. Ohne diese Zeile
-    // wuerde derselbe Betrag zweimal gutgeschrieben.
-    parts.push({
-      key: "base",
-      label: "Vorschuss-Verrechnung",
-      cashDelta: round1(-(terms.advance.amount + terms.advance.fee)),
-      met: true,
-      reason:
-        `bei Unterschrift ausgezahlt: ${round1(terms.advance.amount)} C · ` +
-        `Gebuehr ${round1(terms.advance.fee)} C`,
-    });
-  }
+  // KEINE VORSCHUSS-VERRECHNUNG MEHR. Hier stand eine zweite `base`-Zeile, die den bei Unterschrift
+  // ausgezahlten Vorschuss samt Gebuehr wieder abzog. Sie faellt mit dem Vorschuss selbst weg: die
+  // Auszahlung besteht jetzt vollstaendig aus Saisonbasis + Tabellenplatz (+ Sonderziel).
+  //
+  // ALTVERTRAEGE, die das `advance`-Feld noch tragen, werden hier BEWUSST NICHT MEHR belastet —
+  // die Entscheidung und ihre gemessenen Kosten stehen bei `getSponsorV3Terms` weiter unten.
   if (terms.goalSize > 0) {
     parts.push({
       key: "special",
@@ -624,7 +610,35 @@ export function sponsorV3SettlementParts(input: {
   return parts;
 }
 
-/** Traegt ein Angebot/Vertrag V3-Konditionen? */
+/**
+ * Traegt ein Angebot/Vertrag V3-Konditionen?
+ *
+ * BESTANDSVERTRAEGE MIT `advance` — DIE ENTSCHEIDUNG UND WARUM SIE SO FAELLT.
+ *
+ * In laufenden Spielen liegen unterschriebene Vertraege, die noch ein `advance`-Feld tragen
+ * (gemessen: Save `s2` 9 von 32, Save `repro` 10 von 31, Chris' `1hf25q` 10 von 32). Das Feld wird
+ * hier BEWUSST NICHT entfernt und NICHT mehr gelesen — es ist ab jetzt totes Beiwerk im Spielstand.
+ * Daraus folgen drei Dinge, alle beabsichtigt:
+ *
+ *  1. KEIN NACHTRAEGLICHER ABZUG. Der Vorschuss wurde bei Unterschrift ausgezahlt und ist als
+ *     `v4_advance`-Log gebucht; das Geld liegt real in der Kasse. Die Verrechnungszeile am
+ *     Saisonende ist weg, also wird er nicht mehr eingezogen. Die betroffenen Teams behalten ihn.
+ *     Kosten, gemessen ueber die noch nicht abgerechneten Saisons: `s2` 105,9 C (7 Teams, die in
+ *     Saison 2 unterschrieben haben) + 5,3 C entfallende Gebuehren, `repro` 159,3 C + 8,0 C.
+ *     Das ist der Preis dafuer, dass NICHTS umgebucht werden muss.
+ *  2. KEINE RUECKBUCHUNG. Die Alternative waere, Kasse und Log rueckwirkend zu korrigieren. Das
+ *     haette laufende Spielstaende angefasst, um Geld einzuziehen, das der Spieler laengst
+ *     ausgegeben hat (Transferfenster) — genau der Eingriff, der einen Spielstand kaputt macht.
+ *  3. DER GEFAEHRLICHE FEHLER WAERE DER UMGEKEHRTE, und er war real: `rerollSponsorV3TermsForNewSeason`
+ *     spreadet die Konditionen und nahm `advance` in die Folgesaison mit, ohne dass dort je ein
+ *     Vorschuss ausgezahlt wurde. Ein Mehrjahresvertrag verlor damit ab Jahr 2 jede Saison erneut
+ *     Betrag + Gebuehr (im Save `s2` betraf das H-R und N-W, zusammen 37,5 C + 1,9 C). Weil das
+ *     Feld jetzt nirgends mehr gelesen wird, ist dieser Doppelabzug mit derselben Aenderung
+ *     erledigt — er kann auch fuer die schon gerollten Vertraege nicht mehr auftreten.
+ *
+ * Bereits ABGERECHNETE Saisons bleiben unberuehrt: deren Auszahlung steht als Log fest und wird
+ * nicht neu gerechnet.
+ */
 export function getSponsorV3Terms(
   entry: SponsorOffer | TeamSponsorContract | null | undefined,
 ): SponsorV3ContractTerms | null {

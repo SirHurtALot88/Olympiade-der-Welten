@@ -159,6 +159,29 @@ export function leihRaritaet(rarity: string | null | undefined): SponsorLeihRari
   return RARITAET_AUS_ANZEIGE[rarity ?? ""] ?? "gewoehnlich";
 }
 
+/**
+ * DER GEBÄUDE-SCHALTER — steht auf AUS.
+ *
+ * Chris: „mach das mit dem Schalter deaktiviere Gebäude und mach es wie in der p-c season wieder mit
+ * der kurven Verteilung und den Sponsoren die es vorher gab."
+ *
+ * WAS DER AUS-ZUSTAND TUT: `verteileLeihgabenAufSlate` gibt fuer JEDEN Platz dieselbe reine
+ * Cash-Karte zurueck, die Platz 1 ohnehin schon immer bekommen hat (`leihe: null`, Verzicht 0). Es
+ * ist damit kein zweiter Rechenweg und kein toter Code, sondern derselbe, seit jeher begangene Pfad —
+ * nur fuer alle Plaetze. Alles, was daran haengt, ist bereits auf `null` vorbereitet: der Aufbau des
+ * Angebots (`if (!leihe) return offer`), die Leih-Ziele (`leihZielFuer` prueft dieselbe Bedingung),
+ * der Cash-Verzicht (0 ⇒ `buildSponsorV3TermsCore` setzt das Feld gar nicht erst) und die Rangmarke.
+ *
+ * WARUM ALS SCHALTER UND NICHT ALS AUSBAU: die Gebäude-Leihe soll vergleichbar bleiben. Auf `true`
+ * gestellt laeuft wieder exakt die Fassung, die unter der Bauvorlage gemessen wurde — samt der
+ * Typ-Passung in `sponsor-leih-passung.ts`, die dann wieder greift.
+ *
+ * WAS DAS MESSBAR AENDERT (gemessen, nicht behauptet): 128 von 160 Angeboten eines frischen Spiels
+ * trugen eine Leihe, und ihr Cash-Verzicht (0,8 bis 25,4 C) wird von JEDER Sprosse der Leiter
+ * abgezogen. Er war damit der groesste einzelne Streuungstreiber der Sponsorkarten.
+ */
+export const SPONSOR_GEBAEUDE_LEIHE_AKTIV = false;
+
 export type SponsorSlateKarte = {
   slotIndex: number;
   raritaet: SponsorLeihRaritaet;
@@ -216,7 +239,14 @@ export function verteileLeihgabenAufSlate(input: {
    * jede Groesse annehmen, die der Katalog hergibt.
    */
   verzichtDeckel?: number;
+  /**
+   * Gebäude-Leihe an oder aus. Default ist die Produktionsstellung `SPONSOR_GEBAEUDE_LEIHE_AKTIV` —
+   * der Parameter existiert NUR, damit beide Stellungen messbar und testbar bleiben (Chris will
+   * vergleichen koennen). Kein Aufrufer im Spiel setzt ihn; die eine Wahrheit bleibt die Konstante.
+   */
+  aktiv?: boolean;
 }): SponsorSlateKarte[] {
+  const aktiv = input.aktiv ?? SPONSOR_GEBAEUDE_LEIHE_AKTIV;
   const verleihbar = input.verleihbar ?? VERLEIHBARE_GEBAEUDE;
   const eigene = input.eigeneStufen ?? {};
   const deckel = Number.isFinite(input.verzichtDeckel) ? input.verzichtDeckel! : Number.POSITIVE_INFINITY;
@@ -234,8 +264,10 @@ export function verteileLeihgabenAufSlate(input: {
   const vergeben = new Set<string>();
 
   return input.raritaeten.map((raritaet, slotIndex) => {
-    // Platz 1 bleibt immer reines Geld — die Karte fuer Teams ohne Spielraum.
-    if (slotIndex === 0) {
+    // Platz 1 bleibt immer reines Geld — die Karte fuer Teams ohne Spielraum. Steht der
+    // Gebäude-Schalter auf AUS, gilt dieselbe Zeile fuer ALLE Plaetze: ein Slate aus reinen
+    // Cash-Karten, ohne zweiten Rechenweg.
+    if (!aktiv || slotIndex === 0) {
       return { slotIndex, raritaet, groesse: null, leihe: null, verzichtErsteSaison: 0 };
     }
 
