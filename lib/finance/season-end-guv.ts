@@ -75,6 +75,7 @@ function ausgabe(value: number | null | undefined): number {
 /** Die Posten der GuV, in Anzeigereihenfolge. Reihenfolge = Reihenfolge im Hover. */
 export const SEASON_GUV_POSTEN_KEYS = [
   "sponsor",
+  "sponsorereignisse",
   "gebaeude_einnahme",
   "apron",
   "boardziele",
@@ -118,6 +119,17 @@ export type SeasonGuvParts = {
   teamId: string;
   /** Sponsor-Abrechnung beim AKTUELLEN Rang (Summe der vorzeichenechten Settlement-Deltas). */
   sponsorCash?: number | null;
+  /**
+   * Mid-Season-Sponsor-Ereignisse, die WIRKLICH verrechnet wurden: Aktions-Bonus, ausgelöste
+   * Vertragsklausel, Partner-Reibung. Vorzeichenecht summiert.
+   *
+   * Ein EIGENER Posten und nicht Teil von `sponsorCash`: das sind zwei Systeme, die sich nicht
+   * überschneiden (siehe `lib/sponsor/sponsor-event-cash-source.ts`). Sie fehlten bis hierher in
+   * JEDEM Posten — am Abbild `1hf25q` betraf das 23 von 32 Teams.
+   */
+  sponsorEventCash?: number | null;
+  /** Wie viele Ereignisse dahinterstehen — nur für die Hover-Zeile. */
+  sponsorEventCount?: number | null;
   /** Gebäude-Einnahme brutto (vor Unterhalt). */
   facilityIncome?: number | null;
   /** Tatsächlich bezahlter Gebäude-Unterhalt (Season-End-Semantik), als positive Zahl. */
@@ -170,6 +182,7 @@ export type SeasonGuvParts = {
 
 const POSTEN_LABEL: Record<SeasonGuvPostenKey, string> = {
   sponsor: "Sponsor",
+  sponsorereignisse: "Sponsor-Ereignisse",
   gebaeude_einnahme: "Gebäude-Einnahme",
   apron: "Apron",
   boardziele: "Vorstandsziele",
@@ -190,6 +203,19 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
   const objective = round2(num(parts.objectiveCashDelta));
   const posten: SeasonGuvPosten[] = [
     { key: "sponsor", label: POSTEN_LABEL.sponsor, amount: round2(num(parts.sponsorCash)), counted: true, note: "beim aktuellen Rang" },
+    {
+      key: "sponsorereignisse",
+      label: POSTEN_LABEL.sponsorereignisse,
+      amount: round2(num(parts.sponsorEventCash)),
+      counted: true,
+      // Sie sind beim Spieltagswechsel sofort verrechnet worden — nie eine Hochrechnung. Die Notiz
+      // sagt, WIE VIELE es waren, sonst liest sich eine −4,0 wie eine einzelne grosse Strafe statt
+      // wie zwei kleine Klauseln.
+      note:
+        parts.sponsorEventCount != null && parts.sponsorEventCount > 0
+          ? `${parts.sponsorEventCount} verrechnet`
+          : "keine in dieser Saison",
+    },
     { key: "gebaeude_einnahme", label: POSTEN_LABEL.gebaeude_einnahme, amount: round2(num(parts.facilityIncome)), counted: true },
     {
       key: "apron",

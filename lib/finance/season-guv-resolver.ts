@@ -25,6 +25,7 @@ import {
   type SeasonGuv,
   type SeasonGuvParts,
 } from "@/lib/finance/season-end-guv";
+import { getSponsorEventCashByTeam } from "@/lib/sponsor/sponsor-event-cash-source";
 import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
@@ -65,6 +66,10 @@ export function resolveSeasonGuvPartsByTeam(
   // (am Abbild `1hf25q` gemessen: 5 von 32 Teams wichen vom Beleg ab, bis zu 4,0 C).
   // Siehe `lib/board/objective-settlement-cash-source.ts`.
   const objectiveCash = getObjectiveCashByTeam(gameState);
+  // Mid-Season-Sponsor-Ereignisse: beim Spieltagswechsel sofort verrechnet, in `sponsorEvents`
+  // protokolliert — und bis hierher in KEINEM Posten. Sie sind kein Teil der Sponsor-Zeile: die
+  // liest `sponsorPayoutLogs` und die Vertragskomponenten, nie `sponsorEvents`.
+  const sponsorEventCash = getSponsorEventCashByTeam(gameState);
 
   // Apron EINMAL für die ganze Liga: die Abrechnung ist ein Umverteilungstopf, ein einzelnes Team
   // lässt sich daraus gar nicht isoliert rechnen.
@@ -95,6 +100,8 @@ export function resolveSeasonGuvPartsByTeam(
     byTeam.set(team.teamId, {
       teamId: team.teamId,
       sponsorCash: sponsorCash.get(team.teamId) ?? 0,
+      sponsorEventCash: sponsorEventCash.byTeamId.get(team.teamId) ?? 0,
+      sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(team.teamId) ?? 0,
       facilityIncome: facilities.income,
       facilityUpkeep: facilities.paidUpkeep,
       apronNetto: apronCash.gebucht ? (apronCash.byTeamId.get(team.teamId) ?? 0) : (apronRow?.nettoDelta ?? 0),
