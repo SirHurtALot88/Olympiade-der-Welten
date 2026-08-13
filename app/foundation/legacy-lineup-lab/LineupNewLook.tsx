@@ -1,5 +1,6 @@
 "use client";
 
+import { uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-board-props";
@@ -1467,7 +1468,7 @@ export default function LineupNewLook({
           <p className="nl-lineup-empty__title">Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
           {errors.length > 0 ? (
             <ul className="nl-lineup-empty__reasons">
-              {errors.map((reason) => (
+              {uebersetzeLineupFehlerListe(errors).map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
@@ -2312,7 +2313,7 @@ export default function LineupNewLook({
 
       {errors.length > 0 ? (
         <div className="nl-lineup-status is-error" role="alert">
-          {errors.join(" · ")}
+          {uebersetzeLineupFehlerListe(errors).join(" · ")}
         </div>
       ) : statusMessage ? (
         <div className="nl-lineup-status" role="status">
