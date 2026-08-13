@@ -15,6 +15,7 @@ import {
 } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-source";
+import { getSponsorEventCashByTeam } from "@/lib/sponsor/sponsor-event-cash-source";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -282,6 +283,10 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   // hängt daran, dass hier und dort dieselbe Quelle steht.
   const objectiveCash = getObjectiveCashByTeam(gameState);
   const objectiveCashDelta = round1(objectiveCash.byTeamId.get(teamId) ?? 0);
+  // Mid-Season-Sponsor-Ereignisse (Klausel, Bonus, Partner-Reibung) — sofort verrechnet und bis
+  // zuletzt in keinem GuV-Posten. Dieselbe Quelle wie im Saisonstand, damit beide Reiter dieselbe
+  // Zeile zeigen. Siehe `lib/sponsor/sponsor-event-cash-source.ts`.
+  const sponsorEventCash = getSponsorEventCashByTeam(gameState);
   const objectiveReward = objectiveCashDelta > 0 ? objectiveCashDelta : null;
   const objectivePenalty = objectiveCashDelta < 0 ? round1(-objectiveCashDelta) : null;
 
@@ -410,6 +415,8 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const seasonGuv = buildSeasonGuv({
     teamId,
     sponsorCash: sponsor?.total ?? 0,
+    sponsorEventCash: sponsorEventCash.byTeamId.get(teamId) ?? 0,
+    sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(teamId) ?? 0,
     facilityIncome: facilityIncome?.total ?? 0,
     facilityUpkeep: facilityUpkeepTotal,
     apronNetto: apronNettoDelta?.nettoDelta ?? 0,
