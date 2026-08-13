@@ -100,14 +100,22 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                   </div>
                 </div>
                 {/*
-                  NUR DIE PP — GEWÜNSCHT VON CHRIS: „bei den top players brauch ich gar nicht die
-                  scores, sondern nur die PPs die sie in beiden Diszis gesammelt haben".
-                  Der Score stand hier als zweite Zeile („(Score 142,8)") und war die groessere,
-                  auffaelligere Zahl, obwohl er in dieser Liste nichts entscheidet: sortiert wird
-                  nach PP, gebucht werden PP. Er bleibt weiterhin auf der Spielerkarte und in der
-                  Spieltags-Wertung — hier ist er weg.
-                  Ohne gebuchte Punkte steht „—" statt eines Ersatzwertes: eine Zahl, die dann der
-                  Score waere, wuerde als PP gelesen.
+                  PP UND SCORE — BEIDE ueber BEIDE Disziplinen summiert, sortiert nach PP-Summe.
+
+                  Chris' Praezisierung, nachdem ich ihn zuerst falsch verstanden hatte: „nein die
+                  score darf da stehen bleiben mir ging es nur darum dass die PPs und Score aus der
+                  anderen diszi beim spieler ergaenzt werden und dann die Summe da steht und nach
+                  PPs Total geordnet ist."
+
+                  Ich hatte sein vorheriges „brauch ich gar nicht die scores" als „Score raus"
+                  gelesen. Gemeint war: der Score soll nicht das MASSGEBLICHE sein. Die Summierung
+                  ueber beide Disziplinen und die Sortierung nach PP-Summe macht
+                  `summiereSpieltagsTopSpieler` bereits (Score ist dort nur der Gleichstand-Brecher)
+                  — gefehlt hat nur, dass beide Zahlen auch DASTEHEN.
+
+                  Die PP fuehrt optisch, weil sie sortiert und gebucht wird; der Score steht als
+                  zweite Zeile daneben. Ohne gebuchte Punkte steht „—" statt eines Ersatzwertes:
+                  eine Zahl, die dann der Score waere, wuerde als PP gelesen.
                 */}
                 <div style={{ textAlign: "right" }}>
                   {p.points != null ? (
@@ -120,6 +128,7 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                       — PP
                     </div>
                   )}
+                  <div style={{ fontSize: 10.5, color: "var(--nl-mut)" }}>(Score {fmt1(p.score)})</div>
                 </div>
               </div>
             );
