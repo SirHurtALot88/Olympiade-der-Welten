@@ -38,6 +38,27 @@ describe("season-one long-run market buy (course-corrected)", () => {
     expect(teamId).toBeTruthy();
     expect(playerId).toBeTruthy();
 
+    /**
+     * GEMESSEN WIRD DER ZUWACHS, NICHT DER ABSOLUTE STAND.
+     *
+     * Frueher stand hier `expect(counts.marketBuyCount).toBe(1)` — ein frischer Spielstand
+     * hatte keine Kaeufe. Das gilt nicht mehr: P-S kauft seit dem Nula-Befund schon beim
+     * Anlegen des Spielstands sein Maskottchen (`nula_mascot_rule_buy`,
+     * lib/foundation/ensure-nula-on-project-suicide.ts), und diese Quelle steht NICHT in
+     * `SEASON_ONE_DRAFT_BUY_SOURCES` — sie zaehlt also als MARKTKAUF. Der frische Stand
+     * startet damit bei 1, der Test sah 2.
+     *
+     * Die Zusicherung dieses Tests ist „ein Marktkauf in S1 ist erlaubt und wird gebucht" —
+     * das ist eine Aussage ueber den ZUWACHS. Absolut gemessen haengt sie an jeder kuenftigen
+     * Regel, die beim Anlegen etwas kauft, und sagt trotzdem nichts mehr ueber den Kauf, um
+     * den es geht.
+     *
+     * Ob der Maskottchen-Kauf in der Marktkauf-Statistik auftauchen SOLL, ist eine offene
+     * Frage an Chris (docs/ROTE_TESTS_TRIAGE.md). Er wird nirgends als Sperre ausgewertet,
+     * nur in Audits und Berichten.
+     */
+    const vorher = countSeasonBuyTransfers(fresh.gameState.transferHistory, seasonId);
+
     const directBuy = executeLocalTransfermarktBuy({
       saveId: fresh.saveId,
       seasonId,
@@ -51,7 +72,9 @@ describe("season-one long-run market buy (course-corrected)", () => {
     const after = persistence.getSaveById(fresh.saveId);
     expect(after).toBeTruthy();
     const counts = countSeasonBuyTransfers(after!.gameState.transferHistory, seasonId);
-    expect(counts.marketBuyCount).toBe(1);
+    expect(counts.marketBuyCount - vorher.marketBuyCount).toBe(1);
+    // Und er landet als MARKTkauf, nicht als Draft-Kauf — sonst waere die Zusage umgangen.
+    expect(counts.draftBuyCount).toBe(vorher.draftBuyCount);
   }, S1_MARKTLAUF_TIMEOUT_MS);
 
   it("no longer forbids S1 market buys in applyAiMarketPlanLocally's marketBuysAllowed gate", async () => {

@@ -33,11 +33,16 @@ import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state
 import { createSaveRepository } from "@/lib/persistence/save-repository";
 import { invalidateSaveSessionCache } from "@/lib/persistence/save-session-cache";
 import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
+import {
+  advanceSeasonEconomyFactorWindow,
+  getSeasonEconomyFactorWindow,
+} from "@/lib/season/season-economy-factors";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { readLockedRankPayout } from "@/lib/sponsor/sponsor-economy-calibration";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorV3Terms, sponsorV3GuaranteedLadder } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 
 const SAVE_ID = "sponsorkarte-rundreise";
 const previousSqlitePath = process.env.OLY_APP_SQLITE_PATH;
@@ -61,9 +66,31 @@ afterEach(() => {
  * Ein NEUES SPIEL in genau dem Zustand, in dem der "Neues Spiel"-Knopf es hinterlaesst: Angebote
  * erzeugt, KI-Vertraege unterschrieben, Leiter-Migration noch NIE gelaufen (kein Stempel). Genau
  * dieser Zustand trifft beim ersten Laden auf die Migration.
+ *
+ * DAS GEHALTSFAKTOR-FENSTER GEHOERT DAZU, und zwar VOR der Unterschrift. `createSingleplayerGameState`
+ * liefert es nicht mit; der echte Knopf schon (`withSeededSeasonEconomyFactorsForNewGame`,
+ * new-game-setup-service.ts — mit derselben Funktion und demselben Seed wie die Persistenzschicht,
+ * ausdruecklich, damit die Sponsorleitern nicht auf dem Ersatzwert 1,0 einfrieren, waehrend die
+ * Saison mit einem anderen Faktor laeuft). Ohne diese Zeile baute die Vorlage einen Zustand, den der
+ * Knopf gar nicht erzeugen kann: 32 Vertraege auf Faktor 1,0 in einer Saison, die beim ersten Laden
+ * ihren echten Faktor bekommt — und der Lade-Backfill (sponsor-salary-factor-backfill.ts) zieht sie
+ * dann zu Recht nach. Der Test misst damit weiter, was er messen will (Laden veraendert die Karte
+ * nicht), statt an einem selbst gebauten Defekt zu scheitern.
  */
 function neuesSpielMitUnterschriebenenVertraegen(): GameState {
-  const gameState = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(createSingleplayerGameState()));
+  const frisch = createSingleplayerGameState();
+  const mitFaktor: GameState = {
+    ...frisch,
+    seasonState: {
+      ...frisch.seasonState,
+      seasonEconomyFactors: getSeasonEconomyFactorWindow({
+        saveId: SAVE_ID,
+        seasonId: frisch.season.id,
+        seasonState: frisch.seasonState,
+      }),
+    },
+  };
+  const gameState = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(mitFaktor));
   const seasonState = { ...gameState.seasonState };
   delete (seasonState as { sponsorLadderMigrationVersion?: number }).sponsorLadderMigrationVersion;
   return { ...gameState, seasonState };
@@ -161,9 +188,27 @@ describe("Sponsorkarte == Settlement, auch nach Speichern und Laden", () => {
       geprueft += 1;
     }
     expect(geprueft).toBeGreaterThanOrEqual(31);
-    // Die Gebaeude-Karten sind der teuerste Fall: ihr Cash-Verzicht steckt AUSSCHLIESSLICH in der
-    // Kartenleiter. Ging sie verloren, behielt das Team das Gebaeude UND bekam die volle Leiter.
-    expect(mitVerzicht, "ohne Gebaeude-Karten im Slate misst dieser Test den teuersten Fall nicht").toBeGreaterThan(0);
+    /**
+     * DER TEUERSTE FALL — SOLANGE ES IHN GIBT.
+     *
+     * Die Gebaeude-Karten waren hier der schaerfste Pruefstein: ihr Cash-Verzicht steckt
+     * AUSSCHLIESSLICH in der Kartenleiter. Ging sie beim Laden verloren, behielt das Team das
+     * Gebaeude UND bekam die volle Leiter.
+     *
+     * Chris hat die Gebaeude-Leihe inzwischen abgeschaltet (`SPONSOR_GEBAEUDE_LEIHE_AKTIV`), also
+     * gibt es diesen Fall gerade nicht. Die alte Zusicherung `mitVerzicht > 0` war damit rot,
+     * ohne dass etwas kaputt war — sie beschrieb einen Entwurf, den es nicht mehr gibt.
+     *
+     * Sie wird deshalb an den Schalter gebunden statt geloescht: mit Leihe muss der teuerste Fall
+     * WEITERHIN vorkommen (sonst prueft der Test ihn nur scheinbar), ohne Leihe muss der Verzicht
+     * bei ALLEN Karten fehlen. Beide Richtungen sind eine Aussage — und die Zusicherung ist
+     * sofort wieder scharf, wenn der Schalter zurueckgestellt wird.
+     */
+    if (SPONSOR_GEBAEUDE_LEIHE_AKTIV) {
+      expect(mitVerzicht, "mit eingeschalteter Leihe muss der teuerste Fall im Slate vorkommen").toBeGreaterThan(0);
+    } else {
+      expect(mitVerzicht, "bei abgeschalteter Leihe darf keine Karte einen Verzicht tragen").toBe(0);
+    }
   }, 180_000);
 
   /**
@@ -175,7 +220,28 @@ describe("Sponsorkarte == Settlement, auch nach Speichern und Laden", () => {
    */
   it("auch nach einem SAISONWECHSEL zeigt die geladene Karte, was das Settlement zahlt", () => {
     const saison1 = neuesSpielMitUnterschriebenenVertraegen();
-    const saison2 = advanceSponsorContractsForNewSeason(saison1, "season-2");
+    // DIE REIHENFOLGE DES ECHTEN UEBERGANGS: erst traegt der Zustand die neue Saison-ID UND ihr
+    // Gehaltsfaktor-Fenster, dann rollen die Vertraege (preseason-workflow-service.ts setzt
+    // `seasonEconomyFactors: economyFactors.nextWindow` in `nextSeasonState`, BEVOR es
+    // `advanceSponsorContractsForNewSeason` ruft). Rollte man wie vorher auf dem Fenster der ALTEN
+    // Saison, bekaemen die Vertraege den alten Faktor, waehrend die Saison schon season-2 heisst —
+    // ein Zustand, den der echte Uebergang nicht erzeugen kann, und den der Lade-Backfill
+    // (sponsor-salary-factor-backfill.ts) beim Laden zu Recht wieder geradezieht.
+    const saison2Basis: GameState = {
+      ...saison1,
+      season: { ...saison1.season, id: "season-2" },
+      seasonState: {
+        ...saison1.seasonState,
+        seasonId: "season-2",
+        seasonEconomyFactors: advanceSeasonEconomyFactorWindow({
+          saveId: SAVE_ID,
+          fromSeasonId: saison1.season.id,
+          toSeasonId: "season-2",
+          seasonState: saison1.seasonState,
+        }).nextWindow,
+      },
+    };
+    const saison2 = advanceSponsorContractsForNewSeason(saison2Basis, "season-2");
     const gerollt = vertraege(saison2).filter(([, vertrag]) => getSponsorV3Terms(vertrag) != null);
     expect(gerollt.length, "kein Mehrjahresvertrag gerollt — dann misst dieser Test nichts").toBeGreaterThan(0);
 

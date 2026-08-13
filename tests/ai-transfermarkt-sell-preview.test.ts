@@ -267,6 +267,44 @@ function createGameState(): GameState {
           updatedAt: "2026-06-05T10:00:00.000Z",
         },
       ],
+      /**
+       * ZWEITE HAELFTE DERSELBEN ABHAENGIGKEIT, NACHGETRAGEN. Die Anmerkung darueber gilt
+       * unveraendert — inzwischen reicht der `matchdayResults`-Eintrag aber nicht mehr allein:
+       * seit dem PP-Befund ueberspringt der Ledger jeden Spieltag, zu dem KEIN
+       * Disziplin-Ergebnis vorliegt (lib/foundation/season-points-ledger.ts). Ohne die Zeilen
+       * hier fielen dieselben Leistungszeilen wieder still aus der Wertung, `mvs` kam als null
+       * zurueck, und mit ihm die Begruendung „Performance blieb unter Erwartung".
+       */
+      disciplineResults: [
+        {
+          id: "dres-spe",
+          matchdayResultId: "result-1",
+          teamId: "A-I",
+          disciplineId: "d_spe",
+          disciplineSide: "d1" as const,
+          rank: 3,
+          baseScore: 30,
+          totalScore: 12,
+          formModifier: 0,
+          readinessStatus: "ready" as const,
+          warnings: [],
+          createdAt: "2026-06-05T10:00:00.000Z",
+        },
+        {
+          id: "dres-men",
+          matchdayResultId: "result-1",
+          teamId: "A-I",
+          disciplineId: "d_men",
+          disciplineSide: "d2" as const,
+          rank: 1,
+          baseScore: 70,
+          totalScore: 48,
+          formModifier: 0,
+          readinessStatus: "ready" as const,
+          warnings: [],
+          createdAt: "2026-06-05T10:00:00.000Z",
+        },
+      ],
       playerDisciplinePerformances: [
         createPerformance({ id: "perf-1", teamId: "A-I", playerId: "ai-core", disciplineId: "d_spe", disciplineSide: "d1", scoreContribution: 12, finalPlayerScore: 30 }),
         createPerformance({ id: "perf-2", teamId: "A-I", playerId: "ai-anchor", disciplineId: "d_men", disciplineSide: "d2", scoreContribution: 48, finalPlayerScore: 70, isTop10: true }),
