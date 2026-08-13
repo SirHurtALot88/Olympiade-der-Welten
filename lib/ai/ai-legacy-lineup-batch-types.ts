@@ -111,6 +111,23 @@ export type AiBatchPreviewSummary = {
 };
 
 /**
+ * DARF DER STAPELLAUF SCHREIBEN? — EINE Rechenstelle fuer Knopf und Handler.
+ *
+ * Der Stapellauf schreibt ausschliesslich KI-Teams, nie das im Feld gewaehlte. Er darf deshalb
+ * NICHT an einer Teamschranke haengen. Genau das tat er aber: der Client prueft `isReadOnly`, und
+ * darin steckt `isTeamManagementLocked` („du fuehrst dieses Team nicht"). Ergebnis, im Browser
+ * nachgemessen: mit einem KI-Team im Feld — also im einzig sinnvollen Fall — standen „Probelauf"
+ * und „Speichern" auf aus, und beim eigenen Team, das der Stapel gar nicht anfasst, auf an.
+ *
+ * Der Server zieht die richtige Linie und nur diese: `POST /api/lineups/legacy/ai-batch-apply`
+ * lehnt `source=prisma` mit 409 ab („Prisma/Supabase mode is read-only in this build") und kennt
+ * sonst keine Teampruefung. Die Anzeige spiegelt jetzt dieselbe Regel.
+ */
+export function canRunAiBatchApply(input: { source: "sqlite" | "prisma" }): boolean {
+  return input.source !== "prisma";
+}
+
+/**
  * EIN Status-Wort fuer die Anzeige — statt roher Bezeichner wie `incomplete_roster`.
  *
  * Chris hat denselben Fehler an der Einsatzliste gemeldet („hier stand blank

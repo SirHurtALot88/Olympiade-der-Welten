@@ -57,10 +57,11 @@ import type {
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { areTeamPowersEnabled, describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
-import type {
-  AiBatchApplyResponse,
-  AiBatchPreviewEntry,
-  AiBatchPreviewResponse,
+import {
+  canRunAiBatchApply,
+  type AiBatchApplyResponse,
+  type AiBatchPreviewEntry,
+  type AiBatchPreviewResponse,
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
 import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
@@ -4144,7 +4145,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   async function handleAiBatchApply(dryRun: boolean) {
-    if (source === "prisma" || isReadOnly) {
+    /**
+     * DER STAPELLAUF SCHREIBT KI-TEAMS — nie das gewaehlte Team. Deshalb darf er NICHT an
+     * `isReadOnly` haengen: das enthaelt `isTeamManagementLocked`, also „du fuehrst dieses Team
+     * nicht". Genau dann will man den Stapellauf aber benutzen — sobald ein KI-Team im Team-Feld
+     * steht, waere er gesperrt gewesen, und ausgerechnet beim eigenen Team (das der Stapel gar
+     * nicht anfasst) offen. Im Browser nachgemessen: mit `A-A` im Feld standen „Probelauf" und
+     * „Speichern" auf aus.
+     *
+     * Was bleibt, ist die richtige Schranke — dieselbe, die der Server zieht: `ai-batch-apply`
+     * lehnt genau einen Fall ab, den Referenzmodus (`source === "prisma"`, 409). Eine Teampruefung
+     * kennt die Route gar nicht. `sourceReadOnly` taugt dafuer ebenfalls nicht: es kommt aus
+     * `isSqliteLineupReadOnly` und ist selbst wieder teambezogen.
+     */
+    if (!canRunAiBatchApply({ source })) {
       setErrors(["Referenzmodus ist nur zum Anschauen. Bitte lokalen Spielstand nutzen."]);
       setMessage("");
       return;
@@ -5934,7 +5948,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               canPreviewSelectedTeam={selectedTeamOption?.controlMode === "ai"}
               selectedTeamIsAi={selectedTeamOption?.controlMode === "ai"}
               isBusy={isBusy}
+              // Zwei verschiedene Schranken, bewusst getrennt: `isReadOnly` heisst „du fuehrst
+              // DIESES Team nicht" und gilt fuer das Speichern des Einzelvorschlags. Der
+              // Stapellauf schreibt dagegen nur KI-Teams — ihn interessiert allein, ob der
+              // Spielstand ueberhaupt beschreibbar ist.
               isReadOnly={isReadOnly || source === "prisma"}
+              canRunBatchApply={canRunAiBatchApply({ source })}
               preview={aiPreview}
               batchEntries={aiBatchPreview}
               batchSummary={aiBatchSummary}

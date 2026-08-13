@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  canRunAiBatchApply,
   describeAiPreviewStatus,
   getAiPreviewStatusTone,
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
@@ -75,6 +76,29 @@ describe("KI-Vorschau in der Einsatzliste: die Bedienung ist erreichbar", () => 
     expect(clientSource).toContain("<LineupAiPreviewPanel");
     // … und die Anzeige haengt sie an Schaltflaechen. Ohne `onClick` waere das Panel nur ein Bild.
     expect(panelSource.match(/onClick=/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+  });
+});
+
+/**
+ * DIE SCHRANKE DES STAPELLAUFS — im Browser nachgemessen, nicht hergeleitet.
+ *
+ * Mit `A-A` im Team-Feld standen „Probelauf" und „Speichern" auf AUS, obwohl der Stapellauf
+ * dieses Team gar nicht anfasst: der Knopf hing an `isReadOnly`, und darin steckt
+ * `isTeamManagementLocked` („du fuehrst dieses Team nicht"). Damit war die Schaltflaeche
+ * ausgerechnet im einzig sinnvollen Fall gesperrt — ein KI-Team im Feld — und beim eigenen Team
+ * offen.
+ */
+describe("KI-Stapellauf: die Schranke", () => {
+  it("haengt allein am Referenzmodus — genau wie der Server", () => {
+    expect(canRunAiBatchApply({ source: "sqlite" })).toBe(true);
+    expect(canRunAiBatchApply({ source: "prisma" })).toBe(false);
+  });
+
+  it("kennt keine Teamschranke: die Wahl im Team-Feld aendert nichts", async () => {
+    const source = await fs.readFile(panelPath, "utf8");
+    // Der Stapelblock darf `isReadOnly` gar nicht sehen — sonst kaeme die Teamschranke zurueck.
+    const stapelBlock = source.slice(source.indexOf("function AiBatchPreview"));
+    expect(stapelBlock).not.toContain("isReadOnly");
   });
 });
 

@@ -35,6 +35,7 @@ export function LineupAiPreviewPanel({
   selectedTeamIsAi,
   isBusy,
   isReadOnly,
+  canRunBatchApply,
   preview,
   batchEntries,
   batchSummary,
@@ -55,7 +56,14 @@ export function LineupAiPreviewPanel({
   canPreviewSelectedTeam: boolean;
   selectedTeamIsAi: boolean;
   isBusy: boolean;
+  /** „Du fuehrst DIESES Team nicht" — gilt fuer das Speichern des Einzelvorschlags. */
   isReadOnly: boolean;
+  /**
+   * Ergebnis von `canRunAiBatchApply` — die EINZIGE Schranke des Stapellaufs, dieselbe, die der
+   * Server zieht. Bewusst NICHT `isReadOnly`: der Stapel schreibt KI-Teams, nie das gewaehlte,
+   * und waere sonst ausgerechnet dann gesperrt, wenn ein KI-Team im Feld steht.
+   */
+  canRunBatchApply: boolean;
   preview: AiLegacyLineupPreview | null;
   batchEntries: AiBatchPreviewEntry[];
   batchSummary: AiBatchPreviewSummary | null;
@@ -119,7 +127,7 @@ export function LineupAiPreviewPanel({
           summary={batchSummary}
           applyFeed={batchApplyFeed}
           isBusy={isBusy}
-          isReadOnly={isReadOnly}
+          canRunBatchApply={canRunBatchApply}
           includeWarnings={includeWarnings}
           onIncludeWarningsChange={onIncludeWarningsChange}
           overwriteExisting={overwriteExisting}
@@ -191,7 +199,13 @@ function AiSinglePreview({
           type="button"
           className="nl-lineup-btn is-primary"
           disabled={isBusy || isReadOnly}
-          title={isReadOnly ? "Referenzmodus ist nur zum Anschauen." : "AI-Vorschlag lokal speichern"}
+          // Der Grund gehoert an den gesperrten Knopf. „Gesperrt ohne Angabe" ist von „kaputt"
+          // nicht zu unterscheiden — genau daran hing Chris' Meldung zur Einsatzliste schon einmal.
+          title={
+            isReadOnly
+              ? "Nur zum Anschauen: dieses Team führst du nicht (oder der Spielstand ist im Referenzmodus)."
+              : "KI-Vorschlag lokal speichern"
+          }
           onClick={onSavePreview}
         >
           Vorschlag speichern
@@ -220,7 +234,7 @@ function AiBatchPreview({
   summary,
   applyFeed,
   isBusy,
-  isReadOnly,
+  canRunBatchApply,
   includeWarnings,
   onIncludeWarningsChange,
   overwriteExisting,
@@ -232,7 +246,7 @@ function AiBatchPreview({
   summary: AiBatchPreviewSummary | null;
   applyFeed: AiBatchApplyResponse | null;
   isBusy: boolean;
-  isReadOnly: boolean;
+  canRunBatchApply: boolean;
   includeWarnings: boolean;
   onIncludeWarningsChange: (next: boolean) => void;
   overwriteExisting: boolean;
@@ -299,13 +313,19 @@ function AiBatchPreview({
       {/* DER PROBELAUF IST PFLICHT, nicht Zierde: `handleAiBatchApply(false)` verlangt einen
           vorherigen Trockenlauf, weil es sonst keine Zahl gaebe, die der Nutzer bestaetigt. */}
       <div className="nl-ai-preview-actions">
-        <button type="button" className="nl-lineup-btn" disabled={isBusy || isReadOnly} onClick={() => onBatchApply(true)}>
+        <button
+          type="button"
+          className="nl-lineup-btn"
+          disabled={isBusy || !canRunBatchApply}
+          title={canRunBatchApply ? "Zählen, ohne zu speichern" : "Referenzmodus ist nur zum Anschauen."}
+          onClick={() => onBatchApply(true)}
+        >
           Probelauf
         </button>
         <button
           type="button"
           className="nl-lineup-btn is-primary"
-          disabled={isBusy || isReadOnly || !applyFeed?.dryRun}
+          disabled={isBusy || !canRunBatchApply || !applyFeed?.dryRun}
           title={applyFeed?.dryRun ? "Vorschläge jetzt lokal speichern" : "Erst Probelauf — dann steht die Zahl, die du bestätigst."}
           onClick={() => onBatchApply(false)}
         >
