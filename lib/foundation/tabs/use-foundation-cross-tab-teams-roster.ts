@@ -34,6 +34,7 @@ import {
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -968,6 +969,13 @@ export function useFoundationCrossTabTeamsRoster(input: {
             // CA = peak-gewichtete Current Ability aus den Corestats (#113), nicht Season-PPS.
             currentRating: computeCurrentAbilityScore(player.coreStats),
           });
+          // Eine Quelle: der Record-Score, nicht das Import-Altfeld player.potential —
+          // sonst zeigt die Rosterkarte einen anderen PO als Spielerliste/Profil/Training
+          // (am Live-Spielstand wichen beide Werte bei allen Spielern ab, Median +16,1).
+          const potentialScore = resolvePlayerPotentialScoreFromGameState({
+            gameState: input.gameState,
+            playerId: player.id,
+          });
           const topDisciplines = Object.entries(player.disciplineRatings)
             .sort((left, right) => right[1] - left[1])
             .slice(0, 2)
@@ -1067,8 +1075,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
               moralePenalty: demand.moralePenalty,
             })),
             topDisciplines,
-            potential: player.potential ?? null,
-            potentialBand: player.potential != null ? getPotentialBand(player.potential) : null,
+            potential: potentialScore,
+            potentialBand: potentialScore != null ? getPotentialBand(potentialScore) : null,
             ...caPoStarFields,
           };
         })

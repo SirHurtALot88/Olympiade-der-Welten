@@ -40,11 +40,11 @@ export type FieldGeo = { w: number; h: number; r: number; rOwn: number };
 
 // Gewichtheben · Kraft-Turm — vorab berechnete Latten-/kg-Infos (nur `barbell`).
 export type BarbellInfo = {
-  endKg: number[];
+  endKgByCode: Map<string, number>;
   kgMax: number;
   kgMin: number;
   axTop: number;
-  totals: number[];
+  totalByCode: Map<string, number>;
 } | null;
 
 export type DisciplineFieldProps = {
@@ -117,8 +117,8 @@ export type DisciplineFieldProps = {
   // ---- Gewichtheben (nur `barbell`) -------------------------------------------------
   barbellInfo: BarbellInfo;
   barbellY: (kg: number) => number;
-  barbellKgOf: (idx: number) => number;
-  barbellEliminated: (idx: number) => boolean;
+  barbellKgOf: (code: string) => number;
+  barbellEliminated: (code: string) => boolean;
   barbellRankMap: Record<string, number>;
   demandKg: number | null;
 

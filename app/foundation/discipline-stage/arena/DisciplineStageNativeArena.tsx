@@ -978,6 +978,56 @@ export function accumulateRevealedTeamScore(players: Array<NativeStagePlayer | n
 }
 
 /**
+ * Gewichtheben · Kraft-Turm: Endgewicht je Team, MONOTON im Endscore.
+ *
+ * Die Hantel ist die Inszenierung, der Score die Wertung — damit beide dasselbe erzaehlen, ist
+ * das Endgewicht eine rein lineare Abbildung der Team-Summe auf 150…400 kg. Wer mehr Punkte hat,
+ * stemmt mehr; die Reihenfolge nach kg IST die Reihenfolge nach Score.
+ *
+ * DER SCHLUESSEL IST DAS TEAM-KUERZEL, NICHT DIE ARRAY-POSITION — und das ist der Kern des von
+ * Chris gemeldeten Fehlers („Anzeige und score passen jetzt nicht mehr zusammen"). Vorher war das
+ * Ergebnis ein Array ueber die Position in `teams`, ausgelesen mit `t.idx` aus dem Renderzustand.
+ * Der Renderzustand wird aber nur BEIM MOUNT gebaut, waehrend diese Ableitung bei jeder neuen
+ * `teams`-Identitaet neu rechnet — und `teams` wird nach dem Werten von Disziplin 1 nach dem
+ * aktualisierten Saisonstand UMSORTIERT. Ab da zeigten beide Seiten auf verschiedene
+ * Reihenfolgen, und jedes Team bekam das Kilogramm eines anderen.
+ *
+ * Ein Kuerzel bedeutet in jeder Reihenfolge dasselbe Team. Eine Umsortierung kann daran nichts
+ * mehr verschieben — die Eigenschaft haelt per Konstruktion, nicht per Sorgfalt.
+ *
+ * Als reine Funktion exportiert, damit genau das ohne Arena-Mount pruefbar ist.
+ */
+export function buildBarbellInfo(
+  teams: Array<{ code: string; players: Array<NativeStagePlayer | null | undefined> }>,
+) {
+  const totalByCode = new Map<string, number>();
+  for (const team of teams) {
+    totalByCode.set(team.code, accumulateRevealedTeamScore(team.players));
+  }
+  let maxTot = 0;
+  let minTot = Infinity;
+  for (const total of totalByCode.values()) {
+    if (total > maxTot) maxTot = total;
+    if (total < minTot) minTot = total;
+  }
+  if (!Number.isFinite(minTot)) minTot = 0;
+  const span = maxTot - minTot || 1;
+  // kg-Skala 150…400 kg (schoene Hantel-Zahlen), monoton im Endscore.
+  const endKgByCode = new Map<string, number>();
+  for (const [code, total] of totalByCode) {
+    endKgByCode.set(code, Math.round(150 + ((total - minTot) / span) * 250));
+  }
+  let kgMax = 0;
+  let kgMin = Infinity;
+  for (const kg of endKgByCode.values()) {
+    if (kg > kgMax) kgMax = kg;
+    if (kg < kgMin) kgMin = kg;
+  }
+  if (!Number.isFinite(kgMin)) kgMin = 0;
+  return { endKgByCode, kgMax, kgMin, axTop: Math.max(0, kgMin - 25), totalByCode };
+}
+
+/**
  * Vergleichsrang für die Spalte "Rang Δ" der Ladder: der Stand VOR der gerade
  * gezeigten Etappe.
  *
@@ -1836,38 +1886,36 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [finalMax, finalMin],
   );
 
-  // Gewichtheben · Kraft-Turm: Endgewicht (endKg) je Team, MONOTON im Endscore →
-  // Ranking nach endKg == Ranking nach Score (= Wahrheit). Die Achse startet knapp
-  // unter der schwächsten Kraft; kgMax ist das Maximum (der spätere Champion). Alles
-  // deterministisch aus den Slot-Werten → SSR-stabil, kein Spoiler (Werte werden erst
-  // sichtbar, wenn die Latte sie testet). Nur für prim === "barbell" berechnet.
-  const barbellInfo = useMemo(() => {
-    if (prim !== "barbell") return null;
-    const totals = teams.map((t) => {
-      let s = 0;
-      for (const p of t.players) s += playerNet(p);
-      return s;
-    });
-    let maxTot = 0;
-    let minTot = Infinity;
-    for (const s of totals) {
-      if (s > maxTot) maxTot = s;
-      if (s < minTot) minTot = s;
-    }
-    if (!Number.isFinite(minTot)) minTot = 0;
-    const span = maxTot - minTot || 1;
-    // kg-Skala 150…400 kg (schöne Hantel-Zahlen), monoton im Endscore.
-    const endKg = totals.map((s) => Math.round(150 + ((s - minTot) / span) * 250));
-    let kgMax = 0;
-    let kgMin = Infinity;
-    for (const k of endKg) {
-      if (k > kgMax) kgMax = k;
-      if (k < kgMin) kgMin = k;
-    }
-    if (!Number.isFinite(kgMin)) kgMin = 0;
-    const axTop = Math.max(0, kgMin - 25);
-    return { endKg, kgMax, kgMin, axTop, totals };
-  }, [prim, teams]);
+  /**
+   * Gewichtheben · Kraft-Turm: Endgewicht je Team, MONOTON im Endscore → Ranking nach kg ==
+   * Ranking nach Score (= Wahrheit). Die Achse startet knapp unter der schwaechsten Kraft;
+   * kgMax ist das Maximum (der spaetere Champion). Deterministisch aus den Slot-Werten →
+   * SSR-stabil, kein Spoiler. Nur fuer `prim === "barbell"` berechnet.
+   *
+   * GEMELDET VON CHRIS: „Anzeige und score passen jetzt nicht mehr zusammen" — mit einem
+   * Endstand, in dem P-S mit 400 kg oben stand (Score 297,6) und V-V mit 150 kg unten
+   * (Score 532,1). Die Zeilen selbst waren richtig zugeordnet (Kuerzel und Heber-Name passten
+   * zum Team), nur die Kilogramm gehoerten jemand anderem.
+   *
+   * HIER LAG ES, UND ES IST WIEDER EIN INDEX-PROBLEM: `endKg` war ein ARRAY ueber die
+   * Array-Position von `teams`, gelesen als `endKg[t.idx]`. `t.idx` stammt aber aus `buildRT()`,
+   * und das laeuft NUR BEIM MOUNT (der Reset-Effekt ist bewusst mount-only, sonst wuerfe jeder
+   * Eltern-Render die laufende Simulation auf Runde 0 zurueck, siehe B1). Dieser `useMemo`
+   * dagegen haengt an `[prim, teams]` und rechnet bei JEDER neuen `teams`-Identitaet neu — und
+   * `payload.teams` wird durch `orderStageTeamsBySeasonRank` UMSORTIERT, sobald Disziplin 1
+   * gewertet ist (der Saisonstand aendert sich, `matchdayPanel` faellt neu an).
+   *
+   * Ab diesem Moment zeigten die beiden Seiten auf verschiedene Reihenfolgen: `rtRef` hielt die
+   * alte, `endKg` trug die neue — und `endKg[t.idx]` griff das Kilogramm des falschen Teams.
+   * Genau deshalb stimmte es waehrend der Disziplin und erst danach nicht mehr.
+   *
+   * Der Schluessel ist jetzt das TEAM-KUERZEL statt der Array-Position. Ein Kuerzel bedeutet in
+   * beiden Reihenfolgen dasselbe Team; eine Umsortierung kann daran nichts mehr verschieben.
+   */
+  const barbellInfo = useMemo(
+    () => (prim === "barbell" ? buildBarbellInfo(teams) : null),
+    [prim, teams],
+  );
   // aktuelle Last für tokenPos/Feld ohne Callback-Dep-Churn (Ref im Render aktuell halten)
   barbellDemandRef.current = demandKg;
   // Barbell: kg → y auf der Turm-Achse (baseY…topY). Latte + Heber teilen sich diese Skala.
@@ -1879,19 +1927,24 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     },
     [barbellInfo, layout, H],
   );
+  /** Endgewicht eines Teams — nachgeschlagen ueber das Kuerzel, nicht ueber die Array-Position. */
+  const barbellEndKgOf = useCallback(
+    (code: string): number => barbellInfo?.endKgByCode.get(code) ?? barbellInfo?.axTop ?? 0,
+    [barbellInfo],
+  );
   // aktuelles kg eines Teams: sitzt auf der Latte (min) oder auf seinem Endgewicht (gerissen).
   const barbellKgOf = useCallback(
-    (idx: number): number => {
+    (code: string): number => {
       if (!barbellInfo) return 0;
-      const ek = barbellInfo.endKg[idx] ?? barbellInfo.axTop;
+      const ek = barbellEndKgOf(code);
       return demandKg == null ? barbellInfo.axTop : Math.min(demandKg, ek);
     },
-    [barbellInfo, demandKg],
+    [barbellInfo, barbellEndKgOf, demandKg],
   );
   const barbellEliminated = useCallback(
-    (idx: number): boolean => {
+    (code: string): boolean => {
       if (!barbellInfo || demandKg == null) return false;
-      return demandKg > (barbellInfo.endKg[idx] ?? Infinity);
+      return demandKg > (barbellInfo.endKgByCode.get(code) ?? Infinity);
     },
     [barbellInfo, demandKg],
   );
@@ -1902,12 +1955,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     const rt = rtRef.current;
     if (!barbellInfo) return [...rt];
     return [...rt].sort((a, b) => {
-      const ea = barbellEliminated(a.idx) ? 1 : 0;
-      const eb = barbellEliminated(b.idx) ? 1 : 0;
+      const ea = barbellEliminated(a.code) ? 1 : 0;
+      const eb = barbellEliminated(b.code) ? 1 : 0;
       if (ea !== eb) return ea - eb;
       if (ea) {
-        const ka = barbellInfo.endKg[a.idx] ?? 0;
-        const kb = barbellInfo.endKg[b.idx] ?? 0;
+        const ka = barbellEndKgOf(a.code);
+        const kb = barbellEndKgOf(b.code);
         if (kb !== ka) return kb - ka;
         return a.seasonRank - b.seasonRank;
       }
@@ -1940,7 +1993,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         // geforderten Last (Ref, im Render aktuell) + monotonem Endgewicht ab.
         const x = layout.lPad + t.laneIdx * layout.colW + layout.colW / 2;
         if (!barbellInfo) return { x, y: layout.baseY };
-        const ek = barbellInfo.endKg[t.idx] ?? barbellInfo.axTop;
+        const ek = barbellEndKgOf(t.code);
         const dk = barbellDemandRef.current;
         const kg = dk == null ? barbellInfo.axTop : Math.min(dk, ek);
         return { x, y: barbellY(kg) };
@@ -2615,14 +2668,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       // Letzte Runde: die Latte erreicht kgMax (nur der Champion hält) → Sieg-Hebung.
       const nextBar = isLast ? barbellInfo.kgMax : Math.round(barbellInfo.axTop + (barbellInfo.kgMax - barbellInfo.axTop) * ((r + 1) / slotCount));
       const newlyOut = rt.filter((t) => {
-        const ek = barbellInfo.endKg[t.idx] ?? Infinity;
+        const ek = (barbellInfo.endKgByCode.get(t.code) ?? Infinity);
         return prevBar <= ek && nextBar > ek;
       });
       barbellDemandRef.current = nextBar;
       setDemandKg(nextBar);
       if (isLast) {
-        const champ = [...rt].sort((a, b) => (barbellInfo.endKg[b.idx] ?? 0) - (barbellInfo.endKg[a.idx] ?? 0) || a.seasonRank - b.seasonRank)[0];
-        setBarbellMsg({ text: champ ? `🏆 Sieg-Hebung · ${champ.code} stemmt ${barbellInfo.endKg[champ.idx]} kg` : "🏆 Endstand", kind: "end" });
+        const champ = [...rt].sort((a, b) => (barbellEndKgOf(b.code)) - (barbellEndKgOf(a.code)) || a.seasonRank - b.seasonRank)[0];
+        setBarbellMsg({ text: champ ? `🏆 Sieg-Hebung · ${champ.code} stemmt ${barbellEndKgOf(champ.code)} kg` : "🏆 Endstand", kind: "end" });
       } else if (newlyOut.length) {
         const first = newlyOut[0]!;
         setBarbellMsg({ text: newlyOut.length > 1 ? `🔴 ${first.code} +${newlyOut.length - 1} reißen bei ${nextBar} kg` : `🔴 ${first.code} reißt bei ${nextBar} kg`, kind: "red" });
@@ -3097,7 +3150,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const barbellSorted = prim === "barbell" ? barbellOrder() : sorted;
   const barbellRankMap: Record<string, number> = {};
   if (prim === "barbell") barbellSorted.forEach((t, i) => (barbellRankMap[t.code] = i + 1));
-  const barbellLive = prim === "barbell" && barbellInfo ? rtRef.current.filter((t) => !barbellEliminated(t.idx)).length : 0;
+  const barbellLive = prim === "barbell" && barbellInfo ? rtRef.current.filter((t) => !barbellEliminated(t.code)).length : 0;
   // aktueller Versuch (Kader durchgeschaltet) — 0…slots-1, folgt der Runde.
   const barbellTry = Math.min(slotCount - 1, Math.max(0, done ? slotCount - 1 : round));
   const ladderList = prim === "barbell" ? barbellSorted : sorted;
@@ -3431,7 +3484,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               me
                 ? (() => {
                     const lifter = me.players[barbellTry] ?? null;
-                    const out = barbellEliminated(me.idx);
+                    const out = barbellEliminated(me.code);
                     const myRank = barbellRankMap[me.code] ?? me.rank;
                     const clickable = Boolean(onOpenPlayer && lifter?.playerId);
                     return (
@@ -3450,9 +3503,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                             Versuch {barbellTry + 1} / {slotCount} · Platz {myRank}
                             {" · "}
                             {out ? (
-                              <span style={{ color: "var(--nl-risk)", fontWeight: 800 }}>🔴 raus · {Math.round(barbellKgOf(me.idx))} kg</span>
+                              <span style={{ color: "var(--nl-risk)", fontWeight: 800 }}>🔴 raus · {Math.round(barbellKgOf(me.code))} kg</span>
                             ) : (
-                              <span style={{ color: "var(--nl-good)", fontWeight: 800 }}>hebt {Math.round(barbellKgOf(me.idx))} kg</span>
+                              <span style={{ color: "var(--nl-good)", fontWeight: 800 }}>hebt {Math.round(barbellKgOf(me.code))} kg</span>
                             )}
                           </div>
                         </div>
@@ -3726,8 +3779,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                         Verbliebener bleibt verborgen, bis die Latte sie testet. */}
                     {prim === "barbell" && barbellInfo
                       ? (() => {
-                          const out = barbellEliminated(t.idx);
-                          const kg = Math.round(barbellKgOf(t.idx));
+                          const out = barbellEliminated(t.code);
+                          const kg = Math.round(barbellKgOf(t.code));
                           const lifter = t.players[barbellTry] ?? null;
                           return (
                             <div style={{ margin: "0 0 7px", padding: "6px 9px", borderRadius: 9, background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }}>
@@ -4127,12 +4180,12 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           // Gewichtheben · Kraft-Turm: Rang/kg/Zugewinn aus dem Latten-Modell (Anti-
           // Spoiler zählt live hoch), Rang-Pfeil aus der Barbell-Vorrunde, aktueller Heber.
           const bRank = prim === "barbell" ? barbellRankMap[t.code] ?? t.rank : t.rank;
-          const bOut = prim === "barbell" && barbellEliminated(t.idx);
+          const bOut = prim === "barbell" && barbellEliminated(t.code);
           const bChamp = prim === "barbell" && done && bRank === 1;
-          const bKg = prim === "barbell" ? Math.round(barbellKgOf(t.idx)) : 0;
+          const bKg = prim === "barbell" ? Math.round(barbellKgOf(t.code)) : 0;
           const bPrevRank = prim === "barbell" ? barbellPrevRankRef.current[t.code] : undefined;
           const bArrow = bPrevRank != null ? bPrevRank - bRank : 0;
-          const bPrevKg = prim === "barbell" && barbellInfo ? (barbellPrevDemandRef.current == null ? barbellInfo.axTop : Math.min(barbellPrevDemandRef.current, barbellInfo.endKg[t.idx] ?? barbellInfo.axTop)) : 0;
+          const bPrevKg = prim === "barbell" && barbellInfo ? (barbellPrevDemandRef.current == null ? barbellInfo.axTop : Math.min(barbellPrevDemandRef.current, barbellEndKgOf(t.code))) : 0;
           const bGain = prim === "barbell" && !bOut ? Math.max(0, bKg - Math.round(bPrevKg)) : 0;
           const bLifter = prim === "barbell" ? t.players[barbellTry]?.name ?? "" : "";
           return (

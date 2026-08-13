@@ -142,6 +142,33 @@ export function isTeamAllAvailablePlayersDeployedInLineup(
  * oder alle einsatzbereiten (nicht verletzten) Spieler aufgestellt sind. Offene Slots
  * durch zu dünnen/verletzten Kader sind dann kein Hard-Block mehr.
  */
+/**
+ * Eine `locked`/`resolved` Aufstellung ist FESTGENAGELT — der Spieltag laeuft oder ist gelaufen.
+ *
+ * GEMELDET VON CHRIS: „hier sagt er P-C nicht ready obwohl ich ready bin und auch auf platz 3
+ * gescored habe … ob die verletzungen schuld sind und das scoring blocken"
+ *
+ * Sie sind es, und zwar in der Richtung, die man nicht erwartet. Am Live-Spielstand nachgemessen
+ * (Save `…-0kalpx`, Spieltag 6, Pirate Crew): Kader 8 Spieler, Aufstellung `locked` mit 7
+ * Eintraegen, gefordert waeren 11 Slots (6 + 5) — mit 8 Spielern nie erreichbar. Getragen hat die
+ * Bereitschaft deshalb der dritte Weg: „alle EINSATZBEREITEN Spieler sind aufgestellt". Beim
+ * Abgeben stimmte das. Danach ist Lexa von `injured` auf `recovering` gewechselt und zaehlt seither
+ * als einsatzbereit — aufgestellt ist sie aber nicht, und in einer gesperrten Liste kann sie es
+ * auch nicht mehr werden. Ein Spieler, der GENESEN ist, hat das Team ruecklaufend „nicht bereit"
+ * gemacht, fuer einen Spieltag, den es bereits gespielt hatte.
+ *
+ * Derselbe Fehler wie an anderen Stellen heute: zum falschen Zeitpunkt gemessen. Die Pruefung
+ * fragt die Verfuegbarkeit von JETZT ab, die Aufstellung stammt von VORHER — und ist unaenderbar.
+ *
+ * Solange die Liste noch `submitted` (also aenderbar) ist, bleibt die Live-Pruefung richtig: wird
+ * ein Spieler frei, kann man ihn noch nachtragen, und der Hinweis darauf ist nuetzlich. Ab
+ * `locked` gibt es niemanden mehr, der auf die Antwort reagieren koennte — dann IST die
+ * abgegebene Liste die Antwort.
+ */
+export function isTeamMatchdayLineupSealed(draft: LineupDraft | null | undefined) {
+  return draft?.status === "locked" || draft?.status === "resolved";
+}
+
 export function isTeamMatchdayLineupOperationallyReady(
   gameState: GameState,
   teamId: string,
@@ -149,6 +176,10 @@ export function isTeamMatchdayLineupOperationallyReady(
 ): boolean {
   if (!draft?.entries.length) {
     return false;
+  }
+  // Gesperrt heisst: die Entscheidung ist gefallen und nicht mehr revidierbar.
+  if (isTeamMatchdayLineupSealed(draft)) {
+    return true;
   }
   if (isTeamMatchdayLineupComplete(gameState, teamId, draft)) {
     return true;

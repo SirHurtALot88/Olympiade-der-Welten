@@ -637,6 +637,13 @@ export function revealPlayerPotentialRecord(input: {
   };
 }
 
+/**
+ * LEGACY-Einstieg für Kontexte OHNE GameState (z.B. DB-Read-Services, die einen
+ * synthetischen Score übergeben). Überall, wo ein GameState existiert, gilt die eine
+ * Quelle `playerPotential[].hiddenPotentialScore` → `buildPlayerScoutPotentialFromGameState`
+ * verwenden. `player.potential` ist ein Import-Altfeld, das nach dem Import nicht mehr
+ * gepflegt wird und am Live-Spielstand ligaweit vom Modell abwich (Median +16,1).
+ */
 export function buildPlayerScoutPotential(input: {
   player: Pick<Player, "potential">;
   scoutingLevel?: number | null;

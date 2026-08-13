@@ -441,8 +441,11 @@ function buildTeamContext(
   const lowMoraleCount = morale.filter((entry) => entry.morale < 45).length;
   const lowBoardTrustCount = morale.filter((entry) => (entry.moraleRenewalRisk ?? 0) >= 60).length;
   const youthCount = players.filter((player) => {
+    // Eine Quelle: das gebänderte Scout-Rating kommt bereits aus dem Potenzial-Record;
+    // der frühere Zusatz-ODER auf das Import-Altfeld player.potential mischte eine
+    // zweite, abweichende Zahl in dieselbe Entscheidung.
     const potential = buildPlayerScoutPotentialFromGameState({ gameState, player });
-    return (potential?.scoutRating ?? 0) >= 70 || (player.potential ?? 0) >= 70;
+    return (potential?.scoutRating ?? 0) >= 70;
   }).length;
   const contractExitCount = rosterEntries.filter((entry) => (entry.contractLength ?? 0) <= 1).length;
   const snapshots = gameState.seasonState.seasonSnapshots ?? [];

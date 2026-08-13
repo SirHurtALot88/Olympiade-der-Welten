@@ -279,11 +279,14 @@ function getCurrentAbility(input: { player: Player; playerRating: PlayerRatingCo
   // CA is deliberately NOT the league-relative OVR (`ovrNormalized`) — a league's
   // #1 player must not read as CA 100 just because he tops a weak league. CA is
   // the absolute, peak-weighted score from the player's own core axis values, so
-  // it also works for free agents (who have no OVR at all). `player.rating` /
-  // `player.potential` are last-resort fallbacks for the rare case where core
-  // stats are entirely missing.
+  // it also works for free agents (who have no OVR at all). `player.rating` is the
+  // last-resort fallback for the rare case where core stats are entirely missing.
+  // Das frühere zusätzliche `player.potential` als CA-Ersatz ist raus: das Feld ist
+  // ein Import-Altfeld MIT anderer Bedeutung (Potenzial, nicht Fähigkeit) und wich
+  // am Live-Spielstand systematisch vom Modell ab — lieber „unbekannt" als eine
+  // falsche Größe als Fähigkeit ausgeben.
   const absoluteCurrentAbility = computeCurrentAbilityScore(input.player.coreStats);
-  return roundValue(absoluteCurrentAbility ?? input.player.rating ?? input.player.potential ?? null, 1);
+  return roundValue(absoluteCurrentAbility ?? input.player.rating ?? null, 1);
 }
 
 function getDisplayMarketValue(player: Player) {
@@ -765,10 +768,14 @@ export function buildPlayerProgressionForecast(input: {
   const xpAfterTraits = withTraits(xpBeforeTraits, traitMultiplier);
   const performanceXP = withTraits(appearanceXP + mvsXP + ppsBonusXP + topPlayerXP + highlightXP, traitMultiplier);
   const currentAbilityRating = getCurrentAbility({ player: input.player, playerRating: input.playerRating });
+  // Eine Quelle: Record-Score, ersatzweise das daraus gebänderte Scout-Rating, sonst CA.
+  // Das Import-Altfeld `player.potential` ist bewusst raus aus der Kette — es wich am
+  // Live-Spielstand bei allen Spielern vom Modellwert ab (Median +16,1) und hätte hier
+  // eine andere Zahl in die Prognose gemischt, als das Training tatsächlich verrechnet.
   const potentialRating =
     potentialRecord?.hiddenPotentialScore ??
     scoutPotential.scoutRating ??
-    (input.player.potential > 0 ? input.player.potential : currentAbilityRating);
+    currentAbilityRating;
   const scoutingTeamId = rosterEntry?.teamId ?? null;
   const internalStarSnapshot =
     potentialRecord != null

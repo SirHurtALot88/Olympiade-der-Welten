@@ -25,6 +25,7 @@ import {
 } from "@/lib/training/organic-season-progression";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getAllTrainingModePresentations } from "@/lib/training/training-mode-presentation";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
@@ -176,6 +177,8 @@ export function useFoundationCrossTabTraining(input: {
         player: {
           ...trainingPlayer,
           trainingMode: mode,
+          // Eine Quelle: Potenzial aus dem Record statt aus dem Import-Altfeld player.potential.
+          potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState: input.gameState, playerId: trainingPlayer.id }),
         },
       });
       const appearances = seasonPerformance?.appearances ?? 0;

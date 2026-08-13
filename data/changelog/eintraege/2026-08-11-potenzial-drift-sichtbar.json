@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-11",
+  "seite": "Spieler · Trainingshistorie",
+  "text": "Das Potenzial eines Spielers driftet an jedem Saisonende leicht — um ein bis drei Punkte, gerichtet durch seinen Wachstums-Ausblick. Das war schon immer so, stand aber nirgends: am Live-Spielstand nachgemessen sind 1586 Spieler hoch- und 1367 heruntergedriftet, ohne dass es irgendwo zu sehen war. Wer sich fragte, warum ein Spieler in der Folgesaison vom gleichen Trainingsbudget weniger mitnimmt, fand keine Antwort. Die Trainingshistorie zeigt den Übergang jetzt direkt in der Saisonzeile (\"PO 78→77\", grün bei Anstieg, rot bei Rückgang); aufgeklappt steht dabei, dass es die Obergrenze der nächsten Saison meint und keine Bewertung der abgelaufenen. Der Spielstand hält nur den jeweils letzten Übergang fest — ältere Saisons sagen das offen, statt eine Zahl zu erfinden.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}
