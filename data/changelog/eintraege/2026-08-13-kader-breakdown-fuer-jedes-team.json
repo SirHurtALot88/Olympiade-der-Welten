@@ -1,0 +1,8 @@
+{
+  "datum": "2026-08-13",
+  "seite": "Teams · Kennzahlen",
+  "text": "Die Zusammensetzung hinter den Kennzahlen — „Marktwert · Kader\" mit den Einzelwerten, der Kadersumme und beim Gehalt der Vertragsform je Spieler — gab es nur beim eigenen Team. Bei jedem anderen stand dort die Summe und darunter „Einzel-Marktwerte verdeckt (fremdes Team)\". Das war eine reine Anzeige-Sperre: dieselben Zahlen stehen ohnehin in der Kadertabelle und im Transfermarkt. Jetzt oeffnet die Aufschluesselung fuer JEDES Team, sowohl fuer Marktwert als auch fuer Gehalt, und zwar in beiden Ansichten (Teams-Reiter und Team-Profil). Der Rang-Hover mit der Ligatabelle rund um das gewaehlte Team kannte die Sperre noch nie und bleibt unveraendert.",
+  "gewicht": "feinschliff",
+  "pr": null,
+  "version": "0.5"
+}

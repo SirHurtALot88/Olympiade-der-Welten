@@ -48,6 +48,15 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Teams · Kennzahlen",
+      "pr": null,
+      "text": "Die Zusammensetzung hinter den Kennzahlen — „Marktwert · Kader\" mit den Einzelwerten, der Kadersumme und beim Gehalt der Vertragsform je Spieler — gab es nur beim eigenen Team. Bei jedem anderen stand dort die Summe und darunter „Einzel-Marktwerte verdeckt (fremdes Team)\". Das war eine reine Anzeige-Sperre: dieselben Zahlen stehen ohnehin in der Kadertabelle und im Transfermarkt. Jetzt oeffnet die Aufschluesselung fuer JEDES Team, sowohl fuer Marktwert als auch fuer Gehalt, und zwar in beiden Ansichten (Teams-Reiter und Team-Profil). Der Rang-Hover mit der Ligatabelle rund um das gewaehlte Team kannte die Sperre noch nie und bleibt unveraendert.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Team-Einstellungen · Neues Spiel",
       "pr": null,
       "text": "Ein neu angelegter Spielstand konnte damit enden, dass die KI alle 32 Teams steuert und keines dem Spieler gehört — man saß als Zuschauer in der eigenen Liga, und beim nächsten Spieltag wurde für einen aufgestellt. Grund waren zwei Knöpfe mit fast gleichem Namen: „Neues Spiel erstellen\" führt über den Klub-Assistenten und setzt die Steuerung korrekt, „Neues Spiel anlegen\" baute den Stand direkt aus dem Saatzustand — und der kennt keinen Spieler. An den vorhandenen Spielständen nachgemessen: alle über den Assistenten angelegten haben ein eigenes Team, beide über den zweiten Weg angelegten hatten keines. Die Klub-Auswahl geht jetzt auch diesen Weg mit; ohne Auswahl übernimmt der neue Stand das Team des laufenden.",
