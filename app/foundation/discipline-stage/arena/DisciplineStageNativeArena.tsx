@@ -4,6 +4,11 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useReducer,
 import { createPortal } from "react-dom";
 import { teamPrimaryColor, floorTeamAccent } from "@/lib/foundation/team-colors";
 import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
+import type { ArenaResetAnlass } from "@/lib/foundation/discipline-stage/discipline-stage-replay-gate";
+import {
+  ARENA_LADDER_PAD_Y,
+  resolveArenaLadderRowHeight,
+} from "@/lib/matchday-arena/arena-ladder-metrics";
 import { useStageAudio } from "./useStageAudio";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
@@ -127,7 +132,9 @@ export type DisciplineStageNativeArenaProps = {
   onHoverTeam?: ((teamId: string | null) => void) | null; // Ladder-Hover → Team-Vorschau
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
-  onReset?: (() => void) | null; // „↻ Neu": hebt das Spoiler-Gate im Host wieder auf (arenaEnded=false)
+  // Meldet JEDES Zuruecksetzen der Buehne samt Anlass. Was der Anlass bedeutet, entscheidet der
+  // Host (`replayNachArenaReset`) — ein Mount ist kein Nachspielen, ein „↻ Neu" schon.
+  onReset?: ((anlass: ArenaResetAnlass) => void) | null;
   onResults?: ((byTeam: StageLiveResultsByTeam) => void) | null; // meldet die Live-Ergebnisse aufgedeckter Spieler an den Host (Team-Drawer)
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
@@ -1620,7 +1627,28 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     }
   }, []);
 
-  const reset = useCallback(() => {
+  /**
+   * DER MOUNT IST KEIN „↻ NEU" — DIESE UNTERSCHEIDUNG WAR DER STILLE ANZEIGE-VERLUST.
+   *
+   * GEMELDET VON CHRIS: „top spieler ... warum ist das immernoch nicht da".
+   *
+   * NACHGEMESSEN im Browser (Save `fresh-season-1-1786550453715`, Saison 2, Spieltag 4, beide
+   * Disziplinen gebucht): die Arena meldete `activeSideScoredInSave=true`, aber
+   * `disciplineEnded=false` — und damit fehlte der GANZE Endscreen: Top-Spieler-Liste,
+   * Highlights und der Weiter-Block.
+   *
+   * URSACHE: dieser Reset lief auch beim MOUNT und rief dabei `onReset` mit. Im Host setzt
+   * `onReset` `replayingDisciplineId = disciplineId` — die Zusage „der Nutzer laesst die
+   * Disziplin gerade nochmal laufen, verrate das Ergebnis nicht". Genau diese Zusage hebt
+   * `disciplineEnded` wieder auf:
+   *   disciplineEnded = ... || (activeSideScoredInSave && replayingDisciplineId !== disciplineId)
+   * Wer die Arena zu einer laengst gewerteten Disziplin oeffnet, galt damit als „spielt gerade
+   * nach" — obwohl er nur die Seite geladen hat. Der Save wusste es besser, die Anzeige nicht.
+   *
+   * Deshalb sagt der Aufrufer jetzt, WARUM zurueckgesetzt wird. Nur der Knopf meldet es dem Host;
+   * der Mount setzt bloss die Buehne auf Runde 0.
+   */
+  const reset = useCallback((anlass: ArenaResetAnlass) => {
     clearTimers();
     rtRef.current = buildRT();
     setRound(0);
@@ -1655,9 +1683,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     tier1Budget.current = 4;
     manualPauseRef.current = false;
     setPaused(false);
-    // „↻ Neu": Host-seitiges Spoiler-Gate (arenaEnded) wieder aufheben, damit der
-    // Real-Modus-Endscreen + „Spieltag auswerten"-Button beim Replay verschwinden (FIX A).
-    onReset?.();
+    // Host-seitiges Spoiler-Gate (arenaEnded) wieder aufheben, damit der Real-Modus-Endscreen +
+    // „Spieltag auswerten"-Button beim Replay verschwinden (FIX A). Der ANLASS faehrt mit: was er
+    // bedeutet, entscheidet der Host an einer Stelle (`replayNachArenaReset`) — dieser hier meldet
+    // nur, was passiert ist.
+    onReset?.(anlass);
     force();
   }, [buildRT, clearTimers, onReset]);
 
@@ -1666,7 +1696,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // würde die laufende Sim bei unbeteiligtem Parent-Render (Drawer/Hover) auf Runde 0
   // zurückwerfen (B1). reset ist ein useCallback — Mount-only ist gewollt.
   useEffect(() => {
-    reset();
+    reset("mount");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(
@@ -3141,20 +3171,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
    * unlesbar, ueber ~34px zerfaellt die Liste optisch. Passt die Zeilenzahl auch
    * bei Minimalhoehe nicht, bleibt der Innen-Scroll als ehrlicher Notnagel.
    */
-  const LADDER_ROW_MIN_H = 17;
-  const LADDER_ROW_MAX_H = 34;
-  const LADDER_PAD_Y = 10; // padding des Ladder-Containers, oben + unten je 10px
-  const LADDER_BORDER_Y = 1; // 1px Rahmen, oben + unten
-  const LADDER_ROW_H = useMemo(() => {
-    if (ladderMaxH == null || ladderHeadH <= 0) return 25;
-    // Der Container rechnet seit dem Hoehen-Fix mit `border-box`: `ladderMaxH` ist die
-    // AUSSENhoehe. Fuer die Zeilen bleibt davon der Innenraum — also abzueglich Polster UND
-    // Rahmen. Der Rahmen fehlte hier, was die Zeilen um 2px zu hoch ansetzte und die Liste
-    // ueber den unteren Rand schob.
-    const available = ladderMaxH - ladderHeadH - LADDER_PAD_Y * 2 - LADDER_BORDER_Y * 2;
-    if (available <= 0) return LADDER_ROW_MIN_H;
-    return Math.max(LADDER_ROW_MIN_H, Math.min(LADDER_ROW_MAX_H, available / N));
-  }, [ladderMaxH, ladderHeadH, N]);
+  // Die Rechnung selbst liegt in `lib/matchday-arena/arena-ladder-metrics.ts` — dort ist sie
+  // ueber WERTE pruefbar (vitest faehrt ohne jsdom; ein Flex-Layout gibt es im Test nicht).
+  const LADDER_PAD_Y = ARENA_LADDER_PAD_Y;
+  const LADDER_ROW_H = useMemo(
+    () => resolveArenaLadderRowHeight({ ladderMaxH, ladderHeadH, rowCount: N }),
+    [ladderMaxH, ladderHeadH, N],
+  );
   const ladderRows = trackLadder ? [...rtRef.current].sort((a, b) => a.seasonRank - b.seasonRank) : ladderList;
 
   // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen
@@ -3394,7 +3417,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
-          <button type="button" data-testid="arena-reset" onClick={reset} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
+          <button type="button" data-testid="arena-reset" onClick={() => reset("knopf")} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ↻ Neu
           </button>
           <button type="button" onClick={audio.toggleMute} title="Sound an/aus" style={{ padding: "9px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}>

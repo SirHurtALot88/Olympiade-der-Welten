@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { buildLeihPresentationForOffer } from "@/lib/sponsor/sponsor-leih-presenter";
+import { SponsorLeihePanel } from "@/components/foundation/sponsor/SponsorLeihePanel";
 
 import type {
   GameState,
@@ -237,6 +239,10 @@ export function SponsorOfferCardNewLook({
   const offerModules = describeSponsorOfferModules(offer);
   const offerPerk = offerModules.find((module) => module.kind === "perk") ?? null;
   const specialComponent = offer.components.find((component) => component.kind === "special") ?? null;
+  // Die Gebäude-Leihe kommt fertig gerechnet aus der lib — die Karte formatiert nur. Jede Zahl
+  // stammt aus derselben Quelle wie der Verzicht in der Leiter; eine zweite Rechnung hier waere
+  // genau der Weg, auf dem Anzeige und Abrechnung in diesem Projekt schon auseinandergelaufen sind.
+  const leihe = buildLeihPresentationForOffer(offer);
   // "overperformance" wird als eigene Zeile unter der Rang-Leiter gerendert (nicht als generische Kachel),
   // fließt aber weiter in die Gesamt-Summe (totalCash) ein.
   const standardComponents = offer.components.filter(
@@ -390,6 +396,13 @@ export function SponsorOfferCardNewLook({
         </div>
       ) : null}
 
+      {/* DAS GEBÄUDE — die eigentliche Entscheidung dieser Karte.
+          Es steht bewusst VOR den Cash-Kacheln: wer diese Karte waehlt, waehlt sie wegen des
+          Gebaeudes, und die niedrigere Auszahlung darunter ist die Folge, nicht der Anlass. Die
+          Zeile „steckt bereits in der Auszahlung" ist keine Hoeflichkeit, sondern die Absicherung
+          gegen das naheliegende Missverstaendnis, der Verzicht komme noch obendrauf. */}
+      {leihe ? <SponsorLeihePanel leihe={leihe} formatCash={formatCash} variant="offer" /> : null}
+
       {presentation.isChallenge && presentation.special ? (
         <div className="nl-sponsor-challenge" data-testid="sponsor-challenge-panel">
           <div className="nl-sponsor-challenge-head">
@@ -453,17 +466,9 @@ export function SponsorOfferCardNewLook({
                 <strong className="nl-tnum">+{formatCash(presentation.v3.goal.payout)}</strong>
               </li>
             ) : null}
-            {presentation.v3.advance ? (
-              /* Die zweite Wahldimension. Ohne diese Zeile stuende der Vorschuss nirgends auf der
-                 Karte — der Mensch waehlte dann schlechter informiert als die KI, die ihn bewertet. */
-              <li data-testid="sponsor-v3-advance">
-                <span>
-                  Vorschuss bei Unterschrift{" "}
-                  <em>(Gebuehr {formatCash(presentation.v3.advance.fee)}, am Saisonende verrechnet)</em>
-                </span>
-                <strong className="nl-tnum">+{formatCash(presentation.v3.advance.amount)}</strong>
-              </li>
-            ) : null}
+            {/* Hier stand die Vorschuss-Zeile ("Vorschuss bei Unterschrift"). Es gibt keinen
+                Vorschuss mehr — jede Karte zahlt vollstaendig am Saisonende, deshalb braucht die
+                Karte auch keinen Hinweis auf einen zweiten Zahlungszeitpunkt. */}
           </ul>
           <div className="nl-sponsor-v2-range nl-tnum" data-testid="sponsor-v3-range">
             Spanne {formatCash(presentation.v3.minPayout)} – {formatCash(presentation.v3.maxPayout)}

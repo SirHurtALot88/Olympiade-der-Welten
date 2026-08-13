@@ -101,14 +101,20 @@ describe("facility effects", () => {
     expect(base.after + performanceXp).toBe(178);
   });
 
-  it("scales facility effects by condition below 70 percent and reaches zero when broken", () => {
-    const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 35 } });
+  it("skaliert die Wirkung unterhalb der Schwelle und faellt bei kaputt auf null", () => {
+    // Volle Wirkung gilt bis zum Zustand 80 (FACILITY_CONDITION_WARNING); darunter faellt sie
+    // linear: Effizienz = Zustand / 80. Bei Zustand 40 also die Haelfte.
+    const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 40 } });
     const brokenFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 0 } });
 
-    // L2 = 28 % Basis × 50 % Effizienz (Condition 35 %) = 14 % → after 114.
+    // L2 = 28 % Basis × 50 % Effizienz (Zustand 40 von 80) = 14 % → after 114.
     expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(14);
     expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(114);
     expect(applyTrainingXpFacilityModifiers(100, brokenFacilities).after).toBe(100);
+
+    // Genau auf der Schwelle noch volle Wirkung, einen Punkt darunter nicht mehr.
+    expect(applyTrainingXpFacilityModifiers(100, facilities({ training_center: { level: 2, enabled: true, conditionPct: 80 } })).modifierPct).toBe(28);
+    expect(applyTrainingXpFacilityModifiers(100, facilities({ training_center: { level: 2, enabled: true, conditionPct: 79 } })).modifierPct).toBeLessThan(28);
   });
 
   it("recovery center adds flat bonus on top of base recovery", () => {

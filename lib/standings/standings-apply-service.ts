@@ -13,6 +13,7 @@ import {
   type StandingsPreviewSource,
   type StandingsPreviewTieGroup,
 } from "@/lib/standings/standings-preview-engine";
+import { schalteAlleLeihgabenNachTabelle } from "@/lib/sponsor/sponsor-rangmarke";
 
 export const STANDINGS_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_STANDINGS";
 
@@ -359,7 +360,14 @@ function writeLocalStandingsApply(input: {
     },
   };
 
-  input.persistence.saveSingleplayerState(save.saveId, refreshTeamObjectiveState(nextGameState));
+  // DIE RANGMARKE DER GEBAEUDE-LEIHE SCHALTET GENAU HIER, weil genau hier der Tabellenplatz
+  // entsteht. Frueher waere der alte Rang gemessen, spaeter haette ein ruhendes Gebaeude einen
+  // Spieltag zu lang gewirkt. Ohne Leihgaben im Spielstand gibt die Funktion ihn unveraendert
+  // zurueck — dieser Schritt ist fuer jeden Save ohne Sponsor-Gebaeude ein No-op.
+  input.persistence.saveSingleplayerState(
+    save.saveId,
+    refreshTeamObjectiveState(schalteAlleLeihgabenNachTabelle(nextGameState)),
+  );
 
   return auditLog;
 }

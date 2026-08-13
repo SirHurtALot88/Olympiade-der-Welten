@@ -11,7 +11,7 @@ import {
   NlMarketChanceBar,
 } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
-import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { appendMediaImageVariant, getPlayerPortraitBrowserUrl, getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import type { ContractShape, Team, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
   formatContractShapeLabel,
@@ -314,6 +314,7 @@ export default function FoundationMarketBuyShellHost({
                     <OptimizedMediaImage
                       src={selectedPortrait.src}
                       alt={modalPlayerName}
+                      fallbackLabel={selectedPortrait.initials}
                       width={72}
                       height={72}
                       className="transfermarkt-portrait market-v2-buy-hero-portrait"
@@ -325,6 +326,7 @@ export default function FoundationMarketBuyShellHost({
                         <OptimizedMediaImage
                           src={appendMediaImageVariant(buyModalPortraitBase, "thumb") ?? buyModalPortraitBase}
                           alt={modalPlayerName}
+                          fallbackLabel={getPlayerPortraitInitials(modalPlayerName)}
                           width={72}
                           height={72}
                           className="transfermarkt-portrait market-v2-buy-hero-portrait"
@@ -336,7 +338,7 @@ export default function FoundationMarketBuyShellHost({
                       className="transfermarkt-portrait transfermarkt-portrait-placeholder market-v2-buy-hero-portrait"
                       aria-label={`${modalPlayerName} placeholder`}
                     >
-                      {(selectedPortrait?.initials ?? modalPlayerName.slice(0, 2)).toUpperCase()}
+                      {selectedPortrait?.initials ?? getPlayerPortraitInitials(modalPlayerName)}
                     </div>
                   )}
                   <div className="market-v2-buy-hero-copy">

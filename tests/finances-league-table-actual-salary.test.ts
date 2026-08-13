@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFinancesLeagueTable } from "@/lib/foundation/finances/use-finances-league-table";
+import { getTeamActualSalaryTotal, getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 /**
@@ -82,28 +83,37 @@ describe("Liga-Finanztabelle: Gehälter aus dem echten Vertragswert", () => {
     expect(rows.find((entry) => entry.teamId === "T1")!.expensesAnnual).toBeCloseTo(4.2, 1);
   });
 
+  /**
+   * FRUEHER STAND HIER EIN QUELLTEXT-TEST (`expect(source).toContain("normalizeEconomyMoney(...)")`).
+   * Der ist wertlos: er bleibt gruen, auch wenn die Funktion daneben tot ist oder eine zweite Stelle
+   * anders rechnet — genau die Fehlerklasse, die der Pruefplan vom 11.08.2026 als „Tests, die
+   * Quelltext-Strings pruefen" benennt. Jetzt wird der WERT gegen die geteilte Buchungsfunktion
+   * gehalten.
+   */
   it("nutzt dieselbe Quelle, die am Saisonende wirklich abgebucht wird", () => {
-    const source = readSource("lib/foundation/finances/use-finances-league-table.ts");
-    expect(source).toContain("normalizeEconomyMoney(contract.salary)");
-    expect(source).not.toContain("contract.expectedSalary ??");
+    const gameState = gameStateWithSalaries([
+      { salary: 13.34, expectedSalary: 9.74 },
+      { salary: 5.48, expectedSalary: 4.99 },
+    ]);
+    const row = buildFinancesLeagueTable(gameState).find((entry) => entry.teamId === "T1")!;
+    // `getTeamActualSalaryTotal` ist die Funktion, die `applySponsorSettlement` am Saisonende
+    // abbucht. Ohne Gebaeude und Kredite ist die Gehaltssumme die ganze Ausgabenseite.
+    expect(row.expensesAnnual).toBeCloseTo(getTeamActualSalaryTotal(gameState, "T1"), 2);
   });
 
   /**
    * Der Sponsor-Anker haengt ueber `getTeamSponsorBaseReferenceTotal` an
    * `getTeamDisplaySalaryTotal`. Wuerde man DIE Funktion mit umstellen, verschoebe sich die
    * Sponsoren-Kalibrierung — das gehoert in die Balance-Entscheidung, nicht in einen
-   * Anzeige-Fix. Dieser Test haelt die Trennung fest.
+   * Anzeige-Fix. Dieser Test haelt die Trennung an WERTEN fest, nicht am Quelltext.
    */
-  it("laesst den Sponsor-Anker unberührt", () => {
-    const display = readSource("lib/sponsor/sponsor-team-salary-display.ts");
-    expect(display).toContain("contract.expectedSalary ?? normalizeEconomyMoney(contract.salary)");
+  it("laesst den Sponsor-Anker unberührt: die geglaettete Summe folgt weiter dem Formelwert", () => {
+    // `salaryDemand` speist `expectedSalary`; die faellige Rate steht am Kadereintrag.
+    const gameState = {
+      ...gameStateWithSalaries([{ salary: 13.34, expectedSalary: 9.74 }]),
+      players: [{ id: "p0", name: "Spieler 0", salaryDemand: 9.74 }],
+    } as never as GameState;
+    expect(getTeamDisplaySalaryTotal(gameState, "T1")).toBeCloseTo(9.7, 1);
+    expect(getTeamActualSalaryTotal(gameState, "T1")).toBeCloseTo(13.3, 1);
   });
 });
-
-function readSource(relativePath: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { join } = require("node:path") as typeof import("node:path");
-  return readFileSync(join(process.cwd(), relativePath), "utf8");
-}

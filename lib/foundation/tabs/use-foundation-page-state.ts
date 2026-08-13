@@ -595,6 +595,9 @@ export function useFoundationPageState({
   } | null>(null);
   const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
+  /** Facility-ID des Übernahmeangebots, das gerade angenommen/abgelehnt wird — Busy-Marker für die Karte. */
+  const [sponsorUebernahmeBusy, setSponsorUebernahmeBusy] = useState<string | null>(null);
+  const [sponsorUebernahmeMessage, setSponsorUebernahmeMessage] = useState<string | null>(null);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketSellRiskAcknowledged, setMarketSellRiskAcknowledged] = useState<boolean>(false);
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
@@ -994,6 +997,10 @@ export function useFoundationPageState({
     setSponsorChoiceBusy,
     sponsorChoiceMessage,
     setSponsorChoiceMessage,
+    sponsorUebernahmeBusy,
+    setSponsorUebernahmeBusy,
+    sponsorUebernahmeMessage,
+    setSponsorUebernahmeMessage,
     marketSellSubject,
     setMarketSellSubject,
     marketSellRiskAcknowledged,

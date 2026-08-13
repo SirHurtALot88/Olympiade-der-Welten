@@ -8,6 +8,7 @@ import {
   type SpecialistWingVariant,
 } from "@/lib/facilities/facility-catalog";
 import { clampFacilityCondition, getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
+import { legeLeihgabenUeberBestand, type SponsorLeihgabe } from "@/lib/sponsor/sponsor-leih-overlay";
 import {
   DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
   DEVELOPMENT_ROUTE_BONUS_MAX_PCT,
@@ -53,7 +54,24 @@ export function getTeamFacilityState(source: FacilityStateSource, teamId: string
     }),
   ) as TeamFacilityCollection["facilities"];
 
-  return { facilities };
+  /**
+   * GELIEHENE GEBÄUDE LIEGEN OBENAUF, nicht im Bestand.
+   *
+   * Jede Wirkungsrechnung im Spiel — Training, Erholung, Einnahmen, Scouting — liest ihre Stufe
+   * ueber diese Funktion. Wird die Leihe hier eingerechnet, muss keine dieser Rechnungen von
+   * Sponsoren wissen, und es entsteht kein zweiter Pfad, der auseinanderdriften koennte.
+   *
+   * Geschrieben wird sie NIE in `teamFacilities`: endet der Vertrag oder reisst die Rangmarke,
+   * faellt das Team auf seinen eigenen Bestand zurueck. Stuende die Leihe im Bestand, waere dieser
+   * Rueckfall ein Loeschvorgang — und ein vergessener oder halb ausgefuehrter Loeschvorgang
+   * verschenkt ein Gebaeude auf Dauer.
+   */
+  const leihgaben = gameState.seasonState.sponsorLeihgabenByTeamId?.[teamId] ?? [];
+  if (leihgaben.length === 0) {
+    return { facilities };
+  }
+
+  return legeLeihgabenUeberBestand({ facilities }, leihgaben as SponsorLeihgabe[]);
 }
 
 export function getFacilityLevel(teamFacilities: TeamFacilityCollection | null | undefined, facilityId: FacilityId) {

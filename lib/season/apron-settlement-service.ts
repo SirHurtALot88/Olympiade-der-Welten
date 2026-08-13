@@ -17,7 +17,7 @@
 import type { ApronSettlementLogRecord, GameState } from "@/lib/data/olyDataTypes";
 import { randomUUID } from "@/lib/utils/random-id";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+
 import {
   apronWertungsanteil,
   computeApronLines,
@@ -26,6 +26,7 @@ import {
   resolveApronSalaryFactor,
   type ApronLines,
   type ApronTeamRow,
+  getTeamApronSalaryBase,
 } from "@/lib/season/apron-service";
 
 function roundCash(value: number): number {
@@ -146,9 +147,11 @@ export function previewApronSettlement(gameState: GameState): ApronSettlementPre
     }
     return {
       teamId: team.teamId,
-      // GEGLÄTTETE Gehaltssumme (dieselbe Basis wie computeApronLines) — siehe apron-service.ts
-      // Kopfkommentar, warum nicht die echte, front-/back-loaded Vertragssumme.
-      salary: getTeamDisplaySalaryTotal(gameState, team.teamId),
+      // DIE Bemessungsgrundlage — dieselbe Funktion, aus der auch `computeApronLines` den Median
+      // zieht. Kein zweiter Direktgriff auf irgendeine Gehaltssumme: Abrechnung, Linien,
+      // Hochrechnung und KI MUESSEN dieselbe Zahl lesen, sonst bucht das Saisonende gegen eine
+      // andere Basis, als die KI vorher bepreist hat.
+      salary: getTeamApronSalaryBase(gameState, team.teamId),
       rankShare: apronWertungsanteil(finalRank ?? 32, salaryFactor),
     };
   });

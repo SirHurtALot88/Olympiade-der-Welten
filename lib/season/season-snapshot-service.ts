@@ -929,12 +929,21 @@ export function createSeasonSnapshot(
   if (replaceExisting && preview.existingSnapshot?.status === "completed") {
     const frozenCashByTeamId = new Map(
       (preview.existingSnapshot.finalStandings ?? []).map(
-        (row) => [row.teamId, { cashEnd: row.cashEnd, cashTotal: row.cashTotal }] as const,
+        (row) =>
+          [
+            row.teamId,
+            // `cashCarryOver` gehoert in denselben Schutz: es ist der Ankerpunkt des Cash-Abgleichs
+            // (siehe `patchSeasonSnapshotCashCarryOver`) und wird aus dem aktuellen `gameState` gar
+            // nicht neu gebildet — ein Replace wuerde ihn sonst ersatzlos loeschen.
+            { cashEnd: row.cashEnd, cashTotal: row.cashTotal, cashCarryOver: row.cashCarryOver },
+          ] as const,
       ),
     );
     const patchedTeams = (snapshotToPersist.finalStandings ?? []).map((row) => {
       const frozen = frozenCashByTeamId.get(row.teamId);
-      return frozen ? { ...row, cashEnd: frozen.cashEnd, cashTotal: frozen.cashTotal } : row;
+      return frozen
+        ? { ...row, cashEnd: frozen.cashEnd, cashTotal: frozen.cashTotal, cashCarryOver: frozen.cashCarryOver }
+        : row;
     });
     snapshotToPersist = {
       ...snapshotToPersist,
@@ -1061,6 +1070,58 @@ export function patchSeasonSnapshotMarketValueAfterProgression(
       salarySeasonEnd: record.salarySeasonEnd ?? roundValue(salaryByTeamId.get(record.teamId) ?? 0, 2),
       rosterSeasonEnd: record.rosterSeasonEnd ?? (rosterCountByTeamId.get(record.teamId) ?? 0),
       seasonEndFrozenAt: record.seasonEndFrozenAt ?? frozenAt,
+    }));
+
+  const patched: SeasonSnapshotRecord = {
+    ...snapshot,
+    finalStandings: patchTeams(resolveSeasonSnapshotTeamRecords(snapshot)),
+    teamSnapshots: patchTeams(resolveSeasonSnapshotTeamRecords(snapshot)),
+  };
+  const nextSnapshots = [...snapshots];
+  nextSnapshots[index] = patched;
+
+  return {
+    gameState: { ...gameState, seasonState: { ...gameState.seasonState, seasonSnapshots: nextSnapshots } },
+    patched: true,
+  };
+}
+
+/**
+ * FRIERT DEN KONTOSTAND AN DER SAISONGRENZE EIN — das Geld, das ein Team wirklich mitnimmt.
+ *
+ * WARUM DAS NICHT `cashEnd` IST. `cashEnd` steht, wo Chris es haben will: nach der kompletten
+ * Saisonabrechnung (Sponsoren, Gehaelter, Gebaeude, Apron, Kredite, Vorstandsziele) und VOR der
+ * Oeffnung des Transfermarkts. Danach passiert aber noch etwas, das auf die ALTE Saison gebucht
+ * wird: die Vertragsalterung im `next_season_setup` laesst auslaufende Vertraege auslaufen und
+ * schreibt den Abloesewert als `contract_exit` mit der ALTEN `seasonId` in die Transferhistorie —
+ * das Geld landet erst hier auf dem Konto.
+ *
+ * Am Live-Abbild `new-game-1785823388048-1hf25q` waren das 54 Abgaenge ueber zusammen 1085,24 C,
+ * gebucht 0,7 s nach dem Schnappschuss. Der Abgleich (`getSnapshotCashByTeam`) verankerte Saison 2
+ * auf `cashEnd` und meldete deshalb bei 19 von 32 Teams ein `cash_reconciliation_delta_hard` von
+ * bis zu 112,9 C — kein Cash-Leck, sondern ein falscher Ankerpunkt.
+ *
+ * Deshalb dieser Schnitt: genau an der Grenze, an der jede Buchung der alten Saison durch ist und
+ * noch keine der neuen stattgefunden hat. Write-once je Team (ein zweiter Durchlauf, etwa nach
+ * einem Reload, darf die Historie nicht verschieben) und still, wenn es keinen Schnappschuss gibt —
+ * ein fehlender Datensatz darf den Saisonwechsel nicht sprengen.
+ */
+export function patchSeasonSnapshotCashCarryOver(
+  gameState: GameState,
+  seasonId: string,
+): { gameState: GameState; patched: boolean } {
+  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const index = snapshots.findIndex((entry) => entry.seasonId === seasonId);
+  if (index < 0) {
+    return { gameState, patched: false };
+  }
+
+  const snapshot = snapshots[index]!;
+  const cashByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team.cash ?? 0] as const));
+  const patchTeams = (records: SeasonSnapshotTeamRecord[]) =>
+    records.map((record) => ({
+      ...record,
+      cashCarryOver: record.cashCarryOver ?? roundValue(cashByTeamId.get(record.teamId) ?? 0, 2),
     }));
 
   const patched: SeasonSnapshotRecord = {

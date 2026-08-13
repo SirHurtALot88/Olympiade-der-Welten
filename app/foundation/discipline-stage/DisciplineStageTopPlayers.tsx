@@ -30,13 +30,26 @@ export type DisciplineStageTopPlayersProps = {
   players: DisciplineStageTopPlayer[];
   onOpenPlayer?: ((playerId: string) => void) | null;
   playerIdByRow?: (string | null)[];
+  /**
+   * Namen der Disziplinen, die in dieser Liste STECKEN (aufgedeckte Seiten des Spieltags).
+   * Steht in der Ueberschrift, weil die Zahl daneben eine SUMME ueber genau diese Disziplinen
+   * ist — ohne die Namen laesst sich einer summierten Zahl nicht ansehen, worueber summiert
+   * wurde. Genau das war Chris' wiederkehrende Frage („zeigt noch immer 1 Diszi").
+   */
+  disciplineNames?: readonly string[] | null;
 };
 
-export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playerIdByRow }: DisciplineStageTopPlayersProps) {
+export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playerIdByRow, disciplineNames }: DisciplineStageTopPlayersProps) {
+  const disziplinen = (disciplineNames ?? []).filter((name) => name.trim().length > 0);
   return (
     <div style={{ background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 12, position: "sticky", top: 12 }}>
-      <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
-        Top-Spieler · nach Player-Points
+      <div
+        data-testid="stage-top-players-heading"
+        data-disciplines={disziplinen.join(" + ")}
+        style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}
+      >
+        Top-Spieler · Player-Points des Spieltags
+        {disziplinen.length > 0 ? ` · ${disziplinen.join(" + ")}` : ""}
       </div>
       {players.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Noch keine Werte.</div>
@@ -48,6 +61,8 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
             return (
               <div
                 key={`${p.rank}-${p.name}-${p.teamCode}`}
+                data-testid="stage-top-player-row"
+                data-player-points={p.points == null ? "" : String(p.points)}
                 onClick={clickable ? () => onOpenPlayer!(playerId!) : undefined}
                 title={clickable ? "Spieler-Karte öffnen" : undefined}
                 style={{
@@ -84,15 +99,36 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                     {p.teamCode}
                   </div>
                 </div>
+                {/*
+                  PP UND SCORE — BEIDE ueber BEIDE Disziplinen summiert, sortiert nach PP-Summe.
+
+                  Chris' Praezisierung, nachdem ich ihn zuerst falsch verstanden hatte: „nein die
+                  score darf da stehen bleiben mir ging es nur darum dass die PPs und Score aus der
+                  anderen diszi beim spieler ergaenzt werden und dann die Summe da steht und nach
+                  PPs Total geordnet ist."
+
+                  Ich hatte sein vorheriges „brauch ich gar nicht die scores" als „Score raus"
+                  gelesen. Gemeint war: der Score soll nicht das MASSGEBLICHE sein. Die Summierung
+                  ueber beide Disziplinen und die Sortierung nach PP-Summe macht
+                  `summiereSpieltagsTopSpieler` bereits (Score ist dort nur der Gleichstand-Brecher)
+                  — gefehlt hat nur, dass beide Zahlen auch DASTEHEN.
+
+                  Die PP fuehrt optisch, weil sie sortiert und gebucht wird; der Score steht als
+                  zweite Zeile daneben. Ohne gebuchte Punkte steht „—" statt eines Ersatzwertes:
+                  eine Zahl, die dann der Score waere, wuerde als PP gelesen.
+                */}
                 <div style={{ textAlign: "right" }}>
                   {p.points != null ? (
-                    <>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.points)} PP</div>
-                      <div style={{ fontSize: 10.5, color: "var(--nl-mut)" }}>(Score {fmt1(p.score)})</div>
-                    </>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.points)} PP</div>
                   ) : (
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.score)}</div>
+                    <div
+                      title="Für diesen Spieler sind noch keine Player-Points gebucht."
+                      style={{ fontSize: 14, fontWeight: 800, color: "var(--nl-mut)" }}
+                    >
+                      — PP
+                    </div>
                   )}
+                  <div style={{ fontSize: 10.5, color: "var(--nl-mut)" }}>(Score {fmt1(p.score)})</div>
                 </div>
               </div>
             );

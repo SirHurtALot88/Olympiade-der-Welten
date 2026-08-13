@@ -13,10 +13,27 @@ function humanizeColumnKey(key: string): string {
     .trim();
 }
 
+/**
+ * DER BONUS IST EIN DAVON-POSTEN, KEIN ZUSATZ.
+ *
+ * Der Mutator-Aufschlag steckt bereits in jeder der 20 Disziplin-Spalten: der Ledger bucht
+ * je Spieler-Zeile `points = Anteil + mutatorPpsBonus` und summiert genau dieses `points`
+ * nach `pointsByDiscipline`. Am Live-Abbild vom 11.08. gilt in beiden aktiven Staenden fuer
+ * alle 32 Teams `Σ Disziplin-Spalten − Punkte == Bonus` (Abweichung 0,0). Wer "Punkte +
+ * Bonus" liest, liegt richtig; wer "Σ Disziplinen + Bonus" liest, zaehlt doppelt.
+ *
+ * Der Vertragstext beschreibt nur die HERKUNFT der Zahl ("Mutator-PPs aus gespeicherten
+ * Player-Performance-Zeilen …") und sagt nichts darueber, dass sie nebenan schon enthalten
+ * ist. Genau das ergaenzt dieser Satz — die Buchung bleibt unangetastet.
+ */
+const BONUS_DAVON_HINWEIS =
+  "DAVON-Posten: bereits in den Disziplin-Spalten dieser Zeile enthalten, nicht noch einmal " +
+  "addieren. Es gilt: Punkte + Bonus = Summe der Disziplin-Spalten.";
+
 export function buildFoundationSeasonTableColumns(): FoundationTableColumn[] {
   const contractColumns = saisonstandColumnContract.columns.map((column) => ({
     id: column.normalizedKey,
-    label: column.displayLabel,
+    label: column.normalizedKey === "bonuspunkte" ? "dav. Bonus" : column.displayLabel,
     dataKey: column.normalizedKey,
     defaultWidth: Math.max(Math.round(column.columnSize ?? 96), 52),
     minWidth: column.normalizedKey === "mannschaft" ? 150 : 52,
@@ -25,7 +42,7 @@ export function buildFoundationSeasonTableColumns(): FoundationTableColumn[] {
     // sonst der ausgeschriebene Spaltenname statt nur des Kuerzels.
     tooltip:
       column.normalizedKey === "bonuspunkte"
-        ? `${column.sourceDescription} ${column.transformNote ?? ""}`.trim()
+        ? `${BONUS_DAVON_HINWEIS} ${column.sourceDescription} ${column.transformNote ?? ""}`.trim()
         : getGameTermShort(column.displayLabel) ?? humanizeColumnKey(column.normalizedKey),
   }));
 

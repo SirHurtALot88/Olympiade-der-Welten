@@ -1,13 +1,14 @@
 // @ts-nocheck
 "use client";
 
-import { Fragment, memo, startTransition, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, memo, startTransition, useEffect, useMemo, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 
 import type { ContractAssessment } from "@/lib/foundation/tabs/use-teams-contract-derivations";
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -18,6 +19,7 @@ import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import type { ContractDissolutionOffer } from "@/lib/morale/contract-dissolution-service";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
@@ -625,6 +627,16 @@ function FoundationTeamsDetailPanel({
   // Dasselbe Ausklapp-Muster für die Verträge-Tabelle (NlTable), Zustand je Spieler-ID.
   const [expandedContractPpsPlayerId, setExpandedContractPpsPlayerId] = useState<string | null>(null);
 
+  /**
+   * Spielerzahl je Disziplin DIESER Saison — fuer die Reihenfolge der Disziplin-Unterspalten
+   * in der Team-Historie-Tabelle unten (siehe `TeamDrawerHistoryTable`-Prop-Kommentar / Chris'
+   * Meldung "Showcase hat 6 Spieler in der Season und trotzdem ist SHO nur 2").
+   */
+  const seasonPlayerCountByDisciplineId = useMemo(
+    () => (gameState ? buildSeasonDisciplinePlayerCountMap(gameState) : null),
+    [gameState],
+  );
+
   useEffect(() => {
     if (!showLeagueLogos) {
       setShowDeferredTeamLogos(false);
@@ -848,7 +860,7 @@ function FoundationTeamsDetailPanel({
                                 />
                               ) : (
                                 <span className="teams-dissolution-portrait-fallback">
-                                  {offer.playerName.slice(0, 2).toUpperCase()}
+                                  {getPlayerPortraitInitials(offer.playerName)}
                                 </span>
                               )}
                             </span>
@@ -2861,6 +2873,7 @@ function FoundationTeamsDetailPanel({
                           teamCount: selectedTeamsHistoryData.allTimePpsTeamCount,
                         }}
                         getRowClassName={(row) => (row.isLive ? "is-live" : undefined)}
+                        seasonPlayerCountByDisciplineId={seasonPlayerCountByDisciplineId}
                         renderCell={(columnId, row) => {
                           if (columnId === "season") {
                             return (

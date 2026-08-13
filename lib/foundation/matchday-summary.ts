@@ -1,10 +1,44 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  beschreibeSpieltagsVerletzungsMarke,
+  buildMatchdayInjuryMarks,
+  type SpieltagsVerletzungsMarke,
+} from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { formatMatchdayHighlight } from "@/lib/foundation/matchday-highlight-labels";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { baueSpieltagsPunkteJeSpieltag } from "@/lib/foundation/season-matchday-points";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 
 type RankDirection = "up" | "down" | "same" | "unknown";
+
+/**
+ * DIE VERLETZUNGS-MARKE FAEHRT IN DER ZEILE MIT — NICHT ALS EIGENER PROP.
+ *
+ * GEWUENSCHT VON CHRIS: „es waere gut wenn man in der score tabelle vllt noch sehen kann wenn ein
+ * team einen verletzten spieler hat!"
+ *
+ * Die Marke gab es schon — aber nur in der Arena (`DisciplineStageMatchdayPanel`), also genau so
+ * lange, wie man auf der Buehne steht. Im Spieltagsergebnis, der Tabelle, auf die Chris nach dem
+ * Spieltag schaut, stand sie nirgends (nachgemessen: 0 Treffer auf
+ * `[class*="injur"],[data-testid*="injur"]`).
+ *
+ * Sie haengt deshalb jetzt an der ZEILE und nicht an einem zusaetzlichen Prop. Diese Codebasis hat
+ * eine Fehlerklasse „die Rechnung existiert, die Verdrahtung fehlt": ein optionaler Prop, der
+ * unterwegs verloren geht, faellt niemandem auf, weil die Anzeige dann einfach nichts zeigt. Ein
+ * Feld auf `MatchdaySummaryTeamRow` kann nicht verloren gehen — es kommt mit derselben Zeile an,
+ * die auch Punkte und Raenge traegt.
+ *
+ * GERECHNET WIRD NICHT HIER: `buildMatchdayInjuryMarks` ist die eine Rechenstelle, dieselbe, aus
+ * der auch die Arena-Marke kommt. Hier wird sie nur abgelesen.
+ */
+export type MatchdaySummaryTeamInjury = {
+  /** Betroffene SPIELER an diesem Spieltag (zugezogen + ausgefallen), nie Punkte. */
+  betroffeneSpieler: number;
+  /** Fertiger Klartext fuer Tooltip/Vorlesen — aus derselben Quelle wie die Arena-Marke. */
+  beschreibung: string;
+  marke: SpieltagsVerletzungsMarke;
+};
 
 export type MatchdaySummaryTeamRow = {
   teamId: string;
@@ -21,6 +55,8 @@ export type MatchdaySummaryTeamRow = {
   rankDirection: RankDirection;
   cumulativePointsBefore: number | null;
   cumulativePoints: number | null;
+  /** `null`, wenn dieses Team an diesem Spieltag keine Verletzungsbuchung hat. */
+  injury: MatchdaySummaryTeamInjury | null;
   warnings: string[];
 };
 
@@ -140,6 +176,28 @@ export function buildMatchdaySummary(
   // eine noch ungewertete Seite (D2 am halben Spieltag) trotzdem beim Namen steht.
   const scoringProgress = getMatchdayScoringProgress(gameState, matchdayId ?? "");
 
+  /**
+   * Verletzungsbuchungen DIESES Spieltags, je Team — die eine Rechenstelle
+   * (`buildMatchdayInjuryMarks`), aus der auch die Arena ihre Marke zieht.
+   *
+   * Bewusst NICHT an `hasResult` gehaengt: die Buchung steht im Spielstand, sobald der
+   * Verletzungswurf gefallen ist. Ein Spieltag ohne gewertetes Ergebnis kann trotzdem Ausfaelle
+   * tragen (`unavailableUntil` aus dem Vorspieltag) — die zu verschweigen waere kein Spoilerschutz,
+   * sondern eine Luecke.
+   */
+  const verletzungsMarken = matchdayId
+    ? buildMatchdayInjuryMarks(gameState, { seasonId, matchdayId })
+    : new Map<string, SpieltagsVerletzungsMarke>();
+  const injuryOf = (teamId: string): MatchdaySummaryTeamInjury | null => {
+    const marke = verletzungsMarken.get(teamId);
+    if (!marke || marke.betroffeneSpieler <= 0) return null;
+    return {
+      betroffeneSpieler: marke.betroffeneSpieler,
+      beschreibung: beschreibeSpieltagsVerletzungsMarke(marke),
+      marke,
+    };
+  };
+
   if (!result) {
     warnings.push("missing_matchday_result");
     return {
@@ -165,6 +223,7 @@ export function buildMatchdaySummary(
         rankDirection: "unknown",
         cumulativePointsBefore: null,
         cumulativePoints: null,
+        injury: injuryOf(team.teamId),
         warnings: ["missing_matchday_result"],
       })),
       topTeams: [],
@@ -192,24 +251,55 @@ export function buildMatchdaySummary(
   const ledger = buildSeasonPointsLedger(gameState, seasonId);
   warnings.push(...ledger.warnings);
 
-  const matchdayPointEntries = ledger.pointEntries.filter((entry) => entry.matchdayResultId === resultId);
-  const beforeMatchdayIds = new Set(
-    gameState.season.matchdayIds.slice(0, Math.max(0, matchdayIndex)),
+  /**
+   * TAGESPUNKTE JE SPIELTAG, gerechnet auf dem Stand, der vorliegt.
+   *
+   * Hier wurde frueher unmittelbar ueber `ledger.pointEntries` summiert. Das ging nur auf dem
+   * vollen Save auf: die Anfangsladung beschnitt die `disciplineResults` auf den aktiven
+   * Spieltag, und einen Spieltag ohne Disziplin-Ergebnis bucht der Ledger bewusst nicht
+   * (`skipped_matchdays_without_discipline_results`). Die Summe VOR dem Spieltag war damit
+   * fuer jedes Team 0 — und der „Rang vorher" fuer alle 32 Teams frei erfunden.
+   *
+   * Dagegen fuhr eine Zeit lang die fertige Antwort als Projektion mit
+   * (`foundationMatchdayPoints`). Sie ist entfernt, weil die `disciplineResults` seit `8ec6454b`
+   * wieder vollstaendig mitfahren — die Rechnung unten deckt damit von selbst alle Spieltage.
+   * Der Unterschied zwischen „bekannt und leer" und „unbekannt" bleibt erhalten; daran haengt
+   * die `missing_matchday_points`-Warnung ein paar Zeilen weiter.
+   */
+  const punkteJeSpieltag = baueSpieltagsPunkteJeSpieltag(gameState, seasonId, ledger);
+
+  /**
+   * WELCHE SPIELTAGE MUESSEN DAFUER VORLIEGEN: jeder gewertete Spieltag der Saison bis
+   * einschliesslich dem gezeigten. Fehlt davon auch nur einer, ist die Saisonsumme
+   * unvollstaendig — und aus einer unvollstaendigen Summe faellt zwangslaeufig ein falscher
+   * Rang. Dann bleiben die Saison-Spalten LEER: ein sichtbar leeres Feld ist reparierbar,
+   * eine falsche Zahl wird geglaubt (siehe `season-points-ledger`).
+   */
+  const scoredMatchdayIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.seasonId === seasonId && entry.status === "preview_applied")
+      .map((entry) => entry.matchdayId),
   );
-  const throughMatchdayIds = new Set(
-    matchdayIndex >= 0 ? gameState.season.matchdayIds.slice(0, matchdayIndex + 1) : [],
-  );
-  const beforePoints = sumByTeam(
-    ledger.pointEntries
-      .filter((entry) => entry.matchdayId != null && beforeMatchdayIds.has(entry.matchdayId))
-      .map((entry) => ({ teamId: entry.teamId, points: entry.basePoints })),
-  );
-  const afterPoints = sumByTeam(
-    ledger.pointEntries
-      .filter((entry) => entry.matchdayId != null && throughMatchdayIds.has(entry.matchdayId))
-      .map((entry) => ({ teamId: entry.teamId, points: entry.basePoints })),
-  );
-  const matchdayPoints = sumByTeam(matchdayPointEntries.map((entry) => ({ teamId: entry.teamId, points: entry.basePoints })));
+  const requiredMatchdayIds =
+    matchdayIndex >= 0
+      ? gameState.season.matchdayIds.slice(0, matchdayIndex + 1).filter((id) => scoredMatchdayIds.has(id))
+      : [];
+  const missingMatchdayIds = requiredMatchdayIds.filter((id) => !punkteJeSpieltag.has(id));
+  const seasonTotalsComplete = missingMatchdayIds.length === 0;
+  if (!seasonTotalsComplete) {
+    warnings.push(`missing_matchday_points:${missingMatchdayIds.length}`);
+  }
+
+  const sumOverMatchdays = (matchdayIds: readonly string[]) =>
+    sumByTeam(
+      matchdayIds.flatMap((id) =>
+        [...(punkteJeSpieltag.get(id) ?? new Map<string, number>())].map(([teamId, points]) => ({ teamId, points })),
+      ),
+    );
+
+  const beforePoints = sumOverMatchdays(requiredMatchdayIds.filter((id) => id !== matchdayId));
+  const afterPoints = sumOverMatchdays(requiredMatchdayIds);
+  const matchdayPoints = new Map(punkteJeSpieltag.get(matchdayId ?? "") ?? new Map<string, number>());
   const rankBefore = rankTeams(
     gameState.teams.map((team) => ({ teamId: team.teamId, teamName: team.name, points: beforePoints.get(team.teamId) ?? 0 })),
   );
@@ -244,8 +334,9 @@ export function buildMatchdaySummary(
   const teamRows = gameState.teams
     .map<MatchdaySummaryTeamRow>((team) => {
       const scores = scoreByTeam.get(team.teamId);
-      const beforeRank = rankBefore.get(team.teamId) ?? null;
-      const afterRank = rankAfter.get(team.teamId) ?? null;
+      // Lieber leer als geraten: ohne vollstaendige Saisonsumme gibt es keinen Saison-Rang.
+      const beforeRank = seasonTotalsComplete ? rankBefore.get(team.teamId) ?? null : null;
+      const afterRank = seasonTotalsComplete ? rankAfter.get(team.teamId) ?? null : null;
       const rankDelta = beforeRank != null && afterRank != null ? beforeRank - afterRank : null;
       const d1Score = scores?.d1Score ?? null;
       const d2Score = scores?.d2Score ?? null;
@@ -262,8 +353,9 @@ export function buildMatchdaySummary(
         seasonRankAfterMatchday: afterRank,
         rankDelta,
         rankDirection: rankDirectionFromDelta(rankDelta),
-        cumulativePointsBefore: roundValue(beforePoints.get(team.teamId) ?? 0, 1),
-        cumulativePoints: roundValue(afterPoints.get(team.teamId) ?? 0, 1),
+        cumulativePointsBefore: seasonTotalsComplete ? roundValue(beforePoints.get(team.teamId) ?? 0, 1) : null,
+        cumulativePoints: seasonTotalsComplete ? roundValue(afterPoints.get(team.teamId) ?? 0, 1) : null,
+        injury: injuryOf(team.teamId),
         warnings: Array.from(new Set(scores?.warnings ?? [])),
       };
     })

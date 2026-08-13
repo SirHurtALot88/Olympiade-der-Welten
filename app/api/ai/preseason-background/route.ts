@@ -77,6 +77,15 @@ function buildRunKey(saveId: string, seasonId: string) {
   return `${saveId}:${seasonId}`;
 }
 
+// `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`. Dieser Lauf
+// schreibt ueber viele Phasen hinweg mehrfach (`writeRunRecord`, Manager-Aktionen, Markt, Kredite,
+// Snapshot-Patch); frisch nachlesen statt einen einzelnen `persisted`-Wert durchzureichen, damit
+// JEDER Rueckgabepfad (auch die fruehen "skipped"-Zweige nach einem bereits erfolgten
+// `protectManualPlayerTeams`-Schreiben) die tatsaechlich aktuelle Version traegt.
+function currentSaveVersion(persistence: PersistenceService, saveId: string) {
+  return persistence.getSaveById(saveId)?.gameState.saveVersion ?? null;
+}
+
 // `protectManualPlayerTeams`/`getProtectedHumanTeamIds` already exclude every human-controlled team
 // (Chris's AND Franky's alike) via `seasonState.teamControlSettings`. `callerWritableTeamIds` (read
 // from `room.state.teamOwnership` when a room is active — see `resolveAiBulkTeamWriteScope`) is an
@@ -427,8 +436,12 @@ async function executeAiPreseasonBackgroundWork(input: {
      * umgeht Kapazitaet, Distress-Gate und die S1-Sperre, weil er unfreiwillig ist) und deckt exakt
      * den Fehlbetrag; Cash steht danach auf 0, die Restschuld laeuft im normalen Kreditsystem.
      *
-     * Er steht bewusst am ENDE: erst wenn Markt, Fuellung und Verletzungs-Topup fertig sind, steht
-     * der Kontostand fest, mit dem das Team in die Saison geht.
+     * HIER ist der Zeitpunkt richtig, am SAISONENDE war er falsch: dort hat das Team noch nichts
+     * tun koennen (Chris: „nicht am ende einer season!"). Am Saisonende wird ein Minus deshalb nur
+     * noch festgestellt, siehe `collectNegativeCashTeams`.
+     *
+     * Er steht bewusst am ENDE der Kette: erst wenn Markt, Fuellung und Verletzungs-Topup fertig
+     * sind, steht der Kontostand fest, mit dem das Team in die Saison geht.
      */
     const vorAusgleich = persistence.getSaveById(saveId);
     let notkredite: Array<{ teamId: string; principal: number }> = [];
@@ -547,12 +560,14 @@ export async function POST(request: Request) {
 
   const runKey = buildRunKey(saveId, seasonId);
   if (!claimPreseasonRunKey(runKey)) {
-    const latestRun = persistence.getSaveById(saveId)?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    const latestSave = persistence.getSaveById(saveId);
+    const latestRun = latestSave?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
     return NextResponse.json({
       ok: true,
       skipped: true,
       reason: "ai_preseason_already_running",
       run: latestRun,
+      saveVersion: latestSave?.gameState.saveVersion ?? null,
     });
   }
 
@@ -574,6 +589,7 @@ export async function POST(request: Request) {
         skipped: true,
         reason: existingRun?.status === "running" ? "ai_preseason_already_running" : "ai_preseason_already_completed",
         run: existingRun,
+        saveVersion: currentSaveVersion(persistence, saveId),
       });
     }
 
@@ -616,6 +632,7 @@ export async function POST(request: Request) {
         skipped: true,
         reason: "ai_preseason_deferred_until_new_season_buy_window",
         run: null,
+        saveVersion: currentSaveVersion(persistence, saveId),
       });
     }
     const baseRecord: AiPreseasonAutomationRunRecord = {
@@ -637,7 +654,13 @@ export async function POST(request: Request) {
     if (aiTeamIds.length === 0) {
       const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
       writeRunRecord(saveId, skippedRecord);
-      return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "no_ai_teams",
+        run: skippedRecord,
+        saveVersion: currentSaveVersion(persistence, saveId),
+      });
     }
 
     const latestBeforeStart = persistence.getSaveById(saveId);
@@ -648,6 +671,7 @@ export async function POST(request: Request) {
         skipped: true,
         reason: "ai_preseason_already_running",
         run: runningRecord,
+        saveVersion: currentSaveVersion(persistence, saveId),
       });
     }
 
@@ -679,6 +703,7 @@ export async function POST(request: Request) {
         ok: succeeded,
         skipped: false,
         run: finalRun,
+        saveVersion: currentSaveVersion(persistence, saveId),
       },
       { status: succeeded ? 200 : 500 },
     );

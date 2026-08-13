@@ -596,9 +596,9 @@ function resolveTeamSeasonSponsorSurplus(gameState: GameState, teamId: string, s
           log.teamId === teamId &&
           log.seasonId === seasonId &&
           log.componentId !== "salary_deduct" &&
-          // Der Sponsor-Vorschuss ist vorgezogene eigene Auszahlung und am Saisonende wieder
-          // verrechnet — als Ueberschuss gezaehlt taeuschte er Spielraum vor, den es nicht gibt.
-          log.componentId !== "v4_advance" &&
+          // Der Ausschluss von `v4_advance` ist mit dem Sponsor-Vorschuss entfallen: er taeuschte
+          // Spielraum vor, solange der Betrag am Saisonende wieder abgezogen wurde. Das tut er
+          // nicht mehr, also ist ein alter Vorschuss-Log echter Ueberschuss (siehe loan-service.ts).
           (log.cashDelta ?? 0) > 0,
       )
       .reduce((sum, log) => sum + (log.cashDelta ?? 0), 0),

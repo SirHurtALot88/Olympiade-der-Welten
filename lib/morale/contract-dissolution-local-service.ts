@@ -1,9 +1,9 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import {
   acceptContractDissolution,
   buildContractDissolutionOffers,
+  buildTeamMoraleMap,
   declineContractDissolution,
   type ContractDissolutionOffer,
 } from "@/lib/morale/contract-dissolution-service";
@@ -26,29 +26,6 @@ export type ContractDissolutionActionResult = {
     payableBuyout: number;
   };
 };
-
-/**
- * Moral je Spieler des Teams — aus derselben Quelle wie das Spielerprofil.
- *
- * `buildContractDissolutionOffers` leitet die Moral bewusst NICHT selbst ab, damit der Wert
- * nicht von dem wegdriftet, was in der Oberflaeche steht. Diese Funktion ist die Bruecke:
- * sie fragt `assessPlayerMorale` genau einmal je Kaderspieler.
- */
-function buildTeamMoraleMap(gameState: GameState, teamId: string): Record<string, number> {
-  const moraleByPlayerId: Record<string, number> = {};
-  for (const rosterEntry of gameState.rosters ?? []) {
-    if (rosterEntry.teamId !== teamId) continue;
-    const assessment = assessPlayerMorale({
-      gameState,
-      playerId: rosterEntry.playerId,
-      teamId,
-    });
-    if (assessment?.morale != null && Number.isFinite(assessment.morale)) {
-      moraleByPlayerId[rosterEntry.playerId] = assessment.morale;
-    }
-  }
-  return moraleByPlayerId;
-}
 
 function buildOffers(gameState: GameState, saveId: string, seasonId: string, teamId: string) {
   return buildContractDissolutionOffers({

@@ -125,6 +125,75 @@ export const SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER: Array<{
   keys: SeasonDisciplineKey[];
 }> = SEASON_DISCIPLINE_AREA_GROUP_MEMBERSHIP.map((group) => ({ ...group, keys: [...group.keys] }));
 
+/**
+ * `SeasonDisciplineKey` (z. B. "showcase", "eiskunst") auf die tatsaechliche `discipline.id`
+ * im Katalog (`lib/data/dataAdapter.ts`) — an ein paar Stellen weichen die IDs vom Kuerzel-Key
+ * ab (Bindestrich/Unterstrich, oder ein ganz anderes Wort: "eiskunstlauf" statt "eiskunst",
+ * "speed-schach" statt "schach", "takeshis-castle" statt "takeshi").
+ */
+const SEASON_DISCIPLINE_KEY_TO_CATALOG_ID: Record<SeasonDisciplineKey, string> = {
+  tdm: "tdm",
+  mini_dm: "mini-dm",
+  gewichtheben: "gewichtheben",
+  hockey: "hockey",
+  breaking: "breaking",
+  staffel: "staffel",
+  time_trial: "time-trial",
+  spurt: "spurt",
+  climbing: "climbing",
+  fechten: "fechten",
+  schach: "speed-schach",
+  takeshi: "takeshis-castle",
+  tennis: "tennis",
+  i_spy: "i-spy",
+  wettessen: "wettessen",
+  basketball: "basketball",
+  football: "football",
+  battlefield: "battlefield",
+  eiskunst: "eiskunstlauf",
+  showcase: "showcase",
+};
+
+/**
+ * Wie `SEASON_DISCIPLINE_AREA_GROUPS`, aber sortiert nach der TATSAECHLICH fuer DIESE Saison
+ * ausgelosten Spielerzahl je Disziplin statt der statischen Katalog-Zahl.
+ *
+ * GEMELDET VON CHRIS (mit Bild): „Showcase hat 6 Spieler in der Season und trotzdem ist SHO
+ * nur 2." Ursache: der Saison-Spielplan wuerfelt die Spielerzahl pro Disziplin JEDE Saison neu
+ * aus (`buildSeasonPlayerCountByDiscipline` in `season-discipline-schedule.ts`) — dieselbe Zahl,
+ * die auch die Punkteverteilung steuert (`resolveDisciplinePlayerCount` in
+ * `lib/resolve/rank-to-points.ts`), also die fuer die Saison GUELTIGE Groesse. Die alte,
+ * statische `SEASON_DISCIPLINE_AREA_GROUPS`-Sortierung nutzt dagegen `SEASON_DISCIPLINE_PLAYER_COUNT`,
+ * die Katalog-Zahl aus dem Startzustand — die stimmt nur zufaellig noch mit der ausgelosten
+ * Saison ueberein. Nachgemessen am gemeldeten Spielstand: die SOC-Gruppe stand als
+ * BAS · SHO · FOO · EIS · BAT (Katalog: 6 · 5 · 4 · 3 · 2), waehrend die echten Saison-Werte
+ * BAS=6 · SHO=3 · FOO=2 · EIS=4 · BAT=5 waren — keine absteigende Reihe mehr, SHO landete auf
+ * Position 2, obwohl es (je nach Saison-Auslosung) durchaus mehr Spieler haben kann als BAT
+ * oder EIS, die dahinter stehen.
+ *
+ * `playerCountByDisciplineId` kommt aus `buildSeasonDisciplinePlayerCountMap(gameState)`
+ * (`lib/season/season-discipline-schedule.ts`). Fehlt ein Wert (Alt-Save ohne Spielplan),
+ * faellt NUR diese eine Disziplin auf die Katalog-Zahl zurueck, statt die ganze Sortierung zu
+ * verwerfen.
+ */
+export function buildSeasonAwareDisciplineAreaGroups(
+  playerCountByDisciplineId: Map<string, number | null | undefined> | Record<string, number | null | undefined>,
+): Array<{ id: SeasonDisciplineAreaId; label: string; keys: SeasonDisciplineKey[] }> {
+  const readCount = (key: SeasonDisciplineKey): number => {
+    const catalogId = SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key];
+    const value =
+      playerCountByDisciplineId instanceof Map
+        ? playerCountByDisciplineId.get(catalogId)
+        : playerCountByDisciplineId[catalogId];
+    return value != null && Number.isFinite(value) ? value : SEASON_DISCIPLINE_PLAYER_COUNT[key];
+  };
+
+  return SEASON_DISCIPLINE_AREA_GROUP_MEMBERSHIP.map((group) => ({
+    ...group,
+    keys: [...group.keys].sort((left, right) => readCount(right) - readCount(left)),
+  }));
+}
+
 const SEASON_DISCIPLINE_KEY_SET = new Set<string>(Object.keys(SEASON_DISCIPLINE_LABELS));
 
 export type PlayerHistoryDisciplineValues = Partial<Record<SeasonDisciplineKey, number | null>>;

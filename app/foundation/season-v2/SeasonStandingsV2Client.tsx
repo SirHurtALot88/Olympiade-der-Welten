@@ -7,6 +7,7 @@ import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { TitleRaceResult } from "@/lib/season/title-race";
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
 
@@ -186,6 +187,13 @@ export type SeasonStandingsV2ClientProps = {
   disciplineLeaders: SeasonV2DisciplineLeader[];
   /** Team-IDs der Rivalen des aktiven Teams (additive Hervorhebung, optional/graceful). */
   rivalTeamIds?: ReadonlySet<string>;
+  /**
+   * Meisterschaftskampf am letzten Spieltag (`lib/season/title-race.ts`), fertig gerechnet
+   * vom Host — diese Komponente bekommt nur das Ergebnis, kein `gameState`. `null`/`undefined`
+   * heißt: kein Zeitfenster (nicht der letzte Spieltag, der ist schon durchgespielt, oder es
+   * wird eine archivierte Saison betrachtet) — dann zeigt die UI nichts an.
+   */
+  titleRace?: TitleRaceResult | null;
   /**
    * Top-3-Spieler je Team und Spalte (POW/SPE/MEN/SOC + 20 Disziplinen) fürs
    * Hover-Panel im Saisonstand — im Host EINMAL memoisiert. Optional/`null`

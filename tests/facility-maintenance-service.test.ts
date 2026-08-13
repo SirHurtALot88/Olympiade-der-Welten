@@ -104,10 +104,11 @@ describe("facility maintenance service", () => {
     expect(preview.ok).toBe(true);
     expect(preview.conditionPct).toBe(50);
     expect(preview.nextConditionPct).toBe(100);
-    expect(preview.efficiencyPct).toBe(71.43);
+    // Zustand 50 von der Schwelle 80 → 62,5 % Effizienz (frueher 71,43 bei Schwelle 70).
+    expect(preview.efficiencyPct).toBe(62.5);
     expect(preview.nextEfficiencyPct).toBe(100);
-    expect(preview.maintenanceCost).toBe(3.38);
-    expect(preview.cashAfter).toBe(96.62);
+    expect(preview.maintenanceCost).toBe(2.25);
+    expect(preview.cashAfter).toBe(97.75);
     expect(preview.confirmToken).toEqual(expect.any(String));
   });
 
@@ -128,7 +129,7 @@ describe("facility maintenance service", () => {
     expect(result.applied).toBe(true);
     expect(result.facilityEventId).toEqual(expect.stringMatching(/^facility-event-/));
     if (!savedState) throw new Error("Expected facility maintenance to persist the next game state.");
-    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(96.62);
+    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(97.75);
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
       level: 2,
       enabled: true,
@@ -140,7 +141,7 @@ describe("facility maintenance service", () => {
       source: "manual_facility_maintenance",
       previousConditionPct: 50,
       nextConditionPct: 100,
-      cost: 3.38,
+      cost: 2.25,
     });
   });
 

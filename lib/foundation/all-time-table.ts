@@ -1,6 +1,6 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
-import { alsSchnappschussErsatz } from "@/lib/persistence/foundation-season-history-projection";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -178,15 +178,25 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
    *
    * Der Vorrang ist wichtig herum: liegen die vollen Schnappschuesse vor (Server, Tests), gewinnen
    * sie. Die Kurzfassung springt nur ein, wenn gestrichen wurde.
+   *
+   * DIESE STELLE HAT DIE KURZFASSUNG NIE ERREICHT. Hier stand `seasonSnapshots ?? …`, und `??`
+   * greift nur bei `null`/`undefined`. Gestrichen wird aber nicht mit `undefined`, sondern mit
+   * einer LEEREN LISTE (`withCompactSeasonArchiveSentinel`,
+   * `lib/foundation/apply-compact-season-archive-sentinel.ts`) — und `[]` ist nicht nullish. Der
+   * Ersatzzweig war damit toter Code: die Projektion fuhr mit, kam aber nie zum Zug, und die
+   * Ewige Tabelle meldete im Browser weiterhin „keine archivierten Saisons".
+   *
+   * Deshalb liest sie jetzt ueber `leseSaisonSchnappschuesse` — die eine Stelle, die den Vorrang
+   * an der LAENGE entscheidet statt an `null`. Ein zweites `??` kann hier nicht wieder entstehen.
    */
-  const rawSnapshots =
-    gameState.seasonState.seasonSnapshots ??
-    (gameState.seasonState.foundationSeasonHistory != null
-      ? alsSchnappschussErsatz(gameState.seasonState.foundationSeasonHistory, gameState.teams)
-      : undefined);
-  const hasArchive = rawSnapshots !== undefined;
+  const rawSnapshots = leseSaisonSchnappschuesse(gameState);
+  // `hasArchive` behaelt seine urspruengliche Bedeutung: „es liegt eine ANTWORT vor" — auch die
+  // Antwort „null archivierte Saisons". Deshalb hier weiter am Feld selbst gepruft (`undefined`
+  // = noch nichts geladen) und nicht an der Laenge; die Kurzfassung kann zusaetzlich eine Antwort
+  // liefern, wo das Feld leer geblieben ist.
+  const hasArchive = gameState.seasonState.seasonSnapshots !== undefined || rawSnapshots.length > 0;
   const snapshots = sortSnapshotsAsc(
-    (rawSnapshots ?? []).filter((snapshot) => resolveSeasonSnapshotTeamRecords(snapshot).length > 0),
+    rawSnapshots.filter((snapshot) => resolveSeasonSnapshotTeamRecords(snapshot).length > 0),
   );
   const archivedSeasonCount = snapshots.length;
   const hasHistory = archivedSeasonCount > 0;
@@ -253,7 +263,11 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         marketValue: snapshot.entryRosterPatchedAt
           ? (record.marketValueTotalEnd ?? record.marketValueEnd ?? record.marketValueSeasonEnd ?? null)
           : (record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null),
-        cash: record.cashEntry ?? record.cashEnd ?? record.cashTotal ?? null,
+        // `cashCarryOver` steht zwischen den beiden: der Kontostand an der Saisongrenze (nach der
+        // Vertragsalterung, vor den Kaeufen). Fehlt der Eintritts-Patch noch, ist das die naechste
+        // ehrliche Antwort auf „womit ging das Team weiter" — `cashEnd` liegt eine Vertragsrunde
+        // davor und `cashTotal` ist nur eine Prognose.
+        cash: record.cashEntry ?? record.cashCarryOver ?? record.cashEnd ?? record.cashTotal ?? null,
       });
     }
 

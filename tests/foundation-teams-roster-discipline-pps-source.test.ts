@@ -198,7 +198,7 @@ const SLICE_ABSENT = {
 };
 
 describe("Teams-Kadertabelle: Herkunft der Disziplin-PPs", () => {
-  it("belegt die Ursache: der kompakte Client-Payload leert den Saison-Ledger", () => {
+  it("der kompakte Client-Payload traegt den Saison-Ledger jetzt selbst", () => {
     const { gameState, playerId } = buildGameStateWithPlayedMatchday();
 
     const fullLedger = buildSeasonPointsLedger(gameState);
@@ -208,26 +208,53 @@ describe("Teams-Kadertabelle: Herkunft der Disziplin-PPs", () => {
     expect(fullPoints?.["mini-dm"]).toBeGreaterThan(0);
 
     const compactGameState = compactFoundationInitialGameState(gameState);
-    // Der Kompakt-Payload behält nur den AKTIVEN Spieltag (matchday-2, unausgewertet).
-    expect(compactGameState.seasonState.matchdayResults).toHaveLength(0);
-    expect(compactGameState.seasonState.disciplineResults).toHaveLength(0);
+    /**
+     * FRUEHER STAND HIER: `matchdayResults` und `disciplineResults` beide toHaveLength(0) —
+     * der Payload behielt nur den aktiven, unausgewerteten Spieltag — und daraus folgend ein
+     * leerer Client-Ledger. Genau daran hing das PPs-Panel mit seinem durchgehenden „—".
+     *
+     * Beide Beschneidungen sind entfallen (Herleitung in
+     * `compactFoundationInitialGameState`), also kommt der Browser aus eigener Kraft auf
+     * dieselben Punkte wie der Server. `persistedSeasonDerivations` bleibt gestrichen — der
+     * Slice bleibt deshalb die kanonische Quelle, siehe den Fall darunter.
+     */
+    expect(compactGameState.seasonState.matchdayResults).toHaveLength(1);
+    expect(compactGameState.seasonState.disciplineResults).toHaveLength(2);
     expect(compactGameState.seasonState.persistedSeasonDerivations).toBeUndefined();
 
     const compactLedger = buildSeasonPointsLedger(compactGameState);
-    expect(compactLedger.playerSummariesByPlayerId.get(playerId)).toBeUndefined();
+    const compactPoints = compactLedger.playerSummariesByPlayerId.get(playerId)?.pointsByDiscipline;
+    expect(compactPoints?.["mini-dm"]).toBeCloseTo(fullPoints!["mini-dm"]!, 5);
 
-    // Genau so entstand das Bild aus dem Bugreport: das PPs-Panel zeigte für
-    // jede Disziplin 0 PPs — und die Zelle rendert dafür "—".
-    const brokenAxisGroups = buildRosterRowDisciplinePps({
+    // Und die Zelle des PPs-Panels zeigt damit den Saisonwert statt „—".
+    const axisGroups = buildRosterRowDisciplinePps({
       gameState: compactGameState,
       playerId,
       playerDirectorySlice: SLICE_ABSENT,
-      ledgerPointsByDiscipline:
-        compactLedger.playerSummariesByPlayerId.get(playerId)?.pointsByDiscipline ?? null,
+      ledgerPointsByDiscipline: compactPoints ?? null,
     });
-    expect(readDisciplinePpsFromRow(brokenAxisGroups, "mini-dm")).toBe(0);
+    expect(readDisciplinePpsFromRow(axisGroups, "mini-dm")).toBeCloseTo(fullPoints!["mini-dm"]!, 1);
+  });
+
+  it("ohne jede Punktquelle bleibt das Panel sichtbar leer statt zu raten", () => {
+    /**
+     * Diese Zusicherung stand frueher im Fall darueber und haengt NICHT an der Beschneidung:
+     * hat die Zeile weder Slice noch Ledger-Punkte, steht dort 0 (die Zelle rendert „—") und
+     * gerade keine geratene Zahl. Der Zustand ist nicht ausgestorben — ein Browser-Tab mit
+     * einem aelteren, noch beschnittenen Payload hat genau ihn.
+     */
+    const { gameState, playerId } = buildGameStateWithPlayedMatchday();
+    const compactGameState = compactFoundationInitialGameState(gameState);
+
+    const leereZeile = buildRosterRowDisciplinePps({
+      gameState: compactGameState,
+      playerId,
+      playerDirectorySlice: SLICE_ABSENT,
+      ledgerPointsByDiscipline: null,
+    });
+    expect(readDisciplinePpsFromRow(leereZeile, "mini-dm")).toBe(0);
     expect(
-      brokenAxisGroups.every((axis) => axis.disciplines.every((discipline) => discipline.pps === 0)),
+      leereZeile.every((axis) => axis.disciplines.every((discipline) => discipline.pps === 0)),
     ).toBe(true);
   });
 

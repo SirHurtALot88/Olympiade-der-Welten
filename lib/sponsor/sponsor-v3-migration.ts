@@ -7,8 +7,10 @@
  * G-G +34,2 C ueber Benchmark, D-L −26,7 C).
  *
  * WAS DIE MIGRATION TUT:
- *  - Sie ersetzt bei jedem NOCH NICHT ABGERECHNETEN Vertrag die eingefrorene Leiter durch die
- *    V3-BASISLEITER (Tilt 0 — also exakt die Liga-Benchmark).
+ *  - Sie ersetzt bei jedem NOCH NICHT ABGERECHNETEN ALTVERTRAG — also einem ohne eigene
+ *    V3-Konditionen — die eingefrorene Leiter durch die V3-BASISLEITER (Tilt 0, also exakt die
+ *    Liga-Benchmark). Ein Vertrag, der bereits V3-Konditionen traegt, wird NICHT angefasst; die
+ *    Begruendung samt Messung steht an der Wache in `migrateSponsorLaddersToV3`.
  *  - Die VERTRAGSIDENTITAET bleibt: Marke, Name, Rarity und der Sonderziel-Schluessel sind
  *    unveraendert. Das Sonderziel wird nur nach der neuen Regel bepreist (Praemie nach Rarity,
  *    Sockelabzug −p·G).
@@ -30,6 +32,7 @@ import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 import {
   getSponsorV3PrizeCurve,
   getSponsorV3SalaryFactor,
+  getSponsorV3Terms,
   SPONSOR_V3_FLOOR_C,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildSponsorV3TermsCore, sponsorV3BenchmarkLadder, sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
@@ -123,6 +126,33 @@ export function migrateSponsorLaddersToV3(gameState: GameState): SponsorLadderMi
     if (!contract) continue;
     // Bereits abgerechnet ⇒ das Geld ist geflossen, die Leiter ist Geschichte.
     if (hasSeasonEndPayoutLog(gameState, contract.seasonId ?? seasonId, teamId)) continue;
+    // TRAEGT DER VERTRAG SCHON V3-KONDITIONEN, IST HIER NICHTS ZU MIGRIEREN.
+    //
+    // GEMESSEN, nicht vermutet (Live-Abbild vom 11.08. 20:00, Save
+    // `new-game-1786465783606-0kalpx`, Saison 1, Spieltag 2): 31 der 32 Vertraege trugen eine
+    // ABRECHNUNGSLEITER, die mit der auf ihrer Karte angezeigten nichts mehr zu tun hatte —
+    // A-A zeigte 34,7 C und haette 55,8 C bekommen, R-C 41,4 gegen 95,3, ueber die Liga
+    // 1 997,6 gegen 2 310,1 C (+15,6 %).
+    //
+    // URSACHE: `new-game-setup-service.ts` laesst die KI ihre Karte SOFORT beim Anlegen
+    // unterschreiben (`chooseSponsorOfferForAiTeams`). Der erste Ladevorgang danach findet einen
+    // Spielstand ohne Migrationsstempel vor — und M1 baute bis hierher JEDEM noch nicht
+    // abgerechneten Vertrag neue Konditionen, ohne zu pruefen, ob er schon welche hat. Die
+    // frisch eingefrorene Ligaleiter (Kurvenform, Tilt, Raritaets-Wertfaktor, Gebaeude-Verzicht)
+    // wurde dabei durch die tilt- und formfreie Preisgeld-Benchmark ersetzt. Besonders teuer bei
+    // den 22 Gebaeude-Karten: ihr Cash-Verzicht steckt ausschliesslich in der Kartenleiter — nach
+    // dem Ueberschreiben behielt das Team das geliehene Gebaeude UND bekam die volle Cash-Leiter.
+    // Genau der doppelte Zugriff, den der Sponsoren-Umbau ausschliessen sollte.
+    //
+    // Nur der MENSCH war verschont, weil er erst nach dem ersten Laden unterschreibt — die KI-Liga
+    // bekam den Aufschlag, das Managerteam nicht.
+    //
+    // Die Wache ist dieselbe Frage, die auch das Settlement stellt
+    // (`sponsor-settlement-service.ts`: `getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(...)`):
+    // wer schon V3-Konditionen traegt, rechnet aus ihnen — und darf sie nicht verlieren. M1 hebt
+    // ALTVERTRAEGE auf V3; ein V3-Vertrag noch einmal "migriert" waere genau die stille Drift, vor
+    // der die Regel "unterschriebene Vertraege werden nie nachtraeglich geaendert" schuetzen soll.
+    if (getSponsorV3Terms(contract) != null) continue;
     const terms = buildMigratedSponsorV3Terms(gameState, contract);
     const { sponsorV2: _legacyV2, ...rest } = contract as TeamSponsorContract & { sponsorV2?: unknown };
     nextContracts[teamId] = { ...rest, sponsorV3: terms };

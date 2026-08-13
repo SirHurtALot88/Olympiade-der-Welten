@@ -22,7 +22,7 @@ import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-servi
 import type { TrainingClassDraft, TrainingDevelopmentFilter, TrainingModeDraft } from "@/lib/foundation/tabs/foundation-page-types";
 import { trainingModeConfigs } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { useTrainingForecastLimit } from "@/lib/foundation/tabs/use-training-forecast-limit";
-import { getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import { getRosterEntryDisplaySalary, getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
 
 type RosterPlayer = ReturnType<typeof getRosterPlayers>[number];
 
@@ -141,6 +141,14 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
           potentialStars: forecast.potentialStars,
           currentAbilityRating: forecast.currentAbilityRating,
           potentialRating: forecast.potentialRating,
+        },
+        // Gehalt/Vertrag für die Steuer-Tabelle (Spalten "Gehalt"/"Vertrag"): dieselbe
+        // Ableitung wie die Kaderliste (`FoundationPlayersTableNewLook`), damit Training
+        // und Kader nie unterschiedliche Zahlen für denselben Vertrag zeigen.
+        economy: {
+          salary: getRosterEntryDisplaySalary(entry, trainingPlayer),
+          contractLength: entry.contractLength ?? null,
+          contractShape: entry.contractShape ?? null,
         },
         trainingDemand,
       };

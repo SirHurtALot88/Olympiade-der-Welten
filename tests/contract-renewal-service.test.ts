@@ -162,6 +162,37 @@ function createGameState(input?: {
   };
 }
 
+/**
+ * EIN FLACHES FAKTOR-FENSTER IN DEN SPIELSTAND LEGEN.
+ *
+ * Ohne gesetztes Fenster wuerfelt `getSeasonEconomyFactorWindow` deterministisch aus der saveId —
+ * und seit der Formwahl-Regel (Rangfolge Kassenklemme > Faktor > Profil) entscheidet dieser
+ * Zufallswurf ueber die Vertragsform. Ein Test, der die PROFIL-Regeln meint, muss den Faktor
+ * deshalb ausdruecklich stumm stellen; sonst prueft er den Wuerfel.
+ */
+function mitFlachemFaktorFenster(save: PersistedSaveGame): PersistedSaveGame {
+  const seasonId = save.gameState.season.id;
+  return {
+    ...save,
+    gameState: {
+      ...save.gameState,
+      seasonState: {
+        ...save.gameState.seasonState,
+        seasonEconomyFactors: [1, 1, 1, 1, 1].map((factor, horizonIndex) => ({
+          seasonId,
+          seasonLabel: horizonIndex === 0 ? "Aktuell" : `Season +${horizonIndex}`,
+          horizonIndex,
+          factor,
+          source: "sheet_seed",
+          rollSeed: null,
+          carriedFromSeasonId: null,
+          generatedAt: "2026-08-12T00:00:00.000Z",
+        })),
+      },
+    },
+  } as PersistedSaveGame;
+}
+
 let contractTestSaveCounter = 0;
 
 function createSave(gameState: GameState): PersistedSaveGame {
@@ -316,12 +347,14 @@ describe("contract renewal service", () => {
   it("lets AI choose non-balanced renewal shapes when team profile and cash context support it", () => {
     const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators", cash: 220, humanControlled: false });
     const player = createPlayer("value-core", { rating: 96, marketValue: 48, displayMarketValue: 48, salaryDemand: 8, displaySalary: 8 });
-    const save = createSave(
-      createGameState({
-        teams: [team],
-        players: [player],
-        rosters: [createRosterEntry(player.id, { teamId: team.teamId, contractLength: 1, salary: 6, currentValue: 48 })],
-      }),
+    const save = mitFlachemFaktorFenster(
+      createSave(
+        createGameState({
+          teams: [team],
+          players: [player],
+          rosters: [createRosterEntry(player.id, { teamId: team.teamId, contractLength: 1, salary: 6, currentValue: 48 })],
+        }),
+      ),
     );
     const persistence = createPersistenceMock();
     const preview = previewSeasonEndContracts(save);
@@ -338,6 +371,87 @@ describe("contract renewal service", () => {
     expect(savedGameState?.rosters[0]?.yearlySalarySchedule?.[0]?.salary).toBeGreaterThan(
       savedGameState?.rosters[0]?.yearlySalarySchedule?.at(-1)?.salary ?? 0,
     );
+  });
+
+  /**
+   * UNTERSCHRIFTSPFADE — das Verhandlungs-Benchmark muss an JEDEM gesetzt werden.
+   *
+   * Die Fehlerklasse, vor der `docs/APRON_UND_VERTRAGSFORMEN.md` (Schritt 3) ausdruecklich warnt,
+   * heisst „Feld, das niemand schreibt": ein vergessener Pfad heisst, dass diese Vertraege
+   * stillschweigend anders besteuert werden als alle anderen. Deshalb je Pfad ein WERT-Test —
+   * nicht nur „ist gesetzt", sondern „ist das verhandelte JAHRESGEHALT, nicht die Jahresrate".
+   */
+  it("Unterschriftspfad KI-Verlaengerung: schreibt das verhandelte Jahresgehalt an den Vertrag", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators", cash: 220, humanControlled: false });
+    const player = createPlayer("value-core", { rating: 96, marketValue: 48, displayMarketValue: 48, salaryDemand: 8, displaySalary: 8 });
+    const save = mitFlachemFaktorFenster(
+      createSave(
+        createGameState({
+          teams: [team],
+          players: [player],
+          rosters: [createRosterEntry(player.id, { teamId: team.teamId, contractLength: 1, salary: 6, currentValue: 48 })],
+        }),
+      ),
+    );
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === player.id);
+
+    applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const entry = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1]?.rosters[0];
+
+    // Der Vertrag ist geformt — und genau dann trennen sich Benchmark und Jahresrate.
+    expect(entry?.contractShape).toBe("front_loaded");
+    expect(entry?.negotiatedAnnualSalary).toBe(row?.renewalSalaryPreview);
+    // Das Benchmark ist der Laufzeit-Durchschnitt der Schedule, NICHT deren erstes Jahr.
+    const schedule = entry?.yearlySalarySchedule ?? [];
+    const durchschnitt = schedule.reduce((sum, jahr) => sum + jahr.salary, 0) / Math.max(1, schedule.length);
+    expect(entry?.negotiatedAnnualSalary).toBeCloseTo(durchschnitt, 2);
+    expect(entry?.negotiatedAnnualSalary).toBeLessThan(schedule[0]?.salary ?? 0);
+  });
+
+  it("Unterschriftspfad Vertragsaktion (Mensch wie KI): schreibt das angebotene Jahresgehalt fest", () => {
+    const team = createTeam({ teamId: "H-H", shortCode: "H-H", humanControlled: true, cash: 300 });
+    const player = createPlayer("p1", { rating: 88 });
+    const save = createSave(
+      createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [createRosterEntry("p1", { teamId: team.teamId, contractLength: 0, contractStatus: "renewal_pending", salary: 6 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const preview = previewContractRenewalAction({
+      save,
+      teamId: team.teamId,
+      playerId: "p1",
+      action: "renew",
+      contractLength: 3,
+      contractShape: "back_loaded",
+      offeredSalary: 9.5,
+    });
+
+    applyContractRenewalAction({
+      save,
+      teamId: team.teamId,
+      playerId: "p1",
+      action: "renew",
+      contractLength: 3,
+      contractShape: "back_loaded",
+      offeredSalary: 9.5,
+      confirmToken: preview.confirmToken,
+      persistence,
+      source: "manual_contract_renewal",
+    });
+    const entry = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1]?.rosters[0];
+
+    expect(entry?.contractShape).toBe("back_loaded");
+    expect(entry?.negotiatedAnnualSalary).toBe(9.5);
+    // Die erste Rate liegt unter dem Benchmark — back_loaded. Genau das darf die Apron nicht sehen.
+    expect(entry?.yearlySalarySchedule?.[0]?.salary).toBeLessThan(9.5);
+    // `entry.salary` traegt bei Unterschrift noch das Jahresgehalt — erst der naechste
+    // Saisonwechsel ueberschreibt es mit der Jahresrate. Genau darum ist es keine Steuerbasis.
+    expect(entry?.salary).toBe(9.5);
   });
 
   it("lets AI renew useful players that are already at contract length 0", () => {

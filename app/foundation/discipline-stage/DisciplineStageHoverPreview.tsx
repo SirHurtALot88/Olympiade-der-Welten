@@ -10,7 +10,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitBrowserUrl, getPlayerPortraitInitials, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
@@ -135,7 +135,7 @@ function PlayerPreview({ gameState, target, ratingByPlayerId }: {
         playerId={player.id}
         name={player.name}
         portraitUrl={portraitUrl}
-        portraitInitials={player.name.slice(0, 2).toUpperCase()}
+        portraitInitials={getPlayerPortraitInitials(player.name)}
         playerOvr={row?.ovrNormalized ?? null}
         ovrRank={row?.ovrRank ?? null}
         playerPps={row?.ppsSeason ?? null}

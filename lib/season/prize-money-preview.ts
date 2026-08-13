@@ -8,8 +8,7 @@ import {
 } from "@/lib/season/prize-money-sheet";
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
-import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
-import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
@@ -159,24 +158,12 @@ function buildLeagueSponsorIncomeKey(gameState: GameState, saveId: string): stri
 }
 
 function computeLeagueSponsorIncome(gameState: GameState): LeagueSponsorIncome {
-  const sponsorCashByTeamId = new Map<string, number>();
+  // DIE EINE Sponsor-Einnahme der Saison (`getSeasonSponsorCashByTeam`): bereits gebuchte Logs plus
+  // projizierter Rest, vorzeichenecht. Vorher stand hier nur die Vorschau — sobald die Abrechnung
+  // gebucht war, überging sie `previewSponsorSettlement` (Duplikat-Wache) und die Sponsor-Einnahme
+  // fiel für die ganze Liga auf 0, obwohl das Geld längst geflossen war.
+  const sponsorCashByTeamId = getSeasonSponsorCashByTeam(gameState);
   const facilityIncomeByTeamId = new Map<string, number>();
-  try {
-    // Exakt wie der Apply (sponsor-settlement-service): nur Teams MIT Vertrag zählen,
-    // und die Deltas werden VORZEICHENECHT summiert — negative Rank-/Ziel-Strafen
-    // gehörten vorher (if cashDelta > 0) fälschlich nicht in projectedCash/KI-Signal.
-    const contractedTeamIds = new Set(
-      gameState.teams.filter((team) => getTeamSponsorContract(gameState, team.teamId)).map((team) => team.teamId),
-    );
-    for (const row of previewSponsorSettlement(gameState).rows) {
-      if (!contractedTeamIds.has(row.teamId)) {
-        continue;
-      }
-      sponsorCashByTeamId.set(row.teamId, (sponsorCashByTeamId.get(row.teamId) ?? 0) + row.cashDelta);
-    }
-  } catch {
-    // Sponsor-Vorschau ist optional — fehlt sie (z. B. ohne Verträge), bleibt die Sponsor-Einnahme leer.
-  }
   for (const team of gameState.teams) {
     try {
       const facilities = getTeamFacilityState(gameState, team.teamId);

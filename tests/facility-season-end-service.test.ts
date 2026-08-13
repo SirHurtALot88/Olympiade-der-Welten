@@ -1,6 +1,11 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  FACILITY_SEASON_DECAY_PAID,
+  FACILITY_SEASON_DECAY_SPREAD_PAID,
+} from "@/lib/facilities/facility-condition";
+
 import type { GameState, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
   applyFacilitySeasonEndFinance,
@@ -207,14 +212,21 @@ describe("facility season-end finance service", () => {
     const savedState = saveSingleplayerState.mock.calls[0]?.[1];
 
     if (!savedState) throw new Error("Expected paid facility season-end apply to persist state.");
+    // Der Verschleiss streut jetzt je Gebaeude (12..22 statt fester 8), deshalb wird das Band
+    // geprueft statt einer festen Zahl — und dass er ueberhaupt in der neuen Groessenordnung liegt.
+    const nachher = savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center;
+    expect(nachher?.enabled).toBe(true);
+    expect(nachher?.conditionPct).toBeGreaterThanOrEqual(76 - FACILITY_SEASON_DECAY_PAID - FACILITY_SEASON_DECAY_SPREAD_PAID);
+    expect(nachher?.conditionPct).toBeLessThanOrEqual(76 - FACILITY_SEASON_DECAY_PAID + FACILITY_SEASON_DECAY_SPREAD_PAID);
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
       enabled: true,
-      conditionPct: 68,
     });
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_paid")).toBe(true);
+    // Das Ereignis protokolliert denselben Wert, der im Gebaeude landet — die Kette darf nicht
+    // auseinanderlaufen, sonst zeigt die Zeitleiste einen anderen Zustand als die Gebaeudeseite.
     expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
       previousConditionPct: 76,
-      nextConditionPct: 68,
+      nextConditionPct: nachher?.conditionPct,
     });
   });
 
@@ -223,14 +235,14 @@ describe("facility season-end finance service", () => {
       save({
         teamFacilities: {
           "team-1": facilities({
-            fan_shop: { level: 2, enabled: true, conditionPct: 35 },
+            fan_shop: { level: 2, enabled: true, conditionPct: 40 },
           }),
         },
       }),
       "team-1",
     );
 
-    // fan_shop L2 = 7.8, condition 35% -> efficiency 50% (35/70*100) -> 7.8 * 0.5 = 3.9.
+    // fan_shop L2 = 7.8, Zustand 40 -> Effizienz 50 % (40 von der Schwelle 80) -> 7.8 * 0.5 = 3.9.
     expect(preview.fanShopIncome).toBe(3.9);
     expect(preview.facilityIncomeTotal).toBe(3.9);
   });

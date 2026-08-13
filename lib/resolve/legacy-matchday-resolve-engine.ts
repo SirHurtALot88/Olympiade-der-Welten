@@ -207,6 +207,39 @@ function getWorseStatus(left: ResolvePreviewStatus, right: ResolvePreviewStatus)
   return priority[left] >= priority[right] ? left : right;
 }
 
+/**
+ * DER STATUS NUR DER SEITEN, DIE NOCH GEBUCHT WERDEN.
+ *
+ * `preview.status` ist der schlechteste Status ueber BEIDE Seiten. Fuer die Frage „darf ich die
+ * offene Seite buchen?" ist das die falsche Auskunft: eine bereits gebuchte Seite wird beim
+ * Schreiben ohnehin eingefroren (`legacy-matchday-result-apply-service.ts`, `frozenSides`) — ihr
+ * neu gerechnetes Ergebnis landet nie im Spielstand. Es durfte die Buchung aber trotzdem
+ * abbrechen.
+ *
+ * GEMELDET VON CHRIS: „wieso wird D1 in D2 noch mal gerechnet? das ist doch gar nicht noetig!"
+ * Sein Spieltag 4 hing genau daran: zwei in D1 verletzte Spieler liessen die (verworfene)
+ * D1-Rechnung auf `missing_scores` kippen, und damit war auch D2 nicht mehr buchbar.
+ *
+ * Was eingefroren gespeichert wird, darf auch nicht mehr mitentscheiden.
+ */
+export function getResolveStatusForSides(
+  preview: Pick<LegacyMatchdayResolvePreview, "status" | "disciplinePreviews">,
+  sides: ReadonlySet<"d1" | "d2">,
+): ResolvePreviewStatus {
+  // Keine Einschraenkung (oder keine Seiten-Angaben vorhanden) → unveraendert der Gesamtstatus.
+  if (sides.size === 0) return preview.status;
+  const relevante = preview.disciplinePreviews.filter((entry) => sides.has(entry.disciplineSide));
+  if (relevante.length === 0) return preview.status;
+  return relevante.reduce<ResolvePreviewStatus>(
+    (current, entry) =>
+      entry.teamResults.reduce<ResolvePreviewStatus>(
+        (inner, team) => getWorseStatus(inner, team.status),
+        current,
+      ),
+    "ready",
+  );
+}
+
 function shouldFlagMissingSources(
   score: ReturnType<typeof scoreLegacyLineupDisciplineSide>,
   resolveOptions: LegacyResolvePreviewOptions,

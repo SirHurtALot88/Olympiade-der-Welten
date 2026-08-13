@@ -315,12 +315,10 @@ function buildCashEconomyAudit(gameState: GameState) {
   if (cashPrizeLogs.some((log) => log.action === "apply")) {
     violations.push("cash_prize_apply_executed");
   }
-  // Der V4-Vorschuss benutzt dieselbe Log-Phase, ist aber KEIN vorgezogener Basis-Auszahlungspfad,
-  // sondern eine bewusst gewaehlte Kartenoption — er wird am Saisonende samt Gebuehr verrechnet.
-  // Ohne diese Ausnahme meldete jeder Langlauf mit Vorschussvertraegen Scheinverstoesse.
-  const baseFirstLogs = sponsorLogs.filter(
-    (log) => log.phase === "base_first" && log.componentId !== "v4_advance",
-  );
+  // Die Ausnahme fuer `v4_advance` ist entfallen: den Sponsor-Vorschuss gibt es nicht mehr, also
+  // schreibt auch nichts mehr in die Phase `base_first`. Die Invariante gilt damit wieder ohne
+  // Sonderfall — Sponsorgeld flieszt ausschliesslich am Saisonende.
+  const baseFirstLogs = sponsorLogs.filter((log) => log.phase === "base_first");
   if (baseFirstLogs.length > 0) {
     violations.push(`sponsor_base_first_executed:${baseFirstLogs.length}`);
   }

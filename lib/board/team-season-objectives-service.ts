@@ -1888,6 +1888,31 @@ function buildSponsorObjectiveDrafts(input: {
   });
 }
 
+/**
+ * VERGABE UND BEWERTUNG SIND ZWEI VERSCHIEDENE DINGE.
+ *
+ * Ein Vorstand vergibt seine Saisonziele einmal und misst sie danach. Der Generator hier lieferte
+ * beides in einem Aufruf: er baute den Kandidaten-Pool, wählte daraus einen Slate von 3–5 Zielen und
+ * gab NUR den Slate zurück. Der Merge (`mergeStoredTeamObjectives`) verglich den gespeicherten
+ * Bestand gegen diesen Slate — und warf jedes gespeicherte Ziel weg, das der Slate gerade nicht mehr
+ * enthielt. Da die Slate-Auswahl status-abhängig ist (`status !== "completed"`, `pickUrgentObjective`)
+ * und die Slate-GRÖSSE am Vorstandsdruck hängt, wählte genau der Moment der Erfüllung ein Ziel ab.
+ * Der nächste Refresh löschte es dann samt Reward — am Live-Abbild gemessen: 225 → 222 Ziele, alle
+ * drei bereits erfüllt, 11 C Abrechnungswirkung weg.
+ *
+ * Darum liefert der Generator jetzt beides getrennt:
+ *   - `slate`  — die VERGABE: nur beim ersten Mal (noch kein gespeicherter Bestand für die Saison).
+ *   - `pool`   — die BEWERTUNG: alle Kandidaten VOR der Auswahl, gegen die ein gespeichertes Ziel
+ *                seinen frischen Stand bekommt, egal ob der Slate es heute noch wählen würde.
+ *   - `eventAdditions` — die einzigen Ziele, die einem laufenden Bestand noch zuwachsen dürfen
+ *                (Sponsor-Spiegel nach der Unterschrift, Budget-Kürzung des Vorstands).
+ */
+type TeamObjectiveGeneration = {
+  slate: TeamSeasonObjectiveRecord[];
+  pool: TeamSeasonObjectiveRecord[];
+  eventAdditions: TeamSeasonObjectiveRecord[];
+};
+
 function buildTeamObjectives(input: {
   gameState: GameState;
   team: Team;
@@ -1895,7 +1920,7 @@ function buildTeamObjectives(input: {
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-}): TeamSeasonObjectiveRecord[] {
+}): TeamObjectiveGeneration {
   const { gameState, team, row, rowsByTeamId, identity, profile } = input;
   const boardV2 = isBoardObjectivesV2Enabled();
   const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
@@ -1939,11 +1964,7 @@ function buildTeamObjectives(input: {
         boardConfidenceDelta: (row.transferNet ?? 0) >= transferProfitTarget ? 0.35 : -0.35,
         source: "local_transfer_history",
       };
-  const objectiveDrafts = selectBoardObjectiveDrafts({
-    identity,
-    profile,
-    slateSize,
-    objectives: [
+  const candidateDrafts: ObjectiveDraft[] = [
       {
         objectiveId: `sport-rank-${sportTarget.rank}`,
         category: "sport",
@@ -2009,7 +2030,12 @@ function buildTeamObjectives(input: {
       getTopPlayerObjective({ gameState, team, identity, profile }),
       getRebuildCashObjective({ team, row, rowsByTeamId, identity, profile, settled: seasonIncomeBooked }),
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
-    ].filter((objective): objective is ObjectiveDraft => Boolean(objective)),
+    ].filter((objective): objective is ObjectiveDraft => Boolean(objective));
+  const objectiveDrafts = selectBoardObjectiveDrafts({
+    identity,
+    profile,
+    slateSize,
+    objectives: candidateDrafts,
   });
   const sponsorDrafts = buildSponsorObjectiveDrafts({ gameState, team, row });
 
@@ -2038,29 +2064,68 @@ function buildTeamObjectives(input: {
 
   // `rankTarget` ist reine Vergabe-Information (welche Ziele um das eine verbindliche Rang-Ziel
   // konkurrieren) und wandert nicht in den Spielstand — dort zählt nur noch `optional`.
-  return [...objectiveDrafts, ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts].map(
-    ({ rankTarget: _rankTarget, ...objective }) => ({
+  const toRecord = (drafts: ObjectiveDraft[]): TeamSeasonObjectiveRecord[] =>
+    drafts.map(({ rankTarget: _rankTarget, ...objective }) => ({
       seasonId: gameState.season.id,
       teamId: team.teamId,
       source: objective.source ?? "board_objective_generator_v1",
       ...objective,
-    }),
-  );
+    }));
+
+  // Ereignis-Zugänge: der Sponsor-Spiegel entsteht mit der Unterschrift, die Budget-Kürzung mit dem
+  // Vorstandsvertrauen unter 5,0. Nur diese beiden dürfen einem laufenden Bestand noch zuwachsen —
+  // alles andere würde den Slate über die Saison aufblähen.
+  const eventDrafts = [...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts];
+
+  return {
+    slate: toRecord([...objectiveDrafts, ...eventDrafts]),
+    pool: toRecord([...candidateDrafts, ...eventDrafts]),
+    eventAdditions: toRecord(eventDrafts),
+  };
 }
+
+/**
+ * Zwei Ziel-Familien tragen eine BEWEGLICHE Zielmarke in ihrer Kennung: `sport-rank-<rang>` und
+ * `sport-axis-rank-<achse>-top-<rang>`. Der Zielrang wird bei jedem Refresh neu kalibriert — steigt
+ * ein Team von Rang 5 auf Rang 10, heißt dasselbe Ziel plötzlich anders. Für den Merge war das ein
+ * fremdes Ziel: das alte fiel weg, ein neues kam hinzu (am Abbild gemessen:
+ * `T-G|sport-axis-rank-pow-top-5` → `sport-axis-rank-pow-top-10`, ein verfehltes Ziel mit
+ * 2 C Strafe). Deshalb wird zusätzlich über das Familien-Präfix gematcht; die gespeicherte Kennung
+ * bleibt die bei der Vergabe geschriebene, Zielmarke und Label werden erneuert.
+ */
+function objectiveFamilyPrefix(objectiveId: string): string | null {
+  if (/^sport-rank-\d+$/.test(objectiveId)) return "sport-rank-";
+  const axisRank = /^(sport-axis-rank-[a-z]+-top-)\d+$/.exec(objectiveId);
+  if (axisRank) return axisRank[1];
+  return null;
+}
+
+const SPONSOR_CHOICE_PENDING_SOURCE = "sponsor_v2_choice_pending";
+const SPONSOR_CONTRACT_SOURCE = "sponsor_v2_contract";
 
 function mergeStoredTeamObjectives(input: {
   gameState: GameState;
   teamId: string;
-  generated: TeamSeasonObjectiveRecord[];
+  generation: TeamObjectiveGeneration;
 }) {
   const stored = (input.gameState.seasonState.teamSeasonObjectives ?? []).filter(
     (objective) => objective.seasonId === input.gameState.season.id && objective.teamId === input.teamId,
   );
+  // ERSTE VERGABE: noch kein Bestand für diese Saison — der Vorstand stellt seinen Slate.
+  // `stored.length === 0` und nicht `stored ?? []`: eine LEERE Liste ist nicht nullish, ein `??`
+  // hätte hier nie gegriffen.
   if (stored.length === 0) {
-    return input.generated;
+    return input.generation.slate;
   }
 
-  const generatedById = new Map(input.generated.map((objective) => [objective.objectiveId, objective] as const));
+  // BEWERTUNG eines laufenden Bestands: gegen den vollen Kandidaten-Pool, nicht gegen den Slate.
+  const generated = input.generation.pool;
+  const generatedById = new Map(generated.map((objective) => [objective.objectiveId, objective] as const));
+  const generatedByFamily = new Map<string, TeamSeasonObjectiveRecord>();
+  for (const objective of generated) {
+    const family = objectiveFamilyPrefix(objective.objectiveId);
+    if (family && !generatedByFamily.has(family)) generatedByFamily.set(family, objective);
+  }
   const merged: TeamSeasonObjectiveRecord[] = [];
   const appendObjectiveSource = (source: string | null | undefined, nextSource: string) =>
     Array.from(new Set([...(source ?? "").split("+"), nextSource].map((entry) => entry.trim()).filter(Boolean))).join("+");
@@ -2080,37 +2145,80 @@ function mergeStoredTeamObjectives(input: {
     if (!generatedObjective.source) return false;
     return splitObjectiveSource(storedObjective.source).includes(generatedObjective.source);
   };
+  // Der Sponsor-Platzhalter ist kein Ziel, sondern eine Aufforderung („Sponsor-Vertrag wählen"). Mit
+  // der Unterschrift ersetzen ihn die drei Vertrags-Komponenten — er wird also nicht eingefroren,
+  // sondern zurückgezogen. Das ist der einzige definierte ABGANG; er kostet nichts (kein Reward,
+  // keine Strafe).
+  const sponsorContractSigned = generated.some((objective) =>
+    splitObjectiveSource(objective.source).includes(SPONSOR_CONTRACT_SOURCE),
+  );
+  const isRetiredSponsorPlaceholder = (objective: TeamSeasonObjectiveRecord) =>
+    sponsorContractSigned && splitObjectiveSource(objective.source).includes(SPONSOR_CHOICE_PENDING_SOURCE);
+
   for (const storedObjective of stored) {
-    const generatedObjective = generatedById.get(storedObjective.objectiveId);
+    if (isRetiredSponsorPlaceholder(storedObjective)) {
+      continue;
+    }
+    const generatedObjective =
+      generatedById.get(storedObjective.objectiveId) ??
+      (() => {
+        const family = objectiveFamilyPrefix(storedObjective.objectiveId);
+        return family ? generatedByFamily.get(family) ?? null : null;
+      })();
+
+    // OHNE frischen Kandidaten: das Ziel bleibt mit seinem letzten Stand stehen. Früher warf ein
+    // `continue` es hier weg — samt Reward eines längst ERFÜLLTEN Ziels. Ein einmal vergebenes Ziel
+    // bleibt bis zur Abrechnung bestehen; dass es gerade nicht nachgerechnet werden kann, steht als
+    // `status_stale` im Audit, statt still zu verschwinden.
     if (!generatedObjective) {
+      merged.push({
+        ...storedObjective,
+        source: appendObjectiveSource(storedObjective.source, "status_stale"),
+      });
       continue;
     }
 
+    // Die Herabstufung zum Zusatzziel ist eine Entscheidung der VERGABE (siehe
+    // `demoteExtraRankTargets`) und wird deshalb aus dem gespeicherten Stand übernommen, nicht neu
+    // gefällt: der Kandidaten-Pool durchläuft die Auswahl gar nicht. Ohne diese Übernahme bekäme ein
+    // einmal herabgestuftes Rang-Ziel seine Strafe zurück.
+    const optional = storedObjective.optional === true;
+    const generatedLabel = isGeneratorAuthoredLabel(storedObjective, generatedObjective)
+      ? generatedObjective.label || storedObjective.label
+      : storedObjective.label || generatedObjective.label;
+
     merged.push({
       ...storedObjective,
-      label: isGeneratorAuthoredLabel(storedObjective, generatedObjective)
-        ? generatedObjective.label || storedObjective.label
-        : storedObjective.label || generatedObjective.label,
+      // Die Kennung bleibt die bei der Vergabe geschriebene — auch wenn der Pool-Treffer über das
+      // Familien-Präfix kam und heute eine andere Zielmarke im Namen trägt.
+      objectiveId: storedObjective.objectiveId,
+      label: optional && !generatedLabel.endsWith(" (optional)") ? `${generatedLabel} (optional)` : generatedLabel,
       targetValue: generatedObjective.targetValue,
       rewardCash: generatedObjective.rewardCash,
-      penaltyCash: generatedObjective.penaltyCash,
+      penaltyCash: optional ? undefined : generatedObjective.penaltyCash,
       detail: generatedObjective.detail ?? storedObjective.detail ?? null,
       actionHint: generatedObjective.actionHint ?? storedObjective.actionHint ?? null,
       currentValue: generatedObjective.currentValue,
       status: generatedObjective.status,
-      boardConfidenceDelta: generatedObjective.boardConfidenceDelta,
-      // Ob ein Ziel verbindlich oder nur ein Zusatzziel ist, entscheidet die Vergabe bei jedem
-      // Refresh neu — der gespeicherte Stand darf das nicht einfrieren.
-      optional: generatedObjective.optional,
-      // Dasselbe gilt für „Hochrechnung": der eingefrorene Stand stammt aus einem Moment, in dem die
-      // Einnahmen noch nicht gebucht waren. Bliebe er stehen, trüge das Ziel den Hinweis auch noch
-      // in der Abrechnung, in der es längst feststeht.
+      boardConfidenceDelta: optional
+        ? Math.max(0, generatedObjective.boardConfidenceDelta ?? 0)
+        : generatedObjective.boardConfidenceDelta,
+      optional: storedObjective.optional,
+      // „Hochrechnung" ist dagegen ein Stand, kein Vergabe-Entscheid: der eingefrorene Wert stammt
+      // aus einem Moment, in dem die Einnahmen noch nicht gebucht waren. Bliebe er stehen, trüge das
+      // Ziel den Hinweis auch noch in der Abrechnung, in der es längst feststeht.
       provisional: generatedObjective.provisional,
       source: appendObjectiveSource(storedObjective.source, "status_refresh"),
     });
   }
-  const storedIds = new Set(merged.map((objective) => objective.objectiveId));
-  return [...merged, ...input.generated.filter((objective) => !storedIds.has(objective.objectiveId))];
+
+  // ZUGANG nur über die definierten Ereignisse. Der volle Pool darf hier NICHT einfließen, sonst
+  // wüchse der Slate bei jedem Refresh um alle nicht gewählten Kandidaten.
+  const vorhandeneIds = new Set(merged.map((objective) => objective.objectiveId));
+  return [
+    ...merged,
+    ...input.generation.eventAdditions.filter((objective) => !vorhandeneIds.has(objective.objectiveId)),
+  ];
 }
 
 export function calculateBoardConfidence(input: {
@@ -2312,8 +2420,8 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
 
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const profile = getTeamStrategyProfile(gameState, team.teamId);
-    const generatedObjectives = buildTeamObjectives({ gameState, team, row, rowsByTeamId, identity, profile });
-    const teamObjectives = mergeStoredTeamObjectives({ gameState, teamId: team.teamId, generated: generatedObjectives });
+    const generation = buildTeamObjectives({ gameState, team, row, rowsByTeamId, identity, profile });
+    const teamObjectives = mergeStoredTeamObjectives({ gameState, teamId: team.teamId, generation });
     objectives.push(...teamObjectives);
     const storedBoard = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
     const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;

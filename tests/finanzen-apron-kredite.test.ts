@@ -25,15 +25,23 @@ import { computeApronSettlement } from "@/lib/season/apron-service";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
-import { shouldLoadSeasonArchiveForView } from "@/lib/foundation/tabs/use-season-archive-load";
+import {
+  getTeamDisplaySalaryTotal,
+  getTeamNegotiatedSalaryTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamApronSalaryBase } from "@/lib/season/apron-service";
+import {
+  shouldRequestSeasonArchiveLoad,
+  uebernimmGeladenesSaisonarchiv,
+} from "@/lib/foundation/tabs/use-season-archive-load";
+import { withCompactSeasonArchiveSentinel } from "@/lib/foundation/apply-compact-season-archive-sentinel";
+import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 import { makePlayer, makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
 
 const MARKUP = quelle("app/foundation/finances/FoundationFinancesNewLook.tsx");
 const CSS = quelle("app/globals.css");
-const SCOPE = quelle("lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 
 function round1(value: number): number {
   return Number(value.toFixed(1));
@@ -121,10 +129,18 @@ describe("Apron-Ausweisung: beide Linien einzeln, aus derselben Projektion wie d
     expect(apron.distanceLine2).toBeCloseTo(round1(apron.salaryBasis - apron.line2), 5);
   });
 
-  it("die Bemessungsgrundlage IST die geglättete Gehaltssumme (getTeamDisplaySalaryTotal)", () => {
+  /**
+   * UMGESTELLT (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3 — Chris: „ja!"): die Bemessungsgrundlage
+   * ist das VERHANDELTE Jahresgehalt, nicht mehr das Formel-Gehalt aus Marktwert/Attributen. Der
+   * Test prueft beides — dass die Anzeige die neue Grundlage nimmt UND dass sie sich in diesem
+   * Fixture messbar von der alten unterscheidet; sonst wuerde er die Umstellung nicht bemerken.
+   */
+  it("die Bemessungsgrundlage IST die verhandelte Gehaltssumme — nicht mehr die geglättete", () => {
     const gameState = buildGameState();
     const apron = readyTeam(gameState).apron!;
-    expect(apron.salaryBasis).toBe(round1(getTeamDisplaySalaryTotal(gameState, "team-1")));
+    expect(apron.salaryBasis).toBe(round1(getTeamApronSalaryBase(gameState, "team-1")));
+    expect(apron.salaryBasis).toBe(round1(getTeamNegotiatedSalaryTotal(gameState, "team-1")));
+    expect(apron.salaryBasis).not.toBe(round1(getTeamDisplaySalaryTotal(gameState, "team-1")));
   });
 
   it("Netto == Ausgleich − Abgabe, und die GuV-Posten-Zeile trägt dieselbe Zahl", () => {
@@ -364,10 +380,58 @@ describe("Kredit-Verpflichtungen: eine Zerlegung für Karte, Ausgabenzeile und G
 /* Saisonarchiv-Load + ehrliche Leerzustände (Markt-Audit F4)          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * DIESER BLOCK PRÜFTE BIS HIERHER NICHTS.
+ *
+ * Er hielt `shouldLoadSeasonArchiveForView("finances") === true` fest — eine Funktion, die in der
+ * Produktion NIEMAND aufrief — und daneben eine Quelltext-Regex auf die zweite, inline
+ * ausgeschriebene Liste im Shell-Router. Beide blieben grün, während der Effekt dahinter tot war:
+ * sein Gate stand auf `seasonSnapshots !== undefined`, und hinter dem Sentinel
+ * (`withCompactSeasonArchiveSentinel`) steht dort im Browser immer `[]`. Der Nachladepfad konnte
+ * also nie feuern, und selbst wenn — der Übernahme-Ausdruck `previous ?? geladen` hätte das
+ * Ergebnis wieder verworfen (`[]` ist nicht nullish).
+ *
+ * Jetzt wird die WIRKUNG geprüft: der echte Browser-Zustand entsteht über die echte Kompaktierung
+ * plus den echten Sentinel, und darauf laufen genau die beiden Funktionen, die der Effekt aufruft.
+ */
 describe("Saisonarchiv: Finanzen lädt es nach, und solange sagt die UI „lädt“, nicht „nicht archiviert“", () => {
-  it("die Finanzen-View ist im Archiv-Load-Gate (beide Listen)", () => {
-    expect(shouldLoadSeasonArchiveForView("finances")).toBe(true);
-    expect(SCOPE).toMatch(/shouldLoadSeasonArchive =[\s\S]{0,900}activeView === "finances"/);
+  const schnappschuss = (seasonId: string) =>
+    ({ snapshotId: `snap-${seasonId}`, seasonId, seasonName: seasonId, archivedAt: "", finalStandings: [] }) as never;
+
+  it("hinter dem Sentinel fordert die Finanzen-View das Archiv wirklich an", () => {
+    const voll = buildGameState({ seasonSnapshots: [schnappschuss("season-1")] });
+    const browser = withCompactSeasonArchiveSentinel(compactFoundationInitialGameState(voll));
+
+    // Der Zustand, in dem der Effekt tatsächlich läuft: NICHT `undefined`, sondern die leere Liste.
+    expect(browser.seasonState.seasonSnapshots).toEqual([]);
+    expect(browser.seasonState.seasonSnapshots !== undefined).toBe(true);
+
+    expect(
+      shouldRequestSeasonArchiveLoad({
+        activeView: "finances",
+        seasonSnapshots: browser.seasonState.seasonSnapshots,
+      }),
+    ).toBe(true);
+  });
+
+  it("nach dem einen Abruf wird nicht wieder geholt — auch nicht bei ehrlich null Saisons", () => {
+    expect(
+      shouldRequestSeasonArchiveLoad({
+        activeView: "finances",
+        seasonSnapshots: [],
+        seasonArchiveFetchCompleted: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("das nachgeladene Archiv landet auch hinter dem Sentinel im Zustand", () => {
+    const geladen = [schnappschuss("season-1")];
+    // Der Sentinel-Fall: das war der zweite tote `??`-Ausdruck.
+    expect(uebernimmGeladenesSaisonarchiv([], geladen)).toHaveLength(1);
+    expect(uebernimmGeladenesSaisonarchiv(undefined, geladen)).toHaveLength(1);
+    // Ein parallel eingetroffener, bereits gefüllter Stand wird nicht überschrieben.
+    const parallel = [schnappschuss("season-1"), schnappschuss("season-2")];
+    expect(uebernimmGeladenesSaisonarchiv(parallel, geladen)).toHaveLength(2);
   });
 
   it("archivePending unterscheidet „noch nicht geladen“ (undefined) von „geladen und leer“ ([])", () => {
@@ -453,6 +517,10 @@ describe("Jede im Finanzen-Markup benutzte Klasse existiert in globals.css", () 
     "nl-fin-header-card",
     "nl-fin-flow-card",
     "nl-fin-commitments-card",
+    // Karten des eigenen Apron-Reiters (Chris: „das apron thema als eigenen reiter!") — reine
+    // Anker, das Aussehen bringt NlCard mit.
+    "nl-fin-apron-card",
+    "nl-fin-apron-league-card",
     "nl-fin-transfer-card",
     "nl-fin-reconciliation-card",
     "nl-fin-reconciliation-hint",

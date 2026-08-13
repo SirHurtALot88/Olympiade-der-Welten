@@ -32,7 +32,7 @@ function isNonIncreasing(ladder: readonly number[]): boolean {
 }
 
 describe("Sponsor-Ligaleiter: der Sockel", () => {
-  it("reicht von 18 (Startrang 1) bis 48 (Startrang 32) und steigt monoton dazwischen", () => {
+  it("reicht vom Min-Sockel (Startrang 1) bis zum Max-Sockel (Startrang 32) und steigt monoton dazwischen", () => {
     expect(sponsorSockelFuerStartrang(1)).toBeCloseTo(SPONSOR_SOCKEL_MIN, 9);
     expect(sponsorSockelFuerStartrang(32)).toBeCloseTo(SPONSOR_SOCKEL_MAX, 9);
     let previous = sponsorSockelFuerStartrang(1);
@@ -74,15 +74,24 @@ describe("Sponsor-Ligaleiter: die neutrale Leiter", () => {
     }
   });
 
-  it("Kalibrierungs-Invariante: Sockelsumme 1056, Wertungstopf-Summe = SPONSOR_WERTUNGSTOPF * f", () => {
-    // Σ der Sockel über alle 32 Starträngen — der arithmetische Mittelwert einer linearen Folge von
-    // 18 bis 48 mal 32 Glieder: 32 * (18 + 48) / 2 = 1056. Das ist der Ligahebel des Sockels: kippt
-    // diese Summe, kippt die planbare Absicherung der ganzen Liga.
+  it("Kalibrierungs-Invariante: Sockelsumme = 32 * (Min + Max) / 2, Wertungstopf-Summe = SPONSOR_WERTUNGSTOPF * f", () => {
+    // Σ der Sockel über alle 32 Starträngen ist der arithmetische Mittelwert einer linearen Folge,
+    // mal 32 Glieder. Das ist der Ligahebel des Sockels: kippt diese Summe, kippt die planbare
+    // Absicherung der ganzen Liga.
+    //
+    // GERECHNET STATT ABGESCHRIEBEN: hier stand die feste Zahl 1056 (= 32 * (18 + 48) / 2). Als die
+    // Ausschüttung um 10 % angehoben wurde, war sie falsch — und zwar auf eine Art, die nichts
+    // aussagt: die Invariante ist die LINEARITÄT des Sockels, nicht sein absoluter Betrag. Eine
+    // abgeschriebene Zahl hätte den Test bei jeder Hoehenaenderung rot gemacht, ohne dass die
+    // geprüfte Eigenschaft je verletzt gewesen wäre.
     let sockelSum = 0;
     for (let startRank = 1; startRank <= 32; startRank += 1) {
       sockelSum += sponsorSockelFuerStartrang(startRank);
     }
-    expect(sockelSum).toBeCloseTo(1056, 6);
+    expect(sockelSum).toBeCloseTo((32 * (SPONSOR_SOCKEL_MIN + SPONSOR_SOCKEL_MAX)) / 2, 6);
+    // Und die Enden stehen weiterhin im gesetzten Verhaeltnis zueinander — genau das ist die
+    // Aussage, die die feste Zahl eigentlich absichern sollte.
+    expect(SPONSOR_SOCKEL_MAX / SPONSOR_SOCKEL_MIN).toBeCloseTo(48 / 18, 6);
 
     // Σ des Wertungsanteils über alle 32 Endränge = SPONSOR_WERTUNGSTOPF * salaryFactor — der
     // Wertungstopf selbst haengt nicht am Startrang (die Gewichte sind auf 1 renormiert), deshalb

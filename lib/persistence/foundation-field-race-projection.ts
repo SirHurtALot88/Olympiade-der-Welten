@@ -4,16 +4,23 @@
  * (Rang #23, 17,1 Punkte), Teams und Leaders laengst mit vier gewerteten Spieltagen rechneten.
  *
  * BEFUND: es fehlten keine Daten — der Feld-Rennen-Ledger sah sie nur nicht. Er wird im
- * Browser gebaut, und der kompakte Foundation-Payload streicht `matchdayResults`/
- * `disciplineResults` bis auf den aktiven Spieltag sowie `persistedSeasonDerivations`
- * komplett (docs/CLIENT_PAYLOAD_LEERE_ABLEITUNGEN.md). Ein clientseitiger Neubau kann auf
+ * Browser gebaut, und der kompakte Foundation-Payload strich damals `matchdayResults`/
+ * `disciplineResults` bis auf den aktiven Spieltag. Ein clientseitiger Neubau konnte auf
  * diesem Stand bestenfalls EINEN gespielten Spieltag finden.
  *
- * Nach dem Muster von `foundation-season-history-projection`: statt der schweren Quellen
- * faehrt die fertige, kleine Antwort mit — der Feld-Rennen-Ledger, serverseitig auf dem
- * VOLLEN Save gerechnet, beschnitten auf die gewerteten Spieltage (ungespielte Zeilen sind
- * ableitbar und reines Gewicht). Reine Anzeigefracht: wird beim Compact-PUT-Roundtrip
- * verworfen und bei jeder Auslieferung frisch gebaut, es gibt keine zweite Wahrheit.
+ * WAS SICH SEITHER GEAENDERT HAT, und warum diese Projektion trotzdem bleibt:
+ * `matchdayResults`/`disciplineResults` fahren seit `8ec6454b` VOLLSTAENDIG mit — der
+ * Eigenbau im Browser findet also alle Spieltage. Nachgemessen an beiden aktiven
+ * Spielstaenden (S2/MD10 und S1/MD2): Projektion und Eigenbau liefern Zeichen fuer Zeichen
+ * dasselbe Ledger. Die fuenf Geschwister-Projektionen, die aus demselben Grund entstanden
+ * waren, sind daraufhin entfernt worden; diese hier nicht — ihr Grund ist inzwischen ein
+ * anderer: Home baut die Voll-Ableitungen bewusst NICHT (`shouldLoadSeasonDerivations`
+ * deckt Home nicht ab), und `persistedSeasonDerivations` faehrt weiter nicht mit. Die
+ * Projektion ist dort die billige Antwort auf eine Frage, die sonst den ganzen
+ * Punkte-Ledger kosten wuerde.
+ *
+ * Reine Anzeigefracht: wird beim Compact-PUT-Roundtrip verworfen und bei jeder Auslieferung
+ * frisch gebaut, es gibt keine zweite Wahrheit.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {

@@ -6,6 +6,7 @@ import type { LegacyLineupFocusV2BoardProps } from "@/lib/lineups/legacy-lineup-
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { LineupRosterShortfall } from "@/lib/lineups/lineup-roster-shortfall";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
   FATIGUE_HIGH,
@@ -295,7 +296,7 @@ function NlPlayerAvatar({
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const initials = name.slice(0, 2).toUpperCase();
+  const initials = getPlayerPortraitInitials(name);
   const showImg = Boolean(portraitUrl) && !failed;
   return (
     <span
@@ -346,7 +347,7 @@ function wrapNlPortraitPreview(node: ReactNode, player: NlPortraitPlayer, disabl
       playerId={player.id}
       name={player.name}
       portraitUrl={player.portraitUrl}
-      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      portraitInitials={getPlayerPortraitInitials(player.name)}
       playerOvr={player.playerOvr ?? null}
       playerMvs={null}
       playerPps={player.playerPps}
@@ -1447,11 +1448,50 @@ export default function LineupNewLook({
   );
 
   if (!context) {
+    /**
+     * KEIN EWIGES SKELETT.
+     *
+     * GEMELDET VON CHRIS (mit Bild): die Einsatzliste laedt „einfach minutenlang". Zu sehen waren
+     * vier graue Balken — genau dieser Block. Sein Ladehinweis ist `sr-only`, also unsichtbar; auf
+     * dem Schirm stand nichts, was den Zustand erklaert haette.
+     *
+     * Ursache war nicht die Ladezeit: Die Route antwortet mit HTTP 200 und `context: null`, wenn
+     * der Spieltags-Kontext nicht gebaut werden kann (siehe `lab-context/route.ts` — dort steht
+     * `context: contextResult.ok ? contextResult.context : null`). Das Laden war also laengst
+     * fertig, es gab nur nichts zu zeigen. Der Block hier fragte aber allein `!context` ab und
+     * zeigte deshalb bis in alle Ewigkeit „laedt".
+     *
+     * `isBusy` unterscheidet die beiden Faelle: laeuft die Anfrage noch, ist das Skelett richtig.
+     * Ist sie durch und der Kontext trotzdem leer, gehoert der GRUND auf den Schirm — sonst sucht
+     * der Spieler den Fehler bei seiner Leitung.
+     */
+    if (isBusy) {
+      return (
+        <div className="nl-lineup-root" data-testid="lineup-new-look">
+          <div className="nl-lineup-loading" role="status" aria-busy="true">
+            <span className="sr-only">Spieltag-Kontext wird geladen…</span>
+            <NlSkeletonCard lines={4} />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="nl-lineup-root" data-testid="lineup-new-look">
-        <div className="nl-lineup-loading" role="status" aria-busy="true">
-          <span className="sr-only">Spieltag-Kontext wird geladen…</span>
-          <NlSkeletonCard lines={4} />
+        <div className="nl-lineup-empty" role="alert" data-testid="lineup-context-unavailable">
+          <p className="nl-lineup-empty__title">Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
+          {errors.length > 0 ? (
+            <ul className="nl-lineup-empty__reasons">
+              {errors.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="nl-lineup-empty__hint">
+              Es kam eine Antwort, aber kein Spieltags-Kontext — und kein Grund dazu. Bitte die Seite neu laden;
+              bleibt es dabei, ist das ein Fehler und gehoert gemeldet.
+            </p>
+          )}
         </div>
       </div>
     );

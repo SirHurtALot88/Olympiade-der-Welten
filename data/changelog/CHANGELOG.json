@@ -3,6 +3,69 @@
   "eintraege": [
     {
       "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Eine Disziplin konnte durchlaufen, ohne je gewertet zu werden — ohne Fehlermeldung, ohne Hinweis. Gemeldet als „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme\". Zwei stille Fehler steckten dahinter, beide im Buchungsweg. ERSTENS loeste die Buchung die Spieltags-Seite ausschliesslich ueber die Engine-Preview auf. Faellt die aus, war die Seite nicht bestimmbar und die Buchung kehrte kommentarlos zurueck: die Disziplin lief, im Spielstand landete nichts, nicht einmal ein Fehlerzustand. Fuer die ANZEIGE gab es den Rueckfall auf den Spielplan laengst — er wurde eingefuehrt, weil bei ausgefallener Preview der Weg zur zweiten Disziplin verschwand; die Buchung blieb auf der alten Quelle stehen. Sie zieht jetzt dieselbe, und der Spielplan braucht die Engine gar nicht. ZWEITENS galt „hat keinen Fehler geworfen\" als „gebucht\". Die Buchung wirft in keinem ihrer Fehlerfaelle: im Lesemodus und ohne Lauf-Handler liefert sie nichts zurueck, bei blockierter Wertung ein Ergebnis mit dem Vermerk, dass nicht gebucht wurde. Alles davon wurde als Erfolg vermerkt — der Endscreen sagte „im Saisonstand\", der Spielstand hatte nichts. Gewertet wird jetzt das Ergebnis selbst. Am gemeldeten Stand waren dadurch 32 Aufstellungen fuer die zweite Disziplin vorhanden, aber null Ergebniszeilen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Die Arena behauptete „Beide Disziplinen sind gewertet\", obwohl eine noch gar nicht gebucht war — und der Abschluss-Knopf darunter blockte dann. Gemeldet als „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme\". Am Spielstand nachgemessen: Wettessen mit 32 Ergebniszeilen gebucht, Mini-DM mit null, obwohl alle 32 Aufstellungen dafuer vorlagen. Die Disziplin war gelaufen, die Wertung nicht durchgekommen. Der Weiterfuehrungs-Block unter der Buehne entschied allein daran, WELCHE Seite gerade angezeigt wird, nie daran, ob sie gewertet ist: stand man auf der zweiten Disziplin und war sie ungewertet, fiel die Ansicht in den Abschluss-Zweig mit der falschen Auskunft. Eine Sackgasse — die Arena sagte fertig, der Spieltagswechsel sagte nein, und einen Weg zurueck zur Wertung bot die Seite nicht an. Massgeblich ist jetzt der SPIELSTAND: ist die eigene Seite ungewertet, sagt die Arena genau das und bietet keinen Abschluss an; ist die andere Seite offen, fuehrt sie dorthin, egal auf welcher man steht; der Abschluss-Knopf kommt erst, wenn beide gebucht sind. Der Schutz gegen halbe Spieltage im Spieltagswechsel bleibt unveraendert — ohne ihn fehlte jeder in der zweiten Disziplin aufgestellte Spieler dauerhaft in der Wertung.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Die Erholung zwischen den Spieltagen steigt von 20 auf 28. Seit die zweite Disziplin ihre Fatigue korrekt bucht, war die Dauerlast zu hoch — wer nicht eingesetzt wird, ist jetzt deutlich schneller wieder frisch, ohne dass ein einzelner Einsatz harmloser wird. Dazu nennt der Fatigue-Hinweis in der Einsatzliste jetzt einen konkreten frischeren Ersatzspieler statt nur „eher rotieren\" zu raten; gibt der Kader keinen her, bleibt der Vorschlag aus — auch das ist eine Auskunft. Und die KI erkennt neuerdings Fatigue-Tiefen-Not: ein Team, das ausgelaugt ist und sich keine Ergaenzungen leisten kann, gilt jetzt als Verkaeufer und kann einen teuren Spieler zu Geld machen, um zwei guenstige Koerper zu holen. Die Schutzregeln bleiben: kein Verkauf unter die Mindestkadergroesse, der Kern bleibt geschuetzt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Ein Spieltag liess sich nicht abschliessen, obwohl Punkte zu sehen waren. Gemeldet als „ich haenge in MD4 fest und die spieltagsdaten werden anscheinend nicht berechnet\". Am Spielstand gemessen war nur EINE der beiden Disziplinen gewertet: 32 Ergebniszeilen fuer Wettessen, null fuer Mini-DM. Die sichtbaren Punkte kamen also aus der ersten Haelfte. Der Spieltagswechsel blockte zu Recht — liesse er einen halben Spieltag durch, waere die zweite Disziplin danach nicht mehr nachholbar und alle Spieler, die dort antraten, fehlten fuer diesen Spieltag dauerhaft in den Leistungsdaten, sichtbar als zu niedrige Einsatzzahl in Moral und Gehaltsforderungen. Die Sperre bleibt deshalb, wie sie ist. Neu ist ein Reparaturskript, das die fehlende Seite NACHBUCHT, statt die Sperre zu umgehen — ueber denselben Weg, den die Arena geht, dessen Wiederaufnahme den Fall „erste Disziplin gebucht, zweite offen\" ausdruecklich kennt und nichts doppelt bucht. Am Abbild gefahren: Wertung springt von halb auf vollstaendig, alle 32 Teams bekommen ihre zweite Disziplin, und der Spieltagswechsel ist danach frei. Standard ist der Trockenlauf; geschrieben wird nur auf ausdrueckliche Anweisung, und der Spieltagswechsel selbst bleibt beim Spieler.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Finanzen-Seite ist neu geordnet. Der Liga-Team-Vergleich stand bisher ganz unten — man scrollte an sechs Karten vorbei, um zu sehen, wie die anderen Teams dastehen. Jetzt ist er die erste Karte. Und das Apron-Thema laeuft nicht mehr in der Hauptansicht mit, sondern hat einen eigenen Reiter: oben schaltet man zwischen Uebersicht und Apron um. Im Apron-Reiter stehen deine beiden Linien mit Abstand, Bemessungsgrundlage und Hochrechnung sowie der liga-weite Ausweis, wer zahlt und wer bekommt. In der Uebersicht bleibt die Verpflichtungs-Karte als Kredite & Tilgung stehen — mit derselben Kopfzeile wie bisher, in der die Apron-Abgabe als Teil der festen Verpflichtungen weiter auftaucht. Gerechnet wird nichts anders: alle Zahlen kommen unveraendert aus denselben Quellen wie zuvor, nur der Platz auf dem Bildschirm ist ein anderer.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "War die erste Disziplin eines Spieltags schon gewertet, wurde sie beim Werten der zweiten trotzdem noch einmal durchgerechnet — und konnte die zweite blockieren, obwohl ihr Ergebnis gar nicht mehr gespeichert wird. Jetzt entscheidet nur noch, was dieser Schritt wirklich schreibt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Der Riegel gegen den Gehaltsberg misst jetzt Geld statt Vertragsformen. Bisher zaehlte er nur, wie viele Vertraege eines Teams back-loaded sind - ein Dreijahresvertrag im letzten Jahr galt dabei noch als kuenftige Last, obwohl seine teure Rate laengst faellig ist. Jetzt zaehlt der tatsaechlich gebundene Mehrbetrag spaeterer Vertragsjahre, gemessen an der heutigen Gehaltssumme. Das trifft andere Teams als vorher, und die richtigen: das Team mit dem groessten Berg der Liga blieb dem alten Riegel verborgen, weil nur 40 Prozent seiner Vertraege back-loaded waren.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
       "seite": "Arena · Einsatzliste",
       "pr": null,
       "text": "Ein Team konnte rückwirkend „nicht startklar\" werden, weil ein Spieler GENESEN ist. Wer wegen Verletzungen nicht alle Slots besetzen konnte, galt trotzdem als bereit, solange alle einsatzbereiten Spieler aufgestellt waren — das stimmte beim Abgeben. Wechselte danach ein Verletzter auf „in Genesung\", zählte er wieder als einsatzbereit, stand aber nicht in der längst gesperrten Liste. Ergebnis: „Noch nicht startklar — 31/32 Teams bereit\", für einen Spieltag, der schon gespielt war. Eine gesperrte Aufstellung ist jetzt die Antwort und wird nicht mehr gegen den Stand von später geprüft; solange sie noch änderbar ist, bleibt der Hinweis scharf. Dazu sagt die Arena jetzt, WARUM eine Wertung nicht gebucht wurde, statt nur „fehlgeschlagen\" — und eine abgelehnte Buchung wird nicht länger als „gewertet\" gemeldet.",
@@ -29,6 +92,114 @@
       "version": "0.4"
     },
     {
+      "datum": "2026-08-12",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Verletzte sich ein Spieler in der ersten Disziplin, ließ sich die zweite Disziplin desselben Spieltags danach nicht mehr werten — der Spieltag hing fest und ließ sich nicht abschließen. Aufstellen darf ein Verletzter weiterhin nicht; eine bereits abgegebene Aufstellung wird jetzt aber normal gewertet.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-12",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Teams über der Apron-Linie schlossen weiterhin Verträge, die gerade in dieser Saison am meisten kosten — zusätzlich zur Abgabe. Die KI berücksichtigt die Apron-Lage jetzt bei der Vertragsform und achtet zugleich darauf, dass nicht alle Verträge back-loaded laufen und sich später zu einem Gehaltsberg türmen. Das gilt für alle drei Stellen, an denen die KI eine Vertragsform wählt: den normalen Kauf, den Draft zu Saisonbeginn und die Vertragsverlängerung — letztere ist der größte Strom, in Saison 2 sind 121 von 176 KI-Verlängerungen mehrjährig.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Formkarten",
+      "pr": null,
+      "text": "Formkarten werden seit einiger Zeit richtig gezogen: die positive und die negative Karte eines Spielers sind unabhaengig voneinander. Bestehende Spielstaende hatten davon nichts — die Selbstheilung ergaenzte nur FEHLENDE Karten und raeumte verwaiste ab, eine bereits vorhandene behielt ihren alten Wert fuer immer. Im laufenden Spielstand trugen deshalb 510 von 680 Karten noch die alte, kaputte Ziehung, und alle 266 Spieler mit Kartenpaar hatten ein exakt gespiegeltes (+8 zu -8, +4 zu -4). Jetzt werden ungespielte Karten beim naechsten Laden auf die heutige Ziehung nachgezogen. Bereits gespielte Karten bleiben unangetastet: sie stecken in der Wertung eines gelaufenen Spieltags, ihren Wert nachtraeglich zu aendern wuerde vergangene Ergebnisse umschreiben. In einer laufenden Saison bleibt der gespielte Teil also gespiegelt — vollstaendig zufaellig ist erst eine Saison, die neu beginnt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude",
+      "pr": null,
+      "text": "Ein stark abgenutztes Einnahmegebaeude wurde bisher zum Zuschussgeschaeft: Ein Fan Shop auf Stufe 3 bringt bei voller Wirkung 11,70 gegen 1,40 Unterhalt — bei Zustand 5 aber nur noch 0,73, also ein Minus. Ein Gebaeude, das Geld kostet, WEIL es alt ist, waere eine Falle mit nur einer richtigen Antwort. Jetzt wirkt jedes stehende Gebaeude mindestens zu einem Viertel; derselbe Shop traegt damit auch im schlimmsten Zustand noch 2,93 und rentiert sich minimal. Bei Zustand 0 zaehlt es weiterhin als nicht vorhanden. Ausserdem lohnt sich die Reparatur jetzt frueher: vorher rechnete sie sich erst unterhalb von Zustand 30, man haette also nur fast tote Gebaeude instandgesetzt. Ab spuerbarem Wirkungsverlust ist sie jetzt die bessere Wahl.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand · Spalte Formkarten",
+      "pr": null,
+      "text": "Die Spalte \"Formkarten\" zeigte Striche oder viel zu kleine Zahlen. Sie zaehlt die gespielten Karten ueber die Modifier-Slots der Aufstellungen — und die kamen im Browser nur fuer den gerade aktiven Spieltag an. Gemessen am Live-Save: statt 32 von 32 Teams hatten nur 14 ueberhaupt eine Bilanz, und diese 14 zaehlten die Karten eines einzigen von zehn Spieltagen. An einem Spieltag, an dem noch niemand gelegt hatte, war die Spalte komplett leer. Die Aufstellungen bleiben beschnitten — sie sind schwer und wachsen mit jedem Spieltag (659 KB gegen 70 KB) — aber die fertige Formkarten-Bilanz faehrt jetzt mit, auf dem vollen Spielstand gerechnet und 1,9 KB gross. Die Spalte nennt damit wieder die ganze Saison. Archiv-Saisonen bleiben unveraendert leer statt geraten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand · Formkarten und Rest",
+      "pr": null,
+      "text": "Die Spalte \"Formkarten\" zeigte die Summe der bereits gespielten Kartenwerte. Das war eine Zahl, die kaum etwas verriet: Formkarten kommen je Spieler als gespiegeltes Paar (+8 und -8), und die Minuskarten wirft man zuerst ab, weil ungespielte Minuskarten am Saisonende Punkte kosten. Die Summe lag deshalb bei allen 32 Teams des Spielstands bei null oder darunter — sie sagte nur, wie viel Negatives schon abgeraeumt war, nicht wie stark ein Team in Form gehen konnte. Jetzt steht dort der volle Tank der Saison: die Summe aller positiven Kartenwerte, gespielt wie ungespielt. Daneben steht neu die Spalte \"Rest\" mit dem, was davon noch ungespielt ist — wie viel Luft also noch drin ist. Beide Spalten sind sortierbar, und der Hover nennt Tank, Rest, gespielte Karten und offene Minuskarten samt ihrer Strafe am Saisonende. Ein leerer Tank zeigt 0, ein Team ganz ohne Karten weiterhin einen Strich: kein Tank ist etwas anderes als ein leergefahrener.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude",
+      "pr": null,
+      "text": "Gebaeude nutzen sich jetzt spuerbar ab. Bisher fielen feste 8 Zustandspunkte je Saison an — ein Neubau stand nach drei Jahren noch bei 76 Prozent und hatte nie an Wirkung verloren. Die Warnschwelle wurde damit praktisch nie erreicht, und die Wartung war eine Funktion ohne Anlass. Jetzt fallen im Mittel 17 Punkte je Saison, also rund die Haelfte ueber drei Saisons, und der Verschleiss schwankt von Gebaeude zu Gebaeude zwischen 12 und 22 — zwei gleich alte Gebaeude sind dadurch nicht mehr gleich gut. Gleichzeitig wirkt ein Gebaeude jetzt bis 80 Prozent Zustand mit voller Leistung statt bis 70; darunter faellt die Wirkung linear. Ein Neubau rutscht damit in seiner zweiten Saison unter die Schwelle und will gepflegt werden. Wer den Unterhalt nicht zahlt, verliert doppelt so schnell und steht nach rund drei Saisons vor einer Ruine.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude · Sponsoren",
+      "pr": null,
+      "text": "Das Fundament fuer geliehene Gebaeude steht: Ein Sponsor kann kuenftig ein Gebaeude bereitstellen, das sofort wirkt, ohne dass es dem Team gehoert. Solange der Vertrag laeuft und die vereinbarte Platzierung haelt, trainiert und erholt sich das Team auf der geliehenen Stufe; endet der Vertrag oder reisst die Bedingung, faellt es auf seinen eigenen Bestand zurueck — nie darunter. Wer selbst hoeher gebaut hat, verliert durch eine kleinere Leihgabe nichts. Neu ist auch, dass eine Leihgabe einen eigenen Zustand mitbringt: derselbe Gebaeudetyp auf derselben Stufe kann neuwertig oder abgenutzt verliehen werden und ist dann unterschiedlich viel wert. Sichtbar wird das alles erst mit den neuen Sponsorenkarten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Team · Historie",
+      "pr": null,
+      "text": "Die Cash-Spalte einer abgeschlossenen Saison zeigte den Kontostand NACH der Verkaufsphase am Saisonende — also die Spitze direkt nach dem Ausverkauf. Lost Kingdom stand dort mit 137,4, hatte vor den fuenf Verkaeufen aber nur 9,4 und ging mit 25,6 in die neue Saison; der Vergleich zur laufenden Zeile las sich dadurch wie ein Absturz um 168. Jetzt steht dort der Eintrittsstand der Folgesaison, also das Geld, mit dem das Team wirklich losgespielt hat — dieselbe Zahl, die die Ewige Tabelle schon ausweist. Gehalt und Marktwert bleiben auf dem Saisonabschluss; der Spaltenkopf sagt beim Ueberfahren, welcher Zeitpunkt gemeint ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Gebaeude · KI-Teams",
+      "pr": null,
+      "text": "KI-Teams reparierten bisher jedes Gebaeude, das nicht exakt bei 100 Prozent stand — auch wenn es laengst noch mit voller Leistung arbeitete. Im laufenden Spielstand standen alle zwoelf Gebaeude der Liga bei 92 Prozent und damit bei voller Wirkung; der naechste Vorsaison-Lauf haette fuer jedes davon Geld ausgegeben, ohne dass ein einziger Punkt Leistung zurueckgekommen waere. Mit dem staerkeren Verschleiss waere daraus ein Dauerposten geworden. Jetzt wird erst repariert, wenn ein Gebaeude tatsaechlich unter die Wirkschwelle gefallen ist. Ausserdem passt die Zustandsanzeige wieder zur Schwelle: 'alternd' beginnt jetzt dort, wo die Leistung wieder vollstaendig ist, statt quer darueber hinweg zu spannen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Saisonstand",
+      "pr": null,
+      "text": "Am letzten Spieltag, solange er noch läuft, hebt der Saisonstand jetzt alle Teams hervor, die den Titel rechnerisch noch holen können (goldener Rand, Tag „Titelchance\") und zeigt darüber eine Kopfzeile mit Anzahl der Kandidaten und ihrem Rückstand auf die Spitze. Ist der Titel schon rechnerisch entschieden, steht dort stattdessen nur ein Satz dazu, ohne Zeilen-Hervorhebung. Außerhalb des letzten Spieltags und im Archiv ändert sich nichts.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Der Performance-Anteil im Trainings-Ausblick stand auf +0, obwohl der Spieler Einsaetze und Punkte hatte — besonders auffaellig beim Wechsel der Trainingsklasse, weil die Zeile dabei neu gerechnet wird. Der Motor war nie kaputt: die Performance verteilt sich klassenunabhaengig auf die Stats der Disziplin, in der die Punkte angefallen sind. Es fehlte im Browser nur die schmale Liste der gewerteten Spieltage, an der die Leistungszeilen haengen — ohne sie fiel jede einzelne durchs Sieb. Seit die Liste vollstaendig mitfaehrt, rechnet der Ausblick im Browser exakt dieselben Werte wie der Server, nachgemessen an fuenf Spielern ohne jede Abweichung.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-11",
       "seite": "Spieler · Trainingshistorie",
       "pr": null,
@@ -48,9 +219,54 @@
     },
     {
       "datum": "2026-08-11",
+      "seite": "Team-Historie · Teamprofil & Kader",
+      "pr": null,
+      "text": "In der aufklappbaren Disziplin-Historie eines Teams (POW/SPE/MEN/SOC → einzelne Disziplinen wie SHO für Showcase) stand die Reihenfolge der Disziplin-Spalten bislang nach einer festen Katalog-Zahl, nicht nach der tatsächlich für die laufende Saison ausgelosten Spielerzahl je Disziplin — beide können auseinanderlaufen, weil der Saison-Spielplan die Spielerzahl pro Disziplin jede Saison neu würfelt. Die Spaltenreihenfolge richtet sich jetzt nach der echten Saison-Zahl.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Spielerliste · Disziplin-PPs",
+      "pr": null,
+      "text": "Der Saison-Ledger im Browser konnte eine falsche Punktzahl zeigen. Seit die Spieltags-Verzeichniszeilen vollstaendig zum Browser mitfahren (noetig, damit die Saisonziele wieder alle Spieltage zaehlen), kamen dort auch alle Leistungszeilen durch — nur die zugehoerigen Disziplin-Ergebnisse fehlen im Browser weiterhin, weil sie die schwere Fracht sind. Ohne Disziplin-Ergebnis gibt es keine Teamwertung, und die Punkte fielen still auf den Rohbeitrag zurueck: im Testfall 33,3 Punkte, wo der volle Spielstand 4,9 sagt. Jetzt gilt eine klare Grenze: ein Spieltag ohne Disziplin-Ergebnisse wird gar nicht gebucht. Wo die Zahl nicht sicher ist, steht wieder ein Strich. Ein leeres Feld faellt auf und laesst sich reparieren, eine falsche Zahl wird geglaubt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Spielplan",
+      "pr": null,
+      "text": "Der Spielplan begrenzte die kombinierte Spielerzahl eines Spieltags auf zehn. Der Disziplin-Pool traegt aber Disziplinen bis sechs Spieler — die beiden groessten ergeben zusammen zwoelf. Damit fiel genau die Entscheidung weg, um die es geht: einen breiten Kader zu halten, um an einem grossen Spieltag alle Plaetze besetzen zu koennen, waehrend ein schmaler Kader passen muss. Die Grenze war ohnehin nur halb wirksam, weil eine Ersatzregel sie riss, sobald kein passender Partner uebrig war. Jetzt gibt es keinen Standard-Deckel mehr: ein Zwoelfer-Spieltag ist eine regulaere Auslosung statt eines Ausrutschers.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
       "seite": "Technik · Spielstand",
       "pr": null,
       "text": "Der Spielstand trug zwei Dinge mit sich, die keine Auskunft gaben. Erstens: Jeder eingesetzte Spieler würfelt pro Spieltag gegen das Verletzungsrisiko — im gemessenen Stand 5032-mal, davon 4988-mal ohne Verletzung. Auf diesen gesunden Würfen standen Ausfalldauer und Genesungszeiten trotzdem mit, immer leer, und gelesen wurden sie nie. Zweitens: Die Spielerwerte eines abgeschlossenen Saison-Schnappschusses lagen zweimal Zeichen für Zeichen identisch nebeneinander. Beides ist raus, zusammen 1,38 MB von 33,16 MB. Nichts davon wird irgendwo angezeigt oder gerechnet — gegengeprüft an Spieltags-Belastung, Verletzungshistorie, Verletzungszähler und Archiv-Spielerwerten, überall null Abweichung. Die gesunden Würfe selbst bleiben ausdrücklich erhalten: sie tragen die Belastung vor dem Spieltag und sind die einzige Quelle des Belastungs-Schnitts. Bestehende Spielstände werden beim nächsten Speichern von selbst kleiner.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Sponsoren",
+      "pr": null,
+      "text": "Mehrjahresvertraege aus aelteren Spielstaenden zahlten Saison fuer Saison auf dem Konjunkturniveau ihres Unterschriftsjahres weiter. Der Gehaltsfaktor ist aber der Massstab der laufenden Saison und keine Eigenschaft des Vertrags — beim Saisonwechsel haette er mitziehen muessen. Im laufenden Spielstand steckten dadurch 10 von 32 Vertraegen auf Faktor 1,0 fest, waehrend die Saison mit 1,19 lief: zusammen 129,6 C zu wenig, dem Tabellenersten allein 17,4. Eine frueher gebuchte Einmalreparatur hatte das nur fuer eine Saison ausgeglichen, der Fehler entstand danach bei jedem Saisonwechsel neu. Jetzt wird die eingefrorene Leiter beim Rollen umgerechnet: der Wertungsanteil folgt dem neuen Faktor, der nach Startrang eingefrorene Sockel bleibt unberuehrt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-11",
+      "seite": "Fatigue · Verletzungen",
+      "pr": null,
+      "text": "Chris hatte als Zielwert ausgegeben: ohne Reha-Zentrum und ohne Frische-Boosts sollen ligaweit rund 150-200 Verletzungen pro Saison anfallen. Eine Saison-Simulation über die echte Spiel-Engine (32 Team-Kader in der Größe des laufenden Spielstands, alle zehn Spieltage) zeigt, dass die aktuelle Einstellung genau dort liegt — im Schnitt rund 190, über mehrere durchgerechnete Saisons stabil zwischen 177 und 199. Nichts wurde an der Belastung pro Einsatz verändert; die Zahl saß bereits im gewünschten Rahmen. Wer in Reha-Ausbau oder schonendes Training investiert, drückt die Zahl für sein Team weiterhin spürbar darunter — das bleibt unverändert der Sinn dieser Gebäude.",
       "quelle": "gepflegt",
       "gewicht": "feinschliff",
       "version": "0.4"
@@ -71,6 +287,15 @@
       "text": "Der Cash-Druck der KI unterschied keine Teams mehr. Er addierte vier Ja/Nein-Merkmale, und drei davon trafen in der heutigen Oekonomie fast immer zu — die Gehaltssumme eines Teams ist typisch ein Vielfaches seines Cash-Bestands. Am Spielstand gemessen standen 31 der 32 Teams bei 0,92 oder 1,00. Weil die Notfall-Schwelle bei 0,45 in der Verkaufsauswahl den Kader-Mindestschutz aussetzt, war dieser Schutz damit ligaweit faktisch abgeschaltet: ein Team durfte seinen Kader unter das Minimum verkaufen, weil die Ausnahme immer griff. Dazu stand das Vorzeichen kopf — drei der fuenf Summanden waren mit „Cash groesser null\" bewacht, weshalb das EINZIGE Team der Liga im Minus (Project Suicide, −1,2) mit 0,47 den NIEDRIGSTEN Druckwert von allen hatte, unter allen 31 Teams mit Guthaben. Gemessen wird jetzt an dem Ziel, das jedes Team ohnehin schon hat (Ziel-Cash zu Gehalt, 0,25 bis 0,75 je nach Finanzstaerke): Druck heisst „wie weit unter meinem eigenen Ziel stehe ich\", negatives Cash ist per Definition der Hoechstwert. Dieselbe Liga verteilt sich damit von 0,00 bis 1,00 statt zwischen 0,92 und 1,00, und Teams mit voller Kasse lesen sich endlich als entspannt.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Wenn sich die Einsatzliste für einen Spieltag nicht aufbauen ließ, drehte sich die Seite scheinbar endlos — die Antwort war längst da, es gab nur nichts anzuzeigen, und der Grund stand nirgends. Jetzt steht dort, woran es liegt.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.4"
     },
     {
@@ -120,6 +345,15 @@
     },
     {
       "datum": "2026-08-10",
+      "seite": "Finanzen · Saisonabrechnung",
+      "pr": null,
+      "text": "Nach der Saisonabrechnung stand die halbe Liga auf exakt 0,0 Cash. Kein Zufall: der Insolvenz-Ausgleich lief am Saisonende mit und gab jedem Team im Minus ungefragt einen Bank-Kredit ueber genau den Fehlbetrag. Nach Saison 2 traf das NEUN von 32 Teams — Lost Kingdom 31,2, Mayhem Mavericks 27,6, Death Peaches 21,7, Terrible Teachers 20,5, Hell Raisers 18,4, Royal Court 16,7, Pirate Crew 16,6, Wrecking Legionnaires 6,8, Vigorous Vikings 4,7, zusammen 164,2 Mio Kreditsumme, die niemand beantragt hatte. Gedacht war der Ausgleich als das kleinere Uebel gegenueber einem Clamp auf 0 (der Fehlbetrag blieb ja als verzinste Restschuld stehen), aber der ZEITPUNKT war falsch: am Saisonende hat ein Team noch nichts tun koennen, es hat weder verkauft noch gekauft. Jetzt wird am Saisonende nur noch FESTGESTELLT, wer im Minus steht — der Stand bleibt negativ und das Team muss sich selbst befreien. Der Weg dahin war laengst gebaut und wurde nur nie betreten, weil der Ausgleich vorher zumachte: negatives Cash blockiert Kaeufe, erzwingt Notverkaeufe und setzt den Verkaufsdruck auf den Hoechstwert. Am Ende des KAUFFENSTERS bleibt der Ausgleich unveraendert bestehen — da hat das Team verkauft, gekauft und den regulaeren Kredit-Pass hinter sich, und was dann noch fehlt, ist ein echter Fehlbetrag, mit dem es nicht in die Saison starten kann.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
       "seite": "KI · Transfermarkt",
       "pr": null,
       "text": "Die teuren Teams wussten beim Verkaufen nicht, dass sie ueber der Apron-Linie stehen. Die Verkaufsbewertung sah Verkaufswert, Marktwert, Restlaufzeit, Teamcash und Raenge — die Lage zur Linie kam in keiner einzigen Begruendung vor. Hell Raisers zahlten 16,6 und kannten als Verkaufsgruende nur negatives Cash und schwache Leistung. Jetzt baut jedes Team ueber seiner Gehaltsdecke gezielt ab: es kennt den noetigen Betrag, waehlt danach aus und hoert auf, sobald er erreicht ist. Verankert ist das an der AMBITIONSDECKE, nicht an der ersten Linie — ein Titelanwaerter soll die Abgabe zahlen und den Kader behalten. Auf dem Spielstand bauen damit 4 Teams ueber zusammen 18,9 Gehalt ab statt 8 Teams ueber 62,5. Bewertet wird die Ersparnis am ERLOES, nicht am Gehalt: bei Hell Raisers ranken die gehaltsschweren Ergaenzungsspieler oben (6,1 Gehalt bei 16,8 Marktwert) und die Stars unten (11,8 bei 39,8) — abgegeben wird der Steuerposten, nicht der beste Spieler. Der Zeitpunkt steht im Begruendungstext, weil er zaehlt: die Apron-Abrechnung ist beim Verkaufen schon gebucht, ein Abbau senkt die Abgabe der NAECHSTEN Saison, geschaetzt auf den Linien der laufenden.",
@@ -143,6 +377,15 @@
       "text": "Über der Matrix hing eine Kopie der eigenen Zeile. Sie setzte genau ein eigenes Team voraus — gepinnt wurde das gerade ausgewählte —, und wer mehrere Teams steuert, sah eins davon doppelt und die anderen nicht. Die Kopie ist weg. Die eigenen Teams bleiben auffindbar, aber über Merkmale, die mit jeder Anzahl funktionieren: der „Dein Team\"-Chip an der Zeile, die Akzentlinie und die Besitzer-Tönung.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "Vorstand · Saisonziele",
+      "pr": null,
+      "text": "Die Saisonziele zaehlten im Browser nur den gerade aktiven Spieltag mit. Wer schon vier Top-20-Platzierungen gesammelt hatte, las auf der Karte trotzdem \"0/3, bestes Rank #33\" — das Ziel war laengst erfuellt, die Anzeige verschwieg es. Ursache war die Kurzfassung des Spielstands, die zum Browser faehrt: sie schnitt die Spieltags-Ergebnisliste auf den aktiven Spieltag zusammen, und die Ziel-Rechnung erkennt genau an dieser Liste, welche Leistungen zur laufenden Saison gehoeren. Alles Vorherige fiel damit durchs Raster, ebenso die Zaehlung der verbleibenden Spieltage. Jetzt faehrt die Liste vollstaendig mit — sie ist eine schmale Zeile je Spieltag und kostet 0,03 Prozent des Payloads; die schwere Fracht der Disziplin-Ergebnisse bleibt unveraendert beschnitten.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {
@@ -179,6 +422,15 @@
       "text": "Abgeschlossene Saisons zeigten in Training, Leistung und Alterung das BUDGET vor Verteilung und Ceiling-Kappung, die laufende Saison daneben die tatsächlich angekommenen Attribut-Änderungen. Zwei verschiedene Größen unter demselben Namen, direkt untereinander — an einer Spielerin nachgemessen stand für S1 „Leistung +8,1\" gegen S2 „+1,8\", obwohl ihr Leistungs-Budget mit 8,10 zu 8,16 praktisch unverändert war. Der Unterschied war die Ceiling-Kappung, nicht ihre Leistung. Gezeigt wird jetzt überall dasselbe: was beim Charakter ankommt. Wo die Herkunft je Attribut fehlt, bleiben die drei Posten leer, statt ersatzweise das Budget auszuweisen.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-10",
+      "seite": "KI · Transfermarkt",
+      "pr": null,
+      "text": "Teams mit Krediten merkten nicht, dass es so nicht weitergeht. Der Verkaufsdruck der KI misst die Kasse von HEUTE gegen das eigene Cash-Ziel — Schulden gehen dort gar nicht ein. Am Spielstand standen deshalb acht Teams mit leerer Kasse gleichauf beim Hoechstwert 1,00, darunter Mayhem Mavericks (Restschuld 90,2, Kreditrate 32,7, Gehalt 107,7 — der kommenden Abrechnung fehlen 51,8) genauso wie Vigorous Vikings, denen 1,4 fehlen. Ein Signal, das beide gleich laut anschreit, sagt der KI nicht, wer wirklich mehr verkaufen muss. Jetzt gibt es dafuer eine eigene Fruehwarnung: sie misst die naechste Saisonend-Abbuchung (Gehalt plus Kreditrate) gegen ihre Deckung (Cash plus Jahresumsatz) und meldet den ungedeckten Anteil. Beide Seiten von Chris' Bedingung sind noetig — ein Team mit Schulden aber schlankem Gehalt deckt seine kleine Abbuchung aus dem Umsatz und bleibt still (Riptide Rivers hat 25,1 uebrig), ein Team mit hohem Gehalt ohne Schulden kann sich notfalls ueber einen Kredit befreien, waehrend genau diese Tuer einem verschuldeten Team halb zu ist. Am echten Stand loesen 8 von 32 Teams aus, mit acht VERSCHIEDENEN Werten von 0,08 bis 0,37 — und zwar mitten in der Gruppe, die der Cash-Druck nicht mehr trennen konnte: von den 14 verschuldeten Teams sitzen 9 dort auf exakt 1,00. Die Warnung senkt die Verkaufsschwelle, haelt die Auswahl am Laufen bis die Abbuchung gedeckt waere, und steht als eigener Grund im Begruendungstext. Sie erzwingt nie einen Verkauf: der Kader-Mindestschutz bleibt unberuehrt. Seit das Saisonende keinen Zwangs-Notkredit mehr vergibt, ist das die einzige Stelle, die der KI VOR dem Minus sagt, dass sie handeln sollte.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.4"
     },
     {

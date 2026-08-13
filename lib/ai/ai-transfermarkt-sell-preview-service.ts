@@ -37,6 +37,7 @@ import { apronReliefFuerGehalt, buildApronAbbauZiel } from "@/lib/ai/apron-abbau
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
+import { bewerteFatigueTiefenNot } from "@/lib/ai/ai-fatigue-depth-distress";
 import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 import { applyGmPressureDemandConcession, resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -181,7 +182,33 @@ type SellPreviewRunCache = {
   latestSnapshot: SeasonSnapshotRecord | null;
   performanceByTeamPlayer: Map<string, PlayerPerformanceSummary>;
   needsByTeamId: Map<string, ReturnType<typeof evaluateAiNeeds>>;
+  /**
+   * Verkaufsdruck je TEAM — der Wert haengt nur an Team, Cash und Gehaltssumme, wurde aber je
+   * KANDIDAT neu berechnet, also bis zu 14-mal pro Team. Seit die Schulden-Fruehwarnung mit
+   * drinhaengt, kostet das richtig: sie zieht den Kreditrahmen, und `resolveTeamRosterMarketValue`
+   * baut dafuer jedes Mal eine Map ueber alle ~3000 Spieler der Liga. Gemessen kostete das die
+   * ligaweite Verkaufsvorschau rund 10 % Laufzeit fuer lauter identische Ergebnisse.
+   */
+  sellRunwayByTeam: Map<string, ReturnType<typeof assessTeamSellRunwayPressure>>;
 };
+
+/**
+ * Team-Wert, einmal je Lauf. Der Schluessel traegt die Gehaltssumme mit, weil derselbe Lauf ein
+ * Team mit veraenderter Summe erneut befragen kann — ohne sie waere der Cache still falsch.
+ */
+function getSellRunwayPressure(
+  cache: SellPreviewRunCache,
+  gameState: GameState,
+  team: Team,
+  salaryTotal: number,
+): ReturnType<typeof assessTeamSellRunwayPressure> {
+  const key = `${team.teamId}|${salaryTotal}|${team.cash ?? 0}`;
+  const bekannt = cache.sellRunwayByTeam.get(key);
+  if (bekannt) return bekannt;
+  const frisch = assessTeamSellRunwayPressure({ gameState, team, salaryTotal });
+  cache.sellRunwayByTeam.set(key, frisch);
+  return frisch;
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -195,7 +222,28 @@ function normalizeGameState(gameState: GameState) {
   return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(gameState));
 }
 
-function getBudgetPressure(team: Team, salaryTotal: number): AiSellPreviewBudgetPressure {
+/**
+ * FATIGUE-TIEFEN-NOT HEBT AUF "tight" — Chris: „wenn fatigue ihnen zu hoch ist ggf. spieler
+ * verkaufen um cash zu schaffen und günstigere spieler zu holen aber sich mehr dem eigenen opt zu
+ * nähern." Bis hierher kannte dieser Dienst Kadertiefe NUR als Bremse (`low_roster_depth`), nie als
+ * Auslöser: ein erschöpftes Team ohne Cash galt als „healthy" und verkaufte nichts — obwohl genau
+ * ihm das Geld fuer Ergaenzungen fehlt.
+ *
+ * BEWUSST NUR BIS "tight", NICHT "critical". Die Not ist eine Kader-, keine Zahlungsnot; „critical"
+ * ist fuer Teams reserviert, die ihre Gehaelter nicht decken. Ein cash-kritisches Team bleibt
+ * kritisch — die Not kann eine Einstufung nur ANHEBEN, nie absenken.
+ */
+function getBudgetPressure(
+  team: Team,
+  salaryTotal: number,
+  fatigueTiefenNot = false,
+): AiSellPreviewBudgetPressure {
+  const basis = getBudgetPressureAusCash(team, salaryTotal);
+  if (!fatigueTiefenNot) return basis;
+  return basis === "healthy" ? "tight" : basis;
+}
+
+function getBudgetPressureAusCash(team: Team, salaryTotal: number): AiSellPreviewBudgetPressure {
   if (!Number.isFinite(team.cash)) {
     return "unknown";
   }
@@ -332,6 +380,7 @@ function buildSellPreviewRunCache(gameState: GameState): SellPreviewRunCache {
     latestSnapshot,
     performanceByTeamPlayer,
     needsByTeamId: new Map(),
+    sellRunwayByTeam: new Map(),
   };
 }
 
@@ -561,7 +610,7 @@ function buildCandidate(
     warnings.push("Noch keine lokale Leistungs-Historie für diesen Spieler.");
   }
 
-  const budgetPressure = getBudgetPressure(team, salaryTotal);
+  const budgetPressure = getBudgetPressure(team, salaryTotal, bewerteFatigueTiefenNot(context.gameState, team.teamId).inNot);
   const boardPressure = clamp((10 - (identity?.boardConfidence ?? 5)) / 10, 0, 1);
   const teamSalaryPressure = team.cash > 0 ? clamp(salaryTotal / Math.max(team.cash, 1), 0, 3) / 3 : salaryTotal > 0 ? 1 : 0;
   const salaryShare = salary != null && salaryTotal > 0 ? clamp(salary / salaryTotal, 0, 1) : 0;
@@ -671,11 +720,7 @@ function buildCandidate(
     pushKeep("bargain_contract", "günstiger als für diese Leistung üblich");
   }
 
-  const sellRunway = assessTeamSellRunwayPressure({
-    gameState: context.gameState,
-    team,
-    salaryTotal,
-  });
+  const sellRunway = getSellRunwayPressure(cache, context.gameState, team, salaryTotal);
   const cashPressureGate = sellRunway.cashPressureScore >= 0.45;
   const cashPressureProfitAttractive = isAttractiveProfitSell({
     expectedSellValue,
@@ -707,7 +752,48 @@ function buildCandidate(
     if (cashPressureProfitAttractive) {
       pushSell("profit_window", "Verkaufspreis liegt über Marktwert — lukrativer Exit möglich");
     }
-  } else if (proactiveOfferGate && proactiveProfitAttractive) {
+  }
+
+  /**
+   * SCHULDEN-GEHALTS-FRÜHWARNUNG (siehe `schuldenlast-fruehwarnung.ts`) — bewusst AUSSERHALB des
+   * `cashPressureGate`: sie soll gerade dann warnen, wenn die Kasse heute noch nicht brennt, die
+   * kommende Saisonend-Abbuchung (Gehalt + Kreditrate) aber schon absehbar ungedeckt ist. Die
+   * Star-Protection bleibt respektiert — dieselbe Grenze wie beim Cash-Druck: warnen und Bereitschaft
+   * erhöhen ja, den Star-Kern dafür aufbrechen nein.
+   */
+  const schuldenlast = sellRunway.schuldenlast;
+  /**
+   * DIESER GRUND STEHT BEWUSST BEI JEDEM NICHT-STAR DES TEAMS.
+   *
+   * Gemeldet als Rauschen (Gegenpruefung): in der Vorschau lesen sich damit praktisch alle Spieler
+   * der acht gewarnten Teams als Verkaufskandidaten — 85 Nennungen ueber 340 Kandidaten. Ein
+   * Filter „nur wo der Verkauf die Luecke spuerbar schliesst" (Erloes + freiwerdendes Gehalt gegen
+   * die Notverkaufs-Reserve) wurde gebaut und wieder verworfen: gemessen trimmte er 85 auf 85 —
+   * die Reserve ist mit 5 % der Gehaltslast zu klein, um irgendetwas auszuschliessen.
+   *
+   * Fachlich ist die breite Nennung auch richtig: die Schuldenlage haengt am TEAM, nicht am
+   * Spieler, genauso wie der Cash-Druck daneben. WELCHE Spieler wirklich gehen, entscheidet die
+   * Verkaufsschwelle in `selectCompositeSellCandidates` — bei Mayhem Mavericks zwei von zehn,
+   * trotz acht Nennungen. Eine engere Nennung braeuchte eine Groesse, die es hier nicht gibt
+   * (die teamweite Schwelle), und waere damit eine erfundene zweite Rangfolge.
+   */
+  if (schuldenlast.score > 0 && !starProtection) {
+    pushSell(
+      "debt_salary_runway",
+      // Der Kreditrahmen steht bewusst IM Text: „noch X Kreditrahmen" heisst, die Luecke liesse
+      // sich zur Not ueberbruecken und ein abgegebener Platz waere nachbesetzbar; „kein
+      // Kreditrahmen mehr" heisst, es bleibt nur der Verkauf. Chris: „berücksichtigen ob ein team
+      // überhaupt noch kredit zur Not nehmen kann für Käufe und nicht schon am Maximum ist."
+      `Restschuld und Gehaltslast übersteigen die Einnahmen — der nächsten Saisonend-Abrechnung fehlen rund ${roundValue(schuldenlast.fehlbetrag, 1)}${
+        schuldenlast.kreditrahmen > 0
+          ? `, noch ${roundValue(schuldenlast.kreditrahmen, 1)} Kreditrahmen`
+          : `, und der Kreditrahmen ist ausgeschöpft`
+      }, frühe Verkäufe verhindern den Engpass`,
+    );
+  }
+
+  // `proactiveOfferGate` schliesst `cashPressureGate` bereits aus — kein zusätzlicher Wächter nötig.
+  if (proactiveOfferGate && proactiveProfitAttractive) {
     pushSell(
       "profit_window",
       teamWeakness.isWeakTeam
@@ -862,6 +948,10 @@ function buildCandidate(
     (expiringCoreDecisionPressure ? 10 : 0) +
     buyoutLikelihood * 12 +
     (cashPressureGate && !starProtection ? Math.round(sellRunway.cashPressureScore * 14) : 0) +
+    // Frühwarnungs-Bonus mit demselben Hebel (×14) wie der Cash-Druck darüber: graduell (0,08–0,37
+    // am gemessenen Spielstand → +1 bis +5), damit Mayhem Mavericks lauter gedrängt wird als ein
+    // Team mit kleiner Rate — und 0 für die 24 Teams ohne Frühwarnfall.
+    (schuldenlast.score > 0 && !starProtection ? Math.round(schuldenlast.score * 14) : 0) +
     (cashPressureGate && cashPressureProfitAttractive ? 10 : 0) +
     // Premium-graded proactive strong-offer bonus: bigger premiums over market value pull harder,
     // and weaker teams get a modest extra nudge on top — never enough to force a sale on its own.
@@ -915,13 +1005,18 @@ function buildCandidate(
    * danach) — ohne die Jahreszahl im Satz liest sich die eben gezahlte Abgabe wie ein Verkaufsgrund,
    * den die KI ignoriert hat. Und „Schaetzung", weil gegen die Linien der ABGELAUFENEN Saison
    * gerechnet wird: die der naechsten frieren erst nach dem Kaderbau ein.
+   *
+   * DER BENUTZTE SALARY FACTOR STEHT IM SATZ. Er entscheidet ueber die Groessenordnung (unter 0,95
+   * ist die Abgabe null), und genau an dieser Stelle wurde vorher der Faktor der falschen Saison
+   * gelesen — ein Wert, den man im Text nennt, laesst sich gegen die Sponsorkarte pruefen.
    */
   const apronZiel = buildApronAbbauZiel(context.gameState, team.teamId);
   const apronRelief = apronReliefFuerGehalt(apronZiel, economy.expectedSalary);
   if (apronRelief > 0) {
+    const faktorSaison = apronZiel.salaryFactorHorizonIndex === 1 ? "naechste Saison" : "laufende Saison";
     pushSell(
       "apron_levy_relief",
-      `senkt die Apron-Abgabe der naechsten Saison um rund ${roundValue(apronRelief, 1)} (Schaetzung auf den Linien dieser Saison)`,
+      `senkt die Apron-Abgabe der naechsten Saison um rund ${roundValue(apronRelief, 1)} (Schaetzung auf den Linien dieser Saison, Salary Factor ${roundValue(apronZiel.salaryFactor, 2)} der ${faktorSaison})`,
     );
   }
 
@@ -1247,7 +1342,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       playerOpt,
       targetRosterMin: playerMin,
       targetRosterOpt: playerOpt,
-      budgetPressure: getBudgetPressure(team, salaryTotal),
+      budgetPressure: getBudgetPressure(team, salaryTotal, bewerteFatigueTiefenNot(context.gameState, team.teamId).inNot),
       sellCandidates,
       keepCore,
       warnings,

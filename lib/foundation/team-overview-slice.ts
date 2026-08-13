@@ -1,9 +1,16 @@
+/**
+ * BROWSERSEITE der Team-Overview-Slice: nur Typen und reine Funktionen.
+ *
+ * Der Bau der Slice steht bewusst in `team-overview-slice-build.ts` — er liest die echte
+ * Abrechnung und damit ueber `prize-money-preview` die Persistenz (`node:fs`,
+ * `better-sqlite3`). Diese Datei hier importiert der Browser (`use-season-stand-rows.ts`,
+ * Shell-Router); stuenden beide zusammen, zoege der Client-Import den Server-Code mit in das
+ * Bundle. Genau daran ist der Next-Build einmal gescheitert („Module not found: Can't resolve
+ * 'fs'"). Beim Erweitern also darauf achten, auf welcher Seite der Trennlinie der neue Code
+ * landet.
+ */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildGameStateContentSignature } from "@/lib/foundation/season-derivations-signature";
-import {
-  buildTeamSeasonOverviewRows,
-  type TeamManagementSnapshotRow,
-} from "@/lib/foundation/team-management-overview";
+import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 
 export type TeamOverviewSliceRow = Omit<TeamManagementSnapshotRow, "team" | "roster" | "rosterPlayers"> & {
   team: Pick<TeamManagementSnapshotRow["team"], "teamId" | "name" | "shortCode" | "cash" | "budget">;
@@ -19,22 +26,6 @@ export type TeamOverviewSliceResponse = {
   };
   rows: TeamOverviewSliceRow[];
 };
-
-function serializeTeamOverviewRow(row: TeamManagementSnapshotRow): TeamOverviewSliceRow {
-  const { team, roster, rosterPlayers, ...rest } = row;
-  return {
-    ...rest,
-    team: {
-      teamId: team.teamId,
-      name: team.name,
-      shortCode: team.shortCode,
-      cash: team.cash,
-      budget: team.budget,
-    },
-    rosterCount: roster.length,
-    rosterPlayerIds: roster.map((entry) => entry.playerId),
-  };
-}
 
 export function hydrateTeamOverviewSliceRows(
   sliceRows: TeamOverviewSliceRow[],
@@ -73,28 +64,4 @@ export function hydrateTeamOverviewSliceRows(
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
     };
   });
-}
-
-export function buildTeamOverviewSlice(input: {
-  gameState: GameState;
-  saveId: string;
-  seasonId?: string;
-  contentSignature?: string | null;
-}): TeamOverviewSliceResponse {
-  const seasonId = input.seasonId ?? input.gameState.season.id;
-  const contentSignature = input.contentSignature ?? buildGameStateContentSignature(input.gameState);
-  const rows = buildTeamSeasonOverviewRows({
-    gameState: input.gameState,
-    saveId: input.saveId,
-    seasonId,
-  });
-
-  return {
-    scope: {
-      saveId: input.saveId,
-      seasonId,
-      contentSignature,
-    },
-    rows: rows.map(serializeTeamOverviewRow),
-  };
 }

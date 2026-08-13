@@ -51,12 +51,24 @@ function render(over: Case) {
   );
 }
 
-/** Punkte · Form · Mutator · Gesamt einer Disziplin-Zeile aus dem SSR-HTML lesen. */
+/**
+ * Punkte · Form-Score · Captain-Score · Mutator · Gesamt einer Disziplin-Zeile aus dem
+ * SSR-HTML lesen.
+ *
+ * AUDIT 11.08.2026: dieser Helfer las die Rasterspalten 5–8 und nannte sie
+ * „Punkte · Form · Mutator · Gesamt". Das stimmte, bis die Captain-Spalte dazwischenkam
+ * (COL.captain = 7). Danach lag alles ab Spalte 7 um eins verschoben, und vier Faelle
+ * dieser Datei waren dauerhaft rot — sie prueften seither eine Spalte, die sie nicht
+ * meinten. Jetzt werden alle FUENF Zahlenspalten (5–9) gelesen und ueber benannte
+ * Indizes angesprochen, damit eine weitere Spalte den Test nicht wieder still verdreht.
+ */
+const SPALTE = { punkte: 0, form: 1, captain: 2, mutator: 3, gesamt: 4 } as const;
+
 function sideValues(html: string, side: "d1" | "d2"): string[] | null {
   const start = html.indexOf(`matchday-panel-side-t1-${side}`);
   if (start < 0) return null;
   const rest = html.slice(start);
-  return [5, 6, 7, 8].map((column) => {
+  return [5, 6, 7, 8, 9].map((column) => {
     const match = new RegExp(`grid-column:${column}[^"]*">([^<]*)<`).exec(rest);
     return match?.[1] ?? "FEHLT";
   });
@@ -64,7 +76,10 @@ function sideValues(html: string, side: "d1" | "d2"): string[] | null {
 
 describe("Spieltags-Wertung: Zahlen der Disziplin-Zeile", () => {
   it("zeigt die zugeordneten Werte, wenn die Disziplin aufgedeckt ist", () => {
-    expect(sideValues(render({}), "d1")).toEqual(["+6.6", "0", "◆ +0.3", "+6.9"]);
+    // Form und Captain stehen in SCORE und deshalb in Klammern; Punkte, Mutator und
+    // Gesamt sind PP. Ohne Modifier-Daten ist die Captain-Zelle ein Strich ("nicht
+    // gesetzt" ist etwas anderes als "hat nichts gebracht").
+    expect(sideValues(render({}), "d1")).toEqual(["+6.6", "(0)", "–", "◆ +0.3", "+6.9"]);
   });
 
   it("sagt '–' statt '0', wenn die Disziplin-Zuordnung kein Ergebnis findet", () => {
@@ -76,16 +91,16 @@ describe("Spieltags-Wertung: Zahlen der Disziplin-Zeile", () => {
       ],
     });
     const values = sideValues(html, "d1");
-    expect(values?.[0]).toBe("–");
-    expect(values?.[3]).toBe("–");
+    expect(values?.[SPALTE.punkte]).toBe("–");
+    expect(values?.[SPALTE.gesamt]).toBe("–");
     // Die andere Disziplin bleibt davon unberuehrt.
-    expect(sideValues(html, "d2")?.[0]).toBe("+4.4");
+    expect(sideValues(html, "d2")?.[SPALTE.punkte]).toBe("+4.4");
   });
 
   it("sagt '–', wenn das Team in den Ergebnissen gar nicht vorkommt", () => {
     const values = sideValues(render({ teamResults: [] }), "d1");
-    expect(values?.[0]).toBe("–");
-    expect(values?.[3]).toBe("–");
+    expect(values?.[SPALTE.punkte]).toBe("–");
+    expect(values?.[SPALTE.gesamt]).toBe("–");
   });
 
   it("unterscheidet 'kein Ergebnis' von 'null Punkte'", () => {
@@ -96,9 +111,11 @@ describe("Spieltags-Wertung: Zahlen der Disziplin-Zeile", () => {
         { teamId: "t1", d1DisciplineId: "ispy", d1Points: 0, d2DisciplineId: "basket", d2Points: 4.4, totalPoints: 4.4 },
       ],
     });
-    expect(sideValues(html, "d1")?.[0]).toBe("0");
+    expect(sideValues(html, "d1")?.[SPALTE.punkte]).toBe("0");
     // Mutator bleibt eine echte 0-Aussage: "kein Bonus geholt", nicht "unbekannt".
-    expect(sideValues(html, "d1")?.[3]).toBe("+0.3");
+    expect(sideValues(html, "d1")?.[SPALTE.mutator]).toBe("◆ +0.3");
+    // Und die Gesamt-Spalte ist dann genau der Mutator-Aufschlag.
+    expect(sideValues(html, "d1")?.[SPALTE.gesamt]).toBe("+0.3");
   });
 
   it("verrät über eine verdeckte Disziplin weiterhin gar nichts", () => {

@@ -37,7 +37,7 @@ import type {
 } from "@/lib/foundation/tabs/foundation-page-types";
 import { trainingModeConfigs } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { useTrainingForecastLimit } from "@/lib/foundation/tabs/use-training-forecast-limit";
-import { getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import { getRosterEntryDisplaySalary, getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 
@@ -206,6 +206,13 @@ export function useFoundationCrossTabTraining(input: {
           potentialStars: forecast.potentialStars,
           currentAbilityRating: forecast.currentAbilityRating,
           potentialRating: forecast.potentialRating,
+        },
+        // Dieselbe Ableitung wie `use-training-panel-derivations.ts`/die Kaderliste —
+        // ein Rechenweg für Gehalt/Vertrag, hier nur für die Spielerprofil-Trainingsansicht mitgeführt.
+        economy: {
+          salary: getRosterEntryDisplaySalary(entry, trainingPlayer),
+          contractLength: entry.contractLength ?? null,
+          contractShape: entry.contractShape ?? null,
         },
         trainingDemand,
       };

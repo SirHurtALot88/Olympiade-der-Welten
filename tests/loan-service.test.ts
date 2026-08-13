@@ -4,6 +4,8 @@ import type { GameState, LoanRecord, StandingRecord, Team, TeamIdentity } from "
 import {
   applyEarlyPayoff,
   applyInsolvencyBackstop,
+  collectNegativeCashTeams,
+  INSOLVENCY_BACKSTOP_TERM_SEASONS,
   applyLoanSettlement,
   buildLoanOffers,
   computeBorrowingCapacity,
@@ -315,6 +317,34 @@ describe("estimateTeamAnnualRevenue", () => {
     const gameState = createGameState();
     expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBe(0);
   });
+
+  /**
+   * DIE SORTIER-BOMBE, gemeldet aus der Gegenpruefung der Schulden-Fruehwarnung.
+   *
+   * Die "letzte" Saison wurde per `.sort()` OHNE Vergleichsfunktion bestimmt, also als Text. Bis
+   * "season-9" faellt das nicht auf; ab "season-10" gewinnt dauerhaft "season-9", weil "9" > "1"
+   * ist. Der Schaetzwert waere ab Saison 10 fuer immer auf den Einnahmen von Saison 9 eingefroren —
+   * still, ohne Fehlermeldung, und er bestimmt den Kreditrahmen UND den Verkaufsdruck.
+   */
+  it("nimmt die hoechste SAISONNUMMER, nicht die alphabetisch letzte (season-10 schlaegt season-9)", () => {
+    const gameState = createGameState({
+      sponsorPayoutLogs: [
+        { id: "p1", saveId: "s", seasonId: "season-9", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 20, action: "apply", createdAt: "2034-01-01T00:00:00.000Z" },
+        { id: "p2", saveId: "s", seasonId: "season-10", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 95, action: "apply", createdAt: "2035-01-01T00:00:00.000Z" },
+      ],
+    });
+    expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBeCloseTo(95, 1);
+  });
+
+  it("bleibt auch bei zweistelligen Saisons untereinander richtig (season-12 schlaegt season-11)", () => {
+    const gameState = createGameState({
+      sponsorPayoutLogs: [
+        { id: "p1", saveId: "s", seasonId: "season-11", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 30, action: "apply", createdAt: "2036-01-01T00:00:00.000Z" },
+        { id: "p2", saveId: "s", seasonId: "season-12", teamId: "A-A", phase: "season_end", componentId: "base", cashDelta: 70, action: "apply", createdAt: "2037-01-01T00:00:00.000Z" },
+      ],
+    });
+    expect(estimateTeamAnnualRevenue(gameState, "A-A")).toBeCloseTo(70, 1);
+  });
 });
 
 function baseLoan(): LoanRecord {
@@ -446,8 +476,76 @@ describe("originateLoan", () => {
   });
 });
 
+/**
+ * DER ZWANGS-NOTKREDIT IST AM SAISONENDE WEG — Teams dürfen dort im Minus stehen.
+ *
+ * ENTSCHEIDUNG VON CHRIS (2026-08), zweimal geschärft:
+ *   (1) „teams können auch ins negative gehen und müssen das dann mit verkäufen und krediten wieder
+ *       auffüllen! es darf nicht einfach geld erschummelt und auf 0 gesetzt werden."
+ *   (2) „den kredit sollen sie ja erst aufnehmen wenn sie schon verkauft haben […] aber nicht am
+ *       ende einer season!"
+ *
+ * Vorher hielten hier zwei Tests fest, dass ein Team mit negativem Cash automatisch einen
+ * Bank-Notkredit über den Fehlbetrag bekommt und danach auf exakt 0 steht — und zwar an BEIDEN
+ * Zeitpunkten. Die Absicht war ehrenwert (kein `Math.max(0, …)`-Clamp, der Geld erzeugt), das
+ * Ergebnis am gespielten Stand aber nicht: nach der Abrechnung von Saison 2 standen 9 von 32 Teams
+ * auf 0,0 und keines im Minus — 164,2 Mio Kreditsumme, die niemand beantragt hatte.
+ *
+ * Der Zeitpunkt ist die ganze Regel, deshalb prüfen die beiden Blöcke unten GEGENSÄTZLICHES:
+ * `collectNegativeCashTeams` (Saisonende) stellt nur fest, `applyInsolvencyBackstop` (Ende des
+ * Kauffensters, wo das Team verkauft und gekauft HAT) gleicht weiterhin aus.
+ */
+describe("collectNegativeCashTeams", () => {
+  it("nennt jedes Team im Minus mit seinem Fehlbetrag — und ändert nichts", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: -7 }), createTeam({ teamId: "B-B", cash: 30 })],
+      teamIdentities: [createIdentity("A-A"), createIdentity("B-B")],
+    });
+
+    const report = collectNegativeCashTeams(gameState);
+
+    expect(report.teams).toEqual([{ teamId: "A-A", shortfall: 7 }]);
+    // KEIN Kredit, KEINE Cash-Änderung — das ist der ganze Punkt der Umstellung.
+    expect(gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(-7);
+    expect(gameState.seasonState.loans ?? []).toHaveLength(0);
+  });
+
+  it("ein solventes Team taucht gar nicht auf", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 42 })],
+      teamIdentities: [createIdentity("A-A")],
+    });
+    expect(collectNegativeCashTeams(gameState).teams).toEqual([]);
+  });
+
+  it("die Warnung nennt Team und Betrag, damit der Saisonbericht sie ausweisen kann", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: -12.5 })],
+      teamIdentities: [createIdentity("A-A")],
+    });
+    expect(collectNegativeCashTeams(gameState).warnings).toEqual(["negatives_cash_am_saisonende:A-A:12.5"]);
+  });
+
+  it("ein Rundungs-Krümel unter null zählt nicht als Minus", () => {
+    // Dieselbe Toleranz wie zuvor: -0,01 ist ein Rechenrest, keine Zahlungsunfähigkeit.
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: -0.005 })],
+      teamIdentities: [createIdentity("A-A")],
+    });
+    expect(collectNegativeCashTeams(gameState).teams).toEqual([]);
+  });
+});
+
+/**
+ * DERSELBE FEHLBETRAG, ANDERER ZEITPUNKT — hier bleibt der Ausgleich.
+ *
+ * Am Ende des Kauffensters hat das Team verkauft, gekauft und den regulären Kredit-Pass hinter sich
+ * (siehe `app/api/ai/preseason-background/route.ts`). Was dann noch fehlt, ist ein echter
+ * Fehlbetrag, mit dem es nicht in die Saison starten kann — Chris: „Nur nach dem kaufen und kredite
+ * aufnehmen darf es nicht mehr negativ sein."
+ */
 describe("applyInsolvencyBackstop", () => {
-  it("gives a team with negative cash an emergency loan instead of clamping to 0 (no money from nowhere)", () => {
+  it("gibt dem Team im Minus einen echten Kredit statt eines Clamps auf 0", () => {
     const gameState = createGameState({
       teams: [createTeam({ teamId: "A-A", cash: -7 }), createTeam({ teamId: "B-B", cash: 30 })],
       teamIdentities: [createIdentity("A-A"), createIdentity("B-B")],
@@ -456,28 +554,21 @@ describe("applyInsolvencyBackstop", () => {
     const result = applyInsolvencyBackstop({ gameState, saveId: "save-1" });
 
     const teamA = result.gameState.teams.find((t) => t.teamId === "A-A");
-    const teamB = result.gameState.teams.find((t) => t.teamId === "B-B");
-
-    // Negative-cash team ends up at exactly 0, funded by a real loan (not a Math.max(0, …) clamp).
     expect(teamA?.cash).toBe(0);
-    // Solvent team is left untouched — no loan, no cash change.
-    expect(teamB?.cash).toBe(30);
+    // Das solvente Team bleibt unberührt — kein Kredit, keine Cash-Änderung.
+    expect(result.gameState.teams.find((t) => t.teamId === "B-B")?.cash).toBe(30);
 
     const loansForA = (result.gameState.seasonState.loans ?? []).filter((loan) => loan.borrowerTeamId === "A-A");
     expect(loansForA).toHaveLength(1);
     expect(loansForA[0]?.principalOriginal).toBeCloseTo(7, 1);
     expect(loansForA[0]?.lenderType).toBe("bank");
-
     expect(result.emergencyLoans).toEqual([{ teamId: "A-A", principal: 7 }]);
-    expect((result.gameState.seasonState.loans ?? []).filter((loan) => loan.borrowerTeamId === "B-B")).toHaveLength(0);
 
-    // Money conservation: the cash gained (0 - (-7) = 7) equals exactly the new loan's principal —
-    // nothing is created out of thin air.
-    const cashDelta = (teamA?.cash ?? 0) - -7;
-    expect(cashDelta).toBeCloseTo(loansForA[0]?.principalOriginal ?? 0, 5);
+    // Werterhaltung: der Cash-Zuwachs (0 − (−7) = 7) ist exakt die neue Kreditsumme.
+    expect((teamA?.cash ?? 0) - -7).toBeCloseTo(loansForA[0]?.principalOriginal ?? 0, 5);
   });
 
-  it("leaves a team with positive cash completely unchanged (no loan)", () => {
+  it("lässt ein Team mit Guthaben komplett in Ruhe", () => {
     const gameState = createGameState({
       teams: [createTeam({ teamId: "A-A", cash: 42 })],
       teamIdentities: [createIdentity("A-A")],
@@ -488,6 +579,16 @@ describe("applyInsolvencyBackstop", () => {
     expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(42);
     expect(result.emergencyLoans).toEqual([]);
     expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
+  });
+
+  it("läuft über die Laufzeit-Konstante, nicht über eine im Code verstreute Zahl", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: -5 })],
+      teamIdentities: [createIdentity("A-A")],
+    });
+
+    const loan = applyInsolvencyBackstop({ gameState, saveId: "save-1" }).gameState.seasonState.loans?.[0];
+    expect(loan?.termSeasons).toBe(INSOLVENCY_BACKSTOP_TERM_SEASONS);
   });
 });
 

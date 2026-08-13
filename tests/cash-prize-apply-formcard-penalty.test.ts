@@ -30,7 +30,11 @@ const { buildPrizeMoneyPreview, applySponsorSettlement } = vi.hoisted(() => ({
 vi.mock("@/lib/season/prize-money-preview", () => ({ buildPrizeMoneyPreview }));
 vi.mock("@/lib/sponsor/sponsor-settlement-service", () => ({
   applySponsorSettlement,
-  previewSponsorSettlement: vi.fn(),
+  previewSponsorSettlement: vi.fn(() => ({ rows: [], warnings: [], blockingReasons: [], canApply: false })),
+  // Der GuV-Resolver liest die Sponsor-Einnahme der Saison ueber diese Funktion (gebuchte Logs +
+  // projizierter Rest). Sie MUSS im Mock stehen, sonst faellt der Resolver auf einen fehlenden
+  // Export — hier reicht eine leere Map, die Tests messen andere Groessen.
+  getSeasonSponsorCashByTeam: vi.fn(() => new Map<string, number>()),
 }));
 
 function createPersistenceMock(input?: { penaltyAlreadyApplied?: boolean }) {

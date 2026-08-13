@@ -178,7 +178,7 @@ function buildRowFromPointsByDiscipline(
 }
 
 describe("Spielerliste: Herkunft der Disziplin-PPs", () => {
-  it("belegt die Ursache: der kompakte Client-Payload leert den Saison-Ledger", () => {
+  it("der kompakte Client-Payload traegt den Saison-Ledger jetzt selbst", () => {
     const { gameState, playerId } = buildGameStateWithPlayedMatchday();
 
     const fullLedger = buildSeasonPointsLedger(gameState);
@@ -188,17 +188,63 @@ describe("Spielerliste: Herkunft der Disziplin-PPs", () => {
     expect(fullSummary?.pointsByDiscipline["mini-dm"]).toBeCloseTo(4.9, 5);
 
     const compactGameState = compactFoundationInitialGameState(gameState);
-    // Der Kompakt-Payload behält nur den AKTIVEN Spieltag (matchday-2, unausgewertet).
-    expect(compactGameState.seasonState.matchdayResults).toHaveLength(0);
-    expect(compactGameState.seasonState.disciplineResults).toHaveLength(0);
+    /**
+     * FRUEHER STAND HIER: `matchdayResults` toHaveLength(0), `disciplineResults`
+     * toHaveLength(0) und daraus folgend ein LEERER Client-Ledger — der beschnittene Payload
+     * kannte nur den (unausgewerteten) aktiven Spieltag. Genau daran hingen die aufgeklappten
+     * Disziplin-Spalten mit ihrem durchgehenden „—".
+     *
+     * Beide Beschneidungen sind entfallen (Verzeichniszeilen mit dem Saisonziel-Fix, die
+     * Disziplin-Ergebnisse mit der Messung in `compactFoundationInitialGameState`). Der
+     * Browser rechnet die 4,9 jetzt selbst.
+     *
+     * `persistedSeasonDerivations` bleibt gestrichen — deshalb bleibt der Server-Slice die
+     * kanonische Quelle, und der Fall darunter prueft ihn unveraendert.
+     */
+    expect(compactGameState.seasonState.matchdayResults).toHaveLength(1);
+    expect(compactGameState.seasonState.disciplineResults).toHaveLength(2);
     expect(compactGameState.seasonState.persistedSeasonDerivations).toBeUndefined();
 
     const compactLedger = buildSeasonPointsLedger(compactGameState);
-    expect(compactLedger.playerSummariesByPlayerId.get(playerId)).toBeUndefined();
+    expect(compactLedger.hasResultSource).toBe(true);
+    expect(
+      compactLedger.playerSummariesByPlayerId.get(playerId)?.pointsByDiscipline["mini-dm"],
+    ).toBeCloseTo(4.9, 5);
 
-    // Und genau so entstand das Bild aus dem Bugreport: überall "—" (= 0 PPs).
-    const compactRow = buildRowFromPointsByDiscipline(compactGameState, null);
-    expect(getRowDisciplinePps(compactRow, "mini-dm")).toBe(0);
+    // Und die Zeile der Spielerliste zeigt damit die Saisonwerte statt „—".
+    const compactRow = buildRowFromPointsByDiscipline(
+      compactGameState,
+      compactLedger.playerSummariesByPlayerId.get(playerId)?.pointsByDiscipline ?? null,
+    );
+    expect(getRowDisciplinePps(compactRow, "mini-dm")).toBeCloseTo(4.9, 5);
+
+    // Ohne jede Punktquelle wird trotzdem nichts erfunden — dann steht dort 0 (= „—").
+    expect(getRowDisciplinePps(buildRowFromPointsByDiscipline(compactGameState, null), "mini-dm")).toBe(0);
+  });
+
+  it("Deckungsgrenze: ein Spieltag ohne Disziplin-Ergebnisse wird gar nicht gebucht (nie der Rohbeitrag)", () => {
+    /**
+     * Diese Zusicherung stand frueher im Fall darueber und haengt NICHT an der Beschneidung —
+     * sie ist die Hausregel des Ledgers und muss sie ueberleben. Ohne die Deckungsgrenze
+     * kaemen die vollstaendig mitgelieferten Leistungszeilen alle durch, ihr
+     * Disziplin-Ergebnis fehlte aber, und die Punkte fielen auf den ROHBEITRAG zurueck: der
+     * Ledger meldete 33,3 statt 4,9. Ein solcher Zustand ist nicht ausgestorben — ein
+     * Browser-Tab mit einem aelteren, noch beschnittenen Payload sieht genau ihn.
+     */
+    const { gameState, playerId } = buildGameStateWithPlayedMatchday();
+    const compactGameState = compactFoundationInitialGameState(gameState);
+    const ohneDisziplinErgebnisse: GameState = {
+      ...compactGameState,
+      seasonState: { ...compactGameState.seasonState, disciplineResults: [] },
+    };
+
+    const ledger = buildSeasonPointsLedger(ohneDisziplinErgebnisse);
+    expect(ledger.playerSummariesByPlayerId.get(playerId)).toBeUndefined();
+    expect(ledger.hasResultSource).toBe(false);
+
+    // Kein Rohbeitrag, keine 33,3 — sondern sichtbar leer (= „—").
+    const row = buildRowFromPointsByDiscipline(ohneDisziplinErgebnisse, null);
+    expect(getRowDisciplinePps(row, "mini-dm")).toBe(0);
   });
 
   it("liefert der Directory-Slice die Disziplin-PPs, die der Client-Ledger nicht mehr kennt", () => {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
+import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildGameStateContentSignature, getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-limits";
@@ -1155,6 +1156,10 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     isFirstSeason: gameState.season.id === "season-1",
     gmArchetype: recommendedGmArchetype,
     highValue: (marketValueReference ?? 0) >= 35,
+    // Apron-Lage und bisheriger Vertragsmix des Teams. Beide Wege der KI landen hier: der
+    // Marktplan gibt die Form ausdruecklich mit, der Fuell-Lauf (`ai_roster_fill`) uebergibt
+    // keine und faellt genau auf diese Empfehlung zurueck.
+    ...getContractShapeTeamContext(gameState, params.teamId),
   });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
@@ -2394,6 +2399,13 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           isFirstSeason: gameState.season.id === "season-1",
           gmArchetype: getTeamGeneralManager(gameState, params.teamId)?.profile?.archetype ?? null,
           highValue: (marketValueReference ?? 0) >= 35,
+          // ZWEITER Aufrufer derselben Empfehlung — der Fast-Batch-Pfad. Er wurde beim ersten Umbau
+          // uebersehen. Ueber ihn laeuft der ORGANISCHE Setup-Draft der Saison 1
+          // (`runOrganicTeamDraftExecute`, Flag OLY_ORGANIC_SQUAD_BUILDER, Vorgabe an); dass dessen
+          // Transfers `ai_roster_fill` heissen, ist nur das Etikett — der gleichnamige Fuell-Dienst
+          // ist ab Saison 2 verboten und picken darf nur noch organisch. Ohne diese Zeilen bliebe
+          // der gesamte Erst-Draft apron- und mixblind.
+          ...getContractShapeTeamContext(gameState, params.teamId),
         })
       : null;
   const contractLength = hasExplicitContractLength
@@ -2576,6 +2588,10 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
         yearlySalarySchedule,
         salary,
         upkeep: salary,
+        // UNTERSCHRIFTSPFAD: KI-Massenkauf (Draft, Kaderauffuellung, Redraft-Topup laufen hier
+        // durch). `salary` ist das verhandelte JAHRESGEHALT — die Raten entstehen erst in
+        // `yearlySalarySchedule`.
+        negotiatedAnnualSalary: salary,
         purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",
@@ -2691,6 +2707,10 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         yearlySalarySchedule: preview.yearlySalarySchedule,
         salary: preview.offeredSalary ?? preview.salary,
         upkeep: preview.offeredSalary ?? preview.salary,
+        // UNTERSCHRIFTSPFAD: Transferkauf und Free-Agent-Signing, Mensch wie KI (alle
+        // `executeLocalTransfermarktBuy`-Aufrufer). Das VERHANDELTE Gehalt ist `offeredSalary` —
+        // faellt es weg, ist es das Formel-Gehalt, weil dann nicht verhandelt wurde.
+        negotiatedAnnualSalary: preview.offeredSalary ?? preview.salary,
         purchasePrice: preview.purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",

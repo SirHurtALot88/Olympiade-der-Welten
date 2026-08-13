@@ -44,7 +44,18 @@ import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply, previewCashPrize
  * bis zu 0.2.
  */
 
-const SINGLE_BOOKING_TOLERANCE = 0.05;
+/**
+ * Die dokumentierte Toleranz einer EINZELNEN Buchung: `roundCash` rundet auf 1 Nachkommastelle,
+ * `roundValue` auf 2 — eine Buchung kann deshalb um bis zu einer halben Rundungseinheit von der
+ * exakten Differenz abweichen.
+ *
+ * DAS EPSILON IST KEINE AUFWEICHUNG, sondern die Reparatur eines Vergleichsfehlers. Ein Fall, der
+ * mathematisch GENAU auf der Grenze liegt, scheitert sonst an der Binaerdarstellung: gemessen wurde
+ * `68,75 + (−8,20) = 60,55`, gerundet `60,6` — die Abweichung ist exakt 0,05, in `double` aber
+ * 0.05000000000000426. Ohne das Epsilon haengt es an der Bitfolge der beteiligten Zahlen, ob ein
+ * legitimer Rundungsfall durchgeht; das ist kein Kriterium.
+ */
+const SINGLE_BOOKING_TOLERANCE = 0.05 + 1e-9;
 const AGGREGATE_TOLERANCE = 0.2;
 
 function createInMemoryPersistence(gameState: GameState, saveId = "test-save"): PersistenceService {

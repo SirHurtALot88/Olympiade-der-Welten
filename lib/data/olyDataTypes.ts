@@ -1278,6 +1278,79 @@ export type TeamFacilityCollection = {
   facilities: Record<string, TeamFacilityRecord>;
 };
 
+/**
+ * Ein vom Sponsor geliehenes Gebäude. `zustandPct` ist die Vertragsvariable: derselbe Gebäudetyp
+ * auf derselben Stufe kann neu oder gebraucht verliehen werden und ist dann verschieden wertvoll.
+ * `ruht` schaltet die Leihe ab, wenn die Rangmarke des Vertrags gerissen ist — der Cash-Verzicht
+ * laeuft dabei weiter.
+ */
+/**
+ * DER LEIH-BLOCK EINER SPONSOR-KARTE — bei der Erzeugung eingefroren, bei der Unterschrift 1:1 in
+ * den Vertrag kopiert. Fehlt er, ist es eine reine Cash-Karte.
+ *
+ * Strukturell (keine Importe aus `lib/sponsor`) gehalten, damit der Datentyp nicht an der
+ * Rechenschicht haengt; gebaut wird er ausschliesslich von `verteileLeihgabenAufSlate`.
+ */
+export type SponsorOfferLeihe = {
+  facilityId: string;
+  /** ASCII-Schreibweise der Rarität, wie in `lib/sponsor/sponsor-leihe.ts`. */
+  raritaet: "gewoehnlich" | "magisch" | "selten" | "legendaer";
+  /** Umwandlungskurs dieser Rarität (1,4 / 1,8 / 2,3 / 3,0). */
+  kurs: number;
+  /** Gebäudestufe je Vertragsjahr. */
+  stufenreihe: number[];
+  /** Cash-Verzicht je Vertragsjahr — steckt bereits in der Leiter (E1), ist KEINE Abzugszeile. */
+  verzichtJeSaison: number[];
+  /** Was der Sponsor je Vertragsjahr bereitstellt — Anrechnungsbasis der Übernahme. */
+  leihwertJeSaison: number[];
+  /** Zustand des Gebäudes bei Übergabe (0..100) — die Vertragsvariable aus E7. */
+  startZustandPct: number;
+  /**
+   * DIE RANGMARKE: bis zu welchem Tabellenplatz das geliehene Gebäude wirkt. Bei Unterschrift
+   * eingefroren, relativ zum Startblock, nie darüber (Abschnitt 4.4). Darunter **ruht** das
+   * Gebäude — der Cash-Verzicht läuft trotzdem weiter, das ist der Preis des Risikos.
+   *
+   * Fehlt sie, wirkt die Leihe unbedingt (Angebote aus der Zeit vor Schritt 6).
+   */
+  rangmarke?: number;
+  /** Wie hart die Marke gesetzt ist: `hart` = eigener Startblock, `mild` = ein Block darunter. */
+  rangmarkenHaerte?: "mild" | "hart";
+  /** Selbstbaukosten der zuletzt erreichten Stufe — Grundlage des Übernahmepreises. */
+  katalogkostenEndstufe: number;
+};
+
+export type SponsorLeihgabeRecord = {
+  facilityId: string;
+  stufe: number;
+  zustandPct: number;
+  ruht?: boolean;
+  /** Der Vertrag, aus dem die Leihe stammt — fuer Anzeige und Aufraeumen beim Vertragsende. */
+  seasonId: string;
+  offerId?: string;
+};
+
+/**
+ * DAS ANGEBOT AM VERTRAGSENDE: das geliehene Gebäude behalten, zum Preis aus
+ * `berechneUebernahmepreis` (Katalogkosten − bereitgestellter Leihwert − geerbte Reparatur).
+ *
+ * Es entsteht beim Saisonwechsel, wenn ein Sponsorvertrag mit Leihe auslaeuft, und verschwindet,
+ * sobald das Team zugreift oder ablehnt. Nimmt es niemand an, faellt das Gebäude ersatzlos weg —
+ * das Team steht wieder auf seinem eigenen Bestand.
+ */
+export type SponsorUebernahmeAngebot = {
+  teamId: string;
+  /** Saison, in der das Angebot auf dem Tisch liegt. */
+  seasonId: string;
+  facilityId: string;
+  /** Die zuletzt geliehene Stufe — die bekommt man, keine andere. */
+  stufe: number;
+  /** Zustand bei der Uebergabe. Nach drei Saisons Verschleiss ist das der halbe Preisunterschied. */
+  zustandPct: number;
+  preis: number;
+  /** Der Vertrag, aus dem die Leihe stammte. */
+  offerId?: string;
+};
+
 export type FacilityEventRecord = {
   eventId: string;
   seasonId: string;
@@ -1462,10 +1535,18 @@ export type SponsorV3ContractTermsRecord = {
    */
   axis?: { key: string; baseline: number; scale: number; offset: number };
   /**
-   * V4-Vorschuss: bei Unterschrift ausgezahlter Teil, am Saisonende samt Gebuehr verrechnet.
-   * Fehlt beim Standard-Profil und bei Altvertraegen.
+   * ENTFALLEN: `advance` (V4-Vorschuss, bei Unterschrift ausgezahlt und am Saisonende samt Gebuehr
+   * verrechnet). Sponsorgeld flieszt jetzt ausnahmslos am Saisonende — Begruendung in
+   * sponsor-v3-model.ts. Das Feld wird BEWUSST nicht neu deklariert: gespeicherte Vertraege aus
+   * laufenden Spielen tragen es noch, aber keine Rechenstelle liest es mehr, und ein Typ, der es
+   * weiter kennt, wuerde genau dazu einladen.
    */
-  advance?: { amount: number; fee: number };
+  /**
+   * Cash-Verzicht der Gebäude-Karte (E1), der in dieser Leiter BEREITS steckt. Dokumentarisch —
+   * und die Grundlage dafür, dass der Mehrjahres-Roll ihn beim Neubau der Leiter wieder abzieht.
+   * Fehlt bei reinen Cash-Karten und bei Altverträgen.
+   */
+  leihVerzicht?: number;
 };
 
 /**
@@ -1523,6 +1604,11 @@ export type SponsorOffer = {
    * UI/Debug; die Auszahlung läuft weiter über `components`. Optional/rückwärtskompatibel.
    */
   moduleIds?: string[];
+  /**
+   * DIE GEBÄUDE-LEIHE DIESER KARTE (E1). Gesetzt heisst: weniger Cash, dafür ein Gebäude. Der
+   * Verzicht steckt bereits in der Leiter (`sponsorV3.leihVerzicht`) — hier steht, wofür.
+   */
+  sponsorLeihe?: SponsorOfferLeihe;
   /** SPONSORSYSTEM V3: eingefrorene Konditionen. Jedes erzeugte Angebot traegt sie. */
   sponsorV3?: SponsorV3ContractTermsRecord;
   /** LEGACY, nur noch gelesen: V2-Konditionen aus Spielstaenden von vor dem V3-Umbau. */
@@ -1582,6 +1668,12 @@ export type TeamSponsorContract = {
   teamQualityRankAtSign?: number;
   /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
   isGolden?: boolean;
+  /**
+   * Die Gebäude-Leihe dieses Vertrags, 1:1 vom Angebot übernommen. Sie ist die Quelle für die
+   * Leihgabe im Season-State, für den Stufen-Aufstieg beim Saisonwechsel und für den
+   * Übernahmepreis am Vertragsende.
+   */
+  sponsorLeihe?: SponsorOfferLeihe;
   /**
    * LOCKED-AT-SIGNING Rang-Payout-Leiter: `lockedRankPayoutLadder[finalRank - 1]` = die volle
    * getSponsorPayoutForFinalRankAndTier-Summe für diesen Endrang, berechnet mit dem Anker + salaryFactor
@@ -2024,6 +2116,21 @@ export type RosterEntry = {
   contractShape?: ContractShape;
   yearlySalarySchedule?: ContractYearSalary[];
   salary: number;
+  /**
+   * DAS BEI UNTERSCHRIFT VERHANDELTE JAHRESGEHALT — die Bemessungsgrundlage der Apron.
+   *
+   * Persistiert und danach UNVERAENDERLICH, bis derselbe Vertrag neu unterschrieben wird. Genau
+   * darin liegt sein Zweck: `salary` wird bei JEDEM Saisonwechsel von
+   * `advanceRosterContractSchedule` mit der Jahr-1-Rate der Rest-Schedule ueberschrieben, und auch
+   * der Durchschnitt der REST-Schedule schrumpft bei einem front_loaded-Vertrag Jahr fuer Jahr
+   * (3 Jahre 1,2/1,0/0,8 ⇒ Basen 1,0a / 0,9a / 0,8a = Σ 2,7a statt 3,0a). Beide waeren
+   * formabhaengig — die Apron wuerde sich durch Front-Loading senken lassen.
+   *
+   * Optional, weil Bestandsvertraege das Feld nicht tragen; der Leser
+   * (`resolveNegotiatedAnnualSalary`) und der Lade-Backfill
+   * (`withNegotiatedSalaryBenchmark`) fuellen es aus dem Schedule-Durchschnitt nach.
+   */
+  negotiatedAnnualSalary?: number | null;
   upkeep: number;
   purchasePrice?: number | null;
   currentValue?: number | null;
@@ -2369,6 +2476,21 @@ export type MatchdayResolveSnapshotRecord = {
   seasonId: string;
   matchdayId: string;
   signature: string;
+  /**
+   * Signatur NUR ueber die Aufstellungen, je Disziplin-Seite getrennt, plus die
+   * Verfuegbarkeit der auf DIESER Seite eingesetzten Spieler.
+   *
+   * Warum getrennt: Der D1-Commit schreibt die Fatigue der in D1 gelaufenen Spieler und
+   * veraendert damit die volle `signature` — der Snapshot waere ausgerechnet fuer den
+   * D2-Commit ungueltig. Fuer D2 zaehlt aber nur, ob sich an D2 etwas geaendert hat. Mit
+   * der seitenweisen Signatur laesst sich genau das pruefen, statt die Pruefung fuer den
+   * ganzen Spieltag auszuschalten (dabei ueberlebte auch ein laengst verfallener
+   * Snapshot und wurde als "Ergebnis" gezeigt).
+   *
+   * Alt-Snapshots ohne dieses Feld gelten als nicht mehr pruefbar und werden verworfen —
+   * lieber die gebuchte Wahrheit als eine huebschere Vorschau.
+   */
+  sideSignatures?: Record<"d1" | "d2", string>;
   previewStatus: string;
   readinessByTeamId: Record<
     string,
@@ -2423,6 +2545,28 @@ export type SeasonSnapshotTeamRecord = {
    * jetzt `cashEntry` zuerst und fallen auf `cashEnd` zurueck, wo es fehlt (Altsaves).
    */
   cashEntry?: number | null;
+  /**
+   * DER KONTOSTAND AN DER SAISONGRENZE — das Geld, das ein Team wirklich in die neue Saison
+   * mitgenommen hat. Eingefroren im `next_season_setup`, unmittelbar NACH der Vertragsalterung
+   * (`computeSeasonEndContractTick`) und BEVOR die neue Saison-ID gesetzt ist.
+   *
+   * WOZU EIN DRITTER CASH-WERT. Zwischen `cashEnd` (Ende der Saisonabrechnung, vor dem
+   * Transfermarkt — Chris' Regel) und `cashEntry` (nach den Kaeufen der Folgesaison) liegen
+   * Buchungen, die auf die ALTE Saison gebucht werden, aber erst beim Saisonwechsel stattfinden:
+   * die auslaufenden Vertraege. Ihr Ablösewert (`contract_exit`, `transferHistory` mit der ALTEN
+   * `seasonId`) landet auf `team.cash`, nachdem der Schnappschuss laengst steht.
+   *
+   * Gemessen am Live-Abbild `new-game-1785823388048-1hf25q`: 54 `ai_contract_expiry`-Abgaenge,
+   * zusammen +1085,24 C, gebucht 0,7 s NACH `createSeasonSnapshot`. Genau dieser Betrag war die
+   * Luecke, die `buildTransferFinanceAudit` als `cash_reconciliation_delta_hard` der FOLGE-Saison
+   * meldete (bis 112,9 C bei 19 von 32 Teams) — das Audit verankerte Saison N+1 auf `cashEnd`,
+   * und das ist nicht das Geld, mit dem das Team gestartet ist.
+   *
+   * `cashEnd` bleibt deshalb, was Chris will (Stand vor Marktoeffnung, das zeigt die Historie),
+   * und dieses Feld ist die Buchungsgrenze fuer den Abgleich. Write-once: einmal gesetzt, nie
+   * wieder angefasst.
+   */
+  cashCarryOver?: number | null;
   /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
   rosterEndPostSell?: number | null;
   rosterEnd: number;
@@ -3006,6 +3150,16 @@ export type SeasonState = {
   teamStrategyProfiles?: Record<string, TeamStrategyProfile>;
   aiPreseasonAutomationRuns?: Record<string, AiPreseasonAutomationRunRecord>;
   teamFacilities?: Record<string, TeamFacilityCollection>;
+  /**
+   * GELIEHENE GEBÄUDE aus laufenden Sponsorvertraegen, je Team. Sie liegen NEBEN dem eigenen
+   * Bestand, nicht darin: `getTeamFacilityState` legt sie beim Lesen darueber (Maximum aus eigen
+   * und geliehen), sodass jede Wirkungsrechnung sie sieht, ohne von der Leihe zu wissen. Endet der
+   * Vertrag oder reisst die Rangmarke, faellt das Team auf den eigenen Bestand zurueck — deshalb
+   * darf die Leihe nie in `teamFacilities` geschrieben werden.
+   */
+  sponsorLeihgabenByTeamId?: Record<string, SponsorLeihgabeRecord[]>;
+  /** Offene Übernahme-Angebote aus ausgelaufenen Leihverträgen (siehe `SponsorUebernahmeAngebot`). */
+  sponsorUebernahmeAngeboteByTeamId?: Record<string, SponsorUebernahmeAngebot[]>;
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
@@ -3137,6 +3291,19 @@ export type SeasonState = {
    * (siehe `foundation-field-race-projection`). Wird nie zurueckgeschrieben.
    */
   foundationFieldRace?: FoundationFieldRaceProjection;
+  /**
+   * HIER STANDEN FUENF WEITERE PROJEKTIONEN — `foundationFormCardBonus`, `foundationRecordBook`,
+   * `foundationDisciplineTally`, `foundationMatchdayPoints`, `foundationPpAreaFormBonus`. Sie sind
+   * ERSATZLOS ENTFERNT.
+   *
+   * Alle fuenf gab es nur, weil die Anfangsladung `disciplineResults` und `lineupDrafts` auf den
+   * aktiven Spieltag beschnitt. Seit `8ec6454b` fahren beide Listen vollstaendig mit; die Leser
+   * rechnen wieder selbst richtig. Nachgemessen an beiden aktiven Spielstaenden: mit und ohne
+   * Projektion Zeichen fuer Zeichen dasselbe Ergebnis.
+   *
+   * Kommt die Beschneidung je zurueck, kommen NICHT die Projektionen zurueck — dann waere der
+   * Schnitt selbst der Fehler. Siehe `compactFoundationInitialGameState`.
+   */
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;

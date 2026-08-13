@@ -20,6 +20,7 @@ import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
   MatchdaySummaryHighlight,
+  MatchdaySummaryTeamInjury,
   MatchdaySummaryTeamRow,
   MatchdaySummaryTopPlayer,
 } from "@/lib/foundation/matchday-summary";
@@ -97,6 +98,30 @@ function renderRankMovement(row: MatchdaySummaryTeamRow) {
       <span className="nl-result-movement-ranks nl-tnum">
         {row.seasonRankBeforeMatchday ?? "—"} → {row.seasonRankAfterMatchday ?? "—"}
       </span>
+    </span>
+  );
+}
+
+/**
+ * VERLETZUNGS-MARKE IN DER SCORE-TABELLE — der Wunsch von Chris, hier in der Tabelle, auf die er
+ * NACH dem Spieltag schaut. Die Zahl ist eine SPIELER-Zahl; daneben stehen Punkte und Scores,
+ * deshalb steht die Einheit dran statt einer nackten Ziffer.
+ *
+ * Die Beschreibung im `title` kommt fertig aus der Zeile (`row.injury.beschreibung`) — sie wird
+ * von derselben Funktion gebaut wie der Tooltip der Arena-Marke.
+ */
+function InjuryMark({ injury }: { injury: MatchdaySummaryTeamInjury | null }) {
+  if (!injury || injury.betroffeneSpieler <= 0) return null;
+  const beschriftung = `${injury.betroffeneSpieler} Spieler`;
+  return (
+    <span
+      className="nl-result-injury"
+      data-testid="matchday-injury-mark"
+      data-team-injured-players={injury.betroffeneSpieler}
+      title={injury.beschreibung}
+      aria-label={`Verletzt an diesem Spieltag: ${beschriftung}`}
+    >
+      🩹 {beschriftung}
     </span>
   );
 }
@@ -349,7 +374,10 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
             fallback={<span className="nl-result-crest nl-result-crest-fallback">{row.teamShortCode}</span>}
           />
           <span className="nl-result-team-copy">
-            <span className="nl-result-teamname">{row.teamName}</span>
+            <span className="nl-result-teamline">
+              <span className="nl-result-teamname">{row.teamName}</span>
+              <InjuryMark injury={row.injury} />
+            </span>
             <span className="nl-result-teamcode">{row.teamShortCode}</span>
           </span>
         </button>
@@ -413,6 +441,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               >
                 <td className="nl-result-td-team">
                   <strong>{row.teamShortCode}</strong> · {row.teamName}
+                  <InjuryMark injury={row.injury} />
                 </td>
                 <td>{row.matchdayRank ?? "—"}</td>
                 <td>{row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}</td>

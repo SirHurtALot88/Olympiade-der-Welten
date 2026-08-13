@@ -20,6 +20,7 @@ import {
   refreshTeamObjectiveState,
   resolveBoardDisposition,
 } from "@/lib/board/team-season-objectives-service";
+import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-initial-compact-state";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -360,10 +361,22 @@ describe("team season objectives service", () => {
       standings: { "M-M": { points: 130, rank: 2 }, "C-C": { points: 80, rank: 14 } },
       transferHistory: [
         {
+          // DER VERKAUF GEHOERT IN DIE SAISON, UM DIE ES GEHT.
+          //
+          // Hier stand `season-2`, waehrend der Spielstand in `season-3` steht (siehe
+          // `createGameState`). Der Test war trotzdem gruen, weil der Transfersaldo damals ueber
+          // ALLE Saisons summierte — ein Verkauf aus der Vorsaison erfuellte also das Saisonziel
+          // der laufenden. Das ist kein Randfall, sondern hat das Ziel unbrauchbar gemacht:
+          // `teamSeasonObjectives` werden je Saison gestellt und je Saison mit rewardCash/
+          // penaltyCash abgerechnet (`objective.seasonId === gameState.season.id`), und der
+          // Alle-Zeiten-Saldo traegt den Liga-Draft mit, der jeden Grundstock-Spieler als Kauf
+          // schreibt. Am Abnahme-Spielstand gemessen: Alle-Zeiten-Saldo −251 bis −341 je Team,
+          // Saisonsaldo −43 bis −109. Ein Ziel „Transfergewinn von 15M erzielen" waere gegen den
+          // Alle-Zeiten-Saldo fuer JEDES Team dauerhaft unerreichbar gewesen.
           id: "sell-c1",
           playerId: "x",
-          seasonId: "season-2",
-          seasonLabel: "Season 2",
+          seasonId: "season-3",
+          seasonLabel: "Season 3",
           transferType: "sell",
           fromTeamId: "C-C",
           toTeamId: null,
@@ -393,6 +406,49 @@ describe("team season objectives service", () => {
     // Season 3 → C-C transfer target is 15 (seasonal scaling)
     expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
+    // Und die Zahl selbst ist die der Saison, nicht die Historie.
+    expect(ccTransfer?.currentValue).toBe(16);
+  });
+
+  /**
+   * DIE GEGENPROBE ZUR SAISONBINDUNG: derselbe Verkauf, nur in der VORSAISON gebucht.
+   *
+   * Er darf das Ziel der laufenden Saison nicht erfuellen — sonst startet ein Team, das einmal gut
+   * verkauft hat, jede weitere Saison mit einem bereits erledigten Transferziel.
+   */
+  it("laesst einen Verkauf aus der Vorsaison das Transferziel der laufenden Saison NICHT erfuellen", () => {
+    const teams = [createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" })];
+    const gameState = createGameState({
+      teams,
+      identities: [createIdentity("C-C", { finances: 10, ambition: 5 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+      standings: { "C-C": { points: 80, rank: 14 } },
+      transferHistory: [
+        {
+          id: "sell-c1-vorsaison",
+          playerId: "x",
+          seasonId: "season-2",
+          seasonLabel: "Season 2",
+          transferType: "sell",
+          fromTeamId: "C-C",
+          toTeamId: null,
+          fee: 16,
+          salary: 0,
+          marketValue: 10,
+          remainingContractLength: 1,
+          happenedAt: "2026-06-12T00:00:00.000Z",
+          source: "ai_preseason_market_sell",
+        },
+      ],
+    });
+
+    const ccTransfer = buildTeamObjectiveOverview(gameState).objectives.find(
+      (objective) => objective.teamId === "C-C" && objective.objectiveId === "transfer-profit",
+    );
+    expect(ccTransfer?.targetValue).toBe(15);
+    expect(ccTransfer?.currentValue).toBe(0);
+    expect(ccTransfer?.status).toBe("failed");
   });
 
   it("keeps bottom-table sport objectives realistic even for ambitious teams", () => {
@@ -1017,6 +1073,49 @@ describe("team season objectives service", () => {
 
     expect(top20Goal?.status).toBe("completed");
     expect(top20Goal?.currentValue).toContain("erfuellt");
+  });
+
+  it("counts every played matchday for the 3x-Top-20 goal, also on the compact browser payload", () => {
+    // Der Browser bekommt nicht den vollen Spielstand, sondern die Kurzfassung aus
+    // `compactFoundationInitialGameState`. Solange die dort `matchdayResults` auf den
+    // aktiven Spieltag beschnitt, kannte `getCurrentSeasonMatchdayResultIds` im Browser
+    // nur noch ein einziges Ergebnis — und `getPlayerPeakSummary` warf jede Leistung der
+    // uebrigen Spieltage weg. Am Live-Save gemessen: Server „4/3, bestes Rank #3"
+    // (erfuellt), Browser „0/3, bestes Rank #33". Die Karte log den Spieler um sein
+    // erreichtes Ziel. Der Test haelt beide Seiten aneinander, nicht nur eine Zahl.
+    const team = createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 100 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("M-M", { ambition: 9, boardConfidence: 6 })],
+      players: [createPlayer("m1")],
+      rosters: [createRoster("m1", { teamId: "M-M" })],
+    });
+    gameState.season.matchdayIds = ["md-1", "md-2", "md-3", "md-4", "md-5", "md-6", "md-7", "md-8"];
+    // Aktiv ist md-1 (siehe `matchdayState`) — md-2 und md-3 sind genau die Spieltage,
+    // die die Kurzfassung frueher wegschnitt. Am aktiven Spieltag steht bewusst ein
+    // Rang ausserhalb der Top 20, damit der Beschnitt sichtbar bei 0 landet.
+    gameState.seasonState.matchdayResults = [
+      createMatchdayResult("result-1", "md-1"),
+      createMatchdayResult("result-2", "md-2"),
+      createMatchdayResult("result-3", "md-3"),
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      createPlayerPerformance("perf-1", { matchdayResultId: "result-1", teamId: "M-M", playerId: "m1", rankInDiscipline: 25 }),
+      createPlayerPerformance("perf-2", { matchdayResultId: "result-2", teamId: "M-M", playerId: "m1", rankInDiscipline: 5 }),
+      createPlayerPerformance("perf-3", { matchdayResultId: "result-3", teamId: "M-M", playerId: "m1", rankInDiscipline: 7 }),
+    ];
+
+    const findeZiel = (state: GameState) =>
+      buildTeamObjectiveOverview(state).objectives.find(
+        (objective) => objective.teamId === "M-M" && objective.objectiveId === "player-top20-repeat",
+      );
+
+    const vollesZiel = findeZiel(gameState);
+    const kompaktesZiel = findeZiel(compactFoundationInitialGameState(gameState));
+
+    expect(vollesZiel?.currentValue).toBe("2/3, bestes Rank #5");
+    expect(kompaktesZiel?.currentValue).toBe(vollesZiel?.currentValue);
+    expect(kompaktesZiel?.status).toBe(vollesZiel?.status);
   });
 
   it("pushes AI buying urgency when a repeat Top-20 player goal is still open", () => {

@@ -1,4 +1,4 @@
-import type { AdminBalancingConfigInput, PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { AdminBalancingConfigInput, ContractShape, PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import type { AttributeHeadroomState } from "@/lib/scouting/player-attribute-ceiling-service";
 import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -94,6 +94,20 @@ export type TrainingPlayerRowView = {
     potentialStars: string | null;
     currentAbilityRating: number | null;
     potentialRating: number | null;
+  };
+  /**
+   * Gehalt/Vertrag für die Steuer-Tabelle (Chris: "damit man weiß welche Spieler mit
+   * langem Vertrag man entwickeln sollte"). Dieselbe Quelle wie die Kaderliste
+   * (`getRosterEntryDisplaySalary` in `season-stand-render-helpers.tsx`, die intern
+   * `resolvePlayerEconomyContract` nutzt) — kein zweiter Rechenweg für Gehalt/Vertrag.
+   * `null`, wenn der Spieler keinen Kader-Eintrag hat (z. B. Free Agent im Forecast).
+   */
+  economy: {
+    /** Aktuelles Saison-Gehalt (Vertragsjahr 1) — front-/back-loaded-bewusst. */
+    salary: number | null;
+    /** Restlaufzeit in Saisons. */
+    contractLength: number | null;
+    contractShape: ContractShape | null;
   };
   traitBoosts: Array<{
     trait: string;

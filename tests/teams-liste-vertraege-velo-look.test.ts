@@ -62,10 +62,18 @@ describe("Portraits bleiben Standard, die Tabelle wird Liste-und-Verträge", () 
 });
 
 describe("Portrait-Karten ohne Vertragskram (T2, game statt excel)", () => {
-  it("die Kader-Portraits tragen nur noch MW als Economy-Kennzahl", () => {
+  it("die Kader-Portraits tragen MW und Gehalt — aber keine Laufzeit", () => {
     const grid = TEAMS.slice(TEAMS.indexOf("function renderRosterGrid"), TEAMS.indexOf("function renderContractPlanningSummary"));
     expect(grid).toContain('label: "MW"');
-    expect(grid).not.toContain('label: "Gehalt"');
+    /*
+     * NACHGEZOGEN (P1/Topf a): hier stand `not.toContain('label: "Gehalt"')`. Diese Zusicherung
+     * gilt NACHWEISLICH nicht mehr — sie wurde vom Eigentuemer selbst zurueckgenommen:
+     * „neben MW fehlt noch gehalt! bitte die breite nutzen" (Commit c579624a, Kader-Portraits).
+     * Der Kern der T2-Regel bleibt bestehen und wird weiter geprueft: die VERTRAGS-Laufzeit
+     * ("LZ") gehoert nicht auf die Portrait-Karte, dafuer gibt es „Liste & Vertraege".
+     * Ein rot stehender Verbots-Test gegen eine ausdrueckliche Anforderung meldet nichts mehr.
+     */
+    expect(grid).toContain('label: "Gehalt"');
     expect(grid).not.toContain('label: "LZ"');
   });
 

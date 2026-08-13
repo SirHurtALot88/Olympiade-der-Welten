@@ -24,6 +24,7 @@ import {
   getSponsorV3Terms, resolveSponsorSystemVersion, stampSponsorSystemVersion,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
+import { LEIH_ZIEL_ACHSENRANG, LEIH_ZIEL_FRISCHE, SPONSOR_LEIH_BONUS } from "@/lib/sponsor/sponsor-leih-ziele";
 
 /**
  * V3: aus den Kurvenformen sind die fuenf Risikokarten geworden. Sie sind fuer JEDES Team
@@ -70,6 +71,11 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
   });
 
   it("die Angebote tragen die V3-Struktur: Karte, Tilt, Ziel nach Schwierigkeit", { timeout: 300_000 }, () => {
+    // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
+    // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`). An ihre Stelle treten die zwei
+    // Leih-Ziele auf den Gebaeude-Karten — fest bepreist (`goalP = 0`, `goalSize = 6`), OHNE
+    // Sockelabzug und OHNE Schwierigkeitsband. Die reine Cash-Karte (Platz 0) traegt weiterhin
+    // gar kein Ziel.
     const offers = allOffers(newGameFromButton());
     for (const offer of offers) {
       const terms = getSponsorV3Terms(offer)!;
@@ -80,17 +86,18 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
       // Kurven-Tilt der Karte. Sicherheit kippt nach unten, Ambition nach oben, Basis flach.
       expect(Math.abs(terms.tilt)).toBeLessThanOrEqual(0.3);
       expect(terms.baseLadder).toHaveLength(32);
-      // NUR ZWEI der fuenf Karten tragen ueberhaupt ein Sonderziel (Sonderziel, Ambition+Ziel).
-      // Bei den anderen ist `goalSize` 0 — dort ein Ziel zu erwarten waere schlicht falsch.
+      // NUR DIE GEBAEUDE-KARTEN tragen ueberhaupt ein Sonderziel (die reine Cash-Karte auf
+      // Platz 0 keins) — und keine Karte mehr eine der fuenf Zielachsen.
+      expect(terms.axis).toBeUndefined();
       if (terms.goalSize > 0) {
-        // Das Ziel ist NACH SCHWIERIGKEIT bepreist: die Wahrscheinlichkeit, mit der es
-        // eingepreist wurde, liegt im gefilterten Band — unerreichbare Ziele werden gar
-        // nicht erst angeboten.
         expect(terms.goalKey).not.toBeNull();
-        expect(terms.goalP).toBeGreaterThanOrEqual(0.15);
-        expect(terms.goalP).toBeLessThanOrEqual(0.72);
+        expect([LEIH_ZIEL_FRISCHE, LEIH_ZIEL_ACHSENRANG]).toContain(terms.goalKey);
+        expect(terms.goalSize).toBe(SPONSOR_LEIH_BONUS);
+        // Kein Sockelabzug: wer das Ziel verfehlt, verliert nichts.
+        expect(terms.goalP).toBe(0);
       } else {
         expect(terms.goalKey).toBeNull();
+        expect(terms.goalSize).toBe(0);
         expect(terms.goalP).toBe(0);
       }
     }
@@ -107,9 +114,13 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
       expect(V3_CARD_KEYS).toContain(v2!.cardKey);
       // Klausel entfallen; stattdessen traegt die Karte ihren Tilt.
       expect(Number.isFinite(v2!.tiltPercent)).toBe(true);
-      // Ziel nur bei den beiden Karten, die eines tragen.
+      // Ziel nur bei den Gebaeude-Karten — und GEAENDERT: die zwei Leih-Ziele sind ohne
+      // Sockelabzug bepreist (p = 0, siehe `lib/sponsor/sponsor-leih-ziele.ts`), anders als
+      // die frueheren Zielachsen mit geschaetzter Erfolgswahrscheinlichkeit.
       if (v2!.goal) {
-        expect(v2!.goal.probability).toBeGreaterThan(0);
+        expect(v2!.goal.probability).toBe(0);
+        expect(v2!.goal.upfrontCost).toBe(0);
+        expect(v2!.goal.payout).toBe(SPONSOR_LEIH_BONUS);
       }
       // Die Spanne muss echte Breite haben — sonst zeigt die Karte eine Entscheidung ohne Folgen.
       expect(v2!.maxPayout).toBeGreaterThan(v2!.minPayout);

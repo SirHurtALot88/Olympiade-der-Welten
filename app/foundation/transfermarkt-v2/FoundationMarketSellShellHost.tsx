@@ -8,6 +8,7 @@ import {
   type DecisionSurfaceStatusTone,
 } from "@/app/foundation/decision-surface/FoundationDecisionSurface";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import {
   classifySellPricingNoteWeight,
   classifySellWarningWeight,
@@ -361,7 +362,7 @@ export default function FoundationMarketSellShellHost({
               className="transfer-sell-hero-portrait transfer-sell-hero-portrait-placeholder"
               aria-label={`${playerName} Platzhalter`}
             >
-              {playerName.slice(0, 2).toUpperCase()}
+              {getPlayerPortraitInitials(playerName)}
             </div>
           }
         />

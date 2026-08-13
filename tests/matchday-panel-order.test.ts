@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import {
+  applySeasonRankColumn,
   MATCHDAY_PANEL_DEFAULT_SORT,
   resolveMatchdayRanks,
   resolveProjectedRanksFromMatchday,
@@ -112,15 +110,16 @@ describe("Spieltags-Wertung · Reihenfolge", () => {
 // Tabelle stand dann überall „–", und die Sortierung fiel zusätzlich auf die
 // Eingangsreihenfolge zurück, weil sie bei aufgedeckter Disziplin 2 daran hängt.
 describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", () => {
-  // `total` ist die Zahl aus der Gesamt-Spalte: Disziplin-Punkte PLUS Mutator-Bonus. Genau die
-  // wird auch in der Saisontabelle gebucht (Spalte BONUS) — `sum` allein waere zu wenig.
-  type ProjRow = { teamId: string; currentPoints: number | null; total: number; projectedRank: number | null };
+  // `sum` ist die Zahl, die GEBUCHT wird: die Disziplin-Punkte aus der Rang→Punkte-Tabelle.
+  // Der Mutator-Aufschlag (`mutPp`, in der Gesamt-Spalte `total` mit drin) ist ein SPIELER-Punkt
+  // und geht nicht in die Saisontabelle — siehe den Wert-Test weiter unten.
+  type ProjRow = { teamId: string; currentPoints: number | null; sum: number; projectedRank: number | null };
 
   it("leitet den neuen Rang aus Saisonpunkten plus Spieltags-Punkten ab", () => {
     const rows: ProjRow[] = [
-      { teamId: "R-L", currentPoints: 5, total: 20.4, projectedRank: null }, // 25,4 → 1
-      { teamId: "P-S", currentPoints: 20, total: 17.9, projectedRank: null }, // 37,9 → wäre 1
-      { teamId: "C-C", currentPoints: 12, total: 4.2, projectedRank: null }, // 16,2 → 3
+      { teamId: "R-L", currentPoints: 5, sum: 20.4, projectedRank: null }, // 25,4 → 1
+      { teamId: "P-S", currentPoints: 20, sum: 17.9, projectedRank: null }, // 37,9 → wäre 1
+      { teamId: "C-C", currentPoints: 12, sum: 4.2, projectedRank: null }, // 16,2 → 3
     ];
 
     const ranks = resolveProjectedRanksFromMatchday(rows);
@@ -131,9 +130,9 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
 
   it("teilt bei Punktgleichstand denselben Rang zu", () => {
     const rows: ProjRow[] = [
-      { teamId: "A", currentPoints: 10, total: 5, projectedRank: null },
-      { teamId: "B", currentPoints: 12, total: 3, projectedRank: null },
-      { teamId: "C", currentPoints: 1, total: 1, projectedRank: null },
+      { teamId: "A", currentPoints: 10, sum: 5, projectedRank: null },
+      { teamId: "B", currentPoints: 12, sum: 3, projectedRank: null },
+      { teamId: "C", currentPoints: 1, sum: 1, projectedRank: null },
     ];
 
     const ranks = resolveProjectedRanksFromMatchday(rows);
@@ -144,8 +143,8 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
 
   it("überspringt Teams ohne Saisonpunkte, statt sie auf Rang 1 zu setzen", () => {
     const rows: ProjRow[] = [
-      { teamId: "ohne", currentPoints: null, total: 99, projectedRank: null },
-      { teamId: "mit", currentPoints: 4, total: 1, projectedRank: null },
+      { teamId: "ohne", currentPoints: null, sum: 99, projectedRank: null },
+      { teamId: "mit", currentPoints: 4, sum: 1, projectedRank: null },
     ];
 
     const ranks = resolveProjectedRanksFromMatchday(rows);
@@ -153,30 +152,104 @@ describe("Spieltags-Wertung · projizierter Rang ohne gespeichertes Ergebnis", (
     expect(ranks.get("mit")).toBe(1);
   });
 
+  /**
+   * DER MUTATOR-AUFSCHLAG WIRD NICHT GEBUCHT — die Projektion darf ihn nicht mitrechnen.
+   *
+   * Echte Zahlen aus dem Live-Abbild `new-game-1785823388048-1hf25q` (Saison 2, Spieltag 10):
+   * Punktestand VOR dem Spieltag (`matchdayBaselinePoints`), das gebuchte Tagesdelta aus
+   * `rank_to_points` (`sum`) und der Mutator-Aufschlag des Tages (`mutPp`, Σ aller
+   * `playerDisciplinePerformances.mutatorPpsBonus` des Teams). Rechts der Rang, den
+   * `standings-apply` tatsaechlich in den Spielstand geschrieben hat.
+   *
+   * Mit `sum + mutPp` projiziert wichen 6 von 32 Raengen ab; mit `sum` sind es 0 von 32.
+   */
+  it("projiziert den gebuchten Rang — der Mutator-Aufschlag zaehlt nicht mit", () => {
+    const abbild = [
+      { teamId: "P-S", currentPoints: 100.1, sum: 10.3, mutPp: 0.3, gebuchterRang: 8 },
+      { teamId: "R-L", currentPoints: 99.9, sum: 9.7, mutPp: 1.2, gebuchterRang: 9 },
+      { teamId: "W-W", currentPoints: 81.3, sum: 16.5, mutPp: 0, gebuchterRang: 15 },
+      { teamId: "T-T", currentPoints: 89.4, sum: 7.5, mutPp: 0.9, gebuchterRang: 16 },
+      { teamId: "U-A", currentPoints: 34.4, sum: 2.1, mutPp: 0, gebuchterRang: 31 },
+      { teamId: "C-C", currentPoints: 35.1, sum: 0.9, mutPp: 0.6, gebuchterRang: 32 },
+    ];
+    const reihenfolge = (ranks: Map<string, number>) =>
+      [...abbild].sort((a, b) => (ranks.get(a.teamId) ?? 99) - (ranks.get(b.teamId) ?? 99)).map((r) => r.teamId);
+    const gebucht = [...abbild].sort((a, b) => a.gebuchterRang - b.gebuchterRang).map((r) => r.teamId);
 
-  it("rechnet den Mutator-Bonus mit — sonst steht ein Bonus-Team zu tief", () => {
-    // GEMELDET VON CHRIS nach Spieltag 10: „schade fuer M-M dass sie es nicht geschafft haben aufs
-    // treppchen — und ploetzlich sind sie doch 2." Genau dieser Fall: ohne den Bonus liegt M-M
-    // hinter H-R, mit Bonus davor. Die Saisontabelle bucht den Bonus, der Endstand-Bildschirm
-    // rechnete ihn nicht mit.
-    const mm = { teamId: "M-M", currentPoints: 126.8, total: 6.9, projectedRank: null };
-    const hr = { teamId: "H-R", currentPoints: 123.6, total: 7.5, projectedRank: null };
-    // Ohne Bonus waere M-M mit 130,7 hinter H-R mit 131,1 — mit Bonus 133,7 zu 131,1 davor.
-    const ranks = resolveProjectedRanksFromMatchday([
-      { ...mm, total: mm.total + 4 },
-      { ...hr, total: hr.total },
-    ]);
-    expect(ranks.get("M-M")).toBe(1);
-    expect(ranks.get("H-R")).toBe(2);
+    // Die Zeilen tragen BEIDE Groessen, genau wie im Panel — `total` ist die Gesamt-Spalte
+    // (Disziplin-Punkte + Mutator). Wer die Projektion wieder auf `total` umstellt, faellt hier.
+    const ranks = resolveProjectedRanksFromMatchday(
+      abbild.map((r) => ({
+        teamId: r.teamId,
+        currentPoints: r.currentPoints,
+        sum: r.sum,
+        total: Number((r.sum + r.mutPp).toFixed(4)),
+        projectedRank: null,
+      })),
+    );
+    expect(reihenfolge(ranks)).toEqual(gebucht);
+    // Die Punktesummen selbst, damit ein Rangvergleich nicht zufaellig aufgeht:
+    expect(abbild.map((r) => Number((r.currentPoints + r.sum).toFixed(1)))).toEqual([110.4, 109.6, 97.8, 96.9, 36.5, 36]);
+
+    // GEGENPROBE: mit dem Mutator-Aufschlag kippen genau diese drei Paare.
+    const mitMutator = resolveProjectedRanksFromMatchday(
+      abbild.map((r) => ({
+        teamId: r.teamId,
+        currentPoints: r.currentPoints,
+        sum: Number((r.sum + r.mutPp).toFixed(4)),
+        projectedRank: null,
+      })),
+    );
+    expect(reihenfolge(mitMutator)).toEqual(["R-L", "P-S", "T-T", "W-W", "C-C", "U-A"]);
   });
 
+  /**
+   * DIESER TEST LAS FRUEHER DEN QUELLTEXT.
+   *
+   * Er suchte im Panel nach den Zeichenketten `const alleAusDerEngine = rows.every(…)` und
+   * `if (row.projectedRank == null) {`. Das ist die Fehlerklasse "Test prueft Quelltext-Strings
+   * statt Werte": er waere gruen geblieben, wenn die Regel in eine tote Funktion gewandert
+   * waere, und er waere rot geworden, sobald jemand eine Variable umbenennt, ohne dass sich
+   * das Verhalten aendert. Seit dem Audit vom 11.08. steht die Regel als `applySeasonRankColumn`
+   * exportiert da und wird hier an WERTEN geprueft — inklusive Gegenprobe auf das alte
+   * Luecken-Fuellen.
+   */
   it("mischt nicht zwei Ranglisten in eine Spalte", () => {
-    // Die Panel-Logik fuellte frueher nur die LUECKEN: Teams mit gespeicherter Projektion behielten
-    // den Rang der Engine, der Rest bekam den abgeleiteten. Zwei je fuer sich stimmige Ranglisten,
-    // zusammen aber eine Reihenfolge, die keiner von beiden entspricht.
-    const panel = readFileSync(join(process.cwd(), "app/foundation/discipline-stage/DisciplineStageMatchdayPanel.tsx"), "utf8");
-    expect(panel).toContain("const alleAusDerEngine = rows.every((row) => row.projectedRank != null)");
-    expect(panel).not.toContain("if (row.projectedRank == null) {");
+    // Vier Teams, aber nur zwei tragen eine Engine-Projektion. Genau die Lage, in der die alte
+    // Logik mischte: A/B behielten 1/2 aus der Engine, C/D bekamen aus der abgeleiteten Liste
+    // ebenfalls kleine Zahlen — Rang 1 und 2 waren danach doppelt vergeben.
+    const gemischt = [
+      { teamId: "A", currentPoints: 10, sum: 1, projectedRank: 1 as number | null },
+      { teamId: "B", currentPoints: 9, sum: 1, projectedRank: 2 as number | null },
+      { teamId: "C", currentPoints: 40, sum: 5, projectedRank: null as number | null },
+      { teamId: "D", currentPoints: 30, sum: 5, projectedRank: null as number | null },
+    ];
+
+    // GEGENPROBE — so sah die alte Regel aus (nur Luecken fuellen):
+    const alteRegel = gemischt.map((row) => ({ ...row }));
+    const abgeleitet = resolveProjectedRanksFromMatchday(alteRegel);
+    for (const row of alteRegel) {
+      if (row.projectedRank == null) row.projectedRank = abgeleitet.get(row.teamId) ?? null;
+    }
+    expect(alteRegel.map((row) => row.projectedRank)).toEqual([1, 2, 1, 2]);
+    // Rang 1 und 2 doppelt, 3 und 4 gar nicht — keine Ordnung, sondern zwei uebereinander.
+    expect(new Set(alteRegel.map((row) => row.projectedRank)).size).toBe(2);
+
+    // NEUE REGEL: unvollstaendige Engine-Daten → ALLE Raenge kommen aus einer Liste.
+    applySeasonRankColumn(gemischt);
+    expect(gemischt.map((row) => row.projectedRank)).toEqual([3, 4, 1, 2]);
+    expect(new Set(gemischt.map((row) => row.projectedRank)).size).toBe(4);
+  });
+
+  it("laesst eine VOLLSTAENDIGE Engine-Rangliste unangetastet", () => {
+    // Sind alle Raenge gebucht, ist die Engine die verbindliche Quelle — auch dann, wenn die
+    // abgeleitete Rechnung eine andere Reihenfolge ergaebe (hier: nach Punkten waere B vorn).
+    const ausDerEngine = [
+      { teamId: "A", currentPoints: 1, sum: 0, projectedRank: 1 as number | null },
+      { teamId: "B", currentPoints: 99, sum: 0, projectedRank: 2 as number | null },
+    ];
+    applySeasonRankColumn(ausDerEngine);
+    expect(ausDerEngine.map((row) => row.projectedRank)).toEqual([1, 2]);
   });
 
   it("macht die Saison-Rang-Spalte wieder sortierbar", () => {

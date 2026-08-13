@@ -16,8 +16,20 @@ import {
   buildDisciplineStageTeamsFromPreview,
   type StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
-import { buildDisciplineStageTeamsFromBookedResult } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
+import {
+  buildDisciplineStageTeamsFromBookedResult,
+  chooseDisciplineStageTeams,
+} from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
+import {
+  spieltagsTopSpielerAusBuchung,
+  spieltagsTopSpielerAusVorschau,
+  summiereSpieltagsTopSpieler,
+  waehleSpieltagsTopSpielerZeilen,
+} from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
+import { buildMatchdayInjuryMarks } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
+import { replayNachArenaReset } from "@/lib/foundation/discipline-stage/discipline-stage-replay-gate";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
@@ -868,9 +880,11 @@ export default function DisciplineStageArena({
      * laufen früher oder später auseinander — genau daran krankte die Bühne zuletzt.
      *
      * Wozu das gut ist: das alte „Daten-Ansicht"-Scoreboard zeigte, was Fatigue, Captain,
-     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. `matchday-arena-presenter.ts` rechnet
-     * diese Zahl bis heute (`baseRank`/`rankDelta`), aber die Funktion dort ruft niemand mehr auf —
-     * sie entstand und verschwand ungesehen. Auf Wunsch von Chris zurückgeholt.
+     * Formkarten und Mutatoren an PLÄTZEN gebracht haben. Auf Wunsch von Chris zurückgeholt —
+     * hier aus den Rohsummen der Resolve-Vorschau, nicht aus einer zweiten Rangrechnung. Die gab
+     * es einmal (`lib/season/matchday-arena-presenter.ts`, `baseRank`/`rankDelta`); sie hatte
+     * keinen Aufrufer, sortierte bei Gleichstand nach Teamname statt wie die Engine nach
+     * `rankDescendingSharedTies` und ist am 11.08.2026 gelöscht worden.
      */
     const modifierBaseByTeam = new Map<string, { d1Base: number; d1Score: number; d2Base: number; d2Score: number }>();
     for (const dp of preview.disciplinePreviews ?? []) {
@@ -1210,13 +1224,28 @@ export default function DisciplineStageArena({
    * Deshalb gibt es jetzt eine zweite echte Quelle: ist die Disziplin gewertet, kommen die Bahnen
    * aus `disciplineResults` + `playerDisciplinePerformances`. Das Modell bleibt dem Test-/
    * Random-Modus vorbehalten.
+   *
+   * NACHTRAG (gemessen, nicht vermutet): „Vorschau bevorzugt" war zu weit gefasst. Die Vorschau
+   * kann aus einem verfallenen Resolve-Snapshot stammen — am Spielstand
+   * `new-game-1785823388048-1hf25q` (S2, Spieltag 10) zeigte sie in 20 von 32 d1-Zeilen einen
+   * anderen Score als gebucht (max 0,70). Deshalb entscheidet jetzt
+   * `chooseDisciplineStageTeams`: die Vorschau gilt, solange sie das gebuchte Ergebnis TRIFFT
+   * (Score < 0,05, Rang exakt) — sonst gewinnt das Gebuchte. Lieber die karge Wahrheit als eine
+   * huebschere Zahl, die nie im Saisonstand stand.
    */
   const engineTeams = useMemo(() => {
     const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
-    if (disc && disc.teamResults.length > 0) {
-      return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
-    }
-    return buildDisciplineStageTeamsFromBookedResult(gameState, disciplineId, teamMetaById, portraitById);
+    const previewTeams =
+      disc && disc.teamResults.length > 0
+        ? buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById)
+        : null;
+    const bookedTeams = buildDisciplineStageTeamsFromBookedResult(
+      gameState,
+      disciplineId,
+      teamMetaById,
+      portraitById,
+    );
+    return chooseDisciplineStageTeams({ previewTeams, bookedTeams }).teams;
   }, [preview, disciplineId, teamMetaById, portraitById, gameState]);
 
   // Echt-Modus nutzt IMMER echte Daten. Fehlen sie, wird nichts erfunden — siehe
@@ -1366,11 +1395,20 @@ export default function DisciplineStageArena({
         (matchdayPanel.d2?.disciplineId === disciplineId &&
           matchdayPanel.teamResults.some((row) => row.d1Points != null))),
   );
+  /**
+   * D2 SPIEGELT D1 — die Zusatzbedingung `d2.disciplineId === disciplineId` ist WEG.
+   *
+   * Sie machte den Aufdeck-Stand davon abhängig, welche Disziplin gerade im Dropdown steht: wer
+   * D2 zu Ende gespielt und danach zu D1 zurückgeschaltet hat, sah D2 wieder verdeckt — und die
+   * Topspieler-Liste darunter fiel damit auf die EINE Disziplin zurück, genau das von Chris
+   * gemeldete Bild. Ein Spoiler war die Klausel nie: `endedDisciplineIds` enthält D2 erst,
+   * NACHDEM D2 in dieser Sitzung durchgelaufen ist. Was gelaufen ist, bleibt gelaufen — dieselbe
+   * Zusage, die `panelD1Revealed` schon immer gab.
+   */
   const panelD2Revealed = Boolean(
     matchdayPanel &&
       (scoringProgress?.d2.scored ||
-        (matchdayPanel.d2?.disciplineId === disciplineId &&
-          Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId)))),
+        Boolean(matchdayPanel.d2?.disciplineId && endedDisciplineIds.has(matchdayPanel.d2.disciplineId))),
   );
 
   /**
@@ -1392,63 +1430,92 @@ export default function DisciplineStageArena({
    *
    * SUMMIERT, nicht aneinandergehängt: ein Spieler, der in beiden Disziplinen antrat, steht EINMAL
    * da, mit der Summe seiner Player-Points und Scores. Der Mutator-Aufschlag summiert sich mit.
+   *
+   * GERECHNET WIRD NICHT HIER, sondern in `discipline-stage-matchday-top-players.ts` — und zwar
+   * an EINER Stelle für beide Quellen. Das ist der Unterschied zu vorher: die Liste hing an der
+   * Resolve-Vorschau, und die wird für einen fertig gebuchten Spieltag NEU gerechnet (der
+   * Snapshot gilt dann bewusst nicht mehr, `readMatchdayResolveSnapshot`). Am Live-Abbild
+   * gemessen (Saison 2, Spieltag 10) wichen dadurch 285 von 286 Spieler-Scores und 227 von 286
+   * Player-Points vom Gebuchten ab, und 4 der 12 angezeigten Namen standen dort zu Unrecht.
+   * Jetzt gilt je Disziplin das Gebuchte, sobald es gebucht ist; die laufende Disziplin kommt
+   * weiterhin aus der Vorschau.
    */
+  /**
+   * Der Saison-Ledger — die Stelle, die die gebuchten Player-Points ableitet. Eigenes Memo, weil
+   * er sonst bei jedem Aufdeck-Wechsel neu über alle Leistungszeilen der Saison liefe.
+   */
+  const seasonPointsLedger = useMemo(() => {
+    if (!seasonId) return null;
+    try {
+      return buildSeasonPointsLedger(gameState, seasonId);
+    } catch {
+      // Lässt sich zu einer Leistungszeile kein Punktwert ableiten, wirft der Ledger. Dann bleibt
+      // es bei der Vorschau — eine kargere Liste ist besser als eine leere Bühne.
+      return null;
+    }
+  }, [gameState, seasonId]);
+
+  /**
+   * VERLETZUNGS-MARKEN DER SPIELTAGS-WERTUNG (Wunsch von Chris).
+   *
+   * Kein Spoiler und deshalb NICHT an `panelD1Revealed`/`panelD2Revealed` gehängt: die Marke sagt
+   * nichts über Punkte oder Reihenfolge, sondern nur, dass es dieses Team an diesem Spieltag
+   * erwischt hat. Die Buchung dazu steht ohnehin schon im Spielstand.
+   */
+  const matchdayInjuryMarks = useMemo(
+    () => (seasonId && matchdayId ? buildMatchdayInjuryMarks(gameState, { seasonId, matchdayId }) : null),
+    [gameState, seasonId, matchdayId],
+  );
+
   const matchdayTopPlayers = useMemo(() => {
-    // Auf eine Nachkommastelle, wie ueberall in der Buehne (`fmt1` zeigt genau so viel).
-    const round1 = (value: number) => Math.round(value * 10) / 10;
-    if (!useEngine || !preview) return null;
+    if (!useEngine) return null;
     const revealedIds = new Set<string>();
-    if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) revealedIds.add(matchdayPanel.d1.disciplineId);
-    if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) revealedIds.add(matchdayPanel.d2.disciplineId);
+    // Die NAMEN der aufgedeckten Seiten wandern mit — sie stehen in der Ueberschrift der Liste,
+    // damit der summierten PP-Zahl anzusehen ist, worueber summiert wurde.
+    const revealedNames: string[] = [];
+    if (panelD1Revealed && matchdayPanel?.d1?.disciplineId) {
+      revealedIds.add(matchdayPanel.d1.disciplineId);
+      revealedNames.push(matchdayPanel.d1.displayName || matchdayPanel.d1.disciplineId);
+    }
+    if (panelD2Revealed && matchdayPanel?.d2?.disciplineId) {
+      revealedIds.add(matchdayPanel.d2.disciplineId);
+      revealedNames.push(matchdayPanel.d2.displayName || matchdayPanel.d2.disciplineId);
+    }
     if (revealedIds.size === 0) return null;
 
-    type Sammel = { row: DisciplineStageTopPlayer; id: string | null };
-    const proSpieler = new Map<string, Sammel>();
-    for (const dp of preview.disciplinePreviews ?? []) {
-      if (!revealedIds.has(dp.disciplineId)) continue;
-      for (const pp of dp.topPlayers) {
-        const punkte = resolveAwardedPlayerPoints({
-          pointsAwarded: pp.pointsAwarded,
-          mutatorPpsBonus: pp.mutatorPpsBonus,
-        });
-        const vorhanden = pp.playerId ? proSpieler.get(pp.playerId) : null;
-        if (vorhanden) {
-          vorhanden.row.score = round1(vorhanden.row.score + pp.finalPlayerScore);
-          vorhanden.row.points = punkte == null && vorhanden.row.points == null ? null : round1((vorhanden.row.points ?? 0) + (punkte ?? 0));
-          vorhanden.row.mutatorPoints =
-            pp.mutatorPpsBonus == null && vorhanden.row.mutatorPoints == null
-              ? null
-              : round1((vorhanden.row.mutatorPoints ?? 0) + (pp.mutatorPpsBonus ?? 0));
-          vorhanden.row.isMvp = vorhanden.row.isMvp || Boolean(pp.isMvpCandidate);
-          continue;
-        }
-        const meta = teamMetaById.get(pp.teamId);
-        proSpieler.set(pp.playerId, {
-          id: pp.playerId,
-          row: {
-            rank: 0,
-            name: pp.playerName,
-            teamCode: meta?.code ?? pp.teamId,
-            logoUrl: meta?.logoUrl ?? null,
-            portraitUrl: portraitById.get(pp.playerId) ?? null,
-            score: pp.finalPlayerScore,
-            points: punkte,
-            mutatorPoints: pp.mutatorPpsBonus ?? null,
-            isMvp: Boolean(pp.isMvpCandidate),
-            isOwn: pp.teamId === ownTeamId,
-            ovrRank: ratingByPlayerId.get(pp.playerId)?.ovrRank ?? null,
-          },
-        });
-      }
-    }
-    const sortiert = [...proSpieler.values()].sort(
-      (a, b) => (b.row.points ?? -1) - (a.row.points ?? -1) || b.row.score - a.row.score,
-    );
-    const top = sortiert.slice(0, 12);
-    top.forEach((e, i) => {
-      e.row.rank = i + 1;
+    const buchungsZeilen =
+      seasonId && matchdayId
+        ? spieltagsTopSpielerAusBuchung({ gameState, seasonId, matchdayId, ledger: seasonPointsLedger })
+        : [];
+    const { zeilen } = waehleSpieltagsTopSpielerZeilen({
+      vorschauZeilen: spieltagsTopSpielerAusVorschau(preview?.disciplinePreviews),
+      buchungsZeilen,
     });
-    return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
+    if (zeilen.length === 0) return null;
+
+    const summiert = summiereSpieltagsTopSpieler(zeilen, revealedIds);
+    if (summiert.length === 0) return null;
+
+    return {
+      rows: summiert.map((eintrag, index): DisciplineStageTopPlayer => {
+        const meta = teamMetaById.get(eintrag.teamId);
+        return {
+          rank: index + 1,
+          name: eintrag.playerName,
+          teamCode: meta?.code ?? eintrag.teamId,
+          logoUrl: meta?.logoUrl ?? null,
+          portraitUrl: portraitById.get(eintrag.playerId) ?? null,
+          score: eintrag.score,
+          points: eintrag.points,
+          mutatorPoints: eintrag.mutatorPoints,
+          isMvp: eintrag.isMvp,
+          isOwn: eintrag.teamId === ownTeamId,
+          ovrRank: ratingByPlayerId.get(eintrag.playerId)?.ovrRank ?? null,
+        };
+      }),
+      ids: summiert.map((eintrag) => eintrag.playerId as string | null),
+      disciplineNames: revealedNames,
+    };
   }, [
     useEngine,
     preview,
@@ -1459,6 +1526,10 @@ export default function DisciplineStageArena({
     portraitById,
     ownTeamId,
     ratingByPlayerId,
+    gameState,
+    seasonId,
+    matchdayId,
+    seasonPointsLedger,
   ]);
 
   /**
@@ -1843,10 +1914,13 @@ export default function DisciplineStageArena({
   // Eine laut SAVE bereits gebuchte Seite gilt auch ohne Session-Commit als gebucht — nach einem
   // Reload mitten im Spieltag zeigt der Status sonst nichts, und ein Replay der Disziplin wuerde
   // erneut buchen wollen. Steht bewusst VOR `disciplineEnded`, das diese Quelle jetzt braucht.
+  // Dieselbe Quelle wie die Buchung unten (`matchdaySides`, also Panel mit Spielplan-Rueckfall).
+  // Mit `matchdayPanel` allein galt bei ausgefallener Preview jede Seite als UNgewertet — der
+  // Endscreen verschwand, und ein Replay haette erneut buchen wollen.
   const activeSideScoredInSave =
-    matchdayPanel?.d1?.disciplineId === disciplineId
+    matchdaySides.d1?.disciplineId === disciplineId
       ? scoringProgress?.d1.scored ?? false
-      : matchdayPanel?.d2?.disciplineId === disciplineId
+      : matchdaySides.d2?.disciplineId === disciplineId
         ? scoringProgress?.d2.scored ?? false
         : false;
 
@@ -1892,15 +1966,43 @@ export default function DisciplineStageArena({
   const commitFinishedDiscipline = useCallback(
     (finishedDisciplineId: string) => {
       if (!onCommitDiscipline) return;
+      /**
+       * SEITE AUS `matchdaySides`, NICHT AUS `matchdayPanel` — DAS WAR DER STILLE BUCHUNGSVERLUST.
+       *
+       * GEMELDET VON CHRIS: „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme."
+       * Am Spielstand (Saison 1, Spieltag 4): Mini-DM gelaufen, aber NULL Ergebniszeilen, waehrend
+       * alle 32 Aufstellungen dafuer vorlagen.
+       *
+       * `matchdayPanel` haengt an der Engine-Preview (`if (!preview) return null`). Faellt die aus —
+       * Netzfehler, leeres Ergebnis, Timeout —, war `side` hier `null`, und die Buchung kehrte
+       * KOMMENTARLOS zurueck: Disziplin laeuft durch, nichts landet im Save, keine Fehlermeldung,
+       * nicht einmal ein `failed`-Zustand. Der Spieltag haengt danach an einer Sperre, deren Grund
+       * nirgends steht.
+       *
+       * Fuer die ANZEIGE gibt es den Rueckfall auf den Spielplan laengst (`matchdaySides` =
+       * Panel, sonst `scheduleSides`) — er wurde damals eingefuehrt, weil bei ausgefallener Preview
+       * der gefuehrte Weg zur zweiten Disziplin verschwand. Die BUCHUNG blieb auf der alten,
+       * preview-gebundenen Quelle stehen. Sie zieht jetzt dieselbe: der Spielplan steht lokal im
+       * gameState und braucht die Engine gar nicht.
+       */
       const side =
-        matchdayPanel?.d1?.disciplineId === finishedDisciplineId
+        matchdaySides.d1?.disciplineId === finishedDisciplineId
           ? "d1"
-          : matchdayPanel?.d2?.disciplineId === finishedDisciplineId
+          : matchdaySides.d2?.disciplineId === finishedDisciplineId
             ? "d2"
             : null;
       // Nur die beiden Spieltags-Disziplinen werden gewertet. Ein freies Nachspielen
       // ausserhalb des Spieltags-Paars bleibt folgenlos.
-      if (!side) return;
+      //
+      // Laesst sich die Seite AUCH ueber den Spielplan nicht bestimmen, ist das kein freies
+      // Nachspielen mehr, sondern ein echter Ausfall — er wird als `failed` vermerkt, damit die
+      // Arena ihn zeigen kann, statt still nichts zu tun.
+      if (!side) {
+        if (matchdaySides.d1 == null && matchdaySides.d2 == null) {
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+        }
+        return;
+      }
       // Bereits im Save gebucht (z. B. D1 nach einem Reload erneut abgespielt):
       // NICHT noch einmal buchen — gebucht wird der erste, verbindliche Durchlauf.
       if (scoringProgress && scoringProgress[side].scored) return;
@@ -1913,8 +2015,25 @@ export default function DisciplineStageArena({
       // Buchens vorfindet; bewegte sich dazwischen etwas an den Aufstellungen, landete im
       // Saisonstand etwas anderes als das, was ueber den Schirm gelaufen war.
       void onCommitDiscipline(side, preview)
-        .then(() => {
-          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "booked" }));
+        .then((ergebnis) => {
+          /**
+           * „NICHT GEWORFEN" HEISST NICHT „GEBUCHT".
+           *
+           * Zwei Wege fuehren hier vorbei, und beide muessen zu. `commitArenaDiscipline` WIRFT
+           * inzwischen bei einer blockierten Wertung und traegt den Grund im Fehler mit (siehe
+           * `DisciplineCommitBlockedError`) — aber es gibt Faelle ohne Wurf: im Lesemodus und
+           * ohne Lauf-Handler gibt es schlicht `null` zurueck. Landete das im `then`, wurde es
+           * als „booked" vermerkt: der Endscreen sagte „im Saisonstand", im Save stand nichts.
+           *
+           * Gewertet wird deshalb das ERGEBNIS, nicht das Ausbleiben eines Fehlers.
+           */
+          const gebucht =
+            ergebnis != null &&
+            (ergebnis as { summary?: { standingsApplyAllowed?: boolean } }).summary?.standingsApplyAllowed === true;
+          setCommitStateByDiscipline((prev) => ({
+            ...prev,
+            [finishedDisciplineId]: gebucht ? "booked" : "failed",
+          }));
           setCommitFailureReason((prev) => ({ ...prev, [finishedDisciplineId]: null }));
         })
         .catch((error: unknown) => {
@@ -1929,7 +2048,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdayPanel?.d1?.disciplineId, matchdayPanel?.d2?.disciplineId, onCommitDiscipline, scoringProgress],
+    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
@@ -2419,6 +2538,19 @@ export default function DisciplineStageArena({
       </div>
       )}
 
+      <div
+        data-oly-debug="arena"
+        data-mode={mode}
+        data-discipline-id={disciplineId}
+        data-discipline-ended={String(disciplineEnded)}
+        data-engine-discipline={String(Boolean(engineDiscipline))}
+        data-active-side-scored={String(activeSideScoredInSave)}
+        data-sides={`${matchdaySides.d1?.disciplineId ?? "-"}|${matchdaySides.d2?.disciplineId ?? "-"}`}
+        data-progress={`${scoringProgress?.d1.disciplineId ?? "-"}:${String(scoringProgress?.d1.scored)}|${scoringProgress?.d2.disciplineId ?? "-"}:${String(scoringProgress?.d2.scored)}`}
+        data-panel-reveal={`${String(panelD1Revealed)}|${String(panelD2Revealed)}`}
+        data-md-top={String(Boolean(matchdayTopPlayers))}
+        hidden
+      />
       <DisciplineStageNativeArena
         key={`${disciplineId}-${mode}-${seed}`}
         slots={payload.slots}
@@ -2436,9 +2568,13 @@ export default function DisciplineStageArena({
           // Saisonstand; nach D2 wird der Spieltag zusaetzlich abgeschlossen.
           commitFinishedDiscipline(disciplineId);
         }}
-        onReset={() => {
+        onReset={(anlass) => {
           setArenaEnded(false);
-          setReplayingDisciplineId(disciplineId);
+          // NUR „↻ Neu" ist ein Nachspielen. Vorher galt auch der Mount als Replay — und weil
+          // `disciplineEnded` ein Replay bewusst nicht als abgeschlossen zaehlt, blieb der ganze
+          // Endscreen (Top-Spieler, Highlights, Weiter-Block) beim Oeffnen einer bereits
+          // gewerteten Disziplin unsichtbar. Siehe `discipline-stage-replay-gate.ts`.
+          setReplayingDisciplineId(replayNachArenaReset(anlass, disciplineId));
         }}
         onResults={setLiveResultsByTeam}
         topPlayers={topPlayers}
@@ -2515,6 +2651,7 @@ export default function DisciplineStageArena({
             modifierBaseByTeam={matchdayPanel.modifierBaseByTeam}
             playersByTeam={matchdayPanel.playersByTeam}
             modifiersByTeam={matchdayPanel.modifiersByTeam}
+            injuryMarksByTeam={matchdayInjuryMarks}
           />
         </div>
       ) : mode === "real" ? (
@@ -2608,6 +2745,9 @@ export default function DisciplineStageArena({
           <DisciplineStageTopPlayers
             players={(matchdayTopPlayers ?? topPlayers).rows}
             playerIdByRow={(matchdayTopPlayers ?? topPlayers).ids}
+            // Ohne Spieltags-Liste steht nur die laufende Disziplin drin — dann sagt die
+            // Ueberschrift auch genau die, statt eine Summe zu behaupten.
+            disciplineNames={matchdayTopPlayers?.disciplineNames ?? (model.disciplineName ? [model.disciplineName] : null)}
             onOpenPlayer={(pid) => openDrawerPinned({ kind: "player", playerId: pid })}
           />
           <DisciplineStageHighlights
@@ -2632,8 +2772,59 @@ export default function DisciplineStageArena({
             // zurück → Diszi 2 startet frisch. Der Matchday-Advance erscheint erst auf der letzten
             // Disziplin (d2 bzw. Ein-Disziplin-Spieltag / Dev-Modus).
             const secondDisciplineId = matchdaySides.d2?.disciplineId ?? null;
+
+            /**
+             * GEMELDET VON CHRIS: „aber MD4 hat nicht gescored und blocked auch so dass ich nicht
+             * weiter komme und abschliessen kann das ist mein problem, nicht dass dort keine punkte
+             * sind."
+             *
+             * BEFUND am Spielstand (Saison 1, Spieltag 4): D1 (Wettessen) mit 32 Ergebniszeilen
+             * gebucht, D2 (Mini-DM) mit NULL — obwohl alle 32 Aufstellungen fuer D2 vorlagen
+             * (64 Eintraege). Die Arena war fuer D2 gelaufen (`arenaEnded`), die BUCHUNG aber nicht
+             * durchgekommen.
+             *
+             * DIE ALTE BEDINGUNG FRAGTE NUR, WELCHE SEITE ANGEZEIGT WIRD (`activeDisciplineSide ===
+             * "d1"`), nie ob sie GEWERTET ist. Stand man auf D2 und war D2 ungewertet, fiel die
+             * Ansicht deshalb in den Zweig darunter und behauptete „Beide Disziplinen sind gewertet"
+             * samt Abschluss-Knopf — der dann blockte, weil der Save es besser wusste. Genau die
+             * Sackgasse, die Chris beschreibt: die Arena sagt fertig, der Spieltagswechsel sagt nein,
+             * und einen Weg zurueck zur Wertung bot die Seite nicht an.
+             *
+             * MASSGEBLICH IST JETZT DER SAVE (`scoringProgress`), nicht die angezeigte Seite:
+             *   - die eigene Seite ist ungewertet  → sagen, dass die Buchung fehlt (kein Abschluss)
+             *   - die ANDERE Seite ist ungewertet  → dorthin fuehren, egal auf welcher man steht
+             *   - beide gewertet                   → erst dann der Abschluss-Knopf
+             */
+            const eigeneSeiteGewertet = activeSideScoredInSave;
+            const andereSeiteGewertet =
+              activeDisciplineSide === "d1" ? (scoringProgress?.d2.scored ?? false) : (scoringProgress?.d1.scored ?? false);
+            const andereSeiteGeplant =
+              activeDisciplineSide === "d1" ? (scoringProgress?.d2.required ?? false) : (scoringProgress?.d1.required ?? false);
+
+            // Die eigene Seite ist durchgelaufen, aber NICHT im Save gelandet. Das ist der Fall, in
+            // dem die Seite bisher „beide gewertet" behauptete. Statt eines Knopfes, der blockt,
+            // steht hier, was wirklich fehlt.
+            if (!devMode && !eigeneSeiteGewertet) {
+              return (
+                <div
+                  role="alert"
+                  data-testid="arena-side-not-booked"
+                  style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                >
+                  <span style={{ fontSize: 12, color: "var(--nl-warn, var(--nl-mut))" }}>
+                    Diese Disziplin ist gelaufen, aber noch <strong>nicht gewertet</strong> — der Spieltag lässt sich
+                    deshalb nicht abschliessen. Disziplin neu starten, um die Wertung nachzuholen.
+                  </span>
+                </div>
+              );
+            }
+
             const guideToSecondDiscipline =
-              !devMode && activeDisciplineSide === "d1" && secondDisciplineId != null && secondDisciplineId !== disciplineId;
+              !devMode &&
+              secondDisciplineId != null &&
+              secondDisciplineId !== disciplineId &&
+              andereSeiteGeplant &&
+              !andereSeiteGewertet;
             if (guideToSecondDiscipline) {
               const secondName =
                 matchdayDisciplineOptions.find((option) => option.id === secondDisciplineId)?.name ?? "Disziplin 2";

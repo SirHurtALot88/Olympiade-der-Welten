@@ -582,15 +582,17 @@ export function useFoundationCrossTabTeamsRoster(input: {
               ppSoc: teamEintrag.disciplinePointsByArea.soc,
               /**
                * Die Kurzfassung traegt die Rohwerte des Schnappschusses, die Auswahl trifft die
-               * Ansicht. Genau diese Reihenfolge stand vorher in der Projektion und ist die der
-               * Historienzeile: SAISONABSCHLUSS. Die Ewige Tabelle waehlt bewusst anders
-               * (Eintrittsstand der Folgesaison) — deshalb darf hier nichts vorab zusammengefasst
-               * werden.
+               * Ansicht — deshalb darf hier nichts vorab zusammengefasst werden.
                */
-              // Dieselbe Rangfolge wie im Snapshot-Pfad oben: der gemeinsam
-              // eingefrorene Saisonstand zuerst, die spaeter ueberschriebenen
-              // Felder nur als Rueckfall fuer Altsaisons.
-              cash: teamEintrag.cashSeasonEnd ?? teamEintrag.cashEnd ?? teamEintrag.cashTotal,
+              // Cash wie im Snapshot-Pfad unten: `cashEntry` zuerst (siehe die Begruendung dort),
+              // dann der eingefrorene Saisonabschluss, die ueberschriebenen Felder nur als
+              // Rueckfall.
+              cash:
+                teamEintrag.cashEntry ??
+                teamEintrag.cashCarryOver ??
+                teamEintrag.cashSeasonEnd ??
+                teamEintrag.cashEnd ??
+                teamEintrag.cashTotal,
               salaryTotal:
                 teamEintrag.salarySeasonEnd ?? teamEintrag.salaryTotalEnd ?? teamEintrag.salaryEnd,
               marketValue:
@@ -671,19 +673,43 @@ export function useFoundationCrossTabTeamsRoster(input: {
             ppSpe: resolveSeasonDisciplineAreaTotal(disciplineValues, "spe", areaPoints.spe),
             ppMen: resolveSeasonDisciplineAreaTotal(disciplineValues, "men", areaPoints.men),
             ppSoc: resolveSeasonDisciplineAreaTotal(disciplineValues, "soc", areaPoints.soc),
-            // ALLE DREI SPALTEN AUS DEMSELBEN MOMENT.
-            //
-            // Die eingefrorenen `*SeasonEnd`-Felder zuerst: sie entstehen gemeinsam am
-            // Ende von `player_development` — nach Trainings-Apply und MW-Neuberechnung,
-            // vor dem ersten Verkauf. Die alten Felder dahinter bezeichnen andere
-            // Zeitpunkte: `cashEnd` den Stand NACH den Verkäufen, `salaryTotalEnd` und
-            // `marketValueTotalEnd` sogar den Eintrittsstand der FOLGE-Saison (der
-            // Eintritts-Patch überschreibt sie). Die Zeile zeigte dadurch drei Spalten
-            // mit drei Zeitpunkten, zwei davon aus der falschen Saison.
-            //
-            // Die Rückfallkette bleibt, damit Altsaisons ohne Freeze weiter etwas
-            // anzeigen — nur eben nachrangig.
-            cash: teamSnapshot.cashSeasonEnd ?? teamSnapshot.cashEnd ?? teamSnapshot.cashTotal ?? null,
+            /**
+             * CASH IST DER EINTRITTSSTAND, GEHALT UND MW SIND DER SAISONABSCHLUSS — und das ist
+             * Absicht, keine vergessene Zeile.
+             *
+             * GEMELDET VON CHRIS an der Historie von L-K: „sie hatten so viel cash und sind nun
+             * negativ? […] der cash wert ist vermutlich vom ende der season und nicht vor den
+             * verkäufen gewesen?" — genau so war es. `cashEnd` ist der Stand NACH der
+             * Verkaufsphase am Saisonende. L-K stand dort mit 137,4 in der Zeile, hatte VOR dem
+             * Ausverkauf aber nur 9,4: fünf Verkäufe über 127,96 hatten das Konto eine Sekunde
+             * lang aufgeblasen. Die Zeile zeigte damit einen Kontostand, den das Team nie zum
+             * Spielen hatte, und das Delta zur Live-Zeile las sich wie ein Absturz um 168.
+             *
+             * ENTSCHIEDEN: `cashEntry` — der Stand zu Beginn der FOLGE-Saison, nach Käufen und
+             * Kaderfüllung. Das ist das Geld, mit dem das Team wirklich losgespielt hat, und es
+             * ist dieselbe Wahl, die die Ewige Tabelle (`all-time-table.ts`) schon trifft. Beide
+             * Ansichten weisen ab hier dieselbe Zahl aus.
+             *
+             * WARUM GEHALT UND MW NICHT MITWANDERN: sie tragen die Frage „wie stark war der Kader
+             * am Saisonende", und die beantwortet der eingefrorene `*SeasonEnd`-Block (Ende
+             * `player_development`, nach Trainings-Apply, vor dem ersten Verkauf). Cash
+             * beantwortet die Frage „womit ging das Team in die nächste Saison". Die Spalten
+             * stehen also bewusst auf zwei Zeitpunkten — der Spaltenkopf sagt es an.
+             *
+             * RÜCKFALLKETTE, in dieser Reihenfolge: fehlt der Eintritts-Patch (die letzte
+             * archivierte Saison vor der nächsten Vorbereitung, Altsaves), kommt `cashCarryOver` —
+             * der Kontostand an der Saisongrenze, nach der Vertragsalterung und vor den Käufen.
+             * Das ist von allen verbleibenden Feldern das nächste an „womit ging das Team in die
+             * nächste Saison"; erst danach der eingefrorene Saisonabschluss und ganz zuletzt die
+             * überschriebenen Altfelder.
+             */
+            cash:
+              teamSnapshot.cashEntry ??
+              teamSnapshot.cashCarryOver ??
+              teamSnapshot.cashSeasonEnd ??
+              teamSnapshot.cashEnd ??
+              teamSnapshot.cashTotal ??
+              null,
             salaryTotal:
               teamSnapshot.salarySeasonEnd ?? teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
             marketValue:

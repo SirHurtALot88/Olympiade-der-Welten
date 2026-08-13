@@ -24,6 +24,7 @@ import type {
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
+import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -1307,7 +1308,10 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // beim Laden, damit die anstehende Saisonabrechnung nicht noch einmal die Ausreisser der alten
   // Leiter auszahlt (gemessen am Live-Save: +34,2 C / −26,7 C gegen den Benchmark). Der Stempel im
   // Save (`seasonState.sponsorLadderMigrationVersion`) sorgt dafuer, dass sie GENAU EINMAL laeuft.
-  const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
+  // MIGRATION M2 (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3): das Verhandlungs-Benchmark am
+  // Vertrag nachtragen, damit Bestandsvertraege nicht anders besteuert werden als neue. Ganz
+  // aussen, damit es die fertigen Roster sieht; idempotent (setzt nur fehlende Felder).
+  const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withMigratedSponsorLadders(
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
@@ -1322,7 +1326,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  );
+  ));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

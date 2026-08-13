@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  getContractShapeTeamContext,
+  wendeApronUndMixAn,
+  type ContractShapeTeamContext,
+} from "@/lib/market/contract-shape-context";
 import type {
   ContractEventRecord,
   ContractShape,
@@ -13,10 +18,19 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
+import {
+  applyAiContractDissolutions,
+  type AiDissolutionDecision,
+  type AiDissolutionRenewalSignal,
+} from "@/lib/morale/ai-contract-dissolution-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
-import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import {
+  getSeasonEconomyFactorWindow,
+  isBeforeSeasonEconomyFactorAdvance,
+} from "@/lib/season/season-economy-factors";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -38,6 +52,11 @@ import {
 } from "@/lib/morale/player-morale-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+
+// Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
+// gewandert (siehe dort), damit die KI-Aufloesung sie nutzen kann, ohne einen Import-Zyklus mit
+// diesem Dienst zu bauen. Aufrufer und Tests behalten ihren bisherigen Importpfad.
+export { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 
 export type ContractRenewalAction = "renew" | "release";
 
@@ -172,7 +191,20 @@ function statusAfterSeasonTick(entry: RosterEntry): { nextLength: number; nextSt
   return { nextLength, nextStatus: "active" };
 }
 
-function advanceRosterContractSchedule(entry: RosterEntry, nextLength: number): Pick<RosterEntry, "salary" | "upkeep" | "yearlySalarySchedule"> {
+/**
+ * EIN SAISONWECHSEL FUER EINEN VERTRAG: die Schedule rueckt um ein Jahr vor, `salary` wird mit der
+ * neuen Jahr-1-Rate UEBERSCHRIEBEN.
+ *
+ * Genau dieses Ueberschreiben ist die Falle, die die Apron-Bemessung nicht beruehren darf: bei
+ * einem front_loaded-Vertrag ist `salary` nach dem ersten Saisonwechsel kleiner als das verhandelte
+ * Jahresgehalt. `negotiatedAnnualSalary` steht NICHT im Rueckgabetyp und wird deshalb vom Spread
+ * `{ ...entry, ...scheduleUpdate }` nicht angefasst — das ist beabsichtigt und der Grund, warum das
+ * Feld ueberhaupt existiert.
+ *
+ * Exportiert, damit der Waechter-Test einen Saisonwechsel simulieren kann, ohne die ganze
+ * Saisonende-Kette zu fahren — ohne ihn bliebe die Falle unsichtbar.
+ */
+export function advanceRosterContractSchedule(entry: RosterEntry, nextLength: number): Pick<RosterEntry, "salary" | "upkeep" | "yearlySalarySchedule"> {
   const existingSchedule = entry.yearlySalarySchedule ?? [];
   if (existingSchedule.length <= 1 || nextLength <= 0) {
     return {
@@ -373,68 +405,6 @@ export function resolveContractRenewalTco(input: {
     renewalYearCost,
     minRiskPremium,
     score: exitBias.score + (renewCheaper ? 0.15 : 0) + (underMin ? 0.35 : 0),
-  };
-}
-
-/**
- * Sell-parity for contract exits: exit cash (MW × factor) below purchase price is a realized cash loss
- * (e.g. bought for 20, exit fee 15 → −5). Bias toward a short renewal when eating that loss is
- * worse than bridging one more season — same spirit as lossResistance on market sells, no hard gate.
- */
-export function resolveContractExitRenewBias(input: {
-  exitProfitLoss: number | null;
-  exitPurchasePrice: number | null;
-  exitValue: number | null;
-  renewalSalary: number | null;
-  currentSalary: number | null;
-  ratingValue: number;
-  badValueContract: boolean;
-}): {
-  score: number;
-  shouldBiasRenew: boolean;
-  preferRenewOverExit: boolean;
-  exitLossAbs: number;
-  renewalYearCost: number;
-} {
-  const empty = {
-    score: 0,
-    shouldBiasRenew: false,
-    preferRenewOverExit: false,
-    exitLossAbs: 0,
-    renewalYearCost: 0,
-  };
-  if (input.badValueContract) {
-    return empty;
-  }
-  const purchasePrice = input.exitPurchasePrice;
-  const exitValue = input.exitValue;
-  if (purchasePrice == null || purchasePrice <= 0 || exitValue == null) {
-    return empty;
-  }
-  if (exitValue + 0.005 >= purchasePrice) {
-    return empty;
-  }
-  const exitLossAbs = Math.max(0, purchasePrice - exitValue);
-  const renewalYearCost = roundMoney(input.renewalSalary ?? input.currentSalary ?? 0) ?? 0;
-  const lossRatio = exitLossAbs / purchasePrice;
-  const bracketScale = Math.max(6, purchasePrice * 0.15);
-  const relativePart = clamp01(lossRatio / 0.35);
-  const absolutePart = clamp01(exitLossAbs / bracketScale);
-  const combined = 0.3 * relativePart + 0.7 * absolutePart;
-  const ratingScale = input.ratingValue < 22 ? 0.35 : input.ratingValue < 30 ? 0.65 : 1;
-  // Bridge TCO: one season salary is cheaper than realizing the exit write-down → renew and hope.
-  const tcoFavorsRenew =
-    renewalYearCost > 0 &&
-    exitLossAbs >= renewalYearCost * 0.9 &&
-    input.ratingValue >= 28;
-  const score = Math.min(1, combined * ratingScale + (tcoFavorsRenew ? 0.28 : 0));
-  const shouldBiasRenew = score >= 0.22 || tcoFavorsRenew;
-  return {
-    score,
-    shouldBiasRenew,
-    preferRenewOverExit: tcoFavorsRenew,
-    exitLossAbs,
-    renewalYearCost,
   };
 }
 
@@ -646,12 +616,7 @@ function buildAiRenewalCashGate(input: {
   const cashPriority = bias?.cashPriority ?? 5;
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
   const identityFinances = identity?.finances ?? 5;
-  const salaryFactorCurrent =
-    getSeasonEconomyFactorWindow({
-      saveId: input.gameState.season.id,
-      seasonId: input.gameState.season.id,
-      seasonState: input.gameState.seasonState,
-    })[0]?.factor ?? 1;
+  const salaryFactorCurrent = readSeasonSalaryFactors(input.gameState)[0] ?? 1;
   const salaryIncrease = Math.max(0, (input.renewalSalary ?? input.currentSalary) - input.currentSalary);
   const baseReserve = 3 + salaryTotal * 0.08;
   const strategyReserve =
@@ -674,13 +639,170 @@ function buildAiRenewalCashGate(input: {
   };
 }
 
-function chooseAiRenewalContractShape(input: {
+/**
+ * DAS SALARY-FACTOR-FENSTER — ein Leser fuer diese Datei, eine Quelle fuer den ganzen Baum.
+ *
+ * `getSeasonEconomyFactorWindow` ist die einzige Stelle, die das Fenster kennt; hier wird es nur
+ * auf die nackten Faktoren (horizonIndex 0..4) heruntergebrochen. Kein zweiter Nachbau, kein
+ * direkter Griff in `seasonState.seasonEconomyFactors`.
+ */
+function readSeasonSalaryFactors(gameState: GameState): number[] {
+  return getSeasonEconomyFactorWindow({
+    saveId: gameState.season.id,
+    seasonId: gameState.season.id,
+    seasonState: gameState.seasonState,
+  })
+    .slice()
+    .sort((left, right) => left.horizonIndex - right.horizonIndex)
+    .map((entry) => entry.factor);
+}
+
+/**
+ * DIE FAKTOREN DER SAISONS, DIE DIESER VERTRAG BEZAHLT — Jahr 1 zuerst.
+ *
+ * Verlaengert wird in der Saisonende-Kette; das Faktor-Fenster rueckt erst in deren letztem Schritt
+ * vor (`next_season_setup`). Jahr 1 des neuen Vertrags ist dann `horizonIndex 1`, nicht 0 — genau
+ * dieselbe Verschiebung wie beim Apron (siehe `resolveApronDecisionSalaryFactor`). Laeuft die
+ * Bewertung dagegen in einer bereits gestarteten Saison, ist Jahr 1 der Horizont 0.
+ *
+ * JAHRE JENSEITS DES FENSTERS bekommen das MITTEL DER BEKANNTEN Jahre — nicht den letzten Wert
+ * fortgeschrieben und nicht abgeschnitten. Das Fenster traegt 5 Saisons, betroffen sind also nur
+ * Laufzeiten ab 5 (am Abbild 9 von 262 mehrjaehrigen Vertraegen, 3,4 %). Das Mittel ist die
+ * neutrale Fuellung: es verschiebt keine der beiden Haelften gegenueber der anderen und erfindet
+ * damit kein Gefaelle. Den letzten Faktor fortzuschreiben waere die Behauptung, der Trend halte an
+ * — genau das Raten, das `docs/APRON_UND_VERTRAGSFORMEN.md` (Abschnitt 5 B) ausschliesst.
+ */
+export function resolveContractTermSalaryFactors(gameState: GameState, contractLength: number): number[] {
+  const window = readSeasonSalaryFactors(gameState);
+  const offset = isBeforeSeasonEconomyFactorAdvance(gameState.gamePhase) ? 1 : 0;
+  const laufzeit = Math.max(0, Math.round(contractLength));
+  const bekannt = window.slice(offset, offset + laufzeit);
+  if (bekannt.length === 0 || bekannt.length >= laufzeit) return bekannt;
+  const mittel = bekannt.reduce((sum, value) => sum + value, 0) / bekannt.length;
+  return [...bekannt, ...Array.from({ length: laufzeit - bekannt.length }, () => mittel)];
+}
+
+/**
+ * SCHWELLE DER FORMWAHL — 0,15, hergeleitet in `docs/APRON_UND_VERTRAGSFORMEN.md` Abschnitt 5 A,
+ * nicht geschaetzt. Drei gemessene Anker:
+ *
+ * 1. SIGNAL > VERSCHOBENES: der Wertungsanteil ist linear in f (Rang 1 = 82,7 · Rang 16 = 33,9 ·
+ *    Rang 24 = 13,3 bei f=1). Bei |Δ|=0,15 betraegt die Einnahmendifferenz zwischen den
+ *    Vertragsjahren 12,4 / 5,1 / 2,0 — die Form verschiebt dagegen nur 0,49–1,99 je Vertrag
+ *    (mittleres Jahresgehalt mehrjaehriger Vertraege 6,65 bzw. 4,87 × 10/20/30 %). Bei 0,10 faellt
+ *    der Swing eines Rang-24-Teams (1,3) UNTER das Verschobene — dort dreht man Vertraege fuer
+ *    einen Effekt, der kleiner ist als die Drehung.
+ * 2. AUSLOESEHAEUFIGKEIT (500 000 Ziehungen aus der echten Roll-Spanne 0,82–1,24):
+ *    P(|Δ| ≥ T) = 58/59/43 % bei T=0,10 · 41/42/23 % bei T=0,15 · 28/28/11 % bei T=0,20
+ *    (2/3/4 Jahre). Das Fenster ist LIGA-GLOBAL: feuert die Regel, feuert sie fuer alle 32 Teams
+ *    zugleich. 0,10 uebersteuerte die Profile in der Mehrzahl aller Fenster (Monokultur), 0,20
+ *    machte ausgerechnet die Laufzeit mit dem groessten Hebel (4 Jahre, ±30 %) fast taub (11 %).
+ * 3. KOSTENSEITE: frueh gebundenes Geld kostet schlimmstenfalls den Kreditzins (7–20 %/Saison) auf
+ *    die verschobene Summe, also ≤ 0,27/Saison — die Schwelle braucht keine Kostenmarge, nur
+ *    Rauschabstand. Das echte Kostenrisiko faengt die Cash-Wache in `chooseAiRenewalContractShape`.
+ *
+ * Benannte Konstante, damit die Kontrollmessung nachjustieren kann, ohne den Code zu verstehen.
+ * NICHT vertretbar sind < 0,10 (Anker 1 kippt fuer die halbe Liga) und > 0,20 (Anker 2).
+ * Nachjustiert wird am Langlauf-A/B (Kreditzinsen, `ai_cash_buffer_required`-Blockaden), NICHT an
+ * der Flip-Quote.
+ */
+export const AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE = 0.15;
+
+/**
+ * DAS GEFAELLE Δ = Mittel(ENDHAELFTE der Vertragsjahre) − Mittel(ANFANGSHAELFTE).
+ * Positiv = die Einnahmen STEIGEN ueber die Laufzeit (→ spaeter zahlen), negativ = sie fallen
+ * (→ frueh zahlen). Alle Vertragsjahre zaehlen VOLL, spaete Jahre werden NICHT abgewertet: die
+ * Faktoren sind deterministisch vorausgewuerfelt, es gibt keine Unsicherheit, die eine Abwertung
+ * rechtfertigte (anders als bei den Apron-LINIEN, die wirklich unbekannt sind).
+ *
+ * WARUM DIE HAELFTEN-STATISTIK UND NICHT „naechste Saison gegen den Rest": die naive Variante
+ * verduennt einen spaeten Ausreisser. Am Messkoerper `1hf25q` (Vertragsjahre [0,87, 0,83, 0,91,
+ * 1,24]) liefert sie Δ = −0,12 und damit das FALSCHE VORZEICHEN; die Haelften-Statistik zeigt den
+ * 1,24-Jahrgang korrekt mit Δ = +0,22. Die Haelften passen ausserdem exakt zur Gewichtsrampe von
+ * `buildShapeWeights` (linear, symmetrisch um die Laufzeitmitte).
+ *
+ * Bei ungerader Laufzeit gehoert das Mitteljahr zu KEINER Haelfte — die Rampe bewegt es kaum
+ * (Gewicht ≈ 1), und es wuerde beide Mittelwerte nur gleichsinnig verschieben.
+ */
+function resolveSalaryFactorGefaelle(factors: readonly number[]): number {
+  if (factors.length < 2) return 0;
+  const half = Math.floor(factors.length / 2);
+  const anfang = factors.slice(0, half);
+  const ende = factors.slice(factors.length - half);
+  const mittel = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  // Auf 6 Stellen runden: die Faktoren tragen zwei Nachkommastellen, alles darunter ist
+  // Binaerbruch-Rauschen. Ohne das Runden entscheidet an der Schwelle die Reihenfolge der
+  // Subtraktion (1 − 1,15 = −0,14999999999999991) darueber, ob die Regel greift.
+  return Math.round((mittel(ende) - mittel(anfang)) * 1e6) / 1e6;
+}
+
+/**
+ * DIE VERTRAGSFORM EINER KI-VERLAENGERUNG.
+ *
+ * DIE APRON HAT HIER NICHTS ZU SUCHEN — nachgemessen, nicht vermutet: die Apron bemisst das
+ * GEGLAETTETE Formel-Gehalt (`contract.expectedSalary`, siehe Kopfkommentar von
+ * `lib/season/apron-service.ts`), nicht die Jahreszahlung. Ein Experiment am Spielstand hat die
+ * zehn mehrjaehrigen Vertraege des groessten Zahlers auf `front_loaded` gestellt: die echte
+ * Jahr-1-Gehaltssumme stieg um 10,5, die Apron-Abgabe aenderte sich um EXAKT 0,00. Wer hier eine
+ * Regel „Form gegen die Apron" einbaut, baut eine Regel ohne Wirkung — und bricht die
+ * Anti-Gaming-Entscheidung, die genau das verhindern soll. Ein Waechter-Test haelt die 0,00 fest.
+ *
+ * WAS DIE FORM WIRKLICH BEWEGT, IST CASH-TIMING. Gehaltszahlungen skalieren NICHT mit dem Salary
+ * Factor (es gibt keinen `salaryFactor` in `lib/player-formulas/`, abgebucht wird die nominale
+ * Schedule-Summe), die EINNAHMEN aber schon (Wertungstopf = 1133 × f, im Ligamittel rund ±12 je
+ * Team zwischen f=0,83 und f=1,19). Faellt das Fenster ueber die Laufzeit, ist frueh zahlen
+ * guenstiger; steigt es, spaeter. Die Form verschiebt real 10/20/30 % des Jahresgehalts bei 2/3/4
+ * Jahren Laufzeit.
+ *
+ * RANGFOLGE: KASSENKLEMME > FAKTOR > PROFIL — entschieden und begruendet in
+ * `docs/APRON_UND_VERTRAGSFORMEN.md` Abschnitt 5 C, nicht nach Gefuehl gereiht.
+ *   1. `tightNow && cashPreservationProfile → back_loaded` bleibt die ERSTE Regel: eine erzwungene
+ *      Kreditaufnahme kostet 7–20 %/Saison auf die GESAMTE Luecke und ein gerissenes Cash-Gate
+ *      blockiert die Verlaengerung ganz (`ai_cash_buffer_required`) — das schlaegt jeden
+ *      Ausrichtungsgewinn von ≤ ~2 je Vertrag.
+ *   2. DANN der Faktor — und der UEBERSTIMMT die Profil-Neigungen. `cashPriority`,
+ *      `wageSensitivity`, `long-`/`shortContractPreference` und `sellForProfitAggression` sind
+ *      Geschmack ohne Informationsgehalt ueber die Zukunft; das Faktor-Fenster ist bekannte
+ *      Arithmetik. `front_loaded` nur mit der BESTEHENDEN Cash-Wache `cash ≥ requiredReserve + 10`
+ *      (dieselbe Schwelle wie die `wageSensitivity ≥ 8`-Regel darunter — bewusst keine zweite
+ *      erfundene Zahl); `back_loaded` braucht keine, es entlastet das erste Jahr.
+ *   3. Erst danach die vier Profil-Regeln, dann `balanced`.
+ *
+ * DASS DARAUS KEINE MONOKULTUR WIRD, sichern drei gemessene Dinge: die Schwelle schweigt in rund
+ * 60 % der Fenster (Anker 2 an der Konstante oben), die Cash-Wache trennt die Teams nach ihrer
+ * echten Kassenlage, und Einjahresvertraege (124/340 bzw. 297/343 am Abbild) haben nie eine Form.
+ * GRENZE DER REGEL, offen benannt: sie richtet sich nach dem LIGA-Wetter; der teamindividuelle
+ * Rangverlauf (Wertungsanteil Rang 1 = 82,7 gegen Rang 24 = 13,3) bleibt aussen vor — ihn
+ * vorherzusagen waere Raterei.
+ *
+ * Exportiert, weil die Regel sonst nur beim Saisonwechsel liefe und von keinem Test beruehrt wuerde
+ * — genau die Fehlerklasse, die im Apron-Horizont schon einmal zugeschlagen hat.
+ *
+ * NACHGETRAGEN (PR #508): DER MIX-RIEGEL ALS LETZTE INSTANZ — und NUR er.
+ * Chris' Vorgabe: „es sollen ja nicht alle top teams dann nur back loaded nehmen […] dann hast du
+ * irgendwann nen sehr teuren gehaltspeak das muss auch vermieden werden, der mix machts." Der
+ * Kopfkommentar oben argumentiert, dass keine Monokultur ENTSTEHT (Schwelle schweigt in ~60 % der
+ * Fenster, Cash-Wache trennt, Einjahresvertraege formlos) — das ist eine Begruendung, kein Riegel.
+ * Chris hat ausdruecklich einen Riegel verlangt, also steht hier einer: hat ein Team schon die
+ * Haelfte seiner mindestens vier Mehrjahresvertraege back-loaded, wird der naechste ausgeglichen.
+ *
+ * DIE APRON-REGEL AUS #508 LAEUFT HIER BEWUSST NICHT MIT. Der Kopfkommentar oben entscheidet
+ * begruendet und gemessen, dass die Apron in dieser Wahl nichts zu suchen hat; diese Entscheidung
+ * ist juenger als #508 und wird hier nicht still ueberstimmt. Auf den KAUFWEGEN greift sie weiter
+ * (`contract-negotiation-preview.ts`), dort spricht der Kommentar oben nicht. Ob sie auch bei
+ * Verlaengerungen gelten soll, ist eine Entscheidung fuer Chris und in der Triage-Quittung notiert.
+ */
+export function chooseAiRenewalContractShape(input: {
   team: Team | null;
   entry: RosterEntry;
   recommendedLength: number;
   renewalSalary: number | null;
   cashGate: ReturnType<typeof buildAiRenewalCashGate>;
   profile: TeamStrategyProfile | null;
+  /** Faktoren der Saisons, die dieser Vertrag bezahlt (Jahr 1 zuerst). Fehlt/zu kurz = keine Vorausschau. */
+  termSalaryFactors?: readonly number[];
+  /** Bisheriger Vertragsmix des Teams. Fehlt = kein Riegel, Verhalten unveraendert. */
+  shapeContext?: ContractShapeTeamContext | null;
 }): ContractShape {
   if (input.recommendedLength <= 1) return "balanced";
 
@@ -702,11 +824,42 @@ function chooseAiRenewalContractShape(input: {
   const futureReliefProfile = wageSensitivity >= 7 || longContractPreference >= 7 || sellForProfitAggression >= 7;
   const cashPreservationProfile = cashPriority >= 7 || shortContractPreference >= 7;
 
+  // 1. Kassenklemme — unveraendert die erste Regel.
   if (tightNow && cashPreservationProfile) return "back_loaded";
-  if (strongCashBuffer && futureReliefProfile) return "front_loaded";
-  if (cashPriority >= 8 && !strongCashBuffer) return "back_loaded";
-  if (wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10) return "front_loaded";
-  return "balanced";
+
+  // 2. Konjunktur-Vorausschau. Steht VOR den Profil-Regeln und uebersteuert sie (Kopfkommentar,
+  //    Rangfolge 2). Ohne nennenswertes Gefaelle schweigt sie und laesst die Profile entscheiden.
+  const gefaelle = resolveSalaryFactorGefaelle(input.termSalaryFactors ?? []);
+  if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) {
+    // Auch die Faktor-Regel laeuft durch den Mix-Riegel: die Abnahme von #507 stellte 14 von 216
+    // Vertraegen auf back_loaded — genau die Haeufung, die Chris begrenzt sehen wollte.
+    return wendeApronUndMixAn({
+      form: "back_loaded",
+      laufzeit: input.recommendedLength,
+      gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
+    }).form;
+  }
+  if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && cash >= input.cashGate.requiredReserve + 10) {
+    return "front_loaded";
+  }
+
+  // 3. Profil-Neigungen.
+  const ausRangfolge: ContractShape =
+    strongCashBuffer && futureReliefProfile
+      ? "front_loaded"
+      : cashPriority >= 8 && !strongCashBuffer
+        ? "back_loaded"
+        : wageSensitivity >= 8 && cash >= input.cashGate.requiredReserve + 10
+          ? "front_loaded"
+          : "balanced";
+
+  // 4. Mix-Riegel als letzte Instanz. Er VERSCHIEBT nur nach `balanced` und erzeugt nie
+  //    `back_loaded` — die Rangfolge oben bleibt in jeder anderen Hinsicht unangetastet.
+  return wendeApronUndMixAn({
+    form: ausRangfolge,
+    laufzeit: input.recommendedLength,
+    gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
+  }).form;
 }
 
 function buildToken(input: {
@@ -915,6 +1068,8 @@ function buildPreviewRow(input: {
           renewalSalary: moraleAdjustedRenewalSalary,
           cashGate: renewalCashGate,
           profile: teamStrategyProfile,
+          termSalaryFactors: resolveContractTermSalaryFactors(save.gameState, recommendedLength),
+          shapeContext: getContractShapeTeamContext(save.gameState, entry.teamId),
         })
       : "balanced";
   const marketValueForBad =
@@ -1241,6 +1396,8 @@ export type SeasonEndContractTickComputation = {
   releasedPlayers: number;
   renewedPlayers: number;
   contractEventsWritten: number;
+  /** Entscheidungen der KI ueber Vertragsaufloesungen auf Spielerwunsch (leer, wenn keine anlagen). */
+  dissolutions: AiDissolutionDecision[];
 };
 
 /**
@@ -1265,12 +1422,49 @@ export function computeSeasonEndContractTick(
       releasedPlayers: 0,
       renewedPlayers: 0,
       contractEventsWritten: 0,
+      dissolutions: [],
     };
   }
 
   const preview = previewOverride ?? previewSeasonEndContracts(save);
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
-  const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
+
+  /**
+   * VERTRAGSAUFLOESUNGEN DER KI — VOR der Alterung, aus demselben Dienst wie beim Menschen.
+   *
+   * Der Preis eines Angebots rechnet mit `contractLength - 1` (das laufende Vertragsjahr ist zum
+   * Saisonende gespielt). Liefe die Entscheidung NACH der Alterung, waere der Vertrag bereits
+   * fortgeschrieben und der Rest-Buyout um ein Jahr zu klein. Sie steht deshalb hier — und nicht
+   * in `buildNextSeasonGameState`, wo der Tick im Sim-Pfad schon gelaufen waere.
+   *
+   * Die Angebote sind an dieser Stelle einmalig: `buildContractDissolutionOffers` sperrt einen
+   * Spieler nach der Entscheidung fuer die laufende Saison, und dieser Tick laeuft je Saison genau
+   * einmal (`hasSeasonEndContractTickApplied`, oben).
+   *
+   * Was die KI von der Vertrags-Vorschau uebernimmt, ist die Frage „wollte das Team ihn ueberhaupt
+   * behalten?" — bei einem auslaufenden Vertrag ist genau das der Unterschied zwischen Ablehnen
+   * (er bleibt und wird verlaengert) und Ablehnen ohne Wirkung (er geht ein paar Zeilen weiter
+   * unten mit demselben Erloes durch `buildContractExitValue`).
+   */
+  const renewalSignals = new Map<string, AiDissolutionRenewalSignal>(
+    preview.rows.map((row) => [
+      `${row.teamId}:${row.playerId}`,
+      {
+        wouldRenew: row.recommendedAction === "renew" && row.canRenewEffective,
+        renewalSalary: row.renewalSalaryPreview,
+        renewalLength: row.recommendedLength,
+      },
+    ]),
+  );
+  const dissolutionRun = applyAiContractDissolutions({
+    gameState: save.gameState,
+    saveId: save.saveId,
+    seasonId: save.gameState.season.id,
+    decidedAt: new Date().toISOString(),
+    renewalSignals,
+  });
+  const sourceState = dissolutionRun.gameState;
+  const playersById = new Map(sourceState.players.map((player) => [player.id, player] as const));
   const nextRosters: RosterEntry[] = [];
   const contractEvents: ContractEventRecord[] = [];
   const transferHistory: TransferHistoryEntry[] = [];
@@ -1278,7 +1472,7 @@ export function computeSeasonEndContractTick(
   const teamReleaseCounts = new Map<string, number>();
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
-  for (const entry of save.gameState.rosters) {
+  for (const entry of sourceState.rosters) {
     const tick = statusAfterSeasonTick(entry);
     if (tick.nextStatus === "out_of_contract") {
       const row = rowsByRosterId.get(entry.id);
@@ -1303,13 +1497,17 @@ export function computeSeasonEndContractTick(
           annualSalary: newSalary,
           contractLength: renewLength,
           shape: contractShape,
-          seasonIdBase: save.gameState.season.id,
-          seasonLabelBase: getSeasonLabel(save.gameState),
+          seasonIdBase: sourceState.season.id,
+          seasonLabelBase: getSeasonLabel(sourceState),
         }).yearlySalarySchedule;
         nextRosters.push({
           ...entry,
           salary: newSalary,
           upkeep: newSalary,
+          // UNTERSCHRIFTSPFAD: KI-Verlaengerung. Das Verhandlungs-Benchmark ist das JAHRESGEHALT
+          // des neuen Vertrags, nicht dessen erste Rate — `newSalary` ist genau die Zahl, aus der
+          // `buildContractSalarySchedule` die Raten formt.
+          negotiatedAnnualSalary: newSalary,
           contractLength: renewLength,
           contractStatus: renewLength === 1 ? "expiring" : "active",
           contractShape,
@@ -1317,7 +1515,7 @@ export function computeSeasonEndContractTick(
         });
         contractEvents.push(
           buildContractEvent({
-            seasonId: save.gameState.season.id,
+            seasonId: sourceState.season.id,
             teamId: entry.teamId,
             playerId: entry.playerId,
             eventType: "contract_renewed",
@@ -1347,13 +1545,15 @@ export function computeSeasonEndContractTick(
           ...entry,
           salary: bridgeSalary,
           upkeep: bridgeSalary,
+          // UNTERSCHRIFTSPFAD: Brueckenverlaengerung ueber ein Jahr. Auch sie ist eine Unterschrift.
+          negotiatedAnnualSalary: bridgeSalary,
           contractLength: 1,
           contractStatus: "expiring",
           contractShape: "balanced",
         });
         contractEvents.push(
           buildContractEvent({
-            seasonId: save.gameState.season.id,
+            seasonId: sourceState.season.id,
             teamId: entry.teamId,
             playerId: entry.playerId,
             eventType: "contract_renewed",
@@ -1369,14 +1569,14 @@ export function computeSeasonEndContractTick(
 
       teamReleaseCounts.set(entry.teamId, releaseCount + 1);
 
-      const exit = buildContractExitValue(save.gameState, playerForExit, entry);
+      const exit = buildContractExitValue(sourceState, playerForExit, entry);
       const source: ContractEventRecord["source"] = row?.controlMode === "ai" ? "ai_contract_expiry" : "manual_contract_expiry";
       if (exit.exitValue != null) {
         cashDeltaByTeamId.set(entry.teamId, (cashDeltaByTeamId.get(entry.teamId) ?? 0) + exit.exitValue);
       }
       transferHistory.push(
         buildContractExitTransferHistory({
-          gameState: save.gameState,
+          gameState: sourceState,
           entry,
           player: playerForExit,
           exit,
@@ -1385,7 +1585,7 @@ export function computeSeasonEndContractTick(
       );
       contractEvents.push(
         buildContractEvent({
-          seasonId: save.gameState.season.id,
+          seasonId: sourceState.season.id,
           teamId: entry.teamId,
           playerId: entry.playerId,
           eventType: "contract_expired_exit",
@@ -1427,8 +1627,8 @@ export function computeSeasonEndContractTick(
   const tickLog = buildSeasonEndContractTickLog({ save, renewedPlayers, releasedPlayers, contractEventsWritten });
 
   const gameState: GameState = {
-    ...save.gameState,
-    teams: save.gameState.teams.map((team) => {
+    ...sourceState,
+    teams: sourceState.teams.map((team) => {
       const cashDelta = cashDeltaByTeamId.get(team.teamId) ?? 0;
       return cashDelta === 0
         ? team
@@ -1438,29 +1638,29 @@ export function computeSeasonEndContractTick(
           };
     }),
     rosters: nextRosters,
-    transferHistory: [...transferHistory, ...save.gameState.transferHistory],
+    transferHistory: [...transferHistory, ...sourceState.transferHistory],
     seasonState: {
-      ...save.gameState.seasonState,
-      contractEvents: [...contractEvents, ...(save.gameState.seasonState.contractEvents ?? [])],
-      preSeasonWorkflowLogs: [tickLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
+      ...sourceState.seasonState,
+      contractEvents: [...contractEvents, ...(sourceState.seasonState.contractEvents ?? [])],
+      preSeasonWorkflowLogs: [tickLog, ...(sourceState.seasonState.preSeasonWorkflowLogs ?? [])],
     },
     logs: [
       {
-        id: `contract-season-end:${save.gameState.season.id}:${randomUUID()}`,
+        id: `contract-season-end:${sourceState.season.id}:${randomUUID()}`,
         type: "season",
-        message: `Vertragslaufzeiten fuer ${save.gameState.season.name} fortgeschrieben.`,
+        message: `Vertragslaufzeiten fuer ${sourceState.season.name} fortgeschrieben.`,
         createdAt: new Date().toISOString(),
       },
-      ...save.gameState.logs,
+      ...sourceState.logs,
     ],
   };
-  const relationshipEvents = buildPromisedRoleRelationshipEvents(save.gameState);
+  const relationshipEvents = buildPromisedRoleRelationshipEvents(sourceState);
   const relationshipEventIds = new Set(relationshipEvents.map((event) => event.eventId));
   const gameStateWithRelationshipEvents: GameState = {
     ...gameState,
     playerRelationshipEvents: [
       ...relationshipEvents,
-      ...(save.gameState.playerRelationshipEvents ?? []).filter((event) => !relationshipEventIds.has(event.eventId)),
+      ...(sourceState.playerRelationshipEvents ?? []).filter((event) => !relationshipEventIds.has(event.eventId)),
     ],
   };
 
@@ -1472,6 +1672,7 @@ export function computeSeasonEndContractTick(
     releasedPlayers,
     renewedPlayers,
     contractEventsWritten,
+    dissolutions: dissolutionRun.decisions,
   };
 }
 
@@ -1519,6 +1720,7 @@ export function applySeasonEndContractTick(
 
   saveGameStateWithContractEvents(save, computation.gameState, persistence);
 
+  const dissolutionsAccepted = computation.dissolutions.filter((entry) => entry.decision === "accepted").length;
   return {
     ...preview,
     dryRun: false,
@@ -1527,6 +1729,15 @@ export function applySeasonEndContractTick(
     releasedPlayers: computation.releasedPlayers,
     renewedPlayers: computation.renewedPlayers,
     contractEventsWritten: computation.contractEventsWritten,
+    warnings:
+      computation.dissolutions.length > 0
+        ? Array.from(
+            new Set([
+              ...preview.warnings,
+              `ai_contract_dissolutions:${dissolutionsAccepted}/${computation.dissolutions.length}`,
+            ]),
+          )
+        : preview.warnings,
   };
 }
 
@@ -1737,6 +1948,8 @@ export function applyContractRenewalAction(input: {
                 ...entry,
                 salary: newSalary ?? entry.salary,
                 upkeep: newSalary ?? entry.upkeep,
+                // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
+                negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
                 contractLength: nextLength,
                 contractShape: nextContractShape,
                 yearlySalarySchedule: nextContractSchedule,

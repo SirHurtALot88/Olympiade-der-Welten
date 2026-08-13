@@ -178,6 +178,16 @@ export type UseFoundationPersistenceActionsInput = {
   onFetchSlowClear?: () => void;
 };
 
+/** Ruhezeit nach der letzten Zustandsaenderung, bevor der Autosave schreibt. */
+const AUTO_PERSIST_DEBOUNCE_MS = 2500;
+
+/**
+ * Wartezeit einer Wiedervorlage, wenn gerade nicht geschrieben werden darf. Bewusst deutlich
+ * kuerzer als das Navigations-Ruhefenster (4000 ms, `navigation-coalescing.ts`): die Wiedervorlage
+ * soll unmittelbar nach dessen Ende greifen, nicht eine weitere Sekunde spaeter.
+ */
+const AUTO_PERSIST_RETRY_MS = 400;
+
 export function useFoundationPersistenceActions(input: UseFoundationPersistenceActionsInput) {
   const {
     initialPersistedSave,
@@ -913,25 +923,44 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       return;
     }
 
-    if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current) {
-      return;
-    }
+    // EIN BLOCKIERTER SCHREIBVERSUCH DARF NICHT VERFALLEN — er wird wiedervorgelegt.
+    //
+    // GEMELDET (Chris): „die wunschliste leert sich immer mit der zeit wenn ich durch die spieler
+    // scrolle das ist nicht so angedacht."
+    //
+    // DIE URSACHE war nicht die Wunschliste, sondern dieser Autosave. Beide Wachen (Pause waehrend
+    // Navigation, und das Ruhefenster aus `navigation-coalescing.ts`) haben frueher schlicht
+    // `return` gemacht. Damit war der Schreibversuch WEG: der Effekt haengt an `gameState`, laeuft
+    // also erst wieder, wenn sich der Zustand erneut aendert. Wer eine Aenderung macht und danach
+    // blaettert, hat sie nie geschrieben — und der naechste Reload (Saison-Archiv, KI-Poller,
+    // Live-Sync, 409-Konflikt) ersetzt den lokalen Zustand und setzt dabei die Inhaltssignatur auf
+    // den geladenen Stand. Die Aenderung gilt damit als gespeichert und ist still verschwunden.
+    //
+    // Blaettern ist der schlimmste Fall, weil JEDER Ansichtswechsel das Ruhefenster neu setzt: die
+    // Wache trifft dann nicht einmal, sondern dauernd. Genau deshalb faellt es bei der Wunschliste
+    // auf und sonst kaum — sie ist das, was man WAEHREND des Blaetterns anfasst.
+    //
+    // Der Timer wird jetzt IMMER gestellt; ob geschrieben werden darf, entscheidet allein der
+    // Rueckruf — und wenn er es nicht darf, legt er sich selbst wieder vor.
+    const planeAutoSave = (verzoegerung: number) => {
+      if (autoPersistTimerRef.current != null) {
+        window.clearTimeout(autoPersistTimerRef.current);
+      }
+      autoPersistTimerRef.current = window.setTimeout(versucheAutoSave, Math.max(0, verzoegerung));
+    };
 
-    if (Date.now() < foundationViewTransitionUntilRef.current) {
-      return;
-    }
-
-    if (autoPersistTimerRef.current != null) {
-      window.clearTimeout(autoPersistTimerRef.current);
-    }
-
-    autoPersistTimerRef.current = window.setTimeout(() => {
+    function versucheAutoSave() {
       autoPersistTimerRef.current = null;
+
+      // Pausiert oder ein anderer Schreibvorgang laeuft: kurz warten und erneut versuchen.
       if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current || autoPersistInFlightRef.current) {
+        planeAutoSave(AUTO_PERSIST_RETRY_MS);
         return;
       }
 
+      // Im Ruhefenster: GENAU bis zu dessen Ende warten, nicht laenger.
       if (Date.now() < foundationViewTransitionUntilRef.current) {
+        planeAutoSave(foundationViewTransitionUntilRef.current - Date.now() + AUTO_PERSIST_RETRY_MS);
         return;
       }
 
@@ -1005,7 +1034,9 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         .finally(() => {
           autoPersistInFlightRef.current = false;
         });
-    }, 2500);
+    }
+
+    planeAutoSave(AUTO_PERSIST_DEBOUNCE_MS);
 
     return () => {
       if (autoPersistTimerRef.current != null) {

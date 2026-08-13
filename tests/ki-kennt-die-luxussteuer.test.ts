@@ -20,7 +20,15 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
+import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import {
+  getTeamDisplaySalaryTotal,
+  getTeamNegotiatedSalaryTotal,
+} from "@/lib/sponsor/sponsor-team-salary-display";
+import {
+  getTeamApronSalaryBase,
   APRON_RATE_ZONE_1,
   APRON_RATE_ZONE_2,
   apronKonjunkturhebel,
@@ -70,14 +78,32 @@ describe("Die eine Abgaben-Formel", () => {
 });
 
 describe("Der Salary Factor kommt aus einer Quelle", () => {
+  /**
+   * VOLLSTÄNDIGES Fenster, weil `resolveApronSalaryFactor` seit der Horizont-Reparatur über
+   * `getSeasonEconomyFactorWindow` liest (eine Quelle, siehe apron-service.ts). Jeder geladene
+   * Spielstand trägt genau so ein Fenster (`withSeededSeasonEconomyFactors`, save-repository.ts) —
+   * die frühere Zweier-Attrappe war die Ausnahme, nicht der Normalfall.
+   */
+  function fenster(faktoren: number[]) {
+    return {
+      season: { id: "season-2" },
+      seasonState: {
+        seasonEconomyFactors: faktoren.map((factor, horizonIndex) => ({
+          seasonId: "season-2",
+          horizonIndex,
+          factor,
+        })),
+      },
+    } as never;
+  }
+
   it("liest den laufenden Faktor aus dem Saison-Fenster", () => {
-    const gs = { seasonState: { seasonEconomyFactors: [{ factor: 1.19 }, { factor: 0.87 }] } } as never;
-    expect(resolveApronSalaryFactor(gs)).toBe(1.19);
+    expect(resolveApronSalaryFactor(fenster([1.19, 0.87, 0.83, 0.91, 1.24]))).toBe(1.19);
   });
 
   it("fällt auf 1 zurück, nicht auf 0 — sonst wäre die Steuer für die KI unsichtbar", () => {
     expect(resolveApronSalaryFactor({ seasonState: {} } as never)).toBe(1);
-    expect(resolveApronSalaryFactor({ seasonState: { seasonEconomyFactors: [{ factor: 0 }] } } as never)).toBe(1);
+    expect(resolveApronSalaryFactor(fenster([0, 0.87, 0.83, 0.91, 1.24]))).toBe(1);
   });
 
   it("steht nicht mehr dreimal im Baum", () => {
@@ -102,6 +128,45 @@ describe("Der Salary Factor kommt aus einer Quelle", () => {
  * Cold Steel stand mit echt 63,6 scheinbar weit unter seiner Decke von 81,0, zahlte aber real
  * Abgabe, weil die geglättete Summe 81,6 betrug.
  */
+const TEAM_ID = "A-A";
+
+/**
+ * Ein Kader, in dem die DREI Gehaltsbegriffe garantiert verschieden sind:
+ *
+ *   verhandelt   — was bei Unterschrift ausgemacht wurde (`negotiatedAnnualSalary`), die
+ *                  Bemessungsgrundlage der Abgabe.
+ *   geglaettet   — das Formel-Gehalt aus Marktwert/Attributen (`expectedSalary`), die ALTE
+ *                  Grundlage.
+ *   Zahlung      — was dieses Jahr wirklich abgebucht wird (`salary`), bei geformten Vertraegen
+ *                  ungleich dem verhandelten Wert.
+ *
+ * Nur wenn sie auseinanderfallen, sagt ein Vergleich etwas aus. Faellt eine dieser Zahlen
+ * kuenftig mit einer anderen zusammen, schlaegt die Vorbedingung im Test an — genau so soll es
+ * sein.
+ */
+function baueTeamMitAbweichendenGehaltsbegriffen(): GameState {
+  const basis = createSingleplayerGameState();
+  const rosters = basis.rosters.filter((entry) => entry.teamId === TEAM_ID).slice(0, 3);
+  return {
+    ...basis,
+    rosters: rosters.map((entry, index) => ({
+      ...entry,
+      contractLength: 3,
+      contractShape: index === 0 ? "front_loaded" : index === 1 ? "back_loaded" : "balanced",
+      // verhandelt: bewusst deutlich unter dem Formelwert — das Team hat gut verhandelt.
+      negotiatedAnnualSalary: 6 + index,
+      // Zahlung dieses Jahr: bei geformten Vertraegen verschoben.
+      salary: index === 0 ? 7.8 : index === 1 ? 4.2 : 8,
+    })),
+    players: basis.players.map((player) =>
+      rosters.some((entry) => entry.playerId === player.id)
+        ? { ...player, expectedSalary: 14, displayMarketValue: 60 }
+        : player,
+    ),
+    teams: basis.teams,
+  };
+}
+
 describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
   const quelle = readFileSync(join(process.cwd(), "lib/ai/ai-cash-salary-target-service.ts"), "utf8");
   const apronTeil = quelle.slice(quelle.indexOf("// ── APRON"));
@@ -116,13 +181,40 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     expect(cashTeil).toContain("const salary = getTeamSalarySum(gameState, teamId);");
   });
 
-  it("die Grundlage steht an genau einer Stelle (die Umstellung wäre eine Zeile)", () => {
-    // Sie wohnt in der SAISON-Ebene und nicht bei der KI: sie gehört zur Definition des Apron, nicht
-    // zu seiner Verwendung. Praktisch entscheidet das auch die Importrichtung — die KI-Decke baut
-    // auf dieser Zahl auf, ein Zuhause bei der KI ergäbe einen Zyklus.
-    const dienst = readFileSync(join(process.cwd(), "lib/season/apron-service.ts"), "utf8");
-    const rumpf = dienst.slice(dienst.indexOf("export function getTeamApronSalaryBase"));
-    expect(rumpf).toContain("return getTeamDisplaySalaryTotal(gameState, teamId);");
+  it("die Grundlage steht an genau einer Stelle — geprüft an der Zahl, nicht am Quelltext", () => {
+    // HIER STAND EINE ZEICHENKETTEN-PRÜFUNG: `rumpf` musste wörtlich
+    // `return getTeamDisplaySalaryTotal(gameState, teamId);` enthalten. Sie ist aus zwei Gründen
+    // ersetzt worden.
+    //
+    // ERSTENS ist die Aussage überholt. Chris hat entschieden, die Abgabe am VERHANDELTEN Gehalt
+    // zu bemessen statt am geglätteten Formelwert („ja!", docs/APRON_UND_VERTRAGSFORMEN.md,
+    // Schritt 3) — damit Verhandeln überhaupt zählt. Die Grundlage ist deshalb heute
+    // `getTeamNegotiatedSalaryTotal`.
+    //
+    // ZWEITENS, und das ist der eigentliche Grund: eine Zeichenkette prüft nichts. Genau diese
+    // Sorte Test war im Repo mehrfach über Wochen rot, ohne dass es auffiel, und eine andere
+    // prüfte fleißig Werte über einer Funktion, die niemand mehr aufrief. Der Satz in der
+    // Überschrift („die Umstellung wäre eine Zeile") hat sich zudem als falsch erwiesen: die
+    // ehrliche Umstellung brauchte ein eigenes, gespeichertes Verhandlungs-Benchmark an jedem
+    // Unterschriftspfad, weil das naheliegende Gehaltsfeld beim Saisonwechsel mit der Jahr-1-Rate
+    // überschrieben wird — front_loaded hätte die Steuerbasis sonst dauerhaft gesenkt.
+    //
+    // WAS DIE PRÜFUNG STATTDESSEN FESTHÄLT: dass es genau EINE Grundlage gibt, erkennbar daran,
+    // dass alle Apron-Fragen dieselbe Zahl sehen. Die Fixture wird so gebaut, dass die drei
+    // denkbaren Grundlagen AUSEINANDERFALLEN — sonst wäre der Test auch dann grün, wenn zwei
+    // Stellen verschiedene Wege nähmen.
+    const gameState = baueTeamMitAbweichendenGehaltsbegriffen();
+
+    const grundlage = getTeamApronSalaryBase(gameState, TEAM_ID);
+    const verhandelt = getTeamNegotiatedSalaryTotal(gameState, TEAM_ID);
+    const geglaettet = getTeamDisplaySalaryTotal(gameState, TEAM_ID);
+    const echteZahlung = getTeamSalarySum(gameState, TEAM_ID);
+
+    // Vorbedingung: die drei Begriffe MÜSSEN sich unterscheiden, sonst prüft der Rest nichts.
+    expect(verhandelt).not.toBeCloseTo(geglaettet, 2);
+    expect(verhandelt).not.toBeCloseTo(echteZahlung, 2);
+
+    expect(grundlage).toBeCloseTo(verhandelt, 6);
   });
 });
 

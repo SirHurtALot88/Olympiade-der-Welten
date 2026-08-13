@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-11",
+  "seite": "Saisonstand · Spalte Formkarten",
+  "text": "Die Spalte \"Formkarten\" zeigte Striche oder viel zu kleine Zahlen. Sie zaehlt die gespielten Karten ueber die Modifier-Slots der Aufstellungen — und die kamen im Browser nur fuer den gerade aktiven Spieltag an. Gemessen am Live-Save: statt 32 von 32 Teams hatten nur 14 ueberhaupt eine Bilanz, und diese 14 zaehlten die Karten eines einzigen von zehn Spieltagen. An einem Spieltag, an dem noch niemand gelegt hatte, war die Spalte komplett leer. Die Aufstellungen bleiben beschnitten — sie sind schwer und wachsen mit jedem Spieltag (659 KB gegen 70 KB) — aber die fertige Formkarten-Bilanz faehrt jetzt mit, auf dem vollen Spielstand gerechnet und 1,9 KB gross. Die Spalte nennt damit wieder die ganze Saison. Archiv-Saisonen bleiben unveraendert leer statt geraten.",
+  "gewicht": "normal",
+  "version": "0.4"
+}

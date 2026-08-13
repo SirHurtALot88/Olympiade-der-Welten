@@ -2,7 +2,7 @@
  * SZENARIO-RECHNUNG SPONSOR V4 — reine Analyse, kein Produktivcode.
  *
  * Zeigt, wo Top/Mid/Bottom mit dem umgebauten System landen: neue Auszahlungskurve (flacher Sockel),
- * Achsenkarten statt Risikoprofilen, Vorschuss als zweite Dimension. Gerechnet mit den ECHTEN
+ * Achsenkarten statt Risikoprofilen. Gerechnet mit den ECHTEN
  * Produktionsfunktionen auf den 32 ECHTEN Gehaeltern des Live-Saves.
  *
  * Aufruf: npx tsx scripts/sponsor-v4-szenarien.ts
@@ -10,8 +10,6 @@
 import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
 import { getPrizePlacementBonus } from "@/lib/season/prize-placement-table";
 import {
-  SPONSOR_V4_ADVANCE_FEE_RATE,
-  SPONSOR_V4_ADVANCE_SHARE,
   SPONSOR_V4_AXIS_SIZE_BY_RARITY,
   buildSponsorV3TermsCore,
   sponsorV3BenchmarkLadder,
@@ -76,7 +74,6 @@ for (const factor of SALARY_FACTORS) {
       axisSize: sponsorV4AxisSizeFor(RARITY),
       salaryFactor: factor,
       floor: SPONSOR_V3_FLOOR_C,
-      withAdvance: true,
     });
 
     const gehalt = spot.team.salary;
@@ -100,16 +97,8 @@ for (const factor of SALARY_FACTORS) {
       );
     }
     const spanne = sponsorV3Settle(achse, startRank, 1) - sponsorV3Settle(achse, startRank, 0);
-    console.log(
-      `  Spannweite der Achsenwahl ${spanne.toFixed(1)} C` +
-        (achse.advance ? ` · Vorschuss ${achse.advance.amount.toFixed(1)} C (Gebuehr ${achse.advance.fee.toFixed(1)} C)` : ""),
-    );
+    console.log(`  Spannweite der Achsenwahl ${spanne.toFixed(1)} C`);
   }
   console.log("");
 }
 
-console.log(
-  `Vorschuss = ${(SPONSOR_V4_ADVANCE_SHARE * 100).toFixed(0)} % des Leiterbodens, Gebuehr ` +
-    `${(SPONSOR_V4_ADVANCE_FEE_RATE * 100).toFixed(0)} % — guenstiger als der billigste Kredit (7 %).`,
-);
-console.log("");

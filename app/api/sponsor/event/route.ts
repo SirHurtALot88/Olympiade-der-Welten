@@ -94,8 +94,9 @@ export async function POST(request: Request) {
       );
     }
 
+    let persisted = null as ReturnType<typeof persistence.saveSingleplayerState> | null;
     if (!dryRun) {
-      persistence.saveSingleplayerState(saveId, nextGameState);
+      persisted = persistence.saveSingleplayerState(saveId, nextGameState);
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         teamId: event.teamId,
@@ -107,7 +108,13 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, applied: !dryRun, cashDelta: action === "accept" ? event.cashDelta : 0 });
+    // `saveVersion` mitgeben — siehe Begruendung in `app/api/sponsor/choose/route.ts`.
+    return NextResponse.json({
+      success: true,
+      applied: !dryRun,
+      cashDelta: action === "accept" ? event.cashDelta : 0,
+      saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "sponsor_event_failed" },

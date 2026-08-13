@@ -11,6 +11,7 @@ import type {
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
 import { buildSeasonRecap } from "@/lib/foundation/season-recap-service";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
@@ -28,8 +29,7 @@ import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
-import { buildContractDissolutionOffers } from "@/lib/morale/contract-dissolution-service";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { buildContractDissolutionOffers, buildTeamMoraleMap } from "@/lib/morale/contract-dissolution-service";
 import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { FACILITY_CATALOG_BY_ID } from "@/lib/facilities/facility-catalog";
@@ -380,25 +380,15 @@ function buildContractDissolutionInboxTasks(input: {
 
   const seasonId = input.gameState.season.id;
   // Moral aus derselben Quelle wie Profil und Kader-Ansicht — `buildContractDissolutionOffers`
-  // leitet sie bewusst nicht selbst ab, damit die Zahlen nicht auseinanderlaufen.
-  const moraleByPlayerId: Record<string, number> = {};
-  for (const entry of input.roster) {
-    const assessment = assessPlayerMorale({
-      gameState: input.gameState,
-      playerId: entry.playerId,
-      teamId: input.team.teamId,
-    });
-    if (assessment?.morale != null && Number.isFinite(assessment.morale)) {
-      moraleByPlayerId[entry.playerId] = assessment.morale;
-    }
-  }
-
+  // leitet sie bewusst nicht selbst ab, damit die Zahlen nicht auseinanderlaufen. Die Bruecke
+  // steht neben der Angebots-Funktion (`buildTeamMoraleMap`), damit Inbox, API-Route und
+  // KI-Entscheidung nicht drei Kopien derselben Schleife pflegen.
   const offers = buildContractDissolutionOffers({
     gameState: input.gameState,
     teamId: input.team.teamId,
     seasonId,
     saveId: input.saveId,
-    moraleByPlayerId,
+    moraleByPlayerId: buildTeamMoraleMap(input.gameState, input.team.teamId),
   });
   if (offers.length === 0) {
     return [];
@@ -1263,7 +1253,17 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     );
   }
 
-  const latestCompletedSnapshot = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
+  /**
+   * ÜBER `leseSaisonSchnappschuesse`, NICHT ÜBER `seasonSnapshots ?? []`.
+   *
+   * Die Inbox läuft im Browser (`useFoundationGameInboxItems`), und dort ist `seasonSnapshots`
+   * hinter dem Sentinel IMMER eine leere Liste — `?? []` greift daran nicht. Die Champion-Karte
+   * konnte deshalb nie entstehen. Nachgeladen wird das volle Archiv nur in ausgewählten Ansichten
+   * (`use-season-archive-load`), und Home/Cockpit — wo die Inbox sitzt — gehören nicht dazu.
+   * Am Live-Abbild gemessen: voll 261 Inbox-Karten, im Browser 224; es fehlten genau die eine
+   * `champion_news` und 36 `story:season_recap`.
+   */
+  const latestCompletedSnapshot = [...leseSaisonSchnappschuesse(input.gameState)]
     .reverse()
     .find((snapshot) => snapshot.status === "completed");
   const champion = latestCompletedSnapshot?.finalStandings?.find((row) => row.rank === 1);

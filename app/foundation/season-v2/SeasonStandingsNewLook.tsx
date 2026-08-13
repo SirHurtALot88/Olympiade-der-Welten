@@ -48,6 +48,8 @@ import {
   type SeasonV2StandingsRow,
 } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
+import type { SeasonFormCardBonusEntry } from "@/lib/foundation/season-form-card-bonus";
+import { buildValueRanks as buildTeamValueRanks } from "@/lib/season/season-value-ranks";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -56,6 +58,11 @@ import {
   type SeasonDisciplineAreaId,
   type SeasonDisciplineKey,
 } from "@/lib/season/season-discipline-area-groups";
+import {
+  MAX_PLAYERS_PER_MATCHDAY,
+  MAX_POINTS_PER_MATCHDAY,
+  POINTS_PER_PARTICIPATING_PLAYER,
+} from "@/lib/season/title-race";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -65,8 +72,12 @@ import {
  * Layout zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - kein "Titelrennen"-Hero,
  * - keine Auf-/Abstiegszonen (kein Zonen-Konzept im Datenmodell).
+ *
+ * Meisterschaftskampf (Chris' Wunsch, `lib/season/title-race.ts`): NUR am letzten Spieltag,
+ * solange er noch läuft — der Host rechnet das Zeitfenster fertig vor und reicht das Ergebnis
+ * über `titleRace` durch (`null` = kein Fenster, auch im Archiv). Diese Komponente bekommt nur
+ * das fertige Ergebnis, kein `gameState`.
  *
  * Rang-Movement pro Spieltag (Wave D · D4): `row.fieldRaceRankDelta` trägt
  * jetzt die Δ-Rang-Bewegung gegenüber dem LETZTEN Spieltag aus dem bereits
@@ -152,6 +163,7 @@ type NlTableSortKey =
   | "bonus"
   | SeasonDisciplineAreaId
   | "formCards"
+  | "formCardsLeft"
   | "mw"
   | "cash"
   | "sponsor"
@@ -170,6 +182,7 @@ function getTableSortValue(
   row: SeasonV2StandingsRow,
   key: NlTableSortKey,
   formCardTotalByTeamId?: Map<string, number> | null,
+  formCardLeftByTeamId?: Map<string, number> | null,
 ): number | string {
   switch (key) {
     case "rank":
@@ -183,10 +196,14 @@ function getTableSortValue(
       return bonus != null && Number.isFinite(bonus) ? bonus : Number.NEGATIVE_INFINITY;
     }
     case "formCards": {
-      // Teams ohne gespielte Karte sortieren ans Ende der Absteigend-Sicht (kein
-      // stiller 0-Wert, der eine gespielte ±0-Bilanz vortäuschen würde).
+      // Teams ohne Formkarten sortieren ans Ende der Absteigend-Sicht (kein stiller
+      // 0-Wert, der einen leeren Tank vortäuschen würde, den es gar nicht gibt).
       const total = formCardTotalByTeamId?.get(row.teamId);
       return total != null && Number.isFinite(total) ? total : Number.NEGATIVE_INFINITY;
+    }
+    case "formCardsLeft": {
+      const left = formCardLeftByTeamId?.get(row.teamId);
+      return left != null && Number.isFinite(left) ? left : Number.NEGATIVE_INFINITY;
     }
     case "mw":
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
@@ -267,31 +284,17 @@ function getAreaRankBandClass(rank: number | undefined): string {
  * "bester Rang für alle" würde eine komplett unbespielte Spalte lauter #1
  * ausweisen, obwohl niemand etwas geholt hat.
  */
+/**
+ * Duenne Huelle um `buildValueRanks` aus `lib/season/season-value-ranks` — die Rechnung selbst
+ * liegt dort, weil die Sponsoren-Ziele denselben Rang lesen muessen wie diese Tabelle. Liefe die
+ * Zielpruefung auf einer eigenen Rechnung, koennte sie einem Spieler eine Zielmarke verweigern,
+ * die seine eigene Tabelle bestaetigt.
+ */
 function buildValueRanks(
   rows: SeasonV2StandingsRow[],
   getValue: (row: SeasonV2StandingsRow) => number | null | undefined,
 ): Map<string, number> {
-  const ranked = new Map<string, number>();
-  const scored = rows
-    .map((row) => ({ teamId: row.teamId, value: getValue(row) }))
-    .filter(
-      (entry): entry is { teamId: string; value: number } =>
-        typeof entry.value === "number" && Number.isFinite(entry.value),
-    )
-    .sort((a, b) => b.value - a.value);
-  let groupStart = 0;
-  while (groupStart < scored.length) {
-    let groupEnd = groupStart;
-    while (groupEnd + 1 < scored.length && scored[groupEnd + 1].value === scored[groupStart].value) {
-      groupEnd += 1;
-    }
-    const worstRank = groupEnd + 1;
-    for (let index = groupStart; index <= groupEnd; index += 1) {
-      ranked.set(scored[index].teamId, worstRank);
-    }
-    groupStart = groupEnd + 1;
-  }
-  return ranked;
+  return buildTeamValueRanks(rows, (row) => row.teamId, getValue);
 }
 
 /**
@@ -324,6 +327,36 @@ function renderLeagueRankSuffix(
     </span>
   );
 }
+
+/**
+ * DER BONUS STAND ZWEIMAL IN DERSELBEN ZEILE.
+ *
+ * `disciplineValues.bonuspunkte` ist der Mutator-Aufschlag der Saison
+ * (`season-points-ledger.ts`: `teamSummary.mutatorPpsBonus`). Derselbe Aufschlag steckt aber
+ * bereits in JEDER Disziplin-Spalte: der Ledger bucht je Spieler-Zeile
+ * `points = Anteil + mutatorPpsBonus` (`resolveAwardedPlayerPoints`) und summiert genau
+ * dieses `points` nach `pointsByDiscipline` — und daraus baut `mergeSeasonDisciplineValues`
+ * die 20 Disziplin-Spalten und die vier Bereichs-Spalten.
+ *
+ * Am Live-Abbild vom 11.08. nachgerechnet, beide aktiven Staende, alle 32 Teams:
+ * `Σ Disziplin-Spalten − Punkte-Spalte == Bonus-Spalte`, 32 von 32, Abweichung 0,0.
+ * Beispiel aus dem aktiven Save `new-game-1786465783606-0kalpx` (Saison 1, Spieltag 2):
+ * Pirate Crew — Punkte 20,5 · Bonus 0,3 · Σ Disziplinen 20,8. Betroffen 25 von 32 Teams
+ * (0,3–1,2); am Messkoerper `new-game-1785823388048-1hf25q` (Saison 2, Spieltag 10) 32 von 32
+ * mit bis zu 6,3 (B-B).
+ *
+ * Die Tabelle widersprach sich damit selbst: "Punkte + Bonus" ergibt die Disziplin-Summe und
+ * ist richtig — "Σ Disziplinen + Bonus" zaehlt den Aufschlag ein zweites Mal.
+ *
+ * Die BUCHUNG ist nachgemessen korrekt und bleibt unangetastet (0 von 32 Abweichung ueber
+ * zehn Spieltage). Geaendert ist allein die Beschriftung: "dav. Bonus" ist die uebliche
+ * Schreibweise fuer einen Posten, der in der Summe daneben schon enthalten ist — sie
+ * verbietet das Addieren, ohne eine Zahl anzufassen.
+ */
+const BONUS_DAVON_TITLE =
+  "Mutator-Aufschlag der Saison. DAVON-Posten: er steckt bereits in den Disziplin- und " +
+  "Bereichs-Spalten dieser Zeile und darf nicht noch einmal addiert werden. " +
+  "Es gilt: Punkte + Bonus = Summe der Disziplin-Spalten.";
 
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
@@ -499,6 +532,7 @@ export default function SeasonStandingsNewLook({
   archiveRows,
   disciplineLeaders,
   rivalTeamIds,
+  titleRace,
   teamTopPlayersByColumn,
   teamFormCardBonusByTeamId,
   onChangeSeason,
@@ -509,6 +543,14 @@ export default function SeasonStandingsNewLook({
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
+  /**
+   * Zeilen-Hervorhebung NUR, wenn der Titel noch offen ist. Ist die Meisterschaft rechnerisch
+   * entschieden (`contenderIds.size <= 1` — nur noch der Führende selbst „im Rennen"), läse eine
+   * einzelne golden leuchtende Zeile absurd; dafür gibt es stattdessen die Kopfzeilen-Notiz mit
+   * dem anderen Text (`renderTitleRaceNote`).
+   */
+  const isTitleContender = (teamId: string) =>
+    titleRace != null && titleRace.leaderId != null && titleRace.contenderIds.size > 1 && titleRace.contenderIds.has(teamId);
   // Start bewusst deterministisch mit dem Standard (SSR/Client identisch, keine
   // Hydration-Warnung); die gespeicherte Präferenz zieht direkt nach dem Mount nach.
   const [mode, setMode] = useState<NlStandingsMode>(NL_STANDINGS_DEFAULT_MODE);
@@ -582,9 +624,16 @@ export default function SeasonStandingsNewLook({
   }, [boardRows, boardSort]);
 
   /**
-   * Formkarten-Nennwert-Summe je Team (nur Teams, die überhaupt Karten gespielt
-   * haben). Muss VOR `sortedTableRows` stehen — die Sortierung nach der
-   * Formkarten-Spalte liest diese Karte bereits im Render.
+   * Formkarten-Tank je Team: was die Saison an positivem Nennwert hergibt, und was davon
+   * noch ungespielt ist. Muss VOR `sortedTableRows` stehen — die Sortierung nach beiden
+   * Formkarten-Spalten liest diese Karten bereits im Render.
+   *
+   * Chris: „in der formkarten spalte soll generell immer die summe stehen die AM ANFANG der
+   * saison den teams zur verfuegung stand ... dann weiss man wie viel luft noch im tank ist".
+   * Vorher stand hier `entry.total`, die Summe der GESPIELTEN Nennwerte — eine Zahl, die
+   * bauartbedingt fast immer ≤ 0 ist (die Karten kommen als gespiegeltes Paar +x/−x, und die
+   * negativen wirft man zuerst ab, weil ungespielte negative Karten am Saisonende Punkte
+   * kosten). Am Live-Save galt das fuer alle 32 Teams.
    */
   const formCardTotalByTeamId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -592,16 +641,27 @@ export default function SeasonStandingsNewLook({
       return totals;
     }
     for (const [teamId, entry] of teamFormCardBonusByTeamId) {
-      totals.set(teamId, entry.total);
+      totals.set(teamId, entry.poolPositive);
     }
     return totals;
+  }, [teamFormCardBonusByTeamId]);
+
+  const formCardLeftByTeamId = useMemo(() => {
+    const left = new Map<string, number>();
+    if (!teamFormCardBonusByTeamId) {
+      return left;
+    }
+    for (const [teamId, entry] of teamFormCardBonusByTeamId) {
+      left.set(teamId, entry.remainingPositive);
+    }
+    return left;
   }, [teamFormCardBonusByTeamId]);
 
   const sortedTableRows = useMemo(() => {
     const direction = tableSort.dir === "asc" ? 1 : -1;
     return [...boardRows].sort((left, right) => {
-      const leftValue = getTableSortValue(left, tableSort.key, formCardTotalByTeamId);
-      const rightValue = getTableSortValue(right, tableSort.key, formCardTotalByTeamId);
+      const leftValue = getTableSortValue(left, tableSort.key, formCardTotalByTeamId, formCardLeftByTeamId);
+      const rightValue = getTableSortValue(right, tableSort.key, formCardTotalByTeamId, formCardLeftByTeamId);
       let result =
         typeof leftValue === "string" || typeof rightValue === "string"
           ? String(leftValue).localeCompare(String(rightValue), "de-DE")
@@ -893,13 +953,14 @@ export default function SeasonStandingsNewLook({
     return tableSort.dir === "asc" ? "↑" : "↓";
   }
 
-  function renderTableSortHeader(key: NlTableSortKey, label: string) {
+  function renderTableSortHeader(key: NlTableSortKey, label: string, title?: string) {
     return (
       <button
         type="button"
         className={`nl-standings-sort-th${tableSort.key === key ? " is-active" : ""}`}
         onClick={() => toggleTableSort(key)}
         aria-label={`Nach ${label} sortieren`}
+        title={title}
       >
         <span>{label}</span>
         <b aria-hidden="true">{tableSortArrow(key)}</b>
@@ -1138,7 +1199,7 @@ export default function SeasonStandingsNewLook({
           <span className="nl-standings-expand-title">Disziplinen nach Bereich</span>
           <div className="nl-standings-expand-meta">
             {bonusValue != null && Number.isFinite(bonusValue) ? (
-              <StatChip label="Bonus" value={formatNlNumber(bonusValue, 1)} tone="accent" title="Bonuspunkte der Saison" />
+              <StatChip label="dav. Bonus" value={formatNlNumber(bonusValue, 1)} tone="accent" title={BONUS_DAVON_TITLE} />
             ) : null}
             <StatChip
               label="Team"
@@ -1213,7 +1274,7 @@ export default function SeasonStandingsNewLook({
     return (
       <li
         key={row.teamId}
-        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
+        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}${isTitleContender(row.teamId) ? " is-title-contender" : ""}`}
         style={{ ...getSeasonV2TeamTagStyle(row.teamCode), "--nl-reveal-i": Math.min(revealIndex, 14) } as CSSProperties}
       >
         <div
@@ -1272,6 +1333,11 @@ export default function SeasonStandingsNewLook({
               <span className="nl-standings-teamname">
                 {row.teamName}
                 {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+                {isTitleContender(row.teamId) ? (
+                  <span className="nl-standings-titlerace-tag" title="Kann den Titel am letzten Spieltag noch holen">
+                    Titelchance
+                  </span>
+                ) : null}
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </span>
@@ -1429,8 +1495,9 @@ export default function SeasonStandingsNewLook({
               <th className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
               <th className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
               <th>{renderTableSortHeader("points", "Punkte")}</th>
-              <th>{renderTableSortHeader("bonus", "Bonus")}</th>
+              <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
+              <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
@@ -1471,28 +1538,71 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
-   * Spalte „Formkarten": Summe der NENNWERTE aller in dieser Saison
-   * ausgespielten Formkarten (+8 zählt 8, −4 zählt −4, einfach aufsummiert).
-   * Teams ohne gespielte Karte zeigen „—" statt einer 0 — das ist ein
-   * Unterschied: keine Karte gespielt ≠ Karten mit Bilanz ±0.
+   * Der gemeinsame Erklaertext beider Formkarten-Spalten. Bewusst EIN Text: die zwei Zahlen
+   * gehoeren zusammen (voller Tank / davon noch drin), und wer die eine antippt, will meist
+   * die andere gleich mitlesen.
+   */
+  function buildFormCardTitle(row: SeasonV2StandingsRow, entry: SeasonFormCardBonusEntry) {
+    const teile = [
+      `${row.teamName}: Formkarten-Tank ${formatNlNumber(entry.poolPositive, 0)}`,
+      `davon noch ungespielt ${formatNlNumber(entry.remainingPositive, 0)}`,
+      `gespielt ${entry.cards} von ${entry.poolCards} Karten`,
+    ];
+    if (entry.remainingNegative < 0) {
+      // Ungespielte negative Karten kosten am Saisonende Punkte
+      // (`applyFormCardPenaltyWithRerank`) — das gehoert sichtbar an die Zahl.
+      teile.push(`offene Minuskarten ${formatNlNumber(entry.remainingNegative, 0)} (kosten am Saisonende Punkte)`);
+    }
+    return teile.join(" · ");
+  }
+
+  /**
+   * Spalte „Formkarten": der volle Tank der Saison — die Summe der POSITIVEN Nennwerte aller
+   * Karten des Teams, gespielt wie ungespielt.
+   *
+   * Vorher stand hier die Summe der bereits gespielten Nennwerte. Die war als Kennzahl
+   * unbrauchbar: Karten kommen je Spieler als gespiegeltes Paar (+x und −x), und die negativen
+   * wirft man zuerst ab, weil ungespielte Minuskarten am Saisonende Punkte kosten. Die Summe
+   * lag deshalb bei allen 32 Teams des Live-Saves bei ≤ 0 und sagte nur, wie viel Negatives
+   * schon abgeraeumt war — nicht, wie stark ein Team in Form gehen konnte.
+   *
+   * Teams ganz ohne Karten zeigen „—" statt einer 0: kein Tank ≠ leerer Tank.
    */
   function renderFormCardCell(row: SeasonV2StandingsRow) {
     const entry = teamFormCardBonusByTeamId?.get(row.teamId) ?? null;
-    if (!entry || entry.cards === 0) {
+    if (!entry || entry.poolCards === 0) {
       return (
-        <td className="nl-standings-td-formcards" title={`Keine Formkarte gespielt — ${row.teamName}`}>
+        <td className="nl-standings-td-formcards" title={`Keine Formkarten in dieser Saison — ${row.teamName}`}>
           —
         </td>
       );
     }
-    const total = entry.total;
-    const sign = total > 0 ? " is-pos" : total < 0 ? " is-neg" : "";
     return (
-      <td
-        className={`nl-standings-td-formcards${sign}`}
-        title={`${row.teamName}: ${entry.cards} gespielte Formkarten · positiv ${formatNlNumber(entry.positive, 0)} · negativ ${formatNlNumber(entry.negative, 0)} · Summe ${formatNlNumber(total, 0)}`}
-      >
-        {`${total > 0 ? "+" : total === 0 ? "±" : ""}${formatNlNumber(total, 0)}`}
+      <td className="nl-standings-td-formcards" title={buildFormCardTitle(row, entry)}>
+        {formatNlNumber(entry.poolPositive, 0)}
+      </td>
+    );
+  }
+
+  /**
+   * Spalte „Rest": wie viel vom Tank noch ungespielt ist — „wie viel Luft noch drin ist".
+   * Ein leerer Tank zeigt bewusst „0" und nicht „—": das Team HAT Karten gehabt und sie
+   * ausgegeben, das ist eine Aussage. „—" bleibt den Teams ohne Karten vorbehalten.
+   */
+  function renderFormCardLeftCell(row: SeasonV2StandingsRow) {
+    const entry = teamFormCardBonusByTeamId?.get(row.teamId) ?? null;
+    if (!entry || entry.poolCards === 0) {
+      return (
+        <td className="nl-standings-td-formcards" title={`Keine Formkarten in dieser Saison — ${row.teamName}`}>
+          —
+        </td>
+      );
+    }
+    const anteil = entry.poolPositive > 0 ? entry.remainingPositive / entry.poolPositive : 0;
+    const tank = anteil >= 0.5 ? " is-pos" : anteil > 0 ? "" : " is-neg";
+    return (
+      <td className={`nl-standings-td-formcards${tank}`} title={buildFormCardTitle(row, entry)}>
+        {formatNlNumber(entry.remainingPositive, 0)}
       </td>
     );
   }
@@ -1502,7 +1612,7 @@ export default function SeasonStandingsNewLook({
     return (
       <Fragment key={row.teamId}>
         <tr
-          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isExpanded ? " is-expanded" : ""}`}
+          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isRivalTeam(row.teamId) ? " is-rival" : ""}${isExpanded ? " is-expanded" : ""}${isTitleContender(row.teamId) ? " is-title-contender" : ""}`}
           onClick={() => toggleExpanded(row.teamId)}
         >
           <td className="nl-standings-td-caret">
@@ -1537,6 +1647,11 @@ export default function SeasonStandingsNewLook({
               <span className="nl-standings-teamname">
                 {row.teamName}
                 {isRivalTeam(row.teamId) ? <RivalTag /> : null}
+                {isTitleContender(row.teamId) ? (
+                  <span className="nl-standings-titlerace-tag" title="Kann den Titel am letzten Spieltag noch holen">
+                    Titelchance
+                  </span>
+                ) : null}
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </button>
@@ -1544,6 +1659,7 @@ export default function SeasonStandingsNewLook({
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
+          {renderFormCardLeftCell(row)}
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
@@ -1605,7 +1721,7 @@ export default function SeasonStandingsNewLook({
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={17} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={18} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>
@@ -1741,6 +1857,71 @@ export default function SeasonStandingsNewLook({
           ))}
         </ol>
       </NlCard>
+    );
+  }
+
+  /**
+   * Kopfzeile über der Tabelle für den Meisterschaftskampf am letzten Spieltag
+   * (Chris' Wunsch, `lib/season/title-race.ts`). `titleRace` ist nur in diesem einen
+   * Zeitfenster gesetzt — außerhalb (und im Archiv) rendert diese Funktion `null`,
+   * genau wie die Preseason-Note nie außerhalb ihres eigenen Fensters erscheint.
+   * Beide Notizen können nie gleichzeitig auftauchen (vor Spieltag 1 läuft nie
+   * gleichzeitig schon der letzte Spieltag).
+   *
+   * `leaderId == null` (keine gewertete Mannschaft im übergebenen Stand) wird wie
+   * "kein Fenster" behandelt — ohne Führenden gibt es nichts zu zeigen.
+   */
+  function renderTitleRaceNote() {
+    if (!titleRace || titleRace.leaderId == null) {
+      return null;
+    }
+
+    const leaderRow = boardRows.find((row) => row.teamId === titleRace.leaderId) ?? null;
+    const contenderCount = titleRace.contenderIds.size;
+
+    // Titel rechnerisch entschieden (nur noch der Führende selbst "im Rennen"): eine einzelne
+    // "Titelchance"-Zeile läse sich absurd — hier gibt es nur die Kopfzeile, mit anderem Text,
+    // und KEINE Zeilen-Hervorhebung (siehe `isTitleContender`).
+    if (contenderCount <= 1) {
+      return (
+        <p className="nl-standings-titlerace-note" data-testid="nl-standings-titlerace-note">
+          Letzter Spieltag — die Meisterschaft ist entschieden: {leaderRow?.teamName ?? "Der Spitzenreiter"} ist
+          rechnerisch nicht mehr einzuholen.
+        </p>
+      );
+    }
+
+    const contenderRows = boardRows
+      .filter((row) => titleRace.contenderIds.has(row.teamId))
+      .map((row) => ({ row, gap: titleRace.gapByTeamId.get(row.teamId) ?? 0 }))
+      .sort((left, right) => left.gap - right.gap);
+
+    // Die Konstanten hinter der Obergrenze (Spieleranzahl × Punkte je Spieler) sind bewusst KEINE
+    // eigenen Zahlen im sichtbaren Text — nur die fertige Obergrenze selbst steht in der
+    // Kopfzeile. Die Herleitung ("12 Spieler × 3,3") steht NUR im Tooltip der Chips als
+    // Begründung, sonst würde die Zeile mit Zwischenwerten überladen.
+    const maxPointsLabel = formatNlNumber(MAX_POINTS_PER_MATCHDAY, 1);
+    const maxPointsTooltip = `maximal ${maxPointsLabel} Punkte sind am letzten Spieltag noch zu holen (${formatNlNumber(MAX_PLAYERS_PER_MATCHDAY, 0)} Spieler × ${formatNlNumber(POINTS_PER_PARTICIPATING_PLAYER, 1)})`;
+
+    return (
+      <>
+        <p className="nl-standings-titlerace-note" data-testid="nl-standings-titlerace-note">
+          Letzter Spieltag — Meisterschaftskampf: {contenderCount} Teams können noch Meister werden (maximal{" "}
+          {maxPointsLabel} Punkte sind noch zu holen).
+        </p>
+        <StatChipRow className="nl-standings-titlerace-chips" aria-label="Teams im Meisterschaftskampf">
+          {contenderRows.map(({ row, gap }) => (
+            <StatChip
+              key={row.teamId}
+              label={row.teamCode}
+              value={gap <= 0 ? "Spitze" : `−${formatNlNumber(gap, 1)}`}
+              tone={gap <= 0 ? "good" : "accent"}
+              onClick={() => onOpenTeam(row.teamId)}
+              title={`${row.teamName} — ${maxPointsTooltip}`}
+            />
+          ))}
+        </StatChipRow>
+      </>
     );
   }
 
@@ -2120,6 +2301,10 @@ export default function SeasonStandingsNewLook({
             (deine Startplätze). Punkte, Achsenwerte und Medaillen füllen sich ab Spieltag 1.
           </p>
         ) : null}
+        {/* Meisterschaftskampf-Kopfzeile: kann nie gleichzeitig mit der Preseason-Note oben
+            erscheinen (die eine braucht "noch keine Wertung", die andere "letzter Spieltag,
+            noch nicht durchgespielt" — beide Fenster schließen sich gegenseitig aus). */}
+        {renderTitleRaceNote()}
       </NlCard>
 
       {isLoading && boardRows.length === 0 ? (

@@ -131,3 +131,55 @@ export function buildDisciplineStageTeamsFromBookedResult(
     };
   });
 }
+
+/**
+ * WELCHE BAHNEN GELTEN — Vorschau oder gebuchtes Ergebnis?
+ *
+ * Die Vorschau ist die reichere Anzeige (Fatigue, Captain, Mutator, Form je Spieler); das
+ * gebuchte Ergebnis ist die WAHRE. Solange beide dieselben Zahlen tragen, ist die reichere
+ * die bessere Wahl. Weichen sie ab, gewinnt das Gebuchte — auch wenn es karger aussieht.
+ *
+ * GEMESSEN am Spielstand `new-game-1785823388048-1hf25q` (Saison 2, Spieltag 10, Abbild vom
+ * 11.08.2026): die Arena zog ihre Vorschau aus einem laengst verfallenen Resolve-Snapshot und
+ * zeigte in 20 von 32 d1-Team-Zeilen einen anderen Score als gebucht (max 0,70). Die Raenge
+ * stimmten dort noch zufaellig ueberein — bei einem Gleichstand kippt einer, und die Bühne
+ * zeigt dann einen Rang und damit Punkte, die nie gebucht wurden.
+ *
+ * Toleranz: 0,05 auf den Score (dieselbe Schwelle, mit der die Bühne ihre Mod-Zeilen
+ * unterdrückt) und Rang-Gleichheit exakt.
+ */
+export const DISCIPLINE_STAGE_SCORE_TOLERANCE = 0.05;
+
+export function disciplineStagePreviewMatchesBooked(
+  previewTeams: StagePreviewTeam[],
+  bookedTeams: StagePreviewTeam[],
+): boolean {
+  if (previewTeams.length !== bookedTeams.length) return false;
+  const bookedByTeamId = new Map(bookedTeams.map((team) => [team.teamId, team] as const));
+  return previewTeams.every((previewTeam) => {
+    const booked = bookedByTeamId.get(previewTeam.teamId);
+    if (!booked) return false;
+    if (previewTeam.rank !== booked.rank) return false;
+    return Math.abs(previewTeam.score - booked.score) < DISCIPLINE_STAGE_SCORE_TOLERANCE;
+  });
+}
+
+/**
+ * Die Entscheidung selbst: gibt es kein gebuchtes Ergebnis, gilt die Vorschau (die Disziplin
+ * laeuft gerade). Gibt es eines, gilt die Vorschau nur, wenn sie es TRIFFT.
+ */
+export function chooseDisciplineStageTeams(input: {
+  previewTeams: StagePreviewTeam[] | null;
+  bookedTeams: StagePreviewTeam[] | null;
+}): { teams: StagePreviewTeam[] | null; source: "preview" | "booked" | "none" } {
+  const { previewTeams, bookedTeams } = input;
+  if (!bookedTeams || bookedTeams.length === 0) {
+    return previewTeams && previewTeams.length > 0
+      ? { teams: previewTeams, source: "preview" }
+      : { teams: null, source: "none" };
+  }
+  if (previewTeams && previewTeams.length > 0 && disciplineStagePreviewMatchesBooked(previewTeams, bookedTeams)) {
+    return { teams: previewTeams, source: "preview" };
+  }
+  return { teams: bookedTeams, source: "booked" };
+}

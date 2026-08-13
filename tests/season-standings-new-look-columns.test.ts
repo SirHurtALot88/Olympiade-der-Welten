@@ -74,7 +74,23 @@ function render(extraProps: Record<string, unknown>) {
 
 describe("SeasonStandingsNewLook — Daten-Tabelle", () => {
   const html = render({
-    teamFormCardBonusByTeamId: new Map([["t1", { total: 12, cards: 3, positive: 16, negative: -4 }]]),
+    teamFormCardBonusByTeamId: new Map([
+      [
+        "t1",
+        {
+          total: 12,
+          cards: 3,
+          positive: 16,
+          negative: -4,
+          poolCards: 6,
+          poolPositive: 30,
+          poolNegative: -18,
+          remainingCards: 3,
+          remainingPositive: 14,
+          remainingNegative: -14,
+        },
+      ],
+    ]),
   });
 
   it("hängt den Liga-Rang kompakt an MW und Gehälter (kein eigener Spaltenplatz)", () => {
@@ -85,11 +101,22 @@ describe("SeasonStandingsNewLook — Daten-Tabelle", () => {
     expect(html).toMatch(/nl-standings-td-mw[^>]*>[^<]*<span class="nl-standings-rank-suffix/);
   });
 
-  it("zeigt die Formkarten-Summe (+12) und für Teams ohne gespielte Karte ein „—“", () => {
+  it("zeigt den Formkarten-Tank (30) und daneben den Rest (14)", () => {
+    // Chris: „in der formkarten spalte soll generell immer die summe stehen die AM ANFANG der
+    // saison den teams zur verfuegung stand ... dann weiss man wie viel luft noch im tank ist".
+    // Vorher stand hier die Summe der GESPIELTEN Nennwerte (+12) — eine Zahl, die bauartbedingt
+    // fast immer ≤ 0 ist, weil die Karten als Paar +x/−x kommen und man die Minuskarten zuerst
+    // abwirft. Jetzt: voller Tank in „Formkarten", Ungespieltes in „Rest".
     expect(html).toContain("Formkarten");
-    expect(html).toContain('title="Team A-A: 3 gespielte Formkarten');
-    expect(html).toContain(">+12<");
-    expect(html).toContain('title="Keine Formkarte gespielt — Team B-B"');
+    expect(html).toContain(">Rest<");
+    expect(html).toContain(">30<");
+    expect(html).toContain(">14<");
+    expect(html).toContain("Formkarten-Tank 30");
+    expect(html).toContain("davon noch ungespielt 14");
+    expect(html).toContain("gespielt 3 von 6 Karten");
+    // Offene Minuskarten kosten am Saisonende Punkte — das steht am Wert.
+    expect(html).toContain("offene Minuskarten -14");
+    expect(html).toContain('title="Keine Formkarten in dieser Saison — Team B-B"');
   });
 
   it("rendert auch ohne Formkarten-Karte durch", () => {

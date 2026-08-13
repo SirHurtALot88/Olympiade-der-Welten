@@ -222,8 +222,34 @@ export function buildSeasonPointsLedger(
   const seasonDisciplineResults = (gameState.seasonState.disciplineResults ?? []).filter((result) =>
     seasonResultIds.has(result.matchdayResultId),
   );
+
+  /**
+   * EIN SPIELTAG OHNE DISZIPLIN-ERGEBNISSE WIRD NICHT GEBUCHT.
+   *
+   * Ohne diese Grenze rechnet der Ledger im Browser plausible falsche Zahlen. Der kompakte
+   * Payload beschneidet `disciplineResults` auf den aktiven Spieltag (zu Recht, sie sind die
+   * schwere Fracht), waehrend `playerDisciplinePerformances` und — seit dem Saisonziel-Fix —
+   * auch `matchdayResults` vollstaendig mitfahren. Die Leistungszeilen kamen damit alle durch,
+   * ihr Disziplin-Ergebnis fehlte aber: `teamTotal` blieb null, und die Punkte fielen auf eine
+   * Ersatzquelle zurueck — den ROHBEITRAG statt der gewerteten Punkte. Nachgemessen am
+   * Testfall: 33,3 PP, wo der volle Save 4,9 sagt.
+   *
+   * Ein sichtbar leeres Feld ist reparierbar, eine falsche Zahl wird geglaubt
+   * (docs/TRAINING_PERFORMANCE_ANTEIL_BEFUND.md). Ein Spieltag, zu dem kein einziges
+   * Disziplin-Ergebnis vorliegt, ist nicht gewertet — fuer den gibt es keine Punkte zu buchen,
+   * weder hier noch anderswo. Auf dem vollen Save aendert die Regel nichts: dort traegt jeder
+   * gewertete Spieltag seine Disziplin-Ergebnisse.
+   */
+  const resultIdsWithDisciplineCoverage = new Set(
+    seasonDisciplineResults.map((result) => result.matchdayResultId),
+  );
+  const uncoveredResultIds = [...seasonResultIds].filter((id) => !resultIdsWithDisciplineCoverage.has(id));
+  if (uncoveredResultIds.length > 0) {
+    warnings.push(`skipped_matchdays_without_discipline_results:${uncoveredResultIds.length}`);
+  }
+
   const seasonPlayerPerformances = (gameState.seasonState.playerDisciplinePerformances ?? []).filter((performance) =>
-    seasonResultIds.has(performance.matchdayResultId),
+    resultIdsWithDisciplineCoverage.has(performance.matchdayResultId),
   );
 
   const disciplineResultByKey = new Map(
@@ -463,7 +489,9 @@ export function buildSeasonPointsLedger(
   }
 
   return {
-    hasResultSource: seasonMatchdayResults.length > 0,
+    // Eine Quelle ist nur dann eine Quelle, wenn auch Disziplin-Ergebnisse dazu vorliegen —
+    // sonst meldete der Ledger im Browser „ich habe Daten" und lieferte trotzdem nichts.
+    hasResultSource: resultIdsWithDisciplineCoverage.size > 0,
     pointEntries,
     pointEntriesByPerformanceId,
     teamSummariesByTeamId,

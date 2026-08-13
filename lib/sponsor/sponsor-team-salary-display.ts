@@ -1,6 +1,10 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
-import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import {
+  normalizeEconomyMoney,
+  resolveNegotiatedAnnualSalary,
+  resolvePlayerEconomyContract,
+} from "@/lib/foundation/player-economy-contract";
 
 function round1(value: number) {
   return Math.round(value * 10) / 10;
@@ -42,9 +46,35 @@ export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): 
     .filter((entry) => entry.teamId === teamId)
     .reduce((sum, entry) => {
       const player = playerById.get(entry.playerId) ?? null;
-      const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      return sum + (normalizeEconomyMoney(contract.salary) ?? 0);
+      // KEIN zweites `normalizeEconomyMoney`. `contract.salary` ist bereits normalisiert
+      // (`resolvePlayerEconomyContract` schickt jeden Zweig durch `normalizeStoredEconomyValue`).
+      // Ein zweiter Durchlauf würde einen Betrag über 1000 ein zweites Mal durch 100 teilen und
+      // diese Anzeige um Faktor 100 von dem trennen, was der Saisonende-Apply abbucht. Am Abbild
+      // aller fünf Spielstände (1 689 Rosterverträge) liegt kein einziger über der Schwelle — der
+      // Zweig war also toter, aber falscher Code.
+      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
     }, 0);
+  return round1(total);
+}
+
+/**
+ * DIE VERHANDELTE Gehaltssumme — Summe der Verhandlungs-Benchmarks aller Kadervertraege.
+ *
+ * Das ist seit Chris' Entscheidung („ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3) die
+ * BEMESSUNGSGRUNDLAGE DER APRON. Vorher bemass die Abgabe `getTeamDisplaySalaryTotal` — das
+ * FORMEL-Gehalt aus Marktwert und Attributen. Ein Team, das seinen ganzen Kader unter Formel
+ * verhandelte, zahlte trotzdem die volle Abgabe; am Abbild zahlte Cold Steel 3,18, obwohl seine
+ * echte Gehaltssumme (63,6) UNTER der ersten Linie (76,8) lag. Verhandeln soll zaehlen.
+ *
+ * FORMUNEMPFINDLICH, und das ist die ganze Kunst daran: gezaehlt wird das bei Unterschrift
+ * verhandelte Jahresgehalt, nicht die Jahreszahlung und nicht der Durchschnitt der REST-Schedule —
+ * beide sind manipulierbar (siehe `resolveNegotiatedAnnualSalary`). Ein Formwechsel bewegt diese
+ * Summe um 0,00, auch nach beliebig vielen Saisonwechseln; der Waechter-Test haelt das fest.
+ */
+export function getTeamNegotiatedSalaryTotal(gameState: GameState, teamId: string): number {
+  const total = gameState.rosters
+    .filter((entry) => entry.teamId === teamId)
+    .reduce((sum, entry) => sum + (resolveNegotiatedAnnualSalary(entry).value ?? 0), 0);
   return round1(total);
 }
 

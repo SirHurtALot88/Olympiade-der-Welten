@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { getPlayerPortraitMediaModel, getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { getPlayerPortraitInitials, getPlayerPortraitMediaModel, getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import {
@@ -12,10 +12,17 @@ import { buildApronProjection } from "@/lib/finance/apron-projection";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { hasFinalMatchdayBeenPlayed } from "@/lib/season/season-completion-state";
+import { buildTitleRace, type TitleRaceResult } from "@/lib/season/title-race";
 
 /** Gebäude-Unterhalt p.a. für ein Team — Summe der Season-Upkeeps aller gebauten
- * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak). */
-function computeTeamBuildingCost(gameState: GameState, teamId: string): number {
+ * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak).
+ *
+ * EXPORTIERT, weil die Saisonstand-Tabelle auf dem TATSAECHLICH gerenderten Pfad
+ * (`use-foundation-shell-router-body-scope.tsx` → `FoundationSeasonV2Panel`) dieselbe Zahl
+ * braucht. Dieses Modell hier haengt am nirgends gerenderten `FoundationSeasonV2Host`; waere
+ * die Rechnung dort privat geblieben, stuende sie zweimal im Code und driftete auseinander. */
+export function computeTeamBuildingCost(gameState: GameState, teamId: string): number {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   return FACILITY_CATALOG.reduce(
     (sum, entry) => sum + calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),
@@ -73,6 +80,13 @@ export interface UseSeasonV2PanelModelInput {
   seasonHistorySnapshots: SeasonSnapshotInput[];
   archivedSeasonDisciplineLeaderboards: SeasonV2DisciplineLeaderboardInput[];
   boardConfidence: BoardConfidenceMap;
+  /**
+   * Blendet den Meisterschaftskampf aus, auch wenn die LIVE-Saison zufällig gerade im
+   * Zeitfenster steckt (letzter Spieltag aktiv, noch nicht durchgespielt): eine archivierte
+   * Saison zeigt immer ihren eigenen (abgeschlossenen) Endstand, nie die Live-Berechnung einer
+   * anderen Saison. Optional/Default `false`, weil ältere Aufrufer dieses Feld nicht kennen.
+   */
+  isViewingArchivedSeason?: boolean;
 }
 
 function getPlayerPortraitModel(player: Parameters<typeof getPlayerPortraitMediaModel>[0]) {
@@ -95,6 +109,7 @@ export function useSeasonV2PanelModel({
   seasonHistorySnapshots,
   archivedSeasonDisciplineLeaderboards,
   boardConfidence,
+  isViewingArchivedSeason = false,
 }: UseSeasonV2PanelModelInput) {
   /**
    * Apron-Hochrechnung für die ganze Liga — EINMAL je Tabellenaufbau, nicht je Zeile: Topf und
@@ -190,11 +205,37 @@ export function useSeasonV2PanelModel({
     [apronProjection, gameState, selectedTeamId, sortedSeasonStandRows],
   );
 
+  /**
+   * Meisterschaftskampf am letzten Spieltag (Chris' Wunsch, `lib/season/title-race.ts`).
+   *
+   * `buildTitleRace` selbst kennt keinen Kalender — der Aufrufer muss das Zeitfenster
+   * sicherstellen. Zwei Bedingungen, beide müssen gelten:
+   *  - letzter Spieltag AKTIV (gleiches Muster wie `season-completion-state.ts:47`),
+   *  - dieser Spieltag noch NICHT durchgespielt (`hasFinalMatchdayBeenPlayed`) — sonst
+   *    stünde die Hervorhebung noch da, wenn der Titel längst feststeht.
+   * Außerhalb dieses Fensters (und beim Blick in eine archivierte Saison, die eigene,
+   * abgeschlossene Zahlen trägt) ist `titleRace` `null` — die UI zeigt dann nichts.
+   *
+   * Rechnet mit `standingsRows[].points` — GENAU dem Stand, den die Tabelle daneben zeigt.
+   * Dadurch können Rechnung und Anzeige nie auseinanderlaufen.
+   */
+  const titleRace = useMemo<TitleRaceResult | null>(() => {
+    if (isViewingArchivedSeason) {
+      return null;
+    }
+    const matchdayIds = gameState.season.matchdayIds ?? [];
+    const isLastMatchdayActive = gameState.season.currentMatchday >= matchdayIds.length;
+    if (!isLastMatchdayActive || hasFinalMatchdayBeenPlayed(gameState)) {
+      return null;
+    }
+    return buildTitleRace(standingsRows.map((row) => ({ teamId: row.teamId, points: row.points })));
+  }, [gameState, isViewingArchivedSeason, standingsRows]);
+
   const topPlayers = useMemo(() => {
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = playerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,
@@ -221,7 +262,7 @@ export function useSeasonV2PanelModel({
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.map((row) => {
       const player = playerById.get(row.playerId) ?? null;
-      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: getPlayerPortraitInitials(row.name) };
       return {
         playerId: row.playerId,
         name: row.name,
@@ -420,5 +461,6 @@ export function useSeasonV2PanelModel({
     archiveRows,
     gmRows,
     disciplineLeaders,
+    titleRace,
   };
 }

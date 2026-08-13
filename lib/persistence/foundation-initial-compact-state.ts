@@ -53,26 +53,65 @@ function resolveHumanRosterPlayerIds(gameState: GameState): Set<string> {
 }
 
 /**
- * Append-only archive guard for compact-load round-trips.
+ * Der Schluessel, an dem ein Archiv-Eintrag wiedererkannt wird.
  *
- * The Foundation compact load strips `seasonSnapshots`/`standingsApplyLogs` to
- * `undefined`, and the client re-stamps an EMPTY sentinel `[]` (see
- * `apply-compact-season-archive-sentinel`). A naive `incoming ?? existing`
- * (and even `preserveIfUnchangedFromCompact`, whose compact baseline is
- * `undefined` — `"[]" !== undefined`) would let that `[]` clobber the durable
- * DB archive on the next gameplay PUT — wiping every prior-season snapshot.
+ * Beide Archive tragen eine eigene Kennung (`snapshotId` bei den Saison-Schnappschuessen, `id` bei
+ * den Standings-Buchungen). Faellt beides aus, dient der Inhalt selbst als Schluessel — dann ist ein
+ * Eintrag hoechstens sich selbst gleich, und die Wache haelt ihn erst recht fest.
+ */
+function archiveEntryKey(entry: unknown): string {
+  if (entry && typeof entry === "object") {
+    const record = entry as Record<string, unknown>;
+    for (const field of ["snapshotId", "id", "seasonId"] as const) {
+      const value = record[field];
+      if (typeof value === "string" && value.length > 0) {
+        return `${field}:${value}`;
+      }
+    }
+  }
+  return `json:${stableJson(entry)}`;
+}
+
+/**
+ * ARCHIVSCHUTZ FUER DIE PUT-RUNDREISE — schuetzt den INHALT, nicht die Anzahl.
  *
- * These archives are APPEND-ONLY (they only grow, one entry per completed
- * season / applied matchday). So the safe rule is: only accept the incoming
- * array when it has AT LEAST as many entries as the persisted one; otherwise
- * keep the durable copy. This blocks both the empty sentinel and any partial
- * fetch from shrinking the archive, while still accepting legitimate growth
- * (a freshly-completed season adds a snapshot → incoming is longer → wins).
+ * Die kompakte Anfangsladung streicht `seasonSnapshots`/`standingsApplyLogs` auf `undefined`, und
+ * der Browser stempelt an dieselbe Stelle eine LEERE LISTE (`apply-compact-season-archive-sentinel`).
+ * Ein naives `incoming ?? existing` liesse dieses `[]` beim naechsten Spiel-PUT das dauerhafte
+ * Archiv ueberschreiben — jede vergangene Saison waere weg.
+ *
+ * DIE ALTE WACHE VERGLICH NUR LAENGEN (`incomingLength >= existingLength ? incoming : existing`).
+ * Gemessen am Live-Abbild `new-game-1785823388048-1hf25q`: eine gleich lange, inhaltlich
+ * ausgeraeumte Liste kam anstandslos durch — `finalStandings` 32 -> 0 Zeilen, 3.546.497 B ->
+ * 3.249.724 B, und die Wache meldete nichts. Heute schreibt niemand so eine Liste; der Code
+ * verliess sich aber darauf, dass das so bleibt.
+ *
+ * DIE REGEL, DIE JETZT GILT: dieser Weg darf das Archiv nur WACHSEN lassen. Ein Eintrag, der im
+ * Spielstand liegt, bleibt Zeichen fuer Zeichen erhalten; neue Eintraege werden angehaengt. Das ist
+ * keine Verschaerfung ins Blaue, sondern genau die Zusage, die der Client ohnehin gibt: er verfasst
+ * Schnappschuesse nie (siehe `buildAutoPersistContentSignature` in `use-foundation-persist`, wo
+ * `seasonSnapshots` aus der Aenderungserkennung genommen ist, weil „der Client Schnappschuesse nie
+ * verfasst"). Geschrieben werden sie ausschliesslich serverseitig ueber
+ * `persistGameStateWithMaterializedDerivations` — dieser Weg hier ist nur der Browser-PUT und kommt
+ * an dieser Wache gar nicht vorbei.
+ *
+ * Reihenfolge: die bestehenden Eintraege behalten ihre, neue haengen hinten an. Damit ist das
+ * Ergebnis bei unveraendertem Eingang identisch mit dem Bestand — die Rundreise bleibt Identitaet.
  */
 function preserveAppendOnlyArchive<T extends unknown[] | undefined>(incoming: T, existing: T): T {
-  const incomingLength = incoming?.length ?? 0;
-  const existingLength = existing?.length ?? 0;
-  return incomingLength >= existingLength ? incoming : existing;
+  if (existing === undefined || existing.length === 0) {
+    return incoming ?? existing;
+  }
+  if (incoming === undefined) {
+    return existing;
+  }
+
+  const bekannteSchluessel = new Set(existing.map(archiveEntryKey));
+  // Bestehende Eintraege gewinnen IMMER — auch wenn der Eingang einen gleichnamigen mitbringt.
+  // Genau das ist der Unterschied zur Laengen-Wache: eine ausgeraeumte Fassung desselben
+  // Schnappschusses kommt hier nicht mehr durch.
+  const zusaetzlich = incoming.filter((entry) => !bekannteSchluessel.has(archiveEntryKey(entry)));
+  return (zusaetzlich.length === 0 ? existing : [...existing, ...zusaetzlich]) as T;
 }
 
 function mergeKeyedCollection<T>(
@@ -90,14 +129,47 @@ function mergeKeyedCollection<T>(
   return [...preservedFromExisting, ...incoming];
 }
 
+/**
+ * DIE BASISLINIEN SCHLANK, ABER NICHT WEG — der Saison-0-Bezugswert faehrt mit.
+ *
+ * BEFUND (am Live-Abbild gemessen, Save `new-game-1785823388048-1hf25q`): `playerBaselines` waren
+ * fuer den Browser komplett gestrichen (`undefined`, 4,63 MB gespart). Sie sind aber KEINE reine
+ * Historie — die Marktwert-Anzeige rechnet auf ihnen. `getPlayerSeasonMarketValueReference` und
+ * `getPlayerSeasonZeroMarketValueReference` (`player-display-market-value`) nehmen zuerst den
+ * Basislinien-Bezugswert und fallen ohne ihn auf den Katalogwert des Spielers zurueck. Das ist
+ * kein Leerzustand, sondern eine ANDERE ZAHL. Ueber 540 gepruefte Spieler (alle Kaderspieler plus
+ * 200 freie):
+ *
+ *   getPlayerSeasonZeroMarketValueReference  498 von 540 abweichend (Sofia 7,89 -> 8,05)
+ *   getPlayerSeasonMarketValueReference      165 von 540 abweichend (Zed 53,94 -> 53,84)
+ *   getPlayerDisplayMarketValueDelta         136 von 540 abweichend — und dort wurde aus einem
+ *                                            echten kleinen Delta ein `null`, also „keine
+ *                                            Veraenderung" statt einer Veraenderung.
+ *
+ * Was die Anzeige braucht, ist winzig: `seasonZeroEconomy` plus `marketValue`/`salary`. Was das
+ * Gewicht ausmacht, sind `attributes` und `disciplineRatings` — und die liest im Browser niemand
+ * (der Spieler-Drawer holt seine Attribute ueber `hydrate-player-attribute-sheet` nach). Also
+ * faehrt die schlanke Zeile mit; gemessen bleiben davon rund 0,6 MB der 4,63 MB uebrig.
+ *
+ * ZURUECKGESCHRIEBEN WIRD SIE NIE (siehe `rehydrateGameStateAfterCompactPut`): der Browser
+ * verfasst keine Basislinien, und die schlanke Fassung darf die volle im Spielstand niemals
+ * ersetzen — das waere genau der stille Datenverlust, gegen den `baselineWriteGuardEvents` steht.
+ */
+function schlankeBasislinien(gameState: GameState): GameState["playerBaselines"] {
+  const baselines = gameState.playerBaselines;
+  if (!baselines) return undefined;
+  return baselines.map((baseline) => ({
+    playerId: baseline.playerId,
+    marketValue: baseline.marketValue,
+    salary: baseline.salary,
+    seasonZeroEconomy: baseline.seasonZeroEconomy,
+    createdAt: baseline.createdAt,
+    reconstructionWarning: baseline.reconstructionWarning,
+  })) as GameState["playerBaselines"];
+}
+
 /** Slim initial Foundation payload: strips heavy history and non-active matchday slices. */
 export function compactFoundationInitialGameState(gameState: GameState): GameState {
-  const activeMatchdayId = gameState.matchdayState.matchdayId;
-  const activeMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
-    (result) => result.matchdayId === activeMatchdayId,
-  );
-  const activeMatchdayResultIds = new Set(activeMatchdayResults.map((result) => result.id));
-
   // Keep the OWN team's attribute sheets in the compact payload so whole-roster
   // forecasts (training-SP, per-intensity/-class gain, season-end preview) work
   // immediately — opponent sheets remain stripped and hydrate on demand.
@@ -107,7 +179,8 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
 
   return {
     ...gameState,
-    playerBaselines: undefined,
+    // Siehe `schlankeBasislinien`: die Marktwert-Anzeige rechnet darauf, die Attribute nicht.
+    playerBaselines: schlankeBasislinien(gameState),
     baselineWriteGuardEvents: undefined,
     transferHistory: gameState.transferHistory,
     logs: [],
@@ -125,6 +198,20 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     seasonState: {
       ...gameState.seasonState,
       persistedSeasonDerivations: undefined,
+      /**
+       * DIE VORBERECHNUNG DES SPIELTAGS BLEIBT AUF DEM SERVER — 0,72 MB, die der Browser nie
+       * anfasst.
+       *
+       * `matchdayResolveSnapshots` ist ein Rechen-Cache: `writeMatchdayResolveSnapshot` rechnet den
+       * Spieltag EINMAL, damit Arena-Buehne und beide Disziplin-Buchungen aus demselben Ergebnis
+       * lesen. Beide Leser (`matchday-arena-base-service`, `matchday-auto-run-service`) laufen
+       * serverseitig auf dem vollen Save; im Browser liest das Feld nachweislich niemand. Am
+       * Live-Abbild gemessen fuhr es trotzdem mit: 0,715 MB, bei jedem Laden.
+       *
+       * Verlorengehen kann es dabei nicht — siehe die Wache in
+       * `rehydrateGameStateAfterCompactPut`: der Spielstand behaelt seine Vorberechnung.
+       */
+      matchdayResolveSnapshots: undefined,
       seasonSnapshots: undefined,
       /**
        * Ersatz fuer die gestrichenen Schnappschuesse — siehe
@@ -132,27 +219,87 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
        * vergangene Saison „—", weil die Historie mangels Schnappschuss auf Platzhalterzeilen mit
        * `rank: null` zurueckfiel. Die Daten waren nie weg, sie kamen nur nie im Browser an.
        *
-       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz vergleicht nur die Anzahl der
-       * Eintraege, eine gleich lange Kurzfassung kaeme also durch und wuerde die vollen
-       * Schnappschuesse beim naechsten Speichern ueberschreiben.
+       * Landet BEWUSST nicht in `seasonSnapshots`: der Archivschutz laesst dieses Feld ueber die
+       * PUT-Rundreise nur WACHSEN und haelt jeden vorhandenen Eintrag Zeichen fuer Zeichen fest
+       * (siehe `preserveAppendOnlyArchive`). Eine Kurzfassung unter demselben Namen waere trotzdem
+       * falsch: sie wuerde ab dem naechsten Laden als „das Archiv" gelesen und jede Ansicht, die
+       * die schweren Anhaenge braucht, still auf Luecken rechnen lassen. Ein eigenes Feld sagt
+       * ehrlich, was es ist.
        */
       foundationSeasonHistory: projiziereSaisonHistorie(gameState.seasonState.seasonSnapshots),
       /**
-       * Geschwister-Projektion fuers laufende Feld-Rennen: der Browser kann die gewerteten
-       * Spieltage aus dem kompakten Payload nicht mehr selbst zaehlen (matchdayResults/
-       * disciplineResults sind hier auf den aktiven Spieltag beschnitten) — Home meldete
-       * deshalb mitten in der Saison „erst 0 Spieltage". Die fertige Antwort faehrt mit,
-       * gerechnet auf dem vollen Save; zurueckgeschrieben wird sie nie (s. u.).
+       * Geschwister-Projektion fuers laufende Feld-Rennen — die EINZIGE, die stehen bleibt.
+       *
+       * Sie entstand aus demselben Grund wie die fuenf entfernten (beschnittene
+       * `matchdayResults`/`disciplineResults`), traegt aber inzwischen einen anderen: Home baut
+       * die Voll-Derivationen bewusst NICHT (`shouldLoadSeasonDerivations` deckt Home nicht ab),
+       * und ohne sie meldete die Kachel „erst 0 Spieltage". Die Projektion ist dort die billige
+       * Antwort, nicht die einzig richtige. Nachgemessen am Live-Abbild (S2/MD10 und S1/MD2):
+       * Projektion und Eigenbau liefern Zeichen fuer Zeichen dasselbe Ledger — sie verfaelscht
+       * also nichts, sie erspart nur die Rechnung.
        */
       foundationFieldRace: projiziereFieldRace(gameState),
       standingsApplyLogs: undefined,
-      disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
-        activeMatchdayResultIds.has(result.matchdayResultId),
-      ),
-      matchdayResults: activeMatchdayResults,
-      lineupDrafts: (gameState.seasonState.lineupDrafts ?? []).filter(
-        (draft) => draft.matchdayId === activeMatchdayId,
-      ),
+      /**
+       * FAEHRT VOLLSTAENDIG MIT — die Beschneidung ist ERSATZLOS ENTFALLEN.
+       *
+       * ANSAGE VON CHRIS: „bitte keine gekuerzten spielstaende". Die Messung gibt ihm recht,
+       * und zwar deutlicher als erwartet. Am Live-Save (Saison 2, Spieltag 10) gemessen:
+       *
+       *   voller Spielstand                33,16 MB
+       *   gekuerzt                         15,19 MB   (18,4 MB gespart)
+       *   davon durch `disciplineResults`   271,5 KB -> 26,8 KB, also 245 KB
+       *   davon durch `lineupDrafts`        658,5 KB -> 69,7 KB, also 589 KB
+       *
+       * Diese beiden Felder zusammen tragen 834 KB zur Ersparnis bei — 4,5 % von dem, was die
+       * Kuerzung insgesamt einspart. Der Berg liegt woanders (persistedSeasonDerivations 5,7 MB,
+       * seasonSnapshots 3,5 MB, injuryEvents 2,3 MB, playerBaselines 4,7 MB); die bleiben
+       * beschnitten.
+       *
+       * Bezahlt haben wir diese 834 KB mit sechs Fehlern, die alle dieselbe Bauart hatten: eine
+       * Ansicht rechnet im Browser selbst und bekommt dabei nicht etwa ein leeres Feld, sondern
+       * eine FALSCHE ZAHL. Spieltags-Ergebnis (32 von 32 Zeilen falsch), Rekordbuch (7 von 7
+       * Haltern falsch), Meilensteine, PP-Formbonus (nur 14 von 32 Teams, Werte teils zu hoch),
+       * Formkarten-Alarm der Inbox (605 gemeldete Strafpunkte, in Wahrheit null), Saisonziele.
+       *
+       * 834 KB auf 15,19 MB sind +5,5 % Ladelast. Das ist der Preis dafuer, dass jede dieser
+       * Rechnungen wieder von selbst stimmt, statt einzeln durch eine Projektion abgesichert
+       * werden zu muessen. Der Handel ist eindeutig.
+       *
+       * DIE FUENF PROJEKTIONEN DAZU SIND ERSATZLOS ENTFERNT (foundationMatchdayPoints,
+       * foundationRecordBook, foundationDisciplineTally, foundationPpAreaFormBonus,
+       * foundationFormCardBonus). Nachgewiesen, nicht angenommen: an beiden aktiven Spielstaenden
+       * (S2/MD10 mit 640 Disziplin-Zeilen und 320 Aufstellungen, S1/MD2 mit 64/63) liefert jeder
+       * ihrer Leser mit und ohne Projektion Zeichen fuer Zeichen dasselbe Ergebnis — und dasselbe
+       * wie der Server auf dem vollen Spielstand.
+       *
+       * Weg mussten sie nicht nur wegen der 22 KB. `buildSeasonFormCardBonusByTeamId` gab der
+       * Projektion BEDINGUNGSLOS Vorrang (`if (projektion && projektion.seasonId === seasonId)
+       * return …`) — kein Deckungsvergleich, kein Zurueckfallen. Die Projektion entsteht beim
+       * LADEN; wer waehrend der Sitzung eine Formkarte legte, rechnete danach gegen einen
+       * veralteten Stand, bis er neu lud. Eine zweite Rechenstelle fuer dieselbe Zahl, die den
+       * frischeren Wert ueberstimmt — genau die Fehlerklasse, gegen die die Projektionen einmal
+       * gebaut wurden.
+       */
+      disciplineResults: gameState.seasonState.disciplineResults ?? [],
+      /**
+       * FAEHRT VOLLSTAENDIG MIT — bewusst nicht auf den aktiven Spieltag beschnitten.
+       *
+       * Diese Liste ist kein Datenberg, sondern ein Verzeichnis: eine schmale Zeile je
+       * gewertetem Spieltag (gemessen 10 Zeilen = 4,7 KB, +0,027 % des Payloads). Die
+       * schwere Fracht sind `disciplineResults` und die bleiben beschnitten.
+       *
+       * Beschnitten war sie trotzdem teuer: `getCurrentSeasonMatchdayResultIds` in
+       * `team-season-objectives-service` erkennt an ihr, welche Ergebnisse zur laufenden
+       * Saison gehoeren, und wirft alles weg, was nicht drinsteht. Im Browser blieb davon
+       * genau ein Spieltag uebrig — also zaehlten die Saisonziele nur den aktiven mit.
+       * Gemessen am Live-Save: Server 4/3 Top-20 (erfuellt), Browser 0/3, bestes Rank #33.
+       * `getRemainingMatchdays` verrechnete sich aus demselben Grund und meldete fast die
+       * ganze Saison als offen.
+       */
+      matchdayResults: gameState.seasonState.matchdayResults ?? [],
+      /** Ebenfalls vollstaendig — siehe die Herleitung bei `disciplineResults` (589 KB). */
+      lineupDrafts: gameState.seasonState.lineupDrafts ?? [],
     },
   };
 }
@@ -217,7 +364,21 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
 
   return {
     ...incoming,
-    playerBaselines: incoming.playerBaselines ?? existing.playerBaselines,
+    /**
+     * DIE BASISLINIEN DES SPIELSTANDS GEWINNEN IMMER — hier stand `incoming ?? existing`.
+     *
+     * Solange die Anfangsladung sie ganz strich, war das dasselbe: der Browser schickte
+     * `undefined` zurueck, also gewann `existing`. Seit die SCHLANKE Fassung mitfaehrt (siehe
+     * `schlankeBasislinien`) ist `incoming` nicht mehr nullish — mit `??` haette der naechste
+     * Speichervorgang die vollen Basislinien durch die Kurzfassung ersetzt und `attributes`,
+     * `disciplineRatings`, Traits und Herkunft dauerhaft geloescht. Genau der stille Datenverlust,
+     * gegen den `baselineWriteGuardEvents` steht.
+     *
+     * Der Client verfasst Basislinien nie: sie entstehen im `player-baseline-service`, im
+     * Datenadapter und in der Server-Migration. Nur wenn der Spielstand gar keine hat, darf ein
+     * eingehender Satz sie erstmalig setzen.
+     */
+    playerBaselines: existing.playerBaselines ?? incoming.playerBaselines,
     baselineWriteGuardEvents: incoming.baselineWriteGuardEvents ?? existing.baselineWriteGuardEvents,
     transferHistory: preserveIfUnchangedFromCompact(
       incoming.transferHistory,
@@ -230,10 +391,18 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       ...incoming.seasonState,
       persistedSeasonDerivations:
         incoming.seasonState.persistedSeasonDerivations ?? existing.seasonState.persistedSeasonDerivations,
-      // Append-only archives: the compact client re-stamps an empty sentinel `[]`,
-      // which the old `incoming ?? existing` guard let clobber the durable DB
-      // archive (wiping every prior-season snapshot). Only accept incoming when it
-      // is at least as long as the persisted copy (see preserveAppendOnlyArchive).
+      /**
+       * Die Spieltags-Vorberechnung des SPIELSTANDS gewinnt immer — sie faehrt gar nicht erst zum
+       * Browser hinaus (s. o.), also hat ein eingehender Wert hier nichts zu suchen. Ginge sie beim
+       * Speichern verloren, muesste der naechste Arena-Aufruf neu rechnen — und genau das Neurechnen
+       * war die Ursache dafuer, dass dieselbe Disziplin zwischen Buehne und Buchung zweimal
+       * unterschiedlich herauskam (siehe `matchday-resolve-snapshot`).
+       */
+      matchdayResolveSnapshots:
+        existing.seasonState.matchdayResolveSnapshots ?? incoming.seasonState.matchdayResolveSnapshots,
+      // Append-only-Archive: der kompakte Client stempelt eine leere Liste `[]` an diese
+      // Stelle. Die Wache haelt jeden vorhandenen Eintrag unveraendert fest und laesst nur
+      // NEUE hinzukommen — siehe `preserveAppendOnlyArchive`.
       seasonSnapshots: preserveAppendOnlyArchive(
         incoming.seasonState.seasonSnapshots,
         existing.seasonState.seasonSnapshots,
@@ -249,6 +418,21 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       // Dieselbe Regel wie die Saison-Historie darueber: reine Anzeigefracht, faehrt nur
       // zum Browser hinaus und wird beim naechsten Ausliefern frisch gebaut.
       foundationFieldRace: undefined,
+      /**
+       * DIE FUENF ENTFERNTEN PROJEKTIONEN WERDEN HIER WEITER AUSGERAEUMT — und das ist kein
+       * Ueberbleibsel, sondern Absicht: ein Browser-Tab, der noch die alte Auslieferung im
+       * Speicher hat, schickt sie beim naechsten Speichern zurueck. Ohne diese Zeilen landeten
+       * sie dauerhaft im Spielstand und waeren ab dann eine zweite, nie wieder aufgefrischte
+       * Wahrheit. Die Felder selbst sind aus dem Typ verschwunden, deshalb der Umweg ueber
+       * `undefined` auf einem aufgeweiteten Objekt.
+       */
+      ...({
+        foundationFormCardBonus: undefined,
+        foundationMatchdayPoints: undefined,
+        foundationRecordBook: undefined,
+        foundationDisciplineTally: undefined,
+        foundationPpAreaFormBonus: undefined,
+      } as Record<string, undefined>),
       standingsApplyLogs: preserveAppendOnlyArchive(
         incoming.seasonState.standingsApplyLogs,
         existing.seasonState.standingsApplyLogs,

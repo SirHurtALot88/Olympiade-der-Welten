@@ -19,17 +19,17 @@
  *
  * BEMESSUNGSGRUNDLAGE ist bewusst NICHT die Gehaltsspalte der Standings-Tabelle: die zeigt die
  * echte, front-/back-loaded Vertragssumme (`resolvePlayerEconomyContract().salary`), der Apron
- * rechnet dagegen auf der geglätteten (`getTeamDisplaySalaryTotal`, siehe Kopfkommentar in
- * apron-service.ts). Die beiden dürfen weit auseinanderliegen — im dort dokumentierten Save 97,7
- * gegen 83,3. Würde die Hochrechnung die Tabellenspalte lesen, stünde im Hover eine Abgabe, die
- * die echte Abrechnung nicht bestätigt. Deshalb nennt `salary` unten ausdrücklich die geglättete
- * Zahl, und der Hover schreibt sie mit dazu.
+ * rechnet dagegen auf dem VERHANDELTEN Jahresgehalt (`getTeamApronSalaryBase`, siehe Kopfkommentar
+ * in apron-service.ts). Die beiden dürfen weit auseinanderliegen — ein geformter Vertrag zahlt in
+ * Jahr 1 bis zu 30 % über seinem Jahresgehalt. Würde die Hochrechnung die Tabellenspalte lesen,
+ * stünde im Hover eine Abgabe, die die echte Abrechnung nicht bestätigt. Deshalb nennt `salary`
+ * unten ausdrücklich die Bemessungsgrundlage, und der Hover schreibt sie mit dazu.
  *
  * React-frei und ohne IO (bis auf das lesende GameState-Argument): die Herleitung ist ohne
  * Rendering prüfbar.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+
 import {
   apronWertungsanteil,
   computeApronSettlement,
@@ -37,6 +37,7 @@ import {
   resolveSeasonApronLines,
   resolveApronSalaryFactor,
   type ApronLines,
+  getTeamApronSalaryBase,
 } from "@/lib/season/apron-service";
 
 /** Anzahl der Ligaplätze, mit denen `apronWertungsanteil` bei unbekanntem Rang rechnet — letzter Platz. */
@@ -46,7 +47,7 @@ export type ApronProjectionTeamRow = {
   teamId: string;
   /** Rang, auf den hochgerechnet wurde (`null` = unbekannt, dann letzter Platz angenommen). */
   rank: number | null;
-  /** GEGLÄTTETE Gehaltssumme — die Bemessungsgrundlage des Apron, nicht die Tabellenspalte. */
+  /** VERHANDELTE Gehaltssumme — die Bemessungsgrundlage des Apron, nicht die Tabellenspalte. */
   salary: number;
   /** Abgabe (positiver Betrag; 0 = zahlt nicht). */
   abgabe: number;
@@ -104,7 +105,8 @@ export function buildApronProjection(input: {
 
   const teams = gameState.teams.map((team) => ({
     teamId: team.teamId,
-    salary: getTeamDisplaySalaryTotal(gameState, team.teamId),
+    // Dieselbe Bemessungsgrundlage wie Abrechnung und Linien — siehe apron-service.ts.
+    salary: getTeamApronSalaryBase(gameState, team.teamId),
     rankShare: apronWertungsanteil(input.rankByTeamId.get(team.teamId) ?? APRON_FALLBACK_RANK, salaryFactor),
   }));
 
