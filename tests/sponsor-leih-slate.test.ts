@@ -14,15 +14,43 @@ import { describe, expect, it } from "vitest";
 import { berechneCashVerzicht, type SponsorLeihRaritaet } from "@/lib/sponsor/sponsor-leihe";
 import {
   EINSTIEG_VERZICHT_DECKEL,
+  SPONSOR_GEBAEUDE_LEIHE_AKTIV,
   VERLEIHBARE_GEBAEUDE,
   verteileLeihgabenAufSlate,
 } from "@/lib/sponsor/sponsor-leih-slate";
 
 const FUENF: SponsorLeihRaritaet[] = ["gewoehnlich", "magisch", "selten", "magisch", "legendaer"];
 
+/**
+ * ALLE FAELLE DIESER DATEI PRUEFEN DIE EINGESCHALTETE LEIHE — deshalb `aktiv: true`.
+ *
+ * Der Gebäude-Schalter steht in der Produktion auf AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV`, Chris:
+ * „deaktiviere Gebäude"). Die Auflagen unten bleiben trotzdem gueltig und getestet: sie beschreiben,
+ * was die Verteilung tun MUSS, sobald der Schalter wieder an ist. Ohne das explizite `aktiv: true`
+ * waeren sie ab jetzt gruene Tests ueber einen Zustand, den niemand mehr prueft.
+ */
 function slate(teamId: string, raritaeten: readonly SponsorLeihRaritaet[] = FUENF, eigeneStufen?: Record<string, number>) {
-  return verteileLeihgabenAufSlate({ seasonId: "season-3", teamId, raritaeten, eigeneStufen });
+  return verteileLeihgabenAufSlate({ seasonId: "season-3", teamId, raritaeten, eigeneStufen, aktiv: true });
 }
+
+describe("Der Gebäude-Schalter", () => {
+  it("steht auf AUS — und dann traegt KEIN Platz ein Gebaeude, nicht nur Platz 1", () => {
+    expect(SPONSOR_GEBAEUDE_LEIHE_AKTIV).toBe(false);
+    const karten = verteileLeihgabenAufSlate({ seasonId: "season-3", teamId: "T-1", raritaeten: FUENF });
+    expect(karten).toHaveLength(FUENF.length);
+    for (const karte of karten) {
+      expect(karte.leihe).toBeNull();
+      expect(karte.groesse).toBeNull();
+      expect(karte.verzichtErsteSaison).toBe(0);
+    }
+  });
+
+  it("eingeschaltet liefert dieselbe Funktion wieder Gebaeude — der Aus-Zustand ist kein Ausbau", () => {
+    const karten = verteileLeihgabenAufSlate({ seasonId: "season-3", teamId: "T-1", raritaeten: FUENF, aktiv: true });
+    expect(karten.slice(1).every((karte) => karte.leihe != null)).toBe(true);
+    expect(karten.slice(1).reduce((summe, karte) => summe + karte.verzichtErsteSaison, 0)).toBeGreaterThan(0);
+  });
+});
 
 describe("Platzverteilung", () => {
   it("laesst Platz 1 immer reines Geld — die Karte fuer Teams ohne Spielraum", () => {
@@ -57,7 +85,7 @@ describe("Platzverteilung", () => {
   it("nimmt die Laufzeit vom Aufrufer, wenn er eine mitgibt", () => {
     // Im Live-Pfad kommt sie aus dem Slate-Wurf (`entry.termSeasons`), nicht aus dieser Datei — die
     // Vorgabe hier ist nur der Rueckfall fuer Aufrufer ohne eigene Laufzeiten.
-    const ohneVorgabe = verteileLeihgabenAufSlate({ seasonId: "season-3", teamId: "T-1", raritaeten: FUENF });
+    const ohneVorgabe = verteileLeihgabenAufSlate({ seasonId: "season-3", teamId: "T-1", raritaeten: FUENF, aktiv: true });
     expect(ohneVorgabe[1]!.leihe!.stufenreihe).toHaveLength(2);
 
     const mitVorgabe = verteileLeihgabenAufSlate({
@@ -65,6 +93,7 @@ describe("Platzverteilung", () => {
       teamId: "T-1",
       raritaeten: FUENF,
       laufzeiten: [1, 1, 3, 2, 3],
+      aktiv: true,
     });
     expect(mitVorgabe[1]!.leihe!.stufenreihe).toHaveLength(1);
     expect(mitVorgabe[2]!.leihe!.stufenreihe).toHaveLength(3);

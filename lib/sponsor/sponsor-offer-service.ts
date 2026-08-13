@@ -283,10 +283,23 @@ export function buildSponsorOffersForTeam(input: {
   const beliebtheit = input.gameState.seasonState.beliebtheitByTeamId?.[input.teamId]?.value ?? null;
   const hadGoldenLastSeason =
     input.gameState.seasonState.goldenSponsorHistoryByTeamId?.[input.teamId] === true;
-  // 5 Angebote: pro Slot eine (rarity, Modellkurve)-Paarung aus dem Slate-Wurf — DISTINCT Kurven,
-  // rarity-gedeckelt + beliebtheits-gehoben. Jeder Slot bekommt eigenen Golden-Los, und über
-  // usedParentBrandIds (unten) unterschiedliche Marken.
-  const SLOT_COUNT = 5;
+  // WIE VIELE ANGEBOTE EIN TEAM SIEHT. Pro Slot eine (Rarity, Kurvenform)-Paarung aus dem
+  // Slate-Wurf — DISTINCT Kurven, beliebtheits-gehoben; ueber `usedParentBrandIds` (unten)
+  // unterschiedliche Marken.
+  //
+  // DREI STATT FUENF (Chris: „1 unterschied: nur 3 Sponsoren statt 5"). Die Zahl fuenf stammt aus
+  // der Gebaeude-Bauvorlage — „wenn wir dann wieder genug verschiedene möglichkeiten haben lohnen
+  // auch wieder die 5 statt 3 sponsoren". Mit dem Gebaeude-Schalter auf AUS
+  // (`SPONSOR_GEBAEUDE_LEIHE_AKTIV`) faellt genau diese Vielfalt weg: es blieben fuenf Karten, die
+  // sich nur noch in Achse, Rarity, Kurvenform und Laufzeit unterscheiden. Drei davon sind eine
+  // Auswahl, fuenf waeren Fuellmaterial.
+  //
+  // Alles Nachgelagerte rechnet bereits relativ zur Slot-Zahl und braucht KEINE Anpassung
+  // (nachgemessen, nicht angenommen): der Golden-Slot wird ueber `slotCount` gezogen und mit
+  // `slotCount − 1` geklammert, der Challenge-Slot ueber die Zahl der ZIELKARTEN
+  // (`goalSlotIndexes.length`, hier 2), die Kurvenformen kommen aus einer Ziehung ohne
+  // Zuruecklegen ueber 11 Formen, und die Achsen aus einer ueber bis zu 5.
+  const SLOT_COUNT = 3;
   const slate = rollSponsorOfferSlate({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,

@@ -40,15 +40,19 @@ import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
  */
 
 describe("sponsor special objectives", () => {
-  it("offers exactly one challenge sponsor among five choices", () => {
+  it("offers exactly one challenge sponsor among the slate", () => {
     const gameState = createSingleplayerGameState();
     const teamId = gameState.teams.find((entry) => entry.shortCode === "R-R")?.teamId ?? gameState.teams[0]!.teamId;
     const offers = buildSponsorOffersForTeam({ gameState, teamId });
     const challengeOffers = offers.filter((offer) => offer.isChallengeOffer === true);
-    expect(offers).toHaveLength(5);
+    // DREI statt fuenf seit dem Gebäude-Schalter (SLOT_COUNT in sponsor-offer-service.ts). Der
+    // Challenge-Slot rechnet ohnehin relativ — er wird unter den ZIELKARTEN gezogen, nicht unter
+    // allen Plaetzen —, deshalb bleibt „genau einer" die Zusage, die hier zaehlt.
+    expect(offers).toHaveLength(3);
     expect(challengeOffers).toHaveLength(1);
-    expect(resolveChallengeSlotIndex(gameState.season.id, teamId, offers.length)).toBeGreaterThanOrEqual(0);
-    expect(resolveChallengeSlotIndex(gameState.season.id, teamId, offers.length)).toBeLessThanOrEqual(4);
+    const slot = resolveChallengeSlotIndex(gameState.season.id, teamId, offers.length);
+    expect(slot).toBeGreaterThanOrEqual(0);
+    expect(slot).toBeLessThan(offers.length);
   }, 180000);
 
   it("evaluates axis rank special against league axis ranks", () => {
