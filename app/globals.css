@@ -55398,6 +55398,90 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Gehaltsfaktor-Karte: laufende Saison plus die bereits feststehenden Folgejahre. Die Chips liegen
+   in einer scrollbaren Reihe statt in einem Raster — fuenf Saisons muessen auch auf einem schmalen
+   Bildschirm in ihrer zeitlichen Reihenfolge lesbar bleiben, und ein Umbruch wuerde die Chronologie
+   zerreissen. */
+.is-new-look .nl-sponsor-faktor-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-faktor-lead strong {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-faktor-reihe {
+  display: flex;
+  gap: var(--nl-s1);
+  margin-top: var(--nl-s2);
+  overflow-x: auto;
+}
+
+.is-new-look .nl-sponsor-faktor-chip {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 108px;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s1) var(--nl-s2);
+  border: 1px solid var(--nl-line-2);
+  border-left: 3px solid var(--nl-tone, var(--nl-mut));
+  border-radius: var(--nl-r-2, 8px);
+  background: var(--nl-panel-2);
+}
+
+/* Die laufende Saison ist der Bezugspunkt aller anderen Chips — sie steht deshalb optisch fest,
+   nicht bunt: ihre Richtung ist per Definition "gleich". */
+.is-new-look .nl-sponsor-faktor-chip.is-current {
+  background: var(--nl-panel-3, var(--nl-panel-2));
+}
+
+/* Bindet eine Unterschrift diese Saison mit? Dann ist der Chip Teil der Entscheidung und keine
+   Fussnote — sichtbar abgesetzt statt nur im Text erwaehnt. */
+.is-new-look .nl-sponsor-faktor-chip.is-covered {
+  border-top-color: var(--nl-tone, var(--nl-mut));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 22%, transparent);
+}
+
+.is-new-look .nl-sponsor-faktor-chip-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-faktor-chip-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-faktor-chip-sub {
+  font-size: 11px;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-sponsor-faktor-vertrag {
+  margin: var(--nl-s2) 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--nl-mut);
+}
+
+/* Eingefroren UNTER dem Saisonfaktor: der Vertrag zahlt weniger, als er heute wert waere — das ist
+   die Warnung. Eingefroren DARUEBER ist derselbe Mechanismus zum Vorteil des Teams und darf deshalb
+   nicht in derselben Farbe stehen. */
+.is-new-look .nl-sponsor-faktor-vertrag.is-eingefroren {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-faktor-vertrag.is-eingefroren-oben {
+  color: var(--nl-good);
+}
+
 /* Welches Sponsor-Regelwerk dieser Spielstand benutzt. Bewusst eine ruhige Kennzeichnung und kein
    Warnhinweis: beide Systeme sind gueltig, der Spieler soll nur nicht raten muessen, welches gilt.
    W3-Fix (Audit-Befund 2, Sponsoren): war eine umrandete Pille im Fließtext — genau die Optik einer

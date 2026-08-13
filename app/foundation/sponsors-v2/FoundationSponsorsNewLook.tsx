@@ -13,6 +13,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  nlToneClass,
   useCountUp,
   type NlTableColumn,
   type NlTone,
@@ -38,6 +39,12 @@ import {
   getTeamFacilityUpkeepTotal,
 } from "@/lib/sponsor/sponsor-team-salary-display";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import {
+  buildSponsorSalaryFactorOutlook,
+  type SponsorSalaryFactorOutlook,
+} from "@/lib/sponsor/sponsor-salary-factor-outlook";
+import type { SalaryFactorDirection } from "@/lib/foundation/finances/salary-factor-outlook";
+import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { berechneKatalogkosten } from "@/lib/sponsor/sponsor-leihe";
@@ -326,6 +333,173 @@ const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }
  * dann aktuellen Salary Factor (`rerollSponsorV3TermsForNewSeason`, sponsor-v3-offer-service.ts).
  */
 
+/**
+ * Faktor-Darstellung EXAKT wie im Finanzen-Reiter (`formatSalaryFactor` dort, gleicher Helfer,
+ * gleiche Nachkommastellen, gleiches „×"). Derselbe Wert darf auf zwei Seiten nicht
+ * unterschiedlich aussehen — sonst sucht der Spieler einen Unterschied, den es nicht gibt.
+ */
+function formatSalaryFactorValue(value: number): string {
+  return `${formatLocalePoints(value, 2)}×`;
+}
+
+/** Abstand zur laufenden Saison als BETRAG — die Richtung steht schon im Pfeil daneben. */
+function formatSalaryFactorDistance(delta: number): string {
+  return formatLocalePoints(Math.abs(delta), 2);
+}
+
+/**
+ * Ton nach NUTZEN, nicht nach Vorzeichen — dieselbe Regel wie im Finanzen-Reiter
+ * (`salaryFactorDirectionTone`): ein hoeherer Faktor ist fuer den Manager gut, weil er die
+ * EINNAHMENseite skaliert, nicht die Gehaelter.
+ */
+function salaryFactorTone(direction: SalaryFactorDirection): NlTone {
+  if (direction === "up") return "good";
+  if (direction === "down") return "risk";
+  return "neutral";
+}
+
+function salaryFactorArrow(direction: SalaryFactorDirection): string {
+  return direction === "up" ? "▲" : direction === "down" ? "▼" : "±";
+}
+
+/**
+ * DER GEHALTSFAKTOR — laufende Saison und die Jahre, die eine Unterschrift mitbindet.
+ *
+ * GEMELDET VON CHRIS: „und auf der sponsor seite sollte definiiv auch der salary factor von diesem
+ * und den nächsten jahren zu finden sein!!!" Die Angebote laufen bis zu drei Saisons, und die
+ * Faktoren der Folgejahre stehen im Spielstand bereits fest — sie hier NICHT zu zeigen, hiess: der
+ * Spieler unterschreibt blind, obwohl das Spiel die Antwort kennt.
+ *
+ * Die Zahl allein hilft nicht („1,24 — und?"), deshalb steht die Richtung im Klartext daneben.
+ * Sie ist nachgemessen und zeigt nach OBEN: hoeherer Faktor = mehr Sponsorgeld (Herleitung und
+ * Messwerte in lib/sponsor/sponsor-salary-factor-outlook.ts). Bewusst KEINE Prozentangabe auf das
+ * Geld: der Sockel haengt nicht am Faktor, +19 % Faktor waren gemessen +11,8 % auf Platz 1.
+ */
+export function SponsorSalaryFactorPanel({ outlook }: { outlook: SponsorSalaryFactorOutlook }) {
+  const vertrag = outlook.contract;
+  return (
+    <NlCard
+      className="nl-sponsor-faktor-card"
+      eyebrow="Liga-Konjunktur"
+      title="Gehaltsfaktor dieser und der nächsten Saisons"
+      data-testid="nl-sponsor-salary-factor"
+    >
+      <p className="nl-sponsor-faktor-lead">
+        Der Gehaltsfaktor ist der Konjunkturmaßstab der Liga: er skaliert den Topf, aus dem Sponsoren
+        und Preisgeld bezahlt werden. <strong>Höherer Faktor = mehr Sponsorgeld</strong>, niedrigerer
+        = weniger. Die kommenden Saisons sind bereits ausgewürfelt und stehen fest —{" "}
+        {/* Ein laufender Vertrag ist schon unterschrieben; ihm „wer unterschreibt" zu sagen waere
+            eine Aufforderung zu einer Entscheidung, die er nicht mehr hat. */}
+        {/* Die Bindung haengt am GEWAEHLTEN Angebot: liegen ein Einjahres- und ein Dreijahresangebot
+            nebeneinander, waere „bindet sich an alle 3" fuer zwei Drittel des Rasters falsch. */}
+        {vertrag != null
+          ? outlook.coveredSeasons > 1
+            ? `dein Vertrag läuft noch ${outlook.coveredSeasons} Saisons, alle davon zählen mit.`
+            : "dein Vertrag läuft noch diese eine Saison."
+          : outlook.offerTermMin != null && outlook.offerTermMin < outlook.coveredSeasons
+            ? `je nach Angebot bindet eine Unterschrift ${outlook.offerTermMin} bis ${outlook.coveredSeasons} Saisons.`
+            : outlook.coveredSeasons > 1
+              ? `wer über ${outlook.coveredSeasons} Saisons unterschreibt, bindet sich an alle ${outlook.coveredSeasons}.`
+              : "wer jetzt unterschreibt, bindet sich an die laufende Saison."}
+      </p>
+      <div className="nl-sponsor-faktor-reihe" role="list" aria-label="Gehaltsfaktor je Saison">
+        {outlook.seasons.map((season) => (
+          <div
+            key={season.horizonIndex}
+            role="listitem"
+            className={[
+              "nl-sponsor-faktor-chip",
+              nlToneClass(salaryFactorTone(season.direction)),
+              season.horizonIndex === 0 ? "is-current" : "",
+              season.covered ? "is-covered" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            data-testid="nl-sponsor-salary-factor-season"
+            data-season-number={season.seasonNumber}
+            data-factor={season.factor}
+            data-covered={season.covered ? "ja" : "nein"}
+            title={
+              season.horizonIndex === 0
+                ? "Der Faktor, mit dem die laufende Saison abgerechnet wird."
+                : `Steht bereits fest. ${
+                    season.direction === "up"
+                      ? "Höher als jetzt — in dieser Saison fließt mehr Sponsorgeld."
+                      : season.direction === "down"
+                        ? "Niedriger als jetzt — in dieser Saison fließt weniger Sponsorgeld."
+                        : "So hoch wie jetzt."
+                  }`
+            }
+          >
+            <span className="nl-sponsor-faktor-chip-label">{season.label}</span>
+            <span className="nl-sponsor-faktor-chip-value nl-tnum">
+              {formatSalaryFactorValue(season.factor)}
+            </span>
+            <span className="nl-sponsor-faktor-chip-sub">
+              {/* Der Pfeil traegt das Vorzeichen, deshalb steht der Abstand als Betrag da — „▼ -0,16"
+                  liest sich sonst wie ein doppeltes Minus. Und der Abstand steht in FAKTORpunkten,
+                  nicht in Prozent auf das Geld: der Sockel skaliert nicht mit. */}
+              {season.horizonIndex === 0
+                ? season.covered
+                  ? "läuft · im Vertrag"
+                  : "läuft"
+                : `${salaryFactorArrow(season.direction)} ${formatSalaryFactorDistance(season.deltaToCurrent)} ${
+                    season.direction === "up"
+                      ? "mehr Geld"
+                      : season.direction === "down"
+                        ? "weniger Geld"
+                        : "gleich"
+                  }${season.covered ? " · im Vertrag" : ""}`}
+            </span>
+          </div>
+        ))}
+      </div>
+      {vertrag ? (
+        <p
+          className={`nl-sponsor-faktor-vertrag${
+            vertrag.traegtDenSaisonfaktor
+              ? ""
+              : vertrag.ladderFactor < vertrag.seasonFactor
+                ? " is-eingefroren"
+                : " is-eingefroren-oben"
+          }`}
+          data-testid="nl-sponsor-salary-factor-contract"
+          data-traegt-mit={vertrag.traegtDenSaisonfaktor ? "ja" : "nein"}
+        >
+          {vertrag.traegtDenSaisonfaktor ? (
+            <>
+              Dein laufender Vertrag wandert mit: seine Leiter ist mit{" "}
+              {formatSalaryFactorValue(vertrag.ladderFactor)} gebaut, dem Faktor dieser Saison. Beim
+              Saisonwechsel wird sie auf den dann geltenden Faktor neu gebaut.
+              {vertrag.factorAtSign != null ? (
+                <>
+                  {" "}
+                  Unterschrieben wurde bei {formatSalaryFactorValue(vertrag.factorAtSign)} — seitdem
+                  ist die Konjunktur{" "}
+                  {vertrag.ladderFactor > vertrag.factorAtSign ? "besser" : "schlechter"} geworden.
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              Dein laufender Vertrag wandert NICHT mit: seine Leiter steckt auf{" "}
+              {formatSalaryFactorValue(vertrag.ladderFactor)} fest, während die Saison mit{" "}
+              {formatSalaryFactorValue(vertrag.seasonFactor)} abgerechnet wird. Er zahlt nach der
+              Konjunktur seines Unterschriftsjahres weiter —{" "}
+              {/* Eingefroren ist nicht automatisch schlecht: steckt der Vertrag OBERHALB des
+                  Saisonfaktors, zahlt er mehr als eine Neuunterschrift heute. Die Bewertung folgt
+                  deshalb dem Vergleich und nicht dem Wort „eingefroren". */}
+              {vertrag.ladderFactor < vertrag.seasonFactor
+                ? "in dieser Saison also weniger, als seine Karte heute wert wäre."
+                : "in dieser Saison also mehr, als seine Karte heute wert wäre."}
+            </>
+          )}
+        </p>
+      ) : null}
+    </NlCard>
+  );
+}
+
 type ContractPayoutTile = {
   key: string;
   label: string;
@@ -575,6 +749,7 @@ export default function FoundationSponsorsNewLook({
   sponsorUebernahmeMessage,
   sponsorUebernahmeBusy,
   handleSponsorUebernahme,
+  saveId,
 }: FoundationSponsorsPanelProps) {
   // "Neuer Look" Hooks laufen unconditionally vor jedem Return (dieser
   // Component hat kein weiteres Flag-Gate mehr — er wird nur gerendert,
@@ -677,6 +852,21 @@ export default function FoundationSponsorsNewLook({
   // reine Anzeige: man sah, WER welchen Sponsor hat, aber nicht, woraus dessen Wert besteht — das gab
   // es nur fuer die eigenen Angebote.
   const [leagueDetailTeamId, setLeagueDetailTeamId] = useState<string | null>(null);
+
+  // Gehaltsfaktor der laufenden UND der kommenden Saisons (Chris' Wunsch, siehe
+  // SponsorSalaryFactorPanel). Die Zahlen kommen aus dem kanonischen Season-Ökonomie-Fenster —
+  // derselben Quelle wie Finanzen-Reiter, Season-Briefing und KI, hier nur anders beschriftet.
+  const salaryFactorOutlook = useMemo(
+    () =>
+      buildSponsorSalaryFactorOutlook({
+        saveId,
+        seasonId: gameState.season.id,
+        seasonState: gameState.seasonState,
+        contract: selectedTeamSponsorContract,
+        offerTermSeasons: selectedTeamSponsorOffers.map((offer) => offer.termSeasons),
+      }),
+    [saveId, gameState.season.id, gameState.seasonState, selectedTeamSponsorContract, selectedTeamSponsorOffers],
+  );
 
   // Apron — die zu Saisonbeginn eingefrorenen Gehaltslinien (siehe lib/season/apron-service.ts).
   // Bevorzugt der EINGEFRORENE Snapshot der laufenden Saison; nur Bestandsspielstände ohne Snapshot
@@ -1264,6 +1454,12 @@ export default function FoundationSponsorsNewLook({
             </div>
           ) : null}
         </NlCard>
+
+        {/* Gehaltsfaktor dieser und der kommenden Saisons — bewusst VOR Vertrag und Angebotsraster:
+            er ist die Rahmenbedingung, unter der beides gelesen werden muss. Ohne belastbares
+            Fenster (nur ohne saveId und ohne persistierte Faktoren moeglich) faellt die Karte
+            ersatzlos weg, statt eine Zahl zu zeigen, die der Finanzen-Reiter anders kennt. */}
+        {salaryFactorOutlook ? <SponsorSalaryFactorPanel outlook={salaryFactorOutlook} /> : null}
 
         {sponsorChoiceMessage ? (
           <div className="nl-sponsor-banner" role="status">

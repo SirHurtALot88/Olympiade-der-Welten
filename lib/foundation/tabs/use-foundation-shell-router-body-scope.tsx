@@ -12122,6 +12122,9 @@ export function useFoundationShellRouterBodyScope({
       sponsorUebernahmeBusy,
       handleSponsorUebernahme,
       prizeFinanceTab,
+      // Seed des Season-Ökonomie-Fensters (Gehaltsfaktor auf der Sponsorseite) — dieselbe saveId,
+      // die auch der Finanzen-Reiter bekommt, damit beide Seiten denselben Faktor zeigen.
+      saveId: activeSaveId,
     },
     prizePanelBaseProps: {
       gameState,

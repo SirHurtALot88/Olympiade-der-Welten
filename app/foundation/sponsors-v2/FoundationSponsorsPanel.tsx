@@ -22,6 +22,14 @@ export type FoundationSponsorsPanelProps = {
   sponsorUebernahmeBusy: string | null;
   handleSponsorUebernahme: (facilityId: string, action: "annehmen" | "ablehnen") => void | Promise<void>;
   prizeFinanceTab: "sponsors" | "prize";
+  /**
+   * Aktiver Save — Seed-Anteil des Season-Ökonomie-Fensters (Gehaltsfaktor). Dieselbe Begründung wie
+   * bei `FoundationFinancesHost`: ohne die echte saveId würfelt der Fallback in
+   * `getSeasonEconomyFactorWindow` andere Werte als Finanzen-Reiter und KI. Optional, damit
+   * bestehende Aufrufer unverändert bleiben — fehlt sie UND fehlt das persistierte Fenster, zeigt
+   * die Sponsorseite den Faktor lieber gar nicht als abweichend.
+   */
+  saveId?: string | null;
 };
 
 export default function FoundationSponsorsPanel(props: FoundationSponsorsPanelProps) {
