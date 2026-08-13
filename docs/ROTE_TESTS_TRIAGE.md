@@ -288,6 +288,23 @@ Status-Bezeichner werden übersetzt. Drei Verdrahtungstests halten den Zustand f
 Feld stand — im einzig sinnvollen Fall. Der Server kennt an dieser Route gar keine Teamprüfung,
 nur den Referenzmodus; die Anzeige spiegelt jetzt dieselbe Regel (`canRunAiBatchApply`).
 
+**8. Kader-Minimum gegen Spieltagsbedarf.** — ENTSCHIEDEN: bleibt so
+
+Gemessen: `FIXED_ROSTER_MIN` ist 8, ein Spieltag verlangt die SUMME beider Disziplinen und damit
+bis zu **11** verschiedene Spieler. In der gemessenen Saison lagen 2 von 10 Spieltagen über dem
+Minimum; gegen die Kadergrößen von heute gerechnet bleiben 42 Plätze auf 320 Team-Spieltage leer.
+
+**Chris' Entscheidung:** „darf durchlaufen und gehört zu balance dazu, teams steht ja offen auch
+13 oder 14 schwächere spieler zu kaufen für rotation und erfüllung falls mal 11 oder 12 spieler
+benötigt werden!"
+
+Damit ist die Lücke **gewollt**: sie ist der Preis eines dünnen Kaders, kein Fehler im Spielablauf.
+**Kein Codeeingriff.** Das gehört festgehalten, weil die Zahl bei der nächsten Messung sonst
+erneut als Ungereimtheit aufschlägt und jemand das Minimum „korrigiert".
+
+Die Voraussetzung dafür ist erfüllt und mitgemessen: nach dem Saisonwechsel liegen die Kader bei
+min 8 / median 10 / max 14 — Rotation ist also kaufbar, nicht bloß theoretisch.
+
 **5. Sollen die Manager der Liga andere sein als früher?** (→ oben, Punkt 4)
 Fünf Tests hängen an einer einzigen verschobenen GM-Zuweisung. Die Zuweisung ist deterministisch
 und plausibel, nur eben anders als beim Schreiben der Tests. Ich kann in der Historie nicht mehr
