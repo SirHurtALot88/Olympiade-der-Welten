@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
-import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import { buildLegacyMatchdayResolvePreview, getResolveStatusForSides } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
@@ -363,6 +363,36 @@ describe("legacy matchday resolve preview", () => {
     expect(preview.status).toBe("incomplete_lineups");
     expect(preview.incompleteLineups).toHaveLength(1);
     expect(preview.teamResults[0]?.d2Status).toBe("incomplete_lineups");
+  });
+
+  it("laesst die erlaubte kurze Aufstellung auch in der Disziplinsicht als bereit gelten", () => {
+    // DER SPIELSTOPPER, gemessen an einem frischen Spielstand: Spieltag 1 verlangte 4 + 6 = 10
+    // verschiedene Spieler, zehn von 32 Teams hatten nur 8 oder 9 im Kader und stellten deshalb
+    // regelkonform ALLES auf, was sie hatten. Die Teamsicht sagte "ready", die Disziplinsicht
+    // "incomplete_lineups" — und der Spieltagslauf liest seit `getResolveStatusForSides` (#506)
+    // genau die Disziplinsicht. Ergebnis: 0 von 10 Spieltagen gebucht, die Saison lief nicht an.
+    const context = createContext({
+      teamId: "A-A",
+      teamName: "Alpha",
+      d1Scores: [30, 20],
+      d2Scores: [10, 9, 8],
+      fatigueByPlayerId: {},
+      fatigueSourceStatus: "mapped",
+    });
+    // Der Spielplan verlangt eine Seite mehr, als das Team besetzen kann (5 statt 3 in fechten).
+    context.disciplinePlayerCounts = { "mini-dm": 2, fechten: 5 };
+
+    const preview = buildLegacyMatchdayResolvePreview([context]);
+
+    expect(preview.status).toBe("ready");
+    expect(preview.incompleteLineups).toHaveLength(0);
+    expect(preview.teamResults[0]?.d2Status).toBe("ready");
+    // Der Wert, an dem der Spieltagslauf haengt: der Status der noch offenen Seiten.
+    expect(getResolveStatusForSides(preview, new Set(["d1", "d2"]))).toBe("ready");
+    // Die Beschreibung der Seite bleibt ehrlich: es sind weniger Spieler als Plaetze.
+    const fechten = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "fechten");
+    expect(fechten?.teamResults[0]?.isComplete).toBe(false);
+    expect(fechten?.teamResults[0]?.status).toBe("ready");
   });
 
   it("integrates form and mutator effects into final resolve score and keeps player points reconciled", () => {

@@ -307,11 +307,25 @@ export function buildLegacyMatchdayResolvePreview(
     score: ReturnType<typeof scoreLegacyLineupDisciplineSide>;
   }>>();
 
+  /**
+   * DIE ERLAUBTE KURZE AUFSTELLUNG — einmal je Team entschieden, damit BEIDE Sichten dieselbe
+   * Antwort bekommen.
+   *
+   * Die Teamsicht (`d1Status`/`d2Status` weiter unten) fragt `allowPartialLineup` ab; die
+   * Disziplinsicht (`disciplinePreviews[].teamResults[].status`) tat es NICHT. Solange nur der
+   * Gesamtstatus zaehlte, blieb das folgenlos. Seit `getResolveStatusForSides` (#506) liest der
+   * Spieltagslauf aber genau die Disziplinsicht — und ein Team, das regelkonform mit allen
+   * verfuegbaren Spielern kurz antritt, kippte den ganzen Spieltag auf
+   * `resolve_status:incomplete_lineups`.
+   */
+  const allowPartialLineupByTeamId = new Map<string, boolean>();
+
   const teamResultsUnranked: TeamResolvePreview[] = contexts.map((context) => {
     const draft = context.existingDraft;
     const warnings = [...(draft ? [] : ["No existing legacy lineup draft was found for this team and matchday."])];
     const missingLineup = !draft;
     const allowPartialLineup = !missingLineup && isPartialLineupAllowed(context);
+    allowPartialLineupByTeamId.set(context.team.id, allowPartialLineup);
     if (allowPartialLineup) {
       warnings.push(`partial_lineup_allowed:${context.activePlayers.length}_active_players`);
     }
@@ -571,7 +585,10 @@ export function buildLegacyMatchdayResolvePreview(
           disciplineId,
           missingLineup: !context.existingDraft,
           missingScores: score.missingScores,
-          isComplete: score.isComplete !== false,
+          // Dieselbe Regel wie in der Teamsicht: eine kurze Aufstellung, die alles einsetzt, was
+          // das Team hat, ist vollstaendig. Das Feld `isComplete` weiter unten bleibt bewusst roh
+          // (weniger Spieler als Plaetze) — es beschreibt die Seite, der Status bewertet sie.
+          isComplete: score.isComplete !== false || (allowPartialLineupByTeamId.get(context.team.id) ?? false),
           missingSources: shouldFlagMissingSources(score, resolveOptions, context),
         }),
         baseScore: score.baseScore ?? 0,

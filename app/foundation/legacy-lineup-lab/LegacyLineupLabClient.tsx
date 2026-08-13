@@ -57,6 +57,13 @@ import type {
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { areTeamPowersEnabled, describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
+import {
+  canRunAiBatchApply,
+  type AiBatchApplyResponse,
+  type AiBatchPreviewEntry,
+  type AiBatchPreviewResponse,
+} from "@/lib/ai/ai-legacy-lineup-batch-types";
+import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -275,95 +282,6 @@ type MatchdayMvpScoreboardRowView = MatchdayMvpScoreboardRow & {
   captainScore: number | null;
   formScore: number | null;
   bonusScore: number;
-};
-
-type AiBatchPreviewResponse = {
-  readOnly: true;
-  source: "sqlite" | "prisma";
-  matchdayId: string;
-  totalTeams: number;
-  readyTeams: number;
-  warningTeams: number;
-  blockedTeams: number;
-  teams: AiBatchPreviewEntry[];
-  error?: string;
-};
-
-type AiBatchApplyTeamResult = {
-  teamId: string;
-  teamCode: string;
-  teamName: string;
-  controlMode: "manual" | "ai" | "passive";
-  aiEligible: boolean;
-  previewStatus: string;
-  result:
-    | "saved"
-    | "skipped_warning"
-    | "skipped_blocked"
-    | "skipped_existing"
-    | "skipped_manual"
-    | "skipped_passive"
-    | "skipped_disabled"
-    | "failed_validation";
-  overwriteExisting: boolean;
-  warnings: string[];
-  blockingReasons: string[];
-  saved: boolean;
-};
-
-type AiBatchApplyResponse = {
-  source: "sqlite";
-  readOnly: false;
-  dryRun: boolean;
-  includeWarningTeams: boolean;
-  totalTeams: number;
-  results: AiBatchApplyTeamResult[];
-  summary: {
-    totalTeams: number;
-    aiEligibleTeams: number;
-    skippedManual: number;
-    skippedPassive: number;
-    skippedDisabled: number;
-    readyToSave: number;
-    readyTeams: number;
-    warningTeams: number;
-    blockedTeams: number;
-    wouldSave: number;
-    savedTeams: number;
-    skippedWarning: number;
-    skippedBlocked: number;
-    skippedExisting: number;
-    existingLineups: number;
-    wouldOverwrite: number;
-    overwrittenExisting: number;
-    plannedLineups: number;
-    warnings: string[];
-    blockingReasons: string[];
-  };
-  error?: string;
-};
-
-type AiBatchPreviewEntry = {
-  teamId: string;
-  teamName: string;
-  teamCode: string;
-  status: string;
-  d1Status: string;
-  d2Status: string;
-  totalExpectedScore: number;
-  d1DisciplineName: string | null;
-  d2DisciplineName: string | null;
-  d1SelectedPlayers: number;
-  d1RequiredPlayers: number;
-  d1MissingSlots: number;
-  d2SelectedPlayers: number;
-  d2RequiredPlayers: number;
-  d2MissingSlots: number;
-  d1CaptainName: string | null;
-  d2CaptainName: string | null;
-  warnings: string[];
-  blockingReasons: string[];
-  explanation: string;
 };
 
 type LegacyLineupLabClientProps = {
@@ -4227,7 +4145,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   async function handleAiBatchApply(dryRun: boolean) {
-    if (source === "prisma" || isReadOnly) {
+    /**
+     * DER STAPELLAUF SCHREIBT KI-TEAMS — nie das gewaehlte Team. Deshalb darf er NICHT an
+     * `isReadOnly` haengen: das enthaelt `isTeamManagementLocked`, also „du fuehrst dieses Team
+     * nicht". Genau dann will man den Stapellauf aber benutzen — sobald ein KI-Team im Team-Feld
+     * steht, waere er gesperrt gewesen, und ausgerechnet beim eigenen Team (das der Stapel gar
+     * nicht anfasst) offen. Im Browser nachgemessen: mit `A-A` im Feld standen „Probelauf" und
+     * „Speichern" auf aus.
+     *
+     * Was bleibt, ist die richtige Schranke — dieselbe, die der Server zieht: `ai-batch-apply`
+     * lehnt genau einen Fall ab, den Referenzmodus (`source === "prisma"`, 409). Eine Teampruefung
+     * kennt die Route gar nicht. `sourceReadOnly` taugt dafuer ebenfalls nicht: es kommt aus
+     * `isSqliteLineupReadOnly` und ist selbst wieder teambezogen.
+     */
+    if (!canRunAiBatchApply({ source })) {
       setErrors(["Referenzmodus ist nur zum Anschauen. Bitte lokalen Spielstand nutzen."]);
       setMessage("");
       return;
@@ -6008,6 +5939,36 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 ))}
               </select>
             </label>
+            {/* ENTSCHEIDUNG VON CHRIS aus der Test-Triage: „ki vorschau -> bedienung zurück".
+                Die sechs Handler dahinter existierten die ganze Zeit und hatten KEINEN Aufrufer —
+                die Vorschau lief, schrieb ihr Ergebnis in den Zustand und wurde nie gezeichnet. */}
+            <LineupAiPreviewPanel
+              isOpen={isAiPreviewPanelOpen}
+              onClose={() => setIsAiPreviewPanelOpen(false)}
+              canPreviewSelectedTeam={selectedTeamOption?.controlMode === "ai"}
+              selectedTeamIsAi={selectedTeamOption?.controlMode === "ai"}
+              isBusy={isBusy}
+              // Zwei verschiedene Schranken, bewusst getrennt: `isReadOnly` heisst „du fuehrst
+              // DIESES Team nicht" und gilt fuer das Speichern des Einzelvorschlags. Der
+              // Stapellauf schreibt dagegen nur KI-Teams — ihn interessiert allein, ob der
+              // Spielstand ueberhaupt beschreibbar ist.
+              isReadOnly={isReadOnly || source === "prisma"}
+              canRunBatchApply={canRunAiBatchApply({ source })}
+              preview={aiPreview}
+              batchEntries={aiBatchPreview}
+              batchSummary={aiBatchSummary}
+              batchApplyFeed={aiBatchApplyFeed}
+              includeWarnings={aiBatchIncludeWarnings}
+              onIncludeWarningsChange={setAiBatchIncludeWarnings}
+              overwriteExisting={aiBatchOverwriteExisting}
+              onOverwriteExistingChange={setAiBatchOverwriteExisting}
+              onPreviewTeam={() => void handleAiPreview()}
+              onPreviewAllTeams={() => void handleAiPreviewAllTeams()}
+              onAdoptPreview={handleAdoptAiPreview}
+              onSavePreview={() => void handleSaveAiPreview()}
+              onOpenBatchDetails={(entry) => void handleOpenAiBatchDetails(entry)}
+              onBatchApply={(dryRun) => void handleAiBatchApply(dryRun)}
+            />
           </>
         }
       />
