@@ -724,9 +724,8 @@ export function recommendContractOfferForPlayer(input: {
    */
   apronHeadroom?: number | null;
   /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
-  backLoadedShare?: number | null;
-  /** Nenner zu `backLoadedShare` — der Mix-Riegel braucht MIX_RIEGEL_MINDESTZAHL. */
-  mehrjahresVertraege?: number | null;
+  /** Gebundener Mehrbetrag spaeterer Vertragsjahre, an der heutigen Gehaltssumme gemessen. */
+  gehaltsbergQuote?: number | null;
 }): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
@@ -1006,8 +1005,7 @@ export function recommendContractOfferForPlayer(input: {
     form: contractShape,
     laufzeit: contractLength,
     apronHeadroom: input.apronHeadroom,
-    backLoadedShare: input.backLoadedShare,
-    mehrjahresVertraege: input.mehrjahresVertraege,
+    gehaltsbergQuote: input.gehaltsbergQuote,
   });
   contractShape = apronUndMix.form;
   if (apronUndMix.grund) reasons.push(apronUndMix.grund);

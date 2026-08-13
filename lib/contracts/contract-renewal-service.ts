@@ -836,8 +836,7 @@ export function chooseAiRenewalContractShape(input: {
     return wendeApronUndMixAn({
       form: "back_loaded",
       laufzeit: input.recommendedLength,
-      backLoadedShare: input.shapeContext?.backLoadedShare,
-      mehrjahresVertraege: input.shapeContext?.mehrjahresVertraege,
+      gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
     }).form;
   }
   if (gefaelle <= -AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE && cash >= input.cashGate.requiredReserve + 10) {
@@ -859,8 +858,7 @@ export function chooseAiRenewalContractShape(input: {
   return wendeApronUndMixAn({
     form: ausRangfolge,
     laufzeit: input.recommendedLength,
-    backLoadedShare: input.shapeContext?.backLoadedShare,
-    mehrjahresVertraege: input.shapeContext?.mehrjahresVertraege,
+    gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
   }).form;
 }
 

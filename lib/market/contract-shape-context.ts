@@ -49,23 +49,49 @@ import { getTeamApronSalaryBase, resolveSeasonApronLines } from "@/lib/season/ap
 export type ContractShapeTeamContext = {
   /** `line1 − Apron-Bemessung`. Negativ heisst: das Team liegt ueber der ersten Linie. */
   apronHeadroom: number;
-  /** Anteil back-loaded an den laufenden Mehrjahresvertraegen des Teams (0..1). */
-  backLoadedShare: number;
-  /** Wie viele Mehrjahresvertraege der Anteil misst — der Nenner. Siehe MIX_RIEGEL_MINDESTZAHL. */
-  mehrjahresVertraege: number;
+  /**
+   * DER GEHALTSBERG, IN GELD: der bereits gebundene MEHRBETRAG spaeterer Vertragsjahre, gemessen an
+   * der heutigen Gehaltssumme. 0,18 heisst „das Team hat sich fuer eine spaetere Saison 18 % seiner
+   * jetzigen Gehaltslast zusaetzlich ans Bein gebunden".
+   */
+  gehaltsbergQuote: number;
 };
 
-/** Ab diesem Anteil back-loaded legt kein weiterer back-loaded Vertrag mehr nach. */
-export const MIX_RIEGEL_ANTEIL = 0.5;
-
 /**
- * MINDESTNENNER, damit der Riegel nicht auf Zufall anspringt. Ohne ihn triggert ein Team mit 2 von 2
- * back-loaded Vertraegen genauso wie eines mit 8 von 12 — am Abbild traf das real zu (D-P mit 2/2,
- * A-A mit 4/4). Bei so wenigen Vertraegen sagt der Anteil nichts ueber einen Gehaltsberg aus.
- * Zur Einordnung: Liga-Norm des back-Anteils sind 6,5 % (Saison 1) bzw. 23 % (Saison 2), nur 5 von
- * 32 Teams liegen ueberhaupt bei >= 50 %. Der Riegel ist ein Ausreisser-Riegel, kein Normalfall.
+ * AB HIER LEGT KEIN WEITERER BACK-LOADED VERTRAG MEHR NACH — gemessen am Geld, nicht an Formen.
+ *
+ * CHRIS' AUFTRAG: „Ja miss es an zukunftslast." Vorher zaehlte der Riegel FORM-ANTEILE (ab der
+ * Haelfte back-loaded). Das war zu grob, und zwar nachweislich: ein Dreijahresvertrag im letzten
+ * Jahr zaehlte noch als „back", obwohl seine teure Rate laengst JETZT faellig ist.
+ *
+ * WARUM NICHT EINFACH „Zukunft gegen heute". Der naheliegende Vergleich — Summe der naechsten
+ * Saison gegen die laufende — ist am Abbild WERTLOS: Vertraege laufen aus, die gebundene
+ * Zukunftssumme schrumpft also fast immer. Gemessen liegt die hoechste Folgesaison bei KEINEM
+ * einzigen Team ueber der laufenden (Saison 1 Maximum 0,69, Saison 2 Maximum 1,04). Eine Schwelle
+ * darauf haette nie ausgeloest.
+ *
+ * WAS STATTDESSEN GEMESSEN WIRD, ist der Aufwaerts-Knick INNERHALB der Vertraege: je Vertrag die
+ * teuerste kuenftige Rate minus der Rate dieser Saison, aufsummiert und durch die heutige
+ * Gehaltssumme geteilt. Auslaufende Vertraege verwaessern das nicht, weil nur der Anstieg zaehlt.
+ *
+ * DIE SCHWELLE 0,15 IST GEMESSEN, NICHT GESETZT. Verteilung am Live-Abbild:
+ *
+ *   Saison 1: Median 0,00 · Maximum 0,182 (P-C)     → 1 Team ueber 0,15
+ *   Saison 2: Median 0,06 · Maximum 0,324 (U-A)     → 7 Teams ueber 0,15
+ *
+ * 0,15 ist rund das Zweieinhalbfache des Saison-2-Medians und trifft in BEIDEN Staenden die Teams
+ * mit einem echten Berg. Gegen den alten Riegel gehalten ist das eine UMLENKUNG, keine Ausweitung:
+ * in Saison 2 fingen die Form-Anteile A-A, P-C, R-R, V-V; die Geld-Messung faengt bei 0,20
+ * dieselbe Zahl, aber teils andere Teams (B-B und U-A statt P-C und R-R) — U-A hat mit 0,324 den
+ * groessten Berg der Liga und blieb dem alten Riegel verborgen, weil nur 40 % seiner Vertraege
+ * back-loaded sind. Und P-C, das in Saison 1 als EINZIGES Team einen Berg baut (+7,2 auf 39,5),
+ * war fuer den alten Riegel unsichtbar.
+ *
+ * DER MINDESTNENNER ENTFAELLT. Er war noetig, weil ein Anteil aus 2 von 2 Vertraegen nichts
+ * aussagt. Die Geld-Messung hat dieses Problem nicht: sie normiert auf die Gehaltssumme des Teams,
+ * ein einzelner kleiner Vertrag bewegt sie also kaum.
  */
-export const MIX_RIEGEL_MINDESTZAHL = 4;
+export const MIX_RIEGEL_QUOTE = 0.15;
 
 /**
  * DIE EINE REGEL, die alle Formwähler teilen. Sie VERSCHIEBT nur — sie erzeugt nie `back_loaded`.
@@ -77,8 +103,7 @@ export function wendeApronUndMixAn(input: {
   form: ContractShape;
   laufzeit: number;
   apronHeadroom?: number | null;
-  backLoadedShare?: number | null;
-  mehrjahresVertraege?: number | null;
+  gehaltsbergQuote?: number | null;
 }): { form: ContractShape; grund: string | null } {
   // Bei Einjahresvertraegen gibt es keine Verteilung ueber die Zeit — die Form ist bedeutungslos.
   if (input.laufzeit < 2) return { form: input.form, grund: null };
@@ -90,16 +115,14 @@ export function wendeApronUndMixAn(input: {
     };
   }
 
-  const nennerReicht = (input.mehrjahresVertraege ?? 0) >= MIX_RIEGEL_MINDESTZAHL;
   if (
-    nennerReicht &&
-    input.backLoadedShare != null &&
-    input.backLoadedShare >= MIX_RIEGEL_ANTEIL &&
+    input.gehaltsbergQuote != null &&
+    input.gehaltsbergQuote >= MIX_RIEGEL_QUOTE &&
     input.form === "back_loaded"
   ) {
     return {
       form: "balanced",
-      grund: "Schon ueberwiegend back-loaded: ein weiterer wuerde den Gehaltsberg spaeter aufbauen.",
+      grund: "Gehaltsberg schon gebunden: ein weiterer back-loaded Vertrag wuerde ihn weiter auftuermen.",
     };
   }
 
@@ -135,19 +158,29 @@ export function getContractShapeTeamContext(gameState: GameState, teamId: string
 
   const apronHeadroom = Number((lookup.line1 - getTeamApronSalaryBase(gameState, teamId)).toFixed(1));
 
-  // Nur Mehrjahresvertraege zaehlen: bei einem Einjahresvertrag gibt es keine Verteilung ueber die
-  // Zeit, die Form ist dort bedeutungslos.
-  const mehrjaehrig = (gameState.rosters ?? []).filter(
-    (entry) => entry.teamId === teamId && (entry.contractLength ?? 1) >= 2,
-  );
-  const backLoaded = mehrjaehrig.filter((entry) => entry.contractShape === "back_loaded").length;
-  const backLoadedShare = mehrjaehrig.length === 0 ? 0 : backLoaded / mehrjaehrig.length;
+  // DER BERG IN GELD. Je Vertrag: teuerste kuenftige Rate minus Rate dieser Saison, nur der
+  // ANSTIEG zaehlt (deshalb `Math.max(0, …)`) — ein auslaufender oder front-loaded Vertrag drueckt
+  // die Quote nicht kuenstlich. Geteilt wird durch die Summe der Raten DIESER Saison, also durch
+  // das, was das Team gerade wirklich zahlt.
+  const kader = (gameState.rosters ?? []).filter((entry) => entry.teamId === teamId);
+  let jetzt = 0;
+  let mehrbetrag = 0;
+  for (const entry of kader) {
+    const raten = (entry.yearlySalarySchedule ?? [])
+      .map((jahr) => (Number.isFinite(jahr?.salary) ? jahr.salary : 0));
+    if (raten.length === 0) {
+      // Bestandsvertraege ohne Schedule tragen keine Verteilung — sie zaehlen nur zur Basis.
+      jetzt += Number.isFinite(entry.salary) ? entry.salary : 0;
+      continue;
+    }
+    jetzt += raten[0] ?? 0;
+    if (raten.length >= 2) {
+      mehrbetrag += Math.max(0, Math.max(...raten.slice(1)) - (raten[0] ?? 0));
+    }
+  }
+  const gehaltsbergQuote = jetzt > 0 ? Number((mehrbetrag / jetzt).toFixed(3)) : 0;
 
-  const ergebnis: ContractShapeTeamContext = {
-    apronHeadroom,
-    backLoadedShare,
-    mehrjahresVertraege: mehrjaehrig.length,
-  };
+  const ergebnis: ContractShapeTeamContext = { apronHeadroom, gehaltsbergQuote };
   lookup.byTeamId.set(teamId, ergebnis);
   return ergebnis;
 }

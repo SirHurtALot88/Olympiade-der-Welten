@@ -25,7 +25,11 @@ import { describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
-import { MIX_RIEGEL_MINDESTZAHL, wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
+import {
+  MIX_RIEGEL_QUOTE,
+  getContractShapeTeamContext,
+  wendeApronUndMixAn,
+} from "@/lib/market/contract-shape-context";
 import type { Player } from "@/lib/data/olyDataTypes";
 
 const gameState = createFreshSeasonOneGameState();
@@ -40,11 +44,7 @@ const teurerSpieler: Player = [...gameState.players].sort(
  * Marktwert, langer Kerndeal, offensives Profil. Ohne diesen Aufbau prüfte der Test nichts —
  * die Apron-Regel greift ausschliesslich dort, wo sonst front-geloadet würde.
  */
-function frontLoadLage(extra?: {
-  apronHeadroom?: number;
-  backLoadedShare?: number;
-  mehrjahresVertraege?: number;
-}) {
+function frontLoadLage(extra?: { apronHeadroom?: number; gehaltsbergQuote?: number }) {
   const marktwert = 40;
   return {
     player: teurerSpieler,
@@ -86,7 +86,7 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     // gar nicht." Die Regel darf die Liga nicht in eine Richtung kippen.
     for (const anteil of [0, 0.2, 0.6, 0.9]) {
       const ergebnis = recommendContractOfferForPlayer(
-        frontLoadLage({ apronHeadroom: -9.9, backLoadedShare: anteil }) as never,
+        frontLoadLage({ apronHeadroom: -9.9, gehaltsbergQuote: anteil }) as never,
       );
       expect(ergebnis.contractShape, `backLoadedShare=${anteil}`).toBe("balanced");
     }
@@ -112,46 +112,46 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
       currentTeamSalary: 60,
       dealRole: "core",
       isFirstSeason: false,
-      backLoadedShare: 0.75,
-      mehrjahresVertraege: 8,
+      gehaltsbergQuote: 0.3,
     } as never);
     expect(engMitRiegel.contractShape).toBe("balanced");
   });
 
-  it("der Mix-Riegel braucht einen Mindestnenner — 2 von 2 ist kein Gehaltsberg", () => {
-    // Fables Befund: ohne Mindestnenner triggerte der Riegel am Abbild real bei D-P (2/2) und
-    // A-A (4/4). Bei so wenigen Vertraegen sagt der Anteil nichts ueber eine Zukunftslast aus.
+  it("der Riegel misst GELD, nicht Formen — knapp unter der Quote greift er nicht", () => {
+    // Chris: „Ja miss es an zukunftslast." Die Quote ist der gebundene Mehrbetrag spaeterer
+    // Vertragsjahre, an der heutigen Gehaltssumme gemessen.
     const knapp = wendeApronUndMixAn({
       form: "back_loaded",
       laufzeit: 3,
-      backLoadedShare: 1,
-      mehrjahresVertraege: MIX_RIEGEL_MINDESTZAHL - 1,
+      gehaltsbergQuote: MIX_RIEGEL_QUOTE - 0.01,
     });
     expect(knapp.form).toBe("back_loaded");
 
-    const genug = wendeApronUndMixAn({
+    const drueber = wendeApronUndMixAn({
       form: "back_loaded",
       laufzeit: 3,
-      backLoadedShare: 1,
-      mehrjahresVertraege: MIX_RIEGEL_MINDESTZAHL,
+      gehaltsbergQuote: MIX_RIEGEL_QUOTE,
     });
-    expect(genug.form).toBe("balanced");
+    expect(drueber.form).toBe("balanced");
+  });
+
+  it("ohne Angabe der Quote bleibt das Verhalten unveraendert", () => {
+    expect(wendeApronUndMixAn({ form: "back_loaded", laufzeit: 3 }).form).toBe("back_loaded");
   });
 
   it("die gemeinsame Regel verschiebt nur — sie erzeugt aus keiner Eingabe back_loaded", () => {
     // Die Zusicherung, auf die es Chris ankommt, an der Regel selbst statt nur ueber die Vorschau.
     for (const form of ["front_loaded", "back_loaded", "balanced"] as const) {
       for (const headroom of [-30, -0.1, 0, 5, 50]) {
-        for (const anteil of [0, 0.49, 0.5, 1]) {
+        for (const quote of [0, 0.14, 0.15, 0.5]) {
           const ergebnis = wendeApronUndMixAn({
             form,
             laufzeit: 3,
             apronHeadroom: headroom,
-            backLoadedShare: anteil,
-            mehrjahresVertraege: 10,
+            gehaltsbergQuote: quote,
           });
           if (form !== "back_loaded") {
-            expect(ergebnis.form, `${form}/${headroom}/${anteil}`).not.toBe("back_loaded");
+            expect(ergebnis.form, `${form}/${headroom}/${quote}`).not.toBe("back_loaded");
           }
         }
       }
@@ -172,12 +172,70 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     const mit = recommendContractOfferForPlayer({
       ...einJahr,
       apronHeadroom: -20,
-      backLoadedShare: 0.9,
+      gehaltsbergQuote: 0.9,
     } as never);
     // Der Aufbau MUSS einen Einjahresvertrag liefern, sonst prueft der Fall nichts. Fable hatte
     // zurecht bemaengelt, dass die Zusicherung vorher konditional war und leer durchlaufen konnte.
     expect(ohne.contractLength).toBe(1);
     expect(mit.contractLength).toBe(1);
     expect(mit.contractShape).toBe(ohne.contractShape);
+  });
+});
+
+describe("Die Gehaltsberg-Quote misst gebundenes Geld", () => {
+  const TEAM = gameState.teams[0]!.teamId;
+
+  /** Baut einen Kader aus Vertraegen mit vorgegebenen Jahresraten. */
+  function mitVertraegen(...plaene: number[][]) {
+    return getContractShapeTeamContext(
+      {
+        ...gameState,
+        rosters: plaene.map((raten, index) => ({
+          id: `r-${index}`,
+          teamId: TEAM,
+          playerId: gameState.players[index]!.id,
+          contractLength: raten.length,
+          salary: raten[0],
+          yearlySalarySchedule: raten.map((salary, yearIndex) => ({
+            yearIndex,
+            seasonOffset: yearIndex,
+            label: `J${yearIndex + 1}`,
+            salary,
+          })),
+        })),
+      } as never,
+      TEAM,
+    );
+  }
+
+  it("ein back-loaded Vertrag erzeugt genau seinen Aufschlag", () => {
+    // Jetzt 10, spaeter 16 → Mehrbetrag 6 auf Basis 10.
+    expect(mitVertraegen([10, 16]).gehaltsbergQuote).toBe(0.6);
+  });
+
+  it("front-loaded zaehlt NICHT negativ — nur der Anstieg ist ein Berg", () => {
+    expect(mitVertraegen([16, 10]).gehaltsbergQuote).toBe(0);
+  });
+
+  it("ein front-loaded Vertrag kann einen back-loaded nicht wegrechnen", () => {
+    // Basis 26, Aufschlag nur aus dem zweiten Vertrag: 6/26.
+    expect(mitVertraegen([16, 10], [10, 16]).gehaltsbergQuote).toBe(0.231);
+  });
+
+  it("auslaufende Einjahresvertraege verwaessern die Quote nicht kuenstlich", () => {
+    // Sie erhoehen die Basis, tragen aber keinen Aufschlag — genau wie im echten Kader.
+    const ohne = mitVertraegen([10, 16]).gehaltsbergQuote;
+    const mit = mitVertraegen([10, 16], [10]).gehaltsbergQuote;
+    expect(mit).toBeLessThan(ohne);
+    expect(mit).toBe(0.3);
+  });
+
+  it("die teuerste kuenftige Rate zaehlt, nicht die letzte", () => {
+    // Spitze in Jahr 2, danach wieder billiger — der Berg steht trotzdem.
+    expect(mitVertraegen([10, 20, 12]).gehaltsbergQuote).toBe(1);
+  });
+
+  it("ein leerer Kader ergibt 0 statt einer Division durch null", () => {
+    expect(mitVertraegen().gehaltsbergQuote).toBe(0);
   });
 });
