@@ -254,12 +254,29 @@ Feature-Matrix führt ihn ausdrücklich als „not executed by design"). Betroff
 `scripts/long-run-sandbox-s1-s6.ts`.
 **Entscheidung:** Nula vom Riegel ausnehmen, oder den Modus als Sandbox-Werkzeug so lassen?
 
-**3. Zählt der Maskottchen-Kauf als Marktkauf?**
+**3. Zählt der Maskottchen-Kauf als Marktkauf?** — ENTSCHIEDEN
 `nula_mascot_rule_buy` steht nicht in `SEASON_ONE_DRAFT_BUY_SOURCES` und erscheint deshalb in
 jeder Marktkauf-Statistik der Saison 1. Als **Sperre** wird die Zahl nirgends ausgewertet, nur in
 Audits und Berichten (`generate-balancing-report`, `long-run-phase-audit`, Transfer-Audit).
-**Entscheidung:** in die Draft-Quellen aufnehmen (dann verschwindet er aus der Marktstatistik) —
-oder bewusst sichtbar lassen?
+
+**Chris' Entscheidung:** „masskottchen kauf ist ein ganz normaler spielerkauf".
+
+Damit bleibt es, wie es ist — der Kauf zählt als Marktkauf, weil er einer ist. **Kein
+Codeeingriff.** Das ist die Antwort, die am wenigsten Arbeit macht und trotzdem festgehalten
+gehört: ohne sie wäre die Zeile beim nächsten Audit erneut als Ungereimtheit aufgeschlagen und
+jemand hätte sie „aufgeräumt".
+
+Der zugehörige Test (`season-one-long-run-market-buy`) misst seit der Triage den **Zuwachs**
+statt der absoluten Zahl. Das bleibt richtig: ein frischer Spielstand startet bei 1, weil dieser
+eine echte Kauf schon stattgefunden hat.
+
+**4. Die KI-Vorschau in der Einsatzliste ist unerreichbar.** — ENTSCHIEDEN: Bedienung zurück
+
+**Chris' Entscheidung:** „ki vorschau -> bedienung zurück".
+
+Der tote Cluster wird also NICHT entfernt, sondern wieder erreichbar gemacht. Die Grenze dabei:
+nur der MENSCH arbeitet damit — der automatische Weg für KI-Teams läuft über
+`matchday-auto-run-service` und bleibt unberührt.
 
 **4. Die KI-Vorschau in der Einsatzliste ist unerreichbar.**
 In `LegacyLineupLabClient.tsx` stehen `handleAdoptAiPreview`, `handleAiPreview`,
