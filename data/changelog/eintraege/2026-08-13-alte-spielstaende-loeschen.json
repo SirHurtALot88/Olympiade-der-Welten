@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-13",
+  "seite": "Spielstände",
+  "text": "Ein alter Spielstand ließ sich nicht löschen — der Knopf tat schlicht nichts, ohne Fehler und ohne Erklärung. Der Schutz vor dem Löschen des gerade geladenen Standes griff auf den falschen: er nahm irgendeinen der Stände mit dem Status „aktiv\", und diesen Status tragen alle sieben. Faktisch war das immer der älteste — und damit ausgerechnet der, den man loswerden will, während der wirklich geladene ungeschützt danebenlag. Geschützt ist jetzt genau der Stand, den das Spiel auch tatsächlich lädt, samt der Stände von Mitspielern; alle anderen lassen sich löschen, auch mehrere auf einmal.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}

@@ -1080,7 +1080,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               }
               onClick={() => {
                 const name = `Neues Spiel ${formatGermanSaveTimestamp()}`;
-                void runSaveAction({ action: "create", name });
+                // Die Klub-Auswahl von oben geht MIT. Ohne sie entstand ein Spielstand, in dem die
+                // KI alle 32 Teams steuerte — gemeldet als „ich waehle dort ein team aus aber dann
+                // wird fuer mich gepickt". Ist nichts gewaehlt, uebernimmt der Dienst das Team des
+                // laufenden Standes (siehe `createSave`), statt einen Zuschauer-Save anzulegen.
+                void runSaveAction({ action: "create", name, manualTeamIds: newGameChrisTeamIds });
               }}
             >
               Neues Spiel anlegen

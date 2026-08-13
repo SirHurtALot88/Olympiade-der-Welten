@@ -1445,7 +1445,9 @@ function buildCompactFreeAgentItem(input: {
     scoutingLevel: 0,
   });
   const potentialRecord = playerPotentialById.get(player.id) ?? null;
-  const quickPotentialScore = potentialRecord?.hiddenPotentialScore ?? player.potential ?? player.rating;
+  // Eine Quelle: nur der Record-Score; fehlt er, gilt PO = CA (neutral), NICHT das
+  // Import-Altfeld player.potential (wich am Live-Spielstand ligaweit vom Modell ab).
+  const quickPotentialScore = potentialRecord?.hiddenPotentialScore ?? player.rating;
 
   return {
     playerId: player.id,
@@ -1638,7 +1640,9 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
           scoutingLevel: 0,
         });
         const potentialRecord = playerPotentialById.get(player.id) ?? null;
-        const quickPotentialScore = potentialRecord?.hiddenPotentialScore ?? player.potential ?? player.rating;
+        // Eine Quelle: nur der Record-Score; fehlt er, gilt PO = CA (neutral), NICHT das
+        // Import-Altfeld player.potential (wich am Live-Spielstand ligaweit vom Modell ab).
+        const quickPotentialScore = potentialRecord?.hiddenPotentialScore ?? player.rating;
 
         return {
         playerId: player.id,

@@ -81,7 +81,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
   const rtRef = useRef<RT[]>(rt);
   const barbellSortedRef = useRef<RT[]>(barbellSorted);
   const demandKgRef = useRef<number | null>(demandKg);
-  const barbellKgOfRef = useRef<(idx: number) => number>(barbellKgOf);
+  const barbellKgOfRef = useRef<(code: string) => number>(barbellKgOf);
   const barbellYRef = useRef<(kg: number) => number>(barbellY);
 
   hoverRef.current = props.hoverIdx;
@@ -124,8 +124,8 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
           c.set(t.idx, st);
         }
 
-        // Zielposition: barbellKgOf(idx) → y
-        const targetKg = barbellKgOfRef.current(t.idx);
+        // Zielposition: barbellKgOf(code) → y
+        const targetKg = barbellKgOfRef.current(t.code);
         const targetY = barbellYRef.current(targetKg);
         if (Math.abs(targetY - st.toY) > 0.5) {
           st.fromY = resolveBarbellGlideStart(st);
@@ -186,7 +186,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
 
   // Live-Zähler: wie viele Heber sind noch im Wettkampf (nicht an der Last gescheitert).
   // Macht die Eliminations-Mechanik lesbar — „N/32 stemmen die geforderte Last noch".
-  const liveCount = demandKg == null ? rt.length : rt.filter((t) => !barbellEliminated(t.idx)).length;
+  const liveCount = demandKg == null ? rt.length : rt.filter((t) => !barbellEliminated(t.code)).length;
 
   return (
     <>
@@ -330,12 +330,12 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         const laneIdx = barbellSorted.indexOf(t);
         const laneX = axX + laneIdx * colW + colW / 2;
         const hue = hueForIdx(t.idx);
-        const bbOut = barbellEliminated(t.idx);
+        const bbOut = barbellEliminated(t.code);
         // Turm bis zum ENDGEWICHT zeichnen (die höchste Last, die dieses Team je stemmt) und
         // per Clip auf die animierte Höhe beschneiden. `barbellKgOf` ist durch das Endgewicht
         // gedeckelt, der Token verlässt diesen Bereich also nie. So bleiben die Platten stabil
         // (kein Neuaufbau je Runde) und erscheinen rein über den Clip nach und nach.
-        const maxKg = barbellInfo.endKg[t.idx] ?? barbellInfo.axTop;
+        const maxKg = barbellInfo.endKgByCode.get(t.code) ?? barbellInfo.axTop;
         const maxY = barbellY(maxKg);
         const maxColH = baseY - maxY;
 
@@ -395,7 +395,7 @@ export default function BarbellField(props: DisciplineFieldProps): ReactNode {
         .reverse()
         .map((t) => {
           const r = tokenRadius(t, geo);
-          const bbOut = barbellEliminated(t.idx);
+          const bbOut = barbellEliminated(t.code);
           const bbChamp = done && (barbellRankMap[t.code] ?? 99) === 1;
           const glowing = t.glowUntil > now;
 

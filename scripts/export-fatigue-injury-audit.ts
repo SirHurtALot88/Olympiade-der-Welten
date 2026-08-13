@@ -12,6 +12,7 @@ import {
   injuryRiskBands,
 } from "@/lib/fatigue/fatigue-injury-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveInjuryEventSource } from "@/lib/persistence/save-payload-slimming";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -219,7 +220,8 @@ function main() {
       event.unavailableUntil ?? null,
       event.normalRecovery ?? null,
       event.injuryRecovery ?? null,
-      event.source,
+      // Fehlt das Feld, war es der Standard — die Audit-Spalte bleibt vollstaendig.
+      resolveInjuryEventSource(event),
       event.timestamp,
     ]),
   );

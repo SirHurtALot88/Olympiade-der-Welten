@@ -10,6 +10,7 @@ import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTrainingModeDemandRecord } from "@/lib/training/training-mode-demand-service";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
 type DemandPlayerLike = Pick<
@@ -26,7 +27,6 @@ type DemandPlayerLike = Pick<
 > & {
   trainingMode?: Player["trainingMode"];
   fatigue?: number;
-  potential?: number;
   age?: number | null;
 };
 
@@ -46,6 +46,12 @@ type DemandContext = {
    *  vom ersten Spieltag an gegen den bisherigen Stand geprueft wird (siehe buildAppearanceDemand). */
   matchdaysElapsed?: number;
   totalMatchdays?: number;
+  /**
+   * Voller GameState fuer Nachschlagewerke, die es nur dort gibt (z.B. der
+   * Potenzial-Record fuer die Trainingsmodus-Forderung). Optional, damit
+   * synthetische Test-Kontexte ohne GameState weiter funktionieren.
+   */
+  gameState?: GameState;
 };
 
 const CAPTAIN_POSITIVE_TRAITS = new Set(["eloquent", "motivated", "ambitious", "disciplined", "resourceful", "loyal"]);
@@ -485,7 +491,12 @@ function buildTrainingModePlayerDemand(input: {
       traitsNegative: input.player.traitsNegative,
       trainingMode: input.player.trainingMode ?? "mittel",
       fatigue: input.player.fatigue ?? 0,
-      potential: input.player.potential ?? 0,
+      // Eine Quelle: Potenzial aus dem Record statt aus dem Import-Altfeld
+      // player.potential (wich am Live-Spielstand ligaweit ab, Median +16,1).
+      potentialScore: resolvePlayerPotentialScoreFromGameState({
+        gameState: input.context.gameState ?? null,
+        playerId: input.player.id,
+      }),
       age: input.player.age,
     },
     rosterRank: input.rosterRank,
@@ -546,6 +557,7 @@ function buildDemandContext(gameState: GameState, teamId: string): DemandContext
     matchdaysElapsed,
     totalMatchdays,
     facilityLevels: Object.fromEntries(Object.entries(facilities).map(([facilityId, state]) => [facilityId, state.level ?? 0] as const)),
+    gameState,
   };
 }
 

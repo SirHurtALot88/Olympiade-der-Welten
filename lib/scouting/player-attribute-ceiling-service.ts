@@ -357,3 +357,25 @@ export function resolvePlayerPotentialRecordFromGameState(input: {
   }
   return index.get(input.playerId) ?? null;
 }
+
+/**
+ * DIE eine Quelle für den numerischen Potenzial-Score (PO, 1–99) eines Spielers.
+ *
+ * Hintergrund (gemeldet von Chris, am Live-Spielstand nachgemessen, 2026-08, n=2984):
+ * `player.potential` und `playerPotential[].hiddenPotentialScore` waren bei ALLEN
+ * Spielern verschieden (Median +16,1 Punkte, z.B. Lyraeth Vael 65,74 vs. 77), weil
+ * `player.potential` nur einmalig beim Import gesetzt wird (max(rating, Top-3-Ø) + 4),
+ * während das Potenzial-Modell (Generator v8 + Saisonende-Drift) ausschließlich den
+ * Record pflegt. Je nachdem, welche Quelle ein Leser bevorzugte, sah der Spieler eine
+ * andere Zahl als das Training rechnete — deshalb hier bewusst KEIN Fallback auf
+ * `player.potential`: fehlt der Record (kommt regulär nicht vor, `ensurePlayerPotential-
+ * ForGameState` baut ihn bei jedem Laden), ist die Antwort `null` („unbekannt"), keine
+ * abweichende Ersatzzahl.
+ */
+export function resolvePlayerPotentialScoreFromGameState(input: {
+  gameState?: { playerPotential?: PlayerPotentialRecord[] } | null;
+  playerId: string;
+}): number | null {
+  const score = resolvePlayerPotentialRecordFromGameState(input)?.hiddenPotentialScore;
+  return typeof score === "number" && Number.isFinite(score) ? score : null;
+}

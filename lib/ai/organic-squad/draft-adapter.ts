@@ -35,8 +35,9 @@ import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
-import type { GameState, Player, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
@@ -171,6 +172,7 @@ export function toOrganicPlayerView(
   themeFit?: number,
   purchasePrice?: number | null,
   openBuyoutCost?: number | null,
+  gameState?: { playerPotential?: PlayerPotentialRecord[] } | null,
 ): OrganicPlayerView {
   const marketValue = Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0);
   const buyoutCost =
@@ -190,7 +192,12 @@ export function toOrganicPlayerView(
     // using marketValue unchanged (net == marketValue when nothing is owed). Net may be negative when the
     // clause exceeds the price; sellUtility clamps that to 0.
     netSaleProceeds: buyoutCost > 0 ? marketValue - buyoutCost : undefined,
-    potential: player.potential ?? null,
+    // Eine Quelle: Potenzial aus dem Record (hiddenPotentialScore), nicht aus dem
+    // Import-Altfeld player.potential — das wich am Live-Spielstand ligaweit vom
+    // Modell ab (Median +16,1) und haette den wAsset-Term der Buy-Utility mit einer
+    // anderen Zahl gefuettert, als Training/Anzeige fuehren. Ohne gameState (bzw.
+    // ohne Record) bleibt das Signal null = unbekannt.
+    potential: gameState ? resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }) : null,
     themeFit,
   };
 }
@@ -443,9 +450,17 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     identity: input.identity,
     draftSeed: input.draftSeed ?? null,
   });
-  const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player));
+  const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player, undefined, undefined, undefined, input.gameState));
   const candidates = input.candidates
-    .map((player) => toOrganicPlayerView(player, computeThemeFit(input.gameState, input.team, player, ctx.themeRuntimeContext)))
+    .map((player) =>
+      toOrganicPlayerView(
+        player,
+        computeThemeFit(input.gameState, input.team, player, ctx.themeRuntimeContext),
+        undefined,
+        undefined,
+        input.gameState,
+      ),
+    )
     .filter((view) => view.marketValue > 0);
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
 
@@ -790,6 +805,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       undefined,
       input.purchasePriceByPlayerId?.[player.id],
       openBuyoutCost,
+      input.gameState,
     );
   });
   // Season-end may empty the roster (rebuild in preseason); in-season keeps a fieldable floor.

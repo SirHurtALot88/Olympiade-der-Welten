@@ -1,11 +1,21 @@
 import type { GameState, Player, PlayerDemandRecord, PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 
 type TrainingModeDemandPlayer = Pick<
   Player,
-  "id" | "name" | "trainingMode" | "traitsPositive" | "traitsNegative" | "fatigue" | "potential"
-> & { age?: number | null };
+  "id" | "name" | "trainingMode" | "traitsPositive" | "traitsNegative" | "fatigue"
+> & {
+  age?: number | null;
+  /**
+   * Potenzial-Score aus dem Record (eine Quelle, resolvePlayerPotentialScoreFromGameState),
+   * vom Aufrufer aufgelöst. Bewusst NICHT mehr das Import-Altfeld player.potential — das
+   * wich am Live-Spielstand ligaweit vom Modell ab (Median +16,1). Fehlt der Wert, fällt
+   * die Prospect-Neigung weg statt mit einer falschen Zahl zu rechnen.
+   */
+  potentialScore?: number | null;
+};
 
 const LEICHT_BIAS_TRAITS = new Set(["lazy", "relaxed", "fainthearted", "timid", "caring", "paranoid"]);
 const HART_BIAS_TRAITS = new Set(["ambitious", "motivated", "diligent", "disciplined", "firedup", "egomaniac", "obsessive", "feisty"]);
@@ -54,7 +64,7 @@ export function getTrainingModeBiasScores(input: {
   else if (fatigue >= 40) leicht += 1;
   else if (fatigue <= 20 && traits.some((trait) => HART_BIAS_TRAITS.has(trait))) hart += 2;
 
-  const potential = input.player.potential ?? 0;
+  const potential = input.player.potentialScore ?? 0;
   const age = input.player.age ?? 99;
   if (age <= 22 && potential >= 75) hart += 1;
   if (age >= 32) leicht += 1;
@@ -185,7 +195,19 @@ export function buildTrainingModeDemandMap(gameState: GameState, teamId: string)
   };
 
   return new Map(
-    players.map((player) => [player.id, buildTrainingModeDemand({ context, player }) as TrainingModeDemandView | null] as const),
+    players.map(
+      (player) =>
+        [
+          player.id,
+          buildTrainingModeDemand({
+            context,
+            player: {
+              ...player,
+              potentialScore: resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }),
+            },
+          }) as TrainingModeDemandView | null,
+        ] as const,
+    ),
   );
 }
 

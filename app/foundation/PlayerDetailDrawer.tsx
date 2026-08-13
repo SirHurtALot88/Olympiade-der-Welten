@@ -1511,6 +1511,13 @@ function formatSignedOrigin(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${formatValue(value, 1)}`;
 }
 
+/** Der Potenzial-Drift ist ganzzahlig (±1 bis ±3) — „−1" statt „−1,0". */
+function formatSignedInteger(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (value === 0) return "±0";
+  return `${value > 0 ? "+" : "−"}${Math.abs(value)}`;
+}
+
 /**
  * Trainingshistorie als Saison-Liste. WUNSCH VON CHRIS: „das müsste wo die summe steht pro
  * season sein und dann ausklappbar dass man training leistung regression sehen kann".
@@ -1562,6 +1569,19 @@ type TrainingSeasonEntry = {
   totals: { training: number | null; performance: number | null; regression: number | null };
   hasPerAttributeOrigin: boolean;
   cells: TrainingSeasonOriginCell[];
+  /**
+   * POTENZIAL-DRIFT AM ENDE DIESER SAISON (PO vorher → PO nachher).
+   *
+   * GEMELDET VON CHRIS: „sollte potential sich nicht leicht über die seasons ändern können?"
+   * Es ändert sich längst — `applySeasonEndPotentialUpdate` driftet jeden Spieler am Saisonende
+   * um ±2 Punkte, gerichtet durch den Wachstums-Ausblick und nie auf 0 (am Live-Spielstand
+   * gemessen: 1586 Spieler hoch, 1367 herunter, 31 unverändert). Nur sichtbar war es nirgends,
+   * obwohl es genau erklärt, warum ein Spieler in der Folgesaison weniger herausholt.
+   *
+   * `null`, wenn für diese Saison kein Vorher-Wert im Spielstand liegt — der Save hält nur den
+   * JEWEILS LETZTEN Übergang. Ältere Saisons bleiben deshalb leer, statt eine Zahl zu erfinden.
+   */
+  potentialDrift: { before: number; after: number } | null;
   meta: {
     trainingClass: string | null;
     classBefore: string | null;
@@ -1635,6 +1655,8 @@ function buildTrainingSeasonEntries(input: {
           regression: cell?.regression ?? null,
         };
       }),
+      // Die laufende Saison hat ihren Drift noch nicht gehabt — er faellt erst beim Abschluss.
+      potentialDrift: null,
       meta: null,
     });
   }
@@ -1698,6 +1720,10 @@ function buildTrainingSeasonEntries(input: {
           regression: upgrade?.regression ?? null,
         };
       }),
+      potentialDrift:
+        row.potentialBefore != null && row.potentialAfter != null
+          ? { before: row.potentialBefore, after: row.potentialAfter }
+          : null,
       meta: {
         trainingClass: row.trainingClass,
         classBefore: row.classBefore,
@@ -1876,6 +1902,21 @@ function TrainingSeasonHistoryList({
                           ? `Prognose ${entry.matchdaysPlayed}/${entry.totalMatchdays}`
                           : "gebucht"}
                       </span>
+                      {/* Der Potenzial-Drift steht schon in der zugeklappten Zeile: er erklaert die
+                          Folgesaison, und dafuer darf er nicht hinter einem Klick liegen. */}
+                      {entry.potentialDrift ? (
+                        <span
+                          className={`player-drawer-training-season-potential ${getDeltaToneClass(
+                            entry.potentialDrift.after - entry.potentialDrift.before,
+                          )}`}
+                          data-testid="player-drawer-training-season-potential"
+                          title={`Potenzial am Saisonende: ${entry.potentialDrift.before} → ${entry.potentialDrift.after} (${formatSignedInteger(
+                            entry.potentialDrift.after - entry.potentialDrift.before,
+                          )}). Die Obergrenze der naechsten Saison — nicht die Leistung dieser.`}
+                        >
+                          PO {entry.potentialDrift.before}→{entry.potentialDrift.after}
+                        </span>
+                      ) : null}
                     </button>
                   </th>
                   <td
@@ -1963,6 +2004,32 @@ function TrainingSeasonHistoryList({
                               {formatTrainingSeasonMetaLine(entry.meta)}
                             </p>
                           ) : null}
+                          {/* Der Drift trifft nicht diese Saison, sondern die naechste — deshalb
+                              steht hier, was er bedeutet, und nicht nur die Zahl. */}
+                          {entry.potentialDrift ? (
+                            <p
+                              className="player-drawer-training-season-detail-note"
+                              data-testid="player-drawer-training-season-potential-note"
+                            >
+                              Potenzial am Saisonende{" "}
+                              <strong>
+                                {entry.potentialDrift.before} → {entry.potentialDrift.after}
+                              </strong>{" "}
+                              ({formatSignedInteger(entry.potentialDrift.after - entry.potentialDrift.before)}).
+                              Das Potenzial driftet an jedem Saisonende leicht — es ist die
+                              Obergrenze, gegen die das Training der <em>nächsten</em> Saison
+                              läuft, keine Bewertung dieser Saison. Sinkt es, kommt vom gleichen
+                              Trainingsbudget künftig weniger an.
+                            </p>
+                          ) : (
+                            // Keine erfundenen Zahlen: der Spielstand haelt nur den JEWEILS LETZTEN
+                            // Potenzial-Uebergang, nicht die ganze Reihe. Aeltere Saisons bleiben
+                            // deshalb leer — und sagen das, statt stumm zu sein.
+                            <p className="player-drawer-training-season-detail-note">
+                              Der Potenzial-Wert vor dieser Saison ist im Spielstand nicht mehr
+                              festgehalten — gespeichert wird nur der jeweils letzte Übergang.
+                            </p>
+                          )}
                           {!hasSeasonTotals ? (
                             <p className="player-drawer-training-season-detail-note">
                               Die Herkunft (Training / Leistung / Alterung) wurde beim Abschluss

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-12",
+  "seite": "Saisonstand · Einsatzliste",
+  "text": "Zwei Stellen, an denen eine Größe gemessen und eine andere behauptet wurde. Erstens die Zahl in Klammern hinter jedem Disziplin-Kürzel im Saisonstand: sie sollte sagen, wie viele Spieler des Teams dort im Einsatz waren, zählte aber nur die mit Punkten. Wer angetreten ist und nichts geholt hat, fehlte — am Spielstand nachgemessen in 22 von 352 Fällen, etwa Wettessen mit „(4)\" bei sechs Antritten. Gezählt werden jetzt die Antritte selbst; die Punkte bleiben der Wert dahinter und sind dann eben 0. Zweitens die Einsatzliste: dort stand in Rot der technische Code „lineup_draft_is_locked\", direkt über dem gelben Hinweis, man könne so speichern und in die Arena. Gesperrt ist aber kein Fehler, sondern ein Zustand — der Spieltag läuft und die Liste ist abgegeben. Das steht jetzt als normaler Satz in der Statuszeile, und Rohcodes erscheinen dort nicht mehr.",
+  "gewicht": "behebung",
+  "version": "0.4"
+}
