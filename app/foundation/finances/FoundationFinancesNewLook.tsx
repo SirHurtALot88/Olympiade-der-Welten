@@ -606,7 +606,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
   return (
     <div className="nl-fin-apron" data-testid="nl-fin-apron">
       <div className="nl-fin-apron-rows" role="list" aria-label="Apron-Linien">
-        <div className="nl-fin-apron-row" role="listitem" title="1. Apron-Linie = Median-Gehalt der Liga (geglättet) × 1,1. Wer drüber liegt, zahlt auf den Überschuss eine Abgabe.">
+        <div className="nl-fin-apron-row" role="listitem" title="1. Apron-Linie = Median der real zu zahlenden Gehaltssummen der Liga × 1,1. Wer drüber liegt, zahlt auf den Überschuss eine Abgabe.">
           <span className="nl-fin-apron-row-label">Apron-Linie 1</span>
           <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.line1)}</span>
           <span className="nl-fin-apron-row-note nl-tnum">{formatApronDistance(apron.distanceLine1)}</span>
@@ -619,7 +619,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
         <div
           className="nl-fin-apron-row is-basis"
           role="listitem"
-          title="Bemessungsgrundlage des Apron: die GEGLÄTTETE Gehaltssumme (Verträge über die Laufzeit verteilt) — bewusst nicht die echte Saisonsumme der GuV, siehe Hinweis unten."
+          title="Bemessungsgrundlage des Apron: die Gehaltssumme, die in DIESER Saison wirklich zu zahlen ist — die Jahresrate aus jedem Vertrag. Dieselbe Summe, die die GuV abbucht."
         >
           <span className="nl-fin-apron-row-label">Deine Bemessungsgrundlage</span>
           <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.salaryBasis)}</span>
@@ -667,13 +667,16 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
         {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
       </p>
 
-      {/* Der heikelste Punkt der Karte: hier stehen zwei verschiedene Gehaltssummen nebeneinander,
-          und beide sind richtig. Ohne diesen Satz sähe das wie der Widerspruch aus, den F4 (Fundament)
-          gerade behoben hat — deshalb wird der Unterschied erklärt, nicht versteckt. */}
+      {/* Hier standen bis zum 13.08.2026 zwei verschiedene Gehaltssummen nebeneinander, und der
+          Absatz erklärte, warum beide richtig seien: der Apron bemaß die GEGLÄTTETE Summe, die GuV
+          buchte die echte. Chris hat das aufgehoben („die REAL zu zahlende summe des jahres nach
+          vertrag und nicht geglättet"). Es gibt nur noch EINE Zahl — und der Absatz sagt das jetzt,
+          statt einen Unterschied zu erklären, den es nicht mehr gibt. */}
       <p className="nl-fin-apron-basis-note muted" data-testid="nl-fin-apron-basis-note">
-        Der Apron rechnet auf der <b>geglätteten</b> Gehaltssumme ({formatNlMoney(apron.salaryBasis)}): Verträge werden über ihre
-        Laufzeit verteilt, Front-/Backloading zählt nicht als Mehrausgabe. Die GuV in der Übersicht bucht dagegen die <b>echte</b> Saisonsumme
-        ({formatNlMoney(actualSalaryTotal)}). Beide Zahlen sind absichtlich verschieden.
+        Der Apron rechnet auf der <b>real zu zahlenden</b> Gehaltssumme dieser Saison
+        ({formatNlMoney(apron.salaryBasis)}) — der Jahresrate aus jedem Vertrag. Das ist dieselbe Summe, die die GuV
+        in der Übersicht bucht ({formatNlMoney(actualSalaryTotal)}). Eine Vertragsform, die früh mehr zahlt, hebt damit
+        auch die Bemessung dieser Saison; was hinten geparkt wird, fällt an, sobald die Rate steigt.
       </p>
     </div>
   );
@@ -703,10 +706,10 @@ const APRON_LEAGUE_COLUMNS: NlTableColumn<FinanceApronLeagueRow>[] = [
   { key: "team", label: "Team" },
   {
     key: "basis",
-    label: "Bemessung (geglättet)",
+    label: "Bemessung (real)",
     align: "right",
     tooltip:
-      "Geglättete Gehaltssumme (Verträge über die Laufzeit verteilt) — die Bemessungsgrundlage des Apron, absichtlich NICHT die echte Gehaltssumme der GuV (siehe Hinweis bei den Apron-Linien)",
+      "Die in DIESER Saison real zu zahlende Gehaltssumme — die Jahresrate aus jedem Vertrag. Dieselbe Summe, die die GuV abbucht; seit dem 13.08.2026 gibt es keine zweite, geglättete Bemessung mehr.",
   },
   {
     key: "abstand",

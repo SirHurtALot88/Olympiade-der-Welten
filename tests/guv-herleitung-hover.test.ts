@@ -87,13 +87,15 @@ describe("Der Apron steht als Hochrechnung beim aktuellen Rang daneben", () => {
     expect(text).toContain("mit Apron +26,6");
   });
 
-  it("nennt die GEGLÄTTETE Bemessungsgrundlage, weil sie von der Gehaltsspalte abweichen darf", () => {
-    // apron-service.ts rechnet auf `getTeamDisplaySalaryTotal`, die Tabelle zeigt die echte
-    // Vertragssumme. Ohne diesen Zusatz suchte man die Differenz in der Rechnung (Save-Beispiel
-    // im Kopfkommentar dort: 97,7 echt gegen 83,3 geglättet).
+  it("nennt die Bemessungsgrundlage und die Linien, gegen die sie steht", () => {
+    // FRUEHER hiess dieser Fall „nennt die GEGLAETTETE Bemessungsgrundlage, weil sie von der
+    // Gehaltsspalte abweichen darf" — der Apron rechnete auf einer anderen Groesse als die GuV.
+    // Seit dem 13.08.2026 ist es dieselbe (die real zu zahlende Jahressumme), das Wort
+    // „geglaettet" waere also eine Behauptung ueber einen Unterschied, den es nicht mehr gibt.
+    // Die Zeile selbst bleibt noetig: ohne sie sucht man die Herkunft der Zahl.
     const text = buildGuvBreakdown({ sponsorTotal: 100, salaryTotal: 97.7, guv: 30, apron }).hoverText;
     expect(text).toContain("83,3");
-    expect(text).toContain("geglättet");
+    expect(text).not.toContain("geglättet");
     expect(text).toContain("69,5 / 79");
   });
 

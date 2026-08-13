@@ -11,23 +11,30 @@
  * Funktion `computeApronLines`, die die Liga-Gehaltssumme braucht). Die eigentliche Anwendung
  * (Cash-Aenderungen schreiben, Ledger fuehren) lebt in `lib/season/apron-settlement-service.ts`.
  *
- * BEMESSUNGSGRUNDLAGE: `getTeamNegotiatedSalaryTotal` — die Summe der bei UNTERSCHRIFT
- * VERHANDELTEN Jahresgehälter (`RosterEntry.negotiatedAnnualSalary`). Nicht die Jahreszahlung
- * (`contract.salary`, die `applySponsorSettlement` real abbucht) und seit dem 12.08.2026 auch
- * nicht mehr das FORMEL-Gehalt aus Marktwert/Attributen (`contract.expectedSalary`).
+ * BEMESSUNGSGRUNDLAGE: `getTeamActualSalaryTotal` — die REAL in DIESER Saison zu zahlende
+ * Gehaltssumme, also `yearlySalarySchedule[0]` je Vertrag (das Feld, das
+ * `resolvePlayerEconomyContract().salary` liefert und das die Saisonende-Abrechnung wirklich
+ * abbucht). Nicht das Formel-Gehalt aus Marktwert/Attributen, und seit dem 13.08.2026 auch nicht
+ * mehr das bei Unterschrift verhandelte Jahresgehalt.
  *
- * WARUM UMGESTELLT (Chris: „ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3): das Formel-Gehalt
- * hing weder an der Verhandlung noch an der Form. Ein Team, das seinen ganzen Kader 10 % unter
- * Formel verhandelte, zahlte trotzdem die volle Abgabe — am Abbild zahlte Cold Steel 3,18 Abgabe,
- * obwohl seine echte Gehaltssumme (63,6) UNTER der ersten Linie (76,8) lag, weil geglättet 81,6
- * dastanden. Verhandeln soll die Apron bewegen.
+ * WARUM ZWEIMAL UMGESTELLT — die Meldungen bauen aufeinander auf:
  *
- * DIE ANTI-GAMING-ZUSAGE BLEIBT UNVERÄNDERT IN KRAFT — sie hängt jetzt nur an einem anderen Feld:
- * „ein Formwechsel ändert die Apron-Abgabe um 0,00". Das verhandelte Jahresgehalt wird bei
- * Unterschrift festgeschrieben und danach nie wieder angefasst; weder die Jahreszahlung noch der
- * Durchschnitt der Rest-Schedule taugten dafür (beide sinken bei front_loaded über die Laufzeit —
- * bei drei Jahren auf 2,7 statt 3,0 Jahresgehälter). Der Wächter-Test prüft die 0,00 ausdrücklich
- * AUCH NACH EINEM SAISONWECHSEL, weil erst der die Falle sichtbar macht.
+ *   1. Das FORMEL-Gehalt hing weder an der Verhandlung noch an der Form. Ein Team, das seinen
+ *      ganzen Kader 10 % unter Formel verhandelte, zahlte trotzdem die volle Abgabe (Cold Steel:
+ *      3,18 Abgabe bei einer echten Gehaltssumme von 63,6 unter der ersten Linie von 76,8).
+ *   2. Das VERHANDELTE Jahresgehalt behob das, blieb aber eine GEGLAETTETE Groesse: es ist der
+ *      Durchschnitt ueber die Laufzeit, nicht das, was in diesem Jahr vom Konto geht. Chris:
+ *      „Apron ist noch falsch, das sollte doch umgestellt sein auf die REAL zu zahlende summe des
+ *      jahres nach vertrag und nicht geglättet." Besteuert wird ab hier, was man in dieser Saison
+ *      wirklich zahlt.
+ *
+ * DAMIT IST DIE FRUEHERE ANTI-GAMING-ZUSAGE AUSDRUECKLICH AUFGEHOBEN. Sie lautete „ein Formwechsel
+ * aendert die Apron-Abgabe um 0,00" und hing genau daran, dass die Basis formunabhaengig war. Die
+ * Jahreszahlung ist es nicht: `front_loaded` hebt die Basis dieser Saison, `back_loaded` senkt sie.
+ * Das ist die gewollte Folge der Entscheidung — und es ist ein VERSCHIEBEN, kein Vermeiden: der
+ * Apron wird jede Saison neu abgerechnet, und was `back_loaded` heute spart, faellt in den
+ * Folgejahren an, wenn die Rate steigt. Der Waechter-Test misst jetzt genau diese neue Regel
+ * (`tests/apron-faktor-horizont-und-vertragsform.test.ts`), statt die alte zu behaupten.
  *
  * SAETZE UND LINIENFAKTOREN, GEMESSEN GEGEN DEN GESPIELTEN SAVE (nicht die ursprüngliche Vorgabe):
  * ENDGÜLTIGE ENTSCHEIDUNG (Nutzer, nach drei Kalibrierungsrunden — siehe scripts/apron-kalibrierung.ts
@@ -57,7 +64,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { teamHasFormCardPool } from "@/lib/foundation/form-card-flow";
 import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { SPONSOR_WERTUNGSTOPF, sponsorWertungsGewichte } from "@/lib/sponsor/sponsor-liga-leiter";
 import {
   SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
@@ -237,26 +244,27 @@ function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; u
 }
 
 /**
- * DIE GEHALTSSUMME, GEGEN DIE DER APRON EIN TEAM BEMISST — das VERHANDELTE Gehalt.
+ * DIE GEHALTSSUMME, GEGEN DIE DER APRON EIN TEAM BEMISST — was in DIESER Saison wirklich gezahlt
+ * wird.
  *
  * Eigene Funktion statt eines direkten Aufrufs, damit jede Apron-Frage im Baum nachweislich
  * dieselbe Grundlage nimmt. Genau hier lag schon einmal ein Fehler: die KI prüfte ihre
- * Gehaltsdecke gegen die ECHTE Vertragssumme, während besteuert wird, was diese Funktion liefert.
+ * Gehaltsdecke gegen die ECHTE Vertragssumme, während besteuert wurde, was diese Funktion liefert.
+ * Seit der Umstellung sind beide dasselbe — der Widerspruch kann nicht wiederkommen.
  *
  * Sie steht in der SAISON-Ebene und nicht bei der KI, obwohl die KI ihr Hauptnutzer ist: sie gehört
  * zur Definition des Apron, nicht zu seiner Verwendung. Praktisch entscheidet das auch die
  * Importrichtung — die KI-Decke (`resolveTeamApronSalaryCeiling`) baut auf dieser Zahl auf, und ein
  * Zuhause bei der KI hätte einen Zyklus ergeben.
  *
- * UMGESTELLT (Chris: „ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3): früher
- * `getTeamDisplaySalaryTotal` — das FORMEL-Gehalt aus Marktwert/Attributen, das weder an der
- * Verhandlung noch an der Form hing. Die Anti-Gaming-Zusage bleibt trotzdem in voller Härte
- * bestehen, sie hängt jetzt nur an einem anderen Feld: `getTeamNegotiatedSalaryTotal` summiert das
- * bei Unterschrift verhandelte Jahresgehalt, nicht die Jahreszahlung — ein Formwechsel bewegt sie
- * um 0,00, auch nach einem Saisonwechsel.
+ * ZWEITE UMSTELLUNG (Chris: „das sollte doch umgestellt sein auf die REAL zu zahlende summe des
+ * jahres nach vertrag und nicht geglättet"): vorher `getTeamNegotiatedSalaryTotal`, das bei
+ * Unterschrift verhandelte Jahresgehalt. Es war formunabhängig und trug damit die alte
+ * Anti-Gaming-Zusage — aber es ist der Durchschnitt über die Laufzeit und nicht das, was in dieser
+ * Saison vom Konto geht. Die Begründung samt Folgen steht im Dateikopf.
  */
 export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
-  return getTeamNegotiatedSalaryTotal(gameState, teamId);
+  return getTeamActualSalaryTotal(gameState, teamId);
 }
 
 /**
