@@ -46,7 +46,26 @@ import { buildPlayerDrawerDataFromGameState } from "@/lib/foundation/player-deta
  */
 
 /**
- * DIE FIXTURE DIESER SUITE LIEGT NICHT MEHR IM REPO.
+ * DIE FIXTURE LIEGT WIEDER IM REPO — neu gebaut, nicht wiedergefunden.
+ *
+ * Chris: „arena ovr etc fixtures kannst du holen und bauen." Erzeugt ueber die vorhandene Kette,
+ * jeder Schritt mit `--write` (ohne ihn tun sie nichts und melden trotzdem Erfolg):
+ *
+ *     npx tsx scripts/season1-autoprep-topup.ts --write
+ *     npx tsx scripts/season1-autoprep.ts --write
+ *     npx tsx scripts/season1-simulation-run.ts --write
+ *
+ * Der Stand traegt eine ECHTE Spieltags-Historie: 10 gewertete Spieltage, 640 Disziplin-Ergebnisse,
+ * 2.549 Spieler-Leistungen, 398 Kaderzeilen. Genau das braucht die Suite — der kompakte Payload
+ * muss etwas zu streichen haben.
+ *
+ * AUF DAS NOETIGE GEKUERZT, damit eine Testdatei keine 2,8 MB in die Historie traegt:
+ *   • nur Kaderspieler (398 statt 2.984) — die Suite vergleicht ueber die Kaderspieler,
+ *   • ohne `persistedSeasonDerivations` (5,9 MB roh): das ist ein CACHE, und diese Suite rechnet
+ *     die Ableitungen ohnehin frisch (`buildPlayerRatingContractMap`).
+ * Bleiben 1,55 MB gepackt.
+ *
+ * DIE ALTE LAGE, zum Verstaendnis, warum hier so viel Text steht:
  *
  * `fresh-season-1-1785739623457.json.gz` ist ein Auto-Export-Artefakt (Zeitstempel im Namen),
  * das einmal versehentlich eingecheckt und in Commit `cbbd6ce` wieder geloescht wurde. Seitdem
@@ -63,8 +82,8 @@ import { buildPlayerDrawerDataFromGameState } from "@/lib/foundation/player-deta
  * Wer die Suite dauerhaft zurueckhaben will, legt einen solchen Save unter dem Namen unten ab.
  */
 const REPO_ROOT = process.cwd();
-const FIXTURE_FILE = "fresh-season-1-1785739623457.json.gz";
-const FIXTURE_PATH = join(REPO_ROOT, "data/online-saves", FIXTURE_FILE);
+const FIXTURE_FILE = "arena-season1-save.json.gz";
+const FIXTURE_PATH = join(REPO_ROOT, "tests/_fixtures/season1-regression", FIXTURE_FILE);
 const FIXTURE_VORHANDEN = existsSync(FIXTURE_PATH);
 
 function loadFixtureGameState(): GameState {
