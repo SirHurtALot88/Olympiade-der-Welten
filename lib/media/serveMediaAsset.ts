@@ -120,21 +120,18 @@ async function readOrCreateVariantBuffer(
 
     const sourceBuffer = await readFile(sourcePath);
 
+    let variantBuffer: Buffer;
     try {
       // failOn: "none" makes sharp tolerant of slightly truncated / non-standard
       // JPEGs (progressive quirks, trailing garbage) that browsers render fine
       // but sharp's default strict mode would reject.
-      const variantBuffer = await sharp(sourceBuffer, { failOn: "none" })
+      variantBuffer = await sharp(sourceBuffer, { failOn: "none" })
         .resize(maxSize, maxSize, {
           fit: "inside",
           withoutEnlargement: true,
         })
         .webp({ quality: getMediaVariantQuality(variant) })
         .toBuffer();
-
-      await mkdir(path.dirname(cachePath), { recursive: true });
-      await writeFile(cachePath, variantBuffer);
-      return { buffer: variantBuffer, contentType: "image/webp" };
     } catch {
       // Last resort: sharp cannot decode the image at all. Serve the original
       // bytes unresized so the browser can still display it instead of the
@@ -143,6 +140,28 @@ async function readOrCreateVariantBuffer(
       const contentType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
       return { buffer: sourceBuffer, contentType };
     }
+
+    /**
+     * DER CACHE-SCHREIBVORGANG DARF DIE ANTWORT NICHT VERSCHLECHTERN.
+     *
+     * Vorher lag er im selben `try` wie die Verkleinerung — ein fehlgeschlagenes `writeFile`
+     * landete also im Notausgang darunter und lieferte das UNVERKLEINERTE Originalbild aus. Das
+     * ist die falsche Richtung: das Verkleinern hat ja funktioniert, nur das Ablegen nicht. Ein
+     * Portrait-Original ist rund 1024×1536; statt 64 px webp gingen dann Megabytes an den Browser
+     * — aus „langsam, weil neu gerechnet" wuerde „langsam, weil das Volle uebertragen wird".
+     *
+     * Der Fall ist mit dem neuen Cache-Volume real und nicht theoretisch: gehoert ein frisch
+     * angelegtes Named Volume root (weil der Pfad im Image fehlt), scheitert JEDER Schreibversuch
+     * der App mit EACCES. Der Dockerfile beugt genau dem vor — aber die Antwort muss auch dann
+     * richtig sein, wenn jemand das spaeter uebersieht oder schlicht die Platte voll ist.
+     */
+    try {
+      await mkdir(path.dirname(cachePath), { recursive: true });
+      await writeFile(cachePath, variantBuffer);
+    } catch {
+      // Kein Cache diesmal — die Verkleinerung selbst steht und wird ausgeliefert.
+    }
+    return { buffer: variantBuffer, contentType: "image/webp" };
   }
 }
 
