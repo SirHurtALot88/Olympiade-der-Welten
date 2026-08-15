@@ -1,5 +1,6 @@
 import type { GameState, Player, PlayerDisciplinePerformanceRecord, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import { mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { applyTrainingXpFacilityModifiers, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
@@ -348,8 +349,19 @@ function getRelativePerformanceIndex(input: {
   expectedPps: number;
 }) {
   const signals: number[] = [];
-  if (isFiniteNumber(input.mvs)) {
-    signals.push((input.mvs + 1.2) / (input.expectedMvs + 1.2));
+  /**
+   * MVS zaehlt nur, wenn er ueberhaupt etwas aussagt — `mvsAlsGuete` liefert sonst `null`.
+   *
+   * Seit der Vertrag „keine Quelle" (null) von „null Platzierungen" (0) trennt, kaeme hier fuer
+   * JEDEN Spieler zu Saisonbeginn eine ehrliche 0 an. Eine reine `isFiniteNumber`-Pruefung haette
+   * daraus ein Leistungssignal von (0 + 1,2) / (erwartet + 1,2) gemacht — also fuer die ganze Liga
+   * ein „deutlich unter Erwartung", bevor ein einziger Spieltag gelaufen ist. Ohne Platzierungen
+   * gibt es kein Leistungssignal; dann traegt PPs allein, und fehlt auch das, greift der
+   * neutrale Rueckfall 0,92 unten.
+   */
+  const mvsSignal = mvsAlsGuete(input.mvs);
+  if (mvsSignal != null) {
+    signals.push((mvsSignal + 1.2) / (input.expectedMvs + 1.2));
   }
   if (isFiniteNumber(input.pps)) {
     signals.push((input.pps + 3) / (input.expectedPps + 3));
