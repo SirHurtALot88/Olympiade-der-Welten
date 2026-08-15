@@ -21,6 +21,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { SPONSOR_ANGEBOTE_JE_TEAM } from "@/lib/sponsor/sponsor-offer-service";
+
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
@@ -42,10 +44,25 @@ function alleAngebote(): { gameState: GameState; angebote: SponsorOffer[] } {
   return { gameState, angebote };
 }
 
+/**
+ * MINDESTSTICHPROBE — abgeleitet, nicht geraten.
+ *
+ * Hier stand `toBeGreaterThan(100)`. Die 100 stammte aus der Zeit mit FUENF Angeboten je Team
+ * (32 x 5 = 160). Seit Chris' Entscheidung „nur 3 Sponsoren statt 5" sind es 32 x 3 = 96 — die
+ * Wache schlug also an, obwohl an der GEPRUEFTEN Aussage nichts falsch war. Eine Wache, die bei
+ * einer Balance-Entscheidung rot wird, misst die falsche Sache.
+ *
+ * Jetzt wird die Untergrenze aus derselben Zahl gebildet, die auch die Angebote erzeugt. Sie ist
+ * damit sogar strenger als vorher: sie verlangt, dass JEDES Team ein volles Slate bekommen hat.
+ */
+function mindestStichprobe(teamAnzahl: number) {
+  return teamAnzahl * SPONSOR_ANGEBOTE_JE_TEAM;
+}
+
 describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
   it("`anchor − Sockel` ist exakt der Anteil, den der Saisonwechsel erodieren laesst", () => {
-    const { angebote } = alleAngebote();
-    expect(angebote.length).toBeGreaterThan(100);
+    const { gameState, angebote } = alleAngebote();
+    expect(angebote.length).toBeGreaterThanOrEqual(mindestStichprobe(gameState.teams.length));
 
     const multiplikatorJahr2 = getSponsorTermMultiplier(2);
     expect(multiplikatorJahr2).toBeLessThan(1);
@@ -111,7 +128,8 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
 
     // Der nackte Sockel liegt IMMER zu hoch (Wertfaktor <= 1, Verzicht >= 0) und verfehlt die
     // Erosion bei praktisch jeder Karte. Die Live-Messung ergab Ø 9,76 C / max 30,2 C.
-    expect(gezaehlt).toBeGreaterThan(100);
+    // Jede Karte muss durch die Schleife gelaufen sein — sonst prueft der Test nur einen Teil.
+    expect(gezaehlt).toBe(angebote.length);
     expect(summeAbweichung / gezaehlt).toBeGreaterThan(1);
     expect(groessteAbweichung).toBeGreaterThan(10);
     expect(mitEchterAbweichung / gezaehlt).toBeGreaterThan(0.9);
@@ -136,7 +154,7 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
       }
       geprueft += 1;
     }
-    expect(geprueft).toBeGreaterThan(100);
+    expect(geprueft).toBe(angebote.length);
   }, 120_000);
 
   /**

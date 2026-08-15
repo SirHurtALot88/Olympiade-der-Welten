@@ -14,6 +14,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { SPONSOR_ANGEBOTE_JE_TEAM } from "@/lib/sponsor/sponsor-offer-service";
+
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { buildNewGameStateFromBaseline } from "@/lib/game/new-game-setup-service";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
@@ -57,8 +59,13 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
   });
 
   it("jedes erzeugte Angebot traegt V2-Konditionen", { timeout: 300_000 }, () => {
-    const offers = allOffers(newGameFromButton());
-    expect(offers.length).toBeGreaterThan(100);
+    const gameState = newGameFromButton();
+    const offers = allOffers(gameState);
+    // Hier stand `toBeGreaterThan(100)` — eine Zahl aus der Zeit mit FUENF Angeboten je Team
+    // (32 x 5 = 160). Seit „nur 3 Sponsoren statt 5" sind es 96, und die Wache schlug an, obwohl
+    // an der geprueften Aussage nichts falsch war. Die Untergrenze kommt jetzt aus derselben
+    // Zahl, die die Angebote erzeugt, und verlangt ein volles Slate fuer JEDES Team.
+    expect(offers.length).toBeGreaterThanOrEqual(gameState.teams.length * SPONSOR_ANGEBOTE_JE_TEAM);
     const withoutTerms = offers.filter((offer) => getSponsorV3Terms(offer) === null);
     expect(withoutTerms.length, `${withoutTerms.length} von ${offers.length} Angeboten ohne V2-Konditionen`).toBe(0);
   });

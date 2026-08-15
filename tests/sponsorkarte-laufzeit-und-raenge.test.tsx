@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { SponsorOfferCardNewLook } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { SponsorSeasonRankTable } from "@/components/foundation/sponsor/SponsorSeasonRankTable";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import { SPONSOR_ANGEBOTE_JE_TEAM } from "@/lib/sponsor/sponsor-offer-service";
 import {
   buildOfferRankPayoutLadderPreview,
   buildSponsorOfferTermForecast,
@@ -226,7 +227,10 @@ describe("Der Mittelteil der Sponsorkarte zeigt die Zahlen, die die lib liefert"
   }
 
   it("die Fixture traegt echte V3-Angebote — sonst prueft der Test nichts", () => {
-    expect(alleAngebote.length).toBeGreaterThan(100);
+    // Die frueher hier stehende 100 stammte aus der Zeit mit FUENF Angeboten je Team
+    // (32 x 5 = 160). Seit „nur 3 Sponsoren statt 5" sind es 96 — die Wache schlug an, obwohl an
+    // der Fixture nichts fehlte. Abgeleitet ist sie strenger: jedes Team braucht ein volles Slate.
+    expect(alleAngebote.length).toBeGreaterThanOrEqual(gameState.teams.length * SPONSOR_ANGEBOTE_JE_TEAM);
     expect(alleAngebote.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
   });
 
