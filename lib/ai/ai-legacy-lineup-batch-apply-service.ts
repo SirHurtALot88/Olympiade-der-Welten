@@ -1109,11 +1109,35 @@ function pickPrimaryFormCardForSide(input: {
       });
       if (cheapest) return cheapest;
     }
-    return takeDumpNegativeFormCard({
+    const dump = takeDumpNegativeFormCard({
       cards: input.negativeCards,
       usedIds: input.usedIds,
       color: input.color,
     });
+    if (dump) return dump;
+    /**
+     * HIER VERROTTETEN DIE PLUSKARTEN. Bis hierher endete der schwache Zweig mit `return` —
+     * ohne Minuskarte also mit NICHTS. Eine schwache Seite konnte damit strukturell nie eine
+     * Pluskarte bekommen, egal wie gross der Ausgabedruck war.
+     *
+     * Am Live-Spielstand nachgemessen, letzter Spieltag der Saison: D-L hatte 12 offene
+     * Pluskarten, R-C und R-R je 8, L-K 6 — gesetzt wurden bei allen VIER Teams NULL. Nicht weil
+     * der Vorrat zu gross war, sondern weil beide Disziplinseiten als „weak" eingestuft waren und
+     * die Minuskarten laengst alle abgeraeumt (0 uebrig). Der Zweig lief leer und gab auf.
+     *
+     * Die Einstufung „schwach" ist eine VORLIEBE, keine Verbotszone: sie soll die knappen
+     * Pluskarten den aussichtsreichen Seiten zuschanzen. In dem Moment, in dem die Alternative
+     * „Karte verfaellt ungespielt" heisst, ist die Vorliebe gegenstandslos — eine Karte auf einer
+     * schwachen Seite bringt `Wert x Farbfaktor x Kadergroesse` Punkte, eine verfallene bringt 0.
+     * Und die PP haengen am RANG ueber alle 32 Teams, nicht am Sieg in der Disziplin: auch auf
+     * einer schwachen Seite schiebt mehr Score real Plaetze.
+     *
+     * Deshalb faellt die Sperre GENAU DANN, wenn `mustSpendPositives` gilt — und keinen Moment
+     * frueher.
+     */
+    if (!input.mustSpendPositives) {
+      return null;
+    }
   }
 
   if (input.preferNegativeDump) {
@@ -1195,8 +1219,10 @@ function pickSecondaryFormCardForSide(input: {
   /** Karten, die der Plan für GENAU diese Seite auf den SEKUNDÄRplatz gelegt hat. */
   plannedSecondaryCardIds: Set<string>;
 }) {
-  // Weak sides never get secondary cards.
-  if (input.competitiveness === "weak") return null;
+  // Schwache Seiten bekommen normalerweise keine zweite Karte — dieselbe Vorliebe wie beim
+  // Primaerplatz, und sie faellt aus demselben Grund unter Ausgabedruck: eine ungespielte
+  // Pluskarte verfaellt am Saisonende ersatzlos.
+  if (input.competitiveness === "weak" && !input.mustSpendPositives) return null;
   // Overkill-Bremse: Wer die Disziplin ohnehin klar anführt, gewinnt auch mit EINER Karte —
   // die zweite fehlt später (Chris: "selbst mit nur 1 8x2 Karte wären sie immer noch 1.").
   // Wie konsequent verzichtet wird, ist Team-Charakter (restraint), kein Einheitsschalter.

@@ -129,6 +129,7 @@ import {
 } from "@/lib/foundation/player-potential-display-service";
 import {
   buildOrganicSeasonProgression,
+  buildProjectedSeasonTrainingAccumulatorOverrides,
   normalizePlayerAttributes,
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
@@ -2624,6 +2625,34 @@ export function buildPlayerDrawerDataFromGameState(input: {
           gameState: input.gameState,
           player,
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
+          /**
+           * DIESE ZWEI ARGUMENTE FEHLTEN — und daran hingen zwei verschiedene Zahlen fuer
+           * dieselbe Sache.
+           *
+           * GEMELDET VON CHRIS (Ticket #40): „Das was als Netto/Saison hier steht muss gleich
+           * sein mit dem forecast der im spielerprofil drin steht — bitte prüfen was korrekt ist
+           * und nur eine Zahl ausweisen."
+           *
+           * Ohne den Accumulator-Override faellt die Rechnung auf
+           * `TRAINING_SETPOINTS_BY_MODE[trainingMode]` zurueck und unterstellt „ganze Saison im
+           * HEUTIGEN Modus" — statt der real gespielten Modus-Historie. Genau das Loch, gegen das
+           * der Override gebaut wurde (Anti-Cheese, Audit #6). Gemessen am Live-Spielstand trennte
+           * das bis zu 2,2 SP fuer denselben Spieler (Kaela Stormshield: Profil 3,1, Trainingsseite
+           * 5,3).
+           *
+           * MASSSTAB IST DER SAISONENDE-APPLY, denn der bucht wirklich:
+           * `season-end-xp-apply-service.ts:322` ruft dieselbe Funktion mit genau diesen beiden
+           * Argumenten. Die Trainingsseite tat es schon, das Profil nicht — deshalb zieht das
+           * Profil nach und nicht umgekehrt.
+           */
+          route: progressionForecast.developmentRoute,
+          ...buildProjectedSeasonTrainingAccumulatorOverrides({
+            gameState: input.gameState,
+            player,
+            // Ohne gesetzten Modus derselbe Ersatz wie ueberall sonst im Trainingspfad: „mittel"
+            // ist der Standardmodus, nicht geraten.
+            draftMode: player.trainingMode ?? "mittel",
+          }),
         })
       : null;
   const developmentLevelup = buildPlayerDevelopmentLevelupModel({

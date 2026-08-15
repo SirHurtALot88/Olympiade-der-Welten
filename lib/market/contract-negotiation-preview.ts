@@ -14,6 +14,7 @@ import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { resolveElapsedContractSeasonsForBuyout } from "@/lib/market/contract-buyout-season-window";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { calculateTransfermarktFit, getTransfermarktBracket, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { getTransfermarktScoutingRecruitmentBonus } from "@/lib/market/transfermarkt-scouting";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
@@ -2477,12 +2478,44 @@ export function buildTeamContractSeasonTable(input: {
   teamId: string;
   seasonLabelBase: string;
 }): TeamContractSeasonTable {
-  const rosterRows = input.gameState.rosters
-    .filter((entry) => entry.teamId === input.teamId)
+  const teamRoster = input.gameState.rosters.filter((entry) => entry.teamId === input.teamId);
+  const rosterCount = teamRoster.length;
+  const rosterRows = teamRoster
     .map<TeamContractSeasonRow>((entry) => {
       const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
+      const rohBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
+      /**
+       * DER PREIS, DEN ES BEIM VERKAUF WIRKLICH GIBT — nicht der Rohpreis.
+       *
+       * GEMELDET VON CHRIS (Ticket #44): „Beim Verkauf vs Marktwert hat Lava Golem z.B. +10,7 oben
+       * angezeigt. Wenn ich in sein Profil schaue, steht dort vs Marktwert +9,3 … Was ist nun
+       * richtig?"
+       *
+       * Richtig ist +9,3, und zwar nicht per Argument, sondern per Buchung: Lava Golem wurde am
+       * Live-Spielstand zwölf Minuten nach der Meldung verkauft, die Transferhistorie zeigt
+       * `fee 28.09`. Diese Zeile hier versprach 29,48 — 1,39 Mio, die beim Verkauf nie ankommen.
+       *
+       * Der ganze Unterschied ist EINE Stufe: `applySellPricingPolicyToBreakdown` multipliziert den
+       * Rohpreis mit Saisonstart-Abschlag, Timing, Kaderdruck und Team-Fit (bei Lava Golem
+       * 0,98 x 0,90 x 1,08 = 0,953). Das Verkaufs-Panel schickt den Breakdown durch diese Stufe,
+       * diese Zeile nahm ihn roh — und die Ausfuehrung (`executeLocalTransfermarktSell`) nimmt
+       * ebenfalls die bereinigte Fassung. Von drei Anzeigen war also genau die eine falsch, an der
+       * die Auslauf-Empfehlung „abgeben oder halten" haengt.
+       *
+       * `marketValueAtExit` bleibt unveraendert: der Vergleichsmassstab darf sich nicht
+       * mitverschieben, sonst waere die Differenz wieder eine andere Zahl.
+       */
+      const saleFactorBreakdown = applySellPricingPolicyToBreakdown({
+        gameState: input.gameState,
+        teamId: input.teamId,
+        player,
+        rosterEntry: entry,
+        baseBreakdown: rohBreakdown,
+        // Nach diesem einen Verkauf: der Kaderdruck-Malus liest die GROESSE DANACH, sonst
+        // bewertete er einen Kader, den es nach dem Verkauf nicht mehr gibt.
+        rosterAfter: Math.max(0, rosterCount - 1),
+      }).breakdown;
       const marketValueAtExit = saleFactorBreakdown.baseMarketValue ?? economy.marketValue ?? null;
       const exitValue = saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
       const purchasePrice = normalizeVisibleRosterMoney(entry.purchasePrice, economy.purchasePrice);
