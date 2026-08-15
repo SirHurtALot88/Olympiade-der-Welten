@@ -249,10 +249,12 @@ Wenn `portraitUrl` oder `portraitPath` nicht browserfaehig ist, wird kein kaputt
 
 ## Retool-Column-Quelle
 
-Die Transfermarkt-Spalten werden jetzt primär aus Retool-JSON extrahiert:
+Die Transfermarkt-Spalten stammen aus einer **einmaligen** Extraktion aus der Retool-JSON. Das
+Werkzeug ist entfernt (Chris: „das war einmalig machen wir nicht mehr"), die Ausleitung bleibt
+und ist die Quelle:
 
-- `npm run retool:extract-transfermarkt-columns`
-- Output:
+- ~~`npm run retool:extract-transfermarkt-columns`~~ (entfernt, s. `docs/SCRIPT_TOOLING_REGISTRY.md`)
+- Ausleitung, weiterhin im Repo:
   - `references/retool-transfermarkt-columns/manifest.json`
   - `references/retool-transfermarkt-columns/transfermarkt-columns.raw.json`
   - `references/retool-transfermarkt-columns/README.md`
