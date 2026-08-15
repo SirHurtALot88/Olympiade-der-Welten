@@ -87,6 +87,10 @@ export function buildDisciplineStageTeamsFromBookedResult(
     const teamScore = round1(teamErgebnis.totalScore ?? 0);
     const players = eigene.map((eintrag) => ({
       playerId: eintrag.playerId ?? null,
+      // Die Position wandert mit — sortiert wurde hier schon immer danach, weggeworfen wurde sie
+      // trotzdem (Ticket #35). Ohne sie kann die Buehne eine Luecke nicht von einer Verschiebung
+      // unterscheiden.
+      slotIndex: eintrag.slotIndex ?? 0,
       val: round1(eintrag.finalPlayerScore ?? 0),
       name: namensregister.get(eintrag.playerId) ?? eintrag.playerId,
       portraitUrl: portraitById.get(eintrag.playerId) ?? null,
