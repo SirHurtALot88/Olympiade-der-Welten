@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
@@ -73,7 +74,16 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
     expect(groessterFehler).toBeLessThan(1e-9);
   }, 120_000);
 
-  it("der NACKTE Liga-Sockel verfehlt dieselbe Erosion messbar — deshalb reicht er nicht", () => {
+  // AM SCHALTER, NICHT AM IST-ZUSTAND. Dieser Test sichert zu, dass der nackte Liga-Sockel die
+  // echte Erosion um eine SPUERBARE Groesse verfehlt — die Live-Messung ergab max 30,2 C. Diese
+  // Spanne entsteht fast ganz aus dem Gebäude-Verzicht: ohne Leihe bleibt nur der
+  // Raritaets-Wertfaktor uebrig, und der schafft nachgemessen hoechstens 5,8 C statt der
+  // geforderten 10. Der Test misst dann also nicht mehr, wogegen er gebaut ist.
+  //
+  // Die Zusage bleibt unveraendert stehen und greift wieder, sobald die Leihe an ist (dann aber
+  // zusammen mit FUENF Angebotsplaetzen, siehe `SLOT_COUNT` in sponsor-offer-service.ts — die
+  // Stichprobe unten verlangt ueber 100 Angebote, 32 Teams x 3 Karten sind nur 96).
+  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("der NACKTE Liga-Sockel verfehlt dieselbe Erosion messbar — deshalb reicht er nicht", () => {
     const { angebote } = alleAngebote();
     const multiplikatorJahr2 = getSponsorTermMultiplier(2);
 

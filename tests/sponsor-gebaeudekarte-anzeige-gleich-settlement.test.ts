@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { buildSponsorOffersForTeam, chooseSponsorOffer } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorV3Terms, sponsorV3LadderValue, sponsorV3Settle } from "@/lib/sponsor/sponsor-v3-offer-service";
@@ -83,7 +84,17 @@ function unterschreibeGebaeudeKarte() {
   return { angebot: mitLeihe, gameState: unterschrieben };
 }
 
-describe("Die Gebäude-Karte im Settlement", () => {
+/**
+ * AM SCHALTER, NICHT AM IST-ZUSTAND. Alle drei Tests unterschreiben eine GEBÄUDE-Karte und rechnen
+ * ihr Settlement nach: keine eigene Leih-Zeile (E1), die Kasse aendert sich um exakt die Summe der
+ * angezeigten Zeilen, und die Gebaeude-Karte zahlt messbar weniger als die reine Cash-Karte
+ * desselben Slates. Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, gibt es im ganzen Slate keine
+ * Gebaeude-Karte mehr — es fehlt der Gegenstand, nicht die Zusage.
+ *
+ * Die Erwartungen bleiben unveraendert stehen und greifen wieder, sobald die Leihe an ist. Bewusst
+ * der importierte Schalter statt einer Kopie, damit Schalter und Test nicht auseinanderlaufen.
+ */
+describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Die Gebäude-Karte im Settlement", () => {
   it("bucht KEINE eigene Leih-Zeile — der Verzicht steckt in der Leiter (E1)", () => {
     const { gameState } = unterschreibeGebaeudeKarte();
     const preview = previewSponsorSettlement(gameState, "season_end");

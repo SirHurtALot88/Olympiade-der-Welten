@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 
@@ -45,7 +46,19 @@ function waehle(base: GameState, cash: number) {
   return { reineCash, gross, mittel, klein };
 }
 
-describe("Die KI wiegt Gebäude gegen Cash ab", () => {
+/**
+ * AM SCHALTER, NICHT AM IST-ZUSTAND. Die ganze Suite misst, WIE die KI zwischen Gebäude und Cash
+ * abwaegt — an der Kassenlage, an der Kartengroesse und am eigenen Bestand. Steht
+ * `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, kann die KI gar kein Gebäude mehr waehlen: alle 32 Teams
+ * nehmen zwangslaeufig die reine Cash-Karte, und jeder Vergleich zwischen den Kassenlagen misst
+ * dieselbe Zahl gegen sich selbst.
+ *
+ * Die Zusagen bleiben unveraendert stehen und greifen wieder, sobald die Leihe an ist. Ein Hinweis
+ * fuers Zurueckstellen, nachgemessen: „waehlt bei voller Kasse ueberwiegend ein Gebäude" braucht
+ * ausser dem Schalter auch wieder FUENF Angebotsplaetze (`SLOT_COUNT` in sponsor-offer-service.ts,
+ * mit #512 auf 3 gesetzt) — bei dreien bleiben zu wenige Gebaeude-Karten je Slate uebrig.
+ */
+describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Die KI wiegt Gebäude gegen Cash ab", () => {
   it("greift bei leerer Kasse deutlich seltener zur groessten Karte", () => {
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const klamm = waehle(base, -30);

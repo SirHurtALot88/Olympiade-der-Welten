@@ -20,9 +20,21 @@ import {
   chooseSponsorOffer,
   getTeamSponsorContract,
 } from "@/lib/sponsor/sponsor-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV3GuaranteedLadder, sponsorV3WertFaktorFor } from "@/lib/sponsor/sponsor-v3-model";
 import { sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
+
+/**
+ * AM SCHALTER, NICHT AM IST-ZUSTAND. Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, besteht jedes
+ * Slate nur noch aus reinen Cash-Karten — alles unten, was eine Gebaeude-Karte VORAUSSETZT, haette
+ * dann gar keinen Gegenstand mehr zu pruefen und liefe ins Leere. Die Zusagen selbst bleiben
+ * unveraendert stehen und greifen in dem Moment wieder, in dem Chris die Leihe zurueckstellt.
+ *
+ * Bewusst der importierte Schalter und keine eigene Kopie: eine zweite Konstante hier waere die
+ * naechste Stelle, die beim Zurueckstellen vergessen wird.
+ */
+const ohneGebaeudeLeihe = !SPONSOR_GEBAEUDE_LEIHE_AKTIV;
 
 function baueSpielstand(partial?: Partial<GameState>): GameState {
   const teams = Array.from({ length: 12 }, (_, index) => ({
@@ -75,7 +87,10 @@ function baueSpielstand(partial?: Partial<GameState>): GameState {
   } as GameState;
 }
 
-describe("Das Slate deckt die Preisspanne ab (E8)", () => {
+// Beide Tests dieses Blocks messen den Aufbau der Gebaeude-Karte selbst: dass GENAU EINE Karte
+// ohne Verzicht im Slate steht (E8) und dass am Angebot alles eingefroren ist, was die Karte
+// spaeter braucht. Ohne Leihe gibt es keine Karte MIT Verzicht — greift wieder, sobald sie an ist.
+describe.skipIf(ohneGebaeudeLeihe)("Das Slate deckt die Preisspanne ab (E8)", () => {
   it("hat immer genau eine Karte ohne Verzicht — und sonst nur Gebaeude-Karten", () => {
     for (let index = 1; index <= 12; index += 1) {
       const teamId = index === 1 ? "M-M" : `T-${index}`;
@@ -102,7 +117,9 @@ describe("Das Slate deckt die Preisspanne ab (E8)", () => {
 });
 
 describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () => {
-  it("senkt jede Sprosse der Gebaeude-Karte um genau den Verzicht", () => {
+  // Sichert E1 zu: der Verzicht steht als eingefrorene Zahl in den Konditionen und die reine
+  // Cash-Karte traegt keinen. Braucht eine Gebaeude-Karte — greift wieder, sobald die Leihe an ist.
+  it.skipIf(ohneGebaeudeLeihe)("senkt jede Sprosse der Gebaeude-Karte um genau den Verzicht", () => {
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     const mitLeihe = angebote.find((angebot) => angebot.sponsorLeihe != null)!;
@@ -117,7 +134,10 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     expect(getSponsorV3Terms(angebote[0]!)!.leihVerzicht ?? 0).toBe(0);
   });
 
-  it("macht die Gebaeude-Karte messbar aermer als dieselbe Karte ohne Leihe", () => {
+  // Der Kern von E1: Rarität skaliert die Leiter, DANN geht der Verzicht als absoluter Betrag ab —
+  // und das Netz frisst ihn nicht auf. Ohne Gebaeude-Karte gibt es keinen Verzicht zu messen; der
+  // Test greift wieder, sobald die Leihe an ist.
+  it.skipIf(ohneGebaeudeLeihe)("macht die Gebaeude-Karte messbar aermer als dieselbe Karte ohne Leihe", () => {
     // Der eigentliche Nachweis, exakt statt ungefaehr: die Basisleiter des Angebots muss Sprosse
     // fuer Sprosse genau um den Verzicht unter der Ligaleiter derselben Form, desselben Startrangs
     // und desselben Gehaltsfaktors liegen — nachdem der Raritaets-Wertfaktor angewandt ist. Die
@@ -160,7 +180,13 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     }
   });
 
-  it("spannt die Preisspanne wirklich auf — kleine und grosse Gebaeude im selben Slate", () => {
+  // Sichert zu, dass Groesse und Rarität getrennte Regler sind: das Slate traegt billige UND teure
+  // Gebaeude, und die Stufen 1/3/5 kommen wirklich vor. Ohne Leihe gibt es gar keine Stufen.
+  //
+  // ACHTUNG BEIM ZURUECKSTELLEN, nachgemessen: dieser Test braucht ausser dem Schalter auch wieder
+  // FUENF Angebotsplaetze (`SLOT_COUNT` in sponsor-offer-service.ts, mit #512 auf 3 gesetzt). Bei
+  // drei Plaetzen bleiben nur zwei Gebaeude-Karten uebrig, und die mittlere Stufe 3 fehlt.
+  it.skipIf(ohneGebaeudeLeihe)("spannt die Preisspanne wirklich auf — kleine und grosse Gebaeude im selben Slate", () => {
     // Chris: „manche wollen zb 30 für die gebäude manche nur 5 dafür sind manche stärker manche
     // schwächer." Die erste Fassung koppelte die Stufe an die Rarität und lag damit ueber ALLE
     // Karten zwischen 0,5 und 4,3 C — fuenf Karten, die praktisch dasselbe kosteten. Groesse und
@@ -252,7 +278,10 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
     expect(sponsorV3WertFaktorFor("magisch")).toBeGreaterThan(sponsorV3WertFaktorFor("gewöhnlich"));
   });
 
-  it("erzeugt KEINE zusaetzliche Komponente — sonst zahlte das Team doppelt", () => {
+  // Sichert zu, dass der Verzicht KEINE eigene Buchungszeile erzeugt (E1) — er steckt in der
+  // Leiter. Vergleicht dafuer eine Gebaeude-Karte gegen die reine Cash-Karte desselben Slates;
+  // ohne Leihe fehlt die eine Haelfte des Vergleichs. Greift wieder, sobald die Leihe an ist.
+  it.skipIf(ohneGebaeudeLeihe)("erzeugt KEINE zusaetzliche Komponente — sonst zahlte das Team doppelt", () => {
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     const ohne = angebote[0]!;
@@ -266,7 +295,10 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
 });
 
 describe("Die Unterschrift macht die Leihe wirksam", () => {
-  it("legt die Leihgabe in den Season-State und NICHT in den eigenen Bestand", () => {
+  // Sichert zu, dass die Unterschrift die Leihgabe in den Season-State legt (nicht in den eigenen
+  // Bestand) und das Overlay sie trotzdem liest — der Rueckfall am Vertragsende ist damit kein
+  // Loeschen. Ohne Leihe gibt es nichts zu unterschreiben; greift wieder, sobald sie an ist.
+  it.skipIf(ohneGebaeudeLeihe)("legt die Leihgabe in den Season-State und NICHT in den eigenen Bestand", () => {
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     const mitLeihe = angebote.find((angebot) => angebot.sponsorLeihe != null)!;

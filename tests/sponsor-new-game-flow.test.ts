@@ -25,6 +25,7 @@ import {
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { SPONSOR_V3_CARDS } from "@/lib/sponsor/sponsor-v3-model";
 import { LEIH_ZIEL_ACHSENRANG, LEIH_ZIEL_FRISCHE, SPONSOR_LEIH_BONUS } from "@/lib/sponsor/sponsor-leih-ziele";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 
 /**
  * V3: aus den Kurvenformen sind die fuenf Risikokarten geworden. Sie sind fuer JEDES Team
@@ -70,7 +71,11 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
     }
   });
 
-  it("die Angebote tragen die V3-Struktur: Karte, Tilt, Ziel nach Schwierigkeit", { timeout: 300_000 }, () => {
+  // AM SCHALTER, NICHT AM IST-ZUSTAND. Die Zusage `terms.axis === undefined` haengt an der Leihe:
+  // `buildSponsorOffer` vergibt die Achse nur, wenn die Karte KEIN Leih-Ziel traegt. Ohne Leihe hat
+  // keine Karte ein Leih-Ziel, also ist die Achse zurueck. Ebenso die zweite Haelfte des Tests —
+  // ein Sonderziel tragen ausschliesslich die Gebaeude-Karten. Greift wieder, sobald die Leihe an ist.
+  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("die Angebote tragen die V3-Struktur: Karte, Tilt, Ziel nach Schwierigkeit", { timeout: 300_000 }, () => {
     // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
     // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`). An ihre Stelle treten die zwei
     // Leih-Ziele auf den Gebaeude-Karten — fest bepreist (`goalP = 0`, `goalSize = 6`), OHNE
@@ -103,7 +108,11 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
     }
   });
 
-  it("die Angebotskarte bekommt den V3-Block, den sie anzeigen soll", { timeout: 300_000 }, () => {
+  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test prueft am V3-Block der Karte, dass ein Ziel — wenn
+  // eines da ist — als LEIH-Ziel bepreist ist: Wahrscheinlichkeit 0, kein Vorschuss, fester Bonus.
+  // Ohne Leihe traegt die Karte wieder ein Achsenziel mit geschaetzter Wahrscheinlichkeit, und
+  // genau die 0 stimmt dann nicht mehr. Greift unveraendert wieder, sobald die Leihe an ist.
+  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("die Angebotskarte bekommt den V3-Block, den sie anzeigen soll", { timeout: 300_000 }, () => {
     const gameState = newGameFromButton();
     const teamId = "P-S";
     const offers = gameState.seasonState.sponsorOffersByTeamId?.[teamId] ?? [];

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { buildSponsorV3Terms, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import type { SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
@@ -27,7 +28,11 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     }
   });
 
-  it("waehlt nicht liga-weit dasselbe Gebaeude und dieselbe Kartengroesse — sonst waere die Bewertung blind", () => {
+  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test weist nach, dass die KI-Bewertung nicht blind ist —
+  // und misst das seit dem Achsen-Umbau an GEBÄUDE und Kartengroesse. Ohne Leihe unterschreibt kein
+  // Team mehr ein Gebäude, die Liste der gewaehlten Gebaeude ist leer, und „mehr als eines" laesst
+  // sich an null Werten nicht zeigen. Greift unveraendert wieder, sobald die Leihe an ist.
+  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("waehlt nicht liga-weit dasselbe Gebaeude und dieselbe Kartengroesse — sonst waere die Bewertung blind", () => {
     // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
     // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`) — `terms.axis` ist bei keinem neuen
     // Vertrag mehr gesetzt, die alte Messgroesse dieses Tests ist damit tot. Die Passungsfrage
@@ -50,7 +55,11 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     expect(new Set(gewaehlteGroessen).size, "alle Teams auf derselben Kartengroesse — die Wahl ist blind").toBeGreaterThan(1);
   });
 
-  it("greift bei Geldnot zur Liquiditaet — und seit den Gebaeude-Karten vor allem zur reinen Cash-Karte", () => {
+  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test misst den UNTERSCHIED zwischen klammer und
+  // entspannter Kasse an der Zahl der reinen Cash-Karten. Ohne Leihe ist jede Karte eine reine
+  // Cash-Karte: beide Seiten stehen bei 32, und der Vergleich misst dieselbe Zahl gegen sich
+  // selbst. Die Zusage bleibt unveraendert stehen und greift wieder, sobald die Leihe an ist.
+  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("greift bei Geldnot zur Liquiditaet — und seit den Gebaeude-Karten vor allem zur reinen Cash-Karte", () => {
     // DIESER TEST HAT SEINEN MASSSTAB GEWECHSELT, und der Grund ist eine Aenderung am System, nicht
     // an der KI: bis zu den Gebaeude-Karten war der Vorschuss die EINZIGE Liquiditaetsoption im
     // Slate, also musste er der Massstab sein. Seit E1 gibt es eine zweite und bessere — die reine

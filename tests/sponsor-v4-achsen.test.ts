@@ -18,6 +18,7 @@ import {
 import {
   getSponsorV3SalaryFactor, getSponsorV3Terms, sponsorV3SettlementParts,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { SPONSOR_BODEN, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
 import {
   LEIH_ZIEL_ACHSENRANG,
@@ -172,7 +173,17 @@ describe("Sponsor-Achsen: der Hebel gehoert allen gleich", () => {
  * pruefen) geht dieser Test bewusst ueber `buildSponsorOffersForTeam`: er behauptet nicht, dass die
  * Achsen-Rechnung nicht mehr FUNKTIONIEREN KANN, sondern dass sie am Live-Pfad nicht mehr LAEUFT.
  */
-describe("Sponsor-Achsen: neu erzeugte Angebote tragen keine Achse mehr", () => {
+/**
+ * AM SCHALTER, NICHT AM IST-ZUSTAND — und der Zusammenhang ist hier nicht offensichtlich, deshalb
+ * ausgeschrieben: die Achse verschwindet nicht von sich aus, sondern weil das LEIH-ZIEL ihren Platz
+ * einnimmt. `buildSponsorOffer` setzt sie nur, wenn die Karte kein Leih-Ziel traegt
+ * (`if (input.axisKey && !input.leihZiel)`). Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, hat
+ * keine Karte mehr ein Leih-Ziel — und damit ist die Achse zurueck, genau die, deren Abwesenheit
+ * dieser Block misst. Nicht der Umbau ist zurueckgenommen, es fehlt sein Ausloeser.
+ *
+ * Die Zusage bleibt unveraendert stehen und greift wieder, sobald die Leihe an ist.
+ */
+describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Sponsor-Achsen: neu erzeugte Angebote tragen keine Achse mehr", () => {
   it("keine Karte eines neuen Slates traegt `axis` — Gebaeude-Karten tragen stattdessen ein Leih-Ziel", () => {
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;

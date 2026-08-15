@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import {
@@ -150,7 +151,18 @@ describe("Gebäude-Passung: die Klammer haelt", () => {
   });
 });
 
-describe("Gebäude-Passung am echten Auswahlpfad", () => {
+/**
+ * AM SCHALTER, NICHT AM IST-ZUSTAND. Die Bloecke darueber rechnen die Passungsformel direkt durch
+ * und laufen deshalb weiter. DIESER Block prueft sie am ECHTEN Auswahlpfad: er laesst eine ganze
+ * Liga Angebote erzeugen und die KI unterschreiben. Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS,
+ * enthaelt kein Angebot mehr eine Leihe — die Liga bietet dann null Informationsgebäude an, und ein
+ * Anteil von null gegen null ist keine Messung.
+ *
+ * Die Zusage (Informationsgebäude werden seltener unterschrieben als angeboten) bleibt unveraendert
+ * stehen und greift wieder, sobald die Leihe an ist — samt der Typ-Passung, auf die der
+ * Schalter-Kommentar in sponsor-leih-slate.ts ausdruecklich verweist.
+ */
+describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Gebäude-Passung am echten Auswahlpfad", () => {
   it("Informationsgebäude werden seltener unterschrieben, als sie angeboten werden", () => {
     const basis: GameState = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const nachher = chooseSponsorOfferForAiTeams(basis);
