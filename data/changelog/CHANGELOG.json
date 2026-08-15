@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-14",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Ein negativer Kontostand wird im Saisonstand jetzt rot ausgewiesen. Vorher stand er in derselben gedaempften Farbe wie jede andere Zahl der Finanzspalten — ein Team im Minus war beim Ueberfliegen der Tabelle nicht von einem gesunden zu unterscheiden. Positives Cash bleibt bewusst unausgezeichnet, sonst leuchtet die halbe Spalte und die eine echte Warnung geht darin unter.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-13",
       "seite": "Spielstände",
       "pr": null,
