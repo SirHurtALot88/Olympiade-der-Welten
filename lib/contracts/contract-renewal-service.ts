@@ -26,6 +26,7 @@ import {
 } from "@/lib/morale/ai-contract-dissolution-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-guv-nachbuchung";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import {
   getSeasonEconomyFactorWindow,
@@ -1297,13 +1298,27 @@ function saveGameStateWithContractEvents(
   gameState: GameState,
   persistence: PersistenceService,
 ) {
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, {
-    ...gameState,
-    seasonState: {
-      ...gameState.seasonState,
-      contractEvents: gameState.seasonState.contractEvents ?? [],
-    },
-  });
+  /**
+   * Verlängerung, Auflösung und der Saisonende-Vertragstick ändern Gehälter — und damit die GuV,
+   * die der Finanzen-Reiter aus dem Spielstand liest. Wie im Transfermarkt zieht die gespeicherte
+   * Zeile hier nach, sonst veraltet sie ab der ersten Vertragsentscheidung im Saisonende-Fenster
+   * gegenüber dem live rechnenden Saisonstand (Meldung `1rh8lx`).
+   *
+   * Auch hier am gemeinsamen Schreibpunkt und nicht an den Aufrufern: `applyContractRenewalAction`
+   * (Spieler wie KI) und `applySeasonEndContractTick` laufen beide hier durch. Außerhalb des
+   * Saisonende-Fensters ist der Aufruf ein Nichtstun.
+   */
+  persistGameStateWithMaterializedDerivations(
+    persistence,
+    save.saveId,
+    zieheSaisonstandGuvNachImSaisonendfenster({
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        contractEvents: gameState.seasonState.contractEvents ?? [],
+      },
+    }),
+  );
 }
 
 function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelationshipEventRecord[] {

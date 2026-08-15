@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
+import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-guv-nachbuchung";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTransferMarketPhaseOpen } from "@/lib/market/transfer-window-policy";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
@@ -558,11 +559,25 @@ function computeSeasonTransitionAdvance(
       ? abgeschlosseneSaisonId
       : save.gameState.seasonTransition?.progressionAppliedForSeasonId ?? null,
   };
-  const nextGameState: GameState = {
+  /**
+   * BEIM BETRETEN DER PHASE EINMAL NACHZIEHEN — der dritte Haken zu Meldung `1rh8lx`.
+   *
+   * Die beiden anderen hängen an den Buchungen selbst (Transfermarkt, Verträge). Der hier fängt
+   * ab, was vor ihnen liegt: die Saisonende-Kette bucht Sponsor, Apron und Vorstandsziele NACH
+   * dem Zeitpunkt, an dem `writeLocalCashPrizeApply` die GuV-Zeile schreibt. Wer die Phase betritt
+   * und noch gar nichts getan hat, sähe im Finanzen-Reiter sonst weiterhin die eingefrorene
+   * Hochrechnung — ohne dass eine Buchung den Nachzieher je ausgelöst hätte.
+   *
+   * Der Aufruf hängt am Phasenwechsel und nicht am Lesen, weil die Ableitung teuer ist (siehe die
+   * Messungen in `season-guv-nachbuchung.ts`). Er ist idempotent und außerhalb des
+   * Saisonende-Fensters ein Nichtstun — die Prüfung sitzt in der Funktion, nicht hier, damit es
+   * nur EINE Stelle gibt, die entscheidet, was „Saisonende-Fenster" heißt.
+   */
+  const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({
     ...progressionSave.gameState,
     gamePhase: nextPhase,
     seasonTransition: transition,
-  };
+  });
 
   return { status: "advanced", appliedStep: currentStep, nextGameState, transition };
 }

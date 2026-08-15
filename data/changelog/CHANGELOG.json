@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-15",
+      "seite": "Teams",
+      "pr": null,
+      "text": "Die Spieler-Portraits laden nicht mehr bei jedem Deploy von vorn. Die verkleinerten Bilder landen unter `.cache/media-thumbs` — und genau dafür gab es kein Docker-Volume, der Ordner lag also IM Container. Der Auto-Deploy baut bei jedem Push einen neuen, damit war der ganze Bestand jedes Mal weg, und die nächste Teamseite musste jedes Portrait neu dekodieren und verkleinern, gedrosselt auf vier gleichzeitig. Gemessen an 14 Portraits einer Teamseite: 421 ms kalt gegen 4,3 ms warm, also Faktor 98 — und das seriell, vor der Drosselung. Derselbe Fehler hatte schon einmal die Bug-Meldungen erwischt, nur mit Datenverlust statt Wartezeit als Folge. Nebenbei repariert: schlug das Ablegen im Cache fehl, wurde das UNVERKLEINERTE Original ausgeliefert — Megabytes statt Kilobytes, also das Gegenteil des Gewollten. Jetzt hängt nur der Cache daran, nicht die Antwort.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-14",
       "seite": "Spieltag · Saisonstand",
       "pr": null,

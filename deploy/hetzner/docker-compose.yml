@@ -36,6 +36,13 @@ services:
       # main einen neuen Container. Jede auf dem Live-Server gemeldete Sache war damit beim naechsten
       # Deploy geloescht, ohne Spur und ohne Fehlermeldung.
       - oly-bug-reports:/app/data/bug-reports
+      # Verkleinerte Portraits/Logos. Dieselbe Falle wie eine Zeile darueber, nur mit
+      # Geschwindigkeit statt Datenverlust als Folge: ohne Volume lag der Thumbnail-Bestand IM
+      # Container, und der Auto-Deploy warf ihn bei jedem Push auf main weg. Danach musste jede
+      # Teamseite ihre Portraits neu dekodieren und verkleinern — gedrosselt auf vier gleichzeitig.
+      # Der Inhalt ist reiner Cache (ableitbar aus den Quellbildern), das Volume darf also jederzeit
+      # geloescht werden; es kostet dann nur einmalig die Neuberechnung.
+      - oly-media-cache:/app/.cache/media-thumbs
       - /opt/oly-media:/app/media/dropbox:ro
     expose:
       - "3000"
@@ -83,6 +90,7 @@ services:
 volumes:
   oly-data:
   oly-bug-reports:
+  oly-media-cache:
   lec-data:
   caddy-data:
   caddy-config:

@@ -2625,6 +2625,30 @@ export function buildPlayerDrawerDataFromGameState(input: {
   const revealExactOwnedPotential =
     DEBUG_FORCE_PLAYER_VISIBILITY ||
     (attributeVisibility === "exact" ? ownedPotentialRevealsExact(facilityScoutingLevel) : true);
+  /**
+   * DER NETTO-FORECAST DES PROFILS IST DERSELBE WIE IN DER TRAININGSLISTE.
+   *
+   * GEMELDET VON CHRIS: „Das was als Netto/Saison hier steht muss gleich sein mit dem forecast der
+   * im spielerprofil drin steht - bitte prüfen was korrekt ist und nur eine Zahl ausweisen!"
+   *
+   * BEIDE SEITEN RIEFEN DIESELBE ENGINE — mit verschiedenen Eingaben. Die Trainingsliste
+   * (`use-foundation-cross-tab-training.ts`) reicht zwei Dinge mit, die hier fehlten:
+   *
+   *  1. `route` — die saisonale Entwicklungsroute, damit der Signature-Shift real wirkt.
+   *  2. `buildProjectedSeasonTrainingAccumulatorOverrides` — der Anti-Cheese-Blend aus Audit #6:
+   *     die BEREITS GELAUFENEN Spieltage zaehlen mit ihrem tatsaechlich gelockten Modus, nur die
+   *     Rest-Spieltage mit dem aktuell gewaehlten. Ohne ihn rechnet die Engine „ganze Saison in
+   *     diesem Modus" — eine Zahl, die ab Spieltag 2 niemand mehr erreichen kann.
+   *
+   * Am Live-Abbild gemessen, und die Verteilung beweist die Ursache: an Spieltag 1
+   * (`n90y4m`) weicht KEIN EINZIGER von 335 Spielern ab — da gibt es noch keine gelaufenen
+   * Spieltage, also nichts zu mischen. An Spieltag 4 (`h0z7cl`) sind es 336 von 337 (im Mittel
+   * 2,44 SP, bis 8,2), an Spieltag 10 im gemeldeten Save 278 von 336 (0,67 SP, bis 3,8). Die
+   * Abweichung waechst also genau mit der Zahl der gelaufenen Spieltage.
+   *
+   * DIE LISTE IST DIE RICHTIGE, nicht das Profil: sie zeigt den real erreichbaren Saisonende-Wert.
+   * Deshalb zieht das Profil hier nach — eine Groesse, eine Zahl, eine Quelle.
+   */
   const seasonOrganicForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
       ? buildOrganicSeasonProgression({
@@ -2635,28 +2659,33 @@ export function buildPlayerDrawerDataFromGameState(input: {
            * DIESE ZWEI ARGUMENTE FEHLTEN — und daran hingen zwei verschiedene Zahlen fuer
            * dieselbe Sache.
            *
-           * GEMELDET VON CHRIS (Ticket #40): „Das was als Netto/Saison hier steht muss gleich
-           * sein mit dem forecast der im spielerprofil drin steht — bitte prüfen was korrekt ist
-           * und nur eine Zahl ausweisen."
+           * GEMELDET VON CHRIS (Ticket #40 / `dcut58`): „Das was als Netto/Saison hier steht muss
+           * gleich sein mit dem forecast der im spielerprofil drin steht — bitte prüfen was
+           * korrekt ist und nur eine Zahl ausweisen."
            *
            * Ohne den Accumulator-Override faellt die Rechnung auf
            * `TRAINING_SETPOINTS_BY_MODE[trainingMode]` zurueck und unterstellt „ganze Saison im
            * HEUTIGEN Modus" — statt der real gespielten Modus-Historie. Genau das Loch, gegen das
-           * der Override gebaut wurde (Anti-Cheese, Audit #6). Gemessen am Live-Spielstand trennte
-           * das bis zu 2,2 SP fuer denselben Spieler (Kaela Stormshield: Profil 3,1, Trainingsseite
-           * 5,3).
+           * der Override gebaut wurde (Anti-Cheese, Audit #6).
            *
            * MASSSTAB IST DER SAISONENDE-APPLY, denn der bucht wirklich:
-           * `season-end-xp-apply-service.ts:322` ruft dieselbe Funktion mit genau diesen beiden
+           * `season-end-xp-apply-service.ts` ruft dieselbe Funktion mit genau diesen beiden
            * Argumenten. Die Trainingsseite tat es schon, das Profil nicht — deshalb zieht das
            * Profil nach und nicht umgekehrt.
+           *
+           * ZWEI UNABHAENGIGE MESSUNGEN, beide hier festgehalten, weil sie sich stuetzen: einzeln
+           * bis 2,2 SP fuer denselben Spieler (Kaela Stormshield: Profil 3,1, Trainingsseite 5,3);
+           * ueber fuenf Live-Spielstaende verteilt sich die Abweichung genau nach der Zahl der
+           * GELAUFENEN Spieltage — an Spieltag 1 keiner von 335, an Spieltag 4 dagegen 336 von
+           * 337 (bis 8,2 SP). Das schliesst jede andere Erklaerung aus.
            */
-          route: progressionForecast.developmentRoute,
+          route: progressionForecast?.developmentRoute ?? null,
           ...buildProjectedSeasonTrainingAccumulatorOverrides({
             gameState: input.gameState,
             player,
-            // Ohne gesetzten Modus derselbe Ersatz wie ueberall sonst im Trainingspfad: „mittel"
-            // ist der Standardmodus, nicht geraten.
+            // Derselbe Rueckfall wie in der Trainingsliste (`player.trainingMode ?? "mittel"`) —
+            // ein anderer Standard hier waere genau die naechste Abweichung. Den Entwurfsmodus
+            // aus der Liste kennt das Profil nicht; es zeigt den gespeicherten Stand.
             draftMode: player.trainingMode ?? "mittel",
           }),
         })

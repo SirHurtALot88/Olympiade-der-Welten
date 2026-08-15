@@ -20,6 +20,7 @@ import {
 import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyTeamPowerOption } from "@/lib/lineups/legacy-lineup-types";
 import {
   calculateLocalLegacyLineupPreviewFromContext,
+  loadLocalLegacyLineupBatchPrecheckFromGameState,
   loadLocalLegacyLineupContextFromGameState,
   saveLocalLegacyLineupDraftBatch,
 } from "@/lib/lineups/legacy-lineup-local-service";
@@ -1803,6 +1804,19 @@ export function applyAiLegacyLineupBatchLocally(
 	    persistence.saveSingleplayerState(scope.saveId, preparedGameState);
 	  }
 
+  // Perf: Spielplan und Sollbesetzung des Spieltags haengen nicht am Team — sie werden hier EINMAL
+  // bestimmt, statt sie ueber `loadLocalLegacyLineupContextFromGameState` fuer JEDES Team erneut
+  // (und mitsamt Kader, Verfuegbarkeiten, Formkarten, Team-Powers, Manager-Doktrin) aufzubauen.
+  // Damit laesst sich pro Team billig entscheiden, ob ueberhaupt Arbeit ansteht, BEVOR der teure
+  // Kontext geladen wird — s. `loadLocalLegacyLineupBatchPrecheckFromGameState` fuer die Herleitung
+  // (Meldung Chris: 2,25s Batch-Laufzeit, obwohl an 32 bereits vollstaendig aufgestellten Teams
+  // nichts zu tun war).
+  const batchPrecheck = loadLocalLegacyLineupBatchPrecheckFromGameState(preparedGameState, {
+    saveId: scope.saveId,
+    seasonId: scope.seasonId,
+    matchdayId: scope.matchdayId,
+  });
+
   for (const team of scope.teams) {
     const params: LegacyLineupKeyParams = {
       saveId: scope.saveId,
@@ -1810,6 +1824,141 @@ export function applyAiLegacyLineupBatchLocally(
       matchdayId: scope.matchdayId,
       teamId: team.teamId,
     };
+
+    // Billiger Ausstieg VOR dem vollen Kontextaufbau. Nur erreichbar, wenn die Vorpruefung
+    // sicher weiss, dass der volle Kontextaufbau `ok: true` liefern wuerde (`hasTeamAndIdentity`)
+    // — sonst faellt dieses Team unten auf den vollen, fehlertragenden Pfad zurueck, der die
+    // richtige `skipped_blocked`-Fehlermeldung liefert. Die Bedingungen und ihre REIHENFOLGE
+    // spiegeln exakt den vollen Pfad weiter unten (manual -> passive -> vorhandener frischer
+    // Entwurf -> disabled) — nur mit billigen statt vollen Daten. Bleibt hier keine der
+    // Kurzschluss-Bedingungen stehen, faellt das Team ganz regulaer auf den vollen Kontextaufbau
+    // durch (unveraendertes Verhalten).
+    if (batchPrecheck.ok && batchPrecheck.hasTeamAndIdentity(team.teamId)) {
+      const cheapExistingDraft = batchPrecheck.getExistingDraft(team.teamId);
+      const cheapHasCompleteExistingDraft = isLegacyLineupDraftComplete({
+        existingDraft: cheapExistingDraft,
+        contextMeta: {
+          ...params,
+          d1DisciplineId: batchPrecheck.d1DisciplineId,
+          d2DisciplineId: batchPrecheck.d2DisciplineId,
+        },
+        disciplineSidePlayerCounts: batchPrecheck.disciplineSidePlayerCounts,
+        disciplinePlayerCounts: batchPrecheck.disciplinePlayerCounts,
+      } as unknown as LegacyLineupLoadedContext);
+      const cheapCanAutoFillIncompleteLineup = !cheapHasCompleteExistingDraft;
+
+      if (team.controlMode === "manual") {
+        results.push({
+          teamId: team.teamId,
+          teamCode: team.teamCode,
+          teamName: team.teamName,
+          controlMode: team.controlMode,
+          aiEligible: false,
+          previewStatus: "blocked",
+          captainSlotsUsed: null,
+          captainSlotsRemaining: null,
+          d1CaptainSelectionStatus: null,
+          d2CaptainSelectionStatus: null,
+          captainDecisions: [],
+          result: "skipped_manual",
+          overwriteExisting: false,
+          warnings: [],
+          blockingReasons: [],
+          saved: false,
+        });
+        continue;
+      }
+
+      if (team.controlMode === "passive" && !cheapCanAutoFillIncompleteLineup) {
+        results.push({
+          teamId: team.teamId,
+          teamCode: team.teamCode,
+          teamName: team.teamName,
+          controlMode: team.controlMode,
+          aiEligible: false,
+          previewStatus: "blocked",
+          captainSlotsUsed: null,
+          captainSlotsRemaining: null,
+          d1CaptainSelectionStatus: null,
+          d2CaptainSelectionStatus: null,
+          captainDecisions: [],
+          result: "skipped_passive",
+          overwriteExisting: false,
+          warnings: [],
+          blockingReasons: [],
+          saved: false,
+        });
+        continue;
+      }
+
+      const cheapStaleFindingCount = cheapHasCompleteExistingDraft
+        ? findStaleAiLineupEntries({
+            entryPlayerIds: (cheapExistingDraft?.entries ?? []).map((entry) => entry.playerId),
+            rosterPlayers: batchPrecheck.getFreshnessRosterPlayers(
+              team.teamId,
+              (cheapExistingDraft?.entries ?? []).map((entry) => entry.playerId),
+            ),
+            // `getFreshnessRosterPlayers` liefert bewusst NUR die aufgestellten Spieler, nicht den
+            // vollen Kader — die Schoner-Schwelle braucht die ECHTE Kadergroesse trotzdem, sonst
+            // verschaerft sich die Schwelle an einem scheinbar duennen "Kader" aus nur 7 Spielern.
+            rosterSize: batchPrecheck.getActiveRosterSize(team.teamId),
+          }).length
+        : 0;
+
+      if (
+        shouldSkipExistingAiDraft({
+          hasCompleteExistingDraft: cheapHasCompleteExistingDraft,
+          overwriteExisting,
+          staleFindingCount: cheapStaleFindingCount,
+        })
+      ) {
+        results.push({
+          teamId: team.teamId,
+          teamCode: team.teamCode,
+          teamName: team.teamName,
+          controlMode: team.controlMode,
+          aiEligible: team.aiEligible,
+          previewStatus: "blocked",
+          captainSlotsUsed: null,
+          captainSlotsRemaining: null,
+          d1CaptainSelectionStatus: null,
+          d2CaptainSelectionStatus: null,
+          captainDecisions: [],
+          result: "skipped_existing",
+          overwriteExisting: true,
+          warnings: [],
+          blockingReasons: ["existing_lineup_requires_overwrite_confirm"],
+          saved: false,
+        });
+        continue;
+      }
+
+      if (!team.aiEligible && team.controlMode === "ai" && !cheapCanAutoFillIncompleteLineup) {
+        results.push({
+          teamId: team.teamId,
+          teamCode: team.teamCode,
+          teamName: team.teamName,
+          controlMode: team.controlMode,
+          aiEligible: false,
+          previewStatus: "blocked",
+          captainSlotsUsed: null,
+          captainSlotsRemaining: null,
+          d1CaptainSelectionStatus: null,
+          d2CaptainSelectionStatus: null,
+          captainDecisions: [],
+          result: "skipped_disabled",
+          overwriteExisting: false,
+          warnings: [],
+          blockingReasons: ["ai_lineup_apply_disabled"],
+          saved: false,
+        });
+        continue;
+      }
+      // Keiner der billigen Kurzschluesse griff: dieses Team braucht tatsaechlich Arbeit
+      // (Entwurf fehlt/unvollstaendig/veraltet oder `overwriteExisting`) — weiter unten mit dem
+      // vollen Kontext, wie zuvor.
+    }
+
     const contextStartedAt = performance.now();
     const contextResult = loadLocalLegacyLineupContextFromGameState(preparedGameState, params);
     performanceBreakdown.contextLoadMs += elapsedSince(contextStartedAt);
