@@ -6,7 +6,8 @@ import {
   mapRoomDisciplineSideToFoundationPhase,
   type FoundationArenaRevealState,
 } from "@/lib/foundation/matchday-arena-reveal-sync";
-import type { OlyRoomState, RoomArenaPhaseId, RoomArenaState } from "@/types/game";
+import { ARENA_STEP_DURATION_MS } from "@/lib/foundation/discipline-stage/arena-timeline";
+import type { OlyRoomState, RoomArenaDisciplineSide, RoomArenaPhaseId, RoomArenaState } from "@/types/game";
 
 export const ROOM_ARENA_PHASES: RoomArenaPhaseId[] = [
   "slots",
@@ -59,6 +60,13 @@ export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
     phaseId: state.phaseId ?? getFoundationArenaDisplayPhase(state.phaseIndex < 0 ? 0 : state.phaseIndex),
     slotRevealIndex: revealedSlotCountByDiscipline[activeSide],
     maxSlotRevealIndex: Math.max(maxCounts.d1, maxCounts.d2),
+    // Rueckfall fuer Alt-States vor Stufe 3.3 (kein `stepStartedAt`/`stepDurationMs` gespeichert):
+    // `updatedAt` ist die naechstbeste bekannte Server-Zeit, `ARENA_STEP_DURATION_MS` der bereits
+    // produktiv genutzte Wert (`TRACK_ROUND_MS`) — keine neu erfundene Zahl.
+    stepStartedAt: state.stepStartedAt ?? state.updatedAt,
+    stepDurationMs: state.stepDurationMs ?? ARENA_STEP_DURATION_MS,
+    paused: state.paused ?? false,
+    pausedBy: state.pausedBy ?? null,
   };
 }
 
@@ -114,6 +122,10 @@ export function createRoomArenaState(input: {
     completedDisciplinePhases: { d1: false, d2: false },
     maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
     stepIndex: 0,
+    stepStartedAt: now,
+    stepDurationMs: ARENA_STEP_DURATION_MS,
+    paused: false,
+    pausedBy: null,
     requiredParticipantIds: input.requiredParticipantIds ?? [],
     readyParticipantIds: [],
     autoReadyControllerTypes: ["ai", "passive"],
@@ -206,6 +218,12 @@ export function startRoomArena(input: {
     completedDisciplinePhases: { d1: false, d2: false },
     maxSlotRevealCountByDiscipline: maxCounts,
     stepIndex: 0,
+    // Start ist der Nullpunkt der gemeinsamen Zeitbasis (Stufe 3.3): ab hier zaehlen beide Seiten
+    // dieselbe Server-Zeit als Schrittbeginn.
+    stepStartedAt: now,
+    stepDurationMs: ARENA_STEP_DURATION_MS,
+    paused: false,
+    pausedBy: null,
     requiredParticipantIds,
     readyParticipantIds: [],
     autoReadyControllerTypes: ["ai", "passive"],
@@ -269,6 +287,10 @@ export function advanceRoomArenaReveal(input: {
     },
     maxSlotRevealIndex: Math.max(limits.maxD1SlotRevealCount, limits.maxD2SlotRevealCount),
     stepIndex: arenaState.stepIndex + 1,
+    // Jedes Weiterschalten oeffnet einen NEUEN Schritt-Zeitraum (Stufe 3.3): der Zeitpunkt hier
+    // ist der Nullpunkt, ab dem BEIDE Seiten "verstrichene Zeit" fuer diesen Schritt messen.
+    stepStartedAt: input.now ?? new Date().toISOString(),
+    stepDurationMs: arenaState.stepDurationMs,
     readyParticipantIds: phaseId === "result" ? arenaState.readyParticipantIds : [],
     version: arenaState.version + 1,
     lastActionByParticipantId: input.participantId,
@@ -300,4 +322,118 @@ export function applyFoundationRevealToRoomArenaState(
     },
     maxSlotRevealIndex: Math.max(limits.maxD1SlotRevealCount, limits.maxD2SlotRevealCount),
   });
+}
+
+/**
+ * PAUSE/WEITER ALS RAUM-ZUSTAND (Stufe 3.6): bislang war das rein lokal (`pauseRef`/
+ * `manualPauseRef` in `DisciplineStageNativeArena.tsx`) — der Gast bemerkte eine Host-Pause nur
+ * indirekt daran, dass keine neuen Schritte mehr eintrafen, nie explizit als eigenen Zustand.
+ * Diese Funktion macht "der Host hat pausiert" zu einem Feld, das der Gast direkt lesen kann
+ * (`RoomArenaState.paused`), statt es aus dem Ausbleiben von Updates zu erschliessen.
+ *
+ * Kein Versions-Sprung bei unveraendertem Wert (z.B. doppeltes Event) — sonst wuerde jeder
+ * No-op-Toggle einen Broadcast ohne inhaltliche Aenderung ausloesen.
+ */
+export function setRoomArenaPaused(input: {
+  arenaState: RoomArenaState;
+  participantId: string;
+  paused: boolean;
+  now?: string;
+}): RoomArenaState {
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  if (arenaState.paused === input.paused) {
+    return arenaState;
+  }
+  const now = input.now ?? new Date().toISOString();
+  return normalizeRoomArenaState({
+    ...arenaState,
+    paused: input.paused,
+    pausedBy: input.paused ? input.participantId : null,
+    version: arenaState.version + 1,
+    lastActionByParticipantId: input.participantId,
+    updatedAt: now,
+  });
+}
+
+/**
+ * "↻ NEU" ALS RAUM-AKTION (Stufe 3.6): der Reset-Knopf in `DisciplineStageNativeArena.tsx` wirkte
+ * bisher nur auf die lokale Kaskade des Kliekenden — ein Gast, der die Etappe schon weiter
+ * gesehen hatte, stand danach auf einer Etappe, die es fuer den Host nicht mehr gibt (Befund-Punkt
+ * 4: "Kein Rueckwaerts").
+ *
+ * Setzt NUR die AKTIVE Seite zurueck (d1 ODER d2, je nachdem, welche Seite gerade laeuft) — genau
+ * wie der lokale Reset in der Komponente nur die dort gerade gezeigte Disziplin zuruecksetzt, nicht
+ * eine laengst gewertete andere Seite. `stepIndex` waechst dabei WEITER (monoton, Stufe 3.2) — ein
+ * Reset ist selbst ein Schritt wie jeder andere, nur mit einem "rueckwaerts" zeigenden Ziel; die
+ * Monotonie von `stepIndex` beschreibt Reihenfolge/Frische der Uebertragung (wie `version`), nicht
+ * die Richtung der ANGEZEIGTEN Etappe.
+ */
+export function resetRoomArenaReveal(input: {
+  arenaState: RoomArenaState;
+  participantId: string;
+  now?: string;
+}): RoomArenaState {
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  const now = input.now ?? new Date().toISOString();
+  const side: RoomArenaDisciplineSide = arenaState.activeDisciplinePhase === "d2" ? "d2" : "d1";
+
+  return normalizeRoomArenaState({
+    ...arenaState,
+    status: "revealing",
+    phaseId: "slots",
+    phaseIndex: 0,
+    revealedSlotCountByDiscipline: { ...arenaState.revealedSlotCountByDiscipline, [side]: 0 },
+    completedDisciplinePhases: { ...arenaState.completedDisciplinePhases, [side]: false },
+    slotRevealIndex: 0,
+    stepIndex: arenaState.stepIndex + 1,
+    stepStartedAt: now,
+    stepDurationMs: ARENA_STEP_DURATION_MS,
+    paused: false,
+    pausedBy: null,
+    version: arenaState.version + 1,
+    lastActionByParticipantId: input.participantId,
+    updatedAt: now,
+    callout: null,
+  });
+}
+
+/**
+ * QUICK-SIM ALS RAUM-AKTION (Stufe 3.6): der "⏩"-Knopf in `DisciplineStageNativeArena.tsx`
+ * springt lokal sofort auf den Endstand DER GERADE GEZEIGTEN Disziplinseite — dieselbe Grenze gilt
+ * hier: die Schleife haelt an, sobald `activeDisciplinePhase` die Seite verlaesst, auf der sie
+ * begann (die naechste Seite/das Gesamtergebnis ist NICHT Teil dieses Quick-Sims, genau wie lokal).
+ *
+ * Iteriert ueber das bereits vorhandene `advanceRoomArenaReveal` (keine zweite Rechenstelle fuer
+ * "wie geht ein Schritt weiter") statt den Zielzustand selbst zu konstruieren. Der Deckel gegen
+ * Endlosschleifen ist keine erfundene Zahl, sondern die Summe der real vorhandenen Obergrenzen
+ * (Etappen beider Seiten + Laenge der Phasenkette).
+ */
+export function quickSimRoomArenaReveal(input: {
+  arenaState: RoomArenaState;
+  participantId: string;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
+  now?: string;
+}): RoomArenaState {
+  const now = input.now ?? new Date().toISOString();
+  let state = normalizeRoomArenaState(input.arenaState);
+  const startSide = state.activeDisciplinePhase === "d2" ? "d2" : "d1";
+  const maxCounts = input.maxSlotRevealCountByDiscipline ?? state.maxSlotRevealCountByDiscipline;
+  const guardLimit = Math.max(1, maxCounts.d1) + Math.max(1, maxCounts.d2) + ROOM_ARENA_PHASES.length + 2;
+
+  for (let i = 0; i < guardLimit; i += 1) {
+    if (state.activeDisciplinePhase !== startSide) {
+      break;
+    }
+    const next = advanceRoomArenaReveal({
+      arenaState: state,
+      participantId: input.participantId,
+      maxSlotRevealCountByDiscipline: maxCounts,
+      now,
+    });
+    if (next.version === state.version) {
+      break; // kein Fortschritt mehr moeglich (Endzustand dieser Seite erreicht)
+    }
+    state = next;
+  }
+  return state;
 }

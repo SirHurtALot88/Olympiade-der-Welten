@@ -145,6 +145,28 @@ export type RoomArenaState = {
   completedDisciplinePhases: Record<RoomArenaDisciplineSide, boolean>;
   maxSlotRevealCountByDiscipline: Record<RoomArenaDisciplineSide, number>;
   stepIndex: number;
+  /**
+   * Gemeinsame Zeitbasis (Befund B4, Stufe 3.3): Server-Zeitpunkt (ISO), zu dem der AKTUELLE
+   * Schritt (`stepIndex`) begann — gesetzt bei jedem Weiterschalten/Start/Reset. Ohne dieses Feld
+   * kannte `RoomArenaState` nur `updatedAt` ("wann kam die letzte Aenderung an"), nicht "wann
+   * begann dieser Schritt fuer alle gleichermassen" — zwei Clients mit unterschiedlicher
+   * Systemuhr rechneten deshalb ab ihrem eigenen Empfangszeitpunkt statt ab einem gemeinsamen
+   * Nullpunkt. Siehe `lib/foundation/discipline-stage/arena-timeline.ts` (`resolveArenaDisplayState`).
+   */
+  stepStartedAt: string;
+  /**
+   * Geplante Dauer des aktuellen Schritts in ms — zusammen mit `stepStartedAt` die Grundlage fuer
+   * "verstrichene Zeit seit Schrittbeginn" auf JEDEM Client gleich (Stufe 3.3/3.4).
+   */
+  stepDurationMs: number;
+  /**
+   * Pause/Weiter als geteilter Zustand (Stufe 3.6): pausiert der Host, gilt das fuer beide Seiten
+   * (vorher rein lokal in `manualPauseRef`/`pauseRef` der Komponente — der Gast bemerkte eine
+   * Host-Pause nur indirekt daran, dass keine neuen Schritte mehr kamen, nie explizit als Zustand).
+   */
+  paused: boolean;
+  /** Wer zuletzt pausiert/fortgesetzt hat (`null`, solange nicht pausiert). */
+  pausedBy: string | null;
   requiredParticipantIds: string[];
   readyParticipantIds: string[];
   autoReadyControllerTypes: TeamControllerType[];
