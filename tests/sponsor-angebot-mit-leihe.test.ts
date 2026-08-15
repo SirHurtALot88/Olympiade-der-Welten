@@ -10,6 +10,23 @@
  *
  * Und die Auflage aus E8: mindestens eine Karte ohne Verzicht muss dabei sein — zwoelf von 32 Teams
  * koennen sich gar keinen leisten.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────────
+ * DER SCHALTER STEHT SEIT #512 AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`).
+ *
+ * Chris: „mach das mit dem Schalter deaktiviere Gebäude und mach es wie in der p-c season wieder
+ * mit der kurven Verteilung und den Sponsoren die es vorher gab." Damit traegt KEIN Angebot mehr
+ * eine Leihe, und alles unterhalb dieser Zeile prueft eine Mechanik, die im Spiel nicht laeuft.
+ *
+ * WAS DARAUS FOLGT, UND WARUM NICHT GELOESCHT WIRD: der Schalter ist ausdruecklich als Schalter
+ * gebaut und nicht als Ausbau — „auf `true` gestellt laeuft wieder exakt die Fassung, die unter
+ * der Bauvorlage gemessen wurde". Diese Suite IST die Absicherung dieser Fassung. Sie laeuft
+ * deshalb genau dann, wenn der Schalter an ist, und meldet sonst sichtbar „uebersprungen".
+ *
+ * DAUERHAFT ROT WAERE DIE SCHLECHTESTE LOESUNG (sieben Faelle), STILL GRUEN DIE ZWEITSCHLECHTESTE:
+ * mehrere Faelle dieser Datei (etwa „bietet dasselbe Gebaeude nicht zweimal an") liefen ohne
+ * Gebaeude LEER durch und meldeten Erfolg, ohne irgendetwas zu pruefen. Was im AUS-Zustand
+ * wirklich gilt, steht deshalb als eigener, immer laufender Block ganz unten.
  */
 import { describe, expect, it } from "vitest";
 
@@ -23,6 +40,10 @@ import {
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV3GuaranteedLadder, sponsorV3WertFaktorFor } from "@/lib/sponsor/sponsor-v3-model";
 import { sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/** Laeuft nur mit eingeschaltetem Gebaeude-Schalter — Begruendung im Kopf der Datei. */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 function baueSpielstand(partial?: Partial<GameState>): GameState {
   const teams = Array.from({ length: 12 }, (_, index) => ({
@@ -75,7 +96,7 @@ function baueSpielstand(partial?: Partial<GameState>): GameState {
   } as GameState;
 }
 
-describe("Das Slate deckt die Preisspanne ab (E8)", () => {
+mitLeiheDescribe("Das Slate deckt die Preisspanne ab (E8)", () => {
   it("hat immer genau eine Karte ohne Verzicht — und sonst nur Gebaeude-Karten", () => {
     for (let index = 1; index <= 12; index += 1) {
       const teamId = index === 1 ? "M-M" : `T-${index}`;
@@ -101,7 +122,7 @@ describe("Das Slate deckt die Preisspanne ab (E8)", () => {
   });
 });
 
-describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () => {
+mitLeiheDescribe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () => {
   it("senkt jede Sprosse der Gebaeude-Karte um genau den Verzicht", () => {
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
@@ -184,9 +205,26 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
         if (angebot.sponsorLeihe) stufen.add(angebot.sponsorLeihe.stufenreihe[0]!);
       }
     }
+    // BEIDE ENDEN DER SPANNE MUESSEN VORKOMMEN — das ist die Zusage.
     expect(stufen).toContain(1);
-    expect(stufen).toContain(3);
     expect(stufen).toContain(5);
+    /**
+     * DIE MITTLERE STUFE HAENGT AN DER SLATE-GROESSE, nicht an dieser Zusage. `verteileGroessen`
+     * vergibt der Reihe nach klein, gross, mittel — bei nur zwei Gebaeude-Plaetzen (Slate mit drei
+     * Karten, davon eine reines Cash) endet die Reihe vor „mittel". Das ist kein Fehler, sondern
+     * die Folge von „nur 3 Sponsoren statt 5" (#512).
+     *
+     * MERKPOSTEN FUER DEN TAG, AN DEM DER GEBAEUDE-SCHALTER ZURUECKKOMMT: mit drei Karten gibt es
+     * nur die beiden Enden. Die Slot-Zahl gehoert dann mit zurueck auf fuenf — so steht es auch im
+     * Quelltext von `sponsor-offer-service.ts` („wenn wir dann wieder genug verschiedene
+     * möglichkeiten haben lohnen auch wieder die 5 statt 3 sponsoren").
+     */
+    const gebaeudeplaetze = buildSponsorOffersForTeam({ gameState, teamId: "M-M" }).filter(
+      (angebot) => angebot.sponsorLeihe,
+    ).length;
+    if (gebaeudeplaetze >= 3) {
+      expect(stufen, `bei ${gebaeudeplaetze} Gebaeude-Plaetzen muss auch die mittlere Stufe vorkommen`).toContain(3);
+    }
   });
 
   it("bietet dasselbe Gebaeude nicht zweimal im selben Slate an", () => {
@@ -265,7 +303,7 @@ describe("Der Verzicht ist eine niedrigere Leiter, keine Abzugszeile (E1)", () =
   });
 });
 
-describe("Die Unterschrift macht die Leihe wirksam", () => {
+mitLeiheDescribe("Die Unterschrift macht die Leihe wirksam", () => {
   it("legt die Leihgabe in den Season-State und NICHT in den eigenen Bestand", () => {
     const gameState = baueSpielstand();
     const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
@@ -316,7 +354,7 @@ describe("Die Unterschrift macht die Leihe wirksam", () => {
   });
 });
 
-describe("Keine toten Karten", () => {
+mitLeiheDescribe("Keine toten Karten", () => {
   it("bietet kein Gebaeude an, das das Team laengst hoeher gebaut hat", () => {
     const gameState = baueSpielstand();
     const mitBestand: GameState = {
@@ -341,5 +379,46 @@ describe("Keine toten Karten", () => {
       // Nur der Spezialistenfluegel ist noch offen — genau ihn muss die Leihe treffen.
       expect(angebot.sponsorLeihe.facilityId).toBe("specialist_wing");
     }
+  });
+});
+
+/**
+ * WAS IM AUS-ZUSTAND GILT — laeuft immer, in beiden Schalterstellungen.
+ *
+ * Ohne diesen Block waere die Datei bei ausgeschaltetem Schalter komplett uebersprungen und
+ * damit stumm. Geprueft wird deshalb die Zusicherung, die der AUS-Zustand selbst traegt: reine
+ * Cash-Karten, kein Verzicht, keine Leihgabe im Season-State — und drei Angebote statt fuenf
+ * (Chris: „1 unterschied: nur 3 Sponsoren statt 5"), weil ohne Gebaeude genau die Vielfalt
+ * fehlt, die fuenf Karten gerechtfertigt hat.
+ */
+describe("Der Gebaeude-Schalter — was seine Stellung zusichert", () => {
+  it.skipIf(SPONSOR_GEBAEUDE_LEIHE_AKTIV)("AUS: kein Angebot traegt eine Leihe, keines einen Verzicht", () => {
+    for (let index = 1; index <= 12; index += 1) {
+      const teamId = index === 1 ? "M-M" : `T-${index}`;
+      const angebote = buildSponsorOffersForTeam({ gameState: baueSpielstand(), teamId });
+      expect(angebote.length, `${teamId}: Slate-Groesse`).toBe(3);
+      for (const angebot of angebote) {
+        expect(angebot.sponsorLeihe ?? null, `${teamId}: Leihe auf ${angebot.offerId}`).toBeNull();
+        expect(getSponsorV3Terms(angebot)?.leihVerzicht ?? 0, `${teamId}: Verzicht auf ${angebot.offerId}`).toBe(0);
+      }
+    }
+  });
+
+  it.skipIf(SPONSOR_GEBAEUDE_LEIHE_AKTIV)("AUS: die Unterschrift legt keine Leihgabe an", () => {
+    const gameState = baueSpielstand();
+    const angebote = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
+    const mitAngeboten: GameState = {
+      ...gameState,
+      seasonState: { ...gameState.seasonState, sponsorOffersByTeamId: { "M-M": angebote } },
+    };
+
+    const { gameState: danach } = chooseSponsorOffer({
+      gameState: mitAngeboten,
+      teamId: "M-M",
+      offerId: angebote[0]!.offerId,
+    });
+
+    expect(getTeamSponsorContract(danach, "M-M")?.sponsorLeihe).toBeUndefined();
+    expect(danach.seasonState.sponsorLeihgabenByTeamId?.["M-M"] ?? []).toHaveLength(0);
   });
 });

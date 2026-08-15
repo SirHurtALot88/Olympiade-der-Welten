@@ -34,17 +34,35 @@ import {
   sponsorV3WertFaktorFuerKarte,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 
-/** Alle Angebote eines frisch erzeugten Spielstands — 32 Teams x 5 Karten. */
+/**
+ * Alle Angebote eines frisch erzeugten Spielstands — 32 Teams x der Slate-Groesse.
+ *
+ * DIE ERWARTETE MENGE WIRD GERECHNET, NICHT FESTGENAGELT. Vorher stand hier dreimal
+ * `toBeGreaterThan(100)`, weil 32 x 5 = 160 Karten anfielen. Seit #512 sind es drei Karten je
+ * Team („1 unterschied: nur 3 Sponsoren statt 5"), also 96 — und drei Faelle fielen an der
+ * Stichprobengroesse, nicht an ihrer Aussage. Was sie sichern wollen, ist „die GANZE Liga, nicht
+ * eine Handvoll": also jedes Team mit mindestens einer Karte.
+ */
 function alleAngebote(): { gameState: GameState; angebote: SponsorOffer[] } {
   const gameState = ensureSeasonSponsorOffers(createSingleplayerGameState());
   const angebote = Object.values(gameState.seasonState.sponsorOffersByTeamId ?? {}).flat();
   return { gameState, angebote };
 }
 
+/** Untergrenze fuer „die ganze Liga": jedes Team hat Angebote, und es sind wirklich alle Teams. */
+function erwarteVolleLiga(gameState: GameState, gezaehlt: number): void {
+  const teams = gameState.teams.length;
+  const mitAngeboten = Object.entries(gameState.seasonState.sponsorOffersByTeamId ?? {}).filter(
+    ([, liste]) => (liste?.length ?? 0) > 0,
+  ).length;
+  expect(mitAngeboten, "nicht jedes Team hat Angebote").toBe(teams);
+  expect(gezaehlt, "weniger geprueft als ein Angebot je Team").toBeGreaterThanOrEqual(teams);
+}
+
 describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
   it("`anchor − Sockel` ist exakt der Anteil, den der Saisonwechsel erodieren laesst", () => {
-    const { angebote } = alleAngebote();
-    expect(angebote.length).toBeGreaterThan(100);
+    const { gameState, angebote } = alleAngebote();
+    erwarteVolleLiga(gameState, angebote.length);
 
     const multiplikatorJahr2 = getSponsorTermMultiplier(2);
     expect(multiplikatorJahr2).toBeLessThan(1);
@@ -74,7 +92,7 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
   }, 120_000);
 
   it("der NACKTE Liga-Sockel verfehlt dieselbe Erosion messbar — deshalb reicht er nicht", () => {
-    const { angebote } = alleAngebote();
+    const { gameState, angebote } = alleAngebote();
     const multiplikatorJahr2 = getSponsorTermMultiplier(2);
 
     let summeAbweichung = 0;
@@ -93,22 +111,47 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
         (1 - multiplikatorJahr2) * Math.max(0, terms.anchor - sponsorSockelFuerStartrang(terms.startRank));
       const abweichungDesSockels =
         sponsorSockelFuerStartrang(terms.startRank) - sponsorV3EingefrorenerSockel(terms);
-      summeAbweichung += abweichungDesSockels;
-      groessteAbweichung = Math.max(groessteAbweichung, abweichungDesSockels);
-      if (Math.abs(mitNacktemSockel - echterVerlust) > 1e-6) mitEchterAbweichung += 1;
+      summeAbweichung += Math.abs(abweichungDesSockels);
+      groessteAbweichung = Math.max(groessteAbweichung, Math.abs(abweichungDesSockels));
+      const trifftDaneben = Math.abs(mitNacktemSockel - echterVerlust) > 1e-6;
+      if (trifftDaneben) mitEchterAbweichung += 1;
+      /**
+       * EXAKT STATT ANTEILIG: der nackte Sockel weicht genau dann ab, wenn die Karte einen
+       * EIGENEN Sockel hat — also bei einem Wertfaktor ungleich 1 oder bei einem Cash-Verzicht.
+       * Eine magische Karte ohne Verzicht (Wertfaktor 1,0) IST der Liga-Sockel; dort waere eine
+       * Abweichung der Fehler.
+       */
+      const eigenerSockel = Math.abs(abweichungDesSockels) > 1e-6;
+      expect(trifftDaneben, `${angebot.offerId}: Abweichung ${abweichungDesSockels}`).toBe(eigenerSockel);
       gezaehlt += 1;
     }
 
-    // Der nackte Sockel liegt IMMER zu hoch (Wertfaktor <= 1, Verzicht >= 0) und verfehlt die
-    // Erosion bei praktisch jeder Karte. Die Live-Messung ergab Ø 9,76 C / max 30,2 C.
-    expect(gezaehlt).toBeGreaterThan(100);
-    expect(summeAbweichung / gezaehlt).toBeGreaterThan(1);
-    expect(groessteAbweichung).toBeGreaterThan(10);
-    expect(mitEchterAbweichung / gezaehlt).toBeGreaterThan(0.9);
+    /**
+     * Der nackte Sockel verfehlt die Erosion — das ist die Zusage, und sie haelt.
+     *
+     * DIE RICHTUNG STIMMT NICHT MEHR: hier stand „liegt IMMER zu hoch (Wertfaktor <= 1)". Der
+     * Wertfaktor geht heute ueber 1 hinaus (`SPONSOR_V3_WERT_BY_RARITY`: gewöhnlich 0,89,
+     * magisch 1,0, selten 1,05, legendär 1,11) — bei einer seltenen Karte liegt der nackte
+     * Sockel also zu NIEDRIG (gemessen −2,48 C bei B-B). Gerechnet wird deshalb mit Betraegen:
+     * die Aussage ist „daneben", nicht „darueber".
+     *
+     * DIE HOEHE DER ABWEICHUNG IST KEINE: sie hat zwei Quellen — den Wertfaktor der Rarität und
+     * den Cash-Verzicht der Gebaeude-Karte. Mit abgeschaltetem Gebaeude-Schalter (#512) faellt
+     * die zweite weg: die groesste Abweichung sinkt von 30,2 C auf 5,7 C, und der Anteil der
+     * betroffenen Karten von 98 % auf 73 % — Karten mit Wertfaktor 1 SIND der Liga-Sockel.
+     * Feste Schwellen („> 10", „> 0,9") messen damit den Schalter, nicht den Sockel. Die scharfe
+     * Pruefung steht deshalb in der Schleife (Abweichung genau dann, wenn die Karte einen eigenen
+     * Sockel hat); hier bleibt, dass es die Abweichung ueberhaupt gibt und dass sie streut.
+     */
+    erwarteVolleLiga(gameState, gezaehlt);
+    const durchschnitt = summeAbweichung / gezaehlt;
+    expect(durchschnitt).toBeGreaterThan(1);
+    expect(groessteAbweichung).toBeGreaterThan(durchschnitt);
+    expect(mitEchterAbweichung).toBeGreaterThan(0);
   }, 120_000);
 
   it("der Wertfaktor der Karte kommt aus EINER Formel — Unterschrift wie Saisonwechsel", () => {
-    const { angebote } = alleAngebote();
+    const { gameState, angebote } = alleAngebote();
     let geprueft = 0;
     for (const angebot of angebote) {
       const terms = getSponsorV3Terms(angebot);
@@ -126,7 +169,7 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
       }
       geprueft += 1;
     }
-    expect(geprueft).toBeGreaterThan(100);
+    erwarteVolleLiga(gameState, geprueft);
   }, 120_000);
 
   /**

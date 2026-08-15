@@ -27,6 +27,20 @@ import {
   sponsorLeihPassungFuerTeam,
   type SponsorLeihPassungEingabe,
 } from "@/lib/sponsor/sponsor-leih-passung";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * DER GEBAEUDE-SCHALTER STEHT AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`, #512) — Chris:
+ * „mach das mit dem Schalter deaktiviere Gebäude". Ohne Gebaeude-Karten hat dieser Block nichts
+ * zu messen; er laeuft deshalb genau dann, wenn der Schalter wieder an ist, und meldet sonst
+ * sichtbar „uebersprungen" statt dauerhaft rot zu stehen. Der Schalter ist ausdruecklich als
+ * Schalter gebaut und nicht als Ausbau, damit beide Stellungen vergleichbar bleiben — diese
+ * Faelle sind die Absicherung der EIN-Stellung.
+ *
+ * Was im AUS-Zustand gilt, prueft `tests/sponsor-angebot-mit-leihe.test.ts` im Block
+ * „Der Gebaeude-Schalter — was seine Stellung zusichert".
+ */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 /** Ein Median-Team, wie es die Messung an 32 Teams gezeigt hat: lang 6, kurz 5, Verkauf 5, Tiefe 5. */
 const MEDIAN_TEAM = {
@@ -150,7 +164,7 @@ describe("Gebäude-Passung: die Klammer haelt", () => {
   });
 });
 
-describe("Gebäude-Passung am echten Auswahlpfad", () => {
+mitLeiheDescribe("Gebäude-Passung am echten Auswahlpfad", () => {
   it("Informationsgebäude werden seltener unterschrieben, als sie angeboten werden", () => {
     const basis: GameState = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const nachher = chooseSponsorOfferForAiTeams(basis);

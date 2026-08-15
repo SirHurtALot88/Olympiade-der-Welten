@@ -226,7 +226,14 @@ describe("Der Mittelteil der Sponsorkarte zeigt die Zahlen, die die lib liefert"
   }
 
   it("die Fixture traegt echte V3-Angebote — sonst prueft der Test nichts", () => {
-    expect(alleAngebote.length).toBeGreaterThan(100);
+    // Gerechnet, nicht festgenagelt: hier stand `> 100`, weil 32 Teams x 5 Karten = 160 anfielen.
+    // Seit #512 sind es drei Karten je Team („nur 3 Sponsoren statt 5"), also 96 — der Fall fiel
+    // an der Stichprobengroesse, nicht an seiner Aussage. Gemeint ist „jedes Team der Liga".
+    const teamsMitAngeboten = Object.values(gameState.seasonState.sponsorOffersByTeamId ?? {}).filter(
+      (liste) => (liste?.length ?? 0) > 0,
+    ).length;
+    expect(teamsMitAngeboten).toBe(gameState.teams.length);
+    expect(alleAngebote.length).toBeGreaterThanOrEqual(gameState.teams.length);
     expect(alleAngebote.every((offer) => getSponsorV3Terms(offer) != null)).toBe(true);
   });
 
