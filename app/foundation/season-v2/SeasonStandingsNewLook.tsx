@@ -1696,7 +1696,14 @@ export default function SeasonStandingsNewLook({
             {formatNlMoney(row.marketValueTotal)}
             {renderRankSuffix(marketValueRanks.get(row.teamId), "Marktwert", row.teamName)}
           </td>
-          <td className="nl-standings-td-fin">{formatNlMoney(row.cash)}</td>
+          {/* NEGATIVES CASH ROT — gemeldet von Chris: „bitte den aktuellen Cash stand auch rot
+              markieren wenn der negativ sein sollte!". Bewusst NUR die negative Seite: ein
+              positives Konto ist der Normalfall und braucht keine Auszeichnung, sonst leuchtet
+              die halbe Spalte gruen und die eine echte Warnung geht darin unter. Die Klasse
+              `is-neg` gibt es hier laengst, die Cash-Spalte hat sie nur nie benutzt. */}
+          <td className={`nl-standings-td-fin${(row.cash ?? 0) < 0 ? " is-neg" : ""}`}>
+            {formatNlMoney(row.cash)}
+          </td>
           <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
           <td className="nl-standings-td-fin">
             {formatNlMoney(row.salaryTotal)}
