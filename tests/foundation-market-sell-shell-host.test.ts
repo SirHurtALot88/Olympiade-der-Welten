@@ -318,12 +318,20 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
   // Nutzerwunsch nach der Freigabe #2: "in grün oder rot der vergleich mit dem
   // echten aktuellen MW" — ANDERE Aussage als die GuV-vs-Kaufpreis-Zeile in
   // Kachel 1 (vergleicht mit dem Einkaufspreis), deshalb eigenes Label.
-  it("MW-Vergleich: grün und 'über Marktwert', wenn der Verkaufspreis über dem MW liegt", () => {
+  //
+  // WIE DAS LABEL HEISST, hat Chris spaeter gemeldet (Report zuxbr3): es hiess "Marktwert",
+  // gerechnet wurde aber gegen `marketValueReference` — den zum SAISONENDE EINGEFRORENEN Wert,
+  // aus dem auch der Verkaufsfaktor stammt. Der "echte aktuelle MW" aus dem Wunsch oben steht
+  // eine Zone weiter unten in der Kachel "MW aktuell"; beide sind echt und weichen nach
+  // Training voneinander ab (am Live-Abbild: 335 von 336 Kaderspielern). Der Vergleich MUSS
+  // gegen den eingefrorenen Wert laufen, sonst mischte er zwei Zeitpunkte — er sagt jetzt nur
+  // endlich, welcher gemeint ist: "Saison-MW".
+  it("MW-Vergleich: grün und 'über Saison-MW', wenn der Verkaufspreis über dem Saison-MW liegt", () => {
     const html = render({
       marketSellPreview: makeSummary({ salePrice: 30, buyoutCost: 0, netProceeds: 30, marketValueReference: 20 }),
     });
-    expect(html).toContain("vs. Marktwert:");
-    expect(html).toContain("über Marktwert");
+    expect(html).toContain("vs. Saison-MW:");
+    expect(html).toContain("über Saison-MW");
     expect(html).toMatch(/transfer-sell-price-mw-diff is-good/);
     expect(html).not.toMatch(/transfer-sell-price-mw-diff is-risk/);
     // Von der GuV-vs-Kaufpreis-Zeile klar unterscheidbar beschriftet — sonst
@@ -331,12 +339,12 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     expect(html).toContain("GuV vs. Kaufpreis");
   });
 
-  it("MW-Vergleich: rot und 'unter Marktwert', wenn der Verkaufspreis unter dem MW liegt", () => {
+  it("MW-Vergleich: rot und 'unter Saison-MW', wenn der Verkaufspreis unter dem Saison-MW liegt", () => {
     const html = render({
       marketSellPreview: makeSummary({ salePrice: 15, buyoutCost: 0, netProceeds: 15, marketValueReference: 20 }),
     });
-    expect(html).toContain("vs. Marktwert:");
-    expect(html).toContain("unter Marktwert");
+    expect(html).toContain("vs. Saison-MW:");
+    expect(html).toContain("unter Saison-MW");
     expect(html).toMatch(/transfer-sell-price-mw-diff is-risk/);
     expect(html).not.toMatch(/transfer-sell-price-mw-diff is-good/);
   });
@@ -361,8 +369,8 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
         saleFactor: 1.21,
       }),
     });
-    expect(html).toContain("über Marktwert");
-    expect(html).not.toContain("unter Marktwert");
+    expect(html).toContain("über Saison-MW");
+    expect(html).not.toContain("unter Saison-MW");
     expect(html).toMatch(/transfer-sell-price-mw-diff is-good/);
     // Der Buyout verschwindet dabei nicht — er steht weiter in der Herleitung des Netto-Erlöses.
     expect(html).toContain("− Buyout");
@@ -372,7 +380,7 @@ describe("FoundationMarketSellShellHost — Zustandsmaschine", () => {
     const html = render({
       marketSellPreview: makeSummary({ marketValueReference: null }),
     });
-    expect(html).not.toContain("vs. Marktwert:");
+    expect(html).not.toContain("vs. Saison-MW:");
   });
 });
 

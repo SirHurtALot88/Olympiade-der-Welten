@@ -3,8 +3,6 @@
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 
-import { SPIELTAGS_TOPSPIELER_SPALTENHOEHE } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
-
 import { PlayerAwardStrip } from "@/components/foundation/player-awards/PlayerAwardStrip";
 import type { PlayerSeasonAward } from "@/lib/foundation/player-season-awards";
 
@@ -52,17 +50,6 @@ export type DisciplineStageTopPlayersProps = {
 
 export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playerIdByRow, disciplineNames }: DisciplineStageTopPlayersProps) {
   const disziplinen = (disciplineNames ?? []).filter((name) => name.trim().length > 0);
-  // Der urspruengliche Index wandert mit: `playerIdByRow` ist parallel zur UNGETEILTEN Liste,
-  // und nach dem Schneiden waere der Spalten-Index ein anderer — der Klick oeffnete dann den
-  // falschen Spieler.
-  const spalten: Array<Array<{ spieler: DisciplineStageTopPlayer; index: number }>> = [];
-  for (let start = 0; start < players.length; start += SPIELTAGS_TOPSPIELER_SPALTENHOEHE) {
-    spalten.push(
-      players
-        .slice(start, start + SPIELTAGS_TOPSPIELER_SPALTENHOEHE)
-        .map((spieler, versatz) => ({ spieler, index: start + versatz })),
-    );
-  }
   return (
     <div style={{ background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 12, position: "sticky", top: 12 }}>
       <div
@@ -76,30 +63,30 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
       {players.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Noch keine Werte.</div>
       ) : (
-        /**
-         * ZWEI SPALTEN STATT EINER LANGEN LISTE — Ticket #42.
-         *
-         * CHRIS: „die Top Player Liste könnte man noch ausweiten, dass man nicht nur die top 12
+        /*
+         * ZWEI SPALTEN, DAMIT DIE KACHEL NICHT WAECHST. Chris: „dass man nicht nur die top 12
          * sondern Top 24 hier sieht ohne dass man die Tabelle in der höhe größer macht, sondern
          * nebeneinander."
          *
-         * Die Bedingung ist die Hoehe, nicht die Anzahl. Deshalb wird die Liste in Bloecke zu
-         * `SPIELTAGS_TOPSPIELER_SPALTENHOEHE` geschnitten und nebeneinander gestellt: 24 Zeilen
-         * belegen dieselbe Hoehe wie vorher 12.
+         * `grid-auto-flow: column` mit fester Zeilenzahl fuellt SPALTENWEISE: Rang 1-12 stehen
+         * links untereinander, 13-24 rechts. Damit bleibt die Leserichtung der alten Liste
+         * erhalten — bei zeilenweiser Fuellung stuenden 1 und 2 nebeneinander, und die
+         * Rangfolge waere nicht mehr am Blick abzulesen.
          *
-         * Ein `flex-wrap` und keine feste Zweispaltigkeit: auf schmalem Schirm rutschen die
-         * Bloecke untereinander, statt die Zeilen unlesbar zusammenzuquetschen. Die Karte steht
-         * `sticky` neben der Buehne — eine Liste, die dort horizontal ueberlaeuft, waere schlimmer
-         * als eine, die hoeher wird.
+         * Die Zeilenzahl ist die HAELFTE der wirklich vorhandenen Spieler, nicht die halbe
+         * Obergrenze: bei nur 9 Zeilen entstuenden sonst zwei Spalten mit einer fast leeren
+         * rechten. Bei 12 und weniger bleibt es damit genau die einspaltige Liste von vorher.
          */
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
-          {spalten.map((spalte, spaltenIndex) => (
-            <div
-              key={`stage-top-players-col-${spaltenIndex}`}
-              data-testid="stage-top-players-column"
-              style={{ display: "flex", flexDirection: "column", gap: 2, flex: "1 1 240px", minWidth: 0 }}
-            >
-          {spalte.map(({ spieler: p, index }) => {
+        <div
+          style={{
+            display: "grid",
+            gridAutoFlow: "column",
+            gridTemplateRows: `repeat(${Math.ceil(players.length / (players.length > 12 ? 2 : 1))}, auto)`,
+            columnGap: 10,
+            rowGap: 2,
+          }}
+        >
+          {players.map((p, index) => {
             const playerId = playerIdByRow?.[index] ?? null;
             const clickable = Boolean(onOpenPlayer && playerId);
             return (
@@ -178,8 +165,6 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
               </div>
             );
           })}
-            </div>
-          ))}
         </div>
       )}
     </div>

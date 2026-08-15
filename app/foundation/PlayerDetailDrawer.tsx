@@ -1584,12 +1584,7 @@ type TrainingSeasonEntry = {
   potentialDrift: { before: number; after: number } | null;
   meta: {
     trainingClass: string | null;
-    /**
-     * Die Nebenklasse der Saison. Sie stand in `PlayerTrainingHistoryRow` schon immer drin und
-     * wurde hier nie durchgereicht — Ticket #36 (Chris): „In der Training History sollte auch
-     * drin stehen welche Klasse in der Season mainly trainiert wurde!" „Mainly" ergibt nur einen
-     * Sinn, wenn daneben steht, was die zweite war.
-     */
+    /** Nebenklasse dieser Saison — traegt fest 30 % der Trainings-Setpoints. */
     secondaryTrainingClass: string | null;
     classBefore: string | null;
     classAfter: string | null;
@@ -1802,31 +1797,38 @@ function formatTrainingSeasonSummaryCellTooltip(entry: TrainingSeasonEntry, cell
   return `${cell.attribute}: ${formatValue(cell.fromValue, 1)} → ${formatValue(cell.toValue, 1)} (${formatSignedOrigin(cell.cumulative)})`;
 }
 
+/**
+ * DIE HAUPTSAECHLICH TRAINIERTE KLASSE STEHT JETZT IMMER DA.
+ *
+ * GEMELDET VON CHRIS: „In der Training History sollte auch drin stehen welche Klasse in der Season
+ * mainly trainiert wurde!" — auf Rueckfrage praezisiert: „mainly trainiert wäre die mit den meisten
+ * SP".
+ *
+ * DA IST NICHTS ZU RECHNEN, und das ist der Kern: der Split ist FEST. `organic-season-progression.ts`
+ * verteilt 70 % der Trainings-Setpoints auf die Haupt- und 30 % auf die Nebenklasse
+ * (`primaryShare`/`secondaryShare`). „Die mit den meisten SP" ist damit per Konstruktion immer die
+ * HAUPTklasse — eine Auswertung der Einzelwerte waere Theater um ein feststehendes Ergebnis.
+ *
+ * WAS VORHER FEHLTE: die Zeile zeigte entweder den KLASSENWECHSEL des Spielers oder die trainierte
+ * Klasse — nie beides. Ausgerechnet in den Saisons mit Klassenwechsel, also den interessantesten,
+ * verschwand damit die Information, worauf trainiert wurde. Beides sind verschiedene Dinge: die
+ * eine sagt, was der Spieler IST, die andere, woran er GEARBEITET hat.
+ */
 function formatTrainingSeasonMetaLine(meta: NonNullable<TrainingSeasonEntry["meta"]>) {
   const parts: string[] = [];
-  /**
-   * ZWEI VERSCHIEDENE DINGE, die bisher um EINEN Platz konkurriert haben:
-   *   - WORAUF trainiert wurde (`trainingClass` + `secondaryTrainingClass`) — die Entscheidung.
-   *   - WELCHE Klasse der Spieler hatte (`classBefore` → `classAfter`) — das Ergebnis.
-   *
-   * Bisher gewann bei einem Klassenwechsel die zweite Zeile und die erste fiel weg. Damit fehlte
-   * die trainierte Klasse ausgerechnet in der Saison, in der sich etwas bewegt hat — der einzigen,
-   * in der man sie wirklich wissen will. Ticket #36 (Chris): „In der Training History sollte auch
-   * drin stehen welche Klasse in der Season mainly trainiert wurde!"
-   *
-   * Jetzt stehen beide nebeneinander. Die Nebenklasse kommt nur dazu, wenn es sie gibt und sie
-   * sich von der Hauptklasse unterscheidet — „Trainiert Kraft (auch Kraft)" waere Laerm.
-   */
-  if (meta.trainingClass) {
-    const neben =
-      meta.secondaryTrainingClass && meta.secondaryTrainingClass !== meta.trainingClass
-        ? ` (Neben: ${meta.secondaryTrainingClass})`
-        : "";
-    parts.push(`Trainiert ${meta.trainingClass}${neben}`);
-  }
-  if (meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter) {
+  const classChanged = meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter;
+  if (classChanged) {
     parts.push(`Klasse ${meta.classBefore} → ${meta.classAfter}`);
-  } else if (!meta.trainingClass && meta.classAfter) {
+  }
+  if (meta.trainingClass) {
+    // Die Nebenklasse nur nennen, wenn es sie gibt — sonst suggerierte „(70 %)" einen zweiten
+    // Posten, den es gar nicht gibt: ohne Nebenklasse traegt die Hauptklasse volle 100 %.
+    parts.push(
+      meta.secondaryTrainingClass
+        ? `Trainiert ${meta.trainingClass} (70 %) · ${meta.secondaryTrainingClass} (30 %)`
+        : `Trainiert ${meta.trainingClass}`,
+    );
+  } else if (!classChanged && meta.classAfter) {
     parts.push(`Klasse ${meta.classAfter}`);
   }
   if (meta.trainingMode) {

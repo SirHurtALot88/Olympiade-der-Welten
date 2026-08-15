@@ -134,6 +134,7 @@ import {
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import { SAISON_MW_ERKLAERUNG } from "@/lib/market/transfermarkt-sale-factor";
 import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
@@ -438,7 +439,8 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     // war dann nicht mehr ablesbar. Buyout und Netto stehen jetzt im Zellen-Tooltip,
     // Gewinn/Verlust im Chip daneben.
     tooltip:
-      "Verkaufspreis = Marktwert × Verkaufsfaktor (aus Leistung und Rang in der eigenen Preisklasse). Brutto — ein noch offener Rest-Buyout ist NICHT abgezogen; er steht im Tooltip der Zelle, zusammen mit dem Netto-Erlös und dem Gewinn gegenüber dem Kaufpreis. Der Chip daneben ist der Aufschlag des Verkaufsfaktors: VK-Wert minus Marktwert, beides in dieser Zeile ablesbar. \"—\" bei Free Agents (kein Kader, kein Verkauf).",
+      "Verkaufspreis = Saison-MW × Verkaufsfaktor (aus Leistung und Rang in der eigenen Preisklasse). Brutto — ein noch offener Rest-Buyout ist NICHT abgezogen; er steht im Tooltip der Zelle, zusammen mit dem Netto-Erlös und dem Gewinn gegenüber dem Kaufpreis. Der Chip daneben ist der Aufschlag des Verkaufsfaktors: VK-Wert minus Saison-MW, beides in dieser Zeile ablesbar. \"—\" bei Free Agents (kein Kader, kein Verkauf). " +
+      SAISON_MW_ERKLAERUNG,
   },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
   { id: "contract", label: "Vertrag", sortKey: "contract", align: "right" },
@@ -1858,7 +1860,7 @@ export default function FoundationPlayersTableNewLook({
           className={`nl-players-td-money${sortCellClass("sellValue")}`}
           title={
             row.sellPreview
-              ? `Verkaufspreis = Marktwert × Verkaufsfaktor = ${formatNlMoney(row.sellPreview.grossSalePrice)}` +
+              ? `Verkaufspreis = Saison-MW × Verkaufsfaktor = ${formatNlMoney(row.sellPreview.grossSalePrice)}. ${SAISON_MW_ERKLAERUNG}` +
                 (row.sellPreview.buyoutCost != null && row.sellPreview.buyoutCost > 0
                   ? ` · Bei einem Verkauf JETZT geht davon noch der Rest-Buyout von ${formatNlMoney(row.sellPreview.buyoutCost)} ab → ${formatNlMoney(row.sellPreview.expectedSellValue)} netto.`
                   : " · Kein Rest-Buyout (Vertrag läuft aus) — der Preis geht voll ins Team-Cash.") +

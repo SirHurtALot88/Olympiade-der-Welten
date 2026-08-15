@@ -76,7 +76,10 @@ describe("Der Chip neben dem VK-Wert ist nachrechenbar", () => {
 
   it("erklaert die Spalte im Kopf-Tooltip so, wie sie jetzt rechnet", () => {
     const kopf = quelle.slice(quelle.indexOf('id: "sellValue"'), quelle.indexOf('id: "salary"'));
-    expect(kopf).toContain("VK-Wert minus Marktwert");
+    // „Saison-MW" statt „Marktwert" seit Report zuxbr3: gerechnet wird gegen den zum Saisonende
+    // eingefrorenen Wert, nicht gegen den laufenden im Spielerprofil. Die Rechnung ist dieselbe
+    // geblieben — nur hiessen beide Groessen vorher gleich.
+    expect(kopf).toContain("VK-Wert minus Saison-MW");
     // Die alte Beschreibung versprach den Kaufpreis-Vergleich als Chip — genau die Zahl, die
     // nicht zum danebenstehenden Betrag passte.
     expect(kopf).not.toContain("Darunter Gewinn/Verlust gegenüber dem gezahlten Kaufpreis.");
