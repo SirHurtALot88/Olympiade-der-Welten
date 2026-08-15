@@ -50,7 +50,7 @@ export const FATIGUE_REST_CEILING = 88;
  * Schaetzung in Richtung „duenner Kader" irren: dann wird zu FRUEH geschont statt zu spaet. Ein
  * zu frueh geschonter Spieler kostet ein paar Punkte, ein zu spaet geschonter faellt aus.
  */
-export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 12;
+export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 7;
 /**
  * Ab so vielen Ersatzspielern (Kadergroesse - Spieltagsbedarf) gilt der volle Basis-Boden
  * (FATIGUE_REST_FLOOR). Darunter wird linear zum duennen Boden (FATIGUE_REST_FLOOR_THIN)
@@ -66,7 +66,7 @@ export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 12;
  * Spielern und hoechstens 14 im Kader sind mehr als 2 Ersatzleute gar nicht moeglich — kein Team
  * haette den vollen Boden je erreicht.
  */
-export const FATIGUE_REST_FULL_DEPTH_SUBS = 2;
+export const FATIGUE_REST_FULL_DEPTH_SUBS = 5;
 /** Convex exponent: keeps probability low just above the floor, rising steeply late. */
 const FATIGUE_REST_RAMP_GAMMA = 1.7;
 

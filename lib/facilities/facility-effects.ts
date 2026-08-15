@@ -200,7 +200,7 @@ export function describeTrainingXpFacilityEffect(
  * Neunerkader steigt weiter. Genau dort soll die Grenze liegen: Investition hilft, sie ersetzt den
  * Kader nicht.
  */
-export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 4, 8, 13, 18, 24] as const;
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 2, 4, 6, 9, 12] as const;
 
 export function getRecoveryFlatBonusAtLevel(level: number) {
   return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;

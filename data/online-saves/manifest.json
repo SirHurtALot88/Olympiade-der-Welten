@@ -1,6 +1,6 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-08-13T11:47:41.808Z",
+  "exportedAt": "2026-08-15T18:13:12.813Z",
   "activeSaveId": "new-game-1785067203149-82cbka",
   "saves": [
     {
@@ -17,7 +17,7 @@
       "status": "archived",
       "file": "fresh-season-1-1785061984338.json.gz",
       "uncompressedBytes": 13547192,
-      "gzipBytes": 1934107
+      "gzipBytes": 1934105
     },
     {
       "saveId": "fresh-season-1-1785061991768",
@@ -33,7 +33,7 @@
       "status": "archived",
       "file": "save-singleplayer-dev.json.gz",
       "uncompressedBytes": 11858162,
-      "gzipBytes": 1758564
+      "gzipBytes": 1758565
     },
     {
       "saveId": "fresh-season-1-1784669123253",
@@ -41,7 +41,7 @@
       "status": "archived",
       "file": "fresh-season-1-1784669123253.json.gz",
       "uncompressedBytes": 13547277,
-      "gzipBytes": 1934281
+      "gzipBytes": 1934285
     },
     {
       "saveId": "fresh-season-1-1784669131021",

@@ -85,8 +85,21 @@ export type SpieltagsTopSpieler = {
   disciplineIds: string[];
 };
 
-/** Wie viele Zeilen die Liste unter der Spieltags-Wertung traegt. */
-export const SPIELTAGS_TOPSPIELER_LIMIT = 12;
+/**
+ * Wie viele Zeilen die Liste unter der Spieltags-Wertung traegt.
+ *
+ * CHRIS (Ticket #42): „die Top Player Liste könnte man noch ausweiten, dass man nicht nur die top
+ * 12 sondern Top 24 hier sieht ohne dass man die Tabelle in der höhe größer macht, sondern
+ * nebeneinander."
+ *
+ * Die Hoehe bleibt also gleich — 24 Zeilen in ZWEI Spalten zu je 12. Deshalb steht hier eine
+ * gerade Zahl: eine ungerade liesse die zweite Spalte kuerzer als die erste, und die Liste saehe
+ * abgeschnitten aus statt vollstaendig.
+ */
+export const SPIELTAGS_TOPSPIELER_LIMIT = 24;
+
+/** Zeilen je Spalte — der Rest ergibt sich daraus, damit Hoehe und Anzahl nicht auseinanderlaufen. */
+export const SPIELTAGS_TOPSPIELER_SPALTENHOEHE = 12;
 
 /**
  * DIE EINE RECHENSTELLE.
