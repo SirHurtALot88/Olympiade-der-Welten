@@ -269,7 +269,25 @@ export function resolvePlayerEconomyContract(input: {
   const storedCalculatedSalary = normalizeStoredEconomyValue(player?.salaryDemand);
   const legacyDisplayMarketValue = normalizeStoredEconomyValue(player?.displayMarketValue);
   const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
-  const rosterPurchasePrice = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.purchasePrice));
+  const rosterPurchasePriceRaw = toFiniteNumber(rosterEntry?.purchasePrice);
+  const rosterPurchasePrice = normalizeStoredEconomyValue(rosterPurchasePriceRaw);
+  /**
+   * DERSELBE KAUFPREIS, ABER NUR WENN ER AUF DER ANZEIGE-SKALA STEHT.
+   *
+   * Alte Spielstaende halten Geldbetraege in Hundertsteln: `purchasePrice: 40000` meint 40,0.
+   * `normalizeStoredEconomyValue` teilt bei Werten ueber 1000 zwar durch 100 — das trifft aber
+   * nur EINE Skalen-Generation, aus 40000 wird 400 statt 40. Aus dem Rohwert allein laesst sich
+   * die Skala nicht rekonstruieren; verlaesslich ist nur der mitgelieferte Anzeige-Marktwert als
+   * Anker. Genau so haelt es `normalizeVisibleRosterMoney` (transfermarkt-sale-factor.ts) seit
+   * jeher — hier steht die Regel lokal, weil ein Import von dort einen Ring baute.
+   *
+   * Deshalb gilt: ueber 1000 ist der Rohwert fuer die Kaufpreis-Kette unbrauchbar, und die faellt
+   * auf den Marktwert zurueck. Das ist kein Rueckschritt, sondern die einzige belastbare Lesart
+   * fuer solche Staende — `tests/transfermarkt-local-service.test.ts` haelt sie fest („equal entry
+   * and exit values do not show fake profit").
+   */
+  const rosterPurchasePriceOnDisplayScale =
+    rosterPurchasePriceRaw != null && rosterPurchasePriceRaw > 1000 ? null : rosterPurchasePrice;
   const rosterContractSalaries = resolveRosterContractSalaries(rosterEntry);
   const rosterSalary = rosterContractSalaries.currentSeasonSalary;
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
@@ -370,22 +388,47 @@ export function resolvePlayerEconomyContract(input: {
                 ? resolveImportedSalarySource(player)
                 : "missing_source";
 
+  /**
+   * DER KAUFPREIS IST, WAS BEZAHLT WURDE — nicht ein Marktwert.
+   *
+   * WAS FALSCH WAR: die Kette begann mit ZWEI Marktwerten und erreichte den echten
+   * `rosterPurchasePrice` erst an dritter Stelle. Ein berechneter Marktwert existiert aber
+   * praktisch immer — also gewann er IMMER, und der gezahlte Preis kam nie zum Zug. Verraeterisch
+   * ist die Quellen-Kennung: `"active_purchase_price"` war damit ein toter Zweig, obwohl die
+   * Aufzaehlung ihn ausdruecklich vorsieht. Am Live-Abbild gemessen lieferten 326 von 336
+   * Kadervertraegen einen anderen Wert als den gezahlten (im Mittel 0,40 daneben, bis 1,70),
+   * Quelle ausnahmslos `calculated_preview`; nach der Umstellung sind es ueber alle fuenf
+   * Live-Saves 0, Quelle durchgaengig `active_purchase_price`.
+   *
+   * WIE WEIT DAS REICHT — ehrlich abgegrenzt, weil hier zunaechst mehr behauptet stand: die
+   * beiden Stellen, an denen Chris nachgesehen hat (Verkaufs-Modal und auslaufende Vertraege),
+   * waren NICHT betroffen. Beide fragen ueber `normalizeVisibleRosterMoney(entry?.purchasePrice,
+   * economy.purchasePrice)` zuerst den Kadereintrag und benutzen diesen Wert hier nur als
+   * Rueckfall — siehe `buildContractExitValue` (contract-renewal-service) und
+   * `use-market-sell-derivations`. Betroffen war, wer `economy.purchasePrice` DIREKT liest;
+   * ausserdem greift der Rueckfall ueberall dort, wo kein Kadereintrag vorliegt (Free Agents),
+   * und lieferte dann stillschweigend einen Marktwert unter dem Namen Kaufpreis.
+   *
+   * DIE REIHENFOLGE DER MARKTWERT-KETTE OBEN BLEIBT UNANGETASTET. Geaendert ist nur, dass der
+   * gezahlte Preis hier zuerst gilt; die Marktwerte bleiben als Rueckfall fuer Bestands- und
+   * Importstaende, in denen kein Kaufpreis hinterlegt ist. Dort aendert sich nichts.
+   */
   const purchasePrice =
+    rosterPurchasePriceOnDisplayScale ??
     calculatedFinalMarketValue ??
     storedCalculatedMarketValue ??
-    rosterPurchasePrice ??
     legacyDisplayMarketValue ??
     null;
   const purchasePriceSource =
-    calculatedFinalMarketValue != null
-      ? "calculated_preview"
-      : storedCalculatedMarketValue != null
-        ? "calculated_stored"
-        : rosterPurchasePrice != null
-        ? "active_purchase_price"
-        : legacyDisplayMarketValue != null
-          ? resolveImportedMarketValueSource(player)
-          : "missing_source";
+    rosterPurchasePriceOnDisplayScale != null
+      ? "active_purchase_price"
+      : calculatedFinalMarketValue != null
+        ? "calculated_preview"
+        : storedCalculatedMarketValue != null
+          ? "calculated_stored"
+          : legacyDisplayMarketValue != null
+            ? resolveImportedMarketValueSource(player)
+            : "missing_source";
 
   const contractLengthSource = contractLength != null ? "active_contract" : "missing_source";
   const isImportedEconomy =

@@ -17,6 +17,24 @@ function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+/**
+ * Erklaerung fuer JEDE Oberflaeche, die den Verkaufspreis gegen einen „Marktwert" stellt.
+ *
+ * GEMELDET VON CHRIS: „IN der Erklärung steht auch Gekauft für 18,8 jetzt MW 19,1 denke dann ist
+ * oben bei den auslaufenden veträgen die zahl falsch." Beide Zahlen waren richtig — sie meinten
+ * nur Verschiedenes und hiessen beide „Marktwert". Deshalb steht der Satz jetzt an EINER Stelle
+ * und wird von allen drei Anzeigen (Verkaufs-Modal, Kader-Peek, Spielertabelle) geteilt: traegt
+ * jede ihre eigene Formulierung, driften sie beim naechsten Umbau wieder auseinander.
+ *
+ * NICHT VERWECHSELN mit dem Kaufpreis — das ist eine dritte Groesse (was tatsaechlich gezahlt
+ * wurde) und steht im Modal in der eigenen Kachel „Kaufpreis · letzter Einstieg".
+ */
+export const SAISON_MW_ERKLAERUNG =
+  "Saison-MW: der zum Saisonende eingefrorene Marktwert. Er ist die Basis für Verkaufsfaktor und " +
+  "Verkaufspreis und ändert sich bis zum Saisonwechsel nicht mehr — auch dann nicht, wenn " +
+  "Bracket-Nachbarn verkauft werden. Der laufende Marktwert im Spielerprofil kann durch Training " +
+  "davon abweichen; verkauft wird trotzdem zum Saison-MW.";
+
 // Retool `calculateSaleFactorAndPriceSaison` bracketDefs (9 brackets).
 /**
  * Ab wie vielen Spielern im Bracket der Verkaufsfaktor ueberhaupt greift.

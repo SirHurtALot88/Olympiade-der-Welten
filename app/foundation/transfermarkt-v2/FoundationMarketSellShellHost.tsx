@@ -36,6 +36,7 @@ import {
   type UseMarketSellDerivationsInput,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { SAISON_MW_ERKLAERUNG } from "@/lib/market/transfermarkt-sale-factor";
 import {
   formatPpsValue,
   formatSignedTransfermarktCurrency,
@@ -237,6 +238,18 @@ export default function FoundationMarketSellShellHost({
   // („brutto X − Buyout Y") und in der GuV-Kachel.
   //
   // Verglichen wird deshalb der BRUTTOPREIS — dieselbe Größe, aus der auch der Faktor stammt.
+  //
+  // WOGEGEN verglichen wird, hat Chris gemeldet: „IN der Erklärung steht auch Gekauft für 18,8
+  // jetzt MW 19,1". Beide Zahlen sind echt und beide hießen hier „Marktwert" — nur meinten sie
+  // Verschiedenes. `preview.marketValueReference` ist der zum SAISONENDE EINGEFRORENE Marktwert
+  // (`frozenValuationSnapshot.frozenMw`, gebaut in `matchday-progress-service` nach dem letzten
+  // Spieltag); die Kachel „MW aktuell" weiter unten zeigt den LAUFENDEN Wert, der durch Training
+  // noch steigt. Am Live-Abbild gemessen gingen im eingefrorenen Save 335 von 336 Kaderspielern
+  // auseinander (im Mittel 0,39, bis 1,70) — in den vier Saves vor dem Freeze kein einziger,
+  // weil dort beide auf dieselbe Live-Rechnung fallen. Zwei Zahlen unter einem Namen.
+  //
+  // Der eingefrorene Wert IST der Verkaufswert der Saison (Chris' Entscheidung), an der Rechnung
+  // ändert sich deshalb nichts. Nur der Name sagt jetzt, welcher der beiden gemeint ist.
   const grossSalePrice = preview?.salePrice ?? null;
   const saleVsMarketValue =
     grossSalePrice != null && preview?.marketValueReference != null
@@ -254,7 +267,7 @@ export default function FoundationMarketSellShellHost({
           saleVsMarketValuePct != null
             ? ` (${saleVsMarketValuePct >= 0 ? "+" : ""}${formatLocalePoints(saleVsMarketValuePct, 1)} %)`
             : ""
-        } ${saleVsMarketValue >= 0 ? "über" : "unter"} Marktwert`;
+        } ${saleVsMarketValue >= 0 ? "über" : "unter"} Saison-MW`;
 
   // Buyout-Herleitung unter dem Netto-Erlös: sagt explizit, ob ein Buyout
   // absetzt UND wie viel — statt der bisherigen "kein Buyout"-Nebenbemerkung.
@@ -398,13 +411,16 @@ export default function FoundationMarketSellShellHost({
             <span className="transfer-sell-price-label">Netto-Erlös</span>
             <span className="transfer-sell-price-value nl-tnum">{formatTransfermarktCurrency(netProceeds)}</span>
             {buyoutSubText ? <span className="transfer-sell-price-sub">{buyoutSubText}</span> : null}
-            <span className="transfer-sell-price-sub">
-              Faktor {preview.saleFactor != null ? `${formatLocalePoints(preview.saleFactor, 2)}×` : "—"} auf MW{" "}
+            <span className="transfer-sell-price-sub" title={SAISON_MW_ERKLAERUNG}>
+              Faktor {preview.saleFactor != null ? `${formatLocalePoints(preview.saleFactor, 2)}×` : "—"} auf Saison-MW{" "}
               {formatTransfermarktCurrency(preview.marketValueReference)}
             </span>
             {mwDiffText ? (
-              <span className={`transfer-sell-price-mw-diff${mwDiffTone ? ` is-${mwDiffTone}` : ""}`}>
-                vs. Marktwert: {mwDiffText}
+              <span
+                className={`transfer-sell-price-mw-diff${mwDiffTone ? ` is-${mwDiffTone}` : ""}`}
+                title={SAISON_MW_ERKLAERUNG}
+              >
+                vs. Saison-MW: {mwDiffText}
               </span>
             ) : null}
           </div>
