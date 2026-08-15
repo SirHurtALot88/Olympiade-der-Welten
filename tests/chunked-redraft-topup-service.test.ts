@@ -282,29 +282,37 @@ describe("chunked redraft topup service", () => {
   it("does not use OVR, MVS or market value as draft attractiveness score", () => {
     const serviceText = fs.readFileSync(path.join(process.cwd(), "lib/ai/chunked-redraft-topup-service.ts"), "utf8");
 
-    // Der Survival-Fallback wird HERAUSGESCHNITTEN, nicht das Verbot gelockert: seine
-    // Kostenterme sind benannt (Kopfkommentar), fuer den Rest der Datei gilt das Verbot
-    // unveraendert weiter. Die beiden Marken werden mitgeprueft, damit der Schnitt nicht
-    // eines Tages still die ganze Datei verschluckt.
+    // DAS VERBOT GILT JETZT FUER DIE GANZE DATEI — auch fuer den Survival-Fallback.
+    //
+    // Frueher wurde der Fallback hier herausgeschnitten und nur der Rest geprueft, weil in ihm
+    // `candidate.quality * 0.18` stand; der Fall war als „BLEIBT ROT" markiert, weil seine
+    // Entfernung eine Balance-Aenderung ist. Chris hat entschieden: raus, wie im Entwurf. Der
+    // Schnitt entfaellt damit — und dass er entfaellt, ist die schaerfere Zusicherung.
+    //
+    // Die Kosten-Terme des Fallbacks (Marktwert, Gehalt) bleiben erlaubt und sind unten
+    // ausdruecklich benannt: sie beantworten „koennen wir uns das leisten", nicht „wer ist
+    // besser".
+    expect(serviceText).not.toContain("premiumSignal");
+    expect(serviceText).not.toContain("right.quality");
+    expect(serviceText).not.toContain("input.candidate.quality *");
+    expect(serviceText).not.toContain("candidateQuality: input.candidate.quality");
+    expect(serviceText).not.toContain("return roundValue(candidate.quality");
+    expect(serviceText).not.toContain("candidate.quality *");
+
+    // Der Survival-Fallback existiert weiterhin — sonst pruefte die Zeile darueber ins Leere.
     const blockStart = serviceText.indexOf("const survivalCandidatePool =");
     const blockEnd = serviceText.indexOf("teamWarnings.push(`minimum_survival_budget_fallback:");
-    expect(blockStart).toBeGreaterThan(0);
+    expect(blockStart, "Survival-Fallback nicht gefunden — die Zusicherung liefe ins Leere").toBeGreaterThan(0);
     expect(blockEnd).toBeGreaterThan(blockStart);
-    const ohneSurvivalFallback = serviceText.slice(0, blockStart) + serviceText.slice(blockEnd);
+    const survivalFallback = serviceText.slice(blockStart, blockEnd);
+    // Bezahlbarkeit darf er rechnen, Guete nicht.
+    expect(survivalFallback).toContain("candidate.marketValue * 1.65");
+    expect(survivalFallback).toContain("(candidate.salary ?? 0) * 2.4");
 
-    expect(ohneSurvivalFallback).not.toContain("premiumSignal");
-    expect(ohneSurvivalFallback).not.toContain("right.quality");
-    expect(ohneSurvivalFallback).not.toContain("input.candidate.quality *");
+    // Ausserhalb des Fallbacks bleibt auch der Marktwert als Rangkriterium verboten.
+    const ohneSurvivalFallback = serviceText.slice(0, blockStart) + serviceText.slice(blockEnd);
     expect(ohneSurvivalFallback).not.toContain("marketValue *");
     expect(ohneSurvivalFallback).not.toContain("left.marketValue");
-    expect(ohneSurvivalFallback).not.toContain("candidateQuality: input.candidate.quality");
-    expect(ohneSurvivalFallback).not.toContain("return roundValue(candidate.quality");
-    expect(ohneSurvivalFallback).not.toContain("candidate.quality *");
-
-    // BLEIBT ROT (Befund oben): der Qualitaets-Term IM Fallback. Kein Test-Nachzug —
-    // die Reparatur ist eine Balance-Aenderung und braucht Chris' Entscheid.
-    const survivalFallback = serviceText.slice(blockStart, blockEnd);
-    expect(survivalFallback).not.toContain("candidate.quality *");
   });
 
   it("keeps draft score variance stable per save but different between fresh redraft saves", () => {

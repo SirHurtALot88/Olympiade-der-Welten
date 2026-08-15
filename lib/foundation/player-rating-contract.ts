@@ -9,6 +9,27 @@ export type PlayerRatingWarning =
   | "ovr_pool_no_spread"
   | "mvs_source_missing";
 
+/**
+ * MVS ALS GUETE-SIGNAL — und warum eine ehrliche 0 hier NICHT zaehlt.
+ *
+ * `mvs` beantwortet die Frage „wie hat der Spieler diese Saison platziert". Seit der Vertrag die
+ * Quelle sauber von der Zahl trennt (s. `buildPlayerRatingContractRows`), heisst `null` „keine
+ * Saisonquelle" und 0 heisst „null Platzierungen". Beides ist richtig — aber beides bedeutet fuer
+ * jemanden, der MVS als GUETE liest, dasselbe: es liegt noch keine Leistung vor.
+ *
+ * Zu Saisonbeginn hat jeder Spieler MVS 0. Wer dort `mvs ?? ovr` rechnet, bekaeme nach der
+ * Vertragsaenderung ueberall 0 statt OVR — die KI-Kaufbewertung der gesamten Vorsaison waere von
+ * „nach Koennen" auf „alle gleich" gekippt. Das waere keine Fehlerbehebung, sondern eine
+ * Balance-Aenderung durch die Hintertuer.
+ *
+ * Diese Funktion ist die eine Stelle, an der diese Einordnung steht: sie liefert MVS nur dann,
+ * wenn er ueberhaupt etwas aussagt, und sonst `null` — damit der Aufrufer wie bisher auf OVR
+ * zurueckfaellt. Ihr Ergebnis ist deshalb bit-identisch mit dem Verhalten VOR der Aenderung.
+ */
+export function mvsAlsGuete(mvs: number | null | undefined): number | null {
+  return typeof mvs === "number" && Number.isFinite(mvs) && mvs > 0 ? mvs : null;
+}
+
 export type PlayerRatingSourceStatus = {
   rawOvr: "ready" | "missing_source";
   normalizedOvr: "ready" | "missing_source" | "pool_no_spread";
@@ -377,13 +398,25 @@ export function buildPlayerRatingContractRows(input: {
 
   const sourceRows = rawRows.map((row) => {
     const seasonPoints = row.seasonPointsSummary?.totalPoints ?? null;
+    /**
+     * NULL HEISST „KEINE QUELLE", NICHT „NULL PLATZIERUNGEN".
+     *
+     * Die aeussere Unterscheidung war immer richtig: `mvsPerformances == null` heisst, es gibt
+     * keine Saisonquelle; ein — auch leeres — Array heisst, die Quelle ist da. Die innere Bedingung
+     * (`rawMvs != null && rawMvs > 0`) machte sie wieder kaputt: ein Spieler mit ehrlich null
+     * Platzierungen bekam `mvs: null`, `sourceStatus.mvs: "missing_source"` und die Warnung
+     * `mvs_source_missing` — obwohl die Quelle existiert und die Antwort schlicht 0 lautet.
+     *
+     * Das ist keine Kosmetik: `null` faehrt als „unbekannt" durch die halbe Anwendung, und jede
+     * Stelle, die es liest, muss raten. Steht die Quelle, steht auch die Zahl — und wenn sie 0
+     * ist, dann ist sie 0.
+     *
+     * WER MVS ALS GUETE LIEST, MUSS DIE 0 EINORDNEN: zu Saisonbeginn hat JEDER Spieler MVS 0, und
+     * eine 0 als Guete waere dort keine Aussage, sondern ein Zufallsgenerator. Dafuer gibt es
+     * `mvsAlsGuete` (unten) — die vier Lesestellen im Spiel benutzen sie.
+     */
     const mvs =
-      performanceRows == null
-        ? null
-        : (() => {
-            const rawMvs = mvsByPlayerId.get(row.player.id);
-            return rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null;
-          })();
+      performanceRows == null ? null : roundValue(mvsByPlayerId.get(row.player.id) ?? 0, 2);
 
     return {
       ...row,

@@ -146,7 +146,27 @@ export type PlayerEconomyCompareSummary = {
 export type PlayerEconomyCompareReport = {
   economyMode: PlayerEconomyMode;
   activeTransferEconomyMode: "legacy";
-  benchmarkSource: "legacy_imported_display";
+  /**
+   * WOGEGEN VERGLICHEN WIRD — und der Name war beim Gehalt nie richtig.
+   *
+   * Der Bericht hiess `legacy_imported_display`: importierter Anzeigewert gegen frische
+   * Neuberechnung. Beim Marktwert stimmt das. Beim GEHALT stimmte es nicht, und zwar aus zwei
+   * Gruenden:
+   *
+   *   1. Sobald ein Spieler vollstaendige Attribute hat, gewann in der Gehaltskette laengst die
+   *      eigene Formelrechnung — der Bericht verglich Formel gegen Formel.
+   *   2. Am frischen Spielstand gemessen (alle 2.984 Spieler): importiertes und berechnetes
+   *      Gehalt weichen um 0,00 voneinander ab. Die Katalogladung materialisiert die berechnete
+   *      Oekonomie ohnehin zuerst; der „Import" war eine Kopie derselben Zahl.
+   *
+   * Chris: „keine import gehälter mehr nutzen nicht in tests und nicht im gehalt, nur noch das
+   * berechnete!" — der Import-Zweig ist deshalb aus der Gehaltskette entfernt
+   * (`player-economy-contract.ts`). Damit ist `legacySalary` hier das GELTENDE Gehalt (der
+   * unterschriebene Vertrag, sonst der gespeicherte berechnete Wert) und `calculatedSalary` das,
+   * was die Formel heute sagt. Das ist ein Vergleich mit Aussage — Vertrag gegen Formel —, und
+   * der Name sagt das jetzt auch.
+   */
+  benchmarkSource: "in_kraft_gegen_formel";
   players: PlayerEconomyCompareRow[];
   summary: PlayerEconomyCompareSummary;
   warnings: string[];
@@ -705,7 +725,7 @@ export function buildPlayerEconomyCompareReport(input: {
   return {
     economyMode,
     activeTransferEconomyMode: "legacy",
-    benchmarkSource: "legacy_imported_display",
+    benchmarkSource: "in_kraft_gegen_formel",
     players: rows,
     summary,
     warnings,

@@ -219,3 +219,72 @@ describe("player economy contract", () => {
     expect(rosterSalariesDifferForDisplay(null, 18.63)).toBe(false);
   });
 });
+
+/**
+ * KEINE IMPORT-GEHAELTER MEHR — CHRIS: „keine import gehälter mehr nutzen nicht in tests und
+ * nicht im gehalt, nur noch das berechnete!"
+ *
+ * Die Gehaltskette endete frueher auf `displaySalary`, dem Anzeigewert aus der Katalog-Ausleitung.
+ * Dieser Block haelt fest, dass der Zweig weg ist — und er ist so gebaut, dass er es WIRKLICH
+ * misst: nur wenn die Rechnung nicht laufen kann (keine Attributwerte, kein gespeicherter
+ * berechneter Wert), kommt die Kette ueberhaupt bis dorthin, wo der Import frueher stand.
+ *
+ * An einem frischen Spielstand gemessen war die Entfernung folgenlos: von 2.984 Spielern haengt
+ * KEINER am Import (2.983 `calculated_preview`, einer `active_contract`), und importiertes wie
+ * berechnetes Gehalt weichen um 0,00 ab — die Katalogladung materialisiert die berechnete
+ * Oekonomie ohnehin zuerst.
+ */
+describe("Gehalt: der Import ist kein Rueckfall mehr", () => {
+  /** Ein Spieler, fuer den die Gehaltsformel nichts hergibt — nur der Anzeigewert steht da. */
+  function nurImportSpieler(): Player {
+    const player = buildPlayer({ displaySalary: 19.5 });
+    return {
+      ...player,
+      salaryDemand: null,
+      attributeSheetStats: null,
+    } as unknown as Player;
+  }
+
+  it("meldet `missing_salary` statt heimlich den Anzeigewert zu nehmen", () => {
+    const contract = resolvePlayerEconomyContract({ player: nurImportSpieler(), playerId: "player-1" });
+
+    expect(contract.salary, "der importierte Anzeigewert darf nicht mehr durchschlagen").toBeNull();
+    expect(contract.salarySource).toBe("missing_source");
+    expect(contract.expectedSalary).toBeNull();
+    expect(contract.economyStatus).toBe("missing_salary");
+  });
+
+  it("nimmt weiterhin den unterschriebenen Vertrag, wenn es einen gibt", () => {
+    const rosterEntry = {
+      id: "r-1",
+      teamId: "A-A",
+      playerId: "player-1",
+      contractLength: 3,
+      salary: 12.5,
+      upkeep: 12.5,
+      purchasePrice: 40,
+      currentValue: 40,
+      roleTag: "starter",
+      joinedSeasonId: "season-1",
+    } as unknown as RosterEntry;
+
+    const contract = resolvePlayerEconomyContract({
+      player: nurImportSpieler(),
+      playerId: "player-1",
+      rosterEntry,
+    });
+
+    expect(contract.salary).toBe(12.5);
+    expect(contract.salarySource).toBe("active_contract");
+  });
+
+  it("nimmt die Rechnung, sobald sie laeuft — und nicht den Anzeigewert daneben", () => {
+    // Vollstaendiger Spieler: die Formel greift, der Anzeigewert (16.78) steht daneben und
+    // gewinnt nicht.
+    const contract = resolvePlayerEconomyContract({ player: buildPlayer(), playerId: "player-1" });
+
+    expect(contract.salarySource).toBe("calculated_preview");
+    expect(contract.salary).not.toBe(16.78);
+    expect(contract.salary).toBe(contract.expectedSalary);
+  });
+});

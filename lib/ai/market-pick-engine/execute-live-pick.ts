@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/market-pick-engine/market-brackets";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
+import { mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import {
   listLocalTransfermarktFreeAgents,
   previewLocalTransfermarktBuy,
@@ -274,12 +275,12 @@ export function listExecuteFreeAgentsForSlot(input: {
 
 function resolveNeedAxisScore(item: TransfermarktFreeAgentItem, bestNeedDisciplineId: string | null) {
   if (!bestNeedDisciplineId) {
-    return (item.mvs ?? item.ovr ?? 0) * 0.15;
+    return (mvsAlsGuete(item.mvs) ?? item.ovr ?? 0) * 0.15;
   }
   const disciplineHit = item.preferredDisciplineIds?.includes(bestNeedDisciplineId) ? 12 : 0;
   const statPool = [item.pow ?? 0, item.spe ?? 0, item.men ?? 0, item.soc ?? 0];
   const topStat = statPool.length > 0 ? Math.max(...statPool) : 0;
-  return disciplineHit + topStat * 0.22 + (item.mvs ?? item.ovr ?? 0) * 0.12;
+  return disciplineHit + topStat * 0.22 + (mvsAlsGuete(item.mvs) ?? item.ovr ?? 0) * 0.12;
 }
 
 /**
@@ -400,7 +401,7 @@ function resolveExecuteLivePickForLane(input: {
       item,
       needRankScore: resolveNeedAxisScore(item, input.bestNeedDisciplineId),
       valueAdjustedQuality: executeValueAdjustedQuality({
-        quality: item.mvs ?? item.ovr ?? 0,
+        quality: mvsAlsGuete(item.mvs) ?? item.ovr ?? 0,
         marketValue: item.marketValue,
         slotLane: input.slotLane,
         brackets: input.brackets,

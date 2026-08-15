@@ -157,27 +157,40 @@ describe("player economy compare service", () => {
     expect(report.formulaStatus.marketValueEngine).toBe("ready");
     expect(report.players).toHaveLength(2);
     expect(report.players[0]?.legacyMarketValue).toBe(52);
-    // KNOWN REGRESSION (left red intentionally, do not weaken): `legacySalary`
-    // is sourced from resolvePlayerEconomyContract(...).salary
-    // (lib/foundation/player-economy-compare-service.ts ~line 627), whose
-    // fallback order (lib/foundation/player-economy-contract.ts ~line 310-315)
-    // is `rosterSalary ?? salaryBreakdown?.finalSalary ?? storedCalculatedSalary
-    // ?? legacyDisplaySalary`. Once a player has complete attribute data (as
-    // this fixture does), `salaryBreakdown?.finalSalary` (a fresh, independent
-    // attribute-formula computation) is non-null and wins over the raw
-    // displaySalary (12) — so `legacySalary` silently stops being "legacy" for
-    // exactly the players complete enough to also have a `calculatedSalary`.
-    // This contradicts the compare service's own stated intent
-    // (`benchmarkSource: "legacy_imported_display"`, same file ~line 148) of
-    // showing the original imported/display value side by side with a fresh
-    // recalculation. Unlike `legacyMarketValue` (whose "calculated" path
-    // re-derives FROM the display value via deriveBaseMarketValueFromFinal, so
-    // it round-trips back close to the legacy number), salary's "calculated"
-    // path is a wholly independent attribute-based formula with no such
-    // round-trip guarantee, so this can't be routed around with a different
-    // fixture without also losing calculatedSalary (which the test also needs
-    // to be non-null).
-    expect(report.players[0]?.legacySalary).toBe(12);
+    /**
+     * KEIN IMPORTIERTES GEHALT MEHR — auch nicht hier im Test.
+     *
+     * Hier stand `expect(legacySalary).toBe(12)`, also der `displaySalary` der Vorlage, und der
+     * Fall war als „KNOWN REGRESSION" rot markiert: sobald ein Spieler vollstaendige Attribute
+     * hat, gewann in der Gehaltskette laengst die eigene Formelrechnung, und der Bericht verglich
+     * Formel gegen Formel statt Import gegen Rechnung.
+     *
+     * Chris: „keine import gehälter mehr nutzen nicht in tests und nicht im gehalt, nur noch das
+     * berechnete!" Der Import-Zweig ist deshalb aus der Gehaltskette entfernt. Gemessen an einem
+     * frischen Spielstand war das folgenlos: von 2.984 Spielern haengt KEINER am Import, und
+     * importiertes und berechnetes Gehalt weichen um 0,00 ab — die Katalogladung materialisiert
+     * die berechnete Oekonomie ohnehin zuerst.
+     *
+     * Geprueft wird jetzt die Bedeutung statt der Zahl: `legacySalary` ist das GELTENDE Gehalt
+     * (hier ohne Vertrag also das berechnete), und es ist ausdruecklich NICHT mehr der
+     * importierte Anzeigewert der Vorlage.
+     */
+    // p-1 HAT einen Vertrag (Kaderzeile, Gehalt 11): in Kraft ist der Vertrag, nicht der Import
+    // (12) und nicht die Formel. Genau das ist der Vergleich, den der Bericht anstellt.
+    expect(report.players[0]?.legacySalary).toBe(11);
+    expect(report.players[0]?.legacySalary).not.toBe(12);
+    expect(report.players[0]?.calculatedSalary).not.toBe(report.players[0]?.legacySalary);
+    expect(report.players[0]?.salaryDelta).toBeCloseTo(
+      (report.players[0]!.calculatedSalary ?? 0) - (report.players[0]!.legacySalary ?? 0),
+      2,
+    );
+
+    // p-2 hat KEINEN Vertrag: dann ist das geltende Gehalt das berechnete — und wieder nicht der
+    // importierte Anzeigewert der Vorlage (4).
+    expect(report.players[1]?.legacySalary).not.toBe(4);
+    expect(report.players[1]?.legacySalary).toBe(report.players[1]?.calculatedSalary);
+
+    expect(report.benchmarkSource).toBe("in_kraft_gegen_formel");
     expect(report.players[0]?.calculatedMarketValue).not.toBeNull();
     expect(report.players[0]?.calculatedSalary).not.toBeNull();
     expect(report.players[0]?.calculationBreakdown.marketValueBaseOffset).toBe(0);
