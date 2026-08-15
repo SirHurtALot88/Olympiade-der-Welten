@@ -15,6 +15,7 @@ import type {
   TransfermarktSellSummary,
 } from "@/lib/foundation/tabs/use-market-sell-derivations";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { SAISON_MW_ERKLAERUNG } from "@/lib/market/transfermarkt-sale-factor";
 
 /**
  * KADER-DRAWER: „was sagt das Board zu dem hier?" — ohne den Verkauf anzufangen.
@@ -145,7 +146,12 @@ export default function FoundationRosterSellPeekDrawer({
           {!busy && !error && preview ? (
             <>
               <StatChipRow aria-label="Zahlen zum Verkauf">
-                <StatChip label="VK brutto" value={formatTransfermarktCurrency(brutto)} sub="Marktwert × Verkaufsfaktor" />
+                <StatChip
+                  label="VK brutto"
+                  value={formatTransfermarktCurrency(brutto)}
+                  sub="Saison-MW × Verkaufsfaktor"
+                  title={SAISON_MW_ERKLAERUNG}
+                />
                 <StatChip
                   label="Buyout"
                   value={formatTransfermarktCurrency(buyout)}
@@ -154,10 +160,13 @@ export default function FoundationRosterSellPeekDrawer({
                 />
                 <StatChip label="Netto-Erlös" value={formatTransfermarktCurrency(netto)} sub="was ins Team-Cash geht" />
                 <StatChip
-                  label="vs. Marktwert"
+                  label="vs. Saison-MW"
                   value={aufschlag != null ? formatTransfermarktCurrency(aufschlag) : "—"}
-                  sub={marktwert != null ? `MW ${formatTransfermarktCurrency(marktwert)}` : "kein Marktwert"}
+                  sub={
+                    marktwert != null ? `Saison-MW ${formatTransfermarktCurrency(marktwert)}` : "kein Marktwert"
+                  }
                   tone={aufschlag == null ? "neutral" : aufschlag >= 0 ? "good" : "warn"}
+                  title={SAISON_MW_ERKLAERUNG}
                 />
               </StatChipRow>
 
