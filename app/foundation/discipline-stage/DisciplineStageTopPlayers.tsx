@@ -5,6 +5,9 @@ import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 
 import { SPIELTAGS_TOPSPIELER_SPALTENHOEHE } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 
+import { PlayerAwardStrip } from "@/components/foundation/player-awards/PlayerAwardStrip";
+import type { PlayerSeasonAward } from "@/lib/foundation/player-season-awards";
+
 import { fmt1 } from "./stage-format";
 
 export type DisciplineStageTopPlayer = {
@@ -26,6 +29,12 @@ export type DisciplineStageTopPlayer = {
   isOwn: boolean;
   /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rahmens, NICHT `rank` (der PP-Rang dieser Liste). */
   ovrRank: number | null;
+  /**
+   * Auszeichnungen aus abgeschlossenen Saisons — Ticket #41, Chris: „auch in den drawern der
+   * arena sollen die awards dann auftauchen". Hier nur als Zeichen: eine ganze Marke wuerde die
+   * Zeile sprengen. Leer, solange keine Saison abgeschlossen ist.
+   */
+  awards?: readonly PlayerSeasonAward[] | null;
 };
 
 export type DisciplineStageTopPlayersProps = {
@@ -125,6 +134,7 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                   <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.isMvp ? "⭐ " : ""}
                     {p.name}
+                    <PlayerAwardStrip awards={p.awards} variant="icons" />
                   </div>
                   <div style={{ fontSize: 11, color: "var(--nl-mut)", display: "flex", alignItems: "center", gap: 4 }}>
                     {p.logoUrl ? (

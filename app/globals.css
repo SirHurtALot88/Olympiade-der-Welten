@@ -60048,6 +60048,73 @@ button.foundation-team-portrait-card {
   min-width: 200px;
 }
 
+/* --- Auszeichnungen (Ticket #41) --------------------------------------
+   Zwei Groessen aus EINER Komponente: die volle Marke im Spielerprofil, nur die
+   Zeichen in der Arena-Zeile. Gold, weil das Spiel dafuer bereits `--nl-gold`
+   fuehrt — eine neue Farbe fuer Auszeichnungen einzufuehren waere ein zweites
+   Vokabular fuer dieselbe Aussage. */
+
+.is-new-look .nl-award-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-award-strip-label {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+  font-weight: 800;
+}
+
+.is-new-look .nl-award-strip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-award-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--nl-gold) 11%, var(--nl-bg-2));
+  border: 1px solid color-mix(in srgb, var(--nl-gold) 40%, transparent);
+  color: var(--nl-ink);
+  /* `default`, nicht `pointer`: die Marke ist nicht anklickbar, der Grund steht im Titel.
+     Ein Zeigefinger auf etwas, das nichts tut, ist ein Versprechen, das nicht eingeloest wird. */
+  cursor: default;
+}
+
+.is-new-look .nl-award-chip-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-new-look .nl-award-chip-label {
+  font-weight: 700;
+}
+
+.is-new-look .nl-award-chip-season {
+  color: var(--nl-mut-2);
+}
+
+/* Die Arena-Zeile: nur Zeichen, direkt hinter dem Namen. Sie stehen in einer Zeile mit dem
+   Namen und duerfen ihn nicht verdraengen — deshalb kein Umbruch und kein eigener Block. */
+.is-new-look .nl-award-icons,
+.nl-award-icons {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: baseline;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 /* --- KI-Vorschau ------------------------------------------------------
    Die Bedienung steht in derselben Zeile wie Spieltag und Team, bricht aber
    auf eine eigene Zeile um (`flex-basis: 100%`) — der Panelinhalt ist breiter

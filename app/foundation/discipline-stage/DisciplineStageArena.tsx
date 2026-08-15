@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
 import dynamic from "next/dynamic";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -1344,6 +1345,7 @@ export default function DisciplineStageArena({
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
               ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
+              awards: s.playerId ? buildPlayerSeasonAwards(gameState, s.playerId) : null,
             },
           });
         });
@@ -1537,6 +1539,9 @@ export default function DisciplineStageArena({
           isMvp: eintrag.isMvp,
           isOwn: eintrag.teamId === ownTeamId,
           ovrRank: ratingByPlayerId.get(eintrag.playerId)?.ovrRank ?? null,
+          // Ticket #41 (Chris): „auch in den drawern der arena sollen die awards dann
+          // auftauchen". Nur die Zeichen — eine ganze Marke wuerde die Zeile sprengen.
+          awards: buildPlayerSeasonAwards(gameState, eintrag.playerId),
         };
       }),
       ids: summiert.map((eintrag) => eintrag.playerId as string | null),

@@ -21,6 +21,7 @@
  */
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { PlayerAwardStrip } from "@/components/foundation/player-awards/PlayerAwardStrip";
 import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import {
   NlRadar,
@@ -242,6 +243,11 @@ export default function PlayerHeroNewLook({
               </span>
             ) : null}
           </div>
+          {/* Die Auszeichnungen sitzen zwischen Identitaet und Kennzahlen: sie beantworten „wer
+              ist das", nicht „wie stark ist er". Ohne Titel faellt der Block ganz weg — in einer
+              laufenden ersten Saison ist das der Normalfall, weil Auszeichnungen erst beim
+              Saisonabschluss fallen. */}
+          <PlayerAwardStrip awards={data.seasonAwards} />
           <StatChipRow className="nl-player-hero-chips" aria-label="Spieler-Kennzahlen">
             {/* OVR/PPs/MVS stehen bewusst NICHT hier (D4, Audit „Team"): sie
                 erscheinen bereits mit Rang, Vorsaison-Delta und
