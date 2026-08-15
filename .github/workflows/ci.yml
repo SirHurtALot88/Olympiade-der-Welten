@@ -93,3 +93,34 @@ jobs:
       - name: Stop dev server
         if: always()
         run: kill "$(cat .dev-server.pid)" 2>/dev/null || true
+
+  # DIE VOLLE TESTSUITE — seit diesem Commit im Tor.
+  #
+  # WARUM ES SIE VORHER NICHT GAB, und warum das der eigentliche Befund ist: die CI fuhr
+  # ausschliesslich `ci:flow-smoke` (18 Dateien, 205 Tests). Die volle Suite — 869 Dateien,
+  # ueber 6.800 Tests — lief NIE im Tor. Genau deshalb konnte sie unbemerkt auf 66 rote Tests in
+  # 33 Dateien laufen: eine rote Suite, die niemanden alarmiert, warnt auch dann nicht, wenn ein
+  # echter Fehler dazukommt. Man gewoehnt sich an die Farbe.
+  #
+  # WARUM EIN EIGENER JOB statt eines weiteren Schritts in `test-and-smoke`: der Lauf braucht
+  # rund 20 Minuten, jener Job hat 30 und baut, installiert Chromium und faehrt drei Browser-
+  # Smokes. Zusammengelegt waere beides an der Zeitgrenze gestorben, und ein Timeout haette wie
+  # ein Testfehler ausgesehen. Getrennt laufen sie parallel, und wer rot ist, ist auch der, der
+  # kaputt ist.
+  #
+  # KEIN `npm run build`, KEIN Chromium: die Suite ist reines Node — sie braucht nur die
+  # Importdaten (deshalb `ci:import-exists`) und einen eigenen SQLite-Pfad.
+  full-test-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set CI SQLite path
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-full-suite.sqlite" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:import-exists
+      - run: npm test
