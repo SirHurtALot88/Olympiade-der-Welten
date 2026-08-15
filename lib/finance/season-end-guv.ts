@@ -140,6 +140,14 @@ export type SeasonGuvParts = {
   apronRank?: number | null;
   /** `false` = die Apron-Linien sind für diese Saison noch nicht eingefroren, die Grenze kann sich verschieben. */
   apronFrozenLines?: boolean;
+  /**
+   * Konjunkturhebel k(f) der Saison, 0 bis 1 (`apronKonjunkturhebel`). Steht bei 0, gibt es in
+   * dieser Saison GAR KEINE Abgabe — egal wie weit ein Team über den Linien liegt. Die Zeile sagt
+   * das, statt eine 0 unkommentiert stehen zu lassen: gemessen an Chris' Spielstand vom 13.08.
+   * (Salary Factor 0,84 → k = 0) war das die Erklärung für 32 Teams mit Apron 0 bei Gehältern bis
+   * 99,3 gegen eine 2. Linie von 81,0.
+   */
+  apronKonjunkturhebel?: number | null;
   /** `true` = der Deckel (halber Wertungsanteil) hat die Abgabe begrenzt. */
   apronGedeckelt?: boolean;
   /**
@@ -231,7 +239,20 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
             ? `Hochrechnung auf Platz ${parts.apronRank}, noch nicht gebucht`
             : "Hochrechnung, noch nicht gebucht",
         parts.apronGedeckelt ? "durch den Deckel begrenzt" : null,
-        parts.apronGebucht !== true && parts.apronFrozenLines === false ? "Linien noch nicht eingefroren" : null,
+        // Der Zustand der Linien steht in BEIDE Richtungen da. Nur die Warnung zu zeigen hiess:
+        // „eingefroren" war die Abwesenheit eines Hinweises — und damit von „diese Ansicht kennt
+        // den Apron nicht" nicht zu unterscheiden. Chris hat genau nach diesem Ausweis gefragt.
+        parts.apronGebucht === true
+          ? null
+          : parts.apronFrozenLines === false
+            ? "Linien noch nicht eingefroren"
+            : parts.apronFrozenLines === true
+              ? "Linien eingefroren"
+              : null,
+        // Die häufigste Erklärung für eine glatte 0 — sichtbar machen, nicht verschweigen.
+        parts.apronGebucht !== true && parts.apronKonjunkturhebel === 0
+          ? "Konjunktur zu schwach: in dieser Saison keine Abgabe"
+          : null,
       ]
         .filter(Boolean)
         .join(" · "),

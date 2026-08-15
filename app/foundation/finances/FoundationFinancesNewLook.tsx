@@ -606,7 +606,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
   return (
     <div className="nl-fin-apron" data-testid="nl-fin-apron">
       <div className="nl-fin-apron-rows" role="list" aria-label="Apron-Linien">
-        <div className="nl-fin-apron-row" role="listitem" title="1. Apron-Linie = Median-Gehalt der Liga (geglättet) × 1,1. Wer drüber liegt, zahlt auf den Überschuss eine Abgabe.">
+        <div className="nl-fin-apron-row" role="listitem" title="1. Apron-Linie = Median der real zu zahlenden Gehaltssummen der Liga × 1,1. Wer drüber liegt, zahlt auf den Überschuss eine Abgabe.">
           <span className="nl-fin-apron-row-label">Apron-Linie 1</span>
           <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.line1)}</span>
           <span className="nl-fin-apron-row-note nl-tnum">{formatApronDistance(apron.distanceLine1)}</span>
@@ -619,7 +619,7 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
         <div
           className="nl-fin-apron-row is-basis"
           role="listitem"
-          title="Bemessungsgrundlage des Apron: die GEGLÄTTETE Gehaltssumme (Verträge über die Laufzeit verteilt) — bewusst nicht die echte Saisonsumme der GuV, siehe Hinweis unten."
+          title="Bemessungsgrundlage des Apron: die Gehaltssumme, die in DIESER Saison wirklich zu zahlen ist — die Jahresrate aus jedem Vertrag. Dieselbe Summe, die die GuV abbucht."
         >
           <span className="nl-fin-apron-row-label">Deine Bemessungsgrundlage</span>
           <span className="nl-fin-apron-row-value nl-tnum">{formatNlMoney(apron.salaryBasis)}</span>
@@ -657,18 +657,26 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
         {apron.gebucht
           ? "Die Apron-Abrechnung dieser Saison ist bereits gebucht."
           : apron.frozenLines
-            ? "Linien für diese Saison eingefroren — gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
-            : "Linien noch nicht eingefroren — sie wandern bis zum ersten Spieltag mit dem Median mit, solange noch Kader gebaut werden. Alles hier ist eine Hochrechnung."}
+            ? "Linien für diese Saison eingefroren — seit „Transfers finalisieren\" steht die Grenze, und genau gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
+            : "Linien noch nicht eingefroren — sie wandern mit dem Median mit, solange noch Kader gebaut werden. Mit „Transfers finalisieren\" stehen sie fest. Alles hier ist eine Hochrechnung."}
+        {/* Die haeufigste Erklaerung fuer eine Karte voller Nullen — sie gehoert daneben, sonst
+            liest sich der ausgeschaltete Hebel wie ein kaputter Apron. */}
+        {!apron.gebucht && apron.konjunkturhebel === 0
+          ? ` Abgabe in dieser Saison abgeschaltet: der Salary Factor liegt bei ${apron.salaryFactor.toLocaleString("de-DE", { maximumFractionDigits: 2 })} und damit unter 0,95 — unterhalb dieser Schwelle zahlt niemand, egal wie weit über den Linien.`
+          : ""}
         {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
       </p>
 
-      {/* Der heikelste Punkt der Karte: hier stehen zwei verschiedene Gehaltssummen nebeneinander,
-          und beide sind richtig. Ohne diesen Satz sähe das wie der Widerspruch aus, den F4 (Fundament)
-          gerade behoben hat — deshalb wird der Unterschied erklärt, nicht versteckt. */}
+      {/* Hier standen bis zum 13.08.2026 zwei verschiedene Gehaltssummen nebeneinander, und der
+          Absatz erklärte, warum beide richtig seien: der Apron bemaß die GEGLÄTTETE Summe, die GuV
+          buchte die echte. Chris hat das aufgehoben („die REAL zu zahlende summe des jahres nach
+          vertrag und nicht geglättet"). Es gibt nur noch EINE Zahl — und der Absatz sagt das jetzt,
+          statt einen Unterschied zu erklären, den es nicht mehr gibt. */}
       <p className="nl-fin-apron-basis-note muted" data-testid="nl-fin-apron-basis-note">
-        Der Apron rechnet auf der <b>geglätteten</b> Gehaltssumme ({formatNlMoney(apron.salaryBasis)}): Verträge werden über ihre
-        Laufzeit verteilt, Front-/Backloading zählt nicht als Mehrausgabe. Die GuV in der Übersicht bucht dagegen die <b>echte</b> Saisonsumme
-        ({formatNlMoney(actualSalaryTotal)}). Beide Zahlen sind absichtlich verschieden.
+        Der Apron rechnet auf der <b>real zu zahlenden</b> Gehaltssumme dieser Saison
+        ({formatNlMoney(apron.salaryBasis)}) — der Jahresrate aus jedem Vertrag. Das ist dieselbe Summe, die die GuV
+        in der Übersicht bucht ({formatNlMoney(actualSalaryTotal)}). Eine Vertragsform, die früh mehr zahlt, hebt damit
+        auch die Bemessung dieser Saison; was hinten geparkt wird, fällt an, sobald die Rate steigt.
       </p>
     </div>
   );
@@ -698,10 +706,10 @@ const APRON_LEAGUE_COLUMNS: NlTableColumn<FinanceApronLeagueRow>[] = [
   { key: "team", label: "Team" },
   {
     key: "basis",
-    label: "Bemessung (geglättet)",
+    label: "Bemessung (real)",
     align: "right",
     tooltip:
-      "Geglättete Gehaltssumme (Verträge über die Laufzeit verteilt) — die Bemessungsgrundlage des Apron, absichtlich NICHT die echte Gehaltssumme der GuV (siehe Hinweis bei den Apron-Linien)",
+      "Die in DIESER Saison real zu zahlende Gehaltssumme — die Jahresrate aus jedem Vertrag. Dieselbe Summe, die die GuV abbucht; seit dem 13.08.2026 gibt es keine zweite, geglättete Bemessung mehr.",
   },
   {
     key: "abstand",
@@ -810,9 +818,11 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
 
   const statusText = apron.gebucht
     ? "Abrechnung dieser Saison bereits gebucht"
-    : apron.frozenLines
-      ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
-      : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";
+    : apron.konjunkturhebel === 0
+      ? "In dieser Saison gibt es keine Abgabe — der Salary Factor liegt unter 0,95"
+      : apron.frozenLines
+        ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
+        : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";
   // Summenprobe im Klartext: Topf und Kopfanteil kommen als FERTIGE Werte aus dem View-Model
   // (eine Quelle; der Kopfanteil ist der `ausgleich` einer Empfänger-Zeile, keine zweite
   // Rechnung). Der Topf wird VOLLSTÄNDIG zu gleichen Kopfteilen verteilt — kein Deckel auf der

@@ -685,11 +685,6 @@ export default function TeamProfileNewLook({
     );
   }, [foundationGameState, data.teamId]);
 
-  // Eigentümer-Gate (Fog-of-War): "manual" = vom Spieler geführtes Team
-  // (siehe formatControlModeLabel → "Team geführt"). Nur dann dürfen die
-  // spieler-granularen MW-/GEHALT-Zusammensetzungen sichtbar sein.
-  const isOwnedTeam = data.controlMode === "manual";
-
   // RANG-Hover: kompakte Ligatabelle. Rang/Punkte aus `seasonState.standings`,
   // PPs (Disziplin-Performance) + POW/SPE/MEN/SOC aus dem kanonischen
   // Team-Disziplin-Rang-Engine (dieselbe Quelle wie die Header-Achsen-Ränge).
@@ -1418,9 +1413,11 @@ export default function TeamProfileNewLook({
           </div>
           <span className="nl-kpipop-total">{formatNlMoney(mwBreakdown.total)}</span>
         </div>
-        {!isOwnedTeam ? (
-          <p className="nl-kpipop-note">Einzel-Marktwerte verdeckt (fremdes Team). Nur Kader-Summe sichtbar.</p>
-        ) : mwBreakdown.rows.length === 0 ? (
+        {/* GEMELDET VON CHRIS: „die grafik soll auch von anderen teams verfuegbar sein! sowohl
+            fuer MW als auch gehalt und Rang!" Hier stand ein Fog-of-War-Riegel: fremde Teams sahen
+            nur die Kadersumme und den Satz „Einzel-Marktwerte verdeckt". Aufgehoben — es war eine
+            reine Anzeige-Sperre, die Zahlen stehen ohnehin in derselben Kaderliste. */}
+        {mwBreakdown.rows.length === 0 ? (
           <p className="nl-kpipop-empty">Keine Marktwerte im Kader.</p>
         ) : (
           <ol className="nl-kpipop-players nl-tnum">
@@ -1459,9 +1456,8 @@ export default function TeamProfileNewLook({
           </div>
           <span className="nl-kpipop-total">{formatNlMoney(salaryBreakdown.total)}</span>
         </div>
-        {!isOwnedTeam ? (
-          <p className="nl-kpipop-note">Einzel-Gehälter/Verträge verdeckt (fremdes Team). Nur Kader-Summe sichtbar.</p>
-        ) : salaryBreakdown.rows.length === 0 ? (
+        {/* Fog-of-War aufgehoben, siehe die Begruendung am MW-Popover darueber. */}
+        {salaryBreakdown.rows.length === 0 ? (
           <p className="nl-kpipop-empty">Keine Gehälter im Kader.</p>
         ) : (
           <ol className="nl-kpipop-players nl-tnum">

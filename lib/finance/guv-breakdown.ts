@@ -36,14 +36,16 @@ export type GuvApronProjectionInput = {
   nettoDelta: number;
   /** Rang, auf den hochgerechnet wurde. `null` = unbekannt. */
   rank: number | null;
-  /** GEGLÄTTETE Gehaltssumme — die Bemessungsgrundlage, nicht die Gehaltsspalte der Tabelle. */
+  /** Die real zu zahlende Gehaltssumme dieser Saison — die Bemessungsgrundlage des Apron. */
   salary: number;
   line1: number;
   line2: number;
-  /** `true` = Linien vom Saisonbeginn (verbindlich), `false` = aus dem aktuellen Stand abgeleitet. */
+  /** `true` = Linien stehen fest (Transfers finalisiert), `false` = aus dem aktuellen Stand abgeleitet. */
   frozenLines: boolean;
   /** `true` = der Deckel (halber Wertungsanteil) begrenzt die Abgabe. */
   gedeckelt: boolean;
+  /** Konjunkturhebel k(f) der Saison. 0 = in dieser Saison gibt es gar keine Abgabe. */
+  konjunkturhebel?: number | null;
 };
 
 export type GuvBreakdownInput = {
@@ -95,18 +97,21 @@ function formatPlain(value: number | null) {
 
 /**
  * Die zwei Apron-Zeilen des Hovers: was hochgerechnet herauskäme, und woran diese Hochrechnung
- * hängt. Die zweite Zeile ist keine Ausschmückung — sie nennt die geglättete Bemessungsgrundlage
- * (die von der Gehaltsspalte der Tabelle abweichen DARF, siehe apron-service.ts) und sagt, dass
- * Deckel und Ausschüttung erst mit dem Endrang feststehen. Ohne beides läse sich die Zahl wie ein
- * bereits gebuchter Posten.
+ * hängt. Die zweite Zeile ist keine Ausschmückung — sie nennt die Bemessungsgrundlage und sagt,
+ * dass Deckel und Ausschüttung erst mit dem Endrang feststehen. Ohne beides läse sich die Zahl wie
+ * ein bereits gebuchter Posten. (Bis zum 13.08.2026 stand hier ausdrücklich „geglättet", weil die
+ * Bemessung von der Gehaltsspalte abweichen DURFTE; seit der Umstellung auf die real zu zahlende
+ * Jahressumme sind es dieselben Gehälter, siehe apron-service.ts.)
  */
 function buildApronLines(apron: GuvApronProjectionInput, guv: number | null): string[] {
   const rangText = apron.rank != null ? `beim aktuellen Rang (Platz ${apron.rank})` : "beim aktuellen Rang";
   const mitApron = guv != null ? ` → mit Apron ${formatSigned(Number((guv + apron.nettoDelta).toFixed(2)))}` : "";
   const zusaetze = [
-    `Gehälter ${formatPlain(apron.salary)} (geglättet) gegen Linien ${formatPlain(apron.line1)} / ${formatPlain(apron.line2)}`,
+    `Gehälter ${formatPlain(apron.salary)} gegen Linien ${formatPlain(apron.line1)} / ${formatPlain(apron.line2)}`,
     apron.gedeckelt ? "durch den Deckel begrenzt" : null,
-    apron.frozenLines ? null : "Linien noch nicht eingefroren",
+    // Beide Richtungen benennen: „eingefroren" darf nicht die blosse Abwesenheit einer Warnung sein.
+    apron.frozenLines ? "Linien eingefroren" : "Linien noch nicht eingefroren",
+    apron.konjunkturhebel === 0 ? "Konjunktur zu schwach: in dieser Saison keine Abgabe" : null,
   ].filter(Boolean);
   return [
     `Apron ${rangText}: ${formatSigned(apron.nettoDelta)}${mitApron}`,

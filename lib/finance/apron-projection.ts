@@ -31,9 +31,10 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 import {
+  apronKonjunkturhebel,
   apronWertungsanteil,
+  areSeasonApronLinesFrozen,
   computeApronSettlement,
-  hasSeasonBeenPlayed,
   resolveSeasonApronLines,
   resolveApronSalaryFactor,
   type ApronLines,
@@ -64,13 +65,21 @@ export type ApronProjectionTeamRow = {
 export type ApronProjection = {
   lines: ApronLines;
   /**
-   * `true` = der erste Spieltag ist abgerechnet, die Linien stehen fest, und genau gegen sie wird
-   * am Saisonende gebucht. `false` = die Saison läuft noch im Kaderbau (KI-Vorsaisonkäufe,
-   * Spieler-Picks, organische Nachkäufe); die Linien wandern bis zum ersten Spieltag mit dem
-   * Median mit, und der Hover sagt das.
+   * `true` = das Kauffenster ist zu (Transfers finalisiert oder erster Spieltag abgerechnet), die
+   * Linien stehen fest, und genau gegen sie wird am Saisonende gebucht. `false` = die Saison läuft
+   * noch im Kaderbau (KI-Vorsaisonkäufe, Spieler-Picks, organische Nachkäufe); die Linien wandern
+   * so lange mit dem Median mit, und der Hover sagt das.
    */
   frozenLines: boolean;
   salaryFactor: number;
+  /**
+   * k(f) aus `apronKonjunkturhebel` — 0 bis 1. Steht hier, weil er die häufigste Erklärung für eine
+   * Abgabe von exakt 0 ist: unter einem Salary Factor von 0,95 ist die Abgabe der ganzen Saison
+   * abgeschaltet, ganz gleich wie weit ein Team über den Linien liegt. Ohne diese Zahl in der
+   * Anzeige liest sich die 0 wie ein Fehler (gemessen an Chris' Spielstand vom 13.08.: f = 0,84,
+   * k = 0, also 0 Abgabe für alle 32 Teams — bei Gehältern bis 99,3 gegen eine 2. Linie von 81,0).
+   */
+  konjunkturhebel: number;
   topf: number;
   zahlerCount: number;
   empfaengerCount: number;
@@ -97,10 +106,11 @@ export function buildApronProjection(input: {
   // dieselbe Auswahl doppelt und ohne die Aufbauphase-Regel — die Anzeige zeigte während des
   // Kaderbaus eine Grenze, die der Gehaltsstand daneben längst überholt hatte.
   const lines: ApronLines = resolveSeasonApronLines(gameState);
-  // „Eingefroren" heisst jetzt: der erste Spieltag ist abgerechnet, ab da ist die Grenze fest.
-  // Vorher hiess es nur „ein Snapshot existiert" — der lag aber schon vor dem Kaderbau vor, also
-  // meldete die Anzeige „eingefroren", waehrend die Liga die Linie noch reihenweise ueberholte.
-  const frozenLines = hasSeasonBeenPlayed(gameState);
+  // „Eingefroren" heisst: das Kauffenster ist zu UND ein zur Saison passender Snapshot liegt vor.
+  // Dieselbe Frage, die auch `resolveSeasonApronLines` eine Zeile darueber beantwortet — nicht
+  // zweitgerechnet, sonst koennte die Anzeige „eingefroren" melden, waehrend die Zahl daneben noch
+  // live aus dem Median faellt.
+  const frozenLines = areSeasonApronLinesFrozen(gameState);
   const salaryFactor = resolveApronSalaryFactor(gameState);
 
   const teams = gameState.teams.map((team) => ({
@@ -116,6 +126,7 @@ export function buildApronProjection(input: {
     lines,
     frozenLines,
     salaryFactor,
+    konjunkturhebel: apronKonjunkturhebel(salaryFactor),
     topf: settlement.topf,
     zahlerCount: settlement.zahlerCount,
     empfaengerCount: settlement.empfaengerCount,

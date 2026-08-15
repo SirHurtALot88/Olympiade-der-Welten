@@ -252,7 +252,7 @@ import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-s
 import { buildScoutingHubTargetSections } from "@/lib/scouting/scouting-hub-targets-service";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
-import { getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { buildSeasonDisciplinePlayerCountMap, getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
@@ -7761,10 +7761,34 @@ export function useFoundationShellRouterBodyScope({
       return left.name.localeCompare(right.name, "de");
     });
   }, [gameState.disciplines]);
+  /**
+   * Die fuer DIESE Saison ausgeloste Spielerzahl je Disziplin — nicht die Katalog-Zahl.
+   *
+   * GEMELDET VON CHRIS: „die spaltenreihenfolge soll doch pro saison dynamisch sein. sobald der
+   * spielplan ausgewuerfelt wurde soll die reihenfolge angepasst werden. zb sind hockey und time
+   * trial die 6er diszis. Dann sollten die im rot bzw gruen an erster stelle stehen!"
+   *
+   * Der Spielplan wuerfelt die Spielerzahl jede Saison neu aus. Am Live-Spielstand nachgemessen
+   * weichen ALLE VIER Bereiche vom Katalog ab:
+   *
+   *   POWER   Katalog GEW(6)·HOC(5)·BRE(4)·TDM(3)·MIN(2)  →  Saison GEW(6)·TDM(5)·BRE(4)·HOC(3)·MIN(2)
+   *   SPEED   Katalog CLI(6)·FEC(5)·TIM(4)·STA(3)·SPU(2)  →  Saison STA(6)·CLI(5)·SPU(4)·TIM(3)·FEC(2)
+   *   MENTAL  Katalog ISP(6)·WET(5)·TAK(4)·TEN(3)·SCH(2)  →  Saison WET(6)·TEN(5)·SCH(4)·TAK(3)·ISP(2)
+   *   SOCIAL  Katalog BAS(6)·SHO(5)·FOO(4)·EIS(3)·BAT(2)  →  Saison SHO(6)·BAS(5)·BAT(4)·EIS(3)·FOO(2)
+   *
+   * Dieselbe Zahl steuert die Punkteverteilung (`resolveDisciplinePlayerCount`) — sie ist also
+   * die fuer die Saison GUELTIGE Groesse, waehrend `discipline.playerCount` der Startzustand des
+   * Katalogs ist. Fehlt sie (Alt-Save ohne Spielplan), faellt NUR diese eine Disziplin auf den
+   * Katalog zurueck, statt die ganze Sortierung zu verwerfen.
+   */
+  const seasonPlayerCountByDisciplineId = useMemo(
+    () => buildSeasonDisciplinePlayerCountMap(gameState),
+    [gameState],
+  );
+
   const disciplineRanksColumns = useMemo<FoundationTableColumn[]>(() => {
-    // Innerhalb jedes Achsen-Blocks (POW/SPE/MEN/SOC) die Disziplinen nach Anzahl
-    // eingesetzter Spieler absteigend ordnen (z. B. bei POW zuerst Hockey mit 6,
-    // dann Gewichtheben mit 5 …). Die Block-Reihenfolge der Achsen bleibt erhalten,
+    // Innerhalb jedes Achsen-Blocks (POW/SPE/MEN/SOC) die Disziplinen nach der Anzahl
+    // eingesetzter Spieler absteigend ordnen. Die Block-Reihenfolge der Achsen bleibt erhalten,
     // damit die farbige Gruppierung im Header intakt bleibt.
     const categoryOrder: string[] = [];
     for (const discipline of orderedDisciplines) {
@@ -7777,7 +7801,9 @@ export function useFoundationShellRouterBodyScope({
       if (categoryDelta !== 0) {
         return categoryDelta;
       }
-      const countDelta = (right.playerCount ?? 0) - (left.playerCount ?? 0);
+      const seasonCount = (discipline: { id: string; playerCount?: number | null }) =>
+        seasonPlayerCountByDisciplineId.get(discipline.id) ?? discipline.playerCount ?? 0;
+      const countDelta = seasonCount(right) - seasonCount(left);
       if (countDelta !== 0) {
         return countDelta;
       }
@@ -7785,6 +7811,10 @@ export function useFoundationShellRouterBodyScope({
     });
     return [
       { id: "team", label: "Team", dataKey: "team", defaultWidth: 178, minWidth: 150, maxWidth: 210 },
+      // Kadergroesse vor TOT — Chris: „vor TOT noch ne spalte wo wir die anzahl der spieler im
+      // team sehen koennten einfach als #". Ein Rang ohne die Kadergroesse daneben laesst offen,
+      // ob ein Team stark ist oder nur duenn besetzt.
+      { id: "rosterSize", label: "#", dataKey: "rosterSize", defaultWidth: 44, minWidth: 38, maxWidth: 56 },
       { id: "totalRank", label: "TOT", dataKey: "totalRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "powRank", label: "POW", dataKey: "powRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       { id: "speRank", label: "SPE", dataKey: "speRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
@@ -7799,7 +7829,7 @@ export function useFoundationShellRouterBodyScope({
         maxWidth: 52,
       })),
     ];
-  }, [orderedDisciplines]);
+  }, [orderedDisciplines, seasonPlayerCountByDisciplineId]);
   const disciplineConfigTableColumns = useMemo<FoundationTableColumn[]>(
     () => [
       { id: "originalOrder", label: "Original-Reihenfolge", dataKey: "originalOrder", defaultWidth: 170, minWidth: 130 },

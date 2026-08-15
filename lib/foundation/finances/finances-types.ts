@@ -253,8 +253,16 @@ export type FinanceApronStatus = {
   rank: number | null;
   /** `true` = die Abrechnung dieser Saison ist bereits gebucht (dann ist die Zahl keine Hochrechnung mehr). */
   gebucht: boolean;
-  /** `false` = Linien noch nicht eingefroren — sie können sich bis zum Saisonende verschieben. */
+  /** `false` = Linien noch nicht eingefroren — sie wandern, solange das Kauffenster offen ist. */
   frozenLines: boolean;
+  /**
+   * Konjunkturhebel k(f) der Saison, 0 bis 1 (`apronKonjunkturhebel`). Bei 0 gibt es in dieser
+   * Saison keine Abgabe — die häufigste Erklärung für eine Karte voller Nullen, und ohne diese
+   * Zahl von einem Fehler nicht zu unterscheiden.
+   */
+  konjunkturhebel: number;
+  /** Salary Factor der Saison — die Eingangsgröße des Hebels, damit die Karte sie nennen kann. */
+  salaryFactor: number;
   /** `true` = Frisch-Save-Schranke: Linien aus dem Referenzgehalt statt gemessener Gehälter. */
   usedReferenceSalary: boolean;
   /**

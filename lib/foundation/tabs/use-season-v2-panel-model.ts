@@ -167,6 +167,7 @@ export function useSeasonV2PanelModel({
               line1: apronProjection.lines.line1,
               line2: apronProjection.lines.line2,
               frozenLines: apronProjection.frozenLines,
+              konjunkturhebel: apronProjection.konjunkturhebel,
               gedeckelt: apronRow.gedeckelt,
             };
           })(),

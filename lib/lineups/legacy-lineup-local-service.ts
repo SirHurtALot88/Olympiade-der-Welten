@@ -11,6 +11,7 @@ import {
   normalizeLineupDraftModifiers,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { getLocalModifierSourceBundle } from "@/lib/lineups/legacy-modifier-source-contract";
+import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import {
   ensureLocalTeamPowersForSeason,
   getTeamPowerOptions,
@@ -949,7 +950,23 @@ export function ensureLocalLegacyFormCardsForSeason(
   // nie Formkarten. `ensureLocalFormCardsForSeason` arbeitet jetzt pro Spieler additiv, also lassen wir es immer
   // laufen — es fügt genau die noch fehlenden Karten hinzu (z. B. für frisch gekaufte Spieler) und ist bei bereits
   // vollständigem Kader ein reiner No-op.
-  const nextGameState = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
+  const mitKarten = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
+
+  /**
+   * MIT DEM FINALISIEREN SCHLIESST DAS KAUFFENSTER — also frieren hier die Apron-Linien ein.
+   *
+   * GEMELDET VON CHRIS: „ich habe nun transfers finalisiert -> apron müsste nun eingefroren werden
+   * und hier entsprechend auch angezeigt werden in der GuV und den anderen finanz Seiten!"
+   *
+   * Der Aufruf steht NACH `ensureLocalFormCardsForSeason` und nicht davor: das Einfrieren prüft
+   * über `haveSeasonTransfersBeenFinalized`, ob alle menschlichen Teams ihren Formkarten-Pool
+   * haben — vorher wäre die Antwort noch „nein" und der Snapshot bliebe aus.
+   *
+   * Selbst-sichernd: `ensureSeasonApronLinesFrozen` gibt denselben Zustand zurück, sobald die
+   * Linien stehen. Ein zweites Finalisieren (der Endpunkt ist bewusst idempotent) verschiebt die
+   * Grenze also nicht.
+   */
+  const nextGameState = ensureSeasonApronLinesFrozen(mitKarten, "transfers_finalized");
   const cardsChanged = nextGameState !== save.gameState;
   if (cardsChanged) {
     resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
@@ -1232,7 +1249,7 @@ export function saveLocalLegacyLineupDraft(
     };
   }
 
-  const nextGameState: GameState = {
+  const mitEinsatzliste: GameState = {
     ...gameStateWithFormCards,
     seasonState: {
       ...gameStateWithFormCards.seasonState,
@@ -1242,6 +1259,21 @@ export function saveLocalLegacyLineupDraft(
       ],
     },
   };
+
+  /**
+   * NACHZÜGLER-EINFRIERUNG für Spielstände, die unter einem älteren Build finalisiert haben.
+   *
+   * Der reguläre Zeitpunkt ist „Transfers finalisieren" (`ensureLocalLegacyFormCardsForSeason`).
+   * Wer aber schon VOR diesem Build finalisiert hat, kommt dort nie wieder vorbei — der
+   * Flow-Schritt steht auf „erledigt" und feuert den Endpunkt nicht erneut. Ohne diese Zeile bliebe
+   * die Anzeige bei solchen Spielständen bis zum ersten Spieltag bei „Linien noch nicht
+   * eingefroren", obwohl das Kauffenster längst zu ist.
+   *
+   * Hier ist es sicher: eine Einsatzliste gibt es erst NACH dem Finalisieren (der Flow blockiert
+   * `set_lineup` sonst mit `transfers_not_finalized`). Und `ensureSeasonApronLinesFrozen` gibt
+   * denselben Zustand zurück, sobald die Linien stehen — jedes weitere Speichern ist ein No-op.
+   */
+  const nextGameState = ensureSeasonApronLinesFrozen(mitEinsatzliste, "transfers_finalized");
 
   resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
 

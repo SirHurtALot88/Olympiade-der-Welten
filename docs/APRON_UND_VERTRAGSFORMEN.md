@@ -1,5 +1,29 @@
 # Apron und Vertragsformen — Messung und Plan (12.08.2026)
 
+> **NACHTRAG 13.08.2026 — SCHRITT 3 IST ÜBERHOLT. Die Apron-Bemessung liegt jetzt auf der
+> ECHTEN Jahreszahlung.**
+>
+> Chris, nachdem er die Zahlen gesehen hat: *„Apron ist noch falsch, das sollte doch umgestellt
+> sein auf die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet."*
+>
+> Schritt 3 hatte die Bemessung vom Formel-Gehalt auf `RosterEntry.negotiatedAnnualSalary` gelegt —
+> das bei Unterschrift verhandelte Jahresgehalt. Das behob die erste Meldung (Verhandeln zählt),
+> blieb aber eine **geglättete** Größe: es ist der Durchschnitt über die Laufzeit, nicht das, was
+> in dieser Saison vom Konto geht. Bemessen wird ab jetzt `getTeamActualSalaryTotal` —
+> `yearlySalarySchedule[0]` je Vertrag, exakt das Feld, das die Saisonende-Abrechnung abbucht.
+>
+> **Damit ist die Anti-Gaming-Zusage aus Schritt 3 aufgehoben.** Sie lautete „ein Formwechsel
+> ändert die Apron-Abgabe um 0,00" und hing genau daran, dass die Basis formunabhängig war.
+> `front_loaded` hebt die Basis dieser Saison, `back_loaded` senkt sie — gewollt, weil besteuert
+> werden soll, was man wirklich zahlt. Es bleibt ein **Verschieben, kein Vermeiden**: der Apron
+> wird jede Saison neu abgerechnet, und was `back_loaded` heute spart, fällt an, sobald die Rate
+> steigt. Der Wächter-Test misst diese neue Regel, statt die alte zu behaupten
+> (`tests/apron-faktor-horizont-und-vertragsform.test.ts`).
+>
+> Das Feld `negotiatedAnnualSalary` bleibt bestehen und wird weiter geschrieben — es trägt den
+> Verhandlungserfolg und wird an anderer Stelle gelesen. Es ist nur nicht mehr die Steuerbasis.
+> Alles ab hier beschreibt den Stand vom 12.08.
+
 > **GEBAUT (12.08., abends) — Schritt 2 und Schritt 3 stehen im Code.** Beide Abnahmen sind
 > gemessen; **eine Abweichung ist offen und wird NICHT durch Drehen an Zahlen zugedeckt:**
 >

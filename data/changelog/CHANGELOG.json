@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-14",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Ein negativer Kontostand wird im Saisonstand jetzt rot ausgewiesen. Vorher stand er in derselben gedaempften Farbe wie jede andere Zahl der Finanzspalten — ein Team im Minus war beim Ueberfliegen der Tabelle nicht von einem gesunden zu unterscheiden. Positives Cash bleibt bewusst unausgezeichnet, sonst leuchtet die halbe Spalte und die eine echte Warnung geht darin unter.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.4"
+    },
+    {
       "datum": "2026-08-13",
       "seite": "Spielstände",
       "pr": null,
@@ -12,12 +21,39 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Die Apron-Abgabe bemisst sich ab jetzt an der REAL in dieser Saison zu zahlenden Gehaltssumme — der Jahresrate aus dem Vertrag, also genau dem Betrag, den die Saisonende-Abrechnung abbucht. Vorher war es das bei Unterschrift verhandelte Jahresgehalt: das behob zwar den aelteren Fehler, dass ein gut verhandelter Kader trotzdem voll zahlte, war aber selbst eine geglaettete Groesse — der Durchschnitt ueber die Laufzeit statt dessen, was in diesem Jahr vom Konto geht. Auch die Liga-Linien wandern mit, sie werden aus derselben Groesse gebildet. Am abgerechneten Spielstand verschieben sich 30 von 32 Teams, im Extrem um 8,6; die 1. Linie liegt bei 69,1 statt vorher darueber. Damit faellt die frueher zugesicherte Formunabhaengigkeit weg: eine frontlastige Vertragsform hebt die Abgabe dieser Saison, eine hecklastige senkt sie. Das ist gewollt — besteuert wird, was man wirklich zahlt — und es verschiebt die Last nur, statt sie zu vermeiden: der Apron wird jede Saison neu abgerechnet, und was hinten geparkt wird, faellt an, sobald die Rate steigt. Die Beschriftung zieht mit: die Spalte heisst jetzt „Bemessung (real)\" statt „Bemessung (geglättet)\", und der Absatz unter den Apron-Linien erklaert nicht mehr, warum Apron und GuV absichtlich verschiedene Gehaltssummen zeigen — es ist dieselbe.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Apron-Linien frieren jetzt mit „Transfers finalisieren\" ein statt erst mit dem ersten abgerechneten Spieltag. Solange Kader gebaut werden, sollen sie mit dem Median mitwandern — mit dem Finalisieren endet der Kaderbau der Saison, ab da steht die Grenze, und genau gegen sie wird am Saisonende gebucht. Die Finanzen-Seite und der GuV-Hover sagen den Zustand jetzt in BEIDE Richtungen: „Linien eingefroren\" steht ausdrücklich da, statt nur die Warnung wegzulassen — deren Fehlen war von „diese Ansicht kennt den Apron nicht\" nicht zu unterscheiden. Und eine Abgabe von 0 wird erklärt: am Spielstand nachgemessen liegt der Salary Factor dieser Saison bei 0,84 und damit unter der Schwelle 0,95, ab der die Abgabe überhaupt greift — deshalb zahlt hier kein einziges der 32 Teams etwas, obwohl Gehälter bis 99,3 gegen eine 2. Linie von 81,0 laufen. Das steht jetzt daneben, statt wie ein Fehler auszusehen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Team-Einstellungen",
       "pr": null,
       "text": "Wem ein Team gehört, wird ab jetzt genau einmal entschieden: beim Anlegen des Spielstands. Klubs antippen, die man selbst steuert, dann „Neues Spiel anlegen\" — fertig. Vorher gab es dafür vier Bedienungen an drei Orten: zwei Knöpfe mit fast gleichem Namen zwanzig Zeilen auseinander, dazu ein Dropdown und ein zweites 32-Karten-Raster im Reiter „Spielmodus & KI\". Der rohe zweite Knopf ist ersatzlos entfallen — er war es, der Spielstände erzeugte, in denen die KI alle 32 Klubs steuerte. Dropdown und zweites Raster sind ebenfalls weg; der Reiter heißt jetzt „KI-Verhalten\", zeigt die Zuordnung nur noch an und verweist fürs Ändern auf den einen Weg. Ohne angetippten Klub lässt sich gar kein Spiel mehr anlegen, und der Knopf sagt auch, warum er wartet.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
       "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Einsatzliste · Slots",
+      "pr": null,
+      "text": "Wer einen Spieler ueber das Feld zog, sah an jedem Slot weiter den „Best Fit\" — den Vorschlag der Liste, also die Zahlen eines ANDEREN Spielers. Genau in dem Moment, in dem die Frage „was bringt DIESER hier?\" ansteht, beantwortete die Karte eine andere. Jetzt tritt waehrend des Ziehens an dieselbe Stelle eine Zeile mit dem Spieler in der Hand und seinem projizierten Wert fuer GENAU DIESEN Slot; danach steht der Vorschlag wieder da. Auf belegten Slots kommt das Delta gegen den, der gerade drin steht, dazu — die Antwort auf „lohnt der Tausch?\". Hat der Spieler fuer die Disziplin keinen Wert, sagt die Zeile das ausdruecklich, statt eine Luecke zu lassen. Beide Griffe zaehlen: aus dem Kader und aus einem belegten Slot heraus. Gerechnet wird dafuer nichts Neues — die Werte je Spieler und Slot lagen laengst vor und wurden bisher nur an dieser Stelle nicht gelesen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
     },
     {
       "datum": "2026-08-13",
@@ -39,11 +75,29 @@
     },
     {
       "datum": "2026-08-13",
+      "seite": "Teams · Kennzahlen",
+      "pr": null,
+      "text": "Die Zusammensetzung hinter den Kennzahlen — „Marktwert · Kader\" mit den Einzelwerten, der Kadersumme und beim Gehalt der Vertragsform je Spieler — gab es nur beim eigenen Team. Bei jedem anderen stand dort die Summe und darunter „Einzel-Marktwerte verdeckt (fremdes Team)\". Das war eine reine Anzeige-Sperre: dieselben Zahlen stehen ohnehin in der Kadertabelle und im Transfermarkt. Jetzt oeffnet die Aufschluesselung fuer JEDES Team, sowohl fuer Marktwert als auch fuer Gehalt, und zwar in beiden Ansichten (Teams-Reiter und Team-Profil). Der Rang-Hover mit der Ligatabelle rund um das gewaehlte Team kannte die Sperre noch nie und bleibt unveraendert.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-13",
       "seite": "Team-Einstellungen · Neues Spiel",
       "pr": null,
       "text": "Ein neu angelegter Spielstand konnte damit enden, dass die KI alle 32 Teams steuert und keines dem Spieler gehört — man saß als Zuschauer in der eigenen Liga, und beim nächsten Spieltag wurde für einen aufgestellt. Grund waren zwei Knöpfe mit fast gleichem Namen: „Neues Spiel erstellen\" führt über den Klub-Assistenten und setzt die Steuerung korrekt, „Neues Spiel anlegen\" baute den Stand direkt aus dem Saatzustand — und der kennt keinen Spieler. An den vorhandenen Spielständen nachgemessen: alle über den Assistenten angelegten haben ein eigenes Team, beide über den zweiten Weg angelegten hatten keines. Die Klub-Auswahl geht jetzt auch diesen Weg mit; ohne Auswahl übernimmt der neue Stand das Team des laufenden.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.4"
+    },
+    {
+      "datum": "2026-08-13",
+      "seite": "Ranks",
+      "pr": null,
+      "text": "Die Disziplin-Spalten folgen jetzt der ausgewürfelten Saison statt dem Katalog. Der Spielplan legt jede Saison neu fest, wie viele Spieler eine Disziplin stellt — dieselbe Zahl, die auch die Punkte verteilt. Sortiert wurde bisher nach der Katalog-Zahl aus dem Startzustand, und am Spielstand nachgemessen wich jeder der vier Bereiche ab: im Power-Block stand Hockey an zweiter Stelle, obwohl es in dieser Saison nur drei Spieler stellt, während TDM mit fünf dahinter lag. Jeder Block beginnt jetzt mit seiner größten Disziplin dieser Saison. Neu daneben: eine Spalte „#\" links von TOT mit der Kadergröße — ein guter Rang bei acht Spielern heißt etwas anderes als bei vierzehn.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.4"
     },
     {

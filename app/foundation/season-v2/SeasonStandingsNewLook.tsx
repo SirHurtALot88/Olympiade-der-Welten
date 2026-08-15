@@ -186,21 +186,6 @@ function nlMoneySignClass(value: number | null | undefined): string {
   return value > 0 ? " is-pos" : " is-neg";
 }
 
-/**
- * NUR DAS MINUS EINFAERBEN — fuer Bestandsgroessen wie den Kassenstand.
- *
- * GEMELDET VON CHRIS (Ticket #43): „bitte den aktuellen Cash stand auch rot markieren wenn der
- * negativ sein sollte!"
- *
- * Bewusst NICHT `nlMoneySignClass`: das faerbt auch das Plus gruen, und bei einer Bestandsgroesse
- * waere das Unsinn — eine gefuellte Kasse ist der Normalzustand, kein Erfolgsereignis. Gruen an
- * 31 von 32 Zeilen macht das Rot der einen leiser statt lauter. Bei Fluessen (GuV, Transfersaldo)
- * ist das Vorzeichen dagegen die Aussage selbst, dort bleibt es bei beiden Farben.
- */
-function nlNegativeOnlyClass(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value) || value >= 0) return "";
-  return " is-neg";
-}
 
 function getTableSortValue(
   row: SeasonV2StandingsRow,
@@ -1761,7 +1746,14 @@ export default function SeasonStandingsNewLook({
             {formatNlMoney(row.marketValueTotal)}
             {renderRankSuffix(marketValueRanks.get(row.teamId), "Marktwert", row.teamName)}
           </td>
-          <td className={`nl-standings-td-fin${nlNegativeOnlyClass(row.cash)}`}>{formatNlMoney(row.cash)}</td>
+          {/* NEGATIVES CASH ROT — gemeldet von Chris: „bitte den aktuellen Cash stand auch rot
+              markieren wenn der negativ sein sollte!". Bewusst NUR die negative Seite: ein
+              positives Konto ist der Normalfall und braucht keine Auszeichnung, sonst leuchtet
+              die halbe Spalte gruen und die eine echte Warnung geht darin unter. Die Klasse
+              `is-neg` gibt es hier laengst, die Cash-Spalte hat sie nur nie benutzt. */}
+          <td className={`nl-standings-td-fin${(row.cash ?? 0) < 0 ? " is-neg" : ""}`}>
+            {formatNlMoney(row.cash)}
+          </td>
           <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
           <td className="nl-standings-td-fin">
             {formatNlMoney(row.salaryTotal)}
