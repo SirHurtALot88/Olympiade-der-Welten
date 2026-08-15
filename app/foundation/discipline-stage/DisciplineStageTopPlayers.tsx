@@ -54,7 +54,29 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
       {players.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Noch keine Werte.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        /*
+         * ZWEI SPALTEN, DAMIT DIE KACHEL NICHT WAECHST. Chris: „dass man nicht nur die top 12
+         * sondern Top 24 hier sieht ohne dass man die Tabelle in der höhe größer macht, sondern
+         * nebeneinander."
+         *
+         * `grid-auto-flow: column` mit fester Zeilenzahl fuellt SPALTENWEISE: Rang 1-12 stehen
+         * links untereinander, 13-24 rechts. Damit bleibt die Leserichtung der alten Liste
+         * erhalten — bei zeilenweiser Fuellung stuenden 1 und 2 nebeneinander, und die
+         * Rangfolge waere nicht mehr am Blick abzulesen.
+         *
+         * Die Zeilenzahl ist die HAELFTE der wirklich vorhandenen Spieler, nicht die halbe
+         * Obergrenze: bei nur 9 Zeilen entstuenden sonst zwei Spalten mit einer fast leeren
+         * rechten. Bei 12 und weniger bleibt es damit genau die einspaltige Liste von vorher.
+         */
+        <div
+          style={{
+            display: "grid",
+            gridAutoFlow: "column",
+            gridTemplateRows: `repeat(${Math.ceil(players.length / (players.length > 12 ? 2 : 1))}, auto)`,
+            columnGap: 10,
+            rowGap: 2,
+          }}
+        >
           {players.map((p, index) => {
             const playerId = playerIdByRow?.[index] ?? null;
             const clickable = Boolean(onOpenPlayer && playerId);

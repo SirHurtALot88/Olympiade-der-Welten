@@ -18,8 +18,28 @@ function roundValue(value: number, digits = 2) {
 }
 
 // Retool `calculateSaleFactorAndPriceSaison` bracketDefs (9 brackets).
-/** Rank bonus/malus and bracket spread apply only when the league bracket pool is at least this size. */
-export const SALE_FACTOR_MIN_RANK_POOL = 15;
+/**
+ * Ab wie vielen Spielern im Bracket der Verkaufsfaktor ueberhaupt greift.
+ *
+ * GEMELDET VON CHRIS: „der VK Faktor soll schon ab 8 spielern beginnen, zumindest für die top und
+ * bottom 2 spieler ungefähr - selbe logik wie bisher aber auch!" — nachgeschaerft: „VK faktoren
+ * soll es schon ab 8 spielern im bracket geben."
+ *
+ * WAS DARUNTER PASSIERT, und warum die Zahl ueberhaupt zaehlt: reicht der Pool nicht, faellt die
+ * Rechnung auf `fallback_no_ranked_group` — Faktor exakt 1, Verkaufspreis also gleich Marktwert.
+ * Es gibt dann WEDER Auf- noch Abschlag. Bei 15 blieben kleine Brackets damit dauerhaft ohne jede
+ * Leistungswirkung im Preis.
+ *
+ * WARUM 8 DIE KLEINSTE UNBEDENKLICHE ZAHL IST — und nicht 6 oder 5. `getRankBonus` vergibt an die
+ * DREI besten (+0,15 / +0,10 / +0,05) und die DREI schlechtesten (−0,05 / −0,10 / −0,15). Beide
+ * Baender zusammen brauchen sechs verschiedene Raenge. Bei einem Pool von 6 waeren Rang 3 (+0,05)
+ * und Rang 4 (= total−2, −0,05) direkt benachbart, bei 5 fielen sie sogar auf denselben Rang —
+ * die erste zutreffende Bedingung gewaenne, und ein Spieler bekaeme willkuerlich Bonus statt
+ * Malus. Ab 8 liegen zwei unberuehrte Raenge dazwischen (bei 8: Rang 4 und 5), die Baender sind
+ * sauber getrennt. Chris' „ab 8" trifft damit genau die Grenze, ab der die BESTEHENDE Logik ohne
+ * Sonderfall traegt — deshalb bleibt `getRankBonus` unveraendert.
+ */
+export const SALE_FACTOR_MIN_RANK_POOL = 8;
 
 /**
  * Untere Schranke für den Verkaufsfaktor (Verkaufspreis / MW). Die hochwertigen Brackets haben von Natur

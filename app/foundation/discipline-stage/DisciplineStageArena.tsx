@@ -33,6 +33,7 @@ import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
+import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
@@ -1324,7 +1325,9 @@ export default function DisciplineStageArena({
       });
     }
     entries.sort((a, b) => (b.row.points ?? -1) - (a.row.points ?? -1) || b.row.score - a.row.score);
-    const top = entries.slice(0, 12);
+    // Dieselbe Zahl wie die summierte Spieltags-Liste — sonst zeigte die eine Ansicht mehr
+    // Spieler als die andere. Chris: „nicht nur die top 12 sondern Top 24".
+    const top = entries.slice(0, SPIELTAGS_TOPSPIELER_LIMIT);
     top.forEach((e, i) => {
       e.row.rank = i + 1;
     });
