@@ -1,8 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 
-import { endTurn } from "@/lib/game/apply-end-turn";
-import { applyMoveToken } from "@/lib/game/apply-move-token";
 import {
   applyRoomOwnershipPreset,
   applyRoomTeamSelection,
@@ -24,8 +22,7 @@ import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-
 // letzteres importiert next/headers, was hier (server.ts laedt dieses Modul vor
 // der Next.js-App-Initialisierung) zum Absturz fuehrt. Siehe Kommentar dort.
 import { getSessionUserFromCookieHeader } from "@/lib/auth/session-cookie";
-import type { ClientToServerEvents, EndTurnRequest, MoveTokenRequest, ServerToClientEvents } from "@/types/events";
-import type { CoachRole } from "@/types/game";
+import type { ClientToServerEvents, ServerToClientEvents } from "@/types/events";
 
 declare global {
   var __olyIo: Server<ClientToServerEvents, ServerToClientEvents> | undefined;
@@ -38,21 +35,6 @@ function emitRoomError(
   roomCode?: string,
 ) {
   io.to(socketId).emit("roomError", { roomCode, message });
-}
-
-function resolveRole(roomCode: string, seatToken: string): CoachRole | null {
-  const room = getRoom(roomCode);
-  if (!room) {
-    return null;
-  }
-
-  for (const role of ["A", "B"] as const) {
-    if (room.seats[role]?.seatToken === seatToken) {
-      return role;
-    }
-  }
-
-  return null;
 }
 
 function publicAuthorizationErrorCode(reason: string) {
@@ -297,52 +279,6 @@ export function ensureSocketServer(httpServer: HttpServer) {
               },
             },
       );
-    });
-
-    socket.on("moveToken", (payload: MoveTokenRequest) => {
-      const room = getRoom(payload.roomCode);
-      if (!room) {
-        emitRoomError(io, socket.id, "Der Raum existiert nicht mehr.", payload.roomCode);
-        return;
-      }
-
-      const role = resolveRole(payload.roomCode, payload.seatToken);
-      if (!role) {
-        emitRoomError(io, socket.id, "Dein Sitzplatz ist nicht gueltig.", payload.roomCode);
-        return;
-      }
-
-      const result = applyMoveToken(room.state, role, payload.tokenId);
-      if (!result.ok) {
-        emitRoomError(io, socket.id, result.error, payload.roomCode);
-        return;
-      }
-
-      room.state = result.state;
-      io.to(room.roomCode).emit("roomState", room.state);
-    });
-
-    socket.on("endTurn", (payload: EndTurnRequest) => {
-      const room = getRoom(payload.roomCode);
-      if (!room) {
-        emitRoomError(io, socket.id, "Der Raum existiert nicht mehr.", payload.roomCode);
-        return;
-      }
-
-      const role = resolveRole(payload.roomCode, payload.seatToken);
-      if (!role) {
-        emitRoomError(io, socket.id, "Dein Sitzplatz ist nicht gueltig.", payload.roomCode);
-        return;
-      }
-
-      const result = endTurn(room.state, role);
-      if (!result.ok) {
-        emitRoomError(io, socket.id, result.error, payload.roomCode);
-        return;
-      }
-
-      room.state = result.state;
-      io.to(room.roomCode).emit("roomState", room.state);
     });
 
     socket.on("disconnect", () => {

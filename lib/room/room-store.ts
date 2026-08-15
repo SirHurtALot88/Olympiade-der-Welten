@@ -16,6 +16,8 @@ import {
   buildParticipant,
   buildTurnState,
   canParticipantControlTeam,
+  isRoomMatchdayInProgress,
+  resolveFrankyParticipant,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
 import {
@@ -238,11 +240,18 @@ export function joinRoom(
       role: "player",
     }),
   ];
-  room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  // Nebenbefund (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Beitritt loescht die Zuteilung des
+  // Hosts"): frueher wurde HIER unbedingt ueberschrieben, egal was der Host vorher im Raum
+  // (Lobby-Preset/Team-Picker) bereits zugewiesen hatte. Nur wenn `ownershipAssignedByHost` noch
+  // false ist -- der Host hat im Raum selbst NOCH NICHTS zugewiesen, es steht nur der
+  // System-Default aus `createInitialRoomState` -- greift der Auto-Default. Hat der Host schon
+  // gehandelt, bleibt seine Wahl unangetastet.
+  if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
+    room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  }
   room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: resolvedDisplayName });
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: "B",
       type: "player_joined",
       message: "Coach B ist dem Raum beigetreten.",
@@ -276,7 +285,6 @@ export function rejoinRoom(roomCode: string, seatToken: string, socketId: string
   );
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: role,
       type: "player_rejoined",
       message: `Coach ${role} hat den Raum erneut verbunden.`,
@@ -369,7 +377,6 @@ export function healParticipantPresenceByToken(
   );
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: role!,
       type: "player_rejoined",
       message: `Coach ${role} war offline gemeldet — ein Schreibvorgang mit gueltigem Sitzplatz-Token hat die Verbindung als weiter bestehend erkannt.`,
@@ -605,7 +612,53 @@ export function advanceRoomArenaStep(
   return { ok: true as const, room };
 }
 
-export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, preset: RoomOwnershipPreset) {
+/**
+ * Spiegelt die aktuelle `teamOwnership` in den GEBUNDENEN Spielstand -- derselbe Schreibweg wie
+ * beim Room-Start (`startRoom`s "continue existing"-Zweig), hier wiederverwendet fuer eine
+ * SPAETERE Umverteilung (Stufe 1.3, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md: "Team-Zuordnung darf der
+ * Host auch nach dem Start umverteilen"). `applyGameModeOwnership` ist die EINE Funktion, die
+ * `teamControlSettings`/`humanControlled` aus einer Chris/Franky-Aufteilung ableitet -- kein
+ * zweiter, abweichender Schreibpfad dafuer.
+ *
+ * No-op, solange noch kein echter (Nicht-Sandbox) Spielstand gebunden ist: in der Lobby gibt es
+ * nichts zu synchronisieren, `startRoom` bindet den echten Save erst beim Spielstart -- die
+ * Zuordnung dort uebernimmt `startRoom` selbst beim naechsten Start.
+ */
+function syncRoomOwnershipToBoundSave(room: RuntimeRoom, persistence?: PersistenceService) {
+  if (room.state.multiplayerRoom.status === "lobby" || isSandboxRoomSave(room.state.multiplayerRoom.saveId)) {
+    return;
+  }
+  const service = persistence ?? createPersistenceService();
+  const save = service.getSaveById(room.state.multiplayerRoom.saveId);
+  if (!save) {
+    return;
+  }
+  const host = room.state.roomParticipants.find((participant) => participant.role === "host") ?? null;
+  const franky = resolveFrankyParticipant(room.state.roomParticipants);
+  const chrisTeamIds = host
+    ? room.state.teamOwnership
+        .filter((entry) => entry.controllerType === "human" && entry.participantId === host.participantId)
+        .map((entry) => entry.teamId)
+    : [];
+  const frankyTeamIds = franky
+    ? room.state.teamOwnership
+        .filter((entry) => entry.controllerType === "human" && entry.participantId === franky.participantId)
+        .map((entry) => entry.teamId)
+    : [];
+  const updatedGameState = applyGameModeOwnership(save.gameState, {
+    saveMode: "online_4v4",
+    chrisTeamIds,
+    frankyTeamIds,
+  });
+  service.saveSingleplayerState(save.saveId, updatedGameState);
+}
+
+export function applyRoomOwnershipPreset(
+  roomCode: string,
+  seatToken: string,
+  preset: RoomOwnershipPreset,
+  options?: { persistence?: PersistenceService },
+) {
   const room = getRoom(roomCode);
   if (!room) {
     return { ok: false as const, error: "Der Raum existiert nicht mehr." };
@@ -614,8 +667,18 @@ export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, pr
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf Team-Presets setzen." };
   }
+  // Stufe 1.3: "nur zwischen Spieltagen" -- siehe Kommentar an `isRoomMatchdayInProgress`. In der
+  // Lobby ist niemals ein Spieltag aktiv, die Sperre greift dort also nie; unveraendertes
+  // Verhalten fuer den bisherigen Lobby-Weg.
+  if (isRoomMatchdayInProgress(room.state)) {
+    return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
+  }
 
   room.state = applyOwnershipPresetToState(room.state, preset);
+  // Erst eine explizite Lobby-/Raum-Aktion zaehlt als "Host hat zugeteilt" -- siehe Kommentar am
+  // Feld (types/game.ts) und an `joinRoom` oben.
+  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
   syncPlayers(room);
   return { ok: true as const, room };
@@ -625,6 +688,7 @@ export function applyRoomTeamSelection(
   roomCode: string,
   seatToken: string,
   selection: { chrisTeamIds: string[]; frankyTeamIds: string[] },
+  options?: { persistence?: PersistenceService },
 ) {
   const room = getRoom(roomCode);
   if (!room) {
@@ -634,6 +698,11 @@ export function applyRoomTeamSelection(
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf Teams zuweisen." };
   }
+  // Stufe 1.3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Chris hat "spaeter wechseln" ausdruecklich
+  // verlangt -- aber nicht, waehrend eine Aufstellung/Enthuellung mitten im Spieltag haengt.
+  if (isRoomMatchdayInProgress(room.state)) {
+    return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
+  }
 
   const result = applyExplicitTeamOwnershipToState(room.state, selection);
   if (!result.ok) {
@@ -641,6 +710,8 @@ export function applyRoomTeamSelection(
   }
 
   room.state = result.state;
+  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", {
     source: "team_selection_applied",
     chrisTeamIds: selection.chrisTeamIds,
@@ -697,10 +768,7 @@ export function startRoom(
       room.state.roomParticipants.find((participant) => participant.role === "host") ??
       room.state.roomParticipants[0] ??
       null;
-    const franky =
-      room.state.roomParticipants.find((participant) => /franky/i.test(participant.displayName)) ??
-      room.state.roomParticipants.find((participant) => participant.role === "player") ??
-      null;
+    const franky = resolveFrankyParticipant(room.state.roomParticipants);
     const chrisTeamIds = host
       ? room.state.teamOwnership
           .filter((entry) => entry.controllerType === "human" && entry.participantId === host.participantId)

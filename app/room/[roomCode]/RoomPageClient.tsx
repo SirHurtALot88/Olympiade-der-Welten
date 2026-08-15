@@ -4,14 +4,22 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { ONLINE_ROOM_TEAM_IDS } from "@/lib/room/online-room-model";
+import {
+  MAX_TEAMS_PER_HUMAN_PARTICIPANT,
+  ONLINE_ROOM_TEAM_IDS,
+  isRoomMatchdayInProgress,
+  resolveFrankyParticipant,
+} from "@/lib/room/online-room-model";
 import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { emitRoomFlowButtonAction } from "@/lib/room/room-flow-socket-actions";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
 
-const MAX_TEAMS_PER_HUMAN = 4;
+// Stufe 1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): frueher hier UND in
+// `online-room-model.ts:MAX_TEAMS_PER_HUMAN_PARTICIPANT` als zwei getrennte Konstanten gepflegt --
+// eine zweite Quelle fuer dieselbe Groesse. Jetzt nur noch der Import oben.
+const MAX_TEAMS_PER_HUMAN = MAX_TEAMS_PER_HUMAN_PARTICIPANT;
 type TeamAssignmentTarget = "chris" | "franky" | "ai";
 
 const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
@@ -35,7 +43,12 @@ function readyLabel(readyState: string) {
   return "Nicht bereit";
 }
 
-function CopyRoomCodeButton({ roomCode }: { roomCode: string }) {
+// Stufe 1.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): "Der Link ist die Einladung" -- kopiert wurde
+// bislang nur der nackte Code, der fuer sich genommen niemanden ins Spiel bringt (die Startseite
+// verlangt zusaetzlich einen Anzeigenamen). Diese Seite (`/room/CODE`) nimmt jetzt selbst neue
+// Gaeste per Beitritts-Maske auf (siehe `needsJoin` im `RoomScreen` unten) -- der kopierte Link
+// fuehrt also direkt zum Ziel.
+function CopyInviteLinkButton({ roomCode }: { roomCode: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -44,7 +57,8 @@ function CopyRoomCodeButton({ roomCode }: { roomCode: string }) {
       type="button"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(roomCode);
+          const inviteUrl = `${window.location.origin}/room/${roomCode}`;
+          await navigator.clipboard.writeText(inviteUrl);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1800);
         } catch {
@@ -52,10 +66,16 @@ function CopyRoomCodeButton({ roomCode }: { roomCode: string }) {
         }
       }}
     >
-      {copied ? "Kopiert!" : "Code kopieren"}
+      {copied ? "Kopiert!" : "Einladungslink kopieren"}
     </button>
   );
 }
+
+// Stufe 1.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): exakte Texte aus `joinRoom`
+// (lib/room/room-store.ts), damit die Beitritts-Maske einen abgelehnten Beitritt als
+// ENDGUELTIG erkennt (Raum voll/nicht gefunden) statt als etwas, das ein erneuter Klick loest.
+const ROOM_FULL_MESSAGE = "Der Raum hat bereits zwei aktive Coaches.";
+const ROOM_NOT_FOUND_MESSAGE = "Dieser Raum wurde nicht gefunden.";
 
 function RoomScreen({ roomCode }: { roomCode: string }) {
   const socket = useSocket();
@@ -63,6 +83,14 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(() => socket.connected);
+  // Stufe 1.1: wer `/room/CODE` ohne gespeicherten Sitzplatz oeffnet (der Einladungslink-Fall),
+  // bekommt hier eine Beitritts-Maske statt der frueheren Sackgasse ("Bitte ueber die Startseite
+  // beitreten"). `joinBlocked` haelt fest, wenn der Beitritt ENDGUELTIG abgelehnt wurde (Raum
+  // voll/nicht mehr da) -- dann macht ein erneuter Versuch keinen Sinn, die Maske verschwindet.
+  const [needsJoin, setNeedsJoin] = useState(false);
+  const [joinDisplayName, setJoinDisplayName] = useState("Franky");
+  const [joinBlocked, setJoinBlocked] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     const seatToken = localStorage.getItem(roomStorageKey(roomCode));
@@ -72,7 +100,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       if (seatToken) {
         socket.emit("rejoinRoom", { roomCode, seatToken });
       } else {
-        setError("Kein Sitzplatz gefunden. Bitte über die Startseite beitreten.");
+        setNeedsJoin(true);
       }
     }
 
@@ -89,6 +117,8 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       setParticipantId(payload.participantId);
       setState(payload.state);
       setError(null);
+      setNeedsJoin(false);
+      setIsJoining(false);
     }
 
     function handleRoomState(nextState: OlyRoomState) {
@@ -105,6 +135,13 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       }
 
       setError(payload.message);
+      setIsJoining(false);
+      // Diese beiden Texte kommen ausschliesslich aus `joinRoom`s eigenen Ablehnungen (Raum
+      // voll / nicht gefunden) -- ein erneuter Versuch mit einem anderen Namen wuerde am selben
+      // Ergebnis scheitern, die Maske macht das deshalb sichtbar statt es erneut anzubieten.
+      if (payload.message === ROOM_FULL_MESSAGE || payload.message === ROOM_NOT_FOUND_MESSAGE) {
+        setJoinBlocked(payload.message);
+      }
     }
 
     socket.on("connect", handleConnect);
@@ -160,6 +197,12 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
   }, [state]);
 
   const isLobby = state?.multiplayerRoom.status === "lobby";
+  // Stufe 1.3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): der Host darf Teams auch NACH dem Start
+  // umverteilen, aber nur zwischen zwei Spieltagen -- siehe `isRoomMatchdayInProgress` fuer die
+  // genaue Grenze. In der Lobby ist das immer "kein Spieltag laeuft", das Panel bleibt dort also
+  // wie bisher sichtbar.
+  const matchdayInProgress = state ? isRoomMatchdayInProgress(state) : false;
+  const canReassignTeams = isHost && !matchdayInProgress;
   // A real (non-sandbox) save already bound to the room means "Spiel starten" continues it
   // rather than creating a fresh one - surface that to the host in the lobby.
   const hasExistingRealSave = Boolean(state && !isSandboxRoomSave(state.multiplayerRoom.saveId));
@@ -171,12 +214,10 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
   const teamRosterParticipants = state?.roomParticipants.filter((participant) => participant.controlledTeamIds.length > 0) ?? [];
 
   // Mirrors the server-side host/Franky resolution in buildExplicitTeamOwnership /
-  // buildOwnershipForPreset so the picker shows exactly who a click would assign teams to.
+  // buildOwnershipForPreset (resolveFrankyParticipant: Sitzrolle statt Namens-Regex) so the
+  // picker shows exactly who a click would assign teams to.
   const chrisParticipant = state?.roomParticipants.find((participant) => participant.role === "host") ?? null;
-  const frankyParticipant =
-    state?.roomParticipants.find((participant) => /franky/i.test(participant.displayName)) ??
-    state?.roomParticipants.find((participant) => participant.role === "player") ??
-    null;
+  const frankyParticipant = state ? resolveFrankyParticipant(state.roomParticipants) : null;
   const chrisDisplayName = chrisParticipant?.displayName ?? "Chris";
   const frankyDisplayName = frankyParticipant?.displayName ?? "Franky";
 
@@ -223,7 +264,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
         <span className="pill oly-room-code-pill" data-testid="room-code-pill">
           Raum-Code <strong>{roomCode.toUpperCase()}</strong>
         </span>
-        <CopyRoomCodeButton roomCode={roomCode.toUpperCase()} />
+        <CopyInviteLinkButton roomCode={roomCode.toUpperCase()} />
         <span className={`pill${isConnected ? " is-ready" : " is-warning"}`}>{connectionLabel(isConnected)}</span>
         <Link className="pill" href="/">
           Zur Startseite
@@ -286,11 +327,26 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
             </button>
           </section>
 
-          {isHost && state.multiplayerRoom.status === "lobby" ? (
+          {isHost && matchdayInProgress ? (
             <section className="panel">
               <div className="panel-header">
                 <h2>Teams verteilen</h2>
-                <p className="muted">Als Host legst du fest, wer welche Teams übernimmt. Der Rest läuft über KI.</p>
+                <p className="muted">
+                  Team-Zuordnung ist gesperrt, solange ein Spieltag läuft. Zwischen zwei Spieltagen kannst du hier wieder umverteilen.
+                </p>
+              </div>
+            </section>
+          ) : null}
+
+          {canReassignTeams ? (
+            <section className="panel">
+              <div className="panel-header">
+                <h2>Teams verteilen</h2>
+                <p className="muted">
+                  {isLobby
+                    ? "Als Host legst du fest, wer welche Teams übernimmt. Der Rest läuft über KI."
+                    : "Als Host kannst du zwischen den Spieltagen umverteilen. Der Rest läuft über KI."}
+                </p>
               </div>
               <div className="form-stack">
                 <label className="filter-field">
@@ -463,6 +519,51 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
             </div>
           </section>
         </div>
+      ) : joinBlocked ? (
+        <section className="panel" data-testid="room-join-blocked">
+          <div className="panel-header">
+            <h2>Dieser Raum ist nicht verfügbar</h2>
+          </div>
+          <p className="muted">
+            {joinBlocked === ROOM_FULL_MESSAGE
+              ? "Der Raum hat bereits zwei aktive Coaches — für dich ist hier kein Platz mehr frei."
+              : "Dieser Raum existiert nicht mehr oder wurde beendet."}
+          </p>
+          <Link className="secondary-button inline-button" href="/">
+            Zur Startseite
+          </Link>
+        </section>
+      ) : needsJoin ? (
+        <section className="panel" data-testid="room-join-panel">
+          <div className="panel-header">
+            <h2>Diesem Raum beitreten</h2>
+            <p className="muted">Du wurdest über einen Einladungslink hierher geschickt. Trag deinen Namen ein und leg direkt los.</p>
+          </div>
+          <div className="form-stack">
+            <label className="filter-field">
+              <span>Anzeigename</span>
+              <input
+                className="input"
+                value={joinDisplayName}
+                onChange={(event) => setJoinDisplayName(event.target.value)}
+                data-testid="room-join-display-name"
+              />
+            </label>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={isJoining || !isConnected || !joinDisplayName.trim()}
+              data-testid="room-join-submit"
+              onClick={() => {
+                setError(null);
+                setIsJoining(true);
+                socket.emit("joinRoom", { roomCode: roomCode.toUpperCase(), displayName: joinDisplayName });
+              }}
+            >
+              {isJoining ? "Trete bei ..." : "Beitreten"}
+            </button>
+          </div>
+        </section>
       ) : (
         <section className="panel">
           <p>Raum wird geladen ...</p>

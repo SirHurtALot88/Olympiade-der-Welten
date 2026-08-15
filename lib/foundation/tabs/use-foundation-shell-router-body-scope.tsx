@@ -1355,15 +1355,16 @@ export function useFoundationShellRouterBodyScope({
     const targetControl = targetTeamId
       ? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[targetTeamId]
       : null;
-    const resolvedOwnerId =
-      targetControl?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : targetControl?.ownerId?.trim() || effectiveActiveOwnerId;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieses Feld trug die Owner-ID des
+    // ZIELTEAMS, nicht die eigene — der Server las das bis eben direkt als Besitznachweis
+    // (`authorizeLocalSingleplayerTeamWrite`), womit jeder Schreibversuch auf ein `manual`-Team
+    // automatisch bestand. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum,
+    // sonst die angemeldete Sitzung) — ein Feld, das der Server ignoriert, aber weiter mitschickt,
+    // waere nur irrefuehrend fuer alle, die diesen Code lesen.
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: targetTeamId || selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: targetControl?.controlMode ?? null,
       },
       roomContext,

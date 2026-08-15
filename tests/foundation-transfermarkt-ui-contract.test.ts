@@ -198,8 +198,12 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
     expect(fileText).toContain("FoundationTransfermarktV2Panel");
     expect(fileText).toContain("manageableTeamIds: foundationManageableTeamIds");
-    expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
-    expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
+    // Stufe 0.3 (Befund B2): `withRoomBody` schickte hier frueher `activeOwnerId: resolvedOwnerId`
+    // mit — die Owner-ID des ZIELTEAMS, nicht die eigene. Der Server ignoriert das Feld jetzt und
+    // bestimmt die Identitaet selbst (Sitz-Token im Raum, sonst die Sitzung); die Zeile ist raus,
+    // statt irrefuehrend stehen zu bleiben. Diese Zusicherung haelt fest, dass sie nicht
+    // zurueckkehrt.
+    expect(fileText).not.toContain("activeOwnerId: resolvedOwnerId");
   });
 
   it("keeps scouting values intentionally fuzzy instead of exposing exact hidden truths", async () => {

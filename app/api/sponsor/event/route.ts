@@ -6,6 +6,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolveSponsorEvent } from "@/lib/sponsor/sponsor-event-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 
 type SponsorEventBody = {
   saveId?: string;
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
       source,
       dryRun,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {

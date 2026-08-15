@@ -244,6 +244,33 @@ export function loadPersistedRuntimeRooms(now: Date = new Date()): RuntimeRoom[]
 }
 
 /**
+ * Prueft, OHNE die Prozess-Map `runtimeRooms` anzufassen, ob `saveId` einen (noch nicht
+ * abgeschlossenen) Raum in der ABLAGE hat — Stufe 0.2, Befund B1/B2.
+ *
+ * WARUM DIESE ZWEITE, VON `getActiveRoomBySaveId` UNABHAENGIGE QUELLE NOETIG IST:
+ * `getActiveRoomBySaveId` (room-store.ts) durchsucht nur die In-Memory-Map. Direkt nach einem
+ * Prozess-Neustart — bevor `rehydrateRuntimeRoomsFromPersistence()` in `server.ts` durchgelaufen
+ * ist — oder wenn ein Raum aus einem anderen Grund kurzzeitig aus der Map verschwunden ist, liefert
+ * sie `null`, OBWOHL der Raum in der Ablage weiterhin existiert. `assertSaveNotRoomBound`
+ * (`lib/room/assert-save-not-room-bound.ts`) haengt genau von dieser Unterscheidung ab: „Raum nicht
+ * auffindbar" darf NICHT dasselbe bedeuten wie „Save war nie an einen Raum gebunden" — sonst faellt
+ * der Schreib-Waechter still auf den Einzelspieler-Pfad zurueck (server-authoritative-write-guard.ts),
+ * genau das Loch, das B1 beschreibt.
+ *
+ * Bewusst ALLE Nicht-`completed`-Status (auch `paused`) — anders als `getActiveRoomBySaveId`, die
+ * `paused` fuer Routing/Broadcast-Zwecke ausschliesst. Fuer die Frage „ist dieser Save noch an
+ * einen Raum gebunden" zaehlt ein pausierter Raum weiterhin: er ist nicht beendet, nur gerade ohne
+ * verbundene Sitzplaetze.
+ */
+export function findPersistedRoomBySaveId(saveId: string): { roomCode: string } | null {
+  const database = getRoomDatabase();
+  const row = database
+    .prepare(`SELECT room_code FROM rooms WHERE save_id = ? AND status != 'completed' ORDER BY updated_at DESC LIMIT 1`)
+    .get(saveId) as { room_code: string } | undefined;
+  return row ? { roomCode: row.room_code } : null;
+}
+
+/**
  * TEST-ONLY: setzt `updated_at` eines persistierten Raums direkt, um den Verfall (Stufe 0.4) ohne
  * echtes Warten zu pruefen. Gleiches Schutzmuster wie `resetDatabaseForTests()` in
  * `lib/persistence/sqlite.ts` — verweigert ausserhalb von Tests den Dienst.

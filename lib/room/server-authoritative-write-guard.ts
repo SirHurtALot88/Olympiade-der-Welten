@@ -1,5 +1,6 @@
 import { getActiveRoomBySaveId, getRoom, healParticipantPresenceByToken } from "@/lib/room/room-store";
 import { findSeatByToken } from "@/lib/room/rejoin";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room-model";
 import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -23,6 +24,22 @@ export type ServerRoomWriteContext = {
   confirmToken?: string | null;
   expectedConfirmToken?: string | null;
   activeManagerTeamId?: string | null;
+  /**
+   * NUR AUSSERHALB eines Raums relevant (siehe `authorizeLocalSingleplayerTeamWrite` unten) — im
+   * Raum entscheidet ausschliesslich das Sitz-Token (`resolveParticipant`/`authorizeTeamWrite`),
+   * dieses Feld wird dort nie gelesen.
+   *
+   * MUSS serverseitig aufgeloest sein — NIE roh aus dem Request-Body oder der Query durchreichen.
+   * Stufe 0.3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B2): bis eben las
+   * `authorizeLocalSingleplayerTeamWrite` diesen Wert direkt aus dem Client-Body, und der Client
+   * schickte dort nicht die eigene Identitaet, sondern die Owner-ID des ZIELTEAMS
+   * (use-foundation-shell-router-body-scope.tsx:1352-1368) — der Besitzvergleich war damit fuer
+   * jedes `manual`-Team immer wahr. Aufrufer holen den echten Wert ueber
+   * `resolveAuthoritativeWriteOwnerId()` (lib/auth/session.ts): angemeldete Sitzung, sonst der
+   * lokale Standard-Owner. Diese Datei importiert diese Funktion bewusst NICHT selbst — sie haengt
+   * an `next/headers`, und dieses Modul wird auch vom socket.io-Server geladen, der ausserhalb
+   * jedes Next.js-Request-Kontexts laeuft (siehe Kommentar an lib/auth/session-cookie.ts).
+   */
   activeOwnerId?: string | null;
   controlMode?: TeamControllerType | "manual" | null;
   allowSandboxHostOverride?: boolean;
@@ -154,6 +171,22 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
         allowed: false,
         status: 401,
         reason: "room_context_required_for_room_save",
+        warnings,
+      };
+    }
+    // Stufe 0.2 (Befund B1): `activeRoomForSave` ist null hier NICHT nur, wenn der Save nie an
+    // einen Raum gebunden war — auch dann, wenn er es WAR, der Raum aber im Moment aus der
+    // In-Memory-Map nicht auffindbar ist (Neustart kurz vor dem Rehydrieren, echter Verlust).
+    // Ohne diese Pruefung wuerde genau das still auf den Einzelspieler-Pfad durchrutschen — beide
+    // Browser schreiben unbemerkt weiter in denselben Spielstand, ohne dass je wieder gebroadcastet
+    // wird. `assertSaveNotRoomBound` fragt zusaetzlich die persistierte Ablage (room-persistence.ts)
+    // und faengt so auch den Fall, den die In-Memory-Map allein nicht mehr sieht.
+    const roomBoundCheck = assertSaveNotRoomBound(input.saveId, "server_room_write_fallback");
+    if (roomBoundCheck.blocked) {
+      return {
+        allowed: false,
+        status: roomBoundCheck.status,
+        reason: roomBoundCheck.reason,
         warnings,
       };
     }

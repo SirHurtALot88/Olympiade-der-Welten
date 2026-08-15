@@ -27,6 +27,21 @@ export type MultiplayerRoomMeta = {
   activeMatchday: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Hat der Host die Team-Zuordnung schon einmal EXPLIZIT ueber eine Lobby-/Raum-Aktion gesetzt
+   * (`applyRoomOwnershipPreset` oder `applyRoomTeamSelection` in `lib/room/room-store.ts`)?
+   *
+   * Nebenbefund (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Beitritt loescht die Zuteilung des Hosts"):
+   * `joinRoom` ueberschrieb die Zuteilung bislang bedingungslos mit einem Default-Preset, sobald
+   * der Gast beitrat. Dieses Flag unterscheidet "der Host hat im Raum wirklich schon etwas
+   * zugewiesen" von "es steht nur der System-Default aus `createInitialRoomState`" — NUR im
+   * zweiten Fall darf `joinRoom` noch einen Default anwenden.
+   *
+   * Bewusst NICHT von `createRoom`s eigener `input.preset`-Anwendung gesetzt: zu dem Zeitpunkt
+   * gibt es noch keinen zweiten Teilnehmer, jede "4+4"-Wahl waere fuer die zweite Haelfte ohnehin
+   * wirkungslos (siehe Kommentar dort) — das Flag markiert erst die Lobby-Aktion NACH der Anlage.
+   */
+  ownershipAssignedByHost: boolean;
 };
 
 // A room participant is a real connected browser/user session in an online room.
@@ -179,30 +194,14 @@ export type ServerAuthoritativeWritePolicy = {
   localSandboxForbidsPrismaWrites: true;
 };
 
-export type ActionType = "room_created" | "player_joined" | "moveToken" | "endTurn" | "player_rejoined";
-
-export type AthleteToken = {
-  id: string;
-  ownerRole: CoachRole;
-  position: number;
-  label: string;
-};
+export type ActionType = "room_created" | "player_joined" | "player_rejoined";
 
 export type ActionLogEntry = {
   id: string;
-  turnNumber: number;
   actorRole: CoachRole | "system";
   type: ActionType;
-  tokenId?: string;
-  from?: number;
-  to?: number;
   message: string;
   createdAt: string;
-};
-
-export type BoardDefinition = {
-  laneLength: number;
-  laneLabel: string;
 };
 
 export type RoomPlayerState = {
@@ -223,12 +222,7 @@ export type OlyRoomState = {
   arenaSyncState: RoomArenaState;
   roomEvents: RoomRealtimeEvent[];
   serverWritePolicy: ServerAuthoritativeWritePolicy;
-  activeRole: CoachRole;
-  turnNumber: number;
-  tokens: AthleteToken[];
   actionLog: ActionLogEntry[];
   players: Partial<Record<CoachRole, RoomPlayerState>>;
-  moveCommittedThisTurn: boolean;
-  board: BoardDefinition;
   version: number;
 };

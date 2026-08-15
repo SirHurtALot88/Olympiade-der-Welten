@@ -23,17 +23,6 @@ export type RejoinRoomRequest = {
   seatToken: string;
 };
 
-export type MoveTokenRequest = {
-  roomCode: string;
-  seatToken: string;
-  tokenId: string;
-};
-
-export type EndTurnRequest = {
-  roomCode: string;
-  seatToken: string;
-};
-
 export type RoomJoinedPayload = {
   roomCode: string;
   role: CoachRole;
@@ -151,8 +140,6 @@ export type ClientToServerEvents = {
   setRoomArenaReady: (payload: SetRoomArenaReadyRequest) => void;
   advanceRoomArenaStep: (payload: AdvanceRoomArenaStepRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
-  moveToken: (payload: MoveTokenRequest) => void;
-  endTurn: (payload: EndTurnRequest) => void;
 };
 
 export type ServerToClientEvents = {

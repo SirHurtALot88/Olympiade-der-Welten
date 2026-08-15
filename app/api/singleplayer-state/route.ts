@@ -43,7 +43,7 @@ import { applyNewGameFlowStepUpdate } from "@/lib/game/new-game-flow-scope";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
-import { resolveSessionOwnerId } from "@/lib/auth/session";
+import { resolveAuthoritativeWriteOwnerId, resolveSessionOwnerId } from "@/lib/auth/session";
 
 /**
  * Room-write context a caller may attach to a team-scoped gameplay action so it can be
@@ -416,6 +416,11 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as SaveActionBody;
   const persistence = createPersistenceService();
+  // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+  // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`. Einmal
+  // pro Request aufgeloest, weil alle drei team-gebundenen Aktionen unten dieselbe Identitaet
+  // brauchen.
+  const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
 
   let save:
     | ReturnType<typeof persistence.createSave>
@@ -546,7 +551,7 @@ export async function POST(request: Request) {
       source: "sqlite",
       dryRun: false,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!captainWriteAuth.allowed) {
@@ -610,7 +615,7 @@ export async function POST(request: Request) {
         source: "sqlite",
         dryRun: false,
         activeManagerTeamId: body.activeManagerTeamId,
-        activeOwnerId: body.activeOwnerId,
+        activeOwnerId,
         controlMode: body.controlMode,
       });
       if (!flowStepWriteAuth.allowed) {
@@ -729,7 +734,7 @@ export async function POST(request: Request) {
       source: "sqlite",
       dryRun: false,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!negotiationWriteAuth.allowed) {
