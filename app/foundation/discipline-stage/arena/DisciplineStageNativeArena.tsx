@@ -21,6 +21,11 @@ import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
 import { getDisciplineField } from "./disciplines/registry";
 import type { DisciplineFieldProps } from "./disciplines/types";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
+import {
+  ARENA_STEP_DURATION_MS,
+  resolveArenaCatchUpMode,
+  resolveArenaEffectivePause,
+} from "@/lib/foundation/discipline-stage/arena-timeline";
 
 // Freund/Feind-Rahmenfarbe (mine=blau, ally=grün, rival=rot) über die globalen
 // --nl-* Tokens (Light/Dark ziehen automatisch mit). Marker = Rahmen, nie Füllung.
@@ -167,6 +172,22 @@ export type NativeArenaRoomSync = {
     waitingNames: string[]; // Namen der noch nicht bereiten Teilnehmer
     onToggleReady: () => void; // eigenen Ready-Status umschalten
   };
+  /**
+   * GEMEINSAME ZEITBASIS (Befund B4, Stufe 3.2/3.3/3.4/3.6, `lib/foundation/discipline-stage/
+   * arena-timeline.ts`). ALLE Felder hier sind optional und wirkungslos, solange der Aufrufer
+   * (`DisciplineStageArena.tsx`) sie nicht befuellt — ohne sie verhaelt sich diese Komponente
+   * exakt wie vorher (reine `syncedRound`-Kaskade, rein lokale Pause). Das ist bewusst: Punkt 5
+   * der Aufgabe verlangt, dass Solo (kein `roomSync`) sich in NICHTS aendert, und ein
+   * unbefuellter Aufrufer ist fuer den Guest-Pfad aequivalent zu "noch kein neues Feld da".
+   */
+  stepIndex?: number; // RoomArenaState.stepIndex — der EINE monotone Schrittzaehler (Stufe 3.2)
+  stepStartedAtMs?: number; // Server-Zeitpunkt (ms), zu dem der aktuelle Schritt begann
+  stepDurationMs?: number; // geplante Dauer des aktuellen Schritts
+  clockOffsetMs?: number; // Server-minus-Client-Uhrdifferenz dieses Clients
+  hostPaused?: boolean; // Pause/Weiter (3.6): vom Host gesetzt, gilt fuer den Guest ebenso
+  onHostPauseToggle?: (() => void) | null; // Host: eigene Pause/Weiter an den Raum melden
+  onHostReset?: (() => void) | null; // Host: „↻ Neu" an den Raum melden
+  onHostQuickSim?: (() => void) | null; // Host: Quick-Sim an den Raum melden
 };
 
 export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
@@ -897,7 +918,11 @@ export const STAR_MIN = 80;
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
 // wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
 // Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
-export const TRACK_ROUND_MS = 10000;
+// EINE Quelle statt zweier zufaellig gleicher Zahlen (Stufe 3.3): der Wert steht jetzt in
+// `arena-timeline.ts` (`ARENA_STEP_DURATION_MS`), weil die gemeinsame Zeitbasis im Raum-Zustand
+// dieselbe Schrittdauer braucht wie diese Komponente ihre lokale Reveal-Kaskade. Re-exportiert
+// unter dem alten Namen, damit `disciplines/*.tsx` (barbell.tsx, shared.tsx, …) unveraendert bleiben.
+export const TRACK_ROUND_MS = ARENA_STEP_DURATION_MS;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 //
@@ -1688,8 +1713,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // bedeutet, entscheidet der Host an einer Stelle (`replayNachArenaReset`) — dieser hier meldet
     // nur, was passiert ist.
     onReset?.(anlass);
+    // „↻ Neu" als Raum-Aktion (Stufe 3.6): NUR der bewusste Knopf-Klick geht an den Raum, NICHT
+    // der Mount-Reset (`anlass === "mount"`) — sonst wuerfe schon das blosse Oeffnen/Wechseln der
+    // Seite den Mitspieler zurueck (B1-artiger Fehlschluss, siehe Kommentar oben am Mount-Effekt).
+    // `onHostReset` ist optional/no-op, solange der Aufrufer sie nicht befuellt.
+    if (anlass === "knopf" && roomSync?.active && roomSync.isHost) {
+      roomSync.onHostReset?.();
+    }
     force();
-  }, [buildRT, clearTimers, onReset]);
+  }, [buildRT, clearTimers, onReset, roomSync]);
 
   // Nur beim Mount zurücksetzen: der Host remountet die Arena bereits vollständig
   // via key={`${disciplineId}-${mode}-${seed}`}. Ein Reset bei jeder teams-Identität
@@ -1749,10 +1781,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       e.stopImmediatePropagation();
       manualPauseRef.current = !manualPauseRef.current;
       setPaused(manualPauseRef.current);
+      // Pause als Raum-Zustand (Stufe 3.6): NUR der Host meldet seine Pause an den Raum — der
+      // Guest hat gar keine eigene Pause-Autoritaet (`resolveArenaEffectivePause` in
+      // `arena-timeline.ts`), sein Leertaste-Druck bleibt rein kosmetisch fuer die eigene
+      // Ansicht. `onHostPauseToggle` ist optional/no-op, solange der Aufrufer sie nicht befuellt.
+      if (roomSync?.active && roomSync.isHost) {
+        roomSync.onHostPauseToggle?.();
+      }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [done]);
+  }, [done, roomSync]);
 
   // ---- Feld-Geometrie ----
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -2839,9 +2878,75 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     return () => window.clearTimeout(id);
   }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.followsHost, roomSync?.coopGate.active]);
 
-  // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound` nach —
-  // spielt dieselbe Reveal-Cascade, aber host-getaktet. Pausiert der Host (Hover),
-  // steigt syncedRound nicht → der Guest bleibt automatisch stehen.
+  // Direktes Ueberspringen ohne Kaskade (Stufe 3.4 — "Nachholen durch Ueberspringen, nicht durch
+  // Nachspielen", die Antwort auf Befund-Punkt 4 "kein Rueckwaerts, kein Sprung"). Baut den
+  // Zustand bis EINSCHLIESSLICH `targetRound - 1` direkt auf, ohne jede Zwischenetappe der
+  // Reveal-Kaskade abzuspielen — modelliert nach `quickSim` weiter unten (dieselbe Rechnung),
+  // nur mit einem BELIEBIGEN Ziel statt `slotCount`. Das macht sie auch fuer RUECKWAERTS-Spruenge
+  // tauglich (ein Host-Reset ist `targetRound < round`) — `quickSim` selbst kennt das nicht, weil
+  // sie nur je in eine Richtung (ans Ende) laeuft.
+  //
+  // Nur fuer den Guest-Pfad gedacht: der Host bleibt bei der echten Kaskade (Sounds/Highlights/
+  // Gleiten), damit ihm nichts von seiner eigenen Inszenierung genommen wird.
+  const jumpToRound = useCallback(
+    (targetRound: number) => {
+      clearTimers();
+      const clamped = Math.max(0, Math.min(slotCount, targetRound));
+      rtRef.current = buildRT();
+      const rt = rtRef.current;
+      for (let r = 0; r < clamped; r += 1) {
+        rt.forEach((t) => {
+          const p = t.players[r];
+          if (p) {
+            t.score = round1(t.score + playerNet(p));
+            t.thrownSlot = r;
+          }
+        });
+        recomputeRanks(rt);
+        rt.forEach((t) => t.rankHistory.push(t.trueRank));
+      }
+      rt.forEach((t) => {
+        t.displayScore = t.score;
+        t.animScore = t.score;
+      });
+      roundAnimStartRef.current = 0; // kein Gleiten — der Sprung landet direkt auf dem Zielwert
+      setRound(clamped);
+      setBusy(false);
+      busyRef.current = false;
+      setSpotlight(null);
+      setPops([]);
+      setFrags([]);
+      setTicker([]);
+      setBanner(null);
+      setHandoffTs(0);
+      setPhotoFinish(false);
+      setStageCrown(null);
+      // Start-Gate mit hochziehen: ein Guest, der auf Etappe 7 springt, gehoert sichtbar zu "laeuft
+      // bereits" (Feld-Startaufstellung waere sonst weiter zu sehen, siehe `started` in `fieldCtx`).
+      setStarted(true);
+      force();
+      if (clamped >= slotCount) {
+        later(showPodium, 200);
+      } else {
+        setEnded(false);
+        endedFiredRef.current = false;
+      }
+    },
+    [slotCount, clearTimers, buildRT, later, showPodium],
+  );
+
+  // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound`-Schritt nach.
+  //
+  // "advance-one" (Ziel genau einen Schritt weiter): spielt dieselbe Reveal-Kaskade wie der Host,
+  // nur host-getaktet — der normale Fall, waehrend beide live mitschauen. Pausiert der Host,
+  // bewegt sich `syncedRound` nicht → der Guest bleibt automatisch stehen (`resolveArenaCatchUpMode`
+  // liefert dann "in-sync", nichts zu tun).
+  //
+  // "jump" (alles andere: >1 Schritt Rueckstand, Spaet-Einstieg BEI round=0, oder ein
+  // RUECKWAERTS-Ziel nach einem Host-Reset): baut den Zielzustand direkt auf, statt jede
+  // Zwischenetappe nachzuspielen — vorher war das gar nicht vorgesehen: `syncedRound > round`
+  // (die alte Bedingung) kannte nur "vorwaerts, ein Schritt", ein Reset des Hosts (kleineres Ziel)
+  // bewegte den Guest ueberhaupt nicht.
   //
   // Gate ist `followsHost` (Guest im Room), NICHT `waitingForHost` (Guest VOR dem Host-Start):
   // Letzteres kippt beim Start des Hosts auf false und haette diesen Effekt genau dann
@@ -2849,11 +2954,35 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // klicken kann (`canControl` false → `started` bleibt false → Auto-Continue greift nie), gab es
   // danach keinen Pfad mehr, der `round` bewegt: der Guest stand ohne Reveal und ohne Hinweis da.
   useEffect(() => {
-    if (!roomSync?.followsHost || busy || done) return;
-    if (roomSync.syncedRound > round) {
+    if (!roomSync?.followsHost) return;
+    const mode = resolveArenaCatchUpMode({
+      localStepIndex: round,
+      targetStepIndex: roomSync.syncedRound,
+      localCascadeRunning: busy,
+    });
+    if (mode === "advance-one") {
       advance();
+    } else if (mode === "jump") {
+      jumpToRound(roomSync.syncedRound);
     }
-  }, [roomSync?.followsHost, roomSync?.syncedRound, round, busy, done, advance]);
+  }, [roomSync?.followsHost, roomSync?.syncedRound, round, busy, advance, jumpToRound]);
+
+  // Pause als geteilter Zustand (Stufe 3.6): der Guest hat keine eigene Pause-Autoritaet — er
+  // spiegelt IMMER `roomSync.hostPaused` (ueber `resolveArenaEffectivePause`), nie den eigenen
+  // Tastendruck. Ohne befuellten `hostPaused` (Aufrufer liefert das Feld noch nicht) ist der Wert
+  // `undefined` → `resolveArenaEffectivePause` behandelt das wie "nicht pausiert", der Guest
+  // verhaelt sich also unveraendert, solange die Raum-Anbindung dieses Feld noch nicht sendet.
+  useEffect(() => {
+    if (!roomSync?.followsHost) return;
+    const effectivePause = resolveArenaEffectivePause({
+      roomActive: roomSync.active,
+      isHost: false,
+      roomPaused: roomSync.hostPaused ?? false,
+      localPauseIntent: manualPauseRef.current,
+    });
+    manualPauseRef.current = effectivePause;
+    setPaused(effectivePause);
+  }, [roomSync?.followsHost, roomSync?.active, roomSync?.hostPaused]);
 
   // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
   // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).
@@ -2912,7 +3041,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setStageCrown(null);
     force();
     later(showPodium, 200);
-  }, [slotCount, clearTimers, buildRT, later, showPodium]);
+    // Quick-Sim als Raum-Aktion (Stufe 3.6): der Guest muss denselben Sprung ans Ende sehen —
+    // sonst stuende er auf einer Etappe, die es beim Host nicht mehr gibt. `onHostQuickSim` ist
+    // optional/no-op, solange der Aufrufer sie nicht befuellt.
+    if (roomSync?.active && roomSync.isHost) {
+      roomSync.onHostQuickSim?.();
+    }
+  }, [slotCount, clearTimers, buildRT, later, showPodium, roomSync]);
 
   function causeKick(cause: string, mine: boolean): string {
     const own = mine ? "DEIN LÄUFER · " : "";
