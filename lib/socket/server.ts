@@ -10,8 +10,11 @@ import {
   getRoom,
   joinRoom,
   markDisconnected,
+  quickSimRoomArenaRevealState,
   rejoinRoom,
+  resetRoomArenaRevealState,
   runRoomAiAutoStep,
+  setRoomArenaPausedState,
   setRoomArenaReadyState,
   setParticipantReadyState,
   startRoomArenaSync,
@@ -239,6 +242,37 @@ export function ensureSocketServer(httpServer: HttpServer) {
       }
       const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
       if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    // Stufe 3.6: letzte Meile fuer Pause/Reset/Quick-Sim als Raum-Aktion — reine Weiterleitung an
+    // die Huellen aus room-store.ts, danach der Raum-Zustand-Broadcast wie bei jedem anderen
+    // Room-Write (kein eigener `roomEvents`-Eintrag, siehe Kommentar dort: reine Verkabelung,
+    // keine neue Mechanik).
+    socket.on("setRoomArenaPaused", ({ roomCode, seatToken, paused }) => {
+      const result = setRoomArenaPausedState(roomCode, seatToken, paused);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("resetRoomArenaReveal", ({ roomCode, seatToken }) => {
+      const result = resetRoomArenaRevealState(roomCode, seatToken);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("quickSimRoomArenaReveal", ({ roomCode, seatToken, maxSlotRevealCountByDiscipline }) => {
+      const result = quickSimRoomArenaRevealState(roomCode, seatToken, { maxSlotRevealCountByDiscipline });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 

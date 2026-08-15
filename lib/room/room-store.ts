@@ -4,7 +4,10 @@ import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
 import {
   advanceRoomArenaReveal,
   isRoomArenaReady,
+  quickSimRoomArenaReveal as buildQuickSimmedRoomArenaState,
+  resetRoomArenaReveal as buildResetRoomArenaState,
   setRoomArenaParticipantReady,
+  setRoomArenaPaused as buildRoomArenaPausedState,
   startRoomArena as buildStartedRoomArenaState,
   syncRoomArenaParticipants,
 } from "@/lib/room/arena-sync-state";
@@ -608,6 +611,101 @@ export function advanceRoomArenaStep(
     stepIndex: room.state.arenaSyncState.stepIndex,
     affectedViews: ["arena"],
   });
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * PAUSE/WEITER ALS RAUM-AKTION (Stufe 3.6, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): reine Huelle um
+ * die fertige, getestete `setRoomArenaPaused` aus `arena-sync-state.ts` — dieselbe
+ * Sitzplatz-Pruefung (nur Host, Sitz "A") wie `startRoomArenaSync`/`advanceRoomArenaStep`. Die
+ * Aenderung an `room.state` steht VOR dem letzten `syncPlayers(room)` (Regel siehe `createRoom`),
+ * sonst ueberlebt die Pause keinen Neustart.
+ */
+export function setRoomArenaPausedState(roomCode: string, seatToken: string, paused: boolean) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena pausieren." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildRoomArenaPausedState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      paused,
+    }),
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * "↻ NEU" ALS RAUM-AKTION (Stufe 3.6): reine Huelle um `resetRoomArenaReveal` aus
+ * `arena-sync-state.ts`. Setzt nur die AKTIVE Disziplinseite zurueck (siehe Kommentar dort) —
+ * diese Huelle entscheidet darueber nichts, sie prueft nur den Sitzplatz und speichert.
+ */
+export function resetRoomArenaRevealState(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena zuruecksetzen." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildResetRoomArenaState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+    }),
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * QUICK-SIM ALS RAUM-AKTION (Stufe 3.6): reine Huelle um `quickSimRoomArenaReveal` aus
+ * `arena-sync-state.ts` (die selbst nur ueber das bereits vorhandene `advanceRoomArenaReveal`
+ * iteriert, siehe Kommentar dort — keine zweite Rechenstelle).
+ */
+export function quickSimRoomArenaRevealState(
+  roomCode: string,
+  seatToken: string,
+  input?: { maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena vorspulen." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildQuickSimmedRoomArenaState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      maxSlotRevealCountByDiscipline: input?.maxSlotRevealCountByDiscipline,
+    }),
+  };
   syncPlayers(room);
   return { ok: true as const, room };
 }

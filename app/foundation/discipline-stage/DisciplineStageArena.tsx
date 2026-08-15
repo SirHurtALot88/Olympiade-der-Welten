@@ -1266,6 +1266,17 @@ export default function DisciplineStageArena({
           waitingNames: roomArenaSync.arenaCoopWaitingNames,
           onToggleReady: roomArenaSync.emitArenaCoopReadyToggle,
         },
+        // Gemeinsame Zeitbasis + Pause/Reset/Quick-Sim als Raum-Aktion (Stufe 3.6) — die Felder
+        // heissen hier genau so, wie `NativeArenaRoomSync` (DisciplineStageNativeArena.tsx) sie
+        // erwartet.
+        stepIndex: roomArenaSync.roomArenaStepIndex ?? undefined,
+        stepStartedAtMs: roomArenaSync.roomArenaStepStartedAtMs ?? undefined,
+        stepDurationMs: roomArenaSync.roomArenaStepDurationMs ?? undefined,
+        clockOffsetMs: roomArenaSync.roomArenaClockOffsetMs,
+        hostPaused: roomArenaSync.roomArenaPaused,
+        onHostPauseToggle: roomArenaSync.emitHostRoomArenaPauseToggle,
+        onHostReset: roomArenaSync.emitHostRoomArenaReset,
+        onHostQuickSim: () => roomArenaSync.emitHostRoomArenaQuickSim(maxSlotRevealCountByDiscipline),
       }
     : null;
 

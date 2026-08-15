@@ -104,6 +104,15 @@ export type UseArenaRoomSyncResult = {
     disciplineSide?: "d1" | "d2" | "overall" | null;
     maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   }) => void;
+  /**
+   * Stufe 3.6 — letzte Meile fuer die drei Host-Aktionen aus `arena-sync-state.ts`. Toggelt
+   * gegen den zuletzt EMPFANGENEN Raum-Zustand (wie `emitArenaCoopReadyToggle` gegen
+   * `isSelfArenaReady`), nicht gegen einen rein lokalen Zustand — der Host meldet damit immer,
+   * was der Raum als naechstes sehen soll.
+   */
+  emitHostRoomArenaPauseToggle: () => void;
+  emitHostRoomArenaReset: () => void;
+  emitHostRoomArenaQuickSim: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
 };
 
 export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSyncResult {
@@ -305,6 +314,47 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     [roomContext],
   );
 
+  // Stufe 3.6: toggelt gegen den zuletzt bekannten Raum-Pausenstand (analog
+  // `emitArenaCoopReadyToggle` gegen `isSelfArenaReady`) — der Aufrufer (Space-Handler in
+  // `DisciplineStageNativeArena.tsx`) hat selbst keinen Ziel-Wert zur Hand, nur "umschalten".
+  const emitHostRoomArenaPauseToggle = useCallback(() => {
+    if (!roomContext) {
+      return;
+    }
+    const socket = getClientSocket();
+    socket.emit("setRoomArenaPaused", {
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+      paused: !(scopedRoomArenaSyncState?.paused ?? false),
+    });
+  }, [roomContext, scopedRoomArenaSyncState?.paused]);
+
+  const emitHostRoomArenaReset = useCallback(() => {
+    if (!roomContext) {
+      return;
+    }
+    const socket = getClientSocket();
+    socket.emit("resetRoomArenaReveal", {
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+    });
+  }, [roomContext]);
+
+  const emitHostRoomArenaQuickSim = useCallback(
+    (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => {
+      if (!roomContext) {
+        return;
+      }
+      const socket = getClientSocket();
+      socket.emit("quickSimRoomArenaReveal", {
+        roomCode: roomContext.roomCode,
+        seatToken: roomContext.seatToken,
+        maxSlotRevealCountByDiscipline,
+      });
+    },
+    [roomContext],
+  );
+
   return {
     roomSyncRole,
     // Bewusst der scope-gefilterte State: Konsumenten fragen ihn ab, um zu entscheiden, ob für DIESE
@@ -333,5 +383,8 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     emitHostRoomArenaAdvance,
     emitArenaCoopReadyToggle,
     emitStartRoomArena,
+    emitHostRoomArenaPauseToggle,
+    emitHostRoomArenaReset,
+    emitHostRoomArenaQuickSim,
   };
 }
