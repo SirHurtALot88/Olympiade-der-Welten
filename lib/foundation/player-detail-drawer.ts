@@ -5,6 +5,7 @@ import {
   type PlayerBoardTrustMood,
   type PlayerBoardTrustRenewalPolicy,
 } from "@/lib/ai/player-board-trust-service";
+import { buildPlayerSeasonAwards, type PlayerSeasonAward } from "@/lib/foundation/player-season-awards";
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -598,6 +599,11 @@ export type PlayerDetailDrawerData = {
     warnings: string[];
   }>;
   historyRows: PlayerDrawerHistoryRow[];
+  /**
+   * Saison-Auszeichnungen dieses Spielers — Ticket #41. Leer, solange keine Saison abgeschlossen
+   * ist oder der Spielstand das Feld noch nicht traegt (Bestandsstaende).
+   */
+  seasonAwards: PlayerSeasonAward[];
   ratingWarnings: string[];
 };
 
@@ -2986,6 +2992,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     transferHistory: buildTransferHistory(input.gameState, player.id),
     seasonHistory,
     historyRows,
+    seasonAwards: buildPlayerSeasonAwards(input.gameState, player.id),
     ratingWarnings: playerRating?.warnings ?? [],
   };
 }
@@ -3204,6 +3211,18 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         });
 
   return {
+    /**
+     * AUCH IM ARENA-DRAWER — Chris: „auch in den drawern der arena sollen die awards dann
+     * auftauchen".
+     *
+     * Dieser Pfad baut die Spielerkarte aus dem Aufstellungs-Kontext (Einsatzliste, Arena), nicht
+     * aus dem `gameState`-Hauptpfad. Der Kontext traegt den Spielstand mit
+     * (`context.gameState`) — fehlt er, gibt es schlicht keine Auszeichnungen statt einer
+     * erfundenen leeren Liste.
+     */
+    seasonAwards: input.context.gameState
+      ? buildPlayerSeasonAwards(input.context.gameState, input.playerId)
+      : [],
     playerId: input.playerId,
     activePlayerId: activePlayer?.id ?? null,
     source: input.source,
