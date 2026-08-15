@@ -18,7 +18,6 @@ import {
 import {
   getSponsorV3SalaryFactor, getSponsorV3Terms, sponsorV3SettlementParts,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { SPONSOR_BODEN, sponsorKurvenLeiter } from "@/lib/sponsor/sponsor-liga-leiter";
 import {
   LEIH_ZIEL_ACHSENRANG,
@@ -32,6 +31,10 @@ import {
   sponsorV4AxisSpecialKey,
   sponsorV4OfferableAxes,
 } from "@/lib/sponsor/sponsor-v4-axes";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/** Laeuft nur mit eingeschaltetem Gebaeude-Schalter — Begruendung am Block weiter unten. */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 const baseState = () => createSingleplayerGameState();
 
@@ -168,22 +171,20 @@ describe("Sponsor-Achsen: der Hebel gehoert allen gleich", () => {
 });
 
 /**
- * NEU (2026-08-11): NEU ERZEUGTE Angebote tragen keine Achse mehr — das ist der eigentliche
- * Umbau, den dieser Testlauf festnagelt. Anders als die Bloecke oben (die die Rechenschicht direkt
- * pruefen) geht dieser Test bewusst ueber `buildSponsorOffersForTeam`: er behauptet nicht, dass die
- * Achsen-Rechnung nicht mehr FUNKTIONIEREN KANN, sondern dass sie am Live-Pfad nicht mehr LAEUFT.
- */
-/**
- * AM SCHALTER, NICHT AM IST-ZUSTAND — und der Zusammenhang ist hier nicht offensichtlich, deshalb
- * ausgeschrieben: die Achse verschwindet nicht von sich aus, sondern weil das LEIH-ZIEL ihren Platz
- * einnimmt. `buildSponsorOffer` setzt sie nur, wenn die Karte kein Leih-Ziel traegt
- * (`if (input.axisKey && !input.leihZiel)`). Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, hat
- * keine Karte mehr ein Leih-Ziel — und damit ist die Achse zurueck, genau die, deren Abwesenheit
- * dieser Block misst. Nicht der Umbau ist zurueckgenommen, es fehlt sein Ausloeser.
+ * NEU (2026-08-11): NEU ERZEUGTE Angebote tragen keine Achse mehr — das war der Umbau, den dieser
+ * Block festnagelte. Anders als die Bloecke oben (die die Rechenschicht direkt pruefen) geht er
+ * ueber `buildSponsorOffersForTeam`: er behauptet nicht, dass die Achsen-Rechnung nicht mehr
+ * FUNKTIONIEREN KANN, sondern dass sie am Live-Pfad nicht mehr LAEUFT.
  *
- * Die Zusage bleibt unveraendert stehen und greift wieder, sobald die Leihe an ist.
+ * UND GENAU DAS HAT SICH MIT #512 GEDREHT. Die Achse verschwand vom Live-Pfad, WEIL jede
+ * Gebaeude-Karte stattdessen ein Leih-Ziel trug. Steht der Gebaeude-Schalter auf AUS
+ * (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`), gibt es keine Gebaeude-Karten — und die Achse ist der
+ * Weg, auf dem eine Karte wieder fuer etwas anderes als reines Geld zahlt
+ * (`sponsorV4OfferableAxes` wird im Angebotsbau ausdruecklich aufgerufen).
+ *
+ * Beide Zusagen stehen deshalb nebeneinander, jede an ihre Schalterstellung gebunden.
  */
-describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Sponsor-Achsen: neu erzeugte Angebote tragen keine Achse mehr", () => {
+mitLeiheDescribe("Sponsor-Achsen: neu erzeugte Angebote tragen keine Achse mehr", () => {
   it("keine Karte eines neuen Slates traegt `axis` — Gebaeude-Karten tragen stattdessen ein Leih-Ziel", () => {
     const gameState = baseState();
     const teamId = gameState.teams[0]!.teamId;
@@ -352,4 +353,30 @@ describe("Sponsor-Achsen: das Unterschreiben erfuellt die Soliditaets-Achse nich
       evaluateSponsorV4Axis(gameState, teamId, terms).fraction, 9,
     );
   });
+});
+
+describe.skipIf(SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Sponsor-Achsen: ohne Gebaeude-Karten traegt der Live-Pfad wieder Achsen", () => {
+  it("jede Karte des Slates zahlt fuer eine Achse — und keine traegt ein Leih-Ziel", () => {
+    const gameState = baseState();
+    let mitAchse = 0;
+    for (const team of gameState.teams) {
+      const offers = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
+      expect(offers.length, `${team.teamId}: kein Slate`).toBeGreaterThan(0);
+      for (const offer of offers) {
+        const terms = getSponsorV3Terms(offer)!;
+        expect(offer.sponsorLeihe ?? null, `${offer.offerId}: Leihe trotz ausgeschaltetem Schalter`).toBeNull();
+        expect(
+          [LEIH_ZIEL_FRISCHE, LEIH_ZIEL_ACHSENRANG],
+          `${offer.offerId}: Leih-Ziel ohne Gebaeude`,
+        ).not.toContain(terms.goalKey);
+        if (terms.axis) {
+          mitAchse += 1;
+          expect(SPONSOR_V4_AXIS_KEYS, `${offer.offerId}: unbekannte Achse`).toContain(terms.axis.key);
+        }
+      }
+    }
+    // Ohne diese Zusicherung waere der Block gruen, auch wenn gar keine Achse mehr vergeben wuerde —
+    // dann zahlten alle Karten nur noch reines Geld, und die Kartenwahl waere wieder eine Scheinwahl.
+    expect(mitAchse, "keine einzige Achsen-Karte in der ganzen Liga").toBeGreaterThan(0);
+  }, 120_000);
 });

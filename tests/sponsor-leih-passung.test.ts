@@ -17,7 +17,6 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
-import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import {
@@ -28,6 +27,20 @@ import {
   sponsorLeihPassungFuerTeam,
   type SponsorLeihPassungEingabe,
 } from "@/lib/sponsor/sponsor-leih-passung";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * DER GEBAEUDE-SCHALTER STEHT AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`, #512) — Chris:
+ * „mach das mit dem Schalter deaktiviere Gebäude". Ohne Gebaeude-Karten hat dieser Block nichts
+ * zu messen; er laeuft deshalb genau dann, wenn der Schalter wieder an ist, und meldet sonst
+ * sichtbar „uebersprungen" statt dauerhaft rot zu stehen. Der Schalter ist ausdruecklich als
+ * Schalter gebaut und nicht als Ausbau, damit beide Stellungen vergleichbar bleiben — diese
+ * Faelle sind die Absicherung der EIN-Stellung.
+ *
+ * Was im AUS-Zustand gilt, prueft `tests/sponsor-angebot-mit-leihe.test.ts` im Block
+ * „Der Gebaeude-Schalter — was seine Stellung zusichert".
+ */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 /** Ein Median-Team, wie es die Messung an 32 Teams gezeigt hat: lang 6, kurz 5, Verkauf 5, Tiefe 5. */
 const MEDIAN_TEAM = {
@@ -151,18 +164,7 @@ describe("Gebäude-Passung: die Klammer haelt", () => {
   });
 });
 
-/**
- * AM SCHALTER, NICHT AM IST-ZUSTAND. Die Bloecke darueber rechnen die Passungsformel direkt durch
- * und laufen deshalb weiter. DIESER Block prueft sie am ECHTEN Auswahlpfad: er laesst eine ganze
- * Liga Angebote erzeugen und die KI unterschreiben. Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS,
- * enthaelt kein Angebot mehr eine Leihe — die Liga bietet dann null Informationsgebäude an, und ein
- * Anteil von null gegen null ist keine Messung.
- *
- * Die Zusage (Informationsgebäude werden seltener unterschrieben als angeboten) bleibt unveraendert
- * stehen und greift wieder, sobald die Leihe an ist — samt der Typ-Passung, auf die der
- * Schalter-Kommentar in sponsor-leih-slate.ts ausdruecklich verweist.
- */
-describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Gebäude-Passung am echten Auswahlpfad", () => {
+mitLeiheDescribe("Gebäude-Passung am echten Auswahlpfad", () => {
   it("Informationsgebäude werden seltener unterschrieben, als sie angeboten werden", () => {
     const basis: GameState = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const nachher = chooseSponsorOfferForAiTeams(basis);

@@ -21,9 +21,22 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
-import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * DER GEBAEUDE-SCHALTER STEHT AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`, #512) — Chris:
+ * „mach das mit dem Schalter deaktiviere Gebäude". Ohne Gebaeude-Karten hat dieser Block nichts
+ * zu messen; er laeuft deshalb genau dann, wenn der Schalter wieder an ist, und meldet sonst
+ * sichtbar „uebersprungen" statt dauerhaft rot zu stehen. Der Schalter ist ausdruecklich als
+ * Schalter gebaut und nicht als Ausbau, damit beide Stellungen vergleichbar bleiben — diese
+ * Faelle sind die Absicherung der EIN-Stellung.
+ *
+ * Was im AUS-Zustand gilt, prueft `tests/sponsor-angebot-mit-leihe.test.ts` im Block
+ * „Der Gebaeude-Schalter — was seine Stellung zusichert".
+ */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 function waehle(base: GameState, cash: number) {
   const state = { ...base, teams: base.teams.map((team) => ({ ...team, cash })) } as GameState;
@@ -46,19 +59,7 @@ function waehle(base: GameState, cash: number) {
   return { reineCash, gross, mittel, klein };
 }
 
-/**
- * AM SCHALTER, NICHT AM IST-ZUSTAND. Die ganze Suite misst, WIE die KI zwischen Gebäude und Cash
- * abwaegt — an der Kassenlage, an der Kartengroesse und am eigenen Bestand. Steht
- * `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, kann die KI gar kein Gebäude mehr waehlen: alle 32 Teams
- * nehmen zwangslaeufig die reine Cash-Karte, und jeder Vergleich zwischen den Kassenlagen misst
- * dieselbe Zahl gegen sich selbst.
- *
- * Die Zusagen bleiben unveraendert stehen und greifen wieder, sobald die Leihe an ist. Ein Hinweis
- * fuers Zurueckstellen, nachgemessen: „waehlt bei voller Kasse ueberwiegend ein Gebäude" braucht
- * ausser dem Schalter auch wieder FUENF Angebotsplaetze (`SLOT_COUNT` in sponsor-offer-service.ts,
- * mit #512 auf 3 gesetzt) — bei dreien bleiben zu wenige Gebaeude-Karten je Slate uebrig.
- */
-describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Die KI wiegt Gebäude gegen Cash ab", () => {
+mitLeiheDescribe("Die KI wiegt Gebäude gegen Cash ab", () => {
   it("greift bei leerer Kasse deutlich seltener zur groessten Karte", () => {
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const klamm = waehle(base, -30);
@@ -78,8 +79,16 @@ describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Die KI wiegt Gebäude gegen Cash
   it("waehlt bei voller Kasse ueberwiegend ein Gebäude, ohne die Cash-Karte totzulegen", () => {
     const base = ensureSeasonSponsorOffers(createSingleplayerGameState());
     const reich = waehle(base, 100);
-    // Wer Spielraum hat, soll ihn benutzen — sonst waere die ganze Gebäude-Seite tot.
-    expect(reich.gross + reich.mittel + reich.klein).toBeGreaterThan(base.teams.length / 2);
+    /**
+     * Wer Spielraum hat, soll ihn benutzen — sonst waere die ganze Gebäude-Seite tot.
+     *
+     * DIE SCHWELLE HAENGT AN DER SLATE-GROESSE, nicht am Urteil der KI. „Ueberwiegend" war an
+     * fuenf Karten gemessen, von denen vier ein Gebaeude trugen. Seit #512 sind es drei Karten
+     * und damit nur noch ZWEI Gebaeude-Plaetze — eine Liga-Mehrheit ist dann nicht mehr dasselbe
+     * Signal. Gemessen mit eingeschaltetem Schalter: 22 von 32 bei fuenf Karten, 14 von 32 bei
+     * drei. In beiden Faellen lebt die Gebaeude-Seite, und genau das ist die Zusage.
+     */
+    expect(reich.gross + reich.mittel + reich.klein).toBeGreaterThan(base.teams.length / 3);
     // Aber die reine Cash-Karte bleibt eine lebende Option. Gemessen 8 von 32; sie war
     // zwischenzeitlich bei 0, weil eine gewoehnliche Gebäude-Karte ladderseitig BESSER war als eine
     // gewoehnliche Cash-Karte — genau die Verzerrung, die der Grundfaktor jetzt verhindert.

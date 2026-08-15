@@ -13,10 +13,23 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
-import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { buildSponsorOffersForTeam, chooseSponsorOffer } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorV3Terms, sponsorV3LadderValue, sponsorV3Settle } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * DER GEBAEUDE-SCHALTER STEHT AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`, #512) — Chris:
+ * „mach das mit dem Schalter deaktiviere Gebäude". Ohne Gebaeude-Karten hat dieser Block nichts
+ * zu messen; er laeuft deshalb genau dann, wenn der Schalter wieder an ist, und meldet sonst
+ * sichtbar „uebersprungen" statt dauerhaft rot zu stehen. Der Schalter ist ausdruecklich als
+ * Schalter gebaut und nicht als Ausbau, damit beide Stellungen vergleichbar bleiben — diese
+ * Faelle sind die Absicherung der EIN-Stellung.
+ *
+ * Was im AUS-Zustand gilt, prueft `tests/sponsor-angebot-mit-leihe.test.ts` im Block
+ * „Der Gebaeude-Schalter — was seine Stellung zusichert".
+ */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 function baueSpielstand(): GameState {
   const teams = Array.from({ length: 12 }, (_, index) => ({
@@ -84,17 +97,7 @@ function unterschreibeGebaeudeKarte() {
   return { angebot: mitLeihe, gameState: unterschrieben };
 }
 
-/**
- * AM SCHALTER, NICHT AM IST-ZUSTAND. Alle drei Tests unterschreiben eine GEBÄUDE-Karte und rechnen
- * ihr Settlement nach: keine eigene Leih-Zeile (E1), die Kasse aendert sich um exakt die Summe der
- * angezeigten Zeilen, und die Gebaeude-Karte zahlt messbar weniger als die reine Cash-Karte
- * desselben Slates. Steht `SPONSOR_GEBAEUDE_LEIHE_AKTIV` auf AUS, gibt es im ganzen Slate keine
- * Gebaeude-Karte mehr — es fehlt der Gegenstand, nicht die Zusage.
- *
- * Die Erwartungen bleiben unveraendert stehen und greifen wieder, sobald die Leihe an ist. Bewusst
- * der importierte Schalter statt einer Kopie, damit Schalter und Test nicht auseinanderlaufen.
- */
-describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("Die Gebäude-Karte im Settlement", () => {
+mitLeiheDescribe("Die Gebäude-Karte im Settlement", () => {
   it("bucht KEINE eigene Leih-Zeile — der Verzicht steckt in der Leiter (E1)", () => {
     const { gameState } = unterschreibeGebaeudeKarte();
     const preview = previewSponsorSettlement(gameState, "season_end");

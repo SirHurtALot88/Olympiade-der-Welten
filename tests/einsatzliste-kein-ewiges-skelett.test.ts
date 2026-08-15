@@ -40,7 +40,11 @@ describe("Einsatzliste: kein ewiges Ladeskelett", () => {
   it("nennt den Grund, wenn das Laden durch ist und trotzdem kein Kontext da ist", () => {
     const block = kontextloserBlock();
     expect(block).toContain("lineup-context-unavailable");
-    expect(block).toContain("errors.map(");
+    // Die Gruende der Route werden aufgelistet — und zwar UEBERSETZT: seit #514 („rohe Fehlercodes
+    // werden deutsche Saetze") laeuft die Liste durch `uebersetzeLineupFehlerListe`, statt die Codes
+    // roh auszugeben. Hier stand `errors.map(`; das nagelte die Zwischenstufe fest und fiel,
+    // als die Uebersetzung dazwischenkam — bei besser gewordener Anzeige.
+    expect(block).toContain("uebersetzeLineupFehlerListe(errors).map(");
     // Und sagt auch dann etwas, wenn die Route gar keinen Grund mitgeliefert hat.
     expect(block).toContain("kein Spieltags-Kontext");
   });

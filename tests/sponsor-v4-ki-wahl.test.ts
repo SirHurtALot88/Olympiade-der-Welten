@@ -3,10 +3,17 @@ import { describe, expect, it } from "vitest";
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
-import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { buildSponsorV3Terms, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import type { SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * Zwei Faelle messen die Wahl AM GEBAEUDE (welches, wie gross). Steht der Gebaeude-Schalter auf
+ * AUS (#512), gibt es kein Gebaeude zu waehlen — sie laufen deshalb nur mit eingeschaltetem
+ * Schalter. Dass die Wahl auch OHNE Gebaeude nicht blind ist, prueft der Fall darunter.
+ */
+const mitLeiheIt = it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 /**
  * DIE KI MUSS DIE ACHSE BEWERTEN, NICHT DAS RISIKO.
@@ -28,11 +35,7 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     }
   });
 
-  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test weist nach, dass die KI-Bewertung nicht blind ist —
-  // und misst das seit dem Achsen-Umbau an GEBÄUDE und Kartengroesse. Ohne Leihe unterschreibt kein
-  // Team mehr ein Gebäude, die Liste der gewaehlten Gebaeude ist leer, und „mehr als eines" laesst
-  // sich an null Werten nicht zeigen. Greift unveraendert wieder, sobald die Leihe an ist.
-  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("waehlt nicht liga-weit dasselbe Gebaeude und dieselbe Kartengroesse — sonst waere die Bewertung blind", () => {
+  mitLeiheIt("waehlt nicht liga-weit dasselbe Gebaeude und dieselbe Kartengroesse — sonst waere die Bewertung blind", () => {
     // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
     // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`) — `terms.axis` ist bei keinem neuen
     // Vertrag mehr gesetzt, die alte Messgroesse dieses Tests ist damit tot. Die Passungsfrage
@@ -55,11 +58,7 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     expect(new Set(gewaehlteGroessen).size, "alle Teams auf derselben Kartengroesse — die Wahl ist blind").toBeGreaterThan(1);
   });
 
-  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test misst den UNTERSCHIED zwischen klammer und
-  // entspannter Kasse an der Zahl der reinen Cash-Karten. Ohne Leihe ist jede Karte eine reine
-  // Cash-Karte: beide Seiten stehen bei 32, und der Vergleich misst dieselbe Zahl gegen sich
-  // selbst. Die Zusage bleibt unveraendert stehen und greift wieder, sobald die Leihe an ist.
-  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("greift bei Geldnot zur Liquiditaet — und seit den Gebaeude-Karten vor allem zur reinen Cash-Karte", () => {
+  mitLeiheIt("greift bei Geldnot zur Liquiditaet — und seit den Gebaeude-Karten vor allem zur reinen Cash-Karte", () => {
     // DIESER TEST HAT SEINEN MASSSTAB GEWECHSELT, und der Grund ist eine Aenderung am System, nicht
     // an der KI: bis zu den Gebaeude-Karten war der Vorschuss die EINZIGE Liquiditaetsoption im
     // Slate, also musste er der Massstab sein. Seit E1 gibt es eine zweite und bessere — die reine
@@ -203,5 +202,30 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
         karte("soliditaet", "sol-ziel"),
       ]),
     ).toBe("sol-ziel");
+  }, 120_000);
+});
+
+/**
+ * OHNE GEBAEUDE-KARTEN — laeuft genau dann, wenn der Schalter auf AUS steht (#512).
+ *
+ * Die beiden Faelle oben messen die Passung am Gebaeude. Faellt das Gebaeude weg, bleibt die
+ * eigentliche Frage trotzdem stehen: waehlt die KI ueberhaupt noch, oder greift sie liga-weit
+ * zur selben Karte? Das ist keine Kosmetik — eine KI, die immer Platz 0 nimmt, macht die
+ * Kartenwahl fuer den Menschen wertlos, weil sie keinen Wettbewerb um die guten Karten erzeugt.
+ */
+describe.skipIf(SPONSOR_GEBAEUDE_LEIHE_AKTIV)("KI-Sponsorwahl ohne Gebaeude-Karten", () => {
+  it("greift nicht liga-weit zur selben Karte", () => {
+    const after = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(createSingleplayerGameState()));
+    const gewaehlt: string[] = [];
+    for (const team of after.teams) {
+      const contract = getTeamSponsorContract(after, team.teamId);
+      expect(contract, `${team.shortCode} ohne Vertrag`).not.toBeNull();
+      const angebote = after.seasonState.sponsorOffersByTeamId?.[team.teamId] ?? [];
+      const index = angebote.findIndex((angebot) => angebot.offerId === contract!.offerId);
+      expect(index, `${team.shortCode}: Vertrag ohne passendes Angebot`).toBeGreaterThanOrEqual(0);
+      gewaehlt.push(`${index}`);
+    }
+    expect(gewaehlt).toHaveLength(after.teams.length);
+    expect(new Set(gewaehlt).size, "alle Teams auf demselben Slate-Platz — die Wahl ist blind").toBeGreaterThan(1);
   }, 120_000);
 });

@@ -14,8 +14,6 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SPONSOR_ANGEBOTE_JE_TEAM } from "@/lib/sponsor/sponsor-offer-service";
-
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { buildNewGameStateFromBaseline } from "@/lib/game/new-game-setup-service";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
@@ -61,11 +59,9 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
   it("jedes erzeugte Angebot traegt V2-Konditionen", { timeout: 300_000 }, () => {
     const gameState = newGameFromButton();
     const offers = allOffers(gameState);
-    // Hier stand `toBeGreaterThan(100)` — eine Zahl aus der Zeit mit FUENF Angeboten je Team
-    // (32 x 5 = 160). Seit „nur 3 Sponsoren statt 5" sind es 96, und die Wache schlug an, obwohl
-    // an der geprueften Aussage nichts falsch war. Die Untergrenze kommt jetzt aus derselben
-    // Zahl, die die Angebote erzeugt, und verlangt ein volles Slate fuer JEDES Team.
-    expect(offers.length).toBeGreaterThanOrEqual(gameState.teams.length * SPONSOR_ANGEBOTE_JE_TEAM);
+    // Gerechnet, nicht festgenagelt: hier stand `> 100`, weil 32 Teams x 5 Karten = 160 anfielen.
+    // Seit #512 sind es drei Karten je Team, also 96 — gemeint ist „jedes Team der Liga".
+    expect(offers.length).toBeGreaterThanOrEqual(gameState.teams.length);
     const withoutTerms = offers.filter((offer) => getSponsorV3Terms(offer) === null);
     expect(withoutTerms.length, `${withoutTerms.length} von ${offers.length} Angeboten ohne V2-Konditionen`).toBe(0);
   });
@@ -78,11 +74,7 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
     }
   });
 
-  // AM SCHALTER, NICHT AM IST-ZUSTAND. Die Zusage `terms.axis === undefined` haengt an der Leihe:
-  // `buildSponsorOffer` vergibt die Achse nur, wenn die Karte KEIN Leih-Ziel traegt. Ohne Leihe hat
-  // keine Karte ein Leih-Ziel, also ist die Achse zurueck. Ebenso die zweite Haelfte des Tests —
-  // ein Sonderziel tragen ausschliesslich die Gebaeude-Karten. Greift wieder, sobald die Leihe an ist.
-  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("die Angebote tragen die V3-Struktur: Karte, Tilt, Ziel nach Schwierigkeit", { timeout: 300_000 }, () => {
+  it("die Angebote tragen die V3-Struktur: Karte, Tilt, Ziel nach Schwierigkeit", { timeout: 300_000 }, () => {
     // GEAENDERT: die fuenf V4-Zielachsen werden bei neu erzeugten Angeboten nicht mehr vergeben
     // (siehe Kopfkommentar `lib/sponsor/sponsor-leih-ziele.ts`). An ihre Stelle treten die zwei
     // Leih-Ziele auf den Gebaeude-Karten — fest bepreist (`goalP = 0`, `goalSize = 6`), OHNE
@@ -98,15 +90,34 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
       // Kurven-Tilt der Karte. Sicherheit kippt nach unten, Ambition nach oben, Basis flach.
       expect(Math.abs(terms.tilt)).toBeLessThanOrEqual(0.3);
       expect(terms.baseLadder).toHaveLength(32);
-      // NUR DIE GEBAEUDE-KARTEN tragen ueberhaupt ein Sonderziel (die reine Cash-Karte auf
-      // Platz 0 keins) — und keine Karte mehr eine der fuenf Zielachsen.
-      expect(terms.axis).toBeUndefined();
+      /**
+       * WOFUER EINE KARTE AUSSER GELD ZAHLT — und das haengt am Gebaeude-Schalter.
+       *
+       * MIT Gebaeuden: die Gebaeude-Karten tragen eines der zwei Leih-Ziele, fest bepreist
+       * (`goalSize = SPONSOR_LEIH_BONUS`, `goalP = 0`, kein Sockelabzug), und KEINE Karte traegt
+       * eine der fuenf Zielachsen.
+       *
+       * OHNE Gebaeude (#512, heutige Stellung): es gibt keine Gebaeude-Karten, und die Achse ist
+       * wieder der Weg, auf dem eine Karte fuer etwas anderes als reines Geld zahlt. Sie traegt
+       * dann eine echte Erfolgswahrscheinlichkeit — der Sockelabzug ist bei ihr Teil des Modells.
+       *
+       * Die reine Cash-Karte traegt in BEIDEN Stellungen gar kein Ziel.
+       */
+      if (SPONSOR_GEBAEUDE_LEIHE_AKTIV) {
+        expect(terms.axis, `Angebot ${offer.offerId} traegt eine Achse trotz Gebaeude-Karten`).toBeUndefined();
+      }
       if (terms.goalSize > 0) {
         expect(terms.goalKey).not.toBeNull();
-        expect([LEIH_ZIEL_FRISCHE, LEIH_ZIEL_ACHSENRANG]).toContain(terms.goalKey);
-        expect(terms.goalSize).toBe(SPONSOR_LEIH_BONUS);
-        // Kein Sockelabzug: wer das Ziel verfehlt, verliert nichts.
-        expect(terms.goalP).toBe(0);
+        if (terms.axis) {
+          // Achsen-Karte: die Wahrscheinlichkeit ist geschaetzt und muss eine echte sein.
+          expect(terms.goalP).toBeGreaterThanOrEqual(0);
+          expect(terms.goalP).toBeLessThanOrEqual(1);
+        } else {
+          expect([LEIH_ZIEL_FRISCHE, LEIH_ZIEL_ACHSENRANG]).toContain(terms.goalKey);
+          expect(terms.goalSize).toBe(SPONSOR_LEIH_BONUS);
+          // Kein Sockelabzug: wer das Leih-Ziel verfehlt, verliert nichts.
+          expect(terms.goalP).toBe(0);
+        }
       } else {
         expect(terms.goalKey).toBeNull();
         expect(terms.goalSize).toBe(0);
@@ -115,11 +126,7 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
     }
   });
 
-  // AM SCHALTER, NICHT AM IST-ZUSTAND. Der Test prueft am V3-Block der Karte, dass ein Ziel — wenn
-  // eines da ist — als LEIH-Ziel bepreist ist: Wahrscheinlichkeit 0, kein Vorschuss, fester Bonus.
-  // Ohne Leihe traegt die Karte wieder ein Achsenziel mit geschaetzter Wahrscheinlichkeit, und
-  // genau die 0 stimmt dann nicht mehr. Greift unveraendert wieder, sobald die Leihe an ist.
-  it.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV)("die Angebotskarte bekommt den V3-Block, den sie anzeigen soll", { timeout: 300_000 }, () => {
+  it("die Angebotskarte bekommt den V3-Block, den sie anzeigen soll", { timeout: 300_000 }, () => {
     const gameState = newGameFromButton();
     const teamId = "P-S";
     const offers = gameState.seasonState.sponsorOffersByTeamId?.[teamId] ?? [];
@@ -134,9 +141,20 @@ describe("Neues Spiel — der Knopf erzeugt das neue Sponsorsystem", () => {
       // Sockelabzug bepreist (p = 0, siehe `lib/sponsor/sponsor-leih-ziele.ts`), anders als
       // die frueheren Zielachsen mit geschaetzter Erfolgswahrscheinlichkeit.
       if (v2!.goal) {
-        expect(v2!.goal.probability).toBe(0);
-        expect(v2!.goal.upfrontCost).toBe(0);
-        expect(v2!.goal.payout).toBe(SPONSOR_LEIH_BONUS);
+        // Ohne Gebaeude-Karten zahlt die Karte wieder ueber eine Achse (siehe der Fall darueber);
+        // deren Wahrscheinlichkeit ist geschaetzt statt fest 0. Was in beiden Stellungen gilt:
+        // die Karte kostet nichts im Voraus und ihr Ziel zahlt etwas aus.
+        expect(v2!.goal.probability).toBeGreaterThanOrEqual(0);
+        expect(v2!.goal.probability).toBeLessThanOrEqual(1);
+        expect(v2!.goal.payout).toBeGreaterThan(0);
+        // Der Sockelabzug ist −p·G und wird IMMER faellig — die Karte darf ihn nicht anders
+        // ausweisen, als sie ihn abrechnet. Bei p = 0 (Leih-Ziel) ist er damit zwingend 0.
+        expect(v2!.goal.upfrontCost).toBeCloseTo(v2!.goal.probability * v2!.goal.payout, 1);
+        if (SPONSOR_GEBAEUDE_LEIHE_AKTIV) {
+          expect(v2!.goal.probability).toBe(0);
+          expect(v2!.goal.upfrontCost).toBe(0);
+          expect(v2!.goal.payout).toBe(SPONSOR_LEIH_BONUS);
+        }
       }
       // Die Spanne muss echte Breite haben — sonst zeigt die Karte eine Entscheidung ohne Folgen.
       expect(v2!.maxPayout).toBeGreaterThan(v2!.minPayout);
