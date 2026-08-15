@@ -29,6 +29,11 @@ import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { registerLiveRoomSaveId } from "@/lib/room/live-room-save-registry";
+import {
+  deletePersistedRoom,
+  loadPersistedRuntimeRooms,
+  persistRuntimeRoom,
+} from "@/lib/room/room-persistence";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -136,6 +141,14 @@ function syncPlayers(room: RuntimeRoom) {
       },
     },
   };
+
+  // Stufe 0.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B1): EINZIGE Stelle, an der jede
+  // Raum-Mutation vorbeikommt, bevor sie zum Aufrufer zurueckgeht (createRoom, joinRoom,
+  // rejoinRoom, markDisconnected, alle Room-Flow-/Arena-/Ownership-Aktionen unten rufen sie am
+  // Ende auf) — deshalb hier und nur hier persistiert, statt an zwanzig Aufrufstellen zu
+  // verstreuen. Synchron und pro Aufruf billig (better-sqlite3, kleine JSON-Blobs); der Server
+  // fasst dafuer nach einem Neustart nie wieder eine leere Map an.
+  persistRuntimeRoom(room);
 }
 
 export function createRoom(
@@ -171,12 +184,22 @@ export function createRoom(
     },
   };
 
-  syncPlayers(room);
+  /**
+   * REGEL SEIT DER ABLAGE (Stufe 0.1): `syncPlayers` ist die EINZIGE Stelle, an der ein Raum
+   * gespeichert wird. Jede Änderung an `room.state` muss deshalb VOR dem letzten `syncPlayers`
+   * dieser Funktion stehen — sonst liegt sie zwar im Arbeitsspeicher, aber nicht in der Ablage,
+   * und ein Neustart verliert genau sie.
+   *
+   * Hier stand das Anlege-Ereignis ursprünglich HINTER dem letzten `syncPlayers`; der gespeicherte
+   * Stand war damit bei jeder Raumanlage ein Ereignis hinterher. Wirkung im Alltag klein (das
+   * Ereignisprotokoll ist eine Chronik, kein Zustand), die Regel bricht es trotzdem — und die
+   * nächste Änderung an dieser Stelle wäre womöglich keine Chronik mehr.
+   */
   if (input?.preset) {
     room.state = applyOwnershipPresetToState(room.state, input.preset);
-    syncPlayers(room);
   }
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "room_created", preset: input?.preset ?? "default" });
+  syncPlayers(room);
   runtimeRooms.set(roomCode, room);
 
   return {
@@ -885,4 +908,76 @@ export function canSeatControlTeam(roomCode: string, seatToken: string, teamId: 
   const role = findSeatByToken(room, seatToken);
   const participantId = role ? room.seats[role]?.participantId : null;
   return participantId ? canParticipantControlTeam(room.state, participantId, teamId) : false;
+}
+
+/**
+ * Beendet einen Raum endgueltig (Stufe 0.4, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): bislang gab es
+ * kein `leaveRoom`, kein `closeRoom`, kein `delete` — die Map wuchs bis zum Prozessende, und
+ * `status: "completed"` wurde nirgends gesetzt. Nur der Host darf schliessen, wie bei allen
+ * anderen raumweiten Aktionen hier.
+ *
+ * Setzt `multiplayerRoom.status` auf "completed" (damit ein letzter Broadcast durch den Aufrufer
+ * den Abschluss noch zeigen kann), nimmt den Raum dann aber SOFORT aus der aktiven Menge UND aus
+ * der Ablage — bewusst OHNE `syncPlayers()` (das wuerde den Raum ueber `persistRuntimeRoom` sofort
+ * wieder zurueckschreiben). Der Raumcode ist danach frei: `createRoom()`s Eindeutigkeits-Schleife
+ * oben findet ihn nicht mehr in `runtimeRooms`.
+ */
+export function closeRoom(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf den Raum beenden." };
+  }
+
+  room.state = {
+    ...room.state,
+    multiplayerRoom: {
+      ...room.state.multiplayerRoom,
+      status: "completed",
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  room.state = appendRoomEvent(room.state, "room_state_updated", { source: "room_closed" });
+
+  runtimeRooms.delete(roomCode);
+  deletePersistedRoom(roomCode);
+
+  return { ok: true as const, room };
+}
+
+/**
+ * Laedt alle noch gueltigen Raeume aus der Ablage in die Prozess-Map — aufgerufen von `server.ts`
+ * VOR `ensureSocketServer(httpServer)`, damit ein `rejoinRoom` unmittelbar nach dem Neustart schon
+ * funktioniert, bevor der erste Client verbindet. `alreadyPresent` zaehlt Raeume, die (z. B. bei
+ * einem Hot-Reload im Dev-Betrieb) schon im Speicher liegen — die werden nie ueberschrieben, ein
+ * bereits laufender Raum im Speicher ist immer aktueller als sein zuletzt persistierter Stand.
+ */
+export function rehydrateRuntimeRoomsFromPersistence(): { restored: number; alreadyPresent: number } {
+  const persistedRooms = loadPersistedRuntimeRooms();
+  let restored = 0;
+  let alreadyPresent = 0;
+  for (const room of persistedRooms) {
+    if (runtimeRooms.has(room.roomCode)) {
+      alreadyPresent += 1;
+      continue;
+    }
+    runtimeRooms.set(room.roomCode, room);
+    restored += 1;
+  }
+  return { restored, alreadyPresent };
+}
+
+/**
+ * TEST-ONLY: leert die Prozess-Map, um einen Neustart zu simulieren (die Ablage bleibt
+ * unangetastet — genau das, was ein echter Prozess-Neustart mit `globalThis.__olyRuntimeRooms`
+ * tut). Gleiches Schutzmuster wie `resetDatabaseForTests()` in `lib/persistence/sqlite.ts`.
+ */
+export function resetRuntimeRoomsForTests(): void {
+  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+    throw new Error("resetRuntimeRoomsForTests darf nur in Tests laufen.");
+  }
+  runtimeRooms.clear();
 }

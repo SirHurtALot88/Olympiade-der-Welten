@@ -21,6 +21,7 @@ import {
   chooseDisciplineStageTeams,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
+import { resolveDisciplineStageSlotCount } from "@/lib/foundation/discipline-stage/discipline-stage-slot-count";
 import {
   spieltagsTopSpielerAusBuchung,
   spieltagsTopSpielerAusVorschau,
@@ -1139,6 +1140,58 @@ export default function DisciplineStageArena({
     return slots.map((s) => s.label).filter((l): l is string => Boolean(l && l.trim()));
   }, [engineDiscipline]);
 
+  /**
+   * Etappenzahl EINER Disziplinseite (d1 ODER d2), unabhängig davon, welche Seite
+   * gerade angezeigt wird — Befund B3 (`docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md`):
+   * der Arena-Gleichlauf sendete diese Zahl bisher hart als `0`, wodurch
+   * `revealedSlotCount < maxSlotRevealCount` (`matchday-arena-reveal-sync.ts:139`)
+   * nie wahr wurde und der Gast für immer vor Etappe 1 stehen blieb.
+   *
+   * Dieselbe Formel wie unten in `payload` (die dort NUR für die aktuell offene
+   * Seite läuft): Echt-Modus nimmt die tatsächlich aufgestellte Spielerzahl
+   * (Maximum über die Teams) aus Vorschau/gebuchtem Ergebnis, Test-/Random-Modus
+   * die Slot-Zahl des Modells — je mit `discipline.playerCount` als Rückfall,
+   * falls (noch) keine Teams vorliegen. EINE Funktion für beide Aufrufer, damit
+   * hier keine zweite Quelle für dieselbe Größe entsteht.
+   */
+  const computeStageSlotCount = useCallback(
+    (sideDisciplineId: string | null | undefined): number => {
+      if (!sideDisciplineId) return 1;
+      // Die Rechnung selbst steht in `resolveDisciplineStageSlotCount` (lib/…/discipline-stage-
+      // slot-count.ts) — hier wird nur beschafft, WORAUF sie angewandt wird. Getrennt, weil die
+      // Beschaffung React-Zustand braucht (Vorschau, Portraits) und die Rechnung nicht: so ist die
+      // Eigenschaft ohne Rendering prüfbar, statt wie vorher nur als Textmuster im Bauteil.
+      if (mode !== "real") {
+        const sideModel = buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId);
+        return resolveDisciplineStageSlotCount({
+          playerCountsByTeam: sideModel.teams.map((t) => t.slots.length),
+          fallbackSlotCount: sideModel.slotCount,
+        });
+      }
+      const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === sideDisciplineId);
+      const previewTeams =
+        disc && disc.teamResults.length > 0
+          ? buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById)
+          : null;
+      const bookedTeams = buildDisciplineStageTeamsFromBookedResult(gameState, sideDisciplineId, teamMetaById, portraitById);
+      const chosenTeams = chooseDisciplineStageTeams({ previewTeams, bookedTeams }).teams ?? [];
+      return resolveDisciplineStageSlotCount({
+        playerCountsByTeam: chosenTeams.map((t) => t.players.length),
+        fallbackSlotCount: buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount,
+      });
+    },
+    [mode, gameState, ownTeamId, preview, teamMetaById, portraitById],
+  );
+  // Die ECHTE Etappenzahl je Seite — ersetzt das früher hart auf { d1: 0, d2: 0 }
+  // gesetzte Paar an beiden Sende-Stellen unten (Start + Host-Advance).
+  const maxSlotRevealCountByDiscipline = useMemo(
+    () => ({
+      d1: computeStageSlotCount(matchdaySides.d1?.disciplineId),
+      d2: computeStageSlotCount(matchdaySides.d2?.disciplineId),
+    }),
+    [computeStageSlotCount, matchdaySides],
+  );
+
   // ---- Co-op-Room-Sync (Multiplayer): host-getriebener Lockstep-Reveal ----
   // Die Bühne ist eine Ein-Disziplin-Ansicht → wir tragen die aktuell gezeigte
   // Disziplin als „active phase" und den Reveal-Schritt (round) als slotRevealIndex.
@@ -1185,9 +1238,18 @@ export default function DisciplineStageArena({
       seasonId: seasonId ?? null,
       matchdayId: matchdayId ?? null,
       disciplineSide: activeDisciplineSide,
-      maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
+      maxSlotRevealCountByDiscipline,
     });
-  }, [roomContext, roomArenaSync, preview, seasonId, matchdayId, activeDisciplineSide, arenaStartBlockedByLineups]);
+  }, [
+    roomContext,
+    roomArenaSync,
+    preview,
+    seasonId,
+    matchdayId,
+    activeDisciplineSide,
+    arenaStartBlockedByLineups,
+    maxSlotRevealCountByDiscipline,
+  ]);
   // Prop-Bündel für die NativeArena (nur im Room aktiv; solo bleibt alles inert).
   const nativeRoomSync = roomContext
     ? {
@@ -1197,7 +1259,7 @@ export default function DisciplineStageArena({
         waitingForHost: roomArenaSync.roomRevealWaitingForHost,
         followsHost: roomArenaSync.roomRevealFollowsHost,
         syncedRound,
-        onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance({ d1: 0, d2: 0 }),
+        onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance(maxSlotRevealCountByDiscipline),
         coopGate: {
           active: roomArenaSync.arenaCoopReadyGateActive,
           isSelfReady: roomArenaSync.isSelfArenaReady,
@@ -1752,11 +1814,12 @@ export default function DisciplineStageArena({
      * Das Maximum (statt Minimum) ist richtig, weil Teams unterschiedlich viele
      * Spieler haben duerfen — ein Team mit mehr Spielern muss seine auch alle
      * zeigen duerfen. Der Fallback greift nur, wenn gar keine Spieler vorliegen.
+     *
+     * `computeStageSlotCount` (oben, Co-op-Room-Sync) rechnet EXAKT dieselbe
+     * Formel für eine beliebige Disziplinseite — hier bleibt derselbe Aufruf,
+     * damit es nur EINE Quelle für "Etappenzahl einer Disziplin" gibt.
      */
-    const slotCount = Math.max(
-      1,
-      teams.reduce((max, team) => Math.max(max, team.players.length), 0) || model.slotCount,
-    );
+    const slotCount = computeStageSlotCount(disciplineId);
     return {
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
       mineCode: ownShortCode,
@@ -1780,6 +1843,7 @@ export default function DisciplineStageArena({
     matchdayPanel,
     endedDisciplineIds,
     ratingByPlayerId,
+    computeStageSlotCount,
   ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
@@ -1970,6 +2034,15 @@ export default function DisciplineStageArena({
     (finishedDisciplineId: string) => {
       if (!onCommitDiscipline) return;
       /**
+       * HOST-VORBEHALT (Stufe 3.5): erst mit Befund B3 behoben (siehe `computeStageSlotCount`
+       * oben) erreicht der Gast ueberhaupt den Zieleinlauf und damit `onEnded` — vorher stand
+       * er dauerhaft vor Etappe 1 und rief diesen Pfad nie auf. Ohne die Sperre wuerden ab
+       * jetzt BEIDE Browser dieselbe Disziplin buchen wollen (zwei `onCommitDiscipline`-Aufrufe
+       * fuer denselben Spielstand). Solo (kein `roomContext`) bleibt unveraendert: dort ist
+       * `isRoomHost` per Definition irrelevant, der Aufrufer selbst ist immer "der Host".
+       */
+      if (roomContext && !roomArenaSync.isRoomHost) return;
+      /**
        * SEITE AUS `matchdaySides`, NICHT AUS `matchdayPanel` — DAS WAR DER STILLE BUCHUNGSVERLUST.
        *
        * GEMELDET VON CHRIS: „MD4 hat nicht gescored und blocked auch so dass ich nicht weiter komme."
@@ -2051,7 +2124,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress],
+    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress, roomContext, roomArenaSync.isRoomHost],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
