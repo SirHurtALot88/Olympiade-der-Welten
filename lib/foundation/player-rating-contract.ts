@@ -381,8 +381,27 @@ export function buildPlayerRatingContractRows(input: {
       performanceRows == null
         ? null
         : (() => {
+            /**
+             * NULL PLATZIERUNGEN IST EINE ANTWORT, KEIN FEHLENDER WERT.
+             *
+             * Hier stand `rawMvs != null && rawMvs > 0`. Damit bekam ein Spieler mit ehrlich null
+             * Platzierungen `mvs: null`, `sourceStatus.mvs: "missing_source"` und die Warnung
+             * `mvs_source_missing` — obwohl die Quelle existiert und die Antwort schlicht 0
+             * lautet. Die aeussere Bedingung unterscheidet sauber zwischen „keine Saisonquelle"
+             * (`performanceRows == null`) und „Quelle da, aber leer"; die innere machte die
+             * Unterscheidung wieder kaputt.
+             *
+             * CHRIS: „MVS wäre 0 bis die erste Diszi gespielt ist, das ist korrekt."
+             *
+             * Die KI-Kaufbewertung bleibt davon UNBERUEHRT: sie las bisher `mvs ?? ovr ?? 0` und
+             * fiel bei `null` auf OVR zurueck. Mit einer echten 0 haette `??` nicht mehr
+             * gegriffen (0 ist nicht nullish) und die Bewertung waere in der ganzen Vorsaison von
+             * OVR-gestuetzt auf 0 gekippt — eine Balance-Aenderung, die niemand bestellt hat.
+             * Die drei Stellen in `execute-live-pick.ts` fallen deshalb jetzt ausdruecklich auch
+             * bei 0 auf OVR zurueck.
+             */
             const rawMvs = mvsByPlayerId.get(row.player.id);
-            return rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null;
+            return rawMvs != null ? roundValue(rawMvs, 2) : null;
           })();
 
     return {

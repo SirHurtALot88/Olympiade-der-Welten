@@ -272,14 +272,30 @@ export function listExecuteFreeAgentsForSlot(input: {
   return dedupeFreeAgents([...mainPool, ...cheapPool]);
 }
 
+/**
+ * QUALITAETSMASS FUER DIE KAUFBEWERTUNG — MVS, sonst OVR.
+ *
+ * Hier stand dreimal `item.mvs ?? item.ovr ?? 0`. Solange ein Spieler ohne Platzierungen `null`
+ * trug, fiel das auf OVR zurueck. Seit die Bewertung ehrlich `0` meldet (siehe
+ * `player-rating-contract.ts`), greift `??` nicht mehr — 0 ist nicht nullish — und die KI
+ * bewertete in der GESAMTEN Vorsaison jeden Spieler mit 0, weil dort noch niemand eine
+ * Platzierung hat.
+ *
+ * Die 0 ist als ANZEIGE richtig und als Kaufmass unbrauchbar. Deshalb hier ausdruecklich: ein
+ * MVS von 0 heisst „noch nichts gespielt", nicht „taugt nichts" — dann entscheidet OVR.
+ */
+function resolveQualityScore(item: TransfermarktFreeAgentItem) {
+  return (item.mvs || item.ovr) ?? 0;
+}
+
 function resolveNeedAxisScore(item: TransfermarktFreeAgentItem, bestNeedDisciplineId: string | null) {
   if (!bestNeedDisciplineId) {
-    return (item.mvs ?? item.ovr ?? 0) * 0.15;
+    return (resolveQualityScore(item)) * 0.15;
   }
   const disciplineHit = item.preferredDisciplineIds?.includes(bestNeedDisciplineId) ? 12 : 0;
   const statPool = [item.pow ?? 0, item.spe ?? 0, item.men ?? 0, item.soc ?? 0];
   const topStat = statPool.length > 0 ? Math.max(...statPool) : 0;
-  return disciplineHit + topStat * 0.22 + (item.mvs ?? item.ovr ?? 0) * 0.12;
+  return disciplineHit + topStat * 0.22 + (resolveQualityScore(item)) * 0.12;
 }
 
 /**
@@ -400,7 +416,7 @@ function resolveExecuteLivePickForLane(input: {
       item,
       needRankScore: resolveNeedAxisScore(item, input.bestNeedDisciplineId),
       valueAdjustedQuality: executeValueAdjustedQuality({
-        quality: item.mvs ?? item.ovr ?? 0,
+        quality: resolveQualityScore(item),
         marketValue: item.marketValue,
         slotLane: input.slotLane,
         brackets: input.brackets,
