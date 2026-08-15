@@ -510,6 +510,49 @@ export function buildGeneratedTeamPowersForSeason(
     .flatMap((team) => buildGeneratedTeamPowersForTeam(gameState, saveId, seasonId, team.teamId));
 }
 
+function isSameAttributeTagList(
+  left: TeamPowerAttributeTag[] | undefined,
+  right: TeamPowerAttributeTag[] | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((tag, index) => tag === right[index]);
+}
+
+/**
+ * Feldweiser Vergleich statt `JSON.stringify`: die bestehenden Records kommen aus der
+ * Persistenz, die frisch erzeugten aus dem Generator — deren Schluesselreihenfolge muss
+ * nicht uebereinstimmen, ein Text-Vergleich wuerde also gleiche Datensaetze als
+ * verschieden melden und den Kurzschluss unten wirkungslos machen.
+ */
+function isSameTeamPower(left: TeamPowerRecord, right: TeamPowerRecord): boolean {
+  return (
+    left.id === right.id &&
+    left.saveId === right.saveId &&
+    left.seasonId === right.seasonId &&
+    left.teamId === right.teamId &&
+    left.label === right.label &&
+    left.description === right.description &&
+    left.category === right.category &&
+    left.effectType === right.effectType &&
+    left.targetMode === right.targetMode &&
+    left.targetLimit === right.targetLimit &&
+    left.conditionalBonusPct === right.conditionalBonusPct &&
+    left.conditionalTrigger === right.conditionalTrigger &&
+    left.conditionalDescription === right.conditionalDescription &&
+    left.source === right.source &&
+    left.sourceRank === right.sourceRank &&
+    left.sourceFacilityId === right.sourceFacilityId &&
+    left.modifier === right.modifier &&
+    isSameAttributeTagList(left.positiveAttributeTags, right.positiveAttributeTags) &&
+    left.negativeAttributeTag === right.negativeAttributeTag &&
+    left.chargesTotal === right.chargesTotal &&
+    left.selectedForSeason === right.selectedForSeason &&
+    left.isPassive === right.isPassive &&
+    left.createdAt === right.createdAt
+  );
+}
+
 export function ensureLocalTeamPowersForSeason(gameState: GameState, saveId: string, seasonId: string): GameState {
   const existing = gameState.seasonState.teamPowers ?? [];
   const generated = buildGeneratedTeamPowersForSeason(gameState, saveId, seasonId);
@@ -522,11 +565,31 @@ export function ensureLocalTeamPowersForSeason(gameState: GameState, saveId: str
   }));
   const unchanged = existing.filter((power) => power.seasonId !== seasonId || !generatedIds.has(power.id));
 
+  const nextTeamPowers = [...unchanged.filter((power) => power.seasonId !== seasonId), ...mergedCurrentSeason];
+
+  /**
+   * Kurzschluss wie beim Geschwister `ensureLocalFormCardsForSeason`: aendert der Lauf
+   * nichts, kommt DERSELBE `gameState` zurueck.
+   *
+   * Ohne ihn gab die Funktion immer ein neues Objekt heraus, und die Aufrufer schliessen
+   * aus der neuen Referenz auf „es hat sich etwas geaendert" und schreiben den kompletten
+   * Spielstand. Am Live-Save gemessen kostet ein solcher Schreibvorgang rund 1,2 s — auf
+   * dem Aufstellungs-Pfad und im Spieltagsabschluss fiel er an, obwohl kein einziger
+   * Datensatz anders war. Das Power-System ist ausserdem derzeit ganz abgeschaltet
+   * (`TEAM_POWERS_ENABLED`), der Generator laeuft davon unabhaengig weiter.
+   */
+  const isUnchanged =
+    nextTeamPowers.length === existing.length &&
+    nextTeamPowers.every((power, index) => isSameTeamPower(power, existing[index]));
+  if (isUnchanged) {
+    return gameState;
+  }
+
   return {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      teamPowers: [...unchanged.filter((power) => power.seasonId !== seasonId), ...mergedCurrentSeason],
+      teamPowers: nextTeamPowers,
     },
   };
 }
