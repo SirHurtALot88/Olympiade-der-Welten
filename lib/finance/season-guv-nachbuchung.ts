@@ -34,6 +34,7 @@
 
 import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { resolveSeasonGuvByTeam } from "@/lib/finance/season-guv-resolver";
+import { isSeasonEndRosterPhase } from "@/lib/season/season-end-roster-window";
 
 export type StandingsGuvNachbuchungResult = {
   gameState: GameState;
@@ -97,4 +98,48 @@ export function zieheSaisonstandGuvNach(gameState: GameState): StandingsGuvNachb
     gameState: { ...gameState, seasonState: { ...gameState.seasonState, standings: naechsteStandings } },
     geaenderteTeams,
   };
+}
+
+/**
+ * DASSELBE NACHZIEHEN, ABER NUR IM SAISONENDE-FENSTER — der Haken für die laufenden Buchungen.
+ *
+ * GEMELDET VON CHRIS: „Die GuV im Saisonstand und die im Finanzen-Reiter weichen voneinander ab!
+ * […] die zuletzt bearbeitete müsste die korrekte sein - die sollen nicht unterschiedlich sein."
+ *
+ * `zieheSaisonstandGuvNach` lief bis hierher NUR am Saisonende (`season-completion-service`,
+ * `season-end-tail-settlement`). Danach handelt man aber weiter: verkaufen, verlängern, auflösen
+ * sind im ganzen Saisonende-Fenster offen (`SEASON_END_ROSTER_PHASES`), und jede dieser Buchungen
+ * verschiebt Gehälter und damit die GuV. Die gespeicherte Zeile veraltete ab da wieder — während
+ * der Saisonstand live rechnet und sofort die neue Zahl zeigte.
+ *
+ * Am Live-Abbild ist das exakt sichtbar: im gemeldeten Save (`hwz8fk`, `season_end_management`)
+ * weicht GENAU EIN Team ab — S-C, das von Chris geführte. Die 31 KI-Teams, die dort nicht
+ * gehandelt haben, stimmen. Im abgeschlossenen `1hf25q` sind es 32 von 32, weil dieser Stand die
+ * Nachbuchung noch gar nicht gesehen hat.
+ *
+ * WARUM NICHT BEIM LESEN NEU RECHNEN — gemessen, nicht vermutet: `resolveSeasonGuvByTeam` kostet
+ * auf einem warmen Spielstand rund 85 ms für 32 Teams, auf einem FRISCHEN beim ersten Aufruf 334
+ * Sekunden (die Sponsor-Angebote entstehen dabei erstmalig). In den Tabellenaufbau gehört das
+ * nicht; ein erster Versuch dort trieb `analytics-live-fortschritt` von 17,58 s über 180 s.
+ * Einmal je Buchung ist dagegen bezahlbar — auf den echten Saisonende-Ständen 40 bis 140 ms.
+ *
+ * ZWEI RIEGEL MACHEN DEN AUFRUF ANDERNORTS ZUM NICHTSTUN:
+ *  1. Die Phase. Außerhalb des Saisonende-Fensters kehrt die Funktion sofort um — mitten in der
+ *     Saison stünde in beiden Zeilen ohnehin dieselbe Hochrechnung.
+ *  2. `zieheSaisonstandGuvNach` selbst lässt Teams ohne gespeicherte Postenliste unberührt. Die
+ *     Liste entsteht erst bei der Saisonende-Buchung; wo sie fehlt, gab es diese Buchung nicht.
+ *
+ * IDEMPOTENT wie die zugrunde liegende Funktion: zweimal laufen ändert nichts.
+ */
+export function zieheSaisonstandGuvNachImSaisonendfenster(gameState: GameState): GameState {
+  if (!isSeasonEndRosterPhase(gameState)) {
+    return gameState;
+  }
+  try {
+    return zieheSaisonstandGuvNach(gameState).gameState;
+  } catch {
+    // Eine Buchung darf an der Nachbuchung nicht scheitern. Schlaegt die Ableitung auf einem
+    // unvollstaendigen Stand fehl, bleibt die gespeicherte Zeile stehen — wie bisher.
+    return gameState;
+  }
 }
