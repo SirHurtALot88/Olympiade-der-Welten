@@ -1,12 +1,36 @@
 # Triage der Meldungen vom 14.08. — Tickets #32 bis #44
 
 13 Meldungen aus dem Spiel, alle aus `Oly New Game Custom 13.8.2026` (Saison 1, Spieltag 9–10).
-Sie lagen auf dem Branch `bug-reports` und waren weder nummeriert noch triagiert — deshalb hier
-zuerst die Nummern, dann die Einordnung.
 
-**Warum eine Sammeltriage und nicht 13 Einzeldateien:** vier der Meldungen beschreiben denselben
-Fehlertyp (zwei Zahlen für dieselbe Sache), drei denselben Bereich (KI-Ermüdung). Getrennt
-abgelegt hätte man den Zusammenhang erst wiederfinden müssen.
+**Diese Datei ist die Uebersicht, nicht die Quittung.** Je Meldung liegt eine eigene
+Triage-Datei daneben (`bug-2026-08-14T*.md`) — dort steht der Befund im Detail und der Status.
+Hier steht, was zusammengehoert und in welcher Reihenfolge es sinnvoll ist. Zwei Ablagen fuer
+denselben Vorgang waeren sonst genau der Fehlertyp, den die Haelfte dieser Meldungen beschreibt.
+
+## Stand
+
+| Ticket | Thema | Status |
+|---|---|---|
+| #32 | All-Time-Zeile zaehlt PP/Verletzungen/MW nicht | offen |
+| #33 | VK-Anzeige eigenes Team schlechter als fremdes | offen |
+| #34 | Verletzungs-Spalte im Saisonstand | **behoben** |
+| #35 | Arena: Spieler auf ihrem Slot | **behoben** |
+| #36 | Trainingshistorie: trainierte Klasse | **behoben** |
+| #37 | KI managt Muedigkeit schlecht bei duennem Kader | offen (erst messen) |
+| #38 | VK-Faktor ab 8 Spielern | offen |
+| #39 | KI-Training ignoriert Ermuedung | offen (erst messen) |
+| #40 | Training-Netto ≠ Profil-Forecast | **behoben** |
+| #41 | Awards im Spielerprofil | offen (eigenes Vorhaben) |
+| #42 | Top-Player-Liste auf 24 | offen |
+| #43 | negativer Cash rot | **behoben** |
+| #44 | VK gegen Marktwert: zwei Zahlen | **behoben** |
+
+Sechs von dreizehn behoben. Was offen ist, ist es aus einem der drei Gruende: es fehlt eine
+Entscheidung von Chris, es fehlt eine Messung, oder es ist ein eigenes Vorhaben.
+
+**Warum eine Sammeltriage:** vier der Meldungen beschreiben denselben Fehlertyp (zwei Zahlen fuer
+dieselbe Sache), drei denselben Bereich (KI-Ermuedung). Getrennt abgelegt haette man den
+Zusammenhang erst wiederfinden muessen.
 
 ---
 
@@ -22,14 +46,18 @@ und verliert das Vertrauen in beide.
 > gleich sein mit dem forecast der im spielerprofil drin steht — bitte prüfen was korrekt ist und
 > nur eine Zahl ausweisen"
 
-−40 SP ist keine Rundungsabweichung, das ist eine andere Rechnung. **In Arbeit.**
+−40 SP ist keine Rundungsabweichung, das ist eine andere Rechnung. **BEHOBEN** — es waren zwei
+Fehler: eine unvollstaendige Forecast-Formel UND ein Fallback, der Ersatzwerte gegen echte
+Attributdecken clampte und dadurch einen Absturz erfand. Wahr sind +3,4.
 
 ### #44 — Verkauf: „vs Marktwert" ≠ Wert im Spielerprofil
 > „Beim Verkauf vs Marktwert hat Lava Golem z.B. +10,7 oben angezeigt. Wenn ich in sein Profil
 > schaue, steht dort vs Marktwert +9,3 … Was ist nun richtig?"
 
-Verdacht: die eine Zahl vergleicht gegen den Kaufpreis, die andere gegen den Marktwert, und der
-VK-Faktor steckt nur in einer. **In Arbeit.**
+**BEHOBEN.** Der Verdacht war halb richtig: es fehlte genau eine Stufe
+(`applySellPricingPolicyToBreakdown`). Entschieden hat die Buchung, nicht das Argument — Lava Golem
+wurde zwoelf Minuten nach der Meldung fuer `fee 28.09` verkauft. Die Auslauf-Tabelle versprach
+29,48; richtig ist das Profil (+9,3).
 
 ### #32 — All-Time-Zeile der Historie zählt PP, Verletzungen und MW nicht mit
 > „in der ALl Time Zeile der History sind die PPs Verletzungen MW usw noch nicht erfasst — für die
@@ -53,9 +81,9 @@ Zwei Darstellungen derselben Sache, eine davon schlechter. Gehört zu #44.
 > Spieler auch weiter in ihrem Slot mit ihren Werten bleiben! Also wenn ich in 5 + 6 Slot die
 > spieler einsetze, sollen sie auch dann starten auch wenn davor dann alle slots leer sind!"
 
-Direkt anschlussfähig an die gerade behobene Regel „wer zu wenig Spieler hat, setzt alle ein":
-wenn eine kurze Aufstellung erlaubt ist, darf die Slot-Zuordnung nicht stillschweigend
-zusammenrutschen. Zu prüfen ist, ob leere Slots davor die Wertung verschieben.
+**BEHOBEN.** Die Wertung war immer richtig — die Anzeige nicht. Das ist schlimmer als es klingt:
+die Slot-Position traegt eine eigene Attribut-Gewichtung (bis ±8,5 je Spieler). Wer auf Slot 5
+gewertet wurde, stand als Etappe 1 auf der Buehne.
 
 ---
 
@@ -98,12 +126,13 @@ Klare Ansage, kleiner Eingriff — sobald #44 die VK-Rechnung geklärt hat, geh�
 ### #34 — Verletzungs-Spalte im Saisonstand
 > „im Saisonstand eine Spalte einfügen mit der Anzahl an Verletzungen!"
 
-Die Rohdaten liegen vor (`injuryEvents`, am Abnahmestand 2380 Zeilen) — es fehlt nur die Spalte.
+**BEHOBEN.** Die Rohdaten lagen laengst vor (`injuryEvents`, am Abnahmestand 2380 Zeilen) — es
+fehlte nur die Spalte. Gezaehlt wird ueber dieselbe Stelle wie in der Teamhistorie.
 
 ### #43 — negativer Cash rot
 > „bitte den aktuellen Cash stand auch rot markieren wenn der negativ sein sollte!"
 
-Kleinster Eingriff der ganzen Liste.
+**BEHOBEN** (im Parallel-Lauf, PR #524).
 
 ### #42 — Top-Player-Liste auf 24, nebeneinander
 > „die Top Player Liste könnte man noch ausweiten, dass man nicht nur die top 12 sondern Top 24
@@ -112,6 +141,10 @@ Kleinster Eingriff der ganzen Liste.
 ### #36 — Trainingshistorie: welche Klasse wurde hauptsächlich trainiert
 > „In der Training History sollte auch drin stehen welche Klasse in der Season mainly trainiert
 > wurde!"
+
+**BEHOBEN.** Die trainierte Klasse fiel ausgerechnet in der Saison weg, in der die Klasse
+WECHSELTE — der einzigen, in der man sie wirklich wissen will. Die Nebenklasse stand in den Daten
+und wurde nie durchgereicht.
 
 ### #41 — Awards im Spielerprofil
 > „Wir brauchen noch eine erklärung wie Most Improved Player sich zusammensetzt! Dann brauchen wir
