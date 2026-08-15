@@ -763,6 +763,174 @@ export function loadLocalLegacyLineupContextFromGameState(
   return buildContextFromGameState(gameState, params);
 }
 
+/**
+ * BILLIGE VORPRUEFUNG FUER DEN KI-BATCH — Spielplan/Sollbesetzung EINMAL pro Spieltag, statt den
+ * vollen Kontext (Kader, Verfuegbarkeiten, Formkarten, Team-Powers, Manager-Doktrin, ...) fuer
+ * JEDES Team aufzubauen, nur um am Ende festzustellen, dass gar nichts zu tun ist.
+ *
+ * Anlass (Chris, gemessen): `applyAiLegacyLineupBatchLocally` brauchte 2,25s fuer einen Spieltag,
+ * an dem alle 32 Teams bereits eine vollstaendige Aufstellung hatten (`overwriteExisting: false`)
+ * — reine Verschwendung, denn `isLegacyLineupDraftComplete` braucht davon nur drei Zutaten:
+ *  - den vorhandenen Entwurf (steht direkt in `gameState.seasonState.lineupDrafts`),
+ *  - die D1/D2-Disziplin des Spieltags (haengt nur am Spielplan, nicht am Team),
+ *  - die Sollbesetzung je Disziplin (haengt nur an der Disziplin, nicht am Team).
+ * Alle drei sind fuer JEDES Team des Spieltags IDENTISCH — sie muessen nur einmal stehen.
+ *
+ * Baut die Season-/Spieltag-Aufloesung BEWUSST eigenstaendig auf und ruehrt NICHT den
+ * `getSharedLineupContextBase`-Cache des vollen Kontextaufbaus an, obwohl der dieselben Zutaten
+ * liefern koennte. Der Grund ist keine Bequemlichkeit: der Cache schluesselt (unter anderem) ueber
+ * `saveId`, und Test-Fixtures vergeben `saveId`n teils ueber `Date.now()` — zwei strukturell
+ * gleiche, aber INHALTLICH verschiedene Spielstaende koennen denselben Schluessel treffen. Eine
+ * zusaetzliche Vorpruefung, die diesen Cache zusaetzlich fuellt/liest, erhoeht genau dieses
+ * (seltene, aber beobachtete) Kollisionsrisiko, ohne dass die hier gebrauchten Teile (Spielplan,
+ * Sollbesetzung, Kader-Zuordnung) die teuren, gecachten Anteile (Rang-Tabelle, Score-Map,
+ * Manager-Doktrin) ueberhaupt brauchen — die eigenstaendige Berechnung ist dafuer billig genug.
+ *
+ * `ok: false` heisst: Season oder Spieltag liessen sich nicht aufloesen — in diesem Fall (und nur
+ * dann) ist die Vorpruefung selbst wertlos, der Aufrufer muss fuer JEDES Team auf den vollen,
+ * fehlertragenden Kontextaufbau zurueckfallen (der die richtige Fehlermeldung fuer
+ * `skipped_blocked` liefert).
+ */
+export type LegacyLineupBatchPrecheck = {
+  ok: boolean;
+  d1DisciplineId: string | null;
+  d2DisciplineId: string | null;
+  disciplinePlayerCounts: Record<string, number>;
+  disciplineSidePlayerCounts: Record<string, number>;
+  /**
+   * Team UND Team-Identity im Save gefunden? Nur dann ist sicher, dass der volle Kontextaufbau
+   * fuer dieses Team `ok: true` liefern wuerde — sonst muss der Aufrufer auf ihn zurueckfallen,
+   * damit `skipped_blocked` seine Fehlermeldung bekommt.
+   */
+  hasTeamAndIdentity: (teamId: string) => boolean;
+  /** Derselbe Entwurf, den `context.existingDraft` beim vollen Kontextaufbau liefern wuerde. */
+  getExistingDraft: (teamId: string) => LegacyLineupDraft | null;
+  /**
+   * Kadergroesse (= `context.rosterPlayers.length` beim vollen Kontextaufbau) — MUSS an
+   * `findStaleAiLineupEntries({ rosterSize })` durchgereicht werden. Die Frischepruefung bestimmt
+   * ihre Schoner-Schwelle sonst ueber `rosterPlayers.length` des uebergebenen Arrays; da
+   * `getFreshnessRosterPlayers` bewusst NUR die angefragten (aufgestellten) Spieler liefert, waere
+   * dieser Fallback hier ein zu DUENNER Kader und wuerde die Schwelle faelschlich verschaerfen.
+   */
+  getActiveRosterSize: (teamId: string) => number;
+  /**
+   * Fatigue/Verletzungsstatus NUR fuer die uebergebenen Spieler-IDs — billige Grundlage fuer
+   * `findStaleAiLineupEntries`, ohne den kompletten Kader-Kontext (Marktwert, Potenzial,
+   * Verletzungsrisiko je Intensitaet, ...) aufzubauen, den die Frischepruefung gar nicht braucht.
+   */
+  getFreshnessRosterPlayers: (
+    teamId: string,
+    playerIds: readonly string[],
+  ) => Array<{
+    id: string;
+    fatigue: number | null;
+    injuryStatus: "healthy" | "injured" | "recovering" | null;
+    availabilityBlocker: "player_injured_unavailable" | null;
+  }>;
+};
+
+export function loadLocalLegacyLineupBatchPrecheckFromGameState(
+  gameState: GameState,
+  params: { saveId: string; seasonId: string; matchdayId: string },
+): LegacyLineupBatchPrecheck {
+  const emptyResult: LegacyLineupBatchPrecheck = {
+    ok: false,
+    d1DisciplineId: null,
+    d2DisciplineId: null,
+    disciplinePlayerCounts: {},
+    disciplineSidePlayerCounts: {},
+    hasTeamAndIdentity: () => false,
+    getExistingDraft: () => null,
+    getActiveRosterSize: () => 0,
+    getFreshnessRosterPlayers: () => [],
+  };
+
+  // Dieselbe Aufloesung wie in `getSharedLineupContextBase` (season/matchday finden,
+  // Spieltags-Schedule normalisieren) — absichtlich dupliziert statt geteilt, s. Kommentar oben.
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameState, params.saveId);
+  const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
+  const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
+  const scheduleEntry =
+    season && matchdayIndex >= 0 ? getSeasonDisciplineScheduleEntry(normalizedGameState, params.matchdayId) : null;
+  const matchday =
+    season && matchdayIndex >= 0
+      ? {
+          id: params.matchdayId,
+          seasonId: params.seasonId,
+          index: matchdayIndex + 1,
+          label: scheduleEntry?.matchdayLabel ?? `Spieltag ${matchdayIndex + 1}`,
+          fixtureIds: [],
+          status:
+            normalizedGameState.matchdayState.matchdayId === params.matchdayId ? normalizedGameState.matchdayState.status : "planning",
+        }
+      : null;
+
+  if (!season || !matchday) {
+    return emptyResult;
+  }
+
+  const lineupContract = buildLineupDisciplineContract(normalizedGameState.disciplines);
+  const matchdayContract = buildMatchdayLineupContract({
+    season,
+    matchday,
+    disciplines: normalizedGameState.disciplines,
+    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+  });
+  const disciplinePlayerCounts = Object.fromEntries(
+    lineupContract.map((entry) => [entry.disciplineId, entry.requiredPlayers ?? 0]),
+  );
+  const disciplineSidePlayerCounts = Object.fromEntries(
+    [matchdayContract.discipline1, matchdayContract.discipline2]
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+      .map((entry) => [`${entry.disciplineId}::${entry.disciplineSide}`, entry.requiredPlayers ?? 0] as const),
+  );
+
+  const teamById = new Map(normalizedGameState.teams.map((team) => [team.teamId, team] as const));
+  const teamIdentityById = new Map(normalizedGameState.teamIdentities.map((identity) => [identity.teamId, identity] as const));
+  const playersById = new Map(normalizedGameState.players.map((player) => [player.id, player] as const));
+  const rosterEntriesByTeamId = new Map<string, typeof normalizedGameState.rosters>();
+  for (const rosterEntry of normalizedGameState.rosters) {
+    const existing = rosterEntriesByTeamId.get(rosterEntry.teamId);
+    if (existing) {
+      existing.push(rosterEntry);
+    } else {
+      rosterEntriesByTeamId.set(rosterEntry.teamId, [rosterEntry]);
+    }
+  }
+
+  return {
+    ok: true,
+    d1DisciplineId: matchdayContract.discipline1?.disciplineId ?? null,
+    d2DisciplineId: matchdayContract.discipline2?.disciplineId ?? null,
+    disciplinePlayerCounts,
+    disciplineSidePlayerCounts,
+    hasTeamAndIdentity: (teamId) => teamById.has(teamId) && teamIdentityById.has(teamId),
+    getExistingDraft: (teamId) => getStoredDraft(normalizedGameState, { ...params, teamId }),
+    getActiveRosterSize: (teamId) =>
+      (rosterEntriesByTeamId.get(teamId) ?? []).filter((entry) => playersById.has(entry.playerId)).length,
+    getFreshnessRosterPlayers: (teamId, playerIds) => {
+      const rosterByPlayerId = new Map(
+        (rosterEntriesByTeamId.get(teamId) ?? []).map((entry) => [entry.playerId, entry] as const),
+      );
+      const wanted = new Set(playerIds);
+      const result: ReturnType<LegacyLineupBatchPrecheck["getFreshnessRosterPlayers"]> = [];
+      for (const playerId of wanted) {
+        if (!rosterByPlayerId.has(playerId)) continue; // nicht mehr im Kader -> wie im vollen Pfad "unbekannt"
+        const player = playersById.get(playerId);
+        if (!player) continue;
+        const availability = getPlayerAvailabilityView(normalizedGameState, playerId, teamId, params.matchdayId);
+        result.push({
+          id: playerId,
+          fatigue: availability.fatigue ?? player.fatigue ?? null,
+          injuryStatus: availability.injuryStatus,
+          availabilityBlocker: availability.blocker,
+        });
+      }
+      return result;
+    },
+  };
+}
+
 export function loadAllLocalLegacyLineupContexts(
   input: {
     saveId: string;
