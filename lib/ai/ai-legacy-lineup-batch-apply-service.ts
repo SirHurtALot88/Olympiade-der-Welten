@@ -27,6 +27,7 @@ import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readi
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
+import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -1914,6 +1915,10 @@ export function applyAiLegacyLineupBatchLocally(
       ? findStaleAiLineupEntries({
           entryPlayerIds: (contextResult.context.existingDraft?.entries ?? []).map((entry) => entry.playerId),
           rosterPlayers: contextResult.context.rosterPlayers ?? [],
+          // Dieselbe Korrektur wie im Trainingslast-Dienst: ohne den echten Spieltagsbedarf faellt
+          // die Schonschwelle auf einen Notnagel zurueck und laesst duenne Kader tiefer aussehen,
+          // als sie sind. Beide Stellen lesen jetzt denselben Wert aus dem Spielplan.
+          startingSlots: resolveMatchdayPlayerDemand(preparedGameState, scope.matchdayId) ?? undefined,
         })
       : [];
 

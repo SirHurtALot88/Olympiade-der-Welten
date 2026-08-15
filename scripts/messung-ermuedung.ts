@@ -40,9 +40,28 @@ const ziel = process.env.MESS_SAVE;
 const alle = persistence.listSaves();
 const save = ziel ? alle.find((s) => s.saveId === ziel)! : alle.at(-1)!;
 const gs = persistence.getSaveById(save.saveId)!.gameState as any;
-const ss = gs.seasonState ?? {};
 
-console.log(`=== ${save.saveId} | ${gs.season.id} | Spieltag ${gs.season.currentMatchday} ===\n`);
+/**
+ * WELCHE SAISON WIRD GEMESSEN?
+ *
+ * Nicht die laufende — die ist nach einem Saisonwechsel leer, und eine Nullmessung sieht aus wie
+ * ein Erfolg. Die Verletzungsereignisse bleiben nach dem Wechsel im `seasonState` liegen und
+ * tragen ihre eigene `seasonId`; gemessen wird deshalb die Saison, zu der die MEISTEN Ereignisse
+ * gehoeren. Mit MESS_SAISON=<id> laesst sich das ueberstimmen.
+ */
+const ss = gs.seasonState ?? {};
+const alleEvents: any[] = ss.injuryEvents ?? [];
+const proSaison = new Map<string, number>();
+for (const e of alleEvents) proSaison.set(e.seasonId, (proSaison.get(e.seasonId) ?? 0) + 1);
+const gemesseneSaison =
+  process.env.MESS_SAISON ??
+  [...proSaison.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+  gs.season.id;
+gs.season = { ...gs.season, id: gemesseneSaison };
+
+console.log(
+  `=== ${save.saveId} | gemessene Saison ${gemesseneSaison} | Saisons im Spielstand: ${[...proSaison.entries()].map(([id, n]) => `${id}=${n}`).join(", ") || "keine"} ===\n`,
+);
 
 // ------------------------------------------------------------------ 1) Verletzungen
 const events: any[] = ss.injuryEvents ?? [];

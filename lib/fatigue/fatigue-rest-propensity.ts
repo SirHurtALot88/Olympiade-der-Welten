@@ -33,16 +33,40 @@ export const FATIGUE_REST_FLOOR_THIN = 32;
 /** At/above this fatigue the ramp reaches its configured ceiling. */
 export const FATIGUE_REST_CEILING = 88;
 /**
- * Referenz-Anzahl Startplaetze pro Matchday. Kader-Tiefe = Kadergroesse ueber diesen
- * Startplaetzen (verfuegbare Wechsel/Rotation).
+ * NOTNAGEL fuer die Startplaetze, wenn der Spieltagsbedarf nicht bekannt ist.
+ *
+ * DIESER WEG SOLLTE NIE GENOMMEN WERDEN. Chris dazu: „kann ja gar nicht vorkommen ein team weiss
+ * ja immer vorab wie viele spieler an welchen spieltagen benoetigt werden" — der Bedarf steht im
+ * Spielplan, `resolveMatchdayPlayerDemand` liest ihn.
+ *
+ * Frueher stand hier 7, und weil BEIDE Aufrufer den echten Wert nicht uebergaben, war die 7 nicht
+ * der Notnagel, sondern die Regel. Ein Spieltag verlangt die SUMME beider Disziplinen — nach
+ * Chris' Auslegung 4 bis 12. Ein Neunmannkader an einem Elferspieltag galt damit als „zwei
+ * Ersatzspieler" und schonte zu spaet; am Live-Spielstand gemessen fuhren die KI-Teams 22,7 %
+ * ihrer Einsaetze ab Ermuedung 65 (Mensch: 11,8 %), und 58 % aller Verletzungen fielen auf die
+ * letzten zwei Spieltage.
+ *
+ * Jetzt steht hier der HOECHSTE Bedarf, nicht der mittlere. Ist der Bedarf unbekannt, soll die
+ * Schaetzung in Richtung „duenner Kader" irren: dann wird zu FRUEH geschont statt zu spaet. Ein
+ * zu frueh geschonter Spieler kostet ein paar Punkte, ein zu spaet geschonter faellt aus.
  */
-export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 7;
+export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 12;
 /**
- * Ab so vielen Ersatzspielern (Kadergroesse - Startplaetze) gilt der volle Basis-Boden
+ * Ab so vielen Ersatzspielern (Kadergroesse - Spieltagsbedarf) gilt der volle Basis-Boden
  * (FATIGUE_REST_FLOOR). Darunter wird linear zum duennen Boden (FATIGUE_REST_FLOOR_THIN)
  * interpoliert.
+ *
+ * ZWEI, und die Zahl kommt aus Chris' eigener Auslegung des Kaders: „min 4 - max 12 pro spieltag
+ * deswegen haben wir ja auch das max der spieler auf 14 hoch gesetzt damit man theoretisch alles
+ * bedienen kann selbst mit 2 verletzungen". Voll ausgestattet heisst in diesem Spiel also: den
+ * Spieltag besetzen koennen UND zwei Ausfaelle verkraften.
+ *
+ * Vorher stand hier 5. Das passte zur alten Referenz von 7 Startplaetzen (7 + 5 = 12 waere ein
+ * gut bestueckter Kader), ergibt mit dem ECHTEN Bedarf aber keinen Sinn mehr: bei 12 benoetigten
+ * Spielern und hoechstens 14 im Kader sind mehr als 2 Ersatzleute gar nicht moeglich — kein Team
+ * haette den vollen Boden je erreicht.
  */
-export const FATIGUE_REST_FULL_DEPTH_SUBS = 5;
+export const FATIGUE_REST_FULL_DEPTH_SUBS = 2;
 /** Convex exponent: keeps probability low just above the floor, rising steeply late. */
 const FATIGUE_REST_RAMP_GAMMA = 1.7;
 
