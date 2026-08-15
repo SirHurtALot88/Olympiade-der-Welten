@@ -176,7 +176,6 @@ export type PlayerEconomyContract = {
 };
 
 type ImportedMarketValueSource = Extract<PlayerEconomyMarketValueSource, "imported_display" | "imported_raw">;
-type ImportedSalarySource = Extract<PlayerEconomySalarySource, "imported_display" | "imported_raw">;
 
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -204,16 +203,6 @@ function resolveImportedMarketValueSource(player?: EconomyPlayer | null): Import
     return "imported_display";
   }
   if (toFiniteNumber(player?.marketValue) != null) {
-    return "imported_raw";
-  }
-  return "imported_raw";
-}
-
-function resolveImportedSalarySource(player?: EconomyPlayer | null): ImportedSalarySource {
-  if (toFiniteNumber(player?.displaySalary) != null) {
-    return "imported_display";
-  }
-  if (toFiniteNumber(player?.salaryDemand) != null) {
     return "imported_raw";
   }
   return "imported_raw";
@@ -305,7 +294,7 @@ export function resolvePlayerEconomyContract(input: {
           disciplineRatings: playerEntity?.disciplineRatings,
         })
       : null);
-  const fallbackFinalSalary = legacyDisplaySalary ?? storedCalculatedSalary;
+  const fallbackFinalSalary = storedCalculatedSalary;
   const salaryMarketValueFromLegacySalary =
     salaryMarketValueOverride == null &&
     baseMarketValue == null &&
@@ -371,12 +360,27 @@ export function resolvePlayerEconomyContract(input: {
             ? "active_purchase_price"
             : "missing_source";
 
-  const salary =
-    rosterSalary ??
-    salaryBreakdown?.finalSalary ??
-    storedCalculatedSalary ??
-    legacyDisplaySalary ??
-    null;
+  /**
+   * KEIN IMPORTIERTES GEHALT MEHR — CHRIS: „keine import gehälter mehr nutzen nicht in tests und
+   * nicht im gehalt, nur noch das berechnete!"
+   *
+   * Hier endete die Kette frueher auf `legacyDisplaySalary` (dem `displaySalary` aus der
+   * Katalog-Ausleitung). Der Zweig ist entfernt: was gilt, ist der unterschriebene Vertrag, sonst
+   * die Rechnung.
+   *
+   * WAS DAS AENDERT (an einem frischen Spielstand gemessen, alle 2.984 Spieler): NICHTS. Kein
+   * einziger Spieler haengt am Import — 2.983 stehen auf `calculated_preview`, einer auf
+   * `active_contract`. Und Import und Rechnung sind auf 0,00 identisch: die Katalogladung
+   * materialisiert die berechnete Oekonomie ohnehin zuerst, `displaySalary` trug also nur eine
+   * Kopie derselben Zahl. Der Zweig war ein stiller Rueckfall auf etwas, das es gar nicht mehr
+   * gab.
+   *
+   * WAS ES KUENFTIG AENDERT: ein Spielstand, dessen Rechnung nicht laeuft (fehlende Attribute,
+   * fehlende Formelquellen), bekommt jetzt `missing_salary` statt heimlich einer Importzahl. Das
+   * ist der Sinn der Entscheidung — ein sichtbar leeres Feld ist reparierbar, eine stille
+   * Ersatzzahl wird geglaubt.
+   */
+  const salary = rosterSalary ?? salaryBreakdown?.finalSalary ?? storedCalculatedSalary ?? null;
   const salarySource =
     rosterSalary != null
         ? "active_contract"
@@ -384,9 +388,7 @@ export function resolvePlayerEconomyContract(input: {
             ? "calculated_preview"
             : storedCalculatedSalary != null
               ? "calculated_stored"
-              : legacyDisplaySalary != null
-                ? resolveImportedSalarySource(player)
-                : "missing_source";
+              : "missing_source";
 
   /**
    * DER KAUFPREIS IST, WAS BEZAHLT WURDE — nicht ein Marktwert.
@@ -431,18 +433,22 @@ export function resolvePlayerEconomyContract(input: {
             : "missing_source";
 
   const contractLengthSource = contractLength != null ? "active_contract" : "missing_source";
+  /**
+   * Das GEHALT taucht hier nicht mehr auf: seit der Import-Zweig aus der Gehaltskette raus ist,
+   * kann `salarySource` die beiden Import-Kennungen gar nicht mehr annehmen (s. oben). Die
+   * Abfrage darauf waere ein toter Zweig, der behauptet, es gaebe ihn noch. Marktwert und
+   * Kaufpreis kennen ihre Import-Quellen weiterhin — dort gilt die Entscheidung nicht.
+   */
   const isImportedEconomy =
     marketValueSource === "imported_display" ||
     marketValueSource === "imported_raw" ||
-    salarySource === "imported_display" ||
-    salarySource === "imported_raw" ||
     purchasePriceSource === "imported_display" ||
     purchasePriceSource === "imported_raw";
 
   let economyStatus: PlayerEconomyStatus = isImportedEconomy ? "imported_ready" : "calculated_ready";
   if (marketValue == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_market_value";
-  } else if ((storedCalculatedSalary ?? rosterSalary ?? salaryBreakdown?.finalSalary ?? legacyDisplaySalary) == null) {
+  } else if ((storedCalculatedSalary ?? rosterSalary ?? salaryBreakdown?.finalSalary) == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_salary";
   } else if (!player && !rosterEntry) {
     economyStatus = "manual_draft_required";
@@ -464,7 +470,7 @@ export function resolvePlayerEconomyContract(input: {
     salaryMarketValue: salaryMarketValue != null ? roundTo2(salaryMarketValue) : null,
     allrounderBonus: marketValueBonuses?.allrounderBonus ?? null,
     specialistBonus: marketValueBonuses?.specialistBonus ?? null,
-    expectedSalary: salaryBreakdown?.finalSalary ?? storedCalculatedSalary ?? legacyDisplaySalary ?? null,
+    expectedSalary: salaryBreakdown?.finalSalary ?? storedCalculatedSalary ?? null,
     salaryBase: salaryBreakdown?.basisSalary ?? null,
     traitPercentSum: salaryBreakdown?.traitPercentSum ?? null,
     isImportedEconomy,
