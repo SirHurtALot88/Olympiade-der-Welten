@@ -203,15 +203,24 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
    * eine andere Groesse naehme.
    *
    * Sie ist deshalb durch eine Wertpruefung ersetzt. Der Punkt des Pakets — EINE Quelle je
-   * Groesse — bleibt und wird jetzt schaerfer geprueft: die Apron-Hochrechnung muss das
-   * VERHANDELTE Gehalt messen, nicht das GEZAHLTE und nicht den FORMELWERT. Die drei Begriffe
-   * gehen in der Vorlage bewusst auseinander, sonst beweist der Test nichts.
+   * Groesse — bleibt und wird an der ZAHL geprueft. Die drei Gehaltsbegriffe gehen in der Vorlage
+   * bewusst auseinander, sonst beweist der Test nichts.
+   *
+   * UND DANN IST DIE BEMESSUNG EIN ZWEITES MAL GEWANDERT (#523): weg vom verhandelten
+   * Jahresgehalt, hin zur REAL in dieser Saison zu zahlenden Summe (`getTeamActualSalaryTotal`,
+   * also `yearlySalarySchedule[0]`). Begruendung dort: auch das verhandelte Gehalt war eine
+   * GEGLAETTETE Groesse — der Durchschnitt ueber die Laufzeit, nicht das, was in dieser Saison
+   * vom Konto geht. Bemessen wird jetzt exakt das Feld, das der Saisonende-Apply abbucht.
+   *
+   * Damit ist die Anti-Gaming-Zusage („ein Formwechsel aendert die Abgabe um 0,00") ausdruecklich
+   * aufgehoben: front_loaded hebt die Basis dieser Saison, back_loaded senkt sie. Es bleibt ein
+   * Verschieben, kein Vermeiden — der Apron wird jede Saison neu abgerechnet.
    */
-  it("die Apron-Hochrechnung misst das verhandelte Gehalt — geprüft an der Zahl, nicht am Quelltext", () => {
+  it("die Apron-Hochrechnung misst die real zu zahlende Jahressumme — geprüft an der Zahl, nicht am Quelltext", () => {
     const state = gameStateWithNegotiatedSalaries();
     // Vorbedingung: die drei Gehaltsbegriffe unterscheiden sich wirklich.
-    const verhandelt = 6 + 7 + 8; // 21
-    const gezahlt = 7.8 + 4.2 + 8; // 20
+    const verhandelt = 6 + 7 + 8; // 21 — der Durchschnitt ueber die Laufzeit
+    const gezahlt = 7.8 + 4.2 + 8; // 20 — was DIESE Saison wirklich abgeht
     const formel = 14 * 3; // 42
     expect(new Set([verhandelt, gezahlt, formel]).size).toBe(3);
 
@@ -220,9 +229,11 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
       rankByTeamId: new Map([["T1", 1]]),
     });
     const zeile = projektion.byTeamId.get("T1");
-    expect(zeile?.salary).toBeCloseTo(verhandelt, 2);
-    expect(zeile?.salary).not.toBeCloseTo(gezahlt, 2);
+    expect(zeile?.salary).toBeCloseTo(gezahlt, 2);
+    expect(zeile?.salary).not.toBeCloseTo(verhandelt, 2);
     expect(zeile?.salary).not.toBeCloseTo(formel, 2);
+    // Und es ist wirklich DIESELBE Quelle wie die des Saisonende-Applys — der Punkt des Pakets.
+    expect(zeile?.salary).toBeCloseTo(getTeamActualSalaryTotal(state, "T1"), 2);
   });
 
   it("die Sponsor-Anzeige bleibt auf der Glättung — dort ist sie die Bemessungsgrundlage", () => {
