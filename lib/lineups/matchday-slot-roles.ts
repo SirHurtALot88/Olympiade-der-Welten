@@ -863,11 +863,29 @@ export function calculateSideSlotRoleModifierTotal(input: {
     return 0;
   }
 
-  const roles = resolveSlotRolesForDiscipline(
-    input.disciplineId,
-    input.disciplineId,
-    input.requiredPlayers ?? input.entries.length,
+  // WIE VIELE SLOTS DIE DISZIPLIN HAT — nicht wie viele davon besetzt sind.
+  //
+  // GEMELDET VON CHRIS: „wenn ich in 5 + 6 Slot die spieler einsetze, sollen sie auch dann starten
+  // auch wenn davor dann alle slots leer sind!"
+  //
+  // Sie starten (die Wertung nimmt alle Eintraege der Seite, nach slotIndex sortiert). Ihre
+  // SLOT-ROLLE konnten sie aber verlieren: faellt `requiredPlayers` weg, war die Rollenliste
+  // vorher auf die Zahl der EINTRAEGE dimensioniert. Bei zwei Eintraegen in den Slots 5 und 6
+  // entstanden also zwei Rollen, und `roles[4]`/`roles[5]` waren `undefined` — beide Spieler
+  // rechneten ohne Rolle. Am Live-Abbild gemessen (Basketball, zwei echte Spieler):
+  //
+  //   Slot 5+6 mit bekannter Slotzahl : -5,1   (clutchshot/fastbreak, ihre echten Rollen)
+  //   Slot 5+6 ohne Slotzahl          :  0     <- die Rollen fielen heraus
+  //
+  // Der hoechste BESETZTE Slot ist die richtige Untergrenze: er sagt, bis wohin die Liste reichen
+  // muss, damit jeder Eintrag seine Rolle findet. Bei einer lueckenlosen Aufstellung 1..n ist
+  // `hoechsterSlot + 1` exakt `entries.length` — dort aendert sich also nichts.
+  const hoechsterBesetzterSlot = input.entries.reduce(
+    (max, entry) => Math.max(max, Number.isFinite(entry.slotIndex) ? entry.slotIndex : 0),
+    0,
   );
+  const slotAnzahl = Math.max(input.requiredPlayers ?? 0, hoechsterBesetzterSlot + 1, input.entries.length);
+  const roles = resolveSlotRolesForDiscipline(input.disciplineId, input.disciplineId, slotAnzahl);
   const scoreByPlayer = new Map(input.disciplineScores.map((entry) => [`${entry.playerId}::${entry.disciplineId}`, entry.score]));
   const rosterById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
   const intensity = input.intensity ?? "normal";
