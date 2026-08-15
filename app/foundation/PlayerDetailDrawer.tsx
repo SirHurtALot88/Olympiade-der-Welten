@@ -1584,6 +1584,8 @@ type TrainingSeasonEntry = {
   potentialDrift: { before: number; after: number } | null;
   meta: {
     trainingClass: string | null;
+    /** Nebenklasse dieser Saison — traegt fest 30 % der Trainings-Setpoints. */
+    secondaryTrainingClass: string | null;
     classBefore: string | null;
     classAfter: string | null;
     trainingMode: string | null;
@@ -1726,6 +1728,7 @@ function buildTrainingSeasonEntries(input: {
           : null,
       meta: {
         trainingClass: row.trainingClass,
+        secondaryTrainingClass: row.secondaryTrainingClass,
         classBefore: row.classBefore,
         classAfter: row.classAfter,
         trainingMode: row.trainingMode,
@@ -1794,15 +1797,39 @@ function formatTrainingSeasonSummaryCellTooltip(entry: TrainingSeasonEntry, cell
   return `${cell.attribute}: ${formatValue(cell.fromValue, 1)} → ${formatValue(cell.toValue, 1)} (${formatSignedOrigin(cell.cumulative)})`;
 }
 
+/**
+ * DIE HAUPTSAECHLICH TRAINIERTE KLASSE STEHT JETZT IMMER DA.
+ *
+ * GEMELDET VON CHRIS: „In der Training History sollte auch drin stehen welche Klasse in der Season
+ * mainly trainiert wurde!" — auf Rueckfrage praezisiert: „mainly trainiert wäre die mit den meisten
+ * SP".
+ *
+ * DA IST NICHTS ZU RECHNEN, und das ist der Kern: der Split ist FEST. `organic-season-progression.ts`
+ * verteilt 70 % der Trainings-Setpoints auf die Haupt- und 30 % auf die Nebenklasse
+ * (`primaryShare`/`secondaryShare`). „Die mit den meisten SP" ist damit per Konstruktion immer die
+ * HAUPTklasse — eine Auswertung der Einzelwerte waere Theater um ein feststehendes Ergebnis.
+ *
+ * WAS VORHER FEHLTE: die Zeile zeigte entweder den KLASSENWECHSEL des Spielers oder die trainierte
+ * Klasse — nie beides. Ausgerechnet in den Saisons mit Klassenwechsel, also den interessantesten,
+ * verschwand damit die Information, worauf trainiert wurde. Beides sind verschiedene Dinge: die
+ * eine sagt, was der Spieler IST, die andere, woran er GEARBEITET hat.
+ */
 function formatTrainingSeasonMetaLine(meta: NonNullable<TrainingSeasonEntry["meta"]>) {
   const parts: string[] = [];
-  if (meta.trainingClass || meta.classAfter) {
-    const classChanged = meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter;
+  const classChanged = meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter;
+  if (classChanged) {
+    parts.push(`Klasse ${meta.classBefore} → ${meta.classAfter}`);
+  }
+  if (meta.trainingClass) {
+    // Die Nebenklasse nur nennen, wenn es sie gibt — sonst suggerierte „(70 %)" einen zweiten
+    // Posten, den es gar nicht gibt: ohne Nebenklasse traegt die Hauptklasse volle 100 %.
     parts.push(
-      classChanged
-        ? `Klasse ${meta.classBefore} → ${meta.classAfter}`
-        : `Klasse ${meta.trainingClass ?? meta.classAfter}`,
+      meta.secondaryTrainingClass
+        ? `Trainiert ${meta.trainingClass} (70 %) · ${meta.secondaryTrainingClass} (30 %)`
+        : `Trainiert ${meta.trainingClass}`,
     );
+  } else if (!classChanged && meta.classAfter) {
+    parts.push(`Klasse ${meta.classAfter}`);
   }
   if (meta.trainingMode) {
     parts.push(`Modus ${meta.trainingMode.charAt(0).toUpperCase()}${meta.trainingMode.slice(1)}`);
