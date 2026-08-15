@@ -75,9 +75,24 @@ COPY --from=builder --chown=oly:nodejs /app ./
 # fehlgeschlagen", der Server hat nichts, und nichts im Log sagt warum. Die Existenz des Ordners
 # haenge damit an einer einzelnen README-Datei — wer die aufraeumt, kippt still den ganzen
 # Melde-Weg. Hier steht sie explizit.
-RUN mkdir -p /app/data/persistence /app/data/bug-reports \
+# `.cache/media-thumbs` steht aus GENAU DEM GRUND hier, den der Absatz darueber fuer
+# `bug-reports` beschreibt — und es ist derselbe Fehler in seiner zweiten Auspraegung.
+#
+# GEMELDET VON CHRIS: „wenn ich teams seite aufrufe laden die spieler portraits furchtbar
+# langsam."
+#
+# Dorthin schreibt `getVariantCachePath` (lib/media/serveMediaAsset.ts) die verkleinerten
+# Portraits/Logos: `process.cwd()/.cache/media-thumbs/<art>/<id>-<variante>-<mtime>.webp`. Ohne
+# Volume liegt dieser Ordner IM CONTAINER — und der Auto-Deploy baut bei jedem Push auf main einen
+# neuen. Jeder Deploy warf also den kompletten Thumbnail-Bestand weg, und die naechste Teamseite
+# musste jedes Portrait neu dekodieren und verkleinern, gedrosselt auf vier gleichzeitige Ladungen
+# (`DEFAULT_MAX_CONCURRENT_PORTRAIT_LOADS`). Genau so fuehlt sich „furchtbar langsam" an.
+#
+# Der Ordner MUSS im Image existieren, sonst gehoert das frische Named Volume root und die App
+# (uid 1001) bekommt EACCES beim Schreiben.
+RUN mkdir -p /app/data/persistence /app/data/bug-reports /app/.cache/media-thumbs \
   && chmod +x /app/scripts/start-hosted.sh \
-  && chown -R oly:nodejs /app/data /app/.next /app/deploy
+  && chown -R oly:nodejs /app/data /app/.next /app/deploy /app/.cache
 
 USER oly
 
