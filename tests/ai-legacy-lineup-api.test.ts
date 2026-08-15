@@ -49,6 +49,11 @@ vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
   calculateLocalLegacyLineupPreview,
   calculateLocalLegacyLineupPreviewFromContext,
   ensureLocalLegacyFormCardsForSeason,
+  // Perf-Vorpruefung (s. lib/ai/ai-legacy-lineup-batch-apply-service.ts): `ok: false` haelt sie
+  // hier bewusst wirkungslos, damit JEDES Team wie bisher genau einmal auf
+  // `loadLocalLegacyLineupContextFromGameState` durchfaellt -- die Tests unten steuern Kontexte
+  // ueber `.mockReturnValueOnce(...)` in fester Reihenfolge, die eine greifende Vorpruefung stoeren wuerde.
+  loadLocalLegacyLineupBatchPrecheckFromGameState: () => ({ ok: false }),
 }));
 
 vi.mock("@/lib/lineups/legacy-lineup-context-loader", () => ({
