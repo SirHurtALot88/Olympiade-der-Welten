@@ -499,7 +499,7 @@ export function calculateTeamRecovery(gameState: GameState, teamId: string) {
  * gerissen, den Chris selbst gesetzt hat („ohne gebaeude frische boosts etc 150-200 ok", auf 140
  * Untergrenze nachgezogen). Dieser Faktor trifft die Spirale statt der Giesskanne.
  */
-const INJURY_RECOVERY_FACTOR = 0.5;
+const INJURY_RECOVERY_FACTOR = 1.0;
 
 export function calculatePlayerRecovery(
   gameState: GameState,
