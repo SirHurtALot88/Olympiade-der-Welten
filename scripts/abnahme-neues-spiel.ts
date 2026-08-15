@@ -77,7 +77,22 @@ async function main() {
   const persistence = createPersistenceService();
 
   console.log("=== ABNAHMELAUF: NEUES SPIEL ===\n");
-  const save = persistence.createFreshSeasonOneSave({ name: "Abnahmelauf" });
+  /**
+   * FESTER STARTWURF, WENN GEWUENSCHT — `ABNAHME_SAVE_ID=<kennung>`.
+   *
+   * Ohne ihn traegt die Kennung `Date.now()`, und weil `draftSeed` aus ihr gebildet wird
+   * (`${saveId}:preseason:${teamId}`, Zeile ~377), wuerfelt jeder Lauf eine andere Liga aus.
+   * Gemessen an drei Laeufen kamen 222, 188 und 230 Verletzungen heraus — eine Spanne von 19 %,
+   * ohne dass sich am Code etwas geaendert haette.
+   *
+   * DAS IST EINE FALLE FUER BALANCE-VERGLEICHE: wer zwei Laeufe gegeneinander haelt, misst die
+   * Streuung und haelt sie fuer die Wirkung. Genau das ist hier schon einmal passiert. Mit fester
+   * Kennung ist die Liga identisch, und der Unterschied kommt aus der Aenderung.
+   */
+  const save = persistence.createFreshSeasonOneSave({
+    saveId: process.env.ABNAHME_SAVE_ID || undefined,
+    name: "Abnahmelauf",
+  });
   const saveId = save.saveId;
   let gameState = save.gameState;
   const seasonId = gameState.season.id;
