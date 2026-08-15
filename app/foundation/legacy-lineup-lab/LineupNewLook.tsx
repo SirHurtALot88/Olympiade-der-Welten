@@ -1986,9 +1986,33 @@ export default function LineupNewLook({
             const isCaptain = Boolean(selectedId) && captains[slot.disciplineSide] === selectedId;
             const selectedMeta = selectedId ? getSelectedOptionMeta(selectedId) : null;
             const fatigue = selectedMeta?.fatigueCount ?? null;
-            // Nach-Spieltag-Belastung (Feature 2): aktuelle Fatigue + projizierte
-            // Zusatz-Ermüdung dieses Slots. >= FATIGUE_HIGH ⇒ Warn-Affordanz.
-            const aftermathFatigue = fatigue != null ? fatigue + (preview?.projected.additionalFatigue ?? 0) : null;
+            // Der Einsatz-Verletzungsrisiko-Wurf steht schon hier — und er traegt die ECHTE
+            // Spieltagslast. Deshalb wird er zuerst geholt: die Nach-Spieltag-Belastung darunter
+            // liest ihn mit.
+            const injuryProjectionForSlot =
+              selectedMeta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+            /**
+             * NACH-SPIELTAG-BELASTUNG — jetzt aus dem Modell, das auch bucht.
+             *
+             * HIER STAND `fatigue + projected.additionalFatigue`. `additionalFatigue` ist aber
+             * eine ANZEIGEGROESSE und bei 5 / 8 / 11 gedeckelt
+             * (`INTENSITY_CONFIG.additionalFatigueCap`, matchday-slot-roles.ts:91-93), waehrend
+             * real `MATCHDAY_FATIGUE_LOAD x Trait x Intensitaet` = 12 / 16 / 22,4 gebucht wird
+             * (fatigue-injury-service.ts:147, :202). Die Einsatzliste zeigte einen Einsatz also
+             * rund HALB so teuer, wie er ist — und das ausgerechnet an der Stelle, an der man
+             * entscheidet, wen man noch einmal aufstellt.
+             *
+             * `fatigueBeforeRoll` ist genau die Zahl, gegen die das Spiel den Verletzungswurf
+             * macht: aktuelle Ermuedung plus echte Spieltagslast. Damit zeigen Belastung und
+             * Risiko dieselbe Grundlage, statt zwei verschiedene.
+             *
+             * Der alte Weg bleibt als Rueckfall, wenn keine Projektion vorliegt (synthetische
+             * Kontexte, alte Spielstaende) — dort ist eine zu niedrige Zahl immer noch besser als
+             * gar keine.
+             */
+            const aftermathFatigue =
+              injuryProjectionForSlot?.fatigueBeforeRoll ??
+              (fatigue != null ? fatigue + (preview?.projected.additionalFatigue ?? 0) : null);
             const aftermathHigh = aftermathFatigue != null && aftermathFatigue >= FATIGUE_HIGH;
             // Einsatz-Verletzungsrisiko (Feature-Request "man sieht nicht, wer Verletzungs-
             // potential hat — in der Arena isses zu spaet"): vorberechnet aus dem ECHTEN
@@ -1996,7 +2020,7 @@ export default function LineupNewLook({
             // hier nur noch per aktueller Seiten-Intensitaet nachgeschlagen. Wird fuer JEDEN
             // aufgestellten Spieler gezeigt, auch ausgeruht (~2 %): das Restrisiko ist Teil
             // des Modells und soll nicht mehr wie ein Bug wirken, wenn es zuschlaegt.
-            const injuryProjection = selectedMeta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+            const injuryProjection = injuryProjectionForSlot;
 
             return (
               <article
