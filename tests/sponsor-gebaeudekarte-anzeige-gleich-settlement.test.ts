@@ -16,6 +16,20 @@ import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { buildSponsorOffersForTeam, chooseSponsorOffer } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { getSponsorV3Terms, sponsorV3LadderValue, sponsorV3Settle } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { SPONSOR_GEBAEUDE_LEIHE_AKTIV } from "@/lib/sponsor/sponsor-leih-slate";
+
+/**
+ * DER GEBAEUDE-SCHALTER STEHT AUF AUS (`SPONSOR_GEBAEUDE_LEIHE_AKTIV = false`, #512) — Chris:
+ * „mach das mit dem Schalter deaktiviere Gebäude". Ohne Gebaeude-Karten hat dieser Block nichts
+ * zu messen; er laeuft deshalb genau dann, wenn der Schalter wieder an ist, und meldet sonst
+ * sichtbar „uebersprungen" statt dauerhaft rot zu stehen. Der Schalter ist ausdruecklich als
+ * Schalter gebaut und nicht als Ausbau, damit beide Stellungen vergleichbar bleiben — diese
+ * Faelle sind die Absicherung der EIN-Stellung.
+ *
+ * Was im AUS-Zustand gilt, prueft `tests/sponsor-angebot-mit-leihe.test.ts` im Block
+ * „Der Gebaeude-Schalter — was seine Stellung zusichert".
+ */
+const mitLeiheDescribe = describe.skipIf(!SPONSOR_GEBAEUDE_LEIHE_AKTIV);
 
 function baueSpielstand(): GameState {
   const teams = Array.from({ length: 12 }, (_, index) => ({
@@ -83,7 +97,7 @@ function unterschreibeGebaeudeKarte() {
   return { angebot: mitLeihe, gameState: unterschrieben };
 }
 
-describe("Die Gebäude-Karte im Settlement", () => {
+mitLeiheDescribe("Die Gebäude-Karte im Settlement", () => {
   it("bucht KEINE eigene Leih-Zeile — der Verzicht steckt in der Leiter (E1)", () => {
     const { gameState } = unterschreibeGebaeudeKarte();
     const preview = previewSponsorSettlement(gameState, "season_end");
