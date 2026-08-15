@@ -327,6 +327,7 @@ import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-p
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -10857,6 +10858,10 @@ export function useFoundationShellRouterBodyScope({
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           guvPosten: row.guvPosten ?? null,
+          // Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+          // Verletzungen!" — dieselbe Zaehlstelle wie die Teamhistorie, damit nicht zwei
+          // Verletzungszahlen im Spiel stehen.
+          injuries: countTeamSeasonInjuries(gameState, row.teamId, gameState.season.id),
           marketValueTotal: row.marketValueTotal ?? null,
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,

@@ -554,6 +554,40 @@ function sideTeamPowerPriority(input: {
 // Use-it-or-lose-it target: the AI aims to spend at least this fraction of a team's
 // active team-power charges over the season, so powers don't rot unused. Tunable/reversible
 // via OLY_TEAM_POWER_TARGET_USAGE (0..1); default 0.85 leaves margin above the 80% floor.
+/**
+ * ZIEL FUER PLUSKARTEN UEBER DIE SAISON: 1 = alles faellt.
+ *
+ * CHRIS' VORGABE, woertlich: „ziel: ALLE AI teams haben am ende der Season ALLE ihre karten
+ * gespielt. Negative dürfen eh nicht übrig bleiben wegen der Strafpunkte - aber positive übrig
+ * haben bedeutet dass man nicht die gute Form die man hatte eingesetzt hat und kostet ein Team
+ * sehr viele Punkte!"
+ *
+ * Vorher stand hier faktisch 0.85, kombiniert mit einem backloaded Pace-Exponenten — am letzten
+ * Spieltag ergab das ein Ziel von 75 %. Es gibt keinen Grund, eine Pluskarte mit in die naechste
+ * Saison zu nehmen: sie verfaellt (`unused_positive_formcards_expire`).
+ */
+const FORM_CARD_POSITIVE_SEASON_TARGET = 1;
+
+/**
+ * Sitzplaetze fuer Pluskarten JE SPIELTAG: zwei Disziplinseiten mal Primaer- und Sekundaerplatz.
+ * Das ist die harte Obergrenze dessen, was ein Spieltag aufnehmen kann.
+ */
+const FORM_CARD_POSITIVE_SEATS_PER_MATCHDAY = 4;
+
+/**
+ * Womit der ENDSPURT rechnet — bewusst 2 statt der theoretischen 4.
+ *
+ * Die Primaerplaetze gehen zuerst an die Minuskarten: die MUESSEN fallen, sonst kosten sie am
+ * Saisonende Tabellenpunkte (`form-card-penalty-service`). Weil jeder Spieler ein gespiegeltes
+ * Paar (+x/-x) erzeugt, ist rund die Haelfte aller Karten negativ — auf einem typischen Spieltag
+ * bleiben den Pluskarten also die beiden Sekundaerplaetze.
+ *
+ * Rechnet der Endspurt mit 4, verlaesst er sich auf Plaetze, die es am letzten Spieltag oft nicht
+ * gibt — genau so sind die Karten bisher liegengeblieben. Mit 2 setzt der Druck frueher ein. Der
+ * Deckel je Spieltag bleibt bei 4, die guten Faelle werden also weiter voll genutzt.
+ */
+const FORM_CARD_POSITIVE_SEATS_FOR_ENDGAME = 2;
+
 const TEAM_POWER_TARGET_SEASON_USAGE = (() => {
   const raw = Number(process.env.OLY_TEAM_POWER_TARGET_USAGE ?? 0.9);
   return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.9;
@@ -1344,19 +1378,46 @@ export function buildAiLegacyLineupModifiers(
   // Positive urgency: more than 2 positives needed per matchday to exhaust the pool.
   const negativeUrgency = negativeCards.length > remainingPrimarySlots;
   const positiveUrgency = positiveCards.length > remainingMatchdaysIncludingCurrent * 2;
-  // Ausgaben-Pace über die Saison: ~85% der Positivkarten sollen bis zum Saisonende fallen,
-  // leicht backloaded (Exponent > 1), damit früh gespart und hinten raus ausgegeben wird.
-  // Hinkt das Team dem Pace hinterher, entsteht Ausgabedruck — Karten sollen nicht verrotten.
+  // AUSGABEN-PACE UEBER DIE SAISON — Ziel: am Ende ist der Tank LEER.
+  //
+  // GEMELDET VON CHRIS am Saisonstand: „angeblich haben U-A noch 10 karten übrig!!! und davon
+  // +58 das heißt sie hätten sich deutlich schlechter gemacht als nötig gewesen wäre!" — und am
+  // Live-Spielstand nachgemessen stimmte das: an Spieltag 10 von 10 hatten 23 von 30 KI-Teams
+  // zusammen +486 Nennwert ungespielt liegen. Minuskarten waren dagegen restlos abgeraeumt
+  // (0 uebrig bei allen 30 Teams) — die Entsorgungspflicht funktioniert, die Ausgabepflicht nicht.
+  //
+  // DIE URSACHE STAND IN DIESEN DREI ZEILEN. Der Pace zielte auf 85 % und war zusaetzlich
+  // backloaded: `((10-1)/10)^1.15 = 0.886`, mal 0.85 macht am LETZTEN Spieltag ein Ziel von
+  // 75 %. Der Druck erreichte also nie 100 % — die AI war ausdruecklich angewiesen, ein Viertel
+  // liegen zu lassen. Fuer die Tabelle ist das teuer: eine ungespielte Pluskarte ist verschenkte
+  // Form, und der Punktwert einer Karte ist `Wert x Farbfaktor x Kadergroesse`.
+  //
+  // Jetzt linear auf 100 %: an Spieltag k von M soll `k/M` des Vorrats gefallen sein. Der Druck
+  // baut sich gleichmaessig auf, statt am Saisonende als Sturzflut anzukommen, fuer die es keine
+  // Plaetze mehr gibt.
   const positiveSpentSoFar = (context.formCards ?? []).filter((card) => card.isUsed && card.value > 0).length;
   const totalPositiveSeason = positiveSpentSoFar + positiveCards.length;
-  const paceProgress = Math.pow(Math.max(0, currentMatchdayIndex - 1) / totalMatchdays, 1.15);
-  const paceTarget = Math.floor(totalPositiveSeason * 0.85 * paceProgress);
+  const paceProgress = Math.min(1, currentMatchdayIndex / totalMatchdays);
+  const paceTarget = Math.floor(totalPositiveSeason * FORM_CARD_POSITIVE_SEASON_TARGET * paceProgress);
   const paceDeficit = Math.max(0, paceTarget - positiveSpentSoFar);
+  // ENDSPURT-ZWANG, uebernommen von den Teamkraeften (`planTeamPowerSidesForMatchday`), wo genau
+  // diese Rechnung schon steht: wie viele Karten MUESSEN heute fallen, damit der Rest in den
+  // verbleibenden Spieltagen ueberhaupt noch Platz findet? Ohne sie merkt die AI erst am letzten
+  // Spieltag, dass zehn Karten auf vier Plaetze wollen.
+  const remainingMatchdaysAfterThis = Math.max(0, remainingMatchdaysIncludingCurrent - 1);
+  const endGameForce = Math.max(
+    0,
+    positiveCards.length - remainingMatchdaysAfterThis * FORM_CARD_POSITIVE_SEATS_FOR_ENDGAME,
+  );
   const mustSpendPositives =
-    positiveUrgency || paceDeficit >= 1 || remainingMatchdaysIncludingCurrent <= 2;
+    positiveUrgency || paceDeficit >= 1 || endGameForce >= 1 || remainingMatchdaysIncludingCurrent <= 2;
   const desiredPositiveThisMatchday = Math.min(
-    4,
-    Math.max(Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent), Math.min(3, paceDeficit)),
+    FORM_CARD_POSITIVE_SEATS_PER_MATCHDAY,
+    Math.max(
+      Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent),
+      paceDeficit,
+      endGameForce,
+    ),
   );
   const doctrine = getFormCardDoctrineProfile(context);
   const usedIds = new Set<string>();

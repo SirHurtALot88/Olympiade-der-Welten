@@ -1584,6 +1584,13 @@ type TrainingSeasonEntry = {
   potentialDrift: { before: number; after: number } | null;
   meta: {
     trainingClass: string | null;
+    /**
+     * Die Nebenklasse der Saison. Sie stand in `PlayerTrainingHistoryRow` schon immer drin und
+     * wurde hier nie durchgereicht — Ticket #36 (Chris): „In der Training History sollte auch
+     * drin stehen welche Klasse in der Season mainly trainiert wurde!" „Mainly" ergibt nur einen
+     * Sinn, wenn daneben steht, was die zweite war.
+     */
+    secondaryTrainingClass: string | null;
     classBefore: string | null;
     classAfter: string | null;
     trainingMode: string | null;
@@ -1726,6 +1733,7 @@ function buildTrainingSeasonEntries(input: {
           : null,
       meta: {
         trainingClass: row.trainingClass,
+        secondaryTrainingClass: row.secondaryTrainingClass,
         classBefore: row.classBefore,
         classAfter: row.classAfter,
         trainingMode: row.trainingMode,
@@ -1796,13 +1804,30 @@ function formatTrainingSeasonSummaryCellTooltip(entry: TrainingSeasonEntry, cell
 
 function formatTrainingSeasonMetaLine(meta: NonNullable<TrainingSeasonEntry["meta"]>) {
   const parts: string[] = [];
-  if (meta.trainingClass || meta.classAfter) {
-    const classChanged = meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter;
-    parts.push(
-      classChanged
-        ? `Klasse ${meta.classBefore} → ${meta.classAfter}`
-        : `Klasse ${meta.trainingClass ?? meta.classAfter}`,
-    );
+  /**
+   * ZWEI VERSCHIEDENE DINGE, die bisher um EINEN Platz konkurriert haben:
+   *   - WORAUF trainiert wurde (`trainingClass` + `secondaryTrainingClass`) — die Entscheidung.
+   *   - WELCHE Klasse der Spieler hatte (`classBefore` → `classAfter`) — das Ergebnis.
+   *
+   * Bisher gewann bei einem Klassenwechsel die zweite Zeile und die erste fiel weg. Damit fehlte
+   * die trainierte Klasse ausgerechnet in der Saison, in der sich etwas bewegt hat — der einzigen,
+   * in der man sie wirklich wissen will. Ticket #36 (Chris): „In der Training History sollte auch
+   * drin stehen welche Klasse in der Season mainly trainiert wurde!"
+   *
+   * Jetzt stehen beide nebeneinander. Die Nebenklasse kommt nur dazu, wenn es sie gibt und sie
+   * sich von der Hauptklasse unterscheidet — „Trainiert Kraft (auch Kraft)" waere Laerm.
+   */
+  if (meta.trainingClass) {
+    const neben =
+      meta.secondaryTrainingClass && meta.secondaryTrainingClass !== meta.trainingClass
+        ? ` (Neben: ${meta.secondaryTrainingClass})`
+        : "";
+    parts.push(`Trainiert ${meta.trainingClass}${neben}`);
+  }
+  if (meta.classBefore && meta.classAfter && meta.classBefore !== meta.classAfter) {
+    parts.push(`Klasse ${meta.classBefore} → ${meta.classAfter}`);
+  } else if (!meta.trainingClass && meta.classAfter) {
+    parts.push(`Klasse ${meta.classAfter}`);
   }
   if (meta.trainingMode) {
     parts.push(`Modus ${meta.trainingMode.charAt(0).toUpperCase()}${meta.trainingMode.slice(1)}`);
