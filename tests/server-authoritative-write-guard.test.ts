@@ -89,6 +89,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save",
         teamId: "P-S",
@@ -101,6 +102,7 @@ describe("server-authoritative room write guard", () => {
     const blocked = authorizeServerRoomWrite({
       roomCode: created.room.roomCode,
       participantId: franky.participantId,
+      seatToken: joined.seat.seatToken,
       userId: franky.userId,
       saveId: "sandbox-manager-test-save",
       teamId: "P-S",
@@ -133,6 +135,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-2",
         teamId: "H-R",
@@ -145,6 +148,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-2",
         teamId: "P-S",
@@ -160,6 +164,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-2",
         teamId: "P-S",
@@ -188,6 +193,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-3",
         action: "matchday_resolve",
@@ -198,6 +204,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: franky.participantId,
+        seatToken: joined.seat.seatToken,
         userId: franky.userId,
         saveId: "sandbox-manager-test-save-3",
         action: "matchday_resolve",
@@ -208,6 +215,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-3",
         action: "formcards_season_regenerate",
@@ -218,6 +226,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: franky.participantId,
+        seatToken: joined.seat.seatToken,
         userId: franky.userId,
         saveId: "sandbox-manager-test-save-3",
         teamId: "C-S",
@@ -229,6 +238,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "sandbox-manager-test-save-3",
         action: "lineup_ai_batch_apply",
@@ -239,6 +249,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: franky.participantId,
+        seatToken: joined.seat.seatToken,
         userId: franky.userId,
         saveId: "sandbox-manager-test-save-3",
         action: "ai_preseason_background",
@@ -248,6 +259,7 @@ describe("server-authoritative room write guard", () => {
     const override = authorizeServerRoomWrite({
       roomCode: created.room.roomCode,
       participantId: chris.participantId,
+      seatToken: created.seat.seatToken,
       userId: chris.userId,
       saveId: "sandbox-manager-test-save-3",
       teamId: "H-R",
@@ -260,6 +272,10 @@ describe("server-authoritative room write guard", () => {
     }
 
     markDisconnected("guard-socket-e");
+    // BEWUSST OHNE Sitz-Token, und die Ablehnung heisst seit Befund F12 `participant_missing`
+    // statt `participant_offline`: die `participantId` allein weist niemanden mehr nach, es wird
+    // also gar nicht erst geprueft, ob dieser Teilnehmer offline ist. Die Aussage des Falls bleibt
+    // dieselbe und ist sogar schaerfer — ohne Token geht nichts, unabhaengig vom Praesenz-Zustand.
     expect(
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
@@ -269,7 +285,7 @@ describe("server-authoritative room write guard", () => {
         teamId: "P-S",
         action: "buy",
       }),
-    ).toMatchObject({ allowed: false, reason: "participant_offline" });
+    ).toMatchObject({ allowed: false, status: 401, reason: "participant_missing" });
 
     const rejoined = rejoinRoom(created.room.roomCode, created.seat.seatToken, "guard-socket-e2");
     expect(rejoined.ok).toBe(true);
@@ -308,6 +324,10 @@ describe("server-authoritative room write guard", () => {
     // Simulate a brief network hiccup (laptop sleep / wifi blip / dev-server restart): the
     // transport disconnects and the server marks the seat + participant offline.
     markDisconnected("s10-socket-a");
+    // OHNE Sitz-Token — seit Befund F12 lautet die Ablehnung `participant_missing` (401) statt
+    // `participant_offline` (403): eine `participantId` allein weist niemanden mehr nach, der
+    // Praesenz-Zustand wird deshalb gar nicht mehr erreicht. Mit GUELTIGEM Token wuerde hier
+    // stattdessen die S11-Selbstheilung greifen — das ist der eigene Fall weiter unten.
     expect(
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
@@ -317,7 +337,7 @@ describe("server-authoritative room write guard", () => {
         teamId: chrisOwnershipBefore[0]?.teamId,
         action: "buy",
       }),
-    ).toMatchObject({ allowed: false, status: 403, reason: "participant_offline" });
+    ).toMatchObject({ allowed: false, status: 401, reason: "participant_missing" });
 
     // A wrong/absent seat token must still be rejected while offline - re-identifying with
     // garbage never resurrects a participant.
@@ -362,6 +382,7 @@ describe("server-authoritative room write guard", () => {
       authorizeServerRoomWrite({
         roomCode: created.room.roomCode,
         participantId: chris.participantId,
+        seatToken: created.seat.seatToken,
         userId: chris.userId,
         saveId: "s10-reconnect-save",
         teamId: chrisOwnershipBefore[0]?.teamId,
@@ -406,6 +427,7 @@ describe("server-authoritative room write guard", () => {
         authorizeServerRoomWrite({
           roomCode: created.room.roomCode,
           participantId: chris.participantId,
+          seatToken: created.seat.seatToken,
           userId: chris.userId,
           saveId: "team-settings-guard-save",
           teamId: "P-S",
@@ -423,6 +445,7 @@ describe("server-authoritative room write guard", () => {
         authorizeServerRoomWrite({
           roomCode: created.room.roomCode,
           participantId: franky.participantId,
+          seatToken: joined.seat.seatToken,
           userId: franky.userId,
           saveId: "team-settings-guard-save",
           teamId: "P-S",
@@ -439,6 +462,7 @@ describe("server-authoritative room write guard", () => {
         authorizeServerRoomWrite({
           roomCode: created.room.roomCode,
           participantId: franky.participantId,
+          seatToken: joined.seat.seatToken,
           userId: franky.userId,
           saveId: "team-settings-guard-save",
           teamId: "M-S",
@@ -518,7 +542,7 @@ describe("server-authoritative room write guard", () => {
         teamId: chrisTeamId,
         action: "buy",
       }),
-    ).toMatchObject({ allowed: false, status: 403, reason: "participant_offline" });
+    ).toMatchObject({ allowed: false, status: 401, reason: "participant_missing" });
     expect(
       getRoom(created.room.roomCode)?.state.roomParticipants.find((p) => p.participantId === chris.participantId)
         ?.connectionStatus,

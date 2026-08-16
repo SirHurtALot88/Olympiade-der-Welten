@@ -182,6 +182,11 @@ describe("auto roster fill api", () => {
           dryRun: true,
           roomCode: created.room.roomCode,
           participantId: chris.participantId,
+          // Seit Befund F12 weist NUR das Sitz-Token eine Identitaet nach; eine `participantId`
+          // allein reicht nicht mehr. Der echte Client schickt das Token ohnehin immer mit
+          // (`buildRoomWriteBody`, lib/room/foundation-room-context-client.ts) — ohne es hier
+          // pruefte der Test einen Fall, den es in der Anwendung gar nicht gibt.
+          seatToken: created.seat.seatToken,
           userId: chris.userId,
         }),
       }),
