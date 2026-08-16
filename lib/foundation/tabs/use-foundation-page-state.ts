@@ -304,7 +304,6 @@ import {
   persistFoundationSaveMode,
   persistFoundationTeamFilter,
   readSeasonBriefingDismissedFromStorage,
-  readStoredFoundationActiveOwnerId,
   readStoredFoundationManagerTeamId,
   readStoredFoundationSaveMode,
   readStoredFoundationTeamFilter,
@@ -312,6 +311,7 @@ import {
   resolveFoundationPanelScrollTarget,
   resolveFoundationTeamId,
   resolveFoundationViewTarget,
+  resolveInitialFoundationActiveOwnerId,
   resolvePreferredFoundationTeamContext,
   withNormalizedLocalTeamSettings,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
@@ -406,10 +406,11 @@ export function useFoundationPageState({
     initialResolvedTeamId && initialResolvedTeamId === initialRouteTeamId ? "route" : "default_human_team",
   );
   const [activeOwnerId, setActiveOwnerId] = useState<string>(
-    // Wenn Phase-1-Login aktiv ist und eine Session vorliegt, gewinnt die echte
-    // Identitaet immer gegenueber dem (moeglicherweise veralteten) lokalStorage-
-    // Wert - das ist der eigentliche Fix fuer den "Franky sieht Chris' Teams"-Bug.
-    () => initialActiveOwnerId || readStoredFoundationActiveOwnerId(),
+    // Rangfolge: Sitzung (Login an) -> Raum-Kontext -> lokaler Speicher -> Standard. Siehe
+    // ausfuehrlichen Kommentar an `resolveInitialFoundationActiveOwnerId`
+    // (foundation-page-module-helpers.tsx) fuer den Befund ("Frankys Browser haelt sich fuer
+    // Chris") und warum der Raum-Kontext ausdruecklich VOR dem lokalen Speicher steht.
+    () => resolveInitialFoundationActiveOwnerId(initialActiveOwnerId),
   );
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);

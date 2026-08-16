@@ -9,6 +9,7 @@ import {
   ONLINE_ROOM_TEAM_IDS,
   isRoomMatchdayInProgress,
   resolveFrankyParticipant,
+  resolveRoomParticipantActiveOwnerId,
 } from "@/lib/room/online-room-model";
 import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { emitRoomFlowButtonAction } from "@/lib/room/room-flow-socket-actions";
@@ -182,6 +183,15 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       params.set("userId", currentParticipant.userId);
       params.set("seatToken", seatToken);
       params.set("saveId", state.multiplayerRoom.saveId);
+      // BEFUND (siehe Auftrag): `userId` ist ohne Login ein zufaelliger `user-<uuid>`-String und
+      // stimmt mit keinem `teamControlSettings[...].ownerId` im Spielstand ueberein — Frankys
+      // Browser fiel dadurch im Foundation-Client auf den lokalen Standard (Chris) zurueck. Diese
+      // eigene `ownerId`, aus der SERVER-VERGEBENEN Sitzrolle abgeleitet, ist die Groesse, die
+      // dort tatsaechlich gebraucht wird (siehe Kommentar an `resolveRoomParticipantActiveOwnerId`).
+      const ownerId = resolveRoomParticipantActiveOwnerId(currentParticipant.role);
+      if (ownerId) {
+        params.set("ownerId", ownerId);
+      }
     }
     return `/foundation?${params.toString()}`;
   }

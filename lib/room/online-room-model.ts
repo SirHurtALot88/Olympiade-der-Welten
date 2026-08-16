@@ -6,12 +6,14 @@ import type {
   MultiplayerTurnState,
   OlyRoomState,
   RoomParticipant,
+  RoomParticipantRole,
   ServerAuthoritativeWritePolicy,
   TeamControllerType,
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
 import { matchesArenaScope } from "@/lib/room/arena-sync-state";
+import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -69,6 +71,38 @@ const FOUR_PLUS_FOUR_FRANKY_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
  */
 export function resolveFrankyParticipant(participants: RoomParticipant[]): RoomParticipant | null {
   return participants.find((entry) => entry.role === "player") ?? null;
+}
+
+/**
+ * Ordnet die Sitzrolle im Raum der Owner-ID zu, die der Foundation-Client fuer Sichtbarkeit/
+ * Verwaltbarkeit braucht (`teamControlSettings[teamId].ownerId`, siehe
+ * lib/foundation/team-control-settings.ts) — NICHT dieselbe Groesse wie `participant.userId`.
+ *
+ * WARUM NICHT EINFACH `participant.userId`: ohne aktiven Login (Standard, siehe CLAUDE.md/
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md „Entscheidungen") ist `userId` ein zufaelliger
+ * `user-<uuid>`-String je Teilnehmer (`buildParticipant`-Aufrufe in `createRoom`/`joinRoom`,
+ * room-store.ts) — er stimmt mit KEINEM `ownerId`-Wert im Spielstand ueberein. Beim Spielstart
+ * legt `applyChrisFrankyOwnershipToTeamControlSettings` die Teams aber IMMER auf die zwei festen
+ * Platzhalter `DEFAULT_ACTIVE_OWNER_ID` (Host-Sitz) bzw. `FRANKY_OWNER_ID` (zweiter Sitz) — genau
+ * die Zuordnung, die diese Funktion hier aus der Rolle ableitet.
+ *
+ * `role` ist serverseitig vergeben und nie vom Client frei waehlbar (siehe Kommentar an
+ * `resolveFrankyParticipant` oben) — die Ableitung ist also so ehrlich wie eine Anzeige ohne
+ * zusaetzliche Server-Rundreise sein kann. Sie ist trotzdem NUR eine Anzeige-Hilfe: wer sie
+ * konsumiert (z. B. `activeOwnerId` im Foundation-Client), muss dokumentieren, dass sie niemals
+ * als Berechtigung dient — die einzige Autoritaet bleibt das Sitz-Token
+ * (`authorizeServerRoomWrite`/`authorizeTeamWrite`).
+ *
+ * `null` fuer Zuschauer (`"spectator"`) — die haben keine feste Owner-Spalte.
+ */
+export function resolveRoomParticipantActiveOwnerId(role: RoomParticipantRole): string | null {
+  if (role === "host") {
+    return DEFAULT_ACTIVE_OWNER_ID;
+  }
+  if (role === "player") {
+    return FRANKY_OWNER_ID;
+  }
+  return null;
 }
 
 export const SERVER_AUTHORITATIVE_WRITE_POLICY: ServerAuthoritativeWritePolicy = {
