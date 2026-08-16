@@ -2525,7 +2525,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "lineup" || activeView === "lineupV2" ? (
           <FoundationLineupPanel
             active
-            uiVariant="focusV2"
             clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam

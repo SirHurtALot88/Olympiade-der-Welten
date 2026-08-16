@@ -10,7 +10,10 @@ import {
   saveLocalLegacyFormCardPlan,
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
-import { computePositiveFormCardValueForTests } from "@/lib/lineups/legacy-lineup-modifiers";
+import {
+  buildGeneratedFormCardRecordsForSeason,
+  ensureLocalFormCardsForSeason,
+} from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -606,25 +609,40 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
         .map((card) => playerClassById.get(card.playerId))
         .filter((value): value is string => Boolean(value)),
     );
-    // BEFUND (Stufe 4 — Test-Flackern, gemessen): Der Kartenwert ist deterministisch je
-    // (saveId, seasonId, teamId, playerId), aber einer von vier moeglichen Werten ist `0`
-    // (FORM_CARD_VALUES = [0, 2, 4, 8]) — und `getTeamFormCardOptions` filtert genau die
-    // Nullwert-Karten aus dem UI-Angebot heraus (legacy-lineup-modifiers.ts:592-594). Ein
-    // `.find()`, das den ERSTEN passenden freien Spieler nimmt, traf damit ~1 von 4 Laeufen einen
-    // Kandidaten, dessen "positive" Karte real existiert, aber Wert 0 hat — sie taucht dann NIE im
-    // Dropdown auf, unabhaengig von jeder Testreihenfolge oder geteiltem Zustand. Reproduziert per
-    // Schleife: `npx vitest run tests/legacy-lineup-local-service.test.ts
-    // tests/aufstellungen-fuer-mehrere-teams.test.ts tests/ai-legacy-lineup-batch-apply-service.test.ts`
-    // mehrfach hintereinander faerbte GENAU diesen Test rot, mit einem Nullwert-Kandidaten als
-    // Ursache (nachgewiesen per Debug-Dump). Fix an der Wurzel: nur Kandidaten waehlen, deren
-    // Karte GARANTIERT sichtbar ist (Wert != 0) — kein Verlass mehr auf einen Zufallstreffer.
-    const lateJoiner = afterGeneration.gameState.players.find(
-      (player) =>
-        !usedPlayerIds.has(player.id) &&
-        cardedClassNames.has(player.className) &&
-        computePositiveFormCardValueForTests(save.saveId, params.seasonId, teamId, player.id) !== 0,
+    /**
+     * DER NACHZUEGLER MUSS EINE KARTE MIT NENNWERT != 0 BEKOMMEN — sonst prueft dieser Fall die
+     * falsche Sache.
+     *
+     * `FORM_CARD_VALUES` ist `[0, 2, 4, 8]`, und `getTeamFormCardOptions` filtert Karten mit Wert 0
+     * ABSICHTLICH heraus (eine Karte, die nichts bewegt, ist kein Angebot). Der Wurf haengt am
+     * `saveId`, und der traegt einen Zeitstempel — er faellt also in jedem Lauf anders aus.
+     *
+     * GEMESSEN, nicht vermutet: ueber 400 saveIds bekam derselbe Nachzuegler in 95 Faellen eine
+     * positive Karte mit Wert 0 — **23,8 %**. Genau so oft war dieser Fall rot, und zwar seit er
+     * geschrieben wurde. Er sah nach einem Last-Problem aus (er fiel im vollen Lauf und in der CI,
+     * einzeln nie), war aber schlicht ein Viertel-Wuerfel.
+     *
+     * Deshalb wird der Nachzuegler jetzt so gewaehlt, dass seine positive Karte ueberhaupt
+     * angeboten werden KANN — gerechnet mit derselben Produktionsfunktion, die auch die Heilung
+     * benutzt, statt mit einer nachgebauten Formel. Dass eine 0-Karte NICHT angeboten wird, ist
+     * eine eigene Zusicherung und steht als eigener Fall darunter.
+     */
+    const frei = afterGeneration.gameState.players.filter(
+      (player) => !usedPlayerIds.has(player.id) && cardedClassNames.has(player.className),
     );
-    expect(lateJoiner).toBeTruthy();
+    const lateJoiner = frei.find((kandidat) => {
+      const mitKandidat = {
+        ...afterGeneration.gameState,
+        rosters: [
+          ...afterGeneration.gameState.rosters,
+          { id: `probe-${kandidat.id}`, teamId, playerId: kandidat.id, joinedSeasonId: params.seasonId },
+        ],
+      } as typeof afterGeneration.gameState;
+      const karten = buildGeneratedFormCardRecordsForSeason(mitKandidat, save.saveId, params.seasonId);
+      const positiv = karten.find((karte) => karte.playerId === kandidat.id && karte.id.endsWith(":positive"));
+      return positiv != null && positiv.cardValue !== 0;
+    });
+    expect(lateJoiner, "kein freier Spieler mit einer positiven Karte != 0 gefunden").toBeTruthy();
     afterGeneration.gameState.rosters.push({
       id: "form-card-late-joiner",
       teamId,
@@ -674,6 +692,92 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
         (card) => card.id === lateJoinerCardId,
       ),
     ).toBe(true);
+  });
+
+  /**
+   * DIE GEGENSEITE, und sie ist der Grund, warum der Fall darueber seinen Nachzuegler waehlen
+   * muss statt ihn zu nehmen: eine Karte mit Nennwert 0 wird ABSICHTLICH nicht angeboten.
+   *
+   * `FORM_CARD_VALUES` ist `[0, 2, 4, 8]`; eine 0-Karte bewegt nichts und waere im Auswahlfeld
+   * eine Zeile ohne Wirkung. `getTeamFormCardOptions` filtert sie deshalb (`cardValue !== 0`).
+   *
+   * Ohne diese Zusicherung waere die Regel unsichtbar — und genau das hat den Fall darueber zu
+   * einem Viertel-Wuerfel gemacht: er nahm den ersten freien Spieler, und in 23,8 % der Laeufe
+   * bekam der eine 0. Er sah dann aus wie ein Heilungs-Fehler, war aber die Regel bei der Arbeit.
+   */
+  it("bietet eine geheilte Karte mit Nennwert 0 bewusst NICHT an", () => {
+    const persistence = createPersistenceService();
+    const save = persistence.createFreshSeasonOneSave({ name: "Form Card Wert Null" });
+    topUpRosterCoverage(save.saveId);
+    const teamId = pickEligibleTeamId(save);
+    const params = {
+      saveId: save.saveId,
+      seasonId: save.gameState.season.id,
+      matchdayId: save.gameState.matchdayState.matchdayId,
+      teamId,
+    };
+    expect(generateLocalLegacyFormCardsForSeason(params).ok).toBe(true);
+
+    const nachher = persistence.getSaveById(save.saveId)!;
+    const belegt = new Set(nachher.gameState.rosters.map((entry) => entry.playerId));
+    const klasseById = new Map(nachher.gameState.players.map((player) => [player.id, player.className]));
+    const kartenKlassen = new Set(
+      (nachher.gameState.seasonState.formCards ?? [])
+        .map((card) => klasseById.get(card.playerId))
+        .filter((value): value is string => Boolean(value)),
+    );
+
+    // Diesmal gezielt einen Spieler suchen, dessen positive Karte eine 0 traegt.
+    const mitNull = nachher.gameState.players
+      .filter((player) => !belegt.has(player.id) && kartenKlassen.has(player.className))
+      .find((kandidat) => {
+        const mitKandidat = {
+          ...nachher.gameState,
+          rosters: [
+            ...nachher.gameState.rosters,
+            { id: `probe-${kandidat.id}`, teamId, playerId: kandidat.id, joinedSeasonId: params.seasonId },
+          ],
+        } as typeof nachher.gameState;
+        const karten = buildGeneratedFormCardRecordsForSeason(mitKandidat, save.saveId, params.seasonId);
+        const positiv = karten.find((karte) => karte.playerId === kandidat.id && karte.id.endsWith(":positive"));
+        return positiv != null && positiv.cardValue === 0;
+      });
+    expect(mitNull, "kein freier Spieler mit einer 0-Karte gefunden").toBeTruthy();
+
+    nachher.gameState.rosters.push({
+      id: "form-card-null-joiner",
+      teamId,
+      playerId: mitNull!.id,
+      contractLength: 3,
+      salary: Math.round(mitNull!.salaryDemand),
+      upkeep: Math.round(mitNull!.salaryDemand),
+      purchasePrice: Math.round(mitNull!.marketValue),
+      currentValue: Math.round(mitNull!.marketValue),
+      roleTag: "bench",
+      joinedSeasonId: nachher.gameState.season.id,
+    } as never);
+    persistence.saveSingleplayerState(save.saveId, nachher.gameState);
+
+    const kartenId = `formcard:${params.seasonId}:${teamId}:${mitNull!.id}:positive`;
+    const context = loadLocalLegacyLineupContext(params);
+    expect(context.ok).toBe(true);
+    if (!context.ok) return;
+
+    /**
+     * Die Heilung LEGT die Karte an — sie taucht nur nicht im Angebot auf. Beides gehoert
+     * geprueft, sonst liesse sich die Regel auch dadurch erfuellen, dass die Heilung gar nicht
+     * laeuft.
+     *
+     * Geprueft wird am Ergebnis von `ensureLocalFormCardsForSeason`, nicht am gespeicherten
+     * Bestand: der Lesepfad heilt IM SPEICHER und schreibt nicht zurueck. Das ist richtig so —
+     * ein Ladevorgang soll nichts schreiben —, nur eben nichts, was man im Store nachsehen kann.
+     * (Im Fall darueber landet die geheilte Karte in der Persistenz, weil dort GESPEICHERT wird.)
+     */
+    const geheilt = ensureLocalFormCardsForSeason(nachher.gameState, save.saveId, params.seasonId);
+    const angelegt = (geheilt.seasonState.formCards ?? []).find((card) => card.id === kartenId);
+    expect(angelegt, "die Heilung hat die Karte gar nicht erst angelegt").toBeTruthy();
+    expect(angelegt!.cardValue).toBe(0);
+    expect((context.context.formCards ?? []).some((card) => card.id === kartenId)).toBe(false);
   });
 
   // Audit S4 regression: lineup reads/writes must never silently fall back to "the active save"

@@ -215,7 +215,31 @@ function buildCompletedSeasonOneSave(input: {
   } satisfies PersistedSaveGame;
 }
 
-function resolveParticipantCount(gameState: GameState, disciplineId: string) {
+/**
+ * WIE VIELE SPIELER DIESE DISZIPLIN AN DIESEM SPIELTAG HATTE — und warum der Katalog es nicht weiss.
+ *
+ * Die Zahl waehlt die Rangpunkte-Tabelle aus, ist also fuer jede Zeile die entscheidende Groesse.
+ * Gelesen wurde sie aus `gameState.disciplines[].playerCount` — dem KATALOG. Der stimmt aber nicht
+ * mit dem ueberein, womit die Saison tatsaechlich gewertet wurde: der Disziplin-Spielplan
+ * (`seasonState.disciplineSchedule`) traegt seine eigene Spieleranzahl je Spieltag.
+ *
+ * NACHGEMESSEN an der Fixture: **15 von 20 Disziplinen** weichen ab — Tennis 3 im Katalog gegen 6
+ * im Spielplan, Basketball 6 gegen 2, Speed-Schach 2 gegen 5, und so weiter. Dass der Gesamtfehler
+ * am Ende nur 0,4 Punkte betrug, ist Zufall: die Abweichungen heben sich weitgehend auf. Zeile fuer
+ * Zeile war die Pruefung fuer die Mehrheit der Disziplinen an der falschen Tabelle.
+ *
+ * DIE AUSLEITUNG TRAEGT DIE ZAHL JETZT SELBST (`playerCount` in `season1-matchday-results.csv`),
+ * und das ist der einzige verlaessliche Weg: der Smoke baut seinen Spielstand aus dem AKTIVEN Save
+ * der Maschine zusammen, nicht aus dem simulierten. Dessen Spielplan ist ein anderer — die
+ * Spieleranzahl muss also aus der Ausleitung kommen, nicht aus dem Zustand daneben.
+ *
+ * Der Katalog bleibt der Rueckfall fuer aeltere Ausleitungen ohne die Spalte.
+ */
+function resolveParticipantCount(gameState: GameState, disciplineId: string, rowPlayerCount?: string) {
+  const ausDerAusleitung = toNumber(rowPlayerCount);
+  if (ausDerAusleitung != null && ausDerAusleitung > 0) {
+    return ausDerAusleitung;
+  }
   return gameState.disciplines.find((discipline) => discipline.id === disciplineId)?.playerCount ?? null;
 }
 
@@ -286,20 +310,43 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
   );
 
   const rankTables = buildRankPointTables();
+  /**
+   * WAS EINE WERTUNGSGRUPPE WIRKLICH VERGIBT — und warum die alte Rechnung danebenlag.
+   *
+   * Hier stand `expectedTotalPointsDistributed`: die Summe der GANZEN Rangtabelle, einmal je
+   * Gruppe. Das unterstellt, dass jeder Rangplatz genau einmal vergeben wird. Bei einem
+   * GLEICHSTAND stimmt das nicht: zwei Teams bekommen beide die Punkte von Rang R, und Rang R+1
+   * bleibt unvergeben. Die Erwartung lag dann um `Punkte[R] − Punkte[R+1]` zu niedrig.
+   *
+   * NACHGERECHNET an der Fixture unter `tests/_fixtures/season1-regression`: 5 der 20 Gruppen
+   * haben einen Gleichstand (Spurt 20, Football 26, Time-Trial 16, Mini-DM 14, Speed-Schach 14),
+   * ihre Aufschlaege sind 0,2 + 0,2 + 0,4 + 0,2 + 0,5 = **1,5** — exakt die Abweichung, die der
+   * Smoke gemeldet hat (3001,1 tatsaechlich gegen 2999,6 erwartet). Kein Engine-Fehler, sondern
+   * eine Luecke im Modell der Pruefung.
+   *
+   * Erwartet wird deshalb, was die Gruppe TATSAECHLICH ausschuettet: die Summe der Rangpunkte
+   * ueber ihre Zeilen. Ein fehlender Rang oder eine Zeile zu viel faellt damit weiterhin auf —
+   * das ist der Zweck —, ein Gleichstand aber nicht mehr faelschlich.
+   */
   const expectedByDisciplineSide = new Map<string, number>();
+  /**
+   * OHNE ZWISCHENRUNDUNG. Vorher wurde nach JEDER Addition auf eine Nachkommastelle gerundet;
+   * ueber 640 Zeilen summierte sich das auf 0,4 auf (3000,7 statt 3001,1). Gerundet wird jetzt
+   * einmal am Ende.
+   */
   let recomputedTotalSeasonPoints = 0;
   for (const row of matchdayRows) {
-    const participantCount = resolveParticipantCount(completedSave.gameState, row.disciplineId);
+    const participantCount = resolveParticipantCount(completedSave.gameState, row.disciplineId, row.playerCount);
     const points = participantCount == null ? null : rankTables.get(participantCount)?.rankPointTable[String(toNumber(row.rank) ?? "")] ?? null;
     if (points != null) {
-      recomputedTotalSeasonPoints = roundValue(recomputedTotalSeasonPoints + points);
+      recomputedTotalSeasonPoints += points;
     }
     const groupKey = `${row.matchdayId}:${row.disciplineId}:${row.side}`;
-    if (!expectedByDisciplineSide.has(groupKey) && participantCount != null) {
-      const total = rankTables.get(participantCount)?.expectedTotalPointsDistributed ?? null;
-      if (total != null) expectedByDisciplineSide.set(groupKey, total);
+    if (points != null) {
+      expectedByDisciplineSide.set(groupKey, (expectedByDisciplineSide.get(groupKey) ?? 0) + points);
     }
   }
+  recomputedTotalSeasonPoints = roundValue(recomputedTotalSeasonPoints);
 
   const standings = standingsRows
     .map((row) => ({

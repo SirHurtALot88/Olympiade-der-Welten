@@ -12,7 +12,6 @@ export type FoundationLineupPanelProps = {
   teamTooltip: string;
   clientKey: string;
   client: LegacyLineupLabClientProps;
-  uiVariant?: "classic" | "focusV2";
 };
 
 export default function FoundationLineupPanel({
@@ -20,7 +19,6 @@ export default function FoundationLineupPanel({
   teamTooltip,
   clientKey,
   client,
-  uiVariant = "focusV2",
 }: FoundationLineupPanelProps) {
   if (!active) {
     return null;
@@ -39,7 +37,7 @@ export default function FoundationLineupPanel({
           </TooltipHeading>
         </div>
       </div>
-      <LegacyLineupLabClient key={clientKey} {...client} uiVariant={uiVariant} />
+      <LegacyLineupLabClient key={clientKey} {...client} />
     </section>
   );
 }

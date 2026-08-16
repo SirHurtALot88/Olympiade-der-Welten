@@ -136,6 +136,58 @@ export function createCockpitMatchdayApplyHandlers(
     setFoundationActionFeedback,
   } = deps;
 
+  /**
+   * KI-AUFSTELLUNGEN FUER DEN NEUEN SPIELTAG — IM HINTERGRUND, NICHT IM SPIELTAGSWECHSEL.
+   *
+   * Das Erzeugen fuer 32 Teams kostet gemessen 15-21 s. Frueher lief es mitten im
+   * Spieltagswechsel (`writeLocalMatchdayAdvance`) und machte 82 % der 46,7 s aus, die
+   * „Spieltag abschliessen" gebraucht hat. Der Wechsel schreibt jetzt nur noch den
+   * Spieltag; angestossen wird hier, wenn der Spieler wieder im Saisonstand steht und die
+   * Oberflaeche ohnehin bedienbar ist.
+   *
+   * BEWUSST NICHT ABGEWARTET (`void`, kein `await`): Der Aufruf darf den Auto-Run nicht
+   * verlaengern — sonst waere nichts gewonnen, die Wartezeit stuende nur an anderer Stelle.
+   * Aus demselben Grund setzt er auch KEINEN `cockpitBusyKey`: der sperrt die Bedienung,
+   * und gesperrt werden soll hier gerade nichts.
+   *
+   * FEHLER SIND FOLGENLOS: Der Spieltags-Lauf und das Speichern der eigenen Aufstellung
+   * rufen den Batch ohnehin selbst auf und holen Fehlendes nach. Ein gescheiterter oder
+   * abgebrochener Aufwaermlauf verschiebt darum nur den Zeitpunkt, er verliert nichts.
+   * Deshalb wird ein Fehlschlag hier auch nur leise gemeldet und nicht als Stoerung.
+   */
+  function startAiLineupPrewarm() {
+    if (readMetaSource === "prisma") {
+      return;
+    }
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/lineups/legacy/ai-batch-prewarm?saveId=${encodeURIComponent(activeSaveId)}&seasonId=${encodeURIComponent(seasonId)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(withRoomBody({})),
+          },
+        );
+        if (!response.ok) {
+          return;
+        }
+        const payload = (await response.json()) as { skipped?: boolean; summary?: { savedTeams?: number } };
+        if (payload.skipped || !payload.summary?.savedTeams) {
+          return;
+        }
+        // Nur melden, wenn wirklich etwas entstanden ist — sonst waere es Rauschen.
+        setFoundationActionFeedback({
+          tone: "info",
+          title: "KI-Aufstellungen stehen",
+          detail: `${payload.summary.savedTeams} Teams haben für den neuen Spieltag aufgestellt.`,
+        });
+      } catch {
+        // Siehe oben: folgenlos, der naechste regulaere Aufruf holt es nach.
+      }
+    })();
+  }
+
   async function runCockpitMatchdayMvpScoring(execute: boolean) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
@@ -458,6 +510,7 @@ export function createCockpitMatchdayApplyHandlers(
         });
         await Promise.all([loadSave(activeSaveId), reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
         bumpMarketReloadToken();
+        startAiLineupPrewarm();
       }
       return payload.summary ?? null;
     } finally {

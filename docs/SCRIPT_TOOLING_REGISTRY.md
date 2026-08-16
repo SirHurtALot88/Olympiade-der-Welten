@@ -156,12 +156,20 @@ Kontrollierter Smoke-Test fuer den serverseitigen Buy-Service.
 - keine AI-Kaeufe
 - keine Verkaeufe
 
-## `retool:extract-transfermarkt-columns`
+## `retool:extract-transfermarkt-columns` — ENTFERNT
 
-### Zweck
-Read-only Extraktion der Transfermarkt-Tabellen und Spalten aus der Retool-Draftboard-JSON.
+**Das Werkzeug gibt es nicht mehr.** Chris: „extract retool kann weg das war einmalig machen wir
+nicht mehr." Die Extraktion war ein einmaliger Übernahmeschritt aus der Retool-Draftboard-JSON;
+sie ist gelaufen, ihr **Ergebnis bleibt** und ist weiterhin die Spaltenquelle:
+`references/retool-transfermarkt-columns/`.
 
-### Was erzeugt wird
+Entfernt sind `scripts/extract-retool-transfermarkt-columns.ts`, der npm-Eintrag und der
+zugehörige Test. Letzterer konnte ohnehin nur auf einem einzigen Rechner laufen — er las
+`/Users/chrisfalk/Downloads/…Draftboard (7).json`, eine Datei, die nie im Repo lag.
+
+<details><summary>Was das Werkzeug tat, für den Fall, dass die Übernahme je wiederholt wird</summary>
+
+### Was erzeugt wurde
 - `references/retool-transfermarkt-columns/manifest.json`
 - `references/retool-transfermarkt-columns/transfermarkt-columns.raw.json`
 - `references/retool-transfermarkt-columns/transfermarkt-formatting.raw.json`
@@ -181,6 +189,8 @@ Read-only Extraktion der Transfermarkt-Tabellen und Spalten aus der Retool-Draft
 - keine Prisma-Writes
 - keine SQLite-Writes
 - keine Migrationen
+
+</details>
 
 ## `player:audit-economy-source`
 

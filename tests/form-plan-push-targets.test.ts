@@ -184,10 +184,22 @@ describe("Formplan-Persistenz: Karten und Push-Ziel stoeren sich nicht", () => {
     });
 
     const stored = persistence.getSaveById(params.saveId)!;
-    const cardId =
-      (stored.gameState.seasonState.formCards ?? []).find(
-        (card) => card.seasonId === params.seasonId && card.teamId === params.teamId && card.cardValue > 0,
-      )?.id ?? null;
+    const teamKarten = (stored.gameState.seasonState.formCards ?? []).filter(
+      (card) => card.seasonId === params.seasonId && card.teamId === params.teamId,
+    );
+    // NICHT auf `cardValue > 0` bestehen. Der frische Season-1-Save gibt diesem Team genau
+    // zwei Karten, und ihre Werte werden unabhaengig gezogen — die positive darf dabei 0
+    // sein. Gemessen ueber 12 frische Spielstaende: in 4 davon gab es keine Karte mit Wert
+    // groesser 0. Der Test fiel dadurch in rund einem Drittel aller Laeufe um, ohne dass am
+    // Verhalten etwas kaputt war; im Einzellauf blieb er meist gruen, im vollen Suite-Lauf
+    // faerbte er das Tor rot.
+    //
+    // Fuer das, was hier geprueft wird, ist der Wert ohnehin gleichgueltig: es geht darum,
+    // dass ein Kartenklick das Push-Ziel derselben Seite stehen laesst. `saveLocalLegacyFormCardPlan`
+    // nimmt jede Karte des Teams an (`validCards` filtert nicht auf den Wert), die positive
+    // Auswahl steuert eine andere Regel. Bevorzugt wird trotzdem eine positive Karte — nur
+    // haengt der Test nicht mehr daran.
+    const cardId = (teamKarten.find((card) => card.cardValue > 0) ?? teamKarten[0])?.id ?? null;
     expect(cardId).toBeTruthy();
 
     // Kartenklick ohne `plannedIntensity` — das Feld fehlt bewusst.

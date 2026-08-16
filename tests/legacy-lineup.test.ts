@@ -661,83 +661,65 @@ describe("legacy lineup validator", () => {
 
 describe("legacy lineup draft ui contract", () => {
   /**
-   * ENTSCHIEDEN (Chris, 2026-08-09): Der Expertenmodus ist bewusst weg — Variante (b).
+   * DER „CLASSIC"-BAUM IST WEG — ENTSCHIEDEN (Chris: „classic aufstellungsbaum brauchen wir
+   * nicht mehr").
    *
-   * Der Befund war: `showExpertBackupPanels` stand noch da, wurde aber von KEINER Stelle
-   * gelesen; ebenso wenig der Schalter dahinter — `setIsExpertModeEnabled` hatte nie einen
-   * Aufrufer, der Viewport-Ref war nie an ein Element gehaengt, die virtualisierten
-   * Expertenzeilen wurden nie gerendert. Der Modus schaltete komplett ins Leere.
+   * Was hier frueher stand, war ein uebersprungener Fall, der ein Dutzend Marken des klassischen
+   * Arbeitsbereichs im Quelltext suchte (`legacy-lineup-main-flow`, `legacy-lineup-captain-strip`,
+   * `legacy-lineup-progress-track`, `legacy-lineup-quick-assign-row`, „Vorschlag bewusst setzen"
+   * und weitere). Ein frueherer Durchgang hatte das als moeglichen Feature-Verlust eingeordnet und
+   * bewusst offen gelassen.
    *
-   * Der ganze Cluster ist entfernt (Storage-Key, Preference-Loader, State, Ref, Virtual-Window,
-   * Hoehen-Effekt, Persist-Effekt, tote Konstante) — samt der Zusage, die hier auf
-   * `{showExpertBackupPanels ? (` geprueft hat.
+   * NACHGEMESSEN, bevor entschieden wurde: null Fundstellen fuer JEDE dieser Marken in `app/`,
+   * `lib/` und `components/`. Der Baum war also nicht „unerreichbar", sondern gar nicht mehr da;
+   * uebrig war ein Schalter (`uiVariant`) mit nur noch einer Stellung. Beides ist jetzt entfernt.
    *
-   * Dieser Test bleibt uebersprungen, aber aus einem UNABHAENGIGEN Grund: dem groesseren
-   * Feature-Verlust im "classic"-Draft-Baum, den die NOTE unten beschreibt. Der Expertenmodus
-   * war nur ein Teil der roten Zusagen, nicht ihre Ursache.
+   * Was BLEIBT, steht unten: der Formplan-Weg, den derselbe Fall mitgeprueft hat und der
+   * weiterlebt. Ihn mit dem toten Rest zu streichen waere der zweite Fehler nach dem ersten.
    */
-  it.skip("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
-    // NOTE (investigated, not fixed): several of the lineupText assertions
-    // below (legacy-lineup-main-flow,
-    // legacy-lineup-captain-strip, legacy-lineup-progress-track,
-    // legacy-lineup-quick-assign-row, legacy-lineup-draft-flow-chip,
-    // role="tablist", legacy-lineup-team-tactics-form, "Vorschlag bewusst
-    // setzen") are gone from LegacyLineupLabClient.tsx. This is the same root
-    // cause documented in detail in tests/legacy-lineup-lab.test.ts: the
-    // component's render function now unconditionally returns either
-    // <FormBoardPanel> or <LineupNewLook> regardless of `uiVariant`, so this
-    // file's "classic" draft-workspace JSX tree is dead/unreachable, and parts
-    // of it were also edited/removed outright. Looks like a real feature loss
-    // (see final report) rather than a wrong-file-path issue, so left
-    // unchanged/red intentionally.
+  it("haelt den Formplan-Weg im Client und im FormBoardPanel", async () => {
     const fs = await import("node:fs/promises");
-    const lineupPath = path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
-    const cssPath = path.join(process.cwd(), "app/globals.css");
-    const [lineupText, cssText] = await Promise.all([fs.readFile(lineupPath, "utf8"), fs.readFile(cssPath, "utf8")]);
+    const [lineupText, formBoardText] = await Promise.all([
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"), "utf8"),
+    ]);
 
-    // SHOW_DRAFT_LINEUP_WORKSPACE war (wie SHOW_CLASSIC_LINEUP_WORKSPACE) ein
-    // nirgends gelesenes Flag ohne jeden Aufrufer — beide Flags sind mit dem
-    // Dead-Code-Cleanup entfernt. Der Rest dieses Blocks bleibt unangetastet,
-    // s. NOTE oben zum größeren, unabhängigen Feature-Verlust.
-    expect(lineupText).toContain('className="legacy-lineup-main-flow"');
-    expect(lineupText).toContain("legacy-lineup-captain-strip");
-    expect(lineupText).toContain("Vorschlag bewusst setzen");
-    expect(lineupText).toContain("legacy-lineup-progress-track");
+    // Der Client mountet das Formplan-Panel und traegt den Speicherweg der Formkarten.
+    expect(lineupText).toContain("FormBoardPanel");
     expect(lineupText).toContain("updateFormCardSelection");
-    expect(lineupText).toContain("renderInlineFormCardSelectors");
     expect(lineupText).toContain("queueFormCardPlanSave");
-    // LegacyLineupSlotMicroSteps/LegacyLineupCandidateReasonChips waren die
-    // beiden nie gerenderten Slot-Komponenten aus dem toten "classic"-Baum —
-    // mit dem Dead-Code-Cleanup entfernt, s. Kommentar oben zu diesem Block.
-    expect(lineupText).toContain("legacy-lineup-quick-assign-row");
-    expect(lineupText).toContain("legacy-lineup-draft-flow-chip");
-    expect(lineupText).toContain("Spieltag wird geladen");
-    expect(lineupText).toContain('role="tablist"');
-    expect(lineupText).toContain("Formplan");
-    const formBoardText = await fs.readFile(
-      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"),
-      "utf8",
-    );
+    expect(lineupText).toContain("renderInlineFormCardSelectors");
+    expect(lineupText).toContain("scheduleHoveredCandidate");
+
+    // Und das Panel rendert wirklich ein Formkarten-Deck, keine leere Huelle.
     expect(formBoardText).toContain("legacy-lineup-form-deck");
     expect(formBoardText).toContain("legacy-lineup-form-board-chip-picks");
-    expect(lineupText).not.toContain("Im Formplan bearbeiten");
-    expect(lineupText).not.toContain("legacy-lineup-draft-tactics-form-readonly");
-    expect(lineupText).toContain("legacy-lineup-draft-tactics-form");
-    expect(lineupText).toContain("legacy-lineup-team-tactics-form");
-    expect(lineupText).toContain("FormBoardPanel");
-    // Die beiden folgenden Assertions ("DraftWorkspace", "LineupExpertPanels")
-    // sind mit dem Dead-Code-Cleanup gefallen: Sie prüften keine echte
-    // Funktion, sondern nur einen nie genutzten Import auf die gleichnamige,
-    // ebenfalls tote Geschwisterdatei (deren Render-Pfad seit
-    // SHOW_CLASSIC_LINEUP_WORKSPACE = false nie mehr erreicht wird). Ein
-    // grüner Test hier hätte weiterhin nur belegt, dass der Import existiert
-    // — nicht, dass die Komponente gerendert wird. Import und Datei sind
-    // entfernt, die Assertions daher gestrichen statt auf eine andere Datei
-    // umgebogen.
-    expect(lineupText).not.toContain("legacy-lineup-team-tactics-form-readonly");
-    expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(formBoardText).toContain("legacy-lineup-form-board-cell-velo-strip");
-    expect(cssText).not.toContain(".legacy-lineup-draft-intensity-preview");
-    expect(cssText).toContain(".legacy-lineup-draft-flow-chip");
+  });
+
+  it("kennt die klassische Variante nicht mehr — auch nicht als Schalter", async () => {
+    const fs = await import("node:fs/promises");
+    const [lineupText, derivationsText] = await Promise.all([
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "lib/foundation/tabs/use-lineup-derivations.ts"), "utf8"),
+    ]);
+
+    // Der Schalter ist weg — nicht nur seine zweite Stellung. Ein `uiVariant`, das nur noch
+    // „focusV2" annehmen kann, waere derselbe tote Zweig unter anderem Namen.
+    expect(lineupText).not.toContain("uiVariant?:");
+    expect(lineupText).not.toContain('"classic"');
+    expect(derivationsText).not.toContain("LineupUiVariant");
+    expect(derivationsText).not.toContain("resolveLineupUiVariant");
+
+    // Und die Marken des alten Baums kommen nicht zurueck.
+    for (const marke of [
+      "legacy-lineup-main-flow",
+      "legacy-lineup-captain-strip",
+      "legacy-lineup-progress-track",
+      "legacy-lineup-quick-assign-row",
+      "Vorschlag bewusst setzen",
+    ]) {
+      expect(lineupText, `${marke} ist zurueck`).not.toContain(marke);
+    }
   });
 });
