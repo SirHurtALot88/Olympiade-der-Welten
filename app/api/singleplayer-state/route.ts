@@ -489,6 +489,27 @@ export async function POST(request: Request) {
     // owner's active save). Auth off -> ownerId null -> unchanged global behavior.
     const deleteOwnerId = await resolveSessionOwnerId();
     const activeSave = persistence.getActiveSave(deleteOwnerId);
+    // F3 (Notausfahrt-Korrektur, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md — Chris wörtlich: "franky
+    // darf den auch nicht löschen"): der Riegel unten (`activeRoom`) blockt Löschen nur, SOLANGE
+    // ein Raum für den Save existiert — danach war Löschen für jeden frei, Gast wie Host. Ein
+    // Mehrspieler-Spielstand (`saveMode === "online_4v4"`, dieselbe Erkennung, die auch die
+    // Save-Liste für den Modus-Filter benutzt, siehe `enrichSaveSummary` oben) darf NUR sein Host
+    // löschen — für immer, nicht nur während der Raum läuft.
+    //
+    // `createdBy` (save-repository.ts, Spalte existiert bereits für Befund B3 in
+    // server-authoritative-write-guard.ts) ist die richtige Größe dafür: sie wird EINMALIG beim
+    // Anlegen festgeschrieben und nie wieder verändert. Seit dieser Korrektur stempelt `startRoom`
+    // (room-store.ts) sie beim Anlegen des Koop-Saves mit der Host-Identität (Sitzung, wenn Login
+    // aktiv ist, sonst ein zufälliger, NICHT erratbarer Platzhalter).
+    //
+    // OHNE LOGIN gibt es serverseitig KEINE Identität, die Chris von Franky unterscheidet — beide
+    // Browser sprechen denselben Server ohne Session-Cookie, `deleteOwnerId` ist für BEIDE `null`
+    // und kann nie mit dem (nicht erratbaren) `createdBy` übereinstimmen. Der Save bleibt dann für
+    // JEDEN gesperrt statt (wie vor dieser Korrektur) für jeden offen — die einzige Richtung, in
+    // die sich "ohne Identität nicht unterscheidbar" sicher auflösen lässt: lieber niemand löscht
+    // ihn versehentlich, als dass Franky es könnte. Mit aktivem Login (`OLY_AUTH_ENABLED=1`)
+    // funktioniert der Vergleich exakt.
+    const enrichedSaves = persistence.listSaves().map(enrichSaveSummary);
     const blockedSaveIds: Array<{ saveId: string; reason: string }> = [];
     const deletionCandidates: string[] = [];
     for (const saveId of body.saveIds) {
@@ -504,6 +525,15 @@ export async function POST(request: Request) {
         blockedSaveIds.push({
           saveId,
           reason: `Save wird gerade in Online-Room ${activeRoom.roomCode} verwendet.`,
+        });
+        continue;
+      }
+      const summary = enrichedSaves.find((entry) => entry.saveId === saveId);
+      const isVerifiedHost = deleteOwnerId != null && summary?.createdBy != null && deleteOwnerId === summary.createdBy;
+      if (summary?.saveMode === "online_4v4" && !isVerifiedHost) {
+        blockedSaveIds.push({
+          saveId,
+          reason: "Nur der Host dieses Mehrspieler-Spielstands darf ihn löschen.",
         });
         continue;
       }
