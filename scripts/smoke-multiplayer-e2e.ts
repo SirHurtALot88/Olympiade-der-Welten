@@ -886,7 +886,32 @@ async function main() {
       // spielende Person selbst auf "Zur Bühne →" (`arena-prematch-start-cta`) klickt. Ohne diesen
       // Klick bleibt `arena-coop-status` (das lebt in der NativeArena DAHINTER) fuer immer
       // unerreichbar — das war der eigentliche Grund fuer den 30s-Timeout hier, nicht B3.
-      await pageA.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
+      // DIAGNOSE-DUMP wie beim `arena-coop-status`-Wait weiter unten, und aus demselben Grund:
+      // der Knopf haengt an `preMatchdayReady` (DisciplineStageArena.tsx) und der wiederum an
+      // `leagueLineupReadiness.allReady` -- er erscheint also NUR, wenn wirklich alle 32 Teams eine
+      // Einsatzliste haben. Ein nackter 30s-Timeout sagt dann bloss "Knopf nicht da" und
+      // unterscheidet nicht zwischen "falscher Screen" und "Liga nicht bereit". Genau diese
+      // Unterscheidung fehlte in den CI-Laeufen 1918 und 1923, in denen dieser Wait riss. Die
+      // Tafel schreibt die Zahl selbst hin ("Liga X/32 bereit") und listet die fehlenden Teams --
+      // der Body-Text beantwortet die Frage also sofort, wenn man ihn festhaelt.
+      try {
+        await pageA.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
+      } catch (error) {
+        await pageA.screenshot({ path: path.join(OUTPUT_DIR, "failure-prematch-pageA.png"), fullPage: true }).catch(() => {});
+        const bodyA = await pageA.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+        await fs.writeFile(path.join(OUTPUT_DIR, "failure-prematch-bodyA.txt"), bodyA);
+        const readiness = await fetchJson(
+          options.baseUrl,
+          `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`,
+        ).catch(() => null);
+        const teams = readiness?.save?.gameState?.teams ?? [];
+        const lineups = readiness?.save?.gameState?.matchdayState?.pendingTeamIds ?? [];
+        console.error(
+          `[prematch-cta] Knopf blieb aus. Teams im Save: ${teams.length}, pendingTeamIds: ${JSON.stringify(lineups)}`,
+        );
+        console.error(`[prematch-cta] Bildschirmtext A:\n${bodyA.slice(0, 1500)}`);
+        throw error;
+      }
       await pageA.getByTestId("arena-prematch-start-cta").click();
       await pageB.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
       await pageB.getByTestId("arena-prematch-start-cta").click();
