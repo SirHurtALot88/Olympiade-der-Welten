@@ -3,6 +3,7 @@ import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { distributePerPlayerFormShares, seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
+import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 
 // One aufgestellter Spieler in einem Slot einer Disziplin, mit echter
 // Netto-Leistung aus dem Save (Disziplin-Wert + echtem Fatigue/Form).
@@ -71,7 +72,20 @@ export function buildDisciplineStageModel(
   // Defensiv gegen Bootstrap-/Teil-States: im Ladefenster können diese Arrays
   // (noch) fehlen. Dann bauen wir ein leeres Modell statt zu crashen.
   const discipline = (gameState.disciplines ?? []).find((d) => d.id === disciplineId);
-  const slotCount = discipline?.playerCount ?? 5;
+  // Anzahl der "gewaehlten" Spieler pro Team im Modell-Fallback (Vorschau ohne Engine-Daten,
+  // z.B. bevor der Spieltag laeuft): das muss die fuer DIESE SAISON ausgeloste Kadergroesse
+  // sein, nicht `discipline.playerCount`. Der Katalogwert ist nur der Startzustand — der
+  // Spielplan wuerfelt die Kadergroesse pro Saison neu (siehe
+  // lib/season/season-discipline-schedule.ts) und weicht am Live-Spielstand bei 15 von 20
+  // Disziplinen vom Katalog ab. Ohne diesen Vorrang zeigte die Buehne im Modell-Modus die
+  // falsche Spielerzahl (z.B. 3 statt der ausgelosten 6 bei Tennis).
+  // Genauso defensiv wie oben: `gameState.season`/`gameState.seasonState` koennen im
+  // Bootstrap-/Teil-State fehlen, `buildSeasonDisciplinePlayerCountMap` setzt beide voraus.
+  const seasonSlotCount =
+    gameState.season?.id != null && gameState.seasonState
+      ? buildSeasonDisciplinePlayerCountMap(gameState).get(disciplineId)
+      : null;
+  const slotCount = seasonSlotCount ?? discipline?.playerCount ?? 5;
 
   // Backfill für Alt-Saves: manche Spieler haben keine disciplineRatings-Einträge für
   // Disziplinen, die erst später in die offizielle Liste kamen (z. B. Showcase) → base

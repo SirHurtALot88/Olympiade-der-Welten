@@ -115,12 +115,23 @@ export type PlayerInjuryDiscipline = {
  *
  * Ohne Einsatzliste (alter Spielstand, Draft geloescht) bleibt das Ergebnis leer — es wird
  * keine Disziplin geraten.
+ *
+ * KADERGROESSE: `gameState.disciplines[].playerCount` ist der KATALOG-Wert (Startzustand der
+ * Disziplin), NICHT die fuer diesen Spieltag tatsaechlich ausgeloste Zahl — der Spielplan
+ * wuerfelt sie pro Saison neu (`buildSeasonSeededDisciplineSchedule`, siehe
+ * lib/season/season-discipline-schedule.ts) und weicht am Live-Spielstand bei 15 von 20
+ * Disziplinen vom Katalog ab. Diese Funktion sucht deshalb ZUERST im Spielplan-Eintrag des
+ * betroffenen Spieltags nach der Kadergroesse (`seasonId` grenzt auf die richtige Saison ein,
+ * falls mehrere im Save liegen) und faellt nur auf den Katalog zurueck, wenn dort nichts
+ * steht — z. B. weil `disciplineSchedule` beim Saisonwechsel durch den Plan der NEUEN Saison
+ * ersetzt wurde und die Verletzung aus einer vergangenen Saison stammt.
  */
 export function resolveInjuryMatchdayDisciplines(input: {
   gameState: GameState;
   teamId: string;
   playerId: string;
   matchdayId: string;
+  seasonId?: string | null;
 }): PlayerInjuryDiscipline[] {
   const drafts = (input.gameState.seasonState.lineupDrafts ?? []).filter(
     (draft) => draft.teamId === input.teamId && draft.matchdayId === input.matchdayId,
@@ -138,15 +149,27 @@ export function resolveInjuryMatchdayDisciplines(input: {
     }
   }
 
+  const scheduleEntry = (input.gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.matchdayId === input.matchdayId && (!input.seasonId || entry.seasonId === input.seasonId),
+  ) ?? null;
+  const scheduledPlayerCountByDisciplineId = new Map<string, number | null>();
+  for (const slot of [scheduleEntry?.discipline1, scheduleEntry?.discipline2]) {
+    if (slot?.disciplineId) {
+      scheduledPlayerCountByDisciplineId.set(slot.disciplineId, slot.playerCount ?? null);
+    }
+  }
+
   return disciplineIds.map((disciplineId) => {
     const discipline = input.gameState.disciplines?.find((entry) => entry.id === disciplineId) ?? null;
+    const scheduledPlayerCount = scheduledPlayerCountByDisciplineId.get(disciplineId);
+    const catalogPlayerCount =
+      typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
+        ? discipline.playerCount
+        : null;
     return {
       disciplineId,
       name: discipline?.name ?? disciplineId,
-      playerCount:
-        typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
-          ? discipline.playerCount
-          : null,
+      playerCount: scheduledPlayerCount ?? catalogPlayerCount,
     };
   });
 }
