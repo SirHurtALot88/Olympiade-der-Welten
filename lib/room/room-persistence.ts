@@ -261,12 +261,23 @@ export function loadPersistedRuntimeRooms(now: Date = new Date()): RuntimeRoom[]
  * `paused` fuer Routing/Broadcast-Zwecke ausschliesst. Fuer die Frage „ist dieser Save noch an
  * einen Raum gebunden" zaehlt ein pausierter Raum weiterhin: er ist nicht beendet, nur gerade ohne
  * verbundene Sitzplaetze.
+ *
+ * BEFUND B2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): ein `updated_at` aelter als `ROOM_EXPIRY_MS`
+ * zaehlt hier bewusst NICHT mehr als "gebunden" — derselbe Ausgang wie `evictRoomIfExpired`
+ * (room-store.ts) fuer die In-Memory-Seite, hier fuer die ABLAGE, DAMIT dieser zweite
+ * Pfad — der genau dann greift, wenn die In-Memory-Map den Raum (noch) nicht kennt — einen
+ * verwaisten Raum nicht auf ewig als Riegel weiterreicht. `now` ist injizierbar fuer Tests
+ * (siehe `setPersistedRoomUpdatedAtForTests`), damit der Verfall nicht ueber echtes Warten
+ * geprueft werden muss.
  */
-export function findPersistedRoomBySaveId(saveId: string): { roomCode: string } | null {
+export function findPersistedRoomBySaveId(saveId: string, now: Date = new Date()): { roomCode: string } | null {
   const database = getRoomDatabase();
+  const cutoffIso = new Date(now.getTime() - ROOM_EXPIRY_MS).toISOString();
   const row = database
-    .prepare(`SELECT room_code FROM rooms WHERE save_id = ? AND status != 'completed' ORDER BY updated_at DESC LIMIT 1`)
-    .get(saveId) as { room_code: string } | undefined;
+    .prepare(
+      `SELECT room_code FROM rooms WHERE save_id = ? AND status != 'completed' AND updated_at >= ? ORDER BY updated_at DESC LIMIT 1`,
+    )
+    .get(saveId, cutoffIso) as { room_code: string } | undefined;
   return row ? { roomCode: row.room_code } : null;
 }
 

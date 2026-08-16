@@ -14,6 +14,7 @@ import {
   startRoomArenaSync,
 } from "@/lib/room/room-store";
 import { ROOM_EXPIRY_MS, setPersistedRoomUpdatedAtForTests } from "@/lib/room/room-persistence";
+import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 
 /**
  * STUFE 0.1 + 0.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B1): Raeume lebten bislang NUR in
@@ -217,5 +218,57 @@ describe("Raeume ueberleben den Neustart", () => {
 
     expect(getRoom(stale.room.roomCode)).toBeNull();
     expect(getRoom(fresh.room.roomCode)).toBeTruthy();
+  });
+
+  it("gibt einen verwaisten, raumgebundenen Save nach Ablauf der Frist wieder fuer Nicht-Raum-Schreibvorgaenge frei (Befund B2)", () => {
+    // Befund B2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `closeRoom` wird nur aus Tests gerufen, und
+    // der Sieben-Tage-Verfall griff bislang NUR beim Prozessstart (siehe Test oben,
+    // "laesst einen abgelaufenen Raum verfallen ..." -- der laeuft ueber
+    // `rehydrateRuntimeRoomsFromPersistence()`). Ein Raum, der lange im Speicher bleibt, weil der
+    // Server einfach nicht neu startet, sperrte seinen gebundenen Save damit fuer IMMER gegen jeden
+    // Nicht-Raum-Schreibvorgang -- ein abgebrochenes Koop-Spiel machte seinen Spielstand
+    // unbenutzbar. Dieser Test prueft den Ausgang OHNE jede Neustart-Simulation: genau der
+    // Alltagsfall, in dem der Server einfach lange durchlaeuft.
+    const created = createRoom("socket-orphan-a", { displayName: "Chris", saveId: "verwaister-save" });
+    const roomCode = created.room.roomCode;
+
+    // Kontrollmessung: aktuell noch gebunden, ein Nicht-Raum-Schreibvorgang MUSS abgelehnt werden.
+    const nochAktiv = assertSaveNotRoomBound("verwaister-save", "kontrollmessung");
+    expect(nochAktiv.blocked).toBe(true);
+
+    // "Lange niemand angefasst" OHNE Prozess-Neustart simulieren: direkte Zustandsmutation am
+    // IN-MEMORY-Raum (gleiches Testmuster wie in tests/raum-hosten-und-teams-zuteilen.test.ts) --
+    // genau das Feld, das `evictRoomIfExpired` (room-store.ts, `getActiveRoomBySaveId`) prueft.
+    const room = getRoom(roomCode);
+    expect(room).toBeTruthy();
+    if (!room) return;
+    const laengstVergangen = new Date(Date.now() - ROOM_EXPIRY_MS - 24 * 60 * 60 * 1000).toISOString();
+    room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, updatedAt: laengstVergangen } };
+
+    const nachVerfall = assertSaveNotRoomBound("verwaister-save", "kontrollmessung");
+    expect(nachVerfall.blocked, "ein verwaister Raum darf seinen Save nicht fuer immer sperren").toBe(false);
+
+    // Der Ausgang ist ECHT, nicht nur uebersehen: der Raum ist wirklich weg, der Code wieder frei --
+    // derselbe Zustand, den `closeRoom` hinterlassen wuerde.
+    expect(getRoom(roomCode)).toBeNull();
+  });
+
+  it("gibt einen verwaisten Save auch ueber die Ablage-Quelle frei, wenn die Prozess-Map ihn (noch) nicht kennt", () => {
+    // Zweite Quelle von `assertSaveNotRoomBound` (`findPersistedRoomBySaveId`) -- greift genau
+    // dann, wenn die In-Memory-Map den Raum nicht (mehr) findet, z. B. kurz nach einem
+    // Prozess-Neustart vor dem Rehydrieren. Auch dieser Pfad darf einen verwaisten Raum nicht
+    // ewig als Riegel weiterreichen.
+    const created = createRoom("socket-orphan-b", { displayName: "Chris", saveId: "verwaister-save-2" });
+    const roomCode = created.room.roomCode;
+
+    const laengstVergangen = new Date(Date.now() - ROOM_EXPIRY_MS - 24 * 60 * 60 * 1000).toISOString();
+    setPersistedRoomUpdatedAtForTests(roomCode, laengstVergangen);
+
+    // Map leeren, OHNE zu rehydrieren -- der Zustand direkt nach einem Neustart, bevor
+    // `rehydrateRuntimeRoomsFromPersistence()` gelaufen ist.
+    resetRuntimeRoomsForTests();
+
+    const geprueft = assertSaveNotRoomBound("verwaister-save-2", "kontrollmessung");
+    expect(geprueft.blocked, "ein verwaister Raum darf auch ueber die Ablage-Quelle nicht fuer immer sperren").toBe(false);
   });
 });

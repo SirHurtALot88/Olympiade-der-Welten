@@ -11,6 +11,7 @@ import type {
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
+import { matchesArenaScope } from "@/lib/room/arena-sync-state";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -499,9 +500,32 @@ const ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY = new Set<string>(["lineup", "formcar
  * Arena technisch noch "revealing" ist (der Host hat den letzten Schritt gesendet, der Broadcast
  * mit dem neuen `roomFlowState.step` ist aber noch unterwegs) — ein Schreibvorgang, der nur eines
  * der beiden Felder prueft, haette in genau diesem schmalen Fenster ein falsches "frei".
+ *
+ * BEFUND B1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `arenaSyncState.status` wird beim Anwenden
+ * eines Spieltags auf `result_applied` gesetzt und NIE wieder auf `idle` zurueckgesetzt (Kommentar
+ * an `matchesArenaScope`, arena-sync-state.ts) — ein `status !== "idle"`-Vergleich allein waere
+ * damit ab dem ERSTEN Spieltag fuer den Rest des Raums permanent wahr, und die in Stufe 1.3 gebaute
+ * "zwischen zwei Spieltagen erlaubt"-Umverteilung koennte nie mehr greifen. Der Fix: `status !==
+ * "idle"` zaehlt nur noch, wenn der Sync-State auch zum AKTUELLEN Spieltag gehoert
+ * (`matchesArenaScope`, dieselbe Pruefung, die den Host-Arena-Start-Guard schon vor demselben
+ * Fehler bewahrt) — ein laengst abgeschlossener State eines VORIGEN Spieltags (anderes
+ * `matchdayId`, `advanceRoomFlow` in room-store.ts erhoeht `activeMatchday` beim Weiterziehen)
+ * gehoert nicht mehr zum aktuellen Spieltag und sperrt die Umverteilung folglich nicht mehr.
  */
-export function isRoomMatchdayInProgress(state: Pick<OlyRoomState, "roomFlowState" | "arenaSyncState">): boolean {
-  return ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY.has(state.roomFlowState.step) || state.arenaSyncState.status !== "idle";
+export function isRoomMatchdayInProgress(
+  state: Pick<OlyRoomState, "roomFlowState" | "arenaSyncState" | "multiplayerRoom">,
+): boolean {
+  if (ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY.has(state.roomFlowState.step)) {
+    return true;
+  }
+  if (state.arenaSyncState.status === "idle") {
+    return false;
+  }
+  return matchesArenaScope(state.arenaSyncState, {
+    saveId: state.multiplayerRoom.saveId,
+    seasonId: state.multiplayerRoom.activeSeasonId,
+    matchdayId: String(state.multiplayerRoom.activeMatchday),
+  });
 }
 
 export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwnershipPreset): OlyRoomState {

@@ -38,6 +38,7 @@ import {
   deletePersistedRoom,
   loadPersistedRuntimeRooms,
   persistRuntimeRoom,
+  ROOM_EXPIRY_MS,
 } from "@/lib/room/room-persistence";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -397,13 +398,49 @@ export function getRoom(roomCode: string) {
   return runtimeRooms.get(roomCode.trim().toUpperCase()) ?? null;
 }
 
+/**
+ * BEFUND B2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `closeRoom` beendet einen Raum sauber, wird
+ * aber nur aus Tests gerufen — niemand ruft es aus einem echten, abgebrochenen Spiel heraus. Und
+ * der Sieben-Tage-Verfall (`ROOM_EXPIRY_MS`, room-persistence.ts) griff bislang NUR beim
+ * Prozessstart (`loadPersistedRuntimeRooms` -> `sweepExpiredPersistedRooms`) — ein Raum, der lange
+ * im Speicher bleibt, weil der Server zufaellig nicht neu startet, blieb fuer seinen gebundenen
+ * Save fuer IMMER "aktiv" und sperrte jeden Nicht-Raum-Schreibvorgang dauerhaft
+ * (`assertSaveNotRoomBound` -> `authorizeServerRoomWrite` -> 409).
+ *
+ * DER AUSGANG: hier, auf dem Lesepfad, den `assertSaveNotRoomBound` als ERSTE Quelle befragt.
+ * Ein Raum, der laenger als `ROOM_EXPIRY_MS` nicht mehr angefasst wurde (kein Beitritt, kein
+ * Schreibvorgang, kein Reconnect — jede dieser Aktionen laeuft durch `syncPlayers` und aktualisiert
+ * `multiplayerRoom.updatedAt`), gilt als verwaist: er wird HIER, beim naechsten Blick darauf, aus
+ * der Prozess-Map UND der Ablage entfernt (derselbe Ausgang wie `closeRoom`, nur automatisch statt
+ * vom Host ausgeloest) und zaehlt fortan nicht mehr als "aktiv" — der Save ist danach wieder ein
+ * normaler Solo-Save.
+ *
+ * WARUM DAS DEN SCHUTZ NICHT AUSHOEHLT: sieben Tage sind grosszuegig bemessen (siehe Kommentar an
+ * `ROOM_EXPIRY_MS`) — ein Raum, in dem in dieser Zeit AUCH NUR EIN Schreibvorgang/Beitritt/Reconnect
+ * passiert, bleibt vollstaendig gesperrt wie bisher. Nur ein Raum, den wirklich niemand mehr
+ * anfasst, verliert seinen Riegel — genau das Verhalten, das der Sieben-Tage-Verfall fuer die
+ * ABLAGE schon immer versprochen hat, hier nur unabhaengig von einem Prozess-Neustart nachgezogen.
+ */
+function evictRoomIfExpired(room: RuntimeRoom, nowMs: number): boolean {
+  const updatedAtMs = new Date(room.state.multiplayerRoom.updatedAt).getTime();
+  if (Number.isNaN(updatedAtMs) || nowMs - updatedAtMs < ROOM_EXPIRY_MS) {
+    return false;
+  }
+  runtimeRooms.delete(room.roomCode);
+  deletePersistedRoom(room.roomCode);
+  return true;
+}
+
 export function getActiveRoomBySaveId(saveId: string) {
+  const nowMs = Date.now();
   for (const room of runtimeRooms.values()) {
-    if (
-      room.state.multiplayerRoom.saveId === saveId &&
-      room.state.multiplayerRoom.status !== "completed" &&
-      room.state.multiplayerRoom.status !== "paused"
-    ) {
+    if (room.state.multiplayerRoom.saveId !== saveId) {
+      continue;
+    }
+    if (evictRoomIfExpired(room, nowMs)) {
+      continue;
+    }
+    if (room.state.multiplayerRoom.status !== "completed" && room.state.multiplayerRoom.status !== "paused") {
       return room;
     }
   }

@@ -5,6 +5,7 @@ import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room
 import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { getDatabase } from "@/lib/persistence/sqlite";
 import { broadcastRoomGameplayUpdate } from "@/lib/socket/room-gameplay-broadcast";
 import type { RoomParticipant, TeamControllerType, TeamOwnershipRecord } from "@/types/game";
 import type { RuntimeRoom } from "@/types/room";
@@ -101,6 +102,23 @@ function isSandboxLikeSave(saveId: string) {
   return /sandbox|manager|test|local/i.test(saveId);
 }
 
+/**
+ * Wer hat `saveId` urspruenglich angelegt? Direkter, ungecachter SQLite-Read auf dieselbe Spalte,
+ * die `save-repository.ts` beim Anlegen schreibt (`created_by`, siehe `tests/save-created-by.test.ts`)
+ * — dasselbe Zugriffsmuster wie `room-persistence.ts` (`getDatabase()` direkt statt ueber die
+ * Persistence-Fassade), weil `getSaveById()`/`PersistedSaveGame` diese Spalte NICHT mitfuehrt
+ * (`loadSaveRow` selektiert sie nicht — nur `listSaves()` tut das, und das ist fuer einen
+ * Schreibvorgang je Team zu teuer). `null`, wenn die Spalte leer ist (Alt-Save von vor der Spalte
+ * oder ohne Login angelegt) — Befund B3 unten greift dann bewusst nicht.
+ */
+function resolveSaveCreatedByOwnerId(saveId: string): string | null {
+  const database = getDatabase();
+  const row = database.prepare(`SELECT created_by FROM saves WHERE save_id = ?`).get(saveId) as
+    | { created_by?: string | null }
+    | undefined;
+  return row?.created_by ? row.created_by : null;
+}
+
 function authorizeLocalSingleplayerTeamWrite(input: ServerRoomWriteContext, warnings: string[]): ServerRoomWriteAuthorization {
   if (HOST_LEVEL_ACTIONS.has(input.action)) {
     return {
@@ -128,7 +146,32 @@ function authorizeLocalSingleplayerTeamWrite(input: ServerRoomWriteContext, warn
   }
 
   const activeOwnerId = input.activeOwnerId?.trim() || DEFAULT_ACTIVE_OWNER_ID;
-  if (!canFoundationLocalUserManageTeam(canLocalUserManageTeam(save.gameState, input.teamId, activeOwnerId))) {
+  const ownsAsResolvedIdentity = canLocalUserManageTeam(save.gameState, input.teamId, activeOwnerId);
+
+  // BEFUND B3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md), Regression aus Stufe 0.3: `lib/game/new-game-
+  // setup-service.ts` legt jedes Solo-Team (egal wer eingeloggt ist) auf den generischen Standard-
+  // Platz `DEFAULT_ACTIVE_OWNER_ID` ("der eine lokale Mensch", historisch "Chris" genannt) — nicht
+  // auf die reale Sitzungs-`ownerId` des Anlegenden. Mit aktivem Login (`OLY_AUTH_ENABLED=1`) ist
+  // Chris' Sitzungs-ID zufaellig identisch mit diesem Standard-Platz, Frankys nicht
+  // (`franky_remote_placeholder`) — er fiel deshalb selbst in seinem EIGENEN Solo-Save auf jedem
+  // team-bezogenen Schreibvorgang durch `local_team_not_owned_or_ai_controlled`.
+  //
+  // DER FIX GREIFT NUR UNTER DREI BEDINGUNGEN GLEICHZEITIG: (1) die direkte Identitaets-Pruefung
+  // ist bereits gescheitert, (2) das Team haengt WEITERHIN am generischen Standard-Platz (ein Team,
+  // das explizit dem JEWEILS ANDEREN benannten Menschen gehoert — z. B. Frankys Team in Chris'
+  // Save — bleibt exakt so gesperrt wie vorher, siehe `tests/identitaet-kommt-vom-server.test.ts`
+  // Eigenschaft 1), UND (3) `activeOwnerId` ist der URHEBER dieses konkreten Saves
+  // (`created_by`, save-repository.ts) — NICHT irgendeine beliebige zweite Identitaet. Damit
+  // bleibt die Identitaet weiterhin serverseitig aufgeloest (nie aus dem Body, siehe Kommentar an
+  // `activeOwnerId` oben) — es wird nur die Frage "wessen Save ist das" um eine zweite, ebenfalls
+  // serverseitige Quelle ergaenzt.
+  const ownsAsSaveCreatorOnDefaultSlot =
+    !ownsAsResolvedIdentity &&
+    activeOwnerId !== DEFAULT_ACTIVE_OWNER_ID &&
+    canLocalUserManageTeam(save.gameState, input.teamId, DEFAULT_ACTIVE_OWNER_ID) &&
+    resolveSaveCreatedByOwnerId(input.saveId) === activeOwnerId;
+
+  if (!canFoundationLocalUserManageTeam(ownsAsResolvedIdentity || ownsAsSaveCreatorOnDefaultSlot)) {
     return {
       allowed: false,
       status: 403,
@@ -142,7 +185,7 @@ function authorizeLocalSingleplayerTeamWrite(input: ServerRoomWriteContext, warn
     room: null,
     participant: null,
     ownership: null,
-    warnings,
+    warnings: ownsAsSaveCreatorOnDefaultSlot ? [...warnings, "source:local_team_owned_via_save_creator"] : warnings,
   };
 }
 

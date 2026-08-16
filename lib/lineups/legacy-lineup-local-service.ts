@@ -305,9 +305,66 @@ function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: Lega
 }
 
 /**
+ * Loest `season`/`matchday` (inkl. `matchday.status`) und `matchdayContract` aus dem AKTUELLEN
+ * `normalizedGameState` auf — die EINE Rechenstelle dafuer, von Cache-Treffer UND Cache-Aufbau
+ * gleichermassen benutzt (Befund B4, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Stufe 2.3 nachgezogen).
+ *
+ * WARUM DIESE DREI FELDER NICHT AUS DEM CACHE-WERT KOMMEN DUERFEN: `buildSharedLineupContextBaseCacheKey`
+ * enthaelt weder `matchdayState.status` noch `seasonState.disciplineSchedule` — ein Spieltag, der
+ * waehrend die uebrigen Schluessel-Groessen (Roster/Spieler/Disziplinen/Formkarten/Team-Powers/
+ * -Einrichtungen) unveraendert bleiben den Status wechselt (z. B. Sperren/Freigeben beim
+ * Sammel-Speichern, Stufe 2.1), traf bislang bis zu `SHARED_LINEUP_CONTEXT_BASE_CACHE_TTL_MS` lang
+ * auf einen Cache-Treffer, der noch den ALTEN Status/Contract auslieferte — derselbe Fehler wie bei
+ * `existingDraft`/`teamStatus`/`context.gameState` (siehe Kommentar an `getSharedLineupContextBase`
+ * unten), hier nur uebersehen, weil `matchday`/`matchdayContract` Teil des gecachten WERTS sind,
+ * nicht separat nachgeschaerft wurden.
+ *
+ * `requiredDisciplineIds`/`rankDisciplineIds` (und alles, was darauf aufbaut: Score-Map, Gewichte,
+ * Rangtabelle) bleiben BEWUSST aus dem Cache-Wert — die haengen an `disciplineSchedule` nur
+ * mittelbar (welche Disziplin an diesem Spieltag laeuft), und diese Zuordnung steht fuer die
+ * gesamte Saison fest, sobald sie einmal generiert ist. Sie neu aufzuloesen wuerde den teuren Teil
+ * des Caches wieder entwerten, den Stufe 2.3 gerade erst geteilt hat.
+ */
+function resolveFreshMatchdayContext(
+  normalizedGameState: GameState,
+  params: LegacyLineupKeyParams,
+): Pick<SharedLineupContextBase, "season" | "matchday" | "matchdayContract"> | null {
+  const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
+  const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
+  const scheduleEntry =
+    season && matchdayIndex >= 0 ? getSeasonDisciplineScheduleEntry(normalizedGameState, params.matchdayId) : null;
+  const matchday =
+    season && matchdayIndex >= 0
+      ? {
+          id: params.matchdayId,
+          seasonId: params.seasonId,
+          index: matchdayIndex + 1,
+          label: scheduleEntry?.matchdayLabel ?? `Spieltag ${matchdayIndex + 1}`,
+          fixtureIds: [],
+          status:
+            normalizedGameState.matchdayState.matchdayId === params.matchdayId ? normalizedGameState.matchdayState.status : "planning",
+        }
+      : null;
+
+  if (!season || !matchday) {
+    return null;
+  }
+
+  const matchdayContract = buildMatchdayLineupContract({
+    season,
+    matchday,
+    disciplines: normalizedGameState.disciplines,
+    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+  });
+
+  return { season, matchday, matchdayContract };
+}
+
+/**
  * Ein Cache-Treffer teilt sich die TEUREN, tatsaechlich invarianten Teile (Rangtabelle, Score-Map,
  * Spieler-/Kader-Karten, Gewichte) — `normalizedGameState` selbst gehoert NICHT dazu (siehe
  * Kommentar an `sharedLineupContextBaseCache`) und wird deshalb bei JEDEM Treffer frisch gebaut.
+ * Ebenso `season`/`matchday`/`matchdayContract` — siehe `resolveFreshMatchdayContext`.
  *
  * Ohne dieses Nachschaerfen wuerde jeder Verbraucher, der ueber `context.gameState` liest
  * (Moral-/Kapitaens-Aufloesung beim Resolve, `existingDraft`, `teamStatus`), nach einem
@@ -335,34 +392,29 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     sharedLineupContextBaseCache.delete(cacheKey);
     cached.lastAccessMs = now;
     sharedLineupContextBaseCache.set(cacheKey, cached);
+    const normalizedGameStateOnHit = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
+    // Befund B4: `matchday`/`matchdayContract` muessen bei JEDEM Treffer neu aufgeloest werden,
+    // nicht aus `cached.value` uebernommen — siehe Kommentar an `resolveFreshMatchdayContext`.
+    const freshMatchdayContext = resolveFreshMatchdayContext(normalizedGameStateOnHit, params);
+    if (!freshMatchdayContext) {
+      return null;
+    }
     return {
       ...cached.value,
-      normalizedGameState: withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId),
+      normalizedGameState: normalizedGameStateOnHit,
+      season: freshMatchdayContext.season,
+      matchday: freshMatchdayContext.matchday,
+      matchdayContract: freshMatchdayContext.matchdayContract,
     };
   }
   sharedLineupContextBaseCacheStats.misses += 1;
 
   const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
-  const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
-  const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
-  const scheduleEntry =
-    season && matchdayIndex >= 0 ? getSeasonDisciplineScheduleEntry(normalizedGameState, params.matchdayId) : null;
-  const matchday =
-    season && matchdayIndex >= 0
-      ? {
-          id: params.matchdayId,
-          seasonId: params.seasonId,
-          index: matchdayIndex + 1,
-          label: scheduleEntry?.matchdayLabel ?? `Spieltag ${matchdayIndex + 1}`,
-          fixtureIds: [],
-          status:
-            normalizedGameState.matchdayState.matchdayId === params.matchdayId ? normalizedGameState.matchdayState.status : "planning",
-        }
-      : null;
-
-  if (!season || !matchday) {
+  const freshMatchdayContext = resolveFreshMatchdayContext(normalizedGameState, params);
+  if (!freshMatchdayContext) {
     return null;
   }
+  const { season, matchday, matchdayContract } = freshMatchdayContext;
 
   const playersById = new Map(normalizedGameState.players.map((player) => [player.id, player] as const));
   const rosterEntriesByTeamId = new Map<string, RosterEntry[]>();
@@ -376,12 +428,6 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
   }
 
   const lineupContract = buildLineupDisciplineContract(normalizedGameState.disciplines);
-  const matchdayContract = buildMatchdayLineupContract({
-    season,
-    matchday,
-    disciplines: normalizedGameState.disciplines,
-    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
-  });
   const requiredDisciplineIds = [matchdayContract.discipline1?.disciplineId, matchdayContract.discipline2?.disciplineId].filter(
     (value): value is string => Boolean(value),
   );

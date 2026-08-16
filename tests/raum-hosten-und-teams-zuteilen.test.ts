@@ -6,6 +6,7 @@ import {
   createRoom,
   getRoom,
   joinRoom,
+  recordRoomGameplayWrite,
   setParticipantReadyState,
   startRoom,
 } from "@/lib/room/room-store";
@@ -186,6 +187,82 @@ describe("Raum hosten und Teams zuteilen", () => {
     });
     expect(afterMatchday.ok).toBe(true);
   }, 120_000);
+
+  it(
+    "erlaubt Umverteilen wieder, sobald der naechste Spieltag begonnen hat -- obwohl arenaSyncState nie auf 'idle' zurueckgesetzt wird (Befund B1)",
+    () => {
+      // Befund B1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md), selbst nachgeprueft: `recordRoomGameplayWrite`
+      // setzt `arenaSyncState.status` beim Buchen eines Spieltags auf "result_applied" -- und NIE
+      // wieder zurueck auf "idle" (Kommentar an `matchesArenaScope`, arena-sync-state.ts). Ein reiner
+      // `status !== "idle"`-Vergleich waere damit ab dem ERSTEN gebuchten Spieltag fuer den Rest des
+      // Raums dauerhaft wahr -- die Umverteilung waere fuer immer gesperrt, nicht nur waehrend des
+      // laufenden Spieltags. Dieser Test bucht einen ECHTEN Spieltag ueber denselben Produktionspfad
+      // (`recordRoomGameplayWrite`), zieht den Raum dann zum naechsten Spieltag weiter (wie
+      // `advanceRoomFlow` es taete) und haelt fest: NOCH auf demselben Spieltag bleibt die Sperre
+      // stehen, NACH dem Weiterziehen faellt sie wieder -- ohne dass irgendwer `arenaSyncState`
+      // manuell zurueckgesetzt haette.
+      const persistence = createFakePersistence();
+      const created = createRoom("socket-b1-a", { displayName: "Chris" });
+      const joined = joinRoom(created.room.roomCode, "socket-b1-b", { displayName: "Franky" });
+      expect(joined.ok).toBe(true);
+      if (!joined.ok) return;
+
+      expect(setParticipantReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+      expect(setParticipantReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+      const started = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
+      expect(started.ok).toBe(true);
+      if (!started.ok) return;
+
+      const saveId = started.room.state.multiplayerRoom.saveId;
+      const matchdayBeimBuchen = started.room.state.multiplayerRoom.activeMatchday;
+
+      // Spieltag EINS real buchen -- derselbe Pfad, den ein Spieltags-Ergebnis-Apply nimmt
+      // (room-store.ts, `recordRoomGameplayWrite`).
+      const booked = recordRoomGameplayWrite({
+        roomCode: created.room.roomCode,
+        saveId,
+        action: "matchday_resolve",
+        eventType: "matchday_applied",
+      });
+      expect(booked.ok).toBe(true);
+      if (!booked.ok) return;
+      expect(booked.room.state.arenaSyncState.status).toBe("result_applied");
+      expect(booked.room.state.arenaSyncState.matchdayId).toBe(String(matchdayBeimBuchen));
+
+      // NOCH auf demselben Spieltag (activeMatchday unveraendert, nur der Flow-Schritt zeigt schon
+      // auf die Rueckschau) -- die Sperre muss stehen bleiben.
+      const room = getRoom(created.room.roomCode);
+      expect(room).toBeTruthy();
+      if (!room) return;
+      room.state = { ...room.state, roomFlowState: { ...room.state.roomFlowState, step: "standings" } };
+      const nochGleicherSpieltag = applyRoomTeamSelection(created.room.roomCode, created.seat.seatToken, {
+        chrisTeamIds: ["D-L"],
+        frankyTeamIds: ["N-N"],
+      });
+      expect(nochGleicherSpieltag.ok, "direkt nach dem Buchen, noch auf demselben Spieltag, muss die Sperre stehen bleiben").toBe(false);
+
+      // Jetzt zum naechsten Spieltag weiterziehen -- exakt das, was `advanceRoomFlow` an
+      // `multiplayerRoom.activeMatchday` tut. `arenaSyncState` bleibt UNVERAENDERT auf
+      // "result_applied" fuer den ALTEN Spieltag stehen -- niemand setzt es zurueck.
+      const arenaSyncStateVorher = room.state.arenaSyncState;
+      room.state = {
+        ...room.state,
+        multiplayerRoom: { ...room.state.multiplayerRoom, activeMatchday: matchdayBeimBuchen + 1 },
+      };
+      expect(room.state.arenaSyncState).toBe(arenaSyncStateVorher);
+      expect(room.state.arenaSyncState.status).toBe("result_applied");
+
+      const naechsterSpieltag = applyRoomTeamSelection(created.room.roomCode, created.seat.seatToken, {
+        chrisTeamIds: ["D-L"],
+        frankyTeamIds: ["N-N"],
+      });
+      expect(
+        naechsterSpieltag.ok,
+        "nach dem Weiterziehen zum naechsten Spieltag muss Umverteilen wieder erlaubt sein, obwohl arenaSyncState nie auf idle zurueckgesetzt wurde",
+      ).toBe(true);
+    },
+    120_000,
+  );
 
   it("verweigert einem Nicht-Host jede Umverteilung, auch zwischen Spieltagen", () => {
     const persistence = createFakePersistence();
