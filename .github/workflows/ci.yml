@@ -90,35 +90,43 @@ jobs:
       # SELBST (ueber echte Aufstellungen aller 32 Liga-Teams, per Sammelroute erzeugt), sodass auch
       # der `maxSlotRevealCountByDiscipline`-Wert im Sync-Pfad echt ist, nicht geraten.
       #
-      # STAND 16.08.2026 — NOCH NICHT AKTIV, und diesmal aus einem anderen Grund als vorher.
-      # Der alte Blocker (B3) IST behoben. Beim Nachmessen von Hand faellt der Test jetzt an einer
-      # Stelle, die er vorher nie erreicht hat:
+      # STAND 16.08.2026 — JETZT AKTIV. Der alte Blocker (B3) war schon behoben. Der neuere
+      # ("ai-preview lieferte keine entries fuer D-P … incomplete_roster") lag NICHT dort, wo die
+      # erste Einschaetzung vermutete: nicht nur die acht menschlichen Teams (Chris/Franky) fehlte
+      # ein Kader, sondern der GESAMTEN 32-Team-Liga — nachgemessen an einer frischen Kopie des
+      # isolierten E2E-Saves: 30/32 Teams mit exakt 0 Rosterspielern. Grund: der isolierte Save
+      # kommt aus `bootstrapSingleplayerSave()` (lib/persistence/persistence-service.ts) — anders
+      # als der "Neues Spiel"-Assistent (app/api/new-game/route.ts:88, `kickoffLeagueSetupDraft`)
+      # laesst dieser Bootstrap-Pfad die Liga unbespielt, unabhaengig von Solo/Koop oder
+      # Mensch/KI-Steuerung.
       #
-      #     Error: ai-preview lieferte keine entries fuer D-P … "status":"incomplete_roster"
+      # Fix: `ensureLeagueRostersPlayable` in scripts/smoke-multiplayer-e2e.ts besorgt VOR den
+      # Aufstellungen (`ensureFullLeagueLineupReadiness`) einen echten Kader fuer alle 32 Teams —
+      # der Host (Chris) draftet KI-Teams + seine eigenen 4 ueber `/api/ai/picks-run` (host-level,
+      # scope-begrenzt durch `resolveAiBulkTeamWriteScope`), Franky kauft seine 4 Teams manuell
+      # ueber `/api/transfermarkt/buy` (kein KI-Weg fuer ein fremdes Menschen-Team erreichbar —
+      # Sicherheitsregel, kein Bug). Exakt das Muster aus `scripts/audit-koop-spielbarkeit.ts`
+      # ("A2c"/"A2d"), keine neue Mechanik erfunden. Ausserdem oeffnet die jetzt echte Saison-1-
+      # Situation zum ersten Mal das Season-Briefing-Modal ueber der Arena-Buehne
+      # (`shouldAutoOpenSeasonBriefing`) — `openFoundationArenaPage` schliesst es jetzt ("Später"),
+      # bevor es den `arena-prematch-start-cta`-Klick blockiert.
       #
-      # `D-P` ist eines von Chris' eigenen Teams (CHRIS_ONLINE_4V4_TEAM_IDS,
-      # lib/game/new-game-setup-service.ts:107). Menschliche Teams werden vom Liga-Draft BEWUSST
-      # ausgeschlossen (`excludeTeamIds` in room-store.ts's `kickoffLeagueSetupDraft`), damit der
-      # Mensch seinen Kader selbst baut. In einem frisch gestarteten Koop-Raum haben die
-      # menschlichen Teams also keinen ausreichenden Kader — waehrend das Arena-Tor „Vor dem
-      # Anpfiff" verlangt, dass ALLE 32 Teams aufstellen koennen. Der Test kann das Gate deshalb
-      # gar nicht erfuellen.
+      # Fuenfmal gruen verifiziert: dreimal vom bauenden Agenten, zweimal unabhaengig nachgemessen
+      # (~3:50 min pro Lauf, davon ~3 min fuer den Kader-Schritt).
       #
-      # KORREKTUR ZUR ERSTEN EINSCHAETZUNG: das ist KEIN Koop-Fehler. Der Solo-Weg macht es
-      # identisch — `app/api/new-game/route.ts:83-92` schliesst jedes menschliche Team vom Draft
-      # aus, mit der ausdruecklichen Begruendung „those players draft their own squad". Beide Modi
-      # erwarten, dass der Mensch seinen Kader selbst kauft; im Raum-Flow steht dafuer der Schritt
-      # `buy_players` VOR `lineup` und `arena` (room-flow-controller.ts:72).
+      # WICHTIGE EINSCHRAENKUNG, selbst gemessen — und sie ist eine FOLGE UNSERER EIGENEN STUFE 0.1:
+      # der erste unabhaengige Lauf fiel mit `room_state_timeout:ready-chris:formcards` um. Ursache
+      # waren 11 Raeume, die aus frueheren Laeufen in der `rooms`-Tabelle lagen. Vor der
+      # Raum-Persistenz raeumte ein Serverneustart die weg; seit sie in der Datenbank stehen,
+      # sammeln sie sich ueber Laeufe hinweg an — der Test schliesst seinen Raum nicht. Nach dem
+      # Leeren der Tabelle lief derselbe Test zweimal hintereinander sauber durch.
       #
-      # Die Luecke liegt also im TEST: er ueberspringt die Kaufphase und will direkt in die Arena.
-      # Zu beheben ist das im Smoke (Kader fuer die acht menschlichen Teams besorgen, bevor die
-      # Aufstellungen geschrieben werden) — nicht im Spiel. Bis dahin bleibt der Schritt aus, weil
-      # er sonst jeden Pull Request roetet.
-      #
-      # Alles andere aus Stufe 4 ist drin und wirkt: der Test SELBST ist repariert (echte
-      # Etappenzahlen statt `{d1:2,d2:2}`, Chromium-Pfad, Liga-Aufstellungen ueber die
-      # Sammelroute), und der flackernde Aufstellungstest ist an der Wurzel behoben.
-      # - run: npm run app:smoke-multiplayer-e2e -- --no-start
+      # Fuer DIESES Tor ohne Wirkung: der CI-Job setzt `OLY_APP_SQLITE_PATH` auf eine frische
+      # Datei je Lauf (siehe „Set CI SQLite path" oben), es kann sich also nichts ansammeln. Wer
+      # den Test aber LOKAL mehrfach fahren will, muss die `rooms`-Tabelle zwischendurch leeren —
+      # oder besser: der Test sollte seinen Raum am Ende ueber `closeRoom` (Stufe 0.4) schliessen.
+      # Das waere die saubere Loesung und ist noch nicht gebaut.
+      - run: npm run app:smoke-multiplayer-e2e -- --no-start
       - name: Stop dev server
         if: always()
         run: kill "$(cat .dev-server.pid)" 2>/dev/null || true

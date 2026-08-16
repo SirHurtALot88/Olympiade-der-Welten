@@ -16,6 +16,7 @@ import type {
 import type { OlyRoomState } from "@/types/game";
 import { ROOM_FLOW_STEPS } from "@/lib/room/room-flow-controller";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 
 type JsonObject = Record<string, any>;
 type OlySocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -73,6 +74,17 @@ async function fetchJson(baseUrl: string, pathname: string): Promise<JsonObject>
     throw new Error(`GET ${pathname} failed: ${response.status} ${text.slice(0, 200)}`);
   }
   return body;
+}
+
+async function postJson(baseUrl: string, pathname: string, payload: JsonObject): Promise<{ status: number; body: JsonObject }> {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  return { status: response.status, body };
 }
 
 async function isServerReachable(baseUrl: string) {
@@ -147,6 +159,21 @@ function waitForJoined(socket: OlySocket, trigger: () => void) {
     });
     trigger();
   });
+}
+
+/**
+ * Selbstheilung fuer eine unfreiwillige Server-seitige "offline"-Markierung (403
+ * `participant_offline`) waehrend der CPU-lastigen Kader-Befuellung weiter unten — genau das
+ * Muster aus `scripts/audit-koop-spielbarkeit.ts` (`rejoinChris`/`rejoinFranky`): ein langer,
+ * synchron rechnender Liga-Draft- oder Kauf-Chunk kann die Event-Loop lang genug blockieren,
+ * dass ein Socket.io-Heartbeat verhungert. Der Client-Socket reconnectet sich selbst (Default),
+ * hier wird nur der App-seitige Rejoin (Sitz wieder als "online" eintragen) nachgeholt.
+ */
+async function rejoinParticipant(socket: OlySocket, roomCode: string, seatToken: string) {
+  if (!socket.connected) {
+    await waitForSocketConnect(socket);
+  }
+  await waitForJoined(socket, () => socket.emit("rejoinRoom", { roomCode, seatToken }));
 }
 
 function waitForState(socket: OlySocket, predicate: (state: OlyRoomState) => boolean, label: string) {
@@ -253,6 +280,20 @@ async function openFoundationArenaPage(
   // aber durch die Discipline-Stage-Arena ersetzt wurde (app/foundation/discipline-stage/arena/
   // DisciplineStageNativeArena.tsx) - "arena-stage" ist deren aktueller Container.
   await page.getByTestId("arena-stage").waitFor({ timeout: 90_000 });
+
+  // Neuer Befund (dieser Lauf, nach `ensureLeagueRostersPlayable`): seit die Liga echte Kader hat,
+  // ist Spieltag 1 dieser Saison zum ERSTEN Mal ueberhaupt eine echte Saison mit currentMatchday<=1
+  // - `shouldAutoOpenSeasonBriefing` (lib/foundation/game-flow-controller.ts:939-969) oeffnet dafuer
+  // automatisch das Season-Briefing-Modal (`season-briefing-backdrop`, FoundationShellRouterBody.tsx)
+  // ÜBER der ganzen Buehne. Ohne diesen Save mit vorher leeren Rostern kam kein Lauf je bis hierher,
+  // der Blocker war also unsichtbar. Das Modal faengt Klicks per `pointer-events` ab (das brachte
+  // den vorherigen Lauf 30s lang auf `arena-prematch-start-cta` zum Timeout) - "Später" schliesst
+  // es ueber genau den App-eigenen Weg (`closeSeasonBriefing(false)`), kein Force-Klick noetig.
+  const seasonBriefingBackdrop = page.getByTestId("season-briefing-backdrop");
+  if (await seasonBriefingBackdrop.isVisible().catch(() => false)) {
+    await page.getByRole("button", { name: "Später" }).first().click();
+    await seasonBriefingBackdrop.waitFor({ state: "detached", timeout: 10_000 });
+  }
 }
 
 async function screenshot(page: Page, name: keyof typeof SCREENSHOTS) {
@@ -386,6 +427,147 @@ async function ensureIsolatedMultiplayerE2ESave(baseUrl: string) {
 }
 
 /**
+ * Besorgt der ganzen 32-Team-Liga einen echten Kader, BEVOR `ensureFullLeagueLineupReadiness`
+ * versucht, daraus eine Aufstellung abzuleiten — ohne Kader liefert `ai-preview` fuer jedes
+ * betroffene Team `entries: []`, und genau daran scheiterte dieses Skript reproduzierbar
+ * ("ai-preview lieferte keine entries fuer D-P").
+ *
+ * Befund, nachgemessen an einer frischen Kopie GENAU dieses isolierten Saves (nicht vermutet):
+ * NICHT nur die acht menschlichen Teams sind ohne Kader, wie die urspruengliche Diagnose annahm
+ * ("D-P ist eines von Chris' eigenen Teams, Menschen draften selbst") — 30 von 32 Teams stehen
+ * bei GENAU 0 Rosterspielern, die uebrigen zwei (P-S, M-M) bei genau 1 uebrig gebliebenem
+ * Seed-Spieler. Grund: `ensureIsolatedMultiplayerE2ESave` snapshotet `bootstrapSingleplayerSave()`
+ * (lib/persistence/persistence-service.ts) — anders als der "Neues Spiel"-Assistent
+ * (app/api/new-game/route.ts:88, `kickoffLeagueSetupDraft`) laesst dieser Bootstrap-Pfad die
+ * gesamte Liga unbespielt. Deckt sich mit dem A2b-Befund in `scripts/audit-koop-spielbarkeit.ts`
+ * (dort fuer `createRoomCoopSave`-Saves, hier fuer den Bootstrap-Pfad — derselbe fehlende
+ * Draft-Aufruf, zwei verschiedene Save-Quellen). Die urspruengliche Diagnose war also nur zur
+ * Haelfte richtig: D-P fehlt der Kader nicht NUR, weil es ein Chris-Team ist, sondern weil hier
+ * gar kein Team einen hat — Chris' Teams sind bloss die, an denen es zuerst auffiel (die AI-Teams
+ * werden erst spaeter im Skript ueberhaupt angefasst).
+ *
+ * Gewaehlter Weg (am wenigsten Neues erfunden, zwei Alternativen bewusst NICHT genommen):
+ *  - NICHT `app/api/ai/roster-fill/route.ts`: `runAutoRosterFillForMatchdaySetup`
+ *    (lib/ai/auto-roster-fill-service.ts:503) verweigert jede `seasonId !== "season-1"` komplett
+ *    (gesperrtes Ergebnis, kein Kauf) — der isolierte Save hier landet zufaellig auf season-1,
+ *    aber dieses Skript soll gegen JEDEN Snapshot des aktiven Saves funktionieren, nicht nur den
+ *    zufaellig ersten.
+ *  - NICHT `kickoffLeagueSetupDraft` (lib/game/league-setup-draft-service.ts): fuer eine BRANDNEUE
+ *    Liga gedacht (asynchroner Hintergrund-Draft mit eigenem Status-Polling-Vertrag) und schliesst
+ *    menschlich gesteuerte Teams per Konstruktion IMMER aus (`excludeTeamIds`, siehe new-game/
+ *    route.ts:87) — exakt das Gegenteil dessen, was hier fuer Chris/Franky gebraucht wird.
+ *  - Stattdessen exakt das Muster aus `scripts/audit-koop-spielbarkeit.ts` ("A2c"/"A2d"): der HOST
+ *    (Chris) draftet ueber `/api/ai/picks-run` — host-level (HOST_LEVEL_ACTIONS,
+ *    server-authoritative-write-guard.ts:65-84), `resolveAiBulkTeamWriteScope`
+ *    (ai-bulk-team-write-scope.ts) begrenzt den Lauf serverseitig auf AI-Teams plus die EIGENEN
+ *    4 Teams des Aufrufers — in 4er-Haeppchen wie im Audit-Skript, weil ein einzelner Lauf ueber
+ *    28 Teams synchron lange genug rechnet, um Socket-Heartbeats verhungern zu lassen (siehe
+ *    `rejoinParticipant` oben). Frankys 4 Teams bleiben fuer `picks-run` unerreichbar (host-level
+ *    Aktionen ruehren nie ein fremdes Menschen-Team an — das ist die Sicherheitsregel, nicht ein
+ *    Bug) — die kauft er manuell ueber `/api/transfermarkt/buy`, der einzige verbliebene App-Weg
+ *    fuer ein Gast-Team (siehe C16-Befund im Audit-Skript: `picks-run` weist den Gast mit 403
+ *    `host_only_action` ab).
+ *
+ * Empirisch gemessen (lokal gegen `npm run start`, isolierter Save wie im echten Lauf): Host-Draft
+ * der 28 Teams (24 KI + eigene 4) in 7 Haeppchen ~100s, Gast-Kauf der 4 Franky-Teams (32 Spieler
+ * bis Mindestkadergroesse) ~72s — knapp 3 Minuten zusaetzliche Laufzeit, aber ohne diesen Schritt
+ * kommt das Skript nie ueber `ai-preview` hinaus.
+ */
+async function ensureLeagueRostersPlayable(input: {
+  baseUrl: string;
+  saveId: string;
+  seasonId: string;
+  roomCode: string;
+  hostSocket: OlySocket;
+  guestSocket: OlySocket;
+  chris: JsonObject;
+  chrisSeat: string;
+  franky: JsonObject;
+  frankySeat: string;
+  aiTeamIds: string[];
+}) {
+  const { baseUrl, saveId, seasonId, roomCode, hostSocket, guestSocket, chris, chrisSeat, franky, frankySeat, aiTeamIds } = input;
+
+  // Host: AI-Teams + eigene 4, in 4er-Haeppchen (siehe Kommentar oben).
+  const hostDraftTeamIds = [...aiTeamIds, ...(chris.controlledTeamIds as string[])];
+  for (let index = 0; index < hostDraftTeamIds.length; index += 4) {
+    const chunk = hostDraftTeamIds.slice(index, index + 4);
+    const runOnce = () =>
+      postJson(
+        baseUrl,
+        `/api/ai/picks-run?saveId=${encodeURIComponent(saveId)}&seasonId=${encodeURIComponent(seasonId)}&source=sqlite`,
+        {
+          dryRun: false,
+          confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+          teamScope: "all",
+          teamIds: chunk,
+          allowSetupAllTeams: true,
+          includeManualTeams: true,
+          roomCode,
+          participantId: chris.participantId,
+          seatToken: chrisSeat,
+          userId: chris.userId,
+        },
+      );
+    let draft = await runOnce();
+    if (draft.status === 403 && JSON.stringify(draft.body).includes("participant_offline")) {
+      await rejoinParticipant(hostSocket, roomCode, chrisSeat);
+      draft = await runOnce();
+    }
+    if (draft.status !== 200) {
+      throw new Error(
+        `Liga-Kader-Draft (Host) fuer ${chunk.join(",")} fehlgeschlagen: status=${draft.status} ` +
+          `error=${JSON.stringify(draft.body?.error ?? draft.body).slice(0, 300)}`,
+      );
+    }
+  }
+
+  // Gast: eigene 4 Teams manuell zusammenkaufen (kein KI-Weg erreichbar, siehe Kommentar oben).
+  for (const teamId of franky.controlledTeamIds as string[]) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const freeAgents = await fetchJson(
+        baseUrl,
+        `/api/transfermarkt/free-agents?saveId=${encodeURIComponent(saveId)}&seasonId=${encodeURIComponent(seasonId)}` +
+          `&teamId=${encodeURIComponent(teamId)}&limit=40`,
+      );
+      const items: JsonObject[] = freeAgents.items ?? [];
+      const rosterCount: number = items[0]?.rosterCount ?? 0;
+      const playerMin: number = items[0]?.playerMin ?? 6;
+      if (rosterCount >= Math.max(playerMin, 6)) break;
+      const kandidat = [...items]
+        .filter((item) => item.affordabilityStatus !== "blocked")
+        .sort((a, b) => (a.marketValue ?? 0) - (b.marketValue ?? 0))[0];
+      if (!kandidat) {
+        throw new Error(`Kein bezahlbarer Free Agent fuer ${teamId} (items=${items.length}).`);
+      }
+      const runOnce = () =>
+        postJson(baseUrl, "/api/transfermarkt/buy", {
+          saveId,
+          seasonId,
+          teamId,
+          playerId: kandidat.playerId,
+          dryRun: false,
+          roomCode,
+          participantId: franky.participantId,
+          seatToken: frankySeat,
+          userId: franky.userId,
+        });
+      let kauf = await runOnce();
+      if (kauf.status === 403 && JSON.stringify(kauf.body).includes("participant_offline")) {
+        await rejoinParticipant(guestSocket, roomCode, frankySeat);
+        kauf = await runOnce();
+      }
+      if (kauf.status !== 200 || kauf.body?.success !== true) {
+        throw new Error(
+          `Kauf fuer ${teamId} (${kandidat.playerId}) fehlgeschlagen: status=${kauf.status} ` +
+            `error=${JSON.stringify(kauf.body?.error ?? kauf.body).slice(0, 300)}`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * Befund (dieser Lauf): die Discipline-Stage-Arena zeigt statt der NativeArena (und damit statt
  * `arena-coop-status`) den Vorschau-Screen "Vor dem Anpfiff", solange
  * `getMatchdayLeagueLineupReadiness` nicht ALLE 32 Liga-Teams als bereit meldet
@@ -505,6 +687,28 @@ async function main() {
     if (!currentMatchdayId) {
       throw new Error(`Kein matchdayId auf dem isolierten Save ${saveId} gefunden.`);
     }
+
+    // Siehe Kommentar an `ensureLeagueRostersPlayable`: der isolierte Save startet mit einer
+    // komplett unbespielten Liga (0 Rosterspieler fuer praktisch jedes Team), nicht nur ohne
+    // Kader fuer Chris/Franky. Muss VOR `ensureFullLeagueLineupReadiness` laufen — ohne Kader
+    // liefert `ai-preview` fuer jedes betroffene Team `entries: []`.
+    const aiTeamIds = state.teamOwnership
+      .filter((entry) => entry.controllerType === "ai")
+      .map((entry) => entry.teamId);
+    await ensureLeagueRostersPlayable({
+      baseUrl: options.baseUrl,
+      saveId,
+      seasonId: state.roomFlowState.activeSeasonId,
+      roomCode,
+      hostSocket: socketA,
+      guestSocket: socketB,
+      chris,
+      chrisSeat: created.seatToken,
+      franky,
+      frankySeat: joined.seatToken,
+      aiTeamIds,
+    });
+
     await ensureFullLeagueLineupReadiness({
       baseUrl: options.baseUrl,
       saveId,
