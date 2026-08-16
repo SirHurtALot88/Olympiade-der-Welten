@@ -1,11 +1,10 @@
-import type { CoachRole, OlyRoomState, RoomRealtimeEvent } from "@/types/game";
+import type { CoachRole, OlyRoomState, RoomOwnershipPreset, RoomRealtimeEvent } from "@/types/game";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
-export type RoomOwnershipPreset =
-  | "chris_1_rest_ai"
-  | "chris_2_rest_ai"
-  | "chris_4_rest_ai"
-  | "chris_4_franky_4_rest_ai";
+// Definiert in types/game.ts (dort auch die Begruendung), hier nur weitergereicht — damit die
+// vielen bestehenden Importe aus dieser Datei unveraendert gelten und es EINE Definition gibt.
+// Importiert UND re-exportiert: der Typ wird in dieser Datei selbst noch gebraucht.
+export type { RoomOwnershipPreset };
 
 export type CreateRoomRequest = {
   displayName?: string;

@@ -15,6 +15,20 @@ export type RoomUser = {
   role: RoomParticipantRole;
 };
 
+/**
+ * Die vier Modi, mit denen ein Raum angelegt werden kann.
+ *
+ * STEHT HIER UND NICHT IN types/events.ts, obwohl er dort erklaert wurde: `MultiplayerRoomMeta`
+ * (unten) fuehrt ihn seit Aufgabe #49 mit, und `types/events.ts` importiert bereits aus dieser
+ * Datei — die Gegenrichtung waere ein Ring. `events.ts` reicht ihn unveraendert weiter, damit alle
+ * bestehenden Importe gelten und es weiterhin genau EINE Definition gibt.
+ */
+export type RoomOwnershipPreset =
+  | "chris_1_rest_ai"
+  | "chris_2_rest_ai"
+  | "chris_4_rest_ai"
+  | "chris_4_franky_4_rest_ai";
+
 export type MultiplayerRoomMeta = {
   roomId: string;
   roomCode: string;
@@ -42,6 +56,25 @@ export type MultiplayerRoomMeta = {
    * wirkungslos (siehe Kommentar dort) — das Flag markiert erst die Lobby-Aktion NACH der Anlage.
    */
   ownershipAssignedByHost: boolean;
+  /**
+   * Mit welchem Modus wurde dieser Raum ANGELEGT (`createRoom(..., { preset })`)?
+   *
+   * WOZU, und warum es nicht ohne geht (Aufgabe #49): der Beitritt ist die EINZIGE Stelle, an der
+   * der zweite Sitz ueberhaupt Teams bekommt — beim Anlegen ist er noch nicht da, und
+   * `buildExplicitTeamOwnership` laesst die Teams eines abwesenden Teilnehmers bewusst offen. Beim
+   * Beitritt muss deshalb noch einmal verteilt werden, und dafuer braucht es die Wahl des Hosts
+   * von vorhin. Ohne dieses Feld war sie zu dem Zeitpunkt verloren, und es blieb nur ein fest
+   * verdrahteter 4+4-Vorschlag.
+   *
+   * ABGRENZUNG ZU `ownershipAssignedByHost`: jenes Flag heisst "der Host hat IM RAUM aktiv
+   * zugeteilt" und friert die Zuordnung ein. Ein Preset beim Anlegen darf das NICHT tun — sonst
+   * ueberspringt `joinRoom` die Verteilung, und der Gast bekommt nie Teams (nachgemessen, siehe
+   * den Kommentar an `joinRoom`). Es ist eine gemerkte Absicht, keine erledigte Zuteilung.
+   *
+   * `null` fuer Raeume, die ohne Preset angelegt wurden — und fuer alle Raeume, die vor diesem
+   * Feld entstanden sind und aus der Ablage zurueckkommen.
+   */
+  createdWithPreset?: RoomOwnershipPreset | null;
 };
 
 // A room participant is a real connected browser/user session in an online room.
