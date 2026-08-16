@@ -72,23 +72,46 @@ jobs:
       # `--no-start`, weil der Produktionsserver oben schon laeuft — ohne das startet der Smoke
       # einen zweiten (dev-)Server auf demselben Port.
       - run: npm run app:smoke-coop-sync -- --no-start
-      # TODO(online-mp): Re-enable once the blocker below is fixed.
-      # Der fruehere Blocker ("participant identity restore after a room-page reload") existiert
-      # nicht mehr - er war ein veralteter Text-Selektor ("Participant Franky"), den es auf der
-      # Room-Seite so nie gab; auf data-testid umgestellt und mehrfach lokal gruen verifiziert.
-      # Die Reparatur brachte den 2-Browser-E2E so weit wie nie zuvor (Lobby, Rechtepruefung,
-      # Room-Flow, Ready-Gate, Reload-Persistenz, Arena-Coop-Gate) - und deckte dabei einen
-      # ECHTEN, reproduzierbaren Produktfehler auf, den KEIN Server-Test sieht:
+      # ZWEI-BROWSER-E2E (Stufe 4.1, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md) — seit 11.07.2026 draussen,
+      # jetzt zurueck im Tor. Er ist die EINZIGE Pruefung hier, die zwei echte Playwright-Browser
+      # (Chris + Franky) gegen denselben Room-Socket fuehrt und dabei den kompletten Reveal-Pfad im
+      # DOM anfasst — `app:smoke-coop-sync` daneben bleibt bewusst UI-selektorfrei und sieht diesen
+      # Pfad nicht.
       #
-      # Nachdem der Host im Discipline-Stage-Arena-Reveal weiterschaltet (echter Klick auf
-      # data-testid="arena-primary-step"), zeigt der Gast-Client zwar korrekt "Der Host steuert
-      # den Reveal" an (der Sync-STATUS kommt an) - aber sein eigener Ticker/Reveal-Inhalt bleibt
-      # dauerhaft leer (belegt: >45s Wartezeit, Host-Ticker im selben Moment bereits gefuellt).
-      # Der Gast-Effekt, der `round` an `roomSync.syncedRound` nachziehen soll
-      # (DisciplineStageNativeArena.tsx, `if (roomSync.syncedRound > round) advance();`), scheint
-      # nicht zu feuern oder wirkungslos zu bleiben. Root Cause nicht abschliessend lokalisiert
-      # (Reveal-Engine ist gross und animationslastig) - siehe scripts/smoke-multiplayer-e2e.ts:673
-      # fuer die Zusicherung, die das aufdeckt.
+      # WARUM ER SO LANGE DRAUSSEN WAR: er deckte einen echten Produktfehler auf (Befund B3) — nach
+      # dem Weiterschalten des Hosts im Discipline-Stage-Arena-Reveal blieb der Ticker des Gasts
+      # dauerhaft leer. Ursache (gefunden, Commit 7ea0efa1): beide Aufrufstellen sendeten die
+      # Etappen-Zaehlgrenze hart als `{ d1: 0, d2: 0 }` statt der echten Etappenzahl —
+      # `revealedSlotCount < maxSlotRevealCount` war damit fuer den Gast nie wahr, sein
+      # `slotRevealIndex` blieb für immer 0. Kein Test fing das, weil auch die Smoke-Skripte selbst
+      # nur erfundene Platzhalterwerte sendeten statt der echten, im Client berechneten
+      # (`computeStageSlotCount`) — siehe `ensureFullLeagueLineupReadiness` in
+      # scripts/smoke-multiplayer-e2e.ts fuer den Fix: der Host-Client startet die Arena inzwischen
+      # SELBST (ueber echte Aufstellungen aller 32 Liga-Teams, per Sammelroute erzeugt), sodass auch
+      # der `maxSlotRevealCountByDiscipline`-Wert im Sync-Pfad echt ist, nicht geraten.
+      #
+      # STAND 16.08.2026 — NOCH NICHT AKTIV, und diesmal aus einem anderen Grund als vorher.
+      # Der alte Blocker (B3) IST behoben. Beim Nachmessen von Hand faellt der Test jetzt an einer
+      # Stelle, die er vorher nie erreicht hat:
+      #
+      #     Error: ai-preview lieferte keine entries fuer D-P … "status":"incomplete_roster"
+      #
+      # `D-P` ist eines von Chris' eigenen Teams (CHRIS_ONLINE_4V4_TEAM_IDS,
+      # lib/game/new-game-setup-service.ts:107). Menschliche Teams werden vom Liga-Draft BEWUSST
+      # ausgeschlossen (`excludeTeamIds` in room-store.ts's `kickoffLeagueSetupDraft`), damit der
+      # Mensch seinen Kader selbst baut. In einem frisch gestarteten Koop-Raum haben die
+      # menschlichen Teams also keinen ausreichenden Kader — waehrend das Arena-Tor „Vor dem
+      # Anpfiff" verlangt, dass ALLE 32 Teams aufstellen koennen. Der Test kann das Gate deshalb
+      # gar nicht erfuellen.
+      #
+      # Das ist ein ECHTER Produkt-Befund, kein Testproblem: ein Koop-Spiel ist zwischen
+      # Raumstart und dem ersten Spielerkauf beider Menschen nicht spielbar. Er gehoert eigens
+      # behoben (Erstkader fuer menschliche Teams im Koop) — erst danach traegt dieser Schritt.
+      # Ihn jetzt einzuschalten wuerde jeden Pull Request roeten.
+      #
+      # Alles andere aus Stufe 4 ist drin und wirkt: der Test SELBST ist repariert (echte
+      # Etappenzahlen statt `{d1:2,d2:2}`, Chromium-Pfad, Liga-Aufstellungen ueber die
+      # Sammelroute), und der flackernde Aufstellungstest ist an der Wurzel behoben.
       # - run: npm run app:smoke-multiplayer-e2e -- --no-start
       - name: Stop dev server
         if: always()

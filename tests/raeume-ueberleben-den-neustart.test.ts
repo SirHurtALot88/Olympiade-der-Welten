@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  advanceRoomArenaStep,
   applyRoomTeamSelection,
   closeRoom,
   createRoom,
@@ -9,6 +10,8 @@ import {
   rehydrateRuntimeRoomsFromPersistence,
   rejoinRoom,
   resetRuntimeRoomsForTests,
+  setRoomArenaReadyState,
+  startRoomArenaSync,
 } from "@/lib/room/room-store";
 import { ROOM_EXPIRY_MS, setPersistedRoomUpdatedAtForTests } from "@/lib/room/room-persistence";
 
@@ -81,6 +84,86 @@ describe("Raeume ueberleben den Neustart", () => {
     // Flow-Schritt.
     expect(rehydrated.state.roomFlowState.step).toBe(vorherState.roomFlowState.step);
     expect(rehydrated.state.turnState.currentStep).toBe(vorherState.turnState.currentStep);
+  });
+
+  /**
+   * STUFE 4.3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): die Tests oben decken einen Raum in der
+   * LOBBY ab (Team-Zuordnung, noch kein laufender Spieltag). Chris' Auftrag zielt aber genau auf
+   * den Fall "Raum LAEUFT" — mitten in der gemeinsamen Arena, mit Ready-Haekchen und einem bereits
+   * fortgeschrittenen Reveal-Schritt. `arenaSyncState` ist Teil von `OlyRoomState` und liegt damit
+   * VOLLSTAENDIG im selben `payload_json` wie der Rest (siehe room-persistence.ts) — dieser Test
+   * pinnt, dass ein Neustart mitten im Reveal nicht nur "irgendeinen" Zustand zurueckbringt,
+   * sondern GENAU den Stand, auf dem beide Coaches gerade standen: Status, Etappe, Ready-Liste,
+   * Versionszaehler. Ohne diese Zusicherung waere B1 (Stufe 0.1) nur fuer die Lobby bewiesen, nicht
+   * fuer das Spiel selbst, das Chris tatsaechlich pausiert und fortsetzt.
+   *
+   * KEIN echter Server-Neustart (kein `child_process`/Port-Zyklus) — dieselbe Begruendung wie bei
+   * den Nachbartests oben: `resetRuntimeRoomsForTests()` + `rehydrateRuntimeRoomsFromPersistence()`
+   * IST der Code-Pfad, den `server.ts` beim echten Hochfahren aufruft (siehe dessen Kommentar
+   * "Room-Rehydrierung: ..."); ein echter Prozessneustart in der Testsuite wuerde nur denselben
+   * Pfad ueber einen viel teureren Umweg (neuer Node-Prozess, neuer Socket-Server, echte Ports)
+   * pruefen, ohne eine zusaetzliche Garantie zu gewinnen. Der Zwei-Browser-E2E
+   * (`scripts/smoke-multiplayer-e2e.ts`) deckt den echten Prozess/Socket-Teil separat ab.
+   */
+  it("bringt einen laufenden Reveal (Ready-Haekchen + fortgeschrittener Schritt) unveraendert durch den Neustart", () => {
+    const created = createRoom("socket-restart-arena-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
+    const joined = joinRoom(created.room.roomCode, "socket-restart-arena-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+    const roomCode = created.room.roomCode;
+
+    const started = startRoomArenaSync(roomCode, created.seat.seatToken, {
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      disciplineSide: "d1",
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    // Beide bereit -> Reveal darf laufen; der Host schaltet einen echten Schritt weiter, damit
+    // NICHT nur der Startzustand (slotRevealIndex 0) geprueft wird, sondern ein Stand, der sich
+    // vom "gerade erst gestartet"-Fall unterscheidet.
+    expect(setRoomArenaReadyState(roomCode, created.seat.seatToken, true).ok).toBe(true);
+    expect(setRoomArenaReadyState(roomCode, joined.seat.seatToken, true).ok).toBe(true);
+    const advanced = advanceRoomArenaStep(roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+    });
+    expect(advanced.ok).toBe(true);
+    if (!advanced.ok) return;
+
+    const vorherArena = advanced.room.state.arenaSyncState;
+    expect(vorherArena.status).toBe("revealing");
+    expect(vorherArena.slotRevealIndex).toBeGreaterThan(0);
+
+    resetRuntimeRoomsForTests();
+    expect(getRoom(roomCode)).toBeNull();
+
+    const { restored } = rehydrateRuntimeRoomsFromPersistence();
+    expect(restored).toBeGreaterThanOrEqual(1);
+
+    const rehydrated = getRoom(roomCode);
+    expect(rehydrated).toBeTruthy();
+    if (!rehydrated) return;
+    const nachherArena = rehydrated.state.arenaSyncState;
+
+    expect(nachherArena.status).toBe(vorherArena.status);
+    expect(nachherArena.version).toBe(vorherArena.version);
+    expect(nachherArena.matchdayId).toBe(vorherArena.matchdayId);
+    expect(nachherArena.seasonId).toBe(vorherArena.seasonId);
+    expect(nachherArena.phaseIndex).toBe(vorherArena.phaseIndex);
+    expect(nachherArena.slotRevealIndex).toBe(vorherArena.slotRevealIndex);
+    expect(nachherArena.stepIndex).toBe(vorherArena.stepIndex);
+    expect([...nachherArena.readyParticipantIds].sort()).toEqual([...vorherArena.readyParticipantIds].sort());
+    expect([...nachherArena.requiredParticipantIds].sort()).toEqual([...vorherArena.requiredParticipantIds].sort());
+
+    // Und der Raum bleibt fuer beide bedienbar: der Host darf nach dem Neustart weiter
+    // vorruecken (Sitzplatz-Pruefung findet den Sitz wieder, siehe naechster Test).
+    const nachNeustartAdvance = advanceRoomArenaStep(roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+      force: true,
+    });
+    expect(nachNeustartAdvance.ok).toBe(true);
   });
 
   it("laesst ein Sitzplatz-Token nach dem Rehydrieren weiter gelten (rejoinRoom klappt)", () => {

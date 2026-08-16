@@ -10,6 +10,7 @@ import {
   saveLocalLegacyFormCardPlan,
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
+import { computePositiveFormCardValueForTests } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -605,8 +606,23 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
         .map((card) => playerClassById.get(card.playerId))
         .filter((value): value is string => Boolean(value)),
     );
+    // BEFUND (Stufe 4 — Test-Flackern, gemessen): Der Kartenwert ist deterministisch je
+    // (saveId, seasonId, teamId, playerId), aber einer von vier moeglichen Werten ist `0`
+    // (FORM_CARD_VALUES = [0, 2, 4, 8]) — und `getTeamFormCardOptions` filtert genau die
+    // Nullwert-Karten aus dem UI-Angebot heraus (legacy-lineup-modifiers.ts:592-594). Ein
+    // `.find()`, das den ERSTEN passenden freien Spieler nimmt, traf damit ~1 von 4 Laeufen einen
+    // Kandidaten, dessen "positive" Karte real existiert, aber Wert 0 hat — sie taucht dann NIE im
+    // Dropdown auf, unabhaengig von jeder Testreihenfolge oder geteiltem Zustand. Reproduziert per
+    // Schleife: `npx vitest run tests/legacy-lineup-local-service.test.ts
+    // tests/aufstellungen-fuer-mehrere-teams.test.ts tests/ai-legacy-lineup-batch-apply-service.test.ts`
+    // mehrfach hintereinander faerbte GENAU diesen Test rot, mit einem Nullwert-Kandidaten als
+    // Ursache (nachgewiesen per Debug-Dump). Fix an der Wurzel: nur Kandidaten waehlen, deren
+    // Karte GARANTIERT sichtbar ist (Wert != 0) — kein Verlass mehr auf einen Zufallstreffer.
     const lateJoiner = afterGeneration.gameState.players.find(
-      (player) => !usedPlayerIds.has(player.id) && cardedClassNames.has(player.className),
+      (player) =>
+        !usedPlayerIds.has(player.id) &&
+        cardedClassNames.has(player.className) &&
+        computePositiveFormCardValueForTests(save.saveId, params.seasonId, teamId, player.id) !== 0,
     );
     expect(lateJoiner).toBeTruthy();
     afterGeneration.gameState.rosters.push({

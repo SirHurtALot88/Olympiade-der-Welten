@@ -385,6 +385,82 @@ async function ensureIsolatedMultiplayerE2ESave(baseUrl: string) {
   return { saveId: snapshot.saveId, gameState: scoped.save?.gameState };
 }
 
+/**
+ * Befund (dieser Lauf): die Discipline-Stage-Arena zeigt statt der NativeArena (und damit statt
+ * `arena-coop-status`) den Vorschau-Screen "Vor dem Anpfiff", solange
+ * `getMatchdayLeagueLineupReadiness` nicht ALLE 32 Liga-Teams als bereit meldet
+ * (app/foundation/discipline-stage/DisciplineStageArena.tsx:2394, `arenaStartBlockedByLineups`).
+ * `runRoomAiAutoStep` (Sitz A only in room-store.ts) ist reine Room-Flow-Buchhaltung — es schreibt
+ * NIE eine echte Aufstellung in den Spielstand (Kommentar dort: "NUR den Room-Flow-Schritt frei").
+ * Ohne echte Aufstellungen blieb die Liga bei diesem Skript dauerhaft auf 0/32 stehen und
+ * `arena-coop-status` erschien nie — das Skript hing 30s an `coopStatusA.waitFor` fest, WEIT VOR
+ * dem eigentlich zu pruefenden B3-Pfad (Host-Advance -> Gast-Ticker).
+ *
+ * Das war zum Zeitpunkt der letzten "lokal gruen" Verifikation (siehe Kommentar in ci.yml) noch
+ * kein Blocker — "Vor dem Anpfiff" (app/foundation/discipline-stage/DisciplineStageArena.tsx,
+ * Commit dc124799) kam offenbar erst SPAETER in diesen Pfad. Wie `scripts/audit-koop-spielbarkeit.ts`
+ * (Abschnitt "beideSpielerSetzenAufstellungen") es fuer Chris/Franky bereits vormacht: eine ECHTE
+ * Aufstellung ueber die App selbst abgeben, nicht simulieren. Hier per Stufe-2.1-Sammelroute
+ * (`PUT /api/lineups/legacy/batch`) statt der Einzelroute — EIN Aufruf je Besitzer fuer alle seine
+ * Teams, UND der Aufruf zieht die 24 KI-Teams automatisch nach (`applyAiLegacyLineupBatchLocally`
+ * innerhalb der Route, siehe app/api/lineups/legacy/batch/route.ts:191-209) — kein zusaetzlicher
+ * KI-Aufruf noetig. `confirmLock: true` gleich im ersten Aufruf (Stufe 2.5) macht daraus einen
+ * "locked"-Status, den `isTeamMatchdayLineupSubmitted` als abgegeben zaehlt; dieselbe Route ruft
+ * intern `ensureLocalFormCardsForSeason`, das erfuellt den zweiten Teil des Gates
+ * (Formkarten-POOL vorhanden — Auswahl bleibt optional, siehe form-card-flow.ts:76).
+ *
+ * Bewusst WEITERHIN keine "echten" (spielerisch durchdachten) Aufstellungen — genau wie der Rest
+ * dieses V1-Skripts (siehe `writeAudit.note`), der KI-Vorschlag reicht, um das Gate zu erfuellen.
+ * Was hier geprueft wird, ist der Sync-Pfad (B3), nicht Aufstellungsqualitaet.
+ */
+async function ensureFullLeagueLineupReadiness(input: {
+  baseUrl: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  roomCode: string;
+  owners: Array<{ participant: JsonObject; seatToken: string }>;
+}) {
+  for (const { participant, seatToken } of input.owners) {
+    const basisFor = (teamId: string) =>
+      `saveId=${encodeURIComponent(input.saveId)}&seasonId=${encodeURIComponent(input.seasonId)}` +
+      `&matchdayId=${encodeURIComponent(input.matchdayId)}&teamId=${encodeURIComponent(teamId)}`;
+
+    const teams: JsonObject[] = [];
+    for (const teamId of participant.controlledTeamIds as string[]) {
+      const preview = await fetchJson(input.baseUrl, `/api/lineups/legacy/ai-preview?${basisFor(teamId)}`);
+      const entries = preview.preview?.entries ?? preview.entries ?? [];
+      if (!Array.isArray(entries) || entries.length === 0) {
+        throw new Error(`ai-preview lieferte keine entries fuer ${teamId}: ${JSON.stringify(preview).slice(0, 300)}`);
+      }
+      teams.push({ teamId, entries });
+    }
+
+    const response = await fetch(
+      `${input.baseUrl}/api/lineups/legacy/batch?saveId=${encodeURIComponent(input.saveId)}` +
+        `&seasonId=${encodeURIComponent(input.seasonId)}&matchdayId=${encodeURIComponent(input.matchdayId)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          teams,
+          confirmLock: true,
+          roomCode: input.roomCode,
+          participantId: participant.participantId,
+          userId: participant.userId,
+          seatToken,
+        }),
+      },
+    );
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body.savedCount !== teams.length) {
+      throw new Error(
+        `Batch-Lineup-Speichern fuer ${participant.displayName} fehlgeschlagen: status=${response.status} body=${JSON.stringify(body).slice(0, 500)}`,
+      );
+    }
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   let server: ChildProcessWithoutNullStreams | null = null;
@@ -419,7 +495,34 @@ async function main() {
     assertSameMembers(chris.controlledTeamIds, CHRIS_TEAMS, "Chris teams");
     assertSameMembers(franky.controlledTeamIds, FRANKY_TEAMS, "Franky teams");
 
-    browser = await chromium.launch();
+    // Scoped auf `saveId`, NICHT den global "aktiven" Save: dieses Skript aktiviert seinen
+    // isolierten Save bewusst nicht global (siehe ensureIsolatedMultiplayerE2ESave), also wuerde
+    // eine ungescopte Abfrage hier den FALSCHEN Save lesen. `createRoom` reicht `saveId` unveraendert
+    // durch (room-store.ts:181-186) — `state.multiplayerRoom.saveId` und die hier verwendete
+    // Variable `saveId` sind derselbe Save.
+    const matchdayScope = await fetchJson(options.baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`);
+    const currentMatchdayId = matchdayScope.save?.gameState?.matchdayState?.matchdayId ?? null;
+    if (!currentMatchdayId) {
+      throw new Error(`Kein matchdayId auf dem isolierten Save ${saveId} gefunden.`);
+    }
+    await ensureFullLeagueLineupReadiness({
+      baseUrl: options.baseUrl,
+      saveId,
+      seasonId: state.roomFlowState.activeSeasonId,
+      matchdayId: currentMatchdayId,
+      roomCode,
+      owners: [
+        { participant: chris, seatToken: created.seatToken },
+        { participant: franky, seatToken: joined.seatToken },
+      ],
+    });
+
+    // `PW_EXEC`, wie schon in scripts/smoke-gameplay.ts:576 — lokale Sandboxes stellen unter
+    // /opt/pw-browsers oft eine andere Chromium-Revision bereit, als das installierte
+    // playwright-core erwartet (`chromium.launch()` sucht dann eine Revisions-Ordner-ID, die es
+    // nicht gibt). CI installiert Chromium frisch passend zur Revision (`--with-deps`), dort bleibt
+    // PW_EXEC unset und das Verhalten unveraendert.
+    browser = await chromium.launch({ executablePath: process.env.PW_EXEC || undefined });
     const contextA = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const contextB = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const pageA = await contextA.newPage();
@@ -551,14 +654,9 @@ async function main() {
 
     if (state.roomFlowState.step === "arena") {
       // Die Discipline-Stage-Arena startet den Reveal-Sync nur, wenn `getMatchdayLeagueLineupReadiness`
-      // fuer ALLE 32 Liga-Teams "bereit" meldet (echte Aufstellung + Formkarten). Dieses V1-Skript
-      // schreibt - wie schon fuer sell/buy/facilities/training/lineup/formcards weiter oben - bewusst
-      // KEINE echten Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber
-      // echte Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
-      // unabhaengig (das Gate lebt rein im Client-Effect, siehe DisciplineStageArena.tsx), genau wie es
-      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert — hier wird
-      // derselbe Weg genommen, um die Arena fuer den DOM-Teil dieses Tests ueberhaupt erreichbar zu
-      // machen.
+      // fuer ALLE 32 Liga-Teams "bereit" meldet (echte Aufstellung + Formkarten) —
+      // `ensureFullLeagueLineupReadiness` weiter oben hat das bereits ueber echte App-Schreibvorgaenge
+      // sichergestellt.
       //
       // "arena-coop-ready-gate" / "Bereit für den Spieltag" / "Weiter" / "Phase X/7" waren
       // Selektoren der frueheren MatchdayArenaNewLook-Komponente. Die Arena wurde seither durch
@@ -578,62 +676,52 @@ async function main() {
         seatToken: joined.seatToken,
       });
 
+      // Zweiter, VON DER LIGA-BEREITSCHAFT UNABHAENGIGER Zwischenschritt: "Vor dem Anpfiff"
+      // (DisciplineStageArena.tsx, `data-arena-prematch="true"`, seit Commit dc124799) ersetzt die
+      // ganze Buehne — auch bei 32/32 bereiten Teams — durch einen Vorschau-Screen, bis die
+      // spielende Person selbst auf "Zur Bühne →" (`arena-prematch-start-cta`) klickt. Ohne diesen
+      // Klick bleibt `arena-coop-status` (das lebt in der NativeArena DAHINTER) fuer immer
+      // unerreichbar — das war der eigentliche Grund fuer den 30s-Timeout hier, nicht B3.
+      await pageA.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
+      await pageA.getByTestId("arena-prematch-start-cta").click();
+      await pageB.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
+      await pageB.getByTestId("arena-prematch-start-cta").click();
+
       const coopStatusA = pageA.getByTestId("arena-coop-status");
       const coopStatusB = pageB.getByTestId("arena-coop-status");
-      await coopStatusA.waitFor({ timeout: 30_000 });
-      await coopStatusB.waitFor({ timeout: 30_000 });
+      try {
+        await coopStatusA.waitFor({ timeout: 30_000 });
+        await coopStatusB.waitFor({ timeout: 30_000 });
+      } catch (error) {
+        // Diagnose-Dump statt blindem Nochmal-Versuchen: das genau war das Werkzeug, mit dem sich
+        // dieser Block ueberhaupt reparieren liess (fehlender "Vor dem Anpfiff"-Klick, siehe oben) —
+        // ohne Body-Text/Screenshot haette der 30s-Timeout allein nicht zwischen B3 (Sync-Bug) und
+        // einem simplen "falscher Screen" unterschieden. Bleibt fuer den naechsten Fund stehen.
+        await pageA.screenshot({ path: path.join(OUTPUT_DIR, "failure-pageA.png"), fullPage: true }).catch(() => {});
+        await pageB.screenshot({ path: path.join(OUTPUT_DIR, "failure-pageB.png"), fullPage: true }).catch(() => {});
+        const bodyA = await pageA.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+        const bodyB = await pageB.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+        await fs.writeFile(path.join(OUTPUT_DIR, "failure-bodyA.txt"), bodyA);
+        await fs.writeFile(path.join(OUTPUT_DIR, "failure-bodyB.txt"), bodyB);
+        throw error;
+      }
 
-      // Beide Seiten sind bewusst VOR dem Arena-Start geladen: der Guest muss den
-      // "Warte auf den Host"-Hinweis sehen (arenaSyncState noch "idle"), bevor der Host ueberhaupt
-      // gestartet hat - das ist der Zustand, den ein echter Mitspieler beim Betreten zuerst sieht.
-      await pageB.getByTestId("arena-coop-follow").getByText("Warte auf den Host").waitFor({ timeout: 20_000 });
-      screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
-
-      // Die Discipline-Stage-Arena startet den Reveal-Sync nur automatisch, wenn
-      // `getMatchdayLeagueLineupReadiness` fuer ALLE 32 Liga-Teams "bereit" meldet (echte
-      // Aufstellung + Formkarten). Dieses V1-Skript schreibt - wie schon fuer
-      // sell/buy/facilities/training/lineup/formcards weiter oben - bewusst KEINE echten
-      // Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber echte
-      // Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
-      // unabhaengig (das Gate lebt rein im Client-Effect), genau wie es
-      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert - hier
-      // wird derselbe Weg genommen, um den Reveal fuer den DOM-Teil dieses Tests ueberhaupt
-      // erreichbar zu machen. Beide Browser sind schon offen und reagieren auf den folgenden
-      // Broadcast wie auf jeden echten Room-Sync auch.
-      //
-      // Gefundener echter Bug beim ersten Anlauf dieses Fixes: `startRoomArena` OHNE explizites
-      // matchdayId liess den Server auf `String(activeMatchday)` ("1") zurueckfallen, waehrend die
-      // Discipline-Stage-Arena selbst mit dem echten `gameState.matchdayState.matchdayId`
-      // ("matchday-1") scoped (`matchesArenaScope` in lib/room/arena-sync-state.ts vergleicht
-      // exact) - das Ready-Gate blieb dadurch fuer die UI unsichtbar (arenaSyncState "lief", aber
-      // ausserhalb des vom Client erwarteten Scopes), obwohl der Server den Sync korrekt hielt.
-      // Der echte Client (DisciplineStageArena.tsx) uebergibt matchdayId/seasonId immer explizit -
-      // hier tun wir dasselbe, statt uns auf den (fuer echte Aufrufer nie genutzten) Server-Fallback
-      // zu verlassen. Fix des Fallbacks selbst: lib/room/arena-sync-state.ts.
-      // Scoped auf `saveId`, NICHT den global "aktiven" Save: dieses Skript aktiviert seinen
-      // isolierten Save bewusst nicht global (siehe ensureIsolatedMultiplayerE2ESave), also wuerde
-      // eine ungescopte Abfrage hier den FALSCHEN Save lesen.
-      const matchdayScope = await fetchJson(options.baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`);
-      const currentMatchdayId = matchdayScope.save?.gameState?.matchdayState?.matchdayId ?? null;
-      state = await emitAndWait(
-        socketA,
-        "startRoomArena",
-        {
-          roomCode,
-          seatToken: created.seatToken,
-          seasonId: state.roomFlowState.activeSeasonId,
-          matchdayId: currentMatchdayId,
-          maxSlotRevealCountByDiscipline: { d1: 2, d2: 2 },
-        },
-        (next) => next.arenaSyncState?.status === "ready_check",
-        "start-room-arena",
-      );
-
-      // Co-op ready gate: both real participants control teams, so the shared reveal must NOT
-      // start until both click ready — verified via the actual UI (not raw socket emits) to
-      // exercise the real DisciplineStageNativeArena + useArenaRoomSync wiring end-to-end.
+      // KEIN manueller `startRoomArena`-Socket-Emit mehr an dieser Stelle (frueher hier, mit hart
+      // codierten `{ d1: 2, d2: 2 }`): seit `ensureFullLeagueLineupReadiness` oben die Liga wirklich
+      // bereit meldet, feuert `DisciplineStageArena.tsx` seinen EIGENEN Auto-Start-Effekt (Zeile
+      // ~1219, `roomArenaSync.emitStartRoomArena`) von selbst, sobald der Host-Client mountet — mit
+      // den ECHTEN, ueber `computeStageSlotCount` berechneten Etappenzahlen. Ein zweiter, manueller
+      // Aufruf mit erfundenen Zahlen wuerde diesen echten Start nur ueberschreiben (jeder
+      // `startRoomArena`-Aufruf setzt `readyParticipantIds` zurueck auf `[]`, siehe
+      // `arena-sync-state.ts:228`) — deshalb hier bewusst NICHTS emittieren, nur auf das Ergebnis
+      // warten. Das ist auch der Grund, warum die fruehere "Warte auf den Host"-Zusicherung (Gast
+      // sieht `arenaSyncState` noch als "idle", bevor der Host manuell startet) entfallen ist: der
+      // Auto-Start feuert oft schon, bevor der Gast-Browser ueberhaupt navigiert — ein Wettlauf, der
+      // nichts Sync-Relevantes mehr belegt. Was zaehlt (beide Clients landen im SELBEN Gate, mit den
+      // SELBEN echten Werten), prueft der folgende `arena-coop-ready`-Wait auf BEIDEN Seiten.
       await pageA.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
       await pageB.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
+      screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
 
       const primaryStepA = pageA.getByTestId("arena-primary-step");
       const primaryStepB = pageB.getByTestId("arena-primary-step");
@@ -756,7 +844,11 @@ async function main() {
         generatedWrites,
         unauthorizedWrites: [],
         destructiveGameWrites: [],
-        note: "V1 prueft serverseitige Autorisierung und Room-Flow. Buy/Sell/Lineup/Result werden nicht produktiv geschrieben.",
+        note:
+          "V1 prueft serverseitige Autorisierung und Room-Flow. Buy/Sell/Result werden nicht produktiv geschrieben. " +
+          "Lineups sind seit `ensureFullLeagueLineupReadiness` die Ausnahme: alle 32 Liga-Teams bekommen eine echte, " +
+          "KI-vorgeschlagene Aufstellung (Chris/Franky ueber die Sammelroute, KI-Teams von derselben Route mitgezogen) " +
+          "— sonst rendert die Arena-Seite nur den 'Vor dem Anpfiff'-Vorschauzustand und `arena-coop-status` erscheint nie.",
       },
       screenshots,
     };

@@ -1,47 +1,47 @@
 {
   "schemaVersion": "oly-online-saves-v1",
-  "exportedAt": "2026-08-13T11:47:41.808Z",
-  "activeSaveId": "new-game-1785067203149-82cbka",
+  "exportedAt": "2026-08-16T02:16:33.129Z",
+  "activeSaveId": "save-1786846423494-te4raq",
   "saves": [
+    {
+      "saveId": "save-1786846439775-nodr9w",
+      "name": "Multiplayer E2E Smoke 2026-08-16T02:13:59.775Z",
+      "status": "archived",
+      "file": "save-1786846439775-nodr9w.json.gz",
+      "uncompressedBytes": 15267917,
+      "gzipBytes": 2016203
+    },
+    {
+      "saveId": "save-1786846423494-te4raq",
+      "name": "CI Gameplay Smoke Save",
+      "status": "active",
+      "file": "save-1786846423494-te4raq.json.gz",
+      "uncompressedBytes": 15267855,
+      "gzipBytes": 2016177
+    },
+    {
+      "saveId": "save-1786846403416-ngnfdx",
+      "name": "Multiplayer E2E Smoke 2026-08-16T02:13:23.416Z",
+      "status": "archived",
+      "file": "save-1786846403416-ngnfdx.json.gz",
+      "uncompressedBytes": 15267922,
+      "gzipBytes": 2016206
+    },
     {
       "saveId": "new-game-1785067203149-82cbka",
       "name": "UI-Check Neues Spiel",
-      "status": "active",
+      "status": "archived",
       "file": "new-game-1785067203149-82cbka.json.gz",
-      "uncompressedBytes": 13705389,
-      "gzipBytes": 1907873
+      "uncompressedBytes": 15267791,
+      "gzipBytes": 2016139
     },
     {
-      "saveId": "fresh-season-1-1785061984338",
-      "name": "S1 market buy regression 1785061984337",
+      "saveId": "fresh-season-1-1785859604037",
+      "name": "Local Season Loop 4.8.2026, 16:06:44",
       "status": "archived",
-      "file": "fresh-season-1-1785061984338.json.gz",
-      "uncompressedBytes": 13547192,
-      "gzipBytes": 1934107
-    },
-    {
-      "saveId": "fresh-season-1-1785061991768",
-      "name": "S1 market apply regression 1785061991768",
-      "status": "archived",
-      "file": "fresh-season-1-1785061991768.json.gz",
-      "uncompressedBytes": 12053547,
-      "gzipBytes": 1823930
-    },
-    {
-      "saveId": "save-singleplayer-dev",
-      "name": "Singleplayer Foundation",
-      "status": "archived",
-      "file": "save-singleplayer-dev.json.gz",
-      "uncompressedBytes": 11858162,
-      "gzipBytes": 1758564
-    },
-    {
-      "saveId": "fresh-season-1-1784669123253",
-      "name": "S1 market buy regression 1784669123253",
-      "status": "archived",
-      "file": "fresh-season-1-1784669123253.json.gz",
-      "uncompressedBytes": 13547277,
-      "gzipBytes": 1934281
+      "file": "fresh-season-1-1785859604037.json.gz",
+      "uncompressedBytes": 16914126,
+      "gzipBytes": 2305031
     },
     {
       "saveId": "fresh-season-1-1784669131021",
@@ -49,7 +49,39 @@
       "status": "archived",
       "file": "fresh-season-1-1784669131021.json.gz",
       "uncompressedBytes": 13560985,
-      "gzipBytes": 1927303
+      "gzipBytes": 1927297
+    },
+    {
+      "saveId": "fresh-season-1-1784669123253",
+      "name": "S1 market buy regression 1784669123253",
+      "status": "archived",
+      "file": "fresh-season-1-1784669123253.json.gz",
+      "uncompressedBytes": 13547277,
+      "gzipBytes": 1934274
+    },
+    {
+      "saveId": "save-singleplayer-dev",
+      "name": "Singleplayer Foundation",
+      "status": "archived",
+      "file": "save-singleplayer-dev.json.gz",
+      "uncompressedBytes": 11858162,
+      "gzipBytes": 1758557
+    },
+    {
+      "saveId": "fresh-season-1-1785061991768",
+      "name": "S1 market apply regression 1785061991768",
+      "status": "archived",
+      "file": "fresh-season-1-1785061991768.json.gz",
+      "uncompressedBytes": 12053547,
+      "gzipBytes": 1823923
+    },
+    {
+      "saveId": "fresh-season-1-1785061984338",
+      "name": "S1 market buy regression 1785061984337",
+      "status": "archived",
+      "file": "fresh-season-1-1785061984338.json.gz",
+      "uncompressedBytes": 13547192,
+      "gzipBytes": 1934103
     }
   ]
 }

@@ -21,8 +21,29 @@ function createSaveId() {
   return `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * BEFUND (gemessen, Stufe 4 — Absicherung des Mehrspieler-Vollausbaus): anders als `createSaveId()`
+ * trug diese ID NUR `Date.now()`, keinen Zufallsanteil. Gemessen (siehe
+ * `createFreshSeasonOneSaveIdForTests` + den Test dazu in tests/singleplayer-state.test.ts):
+ * 2000 Aufrufe HINTEREINANDER in derselben Millisekunde lieferten VOR diesem Fix genau EINE
+ * eindeutige ID zurueck (`new Set(...).size === 1`) statt 2000 — jeder weitere `it()`-Block, der
+ * `createFreshSeasonOneSave()` schnell nach einem vorherigen aufruft (in derselben Testdatei UND
+ * damit derselben SQLite-Datenbank, siehe tests/setup/sqlite-pro-testdatei.ts), lief real Gefahr,
+ * denselben `saveId` (Primärschlüssel der `saves`-Tabelle) wie ein VOLLKOMMEN ANDERER Spielstand zu
+ * bekommen — die zweite Speicherung ueberschreibt dann die erste. Fix an der Wurzel (die ID-Vergabe
+ * selbst bekommt denselben Zufallsanteil wie `createSaveId()`), unabhaengig davon, welcher
+ * Cache/Verbraucher eine solche Kollision als naechstes sichtbar gemacht haette.
+ */
 function createFreshSeasonOneSaveId() {
-  return `fresh-season-1-${Date.now()}`;
+  return `fresh-season-1-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * NUR FUER TESTS: pinnt die Eindeutigkeit der ID-Vergabe direkt, ohne bei jedem Aufruf den vollen
+ * (teuren) Liga-Bootstrap von `createFreshSeasonOneSave` zu durchlaufen — siehe Befund am Typ oben.
+ */
+export function createFreshSeasonOneSaveIdForTests() {
+  return createFreshSeasonOneSaveId();
 }
 
 /**
