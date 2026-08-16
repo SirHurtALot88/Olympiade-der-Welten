@@ -222,12 +222,21 @@ type SharedLineupContextBase = {
 // an den drei anderen Teams nichts geaendert hat (gemessen: siehe Kommentar an
 // `sharedLineupContextBaseCacheStats` unten).
 //
-// Die Signatur war dabei nie NOETIG: `SharedLineupContextBase` traegt selbst gar kein Feld, das
-// von `lineupDrafts` abhaengt (kein `existingDraft`, keine Entwurfs-Eintraege) — die teuren Teile
-// (Rangtabelle, Score-Map, Gewichte) haengen ausschliesslich an Spielern/Kadern/Disziplinen. Statt
-// den Schluessel "je Team" zu fuehren (was den geteilten Aufbau erneut N-fach vervielfacht haette,
-// nur mit einer anderen Ursache), faellt die Entwurfs-Signatur hier ganz weg — das ist der
-// tatsaechlich korrekte Schluessel, nicht nur ein kleinerer.
+// Die TEUREN Teile von `SharedLineupContextBase` (Rangtabelle, Score-Map, Gewichte,
+// Spieler-/Kader-Karten) haengen ausschliesslich an Spielern/Kadern/Disziplinen — NICHT an
+// `lineupDrafts`, `playerMoraleState` oder sonst einem sich staendig aendernden Feld. Der
+// Cache-SCHLUESSEL laesst die Entwurfs-Signatur deshalb weg (siehe
+// `buildSharedLineupContextBaseCacheKey`). ABER: `normalizedGameState` selbst — und darueber
+// `context.gameState`, `existingDraft`, `teamStatus` — MUESSEN bei jedem Aufruf den AKTUELLEN
+// Spielstand zeigen (Moral, Formkarten-Plaene, Aufstellungen, ...), sonst saehe ein
+// nachgelagerter Verbraucher (Moral-/Kapitaens-Aufloesung beim Spieltag-Resolve) auf einen
+// Spielstand von VOR dem Speichern zurueck. Deshalb wird `normalizedGameState` bei einem
+// Cache-TREFFER unten IMMER frisch aus dem aktuellen `gameStateWithPowers` gebaut
+// (`withNormalizedSeasonDisciplineSchedule` ist ein O(Spieltage)-Normalisierungsschritt, nicht die
+// teure Rangtabellen-Berechnung) — nur die uebrigen, tatsaechlich invarianten Felder kommen aus
+// dem Cache. Statt den Schluessel "je Team" zu fuehren (was den geteilten Aufbau erneut N-fach
+// vervielfacht haette, nur mit einer anderen Ursache), bleibt so der teure Teil EINMAL gebaut,
+// waehrend der Spielstand selbst nie stehen bleibt.
 const sharedLineupContextBaseCache = new Map<
   string,
   { value: SharedLineupContextBase; insertedAtMs: number; lastAccessMs: number }
@@ -295,6 +304,19 @@ function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: Lega
   ].join("::");
 }
 
+/**
+ * Ein Cache-Treffer teilt sich die TEUREN, tatsaechlich invarianten Teile (Rangtabelle, Score-Map,
+ * Spieler-/Kader-Karten, Gewichte) — `normalizedGameState` selbst gehoert NICHT dazu (siehe
+ * Kommentar an `sharedLineupContextBaseCache`) und wird deshalb bei JEDEM Treffer frisch gebaut.
+ *
+ * Ohne dieses Nachschaerfen wuerde jeder Verbraucher, der ueber `context.gameState` liest
+ * (Moral-/Kapitaens-Aufloesung beim Resolve, `existingDraft`, `teamStatus`), nach einem
+ * Speichervorgang mit demselben Cache-Schluessel (Roster/Spieler/Disziplinen unveraendert) auf den
+ * ALTEN Spielstand zurueckfallen — genau der Fehler, den die fruehere, teure Entwurfs-Signatur nur
+ * zufaellig verhinderte, weil sie bei jedem Speichern ohnehin ALLES ungueltig machte.
+ * `withNormalizedSeasonDisciplineSchedule` ist ein O(Spieltage)-Schritt, keine Neuberechnung der
+ * Rangtabelle — der teure Teil bleibt geteilt.
+ */
 function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKeyParams): SharedLineupContextBase | null {
   const gameStateWithFormCards = ensureLocalFormCardsForSeason(gameState, params.saveId, params.seasonId);
   const hasCurrentSeasonPowers = (gameStateWithFormCards.seasonState.teamPowers ?? []).some(
@@ -313,7 +335,10 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     sharedLineupContextBaseCache.delete(cacheKey);
     cached.lastAccessMs = now;
     sharedLineupContextBaseCache.set(cacheKey, cached);
-    return cached.value;
+    return {
+      ...cached.value,
+      normalizedGameState: withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId),
+    };
   }
   sharedLineupContextBaseCacheStats.misses += 1;
 

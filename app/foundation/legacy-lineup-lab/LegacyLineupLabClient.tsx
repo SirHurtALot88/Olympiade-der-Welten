@@ -64,6 +64,8 @@ import {
   type AiBatchPreviewResponse,
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
 import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
+import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
+import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -5939,6 +5941,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onAssignTeamPower={(disciplineSide, powerId) => updateModifier(disciplineSide, "teamPowerId", powerId ?? "")}
         controlsSlot={
           <>
+            <MyTeamsReadinessPanel
+              readiness={myTeamsMatchdayReadiness}
+              activeTeamId={params.teamId}
+              onJumpToTeam={jumpToMyTeam}
+            />
             <label>
               <span>Spieltag</span>
               <select
