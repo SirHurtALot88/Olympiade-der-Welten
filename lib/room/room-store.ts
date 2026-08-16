@@ -6,6 +6,7 @@ import {
   isRoomArenaReady,
   quickSimRoomArenaReveal as buildQuickSimmedRoomArenaState,
   resetRoomArenaReveal as buildResetRoomArenaState,
+  resumeRoomArenaAfterRestart,
   setRoomArenaParticipantReady,
   setRoomArenaPaused as buildRoomArenaPausedState,
   startRoomArena as buildStartedRoomArenaState,
@@ -1424,6 +1425,19 @@ export function rehydrateRuntimeRoomsFromPersistence(): { restored: number; alre
       alreadyPresent += 1;
       continue;
     }
+    // BEFUND F8 (Aufgabe #45): eine Enthuellung, die der Neustart mitten im Lauf erwischt hat,
+    // bringt ihre Zeitbasis (`stepStartedAt`/`updatedAt`) als minutenalte Zeitstempel zurueck — die
+    // Etappe behauptet damit eine Vergangenheit, die kein Client miterlebt hat. Die Entscheidung,
+    // was daraus wird, steht vollstaendig in `resumeRoomArenaAfterRestart` (arena-sync-state.ts,
+    // dort auch die Messwerte); hier steht nur der Aufruf.
+    //
+    // Bewusst OHNE `syncPlayers(room)`: `server.ts` rehydriert VOR `ensureSocketServer`, es gibt
+    // also noch niemanden zu benachrichtigen, und das Speichern erledigt die naechste echte
+    // Raum-Aktion. Ein zweiter Neustart davor faende denselben Zustand vor und entschiede identisch.
+    room.state = {
+      ...room.state,
+      arenaSyncState: resumeRoomArenaAfterRestart({ arenaState: room.state.arenaSyncState }),
+    };
     runtimeRooms.set(room.roomCode, room);
     restored += 1;
     // BEFUND F5 (Notausfahrt-Audit): `registerLiveRoomSaveId` wird sonst NUR beim

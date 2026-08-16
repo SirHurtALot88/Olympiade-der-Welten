@@ -148,8 +148,23 @@ describe("Raeume ueberleben den Neustart", () => {
     if (!rehydrated) return;
     const nachherArena = rehydrated.state.arenaSyncState;
 
+    // WAS "UNVERAENDERT" HIER HEISST — und was NICHT (Befund F8, Aufgabe #45).
+    //
+    // Diese Pruefung verlangte urspruenglich auch `version` und die Zeitbasis unveraendert. Das war
+    // genau die falsche Zusicherung: sie schrieb fest, dass eine laufende Enthuellung mit einer
+    // MINUTENALTEN `stepStartedAt` zurueckkommt — einer Vergangenheit, die kein Client miterlebt
+    // hat. Die gemeinsame Uhr haette danach sofort losgerechnet.
+    //
+    // Unveraendert bleibt, was die POSITION beschreibt: Etappe, Phase, Spieltag, Saison und wer
+    // bereit ist. Neu angesetzt wird die ZEIT, und angehalten wird sichtbar — Begruendung samt
+    // Messwerten steht an `resumeRoomArenaAfterRestart` (lib/room/arena-sync-state.ts), die
+    // Eigenschaften selbst in tests/arena-ueberlebt-den-neustart.test.ts.
     expect(nachherArena.status).toBe(vorherArena.status);
-    expect(nachherArena.version).toBe(vorherArena.version);
+    expect(nachherArena.version, "genau ein Schritt fuer das Neuansetzen, kein stiller Sprung").toBe(
+      vorherArena.version + 1,
+    );
+    expect(nachherArena.paused, "beim Wiederanlauf steht nachweislich niemand am Bildschirm").toBe(true);
+    expect(nachherArena.pausedBy, "eine Pause ohne Urheber bindet auch den Host").toBeNull();
     expect(nachherArena.matchdayId).toBe(vorherArena.matchdayId);
     expect(nachherArena.seasonId).toBe(vorherArena.seasonId);
     expect(nachherArena.phaseIndex).toBe(vorherArena.phaseIndex);
