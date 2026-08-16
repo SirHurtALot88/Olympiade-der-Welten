@@ -379,6 +379,15 @@ export function createRoom(
    */
   if (input?.preset) {
     room.state = applyOwnershipPresetToState(room.state, input.preset);
+    // Die Wahl MERKEN, nicht nur anwenden (Aufgabe #49): angewandt wirkt sie jetzt nur auf den
+    // Host — Franky ist noch nicht da, und `buildExplicitTeamOwnership` laesst die Teams eines
+    // abwesenden Teilnehmers bewusst offen. Beim Beitritt muss deshalb noch einmal verteilt werden,
+    // und dort war diese Wahl bisher schlicht vergessen; es blieb ein fest verdrahtetes 4+4.
+    // Bewusst NICHT `ownershipAssignedByHost` — siehe Kommentar am Feld (types/game.ts).
+    room.state = {
+      ...room.state,
+      multiplayerRoom: { ...room.state.multiplayerRoom, createdWithPreset: input.preset },
+    };
   }
 
   // NOTAUSFAHRT, Fortsetzung (F1): ein neu angelegter Raum fuer einen ECHTEN, bereits
@@ -428,6 +437,9 @@ export function joinRoom(
   input?: { displayName?: string | null },
   // Phase-1-Login (nur bei OLY_AUTH_ENABLED=1 gesetzt), siehe createRoom() oben.
   sessionUser?: { displayName: string; ownerId: string } | null,
+  // Wie bei createRoom() einspeisbar, damit Tests die Ablage ersetzen koennen — gebraucht fuer
+  // Stufe 3 der Rangfolge unten (Aufteilung aus dem Spielstand).
+  options?: { persistence?: PersistenceService },
 ) {
   const normalizedCode = roomCode.trim().toUpperCase();
   const room = runtimeRooms.get(normalizedCode);
@@ -482,8 +494,46 @@ export function joinRoom(
   // sondern eine Luecke, die es vorher schon gab -- und der Host haengt sie ueber den Team-Picker
   // um. Sie hier "nebenbei" mitzuloesen war genau der Versuch, der die zwei Fehlschlaege oben
   // erzeugt hat; sie gehoert in einen eigenen Schritt mit eigenem Test.
+  //
+  // AUFGABE #49, DER DRITTE ANLAUF — und diesmal mit der Entscheidung VORNEWEG statt hinterher:
+  // bei Widerspruch zwischen Spielstand und Host gewinnt DER HOST. Wer beim Anlegen einen Modus
+  // waehlt, trifft eine Wahl; eine abgeleitete Quelle darf sie nicht ueberstimmen. Genau daran ist
+  // Anlauf 2 gescheitert (`bootstrapSingleplayerSave()` lieferte einen VORHANDENEN Stand, der eine
+  // alte Koop-Aufteilung trug, und die schlug das ausdruecklich mitgegebene Preset).
+  //
+  // Die Rangfolge, jede Stufe eine echte Angabe — nichts davon geraten:
+  //  1. Der Host hat IM RAUM zugeteilt -> unangetastet lassen (bestehend).
+  //  2. Sonst: das Preset, mit dem der Raum ANGELEGT wurde — ABER nur, wenn es dem zweiten Sitz
+  //     ueberhaupt Teams gibt. Ein Solo-Modus ("Chris 4, Rest KI") sagt ueber den zweiten Sitz
+  //     nichts; ihn hier gewinnen zu lassen liesse den Gast, der gerade beigetreten IST, leer
+  //     ausgehen — genau der Ausgang, den die Stufen darunter verhindern sollen. Gemessen statt
+  //     hart auf einen Preset-Namen gepinnt: angewandt wird es nur, wenn dabei wirklich Teams beim
+  //     zweiten Teilnehmer landen. So gilt die Regel auch fuer Modi, die es noch nicht gibt.
+  //  3. Sonst: die Aufteilung aus dem Spielstand — aber NUR, wenn sie beide Seiten nennt. Ein
+  //     Stand, der nur ein Team kennt, ist die Handschrift eines Solo-Standes und sagt ueber den
+  //     zweiten Sitz nichts (Anlauf 1 stutzte Chris genau daran auf ein Team).
+  //  4. Sonst: der bisherige 4+4-Vorschlag.
   if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
-    room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+    const angelegtMit = room.state.multiplayerRoom.createdWithPreset;
+    const mitPreset = angelegtMit ? applyOwnershipPresetToState(room.state, angelegtMit) : null;
+    const presetGibtDemGastTeams =
+      mitPreset != null &&
+      mitPreset.teamOwnership.some(
+        (eintrag) => eintrag.controllerType === "human" && eintrag.participantId === participantId,
+      );
+    if (mitPreset && presetGibtDemGastTeams) {
+      room.state = mitPreset;
+    } else {
+      const saveId = room.state.multiplayerRoom.saveId;
+      const ausSave =
+        saveId && !isSandboxRoomSave(saveId) ? leiteTeamZuordnungAusSaveAb(saveId, options?.persistence) : null;
+      const beschreibtKoop = (ausSave?.frankyTeamIds.length ?? 0) > 0;
+      const uebernommen = ausSave && beschreibtKoop ? applyExplicitTeamOwnershipToState(room.state, ausSave) : null;
+      room.state =
+        uebernommen?.ok === true
+          ? uebernommen.state
+          : applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+    }
   }
   room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: resolvedDisplayName });
   room.state.actionLog.push(
