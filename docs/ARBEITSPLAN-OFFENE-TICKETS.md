@@ -9,6 +9,33 @@ gekennzeichnet und blockieren die darunterliegenden nicht.
 
 ---
 
+## NACHTRAG 16.08. — was seither erledigt ist
+
+Der Plan unten steht auf dem Stand vom 15.08. und ist an mehreren Stellen überholt. **Nachgesehen
+im Code, nicht aus der Erinnerung:**
+
+| Schritt | Stand | Beleg |
+|---|---|---|
+| 1.1 — #38 VK-Faktor ab 8 | **fertig** | `6e6a8a4e` („VK-Faktor ab acht im Bracket") |
+| 1.2 — #33 VK-Anzeige eigenes Team | **fertig** | eine Portraitkarte für beide Fälle; `heroIsOwnTeam` steuert nur noch das Gehalt, die VK-Zahl kommt aus `resolveTeamsPortraitSellValueDisplay` |
+| 1.3 — #32 All-Time-Zeile | **fertig** | `berechneAllTimeWert` in `TeamDrawerHistoryTable.tsx` aggregiert je Spalte nach Art (Summe/Mittel/Maximum/letzter Stand), Verletzungen eingeschlossen |
+| 2.1 — #42 Top-24 | **fertig** | `6e6a8a4e`, Gegenprobe in `tests/arena-top-spieler-zwei-spalten.test.ts` |
+| 3.1–3.4 — #41 Awards | **fertig** | `buildPlayerSeasonAwards`, `PlayerAwardStrip` (Profil `full`, Arena-Zeile `icons`), Persistenz im Saison-Schnappschuss |
+| 3.5 — Erklärung auf der Leaders-Seite | **fertig** | `NL_LEADERS_ERKLAERUNG` in `LeagueLeadersNewLook.tsx` — und zwar für *jede* Kategorie, nicht nur Most Improved |
+| Block 4 — die vier Triage-Fragen | **beantwortet** | siehe Nachtrag in `docs/ROTE_TESTS_TRIAGE.md` |
+
+**Neu dazugekommen (16.08.):** die Verletzten-Erholung stand an vier Stellen, Chris' Entscheidung
+auf 1,0 hatte nur eine erreicht. Am schwersten wog, dass `calculateTeamRecovery` weiter mit einer
+eingetippten 0,5 rechnete — und genau die benutzen die beiden Audit-Skripte, mit denen die Balance
+*bewertet* wird. Behoben, `INJURY_RECOVERY_FACTOR` exportiert, Gegenprobe gefahren.
+
+**Damit offen ist genau ein Punkt:** Block 0.2 — der Endspurt-Stau. Der braucht eine Entscheidung
+von Chris und keine weitere Messung; die Messung liegt vor und sagt, dass die Erholung ihn nicht
+löst (der Anteil bleibt über R = 20…56 bei 53–57 %). Der Hebel wäre der Spielplan: Spieltag 9
+verlangt 12 Spieler, so viele wie kein anderer der Saison.
+
+---
+
 ## Block 0 — die Ermüdung zu Ende bringen (LÄUFT)
 
 Die Schonschwelle liest jetzt den echten Spieltagsbedarf. Vorher/Nachher, beides synthetische
