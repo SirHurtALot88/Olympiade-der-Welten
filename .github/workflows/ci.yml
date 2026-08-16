@@ -104,10 +104,16 @@ jobs:
       # Anpfiff" verlangt, dass ALLE 32 Teams aufstellen koennen. Der Test kann das Gate deshalb
       # gar nicht erfuellen.
       #
-      # Das ist ein ECHTER Produkt-Befund, kein Testproblem: ein Koop-Spiel ist zwischen
-      # Raumstart und dem ersten Spielerkauf beider Menschen nicht spielbar. Er gehoert eigens
-      # behoben (Erstkader fuer menschliche Teams im Koop) — erst danach traegt dieser Schritt.
-      # Ihn jetzt einzuschalten wuerde jeden Pull Request roeten.
+      # KORREKTUR ZUR ERSTEN EINSCHAETZUNG: das ist KEIN Koop-Fehler. Der Solo-Weg macht es
+      # identisch — `app/api/new-game/route.ts:83-92` schliesst jedes menschliche Team vom Draft
+      # aus, mit der ausdruecklichen Begruendung „those players draft their own squad". Beide Modi
+      # erwarten, dass der Mensch seinen Kader selbst kauft; im Raum-Flow steht dafuer der Schritt
+      # `buy_players` VOR `lineup` und `arena` (room-flow-controller.ts:72).
+      #
+      # Die Luecke liegt also im TEST: er ueberspringt die Kaufphase und will direkt in die Arena.
+      # Zu beheben ist das im Smoke (Kader fuer die acht menschlichen Teams besorgen, bevor die
+      # Aufstellungen geschrieben werden) — nicht im Spiel. Bis dahin bleibt der Schritt aus, weil
+      # er sonst jeden Pull Request roetet.
       #
       # Alles andere aus Stufe 4 ist drin und wirkt: der Test SELBST ist repariert (echte
       # Etappenzahlen statt `{d1:2,d2:2}`, Chromium-Pfad, Liga-Aufstellungen ueber die
