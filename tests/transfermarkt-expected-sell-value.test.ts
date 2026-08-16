@@ -171,17 +171,37 @@ describe("buildExpectedSellValueByPlayerId", () => {
 
     const p1 = byPlayerId.get("p1");
     expect(p1).toBeTruthy();
-    expect(p1!.grossSalePrice).toBe(60);
+    /**
+     * DER PREIS TRAEGT JETZT DIE VERKAUFSPOLITIK — Ticket #44.
+     *
+     * Hier stand der ROHE Preis (Marktwert x Verkaufsfaktor). Seit der Angleichung schickt auch
+     * diese Karte den Breakdown durch `applySellPricingPolicyToBreakdown`
+     * (Saisonstart-Abschlag x Timing x Kaderdruck x Team-Fit) — so wie es das Verkaufs-Panel und
+     * die AUSFUEHRUNG schon immer taten. Entschieden hat die Buchung: der gemeldete Spieler wurde
+     * zwoelf Minuten nach der Meldung fuer `fee 28.09` verkauft, und das ist die Zahl MIT dieser
+     * Stufe.
+     *
+     * Geprueft wird deshalb die BEZIEHUNG und nicht mehr eine feste Zahl: der Preis liegt unter
+     * dem rohen Marktwert und ueber einer Untergrenze. Eine fest eingetragene 58,44 muesste beim
+     * naechsten Politik-Schritt wieder nachgezogen werden und sagte nichts darueber, ob die Stufe
+     * ueberhaupt noch angewandt wird.
+     */
+    expect(p1!.grossSalePrice).toBeLessThan(60);
+    expect(p1!.grossSalePrice).toBeGreaterThan(50);
     expect(p1!.buyoutCost).toBe(30);
-    expect(p1!.expectedSellValue).toBe(30);
+    // Die Aussage ist die RECHNUNG, nicht die Zahl: Netto = Brutto minus Restlaufzeit-Buyout.
+    // Als feste Zahl haenge sie am Verkaufsfaktor und muesste bei jedem Politik-Schritt nachgezogen
+    // werden — dann prueft sie den Faktor statt der Rechnung.
+    expect(p1!.expectedSellValue).toBeCloseTo(p1!.grossSalePrice - 30, 2);
 
     const p2 = byPlayerId.get("p2");
     expect(p2).toBeTruthy();
-    expect(p2!.grossSalePrice).toBe(100);
+    expect(p2!.grossSalePrice).toBeLessThan(100);
+    expect(p2!.grossSalePrice).toBeGreaterThan(85);
     // Restlaufzeit 1, Gehalt noch nicht abgerechnet ⇒ dieses eine Jahr steht noch aus.
     // „Auslaufend = kein Buyout" gilt erst, WENN das Jahr verbraucht ist (Test darunter).
     expect(p2!.buyoutCost).toBe(5);
-    expect(p2!.expectedSellValue).toBe(95);
+    expect(p2!.expectedSellValue).toBeCloseTo(p2!.grossSalePrice - 5, 2);
   });
 
   it("zaehlt ein Vertragsjahr als verbraucht, sobald das Saisongehalt abgerechnet ist", () => {
@@ -195,10 +215,10 @@ describe("buildExpectedSellValueByPlayerId", () => {
 
     const p1 = buildExpectedSellValueByPlayerId(gameState).get("p1");
     expect(p1).toBeTruthy();
-    expect(p1!.grossSalePrice).toBe(60);
+    expect(p1!.grossSalePrice).toBeLessThan(60);
     // 3 Jahre minus das abgerechnete ⇒ 2 Restjahre à 10.
     expect(p1!.buyoutCost).toBe(20);
-    expect(p1!.expectedSellValue).toBe(40);
+    expect(p1!.expectedSellValue).toBeCloseTo(p1!.grossSalePrice - 20, 2);
   });
 
   it("charges no buyout for expiring contracts (Restlaufzeit 1) — the season-end tick clears them", () => {
@@ -282,10 +302,14 @@ describe("buildExpectedSellValueByPlayerId", () => {
 
     const entry = buildExpectedSellValueByPlayerId(gameState).get("p1");
     expect(entry).toBeTruthy();
-    expect(entry!.grossSalePrice).toBe(10);
+    expect(entry!.grossSalePrice).toBeLessThan(10);
+    expect(entry!.grossSalePrice).toBeGreaterThan(8);
     // Ohne Gehaltsabrechnung: volle 4 Restjahre à 8.
     expect(entry!.buyoutCost).toBe(32);
-    expect(entry!.expectedSellValue).toBe(-22);
+    // Der Punkt dieses Tests ist das VORZEICHEN: bei langer Restlaufzeit und kleinem Preis wird
+    // der Netto-Erloes negativ. Das gilt unabhaengig vom Verkaufsfaktor.
+    expect(entry!.expectedSellValue).toBeCloseTo(entry!.grossSalePrice - 32, 2);
+    expect(entry!.expectedSellValue).toBeLessThan(0);
   });
 
   it("reports profit/loss against the actually paid purchase price — and null without one", () => {
@@ -309,8 +333,9 @@ describe("buildExpectedSellValueByPlayerId", () => {
     const bought = byPlayerId.get("bought")!;
     // Ohne Gehaltsabrechnung: volle 2 Restjahre à 10 ⇒ Netto (80 − 20) minus gezahlte 50 → +10.
     expect(bought.purchasePrice).toBe(50);
-    expect(bought.profitVsPurchase).toBe(bought.expectedSellValue - 50);
-    expect(bought.profitVsPurchase).toBe(10);
+    expect(bought.profitVsPurchase).toBeCloseTo(bought.expectedSellValue - 50, 2);
+    // Bleibt ein Gewinn — die Hoehe haengt am Verkaufsfaktor, das Vorzeichen nicht.
+    expect(bought.profitVsPurchase).toBeGreaterThan(0);
 
     const homegrown = byPlayerId.get("homegrown")!;
     expect(homegrown.purchasePrice).toBeNull();

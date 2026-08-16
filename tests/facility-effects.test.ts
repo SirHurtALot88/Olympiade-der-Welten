@@ -117,21 +117,34 @@ describe("facility effects", () => {
     expect(applyTrainingXpFacilityModifiers(100, facilities({ training_center: { level: 2, enabled: true, conditionPct: 79 } })).modifierPct).toBeLessThan(28);
   });
 
+  /**
+   * DIE LEITER WURDE ANGEHOBEN (2026-08-15) — Chris: „aber ja die leiter muss angehoben werden".
+   *
+   * Sie stand auf [0,2,4,6,9,12] mit dem Kommentar „exakt auf `BASE_MATCHDAY_RECOVERY = 20`
+   * abgestimmt". Die Basis wurde im August auf 28 angehoben, die Leiter nicht — L5 gab damit nur
+   * noch das 1,43-fache statt des gemeinten 1,6-fachen, und der Ausbau lohnte sich immer weniger,
+   * je besser die Grunderholung wurde. Gemessen brachte die alte Leiter bei vollem Ausbau 1,09
+   * verhinderte Verletzungen je Team bei 131 Baukosten.
+   *
+   * Neu: [0,4,8,13,18,24]. Die Tests rechnen weiter mit der Basis 20 als Eingabe, weil sie die
+   * FUNKTION pruefen und nicht die Produktionskonstante — der Aufschlag ist derselbe, egal worauf
+   * er kommt.
+   */
   it("recovery center adds flat bonus on top of base recovery", () => {
     const result = applyRecoveryFacilityModifiers(20, facilities({ recovery_center: { level: 3, enabled: true } }));
 
-    expect(result.flatBonus).toBe(6);
-    expect(result.after).toBe(26);
+    expect(result.flatBonus).toBe(13);
+    expect(result.after).toBe(33);
   });
 
   it("recovery center reduces training fatigue load proportional to flat bonus vs basis 20", () => {
-    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(30);
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(60);
     expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 0, enabled: false } }))).toBe(0);
   });
 
   it("recovery center uses tiered flat bonus by level", () => {
     const levels = [0, 1, 2, 3, 4, 5] as const;
-    const expectedTotals = [20, 22, 24, 26, 29, 32];
+    const expectedTotals = [20, 24, 28, 33, 38, 44];
 
     for (const level of levels) {
       const result = applyRecoveryFacilityModifiers(
