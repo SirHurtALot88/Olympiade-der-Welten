@@ -40,6 +40,20 @@ describe("Die Sammelroute hat einen Aufrufer in der Oberflaeche (F14)", () => {
     expect(quelltext).toContain("lineup_lock_confirmation_required");
   });
 
+  it("die Rueckfrage nennt je Team, WAS festgenagelt wird — und zaehlt aus der Antwort der Route", () => {
+    const quelltext = readFileSync(
+      resolve(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+      "utf8",
+    );
+    // Der Einzelweg zeigt "Formkarte(n) gesetzt · Kapitän gesetzt" bzw. "WEDER … NOCH …". Der
+    // Sammel-Dialog nagelt MEHR fest und darf deshalb nicht die schwaechere Rueckfrage sein.
+    expect(quelltext).toContain("WEDER Formkarte NOCH Kapitän");
+    // Und die Liste kommt aus `commitments` — dort legt die Route genau die Teams ab, die sie auch
+    // schreiben wird. Ueber den lokalen Stapel zu zaehlen kuendigte Teams als "wird festgelegt" an,
+    // die gleich abgelehnt werden.
+    expect(quelltext).toContain("payload.commitments ?? []");
+  });
+
   it("der Einzelweg bleibt bestehen — die Sammel-Abgabe ersetzt ihn nicht", () => {
     const quelltext = readFileSync(
       resolve(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),

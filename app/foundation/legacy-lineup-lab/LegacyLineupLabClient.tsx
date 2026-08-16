@@ -4016,21 +4016,49 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
       let response = await sendeStapel(false);
       let payload = (await response.json().catch(() => ({}))) as SammelAbgabeAntwort & {
-        commitments?: Array<{ teamId: string; commitment?: { isEmptyCommitment?: boolean } }>;
+        commitments?: Array<{
+          teamId: string;
+          commitment?: { hasFormCards?: boolean; hasCaptain?: boolean; isEmptyCommitment?: boolean };
+        }>;
       };
 
       /**
        * EIN Dialog fuer den ganzen Stapel — genau dafuer traegt die Route den 409-Weg (Stufe 2.5).
        * Der Einzelweg fragt je Team; hier steht einmal da, WELCHE Teams gleich festgenagelt werden.
+       *
+       * Und WAS dabei eingesetzt wird, Team fuer Team: die Route liefert im 409 pro Team sein
+       * `commitment`, und der Einzelweg zeigt genau das. Ohne diese Zeilen waere der Sammel-Dialog
+       * die schwaechere Rueckfrage — dabei nagelt er mehr fest. Besonders "weder Formkarte noch
+       * Kapitaen" ist fast nie Absicht und danach nicht mehr zu korrigieren; der KI-Vorschlag
+       * setzt Formkarten grundsaetzlich nicht und laesst den Kapitaen manchmal bewusst aus.
        */
       if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
-        const zeilen = stapel.map((team) => `• ${nameFuerTeam(team.teamId) ?? team.teamId}`).join("\n");
+        /**
+         * Die Liste kommt aus `commitments`, NICHT aus `stapel`: die Route legt dort genau die
+         * Teams ab, die sie auch schreiben wird — Teams ohne Schreibrecht fallen vorher heraus.
+         * Ueber `stapel` zu gehen haette Teams als "wird festgelegt" angekuendigt, die gleich
+         * abgelehnt werden. Die Differenz wird darunter benannt statt verschwiegen.
+         */
+        const commitments = payload.commitments ?? [];
+        const zeilen = commitments
+          .map((eintrag) => {
+            const einsatz = eintrag.commitment?.isEmptyCommitment
+              ? "WEDER Formkarte NOCH Kapitän"
+              : [
+                  eintrag.commitment?.hasFormCards ? "Formkarte(n)" : "keine Formkarte",
+                  eintrag.commitment?.hasCaptain ? "Kapitän" : "kein Kapitän",
+                ].join(" · ");
+            return `• ${nameFuerTeam(eintrag.teamId) ?? eintrag.teamId} — ${einsatz}`;
+          })
+          .join("\n");
+        const uebrig = stapel.length - commitments.length;
         const bestaetigt =
           typeof window === "undefined"
             ? false
             : window.confirm(
-                `${stapel.length} Aufstellungen mit dem KI-Vorschlag abgeben und für diesen Spieltag festlegen?\n\n` +
+                `${commitments.length} Aufstellungen mit dem KI-Vorschlag abgeben und für diesen Spieltag festlegen?\n\n` +
                   `${zeilen}\n\n` +
+                  (uebrig > 0 ? `${uebrig} weitere Team(s) dürfen hier nicht schreiben und bleiben offen.\n\n` : "") +
                   "Danach lassen sich Aufstellung, Kapitän und Formkarten dieser Teams für diesen " +
                   "Spieltag nicht mehr ändern.",
               );
