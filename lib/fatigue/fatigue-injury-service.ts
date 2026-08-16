@@ -479,6 +479,28 @@ export function calculateTeamRecovery(gameState: GameState, teamId: string) {
   };
 }
 
+/**
+ * WIE SCHNELL SICH EIN VERLETZTER ERHOLT — im Verhaeltnis zu einem gesunden Ersatzspieler.
+ *
+ * ENTSCHEIDUNG VON CHRIS: „die verletzten erholung auf 1,0 gesetzt werden!"
+ *
+ * Vorher stand hier 0,5, und das erzeugte eine Spirale statt einer Pause. Gemessen am
+ * Live-Spielstand: 20 % ALLER Verletzungen sind Wiederholungstreffer, und zwar bei praktisch
+ * identischer Ermuedung (Folgeverletzung im Mittel 79,2, Erstverletzung 78,4). Der Ablauf war
+ * jedes Mal derselbe — bei 95 verletzt, 14 statt 28 abgebaut, kommt bei 81 zurueck, spielt, steht
+ * bei 97 und wuerfelt wieder gegen 25 %.
+ *
+ * Die Zwangspause soll den Spieler zuruecksetzen, nicht ihn zusaetzlich bestrafen: er faellt
+ * ohnehin aus und bringt dem Team in dieser Zeit nichts. Mit 1,0 erholt er sich wie ein
+ * Bankspieler — die Strafe ist der Ausfall, nicht ein zweiter Ausfall.
+ *
+ * WARUM NICHT STATTDESSEN DIE GRUNDERHOLUNG ANHEBEN: die trifft alle 32 Teams zugleich und
+ * verschenkt die Entlastung an gesunde Dauerspieler. Sie haette ausserdem den Verletzungskorridor
+ * gerissen, den Chris selbst gesetzt hat („ohne gebaeude frische boosts etc 150-200 ok", auf 140
+ * Untergrenze nachgezogen). Dieser Faktor trifft die Spirale statt der Giesskanne.
+ */
+const INJURY_RECOVERY_FACTOR = 1.0;
+
 export function calculatePlayerRecovery(
   gameState: GameState,
   teamId: string,
@@ -489,7 +511,7 @@ export function calculatePlayerRecovery(
   return {
     teamNormalRecovery: teamRecovery.normalRecovery,
     normalRecovery: modeRecovery.after,
-    injuryRecovery: round(modeRecovery.after * 0.5, 2),
+    injuryRecovery: round(modeRecovery.after * INJURY_RECOVERY_FACTOR, 2),
     trainingMode: trainingMode ?? "mittel",
     trainingRecoveryModifierPct: modeRecovery.modifierPct,
     trainingRecoveryLabel: modeRecovery.label,

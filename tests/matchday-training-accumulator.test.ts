@@ -121,14 +121,16 @@ describe("accumulateMatchdayTrainingProgress", () => {
     const accL0 = stateL0.players[0].seasonTrainingAccumulator?.accumulatedTrainingFatigue ?? 0;
     expect(accL0).toBeCloseTo(share("hart"), 5);
 
-    // Level 5 recovery center → 30% training-fatigue reduction (factor 0.70), so the applied share drops.
+    // Level 5 recovery center → 60% training-fatigue reduction (factor 0.40), so the applied share
+    // drops. Die Leiter wurde angehoben (Chris: „die leiter muss angehoben werden"): der Bonus auf
+    // Stufe 5 ging von 12 auf 24, und die Trainings-Reduktion haengt an genau diesem Bonus.
     let stateL5 = makeStateWithRecoveryLevel(makePlayer({ fatigue: 30, trainingMode: "hart" }), 5);
     stateL5 = run(stateL5, "md-1");
     const accL5 = stateL5.players[0].seasonTrainingAccumulator?.accumulatedTrainingFatigue ?? 0;
 
     expect(accL5).toBeLessThan(accL0);
-    // getRecoveryTrainingFatigueReductionPct(recovery L5) = 30 → factor 0.70.
-    expect(accL5).toBeCloseTo(share("hart") * 0.70, 5);
+    // getRecoveryTrainingFatigueReductionPct(recovery L5) = 60 → factor 0.40.
+    expect(accL5).toBeCloseTo(share("hart") * 0.4, 5);
     // The fatigue actually written to the player is lower with the recovery center.
     expect(stateL5.players[0].fatigue).toBeLessThan(stateL0.players[0].fatigue);
   });

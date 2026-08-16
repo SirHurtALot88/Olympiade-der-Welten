@@ -11,6 +11,7 @@ import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { resolveFatigueRestFloor, shouldRestForFatigue } from "@/lib/fatigue/fatigue-rest-propensity";
+import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 
 export type AiTeamTrainingIntensity = "light" | "normal" | "hard";
 
@@ -465,7 +466,17 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
   );
   // Kadergroessen-abhaengiger Fatigue-Boden: duenne Kader (wenig Ersatz ueber den Startplaetzen)
   // schonen frueher auf "leicht", damit nicht der ganze Kader gleichzeitig in Fatigue laeuft.
-  const restFloor = resolveFatigueRestFloor({ rosterSize: rosterEntries.length });
+  //
+  // DER SPIELTAGSBEDARF WIRD JETZT DURCHGEREICHT. Ohne ihn fiel die Schwelle auf eine feste 7
+  // zurueck — und weil kein Aufrufer den echten Wert lieferte, war diese 7 nicht der Notnagel,
+  // sondern die Regel. Ein Spieltag verlangt aber die SUMME beider Disziplinen (4 bis 12), und
+  // ein Neunmannkader an einem Elferspieltag galt damit als „zwei Ersatzspieler": er bekam einen
+  // Boden von 37 statt der 32 fuer duenne Kader und schonte zu spaet.
+  const restFloor = resolveFatigueRestFloor({
+    rosterSize: rosterEntries.length,
+    startingSlots:
+      resolveMatchdayPlayerDemand(input.gameState, input.gameState.matchdayState.matchdayId) ?? undefined,
+  });
   const restMatchdayId = input.gameState.matchdayState.matchdayId;
   const currentSchedule =
     input.gameState.seasonState.disciplineSchedule?.find(

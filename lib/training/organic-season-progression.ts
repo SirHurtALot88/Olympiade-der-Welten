@@ -557,6 +557,24 @@ const ATTRIBUTE_FALLBACK_AXIS: Record<PlayerGeneratorAttributeName, "pow" | "spe
   spirit: "soc",
 };
 
+/**
+ * Hat der Achsen-Fallback gegriffen? — `true`, wenn mindestens ein Feinattribut nicht aus dem
+ * Attributbogen kam, sondern aus dem groben Achsenwert (POW/SPE/MEN/SOC) abgeleitet wurde.
+ *
+ * WARUM DAS JEMAND WISSEN MUSS (Ticket #40): der Fallback ist fuer frische Spielstaende gebaut,
+ * die noch keinen Bogen haben. Trifft er dagegen auf einen Spieler, fuer den es ein
+ * `playerPotential`-Record MIT Attributdecken gibt, entsteht ein Widerspruch: der grobe
+ * Achsenwert liegt regelmaessig ueber der Decke, und der Clamp zieht das Attribut auf die Decke
+ * herunter — als waere der Spieler abgestuerzt. Gemessen am Live-Spielstand ergab das fuer
+ * Pandemonium (T-T) awareness 33,94 gegen eine Decke von 7, also -26,94 in einem einzigen
+ * Attribut, und -36 SP fuer die Saison. Chris' Meldung: „er soll angeblich extrem viel awareness
+ * und will verlieren was nicht korrekt ist. auf seinem spielerprofil sieht es normal aus."
+ */
+export function didPlayerAttributesFallBackToAxes(player: Player): boolean {
+  const stats = player.attributeSheetStats;
+  return PROGRESSION_ATTRIBUTE_ORDER.some((attribute) => !isFiniteNumber(stats?.[attribute]));
+}
+
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {
   const stats = player.attributeSheetStats;
   const attributes = Object.fromEntries(
@@ -916,7 +934,30 @@ export function buildOrganicSeasonProgression(input: {
   regressionMatchdayScale?: number;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
-  if (!attributesBefore) {
+  /**
+   * DIE KAPUTTE KOMBINATION: Attributbogen fehlt, Potenzial-Record ist aber da.
+   *
+   * Dann fuellt der Achsen-Fallback grobe Werte ein, waehrend die Decken aus dem echten Record
+   * kommen. Der Clamp `after = clamp(before + delta, 1, ceiling)` zieht die Differenz herunter und
+   * erfindet dabei einen Absturz, den es nicht gibt.
+   *
+   * Wer davon betroffen ist, ist kein Zufall: der kompakte Client-Payload streicht
+   * `attributeSheetStats` fuer alle Spieler ausserhalb der menschlich gefuehrten Kader
+   * (`foundation-initial-compact-state.ts`). Im Browser trifft es also GENAU die fremden Teams —
+   * am Live-Spielstand alle 13 Spieler von T-T.
+   *
+   * Statt einer erfundenen Zahl steht hier jetzt derselbe Leer-Pfad wie bei ganz fehlenden
+   * Attributen, mitsamt seiner Warnung. Das folgt der Regel, die dieses Projekt schon einmal
+   * festgehalten hat: ein sichtbar leeres Feld ist reparierbar, eine falsche Zahl wird geglaubt.
+   *
+   * Der Fall, fuer den der Fallback gebaut wurde, bleibt unberuehrt: ein frisch angelegter
+   * Spielstand hat KEINEN Potenzial-Record, also greift diese Bremse dort nicht.
+   */
+  const hatDeckenOhneBogen =
+    attributesBefore != null &&
+    didPlayerAttributesFallBackToAxes(input.player) &&
+    (input.gameState.playerPotential ?? []).some((eintrag) => eintrag.playerId === input.player.id);
+  if (!attributesBefore || hatDeckenOhneBogen) {
     const empty = Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0])) as PlayerGeneratorAttributes;
     return {
       playerId: input.player.id,

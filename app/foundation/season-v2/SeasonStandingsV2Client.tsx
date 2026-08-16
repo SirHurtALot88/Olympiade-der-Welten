@@ -62,6 +62,16 @@ export type SeasonV2StandingsRow = {
   guvPosten?: import("@/lib/finance/season-end-guv").SeasonGuvPosten[] | null;
   /** Gebäude-Unterhalt p.a. (Summe der Season-Upkeeps gebauter Anlagen). */
   buildingCost: number | null;
+  /**
+   * Verletzungen dieser Saison — GEMELDET VON CHRIS (Ticket #34): „im Saisonstand eine Spalte
+   * einfügen mit der Anzahl an Verletzungen!"
+   *
+   * Gezaehlt von `countTeamSeasonInjuries`, also derselben Stelle, aus der auch die Teamhistorie
+   * liest. Die Funktion fuehrt zwei Quellen zusammen (`seasonState.injuryEvents` und
+   * `player.injuryHistory`) und entdoppelt ueber `eventId` — beide fuer sich waeren unvollstaendig,
+   * beide zusammen ohne Entdopplung zu hoch.
+   */
+  injuries?: number | null;
   guv: number | null;
   sponsorTotal: number | null;
   /** Transferbilanz der Saison = Verkäufe − Käufe (S1 nur Käufe → großes Minus). */

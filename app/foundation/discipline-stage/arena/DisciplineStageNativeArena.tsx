@@ -75,7 +75,12 @@ export type NativeStageTeam = {
   name: string;
   logoUrl: string | null;
   isOwn: boolean;
-  players: NativeStagePlayer[];
+  /**
+   * Positionsgetreu: der Index IST die Etappe, `null` heisst „unbesetzt" (Ticket #35). Ein Team
+   * mit Spielern auf Slot 5 und 6 hat hier vier fuehrende `null`-Eintraege — vorher rutschten die
+   * beiden auf Etappe 1 und 2, unter fremde Rollen-Labels.
+   */
+  players: Array<NativeStagePlayer | null>;
   seasonRank?: number; // echter Season-Tabellenrang → Bahn-/Turm-Reihenfolge
   teamId?: string; // für Team-Drawer
   rel?: TeamRelationshipKind | null; // Freund/Feind (mine/ally/rival) → Rahmen-Marker
@@ -1096,7 +1101,12 @@ export type StageSlotTeam = {
   logoUrl: string | null;
   isOwn: boolean;
   seasonRank: number;
-  players: NativeStagePlayer[];
+  /**
+   * Positionsgetreu: der Index IST die Etappe, `null` heisst „unbesetzt" (Ticket #35). Ein Team
+   * mit Spielern auf Slot 5 und 6 hat hier vier fuehrende `null`-Eintraege — vorher rutschten die
+   * beiden auf Etappe 1 und 2, unter fremde Rollen-Labels.
+   */
+  players: Array<NativeStagePlayer | null>;
 };
 // Reihenfolge einer Etappe: alle Teams nach Netto ihres Slot-Spielers absteigend,
 // Tiebreak Season-Rang. DIE eine Quelle für Runden-Slot-Ränge, Etappensieger-Netto
@@ -1232,7 +1242,12 @@ export type RT = {
   rel: TeamRelationshipKind | null; // Freund/Feind → Rahmen-Marker
   missingLineup: boolean; // A2: keine Aufstellung eingereicht — 0 ist kein echtes Ergebnis
   captainName: string | null; // in der Einsatzliste gesetzter Kapitän → Stern am Wappen
-  players: NativeStagePlayer[];
+  /**
+   * Positionsgetreu: der Index IST die Etappe, `null` heisst „unbesetzt" (Ticket #35). Ein Team
+   * mit Spielern auf Slot 5 und 6 hat hier vier fuehrende `null`-Eintraege — vorher rutschten die
+   * beiden auf Etappe 1 und 2, unter fremde Rollen-Labels.
+   */
+  players: Array<NativeStagePlayer | null>;
   seasonRank: number;
   laneIdx: number; // dichte 0…N-1 Bahn-/Turm-Reihenfolge nach seasonRank (keine Lücken)
   score: number;

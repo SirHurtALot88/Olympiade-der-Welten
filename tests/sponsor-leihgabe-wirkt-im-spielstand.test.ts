@@ -78,7 +78,10 @@ describe("Leihgabe im Spielstand", () => {
       baueSpielstand({ eigeneStufe: 0, leihgabe: { facilityId: "recovery_center", stufe: 3, zustandPct: 100 } }),
       "T-1",
     );
-    expect(applyRecoveryFacilityModifiers(20, mit).flatBonus).toBe(6);
+    // Stufe 3 der angehobenen Reha-Leiter (Chris: „die leiter muss angehoben werden"):
+    // [0,4,8,13,18,24] statt [0,2,4,6,9,12]. Der Punkt dieses Tests ist unveraendert — eine
+    // GELIEHENE Anlage wirkt genauso wie eine gebaute, es gibt keinen Sonderpfad.
+    expect(applyRecoveryFacilityModifiers(20, mit).flatBonus).toBe(13);
   });
 
   it("laesst den eigenen Bestand stehen, wenn er besser ist", () => {

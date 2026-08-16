@@ -77,7 +77,22 @@ async function main() {
   const persistence = createPersistenceService();
 
   console.log("=== ABNAHMELAUF: NEUES SPIEL ===\n");
-  const save = persistence.createFreshSeasonOneSave({ name: "Abnahmelauf" });
+  /**
+   * FESTER STARTWURF, WENN GEWUENSCHT — `ABNAHME_SAVE_ID=<kennung>`.
+   *
+   * Ohne ihn traegt die Kennung `Date.now()`, und weil `draftSeed` aus ihr gebildet wird
+   * (`${saveId}:preseason:${teamId}`, Zeile ~377), wuerfelt jeder Lauf eine andere Liga aus.
+   * Gemessen an drei Laeufen kamen 222, 188 und 230 Verletzungen heraus — eine Spanne von 19 %,
+   * ohne dass sich am Code etwas geaendert haette.
+   *
+   * DAS IST EINE FALLE FUER BALANCE-VERGLEICHE: wer zwei Laeufe gegeneinander haelt, misst die
+   * Streuung und haelt sie fuer die Wirkung. Genau das ist hier schon einmal passiert. Mit fester
+   * Kennung ist die Liga identisch, und der Unterschied kommt aus der Aenderung.
+   */
+  const save = persistence.createFreshSeasonOneSave({
+    saveId: process.env.ABNAHME_SAVE_ID || undefined,
+    name: "Abnahmelauf",
+  });
   const saveId = save.saveId;
   let gameState = save.gameState;
   const seasonId = gameState.season.id;
@@ -197,8 +212,33 @@ async function main() {
   console.log(`Teampunkte gegen unabhaengige Nachrechnung: ${punkteAbweichend} von 32 abweichend, max ${z(maxPunkteDelta)}`);
   if (punkteAbweichend > 0) fehler.push(`Punkte: ${punkteAbweichend} von 32 Teams weichen ab (max ${z(maxPunkteDelta)})`);
 
+  /**
+   * RANGPRUEFUNG MIT PUNKTGLEICHHEIT.
+   *
+   * Vorher wurde stur nach Punkten sortiert und Position gegen gebuchten Rang gehalten. Bei
+   * Gleichstand ist das keine Pruefung, sondern Zufall: `Array.prototype.sort` ist stabil und
+   * laesst punktgleiche Teams in der Reihenfolge von `gameState.teams` stehen (alphabetisch),
+   * waehrend die echte Tabelle eine Feinwertung anlegt. Ein einziger Gleichstand meldete damit
+   * ZWEI Abweichungen, ohne dass irgendetwas falsch war — gemessen an einem Lauf, in dem T-T und
+   * M-M beide auf 130,3 Punkte kamen. Der Schnappschuss derselben Saison zeigte 0 Abweichungen.
+   *
+   * Richtig ist: punktgleiche Teams duerfen die Raenge ihrer Gruppe UNTEREINANDER frei verteilen.
+   * Gemeldet wird nur, wenn ein Team einen Rang AUSSERHALB des Blocks bekommt, den seine
+   * Punktzahl beansprucht — das waere ein echter Fehler.
+   */
   const sortiert = [...gameState.teams].sort((a, b) => (stand[b.teamId]?.points ?? 0) - (stand[a.teamId]?.points ?? 0));
-  const rangFalsch = sortiert.filter((team, index) => (stand[team.teamId]?.rank ?? 0) !== index + 1).length;
+  let rangFalsch = 0;
+  for (let start = 0; start < sortiert.length; ) {
+    const punkte = stand[sortiert[start]!.teamId]?.points ?? 0;
+    let ende = start;
+    while (ende < sortiert.length && (stand[sortiert[ende]!.teamId]?.points ?? 0) === punkte) ende += 1;
+    const erlaubteRaenge = new Set<number>();
+    for (let position = start; position < ende; position += 1) erlaubteRaenge.add(position + 1);
+    for (let position = start; position < ende; position += 1) {
+      if (!erlaubteRaenge.has(stand[sortiert[position]!.teamId]?.rank ?? 0)) rangFalsch += 1;
+    }
+    start = ende;
+  }
   console.log(`Tabellenraenge gegen unabhaengige Sortierung: ${rangFalsch} von 32 abweichend`);
   if (rangFalsch > 2) auffaellig.push(`Tabelle: ${rangFalsch} Raenge weichen von der reinen Punktsortierung ab (Gleichstandsregeln?)`);
 

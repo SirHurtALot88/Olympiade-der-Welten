@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { NULA_PLAYER_ID } from "@/lib/foundation/ensure-nula-on-project-suicide";
 import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
@@ -3515,8 +3516,25 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   if (!dryRun && params.confirmToken !== CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN) {
     throw new Error("chunked_redraft_confirm_token_required");
   }
-  if (params.mode === "full_clean_redraft" && save.gameState.rosters.length > 0) {
-    throw new Error(`full_clean_redraft_requires_empty_rosters:${save.gameState.rosters.length}`);
+  if (params.mode === "full_clean_redraft") {
+    /**
+     * NULA ZAEHLT NICHT GEGEN DEN LEEREN KADER — Chris: „pass den draft entsprechend an, Nula
+     * gehört mit dazu die bleibt bei P-S".
+     *
+     * Zwei bewusste Regeln stiessen hier zusammen. P-S kauft das Maskottchen BEIM ANLEGEN
+     * (`ensureNulaOnProjectSuicide`, Chris: „das ist ok so!"), und dieser Riegel verlangt einen
+     * voellig leeren Kader. Ergebnis: `full_clean_redraft` konnte auf einem frischen Spielstand
+     * gar nicht mehr starten — der Modus war durch eine andere gewollte Regel unerreichbar
+     * geworden.
+     *
+     * Der Riegel selbst bleibt und ist richtig: er soll verhindern, dass ein Neuaufbau auf einen
+     * bereits gefuellten Kader draufsetzt. Nula ist davon die eine dokumentierte Ausnahme, weil
+     * sie per Sonderregel ohnehin nach jedem Lauf wieder bei P-S landet.
+     */
+    const fremdeEintraege = save.gameState.rosters.filter((eintrag) => eintrag.playerId !== NULA_PLAYER_ID);
+    if (fremdeEintraege.length > 0) {
+      throw new Error(`full_clean_redraft_requires_empty_rosters:${fremdeEintraege.length}`);
+    }
   }
 
   const resumeState = params.resume ? readResumeState(outputDir, save.saveId) : null;
