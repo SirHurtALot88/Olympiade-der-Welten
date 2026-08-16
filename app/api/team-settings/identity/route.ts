@@ -11,6 +11,7 @@ import {
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 
 /** Fields a caller may patch on a team's identity draft. Never accepts `teamId`. */
 type TeamIdentityPatch = Partial<Omit<TeamIdentity, "teamId">>;
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "team_not_found" }, { status: 404 });
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -74,7 +78,7 @@ export async function POST(request: Request) {
       source,
       dryRun: false,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {

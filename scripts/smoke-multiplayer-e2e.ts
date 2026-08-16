@@ -16,6 +16,7 @@ import type {
 import type { OlyRoomState } from "@/types/game";
 import { ROOM_FLOW_STEPS } from "@/lib/room/room-flow-controller";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 
 type JsonObject = Record<string, any>;
 type OlySocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -73,6 +74,17 @@ async function fetchJson(baseUrl: string, pathname: string): Promise<JsonObject>
     throw new Error(`GET ${pathname} failed: ${response.status} ${text.slice(0, 200)}`);
   }
   return body;
+}
+
+async function postJson(baseUrl: string, pathname: string, payload: JsonObject): Promise<{ status: number; body: JsonObject }> {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  return { status: response.status, body };
 }
 
 async function isServerReachable(baseUrl: string) {
@@ -147,6 +159,21 @@ function waitForJoined(socket: OlySocket, trigger: () => void) {
     });
     trigger();
   });
+}
+
+/**
+ * Selbstheilung fuer eine unfreiwillige Server-seitige "offline"-Markierung (403
+ * `participant_offline`) waehrend der CPU-lastigen Kader-Befuellung weiter unten — genau das
+ * Muster aus `scripts/audit-koop-spielbarkeit.ts` (`rejoinChris`/`rejoinFranky`): ein langer,
+ * synchron rechnender Liga-Draft- oder Kauf-Chunk kann die Event-Loop lang genug blockieren,
+ * dass ein Socket.io-Heartbeat verhungert. Der Client-Socket reconnectet sich selbst (Default),
+ * hier wird nur der App-seitige Rejoin (Sitz wieder als "online" eintragen) nachgeholt.
+ */
+async function rejoinParticipant(socket: OlySocket, roomCode: string, seatToken: string) {
+  if (!socket.connected) {
+    await waitForSocketConnect(socket);
+  }
+  await waitForJoined(socket, () => socket.emit("rejoinRoom", { roomCode, seatToken }));
 }
 
 function waitForState(socket: OlySocket, predicate: (state: OlyRoomState) => boolean, label: string) {
@@ -253,6 +280,20 @@ async function openFoundationArenaPage(
   // aber durch die Discipline-Stage-Arena ersetzt wurde (app/foundation/discipline-stage/arena/
   // DisciplineStageNativeArena.tsx) - "arena-stage" ist deren aktueller Container.
   await page.getByTestId("arena-stage").waitFor({ timeout: 90_000 });
+
+  // Neuer Befund (dieser Lauf, nach `ensureLeagueRostersPlayable`): seit die Liga echte Kader hat,
+  // ist Spieltag 1 dieser Saison zum ERSTEN Mal ueberhaupt eine echte Saison mit currentMatchday<=1
+  // - `shouldAutoOpenSeasonBriefing` (lib/foundation/game-flow-controller.ts:939-969) oeffnet dafuer
+  // automatisch das Season-Briefing-Modal (`season-briefing-backdrop`, FoundationShellRouterBody.tsx)
+  // ÜBER der ganzen Buehne. Ohne diesen Save mit vorher leeren Rostern kam kein Lauf je bis hierher,
+  // der Blocker war also unsichtbar. Das Modal faengt Klicks per `pointer-events` ab (das brachte
+  // den vorherigen Lauf 30s lang auf `arena-prematch-start-cta` zum Timeout) - "Später" schliesst
+  // es ueber genau den App-eigenen Weg (`closeSeasonBriefing(false)`), kein Force-Klick noetig.
+  const seasonBriefingBackdrop = page.getByTestId("season-briefing-backdrop");
+  if (await seasonBriefingBackdrop.isVisible().catch(() => false)) {
+    await page.getByRole("button", { name: "Später" }).first().click();
+    await seasonBriefingBackdrop.waitFor({ state: "detached", timeout: 10_000 });
+  }
 }
 
 async function screenshot(page: Page, name: keyof typeof SCREENSHOTS) {
@@ -385,6 +426,223 @@ async function ensureIsolatedMultiplayerE2ESave(baseUrl: string) {
   return { saveId: snapshot.saveId, gameState: scoped.save?.gameState };
 }
 
+/**
+ * Besorgt der ganzen 32-Team-Liga einen echten Kader, BEVOR `ensureFullLeagueLineupReadiness`
+ * versucht, daraus eine Aufstellung abzuleiten — ohne Kader liefert `ai-preview` fuer jedes
+ * betroffene Team `entries: []`, und genau daran scheiterte dieses Skript reproduzierbar
+ * ("ai-preview lieferte keine entries fuer D-P").
+ *
+ * Befund, nachgemessen an einer frischen Kopie GENAU dieses isolierten Saves (nicht vermutet):
+ * NICHT nur die acht menschlichen Teams sind ohne Kader, wie die urspruengliche Diagnose annahm
+ * ("D-P ist eines von Chris' eigenen Teams, Menschen draften selbst") — 30 von 32 Teams stehen
+ * bei GENAU 0 Rosterspielern, die uebrigen zwei (P-S, M-M) bei genau 1 uebrig gebliebenem
+ * Seed-Spieler. Grund: `ensureIsolatedMultiplayerE2ESave` snapshotet `bootstrapSingleplayerSave()`
+ * (lib/persistence/persistence-service.ts) — anders als der "Neues Spiel"-Assistent
+ * (app/api/new-game/route.ts:88, `kickoffLeagueSetupDraft`) laesst dieser Bootstrap-Pfad die
+ * gesamte Liga unbespielt. Deckt sich mit dem A2b-Befund in `scripts/audit-koop-spielbarkeit.ts`
+ * (dort fuer `createRoomCoopSave`-Saves, hier fuer den Bootstrap-Pfad — derselbe fehlende
+ * Draft-Aufruf, zwei verschiedene Save-Quellen). Die urspruengliche Diagnose war also nur zur
+ * Haelfte richtig: D-P fehlt der Kader nicht NUR, weil es ein Chris-Team ist, sondern weil hier
+ * gar kein Team einen hat — Chris' Teams sind bloss die, an denen es zuerst auffiel (die AI-Teams
+ * werden erst spaeter im Skript ueberhaupt angefasst).
+ *
+ * Gewaehlter Weg (am wenigsten Neues erfunden, zwei Alternativen bewusst NICHT genommen):
+ *  - NICHT `app/api/ai/roster-fill/route.ts`: `runAutoRosterFillForMatchdaySetup`
+ *    (lib/ai/auto-roster-fill-service.ts:503) verweigert jede `seasonId !== "season-1"` komplett
+ *    (gesperrtes Ergebnis, kein Kauf) — der isolierte Save hier landet zufaellig auf season-1,
+ *    aber dieses Skript soll gegen JEDEN Snapshot des aktiven Saves funktionieren, nicht nur den
+ *    zufaellig ersten.
+ *  - NICHT `kickoffLeagueSetupDraft` (lib/game/league-setup-draft-service.ts): fuer eine BRANDNEUE
+ *    Liga gedacht (asynchroner Hintergrund-Draft mit eigenem Status-Polling-Vertrag) und schliesst
+ *    menschlich gesteuerte Teams per Konstruktion IMMER aus (`excludeTeamIds`, siehe new-game/
+ *    route.ts:87) — exakt das Gegenteil dessen, was hier fuer Chris/Franky gebraucht wird.
+ *  - Stattdessen exakt das Muster aus `scripts/audit-koop-spielbarkeit.ts` ("A2c"/"A2d"): der HOST
+ *    (Chris) draftet ueber `/api/ai/picks-run` — host-level (HOST_LEVEL_ACTIONS,
+ *    server-authoritative-write-guard.ts:65-84), `resolveAiBulkTeamWriteScope`
+ *    (ai-bulk-team-write-scope.ts) begrenzt den Lauf serverseitig auf AI-Teams plus die EIGENEN
+ *    4 Teams des Aufrufers — in 4er-Haeppchen wie im Audit-Skript, weil ein einzelner Lauf ueber
+ *    28 Teams synchron lange genug rechnet, um Socket-Heartbeats verhungern zu lassen (siehe
+ *    `rejoinParticipant` oben). Frankys 4 Teams bleiben fuer `picks-run` unerreichbar (host-level
+ *    Aktionen ruehren nie ein fremdes Menschen-Team an — das ist die Sicherheitsregel, nicht ein
+ *    Bug) — die kauft er manuell ueber `/api/transfermarkt/buy`, der einzige verbliebene App-Weg
+ *    fuer ein Gast-Team (siehe C16-Befund im Audit-Skript: `picks-run` weist den Gast mit 403
+ *    `host_only_action` ab).
+ *
+ * Empirisch gemessen (lokal gegen `npm run start`, isolierter Save wie im echten Lauf): Host-Draft
+ * der 28 Teams (24 KI + eigene 4) in 7 Haeppchen ~100s, Gast-Kauf der 4 Franky-Teams (32 Spieler
+ * bis Mindestkadergroesse) ~72s — knapp 3 Minuten zusaetzliche Laufzeit, aber ohne diesen Schritt
+ * kommt das Skript nie ueber `ai-preview` hinaus.
+ */
+async function ensureLeagueRostersPlayable(input: {
+  baseUrl: string;
+  saveId: string;
+  seasonId: string;
+  roomCode: string;
+  hostSocket: OlySocket;
+  guestSocket: OlySocket;
+  chris: JsonObject;
+  chrisSeat: string;
+  franky: JsonObject;
+  frankySeat: string;
+  aiTeamIds: string[];
+}) {
+  const { baseUrl, saveId, seasonId, roomCode, hostSocket, guestSocket, chris, chrisSeat, franky, frankySeat, aiTeamIds } = input;
+
+  // Host: AI-Teams + eigene 4, in 4er-Haeppchen (siehe Kommentar oben).
+  const hostDraftTeamIds = [...aiTeamIds, ...(chris.controlledTeamIds as string[])];
+  for (let index = 0; index < hostDraftTeamIds.length; index += 4) {
+    const chunk = hostDraftTeamIds.slice(index, index + 4);
+    const runOnce = () =>
+      postJson(
+        baseUrl,
+        `/api/ai/picks-run?saveId=${encodeURIComponent(saveId)}&seasonId=${encodeURIComponent(seasonId)}&source=sqlite`,
+        {
+          dryRun: false,
+          confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+          teamScope: "all",
+          teamIds: chunk,
+          allowSetupAllTeams: true,
+          includeManualTeams: true,
+          roomCode,
+          participantId: chris.participantId,
+          seatToken: chrisSeat,
+          userId: chris.userId,
+        },
+      );
+    let draft = await runOnce();
+    if (draft.status === 403 && JSON.stringify(draft.body).includes("participant_offline")) {
+      await rejoinParticipant(hostSocket, roomCode, chrisSeat);
+      draft = await runOnce();
+    }
+    if (draft.status !== 200) {
+      throw new Error(
+        `Liga-Kader-Draft (Host) fuer ${chunk.join(",")} fehlgeschlagen: status=${draft.status} ` +
+          `error=${JSON.stringify(draft.body?.error ?? draft.body).slice(0, 300)}`,
+      );
+    }
+  }
+
+  // Gast: eigene 4 Teams manuell zusammenkaufen (kein KI-Weg erreichbar, siehe Kommentar oben).
+  for (const teamId of franky.controlledTeamIds as string[]) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const freeAgents = await fetchJson(
+        baseUrl,
+        `/api/transfermarkt/free-agents?saveId=${encodeURIComponent(saveId)}&seasonId=${encodeURIComponent(seasonId)}` +
+          `&teamId=${encodeURIComponent(teamId)}&limit=40`,
+      );
+      const items: JsonObject[] = freeAgents.items ?? [];
+      const rosterCount: number = items[0]?.rosterCount ?? 0;
+      const playerMin: number = items[0]?.playerMin ?? 6;
+      if (rosterCount >= Math.max(playerMin, 6)) break;
+      const kandidat = [...items]
+        .filter((item) => item.affordabilityStatus !== "blocked")
+        .sort((a, b) => (a.marketValue ?? 0) - (b.marketValue ?? 0))[0];
+      if (!kandidat) {
+        throw new Error(`Kein bezahlbarer Free Agent fuer ${teamId} (items=${items.length}).`);
+      }
+      const runOnce = () =>
+        postJson(baseUrl, "/api/transfermarkt/buy", {
+          saveId,
+          seasonId,
+          teamId,
+          playerId: kandidat.playerId,
+          dryRun: false,
+          roomCode,
+          participantId: franky.participantId,
+          seatToken: frankySeat,
+          userId: franky.userId,
+        });
+      let kauf = await runOnce();
+      if (kauf.status === 403 && JSON.stringify(kauf.body).includes("participant_offline")) {
+        await rejoinParticipant(guestSocket, roomCode, frankySeat);
+        kauf = await runOnce();
+      }
+      if (kauf.status !== 200 || kauf.body?.success !== true) {
+        throw new Error(
+          `Kauf fuer ${teamId} (${kandidat.playerId}) fehlgeschlagen: status=${kauf.status} ` +
+            `error=${JSON.stringify(kauf.body?.error ?? kauf.body).slice(0, 300)}`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Befund (dieser Lauf): die Discipline-Stage-Arena zeigt statt der NativeArena (und damit statt
+ * `arena-coop-status`) den Vorschau-Screen "Vor dem Anpfiff", solange
+ * `getMatchdayLeagueLineupReadiness` nicht ALLE 32 Liga-Teams als bereit meldet
+ * (app/foundation/discipline-stage/DisciplineStageArena.tsx:2394, `arenaStartBlockedByLineups`).
+ * `runRoomAiAutoStep` (Sitz A only in room-store.ts) ist reine Room-Flow-Buchhaltung — es schreibt
+ * NIE eine echte Aufstellung in den Spielstand (Kommentar dort: "NUR den Room-Flow-Schritt frei").
+ * Ohne echte Aufstellungen blieb die Liga bei diesem Skript dauerhaft auf 0/32 stehen und
+ * `arena-coop-status` erschien nie — das Skript hing 30s an `coopStatusA.waitFor` fest, WEIT VOR
+ * dem eigentlich zu pruefenden B3-Pfad (Host-Advance -> Gast-Ticker).
+ *
+ * Das war zum Zeitpunkt der letzten "lokal gruen" Verifikation (siehe Kommentar in ci.yml) noch
+ * kein Blocker — "Vor dem Anpfiff" (app/foundation/discipline-stage/DisciplineStageArena.tsx,
+ * Commit dc124799) kam offenbar erst SPAETER in diesen Pfad. Wie `scripts/audit-koop-spielbarkeit.ts`
+ * (Abschnitt "beideSpielerSetzenAufstellungen") es fuer Chris/Franky bereits vormacht: eine ECHTE
+ * Aufstellung ueber die App selbst abgeben, nicht simulieren. Hier per Stufe-2.1-Sammelroute
+ * (`PUT /api/lineups/legacy/batch`) statt der Einzelroute — EIN Aufruf je Besitzer fuer alle seine
+ * Teams, UND der Aufruf zieht die 24 KI-Teams automatisch nach (`applyAiLegacyLineupBatchLocally`
+ * innerhalb der Route, siehe app/api/lineups/legacy/batch/route.ts:191-209) — kein zusaetzlicher
+ * KI-Aufruf noetig. `confirmLock: true` gleich im ersten Aufruf (Stufe 2.5) macht daraus einen
+ * "locked"-Status, den `isTeamMatchdayLineupSubmitted` als abgegeben zaehlt; dieselbe Route ruft
+ * intern `ensureLocalFormCardsForSeason`, das erfuellt den zweiten Teil des Gates
+ * (Formkarten-POOL vorhanden — Auswahl bleibt optional, siehe form-card-flow.ts:76).
+ *
+ * Bewusst WEITERHIN keine "echten" (spielerisch durchdachten) Aufstellungen — genau wie der Rest
+ * dieses V1-Skripts (siehe `writeAudit.note`), der KI-Vorschlag reicht, um das Gate zu erfuellen.
+ * Was hier geprueft wird, ist der Sync-Pfad (B3), nicht Aufstellungsqualitaet.
+ */
+async function ensureFullLeagueLineupReadiness(input: {
+  baseUrl: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  roomCode: string;
+  owners: Array<{ participant: JsonObject; seatToken: string }>;
+}) {
+  for (const { participant, seatToken } of input.owners) {
+    const basisFor = (teamId: string) =>
+      `saveId=${encodeURIComponent(input.saveId)}&seasonId=${encodeURIComponent(input.seasonId)}` +
+      `&matchdayId=${encodeURIComponent(input.matchdayId)}&teamId=${encodeURIComponent(teamId)}`;
+
+    const teams: JsonObject[] = [];
+    for (const teamId of participant.controlledTeamIds as string[]) {
+      const preview = await fetchJson(input.baseUrl, `/api/lineups/legacy/ai-preview?${basisFor(teamId)}`);
+      const entries = preview.preview?.entries ?? preview.entries ?? [];
+      if (!Array.isArray(entries) || entries.length === 0) {
+        throw new Error(`ai-preview lieferte keine entries fuer ${teamId}: ${JSON.stringify(preview).slice(0, 300)}`);
+      }
+      teams.push({ teamId, entries });
+    }
+
+    const response = await fetch(
+      `${input.baseUrl}/api/lineups/legacy/batch?saveId=${encodeURIComponent(input.saveId)}` +
+        `&seasonId=${encodeURIComponent(input.seasonId)}&matchdayId=${encodeURIComponent(input.matchdayId)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          teams,
+          confirmLock: true,
+          roomCode: input.roomCode,
+          participantId: participant.participantId,
+          userId: participant.userId,
+          seatToken,
+        }),
+      },
+    );
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body.savedCount !== teams.length) {
+      throw new Error(
+        `Batch-Lineup-Speichern fuer ${participant.displayName} fehlgeschlagen: status=${response.status} body=${JSON.stringify(body).slice(0, 500)}`,
+      );
+    }
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   let server: ChildProcessWithoutNullStreams | null = null;
@@ -419,7 +677,74 @@ async function main() {
     assertSameMembers(chris.controlledTeamIds, CHRIS_TEAMS, "Chris teams");
     assertSameMembers(franky.controlledTeamIds, FRANKY_TEAMS, "Franky teams");
 
-    browser = await chromium.launch();
+    // Scoped auf `saveId`, NICHT den global "aktiven" Save: dieses Skript aktiviert seinen
+    // isolierten Save bewusst nicht global (siehe ensureIsolatedMultiplayerE2ESave), also wuerde
+    // eine ungescopte Abfrage hier den FALSCHEN Save lesen. `createRoom` reicht `saveId` unveraendert
+    // durch (room-store.ts:181-186) — `state.multiplayerRoom.saveId` und die hier verwendete
+    // Variable `saveId` sind derselbe Save.
+    const matchdayScope = await fetchJson(options.baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`);
+    const currentMatchdayId = matchdayScope.save?.gameState?.matchdayState?.matchdayId ?? null;
+    if (!currentMatchdayId) {
+      throw new Error(`Kein matchdayId auf dem isolierten Save ${saveId} gefunden.`);
+    }
+
+    // Siehe Kommentar an `ensureLeagueRostersPlayable`: der isolierte Save startet mit einer
+    // komplett unbespielten Liga (0 Rosterspieler fuer praktisch jedes Team), nicht nur ohne
+    // Kader fuer Chris/Franky. Muss VOR `ensureFullLeagueLineupReadiness` laufen — ohne Kader
+    // liefert `ai-preview` fuer jedes betroffene Team `entries: []`.
+    const aiTeamIds = state.teamOwnership
+      .filter((entry) => entry.controllerType === "ai")
+      .map((entry) => entry.teamId);
+    await ensureLeagueRostersPlayable({
+      baseUrl: options.baseUrl,
+      saveId,
+      seasonId: state.roomFlowState.activeSeasonId,
+      roomCode,
+      hostSocket: socketA,
+      guestSocket: socketB,
+      chris,
+      chrisSeat: created.seatToken,
+      franky,
+      frankySeat: joined.seatToken,
+      aiTeamIds,
+    });
+
+    await ensureFullLeagueLineupReadiness({
+      baseUrl: options.baseUrl,
+      saveId,
+      seasonId: state.roomFlowState.activeSeasonId,
+      matchdayId: currentMatchdayId,
+      roomCode,
+      owners: [
+        { participant: chris, seatToken: created.seatToken },
+        { participant: franky, seatToken: joined.seatToken },
+      ],
+    });
+
+    // SELBSTHEILUNG AUCH HIER, aus demselben Grund wie im Kader-Schritt (siehe
+    // `rejoinParticipant` oben) -- sie fehlte an dieser Stelle, und das ist ein echter Riss im
+    // Netz: der Aufstellungs-Schritt ist der TEUERSTE des ganzen Laufs. Er rechnet nicht nur acht
+    // `ai-preview`s, sondern zieht ueber die Sammelroute auch die KI-Aufstellungen der restlichen
+    // 24 Teams nach -- fuer 32 Teams sind das nach der Messung in
+    // lib/season/matchday-progress-service.ts 15-21 s synchroner Rechenzeit. Genau so lange kann
+    // ein Socket.io-Heartbeat verhungern; der Server markiert den Sitz dann als offline, der
+    // Client-Socket reconnectet zwar von selbst, ist danach aber nicht mehr im io-Raum und
+    // bekommt KEINE `roomState`-Broadcasts mehr.
+    //
+    // GEMESSEN, nicht vermutet: vier lokale Laeufe hintereinander starben danach reproduzierbar
+    // mit `room_state_timeout:chris-ready-lobby` -- der Bereit-Ruf ging raus, die Antwort kam nie
+    // an, und im Server-Log stand dazu KEIN Fehler (der Aufruf selbst war ja erfolgreich). In der
+    // CI faellt es nicht auf, weil deren Runner den Schritt schnell genug durchrechnet; auf einer
+    // langsameren Maschine ist es ein sicherer Fehlschlag und in der CI ein latentes Flackern.
+    await rejoinParticipant(socketA, roomCode, created.seatToken);
+    await rejoinParticipant(socketB, roomCode, joined.seatToken);
+
+    // `PW_EXEC`, wie schon in scripts/smoke-gameplay.ts:576 — lokale Sandboxes stellen unter
+    // /opt/pw-browsers oft eine andere Chromium-Revision bereit, als das installierte
+    // playwright-core erwartet (`chromium.launch()` sucht dann eine Revisions-Ordner-ID, die es
+    // nicht gibt). CI installiert Chromium frisch passend zur Revision (`--with-deps`), dort bleibt
+    // PW_EXEC unset und das Verhalten unveraendert.
+    browser = await chromium.launch({ executablePath: process.env.PW_EXEC || undefined });
     const contextA = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const contextB = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
     const pageA = await contextA.newPage();
@@ -551,14 +876,9 @@ async function main() {
 
     if (state.roomFlowState.step === "arena") {
       // Die Discipline-Stage-Arena startet den Reveal-Sync nur, wenn `getMatchdayLeagueLineupReadiness`
-      // fuer ALLE 32 Liga-Teams "bereit" meldet (echte Aufstellung + Formkarten). Dieses V1-Skript
-      // schreibt - wie schon fuer sell/buy/facilities/training/lineup/formcards weiter oben - bewusst
-      // KEINE echten Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber
-      // echte Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
-      // unabhaengig (das Gate lebt rein im Client-Effect, siehe DisciplineStageArena.tsx), genau wie es
-      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert — hier wird
-      // derselbe Weg genommen, um die Arena fuer den DOM-Teil dieses Tests ueberhaupt erreichbar zu
-      // machen.
+      // fuer ALLE 32 Liga-Teams "bereit" meldet (echte Aufstellung + Formkarten) —
+      // `ensureFullLeagueLineupReadiness` weiter oben hat das bereits ueber echte App-Schreibvorgaenge
+      // sichergestellt.
       //
       // "arena-coop-ready-gate" / "Bereit für den Spieltag" / "Weiter" / "Phase X/7" waren
       // Selektoren der frueheren MatchdayArenaNewLook-Komponente. Die Arena wurde seither durch
@@ -578,62 +898,90 @@ async function main() {
         seatToken: joined.seatToken,
       });
 
+      // Zweiter, VON DER LIGA-BEREITSCHAFT UNABHAENGIGER Zwischenschritt: "Vor dem Anpfiff"
+      // (DisciplineStageArena.tsx, `data-arena-prematch="true"`, seit Commit dc124799) ersetzt die
+      // ganze Buehne — auch bei 32/32 bereiten Teams — durch einen Vorschau-Screen, bis die
+      // spielende Person selbst auf "Zur Bühne →" (`arena-prematch-start-cta`) klickt. Ohne diesen
+      // Klick bleibt `arena-coop-status` (das lebt in der NativeArena DAHINTER) fuer immer
+      // unerreichbar — das war der eigentliche Grund fuer den 30s-Timeout hier, nicht B3.
+      // ... ABER IM RAUM DARF DIESE TAFEL SCHON WEG SEIN, und dann gibt es den Knopf zu Recht
+      // nicht mehr. Das ist der Befund aus den CI-Laeufen 1918/1923/1925 — und es ist KEIN Fehler,
+      // sondern die im Mehrspieler ausdruecklich gebaute Eigenschaft: `onApplyRevealSync`
+      // (DisciplineStageArena.tsx) setzt `preMatchdayDismissed`, sobald ein RoomArenaState fuer
+      // diese Arena eintrifft. Ohne das blieb der GAST fuer immer auf "Vor dem Anpfiff" stehen,
+      // waehrend der Host laengst gestartet hatte.
+      //
+      // Der Host-Client startet den Reveal inzwischen SELBST, sobald die Liga bereit ist
+      // (Auto-Start-Effekt, siehe Kommentar am `arena-coop-ready`-Wait unten). Ob dieser Sync vor
+      // oder nach dem Oeffnen der Seite eintrifft, ist ein reines Wettrennen — beide Ausgaenge sind
+      // richtig. Der festgehaltene Bildschirmtext des Fehllaufs zeigte genau den zweiten Fall:
+      // Buehne offen ("ARENA · Hockey · MUTATOREN"), Koop-Tor aktiv ("Der Host steuert die
+      // Anzeige", "Warte auf: Fran") — also alles erreicht, worauf der Test danach wartet, nur eben
+      // ohne den Zwischenschritt.
+      //
+      // Deshalb wird hier auf ENTWEDER den Knopf ODER die schon offene Buehne gewartet und nur
+      // geklickt, was wirklich da ist. Ein harter Wait auf den Knopf wuerde eine Eigenschaft
+      // erzwingen, die im Raum bewusst nicht gilt.
+      async function passPreMatchdayBoard(page: Page, label: string) {
+        const cta = page.getByTestId("arena-prematch-start-cta");
+        const coopStatus = page.getByTestId("arena-coop-status");
+        try {
+          await Promise.race([
+            cta.waitFor({ timeout: 30_000 }),
+            coopStatus.waitFor({ timeout: 30_000 }),
+          ]);
+        } catch (error) {
+          await page.screenshot({ path: path.join(OUTPUT_DIR, `failure-prematch-${label}.png`), fullPage: true }).catch(() => {});
+          const body = await page.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+          await fs.writeFile(path.join(OUTPUT_DIR, `failure-prematch-body${label}.txt`), body);
+          console.error(`[prematch-cta] Weder Anpfiff-Knopf noch offene Buehne fuer ${label}.`);
+          console.error(`[prematch-cta] Bildschirmtext ${label}:\n${body.slice(0, 1500)}`);
+          throw error;
+        }
+        // Nur klicken, wenn die Tafel wirklich noch steht. `isVisible()` fragt den JETZT-Zustand ab
+        // (kein Warten) — nach dem Race oben ist genau einer der beiden Faelle bereits eingetreten.
+        if (await cta.isVisible().catch(() => false)) {
+          await cta.click();
+        }
+      }
+      await passPreMatchdayBoard(pageA, "A");
+      await passPreMatchdayBoard(pageB, "B");
+
       const coopStatusA = pageA.getByTestId("arena-coop-status");
       const coopStatusB = pageB.getByTestId("arena-coop-status");
-      await coopStatusA.waitFor({ timeout: 30_000 });
-      await coopStatusB.waitFor({ timeout: 30_000 });
+      try {
+        await coopStatusA.waitFor({ timeout: 30_000 });
+        await coopStatusB.waitFor({ timeout: 30_000 });
+      } catch (error) {
+        // Diagnose-Dump statt blindem Nochmal-Versuchen: das genau war das Werkzeug, mit dem sich
+        // dieser Block ueberhaupt reparieren liess (fehlender "Vor dem Anpfiff"-Klick, siehe oben) —
+        // ohne Body-Text/Screenshot haette der 30s-Timeout allein nicht zwischen B3 (Sync-Bug) und
+        // einem simplen "falscher Screen" unterschieden. Bleibt fuer den naechsten Fund stehen.
+        await pageA.screenshot({ path: path.join(OUTPUT_DIR, "failure-pageA.png"), fullPage: true }).catch(() => {});
+        await pageB.screenshot({ path: path.join(OUTPUT_DIR, "failure-pageB.png"), fullPage: true }).catch(() => {});
+        const bodyA = await pageA.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+        const bodyB = await pageB.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+        await fs.writeFile(path.join(OUTPUT_DIR, "failure-bodyA.txt"), bodyA);
+        await fs.writeFile(path.join(OUTPUT_DIR, "failure-bodyB.txt"), bodyB);
+        throw error;
+      }
 
-      // Beide Seiten sind bewusst VOR dem Arena-Start geladen: der Guest muss den
-      // "Warte auf den Host"-Hinweis sehen (arenaSyncState noch "idle"), bevor der Host ueberhaupt
-      // gestartet hat - das ist der Zustand, den ein echter Mitspieler beim Betreten zuerst sieht.
-      await pageB.getByTestId("arena-coop-follow").getByText("Warte auf den Host").waitFor({ timeout: 20_000 });
-      screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
-
-      // Die Discipline-Stage-Arena startet den Reveal-Sync nur automatisch, wenn
-      // `getMatchdayLeagueLineupReadiness` fuer ALLE 32 Liga-Teams "bereit" meldet (echte
-      // Aufstellung + Formkarten). Dieses V1-Skript schreibt - wie schon fuer
-      // sell/buy/facilities/training/lineup/formcards weiter oben - bewusst KEINE echten
-      // Gameplay-Daten (siehe writeAudit.note unten), kann das Client-Gate also nicht ueber echte
-      // Aufstellungen erfuellen. Der servergetriebene Start-Socket-Event ist von diesem Gate
-      // unabhaengig (das Gate lebt rein im Client-Effect), genau wie es
-      // `scripts/audit-koop-spielbarkeit.ts` (B3) fuer den Server-Pfad bereits verifiziert - hier
-      // wird derselbe Weg genommen, um den Reveal fuer den DOM-Teil dieses Tests ueberhaupt
-      // erreichbar zu machen. Beide Browser sind schon offen und reagieren auf den folgenden
-      // Broadcast wie auf jeden echten Room-Sync auch.
-      //
-      // Gefundener echter Bug beim ersten Anlauf dieses Fixes: `startRoomArena` OHNE explizites
-      // matchdayId liess den Server auf `String(activeMatchday)` ("1") zurueckfallen, waehrend die
-      // Discipline-Stage-Arena selbst mit dem echten `gameState.matchdayState.matchdayId`
-      // ("matchday-1") scoped (`matchesArenaScope` in lib/room/arena-sync-state.ts vergleicht
-      // exact) - das Ready-Gate blieb dadurch fuer die UI unsichtbar (arenaSyncState "lief", aber
-      // ausserhalb des vom Client erwarteten Scopes), obwohl der Server den Sync korrekt hielt.
-      // Der echte Client (DisciplineStageArena.tsx) uebergibt matchdayId/seasonId immer explizit -
-      // hier tun wir dasselbe, statt uns auf den (fuer echte Aufrufer nie genutzten) Server-Fallback
-      // zu verlassen. Fix des Fallbacks selbst: lib/room/arena-sync-state.ts.
-      // Scoped auf `saveId`, NICHT den global "aktiven" Save: dieses Skript aktiviert seinen
-      // isolierten Save bewusst nicht global (siehe ensureIsolatedMultiplayerE2ESave), also wuerde
-      // eine ungescopte Abfrage hier den FALSCHEN Save lesen.
-      const matchdayScope = await fetchJson(options.baseUrl, `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`);
-      const currentMatchdayId = matchdayScope.save?.gameState?.matchdayState?.matchdayId ?? null;
-      state = await emitAndWait(
-        socketA,
-        "startRoomArena",
-        {
-          roomCode,
-          seatToken: created.seatToken,
-          seasonId: state.roomFlowState.activeSeasonId,
-          matchdayId: currentMatchdayId,
-          maxSlotRevealCountByDiscipline: { d1: 2, d2: 2 },
-        },
-        (next) => next.arenaSyncState?.status === "ready_check",
-        "start-room-arena",
-      );
-
-      // Co-op ready gate: both real participants control teams, so the shared reveal must NOT
-      // start until both click ready — verified via the actual UI (not raw socket emits) to
-      // exercise the real DisciplineStageNativeArena + useArenaRoomSync wiring end-to-end.
+      // KEIN manueller `startRoomArena`-Socket-Emit mehr an dieser Stelle (frueher hier, mit hart
+      // codierten `{ d1: 2, d2: 2 }`): seit `ensureFullLeagueLineupReadiness` oben die Liga wirklich
+      // bereit meldet, feuert `DisciplineStageArena.tsx` seinen EIGENEN Auto-Start-Effekt (Zeile
+      // ~1219, `roomArenaSync.emitStartRoomArena`) von selbst, sobald der Host-Client mountet — mit
+      // den ECHTEN, ueber `computeStageSlotCount` berechneten Etappenzahlen. Ein zweiter, manueller
+      // Aufruf mit erfundenen Zahlen wuerde diesen echten Start nur ueberschreiben (jeder
+      // `startRoomArena`-Aufruf setzt `readyParticipantIds` zurueck auf `[]`, siehe
+      // `arena-sync-state.ts:228`) — deshalb hier bewusst NICHTS emittieren, nur auf das Ergebnis
+      // warten. Das ist auch der Grund, warum die fruehere "Warte auf den Host"-Zusicherung (Gast
+      // sieht `arenaSyncState` noch als "idle", bevor der Host manuell startet) entfallen ist: der
+      // Auto-Start feuert oft schon, bevor der Gast-Browser ueberhaupt navigiert — ein Wettlauf, der
+      // nichts Sync-Relevantes mehr belegt. Was zaehlt (beide Clients landen im SELBEN Gate, mit den
+      // SELBEN echten Werten), prueft der folgende `arena-coop-ready`-Wait auf BEIDEN Seiten.
       await pageA.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
       await pageB.getByTestId("arena-coop-ready").waitFor({ timeout: 20_000 });
+      screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
 
       const primaryStepA = pageA.getByTestId("arena-primary-step");
       const primaryStepB = pageB.getByTestId("arena-primary-step");
@@ -756,7 +1104,11 @@ async function main() {
         generatedWrites,
         unauthorizedWrites: [],
         destructiveGameWrites: [],
-        note: "V1 prueft serverseitige Autorisierung und Room-Flow. Buy/Sell/Lineup/Result werden nicht produktiv geschrieben.",
+        note:
+          "V1 prueft serverseitige Autorisierung und Room-Flow. Buy/Sell/Result werden nicht produktiv geschrieben. " +
+          "Lineups sind seit `ensureFullLeagueLineupReadiness` die Ausnahme: alle 32 Liga-Teams bekommen eine echte, " +
+          "KI-vorgeschlagene Aufstellung (Chris/Franky ueber die Sammelroute, KI-Teams von derselben Route mitgezogen) " +
+          "— sonst rendert die Arena-Seite nur den 'Vor dem Anpfiff'-Vorschauzustand und `arena-coop-status` erscheint nie.",
       },
       screenshots,
     };

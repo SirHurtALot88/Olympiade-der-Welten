@@ -4,7 +4,10 @@ import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
 import {
   advanceRoomArenaReveal,
   isRoomArenaReady,
+  quickSimRoomArenaReveal as buildQuickSimmedRoomArenaState,
+  resetRoomArenaReveal as buildResetRoomArenaState,
   setRoomArenaParticipantReady,
+  setRoomArenaPaused as buildRoomArenaPausedState,
   startRoomArena as buildStartedRoomArenaState,
   syncRoomArenaParticipants,
 } from "@/lib/room/arena-sync-state";
@@ -16,6 +19,8 @@ import {
   buildParticipant,
   buildTurnState,
   canParticipantControlTeam,
+  isRoomMatchdayInProgress,
+  resolveFrankyParticipant,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
 import {
@@ -29,7 +34,17 @@ import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { registerLiveRoomSaveId } from "@/lib/room/live-room-save-registry";
-import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
+import {
+  deletePersistedRoom,
+  loadPersistedRuntimeRooms,
+  persistRuntimeRoom,
+  ROOM_EXPIRY_MS,
+} from "@/lib/room/room-persistence";
+import {
+  applyGameModeOwnership,
+  buildTeamControlSettingsMap,
+  deriveChrisFrankyTeamIdsFromSettings,
+} from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { RoomOwnershipPreset } from "@/types/events";
@@ -54,6 +69,43 @@ const runtimeRooms: Map<string, RuntimeRoom> = (globalThis.__olyRuntimeRooms ??=
 
 function getSeatCount(room: RuntimeRoom) {
   return Object.values(room.seats).filter(Boolean).length;
+}
+
+/**
+ * KORREKTUR (16.08.2026, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, F1): Chris' ausdrueckliche Vorgabe
+ * war "im multiplayer spielstand soll man auch nicht solo weiter spielen und franky darf den auch
+ * nicht löschen" -- der urspruengliche Plan (ein Raum-Ende macht den Save wieder solo-spielbar)
+ * ist damit AUSDRUECKLICH FALSCH. Die Notausfahrt aus einem verwaisten Raum heisst deshalb NICHT
+ * "raus aus dem Mehrspieler", sondern "der Raum ist wieder BETRETBAR" -- siehe `createRoom` unten.
+ *
+ * Wie lange ein Raum VOLLSTAENDIG unverbunden sein muss (kein Sitz mit `connected: true`), bevor
+ * ihn jemand OHNE Identitaetsnachweis (kein Login, oder keine passende `hostUserId`) ersetzen
+ * darf. Bewusst kurz genug, dass ein wirklich verwaister Raum (Host-Laptop zu) noch am selben
+ * Abend wieder bespielbar ist, und bewusst laenger als `pingTimeout` (lib/socket/server.ts, bis zu
+ * 85s bis ein Verbindungsabbruch ueberhaupt erkannt wird), damit ein kurzer WLAN-Haenger den Raum
+ * nicht sofort einem Dritten ueberlaesst. Keine erfundene Praezision -- wie bei `ROOM_EXPIRY_MS`
+ * (room-persistence.ts) eine bewusste, grosszuegige Wahl, kein Messwert.
+ */
+export const ORPHANED_ROOM_REPLACE_GRACE_MS = 5 * 60 * 1000;
+
+/** Kein Sitz im Raum ist gerade mit einem Socket verbunden -- Voraussetzung fuer's Ersetzen. */
+function isRoomFullyDisconnected(room: RuntimeRoom): boolean {
+  return (["A", "B"] as const).every((role) => !room.seats[role]?.connected);
+}
+
+/**
+ * EINZIGE Stelle, die einen Raum aus der aktiven Menge nimmt (Prozess-Map + Ablage + Save-Schutz-
+ * Registry). Befund F5 (Notausfahrt-Audit): `registerLiveRoomSaveId` wurde bislang NIE wieder
+ * geloescht -- weder von `closeRoom` noch vom Sieben-Tage-Verfall (`evictRoomIfExpired`) -- die
+ * Registry schuetzte damit auf ewig Saves toter Raeume vor der rollierenden Aufbewahrung
+ * (save-retention.ts). Jeder Ausgang (Host beendet den Raum, Verfall, Ersetzen eines verwaisten
+ * Raums beim Neu-Erstellen) laeuft jetzt durch DIESE eine Funktion, damit kein Pfad das Loeschen
+ * der Registry-Zeile vergisst -- dieselbe "eine Stelle"-Regel wie bei `syncPlayers`/Persistenz.
+ */
+function removeRoomFromActiveSet(room: RuntimeRoom): void {
+  runtimeRooms.delete(room.roomCode);
+  deletePersistedRoom(room.roomCode);
+  registerLiveRoomSaveId(room.roomCode, null);
 }
 
 function buildSeat(role: CoachRole, socketId: string, participantId: string): RoomSeat {
@@ -136,6 +188,65 @@ function syncPlayers(room: RuntimeRoom) {
       },
     },
   };
+
+  // Stufe 0.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B1): EINZIGE Stelle, an der jede
+  // Raum-Mutation vorbeikommt, bevor sie zum Aufrufer zurueckgeht (createRoom, joinRoom,
+  // rejoinRoom, markDisconnected, alle Room-Flow-/Arena-/Ownership-Aktionen unten rufen sie am
+  // Ende auf) — deshalb hier und nur hier persistiert, statt an zwanzig Aufrufstellen zu
+  // verstreuen. Synchron und pro Aufruf billig (better-sqlite3, kleine JSON-Blobs); der Server
+  // fasst dafuer nach einem Neustart nie wieder eine leere Map an.
+  persistRuntimeRoom(room);
+}
+
+/**
+ * Welche Team-Zuordnung steht IM SPIELSTAND — und zwar ausdruecklich, nicht geraten?
+ *
+ * REGRESSION, DIE DIESE FUNKTION BEHEBT (CI-Lauf 1918, drei rote Pruefungen; auf `main` gruen).
+ * Die Vorfassung stand direkt in `createRoom`, baute die Einstellungs-Karte ueber ALLE Teams des
+ * Spielstands (`buildTeamControlSettingsMap` fuellt fuer jedes Team einen Default-Eintrag) und
+ * verstand deshalb jedes menschlich gesteuerte Team ohne eigenen Eintrag als "gehoert Chris".
+ * Bei einem Spielstand ohne jede Besitz-Angabe -- `teamControlSettings: {}` -- fielen damit ALLE
+ * menschlichen Teams an den Host, inklusive der Teams, die Franky spielen soll. Zusammen mit dem
+ * dabei gesetzten `ownershipAssignedByHost: true` war das dauerhaft: `joinRoom` haelt sich an
+ * dieses Kennzeichen und verteilte die Teams beim Beitritt nicht mehr neu, Franky bekam also nie
+ * welche. Messbar an drei Stellen -- Chris durfte auf Frankys Team schreiben (403 erwartet, 200
+ * bekommen), Franky nicht mehr auf sein eigenes (200 erwartet, 403 bekommen), und Chris'
+ * schreibbare Team-Menge enthielt Frankys Team.
+ *
+ * DIE REGEL DAHINTER ist die Hausregel "keine erfundenen Zahlen": ein Spielstand, der zum Besitz
+ * NICHTS sagt, sagt eben nichts -- daraus "der Host besitzt alles" abzuleiten ist geraten, und in
+ * einem Raum mit zwei Sitzen ist es nachweislich falsch geraten. Deshalb zaehlen hier nur Teams
+ * mit einem ECHTEN Eintrag in `seasonState.teamControlSettings`; alle anderen bleiben offen und
+ * werden von der normalen Zuteilung beim Beitritt (`joinRoom`) vergeben.
+ *
+ * `null`, wenn der Spielstand keine ausdrueckliche Zuordnung traegt -- der ehrliche Rueckfall.
+ */
+function leiteTeamZuordnungAusSaveAb(
+  saveId: string,
+  persistence?: PersistenceService,
+): { chrisTeamIds: string[]; frankyTeamIds: string[] } | null {
+  const service = persistence ?? createPersistenceService();
+  const save = service.getSaveById(saveId);
+  if (!save) {
+    return null;
+  }
+
+  const roheEinstellungen = save.gameState.seasonState?.teamControlSettings ?? {};
+  // NUR Teams, ueber die der Spielstand ausdruecklich etwas sagt (siehe Kommentar oben) -- daher
+  // erst filtern, dann die Karte bauen. Andersherum haette `buildTeamControlSettingsMap` fuer
+  // jedes Team einen Default erfunden, und genau daran ist die Vorfassung gescheitert.
+  const benannteTeams = (save.gameState.teams ?? []).filter((team) => roheEinstellungen[team.teamId]);
+  if (benannteTeams.length === 0) {
+    return null;
+  }
+
+  const settingsMap = buildTeamControlSettingsMap(benannteTeams, roheEinstellungen);
+  const { chrisTeamIds, frankyTeamIds } = deriveChrisFrankyTeamIdsFromSettings(benannteTeams, settingsMap);
+  if (chrisTeamIds.length === 0 && frankyTeamIds.length === 0) {
+    return null;
+  }
+
+  return { chrisTeamIds, frankyTeamIds };
 }
 
 export function createRoom(
@@ -150,7 +261,80 @@ export function createRoom(
   // Anzeigenamen und der zufaelligen userId. Bei deaktiviertem Login ist dieser
   // Parameter immer null/undefined und das Verhalten bleibt unveraendert.
   sessionUser?: { displayName: string; ownerId: string } | null,
+  options?: { persistence?: PersistenceService },
 ) {
+  const requestedSaveId = input?.saveId?.trim() || null;
+  const isRealSaveId = Boolean(requestedSaveId) && !isSandboxRoomSave(requestedSaveId!);
+
+  // NOTAUSFAHRT (F1, Korrektur 16.08.2026 -- docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): "der Raum ist
+  // wieder betretbar", NICHT "raus aus dem Mehrspieler" (siehe Kommentar an
+  // `ORPHANED_ROOM_REPLACE_GRACE_MS`). `createRoom` bekommt `saveId` bereits heute mit
+  // (HomePageClient.tsx sendet beim Klick auf "Raum erstellen" den aktiven Save mit) -- das wird
+  // hier genutzt: existiert fuer diesen Save schon ein aktiver Raum, entsteht NIE stumpf ein
+  // zweiter, PARALLELER Raum fuer denselben Save (zwei Raeume koennten sonst gegeneinander in
+  // denselben Spielstand schreiben -- dieselbe Fehlerklasse wie B1).
+  if (isRealSaveId) {
+    const existingRoom = getActiveRoomBySaveId(requestedSaveId!);
+    if (existingRoom) {
+      const hostSeat = existingRoom.seats.A;
+
+      // Fall 1 -- Identitaetsnachweis: der Anrufer ist per Login als GENAU der urspruengliche
+      // Host ausgewiesen (`sessionUser.ownerId` deckungsgleich mit `hostUserId`, gesetzt bei der
+      // Raum-Anlage). NUR mit aktivem Login moeglich -- siehe Kommentar an `resolveSessionOwnerId`
+      // (lib/auth/session.ts): ohne Login gibt es serverseitig KEINE ueber ein Geraet hinweg
+      // stabile Identitaet (der Sitzplatz-Token im localStorage ist ja gerade verloren), dieser
+      // Zweig greift dann nie und faellt auf Fall 2 durch. Sofortige, wartefreie Wiederherstellung
+      // OHNE den bestehenden Raum anzutasten: der Host bekommt SEINEN Sitz A zurueck, der
+      // Mitspieler bleibt drin, falls er noch verbunden ist -- ein neuer Raum wuerde ihn sonst
+      // zurueck lassen.
+      if (hostSeat && sessionUser?.ownerId && sessionUser.ownerId === existingRoom.state.multiplayerRoom.hostUserId) {
+        const reclaimedSeat = buildSeat("A", socketId, hostSeat.participantId);
+        existingRoom.seats.A = reclaimedSeat;
+        existingRoom.state.roomParticipants = existingRoom.state.roomParticipants.map((participant) =>
+          participant.participantId === reclaimedSeat.participantId
+            ? { ...participant, connectionStatus: "online", lastSeenAt: new Date().toISOString() }
+            : participant,
+        );
+        existingRoom.state.actionLog.push(
+          createActionLogEntry({
+            actorRole: "A",
+            type: "player_rejoined",
+            message: "Der Host hat seinen Sitzplatz ueber seine Anmeldung zurueckgeholt.",
+          }),
+        );
+        existingRoom.state = appendRoomEvent(existingRoom.state, "room_state_updated", {
+          source: "host_seat_reclaimed_by_identity",
+        });
+        syncPlayers(existingRoom);
+        return { room: existingRoom, seat: reclaimedSeat };
+      }
+
+      // Fall 2 -- kein Identitaetsnachweis (kein Login, oder der Anrufer ist nicht der Host):
+      // nur ein WIRKLICH verwaister Raum (niemand mehr verbunden, seit mindestens
+      // `ORPHANED_ROOM_REPLACE_GRACE_MS` keine Aktivitaet -- `multiplayerRoom.updatedAt` faengt
+      // jede Aktion, inklusive Disconnects, siehe `syncPlayers`) darf ersetzt werden. Bewusst KEIN
+      // hartes Ablehnen fuer den "noch aktiv"-Fall: ein zweiter, ungenutzter Raum ist unschoen,
+      // aber ungefaehrlich -- `authorizeServerRoomWrite` (server-authoritative-write-guard.ts)
+      // lehnt einen Schreibvorgang, der auf dem "falschen" (nicht dem von `getActiveRoomBySaveId`
+      // gefundenen) Raum landet, ohnehin mit `save_bound_to_different_room` (409) ab. Ein
+      // freundlicher, blockierender Fehlertext haette hier den Rueckgabetyp dieser Funktion in
+      // eine Union geaendert und damit jeden bestehenden Aufrufer (Tests wie Produktionscode) zum
+      // Nachziehen gezwungen -- fuer eine Absicherung, die es bereits gibt, nicht der Aufwand wert.
+      const orphanedSinceMs = Date.now() - new Date(existingRoom.state.multiplayerRoom.updatedAt).getTime();
+      const isReplaceable = isRoomFullyDisconnected(existingRoom) && orphanedSinceMs >= ORPHANED_ROOM_REPLACE_GRACE_MS;
+      if (isReplaceable) {
+        // System-getriggertes Schliessen -- kein Sitzplatz-Token noetig, der Raum ist per
+        // Definition (isReplaceable) ohne verbundenen Teilnehmer. WICHTIG: von hier bis zum
+        // `runtimeRooms.set(...)` unten steht kein `await` -- better-sqlite3 ist synchron, es kann
+        // also KEIN anderer Request dazwischen laufen, der den Save fuer diesen einen Tick
+        // "ungebunden" sehen koennte. Chris' Vorgabe ("nie solo weiterspielbar") bleibt damit auch
+        // beim Ersetzen lueckenlos gewahrt -- der Save ist vor, waehrend und nach diesem Aufruf
+        // ununterbrochen an EINEN aktiven Raum gebunden.
+        removeRoomFromActiveSet(existingRoom);
+      }
+    }
+  }
+
   let roomCode = createRoomCode();
 
   while (runtimeRooms.has(roomCode)) {
@@ -171,12 +355,54 @@ export function createRoom(
     },
   };
 
-  syncPlayers(room);
+  /**
+   * REGEL SEIT DER ABLAGE (Stufe 0.1): `syncPlayers` ist die EINZIGE Stelle, an der ein Raum
+   * gespeichert wird. Jede Änderung an `room.state` muss deshalb VOR dem letzten `syncPlayers`
+   * dieser Funktion stehen — sonst liegt sie zwar im Arbeitsspeicher, aber nicht in der Ablage,
+   * und ein Neustart verliert genau sie.
+   *
+   * Hier stand das Anlege-Ereignis ursprünglich HINTER dem letzten `syncPlayers`; der gespeicherte
+   * Stand war damit bei jeder Raumanlage ein Ereignis hinterher. Wirkung im Alltag klein (das
+   * Ereignisprotokoll ist eine Chronik, kein Zustand), die Regel bricht es trotzdem — und die
+   * nächste Änderung an dieser Stelle wäre womöglich keine Chronik mehr.
+   */
   if (input?.preset) {
     room.state = applyOwnershipPresetToState(room.state, input.preset);
-    syncPlayers(room);
   }
+
+  // NOTAUSFAHRT, Fortsetzung (F1): ein neu angelegter Raum fuer einen ECHTEN, bereits
+  // existierenden Spielstand (der "Fall 2"-Ersatzraum oben, aber auch der ganz normale erste Raum
+  // fuer einen schon laufenden Solo-/Koop-Save) soll die Team-Zuordnung, die im SAVE selbst steht
+  // (`teamControlSettings`), uebernehmen statt bei "1 Team, Rest KI" zu starten. Ohne das wuerde
+  // `startRoom`s "continue existing"-Zweig beim naechsten "Spiel starten" die Zuordnung AUS DEM
+  // (leeren) RAUM in den Save schreiben und die bisherige Aufteilung stillschweigend ueberschreiben
+  // -- der Save selbst bleibt bis dahin unangetastet, es geht also kein Fortschritt verloren, nur
+  // die Lobby-Anzeige waere falsch. Nur der Host ist in diesem Moment im Raum -- Frankys Teams
+  // bleiben bis zu seinem (Wieder-)Beitritt/der naechsten Host-Zuteilung KI-gefuehrt, wie in jedem
+  // Raum ohne zweiten Teilnehmer (`buildExplicitTeamOwnership`).
+  //
+  // KEIN `ownershipAssignedByHost: true` MEHR (Regression aus CI-Lauf 1918, siehe
+  // `leiteTeamZuordnungAusSaveAb`): das Kennzeichen bedeutet "der Host hat SELBST zugeteilt" und
+  // ist genau deshalb die Bremse, die `joinRoom` davon abhaelt, die Zuteilung beim Beitritt neu zu
+  // vergeben. Eine aus dem Spielstand ABGELEITETE Uebernahme ist aber keine Host-Handlung, sondern
+  // ein Vorschlag des Systems -- sie hier als Host-Handlung auszugeben, hat Franky dauerhaft ohne
+  // Teams dastehen lassen. Der Host setzt das Kennzeichen weiterhin ueber die Lobby
+  // (`applyRoomOwnershipPreset`/`applyRoomTeamSelection`), und nur dort.
+  // `!input?.preset`: hat der Host beim Anlegen ausdruecklich einen Modus mitgegeben, ist DAS seine
+  // Ansage -- eine aus dem Spielstand abgeleitete Uebernahme darf sie nicht ueberschreiben. Genau
+  // diese Reihenfolge fehlte und war an einem der beiden Fehlschlaege oben beteiligt.
+  if (isRealSaveId && !input?.preset) {
+    const uebernommen = leiteTeamZuordnungAusSaveAb(requestedSaveId!, options?.persistence);
+    if (uebernommen) {
+      const seeded = applyExplicitTeamOwnershipToState(room.state, uebernommen);
+      if (seeded.ok) {
+        room.state = seeded.state;
+      }
+    }
+  }
+
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "room_created", preset: input?.preset ?? "default" });
+  syncPlayers(room);
   runtimeRooms.set(roomCode, room);
 
   return {
@@ -215,11 +441,42 @@ export function joinRoom(
       role: "player",
     }),
   ];
-  room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  // Nebenbefund (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Beitritt loescht die Zuteilung des
+  // Hosts"): frueher wurde HIER unbedingt ueberschrieben, egal was der Host vorher im Raum
+  // (Lobby-Preset/Team-Picker) bereits zugewiesen hatte. Nur wenn `ownershipAssignedByHost` noch
+  // false ist -- der Host hat im Raum selbst NOCH NICHTS zugewiesen, es steht nur der
+  // System-Default aus `createInitialRoomState` -- greift der Auto-Default. Hat der Host schon
+  // gehandelt, bleibt seine Wahl unangetastet.
+  //
+  // HIER GILT BEWUSST NUR DER 4+4-VORSCHLAG, NICHT die aus dem Spielstand abgeleitete Zuordnung --
+  // und das ist eine Korrektur an meiner eigenen Arbeit, zweimal nachgemessen:
+  //
+  //  1. Erst liess ich die Save-Zuordnung hier gewinnen. Der Zwei-Browser-Test fiel um mit
+  //     "Chris teams mismatch. Expected D-P, M-M, P-S, V-W, got M-M" -- ein Spielstand, der nur
+  //     EIN Team nennt, stutzte Chris auf dieses eine Team und liess Franky ganz leer ausgehen.
+  //  2. Dann liess ich sie nur gewinnen, wenn sie auch Teams des zweiten Spielers nennt. Der Test
+  //     fiel identisch aus: `bootstrapSingleplayerSave()` liefert hier keinen frischen Stand,
+  //     sondern einen VORHANDENEN -- der bereits eine Koop-Aufteilung trug und damit genau das
+  //     Preset ueberstimmte, das der Host beim Anlegen ausdruecklich mitgegeben hatte.
+  //
+  // Die Lehre aus beiden: der Beitritt ist die EINZIGE Stelle, an der Franky ueberhaupt Teams
+  // bekommt (beim Anlegen war er noch nicht da, und `buildExplicitTeamOwnership` laesst die Teams
+  // eines abwesenden Teilnehmers bewusst offen). Diese eine Stelle mit einer abgeleiteten Quelle
+  // zu ueberschreiben, hat ihn beide Male leer ausgehen lassen. Eine Ableitung darf die Zuteilung
+  // vorschlagen, aber nicht den Mechanismus ersetzen, der sie ueberhaupt erst vergibt.
+  //
+  // BEKANNTE, BEWUSST OFFENE LUECKE (Aufgabe #49): wird ein Koop-Spielstand in einem NEUEN Raum
+  // geoeffnet, verteilt dieser Vorschlag die Teams neu, statt die Aufteilung aus dem Spielstand
+  // wiederherzustellen. Das ist unveraendert das Verhalten von `main` -- also keine Regression,
+  // sondern eine Luecke, die es vorher schon gab -- und der Host haengt sie ueber den Team-Picker
+  // um. Sie hier "nebenbei" mitzuloesen war genau der Versuch, der die zwei Fehlschlaege oben
+  // erzeugt hat; sie gehoert in einen eigenen Schritt mit eigenem Test.
+  if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
+    room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  }
   room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: resolvedDisplayName });
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: "B",
       type: "player_joined",
       message: "Coach B ist dem Raum beigetreten.",
@@ -253,7 +510,6 @@ export function rejoinRoom(roomCode: string, seatToken: string, socketId: string
   );
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: role,
       type: "player_rejoined",
       message: `Coach ${role} hat den Raum erneut verbunden.`,
@@ -346,7 +602,6 @@ export function healParticipantPresenceByToken(
   );
   room.state.actionLog.push(
     createActionLogEntry({
-      turnNumber: room.state.turnNumber,
       actorRole: role!,
       type: "player_rejoined",
       message: `Coach ${role} war offline gemeldet — ein Schreibvorgang mit gueltigem Sitzplatz-Token hat die Verbindung als weiter bestehend erkannt.`,
@@ -364,13 +619,51 @@ export function getRoom(roomCode: string) {
   return runtimeRooms.get(roomCode.trim().toUpperCase()) ?? null;
 }
 
+/**
+ * BEFUND B2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `closeRoom` beendet einen Raum sauber, wird
+ * aber nur aus Tests gerufen — niemand ruft es aus einem echten, abgebrochenen Spiel heraus. Und
+ * der Sieben-Tage-Verfall (`ROOM_EXPIRY_MS`, room-persistence.ts) griff bislang NUR beim
+ * Prozessstart (`loadPersistedRuntimeRooms` -> `sweepExpiredPersistedRooms`) — ein Raum, der lange
+ * im Speicher bleibt, weil der Server zufaellig nicht neu startet, blieb fuer seinen gebundenen
+ * Save fuer IMMER "aktiv" und sperrte jeden Nicht-Raum-Schreibvorgang dauerhaft
+ * (`assertSaveNotRoomBound` -> `authorizeServerRoomWrite` -> 409).
+ *
+ * DER AUSGANG: hier, auf dem Lesepfad, den `assertSaveNotRoomBound` als ERSTE Quelle befragt.
+ * Ein Raum, der laenger als `ROOM_EXPIRY_MS` nicht mehr angefasst wurde (kein Beitritt, kein
+ * Schreibvorgang, kein Reconnect — jede dieser Aktionen laeuft durch `syncPlayers` und aktualisiert
+ * `multiplayerRoom.updatedAt`), gilt als verwaist: er wird HIER, beim naechsten Blick darauf, aus
+ * der Prozess-Map UND der Ablage entfernt (derselbe Ausgang wie `closeRoom`, nur automatisch statt
+ * vom Host ausgeloest) und zaehlt fortan nicht mehr als "aktiv" — der Save ist danach wieder ein
+ * normaler Solo-Save.
+ *
+ * WARUM DAS DEN SCHUTZ NICHT AUSHOEHLT: sieben Tage sind grosszuegig bemessen (siehe Kommentar an
+ * `ROOM_EXPIRY_MS`) — ein Raum, in dem in dieser Zeit AUCH NUR EIN Schreibvorgang/Beitritt/Reconnect
+ * passiert, bleibt vollstaendig gesperrt wie bisher. Nur ein Raum, den wirklich niemand mehr
+ * anfasst, verliert seinen Riegel — genau das Verhalten, das der Sieben-Tage-Verfall fuer die
+ * ABLAGE schon immer versprochen hat, hier nur unabhaengig von einem Prozess-Neustart nachgezogen.
+ */
+function evictRoomIfExpired(room: RuntimeRoom, nowMs: number): boolean {
+  const updatedAtMs = new Date(room.state.multiplayerRoom.updatedAt).getTime();
+  if (Number.isNaN(updatedAtMs) || nowMs - updatedAtMs < ROOM_EXPIRY_MS) {
+    return false;
+  }
+  // F5: ueber `removeRoomFromActiveSet` statt der beiden Zeilen einzeln, damit der Verfall auch
+  // den Save-Schutz in der Registry (live-room-save-registry.ts) raeumt -- vorher blieb der hier
+  // fuer immer stehen, siehe Kommentar an `removeRoomFromActiveSet`.
+  removeRoomFromActiveSet(room);
+  return true;
+}
+
 export function getActiveRoomBySaveId(saveId: string) {
+  const nowMs = Date.now();
   for (const room of runtimeRooms.values()) {
-    if (
-      room.state.multiplayerRoom.saveId === saveId &&
-      room.state.multiplayerRoom.status !== "completed" &&
-      room.state.multiplayerRoom.status !== "paused"
-    ) {
+    if (room.state.multiplayerRoom.saveId !== saveId) {
+      continue;
+    }
+    if (evictRoomIfExpired(room, nowMs)) {
+      continue;
+    }
+    if (room.state.multiplayerRoom.status !== "completed" && room.state.multiplayerRoom.status !== "paused") {
       return room;
     }
   }
@@ -582,7 +875,148 @@ export function advanceRoomArenaStep(
   return { ok: true as const, room };
 }
 
-export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, preset: RoomOwnershipPreset) {
+/**
+ * PAUSE/WEITER ALS RAUM-AKTION (Stufe 3.6, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): reine Huelle um
+ * die fertige, getestete `setRoomArenaPaused` aus `arena-sync-state.ts` — dieselbe
+ * Sitzplatz-Pruefung (nur Host, Sitz "A") wie `startRoomArenaSync`/`advanceRoomArenaStep`. Die
+ * Aenderung an `room.state` steht VOR dem letzten `syncPlayers(room)` (Regel siehe `createRoom`),
+ * sonst ueberlebt die Pause keinen Neustart.
+ */
+export function setRoomArenaPausedState(roomCode: string, seatToken: string, paused: boolean) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena pausieren." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildRoomArenaPausedState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      paused,
+    }),
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * "↻ NEU" ALS RAUM-AKTION (Stufe 3.6): reine Huelle um `resetRoomArenaReveal` aus
+ * `arena-sync-state.ts`. Setzt nur die AKTIVE Disziplinseite zurueck (siehe Kommentar dort) —
+ * diese Huelle entscheidet darueber nichts, sie prueft nur den Sitzplatz und speichert.
+ */
+export function resetRoomArenaRevealState(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena zuruecksetzen." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildResetRoomArenaState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+    }),
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * QUICK-SIM ALS RAUM-AKTION (Stufe 3.6): reine Huelle um `quickSimRoomArenaReveal` aus
+ * `arena-sync-state.ts` (die selbst nur ueber das bereits vorhandene `advanceRoomArenaReveal`
+ * iteriert, siehe Kommentar dort — keine zweite Rechenstelle).
+ */
+export function quickSimRoomArenaRevealState(
+  roomCode: string,
+  seatToken: string,
+  input?: { maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena vorspulen." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildQuickSimmedRoomArenaState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      maxSlotRevealCountByDiscipline: input?.maxSlotRevealCountByDiscipline,
+    }),
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * Spiegelt die aktuelle `teamOwnership` in den GEBUNDENEN Spielstand -- derselbe Schreibweg wie
+ * beim Room-Start (`startRoom`s "continue existing"-Zweig), hier wiederverwendet fuer eine
+ * SPAETERE Umverteilung (Stufe 1.3, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md: "Team-Zuordnung darf der
+ * Host auch nach dem Start umverteilen"). `applyGameModeOwnership` ist die EINE Funktion, die
+ * `teamControlSettings`/`humanControlled` aus einer Chris/Franky-Aufteilung ableitet -- kein
+ * zweiter, abweichender Schreibpfad dafuer.
+ *
+ * No-op, solange noch kein echter (Nicht-Sandbox) Spielstand gebunden ist: in der Lobby gibt es
+ * nichts zu synchronisieren, `startRoom` bindet den echten Save erst beim Spielstart -- die
+ * Zuordnung dort uebernimmt `startRoom` selbst beim naechsten Start.
+ */
+function syncRoomOwnershipToBoundSave(room: RuntimeRoom, persistence?: PersistenceService) {
+  if (room.state.multiplayerRoom.status === "lobby" || isSandboxRoomSave(room.state.multiplayerRoom.saveId)) {
+    return;
+  }
+  const service = persistence ?? createPersistenceService();
+  const save = service.getSaveById(room.state.multiplayerRoom.saveId);
+  if (!save) {
+    return;
+  }
+  const host = room.state.roomParticipants.find((participant) => participant.role === "host") ?? null;
+  const franky = resolveFrankyParticipant(room.state.roomParticipants);
+  const chrisTeamIds = host
+    ? room.state.teamOwnership
+        .filter((entry) => entry.controllerType === "human" && entry.participantId === host.participantId)
+        .map((entry) => entry.teamId)
+    : [];
+  const frankyTeamIds = franky
+    ? room.state.teamOwnership
+        .filter((entry) => entry.controllerType === "human" && entry.participantId === franky.participantId)
+        .map((entry) => entry.teamId)
+    : [];
+  const updatedGameState = applyGameModeOwnership(save.gameState, {
+    saveMode: "online_4v4",
+    chrisTeamIds,
+    frankyTeamIds,
+  });
+  service.saveSingleplayerState(save.saveId, updatedGameState);
+}
+
+export function applyRoomOwnershipPreset(
+  roomCode: string,
+  seatToken: string,
+  preset: RoomOwnershipPreset,
+  options?: { persistence?: PersistenceService },
+) {
   const room = getRoom(roomCode);
   if (!room) {
     return { ok: false as const, error: "Der Raum existiert nicht mehr." };
@@ -591,8 +1025,18 @@ export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, pr
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf Team-Presets setzen." };
   }
+  // Stufe 1.3: "nur zwischen Spieltagen" -- siehe Kommentar an `isRoomMatchdayInProgress`. In der
+  // Lobby ist niemals ein Spieltag aktiv, die Sperre greift dort also nie; unveraendertes
+  // Verhalten fuer den bisherigen Lobby-Weg.
+  if (isRoomMatchdayInProgress(room.state)) {
+    return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
+  }
 
   room.state = applyOwnershipPresetToState(room.state, preset);
+  // Erst eine explizite Lobby-/Raum-Aktion zaehlt als "Host hat zugeteilt" -- siehe Kommentar am
+  // Feld (types/game.ts) und an `joinRoom` oben.
+  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
   syncPlayers(room);
   return { ok: true as const, room };
@@ -602,6 +1046,7 @@ export function applyRoomTeamSelection(
   roomCode: string,
   seatToken: string,
   selection: { chrisTeamIds: string[]; frankyTeamIds: string[] },
+  options?: { persistence?: PersistenceService },
 ) {
   const room = getRoom(roomCode);
   if (!room) {
@@ -611,6 +1056,11 @@ export function applyRoomTeamSelection(
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf Teams zuweisen." };
   }
+  // Stufe 1.3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Chris hat "spaeter wechseln" ausdruecklich
+  // verlangt -- aber nicht, waehrend eine Aufstellung/Enthuellung mitten im Spieltag haengt.
+  if (isRoomMatchdayInProgress(room.state)) {
+    return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
+  }
 
   const result = applyExplicitTeamOwnershipToState(room.state, selection);
   if (!result.ok) {
@@ -618,6 +1068,8 @@ export function applyRoomTeamSelection(
   }
 
   room.state = result.state;
+  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", {
     source: "team_selection_applied",
     chrisTeamIds: selection.chrisTeamIds,
@@ -674,10 +1126,7 @@ export function startRoom(
       room.state.roomParticipants.find((participant) => participant.role === "host") ??
       room.state.roomParticipants[0] ??
       null;
-    const franky =
-      room.state.roomParticipants.find((participant) => /franky/i.test(participant.displayName)) ??
-      room.state.roomParticipants.find((participant) => participant.role === "player") ??
-      null;
+    const franky = resolveFrankyParticipant(room.state.roomParticipants);
     const chrisTeamIds = host
       ? room.state.teamOwnership
           .filter((entry) => entry.controllerType === "human" && entry.participantId === host.participantId)
@@ -708,7 +1157,21 @@ export function startRoom(
       persistence.saveSingleplayerState(existingSave.saveId, updatedGameState);
       boundSaveId = existingSave.saveId;
     } else {
-      boundSaveId = createRoomCoopSave({ chrisTeamIds, frankyTeamIds, roomCode: room.roomCode }, persistence).saveId;
+      boundSaveId = createRoomCoopSave(
+        {
+          chrisTeamIds,
+          frankyTeamIds,
+          roomCode: room.roomCode,
+          // F3 (Notausfahrt-Korrektur, Chris: "franky darf den auch nicht löschen"): stempelt
+          // `created_by` mit der Host-Identitaet (Sitzung, wenn Login aktiv ist, sonst derselbe
+          // zufaellige, NICHT erratbare Platzhalter, den `multiplayerRoom.hostUserId` traegt --
+          // siehe `createRoom` oben). `created_by` wird beim Anlegen EINMALIG festgeschrieben und
+          // nie wieder veraendert (save-repository.ts) -- genau die Groesse, die
+          // app/api/singleplayer-state/route.ts beim Loeschen gegen den Anrufer prueft.
+          hostOwnerId: host?.userId ?? null,
+        },
+        persistence,
+      ).saveId;
       // Genau wie ein frischer Solo-Save (fresh-season-1) und die "Neues Spiel"-Wizard-Route
       // startet ein frisch angelegter Koop-Save alle 32 Teams mit LEEREN Kadern — ohne diesen Lauf
       // ist im Room kein Spieltag aufloesbar (siehe league-setup-draft-service.ts Kopfkommentar).
@@ -885,4 +1348,106 @@ export function canSeatControlTeam(roomCode: string, seatToken: string, teamId: 
   const role = findSeatByToken(room, seatToken);
   const participantId = role ? room.seats[role]?.participantId : null;
   return participantId ? canParticipantControlTeam(room.state, participantId, teamId) : false;
+}
+
+/**
+ * Beendet einen Raum endgueltig (Stufe 0.4, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): bislang gab es
+ * kein `leaveRoom`, kein `closeRoom`, kein `delete` — die Map wuchs bis zum Prozessende, und
+ * `status: "completed"` wurde nirgends gesetzt. Nur der Host darf schliessen, wie bei allen
+ * anderen raumweiten Aktionen hier.
+ *
+ * KORREKTUR (16.08.2026, F1): diese Funktion bleibt bewusst OHNE Socket-Ereignis/Knopf im
+ * Client -- Chris hat den urspruenglichen Plan ("ein Raum-Ende macht den Save wieder solo
+ * spielbar") ausdruecklich verworfen ("darf auch nicht solo weiter spielen"). Ein "Raum
+ * beenden"-Knopf haette genau das suggeriert, denn ihr Ausgang war und ist: der Save verlaesst
+ * die aktive Menge -- und `assertSaveNotRoomBound` (lib/room/assert-save-not-room-bound.ts, ausser-
+ * halb dieses Auftrags) faellt danach auf den Solo-Pfad zurueck. Die tatsaechliche Notausfahrt aus
+ * einem VERWAISTEN Raum ist deshalb `createRoom(saveId)` oben (Fall 1/2: Sitz zurueckholen bzw.
+ * verwaisten Raum ATOMAR ersetzen) -- die laesst den Save lueckenlos gebunden. `closeRoom` bleibt
+ * als eigenstaendige, weiterhin nur aus Tests aufgerufene Funktion stehen (unveraendertes
+ * Verhalten seit Stufe 0.4); sie wird intern NICHT mehr fuer die Notausfahrt benutzt (das erledigt
+ * `removeRoomFromActiveSet` direkt).
+ *
+ * Setzt `multiplayerRoom.status` auf "completed" (damit ein letzter Broadcast durch den Aufrufer
+ * den Abschluss noch zeigen kann), nimmt den Raum dann aber SOFORT aus der aktiven Menge, aus der
+ * Ablage UND aus der Save-Schutz-Registry (`removeRoomFromActiveSet`) — bewusst OHNE
+ * `syncPlayers()` (das wuerde den Raum ueber `persistRuntimeRoom` sofort wieder zurueckschreiben).
+ * Der Raumcode ist danach frei: `createRoom()`s Eindeutigkeits-Schleife oben findet ihn nicht mehr
+ * in `runtimeRooms`.
+ */
+export function closeRoom(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf den Raum beenden." };
+  }
+
+  room.state = {
+    ...room.state,
+    multiplayerRoom: {
+      ...room.state.multiplayerRoom,
+      status: "completed",
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  room.state = appendRoomEvent(room.state, "room_state_updated", { source: "room_closed" });
+
+  // BEFUND F17 (Notausfahrt-Audit): `getRoom()` normalisiert den Code (trim/toUpperCase), aber
+  // vorher stand hier `runtimeRooms.delete(roomCode)`/`deletePersistedRoom(roomCode)` mit dem
+  // ROHEN, unnormalisierten Parameter. Mit z. B. kleingeschriebenem Code fand die Suche oben den
+  // Raum (normalisiert), aber das Loeschen traf einen Map-Key/eine Zeile, die es so nie gab —
+  // `ok: true`, geloescht wurde nichts. `removeRoomFromActiveSet` nimmt bewusst das ROOM-OBJEKT
+  // (dessen `.roomCode` der kanonische, bei der Anlage per `createRoomCode()` erzeugte und seitdem
+  // nie mutierte Wert ist), nicht den String-Parameter — dieser Fehler kann so nicht wieder
+  // auftreten, an keiner Aufrufstelle dieser Funktion.
+  removeRoomFromActiveSet(room);
+
+  return { ok: true as const, room };
+}
+
+/**
+ * Laedt alle noch gueltigen Raeume aus der Ablage in die Prozess-Map — aufgerufen von `server.ts`
+ * VOR `ensureSocketServer(httpServer)`, damit ein `rejoinRoom` unmittelbar nach dem Neustart schon
+ * funktioniert, bevor der erste Client verbindet. `alreadyPresent` zaehlt Raeume, die (z. B. bei
+ * einem Hot-Reload im Dev-Betrieb) schon im Speicher liegen — die werden nie ueberschrieben, ein
+ * bereits laufender Raum im Speicher ist immer aktueller als sein zuletzt persistierter Stand.
+ */
+export function rehydrateRuntimeRoomsFromPersistence(): { restored: number; alreadyPresent: number } {
+  const persistedRooms = loadPersistedRuntimeRooms();
+  let restored = 0;
+  let alreadyPresent = 0;
+  for (const room of persistedRooms) {
+    if (runtimeRooms.has(room.roomCode)) {
+      alreadyPresent += 1;
+      continue;
+    }
+    runtimeRooms.set(room.roomCode, room);
+    restored += 1;
+    // BEFUND F5 (Notausfahrt-Audit): `registerLiveRoomSaveId` wird sonst NUR beim
+    // Lobby->season_active-Uebergang in `startRoom` gerufen (einmalig, siehe Kommentar dort) --
+    // ein Prozess-Neustart leert `globalThis.__olyLiveRoomSaveIds` genauso wie die Room-Map, aber
+    // `startRoom` laeuft fuer einen laengst gestarteten Raum nie wieder. Ohne diese Zeile war der
+    // Koop-Save nach JEDEM Deploy ungeschuetzt gegen die rollierende Aufbewahrung
+    // (save-retention.ts) -- "Raum lebt, Schutz weg". Nur fuer NEU restaurierte Raeume noetig: ein
+    // Raum, der schon in der Prozess-Map lag (`alreadyPresent`, z. B. Dev-Hot-Reload), lief in
+    // DIESEM Prozess bereits durch `startRoom`/`syncPlayers` und hat seine Registrierung nie
+    // verloren.
+    registerLiveRoomSaveId(room.roomCode, room.state.multiplayerRoom.saveId);
+  }
+  return { restored, alreadyPresent };
+}
+
+/**
+ * TEST-ONLY: leert die Prozess-Map, um einen Neustart zu simulieren (die Ablage bleibt
+ * unangetastet — genau das, was ein echter Prozess-Neustart mit `globalThis.__olyRuntimeRooms`
+ * tut). Gleiches Schutzmuster wie `resetDatabaseForTests()` in `lib/persistence/sqlite.ts`.
+ */
+export function resetRuntimeRoomsForTests(): void {
+  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+    throw new Error("resetRuntimeRoomsForTests darf nur in Tests laufen.");
+  }
+  runtimeRooms.clear();
 }

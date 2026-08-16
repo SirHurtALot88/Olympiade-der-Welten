@@ -23,11 +23,20 @@ import {
  *             (`getActiveTeamAllyTeamIds`, starke positive Affinität). Es gibt
  *             KEIN Besitz-/Fraktions-Ally-Modell mehr (die `Alliance`-Tabelle
  *             wurde entfernt) — grün erscheint nur, wenn das Sheet Affinität trägt.
+ * - `human` = von einem MENSCHEN gesteuertes Team (`controlMode === "manual"`),
+ *             das NICHT `mine` ist — also der Mitspieler (z. B. Franky in einer
+ *             Koop-Runde). Ohne diese Stufe kannte die Arena nur „mein Team" vs.
+ *             „KI" und zeigte die Teams des Mitspielers wie gewöhnliche
+ *             Computer-Gegner (Audit-Punkt 7, `docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md`).
+ *             NIEDRIGSTE Präzedenz: ein Mitspieler-Team, das zugleich Rivale
+ *             oder Verbündeter ist, zeigt weiterhin Rivale/Verbündet — die
+ *             Freund/Feind-Achse bleibt die stärkere Aussage.
  *
- * Präzedenz bei Mehrfachtreffer: `mine` > `rival` > `ally` (dein eigenes Team
- * schlägt alles). Neutrale Feld-Teams ⇒ `null`.
+ * Präzedenz bei Mehrfachtreffer: `mine` > `rival` > `ally` > `human` (dein
+ * eigenes Team schlägt alles, „nur ein Mensch" schlägt am wenigsten). Neutrale
+ * Feld-Teams (KI, niemandes) ⇒ `null`.
  */
-export type TeamRelationshipKind = "mine" | "ally" | "rival";
+export type TeamRelationshipKind = "mine" | "ally" | "rival" | "human";
 
 /**
  * Minimaler Zustand, den die Einstufung braucht — bewusst kein volles
@@ -67,10 +76,11 @@ export function getActiveOwnerTeamIds(
 }
 
 /**
- * Baut eine Beziehungs-Karte `teamId → Kind` (mine/ally/rival) für alle
+ * Baut eine Beziehungs-Karte `teamId → Kind` (mine/ally/rival/human) für alle
  * relevanten Teams — die effiziente Form für die Arena (einmal memoisiert,
- * dann O(1)-Lookup pro Zeile/Marker). Präzedenz `mine` > `rival` > `ally`
- * wird über die Schreibreihenfolge erzwungen.
+ * dann O(1)-Lookup pro Zeile/Marker). Präzedenz `mine` > `rival` > `ally` >
+ * `human` wird über die Schreibreihenfolge erzwungen (spätere Schleife
+ * überschreibt frühere).
  */
 export function buildTeamRelationshipMap(
   state: TeamRelationshipState,
@@ -79,6 +89,12 @@ export function buildTeamRelationshipMap(
   const relationshipByTeamId = new Map<string, TeamRelationshipKind>();
   if (!activeTeamId) return relationshipByTeamId;
 
+  // NIEDRIGSTE Präzedenz zuerst, damit ally/rival/mine sie unten überschreiben können.
+  for (const team of state.teams) {
+    if (state.teamControlSettings[team.teamId]?.controlMode === "manual") {
+      relationshipByTeamId.set(team.teamId, "human");
+    }
+  }
   const rivalryState = { teams: state.teams, teamIdentities: [] };
   for (const teamId of getActiveTeamAllyTeamIds(state, activeTeamId)) {
     relationshipByTeamId.set(teamId, "ally");

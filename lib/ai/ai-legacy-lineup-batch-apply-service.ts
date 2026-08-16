@@ -2326,7 +2326,33 @@ export function applyAiLegacyLineupBatchLocally(
       persistence,
     );
     performanceBreakdown.saveWriteMs += elapsedSince(saveStartedAt);
-    if (batchSave.ok) {
+    // Stufe 2.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B5): `saveLocalLegacyLineupDraftBatch`
+    // meldet seit dem Ausbau fuer Menschen pro Team, nicht mehr nur alles-oder-nichts ueber `ok`.
+    // Hier auf `results` (falls vorhanden) umgestiegen, damit ein Kaderproblem bei EINEM KI-Team
+    // nicht mehr faelschlich ALLE anderen KI-Teams als "failed_validation" meldet, obwohl sie
+    // tatsaechlich gespeichert wurden. `results` ist optional geprueft (nicht `in`/Pflichtfeld):
+    // bestehende Test-Doubles dieses Moduls liefern noch das alte `{ ok, warnings }`-Muster ohne
+    // `results` — dafuer bleibt der alte Alles-oder-nichts-Zweig als Rueckfall bestehen.
+    const perTeamResults = Array.isArray(batchSave.results) ? batchSave.results : null;
+    if (perTeamResults) {
+      const outcomeByTeamId = new Map(perTeamResults.map((entry) => [entry.teamId, entry] as const));
+      for (const draft of pendingDrafts) {
+        const result = results[draft.resultIndex];
+        if (!result) continue;
+        const outcome = outcomeByTeamId.get(draft.params.teamId);
+        if (outcome?.ok) {
+          result.saved = true;
+          result.warnings = Array.from(new Set([...result.warnings, ...outcome.warnings]));
+        } else {
+          result.result = "failed_validation";
+          result.saved = false;
+          result.warnings = Array.from(new Set([...result.warnings, ...(outcome?.warnings ?? [])]));
+          result.blockingReasons = Array.from(
+            new Set([...result.blockingReasons, ...(outcome?.errors ?? ["batch_save_result_missing"])]),
+          );
+        }
+      }
+    } else if (batchSave.ok) {
       for (const draft of pendingDrafts) {
         const result = results[draft.resultIndex];
         if (!result) continue;

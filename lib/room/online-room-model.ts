@@ -6,11 +6,14 @@ import type {
   MultiplayerTurnState,
   OlyRoomState,
   RoomParticipant,
+  RoomParticipantRole,
   ServerAuthoritativeWritePolicy,
   TeamControllerType,
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
+import { matchesArenaScope } from "@/lib/room/arena-sync-state";
+import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -50,6 +53,58 @@ export const ONLINE_ROOM_TEAM_IDS = [
 const FOUR_PLUS_FOUR_HOST_TEAM_IDS = ["P-S", "D-P", "M-M", "V-W"];
 const FOUR_PLUS_FOUR_FRANKY_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
 
+/**
+ * Findet den zweiten menschlichen Teilnehmer ("Franky") strukturell ueber die Sitzrolle, NICHT
+ * ueber den frei editierbaren Anzeigenamen.
+ *
+ * VORHER stand hier an vier Stellen `/franky\/i.test(participant.displayName)` als
+ * Haupterkennung (Nebenbefund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md). Das griff daneben, sobald
+ * jemand nicht "Franky" hiess — und schlimmer: der Host selbst haette "Franky" heissen und die
+ * Regex damit sich SELBST statt den Gast treffen koennen, denn sie durchsucht ALLE Teilnehmer.
+ * `role` dagegen ist die echte Identitaet: server-vergeben in `buildParticipant`
+ * (`role: "host"`/`role: "player"`, siehe `room-store.ts` `createRoom`/`joinRoom`) und niemals
+ * vom Client editierbar — genau wie `participant.userId` (die eigentliche `ownerId`), die an
+ * derselben Stelle gesetzt wird. Damit ist die Erkennung von der Text-Eingabe entkoppelt.
+ *
+ * Rueckgabe `null`, wenn (noch) kein zweiter Teilnehmer im Raum ist — ein klar benannter
+ * Rueckfall statt eines geratenen Treffers.
+ */
+export function resolveFrankyParticipant(participants: RoomParticipant[]): RoomParticipant | null {
+  return participants.find((entry) => entry.role === "player") ?? null;
+}
+
+/**
+ * Ordnet die Sitzrolle im Raum der Owner-ID zu, die der Foundation-Client fuer Sichtbarkeit/
+ * Verwaltbarkeit braucht (`teamControlSettings[teamId].ownerId`, siehe
+ * lib/foundation/team-control-settings.ts) — NICHT dieselbe Groesse wie `participant.userId`.
+ *
+ * WARUM NICHT EINFACH `participant.userId`: ohne aktiven Login (Standard, siehe CLAUDE.md/
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md „Entscheidungen") ist `userId` ein zufaelliger
+ * `user-<uuid>`-String je Teilnehmer (`buildParticipant`-Aufrufe in `createRoom`/`joinRoom`,
+ * room-store.ts) — er stimmt mit KEINEM `ownerId`-Wert im Spielstand ueberein. Beim Spielstart
+ * legt `applyChrisFrankyOwnershipToTeamControlSettings` die Teams aber IMMER auf die zwei festen
+ * Platzhalter `DEFAULT_ACTIVE_OWNER_ID` (Host-Sitz) bzw. `FRANKY_OWNER_ID` (zweiter Sitz) — genau
+ * die Zuordnung, die diese Funktion hier aus der Rolle ableitet.
+ *
+ * `role` ist serverseitig vergeben und nie vom Client frei waehlbar (siehe Kommentar an
+ * `resolveFrankyParticipant` oben) — die Ableitung ist also so ehrlich wie eine Anzeige ohne
+ * zusaetzliche Server-Rundreise sein kann. Sie ist trotzdem NUR eine Anzeige-Hilfe: wer sie
+ * konsumiert (z. B. `activeOwnerId` im Foundation-Client), muss dokumentieren, dass sie niemals
+ * als Berechtigung dient — die einzige Autoritaet bleibt das Sitz-Token
+ * (`authorizeServerRoomWrite`/`authorizeTeamWrite`).
+ *
+ * `null` fuer Zuschauer (`"spectator"`) — die haben keine feste Owner-Spalte.
+ */
+export function resolveRoomParticipantActiveOwnerId(role: RoomParticipantRole): string | null {
+  if (role === "host") {
+    return DEFAULT_ACTIVE_OWNER_ID;
+  }
+  if (role === "player") {
+    return FRANKY_OWNER_ID;
+  }
+  return null;
+}
+
 export const SERVER_AUTHORITATIVE_WRITE_POLICY: ServerAuthoritativeWritePolicy = {
   clientMayWriteDirectly: false,
   serverValidatesRoomMembership: true,
@@ -77,6 +132,9 @@ export function createMultiplayerRoomMeta(input: {
     activeMatchday: 1,
     createdAt: now,
     updatedAt: now,
+    // Siehe Kommentar am Feld (types/game.ts): erst eine explizite Lobby-Aktion setzt das auf
+    // true, nicht diese Erst-Anlage.
+    ownershipAssignedByHost: false,
   };
 }
 
@@ -217,7 +275,7 @@ export function buildOwnershipForPreset(
   teamIds = ONLINE_ROOM_TEAM_IDS,
 ): TeamOwnershipRecord[] {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
-  const franky = participants.find((entry) => /franky/i.test(entry.displayName)) ?? participants.find((entry) => entry.role === "player") ?? null;
+  const franky = resolveFrankyParticipant(participants);
   const hostCount = preset === "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4;
   const frankyCount = preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0;
   const hostTeamIds = host
@@ -289,10 +347,7 @@ export function buildExplicitTeamOwnership(
   teamIds = ONLINE_ROOM_TEAM_IDS,
 ): ExplicitTeamOwnershipValidationResult {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
-  const franky =
-    participants.find((entry) => /franky/i.test(entry.displayName)) ??
-    participants.find((entry) => entry.role === "player") ??
-    null;
+  const franky = resolveFrankyParticipant(participants);
 
   const chrisTeamIds = Array.from(new Set(selection.chrisTeamIds ?? []));
   // Without a joined second human participant there is nobody to own Franky's teams yet -
@@ -449,6 +504,62 @@ export function buildTurnState(input: {
     blockingTeams,
     canAdvance: requiredParticipants.length > 0 && requiredParticipants.every((participantId) => readyParticipants.includes(participantId)),
   };
+}
+
+/**
+ * Steps im Spieltag-Zyklus, in denen gerade eine Einsatzliste/Formkarte gebaut wird oder eine
+ * Enthuellung laeuft. Team-Zuordnung waehrenddessen umzuhaengen wuerde eine halb gespeicherte
+ * Aufstellung verwaisen lassen — genau das Risiko, das die Entscheidung in
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md ("Team-Zuordnung mitten in der Saison aendern?") benennt.
+ *
+ * "standings" gehoert bewusst NICHT dazu: der Spieltag ist zu dem Zeitpunkt bereits aufgeloest
+ * (das Ergebnis steht), es ist reine Rueckschau vor dem naechsten Zyklus — also schon "zwischen
+ * zwei Spieltagen". Die Vorsaison-Schritte (`sell_players` .. `finalize_transfers`) laufen genau
+ * einmal VOR dem ersten Spieltag (siehe Kommentar an `ROOM_FLOW_MATCHDAY_CYCLE_START` in
+ * room-flow-controller.ts) und zaehlen aus demselben Grund nicht als "laufender Spieltag".
+ */
+const ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY = new Set<string>(["lineup", "formcards", "formcards_season_regenerate", "arena", "result"]);
+
+/**
+ * Laeuft im Raum gerade ein Spieltag (Aufstellung/Formkarten/Arena/Ergebnis) oder eine
+ * Enthuellung? Massgeblich fuer die Sperre "Team-Zuordnung nur zwischen Spieltagen" (Stufe 1.3,
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md).
+ *
+ * Zwei unabhaengige Signale, beide gepflegt in room-store.ts (`syncPlayers`/`advanceRoomArenaStep`
+ * etc.):
+ *   - `roomFlowState.step`: welcher Schritt des 12-Stufen-Flows gerade aktiv ist.
+ *   - `arenaSyncState.status`: ob die Arena-Enthuellung fuer den AKTUELLEN Spieltag laeuft oder
+ *     ihr Ergebnis noch nicht zurueckgesetzt ist ("idle" ist der einzige sichere Zustand).
+ * Beide muessen geprueft werden: der Flow-Schritt kann schon auf "result" stehen, waehrend die
+ * Arena technisch noch "revealing" ist (der Host hat den letzten Schritt gesendet, der Broadcast
+ * mit dem neuen `roomFlowState.step` ist aber noch unterwegs) — ein Schreibvorgang, der nur eines
+ * der beiden Felder prueft, haette in genau diesem schmalen Fenster ein falsches "frei".
+ *
+ * BEFUND B1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `arenaSyncState.status` wird beim Anwenden
+ * eines Spieltags auf `result_applied` gesetzt und NIE wieder auf `idle` zurueckgesetzt (Kommentar
+ * an `matchesArenaScope`, arena-sync-state.ts) — ein `status !== "idle"`-Vergleich allein waere
+ * damit ab dem ERSTEN Spieltag fuer den Rest des Raums permanent wahr, und die in Stufe 1.3 gebaute
+ * "zwischen zwei Spieltagen erlaubt"-Umverteilung koennte nie mehr greifen. Der Fix: `status !==
+ * "idle"` zaehlt nur noch, wenn der Sync-State auch zum AKTUELLEN Spieltag gehoert
+ * (`matchesArenaScope`, dieselbe Pruefung, die den Host-Arena-Start-Guard schon vor demselben
+ * Fehler bewahrt) — ein laengst abgeschlossener State eines VORIGEN Spieltags (anderes
+ * `matchdayId`, `advanceRoomFlow` in room-store.ts erhoeht `activeMatchday` beim Weiterziehen)
+ * gehoert nicht mehr zum aktuellen Spieltag und sperrt die Umverteilung folglich nicht mehr.
+ */
+export function isRoomMatchdayInProgress(
+  state: Pick<OlyRoomState, "roomFlowState" | "arenaSyncState" | "multiplayerRoom">,
+): boolean {
+  if (ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY.has(state.roomFlowState.step)) {
+    return true;
+  }
+  if (state.arenaSyncState.status === "idle") {
+    return false;
+  }
+  return matchesArenaScope(state.arenaSyncState, {
+    saveId: state.multiplayerRoom.saveId,
+    seasonId: state.multiplayerRoom.activeSeasonId,
+    matchdayId: String(state.multiplayerRoom.activeMatchday),
+  });
 }
 
 export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwnershipPreset): OlyRoomState {

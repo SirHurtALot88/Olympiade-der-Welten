@@ -319,6 +319,9 @@ async function loadPrismaOptions(params: LegacyLineupKeyParams) {
         name: state.team.name,
         activePlayers: 0,
         controlMode: "manual",
+        // Prisma ist reine Referenz-Ansicht (read-only) — kein Besitzkonzept hier, siehe Kommentar
+        // am sqlite-Zweig oben.
+        ownerId: null,
         aiLineupApplyEnabled: false,
         lineupFilledCount,
         totalLineupSides,
@@ -412,6 +415,10 @@ function loadSqliteOptions(save: PersistedSaveGame, persistence: ReturnType<type
         name: team.name,
         activePlayers,
         controlMode: controlSettingsMap[team.teamId]?.controlMode ?? "manual",
+        // Stufe 2.2 (Befund B5): fuer die Sammel-Ansicht "meine Teams" gebraucht — ohne den
+        // Besitzer laesst sich aus dieser Liste nicht "meine" von "des Mitspielers Teams"
+        // trennen (siehe `buildMyTeamsMatchdayReadiness`).
+        ownerId: controlSettingsMap[team.teamId]?.ownerId ?? null,
         aiLineupApplyEnabled: controlSettingsMap[team.teamId]?.aiLineupApplyEnabled ?? false,
         lineupFilledCount,
         totalLineupSides,

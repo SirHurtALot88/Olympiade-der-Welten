@@ -1217,16 +1217,15 @@ export default function TransfermarktV2Client({
 
   function withWriteContext<T extends Record<string, unknown>>(body: T) {
     const teamId = typeof body.teamId === "string" ? body.teamId : selectedTeamId;
-    const teamOwner = teamId ? teamControlOwnersByTeamId[teamId] ?? null : null;
-    const resolvedOwnerId =
-      teamOwner?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : teamOwner?.ownerId?.trim() || effectiveOwnerId || DEFAULT_ACTIVE_OWNER_ID;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieselbe Tautologie wie in
+    // `withRoomBody` (use-foundation-shell-router-body-scope.tsx) — dieses Feld trug die Owner-ID
+    // des ZIELTEAMS, nicht die eigene, und wurde vom Server bis eben direkt als Besitznachweis
+    // gelesen. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum, sonst die
+    // angemeldete Sitzung).
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: teamId ?? selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: teamControlModesByTeamId[teamId] ?? null,
       },
       roomContextRef.current,

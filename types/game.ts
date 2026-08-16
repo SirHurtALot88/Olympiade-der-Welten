@@ -27,6 +27,21 @@ export type MultiplayerRoomMeta = {
   activeMatchday: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Hat der Host die Team-Zuordnung schon einmal EXPLIZIT ueber eine Lobby-/Raum-Aktion gesetzt
+   * (`applyRoomOwnershipPreset` oder `applyRoomTeamSelection` in `lib/room/room-store.ts`)?
+   *
+   * Nebenbefund (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Beitritt loescht die Zuteilung des Hosts"):
+   * `joinRoom` ueberschrieb die Zuteilung bislang bedingungslos mit einem Default-Preset, sobald
+   * der Gast beitrat. Dieses Flag unterscheidet "der Host hat im Raum wirklich schon etwas
+   * zugewiesen" von "es steht nur der System-Default aus `createInitialRoomState`" — NUR im
+   * zweiten Fall darf `joinRoom` noch einen Default anwenden.
+   *
+   * Bewusst NICHT von `createRoom`s eigener `input.preset`-Anwendung gesetzt: zu dem Zeitpunkt
+   * gibt es noch keinen zweiten Teilnehmer, jede "4+4"-Wahl waere fuer die zweite Haelfte ohnehin
+   * wirkungslos (siehe Kommentar dort) — das Flag markiert erst die Lobby-Aktion NACH der Anlage.
+   */
+  ownershipAssignedByHost: boolean;
 };
 
 // A room participant is a real connected browser/user session in an online room.
@@ -130,6 +145,28 @@ export type RoomArenaState = {
   completedDisciplinePhases: Record<RoomArenaDisciplineSide, boolean>;
   maxSlotRevealCountByDiscipline: Record<RoomArenaDisciplineSide, number>;
   stepIndex: number;
+  /**
+   * Gemeinsame Zeitbasis (Befund B4, Stufe 3.3): Server-Zeitpunkt (ISO), zu dem der AKTUELLE
+   * Schritt (`stepIndex`) begann — gesetzt bei jedem Weiterschalten/Start/Reset. Ohne dieses Feld
+   * kannte `RoomArenaState` nur `updatedAt` ("wann kam die letzte Aenderung an"), nicht "wann
+   * begann dieser Schritt fuer alle gleichermassen" — zwei Clients mit unterschiedlicher
+   * Systemuhr rechneten deshalb ab ihrem eigenen Empfangszeitpunkt statt ab einem gemeinsamen
+   * Nullpunkt. Siehe `lib/foundation/discipline-stage/arena-timeline.ts` (`resolveArenaDisplayState`).
+   */
+  stepStartedAt: string;
+  /**
+   * Geplante Dauer des aktuellen Schritts in ms — zusammen mit `stepStartedAt` die Grundlage fuer
+   * "verstrichene Zeit seit Schrittbeginn" auf JEDEM Client gleich (Stufe 3.3/3.4).
+   */
+  stepDurationMs: number;
+  /**
+   * Pause/Weiter als geteilter Zustand (Stufe 3.6): pausiert der Host, gilt das fuer beide Seiten
+   * (vorher rein lokal in `manualPauseRef`/`pauseRef` der Komponente — der Gast bemerkte eine
+   * Host-Pause nur indirekt daran, dass keine neuen Schritte mehr kamen, nie explizit als Zustand).
+   */
+  paused: boolean;
+  /** Wer zuletzt pausiert/fortgesetzt hat (`null`, solange nicht pausiert). */
+  pausedBy: string | null;
   requiredParticipantIds: string[];
   readyParticipantIds: string[];
   autoReadyControllerTypes: TeamControllerType[];
@@ -179,30 +216,14 @@ export type ServerAuthoritativeWritePolicy = {
   localSandboxForbidsPrismaWrites: true;
 };
 
-export type ActionType = "room_created" | "player_joined" | "moveToken" | "endTurn" | "player_rejoined";
-
-export type AthleteToken = {
-  id: string;
-  ownerRole: CoachRole;
-  position: number;
-  label: string;
-};
+export type ActionType = "room_created" | "player_joined" | "player_rejoined";
 
 export type ActionLogEntry = {
   id: string;
-  turnNumber: number;
   actorRole: CoachRole | "system";
   type: ActionType;
-  tokenId?: string;
-  from?: number;
-  to?: number;
   message: string;
   createdAt: string;
-};
-
-export type BoardDefinition = {
-  laneLength: number;
-  laneLabel: string;
 };
 
 export type RoomPlayerState = {
@@ -223,12 +244,7 @@ export type OlyRoomState = {
   arenaSyncState: RoomArenaState;
   roomEvents: RoomRealtimeEvent[];
   serverWritePolicy: ServerAuthoritativeWritePolicy;
-  activeRole: CoachRole;
-  turnNumber: number;
-  tokens: AthleteToken[];
   actionLog: ActionLogEntry[];
   players: Partial<Record<CoachRole, RoomPlayerState>>;
-  moveCommittedThisTurn: boolean;
-  board: BoardDefinition;
   version: number;
 };

@@ -64,6 +64,8 @@ import {
   type AiBatchPreviewResponse,
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
 import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
+import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
+import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -152,6 +154,9 @@ type LabOptions = {
     name: string;
     activePlayers: number;
     controlMode?: "manual" | "ai" | "passive";
+    // Stufe 2.2 (Befund B5): fuer die Sammel-Ansicht "meine Teams" — trennt "meine" von "des
+    // Mitspielers" Teams. `undefined`/`null` = unbekannt (Prisma-Referenzansicht).
+    ownerId?: string | null;
     aiLineupApplyEnabled?: boolean;
     lineupFilledCount?: number;
     totalLineupSides?: number;
@@ -1619,6 +1624,35 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   );
   const selectedTeamIsReady = Boolean(selectedTeamOption?.currentMatchdayReady);
   const selectedMatchdayIsReady = Boolean(selectedMatchdayOption?.isReady);
+  // Stufe 2.2 (Befund B5): "Meine Teams · Spieltag X · fertig/offen" — Datenquelle bleibt
+  // `evaluateMatchdayHumanReadiness` (via `buildMyTeamsMatchdayReadiness`), hier nur auf die
+  // bereits geladenen `options.teams` angewandt statt neu zu rechnen.
+  const myTeamsMatchdayReadiness = useMemo(
+    () =>
+      buildMyTeamsMatchdayReadiness({
+        teams: options.teams.map((team) => ({
+          id: team.id,
+          name: team.name,
+          ownerId: team.ownerId ?? null,
+          controlMode: team.controlMode ?? "manual",
+          currentMatchdayReady: Boolean(team.currentMatchdayReady),
+        })),
+        activeOwnerId: props.activeOwnerId ?? null,
+        matchdayId: params.matchdayId,
+        matchdayLabel: selectedMatchdayOption?.label ?? params.matchdayId,
+      }),
+    [options.teams, props.activeOwnerId, params.matchdayId, selectedMatchdayOption?.label],
+  );
+  const jumpToMyTeam = useCallback(
+    (teamId: string) => {
+      if (teamId === params.teamId) {
+        return;
+      }
+      props.onTeamChange?.(teamId);
+      void loadContext({ teamId }, source);
+    },
+    [loadContext, params.teamId, props, source],
+  );
   const missingSeasonFormCards = Boolean(context && (context.formCards?.length ?? 0) === 0);
   const focusV2FormMiniChipsBySide = useMemo(() => {
     const buildSide = (disciplineSide: "d1" | "d2") => {
@@ -5914,6 +5948,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onAssignTeamPower={(disciplineSide, powerId) => updateModifier(disciplineSide, "teamPowerId", powerId ?? "")}
         controlsSlot={
           <>
+            <MyTeamsReadinessPanel
+              readiness={myTeamsMatchdayReadiness}
+              activeTeamId={params.teamId}
+              onJumpToTeam={jumpToMyTeam}
+            />
             <label>
               <span>Spieltag</span>
               <select

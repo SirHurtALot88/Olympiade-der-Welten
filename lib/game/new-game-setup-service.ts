@@ -576,7 +576,20 @@ export function previewNewGameSetup(input: NewGameSetupInput): NewGameSetupPrevi
  * it; getSaveById(saveId) still loads it for the Foundation room bootstrap.
  */
 export function createRoomCoopSave(
-  input: { chrisTeamIds: string[]; frankyTeamIds: string[]; roomCode: string; now?: string },
+  input: {
+    chrisTeamIds: string[];
+    frankyTeamIds: string[];
+    roomCode: string;
+    now?: string;
+    /**
+     * F3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Notausfahrt-Korrektur): Owner-ID des Hosts, die als
+     * `created_by` festgeschrieben wird (siehe `createFreshSeasonOneSave`s `ownerId`-Parameter).
+     * Optional/`null` fuer Rueckwaertskompatibilitaet -- nur `room-store.ts`s `startRoom` reicht
+     * sie ein, jeder andere/aeltere Aufrufer verhaelt sich unveraendert (leere Urheberschaft, wie
+     * vor dieser Korrektur).
+     */
+    hostOwnerId?: string | null;
+  },
   persistence: PersistenceService = createPersistenceService(),
 ): { saveId: string; name: string } {
   const saveId = `new-game-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -593,6 +606,7 @@ export function createRoomCoopSave(
     saveId,
     name: saveName,
     status: "archived",
+    ownerId: input.hostOwnerId ?? null,
   });
   const saved = persistence.saveSingleplayerState(created.saveId, prepared.gameState);
   return { saveId: saved.saveId, name: saved.name };

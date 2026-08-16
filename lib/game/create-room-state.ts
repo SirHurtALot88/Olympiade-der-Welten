@@ -1,7 +1,4 @@
-import { relayArena } from "@/data/relayArena";
-import { createSeedTokens } from "@/data/seedRoom";
 import { createActionLogEntry } from "@/lib/game/action-log";
-import { INITIAL_ACTIVE_ROLE, INITIAL_TURN_NUMBER } from "@/lib/game/constants";
 import { createRoomArenaState } from "@/lib/room/arena-sync-state";
 import {
   SERVER_AUTHORITATIVE_WRITE_POLICY,
@@ -74,20 +71,14 @@ export function createInitialRoomState(
       }),
     ],
     serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
-    activeRole: INITIAL_ACTIVE_ROLE,
-    turnNumber: INITIAL_TURN_NUMBER,
-    tokens: createSeedTokens(),
     actionLog: [
       createActionLogEntry({
-        turnNumber: INITIAL_TURN_NUMBER,
         actorRole: "system",
         type: "room_created",
         message: `Raum ${roomCode} wurde erstellt.`,
       }),
     ],
     players: {},
-    moveCommittedThisTurn: false,
-    board: relayArena,
     version: 1,
   };
 }

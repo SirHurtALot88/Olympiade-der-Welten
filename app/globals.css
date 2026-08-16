@@ -2188,6 +2188,50 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   border-color: rgba(56, 189, 248, 0.35);
 }
 
+/* Stufe 2.2 (Befund B5): Sammel-Ansicht "meine Teams · Spieltag X · fertig/offen". */
+.legacy-lineup-my-teams-readiness {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.legacy-lineup-my-teams-readiness__title {
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.legacy-lineup-my-teams-readiness__chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legacy-lineup-my-teams-readiness__chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-ready {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-pending {
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-active {
+  border-width: 2px;
+}
+
 .facilities-v2-shell {
   display: grid;
   gap: 16px;
@@ -12085,6 +12129,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 .is-new-look .relationship-tag.is-rival {
   --nl-rel: var(--nl-rival);
+}
+.is-new-look .relationship-tag.is-human {
+  --nl-rel: var(--nl-human);
 }
 
 /* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
@@ -44404,6 +44451,10 @@ button.foundation-team-portrait-card {
   --nl-mine: var(--nl-men);
   --nl-ally: var(--nl-spe);
   --nl-rival: var(--nl-risk);
+  /* Audit-Punkt 7 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Mitspieler-Team (von einem MENSCHEN
+     gesteuert, aber nicht mein eigenes) — eigener, vierter Ton, damit er sich von
+     mine/ally/rival UND von neutralen KI-Teams (kein Rahmen) unterscheidet. */
+  --nl-human: var(--nl-soc);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;

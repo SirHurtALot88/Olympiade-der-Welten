@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { matchesArenaScope, normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
+import { computeArenaClockOffsetMs, systemArenaClock, type ArenaClockSource } from "@/lib/foundation/discipline-stage/arena-timeline";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
 import type { CoachRole, OlyRoomState, RoomArenaState, RoomParticipant } from "@/types/game";
@@ -43,6 +44,12 @@ export type UseArenaRoomSyncInput = {
    * onto whatever local reveal state the consumer renders.
    */
   onApplyRevealSync: (normalized: RoomArenaState) => void;
+  /**
+   * Zeitquelle fuer den Uhren-Versatz (Stufe 3.3) — gekapselt statt `Date.now()` direkt zu rufen,
+   * damit ein Test eine eigene Uhr einsetzen kann (siehe `arena-timeline.ts`). Default: die echte
+   * Systemuhr.
+   */
+  now?: ArenaClockSource;
 };
 
 export type UseArenaRoomSyncResult = {
@@ -73,6 +80,22 @@ export type UseArenaRoomSyncResult = {
    * `roomRevealWaitingForHost`, das nur bis zum Host-Start true ist.
    */
   roomRevealFollowsHost: boolean;
+  /**
+   * Gemeinsame Zeitbasis (Stufe 3.3) — Ausschnitt aus dem gescopten `RoomArenaState`, roh
+   * durchgereicht, damit Konsumenten (z.B. `DisciplineStageNativeArena`) sie an
+   * `resolveArenaDisplayState`/`resolveArenaCatchUpMode` (`arena-timeline.ts`) uebergeben koennen,
+   * ohne den Raum-State selbst zu kennen. `null`, solange kein Sync fuer DIESE Arena laeuft.
+   */
+  roomArenaStepIndex: number | null;
+  roomArenaStepStartedAtMs: number | null;
+  roomArenaStepDurationMs: number | null;
+  roomArenaPaused: boolean;
+  /**
+   * Server-Zeit minus eigene Client-Zeit (`computeArenaClockOffsetMs`), aus dem juengsten
+   * `updatedAt` jeder empfangenen Raum-Aktualisierung geschaetzt — kein eigener Ping-Zyklus
+   * noetig. 0, solange noch kein Raum-Zustand eingetroffen ist (dann gilt "eigene Uhr = Server-Uhr").
+   */
+  roomArenaClockOffsetMs: number;
   emitHostRoomArenaAdvance: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
   emitArenaCoopReadyToggle: () => void;
   emitStartRoomArena: (input: {
@@ -81,6 +104,15 @@ export type UseArenaRoomSyncResult = {
     disciplineSide?: "d1" | "d2" | "overall" | null;
     maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   }) => void;
+  /**
+   * Stufe 3.6 — letzte Meile fuer die drei Host-Aktionen aus `arena-sync-state.ts`. Toggelt
+   * gegen den zuletzt EMPFANGENEN Raum-Zustand (wie `emitArenaCoopReadyToggle` gegen
+   * `isSelfArenaReady`), nicht gegen einen rein lokalen Zustand — der Host meldet damit immer,
+   * was der Raum als naechstes sehen soll.
+   */
+  emitHostRoomArenaPauseToggle: () => void;
+  emitHostRoomArenaReset: () => void;
+  emitHostRoomArenaQuickSim: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
 };
 
 export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSyncResult {
@@ -89,7 +121,19 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
   const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
   const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
   const [roomSyncParticipants, setRoomSyncParticipants] = useState<RoomParticipant[]>([]);
+  const [roomArenaClockOffsetMs, setRoomArenaClockOffsetMs] = useState(0);
   const lastAppliedRoomArenaVersionRef = useRef<number | null>(null);
+  const nowRef = useRef<ArenaClockSource>(input.now ?? systemArenaClock);
+  nowRef.current = input.now ?? systemArenaClock;
+
+  // Uhren-Versatz (Stufe 3.3): JEDE eintreffende Raum-Aktualisierung traegt in `updatedAt` einen
+  // frischen Server-Zeitstempel — kein eigener Ping-Zyklus noetig. Bewusst NICHT an
+  // `applyRoomArenaSync` gekoppelt (das ueberspringt idle/fremde/veraltete States): der Versatz
+  // soll aus JEDER Probe verbessert werden, auch wenn deren Inhalt fuer DIESE Arena nicht gilt.
+  const noteServerTime = useCallback((serverTimeIso: string | undefined | null) => {
+    if (!serverTimeIso) return;
+    setRoomArenaClockOffsetMs(computeArenaClockOffsetMs(serverTimeIso, nowRef.current()));
+  }, []);
 
   // Keep the latest callback without forcing the subscription effect below to
   // re-run (and re-subscribe sockets) whenever the consumer re-renders with a
@@ -139,6 +183,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
       setRoomSyncRole(payload.role);
       setRoomArenaSyncState(payload.state.arenaSyncState ?? null);
       setRoomSyncParticipants(payload.state.roomParticipants ?? []);
+      noteServerTime(payload.state.arenaSyncState?.updatedAt);
       applyRoomArenaSync(payload.state.arenaSyncState);
     }
 
@@ -151,6 +196,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
       }
       setRoomArenaSyncState(nextState.arenaSyncState ?? null);
       setRoomSyncParticipants(nextState.roomParticipants ?? []);
+      noteServerTime(nextState.arenaSyncState?.updatedAt);
       applyRoomArenaSync(nextState.arenaSyncState);
     }
 
@@ -268,6 +314,47 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     [roomContext],
   );
 
+  // Stufe 3.6: toggelt gegen den zuletzt bekannten Raum-Pausenstand (analog
+  // `emitArenaCoopReadyToggle` gegen `isSelfArenaReady`) — der Aufrufer (Space-Handler in
+  // `DisciplineStageNativeArena.tsx`) hat selbst keinen Ziel-Wert zur Hand, nur "umschalten".
+  const emitHostRoomArenaPauseToggle = useCallback(() => {
+    if (!roomContext) {
+      return;
+    }
+    const socket = getClientSocket();
+    socket.emit("setRoomArenaPaused", {
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+      paused: !(scopedRoomArenaSyncState?.paused ?? false),
+    });
+  }, [roomContext, scopedRoomArenaSyncState?.paused]);
+
+  const emitHostRoomArenaReset = useCallback(() => {
+    if (!roomContext) {
+      return;
+    }
+    const socket = getClientSocket();
+    socket.emit("resetRoomArenaReveal", {
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+    });
+  }, [roomContext]);
+
+  const emitHostRoomArenaQuickSim = useCallback(
+    (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => {
+      if (!roomContext) {
+        return;
+      }
+      const socket = getClientSocket();
+      socket.emit("quickSimRoomArenaReveal", {
+        roomCode: roomContext.roomCode,
+        seatToken: roomContext.seatToken,
+        maxSlotRevealCountByDiscipline,
+      });
+    },
+    [roomContext],
+  );
+
   return {
     roomSyncRole,
     // Bewusst der scope-gefilterte State: Konsumenten fragen ihn ab, um zu entscheiden, ob für DIESE
@@ -288,8 +375,16 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     canControlArenaReveal,
     roomRevealWaitingForHost,
     roomRevealFollowsHost,
+    roomArenaStepIndex: scopedRoomArenaSyncState?.stepIndex ?? null,
+    roomArenaStepStartedAtMs: scopedRoomArenaSyncState ? Date.parse(scopedRoomArenaSyncState.stepStartedAt) : null,
+    roomArenaStepDurationMs: scopedRoomArenaSyncState?.stepDurationMs ?? null,
+    roomArenaPaused: scopedRoomArenaSyncState?.paused ?? false,
+    roomArenaClockOffsetMs,
     emitHostRoomArenaAdvance,
     emitArenaCoopReadyToggle,
     emitStartRoomArena,
+    emitHostRoomArenaPauseToggle,
+    emitHostRoomArenaReset,
+    emitHostRoomArenaQuickSim,
   };
 }

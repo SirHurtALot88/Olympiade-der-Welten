@@ -1354,15 +1354,16 @@ export function useFoundationShellRouterBodyScope({
     const targetControl = targetTeamId
       ? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[targetTeamId]
       : null;
-    const resolvedOwnerId =
-      targetControl?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : targetControl?.ownerId?.trim() || effectiveActiveOwnerId;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieses Feld trug die Owner-ID des
+    // ZIELTEAMS, nicht die eigene — der Server las das bis eben direkt als Besitznachweis
+    // (`authorizeLocalSingleplayerTeamWrite`), womit jeder Schreibversuch auf ein `manual`-Team
+    // automatisch bestand. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum,
+    // sonst die angemeldete Sitzung) — ein Feld, das der Server ignoriert, aber weiter mitschickt,
+    // waere nur irrefuehrend fuer alle, die diesen Code lesen.
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: targetTeamId || selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: targetControl?.controlMode ?? null,
       },
       roomContext,
@@ -6631,14 +6632,25 @@ export function useFoundationShellRouterBodyScope({
     () => (selectedTeam ? getTeamControlSettings(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam],
   );
-  const isLocalUserManualTeam = (settings: TeamControlSettings | null | undefined) =>
-    Boolean(
-      settings &&
-        settings.controlMode === "manual" &&
-        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris"),
-    );
+  // Stufe 2.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, offen geblieben): hier stand bis eben zusaetzlich
+  // `|| isLocalUserManualTeam(settings)` — ein zweiter Zweig, der JEDES Team mit
+  // `ownerSlot === "user"` oder `displayLabel === "Chris"` freigab, UNABHAENGIG von
+  // `effectiveActiveOwnerId`. Der Server prueft beim Schreiben ausschliesslich exakte
+  // Owner-Gleichheit (`canLocalUserManageTeam`/`canOwnerManageTeam`,
+  // server-authoritative-write-guard.ts) — die Oberflaeche erlaubte also mehr als der Server:
+  // ein Klick, der lokal durchging, endete server-seitig in einem 403.
+  //
+  // Der Fix laesst NUR noch `canOwnerManageTeam(settings, effectiveActiveOwnerId)` stehen —
+  // exakt dieselbe Funktion, die der Server ueber `canLocalUserManageTeam` aufruft
+  // (tests/identitaet-kommt-vom-server.test.ts haelt DAS bereits serverseitig fest). Das ist nur
+  // sicher, WEIL `effectiveActiveOwnerId` jetzt korrekt aufgeloest wird (Punkt 1 dieses Auftrags,
+  // `resolveInitialFoundationActiveOwnerId`): vorher haette das Entfernen Chris ausgesperrt, sobald
+  // sein `activeOwnerId` (durch einen Bug oder eine Race) nicht exakt `DEFAULT_ACTIVE_OWNER_ID`
+  // war — genau die Lage, die `isLocalUserManualTeam` grosszuegig abgefedert hat. Mit Punkt 1
+  // stimmt `effectiveActiveOwnerId` fuer Chris zuverlaessig, der Auffangzweig ist ueberfluessig
+  // geworden statt noetig.
   const selectedTeamCanManage = resolveFoundationTeamCanManage(
-    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId) || isLocalUserManualTeam(selectedTeamControl),
+    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId),
   );
   const isSelectedTeamManagementLocked = Boolean(selectedTeam) && !selectedTeamCanManage;
   function canManageTeamId(teamId: string | null | undefined) {
@@ -6646,9 +6658,7 @@ export function useFoundationShellRouterBodyScope({
       return false;
     }
     const settings = getTeamControlSettings(gameState, teamId);
-    return resolveFoundationTeamCanManage(
-      canOwnerManageTeam(settings, effectiveActiveOwnerId) || isLocalUserManualTeam(settings),
-    );
+    return resolveFoundationTeamCanManage(canOwnerManageTeam(settings, effectiveActiveOwnerId));
   }
 
   const playerProfileTrainingReadOnly =
@@ -12654,6 +12664,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     resultApplyFeed,
     roomActivityNotice,
+    setRoomActivityNotice,
     roomContext,
     roomLiveState,
     rosterFillBusy,

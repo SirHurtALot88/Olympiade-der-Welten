@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-16",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Der Mehrspieler-Modus ist keine Vorführung mehr, sondern trägt. Räume überleben jetzt einen Serverneustart und den Auto-Deploy: sie liegen samt Sitzverteilung in der Datenbank statt nur im Arbeitsspeicher, wo bisher jeder Neustart die laufende Partie stillschweigend auflöste. Wer hostet, verteilt die Teams schon beim Anlegen und kann sie später umhängen — zwischen den Spieltagen, nicht mitten hinein. Die Arena läuft für beide auf EINER Zeitbasis vom Server: bis hierher zählte der Gast seine Etappengrenze aus zwei erfundenen Nullen und blieb deshalb für immer bei Etappe 0 stehen, während der Host schon weiterschaltete. Franky sieht in seinem Browser seine eigenen Teams, weil die Zuordnung vom Server kommt und nicht mehr aus einer Vermutung im Client. Ein Koop-Spielstand bleibt Koop: er lässt sich nie solo weiterspielen, und löschen darf ihn nur der Host — auch nach dem Raumende, auch wenn niemand mehr drin sitzt. Verwaist ein Raum, führt der Weg zurück INS Spiel: der Host holt sich seinen Sitz über seine Identität zurück, oder ein toter Raum wird atomar durch einen neuen für denselben Spielstand ersetzt, ohne dass der Stand dazwischen je freiliegt. Im Tor steht ab sofort der Zwei-Browser-Test, der beide Spieler gleichzeitig durch den kompletten Enthüllungspfad fährt — seit dem 11. Juli war er abgeschaltet, und genau in dieser Zeit entstand der Etappenfehler oben, den kein anderer Test sah.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-16",
       "seite": "Team · Teams",
       "pr": null,
       "text": "Ein auslaufender oder aufgelöster Vertrag bringt jetzt denselben Erlös wie ein Verkauf über den Transfermarkt. Vorher wurde der rohe Preis gutgeschrieben — ohne Saisonstart-Abschlag, Timing, Kaderdruck und Team-Fit —, sodass das Vertragsende Geld einbrachte, das derselbe Spieler am Markt nie gebracht hätte. Die Korrektur geht in beide Richtungen: je nach Kaderdruck fällt der Erlös jetzt höher oder niedriger aus.",

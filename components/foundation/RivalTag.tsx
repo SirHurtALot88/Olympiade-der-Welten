@@ -27,6 +27,10 @@ const RELATIONSHIP_TAG_META: Record<
   mine: { modifier: "is-mine", icon: "★", label: "Dein Team", title: "Von dir gesteuertes Team" },
   ally: { modifier: "is-ally", icon: "🤝", label: "Verbündet", title: "Verbündetes Team (positive Beziehung)" },
   rival: { modifier: "is-rival", icon: "⚔", label: "Rivale", title: "Rivale deines Teams" },
+  // Audit-Punkt 7 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Mitspieler-Team (von einem Menschen
+  // gesteuert, aber nicht deins) — vervollständigt den Record, seit `TeamRelationshipKind` um
+  // "human" erweitert wurde.
+  human: { modifier: "is-human", icon: "👤", label: "Mitspieler", title: "Von einem Mitspieler gesteuertes Team" },
 };
 
 /**

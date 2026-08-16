@@ -6,6 +6,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { lehneUebernahmeAb, nimmUebernahmeAn } from "@/lib/sponsor/sponsor-leih-lifecycle";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import type { SponsorUebernahmeAngebot } from "@/lib/data/olyDataTypes";
 
 type SponsorUebernahmeBody = {
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
       source,
       dryRun,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {

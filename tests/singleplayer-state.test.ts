@@ -14,7 +14,7 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import { deriveTeamIdentityAxisBias, loadDefaultTeamIdentities } from "@/lib/foundation/team-identity-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { createFreshSeasonOneSaveIdForTests, createPersistenceService } from "@/lib/persistence/persistence-service";
 import { allowsSandboxTestWrites, getSandboxLocalWritePolicy } from "@/lib/persistence/sandbox-write-permissions";
 import { getDatabase, getDatabasePath, resetDatabaseForTests } from "@/lib/persistence/sqlite";
 import { invalidateSaveSessionCache } from "@/lib/persistence/save-session-cache";
@@ -507,6 +507,33 @@ describe("singleplayer game state", () => {
       ).toBe(true);
     }
   }, 60000);
+
+  // Stufe 4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md) — gefunden bei der Ursachensuche fuer das
+  // reihenfolgeabhaengige Flackern in `tests/legacy-lineup-local-service.test.ts` > "accepts a
+  // form card of a player who joined the roster after the season cards were generated": anders als
+  // `createSaveId()` trug die "fresh season 1"-ID NUR `Date.now()`, keinen Zufallsanteil. Zwei
+  // `createFreshSeasonOneSave()`-Aufrufe INNERHALB DERSELBEN Millisekunde (leicht erreicht bei
+  // schnellen, synchron laufenden Tests in derselben SQLite-Datei) erzeugten denselben `saveId` —
+  // die zweite Speicherung ueberschreibt dann die erste unter identischer PK, ein vollkommen
+  // ANDERER Spielstand mit demselben Schluessel. Diese eigene, real gemessene Kollisionsquelle
+  // (unten belegt: 2000 Aufrufe in derselben Millisekunde ergaben VOR dem Fix genau EINE ID) wird
+  // hier unabhaengig von der eigentlichen Flacker-Ursache des Formkarten-Tests behoben (die lag,
+  // getrennt davon, an einem deterministisch auf `0` fallenden Kartenwert — siehe der Kommentar
+  // dort). Beide Funde stehen fuer sich; dieser Test pinnt nur die ID-Eindeutigkeit.
+  //
+  // Direkt an der ID-Vergabe gepinnt (ueber die guenstige `*ForTests`-Kennung, ohne 2000x den
+  // vollen Liga-Bootstrap zu durchlaufen) — die Eigenschaft, nicht die Umsetzung: egal wie viele
+  // Aufrufe in derselben Millisekunde landen, jede ID ist einzigartig.
+  it("never hands out two identical fresh-season-1 save ids, even called back-to-back in the same millisecond", () => {
+    const ids = new Set<string>();
+    for (let index = 0; index < 2000; index += 1) {
+      ids.add(createFreshSeasonOneSaveIdForTests());
+    }
+    expect(ids.size).toBe(2000);
+    for (const id of ids) {
+      expect(id).toMatch(/^fresh-season-1-\d+-[a-z0-9]+$/);
+    }
+  });
 
   it("gives distinct fresh season one saves their own discipline schedule instead of a shared constant seed", () => {
     const persistence = createPersistenceService();

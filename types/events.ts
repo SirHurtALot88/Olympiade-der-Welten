@@ -23,17 +23,6 @@ export type RejoinRoomRequest = {
   seatToken: string;
 };
 
-export type MoveTokenRequest = {
-  roomCode: string;
-  seatToken: string;
-  tokenId: string;
-};
-
-export type EndTurnRequest = {
-  roomCode: string;
-  seatToken: string;
-};
-
 export type RoomJoinedPayload = {
   roomCode: string;
   role: CoachRole;
@@ -101,6 +90,27 @@ export type AdvanceRoomArenaStepRequest = {
   force?: boolean | null;
 };
 
+// Stufe 3.6 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): letzte Meile fuer die drei Host-Aktionen, die
+// `lib/room/arena-sync-state.ts` bereits fertig und getestet bereitstellt
+// (`setRoomArenaPaused`/`resetRoomArenaReveal`/`quickSimRoomArenaReveal`) — bislang gab es keinen
+// Weg vom Browser dorthin.
+export type SetRoomArenaPausedRequest = {
+  roomCode: string;
+  seatToken: string;
+  paused: boolean;
+};
+
+export type ResetRoomArenaRevealRequest = {
+  roomCode: string;
+  seatToken: string;
+};
+
+export type QuickSimRoomArenaRevealRequest = {
+  roomCode: string;
+  seatToken: string;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
+};
+
 export type RoomErrorPayload = {
   roomCode?: string;
   message: string;
@@ -150,9 +160,10 @@ export type ClientToServerEvents = {
   startRoomArena: (payload: StartRoomArenaRequest) => void;
   setRoomArenaReady: (payload: SetRoomArenaReadyRequest) => void;
   advanceRoomArenaStep: (payload: AdvanceRoomArenaStepRequest) => void;
+  setRoomArenaPaused: (payload: SetRoomArenaPausedRequest) => void;
+  resetRoomArenaReveal: (payload: ResetRoomArenaRevealRequest) => void;
+  quickSimRoomArenaReveal: (payload: QuickSimRoomArenaRevealRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
-  moveToken: (payload: MoveTokenRequest) => void;
-  endTurn: (payload: EndTurnRequest) => void;
 };
 
 export type ServerToClientEvents = {

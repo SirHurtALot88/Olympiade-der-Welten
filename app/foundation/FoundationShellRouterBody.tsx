@@ -479,6 +479,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   resetTableLayout,
   resolvedTeamControlSettings,
   roomActivityNotice,
+  setRoomActivityNotice,
   roomContext,
   roomLiveState,
   rosterPlayers,
@@ -1489,39 +1490,61 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           (() => {
             // Kompakter Room-Chip statt großem zentralem Banner: die schlanke
             // Pill-Zeile lebt am rechten Rand des Kontext-Banners. Room-Code +
-            // "Zur Room-Ansicht" bleiben sichtbar, die Detailzeile (Save-ID,
-            // Aktivitätsnotiz) wandert in den title-Tooltip (Hover), damit sie
-            // keine Höhe frisst. Der Flow-Schritt/Weiter-Knopf steht NICHT mehr
-            // im Tooltip — die `FoundationRoomFlowBar` unten zeigt ihn sichtbar
-            // und bedienbar an; zwei Stellen mit derselben Wahrheit (eine davon
-            // nur im Hover-Text) wären nur eine Quelle für Drift gewesen.
+            // "Zur Room-Ansicht" bleiben sichtbar, die Save-ID bleibt im
+            // title-Tooltip (Hover), damit sie keine Höhe frisst. Der
+            // Flow-Schritt/Weiter-Knopf steht NICHT mehr im Tooltip — die
+            // `FoundationRoomFlowBar` unten zeigt ihn sichtbar und bedienbar an;
+            // zwei Stellen mit derselben Wahrheit (eine davon nur im
+            // Hover-Text) wären nur eine Quelle für Drift gewesen.
+            //
+            // BEFUND (Auftrag): `roomActivityNotice` stand hier bis eben NUR im title-Attribut,
+            // also unsichtbar ohne Hover — eine Aktion des Mitspielers (Transfer, Lineup, Spieltag)
+            // ging damit praktisch spurlos an einem vorbei. Die Notiz steht jetzt zusaetzlich als
+            // eigene sichtbare Zeile.
             const roomIdentity = roomLiveState?.roomParticipants.find(
               (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
             );
-            const roomChipDetail = [
-              `Save ${formatShortSaveId(roomContext.saveId)}`,
-              roomActivityNotice ? `${roomActivityNotice.title} — ${roomActivityNotice.detail}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ");
             return (
-              <div
-                className="foundation-room-chip"
-                data-testid="foundation-room-context-banner"
-                title={`Multiplayer-Room · Raum ${roomContext.roomCode} · ${roomChipDetail}`}
-              >
-                <span className="pill foundation-room-chip-code">
-                  <span aria-hidden="true">👥</span> Raum {roomContext.roomCode}
-                </span>
-                {roomIdentity ? (
-                  <span className="pill foundation-room-chip-participant" data-testid="foundation-room-participant-identity">
-                    {roomIdentity.displayName}
+              <>
+                <div
+                  className="foundation-room-chip"
+                  data-testid="foundation-room-context-banner"
+                  title={`Multiplayer-Room · Raum ${roomContext.roomCode} · Save ${formatShortSaveId(roomContext.saveId)}`}
+                >
+                  <span className="pill foundation-room-chip-code">
+                    <span aria-hidden="true">👥</span> Raum {roomContext.roomCode}
                   </span>
+                  {roomIdentity ? (
+                    <span className="pill foundation-room-chip-participant" data-testid="foundation-room-participant-identity">
+                      {roomIdentity.displayName}
+                    </span>
+                  ) : null}
+                  <a className="secondary-button inline-button foundation-room-chip-link" href={`/room/${roomContext.roomCode}`}>
+                    Zur Room-Ansicht
+                  </a>
+                </div>
+                {roomActivityNotice ? (
+                  <div
+                    className="foundation-action-feedback is-toast is-info foundation-room-activity-notice"
+                    role="status"
+                    aria-live="polite"
+                    data-testid="foundation-room-activity-notice"
+                  >
+                    <div className="foundation-ai-preseason-copy">
+                      <span className="eyebrow">Mitspieler-Aktion</span>
+                      <strong>{roomActivityNotice.title}</strong>
+                      <span className="muted">{roomActivityNotice.detail}</span>
+                    </div>
+                    <button
+                      className="table-link-button"
+                      type="button"
+                      onClick={() => setRoomActivityNotice(null)}
+                    >
+                      ausblenden
+                    </button>
+                  </div>
                 ) : null}
-                <a className="secondary-button inline-button foundation-room-chip-link" href={`/room/${roomContext.roomCode}`}>
-                  Zur Room-Ansicht
-                </a>
-              </div>
+              </>
             );
           })()
         ) : null}
