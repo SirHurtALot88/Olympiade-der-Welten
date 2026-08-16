@@ -1,5 +1,4 @@
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
-import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -353,20 +352,22 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
 
   persistence.saveSingleplayerState(save.saveId, finalGameState);
 
-  // Die KI-Teams stellen fuer den NEUEN Spieltag sofort auf — nicht erst, wenn der
-  // Spieler seine eigene Aufstellung speichert oder die Arena oeffnet. Sie brauchen
-  // keinen dieser Ausloeser: sobald der vorige Spieltag durch ist, stehen Kader,
-  // Formkarten und Training fest.
+  // HIER WIRD NUR DER SPIELTAG GESCHRIEBEN — die KI-Aufstellungen fuer den neuen
+  // Spieltag entstehen NICHT mehr an dieser Stelle.
   //
-  // Das nimmt zugleich die Wartezeit aus dem Speichern der eigenen Aufstellung
-  // (dort lief der Batch bisher synchron) und sorgt dafuer, dass die Arena von
-  // Anfang an ein vollstaendiges Feld sieht statt eines halb leeren.
+  // Sie liefen frueher direkt hier mit, damit die Arena von Anfang an ein volles Feld
+  // sieht. Das Erzeugen fuer 32 Teams kostet aber gemessen 15-21 s und machte damit den
+  // Loewenanteil des Spieltagsabschlusses aus (82 % von 46,7 s) — Wartezeit, die der
+  // Spieler vor einer stehenden Oberflaeche absitzt, obwohl der Spieltagswechsel selbst
+  // laengst geschrieben ist.
   //
-  // `overwriteExisting: false` macht den Aufruf idempotent — die spaeteren Aufrufe
-  // beim Speichern und beim Ergebnis-Commit bleiben als Sicherheitsnetz bestehen und
-  // finden dann nichts mehr zu tun. Ein Fehlschlag darf den Spieltagswechsel niemals
-  // kippen: der Wechsel ist bereits persistiert, die Aufstellungen holt der naechste
-  // Aufruf nach.
+  // Auf Wunsch von Chris laeuft das Aufwaermen jetzt im HINTERGRUND, sobald der Spieler
+  // wieder im Saisonstand ist: `POST /api/lineups/legacy/ai-batch-prewarm`, angestossen
+  // vom Spieltags-Auto-Run im Cockpit. Das Netz darunter bleibt unveraendert bestehen —
+  // der Spieltags-Lauf (`matchday-auto-run-service`) und das Speichern der eigenen
+  // Aufstellung rufen den Batch ohnehin selbst auf und holen fehlende Aufstellungen nach.
+  // Bleibt der Hintergrundlauf aus (Abbruch, Reload, Fehler), aendert sich also nichts an
+  // der Korrektheit, nur am Zeitpunkt.
   if (prepared.nextMatchdayId) {
     // DER TRAININGSMODUS STEHT, BEVOR IRGENDEINE VORSCHAU GERECHNET WIRD.
     //
@@ -384,32 +385,14 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     // (das ist genau das Signal, auf das der Schoner schauen soll), und der neue Spieltag
     // hat noch keine Aufstellung, keine Vorberechnung und keine gezeigte Zahl. Ab hier
     // sehen KI-Aufstellung, Arena-Vorschau, Buchung und Fatigue-Akkumulation DENSELBEN
-    // Modus. Der Aufruf steht bewusst VOR dem Aufstellungs-Batch darunter, denn die
-    // Aufstell-/Schon-Entscheidung liest den Modus mit.
+    // Modus. Der Aufruf bleibt SYNCHRON, obwohl das Aufstellen ausgelagert wurde: er ist
+    // vergleichsweise billig, und der Modus muss stehen, bevor irgendetwas ihn liest —
+    // auch der Hintergrund-Batch liest ihn mit.
     try {
       reevaluateAiTrainingModesForMatchday({ saveId: save.saveId, persistence });
     } catch {
       // Ein Fehlschlag darf den Spieltagswechsel niemals kippen — der Wechsel ist
       // bereits persistiert. Ohne Neubewertung bleibt der bisherige Modus stehen.
-    }
-    try {
-      // `persistence` MUSS durchgereicht werden: ohne zweites Argument faellt
-      // applyAiLegacyLineupBatchLocally auf ihre eigene createPersistenceService()
-      // zurueck und schreibt am injizierten Persistence-Sandbox vorbei direkt in die
-      // echte SQLite-Ablage. Im Whole-Season-DryRun laeuft dieser Aufwaerm-Batch dann
-      // gegen die echte Datenbank, obwohl der Vorlauf komplett in-memory laufen soll
-      // (siehe scripts/smoke-whole-season-dry-run.ts, das genau das per Vorher/Nachher-
-      // Vergleich abfaengt).
-      applyAiLegacyLineupBatchLocally({
-        saveId: save.saveId,
-        seasonId: prepared.seasonId,
-        matchdayId: prepared.nextMatchdayId,
-        dryRun: false,
-        includeWarningTeams: false,
-        overwriteExisting: false,
-      }, persistence);
-    } catch {
-      // bewusst geschluckt, siehe oben
     }
   }
 

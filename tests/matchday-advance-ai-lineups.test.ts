@@ -3,16 +3,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 
-// Die KI soll fuer den NAECHSTEN Spieltag aufstellen, sobald der vorige durch ist —
-// nicht erst, wenn der Spieler seine eigene Aufstellung speichert oder die Arena
-// oeffnet. Sie braucht keinen dieser Ausloeser: nach dem Spieltagswechsel stehen
-// Kader, Formkarten und Training fest.
+// DER SPIELTAGSWECHSEL SCHREIBT NUR NOCH DEN SPIELTAG.
+//
+// Die KI-Aufstellungen fuer den neuen Spieltag entstanden frueher direkt hier. Das kostet
+// fuer 32 Teams gemessen 15-21 s und machte 82 % der 46,7 s aus, die „Spieltag
+// abschliessen" gebraucht hat. Auf Wunsch von Chris laeuft das Aufwaermen jetzt im
+// Hintergrund, sobald der Spieler wieder im Saisonstand steht
+// (`POST /api/lineups/legacy/ai-batch-prewarm`, angestossen aus `cockpit-matchday-handlers`).
+//
+// Was hier bleibt: die Neubewertung der KI-Trainingsmodi. Sie ist billig und MUSS stehen,
+// bevor irgendetwas den Modus liest — auch der Hintergrund-Batch liest ihn mit.
 
 const aiBatch = vi.fn();
+const trainingReevaluation = vi.fn();
 
 vi.mock("@/lib/ai/ai-legacy-lineup-batch-apply-service", () => ({
   applyAiLegacyLineupBatchLocally: (...args: unknown[]) => aiBatch(...args),
   buildAiLegacyLineupModifiers: vi.fn(),
+}));
+
+vi.mock("@/lib/ai/ai-training-mode-reevaluation-service", () => ({
+  reevaluateAiTrainingModesForMatchday: (...args: unknown[]) => trainingReevaluation(...args),
 }));
 
 const { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } = await import(
@@ -111,28 +122,33 @@ async function advance(persistence: unknown) {
   );
 }
 
-describe("KI stellt beim Spieltagswechsel auf", () => {
-  beforeEach(() => aiBatch.mockReset());
+describe("Spieltagswechsel schreibt nur den Spieltag", () => {
+  beforeEach(() => {
+    aiBatch.mockReset();
+    trainingReevaluation.mockReset();
+  });
 
-  it("stellt direkt fuer den naechsten Spieltag auf", async () => {
+  it("erzeugt KEINE KI-Aufstellungen mehr — die holt der Hintergrundlauf", async () => {
     const { persistence } = createPersistenceMock(["matchday-1", "matchday-2"]);
     await advance(persistence);
 
-    expect(aiBatch).toHaveBeenCalledTimes(1);
-    const call = aiBatch.mock.calls[0][0];
-    // Der NEUE Spieltag, nicht der gerade abgeschlossene.
-    expect(call.matchdayId).toBe("matchday-2");
-    expect(call.seasonId).toBe("season-1");
-    expect(call.dryRun).toBe(false);
-    // Vorhandene Aufstellungen bleiben unangetastet -> der Aufruf ist idempotent, und
-    // die spaeteren Aufrufe beim Speichern und beim Ergebnis-Commit finden nichts mehr.
-    expect(call.overwriteExisting).toBe(false);
+    // Das ist der Kern der Auslagerung: die 15-21 s Aufstellungs-Erzeugung haengen nicht
+    // mehr am Spieltagswechsel. Angestossen wird sie aus dem Cockpit, sobald der Spieler
+    // wieder im Saisonstand steht.
+    expect(aiBatch).not.toHaveBeenCalled();
+  });
+
+  it("bewertet die Trainingsmodi weiterhin neu, mit der injizierten Persistence", async () => {
+    const { persistence } = createPersistenceMock(["matchday-1", "matchday-2"]);
+    await advance(persistence);
+
+    expect(trainingReevaluation).toHaveBeenCalledTimes(1);
     // Die injizierte Persistence MUSS durchgereicht werden — sonst faellt der Aufruf
     // intern auf seine eigene createPersistenceService() zurueck und schreibt an einem
     // Persistence-Sandbox (z. B. dem des Whole-Season-DryRuns) vorbei direkt in die
     // echte Ablage. Das war der Grund fuer den vorher fast immer roten
     // `season:smoke-whole-season-dry-run`-Wachhund.
-    expect(aiBatch.mock.calls[0][1]).toBe(persistence);
+    expect(trainingReevaluation.mock.calls[0][0]).toMatchObject({ saveId: "save-local", persistence });
   });
 
   it("laeuft NACH dem Persistieren, damit der Wechsel sicher geschrieben ist", async () => {
@@ -142,14 +158,16 @@ describe("KI stellt beim Spieltagswechsel auf", () => {
       order.push("persist");
       return { saveId: "save-local", gameState } as never;
     });
-    aiBatch.mockImplementation(() => order.push("ai"));
+    trainingReevaluation.mockImplementation(() => order.push("training"));
 
     await advance(persistence);
-    expect(order).toEqual(["persist", "ai"]);
+    // Der Wechsel liegt auf der Platte, BEVOR irgendeine Nacharbeit laeuft. Ein Absturz
+    // mittendrin darf den Spieltagsuebergang nicht verlieren.
+    expect(order).toEqual(["persist", "training"]);
   });
 
-  it("kann den Spieltagswechsel nicht kippen, wenn die KI scheitert", async () => {
-    // Verhalten ist verifiziert: mit einem werfenden Batch loest `executeMatchdayAdvance`
+  it("kann den Spieltagswechsel nicht kippen, wenn die Nacharbeit scheitert", async () => {
+    // Verhalten ist verifiziert: mit einem werfenden Aufruf loest `executeMatchdayAdvance`
     // trotzdem auf. Festgehalten wird es hier an der Quelle, weil ein werfender Mock von
     // vitest als unbehandelter Fehler gemeldet wird und den Lauf rot faerbt, obwohl der
     // Code ihn korrekt schluckt.
@@ -159,16 +177,19 @@ describe("KI stellt beim Spieltagswechsel auf", () => {
     const tail = source.slice(source.indexOf("persistence.saveSingleplayerState(save.saveId, finalGameState)"));
     const block = tail.slice(tail.indexOf("if (prepared.nextMatchdayId) {"), tail.indexOf("return finalGameState"));
 
-    // Der Wechsel ist zu diesem Zeitpunkt schon geschrieben — ein Fehler der KI darf den
-    // Spieler nicht in einem halben Zustand zuruecklassen.
+    // Der Wechsel ist zu diesem Zeitpunkt schon geschrieben — ein Fehler der Nacharbeit
+    // darf den Spieler nicht in einem halben Zustand zuruecklassen.
     expect(block).toContain("try {");
     expect(block).toContain("} catch {");
-    expect(block).toContain("applyAiLegacyLineupBatchLocally({");
+    expect(block).toContain("reevaluateAiTrainingModesForMatchday(");
+    // Und die Aufstellungs-Erzeugung darf hier NICHT wieder auftauchen.
+    expect(block).not.toContain("applyAiLegacyLineupBatchLocally(");
   });
 
   it("ruft am Saisonende nichts auf — es gibt keinen naechsten Spieltag", async () => {
     const { persistence } = createPersistenceMock(["matchday-1"]);
     await advance(persistence);
     expect(aiBatch).not.toHaveBeenCalled();
+    expect(trainingReevaluation).not.toHaveBeenCalled();
   });
 });
