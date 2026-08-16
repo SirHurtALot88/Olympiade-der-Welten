@@ -1,5 +1,9 @@
 .git
 .next
+# Verkleinerte Portraits/Logos einer LOKALEN Sitzung. Kaemen sie ueber `COPY . .` ins Image,
+# blaehte das jeden Build auf und der Container startete mit fremden Thumbs. Zur Laufzeit liegt
+# der Pfad ohnehin auf einem eigenen Volume (deploy/hetzner/docker-compose.yml).
+.cache
 node_modules
 node_modules_broken_*
 outputs

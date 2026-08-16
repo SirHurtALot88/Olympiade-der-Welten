@@ -1,5 +1,5 @@
 import type { GameState, Player, PlayerDemandRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildPlayerRatingContractMap, mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
 import type { PlayerTrainingMode as TrainingMode } from "@/lib/training/training-plan-types";
 
@@ -48,7 +48,7 @@ function buildCaptainRecordForPlayer(gameState: GameState, teamId: string, playe
       (stats?.will ?? player.coreStats.men ?? 0) * 0.2 +
       (stats?.determination ?? player.coreStats.pow ?? 0) * 0.18 +
       (stats?.awareness ?? player.coreStats.men ?? 0) * 0.16 +
-      (ratings.get(player.id)?.mvs ?? player.ovr ?? 0) * 0.08 +
+      (mvsAlsGuete(ratings.get(player.id)?.mvs) ?? player.ovr ?? 0) * 0.08 +
       traitBonus,
     1,
   );

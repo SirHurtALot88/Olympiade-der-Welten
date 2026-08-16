@@ -14,6 +14,7 @@ import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-guv-nachbuchung";
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
@@ -374,7 +375,22 @@ function persistTransfermarktGameState(
   affectedPlayerIds: string[] = [],
 ) {
   const materialized = withIncrementalSeasonDerivationsAfterTransfer(gameState, affectedPlayerIds);
-  return persistence.saveSingleplayerState(saveId, materialized);
+  /**
+   * JEDE Transfer-Buchung im Saisonende-Fenster zieht die gespeicherte GuV nach — Kauf wie
+   * Verkauf verschieben Gehälter, und damit die Zahl, die der Finanzen-Reiter aus dem Spielstand
+   * liest. Ohne das veraltete sie ab der ersten Buchung wieder gegenüber dem live rechnenden
+   * Saisonstand (Meldung `1rh8lx`).
+   *
+   * HIER und nicht an den einzelnen Aufrufern, weil hier alle Schreibwege zusammenlaufen — und
+   * zwar in der richtigen Körnung: Einzelaktionen des Spielers schreiben direkt (eine
+   * Nachbuchung je Aktion), KI-Läufe sammeln über `LocalTransfermarktRunContext` und schreiben
+   * gebündelt über `flushLocalTransfermarktRunContext` (eine Nachbuchung je Lauf, nicht je
+   * verkauftem Spieler). Am Aufrufer verteilt wäre genau diese Bündelung verlorengegangen.
+   *
+   * Außerhalb des Saisonende-Fensters ist der Aufruf ein Nichtstun — siehe die beiden Riegel in
+   * `zieheSaisonstandGuvNachImSaisonendfenster`.
+   */
+  return persistence.saveSingleplayerState(saveId, zieheSaisonstandGuvNachImSaisonendfenster(materialized));
 }
 
 function getPlayerPotentialCacheSignature(gameState: GameState) {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { getImportedPlayerOvrScale, normalizePlayerOvr } from "@/lib/data/player-ovr-scale";
 import { enrichPlayerDerivedStats, loadImportedPlayerStats } from "@/lib/data/playerStatsAdapter";
-import { buildPlayerRatingContractRows } from "@/lib/foundation/player-rating-contract";
+import { buildPlayerRatingContractRows, mvsAlsGuete } from "@/lib/foundation/player-rating-contract";
 import type { Player } from "@/lib/data/olyDataTypes";
 
 function createPlayer(partial?: Partial<Player>): Player {
@@ -243,20 +243,15 @@ describe("player stats adapter", () => {
       mvsPerformances: [],
     });
 
-    // KNOWN REGRESSION (left red intentionally, do not weaken):
-    // lib/foundation/player-rating-contract.ts distinguishes "no season source"
-    // (mvsPerformances == null) from "source exists" (mvsPerformances is a
-    // non-null array, even empty) at the outer `performanceRows == null ? null
-    // : (...)` check — exactly the signal this fixture provides via
-    // `mvsPerformances: []`. But the INNER ternary
-    // (`rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null`) still
-    // collapses "no MVS record found for this player" back to `null`
-    // regardless of that outer distinction, so a player with a genuinely empty
-    // season (source exists, zero placings yet) still gets `mvs: null`,
-    // `sourceStatus.mvs: "missing_source"` and the "mvs_source_missing"
-    // warning instead of `mvs: 0` / "ready". The outer null-check's own intent
-    // (treat an empty-but-present performances array differently from a
-    // missing one) is never completed for the zero case.
+    // `null` heisst „keine Saisonquelle", 0 heisst „null Platzierungen" — zwei verschiedene
+    // Aussagen, und der Vertrag haelt sie jetzt auseinander. Die Vorlage liefert mit
+    // `mvsPerformances: []` ausdruecklich den zweiten Fall: die Quelle ist da, sie ist nur leer.
+    //
+    // Der Fall stand lange als „KNOWN REGRESSION" rot, weil die Reparatur weiter reichte als der
+    // Befund: mehrere KI-Stellen rechneten `mvs ?? ovr ?? 0`, und zu Saisonbeginn hat JEDER
+    // Spieler MVS 0 — mit einer ehrlichen 0 waere die Kaufbewertung der ganzen Vorsaison von
+    // „nach Koennen" auf „alle gleich" gekippt. Chris hat entschieden: ehrliche 0, und die
+    // Lesestellen ordnen sie ein (`mvsAlsGuete`, s. tests weiter unten).
     expect(result[0]?.mvs).toBe(0);
     expect(result[0]?.sourceStatus.mvs).toBe("ready");
     expect(result[0]?.warnings).not.toContain("mvs_source_missing");
@@ -309,5 +304,39 @@ describe("player stats adapter", () => {
     expect(result[1]?.ovrNormalized).toBe(0);
     expect(result[0]?.warnings).not.toContain("ovr_pool_no_spread");
     expect(result[1]?.warnings).not.toContain("ovr_pool_no_spread");
+  });
+});
+
+/**
+ * DIE ZWEITE HAELFTE DER ENTSCHEIDUNG: der Vertrag meldet die ehrliche 0, und wer MVS als GUETE
+ * liest, ordnet sie ein. Ohne diese Einordnung waere die Ehrlichkeit im Vertrag eine
+ * Balance-Aenderung in der KI gewesen — zu Saisonbeginn hat jeder Spieler MVS 0, und `mvs ?? ovr`
+ * haette ueberall 0 statt OVR ergeben.
+ */
+describe("mvsAlsGuete — eine ehrliche 0 ist keine Guete", () => {
+  it("liefert MVS nur, wenn er etwas aussagt", () => {
+    expect(mvsAlsGuete(7.4)).toBe(7.4);
+    expect(mvsAlsGuete(0.01)).toBe(0.01);
+  });
+
+  it("gibt bei 0, null, undefined und Unsinn `null` zurueck — der Aufrufer faellt auf OVR zurueck", () => {
+    // Genau der Fall aus dem Test darueber: Quelle da, null Platzierungen.
+    expect(mvsAlsGuete(0)).toBeNull();
+    expect(mvsAlsGuete(null)).toBeNull();
+    expect(mvsAlsGuete(undefined)).toBeNull();
+    expect(mvsAlsGuete(Number.NaN)).toBeNull();
+    expect(mvsAlsGuete(Number.POSITIVE_INFINITY)).toBe(null);
+    // Negativ gibt es nicht — und faende es doch statt, waere es keine Guete.
+    expect(mvsAlsGuete(-3)).toBeNull();
+  });
+
+  it("ist fuer jeden Wert, den der Vertrag VOR der Aenderung liefern konnte, deckungsgleich", () => {
+    // Der alte Vertrag lieferte entweder `null` oder einen Wert > 0 — nie 0. Fuer beide Faelle
+    // rechnet `mvsAlsGuete(x) ?? ovr` dasselbe wie das alte `x ?? ovr`. Das ist der Beleg, dass
+    // die Umstellung der Lesestellen nichts an den Zahlen aendert.
+    const ovr = 61;
+    for (const alterVertragswert of [null, 0.5, 3, 9.99]) {
+      expect(mvsAlsGuete(alterVertragswert) ?? ovr).toBe(alterVertragswert ?? ovr);
+    }
   });
 });

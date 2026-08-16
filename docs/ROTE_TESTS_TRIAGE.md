@@ -5,6 +5,38 @@ Gemessen mit `npx vitest run` (voller Lauf, JSON-Reporter), nicht geschätzt.
 
 ---
 
+## NACHTRAG — die Suite ist grün, und sie ist jetzt im Tor
+
+Der Bestand unten beschreibt die Lage bei 32 roten Tests. Sie ist abgearbeitet; was hier steht,
+gilt weiterhin als Begründung, aber nicht mehr als Zustand.
+
+| | Dateien | Tests |
+|---|---:|---:|
+| Bestandsaufnahme unten | 13 rot | 32 rot |
+| **Heute** | **0 rot** | **0 rot** (von 6.806) |
+
+**Was seither passiert ist:**
+
+- **Die Sponsorseite** (10 Dateien, 24 Tests) — unten ausdrücklich „nicht angefasst, ein zweiter
+  Agent arbeitet parallel daran". Eine einzige Ursache: der Gebäude-Schalter steht seit #512 auf
+  AUS. Die Tests sind **nicht gelöscht**, sondern an den Schalter gebunden (`describe.skipIf`) —
+  genau wie unten empfohlen. Daneben steht ein immer laufender Block, der prüft, was die
+  AUS-Stellung zusichert; ohne ihn wäre die Datei stumm gewesen, und mehrere Fälle liefen ohne
+  Gebäude leer durch und meldeten trotzdem Erfolg.
+- **Drei Kalibrierpunkte**, die als Zusicherung verkleidet waren: Stichprobengrößen (32 × 5 = 160
+  Karten gegen ein festes `> 100` — heute sind es 96), die Richtungsaussage zum Liga-Sockel (der
+  Wertfaktor geht bis 1,11, der nackte Sockel liegt also nicht immer zu hoch) und die
+  Apron-Bemessung (#523: die real zu zahlende Jahressumme statt des verhandelten Gehalts).
+- **Die vier offenen Fragen** unten sind beantwortet — siehe die Einträge dort.
+
+**Und der eigentliche Punkt:** `npm test` läuft ab jetzt **im CI-Tor**
+(`.github/workflows/ci.yml`, Job `full-test-suite`). Der Grund steht im Abschnitt „Warum das
+überhaupt ein Problem war": eine Suite, die nie im Tor lief, driftet unbemerkt auf 66 rot. Der
+Job ist bewusst getrennt vom bestehenden `test-and-smoke` — er braucht rund 20 Minuten, und
+zusammengelegt wäre beides an der Zeitgrenze gestorben.
+
+---
+
 ## Warum das überhaupt ein Problem war
 
 Die CI ist grün. `npm run ci:flow-smoke` fährt 18 Dateien mit 205 Tests, und die liefen alle
@@ -135,12 +167,33 @@ auf **OVR** zurück; nach der Reparatur stünde eine echte **0** da. Zu Saisonbe
 Spieler MVS 0 — die Kaufbewertung der KI würde in der gesamten Vorsaison von OVR-gestützt auf
 0 kippen. Das ist eine Balance-Änderung im Kaufverhalten, keine Fehlerbehebung.
 
-### 2. `chunked-redraft-topup-service` — Qualitäts-Term im Survival-Fallback (1 Test)
+### 2. `chunked-redraft-topup-service` — Qualitäts-Term im Survival-Fallback (1 Test) — ENTSCHIEDEN und ERLEDIGT
 
 Der Test war schon vorher als „BLEIBT ROT" markiert, mit derselben Begründung, die ich
 bestätige: der Entwurf sagt, die Draft-Attraktivität soll **nicht** an OVR/MVS/Marktwert hängen;
-im `minimum_survival_budget_fallback` steht `candidate.quality *` weiterhin drin. Die Reparatur
-ist eine Balance-Änderung. Unverändert gelassen.
+im `minimum_survival_budget_fallback` stand der Güte-Term weiterhin drin. Die Reparatur ist eine
+Balance-Änderung.
+
+**Chris' Entscheidung:** „Term raus, wie im Entwurf." — umgesetzt.
+
+**Was er wog:** Güte im Schnitt 23,4 mal 0,18 sind gut 4,2 Punkte; gegen den Marktwert-Term
+(1,65 je C) ein Vorsprung von rund 2,5 C Marktwert. Ohne ihn greift der Notfall eher zum
+günstigeren Spieler — und genau das ist sein Sinn: er soll das Minimum bezahlbar halten, nicht
+die beste Truppe bauen.
+
+**A/B am selben Spielstand** (Liga-Kasse 30, `playerMin`, `roundLimit` 16): 98 Picks hier wie
+dort, Zug für Zug **identisch**. Der Fallback verlangt einen Kandidatenpool, der bezahlbar und
+zugleich durchweg negativ bewertet ist — der Fall trat bei Liga-Kasse 18/30/45/60 kein einziges
+Mal ein. Die Änderung berührt den Normalfall nicht, sondern den Notfall.
+
+**Messfalle, offen benannt:** der erste Anlauf verglich zwei Läufe mit je **eigenem** frischem
+Spielstand und meldete 45 unterschiedliche Picks. Das war die Draft-Varianz am Saatwort des
+Saves, nicht die Änderung — zwei Läufe mit unverändertem Code zeigen denselben Unterschied.
+Aussagekräftig ist nur das A/B am **kopierten selben** Spielstand.
+
+Der Test schneidet den Fallback nicht mehr heraus, sondern prüft die ganze Datei; die
+Kosten-Terme des Fallbacks (Marktwert, Gehalt) bleiben ausdrücklich erlaubt und werden namentlich
+mitgeprüft: sie beantworten „können wir uns das leisten", nicht „wer ist besser".
 
 ### 3. `player-economy-compare-service` — „legacy" ist nicht mehr legacy (1 Test)
 
@@ -238,12 +291,28 @@ Stellungen prüft, überlebt das Wiedereinschalten.
 
 ## Offene Fragen an Chris
 
-**1. MVS 0 oder „keine Quelle"?** (→ oben, Punkt 1)
+**1. MVS 0 oder „keine Quelle"?** — ENTSCHIEDEN und ERLEDIGT
+
+**Chris' Entscheidung:** „Ehrlich 0 + KI umstellen".
+
+Der Vertrag meldet die ehrliche 0 (und damit `ready` statt `missing_source`). Damit daraus keine
+Balance-Änderung durch die Hintertür wird, ordnet `mvsAlsGuete()` die 0 an den vier Lesestellen
+ein: MVS zählt als Güte nur, wenn er etwas aussagt, sonst fällt der Aufrufer wie bisher auf OVR
+zurück. Der alte Vertrag lieferte nie 0 — deshalb sind die Zahlen nachweislich unverändert; ein
+Test hält genau das fest.
+
+Der stillste Fall war die Trainings-Prognose: sie fragte `isFiniteNumber(mvs)` und hätte mit
+einer ehrlichen 0 für die **ganze Liga** ein Leistungssignal „deutlich unter Erwartung" gebildet,
+bevor ein Spieltag gelaufen ist.
+
+<details><summary>Die ursprüngliche Frage</summary>
+
 Ein Spieler ohne Platzierungen zeigt heute „MVS-Quelle fehlt" statt „MVS 0". Die Reparatur ist
 eine Zeile, hat aber eine Nebenwirkung: die KI liest an drei Stellen `mvs ?? ovr ?? 0` und fällt
 heute auf OVR zurück. Mit echter 0 bewertet sie die gesamte Vorsaison anders.
 **Entscheidung:** Anzeige korrigieren und die KI-Rückfälle mit umstellen — oder so lassen und den
 Test streichen?
+</details>
 
 **2. `full_clean_redraft` kann auf einem frischen Spielstand nicht mehr laufen.**
 Zwei bewusste Regeln stoßen zusammen: P-S kauft Nula **beim Anlegen** (dein „das ist ok so!"),
@@ -288,38 +357,52 @@ Status-Bezeichner werden übersetzt. Drei Verdrahtungstests halten den Zustand f
 Feld stand — im einzig sinnvollen Fall. Der Server kennt an dieser Route gar keine Teamprüfung,
 nur den Referenzmodus; die Anzeige spiegelt jetzt dieselbe Regel (`canRunAiBatchApply`).
 
-**8. Kader-Minimum gegen Spieltagsbedarf.** — ENTSCHIEDEN: bleibt so
+**5. Sollen die Manager der Liga andere sein als früher?** — ERLEDIGT, ohne dass die Frage
+beantwortet werden musste
 
-Gemessen: `FIXED_ROSTER_MIN` ist 8, ein Spieltag verlangt die SUMME beider Disziplinen und damit
-bis zu **11** verschiedene Spieler. In der gemessenen Saison lagen 2 von 10 Spieltagen über dem
-Minimum; gegen die Kadergrößen von heute gerechnet bleiben 42 Plätze auf 320 Team-Spieltage leer.
+Die fünf Erwartungen hingen an konkreten GM-Ids. Sie sind auf **Eigenschaften** umgebaut: jedes
+Team bekommt einen GM, die GMs sind verschieden, die abgeleiteten Werte liegen im plausiblen
+Korridor, und derselbe Seed ergibt dieselbe Ziehung. Damit ist die Frage „ist die heutige
+Zuweisung die gewollte" offen — aber sie blockiert nichts mehr, und eine spätere Justierung der
+Ziehung macht die Tests nicht erneut rot.
 
-**Chris' Entscheidung:** „darf durchlaufen und gehört zu balance dazu, teams steht ja offen auch
-13 oder 14 schwächere spieler zu kaufen für rotation und erfüllung falls mal 11 oder 12 spieler
-benötigt werden!"
+<details><summary>Die ursprüngliche Frage</summary>
 
-Damit ist die Lücke **gewollt**: sie ist der Preis eines dünnen Kaders, kein Fehler im Spielablauf.
-**Kein Codeeingriff.** Das gehört festgehalten, weil die Zahl bei der nächsten Messung sonst
-erneut als Ungereimtheit aufschlägt und jemand das Minimum „korrigiert".
-
-Die Voraussetzung dafür ist erfüllt und mitgemessen: nach dem Saisonwechsel liegen die Kader bei
-min 8 / median 10 / max 14 — Rotation ist also kaufbar, nicht bloß theoretisch.
-
-**5. Sollen die Manager der Liga andere sein als früher?** (→ oben, Punkt 4)
 Fünf Tests hängen an einer einzigen verschobenen GM-Zuweisung. Die Zuweisung ist deterministisch
 und plausibel, nur eben anders als beim Schreiben der Tests. Ich kann in der Historie nicht mehr
 auflösen, welcher Eingang sich geändert hat.
 **Entscheidung:** ist die heutige Zuweisung die gewollte (dann ziehe ich die fünf Erwartungen
 nach — besser: baue sie auf Eigenschaften statt auf konkrete GM-Ids um), oder ist da etwas
 verrutscht?
+</details>
 
-**6. Was heißt „legacy" im Wirtschafts-Vergleich?** (→ oben, Punkt 3)
+**6. Was heißt „legacy" im Wirtschafts-Vergleich?** — ENTSCHIEDEN und ERLEDIGT
+
+**Chris' Entscheidung:** „keine import gehälter mehr nutzen nicht in tests und nicht im gehalt,
+nur noch das berechnete!"
+
+Der Import-Zweig ist aus der Gehaltskette entfernt. **Gemessen an einem frischen Spielstand
+(alle 2.984 Spieler): kein einziger hängt am Import**, und importiertes wie berechnetes Gehalt
+weichen um **0,00** voneinander ab — die Katalogladung materialisiert die berechnete Ökonomie
+ohnehin zuerst, `displaySalary` trug nur eine Kopie derselben Zahl. Der Zweig war ein stiller
+Rückfall auf etwas, das es gar nicht mehr gab.
+
+Der Bericht heißt jetzt `in_kraft_gegen_formel` statt `legacy_imported_display` — und ist genau
+das: das **geltende** Gehalt (Vertrag, sonst berechnet) gegen das, was die Formel heute sagt. Das
+ist ein Vergleich mit Aussage, den es vorher nicht gab.
+
+Ein Spielstand, dessen Rechnung nicht läuft, bekommt künftig `missing_salary` statt heimlich einer
+Importzahl.
+
+<details><summary>Die ursprüngliche Frage</summary>
+
 Der Bericht stellt „importiert" gegen „neu gerechnet" — beim Gehalt steht auf beiden Seiten
 inzwischen eine Formel, sobald der Spieler vollständige Attribute hat. Das Signal dafür
 (`salarySource === "calculated_preview"`) liegt vor und wird nicht gelesen.
 **Entscheidung:** `legacySalary` hart auf den importierten Anzeigewert ziehen (dann verschieben
 sich alle Zahlen und Ausreißer-Listen der Vergleichsansicht) — oder den Anspruch fallen lassen
 und den Test streichen?
+</details>
 
 **7. Zwei Reste toter Gestaltung.** — ERLEDIGT
 

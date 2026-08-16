@@ -31,7 +31,23 @@ function frischerDienst() {
   return createPersistenceService();
 }
 
-describe("Spielstände löschen · geschützt ist der geladene", () => {
+/**
+ * EIGENE ZEITGRENZE FÜR DIE GANZE DATEI — der Grund ist gemessen, nicht geschätzt.
+ *
+ * Jeder Fall hier legt echte Spielstände an: `bootstrapSingleplayerSave` und jedes `cloneSave`
+ * bauen einen vollständigen 32-Team-Stand. Das kostet je rund 3,7 s, und der letzte Fall braucht
+ * vier davon. Lokal gemessen (`--reporter=verbose`): 7,4 s · 0 ms · 4,5 s · 9,5 s · **14,9 s**.
+ *
+ * Gegen die globale Grenze von 20 s (siehe `vitest.config.ts`) blieben dem schwersten Fall damit
+ * 25 % Luft — auf dem CI-Runner zu wenig: er ist genau daran gestorben („Test timed out in
+ * 20000ms"), als die volle Suite zum ersten Mal im Tor lief. Kein Testfehler, sondern die
+ * Maschine; die Zusicherungen selbst liefen alle durch.
+ *
+ * 120 s ist bewusst reichlich (rund das Achtfache der lokalen Messung): die Grenze soll einen
+ * HÄNGER fangen, nicht einen langsamen Runner. Dieselbe Begründung tragen die anderen schweren
+ * Dateien der Suite, die eigene Grenzen zwischen 40 s und 240 s setzen.
+ */
+describe("Spielstände löschen · geschützt ist der geladene", { timeout: 120_000 }, () => {
   it("löscht einen Spielstand, der nur den Lebenszyklus-Status trägt, aber nicht geladen ist", () => {
     const persistence = frischerDienst();
     const erster = persistence.bootstrapSingleplayerSave().save;

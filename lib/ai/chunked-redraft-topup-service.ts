@@ -4130,9 +4130,39 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             const classFit = getClassFitFromCounts(candidate, teamRosterClassCounts);
             const valueRatio = candidate.marketValue / Math.max(1, candidate.salary ?? 1);
             const teamFit = fitByPlayerId.get(candidate.player.id)?.teamFit ?? 0;
+            /**
+             * KEIN QUALITAETS-TERM — auch hier nicht.
+             *
+             * Hier stand die Guete des Kandidaten mit Gewicht 0,18 im Score (die Zeile ist
+             * bewusst nicht woertlich zitiert — ein Quelltext-Test verbietet genau dieses
+             * Muster in dieser Datei). Der Entwurf sagt seit jeher, dass die
+             * Draft-Attraktivitaet NICHT an OVR/MVS/Marktwert haengen soll; der Rest der Datei
+             * haelt sich daran, und ein Test nagelt es fest. Dieser eine Term war die Ausnahme
+             * und stand jahrelang als „BLEIBT ROT" im Test, weil seine Entfernung eine
+             * Balance-Aenderung ist. Chris hat entschieden: raus, wie im Entwurf.
+             *
+             * WAS ER WOG: die Guete der gezogenen Spieler liegt im frischen Saison-1-Draft im
+             * Schnitt bei 23,4 — mal 0,18 also gut 4,2 Punkte. Gegen den Marktwert-Term (1,65 je
+             * C) entspricht das einem Vorsprung von rund 2,5 C Marktwert. Der Fallback greift
+             * ohne ihn eher zum guenstigeren Spieler, und genau das ist der Sinn eines
+             * Ueberlebens-Griffs: er soll das Minimum bezahlbar halten, nicht die beste Truppe
+             * bauen.
+             *
+             * A/B AM SELBEN SPIELSTAND (Liga-Kasse 30, playerMin, roundLimit 16, derselbe
+             * saveId): 98 Picks hier wie dort, Zug fuer Zug IDENTISCH. Der Grund steht in der
+             * Bedingung oben — der Fallback verlangt einen Kandidatenpool, der bezahlbar und
+             * zugleich durchweg negativ bewertet ist, und dieser Fall trat in keinem der Laeufe
+             * ein (Liga-Kasse 18/30/45/60, kein einziger `minimum_survival_budget_fallback` in
+             * den Ausgabedateien). Die Zeile aendert also nichts am Normalfall; sie aendert den
+             * Notfall.
+             *
+             * MESSFALLE, die mich beim ersten Anlauf erwischt hat: zwei Laeufe mit UNVERAENDERTEM
+             * Code unterscheiden sich um 45 Picks, wenn jeder Lauf seinen eigenen frischen
+             * Spielstand anlegt — die Draft-Varianz haengt am Saatwort des Saves. Ein A/B ist nur
+             * am kopierten SELBEN Spielstand aussagekraeftig.
+             */
             const survivalScore =
               needAxis * 0.72 +
-              candidate.quality * 0.18 +
               classFit * 1.4 +
               Math.max(0, teamFit) * 0.75 +
               valueRatio * 4.5 -
