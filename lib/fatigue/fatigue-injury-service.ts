@@ -470,15 +470,6 @@ function rollInjuryRiskForRehearsal(input: {
   };
 }
 
-export function calculateTeamRecovery(gameState: GameState, teamId: string) {
-  const facilities = getTeamFacilityState(gameState, teamId);
-  const normalRecovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, facilities).after;
-  return {
-    normalRecovery,
-    injuryRecovery: round(normalRecovery * 0.5, 2),
-  };
-}
-
 /**
  * WIE SCHNELL SICH EIN VERLETZTER ERHOLT — im Verhaeltnis zu einem gesunden Ersatzspieler.
  *
@@ -498,8 +489,27 @@ export function calculateTeamRecovery(gameState: GameState, teamId: string) {
  * verschenkt die Entlastung an gesunde Dauerspieler. Sie haette ausserdem den Verletzungskorridor
  * gerissen, den Chris selbst gesetzt hat („ohne gebaeude frische boosts etc 150-200 ok", auf 140
  * Untergrenze nachgezogen). Dieser Faktor trifft die Spirale statt der Giesskanne.
+ *
+ * WARUM DIE ZAHL EXPORTIERT IST UND HIER OBEN STEHT: sie stand vorher unter
+ * `calculateTeamRecovery`, und genau deshalb ging Chris' Entscheidung an drei Stellen vorbei —
+ * `calculateTeamRecovery` rechnete weiter mit einer eingetippten 0,5 (und damit die beiden
+ * Mess-Skripte, die die Balance BEWERTEN sollen), der Spieler-Drawer schrieb „Regeneration 50%"
+ * unter einen Wert, der 100 % ist, und die Verletzungshistorie fiel auf 50 zurueck. Ein Faktor,
+ * der an vier Stellen getippt wird, ist kein Faktor, sondern vier Meinungen.
  */
-const INJURY_RECOVERY_FACTOR = 1.0;
+export const INJURY_RECOVERY_FACTOR = 1.0;
+
+/** Fuer die Anzeige: „Regeneration 100%" statt einer eingetippten Prozentzahl. */
+export const INJURY_RECOVERY_PCT = Math.round(INJURY_RECOVERY_FACTOR * 100);
+
+export function calculateTeamRecovery(gameState: GameState, teamId: string) {
+  const facilities = getTeamFacilityState(gameState, teamId);
+  const normalRecovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, facilities).after;
+  return {
+    normalRecovery,
+    injuryRecovery: round(normalRecovery * INJURY_RECOVERY_FACTOR, 2),
+  };
+}
 
 export function calculatePlayerRecovery(
   gameState: GameState,

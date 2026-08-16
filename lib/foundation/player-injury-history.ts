@@ -4,6 +4,7 @@ import type {
   Player,
   PlayerInjuryHistoryRecord,
 } from "@/lib/data/olyDataTypes";
+import { INJURY_RECOVERY_PCT } from "@/lib/fatigue/fatigue-injury-service";
 
 export type PlayerInjurySummary = {
   totalInjuries: number;
@@ -44,8 +45,17 @@ export function injuryEventToPlayerHistoryRecord(
   }
   const normalRecovery = event.normalRecovery ?? 0;
   const injuryRecovery = event.injuryRecovery ?? 0;
+  /**
+   * Der Prozentsatz kommt aus dem GESPEICHERTEN Ereignis, nicht aus dem heutigen Faktor — ein
+   * Eintrag aus der Zeit von 0,5 soll auch nach der Umstellung 50 % zeigen. Das ist Geschichte,
+   * die stimmen muss, keine Regel.
+   *
+   * Nur wenn das Ereignis gar keine Erholung mitfuehrt (alte, schlanke Zeilen), greift der
+   * heutige Faktor. Hier stand eine eingetippte 50 — die haette nach Chris' Umstellung auf 1,0
+   * bei jedem Bestandseintrag ohne Werte eine Halbierung behauptet, die es nicht mehr gibt.
+   */
   const injuryRecoveryPct =
-    normalRecovery > 0 ? Math.round((injuryRecovery / normalRecovery) * 100) : 50;
+    normalRecovery > 0 ? Math.round((injuryRecovery / normalRecovery) * 100) : INJURY_RECOVERY_PCT;
 
   return {
     eventId: event.eventId,
