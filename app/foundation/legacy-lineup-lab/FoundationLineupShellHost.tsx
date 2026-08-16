@@ -85,7 +85,7 @@ export default function FoundationLineupShellHost({
   roomContext,
   syncFoundationViewInUrl,
 }: FoundationLineupShellHostProps) {
-  const { variant, clientKey, teamTooltip, effectiveDraftBoardView, highlightMissingSlots } = useLineupDerivations({
+  const { clientKey, teamTooltip, effectiveDraftBoardView, highlightMissingSlots } = useLineupDerivations({
     activeView,
     selectedTeam,
     selectedTeamControlMode,
@@ -102,7 +102,6 @@ export default function FoundationLineupShellHost({
   return (
     <FoundationLineupPanel
       active
-      uiVariant={variant}
       clientKey={clientKey}
       teamTooltip={teamTooltip}
       client={{
