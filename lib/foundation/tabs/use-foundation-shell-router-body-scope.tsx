@@ -3,19 +3,17 @@ import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
 import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import {
-  FoundationShellRouterCockpit,
-  FoundationShellRouterHistoryV2,
-  FoundationShellRouterHomeV2,
-  FoundationShellRouterInboxV2,
-  FoundationShellRouterLineup,
-  FoundationShellRouterMarketSell,
-  FoundationShellRouterMatchdayResult,
-  FoundationShellRouterPrize,
-  FoundationShellRouterSeasonPreview,
-  FoundationShellRouterSeasonV2,
-  FoundationShellRouterTeams,
-} from "@/app/foundation/FoundationShellRouter";
+// Elf Router-Bausteine aus `FoundationShellRouter` waren bis zu dieser Aufräumung hier
+// importiert — und keiner davon wurde in dieser Datei je verwendet. Jeder Name kam genau
+// einmal vor: in dieser Import-Zeile. Nachgezählt (`grep -c` je Name in dieser Datei): je 1.
+// `FoundationShellRouterBody.tsx` rendert sieben dieser Bausteine über eine eigene, separate
+// Import-Zeile direkt (Cockpit, HistoryV2, MarketSell, MatchdayResult, Prize, SeasonPreview,
+// Teams) — die sind also nicht tot, nur hier doppelt und ungenutzt importiert. Die restlichen
+// vier (HomeV2, InboxV2, SeasonV2 sowie der inzwischen entfernte Lineup-Baustein) haben auch
+// dort keinen Aufrufer; die Shell rendert ihre Ansichten für diese Views inline bzw. über
+// andere, tatsächlich aktive Panel-Komponenten. Entfernt wurde hier nur der ungenutzte Import
+// selbst — die vier weiterhin ungerenderten Router-Bausteine bleiben unangetastet in
+// `FoundationShellRouter.tsx` stehen, das ist eine gesonderte Aufräumung.
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
