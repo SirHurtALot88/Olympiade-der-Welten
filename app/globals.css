@@ -2232,6 +2232,24 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   border-width: 2px;
 }
 
+/* Sammel-Abgabe (Aufgabe #43): bewusst in derselben Kachel und im selben Ton wie die Chips —
+   es ist dieselbe Liste offener Teams, nur als Handlung statt als Anzeige. */
+.legacy-lineup-my-teams-readiness__sammel {
+  align-self: flex-start;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.08);
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__sammel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .facilities-v2-shell {
   display: grid;
   gap: 16px;

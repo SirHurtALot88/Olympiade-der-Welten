@@ -24,8 +24,10 @@ import type { DisciplineCategory, FormCardPlanRecord, GameState, LineupDraftModi
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
+  withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
+import { fasseSammelAbgabeZusammen, type SammelAbgabeAntwort } from "@/lib/lineups/sammel-aufstellung-abgabe";
 import { getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
@@ -1050,6 +1052,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [captains, setCaptains] = useState<Record<"d1" | "d2", string>>({ d1: "", d2: "" });
   const [modifiers, setModifiers] = useState<LineupDraftModifiers>(() => createEmptyLineupModifiers());
   const [isBusy, setIsBusy] = useState(false);
+  // Eigener Riegel statt `isBusy` (F14/#43): die Sammel-Abgabe laeuft ueber MEHRERE Teams und darf
+  // die Bedienung des gerade geoeffneten Teams nicht mitsperren.
+  const [sammelAbgabeBusy, setSammelAbgabeBusy] = useState(false);
   const loadContextRequestKeyRef = useRef<string>("");
   const loadContextAbortRef = useRef<AbortController | null>(null);
   const previewRequestKeyRef = useRef<string>("");
@@ -3914,6 +3919,179 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
   }
 
+  /**
+   * SAMMEL-ABGABE FUER MEINE OFFENEN TEAMS (Befund F14, Aufgabe #43).
+   *
+   * DER BEFUND WAR NICHT "es fehlt eine Route": `PUT /api/lineups/legacy/batch` ist seit Stufe 2.1
+   * gebaut, geprueft und gemessen — sie hatte nur nie einen menschlichen Aufrufer. Wer vier Teams
+   * fuehrt, ging bis eben viermal denselben Weg: Team umschalten, Vorschlag holen, speichern,
+   * Sperr-Dialog bestaetigen. Hier ist es EIN Aufruf und EIN Dialog fuer alle offenen Teams.
+   *
+   * WAS ABGEGEBEN WIRD, STEHT IM KNOPF: der KI-Vorschlag je Team (`ai-preview`, derselbe, den der
+   * Einzelweg mit "Vorschlag uebernehmen" anbietet). Etwas anderes gibt es fuer ein Team, das man
+   * noch nicht geoeffnet hat, gar nicht — einen Entwurf hat es ja noch nicht. Wer selbst aufstellen
+   * will, nimmt weiter den Einzelweg; der bleibt unveraendert.
+   *
+   * BEREITS FERTIGE TEAMS BLEIBEN UNANGETASTET. Nur `pendingTeams` gehen mit — sonst schriebe ein
+   * Klick eine sorgfaeltig gesetzte Aufstellung mit einem KI-Vorschlag zu.
+   */
+  async function gibOffeneAufstellungenSammelAb() {
+    const offeneTeams = myTeamsMatchdayReadiness.pendingTeams;
+    const nameFuerTeam = (teamId: string) => options.teams.find((team) => team.id === teamId)?.name ?? null;
+
+    if (offeneTeams.length === 0) {
+      const leer = fasseSammelAbgabeZusammen({ angefragteTeamIds: [], antwort: null, nameFuerTeam });
+      setMessage(leer.satz);
+      return;
+    }
+
+    setSammelAbgabeBusy(true);
+    setErrors([]);
+    setWarnings([]);
+    setMessage("");
+
+    try {
+      const angefragteTeamIds = offeneTeams.map((team) => team.id);
+      const stapel: Array<{ teamId: string; entries: LegacyLineupEntryInput[] }> = [];
+      const ohneVorschlag: string[] = [];
+
+      for (const teamId of angefragteTeamIds) {
+        const vorschlagQuery = new URLSearchParams({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId,
+          source,
+        });
+        const vorschlagResponse = await fetch(`/api/lineups/legacy/ai-preview?${vorschlagQuery.toString()}`, {
+          cache: "no-store",
+        });
+        const vorschlag = (await vorschlagResponse.json().catch(() => ({}))) as AiPreviewResponse & { error?: string };
+        const entries = vorschlag.preview?.entries ?? [];
+        if (!vorschlagResponse.ok || entries.length === 0) {
+          // Ein Team ohne Vorschlag darf die anderen NICHT aufhalten — das ist derselbe Grundsatz,
+          // nach dem die Sammelroute je Team entscheidet. Es faellt unten in die Zusammenfassung.
+          ohneVorschlag.push(teamId);
+          continue;
+        }
+        stapel.push({ teamId, entries: entries as LegacyLineupEntryInput[] });
+      }
+
+      const alsAbgelehnt = (grund: string) =>
+        ohneVorschlag.map((teamId) => ({ teamId, ok: false, errors: [grund], warnings: [] }));
+
+      if (stapel.length === 0) {
+        const nichts = fasseSammelAbgabeZusammen({
+          angefragteTeamIds,
+          antwort: { results: alsAbgelehnt("Zu diesem Team gab es keinen KI-Vorschlag."), savedCount: 0 },
+          nameFuerTeam,
+        });
+        setErrors([nichts.satz]);
+        return;
+      }
+
+      /**
+       * Der Raum-Kontext geht mit, die EINZELTEAM-Felder aus `withRoomQuery` bewusst NICHT:
+       * `activeManagerTeamId`/`controlMode` beschreiben genau ein Team, und in einem Stapel waere
+       * jede Wahl davon falsch. Die Route prueft ohnehin je Team mit dem ausdruecklich
+       * mitgegebenen `teamId` (siehe `authorizeServerRoomWrite` in der Batch-Route).
+       */
+      const query = new URLSearchParams({
+        saveId: params.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+        source,
+      });
+      if (props.activeOwnerId) {
+        query.set("activeOwnerId", props.activeOwnerId);
+      }
+      appendRoomContextToParams(query, roomContext);
+
+      const sendeStapel = (confirmLock: boolean) =>
+        fetch(`/api/lineups/legacy/batch?${query.toString()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomContextBody({ teams: stapel, confirmLock }, roomContext)),
+        });
+
+      let response = await sendeStapel(false);
+      let payload = (await response.json().catch(() => ({}))) as SammelAbgabeAntwort & {
+        commitments?: Array<{ teamId: string; commitment?: { isEmptyCommitment?: boolean } }>;
+      };
+
+      /**
+       * EIN Dialog fuer den ganzen Stapel — genau dafuer traegt die Route den 409-Weg (Stufe 2.5).
+       * Der Einzelweg fragt je Team; hier steht einmal da, WELCHE Teams gleich festgenagelt werden.
+       */
+      if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
+        const zeilen = stapel.map((team) => `• ${nameFuerTeam(team.teamId) ?? team.teamId}`).join("\n");
+        const bestaetigt =
+          typeof window === "undefined"
+            ? false
+            : window.confirm(
+                `${stapel.length} Aufstellungen mit dem KI-Vorschlag abgeben und für diesen Spieltag festlegen?\n\n` +
+                  `${zeilen}\n\n` +
+                  "Danach lassen sich Aufstellung, Kapitän und Formkarten dieser Teams für diesen " +
+                  "Spieltag nicht mehr ändern.",
+              );
+        if (!bestaetigt) {
+          setMessage("");
+          return;
+        }
+        response = await sendeStapel(true);
+        payload = (await response.json().catch(() => ({}))) as typeof payload;
+      }
+
+      const zusammenfassung = fasseSammelAbgabeZusammen({
+        angefragteTeamIds,
+        antwort: {
+          ...payload,
+          results: [...(payload.results ?? []), ...alsAbgelehnt("Zu diesem Team gab es keinen KI-Vorschlag.")],
+        },
+        nameFuerTeam,
+      });
+
+      setWarnings(payload.warnings ?? []);
+      // Ein Teilerfolg ist KEIN Erfolg und kein Fehler: der Satz nennt beide Zahlen, und der Ton
+      // entscheidet nur, wo er landet. Nichts davon darf "gespeichert" melden, wenn ein Team fehlt.
+      if (zusammenfassung.tonfall === "fehler") {
+        setErrors([zusammenfassung.satz]);
+      } else {
+        setMessage(zusammenfassung.satz);
+        if (zusammenfassung.abgelehnt.length > 0) {
+          setErrors([zusammenfassung.satz]);
+        }
+      }
+
+      if (zusammenfassung.gespeicherteTeamIds.length > 0) {
+        await loadContext(params, source);
+        /**
+         * EINMAL melden, nicht je Team: `onLineupSaved` zieht im Shell einen kompletten Nachladen
+         * des Saisonstands nach sich (`reloadLiveSeasonState`). Vier Meldungen waeren vier
+         * Nachladungen fuer denselben einen Schreibvorgang. Ohne `draft` uebergeben heisst: den
+         * Stand bitte vom Server holen statt lokal zu raten — der Stapel hat mehrere Teams
+         * geaendert, und die Wahrheit darueber steht in der Ablage.
+         */
+        props.onLineupSaved?.({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: zusammenfassung.gespeicherteTeamIds[0]!,
+          // Die Rueckmeldung steht bereits ueber der Einsatzliste und nennt Teilerfolge ehrlich.
+          // Der allgemeine Erfolgs-Hinweis der Huelle wuerde daneben "gespeichert" behaupten.
+          silent: true,
+          draft: null,
+          saveVersion: (payload as { saveVersion?: number | null }).saveVersion ?? null,
+          contentSignature: (payload as { contentSignature?: string | null }).contentSignature ?? null,
+        });
+      }
+    } catch {
+      setErrors(["Die Sammel-Abgabe konnte nicht ausgeführt werden."]);
+    } finally {
+      setSammelAbgabeBusy(false);
+    }
+  }
+
   async function requestPreview(
     entriesToPreview: LegacyLineupEntryInput[],
     previewModifiers: LineupDraftModifiers,
@@ -5963,6 +6141,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               readiness={myTeamsMatchdayReadiness}
               activeTeamId={params.teamId}
               onJumpToTeam={jumpToMyTeam}
+              onSammelAbgabe={() => void gibOffeneAufstellungenSammelAb()}
+              sammelAbgabeBusy={sammelAbgabeBusy}
+              sammelAbgabeGesperrtGrund={
+                sourceReadOnly ? "Dieser Modus ist nur zum Anschauen — hier wird nichts geschrieben." : null
+              }
             />
             <label>
               <span>Spieltag</span>

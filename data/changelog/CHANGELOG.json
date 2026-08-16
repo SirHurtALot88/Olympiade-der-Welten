@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-16",
+      "seite": "Einsatzliste",
+      "pr": null,
+      "text": "Wer mehrere Teams führt, gibt die noch offenen Aufstellungen jetzt in EINEM Zug ab. In der Kachel „Meine Teams · Spieltag X\" steht dafür ein Knopf, der sagt, was er tut: „3 offene mit KI-Vorschlag abgeben\". Er holt für jedes offene Team den KI-Vorschlag, schickt alle zusammen über die Sammelroute und fragt EINMAL nach, bevor er die Teams für den Spieltag festnagelt — statt vier Mal Team umschalten, Vorschlag holen, speichern, bestätigen. Bereits fertige Aufstellungen bleiben unangetastet, und wer selbst aufstellen will, nimmt weiter den unveränderten Einzelweg. Die Rückmeldung beschönigt nichts: gelingt es nur teilweise, steht „2 von 3 Aufstellungen abgegeben\" da, samt Namen und Grund für jedes abgelehnte Team. Die Sammelroute selbst gab es schon seit dem Multiplayer-Ausbau — benutzt hat sie bis jetzt nur der Zwei-Browser-Test im CI, nie ein Mensch.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-16",
       "seite": "Team · Teams",
       "pr": null,
       "text": "Ein auslaufender oder aufgelöster Vertrag bringt jetzt denselben Erlös wie ein Verkauf über den Transfermarkt. Vorher wurde der rohe Preis gutgeschrieben — ohne Saisonstart-Abschlag, Timing, Kaderdruck und Team-Fit —, sodass das Vertragsende Geld einbrachte, das derselbe Spieler am Markt nie gebracht hätte. Die Korrektur geht in beide Richtungen: je nach Kaderdruck fällt der Erlös jetzt höher oder niedriger aus.",
