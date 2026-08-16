@@ -35,11 +35,36 @@ describe("game inbox UI contract", () => {
     const navSource = readFileSync(join(root, "lib/foundation/foundation-nav-config.ts"), "utf8");
     expect(navSource).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(navSource).toContain("Offene Aufgaben & Warnungen");
-    expect(source).toContain("FoundationShellRouterInboxV2");
+    /**
+     * HIER STAND `toContain("FoundationShellRouterInboxV2")` — ein Name, den zuletzt nur noch ein
+     * TOTER IMPORT am Leben hielt.
+     *
+     * Das Router-Stueck fuer die Inbox hat keinen Aufrufer; gerendert wird die Inbox direkt in
+     * `FoundationShellRouterBody.tsx`. Der Name stand trotzdem im zusammengesetzten Quelltext,
+     * weil `use-foundation-shell-router-body-scope.tsx` ein Dutzend Router-Stuecke importierte,
+     * ohne eines davon zu benutzen. Mit dem Ausbau dieses Importblocks fiel diese Zusicherung —
+     * und das war richtig so: sie hat nie geprueft, dass die Inbox verdrahtet IST, nur dass
+     * irgendwo ihr Name steht.
+     *
+     * Geprueft wird jetzt die Verdrahtung selbst: die Inbox haengt an der Ansicht `inboxV2` und
+     * rendert ihren Client erst, wenn auch ein Team gewaehlt ist.
+     *
+     * (Ein eigenes Router-Stueck fuer die Inbox ist in `docs/INBOX_KONZEPT.md` als kuenftiger
+     * Umbau vorgesehen. Kommt es, faellt diese Zusicherung nicht — die Bedingung unten bleibt,
+     * egal wer sie rendert.)
+     */
+    expect(source).toContain('activeView === "inboxV2" && selectedTeam ? (');
+    expect(source).toContain("<InboxV2Client");
     const inboxHostSource = readFileSync(join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8");
     expect(inboxHostSource).toContain("<InboxV2Client");
     expect(routingSource).toContain('if (view === "inbox") return "inboxV2"');
-    expect(source).toContain("FoundationShellRouterHomeV2");
+    /**
+     * Gleiche Lage wie bei der Inbox oben: `FoundationShellRouterHomeV2` stand zuletzt nur noch
+     * im toten Importblock. Home wird direkt in `FoundationShellRouterBody.tsx` gerendert, per
+     * `dynamic()` nachgeladen und an die Ansicht `homeV2` gebunden. Genau das wird jetzt geprueft.
+     */
+    expect(source).toContain('const FoundationHomeV2Panel = dynamic(');
+    expect(source).toContain('activeView === "homeV2"');
     expect(source).toContain("selectedHqGmStory");
     expect(officeSource).toContain('data-testid="foundation-hq"');
     expect(source).toContain("primaryInboxItem");
