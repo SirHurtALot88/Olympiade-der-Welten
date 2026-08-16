@@ -699,17 +699,34 @@ describe("legacy lineup draft ui contract", () => {
 
   it("kennt die klassische Variante nicht mehr — auch nicht als Schalter", async () => {
     const fs = await import("node:fs/promises");
-    const [lineupText, derivationsText] = await Promise.all([
-      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
-      fs.readFile(path.join(process.cwd(), "lib/foundation/tabs/use-lineup-derivations.ts"), "utf8"),
-    ]);
+    const lineupText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+      "utf8",
+    );
 
     // Der Schalter ist weg — nicht nur seine zweite Stellung. Ein `uiVariant`, das nur noch
     // „focusV2" annehmen kann, waere derselbe tote Zweig unter anderem Namen.
     expect(lineupText).not.toContain("uiVariant?:");
     expect(lineupText).not.toContain('"classic"');
-    expect(derivationsText).not.toContain("LineupUiVariant");
-    expect(derivationsText).not.toContain("resolveLineupUiVariant");
+
+    /**
+     * HIER WURDE FRUEHER AUCH `lib/foundation/tabs/use-lineup-derivations.ts` GELESEN — die Datei
+     * gibt es nicht mehr.
+     *
+     * Sie trug den Varianten-Typ und seinen Resolver; geprueft wurde, dass beide daraus
+     * verschwunden sind. Inzwischen ist die ganze Datei entfernt, zusammen mit dem
+     * Aufstellungs-Shell-Host und dem Router-Baustein darueber: die Kette hatte nachgezaehlt
+     * keinen Aufrufer mehr, die Live-Shell rendert das Panel direkt.
+     *
+     * Eine geloeschte Datei ist die schaerfere Zusicherung als eine Datei ohne die beiden Namen —
+     * geprueft wird deshalb jetzt ihr Nichtvorhandensein. Kaeme sie zurueck, waere das eine
+     * bewusste Entscheidung und keine schleichende Rueckkehr.
+     */
+    const { existsSync } = await import("node:fs");
+    expect(
+      existsSync(path.join(process.cwd(), "lib/foundation/tabs/use-lineup-derivations.ts")),
+      "use-lineup-derivations.ts ist zurueck — dann gehoert die Zusicherung neu gefasst",
+    ).toBe(false);
 
     // Und die Marken des alten Baums kommen nicht zurueck.
     for (const marke of [

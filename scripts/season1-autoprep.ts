@@ -562,7 +562,7 @@ function summarizeTraining(rows: TrainingAuditRow[]) {
   }));
 }
 
-function buildReadiness(gameState: GameState, preflight: PreflightReport, trainingRows: TrainingAuditRow[], lineupRows: LineupAuditRow[], formRows: FormCardAuditRow[]) {
+function buildReadiness(gameState: GameState, preflight: PreflightReport, trainingRows: TrainingAuditRow[], lineupRows: LineupAuditRow[], formRows: FormCardAuditRow[], dryRun: boolean) {
   const byMatchday = gameState.season.matchdayIds.map((matchdayId) => {
     const rows = lineupRows.filter((row) => row.matchdayId === matchdayId);
     return {
@@ -589,6 +589,12 @@ function buildReadiness(gameState: GameState, preflight: PreflightReport, traini
   ];
 
   return {
+    // Ganz oben, noch vor `ok`: die berechneten Lineups/Formkarten/Trainingsmodi in
+    // diesem Report existieren nur im Arbeitsspeicher dieses Prozesses, solange
+    // WRITE_ENABLED false ist -- `ok: true` beschreibt dann einen hypothetischen
+    // Stand, nicht den tatsaechlich gespeicherten Save. Ohne dieses Flag sah ein
+    // Trockenlauf in der JSON-Datei identisch zu einem echten, geschriebenen Lauf aus.
+    dryRun,
     ok: allBlockers.length === 0 && byMatchday.every((row) => row.validLineups === 32),
     preflight,
     byMatchday,
@@ -619,6 +625,12 @@ function buildMarkdown(readiness: ReturnType<typeof buildReadiness>, files: Reco
   return `# ${readiness.preflight.seasonName} Auto-Prep Readiness
 
 Status: **${readiness.ok ? "READY" : "BLOCKED"}**
+
+${
+  readiness.dryRun
+    ? "**TROCKENLAUF -- es wurde nichts geschrieben.** \"READY\" oben beschreibt, was `--write` speichern WUERDE -- der aktuelle Save enthaelt diese Lineups/Formkarten/Trainingsmodi noch nicht."
+    : "Lauf mit `--write`: die Lineups/Formkarten/Trainingsmodi oben sind gespeichert."
+}
 
 ## Save
 - Save: ${readiness.preflight.saveName} (${readiness.preflight.saveId})
@@ -664,9 +676,15 @@ ${trainingLines}
 `;
 }
 
+// Auf stderr, nicht stdout: stdout bleibt reines JSON. Am Anfang UND am Ende, weil ein
+// langer Lauf die erste Zeile im Terminal-Scrollback begraben kann, bevor jemand liest.
+const DRY_RUN_BANNER =
+  "TROCKENLAUF -- es wurde nichts geschrieben. Mit --write ausfuehren.";
+
 function main() {
   const startedAt = Date.now();
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  if (!WRITE_ENABLED) console.error(DRY_RUN_BANNER);
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
   const save = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave() ?? bootstrapped.save;
@@ -676,7 +694,7 @@ function main() {
   const preflight = buildPreflight(save);
   console.error(`[autoprep] preflight done ok=${preflight.ok} blockers=${preflight.blockers.length} elapsed=${Date.now() - startedAt}ms`);
   if (!preflight.ok) {
-    const jsonPath = writeJson(exportName("autoprep-readiness.json"), { ok: false, preflight });
+    const jsonPath = writeJson(exportName("autoprep-readiness.json"), { dryRun: !WRITE_ENABLED, ok: false, preflight });
     writeMarkdown(exportName("autoprep-readiness.md"), `# ${save.gameState.season.name} Auto-Prep Readiness\n\nStatus: **BLOCKED**\n\nBlocker: ${preflight.blockers.join(" | ")}\n\nJSON: ${jsonPath}\n`);
     throw new Error(`Preflight blocked: ${preflight.blockers.join(" | ")}`);
   }
@@ -722,7 +740,7 @@ function main() {
   }
 
   const formRows = buildFormCardAudit(gameState);
-  const readiness = buildReadiness(gameState, preflight, trainingRows, lineupPrep.rows, formRows);
+  const readiness = buildReadiness(gameState, preflight, trainingRows, lineupPrep.rows, formRows, !WRITE_ENABLED);
   const lineupCsv = writeCsv(exportName("lineup-readiness.csv"), lineupPrep.rows);
   const formCsv = writeCsv(exportName("formcards-audit.csv"), formRows);
   const trainingCsv = writeCsv(exportName("training-audit.csv"), trainingRows);
@@ -730,13 +748,14 @@ function main() {
   const md = writeMarkdown(exportName("autoprep-readiness.md"), buildMarkdown(readiness, { json, lineupCsv, formCsv, trainingCsv }));
 
   console.log(JSON.stringify({
-    ok: readiness.ok,
     dryRun: !WRITE_ENABLED,
+    ok: readiness.ok,
     saveId: save.saveId,
     files: { md, json, lineupCsv, formCsv, trainingCsv },
     matchdays: readiness.byMatchday,
     blockers: readiness.blockers,
   }, null, 2));
+  if (!WRITE_ENABLED) console.error(DRY_RUN_BANNER);
 }
 
 main();

@@ -979,8 +979,27 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.season.matchdayIds[9]).toBe("matchday-10");
     expect(reloaded?.gameState.seasonState.disciplineSchedule).toHaveLength(10);
     expect(reloaded?.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "season_seed")).toBe(true);
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline1?.disciplineId).not.toBe("mini-dm");
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline2?.disciplineId).not.toBe("fechten");
+    /**
+     * HIER STANDEN ZWEI WUERFE GEGEN SICH SELBST.
+     *
+     * Die beiden Zeilen prueften `.not.toBe("mini-dm")` und `.not.toBe("fechten")` als Beweis
+     * dafuer, dass der Spielplan neu ausgelost wurde. Der Saatwert haengt aber an der
+     * Spielstand-Kennung, und die traegt einen Zeitanteil — bei 20 Disziplinen zieht die Auslosung
+     * also etwa jedes zwanzigste Mal genau diese Disziplin an genau diese Stelle, und der Test
+     * fiel ohne jeden Fehler im Spiel. Im vollen Suitenlauf ist er genau so aufgeschlagen
+     * („expected 'mini-dm' not to be 'mini-dm'").
+     *
+     * Geprueft wird jetzt, was die Zeilen SAGEN WOLLTEN: dass ein vollstaendiger, ausgeloster
+     * Spielplan zurueckkommt und nicht zehnmal dieselbe Paarung — Letzteres waere das Kennzeichen
+     * eines hart verdrahteten Rueckfalls. Der Herkunftsvermerk `season_seed` steht schon eine
+     * Zeile darueber.
+     */
+    const plan = reloaded?.gameState.seasonState.disciplineSchedule ?? [];
+    // Jede Runde hat beide Seiten besetzt — ein halber Spieltag waere die eigentliche Regression.
+    expect(plan.every((eintrag) => Boolean(eintrag.discipline1?.disciplineId && eintrag.discipline2?.disciplineId))).toBe(true);
+    // Und es ist eine Auslosung, keine Wiederholung: mehr als eine verschiedene Paarung.
+    const paarungen = new Set(plan.map((eintrag) => `${eintrag.discipline1?.disciplineId}|${eintrag.discipline2?.disciplineId}`));
+    expect(paarungen.size).toBeGreaterThan(1);
   }, 20000);
 
   it("persists local player generator drafts inside the sqlite save", () => {

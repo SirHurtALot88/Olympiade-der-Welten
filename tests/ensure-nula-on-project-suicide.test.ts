@@ -24,7 +24,11 @@ describe("ensureNulaOnProjectSuicide", () => {
     expect(entries[0].teamId).toBe("P-S");
     expect(entries[0].contractLength).toBe(5);
     expect(entries[0].purchasePrice).toBe(10);
-    expect(entries[0].salary).toBe(2);
+    // HEIMRABATT (Chris: „sie ist aber 50% günstiger für P-S weil sie sich dort immer mega wohl
+    // fühlt"). Der Rabatt liegt bewusst auf dem GEHALT und nicht auf der Abloese — die wechselt
+    // bei einem Team-zu-Team-Transfer den Besitzer, ein halber Preis bei vollem Gegenwert wuerde
+    // Geld erzeugen. `purchasePrice` bleibt deshalb der volle Marktwert.
+    expect(entries[0].salary).toBe(1);
     // P-S paid her market value; a free-agent buy leaves the system, so no team is credited.
     expect(cashOf(gs, "P-S")).toBe(90);
     expect(cashOf(gs, "A-A")).toBe(50);

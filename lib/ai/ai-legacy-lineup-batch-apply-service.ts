@@ -28,6 +28,7 @@ import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readi
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
+import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -555,6 +556,40 @@ function sideTeamPowerPriority(input: {
 // Use-it-or-lose-it target: the AI aims to spend at least this fraction of a team's
 // active team-power charges over the season, so powers don't rot unused. Tunable/reversible
 // via OLY_TEAM_POWER_TARGET_USAGE (0..1); default 0.85 leaves margin above the 80% floor.
+/**
+ * ZIEL FUER PLUSKARTEN UEBER DIE SAISON: 1 = alles faellt.
+ *
+ * CHRIS' VORGABE, woertlich: „ziel: ALLE AI teams haben am ende der Season ALLE ihre karten
+ * gespielt. Negative dürfen eh nicht übrig bleiben wegen der Strafpunkte - aber positive übrig
+ * haben bedeutet dass man nicht die gute Form die man hatte eingesetzt hat und kostet ein Team
+ * sehr viele Punkte!"
+ *
+ * Vorher stand hier faktisch 0.85, kombiniert mit einem backloaded Pace-Exponenten — am letzten
+ * Spieltag ergab das ein Ziel von 75 %. Es gibt keinen Grund, eine Pluskarte mit in die naechste
+ * Saison zu nehmen: sie verfaellt (`unused_positive_formcards_expire`).
+ */
+const FORM_CARD_POSITIVE_SEASON_TARGET = 1;
+
+/**
+ * Sitzplaetze fuer Pluskarten JE SPIELTAG: zwei Disziplinseiten mal Primaer- und Sekundaerplatz.
+ * Das ist die harte Obergrenze dessen, was ein Spieltag aufnehmen kann.
+ */
+const FORM_CARD_POSITIVE_SEATS_PER_MATCHDAY = 4;
+
+/**
+ * Womit der ENDSPURT rechnet — bewusst 2 statt der theoretischen 4.
+ *
+ * Die Primaerplaetze gehen zuerst an die Minuskarten: die MUESSEN fallen, sonst kosten sie am
+ * Saisonende Tabellenpunkte (`form-card-penalty-service`). Weil jeder Spieler ein gespiegeltes
+ * Paar (+x/-x) erzeugt, ist rund die Haelfte aller Karten negativ — auf einem typischen Spieltag
+ * bleiben den Pluskarten also die beiden Sekundaerplaetze.
+ *
+ * Rechnet der Endspurt mit 4, verlaesst er sich auf Plaetze, die es am letzten Spieltag oft nicht
+ * gibt — genau so sind die Karten bisher liegengeblieben. Mit 2 setzt der Druck frueher ein. Der
+ * Deckel je Spieltag bleibt bei 4, die guten Faelle werden also weiter voll genutzt.
+ */
+const FORM_CARD_POSITIVE_SEATS_FOR_ENDGAME = 2;
+
 const TEAM_POWER_TARGET_SEASON_USAGE = (() => {
   const raw = Number(process.env.OLY_TEAM_POWER_TARGET_USAGE ?? 0.9);
   return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.9;
@@ -1076,11 +1111,35 @@ function pickPrimaryFormCardForSide(input: {
       });
       if (cheapest) return cheapest;
     }
-    return takeDumpNegativeFormCard({
+    const dump = takeDumpNegativeFormCard({
       cards: input.negativeCards,
       usedIds: input.usedIds,
       color: input.color,
     });
+    if (dump) return dump;
+    /**
+     * HIER VERROTTETEN DIE PLUSKARTEN. Bis hierher endete der schwache Zweig mit `return` —
+     * ohne Minuskarte also mit NICHTS. Eine schwache Seite konnte damit strukturell nie eine
+     * Pluskarte bekommen, egal wie gross der Ausgabedruck war.
+     *
+     * Am Live-Spielstand nachgemessen, letzter Spieltag der Saison: D-L hatte 12 offene
+     * Pluskarten, R-C und R-R je 8, L-K 6 — gesetzt wurden bei allen VIER Teams NULL. Nicht weil
+     * der Vorrat zu gross war, sondern weil beide Disziplinseiten als „weak" eingestuft waren und
+     * die Minuskarten laengst alle abgeraeumt (0 uebrig). Der Zweig lief leer und gab auf.
+     *
+     * Die Einstufung „schwach" ist eine VORLIEBE, keine Verbotszone: sie soll die knappen
+     * Pluskarten den aussichtsreichen Seiten zuschanzen. In dem Moment, in dem die Alternative
+     * „Karte verfaellt ungespielt" heisst, ist die Vorliebe gegenstandslos — eine Karte auf einer
+     * schwachen Seite bringt `Wert x Farbfaktor x Kadergroesse` Punkte, eine verfallene bringt 0.
+     * Und die PP haengen am RANG ueber alle 32 Teams, nicht am Sieg in der Disziplin: auch auf
+     * einer schwachen Seite schiebt mehr Score real Plaetze.
+     *
+     * Deshalb faellt die Sperre GENAU DANN, wenn `mustSpendPositives` gilt — und keinen Moment
+     * frueher.
+     */
+    if (!input.mustSpendPositives) {
+      return null;
+    }
   }
 
   if (input.preferNegativeDump) {
@@ -1162,8 +1221,10 @@ function pickSecondaryFormCardForSide(input: {
   /** Karten, die der Plan für GENAU diese Seite auf den SEKUNDÄRplatz gelegt hat. */
   plannedSecondaryCardIds: Set<string>;
 }) {
-  // Weak sides never get secondary cards.
-  if (input.competitiveness === "weak") return null;
+  // Schwache Seiten bekommen normalerweise keine zweite Karte — dieselbe Vorliebe wie beim
+  // Primaerplatz, und sie faellt aus demselben Grund unter Ausgabedruck: eine ungespielte
+  // Pluskarte verfaellt am Saisonende ersatzlos.
+  if (input.competitiveness === "weak" && !input.mustSpendPositives) return null;
   // Overkill-Bremse: Wer die Disziplin ohnehin klar anführt, gewinnt auch mit EINER Karte —
   // die zweite fehlt später (Chris: "selbst mit nur 1 8x2 Karte wären sie immer noch 1.").
   // Wie konsequent verzichtet wird, ist Team-Charakter (restraint), kein Einheitsschalter.
@@ -1345,19 +1406,46 @@ export function buildAiLegacyLineupModifiers(
   // Positive urgency: more than 2 positives needed per matchday to exhaust the pool.
   const negativeUrgency = negativeCards.length > remainingPrimarySlots;
   const positiveUrgency = positiveCards.length > remainingMatchdaysIncludingCurrent * 2;
-  // Ausgaben-Pace über die Saison: ~85% der Positivkarten sollen bis zum Saisonende fallen,
-  // leicht backloaded (Exponent > 1), damit früh gespart und hinten raus ausgegeben wird.
-  // Hinkt das Team dem Pace hinterher, entsteht Ausgabedruck — Karten sollen nicht verrotten.
+  // AUSGABEN-PACE UEBER DIE SAISON — Ziel: am Ende ist der Tank LEER.
+  //
+  // GEMELDET VON CHRIS am Saisonstand: „angeblich haben U-A noch 10 karten übrig!!! und davon
+  // +58 das heißt sie hätten sich deutlich schlechter gemacht als nötig gewesen wäre!" — und am
+  // Live-Spielstand nachgemessen stimmte das: an Spieltag 10 von 10 hatten 23 von 30 KI-Teams
+  // zusammen +486 Nennwert ungespielt liegen. Minuskarten waren dagegen restlos abgeraeumt
+  // (0 uebrig bei allen 30 Teams) — die Entsorgungspflicht funktioniert, die Ausgabepflicht nicht.
+  //
+  // DIE URSACHE STAND IN DIESEN DREI ZEILEN. Der Pace zielte auf 85 % und war zusaetzlich
+  // backloaded: `((10-1)/10)^1.15 = 0.886`, mal 0.85 macht am LETZTEN Spieltag ein Ziel von
+  // 75 %. Der Druck erreichte also nie 100 % — die AI war ausdruecklich angewiesen, ein Viertel
+  // liegen zu lassen. Fuer die Tabelle ist das teuer: eine ungespielte Pluskarte ist verschenkte
+  // Form, und der Punktwert einer Karte ist `Wert x Farbfaktor x Kadergroesse`.
+  //
+  // Jetzt linear auf 100 %: an Spieltag k von M soll `k/M` des Vorrats gefallen sein. Der Druck
+  // baut sich gleichmaessig auf, statt am Saisonende als Sturzflut anzukommen, fuer die es keine
+  // Plaetze mehr gibt.
   const positiveSpentSoFar = (context.formCards ?? []).filter((card) => card.isUsed && card.value > 0).length;
   const totalPositiveSeason = positiveSpentSoFar + positiveCards.length;
-  const paceProgress = Math.pow(Math.max(0, currentMatchdayIndex - 1) / totalMatchdays, 1.15);
-  const paceTarget = Math.floor(totalPositiveSeason * 0.85 * paceProgress);
+  const paceProgress = Math.min(1, currentMatchdayIndex / totalMatchdays);
+  const paceTarget = Math.floor(totalPositiveSeason * FORM_CARD_POSITIVE_SEASON_TARGET * paceProgress);
   const paceDeficit = Math.max(0, paceTarget - positiveSpentSoFar);
+  // ENDSPURT-ZWANG, uebernommen von den Teamkraeften (`planTeamPowerSidesForMatchday`), wo genau
+  // diese Rechnung schon steht: wie viele Karten MUESSEN heute fallen, damit der Rest in den
+  // verbleibenden Spieltagen ueberhaupt noch Platz findet? Ohne sie merkt die AI erst am letzten
+  // Spieltag, dass zehn Karten auf vier Plaetze wollen.
+  const remainingMatchdaysAfterThis = Math.max(0, remainingMatchdaysIncludingCurrent - 1);
+  const endGameForce = Math.max(
+    0,
+    positiveCards.length - remainingMatchdaysAfterThis * FORM_CARD_POSITIVE_SEATS_FOR_ENDGAME,
+  );
   const mustSpendPositives =
-    positiveUrgency || paceDeficit >= 1 || remainingMatchdaysIncludingCurrent <= 2;
+    positiveUrgency || paceDeficit >= 1 || endGameForce >= 1 || remainingMatchdaysIncludingCurrent <= 2;
   const desiredPositiveThisMatchday = Math.min(
-    4,
-    Math.max(Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent), Math.min(3, paceDeficit)),
+    FORM_CARD_POSITIVE_SEATS_PER_MATCHDAY,
+    Math.max(
+      Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent),
+      paceDeficit,
+      endGameForce,
+    ),
   );
   const doctrine = getFormCardDoctrineProfile(context);
   const usedIds = new Set<string>();
@@ -1976,6 +2064,10 @@ export function applyAiLegacyLineupBatchLocally(
       ? findStaleAiLineupEntries({
           entryPlayerIds: (contextResult.context.existingDraft?.entries ?? []).map((entry) => entry.playerId),
           rosterPlayers: contextResult.context.rosterPlayers ?? [],
+          // Dieselbe Korrektur wie im Trainingslast-Dienst: ohne den echten Spieltagsbedarf faellt
+          // die Schonschwelle auf einen Notnagel zurueck und laesst duenne Kader tiefer aussehen,
+          // als sie sind. Beide Stellen lesen jetzt denselben Wert aus dem Spielplan.
+          startingSlots: resolveMatchdayPlayerDemand(preparedGameState, scope.matchdayId) ?? undefined,
         })
       : [];
 

@@ -7,6 +7,7 @@ import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { resolvePlayerDisciplinePoints } from "@/lib/foundation/discipline-points-source";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import {
@@ -205,8 +206,34 @@ const ROSTER_PPS_AXES: Array<{ axis: SeasonDisciplineAreaId; label: string; cate
  * `pointsByDiscipline`. Es wird nichts neu erfunden: fehlt ein Ledger-Eintrag,
  * steht die Disziplin mit 0 PPs (der Katalog kommt aus `gameState.disciplines`).
  */
+/** Erste endliche Zahl gewinnt: ausgeloste Kadergroesse vor Katalogwert, sonst nichts anzeigen. */
+function resolveAngezeigteKadergroesse(...kandidaten: Array<number | null | undefined>): number | null {
+  for (const wert of kandidaten) {
+    if (typeof wert === "number" && Number.isFinite(wert)) {
+      return wert;
+    }
+  }
+  return null;
+}
+
 export function buildRosterDisciplinePpsByAxis(input: {
   disciplines: GameState["disciplines"];
+  /**
+   * DIE AUSGELOSTE KADERGROESSE DIESER SAISON — nicht die aus dem Katalog.
+   *
+   * Der Spielplan lost die Kadergroesse je Disziplin pro Saison neu aus
+   * (`buildSeasonSeededDisciplineSchedule`); `gameState.disciplines[].playerCount` ist nur der
+   * Startzustand. Am durchgespielten Saison-1-Stand gemessen weichen die beiden bei 15 von 20
+   * Disziplinen voneinander ab.
+   *
+   * Die Zahl steht hier als „(6)" hinter dem Disziplinnamen und behauptet, wie viele Spieler pro
+   * Team antreten. Mit dem Katalogwert war das an ausgelosten Spieltagen schlicht falsch — bei
+   * Tennis stand 3, angetreten sind 6.
+   *
+   * Optional, weil die Funktion auch ohne Saisonbezug aufgerufen werden koennen soll; fehlt die
+   * Karte, bleibt der Katalog der Rueckfall.
+   */
+  seasonPlayerCountByDisciplineId?: Map<string, number | null> | null;
   pointsByDiscipline: Record<string, number> | null | undefined;
   pointsByArea: Record<string, number | null | undefined> | null | undefined;
   axisTotals: Record<SeasonDisciplineAreaId, number | null>;
@@ -241,12 +268,13 @@ export function buildRosterDisciplinePpsByAxis(input: {
             name: discipline.name,
             pps: Number.isFinite(raw) ? roundViewNumber(raw as number, 1) : 0,
             // Kadergröße der Disziplin — steht in der Liste als "(6)" hinter dem Namen und
-            // sagt, wie viele Spieler pro Team hier antreten. Fehlt der Katalogwert, bleibt
-            // die Klammer weg statt eine Zahl zu erfinden.
-            playerCount:
-              typeof discipline.playerCount === "number" && Number.isFinite(discipline.playerCount)
-                ? discipline.playerCount
-                : null,
+            // sagt, wie viele Spieler pro Team hier antreten. Zuerst die für DIESE Saison
+            // ausgeloste Zahl (s. `seasonPlayerCountByDisciplineId` oben), erst dann der
+            // Katalogwert. Fehlt beides, bleibt die Klammer weg statt eine Zahl zu erfinden.
+            playerCount: resolveAngezeigteKadergroesse(
+              input.seasonPlayerCountByDisciplineId?.get(discipline.id),
+              discipline.playerCount,
+            ),
           };
         }),
     };
@@ -415,6 +443,17 @@ export function useFoundationCrossTabTeamsRoster(input: {
     }
 
     const saveId = input.activeSaveId ?? "default";
+    /**
+     * EINMAL je Neuberechnung statt je Spieler: die Karte laeuft ueber den ganzen
+     * Disziplin-Spielplan, und der Kader hat bis zu 14 Zeilen.
+     *
+     * Defensiv wie an den anderen Lesestellen: im Bootstrap-/Teil-Zustand koennen `season` und
+     * `seasonState` noch fehlen, `buildSeasonDisciplinePlayerCountMap` setzt beide voraus.
+     */
+    const seasonPlayerCountByDisciplineId =
+      input.gameState.season?.id != null && input.gameState.seasonState
+        ? buildSeasonDisciplinePlayerCountMap(input.gameState)
+        : null;
     return [...input.rosterPlayers]
       .map(({ entry, player }) => {
         const playerRating = input.playerRatingsById.get(player.id) ?? null;
@@ -454,6 +493,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
             });
             return buildRosterDisciplinePpsByAxis({
               disciplines: input.gameState.disciplines,
+              seasonPlayerCountByDisciplineId: seasonPlayerCountByDisciplineId,
               pointsByDiscipline,
               // Achsen-Gesamtwert bleibt am Ledger: ist der leer, fällt
               // `buildRosterDisciplinePpsByAxis` auf `ppPow`/`ppSpe`… zurück —

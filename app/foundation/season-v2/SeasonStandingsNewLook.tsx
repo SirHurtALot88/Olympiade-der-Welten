@@ -173,6 +173,7 @@ type NlTableSortKey =
   | "formCardsLeft"
   | "mw"
   | "cash"
+  | "injuries"
   | "sponsor"
   | "salary"
   | "buildingCost"
@@ -184,6 +185,7 @@ function nlMoneySignClass(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value) || value === 0) return "";
   return value > 0 ? " is-pos" : " is-neg";
 }
+
 
 function getTableSortValue(
   row: SeasonV2StandingsRow,
@@ -216,6 +218,10 @@ function getTableSortValue(
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
         ? row.marketValueTotal
         : Number.NEGATIVE_INFINITY;
+    case "injuries":
+      // Ohne Zahl ans ENDE sortieren, nicht als 0 an die Spitze: „keine Angabe" ist nicht
+      // dasselbe wie „keine Verletzung".
+      return row.injuries != null && Number.isFinite(row.injuries) ? row.injuries : Number.NEGATIVE_INFINITY;
     case "cash":
       return row.cash != null && Number.isFinite(row.cash) ? row.cash : Number.NEGATIVE_INFINITY;
     case "sponsor":
@@ -1505,6 +1511,12 @@ export default function SeasonStandingsNewLook({
               <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
+              {/* Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+                  Verletzungen!" — die Rohdaten lagen laengst vor (`injuryEvents`), es fehlte nur
+                  die Spalte. */}
+              <th className="nl-standings-th-formcards">
+                {renderTableSortHeader("injuries", "Verl.", "Verletzungen dieser Saison")}
+              </th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
@@ -1605,11 +1617,48 @@ export default function SeasonStandingsNewLook({
         </td>
       );
     }
-    const anteil = entry.poolPositive > 0 ? entry.remainingPositive / entry.poolPositive : 0;
-    const tank = anteil >= 0.5 ? " is-pos" : anteil > 0 ? "" : " is-neg";
+    /**
+     * DIE FARBE STAND AUF DEM KOPF. Bisher: mehr als der halbe Tank uebrig → GRUEN, Tank leer →
+     * ROT. Damit lobte die Spalte genau den Zustand, der Punkte kostet.
+     *
+     * CHRIS' REGEL, woertlich: „positive übrig haben bedeutet dass man nicht die gute Form die man
+     * hatte eingesetzt hat und kostet ein Team sehr viele Punkte!" Eine ungespielte Pluskarte
+     * verfaellt am Saisonende (`unused_positive_formcards_expire`) — sie ist kein Guthaben,
+     * sondern ein Verlust, der noch nicht gebucht ist.
+     *
+     * Jetzt: leerer Tank = Ziel erreicht (gruen), Rest = neutral. Bewusst KEIN Rot fuer den Rest:
+     * diese Ansicht kennt den Spieltag nicht, und mitten in der Saison ist ein voller Tank voellig
+     * in Ordnung. Was ohne Zeitangabe ehrlich gesagt werden kann, ist nur: leer ist gut.
+     */
+    const tank = entry.remainingPositive <= 0 ? " is-pos" : "";
     return (
       <td className={`nl-standings-td-formcards${tank}`} title={buildFormCardTitle(row, entry)}>
         {formatNlNumber(entry.remainingPositive, 0)}
+      </td>
+    );
+  }
+
+  /**
+   * Spalte „Verl." — Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+   * Verletzungen!"
+   *
+   * `null` heisst „nicht gezaehlt" und zeigt „—"; eine echte 0 zeigt 0. Der Unterschied ist keine
+   * Feinheit: „keine Verletzung" ist die beste Zeile der Spalte, „nicht gezaehlt" ist ein Ausfall.
+   */
+  function renderInjuryCell(row: SeasonV2StandingsRow) {
+    if (row.injuries == null || !Number.isFinite(row.injuries)) {
+      return (
+        <td className="nl-standings-td-formcards" title={`Verletzungen nicht gezählt — ${row.teamName}`}>
+          —
+        </td>
+      );
+    }
+    return (
+      <td
+        className={`nl-standings-td-formcards${row.injuries === 0 ? " is-pos" : ""}`}
+        title={`${row.teamName}: ${row.injuries} Verletzung${row.injuries === 1 ? "" : "en"} in dieser Saison`}
+      >
+        {formatNlNumber(row.injuries, 0)}
       </td>
     );
   }
@@ -1667,6 +1716,7 @@ export default function SeasonStandingsNewLook({
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
           {renderFormCardLeftCell(row)}
+          {renderInjuryCell(row)}
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
@@ -1735,7 +1785,7 @@ export default function SeasonStandingsNewLook({
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={18} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={19} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>

@@ -7,6 +7,7 @@ import {
   buildMatchdayInjuryRollMap,
   calculatePlayerRecovery,
   calculateTeamRecovery,
+  INJURY_RECOVERY_FACTOR,
   getInjuryRiskBand,
   getInjuryRiskPercent,
   getPlayerAvailabilityView,
@@ -421,12 +422,21 @@ describe("fatigue injury service", () => {
     expect(result.gameState.seasonState.playerAvailabilityState).toEqual([]);
   });
 
-  it("uses recovery facilities but halves the final recovery while injured", () => {
+  /**
+   * Hier stand `toBe(recovery.normalRecovery * 0.5)`, und der Fall hiess „halves the final
+   * recovery while injured". Beides war die eingetippte Halbierung ein zweites Mal — der Test
+   * hat die Zahl gegen sich selbst geprueft und deshalb nicht gemeldet, dass Chris' Umstellung
+   * auf 1,0 an dieser Rechenstelle vorbeigegangen ist.
+   *
+   * Geprueft wird jetzt die Beziehung: die Gebaeude wirken, und der Verletzten-Wert folgt dem
+   * Faktor aus dem Modell. Welche Zahl der traegt, entscheidet Chris.
+   */
+  it("uses recovery facilities and applies the model's injury factor", () => {
     const gameState = createGameState("player-1", 80);
     const recovery = calculateTeamRecovery(gameState, "A-A");
 
     expect(recovery.normalRecovery).toBeGreaterThan(BASE_MATCHDAY_RECOVERY);
-    expect(recovery.injuryRecovery).toBe(recovery.normalRecovery * 0.5);
+    expect(recovery.injuryRecovery).toBeCloseTo(recovery.normalRecovery * INJURY_RECOVERY_FACTOR, 2);
   });
 
   it("reduces inactive player recovery when training mode is hard", () => {

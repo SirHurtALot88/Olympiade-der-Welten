@@ -158,6 +158,93 @@ type TeamDrawerHistoryTableProps = {
   seasonPlayerCountByDisciplineId?: Map<string, number | null | undefined> | null;
 };
 
+/**
+ * WAS IN DER ALL-TIME-ZEILE STEHEN DARF — und was ausdruecklich nicht.
+ *
+ * GEMELDET VON CHRIS (Ticket #32): „in der ALl Time Zeile der History sind die PPs Verletzungen MW
+ * usw noch nicht erfasst — für die gilt das auch". Die Zeile fuellte bis hierher genau drei
+ * Spalten (Saison, PPs, Platz); jede andere war ein leeres `<td>`. Eine leere Zelle in einer
+ * Summenzeile liest sich wie „null", nicht wie „nicht gezaehlt" — das ist der eigentliche Fehler,
+ * nicht die fehlende Zahl.
+ *
+ * NICHT ALLES DARF SUMMIERT WERDEN, und genau daran haette ein schnelles „alle Spalten addieren"
+ * scheitern muessen:
+ *
+ *   FLUSSGROESSEN (summierbar): PPs und ihre Achsen, Punkte, Verletzungen, GuV. Jede Saison
+ *   steuert etwas bei, die Summe ueber alle Saisons ist eine sinnvolle Aussage.
+ *
+ *   BESTANDSGROESSEN (NICHT summierbar): Cash, Gehaltssumme, Marktwert. Das sind Momentaufnahmen.
+ *   „Cash aller Saisons addiert" waere eine Zahl ohne Bedeutung — dieselben Millionen zehnmal
+ *   gezaehlt. Hier steht deshalb der LETZTE Stand, und zwar gekennzeichnet.
+ *
+ *   MITTELWERTE: Ø Fatigue wird gemittelt, nicht addiert.
+ *
+ *   EINZELEREIGNISSE: Top-Einkauf und Top-Verkauf sind „der groesste", nicht „die Summe" — ueber
+ *   alle Saisons also das Maximum.
+ */
+type AllTimeAggregatArt = "summe" | "letzter" | "mittel" | "maximum" | "keine";
+
+const ALL_TIME_AGGREGAT: Record<string, AllTimeAggregatArt> = {
+  points: "summe",
+  pow: "summe",
+  spe: "summe",
+  men: "summe",
+  soc: "summe",
+  guv: "summe",
+  injuriesCount: "summe",
+  averageFatigue: "mittel",
+  cash: "letzter",
+  salary: "letzter",
+  mw: "letzter",
+  topBuy: "maximum",
+  topSell: "maximum",
+};
+
+function leseAllTimeZahl(row: TeamDetailDrawerHistoryRow, columnId: string): number | null {
+  const werte: Record<string, unknown> = {
+    points: row.points,
+    pow: row.ppPow,
+    spe: row.ppSpe,
+    men: row.ppMen,
+    soc: row.ppSoc,
+    guv: row.guv,
+    injuriesCount: row.injuriesCount,
+    averageFatigue: row.averageFatigue,
+    cash: row.cash,
+    salary: row.salaryTotal,
+    mw: row.marketValue,
+    topBuy: row.topBuyAmount,
+    topSell: row.topSellAmount,
+  };
+  const wert = werte[columnId];
+  return typeof wert === "number" && Number.isFinite(wert) ? wert : null;
+}
+
+function berechneAllTimeWert(rows: readonly TeamDetailDrawerHistoryRow[], columnId: string): number | null {
+  const art = ALL_TIME_AGGREGAT[columnId];
+  if (!art || art === "keine") return null;
+  const werte = rows.map((row) => leseAllTimeZahl(row, columnId)).filter((wert): wert is number => wert != null);
+  if (werte.length === 0) return null;
+  if (art === "summe") return werte.reduce((summe, wert) => summe + wert, 0);
+  if (art === "mittel") return werte.reduce((summe, wert) => summe + wert, 0) / werte.length;
+  if (art === "maximum") return Math.max(...werte);
+  // „letzter": die Zeilen stehen mit der laufenden Saison zuerst — der letzte Stand ist damit die
+  // OBERSTE Zeile, nicht die unterste.
+  for (const row of rows) {
+    const wert = leseAllTimeZahl(row, columnId);
+    if (wert != null) return wert;
+  }
+  return null;
+}
+
+const ALL_TIME_TITEL: Record<AllTimeAggregatArt, string> = {
+  summe: "Summe über alle Saisons",
+  mittel: "Durchschnitt über alle Saisons",
+  maximum: "Höchster Wert über alle Saisons",
+  letzter: "Letzter Stand — eine Bestandsgröße lässt sich nicht über Saisons addieren",
+  keine: "",
+};
+
 export default function TeamDrawerHistoryTable({
   rows,
   tableClassName = "team-table teams-v2-history-table",
@@ -344,7 +431,20 @@ export default function TeamDrawerHistoryTable({
                     </td>
                   );
                 }
-                return <td key={`alltime-${column.id}`} />;
+                const allTimeWert = berechneAllTimeWert(rows, column.id);
+                if (allTimeWert == null) {
+                  return <td key={`alltime-${column.id}`} />;
+                }
+                const art = ALL_TIME_AGGREGAT[column.id] ?? "keine";
+                const nachkomma = column.id === "injuriesCount" || column.id === "points" ? 0 : 1;
+                return (
+                  <td key={`alltime-${column.id}`} className="team-history-alltime-value" title={ALL_TIME_TITEL[art]}>
+                    <strong>{formatNlNumber(allTimeWert, nachkomma)}</strong>
+                    {/* Eine Bestandsgroesse traegt ihr Kennzeichen, sonst liest sie sich wie eine
+                        Summe — und „Cash aller Saisons addiert" waere eine Zahl ohne Bedeutung. */}
+                    {art === "letzter" ? <small className="team-history-alltime-of"> · Stand</small> : null}
+                  </td>
+                );
               })}
             </tr>
           ) : null}

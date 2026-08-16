@@ -130,6 +130,31 @@ function getTimingMultiplier(gameState: GameState) {
   return 0.92;
 }
 
+/**
+ * DER KADERDRUCK BEGINNT EINE STUFE FRUEHER — Ticket #38.
+ *
+ * CHRIS' MELDUNG, woertlich: „der VK Faktor soll schon ab 8 spielern beginnen, zumindest fuer die
+ * top und bottom 2 spieler ungefaehr — selbe logik wie bisher aber auch!"
+ *
+ * Vorher griff der Abschlag ausschliesslich UNTER dem Minimum (`rosterAfter < playerMin`). Bei
+ * einem Minimum von 8 hiess das: aus einem Neunmannkader verkaufen liess acht zurueck, also kein
+ * Abschlag — der Kaeufer sah einem Team, das gerade an die Untergrenze rutscht, keinerlei Not an.
+ * Erst der Verkauf aus dem Achtmannkader (sieben zurueck, Kader kaputt) wurde bestraft.
+ *
+ * Jetzt gibt es zwei Stufen statt einer Kante:
+ *   - GENAU AM MINIMUM (`rosterAfter === playerMin`): milder Abschlag. Das Team kann noch
+ *     antreten, hat aber keine Reserve mehr — das ist eine Verhandlungsposition, keine Notlage.
+ *   - UNTER DEM MINIMUM: der bisherige volle Abschlag, unveraendert („selbe logik wie bisher").
+ *
+ * WARUM DAS FUER DIE TOP- UND BOTTOM-SPIELER BESONDERS ZAEHLT, und warum es trotzdem KEINE eigene
+ * Sonderregel dafuer braucht: der Abschlag ist multiplikativ. An einem teuren Spieler bewegt
+ * derselbe Faktor absolut ein Vielfaches dessen, was er an einem billigen bewegt — die Wirkung
+ * konzentriert sich also von allein dort, wo Chris sie erwartet. Eine zusaetzliche Rangregel
+ * haette eine zweite Rechenstelle fuer denselben Effekt geschaffen.
+ */
+const KADERDRUCK_MALUS_UNTER_MINIMUM = 0.9;
+const KADERDRUCK_MALUS_AM_MINIMUM = 0.95;
+
 function getLiquidationMalus(gameState: GameState, teamId: string, rosterAfter: number, playerMin: number | null) {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   if (!team) {
@@ -140,8 +165,12 @@ function getLiquidationMalus(gameState: GameState, teamId: string, rosterAfter: 
   if (Number.isFinite(team.cash) && team.cash < 0) {
     malus *= 0.88;
   }
-  if (playerMin != null && rosterAfter < playerMin) {
-    malus *= 0.9;
+  if (playerMin != null) {
+    if (rosterAfter < playerMin) {
+      malus *= KADERDRUCK_MALUS_UNTER_MINIMUM;
+    } else if (rosterAfter === playerMin) {
+      malus *= KADERDRUCK_MALUS_AM_MINIMUM;
+    }
   }
   return round(malus, 3);
 }
@@ -172,7 +201,13 @@ export function buildSellPricingPolicyBreakdown(input: {
 
   const liquidationMalus = getLiquidationMalus(input.gameState, input.teamId, input.rosterAfter, playerMin);
   if (liquidationMalus < 1) {
-    notes.push("Liquidations-/Kaderdruck reduziert den erzielbaren Preis.");
+    // Der Grund gehoert dazu: „Kaderdruck" ohne Angabe, WELCHER, ist von einem Rechenfehler nicht
+    // zu unterscheiden. Am Minimum steht etwas anderes als darunter.
+    notes.push(
+      playerMin != null && input.rosterAfter === playerMin
+        ? `Kader genau am Minimum (${playerMin}): keine Reserve mehr, der Preis gibt leicht nach.`
+        : "Liquidations-/Kaderdruck reduziert den erzielbaren Preis.",
+    );
   }
 
   const identityFitMultiplier = getIdentityFitMultiplier(input.gameState, input.teamId, input.player);

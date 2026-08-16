@@ -172,10 +172,35 @@ export function describeTrainingXpFacilityEffect(
 
 /**
  * REHA/recovery-center = FLACHER, absoluter Recovery-Bonus (kein %-Bonus): Basis 20 →
- * L1=22, L2=24, L3=26, L4=29, L5=32 pro Spieltag bei 100% Zustand. Die Leiter ist exakt auf
- * `BASE_MATCHDAY_RECOVERY = 20` abgestimmt (L5 = 20 + 12 = 32 absolut).
+ * DIE LEITER WAR NACH IHRER EIGENEN EICHUNG VERALTET. Hier stand: „exakt auf
+ * `BASE_MATCHDAY_RECOVERY = 20` abgestimmt (L5 = 20 + 12 = 32 absolut)" — L5 gab also das
+ * 1,6-fache der Basis. Im August 2026 wurde die Basis auf 28 angehoben, die Leiter nicht: L5
+ * brachte damit nur noch das 1,43-fache, und der Ausbau lohnte sich immer weniger, je besser die
+ * Grunderholung wurde.
+ *
+ * ENTSCHEIDUNG VON CHRIS: „aber ja die leiter muss angehoben werden". Und zur Frage, ob das
+ * Reha-Zentrum in Saison 1 ueberhaupt gebaut werden kann: „recovery center erst ab season 2 bauen
+ * ist auch nicht so verkehrt weil gebaeude ja auch teuer sind" — das Bau-Signal bleibt also, wie
+ * es ist.
+ *
+ * NEU: L1=32, L2=36, L3=41, L4=46, L5=52 pro Spieltag bei 100 % Zustand (Basis 28 + Bonus).
+ *
+ * WARUM DIESE HOEHE UND NICHT NUR DIE ALTE EICHUNG NACHGEZOGEN: gemessen an einer echten Saison
+ * bringt die alte Leiter, wenn ALLE Teams sie auf Stufe 5 haetten, ganze 1,09 verhinderte
+ * Verletzungen je Team — bei 131 Baukosten und 4,8 Unterhalt je Saison, gegen Teamkassen von 5 bis
+ * 18. Das war kein schwacher Zweig, das war ein toter. Mit der neuen Leiter sind es 1,63.
+ *
+ * WARUM DAS DEN VERLETZUNGSKORRIDOR NICHT REISST (150–200, Untergrenze 140): dieser Bonus gilt
+ * nur fuer Teams, die GEBAUT haben. Der Korridor ist ausdruecklich fuer den gebaeudelosen Fall
+ * gesetzt („ohne gebaeude frische boosts etc 150-200 ok"). Eine Anhebung der GRUNDerholung haette
+ * dieselbe Entlastung gratis an alle 32 Teams verschenkt und den Korridor gerissen.
+ *
+ * DIE OBERGRENZE, an der es kippen wuerde: bei L5 = 52 gegen eine Spieltagslast von 16,9 liegt der
+ * Gleichgewichts-Kader bei rund 10,4 Spielern — ein voll ausgebauter Elferkader laeuft flach, ein
+ * Neunerkader steigt weiter. Genau dort soll die Grenze liegen: Investition hilft, sie ersetzt den
+ * Kader nicht.
  */
-export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 2, 4, 6, 9, 12] as const;
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 4, 8, 13, 18, 24] as const;
 
 export function getRecoveryFlatBonusAtLevel(level: number) {
   return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;

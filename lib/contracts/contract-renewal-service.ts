@@ -43,6 +43,7 @@ import {
   buildPlayerContractPreference,
   type ContractNegotiationPreview,
 } from "@/lib/market/contract-negotiation-preview";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
@@ -892,11 +893,57 @@ function getTeamRosterPlayers(gameState: GameState, teamId: string) {
   return gameState.players.filter((player) => playerIds.has(player.id));
 }
 
+/**
+ * EIN VERTRAGSENDE IST EIN VERKAUF — und wird deshalb genauso bepreist.
+ *
+ * CHRIS' ENTSCHEIDUNG: „ja gleicher abschlag wie beim verkauf -> du musst es so sehen dass
+ * contract exits im grunde nichts anderes als ein verkauf sind bei uns im spiel."
+ *
+ * WAS VORHER WAR: diese Funktion nahm den ROHEN Breakdown. Der Verkaufsweg schickt ihn dagegen
+ * durch `applySellPricingPolicyToBreakdown` — Saisonstart-Abschlag x Timing x Kaderdruck x
+ * Team-Fit. Damit buchte ein auslaufender oder aufgeloester Vertrag dem Team einen Erloes gut, den
+ * derselbe Spieler ueber den Transfermarkt nie gebracht haette. Nicht nur eine Anzeige daneben:
+ * `buildContractExitValue` speist die tatsaechliche Gutschrift (Aufrufer in dieser Datei) UND den
+ * Eintrag in der Transferhistorie.
+ *
+ * DER BELEG STAMMT AUS DER GEGENRICHTUNG: Lava Golem wurde am Live-Spielstand zwoelf Minuten nach
+ * Chris' Meldung ueber den Markt verkauft, die Historie zeigt `fee 28.09` — waehrend der rohe
+ * Breakdown 29,48 sagt. Verhaeltnis 0,9528, exakt die Policy. Ueber den ganzen Kader desselben
+ * Spielstands gemessen wichen ROH und BEREINIGT bei 336 von 336 Vertraegen voneinander ab, im
+ * Mittel 1,78, groesste Differenz 11,52 — durchweg zugunsten des Teams.
+ *
+ * DIE ANZEIGE WAR DIE ERSTE HAELFTE, das hier ist die zweite. `contract-negotiation-preview.ts`
+ * hat die Auslauf-TABELLE bereits auf die Policy gezogen; blieb die BUCHUNG roh, zeigte die
+ * Oberflaeche ab sofort die richtige Zahl und schriebe die falsche gut. Beide Seiten rufen jetzt
+ * dieselbe Stufe mit derselben Kaderdruck-Regel.
+ *
+ * `marketValueAtExit` BLEIBT ROH — bewusst, und aus demselben Grund wie in der Anzeige: das ist
+ * der Vergleichsmassstab. Verschoebe er sich mit, waere die ausgewiesene Differenz wieder eine
+ * andere Zahl als die, die der Spieler sieht.
+ */
 function buildContractExitValue(gameState: GameState, player: Player | null, entry: RosterEntry | null): ContractExitValue {
   const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-  const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, entry);
+  const rohBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, entry);
+  const rosterCount = entry
+    ? gameState.rosters.filter((kadereintrag) => kadereintrag.teamId === entry.teamId).length
+    : 0;
+  const saleFactorBreakdown = entry
+    ? applySellPricingPolicyToBreakdown({
+        gameState,
+        teamId: entry.teamId,
+        player,
+        rosterEntry: entry,
+        baseBreakdown: rohBreakdown,
+        // Wie im Verkaufsweg: der Kaderdruck-Malus liest die Groesse NACH diesem Abgang, sonst
+        // bewertete er einen Kader, den es danach nicht mehr gibt.
+        rosterAfter: Math.max(0, rosterCount - 1),
+      }).breakdown
+    : rohBreakdown;
   const exitValue = roundMoney(saleFactorBreakdown.salePrice ?? economy.marketValue);
-  const marketValueAtExit = roundMoney(saleFactorBreakdown.baseMarketValue ?? economy.marketValue);
+  // AUSDRUECKLICH vom ROHEN Breakdown: der Vergleichsmassstab darf sich nicht mitverschieben.
+  // Die Policy laesst `baseMarketValue` heute ohnehin unberuehrt — hier steht es trotzdem
+  // explizit, damit die Absicht im Code steht und nicht in einer Annahme ueber fremden Code.
+  const marketValueAtExit = roundMoney(rohBreakdown.baseMarketValue ?? economy.marketValue);
   const purchasePrice = roundMoney(normalizeVisibleRosterMoney(entry?.purchasePrice, economy.purchasePrice));
   const profitLoss =
     exitValue != null && purchasePrice != null

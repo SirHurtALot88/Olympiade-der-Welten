@@ -251,6 +251,20 @@ function buildOfferSkeleton(input: {
   return offer;
 }
 
+/**
+ * WIE VIELE SPONSORENANGEBOTE EIN TEAM JE SAISON BEKOMMT.
+ *
+ * Chris: „1 unterschied: nur 3 Sponsoren statt 5". Die Zahl stand als lokale `const` in
+ * `buildSponsorOffersForTeam` und war damit fuer niemanden lesbar — mehrere Tests trugen deshalb
+ * eine feste Stichproben-Wache `toBeGreaterThan(100)`, die aus der Fuenferzeit stammt. Mit drei
+ * Karten sind es 32 Teams mal 3 = 96, und vier Tests standen rot, ohne dass an der geprueften
+ * Aussage irgendetwas falsch war.
+ *
+ * Exportiert, damit Erwartung und Erzeugung DIESELBE Zahl lesen. Stellt jemand wieder auf fuenf
+ * um, ziehen die Tests von allein mit, statt erneut rot zu werden.
+ */
+export const SPONSOR_ANGEBOTE_JE_TEAM = 3;
+
 export function buildSponsorOffersForTeam(input: {
   gameState: GameState;
   teamId: string;
@@ -299,7 +313,7 @@ export function buildSponsorOffersForTeam(input: {
   // `slotCount − 1` geklammert, der Challenge-Slot ueber die Zahl der ZIELKARTEN
   // (`goalSlotIndexes.length`, hier 2), die Kurvenformen kommen aus einer Ziehung ohne
   // Zuruecklegen ueber 11 Formen, und die Achsen aus einer ueber bis zu 5.
-  const SLOT_COUNT = 3;
+  const SLOT_COUNT = SPONSOR_ANGEBOTE_JE_TEAM;
   const slate = rollSponsorOfferSlate({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,

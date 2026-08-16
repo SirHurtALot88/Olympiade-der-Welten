@@ -29,6 +29,12 @@ const MAX_MATCHDAYS = Number(process.env.OLY_MAX_MATCHDAYS ?? "0");
 const ADVANCE_AFTER_MATCHDAY = process.env.OLY_ADVANCE_AFTER_MATCHDAY !== "0";
 const FORCE_REPLACE_RESULTS = process.env.OLY_FORCE_REPLACE_RESULTS === "1";
 
+// Auf stderr, nicht stdout: stdout bleibt reines JSON, das nachgelagerte Skripte/CI
+// weiterverarbeiten. Am Anfang UND am Ende, weil dieser Lauf minutenlang dauert und die
+// erste Zeile im Terminal-Scrollback laengst begraben ist, wenn jemand die Ausgabe liest.
+const DRY_RUN_BANNER =
+  "TROCKENLAUF -- es wurde nichts geschrieben. Mit --write ausfuehren.";
+
 type CandidateEntry = {
   activePlayerId: string;
   playerId: string;
@@ -52,8 +58,8 @@ type MatchdayRunReport = {
 };
 
 type SimulationExport = {
-  generatedAt: string;
   dryRun: boolean;
+  generatedAt: string;
   saveId: string;
   saveName: string | null;
   seasonId: string;
@@ -373,6 +379,22 @@ function refreshActiveMatchdayLineups(input: {
   }
 }
 
+// Fehlende Zusicherung, die dieser Fund aufgedeckt hat: `LegacyMatchdayResultApplyService`
+// meldet `ok: true, applied: true` allein danach, ob der Preview-Status "ready" war und
+// kein widerspruechlicher existierender Eintrag ohne forceReplace im Weg steht (siehe
+// `buildBlockingReasons` in legacy-matchday-result-apply-service.ts) -- die Anzahl der
+// tatsaechlich geschriebenen Disziplin-Zeilen (`resultsWritten`) fliesst in KEINE dieser
+// Bedingungen ein. Ein Spieltag, der mit 0 Disziplin-Zeilen durchlaeuft, waere also nach
+// aussen ok=true/applied=true und liefe hier als "resolvedTeams: 32, blockers: []" durch
+// die Zusammenfassung -- exakt der Trockenlauf-Trugschluss aus diesem Skript, nur eben mit
+// `--write` und einer echten (aber leeren) Ergebniszeile in der DB. Diese Funktion ist die
+// Zusicherung, die vorher fehlte: 0 Zeilen sind ein Blocker, kein aufgeloester Spieltag.
+// Als eigene, exportierte Funktion, damit sie ohne den kompletten (minutenlangen) Lauf
+// isoliert getestet werden kann.
+export function evaluateDisciplineRowGuard(matchdayId: string, disciplineRows: number): string | null {
+  return disciplineRows === 0 ? `zero_discipline_rows:${matchdayId}` : null;
+}
+
 async function resolveAndApplyMatchday(input: {
   saveId: string;
   seasonId: string;
@@ -416,6 +438,13 @@ async function resolveAndApplyMatchday(input: {
     }
 
     if (!input.write) {
+      // Ohne --write bleibt `report.disciplineRows` bei 0 (Initialwert), weil der
+      // Result-Apply unten gar nicht laeuft -- `resolvedTeams` und `blockers` oben kommen
+      // trotzdem schon aus einer echten, "ready" Preview. Genau diese Kombination
+      // (resolvedTeams: 32, blockers: [], disciplineRows: 0) sah wie ein gewerteter
+      // Spieltag aus, obwohl nichts geschrieben wurde. Die Warnung macht das im
+      // Matchday-Report selbst sichtbar, nicht nur im globalen dryRun-Flag.
+      report.warnings.push("dry_run_kein_ergebnis_geschrieben");
       return report;
     }
 
@@ -436,6 +465,14 @@ async function resolveAndApplyMatchday(input: {
     report.resultApplyId = resultApply.matchdayResultId;
     report.disciplineRows = resultApply.resultsWritten;
     report.playerPerformanceRows = resultApply.playerPerformancesWritten;
+    const disciplineRowGuardBlocker = evaluateDisciplineRowGuard(input.matchdayId, report.disciplineRows);
+    if (disciplineRowGuardBlocker) {
+      report.blockers.push(disciplineRowGuardBlocker);
+      throw new Error(
+        `${input.matchdayId}: Result-Apply meldete ok=true/applied=true, hat aber 0 Disziplin-Zeilen geschrieben. ` +
+          "Das ist kein aufgeloester Spieltag, sondern ein Blocker.",
+      );
+    }
 
     const standingsPreview = await buildStandingsPreview({
       saveId: input.saveId,
@@ -842,6 +879,7 @@ function writeExports(exportData: SimulationExport, gameState: GameState) {
 async function main() {
   loadEnvConfig(PROJECT_ROOT);
   const args = parseArgs();
+  if (!args.write && !args.exportOnly) console.error(DRY_RUN_BANNER);
   const { persistence, save } = getActiveSave();
   const saveId = save.saveId;
   const seasonId = save.gameState.season.id;
@@ -944,16 +982,28 @@ async function main() {
   const disciplineRows = finalSave.gameState.seasonState.disciplineResults?.length ?? 0;
   const playerPpsRows = finalSave.gameState.seasonState.playerDisciplinePerformances?.length ?? 0;
 
+  const isDryRun = !args.write && !args.exportOnly;
   if (args.write || args.exportOnly) {
     if (matchdayResultCount !== EXPECTED_MATCHDAY_COUNT) openBlockers.push(`matchday_results:${matchdayResultCount}/10`);
     if (Object.keys(finalSave.gameState.seasonState.standings ?? {}).length !== EXPECTED_TEAM_COUNT) openBlockers.push("standings_team_count_not_32");
     if (!standingsRows[0]?.teamId) openBlockers.push("champion_missing");
     if (playerAggregates.length === 0) openBlockers.push("player_pps_missing");
+  } else if (isDryRun && matchdays.length > 0) {
+    // Ohne --write/--export-only laufen die obigen vier Checks bewusst NICHT, weil sie in
+    // einem Trockenlauf immer feuern wuerden (nichts ist geschrieben) und damit nichts
+    // Zusaetzliches ueber den Spieltag-Loop aussagen. Trotzdem darf `openBlockers` nicht
+    // einfach leer bleiben: genau ein leeres Array hier war Teil des Trugbilds aus diesem
+    // Fund (matchdays: 10, disciplineRows: 0, aber openBlockers: []). Eine einzelne,
+    // klar benannte Zeile macht die Vorschau-Natur des Laufs auch fuer alle, die nur die
+    // JSON-/Markdown-Datei sehen, unmissverstaendlich.
+    openBlockers.push(
+      `dry_run_keine_daten_geschrieben: ${matchdays.length} Spieltag(e) nur als Vorschau geloest, kein --write; matchdayResultCount=${matchdayResultCount}, disciplineRows=${disciplineRows}`,
+    );
   }
 
   const exportData: SimulationExport = {
+    dryRun: isDryRun,
     generatedAt: new Date().toISOString(),
-    dryRun: !args.write && !args.exportOnly,
     saveId,
     saveName: finalSave.name ?? null,
     seasonId,
@@ -978,9 +1028,16 @@ async function main() {
   writeExports(exportData, finalSave.gameState);
 
   console.log(JSON.stringify(exportData, null, 2));
+  if (isDryRun) console.error(DRY_RUN_BANNER);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+// `require.main === module` haelt den Modul-Import testbar (siehe z.B. `parseArgs` in
+// compare-golden-master-fixture.ts fuer dasselbe Muster im Repo): `evaluateDisciplineRowGuard`
+// laesst sich so per Unit-Test isoliert pruefen, ohne dass der komplette, minutenlange
+// Simulationslauf beim blossen Importieren der Datei mitausgefuehrt wird.
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

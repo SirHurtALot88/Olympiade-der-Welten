@@ -20,6 +20,24 @@ export type StagePreviewMod = { k: string; sign: 1 | -1; amt: number; injury?: b
 
 export type StagePreviewPlayer = {
   playerId: string | null;
+  /**
+   * DER SLOT, AUF DEM DIE ENGINE GERECHNET HAT — und der deshalb auch auf der Buehne gelten muss.
+   *
+   * GEMELDET VON CHRIS (Ticket #35): „wenn ich in 5 + 6 Slot die spieler einsetze, sollen sie auch
+   * dann starten auch wenn davor dann alle slots leer sind!"
+   *
+   * Das war keine Geschmacksfrage: die Slot-Position traegt eine eigene Attribut-Gewichtung
+   * (`matchday-slot-roles.ts`, `roles[entry.slotIndex]`), deren `roleModifier` mit bis zu +-8,5 je
+   * Spieler in `prePowerScore` eingeht. Wer auf Slot 5 als „Clutch Shot" gewertet wurde, aber auf
+   * Etappe 1 gezeigt wird, steht unter der falschen Rollenbeschriftung — die Anzeige widerspricht
+   * der Rechnung, die darunter laeuft.
+   *
+   * Bis hierher warf die Buehne die Position weg: `entries.map(...)` erzeugte ein DICHTES Array,
+   * und die Arena liest ueber den Array-Index. Am Live-Spielstand gemessen betrifft das real
+   * S-C an Spieltag 9 (Basketball, 6 Plaetze, besetzt sind Slot 5 und 6) — gezeigt als Etappe 1
+   * und 2.
+   */
+  slotIndex: number;
   val: number;
   name: string;
   portraitUrl: string | null;
@@ -115,6 +133,7 @@ export function buildDisciplineStageTeamsFromPreview(
 
       return {
         playerId: entry.playerId ?? null,
+        slotIndex: entry.slotIndex,
         val: base,
         name: entry.playerName,
         portraitUrl: portraitById.get(entry.playerId) ?? null,

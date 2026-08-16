@@ -1,0 +1,41 @@
+{
+  "note": "im Saisonstand eine Spalte einfügen mit der Anzahl an Verletzungen!",
+  "view": "seasonV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=seasonV2&team=N-N&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T06:26:42.526Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T06-26-34-920Z-t8c1e4",
+  "createdAt": "2026-08-14T06:26:34.920Z",
+  "page": {
+    "path": "/foundation",
+    "view": "seasonV2",
+    "tab": null,
+    "label": "Spieltag · Saisonstand"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 9,
+    "matchdayId": "matchday-9",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

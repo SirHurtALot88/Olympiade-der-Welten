@@ -16,7 +16,31 @@ function gameState(partial?: {
     matchdayId: string;
     entries: Array<{ playerId: string; disciplineId: string }>;
   }>;
+  disciplineSchedule?: Array<{
+    seasonId: string;
+    matchdayId: string;
+    disciplineId: string;
+    side: "discipline1" | "discipline2";
+    playerCount: number;
+  }>;
 }): GameState {
+  const scheduleByEntryKey = new Map<
+    string,
+    { seasonId: string; matchdayId: string; discipline1?: unknown; discipline2?: unknown }
+  >();
+  for (const slot of partial?.disciplineSchedule ?? []) {
+    const key = `${slot.seasonId}::${slot.matchdayId}`;
+    const entry = scheduleByEntryKey.get(key) ?? { seasonId: slot.seasonId, matchdayId: slot.matchdayId };
+    (entry as Record<string, unknown>)[slot.side] = {
+      disciplineId: slot.disciplineId,
+      displayName: slot.disciplineId,
+      order: 1,
+      playerCount: slot.playerCount,
+      category: "power",
+    };
+    scheduleByEntryKey.set(key, entry);
+  }
+
   return {
     disciplines: [
       { id: "gewichtheben", name: "Gewichtheben", category: "power", weight: 1, playerCount: 6 },
@@ -41,6 +65,7 @@ function gameState(partial?: {
         createdAt: "",
         updatedAt: "",
       })),
+      disciplineSchedule: [...scheduleByEntryKey.values()],
     },
   } as unknown as GameState;
 }
@@ -116,6 +141,43 @@ describe("Verletzungshistorie: Einsatz am Spieltag der Verletzung", () => {
 
     // Kein erfundener Wert — null statt 0.
     expect(result[0]?.playerCount).toBeNull();
+  });
+
+  it("nennt die SPIELPLAN-Kadergröße, wenn sie vom Katalog abweicht", () => {
+    // Gewichtheben steht im Katalog mit 6, der Spielplan hat diesen Spieltag aber nur 4
+    // ausgelost (der Spielplan wuerfelt die Kadergroesse pro Saison neu, siehe
+    // lib/season/season-discipline-schedule.ts). Angezeigt werden muss die ausgeloste Zahl,
+    // sonst behauptet die Verletzungshistorie eine Kadergroesse, die diesen Spieltag nie galt.
+    const result = resolveInjuryMatchdayDisciplines({
+      gameState: gameState({
+        drafts: [{ teamId: "C-C", matchdayId: "md-3", entries: [{ playerId: "p1", disciplineId: "gewichtheben" }] }],
+        disciplineSchedule: [
+          { seasonId: "season-1", matchdayId: "md-3", disciplineId: "gewichtheben", side: "discipline1", playerCount: 4 },
+        ],
+      }),
+      teamId: "C-C",
+      playerId: "p1",
+      matchdayId: "md-3",
+      seasonId: "season-1",
+    });
+
+    expect(result).toEqual([{ disciplineId: "gewichtheben", name: "Gewichtheben", playerCount: 4 }]);
+  });
+
+  it("faellt auf den Katalog zurueck, wenn der Spielplan-Eintrag fehlt (vergangene Saison)", () => {
+    // `disciplineSchedule` wird beim Saisonwechsel durch den Plan der neuen Saison ersetzt —
+    // fuer eine Verletzung aus einer vergangenen Saison gibt es dort keinen Eintrag mehr.
+    const result = resolveInjuryMatchdayDisciplines({
+      gameState: gameState({
+        drafts: [{ teamId: "C-C", matchdayId: "md-3", entries: [{ playerId: "p1", disciplineId: "gewichtheben" }] }],
+      }),
+      teamId: "C-C",
+      playerId: "p1",
+      matchdayId: "md-3",
+      seasonId: "season-0",
+    });
+
+    expect(result).toEqual([{ disciplineId: "gewichtheben", name: "Gewichtheben", playerCount: 6 }]);
   });
 
   it("raet nichts, wenn es zu dem Spieltag keine Einsatzliste gibt", () => {

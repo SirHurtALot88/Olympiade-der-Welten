@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
 import dynamic from "next/dynamic";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -502,6 +503,32 @@ function slotLabel(disciplineId: string, index: number, total: number): string {
   if (vocab && vocab[index]) return vocab[index];
   if (total <= 1) return "Einzel";
   return `Etappe ${index + 1}`;
+}
+
+/**
+ * Legt Spieler auf IHRE Slot-Position statt sie dicht durchzureichen — Ticket #35.
+ *
+ * Die Laenge richtet sich nach dem hoechsten besetzten Slot, unbesetzte Etappen bleiben `null`.
+ * Ein Team, das lueckenlos ab Slot 0 aufstellt (der Regelfall, so fuellt die KI), bekommt damit
+ * exakt dasselbe Array wie vorher — die Aenderung wird nur dort sichtbar, wo wirklich eine Luecke
+ * ist.
+ */
+function verteileAufSlots<Q extends { slotIndex?: number }, R>(
+  eintraege: readonly Q[],
+  bauen: (eintrag: Q) => R,
+): Array<R | null> {
+  if (eintraege.length === 0) return [];
+  const laenge = eintraege.reduce((max, eintrag) => Math.max(max, (eintrag.slotIndex ?? 0) + 1), 0);
+  const bahnen: Array<R | null> = Array.from({ length: Math.max(laenge, eintraege.length) }, () => null);
+  let naechsteFreie = 0;
+  for (const eintrag of eintraege) {
+    // Ohne `slotIndex` (alte Spielstaende, Modell-Modus) der bisherige dichte Weg — nichts erfinden.
+    const ziel = eintrag.slotIndex ?? naechsteFreie;
+    const platz = ziel >= 0 && ziel < bahnen.length && bahnen[ziel] == null ? ziel : naechsteFreie;
+    bahnen[platz] = bauen(eintrag);
+    naechsteFreie = Math.max(naechsteFreie, platz + 1);
+  }
+  return bahnen;
 }
 
 export default function DisciplineStageArena({
@@ -1483,6 +1510,7 @@ export default function DisciplineStageArena({
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
               ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
+              awards: s.playerId ? buildPlayerSeasonAwards(gameState, s.playerId) : null,
             },
           });
         });
@@ -1678,6 +1706,9 @@ export default function DisciplineStageArena({
           isMvp: eintrag.isMvp,
           isOwn: eintrag.teamId === ownTeamId,
           ovrRank: ratingByPlayerId.get(eintrag.playerId)?.ovrRank ?? null,
+          // Ticket #41 (Chris): „auch in den drawern der arena sollen die awards dann
+          // auftauchen". Nur die Zeichen — eine ganze Marke wuerde die Zeile sprengen.
+          awards: buildPlayerSeasonAwards(gameState, eintrag.playerId),
         };
       }),
       ids: summiert.map((eintrag) => eintrag.playerId as string | null),
@@ -1863,7 +1894,16 @@ export default function DisciplineStageArena({
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
-          players: t.players.map((p) => ({
+          //
+          // POSITIONSGETREU, NICHT DICHT — Ticket #35 (Chris): „wenn ich in 5 + 6 Slot die spieler
+          // einsetze, sollen sie auch dann starten auch wenn davor dann alle slots leer sind!"
+          //
+          // Bisher lief hier ein einfaches `map`, und die Buehne liest ueber den Array-Index. Zwei
+          // Spieler auf Slot 5 und 6 landeten damit auf Etappe 1 und 2 — unter den Rollen-Labels
+          // von Slot 1 und 2, waehrend die Engine sie als Slot 5 und 6 GEWERTET hat (die
+          // Slot-Rolle traegt eine eigene Attribut-Gewichtung, bis zu +-8,5 je Spieler). Die
+          // Anzeige widersprach also der Rechnung darunter.
+          players: verteileAufSlots(t.players, (p) => ({
             playerId: p.playerId,
             val: p.val,
             name: p.name,
@@ -1921,6 +1961,17 @@ export default function DisciplineStageArena({
      * Formel für eine beliebige Disziplinseite — hier bleibt derselbe Aufruf,
      * damit es nur EINE Quelle für "Etappenzahl einer Disziplin" gibt.
      */
+    // `players.length` ist die POSITIONS-Laenge (hoechster besetzter Slot + 1), nicht die Anzahl
+    // der Aufgestellten — genau die Zahl, die die Etappen der Disziplin abbildet. Diese Praezisierung
+    // kommt aus `main`; sie gilt hier unveraendert, weil `computeStageSlotCount` im echten Modus auf
+    // DENSELBEN `players`-Arrays rechnet (`chosenTeams.map((t) => t.players.length)`, oben) und die
+    // Semantik damit automatisch mittraegt.
+    //
+    // MERGE-ENTSCHEIDUNG: `main` hatte die Formel an dieser Stelle wieder ausgeschrieben
+    // (`teams.reduce(...) || model.slotCount`). Uebernommen wird der Helferaufruf, nicht die
+    // ausgeschriebene Fassung — sonst gaebe es die Etappenzahl wieder an zwei Stellen, und genau
+    // diese Doppelung war der Grund fuer Befund B3 (beide Sende-Stellen schickten hart
+    // `{ d1: 0, d2: 0 }`, der Ticker des Gasts blieb dadurch fuer immer auf Etappe 0).
     const slotCount = computeStageSlotCount(disciplineId);
     return {
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
@@ -1982,14 +2033,19 @@ export default function DisciplineStageArena({
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
         captainName: t.captainName,
-        players: t.players.map((p) => ({
-          playerId: p.playerId,
-          val: p.val,
-          name: p.name,
-          portraitUrl: p.portraitUrl,
-          mods: p.mods,
-          pointsAwarded: p.pointsAwarded,
-        })),
+        // Luecken bleiben Luecken (Ticket #35) — `null` heisst „diese Etappe ist unbesetzt".
+        players: t.players.map((p) =>
+          p == null
+            ? null
+            : {
+                playerId: p.playerId,
+                val: p.val,
+                name: p.name,
+                portraitUrl: p.portraitUrl,
+                mods: p.mods,
+                pointsAwarded: p.pointsAwarded,
+              },
+        ),
       })),
     [payload, teamRelationshipMap],
   );
@@ -2009,7 +2065,7 @@ export default function DisciplineStageArena({
     for (const team of nativeTeams) {
       urls.push(team.logoUrl);
       for (const player of team.players) {
-        urls.push(player.portraitUrl);
+        urls.push(player?.portraitUrl);
       }
     }
     prefetchDisciplineStageMedia({
@@ -2028,7 +2084,7 @@ export default function DisciplineStageArena({
           .filter((t) => Boolean(t.teamId))
           .map((t) => [
             t.teamId as string,
-            t.players.map((p) => p.playerId).filter((id): id is string => Boolean(id)),
+            t.players.map((p) => p?.playerId ?? null).filter((id): id is string => Boolean(id)),
           ]),
       ),
     [payload],

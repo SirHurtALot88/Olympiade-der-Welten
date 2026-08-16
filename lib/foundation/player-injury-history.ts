@@ -4,6 +4,7 @@ import type {
   Player,
   PlayerInjuryHistoryRecord,
 } from "@/lib/data/olyDataTypes";
+import { INJURY_RECOVERY_PCT } from "@/lib/fatigue/fatigue-injury-service";
 
 export type PlayerInjurySummary = {
   totalInjuries: number;
@@ -44,8 +45,17 @@ export function injuryEventToPlayerHistoryRecord(
   }
   const normalRecovery = event.normalRecovery ?? 0;
   const injuryRecovery = event.injuryRecovery ?? 0;
+  /**
+   * Der Prozentsatz kommt aus dem GESPEICHERTEN Ereignis, nicht aus dem heutigen Faktor — ein
+   * Eintrag aus der Zeit von 0,5 soll auch nach der Umstellung 50 % zeigen. Das ist Geschichte,
+   * die stimmen muss, keine Regel.
+   *
+   * Nur wenn das Ereignis gar keine Erholung mitfuehrt (alte, schlanke Zeilen), greift der
+   * heutige Faktor. Hier stand eine eingetippte 50 — die haette nach Chris' Umstellung auf 1,0
+   * bei jedem Bestandseintrag ohne Werte eine Halbierung behauptet, die es nicht mehr gibt.
+   */
   const injuryRecoveryPct =
-    normalRecovery > 0 ? Math.round((injuryRecovery / normalRecovery) * 100) : 50;
+    normalRecovery > 0 ? Math.round((injuryRecovery / normalRecovery) * 100) : INJURY_RECOVERY_PCT;
 
   return {
     eventId: event.eventId,
@@ -115,12 +125,23 @@ export type PlayerInjuryDiscipline = {
  *
  * Ohne Einsatzliste (alter Spielstand, Draft geloescht) bleibt das Ergebnis leer — es wird
  * keine Disziplin geraten.
+ *
+ * KADERGROESSE: `gameState.disciplines[].playerCount` ist der KATALOG-Wert (Startzustand der
+ * Disziplin), NICHT die fuer diesen Spieltag tatsaechlich ausgeloste Zahl — der Spielplan
+ * wuerfelt sie pro Saison neu (`buildSeasonSeededDisciplineSchedule`, siehe
+ * lib/season/season-discipline-schedule.ts) und weicht am Live-Spielstand bei 15 von 20
+ * Disziplinen vom Katalog ab. Diese Funktion sucht deshalb ZUERST im Spielplan-Eintrag des
+ * betroffenen Spieltags nach der Kadergroesse (`seasonId` grenzt auf die richtige Saison ein,
+ * falls mehrere im Save liegen) und faellt nur auf den Katalog zurueck, wenn dort nichts
+ * steht — z. B. weil `disciplineSchedule` beim Saisonwechsel durch den Plan der NEUEN Saison
+ * ersetzt wurde und die Verletzung aus einer vergangenen Saison stammt.
  */
 export function resolveInjuryMatchdayDisciplines(input: {
   gameState: GameState;
   teamId: string;
   playerId: string;
   matchdayId: string;
+  seasonId?: string | null;
 }): PlayerInjuryDiscipline[] {
   const drafts = (input.gameState.seasonState.lineupDrafts ?? []).filter(
     (draft) => draft.teamId === input.teamId && draft.matchdayId === input.matchdayId,
@@ -138,15 +159,27 @@ export function resolveInjuryMatchdayDisciplines(input: {
     }
   }
 
+  const scheduleEntry = (input.gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.matchdayId === input.matchdayId && (!input.seasonId || entry.seasonId === input.seasonId),
+  ) ?? null;
+  const scheduledPlayerCountByDisciplineId = new Map<string, number | null>();
+  for (const slot of [scheduleEntry?.discipline1, scheduleEntry?.discipline2]) {
+    if (slot?.disciplineId) {
+      scheduledPlayerCountByDisciplineId.set(slot.disciplineId, slot.playerCount ?? null);
+    }
+  }
+
   return disciplineIds.map((disciplineId) => {
     const discipline = input.gameState.disciplines?.find((entry) => entry.id === disciplineId) ?? null;
+    const scheduledPlayerCount = scheduledPlayerCountByDisciplineId.get(disciplineId);
+    const catalogPlayerCount =
+      typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
+        ? discipline.playerCount
+        : null;
     return {
       disciplineId,
       name: discipline?.name ?? disciplineId,
-      playerCount:
-        typeof discipline?.playerCount === "number" && Number.isFinite(discipline.playerCount)
-          ? discipline.playerCount
-          : null,
+      playerCount: scheduledPlayerCount ?? catalogPlayerCount,
     };
   });
 }

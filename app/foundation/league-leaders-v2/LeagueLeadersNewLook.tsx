@@ -165,6 +165,37 @@ const NL_LEADERS_PENDING_SLOT_CONFIG: Record<string, { ring: ReactNode; label: s
   mostImproved: { ring: "MI", label: "Most Improved" },
 };
 
+/**
+ * WIE DIE KATEGORIE ZUSTANDE KOMMT — in einem Satz, am Kopf jeder Karte.
+ *
+ * CHRIS (Ticket #41): „Wir brauchen noch eine erklärung wie Most Improved Player sich
+ * zusammensetzt!"
+ *
+ * Die Frage stellt sich bei jeder Kategorie, nicht nur bei dieser. „Most Improved" ist nur die
+ * auffaelligste, weil ihr Ergebnis am wenigsten vorhersagbar ist: der Sieger hat oft weder den
+ * hoechsten OVR noch die meisten Punkte. Eine Rangliste, deren Regel man nicht kennt, liest sich
+ * wie eine Behauptung.
+ *
+ * Der Text ist die KURZFASSUNG der Rechnung, nicht eine zweite Rechnung. Die Herleitung steht
+ * jeweils dort, wo gerechnet wird — fuer Most Improved ausfuehrlich in
+ * `lib/foundation/most-improved-service.ts`.
+ */
+const NL_LEADERS_ERKLAERUNG: Record<string, string> = {
+  pps: "Summe aller Player-Points der Saison — der Anteil des Spielers an den Punkten seines Teams.",
+  pow: "Player-Points, die der Spieler in Power-Disziplinen geholt hat.",
+  spe: "Player-Points aus Speed-Disziplinen.",
+  men: "Player-Points aus Mental-Disziplinen.",
+  soc: "Player-Points aus Social-Disziplinen.",
+  mvs: "Marktwert-Score: der Marktwert des Spielers, umgerechnet auf eine ligaweit vergleichbare Skala.",
+  ovr: "Gesamtstärke aus allen Attributen, normalisiert über die ganze Liga.",
+  training: "Attributpunkte, die der Spieler in der Saisonende-Entwicklung dazugewonnen hat.",
+  mostImproved:
+    "Sprung der Feldposition: mittlere Platzierung der zweiten Saisonhälfte minus erste. " +
+    "Die Feldposition (0–100) macht Disziplinen mit verschieden großen Feldern vergleichbar. " +
+    "Gewertet wird nur, wer in BEIDEN Hälften mindestens dreimal angetreten ist — ohne Startwert " +
+    "gibt es keine Verbesserung zu messen.",
+};
+
 function getLeaderInitials(name: string): string {
   return (
     name
@@ -537,8 +568,20 @@ export default function LeagueLeadersNewLook({
               data-testid={`league-leaders-card-${category.id}`}
             >
               <header className="nl-leaders-card-head">
-                <span className="nl-leaders-card-label">{category.label}</span>
+                {/* Die Regel steht am Titel, nicht in einer Fussnote: gefragt wird sie genau
+                    hier, beim Blick auf den Sieger. */}
+                <span className="nl-leaders-card-label" title={NL_LEADERS_ERKLAERUNG[category.id] ?? undefined}>
+                  {category.label}
+                  {NL_LEADERS_ERKLAERUNG[category.id] ? (
+                    <span className="nl-leaders-card-info" aria-hidden="true">
+                      ?
+                    </span>
+                  ) : null}
+                </span>
               </header>
+              {NL_LEADERS_ERKLAERUNG[category.id] ? (
+                <p className="nl-leaders-card-rule">{NL_LEADERS_ERKLAERUNG[category.id]}</p>
+              ) : null}
 
               {hasData && leader ? (
                 <button

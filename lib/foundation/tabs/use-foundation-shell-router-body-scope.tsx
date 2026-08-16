@@ -3,19 +3,17 @@ import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
 import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import {
-  FoundationShellRouterCockpit,
-  FoundationShellRouterHistoryV2,
-  FoundationShellRouterHomeV2,
-  FoundationShellRouterInboxV2,
-  FoundationShellRouterLineup,
-  FoundationShellRouterMarketSell,
-  FoundationShellRouterMatchdayResult,
-  FoundationShellRouterPrize,
-  FoundationShellRouterSeasonPreview,
-  FoundationShellRouterSeasonV2,
-  FoundationShellRouterTeams,
-} from "@/app/foundation/FoundationShellRouter";
+// Elf Router-Bausteine aus `FoundationShellRouter` waren bis zu dieser Aufräumung hier
+// importiert — und keiner davon wurde in dieser Datei je verwendet. Jeder Name kam genau
+// einmal vor: in dieser Import-Zeile. Nachgezählt (`grep -c` je Name in dieser Datei): je 1.
+// `FoundationShellRouterBody.tsx` rendert sieben dieser Bausteine über eine eigene, separate
+// Import-Zeile direkt (Cockpit, HistoryV2, MarketSell, MatchdayResult, Prize, SeasonPreview,
+// Teams) — die sind also nicht tot, nur hier doppelt und ungenutzt importiert. Die restlichen
+// vier (HomeV2, InboxV2, SeasonV2 sowie der inzwischen entfernte Lineup-Baustein) haben auch
+// dort keinen Aufrufer; die Shell rendert ihre Ansichten für diese Views inline bzw. über
+// andere, tatsächlich aktive Panel-Komponenten. Entfernt wurde hier nur der ungenutzte Import
+// selbst — die vier weiterhin ungerenderten Router-Bausteine bleiben unangetastet in
+// `FoundationShellRouter.tsx` stehen, das ist eine gesonderte Aufräumung.
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -327,6 +325,7 @@ import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-p
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -10897,6 +10896,10 @@ export function useFoundationShellRouterBodyScope({
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           guvPosten: row.guvPosten ?? null,
+          // Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+          // Verletzungen!" — dieselbe Zaehlstelle wie die Teamhistorie, damit nicht zwei
+          // Verletzungszahlen im Spiel stehen.
+          injuries: countTeamSeasonInjuries(gameState, row.teamId, gameState.season.id),
           marketValueTotal: row.marketValueTotal ?? null,
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,

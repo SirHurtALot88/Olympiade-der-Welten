@@ -20,7 +20,17 @@ describe("foundation panel split ui contract", () => {
 
     expect(foundationSurfaceText).toContain("FoundationShellRouterHomeV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonV2");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterLineup");
+    // Der Router-Baustein für die Einsatzliste hatte keinen Aufrufer mehr (nachgezählt: 0 Stellen
+    // außer der eigenen, seither entfernten Definition und einer toten Import-Zeile) und wurde
+    // entfernt. Die zugesicherte EIGENSCHAFT — lazy geladenes Panel, das nur bei aktivem Tab montiert
+    // ist — bleibt bestehen, jetzt über die Ternary direkt in FoundationShellRouterBody.tsx: das Panel
+    // wird per `dynamic()` ohne SSR nachgeladen und nur gerendert, wenn "lineup"/"lineupV2" aktiv ist;
+    // sonst liefert die Ternary `null` — dieselbe An-/Abmontier-Semantik wie das Unmount-Gate der
+    // übrigen Router-Bausteine.
+    expect(foundationSurfaceText).toMatch(/const FoundationLineupPanel = dynamic\(/);
+    expect(foundationSurfaceText).toMatch(
+      /activeView === "lineup" \|\| activeView === "lineupV2" \? \(\s*<FoundationLineupPanel/,
+    );
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketV2");
     expect(pageClientText).not.toContain("FoundationMatchdayArenaPanel");
     expect(foundationSurfaceText).toContain("FoundationShellRouterTeams");

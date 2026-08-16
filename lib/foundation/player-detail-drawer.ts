@@ -5,6 +5,7 @@ import {
   type PlayerBoardTrustMood,
   type PlayerBoardTrustRenewalPolicy,
 } from "@/lib/ai/player-board-trust-service";
+import { buildPlayerSeasonAwards, type PlayerSeasonAward } from "@/lib/foundation/player-season-awards";
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -598,6 +599,11 @@ export type PlayerDetailDrawerData = {
     warnings: string[];
   }>;
   historyRows: PlayerDrawerHistoryRow[];
+  /**
+   * Saison-Auszeichnungen dieses Spielers — Ticket #41. Leer, solange keine Saison abgeschlossen
+   * ist oder der Spielstand das Feld noch nicht traegt (Bestandsstaende).
+   */
+  seasonAwards: PlayerSeasonAward[];
   ratingWarnings: string[];
 };
 
@@ -2559,6 +2565,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       teamId: row.teamId,
       playerId: player.id,
       matchdayId: row.matchdayId,
+      seasonId: row.seasonId,
     }),
   }));
   const injurySummary = buildPlayerInjurySummary(injuryHistoryRows);
@@ -2649,6 +2656,30 @@ export function buildPlayerDrawerDataFromGameState(input: {
           gameState: input.gameState,
           player,
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
+          /**
+           * DIESE ZWEI ARGUMENTE FEHLTEN — und daran hingen zwei verschiedene Zahlen fuer
+           * dieselbe Sache.
+           *
+           * GEMELDET VON CHRIS (Ticket #40 / `dcut58`): „Das was als Netto/Saison hier steht muss
+           * gleich sein mit dem forecast der im spielerprofil drin steht — bitte prüfen was
+           * korrekt ist und nur eine Zahl ausweisen."
+           *
+           * Ohne den Accumulator-Override faellt die Rechnung auf
+           * `TRAINING_SETPOINTS_BY_MODE[trainingMode]` zurueck und unterstellt „ganze Saison im
+           * HEUTIGEN Modus" — statt der real gespielten Modus-Historie. Genau das Loch, gegen das
+           * der Override gebaut wurde (Anti-Cheese, Audit #6).
+           *
+           * MASSSTAB IST DER SAISONENDE-APPLY, denn der bucht wirklich:
+           * `season-end-xp-apply-service.ts` ruft dieselbe Funktion mit genau diesen beiden
+           * Argumenten. Die Trainingsseite tat es schon, das Profil nicht — deshalb zieht das
+           * Profil nach und nicht umgekehrt.
+           *
+           * ZWEI UNABHAENGIGE MESSUNGEN, beide hier festgehalten, weil sie sich stuetzen: einzeln
+           * bis 2,2 SP fuer denselben Spieler (Kaela Stormshield: Profil 3,1, Trainingsseite 5,3);
+           * ueber fuenf Live-Spielstaende verteilt sich die Abweichung genau nach der Zahl der
+           * GELAUFENEN Spieltage — an Spieltag 1 keiner von 335, an Spieltag 4 dagegen 336 von
+           * 337 (bis 8,2 SP). Das schliesst jede andere Erklaerung aus.
+           */
           route: progressionForecast?.developmentRoute ?? null,
           ...buildProjectedSeasonTrainingAccumulatorOverrides({
             gameState: input.gameState,
@@ -2991,6 +3022,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     transferHistory: buildTransferHistory(input.gameState, player.id),
     seasonHistory,
     historyRows,
+    seasonAwards: buildPlayerSeasonAwards(input.gameState, player.id),
     ratingWarnings: playerRating?.warnings ?? [],
   };
 }
@@ -3209,6 +3241,18 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         });
 
   return {
+    /**
+     * AUCH IM ARENA-DRAWER — Chris: „auch in den drawern der arena sollen die awards dann
+     * auftauchen".
+     *
+     * Dieser Pfad baut die Spielerkarte aus dem Aufstellungs-Kontext (Einsatzliste, Arena), nicht
+     * aus dem `gameState`-Hauptpfad. Der Kontext traegt den Spielstand mit
+     * (`context.gameState`) — fehlt er, gibt es schlicht keine Auszeichnungen statt einer
+     * erfundenen leeren Liste.
+     */
+    seasonAwards: input.context.gameState
+      ? buildPlayerSeasonAwards(input.context.gameState, input.playerId)
+      : [],
     playerId: input.playerId,
     activePlayerId: activePlayer?.id ?? null,
     source: input.source,

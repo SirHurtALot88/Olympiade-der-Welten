@@ -296,8 +296,8 @@ type MatchdayMvpScoreboardRowView = MatchdayMvpScoreboardRow & {
  * stehen hier bewusst in deutschen Anfuehrungszeichen — ein Quelltext-Test verbietet die
  * Zeichenkette in dieser Datei). Erreichbar war nur noch die Focus-Stellung: die Shell setzt sie
  * fest (`FoundationShellRouterBody.tsx`), und die einzige Stelle, die je die klassische liefern
- * konnte (`resolveLineupUiVariant` ueber
- * `FoundationLineupShellHost`), haengt an einer Kette ohne Aufrufer. Das zugehoerige Markup —
+ * konnte, hing an einer Kette ohne Aufrufer — sie ist inzwischen ganz entfernt (Shell-Host,
+ * Ableitungs-Hook und der Router-Baustein darueber). Das zugehoerige Markup —
  * Kapitaensleiste, Fortschrittsspur, Schnellzuweisung, der Vorschlags-Knopf — war zu diesem
  * Zeitpunkt bereits vollstaendig aus der Datei entfernt; null Fundstellen in app/, lib/ und
  * components/. (Die Marken stehen hier bewusst nicht woertlich: ein Quelltext-Test in

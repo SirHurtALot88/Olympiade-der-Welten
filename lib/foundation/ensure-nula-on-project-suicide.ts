@@ -2,7 +2,12 @@ import type { GameState, RosterEntry, Team, TransferHistoryEntry } from "@/lib/d
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 /** Sonderregel/Easter-Egg: Nula ist das Maskottchen von Project Suicide. */
-const NULA_PLAYER_ID = "player-2311-nula";
+/**
+ * Exportiert, damit es nur EINE Nula-Kennung im Spiel gibt. Der Draft-Riegel
+ * (`chunked-redraft-topup-service`) nimmt sie vom „leerer Kader"-Zwang aus und braucht dieselbe
+ * Zeichenkette — zwei Kopien liefen beim naechsten Umbau auseinander.
+ */
+export const NULA_PLAYER_ID = "player-2311-nula";
 const NULA_TEAM_ID = "P-S";
 
 /**
@@ -18,6 +23,29 @@ export const NULA_SELL_TRANSFER_SOURCE = "nula_mascot_rule_sell";
  * bekommt immer die 5, damit es nie aus dem Vertrag läuft und P-S nie verlässt.
  */
 const NULA_MAX_CONTRACT_LENGTH = 5;
+
+/**
+ * HEIMRABATT: Nula kostet P-S die Haelfte.
+ *
+ * CHRIS, woertlich: „sie ist aber 50% günstiger für P-S weil sie sich dort immer mega wohl fühlt".
+ *
+ * Der Rabatt liegt auf dem GEHALT, nicht auf der Abloese, und das aus einem Rechengrund: die
+ * Abloese wechselt bei einem Team-zu-Team-Transfer den Besitzer (P-S zahlt, das abgebende Team
+ * bekommt). Zahlte P-S nur die Haelfte, waehrend das andere Team den vollen Preis gutgeschrieben
+ * bekaeme, entstuende Geld aus dem Nichts — dieselbe Klasse Fehler, wegen der die Nula-Buchung
+ * ueberhaupt erst eingefuehrt wurde (P-S war das einzige Team, dessen Kasse ueber zwei Saisons
+ * nicht aufging).
+ *
+ * Und inhaltlich ist das Gehalt auch die richtige Stelle: „sie fuehlt sich dort mega wohl" ist ein
+ * Grund, dauerhaft billiger zu SPIELEN, nicht ein Grund, einmalig billiger den Verein zu wechseln.
+ * Der Rabatt wirkt damit in jeder Saison neu — genau wie die Verlaengerung auf Maximallaufzeit.
+ */
+const NULA_HEIMRABATT = 0.5;
+
+/** Nulas Jahresgehalt bei P-S — nie negativ, immer der halbe Anspruch. */
+function nulaHeimGehalt(salaryDemand: number | null | undefined) {
+  return round2(Math.max(0, (salaryDemand ?? 0) * NULA_HEIMRABATT));
+}
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
@@ -69,15 +97,28 @@ export function ensureNulaOnProjectSuicide(gameState: GameState): GameState {
   if (!nula) return gameState;
 
   const existing = gameState.rosters.find((entry) => entry.playerId === NULA_PLAYER_ID);
+  // „Schon richtig" heisst jetzt AUCH: das Gehalt traegt bereits den Heimrabatt. Ohne diese
+  // Bedingung liefe der Transform bei einem Bestandsspielstand ins No-op und der Rabatt kaeme nie an.
   const alreadyCorrect =
-    existing?.teamId === NULA_TEAM_ID && (existing.contractLength ?? 0) >= NULA_MAX_CONTRACT_LENGTH;
+    existing?.teamId === NULA_TEAM_ID &&
+    (existing.contractLength ?? 0) >= NULA_MAX_CONTRACT_LENGTH &&
+    Math.abs((existing.salary ?? 0) - nulaHeimGehalt(nula.salaryDemand)) < 0.005;
   if (alreadyCorrect) return gameState;
 
   // Fall: schon bei P-S, aber Vertrag zu kurz → reine Verlängerung, keine (erneute) Zahlung.
   if (existing && existing.teamId === NULA_TEAM_ID) {
+    // Der Heimrabatt gilt auch bei der reinen Verlaengerung — sonst haenge er am Zufall, ob Nula
+    // gerade neu gekauft oder nur verlaengert wurde, und ein Bestandsspielstand behielte auf ewig
+    // das volle Gehalt.
     const rosters = gameState.rosters.map((entry) =>
       entry.playerId === NULA_PLAYER_ID
-        ? { ...entry, contractLength: NULA_MAX_CONTRACT_LENGTH, contractStatus: "active" as const }
+        ? {
+            ...entry,
+            contractLength: NULA_MAX_CONTRACT_LENGTH,
+            contractStatus: "active" as const,
+            salary: nulaHeimGehalt(nula.salaryDemand),
+            negotiatedAnnualSalary: nulaHeimGehalt(nula.salaryDemand),
+          }
         : entry,
     );
     return { ...gameState, rosters };
@@ -99,9 +140,9 @@ export function ensureNulaOnProjectSuicide(gameState: GameState): GameState {
     playerId: NULA_PLAYER_ID,
     contractLength: NULA_MAX_CONTRACT_LENGTH,
     contractStatus: "active",
-    salary: Math.max(0, nula.salaryDemand),
-    // UNTERSCHRIFTSPFAD: der feste Nula-Vertrag.
-    negotiatedAnnualSalary: Math.max(0, nula.salaryDemand),
+    salary: nulaHeimGehalt(nula.salaryDemand),
+    // UNTERSCHRIFTSPFAD: der feste Nula-Vertrag, ebenfalls zum Heimrabatt.
+    negotiatedAnnualSalary: nulaHeimGehalt(nula.salaryDemand),
     upkeep: existing?.upkeep ?? 0,
     purchasePrice: price,
     currentValue: price,

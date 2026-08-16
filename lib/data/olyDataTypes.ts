@@ -2103,6 +2103,19 @@ export type Discipline = {
   weight: number;
   originalOrder?: number;
   displayOrder?: number;
+  /**
+   * NICHT die Wertungsgroesse. Das ist der Katalog-Startzustand (Tabelle `disciplines`,
+   * Seed-Daten in lib/data/dataAdapter.ts) — der Spielplan wuerfelt die tatsaechlich fuer eine
+   * Saison geltende Kadergroesse jede Saison neu aus (`buildSeasonSeededDisciplineSchedule`,
+   * lib/season/season-discipline-schedule.ts) und legt sie in
+   * `seasonState.disciplineSchedule[].discipline1/2.playerCount` ab. Am Live-Spielstand
+   * gemessen weichen 15 von 20 Disziplinen zwischen Katalog und Spielplan ab; gegen die
+   * Standings-Punkte nachgerechnet stimmt fuer alle 32 Teams nur der Spielplan-Wert. Wer
+   * wissen will, wie viele Spieler DIESE Saison in einer Disziplin antreten (Aufstellung,
+   * Anzeige, Rangpunkte, KI), muss den Spielplan-Slot lesen — `buildSeasonDisciplinePlayerCountMap`
+   * in lib/season/season-discipline-schedule.ts liefert das je Disziplin fertig mit Katalog-
+   * Rueckfall fuer Disziplinen, die (noch) keinen Spielplan-Eintrag haben.
+   */
   playerCount?: number;
   mutator1?: string | null;
   mutator2?: string | null;
@@ -2805,6 +2818,22 @@ export type TeamStrengthRankCaptureRecord = {
   records: TeamDisciplineRankSnapshotRecord[];
 };
 
+/**
+ * Eine Auszeichnung, wie sie im Saison-Schnappschuss liegenbleibt. Bewusst eine FLACHE Kopie der
+ * Felder aus `SeasonReviewAward` statt eines Imports: der Schnappschuss ist ein gespeichertes
+ * Format und darf sich nicht mitbewegen, wenn der Dienst seinen Typ aendert.
+ */
+export type SeasonSnapshotAwardRecord = {
+  awardId: string;
+  label: string;
+  category: "team" | "player" | "transfer" | "discipline";
+  winnerType: "team" | "player";
+  winnerId: string;
+  winnerName: string;
+  value: number | string | null;
+  reason: string;
+};
+
 export type SeasonSnapshotRecord = {
   snapshotId?: string;
   seasonId: string;
@@ -2828,6 +2857,19 @@ export type SeasonSnapshotRecord = {
   playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
   transferSnapshots?: SeasonSnapshotTransferRecord[];
   gmAssignments?: SeasonSnapshotGeneralManagerRecord[];
+  /**
+   * DIE AUSZEICHNUNGEN DIESER SAISON — Ticket #41.
+   *
+   * CHRIS: „Dafür hätte ich gerne im Spielerprofil die Icons dass man auch später direkt sieht ah
+   * der spieler gehört [dazu]". Genau daran haengt dieses Feld: `buildSeasonReview` ermittelt die
+   * Auszeichnungen beim Saisonabschluss, aber sie wurden NIRGENDS abgelegt. Mit dem
+   * Saisonwechsel waren sie weg — ein Spieler konnte also MVP gewesen sein, ohne dass es eine
+   * Saison spaeter noch irgendwo stand.
+   *
+   * Optional, weil Bestandsspielstaende das Feld nicht haben. Fehlt es, zeigt das Profil keine
+   * Auszeichnungen statt falscher — eine leere Liste waere hier eine Luege.
+   */
+  seasonAwards?: SeasonSnapshotAwardRecord[];
   /** Set when rosterEnd/cashEnd were refreshed from the next season's preseason (post-buy entry state). */
   entryRosterPatchedAt?: string | null;
   entryRosterPatchedFromSeasonId?: string | null;

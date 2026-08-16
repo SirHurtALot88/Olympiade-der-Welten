@@ -31,6 +31,7 @@ import FoundationRosterSellPeekDrawer from "@/app/foundation/teams-v2/Foundation
 import { VeloSplitMeter } from "@/components/foundation/velo-ui";
 import {
   NlCard,
+  NlDeltaChip,
   NlEmptyState,
   NlTable,
   StatChip,
@@ -2342,8 +2343,52 @@ function FoundationTeamsDetailPanel({
                               );
                             case "buyout":
                               return row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—";
-                            case "exit":
-                              return row.exitValue != null ? formatNlMoney(row.exitValue) : "—";
+                            case "exit": {
+                              /**
+                               * DIESELBE DARSTELLUNG WIE BEI DEN FREMDEN TEAMS — Ticket #33.
+                               *
+                               * CHRIS' MELDUNG: „Bei anderen Teams steht VK und darunter der VK
+                               * Preis mit vergleich zum MW — das ist besser gelöst als beim eigen
+                               * gesteuerten team wo das nicht so sauber steht - bitte anpassen."
+                               *
+                               * Er hat recht, und es war ausgerechnet die eigene Mannschaft, bei
+                               * der die Zelle weniger sagte: hier stand nur der nackte Betrag.
+                               * Ob 28,1 viel oder wenig ist, kann niemand wissen, ohne den
+                               * Marktwert danebenzuhalten — und genau der steht eine Spalte
+                               * weiter („Akt. MW"), nur ohne die Verbindung.
+                               *
+                               * `marketValueAtExit` ist trotz des Namens die Basis VOR dem
+                               * Verkaufsfaktor (`exitValue = marketValueAtExit x saleFactor`).
+                               * Die Differenz ist damit genau der Aufschlag des Faktors, und die
+                               * Rechnung geht auf dem Bildschirm auf.
+                               *
+                               * Bewusst DIESELBE Komponente wie in der Spielerliste
+                               * (`NlDeltaChip`) statt einer nachgebauten: zwei Darstellungen
+                               * derselben Groesse laufen beim naechsten Umbau wieder auseinander
+                               * — das ist der Fehler, den die halbe Ticketliste beschreibt.
+                               */
+                              if (row.exitValue == null) {
+                                return "—";
+                              }
+                              const mw = row.marketValueAtExit;
+                              const aufschlag =
+                                mw != null && Number.isFinite(mw) ? row.exitValue - mw : null;
+                              return (
+                                <span className="team-contract-mv-cell nl-tnum">
+                                  <strong>{formatNlMoney(row.exitValue)}</strong>
+                                  {/* Kein Chip bei 0 — wie in der Spielerliste. Ein „±0,00" in
+                                      jeder Zeile waere nur Rauschen; dass der Faktor 1,0 ist,
+                                      sieht man daran, dass beide Betraege gleich sind. */}
+                                  {aufschlag != null && Math.abs(aufschlag) >= 0.005 ? (
+                                    <NlDeltaChip
+                                      value={aufschlag}
+                                      format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
+                                      title={`Aufschlag des Verkaufsfaktors: ${formatNlMoney(row.exitValue)} Verkaufspreis − ${formatNlMoney(mw!)} Marktwert`}
+                                    />
+                                  ) : null}
+                                </span>
+                              );
+                            }
                             case "marketValueNow":
                               // marketValueAtExit ist im Row-Modell trotz des Namens die
                               // Basis VOR dem Sale-Factor (siehe contract-negotiation-preview.ts /
