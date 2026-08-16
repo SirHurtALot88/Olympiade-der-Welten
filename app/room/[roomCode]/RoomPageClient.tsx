@@ -13,6 +13,11 @@ import {
 } from "@/lib/room/online-room-model";
 import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { emitRoomFlowButtonAction } from "@/lib/room/room-flow-socket-actions";
+import {
+  RAUM_EXISTIERT_NICHT_MEHR_MELDUNG,
+  RAUM_NICHT_GEFUNDEN_MELDUNG,
+  RAUM_VOLL_MELDUNG,
+} from "@/lib/room/room-session-fehler";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
@@ -75,15 +80,19 @@ function CopyInviteLinkButton({ roomCode }: { roomCode: string }) {
 // Stufe 1.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): exakte Texte aus `joinRoom`
 // (lib/room/room-store.ts), damit die Beitritts-Maske einen abgelehnten Beitritt als
 // ENDGUELTIG erkennt (Raum voll/nicht gefunden) statt als etwas, das ein erneuter Klick loest.
-const ROOM_FULL_MESSAGE = "Der Raum hat bereits zwei aktive Coaches.";
-const ROOM_NOT_FOUND_MESSAGE = "Dieser Raum wurde nicht gefunden.";
+//
+// Befund F6 (Aufgabe #44): das waren bis eben drei handkopierte Zeichenketten neben denen in
+// `room-store.ts` — zwei Quellen fuer denselben Text. Jetzt kommen sie aus `room-session-fehler.ts`,
+// aus dem auch `room-store.ts` sie zurueckgibt.
+const ROOM_FULL_MESSAGE = RAUM_VOLL_MELDUNG;
+const ROOM_NOT_FOUND_MESSAGE = RAUM_NICHT_GEFUNDEN_MELDUNG;
 // F1 (Notausfahrt-Korrektur, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): exakter Text aus `rejoinRoom`
 // (room-store.ts) -- wer NOCH ein gespeichertes Sitzplatz-Token hat, versucht beim Verbinden immer
 // zuerst `rejoinRoom`, nicht `joinRoom` (siehe `handleConnect` unten). Vorher fehlte fuer diesen
 // Fehlerfall jede Behandlung: die Seite blieb bei "Raum wird geladen ..." haengen, obwohl der Raum
 // laengst weg war (verwaist + ersetzt, oder verfallen) -- eine Sackgasse ohne jeden Hinweis, wie
 // es weitergeht.
-const ROOM_GONE_AFTER_REJOIN_MESSAGE = "Der Raum existiert nicht mehr.";
+const ROOM_GONE_AFTER_REJOIN_MESSAGE = RAUM_EXISTIERT_NICHT_MEHR_MELDUNG;
 
 function RoomScreen({ roomCode }: { roomCode: string }) {
   const socket = useSocket();
