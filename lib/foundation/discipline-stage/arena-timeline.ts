@@ -37,6 +37,18 @@ export const systemArenaClock: ArenaClockSource = () => Date.now();
  *
  * Ungueltige Zeitstempel (z.B. leer, kaputt geparst) ergeben Versatz 0 — der Client faellt dann
  * auf "eigene Uhr = Server-Uhr" zurueck, statt mit `NaN` weiterzurechnen.
+ *
+ * BEDINGUNG, UNTER DER DIESE RECHNUNG UEBERHAUPT STIMMT (Befund F8, Aufgabe #45): `serverTimeIso`
+ * muss in DEM Moment entstanden sein, in dem der Client ihn empfaengt. Ist er aelter, wandert der
+ * gesamte Altersunterschied in den Versatz — der Client haelt die Server-Uhr dann faelschlich fuer
+ * nachgehend. Genau das passierte nach einem Neustart: `rehydrateRuntimeRoomsFromPersistence()`
+ * lieferte den Raum-Zustand mit seinem GESPEICHERTEN `updatedAt` aus, also Minuten alt. Gemessen
+ * bei 4 Minuten Ausfall: Versatz -240.000 ms, und weil `stepStartedAt` denselben alten Wert trug,
+ * hob der Fehler die Veraltung des Schrittbeginns exakt auf — `resolveArenaDisplayState` meldete
+ * `isStepSettled: false` fuer eine vier Minuten alte Etappe. `resumeRoomArenaAfterRestart`
+ * (`lib/room/arena-sync-state.ts`) setzt `updatedAt` beim Wiederanlauf deshalb neu, damit der
+ * Anker wieder frisch ist. KEINE zweite Zeitquelle hier — die Bedingung wird an der Stelle
+ * hergestellt, an der der Zeitstempel entsteht, nicht hier nachtraeglich geraten.
  */
 export function computeArenaClockOffsetMs(serverTimeIso: string, clientNowMs: number): number {
   const serverMs = Date.parse(serverTimeIso);
@@ -193,15 +205,35 @@ export function resolveArenaCatchUpMode(input: {
  * lokal pausiert, waehrend der Host weiterlaeuft, saehe eine Anzeige, die von der des Hosts
  * abweicht — genau die Aufspaltung, die Stufe 3.6 schliessen soll. Deshalb hat der Gast gar keine
  * eigene Pause-Autoritaet, nur der Host.
+ *
+ * EINE PAUSE OHNE URHEBER BINDET AUCH DEN HOST (Befund F8, Aufgabe #45). Die Host-Regel oben
+ * unterstellt, dass die Pause des Raums SEINE ist — dass `roomPaused` also nur zeigt, was er selbst
+ * gemeldet hat. Nach einem Server-Neustart stimmt das nicht mehr: `resumeRoomArenaAfterRestart`
+ * (`lib/room/arena-sync-state.ts`) haelt die Enthuellung an, ohne dass irgendein Mensch etwas
+ * gedrueckt hat. Der Host haette dann die Vorgabe `localPauseIntent: false` und liefe weiter,
+ * waehrend der Gast dem Raum-Feld folgt und einfriert — nachgemessen aus DEMSELBEN Raum-Zustand:
+ * Host `false`, Gast `true`. Genau die Aufspaltung, die es nicht geben darf.
+ *
+ * `roomPausedBy` traegt die Unterscheidung schon (`RoomArenaState.pausedBy`: "wer zuletzt pausiert
+ * hat"), es braucht dafuer kein zweites Feld. Wichtig ist der Unterschied zwischen den beiden
+ * leeren Werten, und er ist bewusst so getippt:
+ *   - `null`      = "pausiert, aber von keinem Menschen" → bindet JEDEN, auch den Host.
+ *   - `undefined` = der Aufrufer liefert das Feld gar nicht → unveraendertes Verhalten von vorher.
+ * Ein Aufrufer, der `pausedBy` nicht kennt, aendert sein Verhalten also in keinem Fall.
  */
 export function resolveArenaEffectivePause(input: {
   roomActive: boolean;
   isHost: boolean;
   roomPaused: boolean;
   localPauseIntent: boolean;
+  /** `RoomArenaState.pausedBy` — siehe Erklaerung oben zu `null` vs. `undefined`. */
+  roomPausedBy?: string | null;
 }): boolean {
   if (!input.roomActive) {
     return input.localPauseIntent;
+  }
+  if (input.roomPaused && input.roomPausedBy === null) {
+    return true;
   }
   if (input.isHost) {
     return input.localPauseIntent;

@@ -91,6 +91,14 @@ export type UseArenaRoomSyncResult = {
   roomArenaStepDurationMs: number | null;
   roomArenaPaused: boolean;
   /**
+   * WER die Raum-Pause ausgeloest hat (`RoomArenaState.pausedBy`) — `null` heisst "pausiert, aber
+   * von keinem Menschen". Genau dieser Fall entsteht nach einem Server-Neustart mitten in der
+   * Enthuellung (`resumeRoomArenaAfterRestart`, `lib/room/arena-sync-state.ts`), und nur an ihm
+   * kann `resolveArenaEffectivePause` erkennen, dass die Pause auch fuer den HOST gilt — sonst
+   * liefe der Host weiter und der Gast bliebe stehen (Befund F8).
+   */
+  roomArenaPausedBy: string | null;
+  /**
    * Server-Zeit minus eigene Client-Zeit (`computeArenaClockOffsetMs`), aus dem juengsten
    * `updatedAt` jeder empfangenen Raum-Aktualisierung geschaetzt — kein eigener Ping-Zyklus
    * noetig. 0, solange noch kein Raum-Zustand eingetroffen ist (dann gilt "eigene Uhr = Server-Uhr").
@@ -379,6 +387,9 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     roomArenaStepStartedAtMs: scopedRoomArenaSyncState ? Date.parse(scopedRoomArenaSyncState.stepStartedAt) : null,
     roomArenaStepDurationMs: scopedRoomArenaSyncState?.stepDurationMs ?? null,
     roomArenaPaused: scopedRoomArenaSyncState?.paused ?? false,
+    // Ohne Sync fuer DIESE Arena gibt es keine Pause -- dann ist auch `roomArenaPaused` false und
+    // die Urheber-Regel greift ohnehin nicht (sie verlangt beides).
+    roomArenaPausedBy: scopedRoomArenaSyncState?.pausedBy ?? null,
     roomArenaClockOffsetMs,
     emitHostRoomArenaAdvance,
     emitArenaCoopReadyToggle,

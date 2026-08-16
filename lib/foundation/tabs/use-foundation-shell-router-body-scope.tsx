@@ -271,7 +271,8 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
-import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import { describeRoomWriteError, formatRoomWriteErrorCode, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import { istRoomSitzungsFehler } from "@/lib/room/room-session-fehler";
 import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import {
@@ -1266,6 +1267,26 @@ export function useFoundationShellRouterBodyScope({
       if (payload.roomCode && payload.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
         return;
       }
+      /**
+       * BEFUND F6 (Aufgabe #44): hier wurde JEDER `roomError` als abgelaufene Sitzung behandelt —
+       * `setRoomLiveState(null)` raeumt die Raum-Bedienleiste weg, dazu die Meldung
+       * "Room-Session abgelaufen". Die grosse Mehrheit der `roomError`-Meldungen sind aber
+       * normale Fach-Ablehnungen aus `room-store.ts` ("Nur der Host darf …", "Arena wartet noch
+       * auf Ready …", "Room-Flow ist noch blockiert …"). Ein Doppelklick des Gasts riss dem
+       * Spieler damit die Bedienung weg und behauptete zusaetzlich etwas Falsches.
+       *
+       * Der Raum ist in diesen Faellen nachweislich noch da — die Ablehnung kam ja aus ihm.
+       * Also: Meldung anzeigen, Bedienleiste stehen lassen. Nur die Meldungen aus
+       * `istRoomSitzungsFehler` (Raum weg / Sitzplatz ungueltig) raeumen weiterhin auf.
+       */
+      if (!istRoomSitzungsFehler(payload.message)) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Aktion abgelehnt",
+          detail: payload.message ?? "Die Raum-Aktion wurde abgelehnt.",
+        });
+        return;
+      }
       setRoomLiveState(null);
       setFoundationActionFeedback({
         tone: "warning",
@@ -2069,7 +2090,11 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Training nicht gespeichert",
-          detail: payload.error ?? "Training konnte nicht gespeichert werden.",
+          // Befund F9: hier stand `payload.error` roh — im Raum liefert die Route Codes des
+          // Write-Guards (`participant_offline`, `host_only_action`, `forbidden_team_control`),
+          // und genau die las der Spieler woertlich. Uebersetzt wird mit DERSELBEN Tabelle wie im
+          // Transfermarkt; alles, was kein bekannter Code ist, geht unveraendert durch.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Training konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -2218,7 +2243,8 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Trainingsklasse nicht gespeichert",
-          detail: payload.error ?? "Trainingsklasse konnte nicht gespeichert werden.",
+          // Siehe `persistPlayerTrainingModeInRoom` — derselbe Befund F9, dieselbe Tabelle.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Trainingsklasse konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -7297,6 +7323,26 @@ export function useFoundationShellRouterBodyScope({
           body: JSON.stringify(withRoomContextBody({}, roomContext)),
         });
         if (!response.ok) {
+          /**
+           * BEFUND F10 (Aufgabe #44): hier wurde die Ablehnung stillschweigend geschluckt — es
+           * ging nur das Flow-Panel auf, und das zeigt, DASS etwas offen ist, nicht warum.
+           *
+           * Nachgemessen, nicht vermutet: `finalize-transfers` autorisiert mit der Aktion
+           * `formcards_season_regenerate`, und die steht in `HOST_LEVEL_ACTIONS`
+           * (lib/room/server-authoritative-write-guard.ts). Im Raum heisst das fuer JEDEN ausser
+           * dem Host: 403 `host_only_action` — der Knopf tat fuer den Gast also zuverlaessig
+           * nichts und sagte auch nichts. Der Grund wird jetzt benannt (dieselbe Tabelle wie F9);
+           * das Flow-Panel geht weiterhin auf, damit der Kontext sichtbar bleibt.
+           */
+          const payload = (await response.json().catch(() => ({}))) as { error?: string; errors?: string[] };
+          const grund =
+            formatRoomWriteErrorCode(payload.error ?? payload.errors?.[0]) ??
+            `Die Route hat mit Status ${response.status} abgelehnt.`;
+          setFoundationActionFeedback({
+            tone: "warning",
+            title: "Transfers nicht finalisiert",
+            detail: grund,
+          });
           setShowGameFlowPanel(true);
           return;
         }

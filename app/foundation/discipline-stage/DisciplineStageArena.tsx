@@ -1392,6 +1392,7 @@ export default function DisciplineStageArena({
         stepDurationMs: roomArenaSync.roomArenaStepDurationMs ?? undefined,
         clockOffsetMs: roomArenaSync.roomArenaClockOffsetMs,
         hostPaused: roomArenaSync.roomArenaPaused,
+        hostPausedBy: roomArenaSync.roomArenaPausedBy,
         onHostPauseToggle: roomArenaSync.emitHostRoomArenaPauseToggle,
         onHostReset: roomArenaSync.emitHostRoomArenaReset,
         onHostQuickSim: () => roomArenaSync.emitHostRoomArenaQuickSim(maxSlotRevealCountByDiscipline),

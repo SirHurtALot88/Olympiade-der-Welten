@@ -84,18 +84,51 @@ const HOST_LEVEL_ACTIONS = new Set<TeamWriteAction>([
   "player_generator_commit",
 ]);
 
+/**
+ * WER SCHREIBT HIER — und der Beweis dafuer ist AUSSCHLIESSLICH das Sitz-Token.
+ *
+ * BEFUND F12, und er widersprach der Regel, die drei Zeilen weiter oben am Feld `activeOwnerId`
+ * bereits steht ("im Raum entscheidet ausschliesslich das Sitz-Token"): die Vorfassung nahm die
+ * `participantId`, SOBALD sie anlag, und pruefte das Token in diesem Fall gar nicht. Die
+ * `participantId` ist aber kein Nachweis, sondern eine Behauptung des Anrufers — sie kommt aus
+ * Query oder Body, und `buildFoundationHref` schreibt sie zusammen mit `userId` und `seatToken` in
+ * JEDE Foundation-URL. Der frei setzbare Wert gewann damit genau im real benutzten Fall.
+ *
+ * DER UNFALL DAZU BRAUCHT KEINEN ANGREIFER: wer die Foundation-URL des anderen oeffnet — aus dem
+ * Verlauf, aus dem Chat, aus einem alten Tab — schreibt ab diesem Moment unter dessen Identitaet.
+ * Im Koop teilen sich Chris und Franky denselben Spielstand; das trifft also nicht einen fremden
+ * Server, sondern die eigene Partie.
+ *
+ * Stufe 0.3 wollte genau diese Luecke schliessen und hat nur die Solo-Haelfte geschlossen
+ * (`activeOwnerId`, siehe Befund B2 am Feld oben). Das hier ist die zweite Haelfte.
+ *
+ * DIE REGEL JETZT, in dieser Reihenfolge:
+ *  1. Kein Sitz-Token -> niemand. Eine `participantId` allein weist nichts nach.
+ *  2. Sitz-Token ungueltig -> niemand.
+ *  3. Sitz-Token gueltig, aber die mitgeschickte `participantId` gehoert zu einem ANDEREN Sitz ->
+ *     niemand. Das ist der eigentliche F12-Fall, und er wird abgelehnt statt stillschweigend zur
+ *     Token-Identitaet umgebogen: wer eine fremde Identitaet behauptet, bekommt keine Antwort, die
+ *     so aussieht, als haette es geklappt.
+ *  4. Sonst gilt der Teilnehmer, der am Token haengt.
+ */
 function resolveParticipant(room: RuntimeRoom, input: ServerRoomWriteContext): RoomParticipant | null {
-  if (input.participantId) {
-    return room.state.roomParticipants.find((participant) => participant.participantId === input.participantId) ?? null;
+  if (!input.seatToken) {
+    return null;
   }
-  if (input.seatToken) {
-    const role = findSeatByToken(room, input.seatToken);
-    const participantId = role ? room.seats[role]?.participantId : null;
-    return participantId
-      ? room.state.roomParticipants.find((participant) => participant.participantId === participantId) ?? null
-      : null;
+
+  const role = findSeatByToken(room, input.seatToken);
+  const participantId = role ? room.seats[role]?.participantId : null;
+  if (!participantId) {
+    return null;
   }
-  return null;
+
+  // Die behauptete Identitaet muss zur nachgewiesenen passen. Fehlt sie ganz, ist das in Ordnung —
+  // das Token allein reicht als Nachweis, und viele Aufrufer schicken nur ihn.
+  if (input.participantId && input.participantId !== participantId) {
+    return null;
+  }
+
+  return room.state.roomParticipants.find((participant) => participant.participantId === participantId) ?? null;
 }
 
 function isSandboxLikeSave(saveId: string) {

@@ -439,6 +439,85 @@ export function resetRoomArenaReveal(input: {
 }
 
 /**
+ * DER NEUSTART MITTEN IN DER ENTHUELLUNG (Befund F8, Aufgabe #45).
+ *
+ * NACHGEMESSEN, NICHT VERMUTET (die Zahlen stehen in `tests/arena-ueberlebt-den-neustart.test.ts`):
+ *
+ * 1. `arenaSyncState` UEBERLEBT den Neustart bereits vollstaendig — er liegt als Teil von
+ *    `OlyRoomState` im `payload_json` der `rooms`-Zeile (room-persistence.ts). Nach
+ *    `rehydrateRuntimeRoomsFromPersistence()` sind `status`, `stepIndex`, `slotRevealIndex`,
+ *    `phaseIndex` und `version` bitgleich. Die Arena steht danach NICHT auf "idle". Der Verdacht
+ *    aus F8 ("nur der Raum ueberlebt") ist damit widerlegt.
+ *
+ * 2. WAS TATSAECHLICH KAPUTT IST, IST DIE ZEITBASIS. `stepStartedAt` UND `updatedAt` kommen
+ *    unveraendert aus der Ablage — nach einem Auto-Deploy also Minuten alt, und zwar BEIDE mit
+ *    demselben Zeitstempel (gemessen: `stepStartedAt === updatedAt` nach dem Rehydrieren, weil
+ *    `advanceRoomArenaReveal` beide gemeinsam setzt). Genau diese Gleichheit ist die Falle:
+ *    `useArenaRoomSync` schaetzt den Uhren-Versatz aus `updatedAt` (`computeArenaClockOffsetMs`),
+ *    also aus demselben alten Zeitstempel. Bei 4 Minuten Ausfall ergibt das einen Versatz von
+ *    -240.000 ms — und dieser Fehler hebt die Veraltung von `stepStartedAt` EXAKT auf:
+ *      - mit vergiftetem Anker: `isStepSettled: false` → `resolveArenaCatchUpMode` = "advance-one"
+ *      - mit ehrlicher Uhr:     `isStepSettled: true`  → `resolveArenaCatchUpMode` = "jump"
+ *    Der Gast spielt also eine volle 10-Sekunden-Kaskade fuer eine Etappe nach, die der Server
+ *    laengst hinter sich hat — genau der Rueckfall, den Befund A1 (`arena-timeline.ts`) schon
+ *    einmal geschlossen hatte.
+ *
+ * 3. Ein "Vollgas durch alle Etappen" gibt es dagegen NICHT: Etappen ruecken ausschliesslich vor,
+ *    wenn der Host sie meldet (`advanceRoomArenaStep`), und dessen Takt ist eine lokale
+ *    Timer-Kaskade im Browser — die kennt die Server-Uhr gar nicht und kann deshalb nicht
+ *    "aufholen". Nachgemessen, damit die Entscheidung unten nicht auf einer Vermutung steht.
+ *
+ * ENTSCHEIDUNG: an der ERREICHTEN Etappe NEU ANSETZEN UND SICHTBAR ANHALTEN.
+ *
+ * - NEU ANSETZEN heisst: `stepStartedAt`/`updatedAt` auf den Neustart-Zeitpunkt. Damit hat die
+ *   gemeinsame Uhr wieder EINEN gueltigen Nullpunkt, statt eines Zeitstempels, der eine
+ *   Vergangenheit behauptet, die kein Client miterlebt hat.
+ * - `stepIndex`, `phaseIndex`, `slotRevealIndex` und die Etappen-Zaehler bleiben UNANGETASTET —
+ *   niemand springt vor oder zurueck, beide Seiten stehen weiter auf derselben Etappe. Insbesondere
+ *   waechst `stepIndex` hier NICHT (anders als bei `advanceRoomArenaReveal`/`resetRoomArenaReveal`):
+ *   ein Hochzaehlen wuerde beim Gast als "eine Etappe Rueckstand" ankommen und ihn eine Etappe zu
+ *   weit tragen.
+ * - ANHALTEN heisst `paused: true`. Der Grund ist nicht Vorsicht, sondern eine Messung: nach dem
+ *   Rehydrieren steht KEIN Sitz auf `connected` (room-persistence.ts setzt `connected: false`,
+ *   nachgemessen). Es ist also im Moment des Wiederanlaufs nachweislich niemand am Bildschirm.
+ *   Weiterlaufen hiesse, Etappen an einem Coach vorbeizuspielen, dessen Browser noch neu verbindet.
+ *   Der Host setzt bewusst fort (Leertaste) — dann stehen beide messbar auf derselben Etappe.
+ *
+ * `pausedBy` BLEIBT `null`, wenn der Neustart die Pause ausgeloest hat: "pausiert, aber von keinem
+ * Menschen". Das ist keine erfundene Zusatzinformation, sondern genau die Bedeutung, die
+ * `RoomArenaState.pausedBy` schon traegt ("wer zuletzt pausiert hat"). `resolveArenaEffectivePause`
+ * (`arena-timeline.ts`) liest sie: eine Pause ohne Urheber bindet auch den HOST. Ohne diese Regel
+ * risse der Neustart die Seiten erst richtig auseinander — der Host haette nach einem Reload die
+ * Vorgabe `localPauseIntent: false` und liefe weiter, waehrend der Gast dem Raum-Feld folgt und
+ * einfriert (nachgemessen: Host `false`, Gast `true` aus DEMSELBEN Raum-Zustand).
+ *
+ * GEGENPROBE (der Fall, der NICHT greifen darf): greift AUSSCHLIESSLICH bei `status === "revealing"`
+ * — nur dort treibt die gemeinsame Uhr ueberhaupt etwas. Ein Raum in der Lobby ("idle"), einer im
+ * Bereit-Tor ("ready_check", der haelt sich selbst an) und ein fertiger Spieltag ("result"/
+ * "result_applied") kommen unveraendert durch, OHNE Versionssprung — sonst wuerde jeder Neustart
+ * jedem ruhenden Raum eine Aenderung anhaengen, die es nicht gab.
+ */
+export function resumeRoomArenaAfterRestart(input: { arenaState: RoomArenaState; now?: string }): RoomArenaState {
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  if (arenaState.status !== "revealing") {
+    return arenaState;
+  }
+  const now = input.now ?? new Date().toISOString();
+
+  return normalizeRoomArenaState({
+    ...arenaState,
+    stepStartedAt: now,
+    paused: true,
+    // War der Host VOR dem Neustart schon in einer eigenen Pause, bleibt sein Name darauf stehen —
+    // seine Pause gilt weiter und hat weiter einen Urheber. Nur eine Pause, die erst der Neustart
+    // erzeugt hat, ist urheberlos.
+    pausedBy: arenaState.paused ? arenaState.pausedBy : null,
+    version: arenaState.version + 1,
+    updatedAt: now,
+  });
+}
+
+/**
  * QUICK-SIM ALS RAUM-AKTION (Stufe 3.6): der "⏩"-Knopf in `DisciplineStageNativeArena.tsx`
  * springt lokal sofort auf den Endstand DER GERADE GEZEIGTEN Disziplinseite — dieselbe Grenze gilt
  * hier: die Schleife haelt an, sobald `activeDisciplinePhase` die Seite verlaesst, auf der sie

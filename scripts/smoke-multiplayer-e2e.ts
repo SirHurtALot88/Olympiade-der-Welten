@@ -760,6 +760,17 @@ async function main() {
     };
 
     const authorizationChecks: JsonObject[] = [];
+    // Das Sitz-Token JE HANDELNDER PERSON (Befund F12): eine `participantId` allein weist seit
+    // dieser Aenderung niemanden mehr nach — sie steht im `roomState`, den beide Teilnehmer
+    // ohnehin per Broadcast bekommen, und war damit als Nachweis wertlos. Die Pruefungen hier
+    // schickten bis eben nur sie und liefen deshalb ALLE in `participant_missing` (401), auch die,
+    // die erlaubt sein sollen. Der echte Client schickt das Token immer mit (`buildRoomWriteBody`,
+    // lib/room/foundation-room-context-client.ts) — ohne es prueft dieser Test einen Weg, den es
+    // in der Anwendung gar nicht gibt.
+    const sitzTokenNachTeilnehmer = new Map<string, string>([
+      [String(chris.participantId), created.seatToken],
+      [String(franky.participantId), joined.seatToken],
+    ]);
     const checkAuth = async (
       label: string,
       actor: JsonObject,
@@ -772,6 +783,7 @@ async function main() {
         roomCode,
         saveId,
         participantId: actor.participantId,
+        seatToken: sitzTokenNachTeilnehmer.get(String(actor.participantId)),
         userId: actor.userId,
         teamId,
         writeAction: action,
