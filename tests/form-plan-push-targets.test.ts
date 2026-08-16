@@ -8,6 +8,7 @@ import {
   generateLocalLegacyFormCardsForSeason,
   saveLocalLegacyFormCardPlan,
 } from "@/lib/lineups/legacy-lineup-local-service";
+import { buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
@@ -150,6 +151,51 @@ describe("Formplan-Persistenz: Karten und Push-Ziel stoeren sich nicht", () => {
       matchdayId: save.gameState.matchdayState.matchdayId,
       teamId,
     };
+    /**
+     * DAS TEAM BRAUCHT MINDESTENS EINE KARTE MIT NENNWERT > 0 — und ein frischer Spielstand
+     * garantiert das nicht.
+     *
+     * `FORM_CARD_VALUES` ist `[0, 2, 4, 8]`, gezogen deterministisch aus
+     * (saveId, seasonId, teamId, playerId, Vorzeichen). Der saveId traegt einen Zeitstempel, der
+     * Wurf faellt also je Lauf anders aus. Und der frische Saison-1-Stand hat genau EINEN
+     * Kaderspieler — also genau eine positive Karte, die in **einem Viertel** der Laeufe eine 0
+     * ist. Genau daran ist dieser Fall im vollen Lauf gefallen („expected null to be truthy"),
+     * einzeln aber immer durchgekommen.
+     *
+     * Deshalb wird hier gezielt ein freier Spieler nachgelegt, dessen positive Karte
+     * nachweislich > 0 ist — gerechnet mit derselben Produktionsfunktion, die auch die Heilung
+     * benutzt, statt mit einer nachgebauten Formel.
+     */
+    const belegt = new Set(save.gameState.rosters.map((entry) => entry.playerId));
+    const spenderMitPositiverKarte = save.gameState.players.find((kandidat) => {
+      if (belegt.has(kandidat.id)) return false;
+      const mitKandidat = {
+        ...save.gameState,
+        rosters: [
+          ...save.gameState.rosters,
+          { id: `probe-${kandidat.id}`, teamId, playerId: kandidat.id, joinedSeasonId: params.seasonId },
+        ],
+      } as typeof save.gameState;
+      const karten = buildGeneratedFormCardRecordsForSeason(mitKandidat, save.saveId, params.seasonId);
+      return karten.some(
+        (karte) => karte.playerId === kandidat.id && karte.id.endsWith(":positive") && karte.cardValue > 0,
+      );
+    });
+    expect(spenderMitPositiverKarte, "kein freier Spieler mit positiver Karte gefunden").toBeTruthy();
+    save.gameState.rosters.push({
+      id: "push-ziel-kartenspender",
+      teamId,
+      playerId: spenderMitPositiverKarte!.id,
+      contractLength: 3,
+      salary: Math.round(spenderMitPositiverKarte!.salaryDemand),
+      upkeep: Math.round(spenderMitPositiverKarte!.salaryDemand),
+      purchasePrice: Math.round(spenderMitPositiverKarte!.marketValue),
+      currentValue: Math.round(spenderMitPositiverKarte!.marketValue),
+      roleTag: "bench",
+      joinedSeasonId: params.seasonId,
+    } as never);
+    persistence.saveSingleplayerState(save.saveId, save.gameState);
+
     expect(generateLocalLegacyFormCardsForSeason(params).ok).toBe(true);
     const scheduleEntry = getSeasonDisciplineSchedule(save.gameState).find(
       (entry) => entry.matchdayId === params.matchdayId,
