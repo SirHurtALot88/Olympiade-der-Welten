@@ -65,7 +65,20 @@ import {
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
 import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
 import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
+import SammelAbgabePanel from "./SammelAbgabePanel";
 import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
+import {
+  baueKontextSchluessel,
+  baueSammelSpeichernAnfrage,
+  beschreibeSammelAbgabeRueckfrage,
+  entferneVormerkung,
+  fasseSammelAbgabeZusammen,
+  merkeAufstellungVor,
+  waehleVorgemerkteFuerKontext,
+  type SammelSpeichernTeamErgebnis,
+  type VorgemerkteAufstellung,
+} from "@/lib/lineups/sammel-aufstellung-abgabe";
+import { formatRoomWriteErrorCode } from "@/lib/room/parse-room-write-context";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -1039,6 +1052,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [captains, setCaptains] = useState<Record<"d1" | "d2", string>>({ d1: "", d2: "" });
   const [modifiers, setModifiers] = useState<LineupDraftModifiers>(() => createEmptyLineupModifiers());
   const [isBusy, setIsBusy] = useState(false);
+  /**
+   * SAMMEL-ABGABE (Aufgabe #43): die vorgemerkten Aufstellungen aller eigenen Teams, bis sie in
+   * EINEM Zug ueber `PUT /api/lineups/legacy/batch` abgegeben werden. Bewusst hier im Lab-Client
+   * und nicht im Speicher-Backend: es ist ein Bedienzustand, kein Spielstand — nichts davon ist
+   * gespeichert, bevor die Abgabe durch ist. Warum vorgemerkt statt automatisch mitgenommen:
+   * siehe Kopfkommentar in `lib/lineups/sammel-aufstellung-abgabe.ts`.
+   */
+  const [vorgemerkteAufstellungen, setVorgemerkteAufstellungen] = useState<VorgemerkteAufstellung[]>([]);
   const loadContextRequestKeyRef = useRef<string>("");
   const loadContextAbortRef = useRef<AbortController | null>(null);
   const previewRequestKeyRef = useRef<string>("");
@@ -1642,6 +1663,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         matchdayLabel: selectedMatchdayOption?.label ?? params.matchdayId,
       }),
     [options.teams, props.activeOwnerId, params.matchdayId, selectedMatchdayOption?.label],
+  );
+  /**
+   * Eine Vormerkung gilt nur fuer den Spieltag, an dem sie entstanden ist (Aufgabe #43). Wer
+   * Spieltag oder Spielstand wechselt, sieht deshalb eine leere Liste statt fremder Eintraege —
+   * die alten bleiben zwar im Zustand liegen, aber sie werden weder angezeigt noch abgegeben.
+   */
+  const aktuellerSammelKontextSchluessel = useMemo(
+    () => baueKontextSchluessel({ saveId: params.saveId, seasonId: params.seasonId, matchdayId: params.matchdayId }),
+    [params.matchdayId, params.saveId, params.seasonId],
+  );
+  const vorgemerkteFuerAktuellenSpieltag = useMemo(
+    () => waehleVorgemerkteFuerKontext(vorgemerkteAufstellungen, aktuellerSammelKontextSchluessel),
+    [aktuellerSammelKontextSchluessel, vorgemerkteAufstellungen],
   );
   const jumpToMyTeam = useCallback(
     (teamId: string) => {
@@ -3709,6 +3743,170 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
   }
 
+  /**
+   * SAMMEL-ABGABE, SCHRITT 1: dieses Team vormerken.
+   *
+   * Dieselbe Vorpruefung wie beim Einzelspeichern (`handleSaveDraft`) — das Mini-Audit. Was das
+   * Mini-Audit blockiert, blockiert auch hier; sonst waere die Vormerkliste ein zweiter Weg an der
+   * Freigabekette vorbei. Gespeichert wird dabei NICHTS: erst die Abgabe schreibt.
+   */
+  function handleVormerkenFuerSammelabgabe() {
+    if (isReadOnly) {
+      setErrors(["Dieses Team steuerst du nicht — es lässt sich nicht vormerken."]);
+      setMessage("");
+      return;
+    }
+    if (lineupMiniAudit.blockingItems.length > 0) {
+      setErrors(lineupMiniAudit.blockingItems.map((item) => `${item.label}: ${item.detail}`));
+      setWarnings(lineupMiniAudit.warningItems.map((item) => `${item.label}: ${item.detail}`));
+      setMessage("");
+      return;
+    }
+
+    const teamName = context?.team?.name ?? selectedTeamOption?.name ?? params.teamId;
+    setVorgemerkteAufstellungen((current) =>
+      merkeAufstellungVor(current, {
+        teamId: params.teamId,
+        teamName,
+        kontextSchluessel: aktuellerSammelKontextSchluessel,
+        entries,
+        modifiers,
+      }),
+    );
+    setErrors([]);
+    const bereitsVorgemerkt = vorgemerkteFuerAktuellenSpieltag.some((eintrag) => eintrag.teamId === params.teamId);
+    const anzahlNachher = bereitsVorgemerkt
+      ? vorgemerkteFuerAktuellenSpieltag.length
+      : vorgemerkteFuerAktuellenSpieltag.length + 1;
+    setMessage(
+      `${teamName} ${bereitsVorgemerkt ? "aktualisiert" : "vorgemerkt"} — ${anzahlNachher} für die Sammelabgabe. Noch nichts gespeichert.`,
+    );
+  }
+
+  function handleVormerkungEntfernen(teamId: string) {
+    setVorgemerkteAufstellungen((current) => entferneVormerkung(current, teamId, aktuellerSammelKontextSchluessel));
+  }
+
+  /**
+   * SAMMEL-ABGABE, SCHRITT 2: alle vorgemerkten Teams in EINEM Zug.
+   *
+   * Genau derselbe zweistufige Ablauf wie beim Einzelweg (erst fragen, was eingesetzt wird, dann
+   * mit `confirmLock` schreiben) — nur EINMAL fuer den ganzen Stapel statt einmal je Team. Der
+   * Einzelweg (`saveEntries`) bleibt unveraendert bestehen; er ist weiterhin der Weg fuer ein Team.
+   */
+  async function handleSammelabgabe() {
+    const vorgemerkte = vorgemerkteFuerAktuellenSpieltag;
+    if (vorgemerkte.length === 0) {
+      setMessage("Nichts vorgemerkt — zuerst Teams für die Sammelabgabe vormerken.");
+      return;
+    }
+    if (source === "prisma") {
+      setErrors(["Referenzmodus ist nur zum Anschauen. Bitte lokalen Spielstand nutzen."]);
+      setMessage("");
+      return;
+    }
+
+    setIsBusy(true);
+    setErrors([]);
+    setWarnings([]);
+    setMessage("");
+
+    try {
+      const query = withRoomQuery(
+        new URLSearchParams({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          source,
+        }),
+      );
+      const anfrage = baueSammelSpeichernAnfrage(vorgemerkte);
+      const putBatch = (confirmLock: boolean) =>
+        fetch(`/api/lineups/legacy/batch?${query.toString()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...anfrage, confirmLock }),
+        });
+
+      let response = await putBatch(false);
+      let payload = (await response.json().catch(() => ({}))) as {
+        results?: SammelSpeichernTeamErgebnis[];
+        savedCount?: number;
+        warnings?: string[];
+        error?: string;
+        commitments?: Array<{
+          teamId: string;
+          commitment?: { hasFormCards?: boolean; hasCaptain?: boolean; isEmptyCommitment?: boolean } | null;
+        }>;
+      };
+
+      // EINE Rueckfrage fuer den ganzen Stapel — der Grund, warum die Sammelroute fuer Menschen
+      // ueberhaupt etwas bringt. Der Einsatz je Team kommt aus der 409-Antwort der Route
+      // (`describeLineupCommitment` serverseitig), nicht aus einer zweiten Rechnung hier.
+      if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
+        const bestaetigt =
+          typeof window === "undefined"
+            ? false
+            : window.confirm(
+                beschreibeSammelAbgabeRueckfrage({
+                  vorgemerkte,
+                  commitments: payload.commitments ?? null,
+                  matchdayLabel: selectedMatchdayOption?.label ?? params.matchdayId,
+                }),
+              );
+        if (!bestaetigt) {
+          setMessage("Sammelabgabe abgebrochen. Die Vormerkungen bleiben stehen.");
+          return;
+        }
+        response = await putBatch(true);
+        payload = (await response.json().catch(() => ({}))) as typeof payload;
+      }
+
+      const bericht = fasseSammelAbgabeZusammen({
+        angefragte: vorgemerkte.map((eintrag) => ({ teamId: eintrag.teamId, teamName: eintrag.teamName })),
+        results: payload.results ?? null,
+        // Antworten OHNE `results` (400/404/409 der Route) tragen ihren Grund in `error`. Ohne
+        // diese Zeile stuende dort nur "0 von 4 gespeichert" ohne jede Begruendung.
+        routenFehler: payload.results ? null : payload.error ?? `Die Sammelroute antwortete mit Status ${response.status}.`,
+      });
+
+      setWarnings(payload.warnings ?? []);
+      // Nur die tatsaechlich gespeicherten Teams verlassen die Vormerkliste. Was abgelehnt wurde
+      // oder gar keine Antwort bekam, bleibt stehen — sonst waere die Arbeit weg und der Spieler
+      // wuesste nicht, welche Teams er neu setzen muss.
+      if (bericht.gespeicherteTeams.length > 0) {
+        const gespeicherteIds = new Set(bericht.gespeicherteTeams.map((team) => team.teamId));
+        setVorgemerkteAufstellungen((current) =>
+          current.filter(
+            (eintrag) =>
+              !(eintrag.kontextSchluessel === aktuellerSammelKontextSchluessel && gespeicherteIds.has(eintrag.teamId)),
+          ),
+        );
+      }
+
+      if (bericht.alleGespeichert) {
+        setMessage(bericht.meldung);
+      } else {
+        // Teilerfolg ist kein Erfolg und kein Totalausfall — die Zahl steht in der Meldung, die
+        // Gruende stehen als Fehler daneben.
+        setMessage(bericht.meldung);
+        setErrors([
+          ...bericht.abgelehnteTeams.map((team) => `${team.teamName}: ${team.grund}`),
+          ...bericht.teamsOhneAntwort.map((team) => `${team.teamName}: keine Antwort der Sammelroute`),
+        ]);
+      }
+
+      if (bericht.gespeicherteAnzahl > 0) {
+        await loadContext(params, source);
+      }
+    } catch {
+      setErrors(["Die Sammelabgabe konnte nicht ausgeführt werden."]);
+      setMessage("");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleGenerateFormCards() {
     if (source === "prisma" || isReadOnly) {
       setErrors(["Formkarten können nur im lokalen Save erzeugt werden."]);
@@ -3868,7 +4066,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (!response.ok) {
-        setErrors(payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."]);
+        /**
+         * BEFUND F9 (Aufgabe #44): hier landete `payload.error` roh in der Meldung. Die Route gibt
+         * bei einer Ablehnung den Grund des Write-Guards zurueck (`writeAuth.reason`) — der Spieler
+         * las im Aufstellungs-Panel also woertlich `participant_offline`, `host_only_action` oder
+         * `forbidden_team_control`.
+         *
+         * Uebersetzt wird mit DERSELBEN Tabelle wie im Transfermarkt (Hausregel "eine Quelle").
+         * `payload.errors` aus der 422-Antwort sind bereits deutsche Validierungstexte — die
+         * Tabelle reicht Unbekanntes unveraendert durch, sie duerfen deshalb denselben Weg gehen.
+         */
+        const uebersetzt = (payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."])
+          .map((eintrag) => formatRoomWriteErrorCode(eintrag) ?? eintrag)
+          .filter((eintrag): eintrag is string => typeof eintrag === "string" && eintrag.length > 0);
+        setErrors(uebersetzt.length > 0 ? uebersetzt : ["Draft konnte nicht gespeichert werden."]);
         setWarnings(payload.warnings ?? []);
         return false;
       }
@@ -5952,6 +6163,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               readiness={myTeamsMatchdayReadiness}
               activeTeamId={params.teamId}
               onJumpToTeam={jumpToMyTeam}
+            />
+            {/* Aufgabe #43: die Sammelroute hatte bis hierher KEINEN menschlichen Aufrufer —
+                nur `scripts/smoke-multiplayer-e2e.ts`. Der Einzelweg bleibt daneben unveraendert. */}
+            <SammelAbgabePanel
+              humanTeamCount={myTeamsMatchdayReadiness.humanTeamCount}
+              vorgemerkte={vorgemerkteFuerAktuellenSpieltag}
+              activeTeamId={params.teamId}
+              activeTeamName={context?.team?.name ?? selectedTeamOption?.name ?? params.teamId}
+              isBusy={isBusy}
+              isReadOnly={isReadOnly}
+              onVormerken={handleVormerkenFuerSammelabgabe}
+              onVormerkungEntfernen={handleVormerkungEntfernen}
+              onAbgeben={() => void handleSammelabgabe()}
             />
             <label>
               <span>Spieltag</span>

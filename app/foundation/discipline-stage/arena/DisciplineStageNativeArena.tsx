@@ -200,6 +200,11 @@ export type NativeArenaRoomSync = {
   stepDurationMs?: number; // geplante Dauer des aktuellen Schritts
   clockOffsetMs?: number; // Server-minus-Client-Uhrdifferenz dieses Clients
   hostPaused?: boolean; // Pause/Weiter (3.6): vom Host gesetzt, gilt fuer den Guest ebenso
+  // Wer die Raum-Pause ausgeloest hat (`RoomArenaState.pausedBy`). `null` = "von keinem Menschen",
+  // der Fall nach einem Server-Neustart mitten im Reveal — eine solche Pause bindet auch den HOST
+  // (Befund F8, siehe `resolveArenaEffectivePause` in `arena-timeline.ts`). `undefined` = Aufrufer
+  // liefert das Feld nicht → unveraendertes Verhalten.
+  hostPausedBy?: string | null;
   onHostPauseToggle?: (() => void) | null; // Host: eigene Pause/Weiter an den Raum melden
   onHostReset?: (() => void) | null; // Host: „↻ Neu" an den Raum melden
   onHostQuickSim?: (() => void) | null; // Host: Quick-Sim an den Raum melden
@@ -3067,17 +3072,32 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Tastendruck. Ohne befuellten `hostPaused` (Aufrufer liefert das Feld noch nicht) ist der Wert
   // `undefined` → `resolveArenaEffectivePause` behandelt das wie "nicht pausiert", der Guest
   // verhaelt sich also unveraendert, solange die Raum-Anbindung dieses Feld noch nicht sendet.
+  //
+  // BEFUND F8 (Aufgabe #45): dieser Effekt lief bisher NUR beim Gast (`followsHost`). Fuer den Host
+  // war das richtig, SOLANGE die Raum-Pause immer seine eigene war. Nach einem Server-Neustart
+  // mitten im Reveal stimmt das nicht mehr: `resumeRoomArenaAfterRestart` haelt die Enthuellung an,
+  // ohne dass jemand etwas gedrueckt hat. Der Host haette dann die Vorgabe `localPauseIntent: false`
+  // und liefe weiter, waehrend der Gast dem Raum-Feld folgt und einfriert — beide Seiten auf
+  // verschiedenen Etappen. Der Effekt laeuft deshalb jetzt fuer BEIDE Rollen; die Entscheidung
+  // selbst trifft weiterhin allein `resolveArenaEffectivePause`, das dem Host seine eigene Absicht
+  // laesst, AUSSER bei einer Pause ohne Urheber (`hostPausedBy === null`).
+  //
+  // Fuer den Host ist das im Normalbetrieb ein Nichts-Tun: `resolveArenaEffectivePause` gibt ihm
+  // dann exakt `manualPauseRef.current` zurueck, also den Wert, der ohnehin schon gesetzt ist.
+  // Sein Leertaste-Handler dreht `manualPauseRef` selbst um — ein vom Neustart erzwungenes `true`
+  // wird durch den ersten Druck also zu "weiter", genau wie gewuenscht.
   useEffect(() => {
-    if (!roomSync?.followsHost) return;
+    if (!roomSync?.active) return;
     const effectivePause = resolveArenaEffectivePause({
       roomActive: roomSync.active,
-      isHost: false,
+      isHost: Boolean(roomSync.isHost),
       roomPaused: roomSync.hostPaused ?? false,
+      roomPausedBy: roomSync.hostPausedBy,
       localPauseIntent: manualPauseRef.current,
     });
     manualPauseRef.current = effectivePause;
     setPaused(effectivePause);
-  }, [roomSync?.followsHost, roomSync?.active, roomSync?.hostPaused]);
+  }, [roomSync?.active, roomSync?.isHost, roomSync?.hostPaused, roomSync?.hostPausedBy]);
 
   // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
   // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).

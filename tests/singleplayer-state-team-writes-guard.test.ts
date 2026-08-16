@@ -134,7 +134,16 @@ function setUpRoom(suffix: string) {
   if (!chris || !franky) {
     throw new Error("expected both participants");
   }
-  return { saveId, roomCode: created.room.roomCode, chris, franky };
+  // Das Sitz-Token gehoert an den Teilnehmer, weil es im echten Client untrennbar dazugehoert:
+  // `resolveFoundationRoomContext` (lib/room/foundation-room-context-client.ts) liefert GAR KEINEN
+  // Kontext ohne Token, und `buildRoomWriteBody` schickt es in jeder Anfrage mit. Ein Test, der nur
+  // `participantId` schickt, prueft damit einen Fall, den es in der Anwendung nicht gibt.
+  return {
+    saveId,
+    roomCode: created.room.roomCode,
+    chris: { ...chris, seatToken: created.seat.seatToken },
+    franky: { ...franky, seatToken: joined.seat.seatToken },
+  };
 }
 
 // The route module pulls in a large dependency graph (season/sponsor/ai services). Preloading it
@@ -186,6 +195,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 
@@ -209,6 +219,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: franky.participantId,
         userId: franky.userId,
+        seatToken: franky.seatToken,
       });
       const body = await response.json();
 
@@ -228,6 +239,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 
@@ -251,6 +263,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 
@@ -275,6 +288,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: franky.participantId,
         userId: franky.userId,
+        seatToken: franky.seatToken,
       });
       const body = await response.json();
 
@@ -299,6 +313,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 
@@ -344,6 +359,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 
@@ -367,6 +383,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: franky.participantId,
         userId: franky.userId,
+        seatToken: franky.seatToken,
       });
       const body = await response.json();
 
@@ -386,6 +403,7 @@ describe("singleplayer-state team-write guards (S9)", () => {
         roomCode,
         participantId: chris.participantId,
         userId: chris.userId,
+        seatToken: chris.seatToken,
       });
       const body = await response.json();
 

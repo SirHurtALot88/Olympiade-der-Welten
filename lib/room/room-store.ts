@@ -6,6 +6,7 @@ import {
   isRoomArenaReady,
   quickSimRoomArenaReveal as buildQuickSimmedRoomArenaState,
   resetRoomArenaReveal as buildResetRoomArenaState,
+  resumeRoomArenaAfterRestart,
   setRoomArenaParticipantReady,
   setRoomArenaPaused as buildRoomArenaPausedState,
   startRoomArena as buildStartedRoomArenaState,
@@ -30,6 +31,15 @@ import {
   roomFlowSeasonContinues,
 } from "@/lib/room/room-flow-controller";
 import { findSeatByToken } from "@/lib/room/rejoin";
+// Befund F6: die Meldungen, die den Client zu Recht auf "Sitzung beendet" schalten duerfen,
+// stehen jetzt an einer Stelle — siehe dort, warum das ueberhaupt eine eigene Datei braucht.
+import {
+  GESPEICHERTER_SITZPLATZ_UNGUELTIG_MELDUNG,
+  RAUM_EXISTIERT_NICHT_MEHR_MELDUNG,
+  RAUM_NICHT_GEFUNDEN_MELDUNG,
+  RAUM_VOLL_MELDUNG,
+  SITZPLATZ_UNGUELTIG_MELDUNG,
+} from "@/lib/room/room-session-fehler";
 import { createSeatToken } from "@/lib/room/seat-tokens";
 import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
@@ -422,11 +432,11 @@ export function joinRoom(
   const room = runtimeRooms.get(normalizedCode);
 
   if (!room) {
-    return { ok: false as const, error: "Dieser Raum wurde nicht gefunden." };
+    return { ok: false as const, error: RAUM_NICHT_GEFUNDEN_MELDUNG };
   }
 
   if (room.seats.B) {
-    return { ok: false as const, error: "Der Raum hat bereits zwei aktive Coaches." };
+    return { ok: false as const, error: RAUM_VOLL_MELDUNG };
   }
 
   const resolvedDisplayName = sessionUser?.displayName || input?.displayName?.trim() || "Franky";
@@ -492,12 +502,12 @@ export function rejoinRoom(roomCode: string, seatToken: string, socketId: string
   const room = runtimeRooms.get(normalizedCode);
 
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
 
   const role = findSeatByToken(room, seatToken);
   if (!role) {
-    return { ok: false as const, error: "Der gespeicherte Sitzplatz ist ungueltig." };
+    return { ok: false as const, error: GESPEICHERTER_SITZPLATZ_UNGUELTIG_MELDUNG };
   }
 
   const seat = room.seats[role]!;
@@ -758,11 +768,11 @@ export function startRoomArenaSync(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!role || !participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena starten." };
@@ -800,11 +810,11 @@ export function startRoomArenaSync(
 export function setRoomArenaReadyState(roomCode: string, seatToken: string, ready: boolean) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
 
   room.state = {
@@ -839,11 +849,11 @@ export function advanceRoomArenaStep(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!role || !participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf den gemeinsamen Arena-Step fortsetzen." };
@@ -885,11 +895,11 @@ export function advanceRoomArenaStep(
 export function setRoomArenaPausedState(roomCode: string, seatToken: string, paused: boolean) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!role || !participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena pausieren." };
@@ -915,11 +925,11 @@ export function setRoomArenaPausedState(roomCode: string, seatToken: string, pau
 export function resetRoomArenaRevealState(roomCode: string, seatToken: string) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!role || !participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena zuruecksetzen." };
@@ -948,11 +958,11 @@ export function quickSimRoomArenaRevealState(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
   if (!role || !participantId) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   if (role !== "A") {
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena vorspulen." };
@@ -1019,7 +1029,7 @@ export function applyRoomOwnershipPreset(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1050,7 +1060,7 @@ export function applyRoomTeamSelection(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1082,11 +1092,11 @@ export function applyRoomTeamSelection(
 export function setParticipantReadyState(roomCode: string, seatToken: string, ready: boolean) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (!role) {
-    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
   }
   const participantId = room.seats[role]?.participantId;
   room.state.roomParticipants = room.state.roomParticipants.map((participant) =>
@@ -1106,7 +1116,7 @@ export function startRoom(
 ) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1240,7 +1250,7 @@ export function startRoom(
 export function runRoomAiAutoStep(roomCode: string, seatToken: string) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1280,7 +1290,7 @@ function readRoomGameState(room: RuntimeRoom, persistence?: PersistenceService) 
 export function advanceRoomFlow(roomCode: string, seatToken: string, options?: { persistence?: PersistenceService }) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1378,7 +1388,7 @@ export function canSeatControlTeam(roomCode: string, seatToken: string, teamId: 
 export function closeRoom(roomCode: string, seatToken: string) {
   const room = getRoom(roomCode);
   if (!room) {
-    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
   }
   const role = findSeatByToken(room, seatToken);
   if (role !== "A") {
@@ -1424,6 +1434,18 @@ export function rehydrateRuntimeRoomsFromPersistence(): { restored: number; alre
       alreadyPresent += 1;
       continue;
     }
+    // BEFUND F8 (Aufgabe #45): eine Enthuellung, die der Neustart mitten im Lauf erwischt hat,
+    // bringt ihre Zeitbasis (`stepStartedAt`/`updatedAt`) als Minuten alte Zeitstempel zurueck —
+    // die Etappe behauptet damit eine Vergangenheit, die kein Client miterlebt hat. Die
+    // Entscheidung, was daraus wird, steht vollstaendig in `resumeRoomArenaAfterRestart`
+    // (`arena-sync-state.ts`, dort auch die Messwerte); hier nur der Aufruf. Bewusst OHNE
+    // `syncPlayers(room)`: `server.ts` rehydriert VOR `ensureSocketServer`, es gibt also noch
+    // niemanden zu benachrichtigen, und das Speichern erledigt die naechste echte Raum-Aktion.
+    // Ein zweiter Neustart davor faende denselben Zustand vor und entschiede identisch.
+    room.state = {
+      ...room.state,
+      arenaSyncState: resumeRoomArenaAfterRestart({ arenaState: room.state.arenaSyncState }),
+    };
     runtimeRooms.set(room.roomCode, room);
     restored += 1;
     // BEFUND F5 (Notausfahrt-Audit): `registerLiveRoomSaveId` wird sonst NUR beim
