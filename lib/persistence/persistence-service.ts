@@ -1,6 +1,7 @@
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import { createSaveGameState, loadFreshSeasonOneSeedData, loadSeedData } from "@/lib/data/dataAdapter";
 import { applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { assertKeinVeralteterKoopSchreibvorgang } from "@/lib/persistence/koop-schreibkonflikt";
 import { createSaveRepository } from "@/lib/persistence/save-repository";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -116,6 +117,17 @@ export function createPersistenceService(): PersistenceService {
       const perfCount = process.env.OLY_PERF_COUNT_SAVES === "1";
       const t0 = perfCount ? Number(process.hrtime.bigint()) : 0;
       const existing = saveRepository.getSaveById(saveId);
+      // Befund F3 (Aufgabe #46): DIE eine Engstelle, an der jeder Koop-Schreibvorgang vorbeikommt.
+      // Begruendung und Grenzen stehen vollstaendig in `koop-schreibkonflikt.ts`; hier steht nur
+      // der Aufruf — und er MUSS vor `withNextSaveVersion` stehen, denn genau dieses Hochzaehlen
+      // von der gespeicherten Version verdeckt den Konflikt sonst.
+      if (!input?.restoresPreviousState) {
+        assertKeinVeralteterKoopSchreibvorgang({
+          saveId,
+          geleseneVersion: gameState.saveVersion,
+          gespeicherteVersion: existing?.gameState.saveVersion,
+        });
+      }
       const nextGameState = withNextSaveVersion(gameState, existing?.gameState.saveVersion);
       const result = saveRepository.saveGameState({
         saveId,
