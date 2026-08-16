@@ -886,35 +886,48 @@ async function main() {
       // spielende Person selbst auf "Zur Bühne →" (`arena-prematch-start-cta`) klickt. Ohne diesen
       // Klick bleibt `arena-coop-status` (das lebt in der NativeArena DAHINTER) fuer immer
       // unerreichbar — das war der eigentliche Grund fuer den 30s-Timeout hier, nicht B3.
-      // DIAGNOSE-DUMP wie beim `arena-coop-status`-Wait weiter unten, und aus demselben Grund:
-      // der Knopf haengt an `preMatchdayReady` (DisciplineStageArena.tsx) und der wiederum an
-      // `leagueLineupReadiness.allReady` -- er erscheint also NUR, wenn wirklich alle 32 Teams eine
-      // Einsatzliste haben. Ein nackter 30s-Timeout sagt dann bloss "Knopf nicht da" und
-      // unterscheidet nicht zwischen "falscher Screen" und "Liga nicht bereit". Genau diese
-      // Unterscheidung fehlte in den CI-Laeufen 1918 und 1923, in denen dieser Wait riss. Die
-      // Tafel schreibt die Zahl selbst hin ("Liga X/32 bereit") und listet die fehlenden Teams --
-      // der Body-Text beantwortet die Frage also sofort, wenn man ihn festhaelt.
-      try {
-        await pageA.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
-      } catch (error) {
-        await pageA.screenshot({ path: path.join(OUTPUT_DIR, "failure-prematch-pageA.png"), fullPage: true }).catch(() => {});
-        const bodyA = await pageA.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
-        await fs.writeFile(path.join(OUTPUT_DIR, "failure-prematch-bodyA.txt"), bodyA);
-        const readiness = await fetchJson(
-          options.baseUrl,
-          `/api/singleplayer-state?saveId=${encodeURIComponent(saveId)}`,
-        ).catch(() => null);
-        const teams = readiness?.save?.gameState?.teams ?? [];
-        const lineups = readiness?.save?.gameState?.matchdayState?.pendingTeamIds ?? [];
-        console.error(
-          `[prematch-cta] Knopf blieb aus. Teams im Save: ${teams.length}, pendingTeamIds: ${JSON.stringify(lineups)}`,
-        );
-        console.error(`[prematch-cta] Bildschirmtext A:\n${bodyA.slice(0, 1500)}`);
-        throw error;
+      // ... ABER IM RAUM DARF DIESE TAFEL SCHON WEG SEIN, und dann gibt es den Knopf zu Recht
+      // nicht mehr. Das ist der Befund aus den CI-Laeufen 1918/1923/1925 — und es ist KEIN Fehler,
+      // sondern die im Mehrspieler ausdruecklich gebaute Eigenschaft: `onApplyRevealSync`
+      // (DisciplineStageArena.tsx) setzt `preMatchdayDismissed`, sobald ein RoomArenaState fuer
+      // diese Arena eintrifft. Ohne das blieb der GAST fuer immer auf "Vor dem Anpfiff" stehen,
+      // waehrend der Host laengst gestartet hatte.
+      //
+      // Der Host-Client startet den Reveal inzwischen SELBST, sobald die Liga bereit ist
+      // (Auto-Start-Effekt, siehe Kommentar am `arena-coop-ready`-Wait unten). Ob dieser Sync vor
+      // oder nach dem Oeffnen der Seite eintrifft, ist ein reines Wettrennen — beide Ausgaenge sind
+      // richtig. Der festgehaltene Bildschirmtext des Fehllaufs zeigte genau den zweiten Fall:
+      // Buehne offen ("ARENA · Hockey · MUTATOREN"), Koop-Tor aktiv ("Der Host steuert die
+      // Anzeige", "Warte auf: Fran") — also alles erreicht, worauf der Test danach wartet, nur eben
+      // ohne den Zwischenschritt.
+      //
+      // Deshalb wird hier auf ENTWEDER den Knopf ODER die schon offene Buehne gewartet und nur
+      // geklickt, was wirklich da ist. Ein harter Wait auf den Knopf wuerde eine Eigenschaft
+      // erzwingen, die im Raum bewusst nicht gilt.
+      async function passPreMatchdayBoard(page: Page, label: string) {
+        const cta = page.getByTestId("arena-prematch-start-cta");
+        const coopStatus = page.getByTestId("arena-coop-status");
+        try {
+          await Promise.race([
+            cta.waitFor({ timeout: 30_000 }),
+            coopStatus.waitFor({ timeout: 30_000 }),
+          ]);
+        } catch (error) {
+          await page.screenshot({ path: path.join(OUTPUT_DIR, `failure-prematch-${label}.png`), fullPage: true }).catch(() => {});
+          const body = await page.evaluate(() => document.body.innerText.slice(0, 3000)).catch(() => "?");
+          await fs.writeFile(path.join(OUTPUT_DIR, `failure-prematch-body${label}.txt`), body);
+          console.error(`[prematch-cta] Weder Anpfiff-Knopf noch offene Buehne fuer ${label}.`);
+          console.error(`[prematch-cta] Bildschirmtext ${label}:\n${body.slice(0, 1500)}`);
+          throw error;
+        }
+        // Nur klicken, wenn die Tafel wirklich noch steht. `isVisible()` fragt den JETZT-Zustand ab
+        // (kein Warten) — nach dem Race oben ist genau einer der beiden Faelle bereits eingetreten.
+        if (await cta.isVisible().catch(() => false)) {
+          await cta.click();
+        }
       }
-      await pageA.getByTestId("arena-prematch-start-cta").click();
-      await pageB.getByTestId("arena-prematch-start-cta").waitFor({ timeout: 30_000 });
-      await pageB.getByTestId("arena-prematch-start-cta").click();
+      await passPreMatchdayBoard(pageA, "A");
+      await passPreMatchdayBoard(pageB, "B");
 
       const coopStatusA = pageA.getByTestId("arena-coop-status");
       const coopStatusB = pageB.getByTestId("arena-coop-status");
