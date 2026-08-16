@@ -284,9 +284,26 @@ type MatchdayMvpScoreboardRowView = MatchdayMvpScoreboardRow & {
   bonusScore: number;
 };
 
+/**
+ * DIE „CLASSIC"-VARIANTE IST WEG (Chris: „classic aufstellungsbaum brauchen wir nicht mehr").
+ *
+ * Der Client hatte ein `uiVariant`-Prop mit zwei Stellungen, „classic" und „focusV2" (die Namen
+ * stehen hier bewusst in deutschen Anfuehrungszeichen — ein Quelltext-Test verbietet die
+ * Zeichenkette in dieser Datei). Erreichbar war nur noch die Focus-Stellung: die Shell setzt sie
+ * fest (`FoundationShellRouterBody.tsx`), und die einzige Stelle, die je die klassische liefern
+ * konnte (`resolveLineupUiVariant` ueber
+ * `FoundationLineupShellHost`), haengt an einer Kette ohne Aufrufer. Das zugehoerige Markup —
+ * Kapitaensleiste, Fortschrittsspur, Schnellzuweisung, der Vorschlags-Knopf — war zu diesem
+ * Zeitpunkt bereits vollstaendig aus der Datei entfernt; null Fundstellen in app/, lib/ und
+ * components/. (Die Marken stehen hier bewusst nicht woertlich: ein Quelltext-Test in
+ * `tests/legacy-lineup.test.ts` verbietet ihre Rueckkehr in diese Datei und wuerde sonst an
+ * diesem Kommentar haengenbleiben.)
+ *
+ * Uebrig war ein Schalter, der nur noch eine Stellung hatte, und fuenf Verzweigungen, deren
+ * zweiter Zweig nie lief. Beides ist raus: der Client rendert immer die Focus-Ansicht.
+ */
 type LegacyLineupLabClientProps = {
   embedded?: boolean;
-  uiVariant?: "classic" | "focusV2";
   initialSource?: "sqlite" | "prisma";
   defaultSaveId?: string;
   defaultSaveName?: string;
@@ -988,7 +1005,6 @@ function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: 
 }
 
 export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps) {
-  const uiVariant = props.uiVariant ?? "classic";
   // "Neuer Look" Flag (additiv): Hook läuft unverändert vor allen anderen Hooks;
   // das eigentliche Gate sitzt NACH allen Hooks/Derivations (siehe vor `const inner`).
   const [params, setParams] = useState(() => defaultParamsFromProps(props));
@@ -1957,7 +1973,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }, [activeSlotKey, nextOpenSlotKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || uiVariant !== "focusV2") {
+    if (typeof window === "undefined") {
       return;
     }
     const raw = window.sessionStorage.getItem("lineup-v2-return-focus");
@@ -1980,7 +1996,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     } catch {
       window.sessionStorage.removeItem("lineup-v2-return-focus");
     }
-  }, [nextOpenSlotKey, params.matchdayId, params.teamId, uiVariant]);
+  }, [nextOpenSlotKey, params.matchdayId, params.teamId]);
 
   useEffect(() => {
     const requestKey = props.focusMissingRequestKey ?? null;
@@ -2241,26 +2257,25 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
    * bank sichtbar - wo sind die übrigen 3???").
    *
    * Deshalb baut das Board seine Liste mit Modus "all" und überlässt das
-   * Filtern seinen eigenen Reitern. Die klassische Ansicht behält
-   * `teamdeckFilterMode` unverändert — dort ist der Modus eine sichtbare
-   * Auswahl des Spielers, keine stille Vorfilterung.
+   * Filtern seinen eigenen Reitern.
+   *
+   * (Hier stand ein Zusatz zur „klassischen Ansicht", die `teamdeckFilterMode` als sichtbare
+   * Auswahl behielt. Diese Ansicht gibt es nicht mehr — s. Kopf der Datei.)
    */
   const focusV2CandidateEntries: TeamdeckCandidateEntry[] = useMemo(
     () =>
-      uiVariant === "focusV2"
-        ? buildTeamdeckCandidateEntries({
-            activeSlot,
-            selections,
-            activeSlotCandidateSummary,
-            activeSlotCandidateByActivePlayerId,
-            matchdayRosterCards,
-            playerBestSlotSummaryByActivePlayerId,
-            context,
-            focusedDisciplineSide,
-            teamdeckFilterMode: "all",
-            teamdeckSortMode,
-          })
-        : [],
+      buildTeamdeckCandidateEntries({
+        activeSlot,
+        selections,
+        activeSlotCandidateSummary,
+        activeSlotCandidateByActivePlayerId,
+        matchdayRosterCards,
+        playerBestSlotSummaryByActivePlayerId,
+        context,
+        focusedDisciplineSide,
+        teamdeckFilterMode: "all",
+        teamdeckSortMode,
+      }),
     [
       activeSlot,
       activeSlotCandidateByActivePlayerId,
@@ -2271,7 +2286,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       playerBestSlotSummaryByActivePlayerId,
       selections,
       teamdeckSortMode,
-      uiVariant,
     ],
   );
   const focusV2CandidateGroups: TeamdeckCandidateGroup[] = useMemo(
@@ -2284,11 +2298,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     [focusV2CandidateEntries],
   );
   const focusV2VisibleCandidates = useMemo(() => {
-    if (uiVariant !== "focusV2") {
-      return [];
-    }
     return filterLegacyLineupCandidateEntries(focusV2CandidateGroups, focusV2CandidateTab, playerFilter);
-  }, [focusV2CandidateGroups, focusV2CandidateTab, playerFilter, uiVariant]);
+  }, [focusV2CandidateGroups, focusV2CandidateTab, playerFilter]);
   const activeSlotSpotlightGroups = useMemo(() => {
     return teamdeckCandidateGroups
       .filter((group) => group.key !== "blocked" && group.entries.length > 0)
@@ -4412,7 +4423,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   function assignActiveSlotCandidateByIndex(index: number) {
     // In focusV2, resolve against the same tab/search-filtered list the board actually renders,
     // so "1"-"4" always match the candidate the user sees at that position.
-    const sourceCandidates = uiVariant === "focusV2" ? focusV2VisibleCandidates : activeSlotSpotlightCandidates;
+    const sourceCandidates = focusV2VisibleCandidates;
     if (!activeSlot || !sourceCandidates[index]) {
       return;
     }
@@ -4586,10 +4597,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       if (event.code === "Enter" && !isReadOnly) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const topCandidate =
-          uiVariant === "focusV2"
-            ? getFocusV2TopPickActivePlayerId()
-            : activeSlotSpotlightCandidates[0]?.player.activePlayerId ?? null;
+        const topCandidate = getFocusV2TopPickActivePlayerId();
         if (activeSlot && !selections[activeSlot.key] && topCandidate) {
           updateSelection(activeSlot.key, topCandidate, { advanceFocusToNextOpenSlot: true });
           return;
@@ -4614,7 +4622,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     matchdayPreviewCards.openSlots,
     selections,
     slots,
-    uiVariant,
     focusV2VisibleCandidates,
   ]);
 
