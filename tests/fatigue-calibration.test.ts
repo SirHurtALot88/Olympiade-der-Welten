@@ -33,7 +33,7 @@ describe("fatigue-calibration", () => {
     expect(getInjuryRiskPercent(30)).toBe(0.6);
     expect(getInjuryRiskPercent(50)).toBe(3);
     expect(getInjuryRiskPercent(80)).toBe(25);
-    expect(getInjuryRiskPercent(100)).toBe(40);
+    expect(getInjuryRiskPercent(100)).toBe(33);
     expect(getInjuryRiskPercent(40)).toBe(1.8);
     expect(getInjuryRiskPercent(65)).toBe(14);
   });
@@ -65,10 +65,12 @@ describe("fatigue-calibration", () => {
     }
     expect(getInjuryRiskPercent(50)).toBe(3);
 
-    // Das hohe Ende ist UNVERAENDERT teuer — die Abflachung unten darf die Fatigue nicht als
-    // Constraint erledigen.
+    // Das hohe Ende bleibt teuer — die Abflachung unten darf die Fatigue nicht als Constraint
+    // erledigen. Der Anker bei 100 steht seit Chris' Deckel-Entscheidung (16.08.) auf 33 statt
+    // 40; der bei 80 ist unberuehrt, damit die Strecke ab 80 flacher wird statt der ganzen
+    // oberen Haelfte.
     expect(getInjuryRiskPercent(80)).toBe(25);
-    expect(getInjuryRiskPercent(100)).toBe(40);
+    expect(getInjuryRiskPercent(100)).toBe(33);
 
     // Und dazwischen ist die Strecke dadurch STEILER als vorher, nicht flacher: sie traegt jetzt
     // den gesamten Anstieg von 3 auf 25. Gegenprobe in Steigung pro Fatigue-Punkt.
@@ -92,7 +94,7 @@ describe("fatigue-calibration", () => {
 
   it("returns ui bands with live risk percent", () => {
     expect(getInjuryRiskBand(85).label).toBe("sehr_stark");
-    expect(getInjuryRiskBand(85).riskPercent).toBe(28.75);
+    expect(getInjuryRiskBand(85).riskPercent).toBe(27);
   });
 
   it("classifies fatigue risk levels on the 0-100 scale", () => {
@@ -144,6 +146,27 @@ describe("Verletzungskurve: die zugesagte Form", () => {
     // Gegenprobe zur Abflachung unten: waere hier mitgesenkt worden, waere die Fatigue als
     // Constraint erledigt und die ganze Rotationsentscheidung bedeutungslos.
     expect(getInjuryRiskPercent(80)).toBe(25);
-    expect(getInjuryRiskPercent(100)).toBe(40);
+    expect(getInjuryRiskPercent(100)).toBe(33);
+  });
+
+  /**
+   * CHRIS' DECKEL (16.08.): „das maximale verletzungsrisiko etwas deckeln … zb auf 33".
+   *
+   * Gebaut wurde der gesenkte ANKER, nicht `min(33, kurve)`. Der Unterschied ist nicht
+   * kosmetisch: ein harter Deckel liesse alles unter Ermuedung 91,4 unberuehrt und erzeugte
+   * darueber ein Plateau — ab 91 wuerde es nicht mehr schlimmer, egal wie sehr ein Team seine
+   * Spieler verheizt. Genau das prueft dieser Fall: die Kurve bleibt bis 100 streng steigend.
+   */
+  it("bleibt oben streng steigend — der Deckel ist ein flacherer Anstieg, kein Plateau", () => {
+    const stufen = [80, 85, 90, 95, 99, 100];
+    for (let index = 1; index < stufen.length; index += 1) {
+      expect(
+        getInjuryRiskPercent(stufen[index]),
+        `Fatigue ${stufen[index]} muss ueber ${stufen[index - 1]} liegen`,
+      ).toBeGreaterThan(getInjuryRiskPercent(stufen[index - 1]));
+    }
+    // Die Strecke ab 80 traegt jetzt 8 statt 15 Prozentpunkte: 0,4 %/Punkt statt 0,75 %/Punkt.
+    const steigungOben = (getInjuryRiskPercent(100) - getInjuryRiskPercent(80)) / 20;
+    expect(steigungOben).toBeCloseTo(0.4, 5);
   });
 });
