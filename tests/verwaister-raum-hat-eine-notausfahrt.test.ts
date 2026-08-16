@@ -38,6 +38,7 @@ import {
 import { getLiveRoomSaveIds, resetLiveRoomSaveIdsForTests } from "@/lib/room/live-room-save-registry";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -329,6 +330,20 @@ describe("Verwaister Raum hat eine Notausfahrt", () => {
   it(
     "F3-Gegenprobe: ein normaler SOLO-Save (nie in einem Raum) bleibt loeschbar wie bisher",
     async () => {
+      // FRISCHE DATENBANK, und der Grund ist gemessen, nicht vorsorglich: die sieben Tests ueber
+      // dieser Gegenprobe teilen sich EINE SQLite-Datei (tests/setup/sqlite-pro-testdatei.ts) und
+      // hinterlassen darin mehr als fuenf GESCHUETZTE Spielstaende (aktive Zeiger, raumgebundene
+      // Koop-Saves). Die rollierende Aufbewahrung (lib/persistence/save-retention.ts) fuellt ihre
+      // Behalten-Liste ZUERST mit genau diesen geschuetzten Staenden und bricht die zweite
+      // Schleife ab, sobald fuenf beisammen sind -- ein ungeschuetzter Save wird danach geloescht,
+      // egal wie neu er ist. Genau das passierte hier: `solo` war beim Loeschaufruf laengst weg,
+      // die Route meldete "Spielstand wurde nicht gefunden", und der Test sah aus wie ein
+      // Produktfehler im neuen F3-Riegel, obwohl der ihn nie zu Gesicht bekam. Ohne diesen
+      // Neuanfang misst die Gegenprobe NICHTS.
+      resetDatabaseForTests();
+      resetRuntimeRoomsForTests();
+      resetLiveRoomSaveIdsForTests();
+
       const persistence = createPersistenceService();
       const solo = persistence.createFreshSeasonOneSave({ name: "Notausfahrt-F3-solo-unberuehrt" });
       // Ein zweiter Save schiebt den aktiven Zeiger weiter -- `solo` darf hier NICHT (mehr) der
@@ -336,6 +351,9 @@ describe("Verwaister Raum hat eine Notausfahrt", () => {
       // Test misst den falschen Grund fuer eine Ablehnung.
       persistence.createFreshSeasonOneSave({ name: "Notausfahrt-F3-solo-verdraengt-aktiv" });
       const eintrag = persistence.listSaves().find((entry) => entry.saveId === solo.saveId);
+      // WACHPOSTEN vor der eigentlichen Messung: existiert der Save hier nicht mehr, ist die
+      // Aufbewahrung wieder dazwischengegangen und jede Aussage darunter waere wertlos.
+      expect(eintrag, "Der Solo-Save muss vor dem Loeschaufruf noch existieren").toBeDefined();
       // Ein reiner Solo-Save traegt nicht den Multiplayer-Modus -- der neue Riegel darf ihn also
       // gar nicht erst pruefen (Beweis, dass F3 auf Koop-Saves beschraenkt ist).
       expect(eintrag?.saveMode).not.toBe("online_4v4");
@@ -344,7 +362,13 @@ describe("Verwaister Raum hat eine Notausfahrt", () => {
       const antwort = await POST(anfrage("singleplayer-state", { action: "delete", saveIds: [solo.saveId] }));
       expect(antwort.status).toBe(200);
       const body = await antwort.json();
-      expect(body.deletedSaveIds, "F3 darf einen reinen Solo-Save nicht neu sperren").toContain(solo.saveId);
+      // Der Grund gehoert in die Fehlermeldung, nicht in ein `console.log` beim Debuggen: schlaegt
+      // diese Gegenprobe fehl, ist die einzig interessante Frage WARUM gesperrt wurde -- und die
+      // Antwort steht in `blockedSaveIds`.
+      expect(
+        body.deletedSaveIds,
+        `F3 darf einen reinen Solo-Save nicht neu sperren. Gesperrt mit: ${JSON.stringify(body.blockedSaveIds)}`,
+      ).toContain(solo.saveId);
     },
     AUFBAU_ZEITGRENZE_MS,
   );
