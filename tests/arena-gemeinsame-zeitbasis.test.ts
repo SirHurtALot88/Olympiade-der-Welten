@@ -209,6 +209,98 @@ describe("Nachholen durch Ueberspringen, nicht durch Nachspielen (Stufe 3.4, Ant
   });
 });
 
+// Befund A1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Audit): `resolveArenaDisplayState` und
+// `estimateServerNowMs` hatten NULL Aufrufer im Produktivcode — nur Tests. `roomSync.stepIndex`/
+// `stepStartedAtMs`/`stepDurationMs`/`clockOffsetMs` kamen als Props bei `DisciplineStageNativeArena`
+// an und wurden nirgends gelesen. Diese Suite haelt die EIGENSCHAFT fest, die jetzt tatsaechlich
+// verdrahtet ist (`resolveArenaCatchUpMode`s neuer `targetStepClock`-Parameter, siehe die
+// Guest-Catch-up-Stelle in `DisciplineStageNativeArena.tsx`): der "advance-one"-Normalfall bleibt
+// unveraendert (Rueckwaertskompatibilitaet ohne die Uhr), aber eine STALE Meldung wird jetzt an der
+// Uhr erkannt und als "jump" behandelt statt eine bereits ueberholte Kaskade zu starten.
+describe("Der Gast benutzt jetzt tatsaechlich die Uhr, nicht nur die Schrittdifferenz (Befund A1)", () => {
+  it("advance-one bleibt advance-one, wenn der Schritt laut Server-Uhr GERADE ERST begann (Normalfall)", () => {
+    const mode = resolveArenaCatchUpMode({
+      localStepIndex: 4,
+      targetStepIndex: 5,
+      localCascadeRunning: false,
+      targetStepClock: {
+        step: { stepIndex: 5, stepStartedAt: BASE_ISO, stepDurationMs: ARENA_STEP_DURATION_MS, paused: false },
+        serverNowMs: BASE_MS + 50, // 50ms nach Schrittbeginn — reine Netzwerklatenz
+      },
+    });
+    expect(mode).toBe("advance-one");
+  });
+
+  it("advance-one wird zu jump, wenn der Schritt laut Server-Uhr beim Empfang schon EINGESCHWUNGEN ist (spaete Meldung)", () => {
+    // Genau der Fall, den A1 beschreibt: die Schrittdifferenz allein (delta === 1) sagt
+    // "advance-one" — ohne Uhr wuerde der Gast jetzt eine frische ~10s-Kaskade fuer einen Moment
+    // starten, den der Server laengst hinter sich hat, und dabei nur WEITER zurueckfallen.
+    const mode = resolveArenaCatchUpMode({
+      localStepIndex: 4,
+      targetStepIndex: 5,
+      localCascadeRunning: false,
+      targetStepClock: {
+        step: { stepIndex: 5, stepStartedAt: BASE_ISO, stepDurationMs: ARENA_STEP_DURATION_MS, paused: false },
+        serverNowMs: BASE_MS + ARENA_STEP_DURATION_MS + 4000, // 4s NACH Schrittende beim Empfang
+      },
+    });
+    expect(mode).toBe("jump");
+  });
+
+  it("ohne `targetStepClock` (Aufrufer liefert die Uhr noch nicht) bleibt das alte Verhalten exakt erhalten", () => {
+    // Rueckwaertskompatibilitaet: kein bestehender Aufrufer/Test wird durch den neuen, optionalen
+    // Parameter veraendert.
+    const mode = resolveArenaCatchUpMode({ localStepIndex: 4, targetStepIndex: 5, localCascadeRunning: false });
+    expect(mode).toBe("advance-one");
+  });
+
+  it("`localCascadeRunning` (hold) gewinnt weiterhin ueber die Uhr — laufende Kaskaden werden nie unterbrochen", () => {
+    const mode = resolveArenaCatchUpMode({
+      localStepIndex: 4,
+      targetStepIndex: 5,
+      localCascadeRunning: true,
+      targetStepClock: {
+        step: { stepIndex: 5, stepStartedAt: BASE_ISO, stepDurationMs: ARENA_STEP_DURATION_MS, paused: false },
+        serverNowMs: BASE_MS + ARENA_STEP_DURATION_MS + 9999,
+      },
+    });
+    expect(mode).toBe("hold");
+  });
+});
+
+// Befund A3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Audit): `resetRoomArenaReveal` behandelte
+// `activeDisciplinePhase === "total"` wie `"d1"` — loeschte d1s Zaehler/Abschluss, liess die Phase
+// aber auf "total" stehen. Der naechste Schritt hatte dadurch einen WIDERSPRUECHLICHEN Zustand vor
+// sich (Phase sagt "beide Diszis fertig", Zaehler sagen "d1 bei 0, nicht abgeschlossen") und lief d1
+// erneut ab, obwohl die sichtbare Buehne zu diesem Zeitpunkt d2 zeigt (die Phasenkette erreicht
+// "total" nur ueber d2, nie direkt aus d1).
+describe("Reset waehrend \"total\" (beide Diszis fertig) trifft d2, nicht d1 (Befund A3)", () => {
+  it("setzt d2 zurueck und die Phase zurueck auf \"d2\" — d1 bleibt unangetastet abgeschlossen", () => {
+    let state = createRoomArenaState({ saveId: "save-a3-total" });
+    // d1 komplett durchlaufen + Seitenwechsel, dann d2 komplett durchlaufen + Seitenwechsel auf "total".
+    for (let i = 0; i < 30; i += 1) {
+      if (state.activeDisciplinePhase === "total") break;
+      state = advanceRoomArenaReveal({ arenaState: state, participantId: "host-1", maxSlotRevealCountByDiscipline: { d1: 2, d2: 2 } });
+    }
+    expect(state.activeDisciplinePhase).toBe("total");
+    expect(state.completedDisciplinePhases).toEqual({ d1: true, d2: true });
+    const d1CountBeforeReset = state.revealedSlotCountByDiscipline.d1;
+    expect(d1CountBeforeReset).toBe(2);
+
+    const reset = resetRoomArenaReveal({ arenaState: state, participantId: "host-1" });
+
+    // Die Phase ist wieder EINDEUTIG (nicht mehr "total" bei gleichzeitig zurueckgesetzten
+    // Zaehlern) — und zeigt d2, weil d2 die sichtbare Buehne im Moment des Reset-Klicks ist.
+    expect(reset.activeDisciplinePhase).toBe("d2");
+    expect(reset.revealedSlotCountByDiscipline.d2).toBe(0);
+    expect(reset.completedDisciplinePhases.d2).toBe(false);
+    // d1 bleibt UNVERAENDERT — kein "d1 laeuft nochmal ab", obwohl die Phase vorher "total" war.
+    expect(reset.revealedSlotCountByDiscipline.d1).toBe(d1CountBeforeReset);
+    expect(reset.completedDisciplinePhases.d1).toBe(true);
+    expect(reset.stepIndex).toBeGreaterThan(state.stepIndex);
+  });
+});
+
 describe("Pause als geteilter Zustand (Stufe 3.6): pausiert der Host, pausiert es beim Gast", () => {
   it("der Raum-Zustand traegt die Pause explizit — der Gast muss sie nicht aus ausbleibenden Updates erschliessen", () => {
     const started = createRoomArenaState({ saveId: "save-pause" });

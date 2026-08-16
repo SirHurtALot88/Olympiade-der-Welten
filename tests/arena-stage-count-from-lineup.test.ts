@@ -62,6 +62,61 @@ describe("Arena: Etappenzahl folgt der tatsaechlichen Aufstellung", () => {
 });
 
 /**
+ * BEFUND A4 (Audit, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): "im Echt-Modus nimmt der Rückfall
+ * `model.slotCount` — also die ANFORDERUNG der Disziplin — statt der tatsächlichen `slots.length`
+ * der Modell-Teams." Nachgeprueft (reproduziert, nicht nur behauptet, Hausregel "vor jedem Paket
+ * wird der Fehler reproduziert"): der ECHT-Modus-Zweig von `computeStageSlotCount`
+ * (`DisciplineStageArena.tsx`) uebergibt bereits `chosenTeams.map((t) => t.players.length)` als
+ * `playerCountsByTeam` — die tatsaechliche Aufstellung, NICHT die Modell-Anforderung. Die
+ * REGEL-Funktion selbst (`resolveDisciplineStageSlotCount`, oben bereits vollstaendig
+ * verhaltensgeprueft) verwirft `fallbackSlotCount` per `maxFielded || fallback`, sobald echte
+ * Spielerzahlen vorliegen — der von A4 beschriebene Fehler ("Rückfall zaehlt die Anforderung")
+ * tritt an dieser Stelle NICHT (mehr) auf. Dieser Test haelt GENAU den vom Audit beschriebenen Fall
+ * fest (3 aufgestellte Spieler bei Anforderung 5) UND prueft per Quellcode-Vertrag (der React-Hook
+ * ist ohne jsdom nicht renderbar, siehe Kommentar oben), dass der Echt-Modus-Zweig wirklich die
+ * Aufstellung uebergibt — als Regressionssperre gegen genau das Zurueckfallen, das A4 befuerchtet.
+ */
+describe("A4: Echt-Modus faellt NICHT auf die Anforderung zurueck, solange eine Aufstellung vorliegt", () => {
+  it("der gemeldete Fall (3 aufgestellte Spieler, Disziplin fordert 5) liefert 3 Etappen, nicht 5", () => {
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [3, 3, 3], fallbackSlotCount: 5 })).toBe(3);
+  });
+
+  it("Quellcode-Vertrag: der Echt-Modus-Zweig uebergibt die echte Aufstellung als `playerCountsByTeam`", () => {
+    const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+    expect(host).toContain("const playerCountsByTeam = chosenTeams.map((t) => t.players.length)");
+  });
+});
+
+/**
+ * BEFUND A5 (Audit): `buildDisciplineStageModel` (baut Kader + Aufstellung komplett neu auf) wurde
+ * im Echt-Modus-Zweig als PLAIN Funktionsargument fuer `fallbackSlotCount` benutzt
+ * (`fallbackSlotCount: buildDisciplineStageModel(...).slotCount`). JS wertet Funktionsargumente VOR
+ * dem Aufruf aus — das lief also bei JEDEM Aufruf, auch wenn `resolveDisciplineStageSlotCount` den
+ * Wert wegen vorhandener echter Aufstellung nie ansah. Bei zwei Seiten (d1+d2,
+ * `maxSlotRevealCountByDiscipline`) macht das bis zu zwei unbenutzte Modell-Aufbauten zusaetzlich
+ * zu dem einen tatsaechlich noetigen (`model`, memoisiert fuer die angezeigte Disziplin) — "bis zu
+ * dreimal je Render". Der Hook selbst ist ohne jsdom nicht renderbar (siehe Kommentar oben); die
+ * hier pruefbare Eigenschaft ist die STRUKTUR des Fixes: der Aufbau ist jetzt lazy (nur bei leerer
+ * Aufstellung) und nutzt fuer die aktuell angezeigte Seite das schon vorhandene `model`.
+ */
+describe("A5: der Modell-Aufbau im Rueckfall ist lazy, nicht mehr eager", () => {
+  const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+
+  it("baut das Modell nicht mehr unbedingt als Funktionsargument auf (kein `fallbackSlotCount: buildDisciplineStageModel(...)` mehr)", () => {
+    expect(host).not.toContain("fallbackSlotCount: buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount");
+  });
+
+  it("der Rueckfall-Aufbau ist an eine Bedingung geknuepft (laeuft nur, wenn wirklich keine Aufstellung vorliegt)", () => {
+    expect(host).toContain("hasAnyFieldedPlayer");
+  });
+
+  it("fuer die gerade angezeigte Disziplin wird das bereits memoisierte `model` wiederverwendet, statt es erneut zu bauen", () => {
+    expect(host).toContain("sideDisciplineId === disciplineId");
+    expect(host).toContain("? model.slotCount");
+  });
+});
+
+/**
  * Der Team-Hover der Arena beantwortet jetzt auch "wer sind hier die Stars?" —
  * die Eingesetzt-Liste zeigt nur, wer HEUTE laeuft.
  */

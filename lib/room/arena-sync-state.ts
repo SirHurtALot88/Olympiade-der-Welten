@@ -367,6 +367,23 @@ export function setRoomArenaPaused(input: {
  * Reset ist selbst ein Schritt wie jeder andere, nur mit einem "rueckwaerts" zeigenden Ziel; die
  * Monotonie von `stepIndex` beschreibt Reihenfolge/Frische der Uebertragung (wie `version`), nicht
  * die Richtung der ANGEZEIGTEN Etappe.
+ *
+ * A3 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): welche Seite ist "die aktive", wenn
+ * `activeDisciplinePhase === "total"` (BEIDE Diszis fertig, Gesamtstand-Bildschirm)? Der alte Code
+ * behandelte "total" wie "d1" (`=== "d2" ? "d2" : "d1"`) — loeschte also d1s Zaehler/Abschluss,
+ * liess `activeDisciplinePhase` selbst aber unveraendert auf "total" stehen (die Spread-Kopie oben
+ * ueberschreibt das Feld nicht). Ergebnis: ein WIDERSPRUECHLICHER Zustand (Phase sagt "beide fertig",
+ * Zaehler sagen "d1 bei Etappe 0, nicht abgeschlossen") — der naechste Schritt liest die Zaehler und
+ * spielt d1 erneut ab, obwohl die Phase das gar nicht ausweist.
+ *
+ * RICHTIG ist "d2", nicht "d1": die Phasenkette erreicht "total" AUSSCHLIESSLICH ueber d2
+ * (`advanceFoundationArenaReveal`: d1 → d2 → total, nie d1 → total direkt). Die zu diesem Zeitpunkt
+ * tatsaechlich SICHTBARE `DisciplineStageNativeArena`-Instanz (die den Reset-Knopf ueberhaupt erst
+ * ausloesen kann) zeigt deshalb noch d2 — `DisciplineStageArena.tsx` wechselt die lokale
+ * `disciplineId` bei "total" bewusst NICHT (siehe `onApplyRevealSync`: `targetDiscId` bleibt `null`
+ * fuer "total"). Ein Reset waehrend "total" meint also "d2 nochmal", nicht "d1 nochmal" — und
+ * `activeDisciplinePhase` wird jetzt explizit auf `side` zurueckgesetzt, statt aus der Spread-Kopie
+ * auf "total" haengen zu bleiben, damit Phase und Zaehler wieder dieselbe Wahrheit erzaehlen.
  */
 export function resetRoomArenaReveal(input: {
   arenaState: RoomArenaState;
@@ -375,11 +392,12 @@ export function resetRoomArenaReveal(input: {
 }): RoomArenaState {
   const arenaState = normalizeRoomArenaState(input.arenaState);
   const now = input.now ?? new Date().toISOString();
-  const side: RoomArenaDisciplineSide = arenaState.activeDisciplinePhase === "d2" ? "d2" : "d1";
+  const side: RoomArenaDisciplineSide = arenaState.activeDisciplinePhase === "d1" ? "d1" : "d2";
 
   return normalizeRoomArenaState({
     ...arenaState,
     status: "revealing",
+    activeDisciplinePhase: side,
     phaseId: "slots",
     phaseIndex: 0,
     revealedSlotCountByDiscipline: { ...arenaState.revealedSlotCountByDiscipline, [side]: 0 },

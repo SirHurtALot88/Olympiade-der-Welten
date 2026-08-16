@@ -23,8 +23,10 @@ import type { DisciplineFieldProps } from "./disciplines/types";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import {
   ARENA_STEP_DURATION_MS,
+  estimateServerNowMs,
   resolveArenaCatchUpMode,
   resolveArenaEffectivePause,
+  type ArenaStepSnapshot,
 } from "@/lib/foundation/discipline-stage/arena-timeline";
 
 // Freund/Feind-Rahmenfarbe (mine=blau, ally=grün, rival=rot) über die globalen
@@ -2921,6 +2923,26 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       setHandoffTs(0);
       setPhotoFinish(false);
       setStageCrown(null);
+      // A2 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher fehlten hier genau die Felder, die
+      // `reset()` (Knopf/Mount) laengst raeumt — podium/flash/shake/hover/stageCrownRef/demandKg/
+      // die Barbell-Refs. Ein Host-Reset ("↻ Neu") laesst `round` per Raum-Sync auf 0 zurueckfallen,
+      // der Gast landet ueber `jumpToRound(0)` HIER (delta<0 ⇒ "jump", siehe
+      // `resolveArenaCatchUpMode`) — vorher blieb dabei das alte Podest sichtbar UEBER dem frisch
+      // gestarteten Feld (Etappe 0), Flash/Shake der letzten Etappe standen nach, die Kür-Rahmen der
+      // alten Kür klebten weiter am Token, und bei Gewichtheben zeigte die Latte noch die zuletzt
+      // geforderte Last. Dieselben Felder wie in `reset()`, NICHT `onReset(...)` selbst — ein
+      // Nachholsprung ist kein "der Nutzer hat neu gestartet"-Ereignis (der Host meldet das schon
+      // separat über `onHostReset`), nur ein Bild, das den Zielzustand ohne Kaskade zeigen muss.
+      setPodium(null);
+      setFlash(null);
+      setShake("none");
+      setHover(null);
+      stageCrownRef.current = { list: [], stage: 0, label: null };
+      setDemandKg(null);
+      setBarbellMsg(null);
+      barbellDemandRef.current = null;
+      barbellPrevDemandRef.current = null;
+      barbellPrevRankRef.current = {};
       // Start-Gate mit hochziehen: ein Guest, der auf Etappe 7 springt, gehoert sichtbar zu "laeuft
       // bereits" (Feld-Startaufstellung waere sonst weiter zu sehen, siehe `started` in `fieldCtx`).
       setStarted(true);
@@ -2955,17 +2977,67 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // danach keinen Pfad mehr, der `round` bewegt: der Guest stand ohne Reveal und ohne Hinweis da.
   useEffect(() => {
     if (!roomSync?.followsHost) return;
+    // A1 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): die gemeinsame Zeitbasis TATSAECHLICH
+    // benutzt, statt nur transportiert. `roomSync.stepStartedAtMs`/`stepDurationMs`/`clockOffsetMs`
+    // kamen bis hierher als Props an und wurden nirgends gelesen — `resolveArenaDisplayState`/
+    // `estimateServerNowMs` hatten null Aufrufer im Produktivcode. Das war die Kernzusage des
+    // Pakets, die NICHT eingeloest war: zwei Browser zeigten dieselbe Reihenfolge, aber nicht
+    // denselben Moment.
+    //
+    // WAS HIER TATSAECHLICH BEHOBEN WIRD (der kleinstmoegliche Schritt, der die Zusage einloest):
+    // ohne Uhr entschied allein die Schrittdifferenz, ob der Gast eine volle, ~10s lange lokale
+    // Reveal-Kaskade abspielt ("advance-one") — auch dann, wenn die Host-Meldung so spaet ankam
+    // (gedrosselter Hintergrund-Tab, Reconnect, hohe Latenz), dass der gemeldete Schritt laut
+    // Server-Uhr laengst eingeschwungen war. Eine frische Kaskade haette den Gast dann nicht
+    // aufholen lassen, sondern IMMER WEITER zurueckfallen (jede Kaskade braucht selbst wieder die
+    // volle Schrittdauer). `resolveArenaCatchUpMode` bekommt deshalb jetzt die Uhr mit
+    // (`targetStepClock`) und liefert in genau diesem Fall "jump" statt "advance-one" — der
+    // Zielzustand wird direkt aufgebaut, keine stale Kaskade.
+    //
+    // WAS BEWUSST LOKAL BLEIBT (ehrlich benannt, kein zweiter unbenutzter Verkabelungs-Anspruch):
+    // die Kaskade SELBST (Sounds/Highlights/Token-Gleiten, `animClockRef`/`roundAnimStartRef` in
+    // `advance()`) laeuft weiterhin auf der lokalen `Date.now()`-Uhr des Gasts, sobald sie einmal
+    // gestartet ist — ein voller Umbau dieses Animationsmotors auf die Server-Uhr (jede Teilnahme-
+    // Choreografie einzeln aus `serverNowMs` ableiten) ist eine eigene, groessere Aufgabe (Stufe
+    // 3.4 vollstaendig). Innerhalb einer normal getakteten "advance-one"-Kaskade bleibt der
+    // Versatz zum Host auf Netzwerklatenz begrenzt (typ. << 1s) — der hier behobene Fall ist der
+    // GROSSE, sichtbare Rueckstand, nicht die letzte Millisekunde Choreografie-Feinschliff.
+    const targetStepClock =
+      roomSync.stepStartedAtMs != null && roomSync.stepDurationMs != null
+        ? {
+            step: {
+              stepIndex: roomSync.stepIndex ?? 0,
+              stepStartedAt: new Date(roomSync.stepStartedAtMs).toISOString(),
+              stepDurationMs: roomSync.stepDurationMs,
+              paused: roomSync.hostPaused ?? false,
+            } satisfies ArenaStepSnapshot,
+            serverNowMs: estimateServerNowMs(Date.now(), roomSync.clockOffsetMs ?? 0),
+          }
+        : undefined;
     const mode = resolveArenaCatchUpMode({
       localStepIndex: round,
       targetStepIndex: roomSync.syncedRound,
       localCascadeRunning: busy,
+      targetStepClock,
     });
     if (mode === "advance-one") {
       advance();
     } else if (mode === "jump") {
       jumpToRound(roomSync.syncedRound);
     }
-  }, [roomSync?.followsHost, roomSync?.syncedRound, round, busy, advance, jumpToRound]);
+  }, [
+    roomSync?.followsHost,
+    roomSync?.syncedRound,
+    roomSync?.stepIndex,
+    roomSync?.stepStartedAtMs,
+    roomSync?.stepDurationMs,
+    roomSync?.clockOffsetMs,
+    roomSync?.hostPaused,
+    round,
+    busy,
+    advance,
+    jumpToRound,
+  ]);
 
   // Pause als geteilter Zustand (Stufe 3.6): der Guest hat keine eigene Pause-Autoritaet — er
   // spiegelt IMMER `roomSync.hostPaused` (ueber `resolveArenaEffectivePause`), nie den eigenen

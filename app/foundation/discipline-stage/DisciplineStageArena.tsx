@@ -1175,12 +1175,29 @@ export default function DisciplineStageArena({
           : null;
       const bookedTeams = buildDisciplineStageTeamsFromBookedResult(gameState, sideDisciplineId, teamMetaById, portraitById);
       const chosenTeams = chooseDisciplineStageTeams({ previewTeams, bookedTeams }).teams ?? [];
-      return resolveDisciplineStageSlotCount({
-        playerCountsByTeam: chosenTeams.map((t) => t.players.length),
-        fallbackSlotCount: buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount,
-      });
+      const playerCountsByTeam = chosenTeams.map((t) => t.players.length);
+      // A5 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `buildDisciplineStageModel` baut Kader +
+      // Aufstellung komplett neu auf — teuer, und `resolveDisciplineStageSlotCount` wirft den
+      // Rückfall-Wert ohnehin weg, sobald `playerCountsByTeam` echte Zahlen liefert
+      // (`maxFielded || fallbackSlotCount`, siehe `discipline-stage-slot-count.ts`). Vorher stand
+      // der Aufbau als PLAIN Funktionsargument da
+      // (`fallbackSlotCount: buildDisciplineStageModel(...).slotCount`) — JS wertet
+      // Funktionsargumente VOR dem Aufruf aus, das lief also bei JEDEM Aufruf, auch im Normalfall
+      // (Aufstellung vorhanden), wo das Ergebnis nie benutzt wurde. Bei zwei Seiten (d1+d2) macht
+      // das bis zu zwei unbenutzte Modell-Aufbauten je Berechnung von `maxSlotRevealCountByDiscipline`
+      // — dazu kommt der tatsaechlich noetige dritte Aufbau in `model` (oben) für die gerade
+      // angezeigte Disziplin. Jetzt: lazy (nur bauen, wenn `playerCountsByTeam` wirklich leer ist)
+      // und, wenn die angefragte Seite die gerade angezeigte Disziplin ist, das dafür schon
+      // vorhandene memoisierte `model` wiederverwenden statt es ein zweites Mal zu bauen.
+      const hasAnyFieldedPlayer = playerCountsByTeam.some((count) => count > 0);
+      const fallbackSlotCount = hasAnyFieldedPlayer
+        ? 0 // wird von resolveDisciplineStageSlotCount ohnehin verworfen (maxFielded > 0)
+        : sideDisciplineId === disciplineId
+          ? model.slotCount
+          : buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount;
+      return resolveDisciplineStageSlotCount({ playerCountsByTeam, fallbackSlotCount });
     },
-    [mode, gameState, ownTeamId, preview, teamMetaById, portraitById],
+    [mode, gameState, ownTeamId, preview, teamMetaById, portraitById, disciplineId, model],
   );
   // Die ECHTE Etappenzahl je Seite — ersetzt das früher hart auf { d1: 0, d2: 0 }
   // gesetzte Paar an beiden Sende-Stellen unten (Start + Host-Advance).

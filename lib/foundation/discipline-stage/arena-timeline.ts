@@ -146,6 +146,23 @@ export function resolveArenaCatchUpMode(input: {
   targetStepIndex: number;
   /** Laeuft gerade eine lokale Reveal-Kaskade (Aequivalent zu `busyRef.current` in der Komponente)? */
   localCascadeRunning: boolean;
+  /**
+   * BEFUND A1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): DIE Stelle, an der die gemeinsame Zeitbasis
+   * tatsaechlich etwas ENTSCHEIDET, statt nur transportiert zu werden. Optional/wirkungslos ohne
+   * diesen Parameter — jeder bestehende Aufrufer/Test, der den Modus rein ueber die Schrittdifferenz
+   * bestimmt, verhaelt sich unveraendert.
+   *
+   * Der Normalfall bei `delta === 1` ist "advance-one": die volle lokale Reveal-Kaskade abspielen
+   * (Sounds/Highlights/Gleiten), weil sie der naechste echte Schritt ist. Das gilt aber nur, WENN
+   * dieser Schritt laut Server-Uhr gerade erst begonnen hat. Kam die Host-Meldung so spaet an (Tab
+   * im Hintergrund gedrosselt, Reconnect, hohe Latenz), dass der Schritt laut
+   * `resolveArenaDisplayState` beim Gast schon EINGESCHWUNGEN ist (`isStepSettled`), waere eine
+   * frische ~10s-Kaskade eine VERSPAETETE Wiederholung eines Moments, den der Server laengst hinter
+   * sich hat — der Gast wuerde dadurch nicht aufholen, sondern (weil jede Kaskade selbst wieder die
+   * volle Schrittdauer braucht) IMMER WEITER zurueckfallen. In diesem Fall gilt "jump" statt
+   * "advance-one": der Zielzustand wird direkt aufgebaut (`jumpToRound`), keine stale Kaskade.
+   */
+  targetStepClock?: { step: ArenaStepSnapshot; serverNowMs: number };
 }): ArenaCatchUpMode {
   if (input.localCascadeRunning) {
     return "hold";
@@ -155,6 +172,9 @@ export function resolveArenaCatchUpMode(input: {
     return "in-sync";
   }
   if (delta === 1) {
+    if (input.targetStepClock && resolveArenaDisplayState(input.targetStepClock).isStepSettled) {
+      return "jump";
+    }
     return "advance-one";
   }
   return "jump";

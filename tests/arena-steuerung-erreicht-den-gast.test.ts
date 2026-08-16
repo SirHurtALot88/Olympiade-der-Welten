@@ -140,6 +140,41 @@ describe("Arena-Steuerung erreicht den Gast (Stufe 3.6)", () => {
     expect(guestView?.state.arenaSyncState.revealedSlotCountByDiscipline.d1).toBe(limits.d1);
   });
 
+  it("Befund A3: ein Reset waehrend \"total\" (beide Diszis fertig) trifft d2, nicht d1 — ueber den vollen Raum-Store-Pfad", () => {
+    const { created } = setupCoopRoom("arena-steuerung-a3-total");
+    const limits = { d1: 3, d2: 3 };
+
+    // d1 ans Ende bringen (Quick-Sim vollendet nur die AKTIVE Seite, siehe oben).
+    const afterD1 = quickSimRoomArenaRevealState(created.room.roomCode, created.seat.seatToken, { maxSlotRevealCountByDiscipline: limits });
+    expect(afterD1.ok).toBe(true);
+    if (!afterD1.ok) return;
+    expect(afterD1.room.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+
+    // d2 ebenfalls ans Ende bringen -> "total" (beide Diszis fertig).
+    const afterD2 = quickSimRoomArenaRevealState(created.room.roomCode, created.seat.seatToken, { maxSlotRevealCountByDiscipline: limits });
+    expect(afterD2.ok).toBe(true);
+    if (!afterD2.ok) return;
+    expect(afterD2.room.state.arenaSyncState.activeDisciplinePhase).toBe("total");
+    expect(afterD2.room.state.arenaSyncState.completedDisciplinePhases).toEqual({ d1: true, d2: true });
+
+    const reset = resetRoomArenaRevealState(created.room.roomCode, created.seat.seatToken);
+    expect(reset.ok).toBe(true);
+    if (!reset.ok) return;
+
+    // Die sichtbare Buehne des Gasts zeigt zu diesem Zeitpunkt d2 (DisciplineStageArena.tsx wechselt
+    // die lokale disciplineId bei "total" bewusst NICHT) -- der Reset muss also d2 treffen, nicht d1
+    // wieder aufleben lassen.
+    expect(reset.room.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+    expect(reset.room.state.arenaSyncState.revealedSlotCountByDiscipline.d2).toBe(0);
+    expect(reset.room.state.arenaSyncState.completedDisciplinePhases.d2).toBe(false);
+    // d1 bleibt unangetastet abgeschlossen.
+    expect(reset.room.state.arenaSyncState.completedDisciplinePhases.d1).toBe(true);
+    expect(reset.room.state.arenaSyncState.revealedSlotCountByDiscipline.d1).toBe(limits.d1);
+
+    const guestView = getRoom(created.room.roomCode);
+    expect(guestView?.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+  });
+
   it("Neustart-Probe (Punkt 2 der Aufgabe): der Pausenzustand ueberlebt einen simulierten Neustart", () => {
     const { created } = setupCoopRoom("arena-steuerung-restart");
     const hostParticipantId = created.room.state.roomParticipants[0]!.participantId;
