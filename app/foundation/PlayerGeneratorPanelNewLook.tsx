@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
+import { formatRoomWriteErrorCode } from "@/lib/room/parse-room-write-context";
 import type {
   Discipline,
   Player,
@@ -635,7 +636,14 @@ export default function PlayerGeneratorPanelNewLook({
       if (result.success) {
         setMessage(`${result.playerName ?? currentDraft.generated.name} wurde als Free Agent übernommen (ID ${result.playerId ?? "?"}).`);
       } else {
-        setMessage(`Free-Agent-Commit fehlgeschlagen: ${result.error ?? "unbekannter Fehler"}.`);
+        // F9 (Aufgabe #44): `onCommitDraft` reicht den rohen Code der Route durch — im Raum also
+        // `host_only_action` & Co., dazu der eigene Sentinel `player_generator_commit_failed`.
+        // Beides stand hier woertlich in der Meldung. Uebersetzt wird an der ANZEIGE, damit der
+        // Rueckgabewert der Huelle ein Code bleibt; der Sentinel bedeutet "kein Grund bekannt"
+        // und faellt deshalb bewusst auf denselben Satz wie ein fehlender Grund.
+        const grund =
+          result.error === "player_generator_commit_failed" ? null : formatRoomWriteErrorCode(result.error);
+        setMessage(`Free-Agent-Commit fehlgeschlagen: ${grund ?? "unbekannter Fehler"}.`);
       }
     } finally {
       setCommittingDraftId(null);

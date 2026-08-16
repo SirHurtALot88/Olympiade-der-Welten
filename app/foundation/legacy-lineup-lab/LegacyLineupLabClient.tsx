@@ -4,6 +4,17 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
+// Befund F9 (Aufgabe #44): hier landete `payload.error` bis eben ROH in der Anzeige — der
+// Spieler las woertlich `participant_offline`, `host_only_action`, `forbidden_team_control`.
+// `formatRoomWriteErrorCode` uebersetzt bekannte Codes und reicht bereits lesbare Texte
+// unveraendert durch; dieselbe Quelle, die auch Transfermarkt und Foundation-Huelle benutzen.
+//
+// AUSNAHMSLOS jede Meldung dieses Moduls laeuft jetzt darueber, auch die der Vorschau-Routen, die
+// heute gar keinen Guard-Code liefern koennen. Das ist Absicht: die Tabelle ist fuer alles, was
+// sie nicht kennt, ein Durchreicher — es kostet also nichts. Eine gepflegte Liste "welche Route
+// ist geschuetzt" waere dagegen genau die Sorte zweite Quelle, die still veraltet, sobald eine
+// Route den Guard bekommt. So gilt schlicht: hier erreicht kein roher Code die Anzeige.
+import { formatRoomWriteErrorCode } from "@/lib/room/parse-room-write-context";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
 
@@ -3491,7 +3502,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (!response.ok || payload.error) {
-        setErrors([payload.error ?? "Lineup-Kontext konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "Lineup-Kontext konnte nicht geladen werden."]);
         return;
       }
 
@@ -3743,7 +3754,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       };
 
       if (!response.ok || !payload.summary) {
-        setErrors(payload.errors ?? [payload.error ?? "Formkarten konnten nicht erzeugt werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Formkarten konnten nicht erzeugt werden."]);
         setWarnings(payload.warnings ?? []);
         return;
       }
@@ -3868,7 +3879,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (!response.ok) {
-        setErrors(payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Draft konnte nicht gespeichert werden."]);
         setWarnings(payload.warnings ?? []);
         return false;
       }
@@ -4041,7 +4052,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         ? { ...payload.summary, error: payload.error }
         : null;
       if (!response.ok || !nextFeed) {
-        setErrors([payload.error ?? "Die Spieltagswertung konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "Die Spieltagswertung konnte nicht geladen werden."]);
         return;
       }
 
@@ -4100,7 +4111,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	
 	      if (!response.ok || !payload.preview) {
 	        if (!silent) {
-	          setErrors(payload.errors ?? [payload.error ?? "AI-Vorschau konnte nicht geladen werden."]);
+	          setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "AI-Vorschau konnte nicht geladen werden."]);
 	          setWarnings(payload.warnings ?? []);
 	        }
 	        return null;
@@ -4158,7 +4169,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const payload = (await response.json()) as AiBatchPreviewResponse;
 
       if (!response.ok) {
-        setErrors([payload.error ?? "AI-Batch-Vorschau konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "AI-Batch-Vorschau konnte nicht geladen werden."]);
         return;
       }
 
@@ -4262,7 +4273,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const payload = (await response.json()) as AiBatchApplyResponse;
 
       if (!response.ok) {
-        setErrors([payload.error ?? "AI-Batch-Apply konnte nicht ausgeführt werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "AI-Batch-Apply konnte nicht ausgeführt werden."]);
         return;
       }
 
@@ -5354,7 +5365,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       });
       const payload = (await response.json()) as FormCardPlanResponse;
       if (!response.ok || payload.error || payload.errors?.length) {
-        setErrors(payload.errors ?? [payload.error ?? "Formkarten-Plan konnte nicht gespeichert werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Formkarten-Plan konnte nicht gespeichert werden."]);
         return;
       }
       setContext((current) => current ? { ...current, formCardPlans: payload.plans ?? [] } : current);

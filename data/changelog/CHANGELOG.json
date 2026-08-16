@@ -5,6 +5,15 @@
       "datum": "2026-08-16",
       "seite": "Multiplayer",
       "pr": null,
+      "text": "Wird eine Aktion im Raum abgelehnt, steht jetzt überall ein Satz da statt eines Codes. Bisher las man in der Einsatzliste, im Cockpit, bei Gebäuden, Verträgen und Sponsoren wörtlich „host_only_action\", „participant_offline\" oder „forbidden_team_control\" — die Übersetzungstabelle gab es längst, gefragt hat sie nur der Transfermarkt. Jetzt läuft jede Meldung dieser Bildschirme durch dieselbe Tabelle, ausnahmslos: unbekannte Texte reicht sie unverändert durch, damit nirgends eine zweite Liste gepflegt werden muss, welche Route geprüft wird und welche nicht. Das Gebäude-Panel entstrichelte solche Codes vorher nur zu „host only action\"; es fragt die Tabelle jetzt ebenfalls — allerdings erst zum Schluss, damit die gebäudebezogenen Sätze, die es selbst besser formuliert, ihren Vorrang behalten.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-16",
+      "seite": "Multiplayer",
+      "pr": null,
       "text": "Der Mehrspieler-Modus ist keine Vorführung mehr, sondern trägt. Räume überleben jetzt einen Serverneustart und den Auto-Deploy: sie liegen samt Sitzverteilung in der Datenbank statt nur im Arbeitsspeicher, wo bisher jeder Neustart die laufende Partie stillschweigend auflöste. Wer hostet, verteilt die Teams schon beim Anlegen und kann sie später umhängen — zwischen den Spieltagen, nicht mitten hinein. Die Arena läuft für beide auf EINER Zeitbasis vom Server: bis hierher zählte der Gast seine Etappengrenze aus zwei erfundenen Nullen und blieb deshalb für immer bei Etappe 0 stehen, während der Host schon weiterschaltete. Franky sieht in seinem Browser seine eigenen Teams, weil die Zuordnung vom Server kommt und nicht mehr aus einer Vermutung im Client. Ein Koop-Spielstand bleibt Koop: er lässt sich nie solo weiterspielen, und löschen darf ihn nur der Host — auch nach dem Raumende, auch wenn niemand mehr drin sitzt. Verwaist ein Raum, führt der Weg zurück INS Spiel: der Host holt sich seinen Sitz über seine Identität zurück, oder ein toter Raum wird atomar durch einen neuen für denselben Spielstand ersetzt, ohne dass der Stand dazwischen je freiliegt. Im Tor steht ab sofort der Zwei-Browser-Test, der beide Spieler gleichzeitig durch den kompletten Enthüllungspfad fährt — seit dem 11. Juli war er abgeschaltet, und genau in dieser Zeit entstand der Etappenfehler oben, den kein anderer Test sah.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
