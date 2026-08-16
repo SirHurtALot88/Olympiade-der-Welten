@@ -198,6 +198,57 @@ function syncPlayers(room: RuntimeRoom) {
   persistRuntimeRoom(room);
 }
 
+/**
+ * Welche Team-Zuordnung steht IM SPIELSTAND — und zwar ausdruecklich, nicht geraten?
+ *
+ * REGRESSION, DIE DIESE FUNKTION BEHEBT (CI-Lauf 1918, drei rote Pruefungen; auf `main` gruen).
+ * Die Vorfassung stand direkt in `createRoom`, baute die Einstellungs-Karte ueber ALLE Teams des
+ * Spielstands (`buildTeamControlSettingsMap` fuellt fuer jedes Team einen Default-Eintrag) und
+ * verstand deshalb jedes menschlich gesteuerte Team ohne eigenen Eintrag als "gehoert Chris".
+ * Bei einem Spielstand ohne jede Besitz-Angabe -- `teamControlSettings: {}` -- fielen damit ALLE
+ * menschlichen Teams an den Host, inklusive der Teams, die Franky spielen soll. Zusammen mit dem
+ * dabei gesetzten `ownershipAssignedByHost: true` war das dauerhaft: `joinRoom` haelt sich an
+ * dieses Kennzeichen und verteilte die Teams beim Beitritt nicht mehr neu, Franky bekam also nie
+ * welche. Messbar an drei Stellen -- Chris durfte auf Frankys Team schreiben (403 erwartet, 200
+ * bekommen), Franky nicht mehr auf sein eigenes (200 erwartet, 403 bekommen), und Chris'
+ * schreibbare Team-Menge enthielt Frankys Team.
+ *
+ * DIE REGEL DAHINTER ist die Hausregel "keine erfundenen Zahlen": ein Spielstand, der zum Besitz
+ * NICHTS sagt, sagt eben nichts -- daraus "der Host besitzt alles" abzuleiten ist geraten, und in
+ * einem Raum mit zwei Sitzen ist es nachweislich falsch geraten. Deshalb zaehlen hier nur Teams
+ * mit einem ECHTEN Eintrag in `seasonState.teamControlSettings`; alle anderen bleiben offen und
+ * werden von der normalen Zuteilung beim Beitritt (`joinRoom`) vergeben.
+ *
+ * `null`, wenn der Spielstand keine ausdrueckliche Zuordnung traegt -- der ehrliche Rueckfall.
+ */
+function leiteTeamZuordnungAusSaveAb(
+  saveId: string,
+  persistence?: PersistenceService,
+): { chrisTeamIds: string[]; frankyTeamIds: string[] } | null {
+  const service = persistence ?? createPersistenceService();
+  const save = service.getSaveById(saveId);
+  if (!save) {
+    return null;
+  }
+
+  const roheEinstellungen = save.gameState.seasonState?.teamControlSettings ?? {};
+  // NUR Teams, ueber die der Spielstand ausdruecklich etwas sagt (siehe Kommentar oben) -- daher
+  // erst filtern, dann die Karte bauen. Andersherum haette `buildTeamControlSettingsMap` fuer
+  // jedes Team einen Default erfunden, und genau daran ist die Vorfassung gescheitert.
+  const benannteTeams = (save.gameState.teams ?? []).filter((team) => roheEinstellungen[team.teamId]);
+  if (benannteTeams.length === 0) {
+    return null;
+  }
+
+  const settingsMap = buildTeamControlSettingsMap(benannteTeams, roheEinstellungen);
+  const { chrisTeamIds, frankyTeamIds } = deriveChrisFrankyTeamIdsFromSettings(benannteTeams, settingsMap);
+  if (chrisTeamIds.length === 0 && frankyTeamIds.length === 0) {
+    return null;
+  }
+
+  return { chrisTeamIds, frankyTeamIds };
+}
+
 export function createRoom(
   socketId: string,
   input?: {
@@ -329,20 +380,23 @@ export function createRoom(
   // die Lobby-Anzeige waere falsch. Nur der Host ist in diesem Moment im Raum -- Frankys Teams
   // bleiben bis zu seinem (Wieder-)Beitritt/der naechsten Host-Zuteilung KI-gefuehrt, wie in jedem
   // Raum ohne zweiten Teilnehmer (`buildExplicitTeamOwnership`).
-  if (isRealSaveId) {
-    const persistence = options?.persistence ?? createPersistenceService();
-    const existingSave = persistence.getSaveById(requestedSaveId!);
-    if (existingSave) {
-      const settingsMap = buildTeamControlSettingsMap(existingSave.gameState.teams, existingSave.gameState.seasonState.teamControlSettings);
-      const { chrisTeamIds } = deriveChrisFrankyTeamIdsFromSettings(existingSave.gameState.teams, settingsMap);
-      if (chrisTeamIds.length > 0) {
-        const seeded = applyExplicitTeamOwnershipToState(room.state, { chrisTeamIds, frankyTeamIds: [] });
-        if (seeded.ok) {
-          room.state = {
-            ...seeded.state,
-            multiplayerRoom: { ...seeded.state.multiplayerRoom, ownershipAssignedByHost: true },
-          };
-        }
+  //
+  // KEIN `ownershipAssignedByHost: true` MEHR (Regression aus CI-Lauf 1918, siehe
+  // `leiteTeamZuordnungAusSaveAb`): das Kennzeichen bedeutet "der Host hat SELBST zugeteilt" und
+  // ist genau deshalb die Bremse, die `joinRoom` davon abhaelt, die Zuteilung beim Beitritt neu zu
+  // vergeben. Eine aus dem Spielstand ABGELEITETE Uebernahme ist aber keine Host-Handlung, sondern
+  // ein Vorschlag des Systems -- sie hier als Host-Handlung auszugeben, hat Franky dauerhaft ohne
+  // Teams dastehen lassen. Der Host setzt das Kennzeichen weiterhin ueber die Lobby
+  // (`applyRoomOwnershipPreset`/`applyRoomTeamSelection`), und nur dort.
+  // `!input?.preset`: hat der Host beim Anlegen ausdruecklich einen Modus mitgegeben, ist DAS seine
+  // Ansage -- eine aus dem Spielstand abgeleitete Uebernahme darf sie nicht ueberschreiben. Genau
+  // diese Reihenfolge fehlte und war an einem der beiden Fehlschlaege oben beteiligt.
+  if (isRealSaveId && !input?.preset) {
+    const uebernommen = leiteTeamZuordnungAusSaveAb(requestedSaveId!, options?.persistence);
+    if (uebernommen) {
+      const seeded = applyExplicitTeamOwnershipToState(room.state, uebernommen);
+      if (seeded.ok) {
+        room.state = seeded.state;
       }
     }
   }
@@ -393,6 +447,30 @@ export function joinRoom(
   // false ist -- der Host hat im Raum selbst NOCH NICHTS zugewiesen, es steht nur der
   // System-Default aus `createInitialRoomState` -- greift der Auto-Default. Hat der Host schon
   // gehandelt, bleibt seine Wahl unangetastet.
+  //
+  // HIER GILT BEWUSST NUR DER 4+4-VORSCHLAG, NICHT die aus dem Spielstand abgeleitete Zuordnung --
+  // und das ist eine Korrektur an meiner eigenen Arbeit, zweimal nachgemessen:
+  //
+  //  1. Erst liess ich die Save-Zuordnung hier gewinnen. Der Zwei-Browser-Test fiel um mit
+  //     "Chris teams mismatch. Expected D-P, M-M, P-S, V-W, got M-M" -- ein Spielstand, der nur
+  //     EIN Team nennt, stutzte Chris auf dieses eine Team und liess Franky ganz leer ausgehen.
+  //  2. Dann liess ich sie nur gewinnen, wenn sie auch Teams des zweiten Spielers nennt. Der Test
+  //     fiel identisch aus: `bootstrapSingleplayerSave()` liefert hier keinen frischen Stand,
+  //     sondern einen VORHANDENEN -- der bereits eine Koop-Aufteilung trug und damit genau das
+  //     Preset ueberstimmte, das der Host beim Anlegen ausdruecklich mitgegeben hatte.
+  //
+  // Die Lehre aus beiden: der Beitritt ist die EINZIGE Stelle, an der Franky ueberhaupt Teams
+  // bekommt (beim Anlegen war er noch nicht da, und `buildExplicitTeamOwnership` laesst die Teams
+  // eines abwesenden Teilnehmers bewusst offen). Diese eine Stelle mit einer abgeleiteten Quelle
+  // zu ueberschreiben, hat ihn beide Male leer ausgehen lassen. Eine Ableitung darf die Zuteilung
+  // vorschlagen, aber nicht den Mechanismus ersetzen, der sie ueberhaupt erst vergibt.
+  //
+  // BEKANNTE, BEWUSST OFFENE LUECKE (Aufgabe #49): wird ein Koop-Spielstand in einem NEUEN Raum
+  // geoeffnet, verteilt dieser Vorschlag die Teams neu, statt die Aufteilung aus dem Spielstand
+  // wiederherzustellen. Das ist unveraendert das Verhalten von `main` -- also keine Regression,
+  // sondern eine Luecke, die es vorher schon gab -- und der Host haengt sie ueber den Team-Picker
+  // um. Sie hier "nebenbei" mitzuloesen war genau der Versuch, der die zwei Fehlschlaege oben
+  // erzeugt hat; sie gehoert in einen eigenen Schritt mit eigenem Test.
   if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
     room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
   }
