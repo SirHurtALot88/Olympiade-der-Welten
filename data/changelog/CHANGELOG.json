@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-16",
+      "seite": "Team · Teams",
+      "pr": null,
+      "text": "Ein auslaufender oder aufgelöster Vertrag bringt jetzt denselben Erlös wie ein Verkauf über den Transfermarkt. Vorher wurde der rohe Preis gutgeschrieben — ohne Saisonstart-Abschlag, Timing, Kaderdruck und Team-Fit —, sodass das Vertragsende Geld einbrachte, das derselbe Spieler am Markt nie gebracht hätte. Die Korrektur geht in beide Richtungen: je nach Kaderdruck fällt der Erlös jetzt höher oder niedriger aus.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5.16"
+    },
+    {
       "datum": "2026-08-15",
       "seite": "Teams",
       "pr": null,

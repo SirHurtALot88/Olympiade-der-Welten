@@ -663,16 +663,21 @@ describe("contract renewal service", () => {
 
     expect(result.releasedPlayers).toBe(1);
     expect(savedGameState?.rosters).toHaveLength(0);
-    expect(savedGameState?.teams[0]?.cash).toBe(108);
+    // REGELAENDERUNG (Chris): „contract exits sind im grunde nichts anderes als ein verkauf" —
+    // der Erloes laeuft jetzt durch dieselbe Preisstufe wie ein Marktverkauf
+    // (`applySellPricingPolicyToBreakdown`, hier Faktor 0,974). Vorher stand hier der ROHE Preis.
+    // `marketValueAtExit` bleibt bewusst roh: das ist der Vergleichsmassstab, nicht der Erloes.
+    expect(savedGameState?.teams[0]?.cash).toBe(107.79);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_expired_exit");
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(8);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(1);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(7.79);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(0.974);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.marketValueAtExit).toBe(8);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.purchasePrice).toBe(10);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(-2);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(-2.21);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.newLength).toBe(0);
     expect(savedGameState?.transferHistory[0]?.transferType).toBe("contract_exit");
-    expect(savedGameState?.transferHistory[0]?.fee).toBe(8);
+    // Die Historie traegt denselben Betrag wie die Gutschrift — ein Vertragsende ist ein Verkauf.
+    expect(savedGameState?.transferHistory[0]?.fee).toBe(7.79);
   });
 
   it("blocks season-end contract apply without confirm token", () => {
@@ -827,15 +832,20 @@ describe("contract renewal service", () => {
 
     expect(result.applied).toBe(true);
     expect(savedGameState?.rosters).toHaveLength(0);
-    expect(savedGameState?.teams[0]?.cash).toBe(113);
+    // REGELAENDERUNG (Chris): „contract exits sind im grunde nichts anderes als ein verkauf" —
+    // der Erloes laeuft jetzt durch dieselbe Preisstufe wie ein Marktverkauf
+    // (`applySellPricingPolicyToBreakdown`, hier Faktor 0,974). Vorher stand hier der ROHE Preis.
+    // `marketValueAtExit` bleibt bewusst roh: das ist der Vergleichsmassstab, nicht der Erloes.
+    expect(savedGameState?.teams[0]?.cash).toBe(111.96);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("player_released");
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(40);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(1);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(38.96);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(0.974);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.marketValueAtExit).toBe(40);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.purchasePrice).toBe(30);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(10);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(8.96);
     expect(savedGameState?.transferHistory[0]?.transferType).toBe("contract_exit");
-    expect(savedGameState?.transferHistory[0]?.fee).toBe(40);
+    // Die Historie traegt denselben Betrag wie die Gutschrift — ein Vertragsende ist ein Verkauf.
+    expect(savedGameState?.transferHistory[0]?.fee).toBe(38.96);
     expect(savedGameState?.transferHistory[0]?.salary).toBe(9);
   });
 
