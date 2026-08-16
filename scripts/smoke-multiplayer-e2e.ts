@@ -721,6 +721,24 @@ async function main() {
       ],
     });
 
+    // SELBSTHEILUNG AUCH HIER, aus demselben Grund wie im Kader-Schritt (siehe
+    // `rejoinParticipant` oben) -- sie fehlte an dieser Stelle, und das ist ein echter Riss im
+    // Netz: der Aufstellungs-Schritt ist der TEUERSTE des ganzen Laufs. Er rechnet nicht nur acht
+    // `ai-preview`s, sondern zieht ueber die Sammelroute auch die KI-Aufstellungen der restlichen
+    // 24 Teams nach -- fuer 32 Teams sind das nach der Messung in
+    // lib/season/matchday-progress-service.ts 15-21 s synchroner Rechenzeit. Genau so lange kann
+    // ein Socket.io-Heartbeat verhungern; der Server markiert den Sitz dann als offline, der
+    // Client-Socket reconnectet zwar von selbst, ist danach aber nicht mehr im io-Raum und
+    // bekommt KEINE `roomState`-Broadcasts mehr.
+    //
+    // GEMESSEN, nicht vermutet: vier lokale Laeufe hintereinander starben danach reproduzierbar
+    // mit `room_state_timeout:chris-ready-lobby` -- der Bereit-Ruf ging raus, die Antwort kam nie
+    // an, und im Server-Log stand dazu KEIN Fehler (der Aufruf selbst war ja erfolgreich). In der
+    // CI faellt es nicht auf, weil deren Runner den Schritt schnell genug durchrechnet; auf einer
+    // langsameren Maschine ist es ein sicherer Fehlschlag und in der CI ein latentes Flackern.
+    await rejoinParticipant(socketA, roomCode, created.seatToken);
+    await rejoinParticipant(socketB, roomCode, joined.seatToken);
+
     // `PW_EXEC`, wie schon in scripts/smoke-gameplay.ts:576 — lokale Sandboxes stellen unter
     // /opt/pw-browsers oft eine andere Chromium-Revision bereit, als das installierte
     // playwright-core erwartet (`chromium.launch()` sucht dann eine Revisions-Ordner-ID, die es
