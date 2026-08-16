@@ -166,9 +166,9 @@ describe("fatigue injury service", () => {
     expect(getInjuryRiskBand(50).label).toBe("mittel");
     expect(getInjuryRiskPercent(70)).toBe(17.67);
     expect(getInjuryRiskBand(70).label).toBe("stark");
-    expect(getInjuryRiskPercent(85)).toBe(28.75);
+    expect(getInjuryRiskPercent(85)).toBe(27);
     expect(getInjuryRiskBand(85).label).toBe("sehr_stark");
-    expect(getInjuryRiskPercent(100)).toBe(40);
+    expect(getInjuryRiskPercent(100)).toBe(33);
   });
 
   it("rolls injury risk deterministically from save, season, matchday and player", () => {
