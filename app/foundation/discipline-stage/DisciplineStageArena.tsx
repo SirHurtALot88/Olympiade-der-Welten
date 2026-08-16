@@ -77,6 +77,7 @@ import {
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
+import { getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import {
   getMatchdayArenaReadiness,
@@ -518,7 +519,40 @@ export default function DisciplineStageArena({
   roomContext,
   canonicalRatingByPlayerId,
 }: DisciplineStageArenaProps) {
-  const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
+  /**
+   * Audit-Punkt 2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): „Mein Team" hing bisher NUR an der
+   * lokalen Auswahl (`activeManagerTeamId`/`selectedTeamId`), nie am Raum-Besitz. Fehlte der
+   * `team=`-Parameter (Direktaufruf, Lesezeichen, Reload), griff ein Rückfall auf `user_local` —
+   * bei Franky also FÄLSCHLICH Chris' Team, samt „★ Dein Team", Podest-Rahmen, Endstands-Zeile
+   * und „DEIN LÄUFER" (alles hängt kaskadierend an `ownTeamId`, siehe `isOwn`-Zuweisungen unten).
+   *
+   * Im Raum entscheidet deshalb der Besitz aus `teamControlSettings` (`getTeamOwner`), nicht die
+   * lokale Auswahl — abgeglichen gegen `roomContext.ownerId`, NICHT `roomContext.userId`:
+   * `userId` ist ohne Login ein zufälliger `user-<uuid>`-String, der mit keinem gespeicherten
+   * `ownerId` übereinstimmt (siehe Kommentar an `FoundationRoomContext.ownerId`,
+   * `lib/room/foundation-room-context-client.ts` — von der Sitzrolle abgeleitet, exakt der Raum
+   * hier gebraucht wird). Fehlt `ownerId` (alter Link/Zuschauer-Sitz), bleibt die Zeile beim
+   * lokalen Wert — kein Verschlechtern gegenüber vorher. Gehört die lokale Auswahl nicht dem
+   * Teilnehmer, wird auf dessen erstes eigenes Team umgezogen. Solo (`roomContext` ist `null`)
+   * bleibt exakt wie vorher — kein Verhaltensunterschied.
+   */
+  const ownTeamId = useMemo(() => {
+    const localTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
+    if (!roomContext?.ownerId) {
+      return localTeamId;
+    }
+    const controlSettings = gameState?.seasonState?.teamControlSettings ?? {};
+    const belongsToSelf = (teamId: string | null | undefined) => {
+      if (!teamId) return false;
+      const settings = controlSettings[teamId];
+      return Boolean(settings) && getTeamOwner(settings) === roomContext.ownerId;
+    };
+    if (belongsToSelf(localTeamId)) {
+      return localTeamId;
+    }
+    const ownedTeam = (gameState?.teams ?? []).find((team) => belongsToSelf(team.teamId));
+    return ownedTeam?.teamId ?? localTeamId;
+  }, [activeManagerTeamId, selectedTeamId, roomContext, gameState?.seasonState?.teamControlSettings, gameState?.teams]);
 
   // Drawer-Overlay über der laufenden Arena. WICHTIG: drawerTarget fließt NICHT in
   // den Arena-key oder das teams-Memo ein — sonst würde ein Klick die Arena
@@ -1233,6 +1267,17 @@ export default function DisciplineStageArena({
       }
       // Reveal-Schritt: Host-slotRevealIndex → lokaler Zielround (Guest zieht nach).
       setSyncedRound(normalized.slotRevealIndex);
+      // Audit-Punkt 1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md), DER WICHTIGSTE Fund: ohne diese
+      // Zeile schloss NUR ein lokaler Klick auf „Zur Bühne" die Vorspiel-Tafel
+      // (`preMatchdayDismissed` oben) — ein Callback, den ein Gast nie selbst auslöst, wenn der
+      // Host die Bühne längst betreten und „Bereit" gedrückt hat. Der Gast blieb dadurch für
+      // immer auf „Vor dem Anpfiff" stehen, sah weder das Bereit-Tor noch den Hinweis, dass auf
+      // ihn gewartet wird — obwohl `onApplyRevealSync` (dieser Callback) exakt in diesem Moment
+      // feuert: sobald ein RoomArenaState fuer DIESE Arena eintrifft (Host hat gestartet). Solo
+      // (kein `roomContext`) ruft `useArenaRoomSync` diesen Callback NIE auf (siehe Hook: ohne
+      // `roomContext` werden gar keine Socket-Listener registriert) — die Zeile ist dort totes,
+      // nie erreichtes Gewebe.
+      setPreMatchdayDismissed(true);
     },
   });
   /**
@@ -1267,6 +1312,34 @@ export default function DisciplineStageArena({
     arenaStartBlockedByLineups,
     maxSlotRevealCountByDiscipline,
   ]);
+  /**
+   * Audit-Punkt 4: Disziplin-Auswahl und „Spieltag abschließen"/„Weiter zu Disziplin 2" sind
+   * League-weite Aktionen — im Raum darf sie NUR steuern, wer den gemeinsamen Reveal steuert
+   * (Host, oder solo-im-Room). Ein Gast, der die Disziplin frei wechselt, sieht sonst eine
+   * Disziplin, die gerade niemand spielt — in einer bereits gewerteten sogar Spoiler. Dieselbe
+   * Bedingung wie `canControlArenaReveal` selbst (die alte, gelöschte Vorgänger-Arena nannte das
+   * sinngemäß "Guests never free-jump the discipline tab while the host controls the shared
+   * reveal").
+   */
+  const arenaGuestLocked = Boolean(roomContext) && !roomArenaSync.canControlArenaReveal;
+  /**
+   * Audit-Punkt 5, zweite Hälfte: „dass jemand getrennt ist, steht in der Arena nirgends" —
+   * `roomSyncParticipants` trägt `connectionStatus` bereits (`use-arena-room-sync.ts`), wurde aber
+   * bisher nie gelesen. Bewusst NICHT aus `arenaCoopGateParticipants` abgeleitet: die
+   * Bereit-pflichtigen (`requiredParticipantIds`) lassen einen Getrennten inzwischen selbst fallen
+   * (`getRoomArenaRequiredParticipantIds`, `arena-sync-state.ts`) — genau deshalb braucht es HIER
+   * eine vom Bereit-Tor unabhängige Quelle, sonst verschwindet der Hinweis im selben Moment, in
+   * dem er am wichtigsten wäre.
+   */
+  const disconnectedCoopNames = roomArenaSync.roomSyncParticipants
+    .filter(
+      (participant) =>
+        participant.participantId !== roomArenaSync.selfArenaParticipantId &&
+        participant.role !== "spectator" &&
+        participant.controlledTeamIds.length > 0 &&
+        participant.connectionStatus === "offline",
+    )
+    .map((participant) => participant.displayName);
   // Prop-Bündel für die NativeArena (nur im Room aktiv; solo bleibt alles inert).
   const nativeRoomSync = roomContext
     ? {
@@ -1283,6 +1356,7 @@ export default function DisciplineStageArena({
           waitingNames: roomArenaSync.arenaCoopWaitingNames,
           onToggleReady: roomArenaSync.emitArenaCoopReadyToggle,
         },
+        disconnectedNames: disconnectedCoopNames,
         // Gemeinsame Zeitbasis + Pause/Reset/Quick-Sim als Raum-Aktion (Stufe 3.6) — die Felder
         // heissen hier genau so, wie `NativeArenaRoomSync` (DisciplineStageNativeArena.tsx) sie
         // erwartet.
@@ -2479,10 +2553,29 @@ export default function DisciplineStageArena({
           <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>
             {devMode ? "Disziplin (Admin: frei)" : "Disziplin (Spieltag)"}
           </span>
+          {/* Audit-Punkt 4: im Room darf nur steuern, wer den gemeinsamen Reveal steuert — sonst
+              sieht der Gast eine Disziplin, die niemand spielt (Spoiler bei bereits gewerteten).
+              Dev-Modus bleibt frei (Admin-Werkzeug, kein Spielzustand). */}
           <select
             value={disciplineId}
-            onChange={(event) => setDisciplineId(event.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
+            onChange={(event) => {
+              if (arenaGuestLocked && !devMode) return;
+              setDisciplineId(event.target.value);
+            }}
+            disabled={arenaGuestLocked && !devMode}
+            title={arenaGuestLocked && !devMode ? "Der Host steuert die gemeinsame Anzeige" : undefined}
+            data-testid="arena-discipline-select"
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--nl-line)",
+              background: "var(--nl-panel)",
+              color: "inherit",
+              fontSize: 14,
+              fontWeight: 700,
+              opacity: arenaGuestLocked && !devMode ? 0.55 : 1,
+              cursor: arenaGuestLocked && !devMode ? "not-allowed" : "pointer",
+            }}
           >
             {disciplineSelectOptions.map((discipline, index) => {
               // Buchungszustand aus dem Save direkt am Auswahl-Eintrag: nach einem
@@ -2504,6 +2597,11 @@ export default function DisciplineStageArena({
               );
             })}
           </select>
+          {arenaGuestLocked && !devMode ? (
+            <span className="nl-arena-coop-note" data-testid="arena-discipline-locked-hint">
+              Der Host steuert die Anzeige
+            </span>
+          ) : null}
         </label>
       </div>
 
@@ -2932,14 +3030,25 @@ export default function DisciplineStageArena({
             if (guideToSecondDiscipline) {
               const secondName =
                 matchdayDisciplineOptions.find((option) => option.id === secondDisciplineId)?.name ?? "Disziplin 2";
+              // Audit-Punkt 4: derselbe League-weite-Aktion-Gedanke wie an der Disziplin-Auswahl
+              // oben — nur wer den Reveal steuert, darf den Spieltag weiterschalten.
+              const locked = arenaGuestLocked;
               return (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div
+                  className={locked ? "nl-arena-phase-controls is-locked" : undefined}
+                  style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                >
                   <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                    Disziplin 1 abgeschlossen — weiter zur zweiten Disziplin dieses Spieltags.
+                    {locked
+                      ? "Disziplin 1 abgeschlossen — der Host schaltet zur zweiten Disziplin weiter."
+                      : "Disziplin 1 abgeschlossen — weiter zur zweiten Disziplin dieses Spieltags."}
                   </span>
                   <button
                     type="button"
+                    disabled={locked}
+                    title={locked ? "Der Host steuert die gemeinsame Anzeige" : undefined}
                     onClick={() => {
+                      if (locked) return;
                       setDisciplineId(secondDisciplineId);
                       // Nach oben scrollen: der Knopf sitzt UNTER der Buehne, nach dem
                       // Wechsel stand man also mitten in der Spieltags-Wertung und musste
@@ -2952,9 +3061,10 @@ export default function DisciplineStageArena({
                       fontSize: 14,
                       border: 0,
                       borderRadius: 10,
-                      cursor: "pointer",
+                      cursor: locked ? "not-allowed" : "pointer",
                       color: "var(--nl-ink)",
                       background: "var(--nl-accent)",
+                      opacity: locked ? 0.45 : 1,
                     }}
                   >
                     Weiter zu Disziplin 2: {secondName} →
@@ -2962,18 +3072,27 @@ export default function DisciplineStageArena({
                 </div>
               );
             }
+            // Audit-Punkt 4: gleiche Sperre fuer den Spieltags-Abschluss.
+            const finishLocked = arenaGuestLocked;
             return onAdvanceMatchday ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div
+                className={finishLocked ? "nl-arena-phase-controls is-locked" : undefined}
+                style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+              >
                 <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                  Beide Disziplinen sind gewertet — schaltet auf den nächsten Spieltag weiter.
+                  {finishLocked
+                    ? "Beide Disziplinen sind gewertet — der Host schaltet auf den nächsten Spieltag weiter."
+                    : "Beide Disziplinen sind gewertet — schaltet auf den nächsten Spieltag weiter."}
                 </span>
                 <button
                   type="button"
                   // Anker fuer Tests und die Browser-Smokes. Lag vorher am Knopf in der
                   // entfernten "Spieltagsergebnis"-Sektion und wandert mit ihm hierher.
                   data-testid="arena-finish-matchday"
-                  disabled={advancing}
+                  disabled={advancing || finishLocked}
+                  title={finishLocked ? "Der Host steuert die gemeinsame Anzeige" : undefined}
                   onClick={async () => {
+                    if (finishLocked) return;
                     if (advancingRef.current) return;
                     advancingRef.current = true;
                     setAdvancing(true);
@@ -2990,10 +3109,10 @@ export default function DisciplineStageArena({
                     fontSize: 14,
                     border: 0,
                     borderRadius: 10,
-                    cursor: advancing ? "default" : "pointer",
+                    cursor: advancing || finishLocked ? "default" : "pointer",
                     color: "var(--nl-ink)",
                     background: "var(--nl-accent)",
-                    opacity: advancing ? 0.6 : 1,
+                    opacity: advancing ? 0.6 : finishLocked ? 0.45 : 1,
                   }}
                 >
                   {advancing ? "schaltet weiter…" : "Spieltag abschließen"}

@@ -12661,6 +12661,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     resultApplyFeed,
     roomActivityNotice,
+    setRoomActivityNotice,
     roomContext,
     roomLiveState,
     rosterFillBusy,

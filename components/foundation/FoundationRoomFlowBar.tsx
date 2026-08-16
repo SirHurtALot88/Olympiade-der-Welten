@@ -70,10 +70,29 @@ export function FoundationRoomFlowBar({ roomContext, roomLiveState }: Foundation
           <div className="foundation-room-flow-waiting" data-testid="foundation-room-flow-waiting">
             {teamRosterParticipants.map((participant) => {
               const ready = flow.completedParticipantIds.includes(participant.participantId);
+              // BEFUND (Auftrag): ohne diesen Hinweis blieb die Leiste bei "0/4 bereit" stehen,
+              // waehrend der Host laengst weiterklicken konnte -- `getRequiredParticipants`
+              // (lib/room/room-flow-controller.ts) nimmt einen getrennten Teilnehmer NICHT mehr in
+              // die Bereit-Pflicht auf, `flow.requiredParticipantIds` zeigt das hier direkt an.
+              const isOffline = participant.connectionStatus === "offline";
+              const isRequired = flow.requiredParticipantIds.includes(participant.participantId);
+              const lastSeenLabel = new Date(participant.lastSeenAt).toLocaleTimeString("de-DE", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
               return (
-                <span key={participant.participantId} className={`pill${ready ? " is-ready" : " is-warning"}`}>
+                <span
+                  key={participant.participantId}
+                  className={`pill${ready ? " is-ready" : " is-warning"}`}
+                  data-testid="foundation-room-flow-participant-pill"
+                >
                   {participant.displayName}: {ready ? participant.controlledTeamIds.length : 0}/
                   {participant.controlledTeamIds.length} Teams bereit
+                  {isOffline
+                    ? ` · getrennt (zuletzt ${lastSeenLabel})${
+                        isRequired ? "" : " · zählt nicht mehr für „Weiter“"
+                      }`
+                    : ""}
                 </span>
               );
             })}

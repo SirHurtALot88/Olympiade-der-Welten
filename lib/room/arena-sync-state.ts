@@ -19,9 +19,32 @@ export const ROOM_ARENA_PHASES: RoomArenaPhaseId[] = [
   "result",
 ];
 
+/**
+ * Wer ist "bereit-pflichtig" fuer das gemeinsame Reveal-Bereit-Tor?
+ *
+ * Audit-Punkt 5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher zaehlte nur Rolle + Teambesitz — ein
+ * GETRENNTER Mitspieler blieb "erforderlich" und blockierte das Tor UNBEGRENZT, weil sein
+ * `readyParticipantIds`-Eintrag nie kam. Das widerspricht der im Plan getroffenen Entscheidung
+ * ("Entscheidungen"-Abschnitt): das Tor blockiert nur, solange der andere VERBUNDEN und noch nicht
+ * bereit ist. Deshalb jetzt zusaetzlich `connectionStatus !== "offline"` -- GENAU dasselbe Muster
+ * wie `getRequiredParticipants` in `room-flow-controller.ts` (dort fuer den 12-Schritt-Flow schon
+ * geloest, siehe dessen Kommentar).
+ *
+ * Wirkt zweifach, weil `requiredParticipantIds` an ZWEI Stellen gelesen wird:
+ * - server: `isRoomArenaReady`/`advanceRoomArenaStep` verlangt Ready nur noch von VERBUNDENEN
+ *   Teilnehmern -- der Host kommt durch, ohne dass der Getrennte je "Bereit" druecken muss.
+ * - client: `isRoomArenaCoop` (`use-arena-room-sync.ts`) faellt auf `length > 1` zurueck, das
+ *   Bereit-Tor (`arenaCoopReadyGateActive`) verschwindet also automatisch mit dem Getrennten.
+ *
+ * `syncPlayers` (`room-store.ts`) ruft diese Funktion bei JEDER Verbindungsaenderung
+ * (Connect/Disconnect/Rejoin) ueber `syncRoomArenaParticipants` neu auf -- der getrennte
+ * Teilnehmer fliegt also im selben Moment aus der Pflicht, in dem der Server ihn als offline
+ * erkennt, nicht erst beim naechsten Ready-Klick.
+ */
 export function getRoomArenaRequiredParticipantIds(state: Pick<OlyRoomState, "roomParticipants" | "teamOwnership">) {
   return state.roomParticipants
     .filter((participant) => participant.role !== "spectator" && participant.controlledTeamIds.length > 0)
+    .filter((participant) => participant.connectionStatus !== "offline")
     .map((participant) => participant.participantId);
 }
 

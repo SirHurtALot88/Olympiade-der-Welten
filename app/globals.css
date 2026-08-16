@@ -12130,6 +12130,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .is-new-look .relationship-tag.is-rival {
   --nl-rel: var(--nl-rival);
 }
+.is-new-look .relationship-tag.is-human {
+  --nl-rel: var(--nl-human);
+}
 
 /* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
    bestehenden Team-Tag-Rahmen (Team-Tag-Farbschema bleibt erhalten). */
@@ -44556,6 +44559,10 @@ button.foundation-team-portrait-card {
   --nl-mine: var(--nl-men);
   --nl-ally: var(--nl-spe);
   --nl-rival: var(--nl-risk);
+  /* Audit-Punkt 7 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Mitspieler-Team (von einem MENSCHEN
+     gesteuert, aber nicht mein eigenes) — eigener, vierter Ton, damit er sich von
+     mine/ally/rival UND von neutralen KI-Teams (kein Rahmen) unterscheidet. */
+  --nl-human: var(--nl-soc);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;

@@ -35,7 +35,7 @@ export function relColor(rel: TeamRelationshipKind | null | undefined): string |
   if (!rel) return null;
   return `var(--nl-${rel})`;
 }
-const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔" };
+const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔", human: "👤" };
 
 // Wiederverwendbarer Kopf-Strip 50/50 (Spec 02): links die „Dein"-Karte
 // (Läufer/Heber/Kämpfer), rechts das Live-Meldungsfeld. Beide teilen sich den Platz
@@ -174,6 +174,14 @@ export type NativeArenaRoomSync = {
     waitingNames: string[]; // Namen der noch nicht bereiten Teilnehmer
     onToggleReady: () => void; // eigenen Ready-Status umschalten
   };
+  /**
+   * Audit-Punkt 5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Namen der Mitspieler, die gerade
+   * GETRENNT sind ("Franky ist getrennt"). Bewusst getrennt von `coopGate.waitingNames` — ein
+   * Getrennter blockiert das Bereit-Tor nicht mehr (siehe `getRoomArenaRequiredParticipantIds`,
+   * `arena-sync-state.ts`), soll aber trotzdem sichtbar bleiben, sonst wirkt der Wechsel zurück in
+   * Solo-artiges Verhalten unerklärt. Leer/undefiniert ⇒ kein Hinweis (Solo/alle verbunden).
+   */
+  disconnectedNames?: string[];
   /**
    * GEMEINSAME ZEITBASIS (Befund B4, Stufe 3.2/3.3/3.4/3.6, `lib/foundation/discipline-stage/
    * arena-timeline.ts`). ALLE Felder hier sind optional und wirkungslos, solange der Aufrufer
@@ -3616,11 +3624,55 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               ) : (
                 <span style={{ fontSize: 12, color: "var(--nl-accent)", fontWeight: 700 }}>👥 Co-op · Du bist Host — dein Reveal läuft synchron bei allen.</span>
               )}
+              {/* Audit-Punkt 5, zweite Haelfte: ein Getrennter blockiert das Bereit-Tor nicht mehr
+                  (siehe `getRoomArenaRequiredParticipantIds`), war bisher aber auch NIRGENDS
+                  sichtbar — der Host sah nur, dass es plötzlich weiterging, ohne Grund. */}
+              {roomSync.disconnectedNames && roomSync.disconnectedNames.length > 0 ? (
+                <span
+                  className="nl-arena-coop-note"
+                  data-testid="arena-coop-disconnected"
+                  style={{ flexBasis: "100%", color: "var(--nl-warn)" }}
+                >
+                  ⚠ Getrennt: {roomSync.disconnectedNames.join(", ")} — blockiert das Bereit-Tor nicht.
+                </span>
+              ) : null}
             </div>
           ) : null}
-          <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy || Boolean(roomSync?.active && !roomSync.canControl) || Boolean(roomSync?.coopGate.active)} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
-            {done ? "✔ Disziplin gewertet" : !started ? `▶ Start · Etappe 1 / ${slotCount}` : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
-          </button>
+          {(() => {
+            // Audit-Punkt 3: der ▶-Knopf war zwar `disabled`, sah beim Gast aber weiter voll
+            // klickbar aus (Akzentfarbe + Zeigefinger-Cursor) — die Nachbarknöpfe (Quick-Sim,
+            // Reset) machten das schon richtig. Zusätzlich: Beschriftung sagt jetzt selbst, WARUM
+            // er nicht reagiert, statt einfach nichts zu tun.
+            const roomBlocksControl = Boolean(roomSync?.active && !roomSync.canControl);
+            const primaryDisabled = done || busy || roomBlocksControl || Boolean(roomSync?.coopGate.active);
+            return (
+              <button
+                type="button"
+                data-testid="arena-primary-step"
+                onClick={() => { setStarted(true); advance(); }}
+                disabled={primaryDisabled}
+                style={{
+                  padding: "9px 18px",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  border: 0,
+                  borderRadius: 10,
+                  cursor: done || busy ? "default" : roomBlocksControl ? "default" : "pointer",
+                  color: "var(--nl-ink)",
+                  background: done ? "var(--nl-line)" : "var(--nl-accent)",
+                  opacity: busy && !done ? 0.7 : roomBlocksControl ? 0.5 : 1,
+                }}
+              >
+                {done
+                  ? "✔ Disziplin gewertet"
+                  : roomBlocksControl
+                    ? "▶ Der Host steuert"
+                    : !started
+                      ? `▶ Start · Etappe 1 / ${slotCount}`
+                      : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+              </button>
+            );
+          })()}
           <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
@@ -3641,7 +3693,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             aria-label="Lautstärke"
             style={{ width: 90, accentColor: "var(--nl-accent)", cursor: "pointer" }}
           />
-          {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
+          {/* Audit-Punkt 6: der Chip behauptete dem Gast "· Leertaste", obwohl seine Leertaste
+              nichts bewirkt — er spiegelt immer nur `roomSync.hostPaused` (siehe Effekt oben, der
+              JEDEN lokalen Tastendruck des Gasts sofort wieder ueberschreibt). */}
+          {paused ? (
+            <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>
+              {roomSync?.followsHost ? "⏸ Host hat pausiert" : "⏸ Pausiert · Leertaste"}
+            </span>
+          ) : null}
           {/* Feld-Legende nur noch als dezentes ⓘ-Hover (früher permanente „Manual"-Zeile je
               Disziplin) — die Felder labeln sich inzwischen selbst (START/ZIEL/Netz/Elo…). */}
           <span
@@ -4441,7 +4500,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <>
                 <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
                 {t.rel && !t.isOwn ? (
-                  <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
+                  <span
+                    title={
+                      t.rel === "ally"
+                        ? "Verbündet"
+                        : t.rel === "rival"
+                          ? "Rivale"
+                          : t.rel === "human"
+                            ? "Mitspieler"
+                            : "Dein Team"
+                    }
+                    aria-hidden
+                    style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}
+                  >
+                    {REL_GLYPH[t.rel]}
+                  </span>
                 ) : null}
                 <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
               </>

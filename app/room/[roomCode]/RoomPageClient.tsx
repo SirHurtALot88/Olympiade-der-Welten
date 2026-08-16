@@ -77,6 +77,13 @@ function CopyInviteLinkButton({ roomCode }: { roomCode: string }) {
 // ENDGUELTIG erkennt (Raum voll/nicht gefunden) statt als etwas, das ein erneuter Klick loest.
 const ROOM_FULL_MESSAGE = "Der Raum hat bereits zwei aktive Coaches.";
 const ROOM_NOT_FOUND_MESSAGE = "Dieser Raum wurde nicht gefunden.";
+// F1 (Notausfahrt-Korrektur, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): exakter Text aus `rejoinRoom`
+// (room-store.ts) -- wer NOCH ein gespeichertes Sitzplatz-Token hat, versucht beim Verbinden immer
+// zuerst `rejoinRoom`, nicht `joinRoom` (siehe `handleConnect` unten). Vorher fehlte fuer diesen
+// Fehlerfall jede Behandlung: die Seite blieb bei "Raum wird geladen ..." haengen, obwohl der Raum
+// laengst weg war (verwaist + ersetzt, oder verfallen) -- eine Sackgasse ohne jeden Hinweis, wie
+// es weitergeht.
+const ROOM_GONE_AFTER_REJOIN_MESSAGE = "Der Raum existiert nicht mehr.";
 
 function RoomScreen({ roomCode }: { roomCode: string }) {
   const socket = useSocket();
@@ -137,10 +144,18 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
 
       setError(payload.message);
       setIsJoining(false);
-      // Diese beiden Texte kommen ausschliesslich aus `joinRoom`s eigenen Ablehnungen (Raum
-      // voll / nicht gefunden) -- ein erneuter Versuch mit einem anderen Namen wuerde am selben
-      // Ergebnis scheitern, die Maske macht das deshalb sichtbar statt es erneut anzubieten.
-      if (payload.message === ROOM_FULL_MESSAGE || payload.message === ROOM_NOT_FOUND_MESSAGE) {
+      // Diese drei Texte kommen ausschliesslich aus `joinRoom`/`rejoinRoom`s eigenen Ablehnungen
+      // (Raum voll / nicht gefunden / nicht mehr vorhanden) -- ein erneuter Versuch (mit einem
+      // anderen Namen, oder einfach nochmal) wuerde am selben Ergebnis scheitern, die Maske macht
+      // das deshalb sichtbar statt es erneut anzubieten. `ROOM_GONE_AFTER_REJOIN_MESSAGE` kommt vom
+      // AUTOMATISCHEN `rejoinRoom`-Versuch beim Verbinden (kein Klick noetig) -- ohne diesen Zweig
+      // blieb die Seite bei einem laengst verwaisten/verfallenen Raum stumm bei "Raum wird
+      // geladen ...", siehe Kommentar an der Konstante.
+      if (
+        payload.message === ROOM_FULL_MESSAGE ||
+        payload.message === ROOM_NOT_FOUND_MESSAGE ||
+        payload.message === ROOM_GONE_AFTER_REJOIN_MESSAGE
+      ) {
         setJoinBlocked(payload.message);
       }
     }
@@ -537,7 +552,14 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
           <p className="muted">
             {joinBlocked === ROOM_FULL_MESSAGE
               ? "Der Raum hat bereits zwei aktive Coaches — für dich ist hier kein Platz mehr frei."
-              : "Dieser Raum existiert nicht mehr oder wurde beendet."}
+              : // F1 (Notausfahrt-Korrektur): dieser Raum-CODE ist weg, der SPIELSTAND dahinter
+                // aber nicht -- Chris hat ausdruecklich verlangt, dass ein Koop-Save nie solo
+                // weiterspielbar wird, also ist "verloren" hier bewusst NICHT die Botschaft.
+                // "Raum erstellen" auf der Startseite bindet automatisch an den aktiven Spielstand
+                // (HomePageClient.tsx) -- ist das noch derselbe Save, entsteht entweder ein neuer
+                // Raum dafuer oder (mit Login als nachgewiesener Host) der alte Sitz kommt zurueck
+                // (siehe `createRoom` in room-store.ts).
+                "Dieser Raum-Code ist nicht mehr aktiv. Der Spielstand dahinter ist deshalb nicht verloren — geh zur Startseite: ist er noch dein aktiver Spielstand, verbindet dich „Raum erstellen“ automatisch wieder."}
           </p>
           <Link className="secondary-button inline-button" href="/">
             Zur Startseite
