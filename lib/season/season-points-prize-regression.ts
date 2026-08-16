@@ -48,7 +48,11 @@ export type SeasonPointsPrizeRegressionSummary = {
     topTeamPointsMin: number;
     bottomTeamPointsMin: number;
     maxTotalPointsDelta: number;
-    expectedBasePrizeTotal: number;
+    /**
+     * FIXTURE-GEBUNDENER Erwartungswert wie `champion`/`resolvedMatchdays` — keine Balancing-Zahl.
+     * Siehe die Herleitung an der Zuweisung unten (`thresholds.expectedTotalPrizeMoney`).
+     */
+    expectedTotalPrizeMoney: number;
   };
   warnings: string[];
   exports: {
@@ -268,12 +272,44 @@ function buildMarkdown(summary: SeasonPointsPrizeRegressionSummary) {
     `- Topteam Punkte > ${summary.thresholds.topTeamPointsMin}`,
     `- Bottomteam Punkte > ${summary.thresholds.bottomTeamPointsMin}`,
     `- Gesamtpunkte Delta <= ${summary.thresholds.maxTotalPointsDelta}`,
-    `- Basis-Preisgeld total = ${summary.thresholds.expectedBasePrizeTotal}`,
+    `- Preisgeld total = ${summary.thresholds.expectedTotalPrizeMoney}`,
     "",
     "## Warnings",
     ...(summary.warnings.length > 0 ? summary.warnings.map((warning) => `- ${warning}`) : ["- keine"]),
   ].join("\n") + "\n";
 }
+
+/**
+ * FIXTURE-GEBUNDENER PREISGELD-ERWARTUNGSWERT — keine Balancing-Zahl, siehe unten warum sie trotzdem
+ * eine feste Konstante sein darf (anders als der Name `expectedBasePrizeTotal` frueher nahelegte).
+ *
+ * FRUEHER STAND HIER 1.656,5 — die Summe der STATISCHEN Referenztabelle
+ * (`references/sheets/prize-money-table.normalized.json`, `readNormalizedPrizeMoneyRows()`). Diese
+ * Tabelle ist ein einmal exportierter Schnappschuss aus einer AELTEREN Version der Preisgeld-Kurve
+ * (`buildPrizeMoneyTable` in `lib/season/prize-money.ts`, dort der Kommentar zu `BASIS_DIFFS`): ihre
+ * Spalte `basis` waechst von 15 (Rang 1) auf 25,5 (Rang 32), waehrend die AKTUELLE Formel einen
+ * FLACHEN Sockel je Rang benutzt. Die 1.656,5 sind also die Summe einer Formel-Version, die es im
+ * Code nicht mehr gibt — an KEINEN Spielstand gebunden, weder an diesen noch an einen kuenftigen.
+ *
+ * `buildPrizeMoneyPreview` liest diese Tabelle nur als FALLBACK (`hasDynamicSalaryBasis` falsch,
+ * z. B. ein druckfrischer Spielstand ohne Kader). Bei jeder gespielten Saison — auch dieser Fixture —
+ * nimmt sie den DYNAMISCHEN Pfad: `buildPrizeMoneyTable(currentLeagueSalaries, currentFactor, ...)`,
+ * skaliert also mit der ECHTEN Liga-Gehaltssumme und dem Saison-Wirtschaftsfaktor dieses Spielstands
+ * (Kommentar dort: "Der Topf ist damit exakt S*f"). 1.656,5 gegen das Ergebnis dieses Pfads zu
+ * pruefen, hiess also zwei unabhaengige Groessen zu vergleichen — der gemeldete Widerspruch
+ * (Tabelle 1.656,5 gegen Vorschau 1.979,5 auf einem Bootstrap-Spielstand bzw. 3.708,9 auf einem
+ * anderen) war deshalb keiner: beide Preisgeld-Zahlen waren jeweils fuer sich richtig, nur an
+ * verschiedene Gehalts-Basen gebunden. Siehe `lib/season/prize-money-preview.ts` fuer die
+ * ausfuehrliche Herleitung an der Rechenstelle.
+ *
+ * DIE 3.708,9 HIER SIND DER RICHTIGE ERWARTUNGSWERT FUER DIESE FIXTURE — nachgerechnet mit den
+ * echten Kadern/Gehaeltern aus `tests/_fixtures/season1-regression/arena-season1-save.json.gz`
+ * (demselben Spielstand, den `discipline-stage-arena-canonical-ovr.test.ts` schon nutzt) statt mit
+ * dem, was zufaellig lokal aktiv ist. Wie `champion`/`resolvedMatchdays` ist das ein Wert, der zur
+ * FIXTURE gehoert, nicht zum Spielbalancing — wer die Fixture neu erzeugt (README dort), zieht ihn
+ * mit einem frischen Messlauf mit.
+ */
+const EXPECTED_TOTAL_PRIZE_MONEY = 3708.9;
 
 export async function runSeasonPointsPrizeRegressionSmoke(input?: {
   outputDir?: string;
@@ -375,7 +411,12 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
     (standings[0]?.points ?? 0) <= 100 ? "top_team_points_not_above_100" : null,
     (standings.at(-1)?.points ?? 0) <= 20 ? "bottom_team_points_too_low" : null,
     totalPointsDelta > 0.2 ? `total_points_delta:${totalPointsDelta}` : null,
-    Math.abs((prizePreview.summary.totalPrizeMoney ?? 0) - 1656.5) > 0.2 ? "base_prize_total_not_1656_5" : null,
+    // SIEHE HERLEITUNG bei `EXPECTED_TOTAL_PRIZE_MONEY` weiter unten: 1.656,5 war die Summe der
+    // STATISCHEN Referenztabelle (references/sheets/prize-money-table.normalized.json) und wurde
+    // frueher hier als Erwartung an die LAUFENDE Vorschau gestellt — zwei verschiedene Groessen.
+    Math.abs((prizePreview.summary.totalPrizeMoney ?? 0) - EXPECTED_TOTAL_PRIZE_MONEY) > 0.2
+      ? `total_prize_money_not_${EXPECTED_TOTAL_PRIZE_MONEY}`.replace(".", "_")
+      : null,
     startRankMissingCount > 0 ? `start_rank_missing:${startRankMissingCount}` : null,
     rankChangePrizeMissingCount > 0 ? `rank_change_prize_missing:${rankChangePrizeMissingCount}` : null,
   ].filter((warning): warning is string => warning != null);
@@ -406,7 +447,7 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
       topTeamPointsMin: 100,
       bottomTeamPointsMin: 20,
       maxTotalPointsDelta: 0.2,
-      expectedBasePrizeTotal: 1656.5,
+      expectedTotalPrizeMoney: EXPECTED_TOTAL_PRIZE_MONEY,
     },
     warnings,
     exports: {

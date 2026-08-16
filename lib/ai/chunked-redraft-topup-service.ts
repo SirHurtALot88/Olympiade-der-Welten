@@ -2963,10 +2963,20 @@ function writeReports(input: {
   progressRows?: ProgressLogRow[];
   counters?: RedraftCandidateCounters;
   reportMode?: "full" | "light";
+  // Reine Anzeige-Info fuer die exportierten Artefakte -- der eigentliche `dryRun`-Zweig
+  // (kein Save-Write) sitzt schon in `runChunkedRedraftTopup`. Ohne dieses Flag hier sahen
+  // `chunked-redraft-summary.md`/`.json` in einem Trockenlauf identisch zu einem echten
+  // Lauf aus: dieselben Picks, dieselben Zaehler, nur eben nie gespeichert. Wer nur die
+  // Datei oeffnet (z.B. fuer eine Test-Fixture), ohne den CLI-Aufruf drumherum zu sehen,
+  // haette den Trockenlauf sonst nicht erkennen koennen.
+  dryRun: boolean;
 }) {
   writeJson(input.outputDir, "chunked-redraft-state.json", input.state);
-  writeJson(input.outputDir, "chunked-redraft-summary.json", input.summary);
+  // `dryRun` steht bewusst als erster Key vor dem Spread der eigentlichen Summary --
+  // wer die Datei oeffnet, sieht die Warnung, bevor irgendein Zahlenwert zu lesen ist.
+  writeJson(input.outputDir, "chunked-redraft-summary.json", { dryRun: input.dryRun, ...input.summary });
   writeJson(input.outputDir, "topup-memory-audit.json", {
+    dryRun: input.dryRun,
     summary: input.summary,
     rounds: input.summary.roundDurations,
     memoryRows: input.memoryRows,
@@ -2977,6 +2987,10 @@ function writeReports(input: {
     "chunked-redraft-summary.md",
     [
       "# Chunked Redraft / Topup Summary",
+      "",
+      input.dryRun
+        ? "**TROCKENLAUF -- es wurde nichts geschrieben.** Alle Zahlen unten sind eine Vorschau, kein gespeicherter Stand. Mit `--write` ausfuehren, um sie zu uebernehmen."
+        : "Lauf mit `--write`: die Zahlen unten sind gespeichert.",
       "",
       `- DRAFT_VALID: ${input.summary.draftValid ? "true" : "false"}`,
       `- Invalid Gruende: ${input.summary.invalidReasons.length ? input.summary.invalidReasons.join(", ") : "keine"}`,
@@ -4627,6 +4641,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       progressRows: profiler.rows,
       counters,
       reportMode,
+      dryRun,
     });
     writeCsv(outputDir, "team-sequential-draft-teams.csv", sequentialTeamRows);
     writeCsv(outputDir, "team-sequential-draft-picks.csv", sequentialPickRows);
@@ -5338,6 +5353,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         progressRows: profiler.rows,
         counters,
         reportMode,
+        dryRun,
       });
       profiler.end("report_export", reportPhaseStartedAt, {
         round,
@@ -5423,6 +5439,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     progressRows: profiler.rows,
     counters,
     reportMode,
+    dryRun,
   });
 
   return {

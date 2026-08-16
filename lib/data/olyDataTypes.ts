@@ -2103,6 +2103,19 @@ export type Discipline = {
   weight: number;
   originalOrder?: number;
   displayOrder?: number;
+  /**
+   * NICHT die Wertungsgroesse. Das ist der Katalog-Startzustand (Tabelle `disciplines`,
+   * Seed-Daten in lib/data/dataAdapter.ts) — der Spielplan wuerfelt die tatsaechlich fuer eine
+   * Saison geltende Kadergroesse jede Saison neu aus (`buildSeasonSeededDisciplineSchedule`,
+   * lib/season/season-discipline-schedule.ts) und legt sie in
+   * `seasonState.disciplineSchedule[].discipline1/2.playerCount` ab. Am Live-Spielstand
+   * gemessen weichen 15 von 20 Disziplinen zwischen Katalog und Spielplan ab; gegen die
+   * Standings-Punkte nachgerechnet stimmt fuer alle 32 Teams nur der Spielplan-Wert. Wer
+   * wissen will, wie viele Spieler DIESE Saison in einer Disziplin antreten (Aufstellung,
+   * Anzeige, Rangpunkte, KI), muss den Spielplan-Slot lesen — `buildSeasonDisciplinePlayerCountMap`
+   * in lib/season/season-discipline-schedule.ts liefert das je Disziplin fertig mit Katalog-
+   * Rueckfall fuer Disziplinen, die (noch) keinen Spielplan-Eintrag haben.
+   */
   playerCount?: number;
   mutator1?: string | null;
   mutator2?: string | null;

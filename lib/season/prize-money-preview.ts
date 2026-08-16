@@ -507,6 +507,25 @@ export async function buildPrizeMoneyPreview(
   const hasDynamicSalaryBasis = [...salaryTotalByTeamId.values()].filter((salary) => salary > 0).length >= 4;
   const currentLeagueSalaries = [...salaryTotalByTeamId.values()];
   const adminBalancingConfig = save.gameState.seasonState.adminBalancingConfig;
+  /**
+   * DIE PREISGELD-ZEILEN SIND FAST IMMER DYNAMISCH, NICHT DIE DER STATISCHEN TABELLE —
+   * das ist beabsichtigt, aber leicht misszulesen, wenn man nur `normalizedPrizeRows` kennt.
+   *
+   * `normalizedPrizeRows` (aus `readNormalizedPrizeMoneyRows`, `references/sheets/prize-money-
+   * table.normalized.json`) ist ein einmal exportierter Schnappschuss einer AELTEREN Formel-Version
+   * (rangabhaengiger Sockel `BASIS_DIFFS`, siehe Kommentar in `prize-money.ts`). Seine Spalte
+   * `prizeMoney` gehoert zu GENAU DER Gehalts-/Faktor-Basis, mit der sie einmal exportiert wurde —
+   * nicht zu diesem oder irgendeinem anderen Spielstand. Wer ihre Summe (aktuell 1.656,5) als
+   * Erwartung an das hier berechnete `totalPrizeMoney` liest, vergleicht zwei unabhaengige Groessen.
+   *
+   * Der DYNAMISCHE Pfad — `buildPrizeMoneyTable(currentLeagueSalaries, currentFactor, ...)` — ist
+   * der eigentliche Rechenweg: er skaliert dieselbe Prozent-/Sockel-Kurve mit der ECHTEN Liga-
+   * Gehaltssumme und dem Saison-Wirtschaftsfaktor DIESES Spielstands (Formel + Kalibrierung in
+   * `buildPrizeMoneyTable`), sodass das Preisgeld mit der Gehaltsinflation der Liga mitwaechst statt
+   * an einem eingefrorenen Basisjahr zu kleben. Er greift bei JEDER Saison mit realem Kader
+   * (`hasDynamicSalaryBasis`) und bekanntem Faktor — die statische Tabelle ist nur der Fallback fuer
+   * Spielstaende ohne beides (z. B. ein druckfrischer Save vor der ersten Kaderfuellung).
+   */
   const prizeRows =
     currentFactor != null && hasDynamicSalaryBasis
       ? buildPrizeMoneyTable(currentLeagueSalaries, currentFactor, adminBalancingConfig).map((row) => ({

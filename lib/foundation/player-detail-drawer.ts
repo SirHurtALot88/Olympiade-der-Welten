@@ -2565,6 +2565,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       teamId: row.teamId,
       playerId: player.id,
       matchdayId: row.matchdayId,
+      seasonId: row.seasonId,
     }),
   }));
   const injurySummary = buildPlayerInjurySummary(injuryHistoryRows);

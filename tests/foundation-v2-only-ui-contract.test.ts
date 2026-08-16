@@ -94,14 +94,14 @@ describe("foundation v2-only ui contract", () => {
 
   it("exposes shell subnav for lineup, scouting, and training compact", async () => {
     const foundationText = await readFoundationSurfaceSource(root);
-    const lineupHostText = await fs.readFile(
-      `${root}/app/foundation/legacy-lineup-lab/FoundationLineupShellHost.tsx`,
-      "utf8",
-    );
 
     expect(foundationText).toContain('activeView === "lineup"');
     expect(foundationText).toContain('{ id: "formBoard", label: "Formplan" }');
-    expect(lineupHostText).toContain("shellControlledDraftBoardView");
+    // Der eigene Lineup-Shell-Host, den dieser Test vorher separat gelesen hat, wurde entfernt
+    // (kein Aufrufer mehr). Die geprüfte Eigenschaft — die Shell steuert den Formplan-Umschalter
+    // selbst — sitzt seither in `FoundationShellRouterBody.tsx`, das bereits Teil von
+    // `foundationText` (Surface-Quelle) ist.
+    expect(foundationText).toContain("shellControlledDraftBoardView");
     expect(foundationText).toContain('activeView === "scoutingCenterV2"');
     expect(foundationText).toContain('activeView === "trainingCompact"');
     // Audit TR4 (Paket T5): Der „Forecast"-Unterreiter war kein eigener Inhalt, sondern
