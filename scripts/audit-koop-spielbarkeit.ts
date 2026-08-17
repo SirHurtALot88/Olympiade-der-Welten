@@ -1617,14 +1617,38 @@ async function main() {
     preseasonFehler || `${stationenDurchlaufen.join(" → ")} → next_season_setup`,
   );
 
-  // Nach dem Durchstich hat die neue Saison im SPIELSTAND begonnen — jetzt darf derselbe
-  // Vorschub, den A19 noch ablehnen musste, tatsaechlich durch (seasonHasAdvanced liest denselben
-  // Spielstand neu, room-store.ts:1386). Ready-Stand blieb erhalten: A19s Ablehnung hat ihn nicht
-  // angeruehrt (der Rueck-auf-not_ready-Rumpf in room-store.ts laeuft nur bei ECHTEM Vorschub).
+  /**
+   * Nach dem Durchstich hat die neue Saison im SPIELSTAND begonnen — jetzt darf derselbe Vorschub,
+   * den A19 noch ablehnen musste, tatsaechlich durch (`seasonHasAdvanced` liest denselben
+   * Spielstand neu, room-store.ts).
+   *
+   * ZUERST ABER EINE BEREIT-RUNDE, und die ist keine Bequemlichkeit: der Durchstich besteht aus
+   * neun `advance_step`-Aufrufen plus `next_season_setup`, allesamt Raum-Schreibvorgaenge DES
+   * HOSTS. Und jeder Raum-Schreibvorgang setzt seinen Urheber auf `not_ready` und feuert
+   * `ready_invalidated` (`applyRoomGameplayWrite`, lib/room/room-store.ts:750-763) — eine
+   * bewusste Regel, die es lange vor diesem Paket gab: wer etwas aendert, bestaetigt neu.
+   *
+   * Der erste Anlauf dieses Checks nahm an, der Ready-Stand ueberlebe den Durchstich, und war
+   * deshalb rot: der Knopf bot `set_ready` statt `advance_flow`. Gemessen war das KEIN
+   * Steckenbleiben — `canClick` stand auf `true`, der Host wurde zum Neu-Bestaetigen aufgefordert.
+   * Die Pruefung hoerte schlicht eine Station zu frueh auf. Die geprueffte Eigenschaft (kommt der
+   * Raum in die neue Saison?) bleibt unveraendert; nur der Weg dorthin ist jetzt der, den beide
+   * Coaches im Spiel auch gehen.
+   */
   await sichereChrisVerbindung();
   await sichereFrankyVerbindung();
   let saisonstartVorschubFehler = "";
   if (preseasonFehler === "") {
+    sendeKnopfAktion(franky.socket, { action: "set_ready", roomCode, seatToken: frankySeat, toggleReadyTo: true });
+    sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+    await waitFor(
+      () => chris.state.roomFlowState.canHostAdvance === true,
+      "Beide erneut bereit nach dem Durchstich (jeder Schreibvorgang verwirft die Bereitmeldung seines Urhebers)",
+    ).catch((error) => {
+      saisonstartVorschubFehler = String(error);
+    });
+  }
+  if (preseasonFehler === "" && saisonstartVorschubFehler === "") {
     const nachDurchstichKnopf = knopf(chris, chrisP.participantId);
     if (nachDurchstichKnopf.action !== "advance_flow" || !nachDurchstichKnopf.canClick) {
       saisonstartVorschubFehler = `Host-Knopf bietet kein advance_flow nach dem Durchstich: action=${nachDurchstichKnopf.action} canClick=${nachDurchstichKnopf.canClick}`;
@@ -1755,14 +1779,25 @@ async function main() {
     `status=${simBeideOffline.status} error=${simBeideOffline.body.error ?? "-"}`,
   );
 
+  /**
+   * "UNVERAENDERT" heisst: derselbe Schritt wie VOR der Trennung — GEMESSEN, nicht hineingeschrieben.
+   *
+   * Hier stand fest `=== "season_review"`, und das war der VIERTE Check in diesem Vorhaben, der den
+   * alten Endzustand als den richtigen festhielt (nach A14 und zwei Vitest-Faellen): seit der Raum
+   * den Saisonwechsel kennt, endet der Lauf dort nicht mehr. Ihn auf den neuen Zielwert
+   * umzuschreiben waere nur die halbe Lehre gewesen — dieser Check misst "der Rejoin aendert
+   * nichts", und dafuer ist JEDER feste Schrittname die falsche Groesse. Er schlaegt sonst beim
+   * naechsten Ausbau des Flows wieder an, ohne dass an der geprueften Eigenschaft etwas fehlt.
+   */
+  const stepVorTrennung = chris.state.roomFlowState.step;
   const chrisSocketNeu = await connect(opts.baseUrl);
   const chrisNeu = trackSocket(chrisSocketNeu);
   await emitJoined(chrisSocketNeu, "rejoinRoom", { roomCode, seatToken: chrisSeat });
   await waitFor(() => Boolean(chrisNeu.state), "Chris hat nach Rejoin roomState");
   check(
     "D5: Rejoin nach Doppel-Trennung fuehrt in denselben Raum mit unveraendertem Endstand zurueck",
-    chrisNeu.state.multiplayerRoom.saveId === coopSaveId && chrisNeu.state.roomFlowState.step === "season_review",
-    `saveId=${chrisNeu.state.multiplayerRoom.saveId === coopSaveId}, step=${chrisNeu.state.roomFlowState.step}, status=${chrisNeu.state.multiplayerRoom.status}`,
+    chrisNeu.state.multiplayerRoom.saveId === coopSaveId && chrisNeu.state.roomFlowState.step === stepVorTrennung,
+    `saveId=${chrisNeu.state.multiplayerRoom.saveId === coopSaveId}, step=${chrisNeu.state.roomFlowState.step} (vor der Trennung: ${stepVorTrennung}), status=${chrisNeu.state.multiplayerRoom.status}`,
   );
   beobachtung(
     `Der Raum-Status blieb waehrend der Doppel-Trennung "${chrisNeu.state.multiplayerRoom.status}" — der Zustand ` +
