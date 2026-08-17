@@ -271,7 +271,12 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
-import { describeRoomWriteError, formatRoomWriteErrorCode, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import {
+  describeRoomWriteError,
+  formatMarketPreviewError,
+  formatRoomWriteErrorCode,
+  isStaleSaveVersionError,
+} from "@/lib/room/parse-room-write-context";
 import { istRoomSitzungsFehler } from "@/lib/room/room-session-fehler";
 import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -2479,7 +2484,7 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamIdentityMessage(payload.error ?? "Team-Identity konnte nicht gespeichert werden.");
+            setTeamIdentityMessage(formatRoomWriteErrorCode(payload.error) ?? "Team-Identity konnte nicht gespeichert werden.");
             return;
           }
         }
@@ -2513,7 +2518,9 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamControlMessage(payload.error ?? "Team-Admin-Settings konnten nicht gespeichert werden.");
+            setTeamControlMessage(
+              formatRoomWriteErrorCode(payload.error) ?? "Team-Admin-Settings konnten nicht gespeichert werden.",
+            );
             return;
           }
         }
@@ -3785,7 +3792,9 @@ export function useFoundationShellRouterBodyScope({
       }
       setMarketSellPeekPreview(payload.summary ?? null);
       if (!payload.summary) {
-        setMarketSellPeekError(payload.error ?? "Verkaufsvorschau konnte nicht geladen werden.");
+        // F9: auch die Vorschau laeuft ueber `/api/transfermarkt/sell` und damit durch den
+        // Write-Guard — im Raum kamen hier dieselben rohen Codes an wie beim echten Verkauf.
+        setMarketSellPeekError(formatMarketPreviewError(payload.error) ?? "Verkaufsvorschau konnte nicht geladen werden.");
       }
     } catch {
       if (requestVersion === marketSellPeekRequestVersion.current) {
@@ -3890,7 +3899,9 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canSell) {
         setMarketSellError(
-          payload.error ??
+          // F9: derselbe Ton wie im Kaufmodal — `formatMarketPreviewError` faellt fuer alles,
+          // was es nicht ausdruecklich kaufbezogen formuliert, auf die neutrale Tabelle durch.
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Verkauf konnte nicht bestätigt werden.",
         );
@@ -4022,7 +4033,10 @@ export function useFoundationShellRouterBodyScope({
           setTeamPicksRefillMessage({
             teamId,
             tone: "error",
-            text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
+            text:
+              formatRoomWriteErrorCode(payload.error) ??
+              payload.blockingReasons?.join(" · ") ??
+              "KI-Picks konnten nicht angewendet werden.",
           });
           return;
         }
@@ -4972,7 +4986,7 @@ export function useFoundationShellRouterBodyScope({
         error?: string;
       };
       if (!response.ok || payload.error) {
-        setAdminSimulationError(payload.error ?? "Season Simulation konnte nicht gestartet werden.");
+        setAdminSimulationError(formatRoomWriteErrorCode(payload.error) ?? "Season Simulation konnte nicht gestartet werden.");
       }
       if (payload.run) {
         setAdminSimulationRun(payload.run);
@@ -5625,7 +5639,7 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canBuy) {
         setMarketBuyError(
-          payload.error ??
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Kauf konnte nicht bestätigt werden.",
         );
@@ -5787,7 +5801,7 @@ export function useFoundationShellRouterBodyScope({
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
-          previewPayload.error ??
+          formatRoomWriteErrorCode(previewPayload.error) ??
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Verhandlungsvorschau blockiert.`,
         );
@@ -5887,7 +5901,7 @@ export function useFoundationShellRouterBodyScope({
         };
       };
       if (!response.ok || payload.error) {
-        setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
+        setSponsorChoiceMessage(formatRoomWriteErrorCode(payload.error) ?? "Sponsor konnte nicht gewählt werden.");
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
@@ -5990,7 +6004,8 @@ export function useFoundationShellRouterBodyScope({
       };
       if (!response.ok || payload.error) {
         setSponsorUebernahmeMessage(
-          payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
+          formatRoomWriteErrorCode(payload.error) ??
+            (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
         );
         return;
       }
@@ -6174,7 +6189,7 @@ export function useFoundationShellRouterBodyScope({
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
-          previewPayload.error ??
+          formatRoomWriteErrorCode(previewPayload.error) ??
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsvorschau blockiert.`,
         );
@@ -6200,7 +6215,7 @@ export function useFoundationShellRouterBodyScope({
       const applyPayload = (await applyResponse.json()) as ContractRenewalApiResponse;
       if (!applyResponse.ok || applyPayload.error || !applyPayload.summary?.applied) {
         setContractRenewalError(
-          applyPayload.error ??
+          formatRoomWriteErrorCode(applyPayload.error) ??
             applyPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsaktion blockiert.`,
         );
@@ -6325,7 +6340,7 @@ export function useFoundationShellRouterBodyScope({
       });
       const payload = (await response.json()) as NewGameSetupApiResponse;
       if (!response.ok || payload.error) {
-        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgeführt werden.");
+        setNewGameError(formatRoomWriteErrorCode(payload.error) ?? "New-Game-Setup konnte nicht ausgeführt werden.");
         return;
       }
 
@@ -11847,7 +11862,7 @@ export function useFoundationShellRouterBodyScope({
           detail:
             payload.error === "offer_not_available"
               ? "Das Angebot steht nicht mehr offen — in dieser Saison wurde bereits entschieden."
-              : payload.error ?? "Die Entscheidung konnte nicht gespeichert werden.",
+              : formatRoomWriteErrorCode(payload.error) ?? "Die Entscheidung konnte nicht gespeichert werden.",
         });
         return;
       }

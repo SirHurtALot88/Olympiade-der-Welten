@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-16",
+  "seite": "Multiplayer",
+  "text": "Wird eine Aktion im Raum abgelehnt, steht jetzt überall ein Satz da statt eines Codes. Bisher las man in der Einsatzliste, im Cockpit, bei Gebäuden, Verträgen und Sponsoren wörtlich „host_only_action\", „participant_offline\" oder „forbidden_team_control\" — die Übersetzungstabelle gab es längst, gefragt hat sie nur der Transfermarkt. Jetzt läuft jede Meldung dieser Bildschirme durch dieselbe Tabelle, ausnahmslos: unbekannte Texte reicht sie unverändert durch, damit nirgends eine zweite Liste gepflegt werden muss, welche Route geprüft wird und welche nicht. Das Gebäude-Panel entstrichelte solche Codes vorher nur zu „host only action\"; es fragt die Tabelle jetzt ebenfalls — allerdings erst zum Schluss, damit die gebäudebezogenen Sätze, die es selbst besser formuliert, ihren Vorrang behalten.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

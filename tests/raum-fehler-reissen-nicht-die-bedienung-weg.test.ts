@@ -13,8 +13,13 @@
  *
  * Beides wird hier an der EIGENSCHAFT gemessen, nicht an der Bauweise.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { lookupRoomWriteErrorMessage } from "@/lib/room/parse-room-write-context";
 import {
   GESPEICHERTER_SITZPLATZ_UNGUELTIG_MELDUNG,
   RAUM_EXISTIERT_NICHT_MEHR_MELDUNG,
@@ -112,5 +117,75 @@ describe("Rohe Fehlercodes werden uebersetzt (F9)", () => {
       formatMarketPreviewError("host_only_action"),
       "ohne eigene Ausnahme muss der kontextfreie Satz gelten",
     ).toBe(formatRoomWriteErrorCode("host_only_action"));
+  });
+
+  it("auch das Cockpit nennt die Guard-Codes beim Namen statt sie nur zu entstricheln", () => {
+    // Der zweite, laenger uebersehene Weg: Gebaeude, Kredite und der Spieltags-Assistent zeigen
+    // ihre Gruende ueber `formatCockpitReason`. Die Funktion kannte die Guard-Codes nicht und
+    // fiel unten auf `reason.replaceAll("_", " ")` durch — im Panel stand dann „host only action".
+    for (const code of ["host_only_action", "participant_offline", "forbidden_team_control", "not_room_participant"]) {
+      const satz = formatCockpitReason(code);
+      expect(satz, `${code} darf nicht als entstrichelter Code stehen bleiben`).toBe(lookupRoomWriteErrorMessage(code));
+      expect(satz).not.toBe(code.replaceAll("_", " "));
+    }
+  });
+
+  it("GEGENPROBE: wo das Cockpit einen eigenen, passenderen Satz hat, behaelt er den Vorrang", () => {
+    // `local_team_not_owned_or_ai_controlled` und `save_not_found` stehen in BEIDEN Tabellen. Im
+    // Gebaeude-Panel ist die gebaeudebezogene Fassung die bessere — deshalb wird die Raum-Tabelle
+    // dort ERST ganz zum Schluss befragt. Diese Reihenfolge ist die eigentliche Entscheidung und
+    // waere ohne Pruefung mit einer verschobenen Zeile still weg.
+    expect(formatCockpitReason("local_team_not_owned_or_ai_controlled")).toMatch(/Gebäude/);
+    expect(formatCockpitReason("local_team_not_owned_or_ai_controlled")).not.toBe(
+      lookupRoomWriteErrorMessage("local_team_not_owned_or_ai_controlled"),
+    );
+  });
+
+  it("GEGENPROBE: ein unbekannter Grund bleibt unveraendert lesbar und wird nicht erfunden", () => {
+    expect(formatCockpitReason("irgendein_neuer_grund")).toBe("irgendein neuer grund");
+  });
+});
+
+/**
+ * DIE STELLEN, AN DENEN ES IM SPIEL SICHTBAR WAR (F9).
+ *
+ * Die Tabelle zu haben nuetzt nichts, solange die Anzeige sie nicht fragt — genau das war der
+ * Befund. Diese Pruefung liest die Client-Module als TEXT und haelt fest, dass in ihnen kein
+ * `payload.error` mehr ungefiltert in eine Anzeige laeuft. Ein Text-Test ist hier das ehrliche
+ * Werkzeug: die betroffenen Module sind React-Huellen mit Dutzenden Abhaengigkeiten, und die
+ * Eigenschaft ("der rohe Code erreicht die Anzeige nicht") steht wirklich im Quelltext.
+ *
+ * OHNE AUSNAHMEN, auch fuer Routen ohne Write-Guard. Der erste Anlauf zaehlte auf, welche Route
+ * geschuetzt ist und welche nicht — das ist eine zweite Quelle fuer eine Angabe, die nur in
+ * `app/api/**` steht, und sie veraltet an dem Tag, an dem eine Route den Guard bekommt. Die
+ * Tabelle reicht unbekannte Texte ohnehin unveraendert durch; sie ueberall zu fragen kostet nichts
+ * und macht aus einer gepflegten Liste eine Regel.
+ */
+describe("Kein roher Guard-Code erreicht die Anzeige (F9)", () => {
+  const MODULE = [
+    "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+    "lib/foundation/tabs/cockpit-handlers.ts",
+    "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+  ];
+
+  /** Genau die Aufrufe, die eine Meldung SETZEN — Feeds und Rueckgabewerte sind nicht gemeint. */
+  const ROH_IN_DIE_ANZEIGE = /set[A-Za-z]*(?:Error|Message|Errors)\(\s*\[?\s*(?:\w*[Pp]ayload)\.error\s*\?\?/;
+
+  for (const datei of MODULE) {
+    it(`${datei} reicht keinen rohen Fehlercode in eine Meldung`, () => {
+      const quelltext = readFileSync(resolve(process.cwd(), datei), "utf8");
+      const treffer = quelltext.split("\n").filter((zeile) => ROH_IN_DIE_ANZEIGE.test(zeile));
+      expect(treffer, `ungefilterte Anzeige in ${datei}:\n${treffer.join("\n")}`).toEqual([]);
+    });
+  }
+
+  it("GEGENPROBE: das Muster wuerde einen Rueckfall auch wirklich finden", () => {
+    // Ohne diese Probe koennte der Ausdruck stillschweigend auf nichts mehr passen — dann waeren
+    // alle drei Pruefungen oben gruen, ohne irgendetwas zu messen.
+    expect(ROH_IN_DIE_ANZEIGE.test('setErrors([payload.error ?? "Fehlgeschlagen."]);')).toBe(true);
+    expect(ROH_IN_DIE_ANZEIGE.test("setContractRenewalError(previewPayload.error ?? blocker);")).toBe(true);
+    expect(ROH_IN_DIE_ANZEIGE.test('setErrors([formatRoomWriteErrorCode(payload.error) ?? "Fehlgeschlagen."]);')).toBe(
+      false,
+    );
   });
 });
