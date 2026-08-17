@@ -31,6 +31,7 @@ import {
   buildTurnState,
   canParticipantControlTeam,
   isRoomMatchdayInProgress,
+  resolveFoundationSaveModeForPreset,
   resolveFrankyParticipant,
   syncParticipantControlledTeams,
   UnknownRoomOwnershipPresetError,
@@ -1094,8 +1095,14 @@ function syncRoomOwnershipToBoundSave(room: RuntimeRoom, persistence?: Persisten
         .filter((entry) => entry.controllerType === "human" && entry.participantId === franky.participantId)
         .map((entry) => entry.teamId)
     : [];
+  // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): stand hier vorher woertlich "online_4v4",
+  // UNABHAENGIG vom Raum-Modus -- ein 1+1-/2+2-Raum haette nach jeder Umverteilung wieder auf
+  // 4v4 zurueckgeschrieben und die Team-Zuteilung im Foundation-Client mit vier Plaetzen je Seite
+  // gezeigt. `resolveFoundationSaveModeForPreset` liest denselben Preset, mit dem der Raum
+  // angelegt wurde (`createdWithPreset`, types/game.ts:77) -- fuer die vier bestehenden Presets
+  // unveraendert "online_4v4" (Gegenprobe 5 im Auftrag), fuer die zwei neuen ihr eigener Modus (E4).
   const updatedGameState = applyGameModeOwnership(save.gameState, {
-    saveMode: "online_4v4",
+    saveMode: resolveFoundationSaveModeForPreset(room.state.multiplayerRoom.createdWithPreset),
     chrisTeamIds,
     frankyTeamIds,
   });
@@ -1138,7 +1145,21 @@ export function applyRoomOwnershipPreset(
   }
   // Erst eine explizite Lobby-/Raum-Aktion zaehlt als "Host hat zugeteilt" -- siehe Kommentar am
   // Feld (types/game.ts) und an `joinRoom` oben.
-  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  //
+  // FUND (Paket 2, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `createdWithPreset` HIER MIT
+  // AKTUALISIEREN, nicht nur beim allerersten `createRoom`. Ohne das haette ein Host, der den Raum
+  // mit 4+4 anlegt und danach ueber den Preset-Knopf im Raum (`applyRoomOwnershipPreset`, genau
+  // diese Funktion) auf 1+1 wechselt, eine Team-Zuteilung mit 1+1, aber `createdWithPreset` bliebe
+  // auf "chris_4_franky_4_rest_ai" stehen -- und `syncRoomOwnershipToBoundSave` (das direkt danach
+  // laeuft) haette darueber weiterhin "online_4v4" in den Spielstand geschrieben, obwohl der Raum
+  // laengst 1+1 spielt (Eigenschaft 4 verletzt). GEFAHRLOS fuer `joinRoom`s Rangfolge (Kommentar
+  // dort): diese Funktion setzt `ownershipAssignedByHost` im SELBEN Zug auf `true`, und Stufe 1
+  // dieser Rangfolge greift dann bei jedem Beitritt VOR Stufe 2 -- `createdWithPreset` wird fuer
+  // die Zuteilung selbst also gar nicht mehr gelesen, nur noch fuer den Save-Modus hier.
+  room.state = {
+    ...room.state,
+    multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true, createdWithPreset: preset },
+  };
   syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
   syncPlayers(room);
@@ -1247,13 +1268,17 @@ export function startRoom(
 
     const currentSaveId = room.state.multiplayerRoom.saveId;
     const existingSave = isSandboxRoomSave(currentSaveId) ? null : persistence.getSaveById(currentSaveId);
+    // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): derselbe Fund/dieselbe Loesung wie an
+    // `syncRoomOwnershipToBoundSave` oben -- welcher Save-Modus zu SCHREIBEN ist, haengt vom Preset
+    // ab, mit dem der Raum angelegt wurde, nicht mehr woertlich "online_4v4" fuer jeden Raum.
+    const raumSaveMode = resolveFoundationSaveModeForPreset(room.state.multiplayerRoom.createdWithPreset);
 
     let boundSaveId: string;
     if (existingSave) {
       // Continue existing: reuse the real save, re-applying the current lobby split so team
       // changes made in the lobby take effect without minting a fresh save.
       const updatedGameState = applyGameModeOwnership(existingSave.gameState, {
-        saveMode: "online_4v4",
+        saveMode: raumSaveMode,
         chrisTeamIds,
         frankyTeamIds,
       });
@@ -1275,6 +1300,30 @@ export function startRoom(
         },
         persistence,
       ).saveId;
+      // FUND (Paket 2): `createRoomCoopSave` (new-game-setup-service.ts) baut den frischen Save
+      // ueber das SEPARATE, aeltere `NewGamePresetId`-System der "Neues Spiel"-Wizard-Route und
+      // schreibt intern IMMER `presetId: "online_4v4"` -- fest verdrahtet, nicht von hier
+      // durchgereicht (diese Route hat gar keinen `saveMode`-Parameter). Ein frischer 1+1-/2+2-Raum
+      // bekaeme seinen ERSTEN Save damit trotzdem als "online_4v4" markiert. Dieses zweite System
+      // (Solo-"Neues Spiel"-Wizard, eigene Presets/Warnungen/Vorschau) auf die neuen Modi
+      // auszuweiten war eine eigene Baustelle wert und ist NICHT Teil von Paket 2 (nirgends im
+      // Auftrag genannt) -- der chirurgische Fix hier laesst `createRoomCoopSave` unangetastet und
+      // korrigiert NUR das `saveMode`-Feld danach, mit derselben Funktion
+      // (`applyGameModeOwnership`), die auch der "continue existing"-Zweig oben nutzt. No-op fuer
+      // 4+4 und alle Solo-Presets (`raumSaveMode === "online_4v4"`, Gegenprobe 5 im Auftrag) --
+      // genau der Wert, den `createRoomCoopSave` ohnehin schon geschrieben hat, kein zweiter Schreib-
+      // zugriff noetig.
+      if (raumSaveMode !== "online_4v4") {
+        const frischerSave = persistence.getSaveById(boundSaveId);
+        if (frischerSave) {
+          const korrigiert = applyGameModeOwnership(frischerSave.gameState, {
+            saveMode: raumSaveMode,
+            chrisTeamIds,
+            frankyTeamIds,
+          });
+          persistence.saveSingleplayerState(boundSaveId, korrigiert);
+        }
+      }
       // Genau wie ein frischer Solo-Save (fresh-season-1) und die "Neues Spiel"-Wizard-Route
       // startet ein frisch angelegter Koop-Save alle 32 Teams mit LEEREN Kadern — ohne diesen Lauf
       // ist im Room kein Spieltag aufloesbar (siehe league-setup-draft-service.ts Kopfkommentar).

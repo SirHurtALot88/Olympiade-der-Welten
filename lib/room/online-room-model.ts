@@ -14,6 +14,7 @@ import type {
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
 import { matchesArenaScope } from "@/lib/room/arena-sync-state";
 import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -305,30 +306,94 @@ export function authorizeTeamWrite(input: {
  * Preset-Namen (`preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0`), also fuer die drei
  * anderen Presets immer 0.
  *
- * `hostTeamIds`/`guestTeamIds` sind nur beim 4+4-Preset gesetzt, weil Chris und Franky dort feste,
- * einander garantiert nicht ueberschneidende Teams bekommen sollen -- unabhaengig von der
- * Reihenfolge im `teamIds`-Array. E5: sie verweisen auf `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/
- * `..._FRANKY_TEAM_IDS` selbst (nicht auf Kopien) -- ein spaeterer 1+1/2+2-Eintrag (Paket 2) kann
- * dieselben zwei Konstanten per `.slice(0, n)` weiterverwenden, ohne eine zweite Liste anzulegen.
+ * `hostTeamIds`/`guestTeamIds` sind bei den drei Zweier-Presets (4+4, 2+2, 1+1) gesetzt, weil Chris
+ * und Franky dort feste, einander garantiert nicht ueberschneidende Teams bekommen sollen --
+ * unabhaengig von der Reihenfolge im `teamIds`-Array. E5 (PFLICHT laut Auftrag): 1+1/2+2
+ * (`chris_1_franky_1_rest_ai`/`chris_2_franky_2_rest_ai`, Paket 2) nehmen ausdruecklich `.slice(0,
+ * 1)` bzw. `.slice(0, 2)` von GENAU `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/`..._FRANKY_TEAM_IDS` -- keine
+ * zweite Liste, dieselben Teams fallen in derselben Reihenfolge wie bei 4+4.
+ *
+ * `saveMode` (Paket 2): der `FoundationSaveModePreset`, den ein mit diesem Preset gestarteter Raum
+ * im Spielstand traegt. ENTSCHEIDUNG (Baustelle 2 im Auftrag: "gehoert das in dieselbe Tabelle?"):
+ * JA -- es ist dieselbe Groesse (eine Eigenschaft PRO PRESET), eine zweite preset-indizierte Map
+ * waere die zweite Quelle, die die Hausregel ausdruecklich verbietet. GEMESSEN, nicht geraten: vor
+ * diesem Paket schrieben `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts)
+ * `saveMode: "online_4v4"` woertlich, fuer JEDEN Preset -- auch fuer die drei Solo-Presets im Raum.
+ * Die vier alten Zeilen tragen deshalb weiterhin `"online_4v4"` (Gegenprobe 5 im Auftrag: 4+4 und
+ * alle Solo-Modi bleiben zeichengenau unveraendert); nur die zwei NEUEN Zeilen bekommen ihren
+ * eigenen Save-Modus (E4: `online_1v1`/`online_2v2`).
  */
 type PresetOwnershipSpec = {
   hostCount: number;
   guestCount: number;
   hostTeamIds?: string[];
   guestTeamIds?: string[];
+  saveMode: FoundationSaveModePreset;
 };
 
 const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> = {
-  chris_1_rest_ai: { hostCount: 1, guestCount: 0 },
-  chris_2_rest_ai: { hostCount: 2, guestCount: 0 },
-  chris_4_rest_ai: { hostCount: 4, guestCount: 0 },
+  chris_1_rest_ai: { hostCount: 1, guestCount: 0, saveMode: "online_4v4" },
+  chris_2_rest_ai: { hostCount: 2, guestCount: 0, saveMode: "online_4v4" },
+  chris_4_rest_ai: { hostCount: 4, guestCount: 0, saveMode: "online_4v4" },
   chris_4_franky_4_rest_ai: {
     hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
     guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
     hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
     guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
+    saveMode: "online_4v4",
+  },
+  chris_1_franky_1_rest_ai: {
+    hostCount: 1,
+    guestCount: 1,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 1),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 1),
+    saveMode: "online_1v1",
+  },
+  chris_2_franky_2_rest_ai: {
+    hostCount: 2,
+    guestCount: 2,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 2),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 2),
+    saveMode: "online_2v2",
   },
 };
+
+/**
+ * Die MENGE aller Raum-Presets, aus der Tabelle abgeleitet -- E3 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md):
+ * "Zieh die MENGE der Modi in eine exportierte Quelle." `Object.keys` auf einem `Record<RoomOwnershipPreset,
+ * ...>` traegt JEDEN Preset garantiert genau einmal, in der Reihenfolge der Objektliteral-Zeilen oben
+ * (JS-Laufzeitgarantie fuer String-Schluessel) -- und der `Record`-Typ zwingt ohnehin zu einer
+ * Tabellenzeile fuer jeden neuen `RoomOwnershipPreset`-Wert (TS-Fehler sonst), die ID-Liste zieht
+ * automatisch nach.
+ *
+ * FUND (Befund 1.3 im Plan): `app/HomePageClient.tsx` und `app/room/[roomCode]/RoomPageClient.tsx`
+ * pflegten die MENGE der Presets bisher als zwei eigene `PRESET_OPTIONS`-Arrays -- ein Preset, der
+ * nur in einer der beiden Dateien landete, war an der anderen unsichtbar. Beide Oberflaechen bauen
+ * ihre Beschriftungen jetzt aus DIESER Liste; die Beschriftung selbst darf je Stelle verschieden
+ * bleiben (E3 sagt das ausdruecklich), die Menge nicht mehr.
+ */
+export const ROOM_OWNERSHIP_PRESET_IDS = Object.keys(PRESET_OWNERSHIP_TABLE) as RoomOwnershipPreset[];
+
+/**
+ * Der `FoundationSaveModePreset`, den ein mit `preset` gestarteter/umverteilter Raum im Spielstand
+ * traegt (Kommentar an `PresetOwnershipSpec.saveMode` oben begruendet die Tabellenzeile je Preset).
+ *
+ * `null`/`undefined`/unbekannt faellt auf `"online_4v4"` zurueck -- das war schon VOR Paket 2 der
+ * einzige Wert, den `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts) fuer JEDEN Raum
+ * schrieben, auch fuer einen Raum ganz ohne erkanntes `createdWithPreset`. Bewusst KEIN Wurf wie bei
+ * `buildOwnershipForPreset`/`UnknownRoomOwnershipPresetError`: anders als dort blockiert ein
+ * unbekannter Preset hier keinen Beitritt, sondern waehlt nur die Beschriftung/Obergrenze des
+ * gebundenen Spielstands -- derselbe "gnaedige" Rueckfall wie in `wendeOwnershipPresetGnaedigAn`
+ * (room-store.ts), nur fuer den Save-Modus statt fuer die Team-Zuteilung.
+ */
+export function resolveFoundationSaveModeForPreset(
+  preset: RoomOwnershipPreset | null | undefined,
+): FoundationSaveModePreset {
+  if (!preset) {
+    return "online_4v4";
+  }
+  return PRESET_OWNERSHIP_TABLE[preset]?.saveMode ?? "online_4v4";
+}
 
 /**
  * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): der alte Code kannte fuer einen nicht in der

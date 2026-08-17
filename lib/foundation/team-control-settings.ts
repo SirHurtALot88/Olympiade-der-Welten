@@ -189,6 +189,14 @@ export function getGameModeOwnershipLimits(saveMode: FoundationSaveModePreset): 
   switch (saveMode) {
     case "online_4v4":
       return { chrisMax: 4, frankyMax: 4 };
+    // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E4): ohne diese zwei Zeilen liefe ein
+    // 1+1-/2+2-Raum unter derselben Obergrenze wie 4v4 (der `default`-Zweig faellt sonst auf 1/0,
+    // was einen 2+2-Raum faelschlich auf ein Team je Seite deckeln wuerde) -- die Obergrenze muss
+    // zum tatsaechlich gewaehlten Save-Modus passen, nicht zur naechstbesten bekannten Groesse.
+    case "online_2v2":
+      return { chrisMax: 2, frankyMax: 2 };
+    case "online_1v1":
+      return { chrisMax: 1, frankyMax: 1 };
     case "solo_4":
       return { chrisMax: 4, frankyMax: 0 };
     case "solo_2":

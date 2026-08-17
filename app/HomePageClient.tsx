@@ -6,15 +6,31 @@ import { useRouter } from "next/navigation";
 
 import { LobbyCard } from "@/components/LobbyCard";
 import { getClientSocket } from "@/lib/socket/client";
+import { ROOM_OWNERSHIP_PRESET_IDS } from "@/lib/room/online-room-model";
 import type { RoomOwnershipPreset } from "@/types/events";
 import type { RoomErrorPayload, RoomJoinedPayload } from "@/types/events";
 
-const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
-  { value: "chris_1_rest_ai", label: "1 Team für mich, Rest KI" },
-  { value: "chris_2_rest_ai", label: "2 Teams für mich, Rest KI" },
-  { value: "chris_4_rest_ai", label: "4 Teams für mich, Rest KI" },
-  { value: "chris_4_franky_4_rest_ai", label: "4 Teams für mich + 4 Teams für Franky, Rest KI" },
-];
+// PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E3): die MENGE der Presets kommt jetzt aus
+// `ROOM_OWNERSHIP_PRESET_IDS` (lib/room/online-room-model.ts) -- derselben Quelle, aus der
+// `RoomPageClient.tsx` ihre PRESET_OPTIONS baut. Vorher pflegte diese Datei ihre eigene, komplette
+// Preset-Liste per Hand (Befund 1.3 im Plan): ein neuer Preset, der nur HIER ergaenzt wurde, blieb
+// in der Room-Seite unsichtbar, und umgekehrt. `Record<RoomOwnershipPreset, string>` zwingt bei
+// einem kuenftigen Preset zu einer Beschriftung HIER (TS-Fehler sonst) -- die Beschriftung selbst
+// darf sich von der in RoomPageClient.tsx unterscheiden (E3 erlaubt das ausdruecklich), die MENGE
+// nicht mehr auseinanderlaufen.
+const PRESET_LABELS: Record<RoomOwnershipPreset, string> = {
+  chris_1_rest_ai: "1 Team für mich, Rest KI",
+  chris_2_rest_ai: "2 Teams für mich, Rest KI",
+  chris_4_rest_ai: "4 Teams für mich, Rest KI",
+  chris_4_franky_4_rest_ai: "4 Teams für mich + 4 Teams für Franky, Rest KI",
+  chris_1_franky_1_rest_ai: "1 Team für mich + 1 Team für Franky, Rest KI",
+  chris_2_franky_2_rest_ai: "2 Teams für mich + 2 Teams für Franky, Rest KI",
+};
+
+const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = ROOM_OWNERSHIP_PRESET_IDS.map((value) => ({
+  value,
+  label: PRESET_LABELS[value],
+}));
 
 function storageKey(roomCode: string) {
   // Runtime rejoin token only. This is not team ownership or write authorization.

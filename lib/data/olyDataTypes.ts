@@ -106,8 +106,18 @@ export type ScenarioMeta = {
   label: string;
   description?: string;
   saveCategory?: "manual" | "autosave" | "pre-deploy" | "pre-season" | "post-season" | "emergency" | "recovery";
-  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
-  newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E4): "online_1v1"/"online_2v2" ergaenzt, damit
+  // ein 1+1-/2+2-Raum sein eigenes `FoundationSaveModePreset` (lib/persistence/foundation-save-mode.ts)
+  // ueberhaupt tragen kann. FUND: diese Werte-Liste steht literal an VIER Stellen dupliziert
+  // (hier x2, lib/persistence/types.ts, lib/game/new-game-setup-service.ts `NewGamePresetId`,
+  // lib/foundation/tabs/foundation-page-types.ts `NewGamePresetId`) statt an einer -- eine
+  // bestehende Verletzung der Hausregel "eine Quelle pro Groesse", die NICHT aus diesem Paket
+  // stammt. Sie hier zu vereinheitlichen war nicht Teil des Auftrags (die zwei `NewGamePresetId`-
+  // Stellen gehoeren zum getrennten Solo-"Neues Spiel"-Wizard-System, siehe Kommentar an
+  // `createRoomCoopSave`s Aufruf in room-store.ts) -- nur die zwei fuer Paket 2 tatsaechlich
+  // benoetigten Stellen (hier und lib/persistence/types.ts) wurden ergaenzt.
+  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
+  newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
   humanControlledTeamCount?: number;
   createdAt: string;
   sourceSaveId?: string;
