@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { DisciplineCategory, GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, GamePhase, GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel } from "@/lib/facilities/facility-effects";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
@@ -12,8 +12,11 @@ import type {
   SeasonSetupStepViewTarget,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import type { HomeNextMatchdayStatus } from "@/lib/foundation/tabs/use-foundation-cross-tab-matchday-lineup";
+import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { findOwnRoomParticipant } from "@/lib/room/online-room-model";
 import { getDisciplineColor } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import type { OlyRoomState } from "@/types/game";
 
 type CurrentMatchdayDisciplineSchedule = {
   discipline1?: { disciplineId?: string | null; displayName?: string | null; playerCount?: number | null } | null;
@@ -97,7 +100,76 @@ const EMPTY_SEASON_TRANSITION_GATE = {
   canCompleteSeason: false,
   disabledReason: "last_matchday_not_completed" as const,
   lastMatchdayId: "",
+  hostOnly: false,
 };
+
+export type LocalSeasonTransitionGate = {
+  gamePhase: GamePhase;
+  canCompleteSeason: boolean;
+  disabledReason: string | null;
+  lastMatchdayId: string;
+  hostOnly: boolean;
+};
+
+/**
+ * Reine Funktion statt Inline-Logik im `useMemo` — als eigener Exportnamen direkt testbar
+ * (tests/season-transition-host-gate.test.ts, Paket B), ohne React rendern zu muessen. Gleiches
+ * Muster wie `buildSeasonPlayabilityGate` (lib/foundation/season-playability-gate.ts): der Gate-
+ * Baustein ist eine pure Funktion, der Hook ruft sie nur noch auf.
+ */
+export function buildLocalSeasonTransitionGate(input: {
+  gameState: GameState;
+  roomContext: FoundationRoomContext | null;
+  roomLiveState: OlyRoomState | null;
+}): LocalSeasonTransitionGate {
+  const matchdayIds = input.gameState.season.matchdayIds ?? [];
+  const lastMatchdayId = matchdayIds[matchdayIds.length - 1] ?? input.gameState.matchdayState.matchdayId;
+  const lastFixtures = input.gameState.seasonState.schedule.filter((fixture) => fixture.matchdayId === lastMatchdayId);
+  const lastFixturesResolved =
+    lastFixtures.length === 0 || lastFixtures.every((fixture) => fixture.status === "resolved");
+  const hasLastMatchdayResult = (input.gameState.seasonState.matchdayResults ?? []).some(
+    (result) => result.seasonId === input.gameState.season.id && result.matchdayId === lastMatchdayId,
+  );
+  const hasLastStandingsApply = (input.gameState.seasonState.standingsApplyLogs ?? []).some(
+    (log) => log.seasonId === input.gameState.season.id && log.matchdayId === lastMatchdayId,
+  );
+  const activeMatchdayIsLast =
+    input.gameState.matchdayState.matchdayId === lastMatchdayId ||
+    input.gameState.season.currentMatchday >= matchdayIds.length;
+  const transitionReadyPhase =
+    input.gameState.gamePhase !== undefined && input.gameState.gamePhase !== "season_active";
+  const canCompleteSeason =
+    transitionReadyPhase ||
+    (activeMatchdayIsLast &&
+      input.gameState.matchdayState.status === "resolved" &&
+      (lastFixturesResolved || (hasLastMatchdayResult && hasLastStandingsApply)));
+
+  // BEFUND (Paket B, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): `season_completion` und
+  // `season_transition` sind HOST_LEVEL_ACTIONS (server-authoritative-write-guard.ts:332-336,
+  // `participant.role === "host"`) — der Gast bekam den Riegel bisher nur als 403 NACH dem
+  // Klick zu sehen. Diese Spiegelung macht ihn VORHER sichtbar, ohne die Server-Autoritaet zu
+  // verdoppeln: sie entscheidet nichts, sie zeigt nur an, was der Server ohnehin ablehnen wuerde.
+  // Solo (`roomContext` null) und Host bleiben unveraendert `false` — die Eigenschaft, die
+  // `hostOnly` NICHT beeinflusst, ist `canCompleteSeason` selbst: der zweite Verbraucher
+  // (use-foundation-cross-tab-screen-primary-action.ts) liest genau dieses Feld fuer Frankys
+  // EIGENE Saisonende-Aktionen (Verkaufen/Verlaengern), die explizit KEINE Host-Aktionen sind
+  // (server-authoritative-write-guard.ts, `contract_renewal`/`contract_dissolution`/
+  // `sponsor_choice` stehen nicht in HOST_LEVEL_ACTIONS). Wuerde `hostOnly` hier in
+  // `canCompleteSeason` einfliessen, spraeche das Gate Franky genau die Aktionen ab, die er
+  // sehr wohl darf — der zu breite Riegel, den Eigenschaft 4 im Plan verbietet.
+  const ownRoomParticipant = input.roomContext
+    ? findOwnRoomParticipant(input.roomLiveState, input.roomContext.participantId)
+    : null;
+  const hostOnly = Boolean(input.roomContext) && ownRoomParticipant?.role !== "host";
+
+  return {
+    gamePhase: input.gameState.gamePhase ?? "season_active",
+    canCompleteSeason,
+    disabledReason: hostOnly ? "season_transition_host_only" : canCompleteSeason ? null : "last_matchday_not_completed",
+    lastMatchdayId,
+    hostOnly,
+  };
+}
 
 const EMPTY_SEASON_BRIEFING_DATA = {
   currentFactor: null as number | null,
@@ -156,6 +228,12 @@ export function useFoundationCrossTabSeasonBriefing(input: {
    * Franky anzeigen (siehe Messbefund in tests/coop-onboarding-new-game-flow-zwei-sitzungen.test.ts).
    */
   newGameFlow: GameState["seasonState"]["newGameFlow"];
+  /**
+   * KOOP (Paket B): braucht das Gate nur fuer den Host-Vorbehalt am Saisonwechsel — `null`/`null`
+   * heisst Solo, dort bleibt `hostOnly` immer `false` (siehe Eigenschaft 2 im Plan).
+   */
+  roomContext: FoundationRoomContext | null;
+  roomLiveState: OlyRoomState | null;
   selectedTeam: Team | null;
   rosterPlayers: RosterPlayerRow[];
   selectedTeamFacilityState: TeamFacilityState;
@@ -177,36 +255,12 @@ export function useFoundationCrossTabSeasonBriefing(input: {
     if (!shouldBuildSeasonTransitionGate) {
       return EMPTY_SEASON_TRANSITION_GATE;
     }
-
-    const matchdayIds = input.gameState.season.matchdayIds ?? [];
-    const lastMatchdayId = matchdayIds[matchdayIds.length - 1] ?? input.gameState.matchdayState.matchdayId;
-    const lastFixtures = input.gameState.seasonState.schedule.filter((fixture) => fixture.matchdayId === lastMatchdayId);
-    const lastFixturesResolved =
-      lastFixtures.length === 0 || lastFixtures.every((fixture) => fixture.status === "resolved");
-    const hasLastMatchdayResult = (input.gameState.seasonState.matchdayResults ?? []).some(
-      (result) => result.seasonId === input.gameState.season.id && result.matchdayId === lastMatchdayId,
-    );
-    const hasLastStandingsApply = (input.gameState.seasonState.standingsApplyLogs ?? []).some(
-      (log) => log.seasonId === input.gameState.season.id && log.matchdayId === lastMatchdayId,
-    );
-    const activeMatchdayIsLast =
-      input.gameState.matchdayState.matchdayId === lastMatchdayId ||
-      input.gameState.season.currentMatchday >= matchdayIds.length;
-    const transitionReadyPhase =
-      input.gameState.gamePhase !== undefined && input.gameState.gamePhase !== "season_active";
-    const canCompleteSeason =
-      transitionReadyPhase ||
-      (activeMatchdayIsLast &&
-        input.gameState.matchdayState.status === "resolved" &&
-        (lastFixturesResolved || (hasLastMatchdayResult && hasLastStandingsApply)));
-
-    return {
-      gamePhase: input.gameState.gamePhase ?? "season_active",
-      canCompleteSeason,
-      disabledReason: canCompleteSeason ? null : "last_matchday_not_completed",
-      lastMatchdayId,
-    };
-  }, [input.gameState, shouldBuildSeasonTransitionGate]);
+    return buildLocalSeasonTransitionGate({
+      gameState: input.gameState,
+      roomContext: input.roomContext,
+      roomLiveState: input.roomLiveState,
+    });
+  }, [input.gameState, input.roomContext, input.roomLiveState, shouldBuildSeasonTransitionGate]);
 
   const seasonSetupFlow = useMemo(() => {
     if (!shouldBuildSeasonSetupFlow || !input.selectedTeam) {

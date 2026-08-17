@@ -418,9 +418,20 @@ const UEBERGANGS_BLOCKER_TEXTE: Record<string, string> = {
     "Die Saisonende-Abrechnung ist noch offen: Preisgeld, Sponsorgeld und Apron sind nicht gebucht. Erst „Saison abschließen“ ausführen — ohne das Geld stimmt die Saisonbilanz nicht.",
   last_matchday_not_completed: "Der letzte Spieltag ist noch nicht abgeschlossen.",
   season_transition_chain_complete: "Die Saisonende-Kette ist durch — weiter geht es über den Pre-Season-Workflow.",
+  // Paket B (docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): der Code aus dem lokalen Saisonwechsel-
+  // Gate (use-foundation-cross-tab-season-briefing.ts, `hostOnly`) — dieselbe Regel wie
+  // `host_only_action` am Server (server-authoritative-write-guard.ts:332-336), hier nur schon
+  // VOR dem Klick sichtbar statt erst als 403 danach.
+  season_transition_host_only:
+    "Der Saisonwechsel gehört dem Host: Nur er kann die Saison abschließen und in die neue Saison wechseln. Deine eigenen Saisonende-Aktionen (Verträge, Sponsor, Verkäufe) bleiben davon unberührt.",
 };
 
-function uebersetzeUebergangsBlocker(reason: string): string {
+/**
+ * Exportiert, weil Paket B einen zweiten Aufrufer braucht (das Cockpit-Panel zeigt
+ * `disabledReason` aus dem Saisonwechsel-Gate an) — vorher blieb die Funktion Modul-intern und
+ * der Code landete dort roh in Titel/„Warum nicht"-Zeile.
+ */
+export function uebersetzeUebergangsBlocker(reason: string): string {
   return UEBERGANGS_BLOCKER_TEXTE[reason] ?? reason;
 }
 

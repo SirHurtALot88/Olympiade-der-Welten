@@ -74,6 +74,31 @@ export function resolveFrankyParticipant(participants: RoomParticipant[]): RoomP
 }
 
 /**
+ * Findet den eigenen Sitz im zuletzt bekannten Raum-Snapshot ueber `participantId`.
+ *
+ * FUND (Paket B, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): dieselbe Suche stand vorher an zwei
+ * Stellen einzeln direkt im JSX/Hook — fuer den Room-Chip
+ * (app/foundation/FoundationShellRouterBody.tsx) und fuer den Host-Vorbehalt am Saisonwechsel-
+ * Gate (lib/foundation/tabs/use-foundation-cross-tab-season-briefing.ts). Eine Quelle statt zwei
+ * Kopien, die beim naechsten Umbau des Teilnehmer-Modells sonst auseinanderlaufen wuerden.
+ *
+ * `null`, wenn (noch) kein Snapshot geladen ist oder der eigene Sitz darin (noch) nicht auftaucht
+ * (z. B. kurz nach dem Verbindungsaufbau) — ein klar benannter Rueckfall statt eines geratenen
+ * Treffers. NUR ANZEIGE, NIE BERECHTIGUNG (siehe Kommentar an `resolveRoomParticipantActiveOwnerId`
+ * unten): die eigentliche Autoritaet fuer Host-Aktionen bleibt ausschliesslich
+ * `server-authoritative-write-guard.ts` (`HOST_LEVEL_ACTIONS`, `participant.role === "host"`).
+ */
+export function findOwnRoomParticipant(
+  roomLiveState: Pick<OlyRoomState, "roomParticipants"> | null,
+  participantId: string | null | undefined,
+): RoomParticipant | null {
+  if (!roomLiveState || !participantId) {
+    return null;
+  }
+  return roomLiveState.roomParticipants.find((participant) => participant.participantId === participantId) ?? null;
+}
+
+/**
  * Ordnet die Sitzrolle im Raum der Owner-ID zu, die der Foundation-Client fuer Sichtbarkeit/
  * Verwaltbarkeit braucht (`teamControlSettings[teamId].ownerId`, siehe
  * lib/foundation/team-control-settings.ts) — NICHT dieselbe Groesse wie `participant.userId`.
