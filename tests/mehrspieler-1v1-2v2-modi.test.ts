@@ -137,6 +137,18 @@ describe("getGameModeOwnershipLimits -- die neuen Save-Modi (Eigenschaft 4 + Geg
 });
 
 describe("ROOM_OWNERSHIP_PRESET_IDS -- eine Quelle fuer beide Oberflaechen (Eigenschaft 3)", () => {
+  /**
+   * DIESE PRUEFUNG SOLL BEIM SIEBTEN MODUS ROT WERDEN — das ist Absicht, kein Versehen.
+   *
+   * In diesem Vorhaben sind wir viermal ueber Tests gestolpert, die den alten Zustand als den
+   * richtigen festhielten, ohne dass jemand ihnen ansah, ob das gewollt war (siehe
+   * docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md, Abschnitt 4). Damit dieser hier nicht der fuenfte
+   * wird: er ist ein absichtlicher Stolperdraht. Wer einen Modus hinzufuegt, soll ihn hier
+   * eintragen — und dabei durch die Pruefung darunter daran erinnert werden, ihn in BEIDEN
+   * Oberflaechen zu beschriften.
+   *
+   * Rot heisst hier also: "trag deinen neuen Modus ein", nicht "du hast etwas kaputtgemacht".
+   */
   it("enthaelt genau die sechs bekannten Presets", () => {
     expect([...ROOM_OWNERSHIP_PRESET_IDS].sort()).toEqual(
       [
