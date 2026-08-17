@@ -294,6 +294,64 @@ export function authorizeTeamWrite(input: {
   return { allowed: true, reason: "ok" };
 }
 
+/**
+ * Eine Tabellenzeile pro Preset (E1, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `hostCount`/
+ * `guestCount` sind die Standardgroesse, wenn KEINE feste Liste vorgegeben ist -- die drei
+ * zaehlenbasierten Presets (1/2/4 fuer Chris, Rest KI) nehmen dann einfach die ersten Eintraege
+ * aus dem `teamIds`-Parameter von `buildOwnershipForPreset` (GENAU wie im alten Code:
+ * `teamIds.slice(0, hostCount)`). `guestCount: 0` bei diesen dreien haelt fest, was gemessen
+ * unveraendertes Verhalten ist: ein zweiter Teilnehmer (Franky) bekommt in einem Solo-Preset KEINE
+ * Teams, selbst wenn er im Raum sitzt -- der alte Code gatete `frankyCount` direkt auf den
+ * Preset-Namen (`preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0`), also fuer die drei
+ * anderen Presets immer 0.
+ *
+ * `hostTeamIds`/`guestTeamIds` sind nur beim 4+4-Preset gesetzt, weil Chris und Franky dort feste,
+ * einander garantiert nicht ueberschneidende Teams bekommen sollen -- unabhaengig von der
+ * Reihenfolge im `teamIds`-Array. E5: sie verweisen auf `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/
+ * `..._FRANKY_TEAM_IDS` selbst (nicht auf Kopien) -- ein spaeterer 1+1/2+2-Eintrag (Paket 2) kann
+ * dieselben zwei Konstanten per `.slice(0, n)` weiterverwenden, ohne eine zweite Liste anzulegen.
+ */
+type PresetOwnershipSpec = {
+  hostCount: number;
+  guestCount: number;
+  hostTeamIds?: string[];
+  guestTeamIds?: string[];
+};
+
+const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> = {
+  chris_1_rest_ai: { hostCount: 1, guestCount: 0 },
+  chris_2_rest_ai: { hostCount: 2, guestCount: 0 },
+  chris_4_rest_ai: { hostCount: 4, guestCount: 0 },
+  chris_4_franky_4_rest_ai: {
+    hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
+    guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
+  },
+};
+
+/**
+ * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): der alte Code kannte fuer einen nicht in der
+ * Ternaer-Kette erkannten Preset keinen Fehlerfall -- `hostCount` fiel ueber den letzten `: 4` der
+ * Kette still auf vier Teams zurueck (alter Stand, online-room-model.ts:304: `preset ===
+ * "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4`). Ein Tippfehler oder ein Preset
+ * aus einer anderen Serverversion bekam damit lautlos die falsche Zuteilung. Dieser Wurf macht den
+ * Fall benennbar: `buildOwnershipForPreset` liefert fuer einen unbekannten Preset gar nichts mehr,
+ * statt eine geratene Zahl Teams.
+ *
+ * Fuer eine EXPLIZITE Host-Aktion (Preset beim Anlegen, Preset-Knopf im Raum) ist das der
+ * richtige, sichtbare Fehler. Fuer den Beitritts-Rueckfall auf einen ALTEN, gespeicherten Preset-
+ * Namen (`joinRoom`, room-store.ts, `multiplayerRoom.createdWithPreset`) waere ein ungefangener
+ * Wurf dagegen teuer -- siehe Kommentar an `wendeOwnershipPresetGnaedigAn` dort, wo genau dieser
+ * Fall abgefangen wird, statt den Beitritt scheitern zu lassen.
+ */
+export class UnknownRoomOwnershipPresetError extends Error {
+  constructor(public readonly preset: string) {
+    super(`Unbekannter Raum-Modus in buildOwnershipForPreset: "${preset}".`);
+    this.name = "UnknownRoomOwnershipPresetError";
+  }
+}
+
 export function buildOwnershipForPreset(
   participants: RoomParticipant[],
   preset: RoomOwnershipPreset,
@@ -301,19 +359,25 @@ export function buildOwnershipForPreset(
 ): TeamOwnershipRecord[] {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
   const franky = resolveFrankyParticipant(participants);
-  const hostCount = preset === "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4;
-  const frankyCount = preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0;
+
+  const spec = PRESET_OWNERSHIP_TABLE[preset];
+  if (!spec) {
+    throw new UnknownRoomOwnershipPresetError(preset);
+  }
+
+  // `.filter(teamIds.includes)` war im alten Code nur fuer die feste 4+4-Liste noetig (Beschraenkung
+  // auf den `teamIds`-Parameter, Gegenprobe 4 im Auftrag). Fuer die slice-Variante ist er ein
+  // No-op, weil deren Eintraege schon aus `teamIds` stammen -- deshalb hier einheitlich statt wie
+  // vorher zweigeteilt.
   const hostTeamIds = host
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_HOST_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(0, hostCount)
+    ? (spec.hostTeamIds ?? teamIds.slice(0, spec.hostCount)).filter((teamId) => teamIds.includes(teamId))
     : [];
-  const frankyTeamIds = franky
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(hostCount, hostCount + frankyCount)
+  const guestTeamIds = franky
+    ? (spec.guestTeamIds ?? teamIds.slice(spec.hostCount, spec.hostCount + spec.guestCount)).filter((teamId) =>
+        teamIds.includes(teamId),
+      )
     : [];
-  const humanTeamIds = new Set([...hostTeamIds, ...frankyTeamIds]);
+  const humanTeamIds = new Set([...hostTeamIds, ...guestTeamIds]);
 
   return teamIds.map((teamId) => {
     if (host && hostTeamIds.includes(teamId)) {
@@ -326,7 +390,7 @@ export function buildOwnershipForPreset(
       };
     }
 
-    if (franky && frankyTeamIds.includes(teamId)) {
+    if (franky && guestTeamIds.includes(teamId)) {
       return {
         teamId,
         controllerType: "human",

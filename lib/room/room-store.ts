@@ -33,6 +33,7 @@ import {
   isRoomMatchdayInProgress,
   resolveFrankyParticipant,
   syncParticipantControlledTeams,
+  UnknownRoomOwnershipPresetError,
 } from "@/lib/room/online-room-model";
 import {
   buildRoomFlowState,
@@ -432,6 +433,34 @@ export function createRoom(
   };
 }
 
+/**
+ * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `buildOwnershipForPreset` wirft jetzt
+ * `UnknownRoomOwnershipPresetError` fuer einen nicht (mehr) bekannten Preset, statt still vier
+ * Teams zu vergeben (Kommentar an der Klasse, online-room-model.ts). Fuer eine EXPLIZITE
+ * Host-Aktion ist das richtig. Hier geht es aber um `multiplayerRoom.createdWithPreset`
+ * (types/game.ts:77) -- ein PERSISTIERTES Feld. Ein Raum aus der Ablage kann einen Preset-Namen
+ * tragen, den DIESER Server-Stand nicht (mehr) kennt (Modus in einer anderen Version umbenannt
+ * oder entfernt) -- niemand hat hier gerade etwas Falsches ausgewaehlt, das Feld ist einfach alt.
+ * Ein ungefangener Wurf wuerde dann jeden Beitritt zu diesem Raum verhindern, obwohl Stufe 3/4 der
+ * Rangfolge unten (Spielstand bzw. 4+4-Vorschlag) den Fall laengst abfangen koennten. Der Wurf
+ * zaehlt deshalb wie "dieses Preset gibt dem Gast keine Teams" -- ein benannter, aber GLEICH
+ * BEHANDELTER Rueckfall, keine stille Verschleierung: `UnknownRoomOwnershipPresetError` traegt den
+ * Preset-Namen weiterhin, faellt hier nur nicht durch den Prozess.
+ */
+function wendeOwnershipPresetGnaedigAn(
+  state: Parameters<typeof applyOwnershipPresetToState>[0],
+  preset: Parameters<typeof applyOwnershipPresetToState>[1],
+): ReturnType<typeof applyOwnershipPresetToState> | null {
+  try {
+    return applyOwnershipPresetToState(state, preset);
+  } catch (error) {
+    if (error instanceof UnknownRoomOwnershipPresetError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 export function joinRoom(
   roomCode: string,
   socketId: string,
@@ -516,7 +545,7 @@ export function joinRoom(
   //  4. Sonst: der bisherige 4+4-Vorschlag.
   if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
     const angelegtMit = room.state.multiplayerRoom.createdWithPreset;
-    const mitPreset = angelegtMit ? applyOwnershipPresetToState(room.state, angelegtMit) : null;
+    const mitPreset = angelegtMit ? wendeOwnershipPresetGnaedigAn(room.state, angelegtMit) : null;
     const presetGibtDemGastTeams =
       mitPreset != null &&
       mitPreset.teamOwnership.some(
@@ -1094,7 +1123,19 @@ export function applyRoomOwnershipPreset(
     return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
   }
 
-  room.state = applyOwnershipPresetToState(room.state, preset);
+  // E2: der Host hat hier gerade AKTIV einen Preset-Namen gewaehlt (Preset-Knopf) -- anders als
+  // beim Beitritts-Rueckfall (`wendeOwnershipPresetGnaedigAn` oben) ist ein unbekannter Preset
+  // hier also kein Alt-Save-Fund, sondern ein Fehler in der gerade laufenden Aktion. Er bekommt
+  // deshalb genau die Fehler-Form, die diese Funktion fuer jede andere Ablehnung schon benutzt
+  // (`{ok:false, error}`), statt den Aufrufer mit einer geworfenen Exception zu ueberraschen.
+  try {
+    room.state = applyOwnershipPresetToState(room.state, preset);
+  } catch (error) {
+    if (error instanceof UnknownRoomOwnershipPresetError) {
+      return { ok: false as const, error: `Unbekannter Raum-Modus: "${preset}".` };
+    }
+    throw error;
+  }
   // Erst eine explizite Lobby-/Raum-Aktion zaehlt als "Host hat zugeteilt" -- siehe Kommentar am
   // Feld (types/game.ts) und an `joinRoom` oben.
   room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
