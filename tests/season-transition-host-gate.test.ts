@@ -142,16 +142,48 @@ describe("Saisonwechsel-Gate: Host-Vorbehalt VOR dem Klick", () => {
     }
   });
 
-  it("unbekannter Sitz im Snapshot (noch nicht geladen) faellt auf NICHT-Host zurueck, nicht auf Host", () => {
-    // Gleiche Konvention wie `room-flow-controller.ts:270` (`participant?.role === "host"` —
-    // `undefined` ist dort ebenfalls nicht Host). Ein Spielstand mit noch leerem/unvollstaendigem
-    // Snapshot darf den Riegel nie versehentlich OEFFNEN.
-    const gate = buildLocalSeasonTransitionGate({
+  it("solange die eigene Rolle UNBEKANNT ist, wird nichts behauptet — sonst sperrt sich der Host selbst aus", () => {
+    /**
+     * DIESER FALL WAR ZUERST FALSCH HERUM GEPINNT, mit der Begruendung "der Riegel darf nie
+     * versehentlich OEFFNEN". Das klingt nach der sicheren Seite, ist hier aber die unsichere:
+     * `roomLiveState` ist der zuletzt EMPFANGENE Schnappschuss und ist `null`, solange keiner da
+     * ist — das ist jeder Seitenaufbau im Raum (der Kontext steht sofort, der Schnappschuss kommt
+     * erst ueber den Socket) und zusaetzlich der Sitzungsfehler-Pfad aus Befund F6. Gemessen mit
+     * der urspruenglichen Fassung: Kontext gesetzt + kein Schnappschuss -> `hostOnly: true`, also
+     * "Nur der Host …" fuer den HOST.
+     *
+     * Die Kosten sind unsymmetrisch, und daran haengt die Entscheidung: dem Host faelschlich zu
+     * sagen, er duerfe nicht, ist schlicht falsch und er sitzt fest. Dem Gast in diesem kurzen
+     * Fenster nichts zu sagen heisst, dass er klickt und die lesbare Absage des Servers bekommt
+     * (Befund F9) — genau der Zustand VOR diesem Paket, also kein Rueckschritt. Die Autoritaet
+     * liegt ohnehin beim Server; hier haengt nur die Anzeige.
+     */
+    const ohneSchnappschuss = buildLocalSeasonTransitionGate({
+      gameState: makeGameState({ ready: true }),
+      roomContext: roomContext("p-chris"),
+      roomLiveState: null,
+    });
+    expect(ohneSchnappschuss.hostOnly, "der Host darf sich nicht selbst aussperren").toBe(false);
+
+    // Dasselbe fuer den Schnappschuss, in dem der eigene Sitz (noch) nicht auftaucht — etwa
+    // waehrend die Teilnehmerliste nach einem Verbindungsabriss neu aufgebaut wird.
+    const sitzNichtImSchnappschuss = buildLocalSeasonTransitionGate({
       gameState: makeGameState({ ready: true }),
       roomContext: roomContext("p-unbekannt"),
       roomLiveState: ROOM_STATE,
     });
-    expect(gate.hostOnly).toBe(true);
+    expect(sitzNichtImSchnappschuss.hostOnly).toBe(false);
+  });
+
+  it("GEGENPROBE: sobald die Rolle BEKANNT ist, greift der Vorbehalt sofort", () => {
+    // Damit die Pruefung oben nicht zum Freibrief wird: kennt der Schnappschuss den Sitz, wird
+    // sehr wohl entschieden — sonst haette das ganze Paket keine Wirkung mehr.
+    const gast = buildLocalSeasonTransitionGate({
+      gameState: makeGameState({ ready: true }),
+      roomContext: roomContext("p-franky"),
+      roomLiveState: ROOM_STATE,
+    });
+    expect(gast.hostOnly).toBe(true);
   });
 
   it("der Host-Vorbehalt hat Vorrang vor der Bereitschafts-Meldung, wenn beides zutrifft", () => {

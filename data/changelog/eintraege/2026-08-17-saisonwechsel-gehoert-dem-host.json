@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-17",
+  "seite": "Multiplayer",
+  "text": "Im Raum sieht der Gast jetzt schon vor dem Klick, dass der Saisonwechsel dem Host gehört: „Abschluss prüfen\", „Saison abschließen\", „Nächster Schritt\" und „Abschluss-Run\" sind für ihn gesperrt, und darunter steht der Grund als Satz. Bisher sahen die Knöpfe normal aus und der Server lehnte erst nach dem Klick ab. Was der Gast sehr wohl darf, bleibt ausdrücklich unangetastet — Verträge verlängern, Verträge auflösen, den Sponsor wählen und verkaufen sind keine Host-Aktionen und werden von der Sperre nicht berührt. Nebenbei erledigt: die Zeile „Warum nicht:\" unter den Knöpfen zeigte bisher den rohen Bezeichner (etwa „last_matchday_not_completed\"); die Übersetzung dafür gab es längst, sie war nur nie an diese Anzeige angeschlossen.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

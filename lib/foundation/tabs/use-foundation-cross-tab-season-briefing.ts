@@ -157,10 +157,25 @@ export function buildLocalSeasonTransitionGate(input: {
   // `sponsor_choice` stehen nicht in HOST_LEVEL_ACTIONS). Wuerde `hostOnly` hier in
   // `canCompleteSeason` einfliessen, spraeche das Gate Franky genau die Aktionen ab, die er
   // sehr wohl darf — der zu breite Riegel, den Eigenschaft 4 im Plan verbietet.
-  const ownRoomParticipant = input.roomContext
+  /**
+   * NUR BEHAUPTEN, WAS BEKANNT IST. Der erste Anlauf schrieb `ownRoomParticipant?.role !== "host"`
+   * — und traf damit ausgerechnet den, der darf: `roomLiveState` ist der zuletzt EMPFANGENE
+   * Schnappschuss und ist `null`, solange keiner da ist. Das ist kein Randfall, sondern jeder
+   * Seitenaufbau im Raum (der Kontext steht sofort, der Schnappschuss kommt erst mit
+   * `roomJoined`/`roomState` ueber den Socket) und zusaetzlich der Sitzungsfehler-Pfad aus Befund
+   * F6, der ihn wieder auf `null` setzt. Gemessen: Kontext gesetzt + Schnappschuss fehlt ->
+   * `hostOnly: true`, also "Nur der Host …" fuer den Host.
+   *
+   * Bei UNBEKANNTER Rolle wird deshalb nichts behauptet. Die Kosten sind unsymmetrisch: sagt die
+   * Anzeige dem Host faelschlich, er duerfe nicht, ist das schlicht falsch und er sitzt fest.
+   * Sagt sie dem Gast in diesem kurzen Fenster nichts, klickt er wie bisher und bekommt die
+   * lesbare Absage des Servers (Befund F9) — das ist genau der Zustand vor diesem Paket, also
+   * kein Rueckschritt. Die Autoritaet liegt ohnehin beim Server, hier haengt nur die Anzeige.
+   */
+  const eigenerSitz = input.roomContext
     ? findOwnRoomParticipant(input.roomLiveState, input.roomContext.participantId)
     : null;
-  const hostOnly = Boolean(input.roomContext) && ownRoomParticipant?.role !== "host";
+  const hostOnly = Boolean(input.roomContext) && eigenerSitz != null && eigenerSitz.role !== "host";
 
   return {
     gamePhase: input.gameState.gamePhase ?? "season_active",
