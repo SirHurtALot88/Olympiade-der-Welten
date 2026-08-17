@@ -331,17 +331,20 @@ type PresetOwnershipSpec = {
   saveMode: FoundationSaveModePreset;
 };
 
+/**
+ * DIE ZEILENFOLGE HIER IST DIE ANZEIGEREIHENFOLGE IM AUSWAHLFELD — bitte beim Umsortieren
+ * mitdenken. `ROOM_OWNERSHIP_PRESET_IDS` (unten) leitet sich per `Object.keys` aus dieser Tabelle
+ * ab, und BEIDE Oberflaechen bauen ihr Auswahlfeld daraus. Wer die Tabelle "der Ordnung halber"
+ * anders sortiert, sortiert damit das Auswahlfeld um, ohne eine Zeile Oberflaechen-Code
+ * anzufassen. Das ist gewollt (eine Quelle), aber es sieht man der Tabelle sonst nicht an.
+ *
+ * SORTIERT NACH GROESSE (Entscheidung von Chris): erst ein Team, dann eins pro Spieler, dann zwei,
+ * zwei pro Spieler, vier, vier pro Spieler. Vorher standen die vier alten Modi zuerst und die
+ * beiden neuen hinten angehaengt — die Reihenfolge, in der sie entstanden sind, nicht die, in der
+ * man sie aussucht.
+ */
 const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> = {
   chris_1_rest_ai: { hostCount: 1, guestCount: 0, saveMode: "online_4v4" },
-  chris_2_rest_ai: { hostCount: 2, guestCount: 0, saveMode: "online_4v4" },
-  chris_4_rest_ai: { hostCount: 4, guestCount: 0, saveMode: "online_4v4" },
-  chris_4_franky_4_rest_ai: {
-    hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
-    guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
-    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
-    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
-    saveMode: "online_4v4",
-  },
   chris_1_franky_1_rest_ai: {
     hostCount: 1,
     guestCount: 1,
@@ -349,12 +352,21 @@ const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> =
     guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 1),
     saveMode: "online_1v1",
   },
+  chris_2_rest_ai: { hostCount: 2, guestCount: 0, saveMode: "online_4v4" },
   chris_2_franky_2_rest_ai: {
     hostCount: 2,
     guestCount: 2,
     hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 2),
     guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 2),
     saveMode: "online_2v2",
+  },
+  chris_4_rest_ai: { hostCount: 4, guestCount: 0, saveMode: "online_4v4" },
+  chris_4_franky_4_rest_ai: {
+    hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
+    guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
+    saveMode: "online_4v4",
   },
 };
 

@@ -162,6 +162,28 @@ describe("ROOM_OWNERSHIP_PRESET_IDS -- eine Quelle fuer beide Oberflaechen (Eige
     );
   });
 
+  it("bietet die Modi NACH GROESSE sortiert an, nicht in der Reihenfolge ihrer Entstehung", () => {
+    /**
+     * Entscheidung von Chris ("sortier nach größe"). Die Reihenfolge ist nirgends sonst
+     * festgehalten: sie ergibt sich aus der ZEILENFOLGE in `PRESET_OWNERSHIP_TABLE`
+     * (`Object.keys`), und beide Oberflaechen bauen ihr Auswahlfeld daraus. Ohne diese Pruefung
+     * verschiebt die naechste Umsortierung der Tabelle — etwa "der Ordnung halber" alphabetisch —
+     * still das, was der Spieler im Auswahlfeld sieht, ohne dass jemand die Oberflaeche angefasst
+     * haette.
+     *
+     * Bewusst gegen die ECHTE exportierte Liste geprueft, nicht gegen eine hier abgeschriebene
+     * Kopie — sonst pruefte der Test seine eigene Kopie.
+     */
+    expect([...ROOM_OWNERSHIP_PRESET_IDS]).toEqual([
+      "chris_1_rest_ai",
+      "chris_1_franky_1_rest_ai",
+      "chris_2_rest_ai",
+      "chris_2_franky_2_rest_ai",
+      "chris_4_rest_ai",
+      "chris_4_franky_4_rest_ai",
+    ]);
+  });
+
   // FUND (Befund 1.3 im Plan): vor Paket 2 pflegten app/HomePageClient.tsx und
   // app/room/[roomCode]/RoomPageClient.tsx ihre PRESET_OPTIONS als zwei eigene, handkopierte
   // Arrays -- ein Preset, der nur in einer Datei landete, war an der anderen unsichtbar, ohne dass
