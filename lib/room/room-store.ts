@@ -56,6 +56,7 @@ import {
   buildTeamControlSettingsMap,
   deriveChrisFrankyTeamIdsFromSettings,
 } from "@/lib/foundation/team-control-settings";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { RoomOwnershipPreset } from "@/types/events";
@@ -1358,18 +1359,57 @@ export function advanceRoomFlow(roomCode: string, seatToken: string, options?: {
   const gameState = readRoomGameState(room, options?.persistence);
   const seasonContinues = gameState ? roomFlowSeasonContinues(gameState) : null;
 
-  // Der Saisonwechsel-Zyklus (E2, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): "hat die neue Saison
-  // begonnen" wird GELESEN, nicht gezaehlt -- genau wie `seasonContinues` oben. Verglichen wird
-  // die Saison-ID aus dem Spielstand gegen die, die der RAUM noch kennt (der Wert VOR dieser
-  // Zuweisung unten) -- ein Zaehler oder ein separates Flag koennte vergessen werden zu setzen,
-  // die ID nicht: `preseason-workflow-service.ts:713-723` vergibt beim Saisonwechsel
-  // `season.id = nextSeasonId` zusammen mit `gamePhase: "season_active"` und
-  // `currentMatchday: 1` -- das ist der einzige Ort, an dem sich die ID aendert.
-  const seasonHasAdvanced = gameState ? gameState.season.id !== room.state.multiplayerRoom.activeSeasonId : null;
+  /**
+   * Der Saisonwechsel-Zyklus (E2, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): "hat die neue Saison
+   * begonnen" wird GELESEN, nicht gezaehlt -- genau wie `seasonContinues` oben.
+   *
+   * GELESEN WIRD AUSSCHLIESSLICH DER SPIELSTAND, nicht der Raum. Der erste Anlauf verglich die
+   * Saison-ID des Spielstands gegen die, die der Raum noch kennt
+   * (`multiplayerRoom.activeSeasonId`) -- und das war ein Selbstschuss, nachgemessen an einem
+   * ganz normalen Ablauf: der Host schliesst den Saisonwechsel im Cockpit ab, BEVOR er das
+   * Season Review wegklickt (nichts haelt ihn davon ab, der Assistent ist unabhaengig vom Raum).
+   * Der Klick `season_review -> season_transition` zieht `activeSeasonId` unten mit -- ab da sind
+   * beide IDs gleich, "hat gewechselt" ist fuer immer falsch, und der Raum steht dauerhaft auf
+   * `season_transition`. Also dieselbe Sackgasse, nur eine Station weiter.
+   *
+   * `isSeasonEndPhase` (lib/season/season-transition-chain.ts) beantwortet die Frage ohne jedes
+   * Raum-Gedaechtnis und ist DIESELBE Quelle wie die Kette selbst: die Menge wird aus
+   * `SEASON_TRANSITION_STEPS` abgeleitet, nicht danebengeschrieben. Nachgemessen ueber alle zehn
+   * Phasen: nur `season_active` ist keine Saisonende-Phase -- und die setzt genau eine Stelle,
+   * naemlich der bestaetigte Pre-Season-Workflow (`preseason-workflow-service.ts:713-723`,
+   * zusammen mit `season.id = nextSeasonId` und `currentMatchday: 1`).
+   *
+   * Verworfen wurde `roomFlowSeasonContinues` als Ersatz: `lineup_setup` ist eine STATION der
+   * Saisonende-Kette (`season-transition-chain.ts`), in der `resolve_matchday` bereits erlaubt
+   * ist -- der Raum waere mitten im Assistenten losgesprungen.
+   */
+  const seasonHasAdvanced = gameState ? !isSeasonEndPhase(gameState.gamePhase) : null;
   const nextStep = getNextRoomFlowStepId(room.state.roomFlowState.step, {
     ...(seasonContinues == null ? {} : { seasonContinues }),
     ...(seasonHasAdvanced == null ? {} : { seasonHasAdvanced }),
   });
+
+  /**
+   * BEI 0 WIRD ERKLAERT, NICHT VERSTECKT: bewegt sich der Schritt nicht, ist das Weiterschalten
+   * nicht nur wirkungslos, sondern SCHAEDLICH -- der Rumpf unten setzt jeden Teilnehmer auf
+   * `not_ready` zurueck. Ohne diesen Riegel raeumt ein Klick am Saisonwechsel-Gate beiden Coaches
+   * die Bereitmeldung weg und laesst sonst alles, wie es war: es sieht aus wie ein Aussetzer.
+   *
+   * Der Riegel steht allgemein und nicht nur fuer `season_transition`: ein Vorschub auf denselben
+   * Schritt hat nirgends einen Zweck, und jede kuenftige Selbstschleife saehe sonst genauso aus.
+   * Der Grund wird dabei benannt, statt nur "geht nicht" zu sagen — die Meldung landet als
+   * `roomError` beim Host und laesst dank `istRoomSitzungsFehler` (Befund F6) die Bedienleiste
+   * stehen.
+   */
+  if (nextStep === room.state.roomFlowState.step) {
+    return {
+      ok: false as const,
+      error:
+        nextStep === "season_transition"
+          ? "Die neue Saison hat noch nicht begonnen. Schließe den Saisonwechsel im Cockpit ab — danach geht es hier weiter."
+          : "Der Room-Flow steht bereits auf diesem Schritt.",
+    };
+  }
 
   // `activeMatchday` stand seit der Raumerstellung fest auf 1 und wurde nie nachgezogen. Mit
   // dem Zyklus ist das nicht mehr nur kosmetisch: `syncRoomArenaParticipants` benutzt den Wert
