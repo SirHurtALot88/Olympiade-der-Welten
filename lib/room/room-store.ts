@@ -1357,10 +1357,19 @@ export function advanceRoomFlow(roomCode: string, seatToken: string, options?: {
   // nicht spielbar. Die Entscheidung kommt aus dem Spielstand, nicht aus einem Room-Zaehler.
   const gameState = readRoomGameState(room, options?.persistence);
   const seasonContinues = gameState ? roomFlowSeasonContinues(gameState) : null;
-  const nextStep = getNextRoomFlowStepId(
-    room.state.roomFlowState.step,
-    seasonContinues == null ? undefined : { seasonContinues },
-  );
+
+  // Der Saisonwechsel-Zyklus (E2, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): "hat die neue Saison
+  // begonnen" wird GELESEN, nicht gezaehlt -- genau wie `seasonContinues` oben. Verglichen wird
+  // die Saison-ID aus dem Spielstand gegen die, die der RAUM noch kennt (der Wert VOR dieser
+  // Zuweisung unten) -- ein Zaehler oder ein separates Flag koennte vergessen werden zu setzen,
+  // die ID nicht: `preseason-workflow-service.ts:713-723` vergibt beim Saisonwechsel
+  // `season.id = nextSeasonId` zusammen mit `gamePhase: "season_active"` und
+  // `currentMatchday: 1` -- das ist der einzige Ort, an dem sich die ID aendert.
+  const seasonHasAdvanced = gameState ? gameState.season.id !== room.state.multiplayerRoom.activeSeasonId : null;
+  const nextStep = getNextRoomFlowStepId(room.state.roomFlowState.step, {
+    ...(seasonContinues == null ? {} : { seasonContinues }),
+    ...(seasonHasAdvanced == null ? {} : { seasonHasAdvanced }),
+  });
 
   // `activeMatchday` stand seit der Raumerstellung fest auf 1 und wurde nie nachgezogen. Mit
   // dem Zyklus ist das nicht mehr nur kosmetisch: `syncRoomArenaParticipants` benutzt den Wert

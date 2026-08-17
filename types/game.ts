@@ -124,7 +124,8 @@ export type RoomFlowStepId =
   | "arena"
   | "result"
   | "standings"
-  | "season_review";
+  | "season_review"
+  | "season_transition";
 
 export type RoomFlowButtonStatus =
   | "ready"

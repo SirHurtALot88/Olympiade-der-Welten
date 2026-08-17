@@ -38,6 +38,9 @@ describe("room flow controller", () => {
       "result",
       "standings",
       "season_review",
+      // Paket A (docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): Ready-Gate + Wegweiser fuer den
+      // Saisonwechsel, siehe Kommentar an der Step-Definition in room-flow-controller.ts.
+      "season_transition",
     ]);
     expect(ROOM_FLOW_STEPS.find((step) => step.stepId === "result")?.targetView).toBe("matchdayArena");
     expect(ROOM_FLOW_STEPS.some((step) => step.targetView === "matchdayResult")).toBe(false);

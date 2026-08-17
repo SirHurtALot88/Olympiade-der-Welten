@@ -82,7 +82,14 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   { stepId: "arena", label: "Arena starten", cta: "Arena starten", targetView: "matchdayArena", aiAutoStep: false },
   { stepId: "result", label: "Spieltagsergebnis ansehen", cta: "Spieltagsergebnis ansehen", targetView: "matchdayArena", aiAutoStep: false },
   { stepId: "standings", label: "Saisonstand ansehen", cta: "Saisonstand ansehen", targetView: "season", aiAutoStep: false },
-  { stepId: "season_review", label: "Season Review", cta: "Season Review", targetView: "cockpit", aiAutoStep: false },
+  { stepId: "season_review", label: "Season Review", cta: "Weiter: Saisonwechsel", targetView: "cockpit", aiAutoStep: false },
+  // Ready-Gate + Wegweiser fuer den Saisonwechsel (Paket A,
+  // docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md E1) -- KEIN zweiter Assistent. Die neun Stationen der
+  // Saisonende-Kette (SEASON_TRANSITION_STEPS, lib/season/season-transition-steps.ts) und der
+  // Pre-Season-Workflow (preseason-workflow-service.ts) laufen unveraendert im Cockpit; dieser
+  // Schritt haelt den Raum nur davor an, bis alle bereit sind (aiAutoStep: false -> dasselbe
+  // canHostAdvance-Gate wie jeder Spieltag-Schritt, E3), und zeigt per targetView dorthin.
+  { stepId: "season_transition", label: "Saisonwechsel", cta: "Neue Saison im Cockpit starten", targetView: "cockpit", aiAutoStep: false },
 ];
 
 export type RoomFlowButtonModel = {
@@ -124,6 +131,22 @@ export const ROOM_FLOW_MATCHDAY_CYCLE_START = "lineup" satisfies RoomFlowStepId;
 export const ROOM_FLOW_MATCHDAY_CYCLE_END = "standings" satisfies RoomFlowStepId;
 
 /**
+ * Wohin der Rueckweg aus `season_transition` fuehrt, sobald die neue Saison begonnen hat (E4).
+ *
+ * GEMESSEN, nicht geraten: `startRoom` (room-store.ts:1284, bestaetigt durch
+ * scripts/smoke-multiplayer-e2e.ts:865) setzt beim allerersten Raumstart `currentStep:
+ * "training"` -- NICHT den ersten Listeneintrag `sell_players`. Der Grund liegt in den
+ * Phasen-Gates: `isTransferSellPhaseOpen` (lib/market/transfer-window-policy.ts:68-74) verlangt
+ * `season_end_management`/`transfer_sell_phase` und schliesst `isEarlySeasonTransferSetup`
+ * ausdruecklich aus ("KEIN isEarlySeasonTransferSetup: der Saisonstart ist die Kaufphase") --
+ * `sell_players` waere also am Beginn einer neuen Saison sofort mit 409 blockiert. `buy_players`
+ * und `facilities` waeren technisch offen (`isEarlySeasonTransferSetup` deckt beide), aber
+ * `startRoom` haelt genau EINEN Einstiegspunkt fuer "eine Saison beginnt im Raum" fest, und der
+ * Rueckweg soll denselben treffen -- sonst gaebe es zwei Antworten auf dieselbe Frage.
+ */
+export const ROOM_FLOW_SEASON_TRANSITION_TARGET = "training" satisfies RoomFlowStepId;
+
+/**
  * Steht in dieser Saison noch ein Spieltag aus?
  *
  * Bewusst KEINE eigene Spieltagsrechnung (`currentMatchday < totalMatchdays`), sondern
@@ -140,14 +163,32 @@ export function roomFlowSeasonContinues(gameState: GameState): boolean {
 /**
  * Der naechste Schritt im Room-Flow.
  *
- * `seasonContinues` ist optional, weil die Kette ausserhalb des Zyklus-Endes gar nicht davon
- * abhaengt. FEHLT es am Zyklus-Ende, bleibt es beim alten linearen Verhalten (Sackgasse im
- * Season Review) — das ist der sichere Rueckfall fuer einen Aufrufer, der den Spielstand
- * nicht aufloesen kann, und ausdruecklich nicht die Normalannahme.
+ * Zwei Verzweigungen haengen vom Spielstand ab, nicht von der Listenposition:
+ *
+ * 1. Am Zyklus-Ende (`standings`): `seasonContinues` entscheidet zwischen einem weiteren
+ *    Spieltag und dem Season Review.
+ * 2. Am Saisonwechsel-Gate (`season_transition`): `seasonHasAdvanced` entscheidet, ob die neue
+ *    Saison im Spielstand schon begonnen hat. Ist das nicht der Fall (oder unbekannt), bleibt
+ *    der Raum stehen — "kein Vorspulen auf Verdacht" (Plan, Paket A, Eigenschaft 2). `season_review`
+ *    selbst haengt an KEINER Bedingung: von dort geht es immer weiter zum Saisonwechsel-Gate.
+ *
+ * Beide Felder sind optional, weil ein Aufrufer den Spielstand nicht immer aufloesen kann. FEHLT
+ * das jeweils gebrauchte Feld, bleibt es beim sicheren Rueckfall: am Zyklus-Ende die alte
+ * Sackgasse im Season Review, am Saisonwechsel-Gate das Stehenbleiben dort — in beiden Faellen
+ * lieber nichts geraten als eine falsche Richtung eingeschlagen.
  */
-export function getNextRoomFlowStepId(stepId: string, input?: { seasonContinues: boolean }): RoomFlowStepId {
+export function getNextRoomFlowStepId(
+  stepId: string,
+  input?: { seasonContinues?: boolean; seasonHasAdvanced?: boolean },
+): RoomFlowStepId {
   if (stepId === ROOM_FLOW_MATCHDAY_CYCLE_END) {
     return input?.seasonContinues ? ROOM_FLOW_MATCHDAY_CYCLE_START : "season_review";
+  }
+  if (stepId === "season_review") {
+    return "season_transition";
+  }
+  if (stepId === "season_transition") {
+    return input?.seasonHasAdvanced ? ROOM_FLOW_SEASON_TRANSITION_TARGET : "season_transition";
   }
   const index = ROOM_FLOW_STEPS.findIndex((entry) => entry.stepId === stepId);
   return ROOM_FLOW_STEPS[Math.min(index + 1, ROOM_FLOW_STEPS.length - 1)]?.stepId ?? "season_review";
