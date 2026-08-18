@@ -14,6 +14,7 @@ import type {
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
 import { matchesArenaScope } from "@/lib/room/arena-sync-state";
 import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -71,6 +72,31 @@ const FOUR_PLUS_FOUR_FRANKY_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
  */
 export function resolveFrankyParticipant(participants: RoomParticipant[]): RoomParticipant | null {
   return participants.find((entry) => entry.role === "player") ?? null;
+}
+
+/**
+ * Findet den eigenen Sitz im zuletzt bekannten Raum-Snapshot ueber `participantId`.
+ *
+ * FUND (Paket B, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): dieselbe Suche stand vorher an zwei
+ * Stellen einzeln direkt im JSX/Hook — fuer den Room-Chip
+ * (app/foundation/FoundationShellRouterBody.tsx) und fuer den Host-Vorbehalt am Saisonwechsel-
+ * Gate (lib/foundation/tabs/use-foundation-cross-tab-season-briefing.ts). Eine Quelle statt zwei
+ * Kopien, die beim naechsten Umbau des Teilnehmer-Modells sonst auseinanderlaufen wuerden.
+ *
+ * `null`, wenn (noch) kein Snapshot geladen ist oder der eigene Sitz darin (noch) nicht auftaucht
+ * (z. B. kurz nach dem Verbindungsaufbau) — ein klar benannter Rueckfall statt eines geratenen
+ * Treffers. NUR ANZEIGE, NIE BERECHTIGUNG (siehe Kommentar an `resolveRoomParticipantActiveOwnerId`
+ * unten): die eigentliche Autoritaet fuer Host-Aktionen bleibt ausschliesslich
+ * `server-authoritative-write-guard.ts` (`HOST_LEVEL_ACTIONS`, `participant.role === "host"`).
+ */
+export function findOwnRoomParticipant(
+  roomLiveState: Pick<OlyRoomState, "roomParticipants"> | null,
+  participantId: string | null | undefined,
+): RoomParticipant | null {
+  if (!roomLiveState || !participantId) {
+    return null;
+  }
+  return roomLiveState.roomParticipants.find((participant) => participant.participantId === participantId) ?? null;
 }
 
 /**
@@ -269,6 +295,140 @@ export function authorizeTeamWrite(input: {
   return { allowed: true, reason: "ok" };
 }
 
+/**
+ * Eine Tabellenzeile pro Preset (E1, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `hostCount`/
+ * `guestCount` sind die Standardgroesse, wenn KEINE feste Liste vorgegeben ist -- die drei
+ * zaehlenbasierten Presets (1/2/4 fuer Chris, Rest KI) nehmen dann einfach die ersten Eintraege
+ * aus dem `teamIds`-Parameter von `buildOwnershipForPreset` (GENAU wie im alten Code:
+ * `teamIds.slice(0, hostCount)`). `guestCount: 0` bei diesen dreien haelt fest, was gemessen
+ * unveraendertes Verhalten ist: ein zweiter Teilnehmer (Franky) bekommt in einem Solo-Preset KEINE
+ * Teams, selbst wenn er im Raum sitzt -- der alte Code gatete `frankyCount` direkt auf den
+ * Preset-Namen (`preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0`), also fuer die drei
+ * anderen Presets immer 0.
+ *
+ * `hostTeamIds`/`guestTeamIds` sind bei den drei Zweier-Presets (4+4, 2+2, 1+1) gesetzt, weil Chris
+ * und Franky dort feste, einander garantiert nicht ueberschneidende Teams bekommen sollen --
+ * unabhaengig von der Reihenfolge im `teamIds`-Array. E5 (PFLICHT laut Auftrag): 1+1/2+2
+ * (`chris_1_franky_1_rest_ai`/`chris_2_franky_2_rest_ai`, Paket 2) nehmen ausdruecklich `.slice(0,
+ * 1)` bzw. `.slice(0, 2)` von GENAU `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/`..._FRANKY_TEAM_IDS` -- keine
+ * zweite Liste, dieselben Teams fallen in derselben Reihenfolge wie bei 4+4.
+ *
+ * `saveMode` (Paket 2): der `FoundationSaveModePreset`, den ein mit diesem Preset gestarteter Raum
+ * im Spielstand traegt. ENTSCHEIDUNG (Baustelle 2 im Auftrag: "gehoert das in dieselbe Tabelle?"):
+ * JA -- es ist dieselbe Groesse (eine Eigenschaft PRO PRESET), eine zweite preset-indizierte Map
+ * waere die zweite Quelle, die die Hausregel ausdruecklich verbietet. GEMESSEN, nicht geraten: vor
+ * diesem Paket schrieben `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts)
+ * `saveMode: "online_4v4"` woertlich, fuer JEDEN Preset -- auch fuer die drei Solo-Presets im Raum.
+ * Die vier alten Zeilen tragen deshalb weiterhin `"online_4v4"` (Gegenprobe 5 im Auftrag: 4+4 und
+ * alle Solo-Modi bleiben zeichengenau unveraendert); nur die zwei NEUEN Zeilen bekommen ihren
+ * eigenen Save-Modus (E4: `online_1v1`/`online_2v2`).
+ */
+type PresetOwnershipSpec = {
+  hostCount: number;
+  guestCount: number;
+  hostTeamIds?: string[];
+  guestTeamIds?: string[];
+  saveMode: FoundationSaveModePreset;
+};
+
+/**
+ * DIE ZEILENFOLGE HIER IST DIE ANZEIGEREIHENFOLGE IM AUSWAHLFELD — bitte beim Umsortieren
+ * mitdenken. `ROOM_OWNERSHIP_PRESET_IDS` (unten) leitet sich per `Object.keys` aus dieser Tabelle
+ * ab, und BEIDE Oberflaechen bauen ihr Auswahlfeld daraus. Wer die Tabelle "der Ordnung halber"
+ * anders sortiert, sortiert damit das Auswahlfeld um, ohne eine Zeile Oberflaechen-Code
+ * anzufassen. Das ist gewollt (eine Quelle), aber es sieht man der Tabelle sonst nicht an.
+ *
+ * SORTIERT NACH GROESSE (Entscheidung von Chris): erst ein Team, dann eins pro Spieler, dann zwei,
+ * zwei pro Spieler, vier, vier pro Spieler. Vorher standen die vier alten Modi zuerst und die
+ * beiden neuen hinten angehaengt — die Reihenfolge, in der sie entstanden sind, nicht die, in der
+ * man sie aussucht.
+ */
+const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> = {
+  chris_1_rest_ai: { hostCount: 1, guestCount: 0, saveMode: "online_4v4" },
+  chris_1_franky_1_rest_ai: {
+    hostCount: 1,
+    guestCount: 1,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 1),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 1),
+    saveMode: "online_1v1",
+  },
+  chris_2_rest_ai: { hostCount: 2, guestCount: 0, saveMode: "online_4v4" },
+  chris_2_franky_2_rest_ai: {
+    hostCount: 2,
+    guestCount: 2,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 2),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 2),
+    saveMode: "online_2v2",
+  },
+  chris_4_rest_ai: { hostCount: 4, guestCount: 0, saveMode: "online_4v4" },
+  chris_4_franky_4_rest_ai: {
+    hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
+    guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
+    saveMode: "online_4v4",
+  },
+};
+
+/**
+ * Die MENGE aller Raum-Presets, aus der Tabelle abgeleitet -- E3 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md):
+ * "Zieh die MENGE der Modi in eine exportierte Quelle." `Object.keys` auf einem `Record<RoomOwnershipPreset,
+ * ...>` traegt JEDEN Preset garantiert genau einmal, in der Reihenfolge der Objektliteral-Zeilen oben
+ * (JS-Laufzeitgarantie fuer String-Schluessel) -- und der `Record`-Typ zwingt ohnehin zu einer
+ * Tabellenzeile fuer jeden neuen `RoomOwnershipPreset`-Wert (TS-Fehler sonst), die ID-Liste zieht
+ * automatisch nach.
+ *
+ * FUND (Befund 1.3 im Plan): `app/HomePageClient.tsx` und `app/room/[roomCode]/RoomPageClient.tsx`
+ * pflegten die MENGE der Presets bisher als zwei eigene `PRESET_OPTIONS`-Arrays -- ein Preset, der
+ * nur in einer der beiden Dateien landete, war an der anderen unsichtbar. Beide Oberflaechen bauen
+ * ihre Beschriftungen jetzt aus DIESER Liste; die Beschriftung selbst darf je Stelle verschieden
+ * bleiben (E3 sagt das ausdruecklich), die Menge nicht mehr.
+ */
+export const ROOM_OWNERSHIP_PRESET_IDS = Object.keys(PRESET_OWNERSHIP_TABLE) as RoomOwnershipPreset[];
+
+/**
+ * Der `FoundationSaveModePreset`, den ein mit `preset` gestarteter/umverteilter Raum im Spielstand
+ * traegt (Kommentar an `PresetOwnershipSpec.saveMode` oben begruendet die Tabellenzeile je Preset).
+ *
+ * `null`/`undefined`/unbekannt faellt auf `"online_4v4"` zurueck -- das war schon VOR Paket 2 der
+ * einzige Wert, den `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts) fuer JEDEN Raum
+ * schrieben, auch fuer einen Raum ganz ohne erkanntes `createdWithPreset`. Bewusst KEIN Wurf wie bei
+ * `buildOwnershipForPreset`/`UnknownRoomOwnershipPresetError`: anders als dort blockiert ein
+ * unbekannter Preset hier keinen Beitritt, sondern waehlt nur die Beschriftung/Obergrenze des
+ * gebundenen Spielstands -- derselbe "gnaedige" Rueckfall wie in `wendeOwnershipPresetGnaedigAn`
+ * (room-store.ts), nur fuer den Save-Modus statt fuer die Team-Zuteilung.
+ */
+export function resolveFoundationSaveModeForPreset(
+  preset: RoomOwnershipPreset | null | undefined,
+): FoundationSaveModePreset {
+  if (!preset) {
+    return "online_4v4";
+  }
+  return PRESET_OWNERSHIP_TABLE[preset]?.saveMode ?? "online_4v4";
+}
+
+/**
+ * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): der alte Code kannte fuer einen nicht in der
+ * Ternaer-Kette erkannten Preset keinen Fehlerfall -- `hostCount` fiel ueber den letzten `: 4` der
+ * Kette still auf vier Teams zurueck (alter Stand, online-room-model.ts:304: `preset ===
+ * "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4`). Ein Tippfehler oder ein Preset
+ * aus einer anderen Serverversion bekam damit lautlos die falsche Zuteilung. Dieser Wurf macht den
+ * Fall benennbar: `buildOwnershipForPreset` liefert fuer einen unbekannten Preset gar nichts mehr,
+ * statt eine geratene Zahl Teams.
+ *
+ * Fuer eine EXPLIZITE Host-Aktion (Preset beim Anlegen, Preset-Knopf im Raum) ist das der
+ * richtige, sichtbare Fehler. Fuer den Beitritts-Rueckfall auf einen ALTEN, gespeicherten Preset-
+ * Namen (`joinRoom`, room-store.ts, `multiplayerRoom.createdWithPreset`) waere ein ungefangener
+ * Wurf dagegen teuer -- siehe Kommentar an `wendeOwnershipPresetGnaedigAn` dort, wo genau dieser
+ * Fall abgefangen wird, statt den Beitritt scheitern zu lassen.
+ */
+export class UnknownRoomOwnershipPresetError extends Error {
+  constructor(public readonly preset: string) {
+    super(`Unbekannter Raum-Modus in buildOwnershipForPreset: "${preset}".`);
+    this.name = "UnknownRoomOwnershipPresetError";
+  }
+}
+
 export function buildOwnershipForPreset(
   participants: RoomParticipant[],
   preset: RoomOwnershipPreset,
@@ -276,19 +436,25 @@ export function buildOwnershipForPreset(
 ): TeamOwnershipRecord[] {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
   const franky = resolveFrankyParticipant(participants);
-  const hostCount = preset === "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4;
-  const frankyCount = preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0;
+
+  const spec = PRESET_OWNERSHIP_TABLE[preset];
+  if (!spec) {
+    throw new UnknownRoomOwnershipPresetError(preset);
+  }
+
+  // `.filter(teamIds.includes)` war im alten Code nur fuer die feste 4+4-Liste noetig (Beschraenkung
+  // auf den `teamIds`-Parameter, Gegenprobe 4 im Auftrag). Fuer die slice-Variante ist er ein
+  // No-op, weil deren Eintraege schon aus `teamIds` stammen -- deshalb hier einheitlich statt wie
+  // vorher zweigeteilt.
   const hostTeamIds = host
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_HOST_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(0, hostCount)
+    ? (spec.hostTeamIds ?? teamIds.slice(0, spec.hostCount)).filter((teamId) => teamIds.includes(teamId))
     : [];
-  const frankyTeamIds = franky
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(hostCount, hostCount + frankyCount)
+  const guestTeamIds = franky
+    ? (spec.guestTeamIds ?? teamIds.slice(spec.hostCount, spec.hostCount + spec.guestCount)).filter((teamId) =>
+        teamIds.includes(teamId),
+      )
     : [];
-  const humanTeamIds = new Set([...hostTeamIds, ...frankyTeamIds]);
+  const humanTeamIds = new Set([...hostTeamIds, ...guestTeamIds]);
 
   return teamIds.map((teamId) => {
     if (host && hostTeamIds.includes(teamId)) {
@@ -301,7 +467,7 @@ export function buildOwnershipForPreset(
       };
     }
 
-    if (franky && frankyTeamIds.includes(teamId)) {
+    if (franky && guestTeamIds.includes(teamId)) {
       return {
         teamId,
         controllerType: "human",

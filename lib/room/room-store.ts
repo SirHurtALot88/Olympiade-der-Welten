@@ -31,8 +31,10 @@ import {
   buildTurnState,
   canParticipantControlTeam,
   isRoomMatchdayInProgress,
+  resolveFoundationSaveModeForPreset,
   resolveFrankyParticipant,
   syncParticipantControlledTeams,
+  UnknownRoomOwnershipPresetError,
 } from "@/lib/room/online-room-model";
 import {
   buildRoomFlowState,
@@ -56,6 +58,7 @@ import {
   buildTeamControlSettingsMap,
   deriveChrisFrankyTeamIdsFromSettings,
 } from "@/lib/foundation/team-control-settings";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { RoomOwnershipPreset } from "@/types/events";
@@ -431,6 +434,34 @@ export function createRoom(
   };
 }
 
+/**
+ * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `buildOwnershipForPreset` wirft jetzt
+ * `UnknownRoomOwnershipPresetError` fuer einen nicht (mehr) bekannten Preset, statt still vier
+ * Teams zu vergeben (Kommentar an der Klasse, online-room-model.ts). Fuer eine EXPLIZITE
+ * Host-Aktion ist das richtig. Hier geht es aber um `multiplayerRoom.createdWithPreset`
+ * (types/game.ts:77) -- ein PERSISTIERTES Feld. Ein Raum aus der Ablage kann einen Preset-Namen
+ * tragen, den DIESER Server-Stand nicht (mehr) kennt (Modus in einer anderen Version umbenannt
+ * oder entfernt) -- niemand hat hier gerade etwas Falsches ausgewaehlt, das Feld ist einfach alt.
+ * Ein ungefangener Wurf wuerde dann jeden Beitritt zu diesem Raum verhindern, obwohl Stufe 3/4 der
+ * Rangfolge unten (Spielstand bzw. 4+4-Vorschlag) den Fall laengst abfangen koennten. Der Wurf
+ * zaehlt deshalb wie "dieses Preset gibt dem Gast keine Teams" -- ein benannter, aber GLEICH
+ * BEHANDELTER Rueckfall, keine stille Verschleierung: `UnknownRoomOwnershipPresetError` traegt den
+ * Preset-Namen weiterhin, faellt hier nur nicht durch den Prozess.
+ */
+function wendeOwnershipPresetGnaedigAn(
+  state: Parameters<typeof applyOwnershipPresetToState>[0],
+  preset: Parameters<typeof applyOwnershipPresetToState>[1],
+): ReturnType<typeof applyOwnershipPresetToState> | null {
+  try {
+    return applyOwnershipPresetToState(state, preset);
+  } catch (error) {
+    if (error instanceof UnknownRoomOwnershipPresetError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 export function joinRoom(
   roomCode: string,
   socketId: string,
@@ -515,7 +546,7 @@ export function joinRoom(
   //  4. Sonst: der bisherige 4+4-Vorschlag.
   if (!room.state.multiplayerRoom.ownershipAssignedByHost) {
     const angelegtMit = room.state.multiplayerRoom.createdWithPreset;
-    const mitPreset = angelegtMit ? applyOwnershipPresetToState(room.state, angelegtMit) : null;
+    const mitPreset = angelegtMit ? wendeOwnershipPresetGnaedigAn(room.state, angelegtMit) : null;
     const presetGibtDemGastTeams =
       mitPreset != null &&
       mitPreset.teamOwnership.some(
@@ -1064,8 +1095,14 @@ function syncRoomOwnershipToBoundSave(room: RuntimeRoom, persistence?: Persisten
         .filter((entry) => entry.controllerType === "human" && entry.participantId === franky.participantId)
         .map((entry) => entry.teamId)
     : [];
+  // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): stand hier vorher woertlich "online_4v4",
+  // UNABHAENGIG vom Raum-Modus -- ein 1+1-/2+2-Raum haette nach jeder Umverteilung wieder auf
+  // 4v4 zurueckgeschrieben und die Team-Zuteilung im Foundation-Client mit vier Plaetzen je Seite
+  // gezeigt. `resolveFoundationSaveModeForPreset` liest denselben Preset, mit dem der Raum
+  // angelegt wurde (`createdWithPreset`, types/game.ts:77) -- fuer die vier bestehenden Presets
+  // unveraendert "online_4v4" (Gegenprobe 5 im Auftrag), fuer die zwei neuen ihr eigener Modus (E4).
   const updatedGameState = applyGameModeOwnership(save.gameState, {
-    saveMode: "online_4v4",
+    saveMode: resolveFoundationSaveModeForPreset(room.state.multiplayerRoom.createdWithPreset),
     chrisTeamIds,
     frankyTeamIds,
   });
@@ -1093,10 +1130,36 @@ export function applyRoomOwnershipPreset(
     return { ok: false as const, error: "Team-Zuordnung ist gesperrt, solange ein Spieltag laeuft. Wechsle zwischen zwei Spieltagen." };
   }
 
-  room.state = applyOwnershipPresetToState(room.state, preset);
+  // E2: der Host hat hier gerade AKTIV einen Preset-Namen gewaehlt (Preset-Knopf) -- anders als
+  // beim Beitritts-Rueckfall (`wendeOwnershipPresetGnaedigAn` oben) ist ein unbekannter Preset
+  // hier also kein Alt-Save-Fund, sondern ein Fehler in der gerade laufenden Aktion. Er bekommt
+  // deshalb genau die Fehler-Form, die diese Funktion fuer jede andere Ablehnung schon benutzt
+  // (`{ok:false, error}`), statt den Aufrufer mit einer geworfenen Exception zu ueberraschen.
+  try {
+    room.state = applyOwnershipPresetToState(room.state, preset);
+  } catch (error) {
+    if (error instanceof UnknownRoomOwnershipPresetError) {
+      return { ok: false as const, error: `Unbekannter Raum-Modus: "${preset}".` };
+    }
+    throw error;
+  }
   // Erst eine explizite Lobby-/Raum-Aktion zaehlt als "Host hat zugeteilt" -- siehe Kommentar am
   // Feld (types/game.ts) und an `joinRoom` oben.
-  room.state = { ...room.state, multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true } };
+  //
+  // FUND (Paket 2, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `createdWithPreset` HIER MIT
+  // AKTUALISIEREN, nicht nur beim allerersten `createRoom`. Ohne das haette ein Host, der den Raum
+  // mit 4+4 anlegt und danach ueber den Preset-Knopf im Raum (`applyRoomOwnershipPreset`, genau
+  // diese Funktion) auf 1+1 wechselt, eine Team-Zuteilung mit 1+1, aber `createdWithPreset` bliebe
+  // auf "chris_4_franky_4_rest_ai" stehen -- und `syncRoomOwnershipToBoundSave` (das direkt danach
+  // laeuft) haette darueber weiterhin "online_4v4" in den Spielstand geschrieben, obwohl der Raum
+  // laengst 1+1 spielt (Eigenschaft 4 verletzt). GEFAHRLOS fuer `joinRoom`s Rangfolge (Kommentar
+  // dort): diese Funktion setzt `ownershipAssignedByHost` im SELBEN Zug auf `true`, und Stufe 1
+  // dieser Rangfolge greift dann bei jedem Beitritt VOR Stufe 2 -- `createdWithPreset` wird fuer
+  // die Zuteilung selbst also gar nicht mehr gelesen, nur noch fuer den Save-Modus hier.
+  room.state = {
+    ...room.state,
+    multiplayerRoom: { ...room.state.multiplayerRoom, ownershipAssignedByHost: true, createdWithPreset: preset },
+  };
   syncRoomOwnershipToBoundSave(room, options?.persistence);
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
   syncPlayers(room);
@@ -1205,13 +1268,17 @@ export function startRoom(
 
     const currentSaveId = room.state.multiplayerRoom.saveId;
     const existingSave = isSandboxRoomSave(currentSaveId) ? null : persistence.getSaveById(currentSaveId);
+    // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): derselbe Fund/dieselbe Loesung wie an
+    // `syncRoomOwnershipToBoundSave` oben -- welcher Save-Modus zu SCHREIBEN ist, haengt vom Preset
+    // ab, mit dem der Raum angelegt wurde, nicht mehr woertlich "online_4v4" fuer jeden Raum.
+    const raumSaveMode = resolveFoundationSaveModeForPreset(room.state.multiplayerRoom.createdWithPreset);
 
     let boundSaveId: string;
     if (existingSave) {
       // Continue existing: reuse the real save, re-applying the current lobby split so team
       // changes made in the lobby take effect without minting a fresh save.
       const updatedGameState = applyGameModeOwnership(existingSave.gameState, {
-        saveMode: "online_4v4",
+        saveMode: raumSaveMode,
         chrisTeamIds,
         frankyTeamIds,
       });
@@ -1233,6 +1300,30 @@ export function startRoom(
         },
         persistence,
       ).saveId;
+      // FUND (Paket 2): `createRoomCoopSave` (new-game-setup-service.ts) baut den frischen Save
+      // ueber das SEPARATE, aeltere `NewGamePresetId`-System der "Neues Spiel"-Wizard-Route und
+      // schreibt intern IMMER `presetId: "online_4v4"` -- fest verdrahtet, nicht von hier
+      // durchgereicht (diese Route hat gar keinen `saveMode`-Parameter). Ein frischer 1+1-/2+2-Raum
+      // bekaeme seinen ERSTEN Save damit trotzdem als "online_4v4" markiert. Dieses zweite System
+      // (Solo-"Neues Spiel"-Wizard, eigene Presets/Warnungen/Vorschau) auf die neuen Modi
+      // auszuweiten war eine eigene Baustelle wert und ist NICHT Teil von Paket 2 (nirgends im
+      // Auftrag genannt) -- der chirurgische Fix hier laesst `createRoomCoopSave` unangetastet und
+      // korrigiert NUR das `saveMode`-Feld danach, mit derselben Funktion
+      // (`applyGameModeOwnership`), die auch der "continue existing"-Zweig oben nutzt. No-op fuer
+      // 4+4 und alle Solo-Presets (`raumSaveMode === "online_4v4"`, Gegenprobe 5 im Auftrag) --
+      // genau der Wert, den `createRoomCoopSave` ohnehin schon geschrieben hat, kein zweiter Schreib-
+      // zugriff noetig.
+      if (raumSaveMode !== "online_4v4") {
+        const frischerSave = persistence.getSaveById(boundSaveId);
+        if (frischerSave) {
+          const korrigiert = applyGameModeOwnership(frischerSave.gameState, {
+            saveMode: raumSaveMode,
+            chrisTeamIds,
+            frankyTeamIds,
+          });
+          persistence.saveSingleplayerState(boundSaveId, korrigiert);
+        }
+      }
       // Genau wie ein frischer Solo-Save (fresh-season-1) und die "Neues Spiel"-Wizard-Route
       // startet ein frisch angelegter Koop-Save alle 32 Teams mit LEEREN Kadern — ohne diesen Lauf
       // ist im Room kein Spieltag aufloesbar (siehe league-setup-draft-service.ts Kopfkommentar).
@@ -1357,10 +1448,58 @@ export function advanceRoomFlow(roomCode: string, seatToken: string, options?: {
   // nicht spielbar. Die Entscheidung kommt aus dem Spielstand, nicht aus einem Room-Zaehler.
   const gameState = readRoomGameState(room, options?.persistence);
   const seasonContinues = gameState ? roomFlowSeasonContinues(gameState) : null;
-  const nextStep = getNextRoomFlowStepId(
-    room.state.roomFlowState.step,
-    seasonContinues == null ? undefined : { seasonContinues },
-  );
+
+  /**
+   * Der Saisonwechsel-Zyklus (E2, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): "hat die neue Saison
+   * begonnen" wird GELESEN, nicht gezaehlt -- genau wie `seasonContinues` oben.
+   *
+   * GELESEN WIRD AUSSCHLIESSLICH DER SPIELSTAND, nicht der Raum. Der erste Anlauf verglich die
+   * Saison-ID des Spielstands gegen die, die der Raum noch kennt
+   * (`multiplayerRoom.activeSeasonId`) -- und das war ein Selbstschuss, nachgemessen an einem
+   * ganz normalen Ablauf: der Host schliesst den Saisonwechsel im Cockpit ab, BEVOR er das
+   * Season Review wegklickt (nichts haelt ihn davon ab, der Assistent ist unabhaengig vom Raum).
+   * Der Klick `season_review -> season_transition` zieht `activeSeasonId` unten mit -- ab da sind
+   * beide IDs gleich, "hat gewechselt" ist fuer immer falsch, und der Raum steht dauerhaft auf
+   * `season_transition`. Also dieselbe Sackgasse, nur eine Station weiter.
+   *
+   * `isSeasonEndPhase` (lib/season/season-transition-chain.ts) beantwortet die Frage ohne jedes
+   * Raum-Gedaechtnis und ist DIESELBE Quelle wie die Kette selbst: die Menge wird aus
+   * `SEASON_TRANSITION_STEPS` abgeleitet, nicht danebengeschrieben. Nachgemessen ueber alle zehn
+   * Phasen: nur `season_active` ist keine Saisonende-Phase -- und die setzt genau eine Stelle,
+   * naemlich der bestaetigte Pre-Season-Workflow (`preseason-workflow-service.ts:713-723`,
+   * zusammen mit `season.id = nextSeasonId` und `currentMatchday: 1`).
+   *
+   * Verworfen wurde `roomFlowSeasonContinues` als Ersatz: `lineup_setup` ist eine STATION der
+   * Saisonende-Kette (`season-transition-chain.ts`), in der `resolve_matchday` bereits erlaubt
+   * ist -- der Raum waere mitten im Assistenten losgesprungen.
+   */
+  const seasonHasAdvanced = gameState ? !isSeasonEndPhase(gameState.gamePhase) : null;
+  const nextStep = getNextRoomFlowStepId(room.state.roomFlowState.step, {
+    ...(seasonContinues == null ? {} : { seasonContinues }),
+    ...(seasonHasAdvanced == null ? {} : { seasonHasAdvanced }),
+  });
+
+  /**
+   * BEI 0 WIRD ERKLAERT, NICHT VERSTECKT: bewegt sich der Schritt nicht, ist das Weiterschalten
+   * nicht nur wirkungslos, sondern SCHAEDLICH -- der Rumpf unten setzt jeden Teilnehmer auf
+   * `not_ready` zurueck. Ohne diesen Riegel raeumt ein Klick am Saisonwechsel-Gate beiden Coaches
+   * die Bereitmeldung weg und laesst sonst alles, wie es war: es sieht aus wie ein Aussetzer.
+   *
+   * Der Riegel steht allgemein und nicht nur fuer `season_transition`: ein Vorschub auf denselben
+   * Schritt hat nirgends einen Zweck, und jede kuenftige Selbstschleife saehe sonst genauso aus.
+   * Der Grund wird dabei benannt, statt nur "geht nicht" zu sagen — die Meldung landet als
+   * `roomError` beim Host und laesst dank `istRoomSitzungsFehler` (Befund F6) die Bedienleiste
+   * stehen.
+   */
+  if (nextStep === room.state.roomFlowState.step) {
+    return {
+      ok: false as const,
+      error:
+        nextStep === "season_transition"
+          ? "Die neue Saison hat noch nicht begonnen. Schließe den Saisonwechsel im Cockpit ab — danach geht es hier weiter."
+          : "Der Room-Flow steht bereits auf diesem Schritt.",
+    };
+  }
 
   // `activeMatchday` stand seit der Raumerstellung fest auf 1 und wurde nie nachgezogen. Mit
   // dem Zyklus ist das nicht mehr nur kosmetisch: `syncRoomArenaParticipants` benutzt den Wert

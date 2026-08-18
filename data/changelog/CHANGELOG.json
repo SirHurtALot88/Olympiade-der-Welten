@@ -2,6 +2,33 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-17",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Zu zweit spielen kannte bisher nur \"4 Teams für mich + 4 Teams für Franky\". Jetzt gibt es beim Raum erstellen zusätzlich \"1 Team für mich + 1 Team für Franky\" und \"2 Teams für mich + 2 Teams für Franky\" — auf beiden Seiten der Startseite (Raum erstellen) und im Raum selbst (Team-Verteilung). Die Team-Zuteilung im Raum zeigt für diese kleineren Modi jetzt auch die passende Anzahl Plätze statt weiterhin vier je Seite.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-17",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Ein gemeinsamer Raum kommt jetzt in die nächste Saison. Bisher endete der Raum-Ablauf im Season Review: der Host klickte „Weiter\" und blieb dort — es gab schlicht keinen Schritt danach, und weil der Raum seine Saison und seinen Spieltag nur beim Weiterschalten nachzieht, warb er anschließend für immer mit der alten Saison. Neu ist genau EIN Schritt: „Saisonwechsel\". Er baut den Saisonende-Assistenten nicht nach — der läuft unverändert im Cockpit — sondern hält den Raum davor an, bis beide Coaches bereit gemeldet haben. Damit ist auch die zweite Lücke zu: bisher konnte der Host die Saison abschließen, während der Mitspieler noch Verträge verlängerte oder verkaufte. Sobald die neue Saison im Spielstand steht, springt der Raum auf den Schritt, mit dem eine Saison im Raum beginnt, und zieht Saison und Spieltag mit. Und solange sie noch nicht steht, sagt der Raum warum, statt beiden Coaches wortlos die Bereitmeldung wegzuräumen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-17",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Im Raum sieht der Gast jetzt schon vor dem Klick, dass der Saisonwechsel dem Host gehört: „Abschluss prüfen\", „Saison abschließen\", „Nächster Schritt\" und „Abschluss-Run\" sind für ihn gesperrt, und darunter steht der Grund als Satz. Bisher sahen die Knöpfe normal aus und der Server lehnte erst nach dem Klick ab. Was der Gast sehr wohl darf, bleibt ausdrücklich unangetastet — Verträge verlängern, Verträge auflösen, den Sponsor wählen und verkaufen sind keine Host-Aktionen und werden von der Sperre nicht berührt. Nebenbei erledigt: die Zeile „Warum nicht:\" unter den Knöpfen zeigte bisher den rohen Bezeichner (etwa „last_matchday_not_completed\"); die Übersetzung dafür gab es längst, sie war nur nie an diese Anzeige angeschlossen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-16",
       "seite": "Multiplayer",
       "pr": null,

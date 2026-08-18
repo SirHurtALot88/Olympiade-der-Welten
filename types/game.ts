@@ -16,7 +16,14 @@ export type RoomUser = {
 };
 
 /**
- * Die vier Modi, mit denen ein Raum angelegt werden kann.
+ * Die sechs Modi, mit denen ein Raum angelegt werden kann.
+ *
+ * PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): frueher standen hier nur vier Werte -- fuer zu
+ * zweit gab es ausschliesslich `chris_4_franky_4_rest_ai`. `chris_1_franky_1_rest_ai` und
+ * `chris_2_franky_2_rest_ai` sind dazugekommen, weil Chris ausdruecklich auch 1+1 und 2+2 wollte
+ * (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, Kopfzeile). Ihre Team-IDs sind KEINE neue Liste (E5): sie
+ * sind die ersten n aus `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/`..._FRANKY_TEAM_IDS`
+ * (lib/room/online-room-model.ts), siehe `PRESET_OWNERSHIP_TABLE` dort.
  *
  * STEHT HIER UND NICHT IN types/events.ts, obwohl er dort erklaert wurde: `MultiplayerRoomMeta`
  * (unten) fuehrt ihn seit Aufgabe #49 mit, und `types/events.ts` importiert bereits aus dieser
@@ -27,7 +34,9 @@ export type RoomOwnershipPreset =
   | "chris_1_rest_ai"
   | "chris_2_rest_ai"
   | "chris_4_rest_ai"
-  | "chris_4_franky_4_rest_ai";
+  | "chris_4_franky_4_rest_ai"
+  | "chris_1_franky_1_rest_ai"
+  | "chris_2_franky_2_rest_ai";
 
 export type MultiplayerRoomMeta = {
   roomId: string;
@@ -124,7 +133,8 @@ export type RoomFlowStepId =
   | "arena"
   | "result"
   | "standings"
-  | "season_review";
+  | "season_review"
+  | "season_transition";
 
 export type RoomFlowButtonStatus =
   | "ready"

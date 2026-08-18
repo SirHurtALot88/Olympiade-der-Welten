@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import {
   MAX_TEAMS_PER_HUMAN_PARTICIPANT,
   ONLINE_ROOM_TEAM_IDS,
+  ROOM_OWNERSHIP_PRESET_IDS,
   isRoomMatchdayInProgress,
   resolveFrankyParticipant,
   resolveRoomParticipantActiveOwnerId,
@@ -28,12 +29,21 @@ import type { OlyRoomState } from "@/types/game";
 const MAX_TEAMS_PER_HUMAN = MAX_TEAMS_PER_HUMAN_PARTICIPANT;
 type TeamAssignmentTarget = "chris" | "franky" | "ai";
 
-const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
-  { value: "chris_1_rest_ai", label: "1 Team Chris, Rest KI" },
-  { value: "chris_2_rest_ai", label: "2 Teams Chris, Rest KI" },
-  { value: "chris_4_rest_ai", label: "4 Teams Chris, Rest KI" },
-  { value: "chris_4_franky_4_rest_ai", label: "4 Teams Chris + 4 Teams Franky, Rest KI" },
-];
+// PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E3): siehe Kommentar an der gleichnamigen Liste
+// in app/HomePageClient.tsx -- dieselbe Quelle (`ROOM_OWNERSHIP_PRESET_IDS`), eigene Beschriftung.
+const PRESET_LABELS: Record<RoomOwnershipPreset, string> = {
+  chris_1_rest_ai: "1 Team Chris, Rest KI",
+  chris_2_rest_ai: "2 Teams Chris, Rest KI",
+  chris_4_rest_ai: "4 Teams Chris, Rest KI",
+  chris_4_franky_4_rest_ai: "4 Teams Chris + 4 Teams Franky, Rest KI",
+  chris_1_franky_1_rest_ai: "1 Team Chris + 1 Team Franky, Rest KI",
+  chris_2_franky_2_rest_ai: "2 Teams Chris + 2 Teams Franky, Rest KI",
+};
+
+const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = ROOM_OWNERSHIP_PRESET_IDS.map((value) => ({
+  value,
+  label: PRESET_LABELS[value],
+}));
 
 function roomStorageKey(roomCode: string) {
   return `oly-seat:${roomCode.toUpperCase()}`;

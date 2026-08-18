@@ -58,23 +58,37 @@ import { AI_PICK_IMPORT_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-import-contract";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
 import {
+  ROOM_FLOW_SEASON_TRANSITION_TARGET,
   ROOM_FLOW_STEPS,
   describeRoomFlowButton,
   getRoomFlowStep,
   mapRoomFlowViewToFoundationViewId,
   type RoomFlowButtonAction,
 } from "@/lib/room/room-flow-controller";
+// Eigene, importfreie Datei (siehe Kommentar dort) — deshalb OHNE das Gewicht des
+// season-transition-service, den Punkt A20 unten ueber die REST-Route ansteuert.
+import { SEASON_TRANSITION_STEPS } from "@/lib/season/season-transition-steps";
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
 
 /**
- * Diese zwei Tokens leben in schweren Service-Modulen (matchday-auto-run-service zieht die halbe
- * Engine, season-snapshot-service haengt an einem "use client"-Modul). Sie sind hier bewusst als
- * Literal kopiert und werden unten per Quelltext-Kontrakt-Check gegen die Service-Datei
- * abgeglichen — Drift faellt also im Audit selbst auf, ohne dass das Skript die Module laedt.
+ * Diese Tokens/Meldungen leben in schweren Service-/Store-Modulen (matchday-auto-run-service zieht
+ * die halbe Engine, season-snapshot-service haengt an einem "use client"-Modul,
+ * season-transition-service zieht die AI-Transferfenster-Session, room-store.ts den kompletten
+ * Socket-/Persistenz-Stack). Sie sind hier bewusst als Literal kopiert und werden unten per
+ * Quelltext-Kontrakt-Check gegen die jeweilige Quelldatei abgeglichen — Drift faellt also im
+ * Audit selbst auf, ohne dass das Skript die Module laedt.
  */
 const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
+const CASH_PRIZE_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
+/** season-transition-service.ts:121 — der Riegel, den A20 beim Schritt "season_rewards" auffaengt. */
+const SEASON_REWARDS_PENDING_REASON = "season_end_cash_settlement_pending";
+/** room-store.ts:1352 — Ready-Gate-Ablehnung, exakter Wortlaut fuer A18b. */
+const ROOM_FLOW_READY_GATE_BLOCKED_MESSAGE = "Room-Flow ist noch blockiert: Human- oder AI-Schritte sind offen.";
+/** room-store.ts:1409 — Riegel-Ablehnung ("neue Saison noch nicht begonnen"), exakter Wortlaut fuer A19. */
+const ROOM_FLOW_SEASON_TRANSITION_RIEGEL_MESSAGE =
+  "Die neue Saison hat noch nicht begonnen. Schließe den Saisonwechsel im Cockpit ab — danach geht es hier weiter.";
 
 type AnyState = any;
 
@@ -311,11 +325,30 @@ function runSourceContractChecks() {
 
   const autoRunService = read("lib/season/matchday-auto-run-service.ts");
   const snapshotService = read("lib/season/season-snapshot-service.ts");
+  const cashPrizeService = read("lib/season/cash-prize-apply-service.ts");
   check(
     "S6: Confirm-Token-Literale des Audits stimmen mit den Service-Quellen ueberein (Driftschutz)",
     autoRunService.includes(`MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "${MATCHDAY_AUTO_RUN_CONFIRM_TOKEN}"`) &&
-      snapshotService.includes(`SEASON_SNAPSHOT_CONFIRM_TOKEN = "${SEASON_SNAPSHOT_CONFIRM_TOKEN}"`),
-    `${MATCHDAY_AUTO_RUN_CONFIRM_TOKEN} / ${SEASON_SNAPSHOT_CONFIRM_TOKEN}`,
+      snapshotService.includes(`SEASON_SNAPSHOT_CONFIRM_TOKEN = "${SEASON_SNAPSHOT_CONFIRM_TOKEN}"`) &&
+      cashPrizeService.includes(`CASH_PRIZE_APPLY_CONFIRM_TOKEN = "${CASH_PRIZE_APPLY_CONFIRM_TOKEN}"`),
+    `${MATCHDAY_AUTO_RUN_CONFIRM_TOKEN} / ${SEASON_SNAPSHOT_CONFIRM_TOKEN} / ${CASH_PRIZE_APPLY_CONFIRM_TOKEN}`,
+  );
+
+  // Fuer Paket C (docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): der Blocker-String, an dem A20 den
+  // season_rewards-Riegel erkennt, und die beiden woertlichen Ablehnungs-Meldungen, an denen
+  // A18b/A19 pruefen (nicht nur am Schritt) — alle drei als Literal kopiert (s.o.), hier gegen die
+  // Quelle abgeglichen.
+  const seasonTransitionService = read("lib/season/season-transition-service.ts");
+  const roomStore = read("lib/room/room-store.ts");
+  check(
+    "S7: SEASON_REWARDS_PENDING_REASON stimmt mit season-transition-service.ts ueberein (Driftschutz fuer A20)",
+    seasonTransitionService.includes(`SEASON_REWARDS_PENDING_REASON = "${SEASON_REWARDS_PENDING_REASON}"`),
+    SEASON_REWARDS_PENDING_REASON,
+  );
+  check(
+    "S8: Die beiden Ablehnungs-Meldungen des Saisonwechsel-Gates (Ready-Gate A18b, Riegel A19) stehen wortgleich in room-store.ts — die Checks pruefen an der Meldung, nicht nur am Schritt",
+    roomStore.includes(ROOM_FLOW_READY_GATE_BLOCKED_MESSAGE) && roomStore.includes(ROOM_FLOW_SEASON_TRANSITION_RIEGEL_MESSAGE),
+    "lib/room/room-store.ts:1352 (Ready-Gate) + :1409 (Riegel)",
   );
 }
 
@@ -500,15 +533,29 @@ async function main() {
     "Franky ready in Lobby",
   );
 
-  // Host: das Knopf-Modell bietet ihm KEIN 'set_ready' an (siehe Check B6) — der Umweg geht
-  // ueber den separaten "Bereit melden"-Knopf der Room-Seite (direktes setReadyState).
+  // Host: seit der mussBereitMelden-Erweiterung (room-flow-controller.ts:307-330, commit
+  // c70739f3) bietet das Knopf-Modell AUCH dem Host 'set_ready' an, sobald er selbst noch nicht
+  // bereit ist — "auch der Host" steht da woertlich im Kommentar. Hier stand bis eben nur die
+  // ALTE Lesart ("Host bekommt nie set_ready") als Bedingung (`if (!chrisLobbyKnopf.canClick)`):
+  // seit der Host-Zweig canClick:true liefert, feuerte dieser Zweig nie mehr, Chris' eigene
+  // Bereitmeldung ging NIE raus, und `startKnopf` unten zeigte weiter 'set_ready' statt
+  // 'start_room' -- B2 schlug fehl UND der Raum startete nie (Timeout auf "Raum gestartet",
+  // empirisch nachgemessen: kompletter Audit-Abbruch direkt nach B2, siehe Bericht). Der Umweg
+  // bleibt nur als Rueckfall fuer den Fall, dass canClick aus einem ANDEREN Grund false ist
+  // (z. B. "Warten auf Franky").
   const chrisLobbyKnopf = knopf(chris, chrisP.participantId);
-  if (!chrisLobbyKnopf.canClick) {
+  if (chrisLobbyKnopf.action === "set_ready" && chrisLobbyKnopf.canClick) {
+    sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+    await waitFor(
+      () => (chris.state.roomParticipants as AnyState[]).find((p) => p.participantId === chrisP.participantId)?.readyState === "ready",
+      "Chris ready in Lobby",
+    );
+  } else if (!chrisLobbyKnopf.canClick) {
     hostUmwege += 1;
     chrisSocket.emit("setReadyState", { roomCode, seatToken: chrisSeat, ready: true });
     await waitFor(
       () => (chris.state.roomParticipants as AnyState[]).find((p) => p.participantId === chrisP.participantId)?.readyState === "ready",
-      "Chris ready in Lobby",
+      "Chris ready in Lobby (Umweg)",
     );
   }
 
@@ -832,7 +879,11 @@ async function main() {
     }
   }
 
-  /** Franky ready ueber das Knopf-Modell, Chris ueber den Room-Seiten-Umweg, dann Host-Advance. */
+  /**
+   * Beide readyen ueber das Knopf-Modell (set_ready gilt seit c70739f3 auch fuer den Host, siehe
+   * Kommentar an der Lobby oben); der separate Room-Seiten-Umweg bleibt nur Rueckfall, falls
+   * canClick aus einem anderen Grund false ist. Danach Host-Advance.
+   */
   async function schrittAbschliessenUndWeiter(): Promise<string> {
     await sichereChrisVerbindung();
     await sichereFrankyVerbindung();
@@ -860,8 +911,11 @@ async function main() {
     );
 
     const chrisKnopf = knopf(chris, chrisP.participantId);
-    if (!chrisKnopf.canClick) {
-      // Umweg: die Shell-Leiste bietet dem Host kein set_ready — Room-Seite noetig (Check B6).
+    if (chrisKnopf.action === "set_ready" && chrisKnopf.canClick) {
+      sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+    } else if (!chrisKnopf.canClick) {
+      // Umweg: canClick ist aus einem ANDEREN Grund false (z. B. "Warten auf Franky"), nicht weil
+      // die Leiste dem Host kein set_ready anbietet -- das tut sie seit c70739f3 (siehe oben).
       hostUmwege += 1;
       chrisSocket.emit("setReadyState", { roomCode, seatToken: chrisSeat, ready: true });
     }
@@ -892,11 +946,13 @@ async function main() {
     durchlaufeneSchritte.join("→"),
   );
 
-  // --- B6: Der Shell-Deadlock des Hosts, an einem konkreten Zustand festgenagelt -------------
-  // Zustand: KI fertig, Gast ready, Host NICHT ready. Behauptung von Punkt 2: der Flow ist in
-  // der Shell an EINEM Ort bedienbar. Realitaet: keinem Teilnehmer bietet die Leiste jetzt einen
-  // klickbaren Knopf — der Host haengt an seiner eigenen Ready-Meldung, die nur die Room-Seite
-  // (separater "Bereit melden"-Knopf) senden kann.
+  // --- B6: Regressions-Wache gegen den Shell-Deadlock des Hosts -------------------------------
+  // Frueherer Fund (c70739f3): im Zustand "KI fertig, Gast ready, Host NICHT ready" bot die
+  // Leiste KEINEM Teilnehmer einen klickbaren Knopf — der Host haengt an seiner eigenen
+  // Ready-Meldung, die nur die Room-Seite (separater "Bereit melden"-Knopf) senden konnte. Die
+  // mussBereitMelden-Erweiterung (room-flow-controller.ts:307-330, siehe Lobby-Kommentar oben)
+  // behebt genau das: sie gibt dem Host in diesem Zustand ein klickbares 'set_ready'. Dieser
+  // Check ist seither eine Regressions-Wache, kein offener Befund mehr.
   {
     const stepDef = getRoomFlowStep(chris.state.roomFlowState.step);
     if (stepDef.aiAutoStep) {
@@ -917,10 +973,10 @@ async function main() {
       "B6: Auch der Host kann seinen Part komplett aus der Shell-Leiste bedienen (kein Klick-Deadlock)",
       hostKnopf.canClick || gastKnopf.canClick,
       `Host: label="${hostKnopf.label}" action=${hostKnopf.action} canClick=${hostKnopf.canClick}; ` +
-        `Gast: label="${gastKnopf.label}" action=${gastKnopf.action} canClick=${gastKnopf.canClick} — ` +
-        "die Leiste bietet dem Host kein set_ready; weiter geht es nur ueber den separaten " +
-        "'Bereit melden'-Knopf der Room-Seite (app/room/[roomCode]/RoomPageClient.tsx:278)",
+        `Gast: label="${gastKnopf.label}" action=${gastKnopf.action} canClick=${gastKnopf.canClick}`,
     );
+    // Chris' eigene Bereitmeldung fehlt an dieser Stelle bewusst noch (die Probe misst den
+    // Zustand DAVOR) — der naechste schrittAbschliessenUndWeiter()-Aufruf holt sie nach.
   }
 
   // --- Zyklus 1 OHNE Spieltags-Aufloesung: kehrt zurueck, schiebt aber nichts weiter ----------
@@ -1227,7 +1283,9 @@ async function main() {
       "Franky ready (standings)",
     );
     const chrisKnopf = knopf(chris, chrisP.participantId);
-    if (!chrisKnopf.canClick) {
+    if (chrisKnopf.action === "set_ready" && chrisKnopf.canClick) {
+      sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+    } else if (!chrisKnopf.canClick) {
       hostUmwege += 1;
       chrisSocket.emit("setReadyState", { roomCode, seatToken: chrisSeat, ready: true });
     }
@@ -1299,21 +1357,338 @@ async function main() {
     `${(endStand?.seasonState?.matchdayResults ?? []).length} Ergebnisse fuer ${spieltageGesamt} Spieltage`,
   );
 
-  // Season Review ist eine Endstation: erneutes Abschliessen+Weiter bleibt dort stehen.
+  /**
+   * A14 PINNTE BIS EBEN DAS GEGENTEIL (docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md Korrektur 2, dritter
+   * Fall dieses Musters nach F8 und dem season_review→season_review-Test): "Season Review ist die
+   * Endstation — kein Wrap-around zurueck in Lobby oder Zyklus" mit der Behauptung
+   * `step === "season_review"` NACH einem erneuten Weiter-Klick. Das war die Sackgasse selbst, die
+   * Paket A aufgeloest hat (`getNextRoomFlowStepId`, room-flow-controller.ts:187-189: aus
+   * `season_review` geht es jetzt IMMER weiter zu `season_transition`). Der Test haette also genau
+   * den reparierten Fehler wieder verlangt.
+   *
+   * Umgedreht statt geloescht: die EIGENTLICH gemeinte Eigenschaft — kein Wrap-around zurueck in
+   * Lobby oder Spieltag-Zyklus — bleibt bestehen. Neu ist nur, dass es jetzt einen geordneten
+   * Ausgang nach VORN gibt (`season_transition`), statt gar keinen.
+   */
   {
-    const next = await schrittAbschliessenUndWeiter().catch(() => chris.state.roomFlowState.step);
+    const next = await schrittAbschliessenUndWeiter();
     check(
-      "A14: Season Review ist die Endstation — kein Wrap-around zurueck in Lobby oder Zyklus",
-      chris.state.roomFlowState.step === "season_review",
-      `nach erneutem Weiter: step=${next}`,
+      "A14: Aus Season Review geht es weiter in den Saisonwechsel — keine Sackgasse mehr, aber (Gegenprobe) auch kein Wrap-around zurueck in Lobby oder Spieltag-Zyklus",
+      next === "season_transition",
+      `season_review→${next}`,
     );
   }
+
+  // -------------------------------------------------------------------------------------------
+  // E) Der Saisonwechsel im Raum (Paket C, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): Gast-Abweisung
+  // mit Gegenprobe, Ready-Gate, der sich erklaerende Riegel, und der Durchstich in die neue Saison.
+  // Numeriert an die A-Reihe angehaengt (A15..), weil sie inhaltlich die Saison-Kette fortsetzen.
+  // -------------------------------------------------------------------------------------------
+  section("E) Der Saisonwechsel im Raum: Gast-Abweisung, Ready-Gate, Riegel, Durchstich");
+
+  // A15/A16: `season_completion` UND `season_transition` stehen in HOST_LEVEL_ACTIONS
+  // (server-authoritative-write-guard.ts:75-76) — der Gast wird an BEIDEN Routen mit 403
+  // host_only_action abgewiesen. dryRun:true, damit ein unerwartet durchgelassener Schreibzugriff
+  // hier nichts am Spielstand veraendert, bevor A17 die Gegenprobe misst.
+  const gastCompletionVersuch = await postJson(api("/api/season/completion"), {
+    saveId: coopSaveId,
+    seasonId: coopSeasonId,
+    dryRun: true,
+    roomCode,
+    participantId: frankyP.participantId,
+    seatToken: frankySeat,
+    userId: frankyP.userId,
+  });
+  check(
+    "A15: Der Gast wird bei season_completion abgewiesen (403 host_only_action) — die Saisonende-Kette gehoert dem Host",
+    gastCompletionVersuch.status === 403 && JSON.stringify(gastCompletionVersuch.body).includes("host_only_action"),
+    `status=${gastCompletionVersuch.status} error=${gastCompletionVersuch.body.error ?? "-"}`,
+  );
+
+  const gastTransitionVersuch = await postJson(api("/api/season/transition"), {
+    saveId: coopSaveId,
+    dryRun: true,
+    action: "advance_step",
+    roomCode,
+    participantId: frankyP.participantId,
+    seatToken: frankySeat,
+    userId: frankyP.userId,
+  });
+  check(
+    "A16: Der Gast wird bei season_transition abgewiesen (403 host_only_action) — derselbe Riegel, die andere der zwei genannten Routen",
+    gastTransitionVersuch.status === 403 && JSON.stringify(gastTransitionVersuch.body).includes("host_only_action"),
+    `status=${gastTransitionVersuch.status} error=${gastTransitionVersuch.body.error ?? "-"}`,
+  );
+
+  /**
+   * A17 — DIE ZWEITE HAELFTE, sonst waeren A15/A16 nur die Haelfte des Falls (Plan, Paket C,
+   * Punkt 2: "Ein Check, der nur die Ablehnung misst, waere genau der halbe Test"). Nachgemessen
+   * (server-authoritative-write-guard.ts:66-83, HOST_LEVEL_ACTIONS): `sponsor_choice` steht dort
+   * NICHT drin — genau wie contract_renewal, contract_dissolution und Team-Verkaeufe (Plan-Text).
+   * Und die Phase erlaubt es genau JETZT: `evaluateGamePhaseAction(..., "sponsor_choice")` laesst
+   * `season_completed` ausdruecklich zu (game-phase-action-policy.ts:74-85) — der Raum steht exakt
+   * dort (A11: gamePhase "season_completed"), noch bevor die Kette unten irgendeine Station
+   * angefasst hat. Franky waehlt mit seinem EIGENEN Sitz-Token einen Sponsor fuer sein EIGENES
+   * Team — keine Host-Aktion, sondern die Art Saisonende-Aktion, die ihm laut 1.3 im Plan gehoert.
+   * Die Angebote selbst muessen nicht erst erzeugt werden: `createRoomCoopSave` ruft
+   * `ensureSeasonSponsorOffers` fuer ALLE Teams beim Praegen des Saves auf (new-game-setup-service.ts:480)
+   * — auch fuer das manuell gefuehrte Team, das seinen Sponsor bewusst erst hier waehlt.
+   */
+  {
+    const frankyTeamId = (frankyP.controlledTeamIds as string[])[0]!;
+    const standVorSponsorwahl = await leseSave(coopSaveId);
+    const frankyOffers = (standVorSponsorwahl?.seasonState?.sponsorOffersByTeamId?.[frankyTeamId] ?? []) as AnyState[];
+    const offer = frankyOffers.find((entry) => entry.seasonId === standVorSponsorwahl?.season?.id);
+    if (!offer) {
+      check(
+        "A17: Gegenprobe — Franky's eigene Saisonende-Aktion (sponsor_choice, NICHT in HOST_LEVEL_ACTIONS) geht mit seinem Sitz-Token durch",
+        false,
+        `kein Sponsor-Angebot fuer Team ${frankyTeamId} in Saison ${standVorSponsorwahl?.season?.id} gefunden — sponsorOffersByTeamId leer?`,
+      );
+    } else {
+      const sponsorWahl = await postJson(api("/api/sponsor/choose"), {
+        saveId: coopSaveId,
+        teamId: frankyTeamId,
+        offerId: offer.offerId,
+        dryRun: false,
+        roomCode,
+        participantId: frankyP.participantId,
+        seatToken: frankySeat,
+        userId: frankyP.userId,
+      });
+      check(
+        "A17: Gegenprobe — Franky's eigene Saisonende-Aktion (sponsor_choice, NICHT in HOST_LEVEL_ACTIONS) geht mit seinem Sitz-Token durch, waehrend derselbe Raum A15/A16 gerade abgewiesen hat",
+        sponsorWahl.status === 200 && sponsorWahl.body.success === true,
+        `status=${sponsorWahl.status} success=${sponsorWahl.body.success} error=${JSON.stringify(sponsorWahl.body.error ?? "-")} team=${frankyTeamId} offer=${offer.offerId}`,
+      );
+    }
+  }
+
+  /**
+   * A18 — DAS READY-GATE AM SAISONWECHSEL (Paket A, E3): `season_transition` hat `aiAutoStep:
+   * false` und laeuft ueber GENAU dasselbe `canHostAdvance`-Gate wie jeder Spieltag-Schritt
+   * (buildRoomFlowState, room-flow-controller.ts:239-253). Frisch auf dem Schritt sind BEIDE
+   * `not_ready` (advanceRoomFlow resetet bei jedem Schrittwechsel, room-store.ts:1427) — der Host
+   * darf noch nicht weiter, und ein Versuch wird server-seitig abgelehnt (room-store.ts:1351-1353),
+   * nicht nur clientseitig ausgegraut.
+   */
+  await sichereChrisVerbindung();
+  await sichereFrankyVerbindung();
+  check(
+    "A18: Frisch auf season_transition ist noch niemand bereit — canHostAdvance ist false",
+    chris.state.roomFlowState.step === "season_transition" && chris.state.roomFlowState.canHostAdvance === false,
+    `step=${chris.state.roomFlowState.step}, canHostAdvance=${chris.state.roomFlowState.canHostAdvance}`,
+  );
+  const vorschubOhneReady = await new Promise<AnyState>((resolve) => {
+    chrisSocket.once("roomError", resolve);
+    chrisSocket.emit("advanceRoomFlow", { roomCode, seatToken: chrisSeat });
+  });
+  check(
+    "A18b: Der Host kann season_transition nicht weiterschalten, solange der Mitspieler nicht bereit ist (Ready-Gate haelt, Meldung benennt es)",
+    vorschubOhneReady?.message === ROOM_FLOW_READY_GATE_BLOCKED_MESSAGE && chris.state.roomFlowState.step === "season_transition",
+    `Meldung="${vorschubOhneReady?.message}", step=${chris.state.roomFlowState.step}`,
+  );
+
+  // Beide readyen ueber das Knopf-Modell (wie schrittAbschliessenUndWeiter, aber ohne den
+  // Vorschub-Klick selbst — den brauchen A19/A20 getrennt, um die Ablehnungs-Meldung zu pruefen).
+  sendeKnopfAktion(franky.socket, { action: "set_ready", roomCode, seatToken: frankySeat, toggleReadyTo: true });
+  await waitFor(
+    () => (chris.state.roomParticipants as AnyState[]).find((p) => p.participantId === frankyP.participantId)?.readyState === "ready",
+    "Franky ready (season_transition)",
+  );
+  const chrisTransitionKnopf = knopf(chris, chrisP.participantId);
+  if (chrisTransitionKnopf.action === "set_ready" && chrisTransitionKnopf.canClick) {
+    sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+  } else if (!chrisTransitionKnopf.canClick) {
+    hostUmwege += 1;
+    chrisSocket.emit("setReadyState", { roomCode, seatToken: chrisSeat, ready: true });
+  }
+  await waitFor(() => chris.state.roomFlowState.canHostAdvance === true, "Host darf weiter (season_transition, Ready-Gate erfuellt)");
+
+  /**
+   * A19 — DER RIEGEL ERKLAERT SICH (Paket A): beide bereit, aber die neue Saison hat im Spielstand
+   * noch nicht begonnen (`seasonHasAdvanced` liest `!isSeasonEndPhase(gameState.gamePhase)`,
+   * room-store.ts:1386) — der Vorschub wird trotzdem abgelehnt (room-store.ts:1404-1412), mit
+   * einem Grund, der das COCKPIT benennt, statt beiden Coaches wortlos die Bereitmeldung
+   * wegzuraeumen (genau das waere sonst der Nebeneffekt: der Rumpf darunter setzt jeden
+   * Teilnehmer auf not_ready zurueck). Geprueft wird die MELDUNG, nicht nur der Schritt — ein
+   * Test, der nur `step === "season_transition"` misst, wuerde denselben Text durch ein
+   * kommentarloses "geht nicht" ersetzen lassen, ohne rot zu werden.
+   */
+  const vorschubVorSaisonwechsel = await new Promise<AnyState>((resolve) => {
+    chrisSocket.once("roomError", resolve);
+    chrisSocket.emit("advanceRoomFlow", { roomCode, seatToken: chrisSeat });
+  });
+  check(
+    "A19: Beide bereit, aber die neue Saison hat noch nicht begonnen — der Vorschub wird abgelehnt, mit einem Grund, der das Cockpit benennt",
+    vorschubVorSaisonwechsel?.message === ROOM_FLOW_SEASON_TRANSITION_RIEGEL_MESSAGE && chris.state.roomFlowState.step === "season_transition",
+    `Meldung="${vorschubVorSaisonwechsel?.message}", step=${chris.state.roomFlowState.step}`,
+  );
+
+  /**
+   * A20 — DER DURCHSTICH: Saisonende-Kette (SEASON_TRANSITION_STEPS, neun Stationen) plus
+   * Pre-Season-Workflow, als HOST ueber Sitz-Token. Die Reihenfolge wird NICHT nachgebaut: jeder
+   * Hop ruft `advance_step` und LIEST aus der Antwort, welche Phase als naechstes dran ist
+   * (computeSeasonTransitionAdvance bestimmt sie aus der Phase im Save, season-transition-service.ts:
+   * 378-442) — reagiert wird nur auf den einen Blocker, den die Kette selbst meldet und benennt:
+   * `season_rewards` haelt an, bis die Saisonende-Abrechnung gebucht ist
+   * (SEASON_REWARDS_PENDING_REASON, season-transition-service.ts:121-125), gebucht wird ueber die
+   * EIGENE, bestaetigte Route (`/api/season/cash-prize-apply`) — nicht Teil der neun Stationen,
+   * aber der einzige App-Weg, den Riegel zu oeffnen (season-transition-service.ts:407-418 laesst
+   * den Riegel ausdruecklich AUCH im Server greifen, nicht nur im UI-Knopf).
+   */
+  const stationenDurchlaufen: string[] = [];
+  let ketteFehler = "";
+  for (let hop = 0; hop < SEASON_TRANSITION_STEPS.length + 2 && !ketteFehler; hop += 1) {
+    const zwischenstand = await leseSave(coopSaveId);
+    if (zwischenstand?.gamePhase === "next_season_ready") break;
+    await sichereChrisVerbindung();
+    const advance = await postJson(api("/api/season/transition"), {
+      saveId: coopSaveId,
+      dryRun: false,
+      action: "advance_step",
+      roomCode,
+      participantId: chrisP.participantId,
+      seatToken: chrisSeat,
+      userId: chrisP.userId,
+    });
+    if (advance.status === 200 && advance.body.success === true) {
+      stationenDurchlaufen.push(advance.body.summary?.gamePhase ?? "?");
+      continue;
+    }
+    const blocker = (advance.body.blockingReasons ?? advance.body.summary?.blockingReasons ?? [])[0];
+    if (blocker === SEASON_REWARDS_PENDING_REASON) {
+      const cashApply = await postJson(api("/api/season/cash-prize-apply"), {
+        saveId: coopSaveId,
+        seasonId: coopSeasonId,
+        phase: "season_end",
+        execute: true,
+        confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
+        roomCode,
+        participantId: chrisP.participantId,
+        seatToken: chrisSeat,
+        userId: chrisP.userId,
+      });
+      if (!(cashApply.status === 200 && cashApply.body.success === true)) {
+        ketteFehler = `cash-prize-apply blockiert: status=${cashApply.status} error=${JSON.stringify(cashApply.body.error ?? cashApply.body.summary?.blockingReasons ?? "-")}`;
+        break;
+      }
+      stationenDurchlaufen.push("cash_prize_apply");
+      continue;
+    }
+    ketteFehler = `advance_step blockiert bei gamePhase=${zwischenstand?.gamePhase}: status=${advance.status} blocker=${JSON.stringify(advance.body.blockingReasons ?? advance.body.error ?? "-")}`;
+    break;
+  }
+
+  let preseasonFehler = ketteFehler;
+  if (!preseasonFehler) {
+    const preseasonPreview = await postJson(api("/api/season/preseason-workflow"), {
+      saveId: coopSaveId,
+      dryRun: true,
+      roomCode,
+      participantId: chrisP.participantId,
+      seatToken: chrisSeat,
+      userId: chrisP.userId,
+    });
+    const setupSchritt = (preseasonPreview.body.summary?.steps as AnyState[] | undefined)?.find(
+      (entry) => entry.stepId === "next_season_setup",
+    );
+    if (!setupSchritt?.confirmToken) {
+      preseasonFehler = `preseason-workflow Preview ohne confirmToken fuer next_season_setup: ${JSON.stringify(preseasonPreview.body).slice(0, 300)}`;
+    } else {
+      const preseasonApply = await postJson(api("/api/season/preseason-workflow"), {
+        saveId: coopSaveId,
+        dryRun: false,
+        stepId: "next_season_setup",
+        confirmToken: setupSchritt.confirmToken,
+        roomCode,
+        participantId: chrisP.participantId,
+        seatToken: chrisSeat,
+        userId: chrisP.userId,
+      });
+      if (!(preseasonApply.status === 200 && preseasonApply.body.success === true)) {
+        preseasonFehler = `preseason-workflow next_season_setup: status=${preseasonApply.status} error=${JSON.stringify(preseasonApply.body.error ?? preseasonApply.body.summary?.blockingReasons ?? "-")}`;
+      }
+    }
+  }
+  check(
+    "A20: Der Durchstich — Host faehrt die Saisonende-Kette (neun Stationen) plus Pre-Season-Workflow, ohne die Reihenfolge nachzubauen (der Server bestimmt je Hop die naechste Station aus der Phase im Save)",
+    preseasonFehler === "",
+    preseasonFehler || `${stationenDurchlaufen.join(" → ")} → next_season_setup`,
+  );
+
+  /**
+   * Nach dem Durchstich hat die neue Saison im SPIELSTAND begonnen — jetzt darf derselbe Vorschub,
+   * den A19 noch ablehnen musste, tatsaechlich durch (`seasonHasAdvanced` liest denselben
+   * Spielstand neu, room-store.ts).
+   *
+   * ZUERST ABER EINE BEREIT-RUNDE, und die ist keine Bequemlichkeit: der Durchstich besteht aus
+   * neun `advance_step`-Aufrufen plus `next_season_setup`, allesamt Raum-Schreibvorgaenge DES
+   * HOSTS. Und jeder Raum-Schreibvorgang setzt seinen Urheber auf `not_ready` und feuert
+   * `ready_invalidated` (`applyRoomGameplayWrite`, lib/room/room-store.ts:750-763) — eine
+   * bewusste Regel, die es lange vor diesem Paket gab: wer etwas aendert, bestaetigt neu.
+   *
+   * Der erste Anlauf dieses Checks nahm an, der Ready-Stand ueberlebe den Durchstich, und war
+   * deshalb rot: der Knopf bot `set_ready` statt `advance_flow`. Gemessen war das KEIN
+   * Steckenbleiben — `canClick` stand auf `true`, der Host wurde zum Neu-Bestaetigen aufgefordert.
+   * Die Pruefung hoerte schlicht eine Station zu frueh auf. Die geprueffte Eigenschaft (kommt der
+   * Raum in die neue Saison?) bleibt unveraendert; nur der Weg dorthin ist jetzt der, den beide
+   * Coaches im Spiel auch gehen.
+   */
+  await sichereChrisVerbindung();
+  await sichereFrankyVerbindung();
+  let saisonstartVorschubFehler = "";
+  if (preseasonFehler === "") {
+    sendeKnopfAktion(franky.socket, { action: "set_ready", roomCode, seatToken: frankySeat, toggleReadyTo: true });
+    sendeKnopfAktion(chrisSocket, { action: "set_ready", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+    await waitFor(
+      () => chris.state.roomFlowState.canHostAdvance === true,
+      "Beide erneut bereit nach dem Durchstich (jeder Schreibvorgang verwirft die Bereitmeldung seines Urhebers)",
+    ).catch((error) => {
+      saisonstartVorschubFehler = String(error);
+    });
+  }
+  if (preseasonFehler === "" && saisonstartVorschubFehler === "") {
+    const nachDurchstichKnopf = knopf(chris, chrisP.participantId);
+    if (nachDurchstichKnopf.action !== "advance_flow" || !nachDurchstichKnopf.canClick) {
+      saisonstartVorschubFehler = `Host-Knopf bietet kein advance_flow nach dem Durchstich: action=${nachDurchstichKnopf.action} canClick=${nachDurchstichKnopf.canClick}`;
+    } else {
+      sendeKnopfAktion(chrisSocket, { action: "advance_flow", roomCode, seatToken: chrisSeat, toggleReadyTo: true });
+      await waitFor(() => chris.state.roomFlowState.step !== "season_transition", "Flow verlaesst season_transition nach dem Durchstich").catch(
+        (error) => {
+          saisonstartVorschubFehler = String(error);
+        },
+      );
+    }
+  }
+  check(
+    "A20b: Nach dem Durchstich schaltet der Raum-Flow von season_transition auf den Saisonstart-Schritt weiter — kein Stehenbleiben mehr",
+    preseasonFehler === "" && saisonstartVorschubFehler === "" && chris.state.roomFlowState.step === ROOM_FLOW_SEASON_TRANSITION_TARGET,
+    saisonstartVorschubFehler ||
+      `season_transition→${chris.state.roomFlowState.step} (erwartetes Ziel: ${ROOM_FLOW_SEASON_TRANSITION_TARGET}, E4/gemessen an startRoom)`,
+  );
+
+  // A21: der Raum meldet danach die NEUE Saison und Spieltag 1 — activeSeasonId/activeMatchday
+  // werden beim Rueckweg aus season_transition aus dem Spielstand nachgezogen (room-store.ts:1417-1426).
+  const nachDurchstichStand = await leseSave(coopSaveId);
+  check(
+    "A21: Der Raum meldet nach dem Wechsel die NEUE Saison und Spieltag 1 — nicht die alte",
+    chris.state.multiplayerRoom.activeSeasonId === nachDurchstichStand?.season?.id &&
+      chris.state.multiplayerRoom.activeSeasonId !== coopSeasonId &&
+      chris.state.multiplayerRoom.activeMatchday === 1 &&
+      nachDurchstichStand?.season?.currentMatchday === 1 &&
+      nachDurchstichStand?.gamePhase === "season_active",
+    `activeSeasonId ${coopSeasonId}→${chris.state.multiplayerRoom.activeSeasonId} (Save-Saison: ${nachDurchstichStand?.season?.id}), ` +
+      `activeMatchday=${chris.state.multiplayerRoom.activeMatchday}, save.currentMatchday=${nachDurchstichStand?.season?.currentMatchday}, ` +
+      `gamePhase=${nachDurchstichStand?.gamePhase}`,
+  );
 
   check(
     "B7: Die GESAMTE Saison lief ueber describeRoomFlowButton().action + die geteilte Event-Zuordnung — ohne Host-Ready-Umwege",
     hostUmwege === 0,
-    `Host brauchte ${hostUmwege}x den separaten 'Bereit melden'-Knopf der Room-Seite (setReadyState), ` +
-      "weil describeRoomFlowButton dem Host nie 'set_ready' anbietet (lib/room/room-flow-controller.ts:254, Branch nur fuer !isHost)",
+    `Host brauchte ${hostUmwege}x den separaten 'Bereit melden'-Knopf der Room-Seite (setReadyState) statt des ` +
+      "eigenen set_ready-Knopfmodells — erwartet ist 0, seit mussBereitMelden (room-flow-controller.ts:307-330) " +
+      "dem Host in jedem Schritt ein klickbares 'set_ready' anbietet, sobald er selbst noch nicht bereit ist",
   );
 
   // -------------------------------------------------------------------------------------------
@@ -1404,14 +1779,25 @@ async function main() {
     `status=${simBeideOffline.status} error=${simBeideOffline.body.error ?? "-"}`,
   );
 
+  /**
+   * "UNVERAENDERT" heisst: derselbe Schritt wie VOR der Trennung — GEMESSEN, nicht hineingeschrieben.
+   *
+   * Hier stand fest `=== "season_review"`, und das war der VIERTE Check in diesem Vorhaben, der den
+   * alten Endzustand als den richtigen festhielt (nach A14 und zwei Vitest-Faellen): seit der Raum
+   * den Saisonwechsel kennt, endet der Lauf dort nicht mehr. Ihn auf den neuen Zielwert
+   * umzuschreiben waere nur die halbe Lehre gewesen — dieser Check misst "der Rejoin aendert
+   * nichts", und dafuer ist JEDER feste Schrittname die falsche Groesse. Er schlaegt sonst beim
+   * naechsten Ausbau des Flows wieder an, ohne dass an der geprueften Eigenschaft etwas fehlt.
+   */
+  const stepVorTrennung = chris.state.roomFlowState.step;
   const chrisSocketNeu = await connect(opts.baseUrl);
   const chrisNeu = trackSocket(chrisSocketNeu);
   await emitJoined(chrisSocketNeu, "rejoinRoom", { roomCode, seatToken: chrisSeat });
   await waitFor(() => Boolean(chrisNeu.state), "Chris hat nach Rejoin roomState");
   check(
     "D5: Rejoin nach Doppel-Trennung fuehrt in denselben Raum mit unveraendertem Endstand zurueck",
-    chrisNeu.state.multiplayerRoom.saveId === coopSaveId && chrisNeu.state.roomFlowState.step === "season_review",
-    `saveId=${chrisNeu.state.multiplayerRoom.saveId === coopSaveId}, step=${chrisNeu.state.roomFlowState.step}, status=${chrisNeu.state.multiplayerRoom.status}`,
+    chrisNeu.state.multiplayerRoom.saveId === coopSaveId && chrisNeu.state.roomFlowState.step === stepVorTrennung,
+    `saveId=${chrisNeu.state.multiplayerRoom.saveId === coopSaveId}, step=${chrisNeu.state.roomFlowState.step} (vor der Trennung: ${stepVorTrennung}), status=${chrisNeu.state.multiplayerRoom.status}`,
   );
   beobachtung(
     `Der Raum-Status blieb waehrend der Doppel-Trennung "${chrisNeu.state.multiplayerRoom.status}" — der Zustand ` +

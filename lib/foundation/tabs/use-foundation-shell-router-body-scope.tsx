@@ -8974,6 +8974,10 @@ export function useFoundationShellRouterBodyScope({
     // KOOP: die EIGENE Sicht statt des geteilten Top-Level-`newGameFlow` — sonst zeigt der
     // Einstiegs-Checklisten-Block (Home) Chris' Fortschritt auch fuer Franky an.
     newGameFlow: activeNewGameFlow,
+    // Paket B: fuer den Host-Vorbehalt am Saisonwechsel-Gate — siehe Kommentar dort. Das
+    // Cockpit-Panel selbst bekommt weiterhin KEIN Raum-Wissen, nur das fertige Gate.
+    roomContext,
+    roomLiveState,
     selectedTeam,
     rosterPlayers,
     selectedTeamFacilityState,

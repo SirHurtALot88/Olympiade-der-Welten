@@ -28,7 +28,7 @@ import { getActiveTeamRivalTeamIds } from "@/lib/rivalries/team-rivalries";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { FoundationRoomFlowBar } from "@/components/foundation/FoundationRoomFlowBar";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import type { RoomParticipant } from "@/types/game";
+import { findOwnRoomParticipant } from "@/lib/room/online-room-model";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
 import {
   FACILITY_CATALOG,
@@ -1501,9 +1501,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             // also unsichtbar ohne Hover — eine Aktion des Mitspielers (Transfer, Lineup, Spieltag)
             // ging damit praktisch spurlos an einem vorbei. Die Notiz steht jetzt zusaetzlich als
             // eigene sichtbare Zeile.
-            const roomIdentity = roomLiveState?.roomParticipants.find(
-              (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
-            );
+            // Entdoppelt (Paket B): dieselbe Suche stand hier vorher direkt inline und ein zweites
+            // Mal am Host-Vorbehalt des Saisonwechsel-Gates — siehe Kommentar an
+            // `findOwnRoomParticipant` (lib/room/online-room-model.ts).
+            const roomIdentity = findOwnRoomParticipant(roomLiveState, roomContext.participantId);
             return (
               <>
                 <div

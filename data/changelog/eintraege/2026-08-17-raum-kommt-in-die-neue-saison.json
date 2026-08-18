@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-17",
+  "seite": "Multiplayer",
+  "text": "Ein gemeinsamer Raum kommt jetzt in die nächste Saison. Bisher endete der Raum-Ablauf im Season Review: der Host klickte „Weiter\" und blieb dort — es gab schlicht keinen Schritt danach, und weil der Raum seine Saison und seinen Spieltag nur beim Weiterschalten nachzieht, warb er anschließend für immer mit der alten Saison. Neu ist genau EIN Schritt: „Saisonwechsel\". Er baut den Saisonende-Assistenten nicht nach — der läuft unverändert im Cockpit — sondern hält den Raum davor an, bis beide Coaches bereit gemeldet haben. Damit ist auch die zweite Lücke zu: bisher konnte der Host die Saison abschließen, während der Mitspieler noch Verträge verlängerte oder verkaufte. Sobald die neue Saison im Spielstand steht, springt der Raum auf den Schritt, mit dem eine Saison im Raum beginnt, und zieht Saison und Spieltag mit. Und solange sie noch nicht steht, sagt der Raum warum, statt beiden Coaches wortlos die Bereitmeldung wegzuräumen.",
+  "gewicht": "grundlegend",
+  "version": "0.5"
+}

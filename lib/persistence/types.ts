@@ -15,7 +15,10 @@ export type SaveSummary = {
    */
   createdBy?: string | null;
   scenarioMeta?: ScenarioMeta;
-  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  // Paket 2: an `ScenarioMeta["saveMode"]` gehaengt statt einer eigenen Kopie der Werte-Liste --
+  // spart HIER wenigstens die dritte Kopie derselben Groesse (Fund/Begruendung an ScenarioMeta.saveMode,
+  // lib/data/olyDataTypes.ts).
+  saveMode?: NonNullable<ScenarioMeta["saveMode"]>;
 };
 
 export type PersistedSaveGame = SaveGameState & {
