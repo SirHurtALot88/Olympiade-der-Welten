@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-18",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Beim Raumstart wird die Liga im Hintergrund gedraftet — das dauert gut zwei Minuten, und in dieser Zeit schreibt im Raum ständig jemand in den Spielstand: die Oberfläche beim Öffnen, der Mitspieler beim Sponsor, ein Einkauf. Der Riegel gegen gleichzeitiges Schreiben wies den Draft dann ab, und der brach den ganzen Lauf ab: Status „fehlgeschlagen“, 31 von 32 Teams ohne einen einzigen Spieler, Raum unspielbar bis jemand im Cockpit „Erneut versuchen“ fand. In fünf gemessenen Raumstarts traf es einen. Der Draft setzt jetzt nach — er liest neu und bedient nur noch die Teams, die wirklich leer geblieben sind; menschlich geführte Teams bleiben dabei ausgeschlossen wie im ersten Anlauf. Gemessen mit 17 erzwungenen Schreibvorgängen während des Drafts: der Lauf wurde fertig statt abzubrechen. Andere Fehler werden weiterhin nicht wiederholt, und nach drei Anläufen bleibt es beim ehrlichen „fehlgeschlagen“.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-18",
       "seite": "Einsatzliste",
       "pr": null,
       "text": "Der Knopf in „Meine Teams“ gibt jetzt zuerst deine eigenen Aufstellungen ab. Bisher holte er für jedes offene Team den KI-Vorschlag — das war richtig, solange ein Teamwechsel den Entwurf ohnehin wegwarf, denn eigene Entwürfe gab es dann gar nicht. Jetzt gibt es sie, und wo einer vorliegt, geht er ab; der Vorschlag kommt nur noch für Teams, die du nicht selbst aufgestellt hast. Die Beschriftung nennt die Mischung („2 eigene Aufstellungen + 2 KI-Vorschläge abgeben“), und die Rückfrage vor dem Festlegen schreibt je Team dazu, woher die Aufstellung kommt. Ein unvollständiger eigener Entwurf wird abgegeben und nicht heimlich gegen einen Vorschlag getauscht — wird er abgelehnt, steht der Grund samt Teamname da.",
