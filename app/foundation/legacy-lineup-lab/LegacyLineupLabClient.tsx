@@ -28,6 +28,7 @@ import {
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
 import { fasseSammelAbgabeZusammen, type SammelAbgabeAntwort } from "@/lib/lineups/sammel-aufstellung-abgabe";
+import { erzeugeEntwurfGedaechtnis } from "@/lib/lineups/entwurf-gedaechtnis";
 import { getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
@@ -1158,6 +1159,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const lastAutoPreviewKeyRef = useRef("");
   const lastAiInsightKeyRef = useRef("");
   const skipNextAutoPersistRef = useRef(false);
+  // Haelt den Entwurf jedes verlassenen Teams, damit der Teamwechsel ihn nicht mehr wegwirft
+  // (siehe `lib/lineups/entwurf-gedaechtnis.ts`). Ref und nicht State — daran haengt keine
+  // Zeichnung, und ein Neuaufbau der Ansicht darf ihn verwerfen.
+  const entwurfGedaechtnisRef = useRef(erzeugeEntwurfGedaechtnis());
   const recentlyAssignedSlotTimeoutRef = useRef<number | null>(null);
   const lastMissingFocusRequestKeyRef = useRef<string | null>(null);
 
@@ -1659,16 +1664,32 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }),
     [options.teams, props.activeOwnerId, params.matchdayId, selectedMatchdayOption?.label],
   );
-  const jumpToMyTeam = useCallback(
-    (teamId: string) => {
-      if (teamId === params.teamId) {
+  /**
+   * EIN WEG FUER DEN TEAMWECHSEL — vorher gab es drei, und zwei davon machten die Arbeit doppelt.
+   *
+   * Eingebettet fuehrt die Schale das aktive Team. Sie meldet es ueber `defaultTeamId` zurueck,
+   * worauf der Effekt weiter unten laedt. Wer hier ZUSAETZLICH `loadContext` ruft, laesst dieselbe
+   * Ladung zweimal anlaufen — und uebergeht, dass die Schale einen Wechsel ablehnen darf
+   * (`setActiveManagerTeam` weist ein Team ab, das es im Spielstand nicht gibt, und schreibt eine
+   * Warnung): geladen worden waere es hier trotzdem.
+   *
+   * Ohne Schale (die eigenstaendige Seite `/foundation/legacy-lineup-lab`) gibt es niemanden, der
+   * es zurueckmeldet — dort laedt dieser Weg selbst.
+   */
+  const wechsleTeam = useCallback(
+    (nextTeamId: string) => {
+      if (!nextTeamId || nextTeamId === params.teamId) {
         return;
       }
-      props.onTeamChange?.(teamId);
-      void loadContext({ teamId }, source);
+      if (props.embedded && props.onTeamChange) {
+        props.onTeamChange(nextTeamId);
+        return;
+      }
+      void loadContext({ teamId: nextTeamId }, source);
     },
     [loadContext, params.teamId, props, source],
   );
+  const jumpToMyTeam = wechsleTeam;
   const missingSeasonFormCards = Boolean(context && (context.formCards?.length ?? 0) === 0);
   const focusV2FormMiniChipsBySide = useMemo(() => {
     const buildSide = (disciplineSide: "d1" | "d2") => {
@@ -3476,6 +3497,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const effectiveSource = nextSource ?? source;
     const shouldResetTransient = options?.resetTransient ?? true;
     const nextParams = { ...params, ...overrides };
+    // Der Entwurf des Teams, das gerade verlassen wird, bleibt im Gedaechtnis. Wann NICHT gemerkt
+    // wird (gleicher Ort, kein Entwurf), entscheidet das Gedaechtnis selbst — dort steht der Grund.
+    entwurfGedaechtnisRef.current.merkeBeimVerlassen({
+      von: { ...params, source },
+      nach: { ...nextParams, source: effectiveSource },
+      entwurf: context ? { selections, captains, modifiers, teamIntensity } : null,
+    });
     const query = new URLSearchParams(
       Object.entries(nextParams).filter(([, value]) => Boolean(value)) as Array<[string, string]>,
     );
@@ -3526,6 +3554,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         setAiBatchSummary(null);
         setIsPreviewPanelOpen(false);
         setIsAiPreviewPanelOpen(false);
+        /**
+         * DIESE VIER HING FRUEHER DER NEUAUFBAU AB.
+         *
+         * Solange die Schale die Ansicht beim Teamwechsel neu aufbaute, war jeder angefasste Slot,
+         * jede offene Formkarten-Zelle und jede Hervorhebung danach automatisch weg. Ohne den
+         * Neuaufbau muessen sie hier fallen: sie zeigen auf den Kader und die Formkarten des
+         * ALTEN Teams, und eine offene Auswahl-Zelle wuerde ihren naechsten Klick auf das neue
+         * Team schreiben.
+         */
+        setActiveSlotKey(null);
+        setRecentlyAssignedSlotKey(null);
+        setActiveMissingHighlightKey(null);
+        setActiveFormPickCell(null);
       }
       /**
        * GEMELDET VON CHRIS: die Einsatzliste laedt „einfach minutenlang".
@@ -3551,10 +3592,27 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           nextCaptains[entry.disciplineSide] = entry.activePlayerId;
         }
       }
-      setSelections(nextSelections);
-      setTeamIntensity("normal");
-      setCaptains(nextCaptains);
-      setModifiers(applyPlannedFormCardsToModifiers(payload.context, normalizeLineupModifiers(payload.context?.existingDraft?.modifiers)));
+      /**
+       * Ein gemerkter Entwurf gewinnt — zu Team B und zurueck, Auswahl steht wieder da. Ohne
+       * gemerkten Entwurf gewinnt der gespeicherte Draft vom Server; beim ERSTEN Oeffnen ist das
+       * immer der Fall, und nach jedem Schreibvorgang wieder (siehe `vergiss`/`vergissAlles`).
+       */
+      const gewaehlt = entwurfGedaechtnisRef.current.waehleBeimLaden(
+        { ...payload.params, source: payload.source },
+        {
+          selections: nextSelections,
+          captains: nextCaptains,
+          modifiers: applyPlannedFormCardsToModifiers(
+            payload.context,
+            normalizeLineupModifiers(payload.context?.existingDraft?.modifiers),
+          ),
+          teamIntensity: "normal",
+        },
+      );
+      setSelections(gewaehlt.entwurf.selections);
+      setTeamIntensity(gewaehlt.entwurf.teamIntensity);
+      setCaptains(gewaehlt.entwurf.captains);
+      setModifiers(gewaehlt.entwurf.modifiers);
       setLineupUndoSnapshot(null);
       setHoveredCandidate(null);
     } catch (error) {
@@ -3890,6 +3948,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       setDraft(payload.draft ?? null);
+      // Geschrieben heisst: fuer dieses Team hat der Server jetzt die Wahrheit. Ein gemerkter
+      // Entwurf duerfte sie beim naechsten Hinwechseln nicht mehr ueberdecken.
+      entwurfGedaechtnisRef.current.vergiss({ ...params, source });
       setWarnings(payload.warnings ?? []);
       if (!options?.silent) {
         setMessage(buildLineupSaveFeedback(entriesToSave, successMessage));
@@ -4092,6 +4153,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (zusammenfassung.gespeicherteTeamIds.length > 0) {
+        // Gleicher Grund wie beim Einzelweg — hier nur fuer jedes geschriebene Team.
+        for (const geschriebenesTeam of zusammenfassung.gespeicherteTeamIds) {
+          entwurfGedaechtnisRef.current.vergiss({ ...params, teamId: geschriebenesTeam, source });
+        }
         await loadContext(params, source);
         /**
          * EINMAL melden, nicht je Team: `onLineupSaved` zieht im Shell einen kompletten Nachladen
@@ -4397,10 +4462,17 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   async function handleOpenAiBatchDetails(entry: AiBatchPreviewEntry) {
-    setParams((current) => ({
-      ...current,
-      teamId: entry.teamId,
-    }));
+    /**
+     * Frueher stand hier nur `setParams` — das reichte, solange die Schale die Einsatzliste beim
+     * Teamwechsel ohnehin neu aufbaute. Ohne den Neuaufbau wuerde der Kontext danach weiter dem
+     * ALTEN Team gehoeren, waehrend im Team-Feld schon das neue steht. Also wird hier wirklich
+     * geladen — und zwar OHNE die fluechtigen Zustaende zu leeren, sonst raeumt die Ladung genau
+     * die Stapel-Vorschau weg, deren Zeile gerade angeklickt wurde.
+     *
+     * Die Meldung an die Schale kommt DANACH: dann stimmen `defaultTeamId` und `params.teamId`
+     * bereits ueberein und der Effekt laedt nicht ein zweites Mal.
+     */
+    await loadContext({ teamId: entry.teamId }, source, { resetTransient: false });
     props.onTeamChange?.(entry.teamId);
     setWarnings(entry.warnings);
     await handleAiPreviewForTeam(entry.teamId);
@@ -4488,6 +4560,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       if (dryRun) {
         setMessage(`Batch-Test bereit: ${payload.summary.plannedLineups} Auto-Teams würden gespeichert.`);
       } else {
+        // Der Stapel schreibt viele Teams auf einmal und meldet nicht zurueck, welche genau.
+        // Deshalb faellt hier das ganze Gedaechtnis: lieber einen Entwurf zu viel verlieren als
+        // einen frisch geschriebenen Stand hinter einem alten Entwurf verstecken.
+        entwurfGedaechtnisRef.current.vergissAlles();
         await loadContext(params, source);
         await handleAiPreviewAllTeams();
         setMessage(`Batch gespeichert: ${payload.summary.savedTeams} Auto-Teams lokal uebernommen.`);
@@ -6194,11 +6270,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <select
                 className={`input legacy-lineup-select${selectedTeamIsReady ? " is-complete" : ""}`}
                 value={params.teamId}
-                onChange={(event) => {
-                  const nextTeamId = event.target.value;
-                  props.onTeamChange?.(nextTeamId);
-                  void loadContext({ teamId: nextTeamId }, source);
-                }}
+                onChange={(event) => wechsleTeam(event.target.value)}
               >
                 {filteredTeamOptions.map((team) => (
                   <option key={team.id} value={team.id}>
