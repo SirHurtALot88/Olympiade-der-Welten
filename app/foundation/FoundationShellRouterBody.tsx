@@ -2526,7 +2526,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "lineup" || activeView === "lineupV2" ? (
           <FoundationLineupPanel
             active
-            clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
+            /**
+             * DIE TEAM-ID GEHOERT NICHT IN DIESEN SCHLUESSEL.
+             *
+             * GEMELDET VON CHRIS: „wenn ich das team wechsel dass die seite aktualisiert und die
+             * aufstellung weg ist". Genau das stand hier: aendert sich der Schluessel, baut React
+             * `LegacyLineupLabClient` komplett neu auf — mitsamt jeder ungespeicherten Auswahl.
+             *
+             * Der Neuaufbau war dabei ueberfluessig: der Client reagiert selbst auf ein von aussen
+             * geaendertes `defaultTeamId` und laedt den Kontext des neuen Teams. Er ist die
+             * einzige der fuenf Groessen, fuer die es diesen eigenen Weg gibt — Spielstand, Saison,
+             * Spieltag und Besitzer bleiben drin, dort ist ein Neuaufbau richtig.
+             */
+            clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
                 ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
