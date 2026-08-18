@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ROOM_OWNERSHIP_PRESET_IDS,
+  UnknownRoomOwnershipPresetError,
   buildOwnershipForPreset,
   buildParticipant,
   resolveFoundationSaveModeForPreset,
@@ -361,4 +362,51 @@ describe("Raum-Start mit den neuen Modi -- Save-Modus passt zum Raum-Modus (Eige
       "online_1v1",
     );
   }, 120_000);
+});
+
+/**
+ * PAKET 3 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md) — und der Zuschnitt hat sich beim Messen
+ * geaendert, das gehoert hierher:
+ *
+ * Der Plan wollte "einen der neuen Modi durch ein Tor fahren", weil ein Modus, den kein Tor
+ * durchlaeuft, still verrottet. Nachgesehen: `npm test` laeuft im CI-Job `full-test-suite`, diese
+ * Datei also auch — die neuen Modi SIND bereits im Tor, seit Paket 2. Die Annahme des Plans war
+ * ueberholt.
+ *
+ * Offen war dafuer etwas anderes, und zwar etwas, das PAKET 1 selbst aufgemacht hat: seit dort
+ * wirft `buildOwnershipForPreset` bei einem unbekannten Modus (richtig so — vorher vergab derselbe
+ * Fall still vier Teams). Der Socket-Einstieg `createRoom` hatte aber keine Stelle, die das faengt.
+ *
+ * GEMESSEN gegen einen laufenden Server, vor der Reparatur: der Client bekam WEDER `roomJoined`
+ * NOCH `roomError` — er haengt stumm — und der Wurf landete als `uncaughtException`
+ * (`at Socket.<anonymous> (lib/socket/server.ts)`). Dass der Prozess weiterlief, verdankte er
+ * allein dem Auffangnetz des Next-Dev-Servers; ein eigenes gibt es nicht.
+ *
+ * Der reale Weg dorthin ist ein Deploy: nach dem Umbenennen oder Entfernen eines Modus schickt
+ * jeder noch offene Browser-Tab weiter den alten Namen.
+ *
+ * WAS DIESE PRUEFUNG KANN UND WAS NICHT: sie liest den Quelltext und haelt fest, DASS der
+ * Einstieg den Fehlertyp faengt und als `roomError` meldet. Sie ersetzt keinen Socket-Lauf — der
+ * Beweis, dass beim Client wirklich ein `roomError` ankommt und der gueltige Modus weiter
+ * durchgeht, wurde von Hand gegen einen laufenden Server gefuehrt (Ergebnis im Commit).
+ */
+describe("Unbekannter Modus haengt den Client nicht auf (Paket 3)", () => {
+  it("createRoom wirft fuer einen unbekannten Modus, statt still vier Teams zu vergeben", () => {
+    expect(() =>
+      buildOwnershipForPreset([host], "chris_9_franky_9_rest_ai" as RoomOwnershipPreset),
+    ).toThrow(UnknownRoomOwnershipPresetError);
+  });
+
+  it("der Socket-Einstieg faengt genau diesen Fehler und meldet ihn als roomError", async () => {
+    const quelltext = await fs.readFile(path.join(process.cwd(), "lib/socket/server.ts"), "utf8");
+    const handler = quelltext.slice(quelltext.indexOf('socket.on("createRoom"'));
+    const bisEnde = handler.slice(0, handler.indexOf('socket.on("joinRoom"'));
+
+    expect(bisEnde, "ohne try/catch landet der Wurf als uncaughtException").toContain("catch");
+    expect(bisEnde).toContain("UnknownRoomOwnershipPresetError");
+    expect(bisEnde, "der Spieler braucht eine Meldung, keinen stummen Klick").toContain("emitRoomError");
+    // GEGENPROBE: nur DIESER Fehlertyp wird geschluckt — ein echter Programmfehler muss weiter
+    // fliegen, statt als hoefliche Meldung zu verschwinden.
+    expect(bisEnde).toContain("throw error");
+  });
 });

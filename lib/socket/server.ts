@@ -20,6 +20,7 @@ import {
   startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
+import { UnknownRoomOwnershipPresetError } from "@/lib/room/online-room-model";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 // WICHTIG: aus lib/auth/session-cookie importieren, NICHT aus lib/auth/session -
 // letzteres importiert next/headers, was hier (server.ts laedt dieses Modul vor
@@ -92,7 +93,40 @@ export function ensureSocketServer(httpServer: HttpServer) {
     const sessionUser = getSessionUserFromCookieHeader(socket.handshake.headers.cookie);
 
     socket.on("createRoom", (payload) => {
-      const { room, seat } = createRoom(socket.id, payload, sessionUser);
+      /**
+       * GEMESSEN, nicht vermutet (Paket 3, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): schickt ein
+       * Client einen Modus-Namen, den DIESER Serverstand nicht kennt, warf `createRoom` bis hier
+       * ungefangen durch -- `buildOwnershipForPreset` wirft seit Paket 1
+       * `UnknownRoomOwnershipPresetError` (richtig so: vorher vergab derselbe Fall still vier
+       * Teams). Sonde gegen den laufenden Server: der Client bekam WEDER `roomJoined` NOCH
+       * `roomError` -- er haengt stumm --, und der Wurf landete als `uncaughtException`. Dass der
+       * Prozess weiterlief, verdankte er allein dem Auffangnetz des Next-Dev-Servers; ein eigenes
+       * gibt es nicht (kein `process.on("uncaughtException")` in server.ts).
+       *
+       * DER REALE WEG DORTHIN ist ein Deploy: nach dem Umbenennen oder Entfernen eines Modus
+       * schickt jeder noch offene Browser-Tab weiter den alten Namen. Deshalb hier gefangen und
+       * als gewoehnliche, lesbare Ablehnung gemeldet -- derselbe `roomError`-Weg, den jede andere
+       * Ablehnung in dieser Datei nimmt und den der Foundation-Client seit Befund F6 anzeigt, ohne
+       * die Bedienleiste wegzuraeumen.
+       *
+       * Bewusst NUR dieser eine Fehlertyp: alles andere fliegt weiter, damit ein echter
+       * Programmfehler nicht als hoefliche Meldung verschwindet.
+       */
+      let erstellterRaum: ReturnType<typeof createRoom>;
+      try {
+        erstellterRaum = createRoom(socket.id, payload, sessionUser);
+      } catch (error) {
+        if (error instanceof UnknownRoomOwnershipPresetError) {
+          emitRoomError(
+            io,
+            socket.id,
+            "Dieser Spiel-Modus ist dem Server nicht bekannt. Bitte die Seite neu laden und den Modus erneut wählen.",
+          );
+          return;
+        }
+        throw error;
+      }
+      const { room, seat } = erstellterRaum;
       const participant = room.state.roomParticipants.find((entry) => entry.participantId === seat.participantId)!;
       socket.join(room.roomCode);
       socket.emit("roomJoined", {
