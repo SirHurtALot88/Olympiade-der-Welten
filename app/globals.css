@@ -25337,6 +25337,26 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   display: none;
 }
 
+/*
+ * AUSNAHME FUER DIE SCHALEN-BANNER — sonst redet die Oberflaeche nicht mit.
+ *
+ * GEMELDET VON CHRIS: „dann bitte im koop auch noch oben anzeigen dass der draft gerade läuft
+ * damit man erstmal 1-2 minuten wartet bevor man loslegt."
+ *
+ * NACHGEMESSEN (Raum, 18.08.): das Banner „Liga wird erstellt … (KI-Teams werden befuellt)" gibt es
+ * laengst, es steht auch im Baum — und es hat `display: none`. Die Regel darueber raeumt die
+ * INFORMATIONS-Callouts der Transfermarkt-Ansichten aus der Foundation-Schale; sie trifft aber ueber
+ * die gemeinsame Klasse `transfer-callout` auch das Fortschritts-Banner der Schale selbst. Zwei
+ * Minuten lang steht der Spieler damit vor einer Liga ohne Kader und bekommt kein Wort dazu.
+ *
+ * Die Ausnahme ist bewusst eng: nur `.foundation-persistence-banner`, also die Banner, die die
+ * Schale selbst setzt (Speicherfehler, Liga-Setup). Der Fehlerfall desselben Banners war nie
+ * betroffen — er traegt `is-warning` und wird von der Regel darunter ohnehin gezeigt.
+ */
+.foundation-shell .foundation-persistence-banner.transfer-callout.is-info {
+  display: grid;
+}
+
 .foundation-shell .transfer-callout.is-blocked,
 .foundation-shell .transfer-callout.is-warning,
 .foundation-shell .error-banner {
