@@ -2,6 +2,7 @@ import type { GameState, LeagueSetupTeamWarning } from "@/lib/data/olyDataTypes"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
 
 /**
  * GETEILTER LIGA-SETUP-DRAFT — EIN Ort statt drei Kopien.
@@ -107,9 +108,112 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
       ? current.gameState.teams.map((team) => team.teamId).filter((teamId) => !excludeTeamIds.has(teamId))
       : null;
 
-  void (async () => {
+  // Detached (kein `await`): der Aufrufer — HTTP-Route oder das synchrone `startRoom` — darf hier
+  // nicht zwei Minuten haengen. Das `.catch` ist kein Schmuck: ohne es waere jeder Fehler, den
+  // `fuehreLigaSetupDraftAus` nicht selbst faengt, eine unbehandelte Ablehnung und riesse je nach
+  // Node-Einstellung den ganzen Server mit.
+  void fuehreLigaSetupDraftAus({
+    persistence,
+    saveId,
+    seasonId,
+    callerWritableTeamIds,
+    excludeTeamIds: [...excludeTeamIds],
+    logPrefix,
+  }).catch((error) => {
+    console.error(`${logPrefix} Liga-Setup-Draft: unerwarteter Fehler im Hintergrundlauf:`, error);
+  });
+
+  return markedInProgress;
+}
+
+/**
+ * WIE OFT DER DRAFT NACH EINEM SCHREIBKONFLIKT NACHSETZT.
+ *
+ * Drei, nicht „unbegrenzt": jeder Versuch kostet gut eine Minute Rechenzeit. Wer in drei Anlaeufen
+ * kein ruhiges Fenster findet, hat kein Timing-Problem mehr, sondern ein anderes — und dann ist
+ * „failed" mit dem Wiederholen-Knopf im Cockpit die ehrlichere Antwort als ein Lauf, der nie endet.
+ */
+export const LIGA_DRAFT_KONFLIKT_VERSUCHE = 3;
+
+/** Der eigentliche Draft-Lauf. Als Parameter, damit Pruefungen den Konflikt herstellen koennen. */
+export type LigaDraftLauf = (
+  input: Parameters<typeof runAiPicksExecutePreview>[0],
+  persistence: PersistenceService,
+) => Promise<AiPicksRunResult>;
+
+export type LigaSetupDraftLaufErgebnis = {
+  status: "ready" | "failed";
+  /** Wie oft der Draft angesetzt wurde — 1 heisst: gleich beim ersten Mal durchgekommen. */
+  versuche: number;
+  /** Team-IDs, die der letzte Anlauf bedient hat. Beim Wiederholen nur noch die leer gebliebenen. */
+  zuletztBedienteTeamIds: string[] | null;
+};
+
+/**
+ * DER HINTERGRUNDLAUF — UND WARUM ER SICH WIEDERHOLEN KOENNEN MUSS.
+ *
+ * GEMESSEN (Raum W9A4-VQUW und drei Geschwister, 18.08.): der Draft liest den Spielstand EINMAL,
+ * rechnet gut zwei Minuten und schreibt erst am Ende. Der Koop-Riegel aus Aufgabe #46
+ * (`assertKeinVeralteterKoopSchreibvorgang`) weist genau diesen Schreibvorgang ab, sobald in der
+ * Zwischenzeit irgendwer sonst geschrieben hat — und im Raum schreibt staendig jemand: die Shell
+ * beim Oeffnen, der Mitspieler beim Sponsor, ein Kauf.
+ *
+ * Bis hierher war die Folge: der GANZE Lauf brach ab, `leagueSetupStatus: "failed"`, und im
+ * gemessenen Fall standen 31 von 32 Teams ohne einen einzigen Spieler da — der Raum war
+ * unspielbar, bis jemand im Cockpit „Erneut versuchen" fand. Einer von fuenf Raumstarts traf es.
+ *
+ * DER RIEGEL BLEIBT RICHTIG und wird hier NICHT aufgeweicht: er verhindert, dass ein zwei Minuten
+ * alter Stand die Arbeit des Mitspielers ueberschreibt. Falsch war nur die Reaktion darauf. Ein
+ * abgewiesener Schreibvorgang heisst „nimm den neuen Stand und mach nochmal" — also genau das.
+ *
+ * DIE WIEDERHOLUNG IST ENGER ALS DER ERSTE ANLAUF: sie bedient nur noch Teams, die WIRKLICH LEER
+ * sind (frisch aus der Ablage gelesen). Ein Team, das inzwischen Spieler hat — weil ein Teil des
+ * Laufs doch durchkam oder weil ein Mensch eingekauft hat —, wird nicht angefasst. Dieselbe harte
+ * Grenze wie im Reparaturweg weiter unten, und aus demselben Grund.
+ *
+ * UND SIE HAELT SICH AN DIE AUSSCHLUSSLISTE. Chris: „niemals soll mit gepickt werden für
+ * menschliche teams!" Menschliche Teams sind leer, weil sie leer BLEIBEN sollen — eine Wiederholung,
+ * die „alle leeren Teams" bedient, wuerde ihnen beim zweiten Anlauf einen Kader hinstellen. Deshalb
+ * geht `excludeTeamIds` hier durch jeden Anlauf mit.
+ */
+export async function fuehreLigaSetupDraftAus(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  seasonId: string;
+  /** Wie beim ersten Anlauf: `null` = keine Einschraenkung. */
+  callerWritableTeamIds: string[] | null;
+  excludeTeamIds: string[];
+  logPrefix: string;
+  maxKonfliktVersuche?: number;
+  draftLauf?: LigaDraftLauf;
+  wartenVorWiederholung?: (versuch: number) => Promise<void>;
+}): Promise<LigaSetupDraftLaufErgebnis> {
+  const { persistence, saveId, seasonId, logPrefix } = input;
+  const maxVersuche = input.maxKonfliktVersuche ?? LIGA_DRAFT_KONFLIKT_VERSUCHE;
+  const draftLauf = input.draftLauf ?? runAiPicksExecutePreview;
+  const ausgeschlossen = new Set(input.excludeTeamIds);
+  let zuletztBedienteTeamIds: string[] | null = null;
+
+  for (let versuch = 1; versuch <= maxVersuche; versuch += 1) {
+    // Beim ERSTEN Anlauf die ganze Liga (minus Ausschlussliste), danach nur noch die Luecken.
+    const teamIds = versuch === 1 ? null : leereBedienbareTeamIds(persistence, saveId, ausgeschlossen);
+    if (versuch > 1) {
+      if (teamIds && teamIds.length === 0) {
+        // Nichts mehr leer: der abgewiesene Schreibvorgang hat nichts gekostet, was noch fehlt.
+        // Dann ist der Status das Einzige, was noch nachzutragen ist.
+        schreibeLigaSetupStatus(persistence, saveId, "ready", []);
+        return { status: "ready", versuche: versuch - 1, zuletztBedienteTeamIds };
+      }
+      console.warn(
+        `${logPrefix} Liga-Draft-Anlauf ${versuch} von ${maxVersuche} nach Schreibkonflikt — ` +
+          `noch ${teamIds?.length ?? 0} leere(s) Team(s).`,
+      );
+      await (input.wartenVorWiederholung?.(versuch) ?? Promise.resolve());
+    }
+    zuletztBedienteTeamIds = teamIds;
+
     try {
-      const runResult = await runAiPicksExecutePreview(
+      const runResult = await draftLauf(
         {
           source: "sqlite",
           saveId,
@@ -119,7 +223,8 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
           teamScope: "all",
           allowSetupAllTeams: true,
           includeManualTeams: true,
-          callerWritableTeamIds,
+          callerWritableTeamIds: input.callerWritableTeamIds,
+          ...(teamIds ? { teamIds } : {}),
           draftSeed: `${saveId}:${seasonId}:setup`,
           yieldBetweenTeams: true,
           batchPersistence: true,
@@ -133,30 +238,80 @@ export function kickoffLeagueSetupDraft(input: LeagueSetupDraftKickoffInput): Pe
           `${logPrefix} AI-Draft liess ${leagueSetupWarnings.length} Team(s) unter Mindestkader, ${blockedTeamCount} blockierte(s) Team(s).`,
         );
       }
-      const filled = persistence.getSaveById(saveId);
-      if (filled) {
-        persistence.saveSingleplayerState(saveId, {
-          ...filled.gameState,
-          seasonState: {
-            ...filled.gameState.seasonState,
-            leagueSetupStatus: "ready",
-            leagueSetupWarnings,
-          },
-        });
-      }
+      schreibeLigaSetupStatus(persistence, saveId, "ready", leagueSetupWarnings);
+      return { status: "ready", versuche: versuch, zuletztBedienteTeamIds };
     } catch (error) {
-      console.error(`${logPrefix} Hintergrund-KI-Draft fehlgeschlagen (im Cockpit wiederholbar):`, error);
-      const errored = persistence.getSaveById(saveId);
-      if (errored) {
-        persistence.saveSingleplayerState(saveId, {
-          ...errored.gameState,
-          seasonState: { ...errored.gameState.seasonState, leagueSetupStatus: "failed" },
-        });
+      // NUR der Schreibkonflikt wird wiederholt. Jeder andere Fehler ist kein Timing-Problem, und
+      // ihn zu wiederholen hiesse dreimal dasselbe kaputte Ergebnis zu erzeugen.
+      if (!istKoopSchreibkonflikt(error) || versuch >= maxVersuche) {
+        console.error(`${logPrefix} Hintergrund-KI-Draft fehlgeschlagen (im Cockpit wiederholbar):`, error);
+        schreibeLigaSetupStatus(persistence, saveId, "failed", null);
+        return { status: "failed", versuche: versuch, zuletztBedienteTeamIds };
       }
     }
-  })();
+  }
 
-  return markedInProgress;
+  // Unerreichbar: die Schleife kehrt in jedem Zweig zurueck. Steht hier, damit der Rueckgabetyp
+  // ohne `!`-Behauptung haelt.
+  schreibeLigaSetupStatus(persistence, saveId, "failed", null);
+  return { status: "failed", versuche: maxVersuche, zuletztBedienteTeamIds };
+}
+
+/** Teams mit GENAU 0 Spielern, die der Draft auch bedienen darf. */
+function leereBedienbareTeamIds(
+  persistence: PersistenceService,
+  saveId: string,
+  ausgeschlossen: ReadonlySet<string>,
+): string[] {
+  const save = persistence.getSaveById(saveId);
+  if (!save) {
+    return [];
+  }
+  const kaderGroesse = new Map<string, number>();
+  for (const eintrag of save.gameState.rosters) {
+    kaderGroesse.set(eintrag.teamId, (kaderGroesse.get(eintrag.teamId) ?? 0) + 1);
+  }
+  return save.gameState.teams
+    .map((team) => team.teamId)
+    .filter((teamId) => !ausgeschlossen.has(teamId) && (kaderGroesse.get(teamId) ?? 0) === 0);
+}
+
+/**
+ * Traegt den Status nach — und liest dafuer frisch, statt einen alten Stand zurueckzuschreiben.
+ *
+ * Auch DIESER Schreibvorgang laeuft in den Koop-Riegel, wenn zwischen Lesen und Schreiben jemand
+ * dazwischenkommt. Er traegt aber nur ein einziges Feld nach, das sonst niemand anfasst — also
+ * nochmal lesen und nochmal schreiben, statt den ganzen Lauf an der Statuszeile scheitern zu
+ * lassen. Bleibt es dabei, faellt der Status weg und nicht die Kader: die Shell sieht dann weiter
+ * "in_progress" und fragt nach, was unschoen ist, aber nichts kaputt macht.
+ */
+function schreibeLigaSetupStatus(
+  persistence: PersistenceService,
+  saveId: string,
+  status: "ready" | "failed",
+  warnings: LeagueSetupTeamWarning[] | null,
+): void {
+  for (let versuch = 1; versuch <= 3; versuch += 1) {
+    const save = persistence.getSaveById(saveId);
+    if (!save) {
+      return;
+    }
+    try {
+      persistence.saveSingleplayerState(saveId, {
+        ...save.gameState,
+        seasonState: {
+          ...save.gameState.seasonState,
+          leagueSetupStatus: status,
+          ...(warnings ? { leagueSetupWarnings: warnings } : {}),
+        },
+      });
+      return;
+    } catch (error) {
+      if (!istKoopSchreibkonflikt(error)) {
+        throw error;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
