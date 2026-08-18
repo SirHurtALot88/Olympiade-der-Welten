@@ -742,10 +742,24 @@ async function main() {
   const draftWartenBis = Date.now() + 6 * 60_000;
   let draftStatus: string | null = null;
   let standNachDraft: AnyState | null = coopState;
+  let draftLeseAbbrueche = 0;
   while (Date.now() < draftWartenBis) {
-    standNachDraft = await leseSave(coopSaveId);
-    draftStatus = standNachDraft?.seasonState?.leagueSetupStatus ?? null;
-    if (draftStatus === "ready" || draftStatus === "failed") break;
+    try {
+      standNachDraft = await leseSave(coopSaveId);
+      draftStatus = standNachDraft?.seasonState?.leagueSetupStatus ?? null;
+      if (draftStatus === "ready" || draftStatus === "failed") break;
+    } catch {
+      /**
+       * EIN ABGERISSENES LESEN IST HIER DER NORMALFALL, kein Grund zum Abbruch.
+       *
+       * GEMESSEN: waehrend des Drafts blockiert die Engine die Event-Loop des Servers so lange,
+       * dass Antwortzeiten auf 19 Sekunden steigen und einzelne Verbindungen mit ECONNRESET
+       * abreissen — ein Lauf starb genau hier, obwohl der Draft danach sauber fertig wurde
+       * ("AI-Draft liess 0 Team(s) unter Mindestkader"). Wer waehrend einer CPU-Last pollt, muss
+       * mit abgerissenen Antworten rechnen; abzubrechen hiesse, die Last als Fehlschlag zu melden.
+       */
+      draftLeseAbbrueche += 1;
+    }
     await delay(3000);
   }
 
@@ -768,7 +782,8 @@ async function main() {
       draftStatus === "ready" && kiOhneKader.length === 0,
       draftStatus === "ready" && kiOhneKader.length === 0
         ? `leagueSetupStatus=ready, ${kiTeams.length} KI-Teams besetzt`
-        : `leagueSetupStatus=${draftStatus ?? "(nicht gesetzt)"} nach bis zu 6 Minuten Warten, ` +
+        : `leagueSetupStatus=${draftStatus ?? "(nicht gesetzt)"} nach bis zu 6 Minuten Warten ` +
+          `(${draftLeseAbbrueche} abgerissene Lesevorgaenge waehrend der Draft-Last), ` +
           `${kiOhneKader.length}/${kiTeams.length} KI-Teams ohne einen einzigen Spieler` +
           (draftStatus === "failed"
             ? " — der Hintergrund-Draft ist gescheitert (im Cockpit ueber 'Erneut versuchen' wiederholbar)"
