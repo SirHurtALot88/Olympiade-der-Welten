@@ -566,7 +566,17 @@ async function main() {
     `label="${startKnopf.label}" action=${startKnopf.action}`,
   );
   sendeKnopfAktion(chrisSocket, { action: startKnopf.action, roomCode, seatToken: chrisSeat, toggleReadyTo: true });
-  await waitFor(() => chris.state.multiplayerRoom.status === "season_active", "Raum gestartet (season_active)");
+  /**
+   * 60 Sekunden statt der 15 aus der Vorgabe — GEMESSEN, nicht grosszuegig geschaetzt.
+   *
+   * `startRoom` praegt den Koop-Save SYNCHRON (`createRoomCoopSave`: 32 Teams, Sponsorangebote,
+   * Kader-Geruest) und schaltet erst danach auf `season_active`. Vier Messungen am 18.08.: 11, 12,
+   * 13 und 18 Sekunden — die Vorgabe lag also mitten in der Streuung, und ein Lauf brach hier mit
+   * "Timeout warten auf: Raum gestartet" ab, bevor ueberhaupt eine Pruefung dran war. Ein Audit,
+   * das am eigenen Zeitfenster scheitert, meldet nicht den Zustand des Spiels, sondern den seiner
+   * Uhr.
+   */
+  await waitFor(() => chris.state.multiplayerRoom.status === "season_active", "Raum gestartet (season_active)", 60_000);
 
   const coopSaveId: string = chris.state.multiplayerRoom.saveId;
   check(
@@ -711,41 +721,119 @@ async function main() {
     `${spieltageGesamt} Spieltage, gamePhase=${coopState?.gamePhase}`,
   );
 
-  // Ist der frisch gepraegte Koop-Save ueberhaupt sofort bespielbar? Ohne Kader kann kein
-  // Spieltag gewertet werden (missing_ai_lineup/missing_manual_lineup blocken den Resolve).
+  /**
+   * A2b — DER LIGA-DRAFT BRAUCHT ZEIT, ALSO WIRD GEWARTET, BEVOR GEMESSEN WIRD.
+   *
+   * DIESE PRUEFUNG WAR IMMER ROT, und ihre Begruendung war ueberholt. Sie las den Spielstand direkt
+   * nach dem Raumstart und schloss aus "31 von 32 Teams leer": `createRoomCoopSave` starte keinen
+   * Liga-Draft. Nachgemessen (Aufgabe #51 und noch einmal am 18.08. ueber fuenf Raumstarts):
+   * `startRoom` STARTET den Draft sehr wohl (room-store.ts, `kickoffLeagueSetupDraft`) — er laeuft
+   * nur abgekoppelt weiter und braucht die gemessenen ein bis zwei Minuten. Wer sofort hinsieht,
+   * sieht zwangsläufig leere Kader und haelt einen richtigen Zustand fuer einen Fehler.
+   *
+   * Gemessen wird deshalb, was wirklich zaehlt: ist die Liga bespielbar, NACHDEM der Draft fertig
+   * ist. Das Feld dafuer gibt es (`seasonState.leagueSetupStatus`), und es ist dasselbe, an dem
+   * auch das Banner in der Oberflaeche haengt.
+   *
+   * MENSCHLICH GEFUEHRTE TEAMS BLEIBEN DABEI LEER — das ist keine Luecke, sondern Chris' Ansage
+   * ("niemals soll mit gepickt werden für menschliche teams"). Sie steht als eigene Pruefung
+   * darunter, damit ein spaeterer Umbau sie nicht unbemerkt aushebelt.
+   */
+  const draftWartenBis = Date.now() + 6 * 60_000;
+  let draftStatus: string | null = null;
+  let standNachDraft: AnyState | null = coopState;
+  let draftLeseAbbrueche = 0;
+  while (Date.now() < draftWartenBis) {
+    try {
+      standNachDraft = await leseSave(coopSaveId);
+      draftStatus = standNachDraft?.seasonState?.leagueSetupStatus ?? null;
+      if (draftStatus === "ready" || draftStatus === "failed") break;
+    } catch {
+      /**
+       * EIN ABGERISSENES LESEN IST HIER DER NORMALFALL, kein Grund zum Abbruch.
+       *
+       * GEMESSEN: waehrend des Drafts blockiert die Engine die Event-Loop des Servers so lange,
+       * dass Antwortzeiten auf 19 Sekunden steigen und einzelne Verbindungen mit ECONNRESET
+       * abreissen — ein Lauf starb genau hier, obwohl der Draft danach sauber fertig wurde
+       * ("AI-Draft liess 0 Team(s) unter Mindestkader"). Wer waehrend einer CPU-Last pollt, muss
+       * mit abgerissenen Antworten rechnen; abzubrechen hiesse, die Last als Fehlschlag zu melden.
+       */
+      draftLeseAbbrueche += 1;
+    }
+    await delay(3000);
+  }
+
   {
     const rosterProTeam = new Map<string, number>();
-    for (const eintrag of coopState?.rosters ?? []) {
+    for (const eintrag of standNachDraft?.rosters ?? []) {
       rosterProTeam.set(eintrag.teamId, (rosterProTeam.get(eintrag.teamId) ?? 0) + 1);
     }
-    const leereTeams = (coopState?.teams ?? []).filter((team: AnyState) => (rosterProTeam.get(team.teamId) ?? 0) === 0);
+    const menschlich = new Set<string>([
+      ...((chrisP.controlledTeamIds as string[]) ?? []),
+      ...((frankyP.controlledTeamIds as string[]) ?? []),
+    ]);
+    const alleTeams: AnyState[] = standNachDraft?.teams ?? [];
+    const kiTeams = alleTeams.filter((team: AnyState) => !menschlich.has(team.teamId));
+    const kiOhneKader = kiTeams.filter((team: AnyState) => (rosterProTeam.get(team.teamId) ?? 0) === 0);
+    const leereTeams = alleTeams.filter((team: AnyState) => (rosterProTeam.get(team.teamId) ?? 0) === 0);
+
     check(
-      "A2b: Ein frisch gepraegter Koop-Save ist sofort bespielbar (alle Teams haben Kader)",
-      leereTeams.length === 0,
-      leereTeams.length === 0
-        ? `alle ${coopState?.teams?.length ?? 0} Teams besetzt`
-        : `${leereTeams.length}/${coopState?.teams?.length ?? 0} Teams OHNE einen einzigen Spieler — createRoomCoopSave ` +
-          "(lib/game/new-game-setup-service.ts:543) startet KEINEN Liga-Draft: der laeuft nur im fresh-season-1-Pfad " +
-          "(app/api/singleplayer-state/route.ts:455ff, leagueSetupStatus='in_progress' + Hintergrund-Draft), und die " +
-          "Auto-Nachzieh-Effekte der Shell sind auf leagueSetupStatus bzw. gamePhase 'preseason_management' gegated " +
-          "(use-foundation-shell-router-body-scope.tsx:9336-9343) — ein Koop-Save startet aber 'season_active' ohne " +
-          "leagueSetupStatus. Spielbar wird der Raum erst nach dem MANUELLEN Cockpit-Umweg 'KI-Teams nachpicken'",
+      "A2b: Nach dem Liga-Draft haben alle KI-Teams einen Kader — der Raum ist bespielbar",
+      draftStatus === "ready" && kiOhneKader.length === 0,
+      draftStatus === "ready" && kiOhneKader.length === 0
+        ? `leagueSetupStatus=ready, ${kiTeams.length} KI-Teams besetzt`
+        : `leagueSetupStatus=${draftStatus ?? "(nicht gesetzt)"} nach bis zu 6 Minuten Warten ` +
+          `(${draftLeseAbbrueche} abgerissene Lesevorgaenge waehrend der Draft-Last), ` +
+          `${kiOhneKader.length}/${kiTeams.length} KI-Teams ohne einen einzigen Spieler` +
+          (draftStatus === "failed"
+            ? " — der Hintergrund-Draft ist gescheitert (im Cockpit ueber 'Erneut versuchen' wiederholbar)"
+            : ""),
     );
+
+    /**
+     * Die Grenze ist nicht "0 Spieler", sondern "deutlich weniger als ein gedrafteter Kader".
+     *
+     * CHRIS zum Einzelfall: "P-S ist in ordnung egal ob AI oder human gesteuert ist NULA dort im
+     * team!" — ein einzelner, fest zum Team gehoerender Spieler ist kein Draft-Ergebnis. Auf
+     * "genau 0" zu pruefen wuerde genau diesen richtigen Zustand als Fehler melden. Gemessen wird
+     * deshalb gegen den kleinsten KI-Kader: ein Team, das der Draft bedient hat, ist mindestens so
+     * gross wie der kleinste, den er hinterlassen hat.
+     */
+    const kleinsterKiKader = kiTeams.length
+      ? Math.min(...kiTeams.map((team: AnyState) => rosterProTeam.get(team.teamId) ?? 0))
+      : 0;
+    const menschlicheGedraftet = alleTeams.filter(
+      (team: AnyState) => menschlich.has(team.teamId) && (rosterProTeam.get(team.teamId) ?? 0) >= kleinsterKiKader,
+    );
+    check(
+      "A2b2: Der Draft laesst die menschlich gefuehrten Teams in Ruhe — sie werden NICHT mitgepickt",
+      draftStatus === "ready" && menschlicheGedraftet.length === 0,
+      `${menschlich.size} menschliche Teams, davon ${menschlicheGedraftet.length} mit gedraftetem Kader ` +
+        `(Schwelle: kleinster KI-Kader = ${kleinsterKiKader}); Kadergroessen: ` +
+        [...menschlich].map((teamId) => `${teamId}=${rosterProTeam.get(teamId) ?? 0}`).join(", "),
+    );
+
     if (leereTeams.length > 0) {
       beobachtung(
-        "Der Room-Flow-Knopf 'AI Teams vorbereiten' (runRoomAiAutoStep, lib/room/room-store.ts:684-706) schreibt NUR " +
-          "Flow-Buchhaltung (aiAutoCompletedTeamIds) und bereitet die KI-Teams im Spielstand NICHT vor — Kader/Draft " +
-          "muss der Host separat im Cockpit anstossen. Das Audit nimmt im Folgenden genau diesen manuellen Umweg " +
-          "(POST /api/ai/picks-run mit Raum-Kontext, wie der Cockpit-Knopf), sonst ist keine Saison spielbar.",
+        "Die menschlich gefuehrten Teams bleiben nach dem Draft ohne Kader — so gewollt. Der Room-Flow-Knopf " +
+          "'AI Teams vorbereiten' (runRoomAiAutoStep, lib/room/room-store.ts:684-706) schreibt nur Flow-Buchhaltung " +
+          "und fuellt sie nicht; der Host baut seine Kader im Cockpit ueber picks-run auf, der Gast ueber manuelle " +
+          "Transfermarkt-Kaeufe. Genau diese beiden Wege geht das Audit im Folgenden.",
       );
-      // Der Cockpit-Umweg: Liga-Draft in kleinen Happen (wie der Chunked-Auto-Finish der Shell,
-      // ~4 Teams pro Request). Besitz-Grenze beachten (resolveAiBulkTeamWriteScope): ein Bulk-Run
-      // darf KI-Teams und die EIGENEN Teams fuellen, nie die des Mitspielers — also draftet
-      // Chris KI+eigene Teams und Franky seine eigenen.
+      /**
+       * Der Cockpit-Weg des Hosts, in kleinen Happen (wie der Chunked-Auto-Finish der Shell,
+       * ~4 Teams pro Request). Besitz-Grenze beachten (resolveAiBulkTeamWriteScope): ein Bulk-Run
+       * darf KI-Teams und die EIGENEN Teams fuellen, nie die des Mitspielers.
+       *
+       * NUR NOCH DIE EIGENEN TEAMS: die KI-Teams hat der Liga-Draft beim Raumstart bereits
+       * besetzt (A2b oben misst genau das). Sie hier ein zweites Mal durchzuschicken kostete rund
+       * zwei Dutzend Anfragen fuer ein Ergebnis, das schon dasteht — ein Ueberbleibsel aus der
+       * Zeit, in der man glaubte, `startRoom` starte gar keinen Draft.
+       */
       const aiTeamIds: string[] = (chris.state.teamOwnership as AnyState[])
         .filter((eintrag) => eintrag.controllerType === "ai")
         .map((eintrag) => eintrag.teamId);
-      const hostDraftTeamIds = [...aiTeamIds, ...(chrisP.controlledTeamIds as string[])];
+      const hostDraftTeamIds = [...(chrisP.controlledTeamIds as string[])];
       let draftFehler = "";
       for (let index = 0; index < hostDraftTeamIds.length && !draftFehler; index += 4) {
         const chunk = hostDraftTeamIds.slice(index, index + 4);
@@ -780,13 +868,14 @@ async function main() {
         }
       }
       const nachHostDraft = await leseSave(coopSaveId);
-      const hostSeiteLeer = [...aiTeamIds, ...(chrisP.controlledTeamIds as string[])].filter(
+      const hostSeiteLeer = [...hostDraftTeamIds].filter(
         (teamId) => !(nachHostDraft?.rosters ?? []).some((eintrag: AnyState) => eintrag.teamId === teamId),
       );
       check(
-        "A2c: Der manuelle Cockpit-Umweg des HOSTS (picks-run mit Raum-Kontext) fuellt KI-Teams und eigene Teams",
+        "A2c: Der Cockpit-Weg des HOSTS (picks-run mit Raum-Kontext) fuellt seine EIGENEN Teams",
         draftFehler === "" && hostSeiteLeer.length === 0,
-        draftFehler || `${aiTeamIds.length} KI-Teams + ${chrisP.controlledTeamIds.length} Chris-Teams besetzt`,
+        draftFehler ||
+          `${chrisP.controlledTeamIds.length} Chris-Teams besetzt (die ${aiTeamIds.length} KI-Teams kamen aus dem Liga-Draft)`,
       );
 
       // Und die Gast-Teams? Der Gast wird von picks-run als Nicht-Host abgewiesen (korrekt als
