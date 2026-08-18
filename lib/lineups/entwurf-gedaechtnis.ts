@@ -16,6 +16,7 @@
  * gewinnt beim Laden, wann wird ueberhaupt gemerkt, und wann faellt ein Eintrag wieder weg.
  */
 import type { LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import type { LegacyLineupEntryInput } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 
 export type GemerkterEntwurf = {
@@ -56,7 +57,20 @@ export type EntwurfGedaechtnis = {
    *   zu ueberdecken.
    * - es gibt gar keinen Entwurf (`null`), etwa weil noch nichts geladen ist.
    */
-  merkeBeimVerlassen(input: { von: EntwurfOrt; nach: EntwurfOrt; entwurf: GemerkterEntwurf | null }): boolean;
+  merkeBeimVerlassen(input: {
+    von: EntwurfOrt;
+    nach: EntwurfOrt;
+    entwurf: GemerkterEntwurf | null;
+    /**
+     * Die fertig gebauten Eintraege desselben Entwurfs.
+     *
+     * WARUM MITGEMERKT UND NICHT SPAETER GERECHNET: sie entstehen aus `selections` PLUS den Slots
+     * und Spielern des Teams — und die stehen nur, solange genau dieses Team geladen ist. Wer sie
+     * spaeter fuer ein anderes Team nachbauen wollte, haette die Daten dafuer nicht. Die
+     * Sammel-Abgabe braucht sie aber genau dann: fuer Teams, die gerade NICHT offen sind.
+     */
+    entries: readonly LegacyLineupEntryInput[];
+  }): boolean;
   /**
    * Beim Laden gewinnt ein gemerkter Entwurf — das ist der Sinn der Sache.
    *
@@ -67,6 +81,13 @@ export type EntwurfGedaechtnis = {
     ort: EntwurfOrt,
     ausDerAblage: GemerkterEntwurf,
   ): { entwurf: GemerkterEntwurf; herkunft: EntwurfHerkunft };
+  /**
+   * Die gemerkten Eintraege eines Ortes, oder `null`, wenn dort nichts gemerkt ist.
+   *
+   * Getrennt von `waehleBeimLaden`, weil es eine andere Frage beantwortet: nicht „was zeige ich
+   * jetzt an", sondern „was wuerde ich fuer dieses Team abgeben".
+   */
+  holeEintraege(ort: EntwurfOrt): readonly LegacyLineupEntryInput[] | null;
   /** Nach einem Schreibvorgang hat die Ablage die Wahrheit — der gemerkte Entwurf darf sie nicht ueberdecken. */
   vergiss(ort: EntwurfOrt): void;
   /** Fuer Schreibvorgaenge ueber viele Teams, die nicht zurueckmelden, welche genau. */
@@ -76,22 +97,27 @@ export type EntwurfGedaechtnis = {
 };
 
 export function erzeugeEntwurfGedaechtnis(): EntwurfGedaechtnis {
-  const speicher = new Map<string, GemerkterEntwurf>();
+  const speicher = new Map<string, { entwurf: GemerkterEntwurf; entries: readonly LegacyLineupEntryInput[] }>();
 
   return {
-    merkeBeimVerlassen({ von, nach, entwurf }) {
+    merkeBeimVerlassen({ von, nach, entwurf, entries }) {
       if (!entwurf) {
         return false;
       }
       if (entwurfSchluessel(von) === entwurfSchluessel(nach)) {
         return false;
       }
-      speicher.set(entwurfSchluessel(von), entwurf);
+      speicher.set(entwurfSchluessel(von), { entwurf, entries });
       return true;
     },
     waehleBeimLaden(ort, ausDerAblage) {
       const gemerkt = speicher.get(entwurfSchluessel(ort));
-      return gemerkt ? { entwurf: gemerkt, herkunft: "gedaechtnis" } : { entwurf: ausDerAblage, herkunft: "ablage" };
+      return gemerkt
+        ? { entwurf: gemerkt.entwurf, herkunft: "gedaechtnis" }
+        : { entwurf: ausDerAblage, herkunft: "ablage" };
+    },
+    holeEintraege(ort) {
+      return speicher.get(entwurfSchluessel(ort))?.entries ?? null;
     },
     vergiss(ort) {
       speicher.delete(entwurfSchluessel(ort));
