@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-18",
+  "seite": "Einsatzliste",
+  "text": "Der Knopf in „Meine Teams“ gibt jetzt zuerst deine eigenen Aufstellungen ab. Bisher holte er für jedes offene Team den KI-Vorschlag — das war richtig, solange ein Teamwechsel den Entwurf ohnehin wegwarf, denn eigene Entwürfe gab es dann gar nicht. Jetzt gibt es sie, und wo einer vorliegt, geht er ab; der Vorschlag kommt nur noch für Teams, die du nicht selbst aufgestellt hast. Die Beschriftung nennt die Mischung („2 eigene Aufstellungen + 2 KI-Vorschläge abgeben“), und die Rückfrage vor dem Festlegen schreibt je Team dazu, woher die Aufstellung kommt. Ein unvollständiger eigener Entwurf wird abgegeben und nicht heimlich gegen einen Vorschlag getauscht — wird er abgelehnt, steht der Grund samt Teamname da.",
+  "gewicht": "grundlegend",
+  "version": "0.5"
+}

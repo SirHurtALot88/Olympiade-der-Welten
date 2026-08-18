@@ -21,6 +21,13 @@ type MyTeamsReadinessPanelProps = {
   /** Fehlt der Prop, gibt es den Knopf nicht — die Ansicht bleibt dann exakt wie zuvor. */
   onSammelAbgabe?: () => void;
   sammelAbgabeBusy?: boolean;
+  /**
+   * Beschriftung und Erklaerung des Knopfes, fertig gemischt aus
+   * `lib/lineups/sammel-abgabe-mischung.ts`. Sie kommen von aussen, weil nur der Aufrufer weiss,
+   * fuer welche Teams ein EIGENER Entwurf vorliegt — diese Ansicht kennt nur „fertig/offen".
+   */
+  sammelAbgabeKnopfText?: string;
+  sammelAbgabeErklaerung?: string;
   /** Warum die Sammel-Abgabe gerade nicht geht (Nur-Lesen, fremdes Team). `null` = sie geht. */
   sammelAbgabeGesperrtGrund?: string | null;
 };
@@ -31,6 +38,8 @@ export default function MyTeamsReadinessPanel({
   onJumpToTeam,
   onSammelAbgabe,
   sammelAbgabeBusy,
+  sammelAbgabeKnopfText,
+  sammelAbgabeErklaerung,
   sammelAbgabeGesperrtGrund,
 }: MyTeamsReadinessPanelProps) {
   // Bei hoechstens einem eigenen Team ist der normale Team-Umschalter bereits die vollstaendige
@@ -76,6 +85,7 @@ export default function MyTeamsReadinessPanel({
           disabled={Boolean(sammelAbgabeBusy) || readiness.pendingTeams.length === 0 || Boolean(sammelAbgabeGesperrtGrund)}
           title={
             sammelAbgabeGesperrtGrund ??
+            sammelAbgabeErklaerung ??
             (readiness.pendingTeams.length === 0
               ? "Alle deine Teams stehen bereits."
               : `Holt für ${readiness.pendingTeams.length} offene Teams den KI-Vorschlag und gibt sie in EINEM Zug ab.`)
@@ -83,10 +93,12 @@ export default function MyTeamsReadinessPanel({
         >
           {sammelAbgabeBusy
             ? "Gibt ab …"
-            : /* Was passiert, steht im Knopf: nicht "alle speichern", sondern welcher Vorschlag
-                 fuer wie viele Teams. Ein Knopf, der eine Aufstellung festnagelt, darf darueber
-                 nicht schweigen. */
-              `${readiness.pendingTeams.length} offene mit KI-Vorschlag abgeben`}
+            : /* Was passiert, steht im Knopf: nicht "alle speichern", sondern WAS fuer wie viele
+                 Teams — eigene Aufstellung oder KI-Vorschlag, und bei gemischter Lage beides mit
+                 seiner Zahl. Ein Knopf, der eine Aufstellung festnagelt, darf darueber nicht
+                 schweigen, und "KI-Vorschlag" zu sagen, wenn er die eigene Auswahl abgibt, waere
+                 genauso falsch herum. */
+              sammelAbgabeKnopfText ?? `${readiness.pendingTeams.length} offene mit KI-Vorschlag abgeben`}
         </button>
       ) : null}
     </div>

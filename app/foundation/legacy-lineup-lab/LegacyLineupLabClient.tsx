@@ -29,6 +29,7 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import { fasseSammelAbgabeZusammen, type SammelAbgabeAntwort } from "@/lib/lineups/sammel-aufstellung-abgabe";
 import { erzeugeEntwurfGedaechtnis } from "@/lib/lineups/entwurf-gedaechtnis";
+import { istEigenerEntwurf, mischeSammelAbgabe } from "@/lib/lineups/sammel-abgabe-mischung";
 import { getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
@@ -1690,6 +1691,37 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     [loadContext, params.teamId, props, source],
   );
   const jumpToMyTeam = wechsleTeam;
+  /**
+   * WELCHE OFFENEN TEAMS EINEN EIGENEN ENTWURF HABEN — und was der Knopf deshalb sagt.
+   *
+   * Zwei Quellen, mehr gibt es nicht: das gerade geoeffnete Team (dessen Entwurf steht live in
+   * `entries`) und die Teams im Gedaechtnis (dort liegt er seit dem Wegwechseln). Ein Team, das
+   * noch nie offen war, hat keinen — fuer das bleibt es beim KI-Vorschlag.
+   */
+  const eigeneEntwuerfeFuerOffeneTeams = useMemo(() => {
+    const nachTeam = new Map<string, LegacyLineupEntryInput[]>();
+    for (const team of myTeamsMatchdayReadiness.pendingTeams) {
+      const eintraege =
+        team.id === params.teamId
+          ? entries
+          : entwurfGedaechtnisRef.current.holeEintraege({ ...params, teamId: team.id, source });
+      if (eintraege && istEigenerEntwurf(eintraege)) {
+        nachTeam.set(team.id, [...eintraege]);
+      }
+    }
+    return nachTeam;
+    // `entwurfGedaechtnisRef` ist ein Ref und taugt nicht als Abhaengigkeit; es aendert sich
+    // ausschliesslich in `loadContext` und beim Schreiben, und beides zieht ohnehin einen neuen
+    // Durchlauf nach sich (Zustand aendert sich dabei immer).
+  }, [entries, myTeamsMatchdayReadiness.pendingTeams, params, source]);
+  const sammelAbgabeMischung = useMemo(
+    () =>
+      mischeSammelAbgabe({
+        offeneTeamIds: myTeamsMatchdayReadiness.pendingTeams.map((team) => team.id),
+        hatEigenenEntwurf: (teamId) => eigeneEntwuerfeFuerOffeneTeams.has(teamId),
+      }),
+    [eigeneEntwuerfeFuerOffeneTeams, myTeamsMatchdayReadiness.pendingTeams],
+  );
   const missingSeasonFormCards = Boolean(context && (context.formCards?.length ?? 0) === 0);
   const focusV2FormMiniChipsBySide = useMemo(() => {
     const buildSide = (disciplineSide: "d1" | "d2") => {
@@ -3503,6 +3535,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       von: { ...params, source },
       nach: { ...nextParams, source: effectiveSource },
       entwurf: context ? { selections, captains, modifiers, teamIntensity } : null,
+      entries,
     });
     const query = new URLSearchParams(
       Object.entries(nextParams).filter(([, value]) => Boolean(value)) as Array<[string, string]>,
@@ -3988,10 +4021,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
    * fuehrt, ging bis eben viermal denselben Weg: Team umschalten, Vorschlag holen, speichern,
    * Sperr-Dialog bestaetigen. Hier ist es EIN Aufruf und EIN Dialog fuer alle offenen Teams.
    *
-   * WAS ABGEGEBEN WIRD, STEHT IM KNOPF: der KI-Vorschlag je Team (`ai-preview`, derselbe, den der
-   * Einzelweg mit "Vorschlag uebernehmen" anbietet). Etwas anderes gibt es fuer ein Team, das man
-   * noch nicht geoeffnet hat, gar nicht — einen Entwurf hat es ja noch nicht. Wer selbst aufstellen
-   * will, nimmt weiter den Einzelweg; der bleibt unveraendert.
+   * WAS ABGEGEBEN WIRD, STEHT IM KNOPF — und seit Paket 2 ist das nicht mehr zwingend der
+   * KI-Vorschlag: wo ein EIGENER Entwurf vorliegt, geht der eigene Entwurf. Der Vorschlag kommt nur
+   * noch fuer Teams, fuer die es keinen gibt.
+   *
+   * Der frueher hier stehende Satz „einen Entwurf hat ein noch nie geoeffnetes Team ja nicht" war
+   * richtig, solange ein Teamwechsel den Entwurf wegwarf — es gab schlicht keine eigenen Entwuerfe
+   * abzugeben. Seit sie den Wechsel ueberleben (Paket 1) gibt es sie, und dann waere der Vorschlag
+   * die falsche Wahl: er wuerde eigene Arbeit ueberschreiben. Die Regel und die Beschriftung stehen
+   * in `lib/lineups/sammel-abgabe-mischung.ts`.
    *
    * BEREITS FERTIGE TEAMS BLEIBEN UNANGETASTET. Nur `pendingTeams` gehen mit — sonst schriebe ein
    * Klick eine sorgfaeltig gesetzte Aufstellung mit einem KI-Vorschlag zu.
@@ -4017,6 +4055,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const ohneVorschlag: string[] = [];
 
       for (const teamId of angefragteTeamIds) {
+        // ZUERST DER EIGENE ENTWURF. Kein Netzweg, keine Rueckfrage — was der Mensch gesetzt hat,
+        // geht so ab, wie er es gesetzt hat. Auch ein unvollstaendiger: ihn heimlich gegen einen
+        // KI-Vorschlag zu tauschen waere das Schlechtere (siehe `sammel-abgabe-mischung.ts`).
+        const eigeneEintraege = eigeneEntwuerfeFuerOffeneTeams.get(teamId);
+        if (eigeneEintraege) {
+          stapel.push({ teamId, entries: eigeneEintraege });
+          continue;
+        }
         const vorschlagQuery = new URLSearchParams({
           saveId: params.saveId,
           seasonId: params.seasonId,
@@ -4109,7 +4155,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   eintrag.commitment?.hasFormCards ? "Formkarte(n)" : "keine Formkarte",
                   eintrag.commitment?.hasCaptain ? "Kapitän" : "kein Kapitän",
                 ].join(" · ");
-            return `• ${nameFuerTeam(eintrag.teamId) ?? eintrag.teamId} — ${einsatz}`;
+            // WOHER die Aufstellung kommt, gehoert in dieselbe Zeile: seit Paket 2 sind im selben
+            // Stapel eigene Entwuerfe UND KI-Vorschlaege, und der Dialog nagelt beide fest. Ein
+            // pauschales "mit dem KI-Vorschlag" waere fuer die eigenen schlicht gelogen.
+            const herkunft = eigeneEntwuerfeFuerOffeneTeams.has(eintrag.teamId)
+              ? "deine Aufstellung"
+              : "KI-Vorschlag";
+            return `• ${nameFuerTeam(eintrag.teamId) ?? eintrag.teamId} — ${herkunft} — ${einsatz}`;
           })
           .join("\n");
         const uebrig = stapel.length - commitments.length;
@@ -4117,7 +4169,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           typeof window === "undefined"
             ? false
             : window.confirm(
-                `${commitments.length} Aufstellungen mit dem KI-Vorschlag abgeben und für diesen Spieltag festlegen?\n\n` +
+                `${commitments.length} Aufstellungen abgeben und für diesen Spieltag festlegen?\n\n` +
                   `${zeilen}\n\n` +
                   (uebrig > 0 ? `${uebrig} weitere Team(s) dürfen hier nicht schreiben und bleiben offen.\n\n` : "") +
                   "Danach lassen sich Aufstellung, Kapitän und Formkarten dieser Teams für diesen " +
@@ -6247,6 +6299,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               onJumpToTeam={jumpToMyTeam}
               onSammelAbgabe={() => void gibOffeneAufstellungenSammelAb()}
               sammelAbgabeBusy={sammelAbgabeBusy}
+              sammelAbgabeKnopfText={sammelAbgabeMischung.knopfText}
+              sammelAbgabeErklaerung={sammelAbgabeMischung.erklaerung}
               sammelAbgabeGesperrtGrund={
                 sourceReadOnly ? "Dieser Modus ist nur zum Anschauen — hier wird nichts geschrieben." : null
               }
