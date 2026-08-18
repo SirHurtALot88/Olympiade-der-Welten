@@ -857,7 +857,21 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           data-league-setup-status="in_progress"
         >
           <strong>Liga wird erstellt … (KI-Teams werden befüllt)</strong>
-          <span>Das dauert rund eine Minute. Du kannst schon andere Ansichten öffnen — wir aktualisieren automatisch.</span>
+          {/* GEMESSEN, nicht geschaetzt: „rund eine Minute" stand hier seit der ersten Fassung. Vier
+              Raumstarts am 18.08. brauchten 126 s, 172 s und (mit dauernden Schreibvorgaengen
+              nebenher) 317 s. Wer nach 60 Sekunden auf ein fertiges Feld schaut, haelt eine
+              richtige Anzeige fuer einen Fehler. */}
+          <span>Das dauert ein bis zwei Minuten. Du kannst schon andere Ansichten öffnen — wir aktualisieren automatisch.</span>
+          {/* CHRIS: „wobei seinen sponsor picken und einkaufen könnte man eigentlich ja schon".
+              Stimmt — im Raum nachgemessen: `/api/sponsor/choose` und `/api/transfermarkt/buy`
+              antworten waehrend des Drafts mit 200/success. Der Satz steht nur im Raum, weil nur
+              dort gemessen wurde; im Solo-Fall behaupten wir es deshalb nicht. */}
+          {roomContext ? (
+            <span data-testid="foundation-league-setup-banner-schon-moeglich">
+              Sponsor wählen und einkaufen geht bereits — beides wartet nicht auf die KI-Kader. Erst
+              der Spieltag braucht sie.
+            </span>
+          ) : null}
         </div>
       ) : leagueSetupStatus === "failed" ? (
         <div
