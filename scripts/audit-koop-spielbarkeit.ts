@@ -1028,7 +1028,7 @@ async function main() {
    * OHNE gespeicherte Aufstellung blockieren die Aufloesung zu Recht (`missing_manual_lineup`,
    * lib/season/matchday-auto-run-service.ts:871) — genau wie im echten Spiel.
    */
-  async function beideSpielerSetzenAufstellungen(matchdayId: string) {
+  async function beideSpielerSetzenAufstellungen(matchdayId: string, seasonIdFuerSpieltag: string = coopSeasonId) {
     await sichereChrisVerbindung();
     await sichereFrankyVerbindung();
     const besitzer = [
@@ -1038,8 +1038,10 @@ async function main() {
     for (const { p, seat } of besitzer) {
       for (const teamId of p.controlledTeamIds as string[]) {
         lineupSavesGesamt += 1;
+        // Die Saison kommt als Parameter, weil dieselbe Hilfe jetzt AUCH den ersten Spieltag der
+        // NEUEN Saison bedient (A22) — dort waere `coopSeasonId` die abgelaufene.
         const basis =
-          `saveId=${encodeURIComponent(coopSaveId)}&seasonId=${encodeURIComponent(coopSeasonId)}` +
+          `saveId=${encodeURIComponent(coopSaveId)}&seasonId=${encodeURIComponent(seasonIdFuerSpieltag)}` +
           `&matchdayId=${encodeURIComponent(matchdayId)}&teamId=${encodeURIComponent(teamId)}`;
         const vorschlag = await fetchJson(api(`/api/lineups/legacy/ai-preview?${basis}`));
         const entries = vorschlag.body?.preview?.entries ?? vorschlag.body?.entries ?? [];
@@ -1682,6 +1684,94 @@ async function main() {
       `activeMatchday=${chris.state.multiplayerRoom.activeMatchday}, save.currentMatchday=${nachDurchstichStand?.season?.currentMatchday}, ` +
       `gamePhase=${nachDurchstichStand?.gamePhase}`,
   );
+
+  /**
+   * A22 — DER ERSTE SPIELTAG DER NEUEN SAISON WIRD WIRKLICH GEWERTET.
+   *
+   * CHRIS: „ja mach den ersten spieltag noch mit rein dass man sieht dass keine blocker
+   * netstanden sind."
+   *
+   * Bis hierher endete das Audit bei der ANKUNFT in Saison 2 (A21: der Raum meldet die neue Saison
+   * und Spieltag 1). Ankommen ist aber nicht weiterspielen: ein Blocker, der erst beim Aufloesen
+   * zuschlaegt — fehlende Aufstellung, leerer Kader, eine Sperre, die den Saisonwechsel nicht
+   * losgelassen hat — waere genau hier stehengeblieben und im Audit trotzdem gruen gewesen.
+   *
+   * Deshalb geht dieser Abschnitt denselben Weg wie die ganze Saison davor, nur einmal: Flow bis
+   * zur Einsatzliste, beide Spieler geben ab, der Host loest auf. Und er misst nicht „kein
+   * Fehler", sondern das Ergebnis — der Spielstand muss danach auf Spieltag 2 stehen und Punkte
+   * tragen. Ein Aufloesungslauf, der 200 meldet und nichts bewegt, waere sonst ununterscheidbar
+   * von einem echten.
+   */
+  {
+    const s2SeasonId: string = nachDurchstichStand?.season?.id ?? "";
+    const s2Spieltag1: string = nachDurchstichStand?.season?.matchdayIds?.[0] ?? "";
+    const punkteSumme = (stand: AnyState | null) =>
+      Object.values((stand?.seasonState?.standings ?? {}) as Record<string, AnyState>).reduce(
+        (summe, eintrag) => summe + (Number(eintrag?.points) || 0),
+        0,
+      );
+    const punkteVorher = punkteSumme(nachDurchstichStand);
+
+    if (!s2SeasonId || !s2Spieltag1) {
+      check("A22: Der erste Spieltag der neuen Saison wird gewertet", false, "neue Saison oder ihr Spieltag 1 nicht lesbar");
+    } else {
+      // Flow bis zur Einsatzliste — dieselbe Kette wie in Saison 1, hier einmal durchlaufen. Sie
+      // ist Teil der Messung: bliebe der Flow im Saisonstart haengen, kaeme man gar nicht zum
+      // Aufloesen.
+      let s2Step: string = chris.state.roomFlowState.step;
+      let s2Sicherung = 0;
+      let s2FlowFehler = "";
+      while (s2Step !== "lineup" && s2Sicherung < 8) {
+        s2Step = await schrittAbschliessenUndWeiter();
+        s2Sicherung += 1;
+      }
+      if (s2Step !== "lineup") {
+        s2FlowFehler = `Flow erreicht in Saison 2 die Einsatzliste nicht (haengt bei ${s2Step} nach ${s2Sicherung} Schritten)`;
+      }
+      check(
+        "A22a: In der neuen Saison fuehrt der Flow wieder bis zur Einsatzliste",
+        s2FlowFehler === "",
+        s2FlowFehler || `${ROOM_FLOW_SEASON_TRANSITION_TARGET}→…→lineup in ${s2Sicherung} Schritt(en)`,
+      );
+
+      await beideSpielerSetzenAufstellungen(s2Spieltag1, s2SeasonId);
+
+      const s2AufloesenEinmal = async () => {
+        await sichereChrisVerbindung();
+        return postJson(api("/api/season/matchday-auto-run"), {
+          saveId: coopSaveId,
+          seasonId: s2SeasonId,
+          matchdayId: s2Spieltag1,
+          execute: true,
+          confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+          roomCode,
+          participantId: chrisP.participantId,
+          seatToken: chrisSeat,
+          userId: chrisP.userId,
+          options: { stopOnTie: false },
+        });
+      };
+      let s2Aufloesung = await s2AufloesenEinmal();
+      if (s2Aufloesung.status === 403 && JSON.stringify(s2Aufloesung.body).includes("participant_offline")) {
+        await rejoinChris();
+        s2Aufloesung = await s2AufloesenEinmal();
+      }
+      const s2Stand = await leseSave(coopSaveId);
+      const punkteNachher = punkteSumme(s2Stand);
+      check(
+        "A22: Der erste Spieltag der NEUEN Saison laesst sich aufloesen — die Saison geht wirklich weiter",
+        s2Aufloesung.status === 200 &&
+          s2Aufloesung.body.success === true &&
+          s2Stand?.season?.id === s2SeasonId &&
+          s2Stand?.season?.currentMatchday === 2 &&
+          punkteNachher > punkteVorher,
+        `status=${s2Aufloesung.status} success=${s2Aufloesung.body.success} ` +
+          `error=${JSON.stringify(s2Aufloesung.body.error ?? s2Aufloesung.body.blockingReasons ?? "-")} · ` +
+          `Saison ${s2Stand?.season?.id}, currentMatchday ${nachDurchstichStand?.season?.currentMatchday}→${s2Stand?.season?.currentMatchday}, ` +
+          `Punktsumme ${punkteVorher}→${punkteNachher}`,
+      );
+    }
+  }
 
   check(
     "B7: Die GESAMTE Saison lief ueber describeRoomFlowButton().action + die geteilte Event-Zuordnung — ohne Host-Ready-Umwege",
