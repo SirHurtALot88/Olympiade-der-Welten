@@ -566,7 +566,17 @@ async function main() {
     `label="${startKnopf.label}" action=${startKnopf.action}`,
   );
   sendeKnopfAktion(chrisSocket, { action: startKnopf.action, roomCode, seatToken: chrisSeat, toggleReadyTo: true });
-  await waitFor(() => chris.state.multiplayerRoom.status === "season_active", "Raum gestartet (season_active)");
+  /**
+   * 60 Sekunden statt der 15 aus der Vorgabe — GEMESSEN, nicht grosszuegig geschaetzt.
+   *
+   * `startRoom` praegt den Koop-Save SYNCHRON (`createRoomCoopSave`: 32 Teams, Sponsorangebote,
+   * Kader-Geruest) und schaltet erst danach auf `season_active`. Vier Messungen am 18.08.: 11, 12,
+   * 13 und 18 Sekunden — die Vorgabe lag also mitten in der Streuung, und ein Lauf brach hier mit
+   * "Timeout warten auf: Raum gestartet" ab, bevor ueberhaupt eine Pruefung dran war. Ein Audit,
+   * das am eigenen Zeitfenster scheitert, meldet nicht den Zustand des Spiels, sondern den seiner
+   * Uhr.
+   */
+  await waitFor(() => chris.state.multiplayerRoom.status === "season_active", "Raum gestartet (season_active)", 60_000);
 
   const coopSaveId: string = chris.state.multiplayerRoom.saveId;
   check(
