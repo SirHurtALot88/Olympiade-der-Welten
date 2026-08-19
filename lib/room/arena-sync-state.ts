@@ -22,30 +22,50 @@ export const ROOM_ARENA_PHASES: RoomArenaPhaseId[] = [
 /**
  * Wer ist "bereit-pflichtig" fuer das gemeinsame Reveal-Bereit-Tor?
  *
- * Audit-Punkt 5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher zaehlte nur Rolle + Teambesitz — ein
- * GETRENNTER Mitspieler blieb "erforderlich" und blockierte das Tor UNBEGRENZT, weil sein
- * `readyParticipantIds`-Eintrag nie kam. Das widerspricht der im Plan getroffenen Entscheidung
- * ("Entscheidungen"-Abschnitt): das Tor blockiert nur, solange der andere VERBUNDEN und noch nicht
- * bereit ist. Deshalb jetzt zusaetzlich `connectionStatus !== "offline"` -- GENAU dasselbe Muster
- * wie `getRequiredParticipants` in `room-flow-controller.ts` (dort fuer den 12-Schritt-Flow schon
- * geloest, siehe dessen Kommentar).
+ * WER GETRENNT IST, FAELLT NICHT AUS DER PFLICHT. Entscheidung von Chris (18.08.): "host kann nur
+ * weiter klicken in der arena wenn frankys teams auch alle ready sind."
  *
- * Wirkt zweifach, weil `requiredParticipantIds` an ZWEI Stellen gelesen wird:
- * - server: `isRoomArenaReady`/`advanceRoomArenaStep` verlangt Ready nur noch von VERBUNDENEN
- *   Teilnehmern -- der Host kommt durch, ohne dass der Getrennte je "Bereit" druecken muss.
- * - client: `isRoomArenaCoop` (`use-arena-room-sync.ts`) faellt auf `length > 1` zurueck, das
- *   Bereit-Tor (`arenaCoopReadyGateActive`) verschwindet also automatisch mit dem Getrennten.
+ * Hier stand vorher zusaetzlich `connectionStatus !== "offline"` — eine bewusste Entscheidung mit
+ * umgekehrtem Vorzeichen (Audit-Punkt 5): ein Getrennter sollte das Tor nicht unbegrenzt
+ * blockieren. Der Preis war, dass der Host an einem Mitspieler vorbeizog, der gerade rausgeflogen
+ * war, ohne je bereit gewesen zu sein — dessen Teams gingen dann unfertig in die Enthuellung.
  *
- * `syncPlayers` (`room-store.ts`) ruft diese Funktion bei JEDER Verbindungsaenderung
- * (Connect/Disconnect/Rejoin) ueber `syncRoomArenaParticipants` neu auf -- der getrennte
- * Teilnehmer fliegt also im selben Moment aus der Pflicht, in dem der Server ihn als offline
- * erkennt, nicht erst beim naechsten Ready-Klick.
+ * WAS SICH DADURCH NICHT AENDERT: `markDisconnected` (room-store.ts) setzt nur `connectionStatus`,
+ * NICHT `readyState`/`readyParticipantIds`. Wer bereit war und dann rausfliegt, BLEIBT bereit und
+ * haelt niemanden auf. Nur die Lage "nicht bereit UND offline" blockiert jetzt — und genau die war
+ * gemeint.
+ *
+ * DER RAUM KANN TROTZDEM NICHT EINFRIEREN: `advanceRoomArenaStep` nimmt `getrennteUeberspringen`
+ * und prueft serverseitig, dass wirklich JEDER Blockierende offline und nicht bereit ist. Einen
+ * ANWESENDEN Mitspieler kann der Host damit nicht uebergehen — das ist der Kern der Regel.
  */
 export function getRoomArenaRequiredParticipantIds(state: Pick<OlyRoomState, "roomParticipants" | "teamOwnership">) {
   return state.roomParticipants
     .filter((participant) => participant.role !== "spectator" && participant.controlledTeamIds.length > 0)
-    .filter((participant) => participant.connectionStatus !== "offline")
     .map((participant) => participant.participantId);
+}
+
+/**
+ * Wer haelt das Bereit-Tor auf, OHNE noch da zu sein?
+ *
+ * Genau diese Menge — bereit-pflichtig, nicht bereit, offline — darf der Notausgang uebergehen,
+ * und keine andere. Sie wird an zwei Stellen gebraucht: der Server prueft mit ihr, ob er den
+ * Notausgang ueberhaupt oeffnen darf, und die Oberflaeche schreibt die Namen daraus in den Knopf.
+ * Eine gemeinsame Quelle, damit der Knopf nie etwas anderes verspricht als der Server zulaesst.
+ */
+export function getRoomArenaOfflineBlockerIds(
+  state: Pick<OlyRoomState, "roomParticipants">,
+  arenaState: Pick<RoomArenaState, "requiredParticipantIds" | "readyParticipantIds">,
+): string[] {
+  const bereit = new Set(arenaState.readyParticipantIds);
+  const offline = new Set(
+    state.roomParticipants
+      .filter((participant) => participant.connectionStatus === "offline")
+      .map((participant) => participant.participantId),
+  );
+  return arenaState.requiredParticipantIds.filter(
+    (participantId) => !bereit.has(participantId) && offline.has(participantId),
+  );
 }
 
 function defaultMaxSlotRevealCounts(maxSlotRevealIndex = 0) {

@@ -3,6 +3,7 @@ import { createInitialRoomState } from "@/lib/game/create-room-state";
 import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
 import {
   advanceRoomArenaReveal,
+  getRoomArenaOfflineBlockerIds,
   isRoomArenaReady,
   quickSimRoomArenaReveal as buildQuickSimmedRoomArenaState,
   resetRoomArenaReveal as buildResetRoomArenaState,
@@ -927,6 +928,19 @@ export function advanceRoomArenaStep(
     maxSlotRevealIndex?: number | null;
     maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
     force?: boolean | null;
+    /**
+     * DER BENANNTE NOTAUSGANG (Entscheidung von Chris, 18.08.).
+     *
+     * Seit ein getrennter Mitspieler das Bereit-Tor haelt, kann eine Enthuellung sonst haengen
+     * bleiben, wenn er rausfliegt, BEVOR er bereit gedrueckt hat — und waehrend ein Spieltag
+     * laeuft, laesst sich auch die Team-Zuordnung nicht umstellen (`isRoomMatchdayInProgress`).
+     * Es gaebe dann keinen Weg mehr aus dem Raum heraus ausser: warten, bis er wiederkommt.
+     *
+     * Anders als `force` ist das hier KEIN Freibrief: der Server laesst es nur durch, wenn jeder,
+     * der gerade blockiert, wirklich offline UND nicht bereit ist. Einen anwesenden Mitspieler
+     * uebergeht der Host damit nicht — das ist genau die Regel, die hier durchgesetzt wird.
+     */
+    getrennteUeberspringen?: boolean | null;
   },
 ) {
   const room = getRoom(roomCode);
@@ -941,7 +955,37 @@ export function advanceRoomArenaStep(
     return { ok: false as const, error: "Nur der Host darf den gemeinsamen Arena-Step fortsetzen." };
   }
   if (!input?.force && room.state.arenaSyncState.status === "ready_check" && !isRoomArenaReady(room.state.arenaSyncState)) {
-    return { ok: false as const, error: "Arena wartet noch auf Ready von allen aktiven Coaches." };
+    const nameFuer = (participantId: string) =>
+      room.state.roomParticipants.find((teilnehmer) => teilnehmer.participantId === participantId)?.displayName ??
+      participantId;
+    const bereit = new Set(room.state.arenaSyncState.readyParticipantIds);
+    const offeneIds = room.state.arenaSyncState.requiredParticipantIds.filter((id) => !bereit.has(id));
+    const getrennteIds = getRoomArenaOfflineBlockerIds(room.state, room.state.arenaSyncState);
+    const anwesendeIds = offeneIds.filter((id) => !getrennteIds.includes(id));
+
+    if (!input?.getrennteUeberspringen || anwesendeIds.length > 0) {
+      /**
+       * Die Meldung nennt WEN und WARUM — beides, weil die zwei Faelle verschieden zu beheben sind:
+       * auf einen Anwesenden wartet man, einen Getrennten kann der Host uebergehen. Ein blosses
+       * "wartet noch auf Ready" liesse den Host raten, welcher der beiden Faelle vorliegt.
+       */
+      const teile: string[] = [];
+      if (anwesendeIds.length > 0) {
+        teile.push(`${anwesendeIds.map(nameFuer).join(", ")} (anwesend, noch nicht bereit)`);
+      }
+      if (getrennteIds.length > 0) {
+        teile.push(`${getrennteIds.map(nameFuer).join(", ")} (offline und nicht bereit)`);
+      }
+      const wer = teile.length > 0 ? teile.join(" · ") : "alle aktiven Coaches";
+      return {
+        ok: false as const,
+        error:
+          `Die Arena wartet noch auf: ${wer}.` +
+          (anwesendeIds.length === 0 && getrennteIds.length > 0
+            ? " Getrennte Mitspieler kannst du als Host ausdruecklich uebergehen."
+            : ""),
+      };
+    }
   }
 
   room.state = {
@@ -1429,7 +1473,22 @@ function readRoomGameState(room: RuntimeRoom, persistence?: PersistenceService) 
   }
 }
 
-export function advanceRoomFlow(roomCode: string, seatToken: string, options?: { persistence?: PersistenceService }) {
+export function advanceRoomFlow(
+  roomCode: string,
+  seatToken: string,
+  options?: {
+    persistence?: PersistenceService;
+    /**
+     * Der benannte Notausgang — dieselbe Regel wie in der Arena (`advanceRoomArenaStep`).
+     *
+     * Seit ein getrennter Mitspieler die Bereit-Pflicht nicht mehr verliert, kann der Ablauf sonst
+     * an jemandem haengen bleiben, der weg ist und nie bereit gedrueckt hat. Der Server oeffnet den
+     * Ausgang NUR, wenn jeder Blockierende offline UND nicht bereit ist; einen Anwesenden
+     * uebergeht der Host damit nicht.
+     */
+    getrennteUeberspringen?: boolean | null;
+  },
+) {
   const room = getRoom(roomCode);
   if (!room) {
     return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
@@ -1439,7 +1498,43 @@ export function advanceRoomFlow(roomCode: string, seatToken: string, options?: {
     return { ok: false as const, error: "Nur der Host darf den Room-Flow fortsetzen." };
   }
   if (!room.state.roomFlowState.canHostAdvance) {
-    return { ok: false as const, error: "Room-Flow ist noch blockiert: Human- oder AI-Schritte sind offen." };
+    const flow = room.state.roomFlowState;
+    const nameFuer = (participantId: string) =>
+      room.state.roomParticipants.find((teilnehmer) => teilnehmer.participantId === participantId)?.displayName ??
+      participantId;
+    const offeneIds = flow.requiredParticipantIds.filter((id) => !flow.completedParticipantIds.includes(id));
+    const getrennteIds = flow.offlineBlockingParticipantIds ?? [];
+    const anwesendeIds = offeneIds.filter((id) => !getrennteIds.includes(id));
+    // Der KI-Teil bleibt ein eigener Grund: ihn kann der Host nicht uebergehen, sondern nur
+    // abwarten — den Notausgang darauf anzuwenden hiesse, einen halb vorbereiteten Spieltag zu
+    // starten.
+    const aiOffen = flow.warnings.includes("ai_auto_step_pending");
+
+    const darfUebergehen =
+      Boolean(options?.getrennteUeberspringen) && !aiOffen && anwesendeIds.length === 0 && getrennteIds.length > 0;
+
+    if (!darfUebergehen) {
+      const teile: string[] = [];
+      if (anwesendeIds.length > 0) {
+        teile.push(`${anwesendeIds.map(nameFuer).join(", ")} (anwesend, noch nicht bereit)`);
+      }
+      if (getrennteIds.length > 0) {
+        teile.push(`${getrennteIds.map(nameFuer).join(", ")} (offline und nicht bereit)`);
+      }
+      if (aiOffen) {
+        teile.push("KI-Teams werden noch vorbereitet");
+      }
+      return {
+        ok: false as const,
+        error:
+          teile.length > 0
+            ? `Der Raum wartet noch auf: ${teile.join(" · ")}.` +
+              (!aiOffen && anwesendeIds.length === 0 && getrennteIds.length > 0
+                ? " Getrennte Mitspieler kannst du als Host ausdruecklich uebergehen."
+                : "")
+            : "Room-Flow ist noch blockiert: Human- oder AI-Schritte sind offen.",
+      };
+    }
   }
 
   // Der Spieltag-Zyklus: nach dem Saisonstand geht es zurueck zur Einsatzliste, solange die

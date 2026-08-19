@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import { matchesArenaScope, normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
+import { getRoomArenaOfflineBlockerIds, matchesArenaScope, normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
 import { computeArenaClockOffsetMs, systemArenaClock, type ArenaClockSource } from "@/lib/foundation/discipline-stage/arena-timeline";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
@@ -66,6 +66,11 @@ export type UseArenaRoomSyncResult = {
   isRoomArenaCoop: boolean;
   /** True while co-op is waiting on the "both ready" gate. */
   arenaCoopReadyGateActive: boolean;
+  /** Namen der Bereit-pflichtigen, die weder bereit noch verbunden sind. Fuer Hinweis UND Knopf. */
+  arenaOfflineBlockerNames: string[];
+  /** Nur wahr, wenn AUSSCHLIESSLICH Getrennte blockieren — sonst lehnt der Server ohnehin ab. */
+  canSkipDisconnectedInArena: boolean;
+  emitHostRoomArenaAdvanceSkippingDisconnected: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
   selfArenaParticipantId: string | null;
   isSelfArenaReady: boolean;
   arenaCoopGateParticipants: RoomParticipant[];
@@ -260,6 +265,37 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
         !arenaReadyParticipantIds.includes(participant.participantId),
     )
     .map((participant) => participant.displayName);
+  /**
+   * WER HAELT DAS TOR AUF, OHNE NOCH DA ZU SEIN — aus derselben Quelle wie die Server-Pruefung
+   * (`getRoomArenaOfflineBlockerIds`). Waere das hier nachgerechnet, koennte der Knopf etwas
+   * versprechen, das der Server gleich wieder ablehnt.
+   */
+  const arenaOfflineBlockerNames = getRoomArenaOfflineBlockerIds(
+    { roomParticipants: roomSyncParticipants },
+    {
+      requiredParticipantIds: arenaRequiredParticipantIds,
+      readyParticipantIds: arenaReadyParticipantIds,
+    },
+  )
+    .map(
+      (participantId) =>
+        roomSyncParticipants.find((participant) => participant.participantId === participantId)?.displayName ??
+        participantId,
+    );
+  /**
+   * Der Notausgang ist NUR dann anzubieten, wenn wirklich ausschliesslich Getrennte blockieren.
+   * Steht auch nur ein anwesender Mitspieler offen, lehnt der Server ab — dann waere der Knopf ein
+   * leeres Versprechen, und der Host suchte den Fehler bei sich.
+   */
+  const arenaOffeneOhneSelbst = arenaRequiredParticipantIds.filter(
+    (participantId) => !arenaReadyParticipantIds.includes(participantId),
+  );
+  const canSkipDisconnectedInArena =
+    isRoomHost &&
+    arenaCoopReadyGateActive &&
+    arenaOfflineBlockerNames.length > 0 &&
+    arenaOffeneOhneSelbst.length === arenaOfflineBlockerNames.length;
+
   const canControlArenaReveal = (!isRoomRevealSyncActive || isRoomHost) && !arenaCoopReadyGateActive;
   const roomRevealWaitingForHost =
     isRoomRevealSyncActive && !isRoomHost && (scopedRoomArenaSyncState?.status ?? "idle") === "idle";
@@ -285,6 +321,27 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
       });
     },
     [roomContext, isRoomArenaCoop],
+  );
+
+  /**
+   * Derselbe Vorschub, aber mit ausdruecklichem "die Getrennten uebergehe ich jetzt". Bewusst ein
+   * EIGENER Aufruf und nicht ein Zusatzhaken am normalen Weiter-Knopf: den normalen darf man aus
+   * Versehen druecken, diesen nicht.
+   */
+  const emitHostRoomArenaAdvanceSkippingDisconnected = useCallback(
+    (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => {
+      if (!roomContext) {
+        return;
+      }
+      const socket = getClientSocket();
+      socket.emit("advanceRoomArenaStep", {
+        roomCode: roomContext.roomCode,
+        seatToken: roomContext.seatToken,
+        maxSlotRevealCountByDiscipline,
+        getrennteUeberspringen: true,
+      });
+    },
+    [roomContext],
   );
 
   const emitArenaCoopReadyToggle = useCallback(() => {
@@ -376,6 +433,9 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     arenaReadyParticipantIds,
     isRoomArenaCoop,
     arenaCoopReadyGateActive,
+    arenaOfflineBlockerNames,
+    canSkipDisconnectedInArena,
+    emitHostRoomArenaAdvanceSkippingDisconnected,
     selfArenaParticipantId,
     isSelfArenaReady,
     arenaCoopGateParticipants,

@@ -202,8 +202,21 @@ describe("Arena-Optik im Mehrspieler — Punkt 4: Disziplin-Auswahl und Spieltag
   });
 });
 
-describe("Arena-Optik im Mehrspieler — Punkt 5: ein getrennter Mitspieler blockiert das Bereit-Tor unbegrenzt", () => {
-  it("getRoomArenaRequiredParticipantIds laesst einen GETRENNTEN Teilnehmer nicht mehr als bereit-pflichtig gelten", () => {
+describe("Arena-Optik im Mehrspieler — Punkt 5, umgedreht: ein Getrennter faellt NICHT aus der Bereit-Pflicht", () => {
+  /**
+   * DIESER BLOCK STAND VORHER GENAU ANDERSHERUM — und er hatte recht, bis Chris entschieden hat.
+   *
+   * Audit-Punkt 5 hatte den Filter `connectionStatus !== "offline"` eingezogen, damit ein
+   * getrennter Mitspieler das Bereit-Tor nicht unbegrenzt blockiert. Der Preis war, dass der Host
+   * an jemandem vorbeizog, der gerade rausgeflogen war, ohne je bereit gewesen zu sein — dessen
+   * Teams gingen unfertig in die Enthuellung.
+   *
+   * CHRIS am 18.08.: "host kann nur weiter klicken in der arena wenn frankys teams auch alle ready
+   * sind." Damit ist die Abwaegung neu entschieden, und die Pruefungen drehen mit — samt dem
+   * Grund, aus dem sie frueher anders lauteten. Der Notausgang unten haelt die Sorge der alten
+   * Fassung am Leben: einfrieren kann der Raum trotzdem nicht.
+   */
+  it("ein GETRENNTER Teilnehmer bleibt bereit-pflichtig", () => {
     const state: Pick<OlyRoomState, "roomParticipants" | "teamOwnership"> = {
       roomParticipants: [
         makeParticipant({ participantId: "p-host", role: "host", controlledTeamIds: ["A"], connectionStatus: "online" }),
@@ -213,22 +226,22 @@ describe("Arena-Optik im Mehrspieler — Punkt 5: ein getrennter Mitspieler bloc
     };
     const required = getRoomArenaRequiredParticipantIds(state);
     expect(required).toContain("p-host");
-    expect(required).not.toContain("p-guest");
+    expect(required, "genau das war die Entscheidung: offline entbindet nicht").toContain("p-guest");
   });
 
-  it("GEGENPROBE: derselbe Teilnehmer bleibt bereit-pflichtig, solange er VERBUNDEN ist", () => {
+  it("GEGENPROBE: wer keine Teams fuehrt, ist weiterhin nicht bereit-pflichtig", () => {
+    // Die Pflicht haengt am Teambesitz, nicht an der Anwesenheit — daran aendert sich nichts.
     const state: Pick<OlyRoomState, "roomParticipants" | "teamOwnership"> = {
       roomParticipants: [
         makeParticipant({ participantId: "p-host", role: "host", controlledTeamIds: ["A"], connectionStatus: "online" }),
-        makeParticipant({ participantId: "p-guest", role: "player", controlledTeamIds: ["B"], connectionStatus: "online" }),
+        makeParticipant({ participantId: "p-zuschauer", role: "player", controlledTeamIds: [], connectionStatus: "online" }),
       ],
       teamOwnership: [],
     };
-    const required = getRoomArenaRequiredParticipantIds(state);
-    expect(required).toContain("p-guest");
+    expect(getRoomArenaRequiredParticipantIds(state)).not.toContain("p-zuschauer");
   });
 
-  it("GEGENPROBE end-to-end (room-store): der Host bleibt VOR dem Disconnect blockiert, kommt NACH dem Disconnect ohne Ready des Getrennten durch", () => {
+  it("end-to-end: der Host bleibt blockiert, AUCH nachdem der Mitspieler rausgeflogen ist", () => {
     const saveId = "arena-optik-mp-disconnect";
     const hostSocket = `socket-${saveId}-a`;
     const guestSocket = `socket-${saveId}-b`;
@@ -245,45 +258,116 @@ describe("Arena-Optik im Mehrspieler — Punkt 5: ein getrennter Mitspieler bloc
     });
     expect(started.ok).toBe(true);
 
-    // Nur der Host ist bereit -- Franky (verbunden) druckt nie auf "Bereit".
+    // Nur der Host ist bereit — Franky drueckt nie auf "Bereit".
     expect(setRoomArenaReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
 
-    // VOR dem Disconnect: das Tor blockiert -- Franky ist noch verbunden und nicht bereit.
-    const blockedAttempt = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+    const blockiertMitFranky = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
       maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
     });
-    expect(blockedAttempt.ok).toBe(false);
-    expect(getRoom(created.room.roomCode)?.state.arenaSyncState.slotRevealIndex).toBe(0);
+    expect(blockiertMitFranky.ok).toBe(false);
 
-    // Franky trennt die Verbindung, OHNE je "Bereit" gedrueckt zu haben.
     markDisconnected(guestSocket);
     const guestParticipantId = joined.seat.participantId;
     expect(
       getRoom(created.room.roomCode)?.state.arenaSyncState.requiredParticipantIds.includes(guestParticipantId),
-    ).toBe(false);
+      "der Getrennte bleibt in der Pflicht",
+    ).toBe(true);
 
-    // NACH dem Disconnect: derselbe Aufruf, dieselben Ready-Flags -- geht jetzt durch.
-    const unblockedAttempt = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+    const blockiertOhneFranky = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
       maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
     });
-    expect(unblockedAttempt.ok).toBe(true);
-    if (unblockedAttempt.ok) {
-      expect(unblockedAttempt.room.state.arenaSyncState.slotRevealIndex).toBe(1);
+    expect(blockiertOhneFranky.ok, "derselbe Aufruf wie vorher — und er geht weiterhin nicht durch").toBe(false);
+    expect(getRoom(created.room.roomCode)?.state.arenaSyncState.slotRevealIndex).toBe(0);
+    if (!blockiertOhneFranky.ok) {
+      // Die Meldung muss den Weg nennen, sonst sucht der Host ihn nicht.
+      expect(blockiertOhneFranky.error).toContain("Franky");
+      expect(blockiertOhneFranky.error).toMatch(/offline und nicht bereit/);
+      expect(blockiertOhneFranky.error).toMatch(/uebergehen/);
     }
 
     resetRuntimeRoomsForTests();
   });
 
-  it("der Hinweis auf einen Getrennten wird jetzt bis in die Arena durchgereicht (vorher nirgends sichtbar)", () => {
-    // Bewusst NICHT aus `arenaCoopGateParticipants` (Bereit-pflichtige) abgeleitet -- ein
-    // Getrennter faellt daraus gerade heraus (siehe Punkt 5, erste Haelfte). Die Quelle hier ist
-    // der VOLLE Teilnehmer-Satz aus dem Hook.
+  it("der Notausgang oeffnet sich fuer einen Getrennten — und NUR fuer ihn", () => {
+    const saveId = "arena-optik-mp-notausgang";
+    const hostSocket = `socket-${saveId}-a`;
+    const guestSocket = `socket-${saveId}-b`;
+    const created = createRoom(hostSocket, { displayName: "Chris", preset: "chris_4_franky_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, guestSocket, { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+    expect(
+      startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+        seasonId: "season-2",
+        matchdayId: "season-2-matchday-1",
+        disciplineSide: "d1",
+        maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+      }).ok,
+    ).toBe(true);
+    expect(setRoomArenaReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+
+    // SOLANGE FRANKY DA IST, hilft der Notausgang nicht — das ist der Kern der Regel. Ein Knopf,
+    // der auch einen Anwesenden uebergeht, waere genau das Verhalten, das abgeschafft werden soll.
+    const mitAnwesendem = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+      getrennteUeberspringen: true,
+    });
+    expect(mitAnwesendem.ok, "ein anwesender Mitspieler ist nicht uebergehbar").toBe(false);
+    if (!mitAnwesendem.ok) {
+      expect(mitAnwesendem.error).toMatch(/anwesend, noch nicht bereit/);
+    }
+
+    markDisconnected(guestSocket);
+    const mitGetrenntem = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+      getrennteUeberspringen: true,
+    });
+    expect(mitGetrenntem.ok, "jetzt darf der Host ausdruecklich vorbei").toBe(true);
+    if (mitGetrenntem.ok) {
+      expect(mitGetrenntem.room.state.arenaSyncState.slotRevealIndex).toBe(1);
+    }
+
+    resetRuntimeRoomsForTests();
+  });
+
+  it("GEGENPROBE: wer bereit war und DANN rausfliegt, haelt niemanden auf", () => {
+    // `markDisconnected` fasst die Bereitmeldung nicht an. Ohne diese Eigenschaft waere die neue
+    // Regel unzumutbar: jeder Verbindungsabriss mitten in der Enthuellung wuerde die Show anhalten,
+    // obwohl der Mitspieler laengst zugestimmt hat.
+    const saveId = "arena-optik-mp-bereit-dann-weg";
+    const hostSocket = `socket-${saveId}-a`;
+    const guestSocket = `socket-${saveId}-b`;
+    const created = createRoom(hostSocket, { displayName: "Chris", preset: "chris_4_franky_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, guestSocket, { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+    expect(
+      startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+        seasonId: "season-2",
+        matchdayId: "season-2-matchday-1",
+        disciplineSide: "d1",
+        maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+      }).ok,
+    ).toBe(true);
+    expect(setRoomArenaReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+    expect(setRoomArenaReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+
+    markDisconnected(guestSocket);
+
+    const ohneNotausgang = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: { d1: 6, d2: 6 },
+    });
+    expect(ohneNotausgang.ok, "bereit bleibt bereit — kein Notausgang noetig").toBe(true);
+
+    resetRuntimeRoomsForTests();
+  });
+
+  it("der Hinweis auf einen Getrennten wird bis in die Arena durchgereicht", () => {
     expect(ARENA).toContain("const disconnectedCoopNames = roomArenaSync.roomSyncParticipants");
     expect(ARENA).toContain('participant.connectionStatus === "offline"');
     expect(ARENA).toContain("disconnectedNames: disconnectedCoopNames,");
     expect(NATIVE).toContain("disconnectedNames?: string[];");
     expect(NATIVE).toContain("roomSync.disconnectedNames && roomSync.disconnectedNames.length > 0");
-    expect(NATIVE).toContain("blockiert das Bereit-Tor nicht");
   });
 });
 

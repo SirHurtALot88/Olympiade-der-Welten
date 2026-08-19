@@ -46,6 +46,37 @@ export function FoundationRoomFlowBar({ roomContext, roomLiveState }: Foundation
   const aiTeamCount = roomLiveState.teamOwnership.filter((entry) => entry.controllerType === "ai").length;
   const aiReadyCount = flow.aiAutoCompletedTeamIds.length;
 
+  /**
+   * DER BENANNTE NOTAUSGANG — nur fuer den Host, nur wenn AUSSCHLIESSLICH Getrennte blockieren.
+   *
+   * Seit ein getrennter Mitspieler die Bereit-Pflicht nicht mehr verliert (Entscheidung von Chris),
+   * kann der Ablauf sonst an jemandem haengen, der weg ist und nie bereit gedrueckt hat. Steht
+   * dagegen noch jemand ANWESENDES offen, gibt es diesen Knopf gar nicht erst — der Server lehnte
+   * ihn ohnehin ab, und ein Knopf, der nichts tut, ist schlimmer als keiner.
+   */
+  const istHost = currentParticipant?.role === "host";
+  const getrennteBlocker = (flow.offlineBlockingParticipantIds ?? [])
+    .map(
+      (participantId) =>
+        roomLiveState.roomParticipants.find((teilnehmer) => teilnehmer.participantId === participantId)?.displayName ??
+        participantId,
+    );
+  const offeneIds = flow.requiredParticipantIds.filter((id) => !flow.completedParticipantIds.includes(id));
+  const nurGetrennteOffen =
+    getrennteBlocker.length > 0 &&
+    offeneIds.length === (flow.offlineBlockingParticipantIds ?? []).length &&
+    !flow.warnings.includes("ai_auto_step_pending");
+  const zeigeNotausgang = istHost && !button.canClick && nurGetrennteOffen;
+
+  function handleSkipDisconnected() {
+    emitRoomFlowButtonAction({
+      action: "advance_flow_skipping_disconnected",
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+      toggleReadyTo: false,
+    });
+  }
+
   function handlePrimaryAction() {
     if (!button.canClick) {
       return;
@@ -114,6 +145,17 @@ export function FoundationRoomFlowBar({ roomContext, roomLiveState }: Foundation
         >
           {button.label}
         </button>
+        {zeigeNotausgang ? (
+          <button
+            className="secondary-button foundation-flow-button"
+            type="button"
+            onClick={handleSkipDisconnected}
+            data-testid="foundation-room-flow-skip-disconnected"
+            title="Der Server prüft nach: übergangen wird nur, wer wirklich offline und nicht bereit ist."
+          >
+            {getrennteBlocker.join(", ")} ist offline und nicht bereit — trotzdem fortfahren
+          </button>
+        ) : null}
       </div>
     </section>
   );

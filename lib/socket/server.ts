@@ -230,8 +230,8 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("advanceRoomFlow", ({ roomCode, seatToken }) => {
-      const result = advanceRoomFlow(roomCode, seatToken);
+    socket.on("advanceRoomFlow", ({ roomCode, seatToken, getrennteUeberspringen }) => {
+      const result = advanceRoomFlow(roomCode, seatToken, { getrennteUeberspringen });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;
@@ -268,8 +268,15 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("advanceRoomArenaStep", ({ roomCode, seatToken, maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force }) => {
-      const result = advanceRoomArenaStep(roomCode, seatToken, { maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force });
+    socket.on(
+      "advanceRoomArenaStep",
+      ({ roomCode, seatToken, maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force, getrennteUeberspringen }) => {
+      const result = advanceRoomArenaStep(roomCode, seatToken, {
+        maxSlotRevealIndex,
+        maxSlotRevealCountByDiscipline,
+        force,
+        getrennteUeberspringen,
+      });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;
@@ -277,7 +284,8 @@ export function ensureSocketServer(httpServer: HttpServer) {
       const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
       if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
       io.to(result.room.roomCode).emit("roomState", result.room.state);
-    });
+      },
+    );
 
     // Stufe 3.6: letzte Meile fuer Pause/Reset/Quick-Sim als Raum-Aktion — reine Weiterleitung an
     // die Huellen aus room-store.ts, danach der Raum-Zustand-Broadcast wie bei jedem anderen

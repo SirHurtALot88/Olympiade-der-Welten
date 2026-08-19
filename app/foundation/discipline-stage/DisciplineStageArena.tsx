@@ -1382,6 +1382,12 @@ export default function DisciplineStageArena({
           isSelfReady: roomArenaSync.isSelfArenaReady,
           waitingNames: roomArenaSync.arenaCoopWaitingNames,
           onToggleReady: roomArenaSync.emitArenaCoopReadyToggle,
+          // Der Notausgang: nur gesetzt, wenn AUSSCHLIESSLICH Getrennte blockieren. Sonst bliebe
+          // ein Knopf stehen, den der Server jedes Mal ablehnt.
+          canSkipDisconnected: roomArenaSync.canSkipDisconnectedInArena,
+          disconnectedBlockerNames: roomArenaSync.arenaOfflineBlockerNames,
+          onSkipDisconnected: () =>
+            roomArenaSync.emitHostRoomArenaAdvanceSkippingDisconnected(maxSlotRevealCountByDiscipline),
         },
         disconnectedNames: disconnectedCoopNames,
         // Gemeinsame Zeitbasis + Pause/Reset/Quick-Sim als Raum-Aktion (Stufe 3.6) — die Felder

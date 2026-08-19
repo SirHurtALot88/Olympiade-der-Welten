@@ -1203,12 +1203,29 @@ async function main() {
           "Franky offline nach manuell ausgeloestem Broadcast",
         );
       }
+      /**
+       * D2b — WER GETRENNT IST, FAELLT NICHT AUS DER PFLICHT.
+       *
+       * Hier stand eine Beobachtung mit umgekehrtem Vorzeichen: `requiredParticipantIds` schrumpfte
+       * waehrend der Trennung auf 1, der Host konnte allein weiterschalten, und der Gast fand sich
+       * nach dem Rejoin mehrere Stationen weiter wieder. CHRIS dazu (18.08.): "host kann nur weiter
+       * klicken ... wenn frankys teams auch alle ready sind." Aus der Beobachtung wird damit eine
+       * Pruefung — sonst faellt ein Rueckbau erst auf, wenn jemand einen Abend verliert.
+       */
       const requiredWaehrendOffline: string[] = chris.state.roomFlowState.requiredParticipantIds;
+      const getrennteBlockerWaehrendOffline: string[] = chris.state.roomFlowState.offlineBlockingParticipantIds ?? [];
+      check(
+        "D2b: Ein getrennter Mitspieler bleibt bereit-pflichtig — der Host schaltet nicht allein weiter",
+        requiredWaehrendOffline.includes(frankyP.participantId) &&
+          getrennteBlockerWaehrendOffline.includes(frankyP.participantId) &&
+          chris.state.roomFlowState.canHostAdvance === false,
+        `required=${requiredWaehrendOffline.length} (Franky drin: ${requiredWaehrendOffline.includes(frankyP.participantId)}), ` +
+          `offlineBlocker=${getrennteBlockerWaehrendOffline.length}, canHostAdvance=${chris.state.roomFlowState.canHostAdvance}`,
+      );
       beobachtung(
-        `Waehrend der Gast offline ist, schrumpft requiredParticipantIds auf ${requiredWaehrendOffline.length} ` +
-          "(lib/room/room-flow-controller.ts:166, connectionStatus-Filter) — der Host koennte Schritte allein " +
-          "weiterschalten; der Gast landet nach dem Rejoin in einem spaeteren Schritt. Design-Entscheidung " +
-          "(Offline-Spieler blockieren nicht), aber fuer eine gemeinsame Saison erwaehnenswert.",
+        "Damit der Raum davon nicht einfrieren kann, gibt es den benannten Notausgang: der Host darf " +
+          "GETRENNTE, nicht bereite Mitspieler ausdruecklich uebergehen (advanceRoomFlow mit " +
+          "`getrennteUeberspringen`, serverseitig geprueft). Einen ANWESENDEN uebergeht er damit nicht.",
       );
       const frankySocketNeu = await connect(opts.baseUrl);
       franky = trackSocket(frankySocketNeu);
@@ -1574,9 +1591,18 @@ async function main() {
     chrisSocket.once("roomError", resolve);
     chrisSocket.emit("advanceRoomFlow", { roomCode, seatToken: chrisSeat });
   });
+  /**
+   * Die Meldung nennt seit dem Ready-Tor gegen Getrennte NAMEN und Grund, statt eines festen
+   * Satzes ("Der Raum wartet noch auf: Franky (anwesend, noch nicht bereit)."). Auf den alten
+   * Wortlaut zu pruefen hiesse, die Verbesserung als Fehler zu melden — geprueft wird deshalb die
+   * EIGENSCHAFT: sie benennt den Blockierenden und seine Lage.
+   */
   check(
-    "A18b: Der Host kann season_transition nicht weiterschalten, solange der Mitspieler nicht bereit ist (Ready-Gate haelt, Meldung benennt es)",
-    vorschubOhneReady?.message === ROOM_FLOW_READY_GATE_BLOCKED_MESSAGE && chris.state.roomFlowState.step === "season_transition",
+    "A18b: Der Host kann season_transition nicht weiterschalten, solange der Mitspieler nicht bereit ist (Ready-Gate haelt, Meldung benennt WEN und WARUM)",
+    typeof vorschubOhneReady?.message === "string" &&
+      vorschubOhneReady.message.includes(String(frankyP.displayName)) &&
+      /anwesend, noch nicht bereit/.test(vorschubOhneReady.message) &&
+      chris.state.roomFlowState.step === "season_transition",
     `Meldung="${vorschubOhneReady?.message}", step=${chris.state.roomFlowState.step}`,
   );
 
