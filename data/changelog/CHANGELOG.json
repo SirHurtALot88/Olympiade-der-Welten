@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Im Mehrspieler folgt der Gast jetzt auch beim Wechsel auf die zweite Disziplin. Bisher war dieser Wechsel beim Host rein örtlich: der Server erfuhr nur die Etappenschritte und schob mit ihnen die Phasenkette der ERSTEN Disziplin weiter, statt die Seite zu wechseln. Durchgezählt an einem Spieltag mit je fünf Etappen: nach dem Wechsel meldete der Server fünf Klicks lang weiter „Disziplin 1, Etappe 5“ — der Gast blieb auf dem Endstand der ersten Disziplin kleben und sah von der zweiten nichts. Der Wechsel ist jetzt ein eigener Raum-Schritt, den nur der Host auslösen darf; die verlassene Disziplin gilt dabei nur dann als gewertet, wenn ihre Etappen wirklich durch sind.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Multiplayer",
       "pr": null,
       "text": "Ein Mitspieler, der die Verbindung verliert, fällt nicht mehr aus der Bereit-Pflicht. Bisher schrumpfte der Kreis der Bereit-pflichtigen in dem Moment, in dem jemand rausflog — der Host konnte ab da allein durch jeden Schritt und durch die Arena klicken, und der Gast fand sich nach dem Wiederverbinden mehrere Stationen weiter, ohne je gefragt worden zu sein. Jetzt hält sein offener Bereit-Status das Tor. Wer bereit war und DANN rausfliegt, hält niemanden auf — die Bereitmeldung überlebt den Abriss. Damit ein Abend daran nicht hängen bleibt, gibt es einen eigenen Knopf, der den Namen nennt: „Franky ist offline und nicht bereit — trotzdem fortfahren\". Er erscheint nur, wenn ausschließlich Getrennte blockieren, und der Server prüft es noch einmal nach: einen anwesenden Mitspieler übergeht der Host damit nicht.",

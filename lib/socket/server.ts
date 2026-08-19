@@ -11,6 +11,7 @@ import {
   joinRoom,
   markDisconnected,
   quickSimRoomArenaRevealState,
+  setRoomArenaDisciplinePhaseState,
   rejoinRoom,
   resetRoomArenaRevealState,
   runRoomAiAutoStep,
@@ -315,6 +316,20 @@ export function ensureSocketServer(httpServer: HttpServer) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;
       }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    // Der Diszi-Wechsel bekommt — anders als Pause/Reset/Quick-Sim — auch den
+    // `roomGameplayEvent`-Broadcast, weil `setRoomArenaDisciplinePhaseState` einen echten
+    // `roomEvents`-Eintrag schreibt (Begruendung dort).
+    socket.on("setRoomArenaDisciplinePhase", ({ roomCode, seatToken, phase, maxSlotRevealCountByDiscipline }) => {
+      const result = setRoomArenaDisciplinePhaseState(roomCode, seatToken, { phase, maxSlotRevealCountByDiscipline });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 

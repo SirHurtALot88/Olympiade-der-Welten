@@ -124,6 +124,18 @@ export type QuickSimRoomArenaRevealRequest = {
   maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
 };
 
+/**
+ * Der Host hat die gezeigte Disziplin gewechselt ("Weiter zu Disziplin 2" oder das Dropdown).
+ * Bis dahin war dieser Wechsel rein lokal — warum das den Gast in Disziplin 1 haengen liess,
+ * steht ausgemessen an `switchRoomArenaDisciplinePhase` (lib/room/arena-sync-state.ts).
+ */
+export type SetRoomArenaDisciplinePhaseRequest = {
+  roomCode: string;
+  seatToken: string;
+  phase: "d1" | "d2";
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
+};
+
 export type RoomErrorPayload = {
   roomCode?: string;
   message: string;
@@ -176,6 +188,7 @@ export type ClientToServerEvents = {
   setRoomArenaPaused: (payload: SetRoomArenaPausedRequest) => void;
   resetRoomArenaReveal: (payload: ResetRoomArenaRevealRequest) => void;
   quickSimRoomArenaReveal: (payload: QuickSimRoomArenaRevealRequest) => void;
+  setRoomArenaDisciplinePhase: (payload: SetRoomArenaDisciplinePhaseRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
 };
 

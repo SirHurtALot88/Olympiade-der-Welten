@@ -126,6 +126,17 @@ export type UseArenaRoomSyncResult = {
   emitHostRoomArenaPauseToggle: () => void;
   emitHostRoomArenaReset: () => void;
   emitHostRoomArenaQuickSim: (maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => void;
+  /**
+   * Welche Disziplinseite der Raum GERADE zeigt (`RoomArenaState.activeDisciplinePhase`) — `null`,
+   * solange kein Sync fuer DIESE Arena laeuft. Der Host vergleicht sie mit seiner lokal gewaehlten
+   * Disziplin, um einen Wechsel genau einmal zu melden; ohne diesen Vergleich gaebe es keinen Weg,
+   * ein erneutes Melden desselben Wechsels zu erkennen.
+   */
+  roomArenaActiveDisciplinePhase: "d1" | "d2" | "total" | null;
+  emitHostRoomArenaDisciplinePhase: (
+    phase: "d1" | "d2",
+    maxSlotRevealCountByDiscipline: { d1: number; d2: number },
+  ) => void;
 };
 
 export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSyncResult {
@@ -420,6 +431,22 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     [roomContext],
   );
 
+  const emitHostRoomArenaDisciplinePhase = useCallback(
+    (phase: "d1" | "d2", maxSlotRevealCountByDiscipline: { d1: number; d2: number }) => {
+      if (!roomContext) {
+        return;
+      }
+      const socket = getClientSocket();
+      socket.emit("setRoomArenaDisciplinePhase", {
+        roomCode: roomContext.roomCode,
+        seatToken: roomContext.seatToken,
+        phase,
+        maxSlotRevealCountByDiscipline,
+      });
+    },
+    [roomContext],
+  );
+
   return {
     roomSyncRole,
     // Bewusst der scope-gefilterte State: Konsumenten fragen ihn ab, um zu entscheiden, ob für DIESE
@@ -457,5 +484,7 @@ export function useArenaRoomSync(input: UseArenaRoomSyncInput): UseArenaRoomSync
     emitHostRoomArenaPauseToggle,
     emitHostRoomArenaReset,
     emitHostRoomArenaQuickSim,
+    roomArenaActiveDisciplinePhase: scopedRoomArenaSyncState?.activeDisciplinePhase ?? null,
+    emitHostRoomArenaDisciplinePhase,
   };
 }
