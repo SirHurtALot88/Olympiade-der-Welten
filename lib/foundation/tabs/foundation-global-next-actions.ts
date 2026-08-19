@@ -34,7 +34,28 @@ export function deriveGlobalNextUi(input: FoundationGlobalNextUiInput): Foundati
     : input.gameFlowActionStep.status === "applying" ||
       input.cockpitBusyKey != null ||
       input.seasonTransitionBusy;
-  const globalNextLabel = input.primaryInboxItem?.title ?? input.gameFlowActionStep.label;
+  /**
+   * DER KNOPF SAGT, WAS ER TUT — nicht, was gerade schiefsteht.
+   *
+   * Hier stand `primaryInboxItem?.title`. Der Titel eines Posteingangs-Eintrags ist aber ein
+   * ZUSTAND, und er ist absichtlich lang: „Board-Ziel verfehlt: ${objective.label}" — der Grund
+   * steht in `game-inbox-service.ts:1060` und ist fuer die Liste richtig, weil sonst mehrere
+   * Board-Ziele wortgleiche Karten ergaeben.
+   *
+   * Auf dem Knopf war er falsch. GEMESSEN am echten Spielstand: 27 Eintraege koennen auf die
+   * Leiste, die Beschriftung war im Median 15 Zeichen lang — und im laengsten Fall 74. Der Knopf
+   * hat dafuer keinen Platz und schnitt mit Ellipse ab: „Weiter Board-Ziel verfehlt: For…".
+   *
+   * `ctaLabel` gab es die ganze Zeit. Es ist an 20 Eintraegen gesetzt und traegt genau das
+   * Richtige — „Lineup pruefen", „Kapitaen waehlen", „Sponsor waehlen" —, wurde aber von KEINER
+   * Anzeige gelesen. Dieselbe Fehlerklasse wie A1 und A3: die Rechnung war da, die Anzeige holte
+   * sie nur nicht ab.
+   *
+   * Der Titel bleibt als letzter Rueckfall, damit nie ein leerer Knopf entsteht; welche
+   * Eintraege ihn noch brauchen, haelt `tests/weiter-leiste-beschriftung.test.ts` fest.
+   */
+  const globalNextLabel =
+    input.primaryInboxItem?.ctaLabel ?? input.primaryInboxItem?.title ?? input.gameFlowActionStep.label;
   const globalNextTitle = input.primaryInboxItem
     ? `${input.primaryInboxItem.title}: ${input.primaryInboxItem.description}`
     : input.gameFlowActionStep.status === "blocked"

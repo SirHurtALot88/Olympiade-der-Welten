@@ -129,6 +129,53 @@ Der Quelltext kennt das Problem schon: `game-flow-controller.ts:290` erklärt au
 „Board-Ziel verfehlt" hieß. **Es steht trotzdem noch da** — der Weg über `primaryInboxItem.title`
 (`foundation-global-next-actions.ts:38`) bringt es wieder herein.
 
+---
+
+### A2 · ERLEDIGT — die Lösung lag seit jeher im Datensatz
+
+**`ctaLabel` gab es die ganze Zeit.** Das Feld steht am `GameInboxItem`, ist an 20 Einträgen
+gesetzt und trägt genau das Richtige — „Lineup prüfen", „Kapitän wählen", „Sponsor wählen". Und
+**keine einzige Anzeige hat es je gelesen.** Der Knopf zog stattdessen `title`, also den Zustand.
+
+Dritter Fall derselben Klasse an einem Tag: die Rechnung war da, die Anzeige holte sie nicht ab.
+
+**Gemessen am echten Spielstand**, vor jeder Änderung:
+
+| | vorher | nachher |
+|---|---|---|
+| Einträge, die auf die Leiste können | 27 | 27 |
+| davon ohne Handlungstext | **2** | **0** |
+| längste Beschriftung | **74 Zeichen** | **20** |
+| Median | 15 | 15 |
+
+Die beiden ohne Handlungstext waren `team_season_objectives` — genau der 74-Zeichen-Eintrag, den
+Chris abgeschnitten sah — und `game_phase` („Pre-Season Schritt offen").
+
+**Im Browser nachgemessen**, bei 1600 / 1280 / 1024 px:
+
+```
+"Board-Ziele ansehen" (19 Zeichen)  abgeschnitten=false  162/162px
+```
+
+Vorher stand dort „Weiter Board-Ziel verfehlt: For…".
+
+**Der lange Titel bleibt, wo er hingehört.** Er ist absichtlich lang (`game-inbox-service.ts:1060`:
+sonst ergäben mehrere Board-Ziele wortgleiche Karten) — richtig für die Liste, falsch für einen
+Knopf. Er steht weiterhin im `title` des Knopfes, also im Tooltip.
+
+**Der Riegel gegen die Klasse:** `isPrimaryInboxCandidate` ist aus `getPrimaryInboxTask`
+herausgelöst (die Bedingung wurde vorher abgeschrieben, wer sie brauchte), und
+`tests/weiter-leiste-beschriftung.test.ts` prüft jeden `createItem`-Aufruf mit wählbarer
+Kategorie auf ein `ctaLabel`. Der Riegel hat sofort **zwei weitere** gefunden, die auf Chris'
+Spielstand gar nicht auftraten: „Mitspieler wartet / Ready fehlt" (Online-Spiel) und
+„AI/Workflow Blocker". Beide ergänzt.
+
+**Und der Riegel hat beim ersten Anlauf gegen sich selbst geprüft.** Die Gegenprobe — das echte
+`ctaLabel` entfernen — blieb grün: der Test suchte das *Wort* `ctaLabel` irgendwo im Block, und
+der erklärende Kommentar daneben nennt es ebenfalls. Ein Riegel, den die eigene Begründung
+aufhält, ist keiner. Geprüft wird jetzt die **Zuweisung** (`ctaLabel:`) in kommentarfreiem
+Quelltext; danach wird die Gegenprobe rot.
+
 ### A3 · `foundation-global-next-actions.ts` ist tot — und ein Test prüft trotzdem darauf
 
 `deriveGlobalNextUi`, `createUpdateInboxItemStatus`, `createTriggerGlobalNext` sind exportiert.

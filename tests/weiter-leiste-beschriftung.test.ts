@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { deriveGlobalNextUi } from "@/lib/foundation/tabs/foundation-global-next-actions";
+import { isPrimaryInboxCandidate } from "@/lib/foundation/game-inbox-service";
 import type { GameInboxItem } from "@/lib/data/olyDataTypes";
 
 /**
@@ -20,8 +24,8 @@ import type { GameInboxItem } from "@/lib/data/olyDataTypes";
 function inboxItem(overrides: Partial<GameInboxItem> = {}): GameInboxItem {
   return {
     itemId: "board_objectives_failed:C-C",
-    title: "Board-Ziel verfehlt",
-    description: "Formkarten-Ausbeute: Ligarang vor dem unteren Viertel",
+    title: "Board-Ziel verfehlt: Formkarten-Ausbeute: Ligarang vor dem unteren Viertel",
+    description: "Aktuell 12 · Ziel 8",
     severity: "warning",
     status: "open",
     ...overrides,
@@ -101,17 +105,26 @@ describe("Weiter-Leiste: was der Knopf sagt", () => {
 
 describe("Weiter-Leiste: der Posteingang uebernimmt", () => {
   /**
-   * GENAU DIESE LAGE stand im Audit als A2: der Knopf trug „Board-Ziel verfehlt: For…" —
-   * einen ZUSTAND statt einer Handlung, dazu abgeschnitten. Der Weg dorthin fuehrt ueber
-   * `primaryInboxItem.title`, das das Label des Schritts verdraengt.
+   * DAS WAR A2: der Knopf trug „Board-Ziel verfehlt: For…" — einen ZUSTAND statt einer Handlung,
+   * dazu abgeschnitten. Er zog `primaryInboxItem.title`, und der ist absichtlich lang.
    *
-   * Der Fall haelt das heutige Verhalten fest, damit A2 eine messbare Ausgangslage hat — er
-   * behauptet NICHT, dass es so richtig ist.
+   * Jetzt geht `ctaLabel` vor. Der Zustand bleibt im `title` des Knopfes, wo Platz dafuer ist.
    */
-  it("ersetzt Label und Titel durch den Posteingangs-Eintrag", () => {
-    const ui = deriveGlobalNextUi(eingabe({ primaryInboxItem: inboxItem() }));
-    expect(ui.globalNextLabel).toBe("Board-Ziel verfehlt");
+  it("nimmt den Handlungstext des Eintrags, nicht seinen Zustand", () => {
+    const ui = deriveGlobalNextUi({
+      ...eingabe(),
+      primaryInboxItem: inboxItem({ ctaLabel: "Board-Ziele ansehen" }),
+    });
+    expect(ui.globalNextLabel).toBe("Board-Ziele ansehen");
+    // Der Zustand geht nicht verloren — er steht im Tooltip.
     expect(ui.globalNextTitle).toBe(
+      "Board-Ziel verfehlt: Formkarten-Ausbeute: Ligarang vor dem unteren Viertel: Aktuell 12 · Ziel 8",
+    );
+  });
+
+  it("faellt auf den Titel zurueck, wenn ein Eintrag keinen Handlungstext hat — nie auf leer", () => {
+    const ui = deriveGlobalNextUi(eingabe({ primaryInboxItem: inboxItem() }));
+    expect(ui.globalNextLabel).toBe(
       "Board-Ziel verfehlt: Formkarten-Ausbeute: Ligarang vor dem unteren Viertel",
     );
   });
@@ -132,5 +145,83 @@ describe("Weiter-Leiste: der Posteingang uebernimmt", () => {
         klasse,
       );
     }
+  });
+});
+
+/**
+ * DER RIEGEL: WER AUF DEN KNOPF KANN, BRAUCHT EINEN HANDLUNGSTEXT.
+ *
+ * `ctaLabel` war an 20 Eintraegen gesetzt und wurde von KEINER Anzeige gelesen — die Rechnung war
+ * da, die Anzeige holte sie nicht ab. Zwei Eintraege hatten gar keinen, darunter ausgerechnet der
+ * mit 74 Zeichen Titel, den Chris abgeschnitten auf dem Knopf sah.
+ *
+ * GEMESSEN am echten Spielstand (Season 1, Spieltag 10): 27 Eintraege koennen auf die Leiste.
+ * Laengste Beschriftung vorher 74 Zeichen, nachher 20; der Median lag schon immer bei 15.
+ *
+ * Dieser Fall liest den Quelltext von `game-inbox-service.ts` und prueft jeden `createItem`-Block
+ * mit einer waehlbaren Kategorie. Das ist eine Quelltext-Pruefung mit den bekannten Grenzen —
+ * aber sie faengt den Fall, um den es geht: einen NEUEN Eintragsbauer ohne `ctaLabel`.
+ */
+describe("Jeder Eintrag, der auf die Weiter-Leiste kann, sagt was er tut", () => {
+  /** Kategorien, die `isPrimaryInboxCandidate` unabhaengig von der Dringlichkeit durchlaesst. */
+  const IMMER_WAEHLBAR = ["task", "warning", "sponsor", "training", "contract"];
+
+  it("das Praedikat und die Kategorienliste hier sagen dasselbe", () => {
+    // Ohne diese Kopplung koennte die Liste oben veralten und der Riegel unbemerkt aufgehen.
+    for (const category of IMMER_WAEHLBAR) {
+      const item = { status: "open", category, severity: "info" } as unknown as GameInboxItem;
+      expect(isPrimaryInboxCandidate(item)).toBe(true);
+    }
+    expect(isPrimaryInboxCandidate({ status: "open", category: "news", severity: "info" } as never)).toBe(false);
+    // Geschlossene Eintraege kommen nie auf den Knopf.
+    expect(isPrimaryInboxCandidate({ status: "done", category: "task", severity: "critical" } as never)).toBe(false);
+  });
+
+  it("kein createItem-Aufruf mit waehlbarer Kategorie ohne ctaLabel", () => {
+    const quelle = readFileSync(join(process.cwd(), "lib/foundation/game-inbox-service.ts"), "utf8");
+
+    // Jeden `createItem({ … })`-Aufruf per Klammerzaehlung schneiden — eine Regex haelt bei
+    // verschachtelten Objekten nicht.
+    const bloecke: string[] = [];
+    let index = quelle.indexOf("createItem({");
+    while (index !== -1) {
+      let tiefe = 0;
+      let ende = index + "createItem(".length;
+      for (; ende < quelle.length; ende += 1) {
+        const zeichen = quelle[ende];
+        if (zeichen === "(" || zeichen === "{") tiefe += 1;
+        else if (zeichen === ")" || zeichen === "}") {
+          tiefe -= 1;
+          if (tiefe === 0) break;
+        }
+      }
+      bloecke.push(quelle.slice(index, ende + 1));
+      index = quelle.indexOf("createItem({", ende);
+    }
+    // Absicherung gegen einen leeren Treffersatz.
+    expect(bloecke.length).toBeGreaterThanOrEqual(30);
+
+    /*
+     * KOMMENTARE RAUS, BEVOR GEPRUEFT WIRD — sonst prueft der Riegel gegen sich selbst.
+     *
+     * Erster Anlauf suchte das Wort `ctaLabel` irgendwo im Block. Die Gegenprobe (das echte
+     * `ctaLabel` entfernen) blieb GRUEN: der erklaerende Kommentar daneben nennt das Feld
+     * ebenfalls, und der Block enthielt den Namen damit weiter. Ein Riegel, den die eigene
+     * Begruendung aufhaelt, ist keiner.
+     *
+     * Geprueft wird jetzt die ZUWEISUNG (`ctaLabel:`) in kommentarfreiem Quelltext.
+     */
+    const ohneKommentare = (block: string) =>
+      block.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+    const ohne = bloecke
+      .filter((block) => IMMER_WAEHLBAR.some((kategorie) => block.includes(`category: "${kategorie}"`)))
+      .filter((block) => !/\bctaLabel\s*:/.test(ohneKommentare(block)))
+      .map((block) => {
+        const titel = /title:\s*([^\n]{0,70})/.exec(block);
+        return titel ? titel[1]!.trim() : block.slice(0, 60);
+      });
+
+    expect(ohne).toEqual([]);
   });
 });
