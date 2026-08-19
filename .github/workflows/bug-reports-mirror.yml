@@ -1,0 +1,123 @@
+
+# Spiegelt die im Spiel gemeldeten Fehler vom Live-Server auf den Branch "bug-reports".
+#
+# WARUM ES DAS GIBT — der Server-Cron ist ausgefallen, und niemand hat es gemerkt.
+# `deploy/hetzner/push-bug-reports.sh` laeuft per Crontab auf dem Hetzner-Server und spiegelt die
+# Meldungen alle 15 Minuten hierher. Am 14.08.2026 um 07:52 hat er zum letzten Mal gepusht, der
+# Live-Save-Cron zwei Minuten davor ebenso. Fuenf Tage lang liefen Meldungen ins Leere, waehrend
+# `main` normal weiterlief — Chris meldete Fehler, der Bugfixing-Lauf sah 51 unveraenderte.
+#
+# DIESER WEG HAENGT NICHT AN DER SERVER-CRONTAB. Ein GitHub-Runner hat offenes Internet und erreicht
+# den Server von aussen; die Automatik liegt damit dort, wo man ihren Ausfall auch SIEHT — eine rote
+# Action statt stiller Stille. Der Server-Cron darf bleiben: beide schreiben denselben Branch, und
+# der Inhalt ist idempotent.
+#
+# ES BRAUCHT KEINEN NEUEN DATENZUGANG: `app/api/bug-report/route.ts` hat bereits ein `GET`, das die
+# Meldungen zurueckgibt. Dieser Job liest nur — er legt nichts an und aendert nichts am Spiel.
+name: Bug-Meldungen spiegeln
+
+on:
+  schedule:
+    # Viertelstuendlich, versetzt zur vollen Viertelstunde — dieselbe Taktung wie der Server-Cron.
+    - cron: "9,24,39,54 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Zwei gleichzeitige Laeufe wuerden denselben Branch force-pushen und sich gegenseitig ueberholen.
+  group: bug-reports-mirror
+  cancel-in-progress: false
+
+jobs:
+  spiegeln:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Meldungen vom Live-Server holen
+        id: holen
+        env:
+          OLY_URL: ${{ secrets.OLY_BASE_URL || 'https://olympiade.duckdns.org' }}
+        run: |
+          set -uo pipefail
+          echo "Server: $OLY_URL"
+          code="$(curl -sS -m 30 -o /tmp/antwort.json -w '%{http_code}' "$OLY_URL/api/bug-report" || echo 000)"
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Server nicht erreichbar oder Antwort unerwartet (HTTP $code). Laeuft der Container?"
+            head -c 500 /tmp/antwort.json || true
+            exit 1
+          fi
+          anzahl="$(node -e 'const a=require("/tmp/antwort.json");console.log(Array.isArray(a.reports)?a.reports.length:-1)')"
+          echo "Meldungen in der Antwort: $anzahl"
+          [ "$anzahl" -ge 0 ] || { echo "::error::Antwort ohne reports-Feld."; exit 1; }
+          echo "anzahl=$anzahl" >> "$GITHUB_OUTPUT"
+
+      - name: Bestehenden Spiegel holen
+        uses: actions/checkout@v4
+        with:
+          ref: bug-reports
+          path: spiegel
+        continue-on-error: true
+
+      - name: Zusammenfuehren und pushen
+        run: |
+          set -euo pipefail
+          ZIEL=/tmp/spiegel/data/bug-reports
+          rm -rf /tmp/spiegel && mkdir -p "$ZIEL"
+
+          # ZUERST der bestehende Stand. Das ist kein Beiwerk, sondern noetig: `listBugReports()`
+          # liefert nur die letzten 50, auf dem Branch liegen aber schon 51. Wuerde der Job den
+          # Branch schlicht ersetzen, verschwaenden die aeltesten — und damit Meldungen, deren
+          # Quittungen auf `main` weiter existieren. Der Bugfixing-Lauf vergleicht beide Listen;
+          # fehlende Meldungen wuerden ihn stillschweigend um genau diese Faelle aermer machen.
+          if [ -d spiegel/data/bug-reports ]; then
+            cp -a spiegel/data/bug-reports/. "$ZIEL"/ 2>/dev/null || true
+            echo "Bestehend: $(find "$ZIEL" -name 'bug-*.json' | wc -l | tr -d ' ') Datei(en)."
+          else
+            echo "Bestehend: keine (Branch noch leer oder nicht vorhanden)."
+          fi
+
+          # DANN die frischen — neuere Fassung derselben Meldung gewinnt.
+          node -e '
+            const fs = require("fs");
+            const ziel = process.env.ZIEL;
+            const antwort = require("/tmp/antwort.json");
+            let neu = 0;
+            for (const r of antwort.reports ?? []) {
+              const id = r.reportId;
+              // Der Name landet in einem Pfad — nur die bekannte Form zulassen, nichts aus der
+              // Antwort ungeprueft ins Dateisystem schreiben.
+              if (typeof id !== "string" || !/^bug-[A-Za-z0-9._-]+$/.test(id)) continue;
+              const pfad = `${ziel}/${id}.json`;
+              if (!fs.existsSync(pfad)) neu += 1;
+              fs.writeFileSync(pfad, JSON.stringify(r, null, 2) + "\n");
+            }
+            console.log(`Neu hinzugekommen: ${neu}`);
+          '
+          gesamt="$(find "$ZIEL" -name 'bug-*.json' | wc -l | tr -d ' ')"
+          echo "Gesamt im Spiegel: $gesamt"
+          [ "$gesamt" != "0" ] || { echo "::error::Spiegel waere leer — nichts gepusht."; exit 1; }
+
+          cd /tmp/spiegel
+          git init -q
+          git config user.name "oly-bug-reports-mirror"
+          git config user.email "noreply@github.com"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          # Elternloser Commit wie im Server-Skript: der Branch ist ein SPIEGEL des Volumes, keine
+          # Historie. So bleibt er genau einen Commit gross statt viertelstuendlich zu wachsen.
+          git checkout -q --orphan bug-reports
+          git add -A
+          git commit -q -m "chore(bug-reports): $gesamt Meldung(en) vom Live-Server"
+
+          # Nur pushen, wenn sich inhaltlich etwas geaendert hat — sonst schreibt der Job die Ref
+          # viertelstuendlich neu, ohne dass eine einzige Meldung dazugekommen waere.
+          if git fetch -q origin bug-reports 2>/dev/null && \
+             git diff --quiet FETCH_HEAD HEAD -- . 2>/dev/null; then
+            echo "Unveraendert — kein Push."
+          else
+            git push -q --force origin bug-reports
+            echo "Gepusht: $gesamt Meldung(en)."
+          fi
+        env:
+          ZIEL: /tmp/spiegel/data/bug-reports
