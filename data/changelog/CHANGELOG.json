@@ -4,7 +4,7 @@
     {
       "datum": "2026-08-19",
       "seite": null,
-      "pr": null,
+      "pr": "560",
       "text": "Ein zu kleiner Kader hält keinen Verkauf mehr auf. Die Verkaufsübersicht kannte den Status „kader zu klein\" und warnte an einzelnen Kandidaten mit „Verkauf würde den Kader unter das Team-Minimum drücken\"; beides las sich wie ein Hindernis und ist weg. Der Kader-Mindestwert steuert weiterhin das KAUFEN — ein Team, das sich darunter verkauft, füllt in der nächsten Runde nach.",
       "quelle": "triage",
       "gewicht": "behebung",
@@ -13,7 +13,7 @@
     {
       "datum": "2026-08-19",
       "seite": null,
-      "pr": null,
+      "pr": "560",
       "text": "Der Schritt „Training prüfen\" sagt jetzt, an welchen Spielern er noch hängt — mit Anzahl und Namen. Vorher stand dort nur „offen\", und ein einziger Spieler ohne Trainingsmodus hielt den ganzen Flow auf, ohne dass irgendwo stand welcher. Zusätzlich bekommen Spieler, die über Draft, KI-Picks oder den Saisonwechsel in einen Kader kommen, jetzt denselben Trainings-Vorgabewert wie gekaufte.",
       "quelle": "triage",
       "gewicht": "behebung",
