@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-19",
+      "seite": null,
+      "pr": "559",
+      "text": "Der Apron sagt jetzt, warum seine Abgabe kleiner ausfaellt, als die Linien vermuten lassen. Der Konjunkturhebel drosselt die Abgabe in schwachen Saisons bis auf null; genannt wurde das bisher nur im Extremfall, sonst stand da eine unerklaerlich kleine Zahl. Finanzen-Karte, Liga-Ausweis, GuV-Hover und Saisonende-GuV nennen die Drosselung jetzt mit Prozentwert und Salary Factor — aus einer gemeinsamen Quelle.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "556",
+      "text": "Ein Spieltag bleibt nicht mehr in Disziplin 2 haengen, wenn ein aufgestellter Spieler waehrend Disziplin 1 ausfaellt. Die Regel „kurz antreten ist erlaubt, wenn alle verfuegbaren Spieler eingesetzt sind\" verglich die rohe Zahl der aufgestellten Namen mit der Zahl der verfuegbaren Spieler — nach einem Ausfall konnten die beiden nie wieder gleich werden, und die Arena bot keinen Ausweg an.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Arena",
       "pr": null,
       "text": "Im Mehrspieler folgt der Gast jetzt auch beim Wechsel auf die zweite Disziplin. Bisher war dieser Wechsel beim Host rein örtlich: der Server erfuhr nur die Etappenschritte und schob mit ihnen die Phasenkette der ERSTEN Disziplin weiter, statt die Seite zu wechseln. Durchgezählt an einem Spieltag mit je fünf Etappen: nach dem Wechsel meldete der Server fünf Klicks lang weiter „Disziplin 1, Etappe 5“ — der Gast blieb auf dem Endstand der ersten Disziplin kleben und sah von der zweiten nichts. Der Wechsel ist jetzt ein eigener Raum-Schritt, den nur der Host auslösen darf; die verlassene Disziplin gilt dabei nur dann als gewertet, wenn ihre Etappen wirklich durch sind.",
