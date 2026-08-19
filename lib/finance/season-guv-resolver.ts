@@ -108,6 +108,7 @@ export function resolveSeasonGuvPartsByTeam(
       apronRank: apronRow?.rank ?? null,
       apronFrozenLines: apron?.frozenLines ?? false,
       apronKonjunkturhebel: apron?.konjunkturhebel ?? null,
+      apronSalaryFactor: apron?.salaryFactor ?? null,
       apronGedeckelt: apronRow?.gedeckelt ?? false,
       apronGebucht,
       objectiveCashDelta: objectiveCash.byTeamId.get(team.teamId) ?? 0,
