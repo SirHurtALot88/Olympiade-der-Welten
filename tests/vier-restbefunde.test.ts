@@ -146,6 +146,16 @@ describe("Der Spieltag des Raums heisst ueberall gleich", () => {
     expect(roomMatchdayScopeId("3")).toBe("matchday-3");
     // Schon fertige Kennungen bleiben, wie sie sind — sonst entstuende "matchday-matchday-1".
     expect(roomMatchdayScopeId("matchday-7")).toBe("matchday-7");
+    /**
+     * UND ZWAR AUCH DIE, DIE DAS PRAEFIX NICHT AM ANFANG TRAGEN. Der erste Anlauf fragte
+     * `startsWith("matchday-")` und verstuemmelte das saisonqualifizierte
+     * `"season-2-matchday-1"` zu `"matchday-season-2-matchday-1"` (gefunden von
+     * `tests/room-store.test.ts`). Umgeschrieben wird nur die nackte Nummer — alles andere ist
+     * schon eine Kennung.
+     */
+    expect(roomMatchdayScopeId("season-2-matchday-1")).toBe("season-2-matchday-1");
+    expect(roomMatchdayScopeId("")).toBe("matchday-1");
+    expect(roomMatchdayScopeId(null)).toBe("matchday-1");
   });
 
   it("der Scope-Vergleich trifft jetzt zu, statt immer danebenzuliegen", () => {

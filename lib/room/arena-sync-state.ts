@@ -117,13 +117,24 @@ export function istDisziplinseiteDurch(input: {
 }
 
 export function roomMatchdayScopeId(activeMatchday: number | string | null | undefined): string {
-  const nummer = typeof activeMatchday === "string" ? activeMatchday.trim() : activeMatchday;
-  if (nummer == null || nummer === "") {
+  const wert = typeof activeMatchday === "string" ? activeMatchday.trim() : activeMatchday;
+  if (wert == null || wert === "") {
     return "matchday-1";
   }
-  // Traegt der Wert das Praefix schon (ein Aufrufer reicht die fertige ID durch), bleibt er, wie
-  // er ist — sonst entstuende "matchday-matchday-1".
-  return String(nummer).startsWith("matchday-") ? String(nummer) : `matchday-${nummer}`;
+  /**
+   * NUR EINE NACKTE NUMMER WIRD UMGESCHRIEBEN — alles andere ist schon eine Kennung.
+   *
+   * Der erste Anlauf fragte `startsWith("matchday-")` und haengte sonst das Praefix an. Das ging
+   * schief, weil es mehr als eine gueltige Kennungsform gibt: ein saisonqualifiziertes
+   * `"season-2-matchday-1"` traegt das Praefix nicht am ANFANG und wurde damit zu
+   * `"matchday-season-2-matchday-1"` verstuemmelt (gefunden von `tests/room-store.test.ts`).
+   *
+   * Umzuschreiben ist ausschliesslich das, was diese Funktion ueberhaupt reparieren soll: die
+   * nackte Spieltagsnummer aus `multiplayerRoom.activeMatchday`. Ein String, der irgendetwas
+   * anderes enthaelt, ist eine fertige Kennung und wird durchgereicht.
+   */
+  const text = String(wert);
+  return /^\d+$/.test(text) ? `matchday-${text}` : text;
 }
 
 export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
