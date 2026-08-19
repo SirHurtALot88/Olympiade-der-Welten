@@ -32,10 +32,42 @@ import {
 } from "@/lib/season/apron-service";
 
 describe("Apron — Konjunkturhebel", () => {
-  it("ist 0 bei f <= 0,95", () => {
-    expect(apronKonjunkturhebel(0.95)).toBe(0);
-    expect(apronKonjunkturhebel(0.82)).toBe(0);
+  it("ist 0 an und unter der Schwelle", () => {
+    /**
+     * Die Schwelle steht als KONSTANTE, nicht als abgetippte Zahl: sie ist gewanderte Balance
+     * (0,95 → 0,88, Meldung `6fv43h`) und wird wieder wandern. Ein Waechter, der die Zahl
+     * festhaelt statt die Regel, faellt bei jeder Nachjustierung — und sagt dabei nichts ueber
+     * das Verhalten aus, um das es geht.
+     */
+    expect(apronKonjunkturhebel(APRON_KONJUNKTUR_FACTOR_MIN)).toBe(0);
+    expect(apronKonjunkturhebel(APRON_KONJUNKTUR_FACTOR_MIN - 0.01)).toBe(0);
     expect(apronKonjunkturhebel(0)).toBe(0);
+  });
+
+  it("greift knapp OBERHALB der Schwelle bereits — der Punkt der Absenkung", () => {
+    // Gegenrichtung zum Fall darueber: unmittelbar ueber der Schwelle darf der Hebel nicht
+    // weiterhin 0 liefern, sonst waere die Absenkung wirkungslos.
+    expect(apronKonjunkturhebel(APRON_KONJUNKTUR_FACTOR_MIN + 0.01)).toBeGreaterThan(0);
+    // Und der frueher tote Bereich lebt: 0,92 lag unter der alten Schwelle 0,95.
+    expect(apronKonjunkturhebel(0.92)).toBeGreaterThan(0);
+  });
+
+  it("die Schwelle liegt im unteren Teil der f-Spanne, nicht an ihrem Rand", () => {
+    /**
+     * Beide Enden sind gemeint: eine Schwelle bei 0,82 (der Untergrenze der Spanne) hiesse, dass
+     * der Hebel immer greift — dann ist er keine Konjunkturbremse mehr, sondern nur noch eine
+     * Skalierung. Eine Schwelle wie die alte 0,95 schaltet dagegen ein Drittel der Spanne ab.
+     */
+    expect(APRON_KONJUNKTUR_FACTOR_MIN).toBeGreaterThan(0.82);
+    expect(APRON_KONJUNKTUR_FACTOR_MIN).toBeLessThan(0.95);
+  });
+
+  it("der Kalibrier-Override wirkt und laesst die Konstante in Ruhe", () => {
+    // `scripts/messe-apron-schwelle.ts` misst Schwellen gegeneinander, ohne die echte Abrechnung
+    // anzufassen — ohne diesen Weg muesste das Skript die Formel nachbauen.
+    expect(apronKonjunkturhebel(0.9, 0.95)).toBe(0);
+    expect(apronKonjunkturhebel(0.9, 0.82)).toBeGreaterThan(0);
+    expect(apronKonjunkturhebel(1.0)).toBe(apronKonjunkturhebel(1.0, APRON_KONJUNKTUR_FACTOR_MIN));
   });
 
   it("ist 1 bei f >= 1,24", () => {
@@ -46,7 +78,7 @@ describe("Apron — Konjunkturhebel", () => {
   it("ist linear dazwischen", () => {
     const mid = (APRON_KONJUNKTUR_FACTOR_MIN + APRON_KONJUNKTUR_FACTOR_MAX) / 2;
     expect(apronKonjunkturhebel(mid)).toBeCloseTo(0.5, 9);
-    // Ein Viertel des Wegs von 0,95 nach 1,24.
+    // Ein Viertel des Wegs von der Schwelle nach 1,24.
     const quarter = APRON_KONJUNKTUR_FACTOR_MIN + (APRON_KONJUNKTUR_FACTOR_MAX - APRON_KONJUNKTUR_FACTOR_MIN) * 0.25;
     expect(apronKonjunkturhebel(quarter)).toBeCloseTo(0.25, 9);
   });
