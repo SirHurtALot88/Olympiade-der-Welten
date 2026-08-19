@@ -44,6 +44,17 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     const phase = input.gameState.gamePhase ?? "season_active";
     // Phasenliste liegt geteilt in `season-end-roster-window` — die Inbox braucht dieselbe,
     // sonst meldet sie Angebote, die der Kader gar nicht freigibt (oder umgekehrt).
+    //
+    // ENTSCHEIDUNG (Paket B, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): dieses Feld liest nur
+    // `canCompleteSeason` — bewusst OHNE den `hostOnly`-Vorbehalt aus demselben Gate. Diese Zeile
+    // schaltet Frankys EIGENE Saisonende-Aktionen frei (Verkaufen/Verlaengern via
+    // `selectedTeamRosterActionsAvailable` unten), und die sind gemessen KEINE Host-Aktionen:
+    // `contract_renewal`, `contract_dissolution`, `sponsor_choice` und Team-Verkaeufe stehen nicht
+    // in `HOST_LEVEL_ACTIONS` (server-authoritative-write-guard.ts:333-338). Wuerde `hostOnly`
+    // hier mitlaufen, spraeche das Gate Franky ausgerechnet in dem Fenster (letzter Spieltag
+    // aufgeloest, Phase noch `season_active`, Host hat "Saison abschließen" noch nicht geklickt)
+    // seine eigenen, erlaubten Aktionen ab — der zu breite Riegel, den Eigenschaft 4 im Plan
+    // ausdruecklich als schlimmeren Fehler benennt als gar keinen Riegel.
     return (
       isSeasonEndRosterPhase(input.gameState) ||
       (phase === "season_active" && input.localSeasonTransitionGate.canCompleteSeason)

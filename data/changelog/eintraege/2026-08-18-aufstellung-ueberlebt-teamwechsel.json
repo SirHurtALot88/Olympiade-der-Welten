@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-18",
+  "seite": "Einsatzliste",
+  "text": "Wer mehrere Teams führt, verliert beim Teamwechsel seine Aufstellung nicht mehr. Bisher baute die Ansicht sich bei jedem Wechsel komplett neu auf, und jede noch nicht gespeicherte Auswahl war weg — der Grund saß im Aufbau-Schlüssel der Einsatzliste, in dem die Team-ID stand. Sie ist raus; nachzuladen braucht es sie nicht, das erledigt die Einsatzliste längst selbst. Zusätzlich merkt sie sich jetzt den Entwurf jedes verlassenen Teams: zu Team B und zurück, und die Auswahl steht wieder da. Bewusst nur im Speicher — ein Neuladen der Seite verwirft ihn weiterhin, und ein bereits gespeicherter Draft gewinnt beim ersten Öffnen wie bisher. Nach jedem Speichern fällt der gemerkte Entwurf weg, damit er den frisch geschriebenen Stand nicht überdeckt.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

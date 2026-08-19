@@ -1,11 +1,10 @@
-import type { CoachRole, OlyRoomState, RoomRealtimeEvent } from "@/types/game";
+import type { CoachRole, OlyRoomState, RoomOwnershipPreset, RoomRealtimeEvent } from "@/types/game";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
-export type RoomOwnershipPreset =
-  | "chris_1_rest_ai"
-  | "chris_2_rest_ai"
-  | "chris_4_rest_ai"
-  | "chris_4_franky_4_rest_ai";
+// Definiert in types/game.ts (dort auch die Begruendung), hier nur weitergereicht — damit die
+// vielen bestehenden Importe aus dieser Datei unveraendert gelten und es EINE Definition gibt.
+// Importiert UND re-exportiert: der Typ wird in dieser Datei selbst noch gebraucht.
+export type { RoomOwnershipPreset };
 
 export type CreateRoomRequest = {
   displayName?: string;
@@ -19,17 +18,6 @@ export type JoinRoomRequest = {
 };
 
 export type RejoinRoomRequest = {
-  roomCode: string;
-  seatToken: string;
-};
-
-export type MoveTokenRequest = {
-  roomCode: string;
-  seatToken: string;
-  tokenId: string;
-};
-
-export type EndTurnRequest = {
   roomCode: string;
   seatToken: string;
 };
@@ -75,6 +63,13 @@ export type RunRoomAiAutoStepRequest = {
 export type AdvanceRoomFlowRequest = {
   roomCode: string;
   seatToken: string;
+  /**
+   * Der benannte Notausgang: getrennte, nicht bereite Mitspieler ausdruecklich uebergehen.
+   *
+   * Der Server prueft das nach (nicht der Client): er laesst es nur durch, wenn WIRKLICH jeder
+   * Blockierende offline und nicht bereit ist. Ein anwesender Mitspieler bleibt unuebergehbar.
+   */
+  getrennteUeberspringen?: boolean | null;
 };
 
 export type StartRoomArenaRequest = {
@@ -99,6 +94,34 @@ export type AdvanceRoomArenaStepRequest = {
   maxSlotRevealIndex?: number | null;
   maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   force?: boolean | null;
+  /**
+   * Der benannte Notausgang: getrennte, nicht bereite Mitspieler ausdruecklich uebergehen.
+   *
+   * Der Server prueft das nach (nicht der Client): er laesst es nur durch, wenn WIRKLICH jeder
+   * Blockierende offline und nicht bereit ist. Ein anwesender Mitspieler bleibt unuebergehbar.
+   */
+  getrennteUeberspringen?: boolean | null;
+};
+
+// Stufe 3.6 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): letzte Meile fuer die drei Host-Aktionen, die
+// `lib/room/arena-sync-state.ts` bereits fertig und getestet bereitstellt
+// (`setRoomArenaPaused`/`resetRoomArenaReveal`/`quickSimRoomArenaReveal`) — bislang gab es keinen
+// Weg vom Browser dorthin.
+export type SetRoomArenaPausedRequest = {
+  roomCode: string;
+  seatToken: string;
+  paused: boolean;
+};
+
+export type ResetRoomArenaRevealRequest = {
+  roomCode: string;
+  seatToken: string;
+};
+
+export type QuickSimRoomArenaRevealRequest = {
+  roomCode: string;
+  seatToken: string;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
 };
 
 export type RoomErrorPayload = {
@@ -150,9 +173,10 @@ export type ClientToServerEvents = {
   startRoomArena: (payload: StartRoomArenaRequest) => void;
   setRoomArenaReady: (payload: SetRoomArenaReadyRequest) => void;
   advanceRoomArenaStep: (payload: AdvanceRoomArenaStepRequest) => void;
+  setRoomArenaPaused: (payload: SetRoomArenaPausedRequest) => void;
+  resetRoomArenaReveal: (payload: ResetRoomArenaRevealRequest) => void;
+  quickSimRoomArenaReveal: (payload: QuickSimRoomArenaRevealRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
-  moveToken: (payload: MoveTokenRequest) => void;
-  endTurn: (payload: EndTurnRequest) => void;
 };
 
 export type ServerToClientEvents = {

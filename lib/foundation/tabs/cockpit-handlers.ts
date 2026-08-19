@@ -2,6 +2,12 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+// Befund F9 (Aufgabe #44): `preseason-workflow`, `season/transition` und `season/completion`
+// laufen alle drei durch den Server-Write-Guard (nachgesehen in `app/api/season/**`). Im Raum
+// antworten sie deshalb mit rohen Codes — der Spieler las hier woertlich `host_only_action`.
+// Dieselbe Tabelle wie ueberall sonst; unbekannte, bereits deutsche Texte gehen unveraendert
+// durch, weshalb `blockingReasons` als Rueckfall unveraendert dahinter stehen bleibt.
+import { formatRoomWriteErrorCode } from "@/lib/room/parse-room-write-context";
 import type { FoundationAiMarketPlanApplyResponse } from "@/lib/foundation/tabs/foundation-page-types";
 import type {
   FoundationAiLineupBatchApplyResponse,
@@ -260,7 +266,9 @@ export function createCockpitPreseasonHandlers(deps: CockpitPreseasonHandlersDep
       const payload = (await response.json()) as PreSeasonWorkflowApiResponse;
       setPreSeasonWorkflowFeed(payload.summary ?? null);
       if (!response.ok || payload.error) {
-        setPreSeasonWorkflowError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Pre-Season Preview blockiert.");
+        setPreSeasonWorkflowError(
+          formatRoomWriteErrorCode(payload.error) ?? payload.blockingReasons?.join(" · ") ?? "Pre-Season Preview blockiert.",
+        );
       }
       return payload;
     } catch {
@@ -300,7 +308,9 @@ export function createCockpitPreseasonHandlers(deps: CockpitPreseasonHandlersDep
       const payload = (await response.json()) as PreSeasonWorkflowApiResponse;
       setPreSeasonWorkflowFeed(payload.summary ?? null);
       if (!response.ok || payload.error || !payload.success) {
-        setPreSeasonWorkflowError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Neue Saison konnte nicht gestartet werden.");
+        setPreSeasonWorkflowError(
+          formatRoomWriteErrorCode(payload.error) ?? payload.blockingReasons?.join(" · ") ?? "Neue Saison konnte nicht gestartet werden.",
+        );
       }
       if (response.ok && payload.success) {
         await Promise.all([
@@ -408,9 +418,20 @@ const UEBERGANGS_BLOCKER_TEXTE: Record<string, string> = {
     "Die Saisonende-Abrechnung ist noch offen: Preisgeld, Sponsorgeld und Apron sind nicht gebucht. Erst „Saison abschließen“ ausführen — ohne das Geld stimmt die Saisonbilanz nicht.",
   last_matchday_not_completed: "Der letzte Spieltag ist noch nicht abgeschlossen.",
   season_transition_chain_complete: "Die Saisonende-Kette ist durch — weiter geht es über den Pre-Season-Workflow.",
+  // Paket B (docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): der Code aus dem lokalen Saisonwechsel-
+  // Gate (use-foundation-cross-tab-season-briefing.ts, `hostOnly`) — dieselbe Regel wie
+  // `host_only_action` am Server (server-authoritative-write-guard.ts:332-336), hier nur schon
+  // VOR dem Klick sichtbar statt erst als 403 danach.
+  season_transition_host_only:
+    "Der Saisonwechsel gehört dem Host: Nur er kann die Saison abschließen und in die neue Saison wechseln. Deine eigenen Saisonende-Aktionen (Verträge, Sponsor, Verkäufe) bleiben davon unberührt.",
 };
 
-function uebersetzeUebergangsBlocker(reason: string): string {
+/**
+ * Exportiert, weil Paket B einen zweiten Aufrufer braucht (das Cockpit-Panel zeigt
+ * `disabledReason` aus dem Saisonwechsel-Gate an) — vorher blieb die Funktion Modul-intern und
+ * der Code landete dort roh in Titel/„Warum nicht"-Zeile.
+ */
+export function uebersetzeUebergangsBlocker(reason: string): string {
   return UEBERGANGS_BLOCKER_TEXTE[reason] ?? reason;
 }
 
@@ -483,7 +504,7 @@ export function createCockpitSeasonTransitionHandlers(
       setSeasonTransitionFeed(payload.summary ?? null);
       if (!response.ok || payload.error) {
         setSeasonTransitionError(
-          payload.error ??
+          formatRoomWriteErrorCode(payload.error) ??
             payload.blockingReasons?.map(uebersetzeUebergangsBlocker).join(" · ") ??
             "Season Transition blockiert.",
         );
@@ -566,7 +587,9 @@ export function createCockpitSeasonTransitionHandlers(
         setSeasonSnapshotFeed(payload.summary.snapshot);
       }
       if (!response.ok || payload.error) {
-        setSeasonTransitionError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Saisonabschluss blockiert.");
+        setSeasonTransitionError(
+          formatRoomWriteErrorCode(payload.error) ?? payload.blockingReasons?.join(" · ") ?? "Saisonabschluss blockiert.",
+        );
       }
       if (execute && response.ok && payload.success) {
         const completion = payload.summary;

@@ -15,7 +15,7 @@ import type {
   SeasonSnapshotRecord,
   Team,
 } from "@/lib/data/olyDataTypes";
-import type { CockpitSeasonTransitionAction } from "@/lib/foundation/tabs/cockpit-handlers";
+import { uebersetzeUebergangsBlocker, type CockpitSeasonTransitionAction } from "@/lib/foundation/tabs/cockpit-handlers";
 import type { CockpitMatchdayMvpScoringFeed } from "@/lib/foundation/tabs/cockpit-matchday-handlers";
 import { featureAuditFilters, getFeatureAuditFlags } from "@/lib/foundation/feature-audit-matrix";
 import type {
@@ -136,7 +136,7 @@ export interface FoundationCockpitPanelProps {
   isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
   lineupModifierStatusSummary: { formCardSourceStatus: "ready"; formCardEffectStatus: "ready"; mutatorSourceStatus: "ready"; mutatorEffectStatus: "ready"; selectedFormCards: number; selectedMutators: number; };
   lineupStatusSummary: { totalTeams: number; readyTeams: number; missingTeams: number; incompleteTeams: number; };
-  localSeasonTransitionGate: { gamePhase: GamePhase; canCompleteSeason: boolean; disabledReason: string | null; lastMatchdayId: string; };
+  localSeasonTransitionGate: { gamePhase: GamePhase; canCompleteSeason: boolean; disabledReason: string | null; lastMatchdayId: string; hostOnly: boolean; };
   manualTeams: Team[];
   marketBuyPreview: TransfermarktBuySummary | null;
   marketFeed: FoundationTransfermarktResponse | null;
@@ -2729,8 +2729,12 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                   <button
                     className="secondary-button"
                     type="button"
-                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Prüft Board-Ziele, Sponsor-Auszahlung, Beziehungen, Snapshot, nächste Saison und AI-Audit ohne zu schreiben"}
+                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason || localSeasonTransitionGate.hostOnly}
+                    title={
+                      localSeasonTransitionGate.disabledReason
+                        ? uebersetzeUebergangsBlocker(localSeasonTransitionGate.disabledReason)
+                        : "Prüft Board-Ziele, Sponsor-Auszahlung, Beziehungen, Snapshot, nächste Saison und AI-Audit ohne zu schreiben"
+                    }
                     onClick={() => {
                       void runSeasonCompletion(false);
                     }}
@@ -2740,8 +2744,12 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Transition-State speichern"}
+                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason || localSeasonTransitionGate.hostOnly}
+                    title={
+                      localSeasonTransitionGate.disabledReason
+                        ? uebersetzeUebergangsBlocker(localSeasonTransitionGate.disabledReason)
+                        : "Transition-State speichern"
+                    }
                     onClick={() => {
                       void runSeasonTransition("start_transition");
                     }}
@@ -2764,10 +2772,11 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     className="primary-button"
                     type="button"
                     data-testid="season-transition-advance"
-                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
+                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason || localSeasonTransitionGate.hostOnly}
                     title={
-                      localSeasonTransitionGate.disabledReason ??
-                      "Schaltet den Assistenten eine Station weiter und gibt die Phase dahinter frei (Verkaufsfenster ab „Vorbereitung“)."
+                      localSeasonTransitionGate.disabledReason
+                        ? uebersetzeUebergangsBlocker(localSeasonTransitionGate.disabledReason)
+                        : "Schaltet den Assistenten eine Station weiter und gibt die Phase dahinter frei (Verkaufsfenster ab „Vorbereitung“)."
                     }
                     onClick={() => {
                       void runSeasonTransition("advance_step");
@@ -2778,8 +2787,12 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Sponsor-Auszahlung, Snapshot, Review und AI-Audit ausführen"}
+                    disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason || localSeasonTransitionGate.hostOnly}
+                    title={
+                      localSeasonTransitionGate.disabledReason
+                        ? uebersetzeUebergangsBlocker(localSeasonTransitionGate.disabledReason)
+                        : "Sponsor-Auszahlung, Snapshot, Review und AI-Audit ausführen"
+                    }
                     onClick={() => {
                       void runSeasonCompletion(true);
                     }}
@@ -2787,13 +2800,15 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     Abschluss-Run
                   </button>
                 </div>
-                {readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason ? (
+                {readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason || localSeasonTransitionGate.hostOnly ? (
                   <p className="foundation-screen-action-reason">
                     Warum nicht: {readMeta.readOnly
                       ? getReadOnlyActionReason("den Saisonabschluss")
                       : seasonTransitionBusy
                         ? getBusyActionReason("Der Saisonwechsel-Assistent")
-                        : localSeasonTransitionGate.disabledReason ?? "Der Saisonabschluss hat noch offene Blocker."}
+                        : localSeasonTransitionGate.disabledReason
+                          ? uebersetzeUebergangsBlocker(localSeasonTransitionGate.disabledReason)
+                          : "Der Saisonabschluss hat noch offene Blocker."}
                   </p>
                 ) : null}
                 {seasonCompletionFeed ? (

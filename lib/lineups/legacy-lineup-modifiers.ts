@@ -111,6 +111,22 @@ function pickDeterministicCardValue(seed: string) {
   return FORM_CARD_VALUES[index] ?? 0;
 }
 
+/**
+ * NUR FUER TESTS: der Kartenwert ist deterministisch je (saveId, seasonId, teamId, playerId,
+ * Vorzeichen) — siehe `buildGeneratedFormCardRecordsForTeam` Zeile 426 fuer denselben Seed-Aufbau,
+ * hier nur exponiert statt neu zusammengesetzt (keine zweite Quelle fuer dieselbe Formel).
+ *
+ * BEFUND (Stufe 4 — Test-Flackern): `getTeamFormCardOptions` (unten) filtert Karten mit Wert 0
+ * heraus (`card.cardValue !== 0`) — von den vier moeglichen Werten `[0, 2, 4, 8]` trifft das
+ * rechnerisch 1 von 4 Spielern. Ein Test, der sich per `.find()` einen BELIEBIGEN Spieler als
+ * "Formkarte muss im Angebot erscheinen"-Beleg aussucht, flackert damit mit ~25% Wahrscheinlichkeit
+ * — unabhaengig von jeder Testreihenfolge oder geteiltem Zustand. Diese Funktion laesst einen Test
+ * gezielt einen Kandidaten waehlen, dessen Karte GARANTIERT sichtbar ist.
+ */
+export function computePositiveFormCardValueForTests(saveId: string, seasonId: string, teamId: string, playerId: string) {
+  return pickDeterministicCardValue(`${saveId}:${seasonId}:${teamId}:${playerId}:positive`);
+}
+
 function createDefaultModifierSide() {
   return {
     primaryFormCardId: null,

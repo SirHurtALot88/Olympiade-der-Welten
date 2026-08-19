@@ -15,6 +15,29 @@ export type RoomUser = {
   role: RoomParticipantRole;
 };
 
+/**
+ * Die sechs Modi, mit denen ein Raum angelegt werden kann.
+ *
+ * PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): frueher standen hier nur vier Werte -- fuer zu
+ * zweit gab es ausschliesslich `chris_4_franky_4_rest_ai`. `chris_1_franky_1_rest_ai` und
+ * `chris_2_franky_2_rest_ai` sind dazugekommen, weil Chris ausdruecklich auch 1+1 und 2+2 wollte
+ * (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, Kopfzeile). Ihre Team-IDs sind KEINE neue Liste (E5): sie
+ * sind die ersten n aus `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/`..._FRANKY_TEAM_IDS`
+ * (lib/room/online-room-model.ts), siehe `PRESET_OWNERSHIP_TABLE` dort.
+ *
+ * STEHT HIER UND NICHT IN types/events.ts, obwohl er dort erklaert wurde: `MultiplayerRoomMeta`
+ * (unten) fuehrt ihn seit Aufgabe #49 mit, und `types/events.ts` importiert bereits aus dieser
+ * Datei — die Gegenrichtung waere ein Ring. `events.ts` reicht ihn unveraendert weiter, damit alle
+ * bestehenden Importe gelten und es weiterhin genau EINE Definition gibt.
+ */
+export type RoomOwnershipPreset =
+  | "chris_1_rest_ai"
+  | "chris_2_rest_ai"
+  | "chris_4_rest_ai"
+  | "chris_4_franky_4_rest_ai"
+  | "chris_1_franky_1_rest_ai"
+  | "chris_2_franky_2_rest_ai";
+
 export type MultiplayerRoomMeta = {
   roomId: string;
   roomCode: string;
@@ -27,6 +50,40 @@ export type MultiplayerRoomMeta = {
   activeMatchday: number;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Hat der Host die Team-Zuordnung schon einmal EXPLIZIT ueber eine Lobby-/Raum-Aktion gesetzt
+   * (`applyRoomOwnershipPreset` oder `applyRoomTeamSelection` in `lib/room/room-store.ts`)?
+   *
+   * Nebenbefund (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Beitritt loescht die Zuteilung des Hosts"):
+   * `joinRoom` ueberschrieb die Zuteilung bislang bedingungslos mit einem Default-Preset, sobald
+   * der Gast beitrat. Dieses Flag unterscheidet "der Host hat im Raum wirklich schon etwas
+   * zugewiesen" von "es steht nur der System-Default aus `createInitialRoomState`" — NUR im
+   * zweiten Fall darf `joinRoom` noch einen Default anwenden.
+   *
+   * Bewusst NICHT von `createRoom`s eigener `input.preset`-Anwendung gesetzt: zu dem Zeitpunkt
+   * gibt es noch keinen zweiten Teilnehmer, jede "4+4"-Wahl waere fuer die zweite Haelfte ohnehin
+   * wirkungslos (siehe Kommentar dort) — das Flag markiert erst die Lobby-Aktion NACH der Anlage.
+   */
+  ownershipAssignedByHost: boolean;
+  /**
+   * Mit welchem Modus wurde dieser Raum ANGELEGT (`createRoom(..., { preset })`)?
+   *
+   * WOZU, und warum es nicht ohne geht (Aufgabe #49): der Beitritt ist die EINZIGE Stelle, an der
+   * der zweite Sitz ueberhaupt Teams bekommt — beim Anlegen ist er noch nicht da, und
+   * `buildExplicitTeamOwnership` laesst die Teams eines abwesenden Teilnehmers bewusst offen. Beim
+   * Beitritt muss deshalb noch einmal verteilt werden, und dafuer braucht es die Wahl des Hosts
+   * von vorhin. Ohne dieses Feld war sie zu dem Zeitpunkt verloren, und es blieb nur ein fest
+   * verdrahteter 4+4-Vorschlag.
+   *
+   * ABGRENZUNG ZU `ownershipAssignedByHost`: jenes Flag heisst "der Host hat IM RAUM aktiv
+   * zugeteilt" und friert die Zuordnung ein. Ein Preset beim Anlegen darf das NICHT tun — sonst
+   * ueberspringt `joinRoom` die Verteilung, und der Gast bekommt nie Teams (nachgemessen, siehe
+   * den Kommentar an `joinRoom`). Es ist eine gemerkte Absicht, keine erledigte Zuteilung.
+   *
+   * `null` fuer Raeume, die ohne Preset angelegt wurden — und fuer alle Raeume, die vor diesem
+   * Feld entstanden sind und aus der Ablage zurueckkommen.
+   */
+  createdWithPreset?: RoomOwnershipPreset | null;
 };
 
 // A room participant is a real connected browser/user session in an online room.
@@ -76,7 +133,8 @@ export type RoomFlowStepId =
   | "arena"
   | "result"
   | "standings"
-  | "season_review";
+  | "season_review"
+  | "season_transition";
 
 export type RoomFlowButtonStatus =
   | "ready"
@@ -97,6 +155,15 @@ export type RoomFlowState = {
   completedParticipantIds: string[];
   blockingTeamIds: string[];
   aiAutoCompletedTeamIds: string[];
+  /**
+   * Bereit-pflichtige Teilnehmer, die weder bereit noch verbunden sind.
+   *
+   * Sie halten `canHostAdvance` auf (Entscheidung von Chris: ein Getrennter faellt nicht aus der
+   * Pflicht) — und sie sind die EINZIGEN, die der Host mit dem Notausgang uebergehen darf. Als
+   * eigenes Feld und nicht als abgeleitete Rechnung im Client, damit Knopf und Server-Pruefung
+   * dieselbe Liste lesen.
+   */
+  offlineBlockingParticipantIds: string[];
   canHostAdvance: boolean;
   /**
    * Steht in dieser Saison noch ein Spieltag aus? Wird beim Weiterschalten aus dem gebundenen
@@ -130,6 +197,28 @@ export type RoomArenaState = {
   completedDisciplinePhases: Record<RoomArenaDisciplineSide, boolean>;
   maxSlotRevealCountByDiscipline: Record<RoomArenaDisciplineSide, number>;
   stepIndex: number;
+  /**
+   * Gemeinsame Zeitbasis (Befund B4, Stufe 3.3): Server-Zeitpunkt (ISO), zu dem der AKTUELLE
+   * Schritt (`stepIndex`) begann — gesetzt bei jedem Weiterschalten/Start/Reset. Ohne dieses Feld
+   * kannte `RoomArenaState` nur `updatedAt` ("wann kam die letzte Aenderung an"), nicht "wann
+   * begann dieser Schritt fuer alle gleichermassen" — zwei Clients mit unterschiedlicher
+   * Systemuhr rechneten deshalb ab ihrem eigenen Empfangszeitpunkt statt ab einem gemeinsamen
+   * Nullpunkt. Siehe `lib/foundation/discipline-stage/arena-timeline.ts` (`resolveArenaDisplayState`).
+   */
+  stepStartedAt: string;
+  /**
+   * Geplante Dauer des aktuellen Schritts in ms — zusammen mit `stepStartedAt` die Grundlage fuer
+   * "verstrichene Zeit seit Schrittbeginn" auf JEDEM Client gleich (Stufe 3.3/3.4).
+   */
+  stepDurationMs: number;
+  /**
+   * Pause/Weiter als geteilter Zustand (Stufe 3.6): pausiert der Host, gilt das fuer beide Seiten
+   * (vorher rein lokal in `manualPauseRef`/`pauseRef` der Komponente — der Gast bemerkte eine
+   * Host-Pause nur indirekt daran, dass keine neuen Schritte mehr kamen, nie explizit als Zustand).
+   */
+  paused: boolean;
+  /** Wer zuletzt pausiert/fortgesetzt hat (`null`, solange nicht pausiert). */
+  pausedBy: string | null;
   requiredParticipantIds: string[];
   readyParticipantIds: string[];
   autoReadyControllerTypes: TeamControllerType[];
@@ -179,30 +268,14 @@ export type ServerAuthoritativeWritePolicy = {
   localSandboxForbidsPrismaWrites: true;
 };
 
-export type ActionType = "room_created" | "player_joined" | "moveToken" | "endTurn" | "player_rejoined";
-
-export type AthleteToken = {
-  id: string;
-  ownerRole: CoachRole;
-  position: number;
-  label: string;
-};
+export type ActionType = "room_created" | "player_joined" | "player_rejoined";
 
 export type ActionLogEntry = {
   id: string;
-  turnNumber: number;
   actorRole: CoachRole | "system";
   type: ActionType;
-  tokenId?: string;
-  from?: number;
-  to?: number;
   message: string;
   createdAt: string;
-};
-
-export type BoardDefinition = {
-  laneLength: number;
-  laneLabel: string;
 };
 
 export type RoomPlayerState = {
@@ -223,12 +296,7 @@ export type OlyRoomState = {
   arenaSyncState: RoomArenaState;
   roomEvents: RoomRealtimeEvent[];
   serverWritePolicy: ServerAuthoritativeWritePolicy;
-  activeRole: CoachRole;
-  turnNumber: number;
-  tokens: AthleteToken[];
   actionLog: ActionLogEntry[];
   players: Partial<Record<CoachRole, RoomPlayerState>>;
-  moveCommittedThisTurn: boolean;
-  board: BoardDefinition;
   version: number;
 };

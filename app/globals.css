@@ -2188,6 +2188,68 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   border-color: rgba(56, 189, 248, 0.35);
 }
 
+/* Stufe 2.2 (Befund B5): Sammel-Ansicht "meine Teams · Spieltag X · fertig/offen". */
+.legacy-lineup-my-teams-readiness {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.legacy-lineup-my-teams-readiness__title {
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.legacy-lineup-my-teams-readiness__chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legacy-lineup-my-teams-readiness__chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-ready {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-pending {
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-active {
+  border-width: 2px;
+}
+
+/* Sammel-Abgabe (Aufgabe #43): bewusst in derselben Kachel und im selben Ton wie die Chips —
+   es ist dieselbe Liste offener Teams, nur als Handlung statt als Anzeige. */
+.legacy-lineup-my-teams-readiness__sammel {
+  align-self: flex-start;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.08);
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__sammel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .facilities-v2-shell {
   display: grid;
   gap: 16px;
@@ -12085,6 +12147,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 .is-new-look .relationship-tag.is-rival {
   --nl-rel: var(--nl-rival);
+}
+.is-new-look .relationship-tag.is-human {
+  --nl-rel: var(--nl-human);
 }
 
 /* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
@@ -25270,6 +25335,26 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .foundation-shell .transfer-callout.is-info {
   display: none;
+}
+
+/*
+ * AUSNAHME FUER DIE SCHALEN-BANNER — sonst redet die Oberflaeche nicht mit.
+ *
+ * GEMELDET VON CHRIS: „dann bitte im koop auch noch oben anzeigen dass der draft gerade läuft
+ * damit man erstmal 1-2 minuten wartet bevor man loslegt."
+ *
+ * NACHGEMESSEN (Raum, 18.08.): das Banner „Liga wird erstellt … (KI-Teams werden befuellt)" gibt es
+ * laengst, es steht auch im Baum — und es hat `display: none`. Die Regel darueber raeumt die
+ * INFORMATIONS-Callouts der Transfermarkt-Ansichten aus der Foundation-Schale; sie trifft aber ueber
+ * die gemeinsame Klasse `transfer-callout` auch das Fortschritts-Banner der Schale selbst. Zwei
+ * Minuten lang steht der Spieler damit vor einer Liga ohne Kader und bekommt kein Wort dazu.
+ *
+ * Die Ausnahme ist bewusst eng: nur `.foundation-persistence-banner`, also die Banner, die die
+ * Schale selbst setzt (Speicherfehler, Liga-Setup). Der Fehlerfall desselben Banners war nie
+ * betroffen — er traegt `is-warning` und wird von der Regel darunter ohnehin gezeigt.
+ */
+.foundation-shell .foundation-persistence-banner.transfer-callout.is-info {
+  display: grid;
 }
 
 .foundation-shell .transfer-callout.is-blocked,
@@ -44404,6 +44489,10 @@ button.foundation-team-portrait-card {
   --nl-mine: var(--nl-men);
   --nl-ally: var(--nl-spe);
   --nl-rival: var(--nl-risk);
+  /* Audit-Punkt 7 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Mitspieler-Team (von einem MENSCHEN
+     gesteuert, aber nicht mein eigenes) — eigener, vierter Ton, damit er sich von
+     mine/ally/rival UND von neutralen KI-Teams (kein Rahmen) unterscheidet. */
+  --nl-human: var(--nl-soc);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;

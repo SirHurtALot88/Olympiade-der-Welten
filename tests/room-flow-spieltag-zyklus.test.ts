@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ROOM_FLOW_MATCHDAY_CYCLE_END,
   ROOM_FLOW_MATCHDAY_CYCLE_START,
+  ROOM_FLOW_SEASON_TRANSITION_TARGET,
   describeRoomFlowButton,
   getNextRoomFlowStepId,
   roomFlowSeasonContinues,
@@ -27,18 +28,19 @@ import type { OlyRoomState } from "@/types/game";
  */
 
 /** Minimaler Spielstand, der genau die Felder traegt, die der Phasen-Gate liest. */
-function spielstand(input: { phase: GameState["gamePhase"]; currentMatchday: number }): GameState {
+function spielstand(input: { phase: GameState["gamePhase"]; currentMatchday: number; seasonId?: string }): GameState {
+  const seasonId = input.seasonId ?? "season-1";
   return {
     gamePhase: input.phase,
     season: {
-      id: "season-1",
+      id: seasonId,
       name: "Season 1",
       year: 1,
       currentMatchday: input.currentMatchday,
-      matchdayIds: Array.from({ length: 10 }, (_, index) => `season-1-matchday-${index + 1}`),
+      matchdayIds: Array.from({ length: 10 }, (_, index) => `${seasonId}-matchday-${index + 1}`),
     },
     matchdayState: {
-      matchdayId: `season-1-matchday-${input.currentMatchday}`,
+      matchdayId: `${seasonId}-matchday-${input.currentMatchday}`,
       status: "planning",
       pendingTeamIds: [],
       resolvedFixtureIds: [],
@@ -71,13 +73,42 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     expect(getNextRoomFlowStepId(ROOM_FLOW_MATCHDAY_CYCLE_END)).toBe("season_review");
   });
 
-  it("laesst die Kette ausserhalb des Zyklus-Endes unveraendert", () => {
+  it("laesst die Kette INNERHALB einer Saison unveraendert", () => {
+    // Gegenprobe zu Paket A: der Saisonwechsel darf NUR die Sackgasse am Season Review
+    // aufloesen, nicht den Rest des Zyklus umbauen.
     expect(getNextRoomFlowStepId("lobby_ready", { seasonContinues: true })).toBe("sell_players");
     expect(getNextRoomFlowStepId("finalize_transfers", { seasonContinues: true })).toBe("lineup");
     expect(getNextRoomFlowStepId("arena", { seasonContinues: true })).toBe("result");
     expect(getNextRoomFlowStepId("result", { seasonContinues: true })).toBe("standings");
-    // Das Season Review bleibt der Endpunkt — auch mit laufender Saison kein Rueckwaertsgang.
-    expect(getNextRoomFlowStepId("season_review", { seasonContinues: true })).toBe("season_review");
+  });
+
+  it("kommt aus dem Season Review heraus, statt dort zu klemmen (E5)", () => {
+    // VORHER stand hier genau die umgekehrte Behauptung: `getNextRoomFlowStepId("season_review",
+    // { seasonContinues: true })` sollte `"season_review"` liefern, unter der Ueberschrift "laesst
+    // die Kette ausserhalb des Zyklus-Endes unveraendert". Das war die gemessene Sackgasse (Plan
+    // 1.1) als gewolltes Verhalten gepinnt: der Host klickte "Season Review" und blieb dort, weil
+    // niemand je einen Schritt danach vorsah. Die Eigenschaft ist jetzt umgedreht: aus dem Season
+    // Review fuehrt IMMER ein Weg heraus, unabhaengig von `seasonContinues` -- das Feld regelt nur
+    // noch den Zyklus-Endpunkt (`standings`), nicht den Ausgang aus dem Review.
+    expect(getNextRoomFlowStepId("season_review", { seasonContinues: true })).toBe("season_transition");
+    expect(getNextRoomFlowStepId("season_review", { seasonContinues: false })).toBe("season_transition");
+    expect(getNextRoomFlowStepId("season_review")).toBe("season_transition");
+  });
+
+  it("haelt den Raum auf season_transition an, solange die neue Saison nicht begonnen hat", () => {
+    // Eigenschaft 2 aus dem Plan: kein Vorspulen auf Verdacht. Weder "explizit noch begonnen"
+    // noch "unbekannt" duerfen ueber das Gate hinweg auf den Saisonstart-Schritt springen -- nur
+    // eine tatsaechlich geaenderte Saison-ID darf das.
+    expect(getNextRoomFlowStepId("season_transition", { seasonHasAdvanced: false })).toBe("season_transition");
+    expect(getNextRoomFlowStepId("season_transition")).toBe("season_transition");
+  });
+
+  it("springt von season_transition auf den Saisonstart-Schritt, sobald die neue Saison begonnen hat", () => {
+    // Eigenschaft 3: der Zielschritt ist ROOM_FLOW_SEASON_TRANSITION_TARGET -- gemessen an
+    // `startRoom` (E4, siehe Kommentar an der Konstante), nicht der erste Listeneintrag.
+    expect(getNextRoomFlowStepId("season_transition", { seasonHasAdvanced: true })).toBe(
+      ROOM_FLOW_SEASON_TRANSITION_TARGET,
+    );
   });
 
   it("liest 'Saison laeuft weiter' aus der Spielphase, nicht aus einer eigenen Rechnung", () => {
@@ -135,6 +166,171 @@ describe("Room-Flow: Spieltag-Zyklus", () => {
     expect(advanced.ok).toBe(true);
     if (!advanced.ok) return;
     expect(advanced.room.state.roomFlowState.step).toBe("season_review");
+  });
+
+  it("bleibt auf season_transition stehen, solange der gebundene Spielstand noch die alte Saison zeigt", () => {
+    // Eigenschaft 2, End-zu-Ende ueber `advanceRoomFlow`: `createRoom` vergibt "season-1" als
+    // `activeSeasonId` (online-room-model.ts:131). Solange der Spielstand DIESELBE Saison-ID
+    // traegt, ist "die neue Saison hat begonnen" falsch -- der Raum darf nicht raten.
+    const saveId = "zyklus-save-wechsel-ausstehend";
+    const created = createRoom("socket-zyklus-g", { displayName: "Chris", preset: "chris_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, "socket-zyklus-h", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+    expect(created.room.state.multiplayerRoom.activeSeasonId).toBe("season-1");
+
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, step: "season_transition", canHostAdvance: true },
+    };
+
+    const advanced = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, {
+      persistence: fakePersistence(saveId, spielstand({ phase: "season_review", currentMatchday: 10, seasonId: "season-1" })),
+    });
+
+    // Der Vorschub wird ABGELEHNT, nicht stillschweigend auf denselben Schritt ausgefuehrt: der
+    // Rumpf von `advanceRoomFlow` setzt sonst alle Teilnehmer auf `not_ready` zurueck (die Probe
+    // dafuer steht weiter unten). Fuer diesen Fall zaehlt: der Raum bleibt stehen und erfindet
+    // keine neue Saison.
+    expect(advanced.ok).toBe(false);
+    expect(created.room.state.roomFlowState.step).toBe("season_transition");
+    expect(created.room.state.multiplayerRoom.activeSeasonId).toBe("season-1");
+  });
+
+  it("springt von season_transition auf den Saisonstart-Schritt und zieht Saison+Spieltag mit, sobald die Saison-ID wechselt", () => {
+    // Eigenschaft 3: `preseason-workflow-service.ts:713-723` ist die einzige Stelle, die
+    // `season.id` neu vergibt (gemeinsam mit `currentMatchday: 1`). Dieser Test simuliert genau
+    // das Ergebnis dieses Laufs im gebundenen Spielstand -- ohne den Workflow selbst zu rufen,
+    // denn geprueft wird hier nur, ob der Room-Flow die geaenderte ID erkennt und mitzieht.
+    const saveId = "zyklus-save-wechsel-vollzogen";
+    const created = createRoom("socket-zyklus-i", { displayName: "Chris", preset: "chris_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, "socket-zyklus-j", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+    expect(created.room.state.multiplayerRoom.activeSeasonId).toBe("season-1");
+
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, step: "season_transition", canHostAdvance: true },
+    };
+
+    const advanced = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, {
+      persistence: fakePersistence(saveId, spielstand({ phase: "season_active", currentMatchday: 1, seasonId: "season-2" })),
+    });
+
+    expect(advanced.ok).toBe(true);
+    if (!advanced.ok) return;
+    expect(advanced.room.state.roomFlowState.step).toBe(ROOM_FLOW_SEASON_TRANSITION_TARGET);
+    expect(advanced.room.state.multiplayerRoom.activeSeasonId).toBe("season-2");
+    expect(advanced.room.state.multiplayerRoom.activeMatchday).toBe(1);
+  });
+
+  it("kommt auch dann in die neue Saison, wenn der Host den Wechsel VOR dem Season Review erledigt", () => {
+    /**
+     * DIESER FALL HAT DEN ERSTEN ANLAUF WIDERLEGT, und er ist kein Sonderfall: der Assistent im
+     * Cockpit ist vom Raum unabhaengig — nichts haelt den Host davon ab, den Saisonwechsel
+     * abzuschliessen, bevor er das Season Review wegklickt.
+     *
+     * Solange "hat die Saison gewechselt" die Saison-ID des Spielstands gegen die des RAUMS
+     * verglich, war das toedlich: der Klick `season_review -> season_transition` zieht
+     * `activeSeasonId` mit, ab da waren beide IDs gleich, und der Raum stand fuer immer auf
+     * `season_transition`. Gemessen: Klick 1 -> season_transition (activeSeasonId bereits
+     * season-2), Klick 2 -> season_transition, Klick 3 -> season_transition.
+     *
+     * Die anderen Pruefungen dieser Datei konnten das nicht sehen, weil sie den Schritt jeweils
+     * DIREKT setzen. Genau darum laeuft dieser hier die Kette wirklich ab.
+     */
+    const saveId = "zyklus-save-wechsel-vorgezogen";
+    const created = createRoom("socket-zyklus-m", { displayName: "Chris", preset: "chris_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, "socket-zyklus-n", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    // Der Spielstand traegt schon Saison 2 — der Raum steht noch auf dem Season Review.
+    const persistence = fakePersistence(
+      saveId,
+      spielstand({ phase: "season_active", currentMatchday: 1, seasonId: "season-2" }),
+    );
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, step: "season_review", canHostAdvance: true },
+    };
+
+    const ersterKlick = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, { persistence });
+    expect(ersterKlick.ok).toBe(true);
+    if (!ersterKlick.ok) return;
+    expect(ersterKlick.room.state.roomFlowState.step).toBe("season_transition");
+
+    ersterKlick.room.state = {
+      ...ersterKlick.room.state,
+      roomFlowState: { ...ersterKlick.room.state.roomFlowState, canHostAdvance: true },
+    };
+    const zweiterKlick = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, { persistence });
+    expect(zweiterKlick.ok).toBe(true);
+    if (!zweiterKlick.ok) return;
+    expect(zweiterKlick.room.state.roomFlowState.step, "der Raum darf hier nicht kleben bleiben").toBe(
+      ROOM_FLOW_SEASON_TRANSITION_TARGET,
+    );
+  });
+
+  it("erklaert am Saisonwechsel-Gate, WARUM es nicht weitergeht, statt die Bereitmeldungen wegzuraeumen", () => {
+    // "Bei 0 wird erklaert, nicht versteckt": ohne Riegel setzt der Rumpf von `advanceRoomFlow`
+    // jeden Teilnehmer auf `not_ready` zurueck und laesst sonst alles stehen — fuer beide Coaches
+    // sieht das aus wie ein Aussetzer, nicht wie eine Bedingung.
+    const saveId = "zyklus-save-wechsel-erklaert";
+    const created = createRoom("socket-zyklus-o", { displayName: "Chris", preset: "chris_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, "socket-zyklus-p", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, step: "season_transition", canHostAdvance: true },
+      roomParticipants: created.room.state.roomParticipants.map((teilnehmer) => ({ ...teilnehmer, readyState: "ready" as const })),
+    };
+
+    const abgelehnt = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, {
+      persistence: fakePersistence(saveId, spielstand({ phase: "season_review", currentMatchday: 10, seasonId: "season-1" })),
+    });
+
+    expect(abgelehnt.ok).toBe(false);
+    if (abgelehnt.ok) return;
+    expect(abgelehnt.error, "der Grund muss der Saisonwechsel sein, nicht 'geht nicht'").toMatch(/Cockpit/);
+    expect(
+      created.room.state.roomParticipants.every((teilnehmer) => teilnehmer.readyState === "ready"),
+      "die Bereitmeldungen bleiben stehen",
+    ).toBe(true);
+  });
+
+  it("haelt den Host-Vorbehalt und das Ready-Gate auch am Saisonwechsel-Gate (Eigenschaft 4)", () => {
+    const saveId = "zyklus-save-wechsel-gate";
+    const created = createRoom("socket-zyklus-k", { displayName: "Chris", preset: "chris_4_rest_ai", saveId });
+    const joined = joinRoom(created.room.roomCode, "socket-zyklus-l", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, step: "season_transition", canHostAdvance: true },
+    };
+    const persistence = fakePersistence(saveId, spielstand({ phase: "season_active", currentMatchday: 1, seasonId: "season-2" }));
+
+    // Der Gast darf am Saisonwechsel-Gate genauso wenig weiterschalten wie an jedem anderen
+    // Schritt -- `findSeatByToken(...) !== "A"` gilt fuer den ganzen Flow, nicht speziell hier.
+    const gast = advanceRoomFlow(created.room.roomCode, joined.seat.seatToken, { persistence });
+    expect(gast.ok).toBe(false);
+
+    // Und ist ein Mitspieler auf DIESEM Schritt noch nicht bereit (`canHostAdvance: false`,
+    // dasselbe Feld wie bei jedem Spieltag-Schritt -- E3: keine zweite Gate-Logik), darf auch
+    // der Host nicht weiterschalten, selbst wenn die neue Saison im Spielstand laengst begonnen
+    // hat.
+    created.room.state = {
+      ...created.room.state,
+      roomFlowState: { ...created.room.state.roomFlowState, canHostAdvance: false },
+    };
+    const blockiert = advanceRoomFlow(created.room.roomCode, created.seat.seatToken, { persistence });
+    expect(blockiert.ok).toBe(false);
+    expect(created.room.state.roomFlowState.step).toBe("season_transition");
   });
 
   it("beschriftet den Host-Knopf am Zyklus-Ende nach dem tatsaechlichen Ziel", () => {

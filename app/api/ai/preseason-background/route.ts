@@ -28,6 +28,7 @@ import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 
 // Roster-abhängige Manager-Aktionen: Training/Einsatzlisten-Setup braucht Spieler im Kader. Im Setup-Draft
 // (Season 1, frische Teams) sind die Kader zu Beginn LEER — laufen diese Aktionen vor dem Draft, werden sie
@@ -557,6 +558,10 @@ export async function POST(request: Request) {
   if (!writeAuth.allowed) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
+  // Stufe 0.3 (Befund B2): die Identitaet fuer den Nicht-Raum-Fall kommt serverseitig aus der
+  // Sitzung (`resolveAuthoritativeWriteOwnerId`), nicht mehr aus `roomWriteContext.activeOwnerId`
+  // (siehe Verwendung unten bei `resolveAiBulkTeamWriteScope`).
+  const scopeOwnerId = await resolveAuthoritativeWriteOwnerId();
 
   const runKey = buildRunKey(saveId, seasonId);
   if (!claimPreseasonRunKey(runKey)) {
@@ -609,7 +614,7 @@ export async function POST(request: Request) {
       gameState: protectedSave.gameState,
       room: writeAuth.room,
       participant: writeAuth.participant,
-      activeOwnerId: roomWriteContext.activeOwnerId,
+      activeOwnerId: scopeOwnerId,
     }).writableTeamIds;
     const aiTeamIds = getAiTeamIds(protectedSave.gameState, callerWritableTeamIds);
     const startedAt = nowIso();

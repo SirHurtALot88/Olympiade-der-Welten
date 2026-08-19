@@ -6,11 +6,15 @@ import type {
   MultiplayerTurnState,
   OlyRoomState,
   RoomParticipant,
+  RoomParticipantRole,
   ServerAuthoritativeWritePolicy,
   TeamControllerType,
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
+import { matchesArenaScope } from "@/lib/room/arena-sync-state";
+import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
 
 export const ONLINE_ROOM_TEAM_IDS = [
   "A-A",
@@ -50,6 +54,83 @@ export const ONLINE_ROOM_TEAM_IDS = [
 const FOUR_PLUS_FOUR_HOST_TEAM_IDS = ["P-S", "D-P", "M-M", "V-W"];
 const FOUR_PLUS_FOUR_FRANKY_TEAM_IDS = ["M-S", "P-C", "C-S", "G-G"];
 
+/**
+ * Findet den zweiten menschlichen Teilnehmer ("Franky") strukturell ueber die Sitzrolle, NICHT
+ * ueber den frei editierbaren Anzeigenamen.
+ *
+ * VORHER stand hier an vier Stellen `/franky\/i.test(participant.displayName)` als
+ * Haupterkennung (Nebenbefund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md). Das griff daneben, sobald
+ * jemand nicht "Franky" hiess — und schlimmer: der Host selbst haette "Franky" heissen und die
+ * Regex damit sich SELBST statt den Gast treffen koennen, denn sie durchsucht ALLE Teilnehmer.
+ * `role` dagegen ist die echte Identitaet: server-vergeben in `buildParticipant`
+ * (`role: "host"`/`role: "player"`, siehe `room-store.ts` `createRoom`/`joinRoom`) und niemals
+ * vom Client editierbar — genau wie `participant.userId` (die eigentliche `ownerId`), die an
+ * derselben Stelle gesetzt wird. Damit ist die Erkennung von der Text-Eingabe entkoppelt.
+ *
+ * Rueckgabe `null`, wenn (noch) kein zweiter Teilnehmer im Raum ist — ein klar benannter
+ * Rueckfall statt eines geratenen Treffers.
+ */
+export function resolveFrankyParticipant(participants: RoomParticipant[]): RoomParticipant | null {
+  return participants.find((entry) => entry.role === "player") ?? null;
+}
+
+/**
+ * Findet den eigenen Sitz im zuletzt bekannten Raum-Snapshot ueber `participantId`.
+ *
+ * FUND (Paket B, docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md): dieselbe Suche stand vorher an zwei
+ * Stellen einzeln direkt im JSX/Hook — fuer den Room-Chip
+ * (app/foundation/FoundationShellRouterBody.tsx) und fuer den Host-Vorbehalt am Saisonwechsel-
+ * Gate (lib/foundation/tabs/use-foundation-cross-tab-season-briefing.ts). Eine Quelle statt zwei
+ * Kopien, die beim naechsten Umbau des Teilnehmer-Modells sonst auseinanderlaufen wuerden.
+ *
+ * `null`, wenn (noch) kein Snapshot geladen ist oder der eigene Sitz darin (noch) nicht auftaucht
+ * (z. B. kurz nach dem Verbindungsaufbau) — ein klar benannter Rueckfall statt eines geratenen
+ * Treffers. NUR ANZEIGE, NIE BERECHTIGUNG (siehe Kommentar an `resolveRoomParticipantActiveOwnerId`
+ * unten): die eigentliche Autoritaet fuer Host-Aktionen bleibt ausschliesslich
+ * `server-authoritative-write-guard.ts` (`HOST_LEVEL_ACTIONS`, `participant.role === "host"`).
+ */
+export function findOwnRoomParticipant(
+  roomLiveState: Pick<OlyRoomState, "roomParticipants"> | null,
+  participantId: string | null | undefined,
+): RoomParticipant | null {
+  if (!roomLiveState || !participantId) {
+    return null;
+  }
+  return roomLiveState.roomParticipants.find((participant) => participant.participantId === participantId) ?? null;
+}
+
+/**
+ * Ordnet die Sitzrolle im Raum der Owner-ID zu, die der Foundation-Client fuer Sichtbarkeit/
+ * Verwaltbarkeit braucht (`teamControlSettings[teamId].ownerId`, siehe
+ * lib/foundation/team-control-settings.ts) — NICHT dieselbe Groesse wie `participant.userId`.
+ *
+ * WARUM NICHT EINFACH `participant.userId`: ohne aktiven Login (Standard, siehe CLAUDE.md/
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md „Entscheidungen") ist `userId` ein zufaelliger
+ * `user-<uuid>`-String je Teilnehmer (`buildParticipant`-Aufrufe in `createRoom`/`joinRoom`,
+ * room-store.ts) — er stimmt mit KEINEM `ownerId`-Wert im Spielstand ueberein. Beim Spielstart
+ * legt `applyChrisFrankyOwnershipToTeamControlSettings` die Teams aber IMMER auf die zwei festen
+ * Platzhalter `DEFAULT_ACTIVE_OWNER_ID` (Host-Sitz) bzw. `FRANKY_OWNER_ID` (zweiter Sitz) — genau
+ * die Zuordnung, die diese Funktion hier aus der Rolle ableitet.
+ *
+ * `role` ist serverseitig vergeben und nie vom Client frei waehlbar (siehe Kommentar an
+ * `resolveFrankyParticipant` oben) — die Ableitung ist also so ehrlich wie eine Anzeige ohne
+ * zusaetzliche Server-Rundreise sein kann. Sie ist trotzdem NUR eine Anzeige-Hilfe: wer sie
+ * konsumiert (z. B. `activeOwnerId` im Foundation-Client), muss dokumentieren, dass sie niemals
+ * als Berechtigung dient — die einzige Autoritaet bleibt das Sitz-Token
+ * (`authorizeServerRoomWrite`/`authorizeTeamWrite`).
+ *
+ * `null` fuer Zuschauer (`"spectator"`) — die haben keine feste Owner-Spalte.
+ */
+export function resolveRoomParticipantActiveOwnerId(role: RoomParticipantRole): string | null {
+  if (role === "host") {
+    return DEFAULT_ACTIVE_OWNER_ID;
+  }
+  if (role === "player") {
+    return FRANKY_OWNER_ID;
+  }
+  return null;
+}
+
 export const SERVER_AUTHORITATIVE_WRITE_POLICY: ServerAuthoritativeWritePolicy = {
   clientMayWriteDirectly: false,
   serverValidatesRoomMembership: true,
@@ -77,6 +158,9 @@ export function createMultiplayerRoomMeta(input: {
     activeMatchday: 1,
     createdAt: now,
     updatedAt: now,
+    // Siehe Kommentar am Feld (types/game.ts): erst eine explizite Lobby-Aktion setzt das auf
+    // true, nicht diese Erst-Anlage.
+    ownershipAssignedByHost: false,
   };
 }
 
@@ -211,26 +295,166 @@ export function authorizeTeamWrite(input: {
   return { allowed: true, reason: "ok" };
 }
 
+/**
+ * Eine Tabellenzeile pro Preset (E1, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): `hostCount`/
+ * `guestCount` sind die Standardgroesse, wenn KEINE feste Liste vorgegeben ist -- die drei
+ * zaehlenbasierten Presets (1/2/4 fuer Chris, Rest KI) nehmen dann einfach die ersten Eintraege
+ * aus dem `teamIds`-Parameter von `buildOwnershipForPreset` (GENAU wie im alten Code:
+ * `teamIds.slice(0, hostCount)`). `guestCount: 0` bei diesen dreien haelt fest, was gemessen
+ * unveraendertes Verhalten ist: ein zweiter Teilnehmer (Franky) bekommt in einem Solo-Preset KEINE
+ * Teams, selbst wenn er im Raum sitzt -- der alte Code gatete `frankyCount` direkt auf den
+ * Preset-Namen (`preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0`), also fuer die drei
+ * anderen Presets immer 0.
+ *
+ * `hostTeamIds`/`guestTeamIds` sind bei den drei Zweier-Presets (4+4, 2+2, 1+1) gesetzt, weil Chris
+ * und Franky dort feste, einander garantiert nicht ueberschneidende Teams bekommen sollen --
+ * unabhaengig von der Reihenfolge im `teamIds`-Array. E5 (PFLICHT laut Auftrag): 1+1/2+2
+ * (`chris_1_franky_1_rest_ai`/`chris_2_franky_2_rest_ai`, Paket 2) nehmen ausdruecklich `.slice(0,
+ * 1)` bzw. `.slice(0, 2)` von GENAU `FOUR_PLUS_FOUR_HOST_TEAM_IDS`/`..._FRANKY_TEAM_IDS` -- keine
+ * zweite Liste, dieselben Teams fallen in derselben Reihenfolge wie bei 4+4.
+ *
+ * `saveMode` (Paket 2): der `FoundationSaveModePreset`, den ein mit diesem Preset gestarteter Raum
+ * im Spielstand traegt. ENTSCHEIDUNG (Baustelle 2 im Auftrag: "gehoert das in dieselbe Tabelle?"):
+ * JA -- es ist dieselbe Groesse (eine Eigenschaft PRO PRESET), eine zweite preset-indizierte Map
+ * waere die zweite Quelle, die die Hausregel ausdruecklich verbietet. GEMESSEN, nicht geraten: vor
+ * diesem Paket schrieben `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts)
+ * `saveMode: "online_4v4"` woertlich, fuer JEDEN Preset -- auch fuer die drei Solo-Presets im Raum.
+ * Die vier alten Zeilen tragen deshalb weiterhin `"online_4v4"` (Gegenprobe 5 im Auftrag: 4+4 und
+ * alle Solo-Modi bleiben zeichengenau unveraendert); nur die zwei NEUEN Zeilen bekommen ihren
+ * eigenen Save-Modus (E4: `online_1v1`/`online_2v2`).
+ */
+type PresetOwnershipSpec = {
+  hostCount: number;
+  guestCount: number;
+  hostTeamIds?: string[];
+  guestTeamIds?: string[];
+  saveMode: FoundationSaveModePreset;
+};
+
+/**
+ * DIE ZEILENFOLGE HIER IST DIE ANZEIGEREIHENFOLGE IM AUSWAHLFELD — bitte beim Umsortieren
+ * mitdenken. `ROOM_OWNERSHIP_PRESET_IDS` (unten) leitet sich per `Object.keys` aus dieser Tabelle
+ * ab, und BEIDE Oberflaechen bauen ihr Auswahlfeld daraus. Wer die Tabelle "der Ordnung halber"
+ * anders sortiert, sortiert damit das Auswahlfeld um, ohne eine Zeile Oberflaechen-Code
+ * anzufassen. Das ist gewollt (eine Quelle), aber es sieht man der Tabelle sonst nicht an.
+ *
+ * SORTIERT NACH GROESSE (Entscheidung von Chris): erst ein Team, dann eins pro Spieler, dann zwei,
+ * zwei pro Spieler, vier, vier pro Spieler. Vorher standen die vier alten Modi zuerst und die
+ * beiden neuen hinten angehaengt — die Reihenfolge, in der sie entstanden sind, nicht die, in der
+ * man sie aussucht.
+ */
+const PRESET_OWNERSHIP_TABLE: Record<RoomOwnershipPreset, PresetOwnershipSpec> = {
+  chris_1_rest_ai: { hostCount: 1, guestCount: 0, saveMode: "online_4v4" },
+  chris_1_franky_1_rest_ai: {
+    hostCount: 1,
+    guestCount: 1,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 1),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 1),
+    saveMode: "online_1v1",
+  },
+  chris_2_rest_ai: { hostCount: 2, guestCount: 0, saveMode: "online_4v4" },
+  chris_2_franky_2_rest_ai: {
+    hostCount: 2,
+    guestCount: 2,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS.slice(0, 2),
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.slice(0, 2),
+    saveMode: "online_2v2",
+  },
+  chris_4_rest_ai: { hostCount: 4, guestCount: 0, saveMode: "online_4v4" },
+  chris_4_franky_4_rest_ai: {
+    hostCount: FOUR_PLUS_FOUR_HOST_TEAM_IDS.length,
+    guestCount: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.length,
+    hostTeamIds: FOUR_PLUS_FOUR_HOST_TEAM_IDS,
+    guestTeamIds: FOUR_PLUS_FOUR_FRANKY_TEAM_IDS,
+    saveMode: "online_4v4",
+  },
+};
+
+/**
+ * Die MENGE aller Raum-Presets, aus der Tabelle abgeleitet -- E3 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md):
+ * "Zieh die MENGE der Modi in eine exportierte Quelle." `Object.keys` auf einem `Record<RoomOwnershipPreset,
+ * ...>` traegt JEDEN Preset garantiert genau einmal, in der Reihenfolge der Objektliteral-Zeilen oben
+ * (JS-Laufzeitgarantie fuer String-Schluessel) -- und der `Record`-Typ zwingt ohnehin zu einer
+ * Tabellenzeile fuer jeden neuen `RoomOwnershipPreset`-Wert (TS-Fehler sonst), die ID-Liste zieht
+ * automatisch nach.
+ *
+ * FUND (Befund 1.3 im Plan): `app/HomePageClient.tsx` und `app/room/[roomCode]/RoomPageClient.tsx`
+ * pflegten die MENGE der Presets bisher als zwei eigene `PRESET_OPTIONS`-Arrays -- ein Preset, der
+ * nur in einer der beiden Dateien landete, war an der anderen unsichtbar. Beide Oberflaechen bauen
+ * ihre Beschriftungen jetzt aus DIESER Liste; die Beschriftung selbst darf je Stelle verschieden
+ * bleiben (E3 sagt das ausdruecklich), die Menge nicht mehr.
+ */
+export const ROOM_OWNERSHIP_PRESET_IDS = Object.keys(PRESET_OWNERSHIP_TABLE) as RoomOwnershipPreset[];
+
+/**
+ * Der `FoundationSaveModePreset`, den ein mit `preset` gestarteter/umverteilter Raum im Spielstand
+ * traegt (Kommentar an `PresetOwnershipSpec.saveMode` oben begruendet die Tabellenzeile je Preset).
+ *
+ * `null`/`undefined`/unbekannt faellt auf `"online_4v4"` zurueck -- das war schon VOR Paket 2 der
+ * einzige Wert, den `startRoom`/`syncRoomOwnershipToBoundSave` (room-store.ts) fuer JEDEN Raum
+ * schrieben, auch fuer einen Raum ganz ohne erkanntes `createdWithPreset`. Bewusst KEIN Wurf wie bei
+ * `buildOwnershipForPreset`/`UnknownRoomOwnershipPresetError`: anders als dort blockiert ein
+ * unbekannter Preset hier keinen Beitritt, sondern waehlt nur die Beschriftung/Obergrenze des
+ * gebundenen Spielstands -- derselbe "gnaedige" Rueckfall wie in `wendeOwnershipPresetGnaedigAn`
+ * (room-store.ts), nur fuer den Save-Modus statt fuer die Team-Zuteilung.
+ */
+export function resolveFoundationSaveModeForPreset(
+  preset: RoomOwnershipPreset | null | undefined,
+): FoundationSaveModePreset {
+  if (!preset) {
+    return "online_4v4";
+  }
+  return PRESET_OWNERSHIP_TABLE[preset]?.saveMode ?? "online_4v4";
+}
+
+/**
+ * E2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): der alte Code kannte fuer einen nicht in der
+ * Ternaer-Kette erkannten Preset keinen Fehlerfall -- `hostCount` fiel ueber den letzten `: 4` der
+ * Kette still auf vier Teams zurueck (alter Stand, online-room-model.ts:304: `preset ===
+ * "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4`). Ein Tippfehler oder ein Preset
+ * aus einer anderen Serverversion bekam damit lautlos die falsche Zuteilung. Dieser Wurf macht den
+ * Fall benennbar: `buildOwnershipForPreset` liefert fuer einen unbekannten Preset gar nichts mehr,
+ * statt eine geratene Zahl Teams.
+ *
+ * Fuer eine EXPLIZITE Host-Aktion (Preset beim Anlegen, Preset-Knopf im Raum) ist das der
+ * richtige, sichtbare Fehler. Fuer den Beitritts-Rueckfall auf einen ALTEN, gespeicherten Preset-
+ * Namen (`joinRoom`, room-store.ts, `multiplayerRoom.createdWithPreset`) waere ein ungefangener
+ * Wurf dagegen teuer -- siehe Kommentar an `wendeOwnershipPresetGnaedigAn` dort, wo genau dieser
+ * Fall abgefangen wird, statt den Beitritt scheitern zu lassen.
+ */
+export class UnknownRoomOwnershipPresetError extends Error {
+  constructor(public readonly preset: string) {
+    super(`Unbekannter Raum-Modus in buildOwnershipForPreset: "${preset}".`);
+    this.name = "UnknownRoomOwnershipPresetError";
+  }
+}
+
 export function buildOwnershipForPreset(
   participants: RoomParticipant[],
   preset: RoomOwnershipPreset,
   teamIds = ONLINE_ROOM_TEAM_IDS,
 ): TeamOwnershipRecord[] {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
-  const franky = participants.find((entry) => /franky/i.test(entry.displayName)) ?? participants.find((entry) => entry.role === "player") ?? null;
-  const hostCount = preset === "chris_1_rest_ai" ? 1 : preset === "chris_2_rest_ai" ? 2 : 4;
-  const frankyCount = preset === "chris_4_franky_4_rest_ai" && franky ? 4 : 0;
+  const franky = resolveFrankyParticipant(participants);
+
+  const spec = PRESET_OWNERSHIP_TABLE[preset];
+  if (!spec) {
+    throw new UnknownRoomOwnershipPresetError(preset);
+  }
+
+  // `.filter(teamIds.includes)` war im alten Code nur fuer die feste 4+4-Liste noetig (Beschraenkung
+  // auf den `teamIds`-Parameter, Gegenprobe 4 im Auftrag). Fuer die slice-Variante ist er ein
+  // No-op, weil deren Eintraege schon aus `teamIds` stammen -- deshalb hier einheitlich statt wie
+  // vorher zweigeteilt.
   const hostTeamIds = host
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_HOST_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(0, hostCount)
+    ? (spec.hostTeamIds ?? teamIds.slice(0, spec.hostCount)).filter((teamId) => teamIds.includes(teamId))
     : [];
-  const frankyTeamIds = franky
-    ? preset === "chris_4_franky_4_rest_ai"
-      ? FOUR_PLUS_FOUR_FRANKY_TEAM_IDS.filter((teamId) => teamIds.includes(teamId))
-      : teamIds.slice(hostCount, hostCount + frankyCount)
+  const guestTeamIds = franky
+    ? (spec.guestTeamIds ?? teamIds.slice(spec.hostCount, spec.hostCount + spec.guestCount)).filter((teamId) =>
+        teamIds.includes(teamId),
+      )
     : [];
-  const humanTeamIds = new Set([...hostTeamIds, ...frankyTeamIds]);
+  const humanTeamIds = new Set([...hostTeamIds, ...guestTeamIds]);
 
   return teamIds.map((teamId) => {
     if (host && hostTeamIds.includes(teamId)) {
@@ -243,7 +467,7 @@ export function buildOwnershipForPreset(
       };
     }
 
-    if (franky && frankyTeamIds.includes(teamId)) {
+    if (franky && guestTeamIds.includes(teamId)) {
       return {
         teamId,
         controllerType: "human",
@@ -289,10 +513,7 @@ export function buildExplicitTeamOwnership(
   teamIds = ONLINE_ROOM_TEAM_IDS,
 ): ExplicitTeamOwnershipValidationResult {
   const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
-  const franky =
-    participants.find((entry) => /franky/i.test(entry.displayName)) ??
-    participants.find((entry) => entry.role === "player") ??
-    null;
+  const franky = resolveFrankyParticipant(participants);
 
   const chrisTeamIds = Array.from(new Set(selection.chrisTeamIds ?? []));
   // Without a joined second human participant there is nobody to own Franky's teams yet -
@@ -449,6 +670,62 @@ export function buildTurnState(input: {
     blockingTeams,
     canAdvance: requiredParticipants.length > 0 && requiredParticipants.every((participantId) => readyParticipants.includes(participantId)),
   };
+}
+
+/**
+ * Steps im Spieltag-Zyklus, in denen gerade eine Einsatzliste/Formkarte gebaut wird oder eine
+ * Enthuellung laeuft. Team-Zuordnung waehrenddessen umzuhaengen wuerde eine halb gespeicherte
+ * Aufstellung verwaisen lassen — genau das Risiko, das die Entscheidung in
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md ("Team-Zuordnung mitten in der Saison aendern?") benennt.
+ *
+ * "standings" gehoert bewusst NICHT dazu: der Spieltag ist zu dem Zeitpunkt bereits aufgeloest
+ * (das Ergebnis steht), es ist reine Rueckschau vor dem naechsten Zyklus — also schon "zwischen
+ * zwei Spieltagen". Die Vorsaison-Schritte (`sell_players` .. `finalize_transfers`) laufen genau
+ * einmal VOR dem ersten Spieltag (siehe Kommentar an `ROOM_FLOW_MATCHDAY_CYCLE_START` in
+ * room-flow-controller.ts) und zaehlen aus demselben Grund nicht als "laufender Spieltag".
+ */
+const ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY = new Set<string>(["lineup", "formcards", "formcards_season_regenerate", "arena", "result"]);
+
+/**
+ * Laeuft im Raum gerade ein Spieltag (Aufstellung/Formkarten/Arena/Ergebnis) oder eine
+ * Enthuellung? Massgeblich fuer die Sperre "Team-Zuordnung nur zwischen Spieltagen" (Stufe 1.3,
+ * docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md).
+ *
+ * Zwei unabhaengige Signale, beide gepflegt in room-store.ts (`syncPlayers`/`advanceRoomArenaStep`
+ * etc.):
+ *   - `roomFlowState.step`: welcher Schritt des 12-Stufen-Flows gerade aktiv ist.
+ *   - `arenaSyncState.status`: ob die Arena-Enthuellung fuer den AKTUELLEN Spieltag laeuft oder
+ *     ihr Ergebnis noch nicht zurueckgesetzt ist ("idle" ist der einzige sichere Zustand).
+ * Beide muessen geprueft werden: der Flow-Schritt kann schon auf "result" stehen, waehrend die
+ * Arena technisch noch "revealing" ist (der Host hat den letzten Schritt gesendet, der Broadcast
+ * mit dem neuen `roomFlowState.step` ist aber noch unterwegs) — ein Schreibvorgang, der nur eines
+ * der beiden Felder prueft, haette in genau diesem schmalen Fenster ein falsches "frei".
+ *
+ * BEFUND B1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `arenaSyncState.status` wird beim Anwenden
+ * eines Spieltags auf `result_applied` gesetzt und NIE wieder auf `idle` zurueckgesetzt (Kommentar
+ * an `matchesArenaScope`, arena-sync-state.ts) — ein `status !== "idle"`-Vergleich allein waere
+ * damit ab dem ERSTEN Spieltag fuer den Rest des Raums permanent wahr, und die in Stufe 1.3 gebaute
+ * "zwischen zwei Spieltagen erlaubt"-Umverteilung koennte nie mehr greifen. Der Fix: `status !==
+ * "idle"` zaehlt nur noch, wenn der Sync-State auch zum AKTUELLEN Spieltag gehoert
+ * (`matchesArenaScope`, dieselbe Pruefung, die den Host-Arena-Start-Guard schon vor demselben
+ * Fehler bewahrt) — ein laengst abgeschlossener State eines VORIGEN Spieltags (anderes
+ * `matchdayId`, `advanceRoomFlow` in room-store.ts erhoeht `activeMatchday` beim Weiterziehen)
+ * gehoert nicht mehr zum aktuellen Spieltag und sperrt die Umverteilung folglich nicht mehr.
+ */
+export function isRoomMatchdayInProgress(
+  state: Pick<OlyRoomState, "roomFlowState" | "arenaSyncState" | "multiplayerRoom">,
+): boolean {
+  if (ROOM_FLOW_STEPS_WITH_ACTIVE_MATCHDAY.has(state.roomFlowState.step)) {
+    return true;
+  }
+  if (state.arenaSyncState.status === "idle") {
+    return false;
+  }
+  return matchesArenaScope(state.arenaSyncState, {
+    saveId: state.multiplayerRoom.saveId,
+    seasonId: state.multiplayerRoom.activeSeasonId,
+    matchdayId: String(state.multiplayerRoom.activeMatchday),
+  });
 }
 
 export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwnershipPreset): OlyRoomState {

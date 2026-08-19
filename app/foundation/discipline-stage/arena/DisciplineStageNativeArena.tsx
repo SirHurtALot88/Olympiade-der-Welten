@@ -21,6 +21,13 @@ import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
 import { getDisciplineField } from "./disciplines/registry";
 import type { DisciplineFieldProps } from "./disciplines/types";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
+import {
+  ARENA_STEP_DURATION_MS,
+  estimateServerNowMs,
+  resolveArenaCatchUpMode,
+  resolveArenaEffectivePause,
+  type ArenaStepSnapshot,
+} from "@/lib/foundation/discipline-stage/arena-timeline";
 
 // Freund/Feind-Rahmenfarbe (mine=blau, ally=grün, rival=rot) über die globalen
 // --nl-* Tokens (Light/Dark ziehen automatisch mit). Marker = Rahmen, nie Füllung.
@@ -28,7 +35,7 @@ export function relColor(rel: TeamRelationshipKind | null | undefined): string |
   if (!rel) return null;
   return `var(--nl-${rel})`;
 }
-const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔" };
+const REL_GLYPH: Record<TeamRelationshipKind, string> = { mine: "★", ally: "🤝", rival: "⚔", human: "👤" };
 
 // Wiederverwendbarer Kopf-Strip 50/50 (Spec 02): links die „Dein"-Karte
 // (Läufer/Heber/Kämpfer), rechts das Live-Meldungsfeld. Beide teilen sich den Platz
@@ -190,7 +197,47 @@ export type NativeArenaRoomSync = {
     isSelfReady: boolean; // eigener Ready-Status
     waitingNames: string[]; // Namen der noch nicht bereiten Teilnehmer
     onToggleReady: () => void; // eigenen Ready-Status umschalten
+    /**
+     * DER BENANNTE NOTAUSGANG (Entscheidung von Chris, 18.08.).
+     *
+     * Ein getrennter Mitspieler haelt das Bereit-Tor jetzt auf — sonst zoege der Host an jemandem
+     * vorbei, der rausgeflogen ist, ohne je bereit gewesen zu sein. Damit die Enthuellung dabei
+     * nicht haengen bleiben kann, darf der Host GENAU DIESE Leute ausdruecklich uebergehen. Nur
+     * gesetzt, wenn ausschliesslich Getrennte blockieren; der Server prueft es noch einmal nach.
+     */
+    canSkipDisconnected?: boolean;
+    disconnectedBlockerNames?: string[];
+    onSkipDisconnected?: () => void;
   };
+  /**
+   * Audit-Punkt 5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Namen der Mitspieler, die gerade
+   * GETRENNT sind ("Franky ist getrennt"). Bewusst getrennt von `coopGate.waitingNames` — ein
+   * Getrennter HAELT das Bereit-Tor inzwischen auf (siehe `getRoomArenaRequiredParticipantIds`,
+   * `arena-sync-state.ts`) — umso wichtiger, dass er sichtbar ist: sonst sucht der Host den Grund
+   * fuer den Stillstand bei sich. Leer/undefiniert ⇒ kein Hinweis (Solo/alle verbunden).
+   */
+  disconnectedNames?: string[];
+  /**
+   * GEMEINSAME ZEITBASIS (Befund B4, Stufe 3.2/3.3/3.4/3.6, `lib/foundation/discipline-stage/
+   * arena-timeline.ts`). ALLE Felder hier sind optional und wirkungslos, solange der Aufrufer
+   * (`DisciplineStageArena.tsx`) sie nicht befuellt — ohne sie verhaelt sich diese Komponente
+   * exakt wie vorher (reine `syncedRound`-Kaskade, rein lokale Pause). Das ist bewusst: Punkt 5
+   * der Aufgabe verlangt, dass Solo (kein `roomSync`) sich in NICHTS aendert, und ein
+   * unbefuellter Aufrufer ist fuer den Guest-Pfad aequivalent zu "noch kein neues Feld da".
+   */
+  stepIndex?: number; // RoomArenaState.stepIndex — der EINE monotone Schrittzaehler (Stufe 3.2)
+  stepStartedAtMs?: number; // Server-Zeitpunkt (ms), zu dem der aktuelle Schritt begann
+  stepDurationMs?: number; // geplante Dauer des aktuellen Schritts
+  clockOffsetMs?: number; // Server-minus-Client-Uhrdifferenz dieses Clients
+  hostPaused?: boolean; // Pause/Weiter (3.6): vom Host gesetzt, gilt fuer den Guest ebenso
+  // Wer die Raum-Pause ausgeloest hat (`RoomArenaState.pausedBy`). `null` = "von keinem Menschen",
+  // der Fall nach einem Server-Neustart mitten im Reveal — eine solche Pause bindet auch den HOST
+  // (Befund F8, siehe `resolveArenaEffectivePause` in `arena-timeline.ts`). `undefined` = Aufrufer
+  // liefert das Feld nicht → unveraendertes Verhalten.
+  hostPausedBy?: string | null;
+  onHostPauseToggle?: (() => void) | null; // Host: eigene Pause/Weiter an den Raum melden
+  onHostReset?: (() => void) | null; // Host: „↻ Neu" an den Raum melden
+  onHostQuickSim?: (() => void) | null; // Host: Quick-Sim an den Raum melden
 };
 
 export type StageMotif = "chevrons" | "combat" | "board" | "court" | "weights" | "grid" | "ice" | "stage" | "plates" | "skyline" | "none";
@@ -921,7 +968,11 @@ export const STAR_MIN = 80;
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
 // wird pro Runde gemeinsam animiert. Mini-DM (duelhp) läuft über das geteilte
 // Chrome + die Registry-Feld-Komponente (arena/disciplines/duelhp.tsx).
-export const TRACK_ROUND_MS = 10000;
+// EINE Quelle statt zweier zufaellig gleicher Zahlen (Stufe 3.3): der Wert steht jetzt in
+// `arena-timeline.ts` (`ARENA_STEP_DURATION_MS`), weil die gemeinsame Zeitbasis im Raum-Zustand
+// dieselbe Schrittdauer braucht wie diese Komponente ihre lokale Reveal-Kaskade. Re-exportiert
+// unter dem alten Namen, damit `disciplines/*.tsx` (barbell.tsx, shared.tsx, …) unveraendert bleiben.
+export const TRACK_ROUND_MS = ARENA_STEP_DURATION_MS;
 // viewBox + Token-Radien je Primitive. Der Rest (Engine/FX/Ticker/Podest/Tabelle)
 // ist geometrieunabhängig; nur Feld-Layout + tokenPos unterscheiden sich.
 //
@@ -1722,8 +1773,15 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     // bedeutet, entscheidet der Host an einer Stelle (`replayNachArenaReset`) — dieser hier meldet
     // nur, was passiert ist.
     onReset?.(anlass);
+    // „↻ Neu" als Raum-Aktion (Stufe 3.6): NUR der bewusste Knopf-Klick geht an den Raum, NICHT
+    // der Mount-Reset (`anlass === "mount"`) — sonst wuerfe schon das blosse Oeffnen/Wechseln der
+    // Seite den Mitspieler zurueck (B1-artiger Fehlschluss, siehe Kommentar oben am Mount-Effekt).
+    // `onHostReset` ist optional/no-op, solange der Aufrufer sie nicht befuellt.
+    if (anlass === "knopf" && roomSync?.active && roomSync.isHost) {
+      roomSync.onHostReset?.();
+    }
     force();
-  }, [buildRT, clearTimers, onReset]);
+  }, [buildRT, clearTimers, onReset, roomSync]);
 
   // Nur beim Mount zurücksetzen: der Host remountet die Arena bereits vollständig
   // via key={`${disciplineId}-${mode}-${seed}`}. Ein Reset bei jeder teams-Identität
@@ -1783,10 +1841,17 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       e.stopImmediatePropagation();
       manualPauseRef.current = !manualPauseRef.current;
       setPaused(manualPauseRef.current);
+      // Pause als Raum-Zustand (Stufe 3.6): NUR der Host meldet seine Pause an den Raum — der
+      // Guest hat gar keine eigene Pause-Autoritaet (`resolveArenaEffectivePause` in
+      // `arena-timeline.ts`), sein Leertaste-Druck bleibt rein kosmetisch fuer die eigene
+      // Ansicht. `onHostPauseToggle` ist optional/no-op, solange der Aufrufer sie nicht befuellt.
+      if (roomSync?.active && roomSync.isHost) {
+        roomSync.onHostPauseToggle?.();
+      }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [done]);
+  }, [done, roomSync]);
 
   // ---- Feld-Geometrie ----
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -2873,9 +2938,95 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     return () => window.clearTimeout(id);
   }, [prim, round, busy, done, demandKg, advance, paused, started, roomSync?.followsHost, roomSync?.coopGate.active]);
 
-  // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound` nach —
-  // spielt dieselbe Reveal-Cascade, aber host-getaktet. Pausiert der Host (Hover),
-  // steigt syncedRound nicht → der Guest bleibt automatisch stehen.
+  // Direktes Ueberspringen ohne Kaskade (Stufe 3.4 — "Nachholen durch Ueberspringen, nicht durch
+  // Nachspielen", die Antwort auf Befund-Punkt 4 "kein Rueckwaerts, kein Sprung"). Baut den
+  // Zustand bis EINSCHLIESSLICH `targetRound - 1` direkt auf, ohne jede Zwischenetappe der
+  // Reveal-Kaskade abzuspielen — modelliert nach `quickSim` weiter unten (dieselbe Rechnung),
+  // nur mit einem BELIEBIGEN Ziel statt `slotCount`. Das macht sie auch fuer RUECKWAERTS-Spruenge
+  // tauglich (ein Host-Reset ist `targetRound < round`) — `quickSim` selbst kennt das nicht, weil
+  // sie nur je in eine Richtung (ans Ende) laeuft.
+  //
+  // Nur fuer den Guest-Pfad gedacht: der Host bleibt bei der echten Kaskade (Sounds/Highlights/
+  // Gleiten), damit ihm nichts von seiner eigenen Inszenierung genommen wird.
+  const jumpToRound = useCallback(
+    (targetRound: number) => {
+      clearTimers();
+      const clamped = Math.max(0, Math.min(slotCount, targetRound));
+      rtRef.current = buildRT();
+      const rt = rtRef.current;
+      for (let r = 0; r < clamped; r += 1) {
+        rt.forEach((t) => {
+          const p = t.players[r];
+          if (p) {
+            t.score = round1(t.score + playerNet(p));
+            t.thrownSlot = r;
+          }
+        });
+        recomputeRanks(rt);
+        rt.forEach((t) => t.rankHistory.push(t.trueRank));
+      }
+      rt.forEach((t) => {
+        t.displayScore = t.score;
+        t.animScore = t.score;
+      });
+      roundAnimStartRef.current = 0; // kein Gleiten — der Sprung landet direkt auf dem Zielwert
+      setRound(clamped);
+      setBusy(false);
+      busyRef.current = false;
+      setSpotlight(null);
+      setPops([]);
+      setFrags([]);
+      setTicker([]);
+      setBanner(null);
+      setHandoffTs(0);
+      setPhotoFinish(false);
+      setStageCrown(null);
+      // A2 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher fehlten hier genau die Felder, die
+      // `reset()` (Knopf/Mount) laengst raeumt — podium/flash/shake/hover/stageCrownRef/demandKg/
+      // die Barbell-Refs. Ein Host-Reset ("↻ Neu") laesst `round` per Raum-Sync auf 0 zurueckfallen,
+      // der Gast landet ueber `jumpToRound(0)` HIER (delta<0 ⇒ "jump", siehe
+      // `resolveArenaCatchUpMode`) — vorher blieb dabei das alte Podest sichtbar UEBER dem frisch
+      // gestarteten Feld (Etappe 0), Flash/Shake der letzten Etappe standen nach, die Kür-Rahmen der
+      // alten Kür klebten weiter am Token, und bei Gewichtheben zeigte die Latte noch die zuletzt
+      // geforderte Last. Dieselben Felder wie in `reset()`, NICHT `onReset(...)` selbst — ein
+      // Nachholsprung ist kein "der Nutzer hat neu gestartet"-Ereignis (der Host meldet das schon
+      // separat über `onHostReset`), nur ein Bild, das den Zielzustand ohne Kaskade zeigen muss.
+      setPodium(null);
+      setFlash(null);
+      setShake("none");
+      setHover(null);
+      stageCrownRef.current = { list: [], stage: 0, label: null };
+      setDemandKg(null);
+      setBarbellMsg(null);
+      barbellDemandRef.current = null;
+      barbellPrevDemandRef.current = null;
+      barbellPrevRankRef.current = {};
+      // Start-Gate mit hochziehen: ein Guest, der auf Etappe 7 springt, gehoert sichtbar zu "laeuft
+      // bereits" (Feld-Startaufstellung waere sonst weiter zu sehen, siehe `started` in `fieldCtx`).
+      setStarted(true);
+      force();
+      if (clamped >= slotCount) {
+        later(showPodium, 200);
+      } else {
+        setEnded(false);
+        endedFiredRef.current = false;
+      }
+    },
+    [slotCount, clearTimers, buildRT, later, showPodium],
+  );
+
+  // Co-op GUEST: zieht `round` auf den vom Host getriebenen `syncedRound`-Schritt nach.
+  //
+  // "advance-one" (Ziel genau einen Schritt weiter): spielt dieselbe Reveal-Kaskade wie der Host,
+  // nur host-getaktet — der normale Fall, waehrend beide live mitschauen. Pausiert der Host,
+  // bewegt sich `syncedRound` nicht → der Guest bleibt automatisch stehen (`resolveArenaCatchUpMode`
+  // liefert dann "in-sync", nichts zu tun).
+  //
+  // "jump" (alles andere: >1 Schritt Rueckstand, Spaet-Einstieg BEI round=0, oder ein
+  // RUECKWAERTS-Ziel nach einem Host-Reset): baut den Zielzustand direkt auf, statt jede
+  // Zwischenetappe nachzuspielen — vorher war das gar nicht vorgesehen: `syncedRound > round`
+  // (die alte Bedingung) kannte nur "vorwaerts, ein Schritt", ein Reset des Hosts (kleineres Ziel)
+  // bewegte den Guest ueberhaupt nicht.
   //
   // Gate ist `followsHost` (Guest im Room), NICHT `waitingForHost` (Guest VOR dem Host-Start):
   // Letzteres kippt beim Start des Hosts auf false und haette diesen Effekt genau dann
@@ -2883,11 +3034,100 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // klicken kann (`canControl` false → `started` bleibt false → Auto-Continue greift nie), gab es
   // danach keinen Pfad mehr, der `round` bewegt: der Guest stand ohne Reveal und ohne Hinweis da.
   useEffect(() => {
-    if (!roomSync?.followsHost || busy || done) return;
-    if (roomSync.syncedRound > round) {
+    if (!roomSync?.followsHost) return;
+    // A1 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): die gemeinsame Zeitbasis TATSAECHLICH
+    // benutzt, statt nur transportiert. `roomSync.stepStartedAtMs`/`stepDurationMs`/`clockOffsetMs`
+    // kamen bis hierher als Props an und wurden nirgends gelesen — `resolveArenaDisplayState`/
+    // `estimateServerNowMs` hatten null Aufrufer im Produktivcode. Das war die Kernzusage des
+    // Pakets, die NICHT eingeloest war: zwei Browser zeigten dieselbe Reihenfolge, aber nicht
+    // denselben Moment.
+    //
+    // WAS HIER TATSAECHLICH BEHOBEN WIRD (der kleinstmoegliche Schritt, der die Zusage einloest):
+    // ohne Uhr entschied allein die Schrittdifferenz, ob der Gast eine volle, ~10s lange lokale
+    // Reveal-Kaskade abspielt ("advance-one") — auch dann, wenn die Host-Meldung so spaet ankam
+    // (gedrosselter Hintergrund-Tab, Reconnect, hohe Latenz), dass der gemeldete Schritt laut
+    // Server-Uhr laengst eingeschwungen war. Eine frische Kaskade haette den Gast dann nicht
+    // aufholen lassen, sondern IMMER WEITER zurueckfallen (jede Kaskade braucht selbst wieder die
+    // volle Schrittdauer). `resolveArenaCatchUpMode` bekommt deshalb jetzt die Uhr mit
+    // (`targetStepClock`) und liefert in genau diesem Fall "jump" statt "advance-one" — der
+    // Zielzustand wird direkt aufgebaut, keine stale Kaskade.
+    //
+    // WAS BEWUSST LOKAL BLEIBT (ehrlich benannt, kein zweiter unbenutzter Verkabelungs-Anspruch):
+    // die Kaskade SELBST (Sounds/Highlights/Token-Gleiten, `animClockRef`/`roundAnimStartRef` in
+    // `advance()`) laeuft weiterhin auf der lokalen `Date.now()`-Uhr des Gasts, sobald sie einmal
+    // gestartet ist — ein voller Umbau dieses Animationsmotors auf die Server-Uhr (jede Teilnahme-
+    // Choreografie einzeln aus `serverNowMs` ableiten) ist eine eigene, groessere Aufgabe (Stufe
+    // 3.4 vollstaendig). Innerhalb einer normal getakteten "advance-one"-Kaskade bleibt der
+    // Versatz zum Host auf Netzwerklatenz begrenzt (typ. << 1s) — der hier behobene Fall ist der
+    // GROSSE, sichtbare Rueckstand, nicht die letzte Millisekunde Choreografie-Feinschliff.
+    const targetStepClock =
+      roomSync.stepStartedAtMs != null && roomSync.stepDurationMs != null
+        ? {
+            step: {
+              stepIndex: roomSync.stepIndex ?? 0,
+              stepStartedAt: new Date(roomSync.stepStartedAtMs).toISOString(),
+              stepDurationMs: roomSync.stepDurationMs,
+              paused: roomSync.hostPaused ?? false,
+            } satisfies ArenaStepSnapshot,
+            serverNowMs: estimateServerNowMs(Date.now(), roomSync.clockOffsetMs ?? 0),
+          }
+        : undefined;
+    const mode = resolveArenaCatchUpMode({
+      localStepIndex: round,
+      targetStepIndex: roomSync.syncedRound,
+      localCascadeRunning: busy,
+      targetStepClock,
+    });
+    if (mode === "advance-one") {
       advance();
+    } else if (mode === "jump") {
+      jumpToRound(roomSync.syncedRound);
     }
-  }, [roomSync?.followsHost, roomSync?.syncedRound, round, busy, done, advance]);
+  }, [
+    roomSync?.followsHost,
+    roomSync?.syncedRound,
+    roomSync?.stepIndex,
+    roomSync?.stepStartedAtMs,
+    roomSync?.stepDurationMs,
+    roomSync?.clockOffsetMs,
+    roomSync?.hostPaused,
+    round,
+    busy,
+    advance,
+    jumpToRound,
+  ]);
+
+  // Pause als geteilter Zustand (Stufe 3.6): der Guest hat keine eigene Pause-Autoritaet — er
+  // spiegelt IMMER `roomSync.hostPaused` (ueber `resolveArenaEffectivePause`), nie den eigenen
+  // Tastendruck. Ohne befuellten `hostPaused` (Aufrufer liefert das Feld noch nicht) ist der Wert
+  // `undefined` → `resolveArenaEffectivePause` behandelt das wie "nicht pausiert", der Guest
+  // verhaelt sich also unveraendert, solange die Raum-Anbindung dieses Feld noch nicht sendet.
+  //
+  // BEFUND F8 (Aufgabe #45): dieser Effekt lief bisher NUR beim Gast (`followsHost`). Fuer den Host
+  // war das richtig, SOLANGE die Raum-Pause immer seine eigene war. Nach einem Server-Neustart
+  // mitten im Reveal stimmt das nicht mehr: `resumeRoomArenaAfterRestart` haelt die Enthuellung an,
+  // ohne dass jemand etwas gedrueckt hat. Der Host haette dann die Vorgabe `localPauseIntent: false`
+  // und liefe weiter, waehrend der Gast dem Raum-Feld folgt und einfriert — beide Seiten auf
+  // verschiedenen Etappen. Der Effekt laeuft deshalb jetzt fuer BEIDE Rollen; die Entscheidung
+  // selbst trifft weiterhin allein `resolveArenaEffectivePause`, das dem Host seine eigene Absicht
+  // laesst, AUSSER bei einer Pause ohne Urheber (`hostPausedBy === null`).
+  //
+  // Fuer den Host ist das im Normalbetrieb ein Nichts-Tun: `resolveArenaEffectivePause` gibt ihm
+  // dann exakt `manualPauseRef.current` zurueck, also den Wert, der ohnehin schon gesetzt ist.
+  // Sein Leertaste-Handler dreht `manualPauseRef` selbst um — ein vom Neustart erzwungenes `true`
+  // wird durch den ersten Druck also zu "weiter", genau wie gewuenscht.
+  useEffect(() => {
+    if (!roomSync?.active) return;
+    const effectivePause = resolveArenaEffectivePause({
+      roomActive: roomSync.active,
+      isHost: Boolean(roomSync.isHost),
+      roomPaused: roomSync.hostPaused ?? false,
+      roomPausedBy: roomSync.hostPausedBy,
+      localPauseIntent: manualPauseRef.current,
+    });
+    manualPauseRef.current = effectivePause;
+    setPaused(effectivePause);
+  }, [roomSync?.active, roomSync?.isHost, roomSync?.hostPaused, roomSync?.hostPausedBy]);
 
   // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
   // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).
@@ -2946,7 +3186,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setStageCrown(null);
     force();
     later(showPodium, 200);
-  }, [slotCount, clearTimers, buildRT, later, showPodium]);
+    // Quick-Sim als Raum-Aktion (Stufe 3.6): der Guest muss denselben Sprung ans Ende sehen —
+    // sonst stuende er auf einer Etappe, die es beim Host nicht mehr gibt. `onHostQuickSim` ist
+    // optional/no-op, solange der Aufrufer sie nicht befuellt.
+    if (roomSync?.active && roomSync.isHost) {
+      roomSync.onHostQuickSim?.();
+    }
+  }, [slotCount, clearTimers, buildRT, later, showPodium, roomSync]);
 
   function causeKick(cause: string, mine: boolean): string {
     const own = mine ? "DEIN LÄUFER · " : "";
@@ -3443,18 +3689,76 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               ) : (
                 <span style={{ fontSize: 12, color: "var(--nl-accent)", fontWeight: 700 }}>👥 Co-op · Du bist Host — dein Reveal läuft synchron bei allen.</span>
               )}
+              {/* Audit-Punkt 5, zweite Haelfte: ein Getrennter blockiert das Bereit-Tor nicht mehr
+                  (siehe `getRoomArenaRequiredParticipantIds`), war bisher aber auch NIRGENDS
+                  sichtbar — der Host sah nur, dass es plötzlich weiterging, ohne Grund. */}
+              {roomSync.disconnectedNames && roomSync.disconnectedNames.length > 0 ? (
+                <span
+                  className="nl-arena-coop-note"
+                  data-testid="arena-coop-disconnected"
+                  style={{ flexBasis: "100%", color: "var(--nl-warn)" }}
+                >
+                  ⚠ Getrennt: {roomSync.disconnectedNames.join(", ")}
+                  {roomSync.coopGate.canSkipDisconnected ? " — hält das Bereit-Tor auf." : "."}
+                </span>
+              ) : null}
+              {/* Der Notausgang steht bewusst NEBEN dem Hinweis und nicht am ▶-Knopf: den ▶ drueckt
+                  man nebenbei, diesen hier soll man bewusst waehlen. Er nennt die Namen, damit dem
+                  Host klar ist, wen er gerade uebergeht. */}
+              {roomSync.coopGate.canSkipDisconnected && roomSync.coopGate.onSkipDisconnected ? (
+                <button
+                  type="button"
+                  className="nl-arena-coop-skip"
+                  data-testid="arena-coop-skip-disconnected"
+                  onClick={roomSync.coopGate.onSkipDisconnected}
+                  style={{ flexBasis: "100%", fontSize: 12, fontWeight: 700 }}
+                >
+                  {(roomSync.coopGate.disconnectedBlockerNames ?? roomSync.disconnectedNames ?? []).join(", ")} ist
+                  offline und nicht bereit — trotzdem fortfahren
+                </button>
+              ) : null}
             </div>
           ) : null}
-          <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy || Boolean(roomSync?.active && !roomSync.canControl) || Boolean(roomSync?.coopGate.active)} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
-            {done
-              ? "✔ Disziplin gewertet"
-              : !started
-                ? /* B2: „Start" war eine Einladung zu etwas, das schon gelaufen ist. */
-                  alreadyScored
-                  ? `▶ Nachspielen · Etappe 1 / ${slotCount}`
-                  : `▶ Start · Etappe 1 / ${slotCount}`
-                : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
-          </button>
+          {(() => {
+            // Audit-Punkt 3: der ▶-Knopf war zwar `disabled`, sah beim Gast aber weiter voll
+            // klickbar aus (Akzentfarbe + Zeigefinger-Cursor) — die Nachbarknöpfe (Quick-Sim,
+            // Reset) machten das schon richtig. Zusätzlich: Beschriftung sagt jetzt selbst, WARUM
+            // er nicht reagiert, statt einfach nichts zu tun.
+            const roomBlocksControl = Boolean(roomSync?.active && !roomSync.canControl);
+            const primaryDisabled = done || busy || roomBlocksControl || Boolean(roomSync?.coopGate.active);
+            return (
+              <button
+                type="button"
+                data-testid="arena-primary-step"
+                onClick={() => { setStarted(true); advance(); }}
+                disabled={primaryDisabled}
+                style={{
+                  padding: "9px 18px",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  border: 0,
+                  borderRadius: 10,
+                  cursor: done || busy ? "default" : roomBlocksControl ? "default" : "pointer",
+                  color: "var(--nl-ink)",
+                  background: done ? "var(--nl-line)" : "var(--nl-accent)",
+                  opacity: busy && !done ? 0.7 : roomBlocksControl ? 0.5 : 1,
+                }}
+              >
+                {done
+                  ? "✔ Disziplin gewertet"
+                  : roomBlocksControl
+                    ? "▶ Der Host steuert"
+                    : !started
+                      ? /* B2: „Start" war eine Einladung zu etwas, das schon gelaufen ist. Der
+                           Zweig steht NACH `roomBlocksControl`, weil „wer darf" die dringendere
+                           Auskunft ist als „was passiert dann". */
+                        alreadyScored
+                        ? `▶ Nachspielen · Etappe 1 / ${slotCount}`
+                        : `▶ Start · Etappe 1 / ${slotCount}`
+                      : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+              </button>
+            );
+          })()}
           <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
@@ -3487,7 +3791,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             aria-label="Lautstärke"
             style={{ width: 90, accentColor: "var(--nl-accent)", cursor: "pointer" }}
           />
-          {paused ? <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>⏸ Pausiert · Leertaste</span> : null}
+          {/* Audit-Punkt 6: der Chip behauptete dem Gast "· Leertaste", obwohl seine Leertaste
+              nichts bewirkt — er spiegelt immer nur `roomSync.hostPaused` (siehe Effekt oben, der
+              JEDEN lokalen Tastendruck des Gasts sofort wieder ueberschreibt). */}
+          {paused ? (
+            <span style={{ padding: "4px 10px", borderRadius: 999, fontWeight: 800, fontSize: 12, background: "var(--nl-warn)", color: "var(--nl-ink)" }}>
+              {roomSync?.followsHost ? "⏸ Host hat pausiert" : "⏸ Pausiert · Leertaste"}
+            </span>
+          ) : null}
           {/* Feld-Legende nur noch als dezentes ⓘ-Hover (früher permanente „Manual"-Zeile je
               Disziplin) — die Felder labeln sich inzwischen selbst (START/ZIEL/Netz/Elo…). */}
           <span
@@ -4287,7 +4598,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               <>
                 <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
                 {t.rel && !t.isOwn ? (
-                  <span title={t.rel === "ally" ? "Verbündet" : t.rel === "rival" ? "Rivale" : "Dein Team"} aria-hidden style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}>{REL_GLYPH[t.rel]}</span>
+                  <span
+                    title={
+                      t.rel === "ally"
+                        ? "Verbündet"
+                        : t.rel === "rival"
+                          ? "Rivale"
+                          : t.rel === "human"
+                            ? "Mitspieler"
+                            : "Dein Team"
+                    }
+                    aria-hidden
+                    style={{ fontSize: 11, flex: "none", color: rc ?? undefined }}
+                  >
+                    {REL_GLYPH[t.rel]}
+                  </span>
                 ) : null}
                 <span style={{ flex: 1, fontSize: 11.5, color: "var(--nl-mut)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
               </>

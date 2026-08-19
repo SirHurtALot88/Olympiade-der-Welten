@@ -1,4 +1,5 @@
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
+import { findPersistedRoomBySaveId } from "@/lib/room/room-persistence";
 
 /**
  * HARTER Schreib-Stopp fuer Admin-/KI-/Simulationswerkzeuge auf einem raumgebundenen Save.
@@ -48,21 +49,39 @@ export type SaveNotRoomBoundResult =
     };
 
 /**
- * Prueft, ob `saveId` an einen aktiven Koop-Raum gebunden ist, und lehnt in diesem Fall hart ab.
+ * Prueft, ob `saveId` an einen Koop-Raum gebunden ist, und lehnt in diesem Fall hart ab.
  *
  * Aufrufer stellen sicher, dass diese Pruefung VOR jedem tatsaechlichen Schreibvorgang laeuft —
  * Preview-/Dry-Run-Zweige, die nie persistieren, muessen sie nicht aufrufen (siehe Kommentare an
  * den jeweiligen Routen fuer den genauen Aufrufpunkt).
+ *
+ * ZWEI QUELLEN, ABSICHTLICH: erst die In-Memory-Map (`getActiveRoomBySaveId`, der schnelle,
+ * uebliche Fall), UND — wenn die nichts findet — zusaetzlich die persistierte Ablage
+ * (`findPersistedRoomBySaveId`, room-persistence.ts). Stufe 0.2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md,
+ * Befund B1): „Raum nicht auffindbar" (Map kurzzeitig leer, z. B. direkt nach einem Neustart vor
+ * dem Rehydrieren) ist NICHT dasselbe wie „Save war nie an einen Raum gebunden" — nur die zweite
+ * Quelle unterscheidet die beiden Faelle zuverlaessig. Ohne sie waere diese Funktion an genau der
+ * Stelle blind, an der sie am meisten gebraucht wird.
  */
 export function assertSaveNotRoomBound(saveId: string, werkzeug: string): SaveNotRoomBoundResult {
   const activeRoom = getActiveRoomBySaveId(saveId);
-  if (!activeRoom) {
+  if (activeRoom) {
+    return {
+      blocked: true,
+      status: 409,
+      reason: `admin_write_blocked_room_bound_save:${werkzeug}`,
+      roomCode: activeRoom.roomCode,
+    };
+  }
+
+  const persistedRoom = findPersistedRoomBySaveId(saveId);
+  if (!persistedRoom) {
     return { blocked: false };
   }
   return {
     blocked: true,
     status: 409,
     reason: `admin_write_blocked_room_bound_save:${werkzeug}`,
-    roomCode: activeRoom.roomCode,
+    roomCode: persistedRoom.roomCode,
   };
 }

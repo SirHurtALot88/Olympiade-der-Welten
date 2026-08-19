@@ -29,7 +29,19 @@ export type RoomFlowView =
  * `describeRoomFlowButton` setzt es explizit in jedem Rueckgabe-Zweig, Aufrufer schalten nur
  * noch darauf.
  */
-export type RoomFlowButtonAction = "set_ready" | "run_ai_auto_step" | "start_room" | "advance_flow" | "none";
+export type RoomFlowButtonAction =
+  | "set_ready"
+  | "run_ai_auto_step"
+  | "start_room"
+  | "advance_flow"
+  /**
+   * Der benannte Notausgang: weiterschalten und dabei getrennte, nicht bereite Mitspieler
+   * ausdruecklich uebergehen. EIGENE Aktion und nicht ein Zusatzhaken an `advance_flow`, damit
+   * niemand sie versehentlich ausloest — und damit die Leiste sie als eigenen Knopf zeigen kann,
+   * der die Namen nennt. Der Server prueft nach, dass wirklich nur Getrennte uebergangen werden.
+   */
+  | "advance_flow_skipping_disconnected"
+  | "none";
 
 /**
  * `RoomFlowView` (Room-Flow-Domäne) und `FoundationViewId` (Shell-Routing) sind zwei
@@ -82,7 +94,14 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   { stepId: "arena", label: "Arena starten", cta: "Arena starten", targetView: "matchdayArena", aiAutoStep: false },
   { stepId: "result", label: "Spieltagsergebnis ansehen", cta: "Spieltagsergebnis ansehen", targetView: "matchdayArena", aiAutoStep: false },
   { stepId: "standings", label: "Saisonstand ansehen", cta: "Saisonstand ansehen", targetView: "season", aiAutoStep: false },
-  { stepId: "season_review", label: "Season Review", cta: "Season Review", targetView: "cockpit", aiAutoStep: false },
+  { stepId: "season_review", label: "Season Review", cta: "Weiter: Saisonwechsel", targetView: "cockpit", aiAutoStep: false },
+  // Ready-Gate + Wegweiser fuer den Saisonwechsel (Paket A,
+  // docs/MULTIPLAYER_SAISONWECHSEL_PLAN.md E1) -- KEIN zweiter Assistent. Die neun Stationen der
+  // Saisonende-Kette (SEASON_TRANSITION_STEPS, lib/season/season-transition-steps.ts) und der
+  // Pre-Season-Workflow (preseason-workflow-service.ts) laufen unveraendert im Cockpit; dieser
+  // Schritt haelt den Raum nur davor an, bis alle bereit sind (aiAutoStep: false -> dasselbe
+  // canHostAdvance-Gate wie jeder Spieltag-Schritt, E3), und zeigt per targetView dorthin.
+  { stepId: "season_transition", label: "Saisonwechsel", cta: "Neue Saison im Cockpit starten", targetView: "cockpit", aiAutoStep: false },
 ];
 
 export type RoomFlowButtonModel = {
@@ -124,6 +143,22 @@ export const ROOM_FLOW_MATCHDAY_CYCLE_START = "lineup" satisfies RoomFlowStepId;
 export const ROOM_FLOW_MATCHDAY_CYCLE_END = "standings" satisfies RoomFlowStepId;
 
 /**
+ * Wohin der Rueckweg aus `season_transition` fuehrt, sobald die neue Saison begonnen hat (E4).
+ *
+ * GEMESSEN, nicht geraten: `startRoom` (room-store.ts:1284, bestaetigt durch
+ * scripts/smoke-multiplayer-e2e.ts:865) setzt beim allerersten Raumstart `currentStep:
+ * "training"` -- NICHT den ersten Listeneintrag `sell_players`. Der Grund liegt in den
+ * Phasen-Gates: `isTransferSellPhaseOpen` (lib/market/transfer-window-policy.ts:68-74) verlangt
+ * `season_end_management`/`transfer_sell_phase` und schliesst `isEarlySeasonTransferSetup`
+ * ausdruecklich aus ("KEIN isEarlySeasonTransferSetup: der Saisonstart ist die Kaufphase") --
+ * `sell_players` waere also am Beginn einer neuen Saison sofort mit 409 blockiert. `buy_players`
+ * und `facilities` waeren technisch offen (`isEarlySeasonTransferSetup` deckt beide), aber
+ * `startRoom` haelt genau EINEN Einstiegspunkt fuer "eine Saison beginnt im Raum" fest, und der
+ * Rueckweg soll denselben treffen -- sonst gaebe es zwei Antworten auf dieselbe Frage.
+ */
+export const ROOM_FLOW_SEASON_TRANSITION_TARGET = "training" satisfies RoomFlowStepId;
+
+/**
  * Steht in dieser Saison noch ein Spieltag aus?
  *
  * Bewusst KEINE eigene Spieltagsrechnung (`currentMatchday < totalMatchdays`), sondern
@@ -140,14 +175,32 @@ export function roomFlowSeasonContinues(gameState: GameState): boolean {
 /**
  * Der naechste Schritt im Room-Flow.
  *
- * `seasonContinues` ist optional, weil die Kette ausserhalb des Zyklus-Endes gar nicht davon
- * abhaengt. FEHLT es am Zyklus-Ende, bleibt es beim alten linearen Verhalten (Sackgasse im
- * Season Review) — das ist der sichere Rueckfall fuer einen Aufrufer, der den Spielstand
- * nicht aufloesen kann, und ausdruecklich nicht die Normalannahme.
+ * Zwei Verzweigungen haengen vom Spielstand ab, nicht von der Listenposition:
+ *
+ * 1. Am Zyklus-Ende (`standings`): `seasonContinues` entscheidet zwischen einem weiteren
+ *    Spieltag und dem Season Review.
+ * 2. Am Saisonwechsel-Gate (`season_transition`): `seasonHasAdvanced` entscheidet, ob die neue
+ *    Saison im Spielstand schon begonnen hat. Ist das nicht der Fall (oder unbekannt), bleibt
+ *    der Raum stehen — "kein Vorspulen auf Verdacht" (Plan, Paket A, Eigenschaft 2). `season_review`
+ *    selbst haengt an KEINER Bedingung: von dort geht es immer weiter zum Saisonwechsel-Gate.
+ *
+ * Beide Felder sind optional, weil ein Aufrufer den Spielstand nicht immer aufloesen kann. FEHLT
+ * das jeweils gebrauchte Feld, bleibt es beim sicheren Rueckfall: am Zyklus-Ende die alte
+ * Sackgasse im Season Review, am Saisonwechsel-Gate das Stehenbleiben dort — in beiden Faellen
+ * lieber nichts geraten als eine falsche Richtung eingeschlagen.
  */
-export function getNextRoomFlowStepId(stepId: string, input?: { seasonContinues: boolean }): RoomFlowStepId {
+export function getNextRoomFlowStepId(
+  stepId: string,
+  input?: { seasonContinues?: boolean; seasonHasAdvanced?: boolean },
+): RoomFlowStepId {
   if (stepId === ROOM_FLOW_MATCHDAY_CYCLE_END) {
     return input?.seasonContinues ? ROOM_FLOW_MATCHDAY_CYCLE_START : "season_review";
+  }
+  if (stepId === "season_review") {
+    return "season_transition";
+  }
+  if (stepId === "season_transition") {
+    return input?.seasonHasAdvanced ? ROOM_FLOW_SEASON_TRANSITION_TARGET : "season_transition";
   }
   const index = ROOM_FLOW_STEPS.findIndex((entry) => entry.stepId === stepId);
   return ROOM_FLOW_STEPS[Math.min(index + 1, ROOM_FLOW_STEPS.length - 1)]?.stepId ?? "season_review";
@@ -157,14 +210,48 @@ export function isSandboxRoomSave(saveId: string) {
   return /sandbox|test|local/i.test(saveId);
 }
 
+/**
+ * WER GETRENNT IST, FAELLT NICHT AUS DER PFLICHT — Entscheidung von Chris (18.08.), fuer den
+ * ganzen Ablauf, nicht nur die Arena: "host kann nur weiter klicken ... wenn frankys teams auch
+ * alle ready sind".
+ *
+ * Hier stand vorher `connectionStatus !== "offline"` im ersten Filter. Damit schrumpfte der Kreis
+ * der Bereit-pflichtigen in dem Moment auf einen, in dem der Mitspieler rausflog — der Host konnte
+ * ab da allein durch jeden Schritt schalten, und der Gast fand sich nach dem Rejoin mehrere
+ * Stationen weiter wieder, ohne je gefragt worden zu sein. Nachgemessen vom Koop-Audit (D2).
+ *
+ * WER BEREIT WAR, BLEIBT BEREIT: `markDisconnected` fasst `readyState` nicht an. Ein Mitspieler,
+ * der seine Teams abgegeben hat und dann die Verbindung verliert, haelt niemanden auf. Nur "nicht
+ * bereit UND offline" blockiert — und dafuer gibt es den benannten Notausgang in
+ * `advanceRoomFlow`, der serverseitig prueft, dass wirklich niemand Anwesendes uebergangen wird.
+ */
 function getRequiredParticipants(participants: RoomParticipant[], ownership: TeamOwnershipRecord[]) {
   const participantIdsWithTeams = new Set(
     ownership.filter((entry) => entry.controllerType === "human" && entry.participantId).map((entry) => entry.participantId!),
   );
   return participants
-    .filter((participant) => participant.role !== "spectator" && participant.connectionStatus !== "offline")
+    .filter((participant) => participant.role !== "spectator")
     .filter((participant) => participantIdsWithTeams.has(participant.participantId))
     .map((participant) => participant.participantId);
+}
+
+/**
+ * Bereit-pflichtig, nicht bereit, und nicht mehr da.
+ *
+ * Dieselbe Rolle wie `getRoomArenaOfflineBlockerIds` fuer die Arena: genau diese Menge darf der
+ * Notausgang uebergehen, und die Oberflaeche nennt ihre Namen. Eine Quelle fuer beides, damit der
+ * Knopf nie mehr verspricht, als der Server durchlaesst.
+ */
+export function getRoomFlowOfflineBlockerIds(
+  participants: RoomParticipant[],
+  requiredParticipantIds: string[],
+  completedParticipantIds: string[],
+): string[] {
+  const fertig = new Set(completedParticipantIds);
+  const offline = new Set(
+    participants.filter((participant) => participant.connectionStatus === "offline").map((p) => p.participantId),
+  );
+  return requiredParticipantIds.filter((participantId) => !fertig.has(participantId) && offline.has(participantId));
 }
 
 export function buildRoomFlowState(input: {
@@ -196,6 +283,11 @@ export function buildRoomFlowState(input: {
       : uniq(input.aiAutoCompletedTeamIds ?? []).filter((teamId) => aiTeamIds.includes(teamId));
   const aiPendingTeamIds = aiTeamIds.filter((teamId) => !aiAutoCompletedTeamIds.includes(teamId));
   const humanReady = requiredParticipantIds.length > 0 && requiredParticipantIds.every((participantId) => completedParticipantIds.includes(participantId));
+  const offlineBlockingParticipantIds = getRoomFlowOfflineBlockerIds(
+    input.state.roomParticipants,
+    requiredParticipantIds,
+    completedParticipantIds,
+  );
   const aiReady = !stepDefinition.aiAutoStep || aiPendingTeamIds.length === 0;
 
   return {
@@ -209,10 +301,15 @@ export function buildRoomFlowState(input: {
     completedParticipantIds,
     blockingTeamIds,
     aiAutoCompletedTeamIds,
+    offlineBlockingParticipantIds,
     canHostAdvance: humanReady && aiReady,
     seasonContinues: input.seasonContinues ?? null,
     warnings: [
       ...(!humanReady ? ["waiting_for_human_ready"] : []),
+      // Eigener Code neben `waiting_for_human_ready`: nur DIESE Lage laesst sich vom Host aufloesen
+      // (Notausgang). "Warten auf jemanden, der da ist" und "warten auf jemanden, der weg ist"
+      // sehen sonst gleich aus und brauchen doch verschiedene Knoepfe.
+      ...(offlineBlockingParticipantIds.length > 0 ? ["waiting_for_offline_human"] : []),
       ...(stepDefinition.aiAutoStep && aiPendingTeamIds.length > 0 ? ["ai_auto_step_pending"] : []),
       ...(isSandboxRoomSave(input.state.multiplayerRoom.saveId) ? ["sandbox_override_available"] : []),
     ],

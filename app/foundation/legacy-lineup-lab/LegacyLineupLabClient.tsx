@@ -4,6 +4,17 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
+// Befund F9 (Aufgabe #44): hier landete `payload.error` bis eben ROH in der Anzeige — der
+// Spieler las woertlich `participant_offline`, `host_only_action`, `forbidden_team_control`.
+// `formatRoomWriteErrorCode` uebersetzt bekannte Codes und reicht bereits lesbare Texte
+// unveraendert durch; dieselbe Quelle, die auch Transfermarkt und Foundation-Huelle benutzen.
+//
+// AUSNAHMSLOS jede Meldung dieses Moduls laeuft jetzt darueber, auch die der Vorschau-Routen, die
+// heute gar keinen Guard-Code liefern koennen. Das ist Absicht: die Tabelle ist fuer alles, was
+// sie nicht kennt, ein Durchreicher — es kostet also nichts. Eine gepflegte Liste "welche Route
+// ist geschuetzt" waere dagegen genau die Sorte zweite Quelle, die still veraltet, sobald eine
+// Route den Guard bekommt. So gilt schlicht: hier erreicht kein roher Code die Anzeige.
+import { formatRoomWriteErrorCode } from "@/lib/room/parse-room-write-context";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
 
@@ -13,8 +24,12 @@ import type { DisciplineCategory, FormCardPlanRecord, GameState, LineupDraftModi
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
+  withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
+import { fasseSammelAbgabeZusammen, type SammelAbgabeAntwort } from "@/lib/lineups/sammel-aufstellung-abgabe";
+import { erzeugeEntwurfGedaechtnis } from "@/lib/lineups/entwurf-gedaechtnis";
+import { istEigenerEntwurf, mischeSammelAbgabe } from "@/lib/lineups/sammel-abgabe-mischung";
 import { getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
@@ -64,6 +79,8 @@ import {
   type AiBatchPreviewResponse,
 } from "@/lib/ai/ai-legacy-lineup-batch-types";
 import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
+import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
+import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -152,6 +169,9 @@ type LabOptions = {
     name: string;
     activePlayers: number;
     controlMode?: "manual" | "ai" | "passive";
+    // Stufe 2.2 (Befund B5): fuer die Sammel-Ansicht "meine Teams" — trennt "meine" von "des
+    // Mitspielers" Teams. `undefined`/`null` = unbekannt (Prisma-Referenzansicht).
+    ownerId?: string | null;
     aiLineupApplyEnabled?: boolean;
     lineupFilledCount?: number;
     totalLineupSides?: number;
@@ -1034,6 +1054,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [captains, setCaptains] = useState<Record<"d1" | "d2", string>>({ d1: "", d2: "" });
   const [modifiers, setModifiers] = useState<LineupDraftModifiers>(() => createEmptyLineupModifiers());
   const [isBusy, setIsBusy] = useState(false);
+  // Eigener Riegel statt `isBusy` (F14/#43): die Sammel-Abgabe laeuft ueber MEHRERE Teams und darf
+  // die Bedienung des gerade geoeffneten Teams nicht mitsperren.
+  const [sammelAbgabeBusy, setSammelAbgabeBusy] = useState(false);
   const loadContextRequestKeyRef = useRef<string>("");
   const loadContextAbortRef = useRef<AbortController | null>(null);
   const previewRequestKeyRef = useRef<string>("");
@@ -1137,6 +1160,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const lastAutoPreviewKeyRef = useRef("");
   const lastAiInsightKeyRef = useRef("");
   const skipNextAutoPersistRef = useRef(false);
+  // Haelt den Entwurf jedes verlassenen Teams, damit der Teamwechsel ihn nicht mehr wegwirft
+  // (siehe `lib/lineups/entwurf-gedaechtnis.ts`). Ref und nicht State — daran haengt keine
+  // Zeichnung, und ein Neuaufbau der Ansicht darf ihn verwerfen.
+  const entwurfGedaechtnisRef = useRef(erzeugeEntwurfGedaechtnis());
   const recentlyAssignedSlotTimeoutRef = useRef<number | null>(null);
   const lastMissingFocusRequestKeyRef = useRef<string | null>(null);
 
@@ -1619,6 +1646,82 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   );
   const selectedTeamIsReady = Boolean(selectedTeamOption?.currentMatchdayReady);
   const selectedMatchdayIsReady = Boolean(selectedMatchdayOption?.isReady);
+  // Stufe 2.2 (Befund B5): "Meine Teams · Spieltag X · fertig/offen" — Datenquelle bleibt
+  // `evaluateMatchdayHumanReadiness` (via `buildMyTeamsMatchdayReadiness`), hier nur auf die
+  // bereits geladenen `options.teams` angewandt statt neu zu rechnen.
+  const myTeamsMatchdayReadiness = useMemo(
+    () =>
+      buildMyTeamsMatchdayReadiness({
+        teams: options.teams.map((team) => ({
+          id: team.id,
+          name: team.name,
+          ownerId: team.ownerId ?? null,
+          controlMode: team.controlMode ?? "manual",
+          currentMatchdayReady: Boolean(team.currentMatchdayReady),
+        })),
+        activeOwnerId: props.activeOwnerId ?? null,
+        matchdayId: params.matchdayId,
+        matchdayLabel: selectedMatchdayOption?.label ?? params.matchdayId,
+      }),
+    [options.teams, props.activeOwnerId, params.matchdayId, selectedMatchdayOption?.label],
+  );
+  /**
+   * EIN WEG FUER DEN TEAMWECHSEL — vorher gab es drei, und zwei davon machten die Arbeit doppelt.
+   *
+   * Eingebettet fuehrt die Schale das aktive Team. Sie meldet es ueber `defaultTeamId` zurueck,
+   * worauf der Effekt weiter unten laedt. Wer hier ZUSAETZLICH `loadContext` ruft, laesst dieselbe
+   * Ladung zweimal anlaufen — und uebergeht, dass die Schale einen Wechsel ablehnen darf
+   * (`setActiveManagerTeam` weist ein Team ab, das es im Spielstand nicht gibt, und schreibt eine
+   * Warnung): geladen worden waere es hier trotzdem.
+   *
+   * Ohne Schale (die eigenstaendige Seite `/foundation/legacy-lineup-lab`) gibt es niemanden, der
+   * es zurueckmeldet — dort laedt dieser Weg selbst.
+   */
+  const wechsleTeam = useCallback(
+    (nextTeamId: string) => {
+      if (!nextTeamId || nextTeamId === params.teamId) {
+        return;
+      }
+      if (props.embedded && props.onTeamChange) {
+        props.onTeamChange(nextTeamId);
+        return;
+      }
+      void loadContext({ teamId: nextTeamId }, source);
+    },
+    [loadContext, params.teamId, props, source],
+  );
+  const jumpToMyTeam = wechsleTeam;
+  /**
+   * WELCHE OFFENEN TEAMS EINEN EIGENEN ENTWURF HABEN — und was der Knopf deshalb sagt.
+   *
+   * Zwei Quellen, mehr gibt es nicht: das gerade geoeffnete Team (dessen Entwurf steht live in
+   * `entries`) und die Teams im Gedaechtnis (dort liegt er seit dem Wegwechseln). Ein Team, das
+   * noch nie offen war, hat keinen — fuer das bleibt es beim KI-Vorschlag.
+   */
+  const eigeneEntwuerfeFuerOffeneTeams = useMemo(() => {
+    const nachTeam = new Map<string, LegacyLineupEntryInput[]>();
+    for (const team of myTeamsMatchdayReadiness.pendingTeams) {
+      const eintraege =
+        team.id === params.teamId
+          ? entries
+          : entwurfGedaechtnisRef.current.holeEintraege({ ...params, teamId: team.id, source });
+      if (eintraege && istEigenerEntwurf(eintraege)) {
+        nachTeam.set(team.id, [...eintraege]);
+      }
+    }
+    return nachTeam;
+    // `entwurfGedaechtnisRef` ist ein Ref und taugt nicht als Abhaengigkeit; es aendert sich
+    // ausschliesslich in `loadContext` und beim Schreiben, und beides zieht ohnehin einen neuen
+    // Durchlauf nach sich (Zustand aendert sich dabei immer).
+  }, [entries, myTeamsMatchdayReadiness.pendingTeams, params, source]);
+  const sammelAbgabeMischung = useMemo(
+    () =>
+      mischeSammelAbgabe({
+        offeneTeamIds: myTeamsMatchdayReadiness.pendingTeams.map((team) => team.id),
+        hatEigenenEntwurf: (teamId) => eigeneEntwuerfeFuerOffeneTeams.has(teamId),
+      }),
+    [eigeneEntwuerfeFuerOffeneTeams, myTeamsMatchdayReadiness.pendingTeams],
+  );
   const missingSeasonFormCards = Boolean(context && (context.formCards?.length ?? 0) === 0);
   const focusV2FormMiniChipsBySide = useMemo(() => {
     const buildSide = (disciplineSide: "d1" | "d2") => {
@@ -3426,6 +3529,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const effectiveSource = nextSource ?? source;
     const shouldResetTransient = options?.resetTransient ?? true;
     const nextParams = { ...params, ...overrides };
+    // Der Entwurf des Teams, das gerade verlassen wird, bleibt im Gedaechtnis. Wann NICHT gemerkt
+    // wird (gleicher Ort, kein Entwurf), entscheidet das Gedaechtnis selbst — dort steht der Grund.
+    entwurfGedaechtnisRef.current.merkeBeimVerlassen({
+      von: { ...params, source },
+      nach: { ...nextParams, source: effectiveSource },
+      entwurf: context ? { selections, captains, modifiers, teamIntensity } : null,
+      entries,
+    });
     const query = new URLSearchParams(
       Object.entries(nextParams).filter(([, value]) => Boolean(value)) as Array<[string, string]>,
     );
@@ -3457,7 +3568,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (!response.ok || payload.error) {
-        setErrors([payload.error ?? "Lineup-Kontext konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "Lineup-Kontext konnte nicht geladen werden."]);
         return;
       }
 
@@ -3476,6 +3587,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         setAiBatchSummary(null);
         setIsPreviewPanelOpen(false);
         setIsAiPreviewPanelOpen(false);
+        /**
+         * DIESE VIER HING FRUEHER DER NEUAUFBAU AB.
+         *
+         * Solange die Schale die Ansicht beim Teamwechsel neu aufbaute, war jeder angefasste Slot,
+         * jede offene Formkarten-Zelle und jede Hervorhebung danach automatisch weg. Ohne den
+         * Neuaufbau muessen sie hier fallen: sie zeigen auf den Kader und die Formkarten des
+         * ALTEN Teams, und eine offene Auswahl-Zelle wuerde ihren naechsten Klick auf das neue
+         * Team schreiben.
+         */
+        setActiveSlotKey(null);
+        setRecentlyAssignedSlotKey(null);
+        setActiveMissingHighlightKey(null);
+        setActiveFormPickCell(null);
       }
       /**
        * GEMELDET VON CHRIS: die Einsatzliste laedt „einfach minutenlang".
@@ -3501,10 +3625,27 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           nextCaptains[entry.disciplineSide] = entry.activePlayerId;
         }
       }
-      setSelections(nextSelections);
-      setTeamIntensity("normal");
-      setCaptains(nextCaptains);
-      setModifiers(applyPlannedFormCardsToModifiers(payload.context, normalizeLineupModifiers(payload.context?.existingDraft?.modifiers)));
+      /**
+       * Ein gemerkter Entwurf gewinnt — zu Team B und zurueck, Auswahl steht wieder da. Ohne
+       * gemerkten Entwurf gewinnt der gespeicherte Draft vom Server; beim ERSTEN Oeffnen ist das
+       * immer der Fall, und nach jedem Schreibvorgang wieder (siehe `vergiss`/`vergissAlles`).
+       */
+      const gewaehlt = entwurfGedaechtnisRef.current.waehleBeimLaden(
+        { ...payload.params, source: payload.source },
+        {
+          selections: nextSelections,
+          captains: nextCaptains,
+          modifiers: applyPlannedFormCardsToModifiers(
+            payload.context,
+            normalizeLineupModifiers(payload.context?.existingDraft?.modifiers),
+          ),
+          teamIntensity: "normal",
+        },
+      );
+      setSelections(gewaehlt.entwurf.selections);
+      setTeamIntensity(gewaehlt.entwurf.teamIntensity);
+      setCaptains(gewaehlt.entwurf.captains);
+      setModifiers(gewaehlt.entwurf.modifiers);
       setLineupUndoSnapshot(null);
       setHoveredCandidate(null);
     } catch (error) {
@@ -3709,7 +3850,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       };
 
       if (!response.ok || !payload.summary) {
-        setErrors(payload.errors ?? [payload.error ?? "Formkarten konnten nicht erzeugt werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Formkarten konnten nicht erzeugt werden."]);
         setWarnings(payload.warnings ?? []);
         return;
       }
@@ -3834,12 +3975,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }
 
       if (!response.ok) {
-        setErrors(payload.errors ?? [payload.error ?? "Draft konnte nicht gespeichert werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Draft konnte nicht gespeichert werden."]);
         setWarnings(payload.warnings ?? []);
         return false;
       }
 
       setDraft(payload.draft ?? null);
+      // Geschrieben heisst: fuer dieses Team hat der Server jetzt die Wahrheit. Ein gemerkter
+      // Entwurf duerfte sie beim naechsten Hinwechseln nicht mehr ueberdecken.
+      entwurfGedaechtnisRef.current.vergiss({ ...params, source });
       setWarnings(payload.warnings ?? []);
       if (!options?.silent) {
         setMessage(buildLineupSaveFeedback(entriesToSave, successMessage));
@@ -3866,6 +4010,230 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return false;
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  /**
+   * SAMMEL-ABGABE FUER MEINE OFFENEN TEAMS (Befund F14, Aufgabe #43).
+   *
+   * DER BEFUND WAR NICHT "es fehlt eine Route": `PUT /api/lineups/legacy/batch` ist seit Stufe 2.1
+   * gebaut, geprueft und gemessen — sie hatte nur nie einen menschlichen Aufrufer. Wer vier Teams
+   * fuehrt, ging bis eben viermal denselben Weg: Team umschalten, Vorschlag holen, speichern,
+   * Sperr-Dialog bestaetigen. Hier ist es EIN Aufruf und EIN Dialog fuer alle offenen Teams.
+   *
+   * WAS ABGEGEBEN WIRD, STEHT IM KNOPF — und seit Paket 2 ist das nicht mehr zwingend der
+   * KI-Vorschlag: wo ein EIGENER Entwurf vorliegt, geht der eigene Entwurf. Der Vorschlag kommt nur
+   * noch fuer Teams, fuer die es keinen gibt.
+   *
+   * Der frueher hier stehende Satz „einen Entwurf hat ein noch nie geoeffnetes Team ja nicht" war
+   * richtig, solange ein Teamwechsel den Entwurf wegwarf — es gab schlicht keine eigenen Entwuerfe
+   * abzugeben. Seit sie den Wechsel ueberleben (Paket 1) gibt es sie, und dann waere der Vorschlag
+   * die falsche Wahl: er wuerde eigene Arbeit ueberschreiben. Die Regel und die Beschriftung stehen
+   * in `lib/lineups/sammel-abgabe-mischung.ts`.
+   *
+   * BEREITS FERTIGE TEAMS BLEIBEN UNANGETASTET. Nur `pendingTeams` gehen mit — sonst schriebe ein
+   * Klick eine sorgfaeltig gesetzte Aufstellung mit einem KI-Vorschlag zu.
+   */
+  async function gibOffeneAufstellungenSammelAb() {
+    const offeneTeams = myTeamsMatchdayReadiness.pendingTeams;
+    const nameFuerTeam = (teamId: string) => options.teams.find((team) => team.id === teamId)?.name ?? null;
+
+    if (offeneTeams.length === 0) {
+      const leer = fasseSammelAbgabeZusammen({ angefragteTeamIds: [], antwort: null, nameFuerTeam });
+      setMessage(leer.satz);
+      return;
+    }
+
+    setSammelAbgabeBusy(true);
+    setErrors([]);
+    setWarnings([]);
+    setMessage("");
+
+    try {
+      const angefragteTeamIds = offeneTeams.map((team) => team.id);
+      const stapel: Array<{ teamId: string; entries: LegacyLineupEntryInput[] }> = [];
+      const ohneVorschlag: string[] = [];
+
+      for (const teamId of angefragteTeamIds) {
+        // ZUERST DER EIGENE ENTWURF. Kein Netzweg, keine Rueckfrage — was der Mensch gesetzt hat,
+        // geht so ab, wie er es gesetzt hat. Auch ein unvollstaendiger: ihn heimlich gegen einen
+        // KI-Vorschlag zu tauschen waere das Schlechtere (siehe `sammel-abgabe-mischung.ts`).
+        const eigeneEintraege = eigeneEntwuerfeFuerOffeneTeams.get(teamId);
+        if (eigeneEintraege) {
+          stapel.push({ teamId, entries: eigeneEintraege });
+          continue;
+        }
+        const vorschlagQuery = new URLSearchParams({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId,
+          source,
+        });
+        const vorschlagResponse = await fetch(`/api/lineups/legacy/ai-preview?${vorschlagQuery.toString()}`, {
+          cache: "no-store",
+        });
+        const vorschlag = (await vorschlagResponse.json().catch(() => ({}))) as AiPreviewResponse & { error?: string };
+        const entries = vorschlag.preview?.entries ?? [];
+        if (!vorschlagResponse.ok || entries.length === 0) {
+          // Ein Team ohne Vorschlag darf die anderen NICHT aufhalten — das ist derselbe Grundsatz,
+          // nach dem die Sammelroute je Team entscheidet. Es faellt unten in die Zusammenfassung.
+          ohneVorschlag.push(teamId);
+          continue;
+        }
+        stapel.push({ teamId, entries: entries as LegacyLineupEntryInput[] });
+      }
+
+      const alsAbgelehnt = (grund: string) =>
+        ohneVorschlag.map((teamId) => ({ teamId, ok: false, errors: [grund], warnings: [] }));
+
+      if (stapel.length === 0) {
+        const nichts = fasseSammelAbgabeZusammen({
+          angefragteTeamIds,
+          antwort: { results: alsAbgelehnt("Zu diesem Team gab es keinen KI-Vorschlag."), savedCount: 0 },
+          nameFuerTeam,
+        });
+        setErrors([nichts.satz]);
+        return;
+      }
+
+      /**
+       * Der Raum-Kontext geht mit, die EINZELTEAM-Felder aus `withRoomQuery` bewusst NICHT:
+       * `activeManagerTeamId`/`controlMode` beschreiben genau ein Team, und in einem Stapel waere
+       * jede Wahl davon falsch. Die Route prueft ohnehin je Team mit dem ausdruecklich
+       * mitgegebenen `teamId` (siehe `authorizeServerRoomWrite` in der Batch-Route).
+       */
+      const query = new URLSearchParams({
+        saveId: params.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+        source,
+      });
+      if (props.activeOwnerId) {
+        query.set("activeOwnerId", props.activeOwnerId);
+      }
+      appendRoomContextToParams(query, roomContext);
+
+      const sendeStapel = (confirmLock: boolean) =>
+        fetch(`/api/lineups/legacy/batch?${query.toString()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomContextBody({ teams: stapel, confirmLock }, roomContext)),
+        });
+
+      let response = await sendeStapel(false);
+      let payload = (await response.json().catch(() => ({}))) as SammelAbgabeAntwort & {
+        commitments?: Array<{
+          teamId: string;
+          commitment?: { hasFormCards?: boolean; hasCaptain?: boolean; isEmptyCommitment?: boolean };
+        }>;
+      };
+
+      /**
+       * EIN Dialog fuer den ganzen Stapel — genau dafuer traegt die Route den 409-Weg (Stufe 2.5).
+       * Der Einzelweg fragt je Team; hier steht einmal da, WELCHE Teams gleich festgenagelt werden.
+       *
+       * Und WAS dabei eingesetzt wird, Team fuer Team: die Route liefert im 409 pro Team sein
+       * `commitment`, und der Einzelweg zeigt genau das. Ohne diese Zeilen waere der Sammel-Dialog
+       * die schwaechere Rueckfrage — dabei nagelt er mehr fest. Besonders "weder Formkarte noch
+       * Kapitaen" ist fast nie Absicht und danach nicht mehr zu korrigieren; der KI-Vorschlag
+       * setzt Formkarten grundsaetzlich nicht und laesst den Kapitaen manchmal bewusst aus.
+       */
+      if (response.status === 409 && payload.error === "lineup_lock_confirmation_required") {
+        /**
+         * Die Liste kommt aus `commitments`, NICHT aus `stapel`: die Route legt dort genau die
+         * Teams ab, die sie auch schreiben wird — Teams ohne Schreibrecht fallen vorher heraus.
+         * Ueber `stapel` zu gehen haette Teams als "wird festgelegt" angekuendigt, die gleich
+         * abgelehnt werden. Die Differenz wird darunter benannt statt verschwiegen.
+         */
+        const commitments = payload.commitments ?? [];
+        const zeilen = commitments
+          .map((eintrag) => {
+            const einsatz = eintrag.commitment?.isEmptyCommitment
+              ? "WEDER Formkarte NOCH Kapitän"
+              : [
+                  eintrag.commitment?.hasFormCards ? "Formkarte(n)" : "keine Formkarte",
+                  eintrag.commitment?.hasCaptain ? "Kapitän" : "kein Kapitän",
+                ].join(" · ");
+            // WOHER die Aufstellung kommt, gehoert in dieselbe Zeile: seit Paket 2 sind im selben
+            // Stapel eigene Entwuerfe UND KI-Vorschlaege, und der Dialog nagelt beide fest. Ein
+            // pauschales "mit dem KI-Vorschlag" waere fuer die eigenen schlicht gelogen.
+            const herkunft = eigeneEntwuerfeFuerOffeneTeams.has(eintrag.teamId)
+              ? "deine Aufstellung"
+              : "KI-Vorschlag";
+            return `• ${nameFuerTeam(eintrag.teamId) ?? eintrag.teamId} — ${herkunft} — ${einsatz}`;
+          })
+          .join("\n");
+        const uebrig = stapel.length - commitments.length;
+        const bestaetigt =
+          typeof window === "undefined"
+            ? false
+            : window.confirm(
+                `${commitments.length} Aufstellungen abgeben und für diesen Spieltag festlegen?\n\n` +
+                  `${zeilen}\n\n` +
+                  (uebrig > 0 ? `${uebrig} weitere Team(s) dürfen hier nicht schreiben und bleiben offen.\n\n` : "") +
+                  "Danach lassen sich Aufstellung, Kapitän und Formkarten dieser Teams für diesen " +
+                  "Spieltag nicht mehr ändern.",
+              );
+        if (!bestaetigt) {
+          setMessage("");
+          return;
+        }
+        response = await sendeStapel(true);
+        payload = (await response.json().catch(() => ({}))) as typeof payload;
+      }
+
+      const zusammenfassung = fasseSammelAbgabeZusammen({
+        angefragteTeamIds,
+        antwort: {
+          ...payload,
+          results: [...(payload.results ?? []), ...alsAbgelehnt("Zu diesem Team gab es keinen KI-Vorschlag.")],
+        },
+        nameFuerTeam,
+      });
+
+      setWarnings(payload.warnings ?? []);
+      // Ein Teilerfolg ist KEIN Erfolg und kein Fehler: der Satz nennt beide Zahlen, und der Ton
+      // entscheidet nur, wo er landet. Nichts davon darf "gespeichert" melden, wenn ein Team fehlt.
+      if (zusammenfassung.tonfall === "fehler") {
+        setErrors([zusammenfassung.satz]);
+      } else {
+        setMessage(zusammenfassung.satz);
+        if (zusammenfassung.abgelehnt.length > 0) {
+          setErrors([zusammenfassung.satz]);
+        }
+      }
+
+      if (zusammenfassung.gespeicherteTeamIds.length > 0) {
+        // Gleicher Grund wie beim Einzelweg — hier nur fuer jedes geschriebene Team.
+        for (const geschriebenesTeam of zusammenfassung.gespeicherteTeamIds) {
+          entwurfGedaechtnisRef.current.vergiss({ ...params, teamId: geschriebenesTeam, source });
+        }
+        await loadContext(params, source);
+        /**
+         * EINMAL melden, nicht je Team: `onLineupSaved` zieht im Shell einen kompletten Nachladen
+         * des Saisonstands nach sich (`reloadLiveSeasonState`). Vier Meldungen waeren vier
+         * Nachladungen fuer denselben einen Schreibvorgang. Ohne `draft` uebergeben heisst: den
+         * Stand bitte vom Server holen statt lokal zu raten — der Stapel hat mehrere Teams
+         * geaendert, und die Wahrheit darueber steht in der Ablage.
+         */
+        props.onLineupSaved?.({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: zusammenfassung.gespeicherteTeamIds[0]!,
+          // Die Rueckmeldung steht bereits ueber der Einsatzliste und nennt Teilerfolge ehrlich.
+          // Der allgemeine Erfolgs-Hinweis der Huelle wuerde daneben "gespeichert" behaupten.
+          silent: true,
+          draft: null,
+          saveVersion: (payload as { saveVersion?: number | null }).saveVersion ?? null,
+          contentSignature: (payload as { contentSignature?: string | null }).contentSignature ?? null,
+        });
+      }
+    } catch {
+      setErrors(["Die Sammel-Abgabe konnte nicht ausgeführt werden."]);
+    } finally {
+      setSammelAbgabeBusy(false);
     }
   }
 
@@ -4007,7 +4375,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         ? { ...payload.summary, error: payload.error }
         : null;
       if (!response.ok || !nextFeed) {
-        setErrors([payload.error ?? "Die Spieltagswertung konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "Die Spieltagswertung konnte nicht geladen werden."]);
         return;
       }
 
@@ -4066,7 +4434,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	
 	      if (!response.ok || !payload.preview) {
 	        if (!silent) {
-	          setErrors(payload.errors ?? [payload.error ?? "AI-Vorschau konnte nicht geladen werden."]);
+	          setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "AI-Vorschau konnte nicht geladen werden."]);
 	          setWarnings(payload.warnings ?? []);
 	        }
 	        return null;
@@ -4124,7 +4492,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const payload = (await response.json()) as AiBatchPreviewResponse;
 
       if (!response.ok) {
-        setErrors([payload.error ?? "AI-Batch-Vorschau konnte nicht geladen werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "AI-Batch-Vorschau konnte nicht geladen werden."]);
         return;
       }
 
@@ -4146,10 +4514,17 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   async function handleOpenAiBatchDetails(entry: AiBatchPreviewEntry) {
-    setParams((current) => ({
-      ...current,
-      teamId: entry.teamId,
-    }));
+    /**
+     * Frueher stand hier nur `setParams` — das reichte, solange die Schale die Einsatzliste beim
+     * Teamwechsel ohnehin neu aufbaute. Ohne den Neuaufbau wuerde der Kontext danach weiter dem
+     * ALTEN Team gehoeren, waehrend im Team-Feld schon das neue steht. Also wird hier wirklich
+     * geladen — und zwar OHNE die fluechtigen Zustaende zu leeren, sonst raeumt die Ladung genau
+     * die Stapel-Vorschau weg, deren Zeile gerade angeklickt wurde.
+     *
+     * Die Meldung an die Schale kommt DANACH: dann stimmen `defaultTeamId` und `params.teamId`
+     * bereits ueberein und der Effekt laedt nicht ein zweites Mal.
+     */
+    await loadContext({ teamId: entry.teamId }, source, { resetTransient: false });
     props.onTeamChange?.(entry.teamId);
     setWarnings(entry.warnings);
     await handleAiPreviewForTeam(entry.teamId);
@@ -4228,7 +4603,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const payload = (await response.json()) as AiBatchApplyResponse;
 
       if (!response.ok) {
-        setErrors([payload.error ?? "AI-Batch-Apply konnte nicht ausgeführt werden."]);
+        setErrors([formatRoomWriteErrorCode(payload.error) ?? "AI-Batch-Apply konnte nicht ausgeführt werden."]);
         return;
       }
 
@@ -4237,6 +4612,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       if (dryRun) {
         setMessage(`Batch-Test bereit: ${payload.summary.plannedLineups} Auto-Teams würden gespeichert.`);
       } else {
+        // Der Stapel schreibt viele Teams auf einmal und meldet nicht zurueck, welche genau.
+        // Deshalb faellt hier das ganze Gedaechtnis: lieber einen Entwurf zu viel verlieren als
+        // einen frisch geschriebenen Stand hinter einem alten Entwurf verstecken.
+        entwurfGedaechtnisRef.current.vergissAlles();
         await loadContext(params, source);
         await handleAiPreviewAllTeams();
         setMessage(`Batch gespeichert: ${payload.summary.savedTeams} Auto-Teams lokal uebernommen.`);
@@ -5320,7 +5699,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       });
       const payload = (await response.json()) as FormCardPlanResponse;
       if (!response.ok || payload.error || payload.errors?.length) {
-        setErrors(payload.errors ?? [payload.error ?? "Formkarten-Plan konnte nicht gespeichert werden."]);
+        setErrors(payload.errors ?? [formatRoomWriteErrorCode(payload.error) ?? "Formkarten-Plan konnte nicht gespeichert werden."]);
         return;
       }
       setContext((current) => current ? { ...current, formCardPlans: payload.plans ?? [] } : current);
@@ -5914,6 +6293,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onAssignTeamPower={(disciplineSide, powerId) => updateModifier(disciplineSide, "teamPowerId", powerId ?? "")}
         controlsSlot={
           <>
+            <MyTeamsReadinessPanel
+              readiness={myTeamsMatchdayReadiness}
+              activeTeamId={params.teamId}
+              onJumpToTeam={jumpToMyTeam}
+              onSammelAbgabe={() => void gibOffeneAufstellungenSammelAb()}
+              sammelAbgabeBusy={sammelAbgabeBusy}
+              sammelAbgabeKnopfText={sammelAbgabeMischung.knopfText}
+              sammelAbgabeErklaerung={sammelAbgabeMischung.erklaerung}
+              sammelAbgabeGesperrtGrund={
+                sourceReadOnly ? "Dieser Modus ist nur zum Anschauen — hier wird nichts geschrieben." : null
+              }
+            />
             <label>
               <span>Spieltag</span>
               <select
@@ -5933,11 +6324,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <select
                 className={`input legacy-lineup-select${selectedTeamIsReady ? " is-complete" : ""}`}
                 value={params.teamId}
-                onChange={(event) => {
-                  const nextTeamId = event.target.value;
-                  props.onTeamChange?.(nextTeamId);
-                  void loadContext({ teamId: nextTeamId }, source);
-                }}
+                onChange={(event) => wechsleTeam(event.target.value)}
               >
                 {filteredTeamOptions.map((team) => (
                   <option key={team.id} value={team.id}>

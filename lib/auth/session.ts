@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { isAuthEnabled } from "@/lib/auth/config";
 import type { AuthUserConfig, AuthUsername } from "@/lib/auth/config";
 import { createSessionCookieValue, SESSION_COOKIE_NAME, sessionCookieOptions, verifySession } from "@/lib/auth/session-cookie";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 /**
  * Nur fuer echte Next.js-Request-Kontexte (Server Components, Layouts, Route
@@ -59,4 +60,29 @@ export async function resolveSessionOwnerId(): Promise<string | null> {
     return null;
   }
   return (await getSessionUser())?.ownerId ?? null;
+}
+
+/**
+ * DIE EINE STELLE, an der ein `authorizeServerRoomWrite`-Aufrufer AUSSERHALB eines Raums die
+ * Schreib-Identitaet bestimmt (Stufe 0.3, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B2).
+ * Rangfolge: angemeldete Sitzung, sonst der lokale Standard-Owner (heutiger Solo-Betrieb,
+ * unveraendert). Nimmt ABSICHTLICH keinen Parameter aus Body/Query entgegen — genau das war das
+ * Loch: `authorizeLocalSingleplayerTeamWrite` vertraute bislang direkt einem Client-Feld namens
+ * `activeOwnerId`, das aber die Owner-ID des ZIELTEAMS trug, nicht die eigene
+ * (use-foundation-shell-router-body-scope.tsx:1352-1368) — der Besitzvergleich war damit fuer jedes
+ * `manual`-Team immer wahr.
+ *
+ * NUR fuer den Nicht-Raum-Fall: IM Raum ist das Sitz-Token bereits der Ausweis
+ * (`findSeatByToken`/`authorizeTeamWrite` in server-authoritative-write-guard.ts bzw.
+ * online-room-model.ts) — dafuer wird diese Funktion nicht gebraucht und nicht aufgerufen.
+ *
+ * Lebt hier und nicht in server-authoritative-write-guard.ts, weil dieses Modul `next/headers`
+ * braucht (ueber `resolveSessionOwnerId`/`getSessionUser`) — der Guard wird auch vom
+ * socket.io-Server geladen, der ausserhalb jedes Next.js-Request-Kontexts laeuft und an so einem
+ * Import zur Modul-Ladezeit abstuerzen wuerde (siehe Kommentar an lib/auth/session-cookie.ts).
+ * Aufrufer (Next.js-Route-Handler) importieren diese Funktion selbst und reichen das Ergebnis als
+ * `activeOwnerId` in den Guard-Kontext hinein.
+ */
+export async function resolveAuthoritativeWriteOwnerId(): Promise<string> {
+  return (await resolveSessionOwnerId()) ?? DEFAULT_ACTIVE_OWNER_ID;
 }

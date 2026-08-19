@@ -101,3 +101,51 @@ export function canJumpToArenaAfterLineupSave(input: {
   }
   return evaluateMatchdayHumanReadiness(input.teams).allHumanTeamsReady;
 }
+
+/**
+ * SAMMEL-ANSICHT „MEINE TEAMS" (Befund B5/4, Stufe 2.2): `evaluateMatchdayHumanReadiness` liefert
+ * `pendingTeamIds` schon seit Langem — ausgewertet wurde das bisher NUR als Arena-Sperre in
+ * `canJumpToArenaAfterLineupSave`, und die wiederum nur bei `isOnlineGame` (praktisch:
+ * `online_4v4`). Wer solo mehrere eigene Teams fuehrt, sah nirgends "3 von 4 fertig".
+ *
+ * Diese Funktion RECHNET NICHTS NEU — sie ruft `evaluateMatchdayHumanReadiness` mit der auf den
+ * angefragten Besitzer (`activeOwnerId`) eingeschraenkten Teamliste auf (Datenquelle bleibt
+ * dieselbe) und haengt fuer die Anzeige nur Name + gefundenes Team-Objekt wieder an.
+ * `activeOwnerId: null` (Login aus) laesst alle Teams stehen — im Solo-Betrieb gibt es ohnehin nur
+ * den einen lokalen Besitzer, jede Einschraenkung waere dort wirkungslose Zusatzarbeit.
+ */
+export type MyTeamsReadinessTeam = MatchdayReadinessTeam & {
+  name: string;
+  ownerId: string | null;
+};
+
+export type MyTeamsMatchdayReadiness = {
+  matchdayId: string;
+  matchdayLabel: string;
+  humanTeamCount: number;
+  readyTeams: MyTeamsReadinessTeam[];
+  pendingTeams: MyTeamsReadinessTeam[];
+  allReady: boolean;
+};
+
+export function buildMyTeamsMatchdayReadiness(input: {
+  teams: readonly MyTeamsReadinessTeam[] | null | undefined;
+  activeOwnerId: string | null | undefined;
+  matchdayId: string;
+  matchdayLabel: string;
+}): MyTeamsMatchdayReadiness {
+  const myTeams = (input.teams ?? []).filter(
+    (team) => input.activeOwnerId == null || team.ownerId === input.activeOwnerId,
+  );
+  const readiness = evaluateMatchdayHumanReadiness(myTeams);
+  const pendingTeamIdSet = new Set(readiness.pendingTeamIds);
+  const humanTeams = myTeams.filter((team) => team.controlMode === "manual");
+  return {
+    matchdayId: input.matchdayId,
+    matchdayLabel: input.matchdayLabel,
+    humanTeamCount: readiness.humanTeamCount,
+    readyTeams: humanTeams.filter((team) => !pendingTeamIdSet.has(team.id)),
+    pendingTeams: humanTeams.filter((team) => pendingTeamIdSet.has(team.id)),
+    allReady: readiness.allHumanTeamsReady,
+  };
+}

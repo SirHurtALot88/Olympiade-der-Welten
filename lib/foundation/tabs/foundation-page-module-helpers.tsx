@@ -72,6 +72,7 @@ import {
   FOUNDATION_TABLE_PREFERENCES_STORAGE_KEY,
   FOUNDATION_TEAM_FILTER_STORAGE_KEY,
 } from "@/lib/foundation/tabs/foundation-page-types";
+import { readFoundationRoomContextFromLocation } from "@/lib/room/foundation-room-context-client";
 
 export function loadFoundationTablePreferences(): PersistedFoundationTablePreferences {
   if (typeof window === "undefined") {
@@ -666,6 +667,43 @@ export function readStoredFoundationActiveOwnerId() {
   } catch {
     return DEFAULT_ACTIVE_OWNER_ID;
   }
+}
+
+/**
+ * BEFUND (Auftrag: "in Frankys Browser haelt sich die Oberflaeche fuer Chris"): der `useState`-
+ * Initializer fuer `activeOwnerId` (use-foundation-page-state.ts) fragte bislang NUR
+ * `initialActiveOwnerId` (die Sitzung — ohne Login immer leer, Login ist standardmaessig AUS,
+ * siehe CLAUDE.md/docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md „Entscheidungen") und danach direkt den
+ * lokalen Speicher, der ohne eigenen Eintrag auf `DEFAULT_ACTIVE_OWNER_ID` ("Chris") faellt. Ein
+ * per `/room/CODE` beigetretener Franky bekam so IMMER Chris' Owner-ID — der Raum-Kontext wurde
+ * nie befragt.
+ *
+ * RANGFOLGE HIER: Sitzung (Login an) → Raum-Kontext (`ownerId` aus der URL, von
+ * `RoomPageClient.tsx` aus der Sitzrolle abgeleitet — siehe `resolveRoomParticipantActiveOwnerId`,
+ * lib/room/online-room-model.ts) → lokaler Speicher → Standard. Der Raum-Kontext steht bewusst VOR
+ * dem lokalen Speicher: ein alter Wert aus einer frueheren Sitzung in DIESEM Browser darf einen
+ * frisch aufgeloesten Raum-Wert nicht ueberschreiben, sonst haengt Franky im naechsten Raum wieder
+ * an Chris' altem Eintrag fest.
+ *
+ * NUR ANZEIGE, NIE BERECHTIGUNG: siehe die Kommentare an `FoundationRoomContext.ownerId`
+ * (foundation-room-context-client.ts) und `resolveRoomParticipantActiveOwnerId`. Die URL ist vom
+ * Nutzer editierbar; ein manipulierter Wert kann die Oberflaeche bestenfalls grosszuegiger ODER
+ * enger zeigen als sie sein sollte, nie tatsaechlichen Zugriff verschaffen — der Server bleibt
+ * ueber das Sitz-Token bzw. (ausserhalb eines Raums) die Sitzung die einzige Autoritaet
+ * (`authorizeServerRoomWrite`, `resolveAuthoritativeWriteOwnerId`).
+ */
+export function resolveInitialFoundationActiveOwnerId(sessionOwnerId: string | null | undefined): string {
+  const trimmedSession = sessionOwnerId?.trim();
+  if (trimmedSession) {
+    return trimmedSession;
+  }
+
+  const roomOwnerId = readFoundationRoomContextFromLocation()?.ownerId?.trim();
+  if (roomOwnerId) {
+    return roomOwnerId;
+  }
+
+  return readStoredFoundationActiveOwnerId();
 }
 
 export function persistFoundationActiveOwnerId(ownerId: string) {

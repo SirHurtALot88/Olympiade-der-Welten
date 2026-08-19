@@ -275,7 +275,13 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
-import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import {
+  describeRoomWriteError,
+  formatMarketPreviewError,
+  formatRoomWriteErrorCode,
+  isStaleSaveVersionError,
+} from "@/lib/room/parse-room-write-context";
+import { istRoomSitzungsFehler } from "@/lib/room/room-session-fehler";
 import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import {
@@ -1270,6 +1276,26 @@ export function useFoundationShellRouterBodyScope({
       if (payload.roomCode && payload.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
         return;
       }
+      /**
+       * BEFUND F6 (Aufgabe #44): hier wurde JEDER `roomError` als abgelaufene Sitzung behandelt —
+       * `setRoomLiveState(null)` raeumt die Raum-Bedienleiste weg, dazu die Meldung
+       * "Room-Session abgelaufen". Die grosse Mehrheit der `roomError`-Meldungen sind aber
+       * normale Fach-Ablehnungen aus `room-store.ts` ("Nur der Host darf …", "Arena wartet noch
+       * auf Ready …", "Room-Flow ist noch blockiert …"). Ein Doppelklick des Gasts riss dem
+       * Spieler damit die Bedienung weg und behauptete zusaetzlich etwas Falsches.
+       *
+       * Der Raum ist in diesen Faellen nachweislich noch da — die Ablehnung kam ja aus ihm.
+       * Also: Meldung anzeigen, Bedienleiste stehen lassen. Nur die Meldungen aus
+       * `istRoomSitzungsFehler` (Raum weg / Sitzplatz ungueltig) raeumen weiterhin auf.
+       */
+      if (!istRoomSitzungsFehler(payload.message)) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Aktion abgelehnt",
+          detail: payload.message ?? "Die Raum-Aktion wurde abgelehnt.",
+        });
+        return;
+      }
       setRoomLiveState(null);
       setFoundationActionFeedback({
         tone: "warning",
@@ -1358,15 +1384,16 @@ export function useFoundationShellRouterBodyScope({
     const targetControl = targetTeamId
       ? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[targetTeamId]
       : null;
-    const resolvedOwnerId =
-      targetControl?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : targetControl?.ownerId?.trim() || effectiveActiveOwnerId;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieses Feld trug die Owner-ID des
+    // ZIELTEAMS, nicht die eigene — der Server las das bis eben direkt als Besitznachweis
+    // (`authorizeLocalSingleplayerTeamWrite`), womit jeder Schreibversuch auf ein `manual`-Team
+    // automatisch bestand. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum,
+    // sonst die angemeldete Sitzung) — ein Feld, das der Server ignoriert, aber weiter mitschickt,
+    // waere nur irrefuehrend fuer alle, die diesen Code lesen.
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: targetTeamId || selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: targetControl?.controlMode ?? null,
       },
       roomContext,
@@ -2072,7 +2099,11 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Training nicht gespeichert",
-          detail: payload.error ?? "Training konnte nicht gespeichert werden.",
+          // Befund F9: hier stand `payload.error` roh — im Raum liefert die Route Codes des
+          // Write-Guards (`participant_offline`, `host_only_action`, `forbidden_team_control`),
+          // und genau die las der Spieler woertlich. Uebersetzt wird mit DERSELBEN Tabelle wie im
+          // Transfermarkt; alles, was kein bekannter Code ist, geht unveraendert durch.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Training konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -2221,7 +2252,8 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Trainingsklasse nicht gespeichert",
-          detail: payload.error ?? "Trainingsklasse konnte nicht gespeichert werden.",
+          // Siehe `persistPlayerTrainingModeInRoom` — derselbe Befund F9, dieselbe Tabelle.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Trainingsklasse konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -2456,7 +2488,7 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamIdentityMessage(payload.error ?? "Team-Identity konnte nicht gespeichert werden.");
+            setTeamIdentityMessage(formatRoomWriteErrorCode(payload.error) ?? "Team-Identity konnte nicht gespeichert werden.");
             return;
           }
         }
@@ -2490,7 +2522,9 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamControlMessage(payload.error ?? "Team-Admin-Settings konnten nicht gespeichert werden.");
+            setTeamControlMessage(
+              formatRoomWriteErrorCode(payload.error) ?? "Team-Admin-Settings konnten nicht gespeichert werden.",
+            );
             return;
           }
         }
@@ -3762,7 +3796,9 @@ export function useFoundationShellRouterBodyScope({
       }
       setMarketSellPeekPreview(payload.summary ?? null);
       if (!payload.summary) {
-        setMarketSellPeekError(payload.error ?? "Verkaufsvorschau konnte nicht geladen werden.");
+        // F9: auch die Vorschau laeuft ueber `/api/transfermarkt/sell` und damit durch den
+        // Write-Guard — im Raum kamen hier dieselben rohen Codes an wie beim echten Verkauf.
+        setMarketSellPeekError(formatMarketPreviewError(payload.error) ?? "Verkaufsvorschau konnte nicht geladen werden.");
       }
     } catch {
       if (requestVersion === marketSellPeekRequestVersion.current) {
@@ -3867,7 +3903,9 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canSell) {
         setMarketSellError(
-          payload.error ??
+          // F9: derselbe Ton wie im Kaufmodal — `formatMarketPreviewError` faellt fuer alles,
+          // was es nicht ausdruecklich kaufbezogen formuliert, auf die neutrale Tabelle durch.
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Verkauf konnte nicht bestätigt werden.",
         );
@@ -3999,7 +4037,10 @@ export function useFoundationShellRouterBodyScope({
           setTeamPicksRefillMessage({
             teamId,
             tone: "error",
-            text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
+            text:
+              formatRoomWriteErrorCode(payload.error) ??
+              payload.blockingReasons?.join(" · ") ??
+              "KI-Picks konnten nicht angewendet werden.",
           });
           return;
         }
@@ -4949,7 +4990,7 @@ export function useFoundationShellRouterBodyScope({
         error?: string;
       };
       if (!response.ok || payload.error) {
-        setAdminSimulationError(payload.error ?? "Season Simulation konnte nicht gestartet werden.");
+        setAdminSimulationError(formatRoomWriteErrorCode(payload.error) ?? "Season Simulation konnte nicht gestartet werden.");
       }
       if (payload.run) {
         setAdminSimulationRun(payload.run);
@@ -5602,7 +5643,7 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canBuy) {
         setMarketBuyError(
-          payload.error ??
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Kauf konnte nicht bestätigt werden.",
         );
@@ -5764,7 +5805,7 @@ export function useFoundationShellRouterBodyScope({
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
-          previewPayload.error ??
+          formatRoomWriteErrorCode(previewPayload.error) ??
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Verhandlungsvorschau blockiert.`,
         );
@@ -5864,7 +5905,7 @@ export function useFoundationShellRouterBodyScope({
         };
       };
       if (!response.ok || payload.error) {
-        setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
+        setSponsorChoiceMessage(formatRoomWriteErrorCode(payload.error) ?? "Sponsor konnte nicht gewählt werden.");
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
@@ -5967,7 +6008,8 @@ export function useFoundationShellRouterBodyScope({
       };
       if (!response.ok || payload.error) {
         setSponsorUebernahmeMessage(
-          payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
+          formatRoomWriteErrorCode(payload.error) ??
+            (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
         );
         return;
       }
@@ -6151,7 +6193,7 @@ export function useFoundationShellRouterBodyScope({
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
-          previewPayload.error ??
+          formatRoomWriteErrorCode(previewPayload.error) ??
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsvorschau blockiert.`,
         );
@@ -6177,7 +6219,7 @@ export function useFoundationShellRouterBodyScope({
       const applyPayload = (await applyResponse.json()) as ContractRenewalApiResponse;
       if (!applyResponse.ok || applyPayload.error || !applyPayload.summary?.applied) {
         setContractRenewalError(
-          applyPayload.error ??
+          formatRoomWriteErrorCode(applyPayload.error) ??
             applyPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsaktion blockiert.`,
         );
@@ -6302,7 +6344,7 @@ export function useFoundationShellRouterBodyScope({
       });
       const payload = (await response.json()) as NewGameSetupApiResponse;
       if (!response.ok || payload.error) {
-        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgeführt werden.");
+        setNewGameError(formatRoomWriteErrorCode(payload.error) ?? "New-Game-Setup konnte nicht ausgeführt werden.");
         return;
       }
 
@@ -6635,14 +6677,25 @@ export function useFoundationShellRouterBodyScope({
     () => (selectedTeam ? getTeamControlSettings(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam],
   );
-  const isLocalUserManualTeam = (settings: TeamControlSettings | null | undefined) =>
-    Boolean(
-      settings &&
-        settings.controlMode === "manual" &&
-        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris"),
-    );
+  // Stufe 2.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, offen geblieben): hier stand bis eben zusaetzlich
+  // `|| isLocalUserManualTeam(settings)` — ein zweiter Zweig, der JEDES Team mit
+  // `ownerSlot === "user"` oder `displayLabel === "Chris"` freigab, UNABHAENGIG von
+  // `effectiveActiveOwnerId`. Der Server prueft beim Schreiben ausschliesslich exakte
+  // Owner-Gleichheit (`canLocalUserManageTeam`/`canOwnerManageTeam`,
+  // server-authoritative-write-guard.ts) — die Oberflaeche erlaubte also mehr als der Server:
+  // ein Klick, der lokal durchging, endete server-seitig in einem 403.
+  //
+  // Der Fix laesst NUR noch `canOwnerManageTeam(settings, effectiveActiveOwnerId)` stehen —
+  // exakt dieselbe Funktion, die der Server ueber `canLocalUserManageTeam` aufruft
+  // (tests/identitaet-kommt-vom-server.test.ts haelt DAS bereits serverseitig fest). Das ist nur
+  // sicher, WEIL `effectiveActiveOwnerId` jetzt korrekt aufgeloest wird (Punkt 1 dieses Auftrags,
+  // `resolveInitialFoundationActiveOwnerId`): vorher haette das Entfernen Chris ausgesperrt, sobald
+  // sein `activeOwnerId` (durch einen Bug oder eine Race) nicht exakt `DEFAULT_ACTIVE_OWNER_ID`
+  // war — genau die Lage, die `isLocalUserManualTeam` grosszuegig abgefedert hat. Mit Punkt 1
+  // stimmt `effectiveActiveOwnerId` fuer Chris zuverlaessig, der Auffangzweig ist ueberfluessig
+  // geworden statt noetig.
   const selectedTeamCanManage = resolveFoundationTeamCanManage(
-    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId) || isLocalUserManualTeam(selectedTeamControl),
+    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId),
   );
   const isSelectedTeamManagementLocked = Boolean(selectedTeam) && !selectedTeamCanManage;
   function canManageTeamId(teamId: string | null | undefined) {
@@ -6650,9 +6703,7 @@ export function useFoundationShellRouterBodyScope({
       return false;
     }
     const settings = getTeamControlSettings(gameState, teamId);
-    return resolveFoundationTeamCanManage(
-      canOwnerManageTeam(settings, effectiveActiveOwnerId) || isLocalUserManualTeam(settings),
-    );
+    return resolveFoundationTeamCanManage(canOwnerManageTeam(settings, effectiveActiveOwnerId));
   }
 
   const playerProfileTrainingReadOnly =
@@ -7270,6 +7321,26 @@ export function useFoundationShellRouterBodyScope({
           body: JSON.stringify(withRoomContextBody({}, roomContext)),
         });
         if (!response.ok) {
+          /**
+           * BEFUND F10 (Aufgabe #44): hier wurde die Ablehnung stillschweigend geschluckt — es
+           * ging nur das Flow-Panel auf, und das zeigt, DASS etwas offen ist, nicht warum.
+           *
+           * Nachgemessen, nicht vermutet: `finalize-transfers` autorisiert mit der Aktion
+           * `formcards_season_regenerate`, und die steht in `HOST_LEVEL_ACTIONS`
+           * (lib/room/server-authoritative-write-guard.ts). Im Raum heisst das fuer JEDEN ausser
+           * dem Host: 403 `host_only_action` — der Knopf tat fuer den Gast also zuverlaessig
+           * nichts und sagte auch nichts. Der Grund wird jetzt benannt (dieselbe Tabelle wie F9);
+           * das Flow-Panel geht weiterhin auf, damit der Kontext sichtbar bleibt.
+           */
+          const payload = (await response.json().catch(() => ({}))) as { error?: string; errors?: string[] };
+          const grund =
+            formatRoomWriteErrorCode(payload.error ?? payload.errors?.[0]) ??
+            `Die Route hat mit Status ${response.status} abgelehnt.`;
+          setFoundationActionFeedback({
+            tone: "warning",
+            title: "Transfers nicht finalisiert",
+            detail: grund,
+          });
           setShowGameFlowPanel(true);
           return;
         }
@@ -8886,6 +8957,10 @@ export function useFoundationShellRouterBodyScope({
     // KOOP: die EIGENE Sicht statt des geteilten Top-Level-`newGameFlow` — sonst zeigt der
     // Einstiegs-Checklisten-Block (Home) Chris' Fortschritt auch fuer Franky an.
     newGameFlow: activeNewGameFlow,
+    // Paket B: fuer den Host-Vorbehalt am Saisonwechsel-Gate — siehe Kommentar dort. Das
+    // Cockpit-Panel selbst bekommt weiterhin KEIN Raum-Wissen, nur das fertige Gate.
+    roomContext,
+    roomLiveState,
     selectedTeam,
     rosterPlayers,
     selectedTeamFacilityState,
@@ -11774,7 +11849,7 @@ export function useFoundationShellRouterBodyScope({
           detail:
             payload.error === "offer_not_available"
               ? "Das Angebot steht nicht mehr offen — in dieser Saison wurde bereits entschieden."
-              : payload.error ?? "Die Entscheidung konnte nicht gespeichert werden.",
+              : formatRoomWriteErrorCode(payload.error) ?? "Die Entscheidung konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -12637,6 +12712,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     resultApplyFeed,
     roomActivityNotice,
+    setRoomActivityNotice,
     roomContext,
     roomLiveState,
     rosterFillBusy,

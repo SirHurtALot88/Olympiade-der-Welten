@@ -41,6 +41,8 @@ import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchda
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
+import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
+import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
 
 function roundScore(value: number) {
   return Number(value.toFixed(2));
@@ -212,15 +214,80 @@ type SharedLineupContextBase = {
   teamNameById: Map<string, string>;
 };
 
-const sharedLineupContextBaseCache = new Map<string, SharedLineupContextBase>();
+// Befund B5/3 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Stufe 2.3): der Schluessel enthielt frueher
+// zusaetzlich eine `lineupDraftSignature` ueber ALLE gespeicherten Entwuerfe (jedes Team, jeder
+// Spieltag). Jedes menschliche Speichern eines EINZELNEN Teams veraenderte damit die Signatur und
+// entwertete den Cache GLOBAL — auch fuer Teams, deren Kontext laengst berechnet war. Der Effekt:
+// wer nacheinander vier eigene Teams speichert, zahlt den vollen Kaltaufbau viermal, obwohl sich
+// an den drei anderen Teams nichts geaendert hat (gemessen: siehe Kommentar an
+// `sharedLineupContextBaseCacheStats` unten).
+//
+// Die TEUREN Teile von `SharedLineupContextBase` (Rangtabelle, Score-Map, Gewichte,
+// Spieler-/Kader-Karten) haengen ausschliesslich an Spielern/Kadern/Disziplinen — NICHT an
+// `lineupDrafts`, `playerMoraleState` oder sonst einem sich staendig aendernden Feld. Der
+// Cache-SCHLUESSEL laesst die Entwurfs-Signatur deshalb weg (siehe
+// `buildSharedLineupContextBaseCacheKey`). ABER: `normalizedGameState` selbst — und darueber
+// `context.gameState`, `existingDraft`, `teamStatus` — MUESSEN bei jedem Aufruf den AKTUELLEN
+// Spielstand zeigen (Moral, Formkarten-Plaene, Aufstellungen, ...), sonst saehe ein
+// nachgelagerter Verbraucher (Moral-/Kapitaens-Aufloesung beim Spieltag-Resolve) auf einen
+// Spielstand von VOR dem Speichern zurueck. Deshalb wird `normalizedGameState` bei einem
+// Cache-TREFFER unten IMMER frisch aus dem aktuellen `gameStateWithPowers` gebaut
+// (`withNormalizedSeasonDisciplineSchedule` ist ein O(Spieltage)-Normalisierungsschritt, nicht die
+// teure Rangtabellen-Berechnung) — nur die uebrigen, tatsaechlich invarianten Felder kommen aus
+// dem Cache. Statt den Schluessel "je Team" zu fuehren (was den geteilten Aufbau erneut N-fach
+// vervielfacht haette, nur mit einer anderen Ursache), bleibt so der teure Teil EINMAL gebaut,
+// waehrend der Spielstand selbst nie stehen bleibt.
+const sharedLineupContextBaseCache = new Map<
+  string,
+  { value: SharedLineupContextBase; insertedAtMs: number; lastAccessMs: number }
+>();
+
+// Unbegrenztes Wachstum (Befund B5/3: "new Map() ohne Verfall") war der zweite Teil des Lochs:
+// ein lang laufender Node-Prozess (Server, lange Testsuite) haette hier fuer jeden je gesehenen
+// (saveId, seasonId, matchdayId)-Dreiklang einen Eintrag behalten. Bewusst simpel: TTL zuerst
+// (raeumt inaktive Saves/Spieltage weg), danach eine harte Obergrenze nach LRU (raeumt auf, falls
+// binnen der TTL viele verschiedene Kombinationen aktiv sind, z. B. mehrere Tabs/Tests parallel).
+const SHARED_LINEUP_CONTEXT_BASE_CACHE_TTL_MS = 10 * 60 * 1000;
+const SHARED_LINEUP_CONTEXT_BASE_CACHE_MAX_ENTRIES = 16;
+
+/**
+ * NUR FUER MESSUNG/TESTS (Hausregel „miss, was du behauptest"): zaehlt Treffer/Fehlschlaege des
+ * geteilten Kontext-Caches, ohne das Produktionsverhalten zu beeinflussen. Wird von
+ * `resetSharedLineupContextBaseCacheForTests` mit zurueckgesetzt.
+ */
+const sharedLineupContextBaseCacheStats = { hits: 0, misses: 0 };
+
+export function getSharedLineupContextBaseCacheStatsForTests() {
+  return { ...sharedLineupContextBaseCacheStats };
+}
+
+export function resetSharedLineupContextBaseCacheForTests() {
+  sharedLineupContextBaseCache.clear();
+  sharedLineupContextBaseCacheStats.hits = 0;
+  sharedLineupContextBaseCacheStats.misses = 0;
+}
+
+function pruneSharedLineupContextBaseCache(now: number) {
+  for (const [key, entry] of sharedLineupContextBaseCache) {
+    if (now - entry.insertedAtMs > SHARED_LINEUP_CONTEXT_BASE_CACHE_TTL_MS) {
+      sharedLineupContextBaseCache.delete(key);
+    }
+  }
+  while (sharedLineupContextBaseCache.size > SHARED_LINEUP_CONTEXT_BASE_CACHE_MAX_ENTRIES) {
+    // Map erhaelt Einfuegereihenfolge — nach jedem Zugriff wird der Eintrag unten neu gesetzt
+    // (`delete` + `set`), rueckt also ans Ende. Der erste Key ist damit der am laengsten
+    // unbenutzte (LRU), nicht bloss der aelteste eingefuegte.
+    const oldestKey = sharedLineupContextBaseCache.keys().next().value;
+    if (oldestKey === undefined) {
+      break;
+    }
+    sharedLineupContextBaseCache.delete(oldestKey);
+  }
+}
 
 function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: LegacyLineupKeyParams) {
   const rosterSignature = gameState.rosters
     .map((entry) => `${entry.teamId}:${entry.playerId}:${entry.salary}:${entry.contractLength}`)
-    .sort()
-    .join("|");
-  const lineupDraftSignature = (gameState.seasonState.lineupDrafts ?? [])
-    .map((draft) => `${draft.lineupId}:${draft.updatedAt}:${draft.entries.length}:${draft.status}`)
     .sort()
     .join("|");
   return [
@@ -234,25 +301,34 @@ function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: Lega
     gameState.seasonState.teamPowers?.length ?? 0,
     JSON.stringify(gameState.seasonState.teamFacilities ?? {}),
     rosterSignature,
-    lineupDraftSignature,
   ].join("::");
 }
 
-function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKeyParams): SharedLineupContextBase | null {
-  const gameStateWithFormCards = ensureLocalFormCardsForSeason(gameState, params.saveId, params.seasonId);
-  const hasCurrentSeasonPowers = (gameStateWithFormCards.seasonState.teamPowers ?? []).some(
-    (power) => power.seasonId === params.seasonId,
-  );
-  const gameStateWithPowers = hasCurrentSeasonPowers
-    ? gameStateWithFormCards
-    : ensureLocalTeamPowersForSeason(gameStateWithFormCards, params.saveId, params.seasonId);
-  const cacheKey = buildSharedLineupContextBaseCacheKey(gameStateWithPowers, params);
-  const cached = sharedLineupContextBaseCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
+/**
+ * Loest `season`/`matchday` (inkl. `matchday.status`) und `matchdayContract` aus dem AKTUELLEN
+ * `normalizedGameState` auf — die EINE Rechenstelle dafuer, von Cache-Treffer UND Cache-Aufbau
+ * gleichermassen benutzt (Befund B4, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Stufe 2.3 nachgezogen).
+ *
+ * WARUM DIESE DREI FELDER NICHT AUS DEM CACHE-WERT KOMMEN DUERFEN: `buildSharedLineupContextBaseCacheKey`
+ * enthaelt weder `matchdayState.status` noch `seasonState.disciplineSchedule` — ein Spieltag, der
+ * waehrend die uebrigen Schluessel-Groessen (Roster/Spieler/Disziplinen/Formkarten/Team-Powers/
+ * -Einrichtungen) unveraendert bleiben den Status wechselt (z. B. Sperren/Freigeben beim
+ * Sammel-Speichern, Stufe 2.1), traf bislang bis zu `SHARED_LINEUP_CONTEXT_BASE_CACHE_TTL_MS` lang
+ * auf einen Cache-Treffer, der noch den ALTEN Status/Contract auslieferte — derselbe Fehler wie bei
+ * `existingDraft`/`teamStatus`/`context.gameState` (siehe Kommentar an `getSharedLineupContextBase`
+ * unten), hier nur uebersehen, weil `matchday`/`matchdayContract` Teil des gecachten WERTS sind,
+ * nicht separat nachgeschaerft wurden.
+ *
+ * `requiredDisciplineIds`/`rankDisciplineIds` (und alles, was darauf aufbaut: Score-Map, Gewichte,
+ * Rangtabelle) bleiben BEWUSST aus dem Cache-Wert — die haengen an `disciplineSchedule` nur
+ * mittelbar (welche Disziplin an diesem Spieltag laeuft), und diese Zuordnung steht fuer die
+ * gesamte Saison fest, sobald sie einmal generiert ist. Sie neu aufzuloesen wuerde den teuren Teil
+ * des Caches wieder entwerten, den Stufe 2.3 gerade erst geteilt hat.
+ */
+function resolveFreshMatchdayContext(
+  normalizedGameState: GameState,
+  params: LegacyLineupKeyParams,
+): Pick<SharedLineupContextBase, "season" | "matchday" | "matchdayContract"> | null {
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
   const scheduleEntry =
@@ -274,6 +350,72 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     return null;
   }
 
+  const matchdayContract = buildMatchdayLineupContract({
+    season,
+    matchday,
+    disciplines: normalizedGameState.disciplines,
+    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+  });
+
+  return { season, matchday, matchdayContract };
+}
+
+/**
+ * Ein Cache-Treffer teilt sich die TEUREN, tatsaechlich invarianten Teile (Rangtabelle, Score-Map,
+ * Spieler-/Kader-Karten, Gewichte) — `normalizedGameState` selbst gehoert NICHT dazu (siehe
+ * Kommentar an `sharedLineupContextBaseCache`) und wird deshalb bei JEDEM Treffer frisch gebaut.
+ * Ebenso `season`/`matchday`/`matchdayContract` — siehe `resolveFreshMatchdayContext`.
+ *
+ * Ohne dieses Nachschaerfen wuerde jeder Verbraucher, der ueber `context.gameState` liest
+ * (Moral-/Kapitaens-Aufloesung beim Resolve, `existingDraft`, `teamStatus`), nach einem
+ * Speichervorgang mit demselben Cache-Schluessel (Roster/Spieler/Disziplinen unveraendert) auf den
+ * ALTEN Spielstand zurueckfallen — genau der Fehler, den die fruehere, teure Entwurfs-Signatur nur
+ * zufaellig verhinderte, weil sie bei jedem Speichern ohnehin ALLES ungueltig machte.
+ * `withNormalizedSeasonDisciplineSchedule` ist ein O(Spieltage)-Schritt, keine Neuberechnung der
+ * Rangtabelle — der teure Teil bleibt geteilt.
+ */
+function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKeyParams): SharedLineupContextBase | null {
+  const gameStateWithFormCards = ensureLocalFormCardsForSeason(gameState, params.saveId, params.seasonId);
+  const hasCurrentSeasonPowers = (gameStateWithFormCards.seasonState.teamPowers ?? []).some(
+    (power) => power.seasonId === params.seasonId,
+  );
+  const gameStateWithPowers = hasCurrentSeasonPowers
+    ? gameStateWithFormCards
+    : ensureLocalTeamPowersForSeason(gameStateWithFormCards, params.saveId, params.seasonId);
+  const cacheKey = buildSharedLineupContextBaseCacheKey(gameStateWithPowers, params);
+  const now = Date.now();
+  pruneSharedLineupContextBaseCache(now);
+  const cached = sharedLineupContextBaseCache.get(cacheKey);
+  if (cached && now - cached.insertedAtMs <= SHARED_LINEUP_CONTEXT_BASE_CACHE_TTL_MS) {
+    sharedLineupContextBaseCacheStats.hits += 1;
+    // Ans Ende der Einfuegereihenfolge ruecken (LRU-Verwendung, siehe `pruneSharedLineupContextBaseCache`).
+    sharedLineupContextBaseCache.delete(cacheKey);
+    cached.lastAccessMs = now;
+    sharedLineupContextBaseCache.set(cacheKey, cached);
+    const normalizedGameStateOnHit = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
+    // Befund B4: `matchday`/`matchdayContract` muessen bei JEDEM Treffer neu aufgeloest werden,
+    // nicht aus `cached.value` uebernommen — siehe Kommentar an `resolveFreshMatchdayContext`.
+    const freshMatchdayContext = resolveFreshMatchdayContext(normalizedGameStateOnHit, params);
+    if (!freshMatchdayContext) {
+      return null;
+    }
+    return {
+      ...cached.value,
+      normalizedGameState: normalizedGameStateOnHit,
+      season: freshMatchdayContext.season,
+      matchday: freshMatchdayContext.matchday,
+      matchdayContract: freshMatchdayContext.matchdayContract,
+    };
+  }
+  sharedLineupContextBaseCacheStats.misses += 1;
+
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
+  const freshMatchdayContext = resolveFreshMatchdayContext(normalizedGameState, params);
+  if (!freshMatchdayContext) {
+    return null;
+  }
+  const { season, matchday, matchdayContract } = freshMatchdayContext;
+
   const playersById = new Map(normalizedGameState.players.map((player) => [player.id, player] as const));
   const rosterEntriesByTeamId = new Map<string, RosterEntry[]>();
   for (const rosterEntry of normalizedGameState.rosters) {
@@ -286,12 +428,6 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
   }
 
   const lineupContract = buildLineupDisciplineContract(normalizedGameState.disciplines);
-  const matchdayContract = buildMatchdayLineupContract({
-    season,
-    matchday,
-    disciplines: normalizedGameState.disciplines,
-    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
-  });
   const requiredDisciplineIds = [matchdayContract.discipline1?.disciplineId, matchdayContract.discipline2?.disciplineId].filter(
     (value): value is string => Boolean(value),
   );
@@ -378,7 +514,8 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     teamNameById: new Map(normalizedGameState.teams.map((entry) => [entry.teamId, entry.name] as const)),
   };
 
-  sharedLineupContextBaseCache.set(cacheKey, sharedBase);
+  sharedLineupContextBaseCache.set(cacheKey, { value: sharedBase, insertedAtMs: now, lastAccessMs: now });
+  pruneSharedLineupContextBaseCache(now);
   return sharedBase;
 }
 
@@ -1452,6 +1589,59 @@ export function saveLocalLegacyLineupDraft(
   };
 }
 
+export type LegacyLineupBatchTeamResult = {
+  teamId: string;
+  ok: boolean;
+  draft: LegacyLineupDraft | null;
+  errors: string[];
+  warnings: string[];
+};
+
+/**
+ * Besitzprüfung je Team (Befund B5/1, Stufe 2.1): dieselbe Regel wie
+ * `authorizeLocalSingleplayerTeamWrite` (lib/room/server-authoritative-write-guard.ts) für den
+ * NICHT-Raum-Fall — bewusst dieselben Funktionen (`canLocalUserManageTeam`,
+ * `canFoundationLocalUserManageTeam`), keine zweite Quelle. `activeOwnerId: undefined/null`
+ * bedeutet: der Aufrufer ist bereits anderweitig autorisiert (KI-Stapellauf, Messskript,
+ * Raum-Aufrufer, die die Pruefung schon serverseitig via `authorizeServerRoomWrite` je Team
+ * durchlaufen haben) — die Pruefung entfaellt dann wie im bisherigen, unbeschraenkten Batch.
+ */
+function authorizeBatchTeamOwnership(
+  gameState: GameState,
+  teamId: string,
+  activeOwnerId: string | null | undefined,
+): { allowed: true } | { allowed: false; reason: string } {
+  if (activeOwnerId == null) {
+    return { allowed: true };
+  }
+  const resolvedActiveOwnerId = activeOwnerId.trim() || DEFAULT_ACTIVE_OWNER_ID;
+  if (!canFoundationLocalUserManageTeam(canLocalUserManageTeam(gameState, teamId, resolvedActiveOwnerId))) {
+    return { allowed: false, reason: "local_team_not_owned_or_ai_controlled" };
+  }
+  return { allowed: true };
+}
+
+/**
+ * SAMMEL-SPEICHERN FUER MEHRERE TEAMS — EIN Schreibvorgang (Befund B5/1, Stufe 2.1).
+ *
+ * Bis eben nahm nur der KI-Stapellauf (`ai-legacy-lineup-batch-apply-service.ts`) und ein
+ * Messskript diesen Pfad; der menschliche Weg (`app/api/lineups/legacy/route.ts`) speicherte pro
+ * Team einzeln. Diese Funktion war fuer Menschen dabei aus drei Gruenden ungeeignet:
+ *  1. Kein `lockMatchday` — der Status stand hart auf "submitted", eine Abgabe liess sich also
+ *     nach dem Arena-Blick beliebig oft nachbessern (siehe `matchday-lineup-lock.ts`).
+ *  2. Keine Formkarten-/Apron-Absicherung — anders als `saveLocalLegacyLineupDraft` wurden weder
+ *     `ensureLocalFormCardsForSeason` noch `ensureSeasonApronLinesFrozen` aufgerufen/persistiert.
+ *  3. Keine Besitzpruefung je Team und Alles-oder-nichts: EIN Kaderproblem in einem Team liess
+ *     ALLE anderen Teams durchfallen (`if (errors.length > 0) return { savedCount: 0, ... }`).
+ *
+ * Jetzt: Formkarten werden VOR der Team-Schleife einmal je betroffener Season sichergestellt (in
+ * der Reihenfolge, die `ensureLocalLegacyFormCardsForSeason` vorschreibt: Formkarten ZUERST, danach
+ * `ensureSeasonApronLinesFrozen` — das prueft ueber `haveSeasonTransfersBeenFinalized`, ob ALLE
+ * menschlichen Teams ihren Pool haben, und muesste vorher noch "nein" antworten). Jedes Team
+ * bekommt sein EIGENES Ergebnis (`results`); ein abgelehntes Team blockiert die anderen nicht
+ * mehr. Genau EIN `saveSingleplayerState`-Aufruf traegt alle erfolgreichen Teams plus die
+ * sichergestellten Formkarten/Apron-Linien.
+ */
 export function saveLocalLegacyLineupDraftBatch(
   drafts: Array<{
     params: LegacyLineupKeyParams;
@@ -1459,19 +1649,24 @@ export function saveLocalLegacyLineupDraftBatch(
     modifiers?: LegacyLineupDraft["modifiers"];
   }>,
   persistence?: PersistenceService,
+  options?: {
+    /** Siehe Kommentar an `saveLocalLegacyLineupDraft` — nur von der Spieler-Route gesetzt. */
+    lockMatchday?: boolean;
+    /** Siehe Kommentar an `authorizeBatchTeamOwnership`. */
+    activeOwnerId?: string | null;
+  },
 ): {
   ok: boolean;
   savedCount: number;
   errors: string[];
   warnings: string[];
+  results: LegacyLineupBatchTeamResult[];
 } {
   if (drafts.length === 0) {
-    return { ok: true, savedCount: 0, errors: [], warnings: [] };
+    return { ok: true, savedCount: 0, errors: [], warnings: [], results: [] };
   }
 
   const { persistence: resolvedPersistence, save } = resolveLocalSave(drafts[0]!.params.saveId, persistence);
-  const errors: string[] = [];
-  const warnings: string[] = [];
   const effectiveDrafts = drafts.map((draft) => ({
     ...draft,
     params: {
@@ -1481,21 +1676,40 @@ export function saveLocalLegacyLineupDraftBatch(
     modifiers: normalizeLineupDraftModifiers(draft.modifiers ?? createDefaultLineupDraftModifiers()),
   }));
 
+  // Formkarten ZUERST sicherstellen — fuer JEDE betroffene Season einmal, additiv auf demselben
+  // GameState aufbauend. In der Praxis ist das fast immer eine einzige Season; die Schleife traegt
+  // trotzdem den allgemeinen Fall, ohne eine zweite Auflösung zu erfinden.
+  let baseGameState = save.gameState;
+  for (const seasonId of new Set(effectiveDrafts.map((entry) => entry.params.seasonId))) {
+    baseGameState = ensureLocalFormCardsForSeason(baseGameState, save.saveId, seasonId);
+  }
+
   const now = new Date().toISOString();
-  const existingDrafts = getStoredDrafts(save.gameState);
+  const existingDrafts = getStoredDrafts(baseGameState);
   const nextDrafts: LineupDraft[] = [];
   const nextDraftIds = new Set<string>();
+  const results: LegacyLineupBatchTeamResult[] = [];
 
   for (const draftInput of effectiveDrafts) {
-    if (save.gameState.matchdayState.matchdayId !== draftInput.params.matchdayId) {
-      errors.push("lineup_matchday_is_not_active");
+    const teamId = draftInput.params.teamId;
+    const pushRejected = (errors: string[], warnings: string[] = []) => {
+      results.push({ teamId, ok: false, draft: null, errors, warnings });
+    };
+
+    const ownership = authorizeBatchTeamOwnership(baseGameState, teamId, options?.activeOwnerId);
+    if (!ownership.allowed) {
+      pushRejected([ownership.reason]);
       continue;
     }
 
-    const contextResult = buildContextFromGameState(save.gameState, draftInput.params);
+    if (baseGameState.matchdayState.matchdayId !== draftInput.params.matchdayId) {
+      pushRejected(["lineup_matchday_is_not_active"]);
+      continue;
+    }
+
+    const contextResult = buildContextFromGameState(baseGameState, draftInput.params);
     if (!contextResult.ok) {
-      errors.push(...contextResult.errors);
-      warnings.push(...contextResult.warnings);
+      pushRejected(contextResult.errors, contextResult.warnings);
       continue;
     }
 
@@ -1510,17 +1724,18 @@ export function saveLocalLegacyLineupDraftBatch(
       buildValidationOptions(contextResult.context),
     );
 
-    warnings.push(...validation.warnings);
     if (!validation.isValid) {
-      errors.push(...validation.errors);
+      pushRejected(validation.errors, validation.warnings);
       continue;
     }
 
     const lineupId = createLineupDraftId(draftInput.params);
     const existing = existingDrafts.find((entry) => entry.lineupId === lineupId) ?? null;
     if (existing && ["locked", "resolved"].includes(existing.status)) {
-      errors.push("lineup_draft_is_locked");
-      warnings.push("This lineup is already locked/resolved and can no longer be overwritten.");
+      pushRejected(
+        ["lineup_draft_is_locked"],
+        ["This lineup is already locked/resolved and can no longer be overwritten."],
+      );
       continue;
     }
 
@@ -1529,35 +1744,39 @@ export function saveLocalLegacyLineupDraftBatch(
       saveId: draftInput.params.saveId,
       seasonId: draftInput.params.seasonId,
       matchdayId: draftInput.params.matchdayId,
-      teamId: draftInput.params.teamId,
-      status: "submitted",
+      teamId,
+      status: options?.lockMatchday ? "locked" : "submitted",
       entries: normalizedEntries,
       modifiers: draftInput.modifiers,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
-    if (!isTeamMatchdayLineupOperationallyReady(save.gameState, draftInput.params.teamId, candidateDraft)) {
-      errors.push("lineup_not_operationally_ready");
+    if (!isTeamMatchdayLineupOperationallyReady(baseGameState, teamId, candidateDraft)) {
+      pushRejected(
+        ["lineup_not_operationally_ready"],
+        ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Einsatzliste gespeichert wird."],
+      );
       continue;
     }
 
     nextDraftIds.add(lineupId);
     nextDrafts.push(candidateDraft);
+    results.push({ teamId, ok: true, draft: toLegacyDraft(candidateDraft), errors: [], warnings: validation.warnings });
   }
 
-  if (errors.length > 0) {
-    return {
-      ok: false,
-      savedCount: 0,
-      errors: Array.from(new Set(errors)),
-      warnings: Array.from(new Set(warnings)),
-    };
+  if (nextDrafts.length === 0) {
+    // Nichts zu schreiben: keine Formkarten-/Apron-Persistenz auf Verdacht, exakt wie beim
+    // Einzelweg (`saveLocalLegacyLineupDraft` persistiert bei einem fehlgeschlagenen Team auch
+    // nichts). Der naechste erfolgreiche Aufruf holt die additive Formkartengenerierung nach.
+    const allErrors = Array.from(new Set(results.flatMap((entry) => entry.errors)));
+    const allWarnings = Array.from(new Set(results.flatMap((entry) => entry.warnings)));
+    return { ok: false, savedCount: 0, errors: allErrors, warnings: allWarnings, results };
   }
 
-  const nextGameState: GameState = {
-    ...save.gameState,
+  const mitEinsatzlisten: GameState = {
+    ...baseGameState,
     seasonState: {
-      ...save.gameState.seasonState,
+      ...baseGameState.seasonState,
       lineupDrafts: [
         ...existingDrafts.filter((draft) => !nextDraftIds.has(draft.lineupId)),
         ...nextDrafts,
@@ -1565,13 +1784,22 @@ export function saveLocalLegacyLineupDraftBatch(
     },
   };
 
+  // Apron-Einfrierung NACH den Formkarten (siehe Funktionskommentar oben und der Kommentar an
+  // `ensureLocalLegacyFormCardsForSeason`, dessen Reihenfolge hier bewusst gespiegelt wird).
+  const nextGameState = ensureSeasonApronLinesFrozen(mitEinsatzlisten, "transfers_finalized");
+
+  // GENAU EIN Schreibvorgang fuer n Teams (Stufe 2.1) — unabhaengig davon, wie viele Teams im
+  // Aufruf steckten, hier steht nur dieser eine Aufruf.
   resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
 
+  const allErrors = Array.from(new Set(results.flatMap((entry) => entry.errors)));
+  const allWarnings = Array.from(new Set(results.flatMap((entry) => entry.warnings)));
   return {
-    ok: true,
+    ok: results.every((entry) => entry.ok),
     savedCount: nextDrafts.length,
-    errors: [],
-    warnings: Array.from(new Set(warnings)),
+    errors: allErrors,
+    warnings: allWarnings,
+    results,
   };
 }
 

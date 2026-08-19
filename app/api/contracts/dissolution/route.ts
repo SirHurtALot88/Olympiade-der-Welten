@@ -8,6 +8,7 @@ import {
 } from "@/lib/morale/contract-dissolution-local-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 
 type DissolutionRequestBody = {
   saveId?: string;
@@ -93,6 +94,9 @@ export async function POST(request: Request) {
     // Besitzpruefung VOR dem Schreiben: `teamId` ist das Team, dessen Spieler geht — nur wer
     // dieses Team fuehrt, darf ueber die Aufloesung entscheiden. Ausserhalb eines Raums laesst
     // der Guard durch (Solo), im Raum prueft er Sitz und Team-Zugehoerigkeit.
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -104,7 +108,7 @@ export async function POST(request: Request) {
       source: "sqlite",
       dryRun: false,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {

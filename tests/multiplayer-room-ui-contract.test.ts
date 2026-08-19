@@ -9,6 +9,9 @@ const modelPath = path.join(process.cwd(), "lib/room/online-room-model.ts");
 const flowPath = path.join(process.cwd(), "lib/room/room-flow-controller.ts");
 const flowSocketActionsPath = path.join(process.cwd(), "lib/room/room-flow-socket-actions.ts");
 const arenaSyncPath = path.join(process.cwd(), "lib/room/arena-sync-state.ts");
+const gameTypesPath = path.join(process.cwd(), "types/game.ts");
+const socketServerPath = path.join(process.cwd(), "lib/socket/server.ts");
+const deadRoomApiRoutePath = path.join(process.cwd(), "app/api/room/route.ts");
 
 describe("online multiplayer room UI contract", () => {
   it("exposes a clean, player-facing online-room setup instead of local-only runtime sessions", async () => {
@@ -91,5 +94,28 @@ describe("online multiplayer room UI contract", () => {
     expect(arenaSyncText).toContain("startRoomArena");
     expect(arenaSyncText).toContain("advanceRoomArenaReveal");
     expect(arenaSyncText).toContain("readyParticipantIds");
+  });
+
+  // Stufe 1.5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, "Toter Brettspiel-Rest"): der Debug-
+  // Bewegungs-Kanal (moveToken/endTurn), die dazugehoerigen Zustandsfelder und die tote
+  // Parallel-API sind entfernt. Diese Suite haelt die ABWESENHEIT fest, damit sie nicht
+  // versehentlich zurueckkehrt.
+  it("keeps the removed board-game debug harness (tokens/board/moveToken/endTurn) gone", async () => {
+    const gameTypesText = await fs.readFile(gameTypesPath, "utf8");
+    const socketServerText = await fs.readFile(socketServerPath, "utf8");
+
+    expect(gameTypesText).not.toContain("activeRole");
+    expect(gameTypesText).not.toContain("moveCommittedThisTurn");
+    expect(gameTypesText).not.toContain("AthleteToken");
+    expect(gameTypesText).not.toContain("BoardDefinition");
+    expect(gameTypesText).not.toMatch(/\btokens:\s*AthleteToken/);
+    expect(gameTypesText).not.toMatch(/\bturnNumber:\s*number/);
+
+    expect(socketServerText).not.toContain('"moveToken"');
+    expect(socketServerText).not.toContain('"endTurn"');
+    expect(socketServerText).not.toContain("apply-move-token");
+    expect(socketServerText).not.toContain("apply-end-turn");
+
+    await expect(fs.access(deadRoomApiRoutePath)).rejects.toThrow();
   });
 });

@@ -238,7 +238,7 @@ async function bootstrapFreshSeasonOneSave(outputDir: string, targetSeasons: num
   const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
   const saveMatch =
     combined.match(/STOP_AFTER=draft — Save `([^`]+)` bereit/) ??
-    combined.match(/\[long-run\] created (fresh-season-1-\d+)/);
+    combined.match(/\[long-run\] created (fresh-season-1-\d+(?:-[a-z0-9]+)?)/);
   if (!saveMatch) {
     throw new Error(
       `Fresh S1 draft bootstrap failed (exit ${result.status ?? "?"}): ${combined.split("\n").slice(-8).join(" | ")}`,

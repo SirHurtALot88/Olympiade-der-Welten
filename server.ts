@@ -3,6 +3,7 @@ import next from "next";
 
 import { ensureSocketServer } from "@/lib/socket/server";
 import { startOnlineSaveAutoExport } from "@/lib/persistence/online-save-auto-export";
+import { rehydrateRuntimeRoomsFromPersistence } from "@/lib/room/room-store";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
@@ -20,6 +21,12 @@ const handle = app.getRequestHandler();
 app
   .prepare()
   .then(() => {
+    // Stufe 0.1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B1): VOR ensureSocketServer, damit
+    // Raeume aus der Ablage schon im Speicher stehen, bevor der erste Client verbindet — sonst
+    // faende ein rejoinRoom() in der ersten Sekunde nach dem Neustart nichts.
+    const { restored, alreadyPresent } = rehydrateRuntimeRoomsFromPersistence();
+    console.log(`Room-Rehydrierung: ${restored} Raum/Raeume aus der Ablage geladen, ${alreadyPresent} bereits im Speicher.`);
+
     const httpServer = createServer((req, res) => handle(req, res));
     ensureSocketServer(httpServer);
     httpServer.listen(port, hostname, () => {
