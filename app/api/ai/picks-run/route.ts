@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
+import { getHumanControlledTeamIds, resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -95,8 +95,40 @@ export async function POST(request: Request) {
       )
     : null;
 
+  /**
+   * KEIN KI-KADERLAUF AUF EIN MENSCHLICH GEFUEHRTES TEAM — auch nicht auf das eigene.
+   *
+   * ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+   *
+   * DASS DIE ANTWORT EINE ABLEHNUNG IST UND KEIN STILLES AUSLASSEN, ist der eigentliche Punkt.
+   * Gemessen bei der Fehlerjagd: ein Lauf auf ein fremdes Team lieferte HTTP 200, `executed: true`,
+   * `status: "applied"` — und schrieb nachweislich nichts (`skippedTeamIds: ["M-M"]`, Kader danach
+   * 0). Die Oberflaeche meldete "KI-Picks angewendet.". Wer klickt, muss erfahren, dass nichts
+   * geschrieben wurde; ein Erfolg, der nichts tut, ist schlimmer als ein Fehler.
+   *
+   * Nur bei ausdruecklich genannten `teamIds`: ein Lauf ueber die KI-Teams der Liga soll weiter
+   * gehen, er fasst menschliche Teams ohnehin nicht an (`includeManualTeams` steht dort auf false).
+   */
+  const angefragteTeamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
+  if (!dryRun && angefragteTeamIds && angefragteTeamIds.length > 0 && freshSaveForScope) {
+    const menschlichGefuehrt = getHumanControlledTeamIds({
+      gameState: freshSaveForScope.gameState,
+      room: writeAuth.room,
+    });
+    const betroffene = angefragteTeamIds.filter((teamId) => menschlichGefuehrt.has(teamId));
+    if (betroffene.length > 0) {
+      return NextResponse.json(
+        {
+          error: "ai_picks_not_allowed_for_human_team",
+          teamIds: betroffene,
+        },
+        { status: 403 },
+      );
+    }
+  }
+
   try {
-    const teamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
+    const teamIds = angefragteTeamIds;
     const result = await runAiPicksExecutePreview({
       source: "sqlite",
       saveId,

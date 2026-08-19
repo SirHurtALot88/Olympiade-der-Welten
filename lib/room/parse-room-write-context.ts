@@ -100,6 +100,11 @@ export function isStaleSaveVersionError(payload: unknown) {
  * Unbekannte, bereits menschenlesbare Texte werden unverändert durchgereicht; leere Eingaben → null.
  */
 const ROOM_WRITE_ERROR_MESSAGES: Record<string, string> = {
+  // ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+  // Der Knopf dafuer ist raus; dieser Satz faengt jeden zweiten Weg dorthin ab (alte Lesezeichen,
+  // Skripte) und sagt, was stattdessen gilt — statt still nichts zu tun und Erfolg zu melden.
+  ai_picks_not_allowed_for_human_team:
+    "Für ein selbst geführtes Team gibt es keinen KI-Kaderlauf. Spieler holst du über den Transfermarkt.",
   room_not_found: "Der Raum ist abgelaufen oder existiert nicht mehr.",
   room_context_required_for_room_save: "Raum-Kontext fehlt — bitte den Raum neu öffnen.",
   save_bound_to_different_room: "Dieser Spielstand gehört zu einem anderen Raum.",

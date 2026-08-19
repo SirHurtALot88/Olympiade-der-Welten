@@ -465,9 +465,6 @@ export type FoundationTeamsDetailPanelProps = {
   contractRenewalMessage: unknown;
   contractRenewalError: unknown;
   /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
-  runTeamPicksRefill?: (teamId: string) => void | Promise<void>;
-  teamPicksRefillBusyTeamId?: string | null;
-  teamPicksRefillMessage?: { teamId: string; tone: "success" | "error"; text: string } | null;
 };
 
 function FoundationTeamsDetailPanel({
@@ -605,9 +602,6 @@ function FoundationTeamsDetailPanel({
   selectedTeamRosterActionHint,
   contractRenewalMessage,
   contractRenewalError,
-  runTeamPicksRefill,
-  teamPicksRefillBusyTeamId,
-  teamPicksRefillMessage,
 }: FoundationTeamsDetailPanelProps) {
   const showLeagueLogos = teamsHydrationPhase === "full";
   const showSecondaryPanels = teamsHydrationPhase === "full";
@@ -1041,11 +1035,6 @@ function FoundationTeamsDetailPanel({
                         <span>{selectedTeamRosterActionHint}</span>
                       </div>
                     ) : null}
-                    {teamPicksRefillMessage && selectedTeam && teamPicksRefillMessage.teamId === selectedTeam.teamId ? (
-                      <div className={`status-banner${teamPicksRefillMessage.tone === "success" ? " is-success" : " is-warning"}`}>
-                        {teamPicksRefillMessage.text}
-                      </div>
-                    ) : null}
                     <div className="team-focus-layout">
                       <div className="table-shell team-focus-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
                         <table
@@ -1386,17 +1375,19 @@ function FoundationTeamsDetailPanel({
                               : "Diszi-Spalten aktuell ausgeblendet"}
                           </span>
                           <div className="team-detail-actions">
-                            {selectedTeamRosterActionsAvailable && selectedTeam && runTeamPicksRefill ? (
-                              <button
-                                className="secondary-button inline-button"
-                                type="button"
-                                disabled={teamPicksRefillBusyTeamId != null}
-                                title="KI-Picks für dieses Team neu anwerfen"
-                                onClick={() => void runTeamPicksRefill(selectedTeam.teamId)}
-                              >
-                                {teamPicksRefillBusyTeamId === selectedTeam.teamId ? "Wirbt an…" : "Kader auffüllen"}
-                              </button>
-                            ) : null}
+                            {/* „Kader auffüllen" (KI-Picks für DIESES Team) stand hier und ist raus.
+                                ENTSCHEIDUNG VON CHRIS (19.08.): „keiner von uns soll seinen kader per
+                                KI füllen! weg damit." Der Knopf erschien ausschliesslich auf einem
+                                menschlich gefuehrten Team im Saisonende-Fenster
+                                (`selectedTeamRosterActionsAvailable` = eigenes Team + Fenster offen) —
+                                also genau in dem Fall, den es nicht mehr geben soll. Kader entstehen
+                                fuer beide Spieler ueber den Transfermarkt.
+
+                                Die Sperre haengt NICHT an diesem Knopf: `/api/ai/picks-run` weist
+                                menschlich gefuehrte Teams jetzt selbst ab (Grund
+                                `ai_picks_not_allowed_for_human_team`) — ein zweiter Weg dorthin, aus
+                                einer alten Lesezeichen-URL oder einem Skript, fuehrt ins Leere und
+                                sagt auch, warum. */}
                             <button
                               className="secondary-button inline-button"
                               type="button"

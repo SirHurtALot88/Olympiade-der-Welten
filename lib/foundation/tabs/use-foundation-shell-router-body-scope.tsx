@@ -3978,111 +3978,17 @@ export function useFoundationShellRouterBodyScope({
     reloadSeasonStandingsOverview,
     reloadTransferRecapFeed,
   ]);
-
-  // Manuelles Neu-Anwerfen der KI-Picks für EIN Team (z. B. ein Team, dessen
-  // Kader nach dem Setup leer geblieben ist). Nutzt denselben scoped picks-run-
-  // Endpoint und dieselbe Reload-Kette wie der Cockpit-Roster-Fill; scope "all"
-  // + teamIds:[teamId] + allowSetupAllTeams begrenzt den Lauf auf genau dieses
-  // Team.
-  const [teamPicksRefillBusyTeamId, setTeamPicksRefillBusyTeamId] = useState<string | null>(null);
-  const [teamPicksRefillMessage, setTeamPicksRefillMessage] = useState<
-    { teamId: string; tone: "success" | "error"; text: string } | null
-  >(null);
-
-  const runTeamPicksRefill = useCallback(
-    async (teamId: string) => {
-      if (!teamId) {
-        return;
-      }
-      if (readMeta.readOnly || readMeta.source === "prisma") {
-        showReadOnlyNotice();
-        return;
-      }
-      if (teamPicksRefillBusyTeamId) {
-        return;
-      }
-
-      setTeamPicksRefillBusyTeamId(teamId);
-      setTeamPicksRefillMessage(null);
-      try {
-        const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            withRoomContextBody(
-              {
-                dryRun: false,
-                confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-                teamScope: "all",
-                teamIds: [teamId],
-                allowSetupAllTeams: true,
-          includeManualTeams: true,
-              },
-              roomContext,
-            ),
-          ),
-        });
-        const payload = (await response.json().catch(() => ({}))) as {
-          error?: string;
-          executed?: boolean;
-          blockingReasons?: string[];
-          teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number; blockingReasons?: string[] }>;
-        };
-
-        if (!response.ok || payload.error) {
-          setTeamPicksRefillMessage({
-            teamId,
-            tone: "error",
-            text:
-              formatRoomWriteErrorCode(payload.error) ??
-              payload.blockingReasons?.join(" · ") ??
-              "KI-Picks konnten nicht angewendet werden.",
-          });
-          return;
-        }
-
-        const teamResult = payload.teams?.find((entry) => entry.teamId === teamId) ?? null;
-        const picksApplied =
-          teamResult?.rosterAfter != null && teamResult.rosterBefore != null
-            ? teamResult.rosterAfter - teamResult.rosterBefore
-            : null;
-
-        if (!payload.executed || (picksApplied != null && picksApplied <= 0)) {
-          const teamBlockers = teamResult?.blockingReasons ?? [];
-          const blockers = teamBlockers.length > 0 ? teamBlockers : payload.blockingReasons ?? [];
-          setTeamPicksRefillMessage({
-            teamId,
-            tone: "error",
-            text:
-              blockers.length > 0
-                ? blockers.slice(0, 3).join(" · ")
-                : "Keine neuen Picks angewendet (kein passender Spieler oder Budget).",
-          });
-          return;
-        }
-
-        setTeamPicksRefillMessage({
-          teamId,
-          tone: "success",
-          text: picksApplied != null ? `${picksApplied} Spieler geholt.` : "KI-Picks angewendet.",
-        });
-        await reloadAfterMarketRosterApply();
-      } catch {
-        setTeamPicksRefillMessage({ teamId, tone: "error", text: "KI-Picks konnten nicht angewendet werden." });
-      } finally {
-        setTeamPicksRefillBusyTeamId(null);
-      }
-    },
-    [
-      buildCockpitScopeParams,
-      readMeta.readOnly,
-      readMeta.source,
-      reloadAfterMarketRosterApply,
-      roomContext,
-      showReadOnlyNotice,
-      teamPicksRefillBusyTeamId,
-    ],
-  );
+  /**
+   * HIER STAND „Kader auffüllen" — der KI-Pick-Lauf fuer GENAU DIESES Team.
+   *
+   * ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+   * Der Knopf erschien nur auf einem selbst gefuehrten Team im Saisonende-Fenster — also genau im
+   * Fall, den es nicht mehr geben soll. Handler, Zustand und Meldungsbanner sind mit raus; stehen
+   * zu lassen hiesse, beim naechsten Umbau wieder einen Aufrufer dafuer zu suchen.
+   *
+   * Die Sperre haengt nicht an dieser Abwesenheit: `/api/ai/picks-run` weist menschlich gefuehrte
+   * Teams selbst ab (`ai_picks_not_allowed_for_human_team`).
+   */
 
   const matchdayArenaApplyHandlers = useMemo(
     () =>
@@ -12026,10 +11932,6 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
-    // Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab).
-    runTeamPicksRefill,
-    teamPicksRefillBusyTeamId,
-    teamPicksRefillMessage,
     // Saison-Kapitän wählen direkt aus dem Kader-Tab (wie AI-Teams). Kandidaten
     // + Führungs-Breakdown baut die Kaderansicht selbst aus `gameState`; hier
     // reicht der aktuelle Kapitän, der Assign-Handler und der Busy-State.
