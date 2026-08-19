@@ -41,6 +41,10 @@ import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/boa
 import { getMetricBarPercent, getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import {
+  createUpdateInboxItemStatus,
+  deriveGlobalNextUi,
+} from "@/lib/foundation/tabs/foundation-global-next-actions";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import {
   FACILITY_CATALOG,
@@ -7140,56 +7144,35 @@ export function useFoundationShellRouterBodyScope({
       }),
     );
   };
-  const updateInboxItemStatus = (item: GameInboxItem, status: GameInboxItem["status"]) => {
-    if (readMeta.readOnly) {
-      showReadOnlyNotice();
-      return;
-    }
-
-    const existingItems = gameState.gameInboxItems ?? [];
-    const hasStoredItem = existingItems.some((entry) => entry.itemId === item.itemId);
-    const nextItems = hasStoredItem
-      ? existingItems.map((entry) => (entry.itemId === item.itemId ? { ...entry, status } : entry))
-      : [...existingItems, { ...item, status }];
-    const nextGameState = {
-      ...gameState,
-      gameInboxItems: nextItems,
-    };
-
-    setGameState(nextGameState);
-    if (readMeta.source !== "prisma" && !readMeta.readOnly && activeSaveId !== "loading-save") {
-      void persistLocalGameStateImmediately(nextGameState).catch((error) => {
-        console.error(error);
-      });
-    }
-  };
-  const globalNextDisabled = primaryInboxItem
-    ? false
-    : gameFlowActionStep.status === "applying" || cockpitBusyKey != null || seasonTransitionBusy;
-  const globalNextLabel = primaryInboxItem?.title ?? gameFlowActionStep.label;
-  const globalNextTitle = primaryInboxItem
-    ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
-    : gameFlowActionStep.status === "blocked"
-      ? formatGameFlowBlockerList(
-          matchdayArenaBlockerSummary.reasons.length > 0
-            ? matchdayArenaBlockerSummary.reasons
-            : gameFlowActionStep.blockers,
-        ) || "Leertaste: zum blockierten Schritt springen"
-      : globalNextDisabled
-        ? "Aktion läuft gerade."
-        : gameFlowActionStep.status === "optional" &&
-            (gameFlowActionStep.stepId === "matchday_facilities" || gameFlowActionStep.stepId === "facilities")
-          ? "Leertaste: optional prüfen oder überspringen"
-          : transferWindowHint.open
-          ? `Leertaste: Weiter · ${transferWindowHint.label}`
-          : "Leertaste: Weiter";
-  const globalNextStatusClass = primaryInboxItem
-    ? primaryInboxItem.severity === "critical"
-      ? "is-blocked"
-      : primaryInboxItem.severity === "warning"
-        ? "is-warning"
-        : "is-ready"
-    : getGameFlowStatusClass(gameFlowActionStep.status);
+  /* Ebenfalls eine wortgleiche Kopie aus `foundation-global-next-actions.ts` — siehe unten. */
+  const updateInboxItemStatus = createUpdateInboxItemStatus({
+    readMeta,
+    showReadOnlyNotice,
+    gameState,
+    setGameState,
+    activeSaveId,
+    persistLocalGameStateImmediately,
+  });
+  /**
+   * EINE RECHENSTELLE FUER DIE WEITER-LEISTE — vorher zwei.
+   *
+   * Hier stand eine wortgleiche Kopie von `deriveGlobalNextUi`
+   * (`foundation-global-next-actions.ts`): dieselben verschachtelten Bedingungen, dieselben
+   * Texte, Zeile fuer Zeile. Nur importierte das Modul niemand — es wurde ausschliesslich als
+   * TEXT von `tests/game-inbox-ui-contract.test.ts` gelesen. Wer dort etwas reparierte, aenderte
+   * am Spiel nichts, und der Vertragstest blieb gruen.
+   *
+   * Jetzt zieht die Leiste ihre Beschriftung aus der Funktion, und die Funktion ist damit
+   * pruefbar (`tests/weiter-leiste-beschriftung.test.ts`) statt nur lesbar.
+   */
+  const { globalNextDisabled, globalNextLabel, globalNextTitle, globalNextStatusClass } = deriveGlobalNextUi({
+    primaryInboxItem,
+    gameFlowActionStep,
+    cockpitBusyKey,
+    seasonTransitionBusy,
+    matchdayArenaBlockerSummary,
+    transferWindowHint,
+  });
   const triggerGlobalNext = async () => {
     if (activeView === "matchdayArena" && !activeManagerMatchdayReady) {
       const lineupInboxItem =

@@ -1,11 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import type { GameInboxItem, GameState } from "@/lib/data/olyDataTypes";
-import type { GameFlowStepStatus, GameFlowView } from "@/lib/foundation/game-flow-controller";
+import type { GameFlowStepStatus } from "@/lib/foundation/game-flow-controller";
 import { formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
-import type { FoundationReadMeta, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
+import type { FoundationReadMeta } from "@/lib/foundation/tabs/foundation-page-types";
 import { getGameFlowStatusClass } from "@/lib/foundation/tabs/cockpit-ui-helpers";
-import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 export type FoundationGlobalNextUiInput = {
   primaryInboxItem: GameInboxItem | null;
@@ -74,7 +73,13 @@ export type UpdateInboxItemStatusDeps = {
   gameState: GameState;
   setGameState: Dispatch<SetStateAction<GameState>>;
   activeSaveId: string;
-  persistLocalGameStateImmediately: (nextGameState: GameState) => Promise<void>;
+  /**
+   * Der Rueckgabewert wird bewusst NICHT festgelegt: die gelebte Fassung im Shell liefert den
+   * gespeicherten `GameState` zurueck und nimmt ausserdem Optionen entgegen. Hier stand
+   * `Promise<void>` — eine engere Zusage, als der Aufrufer einhaelt. Gebraucht wird nur, dass es
+   * ein Promise ist, an das ein `catch` passt.
+   */
+  persistLocalGameStateImmediately: (nextGameState: GameState) => Promise<unknown>;
 };
 
 export function createUpdateInboxItemStatus(deps: UpdateInboxItemStatusDeps) {
@@ -103,84 +108,27 @@ export function createUpdateInboxItemStatus(deps: UpdateInboxItemStatusDeps) {
   };
 }
 
-export type TriggerGlobalNextDeps = {
-  activeView: FoundationView;
-  activeManagerTeamId: string | null;
-  activeManagerMatchdayReady: boolean;
-  homeNextMatchdayStatus: { resultAvailable: boolean };
-  primaryInboxItem: GameInboxItem | null;
-  globalNextDisabled: boolean;
-  gameFlowActionStep: {
-    stepId: string;
-    status: GameFlowStepStatus;
-    targetView: GameFlowView;
-    teamId?: string | null;
-    targetPanel?: string | null;
-  };
-  navigateToInboxItem: (item: GameInboxItem) => void;
-  navigateToGameFlowStep: (
-    targetView: GameFlowView,
-    teamId?: string | null,
-    targetPanel?: string | null,
-  ) => void;
-  resolveLineupIssueTeamId: (preferredTeamId?: string | null) => string | null;
-  setFoundationView: (view: FoundationView, setActiveView: (view: FoundationView) => void) => void;
-  setActiveView: (view: FoundationView) => void;
-  setShowGameFlowPanel: (show: boolean) => void;
-  matchdayArenaApplyHandlers: {
-    runCockpitMatchdayAdvance?: (fromGlobalNext?: boolean) => Promise<{ applied?: boolean } | null | undefined>;
-  } | null;
-  setAcknowledgedFlowStepIds: Dispatch<SetStateAction<Set<string>>>;
-  updateNewGameFlowStepStatus: (stepId: "training_facilities", status: "completed") => void;
-  acknowledgeFlowStep: (stepId: string) => void;
-};
-
-export function createTriggerGlobalNext(deps: TriggerGlobalNextDeps) {
-  return async () => {
-    if (deps.activeView === "matchdayArena" && !deps.activeManagerMatchdayReady) {
-      const lineupInboxItem =
-        deps.primaryInboxItem?.itemId.startsWith("lineup_missing:") ? deps.primaryInboxItem : null;
-      if (lineupInboxItem) {
-        deps.navigateToInboxItem(lineupInboxItem);
-      } else {
-        deps.navigateToGameFlowStep("lineup", deps.resolveLineupIssueTeamId(deps.activeManagerTeamId));
-      }
-      return;
-    }
-    if (
-      deps.activeView === "lineup" &&
-      deps.activeManagerMatchdayReady &&
-      !deps.homeNextMatchdayStatus.resultAvailable &&
-      deps.primaryInboxItem?.itemId.startsWith("lineup_missing:")
-    ) {
-      deps.setFoundationView("matchdayArena", deps.setActiveView);
-      return;
-    }
-    if (deps.primaryInboxItem) {
-      deps.navigateToInboxItem(deps.primaryInboxItem);
-      return;
-    }
-    if (deps.globalNextDisabled) {
-      deps.setShowGameFlowPanel(true);
-      return;
-    }
-    if (canAdvanceMatchdayFromStep(deps.gameFlowActionStep)) {
-      const result = await deps.matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance?.(true);
-      if (result?.applied) {
-        deps.setAcknowledgedFlowStepIds(new Set());
-      } else {
-        deps.setShowGameFlowPanel(true);
-      }
-      return;
-    }
-    if (deps.gameFlowActionStep.stepId === "scouting_facilities") {
-      deps.updateNewGameFlowStepStatus("training_facilities", "completed");
-    }
-    deps.navigateToGameFlowStep(
-      deps.gameFlowActionStep.targetView,
-      deps.gameFlowActionStep.teamId,
-      deps.gameFlowActionStep.targetPanel,
-    );
-    deps.acknowledgeFlowStep(deps.gameFlowActionStep.stepId);
-  };
-}
+/*
+ * HIER STANDEN `TriggerGlobalNextDeps` UND `createTriggerGlobalNext` — ENTFERNT.
+ *
+ * Nicht weil sie doppelt waren, sondern weil sie VERALTET waren. Die gelebte Fassung in
+ * `use-foundation-shell-router-body-scope.tsx` ist der hier geloeschten um drei Korrekturen
+ * voraus, die dort ausfuehrlich begruendet stehen:
+ *
+ *   1. Sie fragte roh `status === "ready"` ab statt `canAdvanceMatchdayFromStep`. Ein Team mit
+ *      gerissenen Board-Zielen (Status "warning") kam ueber diesen Weg nicht weiter.
+ *   2. Sie rief `runCockpitMatchdayAdvance` direkt auf — ohne das Lebenszeichen beim Klick und
+ *      ohne die Ablehnungsgruende, die `finishMatchdayAndAdvance` zusammentraegt.
+ *   3. Sie wechselte danach nicht in den Saisonstand; der Arena-Knopf schon. Derselbe Abschluss
+ *      liess einen also je nach angeklicktem Knopf woanders stehen.
+ *
+ * Dazu fehlten ihr `canJumpToArenaAfterLineupSave` (Online-Spiel: die Arena zeigt den Spieltag
+ * ALLER Teams) und der Zweig fuer `finalize_transfers`.
+ *
+ * Sie zu verdrahten haette also nicht aufgeraeumt, sondern drei behobene Fehler wieder
+ * eingeschleppt — und niemand haette es gemerkt, weil der Vertragstest die Datei nur als TEXT
+ * liest. Genau das ist Befund A3 aus `docs/AUDIT-INGAME-2026-08-19.md`.
+ *
+ * Die beiden Funktionen oben sind dagegen wortgleich mit dem, was lief; sie sind jetzt
+ * verdrahtet statt kopiert.
+ */

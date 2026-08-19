@@ -149,6 +149,49 @@ nichts, und der Test bleibt grün.
 
 ---
 
+### A3 · ERLEDIGT — und die Richtung war nicht die erwartete
+
+Naheliegend wäre gewesen, die ausgelagerten Funktionen zu verdrahten und die Inline-Kopien zu
+löschen. **Der Diff hat das widerlegt.** Die drei Funktionen waren nicht gleich:
+
+| Funktion | Verhältnis zur gelebten Fassung | Entscheidung |
+|---|---|---|
+| `deriveGlobalNextUi` | **wortgleich** | verdrahtet, Inline-Kopie gelöscht |
+| `createUpdateInboxItemStatus` | **wortgleich** | verdrahtet, Inline-Kopie gelöscht |
+| `createTriggerGlobalNext` | **drei Korrekturen hinterher** | gelöscht |
+
+`createTriggerGlobalNext` zu verdrahten hätte nicht aufgeräumt, sondern drei behobene Fehler
+wieder eingeschleppt: die rohe `status === "ready"`-Abfrage statt `canAdvanceMatchdayFromStep`
+(ein Team mit gerissenen Board-Zielen kam über diesen Weg nicht weiter), der direkte Aufruf von
+`runCockpitMatchdayAdvance` ohne die Ablehnungsgründe, und der fehlende Wechsel in den
+Saisonstand. Dazu fehlten ihr `canJumpToArenaAfterLineupSave` (Online-Spiel) und der
+`finalize_transfers`-Zweig.
+
+**Eine zweite tote Datei kam dabei heraus:** `foundation-game-flow-navigation.ts` — ebenfalls von
+niemandem importiert, ebenfalls nur als Text im Vertrag, und ebenfalls veraltet: sie trug noch
+`scrollToFoundationTarget("foundation-home")`, also genau den toten Anker, der unter A1 repariert
+wurde. **Gelöscht.**
+
+**Der Riegel gegen die Klasse** steht in `tests/vertragstests-lesen-keinen-toten-code.test.ts`:
+
+1. Jede Datei, die ein Vertragstest als Text einliest, muss von Laufzeitcode importiert werden.
+2. Das Shell muss die Funktionen **rufen**, statt sie nachzubauen.
+3. Der Text `"Leertaste: Weiter"` darf in **genau einer** Laufzeitdatei stehen.
+
+Alle drei mit Gegenprobe gefahren. Punkt 3 ist der schärfste — er hätte die ursprüngliche Kopie
+sofort aufgedeckt.
+
+**Warum es diesen Riegel braucht, nachgemessen:** löst man im Shell die Verdrahtung wieder, bleibt
+`game-inbox-ui-contract` **grün**. Er prüft, dass Namen irgendwo im zusammengeklebten Quelltext
+stehen — nicht, dass sie benutzt werden. Genau so konnte die Kopie überhaupt entstehen.
+
+**Nebenertrag:** `deriveGlobalNextUi` ist jetzt eine echte, geprüfte Funktion
+(`tests/weiter-leiste-beschriftung.test.ts`, 9 Fälle) statt nur lesbarer Text. Damit hat **A2**
+eine messbare Ausgangslage — der Fall „der Posteingang verdrängt das Label" ist dort festgehalten,
+ausdrücklich als Ist-Zustand und nicht als Soll.
+
+---
+
 ## B — Widersprüche, die der Spieler sieht
 
 ### B1 · „Bereit — alle Aktionen abgeschlossen" neben „Board-Ziel verfehlt"
