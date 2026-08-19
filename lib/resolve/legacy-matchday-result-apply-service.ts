@@ -273,6 +273,28 @@ function loadAllContextsForSqlite(
   return contexts;
 }
 
+/**
+ * DER RIEGEL GEGEN DEN LEEREN SPIELTAG — als reine Funktion, damit er ohne den kompletten
+ * Apply-Aufbau geprueft werden kann.
+ *
+ * `writtenDisciplineRows` ist die Zahl der Zeilen, die DIESER Aufruf wirklich schreibt: die
+ * nicht eingefrorenen Seiten. Bei der gestaffelten Buchung (D1 liegt, D2 kommt) sind das genau
+ * die D2-Zeilen — die bereits gebuchte D1 zaehlt bewusst nicht mit, sonst koennte ein leerer
+ * D2-Commit sich hinter den D1-Zeilen verstecken.
+ */
+export function buildEmptyDisciplineRowBlocker(input: {
+  matchdayId: string;
+  writtenDisciplineRows: number;
+  isStagedContinuation: boolean;
+}): string | null {
+  if (input.writtenDisciplineRows > 0) {
+    return null;
+  }
+  return input.isStagedContinuation
+    ? `Keine wertbare Disziplin-Zeile fuer die offene Seite von ${input.matchdayId}. Der Spieltag wird nicht als gebucht vermerkt.`
+    : `Keine wertbare Disziplin-Zeile fuer ${input.matchdayId}. Der Spieltag wird nicht als gebucht vermerkt.`;
+}
+
 function buildBlockingReasons(input: {
   previewStatus: ResolvePreviewStatus;
   hasExistingResult: boolean;
@@ -744,6 +766,45 @@ export class LegacyMatchdayResultApplyService {
     const isStagedContinuation =
       existingSides.size > 0 && [...incomingSides].some((side) => !existingSides.has(side));
     const frozenSides = isStagedContinuation ? existingSides : new Set<"d1" | "d2">();
+
+    /**
+     * EIN SPIELTAG OHNE EINE EINZIGE GEWERTETE ZEILE IST KEIN GEBUCHTER SPIELTAG.
+     *
+     * Bis hierher entschied allein der Vorschau-Status (`buildBlockingReasons` oben), ob gebucht
+     * werden darf — WIE VIELE Zeilen dabei entstehen, ging in keine Bedingung ein. Ein Apply,
+     * der null Disziplin-Zeilen schreibt, meldete deshalb `ok: true, applied: true`, und die
+     * Oberflaeche sagte „im Saisonstand", waehrend im Save nichts stand.
+     *
+     * Aufgefallen ist das am Trockenlauf der Saison-Simulation: dort kam je Spieltag
+     * `resolvedTeams: 32, blockers: []` zurueck, bei `disciplineRows: 0`. Das Skript hat seither
+     * eine eigene Zusicherung — aber sie half nur dem Skript. Jeder andere Aufrufer, auch der
+     * Spieltagslauf im Spiel, bekam weiterhin ein `applied: true` fuer nichts.
+     *
+     * GEZAEHLT WIRD, WAS DIESER AUFRUF WIRKLICH SCHREIBT: die nicht eingefrorenen Seiten. Bei
+     * der gestaffelten Buchung (D1 liegt, D2 kommt) sind das genau die D2-Zeilen — die bereits
+     * gebuchte D1 zaehlt bewusst NICHT mit, sonst koennte ein leerer D2-Commit sich hinter den
+     * D1-Zeilen verstecken.
+     */
+    const neueDisziplinZeilen = writePayload.disciplineResultPayloads.filter(
+      (payload) => !frozenSides.has(payload.disciplineSide),
+    ).length;
+    const leerlaufGrund = buildEmptyDisciplineRowBlocker({
+      matchdayId: params.matchdayId,
+      writtenDisciplineRows: neueDisziplinZeilen,
+      isStagedContinuation,
+    });
+    if (leerlaufGrund) {
+      const grund = leerlaufGrund;
+      return {
+        ok: false,
+        source,
+        error: grund,
+        previewStatus: prepared.preview.status,
+        canApply: false,
+        blockingReasons: [grund],
+      };
+    }
+
     const frozenDisciplineResults = isStagedContinuation
       ? (save.gameState.seasonState.disciplineResults ?? []).filter(
           (entry) => entry.matchdayResultId === matchdayResultId && frozenSides.has(entry.disciplineSide),
