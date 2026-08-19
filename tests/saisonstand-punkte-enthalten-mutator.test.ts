@@ -26,16 +26,24 @@ const BUCHUNG = readFileSync(join(process.cwd(), "lib/standings/standings-previe
 const SCHREIBWEG = readFileSync(join(process.cwd(), "lib/standings/standings-apply-service.ts"), "utf8");
 const SPIELTAG = readFileSync(join(process.cwd(), "lib/foundation/season-matchday-points.ts"), "utf8");
 const FELDRENNEN = readFileSync(join(process.cwd(), "lib/foundation/build-field-race-ledger.ts"), "utf8");
+const SUMMENQUELLE = readFileSync(join(process.cwd(), "lib/foundation/player-points-total.ts"), "utf8");
 
 describe("Saisonstand-Punkte enthalten den Mutator-Aufschlag", () => {
   it("die Buchung summiert den Mutator-Aufschlag je Team", () => {
-    expect(BUCHUNG).toContain("mutatorPunkteJeTeam");
-    expect(BUCHUNG).toContain("performance.mutatorPpsBonus");
+    /**
+     * Gemessen wird die AUSSAGE, nicht ein Bezeichner. Diese Wache stand zuerst auf einer eigenen
+     * lokalen Zaehlschleife (`mutatorPunkteJeTeam`); inzwischen laeuft dieselbe Summe ueber die
+     * geteilte `resolveTeamMutatorPpsBonus` (lib/foundation/player-points-total.ts). Das ist eine
+     * Zaehlstelle statt zweier und damit besser — der Waechter darf daran nicht scheitern.
+     * Entscheidend bleibt: die Buchung holt sich den Aufschlag ueberhaupt.
+     */
+    expect(BUCHUNG).toContain("resolveTeamMutatorPpsBonus");
+    expect(SUMMENQUELLE).toContain("mutatorPpsBonus");
   });
 
   it("der Aufschlag geht in `pointsDelta` ein — nicht nur in eine Anzeige", () => {
     const stelle = BUCHUNG.slice(BUCHUNG.indexOf("const pointsDelta ="), BUCHUNG.indexOf("const hasStoredResult"));
-    expect(stelle).toContain("mutatorPunkteJeTeam.get(team.teamId)");
+    expect(stelle).toContain("mutatorBonus");
   });
 
   it("Spieltag und Feld-Rennen summieren `points`, nicht `basePoints`", () => {

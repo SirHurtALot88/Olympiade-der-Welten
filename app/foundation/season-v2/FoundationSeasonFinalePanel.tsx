@@ -245,8 +245,18 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     {
       key: "transfer-window",
       title: "Verkäufe & Verträge öffnen",
+      /*
+       * BEFUND B3: hier stand „Offen — Verträge verlängern …" NEBEN dem Statuschip „erledigt".
+       *
+       * Beides stimmte, aber ueber verschiedene Dinge: „Offen" beschrieb das VERKAUFSFENSTER,
+       * „erledigt" den SCHRITT, es zu oeffnen. In einer Zeile gelesen ergab das einen
+       * Widerspruch — und der Spieler glaubt danach keiner der beiden Angaben mehr.
+       *
+       * Der Schritt ist erledigt; der Text sagt jetzt, was dadurch moeglich ist, statt den
+       * Zustand des Fensters noch einmal zu benennen.
+       */
       detail: sellWindowOpen
-        ? "Offen — Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
+        ? "Freigeschaltet — du kannst jetzt Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
         : "Verlängern und verkaufen sind bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch. Kaufen bleibt zu — das ist ein eigener Schritt in der neuen Saison.",
       state: sellWindowOpen ? "done" : readOnly ? "blocked" : busy ? "busy" : "ready",
       action:

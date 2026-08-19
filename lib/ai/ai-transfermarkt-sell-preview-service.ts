@@ -44,10 +44,22 @@ import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 
 export type AiSellPreviewSource = "sqlite" | "prisma";
 export type AiSellPreviewTeamScope = "ai" | "all";
+/**
+ * CHRIS' MELDUNG `33c172`: „anscheinend wurden verkaeufe gestoppt wegen spieler minimum ->
+ * diesen grund darf es nicht geben der muss sauber entfernt werden weil beim verkauf gibt es ja
+ * kein spieler minimum - das hatten wir jetzt schon so oft!"
+ *
+ * `low_roster_depth` ist deshalb WEG. Er war der Status hinter dem Etikett „kader zu klein" und
+ * damit genau der Grund, den er meint. Der Compiler erzwingt ueber diesen Typ, dass keine Stelle
+ * ihn wieder einfuehrt.
+ *
+ * WAS BLEIBT, und das ist kein Widerspruch: der Kader-Mindestwert steuert weiter das KAUFEN — der
+ * Planer fuellt auf `playerMin` auf. Ein Team, das sich unter das Minimum verkauft, kauft in der
+ * naechsten Runde nach. Das ist die Selbstheilung, die den Wegfall der Verkaufsbremse traegt.
+ */
 export type AiSellPreviewTeamStatus =
   | "ready"
   | "no_sell_need"
-  | "low_roster_depth"
   | "no_candidates"
   | "warning"
   | "blocked";
@@ -225,9 +237,10 @@ function normalizeGameState(gameState: GameState) {
 /**
  * FATIGUE-TIEFEN-NOT HEBT AUF "tight" — Chris: „wenn fatigue ihnen zu hoch ist ggf. spieler
  * verkaufen um cash zu schaffen und günstigere spieler zu holen aber sich mehr dem eigenen opt zu
- * nähern." Bis hierher kannte dieser Dienst Kadertiefe NUR als Bremse (`low_roster_depth`), nie als
- * Auslöser: ein erschöpftes Team ohne Cash galt als „healthy" und verkaufte nichts — obwohl genau
- * ihm das Geld fuer Ergaenzungen fehlt.
+ * nähern." Bis hierher kannte dieser Dienst Kadertiefe NUR als Bremse, nie als Auslöser: ein
+ * erschöpftes Team ohne Cash galt als „healthy" und verkaufte nichts — obwohl genau ihm das Geld
+ * fuer Ergaenzungen fehlt. (Die Bremse selbst ist inzwischen weg, Meldung `33c172`; dieser
+ * Auslöser bleibt davon unberührt.)
  *
  * BEWUSST NUR BIS "tight", NICHT "critical". Die Not ist eine Kader-, keine Zahlungsnot; „critical"
  * ist fuer Teams reserviert, die ihre Gehaelter nicht decken. Ein cash-kritisches Team bleibt
@@ -585,12 +598,10 @@ function buildCandidate(
   const hardNoGoHit = matchesHardNoGo(profile, player);
   const rosterAfter = Math.max(rosterSize - 1, 0);
 
-  if (!allowSellBelowRosterMin && playerMin != null && rosterSize - 1 < playerMin) {
-    warnings.push("Verkauf würde den Kader unter das Team-Minimum drücken.");
-  }
-  if (!allowSellBelowRosterMin && rosterSize <= 7) {
-    warnings.push("Kader ist bereits sehr klein.");
-  }
+  // HIER STANDEN ZWEI WARNUNGEN ZUR KADERGROESSE („Verkauf wuerde den Kader unter das
+  // Team-Minimum druecken." / „Kader ist bereits sehr klein.") — beide entfernt, Meldung `33c172`.
+  // Eine Warnung an einem Verkaufskandidaten faerbt seinen Status auf „warning" und liest sich in
+  // der Uebersicht wie ein Hindernis. Beim Verkauf gibt es kein Spielerminimum.
   if (expectedSellValue != null && expectedSellValue <= 0) {
     warnings.push("Netto-Verkaufserlös deckt den offenen Buyout nicht.");
     pushKeep("negative_net_proceeds", "Verkauf bringt nach Buyout keinen positiven Cash-Zufluss");
@@ -1171,13 +1182,6 @@ function getTeamStatus(entry: {
   if (entry.teamScope === "all" && entry.controlMode !== "ai") {
     return "warning" as const;
   }
-  if (
-    !entry.allowSellBelowRosterMin &&
-    entry.playerMin != null &&
-    entry.rosterSize <= entry.playerMin
-  ) {
-    return "low_roster_depth" as const;
-  }
   if (entry.sellCandidates.length === 0) {
     return entry.keepCore.length > 0 ? ("no_sell_need" as const) : ("no_candidates" as const);
   }
@@ -1375,7 +1379,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
     skippedPassive: sortedTeams.filter((team) => team.controlMode === "passive").length,
     skippedDisabled: sortedTeams.filter((team) => team.controlMode === "ai" && !team.aiSellPreviewEnabled).length,
     readyTeams: sortedTeams.filter((team) => team.status === "ready").length,
-    warningTeams: sortedTeams.filter((team) => team.status === "warning" || team.status === "no_sell_need" || team.status === "low_roster_depth" || team.status === "no_candidates").length,
+    warningTeams: sortedTeams.filter((team) => team.status === "warning" || team.status === "no_sell_need" || team.status === "no_candidates").length,
     blockedTeams: sortedTeams.filter((team) => team.status === "blocked").length,
     teams: sortedTeams,
     debugPerformance: {

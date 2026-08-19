@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Mehrspieler",
+  "text": "Wenn ihr beide im selben Moment speichert, sagt das Spiel jetzt sauber, was los ist. Der Schutz davor gab es schon — er verhindert, dass der eine den Stand des anderen überschreibt. Nur kam er als „Serverfehler 500“ mit einem rohen Text an, obwohl der Server genau richtig gehandelt hatte. Jetzt kommt er als das, was er ist: ein Konflikt, mit dem Hinweis „bitte neu laden und die Aktion wiederholen“ und beiden Versionsnummern. Umgestellt in allen 67 Routen, die in den Spielstand schreiben.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

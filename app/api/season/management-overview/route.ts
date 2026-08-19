@@ -7,6 +7,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { db } from "@/src/server/db";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -75,6 +76,8 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Season management overview could not be loaded.";
     return NextResponse.json(
       {

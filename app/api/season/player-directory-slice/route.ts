@@ -10,6 +10,7 @@ import {
 import { resolveSliceSave } from "@/lib/foundation/resolve-slice-save-context";
 import { readSaveSliceHeadProjection } from "@/lib/persistence/save-projection-read";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -78,6 +79,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(maskedPayload);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Player directory slice could not be loaded.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

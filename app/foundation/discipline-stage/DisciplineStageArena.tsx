@@ -1362,6 +1362,51 @@ export default function DisciplineStageArena({
    * sinngemäß "Guests never free-jump the discipline tab while the host controls the shared
    * reveal").
    */
+  /**
+   * DER HOST MELDET SEINEN DISZIPLIN-WECHSEL AN DEN RAUM.
+   *
+   * Bis hierher war der Klick auf "Weiter zu Disziplin 2" (und jede Wahl im Dropdown) rein lokal:
+   * `setDisciplineId`, sonst nichts. Der Server erfuhr nur noch die Etappenschritte — und schob
+   * mit ihnen die PHASENKETTE der alten Disziplin weiter, statt die Seite zu wechseln. Die
+   * durchgezaehlte Messung dazu steht an `switchRoomArenaDisciplinePhase`
+   * (`lib/room/arena-sync-state.ts`); kurz: der Gast blieb in Disziplin 1 auf dem Endstand kleben
+   * und sah von Disziplin 2 nichts.
+   *
+   * Die Meldung haengt bewusst an `activeDisciplineSide` (dem ERGEBNIS des Wechsels) und nicht an
+   * den einzelnen Knoepfen: `setDisciplineId` hat mehrere Aufrufer (Dropdown, "Weiter zu
+   * Disziplin 2", die Vorauswahl beim Aufbau, und den Raum-Sync selbst). An jedem einzeln zu
+   * melden hiesse, den naechsten Aufrufer wieder zu vergessen.
+   *
+   * `gemeldeteDisziplinSeiteRef` verhindert das Nachfeuern: zwischen dem Absenden und dem
+   * zurueckkommenden Raum-Zustand rendert die Ansicht mehrfach, und jeder dieser Renderer saehe
+   * denselben Unterschied erneut. Jede Wiederholung waere ein weiterer Raum-Schritt (`stepIndex`,
+   * `version`) und beim Gast ein weiterer Sprung.
+   */
+  const gemeldeteDisziplinSeiteRef = useRef<"d1" | "d2" | null>(null);
+  useEffect(() => {
+    if (!roomContext || !roomArenaSync.isRoomHost || !roomArenaSync.isRoomRevealSyncActive) {
+      gemeldeteDisziplinSeiteRef.current = null;
+      return;
+    }
+    const raumSeite = roomArenaSync.roomArenaActiveDisciplinePhase;
+    // "overall" (die Gesamtwertung) und "total" sind keine Disziplinseite — dort gibt es nichts zu
+    // wechseln, und der Raum soll auch nicht aus der Gesamtwertung zurueck auf d2 geworfen werden.
+    if (activeDisciplineSide !== "d1" && activeDisciplineSide !== "d2") return;
+    if (raumSeite === null || raumSeite === "total") return;
+    if (raumSeite === activeDisciplineSide) {
+      gemeldeteDisziplinSeiteRef.current = null;
+      return;
+    }
+    if (gemeldeteDisziplinSeiteRef.current === activeDisciplineSide) return;
+    gemeldeteDisziplinSeiteRef.current = activeDisciplineSide;
+    roomArenaSync.emitHostRoomArenaDisciplinePhase(activeDisciplineSide, maxSlotRevealCountByDiscipline);
+  }, [
+    roomContext,
+    roomArenaSync,
+    activeDisciplineSide,
+    maxSlotRevealCountByDiscipline,
+  ]);
+
   const arenaGuestLocked = Boolean(roomContext) && !roomArenaSync.canControlArenaReveal;
   /**
    * Audit-Punkt 5, zweite Hälfte: „dass jemand getrennt ist, steht in der Arena nirgends" —
@@ -2363,7 +2408,7 @@ export default function DisciplineStageArena({
       <div className="arena-prematch" data-testid="arena-stage" data-arena-prematch="true">
         <div>
           <span className="arena-prematch-eyebrow">Arena · {matchdayNumberLabel}</span>
-          <h1 className="arena-prematch-title">Vor dem Anpfiff</h1>
+          <h2 className="arena-prematch-title">Vor dem Anpfiff</h2>
           {disciplineSubtitle ? <p className="arena-prematch-sub">{disciplineSubtitle}</p> : null}
         </div>
 
@@ -2594,7 +2639,7 @@ export default function DisciplineStageArena({
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
             {devMode ? "Arena · Test-Modus · echte Save-Werte" : "Arena"}
           </div>
-          <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
+          <h2 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h2>
           {/* Die 2 aktiven Mutatoren dieser Disziplin — sichtbar direkt an der
               Disziplin, in JEDER Disziplin (darf nicht fehlen). */}
           {shownMutators.length > 0 ? (
@@ -2864,6 +2909,8 @@ export default function DisciplineStageArena({
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}
         env={DISCIPLINE_SKIN[disciplineId]?.env}
         roomSync={nativeRoomSync}
+        /* B2: Der Host wusste das laengst — die Buehne erfaehrt es jetzt auch. */
+        alreadyScored={activeSideScoredInSave}
       />
 
       {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER

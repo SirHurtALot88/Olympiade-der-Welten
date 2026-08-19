@@ -113,11 +113,24 @@ describe("Die drei Haken sitzen an den gemeinsamen Schreibpunkten", () => {
     // `applyContractRenewalAction` (Spieler wie KI) und `applySeasonEndContractTick` laufen beide
     // durch `saveGameStateWithContractEvents`.
     expect(VERTRAG).toContain("function saveGameStateWithContractEvents");
-    expect(VERTRAG).toContain("zieheSaisonstandGuvNachImSaisonendfenster({");
+    // Toleriert einen Zeilenumbruch zwischen Aufruf und Objektliteral. Die Schwester-Zusage eine
+    // Pruefung weiter unten ist genau daran zerbrochen, als #560 den dortigen Aufruf umbrach —
+    // dieselbe Sollbruchstelle stand hier noch und haette beim naechsten Umbruch dasselbe getan.
+    expect(VERTRAG).toMatch(/zieheSaisonstandGuvNachImSaisonendfenster\(\s*\{/);
   });
 
   it("Phasenwechsel: beim Betreten, damit auch ohne Buchung nachgezogen wird", () => {
-    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({");
+    // Der Aufruf steht seit Meldung `j53iox` nicht mehr direkt auf dem Objektliteral — dazwischen
+    // liegt `applyDefaultTrainingFieldsToRosteredPlayers`, das am selben Phasenwechsel haengt.
+    // Gemessen wird deshalb die AUSSAGE (`nextGameState` entsteht durch die Nachbuchung), nicht
+    // die eine Textzeile: sonst faellt dieser Waechter bei jedem weiteren Schritt an derselben
+    // Stelle, obwohl die Nachbuchung unveraendert laeuft.
+    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster(");
+    const stelle = UEBERGANG.slice(
+      UEBERGANG.indexOf("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster("),
+    ).slice(0, 400);
+    expect(stelle).toContain("...progressionSave.gameState");
+    expect(stelle).toContain("gamePhase: nextPhase");
   });
 
   it("der Tabellenaufbau rechnet NICHT live — genau das war zu teuer", () => {

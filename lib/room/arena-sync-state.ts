@@ -4,6 +4,7 @@ import {
   getFoundationArenaDisplayPhase,
   mapFoundationPhaseToRoomDisciplineSide,
   mapRoomDisciplineSideToFoundationPhase,
+  FOUNDATION_ARENA_REVEAL_LIMITS,
   type FoundationArenaRevealState,
 } from "@/lib/foundation/matchday-arena-reveal-sync";
 import { ARENA_STEP_DURATION_MS } from "@/lib/foundation/discipline-stage/arena-timeline";
@@ -73,6 +74,69 @@ function defaultMaxSlotRevealCounts(maxSlotRevealIndex = 0) {
   return { d1: normalized, d2: normalized } as const;
 }
 
+/**
+ * WIE HEISST DER SPIELTAG DIESES RAUMS — eine Quelle, drei ehemalige Schreibweisen.
+ *
+ * `matchesArenaScope` vergleicht `matchdayId` als exakte Zeichenkette, und der einzige Vergleichs-
+ * partner, der im Browser wirklich anliegt, ist `gameState.matchdayState.matchdayId` — Format
+ * "matchday-1" (lib/data/dataAdapter.ts). `startRoomArena` weiss das und schreibt es so; zwei
+ * andere Stellen bauten daneben die NACKTE Nummer:
+ *
+ *   arenaSyncState.matchdayId       = "matchday-1"
+ *   String(activeMatchday)          = "1"
+ *   matchesArenaScope(...)          = false
+ *
+ * Nachgemessen an einem frisch gestarteten Raum. Fuer `isRoomMatchdayInProgress`
+ * (online-room-model.ts) hiess das: die Haelfte der Sperre, die eine LAUFENDE Enthuellung erkennen
+ * soll, konnte nie zutreffen — sie verglich immer "matchday-1" gegen "1". Steht der Flow-Schritt
+ * dabei ausserhalb der Spieltags-Menge, meldete der Raum "kein Spieltag laeuft" und gab die
+ * Team-Umverteilung frei, waehrend die Arena lief.
+ *
+ * Ein `String(...)` an der Aufrufstelle sieht dabei nicht falsch aus — genau deshalb steht das
+ * Format jetzt an EINER Stelle und nicht dreimal nebeneinander.
+ */
+/**
+ * IST DIESE DISZIPLINSEITE DURCH? Ein Kriterium, zwei Aufrufer.
+ *
+ * Gebraucht an zwei Stellen, die sonst getrennt raten wuerden: `switchRoomArenaDisciplinePhase`
+ * (gilt die VERLASSENE Seite als gewertet?) und `quickSimRoomArenaReveal` (gilt die gerade
+ * ans Ende gespulte Seite als gewertet?). Beide meinen dasselbe, und ein Auseinanderdriften waere
+ * ein Widerspruch im selben Zustand.
+ *
+ * `maxCount === 0` zaehlt bewusst NICHT als "durch": eine Seite ohne Etappen ist keine
+ * abgeschlossene Enthuellung, sondern eine, ueber die noch nichts bekannt ist (die Zaehlgrenzen
+ * kommen erst mit dem ersten echten Aufruf aus der Buehne, siehe `maxSlotRevealCountByDiscipline`).
+ */
+export function istDisziplinseiteDurch(input: {
+  seite: RoomArenaDisciplineSide;
+  revealedSlotCountByDiscipline: { d1: number; d2: number };
+  limits: { maxD1SlotRevealCount: number; maxD2SlotRevealCount: number };
+}): boolean {
+  const grenze = input.seite === "d1" ? input.limits.maxD1SlotRevealCount : input.limits.maxD2SlotRevealCount;
+  return grenze > 0 && input.revealedSlotCountByDiscipline[input.seite] >= grenze;
+}
+
+export function roomMatchdayScopeId(activeMatchday: number | string | null | undefined): string {
+  const wert = typeof activeMatchday === "string" ? activeMatchday.trim() : activeMatchday;
+  if (wert == null || wert === "") {
+    return "matchday-1";
+  }
+  /**
+   * NUR EINE NACKTE NUMMER WIRD UMGESCHRIEBEN — alles andere ist schon eine Kennung.
+   *
+   * Der erste Anlauf fragte `startsWith("matchday-")` und haengte sonst das Praefix an. Das ging
+   * schief, weil es mehr als eine gueltige Kennungsform gibt: ein saisonqualifiziertes
+   * `"season-2-matchday-1"` traegt das Praefix nicht am ANFANG und wurde damit zu
+   * `"matchday-season-2-matchday-1"` verstuemmelt (gefunden von `tests/room-store.test.ts`).
+   *
+   * Umzuschreiben ist ausschliesslich das, was diese Funktion ueberhaupt reparieren soll: die
+   * nackte Spieltagsnummer aus `multiplayerRoom.activeMatchday`. Ein String, der irgendetwas
+   * anderes enthaelt, ist eine fertige Kennung und wird durchgereicht.
+   */
+  const text = String(wert);
+  return /^\d+$/.test(text) ? `matchday-${text}` : text;
+}
+
 export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
   const maxCounts = state.maxSlotRevealCountByDiscipline ?? defaultMaxSlotRevealCounts(state.maxSlotRevealIndex);
   const activeDisciplinePhase =
@@ -108,6 +172,13 @@ export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
     // produktiv genutzte Wert (`TRACK_ROUND_MS`) — keine neu erfundene Zahl.
     stepStartedAt: state.stepStartedAt ?? state.updatedAt,
     stepDurationMs: state.stepDurationMs ?? ARENA_STEP_DURATION_MS,
+    // ALT-ZUSTAENDE HEILEN HIER, nicht an jeder Lesestelle: ein Raum, der vor der
+    // Vereinheitlichung angelegt (oder aus der Ablage rehydriert) wurde, traegt die nackte Nummer
+    // ("1") statt "matchday-1" — und `matchesArenaScope` vergleicht exakt. Ohne diese Zeile bliebe
+    // JEDER bestehende Raum bei der alten Schreibweise, und die Behebung wirkte nur fuer Raeume,
+    // die es noch gar nicht gibt. `roomMatchdayScopeId` ist idempotent: eine bereits richtige
+    // Kennung geht unveraendert durch.
+    matchdayId: state.matchdayId ? roomMatchdayScopeId(state.matchdayId) : state.matchdayId,
     paused: state.paused ?? false,
     pausedBy: state.pausedBy ?? null,
   };
@@ -186,7 +257,7 @@ export function syncRoomArenaParticipants(state: OlyRoomState): RoomArenaState {
     ...(state.arenaSyncState ?? createRoomArenaState({ saveId: state.multiplayerRoom.saveId })),
     saveId: state.multiplayerRoom.saveId,
     seasonId: state.arenaSyncState?.seasonId ?? state.multiplayerRoom.activeSeasonId,
-    matchdayId: state.arenaSyncState?.matchdayId ?? String(state.multiplayerRoom.activeMatchday),
+    matchdayId: state.arenaSyncState?.matchdayId ?? roomMatchdayScopeId(state.multiplayerRoom.activeMatchday),
     requiredParticipantIds,
     readyParticipantIds: (state.arenaSyncState?.readyParticipantIds ?? []).filter((participantId) =>
       requiredSet.has(participantId),
@@ -213,9 +284,42 @@ export function setRoomArenaParticipantReady(input: {
     readySet.delete(input.participantId);
   }
   const nextReadyIds = arenaState.requiredParticipantIds.filter((participantId) => readySet.has(participantId));
+  const alleBereit = isRoomArenaReady({ ...arenaState, readyParticipantIds: nextReadyIds });
+
+  /**
+   * EIN BEREIT-KLICK DARF EINE LAUFENDE ENTHUELLUNG NICHT ANHALTEN.
+   *
+   * Hier stand `alleBereit ? "revealing" : "ready_check"` — ohne Ruecksicht darauf, ob das Tor
+   * ueberhaupt noch das ist, worauf gewartet wird. Das ging schief, weil `advanceRoomArenaReveal`
+   * bei JEDEM Etappenschritt `readyParticipantIds` leert (und dabei zu Recht auf "revealing"
+   * bleibt): mitten im Lauf ist die Bereit-Menge also regulaer leer, und dieser Ausdruck las das
+   * als "noch nicht alle bereit".
+   *
+   * NACHGEMESSEN, zwei Menschen, 4 Etappen:
+   *
+   *   beide bereit:             status=revealing   ready=2
+   *   nach 1 Etappe:            status=revealing   ready=0
+   *   Gast klickt "Bereit":     status=ready_check ready=1/2
+   *     Warteliste:             ["Chris"]
+   *     Host will weiter:       abgelehnt — "Die Arena wartet noch auf: Chris (anwesend, noch
+   *                             nicht bereit)."
+   *
+   * Der Host wurde also aufgefordert, auf SICH SELBST zu warten, und die Enthuellung stand. Ein
+   * versehentlicher Klick des Mitspielers reichte dafuer.
+   *
+   * DIE REGEL IST JETZT: das Tor kann nur AUFGEHEN, nie zufallen. Aus "ready_check" wird
+   * "revealing", sobald alle bereit sind — jeder andere Status bleibt, wie er ist. Das Tor selbst
+   * bleibt damit unveraendert wirksam; es haelt nur nicht mehr ein zweites Mal, nachdem es einmal
+   * geoeffnet wurde.
+   *
+   * WER DAS TOR WIRKLICH NEU STELLEN WILL, tut das ueber `startRoomArena` (neuer Spieltag, Status
+   * "ready_check") — die eine Stelle, die einen Anpfiff bedeutet.
+   */
+  const status = arenaState.status === "ready_check" && alleBereit ? "revealing" : arenaState.status;
+
   return {
     ...arenaState,
-    status: isRoomArenaReady({ ...arenaState, readyParticipantIds: nextReadyIds }) ? "revealing" : "ready_check",
+    status,
     readyParticipantIds: nextReadyIds,
     version: arenaState.version + 1,
     lastActionByParticipantId: input.participantId,
@@ -250,7 +354,7 @@ export function startRoomArena(input: {
     // verwarf ihn lautlos als "falscher Spieltag" - das Ready-Gate blieb unsichtbar, obwohl der
     // Reveal serverseitig laengst lief. Gefunden beim Reparieren von
     // scripts/smoke-multiplayer-e2e.ts (dem einzigen Aufrufer, der bisher ohne matchdayId rief).
-    matchdayId: input.matchdayId ?? `matchday-${input.state.multiplayerRoom.activeMatchday}`,
+    matchdayId: input.matchdayId ?? roomMatchdayScopeId(input.state.multiplayerRoom.activeMatchday),
     disciplineSide: input.disciplineSide ?? "d1",
     activeDisciplinePhase: mapRoomDisciplineSideToFoundationPhase(input.disciplineSide ?? "d1"),
     phaseId: "slots",
@@ -538,6 +642,111 @@ export function resumeRoomArenaAfterRestart(input: { arenaState: RoomArenaState;
 }
 
 /**
+ * DER WECHSEL AUF DISZIPLIN 2 ALS RAUM-AKTION.
+ *
+ * NACHGEMESSEN, NICHT VERMUTET (die Zahlen stehen als Testfall in
+ * `tests/diszi-wechsel-ist-eine-raum-aktion.test.ts`): der Host meldet ueber
+ * `advanceRoomArenaStep` NUR seine Etappen-Schritte (`round` in
+ * `DisciplineStageNativeArena.tsx`, der Effekt "Co-op HOST: meldet jeden eigenen Reveal-Schritt").
+ * Sein Klick auf "Weiter zu Disziplin 2" war dagegen rein lokal (`setDisciplineId`) — der Server
+ * erfuhr davon nichts.
+ *
+ * Was daraus folgte, mit d1=5/d2=5 Etappen durchgezaehlt:
+ *
+ *   d1-Klick 1..5  -> phase=d1  phaseId=slots     slot=1..5   (richtig)
+ *   d2-Klick 1     -> phase=d1  phaseId=push      slot=5
+ *   d2-Klick 2     -> phase=d1  phaseId=form      slot=5
+ *   d2-Klick 3     -> phase=d1  phaseId=mutator   slot=5
+ *   d2-Klick 4     -> phase=d1  phaseId=captain   slot=5
+ *   d2-Klick 5     -> phase=d1  phaseId=power     slot=5
+ *
+ * Sobald d1 ausgeschoepft ist, schiebt `advanceFoundationArenaReveal` naemlich die PHASENKETTE
+ * weiter (slots -> push -> form -> mutator -> captain -> power -> final), und erst der Schritt
+ * DANACH kippt auf d2. Die Etappen, die der Host in Disziplin 2 enthuellt, werden also von der
+ * Phasenkette der ALTEN Disziplin aufgefressen: `slotRevealIndex` bleibt bei 5 stehen,
+ * `activeDisciplinePhase` bleibt "d1". Der Gast liest genau diese beiden Felder
+ * (`onApplyRevealSync` in `DisciplineStageArena.tsx`) — er bleibt in Disziplin 1 auf dem Endstand
+ * kleben und sieht von Disziplin 2 nichts. Bei kurzen Disziplinen (5 Etappen < 6 Phasenschritte)
+ * ueberhaupt nichts, bei langen den Rest um genau die Phasenkettenlaenge versetzt.
+ *
+ * DIE BEHEBUNG IST NICHT, DIE PHASENKETTE ANZUFASSEN: die ist fuer eine phasenweise Enthuellung
+ * gebaut, die die native Arena gar nicht spielt (sie enthuellt nur Etappen). Behoben wird die
+ * fehlende MELDUNG — der Wechsel wird ein eigener Raum-Schritt, und danach steht die Phasenkette
+ * beim Wechsel wieder auf 0, statt weitergeschoben zu werden.
+ *
+ * Die Feldabbildung selbst macht `applyFoundationRevealToRoomArenaState` — dieselbe Funktion, die
+ * `advanceRoomArenaReveal` benutzt, damit es fuer "so sieht ein Reveal-Zustand im Raum aus" keine
+ * zweite Stelle gibt. Sie hatte bis hierher keinen Produktionsaufrufer.
+ *
+ * WAS ABSICHTLICH NICHT PASSIERT: das Bereit-Tor wird NICHT neu scharfgestellt
+ * (`readyParticipantIds` bleibt, wie es ist) — genau wie bei `resetRoomArenaReveal`. Ein
+ * Disziplinwechsel ist eine Anzeige-Umschaltung des Hosts, kein neuer Anpfiff; ein zweites Tor
+ * mitten im Spieltag hat niemand bestellt.
+ */
+export function switchRoomArenaDisciplinePhase(input: {
+  arenaState: RoomArenaState;
+  participantId: string;
+  phase: RoomArenaDisciplineSide;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
+  now?: string;
+}): RoomArenaState {
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  const now = input.now ?? new Date().toISOString();
+  const maxCounts = input.maxSlotRevealCountByDiscipline ?? arenaState.maxSlotRevealCountByDiscipline;
+  const limits = {
+    maxD1SlotRevealCount: Math.max(0, maxCounts.d1),
+    maxD2SlotRevealCount: Math.max(0, maxCounts.d2),
+  };
+  const ziel = input.phase;
+  const andere: RoomArenaDisciplineSide = ziel === "d1" ? "d2" : "d1";
+
+  /**
+   * Die verlassene Seite gilt als abgeschlossen, wenn ihre Etappen wirklich durch sind — nicht
+   * allein deshalb, weil der Host wegschaltet. Sonst behauptete ein Wechsel mitten in Disziplin 1
+   * ("ich schau mal kurz die andere an"), sie sei gewertet.
+   */
+  const andereFertig =
+    arenaState.completedDisciplinePhases[andere] ||
+    istDisziplinseiteDurch({
+      seite: andere,
+      revealedSlotCountByDiscipline: arenaState.revealedSlotCountByDiscipline,
+      limits,
+    });
+
+  const zielReveal: FoundationArenaRevealState = {
+    activeDisciplinePhase: ziel,
+    // Die Zielseite faengt bei der Etappen-Phase an — genau da, wo die lokale Arena des Hosts nach
+    // `setDisciplineId` steht (frisch aufgebaute Buehne, `round` = 0).
+    phaseIndex: FOUNDATION_ARENA_REVEAL_LIMITS.slotsPhaseIndex,
+    revealedSlotCountByDiscipline: {
+      ...arenaState.revealedSlotCountByDiscipline,
+      [ziel]: 0,
+    },
+    completedDisciplinePhases: {
+      ...arenaState.completedDisciplinePhases,
+      [ziel]: false,
+      [andere]: andereFertig,
+    },
+  };
+
+  return normalizeRoomArenaState({
+    ...applyFoundationRevealToRoomArenaState(arenaState, zielReveal, limits),
+    status: "revealing",
+    // Ein Wechsel IST ein Schritt: `stepIndex` waechst monoton weiter (wie beim Reset, siehe dort),
+    // und er oeffnet einen neuen Schritt-Zeitraum fuer die gemeinsame Zeitbasis.
+    stepIndex: arenaState.stepIndex + 1,
+    stepStartedAt: now,
+    stepDurationMs: arenaState.stepDurationMs,
+    paused: false,
+    pausedBy: null,
+    version: arenaState.version + 1,
+    lastActionByParticipantId: input.participantId,
+    updatedAt: now,
+    callout: null,
+  });
+}
+
+/**
  * QUICK-SIM ALS RAUM-AKTION (Stufe 3.6): der "⏩"-Knopf in `DisciplineStageNativeArena.tsx`
  * springt lokal sofort auf den Endstand DER GERADE GEZEIGTEN Disziplinseite — dieselbe Grenze gilt
  * hier: die Schleife haelt an, sobald `activeDisciplinePhase` die Seite verlaesst, auf der sie
@@ -561,9 +770,6 @@ export function quickSimRoomArenaReveal(input: {
   const guardLimit = Math.max(1, maxCounts.d1) + Math.max(1, maxCounts.d2) + ROOM_ARENA_PHASES.length + 2;
 
   for (let i = 0; i < guardLimit; i += 1) {
-    if (state.activeDisciplinePhase !== startSide) {
-      break;
-    }
     const next = advanceRoomArenaReveal({
       arenaState: state,
       participantId: input.participantId,
@@ -573,7 +779,49 @@ export function quickSimRoomArenaReveal(input: {
     if (next.version === state.version) {
       break; // kein Fortschritt mehr moeglich (Endzustand dieser Seite erreicht)
     }
+    /**
+     * DIE GRENZE WIRD GEPRUEFT, BEVOR DER SCHRITT UEBERNOMMEN WIRD.
+     *
+     * Die Pruefung stand vorher am SCHLEIFENANFANG — also erst, nachdem der Schritt, der die Seite
+     * verlaesst, laengst in `state` stand. Der Quick-Sim endete damit genau EINEN Schritt zu weit.
+     * Nachgemessen mit d1 = 3 Etappen, Start auf d1:
+     *
+     *   Ergebnis: phase=d2  phaseId=slots  slot=0   (d1 fertig, d2 bei Etappe 0)
+     *
+     * Der Host wollte "diese Disziplin ans Ende spulen" — der Raum meldete stattdessen den ANFANG
+     * der naechsten. Der Gast folgt `activeDisciplinePhase` und wurde damit in Disziplin 2
+     * gezogen, waehrend der Host noch den Endstand der ersten anschaut. Genau das, was der
+     * Kommentar oben ausschliessen wollte ("die naechste Seite ist NICHT Teil dieses Quick-Sims").
+     */
+    if (next.activeDisciplinePhase !== startSide) {
+      break;
+    }
     state = next;
+  }
+
+  /**
+   * DER "DIESE SEITE IST DURCH"-VERMERK WIRD HIER GESETZT, nicht mehr nebenbei mitgenommen.
+   *
+   * Vorher trug ihn ausgerechnet der Schritt, der die Seite VERLAESST (`advanceFoundationArenaReveal`
+   * setzt `completedDisciplinePhases.d1` im selben Zug, in dem er auf d2 kippt). Solange der
+   * Quick-Sim einen Schritt zu weit lief, fiel das nicht auf — jetzt, wo er an der Grenze haelt,
+   * waere der Vermerk sonst verloren: alle Etappen enthuellt, und die Seite gilt trotzdem als offen.
+   *
+   * Dasselbe Kriterium wie beim Disziplinwechsel (`istDisziplinseiteDurch`), damit die beiden
+   * Wege zu "diese Seite ist gewertet" nicht auseinanderlaufen koennen.
+   */
+  if (
+    istDisziplinseiteDurch({
+      seite: startSide,
+      revealedSlotCountByDiscipline: state.revealedSlotCountByDiscipline,
+      limits: { maxD1SlotRevealCount: maxCounts.d1, maxD2SlotRevealCount: maxCounts.d2 },
+    }) &&
+    !state.completedDisciplinePhases[startSide]
+  ) {
+    state = normalizeRoomArenaState({
+      ...state,
+      completedDisciplinePhases: { ...state.completedDisciplinePhases, [startSide]: true },
+    });
   }
   return state;
 }

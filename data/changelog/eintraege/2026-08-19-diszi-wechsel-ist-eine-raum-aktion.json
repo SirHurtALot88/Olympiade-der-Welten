@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Arena",
+  "text": "Im Mehrspieler folgt der Gast jetzt auch beim Wechsel auf die zweite Disziplin. Bisher war dieser Wechsel beim Host rein örtlich: der Server erfuhr nur die Etappenschritte und schob mit ihnen die Phasenkette der ERSTEN Disziplin weiter, statt die Seite zu wechseln. Durchgezählt an einem Spieltag mit je fünf Etappen: nach dem Wechsel meldete der Server fünf Klicks lang weiter „Disziplin 1, Etappe 5“ — der Gast blieb auf dem Endstand der ersten Disziplin kleben und sah von der zweiten nichts. Der Wechsel ist jetzt ein eigener Raum-Schritt, den nur der Host auslösen darf; die verlassene Disziplin gilt dabei nur dann als gewertet, wenn ihre Etappen wirklich durch sind.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

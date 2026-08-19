@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
 import { runSeasonStartReset } from "@/lib/persistence/season-start-reset-service";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Season start reset failed.",

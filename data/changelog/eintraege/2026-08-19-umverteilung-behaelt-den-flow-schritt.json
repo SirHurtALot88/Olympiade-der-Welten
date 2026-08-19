@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Mehrspieler",
+  "text": "Die Team-Zuordnung zwischen zwei Spieltagen zu ändern wirft den Raum nicht mehr an den Anfang zurück. Vorher landete der Raum nach jeder Umverteilung wieder auf „Lobby: bereit machen“ — gemessen an einem Raum, der beim Saisonstand stand: vorher „standings“, danach „lobby_ready“, und zwar über beide Wege, den Modus-Knopf wie die ausdrückliche Teamwahl. Da das Umverteilen genau zwischen zwei Spieltagen erlaubt ist, traf das jedes Mal.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

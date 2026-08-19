@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, SponsorCurveShape, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
-import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
+import { SPONSOR_ANGEBOTE_JE_TEAM, chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { applySponsorV3ToOffers, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { sponsorV3GuaranteedLadder } from "@/lib/sponsor/sponsor-v3-model";
@@ -31,9 +31,19 @@ import {
   type SponsorV3ContractTerms,
 } from "@/lib/sponsor/sponsor-v3-model";
 
-/** Fuenf Formen quer durch alle fuenf Familien — klar verschiedene Boeden (siehe sponsor-curve-shapes.ts:
- * "klassenerhalt" traegt den hoechsten garantierten Absolut-Boden im Pool, "titeljaeger" den niedrigsten). */
-const ISOLATED_SHAPES: SponsorCurveShape[] = ["titeljaeger", "europapokal", "mittelfeld", "aufsteiger", "klassenerhalt"];
+/**
+ * Formen mit klar verschiedenen Boeden (siehe sponsor-curve-shapes.ts: "klassenerhalt" traegt den
+ * hoechsten garantierten Absolut-Boden im Pool, "titeljaeger" den niedrigsten), dazwischen eine
+ * mittlere.
+ *
+ * SO VIELE, WIE EIN ECHTES SLATE HAT. `ensureSeasonSponsorOffers` ersetzt jedes Slate, dessen Groesse
+ * nicht `SPONSOR_ANGEBOTE_JE_TEAM` entspricht — hier standen fuenf Formen, waehrend die Konstante
+ * laengst 3 war. Das fiel nur nicht auf, weil der Vergleich im Produktionscode dieselbe veraltete 5
+ * benutzte; nach der Reparatur waeren die handgebauten Angebote stillschweigend durch echte ersetzt
+ * worden und der Test haette nichts mehr gemessen. Die beiden Extreme bleiben drin — sie tragen die
+ * Aussage.
+ */
+const ISOLATED_SHAPES: SponsorCurveShape[] = ["titeljaeger", "mittelfeld", "klassenerhalt"];
 
 function buildBareOffer(input: { teamId: string; seasonId: string; curveShape: SponsorCurveShape; index: number }): SponsorOffer {
   return {
@@ -61,6 +71,11 @@ function buildBareOffer(input: { teamId: string; seasonId: string; curveShape: S
  * Eco-Downside-Term koennen die Wahl entscheiden.
  */
 function withIsolatedCurveOffers(base: GameState, teamId: string, startRank: number): GameState {
+  if (ISOLATED_SHAPES.length !== SPONSOR_ANGEBOTE_JE_TEAM) {
+    throw new Error(
+      `Das Probe-Slate muss ${SPONSOR_ANGEBOTE_JE_TEAM} Karten haben, sonst ersetzt ensureSeasonSponsorOffers es.`,
+    );
+  }
   const bareOffers = ISOLATED_SHAPES.map((shape, index) =>
     buildBareOffer({ teamId, seasonId: base.season.id, curveShape: shape, index }),
   );

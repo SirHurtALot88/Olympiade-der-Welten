@@ -10,6 +10,7 @@ import {
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -124,6 +125,8 @@ export async function GET(request: Request) {
       payload,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Season ratings slice could not be loaded.";
     return NextResponse.json(
       {

@@ -6,6 +6,7 @@ import { buildTeamOverviewSlice } from "@/lib/foundation/team-overview-slice-bui
 import { resolveSliceSave } from "@/lib/foundation/resolve-slice-save-context";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -48,6 +49,8 @@ export async function GET(request: Request) {
       payload: responsePayload,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Team overview slice could not be loaded.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

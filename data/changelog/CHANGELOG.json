@@ -4,6 +4,24 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "560",
+      "text": "Ein zu kleiner Kader hält keinen Verkauf mehr auf. Die Verkaufsübersicht kannte den Status „kader zu klein\" und warnte an einzelnen Kandidaten mit „Verkauf würde den Kader unter das Team-Minimum drücken\"; beides las sich wie ein Hindernis und ist weg. Der Kader-Mindestwert steuert weiterhin das KAUFEN — ein Team, das sich darunter verkauft, füllt in der nächsten Runde nach.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "568",
+      "text": "Die Einsatz-Zahl in der Spielerliste zählt wieder nur die laufende Saison. Eine Leistung, deren Spieltagsergebnis fehlt, wurde stillschweigend der aktuellen Saison zugeschlagen — am Saisonwechsel, wo die Ergebnisse der alten Saison geräumt werden und die Leistungen kurz weiterleben, standen Spieler damit am ersten Spieltag schon mit zehn Einsätzen da.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "558",
       "text": "Die Disziplin-Punkte in der Arena enthalten jetzt den Mutator-Aufschlag — dieselbe Zahl, die der Saisonstand ausweist. Vorher rechnete die Arena rein aus der Rang-zu-Punkte-Tabelle, waehrend die Saisonstand-Spalte den Aufschlag bereits mitzaehlte.",
       "quelle": "triage",
@@ -39,6 +57,51 @@
     },
     {
       "datum": "2026-08-19",
+      "seite": null,
+      "pr": "560",
+      "text": "Der Schritt „Training prüfen\" sagt jetzt, an welchen Spielern er noch hängt — mit Anzahl und Namen. Vorher stand dort nur „offen\", und ein einziger Spieler ohne Trainingsmodus hielt den ganzen Flow auf, ohne dass irgendwo stand welcher. Zusätzlich bekommen Spieler, die über Draft, KI-Picks oder den Saisonwechsel in einen Kader kommen, jetzt denselben Trainings-Vorgabewert wie gekaufte.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Startet der Host die Arena, steht der Raum danach auch wirklich auf „Arena“. Vorher wurde der Schritt geschrieben und eine Zeile später wieder verworfen — gemessen blieb der Raum auf „Lobby: bereit machen“ stehen. Dieselbe Ursache wie beim Team-Umverteilen: der Flow-Schritt wird aus einem zweiten Feld neu aufgebaut, das nicht mitgezogen wurde.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Ein „Bereit“-Klick mitten in der laufenden Enthüllung hält sie nicht mehr an. Vorher genügte ein versehentlicher Klick des Mitspielers, um zurück ins Bereit-Tor zu fallen — und weil jeder Etappenschritt die Bereitmeldungen ohnehin zurücksetzt, stand der Host danach in seiner eigenen Warteliste: „Die Arena wartet noch auf: Chris (anwesend, noch nicht bereit).“ Das Tor geht jetzt nur noch auf, nie zu. Vor dem ersten Schritt hält es unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Im Mehrspieler folgt der Gast jetzt auch beim Wechsel auf die zweite Disziplin. Bisher war dieser Wechsel beim Host rein örtlich: der Server erfuhr nur die Etappenschritte und schob mit ihnen die Phasenkette der ERSTEN Disziplin weiter, statt die Seite zu wechseln. Durchgezählt an einem Spieltag mit je fünf Etappen: nach dem Wechsel meldete der Server fünf Klicks lang weiter „Disziplin 1, Etappe 5“ — der Gast blieb auf dem Endstand der ersten Disziplin kleben und sah von der zweiten nichts. Der Wechsel ist jetzt ein eigener Raum-Schritt, den nur der Host auslösen darf; die verlassene Disziplin gilt dabei nur dann als gewertet, wenn ihre Etappen wirklich durch sind.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Der Mitspieler kann seinen Schritt „Transfers finalisieren“ jetzt selbst abschließen. Vorher lehnte die Route ihn ab, weil sie mit der host-only Regenerier-Berechtigung prüfte — und weil der Schritt erst NACH einer erfolgreichen Antwort als erledigt gilt, meldete er sich nie bereit und der Host konnte den Raum nicht weiterschalten. Der Spieltagszyklus stand damit still. Geprüft wird jetzt der Team-Besitz: jeder für seine eigenen Teams. Der zerstörerische Weg, der den Formkarten-Pool ersetzt, bleibt unverändert nur beim Host.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Multiplayer",
       "pr": null,
       "text": "Ein Mitspieler, der die Verbindung verliert, fällt nicht mehr aus der Bereit-Pflicht. Bisher schrumpfte der Kreis der Bereit-pflichtigen in dem Moment, in dem jemand rausflog — der Host konnte ab da allein durch jeden Schritt und durch die Arena klicken, und der Gast fand sich nach dem Wiederverbinden mehrere Stationen weiter, ohne je gefragt worden zu sein. Jetzt hält sein offener Bereit-Status das Tor. Wer bereit war und DANN rausfliegt, hält niemanden auf — die Bereitmeldung überlebt den Abriss. Damit ein Abend daran nicht hängen bleibt, gibt es einen eigenen Knopf, der den Namen nennt: „Franky ist offline und nicht bereit — trotzdem fortfahren\". Er erscheint nur, wenn ausschließlich Getrennte blockieren, und der Server prüft es noch einmal nach: einen anwesenden Mitspieler übergeht der Host damit nicht.",
@@ -48,11 +111,56 @@
     },
     {
       "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Lädt der Host die Seite mitten in der Enthüllung neu, holt seine Bühne jetzt auf den Stand auf, auf dem der Raum steht. Vorher startete er wieder bei Etappe 0, während der Mitspieler schon bei Etappe 5 war — und sein erster Klick auf ▶ schob den Raum nicht etwa zurück, sondern noch eine Etappe WEITER. Der Versatz blieb danach für den ganzen Spieltag bestehen. Aufgeholt wird per Sprung, nicht durch erneutes Abspielen: die Etappen davor hat der Mitspieler längst gesehen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Teams",
       "pr": null,
       "text": "Der Knopf „Kader auffüllen“ in der Teamansicht ist weg — für beide Spieler. Er warf einen KI-Pick-Lauf für das eigene Team an; Kader entstehen jetzt ausschließlich über den Transfermarkt. Wichtiger als der Knopf war, was ohne ihn passierte: ein solcher Lauf auf ein Team, das der Aufrufer nicht bedienen darf, antwortete mit „KI-Picks angewendet.“ und schrieb nachweislich nichts — man klickte, bekam Erfolg gemeldet und der Kader blieb leer. Die Route lehnt menschlich geführte Teams jetzt ausdrücklich ab und sagt auch, was stattdessen gilt. Der Liga-Draft beim Spielstart ist davon nicht berührt: er füllt die KI-Teams wie bisher und lässt die geführten Teams in Ruhe.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Wenn ihr beide im selben Moment speichert, sagt das Spiel jetzt sauber, was los ist. Der Schutz davor gab es schon — er verhindert, dass der eine den Stand des anderen überschreibt. Nur kam er als „Serverfehler 500“ mit einem rohen Text an, obwohl der Server genau richtig gehandelt hatte. Jetzt kommt er als das, was er ist: ein Konflikt, mit dem Hinweis „bitte neu laden und die Aktion wiederholen“ und beiden Versionsnummern. Umgestellt in allen 67 Routen, die in den Spielstand schreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Der Schnelldurchlauf spult die gezeigte Disziplin ans Ende — und bleibt dort. Vorher lief er genau eine Etappe zu weit und landete am ANFANG der nächsten Disziplin; gemessen bei drei Etappen: Ergebnis „Disziplin 2, Etappe 0“. Der Mitspieler folgt der angezeigten Disziplin und wurde dabei mitgezogen, während der Host noch den Endstand der ersten anschaute.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Die Team-Zuordnung zwischen zwei Spieltagen zu ändern wirft den Raum nicht mehr an den Anfang zurück. Vorher landete der Raum nach jeder Umverteilung wieder auf „Lobby: bereit machen“ — gemessen an einem Raum, der beim Saisonstand stand: vorher „standings“, danach „lobby_ready“, und zwar über beide Wege, den Modus-Knopf wie die ausdrückliche Teamwahl. Da das Umverteilen genau zwischen zwei Spieltagen erlaubt ist, traf das jedes Mal.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
       "version": "0.5"
     },
     {

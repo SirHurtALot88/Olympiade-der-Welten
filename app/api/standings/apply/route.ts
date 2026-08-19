@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeStandingsApply, previewStandingsApply } from "@/lib/standings/standings-apply-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type ApplyRequestBody = {
   saveId?: string;
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
       warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Standings apply preview could not be loaded.";
     return NextResponse.json(
       {

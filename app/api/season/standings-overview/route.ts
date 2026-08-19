@@ -25,6 +25,7 @@ import {
 } from "@/lib/standings/season-standings-sheet";
 import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { db } from "@/src/server/db";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));
@@ -580,6 +581,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(responsePayload);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Season standings overview could not be loaded.";
     return NextResponse.json(
       {

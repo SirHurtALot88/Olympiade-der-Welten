@@ -10,6 +10,7 @@ import {
   resumeRoomArenaAfterRestart,
   setRoomArenaParticipantReady,
   setRoomArenaPaused as buildRoomArenaPausedState,
+  switchRoomArenaDisciplinePhase as buildRoomArenaDisciplinePhaseState,
   startRoomArena as buildStartedRoomArenaState,
   syncRoomArenaParticipants,
 } from "@/lib/room/arena-sync-state";
@@ -861,8 +862,26 @@ export function startRoomArenaSync(
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena starten." };
   }
 
+  /**
+   * DER SCHRITT MUSS IN BEIDE FELDER, sonst ueberlebt er die naechste Zeile nicht.
+   *
+   * Hier stand nur `roomFlowState.step = "arena"`. Nachgemessen an einem frisch gestarteten Raum:
+   * danach stand `flow.step` weiterhin auf "lobby_ready". Der Grund steht drei Zeilen weiter
+   * unten — `syncPlayers(room)` baut `roomFlowState` komplett neu und liest den Schritt dabei aus
+   * `turnState.currentStep` (siehe dort). Wer nur `roomFlowState` setzt, schreibt in ein Feld, das
+   * unmittelbar darauf ueberschrieben wird.
+   *
+   * Dieselbe Wurzel wie bei der Team-Umverteilung (`buildTurnState`-Vorgabe "lobby_ready",
+   * online-room-model.ts): `turnState.currentStep` ist die fuehrende Quelle fuer den Schritt,
+   * `roomFlowState.step` die daraus abgeleitete Anzeige. Beide werden hier gesetzt, damit der
+   * Neubau denselben Wert wiederfindet, statt auf die Vorgabe zurueckzufallen.
+   */
   room.state = {
     ...room.state,
+    turnState: {
+      ...room.state.turnState,
+      currentStep: "arena",
+    },
     roomFlowState: {
       ...room.state.roomFlowState,
       step: "arena",
@@ -1068,6 +1087,59 @@ export function resetRoomArenaRevealState(roomCode: string, seatToken: string) {
       participantId,
     }),
   };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+/**
+ * DER DISZIPLIN-WECHSEL ALS RAUM-AKTION: reine Huelle um `switchRoomArenaDisciplinePhase` aus
+ * `arena-sync-state.ts` (die Messung, warum es die Aktion ueberhaupt braucht, steht dort) —
+ * dieselbe Sitzplatz-Pruefung (nur Host, Sitz "A") wie `advanceRoomArenaStep`. Das ist die
+ * Server-Seite von "Audit-Punkt 4": die Disziplin-Auswahl ist eine Host-Aktion, also darf sie auch
+ * nur der Host melden.
+ */
+export function setRoomArenaDisciplinePhaseState(
+  roomCode: string,
+  seatToken: string,
+  input: { phase: "d1" | "d2"; maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: RAUM_EXISTIERT_NICHT_MEHR_MELDUNG };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: SITZPLATZ_UNGUELTIG_MELDUNG };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsam gezeigte Disziplin wechseln." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: buildRoomArenaDisciplinePhaseState({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      phase: input.phase,
+      maxSlotRevealCountByDiscipline: input.maxSlotRevealCountByDiscipline,
+    }),
+  };
+  /**
+   * Ein eigener `roomEvents`-Eintrag, anders als bei Pause/Reset/Quick-Sim: der Wechsel aendert,
+   * WELCHE Disziplin ueberhaupt gezeigt wird — das ist im Verlaufsprotokoll dieselbe Klasse von
+   * Ereignis wie ein Etappenschritt, nicht blosse Verkabelung.
+   */
+  room.state = appendRoomEvent(room.state, "arena_step_changed", {
+    roomCode: room.roomCode,
+    saveId: room.state.multiplayerRoom.saveId,
+    participantId,
+    phaseId: room.state.arenaSyncState.phaseId,
+    phaseIndex: room.state.arenaSyncState.phaseIndex,
+    slotRevealIndex: room.state.arenaSyncState.slotRevealIndex,
+    stepIndex: room.state.arenaSyncState.stepIndex,
+    activeDisciplinePhase: room.state.arenaSyncState.activeDisciplinePhase,
+    affectedViews: ["arena"],
+  });
   syncPlayers(room);
   return { ok: true as const, room };
 }

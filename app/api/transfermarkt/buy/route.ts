@@ -11,6 +11,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type BuyRequestBody = {
   saveId?: string;
@@ -189,6 +190,8 @@ export async function POST(request: Request) {
       { status: summary.canBuy ? 200 : 409 },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Transfermarkt buy could not be processed.";
     return NextResponse.json(
       {

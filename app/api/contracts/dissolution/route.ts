@@ -9,6 +9,7 @@ import {
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type DissolutionRequestBody = {
   saveId?: string;
@@ -53,6 +54,8 @@ export async function GET(request: Request) {
       offers: listLocalContractDissolutionOffers({ saveId, seasonId, teamId }),
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Dissolution offers could not be read.";
     return NextResponse.json({ success: false, error: message, offers: [] }, { status: 500 });
   }
@@ -137,6 +140,8 @@ export async function POST(request: Request) {
       { status: result.ok ? 200 : 409 },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Dissolution could not be processed.";
     return NextResponse.json({ success: false, error: message, offers: [] }, { status: 500 });
   }

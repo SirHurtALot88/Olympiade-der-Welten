@@ -29,6 +29,7 @@ import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-w
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 // Roster-abhängige Manager-Aktionen: Training/Einsatzlisten-Setup braucht Spieler im Kader. Im Setup-Draft
 // (Season 1, frische Teams) sind die Kader zu Beginn LEER — laufen diese Aktionen vor dem Draft, werden sie
@@ -713,6 +714,8 @@ export async function POST(request: Request) {
       { status: succeeded ? 200 : 500 },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI preseason background failed.",

@@ -15,6 +15,7 @@ import {
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type ScoutingWatchlistBody = {
   saveId?: string;
@@ -155,6 +156,8 @@ export async function POST(request: Request) {
       saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "scouting_watchlist_failed" },
       { status: 500 },

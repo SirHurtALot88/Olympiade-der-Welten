@@ -535,8 +535,29 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     // Angebote aus einem Spielstand von VOR dem V3-Umbau tragen keine V3-Konditionen. Sie werden
     // ersetzt statt gerechnet — ein noch nicht unterschriebenes Angebot ist keine Zusage, und ein
     // Angebot ohne V3-Block koennte die Auszahlung gar nicht mehr beziffern.
+    //
+    // GEMELDET VON CHRIS: „Ich habe als Saisonziel den Ausbau von 2 Gebäuden meiner Wahl — das habe
+    // ich bereits erledigt. Da würde ich erwarten, dass das Ziel schon als abgeschlossen da steht
+    // und auch finanziell in die GuV schon mit einberechnet und ausgewiesen wird."
+    //
+    // HIER STAND EINE EINGETIPPTE 5. Seit `SPONSOR_ANGEBOTE_JE_TEAM = 3` konnte die Bedingung nie
+    // mehr wahr werden: erzeugt werden drei Angebote, verlangt wurden fuenf. Die Funktion hat
+    // deshalb bei JEDEM Aufruf neu erzeugt — und sie laeuft bei jedem Laden des Spielstands
+    // (`app/api/singleplayer-state/route.ts`). Der Wurf selbst ist saatgebunden und lieferte
+    // dieselben Sponsoren; unsichtbar mitgewandert ist aber die AUSGANGSLAGE der V4-Achse, denn
+    // `buildSponsorOffersForTeam` friert sie aus dem LEBENDEN Zustand ein
+    // (`axisbase:` im targetValue).
+    //
+    // Fuer die Achse „Ausbau" heisst das: die Vorsaison-Reihenfolge baut erst die Gebaeude
+    // (`training_facilities`) und waehlt danach den Sponsor (`choose_sponsor`). Jede gebaute Stufe
+    // wanderte in die Ausgangslage, statt auf das Ziel zu zaehlen — bei Unterschrift stand die Achse
+    // damit garantiert auf 0. An Chris' Spielstand gemessen: `axisbase:2` bei genau zwei gebauten
+    // Stufen, Achse 0 von 2, Sonderziel −6,0 C statt +6,0 C, GuV 22,7 statt 34,7 C.
+    //
+    // Der Vergleich laeuft jetzt gegen die Konstante, damit eine spaetere Aenderung der Angebotszahl
+    // dieselbe Falle nicht erneut aufstellt.
     const hasCurrentSeasonOffers =
-      currentOffers.length === 5 &&
+      currentOffers.length === SPONSOR_ANGEBOTE_JE_TEAM &&
       currentOffers.every((offer) => offer.seasonId === seasonId && getSponsorV3Terms(offer) != null);
     if (!hasCurrentSeasonOffers) {
       const built = buildSponsorOffersForTeam({ gameState, teamId: team.teamId, globalParentUsage });

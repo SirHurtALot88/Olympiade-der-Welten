@@ -7,6 +7,7 @@ import { resolveSponsorEvent } from "@/lib/sponsor/sponsor-event-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type SponsorEventBody = {
   saveId?: string;
@@ -120,6 +121,8 @@ export async function POST(request: Request) {
       saveVersion: persisted ? persisted.gameState.saveVersion : save.gameState.saveVersion,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "sponsor_event_failed" },
       { status: 500 },

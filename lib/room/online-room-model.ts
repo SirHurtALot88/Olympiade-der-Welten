@@ -12,7 +12,7 @@ import type {
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
-import { matchesArenaScope } from "@/lib/room/arena-sync-state";
+import { matchesArenaScope, roomMatchdayScopeId } from "@/lib/room/arena-sync-state";
 import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
 
@@ -609,6 +609,12 @@ export function applyExplicitTeamOwnershipToState(
       roomStatus: multiplayerRoom.status,
       participants,
       ownership,
+      // Eine Umverteilung aendert, WER welches Team fuehrt — nicht, WO im Spieltagszyklus der Raum
+      // steht. Ohne dieses Weiterreichen faellt `buildTurnState` auf seine Vorgabe "lobby_ready"
+      // zurueck, und `buildRoomFlowState` (das den Schritt aus genau diesem `turnState` liest)
+      // zieht den ganzen Raum mit. Nachgemessen mit einem Raum bei "standings": beide Wege —
+      // Preset-Knopf wie ausdrueckliche Teamwahl — landeten danach auf "lobby_ready".
+      currentStep: state.turnState.currentStep,
     }),
     roomFlowState: buildRoomFlowState({
       state: {
@@ -620,8 +626,15 @@ export function applyExplicitTeamOwnershipToState(
           roomStatus: multiplayerRoom.status,
           participants,
           ownership,
+          currentStep: state.turnState.currentStep,
         }),
       },
+      currentStep: state.turnState.currentStep,
+      // Aus demselben Grund weitergereicht wie in `syncPlayers` (room-store.ts): dieser Neubau hat
+      // den Spielstand nicht zur Hand. Ohne das faellt die einmal ermittelte Auskunft "Saison
+      // laeuft noch" auf null zurueck und der Host-Knopf am Zyklus-Ende ist falsch beschriftet.
+      aiAutoCompletedTeamIds: state.roomFlowState?.aiAutoCompletedTeamIds,
+      seasonContinues: state.roomFlowState?.seasonContinues,
     }),
     serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
   };
@@ -724,7 +737,7 @@ export function isRoomMatchdayInProgress(
   return matchesArenaScope(state.arenaSyncState, {
     saveId: state.multiplayerRoom.saveId,
     seasonId: state.multiplayerRoom.activeSeasonId,
-    matchdayId: String(state.multiplayerRoom.activeMatchday),
+    matchdayId: roomMatchdayScopeId(state.multiplayerRoom.activeMatchday),
   });
 }
 
@@ -746,6 +759,12 @@ export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwn
       roomStatus: multiplayerRoom.status,
       participants,
       ownership,
+      // Eine Umverteilung aendert, WER welches Team fuehrt — nicht, WO im Spieltagszyklus der Raum
+      // steht. Ohne dieses Weiterreichen faellt `buildTurnState` auf seine Vorgabe "lobby_ready"
+      // zurueck, und `buildRoomFlowState` (das den Schritt aus genau diesem `turnState` liest)
+      // zieht den ganzen Raum mit. Nachgemessen mit einem Raum bei "standings": beide Wege —
+      // Preset-Knopf wie ausdrueckliche Teamwahl — landeten danach auf "lobby_ready".
+      currentStep: state.turnState.currentStep,
     }),
     roomFlowState: buildRoomFlowState({
       state: {
@@ -757,8 +776,15 @@ export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwn
           roomStatus: multiplayerRoom.status,
           participants,
           ownership,
+          currentStep: state.turnState.currentStep,
         }),
       },
+      currentStep: state.turnState.currentStep,
+      // Aus demselben Grund weitergereicht wie in `syncPlayers` (room-store.ts): dieser Neubau hat
+      // den Spielstand nicht zur Hand. Ohne das faellt die einmal ermittelte Auskunft "Saison
+      // laeuft noch" auf null zurueck und der Host-Knopf am Zyklus-Ende ist falsch beschriftet.
+      aiAutoCompletedTeamIds: state.roomFlowState?.aiAutoCompletedTeamIds,
+      seasonContinues: state.roomFlowState?.seasonContinues,
     }),
     serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
   };
