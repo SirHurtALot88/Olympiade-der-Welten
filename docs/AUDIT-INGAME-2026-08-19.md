@@ -271,6 +271,15 @@ Auf dem Saisonabschluss, Block „DAS STEHT JETZT AN":
 > *Offen* — Verträge verlängern und Spieler verkaufen. …
 > → Chip rechts: **erledigt**
 
+**ERLEDIGT.** Beides stimmte, aber über verschiedene Dinge: „Offen" beschrieb das
+**Verkaufsfenster**, „erledigt" den **Schritt**, es zu öffnen. In einer Zeile gelesen ist das ein
+Widerspruch — und danach glaubt der Spieler keiner der beiden Angaben mehr.
+
+Der Schritt ist erledigt; der Text sagt jetzt, was dadurch möglich ist:
+„**Freigeschaltet** — du kannst jetzt Verträge verlängern und Spieler verkaufen." Die
+Einschränkung bleibt erhalten (Kaufen ist weiterhin zu) — der Widerspruch war das Problem, nicht
+die Information. Im laufenden Spiel nachgemessen.
+
 ### B4 · Die Arena zeigt eine Rangfolge, von der sie selbst sagt, dass es sie nicht geben soll
 
 Panel **„RUNDENSTAND — LIVE"**: eine vollständige Liste #1 bis #32, jede Zeile mit `—` und `0`.
@@ -286,6 +295,29 @@ nicht daran und erfindet eine Reihenfolge aus lauter Nullen.
 
 Oben: **„SAISON ABGESCHLOSSEN · Platz 20 zum Saisonende"**.
 Weiter unten auf derselben Seite: **„LIGA-WERTUNG · SAISON LÄUFT"** und **„Season 1 (aktiv)"**.
+
+**ERLEDIGT.** Die Beschriftung kannte nur **zwei** Zustände — Archiv oder laufend. Es gibt drei:
+die Saison des Spielstands ist *nicht* archiviert (sie ist die aktuelle) und trotzdem durch.
+Genau dieser Fall fiel in den Zweig „läuft".
+
+Die Zeile stand **wortgleich an zwei Stellen** — im Saisonstand und in den Rängen. Das war der
+Grund, dass der dritte Zustand an beiden fehlte; ihn zweimal nachzutragen hätte die nächste
+Abweichung nur vorbereitet. Beide ziehen jetzt `resolveLigaWertungKopfzeile`
+(`lib/foundation/liga-wertung-kopfzeile.ts`), und ein Test hält fest, dass der Text nirgends
+mehr nachgetippt wird.
+
+Im laufenden Spiel nachgemessen: `LIGA-WERTUNG · SAISON ABGESCHLOSSEN`, passend zur Überschrift
+darüber.
+
+**Unterwegs noch ein toter Pfad:** der erste Eingriff ging in `FoundationSeasonV2Host.tsx` — die
+Datei wird **nirgends gerendert** (der Quelltext dokumentiert das an zwei Stellen selbst).
+Gemessen statt geglaubt: die Beschriftung blieb unverändert. Zurückgenommen und der lebende Pfad
+(`FoundationShellRouterBody` → `FoundationSeasonV2Panel`) verdrahtet. Das ist derselbe Stolperstein
+wie bei A1 und A3 — dieser Codebestand trägt mehrere „Host"-Dateien, die niemand rendert.
+
+**Nicht angefasst:** das „(aktiv)" in der Saison-Auswahl. Dort heißt „aktiv" *die Saison dieses
+Spielstands* im Gegensatz zum Archiv — eine andere Aussage als „läuft gerade", und in der
+Auswahlliste die nützlichere.
 
 ---
 

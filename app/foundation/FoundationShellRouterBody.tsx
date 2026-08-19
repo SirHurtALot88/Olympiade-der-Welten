@@ -123,6 +123,7 @@ import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-f
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -2673,6 +2674,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               sourceLabel={seasonOverviewSourceLabel}
               sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
               isArchived={isViewingArchivedSeason}
+              /* B5: „archiviert" und „durch" sind zwei verschiedene Aussagen. Ohne diese Zeile
+                 fiel die abgeschlossene Saison des Spielstands in den Zweig „Saison läuft" —
+                 direkt unter der Ueberschrift „Saison abgeschlossen". */
+              isSeasonEnded={isSeasonEndPhase(gameState.gamePhase)}
               seasonOptions={seasonOverviewOptions}
               selectedTeamSummary={seasonV2SelectedTeamSummary}
               leaderTeam={seasonV2LeaderTeam}
@@ -2767,7 +2772,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}
                     title={seasonOverviewSourceLabel}
                   >
-                    {isViewingArchivedRanksSeason ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+                    {resolveLigaWertungKopfzeile({
+                      istArchiv: isViewingArchivedRanksSeason,
+                      istAbgeschlossen: isSeasonEndPhase(gameState.gamePhase),
+                    })}
                   </span>
                   {ranksArchiveMissing ? (
                     <span className="pill is-warning">Rang-Archiv fehlt — es zählt der laufende Stand</span>
