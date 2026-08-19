@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * WIE ALT SIND DIE SPIEGEL VOM HETZNER-SERVER?
  *
