@@ -150,6 +150,25 @@ export type DisciplineStageNativeArenaProps = {
   motif?: StageMotif; // dezentes Hintergrund-Motiv
   env?: StageEnv; // atmosphärische Umgebung (Stadion o.ä.) — überschreibt die schlichte Optik
   roomSync?: NativeArenaRoomSync | null; // Co-op-Lockstep (Multiplayer) — solo: null/inert
+  /**
+   * DIE DISZIPLIN IST IM SPIELSTAND SCHON GEWERTET — Befund B2 aus
+   * `docs/AUDIT-INGAME-2026-08-19.md`.
+   *
+   * Der Host wusste das laengst (`activeSideScoredInSave`), die Buehne fing trotzdem bei Runde 0
+   * an: der Knopf lud mit „▶ Start · Etappe 1 / 4" dazu ein, etwas zu starten, das bereits
+   * gelaufen ist. GEMESSEN am echten Spielstand — die Arena meldete `data-active-side-scored=true`
+   * und der Knopf war trotzdem aktiv.
+   *
+   * KEIN DATENRISIKO: `commitFinishedDiscipline` bucht eine bereits gewertete Seite nicht noch
+   * einmal (`DisciplineStageArena.tsx:2058`). Nachgemessen: die Spielstand-Datei ist nach einem
+   * vollen Quick-Sim md5-identisch. Der Schaden ist trotzdem echt — der Spieler laesst etwas
+   * laufen, das folgenlos bleibt, und muss selbst darauf kommen, warum.
+   *
+   * WARUM NICHT EINFACH `round` AUF FERTIG SETZEN: dann zeigte die Buehne „gewertet" ueber
+   * einem Rundenstand aus lauter Nullen — nichts ist ja gelaufen. Eine falsche Zahl ist
+   * schlimmer als eine fehlende. Der Knopf sagt stattdessen, was er WIRKLICH tut: nachspielen.
+   */
+  alreadyScored?: boolean;
 };
 
 // Co-op-Lockstep-Steuerung aus dem Room (DisciplineStageArena verdrahtet den Hook).
@@ -1407,7 +1426,7 @@ function HoverTeamCardPortal({
   );
 }
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env, roomSync }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   const prim = primitive;
@@ -3427,11 +3446,30 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             </div>
           ) : null}
           <button type="button" data-testid="arena-primary-step" onClick={() => { setStarted(true); advance(); }} disabled={done || busy || Boolean(roomSync?.active && !roomSync.canControl) || Boolean(roomSync?.coopGate.active)} style={{ padding: "9px 18px", fontWeight: 800, fontSize: 13, border: 0, borderRadius: 10, cursor: done || busy ? "default" : "pointer", color: "var(--nl-ink)", background: done ? "var(--nl-line)" : "var(--nl-accent)", opacity: busy && !done ? 0.7 : 1 }}>
-            {done ? "✔ Disziplin gewertet" : !started ? `▶ Start · Etappe 1 / ${slotCount}` : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
+            {done
+              ? "✔ Disziplin gewertet"
+              : !started
+                ? /* B2: „Start" war eine Einladung zu etwas, das schon gelaufen ist. */
+                  alreadyScored
+                  ? `▶ Nachspielen · Etappe 1 / ${slotCount}`
+                  : `▶ Start · Etappe 1 / ${slotCount}`
+                : `▶ Etappe ${round + 1} / ${slotCount} — ${slots[round] ?? ""}`}
           </button>
           <button type="button" onClick={quickSim} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ⏩ Quick-Sim
           </button>
+          {/* B2: Die Buehne wusste laengst, dass die Seite gewertet ist (`activeSideScoredInSave`)
+              — gesagt hat sie es nicht. Ein Durchlauf bleibt folgenlos, weil
+              `commitFinishedDiscipline` eine gebuchte Seite nicht erneut bucht; ohne diesen Satz
+              muss der Spieler selbst darauf kommen, warum sich nichts geaendert hat. */}
+          {alreadyScored && !done ? (
+            <span
+              data-testid="arena-already-scored-hint"
+              style={{ fontSize: 12, color: "var(--nl-mut)", fontWeight: 700 }}
+            >
+              Bereits gewertet — ein Durchlauf ändert die Wertung nicht.
+            </span>
+          ) : null}
           <button type="button" data-testid="arena-reset" onClick={() => reset("knopf")} disabled={Boolean(roomSync?.active && !roomSync.canControl)} style={{ padding: "9px 14px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: roomSync?.active && !roomSync.canControl ? "default" : "pointer", opacity: roomSync?.active && !roomSync.canControl ? 0.5 : 1 }}>
             ↻ Neu
           </button>

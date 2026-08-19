@@ -263,6 +263,35 @@ Dasselbe auf der Einsatzliste: die Aufstellung für Spieltag 10 ist voll bearbei
 („Lineup speichern", „Arena bereit", „Zur Arena →"), obwohl der Spieltag gespielt und die Saison
 abgeschlossen ist.
 
+**ERLEDIGT — und eine Korrektur an diesem Audit.**
+
+**Meine Einstufung war falsch.** Weiter unten stand B2 in der Reihenfolge-Tabelle als
+„Datenrisiko, nicht nur Anzeige". Das stimmt nicht. `commitFinishedDiscipline` bucht eine bereits
+gewertete Seite nicht erneut, und **nachgemessen** ist die Spielstand-Datei nach einem vollständigen
+Quick-Sim einer gewerteten Disziplin **md5-identisch**. Es gibt kein Datenrisiko.
+
+**Der echte Fehler ist trotzdem da, und es ist wieder dieselbe Klasse:** die Arena meldete
+`data-active-side-scored="true"` — sie *wusste* also, dass gewertet ist — und der Hauptknopf stand
+trotzdem auf „▶ Start · Etappe 1 / 4", aktiv. Die Information lag vor und wurde nicht an die Bühne
+weitergegeben. Der Spieler lässt einen Durchlauf laufen, der folgenlos bleibt, und muss selbst
+darauf kommen, warum sich nichts geändert hat.
+
+| | vorher | nachher |
+|---|---|---|
+| Hauptknopf | `▶ Start · Etappe 1 / 4` | `▶ Nachspielen · Etappe 1 / 4` |
+| Hinweis | — | „Bereits gewertet — ein Durchlauf ändert die Wertung nicht." |
+
+**Was ausdrücklich NICHT gebaut wurde:** die Bühne auf „fertig" zu setzen. Dann stünde „gewertet"
+über einem Rundenstand aus lauter Nullen — es ist ja nichts gelaufen. Eine falsche Zahl ist
+schlimmer als eine fehlende. Ich hatte das zuerst so gebaut und wieder zurückgenommen.
+
+Nachspielen bleibt möglich; der Riegel liegt beim Buchen, nicht beim Abspielen. Ein Test hält
+genau diese Zeile fest — fällt sie weg, wird aus B2 doch noch ein echter Fehler.
+
+**Offen bleibt der zweite Teil:** die Einsatzliste für einen gespielten Spieltag ist weiterhin
+voll bearbeitbar. Das ist eine eigene Entscheidung (was soll ein Speichern dort tun?) und gehört
+nicht in dieselbe Änderung.
+
 ### B3 · Ein Feld sagt „Offen", der Statuschip daneben sagt „erledigt"
 
 Auf dem Saisonabschluss, Block „DAS STEHT JETZT AN":
@@ -387,7 +416,7 @@ Breiten-Umschaltung (`Standard` / `Breit` / `Cinema`, je 17 px) und „Alle Aufg
 | 1 | **A1** Sackgasse am Saisonende | Der Spieler kommt nicht weiter und bekommt keinen Hinweis. Alles andere ist Kosmetik dagegen. |
 | 2 | **A3** tote Datei + Test darauf | Solange die drin ist, kann jede Reparatur an der Weiter-Leiste ins Leere gehen — und der Test meldet es nicht. |
 | 3 | **A2 + B1** Weiter-Knopf und Statuszeile | Eine Ursache, zwei Symptome: ein Zustand steht dort, wo eine Handlung hingehört. |
-| 4 | **B2** gewertete Disziplin neu startbar | Datenrisiko, nicht nur Anzeige. |
+| 4 | **B2** gewertete Disziplin neu startbar | ~~Datenrisiko~~ — nachgemessen falsch, siehe B2. Reine Anzeige, aber irreführend. |
 | 5 | **B3, B4, B5** Widersprüche | Billig zu beheben, kosten aber Vertrauen in jede Zahl daneben. |
 | 6 | **D1** Überschriften | Einmalige Aufräumarbeit, danach stimmt die Struktur überall. |
 | 7 | **C1–C4, D2–D4** | Feinschliff. |

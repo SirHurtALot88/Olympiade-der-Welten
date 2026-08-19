@@ -2635,6 +2635,8 @@ export default function DisciplineStageArena({
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}
         env={DISCIPLINE_SKIN[disciplineId]?.env}
         roomSync={nativeRoomSync}
+        /* B2: Der Host wusste das laengst — die Buehne erfaehrt es jetzt auch. */
+        alreadyScored={activeSideScoredInSave}
       />
 
       {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER
