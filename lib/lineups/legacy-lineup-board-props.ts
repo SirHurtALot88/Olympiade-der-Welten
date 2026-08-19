@@ -219,6 +219,10 @@ export type LegacyLineupFocusV2BoardProps = {
     selectedCount: number;
     totalRequired: number;
     nextStep: { label: string; detail: string };
+    /* B2: siehe `LineupFlowSummary` — die Anzeige spricht an einem gewerteten Spieltag in der
+       Vergangenheit. Optional, weil dieser Prop-Typ absichtlich enger ist als die volle
+       Zusammenfassung und nicht jeder Aufrufer sie vollstaendig durchreicht. */
+    matchdayAlreadyScored?: boolean;
   };
   lineupSaveCta: {
     tone: string;

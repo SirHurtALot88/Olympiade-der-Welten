@@ -82,6 +82,7 @@ import { LineupAiPreviewPanel } from "./LineupAiPreviewPanel";
 import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
 import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
+import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
 // verschoben (siehe dortige Kommentare). Diese Komponente behaelt nur noch duenne
@@ -2757,6 +2758,24 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         moraleNetDelta: lineupMoraleSummary.netDelta,
         lineupReadyToSave,
         openSlots: matchdayPreviewCards.openSlots,
+        /*
+         * B2 (zweiter Teil): ein gewerteter Spieltag hat keinen naechsten Schritt mehr. Ohne
+         * dieses Signal stand am Saisonende „Lineup speichern" ueber einem Spieltag, der laengst
+         * gebucht ist. `getMatchdayScoringProgress` ist dieselbe Quelle, aus der auch die Arena
+         * ihren Wertungsstand liest — nicht eine zweite Meinung darueber.
+         */
+        matchdayAlreadyScored: (() => {
+          const gs = props.embeddedGameState ?? context?.gameState ?? null;
+          const matchdayId = context?.matchday?.id ?? null;
+          if (!gs || !matchdayId) return false;
+          const fortschritt = getMatchdayScoringProgress(gs, matchdayId);
+          const noetig = fortschritt.d1.required || fortschritt.d2.required;
+          if (!noetig) return false;
+          return (
+            (!fortschritt.d1.required || fortschritt.d1.scored) &&
+            (!fortschritt.d2.required || fortschritt.d2.scored)
+          );
+        })(),
       }),
     [
       activeSlot,

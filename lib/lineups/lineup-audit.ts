@@ -68,6 +68,8 @@ export type LineupFlowSummary = {
     detail: string;
     tone: "ready" | "warning" | "blocked";
   };
+  /** Der Spieltag ist gewertet — die Anzeige spricht dann in der Vergangenheit. */
+  matchdayAlreadyScored: boolean;
 };
 
 export type LineupSaveCta = {
@@ -216,6 +218,8 @@ export function buildLineupFlowSummary(input: {
   moraleNetDelta: number;
   lineupReadyToSave: boolean;
   openSlots: number;
+  /** Beide Disziplinen des Spieltags sind im Spielstand gewertet (`getMatchdayScoringProgress`). */
+  matchdayAlreadyScored?: boolean;
 }): LineupFlowSummary {
   const {
     activeSlot,
@@ -234,6 +238,7 @@ export function buildLineupFlowSummary(input: {
     moraleNetDelta,
     lineupReadyToSave,
     openSlots,
+    matchdayAlreadyScored = false,
   } = input;
 
   const totalRequired = d1RequiredPlayers + d2RequiredPlayers;
@@ -243,7 +248,28 @@ export function buildLineupFlowSummary(input: {
   const hasDuplicateSelections = duplicateSelectionsCount > 0;
   const hasOpenSlots = openSlots > 0;
   const missingCaptainCount = Number(!captains.d1) + Number(!captains.d2);
-  const nextStep = hasOpenSlots
+  /**
+   * EIN GEWERTETER SPIELTAG HAT KEINEN NAECHSTEN SCHRITT — Befund B2 (zweiter Teil) aus
+   * `docs/AUDIT-INGAME-2026-08-19.md`.
+   *
+   * GEMESSEN am echten Spielstand (Saison 1, Spieltag 10, beide Disziplinen gewertet, Saison
+   * abgeschlossen): der Hinweis sagte „Lineup speichern" — der Spieler soll also eine
+   * Aufstellung fuer etwas abgeben, das laengst gelaufen und gebucht ist.
+   *
+   * KEIN DATENRISIKO: nachgemessen ist die Spielstand-Datei nach „Optimieren" md5-identisch,
+   * und „Lineup speichern" ist ohnehin nur ein Hinweistext, kein Knopf. Der Schaden ist die
+   * Aufforderung selbst — sie schickt den Spieler auf einen Weg, der nirgends hinfuehrt.
+   *
+   * Der Zweig steht GANZ VORNE: offene Slots, doppelte Spieler oder ein gerissenes
+   * Captain-Limit sind an einem gewerteten Spieltag keine Aufgaben mehr, sondern Geschichte.
+   */
+  const nextStep = matchdayAlreadyScored
+    ? {
+        label: "Spieltag gewertet",
+        detail: "Die Punkte stehen — an dieser Aufstellung ändert sich nichts mehr.",
+        tone: "ready" as const,
+      }
+    : hasOpenSlots
     ? {
         label: "Slots füllen",
         detail: `${openSlots} offene Slots · aktiver Fokus ${activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Auto"}`,
@@ -288,6 +314,8 @@ export function buildLineupFlowSummary(input: {
     progressPercent,
     captainCount,
     nextStep,
+    /* Mitgegeben, damit die Anzeige nicht ein zweites Mal rechnet, was hier schon feststeht. */
+    matchdayAlreadyScored,
   };
 }
 

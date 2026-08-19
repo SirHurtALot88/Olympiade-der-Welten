@@ -195,7 +195,7 @@ export function FacilityDecisionModal({
       <header className="foundation-drilldown-header">
         <div>
           <span className="eyebrow">{facilityDialog.action === "maintenance" ? "Wartung" : facilityDialog.action === "downgrade" ? "Downgrade" : "Upgrade"}</span>
-          <h1>{selectedFacility.name}</h1>
+          <h2>{selectedFacility.name}</h2>
           <p>
             {selectedTeam.shortCode} · L{selectedFacility.level} · {formatLocaleNumber(selectedFacility.conditionPct, 0)}% ·{" "}
             {formatLocaleNumber(selectedFacility.efficiencyPct, 0)}%

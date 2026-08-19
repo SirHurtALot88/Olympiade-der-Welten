@@ -18,6 +18,23 @@ type FoundationShellProps = {
   currentMatchday?: number | null;
   headerActions?: ReactNode;
   breadcrumb?: ReactNode;
+  /**
+   * Name der aktiven Ansicht — wird als `<h1>` gerendert, nur fuer Screenreader sichtbar.
+   *
+   * BEFUND D1 aus `docs/AUDIT-INGAME-2026-08-19.md`: gemessen ueber 14 Ansichten hatten 13 gar
+   * KEINE `<h1>`; die einzige im Spiel hiess „Football" — ein Disziplinname, keine
+   * Seitenueberschrift. Ein Dokument ohne h1 hat keine Gliederung: Screenreader finden keinen
+   * Einstieg, und „Zum Hauptinhalt springen" landet in einem Bereich ohne Titel.
+   *
+   * WARUM HIER UND NICHT IN 19 ANSICHTEN: der Name steht laengst fest
+   * (`getFoundationBreadcrumb`, abgeleitet aus der Nav-Konfiguration). Ihn 19 Mal nachzutragen
+   * hiesse, 19 Stellen zu schaffen, die auseinanderlaufen koennen — genau die Fehlerklasse, die
+   * dieser Lauf den ganzen Tag repariert.
+   *
+   * WARUM UNSICHTBAR: die Ansichten tragen ihre Ueberschrift optisch bereits (Breadcrumb,
+   * Panel-Titel). Eine zweite sichtbare Zeile waere Doppelung; hier fehlt nur die SEMANTIK.
+   */
+  viewTitle?: string | null;
   subNav?: ReactNode;
   children: ReactNode;
   isPending?: boolean;
@@ -58,6 +75,7 @@ export default function FoundationShell({
   isPending = false,
   activities = [],
   teamPicker,
+  viewTitle,
 }: FoundationShellProps) {
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
@@ -75,6 +93,9 @@ export default function FoundationShell({
         teamPicker={teamPicker}
       />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
+        {/* Die Gliederungs-Spitze des Dokuments. Steht VOR allem anderen im Hauptbereich, damit
+            „Zum Hauptinhalt springen" (Ziel `#foundation-main-content`) direkt auf sie faellt. */}
+        {viewTitle ? <h1 className="sr-only">{viewTitle}</h1> : null}
         <FoundationActivityStrip activities={activities} />
         <header className="foundation-shell-header">
           {breadcrumb ? <div className="foundation-shell-breadcrumb-slot">{breadcrumb}</div> : null}

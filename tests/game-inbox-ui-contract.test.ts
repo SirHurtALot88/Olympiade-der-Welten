@@ -19,7 +19,6 @@ describe("game inbox UI contract", () => {
       readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
       readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8") +
       readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8") +
-      readFileSync(join(root, "lib/foundation/tabs/foundation-game-flow-navigation.ts"), "utf8") +
       readFileSync(join(root, "lib/foundation/tabs/foundation-global-next-actions.ts"), "utf8") +
       crossTabGameFlowSource +
       commandPaletteSource +

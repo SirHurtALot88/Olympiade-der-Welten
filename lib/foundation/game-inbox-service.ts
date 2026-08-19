@@ -1063,6 +1063,16 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           objective.status === "failed"
             ? `Board-Ziel verfehlt: ${objective.label}`
             : `Board-Ziel gefährdet: ${objective.label}`,
+        /*
+         * DER TITEL TAUGT NICHT FUER EINEN KNOPF. Er ist absichtlich lang (siehe darueber) und
+         * beschreibt einen ZUSTAND. Auf der Weiter-Leiste stand er deshalb abgeschnitten:
+         * „Weiter Board-Ziel verfehlt: For…" — gemessen 74 Zeichen, der Median aller
+         * Knopf-Beschriftungen liegt bei 15.
+         *
+         * `ctaLabel` sagt stattdessen, was der Druck TUT. Zwei Formulierungen, weil ein
+         * verfehltes Ziel nichts mehr zu retten hat und ein gefaehrdetes schon.
+         */
+        ctaLabel: objective.status === "failed" ? "Board-Ziele ansehen" : "Board-Ziel retten",
         description: `Aktuell ${objective.currentValue ?? "—"} · Ziel ${objective.targetValue ?? "—"}`,
         targetView: "teams",
         targetParams: { team: objective.teamId, panel: "board-objectives" },
@@ -1143,6 +1153,8 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
         category: "task",
         severity: "warning",
         title: "Pre-Season Schritt offen",
+        /* Ohne diesen Handlungstext trug die Weiter-Leiste den Zustand statt der Handlung. */
+        ctaLabel: "Pre-Season öffnen",
         // GEMELDET: „Aktuelle Phase: preseason_management." — der rohe Phasen-Bezeichner. Den
         // Klartextnamen gibt es laengst (`formatGamePhaseLabel`), er wurde hier nur nicht benutzt.
         description: `Aktuelle Phase: ${formatGamePhaseLabel(input.gameState.gamePhase)}.`,
@@ -1168,6 +1180,7 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
         category: "task",
         severity: "warning",
         title: "Mitspieler wartet / Ready fehlt",
+        ctaLabel: "Runde prüfen",
         description: `${missing.length} Participant(s) fehlen im Step ${flow.step ?? "unknown"}.`,
         targetView: "cockpit",
         targetParams: { step: flow.step ?? "unknown" },
@@ -1188,6 +1201,7 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
 	          category: "warning",
 	          severity: "critical",
 	          title: "AI/Workflow Blocker",
+	          ctaLabel: "Blocker ansehen",
 	          description: `${log.stepId}: ${log.errors[0] ?? log.warnings[0] ?? log.status}`,
 	          targetView: "cockpit",
 	          targetParams: { step: log.stepId },
@@ -1708,6 +1722,35 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
   });
 }
 
+/**
+ * KANN DIESER EINTRAG AUF DIE WEITER-LEISTE?
+ *
+ * Herausgeloest aus `getPrimaryInboxTask`, weil die Bedingung nicht nur dort gebraucht wird: an
+ * ihr haengt, fuer welche Eintraege ein `ctaLabel` PFLICHT ist. Ohne eigenen Namen musste jeder,
+ * der das wissen wollte, den Filter abschreiben — und eine abgeschriebene Bedingung ist eine
+ * Bedingung, die auseinanderlaeuft.
+ *
+ * Geprueft wird sie in `tests/weiter-leiste-beschriftung.test.ts`.
+ */
+export function isPrimaryInboxCandidate(
+  item: GameInboxItem,
+  options?: { focusMatchdayLoop?: boolean },
+): boolean {
+  if (item.status !== "open") {
+    return false;
+  }
+  return (
+    item.category === "task" ||
+    item.category === "warning" ||
+    item.category === "sponsor" ||
+    item.category === "training" ||
+    (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
+    (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
+    (!options?.focusMatchdayLoop && item.category === "contract") ||
+    item.severity === "critical"
+  );
+}
+
 export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMatchdayLoop?: boolean }) {
   const severityRank: Record<GameInboxItem["severity"], number> = {
     critical: 0,
@@ -1728,18 +1771,7 @@ export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMat
     facility_finance_forecast: 10,
   };
 
-  const candidates = items.filter(
-    (item) =>
-      item.status === "open" &&
-      (item.category === "task" ||
-        item.category === "warning" ||
-        item.category === "sponsor" ||
-        item.category === "training" ||
-        (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
-        (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
-        (!options?.focusMatchdayLoop && item.category === "contract") ||
-        item.severity === "critical"),
-  );
+  const candidates = items.filter((item) => isPrimaryInboxCandidate(item, options));
 
   if (candidates.length === 0) {
     return null;
