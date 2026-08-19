@@ -484,3 +484,30 @@ Breiten-Umschaltung (`Standard` / `Breit` / `Cinema`, je 17 px) und „Alle Aufg
 Der Durchlauf ist wiederholbar: `scripts/audit-ingame-durchlauf.mjs` startet gegen einen laufenden
 Server und legt Screenshots, Texte und Befunde ab. Der Spielstand kommt über
 `OLY_APP_SQLITE_PATH` aus einer **Kopie** — der Server wird nie angefasst.
+
+
+---
+
+## Nachtrag: manuelle CI-Läufe zählen nicht als Pflicht-Check
+
+Beim Mergen dieses Zweigs lehnte GitHub ab:
+
+> `2 of 2 required status checks are cancelled.`
+
+Obwohl beide Tore grün waren. Der Grund steht in den Ereignissen der Läufe:
+
+| Lauf | Ereignis | Ergebnis |
+|---|---|---|
+| 32255211845 | `pull_request` | **cancelled** |
+| 32257528228 | `workflow_dispatch` | success |
+
+Die Schutzregel wertet den Lauf aus dem **`pull_request`**-Ereignis. Ein manuell angestoßener
+`workflow_dispatch`-Lauf erscheint unter demselben Namen, ersetzt ihn aber nicht.
+
+**Warum das hier passierte:** CI lief für diesen Branch stundenlang gar nicht (siehe oben), also
+habe ich sie mehrfach von Hand angestoßen. Das war richtig, um überhaupt eine Aussage zu bekommen
+— aber es ersetzt den Pflicht-Check nicht.
+
+**Regel daraus:** ein manueller Lauf ist zum *Messen* gut. Zum *Mergen* muss ein Lauf aus dem
+`pull_request`-Ereignis grün sein; den holt man mit einem Push, nicht mit einem Dispatch. Und
+danach nicht mehr dispatchen — sonst bricht der eigene Dispatch den PR-Lauf ab.
