@@ -964,10 +964,41 @@ async function main() {
           console.error(`[prematch-cta] Bildschirmtext ${label}:\n${body.slice(0, 1500)}`);
           throw error;
         }
-        // Nur klicken, wenn die Tafel wirklich noch steht. `isVisible()` fragt den JETZT-Zustand ab
-        // (kein Warten) — nach dem Race oben ist genau einer der beiden Faelle bereits eingetreten.
-        if (await cta.isVisible().catch(() => false)) {
-          await cta.click();
+        /*
+         * ZIEL IST, DIE TAFEL HINTER SICH ZU LASSEN — nicht, unbedingt zu klicken.
+         *
+         * Hier stand `if (await cta.isVisible()) await cta.click();`. Der Kommentar dazu dachte
+         * bis zur PRUEFUNG und nicht bis zur HANDLUNG: zwischen beiden kann die Tafel von selbst
+         * verschwinden, weil der andere Client fertig wird und `preMatchdayReady` die Buehne
+         * oeffnet. `click()` wartet dann 30 Sekunden auf ein Element, das es nicht mehr gibt:
+         *
+         *   locator.click: Timeout 30000ms exceeded.
+         *     - element was detached from the DOM, retrying
+         *
+         * GEMESSEN: genau dieser Schritt ist am 19.08. auf DREI Branches gescheitert
+         * (`bugfixing-agent-run-1azwei`, `diszi-wechsel-ist-eine-raum-aktion`,
+         * `kein-ki-kader-fuer-menschliche-teams`) — es ist also kein Fehler einer einzelnen
+         * Aenderung, sondern dieses Rennen.
+         *
+         * Ein verschwundener Knopf ist deshalb ERFOLG, kein Fehlschlag. Nur eine Tafel, die
+         * stehen bleibt und sich nicht wegklicken laesst, ist ein echter Befund.
+         */
+        for (let versuch = 1; versuch <= 3; versuch += 1) {
+          if (!(await cta.isVisible().catch(() => false))) {
+            return;
+          }
+          try {
+            await cta.click({ timeout: 5_000 });
+            return;
+          } catch (error) {
+            if (versuch === 3) {
+              await page
+                .screenshot({ path: path.join(OUTPUT_DIR, `failure-prematch-klick-${label}.png`), fullPage: true })
+                .catch(() => {});
+              console.error(`[prematch-cta] Tafel steht nach 3 Versuchen noch fuer ${label} — kein Rennen, echter Befund.`);
+              throw error;
+            }
+          }
         }
       }
       await passPreMatchdayBoard(pageA, "A");

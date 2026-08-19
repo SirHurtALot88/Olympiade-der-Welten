@@ -58,6 +58,51 @@ lokale Store leer ist. Ein Store, in dem schon Spielstände liegen, wird **nie**
 `data/online-saves/manifest.json` (JSON-Exporte auf `main`) ist der ältere, zweite Weg und nur noch
 Rückfall. Er trug über die gesamte Historie nur Smoke- und Audit-Saves, nie einen echten Stand.
 
+## An Chris' In-Game-Meldungen kommen
+
+Dieselbe Mechanik, anderer Branch: der Server pusht jede über die Flagge im Spiel abgeschickte
+Meldung nach `bug-reports`. **Dafür muss Chris nichts tun** — nicht kopieren, nicht weiterleiten.
+
+```sh
+git fetch origin bug-reports
+git ls-tree -r --name-only origin/bug-reports
+git show origin/bug-reports:data/bug-reports/<datei>.json
+```
+
+Jede Meldung ist eine JSON-Datei mit `note` (Chris' Text), `page.view` (wo er stand), `game`
+(Spielstand, Saison, Spieltag) und `createdAt`. Der Dateiname trägt den Zeitstempel, `ls-tree`
+liefert sie also schon sortiert.
+
+**Vor jeder Runde einmal lesen.** Die Tickets, die sonst mühsam aus Chats zusammengesucht werden,
+stehen hier vollständig und mit Kontext — inklusive der Ansicht, in der er den Fehler gesehen hat.
+Ausführlicher: `docs/BUGFIXING_AGENT.md`.
+
+## Zuerst prüfen: spiegelt der Server überhaupt noch?
+
+```sh
+npx tsx scripts/pruefe-spiegel-frische.ts
+```
+
+Beide Spiegel (`live-save`, `bug-reports`) hängen an Crons **auf dem Server**. Fallen die aus,
+schlägt nichts fehl — es passiert nur nichts mehr, und zwar lautlos. Am 19.08. stellte sich heraus,
+dass beide seit dem 14.08. standen: fünf Tage lang war das neueste „aktuelle" Abbild fünf Tage alt,
+und keine In-Game-Meldung erreichte GitHub.
+
+**Ein veraltetes Abbild sieht aus wie ein gültiger Spielstand.** Wer darauf misst, misst die
+Vergangenheit und hält sie für die Gegenwart. Der SessionStart-Hook fährt die Prüfung deshalb bei
+jedem Start — auch dann, wenn er den Import überspringt.
+
+Beheben kann das nur Chris auf dem Server. Dafür gibt es **einen** Befehl statt fünf:
+
+```sh
+ssh root@135.181.102.2
+cd Olympiade-der-Welten && bash deploy/hetzner/spiegel-reparieren.sh
+```
+
+Das Skript prüft Crontab, Cron-Dienst, Deploy-Stand und Logs, richtet die Crons neu ein und
+spiegelt einmal sofort. Es zerstört nichts — nur mit `--deploy-loesen` fasst es den Arbeitsbaum an,
+und auch dann sagt es vorher, was es wegwirft.
+
 ## Etwas auf den Server zurückspielen
 
 Nur über `deploy/hetzner/pull-repaired-save.sh` — **nicht** von Hand. Der Grund ist WAL: neben

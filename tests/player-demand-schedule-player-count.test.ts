@@ -107,7 +107,22 @@ function baueSpielstand(): GameState {
           sourceNote: null,
         },
       ],
-      matchdayResults: [],
+      /**
+       * Die acht Spieltagsergebnisse zu den Leistungen darunter. Sie standen hier frueher NICHT --
+       * die Leistungen zeigten mit `result-0..7` ins Leere, und `buildPlayerSeasonPerformanceMap`
+       * zaehlte sie trotzdem mit, weil sie bei fehlendem Ergebnis auf die laufende Saison
+       * zurueckfiel. Seit Meldung `ru28ai` ist "Saison unbekannt" nicht mehr dasselbe wie
+       * "aktuell" (siehe tests/einsaetze-zaehlen-nur-die-laufende-saison.test.ts), also braucht
+       * der Aufbau seine Ergebnisse jetzt wirklich -- sonst stuenden die Einsaetze auf 0, die
+       * "Einsaetze"-Forderung raeumte die Start-Forderung weg und dieser Test pruefte etwas
+       * anderes, als sein Name sagt.
+       */
+      matchdayResults: Array.from({ length: 8 }, (_, index) => ({
+        id: `result-${index}`,
+        seasonId: "season-1",
+        matchdayId: "md-1",
+        status: "preview_applied",
+      })),
       // Saisoneinsätze des Zielspielers auf das Saisonziel (8) auffuellen, damit die
       // "Einsätze"-Forderung nicht zufaellig vor der Start-Forderung landet und sie verdeckt --
       // dieser Test soll ausschliesslich die Start-Forderung pruefen.

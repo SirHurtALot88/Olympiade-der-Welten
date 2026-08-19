@@ -37,6 +37,17 @@ LIVE_DATEI="data/online-saves/hetzner-live.sqlite.gz"
 # Niemals eine Umgebung ueberschreiben, in der schon Spielstaende liegen — dieselbe Zusage wie
 # `--only-if-empty` beim Manifest-Weg. Ein bereits vorhandener Store kann der Stand sein, an dem
 # gerade gearbeitet wird.
+# DIE FRISCHE-PRUEFUNG STEHT VOR DEM ABBRUCH, NICHT DAHINTER.
+#
+# GEMELDET VON CHRIS (19.08.): „ich habe ingame reportet! wenn das letzte vom 14.08. ist fehlt was".
+# Nachgemessen standen BEIDE Server-Crons seit dem 14.08. still — `live-save` 07:50,
+# `bug-reports` 07:52. Fuenf Tage, unbemerkt, weil nichts fehlschlaegt: es passiert nur nichts.
+#
+# Aufgefallen ist es nicht, weil die vorhandene Pruefung (unten, nach dem Import) genau dann
+# uebersprungen wurde, wenn ein Store schon Daten hat — also ausgerechnet in dem Fall, in dem ein
+# veraltetes Abbild am gefaehrlichsten ist. Sie laeuft jetzt in BEIDEN Zweigen.
+npx tsx scripts/pruefe-spiegel-frische.ts 2>&1 || true
+
 if [ -s "$STORE" ]; then
   echo "[session-start] Store enthaelt bereits Spielstaende — Import uebersprungen."
   exit 0

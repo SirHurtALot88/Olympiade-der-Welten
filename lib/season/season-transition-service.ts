@@ -17,6 +17,7 @@ import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { SEASON_TRANSITION_STEPS, type SeasonTransitionStepId } from "@/lib/season/season-transition-steps";
+import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 
 // Audit R2/V1: Phasen, die der Saisonübergang NICHT auf "season_review" zurücksetzen darf (der User ist im
 // Saisonende-Wizard bereits über den Review hinaus). undefined/season_active/season_completed/season_review
@@ -573,11 +574,33 @@ function computeSeasonTransitionAdvance(
    * Saisonende-Fensters ein Nichtstun — die Prüfung sitzt in der Funktion, nicht hier, damit es
    * nur EINE Stelle gibt, die entscheidet, was „Saisonende-Fenster" heißt.
    */
-  const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({
-    ...progressionSave.gameState,
-    gamePhase: nextPhase,
-    seasonTransition: transition,
-  });
+  /**
+   * TRAININGSFELDER FÜR NEUE KADERSPIELER — Meldung `j53iox`: „der Flow hängt bei Training prüfen
+   * fest - weiß nicht warum dabei müsste er auf die Einsatzliste verweisen, training ist erledigt."
+   *
+   * `isTeamTrainingComplete` verlangt, dass JEDER Kaderspieler einen `trainingMode` trägt. Gesetzt
+   * wurde der bis hierher nur auf dem MARKT-Weg (`transfermarkt-local-service.ts` ruft
+   * `applyDefaultTrainingFieldsToRosteredPlayers`). Wer über Draft, KI-Picks oder den
+   * Saisonwechsel in einen Kader kommt, hatte keinen — und der Schritt konnte nie fertig werden,
+   * ohne dass irgendetwas sagte, an welchem Spieler es liegt.
+   *
+   * NACHGEMESSEN an den fünf Live-Spielständen: T-G steht mit 8 von 8 Kaderspielern ohne
+   * Trainingsmodus da, C-C mit 2 von 9 — beide mit Vertragsstatus `active`, es sind also keine
+   * Karteileichen.
+   *
+   * HIER UND NICHT IM ALLGEMEINEN SCHREIBWEG: der Helfer kostet auf einem echten Spielstand
+   * 611 µs je Aufruf (2984 Spieler) und ist KEIN Nichtstun — er füllt zusätzlich `trainingClass`
+   * und lieferte selbst auf einem Stand mit vollständigem Training einen neuen Zustand zurück.
+   * Beides verbietet den Einbau in `saveSingleplayerState`. Am Phasenwechsel fällt er einmal je
+   * Saison an, genau wie die GuV-Nachbuchung eine Zeile weiter.
+   */
+  const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster(
+    applyDefaultTrainingFieldsToRosteredPlayers({
+      ...progressionSave.gameState,
+      gamePhase: nextPhase,
+      seasonTransition: transition,
+    }),
+  );
 
   return { status: "advanced", appliedStep: currentStep, nextGameState, transition };
 }

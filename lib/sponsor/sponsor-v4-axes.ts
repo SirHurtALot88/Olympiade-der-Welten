@@ -37,6 +37,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { DEFAULT_ROSTER_MAX, FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   SPONSOR_V4_AXIS_KEYS, type SponsorV4AxisKey, type SponsorV4AxisTerms,
@@ -74,7 +75,20 @@ type SponsorV4AxisDefinition = {
    * `{ziel}` wird beim Anzeigen durch den Zielwert samt Einheit ersetzt.
    */
   erklaerung: string;
+  /**
+   * Zielmarke, wenn ein Vertrag keine eigene mitfuehrt (Altvertraege ohne `axisscale`).
+   * Fuer NEUE Angebote entscheidet `scaleFor`, sofern die Achse eines hat.
+   */
   scale: number;
+  /**
+   * TEAMABHAENGIGE ZIELMARKE — der Grund, warum es sie gibt, steht bei `entwicklung`.
+   *
+   * Eine feste Zahl ist fuer jede Achse richtig, deren Messgroesse nach oben offen ist (Cash,
+   * Prozent, Gebaeudestufen). Sobald die Messgroesse an einer Obergrenze des Spiels haengt — der
+   * Kader hat hoechstens `DEFAULT_ROSTER_MAX` Spieler — kann eine feste Zahl ueber diese Grenze
+   * hinauslaufen und verspricht dann etwas, das kein Team einloesen kann.
+   */
+  scaleFor?: (gameState: GameState, teamId: string) => number;
   offset: number;
   /** Ausgangswert bei Angebotserzeugung. 0, wenn die Achse ohnehin nur Saisonzuwachs zaehlt. */
   baseline: (gameState: GameState, teamId: string) => number;
@@ -306,11 +320,60 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
       "{ziel} sollen über die Saison mindestens " + String(AXIS_TALENT_JUMP_MV) + " Marktwert dazugewinnen. " +
       "Gezählt werden Spieler, nicht Punkte: wer zweimal zulegt, zählt einmal. Gemeint ist Marktwert, " +
       "nicht SP — und der Endstand nach Regression, nicht der Bruttozuwachs.",
-    // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
-    // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
-    // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
-    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
-    scale: 20,
+    /**
+     * GEMELDET VON CHRIS (19.08., In-Game): „Als Ziel Entwicklung — 20 Spieler sollen sich
+     * entwickeln und 6 MW dazu gewinnen? […] Dazu kommt 20 spieler kann man gar nicht haben????
+     * Bitte das dringend fixen und auf unsere systeme anpassen und messen."
+     *
+     * ER HAT RECHT, UND ZWAR HART. `DEFAULT_ROSTER_MAX` ist 14, und `getTeamPlayerMax` klammert
+     * jedes Team dort hart ab — 20 Spieler kann ein Kader nicht enthalten. Am Live-Abbild
+     * nachgemessen: Kadergroessen 8 bis 14, Median 10. Die Karte versprach also eine Marke, die
+     * kein Team der Liga jemals erreichen konnte.
+     *
+     * WIE DIE 20 ENTSTAND: die Nachkalibrierung vom 03.08. suchte eine Ø Erfuellung im Korridor
+     * 35–65 % und drehte dafuer AUSSCHLIESSLICH an der Zielmarke (3 → 20; gemessene Rohmetrik
+     * 7–13 Spruenge, Median 10, Ø Erfuellung danach 50,6 %). Weil die Achse anteilig zahlt
+     * (`fraction = metric / scale`), ist die Marke zugleich ein Auszahlungsregler — und als Regler
+     * funktionierte die 20. Als AUSSAGE auf der Karte war sie falsch, und die Karte sagt sie
+     * woertlich.
+     *
+     * DIE MARKE HAENGT JETZT AM EIGENEN KADER. Das ist keine neue Idee, sondern die Regel dieser
+     * Datei (Dateikopf, Eigenschaft 1): gemessen wird gegen die eigene Ausgangslage, nie gegen die
+     * Liga — „damit eine Achse fuer den Tabellenletzten genauso ausreizbar ist wie fuer den
+     * Meister". Eine feste 14 haette ein Team mit 8 Spielern bei 57 % gedeckelt; die eigene
+     * Kadergroesse deckelt niemanden.
+     *
+     * WAS DAS AN DER AUSZAHLUNG AENDERT, laesst sich derzeit NICHT ehrlich beziffern — und der
+     * Grund ist wichtiger als die Zahl: die Messgroesse der Achse ist kaputt. Siehe unten.
+     *
+     * ZU CHRIS' ZWEITEM PUNKT („6 MW schaffen wir nicht wenn 2-3 Mio maximum für top playre ist")
+     * — HIER LAG ICH ZUERST FALSCH, UND CHRIS RICHTIG. Meine erste Antwort war, die Schwelle 6 sei
+     * „nachweislich erreichbar", weil im Median 10 Spieler je Team sie ueberspringen. Das war ein
+     * Trugschluss: `talentJumpCount` rechnet `after.marketValuePreview − before.marketValue`, und
+     * `before.marketValue` ist IMMER 0 (nachgemessen an 1017 Entwicklungs-Ereignissen aus drei
+     * Spielstaenden: 0 von 1017 mit einem Wert > 0). Die Differenz ist damit der ABSOLUTE
+     * Marktwert, kein Zuwachs — der „Median-Zuwachs 21,9" ist punktgenau der Median-Marktwert.
+     * Die Achse zaehlt also „Spieler mit Marktwert ueber 6", und das sind 980 von 1017.
+     *
+     * Chris' Einwand trifft damit genau: ein paar Statpoints ergeben keine 6 Marktwert — sie
+     * muessen es auch gar nicht, weil hier nie ein Zuwachs gemessen wurde.
+     *
+     * WAS DAS FUER DIESE AENDERUNG HEISST: die Kadergrenze ist ein EIGENER, davon unabhaengiger
+     * Fehler — 20 Spieler kann kein Kader stellen, egal was gezaehlt wird. Der bleibt behoben, weil
+     * die Karte sonst weiter etwas Unmoegliches verspricht. Eine KALIBRIERUNG der Schwelle waere
+     * dagegen jetzt falsch: sie wuerde eine bedeutungslose Zahl nur anders skalieren und dabei
+     * richtig aussehen. Genau in diese Falle ist schon die Nachkalibrierung vom 03.08. getappt.
+     *
+     * OFFEN UND CHRIS' ENTSCHEIDUNG (Analyse in PR #566): soll die Achse den ATTRIBUT-Zuwachs
+     * messen (saubere Daten liegen vor), den echten Marktwert-Zuwachs (dann muss zuerst
+     * `before.marketValue` repariert werden — Vorsicht, am Saisonende wechselt die
+     * Bewertungsmethode, siehe Kommentar bei `wachstum`), oder vorerst gar nicht angeboten werden.
+     */
+    scale: DEFAULT_ROSTER_MAX,
+    scaleFor: (gameState, teamId) => {
+      const kader = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+      return Math.min(DEFAULT_ROSTER_MAX, Math.max(FIXED_ROSTER_MIN, kader));
+    },
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,
@@ -380,7 +443,7 @@ export function buildSponsorV4AxisTerms(
   return {
     key,
     baseline: Math.round(definition.baseline(gameState, teamId) * 100) / 100,
-    scale: definition.scale,
+    scale: definition.scaleFor?.(gameState, teamId) ?? definition.scale,
     offset: definition.offset,
   };
 }

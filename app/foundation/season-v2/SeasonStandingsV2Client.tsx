@@ -183,6 +183,13 @@ export type SeasonStandingsV2ClientProps = {
   sourceLabel: string;
   sourceBadgeLabel: string;
   isArchived: boolean;
+  /**
+   * Die Saison des Spielstands ist durch — alle Spieltage gewertet. Getrennt von `isArchived`,
+   * weil das zwei verschiedene Aussagen sind: „eine alte Saison wird betrachtet" gegen „die
+   * aktuelle Saison ist zu Ende". Vorher gab es nur `isArchived`, und der zweite Fall fiel
+   * deshalb in den Zweig „Saison läuft" (Befund B5).
+   */
+  isSeasonEnded?: boolean;
   seasonOptions: SeasonV2Option[];
   selectedTeamSummary: SeasonV2TeamSummary | null;
   leaderTeam: SeasonV2StandingsRow | null;

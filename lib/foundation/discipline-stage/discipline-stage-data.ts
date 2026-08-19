@@ -5,6 +5,40 @@ import { distributePerPlayerFormShares, seededFormJitter } from "@/lib/lineups/l
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 
+/**
+ * EIN UNBESCHRIEBENES FORM-FELD IST KEINE SCHLECHTE FORM.
+ *
+ * GEMELDET VON CHRIS (`qwbnic`, Arena): „S-C soll +18,4 gehabt haben — hat in realitaet aber bei
+ * jedem Spieler eine negative Form gehabt! bitte pruefen dass nicht wieder die slots vertauscht
+ * wurden."
+ *
+ * `player.form` wird NIRGENDS geschrieben. Der Generator setzt 0
+ * (`lib/player-generator/commit-draft-to-free-agent.ts:209`,
+ * `lib/player-import/character-import-service.ts:196`), die Saat traegt 0 in allen 2984 Spielern
+ * (`data/generated/oly-player-stats.json`), und in allen sieben Live-Spielstaenden steht das Feld
+ * bei 2304 von 2304 Kaderspielern auf exakt 0 — kein einziger Wert daneben, keiner fehlend.
+ *
+ * Die Buehne las diese 0 als ECHTE Form und rechnete `((0 − 50) / 50) × 8 = −8`. Der neutrale
+ * Rueckfall `?? 50` griff nie, weil das Feld ja da ist. Ergebnis am Live-Abbild `hwz8fk`: 192 von
+ * 192 Spielern in Basketball und 160 von 160 in Battlefield mit negativem Form-Anteil — kein
+ * einziger positiver, in keinem Team. Genau Chris' „bei jedem Spieler".
+ *
+ * Die „+18,4" daneben ist eine ANDERE Groesse: die Formkarten-Summe aus der Resolve-Vorschau
+ * (`lib/foundation/matchday-team-modifiers.ts`). Die ist in Ordnung — am Abbild gemessen folgen
+ * ihre Pro-Spieler-Anteile dem Vorzeichen der Karte. Vertauschte Slots waren es also nicht; es
+ * standen zwei verschiedene Dinge unter demselben Wort auf einem Bildschirm, und das zweite war
+ * aus einem leeren Feld erfunden.
+ *
+ * `lib/training/player-progression-forecast.ts:377,515` haelt diese Regel laengst
+ * (`isFiniteNumber(player.form) && player.form > 0`) — hier fehlte sie.
+ */
+function formKartenwert(form: number | null | undefined): number {
+  if (!Number.isFinite(form) || (form as number) <= 0) {
+    return 0;
+  }
+  return Math.round(((clamp(form as number, 0, 100) - 50) / 50) * 8);
+}
+
 // One aufgestellter Spieler in einem Slot einer Disziplin, mit echter
 // Netto-Leistung aus dem Save (Disziplin-Wert + echtem Fatigue/Form).
 export type DisciplineStageSlot = {
@@ -13,7 +47,7 @@ export type DisciplineStageSlot = {
   playerName: string;
   base: number; // player.disciplineRatings[disciplineId]
   fatiguePenalty: number; // aus player.fatigue
-  formSwing: number; // aus player.form + kleiner Tagesform-Swing
+  formSwing: number; // aus player.form + kleiner Tagesform-Swing; 0, solange keiner einen Formwert traegt
   net: number; // max(0, base - fatiguePenalty + formSwing)
   portraitUrl: string | null;
   traits: string[]; // player.traitsPositive + traitsNegative (für Trait-Mutatoren)
@@ -139,7 +173,7 @@ export function buildDisciplineStageModel(
       .map((p) => {
         const base = Number(ratingOf(p).toFixed(1));
         const fatiguePenalty = Math.round(((base * clamp(p.fatigue ?? 0, 0, 100)) / 100) * 0.25);
-        const formEst = Math.round(((clamp(p.form ?? 50, 0, 100) - 50) / 50) * 8);
+        const formEst = formKartenwert(p.form);
         return { p, key: base - fatiguePenalty + formEst + seededFormJitter(`sel|${p.id}|${disciplineId}`, 5) };
       })
       .sort((a, b) => b.key - a.key)
@@ -149,11 +183,14 @@ export function buildDisciplineStageModel(
     // aufgestellten Teams ein Pro-Spieler-Kartenwert (±8), dann per gemeinsamer
     // Funktion additiv mit Jitter (±4) auf die Spieler verteilt — identische Logik
     // wie die echte Engine, damit Modell- und Engine-Pfad gleich aussehen.
-    const avgForm =
-      chosen.length > 0
-        ? chosen.reduce((sum, p) => sum + clamp(p.form ?? 50, 0, 100), 0) / chosen.length
-        : 50;
-    const flatFormPerPlayer = Math.round(((avgForm - 50) / 50) * 8);
+    // Nur Spieler MIT Formwert bilden den Durchschnitt. Traegt keiner einen (der Regelfall, s.
+    // `formKartenwert`), bleibt der Kartenwert 0 — `distributePerPlayerFormShares` gibt dann fuer
+    // alle exakt 0 zurueck (Riegel `flat === 0`), es wird also auch kein Jitter erfunden.
+    const mitForm = chosen.filter((p) => Number.isFinite(p.form) && (p.form as number) > 0);
+    const flatFormPerPlayer =
+      mitForm.length > 0
+        ? formKartenwert(mitForm.reduce((sum, p) => sum + clamp(p.form, 0, 100), 0) / mitForm.length)
+        : 0;
     const formShares = distributePerPlayerFormShares({
       formModifier: flatFormPerPlayer * chosen.length,
       seeds: chosen.map((p) => `${p.id}|${disciplineId}`),
