@@ -288,9 +288,26 @@ schlimmer als eine fehlende. Ich hatte das zuerst so gebaut und wieder zurückge
 Nachspielen bleibt möglich; der Riegel liegt beim Buchen, nicht beim Abspielen. Ein Test hält
 genau diese Zeile fest — fällt sie weg, wird aus B2 doch noch ein echter Fehler.
 
-**Offen bleibt der zweite Teil:** die Einsatzliste für einen gespielten Spieltag ist weiterhin
-voll bearbeitbar. Das ist eine eigene Entscheidung (was soll ein Speichern dort tun?) und gehört
-nicht in dieselbe Änderung.
+**Der zweite Teil — ebenfalls erledigt.** Die Einsatzliste sprach an einem gewerteten Spieltag
+durchgehend in Zukunftsform.
+
+| | vorher | nachher |
+|---|---|---|
+| Nächster Schritt | „Lineup speichern" | **„Spieltag gewertet"** |
+| Kennzahl | „ERWARTETE PUNKTE" | **„PROGNOSE VOR DEM SPIELTAG"** |
+
+Auch hier **kein Datenrisiko, nachgemessen**: nach „Optimieren" ist die Spielstand-Datei
+md5-identisch und der Aufstellungs-Entwurf trägt denselben Hash. „Lineup speichern" war ohnehin
+nur ein Hinweistext (`<span class="nl-lineup-nextstep">`), kein Knopf — der Schaden war die
+Aufforderung selbst, die auf einen Weg schickt, der nirgends hinführt.
+
+Der neue Zweig steht **ganz vorne** in der Nächster-Schritt-Kette: offene Slots, doppelte Spieler
+oder ein gerissenes Captain-Limit sind nach der Wertung keine Aufgaben mehr, sondern Geschichte.
+Das Signal kommt aus `getMatchdayScoringProgress` — derselben Quelle, aus der auch die Arena ihren
+Wertungsstand liest, nicht einer zweiten Meinung darüber.
+
+Die Zahl selbst bleibt richtig: sie sagt, was **vor** dem Spieltag zu erwarten war. Nur ihr Name
+war falsch.
 
 ### B3 · Ein Feld sagt „Offen", der Statuschip daneben sagt „erledigt"
 

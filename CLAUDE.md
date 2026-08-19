@@ -58,6 +58,25 @@ lokale Store leer ist. Ein Store, in dem schon Spielstände liegen, wird **nie**
 `data/online-saves/manifest.json` (JSON-Exporte auf `main`) ist der ältere, zweite Weg und nur noch
 Rückfall. Er trug über die gesamte Historie nur Smoke- und Audit-Saves, nie einen echten Stand.
 
+## An Chris' In-Game-Meldungen kommen
+
+Dieselbe Mechanik, anderer Branch: der Server pusht jede über die Flagge im Spiel abgeschickte
+Meldung nach `bug-reports`. **Dafür muss Chris nichts tun** — nicht kopieren, nicht weiterleiten.
+
+```sh
+git fetch origin bug-reports
+git ls-tree -r --name-only origin/bug-reports
+git show origin/bug-reports:data/bug-reports/<datei>.json
+```
+
+Jede Meldung ist eine JSON-Datei mit `note` (Chris' Text), `page.view` (wo er stand), `game`
+(Spielstand, Saison, Spieltag) und `createdAt`. Der Dateiname trägt den Zeitstempel, `ls-tree`
+liefert sie also schon sortiert.
+
+**Vor jeder Runde einmal lesen.** Die Tickets, die sonst mühsam aus Chats zusammengesucht werden,
+stehen hier vollständig und mit Kontext — inklusive der Ansicht, in der er den Fehler gesehen hat.
+Ausführlicher: `docs/BUGFIXING_AGENT.md`.
+
 ## Etwas auf den Server zurückspielen
 
 Nur über `deploy/hetzner/pull-repaired-save.sh` — **nicht** von Hand. Der Grund ist WAL: neben
