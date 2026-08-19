@@ -369,6 +369,35 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
             >
               {currentParticipant?.readyState === "ready" ? "Bereit ✓" : "Bereit melden"}
             </button>
+            {isHost ? (
+              /**
+               * DAS ENDE EINES RAUMS WAR NICHT VORGESEHEN. `closeRoom` gibt es serverseitig
+               * vollstaendig (Host-Pruefung, Ablage, Save-Schutz) — nur fuehrte kein Weg dorthin.
+               * Folge: der Spielstand blieb bis zum Sieben-Tage-Verfall raumgebunden und damit fuer
+               * die Admin-Werkzeuge gesperrt, auch wenn laengst niemand mehr im Raum war. Die
+               * Messung dazu steht am Socket-Handler (lib/socket/server.ts).
+               *
+               * Rueckfrage davor, weil der Klick fuer BEIDE gilt und nicht zurueckzunehmen ist —
+               * derselbe Grund, aus dem der Raum sich nicht selbst nach einer geratenen Frist
+               * schliesst.
+               */
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={!seatToken}
+                onClick={() => {
+                  if (!seatToken) return;
+                  const sicher = window.confirm(
+                    "Raum wirklich beenden? Der Raum verschwindet für beide Spieler. " +
+                      "Der Spielstand bleibt erhalten und ist danach wieder ein normaler Solo-Spielstand.",
+                  );
+                  if (!sicher) return;
+                  socket.emit("closeRoom", { roomCode: roomCode.toUpperCase(), seatToken });
+                }}
+              >
+                Raum beenden
+              </button>
+            ) : null}
           </section>
 
           {isHost && matchdayInProgress ? (

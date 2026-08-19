@@ -122,6 +122,15 @@
       "datum": "2026-08-19",
       "seite": "Mehrspieler",
       "pr": null,
+      "text": "Der Host kann einen Raum jetzt beenden — und gibt damit den Spielstand wieder frei. Vorher war das Ende eines Raums schlicht nicht vorgesehen: der Spielstand blieb sieben Tage lang raumgebunden, auch wenn längst niemand mehr drin war, und die Admin-Werkzeuge darauf waren so lange gesperrt. Nachgemessen: nach der Anlage gesperrt, mit beiden Spielern getrennt weiterhin gesperrt, nach dem Beenden frei. Bewusst KEINE kürzere Frist stattdessen — „beide gerade offline“ heißt nicht „fertig“, und zwei Coaches, die gleichzeitig neu laden, sollen ihren laufenden Koop-Spielstand nicht plötzlich für fremde Schreibvorgänge geöffnet sehen. Der Knopf fragt vorher nach, weil er für beide Spieler gilt; der Spielstand selbst bleibt erhalten und ist danach ein normaler Solo-Stand.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
       "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
