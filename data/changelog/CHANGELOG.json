@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Lädt der Host die Seite mitten in der Enthüllung neu, holt seine Bühne jetzt auf den Stand auf, auf dem der Raum steht. Vorher startete er wieder bei Etappe 0, während der Mitspieler schon bei Etappe 5 war — und sein erster Klick auf ▶ schob den Raum nicht etwa zurück, sondern noch eine Etappe WEITER. Der Versatz blieb danach für den ganzen Spieltag bestehen. Aufgeholt wird per Sprung, nicht durch erneutes Abspielen: die Etappen davor hat der Mitspieler längst gesehen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Teams",
       "pr": null,
       "text": "Der Knopf „Kader auffüllen“ in der Teamansicht ist weg — für beide Spieler. Er warf einen KI-Pick-Lauf für das eigene Team an; Kader entstehen jetzt ausschließlich über den Transfermarkt. Wichtiger als der Knopf war, was ohne ihn passierte: ein solcher Lauf auf ein Team, das der Aufrufer nicht bedienen darf, antwortete mit „KI-Picks angewendet.“ und schrieb nachweislich nichts — man klickte, bekam Erfolg gemeldet und der Kader blieb leer. Die Route lehnt menschlich geführte Teams jetzt ausdrücklich ab und sagt auch, was stattdessen gilt. Der Liga-Draft beim Spielstart ist davon nicht berührt: er füllt die KI-Teams wie bisher und lässt die geführten Teams in Ruhe.",

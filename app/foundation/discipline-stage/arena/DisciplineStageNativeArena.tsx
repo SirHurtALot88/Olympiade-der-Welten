@@ -3113,6 +3113,43 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // Co-op HOST: meldet jeden eigenen Reveal-Schritt an den Room (nur bei Increment,
   // nicht beim initialen round=0 und nicht nach „↻ Neu"-Reset).
   const prevSyncRoundRef = useRef(0);
+
+  /**
+   * DER HOST LAEDT MITTEN IN DER ENTHUELLUNG NEU (F5 im Browser, nicht der Server-Neustart).
+   *
+   * `resumeRoomArenaAfterRestart` (`lib/room/arena-sync-state.ts`) faengt den SERVER-Neustart ab.
+   * Der Fall hier ist der andere: der Server laeuft weiter und weiss noch alles, nur die SEITE des
+   * Hosts ist frisch. Sie mountet mit `round = 0` und `started = false`, waehrend der Raum (und
+   * damit der Gast) auf Etappe 7 steht.
+   *
+   * Die Nachhol-Schleife darueber half nicht: sie ist auf `followsHost` verriegelt, und das ist
+   * fuer den Host per Definition false. Was stattdessen passierte: der Host klickt ▶, seine
+   * `round` geht auf 1 — und der Melde-Effekt darunter sieht ein Increment und schaltet den RAUM
+   * von 7 auf 8. Der Gast springt auf 8, der Host zeigt Etappe 1. Ab da laufen beide dauerhaft um
+   * den Rueckstand versetzt, und der Raum ist ueber sein eigenes Ende hinaus geschoben.
+   *
+   * Deshalb holt der Host EINMAL nach, wenn er beim Ankommen hinter dem Raum steht — per Sprung,
+   * nicht per Kaskade: die Etappen davor hat der Gast laengst gesehen, sie noch einmal abzuspielen
+   * waere kein Aufholen, sondern eine Wiederholung.
+   *
+   * NUR "hinter dem Raum" (`syncedRound > round`), nie umgekehrt: waehrend eines normalen eigenen
+   * Schritts ist der Host kurzzeitig VOR dem Raum (lokal schon weiter, die Meldung noch unterwegs)
+   * — dort einzugreifen wuerde ihn bei jedem eigenen Klick zurueckreissen.
+   *
+   * `prevSyncRoundRef` wird VOR dem Sprung mitgezogen, sonst laese der Melde-Effekt den Sprung
+   * (0 -> 7) als sieben eigene Schritte und schoebe den Raum genau um den Rueckstand weiter, den
+   * dieser Effekt gerade aufholt.
+   */
+  const hostHatNachgeholtRef = useRef(false);
+  useEffect(() => {
+    if (!roomSync?.active || !roomSync.isHost) return;
+    if (hostHatNachgeholtRef.current) return;
+    if (roomSync.syncedRound <= round) return;
+    hostHatNachgeholtRef.current = true;
+    prevSyncRoundRef.current = roomSync.syncedRound;
+    jumpToRound(roomSync.syncedRound);
+  }, [roomSync?.active, roomSync?.isHost, roomSync?.syncedRound, round, jumpToRound]);
+
   useEffect(() => {
     if (!roomSync?.active || !roomSync.isHost) {
       prevSyncRoundRef.current = round;
