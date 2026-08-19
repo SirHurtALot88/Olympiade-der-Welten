@@ -218,6 +218,32 @@ function average(values: number[]) {
   return values.length > 0 ? sum(values) / values.length : 0;
 }
 
+/**
+ * Obergrenze fuer Gehalts- und Cash-Reserve ZUSAMMEN, als Anteil des Kontostands.
+ *
+ * DER WERT IST GEMESSEN, NICHT GERATEN. `scripts/messe-reserve-deckel.ts` faehrt den Sweep ueber
+ * alle Live-Spielstaende; das Ergebnis (Teams mit freiem Cash, je Spielstand):
+ *
+ *   Deckel      1,00   0,90   0,75   0,60   0,50
+ *   `1hf25q`     4      4      11     18     18
+ *   `hwz8fk`    20     20      22     24     24
+ *   `89rv3s`    21     21      23     25     25
+ *   `n90y4m`    12     12      12     13     16
+ *   `h0z7cl`     6      6       6      9      9
+ *
+ * 0,90 aendert NICHTS — der Deckel beginnt erst darunter zu greifen. Von 0,75 auf 0,60 liegt der
+ * groesste Sprung (`1hf25q` 11 → 18), danach flacht es ab. 0,50 bringt gegenueber 0,60 fast nichts
+ * mehr und nimmt dafuer echten Schutz weg. Deshalb 0,60.
+ *
+ * SICHERHEIT MITGEMESSEN: die Zahl der Teams, die nach dem geplanten Ausgeben ins Minus geraten
+ * wuerden, ist ueber ALLE Deckelwerte konstant (1 / 3 / 9 je Spielstand) — der Deckel schafft also
+ * keine neue Zahlungsunfaehigkeit, diese Faelle bestehen schon vorher.
+ *
+ * Benannte Konstante und keine Zahl im Ausdruck: an ihr haengt, wie viel die KI-Liga ueberhaupt
+ * investieren kann, und sie gehoert an eine Stelle, die man findet.
+ */
+export const AI_RESERVE_SHARE_OF_CASH_CAP = 0.6;
+
 const RAW_SALARY_TO_BUDGET_UNIT = 1000;
 
 function identitySignal(value: number) {
@@ -652,7 +678,37 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, facilityMaintenanceCost, 0), 2);
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
   const cashReserve = liquidityReserve.cashReserve;
-  const rawFreeCash = Math.max(0, cash - salaryReserve - maintenanceBudget - emergencyBudget - cashReserve);
+  /**
+   * DIE RESERVEN DUERFEN NICHT DEN GANZEN KONTOSTAND FRESSEN.
+   *
+   * GEMELDET VON CHRIS (`nl5eju`): „was mir auffällt in Season 2 hat IMMERNOCH kein einziges team
+   * in gebäude investiert - was mich zb bei T-T wundert wenn die so auf entwicklung von spielern
+   * setzen müsste wenigstens mal 1 lvl in academy gehen".
+   *
+   * NACHGEMESSEN: die KI WILL bauen — 95 von 108 Planzeilen liegen über der Bau-Schwelle, 86 davon
+   * stehen trotzdem auf `skip`. Es lag nicht am Bau-Topf: Teams mit freiem Cash, aber 0 Baubudget,
+   * gab es KEINE. Es lag eine Ebene tiefer — **28 von 32 Teams hatten null freies Cash**, obwohl
+   * G-G 35,6 auf dem Konto hatte, C-S 21,7, A-A 16,7. Auch das Transferbudget war bei denselben
+   * Teams 0; die Meldung heisst „keine Gebäude", der Befund heisst „keine Investitionen".
+   *
+   * DER GRUND IST DIE BEMESSUNG: `salaryReserve` ist die VOLLE Gehalts-Runway — eine absolute
+   * Zahl, die nichts vom Kontostand weiss. Ein Team mit 17 Cash und 60 Gehaltslast hat rechnerisch
+   * eine Deckungslücke, und dann bleibt nach `max(0, …)` eben nichts übrig. Die Reserve schützt in
+   * diesem Fall nichts (das Geld ist ohnehin nicht da) und verhindert nur jede Investition.
+   *
+   * CHRIS' ENTSCHEIDUNG (Weg 1 von drei vorgelegten): die Reserven als ANTEIL des Kontostands
+   * deckeln statt absolut. Damit bleibt jedem Team ein garantierter Rest investierbar, und die
+   * Reserve wirkt weiter dort, wo sie etwas zu schützen hat.
+   *
+   * WAS DIE DECKELUNG NICHT TUT: sie senkt keine Reserve, die aus dem Kontostand gedeckt ist. Bei
+   * einem Team mit viel Cash und kleiner Gehaltslast greift `Math.min` nicht — dort ändert sich
+   * nichts. Sie greift genau bei den Teams, bei denen die Reserve grösser war als das Konto.
+   */
+  const gedeckelteReserven = Math.min(
+    salaryReserve + cashReserve,
+    Math.max(0, cash) * AI_RESERVE_SHARE_OF_CASH_CAP,
+  );
+  const rawFreeCash = Math.max(0, cash - gedeckelteReserven - maintenanceBudget - emergencyBudget);
   const recoveryBuildingNeed =
     context.injuryCount > 0 || context.fatigueHighCount >= 2 || context.fatigueAvg >= 60 ? 0.12 : 0;
   const recoveryBudgetReserve =
