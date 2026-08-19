@@ -405,8 +405,47 @@ Gemessen über die Ansichten hinweg:
 | Arena | 1 | 0 | 0 |
 
 Fünf Ansichten beginnen bei `h3` ohne irgendetwas darüber. Die einzige `h1` im Spiel heißt
-„Football" — ein Disziplinname, keine Seitenüberschrift. Der Link „Zum Hauptinhalt springen"
-existiert, hat aber nichts, worauf er zeigen könnte.
+„Football" — ein Disziplinname, keine Seitenüberschrift.
+
+**Korrektur an diesem Befund:** hier stand außerdem, der Link „Zum Hauptinhalt springen" habe kein
+Ziel. Das war falsch — `#foundation-main-content` existiert (`FoundationShell.tsx`). Nachgesehen
+statt behauptet.
+
+---
+
+### D1 · ERLEDIGT
+
+**Nachher, über 21 Ansichten gemessen:** jede genau **eine** `<h1>`, benannt nach der Ansicht.
+
+| Ansicht | h2 vorher | h2 nachher |
+|---|---:|---:|
+| Gebäude | 0 | 3 |
+| Transfermarkt | 0 | 9 |
+| Finanzen | 0 | 9 |
+| Leaders | 0 | 2 |
+| Sponsoren | 0 | 4 |
+
+**Zwei Entscheidungen:**
+
+Die Überschrift steht **in der Shell**, nicht 19 Mal in den Ansichten. Der Name ist längst
+bestimmt (`getFoundationBreadcrumb`, aus der Nav-Konfiguration); ihn nachzutragen hieße, 19
+Stellen zu schaffen, die auseinanderlaufen können. Sie ist **unsichtbar** (`sr-only`) — optisch
+tragen die Ansichten ihren Titel bereits über Breadcrumb und Panel-Kopf, gefehlt hat nur die
+Semantik.
+
+Der Sprung von `h1` auf `h3` war **systemisch, nicht pro Ansicht**: `NlCard` rendert jeden
+Panel-Titel, und der war ein `h3`. Eine Karte ist ein Abschnitt der Seite, also Stufe 2 — eine
+Zeile statt 36 Dateien. Optisch unverändert, weil das CSS an `.nl-card-title` hängt, nicht am Tag.
+
+**Fünf zweite `h1` fielen dabei auf** (Arena zweimal, Gebäude, Transfermarkt-Verkauf, HQ-Office) —
+mit der Shell-Überschrift wären das zwei Spitzen in einer Gliederung gewesen. Alle auf `h2`
+gezogen. Begründet ausgenommen bleiben: die Fehlerseite (sie *ist* dann das Dokument), der Titel
+des Season-Briefing-Dialogs (`aria-modal`, per `aria-labelledby` verknüpft) und die beiden
+Lab-Routen mit eigener `page.tsx`.
+
+**Und wieder der eigene Kommentar als Stolperstein:** der Riegel meldete beim ersten Anlauf
+`ManagerOfficeClient.tsx` — der Treffer war die Begründung der Demotion, die das Wort `<h1>`
+enthält. Heute der zweite Fall dieser Art. Geprüft wird jetzt kommentarfreier Quelltext.
 
 ### D2 · Spielerliste braucht rund 10 Sekunden bis zum Inhalt
 

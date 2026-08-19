@@ -381,7 +381,7 @@ export default function FoundationMarketSellShellHost({
         />
         <div className="transfer-sell-hero-copy">
           <span className="transfer-sell-hero-eyebrow">Verkaufskandidat</span>
-          <h1 className="transfer-sell-hero-name">{playerName}</h1>
+          <h2 className="transfer-sell-hero-name">{playerName}</h2>
           <div className="transfer-sell-hero-chips">
             <ClassColorChip className={className} />
             <span className="transfer-sell-hero-chip">{race}</span>

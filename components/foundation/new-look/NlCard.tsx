@@ -72,7 +72,17 @@ export function NlCard({
         <header className="nl-card-head">
           <div className="nl-card-head-copy">
             {eyebrow ? <span className="nl-card-eyebrow">{eyebrow}</span> : null}
-            {title ? <h3 className="nl-card-title">{title}</h3> : null}
+            {/*
+              D1: Der Kartentitel war ein `<h3>`. Weil die Ansichten fast vollstaendig aus diesen
+              Karten bestehen, sprang die Gliederung von der Seitenueberschrift direkt auf Stufe 3
+              — gemessen in fuenf Ansichten (Gebaeude, Transfermarkt, Finanzen, Leaders,
+              Sponsoren), die gar keine `h2` hatten.
+
+              Eine Karte ist ein Abschnitt der Seite, also Stufe 2. Die Aenderung sitzt hier statt
+              in 36 Dateien, und optisch aendert sich nichts: das CSS haengt an `.nl-card-title`,
+              nicht am Tag.
+            */}
+            {title ? <h2 className="nl-card-title">{title}</h2> : null}
           </div>
           {actions ? <div className="nl-card-actions">{actions}</div> : null}
         </header>

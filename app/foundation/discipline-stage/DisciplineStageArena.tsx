@@ -2349,7 +2349,7 @@ export default function DisciplineStageArena({
       <div className="arena-prematch" data-testid="arena-stage" data-arena-prematch="true">
         <div>
           <span className="arena-prematch-eyebrow">Arena · {matchdayNumberLabel}</span>
-          <h1 className="arena-prematch-title">Vor dem Anpfiff</h1>
+          <h2 className="arena-prematch-title">Vor dem Anpfiff</h2>
           {disciplineSubtitle ? <p className="arena-prematch-sub">{disciplineSubtitle}</p> : null}
         </div>
 
@@ -2580,7 +2580,7 @@ export default function DisciplineStageArena({
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
             {devMode ? "Arena · Test-Modus · echte Save-Werte" : "Arena"}
           </div>
-          <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
+          <h2 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h2>
           {/* Die 2 aktiven Mutatoren dieser Disziplin — sichtbar direkt an der
               Disziplin, in JEDER Disziplin (darf nicht fehlen). */}
           {shownMutators.length > 0 ? (

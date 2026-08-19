@@ -240,7 +240,10 @@ export function ManagerOfficeClient({
           />
           <div className="stack">
             <span className="eyebrow">HQ / Manager-Zentrale</span>
-            <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
+            {/* D1: Das Office ist ein Tab INNERHALB der Home-Ansicht, keine eigene Seite — die
+                Seitenueberschrift traegt die Shell. Ein `<h1>` hier waere die zweite Spitze der
+                Gliederung. Optik unveraendert: hier haengt kein CSS am Tag. */}
+            <h2>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h2>
             {selectedTeamGeneralManager ? (
               <p className="muted foundation-hq-gm-line">
                 GM {selectedTeamGeneralManager.profile.name} · {selectedTeamGeneralManager.profile.title}

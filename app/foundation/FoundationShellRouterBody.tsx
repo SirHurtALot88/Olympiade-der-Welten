@@ -913,6 +913,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         isPending={isPending}
         activities={foundationActivities}
         breadcrumb={newLookBreadcrumb}
+        /* D1: dieselbe Quelle wie der Breadcrumb — der Ansichtsname wird nicht zweimal
+           bestimmt, nur zweimal verwendet (sichtbar als Krume, semantisch als h1). */
+        viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         subNav={
           activeView === "marketV2" ? (
