@@ -113,11 +113,25 @@ describe("Die drei Haken sitzen an den gemeinsamen Schreibpunkten", () => {
     // `applyContractRenewalAction` (Spieler wie KI) und `applySeasonEndContractTick` laufen beide
     // durch `saveGameStateWithContractEvents`.
     expect(VERTRAG).toContain("function saveGameStateWithContractEvents");
-    expect(VERTRAG).toContain("zieheSaisonstandGuvNachImSaisonendfenster({");
+    expect(VERTRAG).toMatch(/zieheSaisonstandGuvNachImSaisonendfenster\(\s*\{/);
   });
 
   it("Phasenwechsel: beim Betreten, damit auch ohne Buchung nachgezogen wird", () => {
-    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({");
+    /**
+     * DIE ZUSAGE IST „nextGameState geht durch die Nachbuchung", NICHT „die Zeile sieht so aus".
+     *
+     * Hier stand der Aufruf als woertliche Zeichenkette samt `({` am Ende. `ae91fabe` (#560) hat den
+     * Aufruf nur UMBROCHEN — das Argument steht jetzt in der naechsten Zeile und ist ausserdem in
+     * `applyDefaultTrainingFieldsToRosteredPlayers(...)` eingewickelt. Die Zusage war unversehrt, der
+     * Test trotzdem rot, und zwar auf `main` selbst.
+     *
+     * Ein Riegel, der bei jeder Formatierung bricht, wird irgendwann weggeklickt statt gelesen —
+     * dann bewacht er gar nichts mehr. Geprueft wird jetzt, dass `nextGameState` aus dem Aufruf
+     * kommt; wie viele Zeilen und welche Huelle dazwischen liegen, ist Formatierung.
+     */
+    expect(UEBERGANG).toMatch(
+      /const nextGameState: GameState =\s*zieheSaisonstandGuvNachImSaisonendfenster\(/,
+    );
   });
 
   it("der Tabellenaufbau rechnet NICHT live — genau das war zu teuer", () => {
