@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Saisonstand",
+  "text": "Für Spieltage, die schon vor der Korrektur gebucht wurden, gibt es jetzt eine Nachbuchung. Ohne sie mischt eine laufende Saison zwei Rechenweisen: alte Spieltage ohne Mutator-Aufschlag, neue mit — schlechter als jeder der beiden Zustände für sich. Die Nachbuchung prüft vorher, dass jeder gewertete Spieltag wirklich abgedeckt ist, und schreibt sonst gar nichts: auf einem beschnittenen Spielstand würde blindes Überschreiben Punkte vernichten statt sie zu ergänzen.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}
