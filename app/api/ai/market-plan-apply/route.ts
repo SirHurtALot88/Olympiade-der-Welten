@@ -13,6 +13,7 @@ import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-w
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
@@ -143,6 +144,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI market apply failed.",

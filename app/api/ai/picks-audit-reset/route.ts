@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { AI_PICK_AUDIT_RESET_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-audit-reset-contract";
 import { runAiPickAuditReset } from "@/lib/ai/ai-pick-audit-reset-service";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI pick audit/reset failed.",

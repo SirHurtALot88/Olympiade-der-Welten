@@ -7,6 +7,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /**
  * Fields a caller may patch on a team's control settings. Deliberately excludes
@@ -157,6 +158,8 @@ export async function POST(request: Request) {
       teamControlSettings: persisted.gameState.seasonState.teamControlSettings?.[teamId] ?? null,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "team_control_update_failed" },
       { status: 500 },

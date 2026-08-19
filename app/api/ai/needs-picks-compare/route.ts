@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { buildAiNeedsPicksCompare } from "@/lib/ai/ai-needs-picks-compare-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -41,6 +42,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "AI needs/picks compare could not be loaded.";
     const status = message.includes("could not be loaded") ? 500 : 400;
 

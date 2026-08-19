@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { listLocalTransfermarktFreeAgents } from "@/lib/market/transfermarkt-local-service";
 import { listTransfermarktFreeAgents } from "@/lib/market/transfermarkt-read-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -54,6 +55,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Transfermarkt free agents could not be loaded.";
     const status = message.includes("DATABASE_URL") || message.includes("No save available") || message.includes("No season available")
       ? 500

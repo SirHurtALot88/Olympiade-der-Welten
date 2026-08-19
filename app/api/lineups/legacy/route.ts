@@ -18,6 +18,7 @@ import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolut
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -65,6 +66,8 @@ export async function GET(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
   }
@@ -155,6 +158,8 @@ export async function PUT(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
     if (!result.ok) {

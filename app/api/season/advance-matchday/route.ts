@@ -6,6 +6,7 @@ import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeMatchdayAdvance, previewMatchdayAdvance } from "@/lib/season/matchday-progress-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type MatchdayAdvanceRequestBody = {
   saveId?: string;
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
       warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     if (error instanceof SaveResolutionError) {
       return NextResponse.json(
         { success: false, error: error.code, message: error.message, blockingReasons: [error.code] },

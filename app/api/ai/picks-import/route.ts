@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { AI_PICK_IMPORT_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-import-contract";
 import { runAiPickImportReplace } from "@/lib/ai/ai-pick-import-service";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI pick import failed.",

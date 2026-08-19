@@ -8,6 +8,7 @@ import { requireLocalPersistedSave, SaveResolutionError } from "@/lib/persistenc
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /**
  * AUFWAERMEN DER KI-AUFSTELLUNGEN IM HINTERGRUND.
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, skipped: false, matchdayId, summary: result.summary });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     if (error instanceof SaveResolutionError) {
       return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
     }

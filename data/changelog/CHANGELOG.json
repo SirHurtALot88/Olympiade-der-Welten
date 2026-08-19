@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Der Mitspieler kann seinen Schritt „Transfers finalisieren“ jetzt selbst abschließen. Vorher lehnte die Route ihn ab, weil sie mit der host-only Regenerier-Berechtigung prüfte — und weil der Schritt erst NACH einer erfolgreichen Antwort als erledigt gilt, meldete er sich nie bereit und der Host konnte den Raum nicht weiterschalten. Der Spieltagszyklus stand damit still. Geprüft wird jetzt der Team-Besitz: jeder für seine eigenen Teams. Der zerstörerische Weg, der den Formkarten-Pool ersetzt, bleibt unverändert nur beim Host.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Multiplayer",
       "pr": null,
       "text": "Ein Mitspieler, der die Verbindung verliert, fällt nicht mehr aus der Bereit-Pflicht. Bisher schrumpfte der Kreis der Bereit-pflichtigen in dem Moment, in dem jemand rausflog — der Host konnte ab da allein durch jeden Schritt und durch die Arena klicken, und der Gast fand sich nach dem Wiederverbinden mehrere Stationen weiter, ohne je gefragt worden zu sein. Jetzt hält sein offener Bereit-Status das Tor. Wer bereit war und DANN rausfliegt, hält niemanden auf — die Bereitmeldung überlebt den Abriss. Damit ein Abend daran nicht hängen bleibt, gibt es einen eigenen Knopf, der den Namen nennt: „Franky ist offline und nicht bereit — trotzdem fortfahren\". Er erscheint nur, wenn ausschließlich Getrennte blockieren, und der Server prüft es noch einmal nach: einen anwesenden Mitspieler übergeht der Host damit nicht.",
@@ -35,6 +44,15 @@
       "text": "Der Knopf „Kader auffüllen“ in der Teamansicht ist weg — für beide Spieler. Er warf einen KI-Pick-Lauf für das eigene Team an; Kader entstehen jetzt ausschließlich über den Transfermarkt. Wichtiger als der Knopf war, was ohne ihn passierte: ein solcher Lauf auf ein Team, das der Aufrufer nicht bedienen darf, antwortete mit „KI-Picks angewendet.“ und schrieb nachweislich nichts — man klickte, bekam Erfolg gemeldet und der Kader blieb leer. Die Route lehnt menschlich geführte Teams jetzt ausdrücklich ab und sagt auch, was stattdessen gilt. Der Liga-Draft beim Spielstart ist davon nicht berührt: er füllt die KI-Teams wie bisher und lässt die geführten Teams in Ruhe.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Wenn ihr beide im selben Moment speichert, sagt das Spiel jetzt sauber, was los ist. Der Schutz davor gab es schon — er verhindert, dass der eine den Stand des anderen überschreibt. Nur kam er als „Serverfehler 500“ mit einem rohen Text an, obwohl der Server genau richtig gehandelt hatte. Jetzt kommt er als das, was er ist: ein Konflikt, mit dem Hinweis „bitte neu laden und die Aktion wiederholen“ und beiden Versionsnummern. Umgestellt in allen 67 Routen, die in den Spielstand schreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.5"
     },
     {

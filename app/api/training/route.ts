@@ -8,6 +8,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 const VALID_TRAINING_MODES: PlayerTrainingMode[] = ["leicht", "mittel", "hart"];
 
@@ -149,6 +150,8 @@ export async function POST(request: Request) {
       player: persisted.gameState.players.find((entry) => entry.id === playerId) ?? null,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "training_update_failed" },
       { status: 500 },

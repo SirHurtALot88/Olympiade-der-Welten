@@ -28,6 +28,7 @@ import {
 } from "@/lib/lineups/lineup-discipline-contract";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { db } from "@/src/server/db";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function countMatchdayLineupDisciplineSides(input: {
   lineups: Array<{
@@ -579,6 +580,8 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Legacy lineup lab context could not be loaded." },
       { status: 500 },

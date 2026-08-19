@@ -44,6 +44,7 @@ import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { resolveAuthoritativeWriteOwnerId, resolveSessionOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /**
  * Room-write context a caller may attach to a team-scoped gameplay action so it can be
@@ -592,6 +593,8 @@ export async function POST(request: Request) {
     try {
       nextGameState = setTeamCaptain(sourceSave.gameState, body.teamId, body.playerId);
     } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Kapitän konnte nicht gesetzt werden." },
         { status: 400 },
