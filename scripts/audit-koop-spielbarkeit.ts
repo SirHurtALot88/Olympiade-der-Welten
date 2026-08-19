@@ -821,61 +821,39 @@ async function main() {
           "Transfermarkt-Kaeufe. Genau diese beiden Wege geht das Audit im Folgenden.",
       );
       /**
-       * Der Cockpit-Weg des Hosts, in kleinen Happen (wie der Chunked-Auto-Finish der Shell,
-       * ~4 Teams pro Request). Besitz-Grenze beachten (resolveAiBulkTeamWriteScope): ein Bulk-Run
-       * darf KI-Teams und die EIGENEN Teams fuellen, nie die des Mitspielers.
+       * A2c — DER KI-KADERLAUF AUF EIN MENSCHLICH GEFUEHRTES TEAM WIRD ABGEWIESEN.
        *
-       * NUR NOCH DIE EIGENEN TEAMS: die KI-Teams hat der Liga-Draft beim Raumstart bereits
-       * besetzt (A2b oben misst genau das). Sie hier ein zweites Mal durchzuschicken kostete rund
-       * zwei Dutzend Anfragen fuer ein Ergebnis, das schon dasteht — ein Ueberbleibsel aus der
-       * Zeit, in der man glaubte, `startRoom` starte gar keinen Draft.
+       * Hier stand vorher der Gegenteil-Fall: der Host fuellte seine EIGENEN vier Teams ueber
+       * `picks-run` mit `includeManualTeams: true`. ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von
+       * uns soll seinen kader per KI füllen! weg damit." Der Knopf dafuer ist raus, und die Route
+       * lehnt jetzt ausdruecklich ab — geprueft wird also die Ablehnung, nicht mehr der Erfolg.
+       *
+       * DASS DIE ANTWORT EINE ABLEHNUNG IST, ist der eigentliche Punkt: bis eben kam auf denselben
+       * Aufruf HTTP 200 mit `status: "applied"` zurueck, waehrend nachweislich nichts geschrieben
+       * wurde. Ein Erfolg, der nichts tut, ist schlimmer als ein Fehler.
        */
-      const aiTeamIds: string[] = (chris.state.teamOwnership as AnyState[])
-        .filter((eintrag) => eintrag.controllerType === "ai")
-        .map((eintrag) => eintrag.teamId);
-      const hostDraftTeamIds = [...(chrisP.controlledTeamIds as string[])];
-      let draftFehler = "";
-      for (let index = 0; index < hostDraftTeamIds.length && !draftFehler; index += 4) {
-        const chunk = hostDraftTeamIds.slice(index, index + 4);
-        const draftEinmal = async () => {
-          await sichereChrisVerbindung();
-          return postJson(
-            api(
-              `/api/ai/picks-run?saveId=${encodeURIComponent(coopSaveId)}&seasonId=${encodeURIComponent(coopSeasonId)}&source=sqlite`,
-            ),
-            {
-              dryRun: false,
-              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-              teamScope: "all",
-              teamIds: chunk,
-              allowSetupAllTeams: true,
-      includeManualTeams: true,
-              roomCode,
-              participantId: chrisP.participantId,
-              seatToken: chrisSeat,
-              userId: chrisP.userId,
-            },
-          );
-        };
-        let draft = await draftEinmal();
-        if (draft.status === 403 && JSON.stringify(draft.body).includes("participant_offline")) {
-          // Heartbeat waehrend des vorigen CPU-lastigen Chunks verhungert → rejoin + einmal neu.
-          await delay(500);
-          draft = await draftEinmal();
-        }
-        if (draft.status !== 200) {
-          draftFehler = `chunk ${chunk.join(",")}: status=${draft.status} error=${JSON.stringify(draft.body?.error ?? "-")}`;
-        }
-      }
-      const nachHostDraft = await leseSave(coopSaveId);
-      const hostSeiteLeer = [...hostDraftTeamIds].filter(
-        (teamId) => !(nachHostDraft?.rosters ?? []).some((eintrag: AnyState) => eintrag.teamId === teamId),
+      const eigenesTeamPerKi = await postJson(
+        api(
+          `/api/ai/picks-run?saveId=${encodeURIComponent(coopSaveId)}&seasonId=${encodeURIComponent(coopSeasonId)}&source=sqlite`,
+        ),
+        {
+          dryRun: false,
+          confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+          teamScope: "all",
+          teamIds: [(chrisP.controlledTeamIds as string[])[0]],
+          allowSetupAllTeams: true,
+          includeManualTeams: true,
+          roomCode,
+          participantId: chrisP.participantId,
+          seatToken: chrisSeat,
+          userId: chrisP.userId,
+        },
       );
       check(
-        "A2c: Der Cockpit-Weg des HOSTS (picks-run mit Raum-Kontext) fuellt seine EIGENEN Teams",
-        draftFehler === "" && hostSeiteLeer.length === 0,
-        draftFehler ||
-          `${chrisP.controlledTeamIds.length} Chris-Teams besetzt (die ${aiTeamIds.length} KI-Teams kamen aus dem Liga-Draft)`,
+        "A2c: Ein KI-Kaderlauf auf das EIGENE Team wird abgewiesen — auch beim Host, und mit Grund",
+        eigenesTeamPerKi.status === 403 &&
+          String(eigenesTeamPerKi.body?.error ?? "") === "ai_picks_not_allowed_for_human_team",
+        `status=${eigenesTeamPerKi.status} error=${JSON.stringify(eigenesTeamPerKi.body?.error ?? "-")}`,
       );
 
       // Und die Gast-Teams? Der Gast wird von picks-run als Nicht-Host abgewiesen (korrekt als
@@ -909,10 +887,15 @@ async function main() {
           "Transfermarkt-Kaeufe im fruehen Saisonstart-Fenster (isEarlySeasonSetup, solange Spieltag 1 unaufgeloest ist).",
       );
 
-      // Der Gast kauft seine Kader von Hand zusammen — der einzige verbliebene App-Weg.
+      // BEIDE Spieler kaufen ihre Kader von Hand zusammen — seit dem 19.08. der einzige Weg fuer
+      // ein menschlich gefuehrtes Team, fuer den Host genauso wie fuer den Gast.
       let gekaufteSpieler = 0;
       let kaufFehler = "";
-      for (const teamId of frankyP.controlledTeamIds as string[]) {
+      const eigeneKaderTeamIds = [
+        ...(chrisP.controlledTeamIds as string[]),
+        ...(frankyP.controlledTeamIds as string[]),
+      ];
+      for (const teamId of eigeneKaderTeamIds) {
         for (let versuch = 0; versuch < 12 && !kaufFehler; versuch += 1) {
           const fa = await fetchJson(
             api(
@@ -930,6 +913,12 @@ async function main() {
             kaufFehler = `${teamId}: kein bezahlbarer Free Agent (items=${items.length})`;
             break;
           }
+          // JEDER KAUFT FUER SEIN EIGENES TEAM. Mit Frankys Sitz fuer ein Chris-Team zu kaufen
+          // waere ein Fremdzugriff — die Besitzpruefung weist ihn zu Recht ab (siehe B8).
+          const gehoertDemHost = (chrisP.controlledTeamIds as string[]).includes(teamId);
+          const kaeufer = gehoertDemHost
+            ? { p: chrisP, seat: chrisSeat, rejoin: rejoinChris }
+            : { p: frankyP, seat: frankySeat, rejoin: rejoinFranky };
           const kaufEinmal = () =>
             postJson(api("/api/transfermarkt/buy"), {
               saveId: coopSaveId,
@@ -938,13 +927,13 @@ async function main() {
               playerId: kandidat.playerId,
               dryRun: false,
               roomCode,
-              participantId: frankyP.participantId,
-              seatToken: frankySeat,
-              userId: frankyP.userId,
+              participantId: kaeufer.p.participantId,
+              seatToken: kaeufer.seat,
+              userId: kaeufer.p.userId,
             });
           let kauf = await kaufEinmal();
           if (kauf.status === 403 && JSON.stringify(kauf.body).includes("participant_offline")) {
-            await rejoinFranky();
+            await kaeufer.rejoin();
             kauf = await kaufEinmal();
           }
           if (kauf.status === 200 && kauf.body?.success === true) {
@@ -955,15 +944,17 @@ async function main() {
         }
       }
       const nachKauf = await leseSave(coopSaveId);
-      const gastLeer = (frankyP.controlledTeamIds as string[]).filter(
+      const nochLeer = eigeneKaderTeamIds.filter(
         (teamId) =>
           ((nachKauf?.rosters ?? []) as AnyState[]).filter((eintrag) => eintrag.teamId === teamId).length <
           6,
       );
       check(
-        "A2d: Der Gast kann seine Kader im Saisonstart-Fenster manuell zusammenkaufen (Transfermarkt mit Raum-Kontext)",
-        kaufFehler === "" && gastLeer.length === 0,
-        kaufFehler || `${gekaufteSpieler} Spieler fuer ${frankyP.controlledTeamIds.length} Gast-Teams gekauft`,
+        "A2d: BEIDE Spieler koennen ihre Kader im Saisonstart-Fenster manuell zusammenkaufen (Transfermarkt mit Raum-Kontext)",
+        kaufFehler === "" && nochLeer.length === 0,
+        kaufFehler ||
+          `${gekaufteSpieler} Spieler fuer ${eigeneKaderTeamIds.length} menschlich gefuehrte Teams gekauft ` +
+            `(${chrisP.controlledTeamIds.length} Host + ${frankyP.controlledTeamIds.length} Gast)`,
       );
     }
   }

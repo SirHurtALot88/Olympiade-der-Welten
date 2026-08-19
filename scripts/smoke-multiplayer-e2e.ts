@@ -488,8 +488,15 @@ async function ensureLeagueRostersPlayable(input: {
 }) {
   const { baseUrl, saveId, seasonId, roomCode, hostSocket, guestSocket, chris, chrisSeat, franky, frankySeat, aiTeamIds } = input;
 
-  // Host: AI-Teams + eigene 4, in 4er-Haeppchen (siehe Kommentar oben).
-  const hostDraftTeamIds = [...aiTeamIds, ...(chris.controlledTeamIds as string[])];
+  // Host: NUR die KI-Teams, in 4er-Haeppchen (siehe Kommentar oben).
+  //
+  // Hier standen frueher "AI-Teams + eigene 4". Das geht nicht mehr, und zwar absichtlich nicht:
+  // seit Chris' Entscheidung vom 19.08. ("keiner von uns soll seinen kader per KI fuellen") weist
+  // `/api/ai/picks-run` ein ausdruecklich genanntes, menschlich gefuehrtes Team mit 403
+  // `ai_picks_not_allowed_for_human_team` ab. Dieser Smoke lief genau in diese Ablehnung.
+  // Die eigenen vier Teams des Hosts kauft er deshalb jetzt von Hand — auf demselben Weg wie der
+  // Gast seine (unten), nur mit seinem eigenen Sitz.
+  const hostDraftTeamIds = [...aiTeamIds];
   for (let index = 0; index < hostDraftTeamIds.length; index += 4) {
     const chunk = hostDraftTeamIds.slice(index, index + 4);
     const runOnce = () =>
@@ -522,8 +529,14 @@ async function ensureLeagueRostersPlayable(input: {
     }
   }
 
-  // Gast: eigene 4 Teams manuell zusammenkaufen (kein KI-Weg erreichbar, siehe Kommentar oben).
-  for (const teamId of franky.controlledTeamIds as string[]) {
+  // BEIDE Spieler: die eigenen Teams von Hand zusammenkaufen. Jeder mit SEINEM Sitz — ein
+  // fremder Sitz waere ein Fremdzugriff, und genau den weist der Server (zu Recht) ab.
+  const kaeufer = [
+    { teilnehmer: franky, seat: frankySeat, socket: guestSocket },
+    { teilnehmer: chris, seat: chrisSeat, socket: hostSocket },
+  ];
+  for (const kaeuferEintrag of kaeufer) {
+  for (const teamId of kaeuferEintrag.teilnehmer.controlledTeamIds as string[]) {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const freeAgents = await fetchJson(
         baseUrl,
@@ -548,13 +561,13 @@ async function ensureLeagueRostersPlayable(input: {
           playerId: kandidat.playerId,
           dryRun: false,
           roomCode,
-          participantId: franky.participantId,
-          seatToken: frankySeat,
-          userId: franky.userId,
+          participantId: kaeuferEintrag.teilnehmer.participantId,
+          seatToken: kaeuferEintrag.seat,
+          userId: kaeuferEintrag.teilnehmer.userId,
         });
       let kauf = await runOnce();
       if (kauf.status === 403 && JSON.stringify(kauf.body).includes("participant_offline")) {
-        await rejoinParticipant(guestSocket, roomCode, frankySeat);
+        await rejoinParticipant(kaeuferEintrag.socket, roomCode, kaeuferEintrag.seat);
         kauf = await runOnce();
       }
       if (kauf.status !== 200 || kauf.body?.success !== true) {
@@ -564,6 +577,7 @@ async function ensureLeagueRostersPlayable(input: {
         );
       }
     }
+  }
   }
 }
 

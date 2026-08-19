@@ -221,9 +221,6 @@ export type FoundationTeamsNewLookProps = {
   selectedTeamRosterActionsAvailable: boolean;
   selectedTeamRosterActionHint: string | null;
   /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
-  runTeamPicksRefill?: (teamId: string) => void | Promise<void>;
-  teamPicksRefillBusyTeamId?: string | null;
-  teamPicksRefillMessage?: { teamId: string; tone: "success" | "error"; text: string } | null;
   marketSellBusy: boolean;
   contractRenewalBusy: string | null;
   openMarketSellModal: (
@@ -689,9 +686,6 @@ export default function FoundationTeamsNewLook({
   formatDisplayMoney,
   selectedTeamRosterActionsAvailable,
   selectedTeamRosterActionHint,
-  runTeamPicksRefill,
-  teamPicksRefillBusyTeamId,
-  teamPicksRefillMessage,
   marketSellBusy,
   contractRenewalBusy,
   openMarketSellModal,
@@ -2362,24 +2356,13 @@ export default function FoundationTeamsNewLook({
             <span>{selectedTeamRosterActionHint}</span>
           </p>
         ) : null}
-        {selectedTeamRosterActionsAvailable && runTeamPicksRefill ? (
-          <div className="nl-teams-roster-actions">
-            <button
-              type="button"
-              className="nl-teams-action"
-              disabled={teamPicksRefillBusyTeamId != null}
-              title="KI-Picks für dieses Team neu anwerfen"
-              onClick={() => void runTeamPicksRefill(selectedTeam.teamId)}
-            >
-              {teamPicksRefillBusyTeamId === selectedTeam.teamId ? "Wirbt an…" : "Kader auffüllen"}
-            </button>
-            {teamPicksRefillMessage && teamPicksRefillMessage.teamId === selectedTeam.teamId ? (
-              <span className={nlToneClass(teamPicksRefillMessage.tone === "success" ? "good" : "risk")}>
-                {teamPicksRefillMessage.text}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+        {/* Hier stand „Kader auffüllen" — der KI-Pick-Lauf fuer dieses Team, samt Meldungszeile.
+            ENTSCHEIDUNG VON CHRIS (19.08.): „keiner von uns soll seinen kader per KI füllen! weg
+            damit." Er erschien nur auf einem selbst gefuehrten Team im Saisonende-Fenster, also
+            genau im Fall, den es nicht mehr geben soll. Kader entstehen ueber den Transfermarkt.
+
+            ZWEITE KOPIE, ACHTUNG BEIM NAECHSTEN UMBAU: denselben Knopf gab es auch im alten
+            Team-Panel (`FoundationTeamsDetailPanel.tsx`). Gerendert wurde diese hier. */}
         {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
       </NlCard>
       </div>
