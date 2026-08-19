@@ -12,6 +12,7 @@ import {
 } from "@/lib/room/room-store";
 import { resolveFrankyParticipant } from "@/lib/room/online-room-model";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { roomMatchdayScopeId } from "@/lib/room/arena-sync-state";
 
 /**
  * STUFE 1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md) -- Hosten, Einladen, Zuordnung aendern.
@@ -227,7 +228,14 @@ describe("Raum hosten und Teams zuteilen", () => {
       expect(booked.ok).toBe(true);
       if (!booked.ok) return;
       expect(booked.room.state.arenaSyncState.status).toBe("result_applied");
-      expect(booked.room.state.arenaSyncState.matchdayId).toBe(String(matchdayBeimBuchen));
+      /**
+       * GEDREHT auf die vereinheitlichte Schreibweise: hier stand `String(matchdayBeimBuchen)`,
+       * also die nackte Nummer. Genau dieser Unterschied war der Befund — `matchesArenaScope`
+       * vergleicht `matchdayId` exakt, und der einzige Vergleichspartner im Browser ist
+       * "matchday-1" (`gameState.matchdayState.matchdayId`). Die Kennung kommt jetzt ueberall aus
+       * `roomMatchdayScopeId`; diese Behauptung hielt die alte, nicht vergleichbare Form fest.
+       */
+      expect(booked.room.state.arenaSyncState.matchdayId).toBe(roomMatchdayScopeId(matchdayBeimBuchen));
 
       // NOCH auf demselben Spieltag (activeMatchday unveraendert, nur der Flow-Schritt zeigt schon
       // auf die Rueckschau) -- die Sperre muss stehen bleiben.

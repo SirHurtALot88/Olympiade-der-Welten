@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   advanceRoomArenaStep,
+  setRoomArenaDisciplinePhaseState,
   createRoom,
   getRoom,
   joinRoom,
@@ -131,9 +132,17 @@ describe("Arena-Steuerung erreicht den Gast (Stufe 3.6)", () => {
 
     expect(quickSimmed.room.state.arenaSyncState.revealedSlotCountByDiscipline.d1).toBe(limits.d1);
     expect(quickSimmed.room.state.arenaSyncState.completedDisciplinePhases.d1).toBe(true);
-    // Quick-Sim vollendet nur die aktive Seite (d1) -- verlaesst sie danach, wie der lokale
-    // Quick-Sim-Knopf auch nur die gerade gezeigte Disziplin sofort abschliesst.
-    expect(quickSimmed.room.state.arenaSyncState.activeDisciplinePhase).not.toBe("d1");
+    /**
+     * GEDREHT: hier stand `not.toBe("d1")`, und der Kommentar daneben sagte "verlaesst sie
+     * danach" — beides beschrieb einen Fehler als Absicht. Der lokale Quick-Sim-Knopf schliesst
+     * die GERADE GEZEIGTE Disziplin ab und wechselt nirgendwohin; der Raum tat es doch, weil
+     * `quickSimRoomArenaReveal` die Grenze erst am Schleifenanfang prueft und damit einen Schritt
+     * zu weit lief (gemessen mit d1 = 3: `phase=d2 slot=0`). Der Gast folgt
+     * `activeDisciplinePhase` und wurde damit in Disziplin 2 gezogen, waehrend der Host noch den
+     * Endstand der ersten anschaut.
+     */
+    expect(quickSimmed.room.state.arenaSyncState.activeDisciplinePhase).toBe("d1");
+    expect(quickSimmed.room.state.arenaSyncState.revealedSlotCountByDiscipline.d2).toBe(0);
 
     const guestView = getRoom(joined.room.roomCode);
     expect(guestView?.state.arenaSyncState.version).toBe(quickSimmed.room.state.arenaSyncState.version);
@@ -144,18 +153,49 @@ describe("Arena-Steuerung erreicht den Gast (Stufe 3.6)", () => {
     const { created } = setupCoopRoom("arena-steuerung-a3-total");
     const limits = { d1: 3, d2: 3 };
 
-    // d1 ans Ende bringen (Quick-Sim vollendet nur die AKTIVE Seite, siehe oben).
+    /**
+     * DER WEG NACH "total" IST EIN ANDERER GEWORDEN, die geprüfte Eigenschaft nicht.
+     *
+     * Vorher genuegten zwei Quick-Sims: der erste lief ueber die d1-Grenze hinaus auf d2, der
+     * zweite ueber die d2-Grenze hinaus auf "total". Genau dieses Ueberlaufen war der Fehler
+     * (siehe der Test darueber) — ein Quick-Sim haelt jetzt auf seiner Seite.
+     *
+     * Der Wechsel auf d2 ist inzwischen eine eigene Raum-Aktion (`setRoomArenaDisciplinePhaseState`),
+     * und "total" erreicht der Raum ueber die Phasenkette, die `advanceRoomArenaStep` weiterschiebt,
+     * sobald die Etappen einer Seite ausgeschoepft sind. Der Aufbau bildet also den echten Weg
+     * nach, statt sich auf einen Ueberlauf zu stuetzen.
+     */
     const afterD1 = quickSimRoomArenaRevealState(created.room.roomCode, created.seat.seatToken, { maxSlotRevealCountByDiscipline: limits });
     expect(afterD1.ok).toBe(true);
     if (!afterD1.ok) return;
-    expect(afterD1.room.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+    expect(afterD1.room.state.arenaSyncState.activeDisciplinePhase).toBe("d1");
+    expect(afterD1.room.state.arenaSyncState.completedDisciplinePhases.d1).toBe(true);
 
-    // d2 ebenfalls ans Ende bringen -> "total" (beide Diszis fertig).
+    const gewechselt = setRoomArenaDisciplinePhaseState(created.room.roomCode, created.seat.seatToken, {
+      phase: "d2",
+      maxSlotRevealCountByDiscipline: limits,
+    });
+    expect(gewechselt.ok).toBe(true);
+    if (!gewechselt.ok) return;
+    expect(gewechselt.room.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+
     const afterD2 = quickSimRoomArenaRevealState(created.room.roomCode, created.seat.seatToken, { maxSlotRevealCountByDiscipline: limits });
     expect(afterD2.ok).toBe(true);
     if (!afterD2.ok) return;
-    expect(afterD2.room.state.arenaSyncState.activeDisciplinePhase).toBe("total");
-    expect(afterD2.room.state.arenaSyncState.completedDisciplinePhases).toEqual({ d1: true, d2: true });
+    expect(afterD2.room.state.arenaSyncState.activeDisciplinePhase).toBe("d2");
+
+    // Ab hier schiebt jeder weitere Schritt die Phasenkette, bis sie auf "total" kippt.
+    for (let i = 0; i < 12; i += 1) {
+      if (created.room.state.arenaSyncState.activeDisciplinePhase === "total") break;
+      const weiter = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+        maxSlotRevealCountByDiscipline: limits,
+        force: true,
+      });
+      expect(weiter.ok).toBe(true);
+      if (!weiter.ok) return;
+    }
+    expect(created.room.state.arenaSyncState.activeDisciplinePhase).toBe("total");
+    expect(created.room.state.arenaSyncState.completedDisciplinePhases).toEqual({ d1: true, d2: true });
 
     const reset = resetRoomArenaRevealState(created.room.roomCode, created.seat.seatToken);
     expect(reset.ok).toBe(true);

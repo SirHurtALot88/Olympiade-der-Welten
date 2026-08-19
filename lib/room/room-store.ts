@@ -862,8 +862,26 @@ export function startRoomArenaSync(
     return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena starten." };
   }
 
+  /**
+   * DER SCHRITT MUSS IN BEIDE FELDER, sonst ueberlebt er die naechste Zeile nicht.
+   *
+   * Hier stand nur `roomFlowState.step = "arena"`. Nachgemessen an einem frisch gestarteten Raum:
+   * danach stand `flow.step` weiterhin auf "lobby_ready". Der Grund steht drei Zeilen weiter
+   * unten — `syncPlayers(room)` baut `roomFlowState` komplett neu und liest den Schritt dabei aus
+   * `turnState.currentStep` (siehe dort). Wer nur `roomFlowState` setzt, schreibt in ein Feld, das
+   * unmittelbar darauf ueberschrieben wird.
+   *
+   * Dieselbe Wurzel wie bei der Team-Umverteilung (`buildTurnState`-Vorgabe "lobby_ready",
+   * online-room-model.ts): `turnState.currentStep` ist die fuehrende Quelle fuer den Schritt,
+   * `roomFlowState.step` die daraus abgeleitete Anzeige. Beide werden hier gesetzt, damit der
+   * Neubau denselben Wert wiederfindet, statt auf die Vorgabe zurueckzufallen.
+   */
   room.state = {
     ...room.state,
+    turnState: {
+      ...room.state.turnState,
+      currentStep: "arena",
+    },
     roomFlowState: {
       ...room.state.roomFlowState,
       step: "arena",

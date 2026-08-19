@@ -193,16 +193,25 @@ describe("Nachholen durch Ueberspringen, nicht durch Nachspielen (Stufe 3.4, Ant
 
     // Quick-Sim vollendet NUR die aktive Seite (d1) — genau wie der lokale Quick-Sim-Knopf nur
     // die gerade gezeigte Disziplin sofort abschliesst, nicht das ganze Spieltagspaar.
-    expect(quickSimmed.activeDisciplinePhase).not.toBe("d1");
+    //
+    // GEDREHT: hier stand `not.toBe("d1")` — also das GEGENTEIL des Satzes darueber. Die Schleife
+    // in `quickSimRoomArenaReveal` pruefte die Grenze am Schleifenanfang und damit erst, nachdem
+    // der Schritt, der die Seite verlaesst, schon uebernommen war; sie endete einen Schritt zu
+    // weit. Nachgemessen mit d1 = 3: `phase=d2  phaseId=slots  slot=0`. Der Host wollte "diese
+    // Disziplin ans Ende spulen" und der Raum meldete den ANFANG der naechsten — der Gast folgt
+    // `activeDisciplinePhase` und wurde mitgezogen. Die Behauptung hielt genau diesen Fehler als
+    // richtig fest, obwohl der Kommentar direkt darueber schon das Richtige beschrieb.
+    expect(quickSimmed.activeDisciplinePhase).toBe("d1");
     expect(quickSimmed.revealedSlotCountByDiscipline.d1).toBe(maxSlotRevealCountByDiscipline.d1);
     expect(quickSimmed.completedDisciplinePhases.d1).toBe(true);
+    // Die andere Seite bleibt unberuehrt — sie ist nicht Teil dieses Quick-Sims.
+    expect(quickSimmed.revealedSlotCountByDiscipline.d2).toBe(0);
+    expect(quickSimmed.completedDisciplinePhases.d2).toBe(false);
 
-    // `slotRevealIndex` selbst faengt bei einem Seitenwechsel legitim wieder bei 0 an (es zaehlt
-    // NUR die aktive Seite, siehe `normalizeRoomArenaState`) — das entspricht in der echten
-    // Anzeige einem Wechsel der DISZIPLIN (die Bühne mountet dafuer neu, `DisciplineStageArena.tsx`
-    // mappt `activeDisciplinePhase` auf eine andere `disciplineId`). Innerhalb EINER
-    // Buehnen-Instanz ist `stepIndex` das verlaessliche "wie viel ist passiert"-Mass: Quick-Sim
-    // hat mehrere Schritte auf einmal verbraucht, nicht nur einen.
+    // `stepIndex` ist das verlaessliche "wie viel ist passiert"-Mass: Quick-Sim hat mehrere
+    // Schritte auf einmal verbraucht, nicht nur einen. (Der frueher hier stehende Hinweis auf den
+    // Seitenwechsel ist mit der Behauptung darueber weggefallen — Quick-Sim wechselt die Seite
+    // nicht mehr, `slotRevealIndex` steht am Ende auf dem Endstand von d1.)
     expect(quickSimmed.stepIndex - host.stepIndex).toBeGreaterThan(1);
     const mode = resolveArenaCatchUpMode({ localStepIndex: host.stepIndex, targetStepIndex: quickSimmed.stepIndex, localCascadeRunning: false });
     expect(mode).toBe("jump");
