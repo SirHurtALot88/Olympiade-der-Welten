@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 import { zieheSaisonstandPunkteNach } from "@/lib/standings/saisonstand-punkte-nachbuchung";
 
 const BUCHUNG = readFileSync(join(process.cwd(), "lib/standings/standings-preview-engine.ts"), "utf8");
+const SCHREIBWEG = readFileSync(join(process.cwd(), "lib/standings/standings-apply-service.ts"), "utf8");
 const SPIELTAG = readFileSync(join(process.cwd(), "lib/foundation/season-matchday-points.ts"), "utf8");
 const FELDRENNEN = readFileSync(join(process.cwd(), "lib/foundation/build-field-race-ledger.ts"), "utf8");
 
@@ -44,6 +45,23 @@ describe("Saisonstand-Punkte enthalten den Mutator-Aufschlag", () => {
       expect(quelle).toContain(") + entry.points, 4)");
       expect(quelle).not.toContain(") + entry.basePoints, 4)");
     }
+  });
+});
+
+describe("Alte Spieltage heilen beim naechsten Buchen", () => {
+  it("die Buchung zieht die Saisonstand-Punkte nach", () => {
+    // Ohne das mischte eine laufende Saison zwei Rechenweisen: die Spieltage vor dem Fix ohne,
+    // die danach mit Aufschlag. Die Summe passte dann zu gar nichts mehr.
+    expect(SCHREIBWEG).toContain("zieheSaisonstandPunkteNach(nextGameState");
+  });
+
+  it("die Nachbuchung laeuft VOR der Rangmarke der Gebaeude-Leihe", () => {
+    // Die Rangmarke liest den Tabellenplatz. Der kann sich durch die Korrektur aendern — am
+    // gemessenen Spielstand bei 13 von 32 Teams. Liefe sie zuerst, schaltete sie auf dem alten.
+    const nachbuchungAb = SCHREIBWEG.indexOf("zieheSaisonstandPunkteNach(nextGameState");
+    const rangmarkeAb = SCHREIBWEG.indexOf("schalteAlleLeihgabenNachTabelle(korrigierterGameState)");
+    expect(nachbuchungAb).toBeGreaterThan(0);
+    expect(rangmarkeAb).toBeGreaterThan(nachbuchungAb);
   });
 });
 
@@ -78,6 +96,7 @@ describe("Nachbuchung fuer schon gebuchte Spieltage", () => {
     const ergebnis = zieheSaisonstandPunkteNach(gameState, "season-1");
     expect(ergebnis.geaenderteTeams).toHaveLength(0);
     expect(ergebnis.uebersprungen).toContain("ohne Disziplin-Ergebnisse");
-    expect((ergebnis.gameState as never as typeof gameState).seasonState.standings["A-A"].points).toBe(12.3);
+    // Derselbe Spielstand kommt zurueck, nicht eine bereinigte Kopie — nichts wurde angefasst.
+    expect(ergebnis.gameState).toBe(gameState);
   });
 });

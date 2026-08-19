@@ -14,7 +14,7 @@
       "datum": "2026-08-19",
       "seite": null,
       "pr": "558",
-      "text": "Die Mutator-Punkte zaehlen jetzt auch im Saisonstand. Bisher buchte die Tabelle nur die Platzierungs-Punkte aus der Rang-zu-Punkte-Tabelle; der Aufschlag aus den Mutatoren landete zwar beim Spieler, aber nie beim Team. Am Live-Spielstand betraf das ALLE 32 Teams mit 2,4 bis 6,9 Punkten — und drehte 13 Plaetze, darunter die Tabellenspitze. Fuer schon gebuchte Spieltage gibt es `scripts/repariere-saisonstand-punkte.ts`.",
+      "text": "Die Mutator-Punkte zaehlen jetzt auch im Saisonstand. Bisher buchte die Tabelle nur die Platzierungs-Punkte aus der Rang-zu-Punkte-Tabelle; der Aufschlag aus den Mutatoren landete zwar beim Spieler, aber nie beim Team. Am Live-Spielstand betraf das ALLE 32 Teams mit 2,4 bis 6,9 Punkten — und drehte 13 Plaetze, darunter die Tabellenspitze. Schon gebuchte Spieltage werden beim naechsten Spieltag automatisch nachgezogen.",
       "quelle": "triage",
       "gewicht": "behebung",
       "version": null
