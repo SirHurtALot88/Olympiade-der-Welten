@@ -117,7 +117,17 @@ describe("Die drei Haken sitzen an den gemeinsamen Schreibpunkten", () => {
   });
 
   it("Phasenwechsel: beim Betreten, damit auch ohne Buchung nachgezogen wird", () => {
-    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({");
+    // Der Aufruf steht seit Meldung `j53iox` nicht mehr direkt auf dem Objektliteral — dazwischen
+    // liegt `applyDefaultTrainingFieldsToRosteredPlayers`, das am selben Phasenwechsel haengt.
+    // Gemessen wird deshalb die AUSSAGE (`nextGameState` entsteht durch die Nachbuchung), nicht
+    // die eine Textzeile: sonst faellt dieser Waechter bei jedem weiteren Schritt an derselben
+    // Stelle, obwohl die Nachbuchung unveraendert laeuft.
+    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster(");
+    const stelle = UEBERGANG.slice(
+      UEBERGANG.indexOf("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster("),
+    ).slice(0, 400);
+    expect(stelle).toContain("...progressionSave.gameState");
+    expect(stelle).toContain("gamePhase: nextPhase");
   });
 
   it("der Tabellenaufbau rechnet NICHT live — genau das war zu teuer", () => {
