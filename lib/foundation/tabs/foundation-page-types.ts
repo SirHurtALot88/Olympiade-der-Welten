@@ -1095,7 +1095,7 @@ export type FoundationAiSellPreviewTeam = {
   teamName: string;
   controlMode: "manual" | "ai" | "passive";
   aiSellPreviewEnabled: boolean;
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked";
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked";
   strategySummary: string;
   cash: number | null;
   rosterCount: number | null;

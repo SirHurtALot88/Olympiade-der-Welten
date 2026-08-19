@@ -63,6 +63,7 @@ import {
   MAX_POINTS_PER_MATCHDAY,
   POINTS_PER_PARTICIPATING_PLAYER,
 } from "@/lib/season/title-race";
+import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -534,6 +535,7 @@ export default function SeasonStandingsNewLook({
   sourceLabel,
   sourceBadgeLabel,
   isArchived,
+  isSeasonEnded = false,
   seasonOptions,
   selectedTeamSummary,
   leaderTeam,
@@ -2270,7 +2272,7 @@ export default function SeasonStandingsNewLook({
              Zeile der Seite. Der Spieler bekommt Klartext; die technische
              Quelle bleibt als Tooltip erreichbar. */
           <span title={`${sourceBadgeLabel} · ${sourceLabel}`}>
-            {isArchived ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+            {resolveLigaWertungKopfzeile({ istArchiv: isArchived, istAbgeschlossen: isSeasonEnded })}
           </span>
         }
         title={`Saisonstand — ${selectedSeasonLabel}`}

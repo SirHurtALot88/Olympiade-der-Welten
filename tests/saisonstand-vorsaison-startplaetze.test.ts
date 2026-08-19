@@ -86,8 +86,20 @@ describe("G2: Top-Spieler ohne PPs → geteiltes VeloPendingRanking", () => {
 describe("G5: die Kopfzeile spricht Spielerdeutsch, Status-Flags nur noch im Tooltip", () => {
   it("keine rohe Status-Reihe mehr als Eyebrow", () => {
     expect(TSX).not.toContain('`${sourceBadgeLabel} · ${isArchived ? "Archiv" : "Live"} · ${sourceLabel}`');
-    expect(TSX).toContain('"Liga-Wertung · Archiv"');
-    expect(TSX).toContain('"Liga-Wertung · Saison läuft"');
+    /*
+     * HIER STANDEN DIE BEIDEN TEXTE WOERTLICH — und genau das ist seit Befund B5 falsch.
+     *
+     * Die Zeile war an ZWEI Stellen getippt (Saisonstand und Raenge), und deshalb fehlte an
+     * beiden der dritte Zustand: eine Saison, die nicht archiviert und trotzdem durch ist,
+     * las sich als „Saison laeuft" — direkt unter der Ueberschrift „Saison abgeschlossen".
+     *
+     * Die Texte leben jetzt in `lib/foundation/liga-wertung-kopfzeile.ts`. Der Anspruch dieses
+     * Falls bleibt derselbe (Klartext statt Status-Flags), er prueft ihn nur an der richtigen
+     * Stelle: die Ansicht RUFT die Rechenstelle, statt Text nachzutippen. Dass die drei
+     * Zustaende stimmen, haelt `tests/saisonende-widersprueche.test.ts` fest.
+     */
+    expect(TSX).toContain("resolveLigaWertungKopfzeile(");
+    expect(TSX).not.toContain('"Liga-Wertung · Saison läuft"');
   });
 
   it("die technische Quelle bleibt als Tooltip erhalten (nichts wird verschwiegen)", () => {

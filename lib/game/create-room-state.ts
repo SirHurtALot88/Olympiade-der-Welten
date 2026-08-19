@@ -1,5 +1,5 @@
 import { createActionLogEntry } from "@/lib/game/action-log";
-import { createRoomArenaState } from "@/lib/room/arena-sync-state";
+import { createRoomArenaState, roomMatchdayScopeId } from "@/lib/room/arena-sync-state";
 import {
   SERVER_AUTHORITATIVE_WRITE_POLICY,
   buildOwnershipForPreset,
@@ -59,7 +59,7 @@ export function createInitialRoomState(
     arenaSyncState: createRoomArenaState({
       saveId: multiplayerRoom.saveId,
       seasonId: multiplayerRoom.activeSeasonId,
-      matchdayId: String(multiplayerRoom.activeMatchday),
+      matchdayId: roomMatchdayScopeId(multiplayerRoom.activeMatchday),
       requiredParticipantIds: participants.map((participant) => participant.participantId),
     }),
     roomEvents: [

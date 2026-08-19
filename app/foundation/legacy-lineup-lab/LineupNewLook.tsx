@@ -2252,7 +2252,10 @@ export default function LineupNewLook({
 
         <div className="nl-lineup-hud-strength" key={`strength-${assignPulse ?? 0}`} data-testid="nl-lineup-team-strength">
           <div className="nl-lineup-hud-metric is-primary">
-            <small>Erwartete Punkte</small>
+            {/* B2: „Erwartete Punkte" ist eine Prognose. An einem gewerteten Spieltag ist sie
+                eine Prognose ueber Vergangenes — die Zahl bleibt richtig (sie sagt, was VOR dem
+                Spieltag zu erwarten war), nur ihr Name war es nicht. */}
+            <small>{lineupFlowSummary.matchdayAlreadyScored ? "Prognose vor dem Spieltag" : "Erwartete Punkte"}</small>
             {/* Count-up der Hero-Zahl (Kit-Primitive): animiert die obere
                 Fenstergrenze; die untere Grenze läuft proportional zur Animation
                 mit, sodass das "low–high"-Fenster erhalten bleibt und der Endwert

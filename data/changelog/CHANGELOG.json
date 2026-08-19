@@ -4,6 +4,15 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "560",
+      "text": "Ein zu kleiner Kader hält keinen Verkauf mehr auf. Die Verkaufsübersicht kannte den Status „kader zu klein\" und warnte an einzelnen Kandidaten mit „Verkauf würde den Kader unter das Team-Minimum drücken\"; beides las sich wie ein Hindernis und ist weg. Der Kader-Mindestwert steuert weiterhin das KAUFEN — ein Team, das sich darunter verkauft, füllt in der nächsten Runde nach.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "559",
       "text": "Spieler mit 80er- und 90er-Werten sind im Depth-Chart wieder hellblau statt gelb. Gold lag dort zu nah an der Farbe der Stufe 40-59, Elite und Mittelmass waren im selben Raster kaum zu unterscheiden. Im Training uebermalt die gewaehlte Trainingsklasse ausserdem nicht mehr die Klassenfarbe mit der Vereinsfarbe — der Balken bleibt in der Farbe, an der man die Klasse wiedererkennt.",
       "quelle": "triage",
@@ -22,11 +31,47 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "568",
+      "text": "Die Einsatz-Zahl in der Spielerliste zählt wieder nur die laufende Saison. Eine Leistung, deren Spieltagsergebnis fehlt, wurde stillschweigend der aktuellen Saison zugeschlagen — am Saisonwechsel, wo die Ergebnisse der alten Saison geräumt werden und die Leistungen kurz weiterleben, standen Spieler damit am ersten Spieltag schon mit zehn Einsätzen da.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "556",
       "text": "Ein Spieltag bleibt nicht mehr in Disziplin 2 haengen, wenn ein aufgestellter Spieler waehrend Disziplin 1 ausfaellt. Die Regel „kurz antreten ist erlaubt, wenn alle verfuegbaren Spieler eingesetzt sind\" verglich die rohe Zahl der aufgestellten Namen mit der Zahl der verfuegbaren Spieler — nach einem Ausfall konnten die beiden nie wieder gleich werden, und die Arena bot keinen Ausweg an.",
       "quelle": "triage",
       "gewicht": "behebung",
       "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "560",
+      "text": "Der Schritt „Training prüfen\" sagt jetzt, an welchen Spielern er noch hängt — mit Anzahl und Namen. Vorher stand dort nur „offen\", und ein einziger Spieler ohne Trainingsmodus hielt den ganzen Flow auf, ohne dass irgendwo stand welcher. Zusätzlich bekommen Spieler, die über Draft, KI-Picks oder den Saisonwechsel in einen Kader kommen, jetzt denselben Trainings-Vorgabewert wie gekaufte.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Startet der Host die Arena, steht der Raum danach auch wirklich auf „Arena“. Vorher wurde der Schritt geschrieben und eine Zeile später wieder verworfen — gemessen blieb der Raum auf „Lobby: bereit machen“ stehen. Dieselbe Ursache wie beim Team-Umverteilen: der Flow-Schritt wird aus einem zweiten Feld neu aufgebaut, das nicht mitgezogen wurde.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Ein „Bereit“-Klick mitten in der laufenden Enthüllung hält sie nicht mehr an. Vorher genügte ein versehentlicher Klick des Mitspielers, um zurück ins Bereit-Tor zu fallen — und weil jeder Etappenschritt die Bereitmeldungen ohnehin zurücksetzt, stand der Host danach in seiner eigenen Warteliste: „Die Arena wartet noch auf: Chris (anwesend, noch nicht bereit).“ Das Tor geht jetzt nur noch auf, nie zu. Vor dem ersten Schritt hält es unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
     },
     {
       "datum": "2026-08-19",
@@ -78,6 +123,24 @@
       "seite": "Mehrspieler",
       "pr": null,
       "text": "Wenn ihr beide im selben Moment speichert, sagt das Spiel jetzt sauber, was los ist. Der Schutz davor gab es schon — er verhindert, dass der eine den Stand des anderen überschreibt. Nur kam er als „Serverfehler 500“ mit einem rohen Text an, obwohl der Server genau richtig gehandelt hatte. Jetzt kommt er als das, was er ist: ein Konflikt, mit dem Hinweis „bitte neu laden und die Aktion wiederholen“ und beiden Versionsnummern. Umgestellt in allen 67 Routen, die in den Spielstand schreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Der Schnelldurchlauf spult die gezeigte Disziplin ans Ende — und bleibt dort. Vorher lief er genau eine Etappe zu weit und landete am ANFANG der nächsten Disziplin; gemessen bei drei Etappen: Ergebnis „Disziplin 2, Etappe 0“. Der Mitspieler folgt der angezeigten Disziplin und wurde dabei mitgezogen, während der Host noch den Endstand der ersten anschaute.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.5"
