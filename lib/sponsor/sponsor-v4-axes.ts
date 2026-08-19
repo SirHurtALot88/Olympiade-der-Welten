@@ -129,21 +129,29 @@ function netFinancialPosition(gameState: GameState, teamId: string): number {
 }
 
 /**
- * Marktwert-Sprung, ab dem ein Spieler als entwickelt zaehlt.
+ * Marktwert-Sprung, ab dem ein Spieler als entwickelt zaehlt — dieselbe Schwelle wie golden_talent_forge.
  *
- * GEMELDET VON CHRIS (`u3wlh4`): „Als Ziel Entwicklung - 20 Spieler sollen sich entwickeln und
- * 6 MW dazu gewinnen? 6 MW schaffen wir nicht … Dazu kommt 20 spieler kann man gar nicht haben????
- * Bitte das dringend fixen und auf unsere systeme anpassen und messen."
+ * ACHTUNG, OFFENER BEFUND (Meldung `u3wlh4`): DIESE SCHWELLE MISST DERZEIT NICHTS.
  *
- * NACHGEMESSEN an 339 Entwicklungs-Ereignissen aus drei Live-Spielstaenden: der MEDIAN-Zuwachs
- * liegt bei 21,9 Marktwert, p90 bei 35,7, Maximum 77,2. **326 von 339 Spielern (96 %) reissen die
- * alte Schwelle von 6.** Sie hat also nichts ausgesiebt — fast jeder Spieler zaehlte als
- * „entwickelt", und die Achse mass in Wahrheit nur die Kadergroesse.
+ * `talentJumpCount` unten rechnet `after.marketValuePreview − before.marketValue`. An 339
+ * Entwicklungs-Ereignissen aus drei Live-Spielstaenden nachgemessen ist `before.marketValue` in
+ * ALLEN 339 Faellen 0 — die Differenz ist damit der ABSOLUTE Marktwert, kein Zuwachs. Die Achse
+ * zaehlt „Spieler mit Marktwert ueber 6", also praktisch jeden (326 von 339).
  *
- * 25 liegt oberhalb des Medians und macht aus dem Kriterium wieder eine Aussage. Siehe die
- * Ziel-Kalibrierung bei `entwicklung` unten — Schwelle und Ziel gehoeren zusammen.
+ * Zum Vergleich, selber Spielstand: die Summe ALLER Attribut-Aenderungen einer Saison liegt im
+ * Median bei 0,5 Punkten (p90 4,2, max 10,5), waehrend die Achse einen „Zuwachs" von median 21,6
+ * sieht — auf Hoehe der Marktwerte (median 24,9), nicht der Entwicklung.
+ *
+ * ZWEITER, ECHTER FEHLER an derselben Achse: das Ziel (`scale: 20`) liegt ueber der Kadergrenze
+ * `DEFAULT_ROSTER_MAX` = 14. Volle Erfuellung ist selbst dann unmoeglich, wenn jeder Spieler
+ * springt.
+ *
+ * NICHT NACHKALIBRIERT, UND ZWAR ABSICHTLICH: Schwelle und Ziel neu zu setzen wuerde die kaputte
+ * Messgroesse nur anders skalieren. Zuerst muss `before.marketValue` einen echten Ausgangswert
+ * tragen (Spur: `economyAudit.calculatedMarketValue`, `season-end-xp-apply-service.ts:469`).
+ * Festgehalten in `tests/entwicklungs-achse-misst-keine-entwicklung.test.ts`.
  */
-const AXIS_TALENT_JUMP_MV = 25;
+const AXIS_TALENT_JUMP_MV = 6;
 /** Match-Fatigue, bis zu der ein Spieler als frisch zaehlt — dieselbe Grenze wie fatigue_management. */
 const AXIS_FRESH_FATIGUE_CAP = 45;
 
@@ -320,32 +328,14 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
       "{ziel} sollen über die Saison mindestens " + String(AXIS_TALENT_JUMP_MV) + " Marktwert dazugewinnen. " +
       "Gezählt werden Spieler, nicht Punkte: wer zweimal zulegt, zählt einmal. Gemeint ist Marktwert, " +
       "nicht SP — und der Endstand nach Regression, nicht der Bruttozuwachs.",
-    /**
-     * ZIEL 20 → 8, zusammen mit der Schwelle 6 → 25 (Meldung `u3wlh4`).
-     *
-     * DAS ALTE ZIEL WAR STRUKTURELL UNERREICHBAR. Ein Kader fasst hoechstens 14 Spieler
-     * (`DEFAULT_ROSTER_MAX`). Ein Ziel von 20 Spielern kann also selbst dann nicht voll erfuellt
-     * werden, wenn JEDER Spieler springt — Chris' „20 spieler kann man gar nicht haben" trifft
-     * genau zu. Gemessen kam kein Team ueber 14 Spruenge, der Median lag bei 10.
-     *
-     * Die Nachkalibrierung von 2026-08-03 (3 → 20) hat den Ø-Erfuellungsgrad korrekt in den
-     * Korridor gezogen, dabei aber die Kadergrenze nicht geprueft: 20 war als Skalen-Obergrenze
-     * gedacht, liest sich in der Zielbeschreibung aber als Anforderung.
-     *
-     * NEU GEMESSEN ueber einen Sweep aus Schwelle × Ziel (339 Ereignisse, drei Spielstaende):
-     *
-     *   Schwelle   6    10    15    20    25    30    35
-     *   Median      10    9     8     7     4     3     2
-     *   Maximum     14   13    12    10     9     7     5
-     *   Ziel/Ø      20/73% 18/67% 16/58% 14/47% 8/49% 6/47% 4/54%
-     *
-     * Gewaehlt: Schwelle 25, Ziel 8 — Ø Erfuellung 49 %, mittig im Korridor 35–65 %, Ziel unter
-     * der Kadergrenze UND vom hoechsten gemessenen Wert (9) tatsaechlich uebertroffen. Die
-     * Kombination (20, 14) laege mit 47 % ebenfalls im Korridor, aber volle Erfuellung wurde dort
-     * in keinem gemessenen Spielstand je erreicht — ein Ziel, das nur theoretisch erreichbar ist,
-     * war der Ausgangsfehler.
-     */
-    scale: 8,
+    // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
+    // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
+    // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
+    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
+    // Siehe die Warnung bei `AXIS_TALENT_JUMP_MV`: 20 liegt ueber der Kadergrenze
+    // `DEFAULT_ROSTER_MAX` = 14 und ist damit nicht voll erfuellbar. Bewusst NICHT einzeln
+    // korrigiert — solange die Messgroesse selbst falsch ist, waere jede neue Zahl geraten.
+    scale: 20,
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,
