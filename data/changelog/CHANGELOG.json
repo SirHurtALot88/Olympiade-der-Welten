@@ -3,6 +3,42 @@
   "eintraege": [
     {
       "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Die Disziplin-Punkte in der Arena enthalten jetzt den Mutator-Aufschlag — dieselbe Zahl, die der Saisonstand ausweist. Vorher rechnete die Arena rein aus der Rang-zu-Punkte-Tabelle, waehrend die Saisonstand-Spalte den Aufschlag bereits mitzaehlte.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Die Mutator-Punkte zaehlen jetzt auch im Saisonstand. Bisher buchte die Tabelle nur die Platzierungs-Punkte aus der Rang-zu-Punkte-Tabelle; der Aufschlag aus den Mutatoren landete zwar beim Spieler, aber nie beim Team. Am Live-Spielstand betraf das ALLE 32 Teams mit 2,4 bis 6,9 Punkten — und drehte 13 Plaetze, darunter die Tabellenspitze. Fuer schon gebuchte Spieltage gibt es `scripts/repariere-saisonstand-punkte.ts`.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "siehe `w4eloo` — die Mutator-Punkte zaehlen jetzt auch im Saisonstand.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Der Trainings-Filter „Upgrade bereit\" heisst jetzt „Wächst\". „Upgrade\" stammt aus dem abgeschafften XP-/SP-System; die Entwicklung laeuft organisch ueber die Saison. Auch der Erklaertext im Detail spricht nicht mehr von einem Upgrade.",
+      "quelle": "triage",
+      "gewicht": null,
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Multiplayer",
       "pr": null,
       "text": "Ein Mitspieler, der die Verbindung verliert, fällt nicht mehr aus der Bereit-Pflicht. Bisher schrumpfte der Kreis der Bereit-pflichtigen in dem Moment, in dem jemand rausflog — der Host konnte ab da allein durch jeden Schritt und durch die Arena klicken, und der Gast fand sich nach dem Wiederverbinden mehrere Stationen weiter, ohne je gefragt worden zu sein. Jetzt hält sein offener Bereit-Status das Tor. Wer bereit war und DANN rausfliegt, hält niemanden auf — die Bereitmeldung überlebt den Abriss. Damit ein Abend daran nicht hängen bleibt, gibt es einen eigenen Knopf, der den Namen nennt: „Franky ist offline und nicht bereit — trotzdem fortfahren\". Er erscheint nur, wenn ausschließlich Getrennte blockieren, und der Server prüft es noch einmal nach: einen anwesenden Mitspieler übergeht der Host damit nicht.",
