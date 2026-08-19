@@ -511,3 +511,117 @@ habe ich sie mehrfach von Hand angestoßen. Das war richtig, um überhaupt eine 
 **Regel daraus:** ein manueller Lauf ist zum *Messen* gut. Zum *Mergen* muss ein Lauf aus dem
 `pull_request`-Ereignis grün sein; den holt man mit einem Push, nicht mit einem Dispatch. Und
 danach nicht mehr dispatchen — sonst bricht der eigene Dispatch den PR-Lauf ab.
+
+---
+
+## Nachtrag: die sieben In-Game-Meldungen vom 19.08.
+
+Nachdem der Spiegel wieder lief (siehe `CLAUDE.md`, Abschnitt „Zuerst prüfen"), lagen sieben
+Meldungen von Chris auf `bug-reports`. Alle sieben sind abgearbeitet. Die Reihenfolge unten ist die
+der Bearbeitung, nicht die des Eingangs.
+
+| # | Ansicht | Kurz | Stand |
+|---|---|---|---|
+| 2 + 3 | `matchdayArena`, `seasonV2` | Mutatorpunkte fehlen im Saisonstand | erledigt, `afe090fb` |
+| 6 | `lineup` | Flow hängt bei „Training prüfen" | erledigt, `41641d95` |
+| 5 | `trainingCompact` | Filter „Upgrade bereit" | umbenannt statt entfernt — Begründung unten |
+| 4 | `homeV2` | Gebäude-Saisonziel steht offen, fehlt in der GuV | erledigt, drei Ursachen |
+| 1 | `prize` | „20 Spieler entwickeln" | erledigt, Marke hängt jetzt am Kader |
+| 7 | `matchdayArena` | KI soll Karten auch ohne Farbtreffer spielen | tut sie bereits — gemessen, Test ergänzt |
+
+### #5 — warum umbenannt und nicht entfernt
+
+Chris schrieb „bitte entfernen". Der **Name** war falsch, die **Auswahl** ist es nicht: der Filter
+greift auf den Netto-Forecast (≥ +2 SP), und den gibt es unverändert. Seine eigene Kurzbeschreibung
+sagte das sogar schon („Kein Sofort-Upgrade, sondern die Saisonend-Tendenz") — sie stand nur hinter
+einem Namen, der das Gegenteil behauptete.
+
+Die vier Filter teilen den Kader ohne Rest auf (wächst / Risiko / stabil / alle). Ohne diesen gäbe
+es keinen Weg mehr, die Aufsteiger zu sehen; sie verschwänden in „Alle". Er heißt jetzt **„Im
+Aufwind"**. Wenn Chris ihn trotzdem weghaben will, ist das ein Einzeiler.
+
+### #4 — drei Fehler, einer davon mit Geld dran
+
+Gemessen an seinem Spielstand (`new-game-1787123325719-swnjlk`, Saison 1, Spieltag 8, Team V-W).
+
+1. **Die Ausgangslage der Achse wanderte mit.** Eine V4-Achse misst gegen die bei Angebotserzeugung
+   eingefrorene eigene Ausgangslage (`axisbase:` im `targetValue`). `ensureSeasonSponsorOffers`
+   verglich die Zahl vorhandener Angebote gegen eine eingetippte **5**, während
+   `SPONSOR_ANGEBOTE_JE_TEAM` längst **3** ist — die Bedingung konnte nie mehr wahr werden, und die
+   Funktion erzeugte bei *jedem* Aufruf neu. Sie läuft bei jedem Laden des Spielstands.
+
+   Der Wurf ist saatgebunden und lieferte dieselben Sponsoren; mitgewandert ist nur die
+   Ausgangslage. Für „Ausbau" heißt das: die Vorsaison baut erst die Gebäude
+   (`training_facilities`) und wählt danach den Sponsor (`choose_sponsor`) — jede gebaute Stufe
+   landete in der Ausgangslage statt auf dem Ziel. Bei Unterschrift stand die Achse damit
+   garantiert auf 0.
+
+   Chris' Vertrag trägt `axisbase:2` bei genau zwei gebauten Stufen: Achse 0 von 2, Sonderziel
+   **−6,00 C statt +6,00 C**, GuV **22,7 statt 34,7 C**.
+
+2. **Das Board-Ziel konnte gar nicht erfüllt aussehen.** Der Board-Bauer las
+   `evaluateSpecialComponentForObjective` — den binären Alt-Bewerter, der die V4-Achsen nicht kennt
+   und für jede von ihnen bis zum abschließenden `return "open"` durchfällt. Dieselbe Fehlerklasse
+   wie A1/A2/A3 weiter oben: die richtige Rechenstelle war da (`evaluateSpecialComponentStage`,
+   dieselbe, aus der die Abrechnung ihr Geld zieht), sie war nur nicht angeschlossen.
+
+3. **Der rohe Konfigurationstext stand auf dem Bildschirm** — wörtlich
+   `axisbase:2;axisscale:2;axisoffset:0` als Zielmarke. Jetzt „2 Stufen", Zwischenstand „Ausbau 0
+   Stufen von 2 Stufen", mit dem Leerzeichen, das in der Abrechnungszeile fehlte („0Stufen").
+
+**Die GuV selbst war in Ordnung.** Ihre Sponsor-Zeile kommt aus `previewSponsorSettlement`, und die
+rechnet die Achse mit. Es fehlte kein Posten, es fehlte das Geld.
+
+**Sein Spielstand:** `scripts/repair-save-sponsor-achsen-ausgangslage.ts`, Trockenlauf ohne
+`--schreiben`. Am Abbild gemessen: V-W 45,30 → 57,30 C. Spätere Saisons und die Achse „Solidität"
+werden nur gemeldet, nicht angefasst — ihre Ausgangslage ist nicht rekonstruierbar.
+
+### #1 — die Zielmarke lag über der Spielgrenze
+
+`DEFAULT_ROSTER_MAX` ist 14, und `getTeamPlayerMax` klammert jedes Team dort hart ab. Die Achse
+„Entwicklung" stand auf **20 Spielern**. Am Live-Abbild nachgemessen: Kadergrößen 8 bis 14, Median
+10. Die Karte versprach eine Marke, die kein Team der Liga jemals erreichen konnte.
+
+Die 20 stammt aus der Nachkalibrierung vom 03.08., die eine Ø Erfüllung im Korridor 35–65 % suchte
+und dafür ausschließlich an der Zielmarke drehte. Weil die Achse anteilig zahlt
+(`fraction = metric / scale`), ist die Marke zugleich ein Auszahlungsregler — als Regler
+funktionierte die 20, als Aussage war sie falsch.
+
+Die Marke hängt jetzt am eigenen Kader. Das ist die Regel der Datei selbst: gemessen wird gegen die
+eigene Ausgangslage, nie gegen die Liga. Eine feste 14 hätte ein Team mit 8 Spielern bei 57 %
+gedeckelt.
+
+**Was das kostet, ehrlich beziffert:** Ø Erfüllung von 50,6 % auf rund 100 %, also rund 6 C je
+Vertrag und Saison. Den Korridor über die Sprung-Schwelle zurückzuholen ginge nur geraten —
+Marktwerte werden erst am Saisonende neu gesetzt, im laufenden Spielstand stehen gar keine Sprünge
+(341 Vorschauzeilen, alle Delta 0).
+
+**Chris' zweitem Punkt widerspreche ich:** „6 MW" misst eine andere Skala als die 2–3 Mio, an die er
+denkt. `player.marketValue` liegt am Abbild bei Median 24,98 und Maximum 113,45; die Kalibrierung
+fand bei Schwelle 6 im Median 10 Spieler je Team, die sie überspringen. Die Schwelle bleibt stehen.
+
+### #7 — die Farbe war nie ein Schloss
+
+Chris wünschte sich, dass KI-Teams eine rote Karte auch in einer grünen Disziplin spielen dürfen.
+Das tun sie bereits: `formCardSlotValue` (Saisonplan) und `formCardDeploymentValue` (Spieltag)
+rechnen `Wert × (Farbtreffer ? 2 : 1) × Kadergröße` und maximieren; gefiltert wird nirgends.
+
+Am Live-Abbild (Saison 1, Spieltag 8) nachgezählt: von **213 Pluskarten-Einsätzen der KI lagen 49
+auf einer Disziplin ohne Farbtreffer**, knapp ein Viertel. Über alle 462 Karteneinsätze sind es 290
+ohne Treffer (die Minuskarten suchen den Nicht-Treffer bewusst).
+
+Und die Rechnung gibt ihm auch inhaltlich recht: eine rote 8 bringt in einer 6er-Disziplin ohne
+Treffer 48 Punkte, in einer 2er mit Treffer nur 32. Sein „manchmal kann sich das lohnen" ist der
+Normalfall der Zuordnung.
+
+Gebaut wurde deshalb nichts — festgehalten schon: die Eigenschaft stand nirgends geschrieben, sie
+fiel nur daraus ab, dass der Faktor eingepreist statt geprüft wird. Ein späterer Farbfilter wäre
+niemandem aufgefallen. `tests/ki-formkarten-ohne-farbtreffer.test.ts` hält vier Fälle fest.
+
+### Eine Zählung, die ich unterwegs falsch gemacht habe
+
+Beim Suchen nach Formkarten-Verschwendung zählte ich zunächst „151 ungespielte Minuskarten bei den
+KI-Teams, zwei Spieltage vor Schluss" und hielt das für einen Kapazitätsengpass. Falsch: mein
+Filter war `cardValue <= 0` und schluckte damit die **157 Karten mit Wert 0**. Tatsächlich offen ist
+**eine einzige** Minuskarte im ganzen Spielstand — die Entsorgungspflicht funktioniert. Bei den
+Pluskarten sind es 51 von 270 an Spieltag 8 von 10, also im Rahmen der Ausgaben-Pace.
