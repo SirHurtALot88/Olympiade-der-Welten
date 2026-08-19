@@ -12,7 +12,7 @@ import type {
   TeamOwnershipRecord,
 } from "@/types/game";
 import { buildRoomFlowState } from "@/lib/room/room-flow-controller";
-import { matchesArenaScope } from "@/lib/room/arena-sync-state";
+import { matchesArenaScope, roomMatchdayScopeId } from "@/lib/room/arena-sync-state";
 import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { FoundationSaveModePreset } from "@/lib/persistence/foundation-save-mode";
 
@@ -737,7 +737,7 @@ export function isRoomMatchdayInProgress(
   return matchesArenaScope(state.arenaSyncState, {
     saveId: state.multiplayerRoom.saveId,
     seasonId: state.multiplayerRoom.activeSeasonId,
-    matchdayId: String(state.multiplayerRoom.activeMatchday),
+    matchdayId: roomMatchdayScopeId(state.multiplayerRoom.activeMatchday),
   });
 }
 

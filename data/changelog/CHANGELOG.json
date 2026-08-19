@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Startet der Host die Arena, steht der Raum danach auch wirklich auf „Arena“. Vorher wurde der Schritt geschrieben und eine Zeile später wieder verworfen — gemessen blieb der Raum auf „Lobby: bereit machen“ stehen. Dieselbe Ursache wie beim Team-Umverteilen: der Flow-Schritt wird aus einem zweiten Feld neu aufgebaut, das nicht mitgezogen wurde.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Ein „Bereit“-Klick mitten in der laufenden Enthüllung hält sie nicht mehr an. Vorher genügte ein versehentlicher Klick des Mitspielers, um zurück ins Bereit-Tor zu fallen — und weil jeder Etappenschritt die Bereitmeldungen ohnehin zurücksetzt, stand der Host danach in seiner eigenen Warteliste: „Die Arena wartet noch auf: Chris (anwesend, noch nicht bereit).“ Das Tor geht jetzt nur noch auf, nie zu. Vor dem ersten Schritt hält es unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Arena",
       "pr": null,
       "text": "Im Mehrspieler folgt der Gast jetzt auch beim Wechsel auf die zweite Disziplin. Bisher war dieser Wechsel beim Host rein örtlich: der Server erfuhr nur die Etappenschritte und schob mit ihnen die Phasenkette der ERSTEN Disziplin weiter, statt die Seite zu wechseln. Durchgezählt an einem Spieltag mit je fünf Etappen: nach dem Wechsel meldete der Server fünf Klicks lang weiter „Disziplin 1, Etappe 5“ — der Gast blieb auf dem Endstand der ersten Disziplin kleben und sah von der zweiten nichts. Der Wechsel ist jetzt ein eigener Raum-Schritt, den nur der Host auslösen darf; die verlassene Disziplin gilt dabei nur dann als gewertet, wenn ihre Etappen wirklich durch sind.",
@@ -51,6 +69,24 @@
       "seite": "Mehrspieler",
       "pr": null,
       "text": "Wenn ihr beide im selben Moment speichert, sagt das Spiel jetzt sauber, was los ist. Der Schutz davor gab es schon — er verhindert, dass der eine den Stand des anderen überschreibt. Nur kam er als „Serverfehler 500“ mit einem rohen Text an, obwohl der Server genau richtig gehandelt hatte. Jetzt kommt er als das, was er ist: ein Konflikt, mit dem Hinweis „bitte neu laden und die Aktion wiederholen“ und beiden Versionsnummern. Umgestellt in allen 67 Routen, die in den Spielstand schreiben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Der Schnelldurchlauf spult die gezeigte Disziplin ans Ende — und bleibt dort. Vorher lief er genau eine Etappe zu weit und landete am ANFANG der nächsten Disziplin; gemessen bei drei Etappen: Ergebnis „Disziplin 2, Etappe 0“. Der Mitspieler folgt der angezeigten Disziplin und wurde dabei mitgezogen, während der Host noch den Endstand der ersten anschaute.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
+      "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.5"

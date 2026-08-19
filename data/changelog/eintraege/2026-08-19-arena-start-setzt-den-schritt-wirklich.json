@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Mehrspieler",
+  "text": "Startet der Host die Arena, steht der Raum danach auch wirklich auf „Arena“. Vorher wurde der Schritt geschrieben und eine Zeile später wieder verworfen — gemessen blieb der Raum auf „Lobby: bereit machen“ stehen. Dieselbe Ursache wie beim Team-Umverteilen: der Flow-Schritt wird aus einem zweiten Feld neu aufgebaut, das nicht mitgezogen wurde.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}
