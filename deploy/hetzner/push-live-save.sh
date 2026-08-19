@@ -13,6 +13,47 @@
 #   - Nutzt den bereits gespeicherten Git-Zugang (wie auto-deploy.sh) — keine Tokens hier.
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# ANMELDUNG FEHLT? DANN SAG DAS AUCH.
+#
+# GEMESSEN AM 19.08.: beide Spiegel standen seit dem 14.08. still. Im Log stand fuenf Tage lang,
+# alle 15 Minuten, nur:
+#
+#     fatal: could not read Username for 'https://github.com': No such device or address
+#
+# Das ist die Meldung von git, wenn es im Cron nach einem Passwort fragen will und kein Terminal
+# findet. Wer sie nicht kennt, liest daraus einen Netzwerk- oder Geraetefehler — dabei fehlt
+# schlicht der gespeicherte Zugang. `git fetch` laeuft ohne Anmeldung weiter, `git push` nicht;
+# der Auto-Deploy funktionierte deshalb die ganze Zeit, und niemand kam auf die Spur.
+#
+# Diese Funktion uebersetzt die drei Faelle in Klartext samt Loesung. Sie aendert nichts am
+# Verhalten — sie macht nur sichtbar, was zu tun ist.
+# ---------------------------------------------------------------------------
+erklaere_push_fehler() {
+  local ausgabe="$1"
+  case "$ausgabe" in
+    *"could not read Username"*|*"Authentication failed"*|*"Password authentication is not supported"*|*"terminal prompts disabled"*)
+      echo ""
+      echo "!!! DER PUSH SCHEITERT AN DER ANMELDUNG, NICHT AM NETZ !!!"
+      echo ""
+      echo "  GitHub nimmt fuer Git keine Passwoerter mehr an — es braucht einen Token."
+      echo ""
+      echo "  1) Token erzeugen:  https://github.com/settings/tokens/new"
+      echo "     Note 'Olympiade Server', Expiration 'No expiration', Scope: repo"
+      echo ""
+      echo "  2) Auf diesem Server EINMAL von Hand pushen und den Token als Passwort eingeben:"
+      echo "       git config --global credential.helper store"
+      echo "       cd /root/Olympiade-der-Welten"
+      echo "       bash $(basename "$0")"
+      echo "     Username = der GitHub-Benutzername, Password = der Token (er wird beim"
+      echo "     Einfuegen nicht angezeigt, das ist normal)."
+      echo ""
+      echo "  Danach liegt der Zugang in ~/.git-credentials und der Cron laeuft wieder allein."
+      echo ""
+      ;;
+  esac
+}
+
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_DIR"
 
@@ -68,7 +109,12 @@ unset GIT_INDEX_FILE
 rm -f "$TMP_GZ"
 
 echo "[4/4] Push nach GitHub (Branch $BRANCH) ..."
-git push -f origin "$COMMIT:refs/heads/$BRANCH"
+if ! PUSH_AUSGABE="$(git push -f origin "$COMMIT:refs/heads/$BRANCH" 2>&1)"; then
+  printf '%s\n' "$PUSH_AUSGABE"
+  erklaere_push_fehler "$PUSH_AUSGABE"
+  exit 1
+fi
+printf '%s\n' "$PUSH_AUSGABE"
 
 echo ""
 echo "FERTIG — dein Live-Save liegt jetzt auf GitHub (Branch '$BRANCH')."

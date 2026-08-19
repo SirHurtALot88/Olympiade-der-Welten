@@ -65,6 +65,32 @@ DRECK="$(git status --porcelain 2>/dev/null | head -5)"
 [ -n "$DRECK" ] && { echo "    -> Ungespeicherte Aenderungen im Arbeitsbaum:"; printf '%s\n' "$DRECK" | sed 's/^/         /'; }
 
 echo
+echo "[3b] Darf der Server ueberhaupt pushen?"
+#
+# DIE FRAGE, DIE AM 19.08. FUENF TAGE LANG NIEMAND GESTELLT HAT.
+#
+# Crontab, Cron-Dienst und Deploy waren allesamt in Ordnung — gescheitert ist allein der PUSH,
+# weil dem Server der GitHub-Zugang fehlte. `git fetch` laeuft ohne Anmeldung weiter, deshalb sah
+# von aussen alles gesund aus. `--dry-run` authentifiziert sich, legt aber nichts an.
+PUSH_TEST="$(git push --dry-run origin HEAD:refs/heads/__oly-zugangstest 2>&1)" && PUSH_OK=1 || PUSH_OK=0
+if [ "$PUSH_OK" = "1" ]; then
+  echo "    OK      Push-Zugang steht."
+else
+  echo "    FEHLT   Push-Zugang. Antwort von git:"
+  printf '%s\n' "$PUSH_TEST" | sed 's/^/         /'
+  case "$PUSH_TEST" in
+    *"could not read Username"*|*"Authentication failed"*|*"Password authentication is not supported"*)
+      echo
+      echo "    -> GENAU DAS war die Ursache am 19.08. GitHub nimmt fuer Git keine Passwoerter"
+      echo "       mehr an; es braucht einen Token."
+      echo "         1) https://github.com/settings/tokens/new  — Scope: repo"
+      echo "         2) git config --global credential.helper store"
+      echo "         3) bash deploy/hetzner/push-live-save.sh   (Token als Passwort eingeben)"
+      ;;
+  esac
+fi
+
+echo
 echo "[4] Letzte Zeilen der Logs"
 for log in /var/log/oly-deploy.log /var/log/oly-bug-reports.log /var/log/oly-live-save.log; do
   if [ -f "$log" ]; then
