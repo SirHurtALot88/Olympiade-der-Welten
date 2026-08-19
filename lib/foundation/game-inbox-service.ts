@@ -1732,11 +1732,46 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
  *
  * Geprueft wird sie in `tests/weiter-leiste-beschriftung.test.ts`.
  */
+/**
+ * BEOBACHTUNGEN, DIE DEN WEITER-KNOPF NICHT BELEGEN DUERFEN.
+ *
+ * GEMELDET VON CHRIS (19.08.): „der Flow haengt bei Training pruefen fest - weiss nicht warum
+ * dabei muesste er auf die Einsatzliste verweisen, training ist erledigt".
+ *
+ * NACHGEMESSEN an seinem Spielstand: `isTeamTrainingComplete` war `true`, der Flow-Schritt
+ * `check_training` stand auf `completed`. „Training pruefen" kam gar nicht vom Flow, sondern war
+ * der Handlungstext des Postfach-Eintrags `player_health_fatigue_risk` — und der hat die hoechste
+ * Quellen-Prioritaet, bei Fatigue >= 80 dazu die Dringlichkeit `critical`.
+ *
+ * DAS PROBLEM IST NICHT DIE WARNUNG, SONDERN IHR PLATZ. Erhoehte Ermuedung mitten im Spieltag ist
+ * eine Tatsache, die sich durch Draufdruecken nicht aendert: der Knopf schickt einen ins Training,
+ * dort steht dasselbe, und beim naechsten Blick belegt er den Knopf wieder. Der Weiter-Knopf hoert
+ * damit auf, „weiter" zu bedeuten.
+ *
+ * DIESELBE LEHRE GAB ES HIER SCHON EINMAL: `game-flow-controller.ts` nahm
+ * `board_objectives_failed` aus denselben Gruenden aus den Warnungen — „es kann nie wieder
+ * erfuellt werden, verschwindet also nie. Der Weiter-Knopf hiess dadurch dauerhaft
+ * 'Board-Ziel verfehlt'."
+ *
+ * WAS BLEIBT: die Eintraege selbst. Sie stehen unveraendert im Postfach, mit Dringlichkeit und
+ * Begruendung — nur fuehren sie nicht mehr den Spielfluss. Handlungsfaehige Gesundheits-Eintraege
+ * sind ausdruecklich NICHT betroffen: `player_health_injury` bleibt vorn, denn ein verletzter
+ * Spieler in der Aufstellung will wirklich ersetzt werden.
+ */
+const NUR_BEOBACHTUNG_QUELLEN = new Set([
+  "player_health_fatigue_risk",
+  "player_health_training_load",
+  "player_health_lineup_rest",
+]);
+
 export function isPrimaryInboxCandidate(
   item: GameInboxItem,
   options?: { focusMatchdayLoop?: boolean },
 ): boolean {
   if (item.status !== "open") {
+    return false;
+  }
+  if (NUR_BEOBACHTUNG_QUELLEN.has(item.source)) {
     return false;
   }
   return (
