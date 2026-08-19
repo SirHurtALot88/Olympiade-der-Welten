@@ -37,6 +37,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { DEFAULT_ROSTER_MAX, FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   SPONSOR_V4_AXIS_KEYS, type SponsorV4AxisKey, type SponsorV4AxisTerms,
@@ -74,7 +75,20 @@ type SponsorV4AxisDefinition = {
    * `{ziel}` wird beim Anzeigen durch den Zielwert samt Einheit ersetzt.
    */
   erklaerung: string;
+  /**
+   * Zielmarke, wenn ein Vertrag keine eigene mitfuehrt (Altvertraege ohne `axisscale`).
+   * Fuer NEUE Angebote entscheidet `scaleFor`, sofern die Achse eines hat.
+   */
   scale: number;
+  /**
+   * TEAMABHAENGIGE ZIELMARKE — der Grund, warum es sie gibt, steht bei `entwicklung`.
+   *
+   * Eine feste Zahl ist fuer jede Achse richtig, deren Messgroesse nach oben offen ist (Cash,
+   * Prozent, Gebaeudestufen). Sobald die Messgroesse an einer Obergrenze des Spiels haengt — der
+   * Kader hat hoechstens `DEFAULT_ROSTER_MAX` Spieler — kann eine feste Zahl ueber diese Grenze
+   * hinauslaufen und verspricht dann etwas, das kein Team einloesen kann.
+   */
+  scaleFor?: (gameState: GameState, teamId: string) => number;
   offset: number;
   /** Ausgangswert bei Angebotserzeugung. 0, wenn die Achse ohnehin nur Saisonzuwachs zaehlt. */
   baseline: (gameState: GameState, teamId: string) => number;
@@ -306,11 +320,48 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
       "{ziel} sollen über die Saison mindestens " + String(AXIS_TALENT_JUMP_MV) + " Marktwert dazugewinnen. " +
       "Gezählt werden Spieler, nicht Punkte: wer zweimal zulegt, zählt einmal. Gemeint ist Marktwert, " +
       "nicht SP — und der Endstand nach Regression, nicht der Bruttozuwachs.",
-    // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
-    // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
-    // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
-    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
-    scale: 20,
+    /**
+     * GEMELDET VON CHRIS (19.08., In-Game): „Als Ziel Entwicklung — 20 Spieler sollen sich
+     * entwickeln und 6 MW dazu gewinnen? […] Dazu kommt 20 spieler kann man gar nicht haben????
+     * Bitte das dringend fixen und auf unsere systeme anpassen und messen."
+     *
+     * ER HAT RECHT, UND ZWAR HART. `DEFAULT_ROSTER_MAX` ist 14, und `getTeamPlayerMax` klammert
+     * jedes Team dort hart ab — 20 Spieler kann ein Kader nicht enthalten. Am Live-Abbild
+     * nachgemessen: Kadergroessen 8 bis 14, Median 10. Die Karte versprach also eine Marke, die
+     * kein Team der Liga jemals erreichen konnte.
+     *
+     * WIE DIE 20 ENTSTAND: die Nachkalibrierung vom 03.08. suchte eine Ø Erfuellung im Korridor
+     * 35–65 % und drehte dafuer AUSSCHLIESSLICH an der Zielmarke (3 → 20; gemessene Rohmetrik
+     * 7–13 Spruenge, Median 10, Ø Erfuellung danach 50,6 %). Weil die Achse anteilig zahlt
+     * (`fraction = metric / scale`), ist die Marke zugleich ein Auszahlungsregler — und als Regler
+     * funktionierte die 20. Als AUSSAGE auf der Karte war sie falsch, und die Karte sagt sie
+     * woertlich.
+     *
+     * DIE MARKE HAENGT JETZT AM EIGENEN KADER. Das ist keine neue Idee, sondern die Regel dieser
+     * Datei (Dateikopf, Eigenschaft 1): gemessen wird gegen die eigene Ausgangslage, nie gegen die
+     * Liga — „damit eine Achse fuer den Tabellenletzten genauso ausreizbar ist wie fuer den
+     * Meister". Eine feste 14 haette ein Team mit 8 Spielern bei 57 % gedeckelt; die eigene
+     * Kadergroesse deckelt niemanden.
+     *
+     * WAS DAS KOSTET, ehrlich beziffert: mit Median-Rohmetrik 10 und Median-Kader 10 steigt die
+     * Ø Erfuellung von 50,6 % auf rund 100 % — die Achse zahlt also etwa doppelt so oft voll.
+     * Bei Chris' Vertragsgroesse sind das rund 6 C je Vertrag und Saison. Die Alternative waere,
+     * den Korridor mit der Sprung-Schwelle (`AXIS_TALENT_JUMP_MV`) zurueckzuholen; dafuer fehlen
+     * die Daten, weil Marktwerte erst am Saisonende neu gesetzt werden und im laufenden Spielstand
+     * gar keine Spruenge stehen (nachgemessen: 341 Vorschauzeilen, alle Delta 0). Eine Schwelle
+     * zu raten waere genau die Ratenkalibrierung, die der Dateikopf verbietet. Der Korridor ist
+     * hier bewusst nachrangig: er war mit einem unerfuellbaren Versprechen erkauft.
+     *
+     * ZU CHRIS' ZWEITEM PUNKT („6 MW schaffen wir nicht wenn 2-3 Mio maximum für top playre ist"):
+     * das misst eine andere Skala. `player.marketValue` liegt am Live-Abbild bei Median 24,98 und
+     * Maximum 113,45; die Kalibrierung fand bei Schwelle 6 im Median 10 Spieler je Team, die sie
+     * ueberspringen. Die Schwelle bleibt deshalb stehen — sie ist nachweislich erreichbar.
+     */
+    scale: DEFAULT_ROSTER_MAX,
+    scaleFor: (gameState, teamId) => {
+      const kader = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+      return Math.min(DEFAULT_ROSTER_MAX, Math.max(FIXED_ROSTER_MIN, kader));
+    },
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,
@@ -380,7 +431,7 @@ export function buildSponsorV4AxisTerms(
   return {
     key,
     baseline: Math.round(definition.baseline(gameState, teamId) * 100) / 100,
-    scale: definition.scale,
+    scale: definition.scaleFor?.(gameState, teamId) ?? definition.scale,
     offset: definition.offset,
   };
 }
