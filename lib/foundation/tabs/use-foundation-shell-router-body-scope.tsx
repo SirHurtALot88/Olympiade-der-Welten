@@ -6805,7 +6805,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationView("homeV2", setActiveView);
       setShowGameFlowPanel(false);
       openSeasonBriefingPanel();
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
     if (targetPanel === "captain-picker") {
@@ -7028,13 +7028,13 @@ export function useFoundationShellRouterBodyScope({
       seasonBriefingAutoOpenedRef.current = null;
       setFoundationView("homeV2", setActiveView);
       openSeasonBriefingPanel();
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
 
     if (stepId === "team_confirm") {
       setFoundationView("homeV2", setActiveView);
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
 

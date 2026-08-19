@@ -59,6 +59,61 @@ denselben Bildschirm und denselben Knopftext und schließt daraus, dass nichts p
 Und wenn man bereits am Ziel steht, darf der Knopf nicht unverändert weiter „Season vorbereiten"
 sagen — dann ist die nächste Handlung eine andere.
 
+---
+
+### A1 · ERLEDIGT — mit der genauen Ursache und drei Nachbefunden
+
+**Die Ursache war ein Wettlauf, kein fehlender Anker.** `scrollToFoundationTarget` sah nach festen
+90 ms genau einmal nach und brach bei `null` still ab. Gemessen am echten Spielstand:
+
+| | vorher | nachher |
+|---|---|---|
+| Scroller feuert bei | 90 ms | wartet auf das Element |
+| `#season-finale` dann vorhanden | **nein** | — |
+| Element erstmals im DOM | **2972 ms** | 2919 ms (unverändert) |
+| Hervorhebung gesetzt | **nie** | **ab 4279 ms, 57 Frames** |
+| Scrollposition danach | **0** | **96** (rect.top 224 → 114) |
+
+**Gebaut:** gewartet wird jetzt auf das ELEMENT, nicht auf die Uhr — mit 4 s als Reißleine. Die
+Wartelogik (`warteAufSprungziel`) ist von `document`/`window` getrennt, sonst wäre sie in der
+Node-Testumgebung dieses Projekts nicht nachstellbar; ein Fehler, den man nicht rot bekommt, kommt
+wieder. Läuft ein Sprung noch, wenn der nächste startet, wird der alte abgebrochen. Und ein Ziel,
+das die Frist reißt, schreibt eine Warnung statt spurlos zu verschwinden.
+
+**Warum nicht einfach 90 auf 3000 hochdrehen:** das wäre dieselbe Wette auf eine Zahl, nur mit
+anderem Einsatz. Eine schwerere Ansicht, ein langsamerer Rechner, ein größerer Spielstand — und
+der Sprung wäre wieder still tot.
+
+**Die Warnung hat sich sofort bezahlt gemacht — drei weitere tote Sprungziele:**
+
+1. **`formcards` zeigte auf `foundation-lineup`.** Das ist nur ein `data-testid`; die id lautet
+   `foundation-lineup-v2`. **Behoben.**
+2. **Der allgemeine Rückfall zeigte auf `foundation-home`** — ein Name ohne Element (die Startseite
+   heißt `foundation-home-v2`). Jeder Sprung ohne eigene Zuordnung fiel damit still aus.
+   **Behoben**, an vier Stellen.
+3. **`board-objectives` ist tot, obwohl seine id existiert.** `#team-board-objectives` steht in
+   `FoundationTeamsDetailPanel.tsx` — aber **im Browser gemessen** rendert die Teams-Ansicht die
+   New-Look-Variante, und `[data-testid="foundation-teams-view"]` taucht auch nach **60 Sekunden**
+   nicht auf. `FoundationTeamsNewLook` kennt gar keine Board-Ziele. **Offen** — ein Anker lässt
+   sich nicht raten, die Board-Ziele müssten in der Live-Ansicht erst einen Platz bekommen.
+   Das trifft ausgerechnet den ERSTEN Schritt, den der Weiter-Knopf auf Chris' Spielstand anbietet.
+
+**Der Test deckt jetzt die Klasse ab, nicht den Einzelfall.** `season-checklist-jump-targets`
+prüfte nur `season-readiness-checklist.ts` — eine von drei Stellen, die `targetPanel` vergeben.
+`season-finale` kam aus `game-flow-controller.ts` und lag damit außerhalb. Geprüft werden jetzt
+alle drei Quellen; die restlichen toten Ziele (`finalize-transfers`, `form-board`, `resolve-lab`)
+sind als bekannte Lücke verriegelt: ein NEUES totes Ziel macht rot, und ein repariertes ebenso —
+es zwingt dann, den Eintrag zu streichen.
+
+**Ehrlich zur Grenze dieses Tests:** er liest `id="…"` aus Dateien und sieht nicht, ob die
+Komponente überhaupt gerendert wird. Genau daran ist Punkt 3 vorbeigekommen — die Zusicherung war
+grün, der Sprung trotzdem tot. Steht als Kommentar im Test.
+
+**Was NICHT geändert wurde:** dass der Knopf nach der Ankunft unverändert „Season vorbereiten"
+sagt. Mit der jetzt funktionierenden Hervorhebung bekommt jeder Druck eine sichtbare Antwort; ob
+darüber hinaus die Beschriftung wechseln soll, hängt an A2 (der Knopf trägt einen Zustand statt
+einer Handlung) und gehört dorthin.
+
 ### A2 · Der Weiter-Knopf zeigt einen abgeschnittenen Zustand statt einer Aktion
 
 Auf Home steht wörtlich: **„Weiter Board-Ziel verfehlt: For…"** — abgeschnitten, unlesbar.
