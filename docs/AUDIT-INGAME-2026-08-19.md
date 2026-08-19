@@ -625,3 +625,34 @@ KI-Teams, zwei Spieltage vor Schluss" und hielt das für einen Kapazitätsengpas
 Filter war `cardValue <= 0` und schluckte damit die **157 Karten mit Wert 0**. Tatsächlich offen ist
 **eine einzige** Minuskarte im ganzen Spielstand — die Entsorgungspflicht funktioniert. Bei den
 Pluskarten sind es 51 von 270 an Spieltag 8 von 10, also im Rahmen der Ausgaben-Pace.
+
+### Nachtrag zu #4 — der Spielstand heilt sich beim Laden selbst
+
+Der erste Plan war ein Reparatur-Skript auf dem Server. Der Versuch scheiterte an etwas Banalem:
+`npx` gibt es auf dem Host gar nicht, Node lebt nur im Container. Der zweite Gedanke — die
+reparierte SQLite über `pull-repaired-save.sh` zurückspielen — wäre gegangen, ist aber der grobe
+Weg: er tauscht die **ganze** Datenbank und wirft alles weg, was zwischen Abbild und Einspielen
+gespielt wurde.
+
+Stattdessen heilt sich der Spielstand jetzt beim Laden selbst, an derselben Stelle, an der das schon
+für fehlende Sponsorangebote passiert (`healSponsorOffersForSave` in
+`app/api/singleplayer-state/route.ts`). Die Heilung fasst genau ein Feld an, ist idempotent (nach
+dem Lauf steht `axisbase:0`, die Bedingung greift nie wieder) und gibt bei nichts zu tun denselben
+`gameState` zurück — der Aufrufer erkennt am `===`, ob gespeichert werden muss.
+
+**Die Grenzen sind Beweisbarkeit, nicht Vorsicht:**
+
+- Saison 1 + Achse „Ausbau": die richtige Ausgangslage ist nachweislich 0. Ein neues Spiel startet
+  mit jedem Gebäude auf Stufe 0, und die Angebote entstehen in `buildNewGameStateFromBaseline`,
+  bevor irgendetwas gebaut werden kann.
+- Ab Saison 2 wäre der richtige Wert der Gebäudestand zu Saisonbeginn. Der steht nirgends. Ihn zu
+  schätzen hieße, einen laufenden Vertrag nach Gutdünken zu verschieben — schlimmer als der Fehler.
+- `soliditaet` misst die Finanzlage bei Erzeugung, ebenfalls nicht rekonstruierbar. Unangetastet
+  (fünf Verträge im Live-Abbild: D-L, G-G, L-R, M-M, R-R).
+
+`scripts/repair-save-sponsor-achsen-ausgangslage.ts` ruft jetzt **dieselbe** Funktion auf und ist
+damit kein zweiter Weg mehr, sondern der Prüfstand: er zeigt die Wirkung in C, statt sie zu
+behaupten. Am frischen Abbild (16:10) gemessen: V-W 44,10 → 56,10 C.
+
+**Für Chris heißt das: nichts zu tun.** Kein Server-Befehl, kein Datenbank-Tausch, kein verlorener
+Spielfortschritt. Beim nächsten Laden steht das Ziel auf erfüllt und die 12,00 C sind in der GuV.

@@ -27,6 +27,10 @@
  * Ohne `--schreiben` wird nichts gespeichert.
  */
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import {
+  heileSponsorAchsenAusgangslage,
+  istVerschobeneAusbauAchse,
+} from "@/lib/sponsor/sponsor-achsen-ausgangslage-heilung";
 import { evaluateSponsorV4Axis } from "@/lib/sponsor/sponsor-v4-axes";
 import { sponsorV4AxisTermsFromComponent } from "@/lib/sponsor/sponsor-objective-evaluator";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
@@ -49,45 +53,41 @@ function sponsorGesamt(stand: GameState, teamId: string): number {
   return Math.round(zeilen.reduce((summe, row) => summe + row.cashDelta, 0) * 100) / 100;
 }
 
-const naechsteVertraege = { ...(gameState.seasonState.sponsorContractsByTeamId ?? {}) };
-let geaendert = 0;
-const gemeldet: string[] = [];
+/**
+ * EINE RECHENSTELLE: die Heilung selbst steht in
+ * `lib/sponsor/sponsor-achsen-ausgangslage-heilung.ts` und laeuft im Spiel bei jedem Laden des
+ * Spielstands. Dieses Skript ruft genau dieselbe Funktion auf — es ist der PRUEFSTAND dazu, kein
+ * zweiter Weg: es zeigt vorher/nachher in C, damit man die Wirkung sieht, statt sie zu glauben.
+ *
+ * Wer das Spiel einmal laedt, braucht das Skript deshalb gar nicht mehr. Es bleibt fuer den Fall,
+ * dass man die Wirkung an einem ABBILD nachrechnen will, ohne den laufenden Stand anzufassen.
+ */
+const naechsterStand = heileSponsorAchsenAusgangslage(gameState);
+const geaendert = Object.values(gameState.seasonState.sponsorContractsByTeamId ?? {})
+  .flatMap((vertrag) => vertrag?.components ?? [])
+  .filter(istVerschobeneAusbauAchse).length;
 
 for (const [teamId, vertrag] of Object.entries(gameState.seasonState.sponsorContractsByTeamId ?? {})) {
-  if (!vertrag) continue;
-  const komponenten = vertrag.components ?? [];
-  const naechsteKomponenten = komponenten.map((komponente) => {
+  for (const komponente of vertrag?.components ?? []) {
     const terms = sponsorV4AxisTermsFromComponent(komponente);
-    if (!terms || terms.baseline === 0) return komponente;
-    if (terms.key !== "ausbau" || seasonId !== "season-1") {
-      gemeldet.push(`${teamId}: Achse „${terms.key}" mit Ausgangslage ${terms.baseline} (Saison ${seasonId}) — nicht rekonstruierbar, bleibt stehen`);
-      return komponente;
+    if (!terms || terms.baseline === 0) continue;
+    if (istVerschobeneAusbauAchse(komponente) && naechsterStand !== gameState) {
+      const nachher = evaluateSponsorV4Axis(naechsterStand, teamId, { ...terms, baseline: 0 });
+      console.log(
+        `  ${teamId}: axisbase ${terms.baseline} → 0 · Achse ${evaluateSponsorV4Axis(gameState, teamId, terms).metric} → ${nachher.metric} von ${nachher.target} ${nachher.unit}`,
+      );
+    } else {
+      console.log(
+        `  (unangetastet) ${teamId}: Achse „${terms.key}" mit Ausgangslage ${terms.baseline} (Saison ${seasonId}) — nicht rekonstruierbar, bleibt stehen`,
+      );
     }
-    const vorher = evaluateSponsorV4Axis(gameState, teamId, terms);
-    const neuerZielwert = String(komponente.targetValue).replace(/axisbase:[^;]*/, "axisbase:0");
-    const nachher = evaluateSponsorV4Axis(gameState, teamId, { ...terms, baseline: 0 });
-    console.log(
-      `  ${teamId}: axisbase ${terms.baseline} → 0 · Achse ${vorher.metric} → ${nachher.metric} von ${nachher.target} ${nachher.unit}`,
-    );
-    geaendert += 1;
-    return { ...komponente, targetValue: neuerZielwert };
-  });
-  naechsteVertraege[teamId] = { ...vertrag, components: naechsteKomponenten };
-}
-
-for (const zeile of [...new Set(gemeldet)]) {
-  console.log(`  (unangetastet) ${zeile}`);
+  }
 }
 
 if (geaendert === 0) {
   console.log("\nNichts zu reparieren.");
   process.exit(0);
 }
-
-const naechsterStand: GameState = {
-  ...gameState,
-  seasonState: { ...gameState.seasonState, sponsorContractsByTeamId: naechsteVertraege },
-};
 
 console.log(`\n${geaendert} Vertragskomponente(n) betroffen. Wirkung auf die Sponsor-Abrechnung:`);
 for (const team of gameState.teams) {
