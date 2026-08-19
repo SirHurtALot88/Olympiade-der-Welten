@@ -596,9 +596,19 @@ Vertrag und Saison. Den Korridor über die Sprung-Schwelle zurückzuholen ginge 
 Marktwerte werden erst am Saisonende neu gesetzt, im laufenden Spielstand stehen gar keine Sprünge
 (341 Vorschauzeilen, alle Delta 0).
 
-**Chris' zweitem Punkt widerspreche ich:** „6 MW" misst eine andere Skala als die 2–3 Mio, an die er
-denkt. `player.marketValue` liegt am Abbild bei Median 24,98 und Maximum 113,45; die Kalibrierung
-fand bei Schwelle 6 im Median 10 Spieler je Team, die sie überspringen. Die Schwelle bleibt stehen.
+**Zu Chris' zweitem Punkt habe ich mich zuerst geirrt — er hatte recht.** Meine erste Antwort war,
+die Schwelle 6 sei „nachweislich erreichbar", weil im Median 10 Spieler je Team sie überspringen.
+Das war ein Trugschluss. `talentJumpCount` rechnet `after.marketValuePreview − before.marketValue`,
+und `before.marketValue` ist **immer 0** — unabhängig nachgemessen an 1017 Entwicklungs-Ereignissen
+aus drei Spielständen: 0 von 1017 tragen dort einen Wert über 0. Die Differenz ist damit der
+**absolute Marktwert**, kein Zuwachs; der „Median-Zuwachs 21,9" ist punktgenau der Median-Marktwert.
+Die Achse zählt also „Spieler mit Marktwert über 6", und das sind 980 von 1017.
+
+Chris' Einwand trifft damit genau: ein paar Statpoints ergeben keine 6 Marktwert — sie müssen es
+auch gar nicht, weil hier nie ein Zuwachs gemessen wurde. Die tiefere Analyse steht in PR #566
+(anderer Lauf, unabhängig gefunden); die Entscheidung, **was** die Achse messen soll, liegt bei
+Chris. Die Kadergrenze bleibt davon unberührt: 20 Spieler kann kein Kader stellen, egal was gezählt
+wird.
 
 ### #7 — die Farbe war nie ein Schloss
 

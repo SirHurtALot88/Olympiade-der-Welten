@@ -343,19 +343,31 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
      * Meister". Eine feste 14 haette ein Team mit 8 Spielern bei 57 % gedeckelt; die eigene
      * Kadergroesse deckelt niemanden.
      *
-     * WAS DAS KOSTET, ehrlich beziffert: mit Median-Rohmetrik 10 und Median-Kader 10 steigt die
-     * Ø Erfuellung von 50,6 % auf rund 100 % — die Achse zahlt also etwa doppelt so oft voll.
-     * Bei Chris' Vertragsgroesse sind das rund 6 C je Vertrag und Saison. Die Alternative waere,
-     * den Korridor mit der Sprung-Schwelle (`AXIS_TALENT_JUMP_MV`) zurueckzuholen; dafuer fehlen
-     * die Daten, weil Marktwerte erst am Saisonende neu gesetzt werden und im laufenden Spielstand
-     * gar keine Spruenge stehen (nachgemessen: 341 Vorschauzeilen, alle Delta 0). Eine Schwelle
-     * zu raten waere genau die Ratenkalibrierung, die der Dateikopf verbietet. Der Korridor ist
-     * hier bewusst nachrangig: er war mit einem unerfuellbaren Versprechen erkauft.
+     * WAS DAS AN DER AUSZAHLUNG AENDERT, laesst sich derzeit NICHT ehrlich beziffern — und der
+     * Grund ist wichtiger als die Zahl: die Messgroesse der Achse ist kaputt. Siehe unten.
      *
-     * ZU CHRIS' ZWEITEM PUNKT („6 MW schaffen wir nicht wenn 2-3 Mio maximum für top playre ist"):
-     * das misst eine andere Skala. `player.marketValue` liegt am Live-Abbild bei Median 24,98 und
-     * Maximum 113,45; die Kalibrierung fand bei Schwelle 6 im Median 10 Spieler je Team, die sie
-     * ueberspringen. Die Schwelle bleibt deshalb stehen — sie ist nachweislich erreichbar.
+     * ZU CHRIS' ZWEITEM PUNKT („6 MW schaffen wir nicht wenn 2-3 Mio maximum für top playre ist")
+     * — HIER LAG ICH ZUERST FALSCH, UND CHRIS RICHTIG. Meine erste Antwort war, die Schwelle 6 sei
+     * „nachweislich erreichbar", weil im Median 10 Spieler je Team sie ueberspringen. Das war ein
+     * Trugschluss: `talentJumpCount` rechnet `after.marketValuePreview − before.marketValue`, und
+     * `before.marketValue` ist IMMER 0 (nachgemessen an 1017 Entwicklungs-Ereignissen aus drei
+     * Spielstaenden: 0 von 1017 mit einem Wert > 0). Die Differenz ist damit der ABSOLUTE
+     * Marktwert, kein Zuwachs — der „Median-Zuwachs 21,9" ist punktgenau der Median-Marktwert.
+     * Die Achse zaehlt also „Spieler mit Marktwert ueber 6", und das sind 980 von 1017.
+     *
+     * Chris' Einwand trifft damit genau: ein paar Statpoints ergeben keine 6 Marktwert — sie
+     * muessen es auch gar nicht, weil hier nie ein Zuwachs gemessen wurde.
+     *
+     * WAS DAS FUER DIESE AENDERUNG HEISST: die Kadergrenze ist ein EIGENER, davon unabhaengiger
+     * Fehler — 20 Spieler kann kein Kader stellen, egal was gezaehlt wird. Der bleibt behoben, weil
+     * die Karte sonst weiter etwas Unmoegliches verspricht. Eine KALIBRIERUNG der Schwelle waere
+     * dagegen jetzt falsch: sie wuerde eine bedeutungslose Zahl nur anders skalieren und dabei
+     * richtig aussehen. Genau in diese Falle ist schon die Nachkalibrierung vom 03.08. getappt.
+     *
+     * OFFEN UND CHRIS' ENTSCHEIDUNG (Analyse in PR #566): soll die Achse den ATTRIBUT-Zuwachs
+     * messen (saubere Daten liegen vor), den echten Marktwert-Zuwachs (dann muss zuerst
+     * `before.marketValue` repariert werden — Vorsicht, am Saisonende wechselt die
+     * Bewertungsmethode, siehe Kommentar bei `wachstum`), oder vorerst gar nicht angeboten werden.
      */
     scale: DEFAULT_ROSTER_MAX,
     scaleFor: (gameState, teamId) => {
