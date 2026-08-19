@@ -13,6 +13,15 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "568",
+      "text": "Die Einsatz-Zahl in der Spielerliste zählt wieder nur die laufende Saison. Eine Leistung, deren Spieltagsergebnis fehlt, wurde stillschweigend der aktuellen Saison zugeschlagen — am Saisonwechsel, wo die Ergebnisse der alten Saison geräumt werden und die Leistungen kurz weiterleben, standen Spieler damit am ersten Spieltag schon mit zehn Einsätzen da.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "560",
       "text": "Der Schritt „Training prüfen\" sagt jetzt, an welchen Spielern er noch hängt — mit Anzahl und Namen. Vorher stand dort nur „offen\", und ein einziger Spieler ohne Trainingsmodus hielt den ganzen Flow auf, ohne dass irgendwo stand welcher. Zusätzlich bekommen Spieler, die über Draft, KI-Picks oder den Saisonwechsel in einen Kader kommen, jetzt denselben Trainings-Vorgabewert wie gekaufte.",
       "quelle": "triage",
