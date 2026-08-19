@@ -63,6 +63,13 @@ export type RunRoomAiAutoStepRequest = {
 export type AdvanceRoomFlowRequest = {
   roomCode: string;
   seatToken: string;
+  /**
+   * Der benannte Notausgang: getrennte, nicht bereite Mitspieler ausdruecklich uebergehen.
+   *
+   * Der Server prueft das nach (nicht der Client): er laesst es nur durch, wenn WIRKLICH jeder
+   * Blockierende offline und nicht bereit ist. Ein anwesender Mitspieler bleibt unuebergehbar.
+   */
+  getrennteUeberspringen?: boolean | null;
 };
 
 export type StartRoomArenaRequest = {
@@ -87,6 +94,13 @@ export type AdvanceRoomArenaStepRequest = {
   maxSlotRevealIndex?: number | null;
   maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   force?: boolean | null;
+  /**
+   * Der benannte Notausgang: getrennte, nicht bereite Mitspieler ausdruecklich uebergehen.
+   *
+   * Der Server prueft das nach (nicht der Client): er laesst es nur durch, wenn WIRKLICH jeder
+   * Blockierende offline und nicht bereit ist. Ein anwesender Mitspieler bleibt unuebergehbar.
+   */
+  getrennteUeberspringen?: boolean | null;
 };
 
 // Stufe 3.6 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): letzte Meile fuer die drei Host-Aktionen, die

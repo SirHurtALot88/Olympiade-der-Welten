@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-19",
+      "seite": "Multiplayer",
+      "pr": null,
+      "text": "Ein Mitspieler, der die Verbindung verliert, fällt nicht mehr aus der Bereit-Pflicht. Bisher schrumpfte der Kreis der Bereit-pflichtigen in dem Moment, in dem jemand rausflog — der Host konnte ab da allein durch jeden Schritt und durch die Arena klicken, und der Gast fand sich nach dem Wiederverbinden mehrere Stationen weiter, ohne je gefragt worden zu sein. Jetzt hält sein offener Bereit-Status das Tor. Wer bereit war und DANN rausfliegt, hält niemanden auf — die Bereitmeldung überlebt den Abriss. Damit ein Abend daran nicht hängen bleibt, gibt es einen eigenen Knopf, der den Namen nennt: „Franky ist offline und nicht bereit — trotzdem fortfahren\". Er erscheint nur, wenn ausschließlich Getrennte blockieren, und der Server prüft es noch einmal nach: einen anwesenden Mitspieler übergeht der Host damit nicht.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-18",
       "seite": "Einsatzliste",
       "pr": null,

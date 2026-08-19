@@ -155,6 +155,15 @@ export type RoomFlowState = {
   completedParticipantIds: string[];
   blockingTeamIds: string[];
   aiAutoCompletedTeamIds: string[];
+  /**
+   * Bereit-pflichtige Teilnehmer, die weder bereit noch verbunden sind.
+   *
+   * Sie halten `canHostAdvance` auf (Entscheidung von Chris: ein Getrennter faellt nicht aus der
+   * Pflicht) — und sie sind die EINZIGEN, die der Host mit dem Notausgang uebergehen darf. Als
+   * eigenes Feld und nicht als abgeleitete Rechnung im Client, damit Knopf und Server-Pruefung
+   * dieselbe Liste lesen.
+   */
+  offlineBlockingParticipantIds: string[];
   canHostAdvance: boolean;
   /**
    * Steht in dieser Saison noch ein Spieltag aus? Wird beim Weiterschalten aus dem gebundenen

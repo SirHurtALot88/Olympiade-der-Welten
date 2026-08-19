@@ -178,13 +178,24 @@ export type NativeArenaRoomSync = {
     isSelfReady: boolean; // eigener Ready-Status
     waitingNames: string[]; // Namen der noch nicht bereiten Teilnehmer
     onToggleReady: () => void; // eigenen Ready-Status umschalten
+    /**
+     * DER BENANNTE NOTAUSGANG (Entscheidung von Chris, 18.08.).
+     *
+     * Ein getrennter Mitspieler haelt das Bereit-Tor jetzt auf — sonst zoege der Host an jemandem
+     * vorbei, der rausgeflogen ist, ohne je bereit gewesen zu sein. Damit die Enthuellung dabei
+     * nicht haengen bleiben kann, darf der Host GENAU DIESE Leute ausdruecklich uebergehen. Nur
+     * gesetzt, wenn ausschliesslich Getrennte blockieren; der Server prueft es noch einmal nach.
+     */
+    canSkipDisconnected?: boolean;
+    disconnectedBlockerNames?: string[];
+    onSkipDisconnected?: () => void;
   };
   /**
    * Audit-Punkt 5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Namen der Mitspieler, die gerade
    * GETRENNT sind ("Franky ist getrennt"). Bewusst getrennt von `coopGate.waitingNames` — ein
-   * Getrennter blockiert das Bereit-Tor nicht mehr (siehe `getRoomArenaRequiredParticipantIds`,
-   * `arena-sync-state.ts`), soll aber trotzdem sichtbar bleiben, sonst wirkt der Wechsel zurück in
-   * Solo-artiges Verhalten unerklärt. Leer/undefiniert ⇒ kein Hinweis (Solo/alle verbunden).
+   * Getrennter HAELT das Bereit-Tor inzwischen auf (siehe `getRoomArenaRequiredParticipantIds`,
+   * `arena-sync-state.ts`) — umso wichtiger, dass er sichtbar ist: sonst sucht der Host den Grund
+   * fuer den Stillstand bei sich. Leer/undefiniert ⇒ kein Hinweis (Solo/alle verbunden).
    */
   disconnectedNames?: string[];
   /**
@@ -3668,8 +3679,24 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                   data-testid="arena-coop-disconnected"
                   style={{ flexBasis: "100%", color: "var(--nl-warn)" }}
                 >
-                  ⚠ Getrennt: {roomSync.disconnectedNames.join(", ")} — blockiert das Bereit-Tor nicht.
+                  ⚠ Getrennt: {roomSync.disconnectedNames.join(", ")}
+                  {roomSync.coopGate.canSkipDisconnected ? " — hält das Bereit-Tor auf." : "."}
                 </span>
+              ) : null}
+              {/* Der Notausgang steht bewusst NEBEN dem Hinweis und nicht am ▶-Knopf: den ▶ drueckt
+                  man nebenbei, diesen hier soll man bewusst waehlen. Er nennt die Namen, damit dem
+                  Host klar ist, wen er gerade uebergeht. */}
+              {roomSync.coopGate.canSkipDisconnected && roomSync.coopGate.onSkipDisconnected ? (
+                <button
+                  type="button"
+                  className="nl-arena-coop-skip"
+                  data-testid="arena-coop-skip-disconnected"
+                  onClick={roomSync.coopGate.onSkipDisconnected}
+                  style={{ flexBasis: "100%", fontSize: 12, fontWeight: 700 }}
+                >
+                  {(roomSync.coopGate.disconnectedBlockerNames ?? roomSync.disconnectedNames ?? []).join(", ")} ist
+                  offline und nicht bereit — trotzdem fortfahren
+                </button>
               ) : null}
             </div>
           ) : null}

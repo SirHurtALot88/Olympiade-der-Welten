@@ -29,7 +29,19 @@ export type RoomFlowView =
  * `describeRoomFlowButton` setzt es explizit in jedem Rueckgabe-Zweig, Aufrufer schalten nur
  * noch darauf.
  */
-export type RoomFlowButtonAction = "set_ready" | "run_ai_auto_step" | "start_room" | "advance_flow" | "none";
+export type RoomFlowButtonAction =
+  | "set_ready"
+  | "run_ai_auto_step"
+  | "start_room"
+  | "advance_flow"
+  /**
+   * Der benannte Notausgang: weiterschalten und dabei getrennte, nicht bereite Mitspieler
+   * ausdruecklich uebergehen. EIGENE Aktion und nicht ein Zusatzhaken an `advance_flow`, damit
+   * niemand sie versehentlich ausloest — und damit die Leiste sie als eigenen Knopf zeigen kann,
+   * der die Namen nennt. Der Server prueft nach, dass wirklich nur Getrennte uebergangen werden.
+   */
+  | "advance_flow_skipping_disconnected"
+  | "none";
 
 /**
  * `RoomFlowView` (Room-Flow-Domäne) und `FoundationViewId` (Shell-Routing) sind zwei
@@ -198,14 +210,48 @@ export function isSandboxRoomSave(saveId: string) {
   return /sandbox|test|local/i.test(saveId);
 }
 
+/**
+ * WER GETRENNT IST, FAELLT NICHT AUS DER PFLICHT — Entscheidung von Chris (18.08.), fuer den
+ * ganzen Ablauf, nicht nur die Arena: "host kann nur weiter klicken ... wenn frankys teams auch
+ * alle ready sind".
+ *
+ * Hier stand vorher `connectionStatus !== "offline"` im ersten Filter. Damit schrumpfte der Kreis
+ * der Bereit-pflichtigen in dem Moment auf einen, in dem der Mitspieler rausflog — der Host konnte
+ * ab da allein durch jeden Schritt schalten, und der Gast fand sich nach dem Rejoin mehrere
+ * Stationen weiter wieder, ohne je gefragt worden zu sein. Nachgemessen vom Koop-Audit (D2).
+ *
+ * WER BEREIT WAR, BLEIBT BEREIT: `markDisconnected` fasst `readyState` nicht an. Ein Mitspieler,
+ * der seine Teams abgegeben hat und dann die Verbindung verliert, haelt niemanden auf. Nur "nicht
+ * bereit UND offline" blockiert — und dafuer gibt es den benannten Notausgang in
+ * `advanceRoomFlow`, der serverseitig prueft, dass wirklich niemand Anwesendes uebergangen wird.
+ */
 function getRequiredParticipants(participants: RoomParticipant[], ownership: TeamOwnershipRecord[]) {
   const participantIdsWithTeams = new Set(
     ownership.filter((entry) => entry.controllerType === "human" && entry.participantId).map((entry) => entry.participantId!),
   );
   return participants
-    .filter((participant) => participant.role !== "spectator" && participant.connectionStatus !== "offline")
+    .filter((participant) => participant.role !== "spectator")
     .filter((participant) => participantIdsWithTeams.has(participant.participantId))
     .map((participant) => participant.participantId);
+}
+
+/**
+ * Bereit-pflichtig, nicht bereit, und nicht mehr da.
+ *
+ * Dieselbe Rolle wie `getRoomArenaOfflineBlockerIds` fuer die Arena: genau diese Menge darf der
+ * Notausgang uebergehen, und die Oberflaeche nennt ihre Namen. Eine Quelle fuer beides, damit der
+ * Knopf nie mehr verspricht, als der Server durchlaesst.
+ */
+export function getRoomFlowOfflineBlockerIds(
+  participants: RoomParticipant[],
+  requiredParticipantIds: string[],
+  completedParticipantIds: string[],
+): string[] {
+  const fertig = new Set(completedParticipantIds);
+  const offline = new Set(
+    participants.filter((participant) => participant.connectionStatus === "offline").map((p) => p.participantId),
+  );
+  return requiredParticipantIds.filter((participantId) => !fertig.has(participantId) && offline.has(participantId));
 }
 
 export function buildRoomFlowState(input: {
@@ -237,6 +283,11 @@ export function buildRoomFlowState(input: {
       : uniq(input.aiAutoCompletedTeamIds ?? []).filter((teamId) => aiTeamIds.includes(teamId));
   const aiPendingTeamIds = aiTeamIds.filter((teamId) => !aiAutoCompletedTeamIds.includes(teamId));
   const humanReady = requiredParticipantIds.length > 0 && requiredParticipantIds.every((participantId) => completedParticipantIds.includes(participantId));
+  const offlineBlockingParticipantIds = getRoomFlowOfflineBlockerIds(
+    input.state.roomParticipants,
+    requiredParticipantIds,
+    completedParticipantIds,
+  );
   const aiReady = !stepDefinition.aiAutoStep || aiPendingTeamIds.length === 0;
 
   return {
@@ -250,10 +301,15 @@ export function buildRoomFlowState(input: {
     completedParticipantIds,
     blockingTeamIds,
     aiAutoCompletedTeamIds,
+    offlineBlockingParticipantIds,
     canHostAdvance: humanReady && aiReady,
     seasonContinues: input.seasonContinues ?? null,
     warnings: [
       ...(!humanReady ? ["waiting_for_human_ready"] : []),
+      // Eigener Code neben `waiting_for_human_ready`: nur DIESE Lage laesst sich vom Host aufloesen
+      // (Notausgang). "Warten auf jemanden, der da ist" und "warten auf jemanden, der weg ist"
+      // sehen sonst gleich aus und brauchen doch verschiedene Knoepfe.
+      ...(offlineBlockingParticipantIds.length > 0 ? ["waiting_for_offline_human"] : []),
       ...(stepDefinition.aiAutoStep && aiPendingTeamIds.length > 0 ? ["ai_auto_step_pending"] : []),
       ...(isSandboxRoomSave(input.state.multiplayerRoom.saveId) ? ["sandbox_override_available"] : []),
     ],
