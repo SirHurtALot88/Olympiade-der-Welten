@@ -22,6 +22,15 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "566",
+      "text": "Das Saisonziel „Entwicklung\" misst jetzt, was es verspricht. Es rechnete mit dem Marktwert gegen einen Ausgangswert, der immer 0 war — gezählt wurden dadurch „Spieler mit Marktwert über 6\", also praktisch der ganze Kader. Neu: Spieler, die über die Saison mindestens 2 Attributpunkte zulegen, Rückschritte abgezogen. Das Ziel sinkt von 20 auf 8 Spieler und liegt damit erstmals unter der Kadergrenze von 14. Dasselbe galt für das Sponsor-Sonderziel „Goldene Talentschmiede\"; beide benutzen jetzt dieselbe Zählung.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "560",
       "text": "Der Schritt „Training prüfen\" sagt jetzt, an welchen Spielern er noch hängt — mit Anzahl und Namen. Vorher stand dort nur „offen\", und ein einziger Spieler ohne Trainingsmodus hielt den ganzen Flow auf, ohne dass irgendwo stand welcher. Zusätzlich bekommen Spieler, die über Draft, KI-Picks oder den Saisonwechsel in einen Kader kommen, jetzt denselben Trainings-Vorgabewert wie gekaufte.",
       "quelle": "triage",

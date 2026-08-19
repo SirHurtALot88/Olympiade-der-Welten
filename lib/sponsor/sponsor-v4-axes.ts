@@ -35,6 +35,10 @@
  * bleiben im V3-Modell (`sponsorV3Settle`), damit es weiterhin genau EINE Rechenstelle gibt.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  ENTWICKLUNG_ATTRIBUT_PUNKTE,
+  zaehleEntwickelteSpieler,
+} from "@/lib/progression/spieler-entwicklung-zaehler";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -128,30 +132,9 @@ function netFinancialPosition(gameState: GameState, teamId: string): number {
   return cash - debt;
 }
 
-/**
- * Marktwert-Sprung, ab dem ein Spieler als entwickelt zaehlt — dieselbe Schwelle wie golden_talent_forge.
- *
- * ACHTUNG, OFFENER BEFUND (Meldung `u3wlh4`): DIESE SCHWELLE MISST DERZEIT NICHTS.
- *
- * `talentJumpCount` unten rechnet `after.marketValuePreview − before.marketValue`. An 339
- * Entwicklungs-Ereignissen aus drei Live-Spielstaenden nachgemessen ist `before.marketValue` in
- * ALLEN 339 Faellen 0 — die Differenz ist damit der ABSOLUTE Marktwert, kein Zuwachs. Die Achse
- * zaehlt „Spieler mit Marktwert ueber 6", also praktisch jeden (326 von 339).
- *
- * Zum Vergleich, selber Spielstand: die Summe ALLER Attribut-Aenderungen einer Saison liegt im
- * Median bei 0,5 Punkten (p90 4,2, max 10,5), waehrend die Achse einen „Zuwachs" von median 21,6
- * sieht — auf Hoehe der Marktwerte (median 24,9), nicht der Entwicklung.
- *
- * ZWEITER, ECHTER FEHLER an derselben Achse: das Ziel (`scale: 20`) liegt ueber der Kadergrenze
- * `DEFAULT_ROSTER_MAX` = 14. Volle Erfuellung ist selbst dann unmoeglich, wenn jeder Spieler
- * springt.
- *
- * NICHT NACHKALIBRIERT, UND ZWAR ABSICHTLICH: Schwelle und Ziel neu zu setzen wuerde die kaputte
- * Messgroesse nur anders skalieren. Zuerst muss `before.marketValue` einen echten Ausgangswert
- * tragen (Spur: `economyAudit.calculatedMarketValue`, `season-end-xp-apply-service.ts:469`).
- * Festgehalten in `tests/entwicklungs-achse-misst-keine-entwicklung.test.ts`.
- */
-const AXIS_TALENT_JUMP_MV = 6;
+// Schwelle und Zaehlung liegen in `lib/progression/spieler-entwicklung-zaehler.ts` — dieselbe
+// Stelle benutzt das Sonderziel `golden_talent_forge`. Der Befund, warum die alte
+// Marktwert-Rechnung ersetzt wurde, steht im Kopf jener Datei.
 /** Match-Fatigue, bis zu der ein Spieler als frisch zaehlt — dieselbe Grenze wie fatigue_management. */
 const AXIS_FRESH_FATIGUE_CAP = 45;
 
@@ -173,28 +156,15 @@ function isRosterFillPending(gameState: GameState): boolean {
   return (flow.steps ?? []).some((step) => step.stepId === "fill_roster" && step.status === "open");
 }
 
+/**
+ * Zahl der Spieler mit echtem Attribut-Zuwachs — siehe `spieler-entwicklung-zaehler.ts`.
+ *
+ * Hier stand bis zum 19.08.2026 eine eigene Marktwert-Rechnung. Sie mass den absoluten Marktwert
+ * statt eines Zuwachses, weil `progressionSnapshotBefore.marketValue` in ALLEN gemessenen 1017
+ * Ereignissen 0 war (Meldung `u3wlh4`).
+ */
 function talentJumpCount(gameState: GameState, teamId: string): number {
-  const rosterIds = new Set(
-    gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
-  );
-  const jumped = new Set<string>();
-  for (const event of gameState.playerProgressionEvents ?? []) {
-    if (event.seasonId !== gameState.season.id) continue;
-    if (event.teamId !== teamId && !rosterIds.has(event.playerId)) continue;
-    const before = event.progressionSnapshotBefore;
-    const after = event.progressionSnapshotAfter;
-    const mvBefore = typeof before?.marketValue === "number" ? before.marketValue : null;
-    const mvAfter =
-      typeof after?.marketValuePreview === "number"
-        ? after.marketValuePreview
-        : typeof after?.marketValue === "number"
-          ? after.marketValue
-          : null;
-    if (mvBefore != null && mvAfter != null && mvAfter - mvBefore >= AXIS_TALENT_JUMP_MV) {
-      jumped.add(event.playerId);
-    }
-  }
-  return jumped.size;
+  return zaehleEntwickelteSpieler(gameState, teamId);
 }
 
 function freshSharePct(gameState: GameState, teamId: string): number {
@@ -325,17 +295,37 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
     // Abrechnungstext, dort liest sich "20 Spieler" ebenso richtig.
     unit: "Spieler",
     erklaerung:
-      "{ziel} sollen über die Saison mindestens " + String(AXIS_TALENT_JUMP_MV) + " Marktwert dazugewinnen. " +
-      "Gezählt werden Spieler, nicht Punkte: wer zweimal zulegt, zählt einmal. Gemeint ist Marktwert, " +
-      "nicht SP — und der Endstand nach Regression, nicht der Bruttozuwachs.",
-    // Ziel nachkalibriert 3 → 20 Spruenge (2026-08-03): bei 3 lagen alle 8 gemessenen Vertraege bei
-    // voller Erfuellung (Ø 100 %, Rohmetrik-Spanne 7–13 Spruenge, Median 10). Bei 20 liegt keiner der
-    // acht Werte mehr am Deckel, Ø Erfuellung 50,6 % — mittig im Zielkorridor 35–65 %. Siehe
-    // docs/analyse/sponsor-achsen-messung.md, Abschnitt „Nachkalibrierung".
-    // Siehe die Warnung bei `AXIS_TALENT_JUMP_MV`: 20 liegt ueber der Kadergrenze
-    // `DEFAULT_ROSTER_MAX` = 14 und ist damit nicht voll erfuellbar. Bewusst NICHT einzeln
-    // korrigiert — solange die Messgroesse selbst falsch ist, waere jede neue Zahl geraten.
-    scale: 20,
+      "{ziel} sollen über die Saison mindestens " + String(ENTWICKLUNG_ATTRIBUT_PUNKTE) +
+      " Attributpunkte dazugewinnen — über alle Werte zusammen, Rückschritte abgezogen. " +
+      "Gezählt werden Spieler, nicht Punkte: wer in zwei Werten zulegt, zählt einmal.",
+    /**
+     * ZIEL 20 → 8, zusammen mit dem Wechsel der Messgröße auf Attributpunkte (Meldung `u3wlh4`,
+     * Chris' Entscheidung nach dem Befund).
+     *
+     * ZWEI FEHLER LAGEN HIER ÜBEREINANDER:
+     *
+     *  1. Gemessen wurde der MARKTWERT, und zwar gegen einen Ausgangswert, der in allen 1017
+     *     geprüften Ereignissen 0 war — die Achse zählte „Spieler mit Marktwert über 6", also
+     *     praktisch den ganzen Kader. Behoben durch `zaehleEntwickelteSpieler`.
+     *  2. Das Ziel 20 lag ÜBER der Kadergrenze `DEFAULT_ROSTER_MAX` = 14. Volle Erfüllung war
+     *     selbst dann unmöglich, wenn jeder Spieler springt — Chris' „20 spieler kann man gar
+     *     nicht haben" traf zu.
+     *
+     * NEU GEMESSEN über einen Sweep aus Schwelle × Ziel (1017 Spieler, drei Live-Spielstände,
+     * Teams ohne Treffer als 0 mitgezählt):
+     *
+     *   Schwelle (Attributpunkte)  0,5    1    1,5    2    2,5     3     4     5
+     *   Median Spieler je Team       6    6      5    4      3     2     1     1
+     *   Maximum                     12   12     12   11     10     9     6     3
+     *   Ziel (2× Median, ≤ 14)      12   12     10    8      6     4     2     2
+     *   Ø Erfüllung                56%  49%    49%  49%    49%   54%   54%   33%
+     *
+     * Gewählt: Schwelle 2, Ziel 8 — Ø Erfüllung 49 %, mittig im Korridor 35–65 %, Ziel deutlich
+     * unter der Kadergrenze UND vom höchsten gemessenen Wert (11) tatsächlich übertroffen. Die
+     * Schwelle liegt zwischen Median (1,3) und p75 (2,8) der Zuwachsverteilung: darunter wäre sie
+     * wieder wirkungslos, darüber träfe sie nur Ausreißer.
+     */
+    scale: 8,
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,

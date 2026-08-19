@@ -64,15 +64,26 @@ describe("Sponsor-Ziele erklären sich selbst", () => {
   });
 
   it("die Entwicklungs-Achse beantwortet genau Chris' drei Fragen", () => {
+    /**
+     * DIE FRAGEN BLEIBEN, DIE ANTWORTEN HABEN SICH GEAENDERT (Meldung `u3wlh4`, Chris' Weg 1).
+     *
+     * Der Fall verlangte bis zum 19.08.2026 „Marktwert", „nicht SP" und „nach Regression" — die
+     * Antworten der alten, marktwertbasierten Achse. Die misst jetzt ATTRIBUTPUNKTE, weil die
+     * Marktwert-Rechnung nachweislich den absoluten Wert statt eines Zuwachses zaehlte
+     * (`before.marketValue` war in allen 1017 gemessenen Ereignissen 0). „nicht SP" waere heute
+     * sogar falsch: gezaehlt werden genau die Attributpunkte, die Chris „statpoints" nennt.
+     *
+     * Umgeschrieben statt geloescht — die Karte muss die drei Fragen weiterhin beantworten.
+     */
     const text = renderDetail("entwicklung");
-    // Was wird gezählt?
+    // Was wird gezählt — Spieler oder Punkte?
     expect(text).toContain("Spieler");
-    expect(text).toContain("Marktwert");
-    // Sind es SP?
-    expect(text).toMatch(/nicht SP|nicht um SP/);
+    expect(text).toMatch(/Gezählt werden Spieler, nicht Punkte/);
+    // Welche Größe?
+    expect(text).toContain("Attributpunkte");
     // Brutto oder netto?
-    expect(text).toContain("nach Regression");
-    // Und die Einheit selbst nennt nicht mehr das unklare Wort.
+    expect(text).toMatch(/Rückschritte abgezogen/);
+    // Und die Einheit selbst nennt nicht das unklare Wort „Sprünge".
     expect(sponsorV4AxisDefinition("entwicklung").unit).toBe("Spieler");
   });
 
