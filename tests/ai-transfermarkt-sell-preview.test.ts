@@ -616,7 +616,14 @@ describe("ai transfermarkt sell preview", () => {
     expect(candidate?.sellPriorityScore).toBeTypeOf("number");
   });
 
-  it("keeps roster-min advisory warning in default UI preview", async () => {
+  /**
+   * DIESE BEIDEN FAELLE HIELTEN BIS ZUM 19.08.2026 DAS GEGENTEIL FEST — der eine erwartete den
+   * Status `low_roster_depth`, der andere die Warnung „unter das Team-Minimum". Beides ist auf
+   * Chris' Ansage entfernt (Meldung `33c172`): „diesen grund darf es nicht geben der muss sauber
+   * entfernt werden weil beim verkauf gibt es ja kein spieler minimum - das hatten wir jetzt schon
+   * so oft!" Umgeschrieben statt geloescht: die Stelle bleibt gemessen, nur die Erwartung dreht.
+   */
+  it("kennt das Kader-Minimum NICHT mehr als Verkaufsgrund — auch nicht in der UI-Vorschau", async () => {
     const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
     const result = await buildAiTransfermarktSellPreview({
       saveId: "save-local",
@@ -625,14 +632,18 @@ describe("ai transfermarkt sell preview", () => {
       teamId: "A-I",
     });
 
-    expect(result.teams[0]?.status).toBe("low_roster_depth");
-    const warned = result.teams[0]?.sellCandidates.some((candidate) =>
-      candidate.warnings.some((warning) => warning.includes("unter das Team-Minimum")),
-    );
-    expect(warned).toBe(true);
+    // Der Fixture-Kader liegt UNTER dem Minimum — genau der Fall, der vorher gebremst hat.
+    expect((result.teams[0]?.rosterSize ?? 0) <= (result.teams[0]?.playerMin ?? 0)).toBe(true);
+    expect(result.teams[0]?.status).not.toBe("low_roster_depth");
+    const alleWarnungen = result.teams[0]?.sellCandidates.flatMap((candidate) => candidate.warnings) ?? [];
+    expect(alleWarnungen.some((warning) => warning.includes("unter das Team-Minimum"))).toBe(false);
+    expect(alleWarnungen.some((warning) => warning.includes("bereits sehr klein"))).toBe(false);
+    expect((result.teams[0]?.sellCandidates.length ?? 0) > 0).toBe(true);
   });
 
-  it("allows AI sell preview below roster min when explicitly enabled", async () => {
+  it("und auch dann nicht, wenn der Aufrufer das Unterschreiten ausdruecklich erlaubt", async () => {
+    // Die Flagge `allowSellBelowRosterMin` gibt es weiterhin, sie steuert aber nichts mehr an der
+    // Kadergroesse — dieser Fall darf sich vom Fall darueber nicht unterscheiden.
     const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
     const result = await buildAiTransfermarktSellPreview({
       saveId: "save-local",

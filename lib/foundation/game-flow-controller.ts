@@ -17,7 +17,7 @@ import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
-import { isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
+import { findPlayersWithoutTrainingMode, isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
 import { isLegacySeasonCompletedFlagSet } from "@/lib/season/season-completion-state";
 
@@ -610,7 +610,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       : !lineupConfirmed
         ? ["lineup_not_submitted"]
         : ["missing_lineup"];
-  const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
+  // EINE Ableitung fuer beides: der Ja/Nein-Status UND die Namen der Fehlenden. Zwei Aufrufe
+  // waeren zwei Wahrheiten ueber denselben Kader.
+  const trainingGap = findPlayersWithoutTrainingMode(gameState, activeTeamId);
+  const trainingComplete = trainingGap.status === "complete";
   // Am letzten Spieltag beendet "advance" die Saison (gamePhase → season_completed),
   // führt also nicht zu einem nächsten Spieltag — Label/CTA müssen das signalisieren.
   const totalMatchdays = gameState.season.matchdayIds?.length ?? 0;
@@ -723,7 +726,19 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       targetView: "trainingCompact",
       teamId: activeTeamId,
       blockers: !hasActiveTeam ? ["no_active_team"] : activeRosterCount === 0 ? ["empty_roster"] : [],
-      warnings: boardFlowWarnings,
+      // SAGT, AN WEM ES HAENGT (Meldung `j53iox`: „hängt bei Training prüfen fest - weiß nicht
+      // warum"). Ein blankes „offen" ist bei einem einzigen Spieler ohne Trainingsmodus nicht
+      // aufloesbar — man sieht dreissig gesetzte Zeilen und keinen Hinweis auf die eine fehlende.
+      warnings: [
+        ...boardFlowWarnings,
+        ...(trainingGap.status === "incomplete"
+          ? [
+              `training_mode_missing:${trainingGap.missingCount}:${trainingGap.missingPlayerNames.join(", ")}${
+                trainingGap.missingCount > trainingGap.missingPlayerNames.length ? " …" : ""
+              }`,
+            ]
+          : []),
+      ],
     }),
     step({
       stepId: "finalize_transfers",

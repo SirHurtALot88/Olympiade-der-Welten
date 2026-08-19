@@ -53,20 +53,19 @@ export function mapAutoRunStatusToCockpitStatus(
 }
 
 export function getAiTransferStatusLabel(
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked",
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked",
 ) {
   if (status === "ready") return "bereit";
   if (status === "no_sell_need") return "halten";
-  if (status === "low_roster_depth") return "kader zu klein";
   if (status === "no_candidates") return "keine kandidaten";
   if (status === "warning") return "achtung";
   return "blockiert";
 }
 
 export function getAiTransferStatusPillClass(
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked",
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked",
 ) {
-  return `transfer-status-pill${status === "ready" ? " is-ready" : status === "warning" || status === "no_sell_need" || status === "low_roster_depth" || status === "no_candidates" ? " is-warning" : " is-blocked"}`;
+  return `transfer-status-pill${status === "ready" ? " is-ready" : status === "warning" || status === "no_sell_need" || status === "no_candidates" ? " is-warning" : " is-blocked"}`;
 }
 
 export function getAiTransferBudgetLabel(status: "healthy" | "tight" | "critical" | "unknown") {
