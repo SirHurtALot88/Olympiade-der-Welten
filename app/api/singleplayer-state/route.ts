@@ -41,6 +41,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite, type ServerRoomWriteAuthorization } from "@/lib/room/server-authoritative-write-guard";
 import { applyNewGameFlowStepUpdate } from "@/lib/game/new-game-flow-scope";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { heileSponsorAchsenAusgangslage } from "@/lib/sponsor/sponsor-achsen-ausgangslage-heilung";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { resolveAuthoritativeWriteOwnerId, resolveSessionOwnerId } from "@/lib/auth/session";
@@ -207,22 +208,33 @@ function healSponsorOffersForSave(persistence: PersistenceService, save: Persist
     return save.gameState;
   }
 
-  const needsHeal = save.gameState.teams.some((team) => {
+  /**
+   * ZUERST DIE VERSCHOBENE ACHSEN-AUSGANGSLAGE — Begruendung und Grenzen der Heilung stehen in
+   * `sponsor-achsen-ausgangslage-heilung.ts`, hier steht nur die Reihenfolge.
+   *
+   * SIE LAEUFT VOR dem Angebots-Heal und unabhaengig von dessen Bedingung: die greift nur bei
+   * Teams OHNE Vertrag, und der reparierte Wert steckt gerade in einem UNTERSCHRIEBENEN. Beide
+   * schreiben denselben `gameState` fort, deshalb wird einmal gespeichert statt zweimal.
+   */
+  const mitGeheilterAchse = heileSponsorAchsenAusgangslage(save.gameState);
+  const basis = mitGeheilterAchse === save.gameState ? save.gameState : persistence.saveSingleplayerState(save.saveId, mitGeheilterAchse).gameState;
+
+  const needsHeal = basis.teams.some((team) => {
     if (!team.humanControlled) {
       return false;
     }
-    if (getTeamSponsorContract(save.gameState, team.teamId)) {
+    if (getTeamSponsorContract(basis, team.teamId)) {
       return false;
     }
-    return getTeamSponsorOffers(save.gameState, team.teamId).length === 0;
+    return getTeamSponsorOffers(basis, team.teamId).length === 0;
   });
   if (!needsHeal) {
-    return save.gameState;
+    return basis;
   }
 
-  const healedGameState = ensureSeasonSponsorOffers(save.gameState);
-  if (healedGameState === save.gameState) {
-    return save.gameState;
+  const healedGameState = ensureSeasonSponsorOffers(basis);
+  if (healedGameState === basis) {
+    return basis;
   }
 
   const persisted = persistence.saveSingleplayerState(save.saveId, healedGameState);

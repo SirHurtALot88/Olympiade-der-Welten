@@ -113,7 +113,10 @@ describe("Die drei Haken sitzen an den gemeinsamen Schreibpunkten", () => {
     // `applyContractRenewalAction` (Spieler wie KI) und `applySeasonEndContractTick` laufen beide
     // durch `saveGameStateWithContractEvents`.
     expect(VERTRAG).toContain("function saveGameStateWithContractEvents");
-    expect(VERTRAG).toContain("zieheSaisonstandGuvNachImSaisonendfenster({");
+    // Toleriert einen Zeilenumbruch zwischen Aufruf und Objektliteral. Die Schwester-Zusage eine
+    // Pruefung weiter unten ist genau daran zerbrochen, als #560 den dortigen Aufruf umbrach —
+    // dieselbe Sollbruchstelle stand hier noch und haette beim naechsten Umbruch dasselbe getan.
+    expect(VERTRAG).toMatch(/zieheSaisonstandGuvNachImSaisonendfenster\(\s*\{/);
   });
 
   it("Phasenwechsel: beim Betreten, damit auch ohne Buchung nachgezogen wird", () => {

@@ -25,7 +25,11 @@ import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
-import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import {
+  SPONSOR_ANGEBOTE_JE_TEAM,
+  chooseSponsorOfferForAiTeams,
+  ensureSeasonSponsorOffers,
+} from "@/lib/sponsor/sponsor-offer-service";
 import {
   buildSponsorV3Terms,
   getSponsorV3Terms,
@@ -221,14 +225,16 @@ describe("KI-Laufzeitbewertung rechnet mit dem Sockel DIESER Karte", () => {
     // genug auseinander, um das Vorzeichen des Laufzeit-Terms zu drehen.
     expect(sponsorSockelFuerStartrang(15) - sponsorV3EingefrorenerSockel(terms)).toBeGreaterThan(25);
 
-    // `ensureSeasonSponsorOffers` ersetzt jedes Slate, das nicht GENAU FUENF Karten mit V3-Konditionen
-    // hat — deshalb fuenf. Die vier Dreijahresvertraege stehen VORNE: waere der Laufzeit-Term falsch
-    // (oder gar nicht wirksam), gewaenne einer von ihnen schon durch die Sortier-Reihenfolge. Ein
-    // gruener Test heisst also: die Einjahreskarte hat STRIKT besser gepunktet.
+    // `ensureSeasonSponsorOffers` ersetzt jedes Slate, das nicht GENAU `SPONSOR_ANGEBOTE_JE_TEAM`
+    // Karten mit V3-Konditionen hat — die Groesse kommt deshalb aus der Konstante statt aus einer
+    // eingetippten Zahl (hier stand eine 5, waehrend die Konstante laengst 3 war; das fiel nur nicht
+    // auf, weil der Vergleich im Produktionscode dieselbe veraltete 5 benutzte). Die
+    // Dreijahresvertraege stehen VORNE: waere der Laufzeit-Term falsch (oder gar nicht wirksam),
+    // gewaenne einer von ihnen schon durch die Sortier-Reihenfolge. Ein gruener Test heisst also:
+    // die Einjahreskarte hat STRIKT besser gepunktet.
     const slate: SponsorOffer[] = [
-      ...[1, 2, 3, 4].map(
-        (nummer) =>
-          ({ ...rohling, offerId: `probe-3-jahre-${nummer}`, termSeasons: 3, sponsorV3: terms }) as SponsorOffer,
+      ...Array.from({ length: SPONSOR_ANGEBOTE_JE_TEAM - 1 }, (_, index) =>
+        ({ ...rohling, offerId: `probe-3-jahre-${index + 1}`, termSeasons: 3, sponsorV3: terms }) as SponsorOffer,
       ),
       { ...rohling, offerId: "probe-1-jahr", termSeasons: 1, sponsorV3: terms } as SponsorOffer,
     ];
