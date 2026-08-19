@@ -77,6 +77,23 @@ liefert sie also schon sortiert.
 stehen hier vollständig und mit Kontext — inklusive der Ansicht, in der er den Fehler gesehen hat.
 Ausführlicher: `docs/BUGFIXING_AGENT.md`.
 
+## Zuerst prüfen: spiegelt der Server überhaupt noch?
+
+```sh
+npx tsx scripts/pruefe-spiegel-frische.ts
+```
+
+Beide Spiegel (`live-save`, `bug-reports`) hängen an Crons **auf dem Server**. Fallen die aus,
+schlägt nichts fehl — es passiert nur nichts mehr, und zwar lautlos. Am 19.08. stellte sich heraus,
+dass beide seit dem 14.08. standen: fünf Tage lang war das neueste „aktuelle" Abbild fünf Tage alt,
+und keine In-Game-Meldung erreichte GitHub.
+
+**Ein veraltetes Abbild sieht aus wie ein gültiger Spielstand.** Wer darauf misst, misst die
+Vergangenheit und hält sie für die Gegenwart. Der SessionStart-Hook fährt die Prüfung deshalb bei
+jedem Start — auch dann, wenn er den Import überspringt.
+
+Beheben kann das nur Chris auf dem Server; das Skript druckt die nötigen Befehle mit aus.
+
 ## Etwas auf den Server zurückspielen
 
 Nur über `deploy/hetzner/pull-repaired-save.sh` — **nicht** von Hand. Der Grund ist WAL: neben
