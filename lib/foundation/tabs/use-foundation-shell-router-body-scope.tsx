@@ -7248,12 +7248,18 @@ export function useFoundationShellRouterBodyScope({
            * BEFUND F10 (Aufgabe #44): hier wurde die Ablehnung stillschweigend geschluckt — es
            * ging nur das Flow-Panel auf, und das zeigt, DASS etwas offen ist, nicht warum.
            *
-           * Nachgemessen, nicht vermutet: `finalize-transfers` autorisiert mit der Aktion
+           * Nachgemessen, nicht vermutet: `finalize-transfers` autorisierte mit der Aktion
            * `formcards_season_regenerate`, und die steht in `HOST_LEVEL_ACTIONS`
-           * (lib/room/server-authoritative-write-guard.ts). Im Raum heisst das fuer JEDEN ausser
+           * (lib/room/server-authoritative-write-guard.ts). Im Raum hiess das fuer JEDEN ausser
            * dem Host: 403 `host_only_action` — der Knopf tat fuer den Gast also zuverlaessig
-           * nichts und sagte auch nichts. Der Grund wird jetzt benannt (dieselbe Tabelle wie F9);
+           * nichts und sagte auch nichts. Der Grund wird seitdem benannt (dieselbe Tabelle wie F9);
            * das Flow-Panel geht weiterhin auf, damit der Kontext sichtbar bleibt.
+           *
+           * INZWISCHEN IST AUCH DIE SACHE BEHOBEN, nicht nur die Meldung: die Route autorisiert
+           * jetzt mit der team-bezogenen Klasse `formcards` (Begruendung dort). Der Gast kommt
+           * damit durch seinen eigenen `finalize_transfers`-Schritt. Diese Fehlerbehandlung bleibt
+           * trotzdem stehen — sie faengt jede ANDERE Ablehnung ab (kein Besitz am Team, offline,
+           * fehlender Raum), und die gibt es weiterhin.
            */
           const payload = (await response.json().catch(() => ({}))) as { error?: string; errors?: string[] };
           const grund =
