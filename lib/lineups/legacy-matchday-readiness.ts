@@ -4,7 +4,7 @@ import type {
   LegacyLineupEntryInput,
   LegacyLineupLoadedContext,
 } from "@/lib/lineups/legacy-lineup-types";
-import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
+import { countSelectedAvailablePlayers, isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 
 export type LegacyMatchdayReadinessStatus =
@@ -163,7 +163,10 @@ export function buildLegacyMatchdayReadiness(context: LegacyLineupLoadedContext)
   const allowPartialLineup = isPartialLineupComplete({
     activePlayersCount,
     requiredTotalUniquePlayers,
-    selectedPlayerCount,
+    selectedAvailablePlayerCount: countSelectedAvailablePlayers(
+      entries.map((entry) => entry.playerId),
+      context.activePlayers.map((eintrag) => eintrag.playerId),
+    ),
   });
   const validation = validateLegacyLineupContext({
     ...context,

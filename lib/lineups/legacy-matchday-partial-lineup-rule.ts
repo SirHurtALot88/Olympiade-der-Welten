@@ -22,13 +22,56 @@
  * so the readiness/preview path and the result-apply path can never diverge on this rule again
  * (a prior divergence here once caused every team to be written as `invalid_lineup`).
  */
+/**
+ * GEZAEHLT WIRD, WER AUFGESTELLT **UND** NOCH VERFUEGBAR IST.
+ *
+ * Das Feld hiess `selectedPlayerCount` und trug die ROHE Zahl der Namen im Entwurf. Sobald ein
+ * aufgestellter Spieler waehrend des Spieltags ausfiel, war die Regel unerfuellbar:
+ *
+ *   Ein Team mit 9 verfuegbaren Spielern stellt alle 9 auf (gefordert waeren 12) -> vollstaendig.
+ *   In D1 verletzt sich einer. Der abgegebene Entwurf nennt weiterhin 9 Namen, verfuegbar sind
+ *   noch 8. Die Regel verglich 9 mit 8 -> NICHT vollstaendig, und zwar fuer immer.
+ *
+ * Folge: D1 war gebucht, D2 galt dauerhaft als `resolve_status:incomplete_lineups`. Die Arena
+ * kommt aus diesem Zustand nicht heraus — sie ueberschreibt bestehende Aufstellungen bewusst
+ * nicht (sonst wuerde sie andere Aufstellungen buchen als die, gegen die gerade gespielt wurde)
+ * und laesst Warn-Aufstellungen bewusst nicht zu. Der Spieltag haengt in Disziplin 2, ohne
+ * Ausweg auf dem Schirm.
+ *
+ * Die Absicht der Regel war nie die rohe Zahl, sondern: „das Team setzt alle ein, die es hat".
+ * Ein Verletzter ist keiner, den es hat. Verglichen wird deshalb die Schnittmenge aus
+ * Aufgestellten und Verfuegbaren.
+ *
+ * Die Namen der Ausgefallenen bleiben im Entwurf stehen — das ist richtig so: sie belegen, wer
+ * aufgestellt WAR, und die bereits gebuchte D1 rechnet mit ihnen weiter (siehe #505, wo genau
+ * dieses Herausfiltern die Disziplinwerte der D1 zerstoert hatte).
+ */
 export function isPartialLineupComplete(input: {
   activePlayersCount: number;
   requiredTotalUniquePlayers: number;
-  selectedPlayerCount: number;
+  selectedAvailablePlayerCount: number;
 }): boolean {
   return (
     input.activePlayersCount < input.requiredTotalUniquePlayers &&
-    input.selectedPlayerCount === input.activePlayersCount
+    input.selectedAvailablePlayerCount === input.activePlayersCount
   );
+}
+
+/**
+ * Die Schnittmenge aus „steht im Entwurf" und „kann heute spielen" — einmal geschrieben, damit
+ * die drei Aufrufer (Resolve-Vorschau, Resolve-Readiness, Aufstellungs-Readiness) sie nicht je
+ * einzeln nachbauen und dabei auseinanderlaufen.
+ */
+export function countSelectedAvailablePlayers(
+  selectedPlayerIds: Iterable<string>,
+  availablePlayerIds: Iterable<string>,
+): number {
+  const verfuegbar = new Set(availablePlayerIds);
+  const getroffen = new Set<string>();
+  for (const playerId of selectedPlayerIds) {
+    if (verfuegbar.has(playerId)) {
+      getroffen.add(playerId);
+    }
+  }
+  return getroffen.size;
 }

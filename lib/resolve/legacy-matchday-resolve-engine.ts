@@ -1,5 +1,5 @@
 import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
-import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
+import { countSelectedAvailablePlayers, isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { applyCaptainRivalryPressureReduction, calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
@@ -270,7 +270,10 @@ function isPartialLineupAllowed(context: LegacyLineupLoadedContext) {
   return isPartialLineupComplete({
     activePlayersCount: context.activePlayers.length,
     requiredTotalUniquePlayers,
-    selectedPlayerCount: selectedPlayerIds.size,
+    selectedAvailablePlayerCount: countSelectedAvailablePlayers(
+      selectedPlayerIds,
+      context.activePlayers.map((eintrag) => eintrag.playerId),
+    ),
   });
 }
 
