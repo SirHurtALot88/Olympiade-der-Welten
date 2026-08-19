@@ -6,6 +6,7 @@ import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-ov
 import { listTransferHistory } from "@/lib/market/transfer-history-read-service";
 import { calculateTransfermarktFit, hasMercenaryTrait, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { ermittleFensterSaisonId, ermittleLetzteSpieltageJeSaison } from "@/lib/foundation/transfer-window-zuordnung";
 
 export type TransferRecapSource = "sqlite" | "prisma";
 
@@ -403,8 +404,18 @@ function buildLocalTransferRecap(params: TransferRecapParams): TransferRecapResu
   const playerRatings = getSeasonDerivations({ gameState, saveId: save.saveId }).ratingsById;
   const teamStateById = buildCurrentTeamStateMap(gameState);
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
+  /**
+   * Dieselbe Fenster-Zuordnung wie in `listLocalTransferHistory` — siehe die Begruendung dort
+   * (Meldungen `wg919y` / `kn3o08`). Zwei Leser derselben Historie duerfen nicht nach zwei
+   * verschiedenen Saisonbegriffen schneiden: sonst zeigt die Liste die Verkaeufe am Saisonende
+   * unter S2 und der Recap daneben unter S1.
+   */
+  const letzteSpieltageJeSaison = ermittleLetzteSpieltageJeSaison(gameState.transferHistory);
+  const spieltageProSaison = gameState.seasonState.schedule?.length ?? null;
   const historyEntries = gameState.transferHistory
-    .filter((entry) => entry.seasonId === seasonId)
+    .filter(
+      (entry) => ermittleFensterSaisonId(entry, letzteSpieltageJeSaison, spieltageProSaison) === seasonId,
+    )
     .sort((left, right) => Date.parse(right.happenedAt) - Date.parse(left.happenedAt));
   const realizedProfitByTransferId = buildRealizedProfitMap(historyEntries);
 
