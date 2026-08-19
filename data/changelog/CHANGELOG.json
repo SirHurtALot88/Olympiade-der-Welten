@@ -5,6 +5,15 @@
       "datum": "2026-08-19",
       "seite": null,
       "pr": "559",
+      "text": "Spieler mit 80er- und 90er-Werten sind im Depth-Chart wieder hellblau statt gelb. Gold lag dort zu nah an der Farbe der Stufe 40-59, Elite und Mittelmass waren im selben Raster kaum zu unterscheiden. Im Training uebermalt die gewaehlte Trainingsklasse ausserdem nicht mehr die Klassenfarbe mit der Vereinsfarbe — der Balken bleibt in der Farbe, an der man die Klasse wiedererkennt.",
+      "quelle": "triage",
+      "gewicht": null,
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "559",
       "text": "Der Apron sagt jetzt, warum seine Abgabe kleiner ausfaellt, als die Linien vermuten lassen. Der Konjunkturhebel drosselt die Abgabe in schwachen Saisons bis auf null; genannt wurde das bisher nur im Extremfall, sonst stand da eine unerklaerlich kleine Zahl. Finanzen-Karte, Liga-Ausweis, GuV-Hover und Saisonende-GuV nennen die Drosselung jetzt mit Prozentwert und Salary Factor — aus einer gemeinsamen Quelle.",
       "quelle": "triage",
       "gewicht": "behebung",
