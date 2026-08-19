@@ -15,7 +15,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { getPrimaryTeamRivalry } from "@/lib/rivalries/team-rivalries";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
-  evaluateSpecialComponentForObjective,
+  beschreibeSonderziel,
   evaluateSponsorImprovementObjective,
   evaluateSponsorRankObjective,
 } from "@/lib/sponsor/sponsor-objective-evaluator";
@@ -1873,16 +1873,30 @@ function buildSponsorObjectiveDrafts(input: {
         source: "sponsor_v2_contract",
       };
     }
-    const status = evaluateSpecialComponentForObjective(input.gameState, input.team.teamId, component);
+    /**
+     * GEMELDET VON CHRIS: „Ich habe als Saisonziel den Ausbau von 2 Gebäuden meiner Wahl — das habe
+     * ich bereits erledigt. Da würde ich erwarten, dass das Ziel schon als abgeschlossen da steht."
+     *
+     * HIER STAND `evaluateSpecialComponentForObjective` — der BINAERE Alt-Bewerter. Er kennt die
+     * V4-Zielachsen nicht und faellt fuer jede von ihnen bis zum abschliessenden `return "open"`
+     * durch: ein Achsen-Ziel konnte auf dem Board NIE erfuellt aussehen. Dazu wurde der rohe
+     * `targetValue` durchgereicht, sodass auf Chris' Bildschirm woertlich
+     * `axisbase:2;axisscale:2;axisoffset:0` stand.
+     *
+     * `beschreibeSonderziel` liest denselben Stufen-Bewerter, aus dem auch die Abrechnung ihr Geld
+     * zieht (`evaluateSpecialComponentStage`) — Anzeige und Auszahlung koennen damit nicht mehr
+     * auseinanderlaufen.
+     */
+    const sonderziel = beschreibeSonderziel(input.gameState, input.team.teamId, component);
     return {
       objectiveId: `sponsor-${component.componentId}`,
       category: "sponsor",
       label: component.label,
-      targetValue: component.targetValue,
-      currentValue: status === "completed" ? "erfüllt" : "offen",
-      status,
+      targetValue: sonderziel.zielText ?? component.targetValue,
+      currentValue: sonderziel.standText,
+      status: sonderziel.status,
       rewardCash: component.rewardCash,
-      boardConfidenceDelta: status === "completed" ? 0.4 : 0,
+      boardConfidenceDelta: sonderziel.status === "completed" ? 0.4 : 0,
       source: "sponsor_v2_contract",
     };
   });

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
-import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import {
+  SPONSOR_ANGEBOTE_JE_TEAM,
+  chooseSponsorOfferForAiTeams,
+  ensureSeasonSponsorOffers,
+} from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { buildSponsorV3Terms, getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import type { SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
@@ -165,7 +169,9 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
         seasonState: {
           ...basis.seasonState,
           sponsorContractsByTeamId: {},
-          // `ensureSeasonSponsorOffers` ersetzt jedes Slate, das nicht genau fuenf V3-Karten hat.
+          // `ensureSeasonSponsorOffers` ersetzt jedes Slate, das nicht genau `SPONSOR_ANGEBOTE_JE_TEAM`
+          // gueltige V3-Karten hat — die Zahl kam frueher aus einer eingetippten 5 und ist jetzt an
+          // die Konstante gebunden, damit Test und Produktionscode nicht wieder auseinanderlaufen.
           sponsorOffersByTeamId: { [teamId]: slate },
         },
       };
@@ -176,8 +182,10 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
     // `score += (offer.offerId.length % 7) * 0.01` als Tie-Break. Bei ungleich langen IDs entschiede
     // bei Gleichstand diese Stellschraube und nicht die Achse; der Test waere dann gruen, auch wenn
     // der Achsen-Term gar nichts mehr tut (genau so ist er beim Bauen einmal durchgerutscht).
-    const IDS_GLEICH_LANG = ["sol-aaa1", "sol-aaa2", "sol-aaa3", "sol-aaa4", "aus-ziel"];
+    const IDS_GLEICH_LANG = ["sol-aaa1", "sol-aaa2", "aus-ziel"];
     expect(new Set(IDS_GLEICH_LANG.map((id) => id.length)).size).toBe(1);
+    // Das Slate muss genau so gross sein wie ein echtes, sonst wird es ersetzt (siehe oben).
+    expect(IDS_GLEICH_LANG.length).toBe(SPONSOR_ANGEBOTE_JE_TEAM);
 
     // VOLLE KASSE: "ausbau" ist so gut wie sicher (Erfuellung 0,9) — die Karte steht hinten und muss
     // trotzdem gewinnen.
@@ -185,8 +193,6 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
       waehle(200, [
         karte("soliditaet", "sol-aaa1"),
         karte("soliditaet", "sol-aaa2"),
-        karte("soliditaet", "sol-aaa3"),
-        karte("soliditaet", "sol-aaa4"),
         karte("ausbau", "aus-ziel"),
       ]),
     ).toBe("aus-ziel");
@@ -197,8 +203,6 @@ describe("KI-Sponsorwahl: bewertet Passung statt Risiko", () => {
       waehle(-30, [
         karte("ausbau", "aus-aaa1"),
         karte("ausbau", "aus-aaa2"),
-        karte("ausbau", "aus-aaa3"),
-        karte("ausbau", "aus-aaa4"),
         karte("soliditaet", "sol-ziel"),
       ]),
     ).toBe("sol-ziel");
