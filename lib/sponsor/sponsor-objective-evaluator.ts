@@ -708,7 +708,7 @@ export function evaluateSpecialComponentStage(
       fraction: progress.fraction,
       stageIndex: progress.fraction > 0 ? 0 : -1,
       metric: progress.metric,
-      reachedLabel: `${progress.label} ${progress.metric}${progress.unit} von ${progress.target}${progress.unit}`,
+      reachedLabel: `${progress.label} ${einheitMitZahl(progress.metric, progress.unit)} von ${einheitMitZahl(progress.target, progress.unit)}`,
     };
   }
 
@@ -747,5 +747,64 @@ export function evaluateSpecialComponentStage(
     stageIndex: status === "completed" ? 0 : -1,
     metric: null,
     reachedLabel: status,
+  };
+}
+
+/**
+ * Zahl und Einheit — mit dem Leerzeichen dazwischen.
+ *
+ * Hier stand `${zahl}${einheit}` und daraus wurde „0Stufen von 2Stufen". Genau diese Schreibweise
+ * hatte Chris auf der Sponsorenkarte schon einmal gemeldet („20Sprünge"); dort wurde sie repariert,
+ * in der Abrechnungszeile blieb sie stehen. Jetzt gibt es eine Stelle statt zweier.
+ */
+function einheitMitZahl(wert: number, einheit: string): string {
+  return `${wert} ${einheit}`.trim();
+}
+
+/**
+ * WAS EIN SONDERZIEL GERADE STEHT — in Zahlen UND in lesbaren Worten, aus einer Hand.
+ *
+ * GEMELDET VON CHRIS: „Ich habe als Saisonziel den Ausbau von 2 Gebäuden meiner Wahl — das habe ich
+ * bereits erledigt. Da würde ich erwarten, dass das Ziel schon als abgeschlossen da steht."
+ *
+ * Das Board-Ziel las bis hierher `evaluateSpecialComponentForObjective` — den BINAEREN Alt-Bewerter.
+ * Der kennt die V4-Achsen nicht (sie kamen erst mit dem Stufen-Bewerter dazu) und faellt fuer jede
+ * Achse durch bis zum abschliessenden `return "open"`. Ein Achsen-Ziel konnte auf dem Board also
+ * NIE erfuellt aussehen, egal wie viel gebaut wurde. Zugleich reichte der Board-Bauer den rohen
+ * `targetValue` durch — auf Chris' Bildschirm stand woertlich `axisbase:2;axisscale:2;axisoffset:0`.
+ *
+ * Diese Funktion ist die eine Stelle, die aus einer Sonderziel-Komponente Stand, Zielmarke und
+ * Zwischenstand ableitet. Gerechnet wird nicht hier, sondern in `evaluateSpecialComponentStage` —
+ * die Funktion formuliert nur, was dort herauskommt.
+ */
+export type SonderzielStand = {
+  status: "open" | "at_risk" | "completed";
+  /** Erreichter Anteil 0..1 — bei stufenlosen Achsen der anteilige Auszahlungsfaktor. */
+  fraction: number;
+  /** Lesbare Zielmarke („2 Stufen"), oder null wenn die Komponente keine bezifferbare Marke hat. */
+  zielText: string | null;
+  /** Lesbarer Zwischenstand („Ausbau 0 Stufen von 2 Stufen"). */
+  standText: string;
+};
+
+export function beschreibeSonderziel(
+  gameState: GameState,
+  teamId: string,
+  component: SponsorOfferComponent,
+): SonderzielStand {
+  const stand = evaluateSpecialComponentStage(gameState, teamId, component);
+  const axisTerms = sponsorV4AxisTermsFromComponent(component);
+  const achse = axisTerms ? evaluateSponsorV4Axis(gameState, teamId, axisTerms) : null;
+  /**
+   * ANTEILIG HEISST NICHT ERFUELLT. Eine Achse zahlt auf jedem Zwischenstand — „abgeschlossen" darf
+   * trotzdem erst stehen, wenn die Marke wirklich erreicht ist. Alles dazwischen ist `at_risk`:
+   * angefangen, aber noch nicht durch. Das ist der Status, den die Ziel-Ansicht schon kennt.
+   */
+  const status = stand.fraction >= 1 ? "completed" : stand.fraction > 0 ? "at_risk" : "open";
+  return {
+    status,
+    fraction: stand.fraction,
+    zielText: achse ? einheitMitZahl(achse.target, achse.unit) : null,
+    standText: stand.reachedLabel,
   };
 }

@@ -41,6 +41,7 @@ import {
 } from "@/lib/progression/spieler-entwicklung-zaehler";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { DEFAULT_ROSTER_MAX, FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   SPONSOR_V4_AXIS_KEYS, type SponsorV4AxisKey, type SponsorV4AxisTerms,
@@ -78,7 +79,20 @@ type SponsorV4AxisDefinition = {
    * `{ziel}` wird beim Anzeigen durch den Zielwert samt Einheit ersetzt.
    */
   erklaerung: string;
+  /**
+   * Zielmarke, wenn ein Vertrag keine eigene mitfuehrt (Altvertraege ohne `axisscale`).
+   * Fuer NEUE Angebote entscheidet `scaleFor`, sofern die Achse eines hat.
+   */
   scale: number;
+  /**
+   * TEAMABHAENGIGE ZIELMARKE — der Grund, warum es sie gibt, steht bei `entwicklung`.
+   *
+   * Eine feste Zahl ist fuer jede Achse richtig, deren Messgroesse nach oben offen ist (Cash,
+   * Prozent, Gebaeudestufen). Sobald die Messgroesse an einer Obergrenze des Spiels haengt — der
+   * Kader hat hoechstens `DEFAULT_ROSTER_MAX` Spieler — kann eine feste Zahl ueber diese Grenze
+   * hinauslaufen und verspricht dann etwas, das kein Team einloesen kann.
+   */
+  scaleFor?: (gameState: GameState, teamId: string) => number;
   offset: number;
   /** Ausgangswert bei Angebotserzeugung. 0, wenn die Achse ohnehin nur Saisonzuwachs zaehlt. */
   baseline: (gameState: GameState, teamId: string) => number;
@@ -326,6 +340,26 @@ const SPONSOR_V4_AXIS_DEFINITIONS: Readonly<Record<SponsorV4AxisKey, SponsorV4Ax
      * wieder wirkungslos, darüber träfe sie nur Ausreißer.
      */
     scale: 8,
+
+    /**
+     * KEIN `scaleFor` MEHR — bewusst, und das ist die Aufloesung eines echten Widerspruchs.
+     *
+     * Auf `main` bekam diese Achse zwischenzeitlich eine kadergroessen-abhaengige Marke
+     * (`scaleFor: min(14, max(8, Kadergroesse))`). Sie war die richtige Antwort auf den DAMALIGEN
+     * Fehler: das Ziel 20 lag ueber `DEFAULT_ROSTER_MAX` = 14, war also fuer jeden Kader
+     * unerreichbar, und der Kommentar dort hielt ausdruecklich fest, dass die MESSGROESSE noch
+     * offen ist und in dieser Aenderung entschieden wird.
+     *
+     * Mit der Umstellung auf Attributpunkte ist sie es. Und dann traegt `scaleFor` den Fehler
+     * wieder herein: gemessen ueber 1017 Ereignisse erreicht das BESTE Team 11 entwickelte
+     * Spieler, der Median 4. Ein Kader mit 14 Spielern bekaeme mit `scaleFor` die Marke 14 — die
+     * kein Team der Liga je erreicht hat — und ein Kader mit 8 Spielern die Marke 8, also
+     * dieselbe, die hier ohnehin steht. Die Kadergroesse skaliert die Marke also genau in die
+     * falsche Richtung: sie bestraft den grossen Kader fuer seine Groesse.
+     *
+     * Die feste 8 ist an der Verteilung gemessen (2x Median, unter der Kadergrenze, vom Maximum
+     * uebertroffen) und trifft grosse wie kleine Kader gleich.
+     */
     offset: 0,
     // Zaehlt nur den Saisonzuwachs — es gibt keinen Ausgangsbestand, gegen den zu messen waere.
     baseline: () => 0,
@@ -395,7 +429,7 @@ export function buildSponsorV4AxisTerms(
   return {
     key,
     baseline: Math.round(definition.baseline(gameState, teamId) * 100) / 100,
-    scale: definition.scale,
+    scale: definition.scaleFor?.(gameState, teamId) ?? definition.scale,
     offset: definition.offset,
   };
 }
