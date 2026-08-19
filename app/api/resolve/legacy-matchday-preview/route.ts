@@ -12,6 +12,7 @@ import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { db } from "@/src/server/db";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseOptionalParams(request: Request): {
   source: "prisma" | "sqlite";
@@ -199,6 +200,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(responsePayload);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Legacy resolve preview could not be loaded." },
       { status: 500 },

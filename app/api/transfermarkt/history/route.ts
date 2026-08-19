@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { listLocalTransferHistory } from "@/lib/market/transfermarkt-local-service";
 import { listTransferHistory } from "@/lib/market/transfer-history-read-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Transfer history could not be loaded.";
     return NextResponse.json(
       {

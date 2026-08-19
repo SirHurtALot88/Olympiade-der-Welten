@@ -8,6 +8,7 @@ import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolut
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -58,6 +59,8 @@ export async function POST(request: Request) {
   try {
     result = generateLocalLegacyFormCardsForSeason(params);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;

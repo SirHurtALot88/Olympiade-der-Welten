@@ -15,6 +15,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite, type ServerRoomWriteAuthorization } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /**
  * SAMMEL-SPEICHERN FUER MENSCHEN — Stufe 2.1/2.5 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund B5).
@@ -165,6 +166,8 @@ export async function PUT(request: Request) {
       },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;

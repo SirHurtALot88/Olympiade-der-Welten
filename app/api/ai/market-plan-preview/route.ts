@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { buildAiMarketPlanPreview } from "@/lib/ai/ai-market-plan-preview-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "AI market plan preview could not be loaded.";
     const status = message.includes("could not be loaded") ? 500 : 400;
 

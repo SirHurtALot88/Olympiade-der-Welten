@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { getDatabase } from "@/lib/persistence/sqlite";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export function GET() {
   try {
@@ -20,6 +21,8 @@ export function GET() {
       },
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         ok: false,

@@ -11,6 +11,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
 import { db } from "@/src/server/db";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type PreviewSource = "sqlite" | "prisma";
 
@@ -277,6 +278,8 @@ export async function GET(request: Request) {
       teams: sortedTeams,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI batch preview could not be loaded.",

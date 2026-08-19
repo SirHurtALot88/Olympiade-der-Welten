@@ -11,6 +11,7 @@ import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type NewGameRequestBody = {
   presetId?: NewGamePresetId;
@@ -95,6 +96,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ result });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "new_game_setup_failed",

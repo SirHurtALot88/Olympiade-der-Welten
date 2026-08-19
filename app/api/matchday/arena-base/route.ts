@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { loadMatchdayArenaBase } from "@/lib/foundation/matchday-arena-base-service";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -62,6 +63,8 @@ export async function GET(request: Request) {
       ...payload,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     if (error instanceof SaveResolutionError) {
       return NextResponse.json({ ok: false, error: error.code, message: error.message }, { status: error.status });
     }

@@ -7,6 +7,7 @@ import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     if (error instanceof SaveResolutionError) {
       return NextResponse.json({ error: error.code, message: error.message }, { status: error.status });
     }

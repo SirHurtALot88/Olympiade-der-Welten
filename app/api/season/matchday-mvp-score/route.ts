@@ -7,6 +7,7 @@ import {
 } from "@/lib/season/matchday-mvp-scoring-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type MatchdayMvpScoreBody = {
   saveId?: string;
@@ -89,6 +90,8 @@ export async function POST(request: Request) {
       summary: result,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Matchday MVP scoring could not be executed." },
       { status: 500 },

@@ -9,6 +9,7 @@ import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -83,6 +84,8 @@ export async function PUT(request: Request) {
       ...(hasPlannedIntensity ? { plannedIntensity: body.plannedIntensity ?? null } : {}),
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;

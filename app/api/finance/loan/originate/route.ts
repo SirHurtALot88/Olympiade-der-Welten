@@ -8,6 +8,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type LoanOriginateBody = {
   saveId?: string;
@@ -168,6 +169,8 @@ export async function POST(request: Request) {
       terms: result.terms,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         ok: false,

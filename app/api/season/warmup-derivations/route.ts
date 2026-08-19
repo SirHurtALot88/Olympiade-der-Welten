@@ -7,6 +7,7 @@ import { buildGameStateContentSignature } from "@/lib/foundation/season-derivati
 import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { readPersistedSeasonDerivationsProjection } from "@/lib/persistence/save-projection-read";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function POST(request: Request) {
   try {
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
       materialized: materialize,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Season derivations warmup failed.";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin/season-simulation-runner";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, run: readAdminSeasonSimulation(runId) });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         ok: false,

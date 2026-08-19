@@ -8,6 +8,7 @@ import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolut
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -46,10 +47,30 @@ export async function POST(request: Request) {
     ...parseRoomWriteContextFromRequest(request),
     saveId: params.saveId,
     teamId: params.teamId,
-    // Reuses the existing "formcards_season_regenerate" write-permission
-    // class: same team/save gating as the sibling form-cards endpoint, no
-    // new TeamWriteAction literal needed for this confirm gate.
-    action: "formcards_season_regenerate",
+    /**
+     * `formcards`, NICHT `formcards_season_regenerate`.
+     *
+     * Hier stand die Regenerier-Klasse — und die steht in `HOST_LEVEL_ACTIONS`
+     * (`lib/room/server-authoritative-write-guard.ts`). Im Raum hiess das fuer jeden ausser dem
+     * Host: 403 `host_only_action`. Befund F10 hat das schon nachgemessen, aber nur die MELDUNG
+     * geradegezogen ("Transfers nicht finalisiert" statt stiller Schluck) — nicht die Sache. Der
+     * Gast kam damit nie durch seinen `finalize_transfers`-Schritt, und weil dessen Bestaetigung
+     * erst NACH einer erfolgreichen Antwort passiert (`acknowledgeFlowStep`, siehe
+     * use-foundation-shell-router-body-scope.tsx), meldete er sich nie bereit. Der Host konnte
+     * den Raum dann nicht weiterschalten (`canHostAdvance` verlangt alle Menschen bereit) — der
+     * Spieltagszyklus stand.
+     *
+     * `formcards` ist die team-bezogene Klasse: `authorizeTeamWrite` prueft sie ueber den Besitz
+     * des `teamId`, jeder also fuer seine eigenen Teams. Genau das ist hier gemeint.
+     *
+     * WAS DAS NICHT AUFWEICHT: der zerstoererische Regenerier-Weg
+     * (`/api/lineups/legacy/form-cards`) behaelt `formcards_season_regenerate` und bleibt
+     * host-only. Diese Route hier ist ausdruecklich der IDEMPOTENTE Weg — sie legt den
+     * Formkarten-Pool der Saison nur an, wenn es noch keinen gibt, und ersetzt nie einen
+     * bestehenden (siehe Kommentar oben). Wer von beiden zuerst drueckt, aendert das Ergebnis
+     * nicht; der zweite Aufruf ist ein No-op.
+     */
+    action: "formcards",
     source: "sqlite",
     dryRun: false,
   });
@@ -61,6 +82,8 @@ export async function POST(request: Request) {
   try {
     result = ensureLocalLegacyFormCardsForSeason(params);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;
@@ -78,7 +101,7 @@ export async function POST(request: Request) {
   notifyRoomGameplayWrite(writeAuth, {
     saveId: params.saveId,
     teamId: params.teamId,
-    action: "formcards_season_regenerate",
+    action: "formcards",
     eventType: "lineup_updated",
     affectedViews: ["home", "lineup", "matchday", "arena"],
     dryRun: false,

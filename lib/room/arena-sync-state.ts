@@ -4,6 +4,7 @@ import {
   getFoundationArenaDisplayPhase,
   mapFoundationPhaseToRoomDisciplineSide,
   mapRoomDisciplineSideToFoundationPhase,
+  FOUNDATION_ARENA_REVEAL_LIMITS,
   type FoundationArenaRevealState,
 } from "@/lib/foundation/matchday-arena-reveal-sync";
 import { ARENA_STEP_DURATION_MS } from "@/lib/foundation/discipline-stage/arena-timeline";
@@ -534,6 +535,109 @@ export function resumeRoomArenaAfterRestart(input: { arenaState: RoomArenaState;
     pausedBy: arenaState.paused ? arenaState.pausedBy : null,
     version: arenaState.version + 1,
     updatedAt: now,
+  });
+}
+
+/**
+ * DER WECHSEL AUF DISZIPLIN 2 ALS RAUM-AKTION.
+ *
+ * NACHGEMESSEN, NICHT VERMUTET (die Zahlen stehen als Testfall in
+ * `tests/diszi-wechsel-ist-eine-raum-aktion.test.ts`): der Host meldet ueber
+ * `advanceRoomArenaStep` NUR seine Etappen-Schritte (`round` in
+ * `DisciplineStageNativeArena.tsx`, der Effekt "Co-op HOST: meldet jeden eigenen Reveal-Schritt").
+ * Sein Klick auf "Weiter zu Disziplin 2" war dagegen rein lokal (`setDisciplineId`) — der Server
+ * erfuhr davon nichts.
+ *
+ * Was daraus folgte, mit d1=5/d2=5 Etappen durchgezaehlt:
+ *
+ *   d1-Klick 1..5  -> phase=d1  phaseId=slots     slot=1..5   (richtig)
+ *   d2-Klick 1     -> phase=d1  phaseId=push      slot=5
+ *   d2-Klick 2     -> phase=d1  phaseId=form      slot=5
+ *   d2-Klick 3     -> phase=d1  phaseId=mutator   slot=5
+ *   d2-Klick 4     -> phase=d1  phaseId=captain   slot=5
+ *   d2-Klick 5     -> phase=d1  phaseId=power     slot=5
+ *
+ * Sobald d1 ausgeschoepft ist, schiebt `advanceFoundationArenaReveal` naemlich die PHASENKETTE
+ * weiter (slots -> push -> form -> mutator -> captain -> power -> final), und erst der Schritt
+ * DANACH kippt auf d2. Die Etappen, die der Host in Disziplin 2 enthuellt, werden also von der
+ * Phasenkette der ALTEN Disziplin aufgefressen: `slotRevealIndex` bleibt bei 5 stehen,
+ * `activeDisciplinePhase` bleibt "d1". Der Gast liest genau diese beiden Felder
+ * (`onApplyRevealSync` in `DisciplineStageArena.tsx`) — er bleibt in Disziplin 1 auf dem Endstand
+ * kleben und sieht von Disziplin 2 nichts. Bei kurzen Disziplinen (5 Etappen < 6 Phasenschritte)
+ * ueberhaupt nichts, bei langen den Rest um genau die Phasenkettenlaenge versetzt.
+ *
+ * DIE BEHEBUNG IST NICHT, DIE PHASENKETTE ANZUFASSEN: die ist fuer eine phasenweise Enthuellung
+ * gebaut, die die native Arena gar nicht spielt (sie enthuellt nur Etappen). Behoben wird die
+ * fehlende MELDUNG — der Wechsel wird ein eigener Raum-Schritt, und danach steht die Phasenkette
+ * beim Wechsel wieder auf 0, statt weitergeschoben zu werden.
+ *
+ * Die Feldabbildung selbst macht `applyFoundationRevealToRoomArenaState` — dieselbe Funktion, die
+ * `advanceRoomArenaReveal` benutzt, damit es fuer "so sieht ein Reveal-Zustand im Raum aus" keine
+ * zweite Stelle gibt. Sie hatte bis hierher keinen Produktionsaufrufer.
+ *
+ * WAS ABSICHTLICH NICHT PASSIERT: das Bereit-Tor wird NICHT neu scharfgestellt
+ * (`readyParticipantIds` bleibt, wie es ist) — genau wie bei `resetRoomArenaReveal`. Ein
+ * Disziplinwechsel ist eine Anzeige-Umschaltung des Hosts, kein neuer Anpfiff; ein zweites Tor
+ * mitten im Spieltag hat niemand bestellt.
+ */
+export function switchRoomArenaDisciplinePhase(input: {
+  arenaState: RoomArenaState;
+  participantId: string;
+  phase: RoomArenaDisciplineSide;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
+  now?: string;
+}): RoomArenaState {
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  const now = input.now ?? new Date().toISOString();
+  const maxCounts = input.maxSlotRevealCountByDiscipline ?? arenaState.maxSlotRevealCountByDiscipline;
+  const limits = {
+    maxD1SlotRevealCount: Math.max(0, maxCounts.d1),
+    maxD2SlotRevealCount: Math.max(0, maxCounts.d2),
+  };
+  const ziel = input.phase;
+  const andere: RoomArenaDisciplineSide = ziel === "d1" ? "d2" : "d1";
+
+  /**
+   * Die verlassene Seite gilt als abgeschlossen, wenn ihre Etappen wirklich durch sind — nicht
+   * allein deshalb, weil der Host wegschaltet. Sonst behauptete ein Wechsel mitten in Disziplin 1
+   * ("ich schau mal kurz die andere an"), sie sei gewertet.
+   */
+  const andereFertig =
+    arenaState.completedDisciplinePhases[andere] ||
+    (limits[andere === "d1" ? "maxD1SlotRevealCount" : "maxD2SlotRevealCount"] > 0 &&
+      arenaState.revealedSlotCountByDiscipline[andere] >=
+        limits[andere === "d1" ? "maxD1SlotRevealCount" : "maxD2SlotRevealCount"]);
+
+  const zielReveal: FoundationArenaRevealState = {
+    activeDisciplinePhase: ziel,
+    // Die Zielseite faengt bei der Etappen-Phase an — genau da, wo die lokale Arena des Hosts nach
+    // `setDisciplineId` steht (frisch aufgebaute Buehne, `round` = 0).
+    phaseIndex: FOUNDATION_ARENA_REVEAL_LIMITS.slotsPhaseIndex,
+    revealedSlotCountByDiscipline: {
+      ...arenaState.revealedSlotCountByDiscipline,
+      [ziel]: 0,
+    },
+    completedDisciplinePhases: {
+      ...arenaState.completedDisciplinePhases,
+      [ziel]: false,
+      [andere]: andereFertig,
+    },
+  };
+
+  return normalizeRoomArenaState({
+    ...applyFoundationRevealToRoomArenaState(arenaState, zielReveal, limits),
+    status: "revealing",
+    // Ein Wechsel IST ein Schritt: `stepIndex` waechst monoton weiter (wie beim Reset, siehe dort),
+    // und er oeffnet einen neuen Schritt-Zeitraum fuer die gemeinsame Zeitbasis.
+    stepIndex: arenaState.stepIndex + 1,
+    stepStartedAt: now,
+    stepDurationMs: arenaState.stepDurationMs,
+    paused: false,
+    pausedBy: null,
+    version: arenaState.version + 1,
+    lastActionByParticipantId: input.participantId,
+    updatedAt: now,
+    callout: null,
   });
 }
 

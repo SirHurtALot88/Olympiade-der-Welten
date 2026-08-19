@@ -14,6 +14,7 @@ import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-
 import type { DisciplineSide, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import type { LineupDraftModifiers, LineupDraftModifierSide } from "@/lib/data/olyDataTypes";
 import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -165,6 +166,8 @@ export async function GET(request: Request) {
         ? await new LegacyLineupContextLoader().loadLegacyLineupContext(params)
         : loadLocalLegacyLineupContext(params);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;

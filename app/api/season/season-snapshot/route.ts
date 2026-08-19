@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { SaveResolutionError } from "@/lib/persistence/resolve-local-save";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 import {
   createSeasonSnapshot,
   SEASON_SNAPSHOT_CONFIRM_TOKEN,
@@ -102,6 +103,8 @@ export async function POST(request: Request) {
       warnings: result.warnings,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     if (error instanceof SaveResolutionError) {
       return NextResponse.json(
         { success: false, error: error.code, message: error.message, blockingReasons: [error.code] },

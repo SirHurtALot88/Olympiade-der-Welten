@@ -6,6 +6,7 @@ import type { SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import { resolveSessionOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 import {
   readSeasonSnapshotsCache,
   writeSeasonSnapshotsCache,
@@ -75,6 +76,8 @@ export async function GET(request: Request) {
       cache: { hit: false },
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         ok: false,
