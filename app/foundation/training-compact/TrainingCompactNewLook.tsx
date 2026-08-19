@@ -67,11 +67,24 @@ import {
  *   er war nur ein Scroll-Anker auf dieselbe Seite.
  */
 
+/**
+ * CHRIS' MELDUNG `pn7mqj`: „der Filter Upgrade bereit macht keinen Sinn mehr weil es ja keine
+ * Upgrades mehr gibt - bitte entfernen".
+ *
+ * Er hat recht mit dem Grund: das XP-/SP-Upgrade-System ist abgeschafft, „Upgrade" ist totes
+ * Vokabular — der eigene Hinweistext musste bereits dagegen anschreiben („Kein Sofort-Upgrade,
+ * sondern die Saisonend-Tendenz").
+ *
+ * ENTFERNT IST DAS WORT, NICHT DER FILTER. Die Bedingung dahinter (Netto-Forecast ≥ +2 SP) ist das
+ * positive Gegenstück zu „Risiko" und „Stabil"; ohne sie gäbe es keinen Weg mehr, sich die klar
+ * wachsenden Spieler zeigen zu lassen, und die drei Filter deckten den Kader nicht mehr ab. Wenn
+ * Chris den Filter wirklich ganz weghaben will, ist das eine Zeile.
+ */
 const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string; hint: string }> = [
   {
     id: "growth",
-    label: "Upgrade bereit",
-    hint: "Netto-Forecast ≥ +2 SP: Training + Performance übersteigen die Regression deutlich über die Saison. Kein Sofort-Upgrade, sondern die Saisonend-Tendenz.",
+    label: "Wächst",
+    hint: "Netto-Forecast ≥ +2 SP: Training + Performance übersteigen die Regression deutlich über die Saison. Die Saisonend-Tendenz, keine Sofortwirkung.",
   },
   {
     id: "regression",
@@ -223,7 +236,9 @@ function getCoreTakeaway(row: TrainingPlayerRowView): string {
     return `Wächst noch, aber hohes Rückschritt-Risiko (Druck ${formatNlNumber(row.forecast.regressionPressure, 0)}) — kippt der Druck weiter, fällt das Netto ins Minus.`;
   }
   if (row.organicForecast.netSetpoints >= 2) {
-    return "Training und Performance überwiegen deutlich — Upgrade in Reichweite.";
+    // Kein „Upgrade" mehr — das XP-/SP-Upgrade-System ist abgeschafft, die Entwicklung läuft
+    // organisch über die Saison (Meldung `pn7mqj`).
+    return "Training und Performance überwiegen deutlich — der Spieler wächst über die Saison.";
   }
   return "Entwicklung stabil — Training gleicht die laufende Regression aus.";
 }

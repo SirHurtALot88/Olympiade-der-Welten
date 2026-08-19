@@ -1072,8 +1072,22 @@ export default function DisciplineStageArena({
       // konnte nie greifen, weil `d1Points` damit NIE null war. Teams, die in der
       // Disziplin gewertet wurden, aber keinen Score haben, stehen weiterhin auf 0 —
       // die setzt `placementPointsForSide` selbst.
-      const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? null : null;
-      const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? null : null;
+      // PLATZIERUNGS-PUNKTE PLUS MUTATOR-AUFSCHLAG — dieselbe Summe, die gebucht wird
+      // (`points = basePoints + mutatorPpsBonus`, season-points-ledger.ts).
+      //
+      // CHRIS' MELDUNG `vjirth`: „S-C sollte in Basketball 9,1 Punkte haben laut Arena, hat im
+      // Saisonstand dann aber 9,9 Punkte stehen." Nachgemessen am Live-Abbild: die
+      // Saisonstand-Spalte zieht `pointsByDiscipline` aus dem Ledger und enthaelt den Aufschlag,
+      // die Arena rechnete rein aus der Rang-zu-Punkte-Tabelle. Der Aufschlag liegt hier schon
+      // fertig in `mutatorByTeam` — er wurde nur nie addiert.
+      // Das `?? null` daraus bleibt UNANGETASTET (siehe Absatz darueber): der Aufschlag kommt
+      // nur dazu, wo es ueberhaupt eine Platzierungs-Zahl gibt. Aus einem unbekannten Wert darf
+      // kein „0 plus Mutator" werden, sonst faellt die Aufdeck-Regel der Arena.
+      const mutator = mutatorByTeam.get(r.teamId) ?? null;
+      const mitMutator = (punkte: number | null | undefined, aufschlag: number) =>
+        punkte == null ? null : Math.round((punkte + aufschlag) * 10) / 10;
+      const d1Points = d1 ? mitMutator(d1PointsByTeam.get(r.teamId), mutator?.d1Pp ?? 0) : null;
+      const d2Points = d2 ? mitMutator(d2PointsByTeam.get(r.teamId), mutator?.d2Pp ?? 0) : null;
       return {
         teamId: r.teamId,
         d1DisciplineId: d1?.disciplineId ?? null,

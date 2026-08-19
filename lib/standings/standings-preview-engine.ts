@@ -425,6 +425,32 @@ export async function buildStandingsPreview(
       ? (seasonState.disciplineResults ?? []).filter((result) => result.matchdayResultId === matchdayResult.id)
       : [];
 
+    /**
+     * MUTATOR-AUFSCHLAG JE TEAM FUER DIESEN SPIELTAG.
+     *
+     * Die Tagespunkte unten kommen aus der Rang-zu-Punkte-Tabelle: Platz in der Disziplin →
+     * Punkte. Der Mutator-Aufschlag steht NICHT darin, er haengt an den einzelnen Leistungen
+     * (`playerDisciplinePerformances[].mutatorPpsBonus`) und wurde deshalb nie mitgebucht.
+     *
+     * NACHGEMESSEN am Live-Abbild (`hwz8fk`, S1 nach 10 Spieltagen): fuer JEDES Team gilt
+     * `standings[team].points === Ledger-Gesamt − Ledger-Mutator`, Zeile fuer Zeile. Der
+     * Aufschlag liegt bei 3,6 bis 6,9 Punkten je Team — und er dreht Plaetze: mit ihm fuehrt
+     * H-R mit 147,4 vor N-W mit 146,0, ohne ihn N-W mit 142,1 vor H-R mit 142,0. Die
+     * Tabellenspitze haengt also an dieser Zeile.
+     *
+     * CHRIS' ENTSCHEIDUNG (`re954b`): „im Saisonstand sind die Mutatorpunkte mit 0,3 gar nicht
+     * drin!! bitte in die Punkte mit einrechnen!"
+     */
+    const mutatorPunkteJeTeam = new Map<string, number>();
+    if (matchdayResult) {
+      for (const performance of seasonState.playerDisciplinePerformances ?? []) {
+        if (performance.matchdayResultId !== matchdayResult.id) continue;
+        const bonus = performance.mutatorPpsBonus;
+        if (typeof bonus !== "number" || !Number.isFinite(bonus)) continue;
+        mutatorPunkteJeTeam.set(performance.teamId, (mutatorPunkteJeTeam.get(performance.teamId) ?? 0) + bonus);
+      }
+    }
+
     const disciplineByTeam = new Map<
       string,
       {
@@ -489,7 +515,15 @@ export async function buildStandingsPreview(
       const pointsDelta =
         resultRow?.d1Points == null && resultRow?.d2Points == null
           ? null
-          : roundValue((resultRow?.d1Points ?? 0) + (resultRow?.d2Points ?? 0), 1);
+          : roundValue(
+              (resultRow?.d1Points ?? 0) +
+                (resultRow?.d2Points ?? 0) +
+                // Rang-Punkte PLUS Mutator-Aufschlag — siehe `mutatorPunkteJeTeam` oben. Ohne
+                // diesen Summanden buchte der Saisonstand eine andere Zahl als der Ledger und
+                // die Buehne ausweisen, und die Tabellenspitze konnte daran kippen.
+                (mutatorPunkteJeTeam.get(team.teamId) ?? 0),
+              1,
+            );
       const hasStoredResult = d1Score != null && d2Score != null;
       const isIncomplete =
         matchdayResult != null &&

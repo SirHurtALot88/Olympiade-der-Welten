@@ -817,7 +817,7 @@ async function main() {
         const text = await trainingPanel.innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, hasAny(text, ["Training", "Trainings-Setpoints", "Regeneration"]), "Training-Reiter lädt.");
         assertStep(step, hasAny(text, ["Entwicklung", "Setpoints", "Performance"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
-        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader", "Upgrade bereit", "Rückschritt-Risiko", "Netto-Forecast"]), "Spieler-Forecast ist sichtbar.");
+        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader", "Wächst", "Rückschritt-Risiko", "Netto-Forecast"]), "Spieler-Forecast ist sichtbar.");
         assertStep(step, hasAny(text, ["Gebäude", "Facility", "Leicht", "Hart"]), "Training-Kontext inkl. Facility/Modus ist sichtbar.");
       },
     }));
