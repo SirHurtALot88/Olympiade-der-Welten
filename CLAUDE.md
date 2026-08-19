@@ -92,7 +92,16 @@ und keine In-Game-Meldung erreichte GitHub.
 Vergangenheit und hält sie für die Gegenwart. Der SessionStart-Hook fährt die Prüfung deshalb bei
 jedem Start — auch dann, wenn er den Import überspringt.
 
-Beheben kann das nur Chris auf dem Server; das Skript druckt die nötigen Befehle mit aus.
+Beheben kann das nur Chris auf dem Server. Dafür gibt es **einen** Befehl statt fünf:
+
+```sh
+ssh root@135.181.102.2
+cd Olympiade-der-Welten && bash deploy/hetzner/spiegel-reparieren.sh
+```
+
+Das Skript prüft Crontab, Cron-Dienst, Deploy-Stand und Logs, richtet die Crons neu ein und
+spiegelt einmal sofort. Es zerstört nichts — nur mit `--deploy-loesen` fasst es den Arbeitsbaum an,
+und auch dann sagt es vorher, was es wegwirft.
 
 ## Etwas auf den Server zurückspielen
 
