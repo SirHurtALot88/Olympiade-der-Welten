@@ -70,8 +70,21 @@ import {
 const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string; hint: string }> = [
   {
     id: "growth",
-    label: "Upgrade bereit",
-    hint: "Netto-Forecast ≥ +2 SP: Training + Performance übersteigen die Regression deutlich über die Saison. Kein Sofort-Upgrade, sondern die Saisonend-Tendenz.",
+    /*
+     * GEMELDET VON CHRIS (19.08.): „der Filter Upgrade bereit macht keinen Sinn mehr weil es ja
+     * keine Upgrades mehr gibt - bitte entfernen".
+     *
+     * Der NAME war falsch, die Auswahl ist es nicht: der Filter greift auf den Netto-Forecast
+     * (>= +2 SP), und den gibt es unveraendert. Die eigene Kurzbeschreibung sagte das sogar schon
+     * — „Kein Sofort-Upgrade, sondern die Saisonend-Tendenz" —, sie stand nur hinter einem Namen,
+     * der das Gegenteil behauptet.
+     *
+     * Herausgenommen wurde er deshalb NICHT: die vier Filter teilen den Kader ohne Rest auf
+     * (waechst / Risiko / stabil / alle). Ohne diesen haette man keinen Weg mehr, die Aufsteiger
+     * zu sehen — sie verschwaenden in „Alle". Der Name nennt jetzt, was gemeint ist.
+     */
+    label: "Im Aufwind",
+    hint: "Netto-Forecast ≥ +2 SP über die Saison: Training und Performance übersteigen die Regression deutlich. Eine Tendenz zum Saisonende, keine Sofort-Wirkung.",
   },
   {
     id: "regression",
