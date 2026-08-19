@@ -113,11 +113,28 @@ describe("Die drei Haken sitzen an den gemeinsamen Schreibpunkten", () => {
     // `applyContractRenewalAction` (Spieler wie KI) und `applySeasonEndContractTick` laufen beide
     // durch `saveGameStateWithContractEvents`.
     expect(VERTRAG).toContain("function saveGameStateWithContractEvents");
-    expect(VERTRAG).toContain("zieheSaisonstandGuvNachImSaisonendfenster({");
+    // Aus demselben Grund wie beim Phasenwechsel unten formuliert: die Klammer-Schreibweise ist
+    // nicht der Vertrag, der Aufruf ist es.
+    expect(VERTRAG).toMatch(/zieheSaisonstandGuvNachImSaisonendfenster\(/);
   });
 
   it("Phasenwechsel: beim Betreten, damit auch ohne Buchung nachgezogen wird", () => {
-    expect(UEBERGANG).toContain("const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster({");
+    /**
+     * GEPRUEFT WIRD DIE EIGENSCHAFT, NICHT DIE FORMATIERUNG.
+     *
+     * Hier stand `toContain("... = zieheSaisonstandGuvNachImSaisonendfenster({")` — mit der
+     * geschweiften Klammer UNMITTELBAR hinter der runden. Als das Argument in
+     * `season-transition-service.ts` auf eine eigene Zeile umbrach (reine Umformatierung, der
+     * Aufruf selbst blieb), passte die Zeichenfolge nicht mehr und die volle Suite wurde rot —
+     * auf `main`, ohne dass irgendjemand am Verhalten etwas geaendert hatte.
+     *
+     * Der Vertrag, um den es geht, ist: der Zustand, mit dem der Phasenwechsel weiterarbeitet,
+     * geht durch die GuV-Nachbuchung. Genau das steht jetzt da, unabhaengig davon, ob das Argument
+     * auf derselben Zeile beginnt.
+     */
+    expect(UEBERGANG).toMatch(
+      /const nextGameState: GameState = zieheSaisonstandGuvNachImSaisonendfenster\(/,
+    );
   });
 
   it("der Tabellenaufbau rechnet NICHT live — genau das war zu teuer", () => {
