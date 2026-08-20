@@ -175,12 +175,19 @@ export const APRON_KONJUNKTUR_FACTOR_MIN = 0.88;
  * GEMESSEN, zusammen mit den angehobenen Linien, ueber sieben Spielstaende:
  *
  *   Variante                        Topf   Zahler/Stand   M-M gesamt
- *   vorher       1,10/1,25 Rampe   406,0          10,6        148,7
- *   nur Linien   1,25/1,60 Rampe   120,5           3,3         74,2
- *   JETZT        1,25/1,60 Stufe   202,6           3,3        119,8
+ *   vorher       1,10/1,25 Rampe   385,1          10,1        131,9
+ *   nur Linien   1,25/1,60 Rampe   109,8           3,9         62,8
+ *   JETZT        1,25/1,60 Stufe   197,7           3,9        114,0
  *
- * Halb so viel Topf wie vorher, aber auf ein Drittel der Zahler konzentriert — im gemeldeten Stand
- * zahlt M-M 39,7 statt 21,4, und ausser ihm nur noch drei Teams ueberhaupt etwas.
+ * Halb so viel Topf wie vorher, aber auf ein Drittel der Zahler konzentriert.
+ *
+ * NACHGEMESSEN NACH #589. Die erste Fassung dieser Tabelle stand auf der damaligen
+ * Bemessungsgrundlage (der real gezahlten Jahresrate); #589 hat sie auf das VERHANDELTE
+ * Jahresgehalt zurueckgestellt. Damit aendern sich alle Absolutwerte — M-Ms Gehalt etwa von 123,5
+ * auf 115,1 —, und eine Tabelle, die den alten Stand behauptet, waere schlicht falsch. Die AUSSAGE
+ * ueberlebt den Wechsel unveraendert: die Linien allein schwaechen den Apron (−71 %), erst die
+ * Stufe macht ihn wieder scharf, und zwar auf einem Drittel der Zahler. Die Faktoren mussten
+ * deshalb NICHT nachjustiert werden.
  *
  * DER DECKEL BLEIBT (`APRON_CAP_SHARE_OF_RANK_PAYOUT`, halber Wertungsanteil). Er ist der Grund,
  * warum M-M bei 39,7 stehenbleibt, obwohl roh 74,9 anstuenden — Chris' „knapp 40 mio extra […] ist
