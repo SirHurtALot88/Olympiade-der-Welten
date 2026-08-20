@@ -67,6 +67,15 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "566",
+      "text": "Das Saisonziel „Entwicklung\" misst jetzt, was es verspricht. Es rechnete mit dem Marktwert gegen einen Ausgangswert, der immer 0 war — gezählt wurden dadurch „Spieler mit Marktwert über 6\", also praktisch der ganze Kader. Neu: Spieler, die über die Saison mindestens 2 Attributpunkte zulegen, Rückschritte abgezogen. Das Ziel sinkt von 20 auf 8 Spieler und liegt damit erstmals unter der Kadergrenze von 14. Dasselbe galt für das Sponsor-Sonderziel „Goldene Talentschmiede\"; beide benutzen jetzt dieselbe Zählung.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "558",
       "text": "Die Mutator-Punkte zaehlen jetzt auch im Saisonstand. Bisher buchte die Tabelle nur die Platzierungs-Punkte aus der Rang-zu-Punkte-Tabelle; der Aufschlag aus den Mutatoren landete zwar beim Spieler, aber nie beim Team. Am Live-Spielstand betraf das ALLE 32 Teams mit 2,4 bis 6,9 Punkten — und drehte 13 Plaetze, darunter die Tabellenspitze. Schon gebuchte Spieltage werden beim naechsten Spieltag automatisch nachgezogen.",
       "quelle": "triage",

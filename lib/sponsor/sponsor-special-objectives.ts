@@ -187,7 +187,18 @@ export const SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK = objEnvNumber("OLY_SPONSOR_OBJ_
 /** Bracket-Held-Schwelle (bracketScore, 0..1) fuer Fan-Kult / Publikumsliebling. */
 export const SPONSOR_OBJ_BRACKET_HERO = objEnvNumber("OLY_SPONSOR_OBJ_BRACKET_HERO", 0.85);
 /** Talentschmiede (G3): Marktwert-Zuwachs eines Spielers in EINER Saison, ab dem ein "großer Sprung" zählt. */
-export const SPONSOR_OBJ_TALENT_JUMP_MV = objEnvNumber("OLY_SPONSOR_OBJ_TALENT_JUMP_MV", 6);
+/**
+ * Attribut-Punkte, ab denen ein Spieler fuer `golden_talent_forge` als entwickelt zaehlt.
+ *
+ * Hiess bis zum 19.08.2026 `SPONSOR_OBJ_TALENT_JUMP_MV` und meinte Marktwert — die Rechnung dahinter
+ * mass jedoch den absoluten Marktwert, nicht den Zuwachs (Meldung `u3wlh4`, Befund im Kopf von
+ * `lib/progression/spieler-entwicklung-zaehler.ts`). Umbenannt statt nur umgewidmet, damit kein
+ * Aufrufer die alte Bedeutung weiterschleppt.
+ *
+ * 3 statt der 2 der Achse: dieses Sonderziel ist als „hart" ausgewiesen. Gemessen (1017 Spieler)
+ * trifft 3 im Median 2 Spieler je Team, Maximum 9 — deutlich selektiver als die Achse.
+ */
+export const SPONSOR_OBJ_TALENT_JUMP_ATTRIBUTE_POINTS = objEnvNumber("OLY_SPONSOR_OBJ_TALENT_JUMP_ATTRIBUTE_POINTS", 3);
 /** Titel-Schock (G5): teamQualityRankAtSign ≥ dieser Wert = "schwaches" Team (Eignung). */
 export const SPONSOR_OBJ_TITLE_SHOCK_WEAK_RANK = objEnvNumber("OLY_SPONSOR_OBJ_TITLE_SHOCK_WEAK_RANK", 18);
 /** Fatigue-Management (#14): Kader-Fatigue ≤ diese Schwelle zählt als "frisch". */

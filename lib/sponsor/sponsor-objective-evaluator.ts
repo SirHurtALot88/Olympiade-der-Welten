@@ -20,10 +20,11 @@ import {
   SPONSOR_OBJ_DISCIPLINE_GOOD_RANK,
   SPONSOR_OBJ_FATIGUE_CAP,
   SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK,
-  SPONSOR_OBJ_TALENT_JUMP_MV,
+  SPONSOR_OBJ_TALENT_JUMP_ATTRIBUTE_POINTS,
   SPONSOR_OBJ_TITLE_SHOCK_WEAK_RANK,
   type SponsorAxisKey,
 } from "@/lib/sponsor/sponsor-special-objectives";
+import { zaehleEntwickelteSpieler } from "@/lib/progression/spieler-entwicklung-zaehler";
 
 /**
  * WARUM DIESE DATEI DEN VOLLEN 27+6-ZIEL-KATALOG WEITER AUSWERTET, OBWOHL IHN NICHTS MEHR ERZEUGT:
@@ -523,27 +524,20 @@ export function computeObjectiveProgressMetric(
       return heroes;
     }
     case "golden_talent_forge": {
-      // Zahl der (eigenen) Spieler mit großem Marktwert-Sprung in DIESER Saison (Development-Signal).
-      const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);
-      const threshold = SPONSOR_OBJ_TALENT_JUMP_MV;
-      const jumped = new Set<string>();
-      for (const event of gameState.playerProgressionEvents ?? []) {
-        if (event.seasonId !== gameState.season.id) continue;
-        if (event.teamId !== teamId && !rosterIds.has(event.playerId)) continue;
-        const before = event.progressionSnapshotBefore;
-        const after = event.progressionSnapshotAfter;
-        const mvBefore = typeof before?.marketValue === "number" ? before.marketValue : null;
-        const mvAfter =
-          typeof after?.marketValuePreview === "number"
-            ? after.marketValuePreview
-            : typeof after?.marketValue === "number"
-              ? after.marketValue
-              : null;
-        if (mvBefore != null && mvAfter != null && mvAfter - mvBefore >= threshold) {
-          jumped.add(event.playerId);
-        }
-      }
-      return jumped.size;
+      /**
+       * Zahl der (eigenen) Spieler mit echter Entwicklung in DIESER Saison.
+       *
+       * HIER STAND DERSELBE FEHLER WIE IN DER ACHSE `entwicklung` (Meldung `u3wlh4`): gerechnet
+       * wurde `after.marketValuePreview − before.marketValue`, und `before.marketValue` ist in
+       * allen 1017 gemessenen Ereignissen 0. Das Sonderziel zaehlte damit „Spieler mit Marktwert
+       * ueber 6" statt entwickelter Spieler — bei einem Ziel, das sich „hart" nennt.
+       *
+       * Beide Regeln laufen jetzt ueber `zaehleEntwickelteSpieler`; der Befund und die Messung
+       * stehen im Kopf jener Datei. `SPONSOR_OBJ_TALENT_JUMP_ATTRIBUTE_POINTS` ist die HAERTERE Schwelle dieses
+       * Sonderziels (env-steuerbar) und bleibt es — sie zaehlt jetzt nur Attributpunkte statt
+       * Marktwert.
+       */
+      return zaehleEntwickelteSpieler(gameState, teamId, SPONSOR_OBJ_TALENT_JUMP_ATTRIBUTE_POINTS);
     }
     case "golden_discipline_monopoly": {
       const goodRank = SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK;

@@ -156,7 +156,14 @@ function retargetAxis(gameState: GameState, teamId: string, key: SponsorV4AxisKe
   return umgeschrieben;
 }
 
-/** Ein Marktwertsprung-Event, wie es die Saisonend-Progression schreibt. */
+/**
+ * Ein Entwicklungs-Ereignis, wie es die Saisonend-Progression schreibt.
+ *
+ * Die Zaehlung laeuft ueber ATTRIBUTPUNKTE (`lib/progression/spieler-entwicklung-zaehler.ts`),
+ * nicht ueber den Marktwert: `progressionSnapshotBefore.marketValue` ist in allen 1017 Ereignissen
+ * der Live-Spielstaende 0, die alte Marktwert-Differenz war deshalb der absolute Marktwert und kein
+ * Zuwachs. Hier steht darum ein echter Attributzuwachs von +3 (ueber der Schwelle von 2).
+ */
 function jumpEvent(gameState: GameState, teamId: string, index: number) {
   return {
     eventId: `analytics-live-jump-${index}`,
@@ -166,10 +173,10 @@ function jumpEvent(gameState: GameState, teamId: string, index: number) {
     upgrades: [],
     xpSpent: 0,
     progressionSnapshotBefore: {
-      attributes: {}, disciplineRatings: {}, ovr: null, mvs: null, marketValue: 10, salary: null, bracket: null,
+      attributes: { strength: 40, speed: 30 }, disciplineRatings: {}, ovr: null, mvs: null, marketValue: 10, salary: null, bracket: null,
     },
     progressionSnapshotAfter: {
-      attributes: {}, disciplineRatings: {}, ovr: null, mvs: null, marketValue: 20, salary: null, bracket: null,
+      attributes: { strength: 42, speed: 31 }, disciplineRatings: {}, ovr: null, mvs: null, marketValue: 20, salary: null, bracket: null,
       marketValuePreview: null, salaryPreview: null, bracketPreview: null,
     },
     timestamp: new Date().toISOString(),
@@ -363,8 +370,9 @@ describe("Analytics Room: eine Achse ohne belastbare Zahl wird als solche ausgew
     const signiert = retargetAxis(signAxisContract(gameState, teamId), teamId, "entwicklung");
     const state = withAnalyticsLevel(signiert, teamId, 5);
 
-    // GENAU DER FALL, DEN DIE ANZEIGE NICHT ALS SPIELERFEHLER DARSTELLEN DARF: Marktwertspruenge
-    // werden erst in der Saisonabrechnung gebucht, die Rohmetrik steht bis dahin zwingend auf 0.
+    // GENAU DER FALL, DEN DIE ANZEIGE NICHT ALS SPIELERFEHLER DARSTELLEN DARF: die
+    // Entwicklungs-Ereignisse werden erst in der Saisonabrechnung gebucht, die Rohmetrik steht bis
+    // dahin zwingend auf 0.
     expect(sponsorSettlementGoalFraction(state, teamId)).toBe(0);
 
     const live = buildAnalyticsSponsorAxisLive(state, teamId)!;
