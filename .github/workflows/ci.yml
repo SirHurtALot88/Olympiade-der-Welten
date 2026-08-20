@@ -66,6 +66,27 @@ jobs:
         run: timeout 360 npx playwright install chromium --with-deps || npx playwright install chromium
       - run: npm run ci:import-exists
       - run: npm run ci:flow-smoke
+      # DIE QUELLTEXT-WAECHTER, und sie stehen hier aus einem gemessenen Grund.
+      #
+      # `full-test-suite` unten ist KEIN Pflicht-Check. Am 20.08. sind dadurch zwei rote Wächter
+      # durchgerutscht: zwei Apron-Zusicherungen (#589) und ein CSS-Ratchet (#595). Beide Tests
+      # existierten, sie liefen nur nicht im Tor. Beide lesen den QUELLTEXT (Klassennamen, Ratchets,
+      # Vertragstexte), brauchen weder Datenbank noch Browser und kosten zusammen 69 Sekunden fuer
+      # 120 Dateien und 1830 Tests — das passt hier hinein, waehrend die volle Suite mit ihren
+      # ~20 Minuten weiter im eigenen Job laeuft.
+      #
+      # WAS DIESER SCHRITT NICHT ABDECKT, und das gehoert dazu: den Absturz aus #586 (die
+      # Kaufphasen-Warnung warf beim Rendern der Arena) haette er NICHT gefangen — der Waechter
+      # dafuer rendert, statt Quelltext zu lesen. Nachgemessen: alle Tests ohne Persistenz sind 853
+      # Dateien und brauchen 9:40 min, das sprengt diesen Job (der baut, Chromium installiert und
+      # drei Browser-Smokes faehrt). Die vollstaendige Antwort auf jene Klasse bleibt deshalb,
+      # `full-test-suite` zum Pflicht-Check zu machen — eine Einstellung im Branch-Schutz, nicht in
+      # dieser Datei.
+      #
+      # Die Auswahl wird ERRECHNET, nicht aufgezaehlt (siehe scripts/fahre-quelltext-waechter.ts):
+      # eine feste Liste veraltet ab dem ersten neuen Waechter, und genau so eine nicht mitwachsende
+      # Auswahl ist die Ursache, die hier behoben wird.
+      - run: npm run ci:quelltext-waechter
       - run: npm run perf:regression-smoke
       # Serve the browser smokes from the PRODUCTION server (npm run start =
       # NODE_ENV=production, using the build from the step above). The dev server

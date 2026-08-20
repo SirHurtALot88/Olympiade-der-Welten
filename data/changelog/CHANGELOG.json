@@ -57,6 +57,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Intern · Entwicklung",
+      "pr": null,
+      "text": "Die Quelltext-Wächter laufen ab jetzt im Pflicht-Check mit. Die volle Testsuite ist kein Pflicht-Check, und dadurch sind an einem Tag zwei rote Wächter unbemerkt durchgerutscht — die Tests existierten, sie liefen nur nicht in dem Lauf, der den Merge bewacht. Die betroffene Sorte prüft Zusicherungen am Quelltext selbst und braucht weder Datenbank noch Browser: 120 Dateien, 1830 Prüfungen, 69 Sekunden. Die Auswahl wird bei jedem Lauf neu errechnet statt aufgezählt, damit ein neu geschriebener Wächter nicht wieder aus dem Tor fällt. Am Spiel selbst ändert das nichts.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Die Apron-Marke in der Sponsorenliste zeigte bei 61 von 224 Teamzeilen die falsche Zone — über alle sieben Spielstände nachgezählt, und in beide Richtungen. Sie verglich die GEGLÄTTETE Gehaltssumme mit den Linien, während die Abgabe selbst gegen die ECHTE rechnet: Cold Steel stand als „über 2. Linie\" da (79,4) und liegt echt bei 61,6, also nur über der ersten; Big Bang stand auf „unter\" (58,3) und zahlt echt bei 61,3. Die Marke holt ihre Grundlage jetzt bei der Apron selbst, statt sie nachzubauen. Auch die Deckungsspalte („trägt der Sponsor die Mannschaft?\") rechnet jetzt mit dem Geld, das wirklich vom Konto geht — bei Mayhem 123,5 statt 98,9 —, und die Erklärung sagt dazu, welche der Gehaltszahlen sie meint. Die Glättung bleibt, wo sie hingehört: als Bemessungsgrundlage der Sponsor-Kalibrierung.",
