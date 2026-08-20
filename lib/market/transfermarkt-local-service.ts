@@ -53,6 +53,7 @@ import {
   getScoutedTraitView,
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { ermittleFensterSaisonId, ermittleLetzteSpieltageJeSaison } from "@/lib/foundation/transfer-window-zuordnung";
 import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
 import { recordFreeAgentFeed } from "@/lib/ai/transfer-window-profiler";
 import {
@@ -2857,8 +2858,45 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
   }
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
 
+  /**
+   * DER SAISONFILTER MEINT DAS TRANSFERFENSTER, NICHT DEN ZEITSTEMPEL.
+   *
+   * GEMELDET VON CHRIS, zweimal am selben Vormittag und von beiden Seiten desselben Fehlers:
+   *  - `wg919y`: „Alle Teams haben ihre Verkaeufe hier in S2 getrackt, nur die von mir scheinen in
+   *    S1 fest zu haengen und noch nicht angezeigt werden […] bitte so regeln dass
+   *    spielerverkaeufe am ende von S1 mit in die S2 auswertung kommen."
+   *  - `kn3o08`: „die verkaeufe sind alle in S1 noch drin NUR die von mir manuell nicht!!!"
+   *
+   * Die Regel dafuer gab es laengst (`lib/foundation/transfer-window-zuordnung.ts`, seit `#459`):
+   * ein Transfer am LETZTEN Spieltag einer Saison gehoert zum Fenster der FOLGENDEN. Sie lief
+   * aber erst im Browser, NACH diesem Filter hier — und der schnitt nach `seasonId`. Damit
+   * bekam die Zuordnung nie zu sehen, was sie haette hereinholen sollen:
+   *
+   *   Filter S2 -> Server liefert nur `seasonId === "season-2"`. Chris' drei Verkaeufe tragen
+   *                `season-1` und kommen gar nicht erst an  -> Meldung `wg919y`.
+   *   Filter S1 -> Server liefert sie, die Zuordnung im Browser schiebt sie nach S2 hinaus, und
+   *                es kommt nichts nach -> Meldung `kn3o08`.
+   *
+   * Am Abbild `hwz8fk` nachgezaehlt: die 502 Eintraege trennen sich sauber nach Spieltag —
+   * 339 Kaeufe auf `matchday-1` (Erst-Draft, Saisonstart) gegen 99 auf `matchday-10`
+   * (96 `contract_exit` plus Chris' 3 Verkaeufe). Im S2-Filter standen 64 Kaeufe und
+   * 0 Verkaeufe; mit dieser Zuordnung sind es 64 und 3.
+   *
+   * Die Zuordnung wird ueber die VOLLSTAENDIGE Historie gerechnet, nicht ueber das schon
+   * gefilterte Ergebnis: „hoechster Spieltag einer Saison" ist sonst nur so gut wie der
+   * Ausschnitt, und genau davor warnt das Modul selbst.
+   *
+   * `contract_exit` bleibt, wo es ist (nur `phase === "manual_transfer_window"` wandert) —
+   * ein auslaufender Vertrag ist kein Transfer.
+   */
+  const letzteSpieltageJeSaison = ermittleLetzteSpieltageJeSaison(gameState.transferHistory);
+  const spieltageProSaison = gameState.seasonState.schedule?.length ?? null;
+  const gehoertZurFensterSaison = (entry: { seasonId: string; matchdayId?: string | null; phase?: string | null }) =>
+    !input.seasonId ||
+    ermittleFensterSaisonId(entry, letzteSpieltageJeSaison, spieltageProSaison) === input.seasonId;
+
   const localItems = gameState.transferHistory
-    .filter((entry) => (input.seasonId ? entry.seasonId === input.seasonId : true))
+    .filter(gehoertZurFensterSaison)
     .filter((entry) => (input.type ? entry.transferType === input.type : true))
     .filter((entry) =>
       input.teamId ? entry.fromTeamId === input.teamId || entry.toTeamId === input.teamId : true,
@@ -2894,7 +2932,9 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
     .flatMap((snapshot) =>
       (snapshot.transferSnapshots ?? [])
         .filter((entry) => !localTransferIds.has(entry.transferId))
-        .filter((entry) => (input.seasonId ? entry.seasonId === input.seasonId : true))
+        // Dieselbe Fenster-Zuordnung wie oben — Archiv-Eintraege duerfen nicht nach einer
+        // anderen Regel einsortiert werden als die aus der laufenden Historie.
+        .filter((entry) => gehoertZurFensterSaison({ seasonId: entry.seasonId, matchdayId: entry.matchdayId, phase: entry.phase }))
         .filter((entry) => (input.type ? entry.type === input.type : true))
         .filter((entry) =>
           input.teamId ? entry.fromTeamId === input.teamId || entry.toTeamId === input.teamId : true,

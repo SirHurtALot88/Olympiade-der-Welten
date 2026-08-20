@@ -111,6 +111,24 @@
     },
     {
       "datum": "2026-08-19",
+      "seite": "Saisonstand",
+      "pr": null,
+      "text": "Spieltagsrang und Feld-Rennen zählen die Mutatorpunkte jetzt genauso mit wie der Saisonstand. Der Saisonstand hatte den Aufschlag bekommen, diese beiden rechneten weiter ohne — damit rankte dieselbe Liga an drei Stellen nach zwei verschiedenen Größen. Genau die Uneinheitlichkeit, die die ursprüngliche Meldung ausgelöst hat, nur eine Ebene tiefer.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Saisonstand",
+      "pr": null,
+      "text": "Für Spieltage, die schon vor der Korrektur gebucht wurden, gibt es jetzt eine Nachbuchung. Ohne sie mischt eine laufende Saison zwei Rechenweisen: alte Spieltage ohne Mutator-Aufschlag, neue mit — schlechter als jeder der beiden Zustände für sich. Die Nachbuchung prüft vorher, dass jeder gewertete Spieltag wirklich abgedeckt ist, und schreibt sonst gar nichts: auf einem beschnittenen Spielstand würde blindes Überschreiben Punkte vernichten statt sie zu ergänzen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
       "seite": "Arena",
       "pr": null,
       "text": "Der Schnelldurchlauf spult die gezeigte Disziplin ans Ende — und bleibt dort. Vorher lief er genau eine Etappe zu weit und landete am ANFANG der nächsten Disziplin; gemessen bei drei Etappen: Ergebnis „Disziplin 2, Etappe 0“. Der Mitspieler folgt der angezeigten Disziplin und wurde dabei mitgezogen, während der Host noch den Endstand der ersten anschaute.",
@@ -122,9 +140,27 @@
       "datum": "2026-08-19",
       "seite": "Mehrspieler",
       "pr": null,
+      "text": "Der Host kann einen Raum jetzt beenden — und gibt damit den Spielstand wieder frei. Vorher war das Ende eines Raums schlicht nicht vorgesehen: der Spielstand blieb sieben Tage lang raumgebunden, auch wenn längst niemand mehr drin war, und die Admin-Werkzeuge darauf waren so lange gesperrt. Nachgemessen: nach der Anlage gesperrt, mit beiden Spielern getrennt weiterhin gesperrt, nach dem Beenden frei. Bewusst KEINE kürzere Frist stattdessen — „beide gerade offline“ heißt nicht „fertig“, und zwei Coaches, die gleichzeitig neu laden, sollen ihren laufenden Koop-Spielstand nicht plötzlich für fremde Schreibvorgänge geöffnet sehen. Der Knopf fragt vorher nach, weil er für beide Spieler gilt; der Spielstand selbst bleibt erhalten und ist danach ein normaler Solo-Stand.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Mehrspieler",
+      "pr": null,
       "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": "Training",
+      "pr": null,
+      "text": "Der Trainingsfilter heißt jetzt „Wächst“. Er hieß kurzzeitig „Im Aufwind“ — zwei Zweige hatten ihn unabhängig voneinander umbenannt, und die Reihenfolge der Zusammenführung hatte zufällig entschieden. „Wächst“ ist Chris’ Wahl und steht in derselben Wortform wie die Nachbarn „Risiko“ und „Stabil“.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.5"
     },
     {
