@@ -82,8 +82,14 @@ const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string;
      * Herausgenommen wurde er deshalb NICHT: die vier Filter teilen den Kader ohne Rest auf
      * (waechst / Risiko / stabil / alle). Ohne diesen haette man keinen Weg mehr, die Aufsteiger
      * zu sehen — sie verschwaenden in „Alle". Der Name nennt jetzt, was gemeint ist.
+     *
+     * DER NAME IST CHRIS' WAHL (19.08.). Zwei Zweige hatten denselben Filter unabhaengig
+     * umbenannt — „Im Aufwind" und „Waechst" —, und die Merge-Reihenfolge hatte die Frage
+     * zufaellig zugunsten des ersten entschieden. Gefragt, geantwortet: „Waechst". Kuerzer und in
+     * derselben Wortform wie die Nachbarn („Risiko", „Stabil"), die ebenfalls einen Zustand
+     * nennen und keine Bewegung.
      */
-    label: "Im Aufwind",
+    label: "Wächst",
     hint: "Netto-Forecast ≥ +2 SP über die Saison: Training und Performance übersteigen die Regression deutlich. Eine Tendenz zum Saisonende, keine Sofort-Wirkung.",
   },
   {

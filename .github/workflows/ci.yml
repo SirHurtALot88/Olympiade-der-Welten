@@ -41,7 +41,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx playwright install chromium --with-deps
+      # DER EINZIGE SCHRITT HIER OHNE ZEITGRENZE — UND GENAU DER HAT SICH AUFGEHAENGT.
+      #
+      # `--with-deps` faehrt `apt-get update` auf dem Runner. Am 19.08. abends stand das in SECHS
+      # von sieben Laeufen still: der Azure-Mirror antwortete nicht (`Ign: azure.archive.ubuntu.com`
+      # ueber alle Zeilen), apt fiel auf `archive.ubuntu.com` zurueck, holte noch vier InRelease-
+      # Dateien — und danach kam nichts mehr. Letzte Logzeile jeweils
+      # `Get:5 .../noble-security InRelease`, dann 25 Minuten Stille, bis `timeout-minutes: 30` den
+      # Job abraeumte; im Aufraeumen steht der Beweis: `Terminate orphan process: npm exec playwright
+      # install chromium --with-deps`.
+      #
+      # WAS DAS ANRICHTET: ein abgeraeumter Pflicht-Check schliesst mit `cancelled` ab und wird nie
+      # gruen. Damit hing JEDER offene Pull Request gleichzeitig fest (#573, #575, #576, #581, #582,
+      # #583) — bei allen sechs war `full-test-suite` gruen und nur dieser Schritt tot. Im selben
+      # Zeitfenster lief #580 in 25 Minuten normal durch, es ist also keine zu knappe Zeitgrenze und
+      # kein zu langsamer Test, sondern ein Netzhaenger ohne Deckel.
+      #
+      # DER DECKEL: nach 6 Minuten abbrechen und die Browser OHNE Systempakete nachholen. Die
+      # Zeitgrenze bleibt bei 30 Minuten — sie hat richtig gehandelt, sie kam nur als Letzte.
+      # Fehlt danach wirklich eine Systembibliothek, faellt der erste Browser-Smoke mit einer
+      # echten Meldung um, statt den Job stumm auszusitzen: ein lauter Fehler ist besser als ein
+      # leiser Abbruch, der aussieht wie ein Testfehler.
+      - name: Install Chromium for Playwright
+        run: timeout 360 npx playwright install chromium --with-deps || npx playwright install chromium
       - run: npm run ci:import-exists
       - run: npm run ci:flow-smoke
       - run: npm run perf:regression-smoke
