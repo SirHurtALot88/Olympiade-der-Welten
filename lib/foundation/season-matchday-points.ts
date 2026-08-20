@@ -66,7 +66,10 @@ export function summiereSpieltagsPunkteAusLedger(
       jeTeam = new Map<string, number>();
       punkteJeSpieltag.set(entry.matchdayId, jeTeam);
     }
-    jeTeam.set(entry.teamId, roundValue((jeTeam.get(entry.teamId) ?? 0) + entry.basePoints, 4));
+    // `entry.points`, NICHT `entry.basePoints`: `points` ist Rang-Anteil PLUS Mutator-Aufschlag,
+    // also die Zahl, die auch gutgeschrieben wird. Mit `basePoints` rankte der Spieltag nach einer
+    // anderen Groesse als der Saisonstand bucht — am Live-Abbild bis zu 6,9 Punkte je Team.
+    jeTeam.set(entry.teamId, roundValue((jeTeam.get(entry.teamId) ?? 0) + entry.points, 4));
   }
 
   return punkteJeSpieltag;
