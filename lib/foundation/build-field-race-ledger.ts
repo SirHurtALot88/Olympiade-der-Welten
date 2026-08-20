@@ -110,7 +110,9 @@ export function buildFieldRaceLedger(
       perTeam = new Map();
       pointsByMatchday.set(entry.matchdayId, perTeam);
     }
-    perTeam.set(entry.teamId, roundValue((perTeam.get(entry.teamId) ?? 0) + entry.basePoints, 4));
+    // `entry.points` (Rang-Anteil + Mutator), damit das Feld-Rennen dieselbe Summe zeigt wie
+    // Saisonstand und Spieltag. Siehe `season-matchday-points.ts` — beide muessen gleich bleiben.
+    perTeam.set(entry.teamId, roundValue((perTeam.get(entry.teamId) ?? 0) + entry.points, 4));
   }
 
   const rowsByTeamId = new Map<string, FieldRaceLedgerEntry[]>();
