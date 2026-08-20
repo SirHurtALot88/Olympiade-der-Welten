@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
+  APRON_LINE_2_MEDIAN_FACTOR,
   computeApronLines,
   hasSeasonBeenPlayed,
   resolveSeasonApronLines,
@@ -100,7 +101,9 @@ describe("Apron-Linien rasten erst nach dem Kaderbau ein", () => {
     const linien = resolveSeasonApronLines(state);
 
     // OHNE DEN FIX kam hier der veraltete Snapshot zurück (56,2) — das ist die Zeile, die fällt.
-    expect(linien.line2).toBeCloseTo(87.3, 1);
+    // Aus der Konstante abgeleitet, nicht abgetippt — siehe Begruendung in
+    // `apron-linien-jede-saison.test.ts`. Hier stand `87,3`, also Median x 1,25.
+    expect(linien.line2).toBeCloseTo(linien.medianSalary * APRON_LINE_2_MEDIAN_FACTOR, 1);
     expect(linien.medianSalary).toBeCloseTo(69.8, 1);
     expect(linien.line2).not.toBeCloseTo(56.2, 1);
   });
@@ -121,7 +124,10 @@ describe("Apron-Linien rasten erst nach dem Kaderbau ein", () => {
       snapshot: { medianSalary: 45, line1: 49.4, line2: 56.2 },
     });
     const nachgefuehrt = ensureSeasonApronLinesFrozen(vorlaeufig);
-    expect(nachgefuehrt.seasonState.apronLinesSnapshot?.line2).toBeCloseTo(87.3, 1);
+    expect(nachgefuehrt.seasonState.apronLinesSnapshot?.line2).toBeCloseTo(
+      (nachgefuehrt.seasonState.apronLinesSnapshot?.medianSalary ?? 0) * APRON_LINE_2_MEDIAN_FACTOR,
+      1,
+    );
 
     const endgueltig = baueSpielstand(NACH_KADERBAU, {
       gespielt: true,
@@ -132,7 +138,7 @@ describe("Apron-Linien rasten erst nach dem Kaderbau ein", () => {
     expect(unveraendert).toBe(endgueltig);
   });
 
-  it("die gemessene Lage aus dem Save: 28 von 32 über der alten Linie, 0 über der nachgeführten", () => {
+  it("die gemessene Lage aus dem Save: die veraltete Linie fängt fast die ganze Liga, die nachgeführte nicht", () => {
     // Die echte Gehaltsverteilung des Saves (geglättet), absteigend.
     const gehaelter = [
       94.6, 94.1, 86.5, 83.5, 81.6, 79.7, 79.0, 77.9, 76.7, 76.7, 76.6, 76.5, 76.3, 75.6, 73.2,
@@ -150,7 +156,21 @@ describe("Apron-Linien rasten erst nach dem Kaderbau ein", () => {
     const neu = computeApronLines(state);
     expect(neu.medianSalary).toBeCloseTo(69.8, 1);
     const ueberNeu = gehaelter.filter((g) => g > neu.line2).length;
-    // Zwei Teams liegen über der nachgeführten Linie — eine Grenze, die wieder unterscheidet.
-    expect(ueberNeu).toBe(2);
+
+    /**
+     * DIE ZUSAGE IST „die nachgefuehrte Linie unterscheidet wieder", NICHT eine bestimmte Anzahl.
+     *
+     * Hier stand `toBe(2)` — die Zahl, die sich mit dem damaligen Faktor 1,25 ergab. Der Titel des
+     * Falls sagte schon vorher „0 über der nachgeführten", die Zusage darunter „2": Titel und
+     * Pruefung widersprachen sich, und keiner der beiden Werte beschrieb die Regel. Mit Chris'
+     * Anhebung auf 1,60 (`6fv43h`) sind es 0 — die Regel ist unveraendert erfuellt, die abgetippte
+     * Zahl war es nicht.
+     *
+     * Geprueft wird deshalb der ABSTAND: die veraltete Linie fing fast die ganze Liga, die
+     * nachgefuehrte faengt hoechstens eine Handvoll.
+     */
+    expect(ueberAlt).toBeGreaterThan(gehaelter.length * 0.75);
+    expect(ueberNeu).toBeLessThanOrEqual(gehaelter.length * 0.125);
+    expect(ueberNeu).toBeLessThan(ueberAlt);
   });
 });
