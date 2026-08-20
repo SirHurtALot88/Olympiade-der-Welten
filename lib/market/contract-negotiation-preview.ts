@@ -1,4 +1,4 @@
-import { wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
+import { wendeLiquiditaetUndMixAn } from "@/lib/market/contract-shape-context";
 import type {
   ContractNegotiationDraft,
   ContractShape,
@@ -723,7 +723,7 @@ export function recommendContractOfferForPlayer(input: {
    * Siehe `contract-shape-context.ts` — die Abgabe selbst laesst sich damit NICHT umgehen, wohl
    * aber die echte Zahlung dieser Saison, die on top zur Abgabe faellig wird.
    */
-  apronHeadroom?: number | null;
+  kassenstand?: number | null;
   /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
   /** Gebundener Mehrbetrag spaeterer Vertragsjahre, an der heutigen Gehaltssumme gemessen. */
   gehaltsbergQuote?: number | null;
@@ -995,21 +995,21 @@ export function recommendContractOfferForPlayer(input: {
     reasons.push("Culture Keeper: guter Spieler wird langfristig gebunden.");
   }
 
-  // DIE APRON-LAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
+  // DIE TEAMLAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
   //
   // Chris' Vorgabe war beides: „das muss die AI berücksichtigen" UND „es sollen ja nicht alle top
   // teams dann nur back loaded nehmen […] dann hast du irgendwann nen sehr teuren gehaltspeak […]
   // der mix machts." Die Regel selbst steht in `contract-shape-context.ts` — DORT und nicht hier,
   // weil es drei Formwaehler im Spiel gibt (Kaufvorschau, Fast-Batch, Verlaengerung) und alle drei
   // dieselbe Regel brauchen. Ohne die Angaben verhaelt sich die Empfehlung unveraendert.
-  const apronUndMix = wendeApronUndMixAn({
+  const lageUndMix = wendeLiquiditaetUndMixAn({
     form: contractShape,
     laufzeit: contractLength,
-    apronHeadroom: input.apronHeadroom,
+    kassenstand: input.kassenstand,
     gehaltsbergQuote: input.gehaltsbergQuote,
   });
-  contractShape = apronUndMix.form;
-  if (apronUndMix.grund) reasons.push(apronUndMix.grund);
+  contractShape = lageUndMix.form;
+  if (lageUndMix.grund) reasons.push(lageUndMix.grund);
 
   return {
     contractLength: clamp(Math.round(contractLength), 1, 5),
