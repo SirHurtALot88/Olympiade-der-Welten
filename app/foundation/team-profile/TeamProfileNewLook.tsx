@@ -203,12 +203,23 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → GOLD (Elite ≥80).
-  // Die Elite-Stufe war vorher `accent` (blau) — seit Paket F2 gilt: eine
-  // Skala mit `risk` trägt nie die Teamfarbe, die Spitzen-Stufe ist das
-  // theme-feste Gold (wie die Rang-Skala in quartile-tone.ts). Die reale
-  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
-  if (rating >= 80) return "gold";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → HELLBLAU (Elite ≥80).
+  //
+  // CHRIS' MELDUNG `8sbs35`: „Spieler mit 80er und 90er stats sind im depth chart gelb anstatt
+  // hellblau markiert - bitte fixen!" — und nach der Rückfrage seine Entscheidung: „depth chart
+  // soll weiterhin hellblau färben und nicht in team farben, das irritiert sonst."
+  //
+  // ES IST NICHT `accent` UND NICHT WIEDER DER ALTE ZUSTAND. `accent` ist die Vereinsfarbe; eine
+  // Skala, die auch `risk` enthält, darf sie nie tragen — bei rotem Team-Theme sähen Spitze und
+  // Schlusslicht gleich aus (genau der Fehler, den Paket F2 repariert hat). `elite` ist deshalb
+  // ein eigenes, theme-FESTES Hellblau (`--nl-elite`).
+  //
+  // WARUM NICHT WEITER GOLD: Gold (#f6c750) gehört der RANG-Skala und lag hier direkt neben
+  // `warn` (#e0a53a) der 40–59-Stufe — Elite und Mittelmaß lasen sich im selben Raster als
+  // dieselbe Farbe. Genau das hat Chris als „gelb" gemeldet.
+  //
+  // Die reale Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
+  if (rating >= 80) return "elite";
   if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";

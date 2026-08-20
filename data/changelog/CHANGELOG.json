@@ -13,8 +13,35 @@
     {
       "datum": "2026-08-19",
       "seite": null,
+      "pr": "559",
+      "text": "Spieler mit 80er- und 90er-Werten sind im Depth-Chart wieder hellblau statt gelb. Gold lag dort zu nah an der Farbe der Stufe 40-59, Elite und Mittelmass waren im selben Raster kaum zu unterscheiden. Im Training uebermalt die gewaehlte Trainingsklasse ausserdem nicht mehr die Klassenfarbe mit der Vereinsfarbe — der Balken bleibt in der Farbe, an der man die Klasse wiedererkennt.",
+      "quelle": "triage",
+      "gewicht": null,
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "559",
+      "text": "Der Apron sagt jetzt, warum seine Abgabe kleiner ausfaellt, als die Linien vermuten lassen. Der Konjunkturhebel drosselt die Abgabe in schwachen Saisons bis auf null; genannt wurde das bisher nur im Extremfall, sonst stand da eine unerklaerlich kleine Zahl. Finanzen-Karte, Liga-Ausweis, GuV-Hover und Saisonende-GuV nennen die Drosselung jetzt mit Prozentwert und Salary Factor — aus einer gemeinsamen Quelle.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
       "pr": "568",
       "text": "Die Einsatz-Zahl in der Spielerliste zählt wieder nur die laufende Saison. Eine Leistung, deren Spieltagsergebnis fehlt, wurde stillschweigend der aktuellen Saison zugeschlagen — am Saisonwechsel, wo die Ergebnisse der alten Saison geräumt werden und die Leistungen kurz weiterleben, standen Spieler damit am ersten Spieltag schon mit zehn Einsätzen da.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Die Disziplin-Punkte in der Arena enthalten jetzt den Mutator-Aufschlag — dieselbe Zahl, die der Saisonstand ausweist. Vorher rechnete die Arena rein aus der Rang-zu-Punkte-Tabelle, waehrend die Saisonstand-Spalte den Aufschlag bereits mitzaehlte.",
       "quelle": "triage",
       "gewicht": "behebung",
       "version": null
@@ -26,6 +53,42 @@
       "text": "KI-Teams koennen wieder investieren. Ihre Gehalts- und Cash-Reserve war absolut berechnet und band bei 28 von 32 Teams den kompletten Kontostand — Gebaeude UND Transfers lagen damit still, auch bei Teams mit 35 Mio auf dem Konto. Die Reserven sind jetzt auf einen Anteil des Kontostands gedeckelt; am Live-Spielstand steigt die Zahl der Teams mit investierbarem Geld je nach Saison von 4 auf 18 bzw. von 20 auf 24.",
       "quelle": "triage",
       "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "556",
+      "text": "Ein Spieltag bleibt nicht mehr in Disziplin 2 haengen, wenn ein aufgestellter Spieler waehrend Disziplin 1 ausfaellt. Die Regel „kurz antreten ist erlaubt, wenn alle verfuegbaren Spieler eingesetzt sind\" verglich die rohe Zahl der aufgestellten Namen mit der Zahl der verfuegbaren Spieler — nach einem Ausfall konnten die beiden nie wieder gleich werden, und die Arena bot keinen Ausweg an.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Die Mutator-Punkte zaehlen jetzt auch im Saisonstand. Bisher buchte die Tabelle nur die Platzierungs-Punkte aus der Rang-zu-Punkte-Tabelle; der Aufschlag aus den Mutatoren landete zwar beim Spieler, aber nie beim Team. Am Live-Spielstand betraf das ALLE 32 Teams mit 2,4 bis 6,9 Punkten — und drehte 13 Plaetze, darunter die Tabellenspitze. Schon gebuchte Spieltage werden beim naechsten Spieltag automatisch nachgezogen.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "siehe `w4eloo` — die Mutator-Punkte zaehlen jetzt auch im Saisonstand.",
+      "quelle": "triage",
+      "gewicht": "behebung",
+      "version": null
+    },
+    {
+      "datum": "2026-08-19",
+      "seite": null,
+      "pr": "558",
+      "text": "Der Trainings-Filter „Upgrade bereit\" heisst jetzt „Wächst\". „Upgrade\" stammt aus dem abgeschafften XP-/SP-System; die Entwicklung laeuft organisch ueber die Saison. Auch der Erklaertext im Detail spricht nicht mehr von einem Upgrade.",
+      "quelle": "triage",
+      "gewicht": null,
       "version": null
     },
     {

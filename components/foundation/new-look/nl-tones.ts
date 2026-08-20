@@ -5,6 +5,10 @@
  * semantische Töne (good/warn/risk) sind bewusst vom Akzent getrennt.
  * `gold` ist die Spitzen-Stufe der Rang-Skala „Bestwert → Schlusslicht"
  * (lib/foundation/quartile-tone.ts) — themefest, nie die Teamfarbe.
+ * `elite` ist das Gegenstück für WERT-Skalen (Depth-Chart ab Rating 80):
+ * ebenfalls themefest, aber hellblau statt gold. Chris' Entscheidung — Gold
+ * lag dort zu nah an `warn` der Stufe darunter, und `accent` scheidet aus,
+ * weil es die Vereinsfarbe trägt.
  * Alle Farben kommen aus den `--nl-*` Tokens in `app/globals.css`
  * und greifen nur unterhalb von `.is-new-look`.
  */
@@ -15,6 +19,7 @@ export type NlTone =
   | "soc"
   | "accent"
   | "gold"
+  | "elite"
   | "good"
   | "warn"
   | "risk"
@@ -39,6 +44,7 @@ export const NL_TONE_VAR: Record<NlTone, string> = {
   soc: "var(--nl-soc, #e6b455)",
   accent: "var(--nl-accent, #5b9bff)",
   gold: "var(--nl-gold, #f6c750)",
+  elite: "var(--nl-elite, #5b9bff)",
   good: "var(--nl-good, #4cc56b)",
   warn: "var(--nl-warn, #e0a53a)",
   risk: "var(--nl-risk, #e5615a)",

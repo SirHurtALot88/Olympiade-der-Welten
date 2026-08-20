@@ -37,6 +37,7 @@
  */
 
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
+import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinweis";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
@@ -148,6 +149,8 @@ export type SeasonGuvParts = {
    * 99,3 gegen eine 2. Linie von 81,0.
    */
   apronKonjunkturhebel?: number | null;
+  /** Salary Factor f der Saison — nur fuer den Erklaertext zum Hebel, nicht fuer die Rechnung. */
+  apronSalaryFactor?: number | null;
   /** `true` = der Deckel (halber Wertungsanteil) hat die Abgabe begrenzt. */
   apronGedeckelt?: boolean;
   /**
@@ -249,9 +252,14 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
             : parts.apronFrozenLines === true
               ? "Linien eingefroren"
               : null,
-        // Die häufigste Erklärung für eine glatte 0 — sichtbar machen, nicht verschweigen.
-        parts.apronGebucht !== true && parts.apronKonjunkturhebel === 0
-          ? "Konjunktur zu schwach: in dieser Saison keine Abgabe"
+        // Die häufigste Erklärung für eine kleine oder glatte Zahl — sichtbar machen, nicht
+        // verschweigen. Frueher stand hier `=== 0`; bei Hebel 0,03 fehlten damit 97 % der Abgabe
+        // ohne ein Wort dazu (Meldung `6fv43h`).
+        parts.apronGebucht !== true
+          ? apronKonjunkturKurzhinweis({
+              konjunkturhebel: parts.apronKonjunkturhebel,
+              salaryFactor: parts.apronSalaryFactor,
+            })
           : null,
       ]
         .filter(Boolean)
