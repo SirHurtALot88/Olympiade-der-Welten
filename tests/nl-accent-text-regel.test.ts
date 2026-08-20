@@ -27,6 +27,20 @@ import { describe, expect, it } from "vitest";
 
 const CSS = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
+/**
+ * KOMMENTARE RAUS, BEVOR IRGENDETWAS GESUCHT WIRD.
+ *
+ * `tokenWert` suchte mit `--name:\s*([^;]+);` im ROHEN Text — und ein Kommentar, der einen Token
+ * beim Namen nennt und danach einen Doppelpunkt setzt, sieht fuer diese Suche aus wie die
+ * Deklaration selbst. Steht er VOR der echten Zeile, gewinnt er. Genau das ist passiert, als in
+ * `globals.css` ein Kommentar mit dem Satzteil „Bewusst auch nicht --nl-gold: Gold gehoert der
+ * RANG-Skala" dazukam: `tokenWert("--nl-gold")` lieferte den halben Kommentar statt `#f6c750`.
+ *
+ * Der Waechter schlug also an einem PROSATEXT an, nicht an einer Farbe. Die Stripping-Zeile gab es
+ * fuer die Regelblock-Suche weiter unten schon; sie gilt jetzt fuer die ganze Datei.
+ */
+const CSS_OHNE_KOMMENTARE = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+
 /* ------------------------------------------------------------------ */
 /* Ratchet                                                             */
 /* ------------------------------------------------------------------ */
@@ -112,7 +126,7 @@ function kontrast(l1: number, l2: number): number {
 
 /** Liest ein `--token: wert;` aus dem .is-new-look-Grundblock. */
 function tokenWert(name: string): string {
-  const m = CSS.match(new RegExp(`${name}:\\s*([^;]+);`));
+  const m = CSS_OHNE_KOMMENTARE.match(new RegExp(`${name}:\\s*([^;]+);`));
   if (!m) throw new Error(`Token ${name} nicht in globals.css gefunden`);
   return m[1].trim();
 }
@@ -162,7 +176,6 @@ describe("--nl-accent-text: der Default ist gemessen lesbar", () => {
 /* ------------------------------------------------------------------ */
 
 /** Erster Regelblock, dessen Selektor auf das Muster passt. */
-const CSS_OHNE_KOMMENTARE = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 function regelBlock(selektor: RegExp): string {
   const alle = CSS_OHNE_KOMMENTARE.matchAll(/([^{}]+)\{([^{}]*)\}/g);
   for (const m of alle) {

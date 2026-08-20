@@ -38111,6 +38111,15 @@ button.market-v2-bucket-card.is-selected {
    Die `.is-new-look`-Deklarationen bleiben bestehen und gewinnen per Spezifitaet;
    das hier ist der Fallback fuer alles ausserhalb des App-Wrappers. */
 :root {
+  /* --nl-elite = ELITE-STUFE einer WERT-Skala (Depth-Chart ab Rating 80), theme-FEST.
+     CHRIS' ENTSCHEIDUNG: „depth chart soll weiterhin hellblau faerben und nicht in team farben,
+     das irritiert sonst." Bewusst NICHT --nl-accent: das ist die Vereinsfarbe, und eine Skala,
+     die auch --nl-risk enthaelt, darf sie nie tragen — bei rotem Team-Theme saehen Spitze und
+     Schlusslicht sonst gleich aus (der Fehler, den Paket F2 repariert hat). Bewusst auch nicht
+     --nl-gold: Gold gehoert der RANG-Skala („Bestwert -> Schlusslicht", quartile-tone.ts), und
+     es lag mit #f6c750 zu nah an --nl-warn (#e0a53a) der 40-59-Stufe daneben. Hellblau ist
+     hier ein fester Wert, kein Theme-Ableger. */
+  --nl-elite: #5b9bff;
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
@@ -44469,6 +44478,15 @@ button.foundation-team-portrait-card {
   --nl-risk-text: #f0837c;
   /* Medaillen (Podest / Top-3-Rahmen) — metallisch, theme-übergreifend lesbar. Silber ist
      bewusst HELL (nicht --nl-mut, das als „deaktiviert" liest); Bronze löst das rgb-Literal ab. */
+  /* --nl-elite = ELITE-STUFE einer WERT-Skala (Depth-Chart ab Rating 80), theme-FEST.
+     CHRIS' ENTSCHEIDUNG: „depth chart soll weiterhin hellblau faerben und nicht in team farben,
+     das irritiert sonst." Bewusst NICHT --nl-accent: das ist die Vereinsfarbe, und eine Skala,
+     die auch --nl-risk enthaelt, darf sie nie tragen — bei rotem Team-Theme saehen Spitze und
+     Schlusslicht sonst gleich aus (der Fehler, den Paket F2 repariert hat). Bewusst auch nicht
+     --nl-gold: Gold gehoert der RANG-Skala („Bestwert -> Schlusslicht", quartile-tone.ts), und
+     es lag mit #f6c750 zu nah an --nl-warn (#e0a53a) der 40-59-Stufe daneben. Hellblau ist
+     hier ein fester Wert, kein Theme-Ableger. */
+  --nl-elite: #5b9bff;
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
@@ -44565,6 +44583,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-tone-men,
 .is-new-look .nl-tone-soc,
 .is-new-look .nl-tone-gold,
+.is-new-look .nl-tone-elite,
 .is-new-look .nl-tone-good,
 .is-new-look .nl-tone-warn,
 .is-new-look .nl-tone-risk,
@@ -44610,6 +44629,11 @@ button.foundation-team-portrait-card {
    rotem Team-Theme nie wie Rang 31 (risk) aussieht. */
 .is-new-look .nl-tone-gold {
   --nl-tone: var(--nl-gold);
+}
+
+/* Elite-Stufe einer WERT-Skala (Depth-Chart ab 80) — theme-festes Hellblau, siehe --nl-elite. */
+.is-new-look .nl-tone-elite {
+  --nl-tone: var(--nl-elite);
 }
 
 /* --- StatChip: "jeder Stat ist ein Portal" ----------------------- */
@@ -70599,8 +70623,18 @@ span.nl-facility-ampel-chip {
   border-radius: var(--nl-r-pill);
 }
 
+/*
+ * CHRIS: „beim training bitte auch die farben nicht mit team farben ueberschreiben wenn man eine
+ * klasse waehlt."
+ *
+ * Hier stand `var(--nl-accent)` — die VEREINSFARBE. Waehlte man eine Klasse, uebermalte der Balken
+ * damit genau die Klassenfarbe, an der man die Klasse wiedererkennt: der linke Rahmen blieb blau
+ * (Templar), der Balken daneben wurde teamrot. Der gewaehlte Zustand ist ohnehin schon an der
+ * Flaeche und der Innenkante zu sehen — die Farbe des Balkens sagt „welche Klasse", nicht „welche
+ * ist gewaehlt", und bleibt deshalb die Klassenfarbe.
+ */
 .is-new-look .nl-training-class-ranking-row.is-current .nl-training-class-ranking-fill {
-  background: var(--nl-accent);
+  background: var(--nl-tone, var(--nl-soc));
 }
 
 /*
@@ -73335,10 +73369,16 @@ span.nl-facility-ampel-chip {
   -webkit-appearance: none;
   appearance: none;
 }
+/*
+ * Der Hover toent NEUTRAL, nicht in der Vereinsfarbe (Chris, s. o.): er liegt direkt auf einer
+ * Zeile, die ihre Klassenfarbe als linken Rahmen traegt. Ein teamroter Schleier ueber einer blauen
+ * Klasse ist genau die Verwechslung, die die Rahmenfarbe verhindern soll. Der Fokusring darunter
+ * bleibt beim Akzent — der ist Bedienhilfe und faerbt nichts ein.
+ */
 .is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:hover:not(:disabled):not(.is-current),
 .is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:hover:not(:disabled):not(.is-current) {
-  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
-  border-color: color-mix(in srgb, var(--nl-accent) 32%, transparent);
+  background: color-mix(in srgb, var(--nl-ink, #e8edf5) 7%, transparent);
+  border-color: color-mix(in srgb, var(--nl-ink, #e8edf5) 24%, transparent);
 }
 .is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:focus-visible,
 .is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:focus-visible {

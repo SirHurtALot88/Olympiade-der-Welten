@@ -168,6 +168,9 @@ export function useSeasonV2PanelModel({
               line2: apronProjection.lines.line2,
               frozenLines: apronProjection.frozenLines,
               konjunkturhebel: apronProjection.konjunkturhebel,
+              // Fuer den Erklaertext zum Hebel — ohne ihn nennt der Hover die Drosselung ohne ihre
+              // Ursache (Meldung `6fv43h`).
+              salaryFactor: apronProjection.salaryFactor,
               gedeckelt: apronRow.gedeckelt,
             };
           })(),

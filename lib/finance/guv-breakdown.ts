@@ -1,3 +1,4 @@
+import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinweis";
 import { buildSeasonGuvHoverText, seasonGuvFromPosten, type SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 
 /**
@@ -46,6 +47,8 @@ export type GuvApronProjectionInput = {
   gedeckelt: boolean;
   /** Konjunkturhebel k(f) der Saison. 0 = in dieser Saison gibt es gar keine Abgabe. */
   konjunkturhebel?: number | null;
+  /** Salary Factor f der Saison — nur fuer den Erklaertext zum Hebel, nicht fuer die Rechnung. */
+  salaryFactor?: number | null;
 };
 
 export type GuvBreakdownInput = {
@@ -111,7 +114,9 @@ function buildApronLines(apron: GuvApronProjectionInput, guv: number | null): st
     apron.gedeckelt ? "durch den Deckel begrenzt" : null,
     // Beide Richtungen benennen: „eingefroren" darf nicht die blosse Abwesenheit einer Warnung sein.
     apron.frozenLines ? "Linien eingefroren" : "Linien noch nicht eingefroren",
-    apron.konjunkturhebel === 0 ? "Konjunktur zu schwach: in dieser Saison keine Abgabe" : null,
+    // Nennt die Drosselung auch, wenn sie nur TEILWEISE greift — bei Hebel 0,03 stand hier sonst
+    // gar nichts, obwohl 97 % der Abgabe fehlten (Meldung `6fv43h`).
+    apronKonjunkturKurzhinweis({ konjunkturhebel: apron.konjunkturhebel, salaryFactor: apron.salaryFactor }),
   ].filter(Boolean);
   return [
     `Apron ${rangText}: ${formatSigned(apron.nettoDelta)}${mitApron}`,

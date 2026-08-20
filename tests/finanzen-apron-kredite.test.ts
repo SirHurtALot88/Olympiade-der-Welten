@@ -21,7 +21,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
-import { computeApronSettlement } from "@/lib/season/apron-service";
+import { APRON_KONJUNKTUR_FACTOR_MIN, computeApronSettlement } from "@/lib/season/apron-service";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
@@ -320,7 +320,11 @@ describe("Deckel: die naive Satz-Summe geht nicht auf — der Topf ist die Summe
   it("das Empfänger-Flag bleibt auch bei leerem Topf gesetzt (k = 0), damit die UI die Rolle benennen kann", () => {
     const settlement = computeApronSettlement({
       lines: { line1: 10, line2: 20 },
-      salaryFactor: 0.9, // unter APRON_KONJUNKTUR_FACTOR_MIN → niemand zahlt
+      // Die Zahl kommt aus der KONSTANTE, nicht aus einer abgetippten 0,9: als die Schwelle von
+      // 0,95 auf 0,88 fiel (Meldung `6fv43h`), war 0,9 plötzlich DARÜBER und der Fall prüfte das
+      // Gegenteil seiner Beschriftung. Ein Waechter, der an einer Zahl haengt statt an der Regel,
+      // rostet genau so.
+      salaryFactor: APRON_KONJUNKTUR_FACTOR_MIN - 0.05, // unter der Schwelle → niemand zahlt
       teams: [
         { teamId: "big", salary: 40, rankShare: 4 },
         { teamId: "low-a", salary: 5, rankShare: 10 },
