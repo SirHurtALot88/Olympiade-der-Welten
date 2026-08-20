@@ -4,6 +4,21 @@ import { adjustBuyDecisionForDoctrine, getPersonaBlendWeight } from "@/lib/ai/ai
 import type { ReplacementSlot } from "@/lib/ai/ai-transfer-replacement-memory";
 import { scoreReplacementFitForSlots } from "@/lib/ai/ai-transfer-replacement-memory";
 import type { Player } from "@/lib/data/olyDataTypes";
+
+/**
+ * Die zwei Zahlen der Luxussteuer-Bremse: Steigung und Obergrenze, in Punkten Pass-Absicht.
+ *
+ * Sie sind aus zwei Bedingungen ABGELEITET, nicht gegriffen — die Herleitung samt Messwerten steht
+ * an der Verwendungsstelle weiter unten:
+ *
+ *   1. UNTERSCHEIDEN: im gemessenen Bereich (Abgabe 45 bis 48 % der Abloese) darf die Bremse nicht
+ *      am Deckel kleben, sonst kostet jeder Zugang fuer die KI dasselbe.
+ *   2. NICHT VERHINDERN: sie darf einen echten Kader-Notstand nie ueberwiegen. Zwei fehlende
+ *      Kaderstellen bringen `clamp(2 * 14, 14, 42)` = 28 Kauf-Absicht — die Obergrenze muss also
+ *      DARUNTER liegen, nicht unter den 42 einer vollen Luecke.
+ */
+export const APRON_LEVY_PASS_INTENT_SLOPE = 45;
+export const APRON_LEVY_MAX_PASS_INTENT = 27;
 import { passesStrategicBuyGate } from "@/lib/season/transfer-market-policy";
 
 export type AiBuyDecisionInput = {
@@ -178,15 +193,44 @@ export function evaluateAiBuyDecision(input: AiBuyDecisionInput): AiBuyDecisionR
    * Aufschlag. So trifft die Bremse den Fall, um den es geht — der Zugang, der ein Team über die
    * Linie schiebt, ohne dafür Gegenwert zu liefern.
    *
-   * GEDECKELT BEI 18 und NIE blockierend: eine Mindestkader-Lücke bringt bis zu 42 Kauf-Absicht ein,
-   * die Steuer darf einen Notkauf also verzögern, aber nicht verhindern. Das ist dieselbe Linie, die
-   * `resolveApronTighteningMultiplier` mit seinem Boden bei 0,5 schon zieht: ein Team DARF die Linie
-   * reissen, wenn der Kader es zwingend braucht — es soll es nur nicht aus Versehen tun.
+   * NIE BLOCKIEREND: eine Mindestkader-Luecke bringt bis zu 42 Kauf-Absicht ein
+   * (`clamp(minGap * 14, 14, 42)` weiter oben), die Steuer darf einen Notkauf also verzoegern, aber
+   * nicht verhindern. Das ist dieselbe Linie, die `resolveApronTighteningMultiplier` mit seinem
+   * Boden bei 0,5 schon zieht: ein Team DARF die Linie reissen, wenn der Kader es zwingend braucht —
+   * es soll es nur nicht aus Versehen tun.
+   *
+   * DER DECKEL STAND AUF 18 UND SAETTIGTE SEIT DER STUFE DAUERHAFT. Er war gegen eine GEDROSSELTE
+   * Abgabe kalibriert: mit der alten Rampe lag der Konjunkturhebel bei einem Salary Factor von 0,96
+   * bei 0,22, ein Zugang kostete ein Team ueber der 2. Linie also rund 2 bis 5 Abgabe — Anteile von
+   * etwa 10 % an der Abloese, Bremswerte um 6, klar unter dem Deckel und damit UNTERSCHEIDEND.
+   *
+   * Seit der Stufe (Chris' Entscheidung zu `6fv43h`) zieht die Abgabe ueber der Schwelle voll. Am
+   * Live-Abbild nachgemessen, drei Teams ueber der 2. Linie und drei realistische Zugaenge:
+   *
+   *   Gehalt 6 / Abloese 20  → Abgabe  9,60 = 48 % → Bremse 29 (vorher 18, am Deckel)
+   *   Gehalt 10 / Abloese 35 → Abgabe 16,00 = 46 % → Bremse 27 (vorher 18, am Deckel)
+   *   Gehalt 14 / Abloese 50 → Abgabe 22,40 = 45 % → Bremse 27 (vorher 18, am Deckel)
+   *
+   * Bei 18 lieferten ALLE DREI denselben Wert: die KI konnte einen Zugang, der sie 9,60 kostet,
+   * nicht mehr von einem unterscheiden, der 22,40 kostet. Genau die Teams, die die Bremse am
+   * noetigsten haben, bekamen die unschaerfste. Ein Team unter der Linie (R-L) blieb mit 1 bis 7
+   * unveraendert — dort war nie ein Deckel im Spiel.
+   *
+   * ZWEI ZAHLEN STATT EINER, beide abgeleitet. Mein erster Versuch war, nur den Deckel auf 30 zu
+   * heben — das hat den Bestandsfall „ein Mindestkader-Notkauf setzt sich trotz Abgabe durch"
+   * umgeworfen, und zwar zu Recht: eine Luecke von ZWEI Kaderstellen bringt 28 Kauf-Absicht, nicht
+   * die 42 der vollen Luecke. Der Deckel muss also unter 28 liegen. Bei unveraenderter Steigung 60
+   * saettigt der gemessene Bereich dort aber weiterhin (45 % x 60 = 27).
+   *
+   * Deshalb: Steigung 60 → 45, Deckel 18 → 27. Damit bildet der gemessene Bereich auf 20/21/22 ab —
+   * unterscheidend, ohne den Deckel zu beruehren — und 27 bleibt unter den 28 des Notstands. Fuer
+   * Teams UNTER der Linie faellt die Bremse leicht milder aus (R-L: 1/4/5 statt 1/5/7); dort war nie
+   * ein Deckel im Spiel und die Steuer ohnehin klein.
    */
   const apronLevy = Number(input.apronMarginalLevy ?? 0);
   if (Number.isFinite(apronLevy) && apronLevy > 0) {
     const levyShare = price != null && price > 0 ? apronLevy / price : 1;
-    passIntentScore += clamp(Math.round(levyShare * 60), 1, 18);
+    passIntentScore += clamp(Math.round(levyShare * APRON_LEVY_PASS_INTENT_SLOPE), 1, APRON_LEVY_MAX_PASS_INTENT);
     reasonToPass.push(`Luxussteuer: +${Math.round(apronLevy * 100) / 100} Abgabe je Saison`);
   }
 
