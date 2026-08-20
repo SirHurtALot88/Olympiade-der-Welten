@@ -24,6 +24,8 @@ import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { AllTimeTableClientProps } from "@/app/foundation/all-time-table-v2/AllTimeTableClient";
 import type { AllTimeTableRow } from "@/lib/foundation/all-time-table";
+import AllTimeLeagueChart, { type AllTimeLeagueChartMetric } from "@/app/foundation/all-time-table-v2/AllTimeLeagueChart";
+import { baueSaisonSpalten, getSaisonWert, parseSaisonSpalte } from "@/lib/foundation/all-time-season-columns";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 
 /**
@@ -127,18 +129,28 @@ type TableSortKey =
   | "mwGrowthPct"
   | "cashNow"
   | "cashPeak"
-  | "teamValueNow";
+  | "teamValueNow"
+  /**
+   * Saisonspalten der Verlaufssicht: `saison:<seasonId>:mw` bzw. `:cash`. Sie stehen NICHT als
+   * feste Namen hier, weil es je Spielstand andere sind — die Liste kommt aus
+   * `model.seasonLabels`, und der Sortierwert wird in `getSortValue` aus dem Schluessel gelesen.
+   */
+  | `saison:${string}`;
 
 // „Aufteilung" der Ewigen Tabelle in fokussierte Sichten (Reiter über der
 // Tabelle): Punkte & Ränge · Medaillen · Marktwert · Cash & Teamwert. Alle
 // Werte stammen aus dem bereits berechneten Modell — hier nur Spaltenauswahl.
-type TableFocus = "points" | "medals" | "marketValue" | "cash";
+type TableFocus = "points" | "medals" | "marketValue" | "cash" | "seasonHistory";
 
 const TABLE_FOCUS_TABS: Array<{ id: TableFocus; label: string }> = [
   { id: "points", label: "Punkte & Ränge" },
   { id: "medals", label: "Medaillen" },
   { id: "marketValue", label: "Marktwert" },
   { id: "cash", label: "Cash & Teamwert" },
+  {
+    id: "seasonHistory",
+    label: "Verlauf je Saison",
+  },
 ];
 
 const BASE_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
@@ -182,7 +194,9 @@ function getPointsColumns(archivedSeasonCount: number): Array<NlTableColumn<AllT
   );
 }
 
-const FOCUS_COLUMNS: Record<Exclude<TableFocus, "points">, Array<NlTableColumn<AllTimeTableRow>>> = {
+// `seasonHistory` fehlt hier bewusst: seine Spalten haengen am Spielstand und werden im Bauteil
+// aus dem Modell erzeugt (siehe `saisonSpalten`), nicht als feste Liste vorgehalten.
+const FOCUS_COLUMNS: Record<Exclude<TableFocus, "points" | "seasonHistory">, Array<NlTableColumn<AllTimeTableRow>>> = {
   medals: [
     ...BASE_COLUMNS,
     { key: "gold", label: "🥇", align: "right", sortable: true, tooltip: "Gold — Anzahl 1. Plätze (Meistertitel)" },
@@ -211,6 +225,9 @@ const FOCUS_DEFAULT_SORT: Record<TableFocus, TableSortKey> = {
   medals: "gold",
   marketValue: "mwNow",
   cash: "teamValueNow",
+  // Der Verlauf sortiert nach der Gesamtleistung, nicht nach einer einzelnen Saison — sonst
+  // entschiede die zufaellig erste Spalte, wer oben steht.
+  seasonHistory: "cumulativePoints",
 };
 
 function getAvgPoints(row: AllTimeTableRow): number | null {
@@ -225,6 +242,12 @@ function getTeamValueNow(row: AllTimeTableRow): number | null {
 }
 
 function getSortValue(row: AllTimeTableRow, key: TableSortKey): number {
+  const saisonSpalte = parseSaisonSpalte(key);
+  if (saisonSpalte) {
+    // Eine Saison, die ein Team nie gespielt hat, sortiert ans Ende — nicht auf 0. „Nicht dabei"
+    // ist kein Kontostand von null.
+    return getSaisonWert(row, saisonSpalte.seasonId, saisonSpalte.metrik) ?? Number.NEGATIVE_INFINITY;
+  }
   switch (key) {
     case "seasonsPlayed":
       return row.seasons.length;
@@ -321,6 +344,12 @@ function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] 
 /** Zell-Renderer der Ewigen Tabelle — identisch für die Live- und die
  * Archiv-Sicht (beide nutzen dieselben Fokus-Spalten). */
 function renderAllTimeCell(row: AllTimeTableRow, column: NlTableColumn<AllTimeTableRow>): ReactNode {
+  const saisonSpalte = parseSaisonSpalte(column.key);
+  if (saisonSpalte) {
+    const wert = getSaisonWert(row, saisonSpalte.seasonId, saisonSpalte.metrik);
+    // „—" heisst hier wirklich „diese Saison nicht gespielt" und nicht „0" — deshalb kein Nullwert.
+    return wert == null ? "—" : formatNlMoney(wert);
+  }
   switch (column.key) {
     case "allTimeRank":
       return row.allTimeRank;
@@ -390,6 +419,13 @@ function renderAllTimeCell(row: AllTimeTableRow, column: NlTableColumn<AllTimeTa
 export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel, onOpenTeam }: AllTimeTableClientProps) {
   const [openKpi, setOpenKpi] = useState<AllTimeKpiKey | null>(null);
   const [focus, setFocus] = useState<TableFocus>("points");
+  /**
+   * Hervorhebung in der Liga-Grafik. `null` heisst „noch nicht angeklickt" — dann greift unten das
+   * eigene Team als Vorgabe (`lcmgxx`: „mein eigenes standardmäßig das hervorgehobene"). Ein
+   * eigener Zustand statt `selectedTeamId` direkt, damit ein Klick die Vorgabe ueberschreiben kann,
+   * ohne die Team-Auswahl der ganzen Ansicht zu verstellen.
+   */
+  const [hervorgehobenesTeam, setHervorgehobenesTeam] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: TableSortKey; direction: NlTableSortDirection }>({
     key: "cumulativePoints",
     direction: "desc",
@@ -416,9 +452,24 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
    * wirklich aktive Sortierkriterium nennen, nicht immer "nach Punkten"
    * behaupten, wenn gerade z. B. nach Marktwert sortiert ist).
    */
+  /**
+   * Die Saisonspalten kommen aus dem Modell, nicht aus einer festen Liste: jeder Spielstand hat
+   * andere Saisons, und die laufende kommt waehrend des Spielens dazu. Reihenfolge und Beschriftung
+   * stammen aus `model.rows[].seasons` — derselben Quelle, aus der auch die Zelle liest.
+   */
+  const saisonSpalten = useMemo<Array<NlTableColumn<AllTimeTableRow>>>(
+    () => (model ? baueSaisonSpalten(model.rows) : []),
+    [model],
+  );
+
   const activeColumns = useMemo(
-    () => (focus === "points" ? getPointsColumns(model?.archivedSeasonCount ?? 0) : FOCUS_COLUMNS[focus]),
-    [focus, model?.archivedSeasonCount],
+    () =>
+      focus === "points"
+        ? getPointsColumns(model?.archivedSeasonCount ?? 0)
+        : focus === "seasonHistory"
+          ? [...BASE_COLUMNS, ...saisonSpalten]
+          : FOCUS_COLUMNS[focus as Exclude<TableFocus, "points" | "seasonHistory">],
+    [focus, model?.archivedSeasonCount, saisonSpalten],
   );
 
   const openKpiMetric = useMemo(() => KPI_METRICS.find((metric) => metric.key === openKpi) ?? null, [openKpi]);
@@ -515,6 +566,16 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
       getChartValues(row, "teamValue").length >= 1,
   );
   const canShowCharts = maxSeasonPoints >= 2 || hasSingleMoneyAnchor;
+  /**
+   * Die Verlaufskarte kennt fuenf Kennzahlen, die Liga-Grafik vier: `teamValue` (MW + Cash) laesst
+   * sich aus `AllTimeSeasonPoint` nicht je Saison bilden, ohne zwei moeglicherweise fehlende Werte
+   * stillschweigend als 0 zu behandeln. Statt eine erfundene Linie zu zeichnen, bleibt die
+   * Liga-Grafik bei dieser Wahl leer — die Kacheln daneben zeigen sie weiterhin.
+   */
+  const ligaMetrik: AllTimeLeagueChartMetric | null =
+    chartMetric === "mw" || chartMetric === "cash" || chartMetric === "points" || chartMetric === "rank"
+      ? chartMetric
+      : null;
   const defaultChartRows = sortedRows.slice(0, 8);
   const ownRow = selectedTeamId != null ? model.rows.find((row) => row.teamId === selectedTeamId) ?? null : null;
   const ownRowAppended = ownRow != null && !defaultChartRows.some((row) => row.teamId === ownRow.teamId);
@@ -555,6 +616,18 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
       ) : (
         <>
           <p className="nl-alltime-chart-caption">{chartCaption}</p>
+          {/* ALLE TEAMS IN EINEM BILD (`lcmgxx`). Steht ueber dem Kachelgitter: erst „wo stehe ich
+              gegen die Liga", dann der Verlauf je Team im Detail. Das Gitter bleibt — es beantwortet
+              eine andere Frage und war ausdruecklich gewuenscht („mit nem Hover ne
+              Liniendiagramm-Grafik"). */}
+          {ligaMetrik ? (
+            <AllTimeLeagueChart
+              rows={sortedRows}
+              metric={ligaMetrik}
+              highlightedTeamId={hervorgehobenesTeam ?? selectedTeamId ?? null}
+              onHighlight={setHervorgehobenesTeam}
+            />
+          ) : null}
           <div className="nl-alltime-chart-grid">
             {chartRows.map((row) => {
               const { values, labels } = getChartSeries(row, chartMetric);

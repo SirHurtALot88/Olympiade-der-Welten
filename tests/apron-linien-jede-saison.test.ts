@@ -17,7 +17,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ApronLinesSnapshot, GameState } from "@/lib/data/olyDataTypes";
-import { resolveSeasonApronLines } from "@/lib/season/apron-service";
+import { APRON_LINE_2_MEDIAN_FACTOR, resolveSeasonApronLines } from "@/lib/season/apron-service";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 
 /** Minimaler Spielstand — dieselbe Bauweise wie tests/apron-linien-nach-kaderbau.test.ts. */
@@ -97,9 +97,16 @@ describe("Jede Saison bekommt ihre eigenen Apron-Linien", () => {
 
     const linien = resolveSeasonApronLines(state);
 
-    // Aus den EIGENEN Kadern der Season 2 (Median 80 → 88 / 100), nicht aus Season 1 (50).
+    /**
+     * Aus den EIGENEN Kadern der Season 2 (Median 80), nicht aus Season 1 (50).
+     *
+     * Die LINIE wird aus der Konstante abgeleitet statt abgetippt: hier stand `100`, also
+     * 80 x 1,25 — und die 1,25 ist gewanderte Balance (auf 1,60, Meldung `6fv43h`). Ein Waechter,
+     * der die abgeleitete Zahl festhaelt, faellt bei jeder Nachjustierung um und sagt dabei nichts
+     * ueber die Zusage aus, um die es geht: die Linie kommt aus DIESER Saison.
+     */
     expect(linien.medianSalary).toBeCloseTo(80, 1);
-    expect(linien.line2).toBeCloseTo(100, 1);
+    expect(linien.line2).toBeCloseTo(80 * APRON_LINE_2_MEDIAN_FACTOR, 1);
     expect(linien.line2).not.toBeCloseTo(SAISON_1_SNAPSHOT.line2, 1);
   });
 
@@ -116,7 +123,7 @@ describe("Jede Saison bekommt ihre eigenen Apron-Linien", () => {
 
     expect(snapshot?.seasonId).toBe("season-2");
     expect(snapshot?.medianSalary).toBeCloseTo(80, 1);
-    expect(snapshot?.line2).toBeCloseTo(100, 1);
+    expect(snapshot?.line2).toBeCloseTo(80 * APRON_LINE_2_MEDIAN_FACTOR, 1);
     // Der Herkunftsvermerk: ohne ihn wäre ein Alt-Build-Snapshot nicht von einem gültigen zu
     // unterscheiden (genau so saß Chris' veralteter Stand fest).
     expect(snapshot?.frozenAtEvent).toBe("buy_window_close");
