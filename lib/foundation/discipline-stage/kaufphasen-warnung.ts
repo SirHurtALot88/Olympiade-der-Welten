@@ -38,6 +38,23 @@ export type KaufphasenWarnung = {
 };
 
 export function ermittleKaufphasenWarnung(gameState: GameState): KaufphasenWarnung | null {
+  /**
+   * DEFENSIV GEGEN TEIL-SPIELSTAENDE — nachgetragen, nachdem genau das die Arena zerlegt hat.
+   *
+   * `isEarlySeasonTransferSetup` liest `gameState.season.currentMatchday` und
+   * `gameState.matchdayState.status` ohne Absicherung. Im Bootstrap- und im Render-Test-Fall fehlen
+   * beide Zweige, und der Aufruf warf `Cannot read properties of undefined (reading
+   * 'currentMatchday')` — mitten im `useMemo` der Arena, also beim Rendern selbst.
+   *
+   * Die Arena ist an jeder anderen Stelle darauf vorbereitet („Defensiv gegen Bootstrap-/Teil-
+   * States: im Ladefenster koennen diese Arrays (noch) fehlen"); dieser Zugang war es nicht.
+   *
+   * Inhaltlich ist der Riegel ohnehin richtig: ohne Saison und ohne Spieltag gibt es kein
+   * Kauffenster, ueber dessen Schliessen man warnen koennte.
+   */
+  if (gameState?.season == null || gameState.matchdayState == null) {
+    return null;
+  }
   if (!isTransferBuyPhaseOpen(gameState)) {
     return null;
   }
