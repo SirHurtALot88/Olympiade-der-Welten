@@ -38,9 +38,12 @@ describe("A1: Ø Rang und Best sind zusammengelegt, solange sie identisch wären
   });
 
   it("Kopf UND Caption ziehen die Spaltenliste aus derselben Quelle (activeColumns)", () => {
-    expect(MARKUP).toContain(
-      'const activeColumns = useMemo(\n    () => (focus === "points" ? getPointsColumns(model?.archivedSeasonCount ?? 0) : FOCUS_COLUMNS[focus]),',
-    );
+    // HIER STAND DER GANZE AUSDRUCK WÖRTLICH. Das hielt nicht die Zusage fest, sondern die
+    // Schreibweise: der Reiter „Verlauf je Saison" (`lcmgxx`) brauchte einen dritten Zweig, und
+    // der Test wurde rot, obwohl die EINE Quelle genau so blieb. Geprüft wird deshalb jetzt, was
+    // gemeint war — es gibt genau eine Ableitung, und beide Verbraucher lesen sie.
+    expect(MARKUP.match(/const activeColumns = useMemo\(/g) ?? []).toHaveLength(1);
+    expect(MARKUP).toContain("getPointsColumns(model?.archivedSeasonCount ?? 0)");
     expect(MARKUP).toContain("columns={activeColumns}");
     expect(MARKUP).toContain("activeColumns.find((column) => column.key === sort.key)?.label");
   });
@@ -94,8 +97,11 @@ describe("Früher Saisonzustand wird im Kopf erklärt, nicht stillschweigend vor
 
 describe("Eine Quelle pro Größe: activeColumns treibt Tabelle UND Caption, keine zweite Spaltenliste", () => {
   it("es gibt keine zweite Kopie von POINTS_COLUMNS_BASE/FOCUS_COLUMNS[focus] im Render-Pfad", () => {
-    // Nur EIN Aufrufer von FOCUS_COLUMNS[focus] im ganzen Modul — die Zuweisung in activeColumns.
-    const aufrufer = MARKUP.match(/FOCUS_COLUMNS\[focus\]/g) ?? [];
+    // Nur EIN Aufrufer von FOCUS_COLUMNS[focus …] im ganzen Modul — die Zuweisung in
+    // activeColumns. Der Zugriff trägt seit dem Reiter „Verlauf je Saison" eine Typ-Einengung im
+    // Index (`focus as Exclude<…>`), weil dieser Reiter seine Spalten aus dem Spielstand baut und
+    // nicht aus der festen Tabelle; deshalb hier auf den Zugriff geprüft, nicht auf `[focus]`.
+    const aufrufer = MARKUP.match(/FOCUS_COLUMNS\[focus\b/g) ?? [];
     expect(aufrufer.length).toBe(1);
   });
 });

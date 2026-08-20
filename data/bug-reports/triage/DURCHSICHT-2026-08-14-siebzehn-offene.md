@@ -16,7 +16,7 @@ ist dann ehrlich als „am Bildschirm nachsehen" markiert statt als Vermutung ve
 
 | Meldung | Thema | Stand |
 |---|---|---|
-| `17xs83` | Team-Steuerung an zwei Stellen umstellbar | **behoben** |
+| `17xs83` | Team-Steuerung an zwei Stellen umstellbar | **halb behoben** — zweite Hälfte in #592 |
 | `c6ick6` | MD10 D2 läuft nicht durch | **behoben** (#556) |
 | `diwdvh` | Startwert in der Attributentwicklung fehlt | **behoben** |
 | `l4835p` | Top-Disziplinen ohne All-Time | **behoben** |
@@ -38,7 +38,22 @@ ist dann ehrlich als „am Bildschirm nachsehen" markiert statt als Vermutung ve
 
 ### behoben
 
-**`17xs83` — Team-Steuerung an zwei Stellen.** Chris' Folgesatz steht wörtlich im Quelltext:
+**`17xs83` — Team-Steuerung an zwei Stellen. KORREKTUR (20.08.): meine Quittung war zu grob.**
+
+Die Meldung hat ZWEI Hälften, und ich hatte nur die eine geprüft. Chris schrieb:
+
+> „Beim Switch in Season 2 ist C-C plötzlich auch ein von mir gesteuertes Team! aber nur im KI
+> Verhalten Reiter - und ich bekomme das nicht weg... deswegen sollte es nur noch einen Weg geben"
+
+Der EINE WEG ist da — das ist die Hälfte, die ich unten beschreibe und die stimmt. Dass ein FREMDES
+Team sich als seines ausgibt, ist die andere, und die war beim Abhaken noch offen. Sie wird in
+**#592** („Fremdes Team gibt sich nicht mehr als meines aus, `17xs83`, Teil 1") behoben —
+`lib/foundation/team-control-settings.ts` plus eine Heilung für bestehende Spielstände.
+
+„Behoben" war damit die falsche Vokabel für einen Befund, den ich nur zur Hälfte nachgemessen
+hatte. Der Rest dieses Abschnitts beschreibt weiterhin korrekt, was auf `main` liegt.
+
+**Die geprüfte Hälfte.** Chris' Folgesatz steht wörtlich im Quelltext:
 „ich will keine spielstände mehr reparieren, hau es raus mach mir nur einen sauber verknüpften
 weg für die zukunft". Das zweite 32-Klub-Raster im Reiter „KI-Verhalten" ist ersatzlos entfallen
 (`FoundationTeamSettingsNewLook.tsx`, Abschnitt `game-mode-ownership-readonly`). Wem ein Team

@@ -75,12 +75,24 @@ describe("Apron — Konjunkturhebel", () => {
     expect(apronKonjunkturhebel(1.5)).toBe(1);
   });
 
-  it("ist linear dazwischen", () => {
-    const mid = (APRON_KONJUNKTUR_FACTOR_MIN + APRON_KONJUNKTUR_FACTOR_MAX) / 2;
-    expect(apronKonjunkturhebel(mid)).toBeCloseTo(0.5, 9);
-    // Ein Viertel des Wegs von der Schwelle nach 1,24.
-    const quarter = APRON_KONJUNKTUR_FACTOR_MIN + (APRON_KONJUNKTUR_FACTOR_MAX - APRON_KONJUNKTUR_FACTOR_MIN) * 0.25;
-    expect(apronKonjunkturhebel(quarter)).toBeCloseTo(0.25, 9);
+  it("kennt dazwischen nichts — es ist eine Stufe, keine Rampe", () => {
+    /**
+     * CHRIS' ENTSCHEIDUNG zu `6fv43h`: „darüber müsste M-M den vollen betrag zahlen! das ist nicht
+     * nur kleiner teil oder so sondern direkt BAM in your face".
+     *
+     * Hier stand vorher der Rampen-Waechter (Mitte = 0,5, Viertel = 0,25). Er wird NICHT gelockert,
+     * sondern ersetzt: die Zusage hat sich geaendert, nicht ihre Genauigkeit. Geprueft wird die
+     * FORM, nicht die Zahl 0,88 — waere `..._MAX` wieder groesser als `..._MIN`, faellt dieser Fall
+     * sofort auf.
+     */
+    for (const anteil of [0.25, 0.5, 0.75]) {
+      const f = APRON_KONJUNKTUR_FACTOR_MIN + (1.24 - APRON_KONJUNKTUR_FACTOR_MIN) * anteil;
+      expect(apronKonjunkturhebel(f), `f=${f} muss voll ziehen, nicht anteilig`).toBe(1);
+    }
+    // Knapp unter der Schwelle bleibt es bei null — die Schutzzone ist der Sinn der Schwelle.
+    expect(apronKonjunkturhebel(APRON_KONJUNKTUR_FACTOR_MIN - 0.001)).toBe(0);
+    // Und knapp darueber zieht er sofort voll, statt bei fast null anzufangen.
+    expect(apronKonjunkturhebel(APRON_KONJUNKTUR_FACTOR_MIN + 0.001)).toBe(1);
   });
 
   it("klammert statt zu extrapolieren", () => {

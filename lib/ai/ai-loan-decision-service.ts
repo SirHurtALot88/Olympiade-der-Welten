@@ -59,13 +59,34 @@ const LOAN_NEED_FILL_FRACTION = Number(process.env.OLY_LOAN_NEED_FILL_FRACTION ?
  */
 const LOAN_AMOUNT_FILL_FRACTION = Number(process.env.OLY_LOAN_AMOUNT_FILL_FRACTION ?? 0.7) || 0.7;
 /**
- * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt. Das Gehalt
- * wird nur ANTEILIG gegengerechnet (Teams haben auch Transfer-/sonstige Einnahmen), der Gebäude-Unterhalt
- * voll. So behalten Teams Gehalt + Gebäudekosten vs. Sponsor im Blick und nehmen keine zu kurzen (zu
- * teuren) Kredite auf, die sie zusammen mit den Fixkosten nicht stemmen können.
+ * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt.
+ * Gehalt UND Gebäude-Unterhalt zählen voll.
+ *
+ * HIER STAND 0,6, mit der Begründung „Teams haben auch Transfer-/sonstige Einnahmen". Chris hat das
+ * verworfen: „100% der gehälter sind fixkosten logischerweise! da ist das problem". Er hat recht —
+ * das Gehalt wird jede Saison in voller Höhe abgebucht, ob nebenbei ein Transfer gelingt oder
+ * nicht. Ein Anteil von 0,6 rechnete 40 % der sichersten Ausgabe des Spiels einfach nicht mit und
+ * gab dadurch Kreditrahmen frei, den es nie gab.
+ *
+ * ÜBER DIE LIVE-ABBILDER GEMESSEN (129 Teamzeilen mit Sponsoreinkommen): der Rahmen sinkt deutlich
+ * — `hwz8fk` A-A von 26,7 auf 8,3, C-S von 38,0 auf 12,1. Bei 107 der 129 Zeilen liegt die ehrliche
+ * Rechnung damit unter dem Boden (`MIN_DEBT_SERVICE_FLOOR`), vorher bei 40. Der Boden trägt also ab
+ * jetzt die Mehrheit der Fälle — siehe die Notiz dort.
  */
-const SALARY_SERVICE_WEIGHT = 0.6;
-/** Auch bei hohen Fixkosten bleibt mindestens dieser Anteil des Sponsor-FC als Kreditdienst-Budget nutzbar. */
+const SALARY_SERVICE_WEIGHT = 1;
+/**
+ * Auch bei hohen Fixkosten bleibt mindestens dieser Anteil des Sponsor-FC als Kreditdienst-Budget
+ * nutzbar.
+ *
+ * ACHTUNG, DER BODEN TRÄGT JETZT DIE MEHRHEIT. Seit das Gehalt voll gegengerechnet wird, liegt die
+ * ehrliche Rechnung bei 107 von 129 gemessenen Teamzeilen darunter — der Rahmen ist für sie also
+ * nicht mehr „Sponsor minus Fixkosten", sondern schlicht 15 % des Sponsoreinkommens. Bei 79 Zeilen
+ * ist die Rechnung sogar negativ, und der Boden gibt trotzdem Rahmen frei.
+ *
+ * Das ist eine bewusst offene Entscheidung: Chris hat den Boden ausdrücklich behalten wollen
+ * (Antwort „also c"). Wer ihn später an eine Bedingung knüpfen will — etwa nur noch bei Kadern
+ * unter dem Spielerminimum —, findet die Messung in `data/bug-reports/triage/…-cankgm.md`.
+ */
 const MIN_DEBT_SERVICE_FLOOR = 0.15;
 /** Ist nach den bestehenden Raten weniger als das übrig, gibt es keinen Spielraum für einen weiteren Kredit. */
 const MIN_DEBT_SERVICE_ROOM = 1;
