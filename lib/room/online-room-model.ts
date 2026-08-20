@@ -224,6 +224,19 @@ export type TeamWriteAction =
   | "player_generator_commit"
   | "team_identity_update"
   | "team_control_update"
+  /**
+   * Mensch/KI je Team umstellen — WER ein Team führt, nicht wie es geführt wird.
+   *
+   * Eigene Aktion und ausdrücklich HOST-LEVEL (siehe `HOST_LEVEL_ACTIONS`): `team_control_update`
+   * schließt `controlMode`, `ownerId` und `ownerSlot` bewusst aus, damit ein beliebiger Teilnehmer
+   * sich kein Team nehmen kann. Die Umstellung selbst muss es trotzdem geben — Chris' Entscheidung
+   * vom 20.08.2026 zu `17xs83`: „es muss eine möglichkeit geben das sauber umzustellen … und DAS
+   * gilt dann auch überall", mit der Zuständigkeit beim Host, wie bei Draft und Simulation.
+   *
+   * Sie schreibt saveweit (die Zuordnung aller Teams auf einmal) und hat deshalb ohnehin kein
+   * einzelnes `teamId`, gegen das sich autorisieren ließe.
+   */
+  | "team_ownership_update"
   | "team_captain_assign"
   | "new_game_flow_step"
   | "contract_negotiation_outcome"

@@ -23,13 +23,24 @@
  * drei Formen nachgerechnet. Die Form entscheidet nur, WANN das Geld fließt: wer heute Kasse hat,
  * front-loadet und entlastet spätere Jahre; wer knapp steht, verschiebt nach hinten.
  *
- * FOLGE FÜR DIE REGEL UNTEN, die noch aussteht: `apronHeadroom` steuert die Formwahl weiterhin so,
- * als ließe sich damit die Abgabe bewegen. Das tut es seit dieser Umstellung nicht mehr — die
- * Steuerung gehört auf Liquidität umgestellt statt auf Apron-Spielraum. Chris ist darauf
- * hingewiesen; hier steht es, damit es nicht unbemerkt weiterläuft.
+ * DIESE FOLGE IST JETZT GEZOGEN (Chris, 20.08.2026: „a als ein faktor"). Die Regel steuerte die
+ * Formwahl über `apronHeadroom` — also so, als ließe sich damit die Abgabe bewegen. Genau das kann
+ * sie seit der Rücknahme nicht mehr; die Regel feuerte ins Leere. Gesteuert wird jetzt über den
+ * KASSENSTAND. Das ist die Größe, die die Form wirklich bewegt: sie verschiebt Geld zwischen
+ * Jahren, sonst nichts. Warum der blanke Kontostand und nicht `cash − Rücklage` steht am Feld
+ * `kassenstand` — kurz: 156 von 160 Teams liegen unter ihrer Rücklage, das wäre kein Riegel
+ * gewesen, sondern ein Verbot.
  *
  * DIESE DATEI HÄLT DIE REGEL — NICHT DIE AUFRUFER. Es gibt DREI unabhängige Formwähler im Spiel,
- * und alle drei rufen `wendeApronUndMixAn`. Neue Formwähler gehören ebenfalls hierher.
+ * und alle drei rufen `wendeLiquiditaetUndMixAn`. Neue Formwähler gehören ebenfalls hierher.
+ *
+ * DER SPIELERWUNSCH BRAUCHTE KEINE ÄNDERUNG — nachgesehen statt vermutet: `contractShape` startet
+ * in `recommendContractOfferForPlayer` bei `basePreference.shapePreference`, also beim Wunsch des
+ * Spielers (contract-negotiation-preview.ts, „let contractShape = basePreference.shapePreference").
+ * Ein Team, dem die Form egal ist, geht also bereits auf ihn ein; erst eine team-eigene Regel
+ * verschiebt ihn. Was NICHT existiert, ist die Ersparnis: `shapePreference` hat heute nirgends ein
+ * Preisgewicht — die Erfüllung des Wunsches kostet und spart 0,00. Das wäre eine neue Mechanik und
+ * ist Chris' Entscheidung, nicht meine.
  *
  * WELCHE KAUFWEGE HEUTE WIRKLICH LAUFEN — nachgemessen, nicht aus Altbeständen geschlossen. Der
  * Füll-Lauf (`auto-roster-fill-service.ts`) ist AB SAISON 2 VERBOTEN, die Sperre steht im Dienst
@@ -53,11 +64,21 @@
  * und Verlängerung apron-blind blieben.
  */
 import type { ContractShape, GameState } from "@/lib/data/olyDataTypes";
-import { getTeamApronSalaryBase, resolveSeasonApronLines } from "@/lib/season/apron-service";
 
 export type ContractShapeTeamContext = {
-  /** `line1 − Apron-Bemessung`. Negativ heisst: das Team liegt ueber der ersten Linie. */
-  apronHeadroom: number;
+  /**
+   * Der Kontostand des Teams. Null oder negativ heisst: kein Geld, um zusätzlich früh zu zahlen.
+   *
+   * WARUM NICHT `cash − Rücklage`, obwohl das die naheliegende Größe wäre — nachgemessen an den
+   * fünf Abbildern (160 Teams): **156 von 160 liegen unter ihrer Rücklage** (Rücklagen-Median
+   * 26,1 gegen Cash-Median 6,9). Die Rücklage ist ein SPARZIEL, keine Notlinie; als Riegel gelesen
+   * hätte sie front_loaded praktisch abgeschafft. Weitere gemessene Schwellen: `cash < Rücklage/2`
+   * trifft 77 %, `cash < Rücklage/4` noch 44 %.
+   *
+   * `cash <= 0` trifft **24 von 160 (15 %)** — die Teams, die wirklich blank sind. Der abgelöste
+   * Apron-Riegel traf 35 von 160 (22 %), die Größenordnung bleibt also erhalten.
+   */
+  kassenstand: number;
   /**
    * DER GEHALTSBERG, IN GELD: der bereits gebundene MEHRBETRAG spaeterer Vertragsjahre, gemessen an
    * der heutigen Gehaltssumme. 0,18 heisst „das Team hat sich fuer eine spaetere Saison 18 % seiner
@@ -108,19 +129,22 @@ export const MIX_RIEGEL_QUOTE = 0.15;
  * Chris' Grenze dazu war ausdruecklich: „achtung deine messwerte schieben alles extrem richtung
  * backloaded das gefaellt mir gar nicht." Beide Zweige liefern deshalb `balanced`.
  */
-export function wendeApronUndMixAn(input: {
+export function wendeLiquiditaetUndMixAn(input: {
   form: ContractShape;
   laufzeit: number;
-  apronHeadroom?: number | null;
+  kassenstand?: number | null;
   gehaltsbergQuote?: number | null;
 }): { form: ContractShape; grund: string | null } {
   // Bei Einjahresvertraegen gibt es keine Verteilung ueber die Zeit — die Form ist bedeutungslos.
   if (input.laufzeit < 2) return { form: input.form, grund: null };
 
-  if (input.apronHeadroom != null && input.apronHeadroom <= 0 && input.form === "front_loaded") {
+  // HIER STAND DER APRON-SPIELRAUM. Er steuerte die Form so, als liesse sich damit die Abgabe
+  // bewegen — seit die Bemessung wieder am verhandelten Gehalt haengt, tut sie das nicht mehr, und
+  // die Regel feuerte ins Leere. Liquiditaet ist die Groesse, die die Form wirklich bewegt.
+  if (input.kassenstand != null && input.kassenstand <= 0 && input.form === "front_loaded") {
     return {
       form: "balanced",
-      grund: "Ueber der Apron-Linie: nicht zusaetzlich frueh zahlen, wenn die Abgabe ohnehin faellig wird.",
+      grund: "Kasse leer: nicht zusaetzlich frueh zahlen, wenn kein Geld da ist.",
     };
   }
 
@@ -139,33 +163,31 @@ export function wendeApronUndMixAn(input: {
 }
 
 type Lookup = {
-  line1: number;
   byTeamId: Map<string, ContractShapeTeamContext>;
 };
 
 /**
- * Der organische Draft ruft die Kaufvorschau je Kandidat auf, und jede Vorschau braucht diese Lage. Ohne
- * Zwischenspeicher liefe die Liga-Median-Rechnung (`resolveSeasonApronLines`) pro Kandidat erneut.
- * Der Speicher haengt am GameState-Objekt: ein neuer Zustand bekommt eine neue Rechnung, ein
- * unveraenderter wird nicht zweimal vermessen.
+ * Der organische Draft ruft die Kaufvorschau je Kandidat auf, und jede Vorschau braucht diese Lage.
+ * Ohne Zwischenspeicher liefe die Gehaltsberg-Rechnung (ueber alle Kadervertraege des Teams) pro
+ * Kandidat erneut. Der Speicher haengt am GameState-Objekt: ein neuer Zustand bekommt eine neue
+ * Rechnung, ein unveraenderter wird nicht zweimal vermessen.
  */
 const speicher = new WeakMap<object, Lookup>();
 
-function baueLookup(gameState: GameState): Lookup {
-  const lines = resolveSeasonApronLines(gameState);
-  return { line1: lines.line1, byTeamId: new Map() };
+function baueLookup(): Lookup {
+  return { byTeamId: new Map() };
 }
 
 export function getContractShapeTeamContext(gameState: GameState, teamId: string): ContractShapeTeamContext {
   let lookup = speicher.get(gameState as unknown as object);
   if (!lookup) {
-    lookup = baueLookup(gameState);
+    lookup = baueLookup();
     speicher.set(gameState as unknown as object, lookup);
   }
   const vorhanden = lookup.byTeamId.get(teamId);
   if (vorhanden) return vorhanden;
 
-  const apronHeadroom = Number((lookup.line1 - getTeamApronSalaryBase(gameState, teamId)).toFixed(1));
+  const kassenstand = Number((gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? 0).toFixed(1));
 
   // DER BERG IN GELD. Je Vertrag: teuerste kuenftige Rate minus Rate dieser Saison, nur der
   // ANSTIEG zaehlt (deshalb `Math.max(0, …)`) — ein auslaufender oder front-loaded Vertrag drueckt
@@ -189,7 +211,7 @@ export function getContractShapeTeamContext(gameState: GameState, teamId: string
   }
   const gehaltsbergQuote = jetzt > 0 ? Number((mehrbetrag / jetzt).toFixed(3)) : 0;
 
-  const ergebnis: ContractShapeTeamContext = { apronHeadroom, gehaltsbergQuote };
+  const ergebnis: ContractShapeTeamContext = { kassenstand, gehaltsbergQuote };
   lookup.byTeamId.set(teamId, ergebnis);
   return ergebnis;
 }
