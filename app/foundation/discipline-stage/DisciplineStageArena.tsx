@@ -32,6 +32,10 @@ import {
 import { buildMatchdayInjuryMarks } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 import { replayNachArenaReset } from "@/lib/foundation/discipline-stage/discipline-stage-replay-gate";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+// Direkt aus `nl-tones` statt aus dem `new-look`-Sammelmodul: dort haengen React-Bauteile dran,
+// die dieses Buendel sonst mitzoege (siehe `ci:client-bundle-lint`).
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
+import { ermittleKaufphasenWarnung } from "@/lib/foundation/discipline-stage/kaufphasen-warnung";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
@@ -1330,6 +1334,13 @@ export default function DisciplineStageArena({
   const leagueLineupReadiness = useMemo(() => getMatchdayLeagueLineupReadiness(gameState), [gameState]);
   const arenaStartBlockedByLineups = !leagueLineupReadiness.allReady;
 
+  /**
+   * Die Ansage vor der Tür, die für eine ganze Saison zufällt (`cubix1`). Die Regel selbst und
+   * ihre Begründung stehen in `lib/foundation/discipline-stage/kaufphasen-warnung.ts` — hier
+   * steht nur, WO sie erscheint: auf der letzten Tafel vor der Bühne.
+   */
+  const kaufphaseSchliesstMitDiesemSpieltag = useMemo(() => ermittleKaufphasenWarnung(gameState), [gameState]);
+
   // Host meldet den Sync einmalig an, sobald die Preview steht (idle → running).
   useEffect(() => {
     if (!roomContext || !roomArenaSync.isRoomHost || !preview) return;
@@ -2433,6 +2444,21 @@ export default function DisciplineStageArena({
                 : ""}
               {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Einsatzlisten-Editor geklärt." : ""}
             </p>
+            {/* Siehe `kaufphaseSchliesstMitDiesemSpieltag` oben: die Regel bleibt, wie Chris sie
+                gesetzt hat — hier steht nur die Ansage vor der Tür, die zufällt.
+
+                Testid = Klassenname. Die beidseitige Klassen-Wache (Velo-Look-Suite) liest jeden
+                `arena-prematch…`-Namen aus dieser Datei und verlangt ihn in globals.css — mit
+                gleichem Namen braucht sie dafür keine Ausnahme. */}
+            {kaufphaseSchliesstMitDiesemSpieltag ? (
+              <p className="arena-prematch-kaufwarnung" data-testid="arena-prematch-kaufwarnung">
+                <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
+                ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
+                {kaufphaseSchliesstMitDiesemSpieltag.teamCount === 1
+                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`
+                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`}
+              </p>
+            ) : null}
             {slotCells.length > 0 ? (
               <div
                 className="arena-prematch-slotbar"
@@ -2476,7 +2502,11 @@ export default function DisciplineStageArena({
                 data-testid="arena-prematch-start-cta"
               >
                 Zur Bühne →
-                <small className="nl-tnum">Liga vollzählig bereit</small>
+                {/* Die Warnung steht auch AUF dem Knopf: wer die Tafel überfliegt, liest
+                    trotzdem, was dieser Klick kostet. */}
+                <small className="nl-tnum">
+                  {kaufphaseSchliesstMitDiesemSpieltag ? "schließt die Kaufphase" : "Liga vollzählig bereit"}
+                </small>
               </button>
             ) : null}
           </div>
