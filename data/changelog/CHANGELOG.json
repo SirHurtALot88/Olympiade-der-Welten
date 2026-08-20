@@ -84,6 +84,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Intern · Spielstand",
+      "pr": null,
+      "text": "Speichern ist gut ein Drittel schneller. Bei jedem Speichern prüfte eine Wache sämtliche Spieler-Ausgangswerte darauf, ob jemand sie überschreiben will — knapp 3000 Datensätze, jedes Mal neu normalisiert und mit neuer Prüfsumme versehen. Das kostete rund 420 der 1140 Millisekunden, und gefunden hat es im Normalfall nichts: diese Werte sind der Stand bei Spielbeginn und ändern sich praktisch nie. Die Wache läuft jetzt nur noch, wenn sich an den Prüfsummen wirklich etwas geändert hat; ein Speichern fällt damit von 1138 auf 726 Millisekunden. Vor dem Umbau nachgewiesen: über alle Abbilder liefert der abgekürzte Weg denselben Spielstand wie der volle.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Welt · Sponsoren",
       "pr": null,
       "text": "Die Apron-Marke in der Sponsorenliste zeigte bei 61 von 224 Teamzeilen die falsche Zone — über alle sieben Spielstände nachgezählt, und in beide Richtungen. Sie verglich die GEGLÄTTETE Gehaltssumme mit den Linien, während die Abgabe selbst gegen die ECHTE rechnet: Cold Steel stand als „über 2. Linie\" da (79,4) und liegt echt bei 61,6, also nur über der ersten; Big Bang stand auf „unter\" (58,3) und zahlt echt bei 61,3. Die Marke holt ihre Grundlage jetzt bei der Apron selbst, statt sie nachzubauen. Auch die Deckungsspalte („trägt der Sponsor die Mannschaft?\") rechnet jetzt mit dem Geld, das wirklich vom Konto geht — bei Mayhem 123,5 statt 98,9 —, und die Erklärung sagt dazu, welche der Gehaltszahlen sie meint. Die Glättung bleibt, wo sie hingehört: als Bemessungsgrundlage der Sponsor-Kalibrierung.",
