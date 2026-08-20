@@ -12,6 +12,7 @@ import {
   markDisconnected,
   quickSimRoomArenaRevealState,
   setRoomArenaDisciplinePhaseState,
+  closeRoom,
   rejoinRoom,
   resetRoomArenaRevealState,
   runRoomAiAutoStep,
@@ -324,6 +325,48 @@ export function ensureSocketServer(httpServer: HttpServer) {
     // `roomEvents`-Eintrag schreibt (Begruendung dort).
     socket.on("setRoomArenaDisciplinePhase", ({ roomCode, seatToken, phase, maxSlotRevealCountByDiscipline }) => {
       const result = setRoomArenaDisciplinePhaseState(roomCode, seatToken, { phase, maxSlotRevealCountByDiscipline });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    /**
+     * DER HOST BEENDET DEN RAUM — und gibt damit den Spielstand wieder frei.
+     *
+     * `closeRoom` (room-store.ts) gab es seit Stufe 0.4 vollstaendig: Host-Pruefung, Status auf
+     * "completed", `removeRoomFromActiveSet` (Prozess-Map, Ablage UND der Save-Schutz in der
+     * Registry). Nur hatte sie ausserhalb ihrer eigenen Datei keinen einzigen Aufrufer — kein
+     * Socket-Ereignis, kein Knopf. Das Ende eines Raums war nicht vorgesehen.
+     *
+     * WAS DAS IM ALLTAG BEDEUTETE, nachgemessen (`tests/raum-beenden-gibt-den-save-frei.test.ts`):
+     *
+     *   nach Anlage:        gesperrt=true
+     *   beide getrennt:     gesperrt=true   status=lobby  sitze=2  (beide Teilnehmer offline)
+     *   nach dem Beenden:   gesperrt=false
+     *
+     * Ein Raum haelt seinen Spielstand also fest, auch wenn nachweislich niemand mehr drin ist:
+     * `markDisconnected` setzt nur `connectionStatus`, Sitze werden nie entfernt, und der Status
+     * bleibt damit auf "lobby"/"season_active" statt auf "paused" (das ist der Zustand, den
+     * `getActiveRoomBySaveId` von der Sperre ausnehmen wuerde). Der einzige automatische Ausgang
+     * war der Sieben-Tage-Verfall (`ROOM_EXPIRY_MS`) — bis dahin blieben die Admin-Werkzeuge auf
+     * diesem Save zu.
+     *
+     * WARUM KEIN KUERZERER ZEITABLAUF STATTDESSEN: "beide gerade offline" heisst nicht "fertig".
+     * Zwei Coaches, die im selben Moment neu laden oder deren WLAN kurz weg ist, saehen sonst
+     * ihren laufenden Koop-Save fuer Admin-Schreibvorgaenge geoeffnet — genau die Fehlerklasse,
+     * gegen die diese Sperre gebaut wurde. Das Ende eines Raums ist eine ENTSCHEIDUNG, keine
+     * Zeitmessung; deshalb ein ausdruecklicher Knopf beim Host und keine geratene Frist.
+     *
+     * Der Abschluss-Zustand wird NOCH gesendet (der Raum ist aus der Map, sein letzter State
+     * traegt `status: "completed"`) — sonst erfuehre ein anwesender Mitspieler nur daran, dass
+     * seine naechste Aktion ins Leere laeuft.
+     */
+    socket.on("closeRoom", ({ roomCode, seatToken }) => {
+      const result = closeRoom(roomCode, seatToken);
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;

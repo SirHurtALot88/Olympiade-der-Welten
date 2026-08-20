@@ -129,6 +129,17 @@ export type QuickSimRoomArenaRevealRequest = {
  * Bis dahin war dieser Wechsel rein lokal — warum das den Gast in Disziplin 1 haengen liess,
  * steht ausgemessen an `switchRoomArenaDisciplinePhase` (lib/room/arena-sync-state.ts).
  */
+/**
+ * Der Host beendet den Raum ausdruecklich.
+ *
+ * `closeRoom` (lib/room/room-store.ts) gab es seit Stufe 0.4 — aber ohne jeden Aufrufer ausserhalb
+ * der eigenen Datei. Warum das mehr als eine fehlende Schaltflaeche war, steht am Socket-Handler.
+ */
+export type CloseRoomRequest = {
+  roomCode: string;
+  seatToken: string;
+};
+
 export type SetRoomArenaDisciplinePhaseRequest = {
   roomCode: string;
   seatToken: string;
@@ -189,6 +200,7 @@ export type ClientToServerEvents = {
   resetRoomArenaReveal: (payload: ResetRoomArenaRevealRequest) => void;
   quickSimRoomArenaReveal: (payload: QuickSimRoomArenaRevealRequest) => void;
   setRoomArenaDisciplinePhase: (payload: SetRoomArenaDisciplinePhaseRequest) => void;
+  closeRoom: (payload: CloseRoomRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
 };
 
