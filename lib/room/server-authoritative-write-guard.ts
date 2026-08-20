@@ -82,6 +82,11 @@ const HOST_LEVEL_ACTIONS = new Set<TeamWriteAction>([
   // means: unrestricted in local singleplayer (no active room), host-only
   // in a room, exactly like the other save-wide admin actions above.
   "player_generator_commit",
+  // Mensch/KI je Team umstellen: schreibt die Zuordnung ALLER Teams auf einmal und hat deshalb
+  // kein einzelnes `teamId`, gegen das sich autorisieren liesse. Host-level heisst hier dasselbe
+  // wie bei Draft und Simulation — im Solo unbeschraenkt, im Raum nur der Host (Chris'
+  // Entscheidung zu `17xs83`, 20.08.2026).
+  "team_ownership_update",
 ]);
 
 /**
