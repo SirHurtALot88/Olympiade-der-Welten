@@ -29,6 +29,9 @@ import {
   resolveSeasonApronLines,
 } from "@/lib/season/apron-service";
 
+/** Die Rampen-Obergrenze, wie sie bis zur Umstellung auf die Stufe galt — nur zum Vergleichen. */
+const RAMPE_ZUM_VERGLEICH = 1.24;
+
 function r(value: number, stellen = 1): number {
   const f = 10 ** stellen;
   return Math.round(value * f) / f;
@@ -69,7 +72,13 @@ function abrechnung(gameState: GameState, f1: number, f2: number, alsStufe: bool
     salaryFactor,
     teams,
     konjunkturFactorMin: APRON_KONJUNKTUR_FACTOR_MIN,
-    konjunkturFactorMax: alsStufe ? APRON_KONJUNKTUR_FACTOR_MIN : undefined,
+    /**
+     * Die Vergleichszeile „Rampe" muss die alte Form AUSDRUECKLICH anfordern. Seit Chris'
+     * Entscheidung steht `APRON_KONJUNKTUR_FACTOR_MAX` auf dem Wert von `..._MIN`, die Abrechnung
+     * ist also selbst eine Stufe — ein weggelassenes Feld ergaebe zweimal dieselbe Zeile, und der
+     * Vergleich behauptete stillschweigend, die Form mache keinen Unterschied.
+     */
+    konjunkturFactorMax: alsStufe ? APRON_KONJUNKTUR_FACTOR_MIN : RAMPE_ZUM_VERGLEICH,
   });
   const rows = s.rows ?? s.teams ?? [];
   const zahler = rows.filter((row: any) => (row.abgabe ?? 0) > 0.005);

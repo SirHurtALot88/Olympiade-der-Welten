@@ -76,10 +76,30 @@ export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
 // ── Konstanten ─────────────────────────────────────────────────────────────────────────────────
 
-/** 1. Apron-Linie = Median-Gehalt × diesen Faktor. */
-export const APRON_LINE_1_MEDIAN_FACTOR = 1.1;
-/** 2. Apron-Linie = Median-Gehalt × diesen Faktor. Bewusst nah an der 1. Linie (siehe Kopfkommentar). */
-export const APRON_LINE_2_MEDIAN_FACTOR = 1.25;
+/**
+ * 1. und 2. Apron-Linie = Median-Gehalt × diese Faktoren.
+ *
+ * 1,10/1,25 → 1,25/1,60, CHRIS' ENTSCHEIDUNG zu `6fv43h`: „nicht 1/3 der teams besteuert wird
+ * sondern die die wirklich drüber schießen".
+ *
+ * DAS ALTE PAAR FING DAS OBERE DRITTEL. Am Live-Abbild gemessen (sieben Spielstände, laufende
+ * Saison): 10,6 Zahler je Stand von 32 Teams. Eine Luxussteuer, die ein Drittel der Liga trifft,
+ * ist keine Steuer auf Ausreisser, sondern eine allgemeine Gehaltsabgabe. Mit 1,25/1,60 sind es
+ * 3,3 Zahler je Stand.
+ *
+ * WAS DAS FUER SICH GENOMMEN KOSTET, und das ist wichtig zu wissen: die Linien anzuheben macht die
+ * Abgabe KLEINER, nicht groesser — besteuert wird der Ueberschuss UEBER den Linien, und der
+ * schrumpft mit jeder Anhebung. Allein waere der Topf von 406,0 auf 120,5 gefallen (−70 %). Dass
+ * der Apron trotzdem haerter trifft, macht die STUFE eine Zeile weiter unten; beide Aenderungen
+ * gehoeren zusammen und wurden zusammen gemessen (`scripts/messe-apron-faktoren-wirkung.ts`).
+ *
+ * ZUR SPANNE: die Linien haengen am Median, „zu niedrig" ist deshalb eine Aussage ueber die
+ * VERTEILUNG. Im gemeldeten Stand liegt die Gehaltsspitze bei 2,30 x Median (123,5 gegen 53,8), in
+ * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen; 1,25/1,60
+ * laesst in beiden Faellen nur die echten Ausreisser oben herausragen.
+ */
+export const APRON_LINE_1_MEDIAN_FACTOR = 1.25;
+export const APRON_LINE_2_MEDIAN_FACTOR = 1.6;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
 export const APRON_RATE_ZONE_1 = 0.8;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
@@ -119,8 +139,38 @@ export const APRON_CAP_SHARE_OF_RANK_PAYOUT = 0.5;
  * An den Sätzen und Linien ist keine Zeile angefasst.
  */
 export const APRON_KONJUNKTUR_FACTOR_MIN = 0.88;
-/** Konjunkturhebel: 1 bei salaryFactor >= diesem Wert. */
-export const APRON_KONJUNKTUR_FACTOR_MAX = 1.24;
+/**
+ * Konjunkturhebel: 1 bei salaryFactor >= diesem Wert.
+ *
+ * 1,24 → 0,88, also GLEICH `..._MIN`, und damit ist aus der Rampe eine STUFE geworden. CHRIS'
+ * ENTSCHEIDUNG zu `6fv43h`: „ist ja okay wenn er unter 0,95 nicht zieht aber darüber müsste M-M den
+ * vollen betrag zahlen! das ist nicht nur kleiner teil oder so sondern direkt BAM in your face".
+ *
+ * VORHER lief der Hebel von 0,88 bis 1,24 linear hoch. Ein Team weit ueber der Linie zahlte in
+ * einer mittelmaessigen Saison einen Bruchteil: bei f = 0,96 waren es 22 %, bei f = 0,92 noch 11 %.
+ * Die Absicht dahinter — in einer schwachen Saison nicht auch noch die Abgabe voll zuschlagen zu
+ * lassen — bleibt vollstaendig erhalten, sie sitzt jetzt nur in der SCHWELLE statt in der Rampe:
+ * unter 0,88 zahlt weiterhin niemand etwas.
+ *
+ * DIE STUFE BRAUCHT KEINE NEUE LOGIK. `apronKonjunkturhebel` behandelt den Fall „Rampe ohne
+ * Breite" seit jeher (`if (!(max > min)) return salaryFactor >= min ? 1 : 0`); er war nur nie
+ * erreichbar. Es gibt weiterhin genau eine Hebelfunktion.
+ *
+ * GEMESSEN, zusammen mit den angehobenen Linien, ueber sieben Spielstaende:
+ *
+ *   Variante                        Topf   Zahler/Stand   M-M gesamt
+ *   vorher       1,10/1,25 Rampe   406,0          10,6        148,7
+ *   nur Linien   1,25/1,60 Rampe   120,5           3,3         74,2
+ *   JETZT        1,25/1,60 Stufe   202,6           3,3        119,8
+ *
+ * Halb so viel Topf wie vorher, aber auf ein Drittel der Zahler konzentriert — im gemeldeten Stand
+ * zahlt M-M 39,7 statt 21,4, und ausser ihm nur noch drei Teams ueberhaupt etwas.
+ *
+ * DER DECKEL BLEIBT (`APRON_CAP_SHARE_OF_RANK_PAYOUT`, halber Wertungsanteil). Er ist der Grund,
+ * warum M-M bei 39,7 stehenbleibt, obwohl roh 74,9 anstuenden — Chris' „knapp 40 mio extra […] ist
+ * super viel" bezieht sich genau auf diese gedeckelte Zahl.
+ */
+export const APRON_KONJUNKTUR_FACTOR_MAX = APRON_KONJUNKTUR_FACTOR_MIN;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -155,12 +205,16 @@ export function apronKonjunkturhebel(salaryFactor: number, factorMin?: number, f
   const max = factorMax ?? APRON_KONJUNKTUR_FACTOR_MAX;
   /**
    * `max <= min` IST DIE STUFE, nicht ein Sonderfall: die Rampe hat dann keine Breite mehr, und was
-   * bleibt, ist „unter der Schwelle gar nichts, ab der Schwelle voll". Diese Zeile stand schon hier,
-   * war aber nicht erreichbar, weil `max` fest die Modul-Konstante war. Der zweite Regler macht sie
-   * fuer die KALIBRIERUNG erreichbar — die Abrechnung selbst laesst beide Felder weg und bekommt
-   * unveraendert die Rampe.
+   * bleibt, ist „bis zur Schwelle gar nichts, darueber voll". Diese Zeile stand schon hier, war aber
+   * nicht erreichbar, weil `max` fest die Modul-Konstante war.
+   *
+   * DER GRENZFALL IST NICHT THEORETISCH: die Salary Factors tragen zwei Nachkommastellen, `f` kann
+   * also EXAKT auf der Schwelle landen. Hier stand `>= min`, was dort 1 geliefert haette — im
+   * Widerspruch zur Zusage der Konstante selbst („0 bei salaryFactor <= diesem Wert") und zur
+   * Rampe, die an derselben Stelle exakt 0 ergab. Jetzt `> min`: die Stufe uebernimmt die
+   * Grenzsemantik der Rampe, statt sie stillschweigend umzudrehen.
    */
-  if (!(max > min)) return salaryFactor >= min ? 1 : 0;
+  if (!(max > min)) return salaryFactor > min ? 1 : 0;
   return clamp01((salaryFactor - min) / (max - min));
 }
 
