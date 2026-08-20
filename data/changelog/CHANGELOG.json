@@ -20,6 +20,15 @@
       "version": "0.5"
     },
     {
+      "datum": "2026-08-20",
+      "seite": "Spieltag",
+      "pr": null,
+      "text": "Die neue Kaufphasen-Warnung konnte die Arena beim Rendern zum Absturz bringen. Sie fragte das Kauffenster ab, ohne den Fall abzufangen, dass Saison oder Spieltag noch gar nicht geladen sind — im Ladefenster und beim Bootstrap warf das mitten in der Anzeige. Ohne Saison und ohne Spieltag gibt es kein Kauffenster, über dessen Schließen man warnen könnte; die Warnung schweigt dort jetzt, statt zu werfen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-19",
       "seite": null,
       "pr": "560",
