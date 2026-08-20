@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Liga",
+      "pr": null,
+      "text": "Jedes Team strebt jetzt einen Spieler mehr im Kader an, gedeckelt beim Maximum von 14. Der Grund steht in der Ermüdungsmessung: Erholung bekommt nur, wer an einem Spieltag nicht eingesetzt wird, und bei neun Einsatzplätzen liegt das Gleichgewicht bei etwa 14 Spielern. Mit zehn Spielern muss jeder 90 % der Spieltage ran — da kann keine KI rotieren, und die Ermüdung steigt jeden Spieltag weiter, bis der Deckel greift. Genau das war die Ursache der Verletzungswellen zum Saisonende. Im Blatt wandert der Median damit von 11 auf 12; die Persönlichkeit des General Managers verschiebt das Ziel weiterhin um bis zu zwei Plätze.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Spieltag",
       "pr": null,
       "text": "Die Arena sagt jetzt an, bevor die Kaufphase für eine ganze Saison zufällt. Gekauft wird ausschließlich in der neuen Saison vor ihrem ersten Spieltag — sobald dieser Spieltag ein Ergebnis trägt, ist das Fenster zu, und bisher erfuhr man das erst danach. Wer den Spieltag anstieß, bevor er fertig eingekauft hatte, verlor die Möglichkeit für die ganze Saison. Auf der Tafel vor dem Anpfiff steht die Warnung jetzt mit dem eigenen Kontostand, und der Knopf zur Bühne trägt sie als Unterzeile mit. Sie erscheint nur, solange das Fenster wirklich offen ist und Geld auf einem der eigenen Konten liegt — am Saisonende, ab Spieltag 2 oder mit leerer Kasse bleibt sie weg. An der Regel selbst ist keine Zeile geändert.",
@@ -71,6 +80,15 @@
       "text": "Die Quelltext-Wächter laufen ab jetzt im Pflicht-Check mit. Die volle Testsuite ist kein Pflicht-Check, und dadurch sind an einem Tag zwei rote Wächter unbemerkt durchgerutscht — die Tests existierten, sie liefen nur nicht in dem Lauf, der den Merge bewacht. Die betroffene Sorte prüft Zusicherungen am Quelltext selbst und braucht weder Datenbank noch Browser: 120 Dateien, 1830 Prüfungen, 69 Sekunden. Die Auswahl wird bei jedem Lauf neu errechnet statt aufgezählt, damit ein neu geschriebener Wächter nicht wieder aus dem Tor fällt. Am Spiel selbst ändert das nichts.",
       "quelle": "gepflegt",
       "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Team-Einstellungen",
+      "pr": null,
+      "text": "Ein angeforderter Snapshot verschwand kurz nach dem Anlegen wieder, und wer danach seine ID benutzte, bekam einen Serverfehler ohne Erklärung. Der Snapshot übernahm die Kategorie seines Ursprungs: der Snapshot einer Vorsaison-Sicherung wurde selbst eine Vorsaison-Sicherung und rotierte mit deren Fünferliste weg. An einer Kopie des echten Spielstands nachgemessen kostete schon das bloße Anlegen zwei fremde Spielstände. Ein Snapshot, den jemand anfordert, ist jetzt ein manueller Spielstand und rotiert gar nicht erst mit. Eine ID, hinter der kein Spielstand mehr liegt, wird außerdem als \"nicht gefunden\" beantwortet statt als Serverfehler — die Oberfläche kannte diesen Satz längst, sie bekam ihn nur nie zu sehen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
       "version": "0.5"
     },
     {
