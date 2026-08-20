@@ -2,6 +2,24 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-20",
+      "seite": "Spieltag",
+      "pr": null,
+      "text": "Die Arena sagt jetzt an, bevor die Kaufphase für eine ganze Saison zufällt. Gekauft wird ausschließlich in der neuen Saison vor ihrem ersten Spieltag — sobald dieser Spieltag ein Ergebnis trägt, ist das Fenster zu, und bisher erfuhr man das erst danach. Wer den Spieltag anstieß, bevor er fertig eingekauft hatte, verlor die Möglichkeit für die ganze Saison. Auf der Tafel vor dem Anpfiff steht die Warnung jetzt mit dem eigenen Kontostand, und der Knopf zur Bühne trägt sie als Unterzeile mit. Sie erscheint nur, solange das Fenster wirklich offen ist und Geld auf einem der eigenen Konten liegt — am Saisonende, ab Spieltag 2 oder mit leerer Kasse bleibt sie weg. An der Regel selbst ist keine Zeile geändert.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Spieltag",
+      "pr": null,
+      "text": "Die neue Kaufphasen-Warnung konnte die Arena beim Rendern zum Absturz bringen. Sie fragte das Kauffenster ab, ohne den Fall abzufangen, dass Saison oder Spieltag noch gar nicht geladen sind — im Ladefenster und beim Bootstrap warf das mitten in der Anzeige. Ohne Saison und ohne Spieltag gibt es kein Kauffenster, über dessen Schließen man warnen könnte; die Warnung schweigt dort jetzt, statt zu werfen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-19",
       "seite": null,
       "pr": "560",
