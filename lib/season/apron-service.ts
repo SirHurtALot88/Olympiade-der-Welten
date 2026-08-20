@@ -149,11 +149,19 @@ function median(values: readonly number[]): number {
  * Hebel bindet die Abgabe an die tatsächliche wirtschaftliche Lage der Saison statt an eine im
  * Voraus fixierte Gehaltszahl.
  */
-export function apronKonjunkturhebel(salaryFactor: number, factorMin?: number): number {
+export function apronKonjunkturhebel(salaryFactor: number, factorMin?: number, factorMax?: number): number {
   if (!Number.isFinite(salaryFactor)) return 0;
   const min = factorMin ?? APRON_KONJUNKTUR_FACTOR_MIN;
-  if (!(APRON_KONJUNKTUR_FACTOR_MAX > min)) return salaryFactor >= min ? 1 : 0;
-  return clamp01((salaryFactor - min) / (APRON_KONJUNKTUR_FACTOR_MAX - min));
+  const max = factorMax ?? APRON_KONJUNKTUR_FACTOR_MAX;
+  /**
+   * `max <= min` IST DIE STUFE, nicht ein Sonderfall: die Rampe hat dann keine Breite mehr, und was
+   * bleibt, ist „unter der Schwelle gar nichts, ab der Schwelle voll". Diese Zeile stand schon hier,
+   * war aber nicht erreichbar, weil `max` fest die Modul-Konstante war. Der zweite Regler macht sie
+   * fuer die KALIBRIERUNG erreichbar — die Abrechnung selbst laesst beide Felder weg und bekommt
+   * unveraendert die Rampe.
+   */
+  if (!(max > min)) return salaryFactor >= min ? 1 : 0;
+  return clamp01((salaryFactor - min) / (max - min));
 }
 
 /**
@@ -514,13 +522,17 @@ export function apronLevyForSalary(input: {
   rateZone1?: number;
   rateZone2?: number;
   konjunkturFactorMin?: number;
+  konjunkturFactorMax?: number;
 }): number {
   if (!Number.isFinite(input.salary) || input.salary <= 0) return 0;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
   const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
   const ueberLinie1 = Math.max(0, Math.min(input.salary, input.line2) - input.line1);
   const ueberLinie2 = Math.max(0, input.salary - input.line2);
-  return (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * apronKonjunkturhebel(input.salaryFactor, input.konjunkturFactorMin);
+  return (
+    (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) *
+    apronKonjunkturhebel(input.salaryFactor, input.konjunkturFactorMin, input.konjunkturFactorMax)
+  );
 }
 
 /**
@@ -550,6 +562,7 @@ export function computeApronSettlement(input: {
   rateZone2?: number;
   capShareOfRankPayout?: number;
   konjunkturFactorMin?: number;
+  konjunkturFactorMax?: number;
 }): ApronSettlement {
   const { line1, line2 } = input.lines;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
@@ -568,6 +581,7 @@ export function computeApronSettlement(input: {
       rateZone1,
       rateZone2,
       konjunkturFactorMin: input.konjunkturFactorMin,
+      konjunkturFactorMax: input.konjunkturFactorMax,
     });
     const deckel = capShareOfRankPayout * Math.max(0, team.rankShare);
     const abgabe = Math.max(0, Math.min(rohAbgabe, deckel));
