@@ -94,6 +94,20 @@ describe("Die Warnung erscheint genau im letzten Moment, in dem sie noch nützt"
     expect(ermittleKaufphasenWarnung(spielstand({ gamePhase: "transfer_sell_phase" }))).toBeNull();
   });
 
+  it("ein Teil-Spielstand ohne Saison oder Spieltag wirft nicht, er schweigt", () => {
+    /**
+     * DER FALL, DER DIE ARENA ZERLEGT HAT. `isEarlySeasonTransferSetup` liest
+     * `season.currentMatchday` und `matchdayState.status` ungeschuetzt; im Bootstrap- und im
+     * Render-Test-Fall fehlen beide, und der Aufruf warf mitten im `useMemo` der Arena. Sichtbar
+     * wurde das erst in der vollen Testsuite — die Fälle darüber bauen alle einen kompletten
+     * Spielstand, und genau deshalb hat keiner davon es gesehen.
+     */
+    expect(ermittleKaufphasenWarnung({} as never)).toBeNull();
+    expect(ermittleKaufphasenWarnung({ teams: [] } as never)).toBeNull();
+    expect(ermittleKaufphasenWarnung({ season: { id: "season-1" } } as never)).toBeNull();
+    expect(ermittleKaufphasenWarnung({ matchdayState: { status: "planning" } } as never)).toBeNull();
+  });
+
   it("ohne Geld keine Warnung — sie wäre eine Ansage ohne Handlungsmöglichkeit", () => {
     expect(
       ermittleKaufphasenWarnung(spielstand({ teams: [{ teamId: "S-C", cash: 0, manuell: true }] })),
