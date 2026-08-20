@@ -225,7 +225,59 @@ function withSeededSeasonEconomyFactors(gameState: GameState, saveId: string): G
   };
 }
 
-function normalizeLegacyRosterTargets(gameState: GameState): GameState {
+/**
+ * KADER-ZIELGRÖSSE EINMALIG UM EINS ANHEBEN — Chris' Entscheidung vom 20.08.2026 („opt +1 für alle
+ * teams außer die die schon 14 haben"), gezogen aus der Fatigue-Messung `ne85u5`.
+ *
+ * DER GRUND, IN ZAHLEN: die Erholung deckt bei der aktuellen Last rund 63,6 % Einsatzquote, gespielt
+ * werden 73–90 %. Ein Team braucht rechnerisch 13–15 Spieler, um durchzurotieren; das Ziel stand über
+ * die fünf Abbilder gemessen im Median bei 11 (Spanne 8–14).
+ *
+ * WARUM IN DIE GESPEICHERTEN DATEN und nicht nur in die Ableitung: 32 Stellen im Baum lesen
+ * `identity.playerOpt` direkt (Doktrin-Dienst, Pick-Engine, Verkaufs-Vorschau …). Eine Anhebung
+ * allein in `deriveRosterTargets` hätte zwei verschiedene Zielgrößen nebeneinander erzeugt — je
+ * nachdem, welchen Weg der Aufrufer nimmt.
+ *
+ * WARUM MIT STUFENZÄHLER: diese Funktion läuft bei JEDEM Laden. Ohne den Zähler kletterte die Zahl
+ * bei jedem Laden um eins weiter, bis alle Teams bei 14 stünden. `rosterOptBumpVersion` hält fest,
+ * welche Stufe ein Spielstand schon hat; ein zweites `+1` bräuchte eine neue Stufe hier.
+ *
+ * Die Deckelung macht `deriveRosterTargets` von selbst: es klammert auf `playerMax` (14). Teams, die
+ * schon dort stehen — gemessen 10 von 160 —, bleiben unverändert.
+ */
+const ROSTER_OPT_BUMP_VERSION = 1;
+
+function withRaisedRosterOptTarget(gameState: GameState): GameState {
+  if ((gameState.rosterOptBumpVersion ?? 0) >= ROSTER_OPT_BUMP_VERSION) {
+    return gameState;
+  }
+  const teamByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team]));
+  let changed = false;
+  const teamIdentities = gameState.teamIdentities.map((identity) => {
+    const team = teamByTeamId.get(identity.teamId);
+    const playerMax = deriveRosterTargets(team, identity).playerMax;
+    const heute = Number.isFinite(identity.playerOpt) ? Math.round(identity.playerOpt) : null;
+    if (heute == null) {
+      return identity;
+    }
+    const angehoben = Math.min(heute + 1, playerMax);
+    if (angehoben === heute) {
+      return identity;
+    }
+    changed = true;
+    return { ...identity, playerOpt: angehoben };
+  });
+  return {
+    ...gameState,
+    ...(changed ? { teamIdentities } : {}),
+    rosterOptBumpVersion: ROSTER_OPT_BUMP_VERSION,
+  };
+}
+
+/** Exportiert wie `normalizeLegacyFinanceScale`: damit die Anhebung prüfbar ist, ohne eine echte
+ *  SQLite anzulegen. Aufgerufen wird sie ausschließlich hier im Lade- und Schreibpfad. */
+export function normalizeLegacyRosterTargets(eingang: GameState): GameState {
+  const gameState = withRaisedRosterOptTarget(eingang);
   const teamByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team]));
 
   // Kader-Minimum ist fix 8 für alle Teams: Identity-playerMin auf den abgeleiteten

@@ -105,7 +105,10 @@ describe("singleplayer game state", () => {
     expect(cashCreators?.rosterLimit).toBe(14);
     // Kader-Minimum ist jetzt fix 8 für jedes Team (unabhängig vom Sheet-/Identity-playerMin).
     expect(cashCreators?.rosterMinTarget).toBe(8);
-    expect(cashCreators?.rosterOptTarget).toBe(13);
+    // 13 vor der einmaligen Anhebung der Kader-Zielgroesse (Chris, 20.08.: "opt +1 fuer alle teams
+    // ausser die die schon 14 haben") — C-C landet damit auf dem Maximum. Siehe
+    // tests/kader-zielgroesse-plus-eins.test.ts.
+    expect(cashCreators?.rosterOptTarget).toBe(14);
   }, 60000);
 
   it("persists top-level season transition metadata across sqlite reloads", () => {
@@ -1237,7 +1240,9 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances ?? 0).toBeGreaterThanOrEqual(9);
     // playerMin ist jetzt fix 8 (Sheet-/Override-playerMin wird für das Minimum ignoriert).
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(8);
-    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(13);
+    // 13 vor der einmaligen Anhebung um eins (siehe oben); der Override selbst bleibt bei 12 —
+    // angehoben wird die abgeleitete Identity, nicht die gespeicherte Nutzer-Vorgabe.
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(14);
     expect(getTeamGeneralManager(reloaded!.gameState, "C-C")?.profile.title).toContain("Bargain Hunter");
     // GM-justiert (gemessen: 9,72 statt 10) — C-C bleibt das Finanzteam.
     expect(createFreshSeasonOneGameState().teamIdentities.find((entry) => entry.teamId === "C-C")?.finances ?? 0).toBeGreaterThanOrEqual(9);

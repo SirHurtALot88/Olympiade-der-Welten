@@ -3482,6 +3482,17 @@ export type GameState = {
   seasonTransition?: SeasonTransitionState;
   scenarioMeta?: ScenarioMeta;
   saveVersion?: number;
+  /**
+   * Wie oft die Kader-Zielgröße (`teamIdentities[].playerOpt`) schon angehoben wurde.
+   *
+   * EINMALIG, nicht jede Ladung: Chris hat entschieden „opt +1 für alle teams außer die die schon
+   * 14 haben" (20.08.2026, aus der Fatigue-Messung `ne85u5`). Die Anhebung schreibt in die
+   * gespeicherten Identities, weil 32 Stellen im Baum `identity.playerOpt` direkt lesen — eine
+   * Anhebung allein in der Ableitung ergäbe zwei verschiedene Zielgrößen nebeneinander. Damit sie
+   * nicht bei jedem Laden erneut greift und die Zahl bis 14 hochklettert, merkt sich der
+   * Spielstand hier, welche Stufe er schon hat. Siehe `normalizeLegacyRosterTargets`.
+   */
+  rosterOptBumpVersion?: number;
   lastAppliedEventId?: string | null;
   appliedEventIds?: string[];
   seasonReviewState?: unknown;
