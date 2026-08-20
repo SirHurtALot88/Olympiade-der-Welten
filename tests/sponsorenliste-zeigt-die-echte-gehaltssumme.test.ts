@@ -86,10 +86,11 @@ describe("Die drei Gehaltssummen sind wirklich drei verschiedene Zahlen", () => 
     expect(getTeamActualSalaryTotal(gs, "M-M")).toBe(150);
   });
 
-  it("die Apron bemisst die ECHTE Summe, nicht die geglättete", () => {
+  it("die Apron bemisst NICHT die geglättete Summe", () => {
     // Die Zusage aus `getTeamApronSalaryBase`: eine Grundlage für jede Apron-Frage im Baum.
+    // WELCHE das ist, steht in `tests/apron-faktor-horizont-und-vertragsform.test.ts` — hier zählt
+    // nur, dass es nicht das Formel-Gehalt ist, denn genau daran hing die Verwechslung in `cankgm`.
     const gs = spielstand();
-    expect(getTeamApronSalaryBase(gs, "M-M")).toBe(getTeamActualSalaryTotal(gs, "M-M"));
     expect(getTeamApronSalaryBase(gs, "M-M")).not.toBe(getTeamDisplaySalaryTotal(gs, "M-M"));
   });
 });
@@ -117,17 +118,20 @@ describe("Die Sponsorenliste nimmt dieselben Zahlen wie die Apron und die Abbuch
   });
 });
 
-describe("Die veraltete Auskunft über die Apron-Grundlage ist entschärft", () => {
-  it("der Kopf von `getTeamNegotiatedSalaryTotal` behauptet nicht mehr, er sei die Apron-Basis", () => {
+describe("Die Auskunft über die Apron-Grundlage verweist auf die entscheidende Stelle", () => {
+  it("der Kopf von `getTeamNegotiatedSalaryTotal` nennt `getTeamApronSalaryBase` als Quelle", () => {
     /**
-     * Dieser Absatz stand nach der zweiten Umstellung unverändert weiter und hat bei der
-     * Untersuchung dieser Meldung genau die falsche Annahme erzeugt, gegen die der Test oben
-     * steht. Ein Kommentar, der einmal wahr war, ist keine Quelle.
+     * Dieser Absatz behauptete nach einer Umstellung unverändert weiter das Falsche und hat bei
+     * der Untersuchung von `cankgm` genau die Annahme erzeugt, die dort korrigiert werden musste.
+     * Inzwischen ist die Grundlage ZWEIMAL gewandert — erst weg von dieser Funktion, dann zurück.
+     *
+     * Deshalb prüft dieser Wächter nicht mehr, WAS der Absatz behauptet, sondern DASS er auf die
+     * eine Stelle verweist, die es entscheidet. Ein Kommentar, der die Antwort selbst führt, wird
+     * bei der nächsten Umstellung wieder falsch; einer, der weiterzeigt, nicht.
      */
     const quelle = readFileSync(join(process.cwd(), "lib/sponsor/sponsor-team-salary-display.ts"), "utf8");
     const kopf = quelle.slice(0, quelle.indexOf("export function getTeamNegotiatedSalaryTotal"));
     const letzterAbsatz = kopf.slice(kopf.lastIndexOf("DIE VERHANDELTE Gehaltssumme"));
-    expect(letzterAbsatz).toContain("GESCHICHTE UND NICHT DER STAND");
     expect(letzterAbsatz).toContain("getTeamApronSalaryBase");
   });
 });
