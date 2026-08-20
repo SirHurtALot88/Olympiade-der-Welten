@@ -86,8 +86,39 @@ export const APRON_RATE_ZONE_1 = 0.8;
 export const APRON_RATE_ZONE_2 = 1.6;
 /** Deckel: höchstens dieser Anteil des rangabhängigen Sponsor-Wertungsanteils. */
 export const APRON_CAP_SHARE_OF_RANK_PAYOUT = 0.5;
-/** Konjunkturhebel: 0 bei salaryFactor <= diesem Wert. */
-export const APRON_KONJUNKTUR_FACTOR_MIN = 0.95;
+/**
+ * Konjunkturhebel: 0 bei salaryFactor <= diesem Wert.
+ *
+ * 0,95 → 0,88, CHRIS' ENTSCHEIDUNG zu Meldung `6fv43h` („Apron scheint nicht korrekt zu ziehen!
+ * M-M hat Gehalt 123,5 Mio und die 2. Linie ist 67,3 Mio! Die müssten fast 60 mio Strafe zahlen!"),
+ * Weg 1 von dreien: die Schwelle senken.
+ *
+ * DER BEFUND, der dahin führte: der Salary Factor bewegt sich zwischen 0,82 und 1,24. Mit der
+ * Schwelle bei 0,95 war der Apron über das gesamte untere Drittel dieser Spanne KOMPLETT
+ * wirkungslos — nicht gedämpft, aus. In Chris' Saison stand `f` bei 0,96, also `k = 0,03`: elf
+ * Teams über der Linie zahlten zusammen 5,4.
+ *
+ * DURCHGEMESSEN über alle sieben Live-Spielstände, laufende und kommende Saison (14 Beobachtungen,
+ * `scripts/messe-apron-schwelle.ts`) — die Schwelle entscheidet NICHT, wer zahlt (das tun die
+ * Linien), sondern wie viel:
+ *
+ *   Schwelle        0,95   0,92   0,88   0,85   0,82
+ *   hwz8fk f=0,96    5,4   19,6   34,9   44,3   52,3     ← der gemeldete Spielstand
+ *   n90y4m f=0,92    0,0    0,0    4,7    7,6    9,9
+ *   1hf25q f=0,87    0,0    0,0    0,0    4,4   10,3
+ *   hwz8fk f=1,16   91,8   93,4   95,1   96,1   97,0     ← Boomsaison, kaum Bewegung
+ *   Saisons mit k=0   2/14   2/14   1/14   0/14   0/14
+ *
+ * WARUM 0,88 UND NICHT 0,82: bei 0,82 fiele die Schwelle mit der Untergrenze der Spanne zusammen,
+ * der Hebel griffe also IMMER — und die ursprüngliche Absicht ginge verloren. Die steht im
+ * Kommentar an `apronKonjunkturhebel`: die Gehälter stehen fest, bevor die Konjunktur gewürfelt
+ * wird; in einer schwachen Saison soll die Abgabe nicht genau dann am meisten schmerzen, wenn
+ * ohnehin niemand Geld hat. Bei 0,88 bleibt genau EINE von 14 beobachteten Saisons abgabefrei
+ * (f = 0,87) — der Ausnahmefall statt der Regel.
+ *
+ * An den Sätzen und Linien ist keine Zeile angefasst.
+ */
+export const APRON_KONJUNKTUR_FACTOR_MIN = 0.88;
 /** Konjunkturhebel: 1 bei salaryFactor >= diesem Wert. */
 export const APRON_KONJUNKTUR_FACTOR_MAX = 1.24;
 
@@ -118,9 +149,11 @@ function median(values: readonly number[]): number {
  * Hebel bindet die Abgabe an die tatsächliche wirtschaftliche Lage der Saison statt an eine im
  * Voraus fixierte Gehaltszahl.
  */
-export function apronKonjunkturhebel(salaryFactor: number): number {
+export function apronKonjunkturhebel(salaryFactor: number, factorMin?: number): number {
   if (!Number.isFinite(salaryFactor)) return 0;
-  return clamp01((salaryFactor - APRON_KONJUNKTUR_FACTOR_MIN) / (APRON_KONJUNKTUR_FACTOR_MAX - APRON_KONJUNKTUR_FACTOR_MIN));
+  const min = factorMin ?? APRON_KONJUNKTUR_FACTOR_MIN;
+  if (!(APRON_KONJUNKTUR_FACTOR_MAX > min)) return salaryFactor >= min ? 1 : 0;
+  return clamp01((salaryFactor - min) / (APRON_KONJUNKTUR_FACTOR_MAX - min));
 }
 
 /**
@@ -480,13 +513,14 @@ export function apronLevyForSalary(input: {
   /** Nur für die Kalibrierung (siehe `computeApronSettlement`); sonst weglassen. */
   rateZone1?: number;
   rateZone2?: number;
+  konjunkturFactorMin?: number;
 }): number {
   if (!Number.isFinite(input.salary) || input.salary <= 0) return 0;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
   const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
   const ueberLinie1 = Math.max(0, Math.min(input.salary, input.line2) - input.line1);
   const ueberLinie2 = Math.max(0, input.salary - input.line2);
-  return (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * apronKonjunkturhebel(input.salaryFactor);
+  return (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * apronKonjunkturhebel(input.salaryFactor, input.konjunkturFactorMin);
 }
 
 /**
@@ -515,6 +549,7 @@ export function computeApronSettlement(input: {
   rateZone1?: number;
   rateZone2?: number;
   capShareOfRankPayout?: number;
+  konjunkturFactorMin?: number;
 }): ApronSettlement {
   const { line1, line2 } = input.lines;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
@@ -532,6 +567,7 @@ export function computeApronSettlement(input: {
       salaryFactor: input.salaryFactor,
       rateZone1,
       rateZone2,
+      konjunkturFactorMin: input.konjunkturFactorMin,
     });
     const deckel = capShareOfRankPayout * Math.max(0, team.rankShare);
     const abgabe = Math.max(0, Math.min(rohAbgabe, deckel));
