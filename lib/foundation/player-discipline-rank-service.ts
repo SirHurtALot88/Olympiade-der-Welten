@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
 import {
   buildDisciplineGlobalRankMaps,
+  buildPlayerDrawerDataFromGameState,
   resolveRosterEntry,
   type PlayerDisciplineRankOverride,
 } from "@/lib/foundation/player-detail-drawer";
@@ -73,5 +74,46 @@ export function buildPlayerDisciplineRankOverride(input: {
     }
   }
 
-  return { seasonPointsRankByDisciplineId, allTimePointsRankByDisciplineId };
+  /**
+   * DIE ZAHL FAEHRT MIT, NICHT NUR IHR RANG (`l4835p`).
+   *
+   * Der Rang-Teil oben entstand, weil der kompakte Browser-Payload die Vergleichsgrundlage
+   * beschneidet. Fuer die ALL-TIME-PUNKTE gilt dasselbe eine Stufe frueher: die Aufschluesselung je
+   * Disziplin faellt beim Zusammenfalten der Archiv-Saisons ganz weg
+   * (`foundation-season-history-projection.ts`, bewusst — 647 KiB gegen 88 KiB je Saison). Gemessen
+   * am Abbild `hwz8fk`: der Ersatz-Schnappschuss traegt alle 339 Spielerzeilen, aber keine einzige
+   * Disziplin-Zeile; Madrots All-Time steht auf dem vollen Save bei TDM 1,8 / Mini DM 1,3 /
+   * Wettessen 0,7 und im Browser bei nichts.
+   *
+   * KEINE ZWEITE RECHENWEISE, und das ist hier woertlich zu nehmen: die Summe kommt aus DERSELBEN
+   * Funktion, die die Ansicht aufruft — nur auf dem vollen Save statt auf dem beschnittenen.
+   *
+   * Eine erste Fassung summierte hier von Hand ueber die Schnappschuesse. Sie war falsch, und der
+   * Test hat es sofort gezeigt (50 gegen 53,7): die Ansicht zaehlt zusaetzlich die LAUFENDE Saison
+   * mit, solange fuer sie noch kein Schnappschuss existiert (`if (!hasCurrentSeasonSnapshot)` in
+   * `buildDisciplineValuesFromPlayer`). Genau so entsteht der Widerspruch, gegen den dieses
+   * Override antritt — nur eine Ebene tiefer.
+   */
+  const vollstaendigeAnsicht = buildPlayerDrawerDataFromGameState({
+    gameState: input.gameState,
+    playerId: input.playerId,
+    source: "sqlite",
+  });
+  const allTimePointsByDisciplineId: Record<string, number> = {};
+  const allTimeAppearancesByDisciplineId: Record<string, number> = {};
+  for (const zeile of vollstaendigeAnsicht?.disciplineValues ?? []) {
+    if (zeile.allTimePoints != null) {
+      allTimePointsByDisciplineId[zeile.id] = zeile.allTimePoints;
+    }
+    if (zeile.allTimeAppearances != null) {
+      allTimeAppearancesByDisciplineId[zeile.id] = zeile.allTimeAppearances;
+    }
+  }
+
+  return {
+    seasonPointsRankByDisciplineId,
+    allTimePointsRankByDisciplineId,
+    allTimePointsByDisciplineId,
+    allTimeAppearancesByDisciplineId,
+  };
 }

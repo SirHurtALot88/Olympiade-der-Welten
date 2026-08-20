@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-20",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Die All-Time-Spalte der Top-Disziplinen zeigt wieder Zahlen. Die Punkte je Disziplin sind seit jeher archiviert — der kompakte Browser-Payload lässt die Aufschlüsselung der Archiv-Saisons aber bewusst weg (647 KiB gegen 88 KiB je Saison), und die Spalte lief damit gegen eine leere Summe. Am Spielstand gemessen: der Ersatz-Schnappschuss trägt alle 339 Spielerzeilen, aber keine einzige Disziplin-Zeile; Madrots All-Time steht auf dem vollen Spielstand bei TDM 1,8 / Mini DM 1,3 / Wettessen 0,7 und im Browser bei nichts. Die Zahl fährt jetzt denselben Weg wie ihr Rang: serverseitig für den angezeigten Spieler berechnet. Bestehende Spielstände zeigen die Werte sofort, es wird kein Archiv umgeschrieben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Spieltag",
       "pr": null,
       "text": "Die Arena sagt jetzt an, bevor die Kaufphase für eine ganze Saison zufällt. Gekauft wird ausschließlich in der neuen Saison vor ihrem ersten Spieltag — sobald dieser Spieltag ein Ergebnis trägt, ist das Fenster zu, und bisher erfuhr man das erst danach. Wer den Spieltag anstieß, bevor er fertig eingekauft hatte, verlor die Möglichkeit für die ganze Saison. Auf der Tafel vor dem Anpfiff steht die Warnung jetzt mit dem eigenen Kontostand, und der Knopf zur Bühne trägt sie als Unterzeile mit. Sie erscheint nur, solange das Fenster wirklich offen ist und Geld auf einem der eigenen Konten liegt — am Saisonende, ab Spieltag 2 oder mit leerer Kasse bleibt sie weg. An der Regel selbst ist keine Zeile geändert.",
