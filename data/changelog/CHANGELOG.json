@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-20",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Die All-Time-Spalte der Top-Disziplinen zeigt wieder Zahlen. Die Punkte je Disziplin sind seit jeher archiviert — der kompakte Browser-Payload lässt die Aufschlüsselung der Archiv-Saisons aber bewusst weg (647 KiB gegen 88 KiB je Saison), und die Spalte lief damit gegen eine leere Summe. Am Spielstand gemessen: der Ersatz-Schnappschuss trägt alle 339 Spielerzeilen, aber keine einzige Disziplin-Zeile; Madrots All-Time steht auf dem vollen Spielstand bei TDM 1,8 / Mini DM 1,3 / Wettessen 0,7 und im Browser bei nichts. Die Zahl fährt jetzt denselben Weg wie ihr Rang: serverseitig für den angezeigten Spieler berechnet. Bestehende Spielstände zeigen die Werte sofort, es wird kein Archiv umgeschrieben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Finanzen",
       "pr": null,
       "text": "Die Apron-Abgabe bemisst wieder das bei Unterschrift VERHANDELTE Jahresgehalt — nicht das Formel-Gehalt aus Marktwert und Attributen, und nicht die Jahresrate dieser Saison. Die Jahresrate hängt an der Vertragsform, und damit ließ sich die Abgabe umgehen: über die sieben Spielstände nachgezählt lagen 24 von 224 Teamzeilen je nach Basis in einer anderen Zone, und SECHS duckten sich vollständig unter die erste Linie weg — verhandelt darüber, gezahlt darunter, Abgabe null. In der Gegenrichtung zahlte ein Team die zweite Zone, obwohl es unter beiden Linien verhandelt hatte, nur weil sein Vertrag früh zahlt. Beides ist behoben: ein Formwechsel ändert die Abgabe jetzt wieder um 0,00. Die Vertragsform bleibt ein Werkzeug für den Cashflow — über die volle Laufzeit zahlt man exakt das Ausgehandelte, sie entscheidet nur, wann.",
