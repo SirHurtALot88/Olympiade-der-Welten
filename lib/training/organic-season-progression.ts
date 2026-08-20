@@ -163,9 +163,9 @@ export type OrganicRegressionBreakdown = {
 // 0,28 → 0,30: flacher Standard-Verlust leicht angehoben (+0,02/Attr × 12 ≈ +0,24 Verlust/Spieler/Saison),
 // damit der gap-getriebene Beschleuniger den Liga-Ø-Netto nicht über die Zieldecke drückt — der Peak-
 // Korridor (Talente) bleibt im Band, aber der Durchschnittsspieler sinkt zurück auf ~0,25 (Ziel −0,4…0,4).
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.3;
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.345;
 /** 1,02 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune (letzter Balancing-Pass). */
-export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0102;
+export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0117;
 /**
  * Financial/value discipline (B): the market-value regression term scaled linearly and UNBOUNDED, so a
  * near-ceiling high-value star was guaranteed a large negative net — regression fired at full strength

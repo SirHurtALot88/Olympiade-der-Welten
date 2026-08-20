@@ -13,9 +13,21 @@
  * Dieses Skript vergleicht ZWEI durchgespielte Saisons, die sich nur in diesem Schalter
  * unterscheiden. Es rechnet nichts nach, es liest die Endstaende.
  *
+ * ZWEI DATENBANKEN, ZWEI PROZESSE — und das ist keine Umstaendlichkeit, sondern die Reparatur eines
+ * Fehlers, den dieses Skript zuerst hatte. Es setzte `process.env.OLY_APP_SQLITE_PATH` zwischen
+ * zwei `createPersistenceService()`-Aufrufen um. Der Pfad wird aber beim ersten Zugriff auf die
+ * Datenbank gebunden; der zweite Aufruf las deshalb WIEDER die erste Datei. Ergebnis: jede Zeile
+ * zeigte „Delta 0", und das sah aus wie der Befund „die Decke tut nichts" — dabei waren es
+ * zweimal dieselben Zahlen. Aufgefallen ist es nur, weil beide Spalten dieselbe saveId trugen.
+ *
+ * Jede Datenbank wird jetzt in einem EIGENEN Prozess gelesen (`--lies <pfad>` gibt JSON aus), der
+ * Vergleich passiert danach. Ein Prozess, eine Datenbank — dann kann sich nichts mehr binden.
+ *
  * Aufruf:
  *   npx tsx scripts/vergleiche-gehaltsdecke-ab.ts --aus <pfad-a.sqlite> --an <pfad-b.sqlite>
  */
+import { spawnSync } from "node:child_process";
+
 import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
@@ -54,8 +66,8 @@ type Lage = {
   zahler: number;
 };
 
-function lese(pfad: string): Lage | null {
-  process.env.OLY_APP_SQLITE_PATH = pfad;
+/** Liest EINE Datenbank — laeuft ausschliesslich im Kindprozess, siehe Kopfkommentar. */
+function leseDieseDatenbank(): Lage | null {
   const persistence = createPersistenceService();
   // Der juengste Stand in dieser Datei ist der durchgespielte.
   const kopf = persistence.listSaves()[0];
@@ -89,17 +101,45 @@ function zeile(name: string, a: number, b: number, d = 1): void {
   console.log(`  ${name.padEnd(32)} ${r(a, d).padStart(9)} ${r(b, d).padStart(9)}${pfeil} ${(delta >= 0 ? "+" : "") + r(delta, d)}`);
 }
 
+function leseUeberKindprozess(pfad: string): Lage | null {
+  const ergebnis = spawnSync(
+    process.execPath,
+    ["--import", "tsx", process.argv[1] ?? "", "--lies", pfad],
+    { encoding: "utf8", env: { ...process.env, OLY_APP_SQLITE_PATH: pfad } },
+  );
+  const zeile = (ergebnis.stdout ?? "").split("\n").find((z) => z.startsWith("{"));
+  if (!zeile) {
+    console.error(`Konnte ${pfad} nicht lesen:`, (ergebnis.stderr ?? "").slice(-400));
+    return null;
+  }
+  return JSON.parse(zeile) as Lage;
+}
+
 function main(): void {
+  const nurLesen = argValue("--lies");
+  if (nurLesen) {
+    const lage = leseDieseDatenbank();
+    if (!lage) process.exit(1);
+    console.log(JSON.stringify(lage));
+    return;
+  }
   const pfadAus = argValue("--aus");
   const pfadAn = argValue("--an");
   if (!pfadAus || !pfadAn) {
     console.error("Aufruf: --aus <a.sqlite> --an <b.sqlite>");
     process.exit(2);
   }
-  const a = lese(pfadAus);
-  const b = lese(pfadAn);
+  const a = leseUeberKindprozess(pfadAus);
+  const b = leseUeberKindprozess(pfadAn);
   if (!a || !b) {
     console.error("Mindestens ein Spielstand ist nicht lesbar.");
+    process.exit(1);
+  }
+  if (a.saveId === b.saveId) {
+    console.error(
+      `ABBRUCH: beide Spalten tragen dieselbe saveId (${a.saveId}) — es wurde zweimal dieselbe ` +
+        `Datenbank gelesen. Genau dieser Fehler hat hier schon einmal ein falsches „Delta 0" erzeugt.`,
+    );
     process.exit(1);
   }
   console.log(`A (Decke AUS): ${a.saveId} · ${a.saison} · ${a.teams} Teams`);
