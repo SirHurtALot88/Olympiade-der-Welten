@@ -447,20 +447,34 @@ export default function PlayerAttributeProgressChart({
       </div>
 
       <div className="player-attribute-progress-summary" data-testid="player-attribute-progress-summary">
-        <span className="player-attribute-progress-summary-label">Entwicklungsbilanz (PPs)</span>
+        {/* Die Einheit gehört in die Überschrift: die vier Achsen sind seit `diwdvh` Punkte JE
+            EINSATZ, damit eine angefangene Saison mit einer vollen vergleichbar ist. OVR ist ein
+            Niveau und bleibt, wie es war — deshalb steht die Einheit an den Chips und nicht nur
+            hier. */}
+        <span className="player-attribute-progress-summary-label">
+          Entwicklungsbilanz · Achsen-PPs je Einsatz, OVR als Niveau
+        </span>
         <div className="player-attribute-progress-summary-chips">
           {summary.metrics.map((metric) => (
             <span
               key={`summary-${metric.id}`}
               className={`player-attribute-progress-delta-chip is-${metric.tone} player-drawer-history-axis ${metric.id === "ovr" ? "is-neutral" : `is-${metric.id === "pow" ? "power" : metric.id === "spe" ? "speed" : metric.id === "men" ? "mental" : "social"}`}`}
+              title={
+                metric.perAppearance
+                  ? `${metric.label}: Punkte je Einsatz, ${summary.firstSeasonName} → ${summary.lastSeasonName}. Ohne Einsatz in einer der beiden Saisons steht hier „—".`
+                  : `${metric.label}: Niveau, ${summary.firstSeasonName} → ${summary.lastSeasonName}.`
+              }
             >
-              <small>{metric.label}</small>
-              <strong>{formatProgressDelta(metric.delta)}</strong>
+              <small>
+                {metric.label}
+                {metric.perAppearance ? " /Eins." : ""}
+              </small>
+              <strong>{formatProgressDelta(metric.delta, metric.perAppearance ? 2 : 1)}</strong>
             </span>
           ))}
           <span className={`player-attribute-progress-delta-chip is-${summary.axisSumTone} is-axis-sum`}>
-            <small>Achsen-Summe</small>
-            <strong>{formatProgressDelta(summary.axisSumDelta)}</strong>
+            <small>Achsen-Summe /Eins.</small>
+            <strong>{formatProgressDelta(summary.axisSumDelta, 2)}</strong>
           </span>
         </div>
       </div>
