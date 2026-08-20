@@ -48167,9 +48167,14 @@ button.foundation-team-portrait-card {
   cursor: pointer;
 }
 
+/* Der Chip ist SCHRIFT, deshalb `--nl-accent-text` und nicht `--nl-accent`: dasselbe Token, aber
+   per accentTextFor auf >= 4,5:1 angehoben — bei dunklen Vereinsfarben waere die rohe Akzentfarbe
+   als Schrift unlesbar (Ratchet in tests/nl-accent-text-regel.test.ts). Die LINIE daneben bleibt
+   auf `--nl-accent`: sie ist keine Schrift, sondern die Vereinsfarbe selbst, und folgt damit den
+   uebrigen Charts im Haus. */
 .is-new-look .nl-alltime-liga-chip.is-hervorgehoben {
-  border-color: var(--nl-accent);
-  color: var(--nl-accent);
+  border-color: var(--nl-accent-text);
+  color: var(--nl-accent-text);
   font-weight: 700;
 }
 
