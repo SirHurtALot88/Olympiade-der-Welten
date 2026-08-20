@@ -2445,11 +2445,12 @@ export default function DisciplineStageArena({
               {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Einsatzlisten-Editor geklärt." : ""}
             </p>
             {/* Siehe `kaufphaseSchliesstMitDiesemSpieltag` oben: die Regel bleibt, wie Chris sie
-                gesetzt hat — hier steht nur die Ansage vor der Tür, die zufällt. */}
+                gesetzt hat — hier steht nur die Ansage vor der Tür, die zufällt.
+
+                Testid = Klassenname. Die beidseitige Klassen-Wache (Velo-Look-Suite) liest jeden
+                `arena-prematch…`-Namen aus dieser Datei und verlangt ihn in globals.css — mit
+                gleichem Namen braucht sie dafür keine Ausnahme. */}
             {kaufphaseSchliesstMitDiesemSpieltag ? (
-              {/* Testid = Klassenname. Die beidseitige Klassen-Wache (Velo-Look-Suite) liest
-                  jeden `arena-prematch…`-Namen aus dieser Datei und verlangt ihn in
-                  globals.css — mit gleichem Namen braucht sie dafür keine Ausnahme. */}
               <p className="arena-prematch-kaufwarnung" data-testid="arena-prematch-kaufwarnung">
                 <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
                 ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
