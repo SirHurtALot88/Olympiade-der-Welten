@@ -86,7 +86,7 @@ describe("singleplayer game state", () => {
     expect(cashCreatorsIdentity?.playerMin).toBe(11);
     // 14 statt vorher 13: das Blatt (data/source/team-identities.json) zielt jetzt bei jedem Team
     // auf das Kader-Maximum, C-C stand dort auf 12. Der GM-Zuschlag (+1 fuer C-C) laeuft weiter,
-    // klemmt aber bei playerMax = 14. Begruendung in tests/opt-ziel-steht-auf-dem-kadermaximum.ts.
+    // klemmt aber bei playerMax = 14. Begruendung in tests/opt-ziel-steigt-um-einen-platz.test.ts.
     expect(cashCreatorsIdentity?.playerOpt).toBe(14);
     expect(gameState.seasonState.teamGeneralManagers?.["C-C"]?.gmId).toBeTruthy();
 
@@ -744,17 +744,33 @@ describe("singleplayer game state", () => {
   it("varies fit-near GM picks across different save seeds", () => {
     const fresh = createFreshSeasonOneGameState();
     const identities = loadDefaultTeamIdentities();
-    const team = fresh.teams.find((entry) => entry.teamId === "Z-H");
-    expect(team).toBeTruthy();
 
     const saveA = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-a");
     const saveB = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-b");
-    const gmA = saveA["Z-H"]?.gmId;
-    const gmB = saveB["Z-H"]?.gmId;
 
-    expect(gmA).toBeTruthy();
-    expect(gmB).toBeTruthy();
-    expect(gmA).not.toBe(gmB);
+    for (const team of fresh.teams) {
+      expect(saveA[team.teamId]?.gmId, `kein GM fuer ${team.teamId} in Save A`).toBeTruthy();
+      expect(saveB[team.teamId]?.gmId, `kein GM fuer ${team.teamId} in Save B`).toBeTruthy();
+    }
+
+    /**
+     * DIE ZUSICHERUNG IST LIGAWEIT, NICHT AN EINEM TEAM.
+     *
+     * Hier stand vorher: Z-H bekommt unter zwei Seeds zwei verschiedene GMs. Das war nur ein
+     * Stellvertreter fuer die eigentliche Regel — der Save-Seed entscheidet unter Bewerbern mit
+     * aehnlicher Eignung — und der Stellvertreter ist mit der Anhebung der Kader-Zielgroesse
+     * ungueltig geworden: `rosterFit` (team-general-managers.ts) hat harte Schwellen bei 10 und 13,
+     * Z-H wanderte von 10 auf 11 und faellt damit aus der Stufe „<= 10, GM will kleinere Kader",
+     * die ihm vorher mehrere gleich starke Bewerber verschafft hatte. Seine Eignung ist jetzt
+     * eindeutig, also waehlen beide Seeds denselben GM — richtig so, nur eben kein Beleg mehr fuer
+     * die Regel.
+     *
+     * Ligaweit gemessen aendert der Seed 29 von 32 Zuordnungen. Die Schwelle steht bewusst tief bei
+     * acht: der Test soll anschlagen, wenn der Seed AUFHOERT zu wirken, und nicht bei jeder
+     * Verschiebung im Eignungsfeld.
+     */
+    const abweichende = fresh.teams.filter((team) => saveA[team.teamId]?.gmId !== saveB[team.teamId]?.gmId);
+    expect(abweichende.length, "Der Save-Seed bewegt die GM-Vergabe kaum noch").toBeGreaterThanOrEqual(8);
   });
 
   it("caps repeated GM archetypes in the league pool", () => {

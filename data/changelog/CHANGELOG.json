@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Liga",
+      "pr": null,
+      "text": "Jedes Team strebt jetzt einen Spieler mehr im Kader an, gedeckelt beim Maximum von 14. Der Grund steht in der Ermüdungsmessung: Erholung bekommt nur, wer an einem Spieltag nicht eingesetzt wird, und bei neun Einsatzplätzen liegt das Gleichgewicht bei etwa 14 Spielern. Mit zehn Spielern muss jeder 90 % der Spieltage ran — da kann keine KI rotieren, und die Ermüdung steigt jeden Spieltag weiter, bis der Deckel greift. Genau das war die Ursache der Verletzungswellen zum Saisonende. Im Blatt wandert der Median damit von 11 auf 12; die Persönlichkeit des General Managers verschiebt das Ziel weiterhin um bis zu zwei Plätze.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Spieltag",
       "pr": null,
       "text": "Die Arena sagt jetzt an, bevor die Kaufphase für eine ganze Saison zufällt. Gekauft wird ausschließlich in der neuen Saison vor ihrem ersten Spieltag — sobald dieser Spieltag ein Ergebnis trägt, ist das Fenster zu, und bisher erfuhr man das erst danach. Wer den Spieltag anstieß, bevor er fertig eingekauft hatte, verlor die Möglichkeit für die ganze Saison. Auf der Tafel vor dem Anpfiff steht die Warnung jetzt mit dem eigenen Kontostand, und der Knopf zur Bühne trägt sie als Unterzeile mit. Sie erscheint nur, solange das Fenster wirklich offen ist und Geld auf einem der eigenen Konten liegt — am Saisonende, ab Spieltag 2 oder mit leerer Kasse bleibt sie weg. An der Regel selbst ist keine Zeile geändert.",
@@ -51,15 +60,6 @@
       "seite": "Welt · Kredite",
       "pr": null,
       "text": "KI-Teams rechnen ihre Kreditwürdigkeit jetzt mit dem vollen Gehalt. Bisher zählte die Gehaltssumme nur zu 60 % als Fixkosten — begründet mit „Teams haben auch andere Einnahmen\", was nicht trägt: das Gehalt geht jede Saison in voller Höhe vom Konto, ob nebenbei ein Transfer gelingt oder nicht. Die fehlenden 40 % gaben Kreditrahmen frei, den es nie gab. Über die Spielstände nachgerechnet sinkt der Rahmen deutlich, in `hwz8fk` etwa von 26,7 auf 8,3 bei A-A und von 38,0 auf 12,1 bei C-S; die Zahl der Teams, die für einen weiteren Kredit keinen Spielraum mehr haben, steigt von einem auf acht. Der Mindestrahmen für hoch belastete Teams bleibt unverändert bestehen.",
-      "quelle": "gepflegt",
-      "gewicht": "grundlegend",
-      "version": "0.5"
-    },
-    {
-      "datum": "2026-08-20",
-      "seite": "Liga",
-      "pr": null,
-      "text": "Alle 32 Teams zielen jetzt auf einen Kader von 14 statt auf 9 bis 14. Der Grund steht in der Ermüdungsmessung: Erholung bekommt nur, wer an einem Spieltag nicht eingesetzt wird, und bei neun Einsatzplätzen liegt das Gleichgewicht bei etwa 14 Spielern. Mit zehn Spielern muss jeder 90 % der Spieltage ran — da kann keine KI rotieren, und die Fatigue steigt jeden Spieltag weiter, bis der Deckel greift. Genau das war die Ursache der immer zahlreicheren Verletzungen zum Saisonende. Die Persönlichkeit des General Managers bleibt sichtbar: sie verschiebt das Ziel weiterhin um bis zu zwei Plätze, nach oben aber gedeckelt — gemessen 26 Teams auf 14, vier auf 13, zwei auf 12.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
       "version": "0.5"
