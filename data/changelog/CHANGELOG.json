@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Apron-Abgabe bemisst wieder das bei Unterschrift VERHANDELTE Jahresgehalt — nicht das Formel-Gehalt aus Marktwert und Attributen, und nicht die Jahresrate dieser Saison. Die Jahresrate hängt an der Vertragsform, und damit ließ sich die Abgabe umgehen: über die sieben Spielstände nachgezählt lagen 24 von 224 Teamzeilen je nach Basis in einer anderen Zone, und SECHS duckten sich vollständig unter die erste Linie weg — verhandelt darüber, gezahlt darunter, Abgabe null. In der Gegenrichtung zahlte ein Team die zweite Zone, obwohl es unter beiden Linien verhandelt hatte, nur weil sein Vertrag früh zahlt. Beides ist behoben: ein Formwechsel ändert die Abgabe jetzt wieder um 0,00. Die Vertragsform bleibt ein Werkzeug für den Cashflow — über die volle Laufzeit zahlt man exakt das Ausgehandelte, sie entscheidet nur, wann.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Spieltag",
       "pr": null,
       "text": "Die Arena sagt jetzt an, bevor die Kaufphase für eine ganze Saison zufällt. Gekauft wird ausschließlich in der neuen Saison vor ihrem ersten Spieltag — sobald dieser Spieltag ein Ergebnis trägt, ist das Fenster zu, und bisher erfuhr man das erst danach. Wer den Spieltag anstieß, bevor er fertig eingekauft hatte, verlor die Möglichkeit für die ganze Saison. Auf der Tafel vor dem Anpfiff steht die Warnung jetzt mit dem eigenen Kontostand, und der Knopf zur Bühne trägt sie als Unterzeile mit. Sie erscheint nur, solange das Fenster wirklich offen ist und Geld auf einem der eigenen Konten liegt — am Saisonende, ab Spieltag 2 oder mit leerer Kasse bleibt sie weg. An der Regel selbst ist keine Zeile geändert.",
@@ -26,6 +35,15 @@
       "text": "Die neue Kaufphasen-Warnung konnte die Arena beim Rendern zum Absturz bringen. Sie fragte das Kauffenster ab, ohne den Fall abzufangen, dass Saison oder Spieltag noch gar nicht geladen sind — im Ladefenster und beim Bootstrap warf das mitten in der Anzeige. Ohne Saison und ohne Spieltag gibt es kein Kauffenster, über dessen Schließen man warnen könnte; die Warnung schweigt dort jetzt, statt zu werfen.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Welt · Sponsoren",
+      "pr": null,
+      "text": "Die Apron-Marke in der Sponsorenliste zeigte bei 61 von 224 Teamzeilen die falsche Zone — über alle sieben Spielstände nachgezählt, und in beide Richtungen. Sie verglich die GEGLÄTTETE Gehaltssumme mit den Linien, während die Abgabe selbst gegen die ECHTE rechnet: Cold Steel stand als „über 2. Linie\" da (79,4) und liegt echt bei 61,6, also nur über der ersten; Big Bang stand auf „unter\" (58,3) und zahlt echt bei 61,3. Die Marke holt ihre Grundlage jetzt bei der Apron selbst, statt sie nachzubauen. Auch die Deckungsspalte („trägt der Sponsor die Mannschaft?\") rechnet jetzt mit dem Geld, das wirklich vom Konto geht — bei Mayhem 123,5 statt 98,9 —, und die Erklärung sagt dazu, welche der Gehaltszahlen sie meint. Die Glättung bleibt, wo sie hingehört: als Bemessungsgrundlage der Sponsor-Kalibrierung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.5"
     },
     {
