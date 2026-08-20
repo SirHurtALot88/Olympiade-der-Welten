@@ -79335,6 +79335,26 @@ span.nl-facility-ampel-chip {
   max-width: 56ch;
 }
 
+/* Die Ansage vor der Tuer, die fuer eine ganze Saison zufaellt (`cubix1`). Sie steht bewusst
+   auf `--nl-warn` und nicht auf `--nl-bad`: hier ist nichts kaputt, es ist nur gleich zu spaet.
+   Farbe und Flaeche kommen aus Tokens, damit die Tafel in beiden Themes traegt. */
+.arena-prematch-kaufwarnung {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--nl-warn);
+  border-left-width: 3px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 10%, transparent);
+  color: var(--nl-ink);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 56ch;
+}
+
+.arena-prematch-kaufwarnung strong {
+  color: var(--nl-warn);
+}
+
 .arena-prematch-slotbar {
   display: flex;
   flex-wrap: wrap;
