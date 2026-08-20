@@ -15,11 +15,18 @@
  * 2. VERTRAGSFORM NACH DEM FENSTER (Schritt 2): Gehaltszahlungen skalieren nicht mit dem Salary
  *    Factor, die Einnahmen schon — faellt das Fenster, ist frueh zahlen guenstiger.
  *
- * 3. DIE BEMESSUNGSGRUNDLAGE (Kopfkommentar `apron-service.ts`): besteuert wird, was in DIESER
- *    Saison WIRKLICH gezahlt wird — `yearlySalarySchedule[0]` je Vertrag. Der frueher hier
- *    stehende Waechter („ein Formwechsel aendert die Abgabe um 0,00") ist damit gegenstandslos:
- *    Chris hat die Zusage aufgehoben („die REAL zu zahlende summe des jahres nach vertrag und
- *    nicht geglättet"). Die Faelle unten messen jetzt die NEUE Regel, statt die alte zu behaupten.
+ * 3. DIE BEMESSUNGSGRUNDLAGE (Kopfkommentar `apron-service.ts`): besteuert wird das bei
+ *    Unterschrift VERHANDELTE Jahresgehalt. Chris: „apron muss aber doch das verhandelte gehalt
+ *    als bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete!"
+ *
+ *    Diese Waechter standen zwischenzeitlich auf der Jahresrate dieser Saison und hielten
+ *    ausdruecklich fest, dass ein Formwechsel die Abgabe BEWEGT — mit der Begruendung,
+ *    `back_loaded` verschiebe die Last nur in spaetere Jahre. An den sieben Live-Spielstaenden
+ *    nachgezaehlt war es Vermeiden: 24 von 224 Teamzeilen lagen je nach Basis in einer anderen
+ *    Zone, und SECHS duckten sich vollstaendig unter die erste Linie weg — verhandelt darueber,
+ *    Jahresrate darunter, Abgabe null. Ein Vertrag, der vor seinem teuren Jahr verkauft oder nicht
+ *    verlaengert wird, zahlt die verschobene Last nie nach, und die Linien wandern jede Saison mit
+ *    dem Liga-Median. Die Zusage „ein Formwechsel aendert die Abgabe um 0,00" gilt wieder.
  */
 import { describe, expect, it } from "vitest";
 
@@ -266,47 +273,53 @@ describe("Die Bemessungsgrundlage — besteuert wird, was diese Saison wirklich 
     };
   }
 
-  it("die Basis IST die echte Jahreszahlung, nicht der geglaettete Verhandlungswert", () => {
+  it("die Basis IST der Verhandlungswert, nicht die Jahresrate dieser Saison", () => {
     const gs = mitForm(bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]), "front_loaded");
     // Vorbedingung: die beiden Begriffe MUESSEN auseinanderliegen, sonst prueft der Rest nichts.
     expect(getTeamActualSalaryTotal(gs, "team-1")).not.toBe(getTeamNegotiatedSalaryTotal(gs, "team-1"));
-    expect(getTeamApronSalaryBase(gs, "team-1")).toBe(getTeamActualSalaryTotal(gs, "team-1"));
+    expect(getTeamApronSalaryBase(gs, "team-1")).toBe(getTeamNegotiatedSalaryTotal(gs, "team-1"));
   });
 
-  it("front_loaded hebt die Abgabe dieser Saison, back_loaded senkt sie", () => {
+  it("ein Formwechsel aendert die Abgabe um 0,00", () => {
+    /**
+     * DIE ANTI-GAMING-ZUSAGE, WIEDER SCHARF. Sie war zwischenzeitlich aufgehoben, als die Basis auf
+     * die Jahresrate umgestellt wurde — mit der Begruendung, `back_loaded` VERSCHIEBE die Last nur.
+     * An den sieben Live-Spielstaenden gemessen war es Vermeiden: sechs Teamzeilen lagen verhandelt
+     * ueber der ersten Linie und zahlten wegen ihrer Jahresrate NICHTS.
+     */
     const basis = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
     const frueh = mitForm(basis, "front_loaded");
     const spaet = mitForm(basis, "back_loaded");
 
-    // Die Zusage von frueher waere hier „=== 0". Genau das gilt nicht mehr, und zwar gewollt.
-    expect(getTeamApronSalaryBase(frueh, "team-1")).toBeGreaterThan(getTeamApronSalaryBase(basis, "team-1"));
-    expect(getTeamApronSalaryBase(spaet, "team-1")).toBeLessThan(getTeamApronSalaryBase(basis, "team-1"));
     expect(abgabeDerLiga(basis)).toBeGreaterThan(0);
-    expect(abgabeDerLiga(frueh)).toBeGreaterThan(abgabeDerLiga(basis));
+    expect(getTeamApronSalaryBase(frueh, "team-1")).toBe(getTeamApronSalaryBase(basis, "team-1"));
+    expect(getTeamApronSalaryBase(spaet, "team-1")).toBe(getTeamApronSalaryBase(basis, "team-1"));
+    expect(abgabeDerLiga(frueh)).toBe(abgabeDerLiga(basis));
+    expect(abgabeDerLiga(spaet)).toBe(abgabeDerLiga(basis));
   });
 
-  it("back_loaded verschiebt die Last nur — spaeter zahlt es sie nach", () => {
-    // DAS IST DIE ANTWORT AUF DEN VERLORENEN WAECHTER: die Form kann die Abgabe eines JAHRES
-    // druecken, nicht die der Laufzeit. Nach dem Saisonwechsel steht die gesparte Rate wieder da.
+  it("die Vertragsform bewegt sehr wohl die ZAHLUNG dieser Saison — nur eben nicht die Abgabe", () => {
+    // Sonst waere der Test oben auch dann gruen, wenn die Form gar nichts mehr taete. Die Form ist
+    // ein Cashflow-Werkzeug: sie entscheidet, WANN gezahlt wird.
+    const basis = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
+    const frueh = mitForm(basis, "front_loaded");
+    const spaet = mitForm(basis, "back_loaded");
+    expect(getTeamActualSalaryTotal(frueh, "team-1")).toBeGreaterThan(getTeamActualSalaryTotal(spaet, "team-1"));
+  });
+
+  it("auch nach zwei Saisonwechseln bleibt die Basis stehen", () => {
+    /**
+     * Der Weg, auf dem das Schlupfloch entstand: `entry.salary` wird bei JEDEM Saisonwechsel mit
+     * der Jahr-1-Rate der Rest-Schedule ueberschrieben. Eine Basis, die daran haengt, wandert
+     * mit der Form durch die Laufzeit. Das Verhandlungs-Benchmark tut das nicht.
+     */
     const basis = bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]);
     const spaet = mitForm(basis, "back_loaded");
-
-    expect(getTeamApronSalaryBase(spaet, "team-1")).toBeLessThan(getTeamApronSalaryBase(basis, "team-1"));
-
-    const basisSpaeter = eineSaisonWeiter(eineSaisonWeiter(basis));
-    const spaetSpaeter = eineSaisonWeiter(eineSaisonWeiter(spaet));
-    expect(getTeamApronSalaryBase(spaetSpaeter, "team-1")).toBeGreaterThan(
-      getTeamApronSalaryBase(basisSpaeter, "team-1"),
-    );
-  });
-
-  it("die Basis wandert mit dem Saisonwechsel — sie bleibt die Rate DIESES Jahres", () => {
-    const frueh = mitForm(bauLigaMitUeberzahler("season_active", [1.24, 1.24, 1.24, 1.24, 1.24]), "front_loaded");
-    const spaeter = eineSaisonWeiter(frueh);
-    // Bei front_loaded faellt die Rate ueber die Laufzeit — die Basis muss das mitmachen, sonst
-    // besteuerte sie ein Jahr, das es nicht mehr gibt.
-    expect(getTeamApronSalaryBase(spaeter, "team-1")).toBeLessThan(getTeamApronSalaryBase(frueh, "team-1"));
-    expect(getTeamApronSalaryBase(spaeter, "team-1")).toBe(getTeamActualSalaryTotal(spaeter, "team-1"));
+    const vorher = getTeamApronSalaryBase(spaet, "team-1");
+    const spaeter = eineSaisonWeiter(eineSaisonWeiter(spaet));
+    expect(getTeamApronSalaryBase(spaeter, "team-1")).toBe(vorher);
+    // Gegenprobe im selben Aufbau: die Jahresrate wandert sehr wohl.
+    expect(getTeamActualSalaryTotal(spaeter, "team-1")).not.toBe(getTeamActualSalaryTotal(spaet, "team-1"));
   });
 
   it("wer guenstiger zahlt, zahlt weniger Abgabe", () => {

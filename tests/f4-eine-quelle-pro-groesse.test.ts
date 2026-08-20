@@ -25,6 +25,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { getTeamApronSalaryBase } from "@/lib/season/apron-service";
 import { computeTeamTopSixAxisStats } from "@/lib/market/transfermarkt-roster-impact";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { buildLineupSaveCta } from "@/lib/lineups/lineup-audit";
@@ -210,17 +211,26 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
    * Jahresgehalt, hin zur REAL in dieser Saison zu zahlenden Summe (`getTeamActualSalaryTotal`,
    * also `yearlySalarySchedule[0]`). Begruendung dort: auch das verhandelte Gehalt war eine
    * GEGLAETTETE Groesse — der Durchschnitt ueber die Laufzeit, nicht das, was in dieser Saison
-   * vom Konto geht. Bemessen wird jetzt exakt das Feld, das der Saisonende-Apply abbucht.
+   * vom Konto geht.
    *
-   * Damit ist die Anti-Gaming-Zusage („ein Formwechsel aendert die Abgabe um 0,00") ausdruecklich
-   * aufgehoben: front_loaded hebt die Basis dieser Saison, back_loaded senkt sie. Es bleibt ein
-   * Verschieben, kein Vermeiden — der Apron wird jede Saison neu abgerechnet.
+   * DIESE ZWEITE UMSTELLUNG IST ZURUECKGENOMMEN (#589). Sie hatte die Anti-Gaming-Zusage
+   * aufgehoben, und das Schlupfloch war kein theoretisches: `contract.salary` haengt an der
+   * VERTRAGSFORM, back_loaded senkt die Basis dieser Saison. Am echten Spielstand lagen 24 von
+   * 224 Teams dadurch in einer anderen Zone, sechs davon ganz unter Linie 1 (`hwz8fk` L-K:
+   * verhandelt 62,4 gegen Linie 59,2, Rate 56,3 → zahlt nichts). Chris' Entscheidung: „apron muss
+   * aber doch das verhandelte gehalt als bemessung nehmen, nicht das was es THEORETISCH waere und
+   * nicht das geglaettete! und das verhandelte ist ja auch das was abgebucht werden soll, wofuer
+   * verhandelt man sonst".
+   *
+   * Bemessen wird deshalb wieder `getTeamNegotiatedSalaryTotal` — die einzige der drei Groessen,
+   * die weder vom Formelwert noch von der Vertragsform abhaengt. Die Vertragsform verschiebt Geld
+   * weiterhin zwischen den Jahren; sie verschiebt nur nicht mehr die Abgabe.
    */
-  it("die Apron-Hochrechnung misst die real zu zahlende Jahressumme — geprüft an der Zahl, nicht am Quelltext", () => {
+  it("die Apron-Hochrechnung misst das verhandelte Jahresgehalt — geprüft an der Zahl, nicht am Quelltext", () => {
     const state = gameStateWithNegotiatedSalaries();
     // Vorbedingung: die drei Gehaltsbegriffe unterscheiden sich wirklich.
-    const verhandelt = 6 + 7 + 8; // 21 — der Durchschnitt ueber die Laufzeit
-    const gezahlt = 7.8 + 4.2 + 8; // 20 — was DIESE Saison wirklich abgeht
+    const verhandelt = 6 + 7 + 8; // 21 — was am Verhandlungstisch unterschrieben wurde
+    const gezahlt = 7.8 + 4.2 + 8; // 20 — was DIESE Saison wirklich abgeht (formabhaengig!)
     const formel = 14 * 3; // 42
     expect(new Set([verhandelt, gezahlt, formel]).size).toBe(3);
 
@@ -229,11 +239,12 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
       rankByTeamId: new Map([["T1", 1]]),
     });
     const zeile = projektion.byTeamId.get("T1");
-    expect(zeile?.salary).toBeCloseTo(gezahlt, 2);
-    expect(zeile?.salary).not.toBeCloseTo(verhandelt, 2);
+    expect(zeile?.salary).toBeCloseTo(verhandelt, 2);
+    expect(zeile?.salary).not.toBeCloseTo(gezahlt, 2);
     expect(zeile?.salary).not.toBeCloseTo(formel, 2);
-    // Und es ist wirklich DIESELBE Quelle wie die des Saisonende-Applys — der Punkt des Pakets.
-    expect(zeile?.salary).toBeCloseTo(getTeamActualSalaryTotal(state, "T1"), 2);
+    // Und es ist wirklich DIESELBE Quelle, die die KI und die Sponsoren-Seite fragen — der Punkt
+    // des Pakets.
+    expect(zeile?.salary).toBeCloseTo(getTeamApronSalaryBase(state, "T1"), 2);
   });
 
   it("die Sponsor-Anzeige bleibt auf der Glättung — dort ist sie die Bemessungsgrundlage", () => {

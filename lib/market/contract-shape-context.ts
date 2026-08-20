@@ -6,18 +6,27 @@
  * Und als Grenze dazu: „es sollen ja nicht alle top teams dann nur back loaded nehmen […] dann hast
  * du irgendwann nen sehr teuren gehaltspeak das muss auch vermieden werden, der mix machts."
  *
- * WICHTIG — WAS DIE FORM NICHT KANN. Die Apron-Abgabe selbst lässt sich damit NICHT umgehen. Sie
- * bemisst sich bewusst an der GEGLÄTTETEN Gehaltszahl (`getTeamApronSalaryBase` →
- * `getTeamDisplaySalaryTotal`), gerade damit ein Team sich nicht allein durch die zeitliche
- * Verteilung seiner Raten über oder unter die Linie schiebt — so steht es seit der Kalibrierung im
- * Kopfkommentar von `apron-service.ts`. Diese Absicht bleibt unangetastet.
+ * WICHTIG — WAS DIE FORM NICHT KANN, UND ZWAR WIEDER NICHT. Die Apron-Abgabe lässt sich damit NICHT
+ * umgehen: sie bemisst das bei Unterschrift VERHANDELTE Jahresgehalt (`getTeamApronSalaryBase` →
+ * `getTeamNegotiatedSalaryTotal`), und das ist formunempfindlich. Ein Formwechsel ändert die Abgabe
+ * um 0,00.
  *
- * WAS DIE FORM SEHR WOHL BEWEGT: die ECHTE Zahlung dieser Saison (`getTeamActualSalaryTotal`,
- * `resolvePlayerEconomyContract().salary`). Am Live-Abbild gemessen liegen die beiden weit
- * auseinander. In Saison 1 liegen 11 Teams über der ersten Linie, SIEBEN davon zahlen JETZT mehr,
- * als der Apron ihnen anrechnet (M-M: geglättet 81,6, echt 95,9; Z-H: 82,9 gegen 96,9); in Saison 2
- * sind es 4 von 8. Sie front-loaden sich in die Enge hinein und tragen die Abgabe zusätzlich. Genau
- * das ist der behebbare Teil.
+ * DIESER ABSATZ WAR ZWISCHENZEITLICH FALSCH, in zwei Schichten: er nannte `getTeamDisplaySalaryTotal`
+ * als Grundlage (das Formel-Gehalt — schon damals überholt), während die Grundlage tatsächlich auf
+ * die formABHÄNGIGE Jahresrate umgestellt worden war. Die Absicht, die er beschreibt, galt also
+ * gerade nicht. Seit Chris' dritter Entscheidung gilt sie wieder, und die Grundlage heißt jetzt
+ * auch wirklich so.
+ *
+ * WAS DIE FORM SEHR WOHL BEWEGT: den CASHFLOW, also die Zahlung dieser Saison
+ * (`getTeamActualSalaryTotal`, `resolvePlayerEconomyContract().salary`). Über die volle Laufzeit
+ * zahlt man exakt `verhandelt × Jahre` — `buildContractSalarySchedule` erhält die Summe, für alle
+ * drei Formen nachgerechnet. Die Form entscheidet nur, WANN das Geld fließt: wer heute Kasse hat,
+ * front-loadet und entlastet spätere Jahre; wer knapp steht, verschiebt nach hinten.
+ *
+ * FOLGE FÜR DIE REGEL UNTEN, die noch aussteht: `apronHeadroom` steuert die Formwahl weiterhin so,
+ * als ließe sich damit die Abgabe bewegen. Das tut es seit dieser Umstellung nicht mehr — die
+ * Steuerung gehört auf Liquidität umgestellt statt auf Apron-Spielraum. Chris ist darauf
+ * hingewiesen; hier steht es, damit es nicht unbemerkt weiterläuft.
  *
  * DIESE DATEI HÄLT DIE REGEL — NICHT DIE AUFRUFER. Es gibt DREI unabhängige Formwähler im Spiel,
  * und alle drei rufen `wendeApronUndMixAn`. Neue Formwähler gehören ebenfalls hierher.
