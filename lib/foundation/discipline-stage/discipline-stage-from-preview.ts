@@ -1,6 +1,7 @@
 import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
+import { verteileTeamEffektAufBahnen } from "@/lib/foundation/discipline-stage/team-effekt-verteilung";
 
 // Mapping der ECHTEN Resolve-Engine-Preview auf das additive Szenen-Payload der
 // Disziplin-Bühne. Ziel (Parität zur Arena): die Bühne rechnet NICHTS selbst —
@@ -165,28 +166,17 @@ export function buildDisciplineStageTeamsFromPreview(
         { k: "Team-Power", value: teamResult.teamPowerModifier ?? 0 },
       ];
       for (const teamMod of teamLevelMods) {
-        if (Math.abs(teamMod.value) < 0.05) {
-          continue;
-        }
-        let remaining = round1(teamMod.value);
-        players.forEach((player, index) => {
-          const amount = index === players.length - 1 ? round1(remaining) : round1(teamMod.value / players.length);
-          remaining = round1(remaining - amount);
-          if (Math.abs(amount) >= 0.05) {
-            player.mods.push({ k: teamMod.k, sign: amount < 0 ? -1 : 1, amt: Math.abs(amount) });
-          }
-        });
+        verteileTeamEffektAufBahnen(players, teamMod.value, teamMod.k);
       }
     }
 
     // Rest-Reconcile: verbleibende Differenz (Rundung / nicht separat gelistete
-    // Effekte) auf den letzten Slot, damit Σ(Netto) exakt == teamResult.score.
+    // Effekte) über die Bahnen, damit Σ(Netto) exakt == teamResult.score. Bei einem
+    // Betrag, der pro Bahn auf 0,0 rundet, bleibt er zwangsläufig auf der letzten —
+    // das ist dann aber Rundungsrauschen und keine sichtbare Bevorzugung mehr.
     const playerNetSum = players.reduce((sum, p) => sum + p.val + modSum(p.mods), 0);
     const residual = round1(teamResult.score - playerNetSum);
-    if (Math.abs(residual) >= 0.05 && players.length > 0) {
-      const last = players[players.length - 1]!;
-      last.mods.push({ k: "Team", sign: residual < 0 ? -1 : 1, amt: Math.abs(residual) });
-    }
+    verteileTeamEffektAufBahnen(players, residual);
 
     const captainEntry = teamResult.entries.find((entry) => entry.isCaptain) ?? null;
 
