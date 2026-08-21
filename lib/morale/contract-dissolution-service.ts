@@ -29,6 +29,7 @@ import { derivePlayerNatureDemandSignals } from "@/lib/market/contract-negotiati
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { istVertragAmAuslaufen } from "@/lib/contracts/roster-contract-status";
 
 /** Moral-Schwelle, ab der ein Spieler ueber einen Wechsel nachdenkt (siehe getContractIntent). */
 export const DISSOLUTION_MORALE_THRESHOLD = 34;
@@ -136,6 +137,23 @@ export function buildContractDissolutionOffers(input: OfferInput): ContractDisso
 
     const morale = input.moraleByPlayerId[player.id];
     if (morale == null || morale >= DISSOLUTION_MORALE_THRESHOLD) continue;
+
+    /**
+     * GEMELDET VON CHRIS: „spieler bei denen der vertrag sowieso nun ausläuft sollten keine
+     * vertragsauflösung anbieten! sonst kann man sich ja das bessere aussuchen — das ist nur für
+     * spieler die noch restvertrag haben!"
+     *
+     * Er hat den Rechenweg getroffen: der Preis eines Angebots setzt auf `contractLength - 1` auf,
+     * also auf die Jahre NACH der laufenden Saison. Bei einer auslaufenden Laufzeit ist dieser Rest
+     * null — offener Buyout 0, zu zahlender Buyout 0, und der volle Verkaufspreis bliebe uebrig.
+     * Fuer einen Spieler, der ohnehin geht, waere die Aufloesung damit ein geschenkter Erloes und
+     * niemals eine Entscheidung: man nimmt einfach, was mehr bringt.
+     *
+     * Eine Aufloesung ist ein Herauskaufen aus einem LAUFENDEN Vertrag. Gibt es nichts mehr
+     * herauszukaufen, gibt es auch nichts anzubieten — dann laeuft der Vertrag aus, und die Frage
+     * heisst Verlaengern oder Gehenlassen.
+     */
+    if (istVertragAmAuslaufen(rosterEntry)) continue;
 
     // In derselben Saison wird nur einmal entschieden — sonst koennte man ein
     // abgelehntes Angebot beliebig oft neu aufrufen, bis der Preis passt.

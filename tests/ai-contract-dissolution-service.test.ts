@@ -254,9 +254,15 @@ describe("Der Lauf ueber alle Teams", () => {
         { id: "p-froh", name: "Zufriedener", marketValue: 20, displayMarketValue: 20, subclasses: [], traits: [], traitsPositive: [], traitsNegative: [], coreStats: { pow: 50, spe: 50, men: 50, soc: 50 }, disciplineRatings: {} },
       ],
       rosters: [
-        { id: "r1", teamId: "A-A", playerId: "p-ki", contractLength: 1, salary: 4, purchasePrice: 10 },
+        // LAUFZEIT 3, nicht 1: seit Chris’ Meldung („spieler bei denen der vertrag sowieso nun
+        // ausläuft sollten keine vertragsauflösung anbieten") gibt es fuer einen auslaufenden
+        // Vertrag gar kein Angebot mehr. Mit 1 pruefte dieser Test seine eigene Aussage nicht mehr:
+        // „laesst das Managerteam in Ruhe" waere auch dann gruen, wenn die Kontrollart ignoriert
+        // wuerde — es gaebe schlicht nichts anzubieten. Eine Aufloesung setzt einen Restvertrag
+        // voraus, und genau den bildet die Liga jetzt ab.
+        { id: "r1", teamId: "A-A", playerId: "p-ki", contractLength: 3, salary: 4, purchasePrice: 10 },
         { id: "r2", teamId: "A-A", playerId: "p-froh", contractLength: 3, salary: 4, purchasePrice: 10 },
-        { id: "r3", teamId: "S-C", playerId: "p-mensch", contractLength: 1, salary: 4, purchasePrice: 10 },
+        { id: "r3", teamId: "S-C", playerId: "p-mensch", contractLength: 3, salary: 4, purchasePrice: 10 },
       ],
       teams: [
         { teamId: "A-A", name: "KI-Team", cash: 50, humanControlled: false },
