@@ -174,6 +174,33 @@ function toPercentWidth(value: number | null | undefined): number {
   return Math.max(0, Math.min(100, value));
 }
 
+/**
+ * DAS ERGEBNIS EINER VERHANDLUNGSRUNDE.
+ *
+ * GEMELDET VON CHRIS: „und wieso gibts beim verlängern kein angebot senden knopf? der spieler
+ * muss wie beim kauf ja auch verhandeln können."
+ *
+ * Er hatte recht, und der Befund war unangenehm: die Verlaengerung laeuft laengst durch DIESELBE
+ * Engine wie der Kauf (`buildContractNegotiationPreview`). Verdikt und Gegenangebots-Betrag werden
+ * berechnet und mitgeliefert — dieses Fenster zeigte davon nur die drei Prozentbalken und liess
+ * „Vertrag bestaetigen" danach durchlaufen, egal was das Verdikt sagte. Die Chancen waren Deko.
+ *
+ * Der Ablauf ist deshalb derselbe wie beim Kauf: erst senden, dann unterschreiben.
+ *
+ * `fuerAngebot` haelt fest, ZU WELCHEM Angebot das Ergebnis gehoert. Aendert man danach Gehalt,
+ * Laufzeit oder Form, gilt es nicht mehr — sonst unterschriebe man einen anderen Vertrag als den,
+ * dem der Spieler zugestimmt hat.
+ */
+type VerhandlungsErgebnis = {
+  status: "accepted" | "countered" | "rejected";
+  tone: "success" | "warning" | "error";
+  title: string;
+  message: string;
+  counterSalary?: number | null;
+  counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
+  fuerAngebot: { salary: number | null; length: number; shape: ContractShape };
+};
+
 export default function ContractRenewalNegotiationModal({
   subject,
   busy,
@@ -236,6 +263,122 @@ export default function ContractRenewalNegotiationModal({
   }, [draftSalary, draftLength, draftShape]);
 
   const negotiation = summary?.negotiationPreview ?? null;
+
+  // ---- Verhandlung: erst senden, dann unterschreiben --------------------------------
+  const [ergebnis, setErgebnis] = useState<VerhandlungsErgebnis | null>(null);
+  // Ein Ergebnis gilt nur fuer das Angebot, zu dem es gehoert. Wer danach an Gehalt, Laufzeit
+  // oder Form dreht, verhandelt einen anderen Vertrag — und muss neu senden.
+  const ergebnisGilt =
+    ergebnis != null &&
+    ergebnis.fuerAngebot.salary === draftSalary &&
+    ergebnis.fuerAngebot.length === draftLength &&
+    ergebnis.fuerAngebot.shape === draftShape;
+  const aktivesErgebnis = ergebnisGilt ? ergebnis : null;
+
+  function aktuellesAngebot() {
+    return { salary: draftSalary, length: draftLength, shape: draftShape };
+  }
+
+  /**
+   * SCHRITT 1 — das Angebot geht raus.
+   *
+   * Gewuerfelt wird hier nichts: das Verdikt steht deterministisch in der Server-Vorschau
+   * (`verhandlung-rework.md`, Abschnitt 2.2). Die Prozente daneben sind daraus ABGELEITET und
+   * nicht die Entscheidung — deshalb liest dieser Knopf das Verdikt und nicht die Prozente.
+   */
+  function angebotSenden() {
+    if (negotiation?.verdict == null || previewBusy || busy) {
+      return;
+    }
+    const verdict = negotiation.verdict;
+    const name = subject.playerName;
+    const fuerAngebot = aktuellesAngebot();
+
+    if (verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront") {
+      setErgebnis({
+        status: "rejected",
+        tone: "error",
+        title:
+          verdict === "reject_not_about_money"
+            ? "Absage — am Geld liegt's nicht"
+            : verdict === "reject_affront"
+              ? "Absage — Rückzieher"
+              : "Angebot abgelehnt",
+        message:
+          verdict === "reject_not_about_money"
+            ? `${name} will nicht verlängern, und mehr Geld würde daran nichts ändern.`
+            : verdict === "reject_affront"
+              ? `${name} zieht sich zurück: nach seinem Entgegenkommen kam ein NIEDRIGERES Angebot als zuletzt gezeigt. Das zählt als Vertrauensbruch.`
+              : `${name} lehnt dieses Angebot ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    if (verdict === "counter_money") {
+      const gegen = negotiation.counterSalary ?? null;
+      const abstand = gegen != null && draftSalary != null ? Number((gegen - draftSalary).toFixed(2)) : null;
+      setErgebnis({
+        status: "countered",
+        tone: "warning",
+        title: negotiation.concededFromLastCounter === true ? "Er kommt dir entgegen" : "Gegenangebot",
+        message: `${name} will eher ${formatNlMoney(gegen)} pro Saison${
+          abstand != null ? ` (${abstand > 0 ? "+" : ""}${formatNlMoney(abstand)} gegenüber deinem Angebot)` : ""
+        }. Schlag ein oder passe dein Angebot an und verhandle neu.`,
+        counterSalary: gegen,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    if (verdict === "counter_conditions") {
+      const konditionen = negotiation.counterConditions ?? null;
+      setErgebnis({
+        status: "countered",
+        tone: "warning",
+        title: "Beim Gehalt einig, Vertrag noch nicht",
+        message: `${name} ist mit dem Gehalt zufrieden, will aber ${
+          konditionen ? `${konditionen.contractLength} Saison${konditionen.contractLength === 1 ? "" : "en"}` : "eine andere Laufzeit"
+        }${konditionen ? ` (Form: ${formatContractShapeLabel(konditionen.contractShape)})` : ""}. Gib ihm den Wunschvertrag oder leg beim Gehalt nach.`,
+        counterConditions: konditionen,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    setErgebnis({
+      status: "accepted",
+      tone: "success",
+      title: "Angebot angenommen",
+      message: `${name} nimmt an. Du kannst den Vertrag jetzt unterschreiben.`,
+      fuerAngebot,
+    });
+  }
+
+  /**
+   * Ein angenommenes Gegenangebot ist BINDEND — dieselbe Regel wie beim Kauf
+   * (`verhandlung-rework.md`, Abschnitt 3.4). Die genannte Zahl noch einmal durch die Baender zu
+   * schicken waere Wortbruch durch Formel: ein Gegenangebot kann unter der vollen Forderung
+   * liegen und kaeme dann als Gegenangebot zurueck, statt als Zusage zu gelten.
+   */
+  function gegenangebotEinschlagen() {
+    if (aktivesErgebnis?.status !== "countered") {
+      return;
+    }
+    const neuesGehalt = aktivesErgebnis.counterSalary ?? draftSalary;
+    const neueLaufzeit = aktivesErgebnis.counterConditions?.contractLength ?? draftLength;
+    const neueForm = aktivesErgebnis.counterConditions?.contractShape ?? draftShape;
+    setDraftSalary(neuesGehalt);
+    setDraftLength(neueLaufzeit);
+    setDraftShape(neueForm);
+    setErgebnis({
+      status: "accepted",
+      tone: "success",
+      title: "Gegenangebot eingeschlagen",
+      message: `${subject.playerName} ist einverstanden. Du kannst den Vertrag jetzt unterschreiben.`,
+      fuerAngebot: { salary: neuesGehalt, length: neueLaufzeit, shape: neueForm },
+    });
+  }
   const morale = summary?.morale ?? null;
   const expectedSalary = negotiation?.expectedSalary ?? subject.expectedSalary;
   const moraleExpectedSalary = summary?.moraleAdjustedExpectedSalary ?? null;
@@ -253,7 +396,10 @@ export default function ContractRenewalNegotiationModal({
   const scheduleMax = schedule.reduce((max, row) => Math.max(max, row.salary), 0);
 
   const confirmBlocked = summary != null && !summary.ok;
-  const confirmDisabled = busy || previewBusy || draftSalary == null || confirmBlocked;
+  // Schritt 2 ist erst frei, wenn eine Zusage vorliegt — genau wie beim Kauf. Ohne diese Sperre
+  // waeren Verdikt und Chancen weiter reine Anzeige und das Angebot ginge immer durch.
+  const zusageLiegtVor = aktivesErgebnis?.status === "accepted";
+  const confirmDisabled = busy || previewBusy || draftSalary == null || confirmBlocked || !zusageLiegtVor;
   const confirmDisabledReason = !confirmDisabled
     ? null
     : busy
@@ -264,7 +410,22 @@ export default function ContractRenewalNegotiationModal({
           ? "Bitte ein Angebotsgehalt eintragen."
           : blockingReasons.length > 0
             ? translateRenewalReason(blockingReasons[0])
-            : "Diese Verlängerung ist gerade blockiert.";
+            : !zusageLiegtVor
+              ? "Erst das Angebot senden — unterschrieben wird, wenn der Spieler zusagt."
+              : "Diese Verlängerung ist gerade blockiert.";
+
+  const sendenDisabled = busy || previewBusy || draftSalary == null || confirmBlocked || negotiation?.verdict == null;
+  const sendenDisabledReason = !sendenDisabled
+    ? null
+    : previewBusy
+      ? "Die Verhandlungsvorschau wird aktualisiert."
+      : draftSalary == null
+        ? "Bitte ein Angebotsgehalt eintragen."
+        : negotiation?.verdict == null
+          ? "Die Reaktion des Spielers liegt noch nicht vor."
+          : blockingReasons.length > 0
+            ? translateRenewalReason(blockingReasons[0])
+            : "Verhandeln ist gerade gesperrt.";
 
   const offerTone =
     offerRatio == null ? "" : offerRatio >= 1 ? " is-good" : offerRatio >= 0.9 ? " is-warn" : " is-risk";
@@ -293,6 +454,21 @@ export default function ContractRenewalNegotiationModal({
             Schließen
           </button>
         </header>
+
+        {/* Was der Spieler geantwortet hat — ohne diese Zeile waere „Angebot senden" ein Knopf
+            ohne Rueckmeldung. Steht bewusst ueber dem Formular: es ist die Information, wegen der
+            man gerade etwas aendert. */}
+        {aktivesErgebnis ? (
+          <div
+            className={`transfer-feedback-banner is-${aktivesErgebnis.tone}`}
+            role="status"
+            data-testid="negotiation-outcome"
+            data-status={aktivesErgebnis.status}
+          >
+            <strong>{aktivesErgebnis.title}</strong>
+            <span>{aktivesErgebnis.message}</span>
+          </div>
+        ) : null}
 
         {error ? (
           <div className="transfer-feedback-banner is-error">
@@ -513,12 +689,37 @@ export default function ContractRenewalNegotiationModal({
           <button className="secondary-button" type="button" onClick={onClose}>
             Abbrechen
           </button>
+          {/* SCHRITT 1 — derselbe Ablauf wie beim Kauf: erst senden, dann unterschreiben.
+              Liegt ein Gegenangebot auf dem Tisch, tritt „Einschlagen" an diese Stelle. */}
+          {aktivesErgebnis?.status === "countered" ? (
+            <button
+              className="secondary-button is-emphasized"
+              type="button"
+              data-testid="negotiation-accept-counter-button"
+              disabled={busy}
+              title="Seine Forderung übernehmen — das gilt als Zusage."
+              onClick={gegenangebotEinschlagen}
+            >
+              Einschlagen
+            </button>
+          ) : (
+            <button
+              className="secondary-button is-emphasized"
+              type="button"
+              data-testid="negotiation-send-offer-button"
+              disabled={sendenDisabled}
+              title={sendenDisabledReason ?? "Angebot senden und die Reaktion des Spielers abwarten."}
+              onClick={angebotSenden}
+            >
+              {zusageLiegtVor ? "Zusage liegt vor" : "Schritt 1: Angebot senden"}
+            </button>
+          )}
           <button
             className="primary-button"
             type="button"
             data-testid="negotiation-confirm-button"
             disabled={confirmDisabled}
-            title={confirmDisabledReason ?? "Vertrag zu diesen Konditionen bestätigen."}
+            title={confirmDisabledReason ?? "Vertrag zu diesen Konditionen unterschreiben."}
             onClick={() =>
               void onConfirm({
                 contractLength: draftLength,
@@ -527,7 +728,7 @@ export default function ContractRenewalNegotiationModal({
               })
             }
           >
-            {busy ? "Wird verlängert…" : "Vertrag bestätigen"}
+            {busy ? "Wird verlängert…" : "Schritt 2: Vertrag unterschreiben"}
           </button>
         </footer>
         {confirmDisabledReason && !busy && !previewBusy ? (
