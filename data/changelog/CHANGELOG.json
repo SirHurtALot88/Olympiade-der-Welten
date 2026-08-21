@@ -48,6 +48,15 @@
     },
     {
       "datum": "2026-08-21",
+      "seite": "Spieltag · Einsatzliste",
+      "pr": null,
+      "text": "Ein verletzter Spieler steht in der Einsatzliste jetzt unter „🩹 Verletzt — fällt aus\" statt unter „Riskant wegen Fatigue\". Der Grund für die Verwechslung: die Abfrage nach der Verletzung hing an der Slot-Vorschau, und die entsteht erst, wenn du einen Platz anklickst. Beim bloßen Öffnen der Liste — also genau dann, wenn du dir einen Überblick verschaffen willst — wurde sie nie gestellt, und der Verletzte rutschte durch bis zur Müdigkeits-Prüfung darunter. Die Verletzung stand die ganze Zeit auf der Karte, sie wurde nur nicht gelesen. Die neue Gruppe steht über der Fatigue-Gruppe, damit der schwerere Grund nicht unter dem leichteren verschwindet. Wer sich gerade erholt, bleibt weiterhin einsetzbar — zurück ist zurück.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
       "seite": "Welt · Transfermarkt",
       "pr": null,
       "text": "Setzt die KI eine Vertragsform, die der Spieler nicht mag, zahlt sie dafür ab jetzt — so wie du es schon immer getan hast. Beim Nachmessen kam heraus, dass das Preisgewicht für den Formwunsch längst existiert: in der Verhandlung, die du selbst führst, kostet eine Form gegen den Wunsch im Mittel 6,5 Prozent mehr Jahresgehalt. Der Schnellkauf-Pfad, über den sämtliche KI-Käufe und der Erst-Draft der Saison 1 laufen, kannte diese Zahl nicht und reichte sie nie durch. Die KI durfte die Form also frei gegen den Wunsch drehen — nach Kassenstand, Gehaltsberg und Apron-Lage — und bekam sie umsonst. Am Abbild vom 21.08. gemessen: von 651 laufenden Mehrjahresverträgen weichen 285 vom Wunsch ab, für sie hätte der Aufschlag im Mittel 6,3 Prozent betragen. Wer den Wunsch trifft, zahlt weiterhin den Normalpreis — es gibt keinen Rabatt dafür, nur einen Preis fürs Abweichen. Eingepreist wird ausschließlich der Form-Anteil; die Laufzeit bleibt bewertet wie bisher. Bestehende Verträge bleiben unberührt, der Aufschlag gilt ab dem nächsten Abschluss.",
