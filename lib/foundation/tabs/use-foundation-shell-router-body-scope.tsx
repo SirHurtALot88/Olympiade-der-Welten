@@ -5817,6 +5817,7 @@ export function useFoundationShellRouterBodyScope({
     contractLength?: number;
     offeredSalary?: number | null;
     contractShape?: ContractShape;
+    confirmToken?: string | null;
   }) {
     if (!contractRenewalNegotiation) {
       return;
@@ -5830,6 +5831,8 @@ export function useFoundationShellRouterBodyScope({
       offeredSalary:
         draft && "offeredSalary" in draft ? draft.offeredSalary ?? null : contractRenewalNegotiation.offeredSalary,
       contractShape: draft?.contractShape ?? contractRenewalNegotiation.contractShape ?? "balanced",
+      // Der Token der Vorschau, die im Fenster stand — spart die eigene Dry-Run-Runde.
+      confirmToken: draft?.confirmToken ?? null,
     });
     // Fenster bleibt bei Fehlschlag offen, damit der Gate-Grund (z. B.
     // Phase-Sperre bis Season-End) direkt im Verhandlungsfenster sichtbar ist.
@@ -6127,6 +6130,8 @@ export function useFoundationShellRouterBodyScope({
     contractLength?: number | null;
     offeredSalary?: number | null;
     contractShape?: ContractShape;
+    /** Token aus der Vorschau, die der Nutzer gesehen hat — spart die eigene Dry-Run-Runde. */
+    confirmToken?: string | null;
   }): Promise<boolean> {
     if (readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -6144,29 +6149,47 @@ export function useFoundationShellRouterBodyScope({
     setContractRenewalMessage(null);
 
     try {
-      const previewResponse = await fetch("/api/contracts/renewal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withRoomBody({
-          saveId: activeSaveId,
-          teamId: input.teamId,
-          playerId: input.playerId,
-          action: input.action,
-          contractLength: input.contractLength,
-          offeredSalary: input.offeredSalary,
-          contractShape: input.contractShape,
-          dryRun: true,
-          source: readMeta.source,
-        })),
-      });
-      const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
-      if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
-        setContractRenewalError(
-          formatRoomWriteErrorCode(previewPayload.error) ??
-            previewPayload.summary?.blockingReasons?.[0] ??
-            `${input.playerName}: Vertragsvorschau blockiert.`,
-        );
-        return false;
+      /**
+       * EINE VORSCHAU WENIGER — sie kostete zwei Sekunden und sicherte nichts.
+       *
+       * Hier stand ein eigener Dry-Run, nur um einen `confirmToken` zu holen. Er sicherte gegen
+       * einen veralteten Stand — aber der Token kam aus DERSELBEN Sekunde wie die Buchung, und
+       * die Route rechnet die Vorschau intern ohnehin noch einmal (`applyContractRenewalAction`
+       * ruft `previewContractRenewalAction` und vergleicht). Der Aufruf kostete also eine volle
+       * Spielstand-Ladung (am Live-Abbild gemessen: 1965 ms) und brachte keine Aussage.
+       *
+       * Der Token des AUFRUFERS ist der bessere: das Verhandlungsfenster holt bei jeder Aenderung
+       * eine frische Vorschau, sein Token gehoert also genau zu den Zahlen, die der Nutzer
+       * gesehen hat. Passt er nicht mehr, antwortet die Route mit `contract_action_preview_stale`
+       * — ein sichtbarer Fehlschlag statt zwei stiller Sekunden.
+       */
+      let confirmToken = input.confirmToken ?? null;
+      if (!confirmToken) {
+        const previewResponse = await fetch("/api/contracts/renewal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomBody({
+            saveId: activeSaveId,
+            teamId: input.teamId,
+            playerId: input.playerId,
+            action: input.action,
+            contractLength: input.contractLength,
+            offeredSalary: input.offeredSalary,
+            contractShape: input.contractShape,
+            dryRun: true,
+            source: readMeta.source,
+          })),
+        });
+        const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+        if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
+          setContractRenewalError(
+            formatRoomWriteErrorCode(previewPayload.error) ??
+              previewPayload.summary?.blockingReasons?.[0] ??
+              `${input.playerName}: Vertragsvorschau blockiert.`,
+          );
+          return false;
+        }
+        confirmToken = previewPayload.summary.confirmToken;
       }
 
       const applyResponse = await fetch("/api/contracts/renewal", {
@@ -6178,10 +6201,10 @@ export function useFoundationShellRouterBodyScope({
           playerId: input.playerId,
           action: input.action,
           contractLength: input.contractLength,
-          offeredSalary: input.offeredSalary ?? previewPayload.summary.negotiationPreview?.expectedSalary ?? null,
+          offeredSalary: input.offeredSalary ?? null,
           contractShape: input.contractShape,
           dryRun: false,
-          confirmToken: previewPayload.summary.confirmToken,
+          confirmToken,
           source: readMeta.source,
         })),
       });
@@ -6208,13 +6231,29 @@ export function useFoundationShellRouterBodyScope({
             ? `${input.playerName}: neuer Vertrag ist gespeichert. Gehalt und Laufzeit sind im Team-Dossier aktualisiert.`
             : `${input.playerName}: Kaderplatz und Gehaltsdruck wurden aktualisiert.`,
       });
-      await Promise.all([
-        loadSave(activeSaveId),
+      /**
+       * NUR DER SPIELSTAND BLOCKIERT — der Rest laeuft nach.
+       *
+       * GEMELDET VON CHRIS: „verlängern und forderungen aktualisieren dauert ungewöhnlich lange
+       * … dann steht da sehr lange wird verlängert… keine ahnung ob es das wirklich wird oder
+       * nicht es hängt."
+       *
+       * Es hing nicht, es lud. Am Live-Abbild gemessen kostet EIN `getSaveById` 1965 ms — die
+       * Vertragsrechnung darin 2 bis 64 ms. Die Wartezeit ist also fast vollstaendig das Laden
+       * des Spielstands, und hier standen vier Ladungen hintereinander in einem `await`, waehrend
+       * die Anzeige auf „Wird verlaengert…" stand.
+       *
+       * Nur `loadSave` gehoert davor: erst danach traegt der Kader die neue Laufzeit, und genau
+       * die will man sehen. Marktfeed, Historie und Saison-Uebersicht aendern am Ergebnis nichts
+       * — sie duerfen nachlaufen. Denselben Weg geht der Verkauf schon (`confirmTransfermarktSell`).
+       */
+      await loadSave(activeSaveId);
+      setMarketReloadToken((current) => current + 1);
+      void Promise.all([
         reloadMarketFeed(input.teamId),
         reloadHistoryFeed(),
         reloadSeasonManagementOverview(),
-      ]);
-      setMarketReloadToken((current) => current + 1);
+      ]).catch(() => {});
       return true;
     } catch {
       setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgeführt werden.`);

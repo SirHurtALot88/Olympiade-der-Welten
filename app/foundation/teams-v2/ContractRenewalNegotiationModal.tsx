@@ -48,6 +48,14 @@ export type ContractRenewalNegotiationDraft = {
   contractLength: number;
   offeredSalary: number | null;
   contractShape: ContractShape;
+  /**
+   * Der Token der Vorschau, die im Fenster STEHT — nicht der vom Oeffnen.
+   *
+   * Das Fenster holt bei jeder Aenderung eine frische Vorschau; ihr Token gehoert damit genau zu
+   * den Zahlen, die der Nutzer gesehen hat. Ihn mitzugeben erspart dem Schreibweg eine eigene
+   * Dry-Run-Runde — am Live-Abbild gemessen eine volle Spielstand-Ladung von 1965 ms.
+   */
+  confirmToken: string | null;
 };
 
 export type ContractRenewalNegotiationModalProps = {
@@ -725,6 +733,7 @@ export default function ContractRenewalNegotiationModal({
                 contractLength: draftLength,
                 offeredSalary: draftSalary,
                 contractShape: draftShape,
+                confirmToken: summary?.confirmToken ?? subject.confirmToken ?? null,
               })
             }
           >
