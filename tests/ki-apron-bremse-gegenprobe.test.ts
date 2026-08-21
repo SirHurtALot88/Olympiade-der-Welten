@@ -17,9 +17,16 @@ import { describe, expect, it } from "vitest";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 import { resolveApronTighteningMultiplier } from "@/lib/ai/ai-cash-salary-target-service";
+import { FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
 
-const TEAM = "M-M";
+/**
+ * BEWUSST EIN TEAM MIT VOLLEM MINIMUM. `M-M` stand im frischen Stand bei 3 von 8 Plaetzen und ist
+ * damit von der Bremse ausgenommen (siehe `resolveApronTighteningMultiplier`: wer nicht spielfaehig
+ * ist, wird nicht gebremst). Ein Test, der dort misst, prueft die Ausnahme statt der Bremse — und
+ * war genau deshalb kurz gruen aus dem falschen Grund.
+ */
+const TEAM = "D-L";
 
 /**
  * Frischer Stand mit FESTGESETZTEN Linien. Zwei Schritte sind dafür nötig, weil die Linien nur
@@ -39,6 +46,21 @@ function mitLinien(line1: number, line2: number) {
 }
 
 describe("Apron-Bremse — die Gegenrechnung kommt aus derselben Rechenstelle", () => {
+  it("Vorbedingung: das Messteam erfuellt das Kader-Minimum, sonst greift die Ausnahme", () => {
+    const gs = mitLinien(1, 2);
+    expect(gs.rosters.filter((entry) => entry.teamId === TEAM).length).toBeGreaterThanOrEqual(FIXED_ROSTER_MIN);
+  });
+
+  it("wer unter dem Kader-Minimum steht, wird NICHT gebremst — Spielfaehigkeit geht vor", () => {
+    const gs = mitLinien(1, 2);
+    const duenn = {
+      ...gs,
+      rosters: gs.rosters.filter((entry) => entry.teamId !== TEAM || gs.rosters.indexOf(entry) % 3 === 0),
+    };
+    expect(duenn.rosters.filter((entry) => entry.teamId === TEAM).length).toBeLessThan(FIXED_ROSTER_MIN);
+    expect(resolveApronTighteningMultiplier(duenn, TEAM)).toBe(1);
+  });
+
   it("ueber der Decke bremst die Ruecklage nach oben", () => {
     const gs = mitLinien(1, 2);
     expect(resolveApronTighteningMultiplier(gs, TEAM)).toBeLessThan(1);
