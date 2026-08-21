@@ -12,6 +12,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
+import { computeSeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
 import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
@@ -549,12 +550,70 @@ function computeSeasonTransitionAdvance(
     }
   }
 
+  /**
+   * DIE VERTRAEGE ALTERN, BEVOR UEBER SIE ENTSCHIEDEN WIRD.
+   *
+   * GEMELDET VON CHRIS: „zum zeitpunkt der verlängerung müsste wenn da vertrag läuft aus die
+   * vertragslänge von allen doch schon um 1 reduziert sein oder nicht?"
+   *
+   * Ja — und genau das passierte nicht. Der Schritt, der das tut (`applySeasonEndContractTick`),
+   * war vollstaendig gebaut: Dienst da, Route da (`stepId: "contract_renewal"`), im Cockpit als
+   * Karte „Verlaengern" sichtbar. Nur konnte ihn NIEMAND ausloesen. Die Karte ist reine Anzeige
+   * ohne Knopf, und im Client gibt es genau zwei Aufrufe der Workflow-Route: die Vorschau und
+   * „Neue Saison starten". Keinen mit `contract_renewal`.
+   *
+   * Der Tick lief dadurch nur noch als Nebenwirkung IM Saisonstart (`buildNextSeasonGameState`)
+   * — also erst, wenn die Verlaengerungsphase laengst vorbei war. Am gemeldeten Spielstand
+   * gemessen: 288 von 339 Vertraegen standen auf Laufzeit 1, kein einziger auf 0, und
+   * `hasSeasonEndContractTickApplied` war false. „Laeuft aus" stand ueberall, entschieden werden
+   * konnte nichts.
+   *
+   * WARUM HIER: dieser Hop schaltet auf `season_end_management` — die Phase, in der verlaengert
+   * und verkauft wird. Danach steht jeder auslaufende Vertrag eines menschlichen Teams auf
+   * Laufzeit 0 mit Status `renewal_pending`, und eine Verlaengerung ueber N Saisons gibt auch N.
+   * Es ist derselbe Gedanke, aus dem eine Zeile weiter oben die Spielerentwicklung in diesem
+   * Schritt rechnet statt im naechsten: der Schritt tut seine eigene Arbeit, statt sie dem
+   * Saisonstart zu ueberlassen, hinter dem Fenster, in dem sie gebraucht wird.
+   *
+   * NACH dem Marktwert-Freeze und nicht davor: der Freeze haelt den Stand VOR der Marktoeffnung
+   * fest, und der Tick beruehrt keine Marktwerte — aber er bucht Abgangs-Cash. Erst einfrieren,
+   * dann buchen haelt die Reihenfolge, die `patchSeasonSnapshotCashCarryOver` im Saisonstart
+   * ohnehin voraussetzt.
+   *
+   * EINMAL, GARANTIERT: `computeSeasonEndContractTick` prueft selbst
+   * (`hasSeasonEndContractTickApplied`) und ist ein Nichtstun, wenn die Alterung fuer diese
+   * Saison schon gelaufen ist. Der Aufruf im Saisonstart bleibt deshalb unveraendert stehen und
+   * faengt Spielstaende ab, die diesen Hop nie gesehen haben.
+   */
+  let vertragsWarnungen: string[] = [];
+  if (currentStep === "player_development") {
+    try {
+      const alterung = computeSeasonEndContractTick(progressionSave);
+      if (alterung.applied) {
+        progressionSave = { ...progressionSave, gameState: alterung.gameState };
+        vertragsWarnungen = [
+          `season_end_contract_tick_applied:${alterung.releasedPlayers}_freigegeben:${alterung.renewedPlayers}_verlaengert`,
+        ];
+      }
+    } catch (error) {
+      /**
+       * SCHEITERT DIE ALTERUNG, SPERRT SIE DEN WEG NICHT — dieselbe Entscheidung wie bei der
+       * Spielerentwicklung eine Zeile darueber. Ein blockierter Saisonuebergang sperrt
+       * Verlaengerungen und Verkaeufe gleich mit aus, und der Saisonstart holt den Tick ohnehin
+       * nach. Die Warnung sagt, dass die Vertraege in diesem Durchgang noch ungealtert sind.
+       */
+      vertragsWarnungen = [
+        `season_end_contract_tick_failed:${error instanceof Error ? error.message : "unknown"}`,
+      ];
+    }
+  }
+
   const transition: SeasonTransitionState = {
     ...preview.transition,
     status: "preview",
     currentStep: nextStep,
     completedSteps: [...new Set([...preview.transition.completedSteps, currentStep])],
-    warnings: [...new Set([...preview.transition.warnings, ...progressionWarnings])],
+    warnings: [...new Set([...preview.transition.warnings, ...progressionWarnings, ...vertragsWarnungen])],
     // Nur setzen, wenn wirklich gerechnet wurde — sonst holt der Saisonstart es nach.
     progressionAppliedForSeasonId: entwicklungGelaufen
       ? abgeschlosseneSaisonId
