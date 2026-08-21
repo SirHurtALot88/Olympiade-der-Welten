@@ -13,6 +13,12 @@
  * wo die Flaeche die Seite ersetzt — aus der Teamansicht heraus fuehrte er vom Dialog weg. Ein
  * frueherer Bericht („springt der screen nicht zum verkaufsmodal, das irritiert") wurde damals so
  * behoben; die Haelfte, die anhaengt statt zu ersetzen, blieb offen.
+ *
+ * DIESE DATEI ERSETZT `verkauf-springt-nach-oben.test.ts`. Die hielt den damaligen Fix fest —
+ * „scrollt beim Oeffnen nach oben", Wort fuer Wort das, was Chris jetzt als falsch gemeldet hat.
+ * Zwei Dateien mit gegenteiliger Aussage waeren keine Absicherung, sondern ein Widerspruch; ihre
+ * weiterhin gueltigen Zusagen (SSR-Schutz, Reihenfolge zum URL-Sync, der Kauf-Flow bleibt eigen)
+ * stehen deshalb hier unten weiter.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -56,6 +62,31 @@ describe("Verkaufen springt zum Dialog, nicht an den Seitenanfang", () => {
     // Ohne diese Zusage zeigt der Sprung auf ein Element, das es nicht gibt — und faellt still aus.
     expect(HELFER).toContain('\'[data-testid="transfer-sell-page"]\'');
     expect(SELL_HOST).toContain('testId="transfer-sell-page"');
+  });
+
+  it("springt VOR dem URL-Sync, nicht danach", () => {
+    // Uebernommen aus der ersetzten Datei: sonst schiebt der History-Eintrag die Position wieder
+    // zurecht und der Sprung waere je nach Browser wirkungslos.
+    const rumpf = oeffnenRumpf();
+    expect(rumpf.indexOf("springeZuElement(VERKAUFSFLAECHE_ANKER)")).toBeLessThan(
+      rumpf.indexOf("syncFoundationViewInUrl"),
+    );
+  });
+
+  it("fasst `window` nur an, wenn es existiert", () => {
+    // Der Scope laeuft auch serverseitig durch — ein blanker window-Zugriff waere ein Renderfehler
+    // statt eines Sprungs. Der Schutz sitzt jetzt im Helfer, nicht mehr an jeder Aufrufstelle.
+    expect(HELFER).toContain('if (typeof window === "undefined") return;');
+    expect(oeffnenRumpf()).toContain('typeof window === "undefined" ? null : window.scrollY');
+  });
+
+  it("laesst den Kauf-Flow unveraendert seinen eigenen Weg gehen", () => {
+    // Zwei Wege, aber kein doppelter: der Kauf scrollt im Client, der Verkauf im Scope.
+    const client = readFileSync(
+      join(process.cwd(), "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"),
+      "utf8",
+    );
+    expect(client).toContain("function scrollBuyModalToTop()");
   });
 });
 
