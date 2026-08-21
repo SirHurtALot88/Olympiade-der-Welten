@@ -1,6 +1,6 @@
 {
   "name": "baue-einen-lokalen-web-app-prototyp",
-  "version": "0.5.56",
+  "version": "0.5.57",
   "private": true,
   "scripts": {
     "next:clean": "tsx scripts/clean-next-runtime.ts",
@@ -53,6 +53,8 @@
     "ci:design-tokens": "tsx scripts/lint-design-tokens.ts",
     "ci:import-exists": "tsx scripts/check-import-exists.ts",
     "ci:quelltext-waechter": "tsx scripts/fahre-quelltext-waechter.ts",
+    "ci:render-waechter": "tsx scripts/fahre-render-waechter.ts",
+    "ci:persistenz-suiten": "tsx scripts/fahre-persistenz-suiten.ts",
     "ci:ensure-gameplay-smoke-save": "tsx scripts/ensure-ci-gameplay-smoke-save.ts",
     "db:check-foundation-projection": "tsx scripts/check-foundation-projection.ts",
     "db:compare-foundation-sources": "tsx scripts/compare-foundation-sources.ts",

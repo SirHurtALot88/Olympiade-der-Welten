@@ -75,18 +75,24 @@ jobs:
       # 120 Dateien und 1830 Tests — das passt hier hinein, waehrend die volle Suite mit ihren
       # ~20 Minuten weiter im eigenen Job laeuft.
       #
-      # WAS DIESER SCHRITT NICHT ABDECKT, und das gehoert dazu: den Absturz aus #586 (die
-      # Kaufphasen-Warnung warf beim Rendern der Arena) haette er NICHT gefangen — der Waechter
-      # dafuer rendert, statt Quelltext zu lesen. Nachgemessen: alle Tests ohne Persistenz sind 853
-      # Dateien und brauchen 9:40 min, das sprengt diesen Job (der baut, Chromium installiert und
-      # drei Browser-Smokes faehrt). Die vollstaendige Antwort auf jene Klasse bleibt deshalb,
-      # `full-test-suite` zum Pflicht-Check zu machen — eine Einstellung im Branch-Schutz, nicht in
-      # dieser Datei.
-      #
       # Die Auswahl wird ERRECHNET, nicht aufgezaehlt (siehe scripts/fahre-quelltext-waechter.ts):
       # eine feste Liste veraltet ab dem ersten neuen Waechter, und genau so eine nicht mitwachsende
       # Auswahl ist die Ursache, die hier behoben wird.
       - run: npm run ci:quelltext-waechter
+      # DIE TESTS, DIE WIRKLICH RENDERN — 21 Dateien, 196 Tests, 15 Sekunden.
+      #
+      # Hier stand bis eben, der Absturz aus #586 (die Kaufphasen-Warnung warf beim Rendern der
+      # Arena) sei nur ueber `full-test-suite` als Pflicht-Check zu fangen. Das war zu pauschal:
+      # die RENDERNDEN Tests sind eine eigene, winzige Teilmenge, die weder Browser noch Build noch
+      # Datenbank braucht. Sie passt hier hinein wie die Quelltext-Waechter daneben — und sie kann
+      # etwas, was jene prinzipbedingt nie koennen: sehen, dass eine Komponente beim AUSFUEHREN
+      # wirft, nicht nur, dass eine Zeichenkette in ihrer Datei steht.
+      #
+      # EHRLICH GEMESSEN, damit die Zeile nicht mehr verspricht, als sie haelt: #586 selbst haette
+      # auch dieser Schritt nicht gefangen. Kein Test rendert die Arena — `DisciplineStageArena.tsx`
+      # kommt in zehn Testdateien vor, alle lesen ihren Quelltext oder pruefen die Logik daneben.
+      # Der Schritt ist das Geruest, in das so ein Test gehoert, nicht der Beweis, dass es ihn gibt.
+      - run: npm run ci:render-waechter
       - run: npm run perf:regression-smoke
       # Serve the browser smokes from the PRODUCTION server (npm run start =
       # NODE_ENV=production, using the build from the step above). The dev server
@@ -204,3 +210,38 @@ jobs:
       - run: npm ci
       - run: npm run ci:import-exists
       - run: npm test
+
+  # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
+  #
+  # DER ZWECK: `full-test-suite` daneben ist kein Pflicht-Check, und die Einstellung dafuer liegt
+  # im Branch-Schutz, an den ein Agent nicht herankommt. Dieser Job ist die Teilmenge, deren Fehler
+  # den SPIELSTAND kosten — und er ist klein genug, dass ihn niemand aus Zeitgruenden ablehnen muss.
+  #
+  # ZWEI ZAHLEN VON MIR WAREN FALSCH, und sie stehen hier, damit sie niemand nochmal aufwaermt:
+  #
+  #   „~5 Minuten"  (Vorschlag 4b)      -> gemessen 174 Dateien, 1346 Tests, 11m20s
+  #   „~16 statt ~4 Minuten je PR"      -> beide Jobs starten gleichzeitig und laufen PARALLEL
+  #
+  # Zur zweiten: `test-and-smoke` ist der laengste Job und war es immer (#607 24:49, #610 25:27).
+  # `full-test-suite` blieb in jedem gemessenen Lauf darunter (22:20 / 20:59). Ein zusaetzlicher
+  # Pflicht-Check unter dieser Marke verlaengert die Wartezeit auf einen Merge um NULL.
+  #
+  # WAS ER NICHT ABDECKT: die Render-Klasse aus #586. Dafuer laeuft `ci:render-waechter` oben im
+  # bestehenden Pflicht-Job mit — 15 Sekunden, kein Haekchen noetig.
+  #
+  # ZUM ANHAKEN: Settings -> Branches -> Regel fuer `main` -> Require status checks to pass ->
+  # `persistenz-suiten` dazu. Ohne diesen Klick laeuft der Job zwar, haelt aber nichts auf.
+  persistenz-suiten:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set CI SQLite path
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-persistenz.sqlite" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:import-exists
+      - run: npm run ci:persistenz-suiten
