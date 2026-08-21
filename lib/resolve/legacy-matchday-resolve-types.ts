@@ -37,6 +37,14 @@ export type PlayerPerformancePreview = {
   mutatorBonus?: number | null;
   mutatorPpsBonus?: number | null;
   formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
+  /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
+  intensityShare?: number | null;
+  /** Der Modifikator SEINER Slot-Rolle (Clutch Shot, Fastbreak und so weiter). */
+  slotRoleShare?: number | null;
+  /** Sein anteiliger Teil der echten Seiten-Effekte: Team-Power, Mutator-Rest, Rundung. */
+  teamEffectShare?: number | null;
+  /** Sein anteiliger Teil der Team-Power — eigenes Feld, damit die Buehne sie benennen kann. */
+  teamPowerShare?: number | null;
   finalPlayerScore: number;
   scoreContribution: number;
   pointsAwarded: number | null;
@@ -114,6 +122,14 @@ export type DisciplineTeamResolvePreview = {
     mutatorBonus?: number | null;
     mutatorPpsBonus?: number | null;
     formShare?: number | null; // pro Spieler angewandter Form-Anteil (flach + Jitter)
+    /** Sein eigener Intensitaets-Wurf (schonen/normal/pushen), seeded pro Spieler und Spieltag. */
+    intensityShare?: number | null;
+    /** Der Modifikator SEINER Slot-Rolle (Clutch Shot, Fastbreak und so weiter). */
+    slotRoleShare?: number | null;
+    /** Sein anteiliger Teil der echten Seiten-Effekte: Team-Power, Mutator-Rest, Rundung. */
+    teamEffectShare?: number | null;
+    /** Sein anteiliger Teil der Team-Power — eigenes Feld, damit die Buehne sie benennen kann. */
+    teamPowerShare?: number | null;
     finalPlayerScore: number | null;
     pointsAwarded?: number | null;
     isCaptain: boolean;

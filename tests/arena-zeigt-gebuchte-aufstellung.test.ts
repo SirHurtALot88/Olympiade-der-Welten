@@ -120,10 +120,29 @@ describe("Arena zeigt die gebuchte Aufstellung", () => {
       0,
     );
     expect(netto).toBeCloseTo(team.score, 1);
-    // 47,8 − (29,3 + 9,9) = 8,6, beschriftet auf dem letzten Slot.
-    const teamMod = team.players.at(-1)!.mods.find((mod) => mod.k === "Team");
-    expect(teamMod).toBeDefined();
-    expect(teamMod!.amt).toBeCloseTo(8.6, 1);
+    // 47,8 − (29,3 + 9,9) = 8,6 Team-Effekt, beschriftet und über beide Bahnen verteilt.
+    const summe = team.players.reduce(
+      (wert, spieler) => wert + (spieler.mods.find((mod) => mod.k === "Team")?.amt ?? 0),
+      0,
+    );
+    expect(summe).toBeCloseTo(8.6, 1);
+  });
+
+  /**
+   * GEMELDET VON CHRIS: „Was ist denn der ,Team' Score den ein Spieler bekommt??? anscheinend
+   * immer letzte spieler in der Diszi hat so einen Bonus."
+   *
+   * Der Team-Effekt (Intensität, Team-Power, Team-PPs) gehört der Aufstellung, nicht einem
+   * Spieler. Er lag aber als EIN Klumpen auf der letzten Bahn — im gemeldeten Fall +8,6 auf
+   * Myrth, der damit fast so stark aussah wie Spineshard. Er wird jetzt gleichmäßig verteilt.
+   */
+  it("legt den Team-Effekt nicht als Klumpen auf den letzten Spieler", () => {
+    const team = buildDisciplineStageTeamsFromBookedResult(baueSpielstand(), "staffel", META, new Map())![0];
+    const anteile = team.players.map((spieler) => spieler.mods.find((mod) => mod.k === "Team")?.amt ?? 0);
+    // Jede Bahn trägt einen Anteil — vorher stand hier [0, 8.6].
+    expect(anteile.every((anteil) => anteil > 0)).toBe(true);
+    // Und keine Bahn trägt mehr als eine Rundungsstelle mehr als eine andere.
+    expect(Math.max(...anteile) - Math.min(...anteile)).toBeLessThanOrEqual(0.1 + 1e-9);
   });
 
   it("sortiert die Bahnen nach Slot, nicht nach Leistung", () => {
