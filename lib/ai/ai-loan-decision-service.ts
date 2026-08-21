@@ -71,23 +71,60 @@ const LOAN_AMOUNT_FILL_FRACTION = Number(process.env.OLY_LOAN_AMOUNT_FILL_FRACTI
  * ÜBER DIE LIVE-ABBILDER GEMESSEN (129 Teamzeilen mit Sponsoreinkommen): der Rahmen sinkt deutlich
  * — `hwz8fk` A-A von 26,7 auf 8,3, C-S von 38,0 auf 12,1. Bei 107 der 129 Zeilen liegt die ehrliche
  * Rechnung damit unter dem Boden (`MIN_DEBT_SERVICE_FLOOR`), vorher bei 40. Der Boden trägt also ab
- * jetzt die Mehrheit der Fälle — siehe die Notiz dort.
+ * jetzt die Mehrheit der Fälle — die Antwort darauf ist die Rampe unten.
  */
 const SALARY_SERVICE_WEIGHT = 1;
 /**
- * Auch bei hohen Fixkosten bleibt mindestens dieser Anteil des Sponsor-FC als Kreditdienst-Budget
- * nutzbar.
+ * DER BODEN IST EINE RAMPE — Chris' Entscheidung vom 21.08.2026 („1b").
  *
- * ACHTUNG, DER BODEN TRÄGT JETZT DIE MEHRHEIT. Seit das Gehalt voll gegengerechnet wird, liegt die
- * ehrliche Rechnung bei 107 von 129 gemessenen Teamzeilen darunter — der Rahmen ist für sie also
- * nicht mehr „Sponsor minus Fixkosten", sondern schlicht 15 % des Sponsoreinkommens. Bei 79 Zeilen
- * ist die Rechnung sogar negativ, und der Boden gibt trotzdem Rahmen frei.
+ * WARUM ER SICH BEWEGEN MUSSTE: seit das Gehalt voll gegengerechnet wird (#597), lag die ehrliche
+ * Rechnung bei 107 von 129 gemessenen Teamzeilen unter dem Boden — er war von der Ausnahme zur
+ * Regel geworden, und bei 79 Zeilen gab er Rahmen frei, obwohl die Rechnung NEGATIV war. Ein Boden,
+ * der fuer fast jeden gilt, ist kein Boden, sondern ein Freibetrag.
  *
- * Das ist eine bewusst offene Entscheidung: Chris hat den Boden ausdrücklich behalten wollen
- * (Antwort „also c"). Wer ihn später an eine Bedingung knüpfen will — etwa nur noch bei Kadern
- * unter dem Spielerminimum —, findet die Messung in `data/bug-reports/triage/…-cankgm.md`.
+ * WARUM RAMPE UND NICHT SCHWELLE: die naheliegende Fassung waere „Boden nur noch unter dem
+ * Spielerminimum". Sie hat einen Einbahnstrassen-Fall — ein Team mit genau dem Minimum und
+ * negativer Rechnung darf dann nie wieder kaufen UND bekommt kein Geld, es kaeme aus der Lage nicht
+ * mehr heraus. Die Rampe vermeidet die Kante: wer Spieler braucht, bekommt Rahmen; wer keine
+ * braucht, nicht.
+ *
+ * DIE DREI STUFEN, an den Live-Abbildern nachgezaehlt (129 Zeilen):
+ *
+ *   Kader UNTER dem Minimum      1 Zeile     voller Boden 15 %   (Notlage, Team ist nicht spielfaehig)
+ *   zwischen Minimum und OPT   108 Zeilen    halber Boden 7,5 %  (darf aufstocken, aber knapper)
+ *   auf oder ueber OPT          20 Zeilen    KEIN Boden          (Kader voll, kein Kaufbedarf)
+ *
+ * WIRKUNG: der Boden greift bei 87 statt 107 Zeilen. 13 Teams bekommen gar keinen Rahmen mehr —
+ * die stehen auf oder ueber ihrer Zielgroesse und haben eine negative Rechnung, brauchen also
+ * nicht zu kaufen.
+ *
+ * EHRLICH DAZU: seit das Blatt die Zielgroesse angehoben hat (#601), sitzt die grosse Mehrheit in
+ * der MITTLEREN Stufe. In der Praxis heisst diese Rampe deshalb vor allem „halber Boden fuer fast
+ * alle" — die volle Stufe ist mit einer Zeile fast leer. Das ist die gewollte Richtung (enger),
+ * aber es sollte niemand glauben, die drei Stufen seien gleich stark besetzt.
  */
-const MIN_DEBT_SERVICE_FLOOR = 0.15;
+const DEBT_SERVICE_FLOOR_UNTER_MINIMUM = 0.15;
+const DEBT_SERVICE_FLOOR_BIS_OPT = 0.075;
+const DEBT_SERVICE_FLOOR_AB_OPT = 0;
+
+/**
+ * Welcher Anteil des Sponsor-FC dem Team als Boden zusteht — abhaengig davon, ob es ueberhaupt
+ * Spieler braucht. Siehe die Begruendung an den drei Konstanten.
+ */
+function resolveDebtServiceFloorShare(gameState: GameState, teamId: string): number {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const ziele = deriveRosterTargets(team ?? undefined, identity ?? undefined);
+  const kadergroesse = (gameState.rosters ?? []).filter((entry) => entry.teamId === teamId).length;
+  if (kadergroesse < ziele.playerMin) {
+    return DEBT_SERVICE_FLOOR_UNTER_MINIMUM;
+  }
+  if (kadergroesse < ziele.playerOpt) {
+    return DEBT_SERVICE_FLOOR_BIS_OPT;
+  }
+  return DEBT_SERVICE_FLOOR_AB_OPT;
+}
+
 /** Ist nach den bestehenden Raten weniger als das übrig, gibt es keinen Spielraum für einen weiteren Kredit. */
 const MIN_DEBT_SERVICE_ROOM = 1;
 /**
@@ -138,7 +175,7 @@ function disposableDebtServiceBudget(gameState: GameState, teamId: string): numb
   const salary = getTeamSalarySum(gameState, teamId);
   const buildingUpkeep = calculateFacilityUpkeep(getTeamFacilityState(gameState, teamId));
   const afterFixedCosts = sponsorIncome - salary * SALARY_SERVICE_WEIGHT - buildingUpkeep;
-  return Math.max(sponsorIncome * MIN_DEBT_SERVICE_FLOOR, afterFixedCosts);
+  return Math.max(sponsorIncome * resolveDebtServiceFloorShare(gameState, teamId), afterFixedCosts);
 }
 
 function round(value: number, digits = 2) {
