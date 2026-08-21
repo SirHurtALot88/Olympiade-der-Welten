@@ -105,3 +105,47 @@ describe("Ohne erkennbare Saisonnummer bleibt der gespeicherte Countdown die Aus
     expect(endSaisonNummer(vertrag({ contractLength: 3 }), ohneSaison)).toBeNull();
   });
 });
+
+/**
+ * DER VERSATZ — ohne ihn verliert jeder Vertrag eine Saison.
+ *
+ * Die Alterung läuft am ENDE einer Saison, während diese noch die laufende ist. Ein Spielstand in
+ * der Saisonende-Phase trägt danach Laufzeiten, die sich auf die KOMMENDE Saison beziehen, während
+ * die Saisonnummer noch die alte ist. Countdown und Saisonnummer passen dann nicht zusammen.
+ *
+ * An Chris' Spielstand nachgerechnet (Saison 1, Alterung gelaufen) — die rechte Spalte ist der
+ * Wert, den der Spieler VOR der Alterung trug, also die Wahrheit:
+ *
+ *     Jorund       3 -> 2   richtige Endsaison 3
+ *     Xelara       1 -> 0   richtige Endsaison 1
+ *     Lulu         4 -> 3   richtige Endsaison 4
+ *     King Arlen   4 -> 3   richtige Endsaison 4
+ */
+describe("Ist die Alterung schon gelaufen, verschiebt sich die Ableitung um eine Saison", () => {
+  const gealtert = { alterungBereitsGelaufen: true };
+
+  it("trifft die Endsaison, die der Vertrag vor der Alterung hatte", () => {
+    // Laufzeiten NACH der Alterung, Erwartung = Endsaison aus den Werten davor.
+    const faelle: Array<[number, number]> = [
+      [2, 3],
+      [0, 1],
+      [3, 4],
+    ];
+    for (const [laufzeitDanach, erwarteteEndsaison] of faelle) {
+      expect(endSaisonNummer(vertrag({ contractLength: laufzeitDanach }), saison(1), gealtert)).toBe(
+        erwarteteEndsaison,
+      );
+    }
+  });
+
+  it("ohne den Versatz käme jeder Vertrag eine Saison zu kurz heraus", () => {
+    expect(endSaisonNummer(vertrag({ contractLength: 2 }), saison(1))).toBe(2);
+    expect(endSaisonNummer(vertrag({ contractLength: 2 }), saison(1), gealtert)).toBe(3);
+  });
+
+  it("lässt eine bereits gespeicherte Endsaison unangetastet", () => {
+    // Der Versatz ist eine Ableitungshilfe für Altstände, keine Korrektur echter Werte.
+    const eintrag = vertrag({ contractLength: 2, contractEndSeasonNumber: 9 });
+    expect(endSaisonNummer(eintrag, saison(1), gealtert)).toBe(9);
+  });
+});

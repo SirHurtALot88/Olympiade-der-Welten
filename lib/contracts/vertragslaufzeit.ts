@@ -50,6 +50,7 @@ function saisonNummerAus(gameState: Pick<GameState, "season">): number | null {
 export function endSaisonNummer(
   entry: Pick<RosterEntry, "contractLength" | "contractEndSeasonNumber">,
   gameState: Pick<GameState, "season">,
+  optionen?: { alterungBereitsGelaufen?: boolean },
 ): number | null {
   if (typeof entry.contractEndSeasonNumber === "number" && Number.isFinite(entry.contractEndSeasonNumber)) {
     return entry.contractEndSeasonNumber;
@@ -59,7 +60,26 @@ export function endSaisonNummer(
     return null;
   }
   const laufzeit = Math.max(MINDEST_LAUFZEIT, Math.round(entry.contractLength ?? 0));
-  return laufend + laufzeit - 1;
+  /**
+   * DER VERSATZ UM EINE SAISON — ohne ihn verliert jeder Vertrag ein Jahr.
+   *
+   * Die Alterung laeuft am ENDE einer Saison, waehrend diese noch die laufende ist. Ein Spielstand
+   * in der Saisonende-Phase traegt danach also bereits Laufzeiten, die sich auf die KOMMENDE
+   * Saison beziehen — der Countdown und die laufende Saisonnummer passen nicht mehr zusammen.
+   *
+   * An Chris' Spielstand nachgerechnet (Saison 1, Alterung gelaufen):
+   *
+   *     Spieler              vor der Alterung   danach   richtige Endsaison
+   *     Jorund                       3             2             3
+   *     Xelara                       1             0             1
+   *     Lulu                         4             3             4
+   *     King Arlen Morgolor          4             3             4
+   *
+   * Ohne den Versatz kaeme fuer Jorund `1 + 2 - 1 = 2` heraus — eine Saison zu kurz, und zwar
+   * fuer jeden Vertrag im Spielstand.
+   */
+  const versatz = optionen?.alterungBereitsGelaufen === true ? 1 : 0;
+  return laufend + laufzeit - 1 + versatz;
 }
 
 /**
@@ -71,8 +91,9 @@ export function endSaisonNummer(
 export function restlaufzeit(
   entry: Pick<RosterEntry, "contractLength" | "contractEndSeasonNumber">,
   gameState: Pick<GameState, "season">,
+  optionen?: { alterungBereitsGelaufen?: boolean },
 ): number {
-  const ende = endSaisonNummer(entry, gameState);
+  const ende = endSaisonNummer(entry, gameState, optionen);
   const laufend = saisonNummerAus(gameState);
   if (ende == null || laufend == null) {
     // Ohne Saisonnummer bleibt der gespeicherte Countdown die beste verfuegbare Auskunft.
