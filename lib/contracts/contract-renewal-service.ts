@@ -23,6 +23,8 @@ import {
   normalizeContractLength,
   normalizeRosterContractStatus,
 } from "@/lib/contracts/roster-contract-status";
+import { endSaisonFuerNeuenVertrag } from "@/lib/contracts/vertragslaufzeit";
+import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
 import {
   applyAiContractDissolutions,
   type AiDissolutionDecision,
@@ -1568,6 +1570,11 @@ export function computeSeasonEndContractTick(
         nextRosters.push({
           ...entry,
           contractLength: 0,
+          // Sein Vertrag endet MIT der Saison, die gerade gespielt wurde — deshalb steht die
+          // Entscheidung an. Ohne die Endsaison bliebe der Zustand auf den Countdown angewiesen,
+          // und genau dessen Doppeldeutigkeit soll hier verschwinden.
+          contractEndSeasonNumber:
+            getCurrentSeasonNumber(sourceState) ?? entry.contractEndSeasonNumber,
           contractStatus: "renewal_pending",
         });
         continue;
@@ -1597,6 +1604,10 @@ export function computeSeasonEndContractTick(
           // `buildContractSalarySchedule` die Raten formt.
           negotiatedAnnualSalary: newSalary,
           contractLength: renewLength,
+          // Dieselbe Wahrheit wie beim Menschen — die Alterung laeuft im Saisonende-Fenster, eine
+          // Unterschrift hier deckt also ab der kommenden Saison.
+          contractEndSeasonNumber:
+            endSaisonFuerNeuenVertrag(sourceState, renewLength) ?? entry.contractEndSeasonNumber,
           contractStatus: renewLength === 1 ? "expiring" : "active",
           contractShape,
           yearlySalarySchedule: nextContractSchedule,
@@ -1636,6 +1647,7 @@ export function computeSeasonEndContractTick(
           // UNTERSCHRIFTSPFAD: Brueckenverlaengerung ueber ein Jahr. Auch sie ist eine Unterschrift.
           negotiatedAnnualSalary: bridgeSalary,
           contractLength: 1,
+          contractEndSeasonNumber: endSaisonFuerNeuenVertrag(sourceState, 1) ?? entry.contractEndSeasonNumber,
           contractStatus: "expiring",
           contractShape: "balanced",
         });
@@ -2085,9 +2097,40 @@ export function applyContractRenewalAction(input: {
                 // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
                 negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
                 contractLength: nextLength,
+                /**
+                 * DIE ENDSAISON — ab hier die Wahrheit ueber die Laufzeit.
+                 *
+                 * GEMELDET VON CHRIS: „ich will sie ja eine season verlängern bis ende season 2
+                 * das muss sauber sein." Sein Vertrag war richtig, das Etikett nicht: der
+                 * Countdown wird am Ende einer Saison gesenkt, waehrend diese noch die laufende
+                 * ist — danach heisst eine 1 „noch eine volle Saison", die Statusregel las sie
+                 * aber weiter als „letzte Saison".
+                 *
+                 * Die Endsaison kennt dieses Problem nicht: sie ist eine Tatsache und wird nicht
+                 * fortgeschrieben. `endSaisonFuerNeuenVertrag` weiss dabei, dass eine Unterschrift
+                 * im Saisonende-Fenster ab der KOMMENDEN Saison deckt.
+                 */
+                contractEndSeasonNumber:
+                  endSaisonFuerNeuenVertrag(input.save.gameState, nextLength) ?? entry.contractEndSeasonNumber,
                 contractShape: nextContractShape,
                 yearlySalarySchedule: nextContractSchedule,
-                contractStatus: nextLength === 1 ? ("expiring" as const) : ("active" as const),
+                /**
+                 * DAS GESPEICHERTE STATUS-FELD FOLGT DER ENDSAISON, NICHT DEM COUNTDOWN.
+                 *
+                 * `nextLength === 1 ? "expiring" : "active"` war die letzte Stelle, an der Chris'
+                 * Fall noch falsch herauskam: eine Ein-Saison-Verlaengerung AM SAISONENDE deckt die
+                 * kommende Saison ab, ist also aktiv — der Countdown allein kann das nicht wissen.
+                 * Gemessen an seinem Spielstand schrieb diese Zeile „expiring", waehrend die
+                 * Endsaison daneben korrekt auf 2 stand.
+                 */
+                contractStatus: (() => {
+                  const ende = endSaisonFuerNeuenVertrag(input.save.gameState, nextLength);
+                  const laufend = getCurrentSeasonNumber(input.save.gameState);
+                  if (ende == null || laufend == null) {
+                    return nextLength === 1 ? ("expiring" as const) : ("active" as const);
+                  }
+                  return ende <= laufend ? ("expiring" as const) : ("active" as const);
+                })(),
               }
             : entry,
         )
