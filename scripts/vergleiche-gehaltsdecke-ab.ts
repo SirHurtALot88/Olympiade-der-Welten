@@ -135,10 +135,25 @@ function main(): void {
     console.error("Mindestens ein Spielstand ist nicht lesbar.");
     process.exit(1);
   }
-  if (a.saveId === b.saveId) {
+  /**
+   * DER WAECHTER PRUEFT DEN INHALT, NICHT DEN NAMEN — und das ist eine Korrektur an ihm selbst.
+   *
+   * Er verglich zuerst die `saveId`. Das fing zwar den urspruenglichen Fehler (zweimal dieselbe
+   * Datei gelesen), schlug aber beim RICHTIGEN Aufbau falsch an: ein sauberes A/B startet beide Arme
+   * vom SELBEN Ausgangsstand, damit sich nur der Schalter unterscheidet und nicht die Liga. Beide
+   * Seiten tragen dann zwangslaeufig dieselbe saveId — und der Waechter brach genau den Versuch ab,
+   * fuer den er gebaut war.
+   *
+   * Verglichen wird deshalb, was ein Doppel-Lesen wirklich verraet: dass ALLE Messgroessen exakt
+   * gleich sind. Zwei getrennt durchgespielte Saisons treffen sich nicht auf die Nachkommastelle.
+   */
+  const gleich =
+    JSON.stringify([a.gehalt, a.cash, a.kader, a.abgabe]) === JSON.stringify([b.gehalt, b.cash, b.kader, b.abgabe]);
+  if (gleich) {
     console.error(
-      `ABBRUCH: beide Spalten tragen dieselbe saveId (${a.saveId}) — es wurde zweimal dieselbe ` +
-        `Datenbank gelesen. Genau dieser Fehler hat hier schon einmal ein falsches „Delta 0" erzeugt.`,
+      `ABBRUCH: beide Spalten sind in JEDER Messgroesse identisch — sehr wahrscheinlich wurde ` +
+        `zweimal dieselbe Datenbank gelesen (${pfadAus} / ${pfadAn}). Genau dieser Fehler hat hier ` +
+        `schon einmal ein falsches „Delta 0" erzeugt.`,
     );
     process.exit(1);
   }
