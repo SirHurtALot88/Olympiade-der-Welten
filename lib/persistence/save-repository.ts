@@ -1475,6 +1475,51 @@ function resolveCreatingOwnerId(ownerId: string | null | undefined): string {
   return ownerId ?? DEFAULT_ACTIVE_OWNER_ID;
 }
 
+/**
+ * IST AN DEN SPIELERWERTEN UEBERHAUPT ETWAS ANDERS? — der Kurzschluss vor der Baseline-Wache.
+ *
+ * GEMESSEN (`hwz8fk`, 2984 Spieler, 336 Kadereintraege, fuenf Speichervorgaenge in Folge): ein
+ * Speichern kostet rund 1140 ms. Davon gehen ~200 ms in `ensurePlayerBaselines`, ~62 ms in das
+ * Laden von `game_metadata` und der Baselines — und **~420 ms in `guardPlayerBaselineWrite`**, also
+ * gut ein Drittel des gesamten Speicherns. Die Wache normalisiert dafuer JEDEN vorherigen und jeden
+ * neuen Datensatz und rechnet Pruefsummen nach; bei knapp 3000 Spielern summiert sich das.
+ *
+ * WAS SIE IN DER REGEL FINDET: nichts. Spieler-Baselines sind der Stand bei Import („so kam der
+ * Spieler ins Spiel"), sie aendern sich praktisch nie. Die Wache existiert fuer den Fall, dass
+ * etwas sie doch ueberschreiben will — nicht fuer den Normalfall.
+ *
+ * DIESER VERGLEICH IST DER NORMALFALL, IN MIKROSEKUNDEN: tragen beide Seiten dieselben Spieler mit
+ * derselben Pruefsumme und derselben Version, dann liefert die Wache nachweislich exakt
+ * `previous` zurueck und KEIN Ereignis — jeder Datensatz laeuft dort in den Zweig
+ * `previousChecksum === attemptedChecksum`. Das ist keine Vermutung: `tests/baseline-kurzschluss-
+ * ist-deckungsgleich.test.ts` faehrt beide Wege am echten Datenbestand und vergleicht die
+ * Ergebnisse Byte fuer Byte.
+ *
+ * VORSICHTIG IN JEDE RICHTUNG: fehlt irgendwo eine Pruefsumme, unterscheidet sich eine Version,
+ * fehlt ein Spieler oder ist eine Seite leer, faellt der Vergleich auf `false` und die volle Wache
+ * laeuft. Der Kurzschluss kann nur ueberspringen, nie entscheiden.
+ */
+export function baselinesSindDeckungsgleich(
+  previous: PlayerBaselineRecord[] | undefined,
+  next: PlayerBaselineRecord[] | undefined,
+): previous is PlayerBaselineRecord[] {
+  if (!previous || !next || previous.length === 0 || previous.length !== next.length) {
+    return false;
+  }
+  const vorher = new Map<string, string>();
+  for (const baseline of previous) {
+    if (!baseline.checksum) return false;
+    vorher.set(baseline.playerId, `${baseline.checksum}|${baseline.baselineVersion ?? ""}`);
+  }
+  for (const baseline of next) {
+    if (!baseline.checksum) return false;
+    if (vorher.get(baseline.playerId) !== `${baseline.checksum}|${baseline.baselineVersion ?? ""}`) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function createPersistedSaveRecord(input: {
   saveId: string;
   name: string;
@@ -1501,6 +1546,12 @@ function createPersistedSaveRecord(input: {
     ),
     input.saveId,
   );
+  const phase = (label: string) => {
+    if (process.env.OLY_DEBUG_SAVE_TIMING === "1") console.timeLog("createPersistedSaveRecord", label);
+  };
+  if (process.env.OLY_DEBUG_SAVE_TIMING === "1") console.time("createPersistedSaveRecord");
+  phase("normalisierung fertig");
+
   const baselinePlayerIds = new Set([
     ...normalizedWithoutBaselines.rosters.map((entry) => entry.playerId),
     ...(normalizedWithoutBaselines.playerBaselines ?? []).map((entry) => entry.playerId),
@@ -1510,17 +1561,22 @@ function createPersistedSaveRecord(input: {
     createdAt,
     playerIds: baselinePlayerIds,
   }).gameState;
+  phase("ensurePlayerBaselines fertig");
   const existingMetadata = loadSingleton<GameMetadata>("game_metadata", input.saveId);
   const existingBaselines = loadPlayerBaselinesForSave(
     input.saveId,
     (existingMetadata as GameMetadata & { playerBaselines?: PlayerBaselineRecord[] } | null)?.playerBaselines,
   );
-  const guardedBaselineWrite = guardPlayerBaselineWrite({
-    previous: existingBaselines,
-    next: normalizedGameState.playerBaselines,
-    attemptedSource: "save_repository",
-    timestamp: updatedAt,
-  });
+  phase("metadata + baselines geladen");
+  const guardedBaselineWrite = baselinesSindDeckungsgleich(existingBaselines, normalizedGameState.playerBaselines)
+    ? { baselines: existingBaselines, events: [] as PlayerBaselineWriteGuardEvent[] }
+    : guardPlayerBaselineWrite({
+        previous: existingBaselines,
+        next: normalizedGameState.playerBaselines,
+        attemptedSource: "save_repository",
+        timestamp: updatedAt,
+      });
+  phase("baseline-wache fertig");
   const baselineWriteGuardEvents = compactBaselineWriteGuardEvents([
     ...(existingMetadata?.baselineWriteGuardEvents ?? []),
     ...(normalizedGameState.baselineWriteGuardEvents ?? []),

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-20",
+  "seite": "Verwaltung · Settings",
+  "text": "Ein KI-Team, das ein früherer Schutzlauf dauerhaft als Spieler-Team zurückgeschrieben hatte, fällt beim nächsten Laden von selbst wieder auf KI zurück. Der Auslöser war längst behoben, die Narbe in den Spielständen nicht. Und sie erklärt, warum sie sich nicht wegbekommen ließ: der Spielmodus ist in diesen Ständen gar nicht gesetzt, sondern wird aus der ANZAHL der eigenen Teams abgeleitet — das falsch markierte Team hat den Modus also selbst erzeugt, und die Oberfläche zeigte daraufhin „Chris 2/2 — voll\", bestätigte den Fehler damit als gültige Einstellung. Über alle sieben Spielstände geprüft trifft die Heilung genau zwei Teams; ein Stand, in dem dasselbe Kürzel das echte Spielerteam ist, bleibt unberührt. Ein Spielstand ohne eigenes Team kann dabei nicht entstehen.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

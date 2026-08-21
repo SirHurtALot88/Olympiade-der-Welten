@@ -24,11 +24,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
-import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
+import { buildPlayerContractPreference, recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
 import {
   MIX_RIEGEL_QUOTE,
   getContractShapeTeamContext,
-  wendeApronUndMixAn,
+  wendeLiquiditaetUndMixAn,
 } from "@/lib/market/contract-shape-context";
 import type { Player } from "@/lib/data/olyDataTypes";
 
@@ -44,7 +44,7 @@ const teurerSpieler: Player = [...gameState.players].sort(
  * Marktwert, langer Kerndeal, offensives Profil. Ohne diesen Aufbau prüfte der Test nichts —
  * die Apron-Regel greift ausschliesslich dort, wo sonst front-geloadet würde.
  */
-function frontLoadLage(extra?: { apronHeadroom?: number; gehaltsbergQuote?: number }) {
+function frontLoadLage(extra?: { kassenstand?: number; gehaltsbergQuote?: number }) {
   const marktwert = 40;
   return {
     player: teurerSpieler,
@@ -60,39 +60,45 @@ function frontLoadLage(extra?: { apronHeadroom?: number; gehaltsbergQuote?: numb
   };
 }
 
-describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
+describe("Vertragsform: Kassenstand und Vertragsmix fliessen ein", () => {
   it("ohne die Angaben bleibt alles wie bisher — front-loaded bei dickem Cashpuffer", () => {
     const ohne = recommendContractOfferForPlayer(frontLoadLage() as never);
     expect(ohne.contractLength).toBeGreaterThanOrEqual(2);
     expect(ohne.contractShape).toBe("front_loaded");
   });
 
-  it("ueber der Apron-Linie wird nicht mehr front-geloadet", () => {
-    // Negativer Spielraum = das Team liegt ueber der ersten Linie.
-    const drueber = recommendContractOfferForPlayer(frontLoadLage({ apronHeadroom: -9.9 }) as never);
+  it("mit leerer Kasse wird nicht mehr front-geloadet", () => {
+    // HIER STAND DER APRON-SPIELRAUM. Er steuerte die Form so, als liesse sich damit die Abgabe
+    // bewegen — seit die Bemessung wieder am verhandelten Gehalt haengt (#589), tut sie das nicht
+    // mehr, und die Regel feuerte ins Leere. Gemessen wird jetzt der Kassenstand: die Groesse, die
+    // die Form wirklich bewegt.
+    const drueber = recommendContractOfferForPlayer(frontLoadLage({ kassenstand: -9.9 }) as never);
     expect(drueber.contractShape).not.toBe("front_loaded");
     // AUSGEGLICHEN, nicht back-loaded: die Regel nimmt die teure Rate aus der Abgabe-Saison heraus,
     // schiebt sie aber nicht gesammelt nach hinten. „der mix machts."
     expect(drueber.contractShape).toBe("balanced");
   });
 
-  it("unter der Linie bleibt front-loaded erlaubt — die Regel greift nicht flaechendeckend", () => {
-    const drunter = recommendContractOfferForPlayer(frontLoadLage({ apronHeadroom: 12.5 }) as never);
+  it("mit Geld in der Kasse bleibt front-loaded erlaubt — die Regel greift nicht flaechendeckend", () => {
+    // Das ist der Grund, warum hier der blanke Kontostand steht und nicht `cash − Ruecklage`: an
+    // den Abbildern liegen 156 von 160 Teams unter ihrer Ruecklage. Als Riegel gelesen haette sie
+    // front_loaded abgeschafft statt gebremst.
+    const drunter = recommendContractOfferForPlayer(frontLoadLage({ kassenstand: 12.5 }) as never);
     expect(drunter.contractShape).toBe("front_loaded");
   });
 
-  it("die Apron-Regel erzeugt NIE back-loaded — auch nicht bei leerem Back-Load-Anteil", () => {
+  it("die Kassen-Regel erzeugt NIE back-loaded — auch nicht bei leerem Back-Load-Anteil", () => {
     // Chris: „achtung deine messwerte schieben alles extrem richtung backloaded das gefaellt mir
     // gar nicht." Die Regel darf die Liga nicht in eine Richtung kippen.
     for (const anteil of [0, 0.2, 0.6, 0.9]) {
       const ergebnis = recommendContractOfferForPlayer(
-        frontLoadLage({ apronHeadroom: -9.9, gehaltsbergQuote: anteil }) as never,
+        frontLoadLage({ kassenstand: -9.9, gehaltsbergQuote: anteil }) as never,
       );
       expect(ergebnis.contractShape, `backLoadedShare=${anteil}`).toBe("balanced");
     }
   });
 
-  it("der Mix-Riegel greift auch ohne Apron-Druck", () => {
+  it("der Mix-Riegel greift auch ohne Kassendruck", () => {
     // Cash eng → die bestehende Regel empfiehlt back-loaded …
     const engOhneRiegel = recommendContractOfferForPlayer({
       player: teurerSpieler,
@@ -120,14 +126,14 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
   it("der Riegel misst GELD, nicht Formen — knapp unter der Quote greift er nicht", () => {
     // Chris: „Ja miss es an zukunftslast." Die Quote ist der gebundene Mehrbetrag spaeterer
     // Vertragsjahre, an der heutigen Gehaltssumme gemessen.
-    const knapp = wendeApronUndMixAn({
+    const knapp = wendeLiquiditaetUndMixAn({
       form: "back_loaded",
       laufzeit: 3,
       gehaltsbergQuote: MIX_RIEGEL_QUOTE - 0.01,
     });
     expect(knapp.form).toBe("back_loaded");
 
-    const drueber = wendeApronUndMixAn({
+    const drueber = wendeLiquiditaetUndMixAn({
       form: "back_loaded",
       laufzeit: 3,
       gehaltsbergQuote: MIX_RIEGEL_QUOTE,
@@ -136,7 +142,7 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
   });
 
   it("ohne Angabe der Quote bleibt das Verhalten unveraendert", () => {
-    expect(wendeApronUndMixAn({ form: "back_loaded", laufzeit: 3 }).form).toBe("back_loaded");
+    expect(wendeLiquiditaetUndMixAn({ form: "back_loaded", laufzeit: 3 }).form).toBe("back_loaded");
   });
 
   it("die gemeinsame Regel verschiebt nur — sie erzeugt aus keiner Eingabe back_loaded", () => {
@@ -144,10 +150,10 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     for (const form of ["front_loaded", "back_loaded", "balanced"] as const) {
       for (const headroom of [-30, -0.1, 0, 5, 50]) {
         for (const quote of [0, 0.14, 0.15, 0.5]) {
-          const ergebnis = wendeApronUndMixAn({
+          const ergebnis = wendeLiquiditaetUndMixAn({
             form,
             laufzeit: 3,
-            apronHeadroom: headroom,
+            kassenstand: headroom,
             gehaltsbergQuote: quote,
           });
           if (form !== "back_loaded") {
@@ -171,7 +177,7 @@ describe("Vertragsform: Apron-Lage und Vertragsmix fliessen ein", () => {
     const ohne = recommendContractOfferForPlayer(einJahr as never);
     const mit = recommendContractOfferForPlayer({
       ...einJahr,
-      apronHeadroom: -20,
+      kassenstand: -20,
       gehaltsbergQuote: 0.9,
     } as never);
     // Der Aufbau MUSS einen Einjahresvertrag liefern, sonst prueft der Fall nichts. Fable hatte
@@ -237,5 +243,54 @@ describe("Die Gehaltsberg-Quote misst gebundenes Geld", () => {
 
   it("ein leerer Kader ergibt 0 statt einer Division durch null", () => {
     expect(mitVertraegen().gehaltsbergQuote).toBe(0);
+  });
+});
+
+/**
+ * CHRIS' ENTSCHEIDUNG VOM 20.08.2026 zu Frage 4: „a als ein faktor, zusätzlich haben spieler beim
+ * kauf ja wünsche und manche möchten front oder back loaded oder balanced, teams denen es egal ist
+ * können auch auf spielerwünsche besser eingehen um zu sparen".
+ *
+ * Der erste Teil ist die Umstellung von Apron-Spielraum auf Kassenstand (oben geprüft). Der zweite
+ * Teil brauchte KEINEN Umbau — nachgesehen statt vermutet, und genau das hält dieser Block fest.
+ */
+describe("Der Spielerwunsch ist der Ausgangspunkt, nicht die Ausnahme", () => {
+  it("ohne team-eigenen Grund steht die Wunschform im Angebot", () => {
+    // `recommendContractOfferForPlayer` startet bei `basePreference.shapePreference`. Eine Lage
+    // ohne Cash-Signal, ohne Profil und ohne Rolle laesst diesen Startwert stehen — ein Team, dem
+    // die Form egal ist, geht also bereits auf den Spieler ein.
+    const wunsch = buildPlayerContractPreference(teurerSpieler)?.shapePreference ?? null;
+    expect(wunsch).not.toBeNull();
+    const angebot = recommendContractOfferForPlayer({
+      player: teurerSpieler,
+      isFirstSeason: false,
+    } as never);
+    expect(angebot.contractShape).toBe(wunsch);
+  });
+
+  it("erst eine team-eigene Regel verschiebt ihn", () => {
+    // Dieselbe Vorlage, nur mit dickem Cashpuffer und offensivem Profil: jetzt gewinnt das Team.
+    const wunsch = buildPlayerContractPreference(teurerSpieler)?.shapePreference ?? null;
+    const angebot = recommendContractOfferForPlayer(frontLoadLage() as never);
+    expect(angebot.contractShape).toBe("front_loaded");
+    // Die Vorlage ist nur dann eine Probe, wenn sie den Wunsch wirklich verdraengt.
+    expect(angebot.contractShape).not.toBe(wunsch);
+  });
+});
+
+describe("Die Teamlage liefert den Kassenstand, nicht mehr den Apron-Spielraum", () => {
+  it("getContractShapeTeamContext gibt den Kontostand des Teams zurueck", () => {
+    const gameState = {
+      season: { id: "season-2", name: "Season 2" },
+      seasonState: { seasonId: "season-2" },
+      teams: [
+        { teamId: "A-A", cash: 42.4 },
+        { teamId: "B-B", cash: -3.2 },
+      ],
+      rosters: [],
+      players: [],
+    } as never;
+    expect(getContractShapeTeamContext(gameState, "A-A").kassenstand).toBeCloseTo(42.4, 1);
+    expect(getContractShapeTeamContext(gameState, "B-B").kassenstand).toBeCloseTo(-3.2, 1);
   });
 });
