@@ -1515,6 +1515,45 @@ export function resolveContractLengthSalaryFactor(input: {
   );
 }
 
+/**
+ * DER PREIS DES FORMWUNSCHES — nur der Form-Anteil, ohne den Laufzeit-Anteil.
+ *
+ * `buildPlayerContractPreference` mischt beides in einem `salaryAdjustmentPct`: die Abweichung von
+ * der Wunschlaufzeit UND die von der Wunschform. Der menschliche Verhandlungspfad reicht die Summe
+ * durch und preist damit beides ein. Der KI-Schnellkauf-Pfad reichte gar nichts durch — dort war
+ * die Vertragsform gratis, obwohl die KI sie regelmaessig gegen den Wunsch setzt (Kassenstand,
+ * Gehaltsberg, Apron-Lage).
+ *
+ * Damit dieser Pfad nicht nachtraeglich auch noch die Laufzeit neu bepreist — was eine ganz andere
+ * Aenderung waere als die gemeldete — misst diese Funktion die DIFFERENZ zur selben Preference mit
+ * der Wunschform bei identischer Laufzeit. Uebrig bleibt genau der Formanteil.
+ *
+ * Nie negativ: den Wunsch zu treffen kostet nichts extra, verbilligt hier aber auch nichts.
+ * Der Normalpreis bleibt der Normalpreis, Abweichen kostet.
+ */
+export function resolveContractShapeSalarySurcharge(input: {
+  player: Player | null;
+  teamStrategyProfile?: TeamStrategyProfile | null;
+  contractLength: number;
+  contractShape: ContractShape;
+}): number {
+  const gewaehlt = buildPlayerContractPreference(input.player, input.teamStrategyProfile ?? null, {
+    contractLength: input.contractLength,
+    contractShape: input.contractShape,
+  });
+  if (!gewaehlt) {
+    return 0;
+  }
+  if (gewaehlt.shapePreference === input.contractShape) {
+    return 0;
+  }
+  const beiWunschform = buildPlayerContractPreference(input.player, input.teamStrategyProfile ?? null, {
+    contractLength: input.contractLength,
+    contractShape: gewaehlt.shapePreference,
+  });
+  return roundMoney(Math.max(0, gewaehlt.salaryAdjustmentPct - (beiWunschform?.salaryAdjustmentPct ?? 0)), 4);
+}
+
 function deriveContractShapeDemandSignal(contractShape: ContractShape) {
   const entries: NegotiationDemandBreakdownEntry[] = [];
 

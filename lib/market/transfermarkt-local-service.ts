@@ -18,7 +18,12 @@ import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
-import { buildContractNegotiationPreview, recommendContractOfferForPlayer, resolveContractLengthSalaryFactor } from "@/lib/market/contract-negotiation-preview";
+import {
+  buildContractNegotiationPreview,
+  recommendContractOfferForPlayer,
+  resolveContractLengthSalaryFactor,
+  resolveContractShapeSalarySurcharge,
+} from "@/lib/market/contract-negotiation-preview";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import {
@@ -2433,14 +2438,27 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   // lebte nur im langsamen buildContractNegotiationPreview (menschlicher Pfad). Wir ziehen
   // jetzt denselben Längen-Anteil des Verhandlungs-DemandMultipliers auf das Basisgehalt,
   // damit KI-Signings auf 5-Jahres-Deals ein niedrigeres Jahresgehalt zahlen als auf 1-Jahres.
-  const contractLengthSalaryFactor = player
-    ? resolveContractLengthSalaryFactor({ player, contractLength, teamFit: recommendedTeamFit })
-    : 1;
-  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const contractShape =
     params.contractShape != null
       ? normalizeContractShape(params.contractShape)
       : normalizeContractShape(recommendedContract?.contractShape);
+  // Der Formwunsch kostete auf diesem Pfad NICHTS. Im menschlichen Verhandlungspfad schlaegt eine
+  // Form gegen den Spielerwunsch laengst durch (gemessen am Abbild: Median 6,5 % Aufschlag ueber
+  // 285 abweichende Mehrjahresvertraege) — hier fehlte die Zeile, und die KI durfte die Form frei
+  // gegen den Wunsch drehen, ohne dafuer zu zahlen. Nur der FORM-Anteil wandert herein; die
+  // Laufzeit bleibt bepreist wie bisher.
+  const contractShapeSalarySurcharge = player
+    ? resolveContractShapeSalarySurcharge({ player, teamStrategyProfile, contractLength, contractShape })
+    : 0;
+  const contractLengthSalaryFactor = player
+    ? resolveContractLengthSalaryFactor({
+        player,
+        contractLength,
+        teamFit: recommendedTeamFit,
+        salaryPreferenceAdjustmentPct: contractShapeSalarySurcharge,
+      })
+    : 1;
+  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const promisedRole = derivePromisedRoleForBuy({
     explicitRole: params.promisedRole ?? null,
     contractLength,

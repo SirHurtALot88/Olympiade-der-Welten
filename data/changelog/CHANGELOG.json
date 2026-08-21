@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-21",
+      "seite": "Intern · Entwicklung",
+      "pr": null,
+      "text": "Eine auffällige Konjunktur-Reihe wird ab jetzt gemeldet statt stillschweigend ersetzt. Der Konjunkturfaktor entscheidet über Sponsorenzahlungen und die Drosselung der Luxussteuer; wer ihn beim Laden austauscht, ändert rückwirkend die Grundlage von Geld, das längst geflossen ist. Der neue Wächter prüft in jeder Saison, ob die gespeicherte Reihe vollständig und lückenlos ist, und in Saison 1 zusätzlich, ob sie zu dem passt, was aus dem Spielstand folgt. Ab Saison 2 schweigt die Wertprüfung bewusst — dort wird die Reihe von der Vorsaison fortgeschrieben und soll abweichen. Eine auffällige Reihe bleibt stehen; der Wächter schreibt nur auf, was er sieht. Am Spielstand ändert das nichts, solange nichts auffällt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
       "seite": "Welt · Kredite",
       "pr": null,
       "text": "Der Mindest-Kreditrahmen hängt jetzt davon ab, ob ein Team überhaupt Spieler braucht. Bisher bekam jedes Team mindestens 15 % seiner Sponsoreinnahmen als Spielraum — auch dann, wenn die ehrliche Rechnung tief im Minus lag. Seit die Gehälter voll gegengerechnet werden, traf das die Mehrheit der Liga, und aus der Ausnahme war ein Freibetrag geworden. Statt einer harten Kante gibt es jetzt drei Stufen: ein Team unter dem Spielerminimum behält den vollen Mindestrahmen, eines zwischen Minimum und Zielgröße den halben, und eines mit vollem Kader gar keinen. Wer Spieler braucht, bekommt also Luft; wer keine braucht, nicht. Über die Spielstände gerechnet greift der Mindestrahmen damit bei 87 statt bei 107 Teamzeilen.",
@@ -26,6 +35,24 @@
       "text": "Ein Spieltag bleibt nicht mehr stehen, weil sich jemand verletzt hat. Wer aufgestellt war und sich WÄHREND des Spieltags verletzt, belegt seinen Platz weiterhin — er liefert nur keine Wertung mehr, und das ist die sportliche Strafe, die ohnehin vorgesehen ist. Vorher galt seine Aufstellung als unvollständig, und zwar dauerhaft: die Arena überschreibt eine gesperrte Aufstellung bewusst nicht, es gab also keinen Ausweg. Am Spielstand nachgemessen (Spieltag 10) blockierte genau ein Team die ganze Liga, und die beiden Ausfälle standen in Disziplin 1 — der bereits gebuchten. Disziplin 2 hing an Spielern, die dort gar nicht antraten; beide Disziplinen laufen parallel und sind mit verschiedenen Spielern besetzt. Beim AUFSTELLEN bleibt die Sperre bestehen: dort kann man jemand anderen wählen.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
+      "seite": "Welt · Transfermarkt",
+      "pr": null,
+      "text": "Setzt die KI eine Vertragsform, die der Spieler nicht mag, zahlt sie dafür ab jetzt — so wie du es schon immer getan hast. Beim Nachmessen kam heraus, dass das Preisgewicht für den Formwunsch längst existiert: in der Verhandlung, die du selbst führst, kostet eine Form gegen den Wunsch im Mittel 6,5 Prozent mehr Jahresgehalt. Der Schnellkauf-Pfad, über den sämtliche KI-Käufe und der Erst-Draft der Saison 1 laufen, kannte diese Zahl nicht und reichte sie nie durch. Die KI durfte die Form also frei gegen den Wunsch drehen — nach Kassenstand, Gehaltsberg und Apron-Lage — und bekam sie umsonst. Am Abbild vom 21.08. gemessen: von 651 laufenden Mehrjahresverträgen weichen 285 vom Wunsch ab, für sie hätte der Aufschlag im Mittel 6,3 Prozent betragen. Wer den Wunsch trifft, zahlt weiterhin den Normalpreis — es gibt keinen Rabatt dafür, nur einen Preis fürs Abweichen. Eingepreist wird ausschließlich der Form-Anteil; die Laufzeit bleibt bewertet wie bisher. Bestehende Verträge bleiben unberührt, der Aufschlag gilt ab dem nächsten Abschluss.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
+      "seite": "Technik",
+      "pr": null,
+      "text": "Zwei zusätzliche Prüfungen laufen ab jetzt mit, bevor eine Änderung ins Spiel darf. Die erste fährt alle Tests, die eine Ansicht wirklich aufbauen — 21 Dateien in 15 Sekunden. Das kann etwas, was die bisherigen Wächter prinzipbedingt nie konnten: bemerken, dass eine Ansicht beim Anzeigen abstürzt, statt nur zu prüfen, ob der richtige Text in der Datei steht. Genau so ein Absturz war im August ins Spiel gerutscht. Die zweite bündelt alle Tests rund um das Speichern und Laden von Spielständen zu einem eigenen, anhakbaren Prüflauf — 174 Dateien, gut elf Minuten, und damit die Sorte Fehler, die im schlimmsten Fall einen Spielstand kostet. Beide Prüflisten wachsen von selbst mit: wer künftig einen neuen Test schreibt, muss ihn nirgends eintragen, er wird beim nächsten Lauf erkannt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.5"
     },
     {
