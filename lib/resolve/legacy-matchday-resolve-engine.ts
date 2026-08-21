@@ -274,6 +274,8 @@ function isPartialLineupAllowed(context: LegacyLineupLoadedContext) {
       selectedPlayerIds,
       context.activePlayers.map((eintrag) => eintrag.playerId),
     ),
+    selectedPlayerCount: selectedPlayerIds.size,
+    istGesperrt: context.existingDraft?.status === "locked",
   });
 }
 

@@ -11,6 +11,7 @@ export function validateLegacyLineupContext(
   const errors: string[] = [];
   const warnings: string[] = [];
   const enforceCompleteness = options.enforceCompleteness ?? true;
+  const lineupIsLocked = options.lineupIsLocked ?? false;
 
   const activePlayerById = new Map(input.activePlayers.map((player) => [player.id, player]));
   const rosterPlayerById = new Map((input.rosterPlayers ?? []).map((player) => [player.id, player]));
@@ -21,9 +22,40 @@ export function validateLegacyLineupContext(
   for (const entry of input.entries) {
     const rosterPlayer = rosterPlayerById.get(entry.playerId);
     if (rosterPlayer?.availabilityBlocker === "player_injured_unavailable") {
-      errors.push(
-        `player_injured_unavailable: Player ${entry.playerId} is injured and unavailable until ${rosterPlayer.injuryUntilMatchday ?? "next matchday"}.`,
-      );
+      const meldung = `player_injured_unavailable: Player ${entry.playerId} is injured and unavailable until ${rosterPlayer.injuryUntilMatchday ?? "next matchday"}.`;
+      if (!lineupIsLocked) {
+        // ENTWURF OFFEN: hier hat die Sperre einen Sinn UND einen Ausweg — der Spieler kann nicht
+        // antreten, also stellt man jemand anderen auf.
+        errors.push(meldung);
+        continue;
+      }
+      // ENTWURF GESPERRT: der Spieltag laeuft bereits. Der Spieler war gesund, als er aufgestellt
+      // wurde; verletzt hat er sich WAEHREND des Spieltags. Ihn jetzt zum Fehler zu erklaeren
+      // bestraft einen Zustand, den niemand vermeiden konnte, und es gibt keinen Ausweg: die Arena
+      // ueberschreibt eine gesperrte Aufstellung bewusst nicht.
+      //
+      // ES WAR SOGAR EIN WIDERSPRUCH IM EIGENEN HAUS. Der Kopf von
+      // `legacy-matchday-partial-lineup-rule.ts` verlangt ausdruecklich, dass die Namen der
+      // Ausgefallenen im Entwurf STEHEN BLEIBEN — sie belegen, wer aufgestellt war, und die bereits
+      // gebuchte D1 rechnet mit ihnen weiter (#505, wo das Herausfiltern die D1-Werte zerstoerte).
+      // Eine Regel verlangte also, dass sie drin bleiben, und diese hier erklaerte den Entwurf
+      // ungueltig, WEIL sie drin sind. Gemessen an Chris' Spielstand (season-1, matchday-10, V-W):
+      // zwei Ausfaelle in D1 — der bereits gebuchten Disziplin — blockierten D2, in dem beide gar
+      // nicht antraten. D1 und D2 laufen parallel und sind disjunkt besetzt; ein Ausfall in D1 kann
+      // die D2-Aufstellung logisch nie betreffen.
+      //
+      // CHRIS: „verletzungen duerfen ein lineup niemals blockieren erst recht nicht beim scoring da
+      // ist der spieltag ja schon gelaufen".
+      //
+      // DER SLOT ZAEHLT WEITER ALS BESETZT (kein `continue` in die Aktiv-Pruefung, die den
+      // Verletzten nicht mehr fuehrt): aufgestellt WAR er. Was er nicht mehr liefert, ist Wertung —
+      // und das ist die sportliche Strafe, die der Entwurf ohnehin vorsieht.
+      warnings.push(meldung);
+      const countKeyVerletzt = `${entry.disciplineId}::${entry.disciplineSide}`;
+      entriesByDisciplineSide.set(countKeyVerletzt, (entriesByDisciplineSide.get(countKeyVerletzt) ?? 0) + 1);
+      if (entry.isCaptain) {
+        captainCountByDisciplineSide.set(countKeyVerletzt, (captainCountByDisciplineSide.get(countKeyVerletzt) ?? 0) + 1);
+      }
       continue;
     }
 

@@ -508,6 +508,14 @@ export type LegacyLineupPreviewResult =
 
 export type LegacyLineupValidationOptions = {
   enforceCompleteness?: boolean;
+  /**
+   * Der Entwurf ist gesperrt — der Spieltag laeuft bereits oder ist gelaufen.
+   *
+   * Dann darf eine Verletzung die Aufstellung nicht mehr ungueltig machen: der Spieler war gesund,
+   * als er aufgestellt wurde, und der Entwurf ist nicht mehr aenderbar. Siehe die Begruendung an
+   * der Pruefung selbst (`legacy-lineup-validator.ts`).
+   */
+  lineupIsLocked?: boolean;
   seasonCaptainLimit?: number;
   captainUsedBeforeCurrentDraft?: number;
   captainUsedBeforeCurrentDraftSides?: string[];

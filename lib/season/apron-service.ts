@@ -111,11 +111,28 @@ export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
  *
  * ZUR SPANNE: die Linien haengen am Median, „zu niedrig" ist deshalb eine Aussage ueber die
  * VERTEILUNG. Im gemeldeten Stand liegt die Gehaltsspitze bei 2,30 x Median (123,5 gegen 53,8), in
- * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen; 1,25/1,60
- * laesst in beiden Faellen nur die echten Ausreisser oben herausragen.
+ * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen.
+ *
+ * 1,25/1,60 → 1,20/1,40, CHRIS' ENTSCHEIDUNG nach der Ueberschreitungsmessung („davon gefaellt mir
+ * 1,2 und 1,4 eindeutig am besten"). GRUND: 1,60 schob die 2. Linie so weit hinaus, dass sie NIEMANDEN
+ * mehr erreichte. Am Live-Abbild (season-1, Median 64,4) nachgemessen, dieselben Kader gegen drei
+ * Linienpaare:
+ *
+ *   1,10 / 1,25  ->  70,8 /  80,5  ->  Zone 1: 12 Teams, Zone 2: 5 Teams, Topf 127,8
+ *   1,25 / 1,60  ->  80,5 / 103,0  ->  Zone 1:  5 Teams, Zone 2: 0 Teams, Topf  26,6
+ *   1,20 / 1,40  ->  77,3 /  90,2  ->  Zone 1:  8 Teams, Zone 2: 1 Team,  Topf  51,0
+ *
+ * M-M, das teuerste Team der Liga mit 98,7, lag bei 1,60 ganze 4,2 % UNTER der 2. Linie. Eine leere
+ * Zone 2 macht den zweiten Satz wirkungslos, egal wie hoch er steht — besteuert wird ein Ueberschuss,
+ * den es nicht gibt. Bei 1,40 steht M-M 9,5 % darueber und zahlt 23,97 statt 14,56.
+ *
+ * DIE ROLLENVERTEILUNG, DIE DARAUS FOLGT: die 1. Linie fasst mit 8 von 32 das obere Viertel — spuerbar,
+ * aber nicht flaechendeckend („der erste ist ja noch ok"). Die 2. Linie erwischt nur den echten
+ * Ausreisser. Wer die Faktoren aendert, misst mit `scripts/messe-apron-ueberschreitung.ts` NACH, ob
+ * Zone 2 ueberhaupt besetzt bleibt; eine leere Zone 2 ist eine Regel ohne Wirkung.
  */
-export const APRON_LINE_1_MEDIAN_FACTOR = 1.25;
-export const APRON_LINE_2_MEDIAN_FACTOR = 1.6;
+export const APRON_LINE_1_MEDIAN_FACTOR = 1.2;
+export const APRON_LINE_2_MEDIAN_FACTOR = 1.4;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
 export const APRON_RATE_ZONE_1 = 0.8;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
@@ -485,10 +502,57 @@ export function areSeasonApronLinesFrozen(gameState: GameState): boolean {
 }
 
 /**
+ * DER ANKER AUS DER VORSAISON — gegen das Gehalts-TAL im Kaufmoment.
+ *
+ * GEMESSEN (docs/BEFUND-APRON-BREMSE-KAUFMOMENT.md): im Augenblick, in dem die KI kauft, sind die
+ * Vertraege gerade ausgelaufen und die Kader stehen bei 8–11 von 10–14 Plaetzen. Der Median steht
+ * dort im Jahres-Tal. In Saison 4 einer Simulation: vor den Kaeufen Median 39,7 (Linien 49,6/63,5),
+ * nach den Kaeufen Median 55,2 (Linien 69,1/88,4). Die KI entschied also gegen eine Grenze, die
+ * 28 % zu tief lag — gerechnet aus einem Kader, den es noch gar nicht gab. In Saison 1 faellt das
+ * nicht auf, weil der Draft die Kader VOR dem Pruefmoment fuellt; ab Saison 2 ist der Pruefmoment
+ * immer das Tal.
+ *
+ * CHRIS: „die apron linie ist sonst ja nur in S1 korrekt und danach immer falsch das ist ein
+ * grundproblem".
+ *
+ * KEIN NEUER SPEICHER, KEINE ZWEITE RECHNUNG: der Snapshot der abgerechneten Vorsaison ueberlebt
+ * den Saisonuebergang ohnehin im `seasonState` (`preseason-workflow-service.ts` traegt ihn mit) und
+ * faellt heute nur am `seasonId`-Abgleich durch. Er wird hier ein zweites Mal GELESEN, nicht neu
+ * gerechnet.
+ *
+ * VERANKERT WIRD DER MEDIAN, NICHT DIE FERTIGE LINIE. Ein alter Snapshot traegt die Faktoren, die
+ * damals galten (auf Chris' Spielstand 1,10/1,25 aus der Zeit vor dem Umbau auf 1,25/1,6) — wer die
+ * Linien selbst uebernaehme, schleppte die alte Steuer in die neue Saison. Der Median ist die
+ * gemessene Groesse, die Faktoren sind die Regel; die Regel gilt immer in ihrer heutigen Fassung.
+ */
+function vorsaisonMedianAnker(gameState: GameState): number | null {
+  const snapshot = gameState.seasonState?.apronLinesSnapshot;
+  if (!snapshot) return null;
+  // Ein Snapshot der LAUFENDEN Saison ist kein Anker — dann greift ohnehin `areSeasonApronLinesFrozen`.
+  if (snapshot.seasonId === gameState.season?.id) return null;
+  // Ein Snapshot aus einem Referenz-Notbehelf (frischer Save ohne echte Gehaelter) taugt nicht als
+  // Anker: er misst keine gespielte Liga, sondern einen Platzhalter.
+  if (snapshot.usedReferenceSalary) return null;
+  const median = snapshot.medianSalary;
+  return Number.isFinite(median) && median > 0 ? median : null;
+}
+
+/**
  * DIE LINIEN, DIE GERADE GELTEN — abgeleitet aus `areSeasonApronLinesFrozen`, nicht zweitgerechnet.
  *
- * Solange das Kauffenster offen ist, wandern sie mit dem Median mit; sobald es zu ist, gilt der
- * eingefrorene Stand.
+ * Solange das Kauffenster offen ist, wandern sie mit dem Median mit — aber nie unter den Stand, mit
+ * dem die Vorsaison abgerechnet wurde (siehe `vorsaisonMedianAnker`). Sobald das Fenster zu ist,
+ * gilt der eingefrorene Stand.
+ *
+ * WARUM `max` UND NICHT DER ANKER ALLEIN: der Entwurfskern bleibt erhalten — ruestet die Liga ueber
+ * das Vorjahresniveau hinaus, uebernimmt der Live-Median und die Linien wandern nach oben mit. Der
+ * Anker verhindert nur den Absturz ins Tal. Fuer den Menschen heisst das: die Linien steigen
+ * waehrend seiner Kaufphase monoton und rasten beim Finalisieren ein, statt zu Saisonbeginn
+ * unerklaerlich einzubrechen und sich dann wieder hochzuschieben.
+ *
+ * IN DIE ANDERE RICHTUNG IST DER ANKER MILDE: schrumpft die Liga wirklich, haelt er die Linien im
+ * Fenster zu hoch. Das ist die bewusst gewaehlte Fehlerrichtung — eine zu hohe Grenze besteuert zu
+ * wenig, eine zu tiefe besteuert die halbe Liga. Der Einfrier-Schritt korrigiert es am Fensterende.
  *
  * WARUM ÜBERHAUPT MITWANDERN: Der Kopfkommentar dieser Datei nennt es als Kern des Entwurfs — die
  * Linien hängen am Median und nicht an einer festen Zahl, „damit die Linien mitwandern, wenn die
@@ -507,7 +571,16 @@ export function resolveSeasonApronLines(gameState: GameState): ApronLines {
   if (areSeasonApronLinesFrozen(gameState)) {
     return gameState.seasonState!.apronLinesSnapshot!;
   }
-  return computeApronLines(gameState);
+  const live = computeApronLines(gameState);
+  const anker = vorsaisonMedianAnker(gameState);
+  if (anker === null || anker <= live.medianSalary) return live;
+  const medianSalary = round1(anker);
+  return {
+    medianSalary,
+    line1: round1(medianSalary * APRON_LINE_1_MEDIAN_FACTOR),
+    line2: round1(medianSalary * APRON_LINE_2_MEDIAN_FACTOR),
+    usedReferenceSalary: live.usedReferenceSalary,
+  };
 }
 
 // ── Wertungsanteil (für den Deckel) ────────────────────────────────────────────────────────────

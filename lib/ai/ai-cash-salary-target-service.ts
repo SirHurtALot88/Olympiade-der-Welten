@@ -2,6 +2,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
 import { getTeamApronSalaryBase, resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
@@ -162,8 +164,35 @@ export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: stri
  * Die Cash-Ziele oben behalten `getTeamSalarySum` bewusst: sie planen den Cashflow, und abgebucht
  * wird die echte Summe. Nur die APRON-Fragen wechseln die Grundlage.
  */
+/**
+ * DIE GEHALTSSUMME, GEGEN DIE DIE KI IHRE DECKE PRUEFT — hochgerechnet auf den geplanten Kader.
+ *
+ * NICHT die IST-Summe, und das ist der Kern der Reparatur. Im Kaufmoment sind die Vertraege gerade
+ * ausgelaufen und die Kader stehen bei 8–11 von 10–14 Plaetzen; wer dort die IST-Summe gegen eine
+ * Grenze fuer einen vollen Kader haelt, vergleicht einen halben Kader mit einer ganzen Linie und
+ * sieht freie Bahn, bis er real drueber ist — also nach genau den Kaeufen, die die Bremse haette
+ * bremsen sollen. Gemessen in docs/BEFUND-APRON-BREMSE-KAUFMOMENT.md: 1 bis 5 von 32 Teams standen
+ * im Kaufmoment ueber ihrer Decke, und die Bremse entzog der Liga ueber vier Saisons zusammen 12,2
+ * von rund 2000 freiem Kaufbudget.
+ *
+ * ENDZUSTAND GEGEN ENDZUSTAND: die Linien tragen seit demselben Umbau einen Vorsaison-Anker
+ * (`resolveSeasonApronLines`), stehen also auch im Fenster auf Voll-Kader-Niveau. Beide Seiten des
+ * Vergleichs meinen damit denselben Zeitpunkt.
+ *
+ * DIE BASIS BLEIBT DIE APRON-BASIS. Hochgerechnet wird `getTeamApronSalaryBase` (das verhandelte
+ * Jahresgehalt), nicht die Cash-Sicht — sonst kehrt der Fehler zurueck, den der Kommentar unten
+ * beschreibt: die KI pruefte gegen eine andere Zahl, als die Abrechnung besteuert.
+ */
+export function getProjectedTeamApronSalaryBase(gameState: GameState, teamId: string): number {
+  return projectSalaryAtPlannerTarget({
+    gameState,
+    teamId,
+    currentSalary: getTeamApronSalaryBase(gameState, teamId),
+  });
+}
+
 export function isTeamOverApronSalaryCeiling(gameState: GameState, teamId: string): boolean {
-  return getTeamApronSalaryBase(gameState, teamId) > resolveTeamApronSalaryCeiling(gameState, teamId);
+  return getProjectedTeamApronSalaryBase(gameState, teamId) > resolveTeamApronSalaryCeiling(gameState, teamId);
 }
 
 /**
@@ -176,8 +205,25 @@ export function isTeamOverApronSalaryCeiling(gameState: GameState, teamId: strin
 export function resolveApronTighteningMultiplier(gameState: GameState, teamId: string): number {
   const ceiling = resolveTeamApronSalaryCeiling(gameState, teamId);
   if (ceiling <= 0) return 1;
+  // WER NICHT SPIELFAEHIG IST, WIRD NICHT GEBREMST. Der Kommentar oben sagt es als Absicht („ein
+  // Team darf die Linie reissen, wenn der Kader es zwingend braucht"); seit die Decke gegen den
+  // HOCHGERECHNETEN Kader prueft, braucht es die Ausnahme auch als Regel. Sonst trifft die Bremse
+  // ausgerechnet den Wiederaufbau: ein Team mit 2 von 8 Plaetzen wird auf die Gehaltssumme eines
+  // vollen Kaders hochgerechnet, ueberschreitet die Decke rechnerisch und bekommt genau das Geld
+  // weggesperrt, mit dem es spielfaehig werden muesste (nachgemessen in
+  // tests/ai-manager-apply-service: 34,53 statt der geforderten > 35 verfuegbar).
+  //
+  // DIE GRENZE IST DAS HARTE MINIMUM, NICHT DAS OPTIMUM. Unter dem Optimum steht in der Vorsaison
+  // praktisch jedes Team — eine Ausnahme dort haette die Bremse vollstaendig abgeschaltet. Unter
+  // dem Minimum steht ein Team, das ohne Zukauf nicht antreten kann; dort geht Spielfaehigkeit vor
+  // Luxussteuer.
+  const { playerMin } = deriveRosterTargets(
+    gameState.teams.find((entry) => entry.teamId === teamId),
+    gameState.teamIdentities.find((entry) => entry.teamId === teamId),
+  );
+  if (gameState.rosters.filter((entry) => entry.teamId === teamId).length < playerMin) return 1;
   // Dieselbe Grundlage wie `isTeamOverApronSalaryCeiling` — siehe die Begründung dort.
-  const salary = getTeamApronSalaryBase(gameState, teamId);
+  const salary = getProjectedTeamApronSalaryBase(gameState, teamId);
   if (salary <= ceiling) return 1;
   const overshoot = (salary - ceiling) / ceiling;
   return clamp(1 - overshoot, 0.5, 1);
