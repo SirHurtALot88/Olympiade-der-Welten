@@ -485,10 +485,57 @@ export function areSeasonApronLinesFrozen(gameState: GameState): boolean {
 }
 
 /**
+ * DER ANKER AUS DER VORSAISON — gegen das Gehalts-TAL im Kaufmoment.
+ *
+ * GEMESSEN (docs/BEFUND-APRON-BREMSE-KAUFMOMENT.md): im Augenblick, in dem die KI kauft, sind die
+ * Vertraege gerade ausgelaufen und die Kader stehen bei 8–11 von 10–14 Plaetzen. Der Median steht
+ * dort im Jahres-Tal. In Saison 4 einer Simulation: vor den Kaeufen Median 39,7 (Linien 49,6/63,5),
+ * nach den Kaeufen Median 55,2 (Linien 69,1/88,4). Die KI entschied also gegen eine Grenze, die
+ * 28 % zu tief lag — gerechnet aus einem Kader, den es noch gar nicht gab. In Saison 1 faellt das
+ * nicht auf, weil der Draft die Kader VOR dem Pruefmoment fuellt; ab Saison 2 ist der Pruefmoment
+ * immer das Tal.
+ *
+ * CHRIS: „die apron linie ist sonst ja nur in S1 korrekt und danach immer falsch das ist ein
+ * grundproblem".
+ *
+ * KEIN NEUER SPEICHER, KEINE ZWEITE RECHNUNG: der Snapshot der abgerechneten Vorsaison ueberlebt
+ * den Saisonuebergang ohnehin im `seasonState` (`preseason-workflow-service.ts` traegt ihn mit) und
+ * faellt heute nur am `seasonId`-Abgleich durch. Er wird hier ein zweites Mal GELESEN, nicht neu
+ * gerechnet.
+ *
+ * VERANKERT WIRD DER MEDIAN, NICHT DIE FERTIGE LINIE. Ein alter Snapshot traegt die Faktoren, die
+ * damals galten (auf Chris' Spielstand 1,10/1,25 aus der Zeit vor dem Umbau auf 1,25/1,6) — wer die
+ * Linien selbst uebernaehme, schleppte die alte Steuer in die neue Saison. Der Median ist die
+ * gemessene Groesse, die Faktoren sind die Regel; die Regel gilt immer in ihrer heutigen Fassung.
+ */
+function vorsaisonMedianAnker(gameState: GameState): number | null {
+  const snapshot = gameState.seasonState?.apronLinesSnapshot;
+  if (!snapshot) return null;
+  // Ein Snapshot der LAUFENDEN Saison ist kein Anker — dann greift ohnehin `areSeasonApronLinesFrozen`.
+  if (snapshot.seasonId === gameState.season?.id) return null;
+  // Ein Snapshot aus einem Referenz-Notbehelf (frischer Save ohne echte Gehaelter) taugt nicht als
+  // Anker: er misst keine gespielte Liga, sondern einen Platzhalter.
+  if (snapshot.usedReferenceSalary) return null;
+  const median = snapshot.medianSalary;
+  return Number.isFinite(median) && median > 0 ? median : null;
+}
+
+/**
  * DIE LINIEN, DIE GERADE GELTEN — abgeleitet aus `areSeasonApronLinesFrozen`, nicht zweitgerechnet.
  *
- * Solange das Kauffenster offen ist, wandern sie mit dem Median mit; sobald es zu ist, gilt der
- * eingefrorene Stand.
+ * Solange das Kauffenster offen ist, wandern sie mit dem Median mit — aber nie unter den Stand, mit
+ * dem die Vorsaison abgerechnet wurde (siehe `vorsaisonMedianAnker`). Sobald das Fenster zu ist,
+ * gilt der eingefrorene Stand.
+ *
+ * WARUM `max` UND NICHT DER ANKER ALLEIN: der Entwurfskern bleibt erhalten — ruestet die Liga ueber
+ * das Vorjahresniveau hinaus, uebernimmt der Live-Median und die Linien wandern nach oben mit. Der
+ * Anker verhindert nur den Absturz ins Tal. Fuer den Menschen heisst das: die Linien steigen
+ * waehrend seiner Kaufphase monoton und rasten beim Finalisieren ein, statt zu Saisonbeginn
+ * unerklaerlich einzubrechen und sich dann wieder hochzuschieben.
+ *
+ * IN DIE ANDERE RICHTUNG IST DER ANKER MILDE: schrumpft die Liga wirklich, haelt er die Linien im
+ * Fenster zu hoch. Das ist die bewusst gewaehlte Fehlerrichtung — eine zu hohe Grenze besteuert zu
+ * wenig, eine zu tiefe besteuert die halbe Liga. Der Einfrier-Schritt korrigiert es am Fensterende.
  *
  * WARUM ÜBERHAUPT MITWANDERN: Der Kopfkommentar dieser Datei nennt es als Kern des Entwurfs — die
  * Linien hängen am Median und nicht an einer festen Zahl, „damit die Linien mitwandern, wenn die
@@ -507,7 +554,16 @@ export function resolveSeasonApronLines(gameState: GameState): ApronLines {
   if (areSeasonApronLinesFrozen(gameState)) {
     return gameState.seasonState!.apronLinesSnapshot!;
   }
-  return computeApronLines(gameState);
+  const live = computeApronLines(gameState);
+  const anker = vorsaisonMedianAnker(gameState);
+  if (anker === null || anker <= live.medianSalary) return live;
+  const medianSalary = round1(anker);
+  return {
+    medianSalary,
+    line1: round1(medianSalary * APRON_LINE_1_MEDIAN_FACTOR),
+    line2: round1(medianSalary * APRON_LINE_2_MEDIAN_FACTOR),
+    usedReferenceSalary: live.usedReferenceSalary,
+  };
 }
 
 // ── Wertungsanteil (für den Deckel) ────────────────────────────────────────────────────────────
