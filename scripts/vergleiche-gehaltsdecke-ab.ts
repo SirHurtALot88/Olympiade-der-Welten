@@ -23,6 +23,17 @@
  * Jede Datenbank wird jetzt in einem EIGENEN Prozess gelesen (`--lies <pfad>` gibt JSON aus), der
  * Vergleich passiert danach. Ein Prozess, eine Datenbank — dann kann sich nichts mehr binden.
  *
+ * DER ZEITPUNKT ENTSCHEIDET, UND ZWAR ALLES. Am `season_completed`-Stand sind die Vertraege gerade
+ * ausgelaufen und der Wiederaufbau der naechsten Vorsaison hat noch nicht stattgefunden — die Liga
+ * steht dort in ihrem Tal. Ich habe fuenfmal hintereinander genau dort gemessen und daraus
+ * nacheinander geschlossen, es wuerde zu wenig gepickt (247 statt 341), die Simulation erzeuge keine
+ * Ausreisser, und die Decke wirke oeffnend statt bremsend. Alle drei Schluesse waren falsch.
+ *
+ * Der belastbare Punkt ist die VORSAISON: dort stehen die Kader. Die Zahlen dazu liefert der Lauf
+ * selbst in `long-run-audit-preseason-*.md` — dieses Skript liest den Endstand und ist damit nur
+ * fuer Groessen zu gebrauchen, die das Saisonende ueberdauern (Cash, gebuchte Abgabe). Fuer Kader
+ * und Gehaelter das Vorsaison-Audit nehmen.
+ *
  * Aufruf:
  *   npx tsx scripts/vergleiche-gehaltsdecke-ab.ts --aus <pfad-a.sqlite> --an <pfad-b.sqlite>
  */
