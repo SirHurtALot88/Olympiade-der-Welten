@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Verwaltung · Settings",
+      "pr": null,
+      "text": "Ein KI-Team, das ein früherer Schutzlauf dauerhaft als Spieler-Team zurückgeschrieben hatte, fällt beim nächsten Laden von selbst wieder auf KI zurück. Der Auslöser war längst behoben, die Narbe in den Spielständen nicht. Und sie erklärt, warum sie sich nicht wegbekommen ließ: der Spielmodus ist in diesen Ständen gar nicht gesetzt, sondern wird aus der ANZAHL der eigenen Teams abgeleitet — das falsch markierte Team hat den Modus also selbst erzeugt, und die Oberfläche zeigte daraufhin „Chris 2/2 — voll\", bestätigte den Fehler damit als gültige Einstellung. Über alle sieben Spielstände geprüft trifft die Heilung genau zwei Teams; ein Stand, in dem dasselbe Kürzel das echte Spielerteam ist, bleibt unberührt. Ein Spielstand ohne eigenes Team kann dabei nicht entstehen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Liga",
       "pr": null,
       "text": "Jedes Team strebt jetzt einen Spieler mehr im Kader an, gedeckelt beim Maximum von 14. Der Grund steht in der Ermüdungsmessung: Erholung bekommt nur, wer an einem Spieltag nicht eingesetzt wird, und bei neun Einsatzplätzen liegt das Gleichgewicht bei etwa 14 Spielern. Mit zehn Spielern muss jeder 90 % der Spieltage ran — da kann keine KI rotieren, und die Ermüdung steigt jeden Spieltag weiter, bis der Deckel greift. Genau das war die Ursache der Verletzungswellen zum Saisonende. Im Blatt wandert der Median damit von 11 auf 12; die Persönlichkeit des General Managers verschiebt das Ziel weiterhin um bis zu zwei Plätze.",

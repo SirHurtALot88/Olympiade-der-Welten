@@ -360,9 +360,122 @@ export function applyGameModeOwnership(
 }
 
 /** Sync derived fields from teamControlSettings without mutating ownership. */
+/**
+ * EIN KI-TEAM, DAS SICH ALS MEINES AUSGIBT — UND DEN SPIELMODUS GLEICH MIT ERFINDET.
+ *
+ * GEMELDET VON CHRIS (`17xs83`, „Verwaltung · Settings", Spielstand `hwz8fk`): „Beim Switch in
+ * Season 2 ist C-C plötzlich auch ein von mir gesteuertes Team! aber nur im KI Verhalten Reiter —
+ * und ich bekomme das nicht weg…"
+ *
+ * DER AUSLÖSER IST BEHOBEN, DIE NARBE NICHT. `getProtectedHumanTeamIds` zählte früher jedes Team
+ * mit `humanControlled !== false` — also auch `undefined` — als Spieler-Team, und
+ * `protectManualPlayerTeams` SCHRIEB diese Annahme zurück (`humanControlled: true` plus
+ * `controlMode: "manual"`). Ein einziger Durchlauf machte aus einem KI-Team dauerhaft ein
+ * Spieler-Team. Seit der Korrektur zählt nur noch ein ausdrückliches `true` — die bereits
+ * umgeschriebenen Spielstände heilt das aber nicht.
+ *
+ * WARUM ER ES NICHT WEGBEKAM, und das ist der eigentliche Befund: der Spielmodus ist in diesen
+ * Ständen NICHT gesetzt (`scenarioMeta.saveMode` leer), sondern wird aus der ANZAHL der manuellen
+ * Teams abgeleitet (`resolveFoundationSaveMode` → `modeFromHumanTeamCount`). Das falsch markierte
+ * Team hat den Modus damit selbst erzeugt:
+ *
+ *   `hwz8fk`  Modus solo_2   Chris 2/2 (C-C, S-C)   selectedTeamId S-C   ← C-C ist die Narbe
+ *   `89rv3s`  Modus solo_2   Chris 2/2 (C-C, S-C)   selectedTeamId S-C   ← dieselbe
+ *   `n90y4m`  Modus solo_1   Chris 1/1 (C-C)        selectedTeamId C-C   ← hier ist C-C echt
+ *
+ * Die Oberfläche zeigt daraufhin „Chris 2/2 — voll", also den Fehler als gültige Einstellung. Sie
+ * bestätigt ihn, statt ihn zu benennen.
+ *
+ * DER FINGERABDRUCK ist eng und über alle sieben Live-Spielstände geprüft:
+ *
+ *   1. `controlMode === "manual"`,
+ *   2. das Etikett lautet „AI" — ein echt gewähltes Team trägt dort den Spielernamen; in den
+ *      sieben Ständen trug KEIN echtes Spieler-Team „AI",
+ *   3. es ist nicht das in `newGameFlow.selectedTeamId` gewählte Team.
+ *
+ * Zur Sicherheit bleibt mindestens ein manuelles Team stehen: eine Heilung, die einen Spielstand
+ * ohne eigenes Team zurücklässt, wäre schlimmer als die Narbe.
+ *
+ * GESCHRIEBEN WIRD ÜBER `applyChrisFrankyOwnershipToTeamControlSettings` — dieselbe Funktion, die
+ * auch die Team-Zuordnung benutzt. Ein eigener „setz das auf ai"-Zweig wäre eine zweite Wahrheit
+ * darüber, was „KI-Team" bedeutet.
+ */
+export function heileFalschAlsMenschMarkierteTeams(gameState: GameState): {
+  gameState: GameState;
+  geheilteTeamIds: string[];
+} {
+  const teams = gameState.teams ?? [];
+  if (teams.length === 0) {
+    return { gameState, geheilteTeamIds: [] };
+  }
+
+  const settingsMap = buildTeamControlSettingsMap(teams, gameState.seasonState?.teamControlSettings);
+  const gewaehltesTeam = gameState.seasonState?.newGameFlow?.selectedTeamId ?? null;
+
+  const verdaechtig = teams
+    .filter((team) => {
+      const settings = settingsMap[team.teamId];
+      if (!settings || settings.controlMode !== "manual") {
+        return false;
+      }
+      if (team.teamId === gewaehltesTeam) {
+        return false;
+      }
+      return (settings.displayLabel ?? "").trim().toUpperCase() === "AI";
+    })
+    .map((team) => team.teamId);
+
+  if (verdaechtig.length === 0) {
+    return { gameState, geheilteTeamIds: [] };
+  }
+
+  const { chrisTeamIds, frankyTeamIds } = deriveChrisFrankyTeamIdsFromSettings(teams, settingsMap);
+  const verdaechtigeIds = new Set(verdaechtig);
+  const naechsteChris = chrisTeamIds.filter((teamId) => !verdaechtigeIds.has(teamId));
+  const naechsteFranky = frankyTeamIds.filter((teamId) => !verdaechtigeIds.has(teamId));
+
+  // Der Riegel: lieber die Narbe behalten als einen Spielstand ohne eigenes Team.
+  if (naechsteChris.length + naechsteFranky.length === 0) {
+    return { gameState, geheilteTeamIds: [] };
+  }
+
+  const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(
+    teams,
+    naechsteChris,
+    naechsteFranky,
+    settingsMap,
+  );
+
+  return {
+    gameState: {
+      ...gameState,
+      teams: teams.map((team) => ({
+        ...team,
+        humanControlled: teamControlSettings[team.teamId]?.controlMode === "manual",
+      })),
+      seasonState: {
+        ...gameState.seasonState,
+        teamControlSettings,
+      },
+    },
+    geheilteTeamIds: verdaechtig,
+  };
+}
+
 export function withNormalizedTeamControlSettings(gameState: GameState): GameState {
-  const settingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  const teams = gameState.teams.map((team) => ({
+  /**
+   * Vor der Normalisierung: die Narbe aus `17xs83` wegräumen — ein KI-Team, das ein früherer
+   * Schutzlauf dauerhaft als Spieler-Team zurückgeschrieben hat. Begründung, Fingerabdruck und
+   * Messung stehen in `team-control-narbe-heilen.ts`.
+   *
+   * HIER und nicht in einem Reparaturskript, weil dieser Normalisierer auf dem LADEPFAD läuft
+   * (`app/api/singleplayer-state/route.ts` → `withNormalizedLocalTeamSettings`): bestehende
+   * Spielstände heilen sich damit beim nächsten Laden selbst. Chris kommt an den Server nicht
+   * heran, ein Skript hätte ihn also nicht erreicht.
+   */
+  const { gameState: geheilt } = heileFalschAlsMenschMarkierteTeams(gameState);
+  const settingsMap = buildTeamControlSettingsMap(geheilt.teams, geheilt.seasonState.teamControlSettings);
+  const teams = geheilt.teams.map((team) => ({
     ...team,
     humanControlled: settingsMap[team.teamId]?.controlMode === "manual",
   }));
