@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-20",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Die Entwicklungsbilanz im Spielerprofil vergleicht die vier Achsen jetzt als Punkte JE EINSATZ statt als Saisonsummen. Vorher rechnete sie letzte Saison minus erste — wer sie am ersten Spieltag einer neuen Saison ansah, verglich eine volle Saison mit einer, die noch gar nicht stattgefunden hatte. Am Spielstand nachgemessen zeigten dort zwölf von zwölf Spielern ein Minus zwischen 6,5 und 11,6, ohne dass ein einziger schlechter geworden wäre. Ohne Einsatz steht jetzt gar kein Wert mehr statt eines falschen, und gleich viele Punkte aus doppelt so vielen Einsätzen werden korrekt als Rückschritt gezeigt. OVR bleibt unangetastet — es ist ein Niveau und keine Summe. Die Einheit steht jetzt an der Überschrift und an jedem Chip.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
       "seite": "Team · Ewige Tabelle",
       "pr": null,
       "text": "Die Ewige Tabelle zeigt die Entwicklung von Saison zu Saison, nicht mehr nur den besten und den aktuellen Wert. Ein neuer Reiter „Verlauf je Saison\" stellt für jede gespielte Saison zwei Spalten nebeneinander — Marktwert und Kontostand am Saisonende —, und jede davon lässt sich sortieren. Eine Saison, die ein Team gar nicht gespielt hat, steht als „—\" da und nicht als Null; beim Sortieren fällt sie ans Ende. Darunter liegt neu eine einzige Grafik über die ganze Liga: alle Teams in einem Bild, das eigene von Anfang an hervorgehoben, jedes andere per Klick auf sein Kürzel. Die übrigen Linien bleiben blass im Hintergrund — 32 gleich starke Linien wären nicht lesbar. Beim Rang zeigt der bessere Platz nach oben. Solange erst eine Saison vorliegt, steht statt eines leeren Bildes der Grund dafür; die Verlaufskacheln je Team bleiben unverändert daneben stehen.",
