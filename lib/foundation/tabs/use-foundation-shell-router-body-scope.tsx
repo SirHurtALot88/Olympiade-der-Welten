@@ -6218,9 +6218,34 @@ export function useFoundationShellRouterBodyScope({
         return false;
       }
 
+      /**
+       * DIE QUITTUNG SAGT, WAS UNTERSCHRIEBEN WURDE — nicht nur, DASS unterschrieben wurde.
+       *
+       * GEMELDET VON CHRIS: „verhandeln ging sie hat angenommen aber die verlängerung hat nicht
+       * funktioniert - oder man sieht es nicht."
+       *
+       * Sie hatte funktioniert, nur auf eine Saison. Und eine Saison heisst „auslaufend" — der
+       * Spieler stand danach genauso da wie davor. Die Meldung sagte „wurde verlaengert" und
+       * bestaetigte damit etwas, das man nirgends nachvollziehen konnte; er verlaengerte ein
+       * zweites Mal.
+       *
+       * Die Ursachen dafuer sind behoben (der Fallback schrieb die kuerzestmoegliche Bruecke),
+       * aber eine Ein-Saison-Verlaengerung bleibt ein legitimes Verhandlungsergebnis — etwa wenn
+       * man ein entsprechendes Gegenangebot einschlaegt. Damit sie sich nie wieder wie ein
+       * Nichts-Passiert anfuehlt, steht jetzt die unterschriebene Laufzeit in der Meldung. Die
+       * Zahlen kommen aus dem geschriebenen Vertragsereignis, nicht aus dem, was der Client
+       * geschickt hat — sie sagen also, was WIRKLICH im Spielstand steht.
+       */
+      const ereignis = applyPayload.summary.contractEvent ?? null;
+      const laufzeit = ereignis?.newLength ?? null;
+      const gehalt = ereignis?.newSalary ?? null;
+      const laufzeitText =
+        laufzeit == null ? null : `${laufzeit} Saison${laufzeit === 1 ? "" : "en"}`;
       setContractRenewalMessage(
         input.action === "renew"
-          ? `${input.playerName} wurde verlängert.`
+          ? laufzeitText
+            ? `${input.playerName} verlängert: ${laufzeitText}${gehalt != null ? `, ${formatTransfermarktCurrency(gehalt)} pro Saison` : ""}.`
+            : `${input.playerName} wurde verlängert.`
           : `${input.playerName} wurde freigegeben.`,
       );
       setFoundationActionFeedback({
@@ -6228,7 +6253,13 @@ export function useFoundationShellRouterBodyScope({
         title: input.action === "renew" ? "Vertrag verlängert" : "Spieler freigegeben",
         detail:
           input.action === "renew"
-            ? `${input.playerName}: neuer Vertrag ist gespeichert. Gehalt und Laufzeit sind im Team-Dossier aktualisiert.`
+            ? laufzeitText
+              ? `${input.playerName}: ${laufzeitText}${gehalt != null ? ` zu ${formatTransfermarktCurrency(gehalt)} pro Saison` : ""} unterschrieben.${
+                  laufzeit === 1
+                    ? " Eine Saison heißt: der Vertrag läuft danach aus — der Spieler bleibt deshalb als auslaufend geführt."
+                    : ""
+                }`
+              : `${input.playerName}: neuer Vertrag ist gespeichert. Gehalt und Laufzeit sind im Team-Dossier aktualisiert.`
             : `${input.playerName}: Kaderplatz und Gehaltsdruck wurden aktualisiert.`,
       });
       /**

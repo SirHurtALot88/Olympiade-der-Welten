@@ -756,6 +756,87 @@ describe("contract renewal service", () => {
    * Dieser Test hielt vorher genau den Fehler fest („blocks direct renewals until the contract is
    * at LZ 0") und war deshalb kein Schutz, sondern ein Siegel.
    */
+  /**
+   * DER GEMELDETE FALL, DURCH DEN ECHTEN SCHREIBWEG.
+   *
+   * GEMELDET VON CHRIS: „ist denn der bug mit xelara gefixt? ist das geprüft?" — eine berechtigte
+   * Frage, denn bis hierher war die Ursache ERSCHLOSSEN und nicht gemessen.
+   *
+   * Aus seinem Spielstand, 19:27:20 Uhr: `LZ 0 -> 1 · Gehalt 5,00 -> 5,50`. Ein Spieler, ueber den
+   * gerade entschieden wird, steht auf Laufzeit 0. Kam an der Route keine Laufzeit an, nahm der
+   * Apply-Pfad die vorhandene — also 0 — und die Klemme `Math.max(1, ...)` machte daraus 1. Eine
+   * Verlaengerung, die den Spieler auf „auslaufend" stehen laesst.
+   *
+   * Dieser Test faehrt genau das: `applyContractRenewalAction` OHNE `contractLength`, auf einem
+   * Eintrag mit Laufzeit 0. Vorher schrieb er 1, jetzt die Vorgabe des Verhandlungsfensters.
+   */
+  it("schreibt ohne Laufzeitangabe eine echte Verlaengerung, keine Ein-Saison-Bruecke", () => {
+    const player = createPlayer("p1");
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 5 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const token = previewContractRenewalAction({ save, teamId: "A-A", playerId: "p1", action: "renew" }).confirmToken;
+
+    const ergebnis = applyContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      confirmToken: token,
+      persistence,
+      source: "manual_contract_renewal",
+      // KEINE contractLength — genau der Fall aus dem Spielstand.
+    });
+
+    expect(ergebnis.applied).toBe(true);
+    const gespeichert = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+    const eintrag = gespeichert?.rosters.find((zeile) => zeile.playerId === "p1");
+    // Vorher stand hier 1 — und 1 heisst „auslaufend", also sah es aus wie nichts.
+    expect(eintrag?.contractLength).toBe(2);
+    expect(eintrag?.contractStatus).toBe("active");
+  });
+
+  /**
+   * Die Gegenprobe: eine AUSDRUECKLICHE Ein-Saison-Bruecke bleibt moeglich. Sie ist ein legitimes
+   * Ergebnis einer Verhandlung — der Fix soll den Fallback treffen, nicht die Absicht.
+   */
+  it("schreibt eine ausdrueckliche Ein-Saison-Bruecke weiterhin als solche", () => {
+    const player = createPlayer("p1");
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 5 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const token = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      contractLength: 1,
+    }).confirmToken;
+
+    const ergebnis = applyContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      confirmToken: token,
+      persistence,
+      contractLength: 1,
+      source: "manual_contract_renewal",
+    });
+
+    expect(ergebnis.applied).toBe(true);
+    const gespeichert = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+    expect(gespeichert?.rosters.find((zeile) => zeile.playerId === "p1")?.contractLength).toBe(1);
+  });
+
   it("laesst die letzte Vertragssaison verlaengern — dort faellt die Entscheidung", () => {
     const player = createPlayer("p1");
     const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
