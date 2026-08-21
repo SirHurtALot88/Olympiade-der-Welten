@@ -75,8 +75,13 @@ function translateRenewalReason(reason: string): string {
   if (reason.startsWith("phase_blocked:renew_contract")) {
     return "Gehaltsverhandlung öffnet am Season-End (nach MD10) — bis dahin nur Vorschau.";
   }
-  if (reason === "renewal_only_allowed_at_lz_0") {
-    return "Verlängert wird erst, wenn der Vertrag ausläuft (LZ 0 am Season-End) — bis dahin nur Vorschau.";
+  // Der Code hiess bis zum gemeldeten Fehler `renewal_only_allowed_at_lz_0` und der Satz sprach von
+  // „LZ 0". Beides war falsch: entschieden wird in der LETZTEN Vertragssaison (LZ 1), auf 0 faellt
+  // der Vertrag erst durch die Alterung im Saisonuebergang — da ist das Fenster schon zu. Der alte
+  // Code bleibt uebersetzt, damit eine Antwort von einem noch nicht neu gebauten Server nicht roh
+  // durchschlaegt.
+  if (reason === "renewal_only_allowed_at_contract_end" || reason === "renewal_only_allowed_at_lz_0") {
+    return "Verlängert wird in der letzten Vertragssaison — dieser Vertrag läuft noch länger.";
   }
   if (reason === "morale_refuses_extension") {
     return "Der Spieler lehnt eine Verlängerung aktuell ab (Moral).";

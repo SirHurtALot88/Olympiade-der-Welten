@@ -20,6 +20,10 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
+  normalizeContractLength,
+  normalizeRosterContractStatus,
+} from "@/lib/contracts/roster-contract-status";
+import {
   applyAiContractDissolutions,
   type AiDissolutionDecision,
   type AiDissolutionRenewalSignal,
@@ -164,23 +168,10 @@ function getSeasonLabel(gameState: GameState) {
   return gameState.season.name || gameState.season.id;
 }
 
-function normalizeLength(value: number | null | undefined) {
-  return Math.max(0, Math.round(typeof value === "number" && Number.isFinite(value) ? value : 0));
-}
-
-export function normalizeRosterContractStatus(entry: Pick<RosterEntry, "contractLength" | "contractStatus">): ContractStatus {
-  if (entry.contractStatus === "released" || entry.contractStatus === "out_of_contract" || entry.contractStatus === "renewal_pending") {
-    return entry.contractStatus;
-  }
-  if (entry.contractStatus === "free_agent") {
-    return "out_of_contract";
-  }
-
-  const length = normalizeLength(entry.contractLength);
-  if (length <= 0) return "out_of_contract";
-  if (length === 1) return "expiring";
-  return "active";
-}
+// Die Regel selbst liegt in `roster-contract-status.ts` — der Aufloesungs-Dienst braucht sie
+// ebenfalls und duerfte sie hier nicht importieren (Kreis ueber die KI-Aufloesung).
+const normalizeLength = normalizeContractLength;
+export { normalizeRosterContractStatus };
 
 function statusAfterSeasonTick(entry: RosterEntry): { nextLength: number; nextStatus: ContractStatus } {
   const nextLength = Math.max(0, normalizeLength(entry.contractLength) - 1);
@@ -1542,7 +1533,34 @@ export function computeSeasonEndContractTick(
   const teamReleaseCounts = new Map<string, number>();
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
+  /**
+   * FRISCH UNTERSCHRIEBEN HEISST: DIESE SAISON ZAEHLT NICHT MEHR GEGEN IHN.
+   *
+   * Seit die Verlaengerung schon in der letzten Vertragssaison moeglich ist (Laufzeit 1, siehe
+   * `renewalEligible`), kann ein Vertrag unterschrieben werden BEVOR dieser Tick laeuft. Der Tick
+   * zieht jedem Vertrag ein Jahr ab — fuer die gerade gespielte Saison. Ein Vertrag, der nach
+   * dieser Saison unterschrieben wurde, hat sie aber nicht gespielt. Ohne diese Ausnahme haette
+   * Chris auf drei Jahre verlaengert und zwei bekommen.
+   *
+   * Die KI ist davon nicht betroffen: sie verlaengert INNERHALB dieses Ticks und setzt die
+   * Laufzeit direkt (siehe unten), statt sie altern zu lassen.
+   */
+  const frischUnterschrieben = new Set(
+    (sourceState.seasonState.contractEvents ?? [])
+      .filter(
+        (ereignis) =>
+          ereignis.seasonId === sourceState.season.id &&
+          ereignis.eventType === "contract_renewed" &&
+          ereignis.source === "manual_contract_renewal",
+      )
+      .map((ereignis) => `${ereignis.teamId}:${ereignis.playerId}`),
+  );
+
   for (const entry of sourceState.rosters) {
+    if (frischUnterschrieben.has(`${entry.teamId}:${entry.playerId}`)) {
+      nextRosters.push(entry);
+      continue;
+    }
     const tick = statusAfterSeasonTick(entry);
     if (tick.nextStatus === "out_of_contract") {
       const row = rowsByRosterId.get(entry.id);
@@ -1849,9 +1867,33 @@ export function previewContractRenewalAction(input: {
   const team = input.save.gameState.teams.find((candidate) => candidate.teamId === input.teamId) ?? null;
   const player = input.save.gameState.players.find((candidate) => candidate.id === input.playerId) ?? null;
   const currentContractLength = normalizeLength(rosterEntry?.contractLength);
+  /**
+   * GEMELDET VON CHRIS: „ich kann die verträge im aktuellen save nicht verlängern obwohl wir in
+   * der vertrags phase sind!"
+   *
+   * Die Regel war um genau ein Jahr daneben. Sie verlangte `contractLength <= 0` — einen Vertrag,
+   * der bereits abgelaufen IST. `contractLength` zaehlt aber die Saisons EINSCHLIESSLICH der
+   * laufenden: eine 1 heisst „das hier ist seine letzte Saison", und genau dieser Spieler ist der,
+   * ueber den am Saisonende entschieden wird. Auf 0 faellt er erst durch die Vertragsalterung,
+   * und die laeuft im Saisonuebergang — also NACH dem Fenster, in dem verlaengert werden soll.
+   *
+   * Am gemeldeten Spielstand (Saison 1, Spieltag 10, Phase `season_end_management`) gemessen:
+   * 288 von 339 Vertraegen standen auf Laufzeit 1, kein einziger auf 0. Verlaengerbar war damit
+   * NIEMAND — nicht ein Spieler in der ganzen Liga.
+   *
+   * Der Rest des Spiels rechnete laengst mit der richtigen Bedeutung: die Inbox meldet
+   * `contractLength <= 1` als auslaufend, das Auslauf-Board schreibt „Letzte Vertragssaison —
+   * endet nach MD10. Verlaengern", und der Knopf in der Kaderansicht traegt im Code den Hinweis,
+   * dass „LZ > 1 (noch) blockiert" sei — also LZ 1 ausdruecklich nicht. Nur diese eine Zeile
+   * hielt dagegen.
+   *
+   * WANN es trotzdem nicht beliebig geht, bleibt unveraendert: der Phasen-Riegel
+   * (`evaluateGamePhaseAction`) laesst `renew_contract` nur im Saisonende-Fenster und im
+   * Saisonstart-Setup zu. Diese Zeile sagt WER, nicht WANN.
+   */
   const renewalEligible =
     input.action !== "renew" ||
-    currentContractLength <= 0 ||
+    currentContractLength <= 1 ||
     rosterEntry?.contractStatus === "renewal_pending" ||
     rosterEntry?.contractStatus === "out_of_contract";
   // Audit R2/V3: Release NUR bei ausgelaufenem Vertrag zulässig. Ein laufender Vertrag (contractLength > 0)
@@ -1869,7 +1911,7 @@ export function previewContractRenewalAction(input: {
     !team ? "team_not_found" : null,
     !player ? "player_not_found" : null,
     !rosterEntry ? "player_not_on_team_roster" : null,
-    !renewalEligible ? "renewal_only_allowed_at_lz_0" : null,
+    !renewalEligible ? "renewal_only_allowed_at_contract_end" : null,
     !releaseEligible ? "release_only_allowed_at_expired_contract" : null,
   ].filter((blocker): blocker is string => Boolean(blocker));
   const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry?.contractLength ?? 2)));

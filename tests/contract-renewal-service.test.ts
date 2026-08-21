@@ -310,6 +310,54 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents ?? []).toHaveLength(0);
   });
 
+  /**
+   * DIE FOLGE AUS CHRIS' MELDUNG, die man leicht uebersieht.
+   *
+   * Seit in der LETZTEN Vertragssaison verlaengert werden darf, kann eine Unterschrift VOR diesem
+   * Tick liegen. Der Tick zieht jedem Vertrag ein Jahr ab — fuer die gerade gespielte Saison. Ein
+   * Vertrag, der nach dieser Saison unterschrieben wurde, hat sie aber nicht gespielt. Ohne die
+   * Ausnahme haette Chris auf vier Jahre verlaengert und drei bekommen, ohne Hinweis.
+   */
+  it("altert einen frisch unterschriebenen Vertrag NICHT noch einmal", () => {
+    const team = createTeam({ humanControlled: true });
+    const player = createPlayer("p1");
+    const gameState = createGameState({
+      teams: [team],
+      players: [player],
+      rosters: [createRosterEntry("p1", { contractLength: 4 })],
+    });
+    const save = createSave({
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        contractEvents: [
+          {
+            eventId: "e-1",
+            timestamp: "2026-06-12T00:00:00.000Z",
+            seasonId: gameState.season.id,
+            teamId: "A-A",
+            playerId: "p1",
+            eventType: "contract_renewed",
+            oldSalary: 7,
+            newSalary: 9,
+            oldLength: 1,
+            newLength: 4,
+            source: "manual_contract_renewal",
+          },
+        ],
+      },
+    } as never);
+    const persistence = createPersistenceMock();
+    const token = previewSeasonEndContracts(save).confirmToken;
+
+    const result = applySeasonEndContractTick(save, token, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(result.applied).toBe(true);
+    // Vier unterschrieben, vier behalten.
+    expect(savedGameState?.rosters[0]?.contractLength).toBe(4);
+  });
+
   it("keeps manual LZ 1 players pending for a human renewal decision", () => {
     const team = createTeam({ humanControlled: true });
     const player = createPlayer("p1");
@@ -724,7 +772,21 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_renewed");
   });
 
-  it("blocks direct renewals until the contract is at LZ 0", () => {
+  /**
+   * GEMELDET VON CHRIS: „ich kann die verträge im aktuellen save nicht verlängern obwohl wir in
+   * der vertrags phase sind!" — und danach: „es steht ja sogar dort dass vertrag ausläuft, also
+   * wundert es mich dass es nicht klappt."
+   *
+   * Die Regel verlangte Laufzeit 0, also einen bereits abgelaufenen Vertrag. `contractLength`
+   * zaehlt aber EINSCHLIESSLICH der laufenden Saison: eine 1 ist die letzte Vertragssaison, und
+   * genau ueber die wird am Saisonende entschieden. Auf 0 faellt der Vertrag erst durch die
+   * Alterung im Saisonuebergang — da ist das Fenster schon zu. Am gemeldeten Spielstand standen
+   * 288 von 339 Vertraegen auf 1 und kein einziger auf 0; verlaengerbar war niemand.
+   *
+   * Dieser Test hielt vorher genau den Fehler fest („blocks direct renewals until the contract is
+   * at LZ 0") und war deshalb kein Schutz, sondern ein Siegel.
+   */
+  it("laesst die letzte Vertragssaison verlaengern — dort faellt die Entscheidung", () => {
     const player = createPlayer("p1");
     const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
 
@@ -737,8 +799,24 @@ describe("contract renewal service", () => {
       offeredSalary: 8,
     });
 
+    expect(preview.blockingReasons).not.toContain("renewal_only_allowed_at_contract_end");
+  });
+
+  it("blockiert einen Vertrag, der noch laenger laeuft", () => {
+    const player = createPlayer("p1");
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 3, salary: 6 })] }));
+
+    const preview = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      contractLength: 4,
+      offeredSalary: 8,
+    });
+
     expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain("renewal_only_allowed_at_lz_0");
+    expect(preview.blockingReasons).toContain("renewal_only_allowed_at_contract_end");
   });
 
   it("applies morale to renewal salary and limits very unhappy players to short bridge deals", () => {
