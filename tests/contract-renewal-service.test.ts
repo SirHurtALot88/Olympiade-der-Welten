@@ -311,52 +311,22 @@ describe("contract renewal service", () => {
   });
 
   /**
-   * DIE FOLGE AUS CHRIS' MELDUNG, die man leicht uebersieht.
+   * HIER STAND „altert einen frisch unterschriebenen Vertrag NICHT noch einmal".
    *
-   * Seit in der LETZTEN Vertragssaison verlaengert werden darf, kann eine Unterschrift VOR diesem
-   * Tick liegen. Der Tick zieht jedem Vertrag ein Jahr ab — fuer die gerade gespielte Saison. Ein
-   * Vertrag, der nach dieser Saison unterschrieben wurde, hat sie aber nicht gespielt. Ohne die
-   * Ausnahme haette Chris auf vier Jahre verlaengert und drei bekommen, ohne Hinweis.
+   * Der Test schuetzte eine Ausnahme, die ich beim Freigeben der Verlängerung in der letzten
+   * Vertragssaison eingebaut hatte: ein VOR dem Tick unterschriebener Vertrag sollte hier kein
+   * Jahr verlieren. Die Annahme dahinter — verlängert werden kann vor der Alterung — gilt nicht
+   * mehr: die Alterung läuft jetzt beim Betreten der Saisonende-Phase, eine Verlängerung liegt
+   * also immer dahinter.
+   *
+   * Die Ausnahme war nicht nur überflüssig, sie war schädlich. Am gemeldeten Spielstand trug
+   * Xelara zwei Verlängerungs-Ereignisse aus der kaputten Zwischenzeit und wurde deshalb von der
+   * Alterung ausgenommen — sie blieb als einzige ihres Teams auf „auslaufend" stehen, während die
+   * anderen drei sauber alterten. Genau der Zustand, aus dem Chris nicht herauskam.
+   *
+   * Der Wächter dagegen steht jetzt in `vertragsalterung-automatisch.test.ts`: die Alterung nimmt
+   * NIEMANDEN aus.
    */
-  it("altert einen frisch unterschriebenen Vertrag NICHT noch einmal", () => {
-    const team = createTeam({ humanControlled: true });
-    const player = createPlayer("p1");
-    const gameState = createGameState({
-      teams: [team],
-      players: [player],
-      rosters: [createRosterEntry("p1", { contractLength: 4 })],
-    });
-    const save = createSave({
-      ...gameState,
-      seasonState: {
-        ...gameState.seasonState,
-        contractEvents: [
-          {
-            eventId: "e-1",
-            timestamp: "2026-06-12T00:00:00.000Z",
-            seasonId: gameState.season.id,
-            teamId: "A-A",
-            playerId: "p1",
-            eventType: "contract_renewed",
-            oldSalary: 7,
-            newSalary: 9,
-            oldLength: 1,
-            newLength: 4,
-            source: "manual_contract_renewal",
-          },
-        ],
-      },
-    } as never);
-    const persistence = createPersistenceMock();
-    const token = previewSeasonEndContracts(save).confirmToken;
-
-    const result = applySeasonEndContractTick(save, token, persistence);
-    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
-
-    expect(result.applied).toBe(true);
-    // Vier unterschrieben, vier behalten.
-    expect(savedGameState?.rosters[0]?.contractLength).toBe(4);
-  });
 
   it("keeps manual LZ 1 players pending for a human renewal decision", () => {
     const team = createTeam({ humanControlled: true });

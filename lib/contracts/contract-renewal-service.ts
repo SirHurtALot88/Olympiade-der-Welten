@@ -1534,33 +1534,26 @@ export function computeSeasonEndContractTick(
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
   /**
-   * FRISCH UNTERSCHRIEBEN HEISST: DIESE SAISON ZAEHLT NICHT MEHR GEGEN IHN.
+   * HIER STAND EIN SCHUTZ FUER „FRISCH UNTERSCHRIEBENE" VERTRAEGE — er ist weg, und das ist die
+   * Korrektur eines Fehlers, den ich selbst eingebaut habe.
    *
-   * Seit die Verlaengerung schon in der letzten Vertragssaison moeglich ist (Laufzeit 1, siehe
-   * `renewalEligible`), kann ein Vertrag unterschrieben werden BEVOR dieser Tick laeuft. Der Tick
-   * zieht jedem Vertrag ein Jahr ab — fuer die gerade gespielte Saison. Ein Vertrag, der nach
-   * dieser Saison unterschrieben wurde, hat sie aber nicht gespielt. Ohne diese Ausnahme haette
-   * Chris auf drei Jahre verlaengert und zwei bekommen.
+   * Er kam mit der Freigabe der Verlaengerung in der letzten Vertragssaison und sollte verhindern,
+   * dass ein VOR dem Tick unterschriebener Vertrag hier noch ein Jahr verliert. Die Annahme
+   * dahinter war, dass verlaengert werden kann, bevor die Alterung laeuft.
    *
-   * Die KI ist davon nicht betroffen: sie verlaengert INNERHALB dieses Ticks und setzt die
-   * Laufzeit direkt (siehe unten), statt sie altern zu lassen.
+   * Genau diese Annahme ist inzwischen falsch: die Alterung laeuft beim Betreten der
+   * Saisonende-Phase (`season-transition-service.ts`) und wird fuer Altstaende an der
+   * Vertragsroute nachgezogen (`vertragsalterung-nachziehen.ts`). Eine Verlaengerung liegt damit
+   * IMMER hinter dem Tick — es gibt nichts mehr zu schuetzen.
+   *
+   * Stehen bleiben durfte er trotzdem nicht. Am gemeldeten Spielstand gemessen: Xelara trug zwei
+   * `manual_contract_renewal`-Ereignisse aus der kaputten Zwischenzeit und wurde deshalb von der
+   * Alterung ausgenommen — sie blieb als EINZIGE des Teams auf Laufzeit 1 „auslaufend" stehen,
+   * waehrend die anderen drei sauber alterten. Der Schutz zementierte genau den Zustand, aus dem
+   * Chris nicht herauskam („er sagt zwar verlängert aber sie steht einfach immernoch auf
+   * auslaufendem vertrag").
    */
-  const frischUnterschrieben = new Set(
-    (sourceState.seasonState.contractEvents ?? [])
-      .filter(
-        (ereignis) =>
-          ereignis.seasonId === sourceState.season.id &&
-          ereignis.eventType === "contract_renewed" &&
-          ereignis.source === "manual_contract_renewal",
-      )
-      .map((ereignis) => `${ereignis.teamId}:${ereignis.playerId}`),
-  );
-
   for (const entry of sourceState.rosters) {
-    if (frischUnterschrieben.has(`${entry.teamId}:${entry.playerId}`)) {
-      nextRosters.push(entry);
-      continue;
-    }
     const tick = statusAfterSeasonTick(entry);
     if (tick.nextStatus === "out_of_contract") {
       const row = rowsByRosterId.get(entry.id);

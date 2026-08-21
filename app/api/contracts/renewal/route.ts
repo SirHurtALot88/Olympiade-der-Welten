@@ -10,6 +10,7 @@ import {
 import type { ContractShape } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { zieheVertragsalterungNach } from "@/lib/contracts/vertragsalterung-nachziehen";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
@@ -56,10 +57,15 @@ export async function POST(request: Request) {
     }
 
     const persistence = createPersistenceService();
-    const save = persistence.getSaveById(saveId);
-    if (!save) {
+    const gefundenerSave = persistence.getSaveById(saveId);
+    if (!gefundenerSave) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
+    // Vertraege altern beim Betreten der Saisonende-Phase. Spielstaende, die schon davor in der
+    // Phase standen, haben den Hop nie gesehen — siehe `zieheVertragsalterungNach`. Nichtstun,
+    // sobald die Alterung fuer diese Saison gelaufen ist.
+    const nachgezogen = zieheVertragsalterungNach({ save: gefundenerSave, persistence });
+    const save = nachgezogen.save;
     const phaseGate = evaluateGamePhaseAction(save.gameState, "renew_contract");
     // Phase gate blocks only PRODUCTIVE writes. Dry-run previews pass through,
     // so the negotiation window can show real numbers mid-season (preview-only,
