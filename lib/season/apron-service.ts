@@ -111,11 +111,28 @@ export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
  *
  * ZUR SPANNE: die Linien haengen am Median, „zu niedrig" ist deshalb eine Aussage ueber die
  * VERTEILUNG. Im gemeldeten Stand liegt die Gehaltsspitze bei 2,30 x Median (123,5 gegen 53,8), in
- * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen; 1,25/1,60
- * laesst in beiden Faellen nur die echten Ausreisser oben herausragen.
+ * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen.
+ *
+ * 1,25/1,60 → 1,20/1,40, CHRIS' ENTSCHEIDUNG nach der Ueberschreitungsmessung („davon gefaellt mir
+ * 1,2 und 1,4 eindeutig am besten"). GRUND: 1,60 schob die 2. Linie so weit hinaus, dass sie NIEMANDEN
+ * mehr erreichte. Am Live-Abbild (season-1, Median 64,4) nachgemessen, dieselben Kader gegen drei
+ * Linienpaare:
+ *
+ *   1,10 / 1,25  ->  70,8 /  80,5  ->  Zone 1: 12 Teams, Zone 2: 5 Teams, Topf 127,8
+ *   1,25 / 1,60  ->  80,5 / 103,0  ->  Zone 1:  5 Teams, Zone 2: 0 Teams, Topf  26,6
+ *   1,20 / 1,40  ->  77,3 /  90,2  ->  Zone 1:  8 Teams, Zone 2: 1 Team,  Topf  51,0
+ *
+ * M-M, das teuerste Team der Liga mit 98,7, lag bei 1,60 ganze 4,2 % UNTER der 2. Linie. Eine leere
+ * Zone 2 macht den zweiten Satz wirkungslos, egal wie hoch er steht — besteuert wird ein Ueberschuss,
+ * den es nicht gibt. Bei 1,40 steht M-M 9,5 % darueber und zahlt 23,97 statt 14,56.
+ *
+ * DIE ROLLENVERTEILUNG, DIE DARAUS FOLGT: die 1. Linie fasst mit 8 von 32 das obere Viertel — spuerbar,
+ * aber nicht flaechendeckend („der erste ist ja noch ok"). Die 2. Linie erwischt nur den echten
+ * Ausreisser. Wer die Faktoren aendert, misst mit `scripts/messe-apron-ueberschreitung.ts` NACH, ob
+ * Zone 2 ueberhaupt besetzt bleibt; eine leere Zone 2 ist eine Regel ohne Wirkung.
  */
-export const APRON_LINE_1_MEDIAN_FACTOR = 1.25;
-export const APRON_LINE_2_MEDIAN_FACTOR = 1.6;
+export const APRON_LINE_1_MEDIAN_FACTOR = 1.2;
+export const APRON_LINE_2_MEDIAN_FACTOR = 1.4;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
 export const APRON_RATE_ZONE_1 = 0.8;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
