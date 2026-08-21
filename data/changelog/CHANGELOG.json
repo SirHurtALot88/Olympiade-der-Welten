@@ -5,9 +5,45 @@
       "datum": "2026-08-20",
       "seite": "Team · Spieler",
       "pr": null,
+      "text": "Die All-Time-Spalte der Top-Disziplinen zeigt wieder Zahlen. Die Punkte je Disziplin sind seit jeher archiviert — der kompakte Browser-Payload lässt die Aufschlüsselung der Archiv-Saisons aber bewusst weg (647 KiB gegen 88 KiB je Saison), und die Spalte lief damit gegen eine leere Summe. Am Spielstand gemessen: der Ersatz-Schnappschuss trägt alle 339 Spielerzeilen, aber keine einzige Disziplin-Zeile; Madrots All-Time steht auf dem vollen Spielstand bei TDM 1,8 / Mini DM 1,3 / Wettessen 0,7 und im Browser bei nichts. Die Zahl fährt jetzt denselben Weg wie ihr Rang: serverseitig für den angezeigten Spieler berechnet. Bestehende Spielstände zeigen die Werte sofort, es wird kein Archiv umgeschrieben.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Finanzen",
+      "pr": null,
+      "text": "Die Apron-Abgabe bemisst wieder das bei Unterschrift VERHANDELTE Jahresgehalt — nicht das Formel-Gehalt aus Marktwert und Attributen, und nicht die Jahresrate dieser Saison. Die Jahresrate hängt an der Vertragsform, und damit ließ sich die Abgabe umgehen: über die sieben Spielstände nachgezählt lagen 24 von 224 Teamzeilen je nach Basis in einer anderen Zone, und SECHS duckten sich vollständig unter die erste Linie weg — verhandelt darüber, gezahlt darunter, Abgabe null. In der Gegenrichtung zahlte ein Team die zweite Zone, obwohl es unter beiden Linien verhandelt hatte, nur weil sein Vertrag früh zahlt. Beides ist behoben: ein Formwechsel ändert die Abgabe jetzt wieder um 0,00. Die Vertragsform bleibt ein Werkzeug für den Cashflow — über die volle Laufzeit zahlt man exakt das Ausgehandelte, sie entscheidet nur, wann.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Team · Spieler",
+      "pr": null,
       "text": "Die Entwicklungsbilanz im Spielerprofil vergleicht die vier Achsen jetzt als Punkte JE EINSATZ statt als Saisonsummen. Vorher rechnete sie letzte Saison minus erste — wer sie am ersten Spieltag einer neuen Saison ansah, verglich eine volle Saison mit einer, die noch gar nicht stattgefunden hatte. Am Spielstand nachgemessen zeigten dort zwölf von zwölf Spielern ein Minus zwischen 6,5 und 11,6, ohne dass ein einziger schlechter geworden wäre. Ohne Einsatz steht jetzt gar kein Wert mehr statt eines falschen, und gleich viele Punkte aus doppelt so vielen Einsätzen werden korrekt als Rückschritt gezeigt. OVR bleibt unangetastet — es ist ein Niveau und keine Summe. Die Einheit steht jetzt an der Überschrift und an jedem Chip.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Die Ewige Tabelle zeigt die Entwicklung von Saison zu Saison, nicht mehr nur den besten und den aktuellen Wert. Ein neuer Reiter „Verlauf je Saison\" stellt für jede gespielte Saison zwei Spalten nebeneinander — Marktwert und Kontostand am Saisonende —, und jede davon lässt sich sortieren. Eine Saison, die ein Team gar nicht gespielt hat, steht als „—\" da und nicht als Null; beim Sortieren fällt sie ans Ende. Darunter liegt neu eine einzige Grafik über die ganze Liga: alle Teams in einem Bild, das eigene von Anfang an hervorgehoben, jedes andere per Klick auf sein Kürzel. Die übrigen Linien bleiben blass im Hintergrund — 32 gleich starke Linien wären nicht lesbar. Beim Rang zeigt der bessere Platz nach oben. Solange erst eine Saison vorliegt, steht statt eines leeren Bildes der Grund dafür; die Verlaufskacheln je Team bleiben unverändert daneben stehen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Liga",
+      "pr": null,
+      "text": "Jedes Team strebt jetzt einen Spieler mehr im Kader an, gedeckelt beim Maximum von 14. Der Grund steht in der Ermüdungsmessung: Erholung bekommt nur, wer an einem Spieltag nicht eingesetzt wird, und bei neun Einsatzplätzen liegt das Gleichgewicht bei etwa 14 Spielern. Mit zehn Spielern muss jeder 90 % der Spieltage ran — da kann keine KI rotieren, und die Ermüdung steigt jeden Spieltag weiter, bis der Deckel greift. Genau das war die Ursache der Verletzungswellen zum Saisonende. Im Blatt wandert der Median damit von 11 auf 12; die Persönlichkeit des General Managers verschiebt das Ziel weiterhin um bis zu zwei Plätze.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.5"
     },
     {
@@ -26,6 +62,69 @@
       "text": "Die neue Kaufphasen-Warnung konnte die Arena beim Rendern zum Absturz bringen. Sie fragte das Kauffenster ab, ohne den Fall abzufangen, dass Saison oder Spieltag noch gar nicht geladen sind — im Ladefenster und beim Bootstrap warf das mitten in der Anzeige. Ohne Saison und ohne Spieltag gibt es kein Kauffenster, über dessen Schließen man warnen könnte; die Warnung schweigt dort jetzt, statt zu werfen.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Welt · Kredite",
+      "pr": null,
+      "text": "KI-Teams rechnen ihre Kreditwürdigkeit jetzt mit dem vollen Gehalt. Bisher zählte die Gehaltssumme nur zu 60 % als Fixkosten — begründet mit „Teams haben auch andere Einnahmen\", was nicht trägt: das Gehalt geht jede Saison in voller Höhe vom Konto, ob nebenbei ein Transfer gelingt oder nicht. Die fehlenden 40 % gaben Kreditrahmen frei, den es nie gab. Über die Spielstände nachgerechnet sinkt der Rahmen deutlich, in `hwz8fk` etwa von 26,7 auf 8,3 bei A-A und von 38,0 auf 12,1 bei C-S; die Zahl der Teams, die für einen weiteren Kredit keinen Spielraum mehr haben, steigt von einem auf acht. Der Mindestrahmen für hoch belastete Teams bleibt unverändert bestehen.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Team · Einstellungen",
+      "pr": null,
+      "text": "Mensch und KI lassen sich jetzt auch im laufenden Koop-Raum umstellen. Bisher galt die Umschaltung nur im Solo — im Raum stand statt der Einstellung eine Absage („außerhalb des Rooms anpassen\"), und das war die letzte Stelle, an der dieselbe Einstellung zwei verschiedene Antworten gab. Zuständig ist der Host, wie beim Draft und bei der Simulation; ein Mitspieler bekommt einen Klartext-Hinweis statt einer stillen Ablehnung. Die Zuordnung wird als Ganzes geschrieben und gegen den frischen Spielstand geprüft, weil das Heben eines Teams immer das Senken eines anderen bedeutet. Vier Riegel verhindern dabei einen Spielstand, den am Ende niemand mehr führt: keine unbekannten Teams, kein Team bei zwei Eignern, die Grenzen des Spielmodus und mindestens ein menschliches Team. Strategy-Profile bleiben unverändert eine Sache der Einrichtung vor dem Spiel.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Intern · Entwicklung",
+      "pr": null,
+      "text": "Die Quelltext-Wächter laufen ab jetzt im Pflicht-Check mit. Die volle Testsuite ist kein Pflicht-Check, und dadurch sind an einem Tag zwei rote Wächter unbemerkt durchgerutscht — die Tests existierten, sie liefen nur nicht in dem Lauf, der den Merge bewacht. Die betroffene Sorte prüft Zusicherungen am Quelltext selbst und braucht weder Datenbank noch Browser: 120 Dateien, 1830 Prüfungen, 69 Sekunden. Die Auswahl wird bei jedem Lauf neu errechnet statt aufgezählt, damit ein neu geschriebener Wächter nicht wieder aus dem Tor fällt. Am Spiel selbst ändert das nichts.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Team-Einstellungen",
+      "pr": null,
+      "text": "Ein angeforderter Snapshot verschwand kurz nach dem Anlegen wieder, und wer danach seine ID benutzte, bekam einen Serverfehler ohne Erklärung. Der Snapshot übernahm die Kategorie seines Ursprungs: der Snapshot einer Vorsaison-Sicherung wurde selbst eine Vorsaison-Sicherung und rotierte mit deren Fünferliste weg. An einer Kopie des echten Spielstands nachgemessen kostete schon das bloße Anlegen zwei fremde Spielstände. Ein Snapshot, den jemand anfordert, ist jetzt ein manueller Spielstand und rotiert gar nicht erst mit. Eine ID, hinter der kein Spielstand mehr liegt, wird außerdem als \"nicht gefunden\" beantwortet statt als Serverfehler — die Oberfläche kannte diesen Satz längst, sie bekam ihn nur nie zu sehen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Intern · Spielstand",
+      "pr": null,
+      "text": "Speichern ist gut ein Drittel schneller. Bei jedem Speichern prüfte eine Wache sämtliche Spieler-Ausgangswerte darauf, ob jemand sie überschreiben will — knapp 3000 Datensätze, jedes Mal neu normalisiert und mit neuer Prüfsumme versehen. Das kostete rund 420 der 1140 Millisekunden, und gefunden hat es im Normalfall nichts: diese Werte sind der Stand bei Spielbeginn und ändern sich praktisch nie. Die Wache läuft jetzt nur noch, wenn sich an den Prüfsummen wirklich etwas geändert hat; ein Speichern fällt damit von 1138 auf 726 Millisekunden. Vor dem Umbau nachgewiesen: über alle Abbilder liefert der abgekürzte Weg denselben Spielstand wie der volle.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Welt · Sponsoren",
+      "pr": null,
+      "text": "Die Apron-Marke in der Sponsorenliste zeigte bei 61 von 224 Teamzeilen die falsche Zone — über alle sieben Spielstände nachgezählt, und in beide Richtungen. Sie verglich die GEGLÄTTETE Gehaltssumme mit den Linien, während die Abgabe selbst gegen die ECHTE rechnet: Cold Steel stand als „über 2. Linie\" da (79,4) und liegt echt bei 61,6, also nur über der ersten; Big Bang stand auf „unter\" (58,3) und zahlt echt bei 61,3. Die Marke holt ihre Grundlage jetzt bei der Apron selbst, statt sie nachzubauen. Auch die Deckungsspalte („trägt der Sponsor die Mannschaft?\") rechnet jetzt mit dem Geld, das wirklich vom Konto geht — bei Mayhem 123,5 statt 98,9 —, und die Erklärung sagt dazu, welche der Gehaltszahlen sie meint. Die Glättung bleibt, wo sie hingehört: als Bemessungsgrundlage der Sponsor-Kalibrierung.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-20",
+      "seite": "Welt · Transfermarkt",
+      "pr": null,
+      "text": "Die KI wählt die Vertragsform jetzt nach dem Kassenstand statt nach dem Abstand zur Apron-Linie. Der alte Riegel stammte aus einer Zeit, in der sich die Abgabe über die Vertragsform beeinflussen ließ — seit sie wieder am verhandelten Gehalt bemessen wird, tut sie das nicht mehr, und die Regel bremste ins Leere. Die Form verschiebt Geld zwischen Jahren, sonst nichts; deshalb entscheidet jetzt, ob überhaupt Geld da ist: ein Team mit leerer Kasse zahlt nicht zusätzlich früh, sondern verteilt gleichmäßig. Bewusst am blanken Kontostand gemessen und nicht an der Rücklage — 156 von 160 Teams liegen unter ihrer Rücklage, als Riegel gelesen hätte sie die frühzahlenden Verträge nicht gebremst, sondern abgeschafft. Neu ist außerdem, dass auch Vertragsverlängerungen den Riegel kennen; sie sind der größte Vertragsstrom im Spiel und konnten bisher früh zahlen, während das Konto leer war. An der Zusage, dass ein Formwechsel die Abgabe um 0,00 ändert, ist nichts berührt.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
       "version": "0.5"
     },
     {

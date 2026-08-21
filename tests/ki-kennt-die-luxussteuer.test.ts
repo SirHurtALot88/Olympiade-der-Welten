@@ -186,12 +186,19 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     // `return getTeamDisplaySalaryTotal(gameState, teamId);` enthalten. Sie ist aus zwei Gründen
     // ersetzt worden.
     //
-    // ERSTENS ist die Aussage überholt, und zwar inzwischen zweimal. Erst wanderte die Abgabe vom
+    // ERSTENS ist die Aussage überholt, und zwar inzwischen dreimal. Erst wanderte die Abgabe vom
     // geglätteten Formelwert auf das VERHANDELTE Gehalt („ja!", docs/APRON_UND_VERTRAGSFORMEN.md,
     // Schritt 3) — damit Verhandeln überhaupt zählt. Dann meldete Chris, auch das sei geglättet
-    // („die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet"): das verhandelte
-    // Jahresgehalt ist der Durchschnitt über die Laufzeit, nicht das, was in dieser Saison vom
-    // Konto geht. Die Grundlage ist deshalb heute `getTeamActualSalaryTotal`.
+    // („die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet"), und die
+    // Grundlage wurde `getTeamActualSalaryTotal`. Diese zweite Umstellung ist wieder zurückgenommen
+    // (#589): sie hatte ein Schlupfloch geöffnet, weil `contract.salary` von der VERTRAGSFORM
+    // abhängt — back_loaded senkt die Basis dieser Saison, und am echten Spielstand duckten sich
+    // sechs Teams damit ganz unter Linie 1 (`hwz8fk` L-K: verhandelt 62,4 gegen Linie 59,2, Rate
+    // 56,3 → zahlt nichts). Chris' Entscheidung: „apron muss aber doch das verhandelte gehalt als
+    // bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete! und das
+    // verhandelte ist ja auch das was abgebucht werden soll, wofür verhandelt man sonst".
+    // Die Grundlage ist deshalb heute wieder `getTeamNegotiatedSalaryTotal` — die einzige der drei
+    // Größen, die weder vom Formelwert noch von der Vertragsform abhängt.
     //
     // ZWEITENS, und das ist der eigentliche Grund: eine Zeichenkette prüft nichts. Genau diese
     // Sorte Test war im Repo mehrfach über Wochen rot, ohne dass es auffiel, und eine andere
@@ -213,12 +220,13 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     const echteZahlung = getTeamSalarySum(gameState, TEAM_ID);
 
     // Vorbedingung: die drei Begriffe MÜSSEN sich unterscheiden, sonst prüft der Rest nichts.
-    expect(echteZahlung).not.toBeCloseTo(geglaettet, 2);
-    expect(echteZahlung).not.toBeCloseTo(verhandelt, 2);
+    expect(verhandelt).not.toBeCloseTo(geglaettet, 2);
+    expect(verhandelt).not.toBeCloseTo(echteZahlung, 2);
 
-    // Besteuert wird, was in DIESER Saison wirklich gezahlt wird — dieselbe Zahl, gegen die die
-    // KI ihre Gehaltsdecke prüft und die der Saisonende-Apply abbucht.
-    expect(grundlage).toBeCloseTo(echteZahlung, 6);
+    // Besteuert wird, was VERHANDELT wurde — dieselbe Zahl, gegen die die KI ihre Gehaltsdecke
+    // prüft. Sie ist formunabhängig: ein Wechsel von balanced auf back_loaded verschiebt
+    // `echteZahlung`, lässt `grundlage` aber unberührt. Genau das ist der Punkt.
+    expect(grundlage).toBeCloseTo(verhandelt, 6);
   });
 });
 

@@ -63,7 +63,10 @@ import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-h
  *
  * Andere Ansichten (Ewige Tabelle, Ranks-Podium) hatten diesen Rueckfall laengst; dem Drawer fehlte er.
  */
-function schnappschuesseFuerSpielerhistorie(gameState: GameState) {
+// Exportiert, damit der Server-Override (`player-discipline-rank-service.ts`) die All-Time-Summe
+// ueber DIESELBE Quelle bildet wie die Ansicht — zwei Rechenwege waeren genau der Widerspruch,
+// gegen den der Override antritt.
+export function schnappschuesseFuerSpielerhistorie(gameState: GameState) {
   return clampSeasonSnapshotsToCurrentSeason(gameState, leseSaisonSchnappschuesse(gameState));
 }
 import { buildPlayerAttributeHistoryRows, type PlayerAttributeHistoryRow } from "@/lib/foundation/player-attribute-history";
@@ -189,6 +192,33 @@ export type DisciplineGlobalRankMaps = {
 export type PlayerDisciplineRankOverride = {
   seasonPointsRankByDisciplineId: Record<string, number>;
   allTimePointsRankByDisciplineId: Record<string, number>;
+  /**
+   * ALL-TIME-PUNKTE JE DISZIPLIN — dieselbe Payload-Luecke wie bei den Raengen daneben, nur eine
+   * Spalte weiter.
+   *
+   * GEMELDET VON CHRIS (`l4835p`): „in den Top Disziplinen sieht man nur die aktuelle Season in die
+   * Punkte eingepreist! All Time fehlt komplett!"
+   *
+   * Die Zahlen sind LAENGST ARCHIVIERT: `season-snapshot-service.ts` schreibt je Spieler und
+   * Disziplin `totalContribution`, und das ist bereits der PP-Wert aus dem Saison-Punkte-Ledger
+   * (`pointEntriesByPerformanceId…points`), nicht der rohe Beitrag. Am Abbild `hwz8fk` summiert er
+   * sich je Spieler auf `totalPoints` — 339 von 339 Zeilen, Abweichung maximal 0,2 (Rundung), und
+   * die Einsatzzahlen stimmen bei allen exakt.
+   *
+   * WEG IST ER NUR IM BROWSER. `foundation-season-history-projection.ts` laesst
+   * `disciplineBreakdown` beim Zusammenfalten AUSDRUECKLICH weg (647 KiB gegen 88 KiB je Saison) —
+   * gemessen: der Ersatz-Schnappschuss traegt alle 339 Spielerzeilen, aber keine einzige
+   * Disziplin-Zeile. Die All-Time-Spalte der Top-Disziplinen lief damit gegen eine leere Summe und
+   * zeigte nichts, statt zu sagen, dass sie nichts weiss.
+   *
+   * Deshalb faehrt die Zahl denselben Weg wie der Rang: serverseitig auf dem vollen Save gerechnet,
+   * NUR fuer den angezeigten Spieler. Kein Snapshot wird umgeschrieben, und bestehende Spielstaende
+   * — Chris' Saison 1 eingeschlossen — zeigen die Werte sofort.
+   *
+   * Ebenfalls DUENN besetzt: eine fehlende Disziplin-ID heisst „keine Punkte", nicht „unbekannt".
+   */
+  allTimePointsByDisciplineId: Record<string, number>;
+  allTimeAppearancesByDisciplineId: Record<string, number>;
 };
 
 export type PlayerDrawerHistoryRow = {
@@ -1232,11 +1262,24 @@ function buildDisciplineValuesFromPlayer(
           ? disciplineRankOverride.seasonPointsRankByDisciplineId[discipline.id] ?? null
           : globalRankMaps?.seasonPointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         seasonAppearances: seasonRow?.appearances ?? null,
-        allTimePoints: allTimeRow ? roundValue(allTimeRow.points, 1) : null,
+        /**
+         * Der Server-Override hat Vorrang und ist bei Vorhandensein ABSCHLIESSEND — dieselbe Regel
+         * wie bei den Raengen darunter, und aus demselben Grund: im Browser fehlt die
+         * Disziplin-Aufschluesselung der Archiv-Saisons ganz (siehe `PlayerDisciplineRankOverride`).
+         * Die lokal gerechnete Summe waere dort nicht „ungenau", sondern leer, und ein Rueckfall
+         * darauf machte aus einer bekannten Zahl wieder ein stummes Feld.
+         */
+        allTimePoints: disciplineRankOverride
+          ? disciplineRankOverride.allTimePointsByDisciplineId[discipline.id] ?? null
+          : allTimeRow
+            ? roundValue(allTimeRow.points, 1)
+            : null,
         allTimePointsRank: disciplineRankOverride
           ? disciplineRankOverride.allTimePointsRankByDisciplineId[discipline.id] ?? null
           : globalRankMaps?.allTimePointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
-        allTimeAppearances: allTimeRow?.appearances ?? null,
+        allTimeAppearances: disciplineRankOverride
+          ? disciplineRankOverride.allTimeAppearancesByDisciplineId[discipline.id] ?? null
+          : allTimeRow?.appearances ?? null,
         currentSeasonMutatorPps: currentDetail ? roundValue(currentDetail.mutatorPps, 1) : null,
         slotLabels: currentDetail?.slotLabels.slice(0, 8) ?? [],
         lastSeasonPoints: lastSeasonRow?.totalContribution ?? null,

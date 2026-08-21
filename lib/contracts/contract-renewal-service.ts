@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   getContractShapeTeamContext,
-  wendeApronUndMixAn,
+  wendeLiquiditaetUndMixAn,
   type ContractShapeTeamContext,
 } from "@/lib/market/contract-shape-context";
 import type {
@@ -835,9 +835,12 @@ export function chooseAiRenewalContractShape(input: {
   if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) {
     // Auch die Faktor-Regel laeuft durch den Mix-Riegel: die Abnahme von #507 stellte 14 von 216
     // Vertraegen auf back_loaded — genau die Haeufung, die Chris begrenzt sehen wollte.
-    return wendeApronUndMixAn({
+    return wendeLiquiditaetUndMixAn({
       form: "back_loaded",
       laufzeit: input.recommendedLength,
+      // Der Kassen-Riegel greift hier nicht (er bremst nur front_loaded), steht aber der
+      // Vollstaendigkeit halber mit dabei: alle drei Formwaehler geben dieselben Angaben.
+      kassenstand: cash,
       gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
     }).form;
   }
@@ -857,9 +860,14 @@ export function chooseAiRenewalContractShape(input: {
 
   // 4. Mix-Riegel als letzte Instanz. Er VERSCHIEBT nur nach `balanced` und erzeugt nie
   //    `back_loaded` — die Rangfolge oben bleibt in jeder anderen Hinsicht unangetastet.
-  return wendeApronUndMixAn({
+  return wendeLiquiditaetUndMixAn({
     form: ausRangfolge,
     laufzeit: input.recommendedLength,
+    // NEU mit der Umstellung auf den Kassenstand: die Verlaengerung kannte den Riegel bisher gar
+    // nicht (sie uebergab nur den Gehaltsberg) und konnte deshalb front_loaded verlaengern,
+    // waehrend das Konto leer war. Der groesste Vertragsstrom ueberhaupt — 121 von 176
+    // KI-Verlaengerungen in Saison 2 sind mehrjaehrig.
+    kassenstand: cash,
     gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
   }).form;
 }

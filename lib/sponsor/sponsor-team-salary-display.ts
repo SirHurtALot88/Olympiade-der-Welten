@@ -60,8 +60,19 @@ export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): 
 /**
  * DIE VERHANDELTE Gehaltssumme — Summe der Verhandlungs-Benchmarks aller Kadervertraege.
  *
- * Das ist seit Chris' Entscheidung („ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3) die
- * BEMESSUNGSGRUNDLAGE DER APRON. Vorher bemass die Abgabe `getTeamDisplaySalaryTotal` — das
+ * DAS IST DIE BEMESSUNGSGRUNDLAGE DER APRON-ABGABE — entschieden wird das aber an EINER Stelle,
+ * `getTeamApronSalaryBase` (lib/season/apron-service.ts). Wer wissen will, was die Abgabe misst,
+ * liest dort und nicht hier: dieser Absatz behauptete nach einer Umstellung einmal das Falsche
+ * weiter und hat genau die Verwechslung erzeugt, gegen die `cankgm` steht.
+ *
+ * Die Grundlage war zwischenzeitlich die Jahresrate dieser Saison (`getTeamActualSalaryTotal`) und
+ * ist seit Chris' dritter Entscheidung wieder diese Funktion („apron muss aber doch das verhandelte
+ * gehalt als bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete!"). Der
+ * Grund ist die Formunempfindlichkeit unten: die Jahresrate haengt an der Vertragsform, und sechs
+ * Teamzeilen der sieben Live-Spielstaende duckten sich damit unter die erste Linie weg.
+ *
+ * Historisch: Chris' Entscheidung („ja!", `docs/APRON_UND_VERTRAGSFORMEN.md` Schritt 3) machte sie
+ * zuerst zur Bemessungsgrundlage. Davor bemass die Abgabe `getTeamDisplaySalaryTotal` — das
  * FORMEL-Gehalt aus Marktwert und Attributen. Ein Team, das seinen ganzen Kader unter Formel
  * verhandelte, zahlte trotzdem die volle Abgabe; am Abbild zahlte Cold Steel 3,18, obwohl seine
  * echte Gehaltssumme (63,6) UNTER der ersten Linie (76,8) lag. Verhandeln soll zaehlen.

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-20",
+  "seite": "Team-Einstellungen",
+  "text": "Ein angeforderter Snapshot verschwand kurz nach dem Anlegen wieder, und wer danach seine ID benutzte, bekam einen Serverfehler ohne Erklärung. Der Snapshot übernahm die Kategorie seines Ursprungs: der Snapshot einer Vorsaison-Sicherung wurde selbst eine Vorsaison-Sicherung und rotierte mit deren Fünferliste weg. An einer Kopie des echten Spielstands nachgemessen kostete schon das bloße Anlegen zwei fremde Spielstände. Ein Snapshot, den jemand anfordert, ist jetzt ein manueller Spielstand und rotiert gar nicht erst mit. Eine ID, hinter der kein Spielstand mehr liegt, wird außerdem als \"nicht gefunden\" beantwortet statt als Serverfehler — die Oberfläche kannte diesen Satz längst, sie bekam ihn nur nie zu sehen.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

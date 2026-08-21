@@ -207,7 +207,8 @@ describe("resolveAiLoanDecision", () => {
   });
 
   it("refuses a further loan only when existing installments have consumed the debt-service budget", () => {
-    // Existing installment 45 > disposable debt-service budget (~ max(7.5, 50 - 18*0.6) = 39.2) -> no room.
+    // Existing installment 45 > disposable debt-service budget (max(7.5, 50 - 18) = 32) -> no room.
+    // (Stand hier mit `18*0.6 = 39,2`; das Gehalt zaehlt seit Chris' Entscheidung voll, siehe unten.)
     // Outstanding kept modest (20) so borrowing capacity stays positive and we reach the serviceability gate.
     const gameState = buildTeamGameState({
       cash: 3,
@@ -535,5 +536,51 @@ describe("Liquiditaets-Kredit bei negativem Cash", () => {
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("season_one_no_loans");
+  });
+});
+
+/**
+ * CHRIS' ENTSCHEIDUNG: „100% der gehälter sind fixkosten logischerweise! da ist das problem".
+ *
+ * `SALARY_SERVICE_WEIGHT` stand auf 0,6 — 40 % der Gehaltssumme fielen aus der Tragfaehigkeits-
+ * rechnung heraus und gaben Kreditrahmen frei, den es nie gab. Der Test haelt die Zahl an der
+ * WIRKUNG fest, nicht an der Konstanten: dieselbe Vorlage muss mit vollem Gewicht ablehnen und
+ * haette mit 0,6 noch Rahmen gehabt.
+ *
+ * Die Vorlage ist so gerechnet, dass genau dieses Gewicht die Entscheidung kippt:
+ *   Sponsor 60 · Gehalt 9 x 4 = 36 · Unterhalt 0 · laufende Rate 30
+ *   mit 0,6:  60 - 21,6 = 38,4  ->  Rahmen 8,4 uebrig, ein weiterer Kredit ist tragbar
+ *   mit 1,0:  60 - 36,0 = 24,0  ->  Rahmen -6,0, kein weiterer Kredit
+ * Der Boden (15 % von 60 = 9) greift in beiden Faellen nicht, sonst pruefte der Test ihn statt
+ * des Gewichts.
+ */
+describe("Gehaelter zaehlen voll als Fixkosten", () => {
+  const laufenderKredit: LoanRecord = {
+    loanId: "laufend",
+    borrowerTeamId: "T-1",
+    lenderType: "bank",
+    principalOriginal: 20,
+    principalOutstanding: 20,
+    interestRatePerSeason: 0.14,
+    termSeasons: 4,
+    seasonsRemaining: 3,
+    installmentPerSeason: 30,
+    originatedSeasonId: "season-1",
+    status: "active",
+    missedPayments: 0,
+  };
+
+  it("lehnt einen weiteren Kredit ab, sobald das volle Gehalt gegengerechnet wird", () => {
+    const gameState = buildTeamGameState({
+      cash: 3,
+      rosterCount: 9,
+      playerOpt: 14,
+      salaryPerPlayer: 4,
+      annualRevenue: 60,
+      loans: [laufenderKredit],
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("debt_service_ceiling");
   });
 });
