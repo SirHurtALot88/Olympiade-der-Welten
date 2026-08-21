@@ -1,5 +1,10 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
+import {
+  springeZuElement,
+  springeZuPosition,
+  VERKAUFSFLAECHE_ANKER,
+} from "@/lib/foundation/verkauf-sprung";
 import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
 import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
@@ -1527,6 +1532,8 @@ export function useFoundationShellRouterBodyScope({
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
   const marketSellPreviewRequestVersion = useRef(0);
+  /** Wo der Bildschirm stand, als „Verkaufen" gedrueckt wurde — der Rueckweg nach dem Verkauf. */
+  const marketSellRuecksprungRef = useRef<number | null>(null);
   /** Eigener Zaehler fuer den Kader-Drawer — er darf den laufenden Verkaufs-Flow nicht abbrechen. */
   const marketSellPeekRequestVersion = useRef(0);
   const marketFeedReloadersRef = useRef<FoundationMarketFeedReloaders>({
@@ -3776,19 +3783,22 @@ export function useFoundationShellRouterBodyScope({
     setMarketSellPreview(null);
     setMarketSellSubject(subject);
     setFoundationPanel("sell");
-    // GEMELDET: „wenn ich einen spieler verkaufen will, springt der screen nicht zum
-    // verkaufsmodal, das irritiert."
-    //
-    // Der Verkauf ist eine eigene Drilldown-Seite, kein Overlay — die Seite tauscht also nur
-    // ihren Inhalt aus, waehrend die Scrollposition stehen bleibt. Wer weit unten in der
-    // Kaderliste auf „Verkaufen" tippt, landet entsprechend weit unten in der neuen Ansicht
-    // und sieht den Dialog gar nicht. Der Kauf-Flow raeumt das seit laengerem selbst auf
-    // (`scrollBuyModalToTop` in TransfermarktV2Client) — dem Verkauf fehlte das Gegenstueck.
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "auto" });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    }
+    /**
+     * GEMELDET, in zwei Runden. Zuerst: „wenn ich einen spieler verkaufen will, springt der screen
+     * nicht zum verkaufsmodal, das irritiert." Und dann, weil die Haelfte offen blieb: „wenn man
+     * sich die wertung anschaut und dort auf verkaufen klickt oder so oder im verträge reiter auf
+     * verkaufen, dann sollte der screen auch zum verkaufsmodal springen was unten aufgeht."
+     *
+     * Hier stand ein Sprung nach GANZ OBEN. Der stimmt nur fuer den Weg aus dem Transfermarkt, wo
+     * die Verkaufsflaeche die Seite ersetzt. Aus der Teamansicht heraus bleibt die Teamansicht
+     * stehen und die Verkaufsflaeche haengt sich DARUNTER — der Sprung nach oben fuehrte also vom
+     * Dialog weg statt hin.
+     *
+     * Gesprungen wird deshalb zur Flaeche selbst. Das ist in beiden Faellen richtig: ersetzt sie
+     * die Seite, steht sie ohnehin oben.
+     */
+    marketSellRuecksprungRef.current = typeof window === "undefined" ? null : window.scrollY;
+    springeZuElement(VERKAUFSFLAECHE_ANKER);
     syncFoundationViewInUrl(activeView, null, subject.playerId, {
       panel: "sell",
       push: true,
@@ -3871,30 +3881,31 @@ export function useFoundationShellRouterBodyScope({
     closeMarketSellPeek();
     const geoeffnet = openMarketSellModal(subject, effectiveTeamId);
     /**
-     * NOCH EINMAL NACH OBEN — eine Frame spaeter.
+     * NOCH EINMAL SPRINGEN — eine Frame spaeter.
      *
      * Im Browser gemessen: nach diesem Uebergang stand die Seite wieder bei 966px, obwohl
-     * `openMarketSellModal` an den Anfang scrollt. Grund ist die Fokusfalle des Drawers: sie gibt
+     * `openMarketSellModal` selbst schon springt. Grund ist die Fokusfalle des Drawers: sie gibt
      * den Fokus beim Schliessen an das zuvor fokussierte Element zurueck — die geklickte
      * Kaderzeile — und der Browser scrollt die dabei ins Bild. Das passiert erst, wenn React das
-     * Schliessen committet hat, also NACH dem scrollTo oben.
+     * Schliessen committet hat, also NACH dem Sprung oben.
      *
-     * Der Sprung muss der letzte sein, sonst landet man wieder genau dort, wo der gemeldete
-     * Bug („springt nicht zum verkaufsmodal") herkam.
+     * Der Sprung muss der letzte sein, sonst landet man wieder genau dort, wo der gemeldete Fehler
+     * („springt nicht zum verkaufsmodal") herkam. Ziel ist jetzt die Verkaufsflaeche und nicht mehr
+     * der Seitenanfang — aus der Teamansicht heraus haengt sie unter der Liste, und „oben" waere
+     * dort die falsche Richtung.
      */
-    if (typeof window !== "undefined") {
-      window.requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, behavior: "auto" });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      });
-    }
+    springeZuElement(VERKAUFSFLAECHE_ANKER);
     await geoeffnet;
   }
 
   function closeMarketSellModal() {
     marketSellPreviewRequestVersion.current += 1;
     closeFoundationDrilldownPanel();
+    // Abbrechen fuehrt an dieselbe Stelle zurueck wie ein Verkauf. Wer sich einen Spieler nur
+    // angesehen hat, soll nicht woanders herauskommen als der, der ihn abgegeben hat.
+    const ruecksprung = marketSellRuecksprungRef.current;
+    marketSellRuecksprungRef.current = null;
+    if (ruecksprung != null) springeZuPosition(ruecksprung);
   }
 
   /** Fehlerzustand im Verkaufs-Modal: Vorschau für das aktuelle Subjekt neu laden. */
@@ -3973,6 +3984,13 @@ export function useFoundationShellRouterBodyScope({
       setMarketSellSubject(null);
     setMarketSellRiskAcknowledged(false);
       setFoundationPanel(null);
+      // „und wenn der spieler verkauft wurde soll es wieder hoch springen zu den verträgen" —
+      // zurueck an die Stelle, an der der Knopf gedrueckt wurde. Bewusst die Position und kein
+      // fester Anker: geklickt wird auch aus der Wertung und aus dem Auslauf-Center, und fuer die
+      // waere der Vertraege-Anker der falsche Ort.
+      const ruecksprung = marketSellRuecksprungRef.current;
+      marketSellRuecksprungRef.current = null;
+      if (ruecksprung != null) springeZuPosition(ruecksprung);
 
       // Wie beim Kauf: Der neue Kontostand steht bereits in der Antwort und wird oben schon im
       // Erfolgstext angezeigt. Ihn sofort zu übernehmen macht die Zahl richtig, bevor der Nachlauf
