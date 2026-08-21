@@ -113,7 +113,13 @@ describe("Das Fenster wird beim Laden gefuellt", () => {
   });
 
   it("nutzt dieselbe Ableitung wie die Finanzseite, statt eine zweite zu bauen", () => {
-    expect(repo).toContain('import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";');
+    // HIER STAND DIE IMPORT-ZEILE WOERTLICH, einzeilig. Sie ist an einem zweiten Import aus
+    // demselben Modul zerbrochen (der Konjunktur-Waechter braucht zusaetzlich
+    // SEASON_ECONOMY_FACTOR_WINDOW_SIZE und parseSeasonNumber) — obwohl die Zusage, um die es hier
+    // geht, unveraendert galt. Geprueft wird deshalb die ZUSAGE: die Ableitung kommt aus DEM
+    // gemeinsamen Modul, und der Ladepfad wuerfelt nicht selbst.
+    expect(repo).toContain("getSeasonEconomyFactorWindow");
+    expect(repo).toContain('from "@/lib/season/season-economy-factors"');
     // Kein eigener Wurf im Ladepfad — sonst haette man wieder zwei Wahrheiten.
     expect(repo).not.toContain("SALARY_FACTOR_ROLL_MIN");
   });

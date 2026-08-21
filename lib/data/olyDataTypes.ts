@@ -565,6 +565,26 @@ export type PlayerBaselineWriteGuardEvent = {
   timestamp: string;
 };
 
+/**
+ * Eine gespeicherte Konjunktur-Reihe, die NICHT zu dem passt, was der Seed aus
+ * `(saveId, seasonId)` errechnet.
+ *
+ * WARUM DAS AUFGESCHRIEBEN WIRD, statt es stillschweigend zu überschreiben: der Faktor entscheidet
+ * über Sponsorenzahlungen und die Apron-Drosselung. Wer ihn beim Laden austauscht, ändert
+ * rückwirkend die Grundlage von Geld, das schon geflossen ist — und niemand erführe davon. Der
+ * Wächter lässt die gespeicherte Reihe deshalb STEHEN und schreibt die Abweichung auf.
+ */
+export type SeasonEconomyFactorGuardEvent = {
+  eventId: string;
+  seasonId: string;
+  reason: "season_economy_factor_mismatch";
+  /** Die Faktoren, die im Spielstand stehen — und mit denen gerechnet wurde. */
+  storedFactors: number[];
+  /** Was der Seed aus (saveId, seasonId) heute ergäbe. */
+  seededFactors: number[];
+  timestamp: string;
+};
+
 export type TeamIdentity = {
   teamId: string;
   playerType?: string | null;
@@ -3499,6 +3519,11 @@ export type GameState = {
   transferHistory: TransferHistoryEntry[];
   playerBaselines?: PlayerBaselineRecord[];
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
+  /**
+   * Abweichungen zwischen gespeicherter und geseedeter Konjunktur-Reihe. Leer im Normalfall;
+   * ein Eintrag heisst, dass jemand nachsehen sollte (siehe `SeasonEconomyFactorGuardEvent`).
+   */
+  seasonEconomyFactorGuardEvents?: SeasonEconomyFactorGuardEvent[];
   playerPotential?: PlayerPotentialRecord[];
   playerMoraleState?: PlayerMoraleState[];
   playerRelationshipEvents?: PlayerRelationshipEventRecord[];
