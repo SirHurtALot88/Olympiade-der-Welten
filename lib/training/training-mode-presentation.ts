@@ -16,9 +16,9 @@ import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
  *
  *  Der Spillover stammt aus demselben Budget und skaliert deshalb automatisch mit. */
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
-  leicht: 3.43,
-  mittel: 4.34,
-  hart: 6.15,
+  leicht: 2.74,
+  mittel: 3.47,
+  hart: 4.92,
 };
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {
