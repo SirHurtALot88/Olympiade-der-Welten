@@ -2157,7 +2157,21 @@ export type RosterEntry = {
   id: string;
   teamId: string;
   playerId: string;
+  /**
+   * Der Countdown — ABGELEITET, sobald `contractEndSeasonNumber` gesetzt ist.
+   *
+   * Bleibt vorerst das Feld, das die meisten Lesestellen benutzen (93 Dateien in `lib/` und
+   * `app/`). Die Wahrheit ist die Endsaison; siehe `lib/contracts/vertragslaufzeit.ts`.
+   */
   contractLength: number;
+  /**
+   * DIE SAISON, NACH DER DER VERTRAG ENDET — die Wahrheit ueber die Laufzeit.
+   *
+   * Eine Zahl, die nicht fortgeschrieben werden muss: „laeuft aus" heisst, dass sie die laufende
+   * Saison IST. Der Countdown daneben wird daraus gerechnet. Optional, weil Altstaende sie noch
+   * nicht tragen — dann leitet `endSaisonNummer` sie einmalig aus `contractLength` ab.
+   */
+  contractEndSeasonNumber?: number;
   contractStatus?: ContractStatus;
   contractShape?: ContractShape;
   yearlySalarySchedule?: ContractYearSalary[];
