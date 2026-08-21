@@ -170,6 +170,13 @@ function getSeasonLabel(gameState: GameState) {
 
 // Die Regel selbst liegt in `roster-contract-status.ts` — der Aufloesungs-Dienst braucht sie
 // ebenfalls und duerfte sie hier nicht importieren (Kreis ueber die KI-Aufloesung).
+/**
+ * Die Vorgabe fuer eine Verlaengerung ohne ausdrueckliche Laufzeit — dieselbe Zahl, mit der auch
+ * das Verhandlungsfenster aufgeht (`openContractRenewalNegotiation`). Bewusst KEINE Ableitung aus
+ * dem alten Vertrag: der sagt nichts darueber, wie lange der neue laufen soll.
+ */
+const STANDARD_VERTRAGSLAENGE = 2;
+
 const normalizeLength = normalizeContractLength;
 export { normalizeRosterContractStatus };
 
@@ -1907,7 +1914,9 @@ export function previewContractRenewalAction(input: {
     !renewalEligible ? "renewal_only_allowed_at_contract_end" : null,
     !releaseEligible ? "release_only_allowed_at_expired_contract" : null,
   ].filter((blocker): blocker is string => Boolean(blocker));
-  const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry?.contractLength ?? 2)));
+  // Dieselbe Vorgabe wie im Apply-Pfad — sonst rechnet die Vorschau eine andere Laufzeit vor, als
+  // danach unterschrieben wird. Siehe die Begruendung an `nextLength`.
+  const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? STANDARD_VERTRAGSLAENGE)));
   const negotiationPreview =
     input.action === "renew" && rosterEntry
       ? buildNegotiationPreviewForRoster({
@@ -2011,7 +2020,27 @@ export function applyContractRenewalAction(input: {
     };
   }
 
-  const nextLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry.contractLength ?? 2)));
+  /**
+   * OHNE ANGABE WIRD NEU VERHANDELT — NICHT DIE ALTE LAUFZEIT FORTGESCHRIEBEN.
+   *
+   * GEMELDET VON CHRIS: „so jetzt wollte ich xelara verlängern, verhandeln ging sie hat
+   * angenommen aber die verlängerung hat nicht funktioniert - oder man sieht es nicht."
+   *
+   * Sie hat funktioniert — sie schrieb nur `LZ 0 -> 1`, und 1 heisst „auslaufend". Aus seiner
+   * Sicht passierte damit nichts. Aus den Vertragsereignissen des Spielstands, 19:27:20 Uhr:
+   *
+   *     LZ 0 -> 1 · Gehalt 5,00 -> 5,50 · manual_contract_renewal
+   *
+   * Hier stand `?? rosterEntry.contractLength`. Bei einem Spieler, ueber den gerade entschieden
+   * wird, ist das 0 — die Klemme `Math.max(1, ...)` macht daraus 1, also die kuerzestmoegliche
+   * Bruecke. Der Fallback schrieb damit ausgerechnet dort das Gegenteil einer Verlaengerung, wo
+   * verlaengert werden sollte. Erlaubt gewesen waeren 2 Saisons (Moral-Limit 2, Verdikt `accept`).
+   *
+   * Die alte Laufzeit ist fuer eine NEUE Unterschrift ohnehin die falsche Auskunft: sie sagt, wie
+   * lange der ALTE Vertrag noch lief, nicht wie lange der neue laufen soll. Ohne Angabe gilt
+   * deshalb dieselbe Vorgabe wie im Verhandlungsfenster — zwei Saisons.
+   */
+  const nextLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? STANDARD_VERTRAGSLAENGE)));
   const newSalary =
     input.action === "renew"
       ? roundMoney(input.offeredSalary ?? preview.moraleAdjustedExpectedSalary ?? preview.negotiationPreview?.expectedSalary ?? rosterEntry.salary) ?? rosterEntry.salary
