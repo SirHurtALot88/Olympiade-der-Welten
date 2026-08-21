@@ -71,9 +71,16 @@ describe("Verlängern wartet nur auf das, was das Ergebnis verändert", () => {
   it("blockiert nur auf den Spielstand, nicht auf Marktfeed und Historie", () => {
     const weg = schreibweg();
     expect(weg).toContain("await loadSave(activeSaveId);");
-    // Die drei Nachladungen laufen nach — sie ändern am Ergebnis nichts.
-    expect(weg).toContain("void Promise.all([");
     expect(weg).not.toContain("await Promise.all([\n        loadSave(activeSaveId),");
+    /**
+     * Hier stand zusätzlich `void Promise.all([` — die drei Nachladungen liefen nach, statt zu
+     * blockieren. Inzwischen sind sie ganz weg: jede von ihnen materialisiert für sich den
+     * KOMPLETTEN Spielstand, und `better-sqlite3` ist synchron — sie blockierten also den ganzen
+     * Node-Prozess, nur eben nicht die Stelle, an der man hinsah, sondern die nächste, die man
+     * anfasste. Der Marker sorgt dafür, dass Markt und Historie beim nächsten Blick frisch geholt
+     * werden. Festgehalten wird das in `verlaengerung-haengt-nicht.test.ts`.
+     */
+    expect(weg).not.toContain("reloadHistoryFeed()");
   });
 
   it("das Verhandlungsfenster gibt den Token seiner aktuellen Vorschau mit", () => {

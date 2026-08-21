@@ -5772,6 +5772,18 @@ export function useFoundationShellRouterBodyScope({
         })),
       });
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+      /**
+       * ZWEITE RUNDE BEIM OEFFNEN — sie bleibt, und das ist richtig so.
+       *
+       * Diese Vorschau geht ohne `offeredSalary` raus; sie liefert erst die Forderung. Das Fenster
+       * setzt daraus sein Start-Angebot und holt dann eine zweite Vorschau — die rechnet die
+       * Annahme-Chancen FUER DIESES Angebot, was die erste gar nicht konnte. Sie ist also keine
+       * Dopplung, sondern der zweite Halbsatz derselben Frage.
+       *
+       * Teuer war nicht die Runde, sondern was eine Runde kostete: rund 1,7 s, davon 980 ms fuer
+       * `ensurePlayerPotentialForGameState` — eine Ableitung, die die Verlaengerung nie liest.
+       * Dort liegt der Hebel, nicht hier.
+       */
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
           formatRoomWriteErrorCode(previewPayload.error) ??
@@ -6279,12 +6291,22 @@ export function useFoundationShellRouterBodyScope({
        * — sie duerfen nachlaufen. Denselben Weg geht der Verkauf schon (`confirmTransfermarktSell`).
        */
       await loadSave(activeSaveId);
+      /**
+       * DIE DREI NACHLADUNGEN SIND NICHT GRATIS, AUCH NICHT IM HINTERGRUND.
+       *
+       * Sie stehen zwar nicht mehr im `await` (das war der erste Schritt), materialisieren aber
+       * jede fuer sich den KOMPLETTEN Spielstand: Marktfeed ueber `transfermarkt-local-service`,
+       * Historie ebenso, Saison-Uebersicht ueber `resolve-local-save`. Und `better-sqlite3` ist
+       * synchron — jede dieser Ladungen blockiert den ganzen Node-Prozess. Der Nutzer merkt das
+       * nicht an dieser Stelle, sondern an der naechsten, die er anfasst: sie antwortet nicht,
+       * weil der Server noch an Daten arbeitet, die im Verhandlungsfenster niemand sieht.
+       *
+       * Sie laufen deshalb erst, wenn der Nutzer die Ansicht wirklich wechselt. Bis dahin genuegt
+       * `loadSave` — der Kader traegt danach die neue Laufzeit, und das ist das Einzige, was die
+       * Verlaengerung sichtbar veraendert. Der Marker sorgt dafuer, dass die Feeds beim naechsten
+       * Blick auf Markt oder Historie frisch geholt werden.
+       */
       setMarketReloadToken((current) => current + 1);
-      void Promise.all([
-        reloadMarketFeed(input.teamId),
-        reloadHistoryFeed(),
-        reloadSeasonManagementOverview(),
-      ]).catch(() => {});
       return true;
     } catch {
       setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgeführt werden.`);
