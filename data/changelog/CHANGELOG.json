@@ -3,11 +3,29 @@
   "eintraege": [
     {
       "datum": "2026-08-21",
+      "seite": "Finanzen · Apron",
+      "pr": null,
+      "text": "Die beiden Apron-Linien liegen jetzt bei 1,20 und 1,40 des Median-Gehalts statt bei 1,25 und 1,60. Die zweite Linie war so weit außen, dass sie niemanden mehr erreichte: das teuerste Team der Liga lag mit 98,7 noch 4,2 % darunter, die zweite Zone war leer — und ein Satz auf einen Überschuss, den es nicht gibt, wirkt nicht, egal wie hoch er steht. Mit den neuen Linien fasst die erste mit acht von 32 Teams das obere Viertel, die zweite erwischt den einen echten Ausreißer. Zusätzlich stürzen die Linien in der Vorsaison nicht mehr ab: solange die Verträge gerade ausgelaufen sind, halten sie den Stand, mit dem die Vorsaison abgerechnet wurde. Vorher wurde zum Kaufzeitpunkt gegen eine Grenze gerechnet, die rund ein Viertel zu tief lag — gemessen an einem Kader, den es zu dem Zeitpunkt noch gar nicht gab. Laufende Saisons behalten ihre eingefrorenen Linien.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
       "seite": "Welt · Kredite",
       "pr": null,
       "text": "Der Mindest-Kreditrahmen hängt jetzt davon ab, ob ein Team überhaupt Spieler braucht. Bisher bekam jedes Team mindestens 15 % seiner Sponsoreinnahmen als Spielraum — auch dann, wenn die ehrliche Rechnung tief im Minus lag. Seit die Gehälter voll gegengerechnet werden, traf das die Mehrheit der Liga, und aus der Ausnahme war ein Freibetrag geworden. Statt einer harten Kante gibt es jetzt drei Stufen: ein Team unter dem Spielerminimum behält den vollen Mindestrahmen, eines zwischen Minimum und Zielgröße den halben, und eines mit vollem Kader gar keinen. Wer Spieler braucht, bekommt also Luft; wer keine braucht, nicht. Über die Spielstände gerechnet greift der Mindestrahmen damit bei 87 statt bei 107 Teamzeilen.",
       "quelle": "gepflegt",
       "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Ein Spieltag bleibt nicht mehr stehen, weil sich jemand verletzt hat. Wer aufgestellt war und sich WÄHREND des Spieltags verletzt, belegt seinen Platz weiterhin — er liefert nur keine Wertung mehr, und das ist die sportliche Strafe, die ohnehin vorgesehen ist. Vorher galt seine Aufstellung als unvollständig, und zwar dauerhaft: die Arena überschreibt eine gesperrte Aufstellung bewusst nicht, es gab also keinen Ausweg. Am Spielstand nachgemessen (Spieltag 10) blockierte genau ein Team die ganze Liga, und die beiden Ausfälle standen in Disziplin 1 — der bereits gebuchten. Disziplin 2 hing an Spielern, die dort gar nicht antraten; beide Disziplinen laufen parallel und sind mit verschiedenen Spielern besetzt. Beim AUFSTELLEN bleibt die Sperre bestehen: dort kann man jemand anderen wählen.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
       "version": "0.5"
     },
     {
