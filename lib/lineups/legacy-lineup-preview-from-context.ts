@@ -11,7 +11,7 @@ import { SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import {
   applyCaptainRivalryPressureReduction,
-  calculateSideSlotRoleModifierTotal,
+  calculateSideSlotRoleModifierBreakdown,
 } from "@/lib/lineups/matchday-slot-roles";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
@@ -203,7 +203,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       rawRivalryPressure,
       teamCaptain?.effects.rivalryPressureReductionPct ?? null,
     );
-    const slotRoleModifier = calculateSideSlotRoleModifierTotal({
+    const slotRoleBreakdown = calculateSideSlotRoleModifierBreakdown({
       disciplineId,
       disciplineSide,
       entries: sideEntries.map((entry) => ({ playerId: entry.playerId, slotIndex: entry.slotIndex })),
@@ -217,6 +217,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         null,
       rivalryPressure,
     });
+    const slotRoleModifier = slotRoleBreakdown.total;
     return {
       score: scoreLegacyLineupDisciplineSide({
         disciplineId,
@@ -235,6 +236,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         fatigueSourceStatus: fatigueMap ? "mapped" : "missing_source",
         intensity: previewModifiers[disciplineSide].intensity,
         slotRoleModifier,
+        slotRoleModifierByPlayerId: slotRoleBreakdown.byPlayerId,
         formCardsAvailable: formResult.formCardsAvailable,
         formCardsSelected: formResult.formCardsSelected,
         formCardLabel: formResult.formCardLabel,

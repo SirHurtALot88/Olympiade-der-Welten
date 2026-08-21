@@ -185,7 +185,12 @@ describe("legacy matchday resolve preview", () => {
     ]);
 
     const d1Preview = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
-    expect(d1Preview?.topPlayers.slice(0, 3).map((player) => player.finalPlayerScore)).toEqual([30, 20, 15]);
+    // Die Werte tragen seit der Zuteilung (legacy-score-engine.ts) den EIGENEN Intensitaets-Wurf
+    // des Spielers und seinen anteiligen Rest der Seiten-Effekte. Vorher standen hier die nackten
+    // Basiswerte [30, 20, 15] — die Reihenfolge, um die es dem Test geht, ist dieselbe geblieben.
+    const werte = d1Preview?.topPlayers.slice(0, 3).map((player) => player.finalPlayerScore) ?? [];
+    expect(werte).toEqual([29.4, 20, 13.9]);
+    expect([...werte].sort((links, rechts) => rechts - links)).toEqual(werte);
   });
 
   it("maps discipline rank points from the real table and distributes them by base share", () => {
@@ -200,10 +205,16 @@ describe("legacy matchday resolve preview", () => {
     const alphaTop = d1Preview?.topPlayers.find((player) => player.playerId === "A-A-d1-0");
     const alphaSecond = d1Preview?.topPlayers.find((player) => player.playerId === "A-A-d1-1");
 
+    // Team-Punkte haengen am RANG und aendern sich durch die Zuteilung nicht.
     expect(alpha?.teamPoints).toBe(6.6);
     expect(beta?.teamPoints).toBe(6.2);
-    expect(alphaTop?.pointsAwarded).toBe(4.95);
-    expect(alphaSecond?.pointsAwarded).toBe(1.65);
+    // Die AUFTEILUNG dagegen schon — und genau dafuer wurde zugeteilt. Vorher 4,95 / 1,65
+    // (reines Verhaeltnis 30:10). Jetzt traegt jeder Spieler seinen eigenen Intensitaets-Wurf,
+    // und das Verhaeltnis folgt dem, was wirklich auf der Bahn passiert ist.
+    expect(alphaTop?.pointsAwarded).toBe(5.0173);
+    expect(alphaSecond?.pointsAwarded).toBe(1.5827);
+    // Die Summe bleibt exakt die Team-Punktzahl — verteilt wird, nicht erschaffen.
+    expect(Math.round(((alphaTop?.pointsAwarded ?? 0) + (alphaSecond?.pointsAwarded ?? 0)) * 10) / 10).toBe(6.6);
   });
 
   it("uses final preview contribution for top players and team discipline scores", () => {
@@ -237,10 +248,18 @@ describe("legacy matchday resolve preview", () => {
     // ein — für A-A-d1-0/A-A-d1-1 in mini-dm/matchday-1 konstant -0.8 (derselbe Offset taucht bei
     // denselben Spieler-IDs auch in den anderen Tests dieser Datei auf).
     expect(d1Preview?.teamResults[0]?.finalPreviewScore).toBe(58.7);
-    // Individueller Spieler-Score/Captain-Bonus bleibt unverändert: intensityModifier wird erst
-    // NACH dem Captain-Bonus als Team-Summand addiert (siehe legacy-score-engine.ts prePowerScore).
-    expect(d1Preview?.topPlayers[0]?.finalPlayerScore).toBe(40.5);
+    // DER TEAM-SCORE IST DERSELBE GEBLIEBEN — 58,7 stand hier auch vor der Zuteilung. Das ist
+    // die wichtigste Zusage: verteilt wird nur, WEM die Punkte gehoeren, nie WIE VIELE es sind.
+    //
+    // Der Spielerwert dagegen aendert sich, und zwar genau um seinen eigenen Anteil: 40,5 waren
+    // Basis + Fatigue + Captain; die 39,9 tragen zusaetzlich seinen Intensitaets-Wurf und den
+    // anteiligen Rest der Seiten-Effekte. Frueher lagen die als Team-Summand daneben.
+    expect(d1Preview?.topPlayers[0]?.finalPlayerScore).toBe(39.9);
     expect(d1Preview?.topPlayers[0]?.captainBonus).toBe(13.5);
+    // Und die Bahnen summieren sich jetzt auf den Kopf.
+    const bahnenSumme =
+      d1Preview?.teamResults[0]?.entries.reduce((summe, entry) => summe + (entry.finalPlayerScore ?? 0), 0) ?? 0;
+    expect(Math.round(bahnenSumme * 10) / 10).toBe(d1Preview?.teamResults[0]?.finalPreviewScore);
   });
 
   it("applies same-day injury malus on top of fatigue during resolve scoring", () => {
@@ -649,8 +668,23 @@ describe("legacy matchday resolve preview payload", () => {
     const withMalus = victimScoreFor(previewWithInjury);
 
     expect(baseline).not.toBeNull();
-    // Der Malus senkt den Score genau um den Faktor INJURY_PERFORMANCE_MULTIPLIER.
-    expect(withMalus).toBeCloseTo(INJURY_PERFORMANCE_MULTIPLIER * baseline!, 5);
+    // Der Malus senkt den Score genau um den Faktor INJURY_PERFORMANCE_MULTIPLIER — gemessen auf
+    // `injuryAdjustedValue`, also der Ebene, auf der er wirkt (nach Fatigue, vor allem anderen).
+    //
+    // Vorher stand diese Zusage auf `finalPlayerScore`. Das ging nur, solange dort ausschliesslich
+    // multiplikative Spieler-Effekte steckten. Seit der Zuteilung traegt `finalPlayerScore` auch
+    // ADDITIVE Anteile (Intensitaets-Wurf, anteilige Seiten-Effekte) — ein Faktor-Vergleich auf
+    // dieser Ebene misst dann nicht mehr den Malus, sondern den Malus plus Summanden.
+    const injuryAdjustedFor = (payload: ReturnType<typeof buildLegacyMatchdayResolvePreviewPayload> | null) =>
+      payload?.preview.disciplinePreviews
+        .find((discipline) => discipline.disciplineId === "mini-dm")
+        ?.topPlayers.find((player) => player.playerId === victimId)?.injuryAdjustedValue ?? null;
+    const baselineRoh = injuryAdjustedFor(previewNoInjury);
+    const withMalusRoh = injuryAdjustedFor(previewWithInjury);
+    expect(baselineRoh).not.toBeNull();
+    expect(withMalusRoh).toBeCloseTo(INJURY_PERFORMANCE_MULTIPLIER * baselineRoh!, 5);
+    // Der Endscore faellt trotzdem — nur eben nicht mehr um exakt den Faktor.
+    expect(withMalus!).toBeLessThan(baseline!);
     // Und die Vorschau matcht das angewandte Ergebnis exakt (nicht divergent).
     expect(withMalus).toBe(appliedVictimScore);
 

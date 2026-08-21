@@ -1,6 +1,6 @@
 import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
 import { countSelectedAvailablePlayers, isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
-import { applyCaptainRivalryPressureReduction, calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
+import { applyCaptainRivalryPressureReduction, calculateSideSlotRoleModifierBreakdown } from "@/lib/lineups/matchday-slot-roles";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import {
@@ -378,7 +378,7 @@ export function buildLegacyMatchdayResolvePreview(
         rawRivalryPressure,
         teamCaptain?.effects.rivalryPressureReductionPct ?? null,
       );
-      const slotRoleModifier = calculateSideSlotRoleModifierTotal({
+      const slotRoleBreakdown = calculateSideSlotRoleModifierBreakdown({
         disciplineId: meta.disciplineId,
         disciplineSide: meta.disciplineSide,
         entries: sideEntries.map((entry) => ({ playerId: entry.playerId, slotIndex: entry.slotIndex })),
@@ -389,6 +389,7 @@ export function buildLegacyMatchdayResolvePreview(
         requiredPlayers: sideRequiredPlayers,
         rivalryPressure,
       });
+      const slotRoleModifier = slotRoleBreakdown.total;
       const score = scoreLegacyLineupDisciplineSide({
         disciplineId: meta.disciplineId,
         disciplineSide: meta.disciplineSide,
@@ -405,6 +406,7 @@ export function buildLegacyMatchdayResolvePreview(
             injurySourceStatus: context.injurySourceStatus ?? "not_applied",
             intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity,
             slotRoleModifier,
+            slotRoleModifierByPlayerId: slotRoleBreakdown.byPlayerId,
             ...(() => {
           const formResult = calculateFormModifierForSide({
             // Plan schlaegt Entwurf: was im Auswahlfeld steht, wird auch gerechnet.
@@ -642,6 +644,10 @@ export function buildLegacyMatchdayResolvePreview(
           mutatorBonus: entry.mutatorBonus ?? null,
           mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
           formShare: entry.formShare ?? null,
+          intensityShare: entry.intensityShare ?? null,
+          slotRoleShare: entry.slotRoleShare ?? null,
+          teamEffectShare: entry.teamEffectShare ?? null,
+          teamPowerShare: entry.teamPowerShare ?? null,
           finalPlayerScore: entry.finalContribution ?? entry.score,
           pointsAwarded: null,
           isCaptain: Boolean(entry.isCaptain),
@@ -722,6 +728,10 @@ export function buildLegacyMatchdayResolvePreview(
         mutatorBonus: entry.mutatorBonus ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
         formShare: entry.formShare ?? null,
+        intensityShare: entry.intensityShare ?? null,
+        slotRoleShare: entry.slotRoleShare ?? null,
+        teamEffectShare: entry.teamEffectShare ?? null,
+        teamPowerShare: entry.teamPowerShare ?? null,
         finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         pointsAwarded: distributedPoints.entries[index]?.points ?? null,
