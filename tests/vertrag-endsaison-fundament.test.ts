@@ -21,6 +21,7 @@ import {
   restjahreNachDieserSaison,
   restlaufzeit,
 } from "@/lib/contracts/vertragslaufzeit";
+import { normalizeRosterContractStatus } from "@/lib/contracts/roster-contract-status";
 
 const saison = (nummer: number) => ({ season: { id: `season-${nummer}`, name: `Season ${nummer}` } }) as unknown as GameState;
 const vertrag = (teil: Partial<RosterEntry>) => teil as RosterEntry;
@@ -147,5 +148,39 @@ describe("Ist die Alterung schon gelaufen, verschiebt sich die Ableitung um eine
     // Der Versatz ist eine Ableitungshilfe für Altstände, keine Korrektur echter Werte.
     const eintrag = vertrag({ contractLength: 2, contractEndSeasonNumber: 9 });
     expect(endSaisonNummer(eintrag, saison(1), gealtert)).toBe(9);
+  });
+});
+
+/**
+ * DER PUNKT, AN DEM CHRIS' ETIKETT RICHTIG WIRD.
+ *
+ * GEMELDET: „xelara steht aktuell dann immernoch auf vertrag läuft aus" — obwohl ihr Vertrag bis
+ * Ende Saison 2 läuft, also eine volle Saison vor sich hat. Der Countdown wird am ENDE einer
+ * Saison gesenkt, während diese noch die laufende ist; danach heißt eine 1 „noch eine volle
+ * Saison". Die Statusregel las sie weiter als „letzte Saison" — bei ihr und 128 weiteren Spielern.
+ */
+describe("Der Status liest die Endsaison, sobald sie da ist", () => {
+  it("nennt einen Vertrag aktiv, der nach der laufenden Saison endet", () => {
+    // Genau Xelaras Fall: Countdown 1, Endsaison 2, laufende Saison 1.
+    const xelara = vertrag({ contractLength: 1, contractEndSeasonNumber: 2 });
+    expect(normalizeRosterContractStatus(xelara, 1)).toBe("active");
+    // Ohne Saisonnummer bleibt es beim Countdown — die alte, falsche Antwort.
+    expect(normalizeRosterContractStatus(xelara)).toBe("expiring");
+  });
+
+  it("nennt ihn auslaufend genau in seiner Endsaison", () => {
+    const eintrag = vertrag({ contractLength: 99, contractEndSeasonNumber: 3 });
+    expect([1, 2, 3, 4].map((nummer) => normalizeRosterContractStatus(eintrag, nummer))).toEqual([
+      "active",
+      "active",
+      "expiring",
+      "out_of_contract",
+    ]);
+  });
+
+  it("lässt ausdrückliche Zustände unangetastet", () => {
+    // „Entscheidung offen" ist eine Aussage über den Ablauf, keine über die Restlaufzeit.
+    const wartend = vertrag({ contractLength: 0, contractStatus: "renewal_pending", contractEndSeasonNumber: 1 });
+    expect(normalizeRosterContractStatus(wartend, 1)).toBe("renewal_pending");
   });
 });

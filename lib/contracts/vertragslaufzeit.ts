@@ -1,5 +1,6 @@
 import type { GameState, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
+import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 
 /**
  * DIE ENDSAISON IST DIE WAHRHEIT — der Countdown wird daraus abgeleitet.
@@ -132,12 +133,27 @@ export function laeuftMitDieserSaisonAus(
  * kommende, und dieselbe Rechnung stimmt wieder.
  */
 export function endSaisonFuerNeuenVertrag(
-  gameState: Pick<GameState, "season">,
+  gameState: Pick<GameState, "season" | "gamePhase">,
   laufzeit: number,
 ): number | null {
   const laufend = saisonNummerAus(gameState);
   if (laufend == null) {
     return null;
   }
-  return laufend + Math.max(1, Math.round(laufzeit)) - 1;
+  /**
+   * IM SAISONENDE-FENSTER DECKT EINE UNTERSCHRIFT AB DER KOMMENDEN SAISON.
+   *
+   * GEMELDET VON CHRIS: „ich will sie ja eine season verlängern bis ende season 2 das muss sauber
+   * sein."
+   *
+   * Genau dieser Fall. Verlaengert wird am Ende von Saison 1 — die ist gespielt, die Entscheidung
+   * gilt der Zukunft. „Eine Saison" heisst dann Saison 2, nicht Saison 1. Ohne diese Unterscheidung
+   * kaeme fuer eine Ein-Saison-Verlaengerung die Endsaison 1 heraus, also ein Vertrag, der in dem
+   * Moment schon abgelaufen ist, in dem er unterschrieben wird.
+   *
+   * Waehrend der laufenden Saison ist es umgekehrt: wer mitten in Saison 3 fuer zwei Saisons
+   * unterschreibt, bindet Saison 3 und 4 — die laufende zaehlt mit, sie wird ja noch gespielt.
+   */
+  const ersteGedeckteSaison = isSeasonEndPhase(gameState.gamePhase) ? laufend + 1 : laufend;
+  return ersteGedeckteSaison + Math.max(1, Math.round(laufzeit)) - 1;
 }

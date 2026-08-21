@@ -19,7 +19,19 @@ export function normalizeContractLength(value: number | null | undefined): numbe
 }
 
 export function normalizeRosterContractStatus(
-  entry: Pick<RosterEntry, "contractLength" | "contractStatus">,
+  entry: Pick<RosterEntry, "contractLength" | "contractStatus" | "contractEndSeasonNumber">,
+  /**
+   * Die laufende Saison. Ohne sie bleibt es beim Countdown — mit ihr entscheidet die ENDSAISON.
+   *
+   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus", obwohl ihr
+   * Vertrag bis Ende Saison 2 laeuft. Der Countdown wird am Ende einer Saison gesenkt, waehrend
+   * diese noch die laufende ist; danach heisst eine 1 „noch eine volle Saison". Diese Funktion las
+   * sie weiter als „letzte Saison" — bei Xelara und 128 weiteren Spielern der Liga.
+   *
+   * Optional, weil viele Aufrufer keinen Spielstand zur Hand haben. Sie bekommen weiter die alte
+   * Antwort; falsch wird sie erst im Saisonende-Fenster, und dort wandern die Aufrufer nach.
+   */
+  aktuelleSaisonNummer?: number | null,
 ): ContractStatus {
   if (
     entry.contractStatus === "released" ||
@@ -30,6 +42,13 @@ export function normalizeRosterContractStatus(
   }
   if (entry.contractStatus === "free_agent") {
     return "out_of_contract";
+  }
+
+  const ende = entry.contractEndSeasonNumber;
+  if (typeof ende === "number" && Number.isFinite(ende) && aktuelleSaisonNummer != null) {
+    if (ende < aktuelleSaisonNummer) return "out_of_contract";
+    if (ende === aktuelleSaisonNummer) return "expiring";
+    return "active";
   }
 
   const length = normalizeContractLength(entry.contractLength);
