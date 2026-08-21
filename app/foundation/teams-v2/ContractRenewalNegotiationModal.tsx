@@ -246,21 +246,50 @@ export default function ContractRenewalNegotiationModal({
     requestSeqRef.current = seq;
     setPreviewBusy(true);
     debounceRef.current = setTimeout(() => {
+      /**
+       * DAS FENSTER DARF NICHT HAENGEN BLEIBEN.
+       *
+       * GEMELDET VON CHRIS: „momentan lädt es endlos."
+       *
+       * `previewBusy` wurde synchron gesetzt und NUR im Erfolgspfad wieder geloest — kein `catch`,
+       * kein `finally`, kein Timeout. Bleibt eine Antwort aus, steht das Fenster dauerhaft auf
+       * „Die Verhandlungsvorschau wird aktualisiert", und beide Knoepfe sind gesperrt: „Angebot
+       * senden" und „Vertrag unterschreiben" haengen beide an `previewBusy`.
+       *
+       * Und Antworten bleiben aus: `better-sqlite3` ist synchron, jeder Voll-Load des Spielstands
+       * blockiert den ganzen Node-Prozess. Ein Bestaetigen stiess bis eben fuenf davon an, drei
+       * davon im Hintergrund — waehrenddessen wird keine andere Anfrage bedient.
+       *
+       * `finally` statt `then`: der Zustand loest jetzt IMMER, auch bei Netzfehler oder Absturz
+       * der Route. Ein Fehlschlag zeigt dann die zuletzt bekannten Zahlen statt einer toten
+       * Oberflaeche — schlechter als frische Zahlen, aber unendlich viel besser als gar nichts.
+       */
       void requestPreview({
         teamId: subject.teamId,
         playerId: subject.playerId,
         contractLength: draftLength,
         offeredSalary: draftSalary,
         contractShape: draftShape,
-      }).then((payload) => {
-        if (requestSeqRef.current !== seq) {
-          return;
-        }
-        if (payload?.summary) {
-          setSummary(payload.summary);
-        }
-        setPreviewBusy(false);
-      });
+      })
+        .then((payload) => {
+          if (requestSeqRef.current !== seq) {
+            return;
+          }
+          if (payload?.summary) {
+            setSummary(payload.summary);
+          }
+        })
+        .catch(() => {
+          // Bewusst still: `requestPreview` faengt seine Fehler schon selbst ab und liefert null.
+          // Dieser Zweig ist das Netz darunter, damit `finally` garantiert erreicht wird.
+        })
+        .finally(() => {
+          // Nur die JUENGSTE Anfrage darf entsperren — eine ueberholte Antwort wuerde sonst
+          // freigeben, waehrend die neuere noch laeuft.
+          if (requestSeqRef.current === seq) {
+            setPreviewBusy(false);
+          }
+        });
     }, PREVIEW_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) {
