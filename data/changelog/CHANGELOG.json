@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-21",
+      "seite": "Technik",
+      "pr": null,
+      "text": "Die Spieltags-Bühne wird bei jeder Änderung ab jetzt wirklich aufgebaut, bevor etwas ins Spiel darf. Bisher gab es 27 Tests, die sie erwähnten — aber keinen einzigen, der sie tatsächlich zusammensetzte; alle lasen nur ihren Quelltext oder prüften die Logik daneben. Genau daran lag der Absturz im August: die neue Kauffenster-Ansage rechnete beim Aufbauen und flog dabei auf die Nase, was kein Test der Welt bemerken kann, solange niemand aufbaut. Geprüft werden drei echte Lagen — neue Saison mit offenem Kauffenster, gewerteter Spieltag, Saisonende. Der Test hängt sich von selbst in den Pflicht-Prüflauf ein.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-21",
       "seite": "Intern · Entwicklung",
       "pr": null,
       "text": "Eine auffällige Konjunktur-Reihe wird ab jetzt gemeldet statt stillschweigend ersetzt. Der Konjunkturfaktor entscheidet über Sponsorenzahlungen und die Drosselung der Luxussteuer; wer ihn beim Laden austauscht, ändert rückwirkend die Grundlage von Geld, das längst geflossen ist. Der neue Wächter prüft in jeder Saison, ob die gespeicherte Reihe vollständig und lückenlos ist, und in Saison 1 zusätzlich, ob sie zu dem passt, was aus dem Spielstand folgt. Ab Saison 2 schweigt die Wertprüfung bewusst — dort wird die Reihe von der Vorsaison fortgeschrieben und soll abweichen. Eine auffällige Reihe bleibt stehen; der Wächter schreibt nur auf, was er sieht. Am Spielstand ändert das nichts, solange nichts auffällt.",
