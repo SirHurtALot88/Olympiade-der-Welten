@@ -48106,6 +48106,84 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* ALLE TEAMS IN EINEM BILD (`lcmgxx`). Genau eine Linie traegt Farbe und Vordergrund, alle anderen
+   liegen blass dahinter als Feld — 32 gleich starke Linien waeren unlesbar. Farben kommen aus
+   Tokens, damit die Grafik in beiden Themes traegt. */
+.is-new-look .nl-alltime-liga {
+  display: grid;
+  gap: var(--nl-s1);
+  margin: 0 0 var(--nl-s2);
+}
+
+.is-new-look .nl-alltime-liga-spanne {
+  margin: 0;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-liga-svg {
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-bg);
+}
+
+.is-new-look .nl-alltime-liga-linie {
+  fill: none;
+  stroke: var(--nl-line-2);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.is-new-look .nl-alltime-liga-linie.is-hervorgehoben {
+  stroke: var(--nl-accent);
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.is-new-look .nl-alltime-liga-punkt {
+  fill: var(--nl-accent);
+}
+
+.is-new-look .nl-alltime-liga-achse {
+  fill: var(--nl-mut);
+  font-size: 10px;
+}
+
+.is-new-look .nl-alltime-liga-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-alltime-liga-chip {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Der Chip ist SCHRIFT, deshalb `--nl-accent-text` und nicht `--nl-accent`: dasselbe Token, aber
+   per accentTextFor auf >= 4,5:1 angehoben — bei dunklen Vereinsfarben waere die rohe Akzentfarbe
+   als Schrift unlesbar (Ratchet in tests/nl-accent-text-regel.test.ts). Die LINIE daneben bleibt
+   auf `--nl-accent`: sie ist keine Schrift, sondern die Vereinsfarbe selbst, und folgt damit den
+   uebrigen Charts im Haus. */
+.is-new-look .nl-alltime-liga-chip.is-hervorgehoben {
+  border-color: var(--nl-accent-text);
+  color: var(--nl-accent-text);
+  font-weight: 700;
+}
+
+.is-new-look .nl-alltime-liga-hinweis {
+  margin: 0 0 var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-alltime-chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

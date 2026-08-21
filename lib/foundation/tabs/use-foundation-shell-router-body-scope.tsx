@@ -2448,11 +2448,48 @@ export function useFoundationShellRouterBodyScope({
         JSON.stringify(teamStrategyDraft[team.teamId] ?? null) !==
         JSON.stringify(resolvedTeamStrategyProfiles[team.teamId] ?? null),
     );
-    if (gameModeOwnershipDraftChanged || strategyChanged) {
+    if (strategyChanged) {
       setTeamControlMessage(
-        "Spielmodus-/Team-Zuordnung und Strategy-Profile können in einem laufenden Online-Room aktuell nicht gespeichert werden. Bitte nur Identity- und Admin-Settings speichern oder außerhalb des Rooms anpassen.",
+        "Strategy-Profile können in einem laufenden Online-Room aktuell nicht gespeichert werden. Bitte nur Identity-, Admin- und Zuordnungs-Settings speichern oder außerhalb des Rooms anpassen.",
       );
       return;
+    }
+
+    /**
+     * MENSCH/KI GEHT JETZT AUCH IM RAUM — Chris' Entscheidung zu `17xs83` (20.08.2026): „es muss
+     * eine möglichkeit geben das sauber umzustellen … und DAS gilt dann auch überall", Zuständigkeit
+     * beim Host wie bei Draft und Simulation.
+     *
+     * HIER STAND EINE ABLEHNUNG für jeden im Raum. Sie war die letzte Stelle, an der die eine
+     * Umschaltung NICHT galt: im Solo eine Einstellung, im Raum eine Fehlermeldung.
+     *
+     * Der Weg ist bewusst eigen (`/api/team-settings/ownership`) und schreibt saveweit — die
+     * Zuordnung ist eine Aufteilung, kein Feld je Team. Die Host-Prüfung macht der Server; ein
+     * Teilnehmer bekommt `host_only_action` zurück und liest es als Klartext. Eine Prüfung hier im
+     * Browser wäre nur eine Bequemlichkeit und keine Sicherung.
+     */
+    if (gameModeOwnershipDraftChanged) {
+      const response = await fetch("/api/team-settings/ownership", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withRoomBody({
+            saveId: activeSaveId,
+            chrisTeamIds: gameModeOwnershipChrisIds,
+            frankyTeamIds: gameModeOwnershipFrankyIds,
+          }),
+        ),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        setTeamControlMessage(
+          formatRoomWriteErrorCode(payload.error) ?? "Team-Zuordnung konnte nicht gespeichert werden.",
+        );
+        return;
+      }
     }
 
     const changedTeamIds = new Set<string>();
@@ -2468,6 +2505,14 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (changedTeamIds.size === 0) {
+      // Die Zuordnung ist ggf. oben schon geschrieben worden — dann waere „keine Aenderungen" eine
+      // Falschmeldung ueber einen Schreibvorgang, der gerade stattgefunden hat, und der Spielstand
+      // im Browser bliebe auf dem alten Stand stehen.
+      if (gameModeOwnershipDraftChanged) {
+        setTeamControlMessage("Team-Zuordnung wurde gespeichert.");
+        await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
+        return;
+      }
       setTeamIdentityMessage("Keine Änderungen zum Speichern.");
       setTeamControlMessage("Keine Änderungen zum Speichern.");
       return;

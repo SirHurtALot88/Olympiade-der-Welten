@@ -455,10 +455,32 @@ export async function POST(request: Request) {
     if (!source) {
       return NextResponse.json({ error: "sourceSaveId could not be resolved." }, { status: 404 });
     }
+    // EIN SNAPSHOT IST EIN MANUELLER SPIELSTAND — die Kategorie wird hier gesetzt und nicht geerbt.
+    //
+    // GEMESSEN (Koop-Audit, Abschnitt C): der Snapshot verschwand kurz nach dem Anlegen wieder,
+    // und der naechste Zugriff auf seine ID kam als HTTP 500 "Save ... wurde nicht gefunden."
+    // zurueck. Die Ursache sitzt in der Vererbung: `buildScenarioMeta` uebernimmt
+    // `gameState.scenarioMeta.saveCategory` der QUELLE (scenario-meta.ts:103) — und das muss es
+    // auch, weil `withScenarioMeta` bei JEDEM Schreibvorgang darueber laeuft und ein Save sonst
+    // seine Kategorie bei jedem Speichern verloere. Nur beim ANLEGEN eines Snapshots ist die
+    // Vererbung falsch: ein Snapshot der Vorsaison-Sicherung wurde selbst zur Vorsaison-Sicherung,
+    // landete damit in einer rotierenden Fuenfergruppe (save-retention.ts) und war ab dem Moment
+    // Freiwild, in dem ihn ein `activate` seinen `active`-Schutz kostete.
+    //
+    // Der Rueckfall `saveCategory ?? "manual"` in persistence-service.ts:270 sagt genau das schon —
+    // er lief nur nie, weil das geerbte Feld bereits gefuellt war. Hier steht die Absicht jetzt an
+    // der Stelle, an der der Snapshot entsteht: wer auf "Snapshot" klickt, will ihn behalten.
+    //
+    // NACHGEMESSEN an einer Kopie von Chris' Datenbank (40 Spielstaende): der Snapshot fiel in die
+    // Gruppe singleplayer:pre-season, die dadurch von sechs auf fuenf Zeilen gestutzt wurde — zwei
+    // fremde Spielstaende vom 17. und 18.08. waren weg, ohne dass jemand ein Loeschen angefordert
+    // haette. "manual" ist eine geschuetzte Kategorie (PROTECTED_CATEGORIES in save-retention.ts)
+    // und rotiert gar nicht erst mit.
     const scenarioMeta = buildScenarioMeta({
       gameState: source.gameState,
       label: body.name ?? `${source.name} Snapshot`,
       sourceSaveId: source.saveId,
+      saveCategory: "manual",
       isStableTestPoint: true,
     });
     const ownerId = await resolveSessionOwnerId();
