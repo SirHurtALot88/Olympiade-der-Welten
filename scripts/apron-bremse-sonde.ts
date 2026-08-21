@@ -17,6 +17,10 @@
  * dem Team im Kaufmoment real aus der Hand nimmt.
  *
  * Eingeschaltet über `OLY_MESS_APRON_BREMSE=<pfad.jsonl>`; ohne die Variable passiert nichts.
+ *
+ * MESSLÄUFE ZUSÄTZLICH MIT `OLY_LONG_RUN_TUNE=0` FAHREN. Sonst schreibt das Auto-Tune des Laufs
+ * getunte Balancing-Konstanten in lib/training/*.ts zurück — der Lauf verändert also die Regeln,
+ * die er gerade misst, und die Änderung landet im Arbeitsbaum (siehe `run-resilient-multiseason.ts`).
  */
 import fs from "node:fs";
 
