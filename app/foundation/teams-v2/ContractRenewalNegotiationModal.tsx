@@ -547,22 +547,39 @@ export default function ContractRenewalNegotiationModal({
               <div className="nl-negotiation-choice-row" role="group" aria-label="Laufzeit wählen">
                 {CONTRACT_LENGTHS.map((length) => {
                   const overLimit = lengthLimit != null && length > lengthLimit;
+                  /**
+                   * DER STERN SASS AUF EINER LAUFZEIT, DIE DAS FENSTER DANN VERWEIGERTE.
+                   *
+                   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus."
+                   *
+                   * Ihre Wunschlaufzeit ist 3, ihr Moral-Limit 2. Die 3 trug damit den Stern
+                   * („Wunschlaufzeit des Spielers"), war anklickbar — und liess sich anschliessend
+                   * nicht bestaetigen: „Die Moral begrenzt die Vertragslaenge — waehle eine
+                   * kuerzere Laufzeit." Wer daraufhin nach unten geht, landet leicht auf 1. Und 1
+                   * heisst „laeuft aus", also sieht die Verlaengerung aus wie nichts.
+                   *
+                   * Zwei Aenderungen: was das Fenster nicht unterschreiben wird, ist auch nicht
+                   * mehr anklickbar. Und der Stern sitzt nur noch auf einer Laufzeit, die wirklich
+                   * geht — eine Empfehlung, der man nicht folgen kann, ist keine.
+                   */
+                  const istWunsch = negotiation?.contractPreference?.idealLength === length && !overLimit;
                   return (
                     <button
                       key={length}
                       type="button"
+                      disabled={overLimit}
                       className={`nl-negotiation-choice${draftLength === length ? " is-active" : ""}${overLimit ? " is-limited" : ""}`}
                       title={
                         overLimit
-                          ? `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Seasons.`
-                          : negotiation?.contractPreference?.idealLength === length
+                          ? `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Saisons — ${formatNlNumber(length, 0)} ist nicht unterschreibbar.`
+                          : istWunsch
                             ? "Wunschlaufzeit des Spielers."
                             : undefined
                       }
                       onClick={() => setDraftLength(length)}
                     >
                       {formatNlNumber(length, 0)}
-                      {negotiation?.contractPreference?.idealLength === length ? <small>★</small> : null}
+                      {istWunsch ? <small>★</small> : null}
                     </button>
                   );
                 })}
@@ -766,7 +783,17 @@ export default function ContractRenewalNegotiationModal({
               })
             }
           >
-            {busy ? "Wird verlängert…" : "Schritt 2: Vertrag unterschreiben"}
+            {/**
+              * DIE LAUFZEIT STEHT AUF DEM KNOPF.
+              *
+              * Bis hierher sagte er nur „Vertrag unterschreiben" — man konnte eine Ein-Saison-
+              * Verlaengerung abschliessen, ohne sie je gelesen zu haben, und danach stand der
+              * Spieler unveraendert auf „laeuft aus". Wer die Zahl auf dem Knopf sieht, kann sich
+              * nicht mehr unbemerkt verklicken.
+              */}
+            {busy
+              ? "Wird verlängert…"
+              : `Schritt 2: ${formatNlNumber(draftLength, 0)} ${draftLength === 1 ? "Saison" : "Saisons"} unterschreiben`}
           </button>
         </footer>
         {confirmDisabledReason && !busy && !previewBusy ? (
