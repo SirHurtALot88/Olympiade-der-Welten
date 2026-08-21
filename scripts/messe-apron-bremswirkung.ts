@@ -15,6 +15,12 @@
  * Zweig direkt darunter, der die Ruecklage auf 45 % zusammenstreicht, sobald der Kader unter dem
  * Optimum liegt. Genau dieses Zusammenspiel misst dieses Skript, statt es zu vermuten.
  *
+ * DER ZEITPUNKT ENTSCHEIDET. Dieses Skript misst EINEN Stand. Mitten in der Saison hat ohnehin
+ * kaum ein Team freies Budget, am `season_completed`-Stand steht kaum ein Team ueber seiner Decke
+ * (die Vertraege sind gerade ausgelaufen) — beide Male kommt „bindet nichts" heraus, und beide Male
+ * sagt das nichts ueber den KAUFMOMENT. Der liegt in der Vorsaison, unmittelbar vor dem
+ * Kaufdurchlauf; dort misst `scripts/apron-bremse-sonde.ts` waehrend eines Simulationslaufs.
+ *
  * Aufruf:
  *   OLY_APP_SQLITE_PATH=<pfad> npx tsx scripts/messe-apron-bremswirkung.ts [--save <id>]
  */
@@ -24,13 +30,8 @@ loadEnvConfig(process.cwd());
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { getTeamApronSalaryBase, resolveSeasonApronLines } from "@/lib/season/apron-service";
-import {
-  resolveApronTighteningMultiplier,
-  resolveTeamApronSalaryCeiling,
-} from "@/lib/ai/ai-cash-salary-target-service";
-import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { resolveSeasonApronLines } from "@/lib/season/apron-service";
+import { erhebeApronBremsZeilen } from "./apron-bremse-sonde";
 
 function r(x: number, d = 1): string {
   return Number.isFinite(x) ? (Math.round(x * 10 ** d) / 10 ** d).toFixed(d) : "—";
@@ -54,38 +55,20 @@ function main(): void {
   let deltaSumme = 0;
   let freiVerlust = 0;
   const zeilen: string[] = [];
-  for (const team of gs.teams) {
-    const gehalt = getTeamApronSalaryBase(gs, team.teamId);
-    const decke = resolveTeamApronSalaryCeiling(gs, team.teamId);
-    if (gehalt <= decke) continue;
-    const faktor = resolveApronTighteningMultiplier(gs, team.teamId);
-    const mit = resolveTeamCashRunwayReserve(gs, team.teamId);
-    /**
-     * „OHNE Bremse" wird NICHT nachgebaut, sondern aus derselben Funktion gewonnen: die Ruecklage
-     * haengt linear an `1 / apronTightening`, ein Faktor von 1 ergibt also `mit * faktor`. So bleibt
-     * es eine Rechenstelle — ein zweiter Nachbau der Formel wuerde beim naechsten Umbau abweichen.
-     * Der Sockel `maintenancePad` faellt dabei minimal mit heraus; er ist gegen die Gehaltssumme
-     * klein und die Aussage (wie viel Cash die Bremse bindet) haengt nicht an ihm.
-     */
-    const ohne = mit * faktor;
-    const cash = Number((team as { cash?: number }).cash ?? 0);
-    const freiMit = Math.max(0, cash - mit);
-    const freiOhne = Math.max(0, cash - ohne);
-    const identity = gs.teamIdentities.find((e) => e.teamId === team.teamId);
-    const ziele = deriveRosterTargets(team, identity);
-    const kader = gs.rosters.filter((e) => e.teamId === team.teamId).length;
-    deltaSumme += mit - ohne;
-    freiVerlust += freiOhne - freiMit;
+  for (const zeile of erhebeApronBremsZeilen(gs, gs.season.id, "einzelstand")) {
+    if (zeile.faktor >= 1) continue;
+    deltaSumme += zeile.ruecklageMit - zeile.ruecklageOhne;
+    freiVerlust += zeile.freiOhne - zeile.freiMit;
     zeilen.push(
-      `${team.teamId.padEnd(6)} ${r(gehalt).padStart(6)} ${r(decke).padStart(7)} ${r(faktor, 2).padStart(7)} |` +
-        `${r(mit).padStart(15)} ${r(ohne).padStart(5)} ${r(mit - ohne).padStart(7)} |` +
-        `${r(cash).padStart(6)} ${r(freiMit).padStart(9)} ${r(freiOhne).padStart(10)} | ` +
-        `${kader}/${ziele.playerOpt}${kader < ziele.playerOpt ? " (unter Opt → Ruecklage x0,45)" : ""}`,
+      `${zeile.teamId.padEnd(6)} ${r(zeile.gehalt).padStart(6)} ${r(zeile.decke).padStart(7)} ${r(zeile.faktor, 2).padStart(7)} |` +
+        `${r(zeile.ruecklageMit).padStart(15)} ${r(zeile.ruecklageOhne).padStart(5)} ${r(zeile.ruecklageMit - zeile.ruecklageOhne).padStart(7)} |` +
+        `${r(zeile.cash).padStart(6)} ${r(zeile.freiMit).padStart(9)} ${r(zeile.freiOhne).padStart(10)} | ` +
+        `${zeile.kader}/${zeile.kaderOpt}${zeile.kader < zeile.kaderOpt ? " (unter Opt \u2192 Ruecklage x0,45)" : ""}`,
     );
   }
   console.log(zeilen.join("\n"));
   console.log(
-    `\n  Die Bremse bindet zusaetzlich ${r(deltaSumme)} Cash ueber ${zeilen.length} Teams — ` +
+    `\n  Die Bremse bindet zusaetzlich ${r(deltaSumme)} Cash ueber ${zeilen.length} Teams \u2014 ` +
       `davon real verfuegbar gewesen: ${r(freiVerlust)}.`,
   );
   console.log(

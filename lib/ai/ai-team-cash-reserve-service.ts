@@ -94,10 +94,22 @@ export function resolveHoardMultiplier(gameState: GameState, teamId: string) {
   return clamp(0.25 + (cashPriority / 10) * 0.25 + (finances / 10) * 0.3, 0.25, financeCap);
 }
 
+/**
+ * MESSPFAD, KEINE SPIELREGEL: `apronBremseAus` setzt den Apron-Faktor auf 1 und liefert damit die
+ * Ruecklage, die dieselbe Rechnung OHNE Bremse ergaebe. Produktion ruft die Funktion ohne diese
+ * Option, das Verhalten aendert sich also nirgends.
+ *
+ * WARUM ALS OPTION UND NICHT ALS ZWEITE FORMEL IM MESSSKRIPT: die Bremse steht im Zaehler, aber
+ * direkt darunter steht ein Zweig, der die Ruecklage auf 45 % zusammenstreicht, sobald der Kader
+ * unter dem Optimum liegt. `ohne = mit x faktor` stimmt genau dann NICHT, wenn dieser Zweig greift
+ * — und er greift in der Vorsaison bei fast jedem Team. Eine Gegenrechnung im Messskript haette
+ * also stillschweigend falsch gemessen. Dieselbe Rechenstelle zweimal aufzurufen kann das nicht.
+ * (Gleiches Muster wie `konjunkturFactorMax` in `apronLevyForSalary`.)
+ */
 export function resolveTeamCashRunwayReserve(
   gameState: GameState,
   teamId: string,
-  opts?: { expectedSalaryAfterPlan?: number },
+  opts?: { expectedSalaryAfterPlan?: number; apronBremseAus?: boolean },
 ) {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
@@ -117,7 +129,7 @@ export function resolveTeamCashRunwayReserve(
   // Cash zurueck statt weiter draufzusatteln — reserve steigt, wenn apronTightening < 1 sinkt.
   // Titelanwaerter (hohe Ambition) haben eine hoehere Decke und spueren die Bremse spaeter/gar
   // nicht; ein Team darf die Linie trotzdem reissen (Multiplikator hat einen Boden bei 0,5, nie 0).
-  const apronTightening = resolveApronTighteningMultiplier(gameState, teamId);
+  const apronTightening = opts?.apronBremseAus ? 1 : resolveApronTighteningMultiplier(gameState, teamId);
   const facilityPreview = previewFacilitySeasonEndFinance(
     {
       saveId: "reserve-preview",
