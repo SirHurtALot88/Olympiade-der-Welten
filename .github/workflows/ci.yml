@@ -219,7 +219,7 @@ jobs:
   #
   # ZWEI ZAHLEN VON MIR WAREN FALSCH, und sie stehen hier, damit sie niemand nochmal aufwaermt:
   #
-  #   „~5 Minuten"  (Vorschlag 4b)      -> gemessen 174 Dateien, 1346 Tests, 11m20s
+  #   „~5 Minuten"  (Vorschlag 4b)      -> 174 Dateien, 1346 Tests: 11m20s lokal, 16m13s in CI
   #   „~16 statt ~4 Minuten je PR"      -> beide Jobs starten gleichzeitig und laufen PARALLEL
   #
   # Zur zweiten: `test-and-smoke` ist der laengste Job und war es immer (#607 24:49, #610 25:27).

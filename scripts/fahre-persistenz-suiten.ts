@@ -11,13 +11,14 @@
  * Tor fehlt.
  *
  * GEMESSEN, und die Zahl korrigiert eine frühere Schätzung von mir: **174 Dateien, 1346 Tests,
- * 11m20s.** Ich hatte Chris „~5 Minuten" genannt und später „7:27" — beides war zu optimistisch,
- * beides an einer engeren Auswahl gemessen. Es sind rund elf Minuten, und das gehört gesagt,
- * bevor er das Häkchen setzt.
+ * 11m20s lokal — und 16m13s auf dem CI-Runner.** Ich hatte Chris „~5 Minuten" genannt und später
+ * „7:27" — beides war zu optimistisch, beides an einer engeren Auswahl gemessen. Es sind gut
+ * sechzehn Minuten im Tor, und das gehört gesagt, bevor er das Häkchen setzt.
  *
  * WARUM DAS TROTZDEM NICHTS KOSTET: die CI-Jobs laufen parallel. `test-and-smoke` (der heutige
  * Pflicht-Check) braucht 22–25 Minuten; alles, was kürzer ist, verlängert die Wartezeit auf einen
- * Merge um NULL. Nachgemessen an vier Läufen — #607: 24:49/22:20, #610: 25:27/20:59.
+ * Merge um NULL. Nachgemessen — #607: 24:49, #610: 25:27, und im ersten Lauf dieses Jobs 25:25
+ * gegen seine eigenen 16:13.
  *
  * WARUM ERRECHNET UND NICHT AUFGEZÄHLT: dieselbe Lehre wie bei den Quelltext-Wächtern. Eine feste
  * Liste veraltet ab der ersten neuen Persistenz-Suite — und dann fehlt genau sie im Tor.
