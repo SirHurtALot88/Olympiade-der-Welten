@@ -6,6 +6,7 @@ import {
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
+import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   resolveTeamLiquidityBufferTarget,
@@ -66,23 +67,22 @@ function getTeamRosterSalarySum(gameState: GameState, teamId: string) {
   );
 }
 
+/**
+ * Hochrechnung auf die CASH-Sicht der Gehaelter (`getTeamRosterSalarySum` — was vom Konto geht).
+ * Die Formel selbst steht in `lib/ai/salary-projection.ts`; die Apron-Frage ruft dieselbe Formel
+ * mit ihrer eigenen Bemessungsgrundlage auf. Zwei Basen, eine Rechenstelle.
+ */
 export function projectExpectedSalaryAtPlannerTarget(
   gameState: GameState,
   teamId: string,
   plannerTarget?: number,
 ) {
-  const team = gameState.teams.find((entry) => entry.teamId === teamId);
-  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
-  const { playerOpt } = deriveRosterTargets(team, identity);
-  const target = plannerTarget ?? playerOpt;
-  const rosterCount = getTeamRosterCount(gameState, teamId);
-  const currentSalary = getTeamRosterSalarySum(gameState, teamId);
-  const finances = identity?.finances ?? 5;
-  const salaryFloor = target * (3.6 + finances * 0.1);
-  if (rosterCount <= 0) return round(Math.max(salaryFloor, currentSalary), 2);
-  const avgSalary = currentSalary / rosterCount;
-  const missing = Math.max(0, target - rosterCount);
-  return round(Math.max(currentSalary + avgSalary * missing, salaryFloor), 2);
+  return projectSalaryAtPlannerTarget({
+    gameState,
+    teamId,
+    currentSalary: getTeamRosterSalarySum(gameState, teamId),
+    plannerTarget,
+  });
 }
 
 export function resolveHoardMultiplier(gameState: GameState, teamId: string) {
@@ -94,10 +94,22 @@ export function resolveHoardMultiplier(gameState: GameState, teamId: string) {
   return clamp(0.25 + (cashPriority / 10) * 0.25 + (finances / 10) * 0.3, 0.25, financeCap);
 }
 
+/**
+ * MESSPFAD, KEINE SPIELREGEL: `apronBremseAus` setzt den Apron-Faktor auf 1 und liefert damit die
+ * Ruecklage, die dieselbe Rechnung OHNE Bremse ergaebe. Produktion ruft die Funktion ohne diese
+ * Option, das Verhalten aendert sich also nirgends.
+ *
+ * WARUM ALS OPTION UND NICHT ALS ZWEITE FORMEL IM MESSSKRIPT: die Bremse steht im Zaehler, aber
+ * direkt darunter steht ein Zweig, der die Ruecklage auf 45 % zusammenstreicht, sobald der Kader
+ * unter dem Optimum liegt. `ohne = mit x faktor` stimmt genau dann NICHT, wenn dieser Zweig greift
+ * — und er greift in der Vorsaison bei fast jedem Team. Eine Gegenrechnung im Messskript haette
+ * also stillschweigend falsch gemessen. Dieselbe Rechenstelle zweimal aufzurufen kann das nicht.
+ * (Gleiches Muster wie `konjunkturFactorMax` in `apronLevyForSalary`.)
+ */
 export function resolveTeamCashRunwayReserve(
   gameState: GameState,
   teamId: string,
-  opts?: { expectedSalaryAfterPlan?: number },
+  opts?: { expectedSalaryAfterPlan?: number; apronBremseAus?: boolean },
 ) {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
@@ -117,7 +129,7 @@ export function resolveTeamCashRunwayReserve(
   // Cash zurueck statt weiter draufzusatteln — reserve steigt, wenn apronTightening < 1 sinkt.
   // Titelanwaerter (hohe Ambition) haben eine hoehere Decke und spueren die Bremse spaeter/gar
   // nicht; ein Team darf die Linie trotzdem reissen (Multiplikator hat einen Boden bei 0,5, nie 0).
-  const apronTightening = resolveApronTighteningMultiplier(gameState, teamId);
+  const apronTightening = opts?.apronBremseAus ? 1 : resolveApronTighteningMultiplier(gameState, teamId);
   const facilityPreview = previewFacilitySeasonEndFinance(
     {
       saveId: "reserve-preview",

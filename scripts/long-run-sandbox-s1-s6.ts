@@ -85,6 +85,7 @@ import {
 } from "@/lib/season/long-run-profile";
 import { getTeamsNeedingTransferBudgetDeploy } from "@/lib/ai/ai-budget-deploy-service";
 import { runPreseasonProactiveCashRecovery } from "@/lib/ai/preseason-cash-recovery-service";
+import { schreibeApronBremsSonde } from "./apron-bremse-sonde";
 import {
   assertPhaseAuditNoRed,
   runPhaseAuditDe,
@@ -799,6 +800,10 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
       .map(({ team, rosterCount, optTarget, strategy }) => `${team.shortCode}:${rosterCount}/${optTarget}:${strategy}`)
       .join(",")}`,
   );
+  // MESSUNG (No-op ohne `OLY_MESS_APRON_BREMSE`): der Kaufmoment ist GENAU HIER — eine Zeile
+  // spaeter kauft die KI. Was die Apron-Bremse an freiem Budget bindet, ist nur an diesem Stand
+  // ablesbar, nicht am Saisonende und nicht mitten in der Saison.
+  schreibeApronBremsSonde(save.gameState, seasonId, "vor_kauf");
   const preseasonConvergenceStartedAt = Date.now();
   const convergence = await runTransferWindowSession({
     saveId,

@@ -82,6 +82,8 @@ export function buildLegacyMatchdayReadiness(
       draft.entries.map((entry) => entry.playerId),
       context.activePlayers.map((eintrag) => eintrag.playerId),
     ),
+    selectedPlayerCount,
+    istGesperrt: draft?.status === "locked",
   });
   const validation = validateLegacyLineupContext({
     ...context,
@@ -108,6 +110,10 @@ export function buildLegacyMatchdayReadiness(
     ),
   }, {
     enforceCompleteness: !allowPartialLineup,
+    // Ein GESPERRTER Entwurf wird nicht mehr an der Verfuegbarkeit gemessen — die Verletzung
+    // ist waehrend des Spieltags passiert und der Entwurf ist nicht mehr aenderbar. Begruendung
+    // an der Pruefung selbst (`legacy-lineup-validator.ts`).
+    lineupIsLocked: draft?.status === "locked",
   });
 
   if (!validation.isValid) {
