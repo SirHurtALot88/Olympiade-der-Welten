@@ -1,9 +1,13 @@
-# Befund: die Apron-Bremse der KI greift ins Leere — und zwar aus Zeitgründen
+# Befund: die Apron-Bremse der KI — erst falsch bemessen, dann zu schwach gehebelt
 
-**Frage von Chris:** „aber was heißt kauft munter weiter? sollte der appetit nicht das
-kaufverhalten beeinflussen? Können wir das messen wie sehr der bremsfaktor sich real auswirkt?"
+**Chris:** „aber was heißt kauft munter weiter? sollte der appetit nicht das kaufverhalten
+beeinflussen? Können wir das messen wie sehr der bremsfaktor sich real auswirkt?"
 
-Berechtigt. „Kauft munter weiter" war eine Behauptung, keine Messung. Hier ist die Messung.
+Und danach, nach der ersten Messung: „die apron linie ist sonst ja nur in S1 korrekt und danach
+immer falsch das ist ein grundproblem — fixe das sonst können wir nix messen und dann miss erneut".
+
+Beides ist beantwortet. Der Reihe nach, weil der zweite Befund erst sichtbar wurde, nachdem der
+erste behoben war.
 
 ## Was die Bremse tut
 
@@ -13,79 +17,93 @@ Berechtigt. „Kauft munter weiter" war eine Behauptung, keine Messung. Hier ist
 ruecklage = erwartetesGehalt × hoard × hoardTightening / apronFaktor + sockel
 ```
 
-Ein Faktor von 0,77 macht die Rücklage also 1/0,77 = 1,30-mal so groß. Ob das ein Kaufverhalten
-ändert, hängt allein daran, ob dem Team dadurch **freies Budget** verlorengeht (`cash − rücklage`).
+Ein Faktor von 0,83 macht die Rücklage 1/0,83 = 1,20-mal so groß. Ob das ein Kaufverhalten ändert,
+hängt allein daran, ob dem Team dadurch **freies Budget** verlorengeht (`cash − rücklage`).
 
 ## Wie gemessen wurde
 
 `scripts/apron-bremse-sonde.ts` hängt im Simulationslauf genau eine Zeile vor
-`runTransferWindowSession` — das ist der Moment, in dem die KI kauft. Sie schreibt je Team die
-Rücklage MIT und OHNE Bremse, beides aus derselben Funktion
-(`resolveTeamCashRunwayReserve`, Option `apronBremseAus`).
+`runTransferWindowSession` — der Moment, in dem die KI kauft. Sie schreibt je Team die Rücklage MIT
+und OHNE Bremse, beides aus derselben Funktion (`resolveTeamCashRunwayReserve`, Option
+`apronBremseAus`).
 
 **Zwei frühere Messungen waren am falschen Stand** und sind zurückgezogen: mitten in der Saison
-(dort hat ohnehin kaum ein Team freies Budget) und am `season_completed`-Stand (dort steht kaum ein
-Team über seiner Decke, weil die Verträge gerade ausgelaufen sind). Beide Male kam „bindet nichts"
-heraus, und beide Male sagte das nichts über den Kaufmoment.
+(dort hat kaum ein Team freies Budget) und am `season_completed`-Stand (dort steht kaum ein Team
+über seiner Decke). Beide Male kam „bindet nichts" heraus, und beide Male sagte das nichts über den
+Kaufmoment.
 
-## Das Ergebnis, vier Saisons
+## Erster Befund: die Bemessung war falsch — behoben
 
-| Saison | Median-Gehalt | Linien | über der Decke | entzogenes Kaufbudget | freies Budget der Liga |
-|---|---:|---|---:|---:|---:|
-| S1 | 63,1 | 78,8 / 100,9 | 1/32 | 0,0 | 1,2 |
-| S2 | 42,5 | 53,1 / 67,9 | 1/32 | 6,2 | 1962,5 |
-| S3 | 39,4 | 49,2 / 63,0 | 2/32 | 4,1 | 2070,2 |
-| S4 | 39,7 | 49,6 / 63,5 | 5/32 | 1,9 | ~2000 |
+Im Kaufmoment sind die Verträge gerade ausgelaufen, die Kader stehen bei 8–11 von 10–14 Plätzen.
+Dieselbe Liga, dieselbe Saison 4, einmal vor und einmal nach den Käufen gemessen:
 
-Über vier Saisons nimmt die Bremse der ganzen Liga zusammen **12,2** aus der Hand, bei rund 2000
-freiem Kaufbudget je Vorsaison — ein Anteil von 0,1 bis 0,3 Prozent.
+| | vor den Käufen | nach den Käufen |
+|---|---:|---:|
+| Median-Gehalt | 39,7 | **55,2** |
+| höchstes Gehalt | 65,0 | 75,5 |
+| Linien (1,25 / 1,6) | 49,6 / 63,5 | **69,1 / 88,4** |
 
-Käufe danach, Durchschnitt je Team: über der Decke 0,0 / 1,0 / 1,5 / 1,0 gegen darunter
-0,03 / 3,26 / 3,27 / 3,63. Der Unterschied ist echt, aber er misst überwiegend den Kaderbedarf mit:
-Teams über ihrer Decke haben in der Regel den volleren Kader.
+Die KI entschied gegen eine Grenze, die 28 % zu tief lag — gerechnet aus einem Kader, den es noch
+gar nicht gab. In Saison 1 fällt das nicht auf, weil der Draft die Kader VOR dem Prüfmoment füllt;
+ab Saison 2 ist der Prüfmoment immer das Tal.
 
-## Zwei Dinge sind sauber
+Behoben in drei Teilen (siehe Commit „Apron-Linien: Anker aus der Vorsaison"):
 
-1. **Sie greift nicht daneben.** Bei Teams *unter* ihrer Decke ist der Entzug in allen vier
-   Saisons exakt 0,0.
-2. **Sie ist nie hart.** W-L, das am stärksten gebremste Team, geht in S3 mit 49,9 statt 53,7
-   einkaufen — und kauft.
+1. **Linien-Seite.** `resolveSeasonApronLines` verankert im offenen Kauffenster am Median der
+   abgerechneten Vorsaison. Kein neuer Speicher — der Snapshot überlebt den Saisonübergang ohnehin
+   und fiel nur am `seasonId`-Abgleich durch. Verankert wird der MEDIAN, nicht die fertige Linie:
+   ein alter Snapshot trägt die Faktoren von damals.
+2. **Team-Seite.** `isTeamOverApronSalaryCeiling` und `resolveApronTighteningMultiplier` messen die
+   auf den geplanten Kader hochgerechnete Apron-Basis. Endzustand gegen Endzustand.
+3. **Ausnahme.** Unter dem harten Kader-Minimum greift die Bremse nicht. Ohne diese Regel traf die
+   Hochrechnung ausgerechnet den Wiederaufbau: ein Team mit 2 von 8 Plätzen wurde auf einen vollen
+   Kader hochgerechnet und bekam das Geld weggesperrt, mit dem es spielfähig werden musste.
 
-## Der Grund ist der Zeitpunkt, nicht die Stärke
+## Zweiter Befund: der Mechanismus trägt nicht — offen
 
-Im Kaufmoment sind die Verträge gerade ausgelaufen. Das Median-Gehalt fällt von 63,1 auf rund 40,
-die Linien hängen am Median und fallen mit — damit rutscht fast jedes Team unter seine eigene
-Decke. Gleichzeitig steht das Cash auf dem Jahres-Maximum, weil die Preisgelder gerade gebucht
-sind.
+Gemessen nach dem Umbau, vier Saisons, frischer Spielstand:
 
-**Die Bremse prüft den Gehaltsstand also in seinem Jahres-Tief, genau in dem Augenblick, in dem
-entschieden wird.** Binden würde sie mitten in der Saison — dort kauft aber niemand.
+| Saison | Anker | Linien | über Decke | entzogenes Kaufbudget | freies Budget der Liga | Anteil |
+|---|---:|---|---:|---:|---:|---:|
+| S1 | 64,8 | 81,0 / 103,7 | 0/32 | 0,00 | 0,5 | 0,00 % |
+| S2 | 64,8 | 81,0 / 103,7 | 1/32 | 0,59 | 2283,3 | 0,03 % |
+| S3 | 58,4 | 73,0 / 93,4 | 2/32 | 5,88 | 1661,2 | 0,35 % |
+| S4 | 58,6 | 73,3 / 93,8 | 2/32 | 5,51 | 1703,2 | 0,32 % |
 
-Daraus folgt unmittelbar: die Bremse **stärker** zu machen ändert praktisch nichts. Die Bedingung
-„du stehst über deiner Decke" ist im Kaufmoment fast nie wahr, und ein größerer Faktor auf einer
-Bedingung, die nicht zutrifft, bleibt wirkungslos.
+**Über vier Saisons: 11,98 entzogen von 5648,3 freiem Kaufbudget — 0,21 Prozent.**
 
-## Was das für den naheliegenden Gegenvorschlag bedeutet
+Der Anker sitzt (S2 hält 64,8 statt ins Tal zu fallen), die Ausnahme greift (alle markierten Teams
+haben 8+ Spieler, kein Wiederaufbauer ist mehr dabei), und die Bremse trifft die Richtigen: W-L
+steht in S3 bei 69,4 gegen eine Decke von 73,0 und wird trotzdem gebremst, weil 9 von 11 Plätzen
+auf 84,8 hochrechnen. Genau so ist es gedacht.
 
-Der Vorschlag „wer über seiner Ambitions-Decke steht, darf kein NEUES Gehalt aufnehmen" ist
-**hiermit zurückgezogen**. Er stellt dieselbe Frage im selben Moment und liefe damit genauso ins
-Leere: in S4 hätte er 5 von 32 Teams betroffen, die zusammen kaum etwas ausgeben.
+**Nur ändert es nichts.** Die Liga geht mit rund 1700–2300 freiem Kaufbudget in jede Vorsaison,
+etwa 55–70 pro Team. Eine Rücklage von 30 gegen einen Cash-Bestand von 70 ist kein Hindernis; W-L
+kauft in S4 mit 39,8 statt 44,5 ein. Das ist ein Nudge, keine Grenze.
 
-Zwei Richtungen, die am gemessenen Grund ansetzen statt an der Stärke:
+**Daraus folgt: an den Faktoren zu drehen hilft nicht.** Weder 1,25/1,6 noch irgendein anderes Paar
+ändert etwas daran, dass der Hebel selbst zu klein ist. Wenn die 2. Linie „wirklich teuer" sein
+soll, muss der Hebel ein anderer sein — eine harte Schranke auf NEU aufgenommenes Gehalt statt
+einer höheren Rücklage, mit derselben Ausnahme (unter dem Kader-Minimum wird immer gekauft).
 
-- **Gegen das geplante Gehalt prüfen, nicht gegen das aktuelle.** Die Größe existiert bereits:
-  `projectExpectedSalaryAtPlannerTarget` rechnet aus, wo die Gehaltssumme nach dem geplanten Kader
-  steht, und wird für die Rücklage schon benutzt — nur die Apron-Frage liest sie nicht.
-- **Die Linien am abgerechneten Median der Vorsaison verankern**, statt am eingebrochenen der
-  laufenden.
+Das ist ein Eingriff in die Spielregel und liegt zur Entscheidung bei Chris.
 
-Beides ist ein Eingriff in die Regel und keine Messung mehr. Beides gehört vor der Umsetzung an
-denselben vier Saisons gemessen.
+## Offene Nebenpunkte
+
+- **Die Simulationsliga ist ärmer als Chris' Spielstand.** M-M steht dort nach den Käufen bei 72,4,
+  auf seinem Save bei 98,7. Die Struktur des Befunds hängt nicht daran, die absoluten Zahlen schon.
+- **Chris' Saison-1-Linien tragen die alten Faktoren** (Snapshot vom 19.08., 1,10/1,25 → 70,8/80,5).
+  Eingefroren ist eingefroren; ab Saison 2 greifen 1,25/1,6. Ein Nachziehen wäre ein Eingriff in
+  eine laufende Saison (`scripts/repariere-apron-linien.ts`) und ist nicht erfolgt.
+- **Der Messlauf schreibt Balancing-Konstanten in die Quelle.** `run-resilient-multiseason.ts` ruft
+  `long-run-auto-tune-organic.ts --apply`; die getunten Werte landen im Arbeitsbaum und sind einmal
+  über ein pauschales `git add -A` in einen Commit gerutscht. Während ein Lauf läuft: kein
+  `git add -A`.
 
 ## Werkzeuge
 
 - `scripts/apron-bremse-sonde.ts` — Sonde am Kaufmoment (`OLY_MESS_APRON_BREMSE=<pfad.jsonl>`)
 - `scripts/werte-apron-sonde-aus.ts` — Auswertung samt Käufen, getrennt nach über/unter Decke
 - `scripts/messe-apron-bremswirkung.ts` — Einzelstand
-- `tests/ki-apron-bremse-gegenprobe.test.ts` — hält fest, dass die Gegenrechnung aus derselben
-  Rechenstelle kommt
+- `tests/apron-linie-vorsaison-anker.test.ts` — der Anker, mit beiden Gegenproben
+- `tests/ki-apron-bremse-gegenprobe.test.ts` — die Gegenrechnung kommt aus derselben Rechenstelle
