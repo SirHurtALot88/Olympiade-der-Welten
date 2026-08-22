@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
+import { verdiktBlocker } from "@/lib/market/contract-negotiation-preview";
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
@@ -913,7 +914,6 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     lastCounterSalary,
     lastNegotiatedSalary,
   } = context;
-  const canBuy = blockingReasons.length === 0;
   const scoutingLevel = team ? getFacilityLevel(getTeamFacilityState(gameState, team.teamId), "scouting_office") : 0;
   const negotiationCacheKey = [
     marketContext.cacheKey,
@@ -959,10 +959,19 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     localNegotiationPreviewCache.set(negotiationCacheKey, negotiationPreview);
   }
   const contractSalary = negotiationPreview.offeredSalary ?? salary;
+  /**
+   * DAS VERDIKT ZAEHLT ERST HIER — und deshalb wird `canBuy` auch erst hier entschieden.
+   *
+   * Vorher stand `canBuy = blockingReasons.length === 0` oberhalb dieser Zeile, also BEVOR die
+   * Verhandlungsvorschau ueberhaupt gebaut war. Ein abgelehntes Angebot konnte damit gar nicht
+   * blocken: die Antwort trug `verdict: "reject_lowball"` und `canBuy: true` nebeneinander.
+   */
+  const blockingReasonsMitVerdikt = [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];
+  const canBuy = blockingReasonsMitVerdikt.length === 0;
 
   return {
     canBuy,
-    blockingReasons,
+    blockingReasons: blockingReasonsMitVerdikt,
     warnings,
     player: player
       ? {
