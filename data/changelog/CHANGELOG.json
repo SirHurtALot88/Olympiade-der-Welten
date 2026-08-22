@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-22",
+      "seite": "Spieltag · Arena",
+      "pr": null,
+      "text": "Wenn die Antwort des Servers nicht ankommt, behauptet die Arena nicht mehr, die Punkte seien nicht gebucht — sie sagt jetzt, dass sie es nicht weiß, und bittet dich, den Saisonstand zu prüfen. Der Anlass war eine Meldung, die genau das Gegenteil des Zustands behauptete: nachgemessen war der betroffene Spieltag längst gebucht, nur die Antwort war unterwegs verlorengegangen. Wer so einer Meldung glaubt, wertet denselben Spieltag ein zweites Mal. Dazu nennt die Fehlermeldung ab jetzt den Statuscode und den Anfang dessen, was tatsächlich ankam, statt eines technischen Parser-Fehlers — beim nächsten Mal ist damit in Minuten klar, ob es eine Zeitüberschreitung, ein Absturz oder ein Abbruch war. Ein echter fachlicher Fehlschlag heißt weiterhin klar „nicht gebucht\".",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Die Ewige Tabelle führt ab jetzt nur noch abgeschlossene Saisons. Die laufende zählt erst mit, wenn sie vorbei ist — vorher stand sie als eigene Zeile darin, und genau daraus entstanden die doppelten Punkte: der Saisonstand-Feed trägt am Anfang einer neuen Saison noch die Zahlen der eben beendeten, die damit zweimal in der Liste stand. Nachgezählt wurde übrigens auch der Verdacht, es werde etwas doppelt gespeichert — das war es nicht: in jedem Spielstand liegt je Saison genau ein Schnappschuss. Der Fehler saß im Zusammenrechnen, nicht im Speichern.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Der Gehaltsforecast zeigt jetzt genau eine Zahl je Saison: das Geld, das in dieser Saison wirklich abfließt. Bisher stand daneben ein zweiter Balken mit den Verhandlungs-Entwürfen — und die werden beim Unterschreiben nie gelöscht, also zählten längst erledigte Angebote ewig mit. Dazu hing jede Rate eine Saison zu früh, weil die Vertragsalterung am Saisonende läuft, während die Saison noch die laufende ist: die letzte Vertragssaison fiel hinten aus dem Chart, und die schon bezahlte Saison stand vorne als offene Last. Beides ist behoben, die schon gespielte Saison taucht gar nicht mehr auf.",
@@ -17,6 +35,15 @@
       "text": "Die Laufzeit-Spalte und das Vertrags-Auslauf-Center rechnen nicht mehr selbst, sondern lesen die Endsaison des Vertrags. Der Countdown wird am Ende einer Saison gesenkt, während diese noch läuft — danach heißt eine 1 nicht mehr „letzte Saison\", sondern „noch eine volle\". In einem Spielstand standen deshalb 129 von 269 Verträgen fälschlich auf „läuft aus\", obwohl alle noch eine ganze Saison vor sich hatten.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Drei Zahlen rund um den Markt stimmen jetzt. Erstens: wer einen Spieler selbst kauft, bekommt für ihn sofort einen Trainingsmodus — bisher passierte das nur bei KI-Massenkäufen, und ein einziger selbst gekaufter Spieler ohne Modus hielt den ganzen Spieltags-Flow auf, ohne dass klar war warum. Zweitens: die Anzeige „Slots offen\" zählt bis zum Kaderlimit statt bis zum KI-Planungsziel; bei 30 von 32 Teams stand dort eine zu kleine Zahl. Drittens: die Transferbilanz im Saisonstand rechnet deine eigenen Käufe und Verkäufe mit — vorher zählten nur die der KI, und weil die einzige gezählte Verkaufsquelle im Spielstand leer war, standen sämtliche Teams bei null oder darunter.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.5"
     },
     {

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-22",
+  "seite": "Markt · Transfermarkt",
+  "text": "Drei Zahlen rund um den Markt stimmen jetzt. Erstens: wer einen Spieler selbst kauft, bekommt für ihn sofort einen Trainingsmodus — bisher passierte das nur bei KI-Massenkäufen, und ein einziger selbst gekaufter Spieler ohne Modus hielt den ganzen Spieltags-Flow auf, ohne dass klar war warum. Zweitens: die Anzeige „Slots offen\" zählt bis zum Kaderlimit statt bis zum KI-Planungsziel; bei 30 von 32 Teams stand dort eine zu kleine Zahl. Drittens: die Transferbilanz im Saisonstand rechnet deine eigenen Käufe und Verkäufe mit — vorher zählten nur die der KI, und weil die einzige gezählte Verkaufsquelle im Spielstand leer war, standen sämtliche Teams bei null oder darunter.",
+  "gewicht": "klein",
+  "version": "0.5"
+}
