@@ -160,11 +160,26 @@ function getContractIntentToneClass(intent) {
   return "is-neutral";
 }
 
-/** Balkengeometrie für den Gehaltsforecast-Chart (Verträge-Tab): pro Saison
- * ein Balken (gebundene Summe), plus ein zweiter Balken NUR wenn die
- * Preview-Summe (inkl. Kaufdialog-Drafts) tatsächlich abweicht — sonst
- * bleibt der Chart auf den Normalfall (keine Drafts) reduziert. */
-function buildContractForecastChartGeometry(totalsCommitted, totalsWithPreview) {
+/**
+ * Balkengeometrie für den Gehaltsforecast: pro Saison GENAU EIN Balken, das gebundene Kapital.
+ *
+ * GEMELDET VON CHRIS: „da ist ne preview drin für Season 4 mit 5,1 und ich hab dann gar keinen
+ * spieler der 4 jahre drin hat. Da sollte eigentlich 1 wert stehen und zwar der vom gebundenen
+ * kapital was wirklich real weg geht in der jeweiligen saison."
+ *
+ * Der Chart hatte einen zweiten Balken aus `totalsWithPreview` — der Summe INKLUSIVE der
+ * Verhandlungs-Entwürfe. Ein Entwurf wird beim Unterschreiben aber nie gelöscht, er bleibt für
+ * immer im Spielstand stehen. An Chris' Stand lagen neun davon, alle auf
+ * `accepted_pending_confirm`, darunter Spieler mit längst laufendem Vertrag:
+ *
+ *     gebunden        12,52 | 7,87 | 5,19 | 0,00 | 0
+ *     mit Entwürfen   42,59 | 20,56 | 18,50 | 5,13 | 0
+ *
+ * Die 5,13 in Saison 4 waren Lulu (1,10) und King Arlen (4,03) aus alten Entwürfen — Geld, das
+ * niemand schuldet. Der Forecast beantwortet jetzt nur noch die Frage, die er im Titel stellt:
+ * was in einer Saison wirklich abfließt.
+ */
+function buildContractForecastChartGeometry(totalsCommitted) {
   if (!Array.isArray(totalsCommitted) || totalsCommitted.length === 0) {
     return null;
   }
@@ -177,39 +192,23 @@ function buildContractForecastChartGeometry(totalsCommitted, totalsWithPreview) 
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const slotWidth = innerWidth / totalsCommitted.length;
-  const barWidth = Math.max(10, slotWidth * 0.32);
-  const barGap = slotWidth * 0.06;
+  // Ein Balken je Saison statt zweier nebeneinander — er darf entsprechend breiter stehen.
+  const barWidth = Math.max(10, slotWidth * 0.44);
 
   const committedValues = totalsCommitted.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0));
-  const previewValues = totalsCommitted.map((_, index) => {
-    const preview = totalsWithPreview?.[index];
-    return preview && Number.isFinite(preview.salary) ? preview.salary : null;
-  });
-  const maxValue = Math.max(1, ...committedValues, ...previewValues.filter((value) => value != null));
+  const maxValue = Math.max(1, ...committedValues);
 
   const bars = totalsCommitted.map((entry, index) => {
     const committedValue = committedValues[index];
-    const previewValue = previewValues[index];
-    const hasPreviewDelta = previewValue != null && Math.abs(previewValue - committedValue) >= 0.01;
     const committedHeight = (committedValue / maxValue) * innerHeight;
-    const previewHeight = hasPreviewDelta ? (previewValue / maxValue) * innerHeight : null;
-    const slotStart = paddingLeft + index * slotWidth;
-    const centerX = slotStart + slotWidth / 2;
-    const committedX = hasPreviewDelta ? centerX - barWidth - barGap / 2 : centerX - barWidth / 2;
-    const previewX = committedX + barWidth + barGap;
+    const centerX = paddingLeft + index * slotWidth + slotWidth / 2;
     return {
       label: entry.label,
       committedValue,
-      previewValue: hasPreviewDelta ? previewValue : null,
-      hasPreviewDelta,
-      x: committedX,
+      x: centerX - barWidth / 2,
       y: paddingTop + innerHeight - committedHeight,
       width: barWidth,
       height: committedHeight,
-      previewX,
-      previewY: previewHeight != null ? paddingTop + innerHeight - previewHeight : null,
-      previewWidth: barWidth,
-      previewHeight,
       centerX,
     };
   });
@@ -286,33 +285,6 @@ function buildContractSalarySteps(row, seasonLabels) {
     lastActiveSalary: lastActiveIndex >= 0 ? values[lastActiveIndex].salary : null,
     currentSalary: currentIndex >= 0 ? values[currentIndex].salary : null,
   };
-}
-
-/** Mini-Balkenstreifen für die Tabellen-Fußzeile (Team-Gehaltslast pro
- * Saison) — dieselbe committed/preview-Farbsprache wie der
- * Gehaltsforecast-Chart oben, nur kompakt je Saison statt als eigener
- * Chart. */
-function buildContractFooterSteps(totalsCommitted, totalsWithPreview) {
-  const committed = Array.isArray(totalsCommitted) ? totalsCommitted : [];
-  const preview = Array.isArray(totalsWithPreview) ? totalsWithPreview : [];
-  const maxValue = Math.max(
-    1,
-    ...committed.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
-    ...preview.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
-  );
-  return committed.map((entry, index) => {
-    const committedValue = Number.isFinite(entry?.salary) ? entry.salary : 0;
-    const previewEntry = preview[index];
-    const previewValue = Number.isFinite(previewEntry?.salary) ? previewEntry.salary : committedValue;
-    return {
-      label: entry?.label ?? "",
-      committedValue,
-      previewValue,
-      hasPreviewDelta: Math.abs(previewValue - committedValue) >= 0.01,
-      committedPct: Math.max(4, Math.round((committedValue / maxValue) * 100)),
-      previewPct: Math.max(4, Math.round((previewValue / maxValue) * 100)),
-    };
-  });
 }
 
 export type FoundationTeamsDetailPanelProps = {
@@ -799,9 +771,8 @@ function FoundationTeamsDetailPanel({
    *
    * BEWUSST OHNE `useMemo`: die Stelle liegt hinter `if (!active) return null` weiter oben, ein
    * Hook wuerde dort die Aufrufreihenfolge zwischen zwei Renders veraendern
-   * (`react-hooks/rules-of-hooks`) — beim Umschalten von `active` wirft React dann
-   * „Rendered fewer hooks than expected". Das Set baut sich aus ein paar Dutzend Kaderzeilen,
-   * billiger als der Vergleich, den ein Memo dafuer anstellen muesste.
+   * (`react-hooks/rules-of-hooks`). Das Set baut sich aus ein paar Dutzend Kaderzeilen — billiger
+   * als der Vergleich, den ein Memo dafuer anstellen muesste.
    */
   const auslaufendePlayerIds = new Set(
     (selectedTeamContractTable?.rows ?? [])
@@ -1945,7 +1916,6 @@ function FoundationTeamsDetailPanel({
                         {(() => {
                           const chart = buildContractForecastChartGeometry(
                             selectedTeamContractTable.totalsCommitted,
-                            selectedTeamContractTable.totalsWithPreview,
                           );
                           if (!chart) {
                             return null;
@@ -1979,23 +1949,9 @@ function FoundationTeamsDetailPanel({
                                       {bar.label} · {formatDisplayMoney(bar.committedValue)}
                                     </title>
                                   </rect>
-                                  {bar.hasPreviewDelta ? (
-                                    <rect
-                                      x={bar.previewX}
-                                      y={bar.previewY}
-                                      width={bar.previewWidth}
-                                      height={Math.max(bar.previewHeight, 1)}
-                                      rx={3}
-                                      className="contract-forecast-chart-bar is-preview"
-                                    >
-                                      <title>
-                                        {bar.label} · Preview {formatDisplayMoney(bar.previewValue)}
-                                      </title>
-                                    </rect>
-                                  ) : null}
                                   <text
                                     x={bar.centerX}
-                                    y={Math.min(bar.y, bar.previewY ?? bar.y) - 6}
+                                    y={bar.y - 6}
                                     textAnchor="middle"
                                     className="contract-forecast-chart-value"
                                   >
