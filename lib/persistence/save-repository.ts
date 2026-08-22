@@ -54,6 +54,7 @@ import {
   writeSaveSessionCache,
 } from "@/lib/persistence/save-session-cache";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { trageEndsaisonNach } from "@/lib/contracts/endsaison-nachtragen";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
 import { ensureNulaOnProjectSuicide } from "@/lib/foundation/ensure-nula-on-project-suicide";
@@ -1409,6 +1410,10 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
+    // Endsaison-Nachtrag: Bestandsvertraege ohne `contractEndSeasonNumber` bekommen sie hier
+    // einmalig gesetzt. Voraussetzung dafuer, die Vertragsalterung spaeter ersatzlos zu streichen
+    // — siehe `trageEndsaisonNach`. Idempotent, ein gesetztes Feld bleibt unangetastet.
+    trageEndsaisonNach(
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
@@ -1418,6 +1423,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     ),
@@ -1627,11 +1633,15 @@ function createPersistedSaveRecord(input: {
   const createdAt = input.createdAt ?? now;
   const updatedAt = input.updatedAt ?? now;
   const normalizedWithoutBaselines = withNormalizedSeasonDisciplineSchedule(
-    normalizeLegacyRosterTargets(
-      normalizeLegacyFinanceScale(
-        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)), {
-          saveId: input.saveId,
-        }),
+    // Damit ein frisch geschriebener Stand die Endsaison schon traegt und sie nicht erst beim
+    // naechsten Laden bekommt.
+    trageEndsaisonNach(
+      normalizeLegacyRosterTargets(
+        normalizeLegacyFinanceScale(
+          withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)), {
+            saveId: input.saveId,
+          }),
+        ),
       ),
     ),
     input.saveId,
