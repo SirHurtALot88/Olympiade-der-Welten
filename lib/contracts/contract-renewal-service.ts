@@ -22,6 +22,7 @@ import {
   SEASON_END_CONTRACT_TICK_STEP_ID,
   hasSeasonEndContractTickApplied,
 } from "@/lib/contracts/saisonende-alterung-marke";
+import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
   normalizeContractLength,
@@ -2159,7 +2160,19 @@ export function applyContractRenewalAction(input: {
     },
   };
 
-  saveGameStateWithContractEvents(input.save, gameState, input.persistence);
+  /**
+   * Mit der Unterschrift ist die Verhandlung vorbei — ihr Entwurf auch.
+   *
+   * Auch bei der Freigabe: dann gibt es keinen Vertrag mehr, ueber den zu verhandeln waere. Was
+   * der Entwurf sonst anrichtet, steht in `verhandlungs-entwuerfe.ts` — kurz: er redet in die
+   * naechste Verhandlung hinein und steht als Vorschauzeile in der Vertraege-Tabelle.
+   */
+  const gameStateOhneEntwurf = entferneEntwurfNachUnterschrift(gameState, {
+    teamId: input.teamId,
+    playerId: input.playerId,
+  });
+
+  saveGameStateWithContractEvents(input.save, gameStateOhneEntwurf, input.persistence);
   return {
     ...preview,
     applied: true,

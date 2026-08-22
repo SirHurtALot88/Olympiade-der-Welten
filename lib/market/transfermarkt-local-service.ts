@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
@@ -2777,7 +2778,13 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
       ...save.gameState.transferHistory,
     ],
   };
-  const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!);
+  // Mit der Unterschrift ist die Verhandlung vorbei — ihr Entwurf auch. Bleibt er liegen, redet
+  // er in die naechste hinein: der Trotz-Aufschlag wird aus ihm fortgeschrieben, `affrontRetreat`
+  // liest sein altes Angebot, und die Vertraege-Tabelle zeigt ihn als Vorschauzeile.
+  const nextState = entferneEntwurfNachUnterschrift(
+    applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!),
+    { teamId: params.teamId, playerId: params.playerId },
+  );
 
   // Nur der direkte (nicht-Batch) Pfad liefert `gameStateAfter` zurück: der Fast-Batch-Pfad
   // (AI-Massenkäufe, `runContext` gesetzt) deferriert das Persistieren über mehrere Käufe hinweg,
