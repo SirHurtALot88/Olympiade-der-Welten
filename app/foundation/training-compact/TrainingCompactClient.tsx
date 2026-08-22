@@ -1,6 +1,7 @@
 "use client";
 
 import type { Team } from "@/lib/data/olyDataTypes";
+import type { SaisonSpotlightModel } from "@/lib/foundation/saison-spotlight";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 import TrainingCompactNewLook from "@/app/foundation/training-compact/TrainingCompactNewLook";
@@ -14,6 +15,8 @@ import type {
 
 export type TrainingCompactClientProps = {
   selectedTeam: Team;
+  /** Rueckblick auf die Vorsaison; `null`, wenn es keine gibt. */
+  saisonSpotlight?: SaisonSpotlightModel | null;
   selectedTeamControlMode?: string | null;
   seasonLabel: string;
   managementLocked?: boolean;

@@ -5,6 +5,7 @@ import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import SaisonSpotlightCard from "@/app/foundation/training-compact/SaisonSpotlightCard";
 import { getClassColorToken } from "@/app/foundation/classVisuals";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import FoundationPlayerPortraitPreview, {
@@ -1022,6 +1023,7 @@ function NlTrainingPlayerRow({
 
 export default function TrainingCompactNewLook({
   selectedTeam,
+  saisonSpotlight,
   selectedTeamControlMode,
   seasonLabel,
   managementLocked = false,
@@ -1349,6 +1351,10 @@ export default function TrainingCompactNewLook({
         </div>
         {managementLockedReason ? <p className="nl-training-locked">{managementLockedReason}</p> : null}
       </NlCard>
+
+      {/* Saison-Spotlight (`5hcq2p`): der Rueckblick auf die Vorsaison steht oben, weil Chris beim
+          Eintritt in die neue Saison genau hier steht. Ohne Vorsaison rendert die Karte nichts. */}
+      <SaisonSpotlightCard model={saisonSpotlight ?? null} onOpenPlayerDetails={onOpenPlayerDetails} />
 
       <div className="nl-training-filter-row" id="training-development-filters" role="group" aria-label="Entwicklungsfilter">
         {DEVELOPMENT_FILTERS.map((filter) => (

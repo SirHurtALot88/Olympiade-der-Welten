@@ -54324,6 +54324,160 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s3);
 }
 
+/* ------------------------------------------------------------------ */
+/* SAISON-SPOTLIGHT (`5hcq2p`) — Rueckblick auf die Vorsaison, oben auf */
+/* „Team · Training". Teamfarbe nur ueber --nl-accent-text (Textregel),  */
+/* Sekundaertext ueber --nl-mut, nicht --nl-mut-2.                      */
+/* ------------------------------------------------------------------ */
+.is-new-look .nl-spotlight-card .nl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-spotlight-platz {
+  margin: 0;
+  color: var(--nl-mut);
+  font-size: 13px;
+}
+
+.is-new-look .nl-spotlight-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2, transparent);
+}
+
+.is-new-look .nl-spotlight-kpi strong {
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--nl-accent-text);
+}
+
+.is-new-look .nl-spotlight-kpi span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-subhead {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-subhead small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--nl-mut);
+}
+
+/* Breite Tabellen scrollen in ihrem eigenen Kasten, nie die Seite. */
+.is-new-look .nl-spotlight-table-scroll {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-spotlight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-spotlight-table th,
+.is-new-look .nl-spotlight-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spotlight-table thead th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  font-weight: 600;
+}
+
+.is-new-look .nl-spotlight-table tbody tr:last-child th,
+.is-new-look .nl-spotlight-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.is-new-look .nl-spotlight-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-name-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-spotlight-name-button:hover,
+.is-new-look .nl-spotlight-name-button:focus-visible {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-spotlight-classflag {
+  border: 1px solid var(--nl-accent);
+  color: var(--nl-accent-text);
+  border-radius: var(--nl-r-pill);
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spotlight-attr-key {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-mode {
+  text-transform: capitalize;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-leer {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-more,
+.is-new-look .nl-spotlight-neu,
+.is-new-look .nl-spotlight-liga {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+  line-height: 1.5;
+}
+
+.is-new-look .nl-spotlight-neu strong {
+  color: var(--nl-fg, inherit);
+}
+
 /* EINE KPI-Zeile (TR3): Ist-Zahlen, bei aktiver Simulation ersetzt
    durch die Vorschau — mit sichtbarer Marke, nie verwechselbar. */
 .is-new-look .nl-training-kpiline {

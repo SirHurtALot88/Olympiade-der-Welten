@@ -22,6 +22,20 @@ export const PLAYER_ATTRIBUTE_CHART_LABELS: Record<(typeof PLAYER_ATTRIBUTE_CHAR
   dexterity: "DEX",
 };
 
+/**
+ * Kurzform eines Attributnamens, wie sie die Trainingsansichten schreiben: das Chart-Kuerzel,
+ * wo es eines gibt (`power` -> `STR`), sonst die ersten drei Buchstaben in Grossschrift
+ * (`torment` -> `TOR`). Lag frueher als lokale Funktion im PlayerDetailDrawer; seit das
+ * Saison-Spotlight dieselbe Beschriftung braucht, steht sie hier — zwei Ansichten, die
+ * Attribute unterschiedlich abkuerzen, waeren ein Fehler mit Ansage.
+ */
+export function formatTrainingAttributeLabel(attribute: string): string {
+  return (
+    PLAYER_ATTRIBUTE_CHART_LABELS[attribute as keyof typeof PLAYER_ATTRIBUTE_CHART_LABELS] ??
+    attribute.slice(0, 3).toUpperCase()
+  );
+}
+
 export function buildAttributeHistoryDelta(
   rows: PlayerAttributeHistoryRow[],
   attribute: (typeof PLAYER_ATTRIBUTE_CHART_KEYS)[number],
