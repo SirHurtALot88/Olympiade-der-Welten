@@ -231,7 +231,18 @@ describe("all-time-table", () => {
     expect(model.biggestMwGrowth?.teamId).toBe("t1");
   });
 
-  it("merges the live season last and dedupes it against an already-archived season id", () => {
+  /**
+   * UMGESCHRIEBEN. Hier stand „merges the live season last" — die laufende Saison wurde als eigene
+   * Zeile angehaengt. Diese Regel ist mit `6l1b0i` aufgehoben: „in der ewigen Tabelle sollen
+   * wirklich nur vergangene abgeschlossene Seasons getrackt werden!" Aus derselben Regel entstand
+   * `bia63a` (doppelte Punkte in S2 MD1) — der Standings-Feed traegt am Saisonanfang noch den
+   * Vorsaison-Stand, die Saison stand damit zweimal in der Liste.
+   *
+   * Der Test bleibt an derselben Stelle stehen, damit die AUFGEHOBENE Regel nicht unbemerkt
+   * zurueckkehrt; er nagelt jetzt ihr Gegenteil fest. Die neue Zusage im Detail steht in
+   * tests/ewige-tabelle-nur-abgeschlossene-saisons.test.ts.
+   */
+  it("nimmt die laufende Saison NICHT auf, auch nicht mit Live-Feed", () => {
     const withLive = buildAllTimeTableModel({
       gameState: buildGameState({
         season: { id: "season-2", name: "Season 2" } as unknown as GameState["season"],
@@ -253,12 +264,13 @@ describe("all-time-table", () => {
     });
 
     const liveRow = withLive.rows.find((entry) => entry.teamId === "t1");
-    expect(liveRow?.seasons).toHaveLength(2);
-    expect(liveRow?.seasons[1].isLive).toBe(true);
-    expect(liveRow?.seasons[1].seasonId).toBe("season-2");
-    expect(liveRow?.cumulativePoints).toBe(55);
+    // Nur die archivierte season-1. Die 15 Live-Punkte bleiben draussen, 40 bleiben 40.
+    expect(liveRow?.seasons).toHaveLength(1);
+    expect(liveRow?.seasons[0].seasonId).toBe("season-1");
+    expect(liveRow?.seasons.some((season) => season.isLive)).toBe(false);
+    expect(liveRow?.cumulativePoints).toBe(40);
 
-    // Same live season id as an already-archived snapshot → no duplicate entry.
+    // Dieselbe Saison-Id wie ein Snapshot: unveraendert nur EINE Zeile (galt vorher wie nachher).
     const dedupedModel = buildAllTimeTableModel({
       gameState: buildGameState({
         season: { id: "season-1", name: "Season 1" } as unknown as GameState["season"],

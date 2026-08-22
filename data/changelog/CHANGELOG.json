@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-22",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Die Ewige Tabelle führt ab jetzt nur noch abgeschlossene Saisons. Die laufende zählt erst mit, wenn sie vorbei ist — vorher stand sie als eigene Zeile darin, und genau daraus entstanden die doppelten Punkte: der Saisonstand-Feed trägt am Anfang einer neuen Saison noch die Zahlen der eben beendeten, die damit zweimal in der Liste stand. Nachgezählt wurde übrigens auch der Verdacht, es werde etwas doppelt gespeichert — das war es nicht: in jedem Spielstand liegt je Saison genau ein Schnappschuss. Der Fehler saß im Zusammenrechnen, nicht im Speichern.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Der Gehaltsforecast zeigt jetzt genau eine Zahl je Saison: das Geld, das in dieser Saison wirklich abfließt. Bisher stand daneben ein zweiter Balken mit den Verhandlungs-Entwürfen — und die werden beim Unterschreiben nie gelöscht, also zählten längst erledigte Angebote ewig mit. Dazu hing jede Rate eine Saison zu früh, weil die Vertragsalterung am Saisonende läuft, während die Saison noch die laufende ist: die letzte Vertragssaison fiel hinten aus dem Chart, und die schon bezahlte Saison stand vorne als offene Last. Beides ist behoben, die schon gespielte Saison taucht gar nicht mehr auf.",

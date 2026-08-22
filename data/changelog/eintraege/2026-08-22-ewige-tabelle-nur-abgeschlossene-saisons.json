@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-22",
+  "seite": "Team · Ewige Tabelle",
+  "text": "Die Ewige Tabelle führt ab jetzt nur noch abgeschlossene Saisons. Die laufende zählt erst mit, wenn sie vorbei ist — vorher stand sie als eigene Zeile darin, und genau daraus entstanden die doppelten Punkte: der Saisonstand-Feed trägt am Anfang einer neuen Saison noch die Zahlen der eben beendeten, die damit zweimal in der Liste stand. Nachgezählt wurde übrigens auch der Verdacht, es werde etwas doppelt gespeichert — das war es nicht: in jedem Spielstand liegt je Saison genau ein Schnappschuss. Der Fehler saß im Zusammenrechnen, nicht im Speichern.",
+  "gewicht": "klein",
+  "version": "0.5"
+}

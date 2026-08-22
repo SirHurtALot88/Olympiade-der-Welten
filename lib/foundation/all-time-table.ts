@@ -205,13 +205,26 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
     buildAllTimeTableFromSnapshots(snapshots, gameState.teams).map((row) => [row.teamId, row] as const),
   );
 
-  const archivedSeasonIds = new Set(snapshots.map((snapshot) => snapshot.seasonId));
-  const liveSeasonId = gameState.season.id;
-  const liveSeasonIncluded =
-    liveStandingsByTeamId != null && liveSeasonId !== "loading" && !archivedSeasonIds.has(liveSeasonId);
-  const liveSeasonLabel = liveSeasonIncluded
-    ? seasonLabelOf({ seasonId: liveSeasonId, seasonName: gameState.season.name })
-    : null;
+  /**
+   * DIE LAUFENDE SAISON GEHOERT NICHT HINEIN — gemeldet (`6l1b0i`): „in der ewigen Tabelle sollen
+   * wirklich nur vergangene abgeschlossene Seasons getrackt werden!"
+   *
+   * Vorher stand hier ein `liveSeasonIncluded`, das die laufende Saison als eigene Zeile
+   * dazuschrieb, sobald ein Standings-Feed geladen war. Zwei Dinge sprechen dagegen, und Chris hat
+   * beide gemeldet:
+   *
+   *  1. INHALTLICH: eine Ewige Tabelle, die eine halb gespielte Saison mitzaehlt, vergleicht
+   *     Aepfel mit Birnen — der Rang eines Teams an Spieltag 1 ist keine Saisonleistung.
+   *  2. GEMESSEN: genau daraus entstand `bia63a` („in S2 MD1 haben alle Teams doppelte Punkte").
+   *     Der Standings-Feed traegt am Saisonanfang noch den Stand der eben beendeten Saison; die
+   *     stand damit zweimal in der Liste — einmal als Snapshot, einmal als „live". Am Abbild
+   *     nachgezaehlt liegt je Saison genau EIN Snapshot (kein Doppel-Schreiben), die Verdopplung
+   *     entstand also erst hier beim Rechnen.
+   *
+   * `liveStandingsByTeamId` bleibt im Eingang stehen: der Aufrufer soll nicht umgebaut werden
+   * muessen, und der Wert traegt weiter die Live-Sicht anderer Ansichten. Hier wird er nur nicht
+   * mehr zu einer Saisonzeile.
+   */
 
   // Team-Identitäten: aktuelle Liga-Teams + jedes Team, das nur in einem
   // archivierten Snapshot auftaucht (z. B. inzwischen ersetztes Team).
@@ -271,20 +284,7 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
       });
     }
 
-    if (liveSeasonIncluded && liveSeasonLabel != null) {
-      const live = liveStandingsByTeamId?.[team.teamId];
-      if (live) {
-        seasons.push({
-          seasonId: liveSeasonId,
-          seasonLabel: liveSeasonLabel,
-          isLive: true,
-          rank: live.rank ?? null,
-          points: live.points ?? null,
-          marketValue: live.marketValue ?? null,
-          cash: live.cash ?? null,
-        });
-      }
-    }
+    // Hier stand der Live-Saison-Eintrag. Er ist raus — Begruendung oben bei `liveSeasonIncluded`.
 
     const cumulativePoints = seasons.reduce((sum, season) => sum + (season.points ?? 0), 0);
 
@@ -350,9 +350,6 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
   const seasonLabels = snapshots.map((snapshot) =>
     seasonLabelOf({ seasonId: snapshot.seasonId, seasonName: snapshot.seasonName }),
   );
-  if (liveSeasonIncluded && liveSeasonLabel != null) {
-    seasonLabels.push(liveSeasonLabel);
-  }
 
   return {
     rows,
