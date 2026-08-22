@@ -19,6 +19,7 @@
  */
 import { useMemo } from "react";
 
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
@@ -125,10 +126,10 @@ function formatValue(value: number | string | null): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** Auslaufende Verträge des eigenen Teams — Restlaufzeit 1 oder weniger. */
+/** Auslaufende Verträge des eigenen Teams — Restlaufzeit 0, also keine Saison mehr. */
 function countExpiringContracts(gameState: GameState, teamId: string | null): number {
   if (!teamId) return 0;
-  return gameState.rosters.filter((entry) => entry.teamId === teamId && (entry.contractLength ?? 0) <= 1).length;
+  return gameState.rosters.filter((entry) => entry.teamId === teamId && vertragLaeuftAus(entry.contractLength)).length;
 }
 
 export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinalePanelProps) {

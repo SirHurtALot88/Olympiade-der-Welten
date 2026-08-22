@@ -34,6 +34,7 @@ import {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { getClassColorClassName } from "@/app/foundation/classVisuals";
@@ -981,7 +982,7 @@ export default function FoundationTeamsNewLook({
           salary: heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null,
           contractLength: length,
           shapeShort: formatContractShapeShortLabel(row.entry.contractShape),
-          expiring: length <= 1,
+          expiring: vertragLaeuftAus(length),
         };
       })
       .sort((left, right) =>
@@ -1396,7 +1397,7 @@ export default function FoundationTeamsNewLook({
               const annualSalary = getRosterEntryDisplaySalary(entry, player);
               const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
               const shapeShort = formatContractShapeShortLabel(entry.contractShape);
-              const isContractExpiring = entry.contractLength <= 1;
+              const isContractExpiring = vertragLaeuftAus(entry.contractLength);
               return (
                 <tr
                   key={entry.id}

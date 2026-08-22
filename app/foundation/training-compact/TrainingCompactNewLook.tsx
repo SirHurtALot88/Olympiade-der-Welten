@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -774,7 +775,7 @@ function NlTrainingPlayerRow({
   // Vertragsform-Kürzel (FL/BL) — dieselbe Ableitung wie die Kaderliste
   // (`formatContractShapeShortLabel`), `null` bei "balanced" (kein Kürzel dort auch).
   const contractShapeShort = formatContractShapeShortLabel(row.economy.contractShape);
-  const isContractExpiring = row.economy.contractLength != null && row.economy.contractLength <= 1;
+  const isContractExpiring = row.economy.contractLength != null && vertragLaeuftAus(row.economy.contractLength);
 
   // Klassen-Vorschlag aus DERSELBEN Rangliste, die die aufgeklappte Zeile zeigt —
   // ein Chip, der der Liste widerspricht, wäre ein Muster-4-Loch.

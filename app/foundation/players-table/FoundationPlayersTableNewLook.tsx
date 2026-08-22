@@ -116,6 +116,7 @@ import FoundationPlayerPortraitPreview, {
   type FoundationPlayerPortraitPreviewProps,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
@@ -282,10 +283,9 @@ const NL_PLAYERS_BRACKETS: ReadonlyArray<{ bracket: number; range: string }> = [
 
 /**
  * Vertragsauslauf-Radar (additiv): Buckets nach verbleibenden Vertragsjahren
- * (`RosterEntry.contractLength`). "Diese Saison" spiegelt exakt dieselbe
- * Schwelle wie der bestehende "Verträge"-Fokus-Filter im Teams-Roster
- * (`contractLength <= 1`, siehe `use-teams-roster-table-derivations.ts`) —
- * ein Vertrag mit einem verbleibenden Jahr läuft am Ende dieser Saison aus.
+ * (`RosterEntry.contractLength`). "Diese Saison" spiegelt dieselbe Schwelle wie
+ * überall sonst — `vertragLaeuftAus`, also Restlaufzeit 0. Eine 1 heißt "noch
+ * eine ganze Saison" und gehört deshalb ins nächste Fach, nicht ins erste.
  * Free Agents (kein `roster`) haben keinen Vertrag und fließen nicht ein.
  */
 type NlContractExpiryBucket = "current" | "plus1" | "plus2" | "later";
@@ -302,13 +302,13 @@ function getContractExpiryBucket(row: FoundationPlayerScopeRow): NlContractExpir
   if (length == null || !Number.isFinite(length)) {
     return null;
   }
-  if (length <= 1) {
+  if (vertragLaeuftAus(length)) {
     return "current";
   }
-  if (length === 2) {
+  if (length === 1) {
     return "plus1";
   }
-  if (length === 3) {
+  if (length === 2) {
     return "plus2";
   }
   return "later";

@@ -17,6 +17,7 @@
  * Summe wuerde daraus eine glatte Empfehlung machen und die Spannung verschlucken. Genau dann
  * lautet die ehrliche Antwort "beobachten" mit Begruendung, nicht "verkaufen".
  */
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import {
   ordneGehaltEin,
   type SalaryBenchmarkEinordnung,
@@ -150,7 +151,8 @@ export function empfehleVertrag(input: ContractRecommendationInput): ContractRec
     };
   }
 
-  const laeuftAus = istZahl(input.restlaufzeit) && input.restlaufzeit <= 1;
+  // Auslaufend heisst 0 — bei 1 kommt noch eine ganze Saison. Siehe `vertragLaeuftAus`.
+  const laeuftAus = istZahl(input.restlaufzeit) && vertragLaeuftAus(input.restlaufzeit);
   return {
     ...basis,
     empfehlung: "verlaengern",

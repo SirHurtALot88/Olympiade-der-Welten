@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { Discipline, GameState } from "@/lib/data/olyDataTypes";
 import {
   sortFoundationTableRows,
@@ -139,7 +140,7 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
       const salary = input.getRosterEntryDisplaySalary(row.entry, row.player);
       return row.playerPps != null && row.playerPps > 0 && salary != null && salary > 0;
     }).length;
-    const expiringCount = input.selectedRosterTableRows.filter((row) => row.entry.contractLength <= 1).length;
+    const expiringCount = input.selectedRosterTableRows.filter((row) => vertragLaeuftAus(row.entry.contractLength)).length;
     // XP-System abgeschafft: Training-Fokus gruppiert nur noch nach Fatigue (currentXP ist immer 0).
     const trainingCount = input.selectedRosterTableRows.filter(
       (row) => (row.player.fatigue ?? 0) > 0,

@@ -8,6 +8,7 @@ import {
   type DecisionSurfaceStatusTone,
 } from "@/app/foundation/decision-surface/FoundationDecisionSurface";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import {
   classifySellPricingNoteWeight,
@@ -394,8 +395,8 @@ export default function FoundationMarketSellShellHost({
             {preview?.activePlayer ? (
               <span className="transfer-sell-hero-chip">
                 Vertrag{" "}
-                {preview.activePlayer.contractLength <= 1
-                  ? "letztes Jahr"
+                {vertragLaeuftAus(preview.activePlayer.contractLength)
+                  ? "läuft aus"
                   : `${preview.activePlayer.contractLength} Jahre`}
               </span>
             ) : null}
