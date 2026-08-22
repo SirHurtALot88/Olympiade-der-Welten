@@ -5,8 +5,41 @@ import {
   SEASON_ONE_DRAFT_BUY_SOURCES,
 } from "@/lib/season/transfer-season-policy";
 
-export const SEASON_END_MARKET_SELL_SOURCES = ["ai_preseason_market_sell"] as const;
-export const PRESEASON_MARKET_BUY_SOURCES = ["preseason_roster_repair_buy", "ai_preseason_market_buy"] as const;
+/**
+ * DIE EIGENEN TRANSFERS ZAEHLTEN NICHT MIT — gemeldet als `ls9jfg`:
+ * „Transfer im Saisonstand und in der historie sind immernoch falsch berechnet, die Käufe aus S2
+ *  müssen gegen die Verkäufe aus S1 gerechnet werden! so wären dann ein paar Teams positiv und ein
+ *  paar negativ. Hier sind alle 0 oder schlechter weil nur die Käufe drin sind!"
+ *
+ * Die Rechenregel darunter war schon richtig (S2+ = Verkaeufe der Vorsaison minus Kaeufe der
+ * laufenden). Falsch waren diese beiden Listen: sie kannten nur KI-Quellen. Was Chris SELBST tut —
+ * `manual_transfermarkt_sell` und `manual_transfermarkt_buy` — fiel in beiden Richtungen heraus.
+ *
+ * NACHGEMESSEN an `swnjlk` (Saison 2):
+ *
+ *   S1-Verkaeufe   ai_preseason_market_sell    0 Eintraege        (die einzige gezaehlte Quelle!)
+ *                  manual_transfermarkt_sell   5 Eintraege, 101,5  ← fielen heraus
+ *   S2-Kaeufe      ai_preseason_market_buy    33 Eintraege, 774,9
+ *                  manual_transfermarkt_buy    7 Eintraege, 145,3  ← fielen heraus
+ *
+ * Es gab also ueberhaupt keine gezaehlten Verkaeufe, waehrend die Kaeufe zaehlten — genau deshalb
+ * standen alle 32 Teams bei „0 oder schlechter". Beide Listen werden symmetrisch ergaenzt; nur
+ * eine Seite zu oeffnen haette die Schieflage bloss umgedreht.
+ *
+ * BEWUSST NICHT AUFGENOMMEN: `ai_roster_fill` (16 Kaeufe, 249,3 in derselben Saison). Das ist
+ * laufende Kaderpflege beziehungsweise der organische Erst-Draft, keine Marktbewegung der
+ * Vorsaison-Phase — und es war nicht gemeldet. Wenn diese Zeilen mitzaehlen sollen, ist das eine
+ * eigene Entscheidung.
+ */
+export const SEASON_END_MARKET_SELL_SOURCES = [
+  "ai_preseason_market_sell",
+  "manual_transfermarkt_sell",
+] as const;
+export const PRESEASON_MARKET_BUY_SOURCES = [
+  "preseason_roster_repair_buy",
+  "ai_preseason_market_buy",
+  "manual_transfermarkt_buy",
+] as const;
 export const DRAFT_BUY_SOURCES = SEASON_ONE_DRAFT_BUY_SOURCES;
 
 export type StandingsTransferBalance = {

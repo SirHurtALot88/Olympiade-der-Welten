@@ -2790,9 +2790,32 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
   // Mit der Unterschrift ist die Verhandlung vorbei — ihr Entwurf auch. Bleibt er liegen, redet
   // er in die naechste hinein: der Trotz-Aufschlag wird aus ihm fortgeschrieben, `affrontRetreat`
   // liest sein altes Angebot, und die Vertraege-Tabelle zeigt ihn als Vorschauzeile.
-  const nextState = entferneEntwurfNachUnterschrift(
-    applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!),
-    { teamId: params.teamId, playerId: params.playerId },
+  /**
+   * DER TRAININGS-VORGABEWERT FEHLTE AUF GENAU DIESEM WEG — gemeldet als `hnbng4`:
+   * „Der Flow hängt beim ‚Weiter Training Planen' fest obwohl ich bei allen was im Training
+   * festgelegt habe, er weiß nie wann man damit fertig ist."
+   *
+   * Die Quittung zu `j53iox` (PR #560) hatte den Fall als offen benannt: „Spieler, die über Draft
+   * oder KI-Picks MITTEN in einer Saison dazukommen, bekommen den Vorgabewert erst beim naechsten
+   * Saisonwechsel." Der KAUFWEG galt dabei als abgedeckt — er ist es nur zur Haelfte:
+   * `executeFastLocalTransfermarktBatchBuy` ruft den Backfill (Zeile ~2671), dieser direkte Pfad
+   * hier, ueber den JEDER manuelle Kauf laeuft, rief ihn nicht.
+   *
+   * NACHGEMESSEN an Chris' Spielstand `swnjlk`: genau EIN Spieler im Team `V-W` blockierte den
+   * Schritt — „Johanna", `trainingMode: null`, `trainingClass: "Warlord"` (die Klasse kommt aus dem
+   * Katalog, den Modus setzt nur der Backfill). Ihr Transfer steht als
+   * `season-2/season-2-matchday-1 manual_transfermarkt_buy` in der Historie. Ein einziger Spieler
+   * ohne Modus haelt den ganzen Flow auf.
+   *
+   * Der Aufruf steht bewusst hier und nicht im allgemeinen Schreibweg: an dieser Stelle kommt ein
+   * Spieler in einen Kader, und nur dann ist etwas zu tun (611 µs je Aufruf ueber 2984 Spieler
+   * gemessen — bei jedem Klick waere das eine Datenreparatur, hier ist es einmal je Kauf).
+   */
+  const nextState = applyDefaultTrainingFieldsToRosteredPlayers(
+    entferneEntwurfNachUnterschrift(
+      applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!),
+      { teamId: params.teamId, playerId: params.playerId },
+    ),
   );
 
   // Nur der direkte (nicht-Batch) Pfad liefert `gameStateAfter` zurück: der Fast-Batch-Pfad
