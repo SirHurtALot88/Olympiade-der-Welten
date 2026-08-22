@@ -41,6 +41,9 @@ function baueSchnappschuss() {
       // Am Live-Spielstand weichen diese beiden bei 30 von 32 Teams voneinander ab.
       cashEntry: 56.8,
       cashEnd: 91.32,
+      // Der Saisonend-Stand VOR den Verkaeufen — seit Chris' Entscheidung vom 22.08. der Wert
+      // der Ewigen Tabelle. `cashEnd` traegt den Stand NACH den Verkaeufen (olyDataTypes.ts:2654).
+      cashSeasonEnd: 44.2,
       cashTotal: 12.8,
       marketValueTotalEnd: 174.41,
       marketValueEnd: 174.41,
@@ -127,17 +130,24 @@ describe("Ewige Tabelle: die Medaillen der abgeschlossenen Saison", () => {
   /**
    * DER GRUND, WARUM DIE KURZFASSUNG DIE ROHWERTE TRAEGT UND NICHTS VORAB ZUSAMMENFASST.
    *
-   * Die Historienzeile zeigt den SAISONABSCHLUSS (`cashEnd`), die Ewige Tabelle den
-   * EINTRITTSSTAND der Folgesaison (`cashEntry`) — Chris' Vorgabe. Am Live-Spielstand liegen die
-   * beiden bei 30 von 32 Teams auseinander. Haette die Projektion hier schon eine Zahl gewaehlt,
-   * waere eine der beiden Ansichten zwangslaeufig falsch.
+   * Drei Ansichten, drei Zeitpunkte — und die Kurzfassung darf keinen davon vorwegnehmen. Am
+   * Live-Spielstand liegen die Felder bei 29 von 32 Teams auseinander. Haette die Projektion hier
+   * schon eine Zahl gewaehlt, waere mindestens eine Ansicht zwangslaeufig falsch.
+   *
+   * UMGESCHRIEBEN am 22.08. Hier stand „Eintrittsstand, nicht Saisonende" — Chris' damalige
+   * Vorgabe. Seine neue lautet: „ewige tabelle immer zum ende der saison speichern". Gezeigt wird
+   * jetzt `cashSeasonEnd`: der Stand am Ende von `player_development`, also NACH Sponsorgeld und
+   * Gehaltsabzug und VOR dem ersten Verkauf (olyDataTypes.ts:2654,
+   * season-transition-service.ts:112). `cashEnd` waere der Stand NACH den Verkaeufen.
    */
-  it("waehlt Cash nach der Regel der Ewigen Tabelle — Eintrittsstand, nicht Saisonende", () => {
+  it("waehlt Cash nach der Regel der Ewigen Tabelle — Saisonende VOR den Verkaeufen", () => {
     const kompakt = compactFoundationInitialGameState(baueSpielstand([baueSchnappschuss()]));
     const model = buildAllTimeTableModel({ gameState: kompakt, selectedTeamId: "S-C" });
 
     const saison = model.rows.find((row) => row.teamId === "S-C")?.seasons[0];
-    expect(saison?.cash).toBe(56.8);
+    expect(saison?.cash).toBe(44.2);
+    // Weder der Eintrittsstand der Folgesaison noch der Stand nach dem Ausverkauf.
+    expect(saison?.cash).not.toBe(56.8);
     expect(saison?.cash).not.toBe(91.32);
     expect(saison?.marketValue).toBe(174.41);
   });
