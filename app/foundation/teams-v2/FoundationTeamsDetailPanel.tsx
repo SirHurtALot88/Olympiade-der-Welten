@@ -796,15 +796,17 @@ function FoundationTeamsDetailPanel({
    * liest im Saisonende-Fenster jeden Vertrag um ein Jahr zu kurz. Die Verträge-Tabelle rechnet
    * die Endsaison bereits aus; die Kader-Liste fragt deshalb dieselbe Antwort ab, statt eine
    * zweite zu bilden, die daneben liegen kann.
+   *
+   * BEWUSST OHNE `useMemo`: die Stelle liegt hinter `if (!active) return null` weiter oben, ein
+   * Hook wuerde dort die Aufrufreihenfolge zwischen zwei Renders veraendern
+   * (`react-hooks/rules-of-hooks`) — beim Umschalten von `active` wirft React dann
+   * „Rendered fewer hooks than expected". Das Set baut sich aus ein paar Dutzend Kaderzeilen,
+   * billiger als der Vergleich, den ein Memo dafuer anstellen muesste.
    */
-  const auslaufendePlayerIds = useMemo(
-    () =>
-      new Set(
-        (selectedTeamContractTable?.rows ?? [])
-          .filter((row) => row.status === "active" && row.laeuftAus)
-          .map((row) => row.playerId),
-      ),
-    [selectedTeamContractTable],
+  const auslaufendePlayerIds = new Set(
+    (selectedTeamContractTable?.rows ?? [])
+      .filter((row) => row.status === "active" && row.laeuftAus)
+      .map((row) => row.playerId),
   );
   const contractExpiringCount = selectedRoster.filter((entry) => auslaufendePlayerIds.has(entry.playerId)).length;
   // Verkaufen/Verlängern sind IMMER sichtbar (Discoverability); außerhalb des
