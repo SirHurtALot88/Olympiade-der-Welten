@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
+import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -2258,7 +2259,8 @@ export default function DisciplineStageArena({
    * Disziplin bucht NICHT erneut — gebucht wird der erste, verbindliche Durchlauf.
    */
   const [commitStateByDiscipline, setCommitStateByDiscipline] = useState<
-    Record<string, "pending" | "booked" | "failed">
+    // `unknown`: die Antwort war nicht lesbar — ob gebucht wurde, weiss der Browser nicht (`lwlrwd`).
+    Record<string, "pending" | "booked" | "failed" | "unknown">
   >({});
   /** Warum die Buchung abgelehnt wurde — je Disziplin. `null`, solange es keinen Grund gibt. */
   const [commitFailureReason, setCommitFailureReason] = useState<Record<string, string | null>>({});
@@ -2351,7 +2353,10 @@ export default function DisciplineStageArena({
           // Der Grund wurde hier bislang verschluckt: „Die Wertung ist fehlgeschlagen" stand
           // ohne jede Angabe da, und niemand — auch nicht der Entwickler — konnte sehen, WARUM.
           const reason = error instanceof Error && error.message ? error.message : null;
-          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+          // Ein Fehler BEIM LESEN der Antwort sagt nichts darueber, ob der Server gebucht hat —
+          // genau daran ist `lwlrwd` entstanden. Nur ein fachlicher Fehler heisst "nicht gebucht".
+          const zustand = istZustandUnbekannt(error) ? "unknown" : "failed";
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: zustand }));
           setCommitFailureReason((prev) => ({ ...prev, [finishedDisciplineId]: reason }));
           console.error("[Arena] Buchung der Disziplin fehlgeschlagen", finishedDisciplineId, error);
         })
@@ -2976,9 +2981,22 @@ export default function DisciplineStageArena({
               ? matchdayPanel?.d2?.disciplineId === disciplineId
                 ? "Spieltag gewertet — beide Disziplinen stehen im Saisonstand."
                 : "Gewertet — die Platzierungspunkte stehen im Saisonstand."
-              : commitFailureReason[disciplineId]
-                ? `Die Punkte wurden nicht gebucht — ${commitFailureReason[disciplineId]}`
-                : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
+              : commitState === "unknown"
+                ? /**
+                   * GEMELDET (`lwlrwd`): „Die Punkte wurden nicht gebucht — Failed to execute
+                   * 'json' on 'Response': Unexpected end of JSON input"
+                   *
+                   * Nachgemessen war diese Meldung FALSCH: am Live-Abbild trugen alle sieben
+                   * gewerteten Spieltage einen Standings-Apply-Eintrag, Spieltag 4 eingeschlossen.
+                   * Gebucht wurde sehr wohl — nur die Antwort kam nicht beim Browser an.
+                   *
+                   * Wer „nicht gebucht" liest, bucht nochmal. Deshalb sagt die Buehne bei einem
+                   * Fehler BEIM LESEN der Antwort jetzt, was sie wirklich weiss: naemlich nichts.
+                   */
+                  `Die Antwort kam nicht an — ob gebucht wurde, ist unklar. ${commitFailureReason[disciplineId] ?? ""} Bitte den Saisonstand prüfen, bevor du erneut wertest.`.trim()
+                : commitFailureReason[disciplineId]
+                  ? `Die Punkte wurden nicht gebucht — ${commitFailureReason[disciplineId]}`
+                  : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
         </div>
       ) : null}
 
