@@ -1,3 +1,4 @@
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { ContractYearSalary } from "@/lib/data/olyDataTypes";
 
 /**
@@ -59,7 +60,8 @@ export function buildPlayerContractTileView(input: {
   // Verlauf nie widersprechen.
   const rawSchedule = input.yearlySalarySchedule ?? [];
   const schedule = rawSchedule.slice(0, remaining);
-  const isExpiring = remaining === 1;
+  // Auslaufend heisst 0 — bei 1 kommt noch eine ganze Saison. Siehe `vertragLaeuftAus`.
+  const isExpiring = vertragLaeuftAus(remaining);
 
   return {
     valueLabel: `${remaining} ${remaining === 1 ? "Saison" : "Saisons"}`,

@@ -157,3 +157,43 @@ export function endSaisonFuerNeuenVertrag(
   const ersteGedeckteSaison = isSeasonEndPhase(gameState.gamePhase) ? laufend + 1 : laufend;
   return ersteGedeckteSaison + Math.max(1, Math.round(laufzeit)) - 1;
 }
+
+/**
+ * DIE REGEL FÜR DIE ANZEIGE — eine Zahl, eine Schwelle, ein Ort.
+ *
+ * ENTSCHIEDEN VON CHRIS: „nach MD10 muss sie auf 0 LZ sinken!! und das bedeutet läuft aus. Nach
+ * verlängern ist sie auf 1 und das ist nicht auslaufend und auch nichts für das auslauf Center."
+ *
+ * Die angezeigte Restlaufzeit IST der gespeicherte Countdown. Er zählt, wie viele Saisons der
+ * Spieler noch spielt — nach der Alterung am Saisonende also die kommenden. Eine 1 heißt „noch
+ * eine Saison", eine 0 heißt „vorbei".
+ *
+ * WAS VORHER FALSCH WAR, UND WAS NICHT. Gemeldet war: „xelara steht aktuell dann immernoch auf
+ * vertrag läuft aus und ist im vertrags auslauf center." Falsch war ausschließlich die SCHWELLE —
+ * neun Stellen lasen `<= 1` und erklärten damit jeden Spieler mit einer vollen Restsaison für
+ * auslaufend. An Chris' Spielstand betraf das 129 von 269 Verträgen.
+ *
+ * Die ZAHL war die ganze Zeit richtig. Ein erster Anlauf hat sie mitgeändert (auf eine aus der
+ * Endsaison abgeleitete Größe) und damit die Verträge-Karte gegen die acht übrigen Anzeigen
+ * laufen lassen: dort stand 2, überall sonst 1. Das ist zurückgedreht.
+ *
+ * Die Endsaison bleibt die Wahrheit für das SCHREIBEN eines Vertrags (`endSaisonFuerNeuenVertrag`).
+ * Fürs Lesen genügt der Countdown, und er ist die Zahl, die im Spiel überall steht.
+ */
+
+/** Die Restlaufzeit in Saisons, wie sie angezeigt wird. Nie negativ. */
+export function restlaufzeitInSaisons(contractLength: number | null | undefined): number {
+  if (typeof contractLength !== "number" || !Number.isFinite(contractLength)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(contractLength));
+}
+
+/**
+ * Läuft der Vertrag aus — ist die Entscheidung also JETZT fällig?
+ *
+ * Genau dann, wenn keine Saison mehr folgt. Nicht bei 1: da kommt noch eine ganze.
+ */
+export function vertragLaeuftAus(contractLength: number | null | undefined): boolean {
+  return restlaufzeitInSaisons(contractLength) === 0;
+}

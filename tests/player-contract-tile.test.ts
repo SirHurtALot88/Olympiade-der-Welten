@@ -15,10 +15,11 @@ describe("player contract tile", () => {
     expect(buildPlayerContractTileView({ contractLength: 1 }).valueLabel).toBe("1 Saison");
   });
 
-  it("marks a one-season contract as expiring", () => {
+  it("ein Vertrag mit einer Restsaison laeuft NICHT aus", () => {
+    // Entschieden von Chris: „Nach verlaengern ist sie auf 1 und das ist nicht auslaufend."
     const view = buildPlayerContractTileView({ contractLength: 1, yearlySalarySchedule: [year(1, 3.4)] });
-    expect(view.isExpiring).toBe(true);
-    expect(view.subLabel).toBe("läuft aus");
+    expect(view.isExpiring).toBe(false);
+    expect(view.valueLabel).toBe("1 Saison");
   });
 
   it("hides the tile entirely without a running contract", () => {

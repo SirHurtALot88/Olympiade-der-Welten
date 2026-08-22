@@ -1,126 +1,94 @@
 /**
+ * DIE SCHWELLE WAR FALSCH, NICHT DIE ZAHL.
+ *
  * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus und ist im
  * vertrags auslauf center!"
  *
- * Ihr Vertrag war zu dem Zeitpunkt schon richtig — gespeichert stand Endsaison 2, Status „active".
- * Gelogen hat das Etikett. Die Verträge-Tabelle las an rund zehn Stellen direkt
- * `row.contractLength <= 1`, und dieser Countdown wird am ENDE einer Saison gesenkt, während
- * diese noch die laufende ist. Danach heißt eine 1 nicht mehr „letzte Saison", sondern „noch eine
- * volle". An Chris' Spielstand betraf das 129 von 269 Verträgen: alle standen auf „läuft aus",
- * alle hatten in Wahrheit noch eine ganze Saison.
+ * ENTSCHIEDEN VON CHRIS, nachdem ein erster Anlauf die Zahl mitgeändert hatte: „nach MD10 muss
+ * sie auf 0 LZ sinken!! und das bedeutet läuft aus. Nach verlängern ist sie auf 1 und das ist
+ * nicht auslaufend und auch nichts für das auslauf Center."
  *
- * Die Zeile trägt deshalb jetzt die ABGELEITETE Restlaufzeit mit. Sie kommt aus derselben
- * Endsaison-Rechnung wie der Status, und die Tabelle fragt nur noch sie.
+ * Damit steht die Regel fest und gilt überall gleich:
+ *
+ *     angezeigte Restlaufzeit = der gespeicherte Countdown
+ *     läuft aus               = Restlaufzeit 0
+ *
+ * Neun Anzeigen lasen stattdessen `<= 1` und erklärten jeden Spieler mit einer vollen Restsaison
+ * für auslaufend — an Chris' Spielstand 129 von 269 Verträgen.
+ *
+ * Der erste Anlauf hat die ZAHL auf eine aus der Endsaison abgeleitete Größe umgestellt. Das war
+ * zu viel: die Verträge-Karte zeigte danach 2, während die acht übrigen Anzeigen weiter 1 zeigten.
+ * Diese Datei hält die zurückgedrehte Fassung fest.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { SEASON_END_CONTRACT_TICK_STEP_ID } from "@/lib/contracts/contract-renewal-service";
+import { restlaufzeitInSaisons, vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 
 const panel = readFileSync(join(process.cwd(), "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8");
 
-/** Ein Spielstand in Saison 1, bei dem die Vertragsalterung bereits gelaufen ist. */
-function saisonendeNachDerAlterung() {
+function zeileFuerLaufzeit(laufzeit: number) {
   const gameState = structuredClone(createSingleplayerGameState());
-  gameState.gamePhase = "season_end_management";
-  gameState.seasonState.preSeasonWorkflowLogs = [
-    ...(gameState.seasonState.preSeasonWorkflowLogs ?? []),
-    {
-      logId: "season-end-contract-tick__test",
-      saveId: "test",
-      fromSeasonId: gameState.season.id,
-      toSeasonId: gameState.season.id,
-      stepId: SEASON_END_CONTRACT_TICK_STEP_ID,
-      status: "applied",
-      createdAt: new Date(0).toISOString(),
-    } as NonNullable<typeof gameState.seasonState.preSeasonWorkflowLogs>[number],
-  ];
-  return gameState;
+  const teamId = gameState.teams[0].teamId;
+  const eintrag = gameState.rosters.find((row) => row.teamId === teamId)!;
+  eintrag.contractLength = laufzeit;
+  return buildTeamContractSeasonTable({ gameState, teamId, seasonLabelBase: "Season 1" }).rows.find(
+    (row) => row.playerId === eintrag.playerId,
+  )!;
 }
 
-describe("Verträge-Tabelle: die Restlaufzeit kommt aus der Endsaison", () => {
-  it("nach der Alterung heißt Laufzeit 1 „noch eine volle Saison“ — und nicht „läuft aus“", () => {
-    const gameState = saisonendeNachDerAlterung();
-    const teamId = gameState.teams[0].teamId;
-    const eintrag = gameState.rosters.find((row) => row.teamId === teamId)!;
-    eintrag.contractLength = 1;
-    delete (eintrag as { contractEndSeasonNumber?: number }).contractEndSeasonNumber;
-
-    const zeile = buildTeamContractSeasonTable({ gameState, teamId, seasonLabelBase: "Season 1" }).rows.find(
-      (row) => row.playerId === eintrag.playerId,
-    )!;
-
-    expect(zeile.contractLength).toBe(1);
-    expect(zeile.restlaufzeitSaisons).toBe(2);
-    expect(zeile.laeuftAus).toBe(false);
+describe("Die Regel: 0 läuft aus, 1 nicht", () => {
+  it("Restlaufzeit 0 heißt „läuft aus“", () => {
+    expect(vertragLaeuftAus(0)).toBe(true);
+    expect(restlaufzeitInSaisons(0)).toBe(0);
   });
 
-  it("eine gespeicherte Endsaison schlägt den Countdown", () => {
-    const gameState = saisonendeNachDerAlterung();
-    const teamId = gameState.teams[0].teamId;
-    const eintrag = gameState.rosters.find((row) => row.teamId === teamId)!;
-    // Genau Xelaras Fall nach der Verlängerung: Countdown 1, Endsaison 2.
-    eintrag.contractLength = 1;
-    eintrag.contractEndSeasonNumber = 2;
-
-    const zeile = buildTeamContractSeasonTable({ gameState, teamId, seasonLabelBase: "Season 1" }).rows.find(
-      (row) => row.playerId === eintrag.playerId,
-    )!;
-
-    expect(zeile.restlaufzeitSaisons).toBe(2);
-    expect(zeile.laeuftAus).toBe(false);
+  it("Restlaufzeit 1 heißt NICHT „läuft aus“ — es kommt noch eine ganze Saison", () => {
+    // Genau Xelaras Fall nach der Verlängerung um eine Saison.
+    expect(vertragLaeuftAus(1)).toBe(false);
+    expect(restlaufzeitInSaisons(1)).toBe(1);
   });
 
-  it("ein Vertrag, der wirklich mit dieser Saison endet, läuft aus", () => {
-    const gameState = saisonendeNachDerAlterung();
-    const teamId = gameState.teams[0].teamId;
-    const eintrag = gameState.rosters.find((row) => row.teamId === teamId)!;
-    eintrag.contractLength = 1;
-    eintrag.contractEndSeasonNumber = 1;
+  it("fehlende oder unsinnige Werte gelten als abgelaufen, nicht als unendlich", () => {
+    expect(vertragLaeuftAus(null)).toBe(true);
+    expect(vertragLaeuftAus(undefined)).toBe(true);
+    expect(vertragLaeuftAus(Number.NaN)).toBe(true);
+    expect(restlaufzeitInSaisons(-3)).toBe(0);
+  });
+});
 
-    const zeile = buildTeamContractSeasonTable({ gameState, teamId, seasonLabelBase: "Season 1" }).rows.find(
-      (row) => row.playerId === eintrag.playerId,
-    )!;
-
+describe("Verträge-Tabelle: die Zahl ist der Countdown", () => {
+  it("Laufzeit 1 steht als 1 in der Zeile und läuft nicht aus", () => {
+    const zeile = zeileFuerLaufzeit(1);
     expect(zeile.restlaufzeitSaisons).toBe(1);
+    expect(zeile.laeuftAus).toBe(false);
+  });
+
+  it("Laufzeit 0 läuft aus", () => {
+    const zeile = zeileFuerLaufzeit(0);
+    expect(zeile.restlaufzeitSaisons).toBe(0);
     expect(zeile.laeuftAus).toBe(true);
   });
 
-  it("während der laufenden Saison bleibt der Countdown die Restlaufzeit", () => {
-    // Ohne Alterung gibt es keinen Versatz — sonst wäre jeder Vertrag mitten in der Saison zu lang.
-    const gameState = structuredClone(createSingleplayerGameState());
-    const teamId = gameState.teams[0].teamId;
-    const eintrag = gameState.rosters.find((row) => row.teamId === teamId)!;
-    eintrag.contractLength = 3;
-    delete (eintrag as { contractEndSeasonNumber?: number }).contractEndSeasonNumber;
-
-    const zeile = buildTeamContractSeasonTable({ gameState, teamId, seasonLabelBase: "Season 1" }).rows.find(
-      (row) => row.playerId === eintrag.playerId,
-    )!;
-
+  it("Laufzeit 3 bleibt 3", () => {
+    const zeile = zeileFuerLaufzeit(3);
     expect(zeile.restlaufzeitSaisons).toBe(3);
     expect(zeile.laeuftAus).toBe(false);
   });
 });
 
-describe("Die Tabelle fragt nicht mehr den rohen Countdown", () => {
+describe("Die Tabelle rechnet nicht selbst", () => {
   it("keine Zeile der Verträge-Karte entscheidet über `contractLength <= 1`", () => {
-    // Das war die eigentliche Fehlerquelle: dieselbe Bedingung an rund zehn Stellen, jede für sich
-    // im Saisonende-Fenster um eine Saison daneben.
+    // Das war die Fehlerquelle: dieselbe Bedingung an rund zehn Stellen, jede fuer sich daneben.
     expect(panel).not.toContain("row.contractLength <= 1");
-    expect(panel).not.toContain("left.row.contractLength <= 1");
-    expect(panel).not.toContain("right.row.contractLength <= 1");
+    expect(panel).not.toContain("entry.contractLength <= 1");
   });
 
-  it("das Restlaufzeiten-Fach zählt die abgeleitete Laufzeit", () => {
-    expect(panel).toContain("Number.isFinite(row.restlaufzeitSaisons) ? row.restlaufzeitSaisons : null");
-  });
-
-  it("der LZ-Chip zeigt die abgeleitete Laufzeit", () => {
+  it("der LZ-Chip zeigt die Restlaufzeit der Zeile", () => {
     expect(panel).toContain("{formatWholeNumber(row.restlaufzeitSaisons)}");
   });
 });
@@ -134,13 +102,8 @@ describe("Die Tabelle fragt nicht mehr den rohen Countdown", () => {
  * `node:crypto` herein. Webpack brach ab:
  *
  *     UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins
- *       node:crypto → contract-renewal-service.ts → contract-negotiation-preview.ts
- *       → use-foundation-shell-router-body-scope.tsx → FoundationPageClient.tsx
  *
- * Die Prüfung ist reines Lesen aus dem GameState und liegt deshalb jetzt in
- * `saisonende-alterung-marke.ts`, wo auch der Browser sie stellen darf. Der Wächter hält den
- * kurzen Weg zurück in den Server-Pfad zu — `npx tsc --noEmit` merkt davon nichts, erst der
- * Produktions-Build.
+ * `npx tsc --noEmit` merkt davon nichts, erst der Produktions-Build.
  */
 describe("Das Client-Bundle bleibt frei von node:crypto", () => {
   const vorschau = readFileSync(join(process.cwd(), "lib/market/contract-negotiation-preview.ts"), "utf8");
@@ -155,7 +118,6 @@ describe("Das Client-Bundle bleibt frei von node:crypto", () => {
 
   it("das client-sichere Modul zieht selbst nichts aus node: herein", () => {
     const marke = readFileSync(join(process.cwd(), "lib/contracts/saisonende-alterung-marke.ts"), "utf8");
-    // Nur echte Import-Zeilen, nicht die Fehlermeldung im Kommentar darueber.
     const importZeilen = marke.split("\n").filter((zeile) => /^\s*(import|export)\b.*\bfrom\b/.test(zeile));
     expect(importZeilen.filter((zeile) => zeile.includes('"node:'))).toEqual([]);
     expect(marke).not.toContain('require("node:');

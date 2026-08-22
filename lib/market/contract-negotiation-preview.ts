@@ -20,7 +20,7 @@ import { getTransfermarktScoutingRecruitmentBonus } from "@/lib/market/transferm
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { getCanonicalSeasonLabelAtOffset } from "@/lib/season/season-label";
-import { restlaufzeit } from "@/lib/contracts/vertragslaufzeit";
+import { restlaufzeitInSaisons, vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { hasSeasonEndContractTickApplied } from "@/lib/contracts/saisonende-alterung-marke";
 
 type ContractPreviewInput = {
@@ -2578,7 +2578,7 @@ export function buildTeamContractSeasonTable(input: {
   const rosterRows = teamRoster
     .map<TeamContractSeasonRow>((entry) => {
       const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-      const restSaisons = restlaufzeit(entry, input.gameState, { alterungBereitsGelaufen: alterungGelaufen });
+      const restSaisons = restlaufzeitInSaisons(entry.contractLength);
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
       const rohBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
       /**
@@ -2648,7 +2648,7 @@ export function buildTeamContractSeasonTable(input: {
         contractShape: entry.contractShape ?? "balanced",
         contractLength: entry.contractLength,
         restlaufzeitSaisons: restSaisons,
-        laeuftAus: restSaisons <= 1,
+        laeuftAus: vertragLaeuftAus(entry.contractLength),
         totalSalary: roundMoney(yearlySalarySchedule.reduce((sum, row) => sum + row.salary, 0), 2),
         /**
          * GEMELDET: „ich bin gerade MD10 im Saisonende, aber hier stehen immer noch Werte bei
@@ -2696,8 +2696,9 @@ export function buildTeamContractSeasonTable(input: {
       contractShape: draft.contractShape,
       contractLength: draft.contractLength,
       // Ein Entwurf ist noch kein Vertrag — seine Laufzeit ist die geplante, kein Countdown.
-      restlaufzeitSaisons: draft.contractLength,
-      laeuftAus: draft.contractLength <= 1,
+      restlaufzeitSaisons: restlaufzeitInSaisons(draft.contractLength),
+      // Ein Entwurf ist noch kein Vertrag — seine geplante Laufzeit laeuft nie „aus".
+      laeuftAus: false,
       totalSalary: draft.totalSalary,
       buyoutCost: draft.buyoutCost,
       exitValue: null,

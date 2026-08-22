@@ -105,7 +105,10 @@ function makeGameState(partial?: Partial<GameState>): GameState {
           id: "r-1",
           teamId: "M-M",
           playerId: "p-1",
-          contractLength: 1,
+          // Auslaufend heisst 0. Entschieden von Chris: „nach MD10 muss sie auf 0 LZ sinken!!
+          // und das bedeutet laeuft aus." Bei 1 kommt noch eine ganze Saison — dann braucht der
+          // Vertrag auch keine Entscheidung im Postfach.
+          contractLength: 0,
           salary: 2,
           upkeep: 2,
           purchasePrice: 10,
@@ -197,7 +200,10 @@ describe("game inbox service", () => {
           id: "r-1",
           teamId: "M-M",
           playerId: "p-1",
-          contractLength: 1,
+          // Auslaufend heisst 0. Entschieden von Chris: „nach MD10 muss sie auf 0 LZ sinken!!
+          // und das bedeutet laeuft aus." Bei 1 kommt noch eine ganze Saison — dann braucht der
+          // Vertrag auch keine Entscheidung im Postfach.
+          contractLength: 0,
           salary: 2,
           upkeep: 2,
           purchasePrice: 20,

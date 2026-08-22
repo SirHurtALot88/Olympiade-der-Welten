@@ -1,3 +1,4 @@
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
 import { buildTeamPlayerTrainingLoadPlans, type AiTeamTrainingIntensity } from "@/lib/ai/ai-player-training-load-service";
 import type {
@@ -860,9 +861,26 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     // XP-System abgeschafft: Der Inbox-Hinweis „XP verfügbar / XP ausgeben"
     // (gegated auf player.currentXP > 0) entfällt — Entwicklung läuft organisch.
 
-    const expiring = roster.filter(
-      (entry) => (entry.contractLength ?? 0) <= 1 || entry.contractStatus === "expiring" || entry.contractStatus === "renewal_pending",
-    );
+    /**
+     * WER BRAUCHT WIRKLICH EINE ENTSCHEIDUNG.
+     *
+     * Entschieden von Chris: „nach MD10 muss sie auf 0 LZ sinken!! und das bedeutet laeuft aus.
+     * Nach verlaengern ist sie auf 1 und das ist nicht auslaufend."
+     *
+     * `<= 1` fiel hier gleich doppelt auf die Nase: es zog jeden Spieler mit einer vollen
+     * Restsaison herein, UND der gespeicherte Status `expiring` stammt teils aus alten
+     * Verlaengerungen, die ihn bei Laufzeit 1 setzten. Xelara trug so beides — Laufzeit 1 und das
+     * Etikett „auslaufend" — und stand im Postfach, obwohl ihr Vertrag bis Ende Saison 2 laeuft.
+     *
+     * `renewal_pending` und `out_of_contract` bleiben: die beschreiben eine offene Entscheidung,
+     * keine Restlaufzeit. `expiring` ist raus, weil es genau die Zweideutigkeit trug.
+     */
+    const brauchtEntscheidung = (entry: (typeof roster)[number]) =>
+      vertragLaeuftAus(entry.contractLength) ||
+      entry.contractStatus === "renewal_pending" ||
+      entry.contractStatus === "out_of_contract";
+
+    const expiring = roster.filter(brauchtEntscheidung);
     if (expiring.length > 0) {
       items.push(
         createItem({
@@ -891,7 +909,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         const purchase = entry.purchasePrice ?? player?.marketValue ?? 0;
         const current = entry.currentValue ?? player?.displayMarketValue ?? player?.marketValue ?? 0;
         const profit = current - purchase;
-        const isExpiring = (entry.contractLength ?? 0) <= 1 || entry.contractStatus === "expiring" || entry.contractStatus === "renewal_pending";
+        const isExpiring = brauchtEntscheidung(entry);
         const pressureScore = (team.cash < 0 ? 2 : 0) + (profit >= 8 || current >= purchase * 1.2 ? 1 : 0) + (isExpiring ? 1 : 0);
         if (pressureScore >= 2) {
           sellCandidates.push({ entry, player, profit, isExpiring });
