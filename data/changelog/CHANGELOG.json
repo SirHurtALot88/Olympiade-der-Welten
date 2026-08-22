@@ -20,6 +20,33 @@
       "version": "0.5"
     },
     {
+      "datum": "2026-08-22",
+      "seite": "Teams · Verträge",
+      "pr": null,
+      "text": "„Läuft aus\" heißt jetzt überall dasselbe: Restlaufzeit 0. Vorher entschied das jede Anzeige für sich, und zwar bei Restlaufzeit 1 — dadurch galt ein Spieler schon als auslaufend, während er noch eine ganze Saison vor sich hatte. In einem Spielstand betraf das 129 von 269 Verträgen. Zehn Stellen lesen dieselbe Regel: die Verträge-Karte, das Vertrags-Auslauf-Center, die Kaderkarte, die Teams-Kennzahlen, das Saison-Finale, die Trainings-Tabelle, der Vertragsauslauf-Radar der Spielertabelle, der Verkaufs-Dialog, die Vertragsempfehlung und das Postfach. Wer nach dem Saisonende um ein Jahr verlängert, steht danach auf 1 und ist damit aus dem Auslauf-Center raus.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
+      "seite": "Markt · Transfermarkt",
+      "pr": null,
+      "text": "Ein Angebot, das der Spieler ablehnt, lässt sich nicht mehr unterschreiben. Das Verdikt der Verhandlung wurde zwar berechnet und angezeigt, beim Schreiben aber ignoriert: ein Angebot über fünf Prozent der Forderung bekam „abgelehnt\" und ging trotzdem durch. Gilt für Kauf und Verlängerung. Gegenangebote bleiben ausdrücklich erlaubt — der Spieler redet ja weiter.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
+      "seite": "Technik",
+      "pr": null,
+      "text": "Das Laden eines Spielstands dauert nur noch etwa halb so lange: 1,7 Sekunden werden zu 0,9. Der größte Einzelposten war eine Perzentil-Rechnung, die für jeden der knapp 3000 Spieler die ganze Liga durchlief — rund 44 Millionen Vergleiche pro Ladevorgang. Auf einer sortierten Liste geht dieselbe Frage mit einer binären Suche, und die liefert nachweislich identische Werte.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-21",
       "seite": "Finanzen · Apron",
       "pr": null,
