@@ -205,6 +205,39 @@ export type NegotiationVerdict =
   | "reject_lowball"
   | "reject_affront";
 
+/**
+ * Der Blocker, der eine Unterschrift gegen den Willen des Spielers verhindert.
+ *
+ * GEMESSEN, nicht vermutet: ein Angebot ueber 5 % der Forderung bekam
+ * `verdict: "reject_lowball"` — und trotzdem `canBuy: true` mit leerer Blockerliste.
+ *
+ *     Angebot 18,39 (100 %)  verdict counter_money    canBuy true  blocker []
+ *     Angebot  9,20 ( 50 %)  verdict reject_lowball   canBuy true  blocker []
+ *     Angebot  3,68 ( 20 %)  verdict reject_lowball   canBuy true  blocker []
+ *     Angebot  0,92 (  5 %)  verdict reject_lowball   canBuy true  blocker []
+ *
+ * Das Verdikt wurde also berechnet, angezeigt — und beim Schreiben ignoriert. Wer den Aufruf
+ * direkt absetzte, unterschrieb einen Vertrag, den der Spieler gerade abgelehnt hatte.
+ */
+export const VERDIKT_ABGELEHNT_BLOCKER = "negotiation_verdict_rejected";
+
+/**
+ * Ist das ein Nein?
+ *
+ * NUR die drei Ablehnungen zaehlen. Ein Gegenangebot ist ausdruecklich KEIN Nein — der Spieler
+ * redet weiter, und der Verhandlungsweg ist genau dafuer gebaut: Angebot, Gegenangebot,
+ * einschlagen. Selbst ein Angebot in Hoehe der vollen Forderung kommt oben als `counter_money`
+ * zurueck; ein Riegel gegen Gegenangebote wuerde also den normalen Kauf sperren.
+ */
+export function istVerdiktAblehnung(verdict: NegotiationVerdict | null | undefined): boolean {
+  return verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront";
+}
+
+/** Die Blockerliste, die ein abgelehntes Angebot beisteuert — leer, solange verhandelt wird. */
+export function verdiktBlocker(verdict: NegotiationVerdict | null | undefined): string[] {
+  return istVerdiktAblehnung(verdict) ? [VERDIKT_ABGELEHNT_BLOCKER] : [];
+}
+
 export type ContractSchedulePreview = {
   yearlySalarySchedule: ContractYearSalary[];
   totalSalary: number | null;

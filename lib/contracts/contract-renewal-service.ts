@@ -23,6 +23,7 @@ import {
   hasSeasonEndContractTickApplied,
 } from "@/lib/contracts/saisonende-alterung-marke";
 import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
+import { verdiktBlocker } from "@/lib/market/contract-negotiation-preview";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
   normalizeContractLength,
@@ -1959,8 +1960,22 @@ export function previewContractRenewalAction(input: {
     "confirm_required_before_contract_write",
   ].filter((warning): warning is string => Boolean(warning));
 
+  /**
+   * EIN ABGELEHNTES ANGEBOT WIRD NICHT UNTERSCHRIEBEN.
+   *
+   * Das Verdikt lag hier immer schon vor — `negotiationPreview.verdict` — und wurde nur nie gegen
+   * den Schreibweg gehalten. `applyContractRenewalAction` haengt an `preview.ok`, der Riegel
+   * greift damit auch dort, ohne dass der Apply-Pfad die Regel ein zweites Mal kennen muss.
+   * Gegenangebote bleiben ausdruecklich erlaubt: sie sind kein Nein.
+   */
+  const verdiktBlockingReasons = verdiktBlocker(negotiationPreview?.verdict);
+
   return {
-    ok: blockingReasons.length === 0 && (negotiationPreview?.blockingReasons.length ?? 0) === 0 && moraleBlockingReasons.length === 0,
+    ok:
+      blockingReasons.length === 0 &&
+      (negotiationPreview?.blockingReasons.length ?? 0) === 0 &&
+      moraleBlockingReasons.length === 0 &&
+      verdiktBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
     teamId: input.teamId,
@@ -1984,7 +1999,14 @@ export function previewContractRenewalAction(input: {
       : null,
     moraleAdjustedExpectedSalary,
     warnings: Array.from(new Set(warnings)),
-    blockingReasons: Array.from(new Set([...blockingReasons, ...(negotiationPreview?.blockingReasons ?? []), ...moraleBlockingReasons])),
+    blockingReasons: Array.from(
+      new Set([
+        ...blockingReasons,
+        ...(negotiationPreview?.blockingReasons ?? []),
+        ...moraleBlockingReasons,
+        ...verdiktBlockingReasons,
+      ]),
+    ),
   };
 }
 
