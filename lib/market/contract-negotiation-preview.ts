@@ -21,7 +21,7 @@ import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { getCanonicalSeasonLabelAtOffset } from "@/lib/season/season-label";
 import { restlaufzeit } from "@/lib/contracts/vertragslaufzeit";
-import { hasSeasonEndContractTickApplied } from "@/lib/contracts/contract-renewal-service";
+import { hasSeasonEndContractTickApplied } from "@/lib/contracts/saisonende-alterung-marke";
 
 type ContractPreviewInput = {
   annualSalary: number | null;

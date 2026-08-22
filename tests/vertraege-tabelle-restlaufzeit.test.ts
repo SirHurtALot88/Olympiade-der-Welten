@@ -124,3 +124,40 @@ describe("Die Tabelle fragt nicht mehr den rohen Countdown", () => {
     expect(panel).toContain("{formatWholeNumber(row.restlaufzeitSaisons)}");
   });
 });
+
+/**
+ * DER BUILD-BRUCH, DEN DIESE ZEILE FAST GEKOSTET HAT.
+ *
+ * `contract-negotiation-preview.ts` liegt im CLIENT-Bundle (über
+ * `use-foundation-shell-router-body-scope` → `FoundationPageClient`). Der erste Anlauf holte
+ * `hasSeasonEndContractTickApplied` aus `contract-renewal-service` — und das Modul zieht
+ * `node:crypto` herein. Webpack brach ab:
+ *
+ *     UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins
+ *       node:crypto → contract-renewal-service.ts → contract-negotiation-preview.ts
+ *       → use-foundation-shell-router-body-scope.tsx → FoundationPageClient.tsx
+ *
+ * Die Prüfung ist reines Lesen aus dem GameState und liegt deshalb jetzt in
+ * `saisonende-alterung-marke.ts`, wo auch der Browser sie stellen darf. Der Wächter hält den
+ * kurzen Weg zurück in den Server-Pfad zu — `npx tsc --noEmit` merkt davon nichts, erst der
+ * Produktions-Build.
+ */
+describe("Das Client-Bundle bleibt frei von node:crypto", () => {
+  const vorschau = readFileSync(join(process.cwd(), "lib/market/contract-negotiation-preview.ts"), "utf8");
+
+  it("die Vorschau importiert nicht den Verlängerungs-Service", () => {
+    expect(vorschau).not.toContain('from "@/lib/contracts/contract-renewal-service"');
+  });
+
+  it("sie holt den Alterungs-Marker aus dem client-sicheren Modul", () => {
+    expect(vorschau).toContain('from "@/lib/contracts/saisonende-alterung-marke"');
+  });
+
+  it("das client-sichere Modul zieht selbst nichts aus node: herein", () => {
+    const marke = readFileSync(join(process.cwd(), "lib/contracts/saisonende-alterung-marke.ts"), "utf8");
+    // Nur echte Import-Zeilen, nicht die Fehlermeldung im Kommentar darueber.
+    const importZeilen = marke.split("\n").filter((zeile) => /^\s*(import|export)\b.*\bfrom\b/.test(zeile));
+    expect(importZeilen.filter((zeile) => zeile.includes('"node:'))).toEqual([]);
+    expect(marke).not.toContain('require("node:');
+  });
+});
