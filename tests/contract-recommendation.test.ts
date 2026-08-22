@@ -98,11 +98,13 @@ describe("empfehleVertrag", () => {
   });
 
   it("weist auf die auslaufende Restlaufzeit hin, statt sie zu verschweigen", () => {
+    // Auslaufend heisst 0 — bei 1 kommt noch eine ganze Saison. Entschieden von Chris:
+    // „nach MD10 muss sie auf 0 LZ sinken!! und das bedeutet laeuft aus."
     const ergebnis = empfehleVertrag({
       gehalt: fuer(13.4, 9),
       vk: 58.5,
       marktwert: 58.5,
-      restlaufzeit: 1,
+      restlaufzeit: 0,
       moral: 53,
       intent: "verlängerungsbereit",
     });

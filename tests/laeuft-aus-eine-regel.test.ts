@@ -4,10 +4,14 @@
  * ENTSCHIEDEN VON CHRIS: „nach MD10 muss sie auf 0 LZ sinken!! und das bedeutet läuft aus. Nach
  * verlängern ist sie auf 1 und das ist nicht auslaufend und auch nichts für das auslauf Center."
  *
- * Neun Anzeigen hatten die Schwelle je einzeln als `contractLength <= 1` stehen. Jede für sich
+ * Zehn Anzeigen hatten die Schwelle je einzeln als `contractLength <= 1` stehen. Jede für sich
  * sah harmlos aus; zusammen erklärten sie an Chris' Spielstand 129 von 269 Verträgen für
  * auslaufend, obwohl alle noch eine volle Saison hatten. Und als eine davon korrigiert wurde,
  * widersprach sie prompt den acht übrigen.
+ *
+ * Die zehnte fiel erst auf, als Chris fragte, warum Xelara „als auslaufend getaggt" wird: das
+ * Postfach zog zusaetzlich den GESPEICHERTEN Status `expiring` heran, und der stammt teils aus
+ * alten Verlaengerungen.
  *
  * Dieser Wächter hält den Rückweg zu. Er prüft die ANZEIGEN — die Stellen, an denen der Spieler
  * eine Restlaufzeit oder ein „läuft aus" zu sehen bekommt. Die KI-Heuristiken
@@ -31,6 +35,7 @@ const ANZEIGEN = [
   "app/foundation/training-compact/TrainingCompactNewLook.tsx",
   "app/foundation/players-table/FoundationPlayersTableNewLook.tsx",
   "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx",
+  "lib/foundation/game-inbox-service.ts",
 ] as const;
 
 /**
