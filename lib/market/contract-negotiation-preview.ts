@@ -20,6 +20,8 @@ import { getTransfermarktScoutingRecruitmentBonus } from "@/lib/market/transferm
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { getCanonicalSeasonLabelAtOffset } from "@/lib/season/season-label";
+import { restlaufzeit } from "@/lib/contracts/vertragslaufzeit";
+import { hasSeasonEndContractTickApplied } from "@/lib/contracts/contract-renewal-service";
 
 type ContractPreviewInput = {
   annualSalary: number | null;
@@ -327,6 +329,21 @@ export type TeamContractSeasonRow = {
   roleTag: string | null;
   contractShape: ContractShape;
   contractLength: number;
+  /**
+   * DIE RESTLAUFZEIT, WIE SIE WIRKLICH IST — abgeleitet aus der Endsaison.
+   *
+   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus." Sein
+   * Vertrag lief bis Ende Saison 2, gespeichert war Endsaison 2 und Status „active" — die
+   * Tabelle las trotzdem `contractLength <= 1` und schrieb „LÄUFT AUS".
+   *
+   * `contractLength` ist ein Countdown, der am ENDE einer Saison gesenkt wird, waehrend diese
+   * noch die laufende ist. Danach heisst eine 1 „noch eine volle Saison". Wer die Zahl direkt
+   * liest, liest im Saisonende-Fenster jeden Vertrag um ein Jahr zu kurz — bei Chris waren das
+   * 129 Spieler, die alle faelschlich als auslaufend galten.
+   */
+  restlaufzeitSaisons: number;
+  /** Endet der Vertrag mit der laufenden Saison? Die Frage, die „laeuft aus" beantworten soll. */
+  laeuftAus: boolean;
   totalSalary: number | null;
   buyoutCost: number | null;
   exitValue: number | null;
@@ -2519,9 +2536,16 @@ export function buildTeamContractSeasonTable(input: {
 }): TeamContractSeasonTable {
   const teamRoster = input.gameState.rosters.filter((entry) => entry.teamId === input.teamId);
   const rosterCount = teamRoster.length;
+  /**
+   * Im Saisonende-Fenster sind die Laufzeiten bereits gesenkt, die Saisonnummer aber noch die
+   * alte. Ohne diesen Versatz kaeme fuer jeden Vertrag OHNE gespeicherte Endsaison eine Saison
+   * zu wenig heraus — siehe `endSaisonNummer`.
+   */
+  const alterungGelaufen = hasSeasonEndContractTickApplied(input.gameState);
   const rosterRows = teamRoster
     .map<TeamContractSeasonRow>((entry) => {
       const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      const restSaisons = restlaufzeit(entry, input.gameState, { alterungBereitsGelaufen: alterungGelaufen });
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
       const rohBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
       /**
@@ -2590,6 +2614,8 @@ export function buildTeamContractSeasonTable(input: {
         roleTag: entry.roleTag,
         contractShape: entry.contractShape ?? "balanced",
         contractLength: entry.contractLength,
+        restlaufzeitSaisons: restSaisons,
+        laeuftAus: restSaisons <= 1,
         totalSalary: roundMoney(yearlySalarySchedule.reduce((sum, row) => sum + row.salary, 0), 2),
         /**
          * GEMELDET: „ich bin gerade MD10 im Saisonende, aber hier stehen immer noch Werte bei
@@ -2636,6 +2662,9 @@ export function buildTeamContractSeasonTable(input: {
       roleTag: "preview",
       contractShape: draft.contractShape,
       contractLength: draft.contractLength,
+      // Ein Entwurf ist noch kein Vertrag — seine Laufzeit ist die geplante, kein Countdown.
+      restlaufzeitSaisons: draft.contractLength,
+      laeuftAus: draft.contractLength <= 1,
       totalSalary: draft.totalSalary,
       buyoutCost: draft.buyoutCost,
       exitValue: null,

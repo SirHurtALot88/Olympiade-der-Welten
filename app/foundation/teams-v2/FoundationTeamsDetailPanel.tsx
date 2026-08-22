@@ -231,7 +231,9 @@ function buildContractExpiryBuckets(rows, seasonLabelCount) {
   (rows ?? [])
     .filter((row) => row.status === "active")
     .forEach((row) => {
-      const length = Number.isFinite(row.contractLength) ? row.contractLength : null;
+      // Die ABGELEITETE Restlaufzeit, nicht der Countdown: im Saisonende-Fenster ist der um eine
+      // Saison zu kurz, und dann steht ein Spieler mit einer vollen Saison im Ein-Jahres-Fach.
+      const length = Number.isFinite(row.restlaufzeitSaisons) ? row.restlaufzeitSaisons : null;
       if (length == null) {
         return;
       }
@@ -784,7 +786,27 @@ function FoundationTeamsDetailPanel({
     (showDeferredTeamLogos ||
       rowIndex < TEAMS_INITIAL_VISIBLE_LOGO_ROWS ||
       teamId === selectedTeam?.teamId);
-  const contractExpiringCount = selectedRoster.filter((entry) => entry.contractLength <= 1).length;
+  /**
+   * WER LÄUFT AUS — eine Auskunft, nicht zwei.
+   *
+   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus."
+   *
+   * `contractLength` ist ein Countdown, der am ENDE einer Saison gesenkt wird, während diese noch
+   * die laufende ist. Danach heißt eine 1 „noch eine volle Saison" — wer die Zahl direkt liest,
+   * liest im Saisonende-Fenster jeden Vertrag um ein Jahr zu kurz. Die Verträge-Tabelle rechnet
+   * die Endsaison bereits aus; die Kader-Liste fragt deshalb dieselbe Antwort ab, statt eine
+   * zweite zu bilden, die daneben liegen kann.
+   */
+  const auslaufendePlayerIds = useMemo(
+    () =>
+      new Set(
+        (selectedTeamContractTable?.rows ?? [])
+          .filter((row) => row.status === "active" && row.laeuftAus)
+          .map((row) => row.playerId),
+      ),
+    [selectedTeamContractTable],
+  );
+  const contractExpiringCount = selectedRoster.filter((entry) => auslaufendePlayerIds.has(entry.playerId)).length;
   // Verkaufen/Verlängern sind IMMER sichtbar (Discoverability); außerhalb des
   // Season-End-Fensters nur ausgegraut + Tooltip statt versteckt. Der TEMP-
   // Schalter oben macht sie zum Testen sofort klickbar (Server gated Writes).
@@ -1078,11 +1100,11 @@ function FoundationTeamsDetailPanel({
                               const axisDisciplineGroups = Array.isArray(disciplinePpsByAxis) ? disciplinePpsByAxis : [];
                               const isPpsDisziExpanded = expandedRosterPpsDisziId === entry.id;
                               const ppsDisziPanelId = `roster-pps-diszi-${entry.id}`;
-                              const isContractExpiring = entry.contractLength <= 1;
+                              const isContractExpiring = auslaufendePlayerIds.has(entry.playerId);
                               return (
                               <Fragment key={entry.id}>
                               <tr
-                                className={entry.contractLength <= 1 ? "is-contract-expiring" : undefined}
+                                className={isContractExpiring ? "is-contract-expiring" : undefined}
                                 onClick={() => void openPlayerDrawerById(player.id, entry.id)}
                               >
                                 {visibleSelectedRosterColumns.map((column) => {
@@ -1519,9 +1541,9 @@ function FoundationTeamsDetailPanel({
                           const auslaufRows =
                             auslaufScope === "all"
                               ? auslaufActiveRows
-                              : auslaufActiveRows.filter((row) => row.contractLength <= 1);
+                              : auslaufActiveRows.filter((row) => row.laeuftAus);
                           const auslaufExpiringCount = auslaufActiveRows.filter(
-                            (row) => row.contractLength <= 1,
+                            (row) => row.laeuftAus,
                           ).length;
                           const auslaufPlayersById = new Map(
                             (gameState?.players ?? []).map((player) => [player.id, player]),
@@ -1558,8 +1580,8 @@ function FoundationTeamsDetailPanel({
                               return leftRank - rightRank;
                             }
                             // Auslaufende (LZ ≤ 1) immer oben, dann PPs Saison desc, dann Name.
-                            const leftExpiring = left.row.contractLength <= 1 ? 0 : 1;
-                            const rightExpiring = right.row.contractLength <= 1 ? 0 : 1;
+                            const leftExpiring = left.row.laeuftAus ? 0 : 1;
+                            const rightExpiring = right.row.laeuftAus ? 0 : 1;
                             if (leftExpiring !== rightExpiring) {
                               return leftExpiring - rightExpiring;
                             }
@@ -1683,7 +1705,7 @@ function FoundationTeamsDetailPanel({
                                               {(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}
                                             </span>
                                           </button>
-                                          {row.contractLength <= 1 ? (
+                                          {row.laeuftAus ? (
                                             <span
                                               className="team-contract-lz-chip is-expiring heat-band-1 team-auslauf-lz"
                                               title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
@@ -2296,7 +2318,7 @@ function FoundationTeamsDetailPanel({
                                 </span>
                               );
                             case "lz":
-                              return row.contractLength <= 1 ? (
+                              return row.laeuftAus ? (
                                 <span
                                   className={`team-contract-lz-chip is-expiring ${getContractLengthHeatBandClass(row.contractLength)}`}
                                   title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
@@ -2304,8 +2326,14 @@ function FoundationTeamsDetailPanel({
                                   läuft aus
                                 </span>
                               ) : (
-                                <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
-                                  {formatWholeNumber(row.contractLength)}
+                                <span
+                                  className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.restlaufzeitSaisons)}`}
+                                  title={`Läuft noch ${formatWholeNumber(row.restlaufzeitSaisons)} Saison${row.restlaufzeitSaisons === 1 ? "" : "en"}.`}
+                                >
+                                  {/* Die ABGELEITETE Restlaufzeit. `contractLength` ist ein Countdown, der am
+                                      Saisonende gesenkt wird, während die Saison noch läuft — er zeigt dort
+                                      jeden Vertrag um eine Saison zu kurz. */}
+                                  {formatWholeNumber(row.restlaufzeitSaisons)}
                                 </span>
                               );
                             case "morale":
@@ -2632,7 +2660,7 @@ function FoundationTeamsDetailPanel({
                                 return (
                                   [
                                     row.status === "preview" && "is-preview-row",
-                                    row.contractLength <= 1 && "is-contract-expiring",
+                                    row.laeuftAus && "is-contract-expiring",
                                     isSellMarked && "is-sell-marked",
                                   ]
                                     .filter(Boolean)
