@@ -54,8 +54,15 @@ async function main() {
       playerId: row.playerId,
       action: "renew",
     });
+    // Die Endsaison ist inzwischen die massgebliche Groesse; sie steht am Kadereintrag, nicht an
+    // der Vorschauzeile. Ohne sie zeigt die Diagnose nur den Countdown — und genau dessen
+    // Zweideutigkeit soll sie ja aufklaeren.
+    const kader = save.gameState.rosters.find(
+      (eintrag) => eintrag.teamId === row.teamId && eintrag.playerId === row.playerId,
+    );
     console.log(
-      `  ${row.teamId} ${row.playerName}: LZ ${row.contractLengthBefore}->${row.contractLengthAfterTick}` +
+      `  ${row.teamId} ${row.playerName}: LZ ${row.currentLength}->${row.lengthAfterTick}` +
+        ` Endsaison ${kader?.contractEndSeasonNumber ?? "—"}` +
         ` status ${row.statusBeforeTick}->${row.statusAfterTick}` +
         ` | Einzel-Vorschau ok=${einzeln.ok} blocker=${JSON.stringify(einzeln.blockingReasons)}`,
     );
