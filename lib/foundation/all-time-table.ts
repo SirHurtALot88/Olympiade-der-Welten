@@ -255,32 +255,50 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         rank: record.rank ?? null,
         points: record.points ?? null,
         /**
-         * WELCHER STAND HIER STEHT — Chris' Vorgabe: „die snapshots für Cash und Marktwert sollen
-         * ja auch erst am anfang der Saison nach den Käufen stattfinden für die ewige Tabelle /
-         * Finanzen." Gemeint ist der Eintrittsstand der FOLGESAISON: Kader gefüllt, Käufe getätigt,
-         * Kredite aufgenommen — das ist der Stand, mit dem das Team wirklich weiterspielt.
+         * WELCHER STAND HIER STEHT: DER SAISON-ENDSTAND. Chris' Entscheidung vom 22.08. —
+         * „ewige tabelle immer zum ende der saison speichern also in Season 2 sehe ich dort
+         * Season 1 ergebnisse".
          *
-         * Den schreibt `patchCompletedSeasonSnapshotAfterPreseasonBuy` in `marketValueTotalEnd`
-         * (Marktwert) und `cashEntry` (Cash). Ob er gelaufen ist, sagt `entryRosterPatchedAt` —
-         * ungepatchte Snapshots (Altsaves, oder die noch laufende letzte Saison) haben ihn nicht.
+         * DAS DREHT EINE FRUEHERE VORGABE UM, und das gehoert dazu: hier stand der EINTRITTSSTAND
+         * der Folgesaison (Kader gefuellt, Kaeufe getaetigt), auf Chris' damalige Ansage „die
+         * snapshots für Cash und Marktwert sollen ja auch erst am anfang der Saison nach den Käufen
+         * stattfinden". Die Meldung `8gg29q` verlangte das Gegenteil, und die Begruendung
+         * ueberzeugt: eine EWIGE Tabelle beantwortet die Frage „was hat diese Saison gebracht",
+         * nicht „womit ging es weiter". Kaeufe der Folgesaison gehoeren in deren Zeile, nicht in
+         * die der abgeschlossenen.
          *
-         * FALLBACK OHNE PATCH, und warum genau in dieser Reihenfolge:
-         *   Marktwert → `marketValueSeasonEnd` (Stand nach dem Trainings-Apply, der echte
-         *   Saisonabschluss). `marketValueTotalEnd` traegt dann noch den Stand VOR der Entwicklung
-         *   und waere die schlechtere Zahl.
-         *   Cash → `cashEnd` (echter Kontostand zum Snapshot). `cashTotal` ist `projectedCash` aus
-         *   dem Cash-Apply, eine PROGNOSE vor Sponsoren, Krediten, Gebaeuden und Backstop — sie
-         *   stand hier einmal vorne, daher Chris' Meldung „in der ewigen Tabelle stehen auch noch
-         *   die alten Cash-Werte". Deshalb ganz hinten.
+         * Beide Staende bleiben im Snapshot gespeichert — es ist eine Auswahl, kein Datenverlust.
+         * Der Eintrittsstand steht weiter in `marketValueTotalEnd`/`cashEntry` und laesst sich
+         * jederzeit wieder hervorholen.
+         *
+         * WELCHES FELD DAS IST — und `cashEnd` ist es ausdruecklich NICHT. Der Typ sagt es
+         * (olyDataTypes.ts:2654): `marketValueSeasonEnd`/`cashSeasonEnd` sind die Momentwerte am
+         * „Ende `player_development`, also NACH dem Trainings-Apply und VOR dem ersten Verkauf des
+         * Transferfensters" — genau der Zeitpunkt, den Chris meint. `cashEnd` traegt dagegen „den
+         * Stand nach den Verkaeufen", und `salaryEnd`/`rosterEnd` nach dem Eintritts-Patch sogar
+         * den Stand der FOLGE-Saison.
+         *
+         * Der Unterschied ist keine Rundung: an `1hf25q` gemessen steht bei `L-K` in `cashEnd`
+         * **137,4** — die Spitze direkt nach dem Ausverkauf — gegen **25,6** beim Eintritt. Haette
+         * ich hier `cashEnd` genommen, waere genau die Zahl erschienen, die Chris beanstandet hat
+         * („hier sind die verkäufe auch wieder mit dirn!!!").
+         *
+         * DIE RUECKFAELLE, fuer Altsaves ohne die SeasonEnd-Felder:
+         *   Marktwert → `marketValueTotalEnd` (Summe ueber den vollen Kader), dann
+         *   `marketValueEnd` (die einfache Variante). Diese Reihenfolge bleibt unveraendert:
+         *   ohne `marketValueSeasonEnd` ist die Total-Variante die vollstaendigere Zahl. Ein
+         *   Randfall bleibt — ein ALTSAVE, der schon gepatcht wurde, traegt in
+         *   `marketValueTotalEnd` den Stand der Folgesaison. Er verschwindet mit dem naechsten
+         *   Saisonabschluss, weil der `marketValueSeasonEnd` schreibt.
+         *   Cash → `cashCarryOver` (Saisongrenze nach der Vertragsalterung, vor den Kaeufen) ist
+         *   die naechstbeste Antwort, dann `cashEntry` (nach den Kaeufen). `cashEnd` steht bewusst
+         *   WEIT hinten — es ist in Altsaves der Nach-Verkaufs-Stand. `cashTotal` zuletzt: das ist
+         *   `projectedCash`, eine blosse Prognose vor Sponsoren, Krediten und Gebaeuden.
          */
-        marketValue: snapshot.entryRosterPatchedAt
-          ? (record.marketValueTotalEnd ?? record.marketValueEnd ?? record.marketValueSeasonEnd ?? null)
-          : (record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null),
-        // `cashCarryOver` steht zwischen den beiden: der Kontostand an der Saisongrenze (nach der
-        // Vertragsalterung, vor den Kaeufen). Fehlt der Eintritts-Patch noch, ist das die naechste
-        // ehrliche Antwort auf „womit ging das Team weiter" — `cashEnd` liegt eine Vertragsrunde
-        // davor und `cashTotal` ist nur eine Prognose.
-        cash: record.cashEntry ?? record.cashCarryOver ?? record.cashEnd ?? record.cashTotal ?? null,
+        marketValue:
+          record.marketValueSeasonEnd ?? record.marketValueTotalEnd ?? record.marketValueEnd ?? null,
+        cash:
+          record.cashSeasonEnd ?? record.cashCarryOver ?? record.cashEntry ?? record.cashEnd ?? record.cashTotal ?? null,
       });
     }
 

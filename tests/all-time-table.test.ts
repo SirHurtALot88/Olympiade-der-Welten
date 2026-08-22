@@ -26,6 +26,7 @@ function standing(input: {
   marketValueTotalEnd?: number | null;
   marketValueSeasonEnd?: number | null;
   cashEnd?: number | null;
+  cashSeasonEnd?: number | null;
   cashEntry?: number | null;
   cashTotal?: number | null;
 }) {
@@ -39,6 +40,7 @@ function standing(input: {
     marketValueTotalEnd: input.marketValueTotalEnd,
     marketValueSeasonEnd: input.marketValueSeasonEnd,
     cashEnd: input.cashEnd ?? null,
+    cashSeasonEnd: input.cashSeasonEnd,
     cashEntry: input.cashEntry,
     cashTotal: input.cashTotal,
     disciplinePointsByArea: {},
@@ -417,7 +419,13 @@ describe("all-time-table", () => {
     const zeile = (modell: ReturnType<typeof buildAllTimeTableModel>) =>
       modell.rows.find((entry) => entry.teamId === "t1")?.seasons[0];
 
-    it("zeigt nach dem Patch den Stand nach den Kaeufen", () => {
+    /**
+     * UMGESCHRIEBEN am 22.08. Hier stand „zeigt nach dem Patch den Stand nach den Kaeufen" — die
+     * damalige Vorgabe. Chris' neue: „ewige tabelle immer zum ende der saison speichern also in
+     * Season 2 sehe ich dort Season 1 ergebnisse." Der Eintritts-Patch aendert an der Anzeige
+     * jetzt NICHTS mehr; er bleibt im Snapshot stehen, wird hier aber nicht mehr gelesen.
+     */
+    it("zeigt auch NACH dem Eintritts-Patch den Saison-Endstand", () => {
       const modell = baueModell({
         seasonId: "season-1",
         seasonName: "Season 1",
@@ -431,6 +439,7 @@ describe("all-time-table", () => {
             points: 10,
             marketValueSeasonEnd: 100,
             marketValueTotalEnd: 260,
+            cashSeasonEnd: 44,
             cashEnd: 90,
             cashEntry: 12.5,
           }),
@@ -438,9 +447,10 @@ describe("all-time-table", () => {
         playerPerformances: [],
       });
 
-      // Nicht der Saison-Endstand (100 / 90), sondern der Stand, mit dem das Team weiterspielt.
-      expect(zeile(modell)?.marketValue).toBe(260);
-      expect(zeile(modell)?.cash).toBe(12.5);
+      // Der Saison-Endstand VOR den Verkaeufen (100 / 44) — nicht der Stand, mit dem das Team
+      // weiterspielt (260 / 12,5), und auch nicht der nach dem Ausverkauf (90).
+      expect(zeile(modell)?.marketValue).toBe(100);
+      expect(zeile(modell)?.cash).toBe(44);
     });
 
     it("faellt ohne Patch auf den Saison-Endstand zurueck", () => {

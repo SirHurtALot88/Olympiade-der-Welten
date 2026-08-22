@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-22",
+      "seite": "Team · Ewige Tabelle",
+      "pr": null,
+      "text": "Die Ewige Tabelle zeigt Marktwert und Kontostand jetzt so, wie sie am Ende der Saison standen — nach Sponsorgeld und Gehaltsabzug, aber vor dem ersten Verkauf. Vorher stand dort der Stand beim Eintritt in die neue Saison, also nach Verkäufen und Käufen; eine ewige Tabelle beantwortet aber die Frage, was eine Saison gebracht hat, nicht womit es danach weiterging. Der Unterschied ist erheblich: bei 29 von 32 Teams ändert sich die Zeile, und bei einem kippt sogar das Vorzeichen — am Saisonende im Minus, erst durch die Verkäufe danach im Plus. Beide Stände bleiben gespeichert, es ist nur eine Frage, welcher gezeigt wird.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
       "seite": "Teams · Verträge",
       "pr": null,
       "text": "Der Gehaltsforecast zeigt jetzt genau eine Zahl je Saison: das Geld, das in dieser Saison wirklich abfließt. Bisher stand daneben ein zweiter Balken mit den Verhandlungs-Entwürfen — und die werden beim Unterschreiben nie gelöscht, also zählten längst erledigte Angebote ewig mit. Dazu hing jede Rate eine Saison zu früh, weil die Vertragsalterung am Saisonende läuft, während die Saison noch die laufende ist: die letzte Vertragssaison fiel hinten aus dem Chart, und die schon bezahlte Saison stand vorne als offene Last. Beides ist behoben, die schon gespielte Saison taucht gar nicht mehr auf.",
