@@ -2683,8 +2683,31 @@ export function buildTeamContractSeasonTable(input: {
 
   const rows = [...rosterRows, ...previewRows];
   const seasonCount = Math.max(5, ...rows.map((row) => row.yearlySalarySchedule.length));
+  /**
+   * DIE SAISON, IN DER DAS GELD WIRKLICH ABFLIESST.
+   *
+   * GEMELDET VON CHRIS: „Da sollte eigentlich 1 wert stehen und zwar der vom gebundenen kapital
+   * was wirklich real weg geht in der jeweiligen saison."
+   *
+   * `yearlySalarySchedule` traegt die NOCH OFFENEN Raten. Die Alterung laeuft am Ende einer
+   * Saison, waehrend diese noch die laufende ist — danach ist die erste offene Rate die der
+   * KOMMENDEN Saison, nicht die der laufenden. Ohne diesen Versatz bekam jede Rate das Etikett
+   * der Vorsaison, und die letzte Vertragssaison fiel hinten aus dem Chart heraus.
+   *
+   * An Chris' Spielstand, Saison 1, Alterung gelaufen:
+   *
+   *     Jorund      Raten 3,30 | 3,30           -> Saison 2 und 3   (nicht 1 und 2)
+   *     Xelara      Rate  5,27                  -> Saison 2
+   *     Lulu        Raten 1,16 | 1,16 | 1,16    -> Saison 2 bis 4
+   *     King Arlen  Raten 2,79 | 3,41 | 4,03    -> Saison 2 bis 4
+   *
+   * Vorher stand fuer Saison 4 eine Null, obwohl Lulu und King Arlen dort noch zusammen 5,19
+   * kosten. Saison 1 ist zu diesem Zeitpunkt gespielt und bezahlt — sie taucht deshalb gar nicht
+   * mehr auf.
+   */
+  const labelVersatz = alterungGelaufen ? 1 : 0;
   const seasonLabels = Array.from({ length: seasonCount }, (_, index) =>
-    buildSeasonLabel(input.seasonLabelBase, index, input.gameState.season.id),
+    buildSeasonLabel(input.seasonLabelBase, index + labelVersatz, input.gameState.season.id),
   );
 
   const totalsCommitted = seasonLabels.map((label, index) => ({

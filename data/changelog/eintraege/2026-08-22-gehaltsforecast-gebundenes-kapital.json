@@ -1,0 +1,16 @@
+[
+  {
+    "datum": "2026-08-22",
+    "seite": "Teams · Verträge",
+    "text": "Der Gehaltsforecast zeigt jetzt genau eine Zahl je Saison: das Geld, das in dieser Saison wirklich abfließt. Bisher stand daneben ein zweiter Balken mit den Verhandlungs-Entwürfen — und die werden beim Unterschreiben nie gelöscht, also zählten längst erledigte Angebote ewig mit. Dazu hing jede Rate eine Saison zu früh, weil die Vertragsalterung am Saisonende läuft, während die Saison noch die laufende ist: die letzte Vertragssaison fiel hinten aus dem Chart, und die schon bezahlte Saison stand vorne als offene Last. Beides ist behoben, die schon gespielte Saison taucht gar nicht mehr auf.",
+    "gewicht": "behebung",
+    "version": "0.5"
+  },
+  {
+    "datum": "2026-08-22",
+    "seite": "Teams · Verträge",
+    "text": "Die Laufzeit-Spalte und das Vertrags-Auslauf-Center rechnen nicht mehr selbst, sondern lesen die Endsaison des Vertrags. Der Countdown wird am Ende einer Saison gesenkt, während diese noch läuft — danach heißt eine 1 nicht mehr „letzte Saison\", sondern „noch eine volle\". In einem Spielstand standen deshalb 129 von 269 Verträgen fälschlich auf „läuft aus\", obwohl alle noch eine ganze Saison vor sich hatten.",
+    "gewicht": "behebung",
+    "version": "0.5"
+  }
+]
