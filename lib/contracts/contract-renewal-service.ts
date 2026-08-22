@@ -18,6 +18,10 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import {
+  SEASON_END_CONTRACT_TICK_STEP_ID,
+  hasSeasonEndContractTickApplied,
+} from "@/lib/contracts/saisonende-alterung-marke";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
   normalizeContractLength,
@@ -1406,23 +1410,10 @@ function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelati
   });
 }
 
-// Idempotenz-Marker der Saison-Vertragsalterung. Wird als preSeasonWorkflowLogs-Eintrag je
-// fromSeasonId geführt, damit die Alterung pro echtem Saisonübergang GENAU EINMAL läuft — egal ob
-// sie über den (Vorschau-)Schritt contract_renewal, den Sim-Apply oder den interaktiven
-// Saisonübergang (buildNextSeasonGameState) angestoßen wird. Der stepId ist ein freier String im
-// PreSeasonWorkflowLogRecord-Typ, deshalb keine Änderung an gemeinsamen Typen nötig.
-export const SEASON_END_CONTRACT_TICK_STEP_ID = "season_end_contract_tick";
-
-/** Wurde die Vertragsalterung für die AKTUELLE (auslaufende) Saison bereits angewandt? */
-export function hasSeasonEndContractTickApplied(gameState: GameState): boolean {
-  const seasonId = gameState.season.id;
-  return (gameState.seasonState.preSeasonWorkflowLogs ?? []).some(
-    (log) =>
-      log.stepId === SEASON_END_CONTRACT_TICK_STEP_ID &&
-      log.fromSeasonId === seasonId &&
-      log.status === "applied",
-  );
-}
+// Beide liegen in `saisonende-alterung-marke.ts` — dieses Modul zieht `node:crypto` herein und
+// darf deshalb nicht aus dem Client-Bundle importiert werden. Hier weitergereicht, damit die
+// bestehenden Importe unveraendert bleiben.
+export { SEASON_END_CONTRACT_TICK_STEP_ID, hasSeasonEndContractTickApplied };
 
 function buildSeasonEndContractTickLog(input: {
   save: PersistedSaveGame;
