@@ -632,6 +632,19 @@ function buildNextSeasonGameState(
     ),
     formCards: nextFormCards,
     lineupDrafts: [],
+    /**
+     * Mit der neuen Saison verfallen die Verhandlungs-Entwuerfe der alten.
+     *
+     * Das ist die schon dokumentierte Regel, nur bisher nirgends ausgefuehrt: „Neue Season = neuer
+     * Draft = Aufschlag weg" (Trotz-Aufschlag, `transfermarkt-local-service.ts`). Die `draftId`
+     * traegt die Season, ein neuer Zug legt also ohnehin einen neuen Entwurf an — der alte wurde
+     * nur nie weggeraeumt und stapelte sich Saison um Saison.
+     *
+     * Damit verschwinden auch ABGEBROCHENE Verhandlungen. An Chris' Spielstand lagen fuenf
+     * Kaufgespraeche fuer Spieler, die in keinem Kader stehen: nie bestaetigt, nie aufgeraeumt.
+     * Solange die Saison laeuft, darf er sie zu Ende fuehren — deshalb raeumt erst der Wechsel auf.
+     */
+    contractNegotiationDrafts: [],
     matchdayResults: [],
     disciplineResults: [],
     playerDisciplinePerformances: [],
