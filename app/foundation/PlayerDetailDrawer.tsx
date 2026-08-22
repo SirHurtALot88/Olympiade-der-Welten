@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
-import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
+import { formatTrainingAttributeLabel } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
@@ -158,13 +158,6 @@ function formatTrainingSeasonLabel(seasonId: string) {
     return `S${match[1]}`;
   }
   return getCanonicalSeasonLabel({ seasonId }) ?? seasonId;
-}
-
-function formatTrainingAttributeLabel(attribute: string) {
-  return (
-    PLAYER_ATTRIBUTE_CHART_LABELS[attribute as keyof typeof PLAYER_ATTRIBUTE_CHART_LABELS] ??
-    attribute.slice(0, 3).toUpperCase()
-  );
 }
 
 function formatSignedSetpoints(value: number | null | undefined, digits = 1) {

@@ -1,11 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
+
 import TrainingCompactClient from "@/app/foundation/training-compact/TrainingCompactClient";
 import type { TrainingClassOption } from "@/app/foundation/training-facilities-v2/training-view-types";
 import type { GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { TrainingClassDraft, TrainingDevelopmentFilter, TrainingModeDraft } from "@/lib/foundation/tabs/foundation-page-types";
+import { buildSaisonSpotlight } from "@/lib/foundation/saison-spotlight";
 import { getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import { useTrainingPanelDerivations } from "@/lib/foundation/tabs/use-training-panel-derivations";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -82,8 +85,16 @@ export default function FoundationTrainingCompactShellHost({
     trainingDevelopmentFilter,
   });
 
+  // Saison-Spotlight (`5hcq2p`): rein abgeleitet aus dem Spielstand, deshalb hier im Host und
+  // nicht im Client. Ohne Vorsaison liefert der Aufbau `null` und die Karte rendert nichts.
+  const saisonSpotlight = useMemo(
+    () => buildSaisonSpotlight({ gameState, teamId: selectedTeam.teamId }),
+    [gameState, selectedTeam.teamId],
+  );
+
   return (
     <TrainingCompactClient
+      saisonSpotlight={saisonSpotlight}
       selectedTeam={selectedTeam}
       selectedTeamControlMode={selectedTeamControlMode}
       seasonLabel={seasonLabel}
