@@ -39,6 +39,15 @@
     },
     {
       "datum": "2026-08-22",
+      "seite": "Markt · Kredite",
+      "pr": null,
+      "text": "Ein Team verleiht kein Geld mehr unter dem Zins, den es selbst zahlt. Aufgefallen war das an einem Team, das 76 Millionen zu 13 Prozent von der Bank nahm und davon zweimal 22 Millionen zu 11,6 und 10,2 Prozent weiterreichte — ein Verlustgeschäft, das niemand so beschlossen hatte: die Prüfung kannte Beziehung und Kassenstand des Gebers, aber nie dessen eigene Schulden. Über alle Spielstände waren vier von dreißig laufenden Team-Krediten davon betroffen. Es ist bewusst ein Boden und kein Verbot geworden: Geld unter Verbündeten bleibt möglich, nur eben nicht mehr mit Verlust. Wer selbst hoch verschuldet ist, liegt damit unter Umständen über dem Bankzins — dann nimmt der andere eben den Bankkredit, und das ist die ehrlichere Antwort als ein Angebot, das Günstigkeit nur vortäuscht. Laufende Verträge bleiben unberührt.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
       "seite": "Markt · Transfermarkt",
       "pr": null,
       "text": "Drei Zahlen rund um den Markt stimmen jetzt. Erstens: wer einen Spieler selbst kauft, bekommt für ihn sofort einen Trainingsmodus — bisher passierte das nur bei KI-Massenkäufen, und ein einziger selbst gekaufter Spieler ohne Modus hielt den ganzen Spieltags-Flow auf, ohne dass klar war warum. Zweitens: die Anzeige „Slots offen\" zählt bis zum Kaderlimit statt bis zum KI-Planungsziel; bei 30 von 32 Teams stand dort eine zu kleine Zahl. Drittens: die Transferbilanz im Saisonstand rechnet deine eigenen Käufe und Verkäufe mit — vorher zählten nur die der KI, und weil die einzige gezählte Verkaufsquelle im Spielstand leer war, standen sämtliche Teams bei null oder darunter.",
