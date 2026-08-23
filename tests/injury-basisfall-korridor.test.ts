@@ -84,7 +84,45 @@ const MATCHDAYS: Array<{ d1: number; d2: number }> = [
  * gewaehlten 145 zu und haelt weiterhin JEDE Last-Senkung auf, die hier durchrutschen wollte —
  * die naechste Stufe darunter (Last 13) liegt bei 88 und faellt weiterhin rot.
  */
-const KORRIDOR_MIN = 140;
+/**
+ * NACHGEZOGEN (2026-08-15): 140 -> 125, wegen der Verletzten-Erholung.
+ *
+ * CHRIS: „die verletzten erholung auf 1,0 gesetzt werden!" — der Faktor in
+ * `calculatePlayerRecovery` ging von 0,5 auf 1,0, weil die Zwangspause eine SPIRALE erzeugte
+ * statt einer Pause: 20 % aller Verletzungen waren Wiederholungstreffer bei praktisch
+ * identischer Ermuedung (Folgeverletzung Ø 79,2, Erstverletzung Ø 78,4).
+ *
+ * Gemessen ueber die fuenf Saaten dieses Tests, vorher gegen nachher:
+ *   vorher (Faktor 0,5): alle fuenf ueber 140
+ *   nachher (Faktor 1,0): 131 / 144 / 141 / 133 / 134  — Mittel 137
+ *
+ * Die Verteilung ist also um rund zehn Verletzungen gerutscht. Die Untergrenze folgt dieser
+ * Entscheidung, statt sie zurueckzubiegen — dasselbe Vorgehen wie schon beim Schritt von 150 auf
+ * 140, als die Grunderholung von 20 auf 28 stieg. Wer die Erholung aendert, aendert den Korridor
+ * mit; wer den Korridor haelt, macht die Aenderung wirkungslos.
+ *
+ * 125 laesst die gemessenen 131 zu und faengt weiterhin auf, wogegen der Korridor gebaut wurde:
+ * die naechste Last-Senkung darunter (Last 13) liegt bei 88 und faellt weiter rot. Die Obergrenze
+ * 200 bleibt unveraendert — nach oben hat sich nichts bewegt.
+ */
+/**
+ * NACHMESSUNG (2026-08-16) nach Chris' Risiko-Deckel: Anker bei Ermuedung 100 von 40 % auf 33 %.
+ * Die Untergrenze bleibt bei 125 — sie WURDE NICHT nachgezogen, weil sie noch traegt.
+ *
+ *   vorher (Anker 40): 131 / 144 / 141 / 133 / 134   — Mittel 136,6
+ *   nachher (Anker 33): 131 / 138 / 136 / 128 / 130  — Mittel 132,6
+ *
+ * Der Deckel nimmt hier also rund vier Verletzungen (−2,9 %), weniger als die −5,3 %, die am
+ * echten Live-Spielstand gemessen wurden. Das ist kein Widerspruch, sondern der Unterschied
+ * zwischen den Verteilungen: der Basisfall hier faehrt eine gleichmaessigere Belastung, im echten
+ * Spiel sitzen 3,9 % der Wuerfe im Band 95–100 — und genau die trifft der Deckel.
+ *
+ * WORAUF ZU ACHTEN IST: der niedrigste Lauf steht jetzt bei 128, drei ueber der Grenze. Die
+ * naechste Aenderung, die das Risiko senkt, reisst den Korridor voraussichtlich — dann ist die
+ * Frage nicht „Grenze runter", sondern ob die Verletzungszahl noch das trifft, was Chris wollte
+ * („ohne gebaeude frische boosts etc 150-200 ok").
+ */
+const KORRIDOR_MIN = 125;
 const KORRIDOR_MAX = 200;
 
 function buildPlayer(id: string): Player {

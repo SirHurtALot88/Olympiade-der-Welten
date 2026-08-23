@@ -14,8 +14,9 @@
  * mit mindestens zwei müden Spielern, und laut `export-injury-balance-audit.ts` haben nur
  * 6 von 32 Teams überhaupt genug Rotationsspieler.
  *
- * DER VERKAUF WAR NIE AN FATIGUE GEKOPPELT. Der Verkaufsdienst kennt Kadertiefe ausschliesslich als
- * BREMSE (`low_roster_depth`: nicht unter `playerMin` verkaufen), nie als AUSLÖSER. Niemand sagte
+ * DER VERKAUF WAR NIE AN FATIGUE GEKOPPELT. Der Verkaufsdienst kannte Kadertiefe ausschliesslich als
+ * BREMSE (nicht unter `playerMin` verkaufen — inzwischen entfernt, Meldung `33c172`), nie als
+ * AUSLÖSER. Niemand sagte
  * einem erschöpften Team „mach einen teuren Spieler zu Geld und hol zwei Körper". Genau diese Lücke
  * schliesst dieses Modul.
  *

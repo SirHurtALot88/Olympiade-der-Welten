@@ -156,12 +156,20 @@ Kontrollierter Smoke-Test fuer den serverseitigen Buy-Service.
 - keine AI-Kaeufe
 - keine Verkaeufe
 
-## `retool:extract-transfermarkt-columns`
+## `retool:extract-transfermarkt-columns` — ENTFERNT
 
-### Zweck
-Read-only Extraktion der Transfermarkt-Tabellen und Spalten aus der Retool-Draftboard-JSON.
+**Das Werkzeug gibt es nicht mehr.** Chris: „extract retool kann weg das war einmalig machen wir
+nicht mehr." Die Extraktion war ein einmaliger Übernahmeschritt aus der Retool-Draftboard-JSON;
+sie ist gelaufen, ihr **Ergebnis bleibt** und ist weiterhin die Spaltenquelle:
+`references/retool-transfermarkt-columns/`.
 
-### Was erzeugt wird
+Entfernt sind `scripts/extract-retool-transfermarkt-columns.ts`, der npm-Eintrag und der
+zugehörige Test. Letzterer konnte ohnehin nur auf einem einzigen Rechner laufen — er las
+`/Users/chrisfalk/Downloads/…Draftboard (7).json`, eine Datei, die nie im Repo lag.
+
+<details><summary>Was das Werkzeug tat, für den Fall, dass die Übernahme je wiederholt wird</summary>
+
+### Was erzeugt wurde
 - `references/retool-transfermarkt-columns/manifest.json`
 - `references/retool-transfermarkt-columns/transfermarkt-columns.raw.json`
 - `references/retool-transfermarkt-columns/transfermarkt-formatting.raw.json`
@@ -181,6 +189,8 @@ Read-only Extraktion der Transfermarkt-Tabellen und Spalten aus der Retool-Draft
 - keine Prisma-Writes
 - keine SQLite-Writes
 - keine Migrationen
+
+</details>
 
 ## `player:audit-economy-source`
 
@@ -516,4 +526,61 @@ Synchronisiert angeleitete Player-/Economy-Spalten aus dem lokalen Player-Export
 - read-only
 - keine App-Writes
 - keine Datenbank-Writes
+- keine Migrationen
+
+## `scripts/season1-autoprep-topup.ts`
+
+Kein npm-Alias -- direkt mit `npx tsx scripts/season1-autoprep-topup.ts` aufrufen.
+
+### Zweck
+Fuellt Kader per KI-Redraft auf `playerMin`/`playerOpt`/`playerMax` auf (Season-1-Vorbereitung, Teil 1 von 3).
+
+### Verhalten
+- default = Trockenlauf (`dryRun: true`), rechnet Picks nur im Arbeitsspeicher
+- schreibt **nichts** in den Save, solange `--write` nicht gesetzt ist
+- Trockenlauf beendet sich trotzdem mit Exit-Code 0 (solange keine Teams unter Min bleiben) -- das ist gewollt, ein Trockenlauf ist kein Fehler
+- druckt beim Trockenlauf eine Warnzeile auf stderr, am Anfang und am Ende des Laufs
+- `dryRun` steht als oberster Key in der JSON-Ausgabe (stdout) und in den exportierten Dateien `chunked-redraft-summary.json` / `topup-memory-audit.json`; `chunked-redraft-summary.md` traegt dieselbe Warnung als erste Zeile nach der Ueberschrift
+
+### Sicherheitsprofil
+- echte Writes nur mit `--write`
+- schreibt nur in den uebergebenen Save (`saveId`), keine Fremd-Saves
+- keine Migrationen
+
+## `scripts/season1-autoprep.ts`
+
+Kein npm-Alias -- direkt mit `npx tsx scripts/season1-autoprep.ts` aufrufen.
+
+### Zweck
+Baut Aufstellungen, Formkarten und Trainingsmodi fuer alle 10 Spieltage von Season 1 (Vorbereitung, Teil 2 von 3).
+
+### Verhalten
+- default = Trockenlauf (`dryRun: true`), rechnet Lineups/Formkarten/Training nur im Arbeitsspeicher
+- schreibt **nichts** in den Save, solange `--write` nicht gesetzt ist
+- die exportierte Readiness (`autoprep-readiness.json`/`.md`) kann `ok: true` / `Status: READY` zeigen, obwohl nichts gespeichert wurde -- das beschreibt dann, was `--write` speichern WUERDE, nicht den aktuellen Save-Stand
+- druckt beim Trockenlauf eine Warnzeile auf stderr, am Anfang und am Ende des Laufs
+- `dryRun` steht als oberster Key in `autoprep-readiness.json`; `autoprep-readiness.md` traegt dieselbe Warnung direkt unter dem Status
+
+### Sicherheitsprofil
+- echte Writes nur mit `--write`
+- schreibt nur in den uebergebenen Save (`saveId`), keine Fremd-Saves
+- keine Migrationen
+
+## `scripts/season1-simulation-run.ts`
+
+Kein npm-Alias -- direkt mit `npx tsx scripts/season1-simulation-run.ts` aufrufen. Laeuft ueber alle 10 Spieltage typischerweise mehrere Minuten.
+
+### Zweck
+Loest alle 10 Spieltage von Season 1 auf, wendet Ergebnisse/Standings an und schliesst die Saison ab (Vorbereitung, Teil 3 von 3).
+
+### Verhalten
+- default = Trockenlauf (`dryRun: true`): loest jeden Spieltag nur als Preview auf (`resolvedTeams`, `blockers` aus der Preview), wendet aber nichts an -- `disciplineRows` bleibt je Spieltag bei 0
+- schreibt **nichts** in den Save, solange weder `--write` noch `--export-only`/`--finalize-only` gesetzt ist
+- druckt beim Trockenlauf eine Warnzeile auf stderr, am Anfang und am Ende des Laufs; `dryRun` steht als oberster Key der JSON-Zusammenfassung, `simulation-summary.md` nennt "Dry Run: ja" explizit
+- jeder Spieltags-Report im Trockenlauf traegt zusaetzlich die Warnung `dry_run_kein_ergebnis_geschrieben`; die globale Zusammenfassung traegt `dry_run_keine_daten_geschrieben` in `openBlockers`, statt ein leeres Array zu zeigen
+- **Zusicherung:** ein Spieltag, der real (mit `--write`) angewendet wird, aber 0 Disziplin-Zeilen schreibt, gilt nicht als aufgeloest -- das Skript blockiert diesen Fall explizit (`zero_discipline_rows:<matchdayId>`), auch wenn der zugrunde liegende Result-Apply-Service selbst `ok: true` gemeldet hat
+
+### Sicherheitsprofil
+- echte Writes nur mit `--write` (oder `--export-only`/`--finalize-only` fuer den reinen Export-Pfad ohne neue Spieltage)
+- schreibt nur in den aktiven Save, keine Fremd-Saves
 - keine Migrationen

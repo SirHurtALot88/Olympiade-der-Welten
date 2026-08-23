@@ -5,7 +5,9 @@ import type {
   SeasonSnapshotRecord,
   SeasonSnapshotTeamRecord,
   SeasonSnapshotTransferRecord,
+  SeasonSnapshotAwardRecord,
 } from "@/lib/data/olyDataTypes";
+import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { isSeasonCoverageComplete } from "@/lib/season/season-completion-state";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
@@ -581,6 +583,31 @@ function buildSeasonSnapshotRecord(
           capturedAt: archivedAt,
         };
 
+  /**
+   * Die Auszeichnungen dieser Saison — aus derselben Stelle, die sie auch dem Saisonrueckblick
+   * liefert. Scheitert sie (unvollstaendiger Spielstand), bleibt die Liste leer und der
+   * Schnappschuss traegt das Feld gar nicht; ein kaputter Rueckblick darf den Schnappschuss
+   * nicht mitreissen.
+   */
+  const seasonAwards: SeasonSnapshotAwardRecord[] = (() => {
+    try {
+      return buildSeasonReview(gameState)
+        .awards.filter((award) => award.winnerType === "player")
+        .map((award) => ({
+          awardId: award.awardId,
+          label: award.label,
+          category: award.category,
+          winnerType: award.winnerType,
+          winnerId: award.winnerId,
+          winnerName: award.winnerName,
+          value: award.value,
+          reason: award.reason,
+        }));
+    } catch {
+      return [];
+    }
+  })();
+
   return {
     snapshotId: buildSnapshotId(seasonId),
     seasonId,
@@ -604,6 +631,22 @@ function buildSeasonSnapshotRecord(
     // das Altfeld gefuellt ist, werden weiter gelesen.
     transferSnapshots,
     gmAssignments,
+    /**
+     * DIE AUSZEICHNUNGEN BLEIBEN LIEGEN — Ticket #41.
+     *
+     * `buildSeasonReview` ermittelt sie beim Saisonabschluss, und bis hierher wurden sie
+     * NIRGENDS abgelegt: mit dem Saisonwechsel waren sie weg. Ein Spieler konnte MVP gewesen
+     * sein, ohne dass es eine Saison spaeter noch irgendwo stand — waehrend Chris ausdruecklich
+     * darum bat, „dass man auch später direkt sieht ah der spieler gehört [dazu]".
+     *
+     * NUR SPIELER-AUSZEICHNUNGEN werden gespeichert: das Ziel ist das Spielerprofil.
+     * Team-Auszeichnungen (Champion) stehen ohnehin in der Abschlusstabelle desselben
+     * Schnappschusses; sie hier zu doppeln waere eine zweite Wahrheit ueber denselben Titel.
+     *
+     * Faellt die Ermittlung aus, bleibt das Feld WEG statt leer. Eine leere Liste hiesse „diese
+     * Saison hatte keine Auszeichnungen", und das waere gelogen.
+     */
+    seasonAwards: seasonAwards.length > 0 ? seasonAwards : undefined,
     teamDisciplineRankSnapshots,
     teamDisciplineRankSnapshotMeta,
     warnings,

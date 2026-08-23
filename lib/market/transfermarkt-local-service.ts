@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
+import { verdiktBlocker } from "@/lib/market/contract-negotiation-preview";
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { getContractShapeTeamContext } from "@/lib/market/contract-shape-context";
@@ -18,7 +20,12 @@ import { zieheSaisonstandGuvNachImSaisonendfenster } from "@/lib/finance/season-
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
-import { buildContractNegotiationPreview, recommendContractOfferForPlayer, resolveContractLengthSalaryFactor } from "@/lib/market/contract-negotiation-preview";
+import {
+  buildContractNegotiationPreview,
+  recommendContractOfferForPlayer,
+  resolveContractLengthSalaryFactor,
+  resolveContractShapeSalarySurcharge,
+} from "@/lib/market/contract-negotiation-preview";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import {
@@ -53,6 +60,7 @@ import {
   getScoutedTraitView,
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { ermittleFensterSaisonId, ermittleLetzteSpieltageJeSaison } from "@/lib/foundation/transfer-window-zuordnung";
 import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
 import { recordFreeAgentFeed } from "@/lib/ai/transfer-window-profiler";
 import {
@@ -906,7 +914,6 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     lastCounterSalary,
     lastNegotiatedSalary,
   } = context;
-  const canBuy = blockingReasons.length === 0;
   const scoutingLevel = team ? getFacilityLevel(getTeamFacilityState(gameState, team.teamId), "scouting_office") : 0;
   const negotiationCacheKey = [
     marketContext.cacheKey,
@@ -952,10 +959,19 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     localNegotiationPreviewCache.set(negotiationCacheKey, negotiationPreview);
   }
   const contractSalary = negotiationPreview.offeredSalary ?? salary;
+  /**
+   * DAS VERDIKT ZAEHLT ERST HIER — und deshalb wird `canBuy` auch erst hier entschieden.
+   *
+   * Vorher stand `canBuy = blockingReasons.length === 0` oberhalb dieser Zeile, also BEVOR die
+   * Verhandlungsvorschau ueberhaupt gebaut war. Ein abgelehntes Angebot konnte damit gar nicht
+   * blocken: die Antwort trug `verdict: "reject_lowball"` und `canBuy: true` nebeneinander.
+   */
+  const blockingReasonsMitVerdikt = [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];
+  const canBuy = blockingReasonsMitVerdikt.length === 0;
 
   return {
     canBuy,
-    blockingReasons,
+    blockingReasons: blockingReasonsMitVerdikt,
     warnings,
     player: player
       ? {
@@ -2432,14 +2448,27 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   // lebte nur im langsamen buildContractNegotiationPreview (menschlicher Pfad). Wir ziehen
   // jetzt denselben Längen-Anteil des Verhandlungs-DemandMultipliers auf das Basisgehalt,
   // damit KI-Signings auf 5-Jahres-Deals ein niedrigeres Jahresgehalt zahlen als auf 1-Jahres.
-  const contractLengthSalaryFactor = player
-    ? resolveContractLengthSalaryFactor({ player, contractLength, teamFit: recommendedTeamFit })
-    : 1;
-  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const contractShape =
     params.contractShape != null
       ? normalizeContractShape(params.contractShape)
       : normalizeContractShape(recommendedContract?.contractShape);
+  // Der Formwunsch kostete auf diesem Pfad NICHTS. Im menschlichen Verhandlungspfad schlaegt eine
+  // Form gegen den Spielerwunsch laengst durch (gemessen am Abbild: Median 6,5 % Aufschlag ueber
+  // 285 abweichende Mehrjahresvertraege) — hier fehlte die Zeile, und die KI durfte die Form frei
+  // gegen den Wunsch drehen, ohne dafuer zu zahlen. Nur der FORM-Anteil wandert herein; die
+  // Laufzeit bleibt bepreist wie bisher.
+  const contractShapeSalarySurcharge = player
+    ? resolveContractShapeSalarySurcharge({ player, teamStrategyProfile, contractLength, contractShape })
+    : 0;
+  const contractLengthSalaryFactor = player
+    ? resolveContractLengthSalaryFactor({
+        player,
+        contractLength,
+        teamFit: recommendedTeamFit,
+        salaryPreferenceAdjustmentPct: contractShapeSalarySurcharge,
+      })
+    : 1;
+  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const promisedRole = derivePromisedRoleForBuy({
     explicitRole: params.promisedRole ?? null,
     contractLength,
@@ -2758,7 +2787,36 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
       ...save.gameState.transferHistory,
     ],
   };
-  const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!);
+  // Mit der Unterschrift ist die Verhandlung vorbei — ihr Entwurf auch. Bleibt er liegen, redet
+  // er in die naechste hinein: der Trotz-Aufschlag wird aus ihm fortgeschrieben, `affrontRetreat`
+  // liest sein altes Angebot, und die Vertraege-Tabelle zeigt ihn als Vorschauzeile.
+  /**
+   * DER TRAININGS-VORGABEWERT FEHLTE AUF GENAU DIESEM WEG — gemeldet als `hnbng4`:
+   * „Der Flow hängt beim ‚Weiter Training Planen' fest obwohl ich bei allen was im Training
+   * festgelegt habe, er weiß nie wann man damit fertig ist."
+   *
+   * Die Quittung zu `j53iox` (PR #560) hatte den Fall als offen benannt: „Spieler, die über Draft
+   * oder KI-Picks MITTEN in einer Saison dazukommen, bekommen den Vorgabewert erst beim naechsten
+   * Saisonwechsel." Der KAUFWEG galt dabei als abgedeckt — er ist es nur zur Haelfte:
+   * `executeFastLocalTransfermarktBatchBuy` ruft den Backfill (Zeile ~2671), dieser direkte Pfad
+   * hier, ueber den JEDER manuelle Kauf laeuft, rief ihn nicht.
+   *
+   * NACHGEMESSEN an Chris' Spielstand `swnjlk`: genau EIN Spieler im Team `V-W` blockierte den
+   * Schritt — „Johanna", `trainingMode: null`, `trainingClass: "Warlord"` (die Klasse kommt aus dem
+   * Katalog, den Modus setzt nur der Backfill). Ihr Transfer steht als
+   * `season-2/season-2-matchday-1 manual_transfermarkt_buy` in der Historie. Ein einziger Spieler
+   * ohne Modus haelt den ganzen Flow auf.
+   *
+   * Der Aufruf steht bewusst hier und nicht im allgemeinen Schreibweg: an dieser Stelle kommt ein
+   * Spieler in einen Kader, und nur dann ist etwas zu tun (611 µs je Aufruf ueber 2984 Spieler
+   * gemessen — bei jedem Klick waere das eine Datenreparatur, hier ist es einmal je Kauf).
+   */
+  const nextState = applyDefaultTrainingFieldsToRosteredPlayers(
+    entferneEntwurfNachUnterschrift(
+      applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!),
+      { teamId: params.teamId, playerId: params.playerId },
+    ),
+  );
 
   // Nur der direkte (nicht-Batch) Pfad liefert `gameStateAfter` zurück: der Fast-Batch-Pfad
   // (AI-Massenkäufe, `runContext` gesetzt) deferriert das Persistieren über mehrere Käufe hinweg,
@@ -2857,8 +2915,45 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
   }
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
 
+  /**
+   * DER SAISONFILTER MEINT DAS TRANSFERFENSTER, NICHT DEN ZEITSTEMPEL.
+   *
+   * GEMELDET VON CHRIS, zweimal am selben Vormittag und von beiden Seiten desselben Fehlers:
+   *  - `wg919y`: „Alle Teams haben ihre Verkaeufe hier in S2 getrackt, nur die von mir scheinen in
+   *    S1 fest zu haengen und noch nicht angezeigt werden […] bitte so regeln dass
+   *    spielerverkaeufe am ende von S1 mit in die S2 auswertung kommen."
+   *  - `kn3o08`: „die verkaeufe sind alle in S1 noch drin NUR die von mir manuell nicht!!!"
+   *
+   * Die Regel dafuer gab es laengst (`lib/foundation/transfer-window-zuordnung.ts`, seit `#459`):
+   * ein Transfer am LETZTEN Spieltag einer Saison gehoert zum Fenster der FOLGENDEN. Sie lief
+   * aber erst im Browser, NACH diesem Filter hier — und der schnitt nach `seasonId`. Damit
+   * bekam die Zuordnung nie zu sehen, was sie haette hereinholen sollen:
+   *
+   *   Filter S2 -> Server liefert nur `seasonId === "season-2"`. Chris' drei Verkaeufe tragen
+   *                `season-1` und kommen gar nicht erst an  -> Meldung `wg919y`.
+   *   Filter S1 -> Server liefert sie, die Zuordnung im Browser schiebt sie nach S2 hinaus, und
+   *                es kommt nichts nach -> Meldung `kn3o08`.
+   *
+   * Am Abbild `hwz8fk` nachgezaehlt: die 502 Eintraege trennen sich sauber nach Spieltag —
+   * 339 Kaeufe auf `matchday-1` (Erst-Draft, Saisonstart) gegen 99 auf `matchday-10`
+   * (96 `contract_exit` plus Chris' 3 Verkaeufe). Im S2-Filter standen 64 Kaeufe und
+   * 0 Verkaeufe; mit dieser Zuordnung sind es 64 und 3.
+   *
+   * Die Zuordnung wird ueber die VOLLSTAENDIGE Historie gerechnet, nicht ueber das schon
+   * gefilterte Ergebnis: „hoechster Spieltag einer Saison" ist sonst nur so gut wie der
+   * Ausschnitt, und genau davor warnt das Modul selbst.
+   *
+   * `contract_exit` bleibt, wo es ist (nur `phase === "manual_transfer_window"` wandert) —
+   * ein auslaufender Vertrag ist kein Transfer.
+   */
+  const letzteSpieltageJeSaison = ermittleLetzteSpieltageJeSaison(gameState.transferHistory);
+  const spieltageProSaison = gameState.seasonState.schedule?.length ?? null;
+  const gehoertZurFensterSaison = (entry: { seasonId: string; matchdayId?: string | null; phase?: string | null }) =>
+    !input.seasonId ||
+    ermittleFensterSaisonId(entry, letzteSpieltageJeSaison, spieltageProSaison) === input.seasonId;
+
   const localItems = gameState.transferHistory
-    .filter((entry) => (input.seasonId ? entry.seasonId === input.seasonId : true))
+    .filter(gehoertZurFensterSaison)
     .filter((entry) => (input.type ? entry.transferType === input.type : true))
     .filter((entry) =>
       input.teamId ? entry.fromTeamId === input.teamId || entry.toTeamId === input.teamId : true,
@@ -2894,7 +2989,9 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
     .flatMap((snapshot) =>
       (snapshot.transferSnapshots ?? [])
         .filter((entry) => !localTransferIds.has(entry.transferId))
-        .filter((entry) => (input.seasonId ? entry.seasonId === input.seasonId : true))
+        // Dieselbe Fenster-Zuordnung wie oben — Archiv-Eintraege duerfen nicht nach einer
+        // anderen Regel einsortiert werden als die aus der laufenden Historie.
+        .filter((entry) => gehoertZurFensterSaison({ seasonId: entry.seasonId, matchdayId: entry.matchdayId, phase: entry.phase }))
         .filter((entry) => (input.type ? entry.type === input.type : true))
         .filter((entry) =>
           input.teamId ? entry.fromTeamId === input.teamId || entry.toTeamId === input.teamId : true,

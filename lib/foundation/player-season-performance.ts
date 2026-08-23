@@ -232,7 +232,26 @@ export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPoin
 
   for (const entry of gameState.seasonState.playerDisciplinePerformances ?? []) {
     const result = matchdayResultsById.get(entry.matchdayResultId);
-    if ((result?.seasonId ?? gameState.season.id) !== gameState.season.id) {
+    /**
+     * EINE LEISTUNG OHNE SPIELTAGSERGEBNIS GEHOERT NICHT IN DIESE SAISON.
+     *
+     * GEMELDET VON CHRIS (`ru28ai`): „in der Spieler Liste haben Spieler teils schon über 10
+     * Einsätze und mehr All Time Punkte obwohl wir erst in MD1 von S2 sind. Das kann also gar
+     * nicht sein!"
+     *
+     * Hier stand `result?.seasonId ?? gameState.season.id`. Fehlt das Ergebnis, war der Rueckfall
+     * die LAUFENDE Saison — und die Bedingung damit immer erfuellt. Eine verwaiste Leistung wurde
+     * also nicht uebersprungen, sondern der aktuellen Saison zugeschlagen.
+     *
+     * Genau dieser Zustand entsteht am Saisonwechsel: die Spieltagsergebnisse der alten Saison
+     * werden geraeumt, die Leistungen leben kurz weiter. Ein Spieler mit zehn Einsaetzen aus
+     * Saison 1 stand damit am ersten Spieltag von Saison 2 mit zehn Einsaetzen da.
+     *
+     * Der Unterschied zwischen „gehoert zu dieser Saison" und „Saison unbekannt" ist der ganze
+     * Punkt: unbekannt ist NICHT dasselbe wie aktuell. Ohne Ergebnis wird nicht geraten, sondern
+     * uebersprungen.
+     */
+    if (result?.seasonId == null || result.seasonId !== gameState.season.id) {
       continue;
     }
 

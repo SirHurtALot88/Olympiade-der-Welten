@@ -17,6 +17,8 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -44,7 +46,9 @@ function parseRoomWriteContext(request: Request) {
     seatToken: searchParams.get("seatToken"),
     userId: searchParams.get("userId"),
     activeManagerTeamId: searchParams.get("activeManagerTeamId"),
-    activeOwnerId: searchParams.get("activeOwnerId"),
+    // Stufe 0.3 (Befund B2): NICHT mehr aus der Query gelesen — die Identitaet kommt serverseitig
+    // ueber `resolveAuthoritativeWriteOwnerId()` (siehe PUT unten). Das Feld hier bleibt entfernt,
+    // damit niemand versehentlich wieder darauf zurueckfaellt.
     controlMode: searchParams.get("controlMode") as "human" | "ai" | "passive" | "manual" | null,
   };
 }
@@ -62,6 +66,8 @@ export async function GET(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
   }
@@ -108,6 +114,9 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus der Query — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       ...parseRoomWriteContext(request),
       saveId: params.saveId,
@@ -115,6 +124,7 @@ export async function PUT(request: Request) {
       action: "lineup_save",
       source: "sqlite",
       dryRun: false,
+      activeOwnerId,
     });
     if (!writeAuth.allowed) {
       return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
@@ -148,6 +158,8 @@ export async function PUT(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
     if (!result.ok) {

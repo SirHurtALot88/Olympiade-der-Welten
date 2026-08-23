@@ -14,10 +14,20 @@ const OUTPUT_DIR = process.env.OLY_TOPUP_OUTPUT_DIR ?? process.env.OLY_EXPORT_DI
 const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
 
+// Die Warnung geht bewusst auf stderr, nicht stdout: stdout bleibt reines JSON, das
+// nachgelagerte Skripte/CI weiterverarbeiten. Wer stdout in eine Datei umleitet, soll
+// die Warnung trotzdem auf dem Terminal sehen -- genau dafuer ist stderr da. Sie steht
+// am Anfang UND am Ende, weil lange Laeufe die erste Zeile im Terminal-Scrollback
+// begraben, bevor jemand die Ausgabe liest.
+const DRY_RUN_BANNER =
+  "TROCKENLAUF -- es wurde nichts geschrieben. Mit --write ausfuehren.";
+
 function main() {
   const persistence = createPersistenceService();
   const save = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
   if (!save) throw new Error("No active local save available.");
+
+  if (!WRITE_ENABLED) console.error(DRY_RUN_BANNER);
 
   const result = runChunkedRedraftTopup({
     persistence,
@@ -33,7 +43,12 @@ function main() {
     outputDir: OUTPUT_DIR,
   });
 
+  // `result.dryRun` kommt aus dem Service und ist dort schon der oberste Key der
+  // JSON-Ausgabe (siehe runChunkedRedraftTopup) -- hier kommt nur noch die zweite,
+  // unuebersehbare Warnung auf stderr dazu, damit ein Trockenlauf niemals wie ein
+  // durchgefuehrter Lauf aussieht.
   console.log(JSON.stringify(result, null, 2));
+  if (!WRITE_ENABLED) console.error(DRY_RUN_BANNER);
   if (result.summary.teamsBelowMin.length > 0) {
     process.exitCode = 1;
   }

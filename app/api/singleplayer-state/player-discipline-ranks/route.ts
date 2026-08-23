@@ -55,6 +55,8 @@ export async function GET(request: Request) {
       playerId,
       seasonPointsRankByDisciplineId: {},
       allTimePointsRankByDisciplineId: {},
+      allTimePointsByDisciplineId: {},
+      allTimeAppearancesByDisciplineId: {},
     });
   }
 
@@ -69,5 +71,9 @@ export async function GET(request: Request) {
     playerId,
     seasonPointsRankByDisciplineId: override.seasonPointsRankByDisciplineId,
     allTimePointsRankByDisciplineId: override.allTimePointsRankByDisciplineId,
+    // All-Time-PPs je Disziplin: im Browser fehlt die Aufschluesselung der Archiv-Saisons ganz,
+    // deshalb faehrt die Zahl denselben Weg wie ihr Rang (`l4835p`).
+    allTimePointsByDisciplineId: override.allTimePointsByDisciplineId,
+    allTimeAppearancesByDisciplineId: override.allTimeAppearancesByDisciplineId,
   });
 }

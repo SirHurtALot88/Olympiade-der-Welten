@@ -14,7 +14,7 @@ export default async function LegacyLineupLabV2Page({ searchParams }: LegacyLine
 
   return (
     <main className="page-shell">
-      <LegacyLineupLabClient initialSource={source} uiVariant="focusV2" />
+      <LegacyLineupLabClient initialSource={source} />
     </main>
   );
 }

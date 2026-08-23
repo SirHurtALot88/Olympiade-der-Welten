@@ -10,6 +10,8 @@ import {
 } from "@/lib/admin/season-simulation-runner";
 import { assertSaveNotRoomBound } from "@/lib/room/assert-save-not-room-bound";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +122,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, run: readAdminSeasonSimulation(runId) });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
+    // Eine ID, hinter der kein Spielstand mehr liegt, ist eine 404 mit dem Code `save_not_found` —
+    // nicht ein 500 mit einem Satz, den keine Fehlertabelle wiedererkennt. Begruendung ausfuehrlich
+    // bei `resolveSave` in lib/admin/season-simulation-runner.ts.
+    const nichtAufloesbar = mapSaveResolutionErrorToResponse(error);
+    if (nichtAufloesbar) return nichtAufloesbar;
     return NextResponse.json(
       {
         ok: false,

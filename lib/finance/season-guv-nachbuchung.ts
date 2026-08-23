@@ -28,8 +28,12 @@
  * IDEMPOTENT: die Funktion leitet nur ab und vergleicht, bevor sie schreibt. Zweimal laufen ändert
  * nichts.
  *
- * NUR NACH DER BUCHUNG AUFRUFEN. Mitten in der Saison wäre der Aufruf harmlos, aber sinnlos: dann
- * steht in beiden Zeilen dieselbe Hochrechnung.
+ * MITTEN IN DER SAISON IST DER AUFRUF NICHT MEHR SINNLOS. Hier stand: „NUR NACH DER BUCHUNG
+ * AUFRUFEN. Mitten in der Saison wäre der Aufruf harmlos, aber sinnlos: dann steht in beiden Zeilen
+ * dieselbe Hochrechnung." Das galt, solange beide Zeilen überhaupt existierten. Nachgemessen war
+ * genau das nicht der Fall: in sechs der sieben Live-Spielstände gab es die gespeicherte Zeile gar
+ * nicht, und die GuV-Spalte im Saisonstand blieb dauerhaft leer. Seit `zieheSaisonstandGuvNachSpieltag`
+ * (unten) hängt die Ableitung deshalb auch am Spieltag.
  */
 
 import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
@@ -63,8 +67,20 @@ function postenGleich(links: StandingRecord["guvPosten"], rechts: StandingRecord
  * Leitet `guv` und `guvPosten` im Saisonstand aus der gemeinsamen Rechnung neu ab. Persistiert
  * NICHTS — das bleibt beim Aufrufer, der seine eigene Save-Führung hat.
  *
- * Teams ohne gespeicherte Postenliste bleiben unberührt: die Liste entsteht bei der
- * Saisonende-Buchung, und wo sie fehlt, gab es diese Buchung nicht.
+ * HIER STAND EIN RIEGEL: „Teams ohne gespeicherte Postenliste bleiben unberührt: die Liste entsteht
+ * bei der Saisonende-Buchung, und wo sie fehlt, gab es diese Buchung nicht." Er ist weg, auf Chris'
+ * Ansage vom 23.08. („ja bau die drei hovers so und die guv nachbuchung auch").
+ *
+ * WARUM ER FALSCH WAR — nachgemessen an den sieben Live-Spielständen: nur EINER (`1hf25q`,
+ * abgeschlossen) trägt überhaupt `guv`/`guvPosten`. In den sechs laufenden Ständen, Chris' eigenem
+ * `swnjlk` eingeschlossen, blieb die GuV-Spalte im Saisonstand deshalb dauerhaft LEER — während das
+ * Team-Profil daneben eine eigene, unvollständige Zahl zeigte. Der Riegel schützte also nicht vor
+ * einer falschen Zahl, er verhinderte die richtige.
+ *
+ * WAS EINE GuV MITTEN IN DER SAISON IST, und warum sie trotzdem hingehört: eine Hochrechnung. Die
+ * Posten sagen das selbst — `note` trägt bei Apron und Vorstandszielen den Rang, auf den
+ * hochgerechnet wurde. Eine beschriftete Hochrechnung ist besser als eine leere Zelle neben einer
+ * unbeschrifteten Hochrechnung anderswo.
  */
 export function zieheSaisonstandGuvNach(gameState: GameState): StandingsGuvNachbuchungResult {
   const standings = gameState.seasonState.standings ?? {};
@@ -78,7 +94,7 @@ export function zieheSaisonstandGuvNach(gameState: GameState): StandingsGuvNachb
 
   for (const [teamId, standing] of Object.entries(standings)) {
     const neu = frisch.get(teamId) ?? null;
-    if (neu == null || !Array.isArray(standing.guvPosten) || standing.guvPosten.length === 0) {
+    if (neu == null) {
       naechsteStandings[teamId] = standing;
       continue;
     }
@@ -123,11 +139,14 @@ export function zieheSaisonstandGuvNach(gameState: GameState): StandingsGuvNachb
  * nicht; ein erster Versuch dort trieb `analytics-live-fortschritt` von 17,58 s über 180 s.
  * Einmal je Buchung ist dagegen bezahlbar — auf den echten Saisonende-Ständen 40 bis 140 ms.
  *
- * ZWEI RIEGEL MACHEN DEN AUFRUF ANDERNORTS ZUM NICHTSTUN:
- *  1. Die Phase. Außerhalb des Saisonende-Fensters kehrt die Funktion sofort um — mitten in der
- *     Saison stünde in beiden Zeilen ohnehin dieselbe Hochrechnung.
- *  2. `zieheSaisonstandGuvNach` selbst lässt Teams ohne gespeicherte Postenliste unberührt. Die
- *     Liste entsteht erst bei der Saisonende-Buchung; wo sie fehlt, gab es diese Buchung nicht.
+ * NUR NOCH EIN RIEGEL MACHT DEN AUFRUF ANDERNORTS ZUM NICHTSTUN: die Phase. Außerhalb des
+ * Saisonende-Fensters kehrt diese Funktion sofort um.
+ *
+ * Der zweite Riegel ist weg. Er lautete: „`zieheSaisonstandGuvNach` selbst lässt Teams ohne
+ * gespeicherte Postenliste unberührt. Die Liste entsteht erst bei der Saisonende-Buchung; wo sie
+ * fehlt, gab es diese Buchung nicht." Genau der hielt die GuV-Spalte in jedem laufenden Spielstand
+ * leer — siehe den Kopfkommentar von `zieheSaisonstandGuvNach`. Für die laufende Saison hängt die
+ * Ableitung jetzt an `zieheSaisonstandGuvNachSpieltag`.
  *
  * IDEMPOTENT wie die zugrunde liegende Funktion: zweimal laufen ändert nichts.
  */
@@ -140,6 +159,35 @@ export function zieheSaisonstandGuvNachImSaisonendfenster(gameState: GameState):
   } catch {
     // Eine Buchung darf an der Nachbuchung nicht scheitern. Schlaegt die Ableitung auf einem
     // unvollstaendigen Stand fehl, bleibt die gespeicherte Zeile stehen — wie bisher.
+    return gameState;
+  }
+}
+
+/**
+ * DASSELBE NACHZIEHEN, ABER NACH JEDER SPIELTAGS-BUCHUNG — ohne Phasen-Riegel.
+ *
+ * Chris am 23.08.: „ja bau die drei hovers so und die guv nachbuchung auch." Der Anlass war, dass
+ * die GuV-Spalte im Saisonstand in seinem laufenden Spielstand LEER ist, weil `guv`/`guvPosten` dort
+ * nie geschrieben wurden — die gab es bisher erst am Saisonende.
+ *
+ * WARUM AN DIESER STELLE UND NICHT BEIM LESEN: `resolveSeasonGuvByTeam` an den sieben Live-Ständen
+ * gemessen — erster Aufruf 0,6 bis 1,4 Sekunden für 32 Teams, danach 17 bis 67 ms. Einmal je
+ * Spieltag ist das bezahlbar; im Tabellenaufbau wäre es das nicht, und ein früherer Versuch dort
+ * trieb `analytics-live-fortschritt` von 17,6 s über 180 s. (Der Kopfkommentar oben nennt 334
+ * Sekunden — die galten für einen FRISCHEN Spielstand, in dem die Sponsor-Angebote erstmalig
+ * entstehen, nicht für einen laufenden.)
+ *
+ * Der Spieltags-Haken ist derselbe Punkt, an dem `zieheSaisonstandPunkteNach` schon hängt: einmal je
+ * Spieltag, nicht einmal je Klick.
+ *
+ * IDEMPOTENT und ausfallsicher wie die Saisonende-Variante: schlägt die Ableitung auf einem
+ * unvollständigen Stand fehl, bleibt die gespeicherte Zeile stehen. Eine Spieltags-Buchung darf an
+ * der Nachbuchung nicht scheitern.
+ */
+export function zieheSaisonstandGuvNachSpieltag(gameState: GameState): GameState {
+  try {
+    return zieheSaisonstandGuvNach(gameState).gameState;
+  } catch {
     return gameState;
   }
 }

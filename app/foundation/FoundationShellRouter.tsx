@@ -23,9 +23,6 @@ import FoundationSeasonV2Host, {
 import FoundationPrizeFinanceShellHost, {
   type FoundationPrizeFinanceShellHostProps,
 } from "@/app/foundation/prize-v2/FoundationPrizeFinanceShellHost";
-import FoundationLineupShellHost, {
-  type FoundationLineupShellHostProps,
-} from "@/app/foundation/legacy-lineup-lab/FoundationLineupShellHost";
 import FoundationMarketV2ShellHost, {
   type FoundationMarketV2ShellHostProps,
 } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
@@ -296,25 +293,18 @@ export function FoundationShellRouterPrize({ active, hostProps }: FoundationShel
   );
 }
 
-export type FoundationShellRouterLineupProps = {
-  active: boolean;
-  hostProps: FoundationLineupShellHostProps;
-};
-
-/**
- * Incremental Phase 5.3 shell slice: Lineup route with unmount gate.
- */
-export function FoundationShellRouterLineup({ active, hostProps }: FoundationShellRouterLineupProps) {
-  if (!active) {
-    return null;
-  }
-
-  return (
-    <FoundationTabActiveHost active={active}>
-      <FoundationLineupShellHost {...hostProps} />
-    </FoundationTabActiveHost>
-  );
-}
+// Der frühere Router-Baustein für die Einsatzliste (samt eigenem Lineup-Shell-Host und
+// eigener Derivations-Datei) stand hier bis zu dieser Aufräumung — importiert von
+// `use-foundation-shell-router-body-scope.tsx`, aber nirgends gerendert. Die aktive
+// Einsatzliste läuft seit der Umstellung auf `uiVariant="focusV2"` direkt über
+// `FoundationLineupPanel` in `FoundationShellRouterBody.tsx` (Ternary auf
+// `activeView === "lineup" || "lineupV2"`, sonst `null` — dieselbe An-/Abmontier-Semantik
+// wie `FoundationTabActiveHost`). Nachgezählt vor dem Entfernen: der Baustein kam im ganzen
+// Baum nur in der toten Import-Zeile und der eigenen Definition vor, 0 Aufrufer. Geprüft auf
+// Funktionsverlust: die zugehörigen Lineup-Derivations lieferten für diesen Pfad ohnehin immer
+// die Focus-V2-Variante (die einzige Bedingung, unter der die Komponente ueberhaupt montiert
+// wird), Tooltip- und Highlight-Logik decken sich 1:1 mit der Inline-Fassung — kein Feature
+// ging verloren.
 
 export type FoundationShellRouterTrainingProps = {
   active: boolean;

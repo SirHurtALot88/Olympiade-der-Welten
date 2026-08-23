@@ -1,5 +1,6 @@
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { GameFlowStepStatus } from "@/lib/foundation/game-flow-controller";
+import { lookupRoomWriteErrorMessage } from "@/lib/room/parse-room-write-context";
 
 export type CockpitStepStatus = "open" | "ready" | "warning" | "blocked" | "applied";
 
@@ -52,20 +53,19 @@ export function mapAutoRunStatusToCockpitStatus(
 }
 
 export function getAiTransferStatusLabel(
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked",
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked",
 ) {
   if (status === "ready") return "bereit";
   if (status === "no_sell_need") return "halten";
-  if (status === "low_roster_depth") return "kader zu klein";
   if (status === "no_candidates") return "keine kandidaten";
   if (status === "warning") return "achtung";
   return "blockiert";
 }
 
 export function getAiTransferStatusPillClass(
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked",
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked",
 ) {
-  return `transfer-status-pill${status === "ready" ? " is-ready" : status === "warning" || status === "no_sell_need" || status === "low_roster_depth" || status === "no_candidates" ? " is-warning" : " is-blocked"}`;
+  return `transfer-status-pill${status === "ready" ? " is-ready" : status === "warning" || status === "no_sell_need" || status === "no_candidates" ? " is-warning" : " is-blocked"}`;
 }
 
 export function getAiTransferBudgetLabel(status: "healthy" | "tight" | "critical" | "unknown") {
@@ -102,6 +102,21 @@ export function formatCockpitReason(reason: string) {
   if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal prüfen.";
   if (reason === "early_season_setup_allowed_before_first_result") return "Früher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
   if (reason === "concurrent_save_write_conflict") return "Ein anderer Mitspieler hat währenddessen gespeichert. Bitte neu laden und erneut versuchen.";
+
+  /**
+   * BEFUND F9 (Aufgabe #44): die Codes des Server-Write-Guards kannte diese Funktion nicht. Sie
+   * fielen deshalb unten auf `reason.replaceAll("_", " ")` durch, und im Gebäude-Panel stand dann
+   * „host only action" bzw. „participant offline" — kein Satz, keine Handlungsanweisung.
+   *
+   * Nachgeschlagen wird ERST HIER, ganz zum Schluss: `local_team_not_owned_or_ai_controlled` und
+   * `save_not_found` stehen in BEIDEN Tabellen, und an dieser Stelle ist die gebäudebezogene
+   * Fassung oben die bessere. Nur was hier niemand kennt, holt sich den Satz aus der Raum-Tabelle
+   * — es bleibt bei genau einer Quelle je Code.
+   */
+  const ausDerRaumTabelle = lookupRoomWriteErrorMessage(reason);
+  if (ausDerRaumTabelle) {
+    return ausDerRaumTabelle;
+  }
 
   return shared;
 }

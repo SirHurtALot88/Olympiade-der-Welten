@@ -29,7 +29,10 @@ import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToCo
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
-import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
+import {
+  markMatchdayResolveSnapshotAsBooked,
+  resolveMatchdayPreviewToBook,
+} from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 
 type DbClient = typeof db;
@@ -271,6 +274,28 @@ function loadAllContextsForSqlite(
   }
 
   return contexts;
+}
+
+/**
+ * DER RIEGEL GEGEN DEN LEEREN SPIELTAG — als reine Funktion, damit er ohne den kompletten
+ * Apply-Aufbau geprueft werden kann.
+ *
+ * `writtenDisciplineRows` ist die Zahl der Zeilen, die DIESER Aufruf wirklich schreibt: die
+ * nicht eingefrorenen Seiten. Bei der gestaffelten Buchung (D1 liegt, D2 kommt) sind das genau
+ * die D2-Zeilen — die bereits gebuchte D1 zaehlt bewusst nicht mit, sonst koennte ein leerer
+ * D2-Commit sich hinter den D1-Zeilen verstecken.
+ */
+export function buildEmptyDisciplineRowBlocker(input: {
+  matchdayId: string;
+  writtenDisciplineRows: number;
+  isStagedContinuation: boolean;
+}): string | null {
+  if (input.writtenDisciplineRows > 0) {
+    return null;
+  }
+  return input.isStagedContinuation
+    ? `Keine wertbare Disziplin-Zeile fuer die offene Seite von ${input.matchdayId}. Der Spieltag wird nicht als gebucht vermerkt.`
+    : `Keine wertbare Disziplin-Zeile fuer ${input.matchdayId}. Der Spieltag wird nicht als gebucht vermerkt.`;
 }
 
 function buildBlockingReasons(input: {
@@ -744,6 +769,45 @@ export class LegacyMatchdayResultApplyService {
     const isStagedContinuation =
       existingSides.size > 0 && [...incomingSides].some((side) => !existingSides.has(side));
     const frozenSides = isStagedContinuation ? existingSides : new Set<"d1" | "d2">();
+
+    /**
+     * EIN SPIELTAG OHNE EINE EINZIGE GEWERTETE ZEILE IST KEIN GEBUCHTER SPIELTAG.
+     *
+     * Bis hierher entschied allein der Vorschau-Status (`buildBlockingReasons` oben), ob gebucht
+     * werden darf — WIE VIELE Zeilen dabei entstehen, ging in keine Bedingung ein. Ein Apply,
+     * der null Disziplin-Zeilen schreibt, meldete deshalb `ok: true, applied: true`, und die
+     * Oberflaeche sagte „im Saisonstand", waehrend im Save nichts stand.
+     *
+     * Aufgefallen ist das am Trockenlauf der Saison-Simulation: dort kam je Spieltag
+     * `resolvedTeams: 32, blockers: []` zurueck, bei `disciplineRows: 0`. Das Skript hat seither
+     * eine eigene Zusicherung — aber sie half nur dem Skript. Jeder andere Aufrufer, auch der
+     * Spieltagslauf im Spiel, bekam weiterhin ein `applied: true` fuer nichts.
+     *
+     * GEZAEHLT WIRD, WAS DIESER AUFRUF WIRKLICH SCHREIBT: die nicht eingefrorenen Seiten. Bei
+     * der gestaffelten Buchung (D1 liegt, D2 kommt) sind das genau die D2-Zeilen — die bereits
+     * gebuchte D1 zaehlt bewusst NICHT mit, sonst koennte ein leerer D2-Commit sich hinter den
+     * D1-Zeilen verstecken.
+     */
+    const neueDisziplinZeilen = writePayload.disciplineResultPayloads.filter(
+      (payload) => !frozenSides.has(payload.disciplineSide),
+    ).length;
+    const leerlaufGrund = buildEmptyDisciplineRowBlocker({
+      matchdayId: params.matchdayId,
+      writtenDisciplineRows: neueDisziplinZeilen,
+      isStagedContinuation,
+    });
+    if (leerlaufGrund) {
+      const grund = leerlaufGrund;
+      return {
+        ok: false,
+        source,
+        error: grund,
+        previewStatus: prepared.preview.status,
+        canApply: false,
+        blockingReasons: [grund],
+      };
+    }
+
     const frozenDisciplineResults = isStagedContinuation
       ? (save.gameState.seasonState.disciplineResults ?? []).filter(
           (entry) => entry.matchdayResultId === matchdayResultId && frozenSides.has(entry.disciplineSide),
@@ -862,6 +926,29 @@ export class LegacyMatchdayResultApplyService {
         resultAuditLogs: [...(seasonState.resultAuditLogs ?? []), nextAuditLog],
       },
     };
+    /**
+     * DIE GEBUCHTE RECHNUNG WIRD GESTEMPELT — damit die Buehne danach SIE zeigt und nicht neu
+     * rechnet.
+     *
+     * GEMELDET VON CHRIS: Sekunden nach dem Buchen standen in der Arena andere Zahlen und
+     * getauschte Plaetze (Malagor 98,8 → 92,1, S-S 14,9 → 14,2, C-S 14,4 → 14,9). Ursache: ein
+     * durchgebuchter Spieltag machte die Vorberechnung ungueltig, die Arena fiel auf den
+     * Live-Pfad und rechnete gegen den Zustand NACH der Buchung — mit der Nach-Spieltags-Fatigue,
+     * die ein paar Zeilen weiter unten (`applyFatigueAndInjuryAfterMatchday`) genau hier
+     * geschrieben wird.
+     *
+     * Der Stempel steht bewusst VOR dem Fatigue-Apply in derselben Kette: er haengt an dem, was
+     * gebucht WURDE, nicht an dem, was danach gilt. Und er traegt `prepared.preview` — also
+     * dieselbe Rechnung, aus der `nextDisciplineResults` entstanden sind, egal ob sie aus der
+     * Vorberechnung kam oder live gerechnet wurde.
+     */
+    const nextGameStateMitBeleg = markMatchdayResolveSnapshotAsBooked({
+      gameState: nextGameState,
+      scope: { saveId: params.saveId, seasonId: params.seasonId, matchdayId: params.matchdayId },
+      preview: prepared.preview,
+      matchdayResultId,
+      bookedAt: now,
+    });
     const recordMapMs = elapsedSince(recordMapStartedAt);
 
     // Idempotenz unter forceReplace: Existiert bereits ein Ergebnis für diesen Spieltag, so
@@ -871,14 +958,14 @@ export class LegacyMatchdayResultApplyService {
     // ORIGINAL-Save (vor dem Einfügen von `nextMatchdayResult`) ermittelt.
     const isMatchdayReplay = Boolean(existingResult);
     const injuryRollMap = buildMatchdayInjuryRollMap({
-      gameState: nextGameState,
+      gameState: nextGameStateMitBeleg,
       saveId: params.saveId,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       isMatchdayReplay,
     });
     const injuryResult = applyFatigueAndInjuryAfterMatchday({
-          gameState: nextGameState,
+          gameState: nextGameStateMitBeleg,
           saveId: params.saveId,
           seasonId: params.seasonId,
           matchdayId: params.matchdayId,

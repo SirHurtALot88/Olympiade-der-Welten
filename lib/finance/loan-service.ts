@@ -260,13 +260,61 @@ export function computeTeamLoanRate(input: {
   relationshipValue: number;
   lenderFinances: number;
   lenderCashPriority?: number;
+  /**
+   * Hoechster Zins, den der VERLEIHER auf eigene laufende Kredite zahlt. Fehlt der Wert oder ist
+   * er 0, verhaelt sich die Funktion wie vorher.
+   */
+  lenderHighestDebtRate?: number;
 }): number {
   const interactionDiscount = TEAM_INTERACTION_DISCOUNT;
   const relationshipDiscount = (Math.max(0, input.relationshipValue) / 5) * TEAM_RELATIONSHIP_DISCOUNT_MAX;
   const yieldAppetite = Math.max(0, (input.lenderFinances - 5) / 5) * 0.01;
   const maxRate = input.bankRate - interactionDiscount;
   const rate = input.bankRate - interactionDiscount - relationshipDiscount - yieldAppetite;
-  return roundRate(clamp(rate, TEAM_LOAN_FLOOR, maxRate));
+  /**
+   * NIEMAND VERLEIHT UNTER SEINEN EIGENEN KOSTEN — gefragt von Chris (`ua6cx9`):
+   * „M-M einen KRedit genommen … für 76,2 Mio über 13% von der Bank und für R-C und S-C je
+   *  22,4 Mio abgibtg bei 11,6% und 10,2% -> eigentlich ne schlechte Art der Finanzierung oder ist
+   *  das bewusst so?"
+   *
+   * Bewusst war es nicht: der Verleih prueft Beziehung und Liquiditaet des Gebers, nie dessen
+   * eigene Schuldzinsen. Am Live-Abbild gemessen sind 4 von 30 laufenden Team-Krediten
+   * Verlustgeschaefte — T-G verleiht zu 10,1 % und zahlt selbst 14,2 %, M-M gleich zweimal zu
+   * 11,6 % und 10,2 % bei eigenen 13,5 %.
+   *
+   * WARUM EIN BODEN UND KEIN VERBOT: Kredit zwischen Teams ist im Spiel auch ein
+   * Beziehungswerkzeug — ein Team, das einem Verbuendeten hilft, soll das duerfen. Ein Verbot
+   * naehme dem Nehmer die Quelle; der Boden laesst das Geschaeft zustandekommen, nur eben nicht
+   * mehr mit Verlust.
+   *
+   * KEIN AUFSCHLAG OBENDRAUF: der eigene Zins ist die Nulllinie, nicht das Gewinnziel. Wer mehr
+   * verlangen will, tut das ueber die bestehenden Groessen (`finances`, Beziehung).
+   *
+   * Der Boden darf `maxRate` UEBERSTEIGEN. Dann liegt das Team-Angebot ueber dem Bankzins, und der
+   * Nehmer waehlt die Bank — das ist die richtige Antwort: ein hoch verschuldetes Team ist kein
+   * guenstiger Geldgeber, und ein Angebot, das so tut, waere eine Luege.
+   */
+  const eigeneKosten =
+    Number.isFinite(input.lenderHighestDebtRate) && (input.lenderHighestDebtRate ?? 0) > 0
+      ? (input.lenderHighestDebtRate as number)
+      : 0;
+  const boden = Math.max(TEAM_LOAN_FLOOR, eigeneKosten);
+  return roundRate(Math.max(boden, clamp(rate, TEAM_LOAN_FLOOR, maxRate)));
+}
+
+/**
+ * Der hoechste Zins, den ein Team auf eigene LAUFENDE Kredite zahlt — die Untergrenze dafuer, was
+ * es selbst verlangen muss (siehe `computeTeamLoanRate`). Getilgte Kredite zaehlen nicht: sie
+ * kosten nichts mehr.
+ */
+export function getTeamHighestDebtRate(gameState: GameState, teamId: string): number {
+  return (gameState.seasonState?.loans ?? []).reduce(
+    (hoechster, loan) =>
+      loan.borrowerTeamId === teamId && loan.status === "active" && loan.principalOutstanding > 0
+        ? Math.max(hoechster, loan.interestRatePerSeason ?? 0)
+        : hoechster,
+    0,
+  );
 }
 
 /**
@@ -420,6 +468,8 @@ export function buildLoanOffers(
       relationshipValue,
       lenderFinances: lenderIdentity?.finances ?? 5,
       lenderCashPriority: profile?.bias.cashPriority ?? 5,
+      // Der Verleiher darf nicht unter seinen eigenen Schuldzins gehen (`ua6cx9`).
+      lenderHighestDebtRate: getTeamHighestDebtRate(gameState, lender.teamId),
     });
 
     offers.push({

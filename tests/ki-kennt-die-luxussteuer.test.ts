@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
+import { getProjectedTeamApronSalaryBase, getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import {
   getTeamDisplaySalaryTotal,
@@ -171,9 +171,47 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
   const quelle = readFileSync(join(process.cwd(), "lib/ai/ai-cash-salary-target-service.ts"), "utf8");
   const apronTeil = quelle.slice(quelle.indexOf("// ── APRON"));
 
-  it("die Apron-Fragen nehmen die Apron-Grundlage", () => {
-    expect(apronTeil).toContain("getTeamApronSalaryBase(gameState, teamId) > resolveTeamApronSalaryCeiling");
-    expect(apronTeil).not.toContain("getTeamSalarySum(gameState, teamId) > resolveTeamApronSalaryCeiling");
+  it("die Apron-Fragen nehmen die Apron-Grundlage — geprüft an der Zahl, nicht am Quelltext", () => {
+    // HIER STAND EINE ZEICHENKETTEN-PRÜFUNG auf die wörtliche Zeile
+    // `getTeamApronSalaryBase(gameState, teamId) > resolveTeamApronSalaryCeiling`. Sie ist rot
+    // geworden, obwohl die REGEL unverändert galt: die Apron-Fragen rechnen die Grundlage seither
+    // erst auf den geplanten Kader hoch (`getProjectedTeamApronSalaryBase`, siehe
+    // docs/BEFUND-APRON-BREMSE-KAUFMOMENT.md), weil im Kaufmoment die Verträge gerade ausgelaufen
+    // sind. Die Basis blieb dieselbe, nur die Zeile wanderte — und genau das kann eine
+    // Zeichenkette nicht unterscheiden. Der Kommentar zwei Prüfungen weiter unten sagt es bereits:
+    // „eine Zeichenkette prüft nichts."
+    //
+    // WAS STATTDESSEN GEPRÜFT WIRD: dass die Entscheidungsgröße der KI an der VERHANDELTEN Summe
+    // hängt und nicht an dem, was dieses Jahr zufällig abgebucht wird. Die Fixture baut beide
+    // Größen bewusst auseinander.
+    const gameState = baueTeamMitAbweichendenGehaltsbegriffen();
+    const basis = getTeamApronSalaryBase(gameState, TEAM_ID);
+    const projiziert = getProjectedTeamApronSalaryBase(gameState, TEAM_ID);
+
+    // Die Hochrechnung füllt fehlende Plätze auf — sie darf die Grundlage nur nach OBEN tragen,
+    // niemals eine andere Größe daraus machen.
+    expect(projiziert).toBeGreaterThanOrEqual(basis);
+
+    // Die Vertragsform verschiebt die Zahlung dieses Jahres. Die Entscheidungsgröße darf sie nicht
+    // spüren — sonst prüfte die KI wieder gegen etwas anderes, als besteuert wird.
+    const andereForm: GameState = {
+      ...gameState,
+      rosters: gameState.rosters.map((entry) =>
+        entry.teamId === TEAM_ID ? { ...entry, contractShape: "back_loaded" as const, salary: (entry.salary ?? 0) + 5 } : entry,
+      ),
+    };
+    expect(getProjectedTeamApronSalaryBase(andereForm, TEAM_ID)).toBeCloseTo(projiziert, 6);
+
+    // Das VERHANDELTE Gehalt muss sie dagegen bewegen.
+    const teurerVerhandelt: GameState = {
+      ...gameState,
+      rosters: gameState.rosters.map((entry) =>
+        entry.teamId === TEAM_ID
+          ? { ...entry, negotiatedAnnualSalary: (entry.negotiatedAnnualSalary ?? 0) + 5 }
+          : entry,
+      ),
+    };
+    expect(getProjectedTeamApronSalaryBase(teurerVerhandelt, TEAM_ID)).toBeGreaterThan(projiziert);
   });
 
   it("die Cash-Ziele behalten die echte Summe — dort wird wirklich abgebucht", () => {
@@ -186,12 +224,19 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     // `return getTeamDisplaySalaryTotal(gameState, teamId);` enthalten. Sie ist aus zwei Gründen
     // ersetzt worden.
     //
-    // ERSTENS ist die Aussage überholt, und zwar inzwischen zweimal. Erst wanderte die Abgabe vom
+    // ERSTENS ist die Aussage überholt, und zwar inzwischen dreimal. Erst wanderte die Abgabe vom
     // geglätteten Formelwert auf das VERHANDELTE Gehalt („ja!", docs/APRON_UND_VERTRAGSFORMEN.md,
     // Schritt 3) — damit Verhandeln überhaupt zählt. Dann meldete Chris, auch das sei geglättet
-    // („die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet"): das verhandelte
-    // Jahresgehalt ist der Durchschnitt über die Laufzeit, nicht das, was in dieser Saison vom
-    // Konto geht. Die Grundlage ist deshalb heute `getTeamActualSalaryTotal`.
+    // („die REAL zu zahlende summe des jahres nach vertrag und nicht geglättet"), und die
+    // Grundlage wurde `getTeamActualSalaryTotal`. Diese zweite Umstellung ist wieder zurückgenommen
+    // (#589): sie hatte ein Schlupfloch geöffnet, weil `contract.salary` von der VERTRAGSFORM
+    // abhängt — back_loaded senkt die Basis dieser Saison, und am echten Spielstand duckten sich
+    // sechs Teams damit ganz unter Linie 1 (`hwz8fk` L-K: verhandelt 62,4 gegen Linie 59,2, Rate
+    // 56,3 → zahlt nichts). Chris' Entscheidung: „apron muss aber doch das verhandelte gehalt als
+    // bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete! und das
+    // verhandelte ist ja auch das was abgebucht werden soll, wofür verhandelt man sonst".
+    // Die Grundlage ist deshalb heute wieder `getTeamNegotiatedSalaryTotal` — die einzige der drei
+    // Größen, die weder vom Formelwert noch von der Vertragsform abhängt.
     //
     // ZWEITENS, und das ist der eigentliche Grund: eine Zeichenkette prüft nichts. Genau diese
     // Sorte Test war im Repo mehrfach über Wochen rot, ohne dass es auffiel, und eine andere
@@ -213,12 +258,13 @@ describe("Die KI misst auf der Grundlage, die auch besteuert wird", () => {
     const echteZahlung = getTeamSalarySum(gameState, TEAM_ID);
 
     // Vorbedingung: die drei Begriffe MÜSSEN sich unterscheiden, sonst prüft der Rest nichts.
-    expect(echteZahlung).not.toBeCloseTo(geglaettet, 2);
-    expect(echteZahlung).not.toBeCloseTo(verhandelt, 2);
+    expect(verhandelt).not.toBeCloseTo(geglaettet, 2);
+    expect(verhandelt).not.toBeCloseTo(echteZahlung, 2);
 
-    // Besteuert wird, was in DIESER Saison wirklich gezahlt wird — dieselbe Zahl, gegen die die
-    // KI ihre Gehaltsdecke prüft und die der Saisonende-Apply abbucht.
-    expect(grundlage).toBeCloseTo(echteZahlung, 6);
+    // Besteuert wird, was VERHANDELT wurde — dieselbe Zahl, gegen die die KI ihre Gehaltsdecke
+    // prüft. Sie ist formunabhängig: ein Wechsel von balanced auf back_loaded verschiebt
+    // `echteZahlung`, lässt `grundlage` aber unberührt. Genau das ist der Punkt.
+    expect(grundlage).toBeCloseTo(verhandelt, 6);
   });
 });
 

@@ -481,6 +481,106 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
       source: "player-rating-contract.ppsSeason",
     }));
   }
+  /**
+   * DIE ALL-STARS DER VIER ACHSEN UND DER MVP — Ticket #41.
+   *
+   * CHRIS: „Und zwar für die einzelnen Bereiche wie POW SPE MEN SOC -> das sind quasi die All
+   * Stars. OVR = MVP. Training und Most Improved Award."
+   *
+   * WARUM DAS HIER UND NICHT AN EINER NEUEN STELLE: `buildSeasonReview` ist die einzige Stelle,
+   * an der Saison-Auszeichnungen entstehen. Eine zweite Ermittlung waere genau der Fehler, den
+   * die halbe Ticketliste dieser Runde beschreibt — zwei Zahlen fuer dieselbe Sache.
+   *
+   * Die Achsen-PPs liegen fertig im Rating-Vertrag (`ppPow`/`ppSpe`/`ppMen`/`ppSoc`, gebildet
+   * aus `pointsByArea`). Hier wird also NICHT gerechnet, sondern nur der Beste je Achse gesucht.
+   *
+   * `sourceStatus.ppsSeason` gilt fuer alle vier Achsen mit: sie stammen aus derselben
+   * Punkte-Zusammenfassung. Ein Spieler ohne fertige Saison-PPs hat auch keine Achsen-PPs, und
+   * eine Auszeichnung auf einem Ersatzwert waere schlimmer als keine.
+   */
+  const ACHSEN = [
+    { key: "ppPow" as const, awardId: "all_star_pow", label: "All-Star POW", kurz: "POW" },
+    { key: "ppSpe" as const, awardId: "all_star_spe", label: "All-Star SPE", kurz: "SPE" },
+    { key: "ppMen" as const, awardId: "all_star_men", label: "All-Star MEN", kurz: "MEN" },
+    { key: "ppSoc" as const, awardId: "all_star_soc", label: "All-Star SOC", kurz: "SOC" },
+  ];
+  for (const achse of ACHSEN) {
+    const bester =
+      [...playerRatings.values()]
+        .filter((entry) => entry.sourceStatus.ppsSeason === "ready" && entry[achse.key] != null)
+        .sort((links, rechts) => (Number(rechts[achse.key]) || 0) - (Number(links[achse.key]) || 0))[0] ?? null;
+    if (!bester) continue;
+    awards.push(makeAward({
+      awardId: achse.awardId,
+      label: achse.label,
+      category: "player",
+      winnerType: "player",
+      winnerId: bester.playerId,
+      winnerName: playerLabel(playersById.get(bester.playerId)),
+      value: bester[achse.key],
+      reason: `${bester[achse.key]} ${achse.kurz}-PPs der Saison`,
+      source: `player-rating-contract.${achse.key}`,
+    }));
+  }
+
+  /**
+   * MVP UEBER OVR. Chris: „OVR = MVP".
+   *
+   * ABGRENZUNG zu `player_of_the_season`: der geht ueber die Saisonleistung
+   * (`playerPerformances`), also was jemand GETAN hat. Der MVP geht ueber die Staerke am
+   * Saisonende — wer ist der beste Spieler der Liga. Zwei verschiedene Fragen, und beide sollen
+   * eine Antwort haben.
+   *
+   * Gelesen wird `ovrNormalized`, nicht ein Rohwert: nur die normalisierte Fassung ist ueber die
+   * ganze Liga vergleichbar. Ohne fertige Quelle faellt die Auszeichnung aus.
+   */
+  const ovrLeader =
+    [...playerRatings.values()]
+      .filter((entry) => entry.sourceStatus.normalizedOvr === "ready" && entry.ovrNormalized != null)
+      .sort((links, rechts) => (rechts.ovrNormalized ?? 0) - (links.ovrNormalized ?? 0))[0] ?? null;
+  if (ovrLeader) {
+    awards.push(makeAward({
+      awardId: "mvp",
+      label: "MVP",
+      category: "player",
+      winnerType: "player",
+      winnerId: ovrLeader.playerId,
+      winnerName: playerLabel(playersById.get(ovrLeader.playerId)),
+      value: ovrLeader.ovrNormalized,
+      reason: `OVR ${ovrLeader.ovrNormalized} — staerkster Spieler der Liga`,
+      source: "player-rating-contract.ovrNormalized",
+    }));
+  }
+
+  /**
+   * TRAINING AWARD. Chris: „Training und Most Improved Award."
+   *
+   * ABGRENZUNG zu Most Improved, und sie ist der Grund fuer zwei getrennte Auszeichnungen:
+   *   - MOST IMPROVED misst die FELDPOSITION ueber die Saison — wer ist im Wettbewerb nach vorne
+   *     gezogen (siehe `most-improved-service.ts`, dort ausfuehrlich begruendet).
+   *   - TRAINING misst den ATTRIBUT-Zuwachs aus der Saisonende-Entwicklung — wer hat am meisten
+   *     dazugelernt.
+   *
+   * Das ist nicht dasselbe: ein Spieler kann stark zulegen und trotzdem im Feld stehenbleiben,
+   * weil alle anderen auch zulegen. `buildXpDevelopmentRankings` liefert die Rangfolge bereits
+   * fertig sortiert und beschraenkt auf faire Vergleiche (`fairSnapshot` — nur Spieler mit
+   * Vorher-UND-Nachher-Stand, kein erfundener Startwert).
+   */
+  const trainingLeader = xpDevelopmentRankings.topImproved[0] ?? null;
+  if (trainingLeader && trainingLeader.attributeDelta > 0) {
+    awards.push(makeAward({
+      awardId: "training_award",
+      label: "Training Award",
+      category: "player",
+      winnerType: "player",
+      winnerId: trainingLeader.playerId,
+      winnerName: trainingLeader.playerName,
+      value: roundValue(trainingLeader.attributeDelta, 1),
+      reason: `+${roundValue(trainingLeader.attributeDelta, 1)} Attributpunkte in der Saison`,
+      source: "season-review.xpDevelopment.topImproved",
+    }));
+  }
+
   const bestTransfer = transferHighlights.find((entry) => entry.label === "bester Value-Kauf") ?? null;
   if (bestTransfer) {
     awards.push(makeAward({

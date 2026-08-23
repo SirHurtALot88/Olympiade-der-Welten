@@ -19,6 +19,7 @@
  */
 import { useMemo } from "react";
 
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
@@ -125,10 +126,10 @@ function formatValue(value: number | string | null): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** Auslaufende Verträge des eigenen Teams — Restlaufzeit 1 oder weniger. */
+/** Auslaufende Verträge des eigenen Teams — Restlaufzeit 0, also keine Saison mehr. */
 function countExpiringContracts(gameState: GameState, teamId: string | null): number {
   if (!teamId) return 0;
-  return gameState.rosters.filter((entry) => entry.teamId === teamId && (entry.contractLength ?? 0) <= 1).length;
+  return gameState.rosters.filter((entry) => entry.teamId === teamId && vertragLaeuftAus(entry.contractLength)).length;
 }
 
 export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinalePanelProps) {
@@ -245,8 +246,18 @@ export default function FoundationSeasonFinalePanel(props: FoundationSeasonFinal
     {
       key: "transfer-window",
       title: "Verkäufe & Verträge öffnen",
+      /*
+       * BEFUND B3: hier stand „Offen — Verträge verlängern …" NEBEN dem Statuschip „erledigt".
+       *
+       * Beides stimmte, aber ueber verschiedene Dinge: „Offen" beschrieb das VERKAUFSFENSTER,
+       * „erledigt" den SCHRITT, es zu oeffnen. In einer Zeile gelesen ergab das einen
+       * Widerspruch — und der Spieler glaubt danach keiner der beiden Angaben mehr.
+       *
+       * Der Schritt ist erledigt; der Text sagt jetzt, was dadurch moeglich ist, statt den
+       * Zustand des Fensters noch einmal zu benennen.
+       */
       detail: sellWindowOpen
-        ? "Offen — Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
+        ? "Freigeschaltet — du kannst jetzt Verträge verlängern und Spieler verkaufen. Gekauft wird noch nicht: die Kaufphase kommt in der neuen Saison, vor dem 1. Spieltag."
         : "Verlängern und verkaufen sind bis dahin gesperrt. Ein Klick schaltet den Saisonwechsel bis dorthin durch. Kaufen bleibt zu — das ist ein eigener Schritt in der neuen Saison.",
       state: sellWindowOpen ? "done" : readOnly ? "blocked" : busy ? "busy" : "ready",
       action:

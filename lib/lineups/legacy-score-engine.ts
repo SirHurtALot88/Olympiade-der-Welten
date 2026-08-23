@@ -46,6 +46,12 @@ type ScoreSideInput = {
   moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
   intensity?: "conserve" | "normal" | "push" | null;
   slotRoleModifier?: number | null;
+  /**
+   * Der Rollen-Modifikator JE SPIELER. Ohne ihn kann die Wertung den Slot-Effekt nur als
+   * Team-Term obendrauf legen, und der Spieler, dessen Rolle den Abzug verursacht hat,
+   * traegt ihn nicht — siehe `calculateSideSlotRoleModifierBreakdown`.
+   */
+  slotRoleModifierByPlayerId?: Record<string, number> | null;
   formCardsAvailable?: number | null;
   formCardsSelected?: number | null;
   formModifier?: number | null;
@@ -76,6 +82,95 @@ type ScoreSideInput = {
   teamPpsModifier?: number | null;
   teamPpsStatus?: "ready" | "missing_source";
 };
+
+/**
+ * Verteilt den Rest zwischen Spielersumme und Seiten-Score ANTEILIG auf die Eintraege.
+ *
+ * Das ist der Teil, der wirklich der ganzen Seite gehoert: Team-Power (ein Prozentsatz auf den
+ * Seiten-Score), der nicht zuordenbare Mutator-Anteil, der Rivalitaets-Abzug und die Rundung.
+ * Anteilig heisst: jeder bekommt denselben Prozentsatz auf seinen eigenen Beitrag. Damit
+ * aendert dieser Schritt die PP-VERHAELTNISSE nicht — er skaliert alle gleich — und schliesst
+ * trotzdem die Luecke zwischen Kopf und Bahnen vollstaendig.
+ *
+ * Der Rundungsrest geht an den GROESSTEN Beitrag, nicht an den letzten Slot. Der letzte Slot war
+ * jahrelang die Ablage fuer alles Unverteilte, und genau das ist Chris aufgefallen; ein an der
+ * Position haengender Rest waere derselbe Fehler in klein.
+ */
+function verteileAnteilig(
+  eintraege: LegacyLineupScoreResult["entries"],
+  betrag: number,
+  zuweisen: (entry: LegacyLineupScoreResult["entries"][number], anteil: number) => void,
+): void {
+  const gesamt = roundPreviewScore(betrag);
+  // Nur positive Beitraege tragen einen Anteil. Ein Spieler, den Fatigue und Rolle unter null
+  // gedrueckt haben, soll den Team-Aufschlag nicht auch noch verstaerken.
+  const gewichte = eintraege.map((entry) => Math.max(0, entry.finalContribution ?? 0));
+  const gewichtSumme = gewichte.reduce((wert, gewicht) => wert + gewicht, 0);
+  eintraege.forEach((entry, index) => {
+    if (Math.abs(gesamt) < 0.05) {
+      zuweisen(entry, 0);
+      return;
+    }
+    const anteil =
+      gewichtSumme > 0
+        ? roundPreviewScore((gesamt * (gewichte[index] ?? 0)) / gewichtSumme)
+        : roundPreviewScore(gesamt / eintraege.length);
+    zuweisen(entry, anteil);
+    entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + anteil);
+    entry.score = entry.finalContribution;
+  });
+}
+
+/**
+ * Verteilt den Rest zwischen Spielersumme und Seiten-Score ANTEILIG auf die Eintraege.
+ *
+ * Das ist der Teil, der wirklich der ganzen Seite gehoert: Team-Power (ein Prozentsatz auf den
+ * Seiten-Score), der nicht zuordenbare Mutator-Anteil, der Rivalitaets-Abzug und die Rundung.
+ * Anteilig heisst: jeder bekommt denselben Prozentsatz auf seinen eigenen Beitrag. Damit
+ * aendert dieser Schritt die PP-VERHAELTNISSE nicht — er skaliert alle gleich — und schliesst
+ * trotzdem die Luecke zwischen Kopf und Bahnen vollstaendig.
+ *
+ * Team-Power bekommt einen EIGENEN Anteil, getrennt vom Rest. Sonst verlaere die Buehne die
+ * Beschriftung „Team-Power" und zeigte nur noch ein namenloses „Team" — der Manager soll sehen,
+ * ob seine Power etwas gebracht hat.
+ *
+ * Der Rundungsrest geht an den GROESSTEN Beitrag, nicht an den letzten Slot. Der letzte Slot war
+ * jahrelang die Ablage fuer alles Unverteilte, und genau das ist Chris aufgefallen; ein an der
+ * Position haengender Rest waere derselbe Fehler in klein.
+ */
+function verteileSeitenRestAnteilig(
+  eintraege: LegacyLineupScoreResult["entries"],
+  seitenScore: number,
+  teamPowerModifier: number | null,
+): void {
+  if (eintraege.length === 0) return;
+  const summe = roundPreviewScore(eintraege.reduce((wert, entry) => wert + (entry.finalContribution ?? 0), 0));
+  const gesamtRest = roundPreviewScore(seitenScore - summe);
+  const powerTeil = roundPreviewScore(teamPowerModifier ?? 0);
+  const uebrigerTeil = roundPreviewScore(gesamtRest - powerTeil);
+
+  verteileAnteilig(eintraege, powerTeil, (entry, anteil) => {
+    entry.teamPowerShare = anteil;
+  });
+  verteileAnteilig(eintraege, uebrigerTeil, (entry, anteil) => {
+    entry.teamEffectShare = anteil;
+  });
+
+  // Was die Rundung uebrig laesst, traegt der groesste Beitrag — nicht der letzte Slot.
+  const jetzt = roundPreviewScore(eintraege.reduce((wert, entry) => wert + (entry.finalContribution ?? 0), 0));
+  const offen = roundPreviewScore(seitenScore - jetzt);
+  if (Math.abs(offen) >= 0.05) {
+    let groesster = 0;
+    eintraege.forEach((entry, index) => {
+      if ((entry.finalContribution ?? 0) > (eintraege[groesster]?.finalContribution ?? 0)) groesster = index;
+    });
+    const entry = eintraege[groesster]!;
+    entry.teamEffectShare = roundPreviewScore((entry.teamEffectShare ?? 0) + offen);
+    entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + offen);
+    entry.score = entry.finalContribution;
+  }
+}
+
 
 export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLineupScoreResult {
   const scoreByPlayerAndDiscipline = buildScoreMap(input.disciplineScores);
@@ -121,13 +216,20 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   // (Schonen −3..−2, Normal −2..+2, Push +2..+6). Push zieht nach oben (Chance); sein Preis ist
   // der höhere Ausdauerverbrauch (separat, real), nicht ein Score-Downside. Seeded pro
   // (Spieler, Diszi, Spieltag) → reproduzierbar & replay-idempotent wie der Form-Jitter.
-  const intensityModifier = roundPreviewScore(
-    relevantEntries.reduce(
-      (sum, entry) =>
-        sum + seededIntensityShare(intensity, `intensity|${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`),
-      0,
-    ),
-  );
+  // Die Anteile werden JE SPIELER gemerkt, nicht nur aufsummiert: sie gehoeren dem Spieler,
+  // der sie gewuerfelt hat, und werden weiter unten auch ihm gutgeschrieben. Die Summe bleibt
+  // dieselbe Zahl wie zuvor — dieselbe Reihenfolge, dieselbe Rundung.
+  const intensityShareByPlayerId: Record<string, number> = {};
+  let intensityShareSum = 0;
+  for (const entry of relevantEntries) {
+    const share = seededIntensityShare(
+      intensity,
+      `intensity|${entry.playerId}|${input.disciplineId}|${input.matchdayId ?? ""}`,
+    );
+    intensityShareByPlayerId[entry.playerId] = (intensityShareByPlayerId[entry.playerId] ?? 0) + share;
+    intensityShareSum += share;
+  }
+  const intensityModifier = roundPreviewScore(intensityShareSum);
   const captainMode = input.captainMode ?? "selected_captain";
   const captainStatus = input.captainStatus ?? (captainMode === "missing_source" ? "missing_source" : "mapped");
   if (fatigueSourceStatus !== "mapped") {
@@ -334,6 +436,45 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
         : null
       : roundPreviewScore(selectedTeamPowerModifier + passiveTeamPowerModifier);
   const totalScore = roundPreviewScore(prePowerScore + (teamPowerModifier ?? 0));
+
+  // =================================================================================
+  // ZUTEILUNG: die Team-Terme landen bei den Spielern
+  // =================================================================================
+  //
+  // GEMELDET VON CHRIS: „alle boni etc sind doch auf die spieler verteilt und die summe in
+  // der tabelle oben muesste 1:1 dem entsprechen was auch unten ist."
+  //
+  // Bis hierher stimmte das nicht. Vier Terme kamen NACH der Spielersumme obendrauf —
+  // Intensitaet, Slot-Rollen, Mutator-Rest und Team-Power — und keiner davon stand bei
+  // einem Spieler. Gemessen am Live-Abbild klaffte deshalb in 59 % aller 608 gewerteten
+  // Team-Zeilen eine Luecke von 5 Punkten und mehr zwischen Kopf und Bahnen (Median 3,0
+  // Punkte, Maximum 46,0). Die Buehne stopfte sie mit einem namenlosen Aufschlag auf dem
+  // letzten Slot; die PP-Verteilung ignorierte sie ganz.
+  //
+  // WAS HIER PASSIERT, IN DIESER REIHENFOLGE:
+  //  1. Intensitaet und Slot-Rolle gehen an DEN Spieler, der sie erzeugt hat. Beide werden
+  //     ohnehin pro Spieler gerechnet und waren nur unterwegs zusammenaddiert worden. Das
+  //     ist die einzige Aenderung, die die PP-Aufteilung wirklich verschiebt — und genau
+  //     das ist der Punkt: wer eine schlechte Rolle erwischt, soll auch weniger PP holen.
+  //  2. Was danach noch fehlt (Mutator-Rest, Team-Power, Rundung), gehoert wirklich der
+  //     ganzen Seite und wird ANTEILIG verteilt. Team-Power ist ein Prozentsatz auf den
+  //     Seiten-Score, anteilig ist dort also nicht Naeherung sondern exakt.
+  //
+  // WICHTIG — `totalScore` ist oben bereits fertig und wird hier NICHT mehr angefasst. Die
+  // Zuteilung verschiebt nur, WEM die Punkte gehoeren, nie WIE VIELE es sind. Team-Score,
+  // Rang und Tabelle bleiben Zahl fuer Zahl dieselben.
+  const zuteilbar = scoredEntries.filter((entry) => entry.finalContribution != null);
+  if (zuteilbar.length > 0) {
+    for (const entry of zuteilbar) {
+      const intensityShare = roundPreviewScore(intensityShareByPlayerId[entry.playerId] ?? 0);
+      const slotRoleShare = roundPreviewScore(input.slotRoleModifierByPlayerId?.[entry.playerId] ?? 0);
+      entry.intensityShare = intensityShare;
+      entry.slotRoleShare = slotRoleShare;
+      entry.finalContribution = roundPreviewScore((entry.finalContribution ?? 0) + intensityShare + slotRoleShare);
+      entry.score = entry.finalContribution;
+    }
+    verteileSeitenRestAnteilig(zuteilbar, totalScore, teamPowerModifier);
+  }
 
   return {
     disciplineId: input.disciplineId,

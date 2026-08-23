@@ -17,6 +17,16 @@ import "@/app/foundation/season-v2/season-standings-new-look.css";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { buildGuvBreakdown } from "@/lib/finance/guv-breakdown";
+import {
+  buildGehaltHover,
+  buildGebaeudeHover,
+  buildMarktwertHover,
+  buildSponsorHover,
+  buildTeamHover,
+  buildTransferHover,
+  type SaisonstandPostenZeile,
+  type SaisonstandHoverListe,
+} from "@/lib/foundation/saisonstand-team-hover";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import { RivalTag } from "@/components/foundation/RivalTag";
 import {
@@ -63,6 +73,7 @@ import {
   MAX_POINTS_PER_MATCHDAY,
   POINTS_PER_PARTICIPATING_PLAYER,
 } from "@/lib/season/title-race";
+import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -173,6 +184,7 @@ type NlTableSortKey =
   | "formCardsLeft"
   | "mw"
   | "cash"
+  | "injuries"
   | "sponsor"
   | "salary"
   | "buildingCost"
@@ -184,6 +196,7 @@ function nlMoneySignClass(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value) || value === 0) return "";
   return value > 0 ? " is-pos" : " is-neg";
 }
+
 
 function getTableSortValue(
   row: SeasonV2StandingsRow,
@@ -216,6 +229,10 @@ function getTableSortValue(
       return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
         ? row.marketValueTotal
         : Number.NEGATIVE_INFINITY;
+    case "injuries":
+      // Ohne Zahl ans ENDE sortieren, nicht als 0 an die Spitze: „keine Angabe" ist nicht
+      // dasselbe wie „keine Verletzung".
+      return row.injuries != null && Number.isFinite(row.injuries) ? row.injuries : Number.NEGATIVE_INFINITY;
     case "cash":
       return row.cash != null && Number.isFinite(row.cash) ? row.cash : Number.NEGATIVE_INFINITY;
     case "sponsor":
@@ -522,12 +539,138 @@ function StandingsTopPlayersHover({
   );
 }
 
+/**
+ * DIE DREI KADER-HOVERS IM SAISONSTAND — Teamname, Marktwert, Gehälter.
+ *
+ * GEWÜNSCHT VON CHRIS am 23.08.2026: „Können wir bitte diese Hovers auch im Saisonstand einbauen
+ * […] weil in der Teamansicht, wenn ich jetzt in 'nem anderen Team drin bin, haben wir solche
+ * Hovers ja schon etabliert."
+ *
+ * DASSELBE PORTAL-VOKABULAR wie `StandingsTopPlayersHover` darüber (`.nl-teams-rank-portal` /
+ * `.nl-teams-rank-preview`, Sichtbarkeit über `hidden` aus dem React-State). Ein drittes
+ * Popover-System hätte niemand gewollt — die Regeln in `globals.css` greifen so unverändert.
+ *
+ * Der Inhalt kommt als `panel` herein, weil die drei Hovers verschieden aussehen, sich aber gleich
+ * VERHALTEN sollen: gleiche Verzögerung beim Schließen, gleiche Tastatur-Bedienung, gleicher
+ * Accessibility-Baum. Ohne Inhalt wird gar kein Dialog gerendert — kein leerer Knoten.
+ */
+function StandingsKaderHover({
+  panelId,
+  ariaLabel,
+  panel,
+  children,
+  className,
+}: {
+  panelId: string;
+  ariaLabel: string;
+  panel: ReactNode | null;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!panel) {
+    return <>{children}</>;
+  }
+
+  function cancelClose() {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  return (
+    <span
+      className={`nl-teams-rank-portal${className ? ` ${className}` : ""}`}
+      onMouseEnter={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onMouseLeave={() => {
+        cancelClose();
+        // Kleine Verzoegerung, damit der Zeiger die Luecke zum Panel ueberbruecken kann.
+        closeTimer.current = setTimeout(() => setOpen(false), 90);
+      }}
+      onFocus={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onBlur={() => {
+        cancelClose();
+        setOpen(false);
+      }}
+    >
+      {children}
+      <div id={panelId} role="dialog" aria-label={ariaLabel} className="nl-teams-rank-preview" hidden={!open}>
+        {panel}
+      </div>
+    </span>
+  );
+}
+
+/** Eine Wert-Liste (MW oder Gehalt) als Panel-Inhalt. */
+function renderKaderListePanel(input: {
+  titel: string;
+  teamName: string;
+  liste: SaisonstandHoverListe;
+  einheit?: string;
+  mitVertrag?: boolean;
+}): ReactNode {
+  const { titel, teamName, liste, mitVertrag } = input;
+  return (
+    <>
+      <span className="nl-teams-rank-preview-title">
+        {titel} — {teamName} · {formatNlMoney(liste.summe)}
+      </span>
+      <ol className="nl-teams-rank-preview-list">
+        {liste.zeilen.map((zeile: SaisonstandHoverListe["zeilen"][number]) => (
+          <li key={zeile.playerId} className="nl-teams-rank-preview-row">
+            <span className="nl-teams-rank-preview-team">
+              {zeile.name}
+              {mitVertrag && zeile.contractShape ? (
+                <span className="nl-standings-hover-shape">{CONTRACT_SHAPE_SHORT[zeile.contractShape] ?? "STD"}</span>
+              ) : null}
+              {mitVertrag && zeile.contractLength != null ? (
+                <span className="nl-standings-hover-years">{zeile.contractLength} J.</span>
+              ) : null}
+            </span>
+            <span className="nl-teams-rank-preview-points nl-tnum">
+              {formatNlMoney(zeile.wert)}
+              <span className="nl-standings-hover-share">{Math.round(zeile.anteil * 100)} %</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {liste.weitere > 0 ? (
+        <span className="nl-standings-hover-rest">
+          + {liste.weitere} weitere · {formatNlMoney(liste.weitereSumme)}
+        </span>
+      ) : null}
+      {liste.ohneWert > 0 ? (
+        <span className="nl-standings-hover-rest">
+          {liste.ohneWert} ohne Angabe — nicht mitgezählt.
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** Kurzform der Vertragsform, wie im Team-Profil. */
+const CONTRACT_SHAPE_SHORT: Record<string, string> = {
+  front_loaded: "FL",
+  back_loaded: "BL",
+  standard: "STD",
+};
+
 export default function SeasonStandingsNewLook({
   selectedSeasonId,
   selectedSeasonLabel,
   sourceLabel,
   sourceBadgeLabel,
   isArchived,
+  isSeasonEnded = false,
   seasonOptions,
   selectedTeamSummary,
   leaderTeam,
@@ -1505,6 +1648,12 @@ export default function SeasonStandingsNewLook({
               <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
+              {/* Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+                  Verletzungen!" — die Rohdaten lagen laengst vor (`injuryEvents`), es fehlte nur
+                  die Spalte. */}
+              <th className="nl-standings-th-formcards">
+                {renderTableSortHeader("injuries", "Verl.", "Verletzungen dieser Saison")}
+              </th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
@@ -1605,11 +1754,48 @@ export default function SeasonStandingsNewLook({
         </td>
       );
     }
-    const anteil = entry.poolPositive > 0 ? entry.remainingPositive / entry.poolPositive : 0;
-    const tank = anteil >= 0.5 ? " is-pos" : anteil > 0 ? "" : " is-neg";
+    /**
+     * DIE FARBE STAND AUF DEM KOPF. Bisher: mehr als der halbe Tank uebrig → GRUEN, Tank leer →
+     * ROT. Damit lobte die Spalte genau den Zustand, der Punkte kostet.
+     *
+     * CHRIS' REGEL, woertlich: „positive übrig haben bedeutet dass man nicht die gute Form die man
+     * hatte eingesetzt hat und kostet ein Team sehr viele Punkte!" Eine ungespielte Pluskarte
+     * verfaellt am Saisonende (`unused_positive_formcards_expire`) — sie ist kein Guthaben,
+     * sondern ein Verlust, der noch nicht gebucht ist.
+     *
+     * Jetzt: leerer Tank = Ziel erreicht (gruen), Rest = neutral. Bewusst KEIN Rot fuer den Rest:
+     * diese Ansicht kennt den Spieltag nicht, und mitten in der Saison ist ein voller Tank voellig
+     * in Ordnung. Was ohne Zeitangabe ehrlich gesagt werden kann, ist nur: leer ist gut.
+     */
+    const tank = entry.remainingPositive <= 0 ? " is-pos" : "";
     return (
       <td className={`nl-standings-td-formcards${tank}`} title={buildFormCardTitle(row, entry)}>
         {formatNlNumber(entry.remainingPositive, 0)}
+      </td>
+    );
+  }
+
+  /**
+   * Spalte „Verl." — Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+   * Verletzungen!"
+   *
+   * `null` heisst „nicht gezaehlt" und zeigt „—"; eine echte 0 zeigt 0. Der Unterschied ist keine
+   * Feinheit: „keine Verletzung" ist die beste Zeile der Spalte, „nicht gezaehlt" ist ein Ausfall.
+   */
+  function renderInjuryCell(row: SeasonV2StandingsRow) {
+    if (row.injuries == null || !Number.isFinite(row.injuries)) {
+      return (
+        <td className="nl-standings-td-formcards" title={`Verletzungen nicht gezählt — ${row.teamName}`}>
+          —
+        </td>
+      );
+    }
+    return (
+      <td
+        className={`nl-standings-td-formcards${row.injuries === 0 ? " is-pos" : ""}`}
+        title={`${row.teamName}: ${row.injuries} Verletzung${row.injuries === 1 ? "" : "en"} in dieser Saison`}
+      >
+        {formatNlNumber(row.injuries, 0)}
       </td>
     );
   }
@@ -1642,6 +1828,15 @@ export default function SeasonStandingsNewLook({
             {renderRankMovementChip(row)}
           </td>
           <td className="nl-standings-td-team">
+            {/* Chris, 23.08.: „dass ich, wenn ich mit der Maus über den Teamnamen gehe, dass ich dann
+                so eine kleine Miniansicht bekomme, kompakt aus den Spielern". Der Klick bleibt, was
+                er war — das Hover legt sich nur darüber. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-team-${row.teamId}`}
+              ariaLabel={`Kurzübersicht ${row.teamName}`}
+              className="nl-standings-team-portal"
+              panel={row.hoverKader && row.hoverKader.length > 0 ? renderTeamMiniPanel(row) : null}
+            >
             <button
               type="button"
               className="nl-standings-table-teamlink"
@@ -1662,11 +1857,13 @@ export default function SeasonStandingsNewLook({
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </button>
+            </StandingsKaderHover>
           </td>
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
           {renderFormCardLeftCell(row)}
+          {renderInjuryCell(row)}
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
             const areaValue = getAreaValue(row, group.id);
             // Liga-Rang der Bereichsspalte: Top 3 grün, 4–6 gelb, 7–10 rot, Rest neutral.
@@ -1693,7 +1890,23 @@ export default function SeasonStandingsNewLook({
             );
           })}
           <td className="nl-standings-td-mw">
-            {formatNlMoney(row.marketValueTotal)}
+            {/* Chris, 23.08.: „wenn ich … über den Marktwert von dem jeweiligen Team gehe, dass ich
+                dann die Spieler dahinter sehe … immer absteigend sortiert". */}
+            <StandingsKaderHover
+              panelId={`nl-standings-mw-${row.teamId}`}
+              ariaLabel={`Marktwerte ${row.teamName}`}
+              panel={
+                row.hoverKader && row.hoverKader.length > 0
+                  ? renderKaderListePanel({
+                      titel: "Marktwerte",
+                      teamName: row.teamName,
+                      liste: buildMarktwertHover(row.hoverKader),
+                    })
+                  : null
+              }
+            >
+              {formatNlMoney(row.marketValueTotal)}
+            </StandingsKaderHover>
             {renderRankSuffix(marketValueRanks.get(row.teamId), "Marktwert", row.teamName)}
           </td>
           {/* NEGATIVES CASH ROT — gemeldet von Chris: „bitte den aktuellen Cash stand auch rot
@@ -1702,15 +1915,108 @@ export default function SeasonStandingsNewLook({
               die halbe Spalte gruen und die eine echte Warnung geht darin unter. Die Klasse
               `is-neg` gibt es hier laengst, die Cash-Spalte hat sie nur nie benutzt. */}
           <td className={`nl-standings-td-fin${(row.cash ?? 0) < 0 ? " is-neg" : ""}`}>
-            {formatNlMoney(row.cash)}
+            {/* Wo kam das Geld her, wo ging es hin — dieselben Posten wie die GuV-Spalte, andere
+                Frage. Seit der GuV-Vereinheitlichung ist das ohne zweite Rechnung zu haben. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-cash-${row.teamId}`}
+              ariaLabel={`Cash-Bewegungen ${row.teamName}`}
+              panel={(() => {
+                const posten = row.guvPosten ?? null;
+                if (!posten || posten.length === 0) return null;
+                return renderPostenPanel("Cash-Bewegungen", row.teamName, [
+                  { label: "Cash heute", wert: row.cash ?? null },
+                  ...posten
+                    .filter((eintrag) => eintrag.counted && Math.abs(eintrag.amount) > 0.005)
+                    .map((eintrag) => ({ label: eintrag.label, wert: eintrag.amount, notiz: eintrag.note ?? null })),
+                  { label: "≈ Saisonende", wert: row.cash != null && row.guv != null ? Number((row.cash + row.guv).toFixed(2)) : null, istSumme: true },
+                ]);
+              })()}
+            >
+              {formatNlMoney(row.cash)}
+            </StandingsKaderHover>
           </td>
-          <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
+          <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>
+            {/* Basis + Rangbonus + Saisonanteil — die drei Teile stehen im Datensatz laengst
+                getrennt, gezeigt wurde nur die Summe. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-sponsor-${row.teamId}`}
+              ariaLabel={`Sponsoren ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildSponsorHover({
+                  sponsorBasis: row.sponsorBasis,
+                  sponsorRank: row.sponsorRank,
+                  sponsorSeason: row.sponsorSeason,
+                  sponsorTotal: row.sponsorTotal,
+                });
+                return zeilen ? renderPostenPanel("Sponsoren", row.teamName, zeilen) : null;
+              })()}
+            >
+              {formatNlMoney(row.sponsorTotal)}
+            </StandingsKaderHover>
+          </td>
           <td className="nl-standings-td-fin">
-            {formatNlMoney(row.salaryTotal)}
+            {/* „beim Gehalt dasselbe, dass ich dann die Gehälter sehe" — plus Vertragsform und
+                Restlaufzeit, weil beides erklärt, warum eine Zahl so hoch ist. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-gehalt-${row.teamId}`}
+              ariaLabel={`Gehälter ${row.teamName}`}
+              panel={
+                row.hoverKader && row.hoverKader.length > 0
+                  ? renderKaderListePanel({
+                      titel: "Gehälter",
+                      teamName: row.teamName,
+                      liste: buildGehaltHover(row.hoverKader),
+                      mitVertrag: true,
+                    })
+                  : null
+              }
+            >
+              {formatNlMoney(row.salaryTotal)}
+            </StandingsKaderHover>
             {renderRankSuffix(salaryRanks.get(row.teamId), "Gehaltssumme", row.teamName)}
           </td>
-          <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
-          <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>{formatNlMoney(row.transferNet)}</td>
+          <td className="nl-standings-td-fin">
+            {/* Welche Anlage kostet wie viel — dieselbe Rechnung wie die Spalte, nur aufgeschluesselt. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-gebaeude-${row.teamId}`}
+              ariaLabel={`Gebäude-Unterhalt ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildGebaeudeHover(row.buildingUpkeep ?? []);
+                if (zeilen.length === 0) return null;
+                return renderPostenPanel(
+                  "Gebäude-Unterhalt",
+                  row.teamName,
+                  zeilen.map((zeile) => ({
+                    label: zeile.label,
+                    wert: -zeile.upkeep,
+                    notiz: `Stufe ${zeile.level}`,
+                  })),
+                );
+              })()}
+            >
+              {formatNlMoney(row.buildingCost)}
+            </StandingsKaderHover>
+          </td>
+          <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>
+            {/* Verkaeufe und Kaeufe getrennt — genau die Zerlegung, die Chris bei `ls9jfg` vermisst
+                hat („so wären dann ein paar Teams positiv und ein paar negativ"). */}
+            <StandingsKaderHover
+              panelId={`nl-standings-transfers-${row.teamId}`}
+              ariaLabel={`Transfers ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildTransferHover({
+                  transferSellCount: row.transferSellCount,
+                  transferSellTotal: row.transferSellTotal,
+                  transferBuyCount: row.transferBuyCount,
+                  transferBuyTotal: row.transferBuyTotal,
+                  transferNet: row.transferNet,
+                });
+                return zeilen ? renderPostenPanel("Transfers", row.teamName, zeilen) : null;
+              })()}
+            >
+              {formatNlMoney(row.transferNet)}
+            </StandingsKaderHover>
+          </td>
           <td
             className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}
             // Chris: „am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl
@@ -1735,13 +2041,86 @@ export default function SeasonStandingsNewLook({
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={18} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={19} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>
           </tr>
         ) : null}
       </Fragment>
+    );
+  }
+
+  /**
+   * DIE MINIANSICHT HINTER DEM TEAMNAMEN — Kader, Ø OVR, die drei wertvollsten Spieler, die Zahlen
+   * der Zeile in einem Blick. Bewusst KEIN zweiter Tabellenauszug: was in der Zeile daneben schon
+   * steht (Punkte, Rang), steht hier nur, weil man beim Hovern nicht mehr auf die Zeile schaut.
+   */
+  /**
+   * EINE POSTENLISTE ALS PANEL — Sponsoren, Transfers, Cash teilen sich diese Darstellung.
+   * Leere Werte bleiben leer („—"); die Ergebniszeile wird abgesetzt.
+   */
+  function renderPostenPanel(titel: string, teamName: string, zeilen: SaisonstandPostenZeile[]): ReactNode {
+    return (
+      <>
+        <span className="nl-teams-rank-preview-title">
+          {titel} — {teamName}
+        </span>
+        <div className="nl-standings-hover-posten">
+          {zeilen.map((zeile) => (
+            <div
+              key={zeile.label}
+              className={`nl-standings-hover-postenrow${zeile.istSumme ? " is-result" : ""}`}
+            >
+              <span>
+                {zeile.label}
+                {zeile.notiz ? <span className="nl-standings-hover-years">{zeile.notiz}</span> : null}
+              </span>
+              <span
+                className={`nl-tnum${
+                  zeile.wert != null && zeile.wert < 0 ? " is-neg" : zeile.wert != null && zeile.wert > 0 ? " is-pos" : ""
+                }`}
+              >
+                {formatNlMoney(zeile.wert)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  function renderTeamMiniPanel(row: SeasonV2StandingsRow): ReactNode {
+    const hover = buildTeamHover(row.hoverKader ?? []);
+    return (
+      <>
+        <span className="nl-teams-rank-preview-title">
+          {row.teamName} · {row.teamCode}
+          {row.rank != null ? ` · #${row.rank}` : ""}
+        </span>
+        <span className="nl-standings-hover-meta">
+          Kader {hover.kaderGroesse}
+          {hover.ovrSchnitt != null ? ` · Ø OVR ${formatNlNumber(hover.ovrSchnitt, 1)}` : ""}
+          {hover.auslaufend > 0 ? ` · ${hover.auslaufend} auslaufend` : ""}
+        </span>
+        <ol className="nl-teams-rank-preview-list">
+          {hover.top.map((eintrag, index) => (
+            <li key={eintrag.playerId} className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank nl-tnum">#{index + 1}</span>
+              <span className="nl-teams-rank-preview-team">
+                {eintrag.name}
+                {eintrag.className ? <span className="nl-standings-hover-shape">{eintrag.className}</span> : null}
+              </span>
+              <span className="nl-teams-rank-preview-points nl-tnum">{formatNlMoney(eintrag.marketValue)}</span>
+            </li>
+          ))}
+        </ol>
+        <span className="nl-standings-hover-meta">
+          Cash {formatNlMoney(row.cash)} · MW {formatNlMoney(row.marketValueTotal)} · Gehalt{" "}
+          {formatNlMoney(row.salaryTotal)}
+          {row.guv != null ? ` · GuV ${formatNlMoney(row.guv)}` : ""}
+        </span>
+      </>
     );
   }
 
@@ -2220,7 +2599,7 @@ export default function SeasonStandingsNewLook({
              Zeile der Seite. Der Spieler bekommt Klartext; die technische
              Quelle bleibt als Tooltip erreichbar. */
           <span title={`${sourceBadgeLabel} · ${sourceLabel}`}>
-            {isArchived ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+            {resolveLigaWertungKopfzeile({ istArchiv: isArchived, istAbgeschlossen: isSeasonEnded })}
           </span>
         }
         title={`Saisonstand — ${selectedSeasonLabel}`}

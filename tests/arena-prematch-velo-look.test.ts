@@ -47,7 +47,6 @@ describe("Beidseitige Klassen-Absicherung (Markup ↔ globals.css)", () => {
   }
   // data-Attribute/Testids sind keine Klassen.
   tokens.delete("arena-prematch-lineup-cta");
-  tokens.delete("arena-prematch-pending-ranking");
   // Der „Zur Bühne"-Knopf trägt die vorhandene Klasse `arena-prematch-cta`; dies hier ist nur
   // sein Testid.
   tokens.delete("arena-prematch-start-cta");
@@ -77,10 +76,17 @@ describe("Vor dem Start behauptet keine Wertung eine Reihenfolge", () => {
     expect(ARENA).toContain("matchdayPanel && (panelD1Revealed || panelD2Revealed) ?");
   });
 
-  it("ohne Wertung steht der erklärende Platzhalter (VeloPendingRanking), keine Tabelle", () => {
+  it("ohne Wertung steht auf der BÜHNE der erklärende Platzhalter (VeloPendingRanking)", () => {
     expect(ARENA).toContain('data-testid="arena-stage-pending-ranking"');
-    expect(PREMATCH).toContain('data-testid="arena-prematch-pending-ranking"');
-    expect(PREMATCH).toContain("Noch zu vergeben");
+  });
+
+  it("auf der Tafel VOR dem Anpfiff steht gar keine Wertung mehr — auch keine leeren Medaillen", () => {
+    // GEMELDET (Chris): „Diszi 1 und 2 sind ja nichts sagend, dann die Tabelle unten die nur
+    // verbündet und rivale zeigt irgendwie useless". Der Platzhalter mit drei leeren
+    // Medaillenkreisen fiel unter dieselbe Regel: ein Kasten ohne Aussage. Auf der BÜHNE bleibt
+    // er (dort wartet man wirklich auf eine Wertung), auf der Tafel davor ist er weg.
+    expect(PREMATCH).not.toContain("VeloPendingRanking");
+    expect(PREMATCH).not.toContain("Noch zu vergeben");
   });
 
   it("der Pre-Matchday-Ausschnitt rendert keine Rang-Badges und keine Medaillen-Farben", () => {

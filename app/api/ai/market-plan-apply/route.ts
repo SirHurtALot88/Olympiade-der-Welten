@@ -12,6 +12,8 @@ import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
@@ -95,14 +97,20 @@ export async function POST(request: Request) {
   // this route's host-level action does not otherwise validate ownership of). When the save can't
   // be resolved yet, omit the restriction and let the service's own save-resolution error surface
   // as before.
+  //
+  // Stufe 0.3 (Befund B2): die Identitaet fuer den Nicht-Raum-Fall kommt serverseitig aus der
+  // Sitzung (`resolveAuthoritativeWriteOwnerId`), nicht mehr aus `roomWriteContext.activeOwnerId`
+  // (Query/Body) — derselbe Fehler wie bei `authorizeLocalSingleplayerTeamWrite`, nur hier fuer die
+  // Team-Scope-Einschraenkung statt fuer die Kernautorisierung.
   const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const scopeOwnerId = await resolveAuthoritativeWriteOwnerId();
   const callerWritableTeamIds = freshSaveForScope
     ? Array.from(
         resolveAiBulkTeamWriteScope({
           gameState: freshSaveForScope.gameState,
           room: writeAuth.room,
           participant: writeAuth.participant,
-          activeOwnerId: roomWriteContext.activeOwnerId,
+          activeOwnerId: scopeOwnerId,
         }).writableTeamIds,
       )
     : null;
@@ -136,6 +144,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI market apply failed.",

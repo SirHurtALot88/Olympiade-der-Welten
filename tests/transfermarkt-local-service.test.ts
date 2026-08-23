@@ -1960,7 +1960,16 @@ describe("transfermarkt local service", () => {
             name: "Negotiator",
             marketValue: 1000,
             displayMarketValue: 10,
-            salaryDemand: 100,
+            // Die Fixture trug `salaryDemand: 100` neben `displaySalary: 10`. Die Verhandlung
+            // rechnet mit `salaryDemand`, die Forderung lag also bei 96,2 — das Angebot von 12,5
+            // darunter war ein 13-Prozent-Lowball und bekam `reject_lowball`. Solange das Verdikt
+            // nur angezeigt und nicht durchgesetzt wurde, fiel das nicht auf; seit es den
+            // Schreibweg blockiert, haette der Test einen abgelehnten Kauf verlangt.
+            //
+            // Sein Thema ist ein anderes: das VERHANDELTE Gehalt soll in Kader, Vorschau und
+            // Historie landen. Dafuer muss der Spieler zusagen — die Forderung passt deshalb jetzt
+            // zur Anzeige, und 12,5 liegt darueber.
+            salaryDemand: 10,
             displaySalary: 10,
           }),
         ],

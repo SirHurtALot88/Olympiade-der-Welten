@@ -16,6 +16,7 @@ import {
 } from "@/lib/standings/standings-tiebreaker-policy";
 import type { RankToPointsSheetRow, SeasonStandingsSheetRow } from "@/lib/standings/season-standings-sheet";
 import { db } from "@/src/server/db";
+import { resolveTeamMutatorPpsBonus } from "@/lib/foundation/player-points-total";
 
 export type StandingsPreviewSource = "sqlite" | "prisma";
 export type StandingsPreviewResultStatus =
@@ -486,10 +487,29 @@ export async function buildStandingsPreview(
       const baselinePoints = typeof baselineRaw === "number" ? baselineRaw : currentPoints;
       const d1Score = resultRow?.d1Score ?? null;
       const d2Score = resultRow?.d2Score ?? null;
+      /*
+       * DER MUTATOR-AUFSCHLAG GEHOERT IN DIE TABELLE — Chris' Meldung vom 19.08.
+       *
+       * Hier stand nur `d1Points + d2Points`. Diese beiden Werte stehen am Disziplin-Ergebnis
+       * (Team-Ebene); der Mutator-Aufschlag steht dagegen am einzelnen Spieler
+       * (`PlayerDisciplinePerformanceRecord.mutatorPpsBonus`) — auf Team-Ebene gibt es ihn gar
+       * nicht, also konnte die Tabelle ihn nie sehen. Die Spieltagsansicht rechnet ihn laengst
+       * mit (`matchday-mvp-scoring-service`), und genau daran ist der Widerspruch aufgefallen:
+       * ein Team gewann den Spieltag und stand in der Saison trotzdem dahinter.
+       *
+       * NACHGEMESSEN an Chris' Spielstand: bei allen 32 Teams war die Differenz zur
+       * Ledger-Summe exakt der Mutator-Betrag; ligaweit fehlten 101,40 Punkte, und vier Plaetze
+       * standen falsch.
+       */
+      const mutatorBonus = resolveTeamMutatorPpsBonus({
+        performances: seasonState.playerDisciplinePerformances ?? [],
+        matchdayResultId: matchdayResult?.id ?? null,
+        teamId: team.teamId,
+      });
       const pointsDelta =
         resultRow?.d1Points == null && resultRow?.d2Points == null
           ? null
-          : roundValue((resultRow?.d1Points ?? 0) + (resultRow?.d2Points ?? 0), 1);
+          : roundValue((resultRow?.d1Points ?? 0) + (resultRow?.d2Points ?? 0) + mutatorBonus, 1);
       const hasStoredResult = d1Score != null && d2Score != null;
       const isIncomplete =
         matchdayResult != null &&

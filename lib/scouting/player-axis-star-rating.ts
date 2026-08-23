@@ -60,15 +60,40 @@ function getAxisValue(player: Player, axis: PlayerAxisKey) {
   return isFiniteNumber(value) ? value : null;
 }
 
+/**
+ * Das Perzentil eines Werts in einer AUFSTEIGEND sortierten Liste.
+ *
+ * WARUM BINAERE SUCHE. Die Funktion zaehlt, wie viele Eintraege kleiner sind — auf einer
+ * sortierten Liste ist das genau die untere Schranke. Vorher lief dafuer ein linearer Scan ueber
+ * alle Werte, und das schlug voll durch:
+ *
+ *     2984 Spieler x 5 Perzentile (4 Achsen + Gesamt) x 2984 Werte = rund 44 Millionen Vergleiche
+ *
+ * Gemessen am Live-Spielstand kostete `buildPlayerAxisStarProfile` dadurch 0,266 ms je Spieler,
+ * also 794 ms fuer die Liga — der groesste Einzelposten beim Kaltladen (950 von 1688 ms gingen in
+ * `ensurePlayerPotentialForGameState`, das genau diese Profile fuer jeden Spieler baut).
+ *
+ * Die ligaweiten Vorberechnungen waren bereits gecacht; teuer war die Arbeit PRO Spieler.
+ *
+ * ERGEBNISGLEICH PER KONSTRUKTION: die untere Schranke IST die Anzahl der kleineren Eintraege,
+ * auch bei Wiederholungen. Kein Cache, also auch nichts, was veralten koennte. Beide Aufrufer
+ * liefern aufsteigend sortierte Listen (`buildLeagueAxisValues`, `buildLeagueSpecialistProfile`).
+ */
 function percentileOf(value: number, sortedValues: number[]) {
   if (sortedValues.length === 0) {
     return 50;
   }
-  let below = 0;
-  for (const entry of sortedValues) {
-    if (entry < value) below += 1;
+  let low = 0;
+  let high = sortedValues.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (sortedValues[mid]! < value) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
   }
-  return (below / sortedValues.length) * 100;
+  return (low / sortedValues.length) * 100;
 }
 
 /**

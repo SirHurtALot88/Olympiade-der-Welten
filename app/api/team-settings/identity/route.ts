@@ -11,6 +11,8 @@ import {
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /** Fields a caller may patch on a team's identity draft. Never accepts `teamId`. */
 type TeamIdentityPatch = Partial<Omit<TeamIdentity, "teamId">>;
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "team_not_found" }, { status: 404 });
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -74,7 +79,7 @@ export async function POST(request: Request) {
       source,
       dryRun: false,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -126,6 +131,8 @@ export async function POST(request: Request) {
       teamIdentity: persisted.gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : "team_identity_update_failed" },
       { status: 500 },

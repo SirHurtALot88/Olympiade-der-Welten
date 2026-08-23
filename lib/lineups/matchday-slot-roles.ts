@@ -848,7 +848,21 @@ export const SLOT_ROLE_RESOLVE_SCORING_ENABLED = true;
 // rivalryPressure upstream (applyCaptainRivalryPressureReduction) und damit real diesen Abzug.
 const RIVALRY_RESOLVE_SCORE_DRAG_PER_UNIT = 1;
 
-export function calculateSideSlotRoleModifierTotal(input: {
+/**
+ * Der Seiten-Beitrag der Slot-Rollen — AUFGESCHLUESSELT je Spieler.
+ *
+ * GEMELDET VON CHRIS: „alle boni etc sind doch auf die spieler verteilt und die summe in der
+ * tabelle oben muesste 1:1 dem entsprechen was auch unten ist."
+ *
+ * Genau daran fehlte es. Der Rollen-Modifikator wird PRO SLOT gerechnet (Clutch Shot, Fastbreak
+ * und so weiter, jeweils gegen die Attribute des Spielers), und dann sofort zu einer einzigen
+ * Zahl aufsummiert. Der Aufrufer bekam nur diese Summe und konnte sie deshalb nur noch als
+ * Team-Term obendrauf legen — der Spieler, dessen Rolle den Abzug verursacht hat, trug ihn nicht.
+ *
+ * `rivalryScoreDrag` bleibt bewusst Team-Ebene: das ist EIN gedeckelter Seiten-Abzug unter Push,
+ * kein Spieler-Effekt.
+ */
+export function calculateSideSlotRoleModifierBreakdown(input: {
   disciplineId: string;
   disciplineSide: "d1" | "d2";
   entries: Array<{ playerId: string; slotIndex: number }>;
@@ -858,28 +872,11 @@ export function calculateSideSlotRoleModifierTotal(input: {
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
   requiredPlayers?: number | null;
   rivalryPressure?: number | null;
-}): number {
+}): { byPlayerId: Record<string, number>; rivalryScoreDrag: number; total: number } {
   if (!SLOT_ROLE_RESOLVE_SCORING_ENABLED || input.entries.length === 0) {
-    return 0;
+    return { byPlayerId: {}, rivalryScoreDrag: 0, total: 0 };
   }
 
-  // WIE VIELE SLOTS DIE DISZIPLIN HAT — nicht wie viele davon besetzt sind.
-  //
-  // GEMELDET VON CHRIS: „wenn ich in 5 + 6 Slot die spieler einsetze, sollen sie auch dann starten
-  // auch wenn davor dann alle slots leer sind!"
-  //
-  // Sie starten (die Wertung nimmt alle Eintraege der Seite, nach slotIndex sortiert). Ihre
-  // SLOT-ROLLE konnten sie aber verlieren: faellt `requiredPlayers` weg, war die Rollenliste
-  // vorher auf die Zahl der EINTRAEGE dimensioniert. Bei zwei Eintraegen in den Slots 5 und 6
-  // entstanden also zwei Rollen, und `roles[4]`/`roles[5]` waren `undefined` — beide Spieler
-  // rechneten ohne Rolle. Am Live-Abbild gemessen (Basketball, zwei echte Spieler):
-  //
-  //   Slot 5+6 mit bekannter Slotzahl : -5,1   (clutchshot/fastbreak, ihre echten Rollen)
-  //   Slot 5+6 ohne Slotzahl          :  0     <- die Rollen fielen heraus
-  //
-  // Der hoechste BESETZTE Slot ist die richtige Untergrenze: er sagt, bis wohin die Liste reichen
-  // muss, damit jeder Eintrag seine Rolle findet. Bei einer lueckenlosen Aufstellung 1..n ist
-  // `hoechsterSlot + 1` exakt `entries.length` — dort aendert sich also nichts.
   const hoechsterBesetzterSlot = input.entries.reduce(
     (max, entry) => Math.max(max, Number.isFinite(entry.slotIndex) ? entry.slotIndex : 0),
     0,
@@ -890,7 +887,9 @@ export function calculateSideSlotRoleModifierTotal(input: {
   const rosterById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
   const intensity = input.intensity ?? "normal";
 
-  const roleModifierTotal = input.entries.reduce((sum, entry) => {
+  const byPlayerId: Record<string, number> = {};
+  let roleModifierTotal = 0;
+  for (const entry of input.entries) {
     const role = roles[entry.slotIndex] ?? null;
     const rosterPlayer = rosterById.get(entry.playerId) ?? null;
     const baseScore = scoreByPlayer.get(`${entry.playerId}::${input.disciplineId}`) ?? null;
@@ -903,13 +902,35 @@ export function calculateSideSlotRoleModifierTotal(input: {
       intensity,
       rivalryPressure: input.rivalryPressure ?? 0,
     });
-    return sum + preview.roleModifier;
-  }, 0);
+    // Mehrfach-Eintraege desselben Spielers auf einer Seite gibt es nicht (ein Spieler
+    // steht auf genau einem Slot); addiert wird trotzdem, damit ein solcher Fall nicht
+    // still einen Anteil verschluckt.
+    byPlayerId[entry.playerId] = (byPlayerId[entry.playerId] ?? 0) + preview.roleModifier;
+    roleModifierTotal += preview.roleModifier;
+  }
 
-  // Rivalitaetsdruck wirkt jetzt auch auf den echten Score (nicht nur auf die Lab-Streuung):
-  // einmaliger, gedeckelter Seiten-Abzug unter Push. Default 0 → keine Verhaltensaenderung ohne Rivalen.
   const rivalryPressure = Math.max(0, Math.min(2, input.rivalryPressure ?? 0));
   const rivalryScoreDrag = intensity === "push" ? rivalryPressure * RIVALRY_RESOLVE_SCORE_DRAG_PER_UNIT : 0;
 
-  return Number((roleModifierTotal - rivalryScoreDrag).toFixed(1));
+  return {
+    byPlayerId,
+    rivalryScoreDrag,
+    total: Number((roleModifierTotal - rivalryScoreDrag).toFixed(1)),
+  };
 }
+
+export function calculateSideSlotRoleModifierTotal(input: {
+  disciplineId: string;
+  disciplineSide: "d1" | "d2";
+  entries: Array<{ playerId: string; slotIndex: number }>;
+  rosterPlayers: Array<{ id: string; attributeStats?: PlayerAttributeSheetStats | null }>;
+  disciplineScores: Array<{ playerId: string; disciplineId: string; score: number }>;
+  intensity?: MatchdayIntensityStage;
+  fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
+  requiredPlayers?: number | null;
+  rivalryPressure?: number | null;
+}): number {
+  // Nur noch die Summe der Aufschluesselung — eine zweite Rechnung waere eine zweite Wahrheit.
+  return calculateSideSlotRoleModifierBreakdown(input).total;
+}
+

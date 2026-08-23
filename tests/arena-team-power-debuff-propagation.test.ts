@@ -13,13 +13,17 @@ beforeAll(() => __setTeamPowersEnabledForTests(true));
 afterAll(() => __setTeamPowersEnabledForTests(false));
 
 // Fixture style mirrors tests/legacy-matchday-resolve.test.ts createContext().
-// Per-team suffix appended to d1 player IDs. The score engine adds a small
-// seeded "intensity" jitter that is a TEAM-total-only quantity (never
-// distributed into any player's finalContribution) — a separate, pre-existing
-// quirk unrelated to the team-power-debuff bug under test here. These specific
-// suffixes were brute-forced (see scratch search) so that quirk nets out to
-// zero for these fixtures, letting the tests isolate the debuff-propagation
-// behavior instead of also asserting on that unrelated jitter.
+//
+// Der Suffix je Team stand hier, weil der Intensitaets-Jitter frueher eine reine TEAM-Groesse
+// war, die in KEINEM `finalContribution` auftauchte. Die Suffixe wurden gesucht, bis der Jitter
+// sich je Team zu null aufhebt — nur so liessen sich die Spielerwerte ueberhaupt festnageln.
+//
+// Genau diese Eigenart hat Chris spaeter als „Team"-Aufschlag auf dem letzten Slot gesehen. Sie
+// ist weg: der Wurf gehoert jetzt dem Spieler, der ihn gemacht hat. Die Team-SUMME hebt sich
+// weiterhin auf (deshalb bleiben alle Summen-Zusagen hier unveraendert gueltig), die einzelnen
+// Werte tragen ihn aber sichtbar — 20/10 sind zu 18/12 geworden, zusammen weiter 30.
+//
+// Die Suffixe bleiben, weil die Aufhebung auf Team-Ebene die Rechnungen hier lesbar haelt.
 const ZERO_INTENSITY_SUFFIX: Record<string, number> = {
   "A-A": 54,
   "B-B": 289,
@@ -251,9 +255,12 @@ describe("team power debuff propagation to player level", () => {
     expect(entrySum).toBeCloseTo(beta!.score, 5);
     expect(entrySum).toBe(56);
 
-    // Individual scaled values: 40 * 0.8 = 32, 30 * 0.8 = 24.
+    // Skaliert wird mit 0,8. Vorher standen hier 40 und 30 (also 32 und 24); seit die Spieler
+    // ihren eigenen Intensitaets-Wurf tragen, sind es 39,25 und 30,75 vor der Skalierung.
+    // Die Summe ist dieselbe geblieben — genau darum geht es diesem Test.
     const scores = beta!.entries.map((entry) => entry.finalPlayerScore).sort((left, right) => right - left);
-    expect(scores).toEqual([32, 24]);
+    expect(scores).toEqual([31.4, 24.6]);
+    expect(scores[0]! + scores[1]!).toBe(56);
 
     // topPlayers (the persisted-record source) must reflect the same scaled values.
     const betaTop = d1Preview?.topPlayers.filter((player) => player.teamId === "B-B") ?? [];
@@ -266,8 +273,12 @@ describe("team power debuff propagation to player level", () => {
     const gamma = d1Preview?.teamResults.find((team) => team.teamId === "C-C");
     expect(gamma).toBeTruthy();
 
+    // „Unberuehrt" heisst: KEIN Debuff. Die Werte selbst tragen den eigenen Intensitaets-Wurf
+    // der beiden Spieler (+/-2, in der Summe null) — das ist keine Fremdeinwirkung, sondern
+    // ihre eigene Tagesform. Entscheidend bleibt die Summe und das fehlende Debuff-Warning.
     const scores = gamma!.entries.map((entry) => entry.finalPlayerScore).sort((left, right) => right - left);
-    expect(scores).toEqual([20, 10]);
+    expect(scores).toEqual([18, 12]);
+    expect(scores[0]! + scores[1]!).toBe(30);
     expect(gamma!.warnings.some((warning) => warning.startsWith("team_power_debuff:"))).toBe(false);
   });
 
@@ -287,9 +298,19 @@ describe("team power debuff propagation to player level", () => {
 
     expect(debuffedBeta?.teamPoints).toBe(controlBeta?.teamPoints);
 
+    // Der Debuff skaliert jeden Spielerwert mit demselben Faktor und RUNDET dabei je Spieler auf
+    // eine Nachkommastelle. Solange die Werte glatt waren (40/30 mal 0,8), fiel das nicht auf.
+    // Mit den echten Werten (39,25/30,75) verschiebt die Rundung das Verhaeltnis minimal — bei
+    // 3,47 PP um 0,005. Verglichen wird deshalb auf zwei Nachkommastellen: die Zusage lautet
+    // „der Debuff kostet keine PP", nicht „die Rundung existiert nicht".
     const pointsByPlayerId = (team: typeof debuffedBeta) =>
       Object.fromEntries((team?.entries ?? []).map((entry) => [entry.playerId, entry.pointsAwarded]));
-    expect(pointsByPlayerId(debuffedBeta)).toEqual(pointsByPlayerId(controlBeta));
+    const debuffedPunkte = pointsByPlayerId(debuffedBeta);
+    const kontrollPunkte = pointsByPlayerId(controlBeta);
+    expect(Object.keys(debuffedPunkte)).toEqual(Object.keys(kontrollPunkte));
+    for (const [playerId, punkte] of Object.entries(debuffedPunkte)) {
+      expect(punkte).toBeCloseTo(kontrollPunkte[playerId] as number, 2);
+    }
 
     // Alpha (source, never debuffed) and Gamma (not targeted) are unaffected either way.
     const debuffedAlpha = debuffed.d1Preview?.teamResults.find((team) => team.teamId === "A-A");

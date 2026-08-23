@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     const result = await buildPrizeMoneyPreview({ saveId, seasonId, source, phase, includeSponsorIncome: true });
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Prize preview could not be loaded.";
     return NextResponse.json(
       {

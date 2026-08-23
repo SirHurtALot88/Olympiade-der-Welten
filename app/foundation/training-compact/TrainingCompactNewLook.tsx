@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import SaisonSpotlightCard from "@/app/foundation/training-compact/SaisonSpotlightCard";
 import { getClassColorToken } from "@/app/foundation/classVisuals";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import FoundationPlayerPortraitPreview, {
@@ -70,8 +72,27 @@ import {
 const DEVELOPMENT_FILTERS: Array<{ id: TrainingDevelopmentFilter; label: string; hint: string }> = [
   {
     id: "growth",
-    label: "Upgrade bereit",
-    hint: "Netto-Forecast ≥ +2 SP: Training + Performance übersteigen die Regression deutlich über die Saison. Kein Sofort-Upgrade, sondern die Saisonend-Tendenz.",
+    /*
+     * GEMELDET VON CHRIS (19.08.): „der Filter Upgrade bereit macht keinen Sinn mehr weil es ja
+     * keine Upgrades mehr gibt - bitte entfernen".
+     *
+     * Der NAME war falsch, die Auswahl ist es nicht: der Filter greift auf den Netto-Forecast
+     * (>= +2 SP), und den gibt es unveraendert. Die eigene Kurzbeschreibung sagte das sogar schon
+     * — „Kein Sofort-Upgrade, sondern die Saisonend-Tendenz" —, sie stand nur hinter einem Namen,
+     * der das Gegenteil behauptet.
+     *
+     * Herausgenommen wurde er deshalb NICHT: die vier Filter teilen den Kader ohne Rest auf
+     * (waechst / Risiko / stabil / alle). Ohne diesen haette man keinen Weg mehr, die Aufsteiger
+     * zu sehen — sie verschwaenden in „Alle". Der Name nennt jetzt, was gemeint ist.
+     *
+     * DER NAME IST CHRIS' WAHL (19.08.). Zwei Zweige hatten denselben Filter unabhaengig
+     * umbenannt — „Im Aufwind" und „Waechst" —, und die Merge-Reihenfolge hatte die Frage
+     * zufaellig zugunsten des ersten entschieden. Gefragt, geantwortet: „Waechst". Kuerzer und in
+     * derselben Wortform wie die Nachbarn („Risiko", „Stabil"), die ebenfalls einen Zustand
+     * nennen und keine Bewegung.
+     */
+    label: "Wächst",
+    hint: "Netto-Forecast ≥ +2 SP über die Saison: Training und Performance übersteigen die Regression deutlich. Eine Tendenz zum Saisonende, keine Sofort-Wirkung.",
   },
   {
     id: "regression",
@@ -755,7 +776,7 @@ function NlTrainingPlayerRow({
   // Vertragsform-Kürzel (FL/BL) — dieselbe Ableitung wie die Kaderliste
   // (`formatContractShapeShortLabel`), `null` bei "balanced" (kein Kürzel dort auch).
   const contractShapeShort = formatContractShapeShortLabel(row.economy.contractShape);
-  const isContractExpiring = row.economy.contractLength != null && row.economy.contractLength <= 1;
+  const isContractExpiring = row.economy.contractLength != null && vertragLaeuftAus(row.economy.contractLength);
 
   // Klassen-Vorschlag aus DERSELBEN Rangliste, die die aufgeklappte Zeile zeigt —
   // ein Chip, der der Liste widerspricht, wäre ein Muster-4-Loch.
@@ -1002,6 +1023,7 @@ function NlTrainingPlayerRow({
 
 export default function TrainingCompactNewLook({
   selectedTeam,
+  saisonSpotlight,
   selectedTeamControlMode,
   seasonLabel,
   managementLocked = false,
@@ -1329,6 +1351,10 @@ export default function TrainingCompactNewLook({
         </div>
         {managementLockedReason ? <p className="nl-training-locked">{managementLockedReason}</p> : null}
       </NlCard>
+
+      {/* Saison-Spotlight (`5hcq2p`): der Rueckblick auf die Vorsaison steht oben, weil Chris beim
+          Eintritt in die neue Saison genau hier steht. Ohne Vorsaison rendert die Karte nichts. */}
+      <SaisonSpotlightCard model={saisonSpotlight ?? null} onOpenPlayerDetails={onOpenPlayerDetails} />
 
       <div className="nl-training-filter-row" id="training-development-filters" role="group" aria-label="Entwicklungsfilter">
         {DEVELOPMENT_FILTERS.map((filter) => (

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { runWholeSeasonDryRun } from "@/lib/season/whole-season-dryrun-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type WholeSeasonDryRunBody = {
   saveId?: string;
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
       warnings: result.warnings,
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         success: false,

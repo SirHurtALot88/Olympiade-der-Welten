@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 import FoundationTeamsDetailPanel, {
@@ -10,6 +10,11 @@ import FoundationTeamsNewLook, {
   type FoundationTeamsNewLookProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsNewLook";
 import type { GameState, Player, RosterEntry, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
+import {
+  leseGemerkteIds,
+  normalisiereMerklistenBesitzer,
+  schalteMerkliste,
+} from "@/lib/merkliste/merkliste-service";
 import type { FoundationTableSortState } from "@/lib/foundation/foundation-table-sort";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { DisciplineRankRowInput } from "@/lib/foundation/tabs/teams-view-derivations";
@@ -109,6 +114,14 @@ type FoundationTeamsViewHostProps = Omit<
   /** Ernennt einen Spieler zum Saison-Kapitän (nur eigenes, steuerbares Team). */
   assignTeamCaptainForSelectedTeam?: (playerId: string) => void | Promise<void>;
   assignTeamCaptainBusy?: boolean;
+  /**
+   * Wer gerade spielt — Schluessel der Merkliste (Lesezeichen auf Teams und Spielern).
+   *
+   * MUSS DURCHGEREICHT WERDEN, und das ist keine Formalie: ohne dieses Feld faellt die
+   * Normalisierung auf den Standardbesitzer zurueck, und im Koop schriebe Franky in Chris'
+   * Liste. Nachgemessen war es beim Einbau tatsaechlich nicht dabei.
+   */
+  activeOwnerId?: string | null;
 };
 
 export type { FoundationTeamsViewHostProps };
@@ -148,6 +161,7 @@ export default function FoundationTeamsViewHost({
   showSelectedRosterPpsBreakdown,
   showTeamDisciplines,
   onOpenSeason,
+  activeOwnerId,
   ...panelProps
 }: FoundationTeamsViewHostProps) {
   const {
@@ -283,6 +297,48 @@ export default function FoundationTeamsViewHost({
     showTeamDisciplines,
   });
 
+  /**
+   * MERKLISTE — die Verdrahtung des Lesezeichens.
+   *
+   * KEIN NETZAUFRUF, und das ist Absicht: ein Lesezeichen ist keine Spielaktion, niemand sonst
+   * muss darauf reagieren. Eine Route je Klick wuerde den gemeinsamen Koop-Spielstand bei jedem
+   * Klick fortschreiben und dem Mitspieler eine neue Version unterschieben. Stattdessen aendert
+   * die Ansicht den Spielstand lokal, und der vorhandene Autosave
+   * (`use-foundation-persistence-actions.ts`) nimmt es beim naechsten Schreiben mit.
+   *
+   * DER BESITZER kommt aus `activeOwnerId` der Schale. Fehlt er (Solo ohne Anmeldung), fuehrt
+   * `normalisiereMerklistenBesitzer` ihn auf den Standardbesitzer — dieselbe Zusammenfuehrung,
+   * die verhindert, dass Teamansicht und Arena in zwei getrennte Listen schreiben.
+   */
+  const merklisteSetGameState = (panelProps as { setGameState?: unknown }).setGameState as
+    | ((updater: (current: GameState) => GameState) => void)
+    | undefined;
+  const merklisteOwnerId = normalisiereMerklistenBesitzer(activeOwnerId);
+  const gemerkteTeamIds = useMemo(
+    () => leseGemerkteIds(gameState, merklisteOwnerId, "team"),
+    [gameState, merklisteOwnerId],
+  );
+  const gemerkteSpielerIds = useMemo(
+    () => leseGemerkteIds(gameState, merklisteOwnerId, "spieler"),
+    [gameState, merklisteOwnerId],
+  );
+  const onToggleTeamMerken = useCallback(
+    (teamId: string) => {
+      merklisteSetGameState?.((current) =>
+        schalteMerkliste({ gameState: current, ownerId: merklisteOwnerId, art: "team", id: teamId }).gameState,
+      );
+    },
+    [merklisteSetGameState, merklisteOwnerId],
+  );
+  const onToggleSpielerMerken = useCallback(
+    (playerId: string) => {
+      merklisteSetGameState?.((current) =>
+        schalteMerkliste({ gameState: current, ownerId: merklisteOwnerId, art: "spieler", id: playerId }).gameState,
+      );
+    },
+    [merklisteSetGameState, merklisteOwnerId],
+  );
+
   // "Neuer Look" Gate: nur für die Sub-Tabs "roster"/"portraits" — Verträge
   // und Transfer laufen weiterhin über das bestehende Panel. Flag aus =>
   // exakt der bisherige Render-Pfad (Zeilen darunter unverändert).
@@ -294,6 +350,10 @@ export default function FoundationTeamsViewHost({
         sliceSellValueByPlayerId={(panelProps as { sliceSellValueByPlayerId?: FoundationTeamsNewLookProps["sliceSellValueByPlayerId"] }).sliceSellValueByPlayerId ?? null}
         selectedTeamDetailTab={selectedTeamDetailTab === "portraits" ? "portraits" : "roster"}
         onOpenSeason={onOpenSeason}
+        gemerkteTeamIds={gemerkteTeamIds}
+        onToggleTeamMerken={merklisteSetGameState ? onToggleTeamMerken : undefined}
+        gemerkteSpielerIds={gemerkteSpielerIds}
+        onToggleSpielerMerken={merklisteSetGameState ? onToggleSpielerMerken : undefined}
         sortedTeamsViewRows={sortedTeamsViewRows}
         selectedTeamsHistoryData={selectedTeamsHistoryData}
         fieldRaceRecentForm={
@@ -341,15 +401,6 @@ export default function FoundationTeamsViewHost({
         selectedTeamRosterActionsAvailable={Boolean(panelProps.selectedTeamRosterActionsAvailable)}
         selectedTeamRosterActionHint={
           panelProps.selectedTeamRosterActionHint as FoundationTeamsNewLookProps["selectedTeamRosterActionHint"]
-        }
-        runTeamPicksRefill={
-          panelProps.runTeamPicksRefill as FoundationTeamsNewLookProps["runTeamPicksRefill"]
-        }
-        teamPicksRefillBusyTeamId={
-          panelProps.teamPicksRefillBusyTeamId as FoundationTeamsNewLookProps["teamPicksRefillBusyTeamId"]
-        }
-        teamPicksRefillMessage={
-          panelProps.teamPicksRefillMessage as FoundationTeamsNewLookProps["teamPicksRefillMessage"]
         }
         marketSellBusy={panelProps.marketSellBusy ?? false}
         contractRenewalBusy={panelProps.contractRenewalBusy as FoundationTeamsNewLookProps["contractRenewalBusy"]}

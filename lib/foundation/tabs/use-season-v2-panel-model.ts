@@ -9,9 +9,14 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
-import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import {
+  calculateFacilitySeasonUpkeep,
+  getFacilityLevel,
+  getTeamFacilityState,
+} from "@/lib/facilities/facility-effects";
 import { hasFinalMatchdayBeenPlayed } from "@/lib/season/season-completion-state";
 import { buildTitleRace, type TitleRaceResult } from "@/lib/season/title-race";
 
@@ -28,6 +33,27 @@ export function computeTeamBuildingCost(gameState: GameState, teamId: string): n
     (sum, entry) => sum + calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),
     0,
   );
+}
+
+/**
+ * DIESELBE RECHNUNG, NUR AUFGESCHLUESSELT — je Anlage statt als Summe. Speist den Gebaeude-Hover im
+ * Saisonstand (Chris, 23.08.: „1-4 auf jeden fall direkt umsetzen").
+ *
+ * Bewusst DIREKT NEBEN `computeTeamBuildingCost` und ueber dieselben zwei Funktionen: die Summe des
+ * Hovers muss die Zahl der Spalte ergeben. Eine zweite Herleitung an anderer Stelle waere genau der
+ * Fehler, den die GuV gerade hinter sich hat.
+ */
+export function computeTeamBuildingUpkeepRows(
+  gameState: GameState,
+  teamId: string,
+): Array<{ facilityId: string; label: string; level: number; upkeep: number }> {
+  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  return FACILITY_CATALOG.map((entry) => ({
+    facilityId: entry.facilityId,
+    label: entry.label,
+    level: getFacilityLevel(teamFacilities, entry.facilityId),
+    upkeep: calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities),
+  }));
 }
 
 const SEASON_V2_TOP_PLAYER_LIMIT = 32;
@@ -168,10 +194,25 @@ export function useSeasonV2PanelModel({
               line2: apronProjection.lines.line2,
               frozenLines: apronProjection.frozenLines,
               konjunkturhebel: apronProjection.konjunkturhebel,
+              // Fuer den Erklaertext zum Hebel — ohne ihn nennt der Hover die Drosselung ohne ihre
+              // Ursache (Meldung `6fv43h`).
+              salaryFactor: apronProjection.salaryFactor,
               gedeckelt: apronRow.gedeckelt,
             };
           })(),
           marketValueTotal: row.marketValueTotal ?? null,
+          // Einmal je Zeile, nicht je Mausbewegung — siehe `saisonstand-team-hover.ts`.
+          hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
+          // Die TEILE der Zahlenspalten fuer die Hovers (Chris, 23.08.). Sie stehen im Datensatz
+          // getrennt; gezeigt wurde bisher nur die Summe.
+          sponsorBasis: row.sponsorBasis ?? null,
+          sponsorRank: row.sponsorRank ?? null,
+          sponsorSeason: row.sponsorSeason ?? null,
+          transferBuyCount: row.transferBuyCount ?? null,
+          transferSellCount: row.transferSellCount ?? null,
+          transferBuyTotal: row.transferBuyTotal ?? null,
+          transferSellTotal: row.transferSellTotal ?? null,
+          buildingUpkeep: computeTeamBuildingUpkeepRows(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,

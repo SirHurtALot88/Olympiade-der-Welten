@@ -32,6 +32,35 @@ export type AiBulkTeamWriteScope = {
  * actually assigns Chris vs. Franky vs. AI and is authoritative over `teamControlSettings`, which can
  * lag it — falling back to `gameState.seasonState.teamControlSettings` for local (non-room) saves.
  */
+/**
+ * WELCHE TEAMS EIN MENSCH FUEHRT — egal welcher.
+ *
+ * ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+ * Damit ist "menschlich gefuehrt" keine Besitzfrage mehr, sondern eine Sperre fuer den KI-Kaderlauf
+ * ueberhaupt — auch fuer den Besitzer selbst. Deshalb eine EIGENE Funktion neben
+ * `resolveAiBulkTeamWriteScope`: die beantwortet "wer darf hier schreiben", diese "wo darf die KI
+ * ueberhaupt picken". Beide lesen dieselbe autoritative Quelle (Raum-Besitz, sonst
+ * `teamControlSettings`), damit sie nicht auseinanderlaufen.
+ *
+ * NICHT betroffen ist der Liga-Draft beim Raumstart: der ruft `runAiPicksExecutePreview` direkt als
+ * Dienst auf und schliesst die menschlichen Teams ohnehin ueber `excludeTeamIds` aus.
+ */
+export function getHumanControlledTeamIds(input: Pick<AiBulkTeamWriteScopeInput, "gameState" | "room">): Set<string> {
+  const { gameState, room } = input;
+  return new Set(
+    gameState.teams
+      .map((team) => team.teamId)
+      .filter((teamId) => {
+        if (room) {
+          const ownership = room.state.teamOwnership.find((entry) => entry.teamId === teamId);
+          return ownership?.controllerType === "human";
+        }
+        const settings = getTeamControlSettings(gameState, teamId);
+        return settings?.controlMode === "manual";
+      }),
+  );
+}
+
 export function resolveAiBulkTeamWriteScope(input: AiBulkTeamWriteScopeInput): AiBulkTeamWriteScope {
   const { gameState, room, participant, activeOwnerId } = input;
 

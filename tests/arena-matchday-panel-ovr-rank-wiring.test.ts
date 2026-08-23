@@ -43,8 +43,12 @@ describe("Arena: OVR-Rang für die Spieltags-Wertung", () => {
     // `?? 0` liess `d1Points` nie null werden. Folge: die Spieltags-Wertung zeigte in
     // der Disziplin-Zeile eine 0, die niemand berechnet hatte, und die Aufdeck-Regel
     // `teamResults.some((row) => row.d1Points != null)` konnte gar nicht mehr greifen.
-    expect(ARENA).toContain("const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? null : null;");
-    expect(ARENA).toContain("const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? null : null;");
+    // Seit der Mutator-Korrektur (`vjirth`) laeuft der Wert durch `mitMutator`. Die Aussage ist
+    // dieselbe und wird hier an der Stelle gemessen, an der sie jetzt steht: ein UNBEKANNTER
+    // Platzierungswert bleibt `null` und wird nicht zu „0 plus Aufschlag".
+    expect(ARENA).toContain("punkte == null ? null : Math.round((punkte + aufschlag) * 10) / 10");
+    expect(ARENA).toContain("const d1Points = d1 ? mitMutator(d1PointsByTeam.get(r.teamId), mutator?.d1Pp ?? 0) : null;");
+    expect(ARENA).toContain("const d2Points = d2 ? mitMutator(d2PointsByTeam.get(r.teamId), mutator?.d2Pp ?? 0) : null;");
     // Die Spieltags-Summe bleibt eine Zahl — dort ist "unbekannt" als 0 richtig,
     // weil sie ueber beide Disziplinen aufaddiert.
     expect(ARENA).toContain("totalPoints: (d1Points ?? 0) + (d2Points ?? 0),");

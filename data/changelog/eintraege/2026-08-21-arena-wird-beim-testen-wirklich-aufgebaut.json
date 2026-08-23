@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-21",
+  "seite": "Technik",
+  "text": "Die Spieltags-Bühne wird bei jeder Änderung ab jetzt wirklich aufgebaut, bevor etwas ins Spiel darf. Bisher gab es 27 Tests, die sie erwähnten — aber keinen einzigen, der sie tatsächlich zusammensetzte; alle lasen nur ihren Quelltext oder prüften die Logik daneben. Genau daran lag der Absturz im August: die neue Kauffenster-Ansage rechnete beim Aufbauen und flog dabei auf die Nase, was kein Test der Welt bemerken kann, solange niemand aufbaut. Geprüft werden drei echte Lagen — neue Saison mit offenem Kauffenster, gewerteter Spieltag, Saisonende. Der Test hängt sich von selbst in den Pflicht-Prüflauf ein.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

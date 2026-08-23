@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Transfermarkt · KI",
+  "text": "Für Spielstände, in denen der Kauflauf schon abgebrochen ist, gibt es jetzt einen Reparaturlauf. Die Code-Korrektur wirkt erst beim nächsten Kauffenster — ein laufender Spielstand behält die halb gefüllten Kader also, bis jemand nachhilft. Der Reparaturlauf holt genau diesen einen Lauf nach, und zwar über denselben Weg, den das Spiel selbst nimmt: keine zweite Kauflogik, es gelten unverändert Kasse, Gehaltsdecke, Identität und Kaderziele. Ohne Schalter gibt es nur einen Bericht, wer wie weit unter seinem Ziel steht; erst mit --apply wird gekauft, und davor wird gesichert. Menschlich gesteuerte Teams bleiben außen vor. Am echten Spielstand gemessen füllt er 43 Spieler bei 19 Teams nach und meldet ehrlich, welche Teams danach noch offen sind, weil ihnen schlicht das Geld ausgegangen ist.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

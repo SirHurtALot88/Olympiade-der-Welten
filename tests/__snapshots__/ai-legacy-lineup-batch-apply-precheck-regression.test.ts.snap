@@ -30,8 +30,8 @@ exports[`applyAiLegacyLineupBatchLocally bleibt nach der Perf-Vorpruefung ergebn
       "aiEligible": true,
       "blockingReasons": [],
       "captainDecisions": [
-        "Captain opportunistisch gesetzt: Broodmother (Wert 43.0 >= Hürde 30.8, Rang 10, 14% der Seite, Gewicht 1.10)",
-        "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 10, Cloud Strife +31.2 Rohpunkte)",
+        "Captain opportunistisch gesetzt: Broodmother (Wert 44.2 >= Hürde 30.8, Rang 10, 14% der Seite, Gewicht 1.13)",
+        "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 10, Cloud Strife +31.3 Rohpunkte)",
       ],
       "captainSlotsRemaining": 2,
       "captainSlotsUsed": 0,
@@ -130,7 +130,7 @@ exports[`applyAiLegacyLineupBatchLocally bleibt nach der Perf-Vorpruefung ergebn
       "blockingReasons": [],
       "captainDecisions": [
         "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 20, Boulderclash +27.3 Rohpunkte)",
-        "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 21, Valeria Bloodfang +22.8 Rohpunkte)",
+        "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 21, Valeria Bloodfang +22.9 Rohpunkte)",
       ],
       "captainSlotsRemaining": 3,
       "captainSlotsUsed": 0,
@@ -659,10 +659,10 @@ exports[`applyAiLegacyLineupBatchLocally bleibt nach der Perf-Vorpruefung ergebn
       "ai_lineup_apply_disabled",
     ],
     "captainDecisions": [
-      "Captain opportunistisch gesetzt: Broodmother (Wert 43.0 >= Hürde 30.8, Rang 10, 14% der Seite, Gewicht 1.10)",
-      "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 10, Cloud Strife +31.2 Rohpunkte)",
+      "Captain opportunistisch gesetzt: Broodmother (Wert 44.2 >= Hürde 30.8, Rang 10, 14% der Seite, Gewicht 1.13)",
+      "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 10, Cloud Strife +31.3 Rohpunkte)",
       "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 20, Boulderclash +27.3 Rohpunkte)",
-      "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 21, Valeria Bloodfang +22.8 Rohpunkte)",
+      "Captain gespart: negative Formkarte auf dieser Diszi — der Bonus wäre dort verschenkt (Rang 21, Valeria Bloodfang +22.9 Rohpunkte)",
     ],
     "existingLineups": 27,
     "formCardsSelected": 3,

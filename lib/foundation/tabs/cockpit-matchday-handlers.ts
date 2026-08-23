@@ -1,3 +1,4 @@
+import { leseAntwortAlsJson } from "@/lib/foundation/antwort-als-json";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
@@ -172,7 +173,7 @@ export function createCockpitMatchdayApplyHandlers(
         if (!response.ok) {
           return;
         }
-        const payload = (await response.json()) as { skipped?: boolean; summary?: { savedTeams?: number } };
+        const payload = (await leseAntwortAlsJson(response)) as { skipped?: boolean; summary?: { savedTeams?: number } };
         if (payload.skipped || !payload.summary?.savedTeams) {
           return;
         }
@@ -210,7 +211,7 @@ export function createCockpitMatchdayApplyHandlers(
           forceReplace: matchdayMvpForceReplaceExisting,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = (await leseAntwortAlsJson(response)) as {
         success?: boolean;
         summary?: FoundationMatchdayMvpScoringResponse;
         error?: string;
@@ -285,7 +286,7 @@ export function createCockpitMatchdayApplyHandlers(
           }),
         ),
       });
-      const payload = (await response.json()) as FoundationApplySummary;
+      const payload = (await leseAntwortAlsJson(response)) as FoundationApplySummary;
       setResultApplyFeed(payload);
       if (execute && response.ok && payload.applied) {
         await Promise.all([reloadResolvePreview(), reloadStandingsPreviewFeed()]);
@@ -332,7 +333,7 @@ export function createCockpitMatchdayApplyHandlers(
           }),
         ),
       });
-      const payload = (await response.json()) as FoundationApplySummary;
+      const payload = (await leseAntwortAlsJson(response)) as FoundationApplySummary;
       setStandingsApplyFeed(payload);
       if (execute && response.ok && payload.applied) {
         await reloadLiveSeasonState("manual_apply");
@@ -367,7 +368,7 @@ export function createCockpitMatchdayApplyHandlers(
           }),
         ),
       });
-      const payload = (await response.json()) as FoundationApplySummary;
+      const payload = (await leseAntwortAlsJson(response)) as FoundationApplySummary;
       setCashApplyFeed(payload);
       if (execute && response.ok && payload.applied) {
         await Promise.all([loadSave(activeSaveId), reloadPrizePreviewFeed(), reloadStandingsPreviewFeed()]);
@@ -401,7 +402,7 @@ export function createCockpitMatchdayApplyHandlers(
           }),
         ),
       });
-      const payload = (await response.json()) as FoundationApplySummary;
+      const payload = (await leseAntwortAlsJson(response)) as FoundationApplySummary;
       setMatchdayAdvanceFeed(payload);
       if (execute && response.ok && payload.applied) {
         invalidateMatchdayArenaSessionCache({
@@ -492,7 +493,7 @@ export function createCockpitMatchdayApplyHandlers(
           }),
         ),
       });
-      const payload = (await response.json()) as {
+      const payload = (await leseAntwortAlsJson(response)) as {
         success?: boolean;
         summary?: FoundationMatchdayAutoRunSummary;
       };

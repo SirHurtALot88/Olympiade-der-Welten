@@ -80,7 +80,16 @@ function setUpRoom(suffix: string) {
   if (!chris || !franky) {
     throw new Error("expected both participants");
   }
-  return { saveId, roomCode: created.room.roomCode, chris, franky };
+  // Das Sitz-Token gehoert an den Teilnehmer, weil es im echten Client untrennbar dazugehoert:
+  // `resolveFoundationRoomContext` (lib/room/foundation-room-context-client.ts) liefert GAR KEINEN
+  // Kontext ohne Token, und `buildRoomWriteBody` schickt es in jeder Anfrage mit. Ein Test, der nur
+  // `participantId` schickt, prueft damit einen Fall, den es in der Anwendung nicht gibt.
+  return {
+    saveId,
+    roomCode: created.room.roomCode,
+    chris: { ...chris, seatToken: created.seat.seatToken },
+    franky: { ...franky, seatToken: joined.seat.seatToken },
+  };
 }
 
 describe("training api guard", () => {
@@ -116,6 +125,7 @@ describe("training api guard", () => {
           roomCode,
           participantId: chris.participantId,
           userId: chris.userId,
+          seatToken: chris.seatToken,
         }),
       }),
     );
@@ -153,6 +163,7 @@ describe("training api guard", () => {
           roomCode,
           participantId: chris.participantId,
           userId: chris.userId,
+          seatToken: chris.seatToken,
         }),
       }),
     );
@@ -179,6 +190,7 @@ describe("training api guard", () => {
           roomCode,
           participantId: franky.participantId,
           userId: franky.userId,
+          seatToken: franky.seatToken,
         }),
       }),
     );
@@ -205,6 +217,7 @@ describe("training api guard", () => {
           roomCode,
           participantId: chris.participantId,
           userId: chris.userId,
+          seatToken: chris.seatToken,
         }),
       }),
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   NlCard,
@@ -165,6 +165,37 @@ const NL_LEADERS_PENDING_SLOT_CONFIG: Record<string, { ring: ReactNode; label: s
   mostImproved: { ring: "MI", label: "Most Improved" },
 };
 
+/**
+ * WIE DIE KATEGORIE ZUSTANDE KOMMT — in einem Satz, am Kopf jeder Karte.
+ *
+ * CHRIS (Ticket #41): „Wir brauchen noch eine erklärung wie Most Improved Player sich
+ * zusammensetzt!"
+ *
+ * Die Frage stellt sich bei jeder Kategorie, nicht nur bei dieser. „Most Improved" ist nur die
+ * auffaelligste, weil ihr Ergebnis am wenigsten vorhersagbar ist: der Sieger hat oft weder den
+ * hoechsten OVR noch die meisten Punkte. Eine Rangliste, deren Regel man nicht kennt, liest sich
+ * wie eine Behauptung.
+ *
+ * Der Text ist die KURZFASSUNG der Rechnung, nicht eine zweite Rechnung. Die Herleitung steht
+ * jeweils dort, wo gerechnet wird — fuer Most Improved ausfuehrlich in
+ * `lib/foundation/most-improved-service.ts`.
+ */
+const NL_LEADERS_ERKLAERUNG: Record<string, string> = {
+  pps: "Summe aller Player-Points der Saison — der Anteil des Spielers an den Punkten seines Teams.",
+  pow: "Player-Points, die der Spieler in Power-Disziplinen geholt hat.",
+  spe: "Player-Points aus Speed-Disziplinen.",
+  men: "Player-Points aus Mental-Disziplinen.",
+  soc: "Player-Points aus Social-Disziplinen.",
+  mvs: "Marktwert-Score: der Marktwert des Spielers, umgerechnet auf eine ligaweit vergleichbare Skala.",
+  ovr: "Gesamtstärke aus allen Attributen, normalisiert über die ganze Liga.",
+  training: "Attributpunkte, die der Spieler in der Saisonende-Entwicklung dazugewonnen hat.",
+  mostImproved:
+    "Sprung der Feldposition: mittlere Platzierung der zweiten Saisonhälfte minus erste. " +
+    "Die Feldposition (0–100) macht Disziplinen mit verschieden großen Feldern vergleichbar. " +
+    "Gewertet wird nur, wer in BEIDEN Hälften mindestens dreimal angetreten ist — ohne Startwert " +
+    "gibt es keine Verbesserung zu messen.",
+};
+
 function getLeaderInitials(name: string): string {
   return (
     name
@@ -266,6 +297,117 @@ const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = 
   { id: "legends", label: "🏆 Legendäre Spieler" },
   { id: "achievements", label: "Erfolge" },
 ];
+
+/**
+ * DIE HERLEITUNG HINTER „MOST IMPROVED" — als Hover.
+ *
+ * GEBETEN VON CHRIS (`pxoa72`): „Wir brauchen noch eine erklärung wie Most Improved Player sich
+ * zusammensetzt!" Die Quittung hielt bis heute fest, warum nichts gebaut wurde: das gewuenschte
+ * Award-System ist ein eigenes Vorhaben, und die Erklaerung haenge daran, dass die Formel
+ * festgeschrieben wird.
+ *
+ * DIE FORMEL IST LAENGST FESTGESCHRIEBEN — in `lib/foundation/most-improved-service.ts`, samt
+ * Begruendung, warum sie den Leistungs-TREND misst und nicht den Attribut-Zuwachs (zum Zeitpunkt
+ * der Ehrung hat noch niemand etwas dazugewonnen: der Award faellt in `season_rewards`, die
+ * Entwicklung laeuft erst in `player_development`). Gerechnet wurde die Herleitung immer schon;
+ * sie wurde nur auf dem Weg in die Ansicht weggeworfen. Dieses Hover zeigt sie.
+ *
+ * Das Award-System mit Icons im Spielerprofil bleibt ein eigenes Vorhaben — hier steht die
+ * Erklaerung, um die Chris ausdruecklich gebeten hat, nicht mehr.
+ */
+function LeadersHover({
+  panelId,
+  ariaLabel,
+  panel,
+  children,
+}: {
+  panelId: string;
+  ariaLabel: string;
+  panel: ReactNode | null;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  if (!panel) return <>{children}</>;
+  const cancel = () => {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  return (
+    <span
+      className="nl-teams-rank-portal"
+      onMouseEnter={() => {
+        cancel();
+        setOpen(true);
+      }}
+      onMouseLeave={() => {
+        cancel();
+        closeTimer.current = setTimeout(() => setOpen(false), 90);
+      }}
+      onFocus={() => {
+        cancel();
+        setOpen(true);
+      }}
+      onBlur={() => {
+        cancel();
+        setOpen(false);
+      }}
+    >
+      {children}
+      <div id={panelId} role="dialog" aria-label={ariaLabel} className="nl-teams-rank-preview" hidden={!open}>
+        {panel}
+      </div>
+    </span>
+  );
+}
+
+/** Das Panel: Feldposition erste Haelfte -> zweite Haelfte, mit Auftritten je Haelfte. */
+function renderMostImprovedPanel(entry: {
+  name: string;
+  displayValue: string;
+  mostImproved?: {
+    earlyFieldPosition: number | null;
+    lateFieldPosition: number | null;
+    earlyAppearances: number | null;
+    lateAppearances: number | null;
+  } | null;
+}): ReactNode {
+  const herleitung = entry.mostImproved;
+  if (!herleitung || herleitung.earlyFieldPosition == null || herleitung.lateFieldPosition == null) {
+    return null;
+  }
+  const zeile = (label: string, wert: number | null, auftritte: number | null) => (
+    <div className="nl-standings-hover-postenrow" key={label}>
+      <span>
+        {label}
+        {auftritte != null ? (
+          <span className="nl-standings-hover-years">{auftritte} Auftritte</span>
+        ) : null}
+      </span>
+      <span className="nl-tnum">{wert == null ? "—" : formatNlNumber(wert, 1)}</span>
+    </div>
+  );
+  return (
+    <>
+      <span className="nl-teams-rank-preview-title">So kommt die Zahl zustande — {entry.name}</span>
+      <div className="nl-standings-hover-posten">
+        {zeile("Feldposition 1. Saisonhälfte", herleitung.earlyFieldPosition, herleitung.earlyAppearances)}
+        {zeile("Feldposition 2. Saisonhälfte", herleitung.lateFieldPosition, herleitung.lateAppearances)}
+        <div className="nl-standings-hover-postenrow is-result">
+          <span>Veränderung</span>
+          <span className="nl-tnum">{entry.displayValue}</span>
+        </div>
+      </div>
+      <span className="nl-standings-hover-meta">
+        Feldposition 0–100 misst den Platz im Feld der jeweiligen Disziplin an diesem Spieltag
+        (100 = Feldbester) und ist damit zwischen Disziplinen vergleichbar. Gewertet wird nur, wer in
+        BEIDEN Hälften genug Auftritte hat.
+      </span>
+    </>
+  );
+}
 
 export default function LeagueLeadersNewLook({
   categories,
@@ -537,8 +679,20 @@ export default function LeagueLeadersNewLook({
               data-testid={`league-leaders-card-${category.id}`}
             >
               <header className="nl-leaders-card-head">
-                <span className="nl-leaders-card-label">{category.label}</span>
+                {/* Die Regel steht am Titel, nicht in einer Fussnote: gefragt wird sie genau
+                    hier, beim Blick auf den Sieger. */}
+                <span className="nl-leaders-card-label" title={NL_LEADERS_ERKLAERUNG[category.id] ?? undefined}>
+                  {category.label}
+                  {NL_LEADERS_ERKLAERUNG[category.id] ? (
+                    <span className="nl-leaders-card-info" aria-hidden="true">
+                      ?
+                    </span>
+                  ) : null}
+                </span>
               </header>
+              {NL_LEADERS_ERKLAERUNG[category.id] ? (
+                <p className="nl-leaders-card-rule">{NL_LEADERS_ERKLAERUNG[category.id]}</p>
+              ) : null}
 
               {hasData && leader ? (
                 <button
@@ -560,7 +714,13 @@ export default function LeagueLeadersNewLook({
                     </span>
                     <span className="nl-leaders-hero-team">{leader.teamCode ?? leader.teamName}</span>
                   </span>
-                  <span className="nl-leaders-hero-value nl-tnum">{leader.displayValue}</span>
+                  <LeadersHover
+                    panelId={`nl-leaders-mi-hero-${category.id}`}
+                    ariaLabel={`Herleitung ${leader.name}`}
+                    panel={category.id === "mostImproved" ? renderMostImprovedPanel(leader) : null}
+                  >
+                    <span className="nl-leaders-hero-value nl-tnum">{leader.displayValue}</span>
+                  </LeadersHover>
                 </button>
               ) : null}
 
@@ -590,12 +750,18 @@ export default function LeagueLeadersNewLook({
                         <strong>{entry.name}</strong>
                         <small>{entry.teamCode ?? entry.teamName}</small>
                       </span>
+                      <LeadersHover
+                        panelId={`nl-leaders-mi-${category.id}-${entry.playerId}`}
+                        ariaLabel={`Herleitung ${entry.name}`}
+                        panel={category.id === "mostImproved" ? renderMostImprovedPanel(entry) : null}
+                      >
                       <span
                         className="nl-leaders-row-value nl-tnum"
                         title={`${formatNlNumber(entry.value, 1)} von ${formatNlNumber(topValue, 1)} (Leader)`}
                       >
                         {entry.displayValue}
                       </span>
+                      </LeadersHover>
                     </button>
                   ))}
                 </div>

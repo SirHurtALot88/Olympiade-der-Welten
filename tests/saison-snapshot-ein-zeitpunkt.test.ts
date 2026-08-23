@@ -113,12 +113,8 @@ describe("Saison-Snapshot · die Historie liest den eingefrorenen Stand", () => 
     expect(historyReader).toMatch(/marketValueSeasonEnd \?\?\s*teamEintrag\.marketValueTotalEnd/);
   });
 
-  it("liest Cash dagegen als Eintrittsstand der Folgesaison", () => {
-    // BEWUSSTE AUSNAHME, gemeldet an L-K: `cashSeasonEnd`/`cashEnd` ist der Stand am
-    // Saisonende — bei `cashEnd` sogar NACH der Verkaufsphase, also die Spitze direkt nach
-    // dem Ausverkauf (L-K: 137,4 statt der 9,4, die das Team vorher hatte). Die Historie
-    // zeigt deshalb `cashEntry`, dasselbe Feld wie die Ewige Tabelle: das Geld, mit dem das
-    // Team wirklich losgespielt hat.
+  it("liest Cash in der HISTORIE als Eintrittsstand der Folgesaison", () => {
+    // Die Historie zeigt `cashEntry`: das Geld, mit dem das Team wirklich losgespielt hat.
     // `cashCarryOver` darf dazwischenstehen (Kontostand an der Saisongrenze, nach der
     // Vertragsalterung und vor den Kaeufen) — was hier festgehalten wird, ist: `cashEntry` ZUERST,
     // und der Saisonend-Stand erst als Rueckfall dahinter.
@@ -126,7 +122,24 @@ describe("Saison-Snapshot · die Historie liest den eingefrorenen Stand", () => 
       /cashEntry \?\?\s*(?:teamSnapshot\.cashCarryOver \?\?\s*)?teamSnapshot\.cashSeasonEnd|cashEntry \?\?\s*(?:teamEintrag\.cashCarryOver \?\?\s*)?teamEintrag\.cashSeasonEnd/g,
     );
     expect(treffer?.length).toBe(2);
-    expect(allTimeReader).toMatch(/cash: record\.cashEntry \?\? (?:record\.cashCarryOver \?\? )?record\.cashEnd/);
+  });
+
+  /**
+   * DIE EWIGE TABELLE ANTWORTET SEIT DEM 22.08. AUF EINE ANDERE FRAGE — und das ist Absicht.
+   *
+   * Chris' Entscheidung: „ewige tabelle immer zum ende der saison speichern also in Season 2 sehe
+   * ich dort Season 1 ergebnisse." Eine EWIGE Tabelle sagt, was eine Saison gebracht hat; die
+   * Historie sagt, womit das Team weiterspielte. Zwei Fragen, zwei Felder — beide im Snapshot.
+   *
+   * `cashEnd` waere in BEIDEN falsch: es traegt den Stand NACH den Verkaeufen (an `1hf25q`
+   * gemessen bei `L-K` 137,4 statt 25,6 beim Eintritt). Der Wert, den Chris meint, ist
+   * `cashSeasonEnd` — Ende `player_development`, also nach Sponsorgeld und Gehaltsabzug und vor
+   * dem ersten Verkauf (olyDataTypes.ts:2654, season-transition-service.ts:112).
+   */
+  it("liest Cash in der EWIGEN TABELLE als Saisonende VOR den Verkaeufen", () => {
+    expect(allTimeReader).toMatch(/cash:\s*record\.cashSeasonEnd \?\? record\.cashCarryOver/);
+    // Der Stand nach dem Ausverkauf darf dort nicht vorn stehen.
+    expect(allTimeReader).not.toMatch(/cash:\s*record\.cashEnd/);
   });
 
   it("behält die Rückfallkette für Altsaisons ohne Freeze", () => {

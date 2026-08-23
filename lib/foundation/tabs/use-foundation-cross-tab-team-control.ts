@@ -154,17 +154,26 @@ export function useFoundationCrossTabTeamControl(input: {
     });
   }, [input.gameState.teams, resolvedTeamControlSettings]);
   const ownerQuickSwitchTeams = useMemo(() => {
+    // Stufe 2.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, gleicher Befund wie an `canManageTeamId` in
+    // use-foundation-shell-router-body-scope.tsx): hier stand bis eben zusaetzlich ein
+    // bedingungsloser Merge mit `localUserManualTeams` -- Chris' eigene Teams landeten damit in
+    // JEDEM Owner-Quick-Switch, auch in Frankys, unabhaengig von `effectiveActiveOwnerId`.
+    // `foundationManageableTeamIds` (unten) haengt direkt an dieser Liste, der Leck reichte also
+    // bis in die tatsaechliche Verwaltbarkeits-Pruefung durch.
+    //
+    // `filterTeamsByControlScope(..., "my_teams", activeOwnerId)` (unten) ist bereits exakt die
+    // Owner-Gleichheit, die der Server prueft (`getTeamOwner(settings) === activeOwnerId`,
+    // dieselbe Funktion wie in `canOwnerManageTeam`) -- fuer Chris selbst liefert sie seine eigenen
+    // Teams schon korrekt, sobald `effectiveActiveOwnerId` stimmt (Punkt 1 dieses Auftrags). Der
+    // Merge war damit fuer Chris redundant und fuer Franky falsch.
     const ownerTeams = filterTeamsByControlScope(
       input.gameState.teams,
       resolvedTeamControlSettings,
       "my_teams",
       effectiveActiveOwnerId,
     );
-    const merged = [...ownerTeams, ...localUserManualTeams].filter(
-      (team, index, teams) => teams.findIndex((entry) => entry.teamId === team.teamId) === index,
-    );
-    return merged.length ? merged : manualTeams;
-  }, [effectiveActiveOwnerId, localUserManualTeams, manualTeams, resolvedTeamControlSettings]);
+    return ownerTeams.length ? ownerTeams : manualTeams;
+  }, [effectiveActiveOwnerId, manualTeams, resolvedTeamControlSettings]);
   const foundationManageableTeamIds = useMemo(
     () =>
       resolveFoundationManageableTeamIds(

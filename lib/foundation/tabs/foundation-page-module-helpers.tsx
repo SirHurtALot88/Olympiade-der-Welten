@@ -72,6 +72,7 @@ import {
   FOUNDATION_TABLE_PREFERENCES_STORAGE_KEY,
   FOUNDATION_TEAM_FILTER_STORAGE_KEY,
 } from "@/lib/foundation/tabs/foundation-page-types";
+import { readFoundationRoomContextFromLocation } from "@/lib/room/foundation-room-context-client";
 
 export function loadFoundationTablePreferences(): PersistedFoundationTablePreferences {
   if (typeof window === "undefined") {
@@ -310,7 +311,11 @@ export function resolveFoundationPanelScrollTarget(input: {
     return "team-focus-roster";
   }
   if (input.panel === "formcards") {
-    return "foundation-lineup";
+    // Das Aufstellungs-Panel traegt `data-testid="foundation-lineup"`, aber `id="foundation-lineup-v2"`
+    // (FoundationLineupPanel.tsx:27-31). Hier stand der Testid-Name — `getElementById` fand also nie
+    // etwas, und der Sprung fiel still aus. Genau die Verwechslung, die der Kommentar weiter unten
+    // fuer "season-review" und "team-sponsor-choice" schon beschreibt.
+    return "foundation-lineup-v2";
   }
   if (input.panel === "training-plan") {
     // Der Trainingsplan lebt im Training-Tab (trainingCompact), nicht im
@@ -352,25 +357,123 @@ export function resolveFoundationPanelScrollTarget(input: {
     // aeltere Spielstaende mit gespeicherten Links laufen nicht ins Leere.
     return "foundation-matchday-arena";
   }
-  return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home";
+  /*
+   * DER RUECKFALL MUSS EXISTIEREN, sonst ist er keiner.
+   *
+   * Hier stand "foundation-home". Ein Element dieses Namens gibt es nicht — die Startseite traegt
+   * `id="foundation-home-v2"` (HomeV2NewLook.tsx:432, FoundationHomeV2Panel.tsx:35). Jeder Sprung
+   * ohne eigene Zuordnung landete damit bei `getElementById(null)` und fiel still aus.
+   */
+  return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home-v2";
 }
+
+/**
+ * WIE LANGE AUF DAS SPRUNGZIEL GEWARTET WIRD.
+ *
+ * Hier stand eine feste Wartezeit von 90 ms, und genau daran ist der Sprung des Weiter-Knopfes
+ * am Saisonende gescheitert. GEMESSEN am echten Spielstand (Season 1, Spieltag 10):
+ *
+ *   Scroller feuert bei          90 ms
+ *   `#season-finale` vorhanden   nein
+ *   Element erstmals im DOM      2972 ms
+ *   Scrollposition danach        0
+ *
+ * `getElementById` lieferte `null`, die Funktion brach STILL ab, und das Ziel kam knapp drei
+ * Sekunden spaeter an. Von aussen sah das aus wie ein toter Knopf: der Spieler drueckt Weiter,
+ * die Ansicht wechselt, sonst passiert nichts — und weil der Knopf danach unveraendert
+ * "Season vorbereiten" sagt, drueckt er noch einmal. Und noch einmal.
+ *
+ * WARUM NICHT EINFACH 90 AUF 3000 HOCHDREHEN: das waere dieselbe Wette auf eine Zahl, nur mit
+ * anderem Einsatz. Eine schwerere Ansicht, ein langsamerer Rechner, ein groesserer Spielstand —
+ * und der Sprung ist wieder still tot. Gewartet wird deshalb auf das ELEMENT, nicht auf die Uhr;
+ * die Frist ist nur die Reissleine.
+ */
+export const FOUNDATION_JUMP_DEADLINE_MS = 4000;
+
+/** Wie oft nachgesehen wird, solange das Ziel fehlt. Ein Frame-Takt reicht und kostet nichts. */
+export const FOUNDATION_JUMP_POLL_MS = 60;
+
+export type FoundationJumpErgebnis<T> = { gefunden: T } | { gefunden: null; verstrichenMs: number };
+
+/**
+ * SUCHT EIN SPRUNGZIEL, BIS ES DA IST — ohne DOM pruefbar.
+ *
+ * Absichtlich von `scrollToFoundationTarget` getrennt: die Wartelogik ist der Teil, der kaputt
+ * war, und mit `document`/`window` fest verdrahtet waere sie in der Node-Testumgebung dieses
+ * Projekts nicht nachstellbar. Ein Fehler, den man nicht rot bekommt, kommt wieder.
+ */
+export function warteAufSprungziel<T>(input: {
+  suche: () => T | null;
+  jetzt: () => number;
+  planeErneut: (rueckruf: () => void, verzoegerungMs: number) => void;
+  fertig: (ergebnis: FoundationJumpErgebnis<T>) => void;
+  abgebrochen?: () => boolean;
+  fristMs?: number;
+  taktMs?: number;
+}) {
+  const frist = input.fristMs ?? FOUNDATION_JUMP_DEADLINE_MS;
+  const takt = input.taktMs ?? FOUNDATION_JUMP_POLL_MS;
+  const start = input.jetzt();
+
+  const versuch = () => {
+    if (input.abgebrochen?.()) {
+      return;
+    }
+    const treffer = input.suche();
+    if (treffer) {
+      input.fertig({ gefunden: treffer });
+      return;
+    }
+    const verstrichenMs = input.jetzt() - start;
+    if (verstrichenMs >= frist) {
+      input.fertig({ gefunden: null, verstrichenMs });
+      return;
+    }
+    input.planeErneut(versuch, takt);
+  };
+
+  versuch();
+}
+
+/**
+ * Laeuft ein Sprung noch, wenn der naechste ausgeloest wird, wuerde der alte den neuen
+ * ueberschreiben, sobald sein Ziel auftaucht. Der Zaehler macht jeden Sprung eindeutig.
+ */
+let laufenderSprung = 0;
 
 export function scrollToFoundationTarget(targetId: string | null | undefined) {
   if (!targetId || typeof window === "undefined") {
     return;
   }
-  window.setTimeout(() => {
-    const target = document.getElementById(targetId);
-    if (!target) {
-      return;
-    }
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-    target.classList.remove("foundation-jump-target");
-    window.requestAnimationFrame(() => {
-      target.classList.add("foundation-jump-target");
-      window.setTimeout(() => target.classList.remove("foundation-jump-target"), 1400);
-    });
-  }, 90);
+  laufenderSprung += 1;
+  const meiner = laufenderSprung;
+
+  warteAufSprungziel<HTMLElement>({
+    suche: () => document.getElementById(targetId),
+    jetzt: () => Date.now(),
+    planeErneut: (rueckruf, verzoegerungMs) => window.setTimeout(rueckruf, verzoegerungMs),
+    abgebrochen: () => meiner !== laufenderSprung,
+    fertig: (ergebnis) => {
+      if (!ergebnis.gefunden) {
+        /*
+         * Ein Ziel, das nach der Frist nicht existiert, ist ein Verdrahtungsfehler — kein
+         * Zustand, den der Spieler herbeifuehren kann. Vorher verschwand er spurlos; jetzt
+         * steht er wenigstens in der Konsole, wenn er das naechste Mal auftritt.
+         */
+        console.warn(
+          `[foundation] Sprungziel "${targetId}" ist nach ${ergebnis.verstrichenMs} ms nicht im DOM — der Sprung faellt aus.`,
+        );
+        return;
+      }
+      const target = ergebnis.gefunden;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.classList.remove("foundation-jump-target");
+      window.requestAnimationFrame(() => {
+        target.classList.add("foundation-jump-target");
+        window.setTimeout(() => target.classList.remove("foundation-jump-target"), 1400);
+      });
+    },
+  });
 }
 
 export function buildPlayerProfileHydrationSuccessKey(seasonId: string, playerId: string) {
@@ -564,6 +667,43 @@ export function readStoredFoundationActiveOwnerId() {
   } catch {
     return DEFAULT_ACTIVE_OWNER_ID;
   }
+}
+
+/**
+ * BEFUND (Auftrag: "in Frankys Browser haelt sich die Oberflaeche fuer Chris"): der `useState`-
+ * Initializer fuer `activeOwnerId` (use-foundation-page-state.ts) fragte bislang NUR
+ * `initialActiveOwnerId` (die Sitzung — ohne Login immer leer, Login ist standardmaessig AUS,
+ * siehe CLAUDE.md/docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md „Entscheidungen") und danach direkt den
+ * lokalen Speicher, der ohne eigenen Eintrag auf `DEFAULT_ACTIVE_OWNER_ID` ("Chris") faellt. Ein
+ * per `/room/CODE` beigetretener Franky bekam so IMMER Chris' Owner-ID — der Raum-Kontext wurde
+ * nie befragt.
+ *
+ * RANGFOLGE HIER: Sitzung (Login an) → Raum-Kontext (`ownerId` aus der URL, von
+ * `RoomPageClient.tsx` aus der Sitzrolle abgeleitet — siehe `resolveRoomParticipantActiveOwnerId`,
+ * lib/room/online-room-model.ts) → lokaler Speicher → Standard. Der Raum-Kontext steht bewusst VOR
+ * dem lokalen Speicher: ein alter Wert aus einer frueheren Sitzung in DIESEM Browser darf einen
+ * frisch aufgeloesten Raum-Wert nicht ueberschreiben, sonst haengt Franky im naechsten Raum wieder
+ * an Chris' altem Eintrag fest.
+ *
+ * NUR ANZEIGE, NIE BERECHTIGUNG: siehe die Kommentare an `FoundationRoomContext.ownerId`
+ * (foundation-room-context-client.ts) und `resolveRoomParticipantActiveOwnerId`. Die URL ist vom
+ * Nutzer editierbar; ein manipulierter Wert kann die Oberflaeche bestenfalls grosszuegiger ODER
+ * enger zeigen als sie sein sollte, nie tatsaechlichen Zugriff verschaffen — der Server bleibt
+ * ueber das Sitz-Token bzw. (ausserhalb eines Raums) die Sitzung die einzige Autoritaet
+ * (`authorizeServerRoomWrite`, `resolveAuthoritativeWriteOwnerId`).
+ */
+export function resolveInitialFoundationActiveOwnerId(sessionOwnerId: string | null | undefined): string {
+  const trimmedSession = sessionOwnerId?.trim();
+  if (trimmedSession) {
+    return trimmedSession;
+  }
+
+  const roomOwnerId = readFoundationRoomContextFromLocation()?.ownerId?.trim();
+  if (roomOwnerId) {
+    return roomOwnerId;
+  }
+
+  return readStoredFoundationActiveOwnerId();
 }
 
 export function persistFoundationActiveOwnerId(ownerId: string) {

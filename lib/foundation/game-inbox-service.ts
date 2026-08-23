@@ -1,3 +1,4 @@
+import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
 import { buildTeamPlayerTrainingLoadPlans, type AiTeamTrainingIntensity } from "@/lib/ai/ai-player-training-load-service";
 import type {
@@ -860,9 +861,26 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     // XP-System abgeschafft: Der Inbox-Hinweis „XP verfügbar / XP ausgeben"
     // (gegated auf player.currentXP > 0) entfällt — Entwicklung läuft organisch.
 
-    const expiring = roster.filter(
-      (entry) => (entry.contractLength ?? 0) <= 1 || entry.contractStatus === "expiring" || entry.contractStatus === "renewal_pending",
-    );
+    /**
+     * WER BRAUCHT WIRKLICH EINE ENTSCHEIDUNG.
+     *
+     * Entschieden von Chris: „nach MD10 muss sie auf 0 LZ sinken!! und das bedeutet laeuft aus.
+     * Nach verlaengern ist sie auf 1 und das ist nicht auslaufend."
+     *
+     * `<= 1` fiel hier gleich doppelt auf die Nase: es zog jeden Spieler mit einer vollen
+     * Restsaison herein, UND der gespeicherte Status `expiring` stammt teils aus alten
+     * Verlaengerungen, die ihn bei Laufzeit 1 setzten. Xelara trug so beides — Laufzeit 1 und das
+     * Etikett „auslaufend" — und stand im Postfach, obwohl ihr Vertrag bis Ende Saison 2 laeuft.
+     *
+     * `renewal_pending` und `out_of_contract` bleiben: die beschreiben eine offene Entscheidung,
+     * keine Restlaufzeit. `expiring` ist raus, weil es genau die Zweideutigkeit trug.
+     */
+    const brauchtEntscheidung = (entry: (typeof roster)[number]) =>
+      vertragLaeuftAus(entry.contractLength) ||
+      entry.contractStatus === "renewal_pending" ||
+      entry.contractStatus === "out_of_contract";
+
+    const expiring = roster.filter(brauchtEntscheidung);
     if (expiring.length > 0) {
       items.push(
         createItem({
@@ -891,7 +909,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         const purchase = entry.purchasePrice ?? player?.marketValue ?? 0;
         const current = entry.currentValue ?? player?.displayMarketValue ?? player?.marketValue ?? 0;
         const profit = current - purchase;
-        const isExpiring = (entry.contractLength ?? 0) <= 1 || entry.contractStatus === "expiring" || entry.contractStatus === "renewal_pending";
+        const isExpiring = brauchtEntscheidung(entry);
         const pressureScore = (team.cash < 0 ? 2 : 0) + (profit >= 8 || current >= purchase * 1.2 ? 1 : 0) + (isExpiring ? 1 : 0);
         if (pressureScore >= 2) {
           sellCandidates.push({ entry, player, profit, isExpiring });
@@ -1063,6 +1081,16 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           objective.status === "failed"
             ? `Board-Ziel verfehlt: ${objective.label}`
             : `Board-Ziel gefährdet: ${objective.label}`,
+        /*
+         * DER TITEL TAUGT NICHT FUER EINEN KNOPF. Er ist absichtlich lang (siehe darueber) und
+         * beschreibt einen ZUSTAND. Auf der Weiter-Leiste stand er deshalb abgeschnitten:
+         * „Weiter Board-Ziel verfehlt: For…" — gemessen 74 Zeichen, der Median aller
+         * Knopf-Beschriftungen liegt bei 15.
+         *
+         * `ctaLabel` sagt stattdessen, was der Druck TUT. Zwei Formulierungen, weil ein
+         * verfehltes Ziel nichts mehr zu retten hat und ein gefaehrdetes schon.
+         */
+        ctaLabel: objective.status === "failed" ? "Board-Ziele ansehen" : "Board-Ziel retten",
         description: `Aktuell ${objective.currentValue ?? "—"} · Ziel ${objective.targetValue ?? "—"}`,
         targetView: "teams",
         targetParams: { team: objective.teamId, panel: "board-objectives" },
@@ -1143,6 +1171,8 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
         category: "task",
         severity: "warning",
         title: "Pre-Season Schritt offen",
+        /* Ohne diesen Handlungstext trug die Weiter-Leiste den Zustand statt der Handlung. */
+        ctaLabel: "Pre-Season öffnen",
         // GEMELDET: „Aktuelle Phase: preseason_management." — der rohe Phasen-Bezeichner. Den
         // Klartextnamen gibt es laengst (`formatGamePhaseLabel`), er wurde hier nur nicht benutzt.
         description: `Aktuelle Phase: ${formatGamePhaseLabel(input.gameState.gamePhase)}.`,
@@ -1168,6 +1198,7 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
         category: "task",
         severity: "warning",
         title: "Mitspieler wartet / Ready fehlt",
+        ctaLabel: "Runde prüfen",
         description: `${missing.length} Participant(s) fehlen im Step ${flow.step ?? "unknown"}.`,
         targetView: "cockpit",
         targetParams: { step: flow.step ?? "unknown" },
@@ -1188,6 +1219,7 @@ function buildGlobalTasks(input: BuildGameInboxInput, createdAt: string) {
 	          category: "warning",
 	          severity: "critical",
 	          title: "AI/Workflow Blocker",
+	          ctaLabel: "Blocker ansehen",
 	          description: `${log.stepId}: ${log.errors[0] ?? log.warnings[0] ?? log.status}`,
 	          targetView: "cockpit",
 	          targetParams: { step: log.stepId },
@@ -1708,6 +1740,70 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
   });
 }
 
+/**
+ * KANN DIESER EINTRAG AUF DIE WEITER-LEISTE?
+ *
+ * Herausgeloest aus `getPrimaryInboxTask`, weil die Bedingung nicht nur dort gebraucht wird: an
+ * ihr haengt, fuer welche Eintraege ein `ctaLabel` PFLICHT ist. Ohne eigenen Namen musste jeder,
+ * der das wissen wollte, den Filter abschreiben — und eine abgeschriebene Bedingung ist eine
+ * Bedingung, die auseinanderlaeuft.
+ *
+ * Geprueft wird sie in `tests/weiter-leiste-beschriftung.test.ts`.
+ */
+/**
+ * BEOBACHTUNGEN, DIE DEN WEITER-KNOPF NICHT BELEGEN DUERFEN.
+ *
+ * GEMELDET VON CHRIS (19.08.): „der Flow haengt bei Training pruefen fest - weiss nicht warum
+ * dabei muesste er auf die Einsatzliste verweisen, training ist erledigt".
+ *
+ * NACHGEMESSEN an seinem Spielstand: `isTeamTrainingComplete` war `true`, der Flow-Schritt
+ * `check_training` stand auf `completed`. „Training pruefen" kam gar nicht vom Flow, sondern war
+ * der Handlungstext des Postfach-Eintrags `player_health_fatigue_risk` — und der hat die hoechste
+ * Quellen-Prioritaet, bei Fatigue >= 80 dazu die Dringlichkeit `critical`.
+ *
+ * DAS PROBLEM IST NICHT DIE WARNUNG, SONDERN IHR PLATZ. Erhoehte Ermuedung mitten im Spieltag ist
+ * eine Tatsache, die sich durch Draufdruecken nicht aendert: der Knopf schickt einen ins Training,
+ * dort steht dasselbe, und beim naechsten Blick belegt er den Knopf wieder. Der Weiter-Knopf hoert
+ * damit auf, „weiter" zu bedeuten.
+ *
+ * DIESELBE LEHRE GAB ES HIER SCHON EINMAL: `game-flow-controller.ts` nahm
+ * `board_objectives_failed` aus denselben Gruenden aus den Warnungen — „es kann nie wieder
+ * erfuellt werden, verschwindet also nie. Der Weiter-Knopf hiess dadurch dauerhaft
+ * 'Board-Ziel verfehlt'."
+ *
+ * WAS BLEIBT: die Eintraege selbst. Sie stehen unveraendert im Postfach, mit Dringlichkeit und
+ * Begruendung — nur fuehren sie nicht mehr den Spielfluss. Handlungsfaehige Gesundheits-Eintraege
+ * sind ausdruecklich NICHT betroffen: `player_health_injury` bleibt vorn, denn ein verletzter
+ * Spieler in der Aufstellung will wirklich ersetzt werden.
+ */
+const NUR_BEOBACHTUNG_QUELLEN = new Set([
+  "player_health_fatigue_risk",
+  "player_health_training_load",
+  "player_health_lineup_rest",
+]);
+
+export function isPrimaryInboxCandidate(
+  item: GameInboxItem,
+  options?: { focusMatchdayLoop?: boolean },
+): boolean {
+  if (item.status !== "open") {
+    return false;
+  }
+  if (NUR_BEOBACHTUNG_QUELLEN.has(item.source)) {
+    return false;
+  }
+  return (
+    item.category === "task" ||
+    item.category === "warning" ||
+    item.category === "sponsor" ||
+    item.category === "training" ||
+    (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
+    (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
+    (!options?.focusMatchdayLoop && item.category === "contract") ||
+    item.severity === "critical"
+  );
+}
+
 export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMatchdayLoop?: boolean }) {
   const severityRank: Record<GameInboxItem["severity"], number> = {
     critical: 0,
@@ -1728,18 +1824,7 @@ export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMat
     facility_finance_forecast: 10,
   };
 
-  const candidates = items.filter(
-    (item) =>
-      item.status === "open" &&
-      (item.category === "task" ||
-        item.category === "warning" ||
-        item.category === "sponsor" ||
-        item.category === "training" ||
-        (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
-        (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
-        (!options?.focusMatchdayLoop && item.category === "contract") ||
-        item.severity === "critical"),
-  );
+  const candidates = items.filter((item) => isPrimaryInboxCandidate(item, options));
 
   if (candidates.length === 0) {
     return null;

@@ -10,8 +10,11 @@ import {
 import type { ContractShape } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { zieheVertragsalterungNach } from "@/lib/contracts/vertragsalterung-nachziehen";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type ContractRenewalBody = {
   saveId?: string;
@@ -54,10 +57,15 @@ export async function POST(request: Request) {
     }
 
     const persistence = createPersistenceService();
-    const save = persistence.getSaveById(saveId);
-    if (!save) {
+    const gefundenerSave = persistence.getSaveById(saveId);
+    if (!gefundenerSave) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
+    // Vertraege altern beim Betreten der Saisonende-Phase. Spielstaende, die schon davor in der
+    // Phase standen, haben den Hop nie gesehen — siehe `zieheVertragsalterungNach`. Nichtstun,
+    // sobald die Alterung fuer diese Saison gelaufen ist.
+    const nachgezogen = zieheVertragsalterungNach({ save: gefundenerSave, persistence });
+    const save = nachgezogen.save;
     const phaseGate = evaluateGamePhaseAction(save.gameState, "renew_contract");
     // Phase gate blocks only PRODUCTIVE writes. Dry-run previews pass through,
     // so the negotiation window can show real numbers mid-season (preview-only,
@@ -85,6 +93,9 @@ export async function POST(request: Request) {
       offeredSalary: body.offeredSalary,
       contractShape: body.contractShape,
     });
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+    // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -98,7 +109,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: preview.confirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -153,6 +164,8 @@ export async function POST(request: Request) {
       { status: success || dryRun ? 200 : 409 },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         success: false,

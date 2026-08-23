@@ -26,9 +26,11 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
-import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildTeamSeasonAreaPoints } from "@/lib/foundation/season-area-points";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
+import { buildGuvBreakdown, type GuvBreakdownLine } from "@/lib/finance/guv-breakdown";
 import type {
   TeamDetailDrawerData,
   TeamDetailDrawerHistoryRow,
@@ -203,12 +205,23 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → GOLD (Elite ≥80).
-  // Die Elite-Stufe war vorher `accent` (blau) — seit Paket F2 gilt: eine
-  // Skala mit `risk` trägt nie die Teamfarbe, die Spitzen-Stufe ist das
-  // theme-feste Gold (wie die Rang-Skala in quartile-tone.ts). Die reale
-  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
-  if (rating >= 80) return "gold";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → HELLBLAU (Elite ≥80).
+  //
+  // CHRIS' MELDUNG `8sbs35`: „Spieler mit 80er und 90er stats sind im depth chart gelb anstatt
+  // hellblau markiert - bitte fixen!" — und nach der Rückfrage seine Entscheidung: „depth chart
+  // soll weiterhin hellblau färben und nicht in team farben, das irritiert sonst."
+  //
+  // ES IST NICHT `accent` UND NICHT WIEDER DER ALTE ZUSTAND. `accent` ist die Vereinsfarbe; eine
+  // Skala, die auch `risk` enthält, darf sie nie tragen — bei rotem Team-Theme sähen Spitze und
+  // Schlusslicht gleich aus (genau der Fehler, den Paket F2 repariert hat). `elite` ist deshalb
+  // ein eigenes, theme-FESTES Hellblau (`--nl-elite`).
+  //
+  // WARUM NICHT WEITER GOLD: Gold (#f6c750) gehört der RANG-Skala und lag hier direkt neben
+  // `warn` (#e0a53a) der 40–59-Stufe — Elite und Mittelmaß lasen sich im selben Raster als
+  // dieselbe Farbe. Genau das hat Chris als „gelb" gemeldet.
+  //
+  // Die reale Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) bleibt grün.
+  if (rating >= 80) return "elite";
   if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";
@@ -686,30 +699,59 @@ export default function TeamProfileNewLook({
   }, [foundationGameState, data.teamId]);
 
   // RANG-Hover: kompakte Ligatabelle. Rang/Punkte aus `seasonState.standings`,
-  // PPs (Disziplin-Performance) + POW/SPE/MEN/SOC aus dem kanonischen
-  // Team-Disziplin-Rang-Engine (dieselbe Quelle wie die Header-Achsen-Ränge).
+  // PPs und POW/SPE/MEN/SOC aus dem SAISON-PUNKTE-LEDGER — derselben Quelle, aus
+  // der auch der Saisonstand seine Bereichswerte zieht.
+  //
+  // GEMELDET VON CHRIS: „die PP Ansicht zeigt nicht unsere PPs der Spieler! …
+  // Bitte hier die PPs aus den Bereichen hinterlegen wie sie auch im Saisonstand
+  // zu finden sind!"
+  //
+  // ER HATTE RECHT, UND ZWAR VOLLSTAENDIG. Hier stand vorher der `scorePack` aus
+  // `buildTeamDisciplineRankRowsFromGameState` — und der summiert die
+  // DISZIPLIN-STAERKEN der besten sechs Spieler eines Teams (`player.disciplineRatings`),
+  // also Papierform, nicht Ertrag. Unter der Ueberschrift „PPs" stand damit eine
+  // Zahl, die mit geholten Punkten nichts zu tun hat. An Chris' Spielstand
+  // (season-2, Spieltag 9) nachgemessen:
+  //
+  //   C-S  angezeigt 1541/1679/1537/1638 = „6.395 PPs"  ·  tatsaechlich 27/24/13/48 = 112
+  //   G-G  angezeigt 1603/1396/1539/1590 = „6.128 PPs"  ·  tatsaechlich 32/14/26/39 = 110
+  //
+  // Die echten PPs standen die ganze Zeit daneben: die „112 P" SIND die 112 PPs.
+  // Ueber alle 32 Teams gilt Punkte = Ledger-Gesamt = Summe der vier Bereiche.
+  //
+  // KOSTEN, gemessen: der Ledger braucht 17,7 ms gegen 3,6 ms der Staerke-Summe.
+  // Das laeuft im `useMemo` einmal je Spielstand-Aenderung, nicht je Bild — und es
+  // ist dieselbe Rechnung, die der Saisonstand ohnehin anstellt.
   const standingsHoverRows = useMemo(() => {
     if (!foundationGameState) {
       return [];
     }
     const standings = foundationGameState.seasonState.standings ?? {};
-    const rankRows = buildTeamDisciplineRankRowsFromGameState(foundationGameState, foundationGameState.disciplines);
-    const packByTeamId = new Map(rankRows.map((row) => [row.teamId, row.scorePack] as const));
+    const ledger = buildSeasonPointsLedger(foundationGameState, foundationGameState.season.id);
     return foundationGameState.teams
       .map((team) => {
         const standing = standings[team.teamId];
-        const pack = packByTeamId.get(team.teamId) ?? null;
+        const summary = ledger.teamSummariesByTeamId.get(team.teamId) ?? null;
+        const areaPoints = buildTeamSeasonAreaPoints({
+          // Der LIVE-Spielstand fuehrt keine Disziplinwerte im `StandingRecord` — die Merge-Basis
+          // ist hier also allein der Ledger. Genau so rechnet die Saisonstand-Tabelle im
+          // Live-Fall ebenfalls (kein `standingsByTeamId` uebergeben).
+          standingDisciplineValues: null,
+          ledgerPointsByDiscipline: summary?.pointsByDiscipline ?? null,
+          ledgerPointsByArea: summary?.pointsByArea ?? null,
+          ledgerTotalPoints: summary?.totalPoints ?? 0,
+          hasCurrentPps: (summary?.playerDerivedTotal ?? 0) > 0,
+        });
         return {
           teamId: team.teamId,
           shortCode: team.shortCode ?? team.name.slice(0, 3).toUpperCase(),
           teamName: team.name,
           rank: isFiniteNumber(standing?.rank) ? (standing?.rank as number) : null,
           points: isFiniteNumber(standing?.points) ? (standing?.points as number) : null,
-          pps: pack ? pack.total : null,
-          pow: pack ? pack.pow : null,
-          spe: pack ? pack.spe : null,
-          men: pack ? pack.men : null,
-          soc: pack ? pack.soc : null,
+          pow: areaPoints.pow,
+          spe: areaPoints.spe,
+          men: areaPoints.men,
+          soc: areaPoints.soc,
           isOwn: team.teamId === data.teamId,
         };
       })
@@ -728,40 +770,55 @@ export default function TeamProfileNewLook({
       .map((row, index) => ({ ...row, displayRank: row.rank ?? index + 1 }));
   }, [foundationGameState, data.teamId]);
 
-  // CASH-Hover: kompakte GuV. Nur reale, bereits berechnete Größen dieses
-  // Teams — Cash & Gehaltsblock aus `data`, Gebäude-Unterhalt/-Einnahmen und
-  // Sponsoren-Basis aus dem GameState. Ohne Foundation-State (kein Liga-
-  // kontext) bleiben nur Cash & Gehälter; die Ökonomiezeilen entfallen dann.
-  const cashBreakdown = useMemo(() => {
+  /**
+   * CASH-HOVER — EINE GuV, DIESELBE WIE IM SAISONSTAND.
+   *
+   * HIER STAND EINE ZWEITE RECHNUNG: `Cash − Gehälter + Gebäude-Einnahmen − Unterhalt +
+   * Sponsoren-Basis`, überschrieben mit „GuV (Projektion)". Chris am 23.08.: „in der Teamansicht
+   * haben wir ja eine GuV Projektion drinne mit Cash minus Gehälter plus Sponsoren. Das müsste noch
+   * mal angepasst werden, dass es auch gleich ist mit dem, was wir im Saisonstand finden. Also dass
+   * diese GuV, die wir sehen, an allen Stellen dasselbe zeigt."
+   *
+   * DREI DINGE WAREN DARAN FALSCH, alle nachgemessen:
+   *
+   *  1. ES WAREN ZWEI VERSCHIEDENE GRÖSSEN UNTER EINEM NAMEN. Die alte Zeile rechnete einen
+   *     KONTOSTAND (Cash steckte drin), die Spalte im Saisonstand ist ein ERGEBNIS (Einnahmen
+   *     minus Ausgaben, ohne Cash). Zwei Zahlen, die gar nicht gleich sein KONNTEN.
+   *  2. ES FEHLTEN POSTEN. Die gemeinsame Rechnung (`lib/finance/season-end-guv.ts`) kennt zehn —
+   *     Sponsoren, Sponsorereignisse, Gebäude-Einnahmen, Apron, Vorstandsziele, Gehälter,
+   *     Gebäude-Unterhalt, Kreditzins, Kredittilgung, Transfers. Die alte Formel kannte vier. An
+   *     `1hf25q` gemessen wichen 5 von 6 geprüften Teams ab, bei D-L um 11,1 Mio und mit
+   *     Vorzeichenwechsel (Saisonstand +8,8, hier −2,3).
+   *  3. Sie stand auch dort, wo der Saisonstand nichts zeigte — in sechs von sieben Spielständen
+   *     fehlte `guv` ganz, die Spalte blieb leer, und dieser Hover behauptete daneben eine Zahl.
+   *
+   * JETZT: die Posten kommen aus dem Saisonstand desselben Spielstands, durch dieselbe Aufbereitung
+   * wie dort (`buildGuvBreakdown`). Der Kontostand bleibt sichtbar, aber als eigene, klar benannte
+   * Zeile darunter — `Cash + GuV`, nicht als „GuV" getarnt.
+   */
+  const guvBreakdown = useMemo(() => {
     const cash = isFiniteNumber(data.cash) ? data.cash : null;
-    const salaryTotal = isFiniteNumber(data.salaryTotal) ? data.salaryTotal : null;
-    if (!foundationGameState) {
-      return { cash, salaryTotal, facilityUpkeep: null, facilityIncome: null, sponsorBase: null, projected: null };
+    const standing = foundationGameState?.seasonState?.standings?.[data.teamId] ?? null;
+    const guv = isFiniteNumber(standing?.guv) ? standing!.guv! : null;
+    const posten = Array.isArray(standing?.guvPosten) && standing!.guvPosten!.length > 0 ? standing!.guvPosten! : null;
+    if (guv == null && posten == null) {
+      // Keine erfundene Ersatzzahl: fehlt die gemeinsame GuV, sagt der Hover das — genau wie die
+      // leere Zelle im Saisonstand. Eine eigene Formel hier wäre wieder die zweite Wahrheit.
+      return { cash, guv: null, lines: [], cashAtSeasonEnd: null };
     }
-    const teamFacilities = foundationGameState.seasonState.teamFacilities?.[data.teamId] ?? null;
-    const facilityUpkeep = teamFacilities ? calculateFacilityUpkeep(teamFacilities) : null;
-    const facilityIncome = teamFacilities
-      ? calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: beliebtheit?.value ?? 1 })
-      : null;
-    const sponsorContract = foundationGameState.seasonState.sponsorContractsByTeamId?.[data.teamId] ?? null;
-    const sponsorBase = sponsorContract
-      ? sponsorContract.components
-          .filter((component) => component.kind === "base")
-          .reduce((sum, component) => sum + (isFiniteNumber(component.rewardCash) ? component.rewardCash : 0), 0)
-      : null;
-    // Projiziertes Saison-Ende analog zu projectCashFlow(): Cash − Gehälter
-    // + (Gebäude-Einnahmen − Unterhalt) + Sponsoren-Basis. Prämien fließen
-    // bewusst NICHT ein (benchmark-only, siehe cash-flow-forecast.ts).
-    const projected =
-      cash != null
-        ? cash -
-          (salaryTotal ?? 0) +
-          (facilityIncome ?? 0) -
-          (facilityUpkeep ?? 0) +
-          (sponsorBase ?? 0)
-        : null;
-    return { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected };
-  }, [foundationGameState, data.teamId, data.cash, data.salaryTotal, beliebtheit]);
+    const breakdown = buildGuvBreakdown({
+      posten,
+      guv,
+      sponsorTotal: isFiniteNumber(standing?.sponsorTotal) ? standing!.sponsorTotal! : null,
+      salaryTotal: isFiniteNumber(data.salaryTotal) ? data.salaryTotal : null,
+    });
+    return {
+      cash,
+      guv: breakdown.total,
+      lines: breakdown.lines,
+      cashAtSeasonEnd: cash != null && breakdown.total != null ? Number((cash + breakdown.total).toFixed(2)) : null,
+    };
+  }, [foundationGameState, data.teamId, data.cash, data.salaryTotal]);
 
   // MW-Hover: Zusammensetzung aus den echten Einzel-Marktwerten des Kaders.
   const mwBreakdown = useMemo(() => {
@@ -1342,9 +1399,13 @@ export default function TeamProfileNewLook({
                     <span className="nl-kpipop-standcode" title={row.teamName}>
                       {row.shortCode}
                     </span>
-                    <span className="nl-kpipop-standpts">
-                      {formatNlNumber(row.points, 1)} P · {formatNlNumber(row.pps, 0)} PPs
-                    </span>
+                    {/* NUR die Punkte — die PPs standen hier doppelt.
+                        Punkte und PP-Gesamtsumme sind dieselbe Zahl: ueber alle 32 Teams von
+                        Chris' Spielstand gilt Punkte = Ledger-Gesamt = Summe der vier Bereiche.
+                        Die Zeile las sich damit „112 P · 112 PPs". Chris: „ja die dopplung kann
+                        raus". Die Aufschluesselung steht direkt darunter in den vier Bereichen,
+                        und die summieren sich genau auf diese Punktzahl. */}
+                    <span className="nl-kpipop-standpts">{formatNlNumber(row.points, 1)} P</span>
                   </span>
                   <span className="nl-kpipop-standaxes">
                     {NL_TEAMPROFILE_AXES.map(({ key, label }) => (
@@ -1375,29 +1436,48 @@ export default function TeamProfileNewLook({
   }
 
   function renderCashPanel() {
-    const { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected } = cashBreakdown;
+    const { cash, guv, lines, cashAtSeasonEnd } = guvBreakdown;
     return (
       <div className="nl-kpipop-inner">
         <div className="nl-kpipop-head">
           <div className="nl-kpipop-head-copy">
             <span className="nl-kpipop-eyebrow">Cash</span>
-            <strong className="nl-kpipop-title">GuV (Projektion)</strong>
+            <strong className="nl-kpipop-title">GuV (Ergebnis)</strong>
           </div>
         </div>
-        <div className="nl-kpipop-guv">
-          {renderGuvLine("Cash", "", cash)}
-          {renderGuvLine("Gehälter", "−", salaryTotal, "risk")}
-          {facilityUpkeep != null ? renderGuvLine("Gebäude-Unterhalt", "−", facilityUpkeep, "risk") : null}
-          {facilityIncome != null ? renderGuvLine("Gebäude-Einnahmen", "+", facilityIncome, "good") : null}
-          {sponsorBase != null ? renderGuvLine("Sponsoren (Basis)", "+", sponsorBase, "good") : null}
-          {projected != null
-            ? renderGuvLine("≈ Saison-Ende", "", projected, projected < 0 ? "risk" : "good", true)
-            : null}
-        </div>
-        {facilityUpkeep == null && sponsorBase == null ? (
-          <p className="nl-kpipop-note">Gebäude-/Sponsoren-Zeilen benötigen Liga-Kontext.</p>
+        {lines.length === 0 ? (
+          <p className="nl-kpipop-note">
+            Für diese Saison liegt noch keine GuV vor — im Saisonstand steht dort ebenfalls nichts.
+            Sie entsteht mit der nächsten Spieltags-Buchung.
+          </p>
         ) : (
-          <p className="nl-kpipop-note">Prämien fließen nicht ein (benchmark-only).</p>
+          <>
+            <div className="nl-kpipop-guv">
+              {lines.map((line: GuvBreakdownLine) => (
+                <div
+                  key={line.label}
+                  className={`nl-kpipop-guvrow${line.counted ? "" : " is-aside"}`}
+                  title={line.counted ? undefined : "Cash-wirksam, zählt aber nicht in die GuV."}
+                >
+                  <span className="nl-kpipop-guvlabel">{line.label}</span>
+                  <span
+                    className={`nl-kpipop-guvval${
+                      line.value != null && line.value < 0 ? ` ${nlToneClass("risk")}` : line.value != null && line.value > 0 ? ` ${nlToneClass("good")}` : ""
+                    }`}
+                  >
+                    {formatNlMoney(line.value)}
+                  </span>
+                </div>
+              ))}
+              {renderGuvLine("= GuV", "", guv, guv != null && guv < 0 ? "risk" : "good", true)}
+            </div>
+            {/* Der Kontostand bleibt sichtbar — aber als eigene Zeile, nicht als „GuV" getarnt. */}
+            <div className="nl-kpipop-guv nl-kpipop-guv-cash">
+              {renderGuvLine("Cash heute", "", cash)}
+              {renderGuvLine("≈ Cash am Saisonende", "", cashAtSeasonEnd, cashAtSeasonEnd != null && cashAtSeasonEnd < 0 ? "risk" : "good", true)}
+            </div>
+            <p className="nl-kpipop-note">Dieselbe Rechnung wie im Saisonstand. Prämien fließen nicht ein (benchmark-only).</p>
+          </>
         )}
       </div>
     );

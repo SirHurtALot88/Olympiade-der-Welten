@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
+import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -21,6 +23,7 @@ import {
   chooseDisciplineStageTeams,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-booked-result";
 import { orderStageTeamsBySeasonRank } from "@/lib/foundation/discipline-stage/discipline-stage-team-order";
+import { resolveDisciplineStageSlotCount } from "@/lib/foundation/discipline-stage/discipline-stage-slot-count";
 import {
   spieltagsTopSpielerAusBuchung,
   spieltagsTopSpielerAusVorschau,
@@ -30,6 +33,10 @@ import {
 import { buildMatchdayInjuryMarks } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 import { replayNachArenaReset } from "@/lib/foundation/discipline-stage/discipline-stage-replay-gate";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+// Direkt aus `nl-tones` statt aus dem `new-look`-Sammelmodul: dort haengen React-Bauteile dran,
+// die dieses Buendel sonst mitzoege (siehe `ci:client-bundle-lint`).
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
+import { ermittleKaufphasenWarnung } from "@/lib/foundation/discipline-stage/kaufphasen-warnung";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
@@ -76,6 +83,17 @@ import {
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
+import {
+  getManualControlTeamIds,
+  getTeamControlSettings,
+  getTeamOwner,
+  resolveOwnerDisplayLabel,
+} from "@/lib/foundation/team-control-settings";
+import {
+  leseArenaTeamAuswahl,
+  leseGemerkteIds,
+  normalisiereMerklistenBesitzer,
+} from "@/lib/merkliste/merkliste-service";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import {
   getMatchdayArenaReadiness,
@@ -502,6 +520,32 @@ function slotLabel(disciplineId: string, index: number, total: number): string {
   return `Etappe ${index + 1}`;
 }
 
+/**
+ * Legt Spieler auf IHRE Slot-Position statt sie dicht durchzureichen — Ticket #35.
+ *
+ * Die Laenge richtet sich nach dem hoechsten besetzten Slot, unbesetzte Etappen bleiben `null`.
+ * Ein Team, das lueckenlos ab Slot 0 aufstellt (der Regelfall, so fuellt die KI), bekommt damit
+ * exakt dasselbe Array wie vorher — die Aenderung wird nur dort sichtbar, wo wirklich eine Luecke
+ * ist.
+ */
+function verteileAufSlots<Q extends { slotIndex?: number }, R>(
+  eintraege: readonly Q[],
+  bauen: (eintrag: Q) => R,
+): Array<R | null> {
+  if (eintraege.length === 0) return [];
+  const laenge = eintraege.reduce((max, eintrag) => Math.max(max, (eintrag.slotIndex ?? 0) + 1), 0);
+  const bahnen: Array<R | null> = Array.from({ length: Math.max(laenge, eintraege.length) }, () => null);
+  let naechsteFreie = 0;
+  for (const eintrag of eintraege) {
+    // Ohne `slotIndex` (alte Spielstaende, Modell-Modus) der bisherige dichte Weg — nichts erfinden.
+    const ziel = eintrag.slotIndex ?? naechsteFreie;
+    const platz = ziel >= 0 && ziel < bahnen.length && bahnen[ziel] == null ? ziel : naechsteFreie;
+    bahnen[platz] = bauen(eintrag);
+    naechsteFreie = Math.max(naechsteFreie, platz + 1);
+  }
+  return bahnen;
+}
+
 export default function DisciplineStageArena({
   gameState,
   selectedTeamId,
@@ -517,7 +561,40 @@ export default function DisciplineStageArena({
   roomContext,
   canonicalRatingByPlayerId,
 }: DisciplineStageArenaProps) {
-  const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
+  /**
+   * Audit-Punkt 2 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): „Mein Team" hing bisher NUR an der
+   * lokalen Auswahl (`activeManagerTeamId`/`selectedTeamId`), nie am Raum-Besitz. Fehlte der
+   * `team=`-Parameter (Direktaufruf, Lesezeichen, Reload), griff ein Rückfall auf `user_local` —
+   * bei Franky also FÄLSCHLICH Chris' Team, samt „★ Dein Team", Podest-Rahmen, Endstands-Zeile
+   * und „DEIN LÄUFER" (alles hängt kaskadierend an `ownTeamId`, siehe `isOwn`-Zuweisungen unten).
+   *
+   * Im Raum entscheidet deshalb der Besitz aus `teamControlSettings` (`getTeamOwner`), nicht die
+   * lokale Auswahl — abgeglichen gegen `roomContext.ownerId`, NICHT `roomContext.userId`:
+   * `userId` ist ohne Login ein zufälliger `user-<uuid>`-String, der mit keinem gespeicherten
+   * `ownerId` übereinstimmt (siehe Kommentar an `FoundationRoomContext.ownerId`,
+   * `lib/room/foundation-room-context-client.ts` — von der Sitzrolle abgeleitet, exakt der Raum
+   * hier gebraucht wird). Fehlt `ownerId` (alter Link/Zuschauer-Sitz), bleibt die Zeile beim
+   * lokalen Wert — kein Verschlechtern gegenüber vorher. Gehört die lokale Auswahl nicht dem
+   * Teilnehmer, wird auf dessen erstes eigenes Team umgezogen. Solo (`roomContext` ist `null`)
+   * bleibt exakt wie vorher — kein Verhaltensunterschied.
+   */
+  const ownTeamId = useMemo(() => {
+    const localTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
+    if (!roomContext?.ownerId) {
+      return localTeamId;
+    }
+    const controlSettings = gameState?.seasonState?.teamControlSettings ?? {};
+    const belongsToSelf = (teamId: string | null | undefined) => {
+      if (!teamId) return false;
+      const settings = controlSettings[teamId];
+      return Boolean(settings) && getTeamOwner(settings) === roomContext.ownerId;
+    };
+    if (belongsToSelf(localTeamId)) {
+      return localTeamId;
+    }
+    const ownedTeam = (gameState?.teams ?? []).find((team) => belongsToSelf(team.teamId));
+    return ownedTeam?.teamId ?? localTeamId;
+  }, [activeManagerTeamId, selectedTeamId, roomContext, gameState?.seasonState?.teamControlSettings, gameState?.teams]);
 
   // Drawer-Overlay über der laufenden Arena. WICHTIG: drawerTarget fließt NICHT in
   // den Arena-key oder das teams-Memo ein — sonst würde ein Klick die Arena
@@ -1010,8 +1087,22 @@ export default function DisciplineStageArena({
       // konnte nie greifen, weil `d1Points` damit NIE null war. Teams, die in der
       // Disziplin gewertet wurden, aber keinen Score haben, stehen weiterhin auf 0 —
       // die setzt `placementPointsForSide` selbst.
-      const d1Points = d1 ? d1PointsByTeam.get(r.teamId) ?? null : null;
-      const d2Points = d2 ? d2PointsByTeam.get(r.teamId) ?? null : null;
+      // PLATZIERUNGS-PUNKTE PLUS MUTATOR-AUFSCHLAG — dieselbe Summe, die gebucht wird
+      // (`points = basePoints + mutatorPpsBonus`, season-points-ledger.ts).
+      //
+      // CHRIS' MELDUNG `vjirth`: „S-C sollte in Basketball 9,1 Punkte haben laut Arena, hat im
+      // Saisonstand dann aber 9,9 Punkte stehen." Nachgemessen am Live-Abbild: die
+      // Saisonstand-Spalte zieht `pointsByDiscipline` aus dem Ledger und enthaelt den Aufschlag,
+      // die Arena rechnete rein aus der Rang-zu-Punkte-Tabelle. Der Aufschlag liegt hier schon
+      // fertig in `mutatorByTeam` — er wurde nur nie addiert.
+      // Das `?? null` daraus bleibt UNANGETASTET (siehe Absatz darueber): der Aufschlag kommt
+      // nur dazu, wo es ueberhaupt eine Platzierungs-Zahl gibt. Aus einem unbekannten Wert darf
+      // kein „0 plus Mutator" werden, sonst faellt die Aufdeck-Regel der Arena.
+      const mutator = mutatorByTeam.get(r.teamId) ?? null;
+      const mitMutator = (punkte: number | null | undefined, aufschlag: number) =>
+        punkte == null ? null : Math.round((punkte + aufschlag) * 10) / 10;
+      const d1Points = d1 ? mitMutator(d1PointsByTeam.get(r.teamId), mutator?.d1Pp ?? 0) : null;
+      const d2Points = d2 ? mitMutator(d2PointsByTeam.get(r.teamId), mutator?.d2Pp ?? 0) : null;
       return {
         teamId: r.teamId,
         d1DisciplineId: d1?.disciplineId ?? null,
@@ -1139,6 +1230,75 @@ export default function DisciplineStageArena({
     return slots.map((s) => s.label).filter((l): l is string => Boolean(l && l.trim()));
   }, [engineDiscipline]);
 
+  /**
+   * Etappenzahl EINER Disziplinseite (d1 ODER d2), unabhängig davon, welche Seite
+   * gerade angezeigt wird — Befund B3 (`docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md`):
+   * der Arena-Gleichlauf sendete diese Zahl bisher hart als `0`, wodurch
+   * `revealedSlotCount < maxSlotRevealCount` (`matchday-arena-reveal-sync.ts:139`)
+   * nie wahr wurde und der Gast für immer vor Etappe 1 stehen blieb.
+   *
+   * Dieselbe Formel wie unten in `payload` (die dort NUR für die aktuell offene
+   * Seite läuft): Echt-Modus nimmt die tatsächlich aufgestellte Spielerzahl
+   * (Maximum über die Teams) aus Vorschau/gebuchtem Ergebnis, Test-/Random-Modus
+   * die Slot-Zahl des Modells — je mit `discipline.playerCount` als Rückfall,
+   * falls (noch) keine Teams vorliegen. EINE Funktion für beide Aufrufer, damit
+   * hier keine zweite Quelle für dieselbe Größe entsteht.
+   */
+  const computeStageSlotCount = useCallback(
+    (sideDisciplineId: string | null | undefined): number => {
+      if (!sideDisciplineId) return 1;
+      // Die Rechnung selbst steht in `resolveDisciplineStageSlotCount` (lib/…/discipline-stage-
+      // slot-count.ts) — hier wird nur beschafft, WORAUF sie angewandt wird. Getrennt, weil die
+      // Beschaffung React-Zustand braucht (Vorschau, Portraits) und die Rechnung nicht: so ist die
+      // Eigenschaft ohne Rendering prüfbar, statt wie vorher nur als Textmuster im Bauteil.
+      if (mode !== "real") {
+        const sideModel = buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId);
+        return resolveDisciplineStageSlotCount({
+          playerCountsByTeam: sideModel.teams.map((t) => t.slots.length),
+          fallbackSlotCount: sideModel.slotCount,
+        });
+      }
+      const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === sideDisciplineId);
+      const previewTeams =
+        disc && disc.teamResults.length > 0
+          ? buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById)
+          : null;
+      const bookedTeams = buildDisciplineStageTeamsFromBookedResult(gameState, sideDisciplineId, teamMetaById, portraitById);
+      const chosenTeams = chooseDisciplineStageTeams({ previewTeams, bookedTeams }).teams ?? [];
+      const playerCountsByTeam = chosenTeams.map((t) => t.players.length);
+      // A5 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): `buildDisciplineStageModel` baut Kader +
+      // Aufstellung komplett neu auf — teuer, und `resolveDisciplineStageSlotCount` wirft den
+      // Rückfall-Wert ohnehin weg, sobald `playerCountsByTeam` echte Zahlen liefert
+      // (`maxFielded || fallbackSlotCount`, siehe `discipline-stage-slot-count.ts`). Vorher stand
+      // der Aufbau als PLAIN Funktionsargument da
+      // (`fallbackSlotCount: buildDisciplineStageModel(...).slotCount`) — JS wertet
+      // Funktionsargumente VOR dem Aufruf aus, das lief also bei JEDEM Aufruf, auch im Normalfall
+      // (Aufstellung vorhanden), wo das Ergebnis nie benutzt wurde. Bei zwei Seiten (d1+d2) macht
+      // das bis zu zwei unbenutzte Modell-Aufbauten je Berechnung von `maxSlotRevealCountByDiscipline`
+      // — dazu kommt der tatsaechlich noetige dritte Aufbau in `model` (oben) für die gerade
+      // angezeigte Disziplin. Jetzt: lazy (nur bauen, wenn `playerCountsByTeam` wirklich leer ist)
+      // und, wenn die angefragte Seite die gerade angezeigte Disziplin ist, das dafür schon
+      // vorhandene memoisierte `model` wiederverwenden statt es ein zweites Mal zu bauen.
+      const hasAnyFieldedPlayer = playerCountsByTeam.some((count) => count > 0);
+      const fallbackSlotCount = hasAnyFieldedPlayer
+        ? 0 // wird von resolveDisciplineStageSlotCount ohnehin verworfen (maxFielded > 0)
+        : sideDisciplineId === disciplineId
+          ? model.slotCount
+          : buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount;
+      return resolveDisciplineStageSlotCount({ playerCountsByTeam, fallbackSlotCount });
+    },
+    [mode, gameState, ownTeamId, preview, teamMetaById, portraitById, disciplineId, model],
+  );
+  // Die ECHTE Etappenzahl je Seite — ersetzt das früher hart auf { d1: 0, d2: 0 }
+  // gesetzte Paar an beiden Sende-Stellen unten (Start + Host-Advance).
+  const maxSlotRevealCountByDiscipline = useMemo(
+    () => ({
+      d1: computeStageSlotCount(matchdaySides.d1?.disciplineId),
+      d2: computeStageSlotCount(matchdaySides.d2?.disciplineId),
+    }),
+    [computeStageSlotCount, matchdaySides],
+  );
+
   // ---- Co-op-Room-Sync (Multiplayer): host-getriebener Lockstep-Reveal ----
   // Die Bühne ist eine Ein-Disziplin-Ansicht → wir tragen die aktuell gezeigte
   // Disziplin als „active phase" und den Reveal-Schritt (round) als slotRevealIndex.
@@ -1163,6 +1323,17 @@ export default function DisciplineStageArena({
       }
       // Reveal-Schritt: Host-slotRevealIndex → lokaler Zielround (Guest zieht nach).
       setSyncedRound(normalized.slotRevealIndex);
+      // Audit-Punkt 1 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md), DER WICHTIGSTE Fund: ohne diese
+      // Zeile schloss NUR ein lokaler Klick auf „Zur Bühne" die Vorspiel-Tafel
+      // (`preMatchdayDismissed` oben) — ein Callback, den ein Gast nie selbst auslöst, wenn der
+      // Host die Bühne längst betreten und „Bereit" gedrückt hat. Der Gast blieb dadurch für
+      // immer auf „Vor dem Anpfiff" stehen, sah weder das Bereit-Tor noch den Hinweis, dass auf
+      // ihn gewartet wird — obwohl `onApplyRevealSync` (dieser Callback) exakt in diesem Moment
+      // feuert: sobald ein RoomArenaState fuer DIESE Arena eintrifft (Host hat gestartet). Solo
+      // (kein `roomContext`) ruft `useArenaRoomSync` diesen Callback NIE auf (siehe Hook: ohne
+      // `roomContext` werden gar keine Socket-Listener registriert) — die Zeile ist dort totes,
+      // nie erreichtes Gewebe.
+      setPreMatchdayDismissed(true);
     },
   });
   /**
@@ -1173,6 +1344,13 @@ export default function DisciplineStageArena({
    */
   const leagueLineupReadiness = useMemo(() => getMatchdayLeagueLineupReadiness(gameState), [gameState]);
   const arenaStartBlockedByLineups = !leagueLineupReadiness.allReady;
+
+  /**
+   * Die Ansage vor der Tür, die für eine ganze Saison zufällt (`cubix1`). Die Regel selbst und
+   * ihre Begründung stehen in `lib/foundation/discipline-stage/kaufphasen-warnung.ts` — hier
+   * steht nur, WO sie erscheint: auf der letzten Tafel vor der Bühne.
+   */
+  const kaufphaseSchliesstMitDiesemSpieltag = useMemo(() => ermittleKaufphasenWarnung(gameState), [gameState]);
 
   // Host meldet den Sync einmalig an, sobald die Preview steht (idle → running).
   useEffect(() => {
@@ -1185,9 +1363,91 @@ export default function DisciplineStageArena({
       seasonId: seasonId ?? null,
       matchdayId: matchdayId ?? null,
       disciplineSide: activeDisciplineSide,
-      maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
+      maxSlotRevealCountByDiscipline,
     });
-  }, [roomContext, roomArenaSync, preview, seasonId, matchdayId, activeDisciplineSide, arenaStartBlockedByLineups]);
+  }, [
+    roomContext,
+    roomArenaSync,
+    preview,
+    seasonId,
+    matchdayId,
+    activeDisciplineSide,
+    arenaStartBlockedByLineups,
+    maxSlotRevealCountByDiscipline,
+  ]);
+  /**
+   * Audit-Punkt 4: Disziplin-Auswahl und „Spieltag abschließen"/„Weiter zu Disziplin 2" sind
+   * League-weite Aktionen — im Raum darf sie NUR steuern, wer den gemeinsamen Reveal steuert
+   * (Host, oder solo-im-Room). Ein Gast, der die Disziplin frei wechselt, sieht sonst eine
+   * Disziplin, die gerade niemand spielt — in einer bereits gewerteten sogar Spoiler. Dieselbe
+   * Bedingung wie `canControlArenaReveal` selbst (die alte, gelöschte Vorgänger-Arena nannte das
+   * sinngemäß "Guests never free-jump the discipline tab while the host controls the shared
+   * reveal").
+   */
+  /**
+   * DER HOST MELDET SEINEN DISZIPLIN-WECHSEL AN DEN RAUM.
+   *
+   * Bis hierher war der Klick auf "Weiter zu Disziplin 2" (und jede Wahl im Dropdown) rein lokal:
+   * `setDisciplineId`, sonst nichts. Der Server erfuhr nur noch die Etappenschritte — und schob
+   * mit ihnen die PHASENKETTE der alten Disziplin weiter, statt die Seite zu wechseln. Die
+   * durchgezaehlte Messung dazu steht an `switchRoomArenaDisciplinePhase`
+   * (`lib/room/arena-sync-state.ts`); kurz: der Gast blieb in Disziplin 1 auf dem Endstand kleben
+   * und sah von Disziplin 2 nichts.
+   *
+   * Die Meldung haengt bewusst an `activeDisciplineSide` (dem ERGEBNIS des Wechsels) und nicht an
+   * den einzelnen Knoepfen: `setDisciplineId` hat mehrere Aufrufer (Dropdown, "Weiter zu
+   * Disziplin 2", die Vorauswahl beim Aufbau, und den Raum-Sync selbst). An jedem einzeln zu
+   * melden hiesse, den naechsten Aufrufer wieder zu vergessen.
+   *
+   * `gemeldeteDisziplinSeiteRef` verhindert das Nachfeuern: zwischen dem Absenden und dem
+   * zurueckkommenden Raum-Zustand rendert die Ansicht mehrfach, und jeder dieser Renderer saehe
+   * denselben Unterschied erneut. Jede Wiederholung waere ein weiterer Raum-Schritt (`stepIndex`,
+   * `version`) und beim Gast ein weiterer Sprung.
+   */
+  const gemeldeteDisziplinSeiteRef = useRef<"d1" | "d2" | null>(null);
+  useEffect(() => {
+    if (!roomContext || !roomArenaSync.isRoomHost || !roomArenaSync.isRoomRevealSyncActive) {
+      gemeldeteDisziplinSeiteRef.current = null;
+      return;
+    }
+    const raumSeite = roomArenaSync.roomArenaActiveDisciplinePhase;
+    // "overall" (die Gesamtwertung) und "total" sind keine Disziplinseite — dort gibt es nichts zu
+    // wechseln, und der Raum soll auch nicht aus der Gesamtwertung zurueck auf d2 geworfen werden.
+    if (activeDisciplineSide !== "d1" && activeDisciplineSide !== "d2") return;
+    if (raumSeite === null || raumSeite === "total") return;
+    if (raumSeite === activeDisciplineSide) {
+      gemeldeteDisziplinSeiteRef.current = null;
+      return;
+    }
+    if (gemeldeteDisziplinSeiteRef.current === activeDisciplineSide) return;
+    gemeldeteDisziplinSeiteRef.current = activeDisciplineSide;
+    roomArenaSync.emitHostRoomArenaDisciplinePhase(activeDisciplineSide, maxSlotRevealCountByDiscipline);
+  }, [
+    roomContext,
+    roomArenaSync,
+    activeDisciplineSide,
+    maxSlotRevealCountByDiscipline,
+  ]);
+
+  const arenaGuestLocked = Boolean(roomContext) && !roomArenaSync.canControlArenaReveal;
+  /**
+   * Audit-Punkt 5, zweite Hälfte: „dass jemand getrennt ist, steht in der Arena nirgends" —
+   * `roomSyncParticipants` trägt `connectionStatus` bereits (`use-arena-room-sync.ts`), wurde aber
+   * bisher nie gelesen. Bewusst NICHT aus `arenaCoopGateParticipants` abgeleitet: die
+   * Bereit-pflichtigen (`requiredParticipantIds`) lassen einen Getrennten inzwischen selbst fallen
+   * (`getRoomArenaRequiredParticipantIds`, `arena-sync-state.ts`) — genau deshalb braucht es HIER
+   * eine vom Bereit-Tor unabhängige Quelle, sonst verschwindet der Hinweis im selben Moment, in
+   * dem er am wichtigsten wäre.
+   */
+  const disconnectedCoopNames = roomArenaSync.roomSyncParticipants
+    .filter(
+      (participant) =>
+        participant.participantId !== roomArenaSync.selfArenaParticipantId &&
+        participant.role !== "spectator" &&
+        participant.controlledTeamIds.length > 0 &&
+        participant.connectionStatus === "offline",
+    )
+    .map((participant) => participant.displayName);
   // Prop-Bündel für die NativeArena (nur im Room aktiv; solo bleibt alles inert).
   const nativeRoomSync = roomContext
     ? {
@@ -1197,13 +1457,32 @@ export default function DisciplineStageArena({
         waitingForHost: roomArenaSync.roomRevealWaitingForHost,
         followsHost: roomArenaSync.roomRevealFollowsHost,
         syncedRound,
-        onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance({ d1: 0, d2: 0 }),
+        onHostAdvanced: () => roomArenaSync.emitHostRoomArenaAdvance(maxSlotRevealCountByDiscipline),
         coopGate: {
           active: roomArenaSync.arenaCoopReadyGateActive,
           isSelfReady: roomArenaSync.isSelfArenaReady,
           waitingNames: roomArenaSync.arenaCoopWaitingNames,
           onToggleReady: roomArenaSync.emitArenaCoopReadyToggle,
+          // Der Notausgang: nur gesetzt, wenn AUSSCHLIESSLICH Getrennte blockieren. Sonst bliebe
+          // ein Knopf stehen, den der Server jedes Mal ablehnt.
+          canSkipDisconnected: roomArenaSync.canSkipDisconnectedInArena,
+          disconnectedBlockerNames: roomArenaSync.arenaOfflineBlockerNames,
+          onSkipDisconnected: () =>
+            roomArenaSync.emitHostRoomArenaAdvanceSkippingDisconnected(maxSlotRevealCountByDiscipline),
         },
+        disconnectedNames: disconnectedCoopNames,
+        // Gemeinsame Zeitbasis + Pause/Reset/Quick-Sim als Raum-Aktion (Stufe 3.6) — die Felder
+        // heissen hier genau so, wie `NativeArenaRoomSync` (DisciplineStageNativeArena.tsx) sie
+        // erwartet.
+        stepIndex: roomArenaSync.roomArenaStepIndex ?? undefined,
+        stepStartedAtMs: roomArenaSync.roomArenaStepStartedAtMs ?? undefined,
+        stepDurationMs: roomArenaSync.roomArenaStepDurationMs ?? undefined,
+        clockOffsetMs: roomArenaSync.roomArenaClockOffsetMs,
+        hostPaused: roomArenaSync.roomArenaPaused,
+        hostPausedBy: roomArenaSync.roomArenaPausedBy,
+        onHostPauseToggle: roomArenaSync.emitHostRoomArenaPauseToggle,
+        onHostReset: roomArenaSync.emitHostRoomArenaReset,
+        onHostQuickSim: () => roomArenaSync.emitHostRoomArenaQuickSim(maxSlotRevealCountByDiscipline),
       }
     : null;
 
@@ -1319,6 +1598,7 @@ export default function DisciplineStageArena({
               isMvp: s.base >= 80,
               isOwn: t.isOwn,
               ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
+              awards: s.playerId ? buildPlayerSeasonAwards(gameState, s.playerId) : null,
             },
           });
         });
@@ -1514,6 +1794,9 @@ export default function DisciplineStageArena({
           isMvp: eintrag.isMvp,
           isOwn: eintrag.teamId === ownTeamId,
           ovrRank: ratingByPlayerId.get(eintrag.playerId)?.ovrRank ?? null,
+          // Ticket #41 (Chris): „auch in den drawern der arena sollen die awards dann
+          // auftauchen". Nur die Zeichen — eine ganze Marke wuerde die Zeile sprengen.
+          awards: buildPlayerSeasonAwards(gameState, eintrag.playerId),
         };
       }),
       ids: summiert.map((eintrag) => eintrag.playerId as string | null),
@@ -1593,28 +1876,87 @@ export default function DisciplineStageArena({
   // (seasonState.standings — dieselbe wie Home-KPI, Saisonstand und Bahn-Reihenfolge).
   // Vor dem ersten gewerteten Spieltag sind die Ränge die Startplätze der Vorsaison —
   // das steht als Erklärung dran, statt eine frische Wertung zu suggerieren.
+  /**
+   * Die eigenen Athleten je Spieltags-Seite.
+   *
+   * GEMELDET (Chris): „Diszi 1 und 2 sind ja nichts sagend". Die beiden Karten wiederholten nur
+   * den Namen der Disziplin. Wer dort antritt, ist die Information, die vor dem Anpfiff zaehlt.
+   *
+   * Die Nummer ist der ECHTE Slot aus dem Einsatzlisten-Entwurf und kein Laufindex: Positionen
+   * sind verbindlich, eine Luecke davor verschiebt sie nicht.
+   */
+  const ownLineupBySide = useMemo(() => {
+    const entries = ownTeamId ? getTeamMatchdayLineupDraft(gameState, ownTeamId)?.entries ?? [] : [];
+    const proSeite = (seite: "d1" | "d2") =>
+      entries
+        .filter((eintrag) => eintrag.disciplineSide === seite)
+        .sort((links, rechts) => links.slotIndex - rechts.slotIndex)
+        .flatMap((eintrag) => {
+          const name = playerNameById.get(eintrag.playerId);
+          return name
+            ? [{ playerId: eintrag.playerId, name, slotIndex: eintrag.slotIndex, isCaptain: eintrag.isCaptain === true }]
+            : [];
+        });
+    return { d1: proSeite("d1"), d2: proSeite("d2") };
+  }, [gameState, ownTeamId, playerNameById]);
+
+  /**
+   * „Beobachtete Teams" — menschlich gefuehrte PLUS gemerkte.
+   *
+   * GEMELDET (Chris): „dann die Tabelle unten die nur verbündet und rivale zeigt irgendwie
+   * useless · man sollte sich aussuchen können welche teams getrackt werden · in der Arena dann
+   * die angezeigt werden die ich gewishlistet habe zusätzlich zu den menschlichen teams".
+   *
+   * Die frueheren Zeilen kamen aus einer automatisch vergebenen Rivalitaet und halfen bei keiner
+   * Entscheidung — sie sagten nie, WARUM ein Team dort stand. Jetzt steht genau das in der letzten
+   * Spalte, und wer dort steht, bestimmt der Mensch.
+   *
+   * Der Besitzer laeuft durch `normalisiereMerklistenBesitzer`: die Arena kennt ihn nur ueber den
+   * Raum (solo `null`), die Teamansicht ueber `activeOwnerId` (solo der Standardbesitzer). Ohne
+   * die Zusammenfuehrung waeren das zwei getrennte Listen, und ein in der Teamansicht gesetztes
+   * Lesezeichen tauchte hier nie auf.
+   */
   const preMatchContext = useMemo(() => {
     const standings = gameState.seasonState?.standings ?? {};
     const anyPoints = Object.values(standings).some((row) => ((row as { points?: number | null })?.points ?? 0) > 0);
+    const merklisteOwnerId = normalisiereMerklistenBesitzer(roomContext?.ownerId ?? null);
+    // DIE ARENA MUSS AUCH AUF EINEM HALBFERTIGEN SPIELSTAND RENDERN — dafuer gibt es eine eigene
+    // Robustheits-Suite (tests/discipline-stage-host.test.ts: „bootstrap/partial state (empty
+    // object) does NOT throw"). `getManualControlTeamIds` und `getTeamControlSettings` greifen
+    // ungeschuetzt auf `gameState.seasonState.teamControlSettings` zu und werfen dort. Der ganze
+    // Rest dieser Datei fasst den Spielstand deshalb nur mit `?.` und `?? []` an; diese beiden
+    // Aufrufe brauchen die Wache davor.
+    const hatSeasonState = Boolean(gameState?.seasonState);
+    const menschlicheTeamIds = hatSeasonState ? getManualControlTeamIds(gameState) : new Set<string>();
+    const auswahl = leseArenaTeamAuswahl({
+      gameState,
+      ownerId: merklisteOwnerId,
+      menschlicheTeamIds: [...menschlicheTeamIds],
+    });
+    const gemerkteTeamIds = leseGemerkteIds(gameState, merklisteOwnerId, "team");
     const rows = (gameState.teams ?? [])
-      .filter((team) => {
-        const relation = teamRelationshipMap.get(team.teamId);
-        return team.teamId === ownTeamId || relation === "rival" || relation === "ally";
-      })
+      .filter((team) => auswahl.has(team.teamId))
       .map((team) => {
         const entry = standings[team.teamId] as { rank?: number | null; points?: number | null } | undefined;
+        const menschlich = menschlicheTeamIds.has(team.teamId);
         return {
           teamId: team.teamId,
           name: team.name,
           code: team.shortCode,
           rank: typeof entry?.rank === "number" && Number.isFinite(entry.rank) ? entry.rank : null,
           points: entry?.points ?? null,
-          relation: team.teamId === ownTeamId ? ("mine" as const) : teamRelationshipMap.get(team.teamId) ?? null,
+          istEigen: team.teamId === ownTeamId,
+          menschlich,
+          ownerLabel:
+            menschlich && hatSeasonState
+              ? resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, team.teamId)))
+              : null,
+          gemerkt: gemerkteTeamIds.has(team.teamId),
         };
       })
       .sort((left, right) => (left.rank ?? 999) - (right.rank ?? 999) || left.name.localeCompare(right.name, "de-DE"));
-    return { anyPoints, rows };
-  }, [gameState.seasonState?.standings, gameState.teams, teamRelationshipMap, ownTeamId]);
+    return { anyPoints, rows, merklisteLeer: gemerkteTeamIds.size === 0 };
+  }, [gameState, roomContext?.ownerId, ownTeamId]);
 
   // Mutatoren je Spieltags-Seite (aus der Resolve-Preview; fehlt sie, bleibt die
   // Zeile weg — keine erfundenen Chips).
@@ -1699,7 +2041,16 @@ export default function DisciplineStageArena({
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
-          players: t.players.map((p) => ({
+          //
+          // POSITIONSGETREU, NICHT DICHT — Ticket #35 (Chris): „wenn ich in 5 + 6 Slot die spieler
+          // einsetze, sollen sie auch dann starten auch wenn davor dann alle slots leer sind!"
+          //
+          // Bisher lief hier ein einfaches `map`, und die Buehne liest ueber den Array-Index. Zwei
+          // Spieler auf Slot 5 und 6 landeten damit auf Etappe 1 und 2 — unter den Rollen-Labels
+          // von Slot 1 und 2, waehrend die Engine sie als Slot 5 und 6 GEWERTET hat (die
+          // Slot-Rolle traegt eine eigene Attribut-Gewichtung, bis zu +-8,5 je Spieler). Die
+          // Anzeige widersprach also der Rechnung darunter.
+          players: verteileAufSlots(t.players, (p) => ({
             playerId: p.playerId,
             val: p.val,
             name: p.name,
@@ -1752,11 +2103,23 @@ export default function DisciplineStageArena({
      * Das Maximum (statt Minimum) ist richtig, weil Teams unterschiedlich viele
      * Spieler haben duerfen — ein Team mit mehr Spielern muss seine auch alle
      * zeigen duerfen. Der Fallback greift nur, wenn gar keine Spieler vorliegen.
+     *
+     * `computeStageSlotCount` (oben, Co-op-Room-Sync) rechnet EXAKT dieselbe
+     * Formel für eine beliebige Disziplinseite — hier bleibt derselbe Aufruf,
+     * damit es nur EINE Quelle für "Etappenzahl einer Disziplin" gibt.
      */
-    const slotCount = Math.max(
-      1,
-      teams.reduce((max, team) => Math.max(max, team.players.length), 0) || model.slotCount,
-    );
+    // `players.length` ist die POSITIONS-Laenge (hoechster besetzter Slot + 1), nicht die Anzahl
+    // der Aufgestellten — genau die Zahl, die die Etappen der Disziplin abbildet. Diese Praezisierung
+    // kommt aus `main`; sie gilt hier unveraendert, weil `computeStageSlotCount` im echten Modus auf
+    // DENSELBEN `players`-Arrays rechnet (`chosenTeams.map((t) => t.players.length)`, oben) und die
+    // Semantik damit automatisch mittraegt.
+    //
+    // MERGE-ENTSCHEIDUNG: `main` hatte die Formel an dieser Stelle wieder ausgeschrieben
+    // (`teams.reduce(...) || model.slotCount`). Uebernommen wird der Helferaufruf, nicht die
+    // ausgeschriebene Fassung — sonst gaebe es die Etappenzahl wieder an zwei Stellen, und genau
+    // diese Doppelung war der Grund fuer Befund B3 (beide Sende-Stellen schickten hart
+    // `{ d1: 0, d2: 0 }`, der Ticker des Gasts blieb dadurch fuer immer auf Etappe 0).
+    const slotCount = computeStageSlotCount(disciplineId);
     return {
       slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
       mineCode: ownShortCode,
@@ -1780,6 +2143,7 @@ export default function DisciplineStageArena({
     matchdayPanel,
     endedDisciplineIds,
     ratingByPlayerId,
+    computeStageSlotCount,
   ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
@@ -1816,14 +2180,19 @@ export default function DisciplineStageArena({
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
         captainName: t.captainName,
-        players: t.players.map((p) => ({
-          playerId: p.playerId,
-          val: p.val,
-          name: p.name,
-          portraitUrl: p.portraitUrl,
-          mods: p.mods,
-          pointsAwarded: p.pointsAwarded,
-        })),
+        // Luecken bleiben Luecken (Ticket #35) — `null` heisst „diese Etappe ist unbesetzt".
+        players: t.players.map((p) =>
+          p == null
+            ? null
+            : {
+                playerId: p.playerId,
+                val: p.val,
+                name: p.name,
+                portraitUrl: p.portraitUrl,
+                mods: p.mods,
+                pointsAwarded: p.pointsAwarded,
+              },
+        ),
       })),
     [payload, teamRelationshipMap],
   );
@@ -1843,7 +2212,7 @@ export default function DisciplineStageArena({
     for (const team of nativeTeams) {
       urls.push(team.logoUrl);
       for (const player of team.players) {
-        urls.push(player.portraitUrl);
+        urls.push(player?.portraitUrl);
       }
     }
     prefetchDisciplineStageMedia({
@@ -1862,7 +2231,7 @@ export default function DisciplineStageArena({
           .filter((t) => Boolean(t.teamId))
           .map((t) => [
             t.teamId as string,
-            t.players.map((p) => p.playerId).filter((id): id is string => Boolean(id)),
+            t.players.map((p) => p?.playerId ?? null).filter((id): id is string => Boolean(id)),
           ]),
       ),
     [payload],
@@ -1959,7 +2328,8 @@ export default function DisciplineStageArena({
    * Disziplin bucht NICHT erneut — gebucht wird der erste, verbindliche Durchlauf.
    */
   const [commitStateByDiscipline, setCommitStateByDiscipline] = useState<
-    Record<string, "pending" | "booked" | "failed">
+    // `unknown`: die Antwort war nicht lesbar — ob gebucht wurde, weiss der Browser nicht (`lwlrwd`).
+    Record<string, "pending" | "booked" | "failed" | "unknown">
   >({});
   /** Warum die Buchung abgelehnt wurde — je Disziplin. `null`, solange es keinen Grund gibt. */
   const [commitFailureReason, setCommitFailureReason] = useState<Record<string, string | null>>({});
@@ -1969,6 +2339,15 @@ export default function DisciplineStageArena({
   const commitFinishedDiscipline = useCallback(
     (finishedDisciplineId: string) => {
       if (!onCommitDiscipline) return;
+      /**
+       * HOST-VORBEHALT (Stufe 3.5): erst mit Befund B3 behoben (siehe `computeStageSlotCount`
+       * oben) erreicht der Gast ueberhaupt den Zieleinlauf und damit `onEnded` — vorher stand
+       * er dauerhaft vor Etappe 1 und rief diesen Pfad nie auf. Ohne die Sperre wuerden ab
+       * jetzt BEIDE Browser dieselbe Disziplin buchen wollen (zwei `onCommitDiscipline`-Aufrufe
+       * fuer denselben Spielstand). Solo (kein `roomContext`) bleibt unveraendert: dort ist
+       * `isRoomHost` per Definition irrelevant, der Aufrufer selbst ist immer "der Host".
+       */
+      if (roomContext && !roomArenaSync.isRoomHost) return;
       /**
        * SEITE AUS `matchdaySides`, NICHT AUS `matchdayPanel` — DAS WAR DER STILLE BUCHUNGSVERLUST.
        *
@@ -2043,7 +2422,10 @@ export default function DisciplineStageArena({
           // Der Grund wurde hier bislang verschluckt: „Die Wertung ist fehlgeschlagen" stand
           // ohne jede Angabe da, und niemand — auch nicht der Entwickler — konnte sehen, WARUM.
           const reason = error instanceof Error && error.message ? error.message : null;
-          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: "failed" }));
+          // Ein Fehler BEIM LESEN der Antwort sagt nichts darueber, ob der Server gebucht hat —
+          // genau daran ist `lwlrwd` entstanden. Nur ein fachlicher Fehler heisst "nicht gebucht".
+          const zustand = istZustandUnbekannt(error) ? "unknown" : "failed";
+          setCommitStateByDiscipline((prev) => ({ ...prev, [finishedDisciplineId]: zustand }));
           setCommitFailureReason((prev) => ({ ...prev, [finishedDisciplineId]: reason }));
           console.error("[Arena] Buchung der Disziplin fehlgeschlagen", finishedDisciplineId, error);
         })
@@ -2051,7 +2433,7 @@ export default function DisciplineStageArena({
           commitInFlightRef.current.delete(finishedDisciplineId);
         });
     },
-    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress],
+    [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress, roomContext, roomArenaSync.isRoomHost],
   );
 
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
@@ -2111,7 +2493,7 @@ export default function DisciplineStageArena({
       <div className="arena-prematch" data-testid="arena-stage" data-arena-prematch="true">
         <div>
           <span className="arena-prematch-eyebrow">Arena · {matchdayNumberLabel}</span>
-          <h1 className="arena-prematch-title">Vor dem Anpfiff</h1>
+          <h2 className="arena-prematch-title">Vor dem Anpfiff</h2>
           {disciplineSubtitle ? <p className="arena-prematch-sub">{disciplineSubtitle}</p> : null}
         </div>
 
@@ -2131,11 +2513,31 @@ export default function DisciplineStageArena({
             <p>
               Der Spieltag startet, sobald alle {leagueLineupReadiness.totalCount} Teams ihre Einsatzliste
               gespeichert und die Formkarten geklärt haben.
+              {/* Die fehlenden Teams standen bisher klein unter den leeren Medaillenkreisen. Der
+                  Block ist weg, die Information nicht — sie gehoert zum Wartestatus, also hierher. */}
+              {ownLineupComplete && pendingTeams.length > 0 && pendingTeams.length <= 6
+                ? ` Es fehlen noch: ${pendingTeams.map((team) => team.teamName).join(" · ")}.`
+                : ""}
               {missingRosterSlots > 0
                 ? ` Dein Kader hat ${ownRosterCount} Spieler für ${totalRequired} Plätze — ${missingRosterSlots === 1 ? "ein Platz bleibt" : `${missingRosterSlots} Plätze bleiben`} leer und ${missingRosterSlots === 1 ? "bringt" : "bringen"} keine Punkte.`
                 : ""}
               {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Einsatzlisten-Editor geklärt." : ""}
             </p>
+            {/* Siehe `kaufphaseSchliesstMitDiesemSpieltag` oben: die Regel bleibt, wie Chris sie
+                gesetzt hat — hier steht nur die Ansage vor der Tür, die zufällt.
+
+                Testid = Klassenname. Die beidseitige Klassen-Wache (Velo-Look-Suite) liest jeden
+                `arena-prematch…`-Namen aus dieser Datei und verlangt ihn in globals.css — mit
+                gleichem Namen braucht sie dafür keine Ausnahme. */}
+            {kaufphaseSchliesstMitDiesemSpieltag ? (
+              <p className="arena-prematch-kaufwarnung" data-testid="arena-prematch-kaufwarnung">
+                <strong>Die Kaufphase ist noch offen.</strong> Dieser Spieltag schließt sie für die
+                ganze Saison — danach lässt sich kein Spieler mehr kaufen, auch nicht nachträglich.
+                {kaufphaseSchliesstMitDiesemSpieltag.teamCount === 1
+                  ? ` Auf deinem Konto liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`
+                  : ` Auf deinen ${kaufphaseSchliesstMitDiesemSpieltag.teamCount} Konten liegen noch ${formatNlNumber(kaufphaseSchliesstMitDiesemSpieltag.kontostand, 1)} Mio.`}
+              </p>
+            ) : null}
             {slotCells.length > 0 ? (
               <div
                 className="arena-prematch-slotbar"
@@ -2147,11 +2549,10 @@ export default function DisciplineStageArena({
                 ))}
               </div>
             ) : null}
+            {/* Nur noch der Liga-Zaehler: die Zaehler je Seite stehen jetzt gross an den
+                Disziplin-Karten — dieselbe Zahl zweimal auf einer Tafel waere Rauschen. */}
             <span className="arena-prematch-slotlegend nl-tnum">
-              {d1Meta ? `${d1Meta.displayName} ${Math.min(ownLineupSideCounts.d1, sideRequirements?.d1Required ?? ownLineupSideCounts.d1)}/${sideRequirements?.d1Required ?? "?"}` : null}
-              {d1Meta && d2Meta ? " · " : ""}
-              {d2Meta ? `${d2Meta.displayName} ${Math.min(ownLineupSideCounts.d2, sideRequirements?.d2Required ?? ownLineupSideCounts.d2)}/${sideRequirements?.d2Required ?? "?"}` : null}
-              {` · Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
+              {`Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
             </span>
           </div>
           <div className="arena-prematch-hero-actions">
@@ -2179,17 +2580,36 @@ export default function DisciplineStageArena({
                 data-testid="arena-prematch-start-cta"
               >
                 Zur Bühne →
-                <small className="nl-tnum">Liga vollzählig bereit</small>
+                {/* Die Warnung steht auch AUF dem Knopf: wer die Tafel überfliegt, liest
+                    trotzdem, was dieser Klick kostet. */}
+                <small className="nl-tnum">
+                  {kaufphaseSchliesstMitDiesemSpieltag ? "schließt die Kaufphase" : "Liga vollzählig bereit"}
+                </small>
               </button>
             ) : null}
           </div>
         </div>
 
+        {/* Die Disziplin-Karten tragen jetzt die eigene Aufstellung. Chris' Ruege („Diszi 1 und 2
+            sind ja nichts sagend") traf Kaesten, die nur den Namen der Disziplin wiederholten —
+            wer dort antritt, ist die Information, die vor dem Anpfiff zaehlt. */}
         <div className="arena-prematch-disc-grid">
           {([
-            { side: "d1" as const, meta: d1Meta, required: sideRequirements?.d1Required ?? null },
-            { side: "d2" as const, meta: d2Meta, required: sideRequirements?.d2Required ?? null },
-          ]).map(({ side, meta, required }) =>
+            {
+              side: "d1" as const,
+              meta: d1Meta,
+              required: sideRequirements?.d1Required ?? null,
+              filled: ownLineupSideCounts.d1,
+              athleten: ownLineupBySide.d1,
+            },
+            {
+              side: "d2" as const,
+              meta: d2Meta,
+              required: sideRequirements?.d2Required ?? null,
+              filled: ownLineupSideCounts.d2,
+              athleten: ownLineupBySide.d2,
+            },
+          ]).map(({ side, meta, required, filled, athleten }) =>
             meta ? (
               <section key={side} className="arena-prematch-disc">
                 <div className="arena-prematch-disc-head">
@@ -2197,9 +2617,38 @@ export default function DisciplineStageArena({
                     Disziplin {side === "d1" ? 1 : 2} · {meta.displayName}
                   </h3>
                   {required != null && required > 0 ? (
-                    <span className="arena-prematch-disc-badge nl-tnum">{required} Plätze</span>
+                    <span className={`arena-prematch-disc-badge nl-tnum${filled >= required ? " is-full" : ""}`}>
+                      {Math.min(filled, required)}/{required} besetzt
+                    </span>
                   ) : null}
                 </div>
+                {athleten.length > 0 ? (
+                  <ul className="arena-prematch-athletes" aria-label={`Deine Aufstellung für ${meta.displayName}`}>
+                    {athleten.map((athlet) => (
+                      <li key={athlet.playerId} className="arena-prematch-athlete" title={athlet.name}>
+                        <span className="arena-prematch-athlete-slot nl-tnum">{athlet.slotIndex + 1}</span>
+                        <span className="arena-prematch-athlete-name">{athlet.name}</span>
+                        {athlet.isCaptain ? (
+                          <span className="arena-prematch-athlete-captain" title="Kapitän" aria-label="Kapitän">
+                            ★
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="arena-prematch-disc-empty">
+                    Für diese Disziplin ist noch niemand aufgestellt.
+                    {onOpenLineup ? (
+                      <>
+                        {" "}
+                        <button type="button" className="arena-prematch-inlinelink" onClick={() => onOpenLineup()}>
+                          Einsatzliste öffnen
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                )}
                 {preMatchMutatorsBySide[side].length > 0 ? (
                   <div className="arena-prematch-mutrow">
                     <span className="arena-prematch-mutlabel">Mutatoren</span>
@@ -2224,33 +2673,24 @@ export default function DisciplineStageArena({
           )}
         </div>
 
-        <VeloPendingRanking
-          eyebrow="Spieltags-Wertung"
-          title="Wertung folgt"
-          note={`Sobald die erste Etappe läuft, erscheint hier die Wertung aller ${leagueLineupReadiness.totalCount} Teams — beide Disziplinen gemeinsam. Bis dahin steht hier bewusst keine Reihenfolge: ohne Ergebnis gibt es keine Ränge und keine Medaillen.`}
-          slots={[
-            { key: "gold", ring: "1.", label: "Noch zu vergeben" },
-            { key: "silver", ring: "2.", label: "Noch zu vergeben" },
-            { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
-          ]}
-          meta={
-            <>
-              {leagueLineupReadiness.totalCount} Teams gemeldet · {leagueLineupReadiness.readyCount} Einsatzlisten bereit
-              {pendingTeams.length > 0 && pendingTeams.length <= 6
-                ? ` · es fehlen: ${pendingTeams.map((team) => team.teamName).join(" · ")}`
-                : ""}
-            </>
-          }
-          data-testid="arena-prematch-pending-ranking"
-        />
-
+        {/* „Beobachtete Teams" statt „Dein Umfeld": menschlich gefuehrte plus gemerkte Teams.
+            Die frueheren Verbuendet/Rivale-Etiketten kamen aus einer automatisch vergebenen
+            Rivalitaet und halfen bei keiner Entscheidung — sie sagten nie, WARUM ein Team dort
+            stand. Genau das steht jetzt in der letzten Spalte, und wer dort steht, bestimmt der
+            Mensch ueber die Merkliste. */}
         {preMatchContext.rows.length > 0 ? (
-          <section className="arena-prematch-ctx">
-            <h3>Dein Umfeld vor dem Spieltag</h3>
+          <section className="arena-prematch-ctx" data-testid="arena-prematch-ctx">
+            <div className="arena-prematch-ctx-head">
+              <h3>Beobachtete Teams</h3>
+              <span className="arena-prematch-ctx-count nl-tnum">
+                {preMatchContext.rows.length} von {(gameState.teams ?? []).length} Teams
+              </span>
+            </div>
             <p className="arena-prematch-ctx-note">
               {preMatchContext.anyPoints
                 ? "Saisonstand vor diesem Spieltag — dieselbe Quelle wie die Saisontabelle."
-                : "Noch kein Spieltag gewertet — die Reihenfolge sind die Startplätze aus dem Endstand der Vorsaison."}
+                : "Noch kein Spieltag gewertet — die Reihenfolge sind die Startplätze aus dem Endstand der Vorsaison."}{" "}
+              Gezeigt werden die menschlich geführten Teams und alles von deiner Merkliste.
             </p>
             <div style={{ overflowX: "auto" }}>
               <table className="nl-tnum">
@@ -2259,36 +2699,49 @@ export default function DisciplineStageArena({
                     <th className="is-num">Saisonrang</th>
                     <th>Team</th>
                     <th className="is-num">Punkte</th>
-                    <th aria-label="Beziehung" />
+                    <th aria-label="Grund der Beobachtung" />
                   </tr>
                 </thead>
                 <tbody>
                   {preMatchContext.rows.map((row) => (
                     <tr
                       key={row.teamId}
-                      className={row.relation === "mine" ? "is-own" : undefined}
+                      className={row.istEigen ? "is-own" : undefined}
                       onClick={onOpenTeam ? () => onOpenTeam(row.teamId) : undefined}
                       style={onOpenTeam ? { cursor: "pointer" } : undefined}
                       title={onOpenTeam ? `${row.name} öffnen` : undefined}
                     >
                       <td className="is-num">{row.rank != null ? row.rank : "—"}</td>
                       <td>
-                        {row.relation === "mine" ? "★ " : ""}
                         {row.name} · {row.code}
                       </td>
                       <td className="is-num">{fmt1(row.points ?? 0)}</td>
                       <td>
-                        {row.relation === "rival" ? (
-                          <span className="arena-prematch-rival-tag">✕ Rivale</span>
-                        ) : row.relation === "ally" ? (
-                          <span className="arena-prematch-ally-tag">Verbündet</span>
-                        ) : null}
+                        <span className="arena-prematch-tagrow">
+                          {row.istEigen ? (
+                            <span className="arena-prematch-own-tag">Dein Team</span>
+                          ) : row.menschlich ? (
+                            <span className="arena-prematch-mensch-tag">
+                              {row.ownerLabel ? `Mensch · ${row.ownerLabel}` : "Mensch"}
+                            </span>
+                          ) : null}
+                          {/* Am eigenen Team waere „Gemerkt" nur Rauschen — es steht ohnehin immer hier. */}
+                          {row.gemerkt && !row.istEigen ? (
+                            <span className="arena-prematch-merk-tag">Gemerkt</span>
+                          ) : null}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {preMatchContext.merklisteLeer ? (
+              <p className="arena-prematch-ctx-hint">
+                Deine Merkliste ist leer. Der Stern auf einer Team- oder Spielerseite legt einen
+                Eintrag an — gemerkte Teams erscheinen dann vor jedem Spieltag hier.
+              </p>
+            ) : null}
           </section>
         ) : null}
       </div>
@@ -2342,7 +2795,7 @@ export default function DisciplineStageArena({
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
             {devMode ? "Arena · Test-Modus · echte Save-Werte" : "Arena"}
           </div>
-          <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
+          <h2 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h2>
           {/* Die 2 aktiven Mutatoren dieser Disziplin — sichtbar direkt an der
               Disziplin, in JEDER Disziplin (darf nicht fehlen). */}
           {shownMutators.length > 0 ? (
@@ -2378,10 +2831,29 @@ export default function DisciplineStageArena({
           <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>
             {devMode ? "Disziplin (Admin: frei)" : "Disziplin (Spieltag)"}
           </span>
+          {/* Audit-Punkt 4: im Room darf nur steuern, wer den gemeinsamen Reveal steuert — sonst
+              sieht der Gast eine Disziplin, die niemand spielt (Spoiler bei bereits gewerteten).
+              Dev-Modus bleibt frei (Admin-Werkzeug, kein Spielzustand). */}
           <select
             value={disciplineId}
-            onChange={(event) => setDisciplineId(event.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
+            onChange={(event) => {
+              if (arenaGuestLocked && !devMode) return;
+              setDisciplineId(event.target.value);
+            }}
+            disabled={arenaGuestLocked && !devMode}
+            title={arenaGuestLocked && !devMode ? "Der Host steuert die gemeinsame Anzeige" : undefined}
+            data-testid="arena-discipline-select"
+            style={{
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1px solid var(--nl-line)",
+              background: "var(--nl-panel)",
+              color: "inherit",
+              fontSize: 14,
+              fontWeight: 700,
+              opacity: arenaGuestLocked && !devMode ? 0.55 : 1,
+              cursor: arenaGuestLocked && !devMode ? "not-allowed" : "pointer",
+            }}
           >
             {disciplineSelectOptions.map((discipline, index) => {
               // Buchungszustand aus dem Save direkt am Auswahl-Eintrag: nach einem
@@ -2403,6 +2875,11 @@ export default function DisciplineStageArena({
               );
             })}
           </select>
+          {arenaGuestLocked && !devMode ? (
+            <span className="nl-arena-coop-note" data-testid="arena-discipline-locked-hint">
+              Der Host steuert die Anzeige
+            </span>
+          ) : null}
         </label>
       </div>
 
@@ -2588,6 +3065,8 @@ export default function DisciplineStageArena({
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}
         env={DISCIPLINE_SKIN[disciplineId]?.env}
         roomSync={nativeRoomSync}
+        /* B2: Der Host wusste das laengst — die Buehne erfaehrt es jetzt auch. */
+        alreadyScored={activeSideScoredInSave}
       />
 
       {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER
@@ -2623,9 +3102,22 @@ export default function DisciplineStageArena({
               ? matchdayPanel?.d2?.disciplineId === disciplineId
                 ? "Spieltag gewertet — beide Disziplinen stehen im Saisonstand."
                 : "Gewertet — die Platzierungspunkte stehen im Saisonstand."
-              : commitFailureReason[disciplineId]
-                ? `Die Punkte wurden nicht gebucht — ${commitFailureReason[disciplineId]}`
-                : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
+              : commitState === "unknown"
+                ? /**
+                   * GEMELDET (`lwlrwd`): „Die Punkte wurden nicht gebucht — Failed to execute
+                   * 'json' on 'Response': Unexpected end of JSON input"
+                   *
+                   * Nachgemessen war diese Meldung FALSCH: am Live-Abbild trugen alle sieben
+                   * gewerteten Spieltage einen Standings-Apply-Eintrag, Spieltag 4 eingeschlossen.
+                   * Gebucht wurde sehr wohl — nur die Antwort kam nicht beim Browser an.
+                   *
+                   * Wer „nicht gebucht" liest, bucht nochmal. Deshalb sagt die Buehne bei einem
+                   * Fehler BEIM LESEN der Antwort jetzt, was sie wirklich weiss: naemlich nichts.
+                   */
+                  `Die Antwort kam nicht an — ob gebucht wurde, ist unklar. ${commitFailureReason[disciplineId] ?? ""} Bitte den Saisonstand prüfen, bevor du erneut wertest.`.trim()
+                : commitFailureReason[disciplineId]
+                  ? `Die Punkte wurden nicht gebucht — ${commitFailureReason[disciplineId]}`
+                  : "Die Wertung ist fehlgeschlagen. Die Punkte wurden nicht gebucht."}
         </div>
       ) : null}
 
@@ -2831,14 +3323,25 @@ export default function DisciplineStageArena({
             if (guideToSecondDiscipline) {
               const secondName =
                 matchdayDisciplineOptions.find((option) => option.id === secondDisciplineId)?.name ?? "Disziplin 2";
+              // Audit-Punkt 4: derselbe League-weite-Aktion-Gedanke wie an der Disziplin-Auswahl
+              // oben — nur wer den Reveal steuert, darf den Spieltag weiterschalten.
+              const locked = arenaGuestLocked;
               return (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div
+                  className={locked ? "nl-arena-phase-controls is-locked" : undefined}
+                  style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                >
                   <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                    Disziplin 1 abgeschlossen — weiter zur zweiten Disziplin dieses Spieltags.
+                    {locked
+                      ? "Disziplin 1 abgeschlossen — der Host schaltet zur zweiten Disziplin weiter."
+                      : "Disziplin 1 abgeschlossen — weiter zur zweiten Disziplin dieses Spieltags."}
                   </span>
                   <button
                     type="button"
+                    disabled={locked}
+                    title={locked ? "Der Host steuert die gemeinsame Anzeige" : undefined}
                     onClick={() => {
+                      if (locked) return;
                       setDisciplineId(secondDisciplineId);
                       // Nach oben scrollen: der Knopf sitzt UNTER der Buehne, nach dem
                       // Wechsel stand man also mitten in der Spieltags-Wertung und musste
@@ -2851,9 +3354,10 @@ export default function DisciplineStageArena({
                       fontSize: 14,
                       border: 0,
                       borderRadius: 10,
-                      cursor: "pointer",
+                      cursor: locked ? "not-allowed" : "pointer",
                       color: "var(--nl-ink)",
                       background: "var(--nl-accent)",
+                      opacity: locked ? 0.45 : 1,
                     }}
                   >
                     Weiter zu Disziplin 2: {secondName} →
@@ -2861,18 +3365,27 @@ export default function DisciplineStageArena({
                 </div>
               );
             }
+            // Audit-Punkt 4: gleiche Sperre fuer den Spieltags-Abschluss.
+            const finishLocked = arenaGuestLocked;
             return onAdvanceMatchday ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div
+                className={finishLocked ? "nl-arena-phase-controls is-locked" : undefined}
+                style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+              >
                 <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
-                  Beide Disziplinen sind gewertet — schaltet auf den nächsten Spieltag weiter.
+                  {finishLocked
+                    ? "Beide Disziplinen sind gewertet — der Host schaltet auf den nächsten Spieltag weiter."
+                    : "Beide Disziplinen sind gewertet — schaltet auf den nächsten Spieltag weiter."}
                 </span>
                 <button
                   type="button"
                   // Anker fuer Tests und die Browser-Smokes. Lag vorher am Knopf in der
                   // entfernten "Spieltagsergebnis"-Sektion und wandert mit ihm hierher.
                   data-testid="arena-finish-matchday"
-                  disabled={advancing}
+                  disabled={advancing || finishLocked}
+                  title={finishLocked ? "Der Host steuert die gemeinsame Anzeige" : undefined}
                   onClick={async () => {
+                    if (finishLocked) return;
                     if (advancingRef.current) return;
                     advancingRef.current = true;
                     setAdvancing(true);
@@ -2889,10 +3402,10 @@ export default function DisciplineStageArena({
                     fontSize: 14,
                     border: 0,
                     borderRadius: 10,
-                    cursor: advancing ? "default" : "pointer",
+                    cursor: advancing || finishLocked ? "default" : "pointer",
                     color: "var(--nl-ink)",
                     background: "var(--nl-accent)",
-                    opacity: advancing ? 0.6 : 1,
+                    opacity: advancing ? 0.6 : finishLocked ? 0.45 : 1,
                   }}
                 >
                   {advancing ? "schaltet weiter…" : "Spieltag abschließen"}

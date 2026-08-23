@@ -37,6 +37,7 @@ import {
 import { assessPlayerMorale, evaluatePromisedRoleAttendanceOutcome } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
+import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndXpSpend, previewSeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
@@ -257,12 +258,25 @@ function markBlocked(run: AdminSeasonSimulationRunState, phase: AdminSeasonSimul
   log(run, "red", phase, message, code);
 }
 
+/**
+ * EIN FEHLENDER SPIELSTAND IST KEIN SERVERFEHLER.
+ *
+ * Hier stand ein blankes `new Error("Save ... wurde nicht gefunden.")`. Der Sammel-`catch` der
+ * Route macht daraus HTTP 500 mit dem Satz als Fliesstext — so gemessen im Koop-Audit, nachdem
+ * die Aufbewahrung einen Snapshot weggeraeumt hatte und der Aufrufer noch dessen ID hielt.
+ *
+ * Zwei Dinge stimmen daran nicht, dieselben zwei wie beim Koop-Schreibkonflikt (siehe
+ * koop-schreibkonflikt-antwort.ts). Erstens der Status: 500 heisst "der Server ist kaputt", und
+ * das ist er nicht — die angefragte ID gibt es schlicht nicht mehr, das ist eine 404. Zweitens die
+ * Form: die Fehlertabellen der Oberflaeche kennen den CODE `save_not_found` laengst
+ * (foundation-format-render-helpers.ts:469, preseason-blocker-labels.ts:60) und haetten "Spielstand
+ * wurde nicht gefunden." angezeigt — in einem ausformulierten Satz finden sie ihn nicht.
+ *
+ * `requireLocalPersistedSave` wirft genau diesen typisierten Fehler samt Status und war schon da;
+ * es fehlte nur der Anschluss. Die Route uebersetzt ihn ueber `mapSaveResolutionErrorToResponse`.
+ */
 function resolveSave(persistence: PersistenceService, saveId: string) {
-  const save = persistence.getSaveById(saveId);
-  if (!save) {
-    throw new Error(`Save ${saveId} wurde nicht gefunden.`);
-  }
-  return save;
+  return requireLocalPersistedSave(persistence, saveId).save;
 }
 
 function phaseTimeout<T>(phase: AdminSeasonSimulationPhaseId, operation: Promise<T>) {

@@ -209,18 +209,37 @@ describe("standings apply service", () => {
     expect(persistence.saveSingleplayerState).toHaveBeenCalledOnce();
     // The persisted record carries the pre-matchday baseline (projected − delta) + the matchday id, so
     // a forceReplace re-apply recomputes from the baseline instead of double-counting the delta.
-    expect(save.gameState.seasonState.standings["A-A"]).toEqual({
+    expect(save.gameState.seasonState.standings["A-A"]).toMatchObject({
       points: 18.6,
       rank: 1,
       matchdayBaselinePoints: 12,
       matchdayBaselineId: "matchday-1",
     });
-    expect(save.gameState.seasonState.standings["B-B"]).toEqual({
+    expect(save.gameState.seasonState.standings["B-B"]).toMatchObject({
       points: 20.2,
       rank: 2,
       matchdayBaselinePoints: 14,
       matchdayBaselineId: "matchday-1",
     });
+    /*
+     * DIE GuV WIRD SEIT DEM 23.08. HIER MITGESCHRIEBEN — Chris: „ja bau die drei hovers so und die
+     * guv nachbuchung auch." Vorher entstand `guv` erst am Saisonende, und die Spalte im Saisonstand
+     * blieb in jeder laufenden Saison leer, während das Team-Profil daneben eine eigene Zahl zeigte.
+     *
+     * Der Block darüber prüft deshalb nur noch die Punkte-Felder (`toMatchObject` statt `toEqual`);
+     * dass die GuV wirklich dazukommt, steht hier ausdrücklich, damit die Zeile nicht still wieder
+     * verschwinden kann. In dieser Fixture gibt es weder Sponsoren noch Gehälter — 0 ist damit das
+     * richtige Ergebnis eines leeren Kontenbuchs, keine fehlende Zahl.
+     */
+    for (const teamId of ["A-A", "B-B"]) {
+      const zeile = save.gameState.seasonState.standings[teamId] as {
+        guv?: number | null;
+        guvPosten?: Array<{ key: string }> | null;
+      };
+      expect(typeof zeile.guv).toBe("number");
+      expect((zeile.guvPosten ?? []).length).toBeGreaterThan(0);
+      expect((zeile.guvPosten ?? []).map((posten) => posten.key)).toContain("gehaelter");
+    }
     expect(save.gameState.seasonState.standingsApplyLogs).toHaveLength(1);
   });
 

@@ -8,6 +8,8 @@ import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolut
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -55,6 +57,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "plannedIntensity must be conserve, normal, push or null." }, { status: 400 });
   }
 
+  // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
+  // nie aus der Query — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
+  const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
   const writeAuth = authorizeServerRoomWrite({
     ...parseRoomWriteContextFromRequest(request),
     saveId: params.saveId,
@@ -62,6 +67,7 @@ export async function PUT(request: Request) {
     action: "formcards",
     source: "sqlite",
     dryRun: false,
+    activeOwnerId,
   });
   if (!writeAuth.allowed) {
     return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
@@ -78,6 +84,8 @@ export async function PUT(request: Request) {
       ...(hasPlannedIntensity ? { plannedIntensity: body.plannedIntensity ?? null } : {}),
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const mapped = mapSaveResolutionErrorToResponse(error);
     if (mapped) return mapped;
     throw error;

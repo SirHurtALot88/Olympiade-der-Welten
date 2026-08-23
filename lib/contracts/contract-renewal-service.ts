@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   getContractShapeTeamContext,
-  wendeApronUndMixAn,
+  wendeLiquiditaetUndMixAn,
   type ContractShapeTeamContext,
 } from "@/lib/market/contract-shape-context";
 import type {
@@ -18,7 +18,19 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import {
+  SEASON_END_CONTRACT_TICK_STEP_ID,
+  hasSeasonEndContractTickApplied,
+} from "@/lib/contracts/saisonende-alterung-marke";
+import { entferneEntwurfNachUnterschrift } from "@/lib/contracts/verhandlungs-entwuerfe";
+import { verdiktBlocker } from "@/lib/market/contract-negotiation-preview";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
+import {
+  normalizeContractLength,
+  normalizeRosterContractStatus,
+} from "@/lib/contracts/roster-contract-status";
+import { endSaisonFuerNeuenVertrag } from "@/lib/contracts/vertragslaufzeit";
+import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
 import {
   applyAiContractDissolutions,
   type AiDissolutionDecision,
@@ -43,6 +55,7 @@ import {
   buildPlayerContractPreference,
   type ContractNegotiationPreview,
 } from "@/lib/market/contract-negotiation-preview";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
@@ -163,23 +176,17 @@ function getSeasonLabel(gameState: GameState) {
   return gameState.season.name || gameState.season.id;
 }
 
-function normalizeLength(value: number | null | undefined) {
-  return Math.max(0, Math.round(typeof value === "number" && Number.isFinite(value) ? value : 0));
-}
+// Die Regel selbst liegt in `roster-contract-status.ts` — der Aufloesungs-Dienst braucht sie
+// ebenfalls und duerfte sie hier nicht importieren (Kreis ueber die KI-Aufloesung).
+/**
+ * Die Vorgabe fuer eine Verlaengerung ohne ausdrueckliche Laufzeit — dieselbe Zahl, mit der auch
+ * das Verhandlungsfenster aufgeht (`openContractRenewalNegotiation`). Bewusst KEINE Ableitung aus
+ * dem alten Vertrag: der sagt nichts darueber, wie lange der neue laufen soll.
+ */
+const STANDARD_VERTRAGSLAENGE = 2;
 
-export function normalizeRosterContractStatus(entry: Pick<RosterEntry, "contractLength" | "contractStatus">): ContractStatus {
-  if (entry.contractStatus === "released" || entry.contractStatus === "out_of_contract" || entry.contractStatus === "renewal_pending") {
-    return entry.contractStatus;
-  }
-  if (entry.contractStatus === "free_agent") {
-    return "out_of_contract";
-  }
-
-  const length = normalizeLength(entry.contractLength);
-  if (length <= 0) return "out_of_contract";
-  if (length === 1) return "expiring";
-  return "active";
-}
+const normalizeLength = normalizeContractLength;
+export { normalizeRosterContractStatus };
 
 function statusAfterSeasonTick(entry: RosterEntry): { nextLength: number; nextStatus: ContractStatus } {
   const nextLength = Math.max(0, normalizeLength(entry.contractLength) - 1);
@@ -834,9 +841,12 @@ export function chooseAiRenewalContractShape(input: {
   if (gefaelle >= AI_CONTRACT_SHAPE_FACTOR_GEFAELLE_SCHWELLE) {
     // Auch die Faktor-Regel laeuft durch den Mix-Riegel: die Abnahme von #507 stellte 14 von 216
     // Vertraegen auf back_loaded — genau die Haeufung, die Chris begrenzt sehen wollte.
-    return wendeApronUndMixAn({
+    return wendeLiquiditaetUndMixAn({
       form: "back_loaded",
       laufzeit: input.recommendedLength,
+      // Der Kassen-Riegel greift hier nicht (er bremst nur front_loaded), steht aber der
+      // Vollstaendigkeit halber mit dabei: alle drei Formwaehler geben dieselben Angaben.
+      kassenstand: cash,
       gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
     }).form;
   }
@@ -856,9 +866,14 @@ export function chooseAiRenewalContractShape(input: {
 
   // 4. Mix-Riegel als letzte Instanz. Er VERSCHIEBT nur nach `balanced` und erzeugt nie
   //    `back_loaded` — die Rangfolge oben bleibt in jeder anderen Hinsicht unangetastet.
-  return wendeApronUndMixAn({
+  return wendeLiquiditaetUndMixAn({
     form: ausRangfolge,
     laufzeit: input.recommendedLength,
+    // NEU mit der Umstellung auf den Kassenstand: die Verlaengerung kannte den Riegel bisher gar
+    // nicht (sie uebergab nur den Gehaltsberg) und konnte deshalb front_loaded verlaengern,
+    // waehrend das Konto leer war. Der groesste Vertragsstrom ueberhaupt — 121 von 176
+    // KI-Verlaengerungen in Saison 2 sind mehrjaehrig.
+    kassenstand: cash,
     gehaltsbergQuote: input.shapeContext?.gehaltsbergQuote,
   }).form;
 }
@@ -892,11 +907,57 @@ function getTeamRosterPlayers(gameState: GameState, teamId: string) {
   return gameState.players.filter((player) => playerIds.has(player.id));
 }
 
+/**
+ * EIN VERTRAGSENDE IST EIN VERKAUF — und wird deshalb genauso bepreist.
+ *
+ * CHRIS' ENTSCHEIDUNG: „ja gleicher abschlag wie beim verkauf -> du musst es so sehen dass
+ * contract exits im grunde nichts anderes als ein verkauf sind bei uns im spiel."
+ *
+ * WAS VORHER WAR: diese Funktion nahm den ROHEN Breakdown. Der Verkaufsweg schickt ihn dagegen
+ * durch `applySellPricingPolicyToBreakdown` — Saisonstart-Abschlag x Timing x Kaderdruck x
+ * Team-Fit. Damit buchte ein auslaufender oder aufgeloester Vertrag dem Team einen Erloes gut, den
+ * derselbe Spieler ueber den Transfermarkt nie gebracht haette. Nicht nur eine Anzeige daneben:
+ * `buildContractExitValue` speist die tatsaechliche Gutschrift (Aufrufer in dieser Datei) UND den
+ * Eintrag in der Transferhistorie.
+ *
+ * DER BELEG STAMMT AUS DER GEGENRICHTUNG: Lava Golem wurde am Live-Spielstand zwoelf Minuten nach
+ * Chris' Meldung ueber den Markt verkauft, die Historie zeigt `fee 28.09` — waehrend der rohe
+ * Breakdown 29,48 sagt. Verhaeltnis 0,9528, exakt die Policy. Ueber den ganzen Kader desselben
+ * Spielstands gemessen wichen ROH und BEREINIGT bei 336 von 336 Vertraegen voneinander ab, im
+ * Mittel 1,78, groesste Differenz 11,52 — durchweg zugunsten des Teams.
+ *
+ * DIE ANZEIGE WAR DIE ERSTE HAELFTE, das hier ist die zweite. `contract-negotiation-preview.ts`
+ * hat die Auslauf-TABELLE bereits auf die Policy gezogen; blieb die BUCHUNG roh, zeigte die
+ * Oberflaeche ab sofort die richtige Zahl und schriebe die falsche gut. Beide Seiten rufen jetzt
+ * dieselbe Stufe mit derselben Kaderdruck-Regel.
+ *
+ * `marketValueAtExit` BLEIBT ROH — bewusst, und aus demselben Grund wie in der Anzeige: das ist
+ * der Vergleichsmassstab. Verschoebe er sich mit, waere die ausgewiesene Differenz wieder eine
+ * andere Zahl als die, die der Spieler sieht.
+ */
 function buildContractExitValue(gameState: GameState, player: Player | null, entry: RosterEntry | null): ContractExitValue {
   const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-  const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, entry);
+  const rohBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, entry);
+  const rosterCount = entry
+    ? gameState.rosters.filter((kadereintrag) => kadereintrag.teamId === entry.teamId).length
+    : 0;
+  const saleFactorBreakdown = entry
+    ? applySellPricingPolicyToBreakdown({
+        gameState,
+        teamId: entry.teamId,
+        player,
+        rosterEntry: entry,
+        baseBreakdown: rohBreakdown,
+        // Wie im Verkaufsweg: der Kaderdruck-Malus liest die Groesse NACH diesem Abgang, sonst
+        // bewertete er einen Kader, den es danach nicht mehr gibt.
+        rosterAfter: Math.max(0, rosterCount - 1),
+      }).breakdown
+    : rohBreakdown;
   const exitValue = roundMoney(saleFactorBreakdown.salePrice ?? economy.marketValue);
-  const marketValueAtExit = roundMoney(saleFactorBreakdown.baseMarketValue ?? economy.marketValue);
+  // AUSDRUECKLICH vom ROHEN Breakdown: der Vergleichsmassstab darf sich nicht mitverschieben.
+  // Die Policy laesst `baseMarketValue` heute ohnehin unberuehrt — hier steht es trotzdem
+  // explizit, damit die Absicht im Code steht und nicht in einer Annahme ueber fremden Code.
+  const marketValueAtExit = roundMoney(rohBreakdown.baseMarketValue ?? economy.marketValue);
   const purchasePrice = roundMoney(normalizeVisibleRosterMoney(entry?.purchasePrice, economy.purchasePrice));
   const profitLoss =
     exitValue != null && purchasePrice != null
@@ -1351,23 +1412,10 @@ function buildPromisedRoleRelationshipEvents(gameState: GameState): PlayerRelati
   });
 }
 
-// Idempotenz-Marker der Saison-Vertragsalterung. Wird als preSeasonWorkflowLogs-Eintrag je
-// fromSeasonId geführt, damit die Alterung pro echtem Saisonübergang GENAU EINMAL läuft — egal ob
-// sie über den (Vorschau-)Schritt contract_renewal, den Sim-Apply oder den interaktiven
-// Saisonübergang (buildNextSeasonGameState) angestoßen wird. Der stepId ist ein freier String im
-// PreSeasonWorkflowLogRecord-Typ, deshalb keine Änderung an gemeinsamen Typen nötig.
-export const SEASON_END_CONTRACT_TICK_STEP_ID = "season_end_contract_tick";
-
-/** Wurde die Vertragsalterung für die AKTUELLE (auslaufende) Saison bereits angewandt? */
-export function hasSeasonEndContractTickApplied(gameState: GameState): boolean {
-  const seasonId = gameState.season.id;
-  return (gameState.seasonState.preSeasonWorkflowLogs ?? []).some(
-    (log) =>
-      log.stepId === SEASON_END_CONTRACT_TICK_STEP_ID &&
-      log.fromSeasonId === seasonId &&
-      log.status === "applied",
-  );
-}
+// Beide liegen in `saisonende-alterung-marke.ts` — dieses Modul zieht `node:crypto` herein und
+// darf deshalb nicht aus dem Client-Bundle importiert werden. Hier weitergereicht, damit die
+// bestehenden Importe unveraendert bleiben.
+export { SEASON_END_CONTRACT_TICK_STEP_ID, hasSeasonEndContractTickApplied };
 
 function buildSeasonEndContractTickLog(input: {
   save: PersistedSaveGame;
@@ -1487,6 +1535,26 @@ export function computeSeasonEndContractTick(
   const teamReleaseCounts = new Map<string, number>();
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
+  /**
+   * HIER STAND EIN SCHUTZ FUER „FRISCH UNTERSCHRIEBENE" VERTRAEGE — er ist weg, und das ist die
+   * Korrektur eines Fehlers, den ich selbst eingebaut habe.
+   *
+   * Er kam mit der Freigabe der Verlaengerung in der letzten Vertragssaison und sollte verhindern,
+   * dass ein VOR dem Tick unterschriebener Vertrag hier noch ein Jahr verliert. Die Annahme
+   * dahinter war, dass verlaengert werden kann, bevor die Alterung laeuft.
+   *
+   * Genau diese Annahme ist inzwischen falsch: die Alterung laeuft beim Betreten der
+   * Saisonende-Phase (`season-transition-service.ts`) und wird fuer Altstaende an der
+   * Vertragsroute nachgezogen (`vertragsalterung-nachziehen.ts`). Eine Verlaengerung liegt damit
+   * IMMER hinter dem Tick — es gibt nichts mehr zu schuetzen.
+   *
+   * Stehen bleiben durfte er trotzdem nicht. Am gemeldeten Spielstand gemessen: Xelara trug zwei
+   * `manual_contract_renewal`-Ereignisse aus der kaputten Zwischenzeit und wurde deshalb von der
+   * Alterung ausgenommen — sie blieb als EINZIGE des Teams auf Laufzeit 1 „auslaufend" stehen,
+   * waehrend die anderen drei sauber alterten. Der Schutz zementierte genau den Zustand, aus dem
+   * Chris nicht herauskam („er sagt zwar verlängert aber sie steht einfach immernoch auf
+   * auslaufendem vertrag").
+   */
   for (const entry of sourceState.rosters) {
     const tick = statusAfterSeasonTick(entry);
     if (tick.nextStatus === "out_of_contract") {
@@ -1495,6 +1563,11 @@ export function computeSeasonEndContractTick(
         nextRosters.push({
           ...entry,
           contractLength: 0,
+          // Sein Vertrag endet MIT der Saison, die gerade gespielt wurde — deshalb steht die
+          // Entscheidung an. Ohne die Endsaison bliebe der Zustand auf den Countdown angewiesen,
+          // und genau dessen Doppeldeutigkeit soll hier verschwinden.
+          contractEndSeasonNumber:
+            getCurrentSeasonNumber(sourceState) ?? entry.contractEndSeasonNumber,
           contractStatus: "renewal_pending",
         });
         continue;
@@ -1524,6 +1597,10 @@ export function computeSeasonEndContractTick(
           // `buildContractSalarySchedule` die Raten formt.
           negotiatedAnnualSalary: newSalary,
           contractLength: renewLength,
+          // Dieselbe Wahrheit wie beim Menschen — die Alterung laeuft im Saisonende-Fenster, eine
+          // Unterschrift hier deckt also ab der kommenden Saison.
+          contractEndSeasonNumber:
+            endSaisonFuerNeuenVertrag(sourceState, renewLength) ?? entry.contractEndSeasonNumber,
           contractStatus: renewLength === 1 ? "expiring" : "active",
           contractShape,
           yearlySalarySchedule: nextContractSchedule,
@@ -1563,6 +1640,7 @@ export function computeSeasonEndContractTick(
           // UNTERSCHRIFTSPFAD: Brueckenverlaengerung ueber ein Jahr. Auch sie ist eine Unterschrift.
           negotiatedAnnualSalary: bridgeSalary,
           contractLength: 1,
+          contractEndSeasonNumber: endSaisonFuerNeuenVertrag(sourceState, 1) ?? entry.contractEndSeasonNumber,
           contractStatus: "expiring",
           contractShape: "balanced",
         });
@@ -1794,9 +1872,33 @@ export function previewContractRenewalAction(input: {
   const team = input.save.gameState.teams.find((candidate) => candidate.teamId === input.teamId) ?? null;
   const player = input.save.gameState.players.find((candidate) => candidate.id === input.playerId) ?? null;
   const currentContractLength = normalizeLength(rosterEntry?.contractLength);
+  /**
+   * GEMELDET VON CHRIS: „ich kann die verträge im aktuellen save nicht verlängern obwohl wir in
+   * der vertrags phase sind!"
+   *
+   * Die Regel war um genau ein Jahr daneben. Sie verlangte `contractLength <= 0` — einen Vertrag,
+   * der bereits abgelaufen IST. `contractLength` zaehlt aber die Saisons EINSCHLIESSLICH der
+   * laufenden: eine 1 heisst „das hier ist seine letzte Saison", und genau dieser Spieler ist der,
+   * ueber den am Saisonende entschieden wird. Auf 0 faellt er erst durch die Vertragsalterung,
+   * und die laeuft im Saisonuebergang — also NACH dem Fenster, in dem verlaengert werden soll.
+   *
+   * Am gemeldeten Spielstand (Saison 1, Spieltag 10, Phase `season_end_management`) gemessen:
+   * 288 von 339 Vertraegen standen auf Laufzeit 1, kein einziger auf 0. Verlaengerbar war damit
+   * NIEMAND — nicht ein Spieler in der ganzen Liga.
+   *
+   * Der Rest des Spiels rechnete laengst mit der richtigen Bedeutung: die Inbox meldet
+   * `contractLength <= 1` als auslaufend, das Auslauf-Board schreibt „Letzte Vertragssaison —
+   * endet nach MD10. Verlaengern", und der Knopf in der Kaderansicht traegt im Code den Hinweis,
+   * dass „LZ > 1 (noch) blockiert" sei — also LZ 1 ausdruecklich nicht. Nur diese eine Zeile
+   * hielt dagegen.
+   *
+   * WANN es trotzdem nicht beliebig geht, bleibt unveraendert: der Phasen-Riegel
+   * (`evaluateGamePhaseAction`) laesst `renew_contract` nur im Saisonende-Fenster und im
+   * Saisonstart-Setup zu. Diese Zeile sagt WER, nicht WANN.
+   */
   const renewalEligible =
     input.action !== "renew" ||
-    currentContractLength <= 0 ||
+    currentContractLength <= 1 ||
     rosterEntry?.contractStatus === "renewal_pending" ||
     rosterEntry?.contractStatus === "out_of_contract";
   // Audit R2/V3: Release NUR bei ausgelaufenem Vertrag zulässig. Ein laufender Vertrag (contractLength > 0)
@@ -1814,10 +1916,12 @@ export function previewContractRenewalAction(input: {
     !team ? "team_not_found" : null,
     !player ? "player_not_found" : null,
     !rosterEntry ? "player_not_on_team_roster" : null,
-    !renewalEligible ? "renewal_only_allowed_at_lz_0" : null,
+    !renewalEligible ? "renewal_only_allowed_at_contract_end" : null,
     !releaseEligible ? "release_only_allowed_at_expired_contract" : null,
   ].filter((blocker): blocker is string => Boolean(blocker));
-  const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry?.contractLength ?? 2)));
+  // Dieselbe Vorgabe wie im Apply-Pfad — sonst rechnet die Vorschau eine andere Laufzeit vor, als
+  // danach unterschrieben wird. Siehe die Begruendung an `nextLength`.
+  const contractLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? STANDARD_VERTRAGSLAENGE)));
   const negotiationPreview =
     input.action === "renew" && rosterEntry
       ? buildNegotiationPreviewForRoster({
@@ -1856,8 +1960,22 @@ export function previewContractRenewalAction(input: {
     "confirm_required_before_contract_write",
   ].filter((warning): warning is string => Boolean(warning));
 
+  /**
+   * EIN ABGELEHNTES ANGEBOT WIRD NICHT UNTERSCHRIEBEN.
+   *
+   * Das Verdikt lag hier immer schon vor — `negotiationPreview.verdict` — und wurde nur nie gegen
+   * den Schreibweg gehalten. `applyContractRenewalAction` haengt an `preview.ok`, der Riegel
+   * greift damit auch dort, ohne dass der Apply-Pfad die Regel ein zweites Mal kennen muss.
+   * Gegenangebote bleiben ausdruecklich erlaubt: sie sind kein Nein.
+   */
+  const verdiktBlockingReasons = verdiktBlocker(negotiationPreview?.verdict);
+
   return {
-    ok: blockingReasons.length === 0 && (negotiationPreview?.blockingReasons.length ?? 0) === 0 && moraleBlockingReasons.length === 0,
+    ok:
+      blockingReasons.length === 0 &&
+      (negotiationPreview?.blockingReasons.length ?? 0) === 0 &&
+      moraleBlockingReasons.length === 0 &&
+      verdiktBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
     teamId: input.teamId,
@@ -1881,7 +1999,14 @@ export function previewContractRenewalAction(input: {
       : null,
     moraleAdjustedExpectedSalary,
     warnings: Array.from(new Set(warnings)),
-    blockingReasons: Array.from(new Set([...blockingReasons, ...(negotiationPreview?.blockingReasons ?? []), ...moraleBlockingReasons])),
+    blockingReasons: Array.from(
+      new Set([
+        ...blockingReasons,
+        ...(negotiationPreview?.blockingReasons ?? []),
+        ...moraleBlockingReasons,
+        ...verdiktBlockingReasons,
+      ]),
+    ),
   };
 }
 
@@ -1921,7 +2046,27 @@ export function applyContractRenewalAction(input: {
     };
   }
 
-  const nextLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? rosterEntry.contractLength ?? 2)));
+  /**
+   * OHNE ANGABE WIRD NEU VERHANDELT — NICHT DIE ALTE LAUFZEIT FORTGESCHRIEBEN.
+   *
+   * GEMELDET VON CHRIS: „so jetzt wollte ich xelara verlängern, verhandeln ging sie hat
+   * angenommen aber die verlängerung hat nicht funktioniert - oder man sieht es nicht."
+   *
+   * Sie hat funktioniert — sie schrieb nur `LZ 0 -> 1`, und 1 heisst „auslaufend". Aus seiner
+   * Sicht passierte damit nichts. Aus den Vertragsereignissen des Spielstands, 19:27:20 Uhr:
+   *
+   *     LZ 0 -> 1 · Gehalt 5,00 -> 5,50 · manual_contract_renewal
+   *
+   * Hier stand `?? rosterEntry.contractLength`. Bei einem Spieler, ueber den gerade entschieden
+   * wird, ist das 0 — die Klemme `Math.max(1, ...)` macht daraus 1, also die kuerzestmoegliche
+   * Bruecke. Der Fallback schrieb damit ausgerechnet dort das Gegenteil einer Verlaengerung, wo
+   * verlaengert werden sollte. Erlaubt gewesen waeren 2 Saisons (Moral-Limit 2, Verdikt `accept`).
+   *
+   * Die alte Laufzeit ist fuer eine NEUE Unterschrift ohnehin die falsche Auskunft: sie sagt, wie
+   * lange der ALTE Vertrag noch lief, nicht wie lange der neue laufen soll. Ohne Angabe gilt
+   * deshalb dieselbe Vorgabe wie im Verhandlungsfenster — zwei Saisons.
+   */
+  const nextLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? STANDARD_VERTRAGSLAENGE)));
   const newSalary =
     input.action === "renew"
       ? roundMoney(input.offeredSalary ?? preview.moraleAdjustedExpectedSalary ?? preview.negotiationPreview?.expectedSalary ?? rosterEntry.salary) ?? rosterEntry.salary
@@ -1966,9 +2111,40 @@ export function applyContractRenewalAction(input: {
                 // UNTERSCHRIFTSPFAD: Verlaengerung ueber die Vertragsaktion (Mensch wie KI).
                 negotiatedAnnualSalary: newSalary ?? entry.negotiatedAnnualSalary ?? entry.salary,
                 contractLength: nextLength,
+                /**
+                 * DIE ENDSAISON — ab hier die Wahrheit ueber die Laufzeit.
+                 *
+                 * GEMELDET VON CHRIS: „ich will sie ja eine season verlängern bis ende season 2
+                 * das muss sauber sein." Sein Vertrag war richtig, das Etikett nicht: der
+                 * Countdown wird am Ende einer Saison gesenkt, waehrend diese noch die laufende
+                 * ist — danach heisst eine 1 „noch eine volle Saison", die Statusregel las sie
+                 * aber weiter als „letzte Saison".
+                 *
+                 * Die Endsaison kennt dieses Problem nicht: sie ist eine Tatsache und wird nicht
+                 * fortgeschrieben. `endSaisonFuerNeuenVertrag` weiss dabei, dass eine Unterschrift
+                 * im Saisonende-Fenster ab der KOMMENDEN Saison deckt.
+                 */
+                contractEndSeasonNumber:
+                  endSaisonFuerNeuenVertrag(input.save.gameState, nextLength) ?? entry.contractEndSeasonNumber,
                 contractShape: nextContractShape,
                 yearlySalarySchedule: nextContractSchedule,
-                contractStatus: nextLength === 1 ? ("expiring" as const) : ("active" as const),
+                /**
+                 * DAS GESPEICHERTE STATUS-FELD FOLGT DER ENDSAISON, NICHT DEM COUNTDOWN.
+                 *
+                 * `nextLength === 1 ? "expiring" : "active"` war die letzte Stelle, an der Chris'
+                 * Fall noch falsch herauskam: eine Ein-Saison-Verlaengerung AM SAISONENDE deckt die
+                 * kommende Saison ab, ist also aktiv — der Countdown allein kann das nicht wissen.
+                 * Gemessen an seinem Spielstand schrieb diese Zeile „expiring", waehrend die
+                 * Endsaison daneben korrekt auf 2 stand.
+                 */
+                contractStatus: (() => {
+                  const ende = endSaisonFuerNeuenVertrag(input.save.gameState, nextLength);
+                  const laufend = getCurrentSeasonNumber(input.save.gameState);
+                  if (ende == null || laufend == null) {
+                    return nextLength === 1 ? ("expiring" as const) : ("active" as const);
+                  }
+                  return ende <= laufend ? ("expiring" as const) : ("active" as const);
+                })(),
               }
             : entry,
         )
@@ -2006,7 +2182,19 @@ export function applyContractRenewalAction(input: {
     },
   };
 
-  saveGameStateWithContractEvents(input.save, gameState, input.persistence);
+  /**
+   * Mit der Unterschrift ist die Verhandlung vorbei — ihr Entwurf auch.
+   *
+   * Auch bei der Freigabe: dann gibt es keinen Vertrag mehr, ueber den zu verhandeln waere. Was
+   * der Entwurf sonst anrichtet, steht in `verhandlungs-entwuerfe.ts` — kurz: er redet in die
+   * naechste Verhandlung hinein und steht als Vorschauzeile in der Vertraege-Tabelle.
+   */
+  const gameStateOhneEntwurf = entferneEntwurfNachUnterschrift(gameState, {
+    teamId: input.teamId,
+    playerId: input.playerId,
+  });
+
+  saveGameStateWithContractEvents(input.save, gameStateOhneEntwurf, input.persistence);
   return {
     ...preview,
     applied: true,

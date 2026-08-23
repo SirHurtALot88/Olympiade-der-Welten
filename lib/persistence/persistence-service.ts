@@ -1,6 +1,7 @@
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import { createSaveGameState, loadFreshSeasonOneSeedData, loadSeedData } from "@/lib/data/dataAdapter";
 import { applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { assertKeinVeralteterKoopSchreibvorgang } from "@/lib/persistence/koop-schreibkonflikt";
 import { createSaveRepository } from "@/lib/persistence/save-repository";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -21,8 +22,29 @@ function createSaveId() {
   return `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * BEFUND (gemessen, Stufe 4 — Absicherung des Mehrspieler-Vollausbaus): anders als `createSaveId()`
+ * trug diese ID NUR `Date.now()`, keinen Zufallsanteil. Gemessen (siehe
+ * `createFreshSeasonOneSaveIdForTests` + den Test dazu in tests/singleplayer-state.test.ts):
+ * 2000 Aufrufe HINTEREINANDER in derselben Millisekunde lieferten VOR diesem Fix genau EINE
+ * eindeutige ID zurueck (`new Set(...).size === 1`) statt 2000 — jeder weitere `it()`-Block, der
+ * `createFreshSeasonOneSave()` schnell nach einem vorherigen aufruft (in derselben Testdatei UND
+ * damit derselben SQLite-Datenbank, siehe tests/setup/sqlite-pro-testdatei.ts), lief real Gefahr,
+ * denselben `saveId` (Primärschlüssel der `saves`-Tabelle) wie ein VOLLKOMMEN ANDERER Spielstand zu
+ * bekommen — die zweite Speicherung ueberschreibt dann die erste. Fix an der Wurzel (die ID-Vergabe
+ * selbst bekommt denselben Zufallsanteil wie `createSaveId()`), unabhaengig davon, welcher
+ * Cache/Verbraucher eine solche Kollision als naechstes sichtbar gemacht haette.
+ */
 function createFreshSeasonOneSaveId() {
-  return `fresh-season-1-${Date.now()}`;
+  return `fresh-season-1-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * NUR FUER TESTS: pinnt die Eindeutigkeit der ID-Vergabe direkt, ohne bei jedem Aufruf den vollen
+ * (teuren) Liga-Bootstrap von `createFreshSeasonOneSave` zu durchlaufen — siehe Befund am Typ oben.
+ */
+export function createFreshSeasonOneSaveIdForTests() {
+  return createFreshSeasonOneSaveId();
 }
 
 /**
@@ -95,6 +117,17 @@ export function createPersistenceService(): PersistenceService {
       const perfCount = process.env.OLY_PERF_COUNT_SAVES === "1";
       const t0 = perfCount ? Number(process.hrtime.bigint()) : 0;
       const existing = saveRepository.getSaveById(saveId);
+      // Befund F3 (Aufgabe #46): DIE eine Engstelle, an der jeder Koop-Schreibvorgang vorbeikommt.
+      // Begruendung und Grenzen stehen vollstaendig in `koop-schreibkonflikt.ts`; hier steht nur
+      // der Aufruf — und er MUSS vor `withNextSaveVersion` stehen, denn genau dieses Hochzaehlen
+      // von der gespeicherten Version verdeckt den Konflikt sonst.
+      if (!input?.restoresPreviousState) {
+        assertKeinVeralteterKoopSchreibvorgang({
+          saveId,
+          geleseneVersion: gameState.saveVersion,
+          gespeicherteVersion: existing?.gameState.saveVersion,
+        });
+      }
       const nextGameState = withNextSaveVersion(gameState, existing?.gameState.saveVersion);
       const result = saveRepository.saveGameState({
         saveId,

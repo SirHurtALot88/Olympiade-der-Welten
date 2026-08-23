@@ -102,20 +102,26 @@ describe("Kader-Drawer: der Weg von der Zeile zur Einschätzung", () => {
     expect(uebergang).toContain("openMarketSellModal(");
   });
 
-  it("springt beim Übergang trotz Fokus-Rückgabe an den Anfang", () => {
+  it("springt beim Übergang trotz Fokus-Rückgabe zur Verkaufsfläche", () => {
     /**
      * Im Browser gemessen: nach dem Übergang stand die Seite wieder bei 966px, obwohl
-     * `openMarketSellModal` an den Anfang scrollt. Die Fokusfalle des Drawers gibt den Fokus
+     * `openMarketSellModal` selbst schon springt. Die Fokusfalle des Drawers gibt den Fokus
      * beim Schließen an die geklickte Kaderzeile zurück, und der Browser scrollt die ins Bild —
-     * erst nachdem React das Schließen committet hat, also NACH dem scrollTo. Der Sprung muss
-     * deshalb der letzte sein, sonst ist der gemeldete Bug wieder da.
+     * erst nachdem React das Schließen committet hat, also NACH dem ersten Sprung. Der Sprung
+     * muss deshalb der letzte sein, sonst ist der gemeldete Fehler wieder da.
+     *
+     * ZIEL ist seit Chris' zweiter Meldung nicht mehr der Seitenanfang, sondern die
+     * Verkaufsfläche: aus der Teamansicht heraus hängt sie UNTER der Liste, „oben" wäre dort
+     * die falsche Richtung. `springeZuElement` wartet intern Frame für Frame auf das Element.
      */
     const uebergang = SCOPE.slice(
       SCOPE.indexOf("async function openMarketSellFromPeek("),
       SCOPE.indexOf("function closeMarketSellModal("),
     );
-    expect(uebergang).toContain("requestAnimationFrame");
-    expect(uebergang.indexOf("closeMarketSellPeek()")).toBeLessThan(uebergang.indexOf("requestAnimationFrame"));
+    expect(uebergang).toContain("springeZuElement(VERKAUFSFLAECHE_ANKER)");
+    expect(uebergang.indexOf("closeMarketSellPeek()")).toBeLessThan(
+      uebergang.indexOf("springeZuElement(VERKAUFSFLAECHE_ANKER)"),
+    );
   });
 
   it("rendert per Portal in die Shell — nicht in den Body und nicht an Ort und Stelle", () => {

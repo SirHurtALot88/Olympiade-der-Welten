@@ -533,10 +533,24 @@ function buildDemandContext(gameState: GameState, teamId: string): DemandContext
   const rosterIds = new Set(rosterEntries.map((entry) => entry.playerId));
   const rosterPlayers = gameState.players.filter((player) => rosterIds.has(player.id));
   const currentSchedule = gameState.seasonState.disciplineSchedule?.find((entry) => entry.matchdayId === gameState.matchdayState.matchdayId) ?? null;
-  const matchdayDisciplines = [currentSchedule?.discipline1?.disciplineId, currentSchedule?.discipline2?.disciplineId]
-    .filter((id): id is string => Boolean(id))
-    .map((id) => gameState.disciplines.find((discipline) => discipline.id === id))
-    .filter((discipline): discipline is Discipline => Boolean(discipline));
+  // Kadergroesse kommt aus dem SPIELPLAN-Slot, nicht aus dem Katalog: `gameState.disciplines[].
+  // playerCount` ist nur der Startzustand, der Spielplan wuerfelt die Zahl pro Saison neu (siehe
+  // lib/season/season-discipline-schedule.ts) und weicht am Live-Spielstand bei 15 von 20
+  // Disziplinen davon ab. Die Forderungs-Schwellen unten (`requiredPlayers`, Captain-Schwelle)
+  // haengen an genau dieser Zahl — mit dem Katalogwert waeren sie an ausgelosten Spieltagen
+  // regelmaessig falsch kalibriert. Name/Kategorie kommen bevorzugt ebenfalls vom Slot, damit
+  // die Funktion auch dann etwas liefert, wenn der Katalog die Disziplin (noch) nicht kennt.
+  const matchdayDisciplines: DemandDisciplineLike[] = [currentSchedule?.discipline1, currentSchedule?.discipline2]
+    .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot?.disciplineId))
+    .map((slot) => {
+      const catalogDiscipline = gameState.disciplines.find((discipline) => discipline.id === slot.disciplineId);
+      return {
+        id: slot.disciplineId,
+        name: slot.displayName ?? catalogDiscipline?.name ?? slot.disciplineId,
+        category: slot.category ?? catalogDiscipline?.category ?? "power",
+        playerCount: slot.playerCount ?? catalogDiscipline?.playerCount ?? null,
+      };
+    });
   const facilities = getTeamFacilityState(gameState, teamId).facilities;
   const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
   const matchdaysElapsed = Math.min(

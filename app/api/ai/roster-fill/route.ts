@@ -11,6 +11,8 @@ import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -65,14 +67,18 @@ export async function POST(request: Request) {
   // human participant's team — see `resolveAiBulkTeamWriteScope`. Read fresh so nothing here trusts
   // a client-supplied claim. When the save can't be resolved yet, omit the restriction and let the
   // service's own save-resolution error surface as before.
+  //
+  // Stufe 0.3 (Befund B2): die Identitaet fuer den Nicht-Raum-Fall kommt serverseitig aus der
+  // Sitzung (`resolveAuthoritativeWriteOwnerId`), nicht mehr aus `roomWriteContext.activeOwnerId`.
   const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const scopeOwnerId = await resolveAuthoritativeWriteOwnerId();
   const callerWritableTeamIds = freshSaveForScope
     ? Array.from(
         resolveAiBulkTeamWriteScope({
           gameState: freshSaveForScope.gameState,
           room: writeAuth.room,
           participant: writeAuth.participant,
-          activeOwnerId: roomWriteContext.activeOwnerId,
+          activeOwnerId: scopeOwnerId,
         }).writableTeamIds,
       )
     : null;
@@ -101,6 +107,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Auto roster fill failed.",

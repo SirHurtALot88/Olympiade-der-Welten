@@ -109,7 +109,7 @@ export type MatchdaySlotPreviewCard = {
 
 export type TeamdeckFilterMode = "all" | "free" | "assigned" | "blocked";
 export type TeamdeckSortMode = "fit" | "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
-export type TeamdeckCandidateQualityKey = "instant" | "alternative" | "fatigue" | "blocked" | "emergency";
+export type TeamdeckCandidateQualityKey = "instant" | "alternative" | "injured" | "fatigue" | "blocked" | "emergency";
 
 export type SlotCandidateSummaryEntry = {
   activePlayerId: string;
@@ -198,6 +198,18 @@ const FATIGUE_UI_MEDIUM = 40;
 
 export function isElevatedFatigue(fatigue: number | null | undefined) {
   return (fatigue ?? 0) >= FATIGUE_UI_MEDIUM;
+}
+
+/**
+ * Verletzt und deshalb draussen — dieselbe Regel wie `isUnavailable` in
+ * `lib/ai/ai-lineup-freshness.ts:58`, damit Anzeige und KI-Frischepruefung nicht
+ * auseinanderlaufen. „recovering" zaehlt NICHT: wer zurueck ist, darf spielen.
+ */
+export function istVerletztUndNichtEinsetzbar(player: {
+  availabilityBlocker?: string | null;
+  injuryStatus?: "healthy" | "injured" | "recovering" | null;
+}) {
+  return player.availabilityBlocker === "player_injured_unavailable" || player.injuryStatus === "injured";
 }
 
 export function formatScore(value: number) {
@@ -422,12 +434,23 @@ export function getTeamdeckCandidateGroupMeta(groupKey: TeamdeckCandidateQuality
         tone: "info" as const,
         order: 1,
       };
+    case "injured":
+      // GEMELDET (`9ykeqt`): „der eigentliche Grund ist doch dass der spieler verletzt ist.
+      // Entsprchend sollte das auch angegeben sein +Icon!" — eigene Gruppe VOR der Fatigue-Gruppe,
+      // damit die Ueberschrift den Grund nennt statt ihn zu verdecken. Das Kreuz ist dasselbe
+      // Zeichen, mit dem die Kaderkarte Verletzte markiert.
+      return {
+        label: "🩹 Verletzt — faellt aus",
+        description: "Steht fuer diesen Spieltag nicht zur Verfuegung.",
+        tone: "blocked" as const,
+        order: 2,
+      };
     case "fatigue":
       return {
         label: "Riskant wegen Fatigue",
         description: "Nur mit Bedacht einsetzen oder über Team-Einsatz abfedern.",
         tone: "warning" as const,
-        order: 2,
+        order: 3,
       };
     case "blocked":
       return {
@@ -1028,6 +1051,27 @@ export function buildTeamdeckCandidateEntries(input: {
         // damit vor dem Setzen nicht erkennbar, obwohl sie der haeufigste und wichtigste Grund
         // ist. Genau so gemeldet: "verletzungen muessen im ui direkt erkennbar sein".
         shortReason = activeSlotCandidate.blockReason === "player_injured_unavailable" ? "Verletzt" : "blockiert";
+      } else if (istVerletztUndNichtEinsetzbar(player)) {
+        /**
+         * GEMELDET (`9ykeqt`, „Spieltag · Einsatzliste", Spielstand `swnjlk`, Saison 1, MD10):
+         * „Wenn man einen Spieler nicht einsetzen kann steht da immer Riskant wegen Fatigue, aber
+         * der eigentliche Grund ist doch dass der spieler verletzt ist."
+         *
+         * URSACHE: Der Verletzungs-Zweig darueber haengt an `activeSlotCandidate`, und die Karte
+         * ist NUR befuellt, wenn gerade ein Slot angeklickt ist (Zeile 987 —
+         * `activeSlotCandidateByActivePlayerId` wird ohne aktiven Slot nicht gefuellt). Beim
+         * blossen Oeffnen der Einsatzliste — genau Chris' Lage — fiel ein verletzter Spieler
+         * deshalb durch bis zur Fatigue-Pruefung darunter und landete unter der Ueberschrift
+         * „Riskant wegen Fatigue". Die Verletzung ist dabei die ganze Zeit auf der Karte lesbar,
+         * sie wurde nur nicht gefragt.
+         *
+         * Dieselbe Pruefung wie in `lib/ai/ai-lineup-freshness.ts:58` — beide Felder, weil der
+         * Blocker nur den harten Ausfall traegt und `injuryStatus` auch den frisch gemeldeten.
+         * „recovering" gehoert bewusst NICHT dazu: wer zurueck ist, darf spielen.
+         */
+        groupKey = "injured";
+        detail = "Verletzt — steht fuer diesen Spieltag nicht zur Verfuegung.";
+        shortReason = "Verletzt";
       } else if (isElevatedFatigue(player.fatigueCount)) {
         groupKey = "fatigue";
         detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spürbar riskanter.`;
@@ -1172,7 +1216,7 @@ export function buildTeamdeckCandidateGroups(input: {
   teamdeckFilterMode: TeamdeckFilterMode;
 }): TeamdeckCandidateGroup[] {
   const { teamdeckCandidateEntries, showOnlyTopSlotCandidates, teamdeckFilterMode } = input;
-  const keys: TeamdeckCandidateQualityKey[] = ["instant", "alternative", "fatigue", "blocked", "emergency"];
+  const keys: TeamdeckCandidateQualityKey[] = ["instant", "alternative", "injured", "fatigue", "blocked", "emergency"];
   return keys
     .map((groupKey) => {
       const meta = getTeamdeckCandidateGroupMeta(groupKey);

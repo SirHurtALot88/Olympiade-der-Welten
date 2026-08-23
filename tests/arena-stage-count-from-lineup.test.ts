@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { resolveDisciplineStageSlotCount } from "@/lib/foundation/discipline-stage/discipline-stage-slot-count";
+
 const read = (relativePath: string) => readFileSync(join(process.cwd(), relativePath), "utf8");
 
 /**
@@ -16,25 +18,101 @@ const read = (relativePath: string) => readFileSync(join(process.cwd(), relative
  * Die Ziellinie ist dagegen der Endstand des besten Teams ueber DESSEN Spieler
  * und war nach der letzten echten Etappe erreicht.
  */
+/**
+ * VON TEXTSUCHE AUF VERHALTEN UMGESTELLT (16.08.2026). Diese drei Faelle pinnten bis dahin den
+ * WORTLAUT des Ausdrucks im Bauteil (`toContain("teams.reduce((max, team) => …")`). Beim Herausziehen
+ * der Rechnung nach `lib/foundation/discipline-stage/discipline-stage-slot-count.ts` fielen sie um,
+ * obwohl die Eigenschaft unveraendert galt — der Test mass die Schreibweise, nicht die Zusage.
+ *
+ * Herausgezogen wurde sie, weil der Arena-Gleichlauf seit Befund B3 einen ZWEITEN Aufrufer stellt:
+ * der Mitspieler bekommt diese Zahl als Ziel gemeldet. Anzeige und Gleichlauf muessen dieselbe
+ * nehmen — sonst haelt der Gast zu frueh an oder wartet auf eine Etappe, die nie kommt.
+ */
 describe("Arena: Etappenzahl folgt der tatsaechlichen Aufstellung", () => {
-  const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
-
-  it("leitet slotCount aus den Spielern der Teams ab, nicht aus der Anforderung", () => {
-    expect(host).toContain("teams.reduce((max, team) => Math.max(max, team.players.length), 0) || model.slotCount");
-    // Der alte Ausdruck nahm im Modell-Modus ungeprueft die Disziplin-Anforderung.
-    expect(host).not.toContain("      : model.slotCount;");
+  it("leitet die Etappenzahl aus den Spielern der Teams ab, nicht aus der Anforderung", () => {
+    // Die Disziplin FORDERT 5, aufgestellt sind aber nur 3 — genau der gemeldete Fall
+    // („Ziel nach 3 von 5 Etappen erreicht, danach passiert nichts mehr").
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [3, 3, 2], fallbackSlotCount: 5 })).toBe(3);
   });
 
   it("nimmt das Maximum ueber die Teams, nicht das Minimum", () => {
-    // Teams duerfen unterschiedlich viele Spieler haben — wer mehr hat, muss sie
-    // auch alle zeigen duerfen. Ein Minimum wuerde Etappen unterschlagen.
-    expect(host).toContain("Math.max(max, team.players.length)");
-    expect(host).not.toContain("Math.min(min, team.players.length)");
+    // Teams duerfen unterschiedlich viele Spieler haben — wer mehr hat, muss sie auch alle zeigen
+    // duerfen. Ein Minimum wuerde Etappen unterschlagen.
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [2, 6, 4], fallbackSlotCount: 5 })).toBe(6);
   });
 
   it("faellt nur zurueck, wenn gar keine Spieler vorliegen, und nie unter 1", () => {
-    expect(host).toContain("Math.max(\n      1,\n      teams.reduce(");
-    expect(host).toContain("|| model.slotCount,");
+    // Keine Aufstellung bekannt (weder Vorschau noch gebuchtes Ergebnis) ⇒ Anforderung als Rueckfall.
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [], fallbackSlotCount: 5 })).toBe(5);
+    // Auch lauter Nullen sind „nichts aufgestellt" — sonst stuende die Arena bei 0 Etappen.
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [0, 0], fallbackSlotCount: 4 })).toBe(4);
+    // Und selbst ohne jede Angabe niemals 0: eine Arena ohne Etappe liefe sofort ins Ziel, und der
+    // Gleichlauf haette wieder die B3-Sackgasse (0 < 0 ist nie wahr).
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [], fallbackSlotCount: 0 })).toBe(1);
+  });
+
+  it("liefert dieselbe Zahl an Anzeige UND Gleichlauf — eine Quelle", () => {
+    // Das ist die Zusage, die das Herausziehen ueberhaupt noetig machte: `DisciplineStageArena.tsx`
+    // ruft dieselbe Funktion fuer die angezeigten Etappen und fuer die an den Mitspieler gemeldete
+    // Zaehlgrenze. Zwei Ableitungen waeren wieder zwei Wahrheiten.
+    const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+    expect(host).toContain("resolveDisciplineStageSlotCount");
+    expect(host).not.toContain("maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 }");
+  });
+});
+
+/**
+ * BEFUND A4 (Audit, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): "im Echt-Modus nimmt der Rückfall
+ * `model.slotCount` — also die ANFORDERUNG der Disziplin — statt der tatsächlichen `slots.length`
+ * der Modell-Teams." Nachgeprueft (reproduziert, nicht nur behauptet, Hausregel "vor jedem Paket
+ * wird der Fehler reproduziert"): der ECHT-Modus-Zweig von `computeStageSlotCount`
+ * (`DisciplineStageArena.tsx`) uebergibt bereits `chosenTeams.map((t) => t.players.length)` als
+ * `playerCountsByTeam` — die tatsaechliche Aufstellung, NICHT die Modell-Anforderung. Die
+ * REGEL-Funktion selbst (`resolveDisciplineStageSlotCount`, oben bereits vollstaendig
+ * verhaltensgeprueft) verwirft `fallbackSlotCount` per `maxFielded || fallback`, sobald echte
+ * Spielerzahlen vorliegen — der von A4 beschriebene Fehler ("Rückfall zaehlt die Anforderung")
+ * tritt an dieser Stelle NICHT (mehr) auf. Dieser Test haelt GENAU den vom Audit beschriebenen Fall
+ * fest (3 aufgestellte Spieler bei Anforderung 5) UND prueft per Quellcode-Vertrag (der React-Hook
+ * ist ohne jsdom nicht renderbar, siehe Kommentar oben), dass der Echt-Modus-Zweig wirklich die
+ * Aufstellung uebergibt — als Regressionssperre gegen genau das Zurueckfallen, das A4 befuerchtet.
+ */
+describe("A4: Echt-Modus faellt NICHT auf die Anforderung zurueck, solange eine Aufstellung vorliegt", () => {
+  it("der gemeldete Fall (3 aufgestellte Spieler, Disziplin fordert 5) liefert 3 Etappen, nicht 5", () => {
+    expect(resolveDisciplineStageSlotCount({ playerCountsByTeam: [3, 3, 3], fallbackSlotCount: 5 })).toBe(3);
+  });
+
+  it("Quellcode-Vertrag: der Echt-Modus-Zweig uebergibt die echte Aufstellung als `playerCountsByTeam`", () => {
+    const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+    expect(host).toContain("const playerCountsByTeam = chosenTeams.map((t) => t.players.length)");
+  });
+});
+
+/**
+ * BEFUND A5 (Audit): `buildDisciplineStageModel` (baut Kader + Aufstellung komplett neu auf) wurde
+ * im Echt-Modus-Zweig als PLAIN Funktionsargument fuer `fallbackSlotCount` benutzt
+ * (`fallbackSlotCount: buildDisciplineStageModel(...).slotCount`). JS wertet Funktionsargumente VOR
+ * dem Aufruf aus — das lief also bei JEDEM Aufruf, auch wenn `resolveDisciplineStageSlotCount` den
+ * Wert wegen vorhandener echter Aufstellung nie ansah. Bei zwei Seiten (d1+d2,
+ * `maxSlotRevealCountByDiscipline`) macht das bis zu zwei unbenutzte Modell-Aufbauten zusaetzlich
+ * zu dem einen tatsaechlich noetigen (`model`, memoisiert fuer die angezeigte Disziplin) — "bis zu
+ * dreimal je Render". Der Hook selbst ist ohne jsdom nicht renderbar (siehe Kommentar oben); die
+ * hier pruefbare Eigenschaft ist die STRUKTUR des Fixes: der Aufbau ist jetzt lazy (nur bei leerer
+ * Aufstellung) und nutzt fuer die aktuell angezeigte Seite das schon vorhandene `model`.
+ */
+describe("A5: der Modell-Aufbau im Rueckfall ist lazy, nicht mehr eager", () => {
+  const host = read("app/foundation/discipline-stage/DisciplineStageArena.tsx");
+
+  it("baut das Modell nicht mehr unbedingt als Funktionsargument auf (kein `fallbackSlotCount: buildDisciplineStageModel(...)` mehr)", () => {
+    expect(host).not.toContain("fallbackSlotCount: buildDisciplineStageModel(gameState, sideDisciplineId, ownTeamId).slotCount");
+  });
+
+  it("der Rueckfall-Aufbau ist an eine Bedingung geknuepft (laeuft nur, wenn wirklich keine Aufstellung vorliegt)", () => {
+    expect(host).toContain("hasAnyFieldedPlayer");
+  });
+
+  it("fuer die gerade angezeigte Disziplin wird das bereits memoisierte `model` wiederverwendet, statt es erneut zu bauen", () => {
+    expect(host).toContain("sideDisciplineId === disciplineId");
+    expect(host).toContain("? model.slotCount");
   });
 });
 

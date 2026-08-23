@@ -48,6 +48,14 @@ export type ContractRenewalNegotiationDraft = {
   contractLength: number;
   offeredSalary: number | null;
   contractShape: ContractShape;
+  /**
+   * Der Token der Vorschau, die im Fenster STEHT — nicht der vom Oeffnen.
+   *
+   * Das Fenster holt bei jeder Aenderung eine frische Vorschau; ihr Token gehoert damit genau zu
+   * den Zahlen, die der Nutzer gesehen hat. Ihn mitzugeben erspart dem Schreibweg eine eigene
+   * Dry-Run-Runde — am Live-Abbild gemessen eine volle Spielstand-Ladung von 1965 ms.
+   */
+  confirmToken: string | null;
 };
 
 export type ContractRenewalNegotiationModalProps = {
@@ -75,8 +83,13 @@ function translateRenewalReason(reason: string): string {
   if (reason.startsWith("phase_blocked:renew_contract")) {
     return "Gehaltsverhandlung öffnet am Season-End (nach MD10) — bis dahin nur Vorschau.";
   }
-  if (reason === "renewal_only_allowed_at_lz_0") {
-    return "Verlängert wird erst, wenn der Vertrag ausläuft (LZ 0 am Season-End) — bis dahin nur Vorschau.";
+  // Der Code hiess bis zum gemeldeten Fehler `renewal_only_allowed_at_lz_0` und der Satz sprach von
+  // „LZ 0". Beides war falsch: entschieden wird in der LETZTEN Vertragssaison (LZ 1), auf 0 faellt
+  // der Vertrag erst durch die Alterung im Saisonuebergang — da ist das Fenster schon zu. Der alte
+  // Code bleibt uebersetzt, damit eine Antwort von einem noch nicht neu gebauten Server nicht roh
+  // durchschlaegt.
+  if (reason === "renewal_only_allowed_at_contract_end" || reason === "renewal_only_allowed_at_lz_0") {
+    return "Verlängert wird in der letzten Vertragssaison — dieser Vertrag läuft noch länger.";
   }
   if (reason === "morale_refuses_extension") {
     return "Der Spieler lehnt eine Verlängerung aktuell ab (Moral).";
@@ -169,6 +182,33 @@ function toPercentWidth(value: number | null | undefined): number {
   return Math.max(0, Math.min(100, value));
 }
 
+/**
+ * DAS ERGEBNIS EINER VERHANDLUNGSRUNDE.
+ *
+ * GEMELDET VON CHRIS: „und wieso gibts beim verlängern kein angebot senden knopf? der spieler
+ * muss wie beim kauf ja auch verhandeln können."
+ *
+ * Er hatte recht, und der Befund war unangenehm: die Verlaengerung laeuft laengst durch DIESELBE
+ * Engine wie der Kauf (`buildContractNegotiationPreview`). Verdikt und Gegenangebots-Betrag werden
+ * berechnet und mitgeliefert — dieses Fenster zeigte davon nur die drei Prozentbalken und liess
+ * „Vertrag bestaetigen" danach durchlaufen, egal was das Verdikt sagte. Die Chancen waren Deko.
+ *
+ * Der Ablauf ist deshalb derselbe wie beim Kauf: erst senden, dann unterschreiben.
+ *
+ * `fuerAngebot` haelt fest, ZU WELCHEM Angebot das Ergebnis gehoert. Aendert man danach Gehalt,
+ * Laufzeit oder Form, gilt es nicht mehr — sonst unterschriebe man einen anderen Vertrag als den,
+ * dem der Spieler zugestimmt hat.
+ */
+type VerhandlungsErgebnis = {
+  status: "accepted" | "countered" | "rejected";
+  tone: "success" | "warning" | "error";
+  title: string;
+  message: string;
+  counterSalary?: number | null;
+  counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
+  fuerAngebot: { salary: number | null; length: number; shape: ContractShape };
+};
+
 export default function ContractRenewalNegotiationModal({
   subject,
   busy,
@@ -206,21 +246,50 @@ export default function ContractRenewalNegotiationModal({
     requestSeqRef.current = seq;
     setPreviewBusy(true);
     debounceRef.current = setTimeout(() => {
+      /**
+       * DAS FENSTER DARF NICHT HAENGEN BLEIBEN.
+       *
+       * GEMELDET VON CHRIS: „momentan lädt es endlos."
+       *
+       * `previewBusy` wurde synchron gesetzt und NUR im Erfolgspfad wieder geloest — kein `catch`,
+       * kein `finally`, kein Timeout. Bleibt eine Antwort aus, steht das Fenster dauerhaft auf
+       * „Die Verhandlungsvorschau wird aktualisiert", und beide Knoepfe sind gesperrt: „Angebot
+       * senden" und „Vertrag unterschreiben" haengen beide an `previewBusy`.
+       *
+       * Und Antworten bleiben aus: `better-sqlite3` ist synchron, jeder Voll-Load des Spielstands
+       * blockiert den ganzen Node-Prozess. Ein Bestaetigen stiess bis eben fuenf davon an, drei
+       * davon im Hintergrund — waehrenddessen wird keine andere Anfrage bedient.
+       *
+       * `finally` statt `then`: der Zustand loest jetzt IMMER, auch bei Netzfehler oder Absturz
+       * der Route. Ein Fehlschlag zeigt dann die zuletzt bekannten Zahlen statt einer toten
+       * Oberflaeche — schlechter als frische Zahlen, aber unendlich viel besser als gar nichts.
+       */
       void requestPreview({
         teamId: subject.teamId,
         playerId: subject.playerId,
         contractLength: draftLength,
         offeredSalary: draftSalary,
         contractShape: draftShape,
-      }).then((payload) => {
-        if (requestSeqRef.current !== seq) {
-          return;
-        }
-        if (payload?.summary) {
-          setSummary(payload.summary);
-        }
-        setPreviewBusy(false);
-      });
+      })
+        .then((payload) => {
+          if (requestSeqRef.current !== seq) {
+            return;
+          }
+          if (payload?.summary) {
+            setSummary(payload.summary);
+          }
+        })
+        .catch(() => {
+          // Bewusst still: `requestPreview` faengt seine Fehler schon selbst ab und liefert null.
+          // Dieser Zweig ist das Netz darunter, damit `finally` garantiert erreicht wird.
+        })
+        .finally(() => {
+          // Nur die JUENGSTE Anfrage darf entsperren — eine ueberholte Antwort wuerde sonst
+          // freigeben, waehrend die neuere noch laeuft.
+          if (requestSeqRef.current === seq) {
+            setPreviewBusy(false);
+          }
+        });
     }, PREVIEW_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) {
@@ -231,6 +300,122 @@ export default function ContractRenewalNegotiationModal({
   }, [draftSalary, draftLength, draftShape]);
 
   const negotiation = summary?.negotiationPreview ?? null;
+
+  // ---- Verhandlung: erst senden, dann unterschreiben --------------------------------
+  const [ergebnis, setErgebnis] = useState<VerhandlungsErgebnis | null>(null);
+  // Ein Ergebnis gilt nur fuer das Angebot, zu dem es gehoert. Wer danach an Gehalt, Laufzeit
+  // oder Form dreht, verhandelt einen anderen Vertrag — und muss neu senden.
+  const ergebnisGilt =
+    ergebnis != null &&
+    ergebnis.fuerAngebot.salary === draftSalary &&
+    ergebnis.fuerAngebot.length === draftLength &&
+    ergebnis.fuerAngebot.shape === draftShape;
+  const aktivesErgebnis = ergebnisGilt ? ergebnis : null;
+
+  function aktuellesAngebot() {
+    return { salary: draftSalary, length: draftLength, shape: draftShape };
+  }
+
+  /**
+   * SCHRITT 1 — das Angebot geht raus.
+   *
+   * Gewuerfelt wird hier nichts: das Verdikt steht deterministisch in der Server-Vorschau
+   * (`verhandlung-rework.md`, Abschnitt 2.2). Die Prozente daneben sind daraus ABGELEITET und
+   * nicht die Entscheidung — deshalb liest dieser Knopf das Verdikt und nicht die Prozente.
+   */
+  function angebotSenden() {
+    if (negotiation?.verdict == null || previewBusy || busy) {
+      return;
+    }
+    const verdict = negotiation.verdict;
+    const name = subject.playerName;
+    const fuerAngebot = aktuellesAngebot();
+
+    if (verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront") {
+      setErgebnis({
+        status: "rejected",
+        tone: "error",
+        title:
+          verdict === "reject_not_about_money"
+            ? "Absage — am Geld liegt's nicht"
+            : verdict === "reject_affront"
+              ? "Absage — Rückzieher"
+              : "Angebot abgelehnt",
+        message:
+          verdict === "reject_not_about_money"
+            ? `${name} will nicht verlängern, und mehr Geld würde daran nichts ändern.`
+            : verdict === "reject_affront"
+              ? `${name} zieht sich zurück: nach seinem Entgegenkommen kam ein NIEDRIGERES Angebot als zuletzt gezeigt. Das zählt als Vertrauensbruch.`
+              : `${name} lehnt dieses Angebot ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    if (verdict === "counter_money") {
+      const gegen = negotiation.counterSalary ?? null;
+      const abstand = gegen != null && draftSalary != null ? Number((gegen - draftSalary).toFixed(2)) : null;
+      setErgebnis({
+        status: "countered",
+        tone: "warning",
+        title: negotiation.concededFromLastCounter === true ? "Er kommt dir entgegen" : "Gegenangebot",
+        message: `${name} will eher ${formatNlMoney(gegen)} pro Saison${
+          abstand != null ? ` (${abstand > 0 ? "+" : ""}${formatNlMoney(abstand)} gegenüber deinem Angebot)` : ""
+        }. Schlag ein oder passe dein Angebot an und verhandle neu.`,
+        counterSalary: gegen,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    if (verdict === "counter_conditions") {
+      const konditionen = negotiation.counterConditions ?? null;
+      setErgebnis({
+        status: "countered",
+        tone: "warning",
+        title: "Beim Gehalt einig, Vertrag noch nicht",
+        message: `${name} ist mit dem Gehalt zufrieden, will aber ${
+          konditionen ? `${konditionen.contractLength} Saison${konditionen.contractLength === 1 ? "" : "en"}` : "eine andere Laufzeit"
+        }${konditionen ? ` (Form: ${formatContractShapeLabel(konditionen.contractShape)})` : ""}. Gib ihm den Wunschvertrag oder leg beim Gehalt nach.`,
+        counterConditions: konditionen,
+        fuerAngebot,
+      });
+      return;
+    }
+
+    setErgebnis({
+      status: "accepted",
+      tone: "success",
+      title: "Angebot angenommen",
+      message: `${name} nimmt an. Du kannst den Vertrag jetzt unterschreiben.`,
+      fuerAngebot,
+    });
+  }
+
+  /**
+   * Ein angenommenes Gegenangebot ist BINDEND — dieselbe Regel wie beim Kauf
+   * (`verhandlung-rework.md`, Abschnitt 3.4). Die genannte Zahl noch einmal durch die Baender zu
+   * schicken waere Wortbruch durch Formel: ein Gegenangebot kann unter der vollen Forderung
+   * liegen und kaeme dann als Gegenangebot zurueck, statt als Zusage zu gelten.
+   */
+  function gegenangebotEinschlagen() {
+    if (aktivesErgebnis?.status !== "countered") {
+      return;
+    }
+    const neuesGehalt = aktivesErgebnis.counterSalary ?? draftSalary;
+    const neueLaufzeit = aktivesErgebnis.counterConditions?.contractLength ?? draftLength;
+    const neueForm = aktivesErgebnis.counterConditions?.contractShape ?? draftShape;
+    setDraftSalary(neuesGehalt);
+    setDraftLength(neueLaufzeit);
+    setDraftShape(neueForm);
+    setErgebnis({
+      status: "accepted",
+      tone: "success",
+      title: "Gegenangebot eingeschlagen",
+      message: `${subject.playerName} ist einverstanden. Du kannst den Vertrag jetzt unterschreiben.`,
+      fuerAngebot: { salary: neuesGehalt, length: neueLaufzeit, shape: neueForm },
+    });
+  }
   const morale = summary?.morale ?? null;
   const expectedSalary = negotiation?.expectedSalary ?? subject.expectedSalary;
   const moraleExpectedSalary = summary?.moraleAdjustedExpectedSalary ?? null;
@@ -248,7 +433,10 @@ export default function ContractRenewalNegotiationModal({
   const scheduleMax = schedule.reduce((max, row) => Math.max(max, row.salary), 0);
 
   const confirmBlocked = summary != null && !summary.ok;
-  const confirmDisabled = busy || previewBusy || draftSalary == null || confirmBlocked;
+  // Schritt 2 ist erst frei, wenn eine Zusage vorliegt — genau wie beim Kauf. Ohne diese Sperre
+  // waeren Verdikt und Chancen weiter reine Anzeige und das Angebot ginge immer durch.
+  const zusageLiegtVor = aktivesErgebnis?.status === "accepted";
+  const confirmDisabled = busy || previewBusy || draftSalary == null || confirmBlocked || !zusageLiegtVor;
   const confirmDisabledReason = !confirmDisabled
     ? null
     : busy
@@ -259,7 +447,22 @@ export default function ContractRenewalNegotiationModal({
           ? "Bitte ein Angebotsgehalt eintragen."
           : blockingReasons.length > 0
             ? translateRenewalReason(blockingReasons[0])
-            : "Diese Verlängerung ist gerade blockiert.";
+            : !zusageLiegtVor
+              ? "Erst das Angebot senden — unterschrieben wird, wenn der Spieler zusagt."
+              : "Diese Verlängerung ist gerade blockiert.";
+
+  const sendenDisabled = busy || previewBusy || draftSalary == null || confirmBlocked || negotiation?.verdict == null;
+  const sendenDisabledReason = !sendenDisabled
+    ? null
+    : previewBusy
+      ? "Die Verhandlungsvorschau wird aktualisiert."
+      : draftSalary == null
+        ? "Bitte ein Angebotsgehalt eintragen."
+        : negotiation?.verdict == null
+          ? "Die Reaktion des Spielers liegt noch nicht vor."
+          : blockingReasons.length > 0
+            ? translateRenewalReason(blockingReasons[0])
+            : "Verhandeln ist gerade gesperrt.";
 
   const offerTone =
     offerRatio == null ? "" : offerRatio >= 1 ? " is-good" : offerRatio >= 0.9 ? " is-warn" : " is-risk";
@@ -288,6 +491,21 @@ export default function ContractRenewalNegotiationModal({
             Schließen
           </button>
         </header>
+
+        {/* Was der Spieler geantwortet hat — ohne diese Zeile waere „Angebot senden" ein Knopf
+            ohne Rueckmeldung. Steht bewusst ueber dem Formular: es ist die Information, wegen der
+            man gerade etwas aendert. */}
+        {aktivesErgebnis ? (
+          <div
+            className={`transfer-feedback-banner is-${aktivesErgebnis.tone}`}
+            role="status"
+            data-testid="negotiation-outcome"
+            data-status={aktivesErgebnis.status}
+          >
+            <strong>{aktivesErgebnis.title}</strong>
+            <span>{aktivesErgebnis.message}</span>
+          </div>
+        ) : null}
 
         {error ? (
           <div className="transfer-feedback-banner is-error">
@@ -329,22 +547,39 @@ export default function ContractRenewalNegotiationModal({
               <div className="nl-negotiation-choice-row" role="group" aria-label="Laufzeit wählen">
                 {CONTRACT_LENGTHS.map((length) => {
                   const overLimit = lengthLimit != null && length > lengthLimit;
+                  /**
+                   * DER STERN SASS AUF EINER LAUFZEIT, DIE DAS FENSTER DANN VERWEIGERTE.
+                   *
+                   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus."
+                   *
+                   * Ihre Wunschlaufzeit ist 3, ihr Moral-Limit 2. Die 3 trug damit den Stern
+                   * („Wunschlaufzeit des Spielers"), war anklickbar — und liess sich anschliessend
+                   * nicht bestaetigen: „Die Moral begrenzt die Vertragslaenge — waehle eine
+                   * kuerzere Laufzeit." Wer daraufhin nach unten geht, landet leicht auf 1. Und 1
+                   * heisst „laeuft aus", also sieht die Verlaengerung aus wie nichts.
+                   *
+                   * Zwei Aenderungen: was das Fenster nicht unterschreiben wird, ist auch nicht
+                   * mehr anklickbar. Und der Stern sitzt nur noch auf einer Laufzeit, die wirklich
+                   * geht — eine Empfehlung, der man nicht folgen kann, ist keine.
+                   */
+                  const istWunsch = negotiation?.contractPreference?.idealLength === length && !overLimit;
                   return (
                     <button
                       key={length}
                       type="button"
+                      disabled={overLimit}
                       className={`nl-negotiation-choice${draftLength === length ? " is-active" : ""}${overLimit ? " is-limited" : ""}`}
                       title={
                         overLimit
-                          ? `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Seasons.`
-                          : negotiation?.contractPreference?.idealLength === length
+                          ? `Moral begrenzt die Laufzeit auf ${formatNlNumber(lengthLimit, 0)} Saisons — ${formatNlNumber(length, 0)} ist nicht unterschreibbar.`
+                          : istWunsch
                             ? "Wunschlaufzeit des Spielers."
                             : undefined
                       }
                       onClick={() => setDraftLength(length)}
                     >
                       {formatNlNumber(length, 0)}
-                      {negotiation?.contractPreference?.idealLength === length ? <small>★</small> : null}
+                      {istWunsch ? <small>★</small> : null}
                     </button>
                   );
                 })}
@@ -508,21 +743,57 @@ export default function ContractRenewalNegotiationModal({
           <button className="secondary-button" type="button" onClick={onClose}>
             Abbrechen
           </button>
+          {/* SCHRITT 1 — derselbe Ablauf wie beim Kauf: erst senden, dann unterschreiben.
+              Liegt ein Gegenangebot auf dem Tisch, tritt „Einschlagen" an diese Stelle. */}
+          {aktivesErgebnis?.status === "countered" ? (
+            <button
+              className="secondary-button is-emphasized"
+              type="button"
+              data-testid="negotiation-accept-counter-button"
+              disabled={busy}
+              title="Seine Forderung übernehmen — das gilt als Zusage."
+              onClick={gegenangebotEinschlagen}
+            >
+              Einschlagen
+            </button>
+          ) : (
+            <button
+              className="secondary-button is-emphasized"
+              type="button"
+              data-testid="negotiation-send-offer-button"
+              disabled={sendenDisabled}
+              title={sendenDisabledReason ?? "Angebot senden und die Reaktion des Spielers abwarten."}
+              onClick={angebotSenden}
+            >
+              {zusageLiegtVor ? "Zusage liegt vor" : "Schritt 1: Angebot senden"}
+            </button>
+          )}
           <button
             className="primary-button"
             type="button"
             data-testid="negotiation-confirm-button"
             disabled={confirmDisabled}
-            title={confirmDisabledReason ?? "Vertrag zu diesen Konditionen bestätigen."}
+            title={confirmDisabledReason ?? "Vertrag zu diesen Konditionen unterschreiben."}
             onClick={() =>
               void onConfirm({
                 contractLength: draftLength,
                 offeredSalary: draftSalary,
                 contractShape: draftShape,
+                confirmToken: summary?.confirmToken ?? subject.confirmToken ?? null,
               })
             }
           >
-            {busy ? "Wird verlängert…" : "Vertrag bestätigen"}
+            {/**
+              * DIE LAUFZEIT STEHT AUF DEM KNOPF.
+              *
+              * Bis hierher sagte er nur „Vertrag unterschreiben" — man konnte eine Ein-Saison-
+              * Verlaengerung abschliessen, ohne sie je gelesen zu haben, und danach stand der
+              * Spieler unveraendert auf „laeuft aus". Wer die Zahl auf dem Knopf sieht, kann sich
+              * nicht mehr unbemerkt verklicken.
+              */}
+            {busy
+              ? "Wird verlängert…"
+              : `Schritt 2: ${formatNlNumber(draftLength, 0)} ${draftLength === 1 ? "Saison" : "Saisons"} unterschreiben`}
           </button>
         </footer>
         {confirmDisabledReason && !busy && !previewBusy ? (

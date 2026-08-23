@@ -489,7 +489,10 @@ describe("legacy lineup score engine", () => {
       captainMode: "legacy_strongest_selected",
     });
 
-    expect(result.entries.map((entry) => entry.score)).toEqual([10, 20]);
+    // Gemessen am ROHWERT der Disziplin. `score`/`finalContribution` tragen seit der Zuteilung
+    // auch den eigenen Intensitaets-Wurf des Spielers und seinen Anteil an den Seiten-Effekten —
+    // dieser Test prueft aber das Einlesen und Aufsummieren, nicht die Zuteilung.
+    expect(result.entries.map((entry) => entry.baseDisciplineScore)).toEqual([10, 20]);
     expect(result.baseScore).toBe(30);
     expect(result.captainBonusTotal).toBe(0);
     // Intensität trägt jetzt eine seeded Streuung bei (Normal −2..+2/Spieler) — Basis-Summe ohne den
@@ -511,7 +514,7 @@ describe("legacy lineup score engine", () => {
       captainMode: "legacy_strongest_selected",
     });
 
-    expect(result.entries.map((entry) => entry.score)).toEqual([10, null]);
+    expect(result.entries.map((entry) => entry.baseDisciplineScore)).toEqual([10, null]);
     expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(10, 5);
     expect(result.missingScores).toHaveLength(1);
     expect(result.validationWarnings.some((warning) => warning.includes("Missing discipline score"))).toBe(true);
@@ -535,7 +538,13 @@ describe("legacy lineup score engine", () => {
     expect(result.baseScore).toBe(70);
     expect(result.captainBonusTotal).toBe(20);
     expect(result.totalScore - (result.intensityModifier ?? 0)).toBeCloseTo(90, 5);
-    expect(result.entries[1]?.finalContribution).toBe(60);
+    // 40 Rohwert + 20 Captain = 60. Dazu kommt sein eigener Intensitaets-Wurf und sein Anteil
+    // an den Seiten-Effekten — die 60 stehen deshalb im Bonus, nicht mehr im Endwert.
+    expect(result.entries[1]?.captainBonus).toBe(20);
+    expect((result.entries[1]?.baseDisciplineScore ?? 0) + (result.entries[1]?.captainBonus ?? 0)).toBe(60);
+    // Und die Spielersumme trifft den Seiten-Score, ohne Rest.
+    const summe = result.entries.reduce((wert, entry) => wert + (entry.finalContribution ?? 0), 0);
+    expect(Math.round(summe * 10) / 10).toBe(result.totalScore);
     expect(result.validationWarnings.some((warning) => warning.includes("strongest selected player score"))).toBe(true);
   });
 
@@ -624,10 +633,15 @@ describe("legacy lineup score engine", () => {
     expect(result.mutatorModifier).toBe(12);
     expect(result.entries[0]?.mutatorBonus).toBe(12);
     expect(result.entries[0]?.mutatorPpsBonus).toBe(0.3);
-    // finalContribution enthält jetzt den Pro-Spieler-Form-Anteil (war 27 OHNE Form).
-    expect(result.entries[0]?.finalContribution).toBeCloseTo(27 + (result.entries[0]?.formShare ?? 0), 1);
+    // finalContribution traegt den Pro-Spieler-Form-Anteil (war 27 OHNE Form) und seit der
+    // Zuteilung zusaetzlich den eigenen Intensitaets-Wurf plus den Anteil an den Seiten-Effekten.
+    const eigenanteil = (index: number) =>
+      (result.entries[index]?.formShare ?? 0) +
+      (result.entries[index]?.intensityShare ?? 0) +
+      (result.entries[index]?.teamEffectShare ?? 0);
+    expect(result.entries[0]?.finalContribution).toBeCloseTo(27 + eigenanteil(0), 1);
     expect(result.entries[1]?.captainBonus).toBe(8);
-    expect(result.entries[1]?.finalContribution).toBeCloseTo(23.9 + (result.entries[1]?.formShare ?? 0), 1);
+    expect(result.entries[1]?.finalContribution).toBeCloseTo(23.9 + eigenanteil(1), 1);
     // totalScore = Beiträge ohne Form (50,9) + tatsächliche Form-Summe.
     expect(result.totalScore).toBeCloseTo(50.9 + (result.formModifier ?? 0) + (result.intensityModifier ?? 0), 1);
   });
@@ -661,83 +675,82 @@ describe("legacy lineup validator", () => {
 
 describe("legacy lineup draft ui contract", () => {
   /**
-   * ENTSCHIEDEN (Chris, 2026-08-09): Der Expertenmodus ist bewusst weg — Variante (b).
+   * DER „CLASSIC"-BAUM IST WEG — ENTSCHIEDEN (Chris: „classic aufstellungsbaum brauchen wir
+   * nicht mehr").
    *
-   * Der Befund war: `showExpertBackupPanels` stand noch da, wurde aber von KEINER Stelle
-   * gelesen; ebenso wenig der Schalter dahinter — `setIsExpertModeEnabled` hatte nie einen
-   * Aufrufer, der Viewport-Ref war nie an ein Element gehaengt, die virtualisierten
-   * Expertenzeilen wurden nie gerendert. Der Modus schaltete komplett ins Leere.
+   * Was hier frueher stand, war ein uebersprungener Fall, der ein Dutzend Marken des klassischen
+   * Arbeitsbereichs im Quelltext suchte (`legacy-lineup-main-flow`, `legacy-lineup-captain-strip`,
+   * `legacy-lineup-progress-track`, `legacy-lineup-quick-assign-row`, „Vorschlag bewusst setzen"
+   * und weitere). Ein frueherer Durchgang hatte das als moeglichen Feature-Verlust eingeordnet und
+   * bewusst offen gelassen.
    *
-   * Der ganze Cluster ist entfernt (Storage-Key, Preference-Loader, State, Ref, Virtual-Window,
-   * Hoehen-Effekt, Persist-Effekt, tote Konstante) — samt der Zusage, die hier auf
-   * `{showExpertBackupPanels ? (` geprueft hat.
+   * NACHGEMESSEN, bevor entschieden wurde: null Fundstellen fuer JEDE dieser Marken in `app/`,
+   * `lib/` und `components/`. Der Baum war also nicht „unerreichbar", sondern gar nicht mehr da;
+   * uebrig war ein Schalter (`uiVariant`) mit nur noch einer Stellung. Beides ist jetzt entfernt.
    *
-   * Dieser Test bleibt uebersprungen, aber aus einem UNABHAENGIGEN Grund: dem groesseren
-   * Feature-Verlust im "classic"-Draft-Baum, den die NOTE unten beschreibt. Der Expertenmodus
-   * war nur ein Teil der roten Zusagen, nicht ihre Ursache.
+   * Was BLEIBT, steht unten: der Formplan-Weg, den derselbe Fall mitgeprueft hat und der
+   * weiterlebt. Ihn mit dem toten Rest zu streichen waere der zweite Fehler nach dem ersten.
    */
-  it.skip("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
-    // NOTE (investigated, not fixed): several of the lineupText assertions
-    // below (legacy-lineup-main-flow,
-    // legacy-lineup-captain-strip, legacy-lineup-progress-track,
-    // legacy-lineup-quick-assign-row, legacy-lineup-draft-flow-chip,
-    // role="tablist", legacy-lineup-team-tactics-form, "Vorschlag bewusst
-    // setzen") are gone from LegacyLineupLabClient.tsx. This is the same root
-    // cause documented in detail in tests/legacy-lineup-lab.test.ts: the
-    // component's render function now unconditionally returns either
-    // <FormBoardPanel> or <LineupNewLook> regardless of `uiVariant`, so this
-    // file's "classic" draft-workspace JSX tree is dead/unreachable, and parts
-    // of it were also edited/removed outright. Looks like a real feature loss
-    // (see final report) rather than a wrong-file-path issue, so left
-    // unchanged/red intentionally.
+  it("haelt den Formplan-Weg im Client und im FormBoardPanel", async () => {
     const fs = await import("node:fs/promises");
-    const lineupPath = path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
-    const cssPath = path.join(process.cwd(), "app/globals.css");
-    const [lineupText, cssText] = await Promise.all([fs.readFile(lineupPath, "utf8"), fs.readFile(cssPath, "utf8")]);
+    const [lineupText, formBoardText] = await Promise.all([
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"), "utf8"),
+    ]);
 
-    // SHOW_DRAFT_LINEUP_WORKSPACE war (wie SHOW_CLASSIC_LINEUP_WORKSPACE) ein
-    // nirgends gelesenes Flag ohne jeden Aufrufer — beide Flags sind mit dem
-    // Dead-Code-Cleanup entfernt. Der Rest dieses Blocks bleibt unangetastet,
-    // s. NOTE oben zum größeren, unabhängigen Feature-Verlust.
-    expect(lineupText).toContain('className="legacy-lineup-main-flow"');
-    expect(lineupText).toContain("legacy-lineup-captain-strip");
-    expect(lineupText).toContain("Vorschlag bewusst setzen");
-    expect(lineupText).toContain("legacy-lineup-progress-track");
+    // Der Client mountet das Formplan-Panel und traegt den Speicherweg der Formkarten.
+    expect(lineupText).toContain("FormBoardPanel");
     expect(lineupText).toContain("updateFormCardSelection");
-    expect(lineupText).toContain("renderInlineFormCardSelectors");
     expect(lineupText).toContain("queueFormCardPlanSave");
-    // LegacyLineupSlotMicroSteps/LegacyLineupCandidateReasonChips waren die
-    // beiden nie gerenderten Slot-Komponenten aus dem toten "classic"-Baum —
-    // mit dem Dead-Code-Cleanup entfernt, s. Kommentar oben zu diesem Block.
-    expect(lineupText).toContain("legacy-lineup-quick-assign-row");
-    expect(lineupText).toContain("legacy-lineup-draft-flow-chip");
-    expect(lineupText).toContain("Spieltag wird geladen");
-    expect(lineupText).toContain('role="tablist"');
-    expect(lineupText).toContain("Formplan");
-    const formBoardText = await fs.readFile(
-      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"),
-      "utf8",
-    );
+    expect(lineupText).toContain("renderInlineFormCardSelectors");
+    expect(lineupText).toContain("scheduleHoveredCandidate");
+
+    // Und das Panel rendert wirklich ein Formkarten-Deck, keine leere Huelle.
     expect(formBoardText).toContain("legacy-lineup-form-deck");
     expect(formBoardText).toContain("legacy-lineup-form-board-chip-picks");
-    expect(lineupText).not.toContain("Im Formplan bearbeiten");
-    expect(lineupText).not.toContain("legacy-lineup-draft-tactics-form-readonly");
-    expect(lineupText).toContain("legacy-lineup-draft-tactics-form");
-    expect(lineupText).toContain("legacy-lineup-team-tactics-form");
-    expect(lineupText).toContain("FormBoardPanel");
-    // Die beiden folgenden Assertions ("DraftWorkspace", "LineupExpertPanels")
-    // sind mit dem Dead-Code-Cleanup gefallen: Sie prüften keine echte
-    // Funktion, sondern nur einen nie genutzten Import auf die gleichnamige,
-    // ebenfalls tote Geschwisterdatei (deren Render-Pfad seit
-    // SHOW_CLASSIC_LINEUP_WORKSPACE = false nie mehr erreicht wird). Ein
-    // grüner Test hier hätte weiterhin nur belegt, dass der Import existiert
-    // — nicht, dass die Komponente gerendert wird. Import und Datei sind
-    // entfernt, die Assertions daher gestrichen statt auf eine andere Datei
-    // umgebogen.
-    expect(lineupText).not.toContain("legacy-lineup-team-tactics-form-readonly");
-    expect(lineupText).toContain("scheduleHoveredCandidate");
     expect(formBoardText).toContain("legacy-lineup-form-board-cell-velo-strip");
-    expect(cssText).not.toContain(".legacy-lineup-draft-intensity-preview");
-    expect(cssText).toContain(".legacy-lineup-draft-flow-chip");
+  });
+
+  it("kennt die klassische Variante nicht mehr — auch nicht als Schalter", async () => {
+    const fs = await import("node:fs/promises");
+    const lineupText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+      "utf8",
+    );
+
+    // Der Schalter ist weg — nicht nur seine zweite Stellung. Ein `uiVariant`, das nur noch
+    // „focusV2" annehmen kann, waere derselbe tote Zweig unter anderem Namen.
+    expect(lineupText).not.toContain("uiVariant?:");
+    expect(lineupText).not.toContain('"classic"');
+
+    /**
+     * HIER WURDE FRUEHER AUCH `lib/foundation/tabs/use-lineup-derivations.ts` GELESEN — die Datei
+     * gibt es nicht mehr.
+     *
+     * Sie trug den Varianten-Typ und seinen Resolver; geprueft wurde, dass beide daraus
+     * verschwunden sind. Inzwischen ist die ganze Datei entfernt, zusammen mit dem
+     * Aufstellungs-Shell-Host und dem Router-Baustein darueber: die Kette hatte nachgezaehlt
+     * keinen Aufrufer mehr, die Live-Shell rendert das Panel direkt.
+     *
+     * Eine geloeschte Datei ist die schaerfere Zusicherung als eine Datei ohne die beiden Namen —
+     * geprueft wird deshalb jetzt ihr Nichtvorhandensein. Kaeme sie zurueck, waere das eine
+     * bewusste Entscheidung und keine schleichende Rueckkehr.
+     */
+    const { existsSync } = await import("node:fs");
+    expect(
+      existsSync(path.join(process.cwd(), "lib/foundation/tabs/use-lineup-derivations.ts")),
+      "use-lineup-derivations.ts ist zurueck — dann gehoert die Zusicherung neu gefasst",
+    ).toBe(false);
+
+    // Und die Marken des alten Baums kommen nicht zurueck.
+    for (const marke of [
+      "legacy-lineup-main-flow",
+      "legacy-lineup-captain-strip",
+      "legacy-lineup-progress-track",
+      "legacy-lineup-quick-assign-row",
+      "Vorschlag bewusst setzen",
+    ]) {
+      expect(lineupText, `${marke} ist zurueck`).not.toContain(marke);
+    }
   });
 });

@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sponsoren × Gebäude — Mockup</title>
+<style>
+  :root {
+    --bg: #0b0f17;
+    --panel: #121826;
+    --panel-2: #0e1420;
+    --line: #232c3f;
+    --text: #dbe2ee;
+    --muted: #8b96ab;
+    --gold: #e8b84b;
+    --green: #4fc47f;
+    --red: #e06c5c;
+    --blue: #5aa2e0;
+    --violet: #a186e8;
+    --bar: #2a3550;
+    --bar-hi: #3d548c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding: 28px 20px 80px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 24px; letter-spacing: .3px; }
+  h2 { font-size: 17px; margin: 46px 0 6px; color: var(--gold); text-transform: uppercase; letter-spacing: 1.2px; }
+  h2 small { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .sub { color: var(--muted); margin-top: 6px; max-width: 900px; }
+  .kontext {
+    margin-top: 18px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel-2); color: var(--muted); font-size: 13.5px;
+  }
+  .kontext b { color: var(--text); font-weight: 600; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Kartenraster ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-top: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 13px;
+  }
+  .card.is-empfohlen { border-color: #3d548c; }
+  .card-kicker { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); display: flex; justify-content: space-between; }
+  .card-kicker .dauer { color: var(--blue); }
+  .card-head { display: flex; gap: 12px; align-items: center; }
+  .crest {
+    width: 44px; height: 44px; border-radius: 10px; flex: none;
+    display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #0b0f17;
+  }
+  .crest.c-fin { background: linear-gradient(135deg,#7fb2e8,#3a6ea8); }
+  .crest.c-sport { background: linear-gradient(135deg,#f0d27a,#c98f2e); }
+  .crest.c-pharma { background: linear-gradient(135deg,#8fe0a8,#3f9c63); }
+  .card-head .brand { font-size: 17px; font-weight: 650; }
+  .card-head .branche { font-size: 12.5px; color: var(--muted); }
+  .chip {
+    display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); vertical-align: 1px;
+  }
+  .einsatz { font-size: 13.5px; color: var(--muted); font-style: italic; }
+
+  .geldzeile {
+    display: flex; align-items: baseline; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  }
+  .geldzeile .betrag { font-size: 22px; font-weight: 700; color: var(--gold); }
+  .geldzeile .einheit { color: var(--muted); font-size: 13px; }
+
+  /* ---------- Leiter ---------- */
+  .leiter { display: flex; flex-direction: column; gap: 3px; }
+  .leiter-titel { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 3px; display: flex; justify-content: space-between; }
+  .sprosse { display: grid; grid-template-columns: 64px 1fr 44px; align-items: center; gap: 8px; font-size: 12.5px; min-height: 19px; }
+  .sprosse .label { color: var(--muted); }
+  .sprosse .balken { height: 9px; border-radius: 4px; background: var(--bar); position: relative; }
+  .sprosse .balken > i { position: absolute; inset: 0; border-radius: 4px; background: var(--bar-hi); display: block; }
+  .sprosse .wert { text-align: right; color: var(--text); }
+  .sprosse.is-start .label, .sprosse.is-start .wert { color: var(--gold); font-weight: 650; }
+  .sprosse.is-start .balken > i { background: var(--gold); }
+  .sprosse.is-aktuell .label, .sprosse.is-aktuell .wert { color: var(--blue); font-weight: 650; }
+  .sprosse.is-aktuell .balken > i { background: var(--blue); }
+  .sprosse .marke { color: var(--green); font-weight: 700; white-space: nowrap; font-size: 11.5px; }
+  .sprosse.is-marke .label { color: var(--green); font-weight: 650; }
+  .leiter-fuss { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+  /* ---------- Sachleistung / Ziel / Übernahme ---------- */
+  .box { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+  .box .titel { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
+  .box.gebaeude { border-left: 3px solid var(--green); }
+  .box.gebaeude.ruht { border-left-color: var(--red); }
+  .box.ziel { border-left: 3px solid var(--violet); }
+  .box.uebernahme { border-left: 3px solid var(--gold); }
+  .box.keine { border-left: 3px solid var(--line); color: var(--muted); }
+  .stufenreihe { display: flex; gap: 6px; margin: 6px 0 4px; flex-wrap: wrap; }
+  .stufe {
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 12.5px;
+    background: var(--panel); color: var(--muted); text-align: center;
+  }
+  .stufe b { display: block; color: var(--text); font-size: 14px; }
+  .stufe.jetzt { border-color: var(--green); }
+  .stufe.jetzt b { color: var(--green); }
+  .gruen { color: var(--green); } .rot { color: var(--red); } .blau { color: var(--blue); }
+  .gold { color: var(--gold); } .violett { color: var(--violet); }
+  .satz { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+  .waehlen {
+    margin-top: 2px; text-align: center; border: 1px solid var(--bar-hi); border-radius: 10px;
+    padding: 8px; color: var(--blue); font-weight: 650; letter-spacing: .5px;
+  }
+  .annahme { border-bottom: 1px dotted var(--muted); cursor: help; }
+
+  /* ---------- Plan / Randfall / Matrix ---------- */
+  .plan { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 18px; margin-top: 14px; }
+  .plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 12px; }
+  .plan-jahr { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; }
+  .plan-jahr .jahr { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--blue); margin-bottom: 6px; }
+  .plan-jahr ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .plan-ende { border-color: #574a23; }
+  .rechnung { font-size: 13px; margin-top: 6px; border-collapse: collapse; }
+  .rechnung td { padding: 2px 14px 2px 0; color: var(--muted); }
+  .rechnung td.num { text-align: right; color: var(--text); }
+  .rechnung tr.summe td { border-top: 1px solid var(--line); padding-top: 5px; color: var(--gold); font-weight: 650; }
+
+  .matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 14px; }
+  .mtile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 13px; }
+  .mtile .geb { font-weight: 650; font-size: 14.5px; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .mtile .wirkung { color: var(--muted); font-size: 12.5px; margin: 3px 0 8px; }
+  .mtile .marken { color: var(--text); }
+  .mtile .anzahl { color: var(--muted); font-size: 12px; }
+  .zielchip { font-size: 11px; border: 1px solid var(--violet); color: var(--violet); border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+  .zielchip.frische { border-color: var(--green); color: var(--green); }
+  .zielchip.geld { border-color: var(--gold); color: var(--gold); }
+
+  .fussnoten { margin-top: 14px; font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--panel-2); }
+  .fussnoten li { margin: 5px 0 5px 18px; }
+  .fussnoten code { color: var(--text); background: var(--panel); padding: 0 5px; border-radius: 4px; font-size: 12.5px; }
+  .overflow { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Sponsoren × Gebäude — so sähe es im Spiel aus</h1>
+  <p class="sub">Mockup zum Konzept <code style="color:var(--text)">docs/SPONSOREN_GEBAEUDE_KONZEPT.md</code>.
+  Alle Zahlen sind nachrechenbar: Gebäudewirkungen und -kosten wörtlich aus <code style="color:var(--text)">facility-catalog.ts</code>,
+  Marken aus <code style="color:var(--text)">sponsor-brand-parents.ts</code>, Geldleiter aus der bestehenden Sponsor-Ligaleiter.
+  Rechenwege ganz unten. Beträge in C.</p>
+
+  <div class="kontext">
+    Rechenbeispiel mit den gemessenen Werten deines Spielstands: <b>Team S-C</b>, Startrang <b>19</b> von 32,
+    Salary Factor <b>1,19</b>, Kontostand <b>2,53&nbsp;C</b> — kein Gebäude wäre aktuell bezahlbar (Ausbau ab 5&nbsp;C, sieben von acht nicht gebaut).
+    Gezeigt ist die Sponsorwahl zum <b>Start von Saison&nbsp;3</b>. <span class="annahme" title="Annahme fürs Mockup, nicht gemessen">Aktueller-Platz- und Achsen-Rang-Werte in den Saisonansichten sind plausible Annahmen (unteres Drittel) und entsprechend markiert.</span>
+  </div>
+
+  <!-- ================= DIE DREI KARTEN ================= -->
+  <h2>Die Auswahl: drei Karten, feste Rollen <small>— nur die Marke wird gewürfelt</small></h2>
+  <p class="sub">Jede Karte: Gehalt je Spieltag (läuft immer), Prämien-Leiter nach Endrang (die Vierer-Blöcke),
+  dazu ggf. Leihgebäude, Rangmarke <span class="gruen">⚑</span> und Bonus-Ziel. Goldene Sprosse = dein Startplatz.</p>
+
+  <div class="cards">
+
+    <!-- ===== KARTE 1: GELDGEBER ===== -->
+    <div class="card">
+      <div class="card-kicker"><span>Der Geldgeber</span><span class="dauer">1 Saison</span></div>
+      <div class="card-head">
+        <div class="crest c-fin">A</div>
+        <div>
+          <div class="brand">Allianz Versicherung</div>
+          <div class="branche">Finanz <span class="chip">bringt kein Gebäude — nur Geld</span></div>
+        </div>
+      </div>
+      <div class="einsatz">„Sicherheit first: das dickste Gehalt, keine Auflagen."</div>
+
+      <div class="geldzeile">
+        <span class="betrag num">3,5</span>
+        <span class="einheit">C je Spieltag&nbsp;·&nbsp;35&nbsp;C über die Saison, garantiert</span>
+      </div>
+
+      <div class="leiter">
+        <div class="leiter-titel"><span>Prämie nach Endrang (am Saisonende)</span></div>
+        <div class="sprosse"><span class="label">Meister</span><span class="balken"><i style="width:100%"></i></span><span class="wert num">+90</span></div>
+        <div class="sprosse"><span class="label">Top 4</span><span class="balken"><i style="width:89%"></i></span><span class="wert num">+78</span></div>
+        <div class="sprosse"><span class="label">Top 8</span><span class="balken"><i style="width:78%"></i></span><span class="wert num">+63</span></div>
+        <div class="sprosse"><span class="label">Top 12</span><span class="balken"><i style="width:67%"></i></span><span class="wert num">+50</span></div>
+        <div class="sprosse"><span class="label">Top 16</span><span class="balken"><i style="width:56%"></i></span><span class="wert num">+37</span></div>
+        <div class="sprosse is-start"><span class="label">Top 20</span><span class="balken"><i style="width:44%"></i></span><span class="wert num">+25</span></div>
+        <div class="sprosse"><span class="label">Top 24</span><span class="balken"><i style="width:33%"></i></span><span class="wert num">+14</span></div>
+        <div class="sprosse"><span class="label">Top 28</span><span class="balken"><i style="width:22%"></i></span><span class="wert num">+6</span></div>
+        <div class="sprosse"><span class="label">Platz 32</span><span class="balken"><i style="width:11%"></i></span><span class="wert num">+0</span></div>
+        <div class="leiter-fuss">Goldene Sprosse = dein Startplatz (19.). Hältst du ihn, kommen +25&nbsp;C zum Gehalt dazu.</div>
+      </div>
+
+      <div class="box keine">
+        <div class="titel">Sachleistung / Bonus-Ziel</div>
+        Keine. Diese Karte ist nur Geld — dafür am meisten davon.
+      </div>
+
+      <div class="waehlen">Wählen</div>
+    </div>
+
+    <!-- ===== KARTE 2: AUSSTATTER ===== -->
+    <div class="card">
+      <div class="card-kicker"><span>Der Ausstatter</span><span class="dauer">2 Saisons</span></div>
+      <div class="card-head">
+        <div class="crest c-sport">a</div>
+        <div>
+          <div class="brand">Adidas Sport Performance</div>
+          <div class="branche">Sport <span class="chip">bringt: Trainingszentrum</span></div>
+        </div>
+      </div>
+      <div class="einsatz">„Der Ausrüster stellt das Trainingszentrum — solange ihr keine Absteiger seid."</div>
+
+      <div class="geldzeile">
+        <span class="betrag num">3,0</span>
+        <span class="einheit">C je Spieltag&nbsp;·&nbsp;30&nbsp;C je Saison, garantiert</span>
+      </div>
+
+      <div class="leiter">
+        <div class="leiter-titel"><span>Prämie nach Endrang (je Saisonende)</span></div>
+        <div class="sprosse"><span class="label">Meister</span><span class="balken"><i style="width:100%"></i></span><span class="wert num">+76</span></div>
+        <div class="sprosse"><span class="label">Top 4</span><span class="balken"><i style="width:89%"></i></span><span class="wert num">+66</span></div>
+        <div class="sprosse"><span class="label">Top 8</span><span class="balken"><i style="width:78%"></i></span><span class="wert num">+54</span></div>
+        <div class="sprosse"><span class="label">Top 12</span><span class="balken"><i style="width:67%"></i></span><span class="wert num">+42</span></div>
+        <div class="sprosse"><span class="label">Top 16</span><span class="balken"><i style="width:56%"></i></span><span class="wert num">+31</span></div>
+        <div class="sprosse is-start"><span class="label">Top 20</span><span class="balken"><i style="width:44%"></i></span><span class="wert num">+21</span></div>
+        <div class="sprosse is-marke"><span class="label">Top 24</span><span class="balken"><i style="width:33%"></i></span><span class="wert num">+12&nbsp;<span class="marke">⚑</span></span></div>
+        <div class="sprosse"><span class="label">Top 28</span><span class="balken"><i style="width:22%"></i></span><span class="wert num">+5</span></div>
+        <div class="sprosse"><span class="label">Platz 32</span><span class="balken"><i style="width:11%"></i></span><span class="wert num">+0</span></div>
+        <div class="leiter-fuss"><span class="gruen">⚑ Rangmarke Top 24:</span> auf oder über dieser Sprosse wirkt das Gebäude. Dein Startplatz (gold) liegt einen Block darüber — du startest erfüllt.</div>
+      </div>
+
+      <div class="box gebaeude">
+        <div class="titel">Leihgebäude · solange du Top 24 stehst</div>
+        <b>Trainingszentrum</b> — Stufe steigt je gehaltener Saison:
+        <div class="stufenreihe">
+          <div class="stufe jetzt">Saison 1<b>Stufe 2</b>+28 % Grundtraining</div>
+          <div class="stufe">Saison 2<b>Stufe 3</b>+42 % Grundtraining</div>
+        </div>
+        Kein Unterhalt — den trägt der Sponsor. Nach Vertragsende: zurück auf deine eigene Stufe (aktuell&nbsp;0).
+      </div>
+
+      <div class="box ziel">
+        <div class="titel">Bonus-Ziel · je Saison</div>
+        <span class="violett"><b>+6&nbsp;C</b></span>, wenn du am Saisonende <b>POW-Rang <span class="annahme" title="Latte = dein POW-Rang bei Unterschrift (Mittelband: halten). Annahme fürs Mockup: 17.">17</span> oder besser</b> hältst.
+        Kein Abzug, wenn nicht — nur kein Bonus. <span class="chip">dein Stand: POW 17.</span>
+      </div>
+
+      <div class="box uebernahme">
+        <div class="titel">Übernahmerecht am Vertragsende</div>
+        2 Saisons gehalten ⇒ du darfst das Trainingszentrum Stufe 3 <b class="gold">für 24&nbsp;C behalten</b> (Katalogpreis 48&nbsp;C, −25&nbsp;% je gehaltener Saison).
+      </div>
+
+      <div class="satz">Merksatz: Der <b>Endstand</b> zahlt die Prämien-Sprosse — der <b>laufende Platz</b> schaltet nur das Gebäude.</div>
+      <div class="waehlen">Wählen</div>
+    </div>
+
+    <!-- ===== KARTE 3: BAUMEISTER ===== -->
+    <div class="card is-empfohlen">
+      <div class="card-kicker"><span>Der Baumeister</span><span class="dauer">3 Saisons</span></div>
+      <div class="card-head">
+        <div class="crest c-pharma">B</div>
+        <div>
+          <div class="brand">Bayer Pharma Labs</div>
+          <div class="branche">Pharma <span class="chip">bringt: Recovery Center</span></div>
+        </div>
+      </div>
+      <div class="einsatz">„Der Dreijahresplan: wenig Gehalt, dafür am Ende ein Gebäude, das du dir nie bauen könntest."</div>
+
+      <div class="geldzeile">
+        <span class="betrag num">2,7</span>
+        <span class="einheit">C je Spieltag&nbsp;·&nbsp;27&nbsp;C je Saison, garantiert</span>
+      </div>
+
+      <div class="leiter">
+        <div class="leiter-titel"><span>Prämie nach Endrang (je Saisonende)</span></div>
+        <div class="sprosse"><span class="label">Meister</span><span class="balken"><i style="width:100%"></i></span><span class="wert num">+67</span></div>
+        <div class="sprosse"><span class="label">Top 4</span><span class="balken"><i style="width:89%"></i></span><span class="wert num">+59</span></div>
+        <div class="sprosse"><span class="label">Top 8</span><span class="balken"><i style="width:78%"></i></span><span class="wert num">+48</span></div>
+        <div class="sprosse"><span class="label">Top 12</span><span class="balken"><i style="width:67%"></i></span><span class="wert num">+37</span></div>
+        <div class="sprosse"><span class="label">Top 16</span><span class="balken"><i style="width:56%"></i></span><span class="wert num">+27</span></div>
+        <div class="sprosse is-start is-marke"><span class="label">Top 20</span><span class="balken"><i style="width:44%"></i></span><span class="wert num">+19&nbsp;<span class="marke">⚑</span></span></div>
+        <div class="sprosse"><span class="label">Top 24</span><span class="balken"><i style="width:33%"></i></span><span class="wert num">+11</span></div>
+        <div class="sprosse"><span class="label">Top 28</span><span class="balken"><i style="width:22%"></i></span><span class="wert num">+4</span></div>
+        <div class="sprosse"><span class="label">Platz 32</span><span class="balken"><i style="width:11%"></i></span><span class="wert num">+0</span></div>
+        <div class="leiter-fuss"><span class="gruen">⚑ Rangmarke Top 20 — die harte Variante:</span> dein eigener Startblock. „Bleib so gut, wie du gestartet bist."</div>
+      </div>
+
+      <div class="box gebaeude">
+        <div class="titel">Leihgebäude · solange du Top 20 stehst</div>
+        <b>Recovery Center</b> — Stufe steigt je gehaltener Saison:
+        <div class="stufenreihe">
+          <div class="stufe jetzt">Saison 1<b>Stufe 2</b>+4 Erholung (20&nbsp;→&nbsp;24)</div>
+          <div class="stufe">Saison 2<b>Stufe 3</b>+6 Erholung (20&nbsp;→&nbsp;26)</div>
+          <div class="stufe">Saison 3<b>Stufe 4</b>+9 Erholung (20&nbsp;→&nbsp;29)</div>
+        </div>
+        Reißt du eine Saison (unter der Marke an 5+ von 10 Spieltagen), <b>pausiert</b> der Aufstieg — die Stufe fällt nie zurück.
+      </div>
+
+      <div class="box ziel">
+        <div class="titel">Bonus-Ziel · je Saison</div>
+        <span class="violett"><b>+6&nbsp;C</b></span>, wenn am Saisonende <b>mindestens 70&nbsp;% deines Kaders frisch</b> sind (Match-Fatigue ≤ 45).
+        Kein Abzug, wenn nicht — nur kein Bonus.
+      </div>
+
+      <div class="box uebernahme">
+        <div class="titel">Übernahmerecht am Vertragsende</div>
+        3 Saisons gehalten ⇒ Recovery Center Stufe 4 <b class="gold">für 19&nbsp;C behalten</b> (Katalogpreis 77&nbsp;C, −25&nbsp;% je gehaltener Saison, max. −75&nbsp;%).
+      </div>
+
+      <div class="satz">Merksatz: Der <b>Endstand</b> zahlt die Prämien-Sprosse — der <b>laufende Platz</b> schaltet nur das Gebäude.</div>
+      <div class="waehlen">Wählen</div>
+    </div>
+  </div>
+
+  <!-- ================= DREIJAHRESPLAN ================= -->
+  <h2>Der Dreijahresplan <small>— was passiert, wenn du den Baumeister (Bayer) nimmst und durchhältst</small></h2>
+  <div class="plan">
+    <div class="plan-grid">
+      <div class="plan-jahr">
+        <div class="jahr">Saison 3 · Stufe 2</div>
+        <ul>
+          <li>Recovery Center <b>Stufe 2</b>: +4 Erholung (20&nbsp;→&nbsp;24)</li>
+          <li>Gehalt: <span class="num">27&nbsp;C</span> (2,7 × 10)</li>
+          <li>Prämie nach Endrang: <span class="num">+0 … +67&nbsp;C</span></li>
+          <li>Frische-Bonus möglich: <span class="violett">+6&nbsp;C</span></li>
+          <li class="gruen">Top 20 an ≥ 6 Spieltagen gehalten ⇒ Aufstieg</li>
+        </ul>
+      </div>
+      <div class="plan-jahr">
+        <div class="jahr">Saison 4 · Stufe 3</div>
+        <ul>
+          <li>Recovery Center <b>Stufe 3</b>: +6 Erholung (20&nbsp;→&nbsp;26)</li>
+          <li>Gehalt und Leiter wie gehabt (Beträge folgen dem Salary Factor der Saison)</li>
+          <li>Frische-Bonus erneut möglich: <span class="violett">+6&nbsp;C</span></li>
+          <li class="gruen">gehalten ⇒ Aufstieg auf Stufe 4</li>
+          <li class="rot">gerissen ⇒ Aufstieg pausiert: Saison 5 bleibt Stufe 3, kein Rückfall — Endstufe 3, Übernahme siehe unten</li>
+        </ul>
+      </div>
+      <div class="plan-jahr">
+        <div class="jahr">Saison 5 · Stufe 4</div>
+        <ul>
+          <li>Recovery Center <b>Stufe 4</b>: +9 Erholung (20&nbsp;→&nbsp;29)</li>
+          <li>Zum Vergleich: Stufe 4 selbst zu bauen kostet kumuliert <span class="num">77&nbsp;C</span> — dein Kontostand heute: <span class="num">2,53&nbsp;C</span></li>
+          <li>Letzte Bonus-Chance: <span class="violett">+6&nbsp;C</span></li>
+        </ul>
+      </div>
+      <div class="plan-jahr plan-ende">
+        <div class="jahr" style="color:var(--gold)">Vertragsende · die Übernahme</div>
+        <table class="rechnung">
+          <tr><td>Katalogpreis Recovery Stufe 4 (7+13+22+35)</td><td class="num">77&nbsp;C</td></tr>
+          <tr><td>Treuerabatt: 3 gehaltene Saisons × 25&nbsp;%</td><td class="num">−58&nbsp;C</td></tr>
+          <tr class="summe"><td>Übernahmepreis</td><td class="num">19&nbsp;C</td></tr>
+        </table>
+        <div style="margin-top:8px; font-size:12.5px; color:var(--muted)">
+          Nur 2 Saisons gehalten? Endstufe 3, Rabatt 50&nbsp;%: Übernahme 42&nbsp;×&nbsp;0,5&nbsp;=&nbsp;21&nbsp;C.<br>
+          Keine Übernahme (oder kein Geld dafür): Gebäude geht zurück an den Sponsor, du fällst auf deine eigene Stufe (0).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= RANDFALL ================= -->
+  <h2>Der Randfall <small>— dieselbe Karte mitten in der Saison, Rangmarke gerissen</small></h2>
+  <p class="sub">Vertragsansicht am 6. Spieltag von Saison 3, Baumeister-Vertrag (Bayer), Marke Top 20.
+  <span class="annahme" title="Annahme fürs Mockup — unteres Drittel, 4 Plätze unter Startrang">Angenommener aktueller Platz: 23.</span></p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-kicker"><span>Laufender Vertrag · Saison 1 von 3</span><span class="dauer">Spieltag 6/10</span></div>
+      <div class="card-head">
+        <div class="crest c-pharma">B</div>
+        <div>
+          <div class="brand">Bayer Pharma Labs</div>
+          <div class="branche">Pharma <span class="chip">Recovery Center Stufe 2 geliehen</span></div>
+        </div>
+      </div>
+
+      <div class="geldzeile">
+        <span class="betrag num">2,7</span>
+        <span class="einheit">C je Spieltag — <b class="gruen">läuft weiter</b>, Geld hängt nie an der Marke&nbsp;·&nbsp;bisher erhalten: 16,2&nbsp;C</span>
+      </div>
+
+      <div class="leiter">
+        <div class="leiter-titel"><span>Prämie nach Endrang</span><span class="blau">● aktuell: Platz 23</span></div>
+        <div class="sprosse"><span class="label">Meister</span><span class="balken"><i style="width:100%"></i></span><span class="wert num">+67</span></div>
+        <div class="sprosse"><span class="label">Top 4</span><span class="balken"><i style="width:89%"></i></span><span class="wert num">+59</span></div>
+        <div class="sprosse"><span class="label">Top 8</span><span class="balken"><i style="width:78%"></i></span><span class="wert num">+48</span></div>
+        <div class="sprosse"><span class="label">Top 12</span><span class="balken"><i style="width:67%"></i></span><span class="wert num">+37</span></div>
+        <div class="sprosse"><span class="label">Top 16</span><span class="balken"><i style="width:56%"></i></span><span class="wert num">+27</span></div>
+        <div class="sprosse is-marke"><span class="label">Top 20</span><span class="balken"><i style="width:44%"></i></span><span class="wert num">+19&nbsp;<span class="marke">⚑</span></span></div>
+        <div class="sprosse is-aktuell"><span class="label">Top 24</span><span class="balken"><i style="width:33%"></i></span><span class="wert num">+11&nbsp;<span style="color:var(--blue)">●</span></span></div>
+        <div class="sprosse"><span class="label">Top 28</span><span class="balken"><i style="width:22%"></i></span><span class="wert num">+4</span></div>
+        <div class="sprosse"><span class="label">Platz 32</span><span class="balken"><i style="width:11%"></i></span><span class="wert num">+0</span></div>
+        <div class="leiter-fuss">Endest du auf Platz 23, zahlt die Top-24-Sprosse: 27&nbsp;+&nbsp;11&nbsp;=&nbsp;38&nbsp;C diese Saison.</div>
+      </div>
+
+      <div class="box gebaeude ruht">
+        <div class="titel">Leihgebäude</div>
+        <b class="rot">Recovery Center ruht</b> — seit Spieltag 5, du stehst 3 Plätze unter der Marke (23. statt Top 20).<br>
+        <span style="color:var(--muted); font-size:12.5px">
+          Kein Geldabzug, nichts rückwirkend. Erholung läuft ohne den +4-Bonus (Basis 20 statt 24).
+          Zurück auf Top 20 ⇒ <b class="gruen">sofort wieder aktiv.</b>
+        </span>
+        <div style="margin-top:8px; font-size:12.5px">
+          Saison-Wertung: aktiv an <b>4 von 6</b> Spieltagen · saisonweite Wirkungen zählen anteilig.<br>
+          Aufstieg auf Stufe 3 braucht <b>6 aktive Spieltage</b> — <span class="gruen">noch erreichbar</span> (max. 8 von 10, wenn du ab jetzt Top 20 stehst).
+        </div>
+      </div>
+
+      <div class="box ziel">
+        <div class="titel">Bonus-Ziel</div>
+        Frische: aktuell <b>64&nbsp;%</b> des Kaders frisch (Latte: 70&nbsp;% am Saisonende) — <span class="rot">unter der Latte</span>,
+        aber nichts verloren: verfehlt heißt nur kein Bonus, nie ein Abzug.
+      </div>
+
+      <div class="satz">Timeline-Meldung dazu am Spieltag 5: <i>„Bayer Pharma Labs: Recovery Center ruht — Platz 21 unterschreitet die Marke Top 20."</i></div>
+    </div>
+  </div>
+
+  <!-- ================= ZUORDNUNG ================= -->
+  <h2>Wer bringt was <small>— die Branchenregel, ohne Ausnahmen (200 Marken, 12 Branchen)</small></h2>
+  <p class="sub">Das Logo verrät die Sachleistung und das Ziel: <b>Branche → Gebäude → Achse → Bonus-Ziel.</b>
+  Gewürfelt wird erst der Karten-Typ und das Gebäude, dann eine passende Marke — die ungleichen Markenzahlen verzerren also nichts.</p>
+
+  <div class="matrix">
+    <div class="mtile">
+      <div class="geb">Trainingszentrum <span class="zielchip">Ziel: POW-Rang</span></div>
+      <div class="wirkung">+14 → +70 % Grundtraining (Stufe 1→5)</div>
+      <div class="marken">Sport: Adidas, Nike, Puma, Asics, Decathlon, Red Bull …</div>
+      <div class="anzahl">12 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Specialist Wing <span class="zielchip">Ziel: Achse der Variante</span></div>
+      <div class="wirkung">setzt die Fokusachse · passende Routen +8 → +13 %</div>
+      <div class="marken">Auto: BMW, Audi, Ferrari, Continental, Porsche … (Marke bestimmt die Variante: Ferrari → Agility Track → SPE)</div>
+      <div class="anzahl">38 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Analytics Room <span class="zielchip">Ziel: MEN-Rang</span></div>
+      <div class="wirkung">Live-Fortschritt auf Zielen und Leiter</div>
+      <div class="marken">Technik: SAP, Apple, IBM, Nvidia, Zeiss, Siemenswerk …</div>
+      <div class="anzahl">36 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Recovery Center <span class="zielchip frische">Ziel: Frische</span></div>
+      <div class="wirkung">+2 → +12 Erholung (Basis 20 → bis 32)</div>
+      <div class="marken">Pharma: Bayer, Pfizer, Johnson &amp; Johnson</div>
+      <div class="anzahl">3 Marken — die seltenste Leihe</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Academy <span class="zielchip frische">Ziel: Frische</span></div>
+      <div class="wirkung">junge F/E/D-Spieler +6 → +30 % Entwicklung</div>
+      <div class="marken">Lebensmittel: Coca-Cola, Ferrero, McDonald's, Danone …</div>
+      <div class="anzahl">19 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Fan Shop <span class="zielchip">Ziel: SOC-Rang</span></div>
+      <div class="wirkung">+3,9 → +25,0 C je Saison (flach, sicher)</div>
+      <div class="marken">Handel: Aldi, Edeka, Zalando, IKEA, MediaMarkt …</div>
+      <div class="anzahl">41 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Arena Upgrade <span class="zielchip">Ziel: SOC-Rang</span></div>
+      <div class="wirkung">+2,4 → +28,5 C je Saison (× Beliebtheit)</div>
+      <div class="marken">Medien / Telekom / Energie: RTL, Sky, Vodafone, E.ON …</div>
+      <div class="anzahl">20 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Scouting Office <span class="zielchip">Ziel: SPE-Rang</span></div>
+      <div class="wirkung">genauere Potential-/Markt-Infos (Stufe 1→5)</div>
+      <div class="marken">Logistik / Luftfahrt: DHL, FedEx, Emirates, Lufthansa …</div>
+      <div class="anzahl">12 Marken</div>
+    </div>
+    <div class="mtile">
+      <div class="geb">Kein Gebäude <span class="zielchip geld">nur Geld</span></div>
+      <div class="wirkung">der Geldgeber: höchster Geldfaktor, keine Auflagen, kein Ziel</div>
+      <div class="marken">Finanz: Allianz, Deutsche Bank, Visa, Mastercard, Sparkassen …</div>
+      <div class="anzahl">19 Marken</div>
+    </div>
+  </div>
+
+  <!-- ================= RECHENWEGE ================= -->
+  <h2>Woher die Zahlen kommen <small>— zum Gegenrechnen</small></h2>
+  <div class="fussnoten">
+    <ul>
+      <li><b>Gehalt</b> = Sockel der bestehenden Sponsor-Ligaleiter ÷ 10 Spieltage. Sockel für Startrang 19:
+        <code>18 + 30 × 18/31 = 35,4</code> ⇒ 3,5&nbsp;C je Spieltag. Karten skalieren mit festem Faktor:
+        Geldgeber ×1,00 · Ausstatter ×0,85 (3,0) · Baumeister ×0,75 (2,7).</li>
+      <li><b>Prämien-Leiter</b> = Wertungstopf der Liga (<code>1030 × Salary Factor 1,19</code>) verteilt nach Endrang
+        (Kurve 1,35, Platz 32 = 0) — die heutige neutrale Leiter aus <code>sponsor-liga-leiter.ts</code>, ×Kartenfaktor,
+        angezeigt in den bekannten Vierer-Blöcken. Erwartungswert der Geldgeber-Karte auf Startplatz 19: ≈ 63&nbsp;C —
+        dieselbe Größenordnung wie dein aktueller Vertrag (gemessen: 63,8&nbsp;C).</li>
+      <li><b>Gebäudewirkungen und -kosten</b> wörtlich aus <code>facility-catalog.ts</code>: Trainingszentrum Stufe 2/3 = +28/+42&nbsp;%
+        (kumulierte Baukosten 23/48&nbsp;C) · Recovery Stufe 2/3/4 = +4/+6/+9 Erholung (20/42/77&nbsp;C kumuliert).</li>
+      <li><b>Was ist die Leihe wert?</b> <code>kumulierte Baukosten ÷ 5 + Saison-Unterhalt</code>. Eichprobe am einzigen Gebäude,
+        dessen Nutzen selbst in Cash notiert: Fan Shop Stufe 3 ⇒ 52/5 + 1,4 = 11,8&nbsp;C gegen realen Katalog-Ertrag 11,7&nbsp;C/Saison.
+        Danach: Der Ausstatter verzichtet auf ~9,5&nbsp;C/Saison für ~6–12&nbsp;C Leihwert, der Baumeister auf ~16&nbsp;C für
+        ~5–19&nbsp;C plus Übernahmerecht — die harte Marke ist der Grund, warum er weniger „bezahlt".</li>
+      <li><b>Übernahme</b> = kumulierte Katalogkosten der erreichten Stufe × (1 − 25&nbsp;% je gehaltener Saison), max. −75&nbsp;%.
+        „Gehalten" = Gebäude an ≥ 6 von 10 Spieltagen aktiv (dieselbe Schwelle wie der Stufen-Aufstieg).</li>
+      <li><b>Bonus-Ziel-Latte</b> aus deinem Stand bei Unterschrift: Achsen-Rang 1–8 ⇒ „Rang+2 halten" · 9–24 ⇒ „Rang halten" ·
+        25–32 ⇒ „Rang−2 erreichen". Die Achsen-Ränge sind die POW/SPE/MEN/SOC-Plätze aus dem Saisonstand — jederzeit dort sichtbar.</li>
+      <li>Mit <span class="annahme" title="Annahme">gepunkteter Linie</span> markierte Werte sind Annahmen fürs Mockup
+        (aktueller Platz 23, POW-Rang 17, Frische 64&nbsp;%) — alles andere ist Katalog oder Messung.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

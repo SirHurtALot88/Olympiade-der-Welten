@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-16",
+  "seite": "Einsatzliste",
+  "text": "Wer mehrere Teams führt, gibt die noch offenen Aufstellungen jetzt in EINEM Zug ab. In der Kachel „Meine Teams · Spieltag X\" steht dafür ein Knopf, der sagt, was er tut: „3 offene mit KI-Vorschlag abgeben\". Er holt für jedes offene Team den KI-Vorschlag, schickt alle zusammen über die Sammelroute und fragt EINMAL nach, bevor er die Teams für den Spieltag festnagelt — statt vier Mal Team umschalten, Vorschlag holen, speichern, bestätigen. Bereits fertige Aufstellungen bleiben unangetastet, und wer selbst aufstellen will, nimmt weiter den unveränderten Einzelweg. Die Rückmeldung beschönigt nichts: gelingt es nur teilweise, steht „2 von 3 Aufstellungen abgegeben\" da, samt Namen und Grund für jedes abgelehnte Team. Die Sammelroute selbst gab es schon seit dem Multiplayer-Ausbau — benutzt hat sie bis jetzt nur der Zwei-Browser-Test im CI, nie ein Mensch.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

@@ -556,7 +556,15 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationSurfaceText).toContain("FoundationShellRouterInboxV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterPrize");
-    expect(foundationSurfaceText).toContain("FoundationShellRouterLineup");
+    // Der Router-Baustein für die Einsatzliste hatte keinen Aufrufer mehr (nachgezählt: 0 Stellen
+    // außer der eigenen, seither entfernten Definition und einer toten Import-Zeile) und wurde
+    // entfernt. Die EIGENSCHAFT, die hier eigentlich zugesichert werden soll — lazy geladenes Panel,
+    // aus dem DOM entfernt sobald der Tab wechselt —, gilt unverändert, jetzt über die Ternary direkt
+    // in FoundationShellRouterBody.tsx statt über das Unmount-Gate des Router-Bausteins.
+    expect(foundationSurfaceText).toMatch(/const FoundationLineupPanel = dynamic\(/);
+    expect(foundationSurfaceText).toMatch(
+      /activeView === "lineup" \|\| activeView === "lineupV2" \? \(\s*<FoundationLineupPanel/,
+    );
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterMarketSell");
     expect(foundationSurfaceText).toContain("isMarketOfferPanelOpen");
@@ -584,12 +592,10 @@ describe("foundation performance architecture helpers", () => {
     );
     expect(prizeHostText).toContain("use-prize-panel-derivations");
     expect(prizeHostText).toContain("FoundationPrizeFinanceHost");
-    const lineupHostText = await fs.readFile(
-      path.join(root, "app/foundation/legacy-lineup-lab/FoundationLineupShellHost.tsx"),
-      "utf8",
-    );
-    expect(lineupHostText).toContain("use-lineup-derivations");
-    expect(lineupHostText).toContain("FoundationLineupPanel");
+    // Der eigene Lineup-Shell-Host (samt eigener Derivations-Datei) wurde entfernt, weil er
+    // keinen Aufrufer mehr hatte — die aktive Einsatzliste läuft seither direkt über
+    // `FoundationLineupPanel` in `FoundationShellRouterBody.tsx` (siehe Ternary-Check oben).
+    expect(foundationSurfaceText).toContain("FoundationLineupPanel");
     const marketHostText = await fs.readFile(
       path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx"),
       "utf8",

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Team · Training",
+  "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

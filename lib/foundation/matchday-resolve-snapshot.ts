@@ -165,12 +165,26 @@ function getBookedMatchdaySides(gameState: GameState, scope: MatchdayResolveScop
  * DREI FAELLE, in dieser Reihenfolge:
  *
  * 1. Der Spieltag ist DURCH (beide Seiten gebucht). Dann gibt es ein gebuchtes Ergebnis,
- *    und das ist die Wahrheit — der Snapshot ist ab hier Geschichte und darf nichts mehr
+ *    und das ist die Wahrheit — ein Snapshot OHNE Buchungsstempel darf nichts mehr
  *    ueberstimmen. GEMESSEN am Spielstand `new-game-1785823388048-1hf25q` (Saison 2,
  *    Spieltag 10): der dortige Snapshot hatte eine laengst nicht mehr passende Signatur
  *    und zeigte in 20 von 32 d1-Zeilen einen anderen Score als gebucht (max 0,70) —
  *    Zahlen, die nie gebucht wurden. Die Raenge stimmten dort zufaellig noch; bei einem
  *    Gleichstand kippt einer, und mit ihm die Punkte.
+ *
+ *    AUSNAHME, UND SIE IST DER GANZE PUNKT: traegt der Datensatz einen `bookedAt`-Stempel,
+ *    ist er nicht "eine Vorschau von damals", sondern DIE Rechnung, aus der gebucht wurde —
+ *    der Apply stempelt sie mit der Ergebnis-ID. Zum ANZEIGEN ist sie dann die einzig
+ *    richtige Quelle. Ohne diese Ausnahme fiel die Arena nach dem Buchen auf den LIVE-Pfad
+ *    zurueck und rechnete den Spieltag gegen den Zustand NACH der Buchung neu — mit der
+ *    Nach-Spieltags-Fatigue, die derselbe Apply gerade geschrieben hat. Chris sah dadurch
+ *    Sekunden nach dem Buchen andere Zahlen und getauschte Plaetze (Malagor 98,8 → 92,1,
+ *    S-S 14,9 → 14,2, C-S 14,4 → 14,9).
+ *
+ *    Zum BUCHEN gilt die Ausnahme NICHT: `resolveMatchdayPreviewToBook` darf sich nie aus
+ *    einer bereits gebuchten Rechnung bedienen, sonst schriebe ein Re-Apply die alte
+ *    Rechnung ein zweites Mal fest. Deshalb der `zweck`-Parameter statt eines Schalters,
+ *    den man vergessen kann.
  * 2. Der Spieltag LAEUFT (eine Seite gebucht, die andere offen). Fuer die offene Seite
  *    zaehlt ihre eigene Signatur: Aufstellungen dieser Seite und Verfuegbarkeit ihrer
  *    Spieler. Die Fatigue, die der D1-Commit gerade geschrieben hat, faellt damit nicht
@@ -178,9 +192,20 @@ function getBookedMatchdaySides(gameState: GameState, scope: MatchdayResolveScop
  *    `sideSignatures` sind nicht pruefbar und werden verworfen.
  * 3. Der Spieltag hat noch nicht angefangen: die volle Signatur muss passen (wie bisher).
  */
+/**
+ * WOFUER der Snapshot gelesen wird. Die beiden Zwecke haben verschiedene Wahrheiten:
+ *
+ *   `buchen`   — der Apply sucht eine Rechnung, aus der er ein Ergebnis machen darf. Eine schon
+ *                gebuchte kommt dafuer nie in Frage.
+ *   `anzeigen` — die Buehne sucht die Rechnung, die dem Ergebnis zugrunde liegt. Nach der Buchung
+ *                ist genau die gebuchte die richtige — und eine Neuberechnung die falsche.
+ */
+export type MatchdayResolveSnapshotZweck = "buchen" | "anzeigen";
+
 export function readMatchdayResolveSnapshot(
   gameState: GameState,
   scope: MatchdayResolveScope,
+  options?: { zweck?: MatchdayResolveSnapshotZweck },
 ): MatchdayResolveSnapshot | null {
   const record = (gameState.seasonState.matchdayResolveSnapshots ?? []).find(
     (entry) =>
@@ -194,6 +219,13 @@ export function readMatchdayResolveSnapshot(
 
   const bookedSides = getBookedMatchdaySides(gameState, scope);
   if (MATCHDAY_DISCIPLINE_SIDES.every((side) => bookedSides.has(side))) {
+    // Der Buchungsstempel schlaegt die Signatur: er sagt nicht "diese Rechnung passt noch zum
+    // Zustand", sondern "aus dieser Rechnung ist das Ergebnis entstanden". Das kann eine spaetere
+    // Zustandsaenderung nicht mehr entwerten — im Gegenteil, sie ist ja gerade der Grund, warum
+    // eine Neuberechnung hier falsch waere.
+    if ((options?.zweck ?? "buchen") === "anzeigen" && record.bookedAt) {
+      return { record, payload };
+    }
     return null;
   }
 
@@ -350,6 +382,81 @@ export function writeMatchdayResolveSnapshot(
   persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return { record, payload };
+}
+
+/**
+ * STEMPELT DIE GEBUCHTE RECHNUNG — aufgerufen vom Apply, nachdem das Ergebnis steht.
+ *
+ * Ab hier ist der Datensatz kein Vorschlag mehr, sondern der Beleg des Spieltags: die Buehne zeigt
+ * danach genau die Zahlen, die gebucht wurden, statt den Spieltag gegen den veraenderten Zustand
+ * neu zu rechnen (siehe `bookedAt` in olyDataTypes.ts).
+ *
+ * ZWEI FAELLE, beide muessen abgedeckt sein:
+ *   - Es lag eine Vorberechnung vor und der Apply hat aus ihr gebucht (`previewSource: "snapshot"`).
+ *     Dann wird sie nur gestempelt; ihr Inhalt ist bereits der richtige.
+ *   - Der Apply hat LIVE gerechnet (keine oder eine verfallene Vorberechnung). Dann wird die
+ *     GEBUCHTE Rechnung hier abgelegt — sonst haette die Buehne danach gar keine Quelle ausser der
+ *     Neuberechnung, also genau das Problem.
+ *
+ * Rein: gibt den naechsten `GameState` zurueck und persistiert nichts. Der Apply hat seine eigene
+ * Transaktionsfuehrung und schreibt ohnehin im selben Zug.
+ */
+export function markMatchdayResolveSnapshotAsBooked(input: {
+  gameState: GameState;
+  scope: MatchdayResolveScope;
+  /** Die Rechnung, aus der das Ergebnis entstanden ist (`prepared.preview` des Apply). */
+  preview: LegacyMatchdayResolvePreview;
+  matchdayResultId: string;
+  bookedAt: string;
+}): GameState {
+  const { gameState, scope, preview, matchdayResultId, bookedAt } = input;
+  const vorhandene = gameState.seasonState.matchdayResolveSnapshots ?? [];
+  const bestehend =
+    vorhandene.find(
+      (entry) =>
+        entry.saveId === scope.saveId &&
+        entry.seasonId === scope.seasonId &&
+        entry.matchdayId === scope.matchdayId,
+    ) ?? null;
+
+  /**
+   * Der Rest des Payloads (`summary`, `teamDetails`, `topPlayers`, `playerCatalog`) wird vom
+   * bestehenden Datensatz uebernommen, wenn es einen gibt — er beschreibt dasselbe Feld und
+   * dieselben Aufstellungen. Die Buehne liest ohnehin nur `preview` (siehe
+   * `matchday-arena-base-service.ts`); ihn hier neu zu bauen hiesse, den ganzen Spieltag ein
+   * zweites Mal aufzuloesen, und zwar fuer Felder, die niemand abruft.
+   */
+  const bestehendesPayload =
+    bestehend?.payload != null && typeof bestehend.payload === "object" ? (bestehend.payload as object) : {};
+
+  const record: MatchdayResolveSnapshotRecord = {
+    id: bestehend?.id ?? buildSnapshotId(scope),
+    saveId: scope.saveId,
+    seasonId: scope.seasonId,
+    matchdayId: scope.matchdayId,
+    // Die Signaturen bleiben stehen, verlieren aber ihre Rolle: geprueft wird ab jetzt der
+    // Stempel. Sie zu loeschen wuerde nur die Spur verwischen, aus welchem Feldstand die
+    // Rechnung kam.
+    signature: bestehend?.signature ?? "",
+    ...(bestehend?.sideSignatures ? { sideSignatures: bestehend.sideSignatures } : {}),
+    previewStatus: preview.status,
+    readinessByTeamId: bestehend?.readinessByTeamId ?? {},
+    // Der Inhalt ist IMMER die GEBUCHTE Rechnung — auch wenn schon ein Datensatz lag. Buchte der
+    // Apply live, weil die Vorberechnung verfallen war, stuende sonst weiter die verfallene drin
+    // und die Buehne zeigte Zahlen, die nie gebucht wurden.
+    payload: { ...bestehendesPayload, preview },
+    bookedAt,
+    bookedMatchdayResultId: matchdayResultId,
+    createdAt: bestehend?.createdAt ?? bookedAt,
+  };
+
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      matchdayResolveSnapshots: [record],
+    },
+  };
 }
 
 /**

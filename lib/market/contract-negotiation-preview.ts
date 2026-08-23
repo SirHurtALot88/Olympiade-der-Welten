@@ -1,4 +1,4 @@
-import { wendeApronUndMixAn } from "@/lib/market/contract-shape-context";
+import { wendeLiquiditaetUndMixAn } from "@/lib/market/contract-shape-context";
 import type {
   ContractNegotiationDraft,
   ContractShape,
@@ -14,11 +14,14 @@ import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { resolveElapsedContractSeasonsForBuyout } from "@/lib/market/contract-buyout-season-window";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { calculateTransfermarktFit, getTransfermarktBracket, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { getTransfermarktScoutingRecruitmentBonus } from "@/lib/market/transfermarkt-scouting";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { getCanonicalSeasonLabelAtOffset } from "@/lib/season/season-label";
+import { restlaufzeitInSaisons, vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
+import { hasSeasonEndContractTickApplied } from "@/lib/contracts/saisonende-alterung-marke";
 
 type ContractPreviewInput = {
   annualSalary: number | null;
@@ -202,6 +205,39 @@ export type NegotiationVerdict =
   | "reject_lowball"
   | "reject_affront";
 
+/**
+ * Der Blocker, der eine Unterschrift gegen den Willen des Spielers verhindert.
+ *
+ * GEMESSEN, nicht vermutet: ein Angebot ueber 5 % der Forderung bekam
+ * `verdict: "reject_lowball"` — und trotzdem `canBuy: true` mit leerer Blockerliste.
+ *
+ *     Angebot 18,39 (100 %)  verdict counter_money    canBuy true  blocker []
+ *     Angebot  9,20 ( 50 %)  verdict reject_lowball   canBuy true  blocker []
+ *     Angebot  3,68 ( 20 %)  verdict reject_lowball   canBuy true  blocker []
+ *     Angebot  0,92 (  5 %)  verdict reject_lowball   canBuy true  blocker []
+ *
+ * Das Verdikt wurde also berechnet, angezeigt — und beim Schreiben ignoriert. Wer den Aufruf
+ * direkt absetzte, unterschrieb einen Vertrag, den der Spieler gerade abgelehnt hatte.
+ */
+export const VERDIKT_ABGELEHNT_BLOCKER = "negotiation_verdict_rejected";
+
+/**
+ * Ist das ein Nein?
+ *
+ * NUR die drei Ablehnungen zaehlen. Ein Gegenangebot ist ausdruecklich KEIN Nein — der Spieler
+ * redet weiter, und der Verhandlungsweg ist genau dafuer gebaut: Angebot, Gegenangebot,
+ * einschlagen. Selbst ein Angebot in Hoehe der vollen Forderung kommt oben als `counter_money`
+ * zurueck; ein Riegel gegen Gegenangebote wuerde also den normalen Kauf sperren.
+ */
+export function istVerdiktAblehnung(verdict: NegotiationVerdict | null | undefined): boolean {
+  return verdict === "reject_lowball" || verdict === "reject_not_about_money" || verdict === "reject_affront";
+}
+
+/** Die Blockerliste, die ein abgelehntes Angebot beisteuert — leer, solange verhandelt wird. */
+export function verdiktBlocker(verdict: NegotiationVerdict | null | undefined): string[] {
+  return istVerdiktAblehnung(verdict) ? [VERDIKT_ABGELEHNT_BLOCKER] : [];
+}
+
 export type ContractSchedulePreview = {
   yearlySalarySchedule: ContractYearSalary[];
   totalSalary: number | null;
@@ -326,6 +362,21 @@ export type TeamContractSeasonRow = {
   roleTag: string | null;
   contractShape: ContractShape;
   contractLength: number;
+  /**
+   * DIE RESTLAUFZEIT, WIE SIE WIRKLICH IST — abgeleitet aus der Endsaison.
+   *
+   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus." Sein
+   * Vertrag lief bis Ende Saison 2, gespeichert war Endsaison 2 und Status „active" — die
+   * Tabelle las trotzdem `contractLength <= 1` und schrieb „LÄUFT AUS".
+   *
+   * `contractLength` ist ein Countdown, der am ENDE einer Saison gesenkt wird, waehrend diese
+   * noch die laufende ist. Danach heisst eine 1 „noch eine volle Saison". Wer die Zahl direkt
+   * liest, liest im Saisonende-Fenster jeden Vertrag um ein Jahr zu kurz — bei Chris waren das
+   * 129 Spieler, die alle faelschlich als auslaufend galten.
+   */
+  restlaufzeitSaisons: number;
+  /** Endet der Vertrag mit der laufenden Saison? Die Frage, die „laeuft aus" beantworten soll. */
+  laeuftAus: boolean;
   totalSalary: number | null;
   buyoutCost: number | null;
   exitValue: number | null;
@@ -722,7 +773,7 @@ export function recommendContractOfferForPlayer(input: {
    * Siehe `contract-shape-context.ts` — die Abgabe selbst laesst sich damit NICHT umgehen, wohl
    * aber die echte Zahlung dieser Saison, die on top zur Abgabe faellig wird.
    */
-  apronHeadroom?: number | null;
+  kassenstand?: number | null;
   /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
   /** Gebundener Mehrbetrag spaeterer Vertragsjahre, an der heutigen Gehaltssumme gemessen. */
   gehaltsbergQuote?: number | null;
@@ -994,21 +1045,21 @@ export function recommendContractOfferForPlayer(input: {
     reasons.push("Culture Keeper: guter Spieler wird langfristig gebunden.");
   }
 
-  // DIE APRON-LAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
+  // DIE TEAMLAGE FLIESST EIN — SIE ENTSCHEIDET NICHT.
   //
   // Chris' Vorgabe war beides: „das muss die AI berücksichtigen" UND „es sollen ja nicht alle top
   // teams dann nur back loaded nehmen […] dann hast du irgendwann nen sehr teuren gehaltspeak […]
   // der mix machts." Die Regel selbst steht in `contract-shape-context.ts` — DORT und nicht hier,
   // weil es drei Formwaehler im Spiel gibt (Kaufvorschau, Fast-Batch, Verlaengerung) und alle drei
   // dieselbe Regel brauchen. Ohne die Angaben verhaelt sich die Empfehlung unveraendert.
-  const apronUndMix = wendeApronUndMixAn({
+  const lageUndMix = wendeLiquiditaetUndMixAn({
     form: contractShape,
     laufzeit: contractLength,
-    apronHeadroom: input.apronHeadroom,
+    kassenstand: input.kassenstand,
     gehaltsbergQuote: input.gehaltsbergQuote,
   });
-  contractShape = apronUndMix.form;
-  if (apronUndMix.grund) reasons.push(apronUndMix.grund);
+  contractShape = lageUndMix.form;
+  if (lageUndMix.grund) reasons.push(lageUndMix.grund);
 
   return {
     contractLength: clamp(Math.round(contractLength), 1, 5),
@@ -1512,6 +1563,45 @@ export function resolveContractLengthSalaryFactor(input: {
     0.5,
     1.45,
   );
+}
+
+/**
+ * DER PREIS DES FORMWUNSCHES — nur der Form-Anteil, ohne den Laufzeit-Anteil.
+ *
+ * `buildPlayerContractPreference` mischt beides in einem `salaryAdjustmentPct`: die Abweichung von
+ * der Wunschlaufzeit UND die von der Wunschform. Der menschliche Verhandlungspfad reicht die Summe
+ * durch und preist damit beides ein. Der KI-Schnellkauf-Pfad reichte gar nichts durch — dort war
+ * die Vertragsform gratis, obwohl die KI sie regelmaessig gegen den Wunsch setzt (Kassenstand,
+ * Gehaltsberg, Apron-Lage).
+ *
+ * Damit dieser Pfad nicht nachtraeglich auch noch die Laufzeit neu bepreist — was eine ganz andere
+ * Aenderung waere als die gemeldete — misst diese Funktion die DIFFERENZ zur selben Preference mit
+ * der Wunschform bei identischer Laufzeit. Uebrig bleibt genau der Formanteil.
+ *
+ * Nie negativ: den Wunsch zu treffen kostet nichts extra, verbilligt hier aber auch nichts.
+ * Der Normalpreis bleibt der Normalpreis, Abweichen kostet.
+ */
+export function resolveContractShapeSalarySurcharge(input: {
+  player: Player | null;
+  teamStrategyProfile?: TeamStrategyProfile | null;
+  contractLength: number;
+  contractShape: ContractShape;
+}): number {
+  const gewaehlt = buildPlayerContractPreference(input.player, input.teamStrategyProfile ?? null, {
+    contractLength: input.contractLength,
+    contractShape: input.contractShape,
+  });
+  if (!gewaehlt) {
+    return 0;
+  }
+  if (gewaehlt.shapePreference === input.contractShape) {
+    return 0;
+  }
+  const beiWunschform = buildPlayerContractPreference(input.player, input.teamStrategyProfile ?? null, {
+    contractLength: input.contractLength,
+    contractShape: gewaehlt.shapePreference,
+  });
+  return roundMoney(Math.max(0, gewaehlt.salaryAdjustmentPct - (beiWunschform?.salaryAdjustmentPct ?? 0)), 4);
 }
 
 function deriveContractShapeDemandSignal(contractShape: ContractShape) {
@@ -2477,12 +2567,51 @@ export function buildTeamContractSeasonTable(input: {
   teamId: string;
   seasonLabelBase: string;
 }): TeamContractSeasonTable {
-  const rosterRows = input.gameState.rosters
-    .filter((entry) => entry.teamId === input.teamId)
+  const teamRoster = input.gameState.rosters.filter((entry) => entry.teamId === input.teamId);
+  const rosterCount = teamRoster.length;
+  /**
+   * Im Saisonende-Fenster sind die Laufzeiten bereits gesenkt, die Saisonnummer aber noch die
+   * alte. Ohne diesen Versatz kaeme fuer jeden Vertrag OHNE gespeicherte Endsaison eine Saison
+   * zu wenig heraus — siehe `endSaisonNummer`.
+   */
+  const alterungGelaufen = hasSeasonEndContractTickApplied(input.gameState);
+  const rosterRows = teamRoster
     .map<TeamContractSeasonRow>((entry) => {
       const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      const restSaisons = restlaufzeitInSaisons(entry.contractLength);
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
+      const rohBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
+      /**
+       * DER PREIS, DEN ES BEIM VERKAUF WIRKLICH GIBT — nicht der Rohpreis.
+       *
+       * GEMELDET VON CHRIS (Ticket #44): „Beim Verkauf vs Marktwert hat Lava Golem z.B. +10,7 oben
+       * angezeigt. Wenn ich in sein Profil schaue, steht dort vs Marktwert +9,3 … Was ist nun
+       * richtig?"
+       *
+       * Richtig ist +9,3, und zwar nicht per Argument, sondern per Buchung: Lava Golem wurde am
+       * Live-Spielstand zwölf Minuten nach der Meldung verkauft, die Transferhistorie zeigt
+       * `fee 28.09`. Diese Zeile hier versprach 29,48 — 1,39 Mio, die beim Verkauf nie ankommen.
+       *
+       * Der ganze Unterschied ist EINE Stufe: `applySellPricingPolicyToBreakdown` multipliziert den
+       * Rohpreis mit Saisonstart-Abschlag, Timing, Kaderdruck und Team-Fit (bei Lava Golem
+       * 0,98 x 0,90 x 1,08 = 0,953). Das Verkaufs-Panel schickt den Breakdown durch diese Stufe,
+       * diese Zeile nahm ihn roh — und die Ausfuehrung (`executeLocalTransfermarktSell`) nimmt
+       * ebenfalls die bereinigte Fassung. Von drei Anzeigen war also genau die eine falsch, an der
+       * die Auslauf-Empfehlung „abgeben oder halten" haengt.
+       *
+       * `marketValueAtExit` bleibt unveraendert: der Vergleichsmassstab darf sich nicht
+       * mitverschieben, sonst waere die Differenz wieder eine andere Zahl.
+       */
+      const saleFactorBreakdown = applySellPricingPolicyToBreakdown({
+        gameState: input.gameState,
+        teamId: input.teamId,
+        player,
+        rosterEntry: entry,
+        baseBreakdown: rohBreakdown,
+        // Nach diesem einen Verkauf: der Kaderdruck-Malus liest die GROESSE DANACH, sonst
+        // bewertete er einen Kader, den es nach dem Verkauf nicht mehr gibt.
+        rosterAfter: Math.max(0, rosterCount - 1),
+      }).breakdown;
       const marketValueAtExit = saleFactorBreakdown.baseMarketValue ?? economy.marketValue ?? null;
       const exitValue = saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
       const purchasePrice = normalizeVisibleRosterMoney(entry.purchasePrice, economy.purchasePrice);
@@ -2518,6 +2647,8 @@ export function buildTeamContractSeasonTable(input: {
         roleTag: entry.roleTag,
         contractShape: entry.contractShape ?? "balanced",
         contractLength: entry.contractLength,
+        restlaufzeitSaisons: restSaisons,
+        laeuftAus: vertragLaeuftAus(entry.contractLength),
         totalSalary: roundMoney(yearlySalarySchedule.reduce((sum, row) => sum + row.salary, 0), 2),
         /**
          * GEMELDET: „ich bin gerade MD10 im Saisonende, aber hier stehen immer noch Werte bei
@@ -2564,6 +2695,10 @@ export function buildTeamContractSeasonTable(input: {
       roleTag: "preview",
       contractShape: draft.contractShape,
       contractLength: draft.contractLength,
+      // Ein Entwurf ist noch kein Vertrag — seine Laufzeit ist die geplante, kein Countdown.
+      restlaufzeitSaisons: restlaufzeitInSaisons(draft.contractLength),
+      // Ein Entwurf ist noch kein Vertrag — seine geplante Laufzeit laeuft nie „aus".
+      laeuftAus: false,
       totalSalary: draft.totalSalary,
       buyoutCost: draft.buyoutCost,
       exitValue: null,
@@ -2582,8 +2717,31 @@ export function buildTeamContractSeasonTable(input: {
 
   const rows = [...rosterRows, ...previewRows];
   const seasonCount = Math.max(5, ...rows.map((row) => row.yearlySalarySchedule.length));
+  /**
+   * DIE SAISON, IN DER DAS GELD WIRKLICH ABFLIESST.
+   *
+   * GEMELDET VON CHRIS: „Da sollte eigentlich 1 wert stehen und zwar der vom gebundenen kapital
+   * was wirklich real weg geht in der jeweiligen saison."
+   *
+   * `yearlySalarySchedule` traegt die NOCH OFFENEN Raten. Die Alterung laeuft am Ende einer
+   * Saison, waehrend diese noch die laufende ist — danach ist die erste offene Rate die der
+   * KOMMENDEN Saison, nicht die der laufenden. Ohne diesen Versatz bekam jede Rate das Etikett
+   * der Vorsaison, und die letzte Vertragssaison fiel hinten aus dem Chart heraus.
+   *
+   * An Chris' Spielstand, Saison 1, Alterung gelaufen:
+   *
+   *     Jorund      Raten 3,30 | 3,30           -> Saison 2 und 3   (nicht 1 und 2)
+   *     Xelara      Rate  5,27                  -> Saison 2
+   *     Lulu        Raten 1,16 | 1,16 | 1,16    -> Saison 2 bis 4
+   *     King Arlen  Raten 2,79 | 3,41 | 4,03    -> Saison 2 bis 4
+   *
+   * Vorher stand fuer Saison 4 eine Null, obwohl Lulu und King Arlen dort noch zusammen 5,19
+   * kosten. Saison 1 ist zu diesem Zeitpunkt gespielt und bezahlt — sie taucht deshalb gar nicht
+   * mehr auf.
+   */
+  const labelVersatz = alterungGelaufen ? 1 : 0;
   const seasonLabels = Array.from({ length: seasonCount }, (_, index) =>
-    buildSeasonLabel(input.seasonLabelBase, index, input.gameState.season.id),
+    buildSeasonLabel(input.seasonLabelBase, index + labelVersatz, input.gameState.season.id),
   );
 
   const totalsCommitted = seasonLabels.map((label, index) => ({

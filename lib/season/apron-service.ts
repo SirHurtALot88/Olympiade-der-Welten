@@ -11,30 +11,46 @@
  * Funktion `computeApronLines`, die die Liga-Gehaltssumme braucht). Die eigentliche Anwendung
  * (Cash-Aenderungen schreiben, Ledger fuehren) lebt in `lib/season/apron-settlement-service.ts`.
  *
- * BEMESSUNGSGRUNDLAGE: `getTeamActualSalaryTotal` — die REAL in DIESER Saison zu zahlende
- * Gehaltssumme, also `yearlySalarySchedule[0]` je Vertrag (das Feld, das
- * `resolvePlayerEconomyContract().salary` liefert und das die Saisonende-Abrechnung wirklich
- * abbucht). Nicht das Formel-Gehalt aus Marktwert/Attributen, und seit dem 13.08.2026 auch nicht
- * mehr das bei Unterschrift verhandelte Jahresgehalt.
+ * BEMESSUNGSGRUNDLAGE: `getTeamNegotiatedSalaryTotal` — das bei Unterschrift VERHANDELTE
+ * Jahresgehalt je Vertrag. Nicht das Formel-Gehalt aus Marktwert/Attributen (was ein Team
+ * THEORETISCH zahlen muesste), und nicht die Jahresrate dieser Saison (die haengt an der
+ * Vertragsform).
  *
- * WARUM ZWEIMAL UMGESTELLT — die Meldungen bauen aufeinander auf:
+ * WARUM DREIMAL UMGESTELLT — die Entscheidungen bauen aufeinander auf, und die dritte nimmt die
+ * zweite zurueck:
  *
  *   1. Das FORMEL-Gehalt hing weder an der Verhandlung noch an der Form. Ein Team, das seinen
  *      ganzen Kader 10 % unter Formel verhandelte, zahlte trotzdem die volle Abgabe (Cold Steel:
  *      3,18 Abgabe bei einer echten Gehaltssumme von 63,6 unter der ersten Linie von 76,8).
- *   2. Das VERHANDELTE Jahresgehalt behob das, blieb aber eine GEGLAETTETE Groesse: es ist der
- *      Durchschnitt ueber die Laufzeit, nicht das, was in diesem Jahr vom Konto geht. Chris:
- *      „Apron ist noch falsch, das sollte doch umgestellt sein auf die REAL zu zahlende summe des
- *      jahres nach vertrag und nicht geglättet." Besteuert wird ab hier, was man in dieser Saison
- *      wirklich zahlt.
+ *   2. Das VERHANDELTE Jahresgehalt behob das. Dann wurde auf die JAHRESRATE dieser Saison
+ *      umgestellt — gelesen aus Chris' „das sollte doch umgestellt sein auf die REAL zu zahlende
+ *      summe des jahres nach vertrag und nicht geglättet". Der Satz richtete sich gegen das
+ *      Formel-Gehalt („geglättet"); die Umstellung ging einen Schritt weiter als noetig und traf
+ *      eine Groesse, die die Vertragsform bewegt.
+ *   3. ZURUECK AUF DAS VERHANDELTE (Chris: „apron muss aber doch das verhandelte gehalt als
+ *      bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete! und das
+ *      verhandelte ist ja auch das was abgebucht werden soll, wofür verhandelt man sonst").
  *
- * DAMIT IST DIE FRUEHERE ANTI-GAMING-ZUSAGE AUSDRUECKLICH AUFGEHOBEN. Sie lautete „ein Formwechsel
- * aendert die Apron-Abgabe um 0,00" und hing genau daran, dass die Basis formunabhaengig war. Die
- * Jahreszahlung ist es nicht: `front_loaded` hebt die Basis dieser Saison, `back_loaded` senkt sie.
- * Das ist die gewollte Folge der Entscheidung — und es ist ein VERSCHIEBEN, kein Vermeiden: der
- * Apron wird jede Saison neu abgerechnet, und was `back_loaded` heute spart, faellt in den
- * Folgejahren an, wenn die Rate steigt. Der Waechter-Test misst jetzt genau diese neue Regel
- * (`tests/apron-faktor-horizont-und-vertragsform.test.ts`), statt die alte zu behaupten.
+ * WAS SCHRITT 2 AUFGERISSEN HAT, NACHGEZAEHLT AN DEN SIEBEN LIVE-SPIELSTAENDEN: 24 von 224
+ * Teamzeilen liegen je nach Basis in einer ANDEREN Apron-Zone, und SECHS davon ducken sich
+ * vollstaendig unter die erste Linie weg — verhandelt liegen sie darueber, gezahlt wird in dieser
+ * Saison weniger, also zahlen sie NICHTS. (`hwz8fk` L-K: verhandelt 62,4 gegen Linie 59,2, Rate
+ * 56,3 → frei. `1hf25q` P-C: 70,3 gegen 69,1, Rate 66,0 → frei.) In der Gegenrichtung zahlt H-R in
+ * `hwz8fk` die zweite Zone (Rate 72,5), obwohl es nur 57,4 verhandelt hat und damit unter BEIDEN
+ * Linien liegt.
+ *
+ * DIE ANTI-GAMING-ZUSAGE GILT DAMIT WIEDER: ein Formwechsel aendert die Apron-Abgabe um 0,00. Sie
+ * war zwischenzeitlich ausdruecklich aufgehoben worden, mit der Begruendung, `back_loaded` sei ein
+ * VERSCHIEBEN und kein Vermeiden — was heute gespart wird, falle spaeter an. Das haelt nur, solange
+ * der Vertrag auch wirklich ausläuft: wer vor dem teuren Jahr verkauft oder nicht verlaengert, hat
+ * die Abgabe nie gezahlt. Und die Linien wandern jede Saison mit dem Liga-Median, das spaetere Jahr
+ * wird also nicht am selben Massstab gemessen.
+ *
+ * WAS DIE VERTRAGSFORM WEITERHIN BEWEGT: den CASHFLOW. `buildContractSalarySchedule` verteilt genau
+ * `verhandelt x Laufzeit` ueber die Jahre (nachgerechnet fuer 1–5 Jahre und alle drei Formen, Summe
+ * exakt erhalten) — man zahlt also genau das Ausgehandelte, nur zu anderen Zeitpunkten. Das
+ * beantwortet auch Chris' „wofuer verhandelt man sonst": das Verhandelte IST das, was insgesamt vom
+ * Konto geht. Die Form entscheidet nur, wann.
  *
  * SAETZE UND LINIENFAKTOREN, GEMESSEN GEGEN DEN GESPIELTEN SAVE (nicht die ursprüngliche Vorgabe):
  * ENDGÜLTIGE ENTSCHEIDUNG (Nutzer, nach drei Kalibrierungsrunden — siehe scripts/apron-kalibrierung.ts
@@ -64,7 +80,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { teamHasFormCardPool } from "@/lib/foundation/form-card-flow";
 import { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { SPONSOR_WERTUNGSTOPF, sponsorWertungsGewichte } from "@/lib/sponsor/sponsor-liga-leiter";
 import {
   SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
@@ -76,20 +92,125 @@ export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
 // ── Konstanten ─────────────────────────────────────────────────────────────────────────────────
 
-/** 1. Apron-Linie = Median-Gehalt × diesen Faktor. */
-export const APRON_LINE_1_MEDIAN_FACTOR = 1.1;
-/** 2. Apron-Linie = Median-Gehalt × diesen Faktor. Bewusst nah an der 1. Linie (siehe Kopfkommentar). */
-export const APRON_LINE_2_MEDIAN_FACTOR = 1.25;
+/**
+ * 1. und 2. Apron-Linie = Median-Gehalt × diese Faktoren.
+ *
+ * 1,10/1,25 → 1,25/1,60, CHRIS' ENTSCHEIDUNG zu `6fv43h`: „nicht 1/3 der teams besteuert wird
+ * sondern die die wirklich drüber schießen".
+ *
+ * DAS ALTE PAAR FING DAS OBERE DRITTEL. Am Live-Abbild gemessen (sieben Spielstände, laufende
+ * Saison): 10,6 Zahler je Stand von 32 Teams. Eine Luxussteuer, die ein Drittel der Liga trifft,
+ * ist keine Steuer auf Ausreisser, sondern eine allgemeine Gehaltsabgabe. Mit 1,25/1,60 sind es
+ * 3,3 Zahler je Stand.
+ *
+ * WAS DAS FUER SICH GENOMMEN KOSTET, und das ist wichtig zu wissen: die Linien anzuheben macht die
+ * Abgabe KLEINER, nicht groesser — besteuert wird der Ueberschuss UEBER den Linien, und der
+ * schrumpft mit jeder Anhebung. Allein waere der Topf von 406,0 auf 120,5 gefallen (−70 %). Dass
+ * der Apron trotzdem haerter trifft, macht die STUFE eine Zeile weiter unten; beide Aenderungen
+ * gehoeren zusammen und wurden zusammen gemessen (`scripts/messe-apron-faktoren-wirkung.ts`).
+ *
+ * ZUR SPANNE: die Linien haengen am Median, „zu niedrig" ist deshalb eine Aussage ueber die
+ * VERTEILUNG. Im gemeldeten Stand liegt die Gehaltsspitze bei 2,30 x Median (123,5 gegen 53,8), in
+ * einem anderen bei 1,53 x. Ein fester Abstand kann beides nicht gleich gut treffen.
+ *
+ * 1,25/1,60 → 1,20/1,40, CHRIS' ENTSCHEIDUNG nach der Ueberschreitungsmessung („davon gefaellt mir
+ * 1,2 und 1,4 eindeutig am besten"). GRUND: 1,60 schob die 2. Linie so weit hinaus, dass sie NIEMANDEN
+ * mehr erreichte. Am Live-Abbild (season-1, Median 64,4) nachgemessen, dieselben Kader gegen drei
+ * Linienpaare:
+ *
+ *   1,10 / 1,25  ->  70,8 /  80,5  ->  Zone 1: 12 Teams, Zone 2: 5 Teams, Topf 127,8
+ *   1,25 / 1,60  ->  80,5 / 103,0  ->  Zone 1:  5 Teams, Zone 2: 0 Teams, Topf  26,6
+ *   1,20 / 1,40  ->  77,3 /  90,2  ->  Zone 1:  8 Teams, Zone 2: 1 Team,  Topf  51,0
+ *
+ * M-M, das teuerste Team der Liga mit 98,7, lag bei 1,60 ganze 4,2 % UNTER der 2. Linie. Eine leere
+ * Zone 2 macht den zweiten Satz wirkungslos, egal wie hoch er steht — besteuert wird ein Ueberschuss,
+ * den es nicht gibt. Bei 1,40 steht M-M 9,5 % darueber und zahlt 23,97 statt 14,56.
+ *
+ * DIE ROLLENVERTEILUNG, DIE DARAUS FOLGT: die 1. Linie fasst mit 8 von 32 das obere Viertel — spuerbar,
+ * aber nicht flaechendeckend („der erste ist ja noch ok"). Die 2. Linie erwischt nur den echten
+ * Ausreisser. Wer die Faktoren aendert, misst mit `scripts/messe-apron-ueberschreitung.ts` NACH, ob
+ * Zone 2 ueberhaupt besetzt bleibt; eine leere Zone 2 ist eine Regel ohne Wirkung.
+ */
+export const APRON_LINE_1_MEDIAN_FACTOR = 1.2;
+export const APRON_LINE_2_MEDIAN_FACTOR = 1.4;
 /** Satz auf den Gehaltsüberschuss ZWISCHEN 1. und 2. Linie. Gemessen, siehe Kopfkommentar. */
 export const APRON_RATE_ZONE_1 = 0.8;
 /** Satz auf den Gehaltsüberschuss ÜBER der 2. Linie. Gemessen, siehe Kopfkommentar. */
 export const APRON_RATE_ZONE_2 = 1.6;
 /** Deckel: höchstens dieser Anteil des rangabhängigen Sponsor-Wertungsanteils. */
 export const APRON_CAP_SHARE_OF_RANK_PAYOUT = 0.5;
-/** Konjunkturhebel: 0 bei salaryFactor <= diesem Wert. */
-export const APRON_KONJUNKTUR_FACTOR_MIN = 0.95;
-/** Konjunkturhebel: 1 bei salaryFactor >= diesem Wert. */
-export const APRON_KONJUNKTUR_FACTOR_MAX = 1.24;
+/**
+ * Konjunkturhebel: 0 bei salaryFactor <= diesem Wert.
+ *
+ * 0,95 → 0,88, CHRIS' ENTSCHEIDUNG zu Meldung `6fv43h` („Apron scheint nicht korrekt zu ziehen!
+ * M-M hat Gehalt 123,5 Mio und die 2. Linie ist 67,3 Mio! Die müssten fast 60 mio Strafe zahlen!"),
+ * Weg 1 von dreien: die Schwelle senken.
+ *
+ * DER BEFUND, der dahin führte: der Salary Factor bewegt sich zwischen 0,82 und 1,24. Mit der
+ * Schwelle bei 0,95 war der Apron über das gesamte untere Drittel dieser Spanne KOMPLETT
+ * wirkungslos — nicht gedämpft, aus. In Chris' Saison stand `f` bei 0,96, also `k = 0,03`: elf
+ * Teams über der Linie zahlten zusammen 5,4.
+ *
+ * DURCHGEMESSEN über alle sieben Live-Spielstände, laufende und kommende Saison (14 Beobachtungen,
+ * `scripts/messe-apron-schwelle.ts`) — die Schwelle entscheidet NICHT, wer zahlt (das tun die
+ * Linien), sondern wie viel:
+ *
+ *   Schwelle        0,95   0,92   0,88   0,85   0,82
+ *   hwz8fk f=0,96    5,4   19,6   34,9   44,3   52,3     ← der gemeldete Spielstand
+ *   n90y4m f=0,92    0,0    0,0    4,7    7,6    9,9
+ *   1hf25q f=0,87    0,0    0,0    0,0    4,4   10,3
+ *   hwz8fk f=1,16   91,8   93,4   95,1   96,1   97,0     ← Boomsaison, kaum Bewegung
+ *   Saisons mit k=0   2/14   2/14   1/14   0/14   0/14
+ *
+ * WARUM 0,88 UND NICHT 0,82: bei 0,82 fiele die Schwelle mit der Untergrenze der Spanne zusammen,
+ * der Hebel griffe also IMMER — und die ursprüngliche Absicht ginge verloren. Die steht im
+ * Kommentar an `apronKonjunkturhebel`: die Gehälter stehen fest, bevor die Konjunktur gewürfelt
+ * wird; in einer schwachen Saison soll die Abgabe nicht genau dann am meisten schmerzen, wenn
+ * ohnehin niemand Geld hat. Bei 0,88 bleibt genau EINE von 14 beobachteten Saisons abgabefrei
+ * (f = 0,87) — der Ausnahmefall statt der Regel.
+ *
+ * An den Sätzen und Linien ist keine Zeile angefasst.
+ */
+export const APRON_KONJUNKTUR_FACTOR_MIN = 0.88;
+/**
+ * Konjunkturhebel: 1 bei salaryFactor >= diesem Wert.
+ *
+ * 1,24 → 0,88, also GLEICH `..._MIN`, und damit ist aus der Rampe eine STUFE geworden. CHRIS'
+ * ENTSCHEIDUNG zu `6fv43h`: „ist ja okay wenn er unter 0,95 nicht zieht aber darüber müsste M-M den
+ * vollen betrag zahlen! das ist nicht nur kleiner teil oder so sondern direkt BAM in your face".
+ *
+ * VORHER lief der Hebel von 0,88 bis 1,24 linear hoch. Ein Team weit ueber der Linie zahlte in
+ * einer mittelmaessigen Saison einen Bruchteil: bei f = 0,96 waren es 22 %, bei f = 0,92 noch 11 %.
+ * Die Absicht dahinter — in einer schwachen Saison nicht auch noch die Abgabe voll zuschlagen zu
+ * lassen — bleibt vollstaendig erhalten, sie sitzt jetzt nur in der SCHWELLE statt in der Rampe:
+ * unter 0,88 zahlt weiterhin niemand etwas.
+ *
+ * DIE STUFE BRAUCHT KEINE NEUE LOGIK. `apronKonjunkturhebel` behandelt den Fall „Rampe ohne
+ * Breite" seit jeher (`if (!(max > min)) return salaryFactor >= min ? 1 : 0`); er war nur nie
+ * erreichbar. Es gibt weiterhin genau eine Hebelfunktion.
+ *
+ * GEMESSEN, zusammen mit den angehobenen Linien, ueber sieben Spielstaende:
+ *
+ *   Variante                        Topf   Zahler/Stand   M-M gesamt
+ *   vorher       1,10/1,25 Rampe   385,1          10,1        131,9
+ *   nur Linien   1,25/1,60 Rampe   109,8           3,9         62,8
+ *   JETZT        1,25/1,60 Stufe   197,7           3,9        114,0
+ *
+ * Halb so viel Topf wie vorher, aber auf ein Drittel der Zahler konzentriert.
+ *
+ * NACHGEMESSEN NACH #589. Die erste Fassung dieser Tabelle stand auf der damaligen
+ * Bemessungsgrundlage (der real gezahlten Jahresrate); #589 hat sie auf das VERHANDELTE
+ * Jahresgehalt zurueckgestellt. Damit aendern sich alle Absolutwerte — M-Ms Gehalt etwa von 123,5
+ * auf 115,1 —, und eine Tabelle, die den alten Stand behauptet, waere schlicht falsch. Die AUSSAGE
+ * ueberlebt den Wechsel unveraendert: die Linien allein schwaechen den Apron (−71 %), erst die
+ * Stufe macht ihn wieder scharf, und zwar auf einem Drittel der Zahler. Die Faktoren mussten
+ * deshalb NICHT nachjustiert werden.
+ *
+ * DER DECKEL BLEIBT (`APRON_CAP_SHARE_OF_RANK_PAYOUT`, halber Wertungsanteil). Er ist der Grund,
+ * warum M-M bei 39,7 stehenbleibt, obwohl roh 74,9 anstuenden — Chris' „knapp 40 mio extra […] ist
+ * super viel" bezieht sich genau auf diese gedeckelte Zahl.
+ */
+export const APRON_KONJUNKTUR_FACTOR_MAX = APRON_KONJUNKTUR_FACTOR_MIN;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -118,9 +239,23 @@ function median(values: readonly number[]): number {
  * Hebel bindet die Abgabe an die tatsächliche wirtschaftliche Lage der Saison statt an eine im
  * Voraus fixierte Gehaltszahl.
  */
-export function apronKonjunkturhebel(salaryFactor: number): number {
+export function apronKonjunkturhebel(salaryFactor: number, factorMin?: number, factorMax?: number): number {
   if (!Number.isFinite(salaryFactor)) return 0;
-  return clamp01((salaryFactor - APRON_KONJUNKTUR_FACTOR_MIN) / (APRON_KONJUNKTUR_FACTOR_MAX - APRON_KONJUNKTUR_FACTOR_MIN));
+  const min = factorMin ?? APRON_KONJUNKTUR_FACTOR_MIN;
+  const max = factorMax ?? APRON_KONJUNKTUR_FACTOR_MAX;
+  /**
+   * `max <= min` IST DIE STUFE, nicht ein Sonderfall: die Rampe hat dann keine Breite mehr, und was
+   * bleibt, ist „bis zur Schwelle gar nichts, darueber voll". Diese Zeile stand schon hier, war aber
+   * nicht erreichbar, weil `max` fest die Modul-Konstante war.
+   *
+   * DER GRENZFALL IST NICHT THEORETISCH: die Salary Factors tragen zwei Nachkommastellen, `f` kann
+   * also EXAKT auf der Schwelle landen. Hier stand `>= min`, was dort 1 geliefert haette — im
+   * Widerspruch zur Zusage der Konstante selbst („0 bei salaryFactor <= diesem Wert") und zur
+   * Rampe, die an derselben Stelle exakt 0 ergab. Jetzt `> min`: die Stufe uebernimmt die
+   * Grenzsemantik der Rampe, statt sie stillschweigend umzudrehen.
+   */
+  if (!(max > min)) return salaryFactor > min ? 1 : 0;
+  return clamp01((salaryFactor - min) / (max - min));
 }
 
 /**
@@ -257,14 +392,15 @@ function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; u
  * Importrichtung — die KI-Decke (`resolveTeamApronSalaryCeiling`) baut auf dieser Zahl auf, und ein
  * Zuhause bei der KI hätte einen Zyklus ergeben.
  *
- * ZWEITE UMSTELLUNG (Chris: „das sollte doch umgestellt sein auf die REAL zu zahlende summe des
- * jahres nach vertrag und nicht geglättet"): vorher `getTeamNegotiatedSalaryTotal`, das bei
- * Unterschrift verhandelte Jahresgehalt. Es war formunabhängig und trug damit die alte
- * Anti-Gaming-Zusage — aber es ist der Durchschnitt über die Laufzeit und nicht das, was in dieser
- * Saison vom Konto geht. Die Begründung samt Folgen steht im Dateikopf.
+ * DRITTE UMSTELLUNG, zurück auf das Verhandelte (Chris: „apron muss aber doch das verhandelte
+ * gehalt als bemessung nehmen, nicht das was es THEORETISCH wäre und nicht das geglättete!").
+ * Zwischenzeitlich stand hier `getTeamActualSalaryTotal`, die Jahresrate dieser Saison — die haengt
+ * an der Vertragsform und riss damit genau das Schlupfloch auf, gegen das
+ * `resolveNegotiatedAnnualSalary` gebaut wurde. Sechs Teamzeilen der sieben Live-Spielstaende
+ * duckten sich darueber vollstaendig unter die erste Linie weg. Herleitung und Zahlen im Dateikopf.
  */
 export function getTeamApronSalaryBase(gameState: GameState, teamId: string): number {
-  return getTeamActualSalaryTotal(gameState, teamId);
+  return getTeamNegotiatedSalaryTotal(gameState, teamId);
 }
 
 /**
@@ -366,10 +502,57 @@ export function areSeasonApronLinesFrozen(gameState: GameState): boolean {
 }
 
 /**
+ * DER ANKER AUS DER VORSAISON — gegen das Gehalts-TAL im Kaufmoment.
+ *
+ * GEMESSEN (docs/BEFUND-APRON-BREMSE-KAUFMOMENT.md): im Augenblick, in dem die KI kauft, sind die
+ * Vertraege gerade ausgelaufen und die Kader stehen bei 8–11 von 10–14 Plaetzen. Der Median steht
+ * dort im Jahres-Tal. In Saison 4 einer Simulation: vor den Kaeufen Median 39,7 (Linien 49,6/63,5),
+ * nach den Kaeufen Median 55,2 (Linien 69,1/88,4). Die KI entschied also gegen eine Grenze, die
+ * 28 % zu tief lag — gerechnet aus einem Kader, den es noch gar nicht gab. In Saison 1 faellt das
+ * nicht auf, weil der Draft die Kader VOR dem Pruefmoment fuellt; ab Saison 2 ist der Pruefmoment
+ * immer das Tal.
+ *
+ * CHRIS: „die apron linie ist sonst ja nur in S1 korrekt und danach immer falsch das ist ein
+ * grundproblem".
+ *
+ * KEIN NEUER SPEICHER, KEINE ZWEITE RECHNUNG: der Snapshot der abgerechneten Vorsaison ueberlebt
+ * den Saisonuebergang ohnehin im `seasonState` (`preseason-workflow-service.ts` traegt ihn mit) und
+ * faellt heute nur am `seasonId`-Abgleich durch. Er wird hier ein zweites Mal GELESEN, nicht neu
+ * gerechnet.
+ *
+ * VERANKERT WIRD DER MEDIAN, NICHT DIE FERTIGE LINIE. Ein alter Snapshot traegt die Faktoren, die
+ * damals galten (auf Chris' Spielstand 1,10/1,25 aus der Zeit vor dem Umbau auf 1,25/1,6) — wer die
+ * Linien selbst uebernaehme, schleppte die alte Steuer in die neue Saison. Der Median ist die
+ * gemessene Groesse, die Faktoren sind die Regel; die Regel gilt immer in ihrer heutigen Fassung.
+ */
+function vorsaisonMedianAnker(gameState: GameState): number | null {
+  const snapshot = gameState.seasonState?.apronLinesSnapshot;
+  if (!snapshot) return null;
+  // Ein Snapshot der LAUFENDEN Saison ist kein Anker — dann greift ohnehin `areSeasonApronLinesFrozen`.
+  if (snapshot.seasonId === gameState.season?.id) return null;
+  // Ein Snapshot aus einem Referenz-Notbehelf (frischer Save ohne echte Gehaelter) taugt nicht als
+  // Anker: er misst keine gespielte Liga, sondern einen Platzhalter.
+  if (snapshot.usedReferenceSalary) return null;
+  const median = snapshot.medianSalary;
+  return Number.isFinite(median) && median > 0 ? median : null;
+}
+
+/**
  * DIE LINIEN, DIE GERADE GELTEN — abgeleitet aus `areSeasonApronLinesFrozen`, nicht zweitgerechnet.
  *
- * Solange das Kauffenster offen ist, wandern sie mit dem Median mit; sobald es zu ist, gilt der
- * eingefrorene Stand.
+ * Solange das Kauffenster offen ist, wandern sie mit dem Median mit — aber nie unter den Stand, mit
+ * dem die Vorsaison abgerechnet wurde (siehe `vorsaisonMedianAnker`). Sobald das Fenster zu ist,
+ * gilt der eingefrorene Stand.
+ *
+ * WARUM `max` UND NICHT DER ANKER ALLEIN: der Entwurfskern bleibt erhalten — ruestet die Liga ueber
+ * das Vorjahresniveau hinaus, uebernimmt der Live-Median und die Linien wandern nach oben mit. Der
+ * Anker verhindert nur den Absturz ins Tal. Fuer den Menschen heisst das: die Linien steigen
+ * waehrend seiner Kaufphase monoton und rasten beim Finalisieren ein, statt zu Saisonbeginn
+ * unerklaerlich einzubrechen und sich dann wieder hochzuschieben.
+ *
+ * IN DIE ANDERE RICHTUNG IST DER ANKER MILDE: schrumpft die Liga wirklich, haelt er die Linien im
+ * Fenster zu hoch. Das ist die bewusst gewaehlte Fehlerrichtung — eine zu hohe Grenze besteuert zu
+ * wenig, eine zu tiefe besteuert die halbe Liga. Der Einfrier-Schritt korrigiert es am Fensterende.
  *
  * WARUM ÜBERHAUPT MITWANDERN: Der Kopfkommentar dieser Datei nennt es als Kern des Entwurfs — die
  * Linien hängen am Median und nicht an einer festen Zahl, „damit die Linien mitwandern, wenn die
@@ -388,7 +571,16 @@ export function resolveSeasonApronLines(gameState: GameState): ApronLines {
   if (areSeasonApronLinesFrozen(gameState)) {
     return gameState.seasonState!.apronLinesSnapshot!;
   }
-  return computeApronLines(gameState);
+  const live = computeApronLines(gameState);
+  const anker = vorsaisonMedianAnker(gameState);
+  if (anker === null || anker <= live.medianSalary) return live;
+  const medianSalary = round1(anker);
+  return {
+    medianSalary,
+    line1: round1(medianSalary * APRON_LINE_1_MEDIAN_FACTOR),
+    line2: round1(medianSalary * APRON_LINE_2_MEDIAN_FACTOR),
+    usedReferenceSalary: live.usedReferenceSalary,
+  };
 }
 
 // ── Wertungsanteil (für den Deckel) ────────────────────────────────────────────────────────────
@@ -480,13 +672,18 @@ export function apronLevyForSalary(input: {
   /** Nur für die Kalibrierung (siehe `computeApronSettlement`); sonst weglassen. */
   rateZone1?: number;
   rateZone2?: number;
+  konjunkturFactorMin?: number;
+  konjunkturFactorMax?: number;
 }): number {
   if (!Number.isFinite(input.salary) || input.salary <= 0) return 0;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
   const rateZone2 = input.rateZone2 ?? APRON_RATE_ZONE_2;
   const ueberLinie1 = Math.max(0, Math.min(input.salary, input.line2) - input.line1);
   const ueberLinie2 = Math.max(0, input.salary - input.line2);
-  return (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) * apronKonjunkturhebel(input.salaryFactor);
+  return (
+    (ueberLinie1 * rateZone1 + ueberLinie2 * rateZone2) *
+    apronKonjunkturhebel(input.salaryFactor, input.konjunkturFactorMin, input.konjunkturFactorMax)
+  );
 }
 
 /**
@@ -515,6 +712,8 @@ export function computeApronSettlement(input: {
   rateZone1?: number;
   rateZone2?: number;
   capShareOfRankPayout?: number;
+  konjunkturFactorMin?: number;
+  konjunkturFactorMax?: number;
 }): ApronSettlement {
   const { line1, line2 } = input.lines;
   const rateZone1 = input.rateZone1 ?? APRON_RATE_ZONE_1;
@@ -532,6 +731,8 @@ export function computeApronSettlement(input: {
       salaryFactor: input.salaryFactor,
       rateZone1,
       rateZone2,
+      konjunkturFactorMin: input.konjunkturFactorMin,
+      konjunkturFactorMax: input.konjunkturFactorMax,
     });
     const deckel = capShareOfRankPayout * Math.max(0, team.rankShare);
     const abgabe = Math.max(0, Math.min(rohAbgabe, deckel));

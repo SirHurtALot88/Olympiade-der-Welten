@@ -47,12 +47,44 @@ export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = Number(
  * 3 % statt 10 %. Das Band beschreibt die Belastung, nicht die Wahrscheinlichkeit; wer die
  * Beschriftung an Prozente koppeln will, muss beides gemeinsam neu schneiden.
  */
+/**
+ * ENTSCHEIDUNG VON CHRIS (16.08.): DER ANKER BEI 100 FAELLT VON 40 % AUF 33 %.
+ *
+ * Chris' Frage war „was ist da das aktuelle? 40%? Könnte man zb auf 33 runter setzen" — die
+ * Schaetzung stimmte. Gemessen wurde vorher, nicht danach (`scripts/messung-verletzungsrisiko-
+ * deckel.ts`, 2402 echte Wuerfe aus dem Live-Spielstand):
+ *
+ * | Erm.   | Anteil der Wuerfe | Verletzte |
+ * |--------|------------------:|----------:|
+ * | 0–25   |            27,8 % |         0 |
+ * | 25–50  |            32,1 % |        10 |
+ * | 50–65  |            18,2 % |        27 |
+ * | 65–80  |            11,4 % |        47 |
+ * | 80–95  |             6,7 % |        43 |
+ * | 95–100 |             3,9 % |        38 |
+ *
+ * WAS DIE AENDERUNG BRINGT — und ehrlich dazu, was nicht: die erwarteten Verletzungen fallen um
+ * 5,3 % (185,0 auf 175,3). Das ist wenig, und der Grund steht in der Tabelle: nur 4,8 % aller
+ * Wuerfe liegen ueberhaupt oberhalb der Stelle, an der die alte Kurve 33 % erreichte (Erm. 91,4).
+ * Ein Deckel am oberen Ende kann nicht mehr bewegen als das, was oben stattfindet.
+ *
+ * WARUM TROTZDEM DER ANKER UND NICHT `min(33, kurve)`: ein harter Deckel liesse alles unter 91,4
+ * unberuehrt (nur −3,5 %) und erzeugte darueber ein Plateau — ab 91 wuerde es nicht mehr
+ * schlimmer, egal wie sehr ein Team seine Spieler verheizt. Der gesenkte Anker haelt die Kurve
+ * monoton: mehr Ermuedung heisst weiter mehr Risiko, die Strecke ab 80 wird nur flacher
+ * (0,4 %/Punkt statt 0,75 %/Punkt).
+ *
+ * WAS DAMIT NICHT GELOEST IST: das Band 65–80 stellt 11,4 % der Wuerfe und 47 Verletzungen — den
+ * groessten einzelnen Brocken. Dort liegt der Hebel, falls die Zahl spuerbar sinken soll. Und der
+ * Endspurt-Stau bleibt bewusst stehen, so von Chris entschieden: „ne ich würde das so lassen und
+ * gucken wie man mit der fatigue zurecht kommt".
+ */
 export const FATIGUE_INJURY_RISK_ANCHORS = [
   { fatigue: 0, riskPercent: 0 },
   { fatigue: 25, riskPercent: 0 },
   { fatigue: 50, riskPercent: 3 },
   { fatigue: 80, riskPercent: 25 },
-  { fatigue: 100, riskPercent: 40 },
+  { fatigue: 100, riskPercent: 33 },
 ] as const;
 
 /**

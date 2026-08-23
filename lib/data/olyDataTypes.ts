@@ -106,8 +106,18 @@ export type ScenarioMeta = {
   label: string;
   description?: string;
   saveCategory?: "manual" | "autosave" | "pre-deploy" | "pre-season" | "post-season" | "emergency" | "recovery";
-  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
-  newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E4): "online_1v1"/"online_2v2" ergaenzt, damit
+  // ein 1+1-/2+2-Raum sein eigenes `FoundationSaveModePreset` (lib/persistence/foundation-save-mode.ts)
+  // ueberhaupt tragen kann. FUND: diese Werte-Liste steht literal an VIER Stellen dupliziert
+  // (hier x2, lib/persistence/types.ts, lib/game/new-game-setup-service.ts `NewGamePresetId`,
+  // lib/foundation/tabs/foundation-page-types.ts `NewGamePresetId`) statt an einer -- eine
+  // bestehende Verletzung der Hausregel "eine Quelle pro Groesse", die NICHT aus diesem Paket
+  // stammt. Sie hier zu vereinheitlichen war nicht Teil des Auftrags (die zwei `NewGamePresetId`-
+  // Stellen gehoeren zum getrennten Solo-"Neues Spiel"-Wizard-System, siehe Kommentar an
+  // `createRoomCoopSave`s Aufruf in room-store.ts) -- nur die zwei fuer Paket 2 tatsaechlich
+  // benoetigten Stellen (hier und lib/persistence/types.ts) wurden ergaenzt.
+  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
+  newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_1v1" | "online_2v2" | "online_4v4" | "custom";
   humanControlledTeamCount?: number;
   createdAt: string;
   sourceSaveId?: string;
@@ -552,6 +562,26 @@ export type PlayerBaselineWriteGuardEvent = {
   attemptedSource: string;
   previousChecksum: string | null;
   attemptedChecksum: string | null;
+  timestamp: string;
+};
+
+/**
+ * Eine gespeicherte Konjunktur-Reihe, die NICHT zu dem passt, was der Seed aus
+ * `(saveId, seasonId)` errechnet.
+ *
+ * WARUM DAS AUFGESCHRIEBEN WIRD, statt es stillschweigend zu überschreiben: der Faktor entscheidet
+ * über Sponsorenzahlungen und die Apron-Drosselung. Wer ihn beim Laden austauscht, ändert
+ * rückwirkend die Grundlage von Geld, das schon geflossen ist — und niemand erführe davon. Der
+ * Wächter lässt die gespeicherte Reihe deshalb STEHEN und schreibt die Abweichung auf.
+ */
+export type SeasonEconomyFactorGuardEvent = {
+  eventId: string;
+  seasonId: string;
+  reason: "season_economy_factor_mismatch";
+  /** Die Faktoren, die im Spielstand stehen — und mit denen gerechnet wurde. */
+  storedFactors: number[];
+  /** Was der Seed aus (saveId, seasonId) heute ergäbe. */
+  seededFactors: number[];
   timestamp: string;
 };
 
@@ -1845,6 +1875,41 @@ export type ScoutingWatchlistEntry = {
   note?: string | null;
 };
 
+/**
+ * EIN LESEZEICHEN — nicht zu verwechseln mit der Scouting-Beobachtungsliste.
+ *
+ * GEWUENSCHT (Chris): „man sollte sich aussuchen können welche teams getrackt werden, dass man so
+ * ne wishlist option bei teams und spielern hat wie so lesezeichen und sich die dann noch mal
+ * angucken kann".
+ *
+ * WARUM NICHT DIE VORHANDENE `ScoutingWatchlistEntry` ERWEITERT WURDE — die ist etwas anderes,
+ * und der Unterschied faellt erst auf, wenn man sie missbraucht:
+ *
+ *   - sie haengt an einer SAISON (`seasonId`) und ist beim Saisonwechsel weg,
+ *   - sie hat eine Platzgrenze (`scouting-wishlist-slots.ts`),
+ *   - und sie blendet jeden Spieler aus, der in EINEM Kader steht — sie ist eine Liste von
+ *     TRANSFERZIELEN, und ein Spieler mit Vertrag ist keins mehr.
+ *
+ * Genau das darf ein Lesezeichen nicht tun: wer sich den eigenen Aufsteiger merkt, will ihn beim
+ * naechsten Blick wiederfinden und nicht feststellen, dass er verschwunden ist, weil man ihn
+ * gekauft hat.
+ *
+ * AM BESITZER, NICHT AM TEAM. Die Merkliste ist eine Ansichts-Vorliebe, keine Spieltatsache: im
+ * Koop fuehrt Chris seine eigene und Franky seine, und keiner sieht oder ueberschreibt die des
+ * anderen. Ohne Anmeldung (Solo) gibt es genau einen Eimer — `ownerId` steht dann auf null.
+ */
+export type MerklisteArt = "team" | "spieler";
+
+export type MerklisteEintrag = {
+  art: MerklisteArt;
+  /** Team-ID oder Spieler-ID, je nach `art`. */
+  id: string;
+  /** Besitzer der Liste. `null` = Solo/ohne Anmeldung, ein einziger gemeinsamer Eimer. */
+  ownerId: string | null;
+  angelegtAm: string;
+  notiz?: string | null;
+};
+
 export type TeamSeasonObjectiveStatus = "open" | "completed" | "failed" | "at_risk";
 
 export type TeamSeasonObjectiveRecord = {
@@ -2103,6 +2168,19 @@ export type Discipline = {
   weight: number;
   originalOrder?: number;
   displayOrder?: number;
+  /**
+   * NICHT die Wertungsgroesse. Das ist der Katalog-Startzustand (Tabelle `disciplines`,
+   * Seed-Daten in lib/data/dataAdapter.ts) — der Spielplan wuerfelt die tatsaechlich fuer eine
+   * Saison geltende Kadergroesse jede Saison neu aus (`buildSeasonSeededDisciplineSchedule`,
+   * lib/season/season-discipline-schedule.ts) und legt sie in
+   * `seasonState.disciplineSchedule[].discipline1/2.playerCount` ab. Am Live-Spielstand
+   * gemessen weichen 15 von 20 Disziplinen zwischen Katalog und Spielplan ab; gegen die
+   * Standings-Punkte nachgerechnet stimmt fuer alle 32 Teams nur der Spielplan-Wert. Wer
+   * wissen will, wie viele Spieler DIESE Saison in einer Disziplin antreten (Aufstellung,
+   * Anzeige, Rangpunkte, KI), muss den Spielplan-Slot lesen — `buildSeasonDisciplinePlayerCountMap`
+   * in lib/season/season-discipline-schedule.ts liefert das je Disziplin fertig mit Katalog-
+   * Rueckfall fuer Disziplinen, die (noch) keinen Spielplan-Eintrag haben.
+   */
   playerCount?: number;
   mutator1?: string | null;
   mutator2?: string | null;
@@ -2114,7 +2192,21 @@ export type RosterEntry = {
   id: string;
   teamId: string;
   playerId: string;
+  /**
+   * Der Countdown — ABGELEITET, sobald `contractEndSeasonNumber` gesetzt ist.
+   *
+   * Bleibt vorerst das Feld, das die meisten Lesestellen benutzen (93 Dateien in `lib/` und
+   * `app/`). Die Wahrheit ist die Endsaison; siehe `lib/contracts/vertragslaufzeit.ts`.
+   */
   contractLength: number;
+  /**
+   * DIE SAISON, NACH DER DER VERTRAG ENDET — die Wahrheit ueber die Laufzeit.
+   *
+   * Eine Zahl, die nicht fortgeschrieben werden muss: „laeuft aus" heisst, dass sie die laufende
+   * Saison IST. Der Countdown daneben wird daraus gerechnet. Optional, weil Altstaende sie noch
+   * nicht tragen — dann leitet `endSaisonNummer` sie einmalig aus `contractLength` ab.
+   */
+  contractEndSeasonNumber?: number;
   contractStatus?: ContractStatus;
   contractShape?: ContractShape;
   yearlySalarySchedule?: ContractYearSalary[];
@@ -2504,6 +2596,27 @@ export type MatchdayResolveSnapshotRecord = {
     }
   >;
   payload: unknown;
+  /**
+   * GESETZT, SOBALD GENAU DIESE RECHNUNG GEBUCHT WURDE — mit der Ergebnis-ID, in die sie floss.
+   *
+   * GEMELDET VON CHRIS an der Arena: „Screenshot 1 zeigt die Ergebnisse. Screenshot 2 zeigt andere
+   * ergebnisse ungefähr ne Minute später nachdem gebucht wurde. […] ich will keinen switch mehr
+   * sehen dass die punkte sich ändern."
+   *
+   * URSACHE: Ist ein Spieltag DURCH, gab `readMatchdayResolveSnapshot` bewusst `null` zurück (ein
+   * veralteter Snapshot darf die gebuchte Wahrheit nicht überstimmen). Die Arena fiel damit auf den
+   * LIVE-Pfad zurück und rechnete den Spieltag neu — gegen den Zustand NACH der Buchung. Und genau
+   * die schreibt die Nach-Spieltags-Fatigue: dieselbe Disziplin kommt danach anders heraus. Am
+   * Screenshot: Malagor 98,8 → 92,1, Silver Soldiers 14,9 → 14,2, Cold Steel 14,4 → 14,9 — samt
+   * getauschter Plätze.
+   *
+   * Der Stempel löst das ohne Vergleichsheuristik: eine Vorberechnung, die nachweislich GEBUCHT
+   * wurde, ist keine Vorschau mehr, sondern der Beleg des Ergebnisses. Sie darf danach angezeigt
+   * werden — und nur sie. Ein Snapshot ohne Stempel bleibt nach der Buchung ungültig, wie bisher.
+   */
+  bookedAt?: string | null;
+  /** Das Ergebnis, in das diese Rechnung gebucht wurde. Zusammen mit `bookedAt` der Beleg. */
+  bookedMatchdayResultId?: string | null;
   createdAt: string;
 };
 
@@ -2805,6 +2918,22 @@ export type TeamStrengthRankCaptureRecord = {
   records: TeamDisciplineRankSnapshotRecord[];
 };
 
+/**
+ * Eine Auszeichnung, wie sie im Saison-Schnappschuss liegenbleibt. Bewusst eine FLACHE Kopie der
+ * Felder aus `SeasonReviewAward` statt eines Imports: der Schnappschuss ist ein gespeichertes
+ * Format und darf sich nicht mitbewegen, wenn der Dienst seinen Typ aendert.
+ */
+export type SeasonSnapshotAwardRecord = {
+  awardId: string;
+  label: string;
+  category: "team" | "player" | "transfer" | "discipline";
+  winnerType: "team" | "player";
+  winnerId: string;
+  winnerName: string;
+  value: number | string | null;
+  reason: string;
+};
+
 export type SeasonSnapshotRecord = {
   snapshotId?: string;
   seasonId: string;
@@ -2828,6 +2957,19 @@ export type SeasonSnapshotRecord = {
   playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
   transferSnapshots?: SeasonSnapshotTransferRecord[];
   gmAssignments?: SeasonSnapshotGeneralManagerRecord[];
+  /**
+   * DIE AUSZEICHNUNGEN DIESER SAISON — Ticket #41.
+   *
+   * CHRIS: „Dafür hätte ich gerne im Spielerprofil die Icons dass man auch später direkt sieht ah
+   * der spieler gehört [dazu]". Genau daran haengt dieses Feld: `buildSeasonReview` ermittelt die
+   * Auszeichnungen beim Saisonabschluss, aber sie wurden NIRGENDS abgelegt. Mit dem
+   * Saisonwechsel waren sie weg — ein Spieler konnte also MVP gewesen sein, ohne dass es eine
+   * Saison spaeter noch irgendwo stand.
+   *
+   * Optional, weil Bestandsspielstaende das Feld nicht haben. Fehlt es, zeigt das Profil keine
+   * Auszeichnungen statt falscher — eine leere Liste waere hier eine Luege.
+   */
+  seasonAwards?: SeasonSnapshotAwardRecord[];
   /** Set when rosterEnd/cashEnd were refreshed from the next season's preseason (post-buy entry state). */
   entryRosterPatchedAt?: string | null;
   entryRosterPatchedFromSeasonId?: string | null;
@@ -3434,6 +3576,12 @@ export type GameState = {
   appliedEventIds?: string[];
   seasonReviewState?: unknown;
   preSeasonWorkflowState?: unknown;
+  /**
+   * Lesezeichen auf Teams und Spieler, je Besitzer. BEWUSST AUF DER OBERSTEN EBENE und nicht in
+   * `seasonState`: die Liste ueberlebt den Saisonwechsel, das ist ihr halber Zweck. Siehe
+   * `MerklisteEintrag` und lib/merkliste/merkliste-service.ts.
+   */
+  merkliste?: MerklisteEintrag[];
   season: Season;
   seasonState: SeasonState;
   matchdayState: MatchdayState;
@@ -3447,6 +3595,11 @@ export type GameState = {
   transferHistory: TransferHistoryEntry[];
   playerBaselines?: PlayerBaselineRecord[];
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
+  /**
+   * Abweichungen zwischen gespeicherter und geseedeter Konjunktur-Reihe. Leer im Normalfall;
+   * ein Eintrag heisst, dass jemand nachsehen sollte (siehe `SeasonEconomyFactorGuardEvent`).
+   */
+  seasonEconomyFactorGuardEvents?: SeasonEconomyFactorGuardEvent[];
   playerPotential?: PlayerPotentialRecord[];
   playerMoraleState?: PlayerMoraleState[];
   playerRelationshipEvents?: PlayerRelationshipEventRecord[];

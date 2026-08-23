@@ -88,15 +88,18 @@ export type SpieltagsTopSpieler = {
 /**
  * Wie viele Zeilen die Liste unter der Spieltags-Wertung traegt.
  *
- * GEMELDET VON CHRIS: „die Top Player Liste könnte man noch ausweiten, dass man nicht nur die top
- * 12 sondern Top 24 hier sieht ohne dass man die Tabelle in der höhe größer macht, sondern
- * nebeneinander."
+ * GEMELDET VON CHRIS (Ticket #42): „die Top Player Liste könnte man noch ausweiten, dass man
+ * nicht nur die top 12 sondern Top 24 hier sieht ohne dass man die Tabelle in der höhe größer
+ * macht, sondern nebeneinander."
  *
  * 24 statt 12 — und die Anzeige legt sie in ZWEI Spalten, damit die Kachel genauso hoch bleibt wie
  * vorher (`DisciplineStageTopPlayers.tsx`). Die Zahl steht hier und nicht in der Anzeige, weil
  * BEIDE Zulieferer sie brauchen: die Einzel-Disziplin-Liste und die summierte Spieltags-Liste.
  * Stuenden zwei Zahlen an zwei Stellen, zeigte die eine Ansicht frueher oder spaeter mehr als die
  * andere.
+ *
+ * Die Zahl ist bewusst GERADE: eine ungerade liesse die zweite Spalte kuerzer als die erste, und
+ * die Liste saehe abgeschnitten aus statt vollstaendig.
  */
 export const SPIELTAGS_TOPSPIELER_LIMIT = 24;
 

@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Merkliste",
+  "text": "Die gemerkten Teams und Spieler haben jetzt eine eigene Seite — in der Navigation direkt hinter „Spieler\". Sie zeigt beides gemeinsam, das zuletzt Gemerkte oben: zu Teams Saisonrang und Punkte, zu Spielern Klasse und aktuelles Team. Jede Zeile führt ins jeweilige Profil, und der Stern nimmt einen Eintrag direkt dort wieder weg. Ein gemerkter Spieler, den es im Spielstand nicht mehr gibt, verschwindet nicht stillschweigend, sondern bleibt mit dem Hinweis stehen — verschluckte Einträge sind genau der Fehler, den ein Lesezeichen nicht machen darf. Ist nichts gemerkt, steht dort ein Satz, wo man Sterne setzt, statt einer leeren Tabelle.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

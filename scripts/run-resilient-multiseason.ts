@@ -205,7 +205,24 @@ function buildFatigueInjuryReport(saveId: string, targetSeasons: number) {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * DAS AUTO-TUNE SCHREIBT IN DIE QUELLE, NICHT IN DEN SPIELSTAND. `--apply` traegt die getunten
+ * Balancing-Konstanten in lib/training/*.ts ein — der Arbeitsbaum sieht danach aus, als haette
+ * jemand von Hand am Balancing gedreht.
+ *
+ * DAS IST EINMAL SCHIEFGEGANGEN, und zwar leise: ein pauschales `git add -A` waehrend eines
+ * laufenden Messlaufs nahm die getunten Werte in einen Commit ueber ein MESSWERKZEUG mit
+ * (ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE 0,3 -> 0,345; Trainingsbudgets rund ein Viertel hoeher).
+ * Aufgefallen ist es nur, weil zwei Kalibrier-Tests anschlugen.
+ *
+ * `OLY_LONG_RUN_TUNE=0` schaltet das Schreiben ab — fuer Laeufe, die MESSEN und nicht tunen sollen.
+ * Ohne die Variable bleibt alles wie bisher; ein Balancing-Lauf soll weiter tunen duerfen.
+ */
 function runAutoTuneOrganic(saveId: string, seasonId: string) {
+  if (process.env.OLY_LONG_RUN_TUNE === "0") {
+    log(`auto-tune uebersprungen (OLY_LONG_RUN_TUNE=0) — ${seasonId}`);
+    return { status: 0, stdout: "", stderr: "", error: undefined } as ReturnType<typeof spawnSync>;
+  }
   const autoTuneScript = path.join(PROJECT_ROOT, "scripts", "long-run-auto-tune-organic.ts");
   return spawnSync(process.execPath, ["--import", "tsx", autoTuneScript, "--save-id", saveId, "--season-id", seasonId, "--apply"], {
     cwd: PROJECT_ROOT,
@@ -238,7 +255,7 @@ async function bootstrapFreshSeasonOneSave(outputDir: string, targetSeasons: num
   const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
   const saveMatch =
     combined.match(/STOP_AFTER=draft — Save `([^`]+)` bereit/) ??
-    combined.match(/\[long-run\] created (fresh-season-1-\d+)/);
+    combined.match(/\[long-run\] created (fresh-season-1-\d+(?:-[a-z0-9]+)?)/);
   if (!saveMatch) {
     throw new Error(
       `Fresh S1 draft bootstrap failed (exit ${result.status ?? "?"}): ${combined.split("\n").slice(-8).join(" | ")}`,

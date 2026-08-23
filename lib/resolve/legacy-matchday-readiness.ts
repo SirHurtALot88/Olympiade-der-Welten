@@ -1,6 +1,6 @@
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
-import { isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
+import { countSelectedAvailablePlayers, isPartialLineupComplete } from "@/lib/lineups/legacy-matchday-partial-lineup-rule";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 
 export type LegacyMatchdayReadinessStatus =
@@ -78,7 +78,12 @@ export function buildLegacyMatchdayReadiness(
   const allowPartialLineup = isPartialLineupComplete({
     activePlayersCount,
     requiredTotalUniquePlayers,
+    selectedAvailablePlayerCount: countSelectedAvailablePlayers(
+      draft.entries.map((entry) => entry.playerId),
+      context.activePlayers.map((eintrag) => eintrag.playerId),
+    ),
     selectedPlayerCount,
+    istGesperrt: draft?.status === "locked",
   });
   const validation = validateLegacyLineupContext({
     ...context,
@@ -105,6 +110,10 @@ export function buildLegacyMatchdayReadiness(
     ),
   }, {
     enforceCompleteness: !allowPartialLineup,
+    // Ein GESPERRTER Entwurf wird nicht mehr an der Verfuegbarkeit gemessen — die Verletzung
+    // ist waehrend des Spieltags passiert und der Entwurf ist nicht mehr aenderbar. Begruendung
+    // an der Pruefung selbst (`legacy-lineup-validator.ts`).
+    lineupIsLocked: draft?.status === "locked",
   });
 
   if (!validation.isValid) {

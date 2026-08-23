@@ -12,7 +12,7 @@
 | Client-Bundle-Lint | 🟢 | `npm run ci:client-bundle-lint` — kein sqlite/local-service in Foundation-Client |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
 | Playwright gameplay | 🟢 | Read-only-Gate via `contentSignature`; dedizierter CI-Smoke-Save |
-| MP E2E in CI | 🟢 | `app:smoke-multiplayer-e2e` inkl. Foundation-Arena-Reveal-Sync |
+| MP E2E in CI | 🟢 | `app:smoke-multiplayer-e2e` ist **jetzt im Tor**. Der alte Blocker (B3, `{d1:0,d2:0}`) war schon behoben; der neue (`ai-preview lieferte keine entries fuer D-P … "incomplete_roster"`) lag daran, dass der isolierte E2E-Save aus `bootstrapSingleplayerSave()` kommt — anders als „Neues Spiel" ruft der NIE `kickoffLeagueSetupDraft` auf, die ganze 32-Team-Liga startet ohne Kader (nachgemessen: 30/32 Teams mit 0 Rosterspielern, nicht nur die acht menschlichen). `ensureLeagueRostersPlayable` in `scripts/smoke-multiplayer-e2e.ts` besorgt jetzt VOR den Aufstellungen einen echten Kader — Host per `/api/ai/picks-run` fuer KI-Teams + eigene, Gast per manuellem `/api/transfermarkt/buy` (Muster aus `scripts/audit-koop-spielbarkeit.ts` A2c/A2d). Dreimal hintereinander gegen einen frisch gestarteten Server gruen (siehe `.github/workflows/ci.yml`). |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow + Inbox Quick-Actions (Training leicht, Später) + Health-Priorität |
@@ -53,7 +53,7 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 | Solo Loop Wiring | **10/10** | 🟢 | `ci:flow-smoke` + Blocker-Routing + Write-Smoke (Inbox/Training/Matchday) |
 | Build / Client-Server | ~9/10 | 🟢 | TrainingCompact + Resolve-Blocker client-safe; `ci:client-bundle-lint` |
 | Arena + Reveal (Solo) | ~9/10 | 🟢 | Arena/Einsatzliste/Training/Drawer in CI grün |
-| Room Arena Sync | ~9/10 | 🟢 | Unit + 2-Browser Foundation-Arena-E2E in `app:smoke-multiplayer-e2e` |
+| Room Arena Sync | ~9/10 | 🟢 | Unit-Suiten (`arena-steuerung-erreicht-den-gast`, `arena-gemeinsame-zeitbasis`, `raeume-ueberleben-den-neustart` u.a.) + der 2-Browser-E2E, seit Stufe 4 wieder aktiv und lokal grün — vorher (bis 2026-08-16) stand die Zahl auf einem Test, der aus dem CI-Tor draußen war und genau den heute behobenen Etappenzahl-Fehler (B3) aufdeckte, ohne dass es ihn je bis ins Tor schaffte. |
 | Foundation ↔ Room | ~9/10 | 🟢 | Room-Params in URL-Navigation; Banner mit Flow-Step; `roomContext` an Sub-Panels |
 | Server-Authority (Writes) | ~9/10 | 🟢 | Guard + Contract-Test für mutierende API-Routes; Host-only AI/Season-Writes |
 | Parallel Coach UX | ~9/10 | 🟢 | Warten/Host-only in Foundation-Banner + Arena; Room-Event-Hinweise |

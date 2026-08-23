@@ -417,3 +417,131 @@ describe("player detail drawer discipline rank override (bug-2026-08-04T13-23-39
     expect(archery?.allTimePointsRank).toBeNull();
   });
 });
+
+/**
+ * DIESELBE PAYLOAD-LUECKE, EINE SPALTE WEITER: NICHT NUR DER RANG FEHLT, DIE ZAHL AUCH.
+ *
+ * GEMELDET VON CHRIS (`l4835p`, „Team · Spieler", Spielstand `hwz8fk`): „in den Top Disziplinen
+ * sieht man nur die aktuelle Season in die Punkte eingepreist! All Time fehlt komplett! bitte fixen"
+ *
+ * DIE ZAHLEN SIND LAENGST ARCHIVIERT — und das ist die Korrektur an meiner eigenen Triage-Notiz,
+ * die behauptete, PP je Disziplin wuerden „nirgends gespeichert". `season-snapshot-service.ts`
+ * schreibt je Spieler und Disziplin `totalContribution`, und dieses Feld traegt trotz seines Namens
+ * bereits den PP-Wert aus dem Saison-Punkte-Ledger:
+ *
+ *   const normalizedPoints = seasonPointsLedger.pointEntriesByPerformanceId.get(entry.id)?.points
+ *                            ?? entry.scoreContribution;
+ *   breakdown.totalContribution += normalizedPoints;
+ *
+ * Am Abbild `hwz8fk` nachgerechnet: die Breakdown-Summe trifft `totalPoints` bei 339 von 339
+ * Zeilen, groesste Abweichung 0,2 (Rundung), Einsatzzahlen bei allen exakt gleich. Ich hatte vom
+ * FELDNAMEN auf den Inhalt geschlossen, statt die Zuweisung zu lesen.
+ *
+ * WEG IST DIE ZAHL NUR IM BROWSER. `foundation-season-history-projection.ts` faltet die Archiv-
+ * Saisons fuer den Client zusammen und laesst `disciplineBreakdown` dabei AUSDRUECKLICH weg
+ * (647 KiB gegen 88 KiB je Saison). Gemessen: der Ersatz-Schnappschuss traegt alle 339
+ * Spielerzeilen, aber keine einzige Disziplin-Zeile. Madrots All-Time steht auf dem vollen Save
+ * bei TDM 1,8 / Mini DM 1,3 / Wettessen 0,7 — im Browser bei nichts.
+ *
+ * Deshalb faehrt die Zahl jetzt denselben Weg wie ihr Rang: serverseitig auf dem vollen Save
+ * gerechnet, nur fuer den angezeigten Spieler. Kein Schnappschuss wird umgeschrieben, und
+ * bestehende Spielstaende zeigen die Werte sofort — Chris' Saison 1 eingeschlossen.
+ */
+describe("All-Time-PPs je Disziplin ueberleben den kompakten Payload (l4835p)", () => {
+  function baue() {
+    const player = createPlayer("player-gronn", "Gronn");
+    const rival = createPlayer("player-rival", "Rival");
+    const fullGameState = createGameState(player, rival);
+    return {
+      player,
+      fullGameState,
+      compactGameState: compactFoundationInitialGameState(fullGameState),
+    };
+  }
+
+  it("der Server-Override traegt Archiv UND laufende Saison — nicht nur das Archiv", () => {
+    const { player, fullGameState } = baue();
+    const override = buildPlayerDisciplineRankOverride({
+      gameState: fullGameState,
+      playerId: player.id,
+      saveId: "save-discipline-rank-override",
+    });
+
+    /**
+     * 53,7 = 50 aus dem Vorsaison-Schnappschuss PLUS 3,7 aus der laufenden Saison. Letztere zaehlt
+     * mit, solange fuer sie noch kein Schnappschuss existiert — genau die Regel, die auch die
+     * Ansicht anwendet.
+     *
+     * Diese Zahl hat einen ersten Entwurf des Overrides widerlegt, der nur ueber die
+     * Schnappschuesse summierte und deshalb bei 50 stehen blieb. Sie steht hier ausgeschrieben,
+     * damit derselbe Fehler nicht unbemerkt zurueckkommt.
+     */
+    expect(override.allTimePointsByDisciplineId.basketball).toBe(53.7);
+    expect(override.allTimeAppearancesByDisciplineId.basketball).toBe(5);
+
+    const voll = buildPlayerDrawerDataFromGameState({ gameState: fullGameState, playerId: player.id, source: "sqlite" });
+    const vollZeile = voll?.disciplineValues.find((entry) => entry.id === "basketball");
+    expect(override.allTimePointsByDisciplineId.basketball).toBe(vollZeile?.allTimePoints);
+    expect(override.allTimeAppearancesByDisciplineId.basketball).toBe(vollZeile?.allTimeAppearances);
+  });
+
+  it("ohne Override verliert der kompakte Payload die archivierten Punkte", () => {
+    // Der gemeldete Zustand. Die `seasonSnapshots` sind gestrichen (der Berg), also besteht die
+    // All-Time-Summe im Browser nur noch aus der laufenden Saison.
+    const { player, fullGameState, compactGameState } = baue();
+    const voll = buildPlayerDrawerDataFromGameState({ gameState: fullGameState, playerId: player.id, source: "sqlite" });
+    const ohne = buildPlayerDrawerDataFromGameState({ gameState: compactGameState, playerId: player.id, source: "sqlite" });
+
+    const vollWert = voll?.disciplineValues.find((entry) => entry.id === "basketball")?.allTimePoints ?? null;
+    const ohneWert = ohne?.disciplineValues.find((entry) => entry.id === "basketball")?.allTimePoints ?? null;
+
+    expect(vollWert).not.toBeNull();
+    expect(ohneWert).not.toBe(vollWert);
+    expect(vollWert ?? 0).toBeGreaterThan(ohneWert ?? 0);
+  });
+
+  it("MIT Override stimmt der kompakte Payload wieder mit dem vollen Save ueberein", () => {
+    const { player, fullGameState, compactGameState } = baue();
+    const override = buildPlayerDisciplineRankOverride({
+      gameState: fullGameState,
+      playerId: player.id,
+      saveId: "save-discipline-rank-override",
+    });
+
+    const voll = buildPlayerDrawerDataFromGameState({ gameState: fullGameState, playerId: player.id, source: "sqlite" });
+    const mit = buildPlayerDrawerDataFromGameState({
+      gameState: compactGameState,
+      playerId: player.id,
+      source: "sqlite",
+      disciplineRankOverride: override,
+    });
+
+    const vollZeile = voll?.disciplineValues.find((entry) => entry.id === "basketball");
+    const mitZeile = mit?.disciplineValues.find((entry) => entry.id === "basketball");
+
+    expect(mitZeile?.allTimePoints).toBe(vollZeile?.allTimePoints);
+    expect(mitZeile?.allTimeAppearances).toBe(vollZeile?.allTimeAppearances);
+  });
+
+  it("keine Punkte bleibt keine Punkte — der Override erfindet keine 0", () => {
+    // Dieselbe Regel wie beim Rang: eine fehlende Disziplin-ID heisst „nie gepunktet".
+    const { player, fullGameState, compactGameState } = baue();
+    const override = buildPlayerDisciplineRankOverride({
+      gameState: fullGameState,
+      playerId: player.id,
+      saveId: "save-discipline-rank-override",
+    });
+
+    expect(override.allTimePointsByDisciplineId.archery).toBeUndefined();
+
+    const mit = buildPlayerDrawerDataFromGameState({
+      gameState: compactGameState,
+      playerId: player.id,
+      source: "sqlite",
+      disciplineRankOverride: override,
+    });
+    const archery = mit?.disciplineValues.find((entry) => entry.id === "archery");
+    expect(archery?.allTimePoints).toBeNull();
+    expect(archery?.allTimeAppearances).toBeNull();
+  });
+});

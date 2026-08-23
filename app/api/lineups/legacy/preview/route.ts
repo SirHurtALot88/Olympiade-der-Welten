@@ -10,6 +10,7 @@ import {
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { mapSaveResolutionErrorToResponse } from "@/lib/persistence/save-resolution-response";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -42,6 +43,8 @@ export async function GET(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
     if (!preview.ok) {
@@ -78,6 +81,8 @@ export async function POST(request: Request) {
     } catch (error) {
       const mapped = mapSaveResolutionErrorToResponse(error);
       if (mapped) return mapped;
+      const koopKonflikt = koopSchreibkonfliktAntwort(error);
+      if (koopKonflikt) return koopKonflikt;
       throw error;
     }
     if (!preview.ok) {

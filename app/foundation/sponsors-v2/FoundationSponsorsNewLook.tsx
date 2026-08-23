@@ -35,7 +35,7 @@ import {
 import { readContractRankPayoutLadder } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
-  getTeamDisplaySalaryTotal,
+  getTeamActualSalaryTotal,
   getTeamFacilityUpkeepTotal,
 } from "@/lib/sponsor/sponsor-team-salary-display";
 import { resolveSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
@@ -48,7 +48,7 @@ import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { sponsorV4AxisLabel, type SponsorV4AxisKey } from "@/lib/sponsor/sponsor-v4-axes";
 import { previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { berechneKatalogkosten } from "@/lib/sponsor/sponsor-leihe";
-import { computeApronLines, type ApronLines } from "@/lib/season/apron-service";
+import { computeApronLines, getTeamApronSalaryBase, type ApronLines } from "@/lib/season/apron-service";
 import { SponsorRankLadder } from "@/components/foundation/sponsor/SponsorRankLadder";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamObjectives } from "@/lib/board/team-season-objectives-service";
@@ -897,15 +897,44 @@ export default function FoundationSponsorsNewLook({
       // welchen Sponsor" — nicht die Frage, die dahinter steht: traegt der Sponsor die Mannschaft
       // ueberhaupt? Der Betrag allein kann das nicht beantworten, solange die Kader unterschiedlich
       // teuer sind: 90 sind fuer einen Kader mit 84 Gehalt etwas anderes als fuer einen mit 48.
-      const salaryTotal = getTeamDisplaySalaryTotal(gameState, team.teamId);
+      /**
+       * DIESE SPALTE FRAGT NACH CASHFLOW — ALSO NACH DEM GELD, DAS WIRKLICH VOM KONTO GEHT.
+       *
+       * Hier stand `getTeamDisplaySalaryTotal`, die GEGLÄTTETE Summe (`contract.expectedSalary`).
+       * Abgebucht wird am Saisonende aber `contract.salary` (`sponsor-settlement-service.ts`), und
+       * das ist `getTeamActualSalaryTotal`. Die beiden liegen an allen sieben Spielständen bei
+       * ALLEN 32 Teams auseinander — bei M-M in `hwz8fk` um 24,6 (98,9 geglättet gegen 123,5 echt).
+       *
+       * DAS SCHLUG BIS IN DEN APRON-STATUS DURCH, und daran ist Chris' Meldung `cankgm` entstanden
+       * („Wieso gehen sie all out … das ist suicidal!"): die Zonenmarke wurde gegen die geglättete
+       * Summe gerechnet, die Abgabe selbst aber gegen die echte (`getTeamApronSalaryBase`).
+       * Nachgezählt über alle sieben Spielstände: **61 von 224 Teamzeilen** trugen die falsche
+       * Zone — in beide Richtungen. C-S stand als „über 2. Linie" da (79,4) und liegt echt bei
+       * 61,6, also nur über der ersten; B-B stand auf „unter" (58,3) und zahlt echt bei 61,3.
+       *
+       * Die Zonenmarke holt sich ihre Grundlage jetzt bei der Apron selbst statt sie
+       * nachzubauen — dieselbe Zusage, die `getTeamApronSalaryBase` im Dateikopf gibt: „damit jede
+       * Apron-Frage im Baum nachweislich dieselbe Grundlage nimmt".
+       *
+       * Die GLÄTTUNG bleibt, wo sie hingehört: als Bemessungsgrundlage der Sponsor-Kalibrierung
+       * (`getTeamSponsorBaseReferenceTotal`). Sie ist nur keine Cashflow-Anzeige — genau das sagt
+       * ihr eigener Dateikopf, und die Kredite-Seite hat daraus schon dieselbe Folgerung gezogen.
+       */
+      const salaryTotal = getTeamActualSalaryTotal(gameState, team.teamId);
       const upkeepTotal = getTeamFacilityUpkeepTotal(gameState, team.teamId);
       const fixedCostTotal = Math.round((salaryTotal + upkeepTotal) * 10) / 10;
       const costCoverage = computeSponsorCostCoverage(projectedCash, fixedCostTotal);
       // Apron: über welcher der beiden eingefrorenen Linien liegt das Gehalt dieses Teams?
+      const apronSalaryBase = getTeamApronSalaryBase(gameState, team.teamId);
       const apronStatus: "unter" | "ueber_linie_1" | "ueber_linie_2" =
-        salaryTotal > apronLines.line2 ? "ueber_linie_2" : salaryTotal > apronLines.line1 ? "ueber_linie_1" : "unter";
+        apronSalaryBase > apronLines.line2
+          ? "ueber_linie_2"
+          : apronSalaryBase > apronLines.line1
+            ? "ueber_linie_1"
+            : "unter";
       return {
         salaryTotal,
+        apronSalaryBase,
         upkeepTotal,
         fixedCostTotal,
         costCoverage,
@@ -1146,9 +1175,13 @@ export default function FoundationSponsorsNewLook({
         return row.costCoverage != null ? (
           <span
             className={`nl-sponsor-league-coverage nl-tnum is-${getSponsorCoverageTone(row.costCoverage)}`}
+            // „real gezahlt": ohne diesen Zusatz steht hier eine Gehaltszahl, die sich mit der
+            // geglätteten aus der Sponsor-Kalibrierung verwechseln lässt — genau daran ist
+            // `cankgm` entstanden. Beide Zahlen sind richtig, sie beantworten nur verschiedene
+            // Fragen; welche hier steht, muss dranstehen.
             title={`Sponsor deckt ${Math.round(row.costCoverage * 100)} % der Fixkosten · Gehälter ${formatSponsorMoney(
               row.salaryTotal,
-            )}${row.upkeepTotal > 0 ? ` + Unterhalt ${formatSponsorMoney(row.upkeepTotal)}` : ""} = ${formatSponsorMoney(
+            )} (real gezahlt in dieser Saison)${row.upkeepTotal > 0 ? ` + Unterhalt ${formatSponsorMoney(row.upkeepTotal)}` : ""} = ${formatSponsorMoney(
               row.fixedCostTotal,
             )}`}
           >

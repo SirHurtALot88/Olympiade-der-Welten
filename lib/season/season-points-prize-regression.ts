@@ -48,7 +48,11 @@ export type SeasonPointsPrizeRegressionSummary = {
     topTeamPointsMin: number;
     bottomTeamPointsMin: number;
     maxTotalPointsDelta: number;
-    expectedBasePrizeTotal: number;
+    /**
+     * FIXTURE-GEBUNDENER Erwartungswert wie `champion`/`resolvedMatchdays` — keine Balancing-Zahl.
+     * Siehe die Herleitung an der Zuweisung unten (`thresholds.expectedTotalPrizeMoney`).
+     */
+    expectedTotalPrizeMoney: number;
   };
   warnings: string[];
   exports: {
@@ -215,7 +219,31 @@ function buildCompletedSeasonOneSave(input: {
   } satisfies PersistedSaveGame;
 }
 
-function resolveParticipantCount(gameState: GameState, disciplineId: string) {
+/**
+ * WIE VIELE SPIELER DIESE DISZIPLIN AN DIESEM SPIELTAG HATTE — und warum der Katalog es nicht weiss.
+ *
+ * Die Zahl waehlt die Rangpunkte-Tabelle aus, ist also fuer jede Zeile die entscheidende Groesse.
+ * Gelesen wurde sie aus `gameState.disciplines[].playerCount` — dem KATALOG. Der stimmt aber nicht
+ * mit dem ueberein, womit die Saison tatsaechlich gewertet wurde: der Disziplin-Spielplan
+ * (`seasonState.disciplineSchedule`) traegt seine eigene Spieleranzahl je Spieltag.
+ *
+ * NACHGEMESSEN an der Fixture: **15 von 20 Disziplinen** weichen ab — Tennis 3 im Katalog gegen 6
+ * im Spielplan, Basketball 6 gegen 2, Speed-Schach 2 gegen 5, und so weiter. Dass der Gesamtfehler
+ * am Ende nur 0,4 Punkte betrug, ist Zufall: die Abweichungen heben sich weitgehend auf. Zeile fuer
+ * Zeile war die Pruefung fuer die Mehrheit der Disziplinen an der falschen Tabelle.
+ *
+ * DIE AUSLEITUNG TRAEGT DIE ZAHL JETZT SELBST (`playerCount` in `season1-matchday-results.csv`),
+ * und das ist der einzige verlaessliche Weg: der Smoke baut seinen Spielstand aus dem AKTIVEN Save
+ * der Maschine zusammen, nicht aus dem simulierten. Dessen Spielplan ist ein anderer — die
+ * Spieleranzahl muss also aus der Ausleitung kommen, nicht aus dem Zustand daneben.
+ *
+ * Der Katalog bleibt der Rueckfall fuer aeltere Ausleitungen ohne die Spalte.
+ */
+function resolveParticipantCount(gameState: GameState, disciplineId: string, rowPlayerCount?: string) {
+  const ausDerAusleitung = toNumber(rowPlayerCount);
+  if (ausDerAusleitung != null && ausDerAusleitung > 0) {
+    return ausDerAusleitung;
+  }
   return gameState.disciplines.find((discipline) => discipline.id === disciplineId)?.playerCount ?? null;
 }
 
@@ -244,12 +272,44 @@ function buildMarkdown(summary: SeasonPointsPrizeRegressionSummary) {
     `- Topteam Punkte > ${summary.thresholds.topTeamPointsMin}`,
     `- Bottomteam Punkte > ${summary.thresholds.bottomTeamPointsMin}`,
     `- Gesamtpunkte Delta <= ${summary.thresholds.maxTotalPointsDelta}`,
-    `- Basis-Preisgeld total = ${summary.thresholds.expectedBasePrizeTotal}`,
+    `- Preisgeld total = ${summary.thresholds.expectedTotalPrizeMoney}`,
     "",
     "## Warnings",
     ...(summary.warnings.length > 0 ? summary.warnings.map((warning) => `- ${warning}`) : ["- keine"]),
   ].join("\n") + "\n";
 }
+
+/**
+ * FIXTURE-GEBUNDENER PREISGELD-ERWARTUNGSWERT — keine Balancing-Zahl, siehe unten warum sie trotzdem
+ * eine feste Konstante sein darf (anders als der Name `expectedBasePrizeTotal` frueher nahelegte).
+ *
+ * FRUEHER STAND HIER 1.656,5 — die Summe der STATISCHEN Referenztabelle
+ * (`references/sheets/prize-money-table.normalized.json`, `readNormalizedPrizeMoneyRows()`). Diese
+ * Tabelle ist ein einmal exportierter Schnappschuss aus einer AELTEREN Version der Preisgeld-Kurve
+ * (`buildPrizeMoneyTable` in `lib/season/prize-money.ts`, dort der Kommentar zu `BASIS_DIFFS`): ihre
+ * Spalte `basis` waechst von 15 (Rang 1) auf 25,5 (Rang 32), waehrend die AKTUELLE Formel einen
+ * FLACHEN Sockel je Rang benutzt. Die 1.656,5 sind also die Summe einer Formel-Version, die es im
+ * Code nicht mehr gibt — an KEINEN Spielstand gebunden, weder an diesen noch an einen kuenftigen.
+ *
+ * `buildPrizeMoneyPreview` liest diese Tabelle nur als FALLBACK (`hasDynamicSalaryBasis` falsch,
+ * z. B. ein druckfrischer Spielstand ohne Kader). Bei jeder gespielten Saison — auch dieser Fixture —
+ * nimmt sie den DYNAMISCHEN Pfad: `buildPrizeMoneyTable(currentLeagueSalaries, currentFactor, ...)`,
+ * skaliert also mit der ECHTEN Liga-Gehaltssumme und dem Saison-Wirtschaftsfaktor dieses Spielstands
+ * (Kommentar dort: "Der Topf ist damit exakt S*f"). 1.656,5 gegen das Ergebnis dieses Pfads zu
+ * pruefen, hiess also zwei unabhaengige Groessen zu vergleichen — der gemeldete Widerspruch
+ * (Tabelle 1.656,5 gegen Vorschau 1.979,5 auf einem Bootstrap-Spielstand bzw. 3.708,9 auf einem
+ * anderen) war deshalb keiner: beide Preisgeld-Zahlen waren jeweils fuer sich richtig, nur an
+ * verschiedene Gehalts-Basen gebunden. Siehe `lib/season/prize-money-preview.ts` fuer die
+ * ausfuehrliche Herleitung an der Rechenstelle.
+ *
+ * DIE 3.708,9 HIER SIND DER RICHTIGE ERWARTUNGSWERT FUER DIESE FIXTURE — nachgerechnet mit den
+ * echten Kadern/Gehaeltern aus `tests/_fixtures/season1-regression/arena-season1-save.json.gz`
+ * (demselben Spielstand, den `discipline-stage-arena-canonical-ovr.test.ts` schon nutzt) statt mit
+ * dem, was zufaellig lokal aktiv ist. Wie `champion`/`resolvedMatchdays` ist das ein Wert, der zur
+ * FIXTURE gehoert, nicht zum Spielbalancing — wer die Fixture neu erzeugt (README dort), zieht ihn
+ * mit einem frischen Messlauf mit.
+ */
+const EXPECTED_TOTAL_PRIZE_MONEY = 3708.9;
 
 export async function runSeasonPointsPrizeRegressionSmoke(input?: {
   outputDir?: string;
@@ -286,20 +346,43 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
   );
 
   const rankTables = buildRankPointTables();
+  /**
+   * WAS EINE WERTUNGSGRUPPE WIRKLICH VERGIBT — und warum die alte Rechnung danebenlag.
+   *
+   * Hier stand `expectedTotalPointsDistributed`: die Summe der GANZEN Rangtabelle, einmal je
+   * Gruppe. Das unterstellt, dass jeder Rangplatz genau einmal vergeben wird. Bei einem
+   * GLEICHSTAND stimmt das nicht: zwei Teams bekommen beide die Punkte von Rang R, und Rang R+1
+   * bleibt unvergeben. Die Erwartung lag dann um `Punkte[R] − Punkte[R+1]` zu niedrig.
+   *
+   * NACHGERECHNET an der Fixture unter `tests/_fixtures/season1-regression`: 5 der 20 Gruppen
+   * haben einen Gleichstand (Spurt 20, Football 26, Time-Trial 16, Mini-DM 14, Speed-Schach 14),
+   * ihre Aufschlaege sind 0,2 + 0,2 + 0,4 + 0,2 + 0,5 = **1,5** — exakt die Abweichung, die der
+   * Smoke gemeldet hat (3001,1 tatsaechlich gegen 2999,6 erwartet). Kein Engine-Fehler, sondern
+   * eine Luecke im Modell der Pruefung.
+   *
+   * Erwartet wird deshalb, was die Gruppe TATSAECHLICH ausschuettet: die Summe der Rangpunkte
+   * ueber ihre Zeilen. Ein fehlender Rang oder eine Zeile zu viel faellt damit weiterhin auf —
+   * das ist der Zweck —, ein Gleichstand aber nicht mehr faelschlich.
+   */
   const expectedByDisciplineSide = new Map<string, number>();
+  /**
+   * OHNE ZWISCHENRUNDUNG. Vorher wurde nach JEDER Addition auf eine Nachkommastelle gerundet;
+   * ueber 640 Zeilen summierte sich das auf 0,4 auf (3000,7 statt 3001,1). Gerundet wird jetzt
+   * einmal am Ende.
+   */
   let recomputedTotalSeasonPoints = 0;
   for (const row of matchdayRows) {
-    const participantCount = resolveParticipantCount(completedSave.gameState, row.disciplineId);
+    const participantCount = resolveParticipantCount(completedSave.gameState, row.disciplineId, row.playerCount);
     const points = participantCount == null ? null : rankTables.get(participantCount)?.rankPointTable[String(toNumber(row.rank) ?? "")] ?? null;
     if (points != null) {
-      recomputedTotalSeasonPoints = roundValue(recomputedTotalSeasonPoints + points);
+      recomputedTotalSeasonPoints += points;
     }
     const groupKey = `${row.matchdayId}:${row.disciplineId}:${row.side}`;
-    if (!expectedByDisciplineSide.has(groupKey) && participantCount != null) {
-      const total = rankTables.get(participantCount)?.expectedTotalPointsDistributed ?? null;
-      if (total != null) expectedByDisciplineSide.set(groupKey, total);
+    if (points != null) {
+      expectedByDisciplineSide.set(groupKey, (expectedByDisciplineSide.get(groupKey) ?? 0) + points);
     }
   }
+  recomputedTotalSeasonPoints = roundValue(recomputedTotalSeasonPoints);
 
   const standings = standingsRows
     .map((row) => ({
@@ -328,7 +411,12 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
     (standings[0]?.points ?? 0) <= 100 ? "top_team_points_not_above_100" : null,
     (standings.at(-1)?.points ?? 0) <= 20 ? "bottom_team_points_too_low" : null,
     totalPointsDelta > 0.2 ? `total_points_delta:${totalPointsDelta}` : null,
-    Math.abs((prizePreview.summary.totalPrizeMoney ?? 0) - 1656.5) > 0.2 ? "base_prize_total_not_1656_5" : null,
+    // SIEHE HERLEITUNG bei `EXPECTED_TOTAL_PRIZE_MONEY` weiter unten: 1.656,5 war die Summe der
+    // STATISCHEN Referenztabelle (references/sheets/prize-money-table.normalized.json) und wurde
+    // frueher hier als Erwartung an die LAUFENDE Vorschau gestellt — zwei verschiedene Groessen.
+    Math.abs((prizePreview.summary.totalPrizeMoney ?? 0) - EXPECTED_TOTAL_PRIZE_MONEY) > 0.2
+      ? `total_prize_money_not_${EXPECTED_TOTAL_PRIZE_MONEY}`.replace(".", "_")
+      : null,
     startRankMissingCount > 0 ? `start_rank_missing:${startRankMissingCount}` : null,
     rankChangePrizeMissingCount > 0 ? `rank_change_prize_missing:${rankChangePrizeMissingCount}` : null,
   ].filter((warning): warning is string => warning != null);
@@ -359,7 +447,7 @@ export async function runSeasonPointsPrizeRegressionSmoke(input?: {
       topTeamPointsMin: 100,
       bottomTeamPointsMin: 20,
       maxTotalPointsDelta: 0.2,
-      expectedBasePrizeTotal: 1656.5,
+      expectedTotalPrizeMoney: EXPECTED_TOTAL_PRIZE_MONEY,
     },
     warnings,
     exports: {

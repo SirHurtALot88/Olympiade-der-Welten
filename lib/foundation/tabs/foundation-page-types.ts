@@ -80,6 +80,7 @@ export type FoundationView =
   | "trainingV2"
   | "players"
   | "playerProfile"
+  | "merkliste"
   | "teamProfile"
   | "ranks"
   | "diszis"
@@ -360,6 +361,23 @@ export type ContractRenewalNegotiationPreviewPayload = {
     reasons: string[];
     warnings: string[];
   } | null;
+  /**
+   * DAS VERDIKT — die Entscheidung selbst, nicht die drei Prozente daneben.
+   *
+   * GEMELDET VON CHRIS: „wieso gibts beim verlängern kein angebot senden knopf? der spieler muss
+   * wie beim kauf ja auch verhandeln können."
+   *
+   * Der Server berechnet es fuer die Verlaengerung schon immer mit — dieselbe Engine wie beim
+   * Kauf (`buildContractNegotiationPreview`). Nur dieser Client-Typ liess es fallen, und damit war
+   * es fuer den Dialog nicht vorhanden. Die Prozente sind daraus ABGELEITET, nicht umgekehrt.
+   */
+  verdict?: "accept" | "counter_conditions" | "counter_money" | "reject_not_about_money" | "reject_lowball" | "reject_affront" | null;
+  /** Geld-Gegenangebot — nur gesetzt bei `verdict === "counter_money"`. */
+  counterSalary?: number | null;
+  /** Konditionen-Gegenangebot — nur gesetzt bei `verdict === "counter_conditions"`. */
+  counterConditions?: { contractLength: number; contractShape: ContractShape } | null;
+  /** Hat er auf ein Entgegenkommen selbst nachgegeben? Aendert die Ueberschrift, nicht die Zahl. */
+  concededFromLastCounter?: boolean;
   reasons?: string[];
   warnings?: string[];
   blockingReasons?: string[];
@@ -1096,7 +1114,7 @@ export type FoundationAiSellPreviewTeam = {
   teamName: string;
   controlMode: "manual" | "ai" | "passive";
   aiSellPreviewEnabled: boolean;
-  status: "ready" | "no_sell_need" | "low_roster_depth" | "no_candidates" | "warning" | "blocked";
+  status: "ready" | "no_sell_need" | "no_candidates" | "warning" | "blocked";
   strategySummary: string;
   cash: number | null;
   rosterCount: number | null;

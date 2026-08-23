@@ -5,6 +5,9 @@ export type PlayerDisciplineRankPayload = {
   playerId?: string;
   seasonPointsRankByDisciplineId?: Record<string, number>;
   allTimePointsRankByDisciplineId?: Record<string, number>;
+  /** All-Time-PPs je Disziplin — siehe `PlayerDisciplineRankOverride` (`l4835p`). */
+  allTimePointsByDisciplineId?: Record<string, number>;
+  allTimeAppearancesByDisciplineId?: Record<string, number>;
 };
 
 const playerDisciplineRankCache = new Map<string, PlayerDisciplineRankOverride | null>();
@@ -73,6 +76,10 @@ export async function fetchPlayerDisciplineRankOverride(input: {
     const override: PlayerDisciplineRankOverride = {
       seasonPointsRankByDisciplineId: payload.seasonPointsRankByDisciplineId ?? {},
       allTimePointsRankByDisciplineId: payload.allTimePointsRankByDisciplineId ?? {},
+      // Leer statt fehlend: eine Antwort ohne diese Felder (aeltere Route) heisst „keine Punkte
+      // bekannt" und nicht „Feld unbekannt" — der Verbraucher liest beides gleich.
+      allTimePointsByDisciplineId: payload.allTimePointsByDisciplineId ?? {},
+      allTimeAppearancesByDisciplineId: payload.allTimeAppearancesByDisciplineId ?? {},
     };
     playerDisciplineRankCache.set(cacheKey, override);
     return override;

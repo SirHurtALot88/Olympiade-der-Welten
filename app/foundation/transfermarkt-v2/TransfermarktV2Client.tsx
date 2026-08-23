@@ -1217,16 +1217,15 @@ export default function TransfermarktV2Client({
 
   function withWriteContext<T extends Record<string, unknown>>(body: T) {
     const teamId = typeof body.teamId === "string" ? body.teamId : selectedTeamId;
-    const teamOwner = teamId ? teamControlOwnersByTeamId[teamId] ?? null : null;
-    const resolvedOwnerId =
-      teamOwner?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : teamOwner?.ownerId?.trim() || effectiveOwnerId || DEFAULT_ACTIVE_OWNER_ID;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieselbe Tautologie wie in
+    // `withRoomBody` (use-foundation-shell-router-body-scope.tsx) — dieses Feld trug die Owner-ID
+    // des ZIELTEAMS, nicht die eigene, und wurde vom Server bis eben direkt als Besitznachweis
+    // gelesen. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum, sonst die
+    // angemeldete Sitzung).
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: teamId ?? selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: teamControlModesByTeamId[teamId] ?? null,
       },
       roomContextRef.current,
@@ -1238,9 +1237,28 @@ export default function TransfermarktV2Client({
   const availabilityLabel = formatCandidateAvailabilityLabel(selectedTeam?.shortCode ?? null, teamAvailableTotal);
   const rosterTarget = marketContext?.playerOpt ?? selectedTeam?.rosterLimit ?? null;
   const rosterGap = marketContext?.rosterGap ?? null;
+  /**
+   * „SLOTS OFFEN" MEINT DIE PLAETZE BIS ZUM LIMIT, NICHT BIS ZUM KI-ZIEL.
+   *
+   * GEMELDET (`3tklpq`, „Markt · Transfermarkt", Spielstand `swnjlk`, Saison 2, Spieltag 1):
+   * „beim Transfermarkt steht bei 8 besetzten Slots im Team noch 4 Slots offen, aber das Max ist
+   * ja 14 also wären noch 6 Slots offen!"
+   *
+   * Hier stand `playerOpt` — die OPT-Zielgroesse, an der sich die KI-Kaderplanung orientiert
+   * (`deriveRosterTargets`). Das ist eine PLANUNGSGROESSE, kein Limit: wer selbst kauft, darf bis
+   * `rosterLimit` (14). Die Zahl unter der Ueberschrift „Slots offen" hat also etwas anderes
+   * gezaehlt, als ihr Name verspricht.
+   *
+   * NACHGEMESSEN an Chris' Spielstand: bei 30 von 32 Teams wich die angezeigte Zahl vom Limit ab.
+   * Beispiel `B-P`: Kader 8, Limit 14, OPT 10 — angezeigt „2 Slots offen", tatsaechlich frei 6.
+   *
+   * `playerOpt` bleibt als Rueckfall stehen, falls kein Limit im Spielstand steht; ein Team ohne
+   * `rosterLimit` gibt es real nicht, aber eine erfundene 14 waere schlechter als die Zielgroesse.
+   */
+  const rosterKapazitaet = selectedTeam?.rosterLimit ?? rosterTarget;
   const rosterGapOpenCount =
-    marketContext?.rosterCount != null && rosterTarget != null
-      ? Math.max(0, Math.round(rosterTarget - marketContext.rosterCount))
+    marketContext?.rosterCount != null && rosterKapazitaet != null
+      ? Math.max(0, Math.round(rosterKapazitaet - marketContext.rosterCount))
       : rosterGap != null
         ? Math.max(0, Math.round(rosterGap))
         : null;

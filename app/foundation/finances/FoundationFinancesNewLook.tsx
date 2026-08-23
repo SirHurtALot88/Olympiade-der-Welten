@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
+import { apronKonjunkturKurzhinweis, apronKonjunkturSatz } from "@/lib/finance/apron-konjunktur-hinweis";
 import { buildOperatingGuvHoverText } from "@/lib/finance/guv-breakdown";
 import { buildSeasonGuvHoverText, seasonGuvFromPosten } from "@/lib/finance/season-end-guv";
 import {
@@ -659,10 +660,15 @@ function ApronLinesPanel({ apron, actualSalaryTotal }: { apron: FinanceApronStat
           : apron.frozenLines
             ? "Linien für diese Saison eingefroren — seit „Transfers finalisieren\" steht die Grenze, und genau gegen sie wird am Saisonende abgerechnet. Abgabe/Ausgleich bleiben bis dahin eine Hochrechnung auf den aktuellen Rang."
             : "Linien noch nicht eingefroren — sie wandern mit dem Median mit, solange noch Kader gebaut werden. Mit „Transfers finalisieren\" stehen sie fest. Alles hier ist eine Hochrechnung."}
-        {/* Die haeufigste Erklaerung fuer eine Karte voller Nullen — sie gehoert daneben, sonst
-            liest sich der ausgeschaltete Hebel wie ein kaputter Apron. */}
-        {!apron.gebucht && apron.konjunkturhebel === 0
-          ? ` Abgabe in dieser Saison abgeschaltet: der Salary Factor liegt bei ${apron.salaryFactor.toLocaleString("de-DE", { maximumFractionDigits: 2 })} und damit unter 0,95 — unterhalb dieser Schwelle zahlt niemand, egal wie weit über den Linien.`
+        {/* Die haeufigste Erklaerung fuer eine Karte voller kleiner Zahlen — sie gehoert daneben,
+            sonst liest sich der gedrosselte Hebel wie ein kaputter Apron.
+
+            FRUEHER STAND HIER `=== 0`, und genau daran ging Chris' Meldung `6fv43h` vorbei: bei
+            Hebel 0,03 zahlt ein Team weit ueber der Linie drei Prozent — eine Zahl ohne jede
+            Erklaerung. Der Satz kommt jetzt aus `apron-konjunktur-hinweis.ts` und nennt die
+            Drosselung, sobald sie ueberhaupt greift. */}
+        {!apron.gebucht
+          ? apronKonjunkturSatz({ konjunkturhebel: apron.konjunkturhebel, salaryFactor: apron.salaryFactor })
           : ""}
         {apron.usedReferenceSalary ? " Frisch-Save: Linien aus dem Referenzgehalt abgeleitet, nicht aus gemessenen Gehältern." : ""}
       </p>
@@ -816,10 +822,16 @@ function ApronLeagueList({ apron, ownTeamId }: { apron: FinanceApronStatus; ownT
     };
   }, [apron.league, kollabiert]);
 
+  // Der Konjunkturhinweis kommt aus derselben Quelle wie in der Karte darueber und erscheint auch
+  // bei TEILWEISER Drosselung — nicht erst bei Hebel 0 (Meldung `6fv43h`).
+  const konjunkturHinweis = apronKonjunkturKurzhinweis({
+    konjunkturhebel: apron.konjunkturhebel,
+    salaryFactor: apron.salaryFactor,
+  });
   const statusText = apron.gebucht
     ? "Abrechnung dieser Saison bereits gebucht"
-    : apron.konjunkturhebel === 0
-      ? "In dieser Saison gibt es keine Abgabe — der Salary Factor liegt unter 0,95"
+    : konjunkturHinweis
+      ? konjunkturHinweis
       : apron.frozenLines
         ? "Hochrechnung auf die aktuellen Ränge, gegen die eingefrorenen Linien"
         : "Hochrechnung auf die aktuellen Ränge — Linien noch nicht eingefroren";

@@ -935,9 +935,27 @@ describe("AI legacy lineup form-card planning", () => {
       return context;
     };
 
+    /**
+     * DIE OVERKILL-BREMSE WEICHT DEM AUSGABEDRUCK — und das ist gewollt.
+     *
+     * Die Bremse („wer die Disziplin ohnehin klar anfuehrt, gewinnt auch mit EINER Karte", Chris:
+     * „selbst mit nur 1 8x2 Karte wären sie immer noch 1.") gilt weiterhin — aber sie steht seit
+     * dem Formkarten-Umbau UNTER einer aelteren Zusage:
+     *
+     *   „ziel: ALLE AI teams haben am ende der Season ALLE ihre karten gespielt … positive übrig
+     *   haben bedeutet dass man nicht die gute Form die man hatte eingesetzt hat und kostet ein
+     *   Team sehr viele Punkte!"
+     *
+     * Eine ungespielte Pluskarte verfaellt am Saisonende. Sparsamkeit, die zum Verfall fuehrt, ist
+     * keine Sparsamkeit — deshalb faellt die Bremse genau dann, wenn Ausgabedruck herrscht
+     * (`mustSpendPositives`), und nur dann. Dieser Kontext steht an Spieltag 6 von 10 mit vollem
+     * Kartenvorrat, hat also Druck.
+     *
+     * Geprueft wird damit die RANGFOLGE der beiden Regeln, nicht mehr die Bremse allein.
+     */
     const dominantModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(1), fillSide("tdm", "d1", 6));
     expect(dominantModifiers.d1.primaryFormCardId).toBe("positive-red-8");
-    expect(dominantModifiers.d1.secondaryFormCardId).toBeNull();
+    expect(dominantModifiers.d1.secondaryFormCardId).toBe("positive-red-7");
 
     // Ohne klare Dominanz (Rang 5) ist die Doppel-Investition in der großen Disziplin legitim.
     const contestedModifiers = buildAiLegacyLineupModifiers(buildDominanceContext(5), fillSide("tdm", "d1", 6));

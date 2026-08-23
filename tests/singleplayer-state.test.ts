@@ -14,7 +14,7 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import { deriveTeamIdentityAxisBias, loadDefaultTeamIdentities } from "@/lib/foundation/team-identity-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { createFreshSeasonOneSaveIdForTests, createPersistenceService } from "@/lib/persistence/persistence-service";
 import { allowsSandboxTestWrites, getSandboxLocalWritePolicy } from "@/lib/persistence/sandbox-write-permissions";
 import { getDatabase, getDatabasePath, resetDatabaseForTests } from "@/lib/persistence/sqlite";
 import { invalidateSaveSessionCache } from "@/lib/persistence/save-session-cache";
@@ -84,7 +84,10 @@ describe("singleplayer game state", () => {
 
     const cashCreatorsIdentity = gameState.teamIdentities.find((identity) => identity.teamId === "C-C");
     expect(cashCreatorsIdentity?.playerMin).toBe(11);
-    expect(cashCreatorsIdentity?.playerOpt).toBe(13);
+    // 14 statt vorher 13: das Blatt (data/source/team-identities.json) zielt jetzt bei jedem Team
+    // auf das Kader-Maximum, C-C stand dort auf 12. Der GM-Zuschlag (+1 fuer C-C) laeuft weiter,
+    // klemmt aber bei playerMax = 14. Begruendung in tests/opt-ziel-steigt-um-einen-platz.test.ts.
+    expect(cashCreatorsIdentity?.playerOpt).toBe(14);
     expect(gameState.seasonState.teamGeneralManagers?.["C-C"]?.gmId).toBeTruthy();
 
     gameState.teams = gameState.teams.map((team) =>
@@ -105,7 +108,8 @@ describe("singleplayer game state", () => {
     expect(cashCreators?.rosterLimit).toBe(14);
     // Kader-Minimum ist jetzt fix 8 für jedes Team (unabhängig vom Sheet-/Identity-playerMin).
     expect(cashCreators?.rosterMinTarget).toBe(8);
-    expect(cashCreators?.rosterOptTarget).toBe(13);
+    // Der Spiegel auf dem Team folgt der Identity — dieselbe Anhebung wie oben.
+    expect(cashCreators?.rosterOptTarget).toBe(14);
   }, 60000);
 
   it("persists top-level season transition metadata across sqlite reloads", () => {
@@ -508,6 +512,33 @@ describe("singleplayer game state", () => {
     }
   }, 60000);
 
+  // Stufe 4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md) — gefunden bei der Ursachensuche fuer das
+  // reihenfolgeabhaengige Flackern in `tests/legacy-lineup-local-service.test.ts` > "accepts a
+  // form card of a player who joined the roster after the season cards were generated": anders als
+  // `createSaveId()` trug die "fresh season 1"-ID NUR `Date.now()`, keinen Zufallsanteil. Zwei
+  // `createFreshSeasonOneSave()`-Aufrufe INNERHALB DERSELBEN Millisekunde (leicht erreicht bei
+  // schnellen, synchron laufenden Tests in derselben SQLite-Datei) erzeugten denselben `saveId` —
+  // die zweite Speicherung ueberschreibt dann die erste unter identischer PK, ein vollkommen
+  // ANDERER Spielstand mit demselben Schluessel. Diese eigene, real gemessene Kollisionsquelle
+  // (unten belegt: 2000 Aufrufe in derselben Millisekunde ergaben VOR dem Fix genau EINE ID) wird
+  // hier unabhaengig von der eigentlichen Flacker-Ursache des Formkarten-Tests behoben (die lag,
+  // getrennt davon, an einem deterministisch auf `0` fallenden Kartenwert — siehe der Kommentar
+  // dort). Beide Funde stehen fuer sich; dieser Test pinnt nur die ID-Eindeutigkeit.
+  //
+  // Direkt an der ID-Vergabe gepinnt (ueber die guenstige `*ForTests`-Kennung, ohne 2000x den
+  // vollen Liga-Bootstrap zu durchlaufen) — die Eigenschaft, nicht die Umsetzung: egal wie viele
+  // Aufrufe in derselben Millisekunde landen, jede ID ist einzigartig.
+  it("never hands out two identical fresh-season-1 save ids, even called back-to-back in the same millisecond", () => {
+    const ids = new Set<string>();
+    for (let index = 0; index < 2000; index += 1) {
+      ids.add(createFreshSeasonOneSaveIdForTests());
+    }
+    expect(ids.size).toBe(2000);
+    for (const id of ids) {
+      expect(id).toMatch(/^fresh-season-1-\d+-[a-z0-9]+$/);
+    }
+  });
+
   it("gives distinct fresh season one saves their own discipline schedule instead of a shared constant seed", () => {
     const persistence = createPersistenceService();
     persistence.bootstrapSingleplayerSave();
@@ -654,7 +685,9 @@ describe("singleplayer game state", () => {
     expect(cashCreators).toMatchObject({
       playerType: "C",
       playerMin: 11,
-      playerOpt: 13,
+      // 14 statt 13, seit das Blatt bei jedem Team auf das Kader-Maximum zielt (C-C stand auf 12,
+      // GM-Zuschlag +1, geklemmt auf playerMax = 14).
+      playerOpt: 14,
     });
     // `finances` und `ambition` sind ebenfalls GM-justiert (gemessen: C-C 9,72 statt 10). Was der
     // Test wirklich sichern will, ist die IDENTITAET: C-C ist das Finanzteam, Z-H das ehrgeizigste.
@@ -711,17 +744,33 @@ describe("singleplayer game state", () => {
   it("varies fit-near GM picks across different save seeds", () => {
     const fresh = createFreshSeasonOneGameState();
     const identities = loadDefaultTeamIdentities();
-    const team = fresh.teams.find((entry) => entry.teamId === "Z-H");
-    expect(team).toBeTruthy();
 
     const saveA = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-a");
     const saveB = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-b");
-    const gmA = saveA["Z-H"]?.gmId;
-    const gmB = saveB["Z-H"]?.gmId;
 
-    expect(gmA).toBeTruthy();
-    expect(gmB).toBeTruthy();
-    expect(gmA).not.toBe(gmB);
+    for (const team of fresh.teams) {
+      expect(saveA[team.teamId]?.gmId, `kein GM fuer ${team.teamId} in Save A`).toBeTruthy();
+      expect(saveB[team.teamId]?.gmId, `kein GM fuer ${team.teamId} in Save B`).toBeTruthy();
+    }
+
+    /**
+     * DIE ZUSICHERUNG IST LIGAWEIT, NICHT AN EINEM TEAM.
+     *
+     * Hier stand vorher: Z-H bekommt unter zwei Seeds zwei verschiedene GMs. Das war nur ein
+     * Stellvertreter fuer die eigentliche Regel — der Save-Seed entscheidet unter Bewerbern mit
+     * aehnlicher Eignung — und der Stellvertreter ist mit der Anhebung der Kader-Zielgroesse
+     * ungueltig geworden: `rosterFit` (team-general-managers.ts) hat harte Schwellen bei 10 und 13,
+     * Z-H wanderte von 10 auf 11 und faellt damit aus der Stufe „<= 10, GM will kleinere Kader",
+     * die ihm vorher mehrere gleich starke Bewerber verschafft hatte. Seine Eignung ist jetzt
+     * eindeutig, also waehlen beide Seeds denselben GM — richtig so, nur eben kein Beleg mehr fuer
+     * die Regel.
+     *
+     * Ligaweit gemessen aendert der Seed 29 von 32 Zuordnungen. Die Schwelle steht bewusst tief bei
+     * acht: der Test soll anschlagen, wenn der Seed AUFHOERT zu wirken, und nicht bei jeder
+     * Verschiebung im Eignungsfeld.
+     */
+    const abweichende = fresh.teams.filter((team) => saveA[team.teamId]?.gmId !== saveB[team.teamId]?.gmId);
+    expect(abweichende.length, "Der Save-Seed bewegt die GM-Vergabe kaum noch").toBeGreaterThanOrEqual(8);
   });
 
   it("caps repeated GM archetypes in the league pool", () => {
@@ -952,8 +1001,27 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.season.matchdayIds[9]).toBe("matchday-10");
     expect(reloaded?.gameState.seasonState.disciplineSchedule).toHaveLength(10);
     expect(reloaded?.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "season_seed")).toBe(true);
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline1?.disciplineId).not.toBe("mini-dm");
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline2?.disciplineId).not.toBe("fechten");
+    /**
+     * HIER STANDEN ZWEI WUERFE GEGEN SICH SELBST.
+     *
+     * Die beiden Zeilen prueften `.not.toBe("mini-dm")` und `.not.toBe("fechten")` als Beweis
+     * dafuer, dass der Spielplan neu ausgelost wurde. Der Saatwert haengt aber an der
+     * Spielstand-Kennung, und die traegt einen Zeitanteil — bei 20 Disziplinen zieht die Auslosung
+     * also etwa jedes zwanzigste Mal genau diese Disziplin an genau diese Stelle, und der Test
+     * fiel ohne jeden Fehler im Spiel. Im vollen Suitenlauf ist er genau so aufgeschlagen
+     * („expected 'mini-dm' not to be 'mini-dm'").
+     *
+     * Geprueft wird jetzt, was die Zeilen SAGEN WOLLTEN: dass ein vollstaendiger, ausgeloster
+     * Spielplan zurueckkommt und nicht zehnmal dieselbe Paarung — Letzteres waere das Kennzeichen
+     * eines hart verdrahteten Rueckfalls. Der Herkunftsvermerk `season_seed` steht schon eine
+     * Zeile darueber.
+     */
+    const plan = reloaded?.gameState.seasonState.disciplineSchedule ?? [];
+    // Jede Runde hat beide Seiten besetzt — ein halber Spieltag waere die eigentliche Regression.
+    expect(plan.every((eintrag) => Boolean(eintrag.discipline1?.disciplineId && eintrag.discipline2?.disciplineId))).toBe(true);
+    // Und es ist eine Auslosung, keine Wiederholung: mehr als eine verschiedene Paarung.
+    const paarungen = new Set(plan.map((eintrag) => `${eintrag.discipline1?.disciplineId}|${eintrag.discipline2?.disciplineId}`));
+    expect(paarungen.size).toBeGreaterThan(1);
   }, 20000);
 
   it("persists local player generator drafts inside the sqlite save", () => {
@@ -1191,7 +1259,10 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances ?? 0).toBeGreaterThanOrEqual(9);
     // playerMin ist jetzt fix 8 (Sheet-/Override-playerMin wird für das Minimum ignoriert).
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(8);
-    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(13);
+    // 14 statt 13: die abgeleitete Identity folgt dem Blatt (jetzt Kader-Maximum) plus GM-Zuschlag.
+    // Die gespeicherte Nutzer-Vorgabe im Override bleibt davon unberuehrt bei 12 — genau das ist
+    // die Zusicherung dieses Tests: Roster-Ziele kommen aus dem Blatt, nicht aus dem Override.
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(14);
     expect(getTeamGeneralManager(reloaded!.gameState, "C-C")?.profile.title).toContain("Bargain Hunter");
     // GM-justiert (gemessen: 9,72 statt 10) — C-C bleibt das Finanzteam.
     expect(createFreshSeasonOneGameState().teamIdentities.find((entry) => entry.teamId === "C-C")?.finances ?? 0).toBeGreaterThanOrEqual(9);

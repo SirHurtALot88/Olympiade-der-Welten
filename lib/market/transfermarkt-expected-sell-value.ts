@@ -1,6 +1,11 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import {
+  buildTransfermarktSaleFactorBreakdown,
+  normalizeVisibleRosterMoney,
+  type TransfermarktSaleFactorBreakdown,
+} from "@/lib/market/transfermarkt-sale-factor";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 
 export type ExpectedSellValueEntry = {
@@ -14,6 +19,17 @@ export type ExpectedSellValueEntry = {
   buyoutCost: number;
   /** Netto-Erlös = Brutto − Buyout; kann negativ sein (Mehrjahresvertrag). */
   expectedSellValue: number;
+  /**
+   * DIE HERLEITUNG DES PREISES — Bracket, Rang darin, Grundfaktor, Rangbonus.
+   *
+   * Sie wird zwei Zeilen weiter unten ohnehin gerechnet und wurde bisher weggeworfen; uebrig blieb
+   * der Preis. Chris am 23.08.: „Ein Hover, der sagt ‚Marktwert 25,5 × Faktor 0,87 → 22,2; der
+   * Faktor drückt, weil Restlaufzeit 1 Jahr', macht aus einer Zahl eine Entscheidung."
+   *
+   * WICHTIG: die BEREINIGTE Fassung (`applySellPricingPolicyToBreakdown`), nicht die rohe. Die
+   * Ausfuehrung nimmt die bereinigte — wer die rohe zeigt, verspricht Geld, das nie ankommt.
+   */
+  saleFactorBreakdown: TransfermarktSaleFactorBreakdown | null;
   /**
    * Tatsächlich gezahlter Kaufpreis (RosterEntry.purchasePrice, display-skaliert).
    * `null` bei Eigengewächsen/Startkader-Einträgen ohne dokumentierten Kaufpreis —
@@ -61,9 +77,39 @@ export function buildExpectedSellValueByPlayerId(
       continue;
     }
 
-    const breakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry, {
+    const rohBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry, {
       saveId: options?.saveId ?? null,
     });
+    /**
+     * DIE DRITTE ANZEIGE ZIEHT NACH — und damit rechnen alle drei dasselbe.
+     *
+     * Bei Ticket #44 („+10,7 oben, +9,3 im Profil — was ist nun richtig?") fehlte der
+     * Vertragstabelle `applySellPricingPolicyToBreakdown`. Entschieden hat die Buchung: der
+     * gemeldete Spieler wurde zwoelf Minuten spaeter fuer `fee 28.09` verkauft, und das ist die
+     * Zahl MIT dieser Stufe. Die Vertragstabelle wurde deshalb korrigiert.
+     *
+     * Damit stand diese Karte hier als einzige noch ohne die Stufe da — und `main` hat inzwischen
+     * einen Test, der genau die Gleichheit der beiden Rechenstellen festhaelt
+     * (`vk-zwei-rechenstellen-bleiben-gleich`). Er wurde rot, und er hatte recht: 31,78 gegen
+     * 37,39 an einem einzigen Spieler.
+     *
+     * Die Reihenfolge der Korrektur ist kein Zufall. Die Ausfuehrung
+     * (`executeLocalTransfermarktSell`) nimmt die bereinigte Fassung — wer sich ihr angleicht,
+     * hat recht; wer die rohe zeigt, verspricht Geld, das nie ankommt.
+     */
+    const breakdown = applySellPricingPolicyToBreakdown({
+      gameState,
+      teamId: rosterEntry.teamId,
+      player,
+      rosterEntry,
+      baseBreakdown: rohBreakdown,
+      // Der Kaderdruck bemisst sich am Kader NACH diesem einen Verkauf — sonst bewertet er einen
+      // Kader, den es danach nicht mehr gibt.
+      rosterAfter: Math.max(
+        0,
+        gameState.rosters.filter((eintrag) => eintrag.teamId === rosterEntry.teamId).length - 1,
+      ),
+    }).breakdown;
     const economy = resolvePlayerEconomyContract({ player, rosterEntry });
     // Gleiche Fallback-Kette wie `buildExpectedSellValue` im AI-Sell-Preview-Service:
     // Sale-Factor-Preis, sonst Marktwert — ohne beides gibt es keinen ehrlichen Wert.
@@ -91,6 +137,8 @@ export function buildExpectedSellValueByPlayerId(
       grossSalePrice: proceeds.grossSalePrice,
       buyoutCost: proceeds.buyoutCost,
       expectedSellValue: proceeds.netProceeds,
+      // Die BEREINIGTE Fassung — dieselbe, aus der `grossSalePrice` stammt.
+      saleFactorBreakdown: breakdown,
       purchasePrice,
       profitVsPurchase: proceeds.netProfitVsPurchase,
     });

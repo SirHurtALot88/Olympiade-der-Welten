@@ -1,0 +1,88 @@
+# Schlaegt Alarm, wenn die Spielstand-Sicherung stehenbleibt.
+#
+# WARUM ES DAS GIBT — genau das ist passiert, und niemand hat es gemerkt.
+# `deploy/hetzner/push-live-save.sh` laeuft per Crontab auf dem Hetzner-Server und legt den
+# aktuellen Spielstand auf den Branch "live-save". Am 14.08.2026 um 07:50 hat er zum letzten Mal
+# gepusht. Fuenf Tage lang lief das Spiel normal weiter, es wurde gespielt und gemeldet — nur
+# gesichert wurde nichts mehr. Aufgefallen ist es erst, als ein Fehler an einem Spielstand
+# untersucht werden sollte, den es auf GitHub gar nicht gab.
+#
+# Die Ursache war nicht das Netz, sondern die Anmeldung: `git push` fand im Cron kein Terminal fuer
+# die Token-Abfrage und brach mit "could not read Username" ab. `git fetch` laeuft ohne Anmeldung
+# weiter — der Auto-Deploy funktionierte also die ganze Zeit, und nichts wirkte kaputt.
+#
+# WAS DIESER WAECHTER TUT UND WAS NICHT: Er kann die Sicherung NICHT selbst uebernehmen. Der
+# Spielstand ist eine SQLite-Datei im Container; sie von aussen zu holen hiesse, sie im Netz
+# freizulegen, und das waere ein Datenleck statt einer Sicherung. (Bei den Bug-Meldungen geht das,
+# weil die App dafuer laengst eine lesende Route hat — siehe bug-reports-mirror.yml.)
+#
+# Er tut deshalb das, was von aussen geht und hier gefehlt hat: Er SIEHT HIN. Wird der Branch zu
+# alt, faellt dieser Lauf rot aus — und ein rotes Ergebnis meldet GitHub von selbst, statt dass
+# Stille als Normalzustand durchgeht.
+name: Live-Save-Waechter
+
+on:
+  schedule:
+    # Alle sechs Stunden. Der Server-Cron pusht alle 10 bis 15 Minuten; eine Luecke von Stunden
+    # ist damit kein Zufall, sondern ein Ausfall. Oefter zu pruefen brachte nichts — der Ausfall
+    # dauerte fuenf TAGE, nicht fuenf Minuten.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: live-save-waechter
+  cancel-in-progress: false
+
+jobs:
+  alter-pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Alter des letzten Snapshots pruefen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Ab wann gilt die Sicherung als stehengeblieben. Grosszuegig gewaehlt: der Server pusst
+          # unabhaengig davon, ob gespielt wird, also ist eine echte Luecke immer ein Ausfall.
+          MAX_ALTER_STUNDEN: "12"
+        run: |
+          set -euo pipefail
+
+          if ! LETZTER="$(gh api "repos/${GITHUB_REPOSITORY}/commits/live-save" --jq '.commit.committer.date' 2>/dev/null)"; then
+            echo "::error title=Live-Save-Branch fehlt::Der Branch 'live-save' ist nicht erreichbar. Es gibt aktuell KEINE Sicherung des Spielstands."
+            exit 1
+          fi
+
+          JETZT=$(date -u +%s)
+          STAND=$(date -u -d "$LETZTER" +%s)
+          ALTER_STUNDEN=$(( (JETZT - STAND) / 3600 ))
+
+          echo "Letzter Snapshot: $LETZTER"
+          echo "Alter: ${ALTER_STUNDEN} Stunden (Grenze: ${MAX_ALTER_STUNDEN})"
+
+          if [ "$ALTER_STUNDEN" -le "$MAX_ALTER_STUNDEN" ]; then
+            echo "Die Sicherung laeuft."
+            exit 0
+          fi
+
+          echo "::error title=Spielstand-Sicherung steht::Seit ${ALTER_STUNDEN} Stunden kein Snapshot mehr (letzter: ${LETZTER})."
+          cat <<'HINWEIS'
+
+          DIE SICHERUNG DES SPIELSTANDS LAEUFT NICHT MEHR.
+
+          Auf dem Hetzner-Server nachsehen:
+
+              tail -50 /var/log/oly-live-save.log
+              crontab -l
+
+          Steht dort "could not read Username", fehlt der gespeicherte GitHub-Zugang. Dann einmal
+          von Hand pushen und den Token als Passwort eingeben:
+
+              git config --global credential.helper store
+              cd /root/Olympiade-der-Welten
+              bash deploy/hetzner/push-live-save.sh
+
+          Token erzeugen unter https://github.com/settings/tokens/new mit Scope "repo".
+          Danach laeuft der Cron wieder allein.
+
+          HINWEIS
+          exit 1

@@ -10,6 +10,8 @@ import { compactFoundationInitialGameState } from "@/lib/persistence/foundation-
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 type BuyRequestBody = {
   saveId?: string;
@@ -112,6 +114,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung
+    // (resolveAuthoritativeWriteOwnerId), nie aus `body.activeOwnerId` — der Client schickte dort
+    // die Owner-ID des ZIELTEAMS, nicht die eigene. Im Raum ignoriert der Guard dieses Feld ohnehin
+    // (Sitz-Token entscheidet).
+    const activeOwnerId = await resolveAuthoritativeWriteOwnerId();
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -125,7 +132,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: body.expectedConfirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
-      activeOwnerId: body.activeOwnerId,
+      activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -183,6 +190,8 @@ export async function POST(request: Request) {
       { status: summary.canBuy ? 200 : 409 },
     );
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Transfermarkt buy could not be processed.";
     return NextResponse.json(
       {

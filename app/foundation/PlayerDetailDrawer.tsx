@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
-import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
+import { formatTrainingAttributeLabel } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
+import { INJURY_RECOVERY_PCT } from "@/lib/fatigue/fatigue-injury-service";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
@@ -157,13 +158,6 @@ function formatTrainingSeasonLabel(seasonId: string) {
     return `S${match[1]}`;
   }
   return getCanonicalSeasonLabel({ seasonId }) ?? seasonId;
-}
-
-function formatTrainingAttributeLabel(attribute: string) {
-  return (
-    PLAYER_ATTRIBUTE_CHART_LABELS[attribute as keyof typeof PLAYER_ATTRIBUTE_CHART_LABELS] ??
-    attribute.slice(0, 3).toUpperCase()
-  );
 }
 
 function formatSignedSetpoints(value: number | null | undefined, digits = 1) {
@@ -593,9 +587,12 @@ function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
         <strong>Verletzt</strong>
         <span>
           Ausfall bis {data.availability.injuryUntilMatchday ?? "nächster Spieltag"}
+          {/* Die Prozentzahl kommt aus dem Modell (`INJURY_RECOVERY_PCT`), nicht aus der Anzeige.
+              Hier stand eine eingetippte 50 — nach Chris' Umstellung auf 1,0 behauptete der
+              Drawer damit eine Halbierung neben einem Wert, der die volle Erholung war. */}
           {data.availability.injuryRecovery != null
-            ? ` · Regeneration ${formatValue(data.availability.injuryRecovery, 1)} (50%)`
-            : " · Regeneration 50%"}
+            ? ` · Regeneration ${formatValue(data.availability.injuryRecovery, 1)} (${INJURY_RECOVERY_PCT}%)`
+            : ` · Regeneration ${INJURY_RECOVERY_PCT}%`}
         </span>
       </div>
     );
@@ -604,7 +601,13 @@ function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
     return (
       <div className="player-drawer-injury-banner is-warning" data-testid="player-drawer-injury-banner">
         <strong>Genesen</strong>
-        <span>Reduzierte Regeneration — noch nicht voll einsatzbereit.</span>
+        {/* „Reduziert" galt, solange der Faktor unter 1 lag. Bei voller Erholung bliebe von der
+            Genesungsphase nur noch der Hinweis, dass der Spieler gerade erst zurueck ist. */}
+        <span>
+          {INJURY_RECOVERY_PCT < 100
+            ? "Reduzierte Regeneration — noch nicht voll einsatzbereit."
+            : "Zurück aus der Zwangspause — volle Regeneration, aber frisch genesen."}
+        </span>
       </div>
     );
   }

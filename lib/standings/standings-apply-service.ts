@@ -14,6 +14,8 @@ import {
   type StandingsPreviewTieGroup,
 } from "@/lib/standings/standings-preview-engine";
 import { schalteAlleLeihgabenNachTabelle } from "@/lib/sponsor/sponsor-rangmarke";
+import { zieheSaisonstandGuvNachSpieltag } from "@/lib/finance/season-guv-nachbuchung";
+import { zieheSaisonstandPunkteNach } from "@/lib/standings/saisonstand-punkte-nachbuchung";
 
 export const STANDINGS_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_STANDINGS";
 
@@ -360,13 +362,47 @@ function writeLocalStandingsApply(input: {
     },
   };
 
+  /**
+   * SPIELTAGE, DIE VOR DEM MUTATOR-FIX GEBUCHT WURDEN, HEILEN HIER — ohne dass jemand ein Skript
+   * ueber SSH starten muss.
+   *
+   * Bis zum Fix buchte `pointsDelta` nur die Platzierungs-Punkte; der Mutator-Aufschlag fehlte
+   * (Meldungen `w4eloo`/`re954b`, am Live-Abbild an allen 32 Teams nachgerechnet). Die Buchung
+   * oben ist geheilt, aber eine laufende Saison mischte sonst zwei Rechenweisen — die Spieltage
+   * davor ohne, die danach mit Aufschlag. Das ist schlechter als jeder der beiden Zustaende
+   * einzeln, weil die Summe dann zu gar nichts mehr passt.
+   *
+   * WARUM GENAU HIER UND NICHT BEI JEDEM SCHREIBVORGANG: dies ist der EINE Punkt, an dem
+   * Saisonpunkte ueberhaupt entstehen — einmal je Spieltag, nicht einmal je Klick. Eine
+   * Ableitung auf jedem Schreibweg hat sich schon einmal als unbezahlbar erwiesen.
+   *
+   * ES IST KEINE ZWEITE RECHNUNG: geschrieben wird die Team-Summe aus `buildSeasonPointsLedger`,
+   * also dieselbe Zahl, die Spielerprofil, Buehne und Feld-Rennen zeigen. Deckt der Ledger nicht
+   * jeden gewerteten Spieltag ab, laesst die Nachbuchung den Stand unangetastet.
+   *
+   * UND SIE LAEUFT VOR DER RANGMARKE: die liest den Tabellenplatz, und der kann sich durch die
+   * Korrektur aendern — am gemessenen Spielstand bei 13 von 32 Teams.
+   */
+  const nachbuchung = zieheSaisonstandPunkteNach(nextGameState, input.preview.scope.seasonId);
+  /**
+   * UND DIE GuV GLEICH MIT — Chris am 23.08.: „ja bau die drei hovers so und die guv nachbuchung
+   * auch." Die GuV-Spalte im Saisonstand war in jedem LAUFENDEN Spielstand leer, weil `guv` bisher
+   * erst am Saisonende geschrieben wurde; das Team-Profil zeigte daneben eine eigene, unvollständige
+   * Zahl. Beide lesen jetzt dieselbe Rechnung.
+   *
+   * Derselbe Punkt wie die Punkte-Nachbuchung darüber, aus demselben Grund: einmal je Spieltag.
+   * Gemessen kostet die Ableitung auf den echten Ständen 0,6 bis 1,4 s beim ersten Aufruf und
+   * danach 17 bis 67 ms — im Tabellenaufbau wäre das unbezahlbar, hier nicht.
+   */
+  const korrigierterGameState = zieheSaisonstandGuvNachSpieltag(nachbuchung.gameState);
+
   // DIE RANGMARKE DER GEBAEUDE-LEIHE SCHALTET GENAU HIER, weil genau hier der Tabellenplatz
   // entsteht. Frueher waere der alte Rang gemessen, spaeter haette ein ruhendes Gebaeude einen
   // Spieltag zu lang gewirkt. Ohne Leihgaben im Spielstand gibt die Funktion ihn unveraendert
   // zurueck — dieser Schritt ist fuer jeden Save ohne Sponsor-Gebaeude ein No-op.
   input.persistence.saveSingleplayerState(
     save.saveId,
-    refreshTeamObjectiveState(schalteAlleLeihgabenNachTabelle(nextGameState)),
+    refreshTeamObjectiveState(schalteAlleLeihgabenNachTabelle(korrigierterGameState)),
   );
 
   return auditLog;

@@ -207,7 +207,8 @@ describe("resolveAiLoanDecision", () => {
   });
 
   it("refuses a further loan only when existing installments have consumed the debt-service budget", () => {
-    // Existing installment 45 > disposable debt-service budget (~ max(7.5, 50 - 18*0.6) = 39.2) -> no room.
+    // Existing installment 45 > disposable debt-service budget (max(7.5, 50 - 18) = 32) -> no room.
+    // (Stand hier mit `18*0.6 = 39,2`; das Gehalt zaehlt seit Chris' Entscheidung voll, siehe unten.)
     // Outstanding kept modest (20) so borrowing capacity stays positive and we reach the serviceability gate.
     const gameState = buildTeamGameState({
       cash: 3,
@@ -535,5 +536,141 @@ describe("Liquiditaets-Kredit bei negativem Cash", () => {
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("season_one_no_loans");
+  });
+});
+
+/**
+ * CHRIS' ENTSCHEIDUNG: „100% der gehälter sind fixkosten logischerweise! da ist das problem".
+ *
+ * `SALARY_SERVICE_WEIGHT` stand auf 0,6 — 40 % der Gehaltssumme fielen aus der Tragfaehigkeits-
+ * rechnung heraus und gaben Kreditrahmen frei, den es nie gab. Der Test haelt die Zahl an der
+ * WIRKUNG fest, nicht an der Konstanten: dieselbe Vorlage muss mit vollem Gewicht ablehnen und
+ * haette mit 0,6 noch Rahmen gehabt.
+ *
+ * Die Vorlage ist so gerechnet, dass genau dieses Gewicht die Entscheidung kippt:
+ *   Sponsor 60 · Gehalt 9 x 4 = 36 · Unterhalt 0 · laufende Rate 30
+ *   mit 0,6:  60 - 21,6 = 38,4  ->  Rahmen 8,4 uebrig, ein weiterer Kredit ist tragbar
+ *   mit 1,0:  60 - 36,0 = 24,0  ->  Rahmen -6,0, kein weiterer Kredit
+ * Der Boden (15 % von 60 = 9) greift in beiden Faellen nicht, sonst pruefte der Test ihn statt
+ * des Gewichts.
+ */
+describe("Gehaelter zaehlen voll als Fixkosten", () => {
+  const laufenderKredit: LoanRecord = {
+    loanId: "laufend",
+    borrowerTeamId: "T-1",
+    lenderType: "bank",
+    principalOriginal: 20,
+    principalOutstanding: 20,
+    interestRatePerSeason: 0.14,
+    termSeasons: 4,
+    seasonsRemaining: 3,
+    installmentPerSeason: 30,
+    originatedSeasonId: "season-1",
+    status: "active",
+    missedPayments: 0,
+  };
+
+  it("lehnt einen weiteren Kredit ab, sobald das volle Gehalt gegengerechnet wird", () => {
+    const gameState = buildTeamGameState({
+      cash: 3,
+      rosterCount: 9,
+      playerOpt: 14,
+      salaryPerPlayer: 4,
+      annualRevenue: 60,
+      loans: [laufenderKredit],
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("debt_service_ceiling");
+  });
+});
+
+/**
+ * CHRIS' ENTSCHEIDUNG vom 21.08.2026: „1b" — der Kreditboden wird eine RAMPE statt einer Schwelle.
+ *
+ * DER ANLASS: seit das Gehalt voll gegengerechnet wird (#597), lag die ehrliche Rechnung bei 107
+ * von 129 gemessenen Teamzeilen unter dem Boden. Er war von der Ausnahme zur Regel geworden — und
+ * gab bei 79 Zeilen Rahmen frei, obwohl die Rechnung negativ war.
+ *
+ * WARUM RAMPE UND NICHT SCHWELLE: „Boden nur unter dem Spielerminimum" hätte einen
+ * Einbahnstraßen-Fall — ein Team am Minimum mit negativer Rechnung dürfte nie wieder kaufen UND
+ * bekäme kein Geld. Die Rampe macht den Rahmen davon abhängig, ob das Team überhaupt Spieler
+ * braucht.
+ *
+ * Die Vorlage ist so gerechnet, dass die drei Stufen sich am ERGEBNIS unterscheiden: Sponsor 60,
+ * Gehalt und Unterhalt fressen alles auf, also entscheidet allein der Boden. 15 % = 9, 7,5 % = 4,5,
+ * 0 % = 0 — und die laufende Rate ist so gesetzt, dass genau dazwischen die Grenze liegt.
+ */
+describe("Der Kreditboden ist eine Rampe, keine Schwelle", () => {
+  const teuerLaufend = (installmentPerSeason: number): LoanRecord => ({
+    loanId: "laufend",
+    borrowerTeamId: "T-1",
+    lenderType: "bank",
+    principalOriginal: 20,
+    principalOutstanding: 20,
+    interestRatePerSeason: 0.14,
+    termSeasons: 4,
+    seasonsRemaining: 3,
+    installmentPerSeason,
+    originatedSeasonId: "season-1",
+    status: "active",
+    missedPayments: 0,
+  });
+
+  /** Kader so gross wie angegeben, Gehalt so hoch, dass die ehrliche Rechnung negativ ist. */
+  const lage = (rosterCount: number, playerOpt: number, rate: number) =>
+    buildTeamGameState({
+      cash: 3,
+      rosterCount,
+      playerOpt,
+      salaryPerPlayer: 12,
+      annualRevenue: 60,
+      loans: [teuerLaufend(rate)],
+    });
+
+  it("auf OPT gibt es KEINEN Boden mehr — der Kader ist voll, es gibt nichts zu kaufen", () => {
+    // playerOpt 9 bei 9 Spielern: dritte Stufe.
+    //
+    // EHRLICH DAZU, nachgemessen: diese Stufe aendert heute NICHTS. Ein Team auf oder ueber seiner
+    // Zielgroesse erreicht den Kreditdienst-Riegel gar nicht — es wird vorher geblockt. Ueber alle
+    // Live-Abbilder sind das 26 Teams, und ihre Antwort lautet 24x `season_one_no_loans`, 1x
+    // `no_need`, 1x `liquidity_negative_cash`. Die Stufe ist ein Guertel zum Hosentraeger: sie
+    // wuerde greifen, wenn die Bedarfspruefung je gelockert wird, und schadet bis dahin nicht.
+    const decision = resolveAiLoanDecision(lage(9, 9, 1), "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+  });
+
+  it("zwischen Minimum und OPT gilt der HALBE Boden — und das macht den Unterschied", () => {
+    // Der Fall, an dem sich Rampe und alter Flachboden trennen. Sponsor 60, Fixkosten fressen
+    // alles, laufende Rate 5:
+    //   halber Boden  7,5 % = 4,5  ->  Rahmen 4,5 - 5 = -0,5  ->  KEIN weiterer Kredit
+    //   alter Boden    15 %  = 9    ->  Rahmen 9   - 5 =  4    ->  Kredit waere tragbar
+    // Ohne die Rampe ist dieser Test gruen — deshalb steht er hier und nicht ein bequemerer.
+    const decision = resolveAiLoanDecision(lage(9, 14, 5), "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("debt_service_ceiling");
+  });
+
+  it("unter dem Minimum traegt derselbe Fall noch — der volle Boden ist wirklich groesser", () => {
+    // Identische Finanzen und Rate wie oben, nur der Kader ist kleiner: erste Stufe, Boden 9,
+    // Rahmen 4. Das trennt die erste von der zweiten Stufe.
+    const decision = resolveAiLoanDecision(lage(6, 14, 5), "T-1");
+    expect(decision.reason).not.toBe("debt_service_ceiling");
+  });
+
+  it("die Stufe haengt am KADER — dieselbe Kasse, anderes Ziel, andere Antwort", () => {
+    // Der Beweis, dass wirklich die Rampe entscheidet: identische Finanzen, identische Rate,
+    // nur die Zielgroesse unterscheidet sich.
+    const aufOpt = resolveAiLoanDecision(lage(9, 9, 3), "T-1");
+    const unterOpt = resolveAiLoanDecision(lage(9, 14, 3), "T-1");
+    expect(aufOpt.shouldBorrow).toBe(false);
+    expect(unterOpt.reason).not.toBe("debt_service_ceiling");
+  });
+
+  it("unter dem Spielerminimum gilt der volle Boden — 15 % von 60 = 9", () => {
+    // Spielerminimum ist fix 8. Bei 6 Spielern greift die erste Stufe; eine Rate von 6 laesst
+    // 3 uebrig. Mit dem halben Boden (4,5) waere hier kein Spielraum mehr.
+    const decision = resolveAiLoanDecision(lage(6, 14, 6), "T-1");
+    expect(decision.reason).not.toBe("debt_service_ceiling");
   });
 });

@@ -5,10 +5,12 @@ import { NextResponse } from "next/server";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
+import { getHumanControlledTeamIds, resolveAiBulkTeamWriteScope } from "@/lib/room/ai-bulk-team-write-scope";
 import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -78,20 +80,56 @@ export async function POST(request: Request) {
   // human participant's team — see `resolveAiBulkTeamWriteScope`. Read fresh so nothing here trusts
   // a client-supplied claim. When the save can't be resolved yet, omit the restriction and let the
   // service's own save-resolution error surface as before.
+  //
+  // Stufe 0.3 (Befund B2): die Identitaet fuer den Nicht-Raum-Fall kommt serverseitig aus der
+  // Sitzung (`resolveAuthoritativeWriteOwnerId`), nicht mehr aus `roomWriteContext.activeOwnerId`.
   const freshSaveForScope = createPersistenceService().getSaveById(saveId);
+  const scopeOwnerId = await resolveAuthoritativeWriteOwnerId();
   const callerWritableTeamIds = freshSaveForScope
     ? Array.from(
         resolveAiBulkTeamWriteScope({
           gameState: freshSaveForScope.gameState,
           room: writeAuth.room,
           participant: writeAuth.participant,
-          activeOwnerId: roomWriteContext.activeOwnerId,
+          activeOwnerId: scopeOwnerId,
         }).writableTeamIds,
       )
     : null;
 
+  /**
+   * KEIN KI-KADERLAUF AUF EIN MENSCHLICH GEFUEHRTES TEAM — auch nicht auf das eigene.
+   *
+   * ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+   *
+   * DASS DIE ANTWORT EINE ABLEHNUNG IST UND KEIN STILLES AUSLASSEN, ist der eigentliche Punkt.
+   * Gemessen bei der Fehlerjagd: ein Lauf auf ein fremdes Team lieferte HTTP 200, `executed: true`,
+   * `status: "applied"` — und schrieb nachweislich nichts (`skippedTeamIds: ["M-M"]`, Kader danach
+   * 0). Die Oberflaeche meldete "KI-Picks angewendet.". Wer klickt, muss erfahren, dass nichts
+   * geschrieben wurde; ein Erfolg, der nichts tut, ist schlimmer als ein Fehler.
+   *
+   * Nur bei ausdruecklich genannten `teamIds`: ein Lauf ueber die KI-Teams der Liga soll weiter
+   * gehen, er fasst menschliche Teams ohnehin nicht an (`includeManualTeams` steht dort auf false).
+   */
+  const angefragteTeamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
+  if (!dryRun && angefragteTeamIds && angefragteTeamIds.length > 0 && freshSaveForScope) {
+    const menschlichGefuehrt = getHumanControlledTeamIds({
+      gameState: freshSaveForScope.gameState,
+      room: writeAuth.room,
+    });
+    const betroffene = angefragteTeamIds.filter((teamId) => menschlichGefuehrt.has(teamId));
+    if (betroffene.length > 0) {
+      return NextResponse.json(
+        {
+          error: "ai_picks_not_allowed_for_human_team",
+          teamIds: betroffene,
+        },
+        { status: 403 },
+      );
+    }
+  }
+
   try {
-    const teamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
+    const teamIds = angefragteTeamIds;
     const result = await runAiPicksExecutePreview({
       source: "sqlite",
       saveId,
@@ -125,6 +163,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "AI picks run failed.",

@@ -1,6 +1,7 @@
 import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { INJURY_PERFORMANCE_MULTIPLIER } from "@/lib/fatigue/fatigue-calibration";
 import { round1ByMathRound as round1 } from "@/lib/foundation/foundation-number-utils";
+import { verteileTeamEffektAufBahnen } from "@/lib/foundation/discipline-stage/team-effekt-verteilung";
 
 // Mapping der ECHTEN Resolve-Engine-Preview auf das additive Szenen-Payload der
 // Disziplin-Bühne. Ziel (Parität zur Arena): die Bühne rechnet NICHTS selbst —
@@ -20,6 +21,24 @@ export type StagePreviewMod = { k: string; sign: 1 | -1; amt: number; injury?: b
 
 export type StagePreviewPlayer = {
   playerId: string | null;
+  /**
+   * DER SLOT, AUF DEM DIE ENGINE GERECHNET HAT — und der deshalb auch auf der Buehne gelten muss.
+   *
+   * GEMELDET VON CHRIS (Ticket #35): „wenn ich in 5 + 6 Slot die spieler einsetze, sollen sie auch
+   * dann starten auch wenn davor dann alle slots leer sind!"
+   *
+   * Das war keine Geschmacksfrage: die Slot-Position traegt eine eigene Attribut-Gewichtung
+   * (`matchday-slot-roles.ts`, `roles[entry.slotIndex]`), deren `roleModifier` mit bis zu +-8,5 je
+   * Spieler in `prePowerScore` eingeht. Wer auf Slot 5 als „Clutch Shot" gewertet wurde, aber auf
+   * Etappe 1 gezeigt wird, steht unter der falschen Rollenbeschriftung — die Anzeige widerspricht
+   * der Rechnung, die darunter laeuft.
+   *
+   * Bis hierher warf die Buehne die Position weg: `entries.map(...)` erzeugte ein DICHTES Array,
+   * und die Arena liest ueber den Array-Index. Am Live-Spielstand gemessen betrifft das real
+   * S-C an Spieltag 9 (Basketball, 6 Plaetze, besetzt sind Slot 5 und 6) — gezeigt als Etappe 1
+   * und 2.
+   */
+  slotIndex: number;
   val: number;
   name: string;
   portraitUrl: string | null;
@@ -103,6 +122,38 @@ export function buildDisciplineStageTeamsFromPreview(
       if (entry.formShare && Math.abs(entry.formShare) >= 0.05) {
         mods.push({ k: entry.formShare < 0 ? "Formtief" : "Form", sign: entry.formShare < 0 ? -1 : 1, amt: round1(Math.abs(entry.formShare)) });
       }
+      // Seit der Zuteilung in `legacy-score-engine.ts` traegt `finalPlayerScore` auch die
+      // Terme, die frueher als Team-Klumpen obendrauf lagen. Sie MUESSEN hier beschriftet
+      // werden — sonst schluckt sie der Moral-Rest darunter und nennt sie „Moral".
+      if (entry.intensityShare && Math.abs(entry.intensityShare) >= 0.05) {
+        mods.push({
+          k: "Intensität",
+          sign: entry.intensityShare < 0 ? -1 : 1,
+          amt: round1(Math.abs(entry.intensityShare)),
+        });
+      }
+      if (entry.slotRoleShare && Math.abs(entry.slotRoleShare) >= 0.05) {
+        mods.push({
+          k: "Rolle",
+          sign: entry.slotRoleShare < 0 ? -1 : 1,
+          amt: round1(Math.abs(entry.slotRoleShare)),
+        });
+      }
+      if (entry.teamPowerShare && Math.abs(entry.teamPowerShare) >= 0.05) {
+        mods.push({
+          k: "Team-Power",
+          sign: entry.teamPowerShare < 0 ? -1 : 1,
+          amt: round1(Math.abs(entry.teamPowerShare)),
+        });
+      }
+      if (entry.teamEffectShare && Math.abs(entry.teamEffectShare) >= 0.05) {
+        mods.push({
+          k: "Team",
+          sign: entry.teamEffectShare < 0 ? -1 : 1,
+          amt: round1(Math.abs(entry.teamEffectShare)),
+        });
+      }
+
       // Rest je Spieler, damit das Netto EXAKT die echte Engine-Contribution
       // trifft (Moral u.a. per-Spieler-Effekte, die nicht als eigenes Feld
       // vorliegen) — so trägt jeder Spieler seine volle individuelle Leistung.
@@ -115,6 +166,7 @@ export function buildDisciplineStageTeamsFromPreview(
 
       return {
         playerId: entry.playerId ?? null,
+        slotIndex: entry.slotIndex,
         val: base,
         name: entry.playerName,
         portraitUrl: portraitById.get(entry.playerId) ?? null,
@@ -123,51 +175,44 @@ export function buildDisciplineStageTeamsFromPreview(
       };
     });
 
-    // Team-Level-Effekte (Intensität / Team-Power) sind nicht pro Spieler in den
-    // Entries, sondern auf Team-Ebene. Für den additiven Slot-Reveal verteilen wir sie
-    // GLEICHMÄSSIG auf die Slots — aber BESCHRIFTET, damit im Hover/Reveal transparent
-    // bleibt, woher die Punkte kommen.
-    //
-    // HIER STAND EINE DRITTE ZEILE „Team-PPs" (`teamResult.teamPpsModifier`). Sie ist
-    // ersatzlos entfernt, aus zwei Gründen:
-    //  1. Sie konnte nie erscheinen. `calculateMutatorModifierForSide` und
-    //     `calculateMvpForcedMutatorModifierForSide` setzen `teamPpsModifier` an JEDEM
-    //     Rückgabepfad hart auf `null` (legacy-lineup-modifiers.ts); am Abbild gemessen:
-    //     64 von 64 gebuchten Team-Zeilen tragen `null`/`missing_source`.
-    //  2. Wäre das Feld je gefüllt worden, hätte diese Zeile eine PLAYER-POINT-Größe in
-    //     den SCORE geschrieben — zwei verschiedene Währungen in einer Summe. Die
-    //     Mutator-PPs laufen über `playerMutatorPpsBonuses`/`mutatorPpsBonus` und gehören
-    //     in die PP-Rechnung, nicht in den Disziplin-Score.
-    if (players.length > 0) {
-      // Form NICHT mehr team-weit gleichverteilen — sie ist bereits pro Spieler
-      // (formShare, s. oben) berücksichtigt. Nur die echten Team-Effekte bleiben.
-      const teamLevelMods: { k: string; value: number }[] = [
+    // RUECKFALL FUER ALTE PAYLOADS: traegt KEIN Eintrag einen zugeteilten Anteil, stammt die
+    // Vorschau noch aus der Zeit vor der Zuteilung — dann steckt die Team-Power nur im
+    // Team-Score, und die Buehne muss sie wie frueher selbst verteilen. Sobald auch nur ein
+    // Eintrag einen Anteil traegt, bleibt dieser Block aus; sonst zaehlte er doppelt.
+    const traegtZuteilung = teamResult.entries.some(
+      (entry) =>
+        (entry.intensityShare != null && entry.intensityShare !== 0) ||
+        (entry.slotRoleShare != null && entry.slotRoleShare !== 0) ||
+        (entry.teamPowerShare != null && entry.teamPowerShare !== 0) ||
+        (entry.teamEffectShare != null && entry.teamEffectShare !== 0),
+    );
+    if (!traegtZuteilung && players.length > 0) {
+      for (const teamMod of [
         { k: "Intensität", value: teamResult.intensityModifier ?? 0 },
         { k: "Team-Power", value: teamResult.teamPowerModifier ?? 0 },
-      ];
-      for (const teamMod of teamLevelMods) {
-        if (Math.abs(teamMod.value) < 0.05) {
-          continue;
-        }
-        let remaining = round1(teamMod.value);
-        players.forEach((player, index) => {
-          const amount = index === players.length - 1 ? round1(remaining) : round1(teamMod.value / players.length);
-          remaining = round1(remaining - amount);
-          if (Math.abs(amount) >= 0.05) {
-            player.mods.push({ k: teamMod.k, sign: amount < 0 ? -1 : 1, amt: Math.abs(amount) });
-          }
-        });
+      ]) {
+        verteileTeamEffektAufBahnen(players, teamMod.value, teamMod.k);
       }
     }
 
+    // HIER STAND DIE TEAM-LEVEL-VERTEILUNG (Intensität / Team-Power gleichmäßig auf alle
+    // Bahnen). Sie ist ersatzlos weg: beide Terme sind seit der Zuteilung in
+    // `legacy-score-engine.ts` bereits in `finalPlayerScore` enthalten und werden oben je
+    // Spieler mit seinem EIGENEN Wert beschriftet. Hier noch einmal verteilen hiesse
+    // doppelt zaehlen.
+    //
+    // Frueher stand hier zusaetzlich eine Zeile „Team-PPs"; die ist aus zwei Gruenden schon
+    // vorher gefallen: `teamPpsModifier` wurde an jedem Rueckgabepfad hart auf `null` gesetzt,
+    // und sie haette eine Player-Point-Groesse in den SCORE geschrieben — zwei Waehrungen in
+    // einer Summe. Mutator-PPs laufen ueber `mutatorPpsBonus` in die PP-Rechnung.
+
     // Rest-Reconcile: verbleibende Differenz (Rundung / nicht separat gelistete
-    // Effekte) auf den letzten Slot, damit Σ(Netto) exakt == teamResult.score.
+    // Effekte) über die Bahnen, damit Σ(Netto) exakt == teamResult.score. Bei einem
+    // Betrag, der pro Bahn auf 0,0 rundet, bleibt er zwangsläufig auf der letzten —
+    // das ist dann aber Rundungsrauschen und keine sichtbare Bevorzugung mehr.
     const playerNetSum = players.reduce((sum, p) => sum + p.val + modSum(p.mods), 0);
     const residual = round1(teamResult.score - playerNetSum);
-    if (Math.abs(residual) >= 0.05 && players.length > 0) {
-      const last = players[players.length - 1]!;
-      last.mods.push({ k: "Team", sign: residual < 0 ? -1 : 1, amt: Math.abs(residual) });
-    }
+    verteileTeamEffektAufBahnen(players, residual);
 
     const captainEntry = teamResult.entries.find((entry) => entry.isCaptain) ?? null;
 

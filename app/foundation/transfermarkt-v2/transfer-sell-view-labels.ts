@@ -356,3 +356,64 @@ export function describeSellPreviewIssue(error: string): SellPreviewIssue {
     hint: "Lade die Vorschau neu — bleibt der Fehler, schließe den Dialog und öffne den Verkauf erneut.",
   };
 }
+
+export type SellDisabledReasonInput = {
+  /** `"prisma"` = Referenzmodus, dort bleibt der Verkauf grundsaetzlich gesperrt. */
+  readMetaSource?: string | null;
+  preview: {
+    canSell: boolean;
+    blockingReasons?: string[] | null;
+    warnings?: string[] | null;
+  } | null;
+  /** Art des Vorschau-Fehlers, falls einer vorliegt. */
+  issueKind?: string | null;
+  hasIssue: boolean;
+  busy: boolean;
+  strongAckPending: boolean;
+};
+
+/**
+ * WARUM DER VERKAUFEN-KNOPF GESPERRT IST — in einem Satz, und zwar im WAHREN.
+ *
+ * Lag frueher als Kette von Fragezeichen-Operatoren im `FoundationMarketSellShellHost`. Steht jetzt
+ * hier, weil sie eine Regel ist und keine Darstellung: welcher Grund genannt wird, entscheidet, was
+ * Chris fuer kaputt haelt.
+ */
+export function resolveSellDisabledReason(input: SellDisabledReasonInput): string | null {
+  const { preview } = input;
+  const disabled =
+    input.readMetaSource === "prisma" || !preview?.canSell || input.busy || input.strongAckPending;
+  if (!disabled) return null;
+  if (input.readMetaSource === "prisma") return "Im Referenzmodus bleibt der Verkauf gesperrt.";
+  if (!preview) {
+    if (input.issueKind === "window_closed") {
+      return "Das Verkaufsfenster ist geschlossen — verkauft wird im Verkaufsfenster am Saisonende.";
+    }
+    return input.hasIssue
+      ? "Die Verkaufsvorschau ist nicht verfügbar — bitte neu laden."
+      : "Verkaufsvorschau wird noch geladen.";
+  }
+  if (!preview.canSell) {
+    // HIER STAND EIN KADERGRUND, UND ER WAR IMMER FALSCH. Die Kette fragte zuerst, ob eine
+    // Kadergroessen-WARNUNG vorliegt, und schrieb dann „Kader ist am Minimum — verkaufen wuerde
+    // die Aufstellung unmoeglich machen." Der echte Grund aus `blockingReasons` kam erst danach
+    // und wurde damit verdeckt.
+    //
+    // Nachgemessen: KEINER der beiden Verkaufsdienste kennt eine Kadergroessen-Sperre.
+    // `transfermarkt-sell-service.ts:373` und `transfermarkt-local-service.ts:3166` setzen
+    // `canSell = blockingReasons.length === 0`, und in beiden Listen steht kein Kadergrund. Der
+    // Satz konnte also nur dann erscheinen, wenn etwas ANDERES sperrte — und schob es dem Kader in
+    // die Schuhe. Genau das meldete Chris als `33c172`: „verkäufe gestoppt wegen spieler minimum
+    // -> diesen grund darf es nicht geben […] das hatten wir jetzt schon so oft!"
+    //
+    // Die Kadergroessen-Warnung selbst bleibt in der Liste — sie ist ein Hinweis und war nie das
+    // Problem. Was verschwindet, ist ihre Rolle als Erklaerung fuer eine fremde Sperre.
+    const ersterGrund = preview.blockingReasons?.[0];
+    return ersterGrund ? translateSellBlockingReason(ersterGrund) : "Dieser Verkauf ist gerade noch blockiert.";
+  }
+  if (input.busy) return "Der Verkauf wird gerade vorbereitet.";
+  if (input.strongAckPending) {
+    return "Bitte bestätige zuerst die Board-/GM-Warnung oben, dann kannst du final verkaufen.";
+  }
+  return null;
+}

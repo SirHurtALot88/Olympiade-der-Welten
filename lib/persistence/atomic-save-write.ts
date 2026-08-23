@@ -30,7 +30,15 @@ export async function runWithSaveRecovery<T>(input: {
     return await input.run();
   } catch (error) {
     try {
-      input.persistence.saveSingleplayerState(input.saveId, recoverySnapshot, { status: input.status });
+      // `restoresPreviousState`: dieser Schreibvorgang schreibt ABSICHTLICH den Stand von VOR dem
+      // gescheiterten Ablauf zurueck. Der Riegel gegen gleichzeitiges Schreiben (Befund F3,
+      // lib/persistence/koop-schreibkonflikt.ts) sieht einen aelteren Stand als Konflikt — ohne
+      // diese Ausnahme wuerde ausgerechnet die Wiederherstellung abgewiesen, und aus einer
+      // behebbaren Stoerung wuerde eine unbehebbare.
+      input.persistence.saveSingleplayerState(input.saveId, recoverySnapshot, {
+        status: input.status,
+        restoresPreviousState: true,
+      });
     } catch (recoveryError) {
       throw new AtomicSaveRecoveryError({ label: input.label, originalError: error, recoveryError });
     }

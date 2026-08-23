@@ -15,7 +15,10 @@ export type SaveSummary = {
    */
   createdBy?: string | null;
   scenarioMeta?: ScenarioMeta;
-  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  // Paket 2: an `ScenarioMeta["saveMode"]` gehaengt statt einer eigenen Kopie der Werte-Liste --
+  // spart HIER wenigstens die dritte Kopie derselben Groesse (Fund/Begruendung an ScenarioMeta.saveMode,
+  // lib/data/olyDataTypes.ts).
+  saveMode?: NonNullable<ScenarioMeta["saveMode"]>;
 };
 
 export type PersistedSaveGame = SaveGameState & {
@@ -111,7 +114,26 @@ export type PersistenceService = {
   getActiveSave(ownerId?: string | null): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
   getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
-  saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
+  saveSingleplayerState(
+    saveId: string,
+    gameState: GameState,
+    input?: {
+      status?: SaveStatus;
+      /**
+       * "Dieser Schreibvorgang stellt ABSICHTLICH einen aelteren Stand wieder her."
+       *
+       * Nur fuer `runWithSaveRecovery` (lib/persistence/atomic-save-write.ts): dessen ganzer Zweck
+       * ist es, nach einem gescheiterten Ablauf den Stand von VOR dem Ablauf zurueckzuschreiben.
+       * Der Riegel gegen gleichzeitiges Schreiben (Befund F3, `koop-schreibkonflikt.ts`) sieht
+       * genau das als Konflikt — er wuerde die Wiederherstellung abweisen und aus einer behebbaren
+       * Stoerung eine unbehebbare machen.
+       *
+       * Ausdruecklich benannt statt heimlich am Riegel vorbei: wer diese Flagge setzt, sagt damit,
+       * dass der Rueckschritt gewollt ist. Es gibt genau einen Aufrufer.
+       */
+      restoresPreviousState?: boolean;
+    },
+  ): PersistedSaveGame;
   /**
    * `ownerId` (session user, auth-on only): threaded to the internal activate so creating a save
    * moves ONLY that owner's active-save pointer, never another owner's.

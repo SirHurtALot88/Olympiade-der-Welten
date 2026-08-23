@@ -34,6 +34,19 @@ export const PRIZE_MONEY_NORMALIZED_JSON_PATH = path.join(
 export type PrizeMoneyNormalizedRow = {
   rank: number | null;
   placementLabel: string | null;
+  /**
+   * STATISCHER REFERENZWERT — nicht das, was eine laufende Saison tatsaechlich ausweist.
+   *
+   * Diese Zeile stammt aus einem einmal exportierten Snapshot einer AELTEREN Preisgeld-Formel
+   * (rangabhaengiger Sockel `BASIS_DIFFS`, siehe Kommentar bei `buildPrizeMoneyTable` in
+   * `lib/season/prize-money.ts`, wo die aktuelle Formel stattdessen einen flachen Sockel je Rang
+   * verwendet). `prizeMoney` gehoert zu GENAU DER Liga-Gehaltssumme, mit der die Tabelle einmal
+   * erzeugt wurde — nicht zu einem beliebigen Spielstand. `buildPrizeMoneyPreview` liest diese
+   * Zeilen deshalb nur als FALLBACK (kein Kader/Gehaltsfaktor vorhanden); bei jeder gespielten
+   * Saison rechnet sie stattdessen `buildPrizeMoneyTable` frisch gegen die ECHTE Liga-Gehaltssumme
+   * und den Saison-Wirtschaftsfaktor. Die Summe dieser Spalte ueber alle Raenge (aktuell 1.656,5)
+   * ist deshalb KEIN Erwartungswert fuer irgendeine reale Vorschau — nur ein eingefrorenes Beispiel.
+   */
   prizeMoney: number | null;
   percent: number | null;
   basis: number | null;

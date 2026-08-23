@@ -251,6 +251,20 @@ function buildOfferSkeleton(input: {
   return offer;
 }
 
+/**
+ * WIE VIELE SPONSORENANGEBOTE EIN TEAM JE SAISON BEKOMMT.
+ *
+ * Chris: „1 unterschied: nur 3 Sponsoren statt 5". Die Zahl stand als lokale `const` in
+ * `buildSponsorOffersForTeam` und war damit fuer niemanden lesbar — mehrere Tests trugen deshalb
+ * eine feste Stichproben-Wache `toBeGreaterThan(100)`, die aus der Fuenferzeit stammt. Mit drei
+ * Karten sind es 32 Teams mal 3 = 96, und vier Tests standen rot, ohne dass an der geprueften
+ * Aussage irgendetwas falsch war.
+ *
+ * Exportiert, damit Erwartung und Erzeugung DIESELBE Zahl lesen. Stellt jemand wieder auf fuenf
+ * um, ziehen die Tests von allein mit, statt erneut rot zu werden.
+ */
+export const SPONSOR_ANGEBOTE_JE_TEAM = 3;
+
 export function buildSponsorOffersForTeam(input: {
   gameState: GameState;
   teamId: string;
@@ -299,7 +313,7 @@ export function buildSponsorOffersForTeam(input: {
   // `slotCount − 1` geklammert, der Challenge-Slot ueber die Zahl der ZIELKARTEN
   // (`goalSlotIndexes.length`, hier 2), die Kurvenformen kommen aus einer Ziehung ohne
   // Zuruecklegen ueber 11 Formen, und die Achsen aus einer ueber bis zu 5.
-  const SLOT_COUNT = 3;
+  const SLOT_COUNT = SPONSOR_ANGEBOTE_JE_TEAM;
   const slate = rollSponsorOfferSlate({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
@@ -521,8 +535,29 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     // Angebote aus einem Spielstand von VOR dem V3-Umbau tragen keine V3-Konditionen. Sie werden
     // ersetzt statt gerechnet — ein noch nicht unterschriebenes Angebot ist keine Zusage, und ein
     // Angebot ohne V3-Block koennte die Auszahlung gar nicht mehr beziffern.
+    //
+    // GEMELDET VON CHRIS: „Ich habe als Saisonziel den Ausbau von 2 Gebäuden meiner Wahl — das habe
+    // ich bereits erledigt. Da würde ich erwarten, dass das Ziel schon als abgeschlossen da steht
+    // und auch finanziell in die GuV schon mit einberechnet und ausgewiesen wird."
+    //
+    // HIER STAND EINE EINGETIPPTE 5. Seit `SPONSOR_ANGEBOTE_JE_TEAM = 3` konnte die Bedingung nie
+    // mehr wahr werden: erzeugt werden drei Angebote, verlangt wurden fuenf. Die Funktion hat
+    // deshalb bei JEDEM Aufruf neu erzeugt — und sie laeuft bei jedem Laden des Spielstands
+    // (`app/api/singleplayer-state/route.ts`). Der Wurf selbst ist saatgebunden und lieferte
+    // dieselben Sponsoren; unsichtbar mitgewandert ist aber die AUSGANGSLAGE der V4-Achse, denn
+    // `buildSponsorOffersForTeam` friert sie aus dem LEBENDEN Zustand ein
+    // (`axisbase:` im targetValue).
+    //
+    // Fuer die Achse „Ausbau" heisst das: die Vorsaison-Reihenfolge baut erst die Gebaeude
+    // (`training_facilities`) und waehlt danach den Sponsor (`choose_sponsor`). Jede gebaute Stufe
+    // wanderte in die Ausgangslage, statt auf das Ziel zu zaehlen — bei Unterschrift stand die Achse
+    // damit garantiert auf 0. An Chris' Spielstand gemessen: `axisbase:2` bei genau zwei gebauten
+    // Stufen, Achse 0 von 2, Sonderziel −6,0 C statt +6,0 C, GuV 22,7 statt 34,7 C.
+    //
+    // Der Vergleich laeuft jetzt gegen die Konstante, damit eine spaetere Aenderung der Angebotszahl
+    // dieselbe Falle nicht erneut aufstellt.
     const hasCurrentSeasonOffers =
-      currentOffers.length === 5 &&
+      currentOffers.length === SPONSOR_ANGEBOTE_JE_TEAM &&
       currentOffers.every((offer) => offer.seasonId === seasonId && getSponsorV3Terms(offer) != null);
     if (!hasCurrentSeasonOffers) {
       const built = buildSponsorOffersForTeam({ gameState, teamId: team.teamId, globalParentUsage });

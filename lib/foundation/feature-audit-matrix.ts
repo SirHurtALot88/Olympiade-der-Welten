@@ -175,7 +175,7 @@ const registry: RegistryInput[] = [
     category: "Multiplayer",
     status: "multiplayer_ready",
     views: ["home", "room", "context-banner"],
-    writePaths: ["lib/room/room-store.ts", "app/api/room/route.ts", "lib/socket/server.ts"],
+    writePaths: ["lib/room/room-store.ts", "lib/socket/server.ts"],
     testCoverage: ["room-store.test.ts", "multiplayer-room-ui-contract.test.ts"],
     smokeCoverage: ["app:smoke-multiplayer-e2e"],
     knownBlockers: ["real_login_provider_pending", "persistent_room_database_pending"],

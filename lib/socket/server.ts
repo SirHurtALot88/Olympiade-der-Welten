@@ -1,8 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 
-import { endTurn } from "@/lib/game/apply-end-turn";
-import { applyMoveToken } from "@/lib/game/apply-move-token";
 import {
   applyRoomOwnershipPreset,
   applyRoomTeamSelection,
@@ -12,20 +10,25 @@ import {
   getRoom,
   joinRoom,
   markDisconnected,
+  quickSimRoomArenaRevealState,
+  setRoomArenaDisciplinePhaseState,
+  closeRoom,
   rejoinRoom,
+  resetRoomArenaRevealState,
   runRoomAiAutoStep,
+  setRoomArenaPausedState,
   setRoomArenaReadyState,
   setParticipantReadyState,
   startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
+import { UnknownRoomOwnershipPresetError } from "@/lib/room/online-room-model";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 // WICHTIG: aus lib/auth/session-cookie importieren, NICHT aus lib/auth/session -
 // letzteres importiert next/headers, was hier (server.ts laedt dieses Modul vor
 // der Next.js-App-Initialisierung) zum Absturz fuehrt. Siehe Kommentar dort.
 import { getSessionUserFromCookieHeader } from "@/lib/auth/session-cookie";
-import type { ClientToServerEvents, EndTurnRequest, MoveTokenRequest, ServerToClientEvents } from "@/types/events";
-import type { CoachRole } from "@/types/game";
+import type { ClientToServerEvents, ServerToClientEvents } from "@/types/events";
 
 declare global {
   var __olyIo: Server<ClientToServerEvents, ServerToClientEvents> | undefined;
@@ -38,21 +41,6 @@ function emitRoomError(
   roomCode?: string,
 ) {
   io.to(socketId).emit("roomError", { roomCode, message });
-}
-
-function resolveRole(roomCode: string, seatToken: string): CoachRole | null {
-  const room = getRoom(roomCode);
-  if (!room) {
-    return null;
-  }
-
-  for (const role of ["A", "B"] as const) {
-    if (room.seats[role]?.seatToken === seatToken) {
-      return role;
-    }
-  }
-
-  return null;
 }
 
 function publicAuthorizationErrorCode(reason: string) {
@@ -107,7 +95,40 @@ export function ensureSocketServer(httpServer: HttpServer) {
     const sessionUser = getSessionUserFromCookieHeader(socket.handshake.headers.cookie);
 
     socket.on("createRoom", (payload) => {
-      const { room, seat } = createRoom(socket.id, payload, sessionUser);
+      /**
+       * GEMESSEN, nicht vermutet (Paket 3, docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md): schickt ein
+       * Client einen Modus-Namen, den DIESER Serverstand nicht kennt, warf `createRoom` bis hier
+       * ungefangen durch -- `buildOwnershipForPreset` wirft seit Paket 1
+       * `UnknownRoomOwnershipPresetError` (richtig so: vorher vergab derselbe Fall still vier
+       * Teams). Sonde gegen den laufenden Server: der Client bekam WEDER `roomJoined` NOCH
+       * `roomError` -- er haengt stumm --, und der Wurf landete als `uncaughtException`. Dass der
+       * Prozess weiterlief, verdankte er allein dem Auffangnetz des Next-Dev-Servers; ein eigenes
+       * gibt es nicht (kein `process.on("uncaughtException")` in server.ts).
+       *
+       * DER REALE WEG DORTHIN ist ein Deploy: nach dem Umbenennen oder Entfernen eines Modus
+       * schickt jeder noch offene Browser-Tab weiter den alten Namen. Deshalb hier gefangen und
+       * als gewoehnliche, lesbare Ablehnung gemeldet -- derselbe `roomError`-Weg, den jede andere
+       * Ablehnung in dieser Datei nimmt und den der Foundation-Client seit Befund F6 anzeigt, ohne
+       * die Bedienleiste wegzuraeumen.
+       *
+       * Bewusst NUR dieser eine Fehlertyp: alles andere fliegt weiter, damit ein echter
+       * Programmfehler nicht als hoefliche Meldung verschwindet.
+       */
+      let erstellterRaum: ReturnType<typeof createRoom>;
+      try {
+        erstellterRaum = createRoom(socket.id, payload, sessionUser);
+      } catch (error) {
+        if (error instanceof UnknownRoomOwnershipPresetError) {
+          emitRoomError(
+            io,
+            socket.id,
+            "Dieser Spiel-Modus ist dem Server nicht bekannt. Bitte die Seite neu laden und den Modus erneut wählen.",
+          );
+          return;
+        }
+        throw error;
+      }
+      const { room, seat } = erstellterRaum;
       const participant = room.state.roomParticipants.find((entry) => entry.participantId === seat.participantId)!;
       socket.join(room.roomCode);
       socket.emit("roomJoined", {
@@ -211,8 +232,8 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("advanceRoomFlow", ({ roomCode, seatToken }) => {
-      const result = advanceRoomFlow(roomCode, seatToken);
+    socket.on("advanceRoomFlow", ({ roomCode, seatToken, getrennteUeberspringen }) => {
+      const result = advanceRoomFlow(roomCode, seatToken, { getrennteUeberspringen });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;
@@ -249,8 +270,103 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("advanceRoomArenaStep", ({ roomCode, seatToken, maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force }) => {
-      const result = advanceRoomArenaStep(roomCode, seatToken, { maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force });
+    socket.on(
+      "advanceRoomArenaStep",
+      ({ roomCode, seatToken, maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force, getrennteUeberspringen }) => {
+      const result = advanceRoomArenaStep(roomCode, seatToken, {
+        maxSlotRevealIndex,
+        maxSlotRevealCountByDiscipline,
+        force,
+        getrennteUeberspringen,
+      });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+      },
+    );
+
+    // Stufe 3.6: letzte Meile fuer Pause/Reset/Quick-Sim als Raum-Aktion — reine Weiterleitung an
+    // die Huellen aus room-store.ts, danach der Raum-Zustand-Broadcast wie bei jedem anderen
+    // Room-Write (kein eigener `roomEvents`-Eintrag, siehe Kommentar dort: reine Verkabelung,
+    // keine neue Mechanik).
+    socket.on("setRoomArenaPaused", ({ roomCode, seatToken, paused }) => {
+      const result = setRoomArenaPausedState(roomCode, seatToken, paused);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("resetRoomArenaReveal", ({ roomCode, seatToken }) => {
+      const result = resetRoomArenaRevealState(roomCode, seatToken);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("quickSimRoomArenaReveal", ({ roomCode, seatToken, maxSlotRevealCountByDiscipline }) => {
+      const result = quickSimRoomArenaRevealState(roomCode, seatToken, { maxSlotRevealCountByDiscipline });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    // Der Diszi-Wechsel bekommt — anders als Pause/Reset/Quick-Sim — auch den
+    // `roomGameplayEvent`-Broadcast, weil `setRoomArenaDisciplinePhaseState` einen echten
+    // `roomEvents`-Eintrag schreibt (Begruendung dort).
+    socket.on("setRoomArenaDisciplinePhase", ({ roomCode, seatToken, phase, maxSlotRevealCountByDiscipline }) => {
+      const result = setRoomArenaDisciplinePhaseState(roomCode, seatToken, { phase, maxSlotRevealCountByDiscipline });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    /**
+     * DER HOST BEENDET DEN RAUM — und gibt damit den Spielstand wieder frei.
+     *
+     * `closeRoom` (room-store.ts) gab es seit Stufe 0.4 vollstaendig: Host-Pruefung, Status auf
+     * "completed", `removeRoomFromActiveSet` (Prozess-Map, Ablage UND der Save-Schutz in der
+     * Registry). Nur hatte sie ausserhalb ihrer eigenen Datei keinen einzigen Aufrufer — kein
+     * Socket-Ereignis, kein Knopf. Das Ende eines Raums war nicht vorgesehen.
+     *
+     * WAS DAS IM ALLTAG BEDEUTETE, nachgemessen (`tests/raum-beenden-gibt-den-save-frei.test.ts`):
+     *
+     *   nach Anlage:        gesperrt=true
+     *   beide getrennt:     gesperrt=true   status=lobby  sitze=2  (beide Teilnehmer offline)
+     *   nach dem Beenden:   gesperrt=false
+     *
+     * Ein Raum haelt seinen Spielstand also fest, auch wenn nachweislich niemand mehr drin ist:
+     * `markDisconnected` setzt nur `connectionStatus`, Sitze werden nie entfernt, und der Status
+     * bleibt damit auf "lobby"/"season_active" statt auf "paused" (das ist der Zustand, den
+     * `getActiveRoomBySaveId` von der Sperre ausnehmen wuerde). Der einzige automatische Ausgang
+     * war der Sieben-Tage-Verfall (`ROOM_EXPIRY_MS`) — bis dahin blieben die Admin-Werkzeuge auf
+     * diesem Save zu.
+     *
+     * WARUM KEIN KUERZERER ZEITABLAUF STATTDESSEN: "beide gerade offline" heisst nicht "fertig".
+     * Zwei Coaches, die im selben Moment neu laden oder deren WLAN kurz weg ist, saehen sonst
+     * ihren laufenden Koop-Save fuer Admin-Schreibvorgaenge geoeffnet — genau die Fehlerklasse,
+     * gegen die diese Sperre gebaut wurde. Das Ende eines Raums ist eine ENTSCHEIDUNG, keine
+     * Zeitmessung; deshalb ein ausdruecklicher Knopf beim Host und keine geratene Frist.
+     *
+     * Der Abschluss-Zustand wird NOCH gesendet (der Raum ist aus der Map, sein letzter State
+     * traegt `status: "completed"`) — sonst erfuehre ein anwesender Mitspieler nur daran, dass
+     * seine naechste Aktion ins Leere laeuft.
+     */
+    socket.on("closeRoom", ({ roomCode, seatToken }) => {
+      const result = closeRoom(roomCode, seatToken);
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;
@@ -297,52 +413,6 @@ export function ensureSocketServer(httpServer: HttpServer) {
               },
             },
       );
-    });
-
-    socket.on("moveToken", (payload: MoveTokenRequest) => {
-      const room = getRoom(payload.roomCode);
-      if (!room) {
-        emitRoomError(io, socket.id, "Der Raum existiert nicht mehr.", payload.roomCode);
-        return;
-      }
-
-      const role = resolveRole(payload.roomCode, payload.seatToken);
-      if (!role) {
-        emitRoomError(io, socket.id, "Dein Sitzplatz ist nicht gueltig.", payload.roomCode);
-        return;
-      }
-
-      const result = applyMoveToken(room.state, role, payload.tokenId);
-      if (!result.ok) {
-        emitRoomError(io, socket.id, result.error, payload.roomCode);
-        return;
-      }
-
-      room.state = result.state;
-      io.to(room.roomCode).emit("roomState", room.state);
-    });
-
-    socket.on("endTurn", (payload: EndTurnRequest) => {
-      const room = getRoom(payload.roomCode);
-      if (!room) {
-        emitRoomError(io, socket.id, "Der Raum existiert nicht mehr.", payload.roomCode);
-        return;
-      }
-
-      const role = resolveRole(payload.roomCode, payload.seatToken);
-      if (!role) {
-        emitRoomError(io, socket.id, "Dein Sitzplatz ist nicht gueltig.", payload.roomCode);
-        return;
-      }
-
-      const result = endTurn(room.state, role);
-      if (!result.ok) {
-        emitRoomError(io, socket.id, result.error, payload.roomCode);
-        return;
-      }
-
-      room.state = result.state;
-      io.to(room.roomCode).emit("roomState", room.state);
     });
 
     socket.on("disconnect", () => {

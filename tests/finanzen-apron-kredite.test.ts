@@ -21,7 +21,12 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
-import { computeApronSettlement } from "@/lib/season/apron-service";
+import {
+  APRON_KONJUNKTUR_FACTOR_MIN,
+  APRON_LINE_1_MEDIAN_FACTOR,
+  APRON_LINE_2_MEDIAN_FACTOR,
+  computeApronSettlement,
+} from "@/lib/season/apron-service";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { computeTeamLoanShareRows, computeTeamLoanShares } from "@/lib/finance/season-end-guv";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
@@ -118,9 +123,15 @@ describe("Apron-Ausweisung: beide Linien einzeln, aus derselben Projektion wie d
     const apron = team.apron!;
     expect(apron.line1).toBeGreaterThan(0);
     expect(apron.line2).toBeGreaterThan(apron.line1);
-    // Linienfaktoren: Linie 1 = Median × 1,1, Linie 2 = Median × 1,25 (auf Anzeigerundung genau).
-    expect(apron.line1).toBeCloseTo(round1(apron.medianSalary * 1.1), 0);
-    expect(apron.line2).toBeCloseTo(round1(apron.medianSalary * 1.25), 0);
+    /**
+     * Die Zusage ist „die Anzeige leitet beide Linien aus DEMSELBEN Median ab wie die Rechnung",
+     * nicht „die Faktoren sind 1,1 und 1,25". Hier standen die beiden Zahlen abgetippt und fielen
+     * bei Chris' Anhebung auf 1,25/1,60 (`6fv43h`) um — obwohl die Ableitung unveraendert stimmte.
+     * Jetzt aus den Konstanten, damit der Waechter die naechste Balance-Aenderung ueberlebt und
+     * weiter das prueft, wofuer er da ist.
+     */
+    expect(apron.line1).toBeCloseTo(round1(apron.medianSalary * APRON_LINE_1_MEDIAN_FACTOR), 0);
+    expect(apron.line2).toBeCloseTo(round1(apron.medianSalary * APRON_LINE_2_MEDIAN_FACTOR), 0);
   });
 
   it("die Abstände sind exakt Bemessungsgrundlage minus Linie (keine zweite Rechnung)", () => {
@@ -320,7 +331,11 @@ describe("Deckel: die naive Satz-Summe geht nicht auf — der Topf ist die Summe
   it("das Empfänger-Flag bleibt auch bei leerem Topf gesetzt (k = 0), damit die UI die Rolle benennen kann", () => {
     const settlement = computeApronSettlement({
       lines: { line1: 10, line2: 20 },
-      salaryFactor: 0.9, // unter APRON_KONJUNKTUR_FACTOR_MIN → niemand zahlt
+      // Die Zahl kommt aus der KONSTANTE, nicht aus einer abgetippten 0,9: als die Schwelle von
+      // 0,95 auf 0,88 fiel (Meldung `6fv43h`), war 0,9 plötzlich DARÜBER und der Fall prüfte das
+      // Gegenteil seiner Beschriftung. Ein Waechter, der an einer Zahl haengt statt an der Regel,
+      // rostet genau so.
+      salaryFactor: APRON_KONJUNKTUR_FACTOR_MIN - 0.05, // unter der Schwelle → niemand zahlt
       teams: [
         { teamId: "big", salary: 40, rankShare: 4 },
         { teamId: "low-a", salary: 5, rankShare: 10 },

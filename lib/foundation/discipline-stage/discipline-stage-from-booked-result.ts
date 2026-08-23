@@ -29,6 +29,7 @@ import type {
   StagePreviewTeam,
   StageTeamMeta,
 } from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import { verteileTeamEffektAufBahnen } from "@/lib/foundation/discipline-stage/team-effekt-verteilung";
 
 function round1(value: number): number {
   return Number(value.toFixed(1));
@@ -87,6 +88,10 @@ export function buildDisciplineStageTeamsFromBookedResult(
     const teamScore = round1(teamErgebnis.totalScore ?? 0);
     const players = eigene.map((eintrag) => ({
       playerId: eintrag.playerId ?? null,
+      // Die Position wandert mit — sortiert wurde hier schon immer danach, weggeworfen wurde sie
+      // trotzdem (Ticket #35). Ohne sie kann die Buehne eine Luecke nicht von einer Verschiebung
+      // unterscheiden.
+      slotIndex: eintrag.slotIndex ?? 0,
       val: round1(eintrag.finalPlayerScore ?? 0),
       name: namensregister.get(eintrag.playerId) ?? eintrag.playerId,
       portraitUrl: portraitById.get(eintrag.playerId) ?? null,
@@ -103,15 +108,21 @@ export function buildDisciplineStageTeamsFromBookedResult(
      * 47,8 gemeldet und die Bahnen darunter 39,2. Genau so einen stillen Widerspruch soll diese
      * Anzeige nicht mehr produzieren.
      *
-     * Der Unterschied landet deshalb beschriftet auf dem letzten Slot, wie es der Vorschau-Weg in
-     * `discipline-stage-from-preview.ts` schon tut. „Team" ist dabei ehrlich: es IST ein
-     * Team-Effekt, nur ohne die feinere Aufschlüsselung, die nur die Vorschau kennt.
+     * GEMELDET VON CHRIS: „anscheinend immer letzte spieler in der Diszi hat so einen Bonus".
+     * Genau das war der Fehler. Der Unterschied ging vorher als EIN Klumpen auf die letzte Bahn,
+     * und damit sah der letzte Aufgestellte aus, als hätte er den Team-Effekt verdient. Er ist
+     * aber niemandes Verdienst, sondern gilt der ganzen Seite. Er wird deshalb GLEICHMÄSSIG über
+     * alle Bahnen gelegt — nur der Rundungsrest bleibt auf der letzten, damit die Summe exakt den
+     * Team-Score trifft. Denselben Weg geht die Vorschau in `discipline-stage-from-preview.ts`.
+     *
+     * Was hier NICHT passiert: der gebuchte Wert eines Spielers wird nicht angefasst. Punkte,
+     * Rangliste und Ledger lesen `finalPlayerScore` und `pointsAwarded`; dieser Aufschlag ist
+     * reine Anzeige und existiert nur, damit die Bahnen sich auf den Kopf summieren.
      */
     const spielerSumme = round1(players.reduce((summe, spieler) => summe + spieler.val, 0));
     const rest = round1(teamScore - spielerSumme);
     if (Math.abs(rest) >= 0.05 && players.length > 0) {
-      const letzter = players[players.length - 1]!;
-      letzter.mods.push({ k: "Team", sign: rest < 0 ? -1 : 1, amt: Math.abs(rest) });
+      verteileTeamEffektAufBahnen(players, rest);
     }
 
     return {

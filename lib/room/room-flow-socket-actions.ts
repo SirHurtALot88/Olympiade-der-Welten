@@ -35,6 +35,9 @@ export function emitRoomFlowButtonAction(input: {
     case "advance_flow":
       socket.emit("advanceRoomFlow", { roomCode, seatToken });
       return;
+    case "advance_flow_skipping_disconnected":
+      socket.emit("advanceRoomFlow", { roomCode, seatToken, getrennteUeberspringen: true });
+      return;
     case "none":
       return;
   }

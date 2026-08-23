@@ -1,21 +1,24 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
+import {
+  springeZuElement,
+  springeZuPosition,
+  VERKAUFSFLAECHE_ANKER,
+} from "@/lib/foundation/verkauf-sprung";
 import { describeInboxTargetDestination, resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
 import { resolveInboxLane } from "@/lib/foundation/inbox-lanes";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import {
-  FoundationShellRouterCockpit,
-  FoundationShellRouterHistoryV2,
-  FoundationShellRouterHomeV2,
-  FoundationShellRouterInboxV2,
-  FoundationShellRouterLineup,
-  FoundationShellRouterMarketSell,
-  FoundationShellRouterMatchdayResult,
-  FoundationShellRouterPrize,
-  FoundationShellRouterSeasonPreview,
-  FoundationShellRouterSeasonV2,
-  FoundationShellRouterTeams,
-} from "@/app/foundation/FoundationShellRouter";
+// Elf Router-Bausteine aus `FoundationShellRouter` waren bis zu dieser Aufräumung hier
+// importiert — und keiner davon wurde in dieser Datei je verwendet. Jeder Name kam genau
+// einmal vor: in dieser Import-Zeile. Nachgezählt (`grep -c` je Name in dieser Datei): je 1.
+// `FoundationShellRouterBody.tsx` rendert sieben dieser Bausteine über eine eigene, separate
+// Import-Zeile direkt (Cockpit, HistoryV2, MarketSell, MatchdayResult, Prize, SeasonPreview,
+// Teams) — die sind also nicht tot, nur hier doppelt und ungenutzt importiert. Die restlichen
+// vier (HomeV2, InboxV2, SeasonV2 sowie der inzwischen entfernte Lineup-Baustein) haben auch
+// dort keinen Aufrufer; die Shell rendert ihre Ansichten für diese Views inline bzw. über
+// andere, tatsächlich aktive Panel-Komponenten. Entfernt wurde hier nur der ungenutzte Import
+// selbst — die vier weiterhin ungerenderten Router-Bausteine bleiben unangetastet in
+// `FoundationShellRouter.tsx` stehen, das ist eine gesonderte Aufräumung.
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -43,6 +46,10 @@ import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/boa
 import { getMetricBarPercent, getPoolHeatClass } from "@/lib/foundation/player-league-heat";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import {
+  createUpdateInboxItemStatus,
+  deriveGlobalNextUi,
+} from "@/lib/foundation/tabs/foundation-global-next-actions";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import {
   FACILITY_CATALOG,
@@ -273,7 +280,13 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
-import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import {
+  describeRoomWriteError,
+  formatMarketPreviewError,
+  formatRoomWriteErrorCode,
+  isStaleSaveVersionError,
+} from "@/lib/room/parse-room-write-context";
+import { istRoomSitzungsFehler } from "@/lib/room/room-session-fehler";
 import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import {
@@ -326,7 +339,9 @@ import type { FoundationStateContextValue } from "@/lib/foundation/foundation-st
 import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
-import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
+import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
 import { usePlayerDirectorySortWorker } from "@/lib/foundation/use-player-directory-sort-worker";
@@ -406,6 +421,9 @@ import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/Founda
 import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
+import type { FoundationMerklisteHostProps } from "@/app/foundation/merkliste-v2/FoundationMerklisteHost";
+import { baueMerklistenAnsicht } from "@/lib/merkliste/merkliste-ansicht";
+import { normalisiereMerklistenBesitzer, vergiss } from "@/lib/merkliste/merkliste-service";
 import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
 import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
@@ -1267,6 +1285,26 @@ export function useFoundationShellRouterBodyScope({
       if (payload.roomCode && payload.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
         return;
       }
+      /**
+       * BEFUND F6 (Aufgabe #44): hier wurde JEDER `roomError` als abgelaufene Sitzung behandelt —
+       * `setRoomLiveState(null)` raeumt die Raum-Bedienleiste weg, dazu die Meldung
+       * "Room-Session abgelaufen". Die grosse Mehrheit der `roomError`-Meldungen sind aber
+       * normale Fach-Ablehnungen aus `room-store.ts` ("Nur der Host darf …", "Arena wartet noch
+       * auf Ready …", "Room-Flow ist noch blockiert …"). Ein Doppelklick des Gasts riss dem
+       * Spieler damit die Bedienung weg und behauptete zusaetzlich etwas Falsches.
+       *
+       * Der Raum ist in diesen Faellen nachweislich noch da — die Ablehnung kam ja aus ihm.
+       * Also: Meldung anzeigen, Bedienleiste stehen lassen. Nur die Meldungen aus
+       * `istRoomSitzungsFehler` (Raum weg / Sitzplatz ungueltig) raeumen weiterhin auf.
+       */
+      if (!istRoomSitzungsFehler(payload.message)) {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Aktion abgelehnt",
+          detail: payload.message ?? "Die Raum-Aktion wurde abgelehnt.",
+        });
+        return;
+      }
       setRoomLiveState(null);
       setFoundationActionFeedback({
         tone: "warning",
@@ -1355,15 +1393,16 @@ export function useFoundationShellRouterBodyScope({
     const targetControl = targetTeamId
       ? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[targetTeamId]
       : null;
-    const resolvedOwnerId =
-      targetControl?.ownerSlot === "user"
-        ? DEFAULT_ACTIVE_OWNER_ID
-        : targetControl?.ownerId?.trim() || effectiveActiveOwnerId;
+    // KEIN `activeOwnerId` mehr hier (Stufe 0.3, Befund B2): dieses Feld trug die Owner-ID des
+    // ZIELTEAMS, nicht die eigene — der Server las das bis eben direkt als Besitznachweis
+    // (`authorizeLocalSingleplayerTeamWrite`), womit jeder Schreibversuch auf ein `manual`-Team
+    // automatisch bestand. Der Server bestimmt die Identitaet jetzt selbst (Sitz-Token im Raum,
+    // sonst die angemeldete Sitzung) — ein Feld, das der Server ignoriert, aber weiter mitschickt,
+    // waere nur irrefuehrend fuer alle, die diesen Code lesen.
     return withRoomContextBody(
       {
         ...body,
         activeManagerTeamId: targetTeamId || selectedTeamId,
-        activeOwnerId: resolvedOwnerId,
         controlMode: targetControl?.controlMode ?? null,
       },
       roomContext,
@@ -1497,6 +1536,8 @@ export function useFoundationShellRouterBodyScope({
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
   const marketSellPreviewRequestVersion = useRef(0);
+  /** Wo der Bildschirm stand, als „Verkaufen" gedrueckt wurde — der Rueckweg nach dem Verkauf. */
+  const marketSellRuecksprungRef = useRef<number | null>(null);
   /** Eigener Zaehler fuer den Kader-Drawer — er darf den laufenden Verkaufs-Flow nicht abbrechen. */
   const marketSellPeekRequestVersion = useRef(0);
   const marketFeedReloadersRef = useRef<FoundationMarketFeedReloaders>({
@@ -2069,7 +2110,11 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Training nicht gespeichert",
-          detail: payload.error ?? "Training konnte nicht gespeichert werden.",
+          // Befund F9: hier stand `payload.error` roh — im Raum liefert die Route Codes des
+          // Write-Guards (`participant_offline`, `host_only_action`, `forbidden_team_control`),
+          // und genau die las der Spieler woertlich. Uebersetzt wird mit DERSELBEN Tabelle wie im
+          // Transfermarkt; alles, was kein bekannter Code ist, geht unveraendert durch.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Training konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -2218,7 +2263,8 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "warning",
           title: "Trainingsklasse nicht gespeichert",
-          detail: payload.error ?? "Trainingsklasse konnte nicht gespeichert werden.",
+          // Siehe `persistPlayerTrainingModeInRoom` — derselbe Befund F9, dieselbe Tabelle.
+          detail: formatRoomWriteErrorCode(payload.error) ?? "Trainingsklasse konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -2413,11 +2459,48 @@ export function useFoundationShellRouterBodyScope({
         JSON.stringify(teamStrategyDraft[team.teamId] ?? null) !==
         JSON.stringify(resolvedTeamStrategyProfiles[team.teamId] ?? null),
     );
-    if (gameModeOwnershipDraftChanged || strategyChanged) {
+    if (strategyChanged) {
       setTeamControlMessage(
-        "Spielmodus-/Team-Zuordnung und Strategy-Profile können in einem laufenden Online-Room aktuell nicht gespeichert werden. Bitte nur Identity- und Admin-Settings speichern oder außerhalb des Rooms anpassen.",
+        "Strategy-Profile können in einem laufenden Online-Room aktuell nicht gespeichert werden. Bitte nur Identity-, Admin- und Zuordnungs-Settings speichern oder außerhalb des Rooms anpassen.",
       );
       return;
+    }
+
+    /**
+     * MENSCH/KI GEHT JETZT AUCH IM RAUM — Chris' Entscheidung zu `17xs83` (20.08.2026): „es muss
+     * eine möglichkeit geben das sauber umzustellen … und DAS gilt dann auch überall", Zuständigkeit
+     * beim Host wie bei Draft und Simulation.
+     *
+     * HIER STAND EINE ABLEHNUNG für jeden im Raum. Sie war die letzte Stelle, an der die eine
+     * Umschaltung NICHT galt: im Solo eine Einstellung, im Raum eine Fehlermeldung.
+     *
+     * Der Weg ist bewusst eigen (`/api/team-settings/ownership`) und schreibt saveweit — die
+     * Zuordnung ist eine Aufteilung, kein Feld je Team. Die Host-Prüfung macht der Server; ein
+     * Teilnehmer bekommt `host_only_action` zurück und liest es als Klartext. Eine Prüfung hier im
+     * Browser wäre nur eine Bequemlichkeit und keine Sicherung.
+     */
+    if (gameModeOwnershipDraftChanged) {
+      const response = await fetch("/api/team-settings/ownership", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withRoomBody({
+            saveId: activeSaveId,
+            chrisTeamIds: gameModeOwnershipChrisIds,
+            frankyTeamIds: gameModeOwnershipFrankyIds,
+          }),
+        ),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
+      if (!response.ok || !payload.success) {
+        setTeamControlMessage(
+          formatRoomWriteErrorCode(payload.error) ?? "Team-Zuordnung konnte nicht gespeichert werden.",
+        );
+        return;
+      }
     }
 
     const changedTeamIds = new Set<string>();
@@ -2433,6 +2516,14 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (changedTeamIds.size === 0) {
+      // Die Zuordnung ist ggf. oben schon geschrieben worden — dann waere „keine Aenderungen" eine
+      // Falschmeldung ueber einen Schreibvorgang, der gerade stattgefunden hat, und der Spielstand
+      // im Browser bliebe auf dem alten Stand stehen.
+      if (gameModeOwnershipDraftChanged) {
+        setTeamControlMessage("Team-Zuordnung wurde gespeichert.");
+        await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
+        return;
+      }
       setTeamIdentityMessage("Keine Änderungen zum Speichern.");
       setTeamControlMessage("Keine Änderungen zum Speichern.");
       return;
@@ -2453,7 +2544,7 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamIdentityMessage(payload.error ?? "Team-Identity konnte nicht gespeichert werden.");
+            setTeamIdentityMessage(formatRoomWriteErrorCode(payload.error) ?? "Team-Identity konnte nicht gespeichert werden.");
             return;
           }
         }
@@ -2487,7 +2578,9 @@ export function useFoundationShellRouterBodyScope({
             return;
           }
           if (!response.ok || !payload.success) {
-            setTeamControlMessage(payload.error ?? "Team-Admin-Settings konnten nicht gespeichert werden.");
+            setTeamControlMessage(
+              formatRoomWriteErrorCode(payload.error) ?? "Team-Admin-Settings konnten nicht gespeichert werden.",
+            );
             return;
           }
         }
@@ -3694,19 +3787,22 @@ export function useFoundationShellRouterBodyScope({
     setMarketSellPreview(null);
     setMarketSellSubject(subject);
     setFoundationPanel("sell");
-    // GEMELDET: „wenn ich einen spieler verkaufen will, springt der screen nicht zum
-    // verkaufsmodal, das irritiert."
-    //
-    // Der Verkauf ist eine eigene Drilldown-Seite, kein Overlay — die Seite tauscht also nur
-    // ihren Inhalt aus, waehrend die Scrollposition stehen bleibt. Wer weit unten in der
-    // Kaderliste auf „Verkaufen" tippt, landet entsprechend weit unten in der neuen Ansicht
-    // und sieht den Dialog gar nicht. Der Kauf-Flow raeumt das seit laengerem selbst auf
-    // (`scrollBuyModalToTop` in TransfermarktV2Client) — dem Verkauf fehlte das Gegenstueck.
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "auto" });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    }
+    /**
+     * GEMELDET, in zwei Runden. Zuerst: „wenn ich einen spieler verkaufen will, springt der screen
+     * nicht zum verkaufsmodal, das irritiert." Und dann, weil die Haelfte offen blieb: „wenn man
+     * sich die wertung anschaut und dort auf verkaufen klickt oder so oder im verträge reiter auf
+     * verkaufen, dann sollte der screen auch zum verkaufsmodal springen was unten aufgeht."
+     *
+     * Hier stand ein Sprung nach GANZ OBEN. Der stimmt nur fuer den Weg aus dem Transfermarkt, wo
+     * die Verkaufsflaeche die Seite ersetzt. Aus der Teamansicht heraus bleibt die Teamansicht
+     * stehen und die Verkaufsflaeche haengt sich DARUNTER — der Sprung nach oben fuehrte also vom
+     * Dialog weg statt hin.
+     *
+     * Gesprungen wird deshalb zur Flaeche selbst. Das ist in beiden Faellen richtig: ersetzt sie
+     * die Seite, steht sie ohnehin oben.
+     */
+    marketSellRuecksprungRef.current = typeof window === "undefined" ? null : window.scrollY;
+    springeZuElement(VERKAUFSFLAECHE_ANKER);
     syncFoundationViewInUrl(activeView, null, subject.playerId, {
       panel: "sell",
       push: true,
@@ -3759,7 +3855,9 @@ export function useFoundationShellRouterBodyScope({
       }
       setMarketSellPeekPreview(payload.summary ?? null);
       if (!payload.summary) {
-        setMarketSellPeekError(payload.error ?? "Verkaufsvorschau konnte nicht geladen werden.");
+        // F9: auch die Vorschau laeuft ueber `/api/transfermarkt/sell` und damit durch den
+        // Write-Guard — im Raum kamen hier dieselben rohen Codes an wie beim echten Verkauf.
+        setMarketSellPeekError(formatMarketPreviewError(payload.error) ?? "Verkaufsvorschau konnte nicht geladen werden.");
       }
     } catch {
       if (requestVersion === marketSellPeekRequestVersion.current) {
@@ -3787,30 +3885,31 @@ export function useFoundationShellRouterBodyScope({
     closeMarketSellPeek();
     const geoeffnet = openMarketSellModal(subject, effectiveTeamId);
     /**
-     * NOCH EINMAL NACH OBEN — eine Frame spaeter.
+     * NOCH EINMAL SPRINGEN — eine Frame spaeter.
      *
      * Im Browser gemessen: nach diesem Uebergang stand die Seite wieder bei 966px, obwohl
-     * `openMarketSellModal` an den Anfang scrollt. Grund ist die Fokusfalle des Drawers: sie gibt
+     * `openMarketSellModal` selbst schon springt. Grund ist die Fokusfalle des Drawers: sie gibt
      * den Fokus beim Schliessen an das zuvor fokussierte Element zurueck — die geklickte
      * Kaderzeile — und der Browser scrollt die dabei ins Bild. Das passiert erst, wenn React das
-     * Schliessen committet hat, also NACH dem scrollTo oben.
+     * Schliessen committet hat, also NACH dem Sprung oben.
      *
-     * Der Sprung muss der letzte sein, sonst landet man wieder genau dort, wo der gemeldete
-     * Bug („springt nicht zum verkaufsmodal") herkam.
+     * Der Sprung muss der letzte sein, sonst landet man wieder genau dort, wo der gemeldete Fehler
+     * („springt nicht zum verkaufsmodal") herkam. Ziel ist jetzt die Verkaufsflaeche und nicht mehr
+     * der Seitenanfang — aus der Teamansicht heraus haengt sie unter der Liste, und „oben" waere
+     * dort die falsche Richtung.
      */
-    if (typeof window !== "undefined") {
-      window.requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, behavior: "auto" });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      });
-    }
+    springeZuElement(VERKAUFSFLAECHE_ANKER);
     await geoeffnet;
   }
 
   function closeMarketSellModal() {
     marketSellPreviewRequestVersion.current += 1;
     closeFoundationDrilldownPanel();
+    // Abbrechen fuehrt an dieselbe Stelle zurueck wie ein Verkauf. Wer sich einen Spieler nur
+    // angesehen hat, soll nicht woanders herauskommen als der, der ihn abgegeben hat.
+    const ruecksprung = marketSellRuecksprungRef.current;
+    marketSellRuecksprungRef.current = null;
+    if (ruecksprung != null) springeZuPosition(ruecksprung);
   }
 
   /** Fehlerzustand im Verkaufs-Modal: Vorschau für das aktuelle Subjekt neu laden. */
@@ -3864,7 +3963,9 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canSell) {
         setMarketSellError(
-          payload.error ??
+          // F9: derselbe Ton wie im Kaufmodal — `formatMarketPreviewError` faellt fuer alles,
+          // was es nicht ausdruecklich kaufbezogen formuliert, auf die neutrale Tabelle durch.
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Verkauf konnte nicht bestätigt werden.",
         );
@@ -3887,6 +3988,13 @@ export function useFoundationShellRouterBodyScope({
       setMarketSellSubject(null);
     setMarketSellRiskAcknowledged(false);
       setFoundationPanel(null);
+      // „und wenn der spieler verkauft wurde soll es wieder hoch springen zu den verträgen" —
+      // zurueck an die Stelle, an der der Knopf gedrueckt wurde. Bewusst die Position und kein
+      // fester Anker: geklickt wird auch aus der Wertung und aus dem Auslauf-Center, und fuer die
+      // waere der Vertraege-Anker der falsche Ort.
+      const ruecksprung = marketSellRuecksprungRef.current;
+      marketSellRuecksprungRef.current = null;
+      if (ruecksprung != null) springeZuPosition(ruecksprung);
 
       // Wie beim Kauf: Der neue Kontostand steht bereits in der Antwort und wird oben schon im
       // Erfolgstext angezeigt. Ihn sofort zu übernehmen macht die Zahl richtig, bevor der Nachlauf
@@ -3941,108 +4049,17 @@ export function useFoundationShellRouterBodyScope({
     reloadSeasonStandingsOverview,
     reloadTransferRecapFeed,
   ]);
-
-  // Manuelles Neu-Anwerfen der KI-Picks für EIN Team (z. B. ein Team, dessen
-  // Kader nach dem Setup leer geblieben ist). Nutzt denselben scoped picks-run-
-  // Endpoint und dieselbe Reload-Kette wie der Cockpit-Roster-Fill; scope "all"
-  // + teamIds:[teamId] + allowSetupAllTeams begrenzt den Lauf auf genau dieses
-  // Team.
-  const [teamPicksRefillBusyTeamId, setTeamPicksRefillBusyTeamId] = useState<string | null>(null);
-  const [teamPicksRefillMessage, setTeamPicksRefillMessage] = useState<
-    { teamId: string; tone: "success" | "error"; text: string } | null
-  >(null);
-
-  const runTeamPicksRefill = useCallback(
-    async (teamId: string) => {
-      if (!teamId) {
-        return;
-      }
-      if (readMeta.readOnly || readMeta.source === "prisma") {
-        showReadOnlyNotice();
-        return;
-      }
-      if (teamPicksRefillBusyTeamId) {
-        return;
-      }
-
-      setTeamPicksRefillBusyTeamId(teamId);
-      setTeamPicksRefillMessage(null);
-      try {
-        const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            withRoomContextBody(
-              {
-                dryRun: false,
-                confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-                teamScope: "all",
-                teamIds: [teamId],
-                allowSetupAllTeams: true,
-          includeManualTeams: true,
-              },
-              roomContext,
-            ),
-          ),
-        });
-        const payload = (await response.json().catch(() => ({}))) as {
-          error?: string;
-          executed?: boolean;
-          blockingReasons?: string[];
-          teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number; blockingReasons?: string[] }>;
-        };
-
-        if (!response.ok || payload.error) {
-          setTeamPicksRefillMessage({
-            teamId,
-            tone: "error",
-            text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
-          });
-          return;
-        }
-
-        const teamResult = payload.teams?.find((entry) => entry.teamId === teamId) ?? null;
-        const picksApplied =
-          teamResult?.rosterAfter != null && teamResult.rosterBefore != null
-            ? teamResult.rosterAfter - teamResult.rosterBefore
-            : null;
-
-        if (!payload.executed || (picksApplied != null && picksApplied <= 0)) {
-          const teamBlockers = teamResult?.blockingReasons ?? [];
-          const blockers = teamBlockers.length > 0 ? teamBlockers : payload.blockingReasons ?? [];
-          setTeamPicksRefillMessage({
-            teamId,
-            tone: "error",
-            text:
-              blockers.length > 0
-                ? blockers.slice(0, 3).join(" · ")
-                : "Keine neuen Picks angewendet (kein passender Spieler oder Budget).",
-          });
-          return;
-        }
-
-        setTeamPicksRefillMessage({
-          teamId,
-          tone: "success",
-          text: picksApplied != null ? `${picksApplied} Spieler geholt.` : "KI-Picks angewendet.",
-        });
-        await reloadAfterMarketRosterApply();
-      } catch {
-        setTeamPicksRefillMessage({ teamId, tone: "error", text: "KI-Picks konnten nicht angewendet werden." });
-      } finally {
-        setTeamPicksRefillBusyTeamId(null);
-      }
-    },
-    [
-      buildCockpitScopeParams,
-      readMeta.readOnly,
-      readMeta.source,
-      reloadAfterMarketRosterApply,
-      roomContext,
-      showReadOnlyNotice,
-      teamPicksRefillBusyTeamId,
-    ],
-  );
+  /**
+   * HIER STAND „Kader auffüllen" — der KI-Pick-Lauf fuer GENAU DIESES Team.
+   *
+   * ENTSCHEIDUNG VON CHRIS (19.08.): "keiner von uns soll seinen kader per KI füllen! weg damit."
+   * Der Knopf erschien nur auf einem selbst gefuehrten Team im Saisonende-Fenster — also genau im
+   * Fall, den es nicht mehr geben soll. Handler, Zustand und Meldungsbanner sind mit raus; stehen
+   * zu lassen hiesse, beim naechsten Umbau wieder einen Aufrufer dafuer zu suchen.
+   *
+   * Die Sperre haengt nicht an dieser Abwesenheit: `/api/ai/picks-run` weist menschlich gefuehrte
+   * Teams selbst ab (`ai_picks_not_allowed_for_human_team`).
+   */
 
   const matchdayArenaApplyHandlers = useMemo(
     () =>
@@ -4946,7 +4963,7 @@ export function useFoundationShellRouterBodyScope({
         error?: string;
       };
       if (!response.ok || payload.error) {
-        setAdminSimulationError(payload.error ?? "Season Simulation konnte nicht gestartet werden.");
+        setAdminSimulationError(formatRoomWriteErrorCode(payload.error) ?? "Season Simulation konnte nicht gestartet werden.");
       }
       if (payload.run) {
         setAdminSimulationRun(payload.run);
@@ -5599,7 +5616,7 @@ export function useFoundationShellRouterBodyScope({
       }
       if (!response.ok || payload.error || !payload.summary || !payload.summary.canBuy) {
         setMarketBuyError(
-          payload.error ??
+          formatMarketPreviewError(payload.error) ??
             payload.summary?.blockingReasons?.[0] ??
             "Kauf konnte nicht bestätigt werden.",
         );
@@ -5759,9 +5776,21 @@ export function useFoundationShellRouterBodyScope({
         })),
       });
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+      /**
+       * ZWEITE RUNDE BEIM OEFFNEN — sie bleibt, und das ist richtig so.
+       *
+       * Diese Vorschau geht ohne `offeredSalary` raus; sie liefert erst die Forderung. Das Fenster
+       * setzt daraus sein Start-Angebot und holt dann eine zweite Vorschau — die rechnet die
+       * Annahme-Chancen FUER DIESES Angebot, was die erste gar nicht konnte. Sie ist also keine
+       * Dopplung, sondern der zweite Halbsatz derselben Frage.
+       *
+       * Teuer war nicht die Runde, sondern was eine Runde kostete: rund 1,7 s, davon 980 ms fuer
+       * `ensurePlayerPotentialForGameState` — eine Ableitung, die die Verlaengerung nie liest.
+       * Dort liegt der Hebel, nicht hier.
+       */
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
         setContractRenewalError(
-          previewPayload.error ??
+          formatRoomWriteErrorCode(previewPayload.error) ??
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Verhandlungsvorschau blockiert.`,
         );
@@ -5804,6 +5833,7 @@ export function useFoundationShellRouterBodyScope({
     contractLength?: number;
     offeredSalary?: number | null;
     contractShape?: ContractShape;
+    confirmToken?: string | null;
   }) {
     if (!contractRenewalNegotiation) {
       return;
@@ -5817,6 +5847,8 @@ export function useFoundationShellRouterBodyScope({
       offeredSalary:
         draft && "offeredSalary" in draft ? draft.offeredSalary ?? null : contractRenewalNegotiation.offeredSalary,
       contractShape: draft?.contractShape ?? contractRenewalNegotiation.contractShape ?? "balanced",
+      // Der Token der Vorschau, die im Fenster stand — spart die eigene Dry-Run-Runde.
+      confirmToken: draft?.confirmToken ?? null,
     });
     // Fenster bleibt bei Fehlschlag offen, damit der Gate-Grund (z. B.
     // Phase-Sperre bis Season-End) direkt im Verhandlungsfenster sichtbar ist.
@@ -5861,7 +5893,7 @@ export function useFoundationShellRouterBodyScope({
         };
       };
       if (!response.ok || payload.error) {
-        setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
+        setSponsorChoiceMessage(formatRoomWriteErrorCode(payload.error) ?? "Sponsor konnte nicht gewählt werden.");
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
@@ -5964,7 +5996,8 @@ export function useFoundationShellRouterBodyScope({
       };
       if (!response.ok || payload.error) {
         setSponsorUebernahmeMessage(
-          payload.error ?? (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
+          formatRoomWriteErrorCode(payload.error) ??
+            (action === "annehmen" ? "Übernahme konnte nicht abgeschlossen werden." : "Angebot konnte nicht abgelehnt werden."),
         );
         return;
       }
@@ -6113,6 +6146,8 @@ export function useFoundationShellRouterBodyScope({
     contractLength?: number | null;
     offeredSalary?: number | null;
     contractShape?: ContractShape;
+    /** Token aus der Vorschau, die der Nutzer gesehen hat — spart die eigene Dry-Run-Runde. */
+    confirmToken?: string | null;
   }): Promise<boolean> {
     if (readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -6130,29 +6165,47 @@ export function useFoundationShellRouterBodyScope({
     setContractRenewalMessage(null);
 
     try {
-      const previewResponse = await fetch("/api/contracts/renewal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withRoomBody({
-          saveId: activeSaveId,
-          teamId: input.teamId,
-          playerId: input.playerId,
-          action: input.action,
-          contractLength: input.contractLength,
-          offeredSalary: input.offeredSalary,
-          contractShape: input.contractShape,
-          dryRun: true,
-          source: readMeta.source,
-        })),
-      });
-      const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
-      if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
-        setContractRenewalError(
-          previewPayload.error ??
-            previewPayload.summary?.blockingReasons?.[0] ??
-            `${input.playerName}: Vertragsvorschau blockiert.`,
-        );
-        return false;
+      /**
+       * EINE VORSCHAU WENIGER — sie kostete zwei Sekunden und sicherte nichts.
+       *
+       * Hier stand ein eigener Dry-Run, nur um einen `confirmToken` zu holen. Er sicherte gegen
+       * einen veralteten Stand — aber der Token kam aus DERSELBEN Sekunde wie die Buchung, und
+       * die Route rechnet die Vorschau intern ohnehin noch einmal (`applyContractRenewalAction`
+       * ruft `previewContractRenewalAction` und vergleicht). Der Aufruf kostete also eine volle
+       * Spielstand-Ladung (am Live-Abbild gemessen: 1965 ms) und brachte keine Aussage.
+       *
+       * Der Token des AUFRUFERS ist der bessere: das Verhandlungsfenster holt bei jeder Aenderung
+       * eine frische Vorschau, sein Token gehoert also genau zu den Zahlen, die der Nutzer
+       * gesehen hat. Passt er nicht mehr, antwortet die Route mit `contract_action_preview_stale`
+       * — ein sichtbarer Fehlschlag statt zwei stiller Sekunden.
+       */
+      let confirmToken = input.confirmToken ?? null;
+      if (!confirmToken) {
+        const previewResponse = await fetch("/api/contracts/renewal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomBody({
+            saveId: activeSaveId,
+            teamId: input.teamId,
+            playerId: input.playerId,
+            action: input.action,
+            contractLength: input.contractLength,
+            offeredSalary: input.offeredSalary,
+            contractShape: input.contractShape,
+            dryRun: true,
+            source: readMeta.source,
+          })),
+        });
+        const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+        if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
+          setContractRenewalError(
+            formatRoomWriteErrorCode(previewPayload.error) ??
+              previewPayload.summary?.blockingReasons?.[0] ??
+              `${input.playerName}: Vertragsvorschau blockiert.`,
+          );
+          return false;
+        }
+        confirmToken = previewPayload.summary.confirmToken;
       }
 
       const applyResponse = await fetch("/api/contracts/renewal", {
@@ -6164,26 +6217,51 @@ export function useFoundationShellRouterBodyScope({
           playerId: input.playerId,
           action: input.action,
           contractLength: input.contractLength,
-          offeredSalary: input.offeredSalary ?? previewPayload.summary.negotiationPreview?.expectedSalary ?? null,
+          offeredSalary: input.offeredSalary ?? null,
           contractShape: input.contractShape,
           dryRun: false,
-          confirmToken: previewPayload.summary.confirmToken,
+          confirmToken,
           source: readMeta.source,
         })),
       });
       const applyPayload = (await applyResponse.json()) as ContractRenewalApiResponse;
       if (!applyResponse.ok || applyPayload.error || !applyPayload.summary?.applied) {
         setContractRenewalError(
-          applyPayload.error ??
+          formatRoomWriteErrorCode(applyPayload.error) ??
             applyPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsaktion blockiert.`,
         );
         return false;
       }
 
+      /**
+       * DIE QUITTUNG SAGT, WAS UNTERSCHRIEBEN WURDE — nicht nur, DASS unterschrieben wurde.
+       *
+       * GEMELDET VON CHRIS: „verhandeln ging sie hat angenommen aber die verlängerung hat nicht
+       * funktioniert - oder man sieht es nicht."
+       *
+       * Sie hatte funktioniert, nur auf eine Saison. Und eine Saison heisst „auslaufend" — der
+       * Spieler stand danach genauso da wie davor. Die Meldung sagte „wurde verlaengert" und
+       * bestaetigte damit etwas, das man nirgends nachvollziehen konnte; er verlaengerte ein
+       * zweites Mal.
+       *
+       * Die Ursachen dafuer sind behoben (der Fallback schrieb die kuerzestmoegliche Bruecke),
+       * aber eine Ein-Saison-Verlaengerung bleibt ein legitimes Verhandlungsergebnis — etwa wenn
+       * man ein entsprechendes Gegenangebot einschlaegt. Damit sie sich nie wieder wie ein
+       * Nichts-Passiert anfuehlt, steht jetzt die unterschriebene Laufzeit in der Meldung. Die
+       * Zahlen kommen aus dem geschriebenen Vertragsereignis, nicht aus dem, was der Client
+       * geschickt hat — sie sagen also, was WIRKLICH im Spielstand steht.
+       */
+      const ereignis = applyPayload.summary.contractEvent ?? null;
+      const laufzeit = ereignis?.newLength ?? null;
+      const gehalt = ereignis?.newSalary ?? null;
+      const laufzeitText =
+        laufzeit == null ? null : `${laufzeit} Saison${laufzeit === 1 ? "" : "en"}`;
       setContractRenewalMessage(
         input.action === "renew"
-          ? `${input.playerName} wurde verlängert.`
+          ? laufzeitText
+            ? `${input.playerName} verlängert: ${laufzeitText}${gehalt != null ? `, ${formatTransfermarktCurrency(gehalt)} pro Saison` : ""}.`
+            : `${input.playerName} wurde verlängert.`
           : `${input.playerName} wurde freigegeben.`,
       );
       setFoundationActionFeedback({
@@ -6191,15 +6269,47 @@ export function useFoundationShellRouterBodyScope({
         title: input.action === "renew" ? "Vertrag verlängert" : "Spieler freigegeben",
         detail:
           input.action === "renew"
-            ? `${input.playerName}: neuer Vertrag ist gespeichert. Gehalt und Laufzeit sind im Team-Dossier aktualisiert.`
+            ? laufzeitText
+              ? `${input.playerName}: ${laufzeitText}${gehalt != null ? ` zu ${formatTransfermarktCurrency(gehalt)} pro Saison` : ""} unterschrieben.${
+                  laufzeit === 1
+                    ? " Eine Saison heißt: der Vertrag läuft danach aus — der Spieler bleibt deshalb als auslaufend geführt."
+                    : ""
+                }`
+              : `${input.playerName}: neuer Vertrag ist gespeichert. Gehalt und Laufzeit sind im Team-Dossier aktualisiert.`
             : `${input.playerName}: Kaderplatz und Gehaltsdruck wurden aktualisiert.`,
       });
-      await Promise.all([
-        loadSave(activeSaveId),
-        reloadMarketFeed(input.teamId),
-        reloadHistoryFeed(),
-        reloadSeasonManagementOverview(),
-      ]);
+      /**
+       * NUR DER SPIELSTAND BLOCKIERT — der Rest laeuft nach.
+       *
+       * GEMELDET VON CHRIS: „verlängern und forderungen aktualisieren dauert ungewöhnlich lange
+       * … dann steht da sehr lange wird verlängert… keine ahnung ob es das wirklich wird oder
+       * nicht es hängt."
+       *
+       * Es hing nicht, es lud. Am Live-Abbild gemessen kostet EIN `getSaveById` 1965 ms — die
+       * Vertragsrechnung darin 2 bis 64 ms. Die Wartezeit ist also fast vollstaendig das Laden
+       * des Spielstands, und hier standen vier Ladungen hintereinander in einem `await`, waehrend
+       * die Anzeige auf „Wird verlaengert…" stand.
+       *
+       * Nur `loadSave` gehoert davor: erst danach traegt der Kader die neue Laufzeit, und genau
+       * die will man sehen. Marktfeed, Historie und Saison-Uebersicht aendern am Ergebnis nichts
+       * — sie duerfen nachlaufen. Denselben Weg geht der Verkauf schon (`confirmTransfermarktSell`).
+       */
+      await loadSave(activeSaveId);
+      /**
+       * DIE DREI NACHLADUNGEN SIND NICHT GRATIS, AUCH NICHT IM HINTERGRUND.
+       *
+       * Sie stehen zwar nicht mehr im `await` (das war der erste Schritt), materialisieren aber
+       * jede fuer sich den KOMPLETTEN Spielstand: Marktfeed ueber `transfermarkt-local-service`,
+       * Historie ebenso, Saison-Uebersicht ueber `resolve-local-save`. Und `better-sqlite3` ist
+       * synchron — jede dieser Ladungen blockiert den ganzen Node-Prozess. Der Nutzer merkt das
+       * nicht an dieser Stelle, sondern an der naechsten, die er anfasst: sie antwortet nicht,
+       * weil der Server noch an Daten arbeitet, die im Verhandlungsfenster niemand sieht.
+       *
+       * Sie laufen deshalb erst, wenn der Nutzer die Ansicht wirklich wechselt. Bis dahin genuegt
+       * `loadSave` — der Kader traegt danach die neue Laufzeit, und das ist das Einzige, was die
+       * Verlaengerung sichtbar veraendert. Der Marker sorgt dafuer, dass die Feeds beim naechsten
+       * Blick auf Markt oder Historie frisch geholt werden.
+       */
       setMarketReloadToken((current) => current + 1);
       return true;
     } catch {
@@ -6299,7 +6409,7 @@ export function useFoundationShellRouterBodyScope({
       });
       const payload = (await response.json()) as NewGameSetupApiResponse;
       if (!response.ok || payload.error) {
-        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgeführt werden.");
+        setNewGameError(formatRoomWriteErrorCode(payload.error) ?? "New-Game-Setup konnte nicht ausgeführt werden.");
         return;
       }
 
@@ -6632,14 +6742,25 @@ export function useFoundationShellRouterBodyScope({
     () => (selectedTeam ? getTeamControlSettings(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam],
   );
-  const isLocalUserManualTeam = (settings: TeamControlSettings | null | undefined) =>
-    Boolean(
-      settings &&
-        settings.controlMode === "manual" &&
-        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris"),
-    );
+  // Stufe 2.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, offen geblieben): hier stand bis eben zusaetzlich
+  // `|| isLocalUserManualTeam(settings)` — ein zweiter Zweig, der JEDES Team mit
+  // `ownerSlot === "user"` oder `displayLabel === "Chris"` freigab, UNABHAENGIG von
+  // `effectiveActiveOwnerId`. Der Server prueft beim Schreiben ausschliesslich exakte
+  // Owner-Gleichheit (`canLocalUserManageTeam`/`canOwnerManageTeam`,
+  // server-authoritative-write-guard.ts) — die Oberflaeche erlaubte also mehr als der Server:
+  // ein Klick, der lokal durchging, endete server-seitig in einem 403.
+  //
+  // Der Fix laesst NUR noch `canOwnerManageTeam(settings, effectiveActiveOwnerId)` stehen —
+  // exakt dieselbe Funktion, die der Server ueber `canLocalUserManageTeam` aufruft
+  // (tests/identitaet-kommt-vom-server.test.ts haelt DAS bereits serverseitig fest). Das ist nur
+  // sicher, WEIL `effectiveActiveOwnerId` jetzt korrekt aufgeloest wird (Punkt 1 dieses Auftrags,
+  // `resolveInitialFoundationActiveOwnerId`): vorher haette das Entfernen Chris ausgesperrt, sobald
+  // sein `activeOwnerId` (durch einen Bug oder eine Race) nicht exakt `DEFAULT_ACTIVE_OWNER_ID`
+  // war — genau die Lage, die `isLocalUserManualTeam` grosszuegig abgefedert hat. Mit Punkt 1
+  // stimmt `effectiveActiveOwnerId` fuer Chris zuverlaessig, der Auffangzweig ist ueberfluessig
+  // geworden statt noetig.
   const selectedTeamCanManage = resolveFoundationTeamCanManage(
-    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId) || isLocalUserManualTeam(selectedTeamControl),
+    canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId),
   );
   const isSelectedTeamManagementLocked = Boolean(selectedTeam) && !selectedTeamCanManage;
   function canManageTeamId(teamId: string | null | undefined) {
@@ -6647,9 +6768,7 @@ export function useFoundationShellRouterBodyScope({
       return false;
     }
     const settings = getTeamControlSettings(gameState, teamId);
-    return resolveFoundationTeamCanManage(
-      canOwnerManageTeam(settings, effectiveActiveOwnerId) || isLocalUserManualTeam(settings),
-    );
+    return resolveFoundationTeamCanManage(canOwnerManageTeam(settings, effectiveActiveOwnerId));
   }
 
   const playerProfileTrainingReadOnly =
@@ -6806,7 +6925,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationView("homeV2", setActiveView);
       setShowGameFlowPanel(false);
       openSeasonBriefingPanel();
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
     if (targetPanel === "captain-picker") {
@@ -7029,13 +7148,13 @@ export function useFoundationShellRouterBodyScope({
       seasonBriefingAutoOpenedRef.current = null;
       setFoundationView("homeV2", setActiveView);
       openSeasonBriefingPanel();
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
 
     if (stepId === "team_confirm") {
       setFoundationView("homeV2", setActiveView);
-      scrollToFoundationTarget("foundation-home");
+      scrollToFoundationTarget("foundation-home-v2");
       return;
     }
 
@@ -7141,56 +7260,35 @@ export function useFoundationShellRouterBodyScope({
       }),
     );
   };
-  const updateInboxItemStatus = (item: GameInboxItem, status: GameInboxItem["status"]) => {
-    if (readMeta.readOnly) {
-      showReadOnlyNotice();
-      return;
-    }
-
-    const existingItems = gameState.gameInboxItems ?? [];
-    const hasStoredItem = existingItems.some((entry) => entry.itemId === item.itemId);
-    const nextItems = hasStoredItem
-      ? existingItems.map((entry) => (entry.itemId === item.itemId ? { ...entry, status } : entry))
-      : [...existingItems, { ...item, status }];
-    const nextGameState = {
-      ...gameState,
-      gameInboxItems: nextItems,
-    };
-
-    setGameState(nextGameState);
-    if (readMeta.source !== "prisma" && !readMeta.readOnly && activeSaveId !== "loading-save") {
-      void persistLocalGameStateImmediately(nextGameState).catch((error) => {
-        console.error(error);
-      });
-    }
-  };
-  const globalNextDisabled = primaryInboxItem
-    ? false
-    : gameFlowActionStep.status === "applying" || cockpitBusyKey != null || seasonTransitionBusy;
-  const globalNextLabel = primaryInboxItem?.title ?? gameFlowActionStep.label;
-  const globalNextTitle = primaryInboxItem
-    ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
-    : gameFlowActionStep.status === "blocked"
-      ? formatGameFlowBlockerList(
-          matchdayArenaBlockerSummary.reasons.length > 0
-            ? matchdayArenaBlockerSummary.reasons
-            : gameFlowActionStep.blockers,
-        ) || "Leertaste: zum blockierten Schritt springen"
-      : globalNextDisabled
-        ? "Aktion läuft gerade."
-        : gameFlowActionStep.status === "optional" &&
-            (gameFlowActionStep.stepId === "matchday_facilities" || gameFlowActionStep.stepId === "facilities")
-          ? "Leertaste: optional prüfen oder überspringen"
-          : transferWindowHint.open
-          ? `Leertaste: Weiter · ${transferWindowHint.label}`
-          : "Leertaste: Weiter";
-  const globalNextStatusClass = primaryInboxItem
-    ? primaryInboxItem.severity === "critical"
-      ? "is-blocked"
-      : primaryInboxItem.severity === "warning"
-        ? "is-warning"
-        : "is-ready"
-    : getGameFlowStatusClass(gameFlowActionStep.status);
+  /* Ebenfalls eine wortgleiche Kopie aus `foundation-global-next-actions.ts` — siehe unten. */
+  const updateInboxItemStatus = createUpdateInboxItemStatus({
+    readMeta,
+    showReadOnlyNotice,
+    gameState,
+    setGameState,
+    activeSaveId,
+    persistLocalGameStateImmediately,
+  });
+  /**
+   * EINE RECHENSTELLE FUER DIE WEITER-LEISTE — vorher zwei.
+   *
+   * Hier stand eine wortgleiche Kopie von `deriveGlobalNextUi`
+   * (`foundation-global-next-actions.ts`): dieselben verschachtelten Bedingungen, dieselben
+   * Texte, Zeile fuer Zeile. Nur importierte das Modul niemand — es wurde ausschliesslich als
+   * TEXT von `tests/game-inbox-ui-contract.test.ts` gelesen. Wer dort etwas reparierte, aenderte
+   * am Spiel nichts, und der Vertragstest blieb gruen.
+   *
+   * Jetzt zieht die Leiste ihre Beschriftung aus der Funktion, und die Funktion ist damit
+   * pruefbar (`tests/weiter-leiste-beschriftung.test.ts`) statt nur lesbar.
+   */
+  const { globalNextDisabled, globalNextLabel, globalNextTitle, globalNextStatusClass } = deriveGlobalNextUi({
+    primaryInboxItem,
+    gameFlowActionStep,
+    cockpitBusyKey,
+    seasonTransitionBusy,
+    matchdayArenaBlockerSummary,
+    transferWindowHint,
+  });
   const triggerGlobalNext = async () => {
     if (activeView === "matchdayArena" && !activeManagerMatchdayReady) {
       const lineupInboxItem =
@@ -7288,6 +7386,32 @@ export function useFoundationShellRouterBodyScope({
           body: JSON.stringify(withRoomContextBody({}, roomContext)),
         });
         if (!response.ok) {
+          /**
+           * BEFUND F10 (Aufgabe #44): hier wurde die Ablehnung stillschweigend geschluckt — es
+           * ging nur das Flow-Panel auf, und das zeigt, DASS etwas offen ist, nicht warum.
+           *
+           * Nachgemessen, nicht vermutet: `finalize-transfers` autorisierte mit der Aktion
+           * `formcards_season_regenerate`, und die steht in `HOST_LEVEL_ACTIONS`
+           * (lib/room/server-authoritative-write-guard.ts). Im Raum hiess das fuer JEDEN ausser
+           * dem Host: 403 `host_only_action` — der Knopf tat fuer den Gast also zuverlaessig
+           * nichts und sagte auch nichts. Der Grund wird seitdem benannt (dieselbe Tabelle wie F9);
+           * das Flow-Panel geht weiterhin auf, damit der Kontext sichtbar bleibt.
+           *
+           * INZWISCHEN IST AUCH DIE SACHE BEHOBEN, nicht nur die Meldung: die Route autorisiert
+           * jetzt mit der team-bezogenen Klasse `formcards` (Begruendung dort). Der Gast kommt
+           * damit durch seinen eigenen `finalize_transfers`-Schritt. Diese Fehlerbehandlung bleibt
+           * trotzdem stehen — sie faengt jede ANDERE Ablehnung ab (kein Besitz am Team, offline,
+           * fehlender Raum), und die gibt es weiterhin.
+           */
+          const payload = (await response.json().catch(() => ({}))) as { error?: string; errors?: string[] };
+          const grund =
+            formatRoomWriteErrorCode(payload.error ?? payload.errors?.[0]) ??
+            `Die Route hat mit Status ${response.status} abgelehnt.`;
+          setFoundationActionFeedback({
+            tone: "warning",
+            title: "Transfers nicht finalisiert",
+            detail: grund,
+          });
           setShowGameFlowPanel(true);
           return;
         }
@@ -8904,6 +9028,10 @@ export function useFoundationShellRouterBodyScope({
     // KOOP: die EIGENE Sicht statt des geteilten Top-Level-`newGameFlow` — sonst zeigt der
     // Einstiegs-Checklisten-Block (Home) Chris' Fortschritt auch fuer Franky an.
     newGameFlow: activeNewGameFlow,
+    // Paket B: fuer den Host-Vorbehalt am Saisonwechsel-Gate — siehe Kommentar dort. Das
+    // Cockpit-Panel selbst bekommt weiterhin KEIN Raum-Wissen, nur das fertige Gate.
+    roomContext,
+    roomLiveState,
     selectedTeam,
     rosterPlayers,
     selectedTeamFacilityState,
@@ -10779,6 +10907,12 @@ export function useFoundationShellRouterBodyScope({
       delta: row.delta,
       displayValue: formatMostImprovedValue(row.delta),
       ovrRank: row.ovrRank,
+      // Die Herleitung mitgeben statt sie hier wegzuwerfen — Chris (`pxoa72`): „Wir brauchen noch
+      // eine erklärung wie Most Improved Player sich zusammensetzt!"
+      earlyFieldPosition: row.earlyFieldPosition,
+      lateFieldPosition: row.lateFieldPosition,
+      earlyAppearances: row.earlyAppearances,
+      lateAppearances: row.lateAppearances,
     }));
 
     return buildLeagueLeaderBoards({
@@ -10887,7 +11021,32 @@ export function useFoundationShellRouterBodyScope({
           buildingCost: computeTeamBuildingCost(gameState, row.teamId),
           transferNet: row.transferNet ?? row.transfersSeasonValue ?? null,
           guvPosten: row.guvPosten ?? null,
+          // Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
+          // Verletzungen!" — dieselbe Zaehlstelle wie die Teamhistorie, damit nicht zwei
+          // Verletzungszahlen im Spiel stehen.
+          injuries: countTeamSeasonInjuries(gameState, row.teamId, gameState.season.id),
           marketValueTotal: row.marketValueTotal ?? null,
+          /**
+           * DER KADER FUER DIE DREI HOVERS (Chris, 23.08.: „dass ich dann die Spieler dahinter
+           * sehe … immer absteigend sortiert").
+           *
+           * ER MUSS HIER STEHEN, NICHT NUR IM MODELL NEBENAN. `use-season-v2-panel-model.ts` haengt
+           * am nirgends gerenderten `FoundationSeasonV2Host`; die WIRKLICH gezeigte Tabelle baut
+           * ihre Zeilen an dieser Stelle. Eine erste Fassung setzte das Feld nur drueben — die
+           * Hovers waeren im Spiel leer geblieben, ohne dass ein Test das gemerkt haette. Genau
+           * davor warnt der Kommentar an `computeTeamBuildingCost`.
+           */
+          hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
+          // Die TEILE der Zahlenspalten fuer die Hovers (Chris, 23.08.). Sie stehen im Datensatz
+          // getrennt; gezeigt wurde bisher nur die Summe.
+          sponsorBasis: row.sponsorBasis ?? null,
+          sponsorRank: row.sponsorRank ?? null,
+          sponsorSeason: row.sponsorSeason ?? null,
+          transferBuyCount: row.transferBuyCount ?? null,
+          transferSellCount: row.transferSellCount ?? null,
+          transferBuyTotal: row.transferBuyTotal ?? null,
+          transferSellTotal: row.transferSellTotal ?? null,
+          buildingUpkeep: computeTeamBuildingUpkeepRows(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,
@@ -11788,7 +11947,7 @@ export function useFoundationShellRouterBodyScope({
           detail:
             payload.error === "offer_not_available"
               ? "Das Angebot steht nicht mehr offen — in dieser Saison wurde bereits entschieden."
-              : payload.error ?? "Die Entscheidung konnte nicht gespeichert werden.",
+              : formatRoomWriteErrorCode(payload.error) ?? "Die Entscheidung konnte nicht gespeichert werden.",
         });
         return;
       }
@@ -11822,6 +11981,10 @@ export function useFoundationShellRouterBodyScope({
   }
 
   const foundationTeamsViewHostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam"> = {
+    // Schluessel der Merkliste (Lesezeichen auf Teams und Spielern). Ohne dieses Feld faellt
+    // die Ansicht auf den Standardbesitzer zurueck — im Koop schriebe Franky dann in Chris'
+    // Liste. Siehe lib/merkliste/merkliste-service.ts.
+    activeOwnerId,
     // VK je Spieler aus dem SERVER-Slice — der Slice wird oben ohnehin fuer die Teams-Ansicht
     // geladen (`enabled: … || shouldBuildTeamsView`). Die Kaderkarte hatte bis hierhin nur die
     // lokale Rueckfallebene, und die faellt im kompakten Client-Payload auf VK == MW zusammen.
@@ -11948,10 +12111,6 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
-    // Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab).
-    runTeamPicksRefill,
-    teamPicksRefillBusyTeamId,
-    teamPicksRefillMessage,
     // Saison-Kapitän wählen direkt aus dem Kader-Tab (wie AI-Teams). Kandidaten
     // + Führungs-Breakdown baut die Kaderansicht selbst aus `gameState`; hier
     // reicht der aktuelle Kapitän, der Assign-Handler und der Busy-State.
@@ -12240,6 +12399,32 @@ export function useFoundationShellRouterBodyScope({
         }
       : undefined,
     onOpenPlayer: openPlayerProfileById,
+  };
+
+  /**
+   * MERKLISTE — die Ansicht zum Nachschauen („sich die dann noch mal angucken kann", Chris).
+   *
+   * Das Modell ist eine reine Ableitung; hier haengt nur der Besitzer dran und die zwei
+   * Rueckrufe zum Entfernen. Wie ueberall bei der Merkliste ohne Netzaufruf: der Autosave nimmt
+   * die Aenderung beim naechsten Schreiben mit.
+   */
+  const merklisteAnsichtOwnerId = normalisiereMerklistenBesitzer(activeOwnerId);
+  const merklistenAnsicht = useMemo(
+    () => baueMerklistenAnsicht({ gameState, ownerId: merklisteAnsichtOwnerId }),
+    [gameState, merklisteAnsichtOwnerId],
+  );
+  const foundationMerklisteHostProps: FoundationMerklisteHostProps = {
+    ansicht: merklistenAnsicht,
+    onOpenTeam: openTeamProfileById,
+    onOpenPlayer: (playerId: string) => void openPlayerDrawerById(playerId),
+    onEntfernenTeam: (teamId: string) =>
+      setGameState((current) =>
+        vergiss({ gameState: current, ownerId: merklisteAnsichtOwnerId, art: "team", id: teamId }),
+      ),
+    onEntfernenSpieler: (playerId: string) =>
+      setGameState((current) =>
+        vergiss({ gameState: current, ownerId: merklisteAnsichtOwnerId, art: "spieler", id: playerId }),
+      ),
   };
 
   const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
@@ -12651,6 +12836,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     resultApplyFeed,
     roomActivityNotice,
+    setRoomActivityNotice,
     roomContext,
     roomLiveState,
     rosterFillBusy,
@@ -12870,6 +13056,7 @@ export function useFoundationShellRouterBodyScope({
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
     foundationAllTimeTableHostProps,
+    foundationMerklisteHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
     foundationTrainingCompactHostProps,

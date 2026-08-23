@@ -9,6 +9,8 @@ import type {
   Player,
   PlayerBaselineRecord,
   PlayerBaselineWriteGuardEvent,
+  SeasonEconomyFactorGuardEvent,
+  SeasonEconomyFactorRecord,
   RosterEntry,
   Season,
   SeasonState,
@@ -52,6 +54,7 @@ import {
   writeSaveSessionCache,
 } from "@/lib/persistence/save-session-cache";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { trageEndsaisonNach } from "@/lib/contracts/endsaison-nachtragen";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
 import { ensureNulaOnProjectSuicide } from "@/lib/foundation/ensure-nula-on-project-suicide";
@@ -62,9 +65,14 @@ import {
 } from "@/lib/progression/player-potential-service";
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
-import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import {
+  SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
+  getSeasonEconomyFactorWindow,
+  parseSeasonNumber,
+} from "@/lib/season/season-economy-factors";
 import { slimGameStateForWrite } from "@/lib/persistence/save-payload-slimming";
 import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
+import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import type {
   PersistedSaveGame,
   SaveRepository,
@@ -204,15 +212,99 @@ function normalizeLegacyCashCreatorsColdSteelCodes(gameState: GameState): GameSt
  * Faktoren, und `advanceSeasonEconomyFactorWindow` schreibt beim Uebergang exakt die Werte fort,
  * die hier schon standen. Ein bereits vollstaendiges Fenster bleibt unangetastet.
  */
+/**
+ * DER WAECHTER UEBER DER KONJUNKTUR-REIHE — Chris' Auftrag vom 21.08.2026 („3a+b").
+ *
+ * WAS 3a ERGEBEN HAT, und es entlastet: die FAKTOREN sind deterministisch. Ueber zwei Prozesse
+ * gemessen liefern alle fuenf Live-Abbilder dieselbe Reihe (`h0z7cl`: 1,05 · 1,08 · 1,17 · 0,96 ·
+ * 1,14). Gewandert ist allein `generatedAt` — und nur bei `h0z7cl` und `n90y4m`, weil dort
+ * `seasonEconomyFactors` in der gespeicherten Zeile GANZ FEHLTE und der Ladepfad die Reihe jedes
+ * Mal neu baute. Beim ersten Speichern heilt sich das von selbst; nachgemessen: vorher „FEHLT",
+ * nachher „5 Eintraege".
+ *
+ * WAS DER WAECHTER PRUEFT — und was NICHT, denn das ist hier der springende Punkt:
+ *
+ *   STRUKTUR, in jeder Saison: genau fuenf Horizonte, lueckenlos 0..4, alle zur laufenden Saison.
+ *   Eine Reihe mit Luecken oder Dubletten ist kaputt, egal wie alt der Spielstand ist — und eine
+ *   kaputte Reihe verschiebt Sponsorengeld und die Apron-Drosselung.
+ *
+ *   WERTE, NUR in Saison 1: dort gibt es keine Fortschreibung, die gespeicherte Reihe MUSS also
+ *   dem Seed aus `(saveId, seasonId)` entsprechen. Ab Saison 2 waere der Seed die falsche
+ *   Referenz: `advanceSeasonEconomyFactorWindow` nimmt vier von fuenf Horizonten aus der Vorsaison
+ *   mit, die Reihe SOLL dann abweichen. Nachgemessen an `1hf25q` (Saison 2): gespeichert
+ *   [1,19 · 0,87 · 0,83 · 0,91 · 1,24] gegen frischen Seed [1,22 · 0,95 · 1,09 · 1,03 · 1,06] —
+ *   ein Werte-Waechter haette dort dauerhaft rot gezeigt, ohne dass etwas falsch ist. Ein Waechter,
+ *   der immer anschlaegt, ist keiner.
+ *
+ * GEMELDET STATT REPARIERT: eine auffaellige Reihe bleibt STEHEN. Mit ihr wurde gerechnet, mit ihr
+ * ist Geld geflossen — sie beim Laden auszutauschen aendert rueckwirkend die Grundlage und niemand
+ * erfaehrt davon. Der Waechter schreibt auf, was er sieht, und ueberlaesst die Entscheidung Chris.
+ */
+function pruefeKonjunkturReihe(input: {
+  saveId: string;
+  seasonId: string;
+  gespeichert: SeasonEconomyFactorRecord[];
+}): { grund: "struktur" | "werte"; storedFactors: number[]; seededFactors: number[] } | null {
+  const fuerDieseSaison = input.gespeichert.filter((eintrag) => eintrag.seasonId === input.seasonId);
+  if (input.gespeichert.length === 0) {
+    // Erstbefuellung, keine Abweichung.
+    return null;
+  }
+
+  const sortiert = fuerDieseSaison.slice().sort((links, rechts) => links.horizonIndex - rechts.horizonIndex);
+  const storedFactors = sortiert.map((eintrag) => eintrag.factor);
+  const seed = getSeasonEconomyFactorWindow({ saveId: input.saveId, seasonId: input.seasonId });
+  const seededFactors = seed.map((eintrag) => eintrag.factor);
+
+  const strukturHeil =
+    sortiert.length === SEASON_ECONOMY_FACTOR_WINDOW_SIZE &&
+    sortiert.every((eintrag, index) => eintrag.horizonIndex === index) &&
+    fuerDieseSaison.length === input.gespeichert.filter((eintrag) => eintrag.seasonId === input.seasonId).length;
+  if (!strukturHeil) {
+    return { grund: "struktur", storedFactors, seededFactors };
+  }
+
+  // Werte nur in Saison 1 — ab Saison 2 ist der Seed die falsche Referenz (siehe Kopfkommentar).
+  if (parseSeasonNumber(input.seasonId) === 1 && JSON.stringify(storedFactors) !== JSON.stringify(seededFactors)) {
+    return { grund: "werte", storedFactors, seededFactors };
+  }
+  return null;
+}
+
+/** Nur fuer Tests exportiert: der Waechter allein, ohne Datenbank drumherum. */
+export function createPersistedSaveRecordForTest(gameState: GameState, saveId: string): GameState {
+  return withSeededSeasonEconomyFactors(gameState, saveId);
+}
+
 function withSeededSeasonEconomyFactors(gameState: GameState, saveId: string): GameState {
   const window = getSeasonEconomyFactorWindow({
     saveId,
     seasonId: gameState.season.id,
     seasonState: gameState.seasonState,
   });
+  const vorhanden = gameState.seasonState.seasonEconomyFactors ?? [];
+
+  const befund = pruefeKonjunkturReihe({ saveId, seasonId: gameState.season.id, gespeichert: vorhanden });
+  if (befund) {
+    const ereignis: SeasonEconomyFactorGuardEvent = {
+      eventId: `season-economy-factor-${befund.grund}-${saveId}-${gameState.season.id}`,
+      seasonId: gameState.season.id,
+      reason: "season_economy_factor_mismatch",
+      storedFactors: befund.storedFactors,
+      seededFactors: befund.seededFactors,
+      // Der Zeitstempel der gespeicherten Reihe, NICHT die Wanduhr: sonst waere der Spielstand nach
+      // jedem Laden ein anderer, und der Waechter erzeugte genau das Wackeln, das er melden soll.
+      timestamp: vorhanden[0]?.generatedAt ?? "",
+    };
+    const bisher = gameState.seasonEconomyFactorGuardEvents ?? [];
+    if (bisher.some((eintrag) => eintrag.eventId === ereignis.eventId)) {
+      return gameState;
+    }
+    return { ...gameState, seasonEconomyFactorGuardEvents: [...bisher, ereignis] };
+  }
+
   // Unveraendert lassen, wenn schon dasselbe drinsteht — sonst bekaeme jeder Ladevorgang ein neues
   // Objekt und die Save-Session-Signatur wuerde ohne Grund wackeln.
-  const vorhanden = gameState.seasonState.seasonEconomyFactors ?? [];
   const deckungsgleich =
     vorhanden.length === window.length &&
     vorhanden.every((eintrag, index) => eintrag.factor === window[index]!.factor && eintrag.horizonIndex === index);
@@ -1319,6 +1411,10 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
+    // Endsaison-Nachtrag: Bestandsvertraege ohne `contractEndSeasonNumber` bekommen sie hier
+    // einmalig gesetzt. Voraussetzung dafuer, die Vertragsalterung spaeter ersatzlos zu streichen
+    // — siehe `trageEndsaisonNach`. Idempotent, ein gesetztes Feld bleibt unangetastet.
+    trageEndsaisonNach(
     normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
@@ -1328,6 +1424,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     ),
@@ -1345,8 +1442,23 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const gameStateWithPotential = ensurePlayerPotentialForGameState(saveId, withInjuryHistory);
   mark("ensurePlayerPotentialForGameState done");
   // Sonderregel: Nula gehört immer zu Project Suicide (idempotenter Backfill für bestehende Saves).
-  const gameState = ensureNulaOnProjectSuicide(gameStateWithPotential);
+  const gameStateWithNula = ensureNulaOnProjectSuicide(gameStateWithPotential);
   mark("ensureNulaOnProjectSuicide done");
+  /**
+   * TRAININGSMODUS NACHZIEHEN — der dritte Anlauf auf „der Flow hängt bei Training prüfen".
+   *
+   * Zweimal wurde ein SCHREIBWEG geschlossen: der Saisonwechsel (`j53iox`) und der Direktkauf
+   * (`hnbng4`). Beides richtig, beides ohne Wirkung auf Spieler, die schon vorher ohne
+   * Trainingsmodus im Kader standen — und ein einziger solcher Spieler hält den ganzen Flow auf.
+   * Am Abbild vom 23.08. betraf das drei von sieben Spielständen (V-W: Johanna; T-G: acht Spieler;
+   * C-C: zwei), alle über `manual_transfermarkt_buy` hereingekommen, alle vor dem Fix.
+   *
+   * Deshalb hier und nicht an einem vierten Schreibweg: der Ladeweg ist die Stelle, die JEDEN
+   * bestehenden Spielstand erreicht. Idempotent wie die vier Nachzüge darüber — wer einen Modus
+   * hat, behält ihn; wer keinen Kaderplatz hat, bekommt keinen.
+   */
+  const gameState = applyDefaultTrainingFieldsToRosteredPlayers(gameStateWithNula);
+  mark("applyDefaultTrainingFieldsToRosteredPlayers done");
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
@@ -1475,6 +1587,51 @@ function resolveCreatingOwnerId(ownerId: string | null | undefined): string {
   return ownerId ?? DEFAULT_ACTIVE_OWNER_ID;
 }
 
+/**
+ * IST AN DEN SPIELERWERTEN UEBERHAUPT ETWAS ANDERS? — der Kurzschluss vor der Baseline-Wache.
+ *
+ * GEMESSEN (`hwz8fk`, 2984 Spieler, 336 Kadereintraege, fuenf Speichervorgaenge in Folge): ein
+ * Speichern kostet rund 1140 ms. Davon gehen ~200 ms in `ensurePlayerBaselines`, ~62 ms in das
+ * Laden von `game_metadata` und der Baselines — und **~420 ms in `guardPlayerBaselineWrite`**, also
+ * gut ein Drittel des gesamten Speicherns. Die Wache normalisiert dafuer JEDEN vorherigen und jeden
+ * neuen Datensatz und rechnet Pruefsummen nach; bei knapp 3000 Spielern summiert sich das.
+ *
+ * WAS SIE IN DER REGEL FINDET: nichts. Spieler-Baselines sind der Stand bei Import („so kam der
+ * Spieler ins Spiel"), sie aendern sich praktisch nie. Die Wache existiert fuer den Fall, dass
+ * etwas sie doch ueberschreiben will — nicht fuer den Normalfall.
+ *
+ * DIESER VERGLEICH IST DER NORMALFALL, IN MIKROSEKUNDEN: tragen beide Seiten dieselben Spieler mit
+ * derselben Pruefsumme und derselben Version, dann liefert die Wache nachweislich exakt
+ * `previous` zurueck und KEIN Ereignis — jeder Datensatz laeuft dort in den Zweig
+ * `previousChecksum === attemptedChecksum`. Das ist keine Vermutung: `tests/baseline-kurzschluss-
+ * ist-deckungsgleich.test.ts` faehrt beide Wege am echten Datenbestand und vergleicht die
+ * Ergebnisse Byte fuer Byte.
+ *
+ * VORSICHTIG IN JEDE RICHTUNG: fehlt irgendwo eine Pruefsumme, unterscheidet sich eine Version,
+ * fehlt ein Spieler oder ist eine Seite leer, faellt der Vergleich auf `false` und die volle Wache
+ * laeuft. Der Kurzschluss kann nur ueberspringen, nie entscheiden.
+ */
+export function baselinesSindDeckungsgleich(
+  previous: PlayerBaselineRecord[] | undefined,
+  next: PlayerBaselineRecord[] | undefined,
+): previous is PlayerBaselineRecord[] {
+  if (!previous || !next || previous.length === 0 || previous.length !== next.length) {
+    return false;
+  }
+  const vorher = new Map<string, string>();
+  for (const baseline of previous) {
+    if (!baseline.checksum) return false;
+    vorher.set(baseline.playerId, `${baseline.checksum}|${baseline.baselineVersion ?? ""}`);
+  }
+  for (const baseline of next) {
+    if (!baseline.checksum) return false;
+    if (vorher.get(baseline.playerId) !== `${baseline.checksum}|${baseline.baselineVersion ?? ""}`) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function createPersistedSaveRecord(input: {
   saveId: string;
   name: string;
@@ -1492,15 +1649,25 @@ function createPersistedSaveRecord(input: {
   const createdAt = input.createdAt ?? now;
   const updatedAt = input.updatedAt ?? now;
   const normalizedWithoutBaselines = withNormalizedSeasonDisciplineSchedule(
-    normalizeLegacyRosterTargets(
-      normalizeLegacyFinanceScale(
-        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)), {
-          saveId: input.saveId,
-        }),
+    // Damit ein frisch geschriebener Stand die Endsaison schon traegt und sie nicht erst beim
+    // naechsten Laden bekommt.
+    trageEndsaisonNach(
+      normalizeLegacyRosterTargets(
+        normalizeLegacyFinanceScale(
+          withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)), {
+            saveId: input.saveId,
+          }),
+        ),
       ),
     ),
     input.saveId,
   );
+  const phase = (label: string) => {
+    if (process.env.OLY_DEBUG_SAVE_TIMING === "1") console.timeLog("createPersistedSaveRecord", label);
+  };
+  if (process.env.OLY_DEBUG_SAVE_TIMING === "1") console.time("createPersistedSaveRecord");
+  phase("normalisierung fertig");
+
   const baselinePlayerIds = new Set([
     ...normalizedWithoutBaselines.rosters.map((entry) => entry.playerId),
     ...(normalizedWithoutBaselines.playerBaselines ?? []).map((entry) => entry.playerId),
@@ -1510,17 +1677,22 @@ function createPersistedSaveRecord(input: {
     createdAt,
     playerIds: baselinePlayerIds,
   }).gameState;
+  phase("ensurePlayerBaselines fertig");
   const existingMetadata = loadSingleton<GameMetadata>("game_metadata", input.saveId);
   const existingBaselines = loadPlayerBaselinesForSave(
     input.saveId,
     (existingMetadata as GameMetadata & { playerBaselines?: PlayerBaselineRecord[] } | null)?.playerBaselines,
   );
-  const guardedBaselineWrite = guardPlayerBaselineWrite({
-    previous: existingBaselines,
-    next: normalizedGameState.playerBaselines,
-    attemptedSource: "save_repository",
-    timestamp: updatedAt,
-  });
+  phase("metadata + baselines geladen");
+  const guardedBaselineWrite = baselinesSindDeckungsgleich(existingBaselines, normalizedGameState.playerBaselines)
+    ? { baselines: existingBaselines, events: [] as PlayerBaselineWriteGuardEvent[] }
+    : guardPlayerBaselineWrite({
+        previous: existingBaselines,
+        next: normalizedGameState.playerBaselines,
+        attemptedSource: "save_repository",
+        timestamp: updatedAt,
+      });
+  phase("baseline-wache fertig");
   const baselineWriteGuardEvents = compactBaselineWriteGuardEvents([
     ...(existingMetadata?.baselineWriteGuardEvents ?? []),
     ...(normalizedGameState.baselineWriteGuardEvents ?? []),
@@ -1530,11 +1702,18 @@ function createPersistedSaveRecord(input: {
   // gesunden Wuerfen, der byte-identische Zwilling der Saison-Spielerwerte). Beim SCHREIBEN und
   // nicht beim Lesen — so kostet es einmal ein paar Millisekunden statt bei jedem Laden, und
   // bestehende Spielstaende schrumpfen beim naechsten Speichern von selbst.
-  const guardedGameState: GameState = slimGameStateForWrite({
-    ...normalizedGameState,
-    playerBaselines: guardedBaselineWrite.baselines,
-    baselineWriteGuardEvents,
-  });
+  const guardedGameState: GameState = applyDefaultTrainingFieldsToRosteredPlayers(
+    // TRAININGSMODUS AUCH BEIM SCHREIBEN — sonst haelt der Sitzungs-Cache die Luecke am Leben.
+    // Der Nachzug beim Laden (siehe `materializePersistedSave`) erreicht bestehende Spielstaende,
+    // aber `saveGameState` legt seinen Rueckgabewert in `writeSaveSessionCache` ab; ein Lauf, der
+    // speichert und gleich wieder liest, bekaeme sonst weiter den ungeheilten Stand. Beide Wege
+    // brauchen den Nachzug, und er ist idempotent — der zweite Aufruf aendert nichts mehr.
+    slimGameStateForWrite({
+      ...normalizedGameState,
+      playerBaselines: guardedBaselineWrite.baselines,
+      baselineWriteGuardEvents,
+    }),
+  );
 
   const upsertSave = database.prepare(`
     INSERT INTO saves (

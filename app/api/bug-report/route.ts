@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { listBugReports, saveBugReport, type BugReportReporter } from "@/lib/bug-report/bug-report-service";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 /** Obergrenze fuer den Freitext — genug fuer eine Beschreibung, zu wenig zum Zumuellen. */
 const MAX_NOTE_LENGTH = 4000;
@@ -68,6 +69,8 @@ export async function POST(request: Request) {
       git: { pushed: result.git.pushed, unpushed: result.git.unpushed, error: result.git.error },
     });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "bug_report_failed" },
       { status: 500 },
@@ -80,6 +83,8 @@ export function GET() {
   try {
     return NextResponse.json({ ok: true, reports: listBugReports() });
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "bug_report_list_failed" },
       { status: 500 },

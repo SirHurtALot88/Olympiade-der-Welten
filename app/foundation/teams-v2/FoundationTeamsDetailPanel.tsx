@@ -31,6 +31,7 @@ import FoundationRosterSellPeekDrawer from "@/app/foundation/teams-v2/Foundation
 import { VeloSplitMeter } from "@/components/foundation/velo-ui";
 import {
   NlCard,
+  NlDeltaChip,
   NlEmptyState,
   NlTable,
   StatChip,
@@ -159,11 +160,26 @@ function getContractIntentToneClass(intent) {
   return "is-neutral";
 }
 
-/** Balkengeometrie für den Gehaltsforecast-Chart (Verträge-Tab): pro Saison
- * ein Balken (gebundene Summe), plus ein zweiter Balken NUR wenn die
- * Preview-Summe (inkl. Kaufdialog-Drafts) tatsächlich abweicht — sonst
- * bleibt der Chart auf den Normalfall (keine Drafts) reduziert. */
-function buildContractForecastChartGeometry(totalsCommitted, totalsWithPreview) {
+/**
+ * Balkengeometrie für den Gehaltsforecast: pro Saison GENAU EIN Balken, das gebundene Kapital.
+ *
+ * GEMELDET VON CHRIS: „da ist ne preview drin für Season 4 mit 5,1 und ich hab dann gar keinen
+ * spieler der 4 jahre drin hat. Da sollte eigentlich 1 wert stehen und zwar der vom gebundenen
+ * kapital was wirklich real weg geht in der jeweiligen saison."
+ *
+ * Der Chart hatte einen zweiten Balken aus `totalsWithPreview` — der Summe INKLUSIVE der
+ * Verhandlungs-Entwürfe. Ein Entwurf wird beim Unterschreiben aber nie gelöscht, er bleibt für
+ * immer im Spielstand stehen. An Chris' Stand lagen neun davon, alle auf
+ * `accepted_pending_confirm`, darunter Spieler mit längst laufendem Vertrag:
+ *
+ *     gebunden        12,52 | 7,87 | 5,19 | 0,00 | 0
+ *     mit Entwürfen   42,59 | 20,56 | 18,50 | 5,13 | 0
+ *
+ * Die 5,13 in Saison 4 waren Lulu (1,10) und King Arlen (4,03) aus alten Entwürfen — Geld, das
+ * niemand schuldet. Der Forecast beantwortet jetzt nur noch die Frage, die er im Titel stellt:
+ * was in einer Saison wirklich abfließt.
+ */
+function buildContractForecastChartGeometry(totalsCommitted) {
   if (!Array.isArray(totalsCommitted) || totalsCommitted.length === 0) {
     return null;
   }
@@ -176,39 +192,23 @@ function buildContractForecastChartGeometry(totalsCommitted, totalsWithPreview) 
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
   const slotWidth = innerWidth / totalsCommitted.length;
-  const barWidth = Math.max(10, slotWidth * 0.32);
-  const barGap = slotWidth * 0.06;
+  // Ein Balken je Saison statt zweier nebeneinander — er darf entsprechend breiter stehen.
+  const barWidth = Math.max(10, slotWidth * 0.44);
 
   const committedValues = totalsCommitted.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0));
-  const previewValues = totalsCommitted.map((_, index) => {
-    const preview = totalsWithPreview?.[index];
-    return preview && Number.isFinite(preview.salary) ? preview.salary : null;
-  });
-  const maxValue = Math.max(1, ...committedValues, ...previewValues.filter((value) => value != null));
+  const maxValue = Math.max(1, ...committedValues);
 
   const bars = totalsCommitted.map((entry, index) => {
     const committedValue = committedValues[index];
-    const previewValue = previewValues[index];
-    const hasPreviewDelta = previewValue != null && Math.abs(previewValue - committedValue) >= 0.01;
     const committedHeight = (committedValue / maxValue) * innerHeight;
-    const previewHeight = hasPreviewDelta ? (previewValue / maxValue) * innerHeight : null;
-    const slotStart = paddingLeft + index * slotWidth;
-    const centerX = slotStart + slotWidth / 2;
-    const committedX = hasPreviewDelta ? centerX - barWidth - barGap / 2 : centerX - barWidth / 2;
-    const previewX = committedX + barWidth + barGap;
+    const centerX = paddingLeft + index * slotWidth + slotWidth / 2;
     return {
       label: entry.label,
       committedValue,
-      previewValue: hasPreviewDelta ? previewValue : null,
-      hasPreviewDelta,
-      x: committedX,
+      x: centerX - barWidth / 2,
       y: paddingTop + innerHeight - committedHeight,
       width: barWidth,
       height: committedHeight,
-      previewX,
-      previewY: previewHeight != null ? paddingTop + innerHeight - previewHeight : null,
-      previewWidth: barWidth,
-      previewHeight,
       centerX,
     };
   });
@@ -230,7 +230,9 @@ function buildContractExpiryBuckets(rows, seasonLabelCount) {
   (rows ?? [])
     .filter((row) => row.status === "active")
     .forEach((row) => {
-      const length = Number.isFinite(row.contractLength) ? row.contractLength : null;
+      // Die ABGELEITETE Restlaufzeit, nicht der Countdown: im Saisonende-Fenster ist der um eine
+      // Saison zu kurz, und dann steht ein Spieler mit einer vollen Saison im Ein-Jahres-Fach.
+      const length = Number.isFinite(row.restlaufzeitSaisons) ? row.restlaufzeitSaisons : null;
       if (length == null) {
         return;
       }
@@ -283,33 +285,6 @@ function buildContractSalarySteps(row, seasonLabels) {
     lastActiveSalary: lastActiveIndex >= 0 ? values[lastActiveIndex].salary : null,
     currentSalary: currentIndex >= 0 ? values[currentIndex].salary : null,
   };
-}
-
-/** Mini-Balkenstreifen für die Tabellen-Fußzeile (Team-Gehaltslast pro
- * Saison) — dieselbe committed/preview-Farbsprache wie der
- * Gehaltsforecast-Chart oben, nur kompakt je Saison statt als eigener
- * Chart. */
-function buildContractFooterSteps(totalsCommitted, totalsWithPreview) {
-  const committed = Array.isArray(totalsCommitted) ? totalsCommitted : [];
-  const preview = Array.isArray(totalsWithPreview) ? totalsWithPreview : [];
-  const maxValue = Math.max(
-    1,
-    ...committed.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
-    ...preview.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
-  );
-  return committed.map((entry, index) => {
-    const committedValue = Number.isFinite(entry?.salary) ? entry.salary : 0;
-    const previewEntry = preview[index];
-    const previewValue = Number.isFinite(previewEntry?.salary) ? previewEntry.salary : committedValue;
-    return {
-      label: entry?.label ?? "",
-      committedValue,
-      previewValue,
-      hasPreviewDelta: Math.abs(previewValue - committedValue) >= 0.01,
-      committedPct: Math.max(4, Math.round((committedValue / maxValue) * 100)),
-      previewPct: Math.max(4, Math.round((previewValue / maxValue) * 100)),
-    };
-  });
 }
 
 export type FoundationTeamsDetailPanelProps = {
@@ -464,9 +439,6 @@ export type FoundationTeamsDetailPanelProps = {
   contractRenewalMessage: unknown;
   contractRenewalError: unknown;
   /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
-  runTeamPicksRefill?: (teamId: string) => void | Promise<void>;
-  teamPicksRefillBusyTeamId?: string | null;
-  teamPicksRefillMessage?: { teamId: string; tone: "success" | "error"; text: string } | null;
 };
 
 function FoundationTeamsDetailPanel({
@@ -604,9 +576,6 @@ function FoundationTeamsDetailPanel({
   selectedTeamRosterActionHint,
   contractRenewalMessage,
   contractRenewalError,
-  runTeamPicksRefill,
-  teamPicksRefillBusyTeamId,
-  teamPicksRefillMessage,
 }: FoundationTeamsDetailPanelProps) {
   const showLeagueLogos = teamsHydrationPhase === "full";
   const showSecondaryPanels = teamsHydrationPhase === "full";
@@ -789,7 +758,28 @@ function FoundationTeamsDetailPanel({
     (showDeferredTeamLogos ||
       rowIndex < TEAMS_INITIAL_VISIBLE_LOGO_ROWS ||
       teamId === selectedTeam?.teamId);
-  const contractExpiringCount = selectedRoster.filter((entry) => entry.contractLength <= 1).length;
+  /**
+   * WER LÄUFT AUS — eine Auskunft, nicht zwei.
+   *
+   * GEMELDET VON CHRIS: „xelara steht aktuell dann immernoch auf vertrag läuft aus."
+   *
+   * `contractLength` ist ein Countdown, der am ENDE einer Saison gesenkt wird, während diese noch
+   * die laufende ist. Danach heißt eine 1 „noch eine volle Saison" — wer die Zahl direkt liest,
+   * liest im Saisonende-Fenster jeden Vertrag um ein Jahr zu kurz. Die Verträge-Tabelle rechnet
+   * die Endsaison bereits aus; die Kader-Liste fragt deshalb dieselbe Antwort ab, statt eine
+   * zweite zu bilden, die daneben liegen kann.
+   *
+   * BEWUSST OHNE `useMemo`: die Stelle liegt hinter `if (!active) return null` weiter oben, ein
+   * Hook wuerde dort die Aufrufreihenfolge zwischen zwei Renders veraendern
+   * (`react-hooks/rules-of-hooks`). Das Set baut sich aus ein paar Dutzend Kaderzeilen — billiger
+   * als der Vergleich, den ein Memo dafuer anstellen muesste.
+   */
+  const auslaufendePlayerIds = new Set(
+    (selectedTeamContractTable?.rows ?? [])
+      .filter((row) => row.status === "active" && row.laeuftAus)
+      .map((row) => row.playerId),
+  );
+  const contractExpiringCount = selectedRoster.filter((entry) => auslaufendePlayerIds.has(entry.playerId)).length;
   // Verkaufen/Verlängern sind IMMER sichtbar (Discoverability); außerhalb des
   // Season-End-Fensters nur ausgegraut + Tooltip statt versteckt. Der TEMP-
   // Schalter oben macht sie zum Testen sofort klickbar (Server gated Writes).
@@ -1040,11 +1030,6 @@ function FoundationTeamsDetailPanel({
                         <span>{selectedTeamRosterActionHint}</span>
                       </div>
                     ) : null}
-                    {teamPicksRefillMessage && selectedTeam && teamPicksRefillMessage.teamId === selectedTeam.teamId ? (
-                      <div className={`status-banner${teamPicksRefillMessage.tone === "success" ? " is-success" : " is-warning"}`}>
-                        {teamPicksRefillMessage.text}
-                      </div>
-                    ) : null}
                     <div className="team-focus-layout">
                       <div className="table-shell team-focus-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
                         <table
@@ -1088,11 +1073,11 @@ function FoundationTeamsDetailPanel({
                               const axisDisciplineGroups = Array.isArray(disciplinePpsByAxis) ? disciplinePpsByAxis : [];
                               const isPpsDisziExpanded = expandedRosterPpsDisziId === entry.id;
                               const ppsDisziPanelId = `roster-pps-diszi-${entry.id}`;
-                              const isContractExpiring = entry.contractLength <= 1;
+                              const isContractExpiring = auslaufendePlayerIds.has(entry.playerId);
                               return (
                               <Fragment key={entry.id}>
                               <tr
-                                className={entry.contractLength <= 1 ? "is-contract-expiring" : undefined}
+                                className={isContractExpiring ? "is-contract-expiring" : undefined}
                                 onClick={() => void openPlayerDrawerById(player.id, entry.id)}
                               >
                                 {visibleSelectedRosterColumns.map((column) => {
@@ -1385,17 +1370,19 @@ function FoundationTeamsDetailPanel({
                               : "Diszi-Spalten aktuell ausgeblendet"}
                           </span>
                           <div className="team-detail-actions">
-                            {selectedTeamRosterActionsAvailable && selectedTeam && runTeamPicksRefill ? (
-                              <button
-                                className="secondary-button inline-button"
-                                type="button"
-                                disabled={teamPicksRefillBusyTeamId != null}
-                                title="KI-Picks für dieses Team neu anwerfen"
-                                onClick={() => void runTeamPicksRefill(selectedTeam.teamId)}
-                              >
-                                {teamPicksRefillBusyTeamId === selectedTeam.teamId ? "Wirbt an…" : "Kader auffüllen"}
-                              </button>
-                            ) : null}
+                            {/* „Kader auffüllen" (KI-Picks für DIESES Team) stand hier und ist raus.
+                                ENTSCHEIDUNG VON CHRIS (19.08.): „keiner von uns soll seinen kader per
+                                KI füllen! weg damit." Der Knopf erschien ausschliesslich auf einem
+                                menschlich gefuehrten Team im Saisonende-Fenster
+                                (`selectedTeamRosterActionsAvailable` = eigenes Team + Fenster offen) —
+                                also genau in dem Fall, den es nicht mehr geben soll. Kader entstehen
+                                fuer beide Spieler ueber den Transfermarkt.
+
+                                Die Sperre haengt NICHT an diesem Knopf: `/api/ai/picks-run` weist
+                                menschlich gefuehrte Teams jetzt selbst ab (Grund
+                                `ai_picks_not_allowed_for_human_team`) — ein zweiter Weg dorthin, aus
+                                einer alten Lesezeichen-URL oder einem Skript, fuehrt ins Leere und
+                                sagt auch, warum. */}
                             <button
                               className="secondary-button inline-button"
                               type="button"
@@ -1527,9 +1514,9 @@ function FoundationTeamsDetailPanel({
                           const auslaufRows =
                             auslaufScope === "all"
                               ? auslaufActiveRows
-                              : auslaufActiveRows.filter((row) => row.contractLength <= 1);
+                              : auslaufActiveRows.filter((row) => row.laeuftAus);
                           const auslaufExpiringCount = auslaufActiveRows.filter(
-                            (row) => row.contractLength <= 1,
+                            (row) => row.laeuftAus,
                           ).length;
                           const auslaufPlayersById = new Map(
                             (gameState?.players ?? []).map((player) => [player.id, player]),
@@ -1566,8 +1553,8 @@ function FoundationTeamsDetailPanel({
                               return leftRank - rightRank;
                             }
                             // Auslaufende (LZ ≤ 1) immer oben, dann PPs Saison desc, dann Name.
-                            const leftExpiring = left.row.contractLength <= 1 ? 0 : 1;
-                            const rightExpiring = right.row.contractLength <= 1 ? 0 : 1;
+                            const leftExpiring = left.row.laeuftAus ? 0 : 1;
+                            const rightExpiring = right.row.laeuftAus ? 0 : 1;
                             if (leftExpiring !== rightExpiring) {
                               return leftExpiring - rightExpiring;
                             }
@@ -1691,7 +1678,7 @@ function FoundationTeamsDetailPanel({
                                               {(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}
                                             </span>
                                           </button>
-                                          {row.contractLength <= 1 ? (
+                                          {row.laeuftAus ? (
                                             <span
                                               className="team-contract-lz-chip is-expiring heat-band-1 team-auslauf-lz"
                                               title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
@@ -1929,7 +1916,6 @@ function FoundationTeamsDetailPanel({
                         {(() => {
                           const chart = buildContractForecastChartGeometry(
                             selectedTeamContractTable.totalsCommitted,
-                            selectedTeamContractTable.totalsWithPreview,
                           );
                           if (!chart) {
                             return null;
@@ -1963,23 +1949,9 @@ function FoundationTeamsDetailPanel({
                                       {bar.label} · {formatDisplayMoney(bar.committedValue)}
                                     </title>
                                   </rect>
-                                  {bar.hasPreviewDelta ? (
-                                    <rect
-                                      x={bar.previewX}
-                                      y={bar.previewY}
-                                      width={bar.previewWidth}
-                                      height={Math.max(bar.previewHeight, 1)}
-                                      rx={3}
-                                      className="contract-forecast-chart-bar is-preview"
-                                    >
-                                      <title>
-                                        {bar.label} · Preview {formatDisplayMoney(bar.previewValue)}
-                                      </title>
-                                    </rect>
-                                  ) : null}
                                   <text
                                     x={bar.centerX}
-                                    y={Math.min(bar.y, bar.previewY ?? bar.y) - 6}
+                                    y={bar.y - 6}
                                     textAnchor="middle"
                                     className="contract-forecast-chart-value"
                                   >
@@ -2304,7 +2276,7 @@ function FoundationTeamsDetailPanel({
                                 </span>
                               );
                             case "lz":
-                              return row.contractLength <= 1 ? (
+                              return row.laeuftAus ? (
                                 <span
                                   className={`team-contract-lz-chip is-expiring ${getContractLengthHeatBandClass(row.contractLength)}`}
                                   title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
@@ -2312,8 +2284,14 @@ function FoundationTeamsDetailPanel({
                                   läuft aus
                                 </span>
                               ) : (
-                                <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
-                                  {formatWholeNumber(row.contractLength)}
+                                <span
+                                  className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.restlaufzeitSaisons)}`}
+                                  title={`Läuft noch ${formatWholeNumber(row.restlaufzeitSaisons)} Saison${row.restlaufzeitSaisons === 1 ? "" : "en"}.`}
+                                >
+                                  {/* Die ABGELEITETE Restlaufzeit. `contractLength` ist ein Countdown, der am
+                                      Saisonende gesenkt wird, während die Saison noch läuft — er zeigt dort
+                                      jeden Vertrag um eine Saison zu kurz. */}
+                                  {formatWholeNumber(row.restlaufzeitSaisons)}
                                 </span>
                               );
                             case "morale":
@@ -2342,8 +2320,52 @@ function FoundationTeamsDetailPanel({
                               );
                             case "buyout":
                               return row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—";
-                            case "exit":
-                              return row.exitValue != null ? formatNlMoney(row.exitValue) : "—";
+                            case "exit": {
+                              /**
+                               * DIESELBE DARSTELLUNG WIE BEI DEN FREMDEN TEAMS — Ticket #33.
+                               *
+                               * CHRIS' MELDUNG: „Bei anderen Teams steht VK und darunter der VK
+                               * Preis mit vergleich zum MW — das ist besser gelöst als beim eigen
+                               * gesteuerten team wo das nicht so sauber steht - bitte anpassen."
+                               *
+                               * Er hat recht, und es war ausgerechnet die eigene Mannschaft, bei
+                               * der die Zelle weniger sagte: hier stand nur der nackte Betrag.
+                               * Ob 28,1 viel oder wenig ist, kann niemand wissen, ohne den
+                               * Marktwert danebenzuhalten — und genau der steht eine Spalte
+                               * weiter („Akt. MW"), nur ohne die Verbindung.
+                               *
+                               * `marketValueAtExit` ist trotz des Namens die Basis VOR dem
+                               * Verkaufsfaktor (`exitValue = marketValueAtExit x saleFactor`).
+                               * Die Differenz ist damit genau der Aufschlag des Faktors, und die
+                               * Rechnung geht auf dem Bildschirm auf.
+                               *
+                               * Bewusst DIESELBE Komponente wie in der Spielerliste
+                               * (`NlDeltaChip`) statt einer nachgebauten: zwei Darstellungen
+                               * derselben Groesse laufen beim naechsten Umbau wieder auseinander
+                               * — das ist der Fehler, den die halbe Ticketliste beschreibt.
+                               */
+                              if (row.exitValue == null) {
+                                return "—";
+                              }
+                              const mw = row.marketValueAtExit;
+                              const aufschlag =
+                                mw != null && Number.isFinite(mw) ? row.exitValue - mw : null;
+                              return (
+                                <span className="team-contract-mv-cell nl-tnum">
+                                  <strong>{formatNlMoney(row.exitValue)}</strong>
+                                  {/* Kein Chip bei 0 — wie in der Spielerliste. Ein „±0,00" in
+                                      jeder Zeile waere nur Rauschen; dass der Faktor 1,0 ist,
+                                      sieht man daran, dass beide Betraege gleich sind. */}
+                                  {aufschlag != null && Math.abs(aufschlag) >= 0.005 ? (
+                                    <NlDeltaChip
+                                      value={aufschlag}
+                                      format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
+                                      title={`Aufschlag des Verkaufsfaktors: ${formatNlMoney(row.exitValue)} Verkaufspreis − ${formatNlMoney(mw!)} Marktwert`}
+                                    />
+                                  ) : null}
+                                </span>
+                              );
+                            }
                             case "marketValueNow":
                               // marketValueAtExit ist im Row-Modell trotz des Namens die
                               // Basis VOR dem Sale-Factor (siehe contract-negotiation-preview.ts /
@@ -2596,7 +2618,7 @@ function FoundationTeamsDetailPanel({
                                 return (
                                   [
                                     row.status === "preview" && "is-preview-row",
-                                    row.contractLength <= 1 && "is-contract-expiring",
+                                    row.laeuftAus && "is-contract-expiring",
                                     isSellMarked && "is-sell-marked",
                                   ]
                                     .filter(Boolean)

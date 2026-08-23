@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-18",
+  "seite": "Multiplayer",
+  "text": "Beim Raumstart läuft zwei Minuten lang der Liga-Draft, und die Oberfläche sagte dazu nichts. Den Hinweis „Liga wird erstellt … (KI-Teams werden befüllt)“ gab es dabei längst — er stand die ganze Zeit in der Seite, nur mit „display: none“: eine Sammelregel räumt die Info-Hinweise der Transfermarkt-Ansichten aus der Foundation-Oberfläche und erwischte über dieselbe Klasse auch diesen. Jetzt ist er zu sehen. Dazu zwei Korrekturen am Text: er versprach „rund eine Minute“, gemessen wurden 126 und 172 Sekunden — jetzt steht da „ein bis zwei Minuten“. Und im Raum steht darunter, was schon geht: Sponsor wählen und einkaufen warten nicht auf die KI-Kader, erst der Spieltag braucht sie. Der Fehlerfall desselben Hinweises war nie betroffen.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

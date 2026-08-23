@@ -105,6 +105,47 @@ function getExistingMarketTransfers(
   );
 }
 
+/**
+ * Die KI-Teams, die ihre Zielgroesse NOCH NICHT erreicht haben — der Umfang eines Nachlaufs.
+ *
+ * Menschlich gesteuerte Teams sind nie dabei: ihr Kader gehoert dem Spieler (siehe die Meldung
+ * „Wieso wird fuer mich gepickt und gedraftet???" weiter unten in dieser Datei).
+ */
+export function resolvePreseasonNachzueglerTeamIds(gameState: GameState): string[] {
+  return gameState.teams
+    .filter((team) => {
+      const controlMode =
+        getTeamControlSettings(gameState, team.teamId)?.controlMode ??
+        (team.humanControlled ? "manual" : "ai");
+      if (controlMode !== "ai") {
+        return false;
+      }
+      return rosterCount(gameState, team.teamId) < getTeamOptTarget(gameState, team.teamId);
+    })
+    .map((team) => team.teamId);
+}
+
+/**
+ * Der Umfang eines Laufs aus angeforderten Teams und Nachzueglern.
+ *
+ * Ohne Nachzueglerliste (kein vorheriger Transfer, oder Sperre abgeschaltet) bleibt es bei dem, was
+ * der Aufrufer wollte. Mit Liste gilt: nennt er nichts, IST die Liste der Umfang; nennt er etwas,
+ * gilt die SCHNITTMENGE — sonst liesse ein gezielter Aufruf ein bereits fertiges Team doch noch
+ * einmal einkaufen, und genau das soll die Sperre verhindern.
+ */
+export function mischeNachzueglerInDenUmfang(
+  angeforderteTeamIds: string[],
+  nachzueglerTeamIds: string[] | null,
+): string[] {
+  if (nachzueglerTeamIds == null) {
+    return angeforderteTeamIds;
+  }
+  if (angeforderteTeamIds.length === 0) {
+    return unique(nachzueglerTeamIds);
+  }
+  return angeforderteTeamIds.filter((teamId) => nachzueglerTeamIds.includes(teamId));
+}
+
 function rosterCount(gameState: { rosters: Array<{ teamId: string }> }, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
 }
@@ -549,28 +590,68 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   const transferPhase = input.transferPhase ?? "manual_transfer_window";
   const progressLog = input.progressLog ?? false;
 
-  if (input.skipIfExistingMarketTransfers !== false && input.phase === "preseason") {
+  /**
+   * EIN ABGEBROCHENER KAUFLAUF LIESS SICH NIE WIEDER AUFNEHMEN.
+   *
+   * CHRIS: „schau mal warum die KI nicht nachkauft - es gab ein problem beim saisonstart der
+   * koennte damit zusammenhaengen, ich musste dann auf ki picken manuell noch mal klicken vllt ist
+   * da schon was kaputt gewesen und einige teams haben dann nur minimum an playern!"
+   *
+   * NACHGEMESSEN an seinem Spielstand (season-2, Spieltag 10) — die Kette laesst sich vollstaendig
+   * belegen:
+   *
+   *   In `transferHistory` stehen 33 Eintraege der Saison, ALLE mit `ai_preseason_market_buy`.
+   *   22 der 32 Teams haben davon mindestens einen Spieler bekommen, ZEHN gingen leer aus.
+   *   Der Lauf hat also angefangen und ist auf halber Strecke stehengeblieben.
+   *
+   *   Danach: 25 Teams unter ihrem Ziel, 58 Spieler fehlen, SIEBEN Teams sitzen exakt auf ihrem
+   *   Minimum — bei einem Spieltagsbedarf von elf Einsatzplaetzen. Genau das „nur minimum an
+   *   players", das er beschreibt.
+   *
+   * DIE SPERRE MACHTE DEN ZUSTAND UNREPARIERBAR. Sie fragte „existiert IRGENDEIN Transfer dieser
+   * Saison?" und stieg dann fuer die GANZE LIGA aus. Ein Lauf, der einen einzigen Spieler gekauft
+   * hatte, galt damit als erledigt — auch fuer die zehn Teams, die noch nichts hatten. Chris'
+   * manueller Klick auf „KI picken" lief in dieselbe Sperre und tat folgerichtig nichts.
+   *
+   * Nebenwirkung derselben Grobheit: `getExistingMarketTransfers` zaehlt auch
+   * `manual_transfer_window` mit. EIN eigener Transfer des Spielers schaltete die KI-Kaeufe der
+   * ganzen Liga fuer den Rest der Saison ab.
+   *
+   * WAS DIE SPERRE EIGENTLICH VERHINDERN SOLL, ist doppeltes Einkaufen. Das ist eine Frage JE TEAM,
+   * nicht je Liga — und die ehrliche Antwort darauf ist nicht „hat schon mal gekauft", sondern „ist
+   * am Ziel". Ein Team unter seiner Zielgroesse ist unerledigte Arbeit, kein abgeschlossener Fall.
+   *
+   * Also: Teams am Ziel bleiben unangetastet (kein Nachkauf, keine Doppelung), Teams darunter
+   * werden bedient. Sind ALLE fertig, steigt die Sitzung aus wie bisher. Der Lauf konvergiert von
+   * selbst, weil der Planer ohnehin nur bis zur Zielgroesse kauft.
+   */
+  const nachzueglerTeamIds =
+    input.skipIfExistingMarketTransfers === false || input.phase !== "preseason"
+      ? null
+      : getExistingMarketTransfers(save.gameState, input.seasonId).length === 0
+        ? null
+        : resolvePreseasonNachzueglerTeamIds(save.gameState);
+
+  if (nachzueglerTeamIds != null && nachzueglerTeamIds.length === 0) {
     const existing = getExistingMarketTransfers(save.gameState, input.seasonId);
-    if (existing.length > 0) {
-      return {
-        phase: input.phase,
-        leagueRounds: 0,
-        teamCycles: 0,
-        passes: 0,
-        rounds: 0,
-        perTeam: [],
-        emergencyRepairTeams: [],
-        appliedBuys: 0,
-        appliedSells: 0,
-        warnings: [`transfer_window_skipped_existing_market_transfers:${existing.length}`],
-        blockingReasons: [],
-        skipped: true,
-        roundHistory: [],
-      };
-    }
+    return {
+      phase: input.phase,
+      leagueRounds: 0,
+      teamCycles: 0,
+      passes: 0,
+      rounds: 0,
+      perTeam: [],
+      emergencyRepairTeams: [],
+      appliedBuys: 0,
+      appliedSells: 0,
+      warnings: [`transfer_window_skipped_existing_market_transfers:${existing.length}`],
+      blockingReasons: [],
+      skipped: true,
+      roundHistory: [],
+    };
   }
 
-  const scopedTeamIds = unique(input.targetTeamIds ?? []);
+  const scopedTeamIds = mischeNachzueglerInDenUmfang(unique(input.targetTeamIds ?? []), nachzueglerTeamIds);
 
   /**
    * GEMELDET: „Was zur hölle ist passiert mit meinem save am season ende, dass ich plötzlich 3 neue

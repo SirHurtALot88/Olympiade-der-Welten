@@ -32,6 +32,11 @@ type SeasonV2TeamSummary = {
   marketValueTotal: number | null;
 };
 
+import type {
+  SaisonstandGebaeudeZeile,
+  SaisonstandHoverSpieler,
+} from "@/lib/foundation/saisonstand-team-hover";
+
 export type SeasonV2StandingsRow = {
   teamId: string;
   teamName: string;
@@ -62,6 +67,16 @@ export type SeasonV2StandingsRow = {
   guvPosten?: import("@/lib/finance/season-end-guv").SeasonGuvPosten[] | null;
   /** Gebäude-Unterhalt p.a. (Summe der Season-Upkeeps gebauter Anlagen). */
   buildingCost: number | null;
+  /**
+   * Verletzungen dieser Saison — GEMELDET VON CHRIS (Ticket #34): „im Saisonstand eine Spalte
+   * einfügen mit der Anzahl an Verletzungen!"
+   *
+   * Gezaehlt von `countTeamSeasonInjuries`, also derselben Stelle, aus der auch die Teamhistorie
+   * liest. Die Funktion fuehrt zwei Quellen zusammen (`seasonState.injuryEvents` und
+   * `player.injuryHistory`) und entdoppelt ueber `eventId` — beide fuer sich waeren unvollstaendig,
+   * beide zusammen ohne Entdopplung zu hoch.
+   */
+  injuries?: number | null;
   guv: number | null;
   sponsorTotal: number | null;
   /** Transferbilanz der Saison = Verkäufe − Käufe (S1 nur Käufe → großes Minus). */
@@ -73,6 +88,28 @@ export type SeasonV2StandingsRow = {
    */
   apronProjection?: GuvApronProjectionInput | null;
   marketValueTotal: number | null;
+  /**
+   * Der kompakte Kader dieses Teams — Grundlage der drei Hovers auf Teamname, MW und Gehalt.
+   * Gewünscht von Chris am 23.08.: „dass ich dann die Spieler dahinter sehe […] immer absteigend
+   * sortiert". Bewusst je Zeile durchgereicht statt in der Ansicht aus dem `gameState` gezogen: die
+   * Tabelle bekommt „das fertige Ergebnis, kein gameState" (siehe Kopfkommentar des New-Look-Renders),
+   * und der Aufbau kostet EINMAL beim Zeilenbau statt bei jeder Mausbewegung.
+   */
+  hoverKader?: SaisonstandHoverSpieler[] | null;
+  /**
+   * Die TEILE der vier Zahlenspalten — Grundlage der Hovers auf Sponsoren, Transfers und Gebäude
+   * (Chris, 23.08.: „1-4 auf jeden fall direkt umsetzen"). Sie liegen im Saisonstand-Datensatz
+   * längst getrennt vor; gezeigt wurde bisher nur die jeweilige Summe.
+   */
+  sponsorBasis?: number | null;
+  sponsorRank?: number | null;
+  sponsorSeason?: number | null;
+  transferBuyCount?: number | null;
+  transferSellCount?: number | null;
+  transferBuyTotal?: number | null;
+  transferSellTotal?: number | null;
+  /** Gebaute Anlagen mit Stufe und Saison-Unterhalt. */
+  buildingUpkeep?: SaisonstandGebaeudeZeile[] | null;
   disciplineValues: Record<SeasonV2DisciplineKey, number | null>;
   rosterCount: number;
   avgContractLength: number | null;
@@ -173,6 +210,13 @@ export type SeasonStandingsV2ClientProps = {
   sourceLabel: string;
   sourceBadgeLabel: string;
   isArchived: boolean;
+  /**
+   * Die Saison des Spielstands ist durch — alle Spieltage gewertet. Getrennt von `isArchived`,
+   * weil das zwei verschiedene Aussagen sind: „eine alte Saison wird betrachtet" gegen „die
+   * aktuelle Saison ist zu Ende". Vorher gab es nur `isArchived`, und der zweite Fall fiel
+   * deshalb in den Zweig „Saison läuft" (Befund B5).
+   */
+  isSeasonEnded?: boolean;
   seasonOptions: SeasonV2Option[];
   selectedTeamSummary: SeasonV2TeamSummary | null;
   leaderTeam: SeasonV2StandingsRow | null;

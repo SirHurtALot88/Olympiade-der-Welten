@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { readStandingsPreviewCache, writeStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
+import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
 
 export async function GET(request: Request) {
   try {
@@ -47,6 +48,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    const koopKonflikt = koopSchreibkonfliktAntwort(error);
+    if (koopKonflikt) return koopKonflikt;
     const message = error instanceof Error ? error.message : "Standings preview could not be loaded.";
     return NextResponse.json(
       {

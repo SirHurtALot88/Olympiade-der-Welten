@@ -28,7 +28,7 @@ import { getActiveTeamRivalTeamIds } from "@/lib/rivalries/team-rivalries";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { FoundationRoomFlowBar } from "@/components/foundation/FoundationRoomFlowBar";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import type { RoomParticipant } from "@/types/game";
+import { findOwnRoomParticipant } from "@/lib/room/online-room-model";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
 import {
   FACILITY_CATALOG,
@@ -123,6 +123,7 @@ import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-f
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import type { Discipline, GameInboxItem, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -202,6 +203,10 @@ const FoundationLeagueLeadersHost = dynamic(() => import("@/app/foundation/leagu
 const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
+});
+const FoundationMerklisteHost = dynamic(() => import("@/app/foundation/merkliste-v2/FoundationMerklisteHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Merkliste wird geladen…" />,
 });
 const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationDiszisHost"), {
   ssr: false,
@@ -371,6 +376,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationRanksHostProps,
   foundationLeagueLeadersHostProps,
   foundationAllTimeTableHostProps,
+  foundationMerklisteHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
   foundationMatchdayResultHostProps,
@@ -484,6 +490,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   resetTableLayout,
   resolvedTeamControlSettings,
   roomActivityNotice,
+  setRoomActivityNotice,
   roomContext,
   roomLiveState,
   rosterPlayers,
@@ -861,7 +868,21 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           data-league-setup-status="in_progress"
         >
           <strong>Liga wird erstellt … (KI-Teams werden befüllt)</strong>
-          <span>Das dauert rund eine Minute. Du kannst schon andere Ansichten öffnen — wir aktualisieren automatisch.</span>
+          {/* GEMESSEN, nicht geschaetzt: „rund eine Minute" stand hier seit der ersten Fassung. Vier
+              Raumstarts am 18.08. brauchten 126 s, 172 s und (mit dauernden Schreibvorgaengen
+              nebenher) 317 s. Wer nach 60 Sekunden auf ein fertiges Feld schaut, haelt eine
+              richtige Anzeige fuer einen Fehler. */}
+          <span>Das dauert ein bis zwei Minuten. Du kannst schon andere Ansichten öffnen — wir aktualisieren automatisch.</span>
+          {/* CHRIS: „wobei seinen sponsor picken und einkaufen könnte man eigentlich ja schon".
+              Stimmt — im Raum nachgemessen: `/api/sponsor/choose` und `/api/transfermarkt/buy`
+              antworten waehrend des Drafts mit 200/success. Der Satz steht nur im Raum, weil nur
+              dort gemessen wurde; im Solo-Fall behaupten wir es deshalb nicht. */}
+          {roomContext ? (
+            <span data-testid="foundation-league-setup-banner-schon-moeglich">
+              Sponsor wählen und einkaufen geht bereits — beides wartet nicht auf die KI-Kader. Erst
+              der Spieltag braucht sie.
+            </span>
+          ) : null}
         </div>
       ) : leagueSetupStatus === "failed" ? (
         <div
@@ -902,6 +923,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         isPending={isPending}
         activities={foundationActivities}
         breadcrumb={newLookBreadcrumb}
+        /* D1: dieselbe Quelle wie der Breadcrumb — der Ansichtsname wird nicht zweimal
+           bestimmt, nur zweimal verwendet (sichtbar als Krume, semantisch als h1). */
+        viewTitle={newLookBreadcrumbData?.view ?? null}
         teamPicker={activeTeamPickerNode}
         subNav={
           activeView === "marketV2" ? (
@@ -1494,39 +1518,62 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           (() => {
             // Kompakter Room-Chip statt großem zentralem Banner: die schlanke
             // Pill-Zeile lebt am rechten Rand des Kontext-Banners. Room-Code +
-            // "Zur Room-Ansicht" bleiben sichtbar, die Detailzeile (Save-ID,
-            // Aktivitätsnotiz) wandert in den title-Tooltip (Hover), damit sie
-            // keine Höhe frisst. Der Flow-Schritt/Weiter-Knopf steht NICHT mehr
-            // im Tooltip — die `FoundationRoomFlowBar` unten zeigt ihn sichtbar
-            // und bedienbar an; zwei Stellen mit derselben Wahrheit (eine davon
-            // nur im Hover-Text) wären nur eine Quelle für Drift gewesen.
-            const roomIdentity = roomLiveState?.roomParticipants.find(
-              (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
-            );
-            const roomChipDetail = [
-              `Save ${formatShortSaveId(roomContext.saveId)}`,
-              roomActivityNotice ? `${roomActivityNotice.title} — ${roomActivityNotice.detail}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ");
+            // "Zur Room-Ansicht" bleiben sichtbar, die Save-ID bleibt im
+            // title-Tooltip (Hover), damit sie keine Höhe frisst. Der
+            // Flow-Schritt/Weiter-Knopf steht NICHT mehr im Tooltip — die
+            // `FoundationRoomFlowBar` unten zeigt ihn sichtbar und bedienbar an;
+            // zwei Stellen mit derselben Wahrheit (eine davon nur im
+            // Hover-Text) wären nur eine Quelle für Drift gewesen.
+            //
+            // BEFUND (Auftrag): `roomActivityNotice` stand hier bis eben NUR im title-Attribut,
+            // also unsichtbar ohne Hover — eine Aktion des Mitspielers (Transfer, Lineup, Spieltag)
+            // ging damit praktisch spurlos an einem vorbei. Die Notiz steht jetzt zusaetzlich als
+            // eigene sichtbare Zeile.
+            // Entdoppelt (Paket B): dieselbe Suche stand hier vorher direkt inline und ein zweites
+            // Mal am Host-Vorbehalt des Saisonwechsel-Gates — siehe Kommentar an
+            // `findOwnRoomParticipant` (lib/room/online-room-model.ts).
+            const roomIdentity = findOwnRoomParticipant(roomLiveState, roomContext.participantId);
             return (
-              <div
-                className="foundation-room-chip"
-                data-testid="foundation-room-context-banner"
-                title={`Multiplayer-Room · Raum ${roomContext.roomCode} · ${roomChipDetail}`}
-              >
-                <span className="pill foundation-room-chip-code">
-                  <span aria-hidden="true">👥</span> Raum {roomContext.roomCode}
-                </span>
-                {roomIdentity ? (
-                  <span className="pill foundation-room-chip-participant" data-testid="foundation-room-participant-identity">
-                    {roomIdentity.displayName}
+              <>
+                <div
+                  className="foundation-room-chip"
+                  data-testid="foundation-room-context-banner"
+                  title={`Multiplayer-Room · Raum ${roomContext.roomCode} · Save ${formatShortSaveId(roomContext.saveId)}`}
+                >
+                  <span className="pill foundation-room-chip-code">
+                    <span aria-hidden="true">👥</span> Raum {roomContext.roomCode}
                   </span>
+                  {roomIdentity ? (
+                    <span className="pill foundation-room-chip-participant" data-testid="foundation-room-participant-identity">
+                      {roomIdentity.displayName}
+                    </span>
+                  ) : null}
+                  <a className="secondary-button inline-button foundation-room-chip-link" href={`/room/${roomContext.roomCode}`}>
+                    Zur Room-Ansicht
+                  </a>
+                </div>
+                {roomActivityNotice ? (
+                  <div
+                    className="foundation-action-feedback is-toast is-info foundation-room-activity-notice"
+                    role="status"
+                    aria-live="polite"
+                    data-testid="foundation-room-activity-notice"
+                  >
+                    <div className="foundation-ai-preseason-copy">
+                      <span className="eyebrow">Mitspieler-Aktion</span>
+                      <strong>{roomActivityNotice.title}</strong>
+                      <span className="muted">{roomActivityNotice.detail}</span>
+                    </div>
+                    <button
+                      className="table-link-button"
+                      type="button"
+                      onClick={() => setRoomActivityNotice(null)}
+                    >
+                      ausblenden
+                    </button>
+                  </div>
                 ) : null}
-                <a className="secondary-button inline-button foundation-room-chip-link" href={`/room/${roomContext.roomCode}`}>
-                  Zur Room-Ansicht
-                </a>
-              </div>
+              </>
             );
           })()
         ) : null}
@@ -2507,8 +2554,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "lineup" || activeView === "lineupV2" ? (
           <FoundationLineupPanel
             active
-            uiVariant="focusV2"
-            clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
+            /**
+             * DIE TEAM-ID GEHOERT NICHT IN DIESEN SCHLUESSEL.
+             *
+             * GEMELDET VON CHRIS: „wenn ich das team wechsel dass die seite aktualisiert und die
+             * aufstellung weg ist". Genau das stand hier: aendert sich der Schluessel, baut React
+             * `LegacyLineupLabClient` komplett neu auf — mitsamt jeder ungespeicherten Auswahl.
+             *
+             * Der Neuaufbau war dabei ueberfluessig: der Client reagiert selbst auf ein von aussen
+             * geaendertes `defaultTeamId` und laedt den Kontext des neuen Teams. Er ist die
+             * einzige der fuenf Groessen, fuer die es diesen eigenen Weg gibt — Spielstand, Saison,
+             * Spieltag und Besitzer bleiben drin, dort ist ein Neuaufbau richtig.
+             */
+            clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
                 ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
@@ -2679,6 +2737,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               sourceLabel={seasonOverviewSourceLabel}
               sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
               isArchived={isViewingArchivedSeason}
+              /* B5: „archiviert" und „durch" sind zwei verschiedene Aussagen. Ohne diese Zeile
+                 fiel die abgeschlossene Saison des Spielstands in den Zweig „Saison läuft" —
+                 direkt unter der Ueberschrift „Saison abgeschlossen". */
+              isSeasonEnded={isSeasonEndPhase(gameState.gamePhase)}
               seasonOptions={seasonOverviewOptions}
               selectedTeamSummary={seasonV2SelectedTeamSummary}
               leaderTeam={seasonV2LeaderTeam}
@@ -2773,7 +2835,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}
                     title={seasonOverviewSourceLabel}
                   >
-                    {isViewingArchivedRanksSeason ? "Liga-Wertung · Archiv" : "Liga-Wertung · Saison läuft"}
+                    {resolveLigaWertungKopfzeile({
+                      istArchiv: isViewingArchivedRanksSeason,
+                      istAbgeschlossen: isSeasonEndPhase(gameState.gamePhase),
+                    })}
                   </span>
                   {ranksArchiveMissing ? (
                     <span className="pill is-warning">Rang-Archiv fehlt — es zählt der laufende Stand</span>
@@ -3077,6 +3142,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
+
+          {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
           {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist

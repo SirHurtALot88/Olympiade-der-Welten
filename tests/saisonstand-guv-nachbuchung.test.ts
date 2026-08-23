@@ -92,7 +92,9 @@ describe("Saisonstand-GuV · die gespeicherte Zeile veraltet nicht mehr", () => 
   it("zieht die eingefrorene Zeile auf den gebuchten Stand", () => {
     const vorher = baueSpielstand({ apronLogs: [{ teamId: "L-K", cashDelta: 2.4, kind: "payout" }] });
     const apronVorher = (vorher.seasonState.standings?.["L-K"]?.guvPosten ?? []).find((e) => e.key === "apron");
-    expect(apronVorher?.counted).toBe(false);
+    // Gezaehlt wird der Apron in beiden Zustaenden (Chris: „DAS MUSS MIT REIN!"). Was die Buchung
+    // aendert, ist die Notiz und der Betrag — aus der Hochrechnung wird der abgerechnete Wert.
+    expect(apronVorher?.counted).toBe(true);
     expect(apronVorher?.note).toContain("noch nicht gebucht");
 
     const { gameState, geaenderteTeams } = zieheSaisonstandGuvNach(vorher);
@@ -113,13 +115,30 @@ describe("Saisonstand-GuV · die gespeicherte Zeile veraltet nicht mehr", () => 
     expect(zweiterLauf.gameState).toBe(ersterLauf.gameState);
   });
 
-  it("fasst Teams ohne gespeicherte Postenliste nicht an", () => {
-    // Die Liste entsteht bei der Saisonende-Buchung. Wo sie fehlt, gab es diese Buchung nicht —
-    // dann waere ein geschriebener Wert eine Behauptung ueber eine Abrechnung, die nie stattfand.
+  it("schreibt jetzt AUCH dort, wo noch keine Postenliste stand", () => {
+    /*
+     * DIESE ERWARTUNG WAR EINMAL DIE UMGEKEHRTE, und sie steht hier umgeschrieben statt gelöscht.
+     *
+     * Sie lautete „fasst Teams ohne gespeicherte Postenliste nicht an", mit der Begründung: „Die
+     * Liste entsteht bei der Saisonende-Buchung. Wo sie fehlt, gab es diese Buchung nicht — dann
+     * wäre ein geschriebener Wert eine Behauptung über eine Abrechnung, die nie stattfand."
+     *
+     * Chris hat das am 23.08.2026 aufgehoben („ja bau die drei hovers so und die guv nachbuchung
+     * auch"), nachdem gemessen war, was die Regel praktisch bedeutete: von sieben Live-Spielständen
+     * trug nur einer überhaupt eine GuV. In den sechs laufenden — seinem eigenen eingeschlossen —
+     * blieb die Spalte im Saisonstand dauerhaft leer, während das Team-Profil daneben eine eigene,
+     * unvollständige Zahl zeigte. Der Riegel verhinderte nicht die falsche Zahl, sondern die
+     * richtige.
+     *
+     * Eine GuV mitten in der Saison IST eine Hochrechnung — und sie sagt das selbst: die Posten
+     * tragen in `note` den Rang, auf den hochgerechnet wurde.
+     */
     const ohnePosten = baueSpielstand({ apronLogs: [{ teamId: "L-K", cashDelta: 2.4, kind: "payout" }] });
     delete (ohnePosten.seasonState.standings!["L-K"] as { guvPosten?: unknown }).guvPosten;
     const ergebnis = zieheSaisonstandGuvNach(ohnePosten);
-    expect(ergebnis.geaenderteTeams).toEqual([]);
-    expect(ergebnis.gameState).toBe(ohnePosten);
+    expect(ergebnis.geaenderteTeams).toEqual(["L-K"]);
+    const zeile = ergebnis.gameState.seasonState.standings!["L-K"];
+    expect(typeof zeile?.guv).toBe("number");
+    expect((zeile?.guvPosten ?? []).length).toBeGreaterThan(0);
   });
 });

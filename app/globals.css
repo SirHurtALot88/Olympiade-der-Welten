@@ -2188,6 +2188,68 @@ body:has(.oly-auth-status-badge) .oly-bug-report-flag {
   border-color: rgba(56, 189, 248, 0.35);
 }
 
+/* Stufe 2.2 (Befund B5): Sammel-Ansicht "meine Teams · Spieltag X · fertig/offen". */
+.legacy-lineup-my-teams-readiness {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.legacy-lineup-my-teams-readiness__title {
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.legacy-lineup-my-teams-readiness__chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.legacy-lineup-my-teams-readiness__chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-ready {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-pending {
+  border-color: rgba(250, 204, 21, 0.4);
+}
+
+.legacy-lineup-my-teams-readiness__chip.is-active {
+  border-width: 2px;
+}
+
+/* Sammel-Abgabe (Aufgabe #43): bewusst in derselben Kachel und im selben Ton wie die Chips —
+   es ist dieselbe Liste offener Teams, nur als Handlung statt als Anzeige. */
+.legacy-lineup-my-teams-readiness__sammel {
+  align-self: flex-start;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.08);
+  color: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.legacy-lineup-my-teams-readiness__sammel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .facilities-v2-shell {
   display: grid;
   gap: 16px;
@@ -12086,6 +12148,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .is-new-look .relationship-tag.is-rival {
   --nl-rel: var(--nl-rival);
 }
+.is-new-look .relationship-tag.is-human {
+  --nl-rel: var(--nl-human);
+}
 
 /* Saisonstand-Board: roter linker Rand + zarter Ring, additiv über dem
    bestehenden Team-Tag-Rahmen (Team-Tag-Farbschema bleibt erhalten). */
@@ -18361,8 +18426,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .legacy-lineup-team-tactics-head,
-.legacy-lineup-team-tactics-side-head,
-.legacy-lineup-captain-strip {
+.legacy-lineup-team-tactics-side-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -18370,8 +18434,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 .legacy-lineup-team-tactics-head strong,
-.legacy-lineup-team-tactics-side-head strong,
-.legacy-lineup-captain-strip strong {
+.legacy-lineup-team-tactics-side-head strong {
   color: #f7fbff;
 }
 
@@ -18398,24 +18461,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.legacy-lineup-team-tactics-side-head span,
-.legacy-lineup-captain-strip span,
-.legacy-lineup-captain-strip small {
+.legacy-lineup-team-tactics-side-head span {
   color: var(--foundation-muted);
   font-size: 0.78rem;
-}
-
-.legacy-lineup-captain-strip {
-  grid-column: 1 / -1;
-  padding: 12px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(118, 163, 241, 0.11), rgba(255, 255, 255, 0.03));
-  border: 1px solid rgba(118, 163, 241, 0.2);
-}
-
-.legacy-lineup-captain-strip > div:first-child {
-  display: grid;
-  gap: 4px;
 }
 
 .legacy-lineup-captain-resource-meter {
@@ -18534,9 +18582,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 }
 
 @media (max-width: 1180px) {
-  .legacy-lineup-captain-strip {
-    display: grid;
-  }
 
   .legacy-lineup-side-lever-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -18746,21 +18791,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .legacy-lineup-command-main small {
   color: var(--foundation-muted);
   font-size: 0.82rem;
-}
-
-.legacy-lineup-progress-track {
-  height: 8px;
-  overflow: hidden;
-  margin-top: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.legacy-lineup-progress-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #6db6ff, #8ee49b);
 }
 
 .legacy-lineup-command-stats {
@@ -19205,33 +19235,9 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   border-color: rgba(245, 158, 11, 0.3);
 }
 
-.legacy-lineup-main-flow {
-  display: grid;
-  gap: 18px;
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "board"
-    "deck"
-    "preview"
-    "scoreboard"
-    "expert";
-}
-
 .legacy-lineup-expert-panel {
   grid-area: expert;
   margin-top: 4px;
-}
-
-@media (min-width: 1440px) {
-  .legacy-lineup-main-flow {
-    grid-template-columns: minmax(0, 1.08fr) minmax(540px, 0.92fr);
-    grid-template-areas:
-      "board deck"
-      "preview preview"
-      "scoreboard scoreboard"
-      "expert expert";
-  }
 }
 
 .legacy-lineup-player-table-shell {
@@ -20860,12 +20866,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   line-height: 1.35;
 }
 
-.legacy-lineup-quick-assign-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 8px;
-}
-
 .legacy-lineup-quick-assign-button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -21974,16 +21974,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .legacy-lineup-main-flow {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "board"
-      "deck"
-      "preview"
-      "scoreboard"
-      "expert";
-  }
-
   .legacy-matchday-lane-grid {
     grid-template-columns: 1fr;
   }
@@ -22020,8 +22010,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
     flex: 1 1 94px;
   }
 
-  .legacy-lineup-team-tactics-head,
-  .legacy-lineup-captain-strip {
+  .legacy-lineup-team-tactics-head {
     align-items: stretch;
     flex-direction: column;
   }
@@ -25348,6 +25337,26 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   display: none;
 }
 
+/*
+ * AUSNAHME FUER DIE SCHALEN-BANNER — sonst redet die Oberflaeche nicht mit.
+ *
+ * GEMELDET VON CHRIS: „dann bitte im koop auch noch oben anzeigen dass der draft gerade läuft
+ * damit man erstmal 1-2 minuten wartet bevor man loslegt."
+ *
+ * NACHGEMESSEN (Raum, 18.08.): das Banner „Liga wird erstellt … (KI-Teams werden befuellt)" gibt es
+ * laengst, es steht auch im Baum — und es hat `display: none`. Die Regel darueber raeumt die
+ * INFORMATIONS-Callouts der Transfermarkt-Ansichten aus der Foundation-Schale; sie trifft aber ueber
+ * die gemeinsame Klasse `transfer-callout` auch das Fortschritts-Banner der Schale selbst. Zwei
+ * Minuten lang steht der Spieler damit vor einer Liga ohne Kader und bekommt kein Wort dazu.
+ *
+ * Die Ausnahme ist bewusst eng: nur `.foundation-persistence-banner`, also die Banner, die die
+ * Schale selbst setzt (Speicherfehler, Liga-Setup). Der Fehlerfall desselben Banners war nie
+ * betroffen — er traegt `is-warning` und wird von der Regel darunter ohnehin gezeigt.
+ */
+.foundation-shell .foundation-persistence-banner.transfer-callout.is-info {
+  display: grid;
+}
+
 .foundation-shell .transfer-callout.is-blocked,
 .foundation-shell .transfer-callout.is-warning,
 .foundation-shell .error-banner {
@@ -26912,13 +26921,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   stroke-width: 1;
 }
 
-.contract-forecast-chart-bar.is-preview {
-  fill: rgba(96, 165, 250, 0.32);
-  stroke: rgba(96, 165, 250, 0.85);
-  stroke-width: 1;
-  stroke-dasharray: 3 2;
-}
-
 .contract-forecast-chart-value {
   fill: rgba(255, 255, 255, 0.92);
   font-size: 9.5px;
@@ -27388,7 +27390,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   box-shadow: 0 8px 18px rgba(24, 56, 105, 0.28);
 }
 
-.legacy-lineup-lab-grid.is-draft-workspace .legacy-lineup-main-flow,
 .legacy-lineup-lab-grid.is-draft-workspace .legacy-lineup-secondary-panel {
   display: none;
 }
@@ -27532,23 +27533,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   align-self: start;
-}
-
-.legacy-lineup-draft-flow-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(111, 160, 232, 0.28);
-  background: rgba(38, 63, 99, 0.34);
-  color: rgba(218, 229, 245, 0.92);
-  font-size: 0.78rem;
-}
-
-.legacy-lineup-draft-flow-chip.is-positive {
-  border-color: rgba(88, 196, 132, 0.35);
-  background: rgba(44, 96, 68, 0.28);
 }
 
 .legacy-lineup-draft-decision-strip {
@@ -27799,8 +27783,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   min-width: 0;
 }
 
-.legacy-lineup-draft-tactics-form,
-.legacy-lineup-team-tactics-form {
+.legacy-lineup-draft-tactics-form {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -28207,12 +28190,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .legacy-lineup-draft-slot .legacy-lineup-slot-micro-step.has-arrow::after {
   right: -6px;
   font-size: 0.65rem;
-}
-
-.legacy-lineup-draft-side .legacy-lineup-captain-strip {
-  padding: 8px 10px;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .legacy-lineup-draft-side .legacy-lineup-captain-note {
@@ -35401,13 +35378,6 @@ button.market-v2-bucket-card.is-selected {
   font-size: 0.82rem;
 }
 
-.legacy-lineup-team-tactics-form-readonly {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
 @media (max-width: 760px) {
   .season-v2-cards-layout,
   .season-v2-main-grid {
@@ -38134,6 +38104,15 @@ button.market-v2-bucket-card.is-selected {
    Die `.is-new-look`-Deklarationen bleiben bestehen und gewinnen per Spezifitaet;
    das hier ist der Fallback fuer alles ausserhalb des App-Wrappers. */
 :root {
+  /* --nl-elite = ELITE-STUFE einer WERT-Skala (Depth-Chart ab Rating 80), theme-FEST.
+     CHRIS' ENTSCHEIDUNG: „depth chart soll weiterhin hellblau faerben und nicht in team farben,
+     das irritiert sonst." Bewusst NICHT --nl-accent: das ist die Vereinsfarbe, und eine Skala,
+     die auch --nl-risk enthaelt, darf sie nie tragen — bei rotem Team-Theme saehen Spitze und
+     Schlusslicht sonst gleich aus (der Fehler, den Paket F2 repariert hat). Bewusst auch nicht
+     --nl-gold: Gold gehoert der RANG-Skala („Bestwert -> Schlusslicht", quartile-tone.ts), und
+     es lag mit #f6c750 zu nah an --nl-warn (#e0a53a) der 40-59-Stufe daneben. Hellblau ist
+     hier ein fester Wert, kein Theme-Ableger. */
+  --nl-elite: #5b9bff;
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
@@ -44492,6 +44471,15 @@ button.foundation-team-portrait-card {
   --nl-risk-text: #f0837c;
   /* Medaillen (Podest / Top-3-Rahmen) — metallisch, theme-übergreifend lesbar. Silber ist
      bewusst HELL (nicht --nl-mut, das als „deaktiviert" liest); Bronze löst das rgb-Literal ab. */
+  /* --nl-elite = ELITE-STUFE einer WERT-Skala (Depth-Chart ab Rating 80), theme-FEST.
+     CHRIS' ENTSCHEIDUNG: „depth chart soll weiterhin hellblau faerben und nicht in team farben,
+     das irritiert sonst." Bewusst NICHT --nl-accent: das ist die Vereinsfarbe, und eine Skala,
+     die auch --nl-risk enthaelt, darf sie nie tragen — bei rotem Team-Theme saehen Spitze und
+     Schlusslicht sonst gleich aus (der Fehler, den Paket F2 repariert hat). Bewusst auch nicht
+     --nl-gold: Gold gehoert der RANG-Skala („Bestwert -> Schlusslicht", quartile-tone.ts), und
+     es lag mit #f6c750 zu nah an --nl-warn (#e0a53a) der 40-59-Stufe daneben. Hellblau ist
+     hier ein fester Wert, kein Theme-Ableger. */
+  --nl-elite: #5b9bff;
   --nl-gold: #f6c750;
   --nl-silver: #c7d0dc;
   --nl-bronze: #cd7f32;
@@ -44512,6 +44500,10 @@ button.foundation-team-portrait-card {
   --nl-mine: var(--nl-men);
   --nl-ally: var(--nl-spe);
   --nl-rival: var(--nl-risk);
+  /* Audit-Punkt 7 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): Mitspieler-Team (von einem MENSCHEN
+     gesteuert, aber nicht mein eigenes) — eigener, vierter Ton, damit er sich von
+     mine/ally/rival UND von neutralen KI-Teams (kein Rahmen) unterscheidet. */
+  --nl-human: var(--nl-soc);
   /* Radius */
   --nl-r-sm: 8px;
   --nl-r-md: 12px;
@@ -44584,6 +44576,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-tone-men,
 .is-new-look .nl-tone-soc,
 .is-new-look .nl-tone-gold,
+.is-new-look .nl-tone-elite,
 .is-new-look .nl-tone-good,
 .is-new-look .nl-tone-warn,
 .is-new-look .nl-tone-risk,
@@ -44629,6 +44622,11 @@ button.foundation-team-portrait-card {
    rotem Team-Theme nie wie Rang 31 (risk) aussieht. */
 .is-new-look .nl-tone-gold {
   --nl-tone: var(--nl-gold);
+}
+
+/* Elite-Stufe einer WERT-Skala (Depth-Chart ab 80) — theme-festes Hellblau, siehe --nl-elite. */
+.is-new-look .nl-tone-elite {
+  --nl-tone: var(--nl-elite);
 }
 
 /* --- StatChip: "jeder Stat ist ein Portal" ----------------------- */
@@ -48101,6 +48099,84 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* ALLE TEAMS IN EINEM BILD (`lcmgxx`). Genau eine Linie traegt Farbe und Vordergrund, alle anderen
+   liegen blass dahinter als Feld — 32 gleich starke Linien waeren unlesbar. Farben kommen aus
+   Tokens, damit die Grafik in beiden Themes traegt. */
+.is-new-look .nl-alltime-liga {
+  display: grid;
+  gap: var(--nl-s1);
+  margin: 0 0 var(--nl-s2);
+}
+
+.is-new-look .nl-alltime-liga-spanne {
+  margin: 0;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-liga-svg {
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-bg);
+}
+
+.is-new-look .nl-alltime-liga-linie {
+  fill: none;
+  stroke: var(--nl-line-2);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.is-new-look .nl-alltime-liga-linie.is-hervorgehoben {
+  stroke: var(--nl-accent);
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.is-new-look .nl-alltime-liga-punkt {
+  fill: var(--nl-accent);
+}
+
+.is-new-look .nl-alltime-liga-achse {
+  fill: var(--nl-mut);
+  font-size: 10px;
+}
+
+.is-new-look .nl-alltime-liga-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-alltime-liga-chip {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Der Chip ist SCHRIFT, deshalb `--nl-accent-text` und nicht `--nl-accent`: dasselbe Token, aber
+   per accentTextFor auf >= 4,5:1 angehoben — bei dunklen Vereinsfarben waere die rohe Akzentfarbe
+   als Schrift unlesbar (Ratchet in tests/nl-accent-text-regel.test.ts). Die LINIE daneben bleibt
+   auf `--nl-accent`: sie ist keine Schrift, sondern die Vereinsfarbe selbst, und folgt damit den
+   uebrigen Charts im Haus. */
+.is-new-look .nl-alltime-liga-chip.is-hervorgehoben {
+  border-color: var(--nl-accent-text);
+  color: var(--nl-accent-text);
+  font-weight: 700;
+}
+
+.is-new-look .nl-alltime-liga-hinweis {
+  margin: 0 0 var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-alltime-chart-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -48838,6 +48914,138 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-teams-hero-chips {
   flex-wrap: wrap;
+}
+
+/* MERKLISTE — das Lesezeichen auf Teams und Spielern.
+
+   Bewusst ein STERN und kein gefuellter Knopf: er steht neben dem Teamnamen und in der
+   Aktionsspalte der Kadertabelle, also direkt neben Schaltflaechen, die etwas am Spiel aendern.
+   Ein Lesezeichen tut das nicht — es darf optisch nicht mit ihnen konkurrieren. Ungesetzt bleibt
+   er gedaempft und faellt erst beim Hovern auf; gesetzt traegt er die Akzentfarbe, dieselbe wie
+   der Rang-Chip, damit „das beobachte ich" ueberall gleich aussieht. */
+/* DIE MERKLISTEN-ANSICHT — „sich die dann noch mal angucken kann" (Chris).
+
+   Bewusst karg: die Liste ist ein Nachschlagewerk, kein Schaufenster. Sie borgt die Flaechen- und
+   Linienwerte der uebrigen Tafeln, damit sie sich nicht als eigene Welt anfuehlt. */
+.merkliste-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 24px;
+  color: var(--nl-ink);
+}
+
+.merkliste-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.merkliste-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-accent-text);
+}
+
+.merkliste-title {
+  margin: 4px 0 6px;
+  font-family: var(--nl-display);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.merkliste-sub {
+  margin: 0;
+  max-width: 64ch;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.merkliste-count {
+  font-size: 12px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.merkliste-leer {
+  margin: 0;
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.merkliste-block {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  padding: 14px 16px;
+}
+
+.merkliste-block-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.merkliste-block-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.merkliste-scroll {
+  overflow-x: auto;
+}
+
+/* Ein Eintrag, dessen Spieler es nicht mehr gibt, wird GEZEIGT und nicht verschluckt — das
+   Verschlucken ist der Fehler der Scouting-Beobachtungsliste. Gedaempft, weil es ein Hinweis
+   ist und keine Warnung. */
+.merkliste-fehlt {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--nl-mut);
+  font-style: italic;
+}
+
+.is-new-look .nl-merk-stern {
+  margin-left: 8px;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--nl-mut);
+  background: none;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: color 120ms ease, transform 120ms ease;
+}
+
+.is-new-look .nl-merk-stern:hover,
+.is-new-look .nl-merk-stern:focus-visible {
+  color: var(--nl-accent-text);
+  transform: scale(1.15);
+}
+
+.is-new-look .nl-merk-stern.is-gemerkt {
+  color: var(--nl-accent-text);
+}
+
+/* In der Kadertabelle steht der Stern in einer engen Zelle neben zwei Textknoepfen — dort
+   braucht er weniger Luft als am Teamnamen, sonst schiebt er die Aktionen um. */
+.is-new-look .nl-teams-td-actions .nl-merk-stern {
+  margin-left: 0;
+  margin-right: 6px;
+  font-size: 14px;
 }
 
 .is-new-look .nl-teams-hero-axes {
@@ -54246,6 +54454,160 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s3);
+}
+
+/* ------------------------------------------------------------------ */
+/* SAISON-SPOTLIGHT (`5hcq2p`) — Rueckblick auf die Vorsaison, oben auf */
+/* „Team · Training". Teamfarbe nur ueber --nl-accent-text (Textregel),  */
+/* Sekundaertext ueber --nl-mut, nicht --nl-mut-2.                      */
+/* ------------------------------------------------------------------ */
+.is-new-look .nl-spotlight-card .nl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-spotlight-platz {
+  margin: 0;
+  color: var(--nl-mut);
+  font-size: 13px;
+}
+
+.is-new-look .nl-spotlight-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2, transparent);
+}
+
+.is-new-look .nl-spotlight-kpi strong {
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--nl-accent-text);
+}
+
+.is-new-look .nl-spotlight-kpi span {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-subhead {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-subhead small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--nl-mut);
+}
+
+/* Breite Tabellen scrollen in ihrem eigenen Kasten, nie die Seite. */
+.is-new-look .nl-spotlight-table-scroll {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-spotlight-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-spotlight-table th,
+.is-new-look .nl-spotlight-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spotlight-table thead th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  font-weight: 600;
+}
+
+.is-new-look .nl-spotlight-table tbody tr:last-child th,
+.is-new-look .nl-spotlight-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.is-new-look .nl-spotlight-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-spotlight-name-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-spotlight-name-button:hover,
+.is-new-look .nl-spotlight-name-button:focus-visible {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-spotlight-classflag {
+  border: 1px solid var(--nl-accent);
+  color: var(--nl-accent-text);
+  border-radius: var(--nl-r-pill);
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spotlight-attr-key {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-mode {
+  text-transform: capitalize;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-leer {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spotlight-more,
+.is-new-look .nl-spotlight-neu,
+.is-new-look .nl-spotlight-liga {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+  line-height: 1.5;
+}
+
+.is-new-look .nl-spotlight-neu strong {
+  color: var(--nl-fg, inherit);
 }
 
 /* EINE KPI-Zeile (TR3): Ist-Zahlen, bei aktiver Simulation ersetzt
@@ -60046,6 +60408,97 @@ button.foundation-team-portrait-card {
   font-size: 11px;
   color: var(--nl-mut);
   min-width: 200px;
+}
+
+/* Die Regel unter dem Kategorie-Titel (Ticket #41). Bewusst klein und gedaempft: sie soll
+   erklaeren, wenn man hinschaut, und nicht mit dem Sieger um Aufmerksamkeit ringen. */
+.is-new-look .nl-leaders-card-rule {
+  margin: 2px 0 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--nl-mut-2);
+  max-width: 46ch;
+}
+
+.is-new-look .nl-leaders-card-info {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut-2);
+  font-size: 9.5px;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+
+/* --- Auszeichnungen (Ticket #41) --------------------------------------
+   Zwei Groessen aus EINER Komponente: die volle Marke im Spielerprofil, nur die
+   Zeichen in der Arena-Zeile. Gold, weil das Spiel dafuer bereits `--nl-gold`
+   fuehrt — eine neue Farbe fuer Auszeichnungen einzufuehren waere ein zweites
+   Vokabular fuer dieselbe Aussage. */
+
+.is-new-look .nl-award-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-award-strip-label {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+  font-weight: 800;
+}
+
+.is-new-look .nl-award-strip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-award-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--nl-gold) 11%, var(--nl-bg-2));
+  border: 1px solid color-mix(in srgb, var(--nl-gold) 40%, transparent);
+  color: var(--nl-ink);
+  /* `default`, nicht `pointer`: die Marke ist nicht anklickbar, der Grund steht im Titel.
+     Ein Zeigefinger auf etwas, das nichts tut, ist ein Versprechen, das nicht eingeloest wird. */
+  cursor: default;
+}
+
+.is-new-look .nl-award-chip-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-new-look .nl-award-chip-label {
+  font-weight: 700;
+}
+
+.is-new-look .nl-award-chip-season {
+  color: var(--nl-mut-2);
+}
+
+/* Die Arena-Zeile: nur Zeichen, direkt hinter dem Namen. Sie stehen in einer Zeile mit dem
+   Namen und duerfen ihn nicht verdraengen — deshalb kein Umbruch und kein eigener Block. */
+.is-new-look .nl-award-icons,
+.nl-award-icons {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: baseline;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* --- KI-Vorschau ------------------------------------------------------
@@ -70527,8 +70980,18 @@ span.nl-facility-ampel-chip {
   border-radius: var(--nl-r-pill);
 }
 
+/*
+ * CHRIS: „beim training bitte auch die farben nicht mit team farben ueberschreiben wenn man eine
+ * klasse waehlt."
+ *
+ * Hier stand `var(--nl-accent)` — die VEREINSFARBE. Waehlte man eine Klasse, uebermalte der Balken
+ * damit genau die Klassenfarbe, an der man die Klasse wiedererkennt: der linke Rahmen blieb blau
+ * (Templar), der Balken daneben wurde teamrot. Der gewaehlte Zustand ist ohnehin schon an der
+ * Flaeche und der Innenkante zu sehen — die Farbe des Balkens sagt „welche Klasse", nicht „welche
+ * ist gewaehlt", und bleibt deshalb die Klassenfarbe.
+ */
 .is-new-look .nl-training-class-ranking-row.is-current .nl-training-class-ranking-fill {
-  background: var(--nl-accent);
+  background: var(--nl-tone, var(--nl-soc));
 }
 
 /*
@@ -71141,6 +71604,78 @@ span.nl-facility-ampel-chip {
 }
 
 /* --- CASH: Mini-GuV ---------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* SAISONSTAND-HOVERS (Chris, 23.08.) — Teamname, Marktwert, Gehaelter.  */
+/* Sie benutzen das Portal-Vokabular .nl-teams-rank-portal/-preview; hier */
+/* stehen nur die drei Zusaetze, die es dort noch nicht gab.             */
+/* ------------------------------------------------------------------ */
+.is-new-look .nl-standings-hover-shape,
+.is-new-look .nl-standings-hover-years {
+  margin-left: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-hover-share {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+/* Posten-Panels der vier Zahlen-Hovers (Sponsoren, Transfers, Gebaeude, Cash). */
+.is-new-look .nl-standings-hover-posten {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.is-new-look .nl-standings-hover-postenrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-hover-postenrow.is-result {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--nl-line);
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-hover-rest,
+.is-new-look .nl-standings-hover-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--nl-mut);
+  line-height: 1.5;
+}
+
+/* Der Teamnamen-Hover umschliesst einen Button — das Portal darf dessen
+   Klickflaeche nicht verkleinern. */
+.is-new-look .nl-standings-team-portal {
+  display: block;
+}
+
+/* Cash-Block im GuV-Popover des Team-Profils: abgesetzt, damit der Kontostand
+   nicht wie ein weiterer GuV-Posten aussieht. */
+.is-new-look .nl-kpipop-guv-cash {
+  margin-top: var(--nl-s2);
+  padding-top: var(--nl-s2);
+  border-top: 1px solid var(--nl-line);
+}
+
+/* Posten, die cash-wirksam sind, aber nicht in die GuV zaehlen. */
+.is-new-look .nl-kpipop-guvrow.is-aside {
+  opacity: 0.72;
+}
+
 .is-new-look .nl-kpipop-guv {
   display: flex;
   flex-direction: column;
@@ -73263,10 +73798,16 @@ span.nl-facility-ampel-chip {
   -webkit-appearance: none;
   appearance: none;
 }
+/*
+ * Der Hover toent NEUTRAL, nicht in der Vereinsfarbe (Chris, s. o.): er liegt direkt auf einer
+ * Zeile, die ihre Klassenfarbe als linken Rahmen traegt. Ein teamroter Schleier ueber einer blauen
+ * Klasse ist genau die Verwechslung, die die Rahmenfarbe verhindern soll. Der Fokusring darunter
+ * bleibt beim Akzent — der ist Bedienhilfe und faerbt nichts ein.
+ */
 .is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:hover:not(:disabled):not(.is-current),
 .is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:hover:not(:disabled):not(.is-current) {
-  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
-  border-color: color-mix(in srgb, var(--nl-accent) 32%, transparent);
+  background: color-mix(in srgb, var(--nl-ink, #e8edf5) 7%, transparent);
+  border-color: color-mix(in srgb, var(--nl-ink, #e8edf5) 24%, transparent);
 }
 .is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:focus-visible,
 .is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:focus-visible {
@@ -79223,6 +79764,26 @@ span.nl-facility-ampel-chip {
   max-width: 56ch;
 }
 
+/* Die Ansage vor der Tuer, die fuer eine ganze Saison zufaellt (`cubix1`). Sie steht bewusst
+   auf `--nl-warn` und nicht auf `--nl-bad`: hier ist nichts kaputt, es ist nur gleich zu spaet.
+   Farbe und Flaeche kommen aus Tokens, damit die Tafel in beiden Themes traegt. */
+.arena-prematch-kaufwarnung {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--nl-warn);
+  border-left-width: 3px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 10%, transparent);
+  color: var(--nl-ink);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 56ch;
+}
+
+.arena-prematch-kaufwarnung strong {
+  color: var(--nl-warn);
+}
+
 .arena-prematch-slotbar {
   display: flex;
   flex-wrap: wrap;
@@ -79362,6 +79923,76 @@ span.nl-facility-ampel-chip {
   font-size: 12.5px;
 }
 
+/* Der Seiten-Zaehler wechselt auf „gut", sobald die Seite voll ist — dieselbe Bereit-Semantik
+   wie der Status-Pill im Hero, damit ein Blick reicht. */
+.arena-prematch-disc-badge.is-full {
+  border-color: var(--nl-good);
+  color: var(--nl-good);
+}
+
+.arena-prematch-athletes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.arena-prematch-athlete {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-bg);
+  padding: 5px 9px;
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+/* Die Nummer ist der ECHTE Slot aus dem Einsatzlisten-Entwurf: Positionen sind verbindlich, eine
+   Luecke davor verschiebt sie nicht — deshalb steht sie am Namen und ist kein Laufindex. */
+.arena-prematch-athlete-slot {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nl-mut);
+}
+
+.arena-prematch-athlete-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arena-prematch-athlete-captain {
+  flex: none;
+  color: var(--nl-accent-text);
+}
+
+.arena-prematch-disc-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* Textknopf statt Knopfflaeche: der grosse Handlungsknopf lebt im Hero, ein zweiter voller Knopf
+   auf derselben Tafel wuerde mit ihm konkurrieren. */
+.arena-prematch-inlinelink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--nl-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 .arena-prematch-ctx {
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-lg);
@@ -79421,20 +80052,60 @@ span.nl-facility-ampel-chip {
   border-left: 3px solid var(--nl-accent);
 }
 
-.arena-prematch-rival-tag {
-  color: var(--nl-risk);
+/* Drei Herkunfts-Etiketten statt Verbuendet/Rivale: sie beantworten „warum steht dieses Team
+   hier" — eigen (Akzent), Mensch (die echten Gegner, gruen wie „bereit"), gemerkt (Warnton als
+   Lesezeichen-Band). Die frueheren zwei kamen aus einer automatisch vergebenen Rivalitaet und
+   halfen bei keiner Entscheidung. */
+.arena-prematch-tagrow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.arena-prematch-own-tag {
+  color: var(--nl-accent-text);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.arena-prematch-ally-tag {
+.arena-prematch-mensch-tag {
   color: var(--nl-good);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.arena-prematch-merk-tag {
+  color: var(--nl-warn);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.arena-prematch-ctx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.arena-prematch-ctx-count {
+  font-size: 12px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.arena-prematch-ctx-hint {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--nl-line);
+  font-size: 12px;
+  color: var(--nl-mut);
 }
 
 .arena-prematch-ghost {

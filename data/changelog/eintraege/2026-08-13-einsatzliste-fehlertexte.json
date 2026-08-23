@@ -4,6 +4,6 @@
   "pr": null,
   "text": "Ueber der Einsatzliste stand im Fehlerfall ein roher Fehlercode wie „lineup_draft_is_locked\" — ohne Grund und ohne Ausweg. Dahinter steckt kein Fehler, sondern eine gewollte Sperre: sobald ein Spieltag in der Arena gezeigt wurde, ist die Aufstellung festgenagelt, damit sich niemand nach dem Blick aufs Ergebnis noch nachbessern kann. Diese und die uebrigen Meldungen der Einsatzliste erscheinen jetzt als deutscher Satz, der den Grund nennt. Unbekannte Meldungen werden weiterhin unveraendert gezeigt statt gegen ein nichtssagendes „Unbekannter Fehler\" getauscht.",
   "quelle": "gepflegt",
-  "gewicht": null,
+  "gewicht": "behebung",
   "version": "0.4"
 }

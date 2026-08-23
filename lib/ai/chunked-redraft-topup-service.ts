@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { NULA_PLAYER_ID } from "@/lib/foundation/ensure-nula-on-project-suicide";
 import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
@@ -2962,10 +2963,20 @@ function writeReports(input: {
   progressRows?: ProgressLogRow[];
   counters?: RedraftCandidateCounters;
   reportMode?: "full" | "light";
+  // Reine Anzeige-Info fuer die exportierten Artefakte -- der eigentliche `dryRun`-Zweig
+  // (kein Save-Write) sitzt schon in `runChunkedRedraftTopup`. Ohne dieses Flag hier sahen
+  // `chunked-redraft-summary.md`/`.json` in einem Trockenlauf identisch zu einem echten
+  // Lauf aus: dieselben Picks, dieselben Zaehler, nur eben nie gespeichert. Wer nur die
+  // Datei oeffnet (z.B. fuer eine Test-Fixture), ohne den CLI-Aufruf drumherum zu sehen,
+  // haette den Trockenlauf sonst nicht erkennen koennen.
+  dryRun: boolean;
 }) {
   writeJson(input.outputDir, "chunked-redraft-state.json", input.state);
-  writeJson(input.outputDir, "chunked-redraft-summary.json", input.summary);
+  // `dryRun` steht bewusst als erster Key vor dem Spread der eigentlichen Summary --
+  // wer die Datei oeffnet, sieht die Warnung, bevor irgendein Zahlenwert zu lesen ist.
+  writeJson(input.outputDir, "chunked-redraft-summary.json", { dryRun: input.dryRun, ...input.summary });
   writeJson(input.outputDir, "topup-memory-audit.json", {
+    dryRun: input.dryRun,
     summary: input.summary,
     rounds: input.summary.roundDurations,
     memoryRows: input.memoryRows,
@@ -2976,6 +2987,10 @@ function writeReports(input: {
     "chunked-redraft-summary.md",
     [
       "# Chunked Redraft / Topup Summary",
+      "",
+      input.dryRun
+        ? "**TROCKENLAUF -- es wurde nichts geschrieben.** Alle Zahlen unten sind eine Vorschau, kein gespeicherter Stand. Mit `--write` ausfuehren, um sie zu uebernehmen."
+        : "Lauf mit `--write`: die Zahlen unten sind gespeichert.",
       "",
       `- DRAFT_VALID: ${input.summary.draftValid ? "true" : "false"}`,
       `- Invalid Gruende: ${input.summary.invalidReasons.length ? input.summary.invalidReasons.join(", ") : "keine"}`,
@@ -3515,8 +3530,25 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   if (!dryRun && params.confirmToken !== CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN) {
     throw new Error("chunked_redraft_confirm_token_required");
   }
-  if (params.mode === "full_clean_redraft" && save.gameState.rosters.length > 0) {
-    throw new Error(`full_clean_redraft_requires_empty_rosters:${save.gameState.rosters.length}`);
+  if (params.mode === "full_clean_redraft") {
+    /**
+     * NULA ZAEHLT NICHT GEGEN DEN LEEREN KADER — Chris: „pass den draft entsprechend an, Nula
+     * gehört mit dazu die bleibt bei P-S".
+     *
+     * Zwei bewusste Regeln stiessen hier zusammen. P-S kauft das Maskottchen BEIM ANLEGEN
+     * (`ensureNulaOnProjectSuicide`, Chris: „das ist ok so!"), und dieser Riegel verlangt einen
+     * voellig leeren Kader. Ergebnis: `full_clean_redraft` konnte auf einem frischen Spielstand
+     * gar nicht mehr starten — der Modus war durch eine andere gewollte Regel unerreichbar
+     * geworden.
+     *
+     * Der Riegel selbst bleibt und ist richtig: er soll verhindern, dass ein Neuaufbau auf einen
+     * bereits gefuellten Kader draufsetzt. Nula ist davon die eine dokumentierte Ausnahme, weil
+     * sie per Sonderregel ohnehin nach jedem Lauf wieder bei P-S landet.
+     */
+    const fremdeEintraege = save.gameState.rosters.filter((eintrag) => eintrag.playerId !== NULA_PLAYER_ID);
+    if (fremdeEintraege.length > 0) {
+      throw new Error(`full_clean_redraft_requires_empty_rosters:${fremdeEintraege.length}`);
+    }
   }
 
   const resumeState = params.resume ? readResumeState(outputDir, save.saveId) : null;
@@ -4609,6 +4641,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       progressRows: profiler.rows,
       counters,
       reportMode,
+      dryRun,
     });
     writeCsv(outputDir, "team-sequential-draft-teams.csv", sequentialTeamRows);
     writeCsv(outputDir, "team-sequential-draft-picks.csv", sequentialPickRows);
@@ -5320,6 +5353,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         progressRows: profiler.rows,
         counters,
         reportMode,
+        dryRun,
       });
       profiler.end("report_export", reportPhaseStartedAt, {
         round,
@@ -5405,6 +5439,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     progressRows: profiler.rows,
     counters,
     reportMode,
+    dryRun,
   });
 
   return {

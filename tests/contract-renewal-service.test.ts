@@ -310,6 +310,24 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents ?? []).toHaveLength(0);
   });
 
+  /**
+   * HIER STAND „altert einen frisch unterschriebenen Vertrag NICHT noch einmal".
+   *
+   * Der Test schuetzte eine Ausnahme, die ich beim Freigeben der Verlängerung in der letzten
+   * Vertragssaison eingebaut hatte: ein VOR dem Tick unterschriebener Vertrag sollte hier kein
+   * Jahr verlieren. Die Annahme dahinter — verlängert werden kann vor der Alterung — gilt nicht
+   * mehr: die Alterung läuft jetzt beim Betreten der Saisonende-Phase, eine Verlängerung liegt
+   * also immer dahinter.
+   *
+   * Die Ausnahme war nicht nur überflüssig, sie war schädlich. Am gemeldeten Spielstand trug
+   * Xelara zwei Verlängerungs-Ereignisse aus der kaputten Zwischenzeit und wurde deshalb von der
+   * Alterung ausgenommen — sie blieb als einzige ihres Teams auf „auslaufend" stehen, während die
+   * anderen drei sauber alterten. Genau der Zustand, aus dem Chris nicht herauskam.
+   *
+   * Der Wächter dagegen steht jetzt in `vertragsalterung-automatisch.test.ts`: die Alterung nimmt
+   * NIEMANDEN aus.
+   */
+
   it("keeps manual LZ 1 players pending for a human renewal decision", () => {
     const team = createTeam({ humanControlled: true });
     const player = createPlayer("p1");
@@ -663,16 +681,21 @@ describe("contract renewal service", () => {
 
     expect(result.releasedPlayers).toBe(1);
     expect(savedGameState?.rosters).toHaveLength(0);
-    expect(savedGameState?.teams[0]?.cash).toBe(108);
+    // REGELAENDERUNG (Chris): „contract exits sind im grunde nichts anderes als ein verkauf" —
+    // der Erloes laeuft jetzt durch dieselbe Preisstufe wie ein Marktverkauf
+    // (`applySellPricingPolicyToBreakdown`, hier Faktor 0,974). Vorher stand hier der ROHE Preis.
+    // `marketValueAtExit` bleibt bewusst roh: das ist der Vergleichsmassstab, nicht der Erloes.
+    expect(savedGameState?.teams[0]?.cash).toBe(107.79);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_expired_exit");
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(8);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(1);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(7.79);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(0.974);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.marketValueAtExit).toBe(8);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.purchasePrice).toBe(10);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(-2);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(-2.21);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.newLength).toBe(0);
     expect(savedGameState?.transferHistory[0]?.transferType).toBe("contract_exit");
-    expect(savedGameState?.transferHistory[0]?.fee).toBe(8);
+    // Die Historie traegt denselben Betrag wie die Gutschrift — ein Vertragsende ist ein Verkauf.
+    expect(savedGameState?.transferHistory[0]?.fee).toBe(7.79);
   });
 
   it("blocks season-end contract apply without confirm token", () => {
@@ -719,7 +742,102 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_renewed");
   });
 
-  it("blocks direct renewals until the contract is at LZ 0", () => {
+  /**
+   * GEMELDET VON CHRIS: „ich kann die verträge im aktuellen save nicht verlängern obwohl wir in
+   * der vertrags phase sind!" — und danach: „es steht ja sogar dort dass vertrag ausläuft, also
+   * wundert es mich dass es nicht klappt."
+   *
+   * Die Regel verlangte Laufzeit 0, also einen bereits abgelaufenen Vertrag. `contractLength`
+   * zaehlt aber EINSCHLIESSLICH der laufenden Saison: eine 1 ist die letzte Vertragssaison, und
+   * genau ueber die wird am Saisonende entschieden. Auf 0 faellt der Vertrag erst durch die
+   * Alterung im Saisonuebergang — da ist das Fenster schon zu. Am gemeldeten Spielstand standen
+   * 288 von 339 Vertraegen auf 1 und kein einziger auf 0; verlaengerbar war niemand.
+   *
+   * Dieser Test hielt vorher genau den Fehler fest („blocks direct renewals until the contract is
+   * at LZ 0") und war deshalb kein Schutz, sondern ein Siegel.
+   */
+  /**
+   * DER GEMELDETE FALL, DURCH DEN ECHTEN SCHREIBWEG.
+   *
+   * GEMELDET VON CHRIS: „ist denn der bug mit xelara gefixt? ist das geprüft?" — eine berechtigte
+   * Frage, denn bis hierher war die Ursache ERSCHLOSSEN und nicht gemessen.
+   *
+   * Aus seinem Spielstand, 19:27:20 Uhr: `LZ 0 -> 1 · Gehalt 5,00 -> 5,50`. Ein Spieler, ueber den
+   * gerade entschieden wird, steht auf Laufzeit 0. Kam an der Route keine Laufzeit an, nahm der
+   * Apply-Pfad die vorhandene — also 0 — und die Klemme `Math.max(1, ...)` machte daraus 1. Eine
+   * Verlaengerung, die den Spieler auf „auslaufend" stehen laesst.
+   *
+   * Dieser Test faehrt genau das: `applyContractRenewalAction` OHNE `contractLength`, auf einem
+   * Eintrag mit Laufzeit 0. Vorher schrieb er 1, jetzt die Vorgabe des Verhandlungsfensters.
+   */
+  it("schreibt ohne Laufzeitangabe eine echte Verlaengerung, keine Ein-Saison-Bruecke", () => {
+    const player = createPlayer("p1");
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 5 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const token = previewContractRenewalAction({ save, teamId: "A-A", playerId: "p1", action: "renew" }).confirmToken;
+
+    const ergebnis = applyContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      confirmToken: token,
+      persistence,
+      source: "manual_contract_renewal",
+      // KEINE contractLength — genau der Fall aus dem Spielstand.
+    });
+
+    expect(ergebnis.applied).toBe(true);
+    const gespeichert = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+    const eintrag = gespeichert?.rosters.find((zeile) => zeile.playerId === "p1");
+    // Vorher stand hier 1 — und 1 heisst „auslaufend", also sah es aus wie nichts.
+    expect(eintrag?.contractLength).toBe(2);
+    expect(eintrag?.contractStatus).toBe("active");
+  });
+
+  /**
+   * Die Gegenprobe: eine AUSDRUECKLICHE Ein-Saison-Bruecke bleibt moeglich. Sie ist ein legitimes
+   * Ergebnis einer Verhandlung — der Fix soll den Fallback treffen, nicht die Absicht.
+   */
+  it("schreibt eine ausdrueckliche Ein-Saison-Bruecke weiterhin als solche", () => {
+    const player = createPlayer("p1");
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 5 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const token = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      contractLength: 1,
+    }).confirmToken;
+
+    const ergebnis = applyContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      confirmToken: token,
+      persistence,
+      contractLength: 1,
+      source: "manual_contract_renewal",
+    });
+
+    expect(ergebnis.applied).toBe(true);
+    const gespeichert = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+    expect(gespeichert?.rosters.find((zeile) => zeile.playerId === "p1")?.contractLength).toBe(1);
+  });
+
+  it("laesst die letzte Vertragssaison verlaengern — dort faellt die Entscheidung", () => {
     const player = createPlayer("p1");
     const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
 
@@ -732,8 +850,24 @@ describe("contract renewal service", () => {
       offeredSalary: 8,
     });
 
+    expect(preview.blockingReasons).not.toContain("renewal_only_allowed_at_contract_end");
+  });
+
+  it("blockiert einen Vertrag, der noch laenger laeuft", () => {
+    const player = createPlayer("p1");
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 3, salary: 6 })] }));
+
+    const preview = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      contractLength: 4,
+      offeredSalary: 8,
+    });
+
     expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain("renewal_only_allowed_at_lz_0");
+    expect(preview.blockingReasons).toContain("renewal_only_allowed_at_contract_end");
   });
 
   it("applies morale to renewal salary and limits very unhappy players to short bridge deals", () => {
@@ -827,15 +961,20 @@ describe("contract renewal service", () => {
 
     expect(result.applied).toBe(true);
     expect(savedGameState?.rosters).toHaveLength(0);
-    expect(savedGameState?.teams[0]?.cash).toBe(113);
+    // REGELAENDERUNG (Chris): „contract exits sind im grunde nichts anderes als ein verkauf" —
+    // der Erloes laeuft jetzt durch dieselbe Preisstufe wie ein Marktverkauf
+    // (`applySellPricingPolicyToBreakdown`, hier Faktor 0,974). Vorher stand hier der ROHE Preis.
+    // `marketValueAtExit` bleibt bewusst roh: das ist der Vergleichsmassstab, nicht der Erloes.
+    expect(savedGameState?.teams[0]?.cash).toBe(111.96);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("player_released");
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(40);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(1);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.exitValue).toBe(38.96);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.saleFactor).toBe(0.974);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.marketValueAtExit).toBe(40);
     expect(savedGameState?.seasonState.contractEvents?.[0]?.purchasePrice).toBe(30);
-    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(10);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.profitLoss).toBe(8.96);
     expect(savedGameState?.transferHistory[0]?.transferType).toBe("contract_exit");
-    expect(savedGameState?.transferHistory[0]?.fee).toBe(40);
+    // Die Historie traegt denselben Betrag wie die Gutschrift — ein Vertragsende ist ein Verkauf.
+    expect(savedGameState?.transferHistory[0]?.fee).toBe(38.96);
     expect(savedGameState?.transferHistory[0]?.salary).toBe(9);
   });
 

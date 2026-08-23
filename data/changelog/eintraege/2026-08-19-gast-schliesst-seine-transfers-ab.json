@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Mehrspieler",
+  "text": "Der Mitspieler kann seinen Schritt „Transfers finalisieren“ jetzt selbst abschließen. Vorher lehnte die Route ihn ab, weil sie mit der host-only Regenerier-Berechtigung prüfte — und weil der Schritt erst NACH einer erfolgreichen Antwort als erledigt gilt, meldete er sich nie bereit und der Host konnte den Raum nicht weiterschalten. Der Spieltagszyklus stand damit still. Geprüft wird jetzt der Team-Besitz: jeder für seine eigenen Teams. Der zerstörerische Weg, der den Formkarten-Pool ersetzt, bleibt unverändert nur beim Host.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

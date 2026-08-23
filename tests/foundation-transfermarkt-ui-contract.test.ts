@@ -194,12 +194,24 @@ describe("foundation transfermarkt ui contract", () => {
     );
 
     expect(teamControlHookText).toContain("localUserManualTeams");
-    expect(fileText).toContain("settings.ownerSlot === \"user\"");
-    expect(fileText).toContain("settings.displayLabel === \"Chris\"");
+    // Stufe 2.4 (docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md, Befund "die UI erlaubt mehr als der
+    // Server"): hier stand frueher zusaetzlich `settings.ownerSlot === "user"` /
+    // `settings.displayLabel === "Chris"` als eigener, grosszuegigerer Freigabe-Zweig
+    // (`isLocalUserManualTeam`) -- unabhaengig von `effectiveActiveOwnerId`. Der Server prueft
+    // beim Schreiben ausschliesslich exakte Owner-Gleichheit; die Oberflaeche erlaubte also mehr
+    // als der Server, was NACH einem Klick in einem 403 endete. Der Zweig ist raus, Chris' Teams
+    // bleiben trotzdem manageable, weil `effectiveActiveOwnerId` fuer ihn jetzt zuverlaessig
+    // aufgeloest wird (siehe tests/frankys-browser-kennt-seine-teams.test.ts, das den entfernten
+    // Zweig praezise -- ohne Kommentarzeilen -- prueft).
+    expect(fileText).toContain("canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId)");
     expect(fileText).toContain("FoundationTransfermarktV2Panel");
     expect(fileText).toContain("manageableTeamIds: foundationManageableTeamIds");
-    expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
-    expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
+    // Stufe 0.3 (Befund B2): `withRoomBody` schickte hier frueher `activeOwnerId: resolvedOwnerId`
+    // mit — die Owner-ID des ZIELTEAMS, nicht die eigene. Der Server ignoriert das Feld jetzt und
+    // bestimmt die Identitaet selbst (Sitz-Token im Raum, sonst die Sitzung); die Zeile ist raus,
+    // statt irrefuehrend stehen zu bleiben. Diese Zusicherung haelt fest, dass sie nicht
+    // zurueckkehrt.
+    expect(fileText).not.toContain("activeOwnerId: resolvedOwnerId");
   });
 
   it("keeps scouting values intentionally fuzzy instead of exposing exact hidden truths", async () => {

@@ -102,16 +102,21 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "recovery_center",
     label: "Recovery Center",
+    // DIE TEXTE WAREN VERALTET: sie nannten „Basis 20", waehrend `BASE_MATCHDAY_RECOVERY` seit
+    // August 2026 auf 28 steht — die Karte versprach also seit Monaten eine andere Zahl, als das
+    // Spiel rechnete. Die Wahrheit steht in `RECOVERY_FLAT_BONUS_BY_LEVEL`
+    // (`lib/facilities/facility-effects.ts`); diese Zeilen sind ihre Beschriftung und muessen bei
+    // jeder Aenderung dort mitgezogen werden.
     description: "Verbessert Erholung und Fatigue-Signale, macht Push aber nicht kostenlos.",
     maxLevel: 5,
     effectType: "recovery",
     effectDescription: "Erholungs-Bonus",
     levels: [
-      { level: 1, effectDescription: "+2 Erholung (Basis 20 → 22)", upgradeCost: 7, seasonUpkeep: 0.7, modifierPct: 5 },
-      { level: 2, effectDescription: "+4 Erholung (Basis 20 → 24)", upgradeCost: 13, seasonUpkeep: 1.2, modifierPct: 10 },
-      { level: 3, effectDescription: "+6 Erholung (Basis 20 → 26)", upgradeCost: 22, seasonUpkeep: 2.1, modifierPct: 15 },
-      { level: 4, effectDescription: "+9 Erholung (Basis 20 → 29)", upgradeCost: 35, seasonUpkeep: 3.3, modifierPct: 20 },
-      { level: 5, effectDescription: "+12 Erholung (Basis 20 → 32)", upgradeCost: 54, seasonUpkeep: 4.8, modifierPct: 25 },
+      { level: 1, effectDescription: "+4 Erholung (Basis 28 → 32)", upgradeCost: 7, seasonUpkeep: 0.7, modifierPct: 5 },
+      { level: 2, effectDescription: "+8 Erholung (Basis 28 → 36)", upgradeCost: 13, seasonUpkeep: 1.2, modifierPct: 10 },
+      { level: 3, effectDescription: "+13 Erholung (Basis 28 → 41)", upgradeCost: 22, seasonUpkeep: 2.1, modifierPct: 15 },
+      { level: 4, effectDescription: "+18 Erholung (Basis 28 → 46)", upgradeCost: 35, seasonUpkeep: 3.3, modifierPct: 20 },
+      { level: 5, effectDescription: "+24 Erholung (Basis 28 → 52)", upgradeCost: 54, seasonUpkeep: 4.8, modifierPct: 25 },
     ],
   },
   {

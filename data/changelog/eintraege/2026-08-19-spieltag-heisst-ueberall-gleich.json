@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-19",
+  "seite": "Mehrspieler",
+  "text": "Die Sperre „Team-Zuordnung nur zwischen zwei Spieltagen“ erkennt eine laufende Enthüllung jetzt auch dann, wenn der Raum gerade auf einem anderen Schritt steht. Der Spieltag hieß intern an zwei Stellen verschieden — „matchday-1“ gegen „1“ —, weshalb der Vergleich immer danebenlag und die halbe Sperre nie zutraf. Die Schreibweise steht jetzt an einer Stelle statt an dreien.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}
