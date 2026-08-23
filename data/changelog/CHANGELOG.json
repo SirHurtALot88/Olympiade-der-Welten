@@ -48,6 +48,15 @@
     },
     {
       "datum": "2026-08-23",
+      "seite": "Spieltag · Saisonstand",
+      "pr": null,
+      "text": "Im Saisonstand hängen jetzt drei Hovers: über dem Marktwert eines Teams stehen die Spieler dahinter, absteigend sortiert und mit ihrem Anteil; über den Gehältern dieselbe Liste mit Vertragsform und Restlaufzeit; und über dem Teamnamen eine kompakte Kurzübersicht mit Kadergröße, Ø OVR, auslaufenden Verträgen und den drei wertvollsten Spielern. Gezeigt werden höchstens fünf Zeilen, der Rest steht als Summe darunter; Spieler ohne hinterlegten Wert werden getrennt gezählt statt mitgerechnet. Zweitens zeigt die GuV jetzt überall dieselbe Zahl. Der Hover im Team-Profil rechnete bisher eigenständig Cash minus Gehälter plus Sponsoren — das war weder dieselbe Formel wie im Saisonstand noch überhaupt dieselbe Größe: der Saisonstand weist ein Ergebnis aus, der Hover einen Kontostand, und es fehlten Vorstandsziele, Kredite, Apron und Transfers. Beide lesen jetzt dieselbe Rechnung, und der Kontostand steht als eigene Zeile darunter statt als GuV getarnt. Außerdem entstand die GuV bisher erst am Saisonende, weshalb die Spalte in jeder laufenden Saison leer blieb; sie wird jetzt nach jedem Spieltag nachgezogen.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Team · Training",
       "pr": null,
       "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",

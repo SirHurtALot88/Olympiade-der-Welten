@@ -30,6 +30,7 @@ import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamSeasonAreaPoints } from "@/lib/foundation/season-area-points";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
+import { buildGuvBreakdown, type GuvBreakdownLine } from "@/lib/finance/guv-breakdown";
 import type {
   TeamDetailDrawerData,
   TeamDetailDrawerHistoryRow,
@@ -769,40 +770,55 @@ export default function TeamProfileNewLook({
       .map((row, index) => ({ ...row, displayRank: row.rank ?? index + 1 }));
   }, [foundationGameState, data.teamId]);
 
-  // CASH-Hover: kompakte GuV. Nur reale, bereits berechnete Größen dieses
-  // Teams — Cash & Gehaltsblock aus `data`, Gebäude-Unterhalt/-Einnahmen und
-  // Sponsoren-Basis aus dem GameState. Ohne Foundation-State (kein Liga-
-  // kontext) bleiben nur Cash & Gehälter; die Ökonomiezeilen entfallen dann.
-  const cashBreakdown = useMemo(() => {
+  /**
+   * CASH-HOVER — EINE GuV, DIESELBE WIE IM SAISONSTAND.
+   *
+   * HIER STAND EINE ZWEITE RECHNUNG: `Cash − Gehälter + Gebäude-Einnahmen − Unterhalt +
+   * Sponsoren-Basis`, überschrieben mit „GuV (Projektion)". Chris am 23.08.: „in der Teamansicht
+   * haben wir ja eine GuV Projektion drinne mit Cash minus Gehälter plus Sponsoren. Das müsste noch
+   * mal angepasst werden, dass es auch gleich ist mit dem, was wir im Saisonstand finden. Also dass
+   * diese GuV, die wir sehen, an allen Stellen dasselbe zeigt."
+   *
+   * DREI DINGE WAREN DARAN FALSCH, alle nachgemessen:
+   *
+   *  1. ES WAREN ZWEI VERSCHIEDENE GRÖSSEN UNTER EINEM NAMEN. Die alte Zeile rechnete einen
+   *     KONTOSTAND (Cash steckte drin), die Spalte im Saisonstand ist ein ERGEBNIS (Einnahmen
+   *     minus Ausgaben, ohne Cash). Zwei Zahlen, die gar nicht gleich sein KONNTEN.
+   *  2. ES FEHLTEN POSTEN. Die gemeinsame Rechnung (`lib/finance/season-end-guv.ts`) kennt zehn —
+   *     Sponsoren, Sponsorereignisse, Gebäude-Einnahmen, Apron, Vorstandsziele, Gehälter,
+   *     Gebäude-Unterhalt, Kreditzins, Kredittilgung, Transfers. Die alte Formel kannte vier. An
+   *     `1hf25q` gemessen wichen 5 von 6 geprüften Teams ab, bei D-L um 11,1 Mio und mit
+   *     Vorzeichenwechsel (Saisonstand +8,8, hier −2,3).
+   *  3. Sie stand auch dort, wo der Saisonstand nichts zeigte — in sechs von sieben Spielständen
+   *     fehlte `guv` ganz, die Spalte blieb leer, und dieser Hover behauptete daneben eine Zahl.
+   *
+   * JETZT: die Posten kommen aus dem Saisonstand desselben Spielstands, durch dieselbe Aufbereitung
+   * wie dort (`buildGuvBreakdown`). Der Kontostand bleibt sichtbar, aber als eigene, klar benannte
+   * Zeile darunter — `Cash + GuV`, nicht als „GuV" getarnt.
+   */
+  const guvBreakdown = useMemo(() => {
     const cash = isFiniteNumber(data.cash) ? data.cash : null;
-    const salaryTotal = isFiniteNumber(data.salaryTotal) ? data.salaryTotal : null;
-    if (!foundationGameState) {
-      return { cash, salaryTotal, facilityUpkeep: null, facilityIncome: null, sponsorBase: null, projected: null };
+    const standing = foundationGameState?.seasonState?.standings?.[data.teamId] ?? null;
+    const guv = isFiniteNumber(standing?.guv) ? standing!.guv! : null;
+    const posten = Array.isArray(standing?.guvPosten) && standing!.guvPosten!.length > 0 ? standing!.guvPosten! : null;
+    if (guv == null && posten == null) {
+      // Keine erfundene Ersatzzahl: fehlt die gemeinsame GuV, sagt der Hover das — genau wie die
+      // leere Zelle im Saisonstand. Eine eigene Formel hier wäre wieder die zweite Wahrheit.
+      return { cash, guv: null, lines: [], cashAtSeasonEnd: null };
     }
-    const teamFacilities = foundationGameState.seasonState.teamFacilities?.[data.teamId] ?? null;
-    const facilityUpkeep = teamFacilities ? calculateFacilityUpkeep(teamFacilities) : null;
-    const facilityIncome = teamFacilities
-      ? calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: beliebtheit?.value ?? 1 })
-      : null;
-    const sponsorContract = foundationGameState.seasonState.sponsorContractsByTeamId?.[data.teamId] ?? null;
-    const sponsorBase = sponsorContract
-      ? sponsorContract.components
-          .filter((component) => component.kind === "base")
-          .reduce((sum, component) => sum + (isFiniteNumber(component.rewardCash) ? component.rewardCash : 0), 0)
-      : null;
-    // Projiziertes Saison-Ende analog zu projectCashFlow(): Cash − Gehälter
-    // + (Gebäude-Einnahmen − Unterhalt) + Sponsoren-Basis. Prämien fließen
-    // bewusst NICHT ein (benchmark-only, siehe cash-flow-forecast.ts).
-    const projected =
-      cash != null
-        ? cash -
-          (salaryTotal ?? 0) +
-          (facilityIncome ?? 0) -
-          (facilityUpkeep ?? 0) +
-          (sponsorBase ?? 0)
-        : null;
-    return { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected };
-  }, [foundationGameState, data.teamId, data.cash, data.salaryTotal, beliebtheit]);
+    const breakdown = buildGuvBreakdown({
+      posten,
+      guv,
+      sponsorTotal: isFiniteNumber(standing?.sponsorTotal) ? standing!.sponsorTotal! : null,
+      salaryTotal: isFiniteNumber(data.salaryTotal) ? data.salaryTotal : null,
+    });
+    return {
+      cash,
+      guv: breakdown.total,
+      lines: breakdown.lines,
+      cashAtSeasonEnd: cash != null && breakdown.total != null ? Number((cash + breakdown.total).toFixed(2)) : null,
+    };
+  }, [foundationGameState, data.teamId, data.cash, data.salaryTotal]);
 
   // MW-Hover: Zusammensetzung aus den echten Einzel-Marktwerten des Kaders.
   const mwBreakdown = useMemo(() => {
@@ -1420,29 +1436,48 @@ export default function TeamProfileNewLook({
   }
 
   function renderCashPanel() {
-    const { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected } = cashBreakdown;
+    const { cash, guv, lines, cashAtSeasonEnd } = guvBreakdown;
     return (
       <div className="nl-kpipop-inner">
         <div className="nl-kpipop-head">
           <div className="nl-kpipop-head-copy">
             <span className="nl-kpipop-eyebrow">Cash</span>
-            <strong className="nl-kpipop-title">GuV (Projektion)</strong>
+            <strong className="nl-kpipop-title">GuV (Ergebnis)</strong>
           </div>
         </div>
-        <div className="nl-kpipop-guv">
-          {renderGuvLine("Cash", "", cash)}
-          {renderGuvLine("Gehälter", "−", salaryTotal, "risk")}
-          {facilityUpkeep != null ? renderGuvLine("Gebäude-Unterhalt", "−", facilityUpkeep, "risk") : null}
-          {facilityIncome != null ? renderGuvLine("Gebäude-Einnahmen", "+", facilityIncome, "good") : null}
-          {sponsorBase != null ? renderGuvLine("Sponsoren (Basis)", "+", sponsorBase, "good") : null}
-          {projected != null
-            ? renderGuvLine("≈ Saison-Ende", "", projected, projected < 0 ? "risk" : "good", true)
-            : null}
-        </div>
-        {facilityUpkeep == null && sponsorBase == null ? (
-          <p className="nl-kpipop-note">Gebäude-/Sponsoren-Zeilen benötigen Liga-Kontext.</p>
+        {lines.length === 0 ? (
+          <p className="nl-kpipop-note">
+            Für diese Saison liegt noch keine GuV vor — im Saisonstand steht dort ebenfalls nichts.
+            Sie entsteht mit der nächsten Spieltags-Buchung.
+          </p>
         ) : (
-          <p className="nl-kpipop-note">Prämien fließen nicht ein (benchmark-only).</p>
+          <>
+            <div className="nl-kpipop-guv">
+              {lines.map((line: GuvBreakdownLine) => (
+                <div
+                  key={line.label}
+                  className={`nl-kpipop-guvrow${line.counted ? "" : " is-aside"}`}
+                  title={line.counted ? undefined : "Cash-wirksam, zählt aber nicht in die GuV."}
+                >
+                  <span className="nl-kpipop-guvlabel">{line.label}</span>
+                  <span
+                    className={`nl-kpipop-guvval${
+                      line.value != null && line.value < 0 ? ` ${nlToneClass("risk")}` : line.value != null && line.value > 0 ? ` ${nlToneClass("good")}` : ""
+                    }`}
+                  >
+                    {formatNlMoney(line.value)}
+                  </span>
+                </div>
+              ))}
+              {renderGuvLine("= GuV", "", guv, guv != null && guv < 0 ? "risk" : "good", true)}
+            </div>
+            {/* Der Kontostand bleibt sichtbar — aber als eigene Zeile, nicht als „GuV" getarnt. */}
+            <div className="nl-kpipop-guv nl-kpipop-guv-cash">
+              {renderGuvLine("Cash heute", "", cash)}
+              {renderGuvLine("≈ Cash am Saisonende", "", cashAtSeasonEnd, cashAtSeasonEnd != null && cashAtSeasonEnd < 0 ? "risk" : "good", true)}
+            </div>
+            <p className="nl-kpipop-note">Dieselbe Rechnung wie im Saisonstand. Prämien fließen nicht ein (benchmark-only).</p>
+          </>
         )}
       </div>
     );

@@ -32,6 +32,8 @@ type SeasonV2TeamSummary = {
   marketValueTotal: number | null;
 };
 
+import type { SaisonstandHoverSpieler } from "@/lib/foundation/saisonstand-team-hover";
+
 export type SeasonV2StandingsRow = {
   teamId: string;
   teamName: string;
@@ -83,6 +85,14 @@ export type SeasonV2StandingsRow = {
    */
   apronProjection?: GuvApronProjectionInput | null;
   marketValueTotal: number | null;
+  /**
+   * Der kompakte Kader dieses Teams — Grundlage der drei Hovers auf Teamname, MW und Gehalt.
+   * Gewünscht von Chris am 23.08.: „dass ich dann die Spieler dahinter sehe […] immer absteigend
+   * sortiert". Bewusst je Zeile durchgereicht statt in der Ansicht aus dem `gameState` gezogen: die
+   * Tabelle bekommt „das fertige Ergebnis, kein gameState" (siehe Kopfkommentar des New-Look-Renders),
+   * und der Aufbau kostet EINMAL beim Zeilenbau statt bei jeder Mausbewegung.
+   */
+  hoverKader?: SaisonstandHoverSpieler[] | null;
   disciplineValues: Record<SeasonV2DisciplineKey, number | null>;
   rosterCount: number;
   avgContractLength: number | null;
