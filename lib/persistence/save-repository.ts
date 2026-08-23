@@ -72,6 +72,7 @@ import {
 } from "@/lib/season/season-economy-factors";
 import { slimGameStateForWrite } from "@/lib/persistence/save-payload-slimming";
 import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
+import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import type {
   PersistedSaveGame,
   SaveRepository,
@@ -1441,8 +1442,23 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const gameStateWithPotential = ensurePlayerPotentialForGameState(saveId, withInjuryHistory);
   mark("ensurePlayerPotentialForGameState done");
   // Sonderregel: Nula gehört immer zu Project Suicide (idempotenter Backfill für bestehende Saves).
-  const gameState = ensureNulaOnProjectSuicide(gameStateWithPotential);
+  const gameStateWithNula = ensureNulaOnProjectSuicide(gameStateWithPotential);
   mark("ensureNulaOnProjectSuicide done");
+  /**
+   * TRAININGSMODUS NACHZIEHEN — der dritte Anlauf auf „der Flow hängt bei Training prüfen".
+   *
+   * Zweimal wurde ein SCHREIBWEG geschlossen: der Saisonwechsel (`j53iox`) und der Direktkauf
+   * (`hnbng4`). Beides richtig, beides ohne Wirkung auf Spieler, die schon vorher ohne
+   * Trainingsmodus im Kader standen — und ein einziger solcher Spieler hält den ganzen Flow auf.
+   * Am Abbild vom 23.08. betraf das drei von sieben Spielständen (V-W: Johanna; T-G: acht Spieler;
+   * C-C: zwei), alle über `manual_transfermarkt_buy` hereingekommen, alle vor dem Fix.
+   *
+   * Deshalb hier und nicht an einem vierten Schreibweg: der Ladeweg ist die Stelle, die JEDEN
+   * bestehenden Spielstand erreicht. Idempotent wie die vier Nachzüge darüber — wer einen Modus
+   * hat, behält ihn; wer keinen Kaderplatz hat, bekommt keinen.
+   */
+  const gameState = applyDefaultTrainingFieldsToRosteredPlayers(gameStateWithNula);
+  mark("applyDefaultTrainingFieldsToRosteredPlayers done");
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
@@ -1686,11 +1702,18 @@ function createPersistedSaveRecord(input: {
   // gesunden Wuerfen, der byte-identische Zwilling der Saison-Spielerwerte). Beim SCHREIBEN und
   // nicht beim Lesen — so kostet es einmal ein paar Millisekunden statt bei jedem Laden, und
   // bestehende Spielstaende schrumpfen beim naechsten Speichern von selbst.
-  const guardedGameState: GameState = slimGameStateForWrite({
-    ...normalizedGameState,
-    playerBaselines: guardedBaselineWrite.baselines,
-    baselineWriteGuardEvents,
-  });
+  const guardedGameState: GameState = applyDefaultTrainingFieldsToRosteredPlayers(
+    // TRAININGSMODUS AUCH BEIM SCHREIBEN — sonst haelt der Sitzungs-Cache die Luecke am Leben.
+    // Der Nachzug beim Laden (siehe `materializePersistedSave`) erreicht bestehende Spielstaende,
+    // aber `saveGameState` legt seinen Rueckgabewert in `writeSaveSessionCache` ab; ein Lauf, der
+    // speichert und gleich wieder liest, bekaeme sonst weiter den ungeheilten Stand. Beide Wege
+    // brauchen den Nachzug, und er ist idempotent — der zweite Aufruf aendert nichts mehr.
+    slimGameStateForWrite({
+      ...normalizedGameState,
+      playerBaselines: guardedBaselineWrite.baselines,
+      baselineWriteGuardEvents,
+    }),
+  );
 
   const upsertSave = database.prepare(`
     INSERT INTO saves (

@@ -5,9 +5,18 @@
       "datum": "2026-08-23",
       "seite": "Team · Profil",
       "pr": null,
-      "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
+      "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Die Gesamtzahl steht nur noch einmal in der Zeile: Punkte und PP-Summe sind dieselbe Zahl, und die Aufschlüsselung liefern ohnehin die vier Bereiche darunter. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",
+      "quelle": "gepflegt",
+      "gewicht": null,
       "version": "0.5"
     },
     {

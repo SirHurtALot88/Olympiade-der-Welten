@@ -747,7 +747,6 @@ export default function TeamProfileNewLook({
           teamName: team.name,
           rank: isFiniteNumber(standing?.rank) ? (standing?.rank as number) : null,
           points: isFiniteNumber(standing?.points) ? (standing?.points as number) : null,
-          pps: areaPoints.total,
           pow: areaPoints.pow,
           spe: areaPoints.spe,
           men: areaPoints.men,
@@ -1384,9 +1383,13 @@ export default function TeamProfileNewLook({
                     <span className="nl-kpipop-standcode" title={row.teamName}>
                       {row.shortCode}
                     </span>
-                    <span className="nl-kpipop-standpts">
-                      {formatNlNumber(row.points, 1)} P · {formatNlNumber(row.pps, 0)} PPs
-                    </span>
+                    {/* NUR die Punkte — die PPs standen hier doppelt.
+                        Punkte und PP-Gesamtsumme sind dieselbe Zahl: ueber alle 32 Teams von
+                        Chris' Spielstand gilt Punkte = Ledger-Gesamt = Summe der vier Bereiche.
+                        Die Zeile las sich damit „112 P · 112 PPs". Chris: „ja die dopplung kann
+                        raus". Die Aufschluesselung steht direkt darunter in den vier Bereichen,
+                        und die summieren sich genau auf diese Punktzahl. */}
+                    <span className="nl-kpipop-standpts">{formatNlNumber(row.points, 1)} P</span>
                   </span>
                   <span className="nl-kpipop-standaxes">
                     {NL_TEAMPROFILE_AXES.map(({ key, label }) => (

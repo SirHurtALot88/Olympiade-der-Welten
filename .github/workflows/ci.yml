@@ -93,6 +93,17 @@ jobs:
       # kommt in zehn Testdateien vor, alle lesen ihren Quelltext oder pruefen die Logik daneben.
       # Der Schritt ist das Geruest, in das so ein Test gehoert, nicht der Beweis, dass es ihn gibt.
       - run: npm run ci:render-waechter
+      # DIE QUITTUNGEN — kostet Millisekunden und schliesst die Luecke, die Chris am 23.08. gefunden
+      # hat: „hast du die anderen bugs auch alle auditiert und geprueft ob sie WIRKLICH gefixt
+      # sind?" Der Bugfixing-Lauf verglich Meldungen gegen Quittungsdateien und hielt eine
+      # vorhandene Datei fuer einen Beleg. Das Audit fand daraufhin eine Quittung, die einen
+      # umbenannten Test nannte, und 25 gebaute Fixes ganz ohne Test.
+      #
+      # Geprueft wird deshalb hier, was ohne den Spiegel-Branch pruefbar ist (`--nur-repo`): dass
+      # jede gebaute Quittung mit Testnennung mindestens einen EXISTIERENDEN Test nennt, und dass
+      # die Zahl der testlosen Fixes nicht steigt. Der Abgleich gegen `origin/bug-reports` bleibt
+      # dem Bugfixing-Lauf vorbehalten — der Branch ist hier nicht ausgecheckt.
+      - run: npm run ci:quittungen
       - run: npm run perf:regression-smoke
       # Serve the browser smokes from the PRODUCTION server (npm run start =
       # NODE_ENV=production, using the build from the step above). The dev server
