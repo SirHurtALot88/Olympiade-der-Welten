@@ -39,6 +39,15 @@
     },
     {
       "datum": "2026-08-23",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Für Spielstände, in denen der Kauflauf schon abgebrochen ist, gibt es jetzt einen Reparaturlauf. Die Code-Korrektur wirkt erst beim nächsten Kauffenster — ein laufender Spielstand behält die halb gefüllten Kader also, bis jemand nachhilft. Der Reparaturlauf holt genau diesen einen Lauf nach, und zwar über denselben Weg, den das Spiel selbst nimmt: keine zweite Kauflogik, es gelten unverändert Kasse, Gehaltsdecke, Identität und Kaderziele. Ohne Schalter gibt es nur einen Bericht, wer wie weit unter seinem Ziel steht; erst mit --apply wird gekauft, und davor wird gesichert. Menschlich gesteuerte Teams bleiben außen vor. Am echten Spielstand gemessen füllt er 43 Spieler bei 19 Teams nach und meldet ehrlich, welche Teams danach noch offen sind, weil ihnen schlicht das Geld ausgegangen ist.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Team · Training",
       "pr": null,
       "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",
