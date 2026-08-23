@@ -257,6 +257,7 @@
   .pkuerzel{font:700 15px/1 ui-monospace,monospace;color:var(--faint);letter-spacing:.04em}
   .figur{width:44px;height:52px;image-rendering:pixelated;flex:none}
 
+  .lc .ohne{color:var(--crit);font-style:italic}
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1983,22 +1984,49 @@
 
   function renderLevelUp(p){
     const box=document.getElementById("lvlup");if(!box)return;box.textContent="";
-    const wahl=[["power","Wucht","ANG"],["health","Zähigkeit","LP"],["will","Härte","VER"],["speed","Flinkheit","TMP"]];
+    // VIER AUS ZWOELF, nicht vier feste. Chris: "wir haben ja 12 attribute, davon sollten
+    // 4 evtl random gepickt werden beim lvl up die man dann leveln kann."
+    //
+    // Zufaellig, aber nicht beliebig: die Ziehung haengt an Spieler UND Stufe, ist also
+    // fuer denselben Spieler auf derselben Stufe immer dieselbe. Sonst koennte man durch
+    // Neuladen wuerfeln, bis die Wunschauswahl kommt — und die Entscheidung waere keine.
+    const ATTRNAME={power:"Wucht",health:"Zähigkeit",stamina:"Atem",intelligence:"Verstand",
+      awareness:"Gespür",determination:"Biss",speed:"Flinkheit",dexterity:"Geschick",
+      charisma:"Ausstrahlung",will:"Härte",spirit:"Geist",torment:"Grimm"};
+    // Welcher Kampfwert am staerksten von diesem Attribut lebt — nur zur Anzeige.
+    const stuetzt=(attr)=>{const rec=REC[DISCS.tdm.cat];
+      let best=null,w=0; for(const k of KEYS){const x=(rec[k]&&rec[k][attr])||0;if(x>w){w=x;best=k;}}
+      return best;};
+    const ziehe=(p,stufe)=>{
+      let z=(p.n.split("").reduce((a,c)=>a*31+c.charCodeAt(0),7)^(stufe*2654435761))>>>0;
+      const r=(n)=>{z=(Math.imul(z,1103515245)+12345)>>>0;return z%n;};
+      const topf=Object.keys(ATTRNAME), aus=[];
+      while(aus.length<4&&topf.length)aus.push(topf.splice(r(topf.length),1)[0]);
+      return aus;
+    };
+    const wahl=ziehe(p,1).map(a=>[a,ATTRNAME[a],stuetzt(a)]);
     const vorher=stats(p,"tdm");
     wahl.forEach(([attr,label,kampf])=>{
       const alt=p.a[attr],plus=zuwachs(alt);
       const kopie={...p,a:{...p.a,[attr]:Math.min(99,alt+plus)}};
       const nachher=stats(kopie,"tdm");
+      // Charisma und Geist speisen keinen Kampfwert — dann steht das auch da, statt eine
+      // Wirkung vorzutaeuschen, die es nicht gibt.
+      const ohneWirkung=!kampf;
       const c=el("div","lc");
       c.appendChild(el("b",null,label));
       c.appendChild(el("u",null,"+"+plus));
       c.appendChild(el("span",null,attr+" "+alt+" → "+Math.min(99,alt+plus)));
-      c.appendChild(el("span",null,kampf+" "+vorher[kampf]+" → "+nachher[kampf]));
+      c.appendChild(ohneWirkung
+        ? el("span","ohne","kein Kampfwert hängt daran")
+        : el("span",null,kampf+" "+vorher[kampf]+" → "+nachher[kampf]));
       c.tabIndex=0;
       tipOn(c,label+" — Stufenaufstieg",
         "Erhöht das Attribut "+attr+" um "+plus+". Der Zuwachs schrumpft mit der Höhe: bei "+alt+
         " sind es "+plus+", bei 90 wären es nur noch "+zuwachs(90)+". Weil der Marktwert an den Attributen hängt, "+
-        "wird der Spieler dadurch teurer — du bezahlst für die Kraft, die du aufbaust.");
+        "wird der Spieler dadurch teurer — du bezahlst für die Kraft, die du aufbaust."+
+        (ohneWirkung?" ACHTUNG: "+attr+" speist keinen der sechs Kampfwerte. Der Disziplinwert steigt, "+
+          "in der Arena merkt man davon nichts — dieselbe Lücke, die Baumkopfs Charisma betrifft.":""));
       box.appendChild(c);
     });
     const h=document.getElementById("lvlhint");if(!h)return;h.textContent="";
@@ -2674,6 +2702,7 @@
 
   // Die Wirkungen selbst — einmal geschrieben, fuer jeden Skill.
   function wirkeAus(u,sk,ziele,sd){
+    effektFuer(u,sk,ziele);
     const projTempo=sk.projektil&&sk.projektil.tempo;
     for(const e of sk.wirkung){
       if(e.art==="unverwundbar")continue;
@@ -3474,6 +3503,70 @@
     }
   }
 
+  // ===================================================================================
+  // SICHTBARE SKILL-EFFEKTE.
+  //
+  // Bisher sah man am Kampf nur Zahlen aufsteigen — welcher Skill gerade wirkte, stand
+  // hoechstens im Ticker. Chris: "skills sollten coole effekte haben die man erkennt."
+  //
+  // Jeder Effekt haengt an dem, was der Skill LAUT SCHEMA tut, nicht an seinem Namen:
+  // wer sich selbst bewegt, bekommt eine Spur; wer betaeubt, eine Druckwelle; wer
+  // schuetzt, eine Kuppel; wer trifft, einen Hieb. Kommt ein neuer Skill dazu, bekommt er
+  // automatisch das Bild, das zu seiner Wirkung passt.
+  let EFFEKTE=[];
+  function effekt(o){ if(!stumm)EFFEKTE.push({t:0,dauer:o.dauer||0.45,...o}); }
+  function effektFuer(u,sk,ziele){
+    const z=ziele&&ziele[0];
+    const wirkt=(art)=>(sk.wirkung||[]).some(w=>w.art===art);
+    if(sk.eigenbewegung){effekt({typ:"spur",x:u.x,y:u.y,x2:(z||u).x,y2:(z||u).y,seite:u.side,dauer:.5});return;}
+    if(wirkt("schild")&&z){effekt({typ:"kuppel",x:z.x,y:z.y,seite:u.side,dauer:.9});return;}
+    if(wirkt("betaeubung")){effekt({typ:"welle",x:u.x,y:u.y,r:(sk.tor&&sk.tor.max)||120,seite:u.side,dauer:.6});return;}
+    if(sk.form&&sk.form.typ==="linie"&&z){effekt({typ:"strahl",x:u.x,y:u.y,x2:z.x,y2:z.y,seite:u.side,dauer:.35});return;}
+    if(sk.projektil)return;                       // Geschosse zeichnet die Arena schon
+    if(z){const schwer=(sk.wirkung||[]).some(w=>w.mult&&w.mult>1);
+      effekt({typ:"hieb",x:z.x,y:z.y,ux:u.x,uy:u.y,seite:u.side,schwer,dauer:schwer?.42:.3});}
+  }
+
+  function zeichneEffekte(dt){
+    for(const e of EFFEKTE)e.t+=dt;
+    EFFEKTE=EFFEKTE.filter(e=>e.t<e.dauer);
+    for(const e of EFFEKTE){
+      const a=1-e.t/e.dauer;
+      const farbe=e.seite===0?"242,160,61":"69,176,201";
+      ctx.save();
+      if(e.typ==="hieb"){
+        const w=Math.atan2(e.y-e.uy,e.x-e.ux);
+        const r=(e.schwer?34:24)*(0.6+0.4*(1-a));
+        ctx.strokeStyle="rgba("+farbe+","+(a*0.95)+")";
+        ctx.lineWidth=e.schwer?5:3;ctx.lineCap="round";
+        ctx.beginPath();ctx.arc(e.x,e.y,r,w-1.25,w+1.25);ctx.stroke();
+        if(e.schwer){ctx.strokeStyle="rgba(255,255,255,"+(a*0.6)+")";ctx.lineWidth=1.5;
+          ctx.beginPath();ctx.arc(e.x,e.y,r+5,w-1.0,w+1.0);ctx.stroke();}
+      } else if(e.typ==="spur"){
+        const g=ctx.createLinearGradient(e.x,e.y,e.x2,e.y2);
+        g.addColorStop(0,"rgba("+farbe+",0)");g.addColorStop(1,"rgba("+farbe+","+(a*0.8)+")");
+        ctx.strokeStyle=g;ctx.lineWidth=9*a+2;ctx.lineCap="round";
+        ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x2,e.y2);ctx.stroke();
+      } else if(e.typ==="welle"){
+        const r=e.r*(1-a);
+        ctx.strokeStyle="rgba("+farbe+","+(a*0.85)+")";ctx.lineWidth=4*a+1;
+        ctx.beginPath();ctx.arc(e.x,e.y,r,0,6.283);ctx.stroke();
+        ctx.strokeStyle="rgba(255,255,255,"+(a*0.4)+")";ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(e.x,e.y,r*0.7,0,6.283);ctx.stroke();
+      } else if(e.typ==="kuppel"){
+        const r=26+6*(1-a);
+        ctx.strokeStyle="rgba(126,194,255,"+(a*0.9)+")";ctx.lineWidth=2.5;
+        ctx.beginPath();ctx.arc(e.x,e.y-6,r,0,6.283);ctx.stroke();
+        ctx.fillStyle="rgba(126,194,255,"+(a*0.14)+")";
+        ctx.beginPath();ctx.arc(e.x,e.y-6,r,0,6.283);ctx.fill();
+      } else if(e.typ==="strahl"){
+        ctx.strokeStyle="rgba("+farbe+","+(a*0.9)+")";ctx.lineWidth=7*a+2;ctx.lineCap="round";
+        ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x2,e.y2);ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   function draw(){
     ctx.clearRect(0,0,W,H);
     if(disc==="spurt"){zeichneSpurt();return;}
@@ -3546,6 +3639,7 @@
       ctx.fillStyle=pf.side===0?css("--home"):css("--away");
       ctx.beginPath();ctx.arc(pf.x,pf.y,2.4,0,6.3);ctx.fill();
     }
+    zeichneEffekte(1/60);
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
