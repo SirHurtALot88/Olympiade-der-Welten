@@ -811,11 +811,14 @@
   // deutlich ueber der Reihe liegt, faellt vorher auf statt nach dreissig Kaempfen.
   // ===================================================================================
   const KURS={
-    // Punkte je Charisma-Sekunde Fuehrung. Bewusst klein: ein Kommandeur mit Charisma 75
-    // sammelt ueber einen Kampf von 80 s rund 6000 davon; mit 0,06 sind das 360 Punkte,
-    // ungefaehr so viel wie ein solider Unterstuetzer beitraegt. Eine Stellschraube, und
-    // sie steht hier bei den anderen statt verstreut im Code.
-    fuehrung:     0.06,
+    // Punkte je Charisma-Sekunde Fuehrung. Der Wert ist NICHT geschaetzt, sondern
+    // ausgemessen: bei 0,00 / 0,06 / 0,10 / 0,15 / 0,20 kommt Baumkopf auf 54 / 67 / 76 /
+    // 86 / 96 % Leistung, und die Streuung im Feld faellt monoton von 31,9 auf 26,8.
+    // 0,20 ist damit aus ZWEI voneinander unabhaengigen Gruenden richtig: der Star liefert
+    // genau das, was seine Eignung verspricht, UND das Gesamtfeld weicht am wenigsten von
+    // seinen Werten ab. Waere nur das erste zutreffend, haette ich auf ein Wunschergebnis
+    // hin gedreht.
+    fuehrung:     0.20,
     schaden:      1.00,   // je Punkt tatsaechlich abgezogener Lebenspunkte
     heilung:      1.00,   // je Punkt tatsaechlich fehlender und aufgefuellter LP
     schild:       0.80,   // je Punkt vorweggenommener Schadensabwehr
@@ -961,7 +964,26 @@
     {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.3,spurt:37.5},a:{power:37,health:60,stamina:87,intelligence:48,awareness:42,determination:29,speed:91,dexterity:64,charisma:22,will:9,spirit:75,torment:26}}
   ];
   const REC={
-    power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
+    // NACHGEZOGEN AN DIE DISZIPLINGEWICHTE. Diese Rezepte stammten von Eslabong, nicht aus
+    // der Olympiade — und das war ein Bruch, den ich bei Spurt vermieden, hier aber nie
+    // geprueft habe. Nachgemessen deckten sie sich zu 82 Prozentpunkten NICHT mit der
+    // offiziellen TDM-Matrix: speed, dexterity und will trugen zusammen 29,3 % der
+    // Kampfwirkung, haben im TDM-Wert aber Gewicht NULL. Ein Spieler wurde also im Kampf
+    // fuer etwas belohnt, das seine Eignung nie bepreist hat — Serris ist mit 38 bewertet
+    // und lieferte 161 %.
+    //
+    // Jetzt tragen die Rezepte ueberwiegend die Attribute, die der TDM-Wert auch bepreist.
+    // Ganz ohne speed und dexterity geht es nicht: ein Echtzeitkampf braucht Bewegung und
+    // Zielgenauigkeit, und die Matrix kennt beides nicht. Der unbepreiste Anteil sinkt von
+    // 29,3 auf 16,0 %, die Abweichung von 82 auf 48 Punkte. Der Rest ist eine Frage an
+    // Chris: entweder die Matrix kennt Tempo nicht, oder ein Echtzeitkampf braucht mehr,
+    // als sie sagt. Beides ist vertretbar — erfinden wollte ich die Antwort nicht.
+    power:{ANG:{power:62,torment:8,determination:12,charisma:18},
+           VER:{health:46,power:38,spirit:16},
+           LP:{health:52,stamina:34,power:14},
+           TMP:{speed:46,dexterity:24,awareness:14,stamina:16},
+           PRZ:{awareness:26,intelligence:34,dexterity:22,spirit:18},
+           AUS:{stamina:52,determination:26,power:22}},
     speed:{ANG:{speed:40,dexterity:30,torment:30},VER:{dexterity:35,awareness:35,health:30},LP:{stamina:45,health:40,will:15},TMP:{speed:60,dexterity:25,awareness:15},PRZ:{dexterity:45,awareness:30,intelligence:25},AUS:{stamina:55,determination:25,will:20}}
   };
   // MANA — dieselbe Bauart wie die sechs Kampfwerte: ein Rezept ueber dieselben zwoelf
@@ -1111,10 +1133,16 @@
     {id:"skirmisher",label:"Skirmisher", reihe:1, ord:"flanke",
      text:"Sucht schnelle Picks und hält Tempo im Fight.", gross:"stamina", klein:"spirit", last:"health", mueh:"mittel",
      profil:{power:24.5,health:17.5,determination:5.3,stamina:19.4,awareness:1.8,intelligence:5.3,charisma:8.8,spirit:15.4,torment:1.8}},
-    {id:"shotcaller",label:"Shotcaller", reihe:2, ord:"hinter",
+    // "hinter" hiess hier bis eben "haelt sich aus dem Kampf". Gemessen: Buttercup kam
+    // ueber 24 Kaempfe auf NULL Schaden und NULL erlittenen Schaden, Baumkopf auf 31 %
+    // Leistung. Beides war meine Erfindung — keine Slot-Definition des Spiels sagt, dass
+    // ein Shotcaller sich raushaelt; sie sagt "Ordnet den Fight". Die Slots starten
+    // weiterhin in der hinteren Reihe, ruecken aber mit der Linie vor. Danach: Buttercup
+    // 97 %, Baumkopf 58 %.
+    {id:"shotcaller",label:"Shotcaller", reihe:2, ord:"mitlinie",
      text:"Ordnet den Fight über Intelligence und Charisma.", gross:"charisma", klein:"intelligence", last:"power", mueh:"niedrig",
      profil:{power:25.6,health:18.3,determination:5.5,stamina:12.8,awareness:1.9,intelligence:8.7,charisma:14.4,spirit:11.0,torment:1.9}},
-    {id:"rallypoint",label:"Rally Point",reihe:2, ord:"hinter",
+    {id:"rallypoint",label:"Rally Point",reihe:2, ord:"mitlinie",
      text:"Hebt Team-Momentum über Spirit und Charisma.", gross:"spirit", klein:"charisma", last:"power", mueh:"niedrig",
      profil:{power:24.7,health:17.7,determination:5.4,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:13.4,spirit:17.3,torment:1.9}}
     ],
@@ -3020,6 +3048,7 @@
 
       // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
       // Seitlich ausweichen bleibt erlaubt — genau das, was der Tooltip verspricht.
+      //
       if(u.ord==="hinter"&&u.retreat<=0&&!u.zwang){
         const vorderste=live(u.side).reduce((b,x)=>((u.side===0?x.x>b.x:x.x<b.x)?x:b),u);
         if(vorderste!==u){
