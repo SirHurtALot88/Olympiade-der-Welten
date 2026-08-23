@@ -1920,7 +1920,14 @@ export default function DisciplineStageArena({
     const standings = gameState.seasonState?.standings ?? {};
     const anyPoints = Object.values(standings).some((row) => ((row as { points?: number | null })?.points ?? 0) > 0);
     const merklisteOwnerId = normalisiereMerklistenBesitzer(roomContext?.ownerId ?? null);
-    const menschlicheTeamIds = getManualControlTeamIds(gameState);
+    // DIE ARENA MUSS AUCH AUF EINEM HALBFERTIGEN SPIELSTAND RENDERN — dafuer gibt es eine eigene
+    // Robustheits-Suite (tests/discipline-stage-host.test.ts: „bootstrap/partial state (empty
+    // object) does NOT throw"). `getManualControlTeamIds` und `getTeamControlSettings` greifen
+    // ungeschuetzt auf `gameState.seasonState.teamControlSettings` zu und werfen dort. Der ganze
+    // Rest dieser Datei fasst den Spielstand deshalb nur mit `?.` und `?? []` an; diese beiden
+    // Aufrufe brauchen die Wache davor.
+    const hatSeasonState = Boolean(gameState?.seasonState);
+    const menschlicheTeamIds = hatSeasonState ? getManualControlTeamIds(gameState) : new Set<string>();
     const auswahl = leseArenaTeamAuswahl({
       gameState,
       ownerId: merklisteOwnerId,
@@ -1940,9 +1947,10 @@ export default function DisciplineStageArena({
           points: entry?.points ?? null,
           istEigen: team.teamId === ownTeamId,
           menschlich,
-          ownerLabel: menschlich
-            ? resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, team.teamId)))
-            : null,
+          ownerLabel:
+            menschlich && hatSeasonState
+              ? resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, team.teamId)))
+              : null,
           gemerkt: gemerkteTeamIds.has(team.teamId),
         };
       })
