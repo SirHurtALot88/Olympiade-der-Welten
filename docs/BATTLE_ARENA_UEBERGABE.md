@@ -430,6 +430,81 @@ Zur Warnung, weil jeder dieser Posten monatelang wie ein Befund aussah:
 
 ---
 
+## Alle 20 Disziplinen: die Grundlage steht
+
+Die Daten für **alle zwanzig** Disziplinen liegen jetzt im Entwurf, und sie sind nicht
+abgeschrieben, sondern erzeugt:
+
+```sh
+npx tsx scripts/generiere-arena-daten.ts              # nur der Bericht
+npx tsx scripts/generiere-arena-daten.ts --schreiben  # direkt in den Entwurf
+```
+
+Das Skript liest `lib/player-generator/official-discipline-weights.ts` (die Matrizen) und
+`lib/lineups/matchday-slot-roles.ts` (die Slot-Rollen) und ersetzt im Entwurf den Bereich
+zwischen `// <<< GENERIERT: arena-daten` und `// >>> ENDE GENERIERT: arena-daten`. Alles
+andere bleibt unangetastet. Ergebnis: 20 Matrizen (jede summiert exakt auf 100) und 112
+Slot-Profile.
+
+Warum überhaupt: von Hand ging es bei zwei Disziplinen noch. Bei zwanzig sind es über
+1400 Zahlen. Der Beweis kam beim ersten Lauf — der handgetippte Wert für `holdline`
+stand auf `stamina: 12.4`, die Quelle sagt `12.5`. Ein Zehntel, und die 24 Kämpfe endeten
+messbar anders (`3:6` statt `2:6` in sechs Läufen). Genau diese Sorte Drift ist der Grund.
+
+**Was das Skript nicht kennt**, steht bewusst daneben und überlebt jeden Lauf: `SLOT_ZUSATZ`
+mit Reihe, Befehl und Aufstellungsposition je Slot. Das ist Inszenierung dieses Entwurfs,
+keine Spielregel — das Spiel kennt keine Reihen. Für die 18 noch nicht gebauten
+Disziplinen greift ein Platzhalter (je zwei Slots eine Reihe, Befehl `mitlinie`).
+
+### Die Abnahmebedingung für jede neue Disziplin
+
+Chris' Grundsatz — *„immer über die Diszi-Gewichtungen gehen, um zu schauen, was die Leute
+antreibt"* — ist jetzt eine Messung, und zwar eine allgemeine:
+
+```sh
+node scripts/messe-arena-einfluss.mjs spurt 12
+```
+
+Sie hebt bei je einem Teilnehmer je ein Attribut um 15 Punkte an und misst, wie viel
+besser **er** dadurch abschneidet. Die eine Zahl am Ende ist die **Abweichung in
+Prozentpunkten**: Summe der Beträge aus (gemessener Anteil − Matrixgewicht). Null hieße,
+die Mechanik löst die Wertung exakt ein.
+
+Damit das für alle zwanzig gilt, kennt die Messung die Disziplinen nicht — die Motoren
+melden sich an (`MOTOREN` im Entwurf). Ein Motor muss vier Dinge können: einen Durchgang
+bauen, ihn zu Ende rechnen, sagen wer mitmacht, und je Teilnehmer **eine Zahl liefern, bei
+der größer besser heißt**. Im Rennen ist das die negative Platzierung, im Kampf die
+Leistung. Was „besser" heißt, ist die einzige Entscheidung, die je Disziplin fällt.
+
+Angehoben wird an **genau einer Stelle** (`ATTR_HEBUNG` / `gehoben()`), die beide Baupfade
+lesen. Das ist wichtig: die frühere Spurt-Messung hat die fertigen Laufwerte nachträglich
+angefasst und damit Slot-Aufschlag, Form und Stufe übersprungen — sie maß eine kürzere
+Kette, als das Spiel sie rechnet. Speed las sich dadurch als 24,9 % statt 19,1 %.
+
+**Stand heute:**
+
+| Disziplin | Abweichung | Bemerkung |
+|---|---|---|
+| Spurt | **79,5 Pp** (n = 12, 2 s) | Speed sitzt (19,1 vs. 18). Offen: Torment 0 statt 14, Will 32 statt 14, Stamina 21 statt 4 |
+| TDM | **131,7 Pp** (n = 2, 158 s) | siehe unten |
+
+### Ein Befund, der eine Entscheidung braucht
+
+Die TDM-Messung sagt: der Kampf belohnt **Speed mit 40,8 % und Dexterity mit 22,3 %** —
+zwei Attribute, die in der TDM-Matrix mit **null** stehen. Zusammen fast zwei Drittel des
+gemessenen Einflusses auf etwas, das die Wertung gar nicht bepreist. Umgekehrt liegen
+Charisma, Determination und Will bei 0,0 %, obwohl die Matrix ihnen 10, 6 und 0 gibt.
+
+Die Ursache liegt nahe: Tempo entscheidet, wer zuerst am Gegner ist, und wer zuerst da ist,
+schlägt länger zu. Nur sagt die Disziplingewichtung, dass Tempo im TDM nichts wert ist.
+
+Das ist **kein Bug, den man still wegpatcht** — es ist eine Balancing-Entscheidung:
+soll die Bewegung im Teamfight überhaupt an Speed hängen, wenn die Wertung Speed dort mit
+null bepreist? Bitte an Chris. (Die Zahl ist bei n = 2 grob; vor einer Entscheidung mit
+n ≥ 6 nachmessen, das dauert dann rund acht Minuten.)
+
+---
+
 ## Verlässliche Einstiegspunkte
 
 | Was | Wo |
@@ -439,6 +514,8 @@ Zur Warnung, weil jeder dieser Posten monatelang wie ein Befund aussah:
 | Artefakt | https://claude.ai/code/artifact/af3bba05-dc93-4bcc-92f0-5f742f42380e |
 | Sprite-Baukasten | https://claude.ai/code/artifact/bea50d43-e66c-4008-aabf-36a293d594fd |
 | Messreihe | `node scripts/miss-arena-serie.mjs 24` (aus dem Repo-Wurzelverzeichnis!) |
+| Abnahme-Messung | `node scripts/messe-arena-einfluss.mjs <disziplin> <läufe>` |
+| Daten erzeugen | `npx tsx scripts/generiere-arena-daten.ts --schreiben` |
 | Spielstand | `git fetch origin live-save` — siehe `CLAUDE.md` |
 
 Playwright-Skripte **müssen im Repo liegen und von dort laufen**, sonst findet Node das
