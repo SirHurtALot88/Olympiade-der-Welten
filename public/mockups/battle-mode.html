@@ -1740,7 +1740,7 @@
       const c=el("button","dchip",d.label);
       c.appendChild(el("em",null,d.size+"v"+d.size));
       c.setAttribute("aria-pressed",id===disc?"true":"false");
-      c.addEventListener("click",()=>{disc=id;sel=null;renderAll();});
+      c.addEventListener("click",()=>{disc=id;sel=null;slotFokus=null;running=false;reset();renderAll();renderOpp();});
       b.appendChild(c);
     }
   }
@@ -2065,6 +2065,7 @@
   }
 
   function build(saat){
+    if(disc==="spurt")return bauSpurt(saat);
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     const mine=inDisc("tdm").slice(0,6);
@@ -2771,6 +2772,7 @@
   function stepSimStumm(dt){ stumm=true; try{ stepSim(dt); } finally { stumm=false; } }
 
   function stepSim(dt){
+    if(disc==="spurt")return stepSpurt(dt);
     if(done)return;
     t+=dt;
     const sd=t>50?1+(t-50)*0.06:1;
@@ -3286,50 +3288,195 @@
     }
   }
 
-  // Spurt: Rasen, Bahnmarkierungen, Huerden, Baumreihe am Rand.
+  // Spurt: Rasen, Bahnen, Huerden, Baumreihe. Bahnen und Huerden kommen aus DENSELBEN
+  // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
+  // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
   function bodenSpurt(){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    // Grasbueschel
-    ctx.globalAlpha=0.14;
-    for(let i=0;i<420;i++){
-      const x=bodenSaat(i+11)*W, y=90+bodenSaat(i+55)*(H-180);
-      ctx.strokeStyle=bodenSaat(i+99)>0.5?"#6f9e5f":"#3f6b38";ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+1,y-4-bodenSaat(i+140)*4);ctx.stroke();
+    const oben=H*0.14, unten=H*0.94, strecke=W-170;
+    // Baumreihe ueber der Bahn
+    for(let i=0;i<26;i++){
+      const x=12+i*(W/25), yb=oben-24;
+      ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
+      ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
+      ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
     }
-    ctx.globalAlpha=1;
     // Laufbahn
-    const oben=H*0.22, unten=H*0.78;
     ctx.fillStyle="#8a4a32";ctx.fillRect(0,oben,W,unten-oben);
-    ctx.globalAlpha=0.08;
-    for(let i=0;i<260;i++){
+    ctx.globalAlpha=0.07;
+    for(let i=0;i<320;i++){
       const x=bodenSaat(i+300)*W, y=oben+bodenSaat(i+340)*(unten-oben);
       ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";ctx.fillRect(x,y,2,2);
     }
     ctx.globalAlpha=1;
-    ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    for(let i=0;i<=4;i++){const y=oben+(unten-oben)*i/4;
+    // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
+    ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
+    for(let i=0;i<=BAHNEN;i++){const y=oben+(unten-oben)*i/BAHNEN;
       ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    // Huerden
-    for(const x of [W*0.30,W*0.50,W*0.70]){
-      for(let i=0;i<4;i++){
-        const y=oben+(unten-oben)*(i+0.5)/4;
-        ctx.fillStyle="#d8d2c4";ctx.fillRect(x-16,y-14,32,4);
-        ctx.fillStyle="#9a9486";ctx.fillRect(x-16,y-10,3,10);ctx.fillRect(x+13,y-10,3,10);
+    // Huerden genau dort, wo die Simulation sie prueft.
+    for(const h of HUERDEN){
+      const x=80+h*strecke;
+      for(let b=0;b<BAHNEN;b++){
+        const y=bahnY(b)+13;
+        ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3);
+        ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10);
       }
     }
-    // Baumreihe
-    for(let i=0;i<26;i++){
-      const x=12+i*(W/25), yb=oben-22;
-      ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
-      ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
-      ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
+    // Start und Ziel
+    ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(80,oben);ctx.lineTo(80,unten);ctx.stroke();
+    ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
+    ctx.beginPath();ctx.moveTo(80+strecke,oben);ctx.lineTo(80+strecke,unten);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ===================================================================================
+  // SPURT — ein Rennen, kein Kampf.
+  //
+  // Die sechs Kampfwerte (Leben, Angriff, Verteidigung ...) beschreiben eine Schlacht.
+  // Fuer einen Huerdenlauf sagen sie nichts. Also sechs eigene Renn-Werte, aus DENSELBEN
+  // zwoelf Attributen.
+  //
+  // Diese Rezepte sind meine Erfindung — anders als die Slot-Profile, die ich abgeschrieben
+  // habe. Damit sie trotzdem nicht neben dem Spiel stehen, sind sie an die offiziellen
+  // Spurt-Gewichte gebunden: legt man die sechs Rezepte uebereinander, muss dasselbe
+  // Attributgewicht herauskommen wie in der Disziplinmatrix. Nachgerechnet weicht die
+  // Summe um 1,3 Prozentpunkte ab (Speed 18,5 statt 18, Ausdauer 3,3 statt 4). Ein erster
+  // Entwurf lag bei 23 Punkten — der haette eine zweite Wahrheit gebaut.
+  const SPURT_REZEPT={
+    ANTRITT: {speed:55,determination:25,power:20},
+    ENDTEMPO:{speed:53,will:27,stamina:20},
+    TECHNIK: {dexterity:55,awareness:35,determination:10},
+    STEHEN:  {determination:55,will:35,health:10},
+    WUCHT:   {torment:57,power:40,speed:3},
+    ROBUST:  {health:26,torment:27,will:22,dexterity:17,awareness:8}
+  };
+  const SPURT_KEYS=Object.keys(SPURT_REZEPT);
+  const SPURT_LANG={ANTRITT:"Antritt",ENDTEMPO:"Endtempo",TECHNIK:"Technik",
+    STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"};
+  function spurtWerte(p,extra){
+    const a=extra||p.a, o={};
+    for(const k of SPURT_KEYS)o[k]=Math.round(mische({a},SPURT_REZEPT[k]));
+    return o;
+  }
+
+  const BAHNEN=8, HUERDEN=[0.22,0.40,0.58,0.76];
+  let LAEUFER=[], rennFertig=[], rennT=0;
+
+  function bauSpurt(saat){
+    seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    const mine=inDisc("spurt").slice(0,4);
+    const gegen=OPP.slice(0,4);
+    let id=0;
+    const setz=(p,seite,bahn,istGegner)=>{
+      const sl=(!istGegner&&place[p.n])?place[p.n].slot:null;
+      const engP=sl?slotAufschlag(p,sl,"spurt"):0;
+      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      let attr=mitAufschlag(p.a,engP,betroffeneAttribute(sl,"spurt",true),"spurt");
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,"spurt",false),"spurt");
+      const w=spurtWerte(p,attr);
+      LAEUFER.push({id:id++,n:p.n,seite,bahn,...w,
+        eig:(p.d.spurt||0)+engP+breitP,
+        pos:0, v:0, sp:100, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
+        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null});
+    };
+    mine.forEach((p,i)=>setz(p,0,i*2,false));
+    gegen.forEach((o,i)=>setz(o,1,i*2+1,true));
+  }
+
+  // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
+  // das Endtempo; Stehvermoegen bestimmt, wie viel davon bis zum Ziel uebrig bleibt.
+  function tempoVon(u){
+    const phase=Math.min(1,rennT/3.2);
+    const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
+    // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
+    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*0.00055*(u.pos-0.45)*100):1;
+    const stolper=u.stolper>0?0.35:1;
+    return (60+grund*1.5)*mued*stolper*(u.kraft>0?0.82:1);
+  }
+
+  function stepSpurt(dt){
+    if(done)return;
+    rennT+=dt;
+    const strecke=W-170;
+    for(const u of LAEUFER){
+      if(u.fertig!=null)continue;
+      if(u.stolper>0)u.stolper-=dt;
+      if(u.tackleCd>0)u.tackleCd-=dt;
+      if(u.kraft>0)u.kraft-=dt;
+      u.v=tempoVon(u);
+      const vor=u.pos;
+      u.pos+=u.v*dt/strecke;
+
+      // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
+      for(const h of HUERDEN){
+        if(vor<h&&u.pos>=h){
+          const glueck=rr();
+          const chance=Math.min(0.97,0.35+u.TECHNIK*0.0065);
+          if(glueck>chance){
+            u.stolper=0.45+ (1-u.TECHNIK/100)*0.5;
+            u.gestolpert++;
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahn)-20,txt:"stolpert",life:.9,crit:false});
+            feed(u.seite,u.n+" reißt die Hürde.");
+          }
+        }
+      }
+
+      // TACKLE. Wer Wucht hat und einen Gegner in Reichweite, kann zulangen — kostet ihn
+      // selbst Tempo. Ob er es TUT, haengt an seiner Persoenlichkeit, nicht am Zufall.
+      const willTackeln=({draufgaenger:0.9,duellant:0.55,schleicher:0.5,opportunist:0.7,
+        bollwerk:0.25,taktiker:0.3})[u.pers] ?? 0.5;
+      if(u.tackleCd<=0 && u.WUCHT>45 && rr()<willTackeln*dt*1.6){
+        const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null
+          && Math.abs(o.bahn-u.bahn)<=2 && Math.abs(o.pos-u.pos)<0.035);
+        if(opfer.length){
+          const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
+          u.tackleCd=2.2; u.kraft=0.5; u.tackles++;
+          const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
+          if(rr()<stark){
+            o.stolper=0.35+stark*0.6; o.getackelt++;
+            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahn)-20,txt:"getackelt",life:1,crit:true});
+            feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
+          } else {
+            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahn)-20,txt:"hält stand",life:.9,crit:false});
+            feed(o.seite,o.n+" steckt den Rempler weg.");
+          }
+        }
+      }
+
+      if(u.pos>=1){u.pos=1;u.fertig=rennT;rennFertig.push(u);
+        feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");}
+    }
+    if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
+  }
+
+  const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN);};
+
+  function zeichneSpurt(){
+    zeichneBoden();
+    const strecke=W-170;
+    for(const u of LAEUFER){
+      const platz=rennFertig.indexOf(u);
+      const x=80+u.pos*strecke+(platz>=0?12+platz*9:0), y=bahnY(u.bahn);
+      ctx.globalAlpha=0.25;ctx.fillStyle="#000";
+      ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
+      zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
+        lunge:u.kraft>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+      ctx.textAlign="center";
+      ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+      const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
+      ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
+      if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
+        ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
   }
 
   function draw(){
     ctx.clearRect(0,0,W,H);
+    if(disc==="spurt"){zeichneSpurt();return;}
     zeichneBoden();
 
     for(const u of U){
@@ -3509,7 +3656,7 @@
       // einer zweiten Liste, die auseinanderlaufen koennte.
       const liste=document.getElementById(seite===0?"elisteL":"elisteR");
       liste.textContent="";
-      const feld=U.filter(u=>u.side===seite);
+      const feld=disc==="spurt"?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite})):U.filter(u=>u.side===seite);
       const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
       for(const u of feld){
         const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
@@ -3527,7 +3674,7 @@
         liste.appendChild(z);
       }
     }
-    document.getElementById("edisz").textContent="TDM";
+    document.getElementById("edisz").textContent=DISCS[disc].label;
     const eg=document.querySelector(".egegen");
     if(eg){
       let mz=eg.querySelector(".emutator");
@@ -3629,7 +3776,7 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
-      for(const u of U.filter(x=>x.side===seite)){
+      for(const u of (disc==="spurt"?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1})):U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
         const bar=el("div","kbar");
@@ -3640,7 +3787,9 @@
       }
     }
     const m=document.getElementById("kmitte");
-    if(m)m.textContent=live(0).length+" : "+live(1).length;
+    if(m)m.textContent=disc==="spurt"
+      ? (rennFertig.filter(x=>x.seite===0).length+" : "+rennFertig.filter(x=>x.seite===1).length)
+      : (live(0).length+" : "+live(1).length);
   }
 
   const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
@@ -3702,7 +3851,8 @@
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent="TDM · "+live(0).length+" gegen "+live(1).length;
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
-    updateHud();draw();renderKader();
+    if(disc!=="spurt")updateHud();
+    draw();renderKader();
     document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
   }
