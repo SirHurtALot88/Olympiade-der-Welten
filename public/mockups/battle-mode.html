@@ -179,6 +179,49 @@
   .slotvorschlag b{color:#e6edf5}
   .slotvorschlag s{text-decoration:none;color:#e8c07a;font:600 11px/1 ui-monospace,monospace;margin-left:auto}
 
+  .zone.fokus{outline:2px solid var(--warn);outline-offset:-3px}
+  .fokuskopf{display:flex;align-items:center;gap:8px;padding:5px 7px;margin-bottom:5px;
+    border-radius:6px;background:var(--surface-2);font-size:11px}
+  .fokuskopf b{color:var(--ink)}
+  .fokuszu{margin-left:auto;border:1px solid var(--line);background:var(--surface);
+    color:var(--muted);border-radius:5px;padding:2px 7px;font-size:10px;cursor:pointer}
+  .fmark{font:600 10px/1 ui-monospace,monospace;padding:3px 5px;border-radius:4px;white-space:nowrap}
+  .fmark.perfekt {background:#16334d;color:#7ec2ff}
+  .fmark.gut     {background:#1a3a24;color:#7fd396}
+  .fmark.okay    {background:#3d3618;color:#e0c46a}
+  .fmark.schlecht{background:#452020;color:#f08c8c}
+
+  /* Kaderleiste */
+  .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
+    padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
+  .kseite{display:flex;gap:6px;flex-wrap:wrap}
+  .kseite.r{justify-content:flex-end}
+  .kmitte{font:700 14px/1 ui-monospace,monospace;color:var(--ink);white-space:nowrap}
+  .kk{display:flex;flex-direction:column;gap:3px;min-width:74px;padding:4px 6px;border-radius:6px;
+    background:var(--surface);border:1px solid var(--line)}
+  .kk b{font-size:9.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:74px}
+  .kk .kbar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+  .kk .kbar s{display:block;height:100%;background:var(--ok);text-decoration:none}
+  .kk.tot{opacity:.45;border-style:dashed}
+  .kk.tot b{text-decoration:line-through}
+  .kk.tot .kbar s{background:var(--crit)}
+  /* Endstand */
+  .endstand{position:absolute;inset:0;background:var(--ground);display:flex;flex-direction:column;
+    gap:12px;padding:clamp(8px,1.8vw,20px);overflow:auto;align-items:center}
+  .endstand[hidden]{display:none}
+  .esieger{font:700 clamp(15px,2.4vw,26px)/1.2 system-ui,sans-serif;color:var(--warn);text-align:center}
+  .etafeln{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,1.6vw,18px);width:100%}
+  .etafel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:auto}
+  .etafel h5{margin:0;padding:7px 10px;font-size:12px;color:var(--ink);border-bottom:1px solid var(--line)}
+  .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 ui-monospace,monospace}
+  .etafel th{padding:4px 5px;text-align:right;color:var(--faint);font-size:9px;font-weight:600;
+    text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
+  .etafel th:first-child,.etafel td:first-child{text-align:left}
+  .etafel td{padding:4px 5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+  .etafel td.imp{color:var(--warn);font-weight:700}
+  .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
+  .etafel td.leer{color:var(--faint)}
+
   /* Einlauf vor dem Anpfiff */
   .arenaraum{position:relative}
   .einlauf{position:absolute;inset:0;background:rgba(16,20,26,.94);display:flex;
@@ -360,6 +403,24 @@
             <div class="eliste r" id="elisteR"></div>
           </div>
         </div>
+        <!-- ENDSTAND. Dieselben Spalten wie im Vorbild. Was wir wirklich zaehlen, steht
+             als Zahl; was die Arena noch nicht kennt, bleibt leer statt bei null zu
+             stehen und wie eine Messung auszusehen. -->
+        <div class="endstand" id="endstand" hidden>
+          <div class="esieger" id="esieger"></div>
+          <div class="etafeln">
+            <div class="etafel" id="etafelL"></div>
+            <div class="etafel" id="etafelR"></div>
+          </div>
+          <button class="btn" id="ezu">Schließen</button>
+        </div>
+      </div>
+      <!-- KADERLEISTE. Auf einen Blick: wer steht noch, wer ist raus. Beide Seiten,
+           getrennt durch den Stand, mit Lebensbalken und durchgestrichenem Namen. -->
+      <div class="kaderleiste">
+        <div class="kseite" id="kaderL"></div>
+        <div class="kmitte" id="kmitte">6 : 6</div>
+        <div class="kseite r" id="kaderR"></div>
       </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
@@ -957,8 +1018,15 @@
   // sechs Slots zu null addieren. Diese Konstruktion hier nachzuprogrammieren hiesse,
   // sie ein zweites Mal zu erfinden. Also: einmal vom echten Code ausgeben lassen,
   // Zahlen uebernehmen. Bei der Anbindung ans Spiel ruft der Reiter die Funktion selbst.
-  const TDM_BASIS={power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2};
-  const SLOTS=[
+  const BASIS_JE_DISC={
+    tdm:  {power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2},
+    spurt:{speed:18,determination:15,will:14,torment:14,dexterity:12,power:10,awareness:7,health:6,stamina:4}
+  };
+  // Jede Disziplin hat ihre eigene Slot-Zahl: TDM sechs, Spurt vier. Vorher hingen hier
+  // die sechs TDM-Slots fest — im Spurt tauchten damit zwei Slots auf, die es dort gar
+  // nicht gibt.
+  const SLOTS_JE_DISC={
+    tdm:[
     {id:"vanguard",  label:"Vanguard",   reihe:0, ord:"mitlinie",
      text:"Öffnet Teamfights mit Power und Health.", gross:"power", klein:"health", last:"stamina", mueh:"hoch",
      profil:{power:33.4,health:23.4,determination:5.0,stamina:11.5,awareness:1.8,intelligence:5.0,charisma:8.3,spirit:9.9,torment:1.8}},
@@ -977,8 +1045,24 @@
     {id:"rallypoint",label:"Rally Point",reihe:2, ord:"hinter",
      text:"Hebt Team-Momentum über Spirit und Charisma.", gross:"spirit", klein:"charisma", last:"power", mueh:"niedrig",
      profil:{power:24.7,health:17.7,determination:5.4,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:13.4,spirit:17.3,torment:1.9}}
-  ];
-  const SLOTVON=Object.fromEntries(SLOTS.map(s2=>[s2.id,s2]));
+    ],
+    spurt:[
+    {id:"blockstart", label:"Block Start",  reihe:0, ord:"mitlinie",
+     text:"Explodiert aus dem Start über Speed und Determination.", gross:"speed", klein:"determination", last:"stamina", mueh:"hoch",
+     profil:{power:8.7,health:5.3,determination:18.4,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:12.1,torment:12.1}},
+    {id:"acceleration",label:"Acceleration",reihe:0, ord:"mitlinie",
+     text:"Baut Tempo über Speed und Torment auf.", gross:"speed", klein:"torment", last:"health", mueh:"mittel",
+     profil:{power:8.7,health:5.3,determination:13.0,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:12.1,torment:17.4}},
+    {id:"topspeed",   label:"Top Speed",   reihe:1, ord:"verfolgen",
+     text:"Maximiert Endtempo über Speed und Will.", gross:"speed", klein:"will", last:"determination", mueh:"hoch",
+     profil:{power:8.7,health:5.3,determination:13.0,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:17.4,torment:12.1}},
+    {id:"lanecontrol",label:"Lane Control",reihe:1, ord:"flanke",
+     text:"Bleibt sauber über Dexterity und Awareness.", gross:"dexterity", klein:"power", last:"speed", mueh:"niedrig",
+     profil:{power:13.9,health:8.2,determination:15.6,stamina:5.4,speed:1.8,dexterity:16.8,awareness:9.7,will:14.3,torment:14.3}}
+    ]
+  };
+  const SLOTVON=Object.fromEntries(Object.values(SLOTS_JE_DISC).flat().map(s2=>[s2.id,s2]));
+  const slotsVon=(d)=>SLOTS_JE_DISC[d]||[];
 
   // Gewichteter Attributschnitt — dieselbe Rechnung wie resolveWeightedAttributeScore.
   function gewichtet(a,profil){ let s2=0,w=0;
@@ -988,9 +1072,11 @@
   // Der Slot-Aufschlag: wie viel besser (oder schlechter) die Attribute des Spielers im
   // Profil dieses Slots dastehen als im Grundprofil der Disziplin. Faktor 2,2 und die
   // Grenzen bei plus/minus 8,5 stammen aus SLOT_PROFILE_MODIFIER_SCALE im Spiel.
-  function slotAufschlag(p,slotId){
+  function slotAufschlag(p,slotId,d){
     const s2=SLOTVON[slotId]; if(!s2)return 0;
-    const roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,TDM_BASIS))*2.2;
+    const disz=d||(Object.keys(SLOTS_JE_DISC).find(k=>SLOTS_JE_DISC[k].some(x=>x.id===slotId)));
+    const basis=BASIS_JE_DISC[disz]; if(!basis)return 0;
+    const roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
     return Math.max(-8.5,Math.min(8.5,Math.round(roh*10)/10));
   }
   // Vier Stufen, wie Chris sie wollte. Die Grenzen sind gesetzt, nicht gemessen —
@@ -1001,8 +1087,10 @@
     if(m>=-2)  return {k:"okay",    t:"passt okay"};
     return       {k:"schlecht",t:"passt gar nicht"};
   }
-  const besterFuer=(slotId,frei)=>frei.map(p=>({p,m:slotAufschlag(p,slotId)}))
+  const besterFuer=(slotId,frei,d)=>frei.map(p=>({p,m:slotAufschlag(p,slotId,d)}))
     .sort((x,y)=>y.m-x.m)[0]||null;
+  // Angeklickter Slot: danach sortiert die Spielerliste und zeigt das Plus/Minus.
+  let slotFokus=null;
 
   const ROWS=[{k:"Front",d:"vorderste Linie"},{k:"Mitte",d:"stützt beide Seiten"},{k:"Backrow",d:"geschützt hinten"}];
 
@@ -1064,8 +1152,9 @@
     .forEach(([n,sl])=>{place[n]={d:"tdm",slot:sl};order[n]=SLOTVON[sl].ord;});
   // Spurt hat im Entwurf noch keine Slot-Rollen — die liegen im Spiel unter derselben
   // Funktion bereit, sind hier aber nicht abgeschrieben. Bis dahin behelfsweise ohne Slot.
-  [["Remiel","mitlinie"],["Riley Le Rogue","mitlinie"],["Professor Paranoix","decken"],["Marzipella","hinter"]]
-    .forEach(([n,o])=>{place[n]={d:"spurt",slot:null};order[n]=o;});
+  [["Remiel","blockstart"],["Riley Le Rogue","acceleration"],
+   ["Professor Paranoix","topspeed"],["Marzipella","lanecontrol"]]
+    .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=SLOTVON[sl].ord;});
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
@@ -1093,7 +1182,20 @@
 
   function renderList(){
     const box=document.getElementById("plist");box.textContent="";
-    SQUAD.forEach(p=>{
+    // Ist ein Slot angeklickt, steht die Liste in der Reihenfolge, in der die Spieler
+    // fuer DIESEN Slot taugen — der beste oben, mit seinem Plus/Minus daneben.
+    const liste=slotFokus
+      ? [...SQUAD].sort((a,b)=>slotAufschlag(b,slotFokus,disc)-slotAufschlag(a,slotFokus,disc))
+      : SQUAD;
+    if(slotFokus){
+      const kopf=el("div","fokuskopf");
+      kopf.appendChild(el("b",null,"Sortiert für "+SLOTVON[slotFokus].label));
+      const wg=el("button","fokuszu","zurück");
+      wg.addEventListener("click",()=>{slotFokus=null;renderAll();});
+      kopf.appendChild(wg);
+      box.appendChild(kopf);
+    }
+    liste.forEach(p=>{
       const pl=place[p.n],used=pl&&pl.d!==disc;
       const r=el("div","prow"+(sel===p.n?" sel":"")+(used?" used":""));
       r.tabIndex=0;r.setAttribute("role","button");
@@ -1102,6 +1204,12 @@
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
       nm.appendChild(el("span",null,pl?(pl.d===disc?(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot):"in "+DISCS[pl.d].label):"—"));
       r.appendChild(nm);
+      if(slotFokus){
+        const m=slotAufschlag(p,slotFokus,disc), pa=passung(m);
+        const b=el("div","fmark "+pa.k); b.textContent=(m>0?"+":"")+m.toFixed(1);
+        b.title=p.n+" "+pa.t+" als "+SLOTVON[slotFokus].label;
+        r.appendChild(b);
+      }
       const t=p.d.tdm,s=p.d.spurt;
       r.appendChild(el("div","eg"+(t>=s?" best":""),t.toFixed(0)));
       r.appendChild(el("div","eg"+(s>t?" best":""),s.toFixed(0)));
@@ -1117,30 +1225,43 @@
     const here=inDisc(disc);
     const frei=SQUAD.filter(p=>!place[p.n]);
     const gewaehlt=sel?SQUAD.find(p=>p.n===sel):null;
-    SLOTS.forEach((rw)=>{
+    slotsVon(disc).forEach((rw)=>{
       const drin=here.filter(p=>place[p.n].slot===rw.id);
       // Farbe nur, wenn ein Spieler gewaehlt oder gezogen wird: blau perfekt, gruen sehr
       // gut, gelb okay, rot passt nicht. Ohne Auswahl bleibt die Tafel ruhig.
-      const mod=gewaehlt?slotAufschlag(gewaehlt,rw.id):null;
+      const mod=gewaehlt?slotAufschlag(gewaehlt,rw.id,disc):null;
       const pa=mod===null?null:passung(mod);
-      const z=el("div","zone slotzone"+(sel?" hot":"")+(pa?" pass-"+pa.k:""));
+      const z=el("div","zone slotzone"+(sel?" hot":"")+(pa?" pass-"+pa.k:"")+(slotFokus===rw.id?" fokus":""));
       z.dataset.slot=rw.id;
       const h=el("div","zname");
       const links=el("span");links.appendChild(el("b",null,rw.label));
       links.appendChild(el("i","slotfokus","+"+rw.gross+" +"+rw.klein+" · Last "+rw.last));
       h.appendChild(links);
+      h.style.cursor="pointer"; h.tabIndex=0; h.setAttribute("role","button");
+      h.title="Spieler nach Passung für "+rw.label+" sortieren";
+      const umschalten=()=>{slotFokus=slotFokus===rw.id?null:rw.id;renderAll();};
+      h.addEventListener("click",umschalten);
+      h.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();umschalten();}});
       if(pa){const b=el("span","passmarke "+pa.k);b.textContent=(mod>0?"+":"")+mod.toFixed(1)+" · "+pa.t;h.appendChild(b);}
       else h.appendChild(el("span",null,String(drin.length)+"/1"));
       z.appendChild(h);
       z.appendChild(el("p","slottext",rw.text));
       // Wie in der Arena: wenn der Slot leer ist, steht da, wer am besten hineinpasst.
-      if(!drin.length&&frei.length){
-        const b=besterFuer(rw.id,frei);
+      // Der beste Kandidat steht IMMER da, nicht nur wenn der Slot leer ist — sonst
+      // sieht man nie, ob jemand anders besser hineinpasste. Mit Plus/Minus UND dem
+      // absoluten Wert, den er in diesem Slot haette.
+      {
+        const kandidaten=drin.length?SQUAD.filter(p=>!place[p.n]||place[p.n].d!==disc):frei;
+        const b=besterFuer(rw.id,kandidaten,disc);
         if(b){const v=el("div","slotvorschlag");
-          v.appendChild(el("span","vlabel","Bester Freier"));
+          v.appendChild(el("span","vlabel",drin.length?"Besser wäre":"Bester Freier"));
           v.appendChild(el("b",null,b.p.n));
-          v.appendChild(el("s",null,(b.m>0?"+":"")+b.m.toFixed(1)));
-          v.addEventListener("click",()=>{place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=rw.ord;sel=null;renderAll();});
+          const abs=(b.p.d[disc]||0)+b.m;
+          v.appendChild(el("s",null,abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
+          v.addEventListener("click",()=>{
+            const raus=here.find(x=>place[x.n].slot===rw.id);
+            if(raus)delete place[raus.n];
+            place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=rw.ord;sel=null;renderAll();});
           z.appendChild(v);}
       }
       // Ablegen per Ziehen.
@@ -1573,7 +1694,7 @@
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0}});
       });
     }
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
@@ -1592,7 +1713,7 @@
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,...reichweiten(o.skills,false),stun:0,skills:kitVon(o.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0}});
       });
     }
   }
@@ -1622,7 +1743,7 @@
     if(z.schild>0){
       const weg=Math.min(z.schild,rest);
       z.schild-=weg; rest-=weg;
-      if(z.schildVon&&z.schildVon!==z)z.schildVon.st.heal+=weg;
+      if(z.schildVon&&z.schildVon!==z)z.schildVon.st.schild+=weg;
       schwebe({x:z.x,y:z.y-42,txt:"Schild −"+weg,life:.7,heil:true});
     }
     z.hp=Math.max(0,z.hp-rest);
@@ -1661,7 +1782,7 @@
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
-    if(tg.hp===0&&!tg.down){tg.down=true;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true);}
+    if(tg.hp===0&&!tg.down){tg.down=true;tg.st.tode++;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true);}
   }
 
   // EINE UHR FUER ALLE.
@@ -1921,7 +2042,7 @@
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,crit);
-        if(z.hp===0&&!z.down){z.down=true;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true);}
+        if(z.hp===0&&!z.down){z.down=true;z.st.tode++;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true);}
         pf.tot=true;
         continue;
       }
@@ -2162,7 +2283,7 @@
           const bet=(sk.wirkung.find(x=>x.art==="betaeubung")||{}).dauer||0;
           for(const z of ziele){
             nahschlag(u,z,{basis:e.basis},(e.mult||1),kn,ziele.length>1?sk.name:null,sd);
-            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);
+            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);u.st.cc+=bet;
               schwebe({x:z.x,y:z.y-40,txt:"betäubt",life:.9});}
           }
           u.lunge=0.2;
@@ -2506,7 +2627,7 @@
               // der Anlauf begann — sonst fliegen die Getroffenen ihm entgegen statt weg.
               for(const f of bahn){
                 nahschlag(u,f,SKILLS.ram,1,SKILLS.ram.knock,"Battering Ram",sd);
-                f.stun=Math.max(f.stun,SKILLS.ram.stun);
+                f.stun=Math.max(f.stun,SKILLS.ram.stun);u.st.cc+=SKILLS.ram.stun;
                 schwebe({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
               }
               u.x=ex;u.y=ey;
@@ -2588,7 +2709,7 @@
   // Eingesteckte: verhinderte Punkte sind dasselbe wie geheilte, waehrend "ich wurde
   // beschossen" fuer sich genommen noch keine Leistung ist — es zaehlt nur, weil in dieser
   // Zeit niemand anderes beschossen wurde.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
@@ -2673,6 +2794,7 @@
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
     renderWertung();
+    renderKader();
   }
 
   function draw(){
@@ -2767,6 +2889,7 @@
   function finish(){
     if(done)return;done=true;running=false;
     document.getElementById("play").textContent="Vorbei";
+    renderEndstand();
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
     feed(0,(pL>pR?"Armageddon Aftermath gewinnt ":pR>pL?"Blazing Beasts gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
@@ -2845,6 +2968,96 @@
   }
   const zeigeEinlauf=(an)=>{const e=document.getElementById("einlauf");if(e)e.hidden=!an;};
 
+
+  // ===================================================================================
+  // KADERLEISTE und ENDSTAND.
+  //
+  // Der Impact-Wert folgt der Struktur, die im Vorbild woertlich im Tooltip steht:
+  //   IMP = Kampf + Nutzen - Abzuege
+  //   Kampf   = Schaden(gesaettigt) + 95*Ausschaltungen + 35*Beihilfen
+  //   Abzuege = 70*Tode + 1,0*Eigenbeschuss
+  //   Nutzen  = Heilung + Schild + Kontrolle + Frontlinie, jeweils gesaettigt
+  // Die STUECKPREISE (95, 35, 70, 1,0) und die Saettigungsreferenzen (Schaden 650,
+  // Heilung 500, Schild 450, Kontrolle 12) stehen dort ausdruecklich. Die Form der
+  // Saettigungskurve NICHT — die habe ich an fuenfzehn Datenzeilen angepasst und treffe
+  // den Schaden exakt, Kontrolle und Frontlinie aber um rund zehn Prozent daneben.
+  // Deshalb steht sie hier als eigene Konstante: sie ist geschaetzt, nicht abgelesen,
+  // und faellt sofort auf, wenn jemand sie fuer gesichert haelt.
+  const IMP_STUECK={ko:95, beihilfe:35, tod:70, eigen:1.0};
+  const IMP_REF={schaden:650, heilung:500, schild:450, kontrolle:12, frontlinie:200};
+  const IMP_GEWICHT={schaden:449, kontrolle:190, heilung:566, schild:566, frontlinie:164};
+  const impSatt=(x,ref)=>1-Math.exp(-(x||0)/ref);
+  const impVerfall=(tode)=>1+0.75*(tode||0);
+
+  function impactVon(u){
+    const st=u.st;
+    const kampf = IMP_GEWICHT.schaden*impSatt(st.dmg,IMP_REF.schaden)
+                + IMP_STUECK.ko*(st.ko||0);
+    const nutzen = IMP_GEWICHT.heilung*impSatt(st.heal,IMP_REF.heilung)
+                 + IMP_GEWICHT.schild*impSatt(st.schild,IMP_REF.schild)
+                 + IMP_GEWICHT.kontrolle*impSatt(st.cc,IMP_REF.kontrolle)
+                 + IMP_GEWICHT.frontlinie*impSatt(st.tank,IMP_REF.frontlinie)/impVerfall(st.tode);
+    const abzug = IMP_STUECK.tod*(st.tode||0) + IMP_STUECK.eigen*(st.ff||0);
+    let w = kampf + nutzen - abzug;
+    // Weicher Deckel bei 900, harter bei 1400 — beide stehen im Tooltip.
+    if(w>900) w = 900 + (w-900)*0.45;
+    return Math.round(Math.min(1400,w));
+  }
+
+  function renderKader(){
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"kaderL":"kaderR");
+      if(!box)return;
+      box.textContent="";
+      for(const u of U.filter(x=>x.side===seite)){
+        const k=el("div","kk"+(u.down?" tot":""));
+        k.appendChild(el("b",null,u.n));
+        const bar=el("div","kbar");
+        const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
+        bar.appendChild(f); k.appendChild(bar);
+        k.title=u.n+(u.down?" — ausgeschieden":" — "+Math.round(u.hp)+" von "+u.max+" Leben");
+        box.appendChild(k);
+      }
+    }
+    const m=document.getElementById("kmitte");
+    if(m)m.textContent=live(0).length+" : "+live(1).length;
+  }
+
+  const ESPALTEN=[["K","ko"],["T","tode"],["CC","cc"],["H","heal"],["S","schild"],
+                  ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
+  function renderEndstand(){
+    const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
+    document.getElementById("esieger").textContent =
+      sieger===null ? "Unentschieden" : VEREIN[sieger].name+" gewinnt";
+    for(const seite of [0,1]){
+      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+      box.textContent="";
+      box.appendChild(el("h5",null,VEREIN[seite].name));
+      const t=el("table"), kopf=el("tr");
+      kopf.appendChild(el("th",null,"Kämpfer"));
+      for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
+      kopf.appendChild(el("th",null,"IMP"));
+      const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
+      const tb=el("tbody");
+      const reihen=U.filter(u=>u.side===seite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
+      for(const {u,imp} of reihen){
+        const tr=el("tr",u.down?"tot":null);
+        tr.appendChild(el("td",null,u.n));
+        for(const [,f] of ESPALTEN){
+          const v=u.st[f];
+          // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
+          // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
+          if(f==="ff"&&!FREUNDBESCHUSS)tr.appendChild(el("td","leer","—"));
+          else tr.appendChild(el("td",null,String(Math.round(v||0))));
+        }
+        tr.appendChild(el("td","imp",String(imp)));
+        tb.appendChild(tr);
+      }
+      t.appendChild(tb); box.appendChild(t);
+    }
+    document.getElementById("endstand").hidden=false;
+  }
+
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
     build();
@@ -2852,7 +3065,8 @@
     document.getElementById("play").textContent="Kampf starten";
     document.getElementById("arenaDisc").textContent="TDM · "+live(0).length+" gegen "+live(1).length;
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
-    updateHud();draw();
+    updateHud();draw();renderKader();
+    document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
   }
 
@@ -2863,6 +3077,7 @@
     document.getElementById("play").textContent=running?"Pause":"Weiter";
   });
   document.getElementById("reset").addEventListener("click",reset);
+  document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
     speed=speed===1?2:speed===2?4:1;
     document.getElementById("spd").textContent="Tempo "+speed+"×";
