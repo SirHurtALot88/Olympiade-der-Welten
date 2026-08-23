@@ -395,7 +395,7 @@
 
   <section class="panel" id="p1" role="tabpanel" aria-labelledby="t1">
     <div class="frame">
-      <div class="fbar"><span>Spieltag 7</span><span class="sep">·</span><span>Armageddon Aftermath — Blazing Beasts</span>
+      <div class="fbar"><span>Spieltag 7</span><span class="sep">·</span><span>Vigilante Wranglers — Armageddon Aftermath</span>
         <span class="honest">Spieler anklicken, dann Reihe anklicken</span></div>
       <div class="lay">
         <div class="pad">
@@ -412,8 +412,8 @@
           <div class="hint" id="hint"></div>
         </div>
         <div class="pad bl">
-          <h2>Blazing Beasts</h2>
-          <p class="sub">Erwartet: agil, flankiert gern.</p>
+          <h2>Armageddon Aftermath</h2>
+          <p class="sub">Erwartet: schwere Front, wenig Tempo.</p>
           <div id="opp"></div>
           <div class="hint" style="margin-top:14px"><span>Ihre schnellen Leute laufen um deine Front herum. Wer deckt hinten?</span></div>
         </div>
@@ -445,9 +445,9 @@
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
       <div class="scoreline">
-        <div class="tname">Armageddon Aftermath<em>A-A · <span id="aliveL">6</span> im Kampf</em></div>
+        <div class="tname">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
         <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · Punkte</small></div>
-        <div class="tname r">Blazing Beasts<em><span id="aliveR">6</span> im Kampf · B-B</em></div>
+        <div class="tname r">Armageddon Aftermath<em><span id="aliveR">6</span> im Kampf · A-A</em></div>
       </div>
       <div class="hpbars">
         <div class="tbar l"><s id="thpL" style="width:100%"></s></div>
@@ -527,12 +527,12 @@
         </ul>
       </div>
       <div class="note off">
-        <h3>Buttercup als Archer — beispielhaft</h3>
+        <h3>Das Kit, das gerade alle tragen</h3>
         <ul style="margin-bottom:10px">
-          <li><strong>Shoot</strong> — Grundschuss, Pfeil fliegt sichtbar, Rückstoß 40, Abklingzeit 0,35 s.</li>
-          <li><strong>Light Dash</strong> — 20 SP. Kommt jemand näher als 72 px, rollt sie 150 px weg und ist 0,3 s <em>unverwundbar</em> (grüner Ring). Treffer in dieser Zeit prallen ab.</li>
-          <li><strong>Archer Barrage</strong> — 20 MP, 12 s Abklingzeit. Sprung rückwärts, 0,3 s Ansage, dann fünf Pfeile in Folge.</li>
-          <li>Sie <strong>hält Abstand</strong> statt heranzulaufen — der sichtbare Unterschied zum Nahkämpfer. Blauer Balken ist Mana, grüner Ausdauer.</li>
+          <li><strong>Slash</strong> — Grundschlag, Reichweite 23, Abklingzeit 0,3 s, Rückstoß 219 beim aufgeladenen Schlag.</li>
+          <li><strong>Heavy Dash</strong> — 30 SP. Satz nach vorn aufs eigene Ziel, 0,4 s <em>unverwundbar</em> (grüner Ring), bricht durch, wer dazwischensteht.</li>
+          <li><strong>Blessed Shield</strong> — 60 MP, 12 s Abklingzeit, 0,5 s Ansage. Schluckt einem Verbündeten 8 s lang die nächsten 50 Schaden.</li>
+          <li>Alle zwölf tragen denselben Satz — <strong>absichtlich</strong>. Die echten Klassenkits fehlen noch, und mit drei bewaffneten und neun unbewaffneten Spielern würde jede Messung vor allem meine Kit-Verteilung abbilden statt die Spieler. Blauer Balken ist Mana, grüner Ausdauer.</li>
         </ul>
         <h3>Was echte Grafik ergänzt</h3>
         <ul>
@@ -546,7 +546,7 @@
 
   <section class="panel" id="p3" role="tabpanel" aria-labelledby="t3" hidden>
     <div class="frame">
-      <div class="fbar"><span>Spielerprofil</span><span class="sep">·</span><span>Baumkopf Holzfaust</span>
+      <div class="fbar"><span>Spielerprofil</span><span class="sep">·</span><span>Draco</span>
         <span class="honest">Laufbahn-Zahlen sind Beispiele — die Erfassung gibt es noch nicht</span></div>
       <div class="prof">
         <div class="pad">
@@ -649,22 +649,27 @@
   // Bauplan je Kaempfer. Die RASSE bestimmt Kopf, Aufsaetze und Hautton, der ARCHETYP
   // Ruestung und Waffe — genau die Aufteilung, die spaeter aus der Datenbank kommen soll.
   const BAU={
-    "Baumkopf Holzfaust":{kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
-    "T Mask":            {kopf:"human",haut:"amber",ruest:"leder",waffe:"schwert"},
-    "Greenkraut":        {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
-    "Rustrow":           {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
-    // Buttercup traegt keinen Bogen. Der Steckbrief im Spielstand nennt ihn ein Kalb,
-    // das gross wie ein Scheunentor wurde, und sagt ausdruecklich: "Den schweren Panzer
-    // traegt er nicht fuer sich." Also Panzer statt Leder, Hoerner und Schnauze statt
-    // Wolfskopf allein. Die Laterne an seiner Kette fehlt uns noch als Ebene.
-    "Buttercup":         {kopf:"wolf", haut:"fur_brown",ruest:"plate",hoerner:true,ohren:true,waffe:"schwert"},
-    "Serris":            {kopf:"human",haut:"olive",ruest:"leder",hoerner:true,waffe:"schwert"},
-    "Volcanoth":         {kopf:"lizard",haut:"bright_green",ruest:"plate",schwanz:true,waffe:"schwert"},
-    "Ultralisk":         {kopf:"wolf", haut:"fur_grey",ruest:"leder",waffe:"schwert"},
-    "Lhyor":             {kopf:"human",haut:"brown",ruest:"leder",hoerner:true,waffe:"schwert"},
-    "Nocture":           {kopf:"human",haut:"black",ruest:"leder",hoerner:true,waffe:"schwert"},
-    "Minion Master":     {kopf:"alien",haut:"lavender",ruest:"plate",helm:false},
-    "Moro":              {kopf:"wolf", haut:"fur_tan",ruest:"leder"}
+    // Vigilante Wranglers. Rasse gibt Kopf, Hautton und Aufsaetze, die Klasse gibt
+    // Ruestung und Waffe: Warlord, Templar, Hero und Tank tragen Platte, Berserker,
+    // Rogue und Sprinter Leder, Bard, Mage und Overseer die Kapuze.
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
+    "Lava Golem":         {kopf:"orc",  haut:"black",ruest:"plate",hoerner:true,waffe:"schwert"},
+    "Krolach":            {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
+    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
+    "King Arlen Morgolor":{kopf:"human",haut:"amber",ruest:"plate",waffe:"schwert"},
+    "Gram":               {kopf:"lizard",haut:"dark_green",ruest:"plate",schwanz:true,waffe:"schwert"},
+    "Rhyx'Tal":           {kopf:"alien",haut:"lavender",ruest:"leder",waffe:"schwert"},
+    "Xelara":             {kopf:"alien",haut:"blue",ruest:"leder",kapuze:true},
+    "Jorund":             {kopf:"human",haut:"olive",ruest:"leder",kapuze:true},
+    "Inefinna":           {kopf:"human",haut:"light",ruest:"leder",kapuze:true},
+    "Lulu":               {kopf:"human",haut:"light",ruest:"leder",ohren:true,kapuze:true},
+    // Armageddon Aftermath.
+    "Greenkraut":         {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
+    "Krag'Zul":           {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
+    "Tidesprinter":       {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true,waffe:"schwert"},
+    "Seraph-11":          {kopf:"human",haut:"lavender",ruest:"leder",kapuze:true},
+    "Ralazar the Balanced":{kopf:"human",haut:"brown",ruest:"leder",kapuze:true},
+    "Cassandra":          {kopf:"human",haut:"amber",ruest:"leder",kapuze:true}
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
 
@@ -937,38 +942,38 @@
   // Balance-Aussage, sondern die Bedingung dafuer, dass eine Messung ueberhaupt etwas
   // ueber die Spieler sagt statt ueber meine Kit-Verteilung.
   const SQUAD=[
-    // Klasse, Rasse, Unterklassen und Eigenschaften stammen eins zu eins aus dem
-    // Spielstand (data/persistence/oly-app.sqlite, Feld className). Vorher standen hier
-    // neun von achtzehn Klassen falsch — von mir gesetzt, nicht nachgesehen. Buttercup
-    // lief als "Archer" mit Bogen durch die Messung und war zweitbester Spieler des
-    // Feldes; in Wahrheit ist er ein Berserker, ein gepanzertes Rind, das keine zehn
-    // Meter weit schiesst. Jede Leistungszahl davor mass zum Teil diese Erfindung.
-    // Die KITS sind weiterhin Platzhalter — es gibt noch keine echten Klassensaetze.
-    // Sie haengen jetzt aber an der WIRKLICHEN Klasse statt an einer ausgedachten.
-    {n:"Baumkopf Holzfaust",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
-    {n:"T Mask",c:"Sprinter",skills:MATRIARCH,r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.8,spurt:81},a:{power:64,health:55,stamina:72,intelligence:38,awareness:94,determination:79,speed:91,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
-    {n:"Greenkraut",c:"Berserker",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:60.5,spurt:19.9},a:{power:94,health:83,stamina:66,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:11}},
-    {n:"Rustrow",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:39},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
-    {n:"Buttercup",c:"Berserker",skills:MATRIARCH,r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.4},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:43}},
-    {n:"Serris",c:"Berserker",skills:MATRIARCH,r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.9},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
-    {n:"Riley Le Rogue",c:"Rogue",r:"Unknown",sub:[],tp:[],tn:[],d:{tdm:35.1,spurt:18.3},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
-    {n:"Remiel",c:"Rogue",r:"Divine",sub:["Angel","Warrior"],tp:["Diligent"],tn:["Feisty","Devious"],d:{tdm:25.8,spurt:43.3},a:{power:34,health:66,stamina:7,intelligence:36,awareness:60,determination:43,speed:78,dexterity:74,charisma:16,will:9,spirit:49,torment:65}},
-    {n:"Professor Paranoix",c:"Overseer",r:"Human",sub:["Alchemist","Monk","Servant"],tp:["Diligent","Healthy"],tn:["Feisty","Paranoid","Obsessive"],d:{tdm:14.9,spurt:36.7},a:{power:8,health:23,stamina:22,intelligence:81,awareness:82,determination:65,speed:67,dexterity:48,charisma:35,will:27,spirit:23,torment:47}},
-    {n:"Marzipella",c:"Bard",r:"Human",sub:["Warlock","Trickster"],tp:["Caring","Altruistic"],tn:["Lazy"],d:{tdm:11.5,spurt:12.3},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
-    {n:"Byrnja",c:"Tactician",r:"Construct",sub:["Servant","Apparition"],tp:[],tn:["FaintHearted","Manipulative","ColdBlooded"],d:{tdm:7.4,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:28,awareness:24,determination:11,speed:17,dexterity:19,charisma:21,will:8,spirit:27,torment:14}},
-    {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7,spurt:7},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:15,speed:1,dexterity:20,charisma:68,will:19,spirit:19,torment:1}}
+    // DER ECHTE KADER DER VIGILANTE WRANGLERS — Chris' eigenes Team, alle elf Spieler
+    // eins zu eins aus dem laufenden Spielstand auf dem Server (live-save, Saison 2,
+    // Spieltag 10). Klasse, Rasse, Unterklassen, Eigenschaften und alle zwoelf Attribute
+    // sind abgeschrieben, nichts davon gesetzt. Wer hier drinsteht, steht auch im Spiel
+    // drin; wer im Spiel weg ist, ist hier weg.
+    // Die KITS sind weiterhin Platzhalter — es gibt noch keine echten Klassensaetze,
+    // und solange es sie nicht gibt, tragen alle denselben Satz (siehe oben).
+    {n:"Draco",c:"Warlord",skills:MATRIARCH,r:"Human",sub:["Knight","Destroyer","Scout"],tp:["Fair","Diligent","Loyal"],tn:["Renegade","Egomaniac"],d:{tdm:66.1,spurt:44.2},a:{power:81,health:84,stamina:37,intelligence:35,awareness:6,determination:64,speed:19,dexterity:43,charisma:89,will:72,spirit:40,torment:66}},
+    {n:"Lava Golem",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Wayfarer","Behemoth"],tp:["FanFavorite","Healthy","FiredUp"],tn:["Vindictive","Scandalous"],d:{tdm:63.2,spurt:24.2},a:{power:98,health:99,stamina:29,intelligence:1,awareness:1,determination:21,speed:1,dexterity:2,charisma:94,will:35,spirit:2,torment:96}},
+    {n:"Krolach",c:"Templar",skills:MATRIARCH,r:"Construct",sub:["Guardian","Destroyer"],tp:["Loyal","Eloquent"],tn:["Vindictive"],d:{tdm:60.5,spurt:47.7},a:{power:86,health:88,stamina:22,intelligence:47,awareness:32,determination:82,speed:20,dexterity:3,charisma:33,will:94,spirit:45,torment:64}},
+    {n:"Johanna",c:"Templar",skills:MATRIARCH,r:"Human",sub:["Guardian","Knight"],tp:["Loyal","Motivated","Fearless"],tn:["FaintHearted","Obsessive"],d:{tdm:50.7,spurt:44.8},a:{power:56,health:81,stamina:51,intelligence:29,awareness:22,determination:64,speed:23,dexterity:32,charisma:44,will:86,spirit:68,torment:69}},
+    {n:"King Arlen Morgolor",c:"Hero",skills:MATRIARCH,r:"Human",sub:["Warrior","Royalty"],tp:["Eloquent","Altruistic"],tn:[],d:{tdm:47.9,spurt:13.3},a:{power:40,health:70,stamina:26,intelligence:60,awareness:39,determination:54,speed:32,dexterity:33,charisma:95,will:1,spirit:96,torment:12}},
+    {n:"Gram",c:"Warlord",skills:MATRIARCH,r:"Lizard",sub:["Guardian"],tp:["Loyal","Relaxed"],tn:["Lazy"],d:{tdm:45.8,spurt:23},a:{power:67,health:79,stamina:14,intelligence:12,awareness:18,determination:73,speed:3,dexterity:5,charisma:41,will:33,spirit:65,torment:58}},
+    {n:"Rhyx'Tal",c:"Badass",skills:MATRIARCH,r:"Alien",sub:["Isolated","Controller","Guardian"],tp:["Caring","Loyal"],tn:["FaintHearted","Timid","Lazy"],d:{tdm:45.2,spurt:17.9},a:{power:58,health:62,stamina:48,intelligence:24,awareness:41,determination:52,speed:33,dexterity:29,charisma:38,will:1,spirit:81,torment:18}},
+    {n:"Xelara",c:"Bard",skills:MATRIARCH,r:"Alien",sub:["Ambassador","Guardian"],tp:["Eloquent","Altruistic","Caring"],tn:["Lazy","FaintHearted"],d:{tdm:33.2,spurt:24.5},a:{power:22,health:15,stamina:39,intelligence:68,awareness:69,determination:64,speed:31,dexterity:28,charisma:87,will:68,spirit:85,torment:14}},
+    {n:"Jorund",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Vigilante","Royalty","Guardian"],tp:["Eloquent","Loyal"],tn:["FaintHearted"],d:{tdm:27.2,spurt:26.8},a:{power:10,health:25,stamina:29,intelligence:64,awareness:51,determination:81,speed:29,dexterity:34,charisma:85,will:72,spirit:76,torment:24}},
+    {n:"Inefinna",c:"Mage",skills:MATRIARCH,r:"Divine",sub:["Ambassador","Vigilante"],tp:["Loyal","Disciplined"],tn:["Feisty","FaintHearted"],d:{tdm:12.7,spurt:13.1},a:{power:2,health:2,stamina:4,intelligence:84,awareness:64,determination:49,speed:42,dexterity:10,charisma:49,will:70,spirit:89,torment:3}},
+    {n:"Lulu",c:"Bard",skills:MATRIARCH,r:"Elf",sub:["Druid","Healer"],tp:["Loyal","Caring"],tn:["FaintHearted"],d:{tdm:10.1,spurt:8},a:{power:3,health:5,stamina:11,intelligence:86,awareness:52,determination:2,speed:71,dexterity:36,charisma:36,will:7,spirit:88,torment:3}}
   ];
-  // DIE ECHTEN BLAZING BEASTS aus dem laufenden Spielstand — Attribute, Klassen,
-  // Unterklassen und Eigenschaften eins zu eins. Vorher standen hier von mir gesetzte
-  // Spannen; die haben den Gegner staerker gemacht, als er ist, und damit jede Aussage
-  // ueber Leistung verzerrt. Team-TDM: 298,3 (Platz 21 von 32) gegen unsere 339,7 (Platz 12).
+  // DER GEGNER: ARMAGEDDON AFTERMATH, ebenfalls eins zu eins aus dem Spielstand. Die
+  // sechs mit dem hoechsten TDM-Wert des Kaders, in den Reihen, die ihre beste
+  // Slot-Zuteilung ergibt (Vanguard/Hold Line vorn, Breaker/Skirmisher Mitte,
+  // Shotcaller/Rally Point hinten).
+  // Team-TDM der besten Sechs samt Slot-Aufschlag: 308,7 gegen unsere 361,4 —
+  // das deckt sich mit der Tabelle (V-W Platz 9, A-A Platz 22 von 32).
   const OPP=[
-    {n:"Volcanoth",c:"Charger",skills:MATRIARCH,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.9,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
-    {n:"Ultralisk",c:"Charger",skills:MATRIARCH,r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.3,spurt:42.1},a:{power:71,health:84,stamina:93,intelligence:2,awareness:2,determination:1,speed:89,dexterity:28,charisma:1,will:36,spirit:15,torment:68}},
-    {n:"Lhyor",c:"Charger",skills:MATRIARCH,r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48,spurt:80.8},a:{power:72,health:64,stamina:70,intelligence:15,awareness:30,determination:71,speed:68,dexterity:97,charisma:68,will:46,spirit:5,torment:88}},
-    {n:"Nocture",c:"Charger",skills:MATRIARCH,r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73,stamina:74,intelligence:1,awareness:54,determination:26,speed:81,dexterity:32,charisma:13,will:12,spirit:3,torment:94}},
-    {n:"Minion Master",c:"Hero",skills:MATRIARCH,r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:54.6,spurt:21.6},a:{power:65,health:85,stamina:8,intelligence:62,awareness:21,determination:40,speed:11,dexterity:7,charisma:66,will:57,spirit:83,torment:52}},
-    {n:"Moro",c:"Sprinter",skills:MATRIARCH,r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.3,spurt:37.5},a:{power:37,health:60,stamina:87,intelligence:48,awareness:42,determination:29,speed:91,dexterity:64,charisma:22,will:9,spirit:75,torment:26}}
+    {n:"Greenkraut",c:"Warlord",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],row:0,d:{tdm:60.6,spurt:19.9},a:{power:94,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
+    {n:"Krag'Zul",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Guardian","Mage"],tp:["Healthy","Loyal"],tn:["Timid"],row:0,d:{tdm:62.7,spurt:25.2},a:{power:79,health:92,stamina:75,intelligence:31,awareness:20,determination:55,speed:21,dexterity:18,charisma:10,will:50,spirit:52,torment:9}},
+    {n:"Tidesprinter",c:"Berserker",skills:MATRIARCH,r:"Aqua",sub:["Trickster","Warrior"],tp:["Ambitious","Flexible","FiredUp"],tn:["Gambler","Cheater"],row:1,d:{tdm:47.2,spurt:88.3},a:{power:80,health:51,stamina:80,intelligence:35,awareness:63,determination:77,speed:89,dexterity:75,charisma:23,will:39,spirit:5,torment:78}},
+    {n:"Seraph-11",c:"Bard",skills:MATRIARCH,r:"Construct",sub:["Healer","Servant","Guardian"],tp:["Disciplined","Healthy","Loyal"],tn:["Timid"],row:1,d:{tdm:33.8,spurt:31.4},a:{power:19,health:52,stamina:58,intelligence:76,awareness:72,determination:63,speed:28,dexterity:69,charisma:24,will:55,spirit:62,torment:7}},
+    {n:"Ralazar the Balanced",c:"Mage",skills:MATRIARCH,r:"Human",sub:["Warrior","Mage"],tp:["Flexible","Fair","Altruistic"],tn:["Timid"],row:2,d:{tdm:37,spurt:43},a:{power:43,health:61,stamina:9,intelligence:84,awareness:67,determination:65,speed:45,dexterity:36,charisma:54,will:82,spirit:35,torment:34}},
+    {n:"Cassandra",c:"Bard",skills:MATRIARCH,r:"Human",sub:["Hunter","Jungle"],tp:["Motivated","Loyal","Caring"],tn:[],row:2,d:{tdm:32.4,spurt:32.7},a:{power:25,health:37,stamina:47,intelligence:66,awareness:59,determination:27,speed:72,dexterity:81,charisma:38,will:37,spirit:89,torment:13}}
   ];
   const REC={
     // NACHGEZOGEN AN DIE DISZIPLINGEWICHTE. Diese Rezepte stammten von Eslabong, nicht aus
@@ -1448,17 +1453,19 @@
     return{key:best,warum};
   }
   const persOf={},persWarum={};
-  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste von allen 720 moeglichen Zuteilungen, gerechnet mit den
-  // echten Slot-Profilen. Baumkopf steht als Shotcaller, obwohl ihn das -2,3 kostet —
-  // er hat als Einziger die Charisma (75), und irgendwer muss den Slot fuellen. Genau
-  // solche Abwaegungen sollen sichtbar werden.
-  [["Greenkraut","vanguard"],["Rustrow","holdline"],["Serris","breaker"],
-   ["T Mask","skirmisher"],["Baumkopf Holzfaust","shotcaller"],["Buttercup","rallypoint"]]
+  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste aller Zuteilungen von elf Spielern auf sechs Slots
+  // (332.640 Moeglichkeiten, durchgerechnet mit den echten Slot-Profilen), Summe 361,4.
+  // Draco hat mit 66,1 den hoechsten TDM-Wert des Kaders und steht trotzdem als
+  // Shotcaller — seine Charisma 89 bringt dort nur +0,4, aber jeder andere Slot kostet
+  // das Team mehr, als er Draco einbringt. Genau solche Abwaegungen sollen sichtbar
+  // werden. Krolach ist der grosse Gewinner: +8,5 als Vanguard, die Obergrenze.
+  [["Krolach","vanguard"],["Johanna","holdline"],["Lava Golem","breaker"],
+   ["Rhyx'Tal","skirmisher"],["Draco","shotcaller"],["King Arlen Morgolor","rallypoint"]]
     .forEach(([n,sl])=>{place[n]={d:"tdm",slot:sl};order[n]=SLOTVON[sl].ord;});
   // Spurt hat im Entwurf noch keine Slot-Rollen — die liegen im Spiel unter derselben
   // Funktion bereit, sind hier aber nicht abgeschrieben. Bis dahin behelfsweise ohne Slot.
-  [["Remiel","blockstart"],["Riley Le Rogue","acceleration"],
-   ["Professor Paranoix","topspeed"],["Marzipella","lanecontrol"]]
+  [["Jorund","blockstart"],["Lulu","acceleration"],
+   ["Xelara","topspeed"],["Gram","lanecontrol"]]
     .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=SLOTVON[sl].ord;});
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
@@ -3832,7 +3839,7 @@
     renderEndstand();
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
-    feed(0,(pL>pR?"Armageddon Aftermath gewinnt ":pR>pL?"Blazing Beasts gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
+    feed(0,(pL>pR?"Vigilante Wranglers gewinnt ":pR>pL?"Armageddon Aftermath gewinnt ":"Unentschieden ")+pL+":"+pR+" Disziplinpunkte",true);
     updateHud();
   }
 
@@ -3854,14 +3861,15 @@
   // EINLAUF — was vor dem Anpfiff zu sehen ist.
   //
   // Wappen, Tabellenplatz und beide Aufstellungen. Die Zahlen stammen aus dem
-  // Spielstand (teams, season_states.standings): Armageddon Aftermath steht auf 31,
-  // die Blazing Beasts auf 29 von 32. Die Wappen liegen als statische Dateien unter
+  // Spielstand (teams, season_states.standings, Saison 2 nach Spieltag 10): die
+  // Vigilante Wranglers stehen auf 9 mit 112,2 Punkten, Armageddon Aftermath auf 22
+  // mit 78,1 von 32 Teams. Die Wappen liegen als statische Dateien unter
   // /team-logos/<Kuerzel>.jpg — im Spiel laedt der Reiter sie von dort. Wird die Datei
   // nicht gefunden (etwa beim Oeffnen ueber file://), tritt ein Monogramm an ihre
   // Stelle, damit der Einlauf nie leer aussieht.
   const VEREIN={
-    0:{name:"Armageddon Aftermath", kurz:"A-A", platz:31, punkte:0},
-    1:{name:"Blazing Beasts",       kurz:"B-B", platz:29, punkte:0}
+    0:{name:"Vigilante Wranglers",  kurz:"V-W", platz:9,  punkte:112.2},
+    1:{name:"Armageddon Aftermath", kurz:"A-A", platz:22, punkte:78.1}
   };
   const LIGAGROESSE=32;
 
