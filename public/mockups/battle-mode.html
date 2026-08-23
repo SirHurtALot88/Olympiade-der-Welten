@@ -3051,25 +3051,45 @@
   // den Schaden exakt, Kontrolle und Frontlinie aber um rund zehn Prozent daneben.
   // Deshalb steht sie hier als eigene Konstante: sie ist geschaetzt, nicht abgelesen,
   // und faellt sofort auf, wenn jemand sie fuer gesichert haelt.
-  const IMP_STUECK={ko:95, beihilfe:35, tod:70, eigen:1.0};
-  const IMP_REF={schaden:650, heilung:500, schild:450, kontrolle:12, frontlinie:200};
-  const IMP_GEWICHT={schaden:449, kontrolle:190, heilung:566, schild:566, frontlinie:164};
-  const impSatt=(x,ref)=>1-Math.exp(-(x||0)/ref);
-  const impVerfall=(tode)=>1+0.75*(tode||0);
+  // Die Impact-Formel des Vorbilds — ENTZIFFERT, nicht mehr geschaetzt.
+  //
+  // Chris hat Tooltips geschickt, die je Kategorie den Einzelwert nennen. Damit war die
+  // Saettigung nicht mehr zu raten, sondern auszurechnen. Sie ist ueberall dieselbe
+  //
+  //     Beitrag = Gewicht * (1 - e^(-Menge / Referenz))
+  //
+  // und die Gewichte fallen als glatte Zahlen heraus. Aus sechs Schadenswerten zwischen
+  // 639 und 2379 kommt jedes Mal 450 (Streuung 1,0); aus fuenf Kontrollwerten 170; aus
+  // zwei Schildwerten 120; aus sechs Frontlinienwerten 200 bei Referenz 700.
+  //
+  // Zwei Stuecke hatte ich vorher uebersehen. Erstens den Verfall der Frontlinie: er ist
+  // 1 + 0,75 je Tod, was die Tooltips mit 1,00 / 2,50 / 3,25 bei 0 / 2 / 3 Toden exakt
+  // bestaetigen. Zweitens "Survival": 60 Punkte dafuer, dass einer den Kampf ueberlebt,
+  // sonst null. Ohne das ging Erikas Rechnung nicht auf — mit ihm auf 0,4 genau.
+  //
+  // Probe ueber 20 Zeilen: 16 stimmen auf unter einen Punkt, und ALLE sechs, zu denen es
+  // eine exakte Aufschluesselung gibt, auf 0,6. Die vier Ausreisser sind genau die
+  // Zeilen, die ich aus der kleinen Ergebnistabelle abgetippt habe.
+  const IMP_G={schaden:450, kontrolle:170, schild:120, heilung:277, frontlinie:200};
+  const IMP_R={schaden:650, kontrolle:12,  schild:450, heilung:500, frontlinie:700};
+  const IMP_STUECK={ko:95, beihilfe:35, tod:70, eigen:1.0, wieder:134, ueberlebt:60};
+  const IMP_KAPPE={wieder:2, weich:900, weichRest:0.45, hart:1400};
+  const impS=(x,ref)=>1-Math.exp(-(x||0)/ref);
 
   function impactVon(u){
-    const st=u.st;
-    const kampf = IMP_GEWICHT.schaden*impSatt(st.dmg,IMP_REF.schaden)
+    const st=u.st, tode=st.tode||0;
+    const kampf = IMP_G.schaden*impS(st.dmg,IMP_R.schaden)
                 + IMP_STUECK.ko*(st.ko||0);
-    const nutzen = IMP_GEWICHT.heilung*impSatt(st.heal,IMP_REF.heilung)
-                 + IMP_GEWICHT.schild*impSatt(st.schild,IMP_REF.schild)
-                 + IMP_GEWICHT.kontrolle*impSatt(st.cc,IMP_REF.kontrolle)
-                 + IMP_GEWICHT.frontlinie*impSatt(st.tank,IMP_REF.frontlinie)/impVerfall(st.tode);
-    const abzug = IMP_STUECK.tod*(st.tode||0) + IMP_STUECK.eigen*(st.ff||0);
-    let w = kampf + nutzen - abzug;
-    // Weicher Deckel bei 900, harter bei 1400 — beide stehen im Tooltip.
-    if(w>900) w = 900 + (w-900)*0.45;
-    return Math.round(Math.min(1400,w));
+    const nutzen = IMP_G.heilung*impS(st.heal,IMP_R.heilung)
+                 + IMP_G.schild*impS(st.schild,IMP_R.schild)
+                 + IMP_G.kontrolle*impS(st.cc,IMP_R.kontrolle)
+                 + IMP_G.frontlinie*impS(st.tank,IMP_R.frontlinie)/(1+0.75*tode)
+                 + IMP_STUECK.wieder*Math.min(IMP_KAPPE.wieder,st.wieder||0);
+    const ueber = tode===0 ? IMP_STUECK.ueberlebt : 0;
+    const abzug = IMP_STUECK.tod*tode + IMP_STUECK.eigen*(st.ff||0);
+    let w = kampf + nutzen + ueber - abzug;
+    if(w>IMP_KAPPE.weich) w = IMP_KAPPE.weich + (w-IMP_KAPPE.weich)*IMP_KAPPE.weichRest;
+    return Math.round(Math.min(IMP_KAPPE.hart,w));
   }
 
   function renderKader(){
