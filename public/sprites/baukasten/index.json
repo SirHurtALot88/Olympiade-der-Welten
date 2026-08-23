@@ -1,0 +1,541 @@
+{
+  "arme": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4299,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "axt_bg": {
+    "bilder": 18,
+    "breite": 1152,
+    "bytes": 5877,
+    "hoehe": 768,
+    "richtungen": 12
+  },
+  "axt_fg": {
+    "bilder": 18,
+    "breite": 1152,
+    "bytes": 7174,
+    "hoehe": 768,
+    "richtungen": 12
+  },
+  "bart": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 885,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "beine": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4074,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "binde": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4507,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "bogen": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 5762,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fetzen_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 5048,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "fetzen_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4183,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "g_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1702,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "g_slash": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1586,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "g_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1631,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "h_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1271,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "h_slash": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1710,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "h_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1355,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "haar_dread": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 5284,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "haar_lang": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4960,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "haar_mop": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4617,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "helm": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2522,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "helm_horn": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 6215,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "k_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 6737,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "k_slash": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4465,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "k_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 6479,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_alien": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2345,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_boarman": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2417,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_frankenstein": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3134,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_goblin": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3038,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_human": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1586,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_jack": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2894,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_lizard": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2353,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_minotaur": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3386,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_mouse": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4873,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_orc": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2784,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_pig": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2223,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_rabbit": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4795,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_rat": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4399,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_sheep": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4072,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_skeleton": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4550,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_troll": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2855,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_vampire": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2609,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_wartotaur": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3080,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_wolf": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2454,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "kopf_zombie": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2793,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "krone": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1857,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "leder_slash": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4339,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "pfeil": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1418,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "r_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 5585,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "r_slash": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3491,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "r_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 3902,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "s_lizard": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2353,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "s_schwanz_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 774,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "s_schwanz_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 700,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "schild": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 4266,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "schild_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 925,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "schild_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2316,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "schulter": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2177,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "stiefel": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 2416,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "sw_bg": {
+    "bilder": 12,
+    "breite": 768,
+    "bytes": 2684,
+    "hoehe": 512,
+    "richtungen": 8
+  },
+  "sw_fg": {
+    "bilder": 12,
+    "breite": 768,
+    "bytes": 6486,
+    "hoehe": 512,
+    "richtungen": 8
+  },
+  "t_body": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 4643,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "t_hood": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 6584,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "t_leder": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 5330,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "t_orc": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 2131,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "t_stab_bg": {
+    "bilder": 24,
+    "breite": 1536,
+    "bytes": 6306,
+    "hoehe": 768,
+    "richtungen": 12
+  },
+  "t_stab_fg": {
+    "bilder": 24,
+    "breite": 1536,
+    "bytes": 7202,
+    "hoehe": 768,
+    "richtungen": 12
+  },
+  "umhang_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1975,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "umhang_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 3287,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "visier": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1334,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "visier_horn": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1255,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_body": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 4220,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_fluegel_bg": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 3346,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_fluegel_fg": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 2037,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_hoerner": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 2111,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_lizard": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 1189,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_ohren": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 705,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_schwanz_bg": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 755,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "z_schwanz_fg": {
+    "bilder": 7,
+    "breite": 448,
+    "bytes": 519,
+    "hoehe": 256,
+    "richtungen": 4
+  }
+}
