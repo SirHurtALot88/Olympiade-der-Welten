@@ -464,6 +464,14 @@
     power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
     speed:{ANG:{speed:40,dexterity:30,torment:30},VER:{dexterity:35,awareness:35,health:30},LP:{stamina:45,health:40,will:15},TMP:{speed:60,dexterity:25,awareness:15},PRZ:{dexterity:45,awareness:30,intelligence:25},AUS:{stamina:55,determination:25,will:20}}
   };
+  // MANA — dieselbe Bauart wie die sechs Kampfwerte: ein Rezept ueber dieselben zwoelf
+  // Attribute, kein neuer Wert von aussen. Wer Geist und Verstand hat, hat Reserven.
+  // Ausdauer braucht kein eigenes Rezept: dafuer steht AUS schon da.
+  const MANAREZEPT={spirit:45,intelligence:35,will:20};
+  // Der Vorratsbecher: Klassenbasis 100 im Vorbild, bei uns der abgeleitete Wert mal zwei.
+  // Bei 50 landet man also auf denselben 100 wie dort.
+  const vorrat=(wert)=>Math.round(wert*2);
+
   const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4}};
   const KEYS=["LP","ANG","VER","TMP","PRZ","AUS"];
   const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",PRZ:"Präzision",AUS:"Ausdauer"};
@@ -570,9 +578,11 @@
   }
   const ROWS=[{k:"Front",d:"vorderste Linie"},{k:"Mitte",d:"stützt beide Seiten"},{k:"Backrow",d:"geschützt hinten"}];
 
+  const mische=(p,rez)=>{let s=0,w=0;for(const[at,wt]of Object.entries(rez)){s+=(p.a[at]||0)*wt;w+=wt;}
+    return Math.max(1,Math.min(99,Math.round(s/w)));};
   function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
-    for(const k of KEYS){let s=0,w=0;for(const[at,wt]of Object.entries(rec[k])){s+=(p.a[at]||0)*wt;w+=wt;}
-      o[k]=Math.max(1,Math.min(99,Math.round(s/w)));}
+    for(const k of KEYS)o[k]=mische(p,rec[k]);
+    o.MANA=mische(p,MANAREZEPT);
     return o;}
   // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
   // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
@@ -840,6 +850,10 @@
 
   // Aus der Vorschau wird ein Plan. Drei Antworten auf drei Lagen — und zu jeder steht
   // die Begruendung mit den Zahlen da, aus denen sie gezogen wurde.
+  // Zum Nachmessen erzwingbar: nur so laesst sich beantworten, ob ein Plan dem, der ihn
+  // fasst, ueberhaupt nuetzt. Ein Plan, den niemand gegen die Alternative geprueft hat,
+  // ist eine Behauptung.
+  let planZwang=null;
   function schlachtplan(){
     const v=gegnerVorschau();
     if(!v.length)return null;
@@ -853,7 +867,9 @@
     const pz=(x)=>Math.round(x*100)+" %";
 
     let name,grund,flanker,ziel;
-    if(anteil>=0.30&&top.zaeh<medianZaeh){
+    const kopf=planZwang?planZwang==="kopf":(anteil>=0.30&&top.zaeh<medianZaeh);
+    const heil=planZwang?planZwang==="heiler":(heiler&&heiler.hps*4>gesamt);
+    if(kopf){
       // Ein weicher Spitzenschaden ist die lohnendste Investition, die es gibt.
       flanker=anteil>=0.42?5:4;
       ziel="bedrohung";
@@ -863,7 +879,7 @@
         " je Sekunde) und ist mit "+top.zaeh+" effektiven Lebenspunkten weicher als der Durchschnitt ("+
         medianZaeh+"). "+flanker+" von 6 gehen außen herum auf sie, "+halter+
         (halter===1?" hält vorn die Linie und bindet":" halten vorn die Linie und binden")+" den Rest.";
-    }else if(heiler&&heiler.hps*4>gesamt){
+    }else if(heil&&heiler){
       flanker=2; ziel="heiler";
       name="Heiler zuerst";
       grund=heiler.n+" heilt "+heiler.hps+" je Sekunde und macht damit "+
@@ -972,7 +988,7 @@
   /* ================= ARENA ================= */
   const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
-  let U=[],floats=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
   const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
 
@@ -994,8 +1010,8 @@
     return{reach:SKILLS[sw].reichweiteSchwer,reichNah:SKILLS[sw].reichweite};
   }
 
-  function build(){
-    seed=1337;U=[];floats=[];t=0;done=false;freigabe=[false,false];
+  function build(saat){
+    seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];
     PLAN=schlachtplan();
     const mine=inDisc("tdm").slice(0,6);
     const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[place[p.n].row].push(p));
@@ -1008,7 +1024,7 @@
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
-          skills:p.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+          skills:p.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
       });
@@ -1016,13 +1032,26 @@
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
-        // Gegner aus den STAERKSTEN Kaderwerten ableiten, nicht aus zufaelligen Plaetzen —
-        // sonst ist das Duell einseitig und man sieht nichts vom Kampf.
-        const stark=[...SQUAD].sort((a,b)=>b.d.tdm-a.d.tdm);
-        const base=stark[i%stark.length],s0=stats(base,"tdm");
-        const f=1.0+rr()*0.18;
+        // GEGNER AUS IHREM EIGENEN EINSATZWERT.
+        //
+        // Vorher waren sie aus den STAERKSTEN Kaderwerten abgeleitet, mal 1,0-1,18, und das
+        // Tempo noch einmal mal 1,25. Ueber 24 Kaempfe gemessen hat unsere Seite damit 96 %
+        // verloren, und alle sechs sind in fast jedem Kampf gestorben. Damit war jede
+        // Leistungszahl wertlos: wer in einem verlorenen Kampf frueh faellt, sieht schlecht
+        // aus, egal wie gut er ist. Baumkopfs 54 % waren eine Aussage ueber die Ansetzung,
+        // nicht ueber ihn.
+        //
+        // Richtig ist die einfachste Regel: ein Gegner mit Einsatzwert 71,5 ist so stark wie
+        // UNSER Spieler mit 71,5. Genommen wird der Kaderspieler, dessen Eignung am
+        // naechsten liegt, mit einer Streuung von plusminus 9 % — sonst waeren beide Teams
+        // Klone voneinander.
+        const eigW=(o.lo+o.hi)/2;
+        const base=[...SQUAD].reduce((b,x)=>Math.abs(x.d.tdm-eigW)<Math.abs(b.d.tdm-eigW)?x:b);
+        const s0=stats(base,"tdm");
+        const f=0.91+rr()*0.18;
         const s={LP:Math.round(s0.LP*f),ANG:Math.round(s0.ANG*f),VER:Math.round(s0.VER*f),
-          TMP:Math.round(Math.min(99,s0.TMP*f*1.25)),PRZ:Math.round(s0.PRZ*f),AUS:Math.round(s0.AUS*f)};
+          TMP:Math.round(Math.min(99,s0.TMP*f)),PRZ:Math.round(s0.PRZ*f),AUS:Math.round(s0.AUS*f),
+          MANA:Math.round(s0.MANA*f)};
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
@@ -1031,7 +1060,7 @@
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
-          fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+          fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
       });
@@ -1062,7 +1091,7 @@
       const weg=Math.min(z.schild,rest);
       z.schild-=weg; rest-=weg;
       if(z.schildVon&&z.schildVon!==z)z.schildVon.st.heal+=weg;
-      floats.push({x:z.x,y:z.y-42,txt:"Schild −"+weg,life:.7,heil:true});
+      schwebe({x:z.x,y:z.y-42,txt:"Schild −"+weg,life:.7,heil:true});
     }
     z.hp=Math.max(0,z.hp-rest);
     z.lastHit=von;
@@ -1081,21 +1110,24 @@
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
   // geschrieben, damit der Grundangriff und Paladin Slash nicht auseinanderlaufen.
   function nahschlag(u,tg,sk,mult,knock,label,sd){
-    if(tg.invuln>0){floats.push({x:tg.x,y:tg.y-26,txt:"unverwundbar",life:.8});return;}
-    const chance=Math.max(40,Math.min(95,70+(u.PRZ-tg.TMP)*0.3))/100;
+    if(tg.invuln>0){schwebe({x:tg.x,y:tg.y-26,txt:"unverwundbar",life:.8});return;}
+    // PARADE. Ein Nahkampfschlag geht nicht daneben — er wird abgewehrt. Das ist eine
+    // Leistung des VERTEIDIGERS: sein Tempo gegen die Praezision des Angreifers. Bei
+    // gleichen Werten sind es 20 %, gedeckelt auf 5 bis 40 %.
+    const parade=Math.max(0.05,Math.min(0.40,0.20+(tg.TMP-u.PRZ)/300));
     tg.lastHit=u;
-    if(rr()>chance){
+    if(rr()<parade){
       const ax=tg.x-u.x,ay=tg.y-u.y,aL=Math.hypot(ax,ay)||1;
       tg.dx=-ay/aL;tg.dy=ax/aL;tg.dodge=0.26;
-      floats.push({x:tg.x,y:tg.y-26,txt:"ausgewichen",life:.8,crit:false});
-      feed(tg.side,tg.n+" weicht "+u.n+" aus.");
+      schwebe({x:tg.x,y:tg.y-26,txt:"pariert",life:.8,crit:false});
+      feed(tg.side,tg.n+" pariert "+u.n+".");
       return;
     }
     const crit=rr()<u.PRZ/400;
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
-    floats.push({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
+    schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
     if(tg.hp===0&&!tg.down){tg.down=true;u.st.ko++;feed(tg.side,tg.n+" ist ausgeschieden.",true);}
   }
@@ -1140,7 +1172,23 @@
   // Verkuerzung der Abklingzeit durch Tempo: gedeckelt und mit abnehmendem Ertrag, damit
   // die Spitze der Skala selten bleibt. Bei TMP 30 sind es 6 %, bei 99 knapp 14 % — die
   // Groessenordnung, die auch das Vorbild zeigt (0 bis 16 %).
+  // Schwebeschrift: in der Serie faellt sie weg, sonst waechst sie ins Unendliche.
+  let stumm=false;
+  const floats=[];
+  const schwebe=(o)=>{ if(!stumm)floats.push(o); };
   const RANGE=44;
+  // Nachfuellraten je Kit, unveraendert aus den Klassenkarten des Vorbilds.
+  const REGEN={
+    fighter:{mp:5,sp:25},matriarch:{mp:5,sp:15},archer:{mp:5,sp:20},neutral:{mp:5,sp:15}
+  };
+  const regenAls=(skills)=>{const r=regenVon(skills);return{mpReg:r.mp,spReg:r.sp};};
+  const regenVon=(skills)=>{
+    const k=skills||[];
+    if(k.includes("fslash"))return REGEN.fighter;
+    if(k.includes("slash"))return REGEN.matriarch;
+    if(k.includes("shoot"))return REGEN.archer;
+    return REGEN.neutral;
+  };
   const cdKuerzung=(u)=>0.30*u.TMP/(u.TMP+120);
   const abkling=(u,sk_cd,fat)=>sk_cd*(1-cdKuerzung(u))/Math.max(.5,fat);
   // Der schwere Schlag kostet zusaetzlich seine Haltezeit — die steht am Skill.
@@ -1148,9 +1196,18 @@
   // Schaden: Basisschaden des Skills mal Angriffswert. Bei ANG 100 traegt der Skill seinen
   // vollen Basiswert, darunter entsprechend weniger — genau die Prozentlogik des Vorbilds.
   const skillSchaden=(u,sk,mult)=>sk.basis*(u.ANG/100)*mult;
-  // Wer noch kein Kit hat, schlaegt mit einem neutralen Grundschlag zu. Ausdruecklich ein
-  // Platzhalter: sobald die Klasse ihre echten Skills hat, faellt er weg.
-  const GRUNDSCHLAG={basis:12,cd:0.5,reichweite:RANGE};
+  // WER NOCH KEIN KIT HAT, schlaegt mit einem neutralen Grundschlag zu — ausdruecklich ein
+  // Platzhalter, bis die Klasse ihre echten Skills bekommt.
+  //
+  // Er muss der DURCHSCHNITT eines echten Grundangriffs sein, nicht schlechter. Mit 0,5 s
+  // war er das nicht: eine Einheit ohne Kit schlug 40 % seltener zu als eine mit. Ueber 24
+  // Kaempfe gemessen hat unsere Seite dadurch 100 % gewonnen — nicht weil ihre Spieler
+  // besser waren, sondern weil zwei von sechs ein Kit hatten und drueben nur einer. Das
+  // Modell haette damit "hat schon Skills" hoeher belohnt als jedes Attribut.
+  //
+  // 0,3 s und Basis 12 sind der Slash, den Fighter wie Matriarch fuehren. Damit ist "kein
+  // Kit" gleich "durchschnittliches Kit", und die Attribute entscheiden wieder.
+  const GRUNDSCHLAG={basis:12,cd:0.3,reichweite:RANGE};
 
   // WANN AUFLADEN? Nur, wenn der schnelle Schlag nicht hinreicht.
   //
@@ -1242,15 +1299,40 @@
     return xs[Math.floor(xs.length/2)];
   }
 
-  // Ein Skill loest aus: erzeugt Projektile. Der Schaden kommt aus den Attributen,
-  // der Skill liefert nur den Multiplikator.
+  // ===================================================================================
+  // ECHTE PROJEKTILE.
+  //
+  // Vorher war der Pfeil eine Suchrakete: er bog dem Ziel hinterher und traf immer, und
+  // ob er "traf", entschied hinterher ein Wuerfelwurf. Beides war falsch.
+  //
+  // Jetzt bekommt der Pfeil beim Abschuss EINE Richtung und behaelt sie. Er trifft, wen er
+  // physisch schneidet. Wer wegläuft, wegrollt oder unverwundbar ist, wird nicht getroffen —
+  // nicht weil eine Zahl es sagt, sondern weil er nicht mehr da ist.
+  //
+  // Damit bekommt PRAEZISION endlich eine ehrliche Aufgabe: VORHALTEN. Ein guter Schuetze
+  // zielt dorthin, wo das Ziel sein WIRD; wem Praezision fehlt, der zielt dorthin, wo es
+  // gerade noch war, und streut zusaetzlich. Kein Trefferwurf mehr.
+  //
+  // Nahkampf umgekehrt: er trifft immer, es sei denn, der Getroffene PARIERT. Das ist eine
+  // Leistung des Verteidigers (sein Tempo gegen die Praezision des Angreifers), keine
+  // Ungenauigkeit des Angreifers.
+  const PFEILTEMPO=520;
+
   function feuerSkill(u,id){
     const sk=SKILLS[id]; if(!sk) return;
     const tg=u.tgt&&!u.tgt.down?u.tgt:chooseTarget(u); if(!tg) return;
     const n=sk.schuss||1;
+    const flug=dist(u,tg)/PFEILTEMPO;
     for(let i=0;i<n;i++){
-      pfeile.push({x:u.x,y:u.y,ziel:tg,von:u,side:u.side,
-        roh:skillSchaden(u,sk,sk.mult),knock:sk.knock||0,verzug:i*0.09,tempo:520,skill:sk.name});
+      // Vorhalten in dem Mass, in dem er treffsicher ist.
+      const vor=u.PRZ/100;
+      const zx=tg.x+(tg.vx||0)*flug*vor, zy=tg.y+(tg.vy||0)*flug*vor;
+      // Was an Praezision fehlt, landet als Winkelfehler (bis rund 11 Grad).
+      const streu=(1-u.PRZ/100)*0.2;
+      const a=Math.atan2(zy-u.y,zx-u.x)+(rr()*2-1)*streu;
+      pfeile.push({x:u.x,y:u.y,vx:Math.cos(a)*PFEILTEMPO,vy:Math.sin(a)*PFEILTEMPO,
+        von:u,side:u.side,roh:skillSchaden(u,sk,sk.mult),knock:sk.knock||0,
+        verzug:i*0.09,rest:sk.reichweite*1.4,skill:sk.name});
     }
     u.lunge=0.16;
   }
@@ -1258,36 +1340,38 @@
   function schrittPfeile(dt){
     for(const pf of pfeile){
       if(pf.verzug>0){pf.verzug-=dt;continue;}
-      const z=pf.ziel;
-      if(!z||z.down){pf.tot=true;continue;}
-      const dx=z.x-pf.x,dy=z.y-pf.y,L=Math.hypot(dx,dy)||1;
-      const v=pf.tempo*dt;
-      if(L<=v+10){
-        // Einschlag
-        if(z.invuln>0){
-          floats.push({x:z.x,y:z.y-26,txt:"unverwundbar",life:.8});
-        }else{
-          const chance=Math.max(40,Math.min(95,70+(pf.von.PRZ-z.TMP)*0.3))/100;
-          if(rr()>chance){
-            const ax=z.x-pf.x,ay=z.y-pf.y,aL=Math.hypot(ax,ay)||1;
-            z.dx=-ay/aL;z.dy=ax/aL;z.dodge=0.26;
-            floats.push({x:z.x,y:z.y-26,txt:"ausgewichen",life:.8});
-            feed(z.side,z.n+" weicht dem Pfeil aus.");
-          }else{
-            const crit=rr()<pf.von.PRZ/400;
-            const roh=pf.roh*(crit?1.5:1);
-            const d=treffer(pf.von,z,roh,1);
-            stossen(z,pf.x,pf.y,pf.knock);
-            floats.push({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
-            feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+" · "+d,crit);
-            if(z.hp===0&&!z.down){z.down=true;pf.von.st.ko++;feed(z.side,z.n+" ist ausgeschieden.",true);}
-          }
-        }
+      const nx=pf.x+pf.vx*dt, ny=pf.y+pf.vy*dt;
+      const weg=Math.hypot(nx-pf.x,ny-pf.y);
+      // Wen schneidet die Strecke dieses Bildes? Unverwundbare zaehlen nicht — der Pfeil
+      // fliegt durch sie hindurch, genau das ist der Sinn der Ausweichrolle.
+      const kand=live(1-pf.side).filter(f=>f.invuln<=0&&bahnAbstand(f,pf.x,pf.y,nx,ny)<19);
+      const z=kand.length?kand.reduce((b,x)=>Math.hypot(x.x-pf.x,x.y-pf.y)<Math.hypot(b.x-pf.x,b.y-pf.y)?x:b):null;
+      if(z){
+        const crit=rr()<pf.von.PRZ/400;
+        const roh=pf.roh*(crit?1.5:1);
+        const d=treffer(pf.von,z,roh,1);
+        stossen(z,pf.x,pf.y,pf.knock);
+        schwebe({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
+        const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
+        feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
+          (fremd?" (danebengezielt)":"")+" · "+d,crit);
+        if(z.hp===0&&!z.down){z.down=true;pf.von.st.ko++;feed(z.side,z.n+" ist ausgeschieden.",true);}
         pf.tot=true;
-      }else{ pf.x+=dx/L*v; pf.y+=dy/L*v; }
+        continue;
+      }
+      pf.x=nx; pf.y=ny; pf.rest-=weg;
+      if(pf.rest<=0||pf.x<18||pf.x>W-18||pf.y<18||pf.y>H-18){
+        pf.tot=true;
+        schwebe({x:pf.x,y:pf.y-10,txt:"daneben",life:.6});
+        feed(pf.von.side,pf.von.n+" schießt daneben.");
+      }
     }
     pfeile=pfeile.filter(pf=>!pf.tot);
   }
+
+  // Fuer die Serie: derselbe Schritt, aber ohne Ticker und Schwebeschrift — sonst kostet
+  // eine Serie mehr Zeit im DOM als in der Simulation.
+  function stepSimStumm(dt){ stumm=true; try{ stepSim(dt); } finally { stumm=false; } }
 
   function stepSim(dt){
     if(done)return;
@@ -1325,7 +1409,7 @@
       // laufen weiter, sonst waere eine Betaeubung auch noch ein Geschenk an den Getroffenen.
       if(u.stun>0){
         u.stun-=dt;
-        u.cd-=dt; u.mp=Math.min(100,u.mp+10*dt); u.sp=Math.min(100,u.sp+10*dt);
+        u.cd-=dt; u.mp=Math.min(u.mpMax,u.mp+u.mpReg*dt); u.sp=Math.min(u.spMax,u.sp+u.spReg*dt);
         for(const k in u.cds)u.cds[k]=Math.max(0,u.cds[k]-dt);
         if(u.invuln>0)u.invuln-=dt;
         if(u.wurzel>0)u.wurzel-=dt;
@@ -1466,6 +1550,7 @@
       // Wer eine Waffe mit Reichweite fuehrt (Hammer statt Faust), bleibt auf Schlagdistanz
       // stehen, statt in sein Ziel hineinzulaufen.
       const haltAbstand=u.skills&&!u.fern&&tg&&!tg.down&&dist(u,tg)<=u.reichNah*0.85;
+      u.vx=0; u.vy=0;
       // WER SCHIESST, STEHT.
       //
       // Vorher lief Buttercup und schoss im selben Bild. Ein Fernkaempfer mit gleichem
@@ -1482,7 +1567,10 @@
         const v=(40+u.TMP*1.4)*fat*(u.retreat>0?1.25:1)*dt;
         let ux=dx/L,uy=dy/L;
         if(u.ord==="flanke"&&!tg&&u.retreat<=0){const edge=u.y<H/2?46:H-46;uy=(edge-u.y)/60;}
-        u.x+=ux*Math.min(v,L);u.y+=uy*Math.min(v,L);
+        const sx=ux*Math.min(v,L),sy=uy*Math.min(v,L);
+        u.x+=sx;u.y+=sy;
+        // Die tatsaechliche Geschwindigkeit — daraus halten Schuetzen vor.
+        u.vx=sx/dt; u.vy=sy/dt;
         u.y=Math.max(34,Math.min(H-34,u.y));u.x=Math.max(34,Math.min(W-34,u.x));
       }
       // ENTZERRUNG. Ohne sie klumpt am Ende die halbe Mannschaft auf einen Punkt: alle
@@ -1502,7 +1590,10 @@
 
       u.cd-=dt;
       // Ressourcen und Abklingzeiten laufen immer mit (Regeneration 10/s wie im Vorbild).
-      u.mp=Math.min(100,u.mp+10*dt); u.sp=Math.min(100,u.sp+10*dt);
+      // REGENERATION AUS DEM KIT. Der Vorrat kommt aus den Attributen, die Nachfuellrate aus
+      // der Klasse — genau so steht es im Vorbild (Fighter 25/s Ausdauer, Matriarch 15/s;
+      // Mana bei beiden 5/s). Wer noch kein Kit hat, bekommt einen neutralen Mittelwert.
+      u.mp=Math.min(u.mpMax,u.mp+u.mpReg*dt); u.sp=Math.min(u.spMax,u.sp+u.spReg*dt);
       for(const k in u.cds) u.cds[k]=Math.max(0,u.cds[k]-dt);
       if(u.invuln>0)u.invuln-=dt;
       if(u.fern){u.trail.push({x:u.x,y:u.y,l:0.35});}
@@ -1525,7 +1616,7 @@
               for(const f of bahn){
                 nahschlag(u,f,SKILLS.ram,1,SKILLS.ram.knock,"Battering Ram",sd);
                 f.stun=Math.max(f.stun,SKILLS.ram.stun);
-                floats.push({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
+                schwebe({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
               }
               u.x=ex;u.y=ey;
               feed(u.side,u.n+" rammt sich durch"+(bahn.length>1?" — "+bahn.length+" fliegen":"")+".");
@@ -1533,7 +1624,7 @@
           }else if(u.cast==="shield"){
             const z=u.castZiel&&!u.castZiel.down?u.castZiel:u;
             z.schild=SKILLS.shield.schild;z.schildT=SKILLS.shield.dauer;z.schildVon=u;
-            floats.push({x:z.x,y:z.y-34,txt:"+Schild "+SKILLS.shield.schild,life:1.1,heil:true});
+            schwebe({x:z.x,y:z.y-34,txt:"+Schild "+SKILLS.shield.schild,life:1.1,heil:true});
             feed(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+SKILLS.shield.schild+" für "+SKILLS.shield.dauer+" s.");
           }else feuerSkill(u,u.cast);
           u.cast=null;u.castZiel=null;
@@ -1551,7 +1642,7 @@
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
-          floats.push({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,heil:true});
+          schwebe({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,heil:true});
           feed(u.side,u.n+" heilt "+ziel.n+" · "+heal);
           continue;
         }
@@ -1572,7 +1663,7 @@
           u.x=Math.max(34,Math.min(W-34,u.x+dxq/L2*SKILLS.dash.strecke));
           u.y=Math.max(34,Math.min(H-34,u.y+dyq/L2*SKILLS.dash.strecke));
           u.invuln=SKILLS.dash.dauer; u.sp-=SKILLS.dash.sp; u.cds.dash=SKILLS.dash.cd;
-          floats.push({x:u.x,y:u.y-30,txt:"Light Dash",life:1.0,skill:true});
+          schwebe({x:u.x,y:u.y-30,txt:"Light Dash",life:1.0,skill:true});
           feed(u.side,u.n+" rollt weg — unverwundbar.");
           continue;
         }
@@ -1584,7 +1675,7 @@
           u.y=Math.max(34,Math.min(H-34,u.y+dyq/L2*SKILLS.barrage.sprung));
           u.mp-=SKILLS.barrage.mp; u.cds.barrage=SKILLS.barrage.cd;
           u.cast="barrage"; u.castLeft=SKILLS.barrage.castzeit;
-          floats.push({x:u.x,y:u.y-30,txt:"Archer Barrage",life:1.1,skill:true});
+          schwebe({x:u.x,y:u.y-30,txt:"Archer Barrage",life:1.1,skill:true});
           feed(u.side,u.n+" springt zurück und legt an.");
           continue;
         }
@@ -1609,7 +1700,7 @@
             const z=kand.reduce((b,x)=>x.hp/x.max<b.hp/b.max?x:b);
             u.mp-=SKILLS.shield.mp;u.cds.shield=SKILLS.shield.cd;
             u.cast="shield";u.castZiel=z;u.castLeft=SKILLS.shield.castzeit;
-            floats.push({x:u.x,y:u.y-30,txt:"Blessed Shield",life:1.1,skill:true});
+            schwebe({x:u.x,y:u.y-30,txt:"Blessed Shield",life:1.1,skill:true});
             feed(u.side,u.n+" hebt den Hammer und ruft den Segen.");
             continue;
           }
@@ -1622,7 +1713,7 @@
           u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
           u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
           u.invuln=SKILLS.heavydash.dauer;u.sp-=SKILLS.heavydash.sp;u.cds.heavydash=SKILLS.heavydash.cd;
-          floats.push({x:u.x,y:u.y-30,txt:"Heavy Dash",life:1.0,skill:true});
+          schwebe({x:u.x,y:u.y-30,txt:"Heavy Dash",life:1.0,skill:true});
           feed(u.side,u.n+" setzt mit dem Sturmschritt zu "+tgM.n+" durch — unverwundbar.");
           continue;
         }
@@ -1651,7 +1742,7 @@
           if(d0>u.reach*1.4&&d0<SKILLS.ram.reichweite){
             u.sp-=SKILLS.ram.sp;u.cds.ram=SKILLS.ram.cd;
             u.cast="ram";u.castZiel=tgF;u.castLeft=SKILLS.ram.castzeit;
-            floats.push({x:u.x,y:u.y-30,txt:"Battering Ram",life:1.1,skill:true});
+            schwebe({x:u.x,y:u.y-30,txt:"Battering Ram",life:1.1,skill:true});
             feed(u.side,u.n+" senkt die Schulter und nimmt Anlauf auf "+tgF.n+".");
             continue;
           }
@@ -1663,7 +1754,7 @@
           u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
           u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
           u.invuln=SKILLS.mdash.dauer;u.sp-=SKILLS.mdash.sp;u.cds.mdash=SKILLS.mdash.cd;
-          floats.push({x:u.x,y:u.y-30,txt:"Medium Dash",life:1.0,skill:true});
+          schwebe({x:u.x,y:u.y-30,txt:"Medium Dash",life:1.0,skill:true});
           feed(u.side,u.n+" setzt nach — unverwundbar.");
           continue;
         }
@@ -1812,8 +1903,7 @@
     // Pfeile
     for(const pf of pfeile){
       if(pf.verzug>0)continue;
-      const z=pf.ziel; if(!z)continue;
-      const dx=z.x-pf.x,dy=z.y-pf.y,L=Math.hypot(dx,dy)||1;
+      const dx=pf.vx,dy=pf.vy,L=Math.hypot(dx,dy)||1;
       ctx.strokeStyle=pf.side===0?css("--home"):css("--away");
       ctx.lineWidth=2;ctx.beginPath();
       ctx.moveTo(pf.x,pf.y);ctx.lineTo(pf.x-dx/L*13,pf.y-dy/L*13);ctx.stroke();
@@ -1829,6 +1919,7 @@
   }
 
   function feed(side,txt,big){
+    if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
     d.appendChild(el("span","tk","0:"+String(Math.floor(t)).padStart(2,"0")));
@@ -1854,7 +1945,7 @@
       acc+=dt*speed;
       while(acc>=1/60){stepSim(1/60);acc-=1/60;}
       floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
-      floats=floats.filter(f=>f.life>0);
+      for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
     }
     draw();
     requestAnimationFrame(loop);
@@ -1893,7 +1984,38 @@
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
   // schreibgeschuetzt zum Nachmessen bereit; das Spiel liest davon nichts.
-  window.__arena={ einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  // SERIE. Ein einziger Kampf ist EIN Wuerfelwurf: der Seed steht fest, aber jede Aenderung
+  // am Modell verschiebt die Zufallsfolge komplett, und dann vergleicht man Rauschen mit
+  // Rauschen. Wer wissen will, ob jemand seinem Einsatzwert entspricht, muss ihn oefter
+  // spielen lassen. Diese Schleife rechnet dieselbe Aufstellung mit n Saatkoernern durch,
+  // ohne zu zeichnen, und liefert die Mittelwerte.
+  function serie(n,zwang){
+    planZwang=zwang||null;
+    const summe={},alt={U,pfeile,t,done,seed,freigabe};
+    let siege=0,dauer=0;
+    for(let i=0;i<n;i++){
+      build(1337+i*7919);
+      let g=0;
+      while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
+      dauer+=t;
+      if(live(0).length>live(1).length)siege++;
+      const feld=[...U];
+      for(const u of feld){
+        const s=summe[u.n]||(summe[u.n]={n:u.n,seite:u.side,eig:u.eig,dmg:0,heal:0,verh:0,tank:0,ko:0,leist:0,tod:0});
+        s.dmg+=u.st.dmg;s.heal+=u.st.heal;s.verh+=u.st.verh;s.tank+=u.st.tank;s.ko+=u.st.ko;
+        s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
+      }
+    }
+    U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
+    return {plan:gewaehlt,laeufe:n,siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
+      reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
+        dmg:Math.round(s.dmg/n),heal:Math.round(s.heal/n),verh:Math.round(s.verh/n),
+        tank:Math.round(s.tank/n),ko:+(s.ko/n).toFixed(2),leist:Math.round(s.leist/n),
+        totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
+  }
+
+  window.__arena={ serie, einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
