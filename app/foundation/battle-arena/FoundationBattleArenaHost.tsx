@@ -38,7 +38,7 @@ export default function FoundationBattleArenaHost() {
         style={{
           width: "100%",
           height: "min(1400px, 180vh)",
-          border: "1px solid var(--border, #2A3546)",
+          border: "1px solid var(--nl-line)",
           borderRadius: 10,
           background: "transparent",
           display: "block",
