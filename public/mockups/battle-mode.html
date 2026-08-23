@@ -233,6 +233,20 @@
   .stufe.an{border-color:var(--warn);color:var(--ink)}
   .stufe.an s{color:var(--warn)}
 
+  .aufschluss{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}
+  .apart{display:flex;flex-direction:column;gap:1px;padding:3px 6px;border-radius:5px;
+    background:var(--surface-2);font-style:normal}
+  .apart b{font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  .apart s{text-decoration:none;font:600 11px/1 ui-monospace,monospace;color:var(--ink)}
+  .apart.plus s{color:var(--ok)}
+  .apart.minus s{color:var(--crit)}
+  .apart.summe{background:transparent;border:1px solid var(--warn);margin-left:auto}
+  .apart.summe s{color:var(--warn)}
+
+  .oslot{font-style:normal;font-weight:700;color:var(--ink)}
+  .otaktik{font-style:normal;display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;
+    background:var(--surface-2);color:var(--warn);font-size:9.5px;font-weight:600}
+
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1201,24 +1215,46 @@
     return breit?{anteil:breit, breit:true}:null;
   }
 
-  // Punkte auf dem Disziplinwert in Kampfwerte umlegen. "eng" heisst: nach den
-  // Fokus-Attributen des Slots (fuer alles, was mit der Position zu tun hat). "breit"
-  // heisst: nach dem Rezept der Disziplin selbst (fuer alles, was jeden gleich trifft,
-  // etwa Formkarte und Intensitaet).
-  function verteilePunkte(punkte,slotId,dId,eng){
-    if(!punkte)return {};
+  // Punkte auf dem Disziplinwert in EFFEKTIVE ATTRIBUTE umrechnen.
+  //
+  // Vorher habe ich die Punkte direkt auf die Kampfwerte addiert. Das war ein Tausch
+  // zwischen zwei verschiedenen Waehrungen: 8,5 Punkte auf dem Disziplinwert sind bei
+  // Greenkraut (60,5) ein Sprung von 14 %, aber auf drei Kampfwerte verteilt ergaben sie
+  // nur rund 4 % je Wert. Die Anzeige versprach eine grosse Verbesserung, im Kampf kam
+  // ein Fuenftel davon an.
+  //
+  // Richtig ist der Umweg ueber die Attribute: um wie viel muessen die Fokus-Attribute
+  // steigen, damit der DISZIPLINWERT um den Aufschlag steigt? Genau um diesen Faktor
+  // werden sie gehoben, und die Kampfwerte entstehen danach ganz normal aus ihnen. Bei
+  // Greenkraut im Vanguard heisst das power 94 -> 112,6 und health 83 -> 99,4, und daraus
+  // fallen LP +13 %, ANG +16 %, VER +18 % — statt der +4 % von vorher.
+  //
+  // Effektive Attribute duerfen dabei ueber 100 gehen. Die Skala 0–100 gilt fuer das,
+  // was ein Spieler MITBRINGT; was ein Slot daraus macht, ist eine andere Groesse.
+  function mitAufschlag(a,punkte,attrs,dId){
+    if(!punkte||!attrs||!attrs.length)return a;
+    const W=BASIS_JE_DISC[dId]; if(!W)return a;
+    const summeW=Object.values(W).reduce((x,y)=>x+y,0);
+    const traegt=attrs.reduce((x,k)=>x+(W[k]||0)*(a[k]||0),0)/summeW;
+    if(traegt<=0)return a;
+    const f=1+punkte/traegt;
+    const b={...a}; for(const k of attrs)b[k]=Math.max(0,(a[k]||0)*f);
+    return b;
+  }
+
+  // Welche Attribute ein Aufschlag anfasst. Eng: die zwei Fokus-Attribute des Slots —
+  // aber nur, wenn sie ueberhaupt einen Kampfwert speisen. Charisma und Spirit tun das
+  // nicht; ein Shotcaller-Bonus wuerde dort spurlos versickern. Dann breit: alle
+  // Attribute, die die Disziplin gewichtet.
+  function betroffeneAttribute(slotId,dId,eng){
+    const W=BASIS_JE_DISC[dId]||{};
+    const breit=Object.keys(W).filter(k=>W[k]>0);
+    if(!eng)return breit;
+    const sl=SLOTVON[slotId]; if(!sl)return breit;
     const rec=REC[DISCS[dId].cat];
-    let anteil=null;
-    if(eng){const v=traitVerteilung(slotId,dId); anteil=v&&v.anteil;}
-    if(!anteil){
-      // Breit: jeder Kampfwert bekommt so viel, wie sein Rezept insgesamt wiegt.
-      const roh={};let summe=0;
-      for(const k of KEYS){const w=Object.values(rec[k]||{}).reduce((a,b)=>a+b,0);if(w>0){roh[k]=w;summe+=w;}}
-      if(!summe)return {};
-      anteil={};for(const k in roh)anteil[k]=roh[k]/summe;
-    }
-    const teile={};for(const k in anteil)teile[k]=punkte*anteil[k];
-    return teile;
+    const fokus=[sl.gross,sl.klein].filter(k=>W[k]>0);
+    const speist=fokus.some(k=>KEYS.some(x=>rec[x]&&rec[x][k]));
+    return speist?fokus:breit;
   }
 
   // Der fertige Aufschlag je Kampfwert.
@@ -1486,6 +1522,20 @@
           c.tabIndex=0; tipOn(c,lab,tip); wz.appendChild(c);
         }
         u.appendChild(wz);
+        {
+          const a=aufschluesselung(p,disc,false);
+          const az=el("div","aufschluss");
+          a.teile.forEach(([k,v],i)=>{
+            const c=el("i","apart"+(i>0?(v>0?" plus":" minus"):" basis"));
+            c.appendChild(el("b",null,k));
+            c.appendChild(el("s",null,(i>0&&v>0?"+":"")+v.toFixed(1)));
+            az.appendChild(c);
+          });
+          const g=el("i","apart summe");g.appendChild(el("b",null,"Wert"));
+          g.appendChild(el("s",null,a.summe.toFixed(1)));
+          az.appendChild(g);
+          u.appendChild(az);
+        }
         // Welche Eigenschaften diesen Spieltag greifen — und wohin ihr Gewicht geht.
         {
           const sl=place[p.n]&&place[p.n].slot;
@@ -1496,7 +1546,9 @@
           } else {
             for(const t of ta.tr.pos)tz.appendChild(el("span","tchip auf","+"+t));
             for(const t of ta.tr.neg)tz.appendChild(el("span","tchip ab","−"+t));
-            const wohin=Object.entries(ta.teile).filter(([,v])=>Math.abs(v)>=0.05)
+            const attrNeu=mitAufschlag(p.a,ta.netto,betroffeneAttribute(sl,disc,true),disc);
+            const vorher=stats(p,disc), nachher=stats({...p,a:attrNeu},disc);
+            const wohin=KEYS.map(k=>[k,nachher[k]-vorher[k]]).filter(([,v])=>Math.abs(v)>=0.05)
               .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
               .map(([k,v])=>k+" "+(v>0?"+":"")+v.toFixed(1)).join(" · ");
             const text = wohin ? (ta.breit?wohin+" (breit verteilt)":wohin)
@@ -1800,16 +1852,17 @@
     // fuer den eigenen Kader anstellt, nur auf fremde Zahlen angewandt.
     const passt=slotsVon("tdm").map(sl=>({sl,m:slotAufschlag(o,sl.id,"tdm")})).sort((a,b)=>b.m-a.m);
     if(st===0)return {t:"unbekannt", d:"Zu wenig gespäht. Nicht einmal die Rolle ist zu erraten."};
-    if(st===1)return {t:passt[0].sl.label+" oder "+passt[1].sl.label,
+    if(st===1)return {t:"oder "+passt[1].sl.label, slot:passt[0].sl.label,
       d:"Aus seinen Werten geschlossen: zu diesen beiden Rollen passt er am besten ("+
-        passt[0].m.toFixed(1)+" und "+passt[1].m.toFixed(1)+"). Beobachtet ist das nicht."};
+        passt[0].m.toFixed(1)+" und "+passt[1].m.toFixed(1)+"). Beobachtet ist das nicht. "+
+        "Welche Grundtaktik er fährt, ist auf dieser Stufe noch offen."};
     const ord=z?z.ord:o.ord;
     const name=(ORDERS.find(x=>x[0]===ord)||[,ord])[1];
-    if(st===2)return {t:"wahrscheinlich "+passt[0].sl.label,
+    if(st===2)return {t:"", slot:passt[0].sl.label+" (wahrsch.)", taktik:"vermutlich "+name,
       d:"Beste Passung "+passt[0].m.toFixed(1)+", nächstbeste "+passt[1].sl.label+" mit "+passt[1].m.toFixed(1)+
-        ". Aus früheren Spielen gestützt — umstellen kann er trotzdem."};
-    return {t:passt[0].sl.label+", Befehl "+name,
-      d:"Gut gespäht: Rolle und üblicher Befehl. Trotzdem eine Erwartung — die KI fasst ihren Plan erst, wenn sie deine Aufstellung sieht."};
+        ". Die Grundtaktik ist aus früheren Spielen geschätzt — umstellen kann er trotzdem."};
+    return {t:"", slot:passt[0].sl.label, taktik:name+(z?" — "+z.rolle:""),
+      d:"Gut gespäht: Rolle UND Grundtaktik. Trotzdem eine Erwartung — die KI fasst ihren Plan erst, wenn sie deine Aufstellung sieht."};
   }
 
   function renderOpp(){
@@ -1846,7 +1899,11 @@
       const r=el("div","oppline");
       const l=el("div");l.appendChild(el("b",null,o.n));
       const ab=absicht(o,z,SPAEHGRAD);
-      const kl=el("small",null,o.c+" · "+ab.t+(z&&spaehStufe(SPAEHGRAD)>=3?" — "+z.rolle:""));
+      const kl=el("small");
+      kl.appendChild(document.createTextNode(o.c+" · "));
+      if(ab.slot){const sm=el("i","oslot",ab.slot);kl.appendChild(sm);}
+      kl.appendChild(document.createTextNode(" "+ab.t));
+      if(ab.taktik){const tm=el("i","otaktik",ab.taktik);kl.appendChild(tm);}
       kl.tabIndex=0; tipOn(kl,"Was wir wirklich wissen",ab.d);
       l.appendChild(kl);
       r.appendChild(l);
@@ -1965,14 +2022,16 @@
         // rohen Attributen rechnete. Die Karte versprach etwas, das der Kampf nicht hielt.
         const bh=behav(p.n);
         const slId=place[p.n]&&place[p.n].slot;
-        const ta=traitAufschlag(p,slId,"tdm");
-        const eigWert=p.d.tdm+(slotBonus[p.n]||0)+formVon(p.n)+stufenWert()+ta.netto;
-        const auf={};
-        const dazu=(teile)=>{for(const k in teile)auf[k]=(auf[k]||0)+teile[k];};
-        dazu(ta.teile);                                                        // Traits: eng
-        dazu(verteilePunkte(slotBonus[p.n]||0,slId,"tdm",true));                // Slot: eng
-        dazu(verteilePunkte(formVon(p.n)+stufenWert(),slId,"tdm",false));       // Form/Stufe: breit
-        for(const k in auf)s[k]=Math.max(1,Math.round((s[k]+auf[k])*10)/10);
+        const tr=traitTreffer(p);
+        const engPunkte=(slotBonus[p.n]||0)+tr.netto;      // haengt an der Position
+        const breitPunkte=formVon(p.n)+stufenWert();        // trifft jeden gleich
+        const eigWert=p.d.tdm+engPunkte+breitPunkte;
+        // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
+        let attr=mitAufschlag(p.a,engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
+        attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
+        const sMod=stats({...p,a:attr},"tdm");
+        for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
+        s.MANA=sMod.MANA;
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -3219,6 +3278,31 @@
     return box;
   }
 
+  // Woraus sich der Wert eines Spielers zusammensetzt — dieselbe Aufschluesselung, die
+  // das Scoring an anderer Stelle auch zeigt. Wer eine Zahl sieht, soll sie nachrechnen
+  // koennen, ohne den Code zu lesen.
+  function aufschluesselung(p,dId,istGegner){
+    const sl=(!istGegner&&place[p.n])?place[p.n].slot:null;
+    const basis=(p.d&&p.d[dId])||0;
+    const teile=[["Basis",basis,"Der Disziplinwert aus den zwölf Attributen."]];
+    if(sl)teile.push(["Slot",slotAufschlag(p,sl,dId),
+      "Passung zum Profil von "+SLOTVON[sl].label+" (+"+SLOTVON[sl].gross+" +"+SLOTVON[sl].klein+")."]);
+    const fk=formVon(p.n);
+    if(fk)teile.push(["Form",fk,"Formkarte des Spieltags."]);
+    if(!istGegner){
+      const tr=traitTreffer(p);
+      if(tr.netto)teile.push(["Mutator",tr.netto,
+        [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"−"+t)].join(", ")]);
+      const iv=stufenWert();
+      if(iv)teile.push(["Intensität",iv,INTENSITAET[STUFE].label]);
+    }
+    const summe=teile.reduce((a,[,v])=>a+v,0);
+    return {teile,summe};
+  }
+  const aufschlussText=(a)=>a.teile.map(([k,v],i)=>
+    (i===0?"":(v>0?"+ ":"− "))+(i===0?"":Math.abs(v).toFixed(1)+" ")+k+(i===0?" "+v.toFixed(1):"")
+  ).join("  ")+"   =  "+a.summe.toFixed(1);
+
   function renderEinlauf(){
     for(const seite of [0,1]){
       const v=VEREIN[seite];
@@ -3245,7 +3329,13 @@
         const rolle=(pl&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
         z.appendChild(el("span","erolle",rolle.toUpperCase()));
         z.appendChild(el("span","ename",u.n));
-        z.appendChild(el("span","ewert",u.eig.toFixed(1)));
+        const w=el("span","ewert",u.eig.toFixed(1));
+        const auf=aufschluesselung(seite===0?SQUAD.find(x=>x.n===u.n)||{n:u.n,d:{tdm:u.eig}}
+                                           :OPP.find(x=>x.n===u.n)||{n:u.n,d:{tdm:u.eig}},"tdm",seite===1);
+        w.tabIndex=0;
+        tipOn(w,"Wie sich "+u.eig.toFixed(1)+" zusammensetzt",
+          auf.teile.map(([k,v,warum])=>k+" "+(v>=0&&k!=="Basis"?"+":"")+v.toFixed(1)+" — "+warum).join("\n"));
+        z.appendChild(w);
         liste.appendChild(z);
       }
     }
