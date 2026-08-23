@@ -85,18 +85,32 @@ describe("Die EINE GuV", () => {
    * Auflösung: die Zeile ist IMMER da (Chris' „selbst wenn es 0 ist"), aber sie zählt erst, wenn die
    * Apron-Abrechnung dieser Saison wirklich gebucht wurde.
    */
-  it("zählt den Apron erst, wenn er gebucht ist — vorher steht er als Hochrechnung daneben", () => {
+  /**
+   * GEMELDET VON CHRIS: „in der GuV anzeige ist der Apron nicht mit eingerechnet obwohl der auf
+   * jeden fall anfallen wird! DAS MUSS MIT REIN!"
+   *
+   * Vorher hing der Apron an `apronGebucht`. Das war schon damals halb: die VORSTANDSZIELE zählen
+   * ungebucht mit, und zwar bewusst — die GuV war also längst eine Mischung aus Gebuchtem und
+   * Erwartetem. Ausgerechnet der größte Posten stand daneben statt drin: an Chris' Ansicht GuV −6,1
+   * neben einem Apron von −22,86.
+   *
+   * Die Unterscheidung verschwindet nicht, sie wandert nur dorthin, wo sie hingehört: in die
+   * Notiz der Zeile.
+   */
+  it("zählt den Apron auch als Hochrechnung — die Notiz sagt, worauf sie sich stützt", () => {
     const ungebucht = buildSeasonGuv({ ...vollstaendig, apronGebucht: false });
     const apronZeile = ungebucht.posten.find((entry) => entry.key === "apron");
     expect(apronZeile).toBeDefined();
-    expect(apronZeile?.counted).toBe(false);
-    // Ohne den Apron: 64.2 + 12 + 3 − 42.5 − 4.5 − 1.4
-    expect(ungebucht.guv).toBe(30.8);
+    expect(apronZeile?.counted).toBe(true);
+    expect(apronZeile?.note).toContain("noch nicht gebucht");
+    // Mit dem Apron: 64.2 + 12 + 3 − 42.5 − 4.5 − 1.4 − 6.3
+    expect(ungebucht.guv).toBe(24.5);
 
     const gebucht = buildSeasonGuv({ ...vollstaendig, apronGebucht: true });
     expect(gebucht.posten.find((entry) => entry.key === "apron")?.counted).toBe(true);
+    expect(gebucht.posten.find((entry) => entry.key === "apron")?.note).toBe("gebucht");
+    // Dieselbe Zahl wie vor der Buchung — die Buchung bestätigt sie, sie verändert sie nicht.
     expect(gebucht.guv).toBe(24.5);
-    expect(gebucht.posten.find((entry) => entry.key === "apron")?.note).toContain("gebucht");
   });
 
   it("kommt beim Wiederaufsummieren der Postenliste auf dieselbe Zahl", () => {

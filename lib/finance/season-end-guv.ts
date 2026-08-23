@@ -21,6 +21,10 @@
  *   GuV = Sponsor + Gebäude-Einnahme + Apron + Vorstandsziele
  *         − Gehälter − Gebäude-Unterhalt − Kreditzins
  *
+ * Der APRON zählt mit, auch bevor er gebucht ist (Chris: „DAS MUSS MIT REIN!"). Genau wie die
+ * Vorstandsziele ist er dann eine Hochrechnung — die Notiz der Zeile sagt das, die Zahl unterschlägt
+ * ihn nicht mehr.
+ *
  * WAS BEWUSST NICHT ZÄHLT — und trotzdem im Hover steht:
  *  - TRANSFERS. Einmal-Ereignis (in S1 der komplette Kaderaufbau), keine laufende Betriebs-GuV. Sie
  *    stehen im Saisonstand ohnehin in einer eigenen Spalte.
@@ -155,18 +159,26 @@ export type SeasonGuvParts = {
   apronGedeckelt?: boolean;
   /**
    * `true` = die Apron-Abrechnung dieser Saison ist BEREITS GEBUCHT (`apronSettlementLogs` trägt
-   * einen `season_end`-Eintrag). Nur dann zählt der Apron in die GuV.
+   * einen `season_end`-Eintrag).
    *
-   * WARUM DIESE UNTERSCHEIDUNG NÖTIG IST — ich hatte den Apron zuerst bedingungslos mitgezählt, weil
-   * er eine der drei Einnahmequellen ist. Das war falsch, und zwei Invarianten-Tests haben es
-   * gefangen: der Finanzen-Reiter verspricht `Σ(Einnahmen) − Σ(Ausgaben) == GuV == echte
-   * Cash-Veränderung der Saison`, und die Geldfluss-Invariante verlangt `cashVorher + Σ Buchungen ==
-   * cashNachher`. Eine HOCHRECHNUNG in der GuV bricht beide: das Geld ist noch nicht geflossen
-   * (gemessen: 11,3 bzw. 3,0 Differenz).
+   * DAS ENTSCHEIDET NICHT MEHR, OB DER APRON ZÄHLT — er zählt immer. Gemeldet von Chris: „in der
+   * GuV anzeige ist der Apron nicht mit eingerechnet obwohl der auf jeden fall anfallen wird! DAS
+   * MUSS MIT REIN!"
    *
-   * Beides zusammen geht: vor der Buchung steht der Apron als Hochrechnung DANEBEN (sichtbar, aber
-   * nicht gezählt), nach der Buchung zählt er wie jede andere Einnahme. Die Zeile ist in beiden
-   * Fällen da — nur ihr Status ändert sich mit der Realität.
+   * Vorher hing das Zählen hier dran, mit dem Argument, eine Hochrechnung gehöre nicht in eine
+   * Zahl, die sich an der Kasse messen lassen muss. Das Argument war schon damals halb: die
+   * VORSTANDSZIELE zählen ungebucht mit (siehe `boardzieleGebucht`), die GuV war also längst eine
+   * Mischung aus Gebuchtem und Erwartetem. Ausgerechnet beim größten Posten stand die Hochrechnung
+   * daneben statt drin — an Chris' Ansicht eine ausgewiesene GuV von −6,1 neben einem Apron von
+   * −22,86, der sicher anfällt.
+   *
+   * Nachgemessen beim Umbau: die damals genannten Invarianten-Tests fangen das heute nicht mehr —
+   * `economy-cashflow-invariant` prüft Buchungen, nicht die GuV-Anzeige, und `finanzen-apron-kredite`
+   * bleibt grün. Es fielen genau die zwei Tests, die diese Regel selbst festschrieben.
+   *
+   * Was das Feld weiterhin steuert, ist die NOTIZ der Zeile: „gebucht" gegen „Hochrechnung auf Platz
+   * N, noch nicht gebucht", samt Deckel- und Linien-Hinweis. Der Unterschied bleibt sichtbar — er
+   * entscheidet nur nicht mehr darüber, ob der Posten überhaupt vorkommt.
    */
   apronGebucht?: boolean;
   /** Netto-Cash aus Vorstandszielen (Prämien − Strafen). */
@@ -232,7 +244,28 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
       key: "apron",
       label: POSTEN_LABEL.apron,
       amount: apronNetto,
-      counted: parts.apronGebucht === true,
+      /**
+       * DER APRON ZÄHLT — auch als Hochrechnung.
+       *
+       * GEMELDET VON CHRIS: „in der GuV anzeige ist der Apron nicht mit eingerechnet obwohl der auf
+       * jeden fall anfallen wird! DAS MUSS MIT REIN!"
+       *
+       * Ich hatte ihn vorher an `apronGebucht` gehängt, mit dem Argument, eine Hochrechnung gehöre
+       * nicht in eine Zahl, die sich an der Kasse messen lassen muss. Das Argument war schon damals
+       * halb: die VORSTANDSZIELE zählen ungebucht mit, und zwar bewusst. Die GuV war also längst
+       * eine Mischung aus Gebuchtem und Erwartetem — nur ausgerechnet beim größten Posten stand die
+       * Hochrechnung daneben statt drin.
+       *
+       * An Chris' Ansicht: GuV −6,1, daneben ein Apron von −22,86, der „auf jeden Fall anfallen
+       * wird". Die ausgewiesene Zahl war damit um den Faktor vier vom erwarteten Ergebnis entfernt —
+       * aus einer schwarzen Null wurde in Wahrheit ein Minus von rund 29. Wer danach plant, plant
+       * falsch.
+       *
+       * Was die Zeile leistet, bleibt: ihr `note` sagt weiterhin, ob gebucht oder hochgerechnet,
+       * worauf sich die Hochrechnung stützt und was sie begrenzt. Der Unterschied ist sichtbar —
+       * er entscheidet nur nicht mehr darüber, ob der Posten überhaupt vorkommt.
+       */
+      counted: true,
       // Der Apron wird erst am Saisonende abgerechnet, und Deckel wie Ausschüttung hängen am ENDrang.
       // Die Zeile sagt deshalb, worauf sie sich stützt — sonst läse sie sich wie ein gebuchter Posten.
       note: [
