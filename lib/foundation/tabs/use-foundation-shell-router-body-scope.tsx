@@ -10907,6 +10907,12 @@ export function useFoundationShellRouterBodyScope({
       delta: row.delta,
       displayValue: formatMostImprovedValue(row.delta),
       ovrRank: row.ovrRank,
+      // Die Herleitung mitgeben statt sie hier wegzuwerfen — Chris (`pxoa72`): „Wir brauchen noch
+      // eine erklärung wie Most Improved Player sich zusammensetzt!"
+      earlyFieldPosition: row.earlyFieldPosition,
+      lateFieldPosition: row.lateFieldPosition,
+      earlyAppearances: row.earlyAppearances,
+      lateAppearances: row.lateAppearances,
     }));
 
     return buildLeagueLeaderBoards({

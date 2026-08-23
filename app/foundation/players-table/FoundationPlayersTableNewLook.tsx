@@ -65,7 +65,7 @@
  * `.is-new-look .nl-ridge-*`.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
@@ -135,6 +135,7 @@ import {
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import type { TransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { SAISON_MW_ERKLAERUNG } from "@/lib/market/transfermarkt-sale-factor";
 import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
@@ -668,6 +669,112 @@ function NlCloseGlyph() {
     >
       <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
+  );
+}
+
+/**
+ * WIE DER VERKAUFSPREIS ZUSTANDE KOMMT — als Hover.
+ *
+ * GEWUENSCHT VON CHRIS am 23.08.: „Ein Hover, der sagt ‚Marktwert 25,5 × Faktor 0,87 → 22,2; der
+ * Faktor drückt, weil Restlaufzeit 1 Jahr', macht aus einer Zahl eine Entscheidung."
+ *
+ * Die Zerlegung wurde in `transfermarkt-expected-sell-value.ts` immer schon gerechnet und dann
+ * weggeworfen. Gezeigt wird die BEREINIGTE Fassung — dieselbe, aus der der Preis stammt und die
+ * auch die Ausfuehrung nimmt.
+ */
+function PlayersSellHover({
+  panelId,
+  ariaLabel,
+  panel,
+  children,
+}: {
+  panelId: string;
+  ariaLabel: string;
+  panel: ReactNode | null;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  if (!panel) return <>{children}</>;
+  const cancel = () => {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  return (
+    <span
+      className="nl-teams-rank-portal"
+      onMouseEnter={() => {
+        cancel();
+        setOpen(true);
+      }}
+      onMouseLeave={() => {
+        cancel();
+        closeTimer.current = setTimeout(() => setOpen(false), 90);
+      }}
+      onFocus={() => {
+        cancel();
+        setOpen(true);
+      }}
+      onBlur={() => {
+        cancel();
+        setOpen(false);
+      }}
+    >
+      {children}
+      <div id={panelId} role="dialog" aria-label={ariaLabel} className="nl-teams-rank-preview" hidden={!open}>
+        {panel}
+      </div>
+    </span>
+  );
+}
+
+/** Die Posten des Verkaufspreises. Fehlt die Zerlegung, gibt es kein Panel. */
+function renderSellFactorPanel(input: {
+  name: string;
+  breakdown: TransfermarktSaleFactorBreakdown | null | undefined;
+  grossSalePrice: number | null;
+}): ReactNode {
+  const b = input.breakdown;
+  if (!b || b.saleFactor == null) return null;
+  const zeile = (label: string, wert: ReactNode, notiz?: string | null) => (
+    <div className="nl-standings-hover-postenrow" key={label}>
+      <span>
+        {label}
+        {notiz ? <span className="nl-standings-hover-years">{notiz}</span> : null}
+      </span>
+      <span className="nl-tnum">{wert}</span>
+    </div>
+  );
+  return (
+    <>
+      <span className="nl-teams-rank-preview-title">Verkaufspreis — {input.name}</span>
+      <div className="nl-standings-hover-posten">
+        {zeile("Saison-Marktwert", formatNlMoney(b.baseMarketValue))}
+        {zeile(
+          "Grundfaktor",
+          b.baseFactor == null ? "—" : formatNlNumber(b.baseFactor, 2),
+          b.bracket != null ? `Bracket ${b.bracket}` : null,
+        )}
+        {zeile(
+          "Rangbonus",
+          b.rankBonus == null ? "—" : `${b.rankBonus > 0 ? "+" : ""}${formatNlNumber(b.rankBonus, 2)}`,
+          b.rankInBracket != null && b.bracketGroupSize > 0
+            ? `Platz ${b.rankInBracket} von ${b.bracketGroupSize} im Bracket`
+            : null,
+        )}
+        {zeile("= Verkaufsfaktor", formatNlNumber(b.saleFactor, 2))}
+        <div className="nl-standings-hover-postenrow is-result">
+          <span>Preis</span>
+          <span className="nl-tnum">{formatNlMoney(input.grossSalePrice ?? b.salePrice)}</span>
+        </div>
+      </div>
+      <span className="nl-standings-hover-meta">
+        Der Rang im Bracket kommt aus der Saisonleistung (MVS bzw. PPs) gegen Spieler ähnlichen
+        Marktwerts. {SAISON_MW_ERKLAERUNG}
+      </span>
+    </>
   );
 }
 
@@ -1878,7 +1985,17 @@ export default function FoundationPlayersTableNewLook({
                 Mehrjahresverträgen konnte das negativ werden und verdeckte den eigentlichen Wert
                 des Spielers. Der Buyout haengt am Vertrag, nicht am Spieler; er steht jetzt im
                 Tooltip und im G/V-Chip daneben. */}
-            <span className="nl-tnum">{row.sellPreview ? formatNlMoney(row.sellPreview.grossSalePrice) : "—"}</span>
+            <PlayersSellHover
+              panelId={`nl-players-sell-${row.player.id}`}
+              ariaLabel={`Verkaufspreis ${row.player.name}`}
+              panel={renderSellFactorPanel({
+                name: row.player.name,
+                breakdown: row.sellPreview?.saleFactorBreakdown ?? null,
+                grossSalePrice: row.sellPreview?.grossSalePrice ?? null,
+              })}
+            >
+              <span className="nl-tnum">{row.sellPreview ? formatNlMoney(row.sellPreview.grossSalePrice) : "—"}</span>
+            </PlayersSellHover>
             {/* GEMELDET: „VK wert + wird hier falsch angezeigt, angeblich nur geringes plus obwohl
                 der Wert change eigentlich >12 mio oder so sein sollte."
 
