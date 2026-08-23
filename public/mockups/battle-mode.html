@@ -191,6 +191,15 @@
   .fmark.okay    {background:#3d3618;color:#e0c46a}
   .fmark.schlecht{background:#452020;color:#f08c8c}
 
+  .spaehzeile{display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:6px;
+    border-radius:6px;background:var(--surface-2);font-size:11px}
+  .spaehzeile b{color:var(--ink);white-space:nowrap}
+  .spaehzeile input{flex:1;min-width:70px}
+  .spaehzeile s{text-decoration:none;font:600 11px/1 ui-monospace,monospace;color:var(--warn);min-width:34px;text-align:right}
+  .spaehzeile em{font-style:normal;color:var(--faint);white-space:nowrap}
+  .plan.verdeckt b{color:var(--faint)}
+  .rng.band{color:var(--faint);font-style:italic}
+
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1562,13 +1571,63 @@
 
   let PLAN=null;
 
+  // ===================================================================================
+  // SPAEHEN. Was man vom Gegner WIRKLICH weiss.
+  //
+  // Bisher stand der Gegner offen da: genauer Wert, genaue Rolle, genauer Befehl. Das
+  // ist zwei Mal falsch. Erstens kennt man fremde Werte nicht auf die Nachkommastelle.
+  // Zweitens — und das ist der wichtigere Punkt — sagt ein Slot nur, WOFUER er gedacht
+  // ist. Ein Vanguard marschiert ueblicherweise vorn, aber die KI darf abweichen und mit
+  // vier Leuten flankieren. Wer die Slot-Rolle fuer die Taktik haelt, plant gegen eine
+  // Annahme und nicht gegen den Gegner.
+  //
+  // Die Gewissheit laeuft 0 bis 100 mit Stufen bei 25, 50 und 75 — dieselbe Skala und
+  // dieselben Schwellen wie im Spaeh-System des Spiels (getScoutingIntelMilestone).
+  let SPAEHGRAD=35;
+  const spaehStufe=(c)=>c<25?0:c<50?1:c<75?2:3;
+  // Die Breite des Bandes schrumpft mit der Gewissheit. Die vier Breiten sind gesetzt,
+  // nicht gemessen — sie sollen "grober Bereich" bis "auf zwei Punkte genau" abbilden.
+  const BANDBREITE=[16,10,5,2];
+  function band(wert,c){
+    const b=BANDBREITE[spaehStufe(c)];
+    if(b<=2)return wert.toFixed(1);
+    // Auf das Raster runden, damit das Band nicht doch wieder den genauen Wert verraet.
+    const lo=Math.max(0,Math.round((wert-b/2)/b)*b), hi=lo+b;
+    return lo+"–"+hi;
+  }
+  // Was man ueber die Absicht weiss. Auch bei voller Gewissheit bleibt es eine
+  // Erwartung: gespaeht wird der Kader, nicht der Plan, den die KI erst im Kampf fasst.
+  function absicht(o,z,c){
+    const st=spaehStufe(c);
+    const slotUeblich=o.row===0?"steht vermutlich vorn":o.row===1?"vermutlich im Mittelfeld":"vermutlich hinten";
+    if(st===0)return {t:"unbekannt", d:"Zu wenig gespäht. Nicht einmal die grobe Aufstellung ist gesichert."};
+    if(st===1)return {t:slotUeblich, d:"Aus der Rolle geschlossen, nicht beobachtet. Die KI kann davon abweichen."};
+    const ord=z?z.ord:o.ord;
+    const name=(ORDERS.find(x=>x[0]===ord)||[,ord])[1];
+    if(st===2)return {t:"wahrscheinlich "+name, d:"Aus früheren Spielen dieses Gegners geschätzt. Er kann seinen Plan jederzeit umstellen."};
+    return {t:name+" erwartet", d:"Gut gespäht. Trotzdem eine Erwartung — die KI fasst ihren Plan erst, wenn sie deine Aufstellung sieht."};
+  }
+
   function renderOpp(){
     const box=document.getElementById("opp");box.textContent="";
     PLAN=schlachtplan();
+    // Regler: wie gut ist gespäht? Im Spiel kommt die Zahl aus scoutIntelByTeamId.
+    const reg=el("div","spaehzeile");
+    reg.appendChild(el("b",null,"Späh-Gewissheit"));
+    const sl=el("input");sl.type="range";sl.min="0";sl.max="100";sl.value=String(SPAEHGRAD);
+    sl.addEventListener("input",()=>{SPAEHGRAD=+sl.value;renderOpp();});
+    reg.appendChild(sl);
+    reg.appendChild(el("s",null,SPAEHGRAD+" %"));
+    reg.appendChild(el("em",null,["kaum etwas","grobe Bereiche","brauchbar","genau"][spaehStufe(SPAEHGRAD)]));
+    box.appendChild(reg);
     if(PLAN){
-      const k=el("div","plan");
-      k.appendChild(el("b",null,"Plan der KI: "+PLAN.name));
-      k.appendChild(el("p",null,PLAN.grund));
+      const k=el("div","plan"+(spaehStufe(SPAEHGRAD)<2?" verdeckt":""));
+      k.appendChild(el("b",null,spaehStufe(SPAEHGRAD)<2
+        ? "Plan der KI: noch nicht durchschaut"
+        : "Vermuteter Plan: "+PLAN.name));
+      k.appendChild(el("p",null,spaehStufe(SPAEHGRAD)<2
+        ? "Dafür reicht das Späh-Ergebnis nicht. Man sieht den Kader, nicht die Absicht."
+        : PLAN.grund));
       k.tabIndex=0;
       tipOn(k,"Woher der Plan kommt",
         "Die KI sieht genau die Vorschau, die du auch siehst — Name, Rolle und die sechs "+
@@ -1582,8 +1641,17 @@
       const ord=z?z.ord:o.ord;
       const r=el("div","oppline");
       const l=el("div");l.appendChild(el("b",null,o.n));
-      l.appendChild(el("small",null,o.c+" · "+ORDERS.find(x=>x[0]===ord)[1]+(z?" — "+z.rolle:"")));
-      r.appendChild(l);r.appendChild(el("span","rng",o.d.tdm.toFixed(1)));
+      const ab=absicht(o,z,SPAEHGRAD);
+      const kl=el("small",null,o.c+" · "+ab.t+(z&&spaehStufe(SPAEHGRAD)>=3?" — "+z.rolle:""));
+      kl.tabIndex=0; tipOn(kl,"Was wir wirklich wissen",ab.d);
+      l.appendChild(kl);
+      r.appendChild(l);
+      const w=el("span","rng"+(spaehStufe(SPAEHGRAD)<3?" band":""),band(o.d.tdm,SPAEHGRAD));
+      w.tabIndex=0;
+      tipOn(w,"Geschätzte Stärke", spaehStufe(SPAEHGRAD)<3
+        ? "Ein Bereich, kein Wert. Je besser gespäht, desto enger — bei voller Gewissheit steht die Zahl."
+        : "Voll gespäht: der Disziplinwert, wie er im Kader steht.");
+      r.appendChild(w);
       box.appendChild(r);
     });
     const ap=document.getElementById("arenaplan");
