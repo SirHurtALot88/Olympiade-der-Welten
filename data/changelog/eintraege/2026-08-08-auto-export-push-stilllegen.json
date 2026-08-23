@@ -2,6 +2,6 @@
   "datum": "2026-08-08",
   "seite": "Server · Spielstand-Export",
   "text": "Im Server-Log stand seit Wochen alle drei Minuten derselbe Fehler: der automatische Export wollte die Spielstände nach GitHub hochladen und scheiterte jedes Mal, weil das Verzeichnis der laufenden App kein Git-Repository ist — dort liegt nur das fertig gebaute Programm, kein Checkout und keine Zugangsdaten. Der Upload aus der App heraus kann deshalb gar nicht gelingen. Statt es endlos zu wiederholen, legt er sich jetzt beim ersten Fehlschlag still und schreibt einmal deutlich, was stattdessen greift: das Skript auf dem Server selbst, das den Spielstand ohnehin regelmäßig hochlädt. Der Export in den Ordner läuft unverändert weiter. Vorübergehende Störungen wie ein Netzausfall werden weiterhin im nächsten Zyklus erneut versucht.",
-  "gewicht": "hintergrund",
+  "gewicht": "feinschliff",
   "version": "0.4"
 }

@@ -2,6 +2,6 @@
   "datum": "2026-08-22",
   "seite": "Team · Training",
   "text": "Beim Start einer neuen Saison steht oben auf der Trainingsansicht jetzt ein Rückblick auf die letzte: wie viele Setpoints dein Team netto zugelegt hat, wer die Klasse gewechselt hat, wie sich die Marktwerte bewegt haben, und welche Spieler ganz neu dabei sind und deshalb noch keine Trainingshistorie bei dir haben. Dazu eine Zeile zum Vergleich, wer ligaweit am meisten aus seinem Training geholt hat. Gezeigt werden die fünf stärksten Zuwächse unter den Spielern, die heute noch in deinem Kader stehen — wer verkauft wurde, taucht nicht auf, auch wenn er sich gut entwickelt hat. Eine OVR-Spalte fehlt bewusst: der gespeicherte Wert ist über die Saisongrenze hinweg nicht vergleichbar, und eine Spalte voller Striche wäre schlechter als keine. Der Block lässt sich zuklappen und merkt sich das.",
-  "gewicht": "mittel",
+  "gewicht": "grundlegend",
   "version": "0.5"
 }

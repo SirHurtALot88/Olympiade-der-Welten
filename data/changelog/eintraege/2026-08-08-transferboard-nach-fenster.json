@@ -2,6 +2,6 @@
   "datum": "2026-08-08",
   "seite": "Transferhistorie · Team-Board",
   "text": "Auf dem Transferboard stand bei jedem einzelnen Team „Einnahmen 0,0 Mio\", als hätte die ganze Liga nur Geld ausgegeben. Verkauft worden war reichlich: 49 Verkäufe von 20 Teams. Sie tauchten nur nicht auf, weil das Transferfenster am Saisonwechsel auf zwei Saisons aufgeteilt wird — verkauft wird am letzten Spieltag der alten Saison, gekauft am ersten der neuen, und das Board gruppierte nach Saison. Damit zerschnitt es einen einzigen Vorgang: die Verkäufe, aus denen die Käufe bezahlt wurden, landeten in der Ansicht davor. Das Board gruppiert jetzt nach Transferfenster statt nach Saison, und jedes Team zeigt wieder Einnahmen, Ausgaben und eine echte Bilanz. An der gespeicherten Historie ändert sich nichts — dort steht weiterhin wahrheitsgemäß, wann ein Transfer passiert ist. Auslaufende Verträge bleiben bewusst bei ihrer Saison: das sind keine Transfers und bringen kein Geld.",
-  "gewicht": "stoerend",
+  "gewicht": "behebung",
   "version": "0.4"
 }

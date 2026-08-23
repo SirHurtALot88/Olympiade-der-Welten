@@ -2,6 +2,6 @@
   "datum": "2026-08-11",
   "seite": "Formkarten",
   "text": "Formkarten werden seit einiger Zeit richtig gezogen: die positive und die negative Karte eines Spielers sind unabhaengig voneinander. Bestehende Spielstaende hatten davon nichts — die Selbstheilung ergaenzte nur FEHLENDE Karten und raeumte verwaiste ab, eine bereits vorhandene behielt ihren alten Wert fuer immer. Im laufenden Spielstand trugen deshalb 510 von 680 Karten noch die alte, kaputte Ziehung, und alle 266 Spieler mit Kartenpaar hatten ein exakt gespiegeltes (+8 zu -8, +4 zu -4). Jetzt werden ungespielte Karten beim naechsten Laden auf die heutige Ziehung nachgezogen. Bereits gespielte Karten bleiben unangetastet: sie stecken in der Wertung eines gelaufenen Spieltags, ihren Wert nachtraeglich zu aendern wuerde vergangene Ergebnisse umschreiben. In einer laufenden Saison bleibt der gespielte Teil also gespiegelt — vollstaendig zufaellig ist erst eine Saison, die neu beginnt.",
-  "gewicht": "normal",
+  "gewicht": "behebung",
   "version": "0.4"
 }
