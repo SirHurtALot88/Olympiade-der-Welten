@@ -208,6 +208,15 @@
   .pico.belegt::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;
     border-radius:50%;background:var(--warn);border:2px solid var(--surface)}
 
+  /* Eigenschaften, die diesen Spieltag greifen */
+  .traitzeile{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:5px;font-size:10px}
+  .tchip{padding:2px 6px;border-radius:4px;font-weight:600}
+  .tchip.auf{background:#1a3a24;color:#7fd396}
+  .tchip.ab {background:#452020;color:#f08c8c}
+  .twohin{margin-left:auto;color:var(--faint);font:600 10px/1.4 ui-monospace,monospace;cursor:help}
+  .tleer{color:var(--faint);font-style:italic}
+
+  .emutator{display:flex;gap:4px;justify-content:center;margin-top:6px}
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1113,6 +1122,78 @@
 
   const mische=(p,rez)=>{let s=0,w=0;for(const[at,wt]of Object.entries(rez)){s+=(p.a[at]||0)*wt;w+=wt;}
     return Math.max(1,Math.min(99,Math.round(s/w)));};
+  // ===================================================================================
+  // TRAITS WIRKEN — und zwar dort, wo der Slot hinzeigt.
+  //
+  // Traits sind im Spiel nicht kosmetisch. Je Spieltag werden Mutator-Traits gezogen;
+  // wer einen davon hat, bekommt SECHS Punkte auf seinen Disziplinwert, positiv wie
+  // negativ (legacy-lineup-modifiers.ts: `hits * 6`). Die 18 + 18 Namen unten sind
+  // dieselben Listen, nicht meine Auswahl.
+  const MUTATOR_POS=["Altruistic","Ambitious","Caring","Cool","Diligent","Disciplined",
+    "Eloquent","Fair","FanFavorite","Fearless","FiredUp","Flexible","Healthy","Loyal",
+    "Motivated","Relaxed","Resourceful","Sexy"];
+  const MUTATOR_NEG=["Timid","Cheater","ColdBlooded","Cruel","Devious","Diva","Egomaniac",
+    "FaintHearted","Feisty","Gambler","Lazy","Manipulative","Mercenary","Obsessive",
+    "Paranoid","Renegade","Scandalous","Vindictive"];
+  const TRAIT_PUNKTE=6;
+
+  // Zwei gezogene Traits je Spieltag, wie im Spiel. Deterministisch aus der Saat, damit
+  // dieselbe Aufstellung denselben Verlauf hat.
+  let MUTATOREN=["Diligent","ColdBlooded"];
+  // Einmal je Spieltag gezogen, nicht je Kampf — sonst zeigen Tafel und Arena Verschiedenes.
+  function zieheMutatoren(saat){
+    const r=(n)=>{saat=(saat*1103515245+12345)&0x7fffffff;return saat%n;};
+    MUTATOREN=[MUTATOR_POS[r(MUTATOR_POS.length)], MUTATOR_NEG[r(MUTATOR_NEG.length)]];
+  }
+
+  // Wie viel ein Spieler durch die gezogenen Traits gewinnt oder verliert.
+  function traitTreffer(p){
+    const pos=(p.tp||[]).filter(t=>MUTATOREN.includes(t));
+    const neg=(p.tn||[]).filter(t=>MUTATOREN.includes(t));
+    return {pos, neg, netto:(pos.length-neg.length)*TRAIT_PUNKTE};
+  }
+
+  // WOHIN der Bonus geht. Nicht pauschal auf alles — sondern in die Kampfwerte, die von
+  // den Fokus-Attributen DIESES Slots gespeist werden. Ein Vanguard schaut auf Power und
+  // Health; die stecken in Angriff, Verteidigung und Leben, also landet sein Bonus dort.
+  // Ein Breaker schaut auf Power und Stamina und bekommt ihn eher auf Angriff und
+  // Ausdauer. Damit heisst "offensive Position" nicht nur, wo einer steht, sondern was
+  // seine Eigenschaften bei ihm bewirken. Die Verteilung ist abgeleitet, nicht gesetzt:
+  // sie kommt aus denselben Rezepten (REC), aus denen die Kampfwerte selbst entstehen.
+  function traitVerteilung(slotId,dId){
+    const sl=SLOTVON[slotId]; if(!sl)return null;
+    const rec=REC[DISCS[dId].cat];
+    const verteile=(attrs)=>{
+      const roh={}; let summe=0;
+      for(const k of KEYS){
+        const w=attrs.reduce((a,attr)=>a+((rec[k]&&rec[k][attr])||0),0);
+        if(w>0){roh[k]=w;summe+=w;}
+      }
+      if(!summe)return null;
+      const anteil={}; for(const k in roh)anteil[k]=roh[k]/summe;
+      return anteil;
+    };
+    const eng=verteile([sl.gross,sl.klein]);
+    if(eng)return {anteil:eng, breit:false};
+    // KEIN Kampfwert haengt an den Fokus-Attributen dieses Slots. Das ist kein
+    // Sonderfall, sondern eine Luecke in der Wertekette: Charisma und Spirit tragen
+    // zusammen 22 % zum TDM-Wert bei, speisen aber KEINEN der sechs Kampfwerte. Ein
+    // Shotcaller oder Rally Point haette damit nichts, worauf sein Bonus gehen koennte.
+    // Bis das geklaert ist, faellt die Verteilung auf das ganze Slot-Profil zurueck,
+    // statt den Bonus verschwinden zu lassen — und sagt in der Anzeige, dass sie das tut.
+    const breit=verteile(Object.keys(sl.profil));
+    return breit?{anteil:breit, breit:true}:null;
+  }
+
+  // Der fertige Aufschlag je Kampfwert.
+  function traitAufschlag(p,slotId,dId){
+    const tr=traitTreffer(p); if(!tr.netto)return {netto:0,teile:{},tr};
+    const v=traitVerteilung(slotId,dId);
+    if(!v)return {netto:tr.netto,teile:{},tr,breit:false};
+    const teile={}; for(const k in v.anteil)teile[k]=tr.netto*v.anteil[k];
+    return {netto:tr.netto,teile,tr,breit:v.breit};
+  }
+
   function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
@@ -1326,6 +1407,31 @@
           c.tabIndex=0; tipOn(c,lab,tip); wz.appendChild(c);
         }
         u.appendChild(wz);
+        // Welche Eigenschaften diesen Spieltag greifen — und wohin ihr Gewicht geht.
+        {
+          const sl=place[p.n]&&place[p.n].slot;
+          const ta=traitAufschlag(p,sl,disc);
+          const tz=el("div","traitzeile");
+          if(!ta.tr.pos.length&&!ta.tr.neg.length){
+            tz.appendChild(el("span","tleer","Keine der gezogenen Eigenschaften greift"));
+          } else {
+            for(const t of ta.tr.pos)tz.appendChild(el("span","tchip auf","+"+t));
+            for(const t of ta.tr.neg)tz.appendChild(el("span","tchip ab","−"+t));
+            const wohin=Object.entries(ta.teile).filter(([,v])=>Math.abs(v)>=0.05)
+              .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
+              .map(([k,v])=>k+" "+(v>0?"+":"")+v.toFixed(1)).join(" · ");
+            const text = wohin ? (ta.breit?wohin+" (breit verteilt)":wohin)
+              : (ta.netto===0 ? "heben sich auf" : "kein passender Kampfwert");
+            const z2=el("span","twohin",text);
+            z2.tabIndex=0;
+            tipOn(z2,"Warum dorthin",
+              "Der Aufschlag von "+(ta.netto>0?"+":"")+ta.netto+" geht in die Kampfwerte, die von den "+
+              "Fokus-Attributen dieses Slots gespeist werden ("+(SLOTVON[sl]?SLOTVON[sl].gross+" und "+SLOTVON[sl].klein:"—")+"). "+
+              "Auf einer offensiven Position wirkt dieselbe Eigenschaft also anders als auf einer defensiven.");
+            tz.appendChild(z2);
+          }
+          u.appendChild(tz);
+        }
         // SKILLS als Karten — mit genau den Werten, mit denen die Arena dann rechnet.
         if(p.skills){
           const sw=el("div","skillwrap");
@@ -1766,6 +1872,9 @@
         // Der Disziplinwert des Spielers PLUS der Aufschlag seines Slots. Steht Baumkopf
         // als Shotcaller, kostet ihn das 2,3 Punkte; als Vanguard braechte es ihm 2,1.
         const bh=behav(p.n);const eigWert=p.d.tdm+(slotBonus[p.n]||0);
+        // Traits landen in den Kampfwerten, die der Slot betont — nicht pauschal.
+        const ta=traitAufschlag(p,place[p.n]&&place[p.n].slot,"tdm");
+        for(const k in ta.teile)s[k]=Math.max(1,Math.round((s[k]+ta.teile[k])*10)/10);
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -3043,6 +3152,14 @@
       }
     }
     document.getElementById("edisz").textContent="TDM";
+    const eg=document.querySelector(".egegen");
+    if(eg){
+      let mz=eg.querySelector(".emutator");
+      if(!mz){mz=el("div","emutator");eg.appendChild(mz);}
+      mz.textContent="";
+      mz.appendChild(el("span","tchip auf","+"+MUTATOREN[0]));
+      mz.appendChild(el("span","tchip ab","−"+MUTATOREN[1]));
+    }
   }
   const zeigeEinlauf=(an)=>{const e=document.getElementById("einlauf");if(e)e.hidden=!an;};
 
@@ -3189,6 +3306,7 @@
   }));
 
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
+  zieheMutatoren(20260823);
   renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
@@ -3230,7 +3348,7 @@
         totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
   }
 
-  window.__arena={ serie, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
