@@ -51,10 +51,19 @@ mit ihrer LPC-Quelle; `quellen.json` nennt zu jeder Ebene den Pfad im LPC-Satz.
 Damit fällt die Teilung „stehende Figur aus dem vollen Satz, laufender Kämpfer aus dem
 animierbaren Kern" weg. Auch die `hurt`-Blätter für gefallene Kämpfer sind jetzt da.
 
-**Was weiterhin fehlt:** `run` für sieben Ebenen (Arme, Beine, Umhang, Fetzen, Haar) — und
-für **Waffen überhaupt**. Keine einzige Waffe im LPC-Satz hat ein `run`-Blatt, null von
-allen; Waffen werden dort nur zu `walk` und den Angriffen geführt. Das ist kein Loch im
-Download, sondern der Standard. Draco kann mit Doppelaxt stehen und gehen, nicht rennen.
+**Was weiterhin fehlt — und warum es nicht nachzuholen ist.** Sieben Ebenen haben kein
+`run`. Nachgemessen im gesamten LPC-Satz, nicht nur in unserem Ausschnitt:
+
+| Ebene | Lage im LPC-Satz |
+|---|---|
+| Arme, Beine (Plattenrüstung) | `run` gibt es unter `arms/` und `legs/` **nur für Stoff und Kleinteile** — Armschienen, Handschuhe, Ringe, Hosen. Für **Plattenrüstung in keiner Variante**, weder `male` noch `thin` |
+| Umhang, Fetzen | die Kategorie `cape/` hat **null** `run`-Blätter, über alle Umhänge hinweg |
+| Haar | unser `h_*` stammt aus `hair/flat_top_fade/male/`, das kein `run` führt. Der Ordner `adult/` daneben hat eines — aber es ist **anderes Bild** (byte-verschieden in jeder Bewegung), also kein Ersatz |
+| **Waffen** | **keine einzige Waffe im ganzen Satz** hat ein `run`-Blatt, null von allen |
+
+Das ist kein Loch im Download, sondern der LPC-Standard: getragene Platten, Umhänge und
+Waffen werden nur zu `walk` und den Angriffen geführt. Draco kann mit Doppelaxt stehen und
+gehen, nicht rennen. Wer das ändern will, muss zeichnen — oder im Sprint `walk` fahren.
 
 ## Umfärben
 
