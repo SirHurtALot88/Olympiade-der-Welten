@@ -271,7 +271,7 @@
         <ul>
           <li><strong>Alle rücken vor.</strong> „Formation halten" heißt mit der Linie mitgehen, nicht stehenbleiben.</li>
           <li><strong>Drei Skalen statt Zahlen</strong>, nach deinem Screenshot: Haltung (defensiv bis ungestüm), Zusammenhalt (eigenmächtig bis dicht), Bindung (opportunistisch bis unbeirrt).</li>
-          <li><strong>„natürlich" heißt: die Persönlichkeit entscheidet.</strong> Das ist der eigentliche Kniff daran — man stellt nur ein, was einen stört, der Rest bleibt Charakter. Ein Bollwerk auf „natürlich" hält dicht, ein Draufgänger reißt sich los.</li>
+          <li><strong>Es steht immer ein konkreter Wert da</strong>, nie ein Platzhalter. Der <strong>★</strong> markiert, was diese Persönlichkeit von sich aus täte — so sieht man auf einen Blick, wo man vom Charakter abgewichen ist.</li>
           <li><strong>Zusammenhalt</strong> spannt die Leine zur eigenen Linie, <strong>Bindung</strong> bestimmt, wie oft neu gezielt wird (0,35 s bis 2,8 s), <strong>Haltung</strong> löst den Rückzug aus.</li>
           <li>Genau dein Fall: der Flankierer, der unterwegs abgefangen wird, bricht ab — es sei denn, er ist ungestüm.</li>
         </ul>
@@ -367,9 +367,9 @@
     {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
   ];
   const OPP=[
-    {n:"Skarn",c:"Warlord",lo:64,hi:79,row:0,ord:"natur"},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke"},
+    {n:"Skarn",c:"Warlord",lo:64,hi:79,row:0,ord:"mitlinie"},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke"},
     {n:"Brambleaux",c:"Tank",lo:52,hi:66,row:0,ord:"hinter"},{n:"Nixie",c:"Bard",lo:33,hi:49,row:2,ord:"decken"},
-    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"natur"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke"}
+    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"mitlinie"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke"}
   ];
   const REC={
     power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
@@ -381,8 +381,8 @@
   // JEDER BEFEHL HAT EINE EXAKT BESCHREIBBARE WIRKUNG. Der Tooltip unten ist ein
   // Versprechen — was dort steht, tut die Simulation, sonst darf es dort nicht stehen.
   const ORDERS=[
-    ["natur","Natürlich",
-      "Die Persönlichkeit entscheidet. Der Spieler rückt mit der Linie vor und hält so viel Abstand zu ihr, wie sein Zusammenhalt vorgibt."],
+    ["mitlinie","Mit der Linie",
+      "Rückt zusammen mit den eigenen Leuten vor und hält so viel Abstand zur Linie, wie sein Zusammenhalt vorgibt. Greift an, was in Reichweite kommt."],
     ["hinter","Hinter den Eigenen",
       "Bleibt hinter der vordersten eigenen Einheit und überquert diese Linie nie. Er darf seitlich ausweichen und nachrücken, verfolgt aber keinen Gegner über die Front hinaus."],
     ["decken","Rücken decken",
@@ -392,6 +392,9 @@
     ["verfolgen","Verfolgen",
       "Bleibt an seinem Ziel dran, quer über das ganze Feld. Ignoriert die Formation vollständig — er kehrt nicht zur Linie zurück."]
   ];
+  // Welchen Befehl jede Persoenlichkeit von sich aus waehlt.
+  const PERSORD={bollwerk:"hinter",draufgaenger:"verfolgen",duellant:"mitlinie",
+    schleicher:"flanke",beschuetzer:"decken",opportunist:"mitlinie"};
   const ORDTIP=Object.fromEntries(ORDERS.map(([v,l,t])=>[v,{l,t}]));
   // Persoenlichkeit setzt die Grundveranlagung. Der Befehl VERSCHIEBT sie, er ersetzt sie nicht.
   // form  = Formationstreue: wie nah bleibt er der eigenen Linie
@@ -413,8 +416,10 @@
   const ZUSAMMEN=[["eigen","Eigenmächtig"],["locker","Locker"],["ausgewogen","Ausgewogen"],["eng","Eng"],["dicht","Dicht"]];
   const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
   // ZIELPRIORITAET — uebersteuert die Neigung der Persoenlichkeit.
+  // Welche Zielwahl jede Persoenlichkeit von sich aus trifft — das ist der Stern-Eintrag.
+  const PERSZIEL={bollwerk:"naechster",draufgaenger:"naechster",duellant:"bedrohung",
+    schleicher:"hinten",beschuetzer:"naechster",opportunist:"schwach"};
   const ZIELE=[
-    ["natur","Natürlich",""],
     ["bedrohung","Größte Bedrohung","Greift den Gegner mit dem höchsten Angriffswert an, egal wie weit er entfernt ist."],
     ["schwach","Angeschlagensten","Greift den Gegner mit den wenigsten verbleibenden Lebenspunkten an — Fokusfeuer, um ihn schnell auszuschalten."],
     ["naechster","Nächsten","Greift immer den nächststehenden Gegner an. Läuft niemandem hinterher."],
@@ -449,9 +454,7 @@
   const takt={};
   function behav(name){
     const pk=persOf[name]||"duellant",def=PERSDEF[pk],t=takt[name]||{};
-    const h=t.h&&t.h!=="natur"?t.h:def.h;
-    const z=t.z&&t.z!=="natur"?t.z:def.z;
-    const b=t.b&&t.b!=="natur"?t.b:def.b;
+    const h=t.h||def.h, z=t.z||def.z, b=t.b||def.b;
     return{
       h,z,b,
       // Formationstreue steigt mit "Zusammenhalt", Opportunismus faellt mit "Bindung",
@@ -517,9 +520,9 @@
     return{key:best,warum};
   }
   const persOf={},persWarum={};
-  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  [["Baumkopf Holzfaust",0,"natur"],["Rustrow",0,"hinter"],["Greenkraut",0,"verfolgen"],
-   ["Buttercup",2,"decken"],["Serris",1,"natur"],["T Mask",1,"flanke"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
-  [["Remiel",1,"natur"],["Riley Le Rogue",0,"natur"],["Professor Paranoix",2,"decken"],["Marzipella",1,"hinter"]]
+  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  [["Baumkopf Holzfaust",0,"mitlinie"],["Rustrow",0,"hinter"],["Greenkraut",0,"verfolgen"],
+   ["Buttercup",2,"decken"],["Serris",1,"verfolgen"],["T Mask",1,"flanke"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
+  [["Remiel",1,"mitlinie"],["Riley Le Rogue",0,"mitlinie"],["Professor Paranoix",2,"decken"],["Marzipella",1,"hinter"]]
     .forEach(([n,r,o])=>{place[n]={d:"spurt",row:r};order[n]=o;});
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
@@ -606,19 +609,22 @@
         u.appendChild(pl);
 
         const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
-        ORDERS.forEach(([v,l])=>{const o=el("option",null,l);o.value=v;if(order[p.n]===v)o.selected=true;se.appendChild(o);});
+        const oStd=PERSORD[persOf[p.n]||"duellant"];
+        ORDERS.forEach(([v,l])=>{const o=el("option",null,l+(v===oStd?" ★":""));o.value=v;
+          if((order[p.n]||oStd)===v)o.selected=true;se.appendChild(o);});
         se.addEventListener("click",e=>e.stopPropagation());
         se.addEventListener("change",()=>{order[p.n]=se.value;renderBoard();});
-        const cur=ORDTIP[order[p.n]||"natur"];
-        tipOn(se,cur.l,cur.t);
+        const cur=ORDTIP[order[p.n]||"mitlinie"];
+        tipOn(se,cur.l,cur.t+" ★ markiert, was diese Persönlichkeit von sich aus täte.");
         u.appendChild(se);
 
         const ze=el("select");ze.setAttribute("aria-label","Zielpriorität für "+p.n);
-        ZIELE.forEach(([v,l])=>{const o=el("option",null,"Ziel: "+l);o.value=v;
-          if((zielOf[p.n]||"natur")===v)o.selected=true;ze.appendChild(o);});
+        const zStd=PERSZIEL[persOf[p.n]||"duellant"];
+        ZIELE.forEach(([v,l])=>{const o=el("option",null,"Ziel: "+l+(v===zStd?" ★":""));o.value=v;
+          if((zielOf[p.n]||zStd)===v)o.selected=true;ze.appendChild(o);});
         ze.addEventListener("click",e=>e.stopPropagation());
         ze.addEventListener("change",()=>{zielOf[p.n]=ze.value;renderBoard();});
-        const zc=ZIELTIP[zielOf[p.n]||"natur"];
+        const zc=ZIELTIP[zielOf[p.n]||zStd];
         tipOn(ze,"Zielpriorität: "+zc.l,zc.t||SKTIP.ziel);
         u.appendChild(ze);
 
@@ -631,17 +637,18 @@
             const row=el("div","srow");row.title=lbl;
             row.appendChild(el("b",null,lbl));
             const se=el("select");se.setAttribute("aria-label",lbl+" von "+p.n);
-            tipOn(se,lbl,SKTIP[key]);
-            const nat=el("option",null,"natürlich");nat.value="natur";
-            if(!(takt[p.n]&&takt[p.n][key]&&takt[p.n][key]!=="natur"))nat.selected=true;
-            se.appendChild(nat);
-            arr.forEach(([v,l])=>{const o=el("option",null,l);o.value=v;
-              if(takt[p.n]&&takt[p.n][key]===v)o.selected=true;se.appendChild(o);});
+            const std=PERSDEF[persOf[p.n]||"duellant"][key];
+            arr.forEach(([v,l])=>{
+              // Der Standard dieser Persoenlichkeit traegt einen Stern. Kein leeres Wort mehr,
+              // sondern immer ein konkreter Wert — man sieht, was der Spieler TUT.
+              const o=el("option",null,l+(v===std?" ★":""));o.value=v;
+              if(cur===v)o.selected=true;
+              se.appendChild(o);
+            });
             se.addEventListener("click",e=>e.stopPropagation());
             se.addEventListener("change",()=>{takt[p.n]=takt[p.n]||{};takt[p.n][key]=se.value;renderBoard();});
+            tipOn(se,lbl,SKTIP[key]+" ★ markiert, was diese Persönlichkeit von sich aus tut.");
             row.appendChild(se);
-            const cu=el("u",null,arr.find(x=>x[0]===cur)?arr.find(x=>x[0]===cur)[1].slice(0,4):"—");
-            row.appendChild(cu);
             tw.appendChild(row);
           });
         u.appendChild(tw);
@@ -651,7 +658,7 @@
       z.addEventListener("click",()=>{
         if(!sel)return;
         if(inDisc(disc).length>=DISCS[disc].size&&(!place[sel]||place[sel].d!==disc))return;
-        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="natur";
+        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="mitlinie";
         sel=null;renderAll();
       });
       pit.appendChild(z);
@@ -724,7 +731,7 @@
       byRow[row].forEach((p,i)=>{
         const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
         const bh=behav(p.n);
-        U.push({id:id++,n:p.n,side:0,row,ord:order[p.n]||"natur",zielP:zielOf[p.n]||"natur",heiler:istHeiler(p),...s,...bh,
+        U.push({id:id++,n:p.n,side:0,row,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null});
       });
@@ -739,7 +746,7 @@
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
-        U.push({id:id++,n:o.n,side:1,row,ord:o.ord,zielP:"natur",heiler:o.heiler===true,...s,
+        U.push({id:id++,n:o.n,side:1,row,ord:o.ord,zielP:"naechster",heiler:o.heiler===true,...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null});
@@ -777,7 +784,7 @@
       return (back.length?back:foes).reduce((b,x)=>x.ANG>b.ANG?x:b);
     }
     // Uebersteuerte Zielpriorität geht der Persoenlichkeit vor.
-    if(u.zielP&&u.zielP!=="natur"){
+    if(u.zielP){
       if(u.zielP==="bedrohung")return foes.reduce((b,x)=>x.ANG>b.ANG?x:b);
       if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
       if(u.zielP==="naechster")return nearest(foes);
