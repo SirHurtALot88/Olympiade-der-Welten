@@ -86,8 +86,28 @@ Das erste Fixture ließ `shortCode` und `teamIdentities` weg; die Gegenprobe fie
 `TypeError` statt mit einer Aussage — ein Generator, der wirft, belegt nicht, dass der Schalter ihn
 hält. Ergänzt und im Test begründet.
 
-**Bestehende Suiten:** alle sieben Team-Power-Suiten grün (39 Fälle), `ai-legacy-lineup-batch-apply`
-und `trainingsmodus-heilt-beim-laden` grün (25).
+### In der CI rot geworden — und warum mein lokaler Lauf es nicht gesehen hat
+
+`full-test-suite` fiel mit **4 Fällen** in `tests/team-powers-ensure-idempotent.test.ts`. Die
+Suite prüft die Merge- und Idempotenz-Mechanik des Generators und rief ihn auf, **ohne den Schalter
+einzuschalten** — was bis heute ging, weil er unabhängig davon lief. Genau das ist jetzt nicht mehr
+so.
+
+Die Suite schaltet die Mechanik jetzt ausdrücklich ein. Das folgt der Absicht, die im Modul selbst
+steht: der Laufzeit-Schalter ist von der Konstante getrennt, *„damit die bestehenden Mechanik-Tests
+die Rechenwege weiter abdecken koennen"*.
+
+**Ein Detail daran ist die eigentliche Lehre.** Der erste Fall der Suite („gibt beim zweiten Lauf
+denselben gameState zurueck") wäre auch ohne das Einschalten grün geblieben — bei abgeschalteter
+Mechanik gibt der Lauf beide Male dieselbe Referenz zurück. Richtig geantwortet, auf eine andere
+Frage. Nur die vier Fälle daneben haben den Unterschied gemeldet.
+
+**Mein Fehler beim Prüfen:** ich hatte die Team-Power-Suiten von Hand aufgezählt statt gesucht, und
+diese eine stand nicht auf der Liste. Jetzt gesammelt statt geraten —
+`grep -rl "teamPower\|TeamPower\|team-powers" tests/` findet **33** Dateien; alle 32 Suiten davon
+laufen grün (345 Fälle).
+
+**Bestehende Suiten:** `ai-legacy-lineup-batch-apply` und `trainingsmodus-heilt-beim-laden` grün.
 
 `tsc` leer · `ci:import-exists` (2343) · `ci:client-bundle-lint` · `ci:flow-smoke` (205) ·
 Quelltext-Wächter (1998, 139 Dateien) · Render-Wächter (217) · Persistenz-Suiten (1384) ·

@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
+import {
+  __setTeamPowersEnabledForTests,
+  areTeamPowersEnabled,
+  ensureLocalTeamPowersForSeason,
+} from "@/lib/lineups/team-powers";
 
 /**
  * `ensureLocalTeamPowersForSeason` gab frueher IMMER ein neues `gameState`-Objekt heraus,
@@ -11,6 +15,23 @@ import { ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
  *
  * Der Kurzschluss ist derselbe, den das Geschwister `ensureLocalFormCardsForSeason` schon
  * hat. Diese Suite haelt ihn fest.
+ *
+ * DIE SUITE SCHALTET DIE MECHANIK AUSDRUECKLICH EIN — seit dem 23.08.2026 noetig, und sie folgt
+ * damit genau der Absicht, die im Modul steht: der Laufzeit-Schalter ist von der Konstante
+ * getrennt, „damit die bestehenden Mechanik-Tests die Rechenwege weiter abdecken koennen".
+ *
+ * Vorher lief das ohne Zutun, weil der Generator UNABHAENGIG vom Schalter arbeitete. Auf Chris'
+ * Ansage („die alten teamPowers können raus") raeumt er jetzt, statt zu erzeugen, solange der
+ * Schalter aus steht — sonst haette er jede Raeumung auf drei heissen Pfaden sofort rueckgaengig
+ * gemacht.
+ *
+ * Bemerkenswert dabei: der erste Fall unten waere auch OHNE dieses Einschalten gruen geblieben.
+ * Bei abgeschalteter Mechanik gibt der Lauf beide Male dieselbe Referenz zurueck — richtig
+ * geantwortet, aber auf eine andere Frage. Ein Test, der aus dem falschen Grund gruen ist, faellt
+ * nicht auf; die vier Faelle darunter sind es, die den Unterschied gemeldet haben.
+ *
+ * DAS VERHALTEN BEI AUSGESCHALTETEM SCHALTER steht in
+ * `tests/alte-team-powers-werden-geraeumt.test.ts`.
  */
 
 const SAVE_ID = "save-team-powers-idempotent";
@@ -138,7 +159,17 @@ function baseGameState(): GameState {
   };
 }
 
+const AUSGANGSZUSTAND = areTeamPowersEnabled();
+
 describe("ensureLocalTeamPowersForSeason", () => {
+  beforeEach(() => {
+    __setTeamPowersEnabledForTests(true);
+  });
+
+  afterEach(() => {
+    __setTeamPowersEnabledForTests(AUSGANGSZUSTAND);
+  });
+
   it("gibt beim zweiten Lauf denselben gameState zurueck, wenn sich nichts geaendert hat", () => {
     const erster = ensureLocalTeamPowersForSeason(baseGameState(), SAVE_ID, SEASON_ID);
     const zweiter = ensureLocalTeamPowersForSeason(erster, SAVE_ID, SEASON_ID);
