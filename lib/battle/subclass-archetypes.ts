@@ -229,6 +229,13 @@ export const BILDBEFUNDE: readonly Bildbefund[] = [
       "Lancer, Halberdier, Ice Mage, Conjurer und Necromancer: er führt keine Waffe und wirkt nichts — er schlägt mit den Händen. Die Zeichnungen an der Höhlenwand passen zur Unterklasse Isolated und zu den Eigenschaften Caring und Timid, machen ihn aber nicht zum Beschwörer.",
   },
   {
+    spieler: "Jorund",
+    bild: "Alter Mann mit grauem Haar und Vollbart, Fellumhang, Holzstab, am Feuer in einem verschneiten Dorf. Keine Rüstung, keine Klinge.",
+    archetypen: ["Matriarch"],
+    schliesstAus:
+      "Blackguard, Bullbreaker, Frost Knight, Steelwind, Templar und Crusader: er trägt keine Rüstung. Rogue: keine Klinge, kein Schleicher. Übrig bleibt aus seinen Unterklassen (Vigilante, Royalty, Guardian) allein Matriarch — der einzige Weg dort, der ohne Panzer auskommt und über Charisma und Spirit wirkt, was zu seinen Werten passt (Charisma 85, Spirit 76, Power 10).\n\nBEFUND: Das Bild zeigt einen Stabträger, und die Karten haben dafür eigene Wege — Archmage, Priest, Orc Shaman. KEINER davon ist aus seinen drei Unterklassen erreichbar. Hier widersprechen sich Bild und Unterklassen; die Zuordnungstabelle für Vigilante, Royalty oder Guardian ist womöglich zu eng. Das gehört Chris vorgelegt, nicht still überschrieben.",
+  },
+  {
     spieler: "Seraph-11",
     bild: "Mechanischer Vogel aus Metall mit leuchtendem Kern im Rumpf, Nebel und Vollmond.",
     archetypen: ["Priest", "Cleric"],
