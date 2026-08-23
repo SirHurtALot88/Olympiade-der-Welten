@@ -111,6 +111,24 @@ Hauptdatei, schreibt SQLite beim Start die alte WAL auf den neuen Stand; bestenf
 Stand zurück, schlimmstenfalls ist die Datenbank kaputt. Das Skript sichert vorher, hält die App an,
 räumt WAL/SHM weg und kann mit `--zurueck` alles rückgängig machen.
 
+## Kader auffüllen, wenn ein Kauflauf abgebrochen ist
+
+Ein Fehler beim Saisonstart konnte den KI-Kauflauf auf halber Strecke stehen lassen: die Sperre
+`skipIfExistingMarketTransfers` fragte nur „existiert IRGENDEIN Transfer dieser Saison?" und stieg
+dann für die **ganze Liga** aus. Teams blieben auf ihrem Minimum stehen, und auch ein erneuter Klick
+auf „KI picken" tat nichts. Der Code ist repariert — ein **bestehender** Spielstand holt das aber
+nicht von selbst nach, weil das Kauffenster der Saison durch ist.
+
+```sh
+ssh root@135.181.102.2
+cd Olympiade-der-Welten && bash deploy/hetzner/kader-auffuellen.sh
+```
+
+Ohne Schalter gibt es **nur den Bericht**, die App läuft weiter. `--apply` fährt den Kauf wirklich
+(sichert vorher nach `/root/oly-save-sicherungen/`, hält die App an, setzt Besitzrechte zurück),
+`--zurueck` dreht auf die letzte Sicherung zurück. Gekauft wird über denselben Produktionspfad, den
+das Spiel selbst nimmt — keine zweite Kauflogik.
+
 ## Deploy
 
 `deploy/hetzner/auto-deploy.sh` pollt per Cron `main` und baut bei neuen Commits neu. Er zieht mit

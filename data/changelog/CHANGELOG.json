@@ -12,6 +12,15 @@
     },
     {
       "datum": "2026-08-23",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Ein abgebrochener Kauflauf lässt sich jetzt fortsetzen. Bisher fragte die Sperre nur „existiert irgendein Transfer dieser Saison?“ und stieg dann für die ganze Liga aus — ein einziger gekaufter Spieler galt damit als erledigte Saison. Am Spielstand nachgemessen war genau das passiert: von 33 Transfers hatten 22 Teams etwas bekommen, zehn gingen leer aus, und jeder weitere Versuch inklusive des manuellen Klicks auf „KI picken“ tat folgerichtig nichts. Übrig blieben 25 Teams unter ihrer Zielgröße, 58 fehlende Spieler und sieben Teams exakt auf ihrem Minimum — bei elf Einsatzplätzen je Spieltag konnten die nicht einmal vollständig aufstellen. Die Sperre fragt jetzt je Team und nach dem, was sie eigentlich meint: ein Team am Ziel bleibt unangetastet, ein Team darunter ist unerledigte Arbeit und wird bedient. Gegen den echten Spielstand gemessen kauft derselbe Aufruf damit 43 Spieler für 19 Teams, wo er vorher nichts tat. Nebenbei behoben: auch ein einzelner eigener Transfer des Spielers zählte in diese Sperre und schaltete die KI-Käufe der ganzen Liga für den Rest der Saison ab.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Arena",
       "pr": null,
       "text": "Teams und Spieler lassen sich jetzt merken — ein Stern am Teamnamen und an jedem Spieler in der Kadertabelle, wie ein Lesezeichen. Die Tafel vor dem Anpfiff wurde dafür neu gebaut: die beiden Disziplin-Kästen wiederholten bisher nur den Namen der Disziplin und zeigen jetzt, wer von den eigenen Athleten dort antritt, mit Slot, Kapitänsstern und einem Zähler, der grün wird, sobald die Seite voll ist. Die Tabelle darunter hieß „Dein Umfeld\" und zeigte nur ein automatisch vergebenes Verbündet oder Rivale — sie heißt jetzt „Beobachtete Teams\", enthält die menschlich geführten und alles Gemerkte, und sagt in der letzten Spalte, warum ein Team dort steht. Der Block mit den drei leeren Medaillenkreisen ist ersatzlos weg; die Namen der noch fehlenden Teams stehen jetzt oben beim Wartestatus, wo sie hingehören.",
@@ -42,6 +51,15 @@
       "seite": "Team · Profil",
       "pr": null,
       "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Die Gesamtzahl steht nur noch einmal in der Zeile: Punkte und PP-Summe sind dieselbe Zahl, und die Aufschlüsselung liefern ohnehin die vier Bereiche darunter. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Für Spielstände, in denen der Kauflauf schon abgebrochen ist, gibt es jetzt einen Reparaturlauf. Die Code-Korrektur wirkt erst beim nächsten Kauffenster — ein laufender Spielstand behält die halb gefüllten Kader also, bis jemand nachhilft. Der Reparaturlauf holt genau diesen einen Lauf nach, und zwar über denselben Weg, den das Spiel selbst nimmt: keine zweite Kauflogik, es gelten unverändert Kasse, Gehaltsdecke, Identität und Kaderziele. Ohne Schalter gibt es nur einen Bericht, wer wie weit unter seinem Ziel steht; erst mit --apply wird gekauft, und davor wird gesichert. Menschlich gesteuerte Teams bleiben außen vor. Am echten Spielstand gemessen füllt er 43 Spieler bei 19 Teams nach und meldet ehrlich, welche Teams danach noch offen sind, weil ihnen schlicht das Geld ausgegangen ist.",
       "quelle": "gepflegt",
       "gewicht": "behebung",
       "version": "0.5"
