@@ -96,6 +96,14 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
         tooltip: "Was zuletzt gefixt oder geändert wurde — mit PR-Nummer als Beleg.",
         icon: "✓",
       },
+      // Ganz unten und bewusst in "Info": ein Entwurf zum Anschauen, keine Spielsteuerung.
+      // Er liest und schreibt keinen Spielstand.
+      {
+        id: "mockup",
+        label: "Mockup",
+        tooltip: "Entwurf für den Battle Mode: Aufstellung mit Reihen und Befehlen, dazu eine laufende Arena.",
+        icon: "◇",
+      },
     ],
   },
 ];

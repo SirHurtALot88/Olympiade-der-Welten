@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Battle Mode Taktikbrett</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{--ground:#F2F5F9;--surface:#FFF;--surface-2:#E9EEF5;--sunk:#DFE6EF;--pitch:#E4EAF2;
+    --line:#CFD8E4;--line-soft:#E3E9F1;--ink:#111823;--muted:#5A6678;--faint:#8B98AA;
+    --home:#B26A12;--home-bg:#F2A03D26;--away:#15707F;--away-bg:#45B0C926;
+    --ok:#2F8F6B;--crit:#C4443A;--warn:#B07A12;--shadow:0 1px 2px #11182310,0 10px 30px #1118230d}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ground:#0B1018;--surface:#141C28;--surface-2:#1C2534;--sunk:#0E1621;--pitch:#0D141E;
+    --line:#2A3546;--line-soft:#212B3B;--ink:#E7EDF6;--muted:#8795A9;--faint:#6A778A;
+    --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}}
+  :root[data-theme="dark"]{--ground:#0B1018;--surface:#141C28;--surface-2:#1C2534;--sunk:#0E1621;--pitch:#0D141E;
+    --line:#2A3546;--line-soft:#212B3B;--ink:#E7EDF6;--muted:#8795A9;--faint:#6A778A;
+    --home:#F2A03D;--home-bg:#F2A03D1F;--away:#45B0C9;--away-bg:#45B0C91F;
+    --ok:#57B894;--crit:#E05A4F;--warn:#E0B341;--shadow:0 1px 2px #00000050,0 10px 32px #00000040}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1300px;margin:0 auto;padding:36px 20px 80px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  h1{font-family:"Barlow Condensed",Impact,sans-serif;font-weight:700;font-size:clamp(34px,5.2vw,54px);
+    line-height:.98;margin:8px 0 12px;text-transform:uppercase}
+  .lede{max-width:64ch;color:var(--muted);margin:0 0 8px}
+  .lede strong{color:var(--ink);font-weight:600}
+
+  .tabs{display:flex;gap:2px;margin:28px 0 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);
+    padding:9px 18px;cursor:pointer;margin-bottom:-1px}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--home)}
+  .tab:focus-visible{outline:2px solid var(--home);outline-offset:2px}
+  .panel[hidden]{display:none}
+
+  .frame{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+  .fbar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line-soft);
+    background:var(--surface-2);font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--muted);flex-wrap:wrap}
+  .fbar .sep{color:var(--faint)}
+  .honest{margin-left:auto;color:var(--faint);text-transform:none;letter-spacing:0;font-size:10px}
+
+  h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:16px;letter-spacing:.07em;text-transform:uppercase;margin:0 0 3px}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 12px}
+
+  .lay{display:grid;grid-template-columns:300px 1fr 250px}
+  @media (max-width:1120px){.lay{grid-template-columns:1fr}}
+  .pad{padding:14px 16px}
+  .bl{border-left:1px solid var(--line-soft)}
+  @media (max-width:1120px){.bl{border-left:0;border-top:1px solid var(--line-soft)}}
+
+  .dbar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .dchip{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.03em;
+    text-transform:uppercase;padding:6px 12px;border-radius:6px;cursor:pointer;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--muted)}
+  .dchip[aria-pressed="true"]{background:var(--home-bg);border-color:var(--home);color:var(--ink)}
+  .dchip em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--faint);margin-left:5px}
+
+  .plist{max-height:560px;overflow-y:auto;margin:0 -4px;padding:0 4px}
+  .prow{display:grid;grid-template-columns:28px 1fr 46px 46px;gap:7px;align-items:center;padding:6px 7px;
+    border:1px solid transparent;border-radius:7px;cursor:pointer;margin-bottom:3px}
+  .prow:hover{background:var(--surface-2)}
+  .prow.sel{border-color:var(--home);background:var(--home-bg)}
+  .prow.used{opacity:.42}
+  .prow:focus-visible{outline:2px solid var(--home);outline-offset:1px}
+  .pico{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;background:var(--surface-2);
+    color:var(--muted);font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px}
+  .prow.sel .pico{background:var(--home);color:#0B1018}
+  .pnm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25}
+  .pnm span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
+  .eg{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums;
+    padding:2px 0;border-radius:4px;color:var(--muted)}
+  .eg.best{background:var(--home-bg);color:var(--ink);font-weight:600}
+  .eghead{display:grid;grid-template-columns:28px 1fr 46px 46px;gap:7px;padding:0 7px 5px;
+    font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+  .eghead span:nth-child(3),.eghead span:nth-child(4){text-align:center}
+
+  .pitch{background:var(--pitch);border-radius:9px;border:1px solid var(--line);padding:10px;display:grid;
+    grid-template-columns:1fr 1fr 1fr;gap:8px;min-height:300px}
+  .zone{border:1px dashed var(--line);border-radius:7px;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .zone.hot{border-color:var(--home);border-style:solid;background:var(--home-bg)}
+  .zname{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);display:flex;justify-content:space-between}
+  .unit{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:6px;padding:6px 7px}
+  .unit b{display:block;font-size:12px;font-weight:600}
+  .unit span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);display:block;margin-top:1px}
+  .unit select{width:100%;margin-top:5px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;
+    background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:2px 3px}
+  .bwrap{margin-top:5px;display:flex;flex-direction:column;gap:3px}
+  .srow{display:grid;grid-template-columns:58px 1fr;gap:4px;align-items:center}
+  .srow b{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.04em;color:var(--faint);font-weight:500}
+  .srow select{margin-top:0!important;font-size:9px!important}
+  .srow u{display:none}
+  .brow{display:grid;grid-template-columns:30px 1fr 20px;gap:4px;align-items:center}
+  .brow b{font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.05em;color:var(--faint);font-weight:500}
+  .brow i{display:block;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+  .brow i s{display:block;height:100%;background:var(--home);border-radius:2px}
+  .brow u{text-decoration:none;font-family:"IBM Plex Mono",monospace;font-size:8.5px;text-align:right;color:var(--muted)}
+  .neig{margin-top:4px!important;color:var(--home)!important;font-size:9px!important}
+  .unit .rm{float:right;background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+
+  .hint{display:flex;gap:8px;padding:8px 11px;border-radius:7px;background:var(--sunk);font-size:12.5px;color:var(--muted);margin-top:10px}
+  .hint b{color:var(--ink);font-weight:600}
+
+  .oppline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+  .oppline:last-child{border-bottom:0}
+  .oppline small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
+  .rng{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--away);white-space:nowrap}
+
+  .scoreline{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;padding:12px 18px;
+    background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+  .tname{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+  .tname em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.11em;color:var(--muted)}
+  .tname.r{text-align:right}
+  .clock{font-family:"Barlow Condensed",sans-serif;font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;text-align:center}
+  .clock small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted);font-weight:400;letter-spacing:.1em;margin-top:3px}
+  .hpbars{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:0 18px 11px;background:var(--surface-2);align-items:center}
+  .tbar{height:7px;border-radius:4px;background:var(--sunk);overflow:hidden}
+  .tbar s{display:block;height:100%;border-radius:4px;transition:width .2s linear}
+  .tbar.l s{background:var(--home)}.tbar.r s{background:var(--away)}
+  .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
+  canvas{display:block;width:100%;height:auto;background:var(--pitch)}
+  .ctrl{display:flex;gap:8px;align-items:center;padding:11px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
+  .btn{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    background:var(--home);color:#0B1018;border:0;border-radius:6px;padding:7px 17px;cursor:pointer}
+  .btn.g{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .feed{padding:9px 18px;border-top:1px solid var(--line-soft);font-family:"IBM Plex Mono",monospace;
+    font-size:11.5px;height:88px;overflow-y:auto;line-height:1.75}
+  .feed div{display:flex;gap:9px}
+  .feed .tk{color:var(--faint);flex:none}
+  .feed .h{color:var(--home)}.feed .a{color:var(--away)}.feed .big{color:var(--ink);font-weight:500}
+
+  .prof{display:grid;grid-template-columns:1fr 1fr}
+  @media (max-width:860px){.prof{grid-template-columns:1fr}}
+  .bigstat{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft)}
+  .bigstat:last-child{border-bottom:0}
+  .bigstat b{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);letter-spacing:.08em;width:34px}
+  .bigstat u{text-decoration:none;font-family:"Barlow Condensed",sans-serif;font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .bigstat span{font-size:11.5px;color:var(--muted);text-align:right}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line-soft)}
+  .kv:last-child{border-bottom:0}
+  .kv b{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+  .kv span{color:var(--muted)}
+  .gh{display:flex;align-items:baseline;gap:9px;margin:15px 0 7px}
+  .gh b{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+  .gh span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted)}
+  .gh hr{flex:1;border:0;border-top:1px solid var(--line-soft)}
+  .lvlup{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  @media (max-width:700px){.lvlup{grid-template-columns:repeat(2,1fr)}}
+  .lc{border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;background:var(--surface-2)}
+  .lc b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.05em;text-transform:uppercase}
+  .lc u{display:block;text-decoration:none;font-family:"Barlow Condensed",sans-serif;font-size:23px;font-weight:700;color:var(--home);margin:2px 0}
+  .lc span{font-size:10.5px;color:var(--muted)}
+
+  .notes{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:840px){.notes{grid-template-columns:1fr}}
+  .note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--home);border-radius:8px;padding:13px 15px}
+  .note.off{border-left-color:var(--faint)}
+  .note h3{font-family:"Barlow Condensed",sans-serif;font-size:14px;letter-spacing:.07em;text-transform:uppercase;margin:0 0 7px}
+  .note ul{margin:0;padding-left:16px;font-size:13.5px;color:var(--muted)}
+  .note li{margin-bottom:5px}
+  .note li strong{color:var(--ink);font-weight:600}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="kicker">Olympiade der Welten · Entwurf, keine Implementierung</p>
+  <h1>Battle Mode</h1>
+  <p class="lede">Echter Kader von Armageddon Aftermath, echte Attributwerte. <strong>Keine Zahl erfunden.</strong></p>
+  <p class="lede">Der Schaden je Treffer steht fest: <strong>steht 21 dran, macht er 21.</strong> Die Streuung kommt aus Treffen, Verfehlen und kritischen Treffern — nicht aus einem Schadenswürfel.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" aria-controls="p1" id="t1">Aufstellung</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Arena</button>
+    <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Spielerprofil</button>
+  </div>
+
+  <section class="panel" id="p1" role="tabpanel" aria-labelledby="t1">
+    <div class="frame">
+      <div class="fbar"><span>Spieltag 7</span><span class="sep">·</span><span>Armageddon Aftermath — Blazing Beasts</span>
+        <span class="honest">Spieler anklicken, dann Reihe anklicken</span></div>
+      <div class="lay">
+        <div class="pad">
+          <h2>Kader</h2>
+          <p class="sub">Beide Eignungen nebeneinander — der bessere Wert ist hervorgehoben.</p>
+          <div class="eghead"><span></span><span></span><span>TDM</span><span>SPURT</span></div>
+          <div class="plist" id="plist"></div>
+        </div>
+        <div class="pad">
+          <h2 id="boardTitle">Aufstellung TDM</h2>
+          <p class="sub">Drei Reihen. Jeder Spieler bekommt einen Befehl, der sein Verhalten im Kampf bestimmt.</p>
+          <div class="dbar" id="dbar"></div>
+          <div class="pitch" id="pitch"></div>
+          <div class="hint" id="hint"></div>
+        </div>
+        <div class="pad bl">
+          <h2>Blazing Beasts</h2>
+          <p class="sub">Erwartet: agil, flankiert gern.</p>
+          <div id="opp"></div>
+          <div class="hint" style="margin-top:14px"><span>Ihre schnellen Leute laufen um deine Front herum. Wer deckt hinten?</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>Was sich gegenüber der ersten Fassung geändert hat</h3>
+        <ul>
+          <li><strong>Echte Reihen statt Liste.</strong> Front, Mitte und Backrow sind Positionen auf dem Feld — wo jemand steht, entscheidet, wen er trifft und wer ihn erreicht.</li>
+          <li><strong>Beide Eignungen nebeneinander</strong>, damit auf einen Blick klar ist, wer in Disziplin 1 und wer in Disziplin 2 gehört.</li>
+          <li><strong>Befehle statt Zielprioritäten.</strong> „Vormarsch" und „Backrow decken" erzeugen sichtbar unterschiedliche Bewegung, keine unsichtbare Zahlenpräferenz.</li>
+        </ul>
+      </div>
+      <div class="note off">
+        <h3>Noch nicht drin</h3>
+        <ul>
+          <li>Ziehen und Ablegen — hier klickt man. Im echten Spiel wäre es ein Zug mit der Maus.</li>
+          <li>Formkarten, Kapitän, Intensität. Existieren bereits und kommen unverändert dazu.</li>
+          <li>Fähigkeiten-Slots. Der Baukasten liegt als Prototyp im Repo, ist aber nicht verdrahtet.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
+    <div class="frame">
+      <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
+        <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
+      <div class="scoreline">
+        <div class="tname">Armageddon Aftermath<em>A-A · <span id="aliveL">6</span> im Kampf</em></div>
+        <div class="clock"><span id="clock">0:00</span><small id="phase">bereit</small></div>
+        <div class="tname r">Blazing Beasts<em><span id="aliveR">6</span> im Kampf · B-B</em></div>
+      </div>
+      <div class="hpbars">
+        <div class="tbar l"><s id="thpL" style="width:100%"></s></div>
+        <div class="sd">Sudden Death 0:25</div>
+        <div class="tbar r"><s id="thpR" style="width:100%"></s></div>
+      </div>
+      <canvas id="cv" width="1240" height="470"></canvas>
+      <div class="ctrl">
+        <button class="btn" id="play">Kampf starten</button>
+        <button class="btn g" id="reset">Zurücksetzen</button>
+        <button class="btn g" id="spd">Tempo 1×</button>
+      </div>
+      <div class="feed" id="feed"></div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>Das Verhaltensmodell</h3>
+        <ul>
+          <li><strong>Alle rücken vor.</strong> „Formation halten" heißt mit der Linie mitgehen, nicht stehenbleiben.</li>
+          <li><strong>Drei Skalen statt Zahlen</strong>, nach deinem Screenshot: Haltung (defensiv bis ungestüm), Zusammenhalt (eigenmächtig bis dicht), Bindung (opportunistisch bis unbeirrt).</li>
+          <li><strong>„natürlich" heißt: die Persönlichkeit entscheidet.</strong> Das ist der eigentliche Kniff daran — man stellt nur ein, was einen stört, der Rest bleibt Charakter. Ein Bollwerk auf „natürlich" hält dicht, ein Draufgänger reißt sich los.</li>
+          <li><strong>Zusammenhalt</strong> spannt die Leine zur eigenen Linie, <strong>Bindung</strong> bestimmt, wie oft neu gezielt wird (0,35 s bis 2,8 s), <strong>Haltung</strong> löst den Rückzug aus.</li>
+          <li>Genau dein Fall: der Flankierer, der unterwegs abgefangen wird, bricht ab — es sei denn, er ist ungestüm.</li>
+        </ul>
+      </div>
+      <div class="note off">
+        <h3>Was echte Grafik ergänzt</h3>
+        <ul>
+          <li><strong>Deine 14 Klassen-Icons</strong> statt Kürzel — liegen bereits in <code>public/class-icons</code>. Ein Tank sähe sofort anders aus als ein Rogue.</li>
+          <li>Angriffs-Animation statt Ausfallschritt. Der Rest der Bewegung ist echt und bleibt.</li>
+          <li>Kill-Feed und „Doppelkill" wie in Eslabong.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p3" role="tabpanel" aria-labelledby="t3" hidden>
+    <div class="frame">
+      <div class="fbar"><span>Spielerprofil</span><span class="sep">·</span><span>Baumkopf Holzfaust</span>
+        <span class="honest">Laufbahn-Zahlen sind Beispiele — die Erfassung gibt es noch nicht</span></div>
+      <div class="prof">
+        <div class="pad">
+          <h2>Kampfwerte</h2>
+          <p class="sub" id="profSub"></p>
+          <div id="profStats"></div>
+          <div class="gh"><b>Veranlagung</b><span>auch als Hover im Kader</span><hr></div>
+          <div class="kv"><span>Persönlichkeit</span><b>Bollwerk</b></div>
+          <div class="kv"><span>Wachstum</span><b>Ausgeglichen</b></div>
+          <div class="kv"><span>Neigungen</span><b>Standhaft · Deckt · Spät stark</b></div>
+          <div class="gh"><b>Stufenaufstieg</b><span>eine Wahl</span><hr></div>
+          <div class="lvlup">
+            <div class="lc"><b>Vitalität</b><u>+4</u><span>LP 82 → 86</span></div>
+            <div class="lc"><b>Wucht</b><u>+3</u><span>ANG 67 → 70</span></div>
+            <div class="lc"><b>Härte</b><u>+4</u><span>VER 74 → 78</span></div>
+            <div class="lc"><b>Flinkheit</b><u>+5</u><span>TMP 30 → 35</span></div>
+          </div>
+          <div class="hint" style="margin-top:10px"><span>Auf der 1–100-Skala bleiben auch die Zuwächse klein — dein Einwand gegen „+22 gibt +44 Leben" ist eingebaut.</span></div>
+        </div>
+        <div class="pad bl">
+          <h2>Laufbahn</h2>
+          <p class="sub">Was er geleistet hat, nicht was er könnte.</p>
+          <div class="kv"><span>Einsätze</span><b>18</b></div>
+          <div class="kv"><span>Ausschaltungen</span><b>31</b></div>
+          <div class="kv"><span>Ausgefallen</span><b>7</b></div>
+          <div class="kv"><span>Verhältnis</span><b>4,43</b></div>
+          <div class="kv"><span>Schaden ausgeteilt</span><b>8.412</b></div>
+          <div class="kv"><span>Schaden genommen</span><b>11.907</b></div>
+          <div class="kv"><span>Je Einsatz ausgeteilt</span><b>467</b></div>
+          <div class="kv"><span>Assists</span><b>19</b></div>
+          <div class="kv"><span>Verletzungen</span><b>2</b></div>
+          <div class="kv"><span>Spieler des Spieltags</span><b>5</b></div>
+          <div class="gh"><b>Stärkste Disziplinen</b><span>habt ihr schon</span><hr></div>
+          <div class="kv"><span>TDM</span><b>81,0</b></div>
+          <div class="kv"><span>Gewichtheben</span><b>68,4</b></div>
+          <div class="kv"><span>Hockey</span><b>64,1</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note">
+        <h3>Zwei Wege zu stärkeren Spielern</h3>
+        <ul>
+          <li><strong>Organisch durch Training</strong> — wie heute, langsam und stetig.</li>
+          <li><strong>Verdient durch Leistung</strong> — Einsätze bringen XP, XP bringt Stufen, und bei jeder Stufe wählst DU, was wächst. Das ist der Bindungs-Hebel.</li>
+          <li>Beides nebeneinander heißt: ein wenig genutzter Spieler wächst trotzdem, ein oft eingesetzter wächst schneller und in DIE Richtung, die du willst.</li>
+        </ul>
+      </div>
+      <div class="note off">
+        <h3>Was das kostet</h3>
+        <ul>
+          <li>Die Laufbahn-Zahlen müssen im Kampf <strong>erfasst und gespeichert</strong> werden. Neu, aber klein.</li>
+          <li>Der Aufstiegs-Moment braucht einen Platz im Ablauf. Die XP-Systeme existieren bereits.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const SQUAD=[
+    {n:"Baumkopf Holzfaust",c:"Tank",r:"Construct",d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
+    {n:"T Mask",c:"Rogue",r:"Human",d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
+    {n:"Greenkraut",c:"Warlord",r:"Construct",d:{tdm:61.1,spurt:19.9},a:{power:95,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
+    {n:"Rustrow",c:"Tank",r:"Construct",d:{tdm:60.2,spurt:38.9},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
+    {n:"Buttercup",c:"Charger",r:"Animal",d:{tdm:57.4,spurt:46.3},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:44}},
+    {n:"Serris",c:"Berserker",r:"Construct",d:{tdm:33.9,spurt:44.8},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
+    {n:"Riley Le Rogue",c:"Charger",r:"Unknown",d:{tdm:35.1,spurt:18.2},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
+    {n:"Remiel",c:"Rogue",r:"Divine",d:{tdm:25.9,spurt:44.6},a:{power:35,health:65,stamina:7,intelligence:36,awareness:61,determination:44,speed:81,dexterity:78,charisma:15,will:9,spirit:48,torment:67}},
+    {n:"Professor Paranoix",c:"Overseer",r:"Human",d:{tdm:14.6,spurt:36.8},a:{power:7,health:23,stamina:22,intelligence:82,awareness:83,determination:65,speed:67,dexterity:48,charisma:36,will:27,spirit:23,torment:47}},
+    {n:"Marzipella",c:"Bard",r:"Human",d:{tdm:11.5,spurt:12.2},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
+    {n:"Byrnja",c:"Overseer",r:"Construct",d:{tdm:7.6,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:29,awareness:25,determination:11,speed:16,dexterity:18,charisma:21,will:8,spirit:28,torment:15}},
+    {n:"Kloeschen",c:"Bard",r:"Alien",d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
+  ];
+  const OPP=[
+    {n:"Skarn",c:"Warlord",lo:64,hi:79,row:0,ord:"vor"},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke"},
+    {n:"Brambleaux",c:"Tank",lo:52,hi:66,row:0,ord:"vor"},{n:"Nixie",c:"Bard",lo:33,hi:49,row:2,ord:"deck"},
+    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"halten"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke"}
+  ];
+  const REC={
+    power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
+    speed:{ANG:{speed:40,dexterity:30,torment:30},VER:{dexterity:35,awareness:35,health:30},LP:{stamina:45,health:40,will:15},TMP:{speed:60,dexterity:25,awareness:15},PRZ:{dexterity:45,awareness:30,intelligence:25},AUS:{stamina:55,determination:25,will:20}}
+  };
+  const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4}};
+  const KEYS=["LP","ANG","VER","TMP","PRZ","AUS"];
+  const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",PRZ:"Präzision",AUS:"Ausdauer"};
+  const ORDERS=[["vor","Vormarsch"],["halten","Formation halten"],["deck","Backrow decken"],["flanke","Flanke"],["begleit","Begleiten"]];
+  // Persoenlichkeit setzt die Grundveranlagung. Der Befehl VERSCHIEBT sie, er ersetzt sie nicht.
+  // form  = Formationstreue: wie nah bleibt er der eigenen Linie
+  // opp   = Opportunismus:   wie bereitwillig wechselt er das Ziel
+  // selb  = Selbsterhaltung: zieht er sich zurueck, wenn es eng wird
+  const PERS={
+    bollwerk:{l:"Bollwerk",form:85,opp:20,selb:35,ziel:"naechster"},
+    draufgaenger:{l:"Draufgänger",form:20,opp:75,selb:5,ziel:"naechster"},
+    duellant:{l:"Duellant",form:55,opp:30,selb:45,ziel:"gefaehrlichster"},
+    schleicher:{l:"Schleicher",form:15,opp:55,selb:80,ziel:"hinten"},
+    beschuetzer:{l:"Beschützer",form:75,opp:45,selb:50,ziel:"naechster"},
+    opportunist:{l:"Opportunist",form:40,opp:90,selb:65,ziel:"schwaechster"}
+  };
+  // Der Befehl verschiebt die drei Werte. So bleibt die Persoenlichkeit spuerbar,
+  // die Taktik aber wirksam — genau die Schichtung aus Eslabong.
+  // DREI FUENFERSKALEN statt Zahlenschieber — die Eslabong-Struktur, und sie ist besser:
+  // benannte Stufen kann man lesen, „Formationstreue 62" nicht.
+  const HALTUNG=[["defensiv","Defensiv"],["vorsichtig","Vorsichtig"],["ausgewogen","Ausgewogen"],["offensiv","Offensiv"],["wild","Ungestüm"]];
+  const ZUSAMMEN=[["eigen","Eigenmächtig"],["locker","Locker"],["ausgewogen","Ausgewogen"],["eng","Eng"],["dicht","Dicht"]];
+  const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
+  const SK=(arr,v)=>Math.max(0,arr.findIndex(x=>x[0]===v))/(arr.length-1);
+  // Jede Persoenlichkeit hat ihre eigene Grundstellung auf den drei Skalen.
+  const PERSDEF={
+    bollwerk:{h:"vorsichtig",z:"dicht",b:"treu"},
+    draufgaenger:{h:"wild",z:"eigen",b:"opportun"},
+    duellant:{h:"ausgewogen",z:"ausgewogen",b:"treu"},
+    schleicher:{h:"vorsichtig",z:"eigen",b:"flexibel"},
+    beschuetzer:{h:"defensiv",z:"eng",b:"ausgewogen"},
+    opportunist:{h:"ausgewogen",z:"locker",b:"opportun"}
+  };
+    const clamp=(v)=>Math.max(0,Math.min(100,Math.round(v)));
+  // "natürlich" heisst: die Persoenlichkeit entscheidet. Genau der Kniff aus dem Vorbild —
+  // man stellt nur ein, was einen wirklich stoert, der Rest bleibt Charakter.
+  const takt={};
+  function behav(name){
+    const pk=persOf[name]||"duellant",def=PERSDEF[pk],t=takt[name]||{};
+    const h=t.h&&t.h!=="natur"?t.h:def.h;
+    const z=t.z&&t.z!=="natur"?t.z:def.z;
+    const b=t.b&&t.b!=="natur"?t.b:def.b;
+    return{
+      h,z,b,
+      // Formationstreue steigt mit "Zusammenhalt", Opportunismus faellt mit "Bindung",
+      // Selbsterhaltung faellt mit "Haltung".
+      form:Math.round(SK(ZUSAMMEN,z)*100),
+      opp:Math.round((1-SK(BINDUNG,b))*100),
+      selb:Math.round((1-SK(HALTUNG,h))*100),
+      ziel:PERS[pk].ziel
+    };
+  }
+  // Beschreibende Neigungen — wie „Composed · Map-aware" bei Eslabong, nur abgeleitet.
+  function neigungen(b){
+    const o=[];
+    o.push(b.form>=70?"Linientreu":b.form<=30?"Eigenmächtig":"Beweglich");
+    o.push(b.opp>=70?"Wechselhaft":b.opp<=25?"Tunnelblick":"Aufmerksam");
+    o.push(b.selb>=70?"Vorsichtig":b.selb<=20?"Todesmutig":"Besonnen");
+    return o.join(" · ");
+  }
+  const ROWS=[{k:"Front",d:"vorderste Linie"},{k:"Mitte",d:"stützt beide Seiten"},{k:"Backrow",d:"geschützt hinten"}];
+
+  function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
+    for(const k of KEYS){let s=0,w=0;for(const[at,wt]of Object.entries(rec[k])){s+=(p.a[at]||0)*wt;w+=wt;}
+      o[k]=Math.max(1,Math.min(99,Math.round(s/w)));}
+    return o;}
+  const dmgOf=(atk,vr)=>Math.max(2,Math.round(atk*0.5*(100/(100+vr))));
+
+  let disc="tdm",sel=null;
+  const place={},order={};
+  const persOf={"Baumkopf Holzfaust":"bollwerk","Rustrow":"bollwerk","Greenkraut":"draufgaenger",
+    "Buttercup":"beschuetzer","Serris":"draufgaenger","T Mask":"schleicher","Remiel":"schleicher",
+    "Riley Le Rogue":"duellant","Professor Paranoix":"opportunist","Marzipella":"opportunist",
+    "Byrnja":"duellant","Kloeschen":"duellant"};
+  [["Baumkopf Holzfaust",0,"vor"],["Rustrow",0,"halten"],["Greenkraut",0,"vor"],
+   ["Buttercup",2,"deck"],["Serris",1,"flanke"],["T Mask",1,"begleit"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
+  [["Remiel",1,"vor"],["Riley Le Rogue",0,"vor"],["Professor Paranoix",2,"deck"],["Marzipella",1,"halten"]]
+    .forEach(([n,r,o])=>{place[n]={d:"spurt",row:r};order[n]=o;});
+
+  const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
+  const inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d);
+
+  function renderList(){
+    const box=document.getElementById("plist");box.textContent="";
+    SQUAD.forEach(p=>{
+      const pl=place[p.n],used=pl&&pl.d!==disc;
+      const r=el("div","prow"+(sel===p.n?" sel":"")+(used?" used":""));
+      r.tabIndex=0;r.setAttribute("role","button");
+      r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
+      r.appendChild(el("div","pico",p.n.slice(0,2).toUpperCase()));
+      const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
+      nm.appendChild(el("span",null,pl?(pl.d===disc?ROWS[pl.row].k:"in "+DISCS[pl.d].label):"—"));
+      r.appendChild(nm);
+      const t=p.d.tdm,s=p.d.spurt;
+      r.appendChild(el("div","eg"+(t>=s?" best":""),t.toFixed(0)));
+      r.appendChild(el("div","eg"+(s>t?" best":""),s.toFixed(0)));
+      const go=()=>{sel=sel===p.n?null:p.n;renderAll();};
+      r.addEventListener("click",go);
+      r.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
+      box.appendChild(r);
+    });
+  }
+
+  function renderBoard(){
+    const pit=document.getElementById("pitch");pit.textContent="";
+    const here=inDisc(disc);
+    ROWS.forEach((rw,ri)=>{
+      const z=el("div","zone"+(sel?" hot":""));
+      const h=el("div","zname");h.appendChild(el("span",null,rw.k));
+      h.appendChild(el("span",null,String(here.filter(p=>place[p.n].row===ri).length)));
+      z.appendChild(h);
+      here.filter(p=>place[p.n].row===ri).forEach(p=>{
+        const s=stats(p,disc);
+        const u=el("div","unit");
+        const rm=el("button","rm","×");rm.setAttribute("aria-label","Entfernen");
+        rm.addEventListener("click",ev=>{ev.stopPropagation();delete place[p.n];renderAll();});
+        u.appendChild(rm);
+        u.appendChild(el("b",null,p.n));
+        u.appendChild(el("span",null,"LP "+s.LP+" · ANG "+s.ANG+" · VER "+s.VER+" · TMP "+s.TMP));
+        u.appendChild(el("span",null,"Schaden je Treffer "+dmgOf(s.ANG,60)+" · Präzision "+s.PRZ));
+
+        const pe=el("select");pe.setAttribute("aria-label","Persönlichkeit von "+p.n);
+        Object.entries(PERS).forEach(([v,d])=>{const o=el("option",null,d.l);o.value=v;
+          if((persOf[p.n]||"duellant")===v)o.selected=true;pe.appendChild(o);});
+        pe.addEventListener("click",e=>e.stopPropagation());
+        pe.addEventListener("change",()=>{persOf[p.n]=pe.value;renderBoard();});
+        u.appendChild(pe);
+
+        const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
+        ORDERS.forEach(([v,l])=>{const o=el("option",null,l);o.value=v;if(order[p.n]===v)o.selected=true;se.appendChild(o);});
+        se.addEventListener("click",e=>e.stopPropagation());
+        se.addEventListener("change",()=>{order[p.n]=se.value;renderBoard();});
+        u.appendChild(se);
+
+        // Drei Skalen, jeweils mit „natürlich" als Vorgabe: dann entscheidet die
+        // Persoenlichkeit. Man stellt nur ein, was einen wirklich stoert.
+        const b=behav(p.n);
+        const tw=el("div","bwrap");
+        [["h","Haltung",HALTUNG,b.h],["z","Zusammenhalt",ZUSAMMEN,b.z],["b","Bindung",BINDUNG,b.b]]
+          .forEach(([key,lbl,arr,cur])=>{
+            const row=el("div","srow");row.title=lbl;
+            row.appendChild(el("b",null,lbl));
+            const se=el("select");se.setAttribute("aria-label",lbl+" von "+p.n);
+            const nat=el("option",null,"natürlich");nat.value="natur";
+            if(!(takt[p.n]&&takt[p.n][key]&&takt[p.n][key]!=="natur"))nat.selected=true;
+            se.appendChild(nat);
+            arr.forEach(([v,l])=>{const o=el("option",null,l);o.value=v;
+              if(takt[p.n]&&takt[p.n][key]===v)o.selected=true;se.appendChild(o);});
+            se.addEventListener("click",e=>e.stopPropagation());
+            se.addEventListener("change",()=>{takt[p.n]=takt[p.n]||{};takt[p.n][key]=se.value;renderBoard();});
+            row.appendChild(se);
+            const cu=el("u",null,arr.find(x=>x[0]===cur)?arr.find(x=>x[0]===cur)[1].slice(0,4):"—");
+            row.appendChild(cu);
+            tw.appendChild(row);
+          });
+        u.appendChild(tw);
+        u.appendChild(el("span","neig",neigungen(b)));
+        z.appendChild(u);
+      });
+      z.addEventListener("click",()=>{
+        if(!sel)return;
+        if(inDisc(disc).length>=DISCS[disc].size&&(!place[sel]||place[sel].d!==disc))return;
+        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="halten";
+        sel=null;renderAll();
+      });
+      pit.appendChild(z);
+    });
+    document.getElementById("boardTitle").textContent="Aufstellung "+DISCS[disc].label;
+    const h=document.getElementById("hint");h.textContent="";
+    const n=inDisc(disc).length;
+    h.appendChild(el("b",null,n+" von "+DISCS[disc].size));
+    h.appendChild(el("span",null,sel?" — jetzt eine Reihe anklicken, um "+sel+" zu setzen."
+      :" aufgestellt. Insgesamt "+(DISCS.tdm.size+DISCS.spurt.size)+" Einsätze bei "+SQUAD.length+" Spielern."));
+  }
+
+  function renderDbar(){
+    const b=document.getElementById("dbar");b.textContent="";
+    for(const[id,d]of Object.entries(DISCS)){
+      const c=el("button","dchip",d.label);
+      c.appendChild(el("em",null,d.size+"v"+d.size));
+      c.setAttribute("aria-pressed",id===disc?"true":"false");
+      c.addEventListener("click",()=>{disc=id;sel=null;renderAll();});
+      b.appendChild(c);
+    }
+  }
+
+  function renderOpp(){
+    const box=document.getElementById("opp");box.textContent="";
+    OPP.forEach(o=>{
+      const r=el("div","oppline");
+      const l=el("div");l.appendChild(el("b",null,o.n));
+      l.appendChild(el("small",null,o.c+" · "+ORDERS.find(x=>x[0]===o.ord)[1]));
+      r.appendChild(l);r.appendChild(el("span","rng",o.lo+"–"+o.hi));
+      box.appendChild(r);
+    });
+  }
+
+  function renderProfile(){
+    const p=SQUAD[0],s=stats(p,"tdm");
+    document.getElementById("profSub").textContent=p.c+" · "+p.r+" · Eignung TDM "+p.d.tdm.toFixed(1);
+    const box=document.getElementById("profStats");box.textContent="";
+    const ex={LP:"hält "+(s.LP*6)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Treffer (gegen VER 60)",
+      VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
+      TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · "+(0.5+s.TMP/120).toFixed(2)+" Schläge/s",
+      PRZ:Math.min(95,Math.max(40,Math.round(70+(s.PRZ-50)*0.3)))+" % Trefferchance gegen TMP 50",
+      AUS:"verliert ab Sekunde 20 "+((100-s.AUS)*0.15).toFixed(2)+" % je Sekunde"};
+    for(const k of KEYS){
+      const r=el("div","bigstat");
+      r.appendChild(el("b",null,k));r.appendChild(el("u",null,String(s[k])));
+      r.appendChild(el("span",null,ex[k]));r.title=LONG[k];
+      box.appendChild(r);
+    }
+  }
+
+  /* ================= ARENA ================= */
+  const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height,MID=W/2;
+  let U=[],floats=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  const css=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+  let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+
+  function homeFor(side,row,i,n){
+    const cols=[side===0?MID-140:MID+140,side===0?MID-300:MID+300,side===0?MID-460:MID+460];
+    return{x:cols[row],y:70+(H-140)*(n<2?0.5:i/(n-1||1))};
+  }
+
+  function build(){
+    seed=1337;U=[];floats=[];t=0;done=false;
+    const mine=inDisc("tdm").slice(0,6);
+    const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[place[p.n].row].push(p));
+    let id=0;
+    for(const row of[0,1,2]){
+      byRow[row].forEach((p,i)=>{
+        const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
+        const bh=behav(p.n);
+        U.push({id:id++,n:p.n,side:0,row,ord:order[p.n]||"halten",...s,...bh,
+          hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+          dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null});
+      });
+    }
+    const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
+    for(const row of[0,1,2]){
+      oByRow[row].forEach((o,i)=>{
+        const base=SQUAD[(id+i)%SQUAD.length],s0=stats(base,"tdm");
+        const f=0.85+rr()*0.4;
+        const s={LP:Math.round(s0.LP*f),ANG:Math.round(s0.ANG*f),VER:Math.round(s0.VER*f),
+          TMP:Math.round(Math.min(99,s0.TMP*f*1.25)),PRZ:Math.round(s0.PRZ*f),AUS:Math.round(s0.AUS*f)};
+        const h=homeFor(1,row,i,oByRow[row].length);
+        const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
+        const bp=PERS[pk],bm=ORDMOD[o.ord];
+        U.push({id:id++,n:o.n,side:1,row,ord:o.ord,...s,
+          form:clamp(bp.form+bm.form),opp:clamp(bp.opp+bm.opp),selb:clamp(bp.selb+bm.selb),ziel:bp.ziel,
+          hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+          dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null});
+      });
+    }
+  }
+
+  const live=s=>U.filter(u=>u.side===s&&!u.down);
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const RANGE=44;
+
+  function chooseTarget(u){
+    const foes=live(1-u.side);if(!foes.length)return null;
+    const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
+    const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+
+    // Wer sich zurueckzieht, sucht kein Ziel.
+    if(u.retreat>0)return null;
+
+    // Ein Angreifer im Ruecken schlaegt jede Absicht — je opportunistischer, desto eher.
+    if(u.lastHit&&!u.lastHit.down&&dist(u,u.lastHit)<130&&u.opp>=45)return u.lastHit;
+
+    if(u.ord==="deck"){
+      const intr=foes.filter(own);
+      return intr.length?nearest(intr):null;
+    }
+    if(u.ord==="flanke"){
+      const deep=u.side===0?u.x>MID+180:u.x<MID-180;
+      if(!deep){
+        // Unterwegs nur wehren, wenn wirklich jemand direkt dranhaengt.
+        const cling=foes.filter(f=>dist(u,f)<58);
+        return cling.length?nearest(cling):null;
+      }
+      const back=foes.filter(f=>f.row===2);
+      return (back.length?back:foes).reduce((b,x)=>x.ANG>b.ANG?x:b);
+    }
+    // Grundneigung aus der Persoenlichkeit
+    if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>x.ANG>b.ANG?x:b);
+    if(u.ziel==="schwaechster")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
+    if(u.ziel==="hinten"){const back=foes.filter(f=>f.row===2);if(back.length)return nearest(back);}
+    return nearest(foes);
+  }
+
+  // Die eigene Linie: wie weit ist das Team im Schnitt vorgerueckt.
+  function teamFront(side){
+    const g=live(side);if(!g.length)return side===0?MID-300:MID+300;
+    return g.reduce((a,u)=>a+u.x,0)/g.length;
+  }
+
+  function stepSim(dt){
+    if(done)return;
+    t+=dt;
+    const sd=t>25?1+(t-25)*0.05:1;
+    for(const u of U){
+      if(u.down)continue;
+      const fat=t>20?Math.max(0.55,1-(100-u.AUS)*0.0015*(t-20)):1;
+
+      // SELBSTERHALTUNG: wer angeschlagen ist, loest sich vom Feind — je hoeher der Wert,
+      // desto frueher. Ein Todesmutiger (selb 5) rennt weiter, ein Vorsichtiger (selb 80)
+      // zieht sich bei knapp einem Drittel zurueck. Genau der Fall mit dem Flankierer,
+      // der unterwegs angegriffen wird.
+      const schwelle=u.selb/280;
+      if(u.retreat<=0&&u.hp/u.max<schwelle&&u.selb>25){u.retreat=2.2;u.tgt=null;
+        feed(u.side,u.n+" löst sich aus dem Kampf.");}
+      if(u.retreat>0)u.retreat-=dt;
+
+      // ZIELWECHSEL: wie oft neu geschaut wird, haengt am Opportunismus.
+      u.reev-=dt;
+      if(!u.tgt||u.tgt.down||u.reev<=0||u.retreat>0){
+        u.tgt=chooseTarget(u);
+        u.reev=0.35+(100-u.opp)/100*2.4;
+      }
+      const tg=u.tgt;
+
+      // ZIEL DER BEWEGUNG
+      let gx,gy;
+      if(u.retreat>0){ gx=u.side===0?u.hx-90:u.hx+90; gy=u.hy; }
+      else if(tg){ gx=tg.x; gy=tg.y; }
+      else if(u.ord==="flanke"){ gx=u.side===0?MID+340:MID-340; gy=u.y<H/2?46:H-46; }
+      else {
+        // INTRINSISCHE MOTIVATION: auch ohne Ziel geht es nach vorn. „Formation halten"
+        // heisst mit der Linie vorruecken, nicht stehenbleiben.
+        gx=u.side===0?MID-40:MID+40; gy=u.hy;
+      }
+
+      // FORMATIONSTREUE: je hoeher, desto naeher bleibt er der eigenen Linie.
+      const front=teamFront(u.side);
+      const leine=40+(100-u.form)*3.4;
+      if(u.retreat<=0&&Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+
+      const dx=gx-u.x,dy=gy-u.y,L=Math.hypot(dx,dy)||1;
+      const inRange=tg&&!tg.down&&dist(u,tg)<=RANGE;
+      if(!inRange&&L>3){
+        const v=(40+u.TMP*1.4)*fat*(u.retreat>0?1.25:1)*dt;
+        let ux=dx/L,uy=dy/L;
+        if(u.ord==="flanke"&&!tg&&u.retreat<=0){const edge=u.y<H/2?46:H-46;uy=(edge-u.y)/60;}
+        u.x+=ux*Math.min(v,L);u.y+=uy*Math.min(v,L);
+        u.y=Math.max(34,Math.min(H-34,u.y));u.x=Math.max(34,Math.min(W-34,u.x));
+      }
+      u.cd-=dt;
+      if(inRange&&u.cd<=0&&u.retreat<=0){
+        u.cd=1/((0.5+u.TMP/120)*fat);
+        u.lunge=0.16;
+        const chance=Math.max(40,Math.min(95,70+(u.PRZ-tg.TMP)*0.3))/100;
+        tg.lastHit=u;
+        if(rr()>chance){
+          const ax=tg.x-u.x,ay=tg.y-u.y,aL=Math.hypot(ax,ay)||1;
+          tg.dx=-ay/aL;tg.dy=ax/aL;tg.dodge=0.26;
+          floats.push({x:tg.x,y:tg.y-26,txt:"ausgewichen",life:.8,crit:false});
+          feed(tg.side,tg.n+" weicht "+u.n+" aus.");
+        }else{
+          const crit=rr()<u.PRZ/400;
+          const d=Math.round(dmgOf(u.ANG,tg.VER)*sd*(crit?1.5:1));
+          tg.hp=Math.max(0,tg.hp-d);
+          floats.push({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
+          feed(u.side,u.n+(crit?" trifft kritisch ":" trifft ")+tg.n+" · "+d,crit);
+          if(tg.hp===0&&!tg.down){tg.down=true;feed(tg.side,tg.n+" ist ausgeschieden.",true);}
+        }
+      }
+      if(u.lunge>0)u.lunge-=dt;
+      if(u.dodge>0)u.dodge-=dt;
+    }
+    if(!live(0).length||!live(1).length||t>60)finish();
+    updateHud();
+  }
+
+  function updateHud(){
+    document.getElementById("clock").textContent="0:"+String(Math.floor(t)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":(t>25?"Sudden Death":"läuft");
+    document.getElementById("aliveL").textContent=String(live(0).length);
+    document.getElementById("aliveR").textContent=String(live(1).length);
+    const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
+    document.getElementById("thpL").style.width=(sum(0)*100)+"%";
+    document.getElementById("thpR").style.width=(sum(1)*100)+"%";
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle=css("--pitch");ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=css("--line-soft");ctx.lineWidth=1;
+    ctx.setLineDash([5,7]);
+    [MID-140,MID-300,MID-460,MID+140,MID+300,MID+460].forEach(x=>{
+      ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,H-20);ctx.stroke();});
+    ctx.setLineDash([]);
+    ctx.strokeStyle=css("--line");ctx.beginPath();ctx.moveTo(MID,14);ctx.lineTo(MID,H-14);ctx.stroke();
+
+    for(const u of U){
+      if(u.down)continue;
+      const tg=u.tgt;
+      if(tg&&!tg.down&&dist(u,tg)<=RANGE+6){
+        ctx.strokeStyle=u.side===0?css("--home"):css("--away");
+        ctx.globalAlpha=.28;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();ctx.globalAlpha=1;
+      }
+    }
+    for(const u of U){
+      const c=u.side===0?css("--home"):css("--away");
+      let x=u.x,y=u.y;
+      if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
+        const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
+      if(u.dodge>0){const k=Math.sin((1-u.dodge/0.26)*Math.PI)*15;x+=(u.dx||0)*k;y+=(u.dy||0)*k;}
+      ctx.globalAlpha=u.down?.22:1;
+      ctx.fillStyle=u.side===0?css("--home-bg"):css("--away-bg");
+      ctx.beginPath();ctx.roundRect(x-20,y-20,40,40,9);ctx.fill();
+      ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle=c;ctx.font="600 14px 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText(u.n.slice(0,2).toUpperCase(),x,y+1);
+      if(!u.down){
+        const w=44,p=u.hp/u.max;
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+24,w,5);
+        ctx.fillStyle=p<.34?css("--crit"):css("--ok");ctx.fillRect(x-w/2,y+24,w*p,5);
+      }
+      ctx.globalAlpha=u.down?.22:.8;
+      ctx.fillStyle=css("--muted");ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      ctx.fillText(u.n.length>14?u.n.slice(0,13)+"…":u.n,x,y+40);
+      ctx.globalAlpha=1;
+    }
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--crit"):css("--ink");
+      ctx.font=(f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
+    }
+  }
+
+  function feed(side,txt,big){
+    const f=document.getElementById("feed");
+    const d=el("div");
+    d.appendChild(el("span","tk","0:"+String(Math.floor(t)).padStart(2,"0")));
+    d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
+    f.appendChild(d);
+    while(f.children.length>140)f.removeChild(f.firstChild);
+    f.scrollTop=f.scrollHeight;
+  }
+
+  function finish(){
+    if(done)return;done=true;running=false;
+    document.getElementById("play").textContent="Vorbei";
+    const l=live(0).length,r=live(1).length;
+    feed(0,(l>r?"Armageddon Aftermath gewinnt ":r>l?"Blazing Beasts gewinnt ":"Unentschieden ")+l+":"+r,true);
+    updateHud();
+  }
+
+  function loop(ts){
+    if(!last)last=ts;
+    let dt=Math.min(.05,(ts-last)/1000);last=ts;
+    if(running){
+      acc+=dt*speed;
+      while(acc>=1/60){stepSim(1/60);acc-=1/60;}
+      floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
+      floats=floats.filter(f=>f.life>0);
+    }
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function reset(){
+    running=false;done=false;last=0;acc=0;
+    build();
+    document.getElementById("feed").textContent="";
+    document.getElementById("play").textContent="Kampf starten";
+    document.getElementById("arenaDisc").textContent="TDM · "+live(0).length+" gegen "+live(1).length;
+    feed(0,"Aufstellung steht. Befehle sind gesetzt.");
+    updateHud();draw();
+  }
+
+  document.getElementById("play").addEventListener("click",()=>{
+    if(done)reset();
+    running=!running;
+    document.getElementById("play").textContent=running?"Pause":"Weiter";
+  });
+  document.getElementById("reset").addEventListener("click",reset);
+  document.getElementById("spd").addEventListener("click",()=>{
+    speed=speed===1?2:speed===2?4:1;
+    document.getElementById("spd").textContent="Tempo "+speed+"×";
+  });
+
+  const tabs=[...document.querySelectorAll(".tab")];
+  tabs.forEach(tb=>tb.addEventListener("click",()=>{
+    tabs.forEach(o=>{const on=o===tb;o.setAttribute("aria-selected",on?"true":"false");
+      document.getElementById(o.getAttribute("aria-controls")).hidden=!on;});
+    if(tb.id==="t2")reset();
+  }));
+
+  function renderAll(){renderDbar();renderList();renderBoard();}
+  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
