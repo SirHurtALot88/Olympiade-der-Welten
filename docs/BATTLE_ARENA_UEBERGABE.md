@@ -42,10 +42,16 @@ Ebenfalls dort: `Rassen Klassen Traits.xlsx`, `Oly Player Stats 05-2026.xlsx`,
 
 ### 2. Die fehlenden Lauf-Sprites
 
-`public/mockups/battle-mode.html` trägt jetzt 51 Blätter aus dem Sprite-Baukasten. Von
-Krone, Bart, Haar, Schultern, Armen, Beinen, Stiefeln, Umhang, Hörnerhelm und Visier gibt
-es aber **nur Slash-Blätter** (6 Bilder). Für die Animation fehlen die Lauf-Varianten
-(9 Bilder) und alle `hurt`-Blätter.
+**Alle 77 Blätter des Sprite-Baukastens liegen jetzt als PNG-Dateien** unter
+`public/sprites/baukasten/` — mit `index.json` (Maße, Bildzahl, Richtungen) und einer
+README, die den Aufbau erklärt. Sie sind zusätzlich in `battle-mode.html` eingebettet.
+Vorher lagen sie nur als base64 in zwei HTML-Dokumenten.
+
+Den vollen Satz aus Gang, Schlag und Schuss haben aber nur **vier** Ebenen: Körper
+(`k_*`), Kopf (`g_*`), Rüstung (`r_*`) und Haar (`h_*`). Krone, Bart, Schultern, Arme,
+Beine, Stiefel, Umhang, Hörnerhelm, Visier, Schild, Doppelaxt und die zwanzig Köpfe gibt
+es **nur als Schlag-Blatt** (6 Bilder). Für die Animation fehlen deren Gang-Varianten
+(9 Bilder), die Schuss-Varianten (13) und **alle `hurt`-Blätter**.
 
 Quelle: Liberated Pixel Cup, dieselben Urheber wie in `CREDITS.csv`. Solange sie fehlen,
 zeichnet die **stehende** Figur aus dem vollen Baukasten und der **laufende** Kämpfer aus
