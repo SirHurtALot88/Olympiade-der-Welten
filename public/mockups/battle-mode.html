@@ -125,13 +125,13 @@
 
   .plan{background:linear-gradient(180deg,rgba(226,168,74,.10),rgba(226,168,74,.03));
     border:1px solid rgba(226,168,74,.34);border-radius:8px;padding:9px 11px;margin-bottom:10px;cursor:help}
-  .plan b{display:block;color:var(--gold,#E2A84A);font-size:13px;letter-spacing:.02em;margin-bottom:3px}
+  .plan b{display:block;color:var(--warn,#E2A84A);font-size:13px;letter-spacing:.02em;margin-bottom:3px}
   .plan p{margin:0;font-size:12px;line-height:1.5;color:var(--muted,#93A2B8)}
   .planzeile{display:flex;gap:10px;align-items:baseline;padding:7px 12px;
     border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--muted,#93A2B8);line-height:1.5}
-  .planzeile b{color:var(--gold,#E2A84A);white-space:nowrap;letter-spacing:.02em}
+  .planzeile b{color:var(--warn,#E2A84A);white-space:nowrap;letter-spacing:.02em}
   .prozente{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 2px}
-  .prozente .pz{display:flex;flex-direction:column;gap:1px;background:var(--panel-2,#161C26);
+  .prozente .pz{display:flex;flex-direction:column;gap:1px;background:var(--surface-2);
     border:1px solid var(--line-soft,#232B38);border-radius:5px;padding:3px 6px;cursor:help;font-style:normal}
   .prozente .pz b{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#93A2B8);font-weight:600}
   .prozente .pz s{text-decoration:none;font-size:12px;font-weight:600;color:var(--ink,#E6ECF5);font-variant-numeric:tabular-nums}
@@ -153,6 +153,64 @@
   .tbar.l s{background:var(--home)}.tbar.r s{background:var(--away)}
   .sd{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--faint);letter-spacing:.08em}
   canvas{display:block;width:100%;height:auto;background:var(--pitch)}
+  /* Slot-Tafel */
+  .slotzone{position:relative}
+  .slotzone .zname{align-items:flex-start}
+  .slotzone .zname b{display:block;font-size:13px;color:#eef3f9}
+  .slotfokus{display:block;font-style:normal;font-size:9.5px;color:#8d9aab}
+  .slotfokus{color:#8d9aab;letter-spacing:.02em;margin-top:1px}
+  .slottext{margin:0 0 6px;font-size:10px;color:#8d9aab;line-height:1.45}
+  .passmarke{font:600 10px/1 ui-monospace,monospace;padding:3px 6px;border-radius:5px;white-space:nowrap}
+  .passmarke.perfekt {background:#16334d;color:#7ec2ff}
+  .passmarke.gut     {background:#1a3a24;color:#7fd396}
+  .passmarke.okay    {background:#3d3618;color:#e0c46a}
+  .passmarke.schlecht{background:#452020;color:#f08c8c}
+  .zone.pass-perfekt {box-shadow:inset 0 0 0 2px #2f7fc4}
+  .zone.pass-gut     {box-shadow:inset 0 0 0 2px #3f8f57}
+  .zone.pass-okay    {box-shadow:inset 0 0 0 2px #97822f}
+  .zone.pass-schlecht{box-shadow:inset 0 0 0 2px #a04a4a;opacity:.75}
+  .zone.ueber{outline:2px dashed #6d7d92;outline-offset:-4px}
+  .unit[draggable="true"]{cursor:grab}
+  .unit[draggable="true"]:active{cursor:grabbing}
+  .slotvorschlag{display:flex;align-items:baseline;gap:6px;padding:5px 7px;border-radius:6px;
+    background:#1d242e;border:1px dashed #3a4553;cursor:pointer;font-size:11px}
+  .slotvorschlag:hover{background:#232c37;border-color:#4d5a6b}
+  .slotvorschlag .vlabel{font:600 9px/1 ui-monospace,monospace;color:#7f8c9e;text-transform:uppercase}
+  .slotvorschlag b{color:#e6edf5}
+  .slotvorschlag s{text-decoration:none;color:#e8c07a;font:600 11px/1 ui-monospace,monospace;margin-left:auto}
+
+  /* Einlauf vor dem Anpfiff */
+  .arenaraum{position:relative}
+  .einlauf{position:absolute;inset:0;background:rgba(16,20,26,.94);display:flex;
+    flex-direction:column;justify-content:center;gap:clamp(8px,2.2vw,22px);
+    padding:clamp(8px,2vw,26px);overflow:auto}
+  .einlauf[hidden]{display:none}
+  .ewappen{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:clamp(8px,2vw,24px)}
+  .eteam{display:flex;align-items:center;gap:clamp(6px,1.4vw,16px)}
+  .eteam.r{flex-direction:row-reverse;text-align:right}
+  .ewappenbild{width:clamp(48px,7vw,84px);height:clamp(48px,7vw,84px);border-radius:12px;
+    object-fit:cover;background:#222831;border:1px solid #39424f;flex:none}
+  .ewappenbild.mono{display:flex;align-items:center;justify-content:center;
+    font:700 clamp(15px,2.4vw,28px)/1 ui-monospace,monospace;color:#c9d4e2;letter-spacing:.04em}
+  .eteam h4{margin:0;font-size:clamp(13px,1.7vw,21px);color:#eef3f9}
+  .eteam .eplatz{margin:2px 0 0;font-size:clamp(10px,1.15vw,13px);color:#93a1b3}
+  .eteam .eplatz b{color:#e8c07a}
+  .egegen{text-align:center;color:#93a1b3}
+  .egegen b{display:block;font-size:clamp(13px,1.9vw,22px);color:#eef3f9;letter-spacing:.06em}
+  .egegen em{font-style:normal;font-size:clamp(9px,1.05vw,12px)}
+  .eaufstellung{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,2vw,24px)}
+  .eliste{display:flex;flex-direction:column;gap:3px}
+  .ezeile{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;
+    padding:3px clamp(5px,.8vw,9px);border-radius:6px;background:#1b222b;
+    font-size:clamp(9px,1.05vw,12.5px)}
+  .eliste.r .ezeile{direction:rtl}
+  .eliste.r .ezeile>*{direction:ltr}
+  .ezeile .erolle{color:#7f8c9e;font:600 clamp(8px,.9vw,10px)/1.6 ui-monospace,monospace;
+    text-transform:uppercase;letter-spacing:.05em}
+  .ezeile .ename{color:#e6edf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ezeile .ewert{color:#e8c07a;font:600 clamp(9px,1.05vw,12.5px)/1 ui-monospace,monospace}
+  .ezeile.stern{background:#232c22;box-shadow:inset 0 0 0 1px #3c5238}
+
   .ctrl{display:flex;gap:8px;align-items:center;padding:11px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
   .btn{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
     background:var(--home);color:#0B1018;border:0;border-radius:6px;padding:7px 17px;cursor:pointer}
@@ -286,7 +344,23 @@
         <div class="sd">Sudden Death 0:50</div>
         <div class="tbar r"><s id="thpR" style="width:100%"></s></div>
       </div>
-      <canvas id="cv" width="1240" height="470"></canvas>
+      <div class="arenaraum">
+        <canvas id="cv" width="1240" height="470"></canvas>
+        <!-- EINLAUF. Was vor dem Anpfiff zu sehen ist: wer gegen wen, auf welchem Platz
+             die beiden stehen, und wer wirklich auf dem Feld steht. Liegt ueber der
+             Leinwand und verschwindet beim Anpfiff. -->
+        <div class="einlauf" id="einlauf">
+          <div class="ewappen">
+            <div class="eteam" id="eteamL"></div>
+            <div class="egegen"><b id="edisz">TDM</b><em>6 gegen 6</em></div>
+            <div class="eteam r" id="eteamR"></div>
+          </div>
+          <div class="eaufstellung">
+            <div class="eliste" id="elisteL"></div>
+            <div class="eliste r" id="elisteR"></div>
+          </div>
+        </div>
+      </div>
       <div class="ctrl">
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>
@@ -746,12 +820,12 @@
   // Spannen; die haben den Gegner staerker gemacht, als er ist, und damit jede Aussage
   // ueber Leistung verzerrt. Team-TDM: 298,3 (Platz 21 von 32) gegen unsere 339,7 (Platz 12).
   const OPP=[
-    {n:"Volcanoth",c:"Charger",skills:FIGHTER,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.8,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
-    {n:"Ultralisk",c:"Charger",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.5,spurt:42.2},a:{power:72,health:84.5,stamina:93,intelligence:1.7,awareness:1.5,determination:1,speed:89,dexterity:28.2,charisma:1,will:36.1,spirit:14.8,torment:68.5}},
-    {n:"Lhyor",c:"Charger",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48.3,spurt:80.8},a:{power:72.8,health:64.1,stamina:70.4,intelligence:14.6,awareness:29.8,determination:70.8,speed:68.8,dexterity:97,charisma:67.7,will:46,spirit:4.6,torment:88.2}},
-    {n:"Nocture",c:"Charger",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73.2,stamina:74,intelligence:1,awareness:54,determination:25.9,speed:80.9,dexterity:32.2,charisma:12.9,will:12,spirit:3.1,torment:94}},
-    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
-    {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.2,spurt:37.9},a:{power:36.5,health:59.8,stamina:87.7,intelligence:47.8,awareness:42.6,determination:29.1,speed:91.9,dexterity:64.7,charisma:21.7,will:8.7,spirit:75.2,torment:25.9}}
+    {n:"Volcanoth",c:"Charger",skills:FIGHTER,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.9,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
+    {n:"Ultralisk",c:"Charger",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.3,spurt:42.1},a:{power:71,health:84,stamina:93,intelligence:2,awareness:2,determination:1,speed:89,dexterity:28,charisma:1,will:36,spirit:15,torment:68}},
+    {n:"Lhyor",c:"Charger",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48,spurt:80.8},a:{power:72,health:64,stamina:70,intelligence:15,awareness:30,determination:71,speed:68,dexterity:97,charisma:68,will:46,spirit:5,torment:88}},
+    {n:"Nocture",c:"Charger",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73,stamina:74,intelligence:1,awareness:54,determination:26,speed:81,dexterity:32,charisma:13,will:12,spirit:3,torment:94}},
+    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:54.6,spurt:21.6},a:{power:65,health:85,stamina:8,intelligence:62,awareness:21,determination:40,speed:11,dexterity:7,charisma:66,will:57,spirit:83,torment:52}},
+    {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.3,spurt:37.5},a:{power:37,health:60,stamina:87,intelligence:48,awareness:42,determination:29,speed:91,dexterity:64,charisma:22,will:9,spirit:75,torment:26}}
   ];
   const REC={
     power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
@@ -869,6 +943,67 @@
     o.push(b.selb>=70?"Vorsichtig":b.selb<=20?"Todesmutig":"Besonnen");
     return o.join(" · ");
   }
+  // ===================================================================================
+  // SLOTS STATT REIHEN.
+  //
+  // Front/Mitte/Backrow waren meine Erfindung. Das Spiel hat laengst echte Slot-Rollen
+  // (lib/lineups/matchday-slot-roles.ts), und die sagen mehr: sie legen fest, WELCHE
+  // Attribute in diesem Slot zaehlen. Ein Vanguard wird nach Power und Health bewertet,
+  // ein Shotcaller nach Charisma und Intelligence. Damit beeinflusst der Slot die
+  // Grundwerte des Spielers, statt nur zu sagen, wo er steht.
+  //
+  // Die Profile sind ABGESCHRIEBEN, nicht nachgebaut: resolveSlotRolesForDiscipline
+  // ("tdm","TDM",6) rechnet sie aus verschobenen Gewichten aus, die sich ueber alle
+  // sechs Slots zu null addieren. Diese Konstruktion hier nachzuprogrammieren hiesse,
+  // sie ein zweites Mal zu erfinden. Also: einmal vom echten Code ausgeben lassen,
+  // Zahlen uebernehmen. Bei der Anbindung ans Spiel ruft der Reiter die Funktion selbst.
+  const TDM_BASIS={power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2};
+  const SLOTS=[
+    {id:"vanguard",  label:"Vanguard",   reihe:0, ord:"mitlinie",
+     text:"Öffnet Teamfights mit Power und Health.", gross:"power", klein:"health", last:"stamina", mueh:"hoch",
+     profil:{power:33.4,health:23.4,determination:5.0,stamina:11.5,awareness:1.8,intelligence:5.0,charisma:8.3,spirit:9.9,torment:1.8}},
+    {id:"holdline",  label:"Hold Line",  reihe:0, ord:"mitlinie",
+     text:"Stabilisiert knappe Phasen mit Health und Determination.", gross:"health", klein:"determination", last:"stamina", mueh:"mittel",
+     profil:{power:24.8,health:25.4,determination:8.7,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:8.9,spirit:10.7,torment:1.9}},
+    {id:"breaker",   label:"Breaker",    reihe:1, ord:"verfolgen",
+     text:"Bricht Widerstand mit Power und Torment.", gross:"power", klein:"stamina", last:"awareness", mueh:"hoch",
+     profil:{power:35.0,health:17.7,determination:6.1,stamina:15.4,awareness:2.8,intelligence:6.3,charisma:6.2,spirit:7.7,torment:2.8}},
+    {id:"skirmisher",label:"Skirmisher", reihe:1, ord:"flanke",
+     text:"Sucht schnelle Picks und hält Tempo im Fight.", gross:"stamina", klein:"spirit", last:"health", mueh:"mittel",
+     profil:{power:24.5,health:17.5,determination:5.3,stamina:19.4,awareness:1.8,intelligence:5.3,charisma:8.8,spirit:15.4,torment:1.8}},
+    {id:"shotcaller",label:"Shotcaller", reihe:2, ord:"hinter",
+     text:"Ordnet den Fight über Intelligence und Charisma.", gross:"charisma", klein:"intelligence", last:"power", mueh:"niedrig",
+     profil:{power:25.6,health:18.3,determination:5.5,stamina:12.8,awareness:1.9,intelligence:8.7,charisma:14.4,spirit:11.0,torment:1.9}},
+    {id:"rallypoint",label:"Rally Point",reihe:2, ord:"hinter",
+     text:"Hebt Team-Momentum über Spirit und Charisma.", gross:"spirit", klein:"charisma", last:"power", mueh:"niedrig",
+     profil:{power:24.7,health:17.7,determination:5.4,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:13.4,spirit:17.3,torment:1.9}}
+  ];
+  const SLOTVON=Object.fromEntries(SLOTS.map(s2=>[s2.id,s2]));
+
+  // Gewichteter Attributschnitt — dieselbe Rechnung wie resolveWeightedAttributeScore.
+  function gewichtet(a,profil){ let s2=0,w=0;
+    for(const k in profil){const g=profil[k]||0; if(g>0&&a[k]!=null){s2+=g*a[k];w+=g;}}
+    return w?s2/w:0; }
+
+  // Der Slot-Aufschlag: wie viel besser (oder schlechter) die Attribute des Spielers im
+  // Profil dieses Slots dastehen als im Grundprofil der Disziplin. Faktor 2,2 und die
+  // Grenzen bei plus/minus 8,5 stammen aus SLOT_PROFILE_MODIFIER_SCALE im Spiel.
+  function slotAufschlag(p,slotId){
+    const s2=SLOTVON[slotId]; if(!s2)return 0;
+    const roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,TDM_BASIS))*2.2;
+    return Math.max(-8.5,Math.min(8.5,Math.round(roh*10)/10));
+  }
+  // Vier Stufen, wie Chris sie wollte. Die Grenzen sind gesetzt, nicht gemessen —
+  // sie teilen die Spanne von plus/minus 8,5 in perfekt, sehr gut, okay, passt nicht.
+  function passung(m){
+    if(m>=6)   return {k:"perfekt", t:"passt perfekt"};
+    if(m>=2)   return {k:"gut",     t:"passt sehr gut"};
+    if(m>=-2)  return {k:"okay",    t:"passt okay"};
+    return       {k:"schlecht",t:"passt gar nicht"};
+  }
+  const besterFuer=(slotId,frei)=>frei.map(p=>({p,m:slotAufschlag(p,slotId)}))
+    .sort((x,y)=>y.m-x.m)[0]||null;
+
   const ROWS=[{k:"Front",d:"vorderste Linie"},{k:"Mitte",d:"stützt beide Seiten"},{k:"Backrow",d:"geschützt hinten"}];
 
   const mische=(p,rez)=>{let s=0,w=0;for(const[at,wt]of Object.entries(rez)){s+=(p.a[at]||0)*wt;w+=wt;}
@@ -920,10 +1055,17 @@
     return{key:best,warum};
   }
   const persOf={},persWarum={};
-  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  [["Baumkopf Holzfaust",0,"mitlinie"],["Rustrow",0,"hinter"],["Greenkraut",0,"verfolgen"],
-   ["Buttercup",1,"mitlinie"],["Serris",1,"verfolgen"],["T Mask",1,"flanke"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
-  [["Remiel",1,"mitlinie"],["Riley Le Rogue",0,"mitlinie"],["Professor Paranoix",2,"decken"],["Marzipella",1,"hinter"]]
-    .forEach(([n,r,o])=>{place[n]={d:"spurt",row:r};order[n]=o;});
+  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste von allen 720 moeglichen Zuteilungen, gerechnet mit den
+  // echten Slot-Profilen. Baumkopf steht als Shotcaller, obwohl ihn das -2,3 kostet —
+  // er hat als Einziger die Charisma (75), und irgendwer muss den Slot fuellen. Genau
+  // solche Abwaegungen sollen sichtbar werden.
+  [["Greenkraut","vanguard"],["Rustrow","holdline"],["Serris","breaker"],
+   ["T Mask","skirmisher"],["Baumkopf Holzfaust","shotcaller"],["Buttercup","rallypoint"]]
+    .forEach(([n,sl])=>{place[n]={d:"tdm",slot:sl};order[n]=SLOTVON[sl].ord;});
+  // Spurt hat im Entwurf noch keine Slot-Rollen — die liegen im Spiel unter derselben
+  // Funktion bereit, sind hier aber nicht abgeschrieben. Bis dahin behelfsweise ohne Slot.
+  [["Remiel","mitlinie"],["Riley Le Rogue","mitlinie"],["Professor Paranoix","decken"],["Marzipella","hinter"]]
+    .forEach(([n,o])=>{place[n]={d:"spurt",slot:null};order[n]=o;});
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
@@ -958,7 +1100,7 @@
       r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
       r.appendChild(el("div","pico",p.n.slice(0,2).toUpperCase()));
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
-      nm.appendChild(el("span",null,pl?(pl.d===disc?ROWS[pl.row].k:"in "+DISCS[pl.d].label):"—"));
+      nm.appendChild(el("span",null,pl?(pl.d===disc?(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot):"in "+DISCS[pl.d].label):"—"));
       r.appendChild(nm);
       const t=p.d.tdm,s=p.d.spurt;
       r.appendChild(el("div","eg"+(t>=s?" best":""),t.toFixed(0)));
@@ -973,14 +1115,52 @@
   function renderBoard(){
     const pit=document.getElementById("pitch");pit.textContent="";
     const here=inDisc(disc);
-    ROWS.forEach((rw,ri)=>{
-      const z=el("div","zone"+(sel?" hot":""));
-      const h=el("div","zname");h.appendChild(el("span",null,rw.k));
-      h.appendChild(el("span",null,String(here.filter(p=>place[p.n].row===ri).length)));
+    const frei=SQUAD.filter(p=>!place[p.n]);
+    const gewaehlt=sel?SQUAD.find(p=>p.n===sel):null;
+    SLOTS.forEach((rw)=>{
+      const drin=here.filter(p=>place[p.n].slot===rw.id);
+      // Farbe nur, wenn ein Spieler gewaehlt oder gezogen wird: blau perfekt, gruen sehr
+      // gut, gelb okay, rot passt nicht. Ohne Auswahl bleibt die Tafel ruhig.
+      const mod=gewaehlt?slotAufschlag(gewaehlt,rw.id):null;
+      const pa=mod===null?null:passung(mod);
+      const z=el("div","zone slotzone"+(sel?" hot":"")+(pa?" pass-"+pa.k:""));
+      z.dataset.slot=rw.id;
+      const h=el("div","zname");
+      const links=el("span");links.appendChild(el("b",null,rw.label));
+      links.appendChild(el("i","slotfokus","+"+rw.gross+" +"+rw.klein+" · Last "+rw.last));
+      h.appendChild(links);
+      if(pa){const b=el("span","passmarke "+pa.k);b.textContent=(mod>0?"+":"")+mod.toFixed(1)+" · "+pa.t;h.appendChild(b);}
+      else h.appendChild(el("span",null,String(drin.length)+"/1"));
       z.appendChild(h);
-      here.filter(p=>place[p.n].row===ri).forEach(p=>{
+      z.appendChild(el("p","slottext",rw.text));
+      // Wie in der Arena: wenn der Slot leer ist, steht da, wer am besten hineinpasst.
+      if(!drin.length&&frei.length){
+        const b=besterFuer(rw.id,frei);
+        if(b){const v=el("div","slotvorschlag");
+          v.appendChild(el("span","vlabel","Bester Freier"));
+          v.appendChild(el("b",null,b.p.n));
+          v.appendChild(el("s",null,(b.m>0?"+":"")+b.m.toFixed(1)));
+          v.addEventListener("click",()=>{place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=rw.ord;sel=null;renderAll();});
+          z.appendChild(v);}
+      }
+      // Ablegen per Ziehen.
+      z.addEventListener("dragover",ev=>{ev.preventDefault();z.classList.add("ueber");});
+      z.addEventListener("dragleave",()=>z.classList.remove("ueber"));
+      z.addEventListener("drop",ev=>{ev.preventDefault();z.classList.remove("ueber");
+        const n=ev.dataTransfer.getData("text/plain"); if(!n)return;
+        // Slot ist besetzt? Dann tauschen die beiden die Plaetze.
+        const alt=here.find(x=>place[x.n].slot===rw.id&&x.n!==n);
+        const vorher=place[n]?place[n].slot:null;
+        if(alt&&vorher)place[alt.n]={d:disc,slot:vorher}; else if(alt)delete place[alt.n];
+        place[n]={d:disc,slot:rw.id}; if(!order[n])order[n]=rw.ord;
+        sel=null;renderAll();});
+      drin.forEach(p=>{
         const s=stats(p,disc);
         const u=el("div","unit");
+        u.draggable=true;
+        u.addEventListener("dragstart",ev=>{ev.dataTransfer.setData("text/plain",p.n);
+          ev.dataTransfer.effectAllowed="move";sel=p.n;renderBoard();});
+        u.addEventListener("dragend",()=>{sel=null;renderBoard();});
         const rm=el("button","rm","×");rm.setAttribute("aria-label","Entfernen");
         rm.addEventListener("click",ev=>{ev.stopPropagation();delete place[p.n];renderAll();});
         u.appendChild(rm);
@@ -1107,7 +1287,7 @@
       z.addEventListener("click",()=>{
         if(!sel)return;
         if(inDisc(disc).length>=DISCS[disc].size&&(!place[sel]||place[sel].d!==disc))return;
-        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="mitlinie";
+        place[sel]={d:disc,slot:rw.id};if(!order[sel])order[sel]=rw.ord;
         sel=null;renderAll();
       });
       pit.appendChild(z);
@@ -1374,12 +1554,19 @@
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     const mine=inDisc("tdm").slice(0,6);
-    const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[place[p.n].row].push(p));
+    const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[(SLOTVON[place[p.n].slot]||{reihe:1}).reihe].push(p));
+    // Der Slot verschiebt den Disziplinwert, aus dem die Kampfwerte gezogen werden.
+    // Damit beeinflusst die Aufstellung die Grundwerte wirklich, statt nur zu sagen,
+    // wer wo steht — genau das, was das Spiel mit roleModifier ohnehin schon tut.
+    const slotBonus={};
+    for(const p of mine){const sl=place[p.n]&&place[p.n].slot; slotBonus[p.n]=sl?slotAufschlag(p,sl):0;}
     let id=0;
     for(const row of[0,1,2]){
       byRow[row].forEach((p,i)=>{
         const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
-        const bh=behav(p.n);const eigWert=p.d.tdm;
+        // Der Disziplinwert des Spielers PLUS der Aufschlag seines Slots. Steht Baumkopf
+        // als Shotcaller, kostet ihn das 2,3 Punkte; als Vanguard braechte es ihm 2,1.
+        const bh=behav(p.n);const eigWert=p.d.tdm+(slotBonus[p.n]||0);
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -2599,6 +2786,65 @@
     requestAnimationFrame(loop);
   }
 
+
+  // ===================================================================================
+  // EINLAUF — was vor dem Anpfiff zu sehen ist.
+  //
+  // Wappen, Tabellenplatz und beide Aufstellungen. Die Zahlen stammen aus dem
+  // Spielstand (teams, season_states.standings): Armageddon Aftermath steht auf 31,
+  // die Blazing Beasts auf 29 von 32. Die Wappen liegen als statische Dateien unter
+  // /team-logos/<Kuerzel>.jpg — im Spiel laedt der Reiter sie von dort. Wird die Datei
+  // nicht gefunden (etwa beim Oeffnen ueber file://), tritt ein Monogramm an ihre
+  // Stelle, damit der Einlauf nie leer aussieht.
+  const VEREIN={
+    0:{name:"Armageddon Aftermath", kurz:"A-A", platz:31, punkte:0},
+    1:{name:"Blazing Beasts",       kurz:"B-B", platz:29, punkte:0}
+  };
+  const LIGAGROESSE=32;
+
+  function wappen(v){
+    const box=el("div");box.className="ewappenbild mono";box.textContent=v.kurz;
+    const im=new Image();
+    im.onload=()=>{ if(box.parentNode){const b=el("img");b.className="ewappenbild";
+      b.src=im.src;b.alt=v.name;box.parentNode.replaceChild(b,box);} };
+    im.src="/team-logos/"+v.kurz+".jpg";
+    return box;
+  }
+
+  function renderEinlauf(){
+    for(const seite of [0,1]){
+      const v=VEREIN[seite];
+      const k=document.getElementById(seite===0?"eteamL":"eteamR");
+      k.textContent="";
+      k.appendChild(wappen(v));
+      const txt=el("div");
+      txt.appendChild(el("h4",null,v.name));
+      const pl=el("p");pl.className="eplatz";
+      pl.appendChild(el("b","","Platz "+v.platz));
+      pl.appendChild(document.createTextNode(" von "+LIGAGROESSE+" · "+v.punkte+" Punkte"));
+      txt.appendChild(pl);
+      k.appendChild(txt);
+
+      // Die Aufstellung kommt aus DENSELBEN Einheiten, die gleich kaempfen — nicht aus
+      // einer zweiten Liste, die auseinanderlaufen koennte.
+      const liste=document.getElementById(seite===0?"elisteL":"elisteR");
+      liste.textContent="";
+      const feld=U.filter(u=>u.side===seite);
+      const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
+      for(const u of feld){
+        const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
+        const pl=place[u.n];
+        const rolle=(pl&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
+        z.appendChild(el("span","erolle",rolle.toUpperCase()));
+        z.appendChild(el("span","ename",u.n));
+        z.appendChild(el("span","ewert",u.eig.toFixed(1)));
+        liste.appendChild(z);
+      }
+    }
+    document.getElementById("edisz").textContent="TDM";
+  }
+  const zeigeEinlauf=(an)=>{const e=document.getElementById("einlauf");if(e)e.hidden=!an;};
+
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
     build();
@@ -2607,10 +2853,12 @@
     document.getElementById("arenaDisc").textContent="TDM · "+live(0).length+" gegen "+live(1).length;
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
     updateHud();draw();
+    renderEinlauf();zeigeEinlauf(true);
   }
 
   document.getElementById("play").addEventListener("click",()=>{
     if(done)reset();
+    zeigeEinlauf(false);
     running=!running;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
   });
