@@ -247,6 +247,7 @@
   .otaktik{font-style:normal;display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;
     background:var(--surface-2);color:var(--warn);font-size:9.5px;font-weight:600}
 
+  .etafel td.hovbar{cursor:help;text-decoration:underline dotted var(--faint) 1px;text-underline-offset:3px}
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1956,8 +1957,15 @@
     const box=document.getElementById("profStats");box.textContent="";
     const ex={LP:"hält "+(s.LP*12)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
-      TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · "+(0.5+s.TMP/120).toFixed(2)+" Schläge/s",
-      PRZ:Math.min(95,Math.max(40,Math.round(70+(s.PRZ-50)*0.3)))+" % Trefferchance gegen TMP 50",
+      // NACHGEPRUEFT gegen die Simulation. Zwei dieser Zeilen standen vorher auf eigenen
+      // Formeln, die es im Kampf nicht gibt: "0,5 + TMP/120 Schlaege/s" (die Arena kuerzt
+      // in Wahrheit die Abklingzeit des Skills um 30 %*TMP/(TMP+120)) und "70 + (PRZ-50)*0,3
+      // % Trefferchance" (die Arena wuerfelt eine Parade von 0,20 + (TMP_Ziel - PRZ)/300).
+      // Bei Baumkopf wichen sie um Faktor 4,7 beziehungsweise 10 Punkte ab.
+      TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · Abklingzeiten −"
+        +Math.round(0.30*s.TMP/(s.TMP+120)*100)+" %",
+      PRZ:Math.round(100-Math.max(5,Math.min(40,(0.20+(50-s.PRZ)/300)*100)))
+        +" % Treffer gegen TMP 50 · "+Math.round(s.PRZ/4)+" % kritisch",
       AUS:"verliert ab Sekunde 35 "+((100-s.AUS)*0.11).toFixed(2)+" % je Sekunde"};
     renderLevelUp(p);
     for(const k of KEYS){
@@ -2038,7 +2046,7 @@
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{}}});
       });
     }
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
@@ -2057,7 +2065,7 @@
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,...reichweiten(o.skills,false),stun:0,skills:kitVon(o.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{}}});
       });
     }
   }
@@ -2073,6 +2081,13 @@
   // Der Schild von Blessed Shield sitzt VOR den Lebenspunkten: er schluckt den bereits
   // geminderten Schaden. Was er schluckt, wird dem Zauberer als Heilung gutgeschrieben —
   // verhinderter Schaden ist derselbe Beitrag wie geheilter.
+  // Wer hat wem was getan. Ohne das ist "8.412 Schaden" eine Zahl ohne Adresse.
+  function gegenZaehler(u,name,feld,wert){
+    if(!u||!u.st)return;
+    const g=u.st.gegen[name]||(u.st.gegen[name]={dmg:0,erl:0,ko:0,cc:0});
+    g[feld]+=wert;
+  }
+
   function treffer(von,z,roh,sd){
     const d=Math.max(1,Math.round(roh*sd*(100/(100+z.VER))));
     // VERHINDERT: was seine Verteidigung von diesem Schlag weggenommen hat. Das ist keine
@@ -2081,6 +2096,7 @@
     // viel wert wie eine geheilte Lebenspunktezahl, und ein Tank steht endlich mit dem in
     // der Tabelle, wofuer er gebaut ist.
     z.st.tank+=roh*sd; z.st.verh+=roh*sd-d; von.st.dmg+=d;
+    gegenZaehler(von,z.n,"dmg",d); gegenZaehler(z,von.n,"erl",d);
     // Wer wie viel an diesem Gegner gearbeitet hat — fuer die Aufteilung der Ausschaltung.
     (z.anteile||(z.anteile=new Map())).set(von,(z.anteile.get(von)||0)+d);
     let rest=d;
@@ -2627,7 +2643,7 @@
           const bet=(sk.wirkung.find(x=>x.art==="betaeubung")||{}).dauer||0;
           for(const z of ziele){
             nahschlag(u,z,{basis:e.basis},(e.mult||1),kn,ziele.length>1?sk.name:null,sd);
-            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);u.st.cc+=bet;
+            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);u.st.cc+=bet;gegenZaehler(u,z.n,"cc",bet);
               schwebe({x:z.x,y:z.y-40,txt:"betäubt",life:.9});}
           }
           u.lunge=0.2;
@@ -2971,7 +2987,7 @@
               // der Anlauf begann — sonst fliegen die Getroffenen ihm entgegen statt weg.
               for(const f of bahn){
                 nahschlag(u,f,SKILLS.ram,1,SKILLS.ram.knock,"Battering Ram",sd);
-                f.stun=Math.max(f.stun,SKILLS.ram.stun);u.st.cc+=SKILLS.ram.stun;
+                f.stun=Math.max(f.stun,SKILLS.ram.stun);u.st.cc+=SKILLS.ram.stun;gegenZaehler(u,f.n,"cc",SKILLS.ram.stun);
                 schwebe({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
               }
               u.x=ex;u.y=ey;
@@ -3066,7 +3082,13 @@
     if(!anteile||!anteile.size){letzter.st.koAnteil+=1;return;}
     let summe=0; for(const w of anteile.values())summe+=w;
     if(summe<=0){letzter.st.koAnteil+=1;return;}
-    for(const [wer,w] of anteile)wer.st.koAnteil+=w/summe;
+    for(const [wer,w] of anteile){
+      wer.st.koAnteil+=w/summe;
+      // Beihilfe: wer am Ausschalten beteiligt war, aber nicht den letzten Schlag setzte.
+      // Dieselbe Quelle wie der KO-Anteil, also keine zweite Buchfuehrung.
+      if(wer!==letzter)wer.st.beihilfe++;
+    }
+    gegenZaehler(letzter,z.n,"ko",1);
   }
 
   // LEISTUNG beantwortet die eigentliche Frage: hat jemand geliefert, was sein Einsatzwert
@@ -3394,7 +3416,8 @@
   function impactVon(u){
     const st=u.st, tode=st.tode||0;
     const kampf = IMP_G.schaden*impS(st.dmg,IMP_R.schaden)
-                + IMP_STUECK.ko*(st.ko||0);
+                + IMP_STUECK.ko*(st.ko||0)
+                + IMP_STUECK.beihilfe*(st.beihilfe||0);
     const nutzen = IMP_G.heilung*impS(st.heal,IMP_R.heilung)
                  + IMP_G.schild*impS(st.schild,IMP_R.schild)
                  + IMP_G.kontrolle*impS(st.cc,IMP_R.kontrolle)
@@ -3405,6 +3428,34 @@
     let w = kampf + nutzen + ueber - abzug;
     if(w>IMP_KAPPE.weich) w = IMP_KAPPE.weich + (w-IMP_KAPPE.weich)*IMP_KAPPE.weichRest;
     return Math.round(Math.min(IMP_KAPPE.hart,w));
+  }
+
+  // Impact Zeile fuer Zeile, in derselben Gliederung wie das Vorbild:
+  // Kampf, Nutzen, Ueberleben, Abzuege — jeweils mit Menge und Referenz.
+  function impZerlegung(u){
+    const st=u.st, tode=st.tode||0, z=[];
+    const p=(x)=>(x>=0?"+":"")+Math.round(x);
+    const kampfD=IMP_G.schaden*impS(st.dmg,IMP_R.schaden);
+    const kampfK=IMP_STUECK.ko*(st.ko||0), kampfB=IMP_STUECK.beihilfe*(st.beihilfe||0);
+    z.push("KAMPF "+Math.round(kampfD+kampfK+kampfB));
+    z.push("  "+p(kampfD)+" Schaden ("+Math.round(st.dmg)+", Sättigung "+IMP_R.schaden+")");
+    z.push("  "+p(kampfK)+" Ausschaltungen ("+(st.ko||0)+" × "+IMP_STUECK.ko+")");
+    z.push("  "+p(kampfB)+" Beihilfen ("+(st.beihilfe||0)+" × "+IMP_STUECK.beihilfe+")");
+    const nH=IMP_G.heilung*impS(st.heal,IMP_R.heilung);
+    const nS=IMP_G.schild*impS(st.schild,IMP_R.schild);
+    const nC=IMP_G.kontrolle*impS(st.cc,IMP_R.kontrolle);
+    const nF=IMP_G.frontlinie*impS(st.tank,IMP_R.frontlinie)/(1+0.75*tode);
+    z.push("NUTZEN "+Math.round(nH+nS+nC+nF));
+    z.push("  "+p(nH)+" Heilung ("+Math.round(st.heal)+", Sättigung "+IMP_R.heilung+")");
+    z.push("  "+p(nS)+" Schild ("+Math.round(st.schild)+", Sättigung "+IMP_R.schild+")");
+    z.push("  "+p(nC)+" Kontrolle ("+(Math.round(st.cc*10)/10)+" s, Sättigung "+IMP_R.kontrolle+")");
+    z.push("  "+p(nF)+" Frontlinie ("+Math.round(st.tank)+" erlitten, Verfall ×"+(1+0.75*tode).toFixed(2)+")");
+    z.push("ÜBERLEBEN "+(tode===0?IMP_STUECK.ueberlebt:0));
+    z.push("ABZÜGE −"+Math.round(IMP_STUECK.tod*tode+(st.ff||0)));
+    z.push("  −"+IMP_STUECK.tod*tode+" Tode ("+tode+" × "+IMP_STUECK.tod+")");
+    const roh=kampfD+kampfK+kampfB+nH+nS+nC+nF+(tode===0?IMP_STUECK.ueberlebt:0)-IMP_STUECK.tod*tode-(st.ff||0);
+    if(roh>IMP_KAPPE.weich)z.push("Weicher Deckel: "+Math.round(roh)+" → "+Math.round(IMP_KAPPE.weich+(roh-IMP_KAPPE.weich)*IMP_KAPPE.weichRest));
+    return z;
   }
 
   function renderKader(){
@@ -3426,8 +3477,10 @@
     if(m)m.textContent=live(0).length+" : "+live(1).length;
   }
 
-  const ESPALTEN=[["K","ko"],["T","tode"],["CC","cc"],["H","heal"],["S","schild"],
+  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
                   ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
+  // Welche Spalten sich nach Gegner aufschluesseln lassen.
+  const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl"};
   function renderEndstand(){
     const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
     document.getElementById("esieger").textContent =
@@ -3446,14 +3499,29 @@
       for(const {u,imp} of reihen){
         const tr=el("tr",u.down?"tot":null);
         tr.appendChild(el("td",null,u.n));
-        for(const [,f] of ESPALTEN){
+        for(const [lab,f] of ESPALTEN){
           const v=u.st[f];
           // Eigenbeschuss zaehlt die Arena, aber er ist abgeschaltet — also bleibt die
           // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
-          if(f==="ff"&&!FREUNDBESCHUSS)tr.appendChild(el("td","leer","—"));
-          else tr.appendChild(el("td",null,String(Math.round(v||0))));
+          if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
+          const z=el("td",null,String(Math.round(v||0)));
+          const gf=GEGENFELD[f];
+          if(gf&&v){
+            const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
+              .filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]);
+            if(liste.length){
+              z.tabIndex=0; z.classList.add("hovbar");
+              tipOn(z,lab+" von "+u.n+" — gegen wen",
+                liste.map(([n,x])=>n+": "+Math.round(x*10)/10).join("\n"));
+            }
+          }
+          tr.appendChild(z);
         }
-        tr.appendChild(el("td","imp",String(imp)));
+        // Impact aufgeschluesselt, wie es das Vorbild im Tooltip zeigt.
+        const iz=el("td","imp",String(imp));
+        iz.tabIndex=0;
+        tipOn(iz,"Impact "+imp+" — woraus er besteht",impZerlegung(u).join("\n"));
+        tr.appendChild(iz);
         tb.appendChild(tr);
       }
       t.appendChild(tb); box.appendChild(t);
