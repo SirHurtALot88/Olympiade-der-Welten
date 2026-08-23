@@ -15,6 +15,10 @@ import {
   type SeasonRatingsSlicePlayerRow,
 } from "@/lib/foundation/season-ratings-slice";
 import { buildPlayerAttributeVisibilityResolver } from "@/lib/foundation/server-player-visibility";
+import { buildMarktwertHerleitung, type MarktwertHerleitung } from "@/lib/foundation/marktwert-herleitung";
+import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
+import { buildMarketValueDisciplineInputsFromPlayers } from "@/lib/player-formulas/league-market-value-snapshot";
+import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
 
 export type PlayerDirectoryPerformanceRow = Pick<
   PlayerSeasonPerformanceSummary,
@@ -97,6 +101,21 @@ export type PlayerDirectorySliceResponse = {
    * `buildExpectedSellValueByPlayerId`).
    */
   sellValueByPlayerId: Record<string, ExpectedSellValueEntry>;
+  /**
+   * Zerlegung des Marktwerts je Kaderspieler — der Hover auf der MW-Spalte (Chris' Punkt 6).
+   *
+   * Warum vom Server und nicht im Browser gerechnet: die Zerlegung braucht den ligaweiten Rang des
+   * Spielers in JEDER Disziplin und die Tabelle `rank-to-discipline-market-value.json`. Die ist
+   * 222 KB gross und liegt heute in keinem Client-Bundle; sie fuer einen Hover hineinzuziehen
+   * waere ein schlechter Tausch. Eine gekuerzte Tabelle waere schlimmer — sie ergaebe eine ZWEITE,
+   * leicht andere Zahl neben der gezeigten, und genau das ist eine Zeile weiter oben schon einmal
+   * als schlechtere Loesung verworfen worden.
+   *
+   * NUR KADERSPIELER, aus Groessengruenden am Live-Abbild nachgemessen: ueber alle 2984 Spieler
+   * waeren es 1163 KB, ueber die 328 Kaderspieler 128 KB — dieselbe Groessenordnung wie
+   * `sellValueByPlayerId` daneben. Fuer einen vereinslosen Spieler faellt der Hover weg.
+   */
+  marketValueBreakdownByPlayerId: Record<string, MarktwertHerleitung>;
   count: number;
 };
 
@@ -127,6 +146,34 @@ function buildDisciplinePointsByPlayerId(
     }
   }
   return result;
+}
+
+/**
+ * Zerlegt den Marktwert jedes KADERSPIELERS in seine Rangbeitraege (siehe Feldkommentar oben).
+ *
+ * Die Engine rankt ohnehin die ganze Liga — anders ginge es auch nicht, der Rang IST der ligaweite.
+ * Weggeworfen wird erst danach: gespeichert werden nur die Zeilen der Spieler, die im Kader stehen.
+ */
+function buildMarketValueBreakdownByPlayerId(gameState: GameState): Record<string, MarktwertHerleitung> {
+  const ergebnis = calculateMarketValueFromRankTable({
+    players: buildMarketValueDisciplineInputsFromPlayers(gameState.players),
+    rankToDisciplineMarketValue: loadPlayerFormulaSources().rankToDisciplineMarketValue,
+  });
+  // Fehlt die Rangtabelle, gibt es keine Zerlegung — und dann bleibt der Hover leer, statt eine
+  // Herleitung zu erfinden. Dieselbe Regel wie bei den Saisonstand-Hovers.
+  if (ergebnis.status !== "ready") {
+    return {};
+  }
+  const imKader = new Set(gameState.rosters.map((eintrag) => eintrag.playerId));
+  const zeilen: Record<string, MarktwertHerleitung> = {};
+  for (const fixture of ergebnis.players) {
+    if (!imKader.has(fixture.playerId)) continue;
+    const herleitung = buildMarktwertHerleitung(fixture);
+    if (herleitung) {
+      zeilen[fixture.playerId] = herleitung;
+    }
+  }
+  return zeilen;
 }
 
 function toPerformanceRow(summary: PlayerSeasonPerformanceSummary): PlayerDirectoryPerformanceRow {
@@ -218,6 +265,15 @@ export function maskPlayerDirectorySliceForRequestingTeam(input: {
       ([playerId]) => resolveVisibility(playerId) === "exact",
     ),
   );
+  // Die MW-Zerlegung nennt je Disziplin den ligaweiten RANG — das ist die Disziplinstaerke des
+  // Spielers, nur anders ausgedrueckt, und die ist fog-gated (`maskRatingsRowForVisibility`). Der
+  // Marktwert selbst bleibt sichtbar; erklaert wird er nur dort, wo man die Werte ohnehin sehen
+  // duerfte. Sonst waere der Hover ein Scouting-Bericht zum Nulltarif.
+  const marketValueBreakdownByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.marketValueBreakdownByPlayerId ?? {}).filter(
+      ([playerId]) => resolveVisibility(playerId) === "exact",
+    ),
+  );
 
   return {
     ...input.payload,
@@ -226,6 +282,7 @@ export function maskPlayerDirectorySliceForRequestingTeam(input: {
     careerStatsByPlayerId,
     disciplinePointsByPlayerId,
     sellValueByPlayerId,
+    marketValueBreakdownByPlayerId,
   };
 }
 
@@ -270,6 +327,10 @@ export function buildPlayerDirectorySliceFromPersisted(input: {
     // Rostern/Vertraegen — ohne die gibt es keinen Verkaufswert. Leer statt geraten:
     // der Client faellt dann auf seine eigene Rechnung zurueck (siehe Feldkommentar).
     sellValueByPlayerId: {},
+    // Dieselbe Lage: die Zerlegung braucht `players` mit ihren Disziplinwerten (fuer die
+    // ligaweiten Raenge) und `rosters` (fuer den Zuschnitt). Der Projektions-Pfad hat beides
+    // nicht. Leer heisst hier: kein Hover — nicht „Marktwert ohne Bestandteile".
+    marketValueBreakdownByPlayerId: {},
     count: Object.keys(ratingsByPlayerId).length,
   };
 }
@@ -322,6 +383,7 @@ export function buildPlayerDirectorySlice(input: {
     sellValueByPlayerId: Object.fromEntries(
       buildExpectedSellValueByPlayerId(input.gameState, { saveId: input.saveId }),
     ),
+    marketValueBreakdownByPlayerId: buildMarketValueBreakdownByPlayerId(input.gameState),
     count: Object.keys(ratingsSlice.ratingsByPlayerId).length,
   };
 }

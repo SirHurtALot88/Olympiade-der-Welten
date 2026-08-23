@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Spieltag · Aufstellung",
+      "pr": null,
+      "text": "Die Reste des abgeschalteten Team-Power-Systems verschwinden aus den Spielständen. Die Mechanik war längst aus, aber die Daten lagen weiter da — über alle Spielstände 2131 gespeicherte Powers, dazu 13 Aufstellungs-Entwürfe, die noch eine ausgewählte Power nannten. Sichtbar wurde das an Kleinigkeiten wie der Speichern-Meldung, die „1 Power“ für etwas zählte, das nirgends mehr wählbar ist. Beim nächsten Laden oder Speichern räumt sich jeder Spielstand von selbst auf, und es wächst nichts mehr nach.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Was ist neu",
       "pr": null,
       "text": "Der Reiter „Was ist neu“ sortiert wieder richtig. 47 Einträge standen am Ende unter „Ohne Einstufung“, obwohl in der Quelle eine Einstufung stand — sie trug nur ein Wort, das das Spiel gar nicht kennt (etwa „normal“ oder „klein“ statt „Behoben“ oder „Feinschliff“). Unbekannte Wörter wurden stillschweigend verworfen, deshalb fiel es nie auf. Alle 47 sind jetzt einsortiert, und ein neuer Prüflauf lässt ein erfundenes Wort nicht mehr durch.",
@@ -17,6 +26,15 @@
       "text": "Ein abgebrochener Kauflauf lässt sich jetzt fortsetzen. Bisher fragte die Sperre nur „existiert irgendein Transfer dieser Saison?“ und stieg dann für die ganze Liga aus — ein einziger gekaufter Spieler galt damit als erledigte Saison. Am Spielstand nachgemessen war genau das passiert: von 33 Transfers hatten 22 Teams etwas bekommen, zehn gingen leer aus, und jeder weitere Versuch inklusive des manuellen Klicks auf „KI picken“ tat folgerichtig nichts. Übrig blieben 25 Teams unter ihrer Zielgröße, 58 fehlende Spieler und sieben Teams exakt auf ihrem Minimum — bei elf Einsatzplätzen je Spieltag konnten die nicht einmal vollständig aufstellen. Die Sperre fragt jetzt je Team und nach dem, was sie eigentlich meint: ein Team am Ziel bleibt unangetastet, ein Team darunter ist unerledigte Arbeit und wird bedient. Gegen den echten Spielstand gemessen kauft derselbe Aufruf damit 43 Spieler für 19 Teams, wo er vorher nichts tat. Nebenbei behoben: auch ein einzelner eigener Transfer des Spielers zählte in diese Sperre und schaltete die KI-Käufe der ganzen Liga für den Rest der Saison ab.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "In der Spielerliste erklärt sich jetzt auch der Marktwert selbst. Fährst du mit der Maus darüber, siehst du, woraus er sich zusammensetzt: Der Marktwert ist keine geschätzte Größe, sondern eine Summe — für jede der zwanzig Disziplinen wird der Spieler gegen die ganze Liga gerankt, und jeder Rang ist etwas wert. Gezeigt werden die fünf stärksten Ränge einzeln, der Rest als eine Zeile, darunter die Summe. Daran liest du ab, ob ein Spieler von einem Spitzenplatz in wenigen Disziplinen lebt oder von solider Breite — und wo sich Training am ehesten lohnt. Die Zahlen gehen dabei genau auf: was im Hover steht, ergibt zusammen exakt den Marktwert daneben.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.5"
     },
     {

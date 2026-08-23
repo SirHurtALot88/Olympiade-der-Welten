@@ -72,6 +72,7 @@ import {
 } from "@/lib/season/season-economy-factors";
 import { slimGameStateForWrite } from "@/lib/persistence/save-payload-slimming";
 import { migrateLegacyPreseasonManagementPhase } from "@/lib/season/season-transition-chain";
+import { raeumeAbgeschalteteTeamPowers } from "@/lib/lineups/team-powers";
 import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import type {
   PersistedSaveGame,
@@ -1457,8 +1458,23 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
    * bestehenden Spielstand erreicht. Idempotent wie die vier Nachzüge darüber — wer einen Modus
    * hat, behält ihn; wer keinen Kaderplatz hat, bekommt keinen.
    */
-  const gameState = applyDefaultTrainingFieldsToRosteredPlayers(gameStateWithNula);
+  const gameStateWithTraining = applyDefaultTrainingFieldsToRosteredPlayers(gameStateWithNula);
   mark("applyDefaultTrainingFieldsToRosteredPlayers done");
+  /**
+   * ALTE TEAM-POWER-DATEN RAEUMEN — auf Chris' Ansage vom 23.08.2026 („die alten teamPowers
+   * können raus").
+   *
+   * Dieselbe Begruendung wie beim Trainingsmodus zwei Zeilen darueber: der Ladeweg ist die
+   * Stelle, die JEDEN bestehenden Spielstand erreicht, auch die, die gerade niemand spielt. Der
+   * Generator ist parallel dazu stillgelegt (`ensureLocalTeamPowersForSeason` raeumt jetzt selbst,
+   * statt nachzuerzeugen) — ohne das waere die Raeumung hier eine Tretmuehle: Aufstellung laden,
+   * KI-Stapellauf und Spieltagsabschluss haetten die Records sofort wieder hingeschrieben.
+   *
+   * Idempotent, und mit einem billigen Ausstieg: liegt nichts mehr da, kommt DIESELBE Referenz
+   * zurueck und dieser Schritt kostet nichts.
+   */
+  const gameState = raeumeAbgeschalteteTeamPowers(gameStateWithTraining);
+  mark("raeumeAbgeschalteteTeamPowers done");
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
@@ -1702,17 +1718,23 @@ function createPersistedSaveRecord(input: {
   // gesunden Wuerfen, der byte-identische Zwilling der Saison-Spielerwerte). Beim SCHREIBEN und
   // nicht beim Lesen — so kostet es einmal ein paar Millisekunden statt bei jedem Laden, und
   // bestehende Spielstaende schrumpfen beim naechsten Speichern von selbst.
-  const guardedGameState: GameState = applyDefaultTrainingFieldsToRosteredPlayers(
+  const guardedGameState: GameState = raeumeAbgeschalteteTeamPowers(
+    // TEAM-POWERS AUCH BEIM SCHREIBEN, aus demselben Grund wie der Trainingsmodus eine Zeile
+    // tiefer: der Sitzungs-Cache haelt sonst den ungeraeumten Stand am Leben. Ausserdem verlassen
+    // die Records den Spielstand so wirklich — ein Nachzug nur beim Lesen wuerde sie beim
+    // naechsten Schreiben unveraendert zurueckschreiben.
+    applyDefaultTrainingFieldsToRosteredPlayers(
     // TRAININGSMODUS AUCH BEIM SCHREIBEN — sonst haelt der Sitzungs-Cache die Luecke am Leben.
     // Der Nachzug beim Laden (siehe `materializePersistedSave`) erreicht bestehende Spielstaende,
     // aber `saveGameState` legt seinen Rueckgabewert in `writeSaveSessionCache` ab; ein Lauf, der
     // speichert und gleich wieder liest, bekaeme sonst weiter den ungeheilten Stand. Beide Wege
     // brauchen den Nachzug, und er ist idempotent — der zweite Aufruf aendert nichts mehr.
-    slimGameStateForWrite({
-      ...normalizedGameState,
-      playerBaselines: guardedBaselineWrite.baselines,
-      baselineWriteGuardEvents,
-    }),
+      slimGameStateForWrite({
+        ...normalizedGameState,
+        playerBaselines: guardedBaselineWrite.baselines,
+        baselineWriteGuardEvents,
+      }),
+    ),
   );
 
   const upsertSave = database.prepare(`
