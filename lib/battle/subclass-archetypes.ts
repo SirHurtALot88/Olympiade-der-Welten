@@ -173,6 +173,76 @@ export const ZUORDNUNGEN: readonly Zuordnung[] = [
     warum: "Datenrest aus dem Import, kein Spielbegriff. Bleibt ohne Zuordnung, damit der Fehler sichtbar bleibt." },
 ];
 
+/**
+ * VERFEINERUNG AM BILD.
+ *
+ * Die Zuordnung oben gilt für eine UNTERKLASSE. Das Spielerbild sagt etwas über einen
+ * EINZELNEN Spieler — und ist damit die stärkere Quelle, sobald es vorliegt. Chris:
+ * "vielleicht kannst du die mit den Bildern noch mehr spezifizieren."
+ *
+ * Deshalb steht die Verfeinerung hier daneben und nicht in der Tabelle: sie überschreibt
+ * die Vereinigung für genau diesen Spieler, ohne die allgemeine Regel anzufassen. Ein
+ * anderer Hunter kann weiterhin eine Armbrust tragen.
+ *
+ * Die Bilder liegen in Chris' Dropbox unter "Mark VI Cardgame/Spieler/". Aus dieser
+ * Sitzung heraus sind sie NICHT abrufbar — der Egress-Proxy blockt
+ * dropboxusercontent.com —, sie kamen einzeln über den Chat. Wer hier etwas ändert,
+ * braucht das Bild dazu.
+ */
+export interface Bildbefund {
+  readonly spieler: string;
+  /** Was auf dem Bild zu sehen ist. Beobachtung, keine Deutung. */
+  readonly bild: string;
+  /** Die Archetypen, die nach dem Bild übrig bleiben — ersetzt die Vereinigung. */
+  readonly archetypen: readonly string[];
+  /** Was das Bild ausschließt und warum. */
+  readonly schliesstAus: string;
+}
+
+export const BILDBEFUNDE: readonly Bildbefund[] = [
+  {
+    spieler: "Cassandra",
+    bild: "Rothaarige Elfe mit LANGBOGEN und Köcher, grüner Umhang, leichte Rüstung, Wald.",
+    archetypen: ["Bowman", "Hunter"],
+    schliesstAus:
+      "Crossbowman: sie trägt einen Bogen, keine Armbrust. Genau die Frage, die Chris am Beispiel Hunter gestellt hat — hier ist sie beantwortet. Thunderclaw und Barbarian (aus Jungle) fallen weg: sie ist Fernkämpferin, kein Nahkämpfer.",
+  },
+  {
+    spieler: "Draco",
+    bild: "Schwere Schuppenpanzerung mit gehörntem Helm, große Streitaxt und Schild, Drache im Hintergrund.",
+    archetypen: ["Blackguard", "Crusader", "Frost Knight", "Halberdier"],
+    schliesstAus:
+      "Bowman, Hunter und Goblin Archer (kamen aus der Unterklasse Scout): er ist voll gepanzerter Nahkämpfer mit Axt und Schild. Auch Reaver, Barbarian und Voidfist fallen weg — die tragen keine schwere Platte.",
+  },
+  {
+    spieler: "Krag'Zul",
+    bild: "Riesiger Koloss aus Kristallschollen, violette Energie in Brust und Rissen, unbewaffnet, Gewitterhimmel.",
+    archetypen: ["Bullbreaker", "Lightning Mage", "Conjurer"],
+    schliesstAus:
+      "Orc Warrior und Barbarian: er ist kein Humanoider mit Waffe, sondern ein unbewaffneter Koloss. Die Unterklasse Mage zeigt sich als Energie im Körper, nicht als Stab — deshalb bleiben zwei Magierwege stehen, aber kein Stabträger.",
+  },
+  {
+    spieler: "Rhyx'Tal",
+    bild: "Massiges Steinwesen mit Echsenkopf und glühenden Augen, unbewaffnet, kauert in einer Höhle; an den Wänden gezeichnete Porträts, Kristalle ringsum.",
+    archetypen: ["Bullbreaker", "Voidfist"],
+    schliesstAus:
+      "Lancer, Halberdier, Ice Mage, Conjurer und Necromancer: er führt keine Waffe und wirkt nichts — er schlägt mit den Händen. Die Zeichnungen an der Höhlenwand passen zur Unterklasse Isolated und zu den Eigenschaften Caring und Timid, machen ihn aber nicht zum Beschwörer.",
+  },
+  {
+    spieler: "Seraph-11",
+    bild: "Mechanischer Vogel aus Metall mit leuchtendem Kern im Rumpf, Nebel und Vollmond.",
+    archetypen: ["Priest", "Cleric"],
+    schliesstAus:
+      "Blackguard, Bullbreaker und Frost Knight (kamen aus Guardian): keine Rüstung, keine Waffe, kein Panzer. Der leuchtende Kern passt zu den beiden Lichtwegen — und das sind genau die zwei Kits, die schon vorliegen.",
+  },
+];
+
+const BEFUND_NACH_SPIELER = new Map(BILDBEFUNDE.map((b) => [b.spieler, b] as const));
+
+export function bildbefundVon(spieler: string): Bildbefund | undefined {
+  return BEFUND_NACH_SPIELER.get(spieler);
+}
+
 const NACH_UNTERKLASSE = new Map(ZUORDNUNGEN.map((z) => [z.unterklasse, z] as const));
 const ARCHETYP_NACH_NAME = new Map(ARCHETYPES.map((a) => [a.name, a] as const));
 
@@ -187,7 +257,14 @@ export function zuordnungVon(unterklasse: string): Zuordnung | undefined {
  * neuen der zweiten, und so fort. Damit steht der naheliegendste Archetyp vorn, und
  * zwei Aufrufe liefern nie eine andere Reihenfolge.
  */
-export function archetypenFuer(unterklassen: readonly string[]): readonly Archetype[] {
+export function archetypenFuer(unterklassen: readonly string[], spieler?: string): readonly Archetype[] {
+  // Liegt ein Bild vor, gilt das Bild. Es ist die konkretere Quelle.
+  const befund = spieler ? BEFUND_NACH_SPIELER.get(spieler) : undefined;
+  if (befund) {
+    return befund.archetypen
+      .map((n) => ARCHETYP_NACH_NAME.get(n))
+      .filter((a): a is Archetype => Boolean(a));
+  }
   const gesehen = new Set<string>();
   const raus: Archetype[] = [];
   for (const u of unterklassen) {
@@ -203,6 +280,6 @@ export function archetypenFuer(unterklassen: readonly string[]): readonly Archet
 }
 
 /** Wie viele Wege einem Spieler offenstehen — je mehr Unterklassen, desto breiter. */
-export function poolBreite(unterklassen: readonly string[]): number {
-  return archetypenFuer(unterklassen).length;
+export function poolBreite(unterklassen: readonly string[], spieler?: string): number {
+  return archetypenFuer(unterklassen, spieler).length;
 }

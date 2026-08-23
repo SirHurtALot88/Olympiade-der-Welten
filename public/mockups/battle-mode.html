@@ -652,24 +652,37 @@
     // Vigilante Wranglers. Rasse gibt Kopf, Hautton und Aufsaetze, die Klasse gibt
     // Ruestung und Waffe: Warlord, Templar, Hero und Tank tragen Platte, Berserker,
     // Rogue und Sprinter Leder, Bard, Mage und Overseer die Kapuze.
-    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
+    // Bild: schwere Schuppenpanzerung, GEHOERNTER Helm, Streitaxt und Schild, Drache im
+    // Hintergrund. Hoerner dazu; eine Axt haben wir als Ebene nicht, das Schwert vertritt sie.
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"schwert"},
     "Lava Golem":         {kopf:"orc",  haut:"black",ruest:"plate",hoerner:true,waffe:"schwert"},
     "Krolach":            {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
     "Johanna":            {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
     "King Arlen Morgolor":{kopf:"human",haut:"amber",ruest:"plate",waffe:"schwert"},
     "Gram":               {kopf:"lizard",haut:"dark_green",ruest:"plate",schwanz:true,waffe:"schwert"},
-    "Rhyx'Tal":           {kopf:"alien",haut:"lavender",ruest:"leder",waffe:"schwert"},
+    // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
+    // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
+    "Rhyx'Tal":           {kopf:"lizard",haut:"black",ruest:"plate"},
     "Xelara":             {kopf:"alien",haut:"blue",ruest:"leder",kapuze:true},
     "Jorund":             {kopf:"human",haut:"olive",ruest:"leder",kapuze:true},
     "Inefinna":           {kopf:"human",haut:"light",ruest:"leder",kapuze:true},
     "Lulu":               {kopf:"human",haut:"light",ruest:"leder",ohren:true,kapuze:true},
     // Armageddon Aftermath.
     "Greenkraut":         {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
-    "Krag'Zul":           {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
+    // Bild: Koloss aus Kristallschollen mit violetter Energie, UNBEWAFFNET. Kein Ork, kein
+    // Schwert: die Zacken werden zu Hoernern, die Platte bleibt als Kristallpanzer.
+    "Krag'Zul":           {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true},
     "Tidesprinter":       {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true,waffe:"schwert"},
-    "Seraph-11":          {kopf:"human",haut:"lavender",ruest:"leder",kapuze:true},
+    // Bild: mechanischer VOGEL mit leuchtendem Kern. Einen Vogel haben wir als Ebene nicht —
+    // bis dahin ein schmaler, unbewaffneter Kapuzentraeger in Metallton. Das ist ein
+    // Platzhalter und keine Abbildung; er gehoert auf die Liste der fehlenden Sprites.
+    "Seraph-11":          {kopf:"alien",haut:"fur_grey",ruest:"leder",kapuze:true},
     "Ralazar the Balanced":{kopf:"human",haut:"brown",ruest:"leder",kapuze:true},
-    "Cassandra":          {kopf:"human",haut:"amber",ruest:"leder",kapuze:true}
+    // Bild: rothaarige ELFE mit LANGBOGEN und Koecher, gruener Umhang, leichte Ruestung.
+    // Genau Chris' Frage von vorhin, am Bild beantwortet: Bogen, keine Armbrust. Sie ist
+    // damit die erste echte Fernkaempferin im Feld — deshalb traegt ihr Eintrag im Kader
+    // jetzt auch fern:true, sonst rennt eine Bogenschuetzin in den Nahkampf.
+    "Cassandra":          {kopf:"human",haut:"light",ruest:"leder",ohren:true,waffe:"bogen"}
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
 
@@ -934,7 +947,26 @@
     return {wert:Math.round(w), jeSekunde:Math.round(w/zeit*10)/10, zeit:Math.round(zeit*100)/100, teile};
   }
 
-  // PLATZHALTERKIT FUER ALLE. Bis eben hatten drei von zwoelf Spielern ein Kit und neun
+  // PLATZHALTERKIT FUER ALLE — UND WARUM CASSANDRA TROTZ BOGEN KEINE AUSNAHME IST.
+  //
+  // Ihr Bild zeigt eindeutig eine Bogenschuetzin mit Koecher; ihr Sprite traegt den Bogen
+  // deshalb auch. Das Kit bleibt trotzdem der Nahkampf-Platzhalter, und zwar aus einem
+  // gemessenen Grund, nicht aus Bequemlichkeit:
+  //
+  //   fern:true mit MATRIARCH  -> Leistung 142 % auf 65 %. Sie steht auf Distanz und hat
+  //                               nichts, womit sie sie nutzen koennte. Widerspruechlich.
+  //   fern:true mit ARCHER     -> Leistung auf 128 %, V-W verliert 24 von 24 statt 12.
+  //
+  // Der zweite Fall ist kein Spielerbefund, sondern ein KIT-Ungleichgewicht: die statische
+  // Nutzwerttabelle gibt Shoot 12,9 je Sekunde und Slash 7,3 — wer als Einziger im Feld das
+  // Bogenkit traegt, entscheidet die Partie ueber sein Kit, nicht ueber seine Werte. Genau
+  // dagegen wurde der einheitliche Satz eingefuehrt.
+  //
+  // Der Befund zum Bild steht also in lib/battle/subclass-archetypes.ts (Cassandra ->
+  // Bowman, Hunter; Crossbowman ausgeschlossen) und im Sprite. Das Kit folgt, sobald die
+  // Karten Bowman und Hunter vorliegen — dann traegt sie einen echten Bogensatz, und die
+  // anderen elf ebenfalls ihren eigenen.
+  // Bis eben hatten drei von zwoelf Spielern ein Kit und neun
   // gar keins — und die drei waren von mir willkuerlich gewaehlt. Damit mass jede Serie
   // vor allem, wer zufaellig Skills hatte: mit gleichem Kit auf beiden Seiten sank die
   // Kampfdauer von 15 auf 24 s und die Ergebnisse wurden erst vergleichbar.
@@ -1697,13 +1729,14 @@
         const pz=(x)=>(x>=0?"+":"")+x+" %";
         const wz=el("span","prozente");
         const teile=[
-          ["Leben",(s.LP*12)+"",  "Er hält "+(s.LP*12)+" Schaden aus, bevor er ausscheidet ("+s.LP+" × 12)."],
+          ["Leben",Math.round(s.LP*LEBEN_JE_LP)+"",  "Er hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus, bevor er ausscheidet ("+s.LP+" × "+LEBEN_JE_LP+")."],
           ["Angriff",pz(Math.round((s.ANG/50-1)*100)),
             "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+s.ANG+"."],
           ["Minderung",Math.round(s.VER/(s.VER+100)*100)+" %",
             "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+s.VER+". Genau die Kurve, die auch im Vorbild steht."],
           ["Tempo",pz(Math.round(((40+s.TMP*1.4)/110-1)*100)),
-            "Laufgeschwindigkeit gegenüber einem Spieler mit Tempo 50. Dazu verkürzt Tempo jede Abklingzeit um "+Math.round(0.30*s.TMP/(s.TMP+120)*100)+" %."],
+            "Laufgeschwindigkeit gegenüber einem Spieler mit Tempo 50. Tempo verkürzt KEINE Abklingzeit — "
+            +"es entscheidet nur, wer zuerst da ist. Die Spanne folgt den Klassenkarten (SPD 91 bis 140 auf einer Stufe)."],
           ["Ausdauer",(s.AUS*2)+"",  "Vorrat für Ausdauer-Skills ("+s.AUS+" × 2). Die Nachfüllrate kommt aus dem Kit seiner Klasse."],
           ["Mana",(s.MANA*2)+"",  "Vorrat für Mana-Skills ("+s.MANA+" × 2), abgeleitet aus Geist 45, Verstand 35, Wille 20."],
         ];
@@ -1768,9 +1801,13 @@
             const schaden=einzel
               ? (sk.schuss?sk.schuss+" × "+einzel+" Rohschaden":einzel+" Rohschaden (Basis "+sk.basis+" "+(s.ANG>=50?"+":"")+Math.round((s.ANG/50-1)*100)+" % Angriff)")
               : "kein Schaden";
-            const kuerzung=0.30*s.TMP/(s.TMP+120);
+            // Die Abklingzeit ist die des Kits, PUNKT. Hier stand vorher "Kit 0,3 s minus
+            // 27 % aus Tempo" und damit 1,09 s bei einem schnellen Spieler — eine Rechnung,
+            // die die Arena seit dem Tempo-Umbau nicht mehr fuehrt. Chris hat es an der
+            // Erklaerungsseite gesehen: "auf deiner erklaerungs seite steht es noch mit
+            // 1,09s drin, das ist einfach falsch." Genau so war es.
             const rhythmus=sk.cd
-              ? "Abklingzeit "+(sk.cd*(1-kuerzung)).toFixed(2)+" s (Kit "+sk.cd+" s minus "+Math.round(kuerzung*100)+" % aus Tempo "+s.TMP+")"
+              ? "Abklingzeit "+sk.cd.toFixed(2)+" s (fest aus dem Kit — Tempo verkürzt sie nicht)"
               : "keine Abklingzeit";
             tipOn(b,sk.name+" · "+sk.stufe,
               sk.text+" "+schaden+" · "+rhythmus+
@@ -1894,17 +1931,21 @@
     return inDisc("tdm").slice(0,6).map(p=>{
       const s=stats(p,"tdm");
       const fern=p.fern===true,heiler=istHeiler(p);
-      // Schlagfolge: der Fernkaempfer haengt an der Abklingzeit seines Schusses,
-      // der Nahkaempfer an seinem Tempo. Beides sind die Formeln der Simulation.
-      // Dieselbe Rechnung wie in der Arena: Basisschaden des Grundangriffs mal Angriffswert,
-      // geteilt durch die Abklingzeit, die sein Tempo daraus macht.
+      // Schlagfolge: Basisschaden des Grundangriffs mal Angriffswert, geteilt durch die
+      // Abklingzeit des Kits. Tempo steht hier NICHT mehr drin — es beschleunigt den
+      // Angriff nicht mehr, und die Vorschau darf nichts anderes behaupten als der Kampf.
       const sk=fern?SKILLS.shoot:((p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)?SKILLS[(p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)]:GRUNDSCHLAG);
-      const cd=sk.cd*(1-0.30*s.TMP/(s.TMP+120));
+      const cd=sk.cd;
       const roh=sk.basis*(s.ANG/50);
       return {n:p.n,c:p.c,fern,heiler,eig:p.d.tdm,TMP:s.TMP,
         dps:heiler?0:Math.round(roh/cd),
-        hps:heiler?Math.round(12*(s.ANG/50)*0.9/cd):0,
-        zaeh:Math.round(s.LP*12*(1+s.VER/100))};
+        // Heilung nach der Karte: HEILUNG.basis mal Angriffswert, je HEILTAKT (Abklingzeit
+        // PLUS Ansagezeit). Vorher standen hier 12 und 0,9 — Zahlen aus einer Fassung, die
+        // es nicht mehr gibt.
+        hps:heiler?Math.round(HEILUNG.basis*(s.ANG/50)/HEILTAKT):0,
+        // LEBEN_JE_LP steht seit den Klassenkarten auf 4, nicht auf 12. Diese Anzeige hat
+        // die Zaehigkeit also dreifach ueberschaetzt.
+        zaeh:Math.round(s.LP*LEBEN_JE_LP*(1+s.VER/100))};
     });
   }
 
@@ -2171,15 +2212,17 @@
     const p=SQUAD[0],s=stats(p,"tdm");
     document.getElementById("profSub").textContent=p.c+" · "+p.r+" · Eignung TDM "+p.d.tdm.toFixed(1);
     const box=document.getElementById("profStats");box.textContent="";
-    const ex={LP:"hält "+(s.LP*12)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
+    // NACHGEPRUEFT gegen die Simulation — zum zweiten Mal, und zum zweiten Mal stimmte es
+    // nicht. Diese Zeilen sind der Ort, an dem die Erklaerung der Mechanik hinterherhinkt:
+    // sie standen noch auf Leben mal 12 (heute 4, siehe LEBEN_JE_LP) und auf einer
+    // Tempo-Verkuerzung der Abklingzeit von bis zu 30 % (heute null, siehe cdKuerzung).
+    // Ein Spieler las hier 1,09 s Abklingzeit fuer Slash, waehrend die Arena mit 0,3 s
+    // rechnete. Wer eine Zahl anzeigt, die der Kampf nicht fuehrt, erklaert nichts — er
+    // luegt praezise.
+    const ex={LP:"hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus",
+      ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
-      // NACHGEPRUEFT gegen die Simulation. Zwei dieser Zeilen standen vorher auf eigenen
-      // Formeln, die es im Kampf nicht gibt: "0,5 + TMP/120 Schlaege/s" (die Arena kuerzt
-      // in Wahrheit die Abklingzeit des Skills um 30 %*TMP/(TMP+120)) und "70 + (PRZ-50)*0,3
-      // % Trefferchance" (die Arena wuerfelt eine Parade von 0,20 + (TMP_Ziel - PRZ)/300).
-      // Bei Baumkopf wichen sie um Faktor 4,7 beziehungsweise 10 Punkte ab.
-      TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · Abklingzeiten −"
-        +Math.round(0.30*s.TMP/(s.TMP+120)*100)+" %",
+      TMP:Math.round(KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)+" px/s Marschtempo · beschleunigt den Angriff nicht",
       AUS:"verliert ab Sekunde 35 "+((100-s.AUS)*0.11).toFixed(2)+" % je Sekunde"};
     renderLevelUp(p);
     for(const k of KEYS){
