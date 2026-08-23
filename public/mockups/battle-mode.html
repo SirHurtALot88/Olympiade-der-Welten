@@ -455,10 +455,17 @@
     {n:"Byrnja",c:"Overseer",r:"Construct",sub:["Servant","Apparition"],tp:[],tn:["FaintHearted","Manipulative","ColdBlooded"],d:{tdm:7.6,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:29,awareness:25,determination:11,speed:16,dexterity:18,charisma:21,will:8,spirit:28,torment:15}},
     {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
   ];
+  // DIE ECHTEN BLAZING BEASTS aus dem laufenden Spielstand — Attribute, Klassen,
+  // Unterklassen und Eigenschaften eins zu eins. Vorher standen hier von mir gesetzte
+  // Spannen; die haben den Gegner staerker gemacht, als er ist, und damit jede Aussage
+  // ueber Leistung verzerrt. Team-TDM: 298,3 (Platz 21 von 32) gegen unsere 339,7 (Platz 12).
   const OPP=[
-    {n:"Skarn",c:"Matriarch",skills:MATRIARCH,lo:64,hi:79,row:0,ord:"mitlinie",jagd:true},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke",jagd:true},
-    {n:"Brambleaux",c:"Tank",lo:52,hi:66,row:0,ord:"hinter"},{n:"Nixie",c:"Bard",lo:33,hi:49,row:2,ord:"decken"},
-    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"mitlinie"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke",jagd:true}
+    {n:"Volcanoth",c:"Charger",r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.8,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
+    {n:"Ultralisk",c:"Berserker",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.5,spurt:42.2},a:{power:72,health:84.5,stamina:93,intelligence:1.7,awareness:1.5,determination:1,speed:89,dexterity:28.2,charisma:1,will:36.1,spirit:14.8,torment:68.5}},
+    {n:"Lhyor",c:"Berserker",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48.3,spurt:80.8},a:{power:72.8,health:64.1,stamina:70.4,intelligence:14.6,awareness:29.8,determination:70.8,speed:68.8,dexterity:97,charisma:67.7,will:46,spirit:4.6,torment:88.2}},
+    {n:"Nocture",c:"Berserker",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73.2,stamina:74,intelligence:1,awareness:54,determination:25.9,speed:80.9,dexterity:32.2,charisma:12.9,will:12,spirit:3.1,torment:94}},
+    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
+    {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.2,spurt:37.9},a:{power:36.5,health:59.8,stamina:87.7,intelligence:47.8,awareness:42.6,determination:29.1,speed:91.9,dexterity:64.7,charisma:21.7,will:8.7,spirit:75.2,torment:25.9}}
   ];
   const REC={
     power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
@@ -866,10 +873,40 @@
     const heiler=v.filter(x=>x.hps>0).sort((a,b)=>b.hps-a.hps)[0];
     const pz=(x)=>Math.round(x*100)+" %";
 
-    let name,grund,flanker,ziel;
-    const kopf=planZwang?planZwang==="kopf":(anteil>=0.30&&top.zaeh<medianZaeh);
-    const heil=planZwang?planZwang==="heiler":(heiler&&heiler.hps*4>gesamt);
-    if(kopf){
+    // WERT JE AUFWAND. Auf einen dicken Tank einfach draufzurennen ist keine Taktik: man
+    // verbringt die halbe Kampfzeit damit, den zu entfernen, der am wenigsten anrichtet,
+    // waehrend sein Team in Ruhe arbeitet.
+    //
+    // Der richtige Massstab ist nicht "wer ist zaeh", sondern wie viel Wirkung man je
+    // Arbeit bekommt: Schaden je Sekunde geteilt durch die wirksamen Lebenspunkte, die man
+    // dafuer wegraeumen muss. Nachgerechnet an dieser Aufstellung kostet Baumkopf rund 30
+    // Sekunden Arbeit fuer 28 Schaden je Sekunde, Serris 13 Sekunden fuer 27. Serris zuerst
+    // ist damit mehr als doppelt so viel wert — und der Tank bleibt von selbst zuletzt
+    // uebrig, ohne dass man ihn zum Sonderfall erklaeren muesste.
+    // Wirkung ist Schaden ODER Heilung — ein Heiler mit 0 Schaden ist nicht wertlos, sonst
+    // steht im Nenner eine Null und die Kennzahl explodiert (gemessen: das 77338-fache).
+    const wirkung=(x)=>Math.max(x.dps,x.hps*0.9,1);
+    const wertJeAufwand=(x)=>wirkung(x)/Math.max(1,x.zaeh);
+    const nachWert=[...v].sort((a,b)=>wertJeAufwand(b)-wertJeAufwand(a));
+    const spreizung=wertJeAufwand(nachWert[0])/Math.max(1e-6,wertJeAufwand(nachWert[nachWert.length-1]));
+    const zaehste=nachWert[nachWert.length-1];
+
+    let name,grund,flanker,ziel,felsName=null;
+    const wand=planZwang?planZwang==="fels":spreizung>=2;
+    const kopf=planZwang?planZwang==="kopf":(!wand&&anteil>=0.30&&top.zaeh<medianZaeh);
+    const heil=planZwang?planZwang==="heiler":(!wand&&heiler&&heiler.hps*4>gesamt);
+    if(wand){
+      // Zwei binden den Zaehesten, vier raeumen nach Wert ab. Erst wenn sonst niemand mehr
+      // steht, ist er dran — dann aber zu sechst statt einzeln.
+      flanker=0; ziel="lohnend"; felsName=zaehste.n;
+      const zeit=(x)=>Math.round(x.zaeh/wirkung(x));
+      name="Lohnendste zuerst";
+      grund=zaehste.n+" kostet rund "+zeit(zaehste)+" s Arbeit für "+Math.round(wirkung(zaehste))+
+        " Wirkung je Sekunde, "+nachWert[0].n+" nur "+zeit(nachWert[0])+" s für "+Math.round(wirkung(nachWert[0]))+
+        " — das "+spreizung.toFixed(1)+"-fache je Aufwand. Zwei binden "+zaehste.n+
+        ", die anderen vier räumen von oben nach unten nach diesem Verhältnis ab. Er kommt "+
+        "zuletzt, dafür gemeinsam.";
+    }else if(kopf){
       // Ein weicher Spitzenschaden ist die lohnendste Investition, die es gibt.
       flanker=anteil>=0.42?5:4;
       ziel="bedrohung";
@@ -895,15 +932,25 @@
 
     // ZUTEILUNG. Die Zaehesten halten vorn — sie sollen binden, nicht toeten. Aussen
     // herum gehen die Schnellsten, weil der Umweg Zeit kostet und die Zeit ihr Preis ist.
-    const nachZaeh=[...OPP].map((o,i)=>({o,i,zaeh:o.lo+o.hi})).sort((a,b)=>b.zaeh-a.zaeh);
-    const haltend=new Set(nachZaeh.slice(0,OPP.length-flanker).map(x=>x.o.n));
+    const nachZaeh=[...OPP].map((o,i)=>({o,i,zaeh:(o.a.health||0)+(o.a.stamina||0)+(o.a.will||0)})).sort((a,b)=>b.zaeh-a.zaeh);
     const zuteilung={};
+    if(felsName){
+      // Die zwei Zaehesten binden den Fels, der Rest sucht die weichen Ziele.
+      const binder=new Set(nachZaeh.slice(0,2).map(x=>x.o.n));
+      for(const o of OPP){
+        zuteilung[o.n]=binder.has(o.n)
+          ?{ord:"mitlinie",zielP:"fels",rolle:"bindet "+felsName}
+          :{ord:"mitlinie",zielP:"lohnend",rolle:"räumt nach Wert je Aufwand"};
+      }
+      return {name,grund,zuteilung,vorschau:v,flanker,felsName};
+    }
+    const haltend=new Set(nachZaeh.slice(0,OPP.length-flanker).map(x=>x.o.n));
     for(const o of OPP){
       zuteilung[o.n]=haltend.has(o.n)
         ?{ord:"mitlinie",zielP:"naechster",rolle:"hält die Linie"}
         :{ord:"flanke",zielP:ziel,rolle:"geht außen herum"};
     }
-    return {name,grund,zuteilung,vorschau:v,flanker};
+    return {name,grund,zuteilung,vorschau:v,flanker,felsName};
   }
 
   let PLAN=null;
@@ -929,7 +976,7 @@
       const r=el("div","oppline");
       const l=el("div");l.appendChild(el("b",null,o.n));
       l.appendChild(el("small",null,o.c+" · "+ORDERS.find(x=>x[0]===ord)[1]+(z?" — "+z.rolle:"")));
-      r.appendChild(l);r.appendChild(el("span","rng",o.lo+"–"+o.hi));
+      r.appendChild(l);r.appendChild(el("span","rng",o.d.tdm.toFixed(1)));
       box.appendChild(r);
     });
     const ap=document.getElementById("arenaplan");
@@ -1026,43 +1073,26 @@
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:p.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
-        // GEGNER AUS IHREM EIGENEN EINSATZWERT.
-        //
-        // Vorher waren sie aus den STAERKSTEN Kaderwerten abgeleitet, mal 1,0-1,18, und das
-        // Tempo noch einmal mal 1,25. Ueber 24 Kaempfe gemessen hat unsere Seite damit 96 %
-        // verloren, und alle sechs sind in fast jedem Kampf gestorben. Damit war jede
-        // Leistungszahl wertlos: wer in einem verlorenen Kampf frueh faellt, sieht schlecht
-        // aus, egal wie gut er ist. Baumkopfs 54 % waren eine Aussage ueber die Ansetzung,
-        // nicht ueber ihn.
-        //
-        // Richtig ist die einfachste Regel: ein Gegner mit Einsatzwert 71,5 ist so stark wie
-        // UNSER Spieler mit 71,5. Genommen wird der Kaderspieler, dessen Eignung am
-        // naechsten liegt, mit einer Streuung von plusminus 9 % — sonst waeren beide Teams
-        // Klone voneinander.
-        const eigW=(o.lo+o.hi)/2;
-        const base=[...SQUAD].reduce((b,x)=>Math.abs(x.d.tdm-eigW)<Math.abs(b.d.tdm-eigW)?x:b);
-        const s0=stats(base,"tdm");
-        const f=0.91+rr()*0.18;
-        const s={LP:Math.round(s0.LP*f),ANG:Math.round(s0.ANG*f),VER:Math.round(s0.VER*f),
-          TMP:Math.round(Math.min(99,s0.TMP*f)),PRZ:Math.round(s0.PRZ*f),AUS:Math.round(s0.AUS*f),
-          MANA:Math.round(s0.MANA*f)};
+        // Die Gegner rechnen jetzt aus IHREN EIGENEN Attributen — dieselbe Formel wie unsere
+        // Spieler, kein Klon eines Kaderspielers mehr und kein Aufschlag von aussen.
+        const s=stats(o,"tdm");
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
         const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
-        U.push({id:id++,n:o.n,side:1,row,eig:(o.lo+o.hi)/2,ord:z.ord,zielP:z.zielP,heiler:o.heiler===true,...s,
+        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm,ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
   }
@@ -1086,6 +1116,8 @@
     // viel wert wie eine geheilte Lebenspunktezahl, und ein Tank steht endlich mit dem in
     // der Tabelle, wofuer er gebaut ist.
     z.st.tank+=roh*sd; z.st.verh+=roh*sd-d; von.st.dmg+=d;
+    // Wer wie viel an diesem Gegner gearbeitet hat — fuer die Aufteilung der Ausschaltung.
+    (z.anteile||(z.anteile=new Map())).set(von,(z.anteile.get(von)||0)+d);
     let rest=d;
     if(z.schild>0){
       const weg=Math.min(z.schild,rest);
@@ -1129,7 +1161,7 @@
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,crit||!!label);
-    if(tg.hp===0&&!tg.down){tg.down=true;u.st.ko++;feed(tg.side,tg.n+" ist ausgeschieden.",true);}
+    if(tg.hp===0&&!tg.down){tg.down=true;u.st.ko++;verteileKo(tg,u);feed(tg.side,tg.n+" ist ausgeschieden.",true);}
   }
 
   // EINE UHR FUER ALLE.
@@ -1277,6 +1309,19 @@
       if(u.zielP==="naechster")return nearest(foes);
       if(u.zielP==="hinten"){const bk=foes.filter(f=>f.row===2);if(bk.length)return nearest(bk);}
       if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
+      // "fels": genau den binden, den der Plan benannt hat.
+      if(u.zielP==="fels"&&PLAN&&PLAN.felsName){
+        const f=foes.find(x=>x.n===PLAN.felsName); if(f)return f;
+      }
+      // "lohnend": das beste Verhaeltnis aus dem, was jemand anrichtet, und dem, was es
+      // kostet ihn zu entfernen. Der Zaehste bleibt aussen vor, bis sonst niemand mehr
+      // steht — dann greifen ihn alle gemeinsam an.
+      if(u.zielP==="weich"||u.zielP==="lohnend"){
+        const wert=(x)=>(x.ANG*(x.heiler?0.9:1))/Math.max(1,x.hp*(1+x.VER/100));
+        const rest=PLAN&&PLAN.felsName?foes.filter(x=>x.n!==PLAN.felsName):foes;
+        const pool=rest.length?rest:foes;
+        return pool.reduce((b,x)=>wert(x)>wert(b)?x:b);
+      }
     }
     // Grundneigung aus der Persoenlichkeit
     if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
@@ -1355,7 +1400,7 @@
         const fremd=pf.von.tgt&&pf.von.tgt!==z&&!pf.von.tgt.down;
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,crit);
-        if(z.hp===0&&!z.down){z.down=true;pf.von.st.ko++;feed(z.side,z.n+" ist ausgeschieden.",true);}
+        if(z.hp===0&&!z.down){z.down=true;pf.von.st.ko++;verteileKo(z,pf.von);feed(z.side,z.n+" ist ausgeschieden.",true);}
         pf.tot=true;
         continue;
       }
@@ -1793,7 +1838,21 @@
   // Eingesteckte: verhinderte Punkte sind dasselbe wie geheilte, waehrend "ich wurde
   // beschossen" fuer sich genommen noch keine Leistung ist — es zaehlt nur, weil in dieser
   // Zeit niemand anderes beschossen wurde.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.verh+u.st.tank*0.15+u.st.ko*140;
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
+
+  // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
+  //
+  // Vorher bekam die Ausschaltung ganz, wer zufaellig zuletzt getroffen hat. Der Tank, der
+  // jemanden ueber zwanzig Sekunden weichgeklopft hat, ging leer aus. Jetzt wird der Punkt
+  // nach dem Schadensanteil geteilt — die Zahl in der KO-Spalte bleibt der letzte Schlag,
+  // weil der sich zaehlen laesst, aber die LEISTUNG rechnet mit dem Anteil.
+  function verteileKo(z,letzter){
+    const anteile=z.anteile;
+    if(!anteile||!anteile.size){letzter.st.koAnteil+=1;return;}
+    let summe=0; for(const w of anteile.values())summe+=w;
+    if(summe<=0){letzter.st.koAnteil+=1;return;}
+    for(const [wer,w] of anteile)wer.st.koAnteil+=w/summe;
+  }
 
   // LEISTUNG beantwortet die eigentliche Frage: hat jemand geliefert, was sein Einsatzwert
   // verspricht? Erwartet wird der Anteil, den seine Eignung am Feld ausmacht. 100 heisst
@@ -1992,23 +2051,26 @@
   function serie(n,zwang){
     planZwang=zwang||null;
     const summe={},alt={U,pfeile,t,done,seed,freigabe};
-    let siege=0,dauer=0;
+    let siege=0,dauer=0; const ergebnisse={};
     for(let i=0;i<n;i++){
       build(1337+i*7919);
       let g=0;
       while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
       dauer+=t;
       if(live(0).length>live(1).length)siege++;
+      // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
+      const e=(6-live(1).length)+":"+(6-live(0).length);
+      ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
       for(const u of feld){
         const s=summe[u.n]||(summe[u.n]={n:u.n,seite:u.side,eig:u.eig,dmg:0,heal:0,verh:0,tank:0,ko:0,leist:0,tod:0});
-        s.dmg+=u.st.dmg;s.heal+=u.st.heal;s.verh+=u.st.verh;s.tank+=u.st.tank;s.ko+=u.st.ko;
+        s.dmg+=u.st.dmg;s.heal+=u.st.heal;s.verh+=u.st.verh;s.tank+=u.st.tank;s.ko+=u.st.koAnteil;
         s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
       }
     }
     U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
-    return {plan:gewaehlt,laeufe:n,siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
+    return {plan:gewaehlt,laeufe:n,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
       reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
         dmg:Math.round(s.dmg/n),heal:Math.round(s.heal/n),verh:Math.round(s.verh/n),
         tank:Math.round(s.tank/n),ko:+(s.ko/n).toFixed(2),leist:Math.round(s.leist/n),
