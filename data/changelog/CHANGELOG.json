@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Spieltag · Aufstellung",
+      "pr": null,
+      "text": "Die Reste des abgeschalteten Team-Power-Systems verschwinden aus den Spielständen. Die Mechanik war längst aus, aber die Daten lagen weiter da — über alle Spielstände 2131 gespeicherte Powers, dazu 13 Aufstellungs-Entwürfe, die noch eine ausgewählte Power nannten. Sichtbar wurde das an Kleinigkeiten wie der Speichern-Meldung, die „1 Power“ für etwas zählte, das nirgends mehr wählbar ist. Beim nächsten Laden oder Speichern räumt sich jeder Spielstand von selbst auf, und es wächst nichts mehr nach.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Was ist neu",
       "pr": null,
       "text": "Der Reiter „Was ist neu“ sortiert wieder richtig. 47 Einträge standen am Ende unter „Ohne Einstufung“, obwohl in der Quelle eine Einstufung stand — sie trug nur ein Wort, das das Spiel gar nicht kennt (etwa „normal“ oder „klein“ statt „Behoben“ oder „Feinschliff“). Unbekannte Wörter wurden stillschweigend verworfen, deshalb fiel es nie auf. Alle 47 sind jetzt einsortiert, und ein neuer Prüflauf lässt ein erfundenes Wort nicht mehr durch.",
