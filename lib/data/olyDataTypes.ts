@@ -1875,6 +1875,41 @@ export type ScoutingWatchlistEntry = {
   note?: string | null;
 };
 
+/**
+ * EIN LESEZEICHEN — nicht zu verwechseln mit der Scouting-Beobachtungsliste.
+ *
+ * GEWUENSCHT (Chris): „man sollte sich aussuchen können welche teams getrackt werden, dass man so
+ * ne wishlist option bei teams und spielern hat wie so lesezeichen und sich die dann noch mal
+ * angucken kann".
+ *
+ * WARUM NICHT DIE VORHANDENE `ScoutingWatchlistEntry` ERWEITERT WURDE — die ist etwas anderes,
+ * und der Unterschied faellt erst auf, wenn man sie missbraucht:
+ *
+ *   - sie haengt an einer SAISON (`seasonId`) und ist beim Saisonwechsel weg,
+ *   - sie hat eine Platzgrenze (`scouting-wishlist-slots.ts`),
+ *   - und sie blendet jeden Spieler aus, der in EINEM Kader steht — sie ist eine Liste von
+ *     TRANSFERZIELEN, und ein Spieler mit Vertrag ist keins mehr.
+ *
+ * Genau das darf ein Lesezeichen nicht tun: wer sich den eigenen Aufsteiger merkt, will ihn beim
+ * naechsten Blick wiederfinden und nicht feststellen, dass er verschwunden ist, weil man ihn
+ * gekauft hat.
+ *
+ * AM BESITZER, NICHT AM TEAM. Die Merkliste ist eine Ansichts-Vorliebe, keine Spieltatsache: im
+ * Koop fuehrt Chris seine eigene und Franky seine, und keiner sieht oder ueberschreibt die des
+ * anderen. Ohne Anmeldung (Solo) gibt es genau einen Eimer — `ownerId` steht dann auf null.
+ */
+export type MerklisteArt = "team" | "spieler";
+
+export type MerklisteEintrag = {
+  art: MerklisteArt;
+  /** Team-ID oder Spieler-ID, je nach `art`. */
+  id: string;
+  /** Besitzer der Liste. `null` = Solo/ohne Anmeldung, ein einziger gemeinsamer Eimer. */
+  ownerId: string | null;
+  angelegtAm: string;
+  notiz?: string | null;
+};
+
 export type TeamSeasonObjectiveStatus = "open" | "completed" | "failed" | "at_risk";
 
 export type TeamSeasonObjectiveRecord = {
@@ -3520,6 +3555,12 @@ export type GameState = {
   appliedEventIds?: string[];
   seasonReviewState?: unknown;
   preSeasonWorkflowState?: unknown;
+  /**
+   * Lesezeichen auf Teams und Spieler, je Besitzer. BEWUSST AUF DER OBERSTEN EBENE und nicht in
+   * `seasonState`: die Liste ueberlebt den Saisonwechsel, das ist ihr halber Zweck. Siehe
+   * `MerklisteEintrag` und lib/merkliste/merkliste-service.ts.
+   */
+  merkliste?: MerklisteEintrag[];
   season: Season;
   seasonState: SeasonState;
   matchdayState: MatchdayState;
