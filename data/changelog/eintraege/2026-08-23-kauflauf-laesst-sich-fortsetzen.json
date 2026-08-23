@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Transfermarkt · KI",
+  "text": "Ein abgebrochener Kauflauf lässt sich jetzt fortsetzen. Bisher fragte die Sperre nur „existiert irgendein Transfer dieser Saison?“ und stieg dann für die ganze Liga aus — ein einziger gekaufter Spieler galt damit als erledigte Saison. Am Spielstand nachgemessen war genau das passiert: von 33 Transfers hatten 22 Teams etwas bekommen, zehn gingen leer aus, und jeder weitere Versuch inklusive des manuellen Klicks auf „KI picken“ tat folgerichtig nichts. Übrig blieben 25 Teams unter ihrer Zielgröße, 58 fehlende Spieler und sieben Teams exakt auf ihrem Minimum — bei elf Einsatzplätzen je Spieltag konnten die nicht einmal vollständig aufstellen. Die Sperre fragt jetzt je Team und nach dem, was sie eigentlich meint: ein Team am Ziel bleibt unangetastet, ein Team darunter ist unerledigte Arbeit und wird bedient. Gegen den echten Spielstand gemessen kauft derselbe Aufruf damit 43 Spieler für 19 Teams, wo er vorher nichts tat. Nebenbei behoben: auch ein einzelner eigener Transfer des Spielers zählte in diese Sperre und schaltete die KI-Käufe der ganzen Liga für den Rest der Saison ab.",
+  "gewicht": "spielblockierend",
+  "version": "0.5"
+}

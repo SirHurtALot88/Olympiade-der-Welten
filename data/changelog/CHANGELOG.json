@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Transfermarkt · KI",
+      "pr": null,
+      "text": "Ein abgebrochener Kauflauf lässt sich jetzt fortsetzen. Bisher fragte die Sperre nur „existiert irgendein Transfer dieser Saison?“ und stieg dann für die ganze Liga aus — ein einziger gekaufter Spieler galt damit als erledigte Saison. Am Spielstand nachgemessen war genau das passiert: von 33 Transfers hatten 22 Teams etwas bekommen, zehn gingen leer aus, und jeder weitere Versuch inklusive des manuellen Klicks auf „KI picken“ tat folgerichtig nichts. Übrig blieben 25 Teams unter ihrer Zielgröße, 58 fehlende Spieler und sieben Teams exakt auf ihrem Minimum — bei elf Einsatzplätzen je Spieltag konnten die nicht einmal vollständig aufstellen. Die Sperre fragt jetzt je Team und nach dem, was sie eigentlich meint: ein Team am Ziel bleibt unangetastet, ein Team darunter ist unerledigte Arbeit und wird bedient. Gegen den echten Spielstand gemessen kauft derselbe Aufruf damit 43 Spieler für 19 Teams, wo er vorher nichts tat. Nebenbei behoben: auch ein einzelner eigener Transfer des Spielers zählte in diese Sperre und schaltete die KI-Käufe der ganzen Liga für den Rest der Saison ab.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Arena",
+      "pr": null,
+      "text": "Teams und Spieler lassen sich jetzt merken — ein Stern am Teamnamen und an jedem Spieler in der Kadertabelle, wie ein Lesezeichen. Die Tafel vor dem Anpfiff wurde dafür neu gebaut: die beiden Disziplin-Kästen wiederholten bisher nur den Namen der Disziplin und zeigen jetzt, wer von den eigenen Athleten dort antritt, mit Slot, Kapitänsstern und einem Zähler, der grün wird, sobald die Seite voll ist. Die Tabelle darunter hieß „Dein Umfeld\" und zeigte nur ein automatisch vergebenes Verbündet oder Rivale — sie heißt jetzt „Beobachtete Teams\", enthält die menschlich geführten und alles Gemerkte, und sagt in der letzten Spalte, warum ein Team dort steht. Der Block mit den drei leeren Medaillenkreisen ist ersatzlos weg; die Namen der noch fehlenden Teams stehen jetzt oben beim Wartestatus, wo sie hingehören.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Team · Kader",
       "pr": null,
       "text": "B-P und V-V streben jetzt einen Spieler mehr an — B-P 11 statt 10, V-V 12 statt 11. Gemeldet war, dass beide im Spiel abfallen, weil sie nicht rotieren können; am Spielstand nachgemessen war es schlimmer als das: beide standen bei acht Spielern, während ein Spieltag elf verlangt. Sie konnten also nicht bloß nicht rotieren, sie konnten nicht einmal vollständig aufstellen. Über die ganze Liga gerechnet hängt der Rang deutlich an der Kadergröße (Korrelation −0,72); die sieben Teams mit acht Spielern belegten die Ränge 19, 23, 27, 28, 29, 31 und 32, B-P davon Rang 27 und V-V Rang 28. Am Geld lag es nicht, beide hatten über 40 Mio Cash. Die Zielgröße steht im Identitätsblatt, laufende Spielstände ziehen also von selbst nach; wirksam wird sie, sobald wieder eingekauft wird. Für die übrigen 30 Teams gilt die bisherige Regel unverändert.",
