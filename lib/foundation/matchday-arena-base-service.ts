@@ -233,11 +233,23 @@ export async function loadMatchdayArenaBase(input: {
     // zeigt damit exakt das, was am Ende jeder Disziplin in den Saisonstand wandert.
     // Fehlt sie (Feld noch unvollstaendig, Snapshot durch geaenderte Aufstellungen
     // verfallen), wird wie bisher live gerechnet; dann ist es eben nur eine Vorschau.
-    const snapshot = readMatchdayResolveSnapshot(save.gameState, {
-      saveId: save.saveId,
-      seasonId: params.seasonId,
-      matchdayId: params.matchdayId,
-    });
+    //
+    // `zweck: "anzeigen"` ist hier entscheidend. GEMELDET VON CHRIS: kurz nach dem Buchen zeigte
+    // die Arena andere Zahlen und getauschte Plaetze (Malagor 98,8 → 92,1, S-S 14,9 → 14,2,
+    // C-S 14,4 → 14,9). Grund: ein durchgebuchter Spieltag machte die Vorberechnung ungueltig,
+    // und die Kette unten rechnete den Spieltag LIVE neu — gegen den Zustand NACH der Buchung,
+    // also mit der Nach-Spieltags-Fatigue, die derselbe Apply gerade geschrieben hatte. Zum
+    // ANZEIGEN gilt deshalb der Buchungsstempel: die gebuchte Rechnung ist die richtige, und eine
+    // Neuberechnung waere per Konstruktion eine andere.
+    const snapshot = readMatchdayResolveSnapshot(
+      save.gameState,
+      {
+        saveId: save.saveId,
+        seasonId: params.seasonId,
+        matchdayId: params.matchdayId,
+      },
+      { zweck: "anzeigen" },
+    );
     resolvePreview =
       snapshot?.payload ??
       readArenaPreviewCache<LegacyMatchdayResolvePreviewPayload>(resolveCacheKey, cacheSignature) ??

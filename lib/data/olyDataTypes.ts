@@ -2561,6 +2561,27 @@ export type MatchdayResolveSnapshotRecord = {
     }
   >;
   payload: unknown;
+  /**
+   * GESETZT, SOBALD GENAU DIESE RECHNUNG GEBUCHT WURDE — mit der Ergebnis-ID, in die sie floss.
+   *
+   * GEMELDET VON CHRIS an der Arena: „Screenshot 1 zeigt die Ergebnisse. Screenshot 2 zeigt andere
+   * ergebnisse ungefähr ne Minute später nachdem gebucht wurde. […] ich will keinen switch mehr
+   * sehen dass die punkte sich ändern."
+   *
+   * URSACHE: Ist ein Spieltag DURCH, gab `readMatchdayResolveSnapshot` bewusst `null` zurück (ein
+   * veralteter Snapshot darf die gebuchte Wahrheit nicht überstimmen). Die Arena fiel damit auf den
+   * LIVE-Pfad zurück und rechnete den Spieltag neu — gegen den Zustand NACH der Buchung. Und genau
+   * die schreibt die Nach-Spieltags-Fatigue: dieselbe Disziplin kommt danach anders heraus. Am
+   * Screenshot: Malagor 98,8 → 92,1, Silver Soldiers 14,9 → 14,2, Cold Steel 14,4 → 14,9 — samt
+   * getauschter Plätze.
+   *
+   * Der Stempel löst das ohne Vergleichsheuristik: eine Vorberechnung, die nachweislich GEBUCHT
+   * wurde, ist keine Vorschau mehr, sondern der Beleg des Ergebnisses. Sie darf danach angezeigt
+   * werden — und nur sie. Ein Snapshot ohne Stempel bleibt nach der Buchung ungültig, wie bisher.
+   */
+  bookedAt?: string | null;
+  /** Das Ergebnis, in das diese Rechnung gebucht wurde. Zusammen mit `bookedAt` der Beleg. */
+  bookedMatchdayResultId?: string | null;
   createdAt: string;
 };
 
