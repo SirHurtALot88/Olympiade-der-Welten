@@ -9,6 +9,7 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
+import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -175,6 +176,8 @@ export function useSeasonV2PanelModel({
             };
           })(),
           marketValueTotal: row.marketValueTotal ?? null,
+          // Einmal je Zeile, nicht je Mausbewegung — siehe `saisonstand-team-hover.ts`.
+          hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,

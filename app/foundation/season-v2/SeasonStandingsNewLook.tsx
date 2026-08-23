@@ -17,6 +17,12 @@ import "@/app/foundation/season-v2/season-standings-new-look.css";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { buildGuvBreakdown } from "@/lib/finance/guv-breakdown";
+import {
+  buildGehaltHover,
+  buildMarktwertHover,
+  buildTeamHover,
+  type SaisonstandHoverListe,
+} from "@/lib/foundation/saisonstand-team-hover";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
 import { RivalTag } from "@/components/foundation/RivalTag";
 import {
@@ -528,6 +534,131 @@ function StandingsTopPlayersHover({
     </Wrapper>
   );
 }
+
+/**
+ * DIE DREI KADER-HOVERS IM SAISONSTAND — Teamname, Marktwert, Gehälter.
+ *
+ * GEWÜNSCHT VON CHRIS am 23.08.2026: „Können wir bitte diese Hovers auch im Saisonstand einbauen
+ * […] weil in der Teamansicht, wenn ich jetzt in 'nem anderen Team drin bin, haben wir solche
+ * Hovers ja schon etabliert."
+ *
+ * DASSELBE PORTAL-VOKABULAR wie `StandingsTopPlayersHover` darüber (`.nl-teams-rank-portal` /
+ * `.nl-teams-rank-preview`, Sichtbarkeit über `hidden` aus dem React-State). Ein drittes
+ * Popover-System hätte niemand gewollt — die Regeln in `globals.css` greifen so unverändert.
+ *
+ * Der Inhalt kommt als `panel` herein, weil die drei Hovers verschieden aussehen, sich aber gleich
+ * VERHALTEN sollen: gleiche Verzögerung beim Schließen, gleiche Tastatur-Bedienung, gleicher
+ * Accessibility-Baum. Ohne Inhalt wird gar kein Dialog gerendert — kein leerer Knoten.
+ */
+function StandingsKaderHover({
+  panelId,
+  ariaLabel,
+  panel,
+  children,
+  className,
+}: {
+  panelId: string;
+  ariaLabel: string;
+  panel: ReactNode | null;
+  children: ReactNode;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  if (!panel) {
+    return <>{children}</>;
+  }
+
+  function cancelClose() {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  return (
+    <span
+      className={`nl-teams-rank-portal${className ? ` ${className}` : ""}`}
+      onMouseEnter={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onMouseLeave={() => {
+        cancelClose();
+        // Kleine Verzoegerung, damit der Zeiger die Luecke zum Panel ueberbruecken kann.
+        closeTimer.current = setTimeout(() => setOpen(false), 90);
+      }}
+      onFocus={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onBlur={() => {
+        cancelClose();
+        setOpen(false);
+      }}
+    >
+      {children}
+      <div id={panelId} role="dialog" aria-label={ariaLabel} className="nl-teams-rank-preview" hidden={!open}>
+        {panel}
+      </div>
+    </span>
+  );
+}
+
+/** Eine Wert-Liste (MW oder Gehalt) als Panel-Inhalt. */
+function renderKaderListePanel(input: {
+  titel: string;
+  teamName: string;
+  liste: SaisonstandHoverListe;
+  einheit?: string;
+  mitVertrag?: boolean;
+}): ReactNode {
+  const { titel, teamName, liste, mitVertrag } = input;
+  return (
+    <>
+      <span className="nl-teams-rank-preview-title">
+        {titel} — {teamName} · {formatNlMoney(liste.summe)}
+      </span>
+      <ol className="nl-teams-rank-preview-list">
+        {liste.zeilen.map((zeile: SaisonstandHoverListe["zeilen"][number]) => (
+          <li key={zeile.playerId} className="nl-teams-rank-preview-row">
+            <span className="nl-teams-rank-preview-team">
+              {zeile.name}
+              {mitVertrag && zeile.contractShape ? (
+                <span className="nl-standings-hover-shape">{CONTRACT_SHAPE_SHORT[zeile.contractShape] ?? "STD"}</span>
+              ) : null}
+              {mitVertrag && zeile.contractLength != null ? (
+                <span className="nl-standings-hover-years">{zeile.contractLength} J.</span>
+              ) : null}
+            </span>
+            <span className="nl-teams-rank-preview-points nl-tnum">
+              {formatNlMoney(zeile.wert)}
+              <span className="nl-standings-hover-share">{Math.round(zeile.anteil * 100)} %</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {liste.weitere > 0 ? (
+        <span className="nl-standings-hover-rest">
+          + {liste.weitere} weitere · {formatNlMoney(liste.weitereSumme)}
+        </span>
+      ) : null}
+      {liste.ohneWert > 0 ? (
+        <span className="nl-standings-hover-rest">
+          {liste.ohneWert} ohne Angabe — nicht mitgezählt.
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** Kurzform der Vertragsform, wie im Team-Profil. */
+const CONTRACT_SHAPE_SHORT: Record<string, string> = {
+  front_loaded: "FL",
+  back_loaded: "BL",
+  standard: "STD",
+};
 
 export default function SeasonStandingsNewLook({
   selectedSeasonId,
@@ -1693,6 +1824,15 @@ export default function SeasonStandingsNewLook({
             {renderRankMovementChip(row)}
           </td>
           <td className="nl-standings-td-team">
+            {/* Chris, 23.08.: „dass ich, wenn ich mit der Maus über den Teamnamen gehe, dass ich dann
+                so eine kleine Miniansicht bekomme, kompakt aus den Spielern". Der Klick bleibt, was
+                er war — das Hover legt sich nur darüber. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-team-${row.teamId}`}
+              ariaLabel={`Kurzübersicht ${row.teamName}`}
+              className="nl-standings-team-portal"
+              panel={row.hoverKader && row.hoverKader.length > 0 ? renderTeamMiniPanel(row) : null}
+            >
             <button
               type="button"
               className="nl-standings-table-teamlink"
@@ -1713,6 +1853,7 @@ export default function SeasonStandingsNewLook({
               </span>
               <span className="nl-standings-teamcode">{row.teamCode}</span>
             </button>
+            </StandingsKaderHover>
           </td>
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
@@ -1745,7 +1886,23 @@ export default function SeasonStandingsNewLook({
             );
           })}
           <td className="nl-standings-td-mw">
-            {formatNlMoney(row.marketValueTotal)}
+            {/* Chris, 23.08.: „wenn ich … über den Marktwert von dem jeweiligen Team gehe, dass ich
+                dann die Spieler dahinter sehe … immer absteigend sortiert". */}
+            <StandingsKaderHover
+              panelId={`nl-standings-mw-${row.teamId}`}
+              ariaLabel={`Marktwerte ${row.teamName}`}
+              panel={
+                row.hoverKader && row.hoverKader.length > 0
+                  ? renderKaderListePanel({
+                      titel: "Marktwerte",
+                      teamName: row.teamName,
+                      liste: buildMarktwertHover(row.hoverKader),
+                    })
+                  : null
+              }
+            >
+              {formatNlMoney(row.marketValueTotal)}
+            </StandingsKaderHover>
             {renderRankSuffix(marketValueRanks.get(row.teamId), "Marktwert", row.teamName)}
           </td>
           {/* NEGATIVES CASH ROT — gemeldet von Chris: „bitte den aktuellen Cash stand auch rot
@@ -1758,7 +1915,24 @@ export default function SeasonStandingsNewLook({
           </td>
           <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
           <td className="nl-standings-td-fin">
-            {formatNlMoney(row.salaryTotal)}
+            {/* „beim Gehalt dasselbe, dass ich dann die Gehälter sehe" — plus Vertragsform und
+                Restlaufzeit, weil beides erklärt, warum eine Zahl so hoch ist. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-gehalt-${row.teamId}`}
+              ariaLabel={`Gehälter ${row.teamName}`}
+              panel={
+                row.hoverKader && row.hoverKader.length > 0
+                  ? renderKaderListePanel({
+                      titel: "Gehälter",
+                      teamName: row.teamName,
+                      liste: buildGehaltHover(row.hoverKader),
+                      mitVertrag: true,
+                    })
+                  : null
+              }
+            >
+              {formatNlMoney(row.salaryTotal)}
+            </StandingsKaderHover>
             {renderRankSuffix(salaryRanks.get(row.teamId), "Gehaltssumme", row.teamName)}
           </td>
           <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
@@ -1794,6 +1968,45 @@ export default function SeasonStandingsNewLook({
           </tr>
         ) : null}
       </Fragment>
+    );
+  }
+
+  /**
+   * DIE MINIANSICHT HINTER DEM TEAMNAMEN — Kader, Ø OVR, die drei wertvollsten Spieler, die Zahlen
+   * der Zeile in einem Blick. Bewusst KEIN zweiter Tabellenauszug: was in der Zeile daneben schon
+   * steht (Punkte, Rang), steht hier nur, weil man beim Hovern nicht mehr auf die Zeile schaut.
+   */
+  function renderTeamMiniPanel(row: SeasonV2StandingsRow): ReactNode {
+    const hover = buildTeamHover(row.hoverKader ?? []);
+    return (
+      <>
+        <span className="nl-teams-rank-preview-title">
+          {row.teamName} · {row.teamCode}
+          {row.rank != null ? ` · #${row.rank}` : ""}
+        </span>
+        <span className="nl-standings-hover-meta">
+          Kader {hover.kaderGroesse}
+          {hover.ovrSchnitt != null ? ` · Ø OVR ${formatNlNumber(hover.ovrSchnitt, 1)}` : ""}
+          {hover.auslaufend > 0 ? ` · ${hover.auslaufend} auslaufend` : ""}
+        </span>
+        <ol className="nl-teams-rank-preview-list">
+          {hover.top.map((eintrag, index) => (
+            <li key={eintrag.playerId} className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank nl-tnum">#{index + 1}</span>
+              <span className="nl-teams-rank-preview-team">
+                {eintrag.name}
+                {eintrag.className ? <span className="nl-standings-hover-shape">{eintrag.className}</span> : null}
+              </span>
+              <span className="nl-teams-rank-preview-points nl-tnum">{formatNlMoney(eintrag.marketValue)}</span>
+            </li>
+          ))}
+        </ol>
+        <span className="nl-standings-hover-meta">
+          Cash {formatNlMoney(row.cash)} · MW {formatNlMoney(row.marketValueTotal)} · Gehalt{" "}
+          {formatNlMoney(row.salaryTotal)}
+          {row.guv != null ? ` · GuV ${formatNlMoney(row.guv)}` : ""}
+        </span>
+      </>
     );
   }
 

@@ -71511,6 +71511,54 @@ span.nl-facility-ampel-chip {
 }
 
 /* --- CASH: Mini-GuV ---------------------------------------------- */
+/* ------------------------------------------------------------------ */
+/* SAISONSTAND-HOVERS (Chris, 23.08.) — Teamname, Marktwert, Gehaelter.  */
+/* Sie benutzen das Portal-Vokabular .nl-teams-rank-portal/-preview; hier */
+/* stehen nur die drei Zusaetze, die es dort noch nicht gab.             */
+/* ------------------------------------------------------------------ */
+.is-new-look .nl-standings-hover-shape,
+.is-new-look .nl-standings-hover-years {
+  margin-left: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-hover-share {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-hover-rest,
+.is-new-look .nl-standings-hover-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--nl-mut);
+  line-height: 1.5;
+}
+
+/* Der Teamnamen-Hover umschliesst einen Button — das Portal darf dessen
+   Klickflaeche nicht verkleinern. */
+.is-new-look .nl-standings-team-portal {
+  display: block;
+}
+
+/* Cash-Block im GuV-Popover des Team-Profils: abgesetzt, damit der Kontostand
+   nicht wie ein weiterer GuV-Posten aussieht. */
+.is-new-look .nl-kpipop-guv-cash {
+  margin-top: var(--nl-s2);
+  padding-top: var(--nl-s2);
+  border-top: 1px solid var(--nl-line);
+}
+
+/* Posten, die cash-wirksam sind, aber nicht in die GuV zaehlen. */
+.is-new-look .nl-kpipop-guvrow.is-aside {
+  opacity: 0.72;
+}
+
 .is-new-look .nl-kpipop-guv {
   display: flex;
   flex-direction: column;
