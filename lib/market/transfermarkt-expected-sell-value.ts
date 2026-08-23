@@ -1,6 +1,10 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import {
+  buildTransfermarktSaleFactorBreakdown,
+  normalizeVisibleRosterMoney,
+  type TransfermarktSaleFactorBreakdown,
+} from "@/lib/market/transfermarkt-sale-factor";
 import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 
@@ -15,6 +19,17 @@ export type ExpectedSellValueEntry = {
   buyoutCost: number;
   /** Netto-Erlös = Brutto − Buyout; kann negativ sein (Mehrjahresvertrag). */
   expectedSellValue: number;
+  /**
+   * DIE HERLEITUNG DES PREISES — Bracket, Rang darin, Grundfaktor, Rangbonus.
+   *
+   * Sie wird zwei Zeilen weiter unten ohnehin gerechnet und wurde bisher weggeworfen; uebrig blieb
+   * der Preis. Chris am 23.08.: „Ein Hover, der sagt ‚Marktwert 25,5 × Faktor 0,87 → 22,2; der
+   * Faktor drückt, weil Restlaufzeit 1 Jahr', macht aus einer Zahl eine Entscheidung."
+   *
+   * WICHTIG: die BEREINIGTE Fassung (`applySellPricingPolicyToBreakdown`), nicht die rohe. Die
+   * Ausfuehrung nimmt die bereinigte — wer die rohe zeigt, verspricht Geld, das nie ankommt.
+   */
+  saleFactorBreakdown: TransfermarktSaleFactorBreakdown | null;
   /**
    * Tatsächlich gezahlter Kaufpreis (RosterEntry.purchasePrice, display-skaliert).
    * `null` bei Eigengewächsen/Startkader-Einträgen ohne dokumentierten Kaufpreis —
@@ -122,6 +137,8 @@ export function buildExpectedSellValueByPlayerId(
       grossSalePrice: proceeds.grossSalePrice,
       buyoutCost: proceeds.buyoutCost,
       expectedSellValue: proceeds.netProceeds,
+      // Die BEREINIGTE Fassung — dieselbe, aus der `grossSalePrice` stammt.
+      saleFactorBreakdown: breakdown,
       purchasePrice,
       profitVsPurchase: proceeds.netProfitVsPurchase,
     });

@@ -52,6 +52,19 @@ export type LeagueMostImprovedSourceRow = {
   displayValue: string;
   /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
   ovrRank: number | null;
+  /**
+   * DIE HERLEITUNG DER ZAHL — gewuenscht von Chris (`pxoa72`): „Wir brauchen noch eine erklärung
+   * wie Most Improved Player sich zusammensetzt!"
+   *
+   * Sie wurde in `buildMostImprovedRows` laengst gerechnet und hier weggeworfen; uebrig blieb das
+   * blosse Delta. Damit war die Zahl im Spiel nicht nachvollziehbar — genau Chris' Beanstandung.
+   * Gereicht wird, was das Mass ausmacht: die mittlere Feldposition beider Saisonhaelften und wie
+   * viele Auftritte dahinterstehen.
+   */
+  earlyFieldPosition?: number | null;
+  lateFieldPosition?: number | null;
+  earlyAppearances?: number | null;
+  lateAppearances?: number | null;
 };
 
 export type LeagueLeaderTone = "total" | "pow" | "spe" | "men" | "soc" | "mvs" | "ovr" | "training" | "improved";
@@ -78,6 +91,13 @@ export type LeagueLeaderEntry = {
   displayValue: string;
   /** Ligaweiter OVR-Rang — siehe `LeagueLeaderSourceRow.ovrRank`. */
   ovrRank: number | null;
+  /** Nur bei „Most Improved" gesetzt — die Herleitung fuer das Hover (`pxoa72`). */
+  mostImproved?: {
+    earlyFieldPosition: number | null;
+    lateFieldPosition: number | null;
+    earlyAppearances: number | null;
+    lateAppearances: number | null;
+  } | null;
 };
 
 export type LeagueLeaderCategory = {
@@ -136,6 +156,8 @@ type LeaderCandidateRow = {
   teamName: string;
   value: number | null;
   ovrRank: number | null;
+  /** Optionale Herleitung, die die Kategorie unveraendert bis zur Anzeige durchreicht. */
+  mostImproved?: LeagueLeaderEntry["mostImproved"];
 };
 
 function formatLeaderValue(categoryId: string, value: number): string {
@@ -201,6 +223,9 @@ function buildPreSortedCategory(
     .filter((row) => row.value != null && Number.isFinite(row.value))
     .map((row, index) => ({
       rank: index + 1,
+      // Zusatzfelder unveraendert weiterreichen (heute: die Most-Improved-Herleitung). Ohne diese
+      // Zeile faellt die Erklaerung genau hier wieder heraus.
+      ...(row.mostImproved ? { mostImproved: row.mostImproved } : {}),
       playerId: row.playerId,
       name: row.name,
       teamId: row.teamId,
@@ -278,6 +303,12 @@ export function buildLeagueLeaderBoards(input: {
           value: row.delta,
           displayValue: row.displayValue,
           ovrRank: row.ovrRank,
+          mostImproved: {
+            earlyFieldPosition: row.earlyFieldPosition ?? null,
+            lateFieldPosition: row.lateFieldPosition ?? null,
+            earlyAppearances: row.earlyAppearances ?? null,
+            lateAppearances: row.lateAppearances ?? null,
+          },
         })),
         limit,
       ),

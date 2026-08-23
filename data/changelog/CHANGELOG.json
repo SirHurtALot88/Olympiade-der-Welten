@@ -21,6 +21,15 @@
     },
     {
       "datum": "2026-08-23",
+      "seite": "Merkliste",
+      "pr": null,
+      "text": "Die gemerkten Teams und Spieler haben jetzt eine eigene Seite — in der Navigation direkt hinter „Spieler\". Sie zeigt beides gemeinsam, das zuletzt Gemerkte oben: zu Teams Saisonrang und Punkte, zu Spielern Klasse und aktuelles Team. Jede Zeile führt ins jeweilige Profil, und der Stern nimmt einen Eintrag direkt dort wieder weg. Ein gemerkter Spieler, den es im Spielstand nicht mehr gibt, verschwindet nicht stillschweigend, sondern bleibt mit dem Hinweis stehen — verschluckte Einträge sind genau der Fehler, den ein Lesezeichen nicht machen darf. Ist nichts gemerkt, steht dort ein Satz, wo man Sterne setzt, statt einer leeren Tabelle.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Team · Kader",
       "pr": null,
       "text": "B-P und V-V streben jetzt einen Spieler mehr an — B-P 11 statt 10, V-V 12 statt 11. Gemeldet war, dass beide im Spiel abfallen, weil sie nicht rotieren können; am Spielstand nachgemessen war es schlimmer als das: beide standen bei acht Spielern, während ein Spieltag elf verlangt. Sie konnten also nicht bloß nicht rotieren, sie konnten nicht einmal vollständig aufstellen. Über die ganze Liga gerechnet hängt der Rang deutlich an der Kadergröße (Korrelation −0,72); die sieben Teams mit acht Spielern belegten die Ränge 19, 23, 27, 28, 29, 31 und 32, B-P davon Rang 27 und V-V Rang 28. Am Geld lag es nicht, beide hatten über 40 Mio Cash. Die Zielgröße steht im Identitätsblatt, laufende Spielstände ziehen also von selbst nach; wirksam wird sie, sobald wieder eingekauft wird. Für die übrigen 30 Teams gilt die bisherige Regel unverändert.",
@@ -53,6 +62,15 @@
       "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",
       "quelle": "gepflegt",
       "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Zwei weitere Zahlen erklären sich beim Darüberfahren. In der Spielerliste zeigt der Verkaufswert jetzt, wie er zustande kommt: Saison-Marktwert, Grundfaktor mit Bracket, Rangbonus mit dem Platz im Bracket, daraus der Verkaufsfaktor und der Preis. Gezeigt wird dabei die bereinigte Rechnung — also die, aus der auch der tatsächlich gebuchte Erlös entsteht. Und in den Bestenlisten sagt „Most Improved\" endlich, worauf die Zahl beruht: auf der mittleren Feldposition der ersten und der zweiten Saisonhälfte, jeweils mit der Zahl der Auftritte. Die Feldposition misst den Platz im Feld der jeweiligen Disziplin und ist dadurch zwischen Disziplinen vergleichbar. Beide Herleitungen wurden vorher berechnet und auf dem Weg in die Ansicht weggeworfen.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
       "version": "0.5"
     },
     {
