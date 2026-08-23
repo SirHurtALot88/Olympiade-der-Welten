@@ -217,6 +217,22 @@
   .tleer{color:var(--faint);font-style:italic}
 
   .emutator{display:flex;gap:4px;justify-content:center;margin-top:6px}
+  .formkarte{position:absolute;left:-3px;top:-4px;font:700 8px/1 ui-monospace,monospace;
+    padding:1px 3px;border-radius:3px;font-style:normal;color:#0d1119}
+  .formkarte.rot{background:#e07a6a}.formkarte.gruen{background:#7fd396}
+  .formkarte.blau{background:#7ec2ff}.formkarte.gelb{background:#e0c46a}
+  .formkarte.grau{background:#9aa7b8}
+  .pico{position:relative}
+  .stufenzeile{grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:6px 8px;
+    border-radius:6px;background:var(--surface-2);font-size:11px;margin-bottom:6px}
+  .stufenzeile b{color:var(--ink);margin-right:2px}
+  .stufe{display:flex;align-items:baseline;gap:5px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);border-radius:5px;padding:3px 8px;
+    font-size:11px;cursor:pointer}
+  .stufe s{text-decoration:none;font:600 10px/1 ui-monospace,monospace;color:var(--faint)}
+  .stufe.an{border-color:var(--warn);color:var(--ink)}
+  .stufe.an s{color:var(--warn)}
+
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1142,7 +1158,7 @@
   let MUTATOREN=["Diligent","ColdBlooded"];
   // Einmal je Spieltag gezogen, nicht je Kampf — sonst zeigen Tafel und Arena Verschiedenes.
   function zieheMutatoren(saat){
-    const r=(n)=>{saat=(saat*1103515245+12345)&0x7fffffff;return saat%n;};
+    const r=(n)=>{saat=(Math.imul(saat,1103515245)+12345)&0x7fffffff;return saat%n;};
     MUTATOREN=[MUTATOR_POS[r(MUTATOR_POS.length)], MUTATOR_NEG[r(MUTATOR_NEG.length)]];
   }
 
@@ -1185,6 +1201,26 @@
     return breit?{anteil:breit, breit:true}:null;
   }
 
+  // Punkte auf dem Disziplinwert in Kampfwerte umlegen. "eng" heisst: nach den
+  // Fokus-Attributen des Slots (fuer alles, was mit der Position zu tun hat). "breit"
+  // heisst: nach dem Rezept der Disziplin selbst (fuer alles, was jeden gleich trifft,
+  // etwa Formkarte und Intensitaet).
+  function verteilePunkte(punkte,slotId,dId,eng){
+    if(!punkte)return {};
+    const rec=REC[DISCS[dId].cat];
+    let anteil=null;
+    if(eng){const v=traitVerteilung(slotId,dId); anteil=v&&v.anteil;}
+    if(!anteil){
+      // Breit: jeder Kampfwert bekommt so viel, wie sein Rezept insgesamt wiegt.
+      const roh={};let summe=0;
+      for(const k of KEYS){const w=Object.values(rec[k]||{}).reduce((a,b)=>a+b,0);if(w>0){roh[k]=w;summe+=w;}}
+      if(!summe)return {};
+      anteil={};for(const k in roh)anteil[k]=roh[k]/summe;
+    }
+    const teile={};for(const k in anteil)teile[k]=punkte*anteil[k];
+    return teile;
+  }
+
   // Der fertige Aufschlag je Kampfwert.
   function traitAufschlag(p,slotId,dId){
     const tr=traitTreffer(p); if(!tr.netto)return {netto:0,teile:{},tr};
@@ -1193,6 +1229,34 @@
     const teile={}; for(const k in v.anteil)teile[k]=tr.netto*v.anteil[k];
     return {netto:tr.netto,teile,tr,breit:v.breit};
   }
+
+  // ===================================================================================
+  // FORMKARTEN und INTENSITAET — beides gibt es im Spiel bereits.
+  //
+  // Formkarte: ein Wert aus [0, 2, 4, 8], gezogen je Spieltag, mit einer Farbe je Klasse
+  // (legacy-lineup-modifiers.ts). Intensitaet: Schonen, Normal, Push mit -2,5 / 0 / +4
+  // auf den Wert und 1 / 3 / 4 Grundermuedung (matchday-slot-roles.ts). Beide Zahlen
+  // sind uebernommen, nicht gesetzt.
+  const FORMWERTE=[0,2,4,8];
+  const KLASSENFARBE={Berserker:"rot",Warlord:"rot",Tank:"rot",Sprinter:"gruen",Rogue:"gruen",
+    Charger:"gruen",Mage:"blau",Overseer:"blau",Templar:"blau",Bard:"gelb",Hero:"gelb",
+    Badass:"gelb",Tactician:"gelb"};
+  const INTENSITAET={
+    schonen:{label:"Schonen", wert:-2.5, mued:1, kappe:5},
+    normal: {label:"Normal",  wert:0,    mued:3, kappe:8},
+    push:   {label:"Push",    wert:4,    mued:4, kappe:11}
+  };
+  let STUFE="normal";
+  let FORMKARTE={};
+  function zieheFormkarten(saat){
+    FORMKARTE={};
+    let z=saat;
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return z%n;};
+    for(const p of SQUAD)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
+    for(const o of OPP)FORMKARTE[o.n]=FORMWERTE[r(FORMWERTE.length)];
+  }
+  const formVon=(n)=>FORMKARTE[n]||0;
+  const stufenWert=()=>INTENSITAET[STUFE].wert;
 
   function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
@@ -1299,6 +1363,9 @@
       r.tabIndex=0;r.setAttribute("role","button");
       r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
       const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
+      const fk=formVon(p.n);
+      if(fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent="+"+fk;
+        fm.title="Formkarte des Spieltags: +"+fk+" auf den Disziplinwert";ico.appendChild(fm);}
       if(gesetzt||anderswo)ico.title=anderswo?("steht in "+DISCS[pl.d].label):("steht auf "+(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot));
       r.appendChild(ico);
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
@@ -1322,6 +1389,18 @@
 
   function renderBoard(){
     const pit=document.getElementById("pitch");pit.textContent="";
+    // Schonen / Normal / Push — dieselben drei Stufen wie im Spieltag.
+    const st=el("div","stufenzeile");
+    st.appendChild(el("b",null,"Intensität"));
+    for(const [id,cfg] of Object.entries(INTENSITAET)){
+      const b=el("button","stufe"+(STUFE===id?" an":""));
+      b.appendChild(el("span",null,cfg.label));
+      b.appendChild(el("s",null,(cfg.wert>0?"+":"")+cfg.wert));
+      b.title=cfg.label+": "+(cfg.wert>0?"+":"")+cfg.wert+" auf den Wert, Grundermüdung "+cfg.mued+", Ermüdungsdeckel "+cfg.kappe;
+      b.addEventListener("click",()=>{STUFE=id;renderAll();});
+      st.appendChild(b);
+    }
+    pit.appendChild(st);
     const here=inDisc(disc);
     const frei=SQUAD.filter(p=>!place[p.n]);
     const gewaehlt=sel?SQUAD.find(p=>p.n===sel):null;
@@ -1715,13 +1794,22 @@
   // Erwartung: gespaeht wird der Kader, nicht der Plan, den die KI erst im Kampf fasst.
   function absicht(o,z,c){
     const st=spaehStufe(c);
-    const slotUeblich=o.row===0?"steht vermutlich vorn":o.row===1?"vermutlich im Mittelfeld":"vermutlich hinten";
-    if(st===0)return {t:"unbekannt", d:"Zu wenig gespäht. Nicht einmal die grobe Aufstellung ist gesichert."};
-    if(st===1)return {t:slotUeblich, d:"Aus der Rolle geschlossen, nicht beobachtet. Die KI kann davon abweichen."};
+    // "Vorn / Mitte / hinten" sagt bei sechs Slots nichts mehr. Was das Spaehen liefert,
+    // ist eine Vermutung, WELCHE ROLLE einer spielt — geschaetzt daraus, zu welchem
+    // Slot-Profil seine Werte am besten passen. Das ist genau die Rechnung, die man auch
+    // fuer den eigenen Kader anstellt, nur auf fremde Zahlen angewandt.
+    const passt=slotsVon("tdm").map(sl=>({sl,m:slotAufschlag(o,sl.id,"tdm")})).sort((a,b)=>b.m-a.m);
+    if(st===0)return {t:"unbekannt", d:"Zu wenig gespäht. Nicht einmal die Rolle ist zu erraten."};
+    if(st===1)return {t:passt[0].sl.label+" oder "+passt[1].sl.label,
+      d:"Aus seinen Werten geschlossen: zu diesen beiden Rollen passt er am besten ("+
+        passt[0].m.toFixed(1)+" und "+passt[1].m.toFixed(1)+"). Beobachtet ist das nicht."};
     const ord=z?z.ord:o.ord;
     const name=(ORDERS.find(x=>x[0]===ord)||[,ord])[1];
-    if(st===2)return {t:"wahrscheinlich "+name, d:"Aus früheren Spielen dieses Gegners geschätzt. Er kann seinen Plan jederzeit umstellen."};
-    return {t:name+" erwartet", d:"Gut gespäht. Trotzdem eine Erwartung — die KI fasst ihren Plan erst, wenn sie deine Aufstellung sieht."};
+    if(st===2)return {t:"wahrscheinlich "+passt[0].sl.label,
+      d:"Beste Passung "+passt[0].m.toFixed(1)+", nächstbeste "+passt[1].sl.label+" mit "+passt[1].m.toFixed(1)+
+        ". Aus früheren Spielen gestützt — umstellen kann er trotzdem."};
+    return {t:passt[0].sl.label+", Befehl "+name,
+      d:"Gut gespäht: Rolle und üblicher Befehl. Trotzdem eine Erwartung — die KI fasst ihren Plan erst, wenn sie deine Aufstellung sieht."};
   }
 
   function renderOpp(){
@@ -1871,10 +1959,20 @@
         const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
         // Der Disziplinwert des Spielers PLUS der Aufschlag seines Slots. Steht Baumkopf
         // als Shotcaller, kostet ihn das 2,3 Punkte; als Vanguard braechte es ihm 2,1.
-        const bh=behav(p.n);const eigWert=p.d.tdm+(slotBonus[p.n]||0);
-        // Traits landen in den Kampfwerten, die der Slot betont — nicht pauschal.
-        const ta=traitAufschlag(p,place[p.n]&&place[p.n].slot,"tdm");
-        for(const k in ta.teile)s[k]=Math.max(1,Math.round((s[k]+ta.teile[k])*10)/10);
+        // Vier Aufschlaege auf den Disziplinwert — und ALLE VIER muessen auch in den
+        // Kampfwerten ankommen. Vorher taten das nur die Traits: Slot, Formkarte und
+        // Stufe verschoben bloss die angezeigte Zahl, waehrend die Arena weiter mit den
+        // rohen Attributen rechnete. Die Karte versprach etwas, das der Kampf nicht hielt.
+        const bh=behav(p.n);
+        const slId=place[p.n]&&place[p.n].slot;
+        const ta=traitAufschlag(p,slId,"tdm");
+        const eigWert=p.d.tdm+(slotBonus[p.n]||0)+formVon(p.n)+stufenWert()+ta.netto;
+        const auf={};
+        const dazu=(teile)=>{for(const k in teile)auf[k]=(auf[k]||0)+teile[k];};
+        dazu(ta.teile);                                                        // Traits: eng
+        dazu(verteilePunkte(slotBonus[p.n]||0,slId,"tdm",true));                // Slot: eng
+        dazu(verteilePunkte(formVon(p.n)+stufenWert(),slId,"tdm",false));       // Form/Stufe: breit
+        for(const k in auf)s[k]=Math.max(1,Math.round((s[k]+auf[k])*10)/10);
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
@@ -1894,7 +1992,7 @@
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
         const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
-        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm,ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
+        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm+formVon(o.n),ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
@@ -3307,6 +3405,7 @@
 
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   zieheMutatoren(20260823);
+  zieheFormkarten(20260823);
   renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
