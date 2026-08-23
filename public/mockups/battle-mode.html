@@ -305,6 +305,16 @@
     </div>
     <div class="notes">
       <div class="note">
+        <h3>Nutzwert je Skill — der Wächter gegen zu starke Kits</h3>
+        <p class="muted" style="font-size:12px;margin:0 0 8px">Aus den Wechselkursen ausgerechnet,
+        gegen einen Durchschnittsgegner (Angriff 50, Verteidigung 50), <strong>bevor ein Skill je
+        gespielt wurde</strong>. Wer hier deutlich aus der Reihe fällt, fällt vorher auf statt nach
+        dreißig Kämpfen.</p>
+        <div class="tbl-wrap"><table class="wtbl"><thead><tr>
+          <th>Skill</th><th class="n">Wert</th><th class="n">blockiert</th><th class="n">je Sekunde</th><th>woraus</th>
+        </tr></thead><tbody id="nutzbody"></tbody></table></div>
+      </div>
+      <div class="note">
         <h3>Das Verhaltensmodell</h3>
         <ul>
           <li><strong>Alle rücken vor.</strong> „Formation halten" heißt mit der Linie mitgehen, nicht stehenbleiben.</li>
@@ -552,6 +562,159 @@
   });
   const FIGHTER=["fslash","mdash","ram"];
 
+  // ===================================================================================
+  // DAS SKILL-SCHEMA — und warum es vor den Zaubern kommt
+  //
+  // Bis hierher war die Auswahl eine hartkodierte Wenn-Dann-Kette je Klasse, und ihre
+  // REIHENFOLGE war die Entscheidung. Das traegt bei drei Skills. Bei sechs bricht es:
+  // die Kette wird unlesbar, und "was zuerst kommt, gewinnt" ist keine Abwaegung. Ein
+  // Flaechenzauber oben in der Kette feuert auf ein einzelnes Ziel; unten feuert er nie.
+  //
+  // Deshalb beschreibt ein Skill ab jetzt nur noch SICH SELBST, und eine einzige
+  // Bewertungsfunktion entscheidet. Die Engine liest Felder, nie Namen — dasselbe
+  // Prinzip, mit dem Pokemon Showdown 953 Angriffe fuehrt, deren gesamtes Zielsystem
+  // fuenfzehn Werte in einem Feld sind.
+  //
+  // Damit lassen sich Chris' echte Kits spaeter EINTRAGEN statt programmieren.
+  //
+  //   tor          Was erfuellt sein muss, damit der Skill ueberhaupt zur Wahl steht.
+  //   wirkung[]    Was passiert — Schaden, Heilung, Schild, Betaeubung, Rueckstoss.
+  //   form         Wen es trifft: einzel, kreis{radius}, linie{laenge,breite}.
+  //   zielart      gegner | verbuendeter | selbst
+  //   projektil    Flugkoerper mit Tempo, oder null fuer sofortige Wirkung.
+  //   eigenbewegung Wohin sich der Anwender dabei bewegt.
+  //   ki           GENAU DREI Felder. Jedes weitere waere eine Hintertuer, durch die die
+  //                Wenn-Dann-Kette zurueckkriecht.
+  // ===================================================================================
+
+  // FREUNDBESCHUSS. Heute aus: Flaechen und Projektile treffen nur Gegner. Der Schalter
+  // sitzt hier, damit man ihn spaeter umlegen kann, ohne die Trefferpruefung zu suchen —
+  // dann gelten Salven und Sturmangriffe fuer beide Seiten, und die Aufstellung bekommt
+  // eine ganz neue Bedeutung.
+  let FREUNDBESCHUSS=false;
+
+  // ===================================================================================
+  // DIE WECHSELKURSE — die EINE Stelle, an der balanciert wird.
+  //
+  // Die schwerste Frage jedes Bewertungsmodells: ist verhinderter Schaden so viel wert
+  // wie ausgeteilter? Statt sie in jedem Skill einzeln zu beantworten, steht die Antwort
+  // hier einmal. Getuned wird nur diese Tabelle, nie ein einzelner Zauber.
+  //
+  // Und weil sie feststeht, laesst sich der Nutzwert eines Skills AUSRECHNEN, bevor er
+  // je gespielt wurde. Das ist unser Waechter gegen zu starke Kits: wer beim Eintragen
+  // deutlich ueber der Reihe liegt, faellt vorher auf statt nach dreissig Kaempfen.
+  // ===================================================================================
+  const KURS={
+    schaden:      1.00,   // je Punkt tatsaechlich abgezogener Lebenspunkte
+    heilung:      1.00,   // je Punkt tatsaechlich fehlender und aufgefuellter LP
+    schild:       0.80,   // je Punkt vorweggenommener Schadensabwehr
+    betaeubung:   0.70,   // je Sekunde, multipliziert mit dem Schaden/s des Betaeubten
+    rueckstoss:   0.018,  // je Punkt Rueckstoss — Positionsgewinn, kein Schaden
+    bewegung:     0.12,   // je Pixel Eigenbewegung
+    unverwundbar: 0.90    // je Sekunde Unverwundbarkeit, mal erwartetem Schaden/s
+  };
+
+  // Referenzlage fuer die statische Rechnung: ein Durchschnittskaempfer gegen einen
+  // Durchschnittsgegner. ANG 50 ist die Basismitte, also Faktor 1,0.
+  const REF={ang:50, verZiel:50, dpsZiel:25, tmp:50};
+  const refMinderung=100/(100+REF.verZiel);
+
+  // NUTZWERT JE SEKUNDE. Was ein Skill im Mittel einbringt, geteilt durch die Zeit, die
+  // er blockiert. Vergleichbar ueber alle Klassen und Wirkungsarten hinweg.
+  // Die neun vorhandenen Skills im neuen Schema. Nichts daran ist erfunden — es sind
+  // dieselben Zahlen wie oben, nur so beschrieben, dass eine einzige Funktion sie lesen kann.
+  //
+  // Der SCHWERE SCHLAG ist dabei zu einem eigenen Skill geworden. Vorher war er eine
+  // Sonderregel ("laedt auf, wenn der schnelle Schlag nicht hinreicht"), die ich zweimal
+  // falsch gebaut habe: erst so, dass Baumkopf durchgehend auflud und sich damit selbst
+  // lahmlegte, dann so, dass der Rueckstoss nie zum Zug kam. Als eigene Option entscheidet
+  // die Bewertung — weiter reichend, mehr Schaden, dafuer laenger.
+  const SCHEMA={
+    shoot:{rang:3, tor:{max:280,cd:0.35,sp:0,mp:0,wurzel:0.25},
+      zielart:"gegner", form:{typ:"einzel"}, projektil:{tempo:520},
+      wirkung:[{art:"schaden",basis:20},{art:"rueckstoss",staerke:40}],
+      ki:{rolle:"grundangriff",aufsparen:0,mindestwert:0}},
+    dash:{rang:1, tor:{cd:3,sp:20,bedraengt:115},
+      zielart:"selbst", form:{typ:"einzel"}, eigenbewegung:{typ:"wegVomZiel",distanz:150},
+      wirkung:[{art:"unverwundbar",dauer:0.3}],
+      ki:{rolle:"flucht",aufsparen:0.2,mindestwert:0.9}},
+    barrage:{rang:2, tor:{max:340,cd:12,mp:20,castzeit:0.3},
+      zielart:"gegner", form:{typ:"einzel"}, projektil:{tempo:520},
+      eigenbewegung:{typ:"wegVomZiel",distanz:90},
+      wirkung:[{art:"schaden",basis:20,mult:0.25,stoesse:5},{art:"rueckstoss",staerke:30}],
+      ki:{rolle:"einzelschaden",aufsparen:0.5,mindestwert:1.4,erwarteteZiele:1}},
+
+    slash:{rang:3, tor:{max:23,cd:0.3,sp:0},
+      zielart:"gegner", form:{typ:"einzel"},
+      wirkung:[{art:"schaden",basis:9}],
+      ki:{rolle:"grundangriff",aufsparen:0,mindestwert:0}},
+    slash_schwer:{rang:2, name:"Paladin Slash (aufgeladen)", tor:{max:60,cd:0.9,sp:8},
+      zielart:"gegner", form:{typ:"einzel"},
+      wirkung:[{art:"schaden",basis:9,mult:1.45},{art:"rueckstoss",staerke:219}],
+      ki:{rolle:"einzelschaden",aufsparen:0.1,mindestwert:1.0}},
+    heavydash:{rang:1, tor:{cd:5,sp:30},
+      zielart:"selbst", form:{typ:"einzel"}, eigenbewegung:{typ:"zumZiel",distanz:100},
+      wirkung:[{art:"unverwundbar",dauer:0.4}],
+      ki:{rolle:"eroeffnung",aufsparen:0.2,mindestwert:0.8}},
+    shield:{rang:1, tor:{max:260,cd:12,mp:60,castzeit:0.5},
+      zielart:"verbuendeter", form:{typ:"einzel"},
+      wirkung:[{art:"schild",staerke:50,dauer:8}],
+      ki:{rolle:"rettung",aufsparen:0.3,mindestwert:0.9}},
+
+    fslash:{rang:3, tor:{max:18,cd:0.3,sp:0},
+      zielart:"gegner", form:{typ:"einzel"},
+      wirkung:[{art:"schaden",basis:12}],
+      ki:{rolle:"grundangriff",aufsparen:0,mindestwert:0}},
+    fslash_schwer:{rang:2, name:"Slash (aufgeladen)", tor:{max:50,cd:1.3,sp:3},
+      zielart:"gegner", form:{typ:"einzel"},
+      wirkung:[{art:"schaden",basis:12,mult:1.45},{art:"rueckstoss",staerke:375}],
+      ki:{rolle:"einzelschaden",aufsparen:0.1,mindestwert:1.0}},
+    mdash:{rang:1, tor:{cd:4,sp:20},
+      zielart:"selbst", form:{typ:"einzel"}, eigenbewegung:{typ:"zumZiel",distanz:130},
+      wirkung:[{art:"unverwundbar",dauer:0.3}],
+      ki:{rolle:"eroeffnung",aufsparen:0.2,mindestwert:0.8}},
+    ram:{rang:1, tor:{max:325,cd:12,sp:15,castzeit:0.2},
+      zielart:"gegner", form:{typ:"linie",laenge:325,breite:46},
+      eigenbewegung:{typ:"zumZiel",distanz:325},
+      wirkung:[{art:"schaden",basis:22},{art:"rueckstoss",staerke:375},{art:"betaeubung",dauer:0.8}],
+      ki:{rolle:"eroeffnung",aufsparen:0.4,mindestwert:1.3,erwarteteZiele:2}}
+  };
+  // Schema und Anzeigedaten zusammenfuehren, damit beide Seiten dieselbe Wahrheit lesen.
+  for(const id in SCHEMA){
+    const q=SKILLS[id]||(SKILLS[id]={id,stufe:"Common"});
+    Object.assign(q,SCHEMA[id]);
+    if(!q.name)q.name=id;
+  }
+  SKILLS.slash_schwer.text="Der aufgeladene Hammerschlag: reicht 60 statt 23, macht rund +45 % Schaden und stößt mit 219 zurück — dafür dreimal so lange Pause.";
+  SKILLS.fslash_schwer.text="Der aufgeladene Schwertschlag: reicht 50 statt 18, macht rund +45 % Schaden und stößt mit 375 zurück — dafür über viermal so lange Pause.";
+  SKILLS.slash_schwer.flavour=SKILLS.slash.flavour; SKILLS.fslash_schwer.flavour=SKILLS.fslash.flavour;
+  SKILLS.slash_schwer.art="Schwerer Hammerschlag"; SKILLS.fslash_schwer.art="Schwerer Schwertschlag";
+  const ARCHER2=["shoot","dash","barrage"];
+  const MATRIARCH2=["slash","slash_schwer","heavydash","shield"];
+  const FIGHTER2=["fslash","fslash_schwer","mdash","ram"];
+
+  function nutzwertStatisch(sk){
+    if(!sk.wirkung)return null;
+    let w=0; const teile=[];
+    const ziele=sk.form&&sk.form.typ!=="einzel"?(sk.ki&&sk.ki.erwarteteZiele||2):1;
+    for(const e of sk.wirkung){
+      let v=0;
+      if(e.art==="schaden")      v=e.basis*(REF.ang/50)*refMinderung*(e.stoesse||1)*ziele*KURS.schaden;
+      else if(e.art==="heilung") v=e.basis*(REF.ang/50)*KURS.heilung;
+      else if(e.art==="schild")  v=e.staerke*KURS.schild;
+      else if(e.art==="betaeubung")v=e.dauer*REF.dpsZiel*ziele*KURS.betaeubung;
+      else if(e.art==="rueckstoss")v=e.staerke*KURS.rueckstoss*ziele;
+      else if(e.art==="unverwundbar")v=e.dauer*REF.dpsZiel*KURS.unverwundbar;
+      if(v){w+=v;teile.push(e.art+" "+Math.round(v));}
+    }
+    if(sk.eigenbewegung){const v=sk.eigenbewegung.distanz*KURS.bewegung;w+=v;teile.push("Bewegung "+Math.round(v));}
+    // Die Zeit, die der Skill blockiert: seine Abklingzeit, mindestens aber der Grundtakt
+    // eines Durchschnittskaempfers — sonst sieht ein Skill ohne Abklingzeit unendlich gut aus.
+    const grund=1/(0.5+REF.tmp/120);
+    const zeit=Math.max(sk.tor&&sk.tor.cd||0, grund)+(sk.tor&&sk.tor.castzeit||0);
+    return {wert:Math.round(w), jeSekunde:Math.round(w/zeit*10)/10, zeit:Math.round(zeit*100)/100, teile};
+  }
+
   const SQUAD=[
     {n:"Baumkopf Holzfaust",c:"Fighter",skills:FIGHTER,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
     {n:"T Mask",c:"Rogue",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
@@ -575,7 +738,12 @@
     {n:"Ultralisk",c:"Berserker",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.5,spurt:42.2},a:{power:72,health:84.5,stamina:93,intelligence:1.7,awareness:1.5,determination:1,speed:89,dexterity:28.2,charisma:1,will:36.1,spirit:14.8,torment:68.5}},
     {n:"Lhyor",c:"Berserker",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48.3,spurt:80.8},a:{power:72.8,health:64.1,stamina:70.4,intelligence:14.6,awareness:29.8,determination:70.8,speed:68.8,dexterity:97,charisma:67.7,will:46,spirit:4.6,torment:88.2}},
     {n:"Nocture",c:"Berserker",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73.2,stamina:74,intelligence:1,awareness:54,determination:25.9,speed:80.9,dexterity:32.2,charisma:12.9,will:12,spirit:3.1,torment:94}},
-    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
+    // PLATZHALTER-KIT: Der Matriarch-Satz lag ohne Traeger im Entwurf, seit die Aufstellung
+    // auf die echten Blazing Beasts umgestellt wurde. Ein Drittel des Skill-Gerüsts — der
+    // Stuetz-Zweig mit Schild auf einen Verbuendeten — lief dadurch in keinem einzigen Kampf.
+    // Untestet ist nicht dasselbe wie richtig, also bekommt der Stuetzspieler des Gegners ihn.
+    // Das ist eine Zuordnung fuer die Messung, keine Aussage darueber, was ein Hero spaeter kann.
+    {n:"Minion Master",c:"Hero",skills:MATRIARCH,r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
     {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.2,spurt:37.9},a:{power:36.5,health:59.8,stamina:87.7,intelligence:47.8,awareness:42.6,determination:29.1,speed:91.9,dexterity:64.7,charisma:21.7,will:8.7,spirit:75.2,torment:25.9}}
   ];
   const REC={
@@ -1196,7 +1364,7 @@
   }
 
   function build(saat){
-    seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];
+    seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     const mine=inDisc("tdm").slice(0,6);
     const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[place[p.n].row].push(p));
@@ -1209,8 +1377,8 @@
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
-          skills:p.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+          skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+          schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
@@ -1228,8 +1396,8 @@
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
-          fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+          fern:false,...reichweiten(o.skills,false),stun:0,skills:kitVon(o.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+          schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
@@ -1573,6 +1741,290 @@
     pfeile=pfeile.filter(pf=>!pf.tot);
   }
 
+  // ===================================================================================
+  // DIE BEWERTUNG: Tore, Nutzenwert, Hysterese.
+  //
+  // Drei Stufen, absichtlich getrennt:
+  //
+  //   1. TORE (hart)      Reichweite, Kosten, Abklingzeit, gueltiges Ziel, Befehlsverbot.
+  //                       Was durchfaellt, wird gar nicht bewertet — dann kann der Ticker
+  //                       "noch 2,1 s" sagen statt einer Zahl.
+  //   2. NUTZENWERT       Was der Skill JETZT einbringt, in der Waehrung der Wechselkurse.
+  //                       Ueberschuss zaehlt nicht: Schaden ueber die Rest-Lebenspunkte
+  //                       hinaus ist verpufft, Heilung auf einen Vollen fast wertlos.
+  //   3. HYSTERESE        Die zuletzt getroffene Wahl bekommt +15 %. Ohne das flattert
+  //                       jede Nutzenbewertung zwischen zwei fast gleich guten Optionen —
+  //                       der bekannteste Fehlermodus dieses Modells.
+  //
+  // Und der wichtigste Bauentscheid: DIE TAKTIK IST EIN MULTIPLIKATOR IM SCORE, keine
+  // eigene Regel. Damit haelt die Simulation die Tooltips STRUKTURELL ein — es gibt
+  // keinen zweiten Codepfad, der ein Versprechen brechen koennte.
+  // ===================================================================================
+
+  // Kennzahlen je Skill: Einsaetze, Ziele, wie oft die Entscheidung eng war, und wie
+  // lange der Skill vor dem Zuenden bereit lag. Zusammen beantworten sie die Frage
+  // "sinnvoll oder nur oft".
+  let MESS={};
+
+  // Die alten Kit-Listen zeigen auf die neuen — der schwere Schlag ist dort ein eigener
+  // Skill, also hat jedes Kit einen Eintrag mehr.
+  const kitVon=(alt)=>!alt?null:(alt===ARCHER?ARCHER2:alt===MATRIARCH?MATRIARCH2:alt===FIGHTER?FIGHTER2:alt);
+
+  const grundtaktVon=(u)=>1/(0.5+u.TMP/120);
+
+  // REICHWEITE AB KOERPER. Die Zahl aus dem Kit ist der Arm, nicht der Abstand der
+  // Fusspunkte — und seit die Entzerrung niemanden mehr in jemand anderem stehen laesst,
+  // sind zwei Kaempfer schon 58 px auseinander. Ohne diese Umrechnung waere ein Schlag
+  // mit Kit-Reichweite 18 nie wieder gelandet (gemessen: Baumkopf fiel auf 15 %).
+  const reichweiteVon=(sk)=>KOERPER_X+((sk.tor&&sk.tor.max)||0);
+
+  // Wen wuerde dieser Skill jetzt treffen?
+  function zieleFuer(u,sk,tg){
+    if(sk.zielart==="selbst")return [u];
+    if(sk.zielart==="verbuendeter"){
+      // Die Form gilt auch nach innen. Dieser Zweig gab frueher JEDEN verwundeten
+      // Verbuendeten in Reichweite zurueck, egal was in form.typ stand — ein Schild auf
+      // "einzel" lag damit auf dem halben Team (gemessen: 3,3 Ziele je Wirken). Schlimmer
+      // als die Wirkung war die Bewertung: wirkungswert() rechnete mit denselben drei
+      // Zielen und hielt den Schild fuer dreimal so wertvoll, wie die Karte verspricht.
+      const max=reichweiteVon(sk);
+      const kand=live(u.side).filter(a=>a!==u&&dist(u,a)<=max&&a.hp<a.max);
+      if(!kand.length)return [];
+      // Einzelziel heisst einer — und zwar der, der es am noetigsten hat.
+      if(sk.form.typ==="einzel"){
+        let w=kand[0];
+        for(const a of kand)if(a.hp/a.max<w.hp/w.max)w=a;
+        return [w];
+      }
+      if(sk.form.typ==="kreis"){
+        let best=[];
+        for(const z of kand){
+          const t=kand.filter(a=>dist(a,z)<=sk.form.radius);
+          if(t.length>best.length)best=t;
+        }
+        return best;
+      }
+      return kand;
+    }
+    const feinde=live(1-u.side);
+    const max=reichweiteVon(sk);
+    if(!tg||tg.down)return [];
+    if(sk.form.typ==="einzel")return dist(u,tg)<=max?[tg]:[];
+    if(sk.form.typ==="kreis"){
+      // Einschlagpunkt auf jeden Gegner zentriert pruefen, bester Treffersatz gewinnt —
+      // hoechstens sechs Pruefungen statt einer Flaechensuche, und deterministisch.
+      let best=[];
+      for(const z of feinde){
+        if(dist(u,z)>max)continue;
+        const t=feinde.filter(f=>dist(f,z)<=sk.form.radius);
+        if(t.length>best.length)best=t;
+      }
+      return best;
+    }
+    if(sk.form.typ==="linie"){
+      const ax=tg.x-u.x, ay=tg.y-u.y, L=Math.hypot(ax,ay)||1;
+      const w=Math.min(KOERPER_X+sk.form.laenge,L);
+      const ex=u.x+ax/L*w, ey=u.y+ay/L*w;
+      const auf=FREUNDBESCHUSS?live(0).concat(live(1)).filter(f=>f!==u):feinde;
+      return auf.filter(f=>bahnAbstand(f,u.x,u.y,ex,ey)<sk.form.breite/2);
+    }
+    return [tg];
+  }
+
+  // Was ist eine Wirkung an diesem Ziel wert? Ueberschuss faellt raus.
+  function wirkungswert(u,e,ziele,sk){
+    const m=e.mult||1, st=e.stoesse||1;
+    let w=0;
+    for(const z of ziele){
+      if(e.art==="schaden"){
+        const roh=e.basis*angFaktor(u.ANG)*m*st;
+        const d=roh*(100/(100+z.VER));
+        w+=Math.min(d,z.hp)*KURS.schaden;          // Overkill zaehlt nicht
+      }else if(e.art==="heilung"){
+        const heil=e.basis*angFaktor(u.ANG)*m;
+        w+=Math.min(heil,z.max-z.hp)*KURS.heilung; // Ueberheilung zaehlt nicht
+      }else if(e.art==="schild"){
+        // Wert steigt mit der Bedrohung: wie viele Gegner haben dieses Ziel im Visier?
+        const jaeger=live(1-u.side).filter(f=>f.tgt===z).length;
+        w+=e.staerke*KURS.schild*(0.4+0.3*jaeger);
+      }else if(e.art==="betaeubung"){
+        w+=e.dauer*(z.ANG*0.5)*KURS.betaeubung;
+      }else if(e.art==="rueckstoss"){
+        w+=e.staerke*KURS.rueckstoss;
+      }else if(e.art==="unverwundbar"){
+        const drauf=live(1-u.side).filter(f=>dist(u,f)<140).length;
+        w+=e.dauer*(20+drauf*18)*KURS.unverwundbar;
+      }
+    }
+    return w;
+  }
+
+  // Taktik als Multiplikator. Jeder Faktor hier ist ein Tooltip-Versprechen.
+  function taktikFaktor(u,sk,ziele){
+    let f=1, grund=[];
+    const rolle=sk.ki&&sk.ki.rolle;
+    // HALTUNG: ungestuem hebt Angriff, defensiv hebt Schutz und Flucht.
+    const ung=(u.selb||50)/100;
+    if(rolle==="einzelschaden"||rolle==="flaechenschaden"||rolle==="grundangriff"){
+      const k=0.75+ung*0.5; f*=k; if(Math.abs(k-1)>0.08)grund.push("Haltung ×"+k.toFixed(2));
+    }else if(rolle==="flucht"||rolle==="rettung"){
+      const k=1.25-ung*0.5; f*=k; if(Math.abs(k-1)>0.08)grund.push("Haltung ×"+k.toFixed(2));
+    }
+    // ZIELPRIORITAET: was der Spieler eingestellt hat, wiegt schwerer.
+    if(u.zielP&&ziele.length&&sk.zielart==="gegner"){
+      const passt=ziele.some(z=>
+        (u.zielP==="heiler"&&z.heiler)||
+        (u.zielP==="schwach"&&z.hp/z.max<0.4)||
+        (u.zielP==="bedrohung"&&z===live(1-u.side).reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b))||
+        (u.zielP==="hinten"&&z.row===2));
+      if(passt){f*=1.6;grund.push("Zielpriorität ×1,6");}
+    }
+    // BEFEHL: "Hinter den Eigenen" verbietet den Sprung nach vorn.
+    if(u.ord==="hinter"&&sk.eigenbewegung&&sk.eigenbewegung.typ==="zumZiel"){f*=0.15;grund.push("Befehl ×0,15");}
+    if(u.ord==="decken"&&sk.eigenbewegung&&sk.eigenbewegung.typ==="zumZiel"){f*=0.4;grund.push("Befehl ×0,4");}
+    return {f,grund};
+  }
+
+  // Die abschmelzende Schwelle: ein aufgesparter Skill muss anfangs mehr schlagen als der
+  // Grundangriff, und diese Huerde sinkt, je laenger er bereit liegt — und faellt, wenn es
+  // eng wird. "Warten" ist damit kein Zustand, sondern ein verlorener Vergleich.
+  function schwelleVon(u,sk){
+    const m0=(sk.ki&&sk.ki.mindestwert)||0;
+    if(!m0)return 0;
+    const bereitSeit=u.bereit&&u.bereit[sk.id]||0;
+    const aufsparen=(sk.ki&&sk.ki.aufsparen)||0;
+    const fenster=4+aufsparen*10;
+    let m=m0-(m0-1)*Math.min(1,bereitSeit/fenster);
+    if(u.hp/u.max<0.4)m*=0.5;
+    return m;
+  }
+
+  // AUSFUEHRUNG — ebenfalls generisch. Sie liest dieselben Felder wie die Bewertung,
+  // damit kein Skill etwas anderes TUT, als sein Nutzen versprochen hat.
+  function fuehreAus(u,wahl,fat,sd){
+    const sk=wahl.sk, t=sk.tor||{};
+    if(t.mp)u.mp-=t.mp;
+    if(t.sp)u.sp-=t.sp;
+    u.cds[sk.id]=(t.cd||0)*(1-cdKuerzung(u))/Math.max(.5,fat);
+    u.letzterSkill=sk.id;
+    if(u.bereit)u.bereit[sk.id]=0;
+
+    // Eigenbewegung
+    if(sk.eigenbewegung){
+      const z=wahl.ziele[0]||u.tgt;
+      let ax=0, ay=0;
+      if(z&&z!==u){ax=z.x-u.x; ay=z.y-u.y;}
+      else {ax=(u.side===0?1:-1); ay=0;}
+      const L=Math.hypot(ax,ay)||1;
+      const vor=sk.eigenbewegung.typ==="zumZiel"?1:-1;
+      let w=sk.eigenbewegung.distanz;
+      if(vor>0&&z&&z!==u)w=Math.max(0,Math.min(w,L-u.reichNah*0.8));
+      u.x=Math.max(34,Math.min(W-34,u.x+ax/L*w*vor));
+      u.y=Math.max(34,Math.min(H-34,u.y+ay/L*w*vor));
+    }
+    for(const e of sk.wirkung)if(e.art==="unverwundbar")u.invuln=e.dauer;
+    schwebe({x:u.x,y:u.y-30,txt:sk.name,life:1.0,skill:true});
+
+    // Zauberzeit: Wirkung folgt spaeter
+    if(t.castzeit){u.cast=sk.id;u.castZiel=wahl.ziele[0]||null;u.castLeft=t.castzeit;u.castZiele=wahl.ziele;return;}
+    wirkeAus(u,sk,wahl.ziele,sd);
+  }
+
+  // Die Wirkungen selbst — einmal geschrieben, fuer jeden Skill.
+  function wirkeAus(u,sk,ziele,sd){
+    const projTempo=sk.projektil&&sk.projektil.tempo;
+    for(const e of sk.wirkung){
+      if(e.art==="unverwundbar")continue;
+      if(e.art==="schild"){
+        for(const z of ziele){z.schild=e.staerke;z.schildT=e.dauer;z.schildVon=u;
+          schwebe({x:z.x,y:z.y-34,txt:"+Schild "+e.staerke,life:1.1,heil:true});
+          feed(u.side,u.n+" segnet "+(z===u?"sich selbst":z.n)+" — Schild "+e.staerke+" für "+e.dauer+" s.");}
+        continue;
+      }
+      if(e.art==="heilung"){
+        for(const z of ziele){const h=Math.round(e.basis*angFaktor(u.ANG)*(e.mult||1));
+          const echt=Math.min(h,z.max-z.hp); z.hp=Math.min(z.max,z.hp+h); u.st.heal+=echt;
+          schwebe({x:z.x,y:z.y-26,txt:"+"+h,life:.95,heil:true});
+          feed(u.side,u.n+" heilt "+z.n+" · "+h);}
+        continue;
+      }
+      if(e.art==="schaden"){
+        const n=e.stoesse||1;
+        if(projTempo){
+          const tg=ziele[0]; if(!tg)continue;
+          const flug=dist(u,tg)/projTempo, vor=u.PRZ/100;
+          for(let i=0;i<n;i++){
+            const zx=tg.x+(tg.vx||0)*flug*vor, zy=tg.y+(tg.vy||0)*flug*vor;
+            const streu=(1-u.PRZ/100)*0.2;
+            const a=Math.atan2(zy-u.y,zx-u.x)+(rr()*2-1)*streu;
+            const kn=(sk.wirkung.find(x=>x.art==="rueckstoss")||{}).staerke||0;
+            pfeile.push({x:u.x,y:u.y,vx:Math.cos(a)*projTempo,vy:Math.sin(a)*projTempo,
+              von:u,side:u.side,roh:e.basis*angFaktor(u.ANG)*(e.mult||1),knock:kn,
+              verzug:i*0.09,rest:reichweiteVon(sk)*1.4,skill:sk.name});
+          }
+          u.lunge=0.16;
+        }else{
+          const kn=(sk.wirkung.find(x=>x.art==="rueckstoss")||{}).staerke||0;
+          const bet=(sk.wirkung.find(x=>x.art==="betaeubung")||{}).dauer||0;
+          for(const z of ziele){
+            nahschlag(u,z,{basis:e.basis},(e.mult||1),kn,ziele.length>1?sk.name:null,sd);
+            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);
+              schwebe({x:z.x,y:z.y-40,txt:"betäubt",life:.9});}
+          }
+          u.lunge=0.2;
+        }
+      }
+    }
+  }
+
+  function waehleSkill(u,tg,fat){
+    if(!u.skills||!u.skills.length)return null;
+    const kandidaten=[];
+    let grundwert=0;
+    for(const id of u.skills){
+      const sk=SKILLS[id]; if(!sk||!sk.wirkung)continue;
+      const t=sk.tor||{};
+      // --- TORE ---
+      if((u.cds[id]||0)>0)continue;
+      if(t.mp&&u.mp<t.mp)continue;
+      if(t.sp&&u.sp<t.sp)continue;
+      if(t.bedraengt&&!live(1-u.side).some(f=>dist(u,f)<t.bedraengt))continue;
+      const ziele=zieleFuer(u,sk,tg);
+      if(!ziele.length)continue;
+      if(t.min&&tg&&dist(u,tg)<t.min)continue;
+      // --- NUTZENWERT ---
+      let w=0;
+      for(const e of sk.wirkung)w+=wirkungswert(u,e,ziele,sk);
+      if(sk.eigenbewegung)w+=sk.eigenbewegung.distanz*KURS.bewegung;
+      // Kosten daempfen, statt zu verbieten
+      const kost=(t.mp?t.mp/Math.max(1,u.mpMax):0)+(t.sp?t.sp/Math.max(1,u.spMax):0);
+      w/=(1+kost);
+      const tk=taktikFaktor(u,sk,ziele);
+      w*=tk.f;
+      // Hysterese: an der zuletzt getroffenen Wahl festhalten, solange sie taugt.
+      if(u.letzterSkill===id)w*=1.15;
+      // Zeitkosten: was blockiert er?
+      const zeit=Math.max((t.cd||0),grundtaktVon(u))+(t.castzeit||0);
+      const jeSek=w/zeit;
+      if((sk.ki&&sk.ki.rolle)==="grundangriff")grundwert=Math.max(grundwert,jeSek);
+      kandidaten.push({sk,id,w,jeSek,ziele,gruende:tk.grund,zeit});
+    }
+    if(!kandidaten.length)return null;
+    // Aufgesparte Skills muessen die Schwelle gegen den Grundangriff nehmen.
+    const zulaessig=kandidaten.filter(k=>{
+      const m=schwelleVon(u,k.sk);
+      return !m||!grundwert||k.jeSek>=grundwert*m;
+    });
+    const feld=zulaessig.length?zulaessig:kandidaten.filter(k=>(k.sk.ki&&k.sk.ki.rolle)==="grundangriff");
+    if(!feld.length)return null;
+    // Bester Nutzen je Sekunde; Gleichstand bricht der feste Rang im Kit.
+    feld.sort((a,b)=>(b.jeSek-a.jeSek)||((a.sk.rang||9)-(b.sk.rang||9)));
+    const sieger=feld[0], zweiter=feld[1]||null;
+    sieger.abstand=zweiter?(sieger.jeSek-zweiter.jeSek)/Math.max(1e-6,sieger.jeSek):1;
+    sieger.zweiter=zweiter;
+    return sieger;
+  }
+
   // Fuer die Serie: derselbe Schritt, aber ohne Ticker und Schwebeschrift — sonst kostet
   // eine Serie mehr Zeit im DOM als in der Simulation.
   function stepSimStumm(dt){ stumm=true; try{ stepSim(dt); } finally { stumm=false; } }
@@ -1845,7 +2297,10 @@
       if(u.cast){
         u.castLeft-=dt;
         if(u.castLeft<=0){
-          if(u.cast==="ram"){
+          if(SKILLS[u.cast]&&SKILLS[u.cast].wirkung&&u.castZiele){
+            wirkeAus(u,SKILLS[u.cast],u.castZiele,sd);
+            u.cast=null;u.castZiel=null;u.castZiele=null;
+          }else if(u.cast==="ram"){
             const z=u.castZiel&&!u.castZiel.down?u.castZiel:null;
             if(z){
               const ax=z.x-u.x,ay=z.y-u.y,L=Math.hypot(ax,ay)||1;
@@ -1890,126 +2345,30 @@
         }
       }
 
-      // SKILLS — Reihenfolge ist die Entscheidungslogik des Kaempfers.
-      if(u.skills&&u.skills.includes("shoot")&&(u.retreat<=0||u.fern)){
-        // Ein Fernkaempfer ohne Ziel sucht sich eines in Reichweite, statt untaetig zu stehen.
-        if(!tg||tg.down){
-          const inReach=live(1-u.side).filter(f=>dist(u,f)<=u.reach);
-          if(inReach.length)u.tgt=inReach.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+      // SKILLS — jetzt eine Bewertung statt dreier Ketten.
+      //
+      // Der Kaempfer wartet nie: findet die Bewertung nichts Besseres, schlaegt er
+      // weiter zu. "Aufsparen" ist deshalb kein Zustand, sondern ein verlorener
+      // Vergleich — er war die ganze Zeit produktiv.
+      if(u.skills&&u.skills.length&&u.retreat<=0){
+        u.bereit=u.bereit||{};
+        for(const id of u.skills){
+          if((u.cds[id]||0)<=0)u.bereit[id]=(u.bereit[id]||0)+dt; else u.bereit[id]=0;
         }
-        const bedraenger=live(1-u.side).filter(f=>dist(u,f)<115);
-        // 1. Light Dash: jemand ist zu nah. Ausweichrolle, kurz unverwundbar.
-        if(bedraenger.length&&(u.cds.dash||0)<=0&&u.sp>=SKILLS.dash.sp){
-          const th=bedraenger[0];
-          const dxq=u.x-th.x,dyq=u.y-th.y,L2=Math.hypot(dxq,dyq)||1;
-          u.x=Math.max(34,Math.min(W-34,u.x+dxq/L2*SKILLS.dash.strecke));
-          u.y=Math.max(34,Math.min(H-34,u.y+dyq/L2*SKILLS.dash.strecke));
-          u.invuln=SKILLS.dash.dauer; u.sp-=SKILLS.dash.sp; u.cds.dash=SKILLS.dash.cd;
-          schwebe({x:u.x,y:u.y-30,txt:"Light Dash",life:1.0,skill:true});
-          feed(u.side,u.n+" rollt weg — unverwundbar.");
-          continue;
-        }
-        const tgS=u.tgt&&!u.tgt.down?u.tgt:null;
-        // 2. Archer Barrage: Ziel in Reichweite, genug Mana. Sprung rueckwaerts, dann Salve.
-        if(tgS&&dist(u,tgS)<SKILLS.barrage.reichweite&&(u.cds.barrage||0)<=0&&u.mp>=SKILLS.barrage.mp){
-          const dxq=u.x-tgS.x,dyq=u.y-tgS.y,L2=Math.hypot(dxq,dyq)||1;
-          u.x=Math.max(34,Math.min(W-34,u.x+dxq/L2*SKILLS.barrage.sprung));
-          u.y=Math.max(34,Math.min(H-34,u.y+dyq/L2*SKILLS.barrage.sprung));
-          u.mp-=SKILLS.barrage.mp; u.cds.barrage=SKILLS.barrage.cd;
-          u.cast="barrage"; u.castLeft=SKILLS.barrage.castzeit;
-          schwebe({x:u.x,y:u.y-30,txt:"Archer Barrage",life:1.1,skill:true});
-          feed(u.side,u.n+" springt zurück und legt an.");
-          continue;
-        }
-        // 3. Shoot: der Grundschuss.
-        if(tgS&&dist(u,tgS)<=u.reach&&(u.cds.shoot||0)<=0){
-          u.cds.shoot=abkling(u,SKILLS.shoot.cd,fat);
-          u.wurzel=SKILLS.shoot.zielzeit;
-          feuerSkill(u,"shoot");
-          continue;
-        }
-      }
-
-      // MATRIARCH — Support-Paladin. Die Reihenfolge IST seine Entscheidungslogik:
-      // erst jemanden am Leben halten, dann die Luecke zum eigenen Ziel schliessen,
-      // dann zuschlagen. Heavy Dash ist dabei ausdruecklich das Mittel gegen
-      // "wird abgefangen und kommt nie an" — er springt durch, statt haengenzubleiben.
-      if(u.skills&&u.skills.includes("slash")&&u.retreat<=0){
-        // 1. Blessed Shield auf den am schwersten Angeschlagenen ohne Schild.
-        if((u.cds.shield||0)<=0&&u.mp>=SKILLS.shield.mp){
-          const kand=live(u.side).filter(a=>a.schild<=0&&a.hp/a.max<0.7&&dist(u,a)<260);
-          if(kand.length){
-            const z=kand.reduce((b,x)=>x.hp/x.max<b.hp/b.max?x:b);
-            u.mp-=SKILLS.shield.mp;u.cds.shield=SKILLS.shield.cd;
-            u.cast="shield";u.castZiel=z;u.castLeft=SKILLS.shield.castzeit;
-            schwebe({x:u.x,y:u.y-30,txt:"Blessed Shield",life:1.1,skill:true});
-            feed(u.side,u.n+" hebt den Hammer und ruft den Segen.");
-            continue;
+        const wahl=waehleSkill(u,tg,fat);
+        if(wahl){
+          // MESSUNG: was gewaehlt wurde, wie deutlich, und mit wie vielen Zielen.
+          const st=MESS[wahl.id]||(MESS[wahl.id]={n:0,ziele:0,eng:0,bereit:0});
+          st.n++; st.ziele+=wahl.ziele.length;
+          if(wahl.abstand<0.10)st.eng++;
+          st.bereit+=(u.bereit[wahl.id]||0);
+          if(!stumm&&wahl.zweiter){
+            const g=wahl.gruende.length?" ("+wahl.gruende.join(", ")+")":"";
+            feed(u.side,u.n+" — "+wahl.sk.name+" ["+Math.round(wahl.jeSek)+"] statt "+
+              wahl.zweiter.sk.name+" ["+Math.round(wahl.zweiter.jeSek)+"]"+g+
+              (wahl.ziele.length>1?" · "+wahl.ziele.length+" Ziele":""));
           }
-        }
-        const tgM=u.tgt&&!u.tgt.down?u.tgt:null;
-        // 2. Heavy Dash: Ziel ausser Hammerreichweite, Sturmschritt hin, 0,4 s unverwundbar.
-        if(tgM&&dist(u,tgM)>u.reach*1.3&&(u.cds.heavydash||0)<=0&&u.sp>=SKILLS.heavydash.sp){
-          const ax=tgM.x-u.x,ay=tgM.y-u.y,L2=Math.hypot(ax,ay)||1;
-          const w=Math.max(0,Math.min(SKILLS.heavydash.strecke,L2-u.reichNah*0.8));
-          u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
-          u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
-          u.invuln=SKILLS.heavydash.dauer;u.sp-=SKILLS.heavydash.sp;u.cds.heavydash=SKILLS.heavydash.cd;
-          schwebe({x:u.x,y:u.y-30,txt:"Heavy Dash",life:1.0,skill:true});
-          feed(u.side,u.n+" setzt mit dem Sturmschritt zu "+tgM.n+" durch — unverwundbar.");
-          continue;
-        }
-        // 3. Paladin Slash. Mit Ausdauer wird aufgeladen: mehr Schaden, volle Wucht, langsamer.
-        if(tgM&&dist(u,tgM)<=u.reach&&(u.cds.slash||0)<=0){
-          const schwer=hauSchwer(u,tgM,SKILLS.slash);
-          if(schwer)u.sp-=SKILLS.slash.sp;
-          const sw=SKILLS.slash.schwer;
-          const m=schwer?sw.von+rr()*(sw.bis-sw.von):SKILLS.slash.mult;
-          u.cds.slash=schwer?abklingSchwer(u,SKILLS.slash,fat):abkling(u,SKILLS.slash.cd,fat);
-          u.lunge=0.2;
-          nahschlag(u,tgM,SKILLS.slash,m,schwer?SKILLS.slash.knock:0,schwer?"Schwerer Hammerschlag":null,sd);
-          continue;
-        }
-      }
-
-      // FIGHTER — Tank mit Druck. Die Reihenfolge ist seine Entscheidungslogik: erst die
-      // grosse Bahn raeumen, dann die Luecke schliessen, dann schlagen. Battering Ram ist
-      // genau die Antwort auf "der Tank kommt nicht ran": er muss nicht hinterherlaufen,
-      // er faehrt durch.
-      if(u.skills&&u.skills.includes("fslash")&&u.retreat<=0){
-        const tgF=u.tgt&&!u.tgt.down?u.tgt:null;
-        // 1. Battering Ram: Ziel ausser Schlagweite, aber in Sturmreichweite.
-        if(tgF&&(u.cds.ram||0)<=0&&u.sp>=SKILLS.ram.sp){
-          const d0=dist(u,tgF);
-          if(d0>u.reach*1.4&&d0<SKILLS.ram.reichweite){
-            u.sp-=SKILLS.ram.sp;u.cds.ram=SKILLS.ram.cd;
-            u.cast="ram";u.castZiel=tgF;u.castLeft=SKILLS.ram.castzeit;
-            schwebe({x:u.x,y:u.y-30,txt:"Battering Ram",life:1.1,skill:true});
-            feed(u.side,u.n+" senkt die Schulter und nimmt Anlauf auf "+tgF.n+".");
-            continue;
-          }
-        }
-        // 2. Medium Dash: kurzer Satz nach vorn, 0,3 s unverwundbar.
-        if(tgF&&dist(u,tgF)>u.reach*1.4&&(u.cds.mdash||0)<=0&&u.sp>=SKILLS.mdash.sp){
-          const ax=tgF.x-u.x,ay=tgF.y-u.y,L2=Math.hypot(ax,ay)||1;
-          const w=Math.max(0,Math.min(SKILLS.mdash.strecke,L2-u.reichNah*0.6));
-          u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
-          u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
-          u.invuln=SKILLS.mdash.dauer;u.sp-=SKILLS.mdash.sp;u.cds.mdash=SKILLS.mdash.cd;
-          schwebe({x:u.x,y:u.y-30,txt:"Medium Dash",life:1.0,skill:true});
-          feed(u.side,u.n+" setzt nach — unverwundbar.");
-          continue;
-        }
-        // 3. Slash. Aufgeladen nur, wenn das Ziel sonst nicht zu erreichen ist oder
-        //    mehrere dicht stehen — sonst ist der schnelle Schlag mehr wert.
-        if(tgF&&dist(u,tgF)<=u.reach&&(u.cds.fslash||0)<=0){
-          const schwer=hauSchwer(u,tgF,SKILLS.fslash);
-          if(schwer)u.sp-=SKILLS.fslash.sp;
-          const sw=SKILLS.fslash.schwer;
-          const m=schwer?sw.von+rr()*(sw.bis-sw.von):SKILLS.fslash.mult;
-          u.cds.fslash=schwer?abklingSchwer(u,SKILLS.fslash,fat):abkling(u,SKILLS.fslash.cd,fat);
-          u.lunge=0.2;
-          nahschlag(u,tgF,SKILLS.fslash,m,schwer?SKILLS.fslash.knock:0,schwer?"Schwerer Schwertschlag":null,sd);
+          fuehreAus(u,wahl,fat,sd);
           continue;
         }
       }
@@ -2060,6 +2419,25 @@
     if(gesamtBeitrag<=0||gesamtEig<=0)return null;
     const erwartet=(u.eig||1)/gesamtEig*gesamtBeitrag;
     return erwartet>0?Math.round(beitragVon(u)/erwartet*100):null;
+  }
+
+  function renderNutzwert(){
+    const tb=document.getElementById("nutzbody"); if(!tb)return;
+    const reihen=Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])}))
+      .filter(x=>x.wert!=null).sort((a,b)=>b.jeSekunde-a.jeSekunde);
+    const max=Math.max(...reihen.map(r=>r.jeSekunde));
+    tb.textContent="";
+    for(const r of reihen){
+      const tr=el("tr");
+      tr.appendChild(el("td",null,r.name));
+      const c=(v)=>{const td=el("td","n");td.textContent=v;return td;};
+      tr.appendChild(c(r.wert)); tr.appendChild(c(r.zeit+" s")); 
+      const td=el("td","n"+(r.jeSekunde>=max*0.95?" top":"")); td.textContent=r.jeSekunde;
+      tr.appendChild(td);
+      const w=el("td"); w.style.color="var(--muted)"; w.style.fontSize="11px";
+      w.textContent=r.teile.join(" · "); tr.appendChild(w);
+      tb.appendChild(tr);
+    }
   }
 
   function renderWertung(){
@@ -2242,7 +2620,7 @@
     if(tb.id==="t2")reset();
   }));
 
-  function renderAll(){renderDbar();renderList();renderBoard();}
+  function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
@@ -2255,12 +2633,15 @@
   function serie(n,zwang){
     planZwang=zwang||null;
     const summe={},alt={U,pfeile,t,done,seed,freigabe};
-    let siege=0,dauer=0; const ergebnisse={};
+    let siege=0,dauer=0; const ergebnisse={}, messSumme={};
     for(let i=0;i<n;i++){
       build(1337+i*7919);
       let g=0;
       while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
       dauer+=t;
+      // Skill-Kennzahlen ueber die ganze Serie sammeln — ein einzelner Kampf ist ein Wurf.
+      for(const k in MESS){const a=messSumme[k]||(messSumme[k]={n:0,ziele:0,eng:0,bereit:0});
+        a.n+=MESS[k].n;a.ziele+=MESS[k].ziele;a.eng+=MESS[k].eng;a.bereit+=MESS[k].bereit;}
       if(live(0).length>live(1).length)siege++;
       // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
       const e=(6-live(1).length)+":"+(6-live(0).length);
@@ -2274,14 +2655,14 @@
     }
     U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
-    return {plan:gewaehlt,laeufe:n,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
+    return {plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
       reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
         dmg:Math.round(s.dmg/n),heal:Math.round(s.heal/n),verh:Math.round(s.verh/n),
         tank:Math.round(s.tank/n),ko:+(s.ko/n).toFixed(2),leist:Math.round(s.leist/n),
         totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
   }
 
-  window.__arena={ serie, einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
