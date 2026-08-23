@@ -200,6 +200,14 @@
   .plan.verdeckt b{color:var(--faint)}
   .rng.band{color:var(--faint);font-style:italic}
 
+  /* Schon eingesetzte Spieler: blass, damit auf einen Blick klar ist, wer noch frei ist. */
+  .prow.gesetzt{opacity:.5}
+  .prow.gesetzt .pnm b{font-weight:500}
+  .prow.gesetzt.sel,.prow.used.sel{opacity:1}
+  .pico.belegt{position:relative}
+  .pico.belegt::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;
+    border-radius:50%;background:var(--warn);border:2px solid var(--surface)}
+
   /* Kaderleiste */
   .kaderleiste{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
     padding:8px 10px;background:var(--sunk);border-top:1px solid var(--line)}
@@ -1205,11 +1213,13 @@
       box.appendChild(kopf);
     }
     liste.forEach(p=>{
-      const pl=place[p.n],used=pl&&pl.d!==disc;
-      const r=el("div","prow"+(sel===p.n?" sel":"")+(used?" used":""));
+      const pl=place[p.n], anderswo=pl&&pl.d!==disc, gesetzt=pl&&pl.d===disc;
+      const r=el("div","prow"+(sel===p.n?" sel":"")+(anderswo?" used":"")+(gesetzt?" gesetzt":""));
       r.tabIndex=0;r.setAttribute("role","button");
       r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
-      r.appendChild(el("div","pico",p.n.slice(0,2).toUpperCase()));
+      const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
+      if(gesetzt||anderswo)ico.title=anderswo?("steht in "+DISCS[pl.d].label):("steht auf "+(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot));
+      r.appendChild(ico);
       const nm=el("div","pnm");nm.appendChild(el("b",null,p.n));
       nm.appendChild(el("span",null,pl?(pl.d===disc?(SLOTVON[pl.slot]?SLOTVON[pl.slot].label:pl.slot):"in "+DISCS[pl.d].label):"—"));
       r.appendChild(nm);
