@@ -20,12 +20,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import {
   istGemerkt,
   leseArenaTeamAuswahl,
   leseGemerkteIds,
   leseMerkliste,
   merke,
+  normalisiereMerklistenBesitzer,
   schalteMerkliste,
   vergiss,
 } from "@/lib/merkliste/merkliste-service";
@@ -71,13 +73,24 @@ describe("Merkliste", () => {
     expect(istGemerkt(stand, { ownerId: CHRIS, art: "team", id: "D-P" })).toBe(true);
   });
 
-  it("behandelt Solo (ohne Anmeldung) als eigenen, einzigen Eimer", () => {
+  it("führt „kein Besitzer\" und den Standardbesitzer auf DENSELBEN Eimer zusammen", () => {
+    // DER FEHLER, DEN DAS VERHINDERT, war beim Verdrahten schon angelegt: die Arena kennt den
+    // Besitzer nur ueber den Raum (im Solo `null`), die Teamansicht ueber `activeOwnerId` der
+    // Schale (im Solo `DEFAULT_ACTIVE_OWNER_ID`). Ohne die Normalisierung waeren das zwei
+    // getrennte Listen — ein in der Teamansicht gesetztes Lesezeichen waere in der Arena nie
+    // aufgetaucht, und niemand haette gesehen, warum. Fachlich ist es dasselbe: ohne Anmeldung
+    // spielt der Standardbesitzer.
     let stand = merke({ gameState: leererStand(), ownerId: null, art: "team", id: "D-P" });
     expect(istGemerkt(stand, { ownerId: null, art: "team", id: "D-P" })).toBe(true);
-    // Ein angemeldeter Besitzer sieht den Solo-Eintrag NICHT — sonst liefen beide Welten
-    // ineinander, sobald jemand die Anmeldung einschaltet.
-    expect(istGemerkt(stand, { ownerId: CHRIS, art: "team", id: "D-P" })).toBe(false);
-    stand = vergiss({ gameState: stand, ownerId: null, art: "team", id: "D-P" });
+    expect(istGemerkt(stand, { ownerId: DEFAULT_ACTIVE_OWNER_ID, art: "team", id: "D-P" })).toBe(true);
+    expect(normalisiereMerklistenBesitzer(null)).toBe(DEFAULT_ACTIVE_OWNER_ID);
+    expect(normalisiereMerklistenBesitzer("   ")).toBe(DEFAULT_ACTIVE_OWNER_ID);
+
+    // Ein ANDERER benannter Besitzer bleibt getrennt — die Zusammenfuehrung gilt nur fuer „leer".
+    expect(istGemerkt(stand, { ownerId: FRANKY, art: "team", id: "D-P" })).toBe(false);
+
+    // Und was ohne Besitzer gesetzt wurde, laesst sich mit dem Standardbesitzer wieder entfernen.
+    stand = vergiss({ gameState: stand, ownerId: DEFAULT_ACTIVE_OWNER_ID, art: "team", id: "D-P" });
     expect(leseMerkliste(stand, null)).toHaveLength(0);
   });
 

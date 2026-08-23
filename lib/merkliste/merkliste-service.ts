@@ -1,4 +1,5 @@
 import type { GameState, MerklisteArt, MerklisteEintrag } from "@/lib/data/olyDataTypes";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 /**
  * DIE MERKLISTE — Lesezeichen auf Teams und Spieler.
@@ -24,9 +25,29 @@ import type { GameState, MerklisteArt, MerklisteEintrag } from "@/lib/data/olyDa
  *      gerade den aktuellen Stand kennt.
  */
 
+/**
+ * EIN EIMER JE BESITZER — und „niemand" ist derselbe Eimer wie der Standardbesitzer.
+ *
+ * DER FEHLER, DEN DAS VERHINDERT, war beim Verdrahten schon angelegt: die Arena kennt den
+ * Besitzer nur ueber den Raum (`roomContext?.ownerId`, im Solo also `null`), die Teamansicht ueber
+ * `activeOwnerId` der Schale (im Solo `DEFAULT_ACTIVE_OWNER_ID`). Ohne diese Normalisierung waeren
+ * das zwei getrennte Listen gewesen: ein in der Teamansicht gesetztes Lesezeichen waere in der
+ * Arena nie aufgetaucht, und niemand haette gesehen, warum.
+ *
+ * Fachlich ist es ohnehin dasselbe: ohne Anmeldung spielt der Standardbesitzer. Zwei benannte
+ * Besitzer bleiben getrennt, wie sie sollen.
+ */
+export function normalisiereMerklistenBesitzer(ownerId: string | null | undefined): string {
+  const getrimmt = ownerId?.trim();
+  return getrimmt ? getrimmt : DEFAULT_ACTIVE_OWNER_ID;
+}
+
 /** Alle Eintraege dieses Besitzers, neueste zuerst. */
 export function leseMerkliste(gameState: GameState, ownerId: string | null): MerklisteEintrag[] {
-  return (gameState.merkliste ?? []).filter((eintrag) => (eintrag.ownerId ?? null) === (ownerId ?? null));
+  const besitzer = normalisiereMerklistenBesitzer(ownerId);
+  return (gameState.merkliste ?? []).filter(
+    (eintrag) => normalisiereMerklistenBesitzer(eintrag.ownerId) === besitzer,
+  );
 }
 
 /** Die gemerkten IDs einer Art — als Menge, weil jede Ansicht damit nur nachschlaegt. */
@@ -62,7 +83,7 @@ export function merke(input: {
   const eintrag: MerklisteEintrag = {
     art: input.art,
     id,
-    ownerId: input.ownerId ?? null,
+    ownerId: normalisiereMerklistenBesitzer(input.ownerId),
     angelegtAm: input.jetzt ?? new Date().toISOString(),
     ...(input.notiz != null ? { notiz: input.notiz } : {}),
   };
@@ -80,10 +101,11 @@ export function vergiss(input: {
   id: string;
 }): GameState {
   const vorhanden = input.gameState.merkliste ?? [];
+  const besitzer = normalisiereMerklistenBesitzer(input.ownerId);
   const uebrig = vorhanden.filter(
     (eintrag) =>
       !(
-        (eintrag.ownerId ?? null) === (input.ownerId ?? null) &&
+        normalisiereMerklistenBesitzer(eintrag.ownerId) === besitzer &&
         eintrag.art === input.art &&
         eintrag.id === input.id
       ),
