@@ -811,6 +811,11 @@
   // deutlich ueber der Reihe liegt, faellt vorher auf statt nach dreissig Kaempfen.
   // ===================================================================================
   const KURS={
+    // Punkte je Charisma-Sekunde Fuehrung. Bewusst klein: ein Kommandeur mit Charisma 75
+    // sammelt ueber einen Kampf von 80 s rund 6000 davon; mit 0,06 sind das 360 Punkte,
+    // ungefaehr so viel wie ein solider Unterstuetzer beitraegt. Eine Stellschraube, und
+    // sie steht hier bei den anderen statt verstreut im Code.
+    fuehrung:     0.06,
     schaden:      1.00,   // je Punkt tatsaechlich abgezogener Lebenspunkte
     heilung:      1.00,   // je Punkt tatsaechlich fehlender und aufgefuellter LP
     schild:       0.80,   // je Punkt vorweggenommener Schadensabwehr
@@ -2125,13 +2130,13 @@
         const sMod=stats({...p,a:attr},"tdm");
         for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
         s.MANA=sMod.MANA;
-        U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
+        U.push({id:id++,n:p.n,side:0,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{}}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}});
       });
     }
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
@@ -2144,13 +2149,13 @@
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
         const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
-        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm+formVon(o.n),ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
+        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm+formVon(o.n),charisma:o.a.charisma||0,slot:(z&&z.slot)||null,ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,...reichweiten(o.skills,false),stun:0,skills:kitVon(o.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{}}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}});
       });
     }
   }
@@ -2800,8 +2805,67 @@
   // eine Serie mehr Zeit im DOM als in der Simulation.
   function stepSimStumm(dt){ stumm=true; try{ stepSim(dt); } finally { stumm=false; } }
 
+  // ===================================================================================
+  // FUEHRUNG — wofuer Charisma da ist.
+  //
+  // Charisma traegt 10 % zum TDM-Wert bei und speiste bis hierher NICHTS: keinen der
+  // sechs Kampfwerte, kein Mana. Ein Spieler wurde also fuer etwas bezahlt, das die Arena
+  // nicht ausdruecken konnte. Baumkopf hat mit 75 die hoechste Charisma im Kader — ein
+  // Zehntel seiner 81 hing an einem Wert ohne Wirkung.
+  //
+  // (Zur Klarstellung, weil ich es vorher falsch gesagt habe: Geist ist NICHT tot. Er
+  // speist Mana zu 45 %, und Mana wird im Kampf ausgegeben. Meine Pruefung hatte nur die
+  // sechs Kampfwerte angesehen und Mana uebergangen.)
+  //
+  // Charisma ist kein Kampfwert und soll auch keiner werden — es waere weder Schaden noch
+  // Panzerung. Es ist eine FUEHRUNGSGROESSE: wer sie hat, haelt die Linie zusammen. Dafuer
+  // gibt es bereits eine Stellschraube, die Formationstreue, an der die Leine haengt
+  // (leine = 40 + (100 - form) * 3,4). Fuehrung hebt sie, statt einen zweiten Mechanismus
+  // danebenzustellen.
+  //
+  // Wer fuehrt, haengt am Slot: Shotcaller und Rally Point sind ausdruecklich die
+  // Kommandorollen ("Ordnet den Fight ueber Intelligence und Charisma", "Hebt
+  // Team-Momentum ueber Spirit und Charisma"). Wer dort steht, zaehlt voll; alle anderen
+  // halb — Charisma wirkt auch ohne Kommandoposten, aber schwaecher.
+  //
+  // Und es haengt am LEBEN: faellt der Kommandeur, faellt die Fuehrung mit ihm. Damit wird
+  // Charisma taktisch — man kann den Shotcaller des Gegners ausschalten und ihm damit die
+  // Ordnung nehmen.
+  const KOMMANDOSLOT=new Set(["shotcaller","rallypoint"]);
+  function fuehrungVon(seite){
+    let best=0, wer=null;
+    for(const u of live(seite)){
+      const gewicht=KOMMANDOSLOT.has(u.slot)?1:0.5;
+      const w=(u.charisma||0)*gewicht;
+      if(w>best){best=w;wer=u;}
+    }
+    return {wert:best, wer};
+  }
+  // Die Fuehrung wird einmal je Bild bestimmt, nicht je Einheit — sonst kostet sie
+  // unnoetig, und ein Wechsel waere nicht meldbar.
+  let FUEHRUNG={0:{wert:0,wer:null},1:{wert:0,wer:null}};
+  function aktualisiereFuehrung(dt){
+    for(const seite of [0,1]){
+      const neu=fuehrungVon(seite), alt=FUEHRUNG[seite];
+      if(alt.wer&&alt.wer!==neu.wer&&alt.wer.down)
+        feed(seite,alt.wer.n+" ist raus — die Ordnung bricht.");
+      FUEHRUNG[seite]=neu;
+      // WER FUEHRT, LEISTET ETWAS — und bis hierher sah die Wertung davon nichts.
+      // Genau dieselbe Luecke hatten die Tanks, bis "verhindert" dazukam: Baumkopf haelt
+      // mit seiner Charisma die Linie zusammen, und in seiner Leistung stand trotzdem nur,
+      // was er selbst geschlagen hat. Also wird Fuehrung erfasst wie Schaden oder Heilung:
+      // Staerke mal Zeit, in der er sie getragen hat.
+      if(neu.wer&&dt)neu.wer.st.fuehrung+=neu.wert*dt;
+    }
+  }
+  // Formationstreue plus Fuehrung, gedeckelt. Der Faktor 0,35 heisst: eine Charisma von
+  // 75 auf dem Kommandoposten bringt rund 26 Punkte Formationstreue und verkuerzt die
+  // Leine damit um etwa 90 Pixel.
+  const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
+
   function stepSim(dt){
     if(disc==="spurt")return stepSpurt(dt);
+    aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
     const sd=t>50?1+(t-50)*0.06:1;
@@ -2950,7 +3014,7 @@
       // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
       // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
       if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
-        const leine=40+(100-u.form)*3.4;
+        const leine=40+(100-formMitFuehrung(u))*3.4;
         if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
       }
 
@@ -3166,7 +3230,8 @@
   // Eingesteckte: verhinderte Punkte sind dasselbe wie geheilte, waehrend "ich wurde
   // beschossen" fuer sich genommen noch keine Leistung ist — es zaehlt nur, weil in dieser
   // Zeit niemand anderes beschossen wurde.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140
+    +(u.st.fuehrung||0)*KURS.fuehrung;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
@@ -3886,7 +3951,7 @@
       : (live(0).length+" : "+live(1).length);
   }
 
-  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
+  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["FÜ","fuehrung"],["CC","cc"],["H","heal"],["S","schild"],
                   ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
   // Welche Spalten sich nach Gegner aufschluesseln lassen.
   const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl"};
@@ -3914,6 +3979,18 @@
           // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
           if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
           const z=el("td",null,String(Math.round(v||0)));
+          // Fuehrung zaehlt in UNSERE Leistung, nicht in den Impact. Der Impact ist die
+          // abgeschriebene Formel des Vorbilds, und die kennt keine Fuehrung — ich haette
+          // sie hineinschreiben koennen, aber dann waere sie nicht mehr die Formel, die ich
+          // an zwanzig Datenzeilen geprueft habe.
+          if(f==="fuehrung"&&v){
+            z.tabIndex=0; z.classList.add("hovbar");
+            tipOn(z,"Führung — "+Math.round(v)+" Charisma-Sekunden",
+              "Wie lange dieser Spieler die Linie zusammengehalten hat, mal der Stärke seiner "+
+              "Führung. Zählt in die Leistung (Kurs "+KURS.fuehrung+" je Punkt), NICHT in den "+
+              "Impact: der ist die Formel des Vorbilds, und die kennt keine Führung.");
+            tr.appendChild(z); continue;
+          }
           const gf=GEGENFELD[f];
           if(gf&&v){
             const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
