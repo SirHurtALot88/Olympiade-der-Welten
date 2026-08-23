@@ -204,6 +204,10 @@ const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-ti
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
 });
+const FoundationMerklisteHost = dynamic(() => import("@/app/foundation/merkliste-v2/FoundationMerklisteHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Merkliste wird geladen…" />,
+});
 const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationDiszisHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
@@ -367,6 +371,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationRanksHostProps,
   foundationLeagueLeadersHostProps,
   foundationAllTimeTableHostProps,
+  foundationMerklisteHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
   foundationMatchdayResultHostProps,
@@ -3132,6 +3137,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
+
+          {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
           {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist
