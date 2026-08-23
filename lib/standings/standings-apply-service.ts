@@ -14,6 +14,7 @@ import {
   type StandingsPreviewTieGroup,
 } from "@/lib/standings/standings-preview-engine";
 import { schalteAlleLeihgabenNachTabelle } from "@/lib/sponsor/sponsor-rangmarke";
+import { zieheSaisonstandGuvNachSpieltag } from "@/lib/finance/season-guv-nachbuchung";
 import { zieheSaisonstandPunkteNach } from "@/lib/standings/saisonstand-punkte-nachbuchung";
 
 export const STANDINGS_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_STANDINGS";
@@ -383,7 +384,17 @@ function writeLocalStandingsApply(input: {
    * Korrektur aendern — am gemessenen Spielstand bei 13 von 32 Teams.
    */
   const nachbuchung = zieheSaisonstandPunkteNach(nextGameState, input.preview.scope.seasonId);
-  const korrigierterGameState = nachbuchung.gameState;
+  /**
+   * UND DIE GuV GLEICH MIT — Chris am 23.08.: „ja bau die drei hovers so und die guv nachbuchung
+   * auch." Die GuV-Spalte im Saisonstand war in jedem LAUFENDEN Spielstand leer, weil `guv` bisher
+   * erst am Saisonende geschrieben wurde; das Team-Profil zeigte daneben eine eigene, unvollständige
+   * Zahl. Beide lesen jetzt dieselbe Rechnung.
+   *
+   * Derselbe Punkt wie die Punkte-Nachbuchung darüber, aus demselben Grund: einmal je Spieltag.
+   * Gemessen kostet die Ableitung auf den echten Ständen 0,6 bis 1,4 s beim ersten Aufruf und
+   * danach 17 bis 67 ms — im Tabellenaufbau wäre das unbezahlbar, hier nicht.
+   */
+  const korrigierterGameState = zieheSaisonstandGuvNachSpieltag(nachbuchung.gameState);
 
   // DIE RANGMARKE DER GEBAEUDE-LEIHE SCHALTET GENAU HIER, weil genau hier der Tabellenplatz
   // entsteht. Frueher waere der alte Rang gemessen, spaeter haette ein ruhendes Gebaeude einen
