@@ -130,6 +130,11 @@
   .planzeile{display:flex;gap:10px;align-items:baseline;padding:7px 12px;
     border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--muted,#93A2B8);line-height:1.5}
   .planzeile b{color:var(--gold,#E2A84A);white-space:nowrap;letter-spacing:.02em}
+  .prozente{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 2px}
+  .prozente .pz{display:flex;flex-direction:column;gap:1px;background:var(--panel-2,#161C26);
+    border:1px solid var(--line-soft,#232B38);border-radius:5px;padding:3px 6px;cursor:help;font-style:normal}
+  .prozente .pz b{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#93A2B8);font-weight:600}
+  .prozente .pz s{text-decoration:none;font-size:12px;font-weight:600;color:var(--ink,#E6ECF5);font-variant-numeric:tabular-nums}
   .oppline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
   .oppline:last-child{border-bottom:0}
   .oppline small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
@@ -546,7 +551,7 @@
     h:"Haltung steuert, wann jemand abbricht. Defensiv löst sich schon bei knapp der Hälfte seiner Lebenspunkte aus dem Kampf und fällt zurück; ungestüm kämpft bis zum Ende weiter und zieht sich nie zurück.",
     z:"Zusammenhalt bestimmt, wie weit sich jemand von der eigenen Linie entfernen darf. Dicht bleibt eng bei den Kameraden und kehrt zurück; eigenmächtig läuft dem Ziel hinterher, auch quer über das Feld.",
     ziel:"Wen dieser Spieler bevorzugt angreift. Natürlich heißt: seine Persönlichkeit entscheidet — ein Duellant sucht den Stärksten, ein Opportunist den Schwächsten, ein Bollwerk den Nächsten.",
-    b:"Bindung bestimmt, wie oft neu gezielt wird. Opportunistisch prüft alle 0,35 Sekunden und wechselt auf das lohnendste Ziel; unbeirrt bleibt bis zu 2,8 Sekunden am einmal gewählten Gegner und ignoriert Angreifer im Rücken."
+    b:"Bindung bestimmt, wie oft neu gezielt wird. Opportunistisch prüft alle 0,35 Sekunden und wechselt auf das lohnendste Ziel; unbeirrt bleibt bis zu 2,8 Sekunden am einmal gewählten Gegner und ignoriert Angreifer im Rücken. Sie entscheidet außerdem, was er tut, wenn ihn jemand abfängt: ab 55 stellt er sich dem Abfangenden, darunter geht er weiter — und kassiert dafür beim Lösen einen Trennschlag mit halbem Schaden."
   };
   const SK=(arr,v)=>Math.max(0,arr.findIndex(x=>x[0]===v))/(arr.length-1);
   // Jede Persoenlichkeit hat ihre eigene Grundstellung auf den drei Skalen.
@@ -593,7 +598,7 @@
     return o;}
   // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
   // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
-  const dmgOf=(atk,vr)=>Math.max(1,Math.round(12*(atk/100)*(100/(100+vr))));
+  const dmgOf=(atk,vr)=>Math.max(1,Math.round(12*(atk/50)*(100/(100+vr))));
 
   let disc="tdm",sel=null;
   const place={},order={},zielOf={};
@@ -700,6 +705,26 @@
         u.appendChild(rm);
         u.appendChild(el("b",null,p.n));
         u.appendChild(el("span",null,"LP "+s.LP+" · ANG "+s.ANG+" · VER "+s.VER+" · TMP "+s.TMP));
+        // DIESELBE LESART WIE IM VORBILD: die Kampfwerte als Prozente, damit man sofort
+        // sieht, was sie bewirken, statt eine nackte Zahl zwischen 1 und 99 zu deuten.
+        const pz=(x)=>(x>=0?"+":"")+x+" %";
+        const wz=el("span","prozente");
+        const teile=[
+          ["Leben",(s.LP*12)+"",  "Er hält "+(s.LP*12)+" Schaden aus, bevor er ausscheidet ("+s.LP+" × 12)."],
+          ["Angriff",pz(Math.round((s.ANG/50-1)*100)),
+            "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+s.ANG+"."],
+          ["Minderung",Math.round(s.VER/(s.VER+100)*100)+" %",
+            "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+s.VER+". Genau die Kurve, die auch im Vorbild steht."],
+          ["Tempo",pz(Math.round(((40+s.TMP*1.4)/110-1)*100)),
+            "Laufgeschwindigkeit gegenüber einem Spieler mit Tempo 50. Dazu verkürzt Tempo jede Abklingzeit um "+Math.round(0.30*s.TMP/(s.TMP+120)*100)+" %."],
+          ["Ausdauer",(s.AUS*2)+"",  "Vorrat für Ausdauer-Skills ("+s.AUS+" × 2). Die Nachfüllrate kommt aus dem Kit seiner Klasse."],
+          ["Mana",(s.MANA*2)+"",  "Vorrat für Mana-Skills ("+s.MANA+" × 2), abgeleitet aus Geist 45, Verstand 35, Wille 20."],
+        ];
+        for(const [lab,val,tip] of teile){
+          const c=el("i","pz"); c.appendChild(el("b",null,lab)); c.appendChild(el("s",null,val));
+          c.tabIndex=0; tipOn(c,lab,tip); wz.appendChild(c);
+        }
+        u.appendChild(wz);
         // SKILLS als Karten — mit genau den Werten, mit denen die Arena dann rechnet.
         if(p.skills){
           const sw=el("div","skillwrap");
@@ -711,9 +736,9 @@
             b.appendChild(el("s",null,kosten));
             b.tabIndex=0;
             // Der Tooltip zeigt, was DIESER Spieler mit dem Skill tut — nicht die Kit-Zahl.
-            const einzel=sk.basis?Math.max(1,Math.round(sk.basis*(s.ANG/100)*(sk.mult||1))):0;
+            const einzel=sk.basis?Math.max(1,Math.round(sk.basis*(s.ANG/50)*(sk.mult||1))):0;
             const schaden=einzel
-              ? (sk.schuss?sk.schuss+" × "+einzel+" Rohschaden":einzel+" Rohschaden (Basis "+sk.basis+" × Angriff "+s.ANG+" %)")
+              ? (sk.schuss?sk.schuss+" × "+einzel+" Rohschaden":einzel+" Rohschaden (Basis "+sk.basis+" "+(s.ANG>=50?"+":"")+Math.round((s.ANG/50-1)*100)+" % Angriff)")
               : "kein Schaden";
             const kuerzung=0.30*s.TMP/(s.TMP+120);
             const rhythmus=sk.cd
@@ -730,7 +755,7 @@
           u.appendChild(sw);
         }
         if(istHeiler(p)){
-          const hb=el("span","heilbadge","HEILER · "+Math.round(12*(s.ANG/100)*0.9)+" Heilung statt Schaden");
+          const hb=el("span","heilbadge","HEILER · "+Math.round(12*(s.ANG/50)*0.9)+" Heilung statt Schaden");
           hb.tabIndex=0;
           tipOn(hb,"Heiler",
             "Diese Unterklasse heilt statt Schaden zu machen: "+(p.sub||[]).filter(x=>HEILER.has(x)).join(", ")+
@@ -847,11 +872,11 @@
       // geteilt durch die Abklingzeit, die sein Tempo daraus macht.
       const sk=fern?SKILLS.shoot:((p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)?SKILLS[(p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)]:GRUNDSCHLAG);
       const cd=sk.cd*(1-0.30*s.TMP/(s.TMP+120));
-      const roh=sk.basis*(s.ANG/100);
+      const roh=sk.basis*(s.ANG/50);
       return {n:p.n,c:p.c,fern,heiler,eig:p.d.tdm,TMP:s.TMP,
         dps:heiler?0:Math.round(roh/cd),
-        hps:heiler?Math.round(12*(s.ANG/100)*0.9/cd):0,
-        zaeh:Math.round(s.LP*6*(1+s.VER/100))};
+        hps:heiler?Math.round(12*(s.ANG/50)*0.9/cd):0,
+        zaeh:Math.round(s.LP*12*(1+s.VER/100))};
     });
   }
 
@@ -1018,7 +1043,7 @@
     const p=SQUAD[0],s=stats(p,"tdm");
     document.getElementById("profSub").textContent=p.c+" · "+p.r+" · Eignung TDM "+p.d.tdm.toFixed(1);
     const box=document.getElementById("profStats");box.textContent="";
-    const ex={LP:"hält "+(s.LP*6)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
+    const ex={LP:"hält "+(s.LP*12)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
       TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · "+(0.5+s.TMP/120).toFixed(2)+" Schläge/s",
       PRZ:Math.min(95,Math.max(40,Math.round(70+(s.PRZ-50)*0.3)))+" % Trefferchance gegen TMP 50",
@@ -1068,11 +1093,11 @@
         const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
         const bh=behav(p.n);const eigWert=p.d.tdm;
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
-          hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+          hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
           fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:p.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
+          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
@@ -1088,10 +1113,10 @@
         const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
         U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm,ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
-          hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+          hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
+          schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0}});
       });
     }
@@ -1227,7 +1252,25 @@
   const abklingSchwer=(u,sk,fat)=>abkling(u,sk.cd+sk.halten,fat);
   // Schaden: Basisschaden des Skills mal Angriffswert. Bei ANG 100 traegt der Skill seinen
   // vollen Basiswert, darunter entsprechend weniger — genau die Prozentlogik des Vorbilds.
-  const skillSchaden=(u,sk,mult)=>sk.basis*(u.ANG/100)*mult;
+  // PROZENTE STATT ANTEILE — genau die Bauart des Vorbilds.
+  //
+  // Dort steht "ATK 275, Attack +175 %", und 275 geteilt durch die Klassen-Basismitte 100
+  // ergibt exakt diese +175 %. Wer auf der Basismitte steht, macht also genau den
+  // Basisschaden des Skills; darueber mehr, darunter weniger.
+  //
+  // Unsere Basismitte ist 50 — die Mitte der Attributskala. Ein Spieler mit Angriff 50
+  // macht damit 100 % des Kit-Basisschadens, Angriff 75 sind +50 %, Angriff 25 sind -50 %.
+  // Dieselben Verhaeltnisse wie vorher (ANG/100 mal doppelte Lebenspunkte), aber jetzt
+  // steht ueberall eine Zahl, die man vorlesen kann.
+  const BASISMITTE=50;
+  const angFaktor=(ang)=>ang/BASISMITTE;
+  const LEBEN_JE_LP=12;
+  // Die drei Umrechnungen, die auch in der Anzeige stehen:
+  const angProzent=(ang)=>Math.round((angFaktor(ang)-1)*100);
+  const minderung=(ver)=>Math.round(ver/(ver+100)*100);
+  const tempoProzent=(tmp)=>Math.round(((40+tmp*1.4)/(40+BASISMITTE*1.4)-1)*100);
+
+  const skillSchaden=(u,sk,mult)=>sk.basis*angFaktor(u.ANG)*mult;
   // WER NOCH KEIN KIT HAT, schlaegt mit einem neutralen Grundschlag zu — ausdruecklich ein
   // Platzhalter, bis die Klasse ihre echten Skills bekommt.
   //
@@ -1532,6 +1575,20 @@
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
       }
 
+      // ABGEFANGEN. Wer in Schlagweite eines Gegners steht, ist an ihn GEBUNDEN. Er darf
+      // trotzdem weitergehen — aber nicht umsonst: beim Loesen kassiert er einen
+      // Trennschlag. Damit ist das Durchbrechen endlich eine Entscheidung mit Preis statt
+      // eines Freifahrtscheins.
+      //
+      // Ob jemand stehenbleibt oder weitergeht, sagt seine BINDUNG. Der Opportunist stellt
+      // sich dem, der ihn abfaengt; der Unbeirrte laeuft weiter und nimmt den Schlag mit.
+      if(u.cdTrenn>0)u.cdTrenn-=dt;
+      u.bindAn=live(1-u.side).find(f=>!f.fern&&dist(u,f)<=f.reichNah*1.15)||null;
+      if(u.bindAn&&!u.durch&&u.retreat<=0&&u.tgt!==u.bindAn&&u.opp>=55){
+        if(u.tgt!==u.bindAn)feed(u.side,u.n+" wird von "+u.bindAn.n+" gestellt und nimmt den Kampf an.");
+        u.tgt=u.bindAn; u.reev=0.6;
+      }
+
       const tg=u.tgt;
 
       // ZIEL DER BEWEGUNG
@@ -1613,7 +1670,18 @@
         let ux=dx/L,uy=dy/L;
         if(u.ord==="flanke"&&!tg&&u.retreat<=0){const edge=u.y<H/2?46:H-46;uy=(edge-u.y)/60;}
         const sx=ux*Math.min(v,L),sy=uy*Math.min(v,L);
+        const b=u.bindAn;
+        const vorher=b?dist(u,b):0;
         u.x+=sx;u.y+=sy;
+        // TRENNSCHLAG: er hat sich gerade aus der Schlagweite geloest. Das kostet.
+        // Halber Schaden, kein Rueckstoss, und drei Sekunden lang nicht noch einmal —
+        // sonst wird aus einem Preis eine Mauer, durch die niemand mehr kommt.
+        if(b&&!b.down&&b.stun<=0&&b.cdTrenn<=0&&vorher<=b.reichNah*1.15&&dist(u,b)>b.reichNah*1.15){
+          b.cdTrenn=3;
+          const sk=(b.skills&&b.skills.includes("fslash"))?SKILLS.fslash
+                 :(b.skills&&b.skills.includes("slash"))?SKILLS.slash:GRUNDSCHLAG;
+          nahschlag(b,u,sk,0.5,0,"Trennschlag",sd);
+        }
         // Die tatsaechliche Geschwindigkeit — daraus halten Schuetzen vor.
         u.vx=sx/dt; u.vy=sy/dt;
         u.y=Math.max(34,Math.min(H-34,u.y));u.x=Math.max(34,Math.min(W-34,u.x));
@@ -1683,7 +1751,7 @@
         if(verwundet.length){
           const ziel=verwundet.reduce((b,x)=>(x.hp/x.max<b.hp/b.max?x:b));
           u.cd=abkling(u,GRUNDSCHLAG.cd,fat);u.lunge=0.16;u.tgt=null;
-          const heal=Math.round(GRUNDSCHLAG.basis*(u.ANG/100)*0.9);
+          const heal=Math.round(GRUNDSCHLAG.basis*angFaktor(u.ANG)*0.9);
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
