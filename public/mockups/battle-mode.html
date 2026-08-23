@@ -989,9 +989,8 @@
            VER:{health:46,power:38,spirit:16},
            LP:{health:52,stamina:34,power:14},
            TMP:{speed:46,dexterity:24,awareness:14,stamina:16},
-           PRZ:{awareness:26,intelligence:34,dexterity:22,spirit:18},
            AUS:{stamina:52,determination:26,power:22}},
-    speed:{ANG:{speed:40,dexterity:30,torment:30},VER:{dexterity:35,awareness:35,health:30},LP:{stamina:45,health:40,will:15},TMP:{speed:60,dexterity:25,awareness:15},PRZ:{dexterity:45,awareness:30,intelligence:25},AUS:{stamina:55,determination:25,will:20}}
+    speed:{ANG:{speed:40,dexterity:30,torment:30},VER:{dexterity:35,awareness:35,health:30},LP:{stamina:45,health:40,will:15},TMP:{speed:60,dexterity:25,awareness:15},AUS:{stamina:55,determination:25,will:20}}
   };
   // MANA — dieselbe Bauart wie die sechs Kampfwerte: ein Rezept ueber dieselben zwoelf
   // Attribute, kein neuer Wert von aussen. Wer Geist und Verstand hat, hat Reserven.
@@ -1002,8 +1001,31 @@
   const vorrat=(wert)=>Math.round(wert*2);
 
   const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4}};
-  const KEYS=["LP","ANG","VER","TMP","PRZ","AUS"];
-  const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",PRZ:"Präzision",AUS:"Ausdauer"};
+  // ===================================================================================
+  // WAS EINE KLASSENKARTE WIRKLICH KENNT.
+  //
+  // Chris: "aber was ist mit crit chance etc, haben klassen die nicht auch? trefferchance
+  // gab es glaub ich nicht in dem spiel."
+  //
+  // Nachgesehen: alle 35 Karten fuehren genau hp, atk, def, spd, stunResist,
+  // knockbackResist, mana samt Regeneration und stamina samt Regeneration. KEINE Karte
+  // kennt Praezision, und keine kennt eine Krit-Chance.
+  //
+  // Praezision war also meine Erfindung — ein siebter Wert, den keine Klasse bepreist.
+  // Sie fliegt raus, und mit ihr der kritische Treffer, der allein an ihr hing. Wollen
+  // wir Krits, gehoeren sie an den SKILL (dort kann eine Karte sie ausweisen), nicht an
+  // einen ausgedachten Spielerwert.
+  //
+  // Umgekehrt habe ich zwei Werte uebersehen, die auf JEDER Karte stehen und die die
+  // Arena bis eben komplett ignoriert hat: Betaeubungs- und Rueckstosswiderstand. Beide
+  // wirken jetzt. Sie sind Klassenwerte — solange kein Spieler einem Archetyp zugeordnet
+  // ist, tragen alle denselben Platzhalter (Fighter: 15 % und 30 %), so wie beim Kit.
+  const PLATZHALTER_ARCHETYP={name:"Fighter", stunResist:15, knockbackResist:30};
+  const betWiderstand=(u)=>(u.stunResist??PLATZHALTER_ARCHETYP.stunResist)/100;
+  const stossWiderstand=(u)=>(u.knockbackResist??PLATZHALTER_ARCHETYP.knockbackResist)/100;
+
+  const KEYS=["LP","ANG","VER","TMP","AUS"];
+  const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",AUS:"Ausdauer"};
   // JEDER BEFEHL HAT EINE EXAKT BESCHREIBBARE WIRKUNG. Der Tooltip unten ist ein
   // Versprechen — was dort steht, tut die Simulation, sonst darf es dort nicht stehen.
   const ORDERS=[
@@ -1732,7 +1754,7 @@
             ". Der Angriffswert wird zur Heilkraft und geht an den am stärksten verwundeten Kameraden in Reichweite. Kein neuer Wert — dieselbe Zahl, andere Wirkung.");
           u.appendChild(hb);
         }
-        u.appendChild(el("span",null,"Schaden je Treffer "+dmgOf(s.ANG,60)+" · Präzision "+s.PRZ));
+        u.appendChild(el("span",null,"Schaden je Treffer "+dmgOf(s.ANG,60)));
 
         // Persoenlichkeit: ABGELEITET, nicht gewaehlt. Der Tooltip zeigt, woraus.
         const pk=persOf[p.n]||"duellant";
@@ -2122,8 +2144,6 @@
       // Bei Baumkopf wichen sie um Faktor 4,7 beziehungsweise 10 Punkte ab.
       TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · Abklingzeiten −"
         +Math.round(0.30*s.TMP/(s.TMP+120)*100)+" %",
-      PRZ:Math.round(100-Math.max(5,Math.min(40,(0.20+(50-s.PRZ)/300)*100)))
-        +" % Treffer gegen TMP 50 · "+Math.round(s.PRZ/4)+" % kritisch",
       AUS:"verliert ab Sekunde 35 "+((100-s.AUS)*0.11).toFixed(2)+" % je Sekunde"};
     renderLevelUp(p);
     for(const k of KEYS){
@@ -2275,7 +2295,9 @@
   // Linie aufzureissen, nicht genug, um jemanden vom Feld zu pusten.
   function stossen(z,fx,fy,knock){
     if(!knock)return;
-    const dx=z.x-fx,dy=z.y-fy,L=Math.hypot(dx,dy)||1,k=knock*0.22;
+    // Rueckstosswiderstand steht auf JEDER Klassenkarte und wurde bis eben ignoriert.
+    // Ein Barbar (50 %) wird nur halb so weit geschoben wie jemand ohne Widerstand.
+    const dx=z.x-fx,dy=z.y-fy,L=Math.hypot(dx,dy)||1,k=knock*0.22*(1-stossWiderstand(z));
     z.x=Math.max(34,Math.min(W-34,z.x+dx/L*k));
     z.y=Math.max(34,Math.min(H-34,z.y+dy/L*k));
   }
@@ -2295,7 +2317,7 @@
     // schneller sein Gegner war. Praezision entscheidet jetzt nur noch ueber den
     // kritischen Treffer.
     tg.lastHit=u;
-    const crit=rr()<u.PRZ/400;
+    const crit=false;   // Krits kommen kuenftig aus dem Skill, nicht aus einem Spielerwert.
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
@@ -2547,10 +2569,10 @@
     const flug=dist(u,tg)/PFEILTEMPO;
     for(let i=0;i<n;i++){
       // Vorhalten in dem Mass, in dem er treffsicher ist.
-      const vor=u.PRZ/100;
+      const vor=1;
       const zx=tg.x+(tg.vx||0)*flug*vor, zy=tg.y+(tg.vy||0)*flug*vor;
       // Was an Praezision fehlt, landet als Winkelfehler (bis rund 11 Grad).
-      const streu=(1-u.PRZ/100)*0.2;
+      const streu=0;
       const a=Math.atan2(zy-u.y,zx-u.x)+(rr()*2-1)*streu;
       pfeile.push({x:u.x,y:u.y,vx:Math.cos(a)*PFEILTEMPO,vy:Math.sin(a)*PFEILTEMPO,
         von:u,side:u.side,roh:skillSchaden(u,sk,sk.mult),knock:sk.knock||0,
@@ -2569,7 +2591,7 @@
       const kand=gegner(pf).filter(f=>f.invuln<=0&&bahnAbstand(f,pf.x,pf.y,nx,ny)<19);
       const z=kand.length?kand.reduce((b,x)=>Math.hypot(x.x-pf.x,x.y-pf.y)<Math.hypot(b.x-pf.x,b.y-pf.y)?x:b):null;
       if(z){
-        const crit=rr()<pf.von.PRZ/400;
+        const crit=false;
         const roh=pf.roh*(crit?1.5:1);
         const d=treffer(pf.von,z,roh,1);
         stossen(z,pf.x,pf.y,pf.knock);
@@ -2803,10 +2825,10 @@
         const n=e.stoesse||1;
         if(projTempo){
           const tg=ziele[0]; if(!tg)continue;
-          const flug=dist(u,tg)/projTempo, vor=u.PRZ/100;
+          const flug=dist(u,tg)/projTempo, vor=1;
           for(let i=0;i<n;i++){
             const zx=tg.x+(tg.vx||0)*flug*vor, zy=tg.y+(tg.vy||0)*flug*vor;
-            const streu=(1-u.PRZ/100)*0.2;
+            const streu=0;
             const a=Math.atan2(zy-u.y,zx-u.x)+(rr()*2-1)*streu;
             const kn=(sk.wirkung.find(x=>x.art==="rueckstoss")||{}).staerke||0;
             pfeile.push({x:u.x,y:u.y,vx:Math.cos(a)*projTempo,vy:Math.sin(a)*projTempo,
@@ -2819,7 +2841,10 @@
           const bet=(sk.wirkung.find(x=>x.art==="betaeubung")||{}).dauer||0;
           for(const z of ziele){
             nahschlag(u,z,{basis:e.basis},(e.mult||1),kn,ziele.length>1?sk.name:null,sd);
-            if(bet&&!z.down){z.stun=Math.max(z.stun,bet);u.st.cc+=bet;gegenZaehler(u,z.n,"cc",bet);
+            // Betaeubungswiderstand ebenso — der Bullbreaker hat 40 %, und das stand
+            // bisher nur auf seiner Karte, nicht in der Arena.
+            const betEff=bet*(1-betWiderstand(z));
+            if(betEff>0.01&&!z.down){z.stun=Math.max(z.stun,betEff);u.st.cc+=betEff;gegenZaehler(u,z.n,"cc",betEff);
               schwebe({x:z.x,y:z.y-40,txt:"betäubt",life:.9});}
           }
           u.lunge=0.2;
@@ -3224,7 +3249,8 @@
               // der Anlauf begann — sonst fliegen die Getroffenen ihm entgegen statt weg.
               for(const f of bahn){
                 nahschlag(u,f,SKILLS.ram,1,SKILLS.ram.knock,"Battering Ram",sd);
-                f.stun=Math.max(f.stun,SKILLS.ram.stun);u.st.cc+=SKILLS.ram.stun;gegenZaehler(u,f.n,"cc",SKILLS.ram.stun);
+                const bw=SKILLS.ram.stun*(1-betWiderstand(f));
+                f.stun=Math.max(f.stun,bw);u.st.cc+=bw;gegenZaehler(u,f.n,"cc",bw);
                 schwebe({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
               }
               u.x=ex;u.y=ey;
