@@ -19,6 +19,7 @@ import {
   formatMatchdayShortLabel,
   formatReadinessAfterSellLabel,
   formatRosterRoleTagLabel,
+  resolveSellDisabledReason,
   translateSellBlockingReason,
   translateSellWarning,
   type SellNoticeWeight,
@@ -173,41 +174,35 @@ export default function FoundationMarketSellShellHost({
   // FoundationDecisionSurface, siehe Kopfkommentar).
   const bookingInFlight = marketSellBusy && preview != null;
 
-  // Friction fix (Generalprobe #4, unverändert aus dem Bestand): der
-  // Bestätigen-Button war ohne sichtbare Begründung deaktiviert. Der konkrete
-  // Grund steht neben dem Button, nicht nur im Tooltip. Kader-Minimum wird
-  // zusätzlich immer markiert.
-  const rosterAtMinimum =
-    (preview?.warnings ?? []).some(
-      (warning) => warning === "team_would_fall_under_7" || warning === "team_would_fall_under_player_min",
-    );
+  // Friction fix (Generalprobe #4): der Bestätigen-Button war ohne sichtbare Begründung
+  // deaktiviert. Der konkrete Grund steht neben dem Button, nicht nur im Tooltip.
+  //
+  // WELCHER Grund das ist, entscheidet jetzt `resolveSellDisabledReason` in
+  // `transfer-sell-view-labels.ts` — hier stand die Kette früher selbst, und sie schob eine
+  // fremde Sperre dem Kader-Minimum in die Schuhe (Meldung `33c172`, beim Audit am 23.08.
+  // aufgedeckt). Eine Regel, eine Stelle, ein Test.
+  //
+  // DER AMBIENTE HINWEIS UNTEN hängt weiter an einer Kadergröße — aber nur noch an der SIEBEN.
+  // Er behauptet „dann ist keine Aufstellung mehr möglich", und das stimmt genau dann, wenn
+  // danach weniger als sieben Spieler dastehen. Beim TEAM-MINIMUM stimmt es nicht: darunter ist
+  // eine Aufstellung sehr wohl möglich, das Minimum steuert das KAUFEN
+  // (`resolvePlannerRosterTargets` füllt in der nächsten Runde nach). Der Satz behauptete dort
+  // also etwas Falsches — dieselbe Wurzel wie die verdeckte Sperre.
+  const kaderUnterSieben = (preview?.warnings ?? []).includes("team_would_fall_under_7");
   const strongAckRequired =
     preview?.coaching != null &&
     (preview.coaching.boardReaction.requiresStrongAcknowledgment ||
       (preview.coaching.gmSoftBlockStarSell && (preview.coaching.keepIntentScore ?? 0) >= 55));
   const strongAckPending = strongAckRequired && !marketSellRiskAcknowledged;
   const sellDisabled = readMetaSource === "prisma" || !preview?.canSell || marketSellBusy || strongAckPending;
-  const sellDisabledReason = !sellDisabled
-    ? null
-    : readMetaSource === "prisma"
-      ? "Im Referenzmodus bleibt der Verkauf gesperrt."
-      : !preview
-        ? issue?.kind === "window_closed"
-          ? "Das Verkaufsfenster ist geschlossen — verkauft wird im Verkaufsfenster am Saisonende."
-          : issue
-            ? "Die Verkaufsvorschau ist nicht verfügbar — bitte neu laden."
-            : "Verkaufsvorschau wird noch geladen."
-        : !preview.canSell
-          ? rosterAtMinimum
-            ? "Kader ist am Minimum — verkaufen würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz, bevor du hier verkaufst."
-            : preview.blockingReasons?.[0]
-              ? translateSellBlockingReason(preview.blockingReasons[0])
-              : "Dieser Verkauf ist gerade noch blockiert."
-          : marketSellBusy
-            ? "Der Verkauf wird gerade vorbereitet."
-            : strongAckPending
-              ? "Bitte bestätige zuerst die Board-/GM-Warnung oben, dann kannst du final verkaufen."
-              : null;
+  const sellDisabledReason = resolveSellDisabledReason({
+    readMetaSource,
+    preview,
+    issueKind: issue?.kind ?? null,
+    hasIssue: issue != null,
+    busy: marketSellBusy,
+    strongAckPending,
+  });
 
   // --- Hero-Basisdaten (auch ohne Preview vorhanden: Identität statt Striche). ---
   const playerName = preview?.player?.name ?? marketSellSubject?.playerName ?? "Spieler verkaufen";
@@ -969,9 +964,9 @@ export default function FoundationMarketSellShellHost({
       {/* Ambienter Kader-Minimum-Hinweis (unabhängig vom Bestätigen-Schritt) —
           bleibt am Ende des Inhalts, direkt vor der Fußleiste der Hülle, wie
           vorher direkt vor der eigenen Fußleiste. */}
-      {rosterAtMinimum && !marketSellSuccess ? (
+      {kaderUnterSieben && !marketSellSuccess ? (
         <p className="foundation-screen-action-reason" data-testid="transfer-sell-roster-min-note">
-          Kader ist am Minimum — ein weiterer Verkauf würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz.
+          Der Kader fiele unter sieben Spieler — dann ist keine Aufstellung mehr möglich. Kaufe zuerst Ersatz.
         </p>
       ) : null}
     </FoundationDecisionSurface>
