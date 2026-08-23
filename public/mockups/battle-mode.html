@@ -1345,6 +1345,40 @@
   const formVon=(n)=>FORMKARTE[n]||0;
   const stufenWert=()=>INTENSITAET[STUFE].wert;
 
+  // ===================================================================================
+  // EINE GEWICHTUNG, NICHT ZWEI.
+  //
+  // Chris: "wir haben doch schon die eignung, die ein gewichteter wert ist — wieso gibt
+  // es dann zusaetzlich noch unterschiedliche kampfkraft? das macht ja keinen sinn."
+  //
+  // Er hat recht, und es war der Konstruktionsfehler unter allen anderen. Die Eignung
+  // gewichtet die zwoelf Attribute EINMAL (offizielle Disziplinmatrix). Meine
+  // Kampfrezepte gewichteten dieselben zwoelf Attribute ein ZWEITES Mal, anders. Zwei
+  // Gewichtungen derselben Sache muessen sich widersprechen, und sie taten es: Rustrow
+  // und Baumkopf sind fast gleich bewertet (78 und 78,6), Rustrow hatte aber 45 % mehr
+  // Kampfkraft. Gemessen schwankte die Kraft je Eignungspunkt zwischen 0,161 und 0,320.
+  //
+  // Die Rezepte bleiben — aber nur noch fuer die FORM. Sie sagen, WIE sich die Staerke
+  // eines Spielers verteilt: Baumkopf zaeh, Greenkraut schlagkraeftig. WIE VIEL Staerke
+  // er insgesamt hat, sagt allein die Eignung. Dafuer wird der Rohentwurf so skaliert,
+  // dass die Kampfkraft proportional zur Eignung wird.
+  //
+  // Kampfkraft ist das Produkt aus Ueberlebenszeit und Schadensausstoss, also grob
+  // LP mal ANG. Ein Faktor f auf beide hebt sie um f² — deshalb die Wurzel.
+  const KRAFTMITTE=50;   // Eignung, bei der nichts skaliert wird
+  function rohKraft(s){ return (s.LP*(1+s.VER/100))*(s.ANG/50); }
+  function aufEignung(s,eig){
+    const roh=rohKraft(s); if(roh<=0)return s;
+    // Ziel: Kraft waechst linear mit der Eignung. Bei KRAFTMITTE bleibt alles wie es ist.
+    const referenz=rohKraft({LP:75,VER:60,ANG:70});
+    const ziel=referenz*(eig/KRAFTMITTE);
+    const f=Math.sqrt(ziel/roh);
+    const o={...s};
+    o.LP=Math.max(1,s.LP*f);
+    o.ANG=Math.max(1,s.ANG*f);
+    return o;
+  }
+
   function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
@@ -2162,7 +2196,8 @@
         // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
         let attr=mitAufschlag(p.a,engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
         attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
-        const sMod=stats({...p,a:attr},"tdm");
+        // Rezepte geben die FORM, die Eignung gibt die MENGE.
+        const sMod=aufEignung(stats({...p,a:attr},"tdm"),eigWert);
         for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
         s.MANA=sMod.MANA;
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
@@ -2179,7 +2214,7 @@
       oByRow[row].forEach((o,i)=>{
         // Die Gegner rechnen jetzt aus IHREN EIGENEN Attributen — dieselbe Formel wie unsere
         // Spieler, kein Klon eines Kaderspielers mehr und kein Aufschlag von aussen.
-        const s=stats(o,"tdm");
+        const s=aufEignung(stats(o,"tdm"),o.d.tdm+formVon(o.n));
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
