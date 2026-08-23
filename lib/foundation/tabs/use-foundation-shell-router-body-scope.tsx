@@ -339,6 +339,7 @@ import type { FoundationStateContextValue } from "@/lib/foundation/foundation-st
 import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
@@ -11016,6 +11017,17 @@ export function useFoundationShellRouterBodyScope({
           // Verletzungszahlen im Spiel stehen.
           injuries: countTeamSeasonInjuries(gameState, row.teamId, gameState.season.id),
           marketValueTotal: row.marketValueTotal ?? null,
+          /**
+           * DER KADER FUER DIE DREI HOVERS (Chris, 23.08.: „dass ich dann die Spieler dahinter
+           * sehe … immer absteigend sortiert").
+           *
+           * ER MUSS HIER STEHEN, NICHT NUR IM MODELL NEBENAN. `use-season-v2-panel-model.ts` haengt
+           * am nirgends gerenderten `FoundationSeasonV2Host`; die WIRKLICH gezeigte Tabelle baut
+           * ihre Zeilen an dieser Stelle. Eine erste Fassung setzte das Feld nur drueben — die
+           * Hovers waeren im Spiel leer geblieben, ohne dass ein Test das gemerkt haette. Genau
+           * davor warnt der Kommentar an `computeTeamBuildingCost`.
+           */
+          hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,
