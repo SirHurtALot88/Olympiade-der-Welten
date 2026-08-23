@@ -25,11 +25,17 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const GERENDERT = join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
-const MODELL = join(process.cwd(), "lib/foundation/tabs/use-season-v2-panel-model.ts");
-
-const gerendert = readFileSync(GERENDERT, "utf8");
-const modell = readFileSync(MODELL, "utf8");
+/*
+ * DIE AUFRUFE STEHEN AUSGESCHRIEBEN, und das ist kein Zufall. `scripts/fahre-quelltext-waechter.ts`
+ * sammelt seine Auswahl an der woertlichen Signatur `readFileSync(join(process.cwd()` ein. Eine
+ * erste Fassung hier legte die Pfade in Konstanten — der Waechter uebersah die Datei damit
+ * lautlos, und ausgerechnet dieser Test waere nicht im Pflicht-Job gelaufen.
+ */
+const gerendert = readFileSync(
+  join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
+  "utf8",
+);
+const modell = readFileSync(join(process.cwd(), "lib/foundation/tabs/use-season-v2-panel-model.ts"), "utf8");
 
 /**
  * Felder, die BEIDE Bauer setzen müssen. Bewusst nur die, die eine eigene Ableitung mitbringen —
