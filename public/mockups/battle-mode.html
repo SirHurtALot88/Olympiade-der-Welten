@@ -4005,17 +4005,70 @@
   // Attributgewicht herauskommen wie in der Disziplinmatrix. Nachgerechnet weicht die
   // Summe um 1,3 Prozentpunkte ab (Speed 18,5 statt 18, Ausdauer 3,3 statt 4). Ein erster
   // Entwurf lag bei 23 Punkten — der haette eine zweite Wahrheit gebaut.
+  // ===================================================================================
+  // SPURT RECHNET NICHT MIT ANGRIFF, VERTEIDIGUNG UND LEBEN.
+  //
+  // Chris: "dort hat man ja nicht klassisch atk def lp, weil es ja Racing ist."
+  // Richtig — und deshalb hat der Spurt SIEBEN eigene Werte, gezogen aus denselben zwoelf
+  // Attributen wie alles andere. Kein Wert wird aus dem Kampf uebernommen.
+  //
+  // Der Ersatz fuer LEBEN ist die KRAFTRESERVE: sie geht nicht durch Schlaege verloren,
+  // sondern durch Tempo. Wer schneller laeuft, als er kann, ist frueher leer — und wer
+  // leer ist, faellt zurueck und kommt nicht mehr heran. Das ist die Waehrung des Rennens.
+  //
+  // Der Ersatz fuer VERTEIDIGUNG ist ROBUSTHEIT gegen Rempler und WENDIGKEIT, um ihnen
+  // auszuweichen. Der Ersatz fuer ANGRIFF ist WUCHT — man raeumt jemanden von der Bahn,
+  // statt ihn zu toeten.
+  // ===================================================================================
   const SPURT_REZEPT={
-    ANTRITT: {speed:55,determination:25,power:20},
-    ENDTEMPO:{speed:53,will:27,stamina:20},
-    TECHNIK: {dexterity:55,awareness:35,determination:10},
-    STEHEN:  {determination:55,will:35,health:10},
-    WUCHT:   {torment:57,power:40,speed:3},
-    ROBUST:  {health:26,torment:27,will:22,dexterity:17,awareness:8}
+    ANTRITT:    {speed:55,determination:25,power:20},
+    ENDTEMPO:   {speed:53,will:27,stamina:20},
+    TECHNIK:    {dexterity:55,awareness:35,determination:10},
+    // NEU: Wendigkeit. Bisher konnte niemand die Bahn wechseln — jeder lief seine Spur
+    // von vorn bis hinten durch, und Windschatten war damit unmoeglich. Wer wendig ist,
+    // findet den Windschatten, weicht einem Stuerzenden aus und entkommt einem Rempler.
+    WENDIGKEIT: {dexterity:48,awareness:32,speed:20},
+    STEHEN:     {determination:55,will:35,health:10},
+    WUCHT:      {torment:57,power:40,speed:3},
+    ROBUST:     {health:26,torment:27,will:22,dexterity:17,awareness:8}
   };
   const SPURT_KEYS=Object.keys(SPURT_REZEPT);
   const SPURT_LANG={ANTRITT:"Antritt",ENDTEMPO:"Endtempo",TECHNIK:"Technik",
-    STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"};
+    WENDIGKEIT:"Wendigkeit",STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"};
+
+  // DIE KRAFTRESERVE. Zwei Drittel Stehvermoegen, ein Drittel Robustheit: wer durchhaelt,
+  // hat mehr, und wer viel einsteckt, verliert weniger davon. Die 240 sind der Rahmen, in
+  // dem ein Rennen ueber vierzig Sekunden ueberhaupt entschieden werden kann — bei 100
+  // waere jeder nach zehn Sekunden leer, bei 600 nie.
+  // NACHGERECHNET, NICHT GERATEN. Der Verbrauch betraegt bei vollem Tempo
+  // (0,55 + 1,0^2 x 1,9) x 10 = 24,5 je Sekunde, im Windschatten 16,2. Ein Rennen dauert
+  // rund elf Sekunden. Voll durchgelaufen kostet es also ~270, im Sog gespart ~180.
+  //
+  // Erste Fassung gab 180 bei mittleren Werten — Reserve reichte 7,3 s bei 11 s Rennen,
+  // und 91 % der Laeufer brachen ein. Ein Einbruch, den fast jeder hat, ist kein Drama,
+  // sondern Grundrauschen. Jetzt liegt die Mitte bei 240: wer im Sog spart, kommt durch,
+  // wer von vorn durchzieht, geht kurz vor dem Ziel leer. Genau dort soll das Rennen
+  // entschieden werden.
+  const KRAFT_VON=(u)=>Math.round(150+ (u.STEHEN*0.7+u.ROBUST*0.3) *1.8);
+
+  // RENNPLAENE. Das Gegenstueck zu den Befehlen im Kampf — und sie kommen aus DEMSELBEN
+  // Ort: dem Slot, auf dem der Spieler steht. Ein Block Start geht von vorn, ein Lane
+  // Control setzt sich in den Windschatten, ein Top Speed hebt sich fuer den Schlusssprint
+  // auf. Damit entscheidet die Aufstellung das Rennen, nicht der Zufall.
+  //
+  //   tempo   Anteil der eigenen Hoechstgeschwindigkeit, den er von sich aus laeuft
+  //   sucht   wie stark er den Windschatten sucht (0 = laeuft lieber frei)
+  //   ab      ab welchem Streckenanteil er alles gibt
+  const RENNPLAN={
+    vorn:    {label:"Von vorn",      tempo:1.00, sucht:0.15, ab:0.70,
+              text:"Geht sofort an die Spitze und diktiert das Rennen. Kostet Kraft — im Wind läuft niemand billig."},
+    schatten:{label:"Windschatten",  tempo:0.94, sucht:0.90, ab:0.78,
+              text:"Hängt sich an und spart Kraft, bis der Vordermann leer ist."},
+    kick:    {label:"Schlusssprint", tempo:0.90, sucht:0.55, ab:0.62,
+              text:"Hält sich zurück und wirft alles auf das letzte Drittel."}
+  };
+  const PLAN_JE_SLOT={blockstart:"vorn", acceleration:"vorn",
+                      topspeed:"kick",   lanecontrol:"schatten"};
   function spurtWerte(p,extra){
     const a=extra||p.a, o={};
     for(const k of SPURT_KEYS)o[k]=Math.round(mische({a},SPURT_REZEPT[k]));
@@ -4037,10 +4090,17 @@
       let attr=mitAufschlag(p.a,engP,betroffeneAttribute(sl,"spurt",true),"spurt");
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,"spurt",false),"spurt");
       const w=spurtWerte(p,attr);
-      LAEUFER.push({id:id++,n:p.n,seite,bahn,...w,
+      const planId=(sl&&PLAN_JE_SLOT[sl])||"schatten";
+      const L={id:id++,n:p.n,seite,bahn,...w,
         eig:(p.d.spurt||0)+engP+breitP,
-        pos:0, v:0, sp:100, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
-        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null});
+        pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
+        plan:planId, ...RENNPLAN[planId],
+        // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
+        bahnZ:bahn, wechselCd:0, wechsel:0,
+        reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
+        pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null};
+      L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      LAEUFER.push(L);
     };
     mine.forEach((p,i)=>setz(p,0,i*2,false));
     gegen.forEach((o,i)=>setz(o,1,i*2+1,true));
@@ -4048,13 +4108,48 @@
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
   // das Endtempo; Stehvermoegen bestimmt, wie viel davon bis zum Ziel uebrig bleibt.
+  // WINDSCHATTEN. Wer dicht hinter einem anderen laeuft — hoechstens zwei Zehntel der
+  // Strecke zurueck, hoechstens eine Bahn daneben —, laeuft im Sog: etwas schneller und
+  // vor allem SPARSAMER. Das ist der Kern des Rennens: vorn laufen kostet, hinten haengen
+  // spart, und irgendwann muss man trotzdem vorbei.
+  const SCHATTEN_ABSTAND=0.062, SCHATTEN_TEMPO=1.045, SCHATTEN_SPAREN=0.66;
+  function vordermann(u){
+    let best=null, bestD=9;
+    for(const o of LAEUFER){
+      if(o===u||o.fertig!=null)continue;
+      const d=o.pos-u.pos;
+      if(d<=0.004||d>SCHATTEN_ABSTAND)continue;
+      if(Math.abs(o.bahnZ-u.bahnZ)>1.05)continue;
+      if(d<bestD){bestD=d;best=o;}
+    }
+    return best;
+  }
+
+  // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
+  // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
+  // was ihm gerade zugestossen ist.
   function tempoVon(u){
     const phase=Math.min(1,rennT/3.2);
     const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
+    // Der Plan: bis zum Angriffspunkt laeuft er verhalten, danach alles.
+    const planT=u.pos>=u.ab?1.0:u.tempo;
     // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
     const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*0.00055*(u.pos-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
-    return (60+grund*1.5)*mued*stolper*(u.kraft>0?0.82:1);
+    const sog=u.imSchatten?SCHATTEN_TEMPO:1;
+    // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
+    // faellt zurueck und kommt nicht mehr heran.
+    //
+    // Der Faktor stand auf 0,66 und riss das Feld auf: der Letzte brauchte 21,0 s gegen
+    // 8,4 s des Siegers, also Faktor 2,5. Ein Sprintfeld spreizt sich nie so weit — das
+    // Modell hatte schlicht keinen BODEN. Mit 0,80 bleibt der Einbruch die Entscheidung
+    // des Rennens, ohne dass ein Laeufer aus dem Bild faellt. Stehvermoegen federt ihn
+    // zusaetzlich ab: wer zaeh ist, schleppt sich besser ins Ziel als einer, der es nicht
+    // ist — genau das, wofuer der Wert da ist.
+    const leer=u.leer?(0.74+u.STEHEN*0.0012):1;
+    // Ein Bahnwechsel kostet Tempo, solange er laeuft.
+    const quer=u.wechsel>0?0.94:1;
+    return (60+grund*1.5)*planT*mued*stolper*sog*leer*quer*(u.kraft>0?0.82:1);
   }
 
   function stepSpurt(dt){
@@ -4066,9 +4161,61 @@
       if(u.stolper>0)u.stolper-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
       if(u.kraft>0)u.kraft-=dt;
+      if(u.wechselCd>0)u.wechselCd-=dt;
+
+      // ---- WINDSCHATTEN: haengt er gerade in einem? ----
+      const vm=vordermann(u);
+      u.imSchatten=!!vm;
+      if(u.imSchatten)u.schattenS+=dt; else u.spitzeS+=dt;
+
+      // ---- BAHNWECHSEL. Drei Gruende, in dieser Reihenfolge:
+      //   1. jemand direkt vor mir liegt am Boden -> ausweichen, sonst laufe ich hinein
+      //   2. ich will in den Windschatten und finde daneben einen Vordermann
+      //   3. ich will VORBEI und der Vordermann ist genau vor mir
+      // Ob er es schafft, haengt an der Wendigkeit; ein Wechsel dauert und kostet Tempo.
+      if(u.wechsel>0){
+        u.wechsel-=dt;
+        u.bahnZ += (u.bahn-u.bahnZ)*Math.min(1,dt*6);
+        if(u.wechsel<=0)u.bahnZ=u.bahn;
+      } else if(u.wechselCd<=0 && u.fertig==null){
+        let wunsch=null;
+        const frei=(b)=>b>=0&&b<BAHNEN&&!LAEUFER.some(o=>o!==u&&o.fertig==null
+          && Math.round(o.bahnZ)===b && Math.abs(o.pos-u.pos)<0.02);
+        const gefallen=LAEUFER.find(o=>o!==u&&o.fertig==null&&o.stolper>0
+          && Math.abs(o.bahnZ-u.bahnZ)<0.6 && o.pos-u.pos>0 && o.pos-u.pos<0.03);
+        if(gefallen)                              wunsch=frei(u.bahn+1)?u.bahn+1:(frei(u.bahn-1)?u.bahn-1:null);
+        else if(!u.imSchatten && u.sucht>0.3){    // Windschatten suchen
+          for(const b of [u.bahn-1,u.bahn+1]){
+            if(!frei(b))continue;
+            const kandidat=LAEUFER.some(o=>o!==u&&o.fertig==null&&Math.round(o.bahnZ)===b
+              && o.pos-u.pos>0.004 && o.pos-u.pos<SCHATTEN_ABSTAND);
+            if(kandidat){wunsch=b;break;}
+          }
+        } else if(u.imSchatten && u.pos>=u.ab){   // vorbei: raus aus dem Sog
+          wunsch=frei(u.bahn+1)?u.bahn+1:(frei(u.bahn-1)?u.bahn-1:null);
+        }
+        if(wunsch!=null && rr()<(0.25+u.WENDIGKEIT*0.009)*dt*3){
+          u.bahn=wunsch; u.wechsel=0.55-u.WENDIGKEIT*0.0022; u.wechselCd=1.6;
+        }
+      }
+
       u.v=tempoVon(u);
       const vor=u.pos;
       u.pos+=u.v*dt/strecke;
+
+      // ---- KRAFTVERBRAUCH. Der Ersatz fuer Lebenspunkte: sie gehen nicht durch Schlaege
+      // verloren, sondern durch Tempo. Wer ueber seinem Grundtempo laeuft, zahlt
+      // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
+      const ueber=Math.max(0.4,(u.pos>=u.ab?1.0:u.tempo));
+      let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      if(u.kraft>0)zehr*=1.5;              // gerade getackelt oder selbst gerempelt
+      if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
+      u.reserve=Math.max(0,u.reserve-zehr*dt*10);
+      if(!u.leer && u.reserve<=0){
+        u.leer=true;
+        schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
+        feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
+      }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
       for(const h of HUERDEN){
@@ -4078,7 +4225,7 @@
           if(glueck>chance){
             u.stolper=0.45+ (1-u.TECHNIK/100)*0.5;
             u.gestolpert++;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahn)-20,txt:"stolpert",life:.9,crit:false});
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
             feed(u.seite,u.n+" reißt die Hürde.");
           }
         }
@@ -4090,17 +4237,17 @@
         bollwerk:0.25,taktiker:0.3})[u.pers] ?? 0.5;
       if(u.tackleCd<=0 && u.WUCHT>45 && rr()<willTackeln*dt*1.6){
         const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null
-          && Math.abs(o.bahn-u.bahn)<=2 && Math.abs(o.pos-u.pos)<0.035);
+          && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
           u.tackleCd=2.2; u.kraft=0.5; u.tackles++;
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.35+stark*0.6; o.getackelt++;
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahn)-20,txt:"getackelt",life:1,crit:true});
+            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahn)-20,txt:"hält stand",life:.9,crit:false});
+            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
             feed(o.seite,o.n+" steckt den Rempler weg.");
           }
         }
@@ -4119,16 +4266,45 @@
     const strecke=W-170;
     for(const u of LAEUFER){
       const platz=rennFertig.indexOf(u);
-      const x=80+u.pos*strecke+(platz>=0?12+platz*9:0), y=bahnY(u.bahn);
+      const x=80+u.pos*strecke+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
       ctx.globalAlpha=0.25;ctx.fillStyle="#000";
       ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
       zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
         lunge:u.kraft>0?0.15:0,down:u.stolper>0,hp:1,max:1},x,y);
+      // WINDSCHATTEN SICHTBAR MACHEN. Ohne Anzeige ist der Sog eine Zahl im Code —
+      // man sieht nur, dass jemand schneller wird, und weiss nicht warum.
+      if(u.imSchatten&&u.fertig==null){
+        ctx.save();
+        const g=ctx.createLinearGradient(x-30,y,x+6,y);
+        g.addColorStop(0,"rgba(120,190,255,0)"); g.addColorStop(1,"rgba(120,190,255,.38)");
+        ctx.fillStyle=g;
+        ctx.beginPath();ctx.moveTo(x+6,y-9);ctx.lineTo(x-30,y-3);
+        ctx.lineTo(x-30,y+3);ctx.lineTo(x+6,y+9);ctx.closePath();ctx.fill();
+        ctx.restore();
+      }
+      // KRAFTRESERVE als schmaler Balken unter den Fuessen — der Ersatz fuer den
+      // Lebensbalken des Kampfes. Rot ab einem Fuenftel, weg wenn er im Ziel ist.
+      if(u.fertig==null){
+        const bw=26, a=Math.max(0,u.reserve/u.reserveMax);
+        ctx.fillStyle="rgba(8,10,14,.55)";ctx.fillRect(x-bw/2,y+20,bw,3);
+        ctx.fillStyle=u.leer?"#c0504a":(a<0.2?"#d98b3a":"#5FD08A");
+        ctx.fillRect(x-bw/2,y+20,bw*a,3);
+      }
       ctx.textAlign="center";
       ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       ctx.strokeText(txt,x,y-30);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,y-30);
+      // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
+      if(u.fertig==null){
+        ctx.font="400 8px 'IBM Plex Mono',monospace";
+        const pl=(RENNPLAN[u.plan]||{}).label||"";
+        const zus=u.leer?" · leer":(u.imSchatten?" · Sog":"");
+        ctx.strokeText(pl+zus,x,y-40);
+        ctx.fillStyle=u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9");
+        ctx.fillText(pl+zus,x,y-40);
+        ctx.font="400 9.5px 'IBM Plex Mono',monospace";
+      }
       if(u.fertig!=null){const pt="Platz "+(rennFertig.indexOf(u)+1)+" · "+u.fertig.toFixed(1)+" s";
         ctx.strokeText(pt,x,y-19);ctx.fillStyle="#e0c46a";ctx.fillText(pt,x,y-19);}
     }
@@ -4657,7 +4833,42 @@
         totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
   }
 
-  window.__arena={ serie, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
+  // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
+  // wie lange er im Windschatten hing, wie oft er einbrach, stolperte und tackelte.
+  function spurtSerie(n){
+    const alt={disc, LAEUFER, rennFertig, rennT, done};
+    disc="spurt";
+    const summe={}; let leerGesamt=0, schattenGesamt=0, laeufe=0;
+    for(let i=0;i<n;i++){
+      zieheFormkarten(20260823+i*104729);
+      bauSpurt(1337+i*7919);
+      let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }
+      laeufe++;
+      const sortiert=[...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99));
+      sortiert.forEach((u,platz)=>{
+        const e=summe[u.n]||(summe[u.n]={n:u.n,seite:u.seite,plan:u.plan,eig:u.eig,
+          platz:0,zeit:0,schatten:0,leer:0,stolper:0,tackles:0,getackelt:0,wechsel:0});
+        e.platz+=platz+1; e.zeit+=u.fertig??90;
+        e.schatten+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
+        e.leer+=u.leer?1:0; e.stolper+=u.gestolpert; e.tackles+=u.tackles; e.getackelt+=u.getackelt;
+        leerGesamt+=u.leer?1:0; schattenGesamt+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
+      });
+    }
+    disc=alt.disc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig; rennT=alt.rennT; done=alt.done;
+    zieheFormkarten(20260823);
+    const reihen=Object.values(summe).map(e=>({n:e.n,seite:e.seite,plan:e.plan,
+      eig:Math.round(e.eig*10)/10,
+      platz:+(e.platz/laeufe).toFixed(2), zeit:+(e.zeit/laeufe).toFixed(2),
+      schatten:Math.round(e.schatten/laeufe*100), leerQuote:Math.round(e.leer/laeufe*100),
+      stolper:+(e.stolper/laeufe).toFixed(2), tackles:+(e.tackles/laeufe).toFixed(2),
+      getackelt:+(e.getackelt/laeufe).toFixed(2)})).sort((a,b)=>a.platz-b.platz);
+    return {laeufe, reihen,
+      leerQuote:Math.round(leerGesamt/(laeufe*8)*100),
+      schattenAnteil:Math.round(schattenGesamt/(laeufe*8)*100)};
+  }
+
+  window.__arena={ serie, spurtSerie, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
