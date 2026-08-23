@@ -640,6 +640,52 @@
     }
     x.putImageData(d,0,0);return c;
   }
+  // ===================================================================================
+  // RUESTUNG UMFAERBEN.
+  //
+  // faerbe() oben tauscht HAUTtoene: es sucht die sechs Farben der hellen Hautrampe und
+  // ersetzt sie. Auf eine Platte greift das nicht — die ist stahlgrau und trifft keine
+  // einzige Hautfarbe. Deshalb hier eine zweite, eigene Rampe.
+  //
+  // Die sechs Farben sind NICHT geschaetzt, sondern aus dem Blatt plate_walk ausgezaehlt:
+  // #1D131E (2022 px), #4D4A5D (888), #726B7E (2397), #867E7F (2079), #C4B59F (549) und
+  // #FFFFFF (279). Mehr Farben hat die Ruestung nicht.
+  //
+  // Chris zu King Arlen Morgolor: "da hatten wir doch schon den alten goldenen Ritter mit
+  // Krone." Eine KRONE gibt es unter den 59 Blaettern nicht — die naechste Ebene waeren
+  // Hoerner, und das ist etwas anderes. Was geht, ist das Gold: derselbe Vollhelm, dieselbe
+  // Platte, in Goldtoenen statt Stahl. Ein Koenig mit Charisma 95 und Unterklasse Royalty
+  // sah als grauer Fussknecht schlicht falsch aus.
+  const RUEST_RAMPE=[[0x1D,0x13,0x1E],[0x4D,0x4A,0x5D],[0x72,0x6B,0x7E],
+                     [0x86,0x7E,0x7F],[0xC4,0xB5,0x9F],[0xFF,0xFF,0xFF]];
+  const RUEST_TON={
+    gold:  ["#2A1B08","#6B4A12","#A87524","#D19B2E","#F0C858","#FFF0B8"],
+    bronze:["#241408","#5A3418","#8A5424","#AD6E31","#D2954F","#F0D2A0"],
+    dunkel:["#0A0A0E","#1E1E28","#33333F","#454552","#6E6E7C","#A8A8B4"]
+  };
+  const ruestGefaerbt={};
+  function spriteRuest(key,ton){
+    if(!ton||!RUEST_TON[ton])return sprBild[key];
+    const id=key+"|r"+ton;
+    if(!ruestGefaerbt[id]){
+      const im=sprBild[key];
+      if(!im||!im.complete||!im.width)return im;
+      const ziel=RUEST_TON[ton].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+      const c=document.createElement("canvas");c.width=im.width;c.height=im.height;
+      const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(im,0,0);
+      const d=x.getImageData(0,0,c.width,c.height),q=d.data;
+      for(let i=0;i<q.length;i+=4){
+        if(q[i+3]===0)continue;
+        for(let k=0;k<RUEST_RAMPE.length;k++){
+          if(Math.abs(q[i]-RUEST_RAMPE[k][0])<10&&Math.abs(q[i+1]-RUEST_RAMPE[k][1])<10&&Math.abs(q[i+2]-RUEST_RAMPE[k][2])<10){
+            q[i]=ziel[k][0];q[i+1]=ziel[k][1];q[i+2]=ziel[k][2];break;}
+        }
+      }
+      x.putImageData(d,0,0);ruestGefaerbt[id]=c;
+    }
+    return ruestGefaerbt[id];
+  }
+
   function sprite(key,ton){
     if(!ton)return sprBild[key];
     const id=key+"|"+ton;
@@ -663,7 +709,10 @@
     "Lava Golem":         {kopf:"orc",  haut:"black",ruest:"plate",hoerner:true,waffe:"schwert"},
     "Krolach":            {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
     "Johanna":            {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
-    "King Arlen Morgolor":{kopf:"human",haut:"amber",ruest:"plate",waffe:"schwert"},
+    // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
+    // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
+    // Sprite-Blaettern nicht; die fehlt und gehoert auf die Liste.
+    "King Arlen Morgolor":{kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",helm:true,waffe:"schwert"},
     "Gram":               {kopf:"lizard",haut:"dark_green",ruest:"plate",schwanz:true,waffe:"schwert"},
     // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
     // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
@@ -718,19 +767,22 @@
     // Bei 2 waren sie doppelt so gross wie der Platz, den die Entzerrung ihnen laesst —
     // die Figuren standen wieder ineinander, obwohl die Rechnung stimmte.
     const r=blickAus(u), Z=1;
-    const zeichne=(key,zell,ox,oy,ton)=>{
-      const im=sprite(key,ton); if(!im||!im.width)return;
+    const male=(im,zell,ox,oy)=>{
+      if(!im||!im.width)return;
       const sp=zell===64?r*64:r*zell;
       try{ctx.drawImage(im,f*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);}catch(e){}
     };
+    const zeichne=(key,zell,ox,oy,ton)=>male(sprite(key,ton),zell,ox,oy);
+    // Dasselbe, nur ueber die Ruestungsrampe statt der Hautrampe.
+    const zeichneR=(key,ton)=>male(spriteRuest(key,ton),64,0,0);
     if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
     if(b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
     zeichne("body_"+ani,64,0,0,b.haut);
     zeichne("k"+b.kopf+"_"+ani,64,0,0,b.haut);
     if(b.ohren)zeichne("ohren_"+ani,64,0,0,b.haut);
-    if(b.ruest)zeichne(b.ruest+"_"+ani,64,0,0,null);
+    if(b.ruest)zeichneR(b.ruest+"_"+ani,b.ruestTon);
     if(b.hoerner)zeichne("hoerner_"+ani,64,0,0,b.haut);
-    if(b.helm)zeichne("helm_"+ani,64,0,0,null);
+    if(b.helm)zeichneR("helm_"+ani,b.ruestTon);
     if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
     if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
     if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
@@ -1591,9 +1643,11 @@
       setz("body_walk",b.haut);
       setz("k"+b.kopf+"_walk",b.haut);
       if(b.ohren)setz("ohren_walk",b.haut);
-      if(b.ruest)setz(b.ruest+"_walk",null);
+      if(b.ruest){const im=spriteRuest(b.ruest+"_walk",b.ruestTon);
+        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-10,-10,64,64);}catch(e){}}}
       if(b.hoerner)setz("hoerner_walk",b.haut);
-      if(b.helm)setz("helm_walk",null);
+      if(b.helm){const im=spriteRuest("helm_walk",b.ruestTon);
+        if(im&&im.width){try{x.drawImage(im,0,r*64,64,64,-10,-10,64,64);}catch(e){}}}
       if(b.kapuze)setz("kapuze_walk",null);
       if(b.schwanz)setz("schwanzfg_walk",b.haut);
       // DIE WAFFE GEHOERT DAZU. Ohne sie sah eine Bogenschuetzin aus wie jede andere
