@@ -393,13 +393,13 @@
   const SKILLS={
     shoot:{id:"shoot",name:"Shoot",stufe:"Common",art:"Grundschuss",
       text:"Aufladbarer Bogenschuss. Zum Zielen muss er stehen (0,25 s) — laufen und schießen geht nicht.",flavour:"Straight to the point.",
-      mult:1.0,reichweite:280,knock:40,takt:1.0,ladung:0.6,zielzeit:0.25,mp:0,sp:0},
+      basis:20,cd:0.35,mult:1.0,reichweite:280,knock:40,ladung:0.6,zielzeit:0.25,mp:0,sp:0},
     dash:{id:"dash",name:"Light Dash",stufe:"Common",art:"Ausweichrolle",
       text:"Rolle zur Seite, 0,3 s unverwundbar.",flavour:"If I'm not wearing armor, I'ma take advantage of it!",
       mult:0,strecke:150,dauer:0.3,cd:3,mp:0,sp:20},
     barrage:{id:"barrage",name:"Archer Barrage",stufe:"Common",art:"Salve",
       text:"Sprung rückwärts, dann fünf Pfeile in schneller Folge.",flavour:"Quantity and escape over Quality",
-      mult:0.25,schuss:5,reichweite:340,knock:30,cd:12,castzeit:0.3,sprung:90,mp:20,sp:0}
+      basis:20,mult:0.25,schuss:5,reichweite:340,knock:30,cd:12,castzeit:0.3,sprung:90,mp:20,sp:0}
   };
   const ARCHER=["shoot","dash","barrage"];
   // MATRIARCH — Support-Paladin: am Leben halten, stoeren, mit dem Hammer Ordnung machen.
@@ -408,9 +408,9 @@
   // und Kosten sind uebernommen.
   Object.assign(SKILLS,{
     slash:{id:"slash",name:"Paladin Slash",stufe:"Common",art:"Hammerschlag",
-      text:"Schneller heiliger Schlag. Mit Ausdauer wird aufgeladen: +15–75 % Schaden, dafür langsamer und mit voller Wucht.",
+      text:"Schneller heiliger Schlag auf 23. Aufgeladen reicht er 60 weit, macht +15–75 % Schaden und stößt mit 219 zurück — dafür 0,6 s länger. Er lädt nur auf, wenn der schnelle Schlag nicht hinreicht.",
       flavour:"Order, applied by hand.",
-      mult:1.0,schwer:{von:1.15,bis:1.75},reichweite:60,knock:219,takt:1.0,taktSchwer:1.8,mp:0,sp:8},
+      basis:9,cd:0.3,mult:1.0,schwer:{von:1.15,bis:1.75},reichweite:23,reichweiteSchwer:60,knock:219,halten:0.6,mp:0,sp:8},
     heavydash:{id:"heavydash",name:"Heavy Dash",stufe:"Common",art:"Sturmschritt",
       text:"Gewichtiger Satz nach vorn auf das eigene Ziel, 0,4 s unverwundbar. Bricht durch, wer sich dazwischenstellt.",
       flavour:"A powerful, weighted dash for armored units.",
@@ -421,9 +421,28 @@
       mult:0,schild:50,dauer:8,cd:12,castzeit:0.5,mp:60,sp:0}
   });
   const MATRIARCH=["slash","heavydash","shield"];
+  // FIGHTER — Tank/Bruiser: Druck machen, Gegner festnageln, Formationen aufbrechen.
+  // Dieselbe Umrechnung wie ueberall: die Schadenszahlen des Kits werden zu Multiplikatoren
+  // auf den attributbasierten Schaden, die Reichweiten, Rueckstoesse, Betaeubungen und
+  // Abklingzeiten kommen unveraendert aus dem Kit.
+  Object.assign(SKILLS,{
+    fslash:{id:"fslash",name:"Slash",stufe:"Common",art:"Schwertschlag",
+      text:"Einfacher Schwertschlag auf 18. Aufgeladen reicht er 50 weit, macht +15–75 % Schaden und stößt mit 375 zurück — dafür 1 s länger. Er lädt nur auf, wenn der schnelle Schlag nicht hinreicht.",
+      flavour:"The generic swing. Truly, a pinnacle of game design.",
+      basis:12,cd:0.3,mult:1.0,schwer:{von:1.15,bis:1.75},reichweite:18,reichweiteSchwer:50,knock:375,halten:1.0,mp:0,sp:3},
+    mdash:{id:"mdash",name:"Medium Dash",stufe:"Common",art:"Ausweichschritt",
+      text:"Ausgewogener Satz nach vorn auf das eigene Ziel, 0,3 s unverwundbar.",
+      flavour:"Standard balanced Dash.",
+      mult:0,strecke:130,dauer:0.3,cd:4,mp:0,sp:20},
+    ram:{id:"ram",name:"Battering Ram",stufe:"Common",art:"Sturmangriff",
+      text:"Stürmt bis zu 325 weit los, nimmt den Ersten mit, der im Weg steht, räumt damit alle anderen auf der Bahn weg und schleudert sie nach vorn. Betäubt 0,8 s.",
+      flavour:"Catch the first enemy on your charge, use them to batter through others.",
+      basis:22,mult:1.0,reichweite:325,knock:375,stun:0.8,cd:12,castzeit:0.2,mp:0,sp:15}
+  });
+  const FIGHTER=["fslash","mdash","ram"];
 
   const SQUAD=[
-    {n:"Baumkopf Holzfaust",c:"Tank",r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
+    {n:"Baumkopf Holzfaust",c:"Fighter",skills:FIGHTER,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
     {n:"T Mask",c:"Rogue",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
     {n:"Greenkraut",c:"Warlord",r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:61.1,spurt:19.9},a:{power:95,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
     {n:"Rustrow",c:"Tank",r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:38.9},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
@@ -555,7 +574,9 @@
     for(const k of KEYS){let s=0,w=0;for(const[at,wt]of Object.entries(rec[k])){s+=(p.a[at]||0)*wt;w+=wt;}
       o[k]=Math.max(1,Math.min(99,Math.round(s/w)));}
     return o;}
-  const dmgOf=(atk,vr)=>Math.max(2,Math.round(atk*0.5*(100/(100+vr))));
+  // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
+  // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
+  const dmgOf=(atk,vr)=>Math.max(1,Math.round(12*(atk/100)*(100/(100+vr))));
 
   let disc="tdm",sel=null;
   const place={},order={},zielOf={};
@@ -672,12 +693,15 @@
             const kosten=sk.mp?sk.mp+" MP":sk.sp?sk.sp+" SP":"—";
             b.appendChild(el("s",null,kosten));
             b.tabIndex=0;
-            const schaden=sk.mult>0
-              ? (sk.schuss?sk.schuss+" × "+Math.max(1,Math.round(dmgOf(s.ANG,60)*sk.mult))+" Schaden":Math.round(dmgOf(s.ANG,60)*sk.mult)+" Schaden")
+            // Der Tooltip zeigt, was DIESER Spieler mit dem Skill tut — nicht die Kit-Zahl.
+            const einzel=sk.basis?Math.max(1,Math.round(sk.basis*(s.ANG/100)*(sk.mult||1))):0;
+            const schaden=einzel
+              ? (sk.schuss?sk.schuss+" × "+einzel+" Rohschaden":einzel+" Rohschaden (Basis "+sk.basis+" × Angriff "+s.ANG+" %)")
               : "kein Schaden";
-            const rhythmus=sk.takt
-              ? "Schlagfolge "+(sk.takt/(0.5+s.TMP/120)).toFixed(2)+" s (aus seinem Tempo "+s.TMP+")"
-              : "Abklingzeit "+sk.cd+" s";
+            const kuerzung=0.30*s.TMP/(s.TMP+120);
+            const rhythmus=sk.cd
+              ? "Abklingzeit "+(sk.cd*(1-kuerzung)).toFixed(2)+" s (Kit "+sk.cd+" s minus "+Math.round(kuerzung*100)+" % aus Tempo "+s.TMP+")"
+              : "keine Abklingzeit";
             tipOn(b,sk.name+" · "+sk.stufe,
               sk.text+" "+schaden+" · "+rhythmus+
               (sk.reichweite?" · Reichweite "+sk.reichweite:"")+
@@ -689,7 +713,7 @@
           u.appendChild(sw);
         }
         if(istHeiler(p)){
-          const hb=el("span","heilbadge","HEILER · "+Math.round(s.ANG*0.42)+" Heilung statt Schaden");
+          const hb=el("span","heilbadge","HEILER · "+Math.round(12*(s.ANG/100)*0.9)+" Heilung statt Schaden");
           hb.tabIndex=0;
           tipOn(hb,"Heiler",
             "Diese Unterklasse heilt statt Schaden zu machen: "+(p.sub||[]).filter(x=>HEILER.has(x)).join(", ")+
@@ -802,10 +826,14 @@
       const fern=p.fern===true,heiler=istHeiler(p);
       // Schlagfolge: der Fernkaempfer haengt an der Abklingzeit seines Schusses,
       // der Nahkaempfer an seinem Tempo. Beides sind die Formeln der Simulation.
-      const takt=0.5+s.TMP/120;
+      // Dieselbe Rechnung wie in der Arena: Basisschaden des Grundangriffs mal Angriffswert,
+      // geteilt durch die Abklingzeit, die sein Tempo daraus macht.
+      const sk=fern?SKILLS.shoot:((p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)?SKILLS[(p.skills||[]).find(id=>SKILLS[id]&&SKILLS[id].basis&&SKILLS[id].cd)]:GRUNDSCHLAG);
+      const cd=sk.cd*(1-0.30*s.TMP/(s.TMP+120));
+      const roh=sk.basis*(s.ANG/100);
       return {n:p.n,c:p.c,fern,heiler,eig:p.d.tdm,TMP:s.TMP,
-        dps:heiler?0:Math.round(s.ANG*0.5*takt),
-        hps:heiler?Math.round(s.ANG*0.42*takt):0,
+        dps:heiler?0:Math.round(roh/cd),
+        hps:heiler?Math.round(12*(s.ANG/100)*0.9/cd):0,
         zaeh:Math.round(s.LP*6*(1+s.VER/100))};
     });
   }
@@ -830,10 +858,11 @@
       flanker=anteil>=0.42?5:4;
       ziel="bedrohung";
       name="Kopf abschlagen";
+      const halter=6-flanker;
       grund=top.n+" stellt allein "+pz(anteil)+" des gegnerischen Schadens ("+top.dps+" von "+gesamt+
         " je Sekunde) und ist mit "+top.zaeh+" effektiven Lebenspunkten weicher als der Durchschnitt ("+
-        medianZaeh+"). "+flanker+" von 6 gehen außen herum auf sie, "+(6-flanker)+
-        (6-flanker===1?" hält":" halten")+" vorn die Linie und bindet"+(6-flanker===1?"":"n")+" den Rest.";
+        medianZaeh+"). "+flanker+" von 6 gehen außen herum auf sie, "+halter+
+        (halter===1?" hält vorn die Linie und bindet":" halten vorn die Linie und binden")+" den Rest.";
     }else if(heiler&&heiler.hps*4>gesamt){
       flanker=2; ziel="heiler";
       name="Heiler zuerst";
@@ -851,10 +880,10 @@
     // ZUTEILUNG. Die Zaehesten halten vorn — sie sollen binden, nicht toeten. Aussen
     // herum gehen die Schnellsten, weil der Umweg Zeit kostet und die Zeit ihr Preis ist.
     const nachZaeh=[...OPP].map((o,i)=>({o,i,zaeh:o.lo+o.hi})).sort((a,b)=>b.zaeh-a.zaeh);
-    const halter=new Set(nachZaeh.slice(0,OPP.length-flanker).map(x=>x.o.n));
+    const haltend=new Set(nachZaeh.slice(0,OPP.length-flanker).map(x=>x.o.n));
     const zuteilung={};
     for(const o of OPP){
-      zuteilung[o.n]=halter.has(o.n)
+      zuteilung[o.n]=haltend.has(o.n)
         ?{ord:"mitlinie",zielP:"naechster",rolle:"hält die Linie"}
         :{ord:"flanke",zielP:ziel,rolle:"geht außen herum"};
     }
@@ -926,7 +955,7 @@
     const p=SQUAD[0],s=stats(p,"tdm");
     document.getElementById("profSub").textContent=p.c+" · "+p.r+" · Eignung TDM "+p.d.tdm.toFixed(1);
     const box=document.getElementById("profStats");box.textContent="";
-    const ex={LP:"hält "+(s.LP*6)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Treffer (gegen VER 60)",
+    const ex={LP:"hält "+(s.LP*6)+" Schaden aus",ANG:dmgOf(s.ANG,60)+" Schaden je Grundschlag (gegen VER 60)",
       VER:Math.round(100*s.VER/(100+s.VER))+" % Schadensminderung",
       TMP:Math.round(40+s.TMP*1.4)+" px/s Marschtempo · "+(0.5+s.TMP/120).toFixed(2)+" Schläge/s",
       PRZ:Math.min(95,Math.max(40,Math.round(70+(s.PRZ-50)*0.3)))+" % Trefferchance gegen TMP 50",
@@ -955,6 +984,16 @@
   // Ist die Flanke schon losgelassen? Je Seite eine Entscheidung, nicht je Kopf.
   let freigabe=[false,false];
 
+  // Welche Reichweite jemand hat, sagt sein Kit — nicht eine Sonderregel je Klasse.
+  // "reach" ist die weiteste Bedrohung (der aufgeladene Schlag), "reichNah" die, auf die
+  // er wirklich herangeht. Ohne Kit sind beide der blosse Nahkampf.
+  function reichweiten(skills,fern){
+    if(fern)return{reach:SKILLS.shoot.reichweite,reichNah:SKILLS.shoot.reichweite};
+    const sw=(skills||[]).find(id=>SKILLS[id]&&SKILLS[id].reichweiteSchwer);
+    if(!sw)return{reach:RANGE,reichNah:RANGE};
+    return{reach:SKILLS[sw].reichweiteSchwer,reichNah:SKILLS[sw].reichweite};
+  }
+
   function build(){
     seed=1337;U=[];floats=[];t=0;done=false;freigabe=[false,false];
     PLAN=schlachtplan();
@@ -968,7 +1007,7 @@
         U.push({id:id++,n:p.n,side:0,row,eig:eigWert,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
-          fern:p.fern===true,reach:p.fern?SKILLS.shoot.reichweite:RANGE,
+          fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
           skills:p.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
@@ -992,7 +1031,7 @@
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
-          fern:false,reach:(o.skills||[]).includes("slash")?SKILLS.slash.reichweite:RANGE,skills:o.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+          fern:false,...reichweiten(o.skills,false),stun:0,skills:o.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
           st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
       });
@@ -1041,7 +1080,7 @@
 
   // EIN NAHKAMPFSCHLAG. Ausweichen, Kritisch, Schaden, Rueckstoss, Ticker — einmal
   // geschrieben, damit der Grundangriff und Paladin Slash nicht auseinanderlaufen.
-  function nahschlag(u,tg,mult,knock,label,sd){
+  function nahschlag(u,tg,sk,mult,knock,label,sd){
     if(tg.invuln>0){floats.push({x:tg.x,y:tg.y-26,txt:"unverwundbar",life:.8});return;}
     const chance=Math.max(40,Math.min(95,70+(u.PRZ-tg.TMP)*0.3))/100;
     tg.lastHit=u;
@@ -1053,7 +1092,7 @@
       return;
     }
     const crit=rr()<u.PRZ/400;
-    const roh=u.ANG*0.5*mult*(crit?1.5:1);
+    const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     floats.push({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
@@ -1074,12 +1113,70 @@
   // viele Schlaege er dieser Uhr wert ist: der Grundschuss 1,0, der schwere Hammerschlag
   // 1,8 (dafuer +15-75 % Schaden). Seltene Faehigkeiten (Barrage, Dash, Segen) behalten
   // ihre echten Abklingzeiten in Sekunden — die sind Ereignisse, nicht der Takt.
-  const grundtakt=(u,fat)=>1/((0.5+u.TMP/120)*Math.max(.5,fat));
-  const skillTakt=(u,fak,fat)=>grundtakt(u,fat)*fak;
+  // ===================================================================================
+  // WIE AUS ATTRIBUTEN WIRKUNG WIRD — nach dem Vorbild, nicht nach Gefuehl.
+  //
+  // Das Vorbild rechnet nachweislich so (aus den Spielerkarten abgelesen und geprueft):
+  //
+  //   "DMG: 35 (base 14)" bei "Attack +175 %"  ->  Schaden = Basisschaden des Skills mal
+  //   dem Angriffswert. ATK 275 geteilt durch die Klassen-Basismitte 100 sind exakt jene
+  //   +175 %. Dasselbe Verhaeltnis stimmt bei Milagros (308 -> +208 %), Erika (194 ->
+  //   +94 %) und Osurac (195 -> +95 %): immer Basismitte 100.
+  //
+  //   "DEF 265 -> Dmg reduct. 35 %"  ->  DEF/(DEF+495). Passt auf alle fuenf Karten
+  //   (155 -> 24 %, 197 -> 28 %, 247 -> 33 %, 350 -> 41 %). Das ist dieselbe Kurvenform,
+  //   die wir mit VER/(VER+100) schon fahren.
+  //
+  //   "SPD 185 -> MS +28 %, CD -13 %"  ->  Tempo gibt Laufgeschwindigkeit UND eine
+  //   prozentuale Verkuerzung der Abklingzeit. Die Abklingzeit selbst gehoert dem SKILL.
+  //
+  // Das letzte Stueck ist die Korrektur an mir selbst: ich hatte alle Angriffe auf eine
+  // gemeinsame Tempo-Uhr gelegt, weil 0,35 s neben 1,33 s unfair aussah. Richtig ist, dass
+  // JEDER auf Skill-Abklingzeiten laeuft. Und dann kippt das Bild: Shoot (0,35 s) ist
+  // LANGSAMER als Slash (0,3 s). Buttercups Vorteil ist nicht die Frequenz, sondern ihr
+  // Basisschaden 20 gegen 12 — bezahlt mit Papierruestung. Das ist eine Balance, die man
+  // verstehen und kontern kann.
+  //
+  // Verkuerzung der Abklingzeit durch Tempo: gedeckelt und mit abnehmendem Ertrag, damit
+  // die Spitze der Skala selten bleibt. Bei TMP 30 sind es 6 %, bei 99 knapp 14 % — die
+  // Groessenordnung, die auch das Vorbild zeigt (0 bis 16 %).
+  const RANGE=44;
+  const cdKuerzung=(u)=>0.30*u.TMP/(u.TMP+120);
+  const abkling=(u,sk_cd,fat)=>sk_cd*(1-cdKuerzung(u))/Math.max(.5,fat);
+  // Der schwere Schlag kostet zusaetzlich seine Haltezeit — die steht am Skill.
+  const abklingSchwer=(u,sk,fat)=>abkling(u,sk.cd+sk.halten,fat);
+  // Schaden: Basisschaden des Skills mal Angriffswert. Bei ANG 100 traegt der Skill seinen
+  // vollen Basiswert, darunter entsprechend weniger — genau die Prozentlogik des Vorbilds.
+  const skillSchaden=(u,sk,mult)=>sk.basis*(u.ANG/100)*mult;
+  // Wer noch kein Kit hat, schlaegt mit einem neutralen Grundschlag zu. Ausdruecklich ein
+  // Platzhalter: sobald die Klasse ihre echten Skills hat, faellt er weg.
+  const GRUNDSCHLAG={basis:12,cd:0.5,reichweite:RANGE};
+
+  // WANN AUFLADEN? Nur, wenn der schnelle Schlag nicht hinreicht.
+  //
+  // Gemessen: mit der frueheren Regel ("oder wenn mehrere dicht stehen") hat Baumkopf
+  // durchgehend aufgeladen — an der Front stehen IMMER zwei Gegner. Der schwere Schlag
+  // kostet 0,3 + 1,0 s statt 0,3 s, macht dafuer im Schnitt nur +45 % Schaden. Das ist
+  // ein Drittel der Wirkung. Er hat sich damit selbst lahmgelegt: 194 Schaden in 37 s,
+  // wo rund 550 drin gewesen waeren.
+  //
+  // Der Rueckstoss ist ein Nebeneffekt, kein Grund. Der Grund ist Reichweite: 18 gegen 50.
+  function hauSchwer(u,tg,sk){
+    if(u.sp<sk.sp)return false;
+    return dist(u,tg)>sk.reichweite;
+  }
+
+  // Abstand eines Punktes zur Strecke A->B. Braucht der Sturmangriff: erwischt wird, wer
+  // AUF DER BAHN steht, nicht wer irgendwo in der Naehe des Ziels herumsteht.
+  function bahnAbstand(p,ax,ay,bx,by){
+    const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;
+    if(L2<1)return Math.hypot(p.x-ax,p.y-ay);
+    let t=((p.x-ax)*dx+(p.y-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
+    return Math.hypot(p.x-(ax+dx*t),p.y-(ay+dy*t));
+  }
 
   const live=s=>U.filter(u=>u.side===s&&!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-  const RANGE=44;
 
   function chooseTarget(u){
     const foes=live(1-u.side);if(!foes.length)return null;
@@ -1153,7 +1250,7 @@
     const n=sk.schuss||1;
     for(let i=0;i<n;i++){
       pfeile.push({x:u.x,y:u.y,ziel:tg,von:u,side:u.side,
-        mult:sk.mult,knock:sk.knock||0,verzug:i*0.09,tempo:520,skill:sk.name});
+        roh:skillSchaden(u,sk,sk.mult),knock:sk.knock||0,verzug:i*0.09,tempo:520,skill:sk.name});
     }
     u.lunge=0.16;
   }
@@ -1178,7 +1275,7 @@
             feed(z.side,z.n+" weicht dem Pfeil aus.");
           }else{
             const crit=rr()<pf.von.PRZ/400;
-            const roh=pf.von.ANG*0.5*pf.mult*(crit?1.5:1);
+            const roh=pf.roh*(crit?1.5:1);
             const d=treffer(pf.von,z,roh,1);
             stossen(z,pf.x,pf.y,pf.knock);
             floats.push({x:z.x,y:z.y-26,txt:"−"+d,life:.9,crit});
@@ -1223,6 +1320,20 @@
     for(const u of U){
       if(u.down)continue;
       const fat=t>35?Math.max(0.55,1-(100-u.AUS)*0.0011*(t-35)):1;
+
+      // BETAEUBT. Nichts geht mehr — kein Schritt, kein Schlag, kein Zauber. Nur die Uhren
+      // laufen weiter, sonst waere eine Betaeubung auch noch ein Geschenk an den Getroffenen.
+      if(u.stun>0){
+        u.stun-=dt;
+        u.cd-=dt; u.mp=Math.min(100,u.mp+10*dt); u.sp=Math.min(100,u.sp+10*dt);
+        for(const k in u.cds)u.cds[k]=Math.max(0,u.cds[k]-dt);
+        if(u.invuln>0)u.invuln-=dt;
+        if(u.wurzel>0)u.wurzel-=dt;
+        if(u.lunge>0)u.lunge-=dt;
+        if(u.dodge>0)u.dodge-=dt;
+        if(u.schildT>0){u.schildT-=dt;if(u.schildT<=0){u.schild=0;u.schildVon=null;}}
+        continue;
+      }
 
       // SELBSTERHALTUNG — aber rollengerecht. Ein Rueckzug, der jemanden dauerhaft aus dem
       // Kampf nimmt, ist wertlos: der Spieler will ueberleben UND danach wieder wirken.
@@ -1354,7 +1465,7 @@
       const inRange=tg&&!tg.down&&dist(u,tg)<=u.reach&&!u.skills;
       // Wer eine Waffe mit Reichweite fuehrt (Hammer statt Faust), bleibt auf Schlagdistanz
       // stehen, statt in sein Ziel hineinzulaufen.
-      const haltAbstand=u.skills&&!u.fern&&tg&&!tg.down&&dist(u,tg)<=u.reach*0.85;
+      const haltAbstand=u.skills&&!u.fern&&tg&&!tg.down&&dist(u,tg)<=u.reichNah*0.85;
       // WER SCHIESST, STEHT.
       //
       // Vorher lief Buttercup und schoss im selben Bild. Ein Fernkaempfer mit gleichem
@@ -1401,7 +1512,25 @@
       if(u.cast){
         u.castLeft-=dt;
         if(u.castLeft<=0){
-          if(u.cast==="shield"){
+          if(u.cast==="ram"){
+            const z=u.castZiel&&!u.castZiel.down?u.castZiel:null;
+            if(z){
+              const ax=z.x-u.x,ay=z.y-u.y,L=Math.hypot(ax,ay)||1;
+              const w=Math.min(SKILLS.ram.reichweite,Math.max(0,L-u.reichNah*0.6));
+              const ex=Math.max(34,Math.min(W-34,u.x+ax/L*w)),ey=Math.max(34,Math.min(H-34,u.y+ay/L*w));
+              // Erwischt wird, wer AUF DER BAHN steht — nicht nur das gemeinte Ziel.
+              const bahn=live(1-u.side).filter(f=>bahnAbstand(f,u.x,u.y,ex,ey)<46);
+              // Erst schlagen, dann stehenbleiben: der Rueckstoss soll von dort kommen, wo
+              // der Anlauf begann — sonst fliegen die Getroffenen ihm entgegen statt weg.
+              for(const f of bahn){
+                nahschlag(u,f,SKILLS.ram,1,SKILLS.ram.knock,"Battering Ram",sd);
+                f.stun=Math.max(f.stun,SKILLS.ram.stun);
+                floats.push({x:f.x,y:f.y-40,txt:"betäubt",life:.9});
+              }
+              u.x=ex;u.y=ey;
+              feed(u.side,u.n+" rammt sich durch"+(bahn.length>1?" — "+bahn.length+" fliegen":"")+".");
+            }
+          }else if(u.cast==="shield"){
             const z=u.castZiel&&!u.castZiel.down?u.castZiel:u;
             z.schild=SKILLS.shield.schild;z.schildT=SKILLS.shield.dauer;z.schildVon=u;
             floats.push({x:z.x,y:z.y-34,txt:"+Schild "+SKILLS.shield.schild,life:1.1,heil:true});
@@ -1417,8 +1546,8 @@
         const verwundet=live(u.side).filter(a=>a!==u&&a.hp<a.max&&dist(u,a)<190);
         if(verwundet.length){
           const ziel=verwundet.reduce((b,x)=>(x.hp/x.max<b.hp/b.max?x:b));
-          u.cd=1/((0.5+u.TMP/120)*fat);u.lunge=0.16;u.tgt=null;
-          const heal=Math.round(u.ANG*0.42);
+          u.cd=abkling(u,GRUNDSCHLAG.cd,fat);u.lunge=0.16;u.tgt=null;
+          const heal=Math.round(GRUNDSCHLAG.basis*(u.ANG/100)*0.9);
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
@@ -1461,7 +1590,7 @@
         }
         // 3. Shoot: der Grundschuss.
         if(tgS&&dist(u,tgS)<=u.reach&&(u.cds.shoot||0)<=0){
-          u.cds.shoot=skillTakt(u,SKILLS.shoot.takt,fat);
+          u.cds.shoot=abkling(u,SKILLS.shoot.cd,fat);
           u.wurzel=SKILLS.shoot.zielzeit;
           feuerSkill(u,"shoot");
           continue;
@@ -1498,22 +1627,64 @@
           continue;
         }
         // 3. Paladin Slash. Mit Ausdauer wird aufgeladen: mehr Schaden, volle Wucht, langsamer.
-        if(tgM&&dist(u,tgM)<=SKILLS.slash.reichweite&&(u.cds.slash||0)<=0){
-          const schwer=u.sp>=SKILLS.slash.sp;
+        if(tgM&&dist(u,tgM)<=SKILLS.slash.reichweiteSchwer&&(u.cds.slash||0)<=0){
+          const schwer=hauSchwer(u,tgM,SKILLS.slash);
           if(schwer)u.sp-=SKILLS.slash.sp;
           const sw=SKILLS.slash.schwer;
           const m=schwer?sw.von+rr()*(sw.bis-sw.von):SKILLS.slash.mult;
-          u.cds.slash=skillTakt(u,schwer?SKILLS.slash.taktSchwer:SKILLS.slash.takt,fat);
+          u.cds.slash=schwer?abklingSchwer(u,SKILLS.slash,fat):abkling(u,SKILLS.slash.cd,fat);
           u.lunge=0.2;
-          nahschlag(u,tgM,m,schwer?SKILLS.slash.knock:0,schwer?"Schwerer Hammerschlag":null,sd);
+          nahschlag(u,tgM,SKILLS.slash,m,schwer?SKILLS.slash.knock:0,schwer?"Schwerer Hammerschlag":null,sd);
+          continue;
+        }
+      }
+
+      // FIGHTER — Tank mit Druck. Die Reihenfolge ist seine Entscheidungslogik: erst die
+      // grosse Bahn raeumen, dann die Luecke schliessen, dann schlagen. Battering Ram ist
+      // genau die Antwort auf "der Tank kommt nicht ran": er muss nicht hinterherlaufen,
+      // er faehrt durch.
+      if(u.skills&&u.skills.includes("fslash")&&u.retreat<=0){
+        const tgF=u.tgt&&!u.tgt.down?u.tgt:null;
+        // 1. Battering Ram: Ziel ausser Schlagweite, aber in Sturmreichweite.
+        if(tgF&&(u.cds.ram||0)<=0&&u.sp>=SKILLS.ram.sp){
+          const d0=dist(u,tgF);
+          if(d0>u.reach*1.4&&d0<SKILLS.ram.reichweite){
+            u.sp-=SKILLS.ram.sp;u.cds.ram=SKILLS.ram.cd;
+            u.cast="ram";u.castZiel=tgF;u.castLeft=SKILLS.ram.castzeit;
+            floats.push({x:u.x,y:u.y-30,txt:"Battering Ram",life:1.1,skill:true});
+            feed(u.side,u.n+" senkt die Schulter und nimmt Anlauf auf "+tgF.n+".");
+            continue;
+          }
+        }
+        // 2. Medium Dash: kurzer Satz nach vorn, 0,3 s unverwundbar.
+        if(tgF&&dist(u,tgF)>u.reach*1.4&&(u.cds.mdash||0)<=0&&u.sp>=SKILLS.mdash.sp){
+          const ax=tgF.x-u.x,ay=tgF.y-u.y,L2=Math.hypot(ax,ay)||1;
+          const w=Math.max(0,Math.min(SKILLS.mdash.strecke,L2-u.reichNah*0.6));
+          u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
+          u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
+          u.invuln=SKILLS.mdash.dauer;u.sp-=SKILLS.mdash.sp;u.cds.mdash=SKILLS.mdash.cd;
+          floats.push({x:u.x,y:u.y-30,txt:"Medium Dash",life:1.0,skill:true});
+          feed(u.side,u.n+" setzt nach — unverwundbar.");
+          continue;
+        }
+        // 3. Slash. Aufgeladen nur, wenn das Ziel sonst nicht zu erreichen ist oder
+        //    mehrere dicht stehen — sonst ist der schnelle Schlag mehr wert.
+        if(tgF&&dist(u,tgF)<=SKILLS.fslash.reichweiteSchwer&&(u.cds.fslash||0)<=0){
+          const schwer=hauSchwer(u,tgF,SKILLS.fslash);
+          if(schwer)u.sp-=SKILLS.fslash.sp;
+          const sw=SKILLS.fslash.schwer;
+          const m=schwer?sw.von+rr()*(sw.bis-sw.von):SKILLS.fslash.mult;
+          u.cds.fslash=schwer?abklingSchwer(u,SKILLS.fslash,fat):abkling(u,SKILLS.fslash.cd,fat);
+          u.lunge=0.2;
+          nahschlag(u,tgF,SKILLS.fslash,m,schwer?SKILLS.fslash.knock:0,schwer?"Schwerer Schwertschlag":null,sd);
           continue;
         }
       }
 
       if(inRange&&u.cd<=0&&u.retreat<=0){
-        u.cd=1/((0.5+u.TMP/120)*fat);
+        u.cd=abkling(u,GRUNDSCHLAG.cd,fat);
         u.lunge=0.16;
-        nahschlag(u,tg,1,0,null,sd);
+        nahschlag(u,tg,GRUNDSCHLAG,1,0,null,sd);
       }
       if(u.lunge>0)u.lunge-=dt;
       if(u.dodge>0)u.dodge-=dt;
