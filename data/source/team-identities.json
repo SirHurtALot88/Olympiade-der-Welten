@@ -32,7 +32,7 @@
     "popularity": 8.5,
     "cooperation": 5,
     "playerMin": 8,
-    "playerOpt": 10,
+    "playerOpt": 11,
     "sourceNote": "team-ratings-sheet + small_elite_core"
   },
   {
@@ -518,7 +518,7 @@
     "popularity": 1,
     "cooperation": 1.5,
     "playerMin": 8,
-    "playerOpt": 11,
+    "playerOpt": 12,
     "sourceNote": "team-ratings-sheet"
   },
   {

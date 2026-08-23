@@ -56,6 +56,29 @@ const BLATT_VOR_DER_ANHEBUNG: Record<string, number> = {
   "T-T": 13, "U-A": 11, "V-D": 10, "V-V": 10, "V-W": 10, "W-L": 10, "W-W": 11, "Z-H": 10,
 };
 
+/**
+ * ZWEI TEAMS BEKAMEN SPAETER EINEN PLATZ MEHR — namentlich, nicht als Aufweichung der Regel.
+ *
+ * CHRIS: „kannst du die OPT spielerzahl von V-V und B-P um 1 erhoehen? die kacken im spiel voll ab
+ * weil die nicht rotieren koennen"
+ *
+ * NACHGEMESSEN an seinem Spielstand (season-2, Spieltag 9), und der Befund ist deutlicher als die
+ * Meldung: beide Teams standen bei acht Spielern, waehrend ein Spieltag ELF verlangt. Sie konnten
+ * also nicht bloss nicht rotieren — sie konnten nicht einmal vollstaendig aufstellen.
+ *
+ *   Kadergroesse gegen Ligarang, alle 32 Teams:  Korrelation -0,72
+ *   Die sieben Teams mit acht Spielern belegten die Raenge 19, 23, 27, 28, 29, 31, 32.
+ *   B-P stand auf Rang 27, V-V auf Rang 28. An Geld lag es nicht: 40,5 bzw. 47,5 Mio Cash.
+ *
+ * Die Regel „genau ein Platz mehr" gilt weiterhin fuer die anderen 30 Teams — deshalb steht die
+ * Ausnahme hier als benannte Liste und nicht als aufgeweichte Bedingung. Wer ein drittes Team
+ * anhebt, ohne es hier einzutragen, faellt nach wie vor auf.
+ */
+const SPAETERE_EINZELANHEBUNGEN: Record<string, number> = {
+  "B-P": 1,
+  "V-V": 1,
+};
+
 describe("Kader-Zielgroesse im Blatt", () => {
   it("liegt bei jedem Team genau einen Platz ueber dem alten Stand — oder beim Maximum", () => {
     expect(identitaeten).toHaveLength(32);
@@ -65,12 +88,22 @@ describe("Kader-Zielgroesse im Blatt", () => {
       if (vorher == null) {
         continue;
       }
-      const erwartet = Math.min(vorher + 1, DEFAULT_ROSTER_MAX);
+      const zuschlag = SPAETERE_EINZELANHEBUNGEN[identity.teamId] ?? 0;
+      const erwartet = Math.min(vorher + 1 + zuschlag, DEFAULT_ROSTER_MAX);
       if (identity.playerOpt !== erwartet) {
         abweicher.push(`${identity.teamId}: ${vorher} -> ${identity.playerOpt}, erwartet ${erwartet}`);
       }
     }
     expect(abweicher, "Anhebung ist nicht genau ein Platz").toEqual([]);
+  });
+
+  it("hebt genau die beiden gemeldeten Teams einzeln an — und sonst keines", () => {
+    // Die Gegenrichtung derselben Zusicherung: die Ausnahmeliste darf nicht unbemerkt wachsen.
+    expect(Object.keys(SPAETERE_EINZELANHEBUNGEN).sort()).toEqual(["B-P", "V-V"]);
+    const bp = identitaeten.find((identity) => identity.teamId === "B-P");
+    const vv = identitaeten.find((identity) => identity.teamId === "V-V");
+    expect(bp?.playerOpt).toBe(11);
+    expect(vv?.playerOpt).toBe(12);
   });
 
   it("laesst kein Team ueber das Kader-Maximum klettern", () => {
@@ -86,6 +119,9 @@ describe("Kader-Zielgroesse im Blatt", () => {
     // Chris' eigene Gegenrechnung zur Anweisung: „im team identity blatt median müsste dann 12
     // sein". Sie stimmt — und sie ist die knappste Zusicherung dafuer, dass die Anhebung wirklich
     // die ganze Liga erfasst hat und nicht nur ein paar Zeilen.
+    // Nachgerechnet, dass die beiden Einzelanhebungen den Median NICHT verschieben: B-P wandert
+    // von 10 auf 11 und V-V von 11 auf 12, die Verteilung wird dadurch bei 11 und 12 nur
+    // umgeschichtet (11 bleibt 14-fach, 12 waechst von 8 auf 9). 16. und 17. Wert bleiben 12.
     const werte = identitaeten.map((identity) => identity.playerOpt).sort((a, b) => a - b);
     const median = (werte[werte.length / 2 - 1]! + werte[werte.length / 2]!) / 2;
     expect(median).toBe(12);
