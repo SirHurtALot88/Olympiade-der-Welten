@@ -67,8 +67,13 @@
   .prow.sel{border-color:var(--home);background:var(--home-bg)}
   .prow.used{opacity:.42}
   .prow:focus-visible{outline:2px solid var(--home);outline-offset:1px}
-  .pico{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;background:var(--surface-2);
+  /* Das Kuerzel liegt hinten, die Figur davor — laedt ein Sprite-Blatt nicht, bleibt das
+     Kuerzel sichtbar statt einer leeren Flaeche. */
+  .pico{position:relative;width:36px;height:40px;border-radius:6px;display:grid;place-items:center;
+    background:var(--surface-2);overflow:hidden;
     color:var(--muted);font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px}
+  .figurklein{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);
+    image-rendering:pixelated;pointer-events:none}
   .prow.sel .pico{background:var(--home);color:#0B1018}
   .pnm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25}
   .pnm span{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
@@ -384,8 +389,8 @@
 <div class="wrap">
   <p class="kicker">Olympiade der Welten · Entwurf, keine Implementierung</p>
   <h1>Battle Mode</h1>
-  <p class="lede">Echter Kader von Armageddon Aftermath, echte Attributwerte. <strong>Keine Zahl erfunden.</strong></p>
-  <p class="lede">Der Schaden je Treffer steht fest: <strong>steht 21 dran, macht er 21.</strong> Die Streuung kommt aus Treffen, Verfehlen und kritischen Treffern — nicht aus einem Schadenswürfel.</p>
+  <p class="lede">Echte Kader aus dem laufenden Spielstand: <strong>Vigilante Wranglers</strong> gegen <strong>Armageddon Aftermath</strong>, Saison 2 nach Spieltag 10. Klassen, Rassen, Unterklassen, Eigenschaften und alle zwölf Attribute sind abgeschrieben. <strong>Keine Zahl erfunden.</strong></p>
+  <p class="lede">Jeder Nahkampfschlag <strong>trifft</strong> — Trefferchance und kritische Treffer gibt es hier nicht, das Vorbild kennt sie im Nahkampf auch nicht. Die Streuung kommt aus Stellung, Reichweite, Ausdauer und den Formkarten des Spieltags, nicht aus einem Schadenswürfel.</p>
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" aria-controls="p1" id="t1">Aufstellung</button>
@@ -1591,8 +1596,29 @@
       if(b.helm)setz("helm_walk",null);
       if(b.kapuze)setz("kapuze_walk",null);
       if(b.schwanz)setz("schwanzfg_walk",b.haut);
+      // DIE WAFFE GEHOERT DAZU. Ohne sie sah eine Bogenschuetzin aus wie jede andere
+      // Lederfigur — genau das, was bei Buttercup schon einmal schieflief.
+      //
+      // Es gibt nur EIN Waffenblatt je Waffe, und beide gehoeren zur Aktion: "bogen_shoot"
+      // und "schwertbg/fg_slash". Fuer das stehende Bild wird deshalb das erste Bild der
+      // jeweiligen Folge genommen — der Bogen ist da schon in der Hand, das Schwert
+      // ebenfalls. Ein eigenes Steh-Blatt fehlt uns; das gehoert auf die Sprite-Liste.
+      if(b.waffe==="bogen")setz("bogen_shoot",null);
+      else if(b.waffe==="schwert"){
+        const im=sprite("schwertfg_slash",null);
+        if(im&&im.width){try{x.drawImage(im,0,r*128,128,128,-30,-28,128,128);}catch(e){}}
+      }
     };
     mal(); setTimeout(mal,300);   // falls die Blaetter noch laden
+    return c;
+  }
+
+  // Dieselbe Figur, nur klein — fuer Kaderliste und Aufstellung.
+  function figurKlein(p,gr){
+    const c=figur(p);
+    c.className="figurklein";
+    c.style.width=(gr||30)+"px";
+    c.style.height=Math.round((gr||30)*52/44)+"px";
     return c;
   }
 
@@ -1616,7 +1642,10 @@
       const r=el("div","prow"+(sel===p.n?" sel":"")+(anderswo?" used":"")+(gesetzt?" gesetzt":""));
       r.tabIndex=0;r.setAttribute("role","button");
       r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
+      // Das Kuerzel bleibt als Grund, die Figur legt sich darueber — so sieht man auf
+      // einen Blick, WER da steht, und nicht nur zwei Buchstaben.
       const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
+      ico.appendChild(figurKlein(p,34));
       const fk=formVon(p.n);
       if(fk>0){const fm=el("i","formkarte "+(KLASSENFARBE[p.c]||"grau"));fm.textContent="+"+fk;
         fm.title="Formkarte des Spieltags: +"+fk+" auf den Disziplinwert";ico.appendChild(fm);}
