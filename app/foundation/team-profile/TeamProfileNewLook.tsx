@@ -26,7 +26,8 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { CONTRACT_SHAPE_LABELS } from "@/lib/foundation/contract-shape-label";
-import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildTeamSeasonAreaPoints } from "@/lib/foundation/season-area-points";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import type {
@@ -697,30 +698,60 @@ export default function TeamProfileNewLook({
   }, [foundationGameState, data.teamId]);
 
   // RANG-Hover: kompakte Ligatabelle. Rang/Punkte aus `seasonState.standings`,
-  // PPs (Disziplin-Performance) + POW/SPE/MEN/SOC aus dem kanonischen
-  // Team-Disziplin-Rang-Engine (dieselbe Quelle wie die Header-Achsen-Ränge).
+  // PPs und POW/SPE/MEN/SOC aus dem SAISON-PUNKTE-LEDGER — derselben Quelle, aus
+  // der auch der Saisonstand seine Bereichswerte zieht.
+  //
+  // GEMELDET VON CHRIS: „die PP Ansicht zeigt nicht unsere PPs der Spieler! …
+  // Bitte hier die PPs aus den Bereichen hinterlegen wie sie auch im Saisonstand
+  // zu finden sind!"
+  //
+  // ER HATTE RECHT, UND ZWAR VOLLSTAENDIG. Hier stand vorher der `scorePack` aus
+  // `buildTeamDisciplineRankRowsFromGameState` — und der summiert die
+  // DISZIPLIN-STAERKEN der besten sechs Spieler eines Teams (`player.disciplineRatings`),
+  // also Papierform, nicht Ertrag. Unter der Ueberschrift „PPs" stand damit eine
+  // Zahl, die mit geholten Punkten nichts zu tun hat. An Chris' Spielstand
+  // (season-2, Spieltag 9) nachgemessen:
+  //
+  //   C-S  angezeigt 1541/1679/1537/1638 = „6.395 PPs"  ·  tatsaechlich 27/24/13/48 = 112
+  //   G-G  angezeigt 1603/1396/1539/1590 = „6.128 PPs"  ·  tatsaechlich 32/14/26/39 = 110
+  //
+  // Die echten PPs standen die ganze Zeit daneben: die „112 P" SIND die 112 PPs.
+  // Ueber alle 32 Teams gilt Punkte = Ledger-Gesamt = Summe der vier Bereiche.
+  //
+  // KOSTEN, gemessen: der Ledger braucht 17,7 ms gegen 3,6 ms der Staerke-Summe.
+  // Das laeuft im `useMemo` einmal je Spielstand-Aenderung, nicht je Bild — und es
+  // ist dieselbe Rechnung, die der Saisonstand ohnehin anstellt.
   const standingsHoverRows = useMemo(() => {
     if (!foundationGameState) {
       return [];
     }
     const standings = foundationGameState.seasonState.standings ?? {};
-    const rankRows = buildTeamDisciplineRankRowsFromGameState(foundationGameState, foundationGameState.disciplines);
-    const packByTeamId = new Map(rankRows.map((row) => [row.teamId, row.scorePack] as const));
+    const ledger = buildSeasonPointsLedger(foundationGameState, foundationGameState.season.id);
     return foundationGameState.teams
       .map((team) => {
         const standing = standings[team.teamId];
-        const pack = packByTeamId.get(team.teamId) ?? null;
+        const summary = ledger.teamSummariesByTeamId.get(team.teamId) ?? null;
+        const areaPoints = buildTeamSeasonAreaPoints({
+          // Der LIVE-Spielstand fuehrt keine Disziplinwerte im `StandingRecord` — die Merge-Basis
+          // ist hier also allein der Ledger. Genau so rechnet die Saisonstand-Tabelle im
+          // Live-Fall ebenfalls (kein `standingsByTeamId` uebergeben).
+          standingDisciplineValues: null,
+          ledgerPointsByDiscipline: summary?.pointsByDiscipline ?? null,
+          ledgerPointsByArea: summary?.pointsByArea ?? null,
+          ledgerTotalPoints: summary?.totalPoints ?? 0,
+          hasCurrentPps: (summary?.playerDerivedTotal ?? 0) > 0,
+        });
         return {
           teamId: team.teamId,
           shortCode: team.shortCode ?? team.name.slice(0, 3).toUpperCase(),
           teamName: team.name,
           rank: isFiniteNumber(standing?.rank) ? (standing?.rank as number) : null,
           points: isFiniteNumber(standing?.points) ? (standing?.points as number) : null,
-          pps: pack ? pack.total : null,
-          pow: pack ? pack.pow : null,
-          spe: pack ? pack.spe : null,
-          men: pack ? pack.men : null,
-          soc: pack ? pack.soc : null,
+          pps: areaPoints.total,
+          pow: areaPoints.pow,
+          spe: areaPoints.spe,
+          men: areaPoints.men,
+          soc: areaPoints.soc,
           isOwn: team.teamId === data.teamId,
         };
       })

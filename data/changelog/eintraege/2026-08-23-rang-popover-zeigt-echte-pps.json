@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Team · Profil",
+  "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

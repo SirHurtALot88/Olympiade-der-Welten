@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Markt · Verkauf",
       "pr": null,
       "text": "Wenn der Verkaufen-Knopf gesperrt ist, steht daneben jetzt der Grund, den der Dienst wirklich genannt hat. Vorher schob der Dialog eine fremde Sperre dem Kader in die Schuhe: sobald der Kader klein war, las man, er sei am Minimum und ein Verkauf mache die Aufstellung unmöglich — auch dann, wenn in Wahrheit der Verkaufspreis fehlte oder der Spieler nicht mehr aktiv war. Ein Kadergrund kann eine Verkaufssperre gar nicht auslösen; keiner der beiden Verkaufsdienste kennt einen. Der Hinweis am Ende des Dialogs warnt weiterhin, aber nur noch vor der echten Grenze: unter sieben Spielern ist keine Aufstellung mehr möglich. Unter dem Team-Minimum ist sie es sehr wohl — das Minimum steuert das Kaufen, nicht das Verkaufen.",
