@@ -48916,6 +48916,45 @@ button.foundation-team-portrait-card {
   flex-wrap: wrap;
 }
 
+/* MERKLISTE — das Lesezeichen auf Teams und Spielern.
+
+   Bewusst ein STERN und kein gefuellter Knopf: er steht neben dem Teamnamen und in der
+   Aktionsspalte der Kadertabelle, also direkt neben Schaltflaechen, die etwas am Spiel aendern.
+   Ein Lesezeichen tut das nicht — es darf optisch nicht mit ihnen konkurrieren. Ungesetzt bleibt
+   er gedaempft und faellt erst beim Hovern auf; gesetzt traegt er die Akzentfarbe, dieselbe wie
+   der Rang-Chip, damit „das beobachte ich" ueberall gleich aussieht. */
+.is-new-look .nl-merk-stern {
+  margin-left: 8px;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--nl-mut);
+  background: none;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: color 120ms ease, transform 120ms ease;
+}
+
+.is-new-look .nl-merk-stern:hover,
+.is-new-look .nl-merk-stern:focus-visible {
+  color: var(--nl-accent-text);
+  transform: scale(1.15);
+}
+
+.is-new-look .nl-merk-stern.is-gemerkt {
+  color: var(--nl-accent-text);
+}
+
+/* In der Kadertabelle steht der Stern in einer engen Zelle neben zwei Textknoepfen — dort
+   braucht er weniger Luft als am Teamnamen, sonst schiebt er die Aktionen um. */
+.is-new-look .nl-teams-td-actions .nl-merk-stern {
+  margin-left: 0;
+  margin-right: 6px;
+  font-size: 14px;
+}
+
 .is-new-look .nl-teams-hero-axes {
   display: flex;
   align-items: center;

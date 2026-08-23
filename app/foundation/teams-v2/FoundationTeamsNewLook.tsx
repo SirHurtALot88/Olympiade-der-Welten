@@ -255,6 +255,22 @@ export type FoundationTeamsNewLookProps = {
   selectedTeamCaptainPlayerId?: string | null;
   assignTeamCaptainForSelectedTeam?: (playerId: string) => void | Promise<void>;
   assignTeamCaptainBusy?: boolean;
+  /**
+   * MERKLISTE — Lesezeichen auf Teams und Spieler.
+   *
+   * GEWUENSCHT (Chris): „man sollte sich aussuchen können welche teams getrackt werden, dass man
+   * so ne wishlist option bei teams und spielern hat wie so lesezeichen und sich die dann noch
+   * mal angucken kann · binde das bei den teams ein dass in der Arena dann die angezeigt werden
+   * die ich gewishlistet habe zusätzlich zu den menschlichen teams".
+   *
+   * ALLES OPTIONAL: fehlen die Rueckrufe, bleibt die Ansicht exakt wie vorher — kein Stern, kein
+   * toter Knopf. Die Liste haengt am Besitzer und nicht am Team; die Begruendung steht am Typ
+   * `MerklisteEintrag` und in lib/merkliste/merkliste-service.ts.
+   */
+  gemerkteTeamIds?: ReadonlySet<string> | null;
+  onToggleTeamMerken?: (teamId: string) => void;
+  gemerkteSpielerIds?: ReadonlySet<string> | null;
+  onToggleSpielerMerken?: (playerId: string) => void;
 };
 
 /**
@@ -695,6 +711,10 @@ export default function FoundationTeamsNewLook({
   selectedTeamCaptainPlayerId,
   assignTeamCaptainForSelectedTeam,
   assignTeamCaptainBusy,
+  gemerkteTeamIds,
+  onToggleTeamMerken,
+  gemerkteSpielerIds,
+  onToggleSpielerMerken,
 }: FoundationTeamsNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>(() =>
     defaultRosterModeForTab(selectedTeamDetailTab),
@@ -1477,6 +1497,30 @@ export default function FoundationTeamsNewLook({
                   </td>
                   {showActions ? (
                     <td className="nl-teams-td-actions" onClick={(event) => event.stopPropagation()}>
+                      {/* Der Stern steht VOR den Vertragsaktionen und ausserhalb ihrer Gruppe: er
+                          ist die einzige Aktion hier, die nichts am Spiel aendert — nur an dem,
+                          was ich mir ansehen will. Er ist deshalb auch nie gesperrt, waehrend
+                          Verlaengern und Verkaufen am Season-End-Fenster haengen. */}
+                      {onToggleSpielerMerken ? (
+                        <button
+                          type="button"
+                          className={`nl-merk-stern${gemerkteSpielerIds?.has(player.id) ? " is-gemerkt" : ""}`}
+                          onClick={() => onToggleSpielerMerken(player.id)}
+                          aria-pressed={Boolean(gemerkteSpielerIds?.has(player.id))}
+                          aria-label={
+                            gemerkteSpielerIds?.has(player.id)
+                              ? `${player.name} von der Merkliste nehmen`
+                              : `${player.name} merken`
+                          }
+                          title={
+                            gemerkteSpielerIds?.has(player.id)
+                              ? `${player.name} von der Merkliste nehmen`
+                              : `${player.name} merken — bleibt auch nach einem Kauf auf der Liste`
+                          }
+                        >
+                          {gemerkteSpielerIds?.has(player.id) ? "★" : "☆"}
+                        </button>
+                      ) : null}
                       {/* T-036: „Verkaufen" ist destruktiv und stand bisher direkt
                           neben „Verlängern" in identischer Optik → Fehlklick-Gefahr.
                           Fix: eigene Gruppe mit sichtbarem Abstand + Warnstil
@@ -1701,7 +1745,29 @@ export default function FoundationTeamsNewLook({
             />
             <div className="nl-teams-hero-copy">
               <span className="nl-teams-hero-eyebrow">Team Fokus</span>
-              <h2 className="nl-teams-hero-name">{selectedTeam.name}</h2>
+              {/* Der Stern sitzt AM NAMEN und nicht bei den Kennzahlen-Chips: er sagt nichts ueber
+                  das Team aus, sondern ueber die eigene Beobachtung — und beim Namen sucht ihn,
+                  wer ihn setzen will. Ohne Rueckruf erscheint er gar nicht erst; ein Knopf, der
+                  nichts tut, waere schlimmer als keiner. */}
+              <h2 className="nl-teams-hero-name">
+                {selectedTeam.name}
+                {onToggleTeamMerken ? (
+                  <button
+                    type="button"
+                    className={`nl-merk-stern${gemerkteTeamIds?.has(selectedTeam.teamId) ? " is-gemerkt" : ""}`}
+                    onClick={() => onToggleTeamMerken(selectedTeam.teamId)}
+                    aria-pressed={Boolean(gemerkteTeamIds?.has(selectedTeam.teamId))}
+                    title={
+                      gemerkteTeamIds?.has(selectedTeam.teamId)
+                        ? `${selectedTeam.name} von der Merkliste nehmen`
+                        : `${selectedTeam.name} merken — erscheint dann vor jedem Spieltag in der Arena`
+                    }
+                    data-testid="nl-merk-stern-team"
+                  >
+                    {gemerkteTeamIds?.has(selectedTeam.teamId) ? "★" : "☆"}
+                  </button>
+                ) : null}
+              </h2>
               <StatChipRow className="nl-teams-hero-chips" aria-label={`Kennzahlen ${selectedTeam.name}`}>
                 <TeamsKpiHoverPortal
                   panelId="nl-teams-hero-rang-pop"

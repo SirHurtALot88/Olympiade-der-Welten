@@ -11950,6 +11950,10 @@ export function useFoundationShellRouterBodyScope({
   }
 
   const foundationTeamsViewHostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam"> = {
+    // Schluessel der Merkliste (Lesezeichen auf Teams und Spielern). Ohne dieses Feld faellt
+    // die Ansicht auf den Standardbesitzer zurueck — im Koop schriebe Franky dann in Chris'
+    // Liste. Siehe lib/merkliste/merkliste-service.ts.
+    activeOwnerId,
     // VK je Spieler aus dem SERVER-Slice — der Slice wird oben ohnehin fuer die Teams-Ansicht
     // geladen (`enabled: … || shouldBuildTeamsView`). Die Kaderkarte hatte bis hierhin nur die
     // lokale Rueckfallebene, und die faellt im kompakten Client-Payload auf VK == MW zusammen.
