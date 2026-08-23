@@ -2267,10 +2267,20 @@
   }
 
   const live=s=>U.filter(u=>u.side===s&&!u.down);
+  // GEGNER IST, WER EINE ANDERE SEITE HAT — nicht "die andere Seite".
+  //
+  // Vorher stand an elf Stellen live(1-u.side). Das ist keine Abfrage, das ist eine
+  // Behauptung: es gibt genau zwei Parteien. Solange TDM gemeint war, stimmte sie. Chris
+  // will aber Formate, in denen vier Teams gleichzeitig antreten oder ein gemischter Pool
+  // frei gegeneinander kaempft — dort ist sie schlicht falsch. Die beiden Helfer hier
+  // wissen nicht, wie viele Parteien es gibt, und muessen es auch nicht wissen.
+  const gegner=u=>U.filter(x=>x.side!==u.side&&!x.down);
+  const eigene=u=>U.filter(x=>x.side===u.side&&!x.down);
+  const alleLebenden=()=>U.filter(u=>!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 
   function chooseTarget(u){
-    const foes=live(1-u.side);if(!foes.length)return null;
+    const foes=gegner(u);if(!foes.length)return null;
     const own=u.side===0?(p=>p.x<MID):(p=>p.x>MID);
     const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
 
@@ -2391,7 +2401,7 @@
       const weg=Math.hypot(nx-pf.x,ny-pf.y);
       // Wen schneidet die Strecke dieses Bildes? Unverwundbare zaehlen nicht — der Pfeil
       // fliegt durch sie hindurch, genau das ist der Sinn der Ausweichrolle.
-      const kand=live(1-pf.side).filter(f=>f.invuln<=0&&bahnAbstand(f,pf.x,pf.y,nx,ny)<19);
+      const kand=gegner(pf).filter(f=>f.invuln<=0&&bahnAbstand(f,pf.x,pf.y,nx,ny)<19);
       const z=kand.length?kand.reduce((b,x)=>Math.hypot(x.x-pf.x,x.y-pf.y)<Math.hypot(b.x-pf.x,b.y-pf.y)?x:b):null;
       if(z){
         const crit=rr()<pf.von.PRZ/400;
@@ -2481,7 +2491,7 @@
       }
       return kand;
     }
-    const feinde=live(1-u.side);
+    const feinde=gegner(u);
     const max=reichweiteVon(sk);
     if(!tg||tg.down)return [];
     if(sk.form.typ==="einzel")return dist(u,tg)<=max?[tg]:[];
@@ -2500,7 +2510,7 @@
       const ax=tg.x-u.x, ay=tg.y-u.y, L=Math.hypot(ax,ay)||1;
       const w=Math.min(KOERPER_X+sk.form.laenge,L);
       const ex=u.x+ax/L*w, ey=u.y+ay/L*w;
-      const auf=FREUNDBESCHUSS?live(0).concat(live(1)).filter(f=>f!==u):feinde;
+      const auf=FREUNDBESCHUSS?alleLebenden().filter(f=>f!==u):feinde;
       return auf.filter(f=>bahnAbstand(f,u.x,u.y,ex,ey)<sk.form.breite/2);
     }
     return [tg];
@@ -2520,14 +2530,14 @@
         w+=Math.min(heil,z.max-z.hp)*KURS.heilung; // Ueberheilung zaehlt nicht
       }else if(e.art==="schild"){
         // Wert steigt mit der Bedrohung: wie viele Gegner haben dieses Ziel im Visier?
-        const jaeger=live(1-u.side).filter(f=>f.tgt===z).length;
+        const jaeger=gegner(u).filter(f=>f.tgt===z).length;
         w+=e.staerke*KURS.schild*(0.4+0.3*jaeger);
       }else if(e.art==="betaeubung"){
         w+=e.dauer*(z.ANG*0.5)*KURS.betaeubung;
       }else if(e.art==="rueckstoss"){
         w+=e.staerke*KURS.rueckstoss;
       }else if(e.art==="unverwundbar"){
-        const drauf=live(1-u.side).filter(f=>dist(u,f)<140).length;
+        const drauf=gegner(u).filter(f=>dist(u,f)<140).length;
         w+=e.dauer*(20+drauf*18)*KURS.unverwundbar;
       }
     }
@@ -2550,7 +2560,7 @@
       const passt=ziele.some(z=>
         (u.zielP==="heiler"&&z.heiler)||
         (u.zielP==="schwach"&&z.hp/z.max<0.4)||
-        (u.zielP==="bedrohung"&&z===live(1-u.side).reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b))||
+        (u.zielP==="bedrohung"&&z===gegner(u).reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b))||
         (u.zielP==="hinten"&&z.row===2));
       if(passt){f*=1.6;grund.push("Zielpriorität ×1,6");}
     }
@@ -2663,7 +2673,7 @@
       if((u.cds[id]||0)>0)continue;
       if(t.mp&&u.mp<t.mp)continue;
       if(t.sp&&u.sp<t.sp)continue;
-      if(t.bedraengt&&!live(1-u.side).some(f=>dist(u,f)<t.bedraengt))continue;
+      if(t.bedraengt&&!gegner(u).some(f=>dist(u,f)<t.bedraengt))continue;
       const ziele=zieleFuer(u,sk,tg);
       if(!ziele.length)continue;
       if(t.min&&tg&&dist(u,tg)<t.min)continue;
@@ -2770,7 +2780,7 @@
         // Frueher zurueck ins Gefecht, wenn ohnehin niemand mehr dranhaengt.
         // Fruehestens nach der halben Zeit abbrechen — sonst flattert es zwischen
         // Loesen und Angreifen hin und her.
-        if(!u.fern&&u.retreat<u.rtBis*0.5&&!live(1-u.side).some(f=>dist(u,f)<120))u.retreat=0;
+        if(!u.fern&&u.retreat<u.rtBis*0.5&&!gegner(u).some(f=>dist(u,f)<120))u.retreat=0;
         if(u.retreat<=0){u.rtCd=7;feed(u.side,u.n+" greift wieder an.");}
       }
 
@@ -2812,7 +2822,7 @@
       // Flanke unbedingt durchkommen will oder unterwegs Beute macht.
       const durchAb=1.5+u.opp/100*4;
       // Ein Opportunist geht nicht durch, solange direkt vor ihm etwas Angeschlagenes steht.
-      const beuteDa=u.opp>=60&&live(1-u.side).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
+      const beuteDa=u.opp>=60&&gegner(u).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
       if(u.zielSeit>durchAb&&weitWeg&&!beuteDa){
         u.durch=true;
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
@@ -2826,7 +2836,7 @@
       // Ob jemand stehenbleibt oder weitergeht, sagt seine BINDUNG. Der Opportunist stellt
       // sich dem, der ihn abfaengt; der Unbeirrte laeuft weiter und nimmt den Schlag mit.
       if(u.cdTrenn>0)u.cdTrenn-=dt;
-      u.bindAn=live(1-u.side).find(f=>!f.fern&&dist(u,f)<=f.reichNah*1.15)||null;
+      u.bindAn=gegner(u).find(f=>!f.fern&&dist(u,f)<=f.reichNah*1.15)||null;
       if(u.bindAn&&!u.durch&&u.retreat<=0&&u.tgt!==u.bindAn&&u.opp>=55){
         if(u.tgt!==u.bindAn)feed(u.side,u.n+" wird von "+u.bindAn.n+" gestellt und nimmt den Kampf an.");
         u.tgt=u.bindAn; u.reev=0.6;
@@ -2982,7 +2992,7 @@
               const w=Math.min(SKILLS.ram.reichweite,Math.max(0,L-u.reichNah*0.6));
               const ex=Math.max(34,Math.min(W-34,u.x+ax/L*w)),ey=Math.max(34,Math.min(H-34,u.y+ay/L*w));
               // Erwischt wird, wer AUF DER BAHN steht — nicht nur das gemeinte Ziel.
-              const bahn=live(1-u.side).filter(f=>bahnAbstand(f,u.x,u.y,ex,ey)<46);
+              const bahn=gegner(u).filter(f=>bahnAbstand(f,u.x,u.y,ex,ey)<46);
               // Erst schlagen, dann stehenbleiben: der Rueckstoss soll von dort kommen, wo
               // der Anlauf begann — sonst fliegen die Getroffenen ihm entgegen statt weg.
               for(const f of bahn){
