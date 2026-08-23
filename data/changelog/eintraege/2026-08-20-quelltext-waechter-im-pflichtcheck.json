@@ -2,6 +2,6 @@
   "datum": "2026-08-20",
   "seite": "Intern · Entwicklung",
   "text": "Die Quelltext-Wächter laufen ab jetzt im Pflicht-Check mit. Die volle Testsuite ist kein Pflicht-Check, und dadurch sind an einem Tag zwei rote Wächter unbemerkt durchgerutscht — die Tests existierten, sie liefen nur nicht in dem Lauf, der den Merge bewacht. Die betroffene Sorte prüft Zusicherungen am Quelltext selbst und braucht weder Datenbank noch Browser: 120 Dateien, 1830 Prüfungen, 69 Sekunden. Die Auswahl wird bei jedem Lauf neu errechnet statt aufgezählt, damit ein neu geschriebener Wächter nicht wieder aus dem Tor fällt. Am Spiel selbst ändert das nichts.",
-  "gewicht": null,
+  "gewicht": "feinschliff",
   "version": "0.5"
 }

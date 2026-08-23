@@ -340,7 +340,7 @@ import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-p
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
-import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
@@ -11031,6 +11031,16 @@ export function useFoundationShellRouterBodyScope({
            * davor warnt der Kommentar an `computeTeamBuildingCost`.
            */
           hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
+          // Die TEILE der Zahlenspalten fuer die Hovers (Chris, 23.08.). Sie stehen im Datensatz
+          // getrennt; gezeigt wurde bisher nur die Summe.
+          sponsorBasis: row.sponsorBasis ?? null,
+          sponsorRank: row.sponsorRank ?? null,
+          sponsorSeason: row.sponsorSeason ?? null,
+          transferBuyCount: row.transferBuyCount ?? null,
+          transferSellCount: row.transferSellCount ?? null,
+          transferBuyTotal: row.transferBuyTotal ?? null,
+          transferSellTotal: row.transferSellTotal ?? null,
+          buildingUpkeep: computeTeamBuildingUpkeepRows(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,

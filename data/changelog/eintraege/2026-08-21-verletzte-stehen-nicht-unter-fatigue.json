@@ -2,6 +2,6 @@
   "datum": "2026-08-21",
   "seite": "Spieltag · Einsatzliste",
   "text": "Ein verletzter Spieler steht in der Einsatzliste jetzt unter „🩹 Verletzt — fällt aus\" statt unter „Riskant wegen Fatigue\". Der Grund für die Verwechslung: die Abfrage nach der Verletzung hing an der Slot-Vorschau, und die entsteht erst, wenn du einen Platz anklickst. Beim bloßen Öffnen der Liste — also genau dann, wenn du dir einen Überblick verschaffen willst — wurde sie nie gestellt, und der Verletzte rutschte durch bis zur Müdigkeits-Prüfung darunter. Die Verletzung stand die ganze Zeit auf der Karte, sie wurde nur nicht gelesen. Die neue Gruppe steht über der Fatigue-Gruppe, damit der schwerere Grund nicht unter dem leichteren verschwindet. Wer sich gerade erholt, bleibt weiterhin einsetzbar — zurück ist zurück.",
-  "gewicht": "klein",
+  "gewicht": "behebung",
   "version": "0.5"
 }

@@ -2,6 +2,6 @@
   "datum": "2026-08-11",
   "seite": "Gebaeude",
   "text": "Gebaeude nutzen sich jetzt spuerbar ab. Bisher fielen feste 8 Zustandspunkte je Saison an — ein Neubau stand nach drei Jahren noch bei 76 Prozent und hatte nie an Wirkung verloren. Die Warnschwelle wurde damit praktisch nie erreicht, und die Wartung war eine Funktion ohne Anlass. Jetzt fallen im Mittel 17 Punkte je Saison, also rund die Haelfte ueber drei Saisons, und der Verschleiss schwankt von Gebaeude zu Gebaeude zwischen 12 und 22 — zwei gleich alte Gebaeude sind dadurch nicht mehr gleich gut. Gleichzeitig wirkt ein Gebaeude jetzt bis 80 Prozent Zustand mit voller Leistung statt bis 70; darunter faellt die Wirkung linear. Ein Neubau rutscht damit in seiner zweiten Saison unter die Schwelle und will gepflegt werden. Wer den Unterhalt nicht zahlt, verliert doppelt so schnell und steht nach rund drei Saisons vor einer Ruine.",
-  "gewicht": "normal",
+  "gewicht": "grundlegend",
   "version": "0.4"
 }

@@ -19,8 +19,12 @@ import PlayerStarFrame from "@/components/foundation/player-portrait-card/Player
 import { buildGuvBreakdown } from "@/lib/finance/guv-breakdown";
 import {
   buildGehaltHover,
+  buildGebaeudeHover,
   buildMarktwertHover,
+  buildSponsorHover,
   buildTeamHover,
+  buildTransferHover,
+  type SaisonstandPostenZeile,
   type SaisonstandHoverListe,
 } from "@/lib/foundation/saisonstand-team-hover";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
@@ -1911,9 +1915,45 @@ export default function SeasonStandingsNewLook({
               die halbe Spalte gruen und die eine echte Warnung geht darin unter. Die Klasse
               `is-neg` gibt es hier laengst, die Cash-Spalte hat sie nur nie benutzt. */}
           <td className={`nl-standings-td-fin${(row.cash ?? 0) < 0 ? " is-neg" : ""}`}>
-            {formatNlMoney(row.cash)}
+            {/* Wo kam das Geld her, wo ging es hin — dieselben Posten wie die GuV-Spalte, andere
+                Frage. Seit der GuV-Vereinheitlichung ist das ohne zweite Rechnung zu haben. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-cash-${row.teamId}`}
+              ariaLabel={`Cash-Bewegungen ${row.teamName}`}
+              panel={(() => {
+                const posten = row.guvPosten ?? null;
+                if (!posten || posten.length === 0) return null;
+                return renderPostenPanel("Cash-Bewegungen", row.teamName, [
+                  { label: "Cash heute", wert: row.cash ?? null },
+                  ...posten
+                    .filter((eintrag) => eintrag.counted && Math.abs(eintrag.amount) > 0.005)
+                    .map((eintrag) => ({ label: eintrag.label, wert: eintrag.amount, notiz: eintrag.note ?? null })),
+                  { label: "≈ Saisonende", wert: row.cash != null && row.guv != null ? Number((row.cash + row.guv).toFixed(2)) : null, istSumme: true },
+                ]);
+              })()}
+            >
+              {formatNlMoney(row.cash)}
+            </StandingsKaderHover>
           </td>
-          <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>{formatNlMoney(row.sponsorTotal)}</td>
+          <td className={`nl-standings-td-fin${row.sponsorTotal ? " is-pos" : ""}`}>
+            {/* Basis + Rangbonus + Saisonanteil — die drei Teile stehen im Datensatz laengst
+                getrennt, gezeigt wurde nur die Summe. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-sponsor-${row.teamId}`}
+              ariaLabel={`Sponsoren ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildSponsorHover({
+                  sponsorBasis: row.sponsorBasis,
+                  sponsorRank: row.sponsorRank,
+                  sponsorSeason: row.sponsorSeason,
+                  sponsorTotal: row.sponsorTotal,
+                });
+                return zeilen ? renderPostenPanel("Sponsoren", row.teamName, zeilen) : null;
+              })()}
+            >
+              {formatNlMoney(row.sponsorTotal)}
+            </StandingsKaderHover>
+          </td>
           <td className="nl-standings-td-fin">
             {/* „beim Gehalt dasselbe, dass ich dann die Gehälter sehe" — plus Vertragsform und
                 Restlaufzeit, weil beides erklärt, warum eine Zahl so hoch ist. */}
@@ -1935,8 +1975,48 @@ export default function SeasonStandingsNewLook({
             </StandingsKaderHover>
             {renderRankSuffix(salaryRanks.get(row.teamId), "Gehaltssumme", row.teamName)}
           </td>
-          <td className="nl-standings-td-fin">{formatNlMoney(row.buildingCost)}</td>
-          <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>{formatNlMoney(row.transferNet)}</td>
+          <td className="nl-standings-td-fin">
+            {/* Welche Anlage kostet wie viel — dieselbe Rechnung wie die Spalte, nur aufgeschluesselt. */}
+            <StandingsKaderHover
+              panelId={`nl-standings-gebaeude-${row.teamId}`}
+              ariaLabel={`Gebäude-Unterhalt ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildGebaeudeHover(row.buildingUpkeep ?? []);
+                if (zeilen.length === 0) return null;
+                return renderPostenPanel(
+                  "Gebäude-Unterhalt",
+                  row.teamName,
+                  zeilen.map((zeile) => ({
+                    label: zeile.label,
+                    wert: -zeile.upkeep,
+                    notiz: `Stufe ${zeile.level}`,
+                  })),
+                );
+              })()}
+            >
+              {formatNlMoney(row.buildingCost)}
+            </StandingsKaderHover>
+          </td>
+          <td className={`nl-standings-td-fin${nlMoneySignClass(row.transferNet)}`}>
+            {/* Verkaeufe und Kaeufe getrennt — genau die Zerlegung, die Chris bei `ls9jfg` vermisst
+                hat („so wären dann ein paar Teams positiv und ein paar negativ"). */}
+            <StandingsKaderHover
+              panelId={`nl-standings-transfers-${row.teamId}`}
+              ariaLabel={`Transfers ${row.teamName}`}
+              panel={(() => {
+                const zeilen = buildTransferHover({
+                  transferSellCount: row.transferSellCount,
+                  transferSellTotal: row.transferSellTotal,
+                  transferBuyCount: row.transferBuyCount,
+                  transferBuyTotal: row.transferBuyTotal,
+                  transferNet: row.transferNet,
+                });
+                return zeilen ? renderPostenPanel("Transfers", row.teamName, zeilen) : null;
+              })()}
+            >
+              {formatNlMoney(row.transferNet)}
+            </StandingsKaderHover>
+          </td>
           <td
             className={`nl-standings-td-fin${nlMoneySignClass(row.guv)}`}
             // Chris: „am besten ein Hover auf dem GuV-Posten, der noch mal aufzeigt, wie die Zahl
@@ -1976,6 +2056,40 @@ export default function SeasonStandingsNewLook({
    * der Zeile in einem Blick. Bewusst KEIN zweiter Tabellenauszug: was in der Zeile daneben schon
    * steht (Punkte, Rang), steht hier nur, weil man beim Hovern nicht mehr auf die Zeile schaut.
    */
+  /**
+   * EINE POSTENLISTE ALS PANEL — Sponsoren, Transfers, Cash teilen sich diese Darstellung.
+   * Leere Werte bleiben leer („—"); die Ergebniszeile wird abgesetzt.
+   */
+  function renderPostenPanel(titel: string, teamName: string, zeilen: SaisonstandPostenZeile[]): ReactNode {
+    return (
+      <>
+        <span className="nl-teams-rank-preview-title">
+          {titel} — {teamName}
+        </span>
+        <div className="nl-standings-hover-posten">
+          {zeilen.map((zeile) => (
+            <div
+              key={zeile.label}
+              className={`nl-standings-hover-postenrow${zeile.istSumme ? " is-result" : ""}`}
+            >
+              <span>
+                {zeile.label}
+                {zeile.notiz ? <span className="nl-standings-hover-years">{zeile.notiz}</span> : null}
+              </span>
+              <span
+                className={`nl-tnum${
+                  zeile.wert != null && zeile.wert < 0 ? " is-neg" : zeile.wert != null && zeile.wert > 0 ? " is-pos" : ""
+                }`}
+              >
+                {formatNlMoney(zeile.wert)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
   function renderTeamMiniPanel(row: SeasonV2StandingsRow): ReactNode {
     const hover = buildTeamHover(row.hoverKader ?? []);
     return (

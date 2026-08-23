@@ -2,6 +2,6 @@
   "datum": "2026-08-22",
   "seite": "Team · Ewige Tabelle",
   "text": "Die Ewige Tabelle zeigt Marktwert und Kontostand jetzt so, wie sie am Ende der Saison standen — nach Sponsorgeld und Gehaltsabzug, aber vor dem ersten Verkauf. Vorher stand dort der Stand beim Eintritt in die neue Saison, also nach Verkäufen und Käufen; eine ewige Tabelle beantwortet aber die Frage, was eine Saison gebracht hat, nicht womit es danach weiterging. Der Unterschied ist erheblich: bei 29 von 32 Teams ändert sich die Zeile, und bei einem kippt sogar das Vorzeichen — am Saisonende im Minus, erst durch die Verkäufe danach im Plus. Beide Stände bleiben gespeichert, es ist nur eine Frage, welcher gezeigt wird.",
-  "gewicht": "klein",
+  "gewicht": "behebung",
   "version": "0.5"
 }

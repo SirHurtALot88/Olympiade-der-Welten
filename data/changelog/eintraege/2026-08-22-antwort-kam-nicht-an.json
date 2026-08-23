@@ -2,6 +2,6 @@
   "datum": "2026-08-22",
   "seite": "Spieltag · Arena",
   "text": "Wenn die Antwort des Servers nicht ankommt, behauptet die Arena nicht mehr, die Punkte seien nicht gebucht — sie sagt jetzt, dass sie es nicht weiß, und bittet dich, den Saisonstand zu prüfen. Der Anlass war eine Meldung, die genau das Gegenteil des Zustands behauptete: nachgemessen war der betroffene Spieltag längst gebucht, nur die Antwort war unterwegs verlorengegangen. Wer so einer Meldung glaubt, wertet denselben Spieltag ein zweites Mal. Dazu nennt die Fehlermeldung ab jetzt den Statuscode und den Anfang dessen, was tatsächlich ankam, statt eines technischen Parser-Fehlers — beim nächsten Mal ist damit in Minuten klar, ob es eine Zeitüberschreitung, ein Absturz oder ein Abbruch war. Ein echter fachlicher Fehlschlag heißt weiterhin klar „nicht gebucht\".",
-  "gewicht": "klein",
+  "gewicht": "behebung",
   "version": "0.5"
 }
