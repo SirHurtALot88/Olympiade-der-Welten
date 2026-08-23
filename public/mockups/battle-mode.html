@@ -823,7 +823,7 @@
     // genau das, was seine Eignung verspricht, UND das Gesamtfeld weicht am wenigsten von
     // seinen Werten ab. Waere nur das erste zutreffend, haette ich auf ein Wunschergebnis
     // hin gedreht.
-    fuehrung:     0.20,
+
     schaden:      1.00,   // je Punkt tatsaechlich abgezogener Lebenspunkte
     heilung:      1.00,   // je Punkt tatsaechlich fehlender und aufgefuellter LP
     schild:       0.80,   // je Punkt vorweggenommener Schadensabwehr
@@ -1399,10 +1399,36 @@
     // Ziel: Kraft waechst linear mit der Eignung. Bei KRAFTMITTE bleibt alles wie es ist.
     const referenz=rohKraft({LP:75,VER:60,ANG:70});
     const ziel=referenz*(eig/KRAFTMITTE);
-    const f=Math.sqrt(ziel/roh);
+
+    // DIE VERTEIDIGUNG WIRD MITSKALIERT.
+    //
+    // Vorher fasste diese Funktion nur LP und ANG an und liess VER stehen. Damit wirkte
+    // die Verteidigung als STEUER auf die beiden anderen: wer von Haus aus zaeh ist, hat
+    // eine hohe rohKraft, braucht also einen kleineren Faktor — und bekommt am Ende
+    // WENIGER Leben als ein weicher Spieler, dessen Werte hochskaliert werden mussten.
+    //
+    // Wie absurd das wird, zeigt ein Paar aus dem laufenden Spielstand: Lava Golem hat
+    // Health 99 und Power 98 und kam auf 280 Leben; Seraph-11 hat Health 52 und kam auf
+    // 403. Auch nach Verteidigung gerechnet blieb der Golem hinten (529 zu 581 effektive
+    // Leben). Chris: "aber auch wenn Lava Golem langsam ist, er müsste ja super tanky
+    // sein." Genau — und er war es nicht, weil ich die Form seiner Werte zerstoert habe.
+    //
+    // Jetzt wachsen alle drei Kampfwerte mit demselben Faktor. Die MENGE richtet sich
+    // weiter nach der Eignung, die FORM bleibt die des Spielers: wer zaeh gebaut ist,
+    // bleibt zaeh, wer hart zuschlaegt, schlaegt hart zu.
+    //
+    // Weil VER im Produkt steckt, laesst sich der Faktor nicht mehr geschlossen ausrechnen
+    // (er stuende in einer Gleichung dritten Grades). Zwanzig Halbierungsschritte treffen
+    // ihn auf sechs Stellen genau und kosten nichts — die Funktion laeuft zwoelfmal je
+    // Kampfaufbau, nicht je Bild.
+    const mit=(f)=>rohKraft({LP:s.LP*f,VER:s.VER*f,ANG:s.ANG*f});
+    let lo=0.05,hi=8;
+    for(let i=0;i<40;i++){const m=(lo+hi)/2; if(mit(m)<ziel)lo=m;else hi=m;}
+    const f=(lo+hi)/2;
     const o={...s};
-    o.LP=Math.max(1,s.LP*f);
+    o.LP =Math.max(1,s.LP *f);
     o.ANG=Math.max(1,s.ANG*f);
+    o.VER=Math.max(0,s.VER*f);
     return o;
   }
 
@@ -1453,7 +1479,10 @@
     return{key:best,warum};
   }
   const persOf={},persWarum={};
-  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste aller Zuteilungen von elf Spielern auf sechs Slots
+  // Beide Seiten. Vorher lief das nur ueber SQUAD, und die Gegner bekamen ihre
+  // Persoenlichkeit stattdessen aus einer Rotation ["bollwerk","draufgaenger",...][i%6].
+  // Damit hing das Verhalten eines Gegners an seiner Zeilennummer statt an seiner Klasse.
+  [...SQUAD,...OPP].forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  // Startbelegung: die beste aller Zuteilungen von elf Spielern auf sechs Slots
   // (332.640 Moeglichkeiten, durchgerechnet mit den echten Slot-Profilen), Summe 361,4.
   // Draco hat mit 66,1 den hoechsten TDM-Wert des Kaders und steht trotzdem als
   // Shotcaller — seine Charisma 89 bringt dort nur +0,4, aber jeder andere Slot kostet
@@ -2193,66 +2222,87 @@
     return{reach:KOERPER_X+SKILLS[sw].reichweiteSchwer,reichNah:KOERPER_X+SKILLS[sw].reichweite};
   }
 
+  // EIN BAUWEG FUER BEIDE SEITEN.
+  //
+  // Bis hierher hatte jede Seite ihren eigenen. Unsere Spieler bekamen Slot-Aufschlag,
+  // Traits, Formkarte und Intensitaetsstufe und wurden ueber mitAufschlag in den
+  // Attributen angehoben; die Gegner bekamen nur Disziplinwert plus Formkarte, ihre
+  // Persoenlichkeit aus einer Rotation nach Zeilennummer und nie einen Slot.
+  //
+  // Gemessen: im SPIEGELKAMPF — dasselbe Team gegen eine identische Kopie seiner selbst —
+  // verlor die linke Seite 2:6 in 24 von 24 Kaempfen, und die "identischen" Klone hatten
+  // nicht einmal dieselben Werte (Krolach 298 Leben links, 286 rechts). Ein Spiegel war
+  // gar kein Spiegel. Damit war jede Serie eine Messung meiner zwei Codepfade, nicht der
+  // Spieler. Vorher schon ausgeschlossen: Tempo (TMP 40 fuer alle -> 0:6 in 24 von 24),
+  // Befehle (alle mitlinie -> 0:6), Seitentausch (A-A links -> 0:6). Es lag am Bauweg.
+  //
+  // Jetzt geht jede Einheit durch dieselbe Funktion. Unterschiede duerfen nur noch aus
+  // DATEN kommen — Formkarte, Intensitaet, Ermuedung, Attribute, Slot —, nie mehr daraus,
+  // auf welcher Seite jemand steht.
+  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers){
+    const bh=behav(p.n);
+    const tr=traitTreffer(p);
+    const engPunkte=(slId?slotAufschlag(p,slId,"tdm"):0)+tr.netto;   // haengt an der Position
+    const breitPunkte=formVon(p.n)+stufenWert();                     // trifft jeden gleich
+    const eigWert=p.d.tdm+engPunkte+breitPunkte;
+    // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
+    let attr=mitAufschlag(p.a,engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
+    // Rezepte geben die FORM, die Eignung gibt die MENGE.
+    const sMod=aufEignung(stats({...p,a:attr},"tdm"),eigWert);
+    const s={};
+    for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
+    s.MANA=sMod.MANA;
+    const h=homeFor(side,row,i,n);
+    const fern=p.fern===true;
+    return {id,n:p.n,side,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId||null,
+      ord:ordung||"mitlinie",zielP:zielPers||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
+      hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
+      dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
+      fern,...reichweiten(p.skills,fern),stun:0,
+      skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),
+      ...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
+      schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,
+      durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
+      st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}};
+  }
+
+  // Die Slots einer Reihe, in der Reihenfolge, in der sie definiert sind. Unsere Seite
+  // bekommt ihren Slot aus der Aufstellung; die Gegner haben keine Aufstellung, die wir
+  // kennen — sie bekommen den Slot ihrer Reihe. Damit trifft sie derselbe Aufschlag nach
+  // derselben Regel, statt gar keiner.
+  const slotsDerReihe=(row)=>slotsVon("tdm").filter(sl=>sl.reihe===row);
+
   function build(saat){
     if(disc==="spurt")return bauSpurt(saat);
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
-    const mine=inDisc("tdm").slice(0,6);
-    const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[(SLOTVON[place[p.n].slot]||{reihe:1}).reihe].push(p));
-    // Der Slot verschiebt den Disziplinwert, aus dem die Kampfwerte gezogen werden.
-    // Damit beeinflusst die Aufstellung die Grundwerte wirklich, statt nur zu sagen,
-    // wer wo steht — genau das, was das Spiel mit roleModifier ohnehin schon tut.
-    const slotBonus={};
-    for(const p of mine){const sl=place[p.n]&&place[p.n].slot; slotBonus[p.n]=sl?slotAufschlag(p,sl):0;}
     let id=0;
+
+    // UNSERE SEITE — Slot aus der Aufstellung, Befehl aus dem Slot, Ziel aus der
+    // Persoenlichkeit (oder aus dem, was der Spieler von Hand gesetzt hat).
+    const mine=inDisc("tdm").slice(0,6);
+    const byRow={0:[],1:[],2:[]};
+    mine.forEach(p=>byRow[(SLOTVON[place[p.n].slot]||{reihe:1}).reihe].push(p));
     for(const row of[0,1,2]){
       byRow[row].forEach((p,i)=>{
-        const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
-        // Der Disziplinwert des Spielers PLUS der Aufschlag seines Slots. Steht Baumkopf
-        // als Shotcaller, kostet ihn das 2,3 Punkte; als Vanguard braechte es ihm 2,1.
-        // Vier Aufschlaege auf den Disziplinwert — und ALLE VIER muessen auch in den
-        // Kampfwerten ankommen. Vorher taten das nur die Traits: Slot, Formkarte und
-        // Stufe verschoben bloss die angezeigte Zahl, waehrend die Arena weiter mit den
-        // rohen Attributen rechnete. Die Karte versprach etwas, das der Kampf nicht hielt.
-        const bh=behav(p.n);
         const slId=place[p.n]&&place[p.n].slot;
-        const tr=traitTreffer(p);
-        const engPunkte=(slotBonus[p.n]||0)+tr.netto;      // haengt an der Position
-        const breitPunkte=formVon(p.n)+stufenWert();        // trifft jeden gleich
-        const eigWert=p.d.tdm+engPunkte+breitPunkte;
-        // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
-        let attr=mitAufschlag(p.a,engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
-        attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
-        // Rezepte geben die FORM, die Eignung gibt die MENGE.
-        const sMod=aufEignung(stats({...p,a:attr},"tdm"),eigWert);
-        for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
-        s.MANA=sMod.MANA;
-        U.push({id:id++,n:p.n,side:0,row,eig:eigWert,charisma:p.a.charisma||0,slot:slId,ord:order[p.n]||"mitlinie",zielP:zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],heiler:istHeiler(p),...s,...bh,
-          hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
-          dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null,
-          fern:p.fern===true,...reichweiten(p.skills,p.fern===true),stun:0,
-          skills:kitVon(p.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(p.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}});
+        U.push(baueEinheit(p,0,row,i,byRow[row].length,id++,slId,
+          order[p.n],zielOf[p.n]));
       });
     }
+
+    // GEGNERSEITE — derselbe Aufruf. Der Slot kommt aus der Reihe, Befehl und Ziel aus
+    // dem Schlachtplan der KI (das ist ihre Taktik, so wie die Aufstellung unsere ist);
+    // fehlt der Plan, greift derselbe Standard wie bei uns.
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
-        // Die Gegner rechnen jetzt aus IHREN EIGENEN Attributen — dieselbe Formel wie unsere
-        // Spieler, kein Klon eines Kaderspielers mehr und kein Aufschlag von aussen.
-        const s=aufEignung(stats(o,"tdm"),o.d.tdm+formVon(o.n));
-        const h=homeFor(1,row,i,oByRow[row].length);
-        const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
-        const bp=PERS[pk],pd=PERSDEF[pk];
-        const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
-        U.push({id:id++,n:o.n,side:1,row,eig:o.d.tdm+formVon(o.n),charisma:o.a.charisma||0,slot:(z&&z.slot)||null,ord:z.ord,zielP:z.zielP,heiler:istHeiler(o),...s,
-          form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
-          hp:s.LP*LEBEN_JE_LP,max:s.LP*LEBEN_JE_LP,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
-          dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
-          fern:false,...reichweiten(o.skills,false),stun:0,skills:kitVon(o.skills),mp:vorrat(s.MANA),mpMax:vorrat(s.MANA),sp:vorrat(s.AUS),spMax:vorrat(s.AUS),...regenAls(o.skills),cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
-          schild:0,schildT:0,schildVon:null,wurzel:0,letzterSkill:null,bereit:{},leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,bindAn:null,cdTrenn:0,
-          st:{dmg:0,heal:0,tank:0,verh:0,ko:0,koAnteil:0,cc:0,schild:0,wieder:0,ff:0,tode:0,beihilfe:0,gegen:{},fuehrung:0}});
+        const reihenSlots=slotsDerReihe(row);
+        const z=(PLAN&&PLAN.zuteilung[o.n])||{};
+        const slId=z.slot||(reihenSlots[i%Math.max(1,reihenSlots.length)]||{}).id||null;
+        U.push(baueEinheit(o,1,row,i,oByRow[row].length,id++,slId,
+          z.ord||(SLOTVON[slId]||{}).ord,z.zielP||(o.jagd?"bedrohung":null)));
       });
     }
   }
@@ -2393,8 +2443,23 @@
     if(k.includes("shoot"))return REGEN.archer;
     return REGEN.neutral;
   };
-  const cdKuerzung=(u)=>0.30*u.TMP/(u.TMP+120);
-  const abkling=(u,sk_cd,fat)=>sk_cd*(1-cdKuerzung(u))/Math.max(.5,fat);
+  // TEMPO BESCHLEUNIGT DEN ANGRIFF NICHT MEHR.
+  //
+  // Bis hierher kuerzte Tempo jede Abklingzeit um bis zu 30 %. Chris: "schau, dass Tempo
+  // nicht den Angriff beschleunigt — du musst die Mechaniken wirklich von Eslabong
+  // uebernehmen, sonst funktioniert es nicht." Und die Klassenkarten geben ihm recht:
+  // dort steht an JEDEM Skill eine feste Abklingzeit (Magic Heal 1s CD, Holy Light 11s CD,
+  // Medium Dash 4s CD). Keine davon haengt am Tempo des Traegers.
+  //
+  // Das war auch kein kleiner Nebeneffekt: die Abklingzeit steht im Nenner, also
+  // multipliziert sie sich direkt auf den Schaden je Sekunde. Ein Spieler mit Tempo 80
+  // schlug damit 18 % oefter zu als einer mit Tempo 20 — bezahlt hat er dafuer nichts,
+  // denn die TDM-Matrix bepreist Tempo mit Gewicht NULL.
+  //
+  // Tempo bleibt, wofuer es da ist: Laufgeschwindigkeit. Wer schnell ist, ist zuerst da
+  // und kommt schneller wieder heraus — er schlaegt nur nicht haeufiger zu.
+  const cdKuerzung=(u)=>0;
+  const abkling=(u,sk_cd,fat)=>sk_cd/Math.max(.5,fat);
   // Der schwere Schlag kostet zusaetzlich seine Haltezeit — die steht am Skill.
   const abklingSchwer=(u,sk,fat)=>abkling(u,sk.cd+sk.halten,fat);
   // Schaden: Basisschaden des Skills mal Angriffswert. Bei ANG 100 traegt der Skill seinen
@@ -2436,6 +2501,34 @@
   // 0,3 s und Basis 12 sind der Slash, den Fighter wie Matriarch fuehren. Damit ist "kein
   // Kit" gleich "durchschnittliches Kit", und die Attribute entscheiden wieder.
   const GRUNDSCHLAG={basis:12,cd:0.3,reichweite:RANGE};
+  // DER STANDARDHEILER, abgeschrieben von der Klassenkarte (Priest, "Magic Heal"):
+  // Heal 16, Reichweite 1800, 1 s Abklingzeit, 1 s Ansagezeit.
+  // Uebernommen sind Menge, Abklingzeit UND Ansagezeit: ein Heiler braucht also zwei
+  // Sekunden je Heilung, nicht eine. Genau so steht es auf der Karte.
+  // Die Menge skaliert wie der Schaden mit dem Angriffswert: bei ANG 50 kommen genau die
+  // 16 der Karte heraus, darueber und darunter entsprechend.
+  const HEILUNG={basis:16,cd:1.0,castzeit:1.0,reichweite:190};
+  // Der Takt, in dem ein Heiler wirklich heilen kann: Ansage PLUS Abklingzeit. Vorher
+  // stand hier nur die Abklingzeit, und die Ansage war ein Kommentar mit dem Hinweis, dass
+  // sie fehlt. Gemessen war das kein Detail: Greenkraut und Seraph-11 brachten A-A 758
+  // geheilte Punkte je Kampf, waehrend die Vigilante Wranglers keinen Heiler haben.
+  const HEILTAKT=HEILUNG.cd+HEILUNG.castzeit;
+
+  // Lauftempo auf der Skala der Klassenkarten — ABER AUF DER RICHTIGEN SPANNE.
+  //
+  // Erst hatte ich 91 bis 260 genommen, die volle SPD-Spanne ueber alle 35 Archetypen.
+  // Das war zu weit: 260 erreicht ein Archetyp erst am ENDE seiner Wachstumskurve, 91 ist
+  // ein Startwert. Zwei Spieler derselben Liga stehen aber auf vergleichbarer Stufe, und
+  // dort laufen die Startwerte nur von 91 (Bullbreaker) bis 140 — Faktor 1,54, nicht 2,9.
+  //
+  // Warum das zaehlt, ist gemessen: die Ausnutzung eines Spielers (angerichteter Schaden
+  // geteilt durch den rechnerisch moeglichen) folgt fast eins zu eins seinem Tempo.
+  // Lava Golem mit TMP 6 kam auf 34 %, Tidesprinter mit TMP 84 auf 139 %. V-W hat im
+  // Schnitt TMP 24,7, Armageddon Aftermath 51,2 — doppelt so schnell. Weil die TDM-Matrix
+  // Speed und Dexterity mit Gewicht NULL bepreist, bezahlt niemand fuer diesen Vorteil.
+  //
+  // Tempo bleibt spuerbar (wer schnell ist, ist zuerst da), nur nicht mehr entscheidend.
+  const KARTEN_SPD=(()=>{ const u=110/((91+140)/2); return {fuss:91*u, je:0.49*u}; })();
 
   // WANN AUFLADEN? Nur, wenn der schnelle Schlag nicht hinreicht.
   //
@@ -2649,7 +2742,9 @@
   // Skill, also hat jedes Kit einen Eintrag mehr.
   const kitVon=(alt)=>!alt?null:(alt===ARCHER?ARCHER2:alt===MATRIARCH?MATRIARCH2:alt===FIGHTER?FIGHTER2:alt);
 
-  const grundtaktVon=(u)=>1/(0.5+u.TMP/120);
+  // Ebenfalls ohne Tempo (siehe cdKuerzung): der Grundtakt ist der Takt des
+  // Grundschlags, und der steht am Kit, nicht an den Beinen.
+  const grundtaktVon=(u)=>1/(0.5+40/120);
 
   // REICHWEITE AB KOERPER. Die Zahl aus dem Kit ist der Arm, nicht der Abstand der
   // Fusspunkte — und seit die Entzerrung niemanden mehr in jemand anderem stehen laesst,
@@ -3178,7 +3273,23 @@
       if(u.wurzel>0)u.wurzel-=dt;
       const festgenagelt=u.wurzel>0||!!u.cast;
       if(!inRange&&!haltAbstand&&!festgenagelt&&L>3){
-        const v=(40+u.TMP*1.4)*fat*(u.retreat>0?1.25:1)*dt;
+        // LAUFTEMPO AUF DER SKALA DER KLASSENKARTEN.
+        //
+        // Vorher: 40 + TMP*1,4. Das gab bei TMP 7 rund 50 px/s und bei TMP 81 rund 153 —
+        // eine Spanne von Faktor 3,1 ueber ein Feld von tausend Pixeln. Gemessen hiess das
+        // fuer Lava Golem (Speed 1, Dexterity 2, also TMP 7): neun Sekunden allein fuer den
+        // Anmarsch, nie ein Nachsetzen, und 95 statt rechnerisch moeglicher 357 Punkte
+        // Schaden — 27 %. Mit gleichem Lauftempo fuer alle waren es 711. Ein Spieler, den
+        // die TDM-Wertung mit 63,2 fuehrt, war in meiner Arena eine Statistenrolle.
+        //
+        // Die Karten geben die richtige Spanne vor: SPD laeuft ueber ALLE 35 Archetypen
+        // und ALLE Stufen von 91 bis 260, also Faktor 2,9 — und innerhalb einer Stufe nur
+        // rund 1,5. Meine 3,1 lagen darueber, und zwar bei jedem Vergleich.
+        //
+        // Also dieselbe Abbildung: TMP 0 auf 91, TMP 100 auf 260, dann auf unsere Pixel
+        // umgerechnet, sodass TMP 50 weiterhin genau die bisherigen 110 px/s ergibt. Nichts
+        // wird schneller oder langsamer in der Mitte — nur die Enden ruecken zusammen.
+        const v=(KARTEN_SPD.fuss+u.TMP*KARTEN_SPD.je)*fat*(u.retreat>0?1.25:1)*dt;
         let ux=dx/L,uy=dy/L;
         if(u.ord==="flanke"&&!tg&&u.retreat<=0){const edge=u.y<H/2?46:H-46;uy=(edge-u.y)/60;}
         const sx=ux*Math.min(v,L),sy=uy*Math.min(v,L);
@@ -3274,13 +3385,27 @@
         continue;
       }
 
-      // HEILER: Angriffswert wird zur Heilkraft.
+      // HEILER: Angriffswert wird zur Heilkraft — ABER IM TAKT DER KARTE.
+      //
+      // Bis hierher lief die Heilung auf GRUNDSCHLAG.cd, also alle 0,3 s, gratis und ohne
+      // Ansage. Das war meine Erfindung: die Klassenkarte sagt fuer den Standardheiler
+      // "Magic Heal — Heal: 16 | 1s CD | Cast time: 1s". Ein Drittel-Sekunden-Takt ist
+      // mehr als dreimal so schnell wie die Karte erlaubt.
+      //
+      // Was das angerichtet hat, war nicht klein. Greenkraut (Unterklasse Druid) und
+      // Seraph-11 (Unterklasse Healer) stehen beide bei Armageddon Aftermath; die
+      // Vigilante Wranglers haben in ihrer Startelf KEINEN Heiler. Mit 0,3-s-Takt kamen
+      // die beiden zusammen auf rund 64 geheilte Punkte je Sekunde — gegen etwa 27
+      // Schaden je Sekunde und Angreifer. A-A war damit unkaputtbar, und zwar auf jeder
+      // Seite des Feldes: der Seitentausch aenderte nichts (0:6 in 24 von 24 in BEIDEN
+      // Anordnungen), der Spiegelkampf dagegen sah normal aus — weil dort auf beiden
+      // Seiten dieselben Null Heiler standen. Genau dieses Muster erklaert nur der Heal.
       if(u.heiler&&u.retreat<=0&&u.cd<=0){
-        const verwundet=live(u.side).filter(a=>a!==u&&a.hp<a.max&&dist(u,a)<190);
+        const verwundet=live(u.side).filter(a=>a!==u&&a.hp<a.max&&dist(u,a)<HEILUNG.reichweite);
         if(verwundet.length){
           const ziel=verwundet.reduce((b,x)=>(x.hp/x.max<b.hp/b.max?x:b));
-          u.cd=abkling(u,GRUNDSCHLAG.cd,fat);u.lunge=0.16;u.tgt=null;
-          const heal=Math.round(GRUNDSCHLAG.basis*angFaktor(u.ANG)*0.9);
+          u.cd=abkling(u,HEILTAKT,fat);u.lunge=0.16;u.tgt=null;
+          const heal=Math.round(HEILUNG.basis*angFaktor(u.ANG));
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
@@ -3339,8 +3464,15 @@
   // Eingesteckte: verhinderte Punkte sind dasselbe wie geheilte, waehrend "ich wurde
   // beschossen" fuer sich genommen noch keine Leistung ist — es zaehlt nur, weil in dieser
   // Zeit niemand anderes beschossen wurde.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140
-    +(u.st.fuehrung||0)*KURS.fuehrung;
+  //
+  // FUEHRUNG ZAEHLT HIER NICHT MEHR MIT. Sie stand als eigener Posten drin, weil ich
+  // Charisma sonst nirgends wirken sah. Chris: "warum zur hoelle gibt es fuehrung, die
+  // ralazar und co als punkte haben — sowas gabs im original nicht und brauchen wir hier
+  // auch nicht fuers impact rating". Stimmt: sie war meine Erfindung neben einer Formel,
+  // die ich sonst Zeile fuer Zeile abgeschrieben habe. Charisma wirkt weiterhin im Kampf
+  // (ueber formMitFuehrung auf den Zusammenhalt der Linie) — es wird nur nicht mehr als
+  // Leistung verbucht.
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.schild+u.st.verh+u.st.tank*0.15+u.st.koAnteil*140;
 
   // AUSSCHALTUNG NACH ANTEIL, nicht nach letztem Schlag.
   //
@@ -4061,7 +4193,8 @@
       : (live(0).length+" : "+live(1).length);
   }
 
-  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["FÜ","fuehrung"],["CC","cc"],["H","heal"],["S","schild"],
+  // Ohne Spalte "FÜ": Fuehrung ist keine Leistungsgroesse mehr (siehe beitragVon).
+  const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
                   ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
   // Welche Spalten sich nach Gegner aufschluesseln lassen.
   const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl"};
@@ -4089,18 +4222,6 @@
           // Spalte leer statt bei null zu stehen, als haetten wir etwas gemessen.
           if(f==="ff"&&!FREUNDBESCHUSS){tr.appendChild(el("td","leer","—"));continue;}
           const z=el("td",null,String(Math.round(v||0)));
-          // Fuehrung zaehlt in UNSERE Leistung, nicht in den Impact. Der Impact ist die
-          // abgeschriebene Formel des Vorbilds, und die kennt keine Fuehrung — ich haette
-          // sie hineinschreiben koennen, aber dann waere sie nicht mehr die Formel, die ich
-          // an zwanzig Datenzeilen geprueft habe.
-          if(f==="fuehrung"&&v){
-            z.tabIndex=0; z.classList.add("hovbar");
-            tipOn(z,"Führung — "+Math.round(v)+" Charisma-Sekunden",
-              "Wie lange dieser Spieler die Linie zusammengehalten hat, mal der Stärke seiner "+
-              "Führung. Zählt in die Leistung (Kurs "+KURS.fuehrung+" je Punkt), NICHT in den "+
-              "Impact: der ist die Formel des Vorbilds, und die kennt keine Führung.");
-            tr.appendChild(z); continue;
-          }
           const gf=GEGENFELD[f];
           if(gf&&v){
             const liste=Object.entries(u.st.gegen||{}).map(([n,g])=>[n,g[gf]||0])
@@ -4175,6 +4296,14 @@
     const summe={},alt={U,pfeile,t,done,seed,freigabe};
     let siege=0,dauer=0; const ergebnisse={}, messSumme={};
     for(let i=0;i<n;i++){
+      // JE KAMPF EINE NEUE FORMKARTEN-ZIEHUNG.
+      //
+      // Vorher wurden die Karten EINMAL beim Laden der Seite gezogen und galten dann fuer
+      // die ganze Serie. Damit mass eine Serie ueber 24 Kaempfe nicht 24 Ziehungen, sondern
+      // eine Ziehung 24 Mal — und ein einziger unguenstiger Zug entschied alle 24 Ergebnisse
+      // auf denselben Endstand. Genau das war zu sehen: "0:6 (24x)", nie etwas dazwischen.
+      // Im Spiel gilt eine Karte fuer einen Spieltag, also gehoert sie hier an den Kampf.
+      zieheFormkarten(20260823+i*104729);
       build(1337+i*7919);
       let g=0;
       while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
@@ -4194,6 +4323,7 @@
       }
     }
     U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    zieheFormkarten(20260823);
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
     return {plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
       reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
@@ -4204,7 +4334,7 @@
 
   window.__arena={ serie, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
-    down:u.down,TMP:u.TMP,ANG:u.ANG,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
+    down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
 })();
 </script>
