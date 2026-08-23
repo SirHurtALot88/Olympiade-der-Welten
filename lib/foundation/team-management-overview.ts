@@ -40,6 +40,13 @@ type TeamManagementSnapshotStanding = {
 
 type TeamManagementTransferSummary = {
   transferCount: number;
+  /**
+   * Kaeufe und Verkaeufe GETRENNT gezaehlt — fuer den Transfer-Hover im Saisonstand (Chris, 23.08.).
+   * `transferCount` ist die Summe beider und sagt allein nicht, in welche Richtung gehandelt wurde;
+   * genau das war Chris' Beanstandung an der Netto-Spalte (`ls9jfg`).
+   */
+  transferBuyCount: number;
+  transferSellCount: number;
   transferBuyTotal: number;
   transferSellTotal: number;
   transferNet: number;
@@ -74,11 +81,14 @@ function buildTransferSummaryByTeamIdFromHistory(gameState: GameState, seasonId:
     if (entry.transferType === "buy" && entry.toTeamId) {
       const current = summary.get(entry.toTeamId) ?? {
         transferCount: 0,
+        transferBuyCount: 0,
+        transferSellCount: 0,
         transferBuyTotal: 0,
         transferSellTotal: 0,
         transferNet: 0,
       };
       current.transferCount += 1;
+      current.transferBuyCount += 1;
       current.transferBuyTotal = roundValue(current.transferBuyTotal + fee, 2);
       current.transferNet = roundValue(current.transferSellTotal - current.transferBuyTotal, 2);
       summary.set(entry.toTeamId, current);
@@ -87,11 +97,14 @@ function buildTransferSummaryByTeamIdFromHistory(gameState: GameState, seasonId:
     if (entry.transferType === "sell" && entry.fromTeamId) {
       const current = summary.get(entry.fromTeamId) ?? {
         transferCount: 0,
+        transferBuyCount: 0,
+        transferSellCount: 0,
         transferBuyTotal: 0,
         transferSellTotal: 0,
         transferNet: 0,
       };
       current.transferCount += 1;
+      current.transferSellCount += 1;
       current.transferSellTotal = roundValue(current.transferSellTotal + fee, 2);
       current.transferNet = roundValue(current.transferSellTotal - current.transferBuyTotal, 2);
       summary.set(entry.fromTeamId, current);
@@ -143,6 +156,9 @@ export type TeamManagementSnapshotRow = {
   playerOpt: number | null;
   rosterTarget: string | null;
   transferCount: number;
+  /** Getrennt gezaehlt — speist den Transfer-Hover im Saisonstand. */
+  transferBuyCount: number;
+  transferSellCount: number;
   transferBuyTotal: number;
   transferSellTotal: number;
   transferNet: number;
@@ -590,6 +606,8 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
           ? `${Math.round(playerMin)} / ${Math.round(playerOpt)}`
           : null,
       transferCount: transferSummary?.transferCount ?? 0,
+      transferBuyCount: transferSummary?.transferBuyCount ?? 0,
+      transferSellCount: transferSummary?.transferSellCount ?? 0,
       transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
       transferSellTotal: transferSummary?.transferSellTotal ?? 0,
       transferNet,
@@ -827,6 +845,8 @@ export function buildLightweightTeamSeasonStandRows(input: {
         playerOpt: standing?.playerOpt ?? null,
         rosterTarget: null,
         transferCount: transferSummary?.transferCount ?? 0,
+        transferBuyCount: transferSummary?.transferBuyCount ?? 0,
+        transferSellCount: transferSummary?.transferSellCount ?? 0,
         transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
         transferSellTotal: transferSummary?.transferSellTotal ?? 0,
         transferNet: transferSummary?.transferNet ?? 0,

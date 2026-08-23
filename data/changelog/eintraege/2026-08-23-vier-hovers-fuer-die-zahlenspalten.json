@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Spieltag · Saisonstand",
+  "text": "Vier weitere Spalten im Saisonstand erklären sich jetzt beim Darüberfahren. Bei den Sponsoren siehst du, wie sich die Summe aus Basis, Rangbonus und Saisonanteil zusammensetzt — am Rangbonus liest du ab, ob ein guter Tabellenplatz sich ausgezahlt hat. Bei den Transfers stehen Verkäufe und Käufe getrennt, jeweils mit Anzahl, statt nur des Nettos. Bei den Gebäuden siehst du, welche Anlage auf welcher Stufe wie viel Unterhalt kostet, also wo sich Sparen lohnt. Und beim Cash stehen die Bewegungen der Saison mit dem voraussichtlichen Stand am Saisonende. Alle vier zerlegen nur Zahlen, deren Bestandteile ohnehin gespeichert sind; wo ein Teil fehlt, bleibt die Zeile leer, statt eine Summe zu erfinden.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}

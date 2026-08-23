@@ -17,9 +17,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGebaeudeHover,
   buildGehaltHover,
   buildMarktwertHover,
+  buildSponsorHover,
   buildTeamHover,
+  buildTransferHover,
   SAISONSTAND_HOVER_MAX_ZEILEN,
   type SaisonstandHoverSpieler,
 } from "@/lib/foundation/saisonstand-team-hover";
@@ -139,5 +142,89 @@ describe("Team-Hover", () => {
     const hover = buildTeamHover([]);
     expect(hover).toMatchObject({ kaderGroesse: 0, ovrSchnitt: null, top: [], auslaufend: 0 });
     expect(buildMarktwertHover([])).toMatchObject({ zeilen: [], weitere: 0, summe: 0, ohneWert: 0 });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Die vier Zahlen-Hovers (Chris: „1-4 auf jeden fall direkt umsetzen") */
+/* ------------------------------------------------------------------ */
+
+describe("Sponsor-Hover", () => {
+  it("zerlegt die Summe in Basis, Rangbonus und Saisonanteil", () => {
+    const zeilen = buildSponsorHover({ sponsorBasis: 54.56, sponsorRank: 3.85, sponsorSeason: 40.44, sponsorTotal: 95 })!;
+    expect(zeilen.map((z) => [z.label, z.wert])).toEqual([
+      ["Basis", 54.56],
+      ["Rangbonus", 3.85],
+      ["Saisonanteil", 40.44],
+      ["Gesamt", 95],
+    ]);
+    expect(zeilen[3]?.istSumme).toBe(true);
+  });
+
+  it("erfindet keine Summe aus den vorhandenen Teilen", () => {
+    // Fehlt `sponsorTotal`, bleibt die Ergebniszeile leer — eine selbst gebildete Summe waere eine
+    // ANDERE Zahl als die gespeicherte, und genau solche Zweitrechnungen sind das Problem.
+    const zeilen = buildSponsorHover({ sponsorBasis: 10, sponsorRank: 2, sponsorSeason: 3, sponsorTotal: null })!;
+    expect(zeilen.find((z) => z.istSumme)?.wert).toBeNull();
+  });
+
+  it("erscheint gar nicht, wenn keine einzige Zahl vorliegt", () => {
+    expect(buildSponsorHover({ sponsorBasis: null, sponsorRank: null, sponsorSeason: null, sponsorTotal: null })).toBeNull();
+  });
+});
+
+describe("Transfer-Hover", () => {
+  it("trennt Verkaeufe und Kaeufe und nennt die Anzahl", () => {
+    const zeilen = buildTransferHover({
+      transferSellCount: 5,
+      transferSellTotal: 101.5,
+      transferBuyCount: 7,
+      transferBuyTotal: 145.3,
+      transferNet: -43.8,
+    })!;
+    expect(zeilen[0]).toMatchObject({ label: "Verkäufe", wert: 101.5, notiz: "5 Transfers" });
+    // Kaeufe stehen negativ — die Richtung soll ohne Nachdenken stimmen.
+    expect(zeilen[1]).toMatchObject({ label: "Käufe", wert: -145.3 });
+    expect(zeilen[2]).toMatchObject({ label: "Netto", wert: -43.8, istSumme: true });
+  });
+
+  it("schreibt die Einzahl richtig", () => {
+    const zeilen = buildTransferHover({
+      transferSellCount: 1,
+      transferSellTotal: 9,
+      transferBuyCount: 0,
+      transferBuyTotal: 0,
+      transferNet: 9,
+    })!;
+    expect(zeilen[0]?.notiz).toBe("1 Transfer");
+    expect(zeilen[1]?.notiz).toBe("0 Transfers");
+  });
+
+  it("erscheint gar nicht ohne jede Zahl", () => {
+    expect(
+      buildTransferHover({
+        transferSellCount: null,
+        transferSellTotal: null,
+        transferBuyCount: null,
+        transferBuyTotal: null,
+        transferNet: null,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("Gebaeude-Hover", () => {
+  it("zeigt nur gebaute Anlagen mit Unterhalt, teuerste zuerst", () => {
+    const zeilen = buildGebaeudeHover([
+      { facilityId: "a", label: "Power Gym", level: 2, upkeep: 1.2 },
+      { facilityId: "b", label: "Mind Lab", level: 0, upkeep: 0 },
+      { facilityId: "c", label: "Arena", level: 3, upkeep: 4.5 },
+      { facilityId: "d", label: "Analytics Room", level: 1, upkeep: 0 },
+    ]);
+    expect(zeilen.map((z) => z.label)).toEqual(["Arena", "Power Gym"]);
+  });
+
+  it("liefert eine leere Liste, wenn nichts gebaut ist", () => {
+    expect(buildGebaeudeHover([{ facilityId: "a", label: "Power Gym", level: 0, upkeep: 0 }])).toEqual([]);
   });
 });
