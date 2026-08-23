@@ -38,6 +38,35 @@ export type Spanne = readonly [min: number, max: number];
  */
 export const WACHSTUM = 13 / 7;
 
+/**
+ * WAS DIE SPANNE IN STUFEN BEDEUTET — Chris' Beobachtung aus dem Vorbild.
+ *
+ * "Spieler, die die ganze Saison quasi spielen, hatten bei mir sowas von Level 21–25,
+ * aber zwischendurch gab's auch nen Cup, der viel XP gebracht hat — den haben wir ja
+ * ingame nicht."
+ *
+ * Damit ist der Rahmen zum ersten Mal beziffert, und zwar aus dem Spiel und nicht aus
+ * einer Schätzung: eine volle Saison Dauereinsatz trägt rund zwanzig Stufen. Das
+ * Maximallevel ist laut den Entwicklernotizen 100 — eine Saison ist also etwa ein
+ * Fünftel des Weges, nicht der ganze. Die 13/7-Spanne einer Karte beschreibt folglich
+ * eine Laufbahn über mehrere Saisons, keine einzelne.
+ *
+ * Der Cup ist ausdrücklich als ZUSATZ markiert: ein Teil dieser zwanzig Stufen kam aus
+ * einem Wettbewerb, den unsere Olympiade nicht hat. Wer die Kurve bei uns nachbaut,
+ * darf die 21–25 also nicht eins zu eins als Saisonertrag setzen — sonst wachsen
+ * unsere Spieler schneller als ihre Vorbilder.
+ *
+ * Beides ist hier notiert und NICHT in Code gegossen: das Stufensystem gibt es noch
+ * nicht, und eine Zahl, die nur in einem Kommentar steht, kann wenigstens niemand
+ * versehentlich für gemessen halten.
+ */
+export const SAISON_STUFEN_BEOBACHTUNG = {
+  vollerEinsatzEineSaison: [21, 25] as const,
+  maximalstufe: 100,
+  /** Ein Teil der Stufen kam aus einem Cup, den es bei uns nicht gibt. */
+  enthaeltCupBonus: true,
+} as const;
+
 export interface Archetype {
   /** Kleingeschriebener Schlüssel, z. B. "bowman". */
   readonly id: string;
