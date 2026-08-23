@@ -118,6 +118,7 @@ import FoundationPlayerPortraitPreview, {
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data/olyDataTypes";
+import type { MarktwertHerleitung } from "@/lib/foundation/marktwert-herleitung";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
   formatLeaguePercentile,
@@ -773,6 +774,71 @@ function renderSellFactorPanel(input: {
       <span className="nl-standings-hover-meta">
         Der Rang im Bracket kommt aus der Saisonleistung (MVS bzw. PPs) gegen Spieler ähnlichen
         Marktwerts. {SAISON_MW_ERKLAERUNG}
+      </span>
+    </>
+  );
+}
+
+/**
+ * WORAUS SICH DER MARKTWERT ZUSAMMENSETZT — Chris' Punkt 6.
+ *
+ * Der Marktwert ist keine geschaetzte Groesse, sondern eine Summe: fuer JEDE Disziplin wird der
+ * Spieler gegen die ganze Liga gerankt, der Rang in einer Tabelle nachgeschlagen, und die 20
+ * Teilwerte werden addiert. Gezeigt werden die fuenf groessten, der Rest als eine Summenzeile.
+ *
+ * Am Live-Abbild nachgemessen: die Summe trifft den danebenstehenden Marktwert auf 0,01 genau,
+ * ueber sieben Spielstaende und je 2984 Spieler. Der Hover erklaert also DIESE Zahl.
+ *
+ * Fehlt die Zerlegung (Free Agent, nicht gescoutet, Saison-Archiv), gibt es kein Panel — dann
+ * verhaelt sich die Zelle wie vorher.
+ */
+function renderMarketValuePanel(input: {
+  name: string;
+  herleitung: MarktwertHerleitung | null | undefined;
+  disciplines: Discipline[];
+}): ReactNode {
+  const h = input.herleitung;
+  if (!h || h.zeilen.length === 0) return null;
+  const nameById = new Map(input.disciplines.map((discipline) => [discipline.id, discipline.name] as const));
+  const zeile = (label: string, wert: ReactNode, notiz?: string | null) => (
+    <div className="nl-standings-hover-postenrow" key={label}>
+      <span>
+        {label}
+        {notiz ? <span className="nl-standings-hover-years">{notiz}</span> : null}
+      </span>
+      <span className="nl-tnum">{wert}</span>
+    </div>
+  );
+  return (
+    <>
+      <span className="nl-teams-rank-preview-title">Marktwert — {input.name}</span>
+      <div className="nl-standings-hover-posten">
+        {h.zeilen.map((eintrag) =>
+          zeile(
+            // Fehlt der Katalogname, steht die ID da — lesbar genug und ehrlicher als eine
+            // Auslassung, die aussaehe, als traege die Disziplin nichts bei.
+            nameById.get(eintrag.disciplineId) ?? eintrag.disciplineId,
+            formatNlNumber(eintrag.amount, 2),
+            `Rang ${eintrag.rank}`,
+          ),
+        )}
+        {h.restAnzahl > 0
+          ? zeile(`+ ${h.restAnzahl} weitere Disziplinen`, formatNlNumber(h.restSumme, 2))
+          : null}
+        {h.mwChangeFix != null
+          ? zeile(
+              "Handkorrektur",
+              `${h.mwChangeFix > 0 ? "+" : ""}${formatNlNumber(h.mwChangeFix, 2)}`,
+            )
+          : null}
+        <div className="nl-standings-hover-postenrow is-result">
+          <span>Marktwert</span>
+          <span className="nl-tnum">{formatNlMoney(h.marktwert)}</span>
+        </div>
+      </div>
+      <span className="nl-standings-hover-meta">
+        Je Disziplin zählt der ligaweite Rang, nicht der Rohwert — ein Platz weiter vorn ist
+        deshalb in einer dicht besetzten Disziplin weniger wert als in einer dünnen.
       </span>
     </>
   );
@@ -1947,7 +2013,17 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("mw") ? (
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
-            <span className="nl-tnum">{formatNlMoney(marketValue)}</span>
+            <PlayersSellHover
+              panelId={`nl-players-mw-${row.player.id}`}
+              ariaLabel={`Marktwert ${row.player.name}`}
+              panel={renderMarketValuePanel({
+                name: row.player.name,
+                herleitung: row.marketValueBreakdown,
+                disciplines: gameState.disciplines,
+              })}
+            >
+              <span className="nl-tnum">{formatNlMoney(marketValue)}</span>
+            </PlayersSellHover>
             {/* Formatfix (Durchklick): Geld-Deltas liefen mit 2 Nachkommastellen („+54,27")
                 neben 1-Nachkommastellen-Geldwerten (formatNlMoney) — jetzt überall das
                 Haus-Format mit einer Nachkommastelle (gilt für alle Geld-Delta-Chips

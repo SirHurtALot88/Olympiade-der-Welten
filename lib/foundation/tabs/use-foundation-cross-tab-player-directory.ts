@@ -12,6 +12,7 @@ import {
   buildPlayerLeagueCareerStatsMap,
   type PlayerLeagueCareerStats,
 } from "@/lib/foundation/player-league-career-stats";
+import type { MarktwertHerleitung } from "@/lib/foundation/marktwert-herleitung";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -64,6 +65,18 @@ export type FoundationPlayerScopeRow = {
    * ohne belastbaren Marktwert — dort zeigt die Spalte "—" statt einer Schätzung.
    */
   sellPreview: ExpectedSellValueEntry | null;
+  /**
+   * Woraus sich der Marktwert zusammensetzt — die fünf stärksten Disziplin-Ränge, der Rest als
+   * Summe (Chris' Punkt 6). Kommt AUSSCHLIESSLICH aus dem Directory-Slice: die Zerlegung braucht
+   * die ligaweiten Ränge und eine 222 KB grosse Tabelle, die in keinem Client-Bundle liegt. Es
+   * gibt hier deshalb bewusst KEINE lokale Rückfallebene wie beim Verkaufswert — eine im Browser
+   * halb gerechnete Zerlegung wäre eine zweite, leicht andere Zahl neben der gezeigten.
+   *
+   * `null` für Free Agents (der Slice führt nur Kaderspieler), für nicht gescoutete Spieler (der
+   * Rang ist Disziplinstärke und damit fog-gated) und im Saison-Archiv (Projektions-Pfad). In all
+   * diesen Fällen bleibt der Hover einfach aus.
+   */
+  marketValueBreakdown: MarktwertHerleitung | null;
   /**
    * Dieselben PP eine Ebene tiefer: je Achse zusätzlich die zugehörigen
    * Disziplinen aus dem Saison-Punkte-Ledger — Grundlage der aufklappbaren
@@ -203,6 +216,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     disciplinePointsByPlayerId: Record<string, Record<string, number>>;
     /** Erwarteter Verkaufswert je Kaderspieler, gerechnet auf dem vollen Save. */
     sellValueByPlayerId: Record<string, ExpectedSellValueEntry>;
+    /** Zerlegung des Marktwerts je Kaderspieler — ebenfalls nur vom Server (siehe Zeilentyp). */
+    marketValueBreakdownByPlayerId: Record<string, MarktwertHerleitung>;
   };
   playerScope: PlayerTableScope;
   playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
@@ -346,6 +361,10 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       Boolean(input.playerDirectorySlice.payload) &&
       !input.playerDirectorySlice.error &&
       Object.keys(sliceSellValues).length > 0;
+    // Die MW-Zerlegung hat KEINE lokale Rückfallebene (Feldkommentar am Zeilentyp), deshalb hier
+    // auch keine `useSlice…`-Weiche: was der Slice nicht liefert, gibt es nicht, und dann bleibt
+    // der Hover aus.
+    const sliceMarketValueBreakdowns = input.playerDirectorySlice.marketValueBreakdownByPlayerId;
 
     return input.gameState.players
       .map((player) => {
@@ -414,6 +433,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
           sellPreview: useSliceSellValues
             ? sliceSellValues[player.id] ?? null
             : sellValueByPlayerId.get(player.id) ?? null,
+          // Ohne Rückfallebene, mit Absicht — siehe Feldkommentar am Zeilentyp.
+          marketValueBreakdown: sliceMarketValueBreakdowns[player.id] ?? null,
           seasonPoints: seasonPerformance?.totalPoints ?? null,
           appearances: seasonPerformance?.appearances ?? null,
           bestDiscipline: seasonPerformance?.bestDisciplineLabel ?? null,

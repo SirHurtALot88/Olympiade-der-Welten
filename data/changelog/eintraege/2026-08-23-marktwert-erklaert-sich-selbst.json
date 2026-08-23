@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Team · Spieler",
+  "text": "In der Spielerliste erklärt sich jetzt auch der Marktwert selbst. Fährst du mit der Maus darüber, siehst du, woraus er sich zusammensetzt: Der Marktwert ist keine geschätzte Größe, sondern eine Summe — für jede der zwanzig Disziplinen wird der Spieler gegen die ganze Liga gerankt, und jeder Rang ist etwas wert. Gezeigt werden die fünf stärksten Ränge einzeln, der Rest als eine Zeile, darunter die Summe. Daran liest du ab, ob ein Spieler von einem Spitzenplatz in wenigen Disziplinen lebt oder von solider Breite — und wo sich Training am ehesten lohnt. Die Zahlen gehen dabei genau auf: was im Hover steht, ergibt zusammen exakt den Marktwert daneben.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}
