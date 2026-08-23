@@ -83,7 +83,17 @@ import {
 import DisciplineStageHoverPreview, { type DisciplineStageHoverTarget } from "@/app/foundation/discipline-stage/DisciplineStageHoverPreview";
 import { fmt1 } from "@/app/foundation/discipline-stage/stage-format";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
-import { getTeamOwner } from "@/lib/foundation/team-control-settings";
+import {
+  getManualControlTeamIds,
+  getTeamControlSettings,
+  getTeamOwner,
+  resolveOwnerDisplayLabel,
+} from "@/lib/foundation/team-control-settings";
+import {
+  leseArenaTeamAuswahl,
+  leseGemerkteIds,
+  normalisiereMerklistenBesitzer,
+} from "@/lib/merkliste/merkliste-service";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import {
   getMatchdayArenaReadiness,
@@ -1866,28 +1876,87 @@ export default function DisciplineStageArena({
   // (seasonState.standings — dieselbe wie Home-KPI, Saisonstand und Bahn-Reihenfolge).
   // Vor dem ersten gewerteten Spieltag sind die Ränge die Startplätze der Vorsaison —
   // das steht als Erklärung dran, statt eine frische Wertung zu suggerieren.
+  /**
+   * Die eigenen Athleten je Spieltags-Seite.
+   *
+   * GEMELDET (Chris): „Diszi 1 und 2 sind ja nichts sagend". Die beiden Karten wiederholten nur
+   * den Namen der Disziplin. Wer dort antritt, ist die Information, die vor dem Anpfiff zaehlt.
+   *
+   * Die Nummer ist der ECHTE Slot aus dem Einsatzlisten-Entwurf und kein Laufindex: Positionen
+   * sind verbindlich, eine Luecke davor verschiebt sie nicht.
+   */
+  const ownLineupBySide = useMemo(() => {
+    const entries = ownTeamId ? getTeamMatchdayLineupDraft(gameState, ownTeamId)?.entries ?? [] : [];
+    const proSeite = (seite: "d1" | "d2") =>
+      entries
+        .filter((eintrag) => eintrag.disciplineSide === seite)
+        .sort((links, rechts) => links.slotIndex - rechts.slotIndex)
+        .flatMap((eintrag) => {
+          const name = playerNameById.get(eintrag.playerId);
+          return name
+            ? [{ playerId: eintrag.playerId, name, slotIndex: eintrag.slotIndex, isCaptain: eintrag.isCaptain === true }]
+            : [];
+        });
+    return { d1: proSeite("d1"), d2: proSeite("d2") };
+  }, [gameState, ownTeamId, playerNameById]);
+
+  /**
+   * „Beobachtete Teams" — menschlich gefuehrte PLUS gemerkte.
+   *
+   * GEMELDET (Chris): „dann die Tabelle unten die nur verbündet und rivale zeigt irgendwie
+   * useless · man sollte sich aussuchen können welche teams getrackt werden · in der Arena dann
+   * die angezeigt werden die ich gewishlistet habe zusätzlich zu den menschlichen teams".
+   *
+   * Die frueheren Zeilen kamen aus einer automatisch vergebenen Rivalitaet und halfen bei keiner
+   * Entscheidung — sie sagten nie, WARUM ein Team dort stand. Jetzt steht genau das in der letzten
+   * Spalte, und wer dort steht, bestimmt der Mensch.
+   *
+   * Der Besitzer laeuft durch `normalisiereMerklistenBesitzer`: die Arena kennt ihn nur ueber den
+   * Raum (solo `null`), die Teamansicht ueber `activeOwnerId` (solo der Standardbesitzer). Ohne
+   * die Zusammenfuehrung waeren das zwei getrennte Listen, und ein in der Teamansicht gesetztes
+   * Lesezeichen tauchte hier nie auf.
+   */
   const preMatchContext = useMemo(() => {
     const standings = gameState.seasonState?.standings ?? {};
     const anyPoints = Object.values(standings).some((row) => ((row as { points?: number | null })?.points ?? 0) > 0);
+    const merklisteOwnerId = normalisiereMerklistenBesitzer(roomContext?.ownerId ?? null);
+    // DIE ARENA MUSS AUCH AUF EINEM HALBFERTIGEN SPIELSTAND RENDERN — dafuer gibt es eine eigene
+    // Robustheits-Suite (tests/discipline-stage-host.test.ts: „bootstrap/partial state (empty
+    // object) does NOT throw"). `getManualControlTeamIds` und `getTeamControlSettings` greifen
+    // ungeschuetzt auf `gameState.seasonState.teamControlSettings` zu und werfen dort. Der ganze
+    // Rest dieser Datei fasst den Spielstand deshalb nur mit `?.` und `?? []` an; diese beiden
+    // Aufrufe brauchen die Wache davor.
+    const hatSeasonState = Boolean(gameState?.seasonState);
+    const menschlicheTeamIds = hatSeasonState ? getManualControlTeamIds(gameState) : new Set<string>();
+    const auswahl = leseArenaTeamAuswahl({
+      gameState,
+      ownerId: merklisteOwnerId,
+      menschlicheTeamIds: [...menschlicheTeamIds],
+    });
+    const gemerkteTeamIds = leseGemerkteIds(gameState, merklisteOwnerId, "team");
     const rows = (gameState.teams ?? [])
-      .filter((team) => {
-        const relation = teamRelationshipMap.get(team.teamId);
-        return team.teamId === ownTeamId || relation === "rival" || relation === "ally";
-      })
+      .filter((team) => auswahl.has(team.teamId))
       .map((team) => {
         const entry = standings[team.teamId] as { rank?: number | null; points?: number | null } | undefined;
+        const menschlich = menschlicheTeamIds.has(team.teamId);
         return {
           teamId: team.teamId,
           name: team.name,
           code: team.shortCode,
           rank: typeof entry?.rank === "number" && Number.isFinite(entry.rank) ? entry.rank : null,
           points: entry?.points ?? null,
-          relation: team.teamId === ownTeamId ? ("mine" as const) : teamRelationshipMap.get(team.teamId) ?? null,
+          istEigen: team.teamId === ownTeamId,
+          menschlich,
+          ownerLabel:
+            menschlich && hatSeasonState
+              ? resolveOwnerDisplayLabel(getTeamOwner(getTeamControlSettings(gameState, team.teamId)))
+              : null,
+          gemerkt: gemerkteTeamIds.has(team.teamId),
         };
       })
       .sort((left, right) => (left.rank ?? 999) - (right.rank ?? 999) || left.name.localeCompare(right.name, "de-DE"));
-    return { anyPoints, rows };
-  }, [gameState.seasonState?.standings, gameState.teams, teamRelationshipMap, ownTeamId]);
+    return { anyPoints, rows, merklisteLeer: gemerkteTeamIds.size === 0 };
+  }, [gameState, roomContext?.ownerId, ownTeamId]);
 
   // Mutatoren je Spieltags-Seite (aus der Resolve-Preview; fehlt sie, bleibt die
   // Zeile weg — keine erfundenen Chips).
@@ -2444,6 +2513,11 @@ export default function DisciplineStageArena({
             <p>
               Der Spieltag startet, sobald alle {leagueLineupReadiness.totalCount} Teams ihre Einsatzliste
               gespeichert und die Formkarten geklärt haben.
+              {/* Die fehlenden Teams standen bisher klein unter den leeren Medaillenkreisen. Der
+                  Block ist weg, die Information nicht — sie gehoert zum Wartestatus, also hierher. */}
+              {ownLineupComplete && pendingTeams.length > 0 && pendingTeams.length <= 6
+                ? ` Es fehlen noch: ${pendingTeams.map((team) => team.teamName).join(" · ")}.`
+                : ""}
               {missingRosterSlots > 0
                 ? ` Dein Kader hat ${ownRosterCount} Spieler für ${totalRequired} Plätze — ${missingRosterSlots === 1 ? "ein Platz bleibt" : `${missingRosterSlots} Plätze bleiben`} leer und ${missingRosterSlots === 1 ? "bringt" : "bringen"} keine Punkte.`
                 : ""}
@@ -2475,11 +2549,10 @@ export default function DisciplineStageArena({
                 ))}
               </div>
             ) : null}
+            {/* Nur noch der Liga-Zaehler: die Zaehler je Seite stehen jetzt gross an den
+                Disziplin-Karten — dieselbe Zahl zweimal auf einer Tafel waere Rauschen. */}
             <span className="arena-prematch-slotlegend nl-tnum">
-              {d1Meta ? `${d1Meta.displayName} ${Math.min(ownLineupSideCounts.d1, sideRequirements?.d1Required ?? ownLineupSideCounts.d1)}/${sideRequirements?.d1Required ?? "?"}` : null}
-              {d1Meta && d2Meta ? " · " : ""}
-              {d2Meta ? `${d2Meta.displayName} ${Math.min(ownLineupSideCounts.d2, sideRequirements?.d2Required ?? ownLineupSideCounts.d2)}/${sideRequirements?.d2Required ?? "?"}` : null}
-              {` · Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
+              {`Liga ${leagueLineupReadiness.readyCount}/${leagueLineupReadiness.totalCount} bereit`}
             </span>
           </div>
           <div className="arena-prematch-hero-actions">
@@ -2517,11 +2590,26 @@ export default function DisciplineStageArena({
           </div>
         </div>
 
+        {/* Die Disziplin-Karten tragen jetzt die eigene Aufstellung. Chris' Ruege („Diszi 1 und 2
+            sind ja nichts sagend") traf Kaesten, die nur den Namen der Disziplin wiederholten —
+            wer dort antritt, ist die Information, die vor dem Anpfiff zaehlt. */}
         <div className="arena-prematch-disc-grid">
           {([
-            { side: "d1" as const, meta: d1Meta, required: sideRequirements?.d1Required ?? null },
-            { side: "d2" as const, meta: d2Meta, required: sideRequirements?.d2Required ?? null },
-          ]).map(({ side, meta, required }) =>
+            {
+              side: "d1" as const,
+              meta: d1Meta,
+              required: sideRequirements?.d1Required ?? null,
+              filled: ownLineupSideCounts.d1,
+              athleten: ownLineupBySide.d1,
+            },
+            {
+              side: "d2" as const,
+              meta: d2Meta,
+              required: sideRequirements?.d2Required ?? null,
+              filled: ownLineupSideCounts.d2,
+              athleten: ownLineupBySide.d2,
+            },
+          ]).map(({ side, meta, required, filled, athleten }) =>
             meta ? (
               <section key={side} className="arena-prematch-disc">
                 <div className="arena-prematch-disc-head">
@@ -2529,9 +2617,38 @@ export default function DisciplineStageArena({
                     Disziplin {side === "d1" ? 1 : 2} · {meta.displayName}
                   </h3>
                   {required != null && required > 0 ? (
-                    <span className="arena-prematch-disc-badge nl-tnum">{required} Plätze</span>
+                    <span className={`arena-prematch-disc-badge nl-tnum${filled >= required ? " is-full" : ""}`}>
+                      {Math.min(filled, required)}/{required} besetzt
+                    </span>
                   ) : null}
                 </div>
+                {athleten.length > 0 ? (
+                  <ul className="arena-prematch-athletes" aria-label={`Deine Aufstellung für ${meta.displayName}`}>
+                    {athleten.map((athlet) => (
+                      <li key={athlet.playerId} className="arena-prematch-athlete" title={athlet.name}>
+                        <span className="arena-prematch-athlete-slot nl-tnum">{athlet.slotIndex + 1}</span>
+                        <span className="arena-prematch-athlete-name">{athlet.name}</span>
+                        {athlet.isCaptain ? (
+                          <span className="arena-prematch-athlete-captain" title="Kapitän" aria-label="Kapitän">
+                            ★
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="arena-prematch-disc-empty">
+                    Für diese Disziplin ist noch niemand aufgestellt.
+                    {onOpenLineup ? (
+                      <>
+                        {" "}
+                        <button type="button" className="arena-prematch-inlinelink" onClick={() => onOpenLineup()}>
+                          Einsatzliste öffnen
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                )}
                 {preMatchMutatorsBySide[side].length > 0 ? (
                   <div className="arena-prematch-mutrow">
                     <span className="arena-prematch-mutlabel">Mutatoren</span>
@@ -2556,33 +2673,24 @@ export default function DisciplineStageArena({
           )}
         </div>
 
-        <VeloPendingRanking
-          eyebrow="Spieltags-Wertung"
-          title="Wertung folgt"
-          note={`Sobald die erste Etappe läuft, erscheint hier die Wertung aller ${leagueLineupReadiness.totalCount} Teams — beide Disziplinen gemeinsam. Bis dahin steht hier bewusst keine Reihenfolge: ohne Ergebnis gibt es keine Ränge und keine Medaillen.`}
-          slots={[
-            { key: "gold", ring: "1.", label: "Noch zu vergeben" },
-            { key: "silver", ring: "2.", label: "Noch zu vergeben" },
-            { key: "bronze", ring: "3.", label: "Noch zu vergeben" },
-          ]}
-          meta={
-            <>
-              {leagueLineupReadiness.totalCount} Teams gemeldet · {leagueLineupReadiness.readyCount} Einsatzlisten bereit
-              {pendingTeams.length > 0 && pendingTeams.length <= 6
-                ? ` · es fehlen: ${pendingTeams.map((team) => team.teamName).join(" · ")}`
-                : ""}
-            </>
-          }
-          data-testid="arena-prematch-pending-ranking"
-        />
-
+        {/* „Beobachtete Teams" statt „Dein Umfeld": menschlich gefuehrte plus gemerkte Teams.
+            Die frueheren Verbuendet/Rivale-Etiketten kamen aus einer automatisch vergebenen
+            Rivalitaet und halfen bei keiner Entscheidung — sie sagten nie, WARUM ein Team dort
+            stand. Genau das steht jetzt in der letzten Spalte, und wer dort steht, bestimmt der
+            Mensch ueber die Merkliste. */}
         {preMatchContext.rows.length > 0 ? (
-          <section className="arena-prematch-ctx">
-            <h3>Dein Umfeld vor dem Spieltag</h3>
+          <section className="arena-prematch-ctx" data-testid="arena-prematch-ctx">
+            <div className="arena-prematch-ctx-head">
+              <h3>Beobachtete Teams</h3>
+              <span className="arena-prematch-ctx-count nl-tnum">
+                {preMatchContext.rows.length} von {(gameState.teams ?? []).length} Teams
+              </span>
+            </div>
             <p className="arena-prematch-ctx-note">
               {preMatchContext.anyPoints
                 ? "Saisonstand vor diesem Spieltag — dieselbe Quelle wie die Saisontabelle."
-                : "Noch kein Spieltag gewertet — die Reihenfolge sind die Startplätze aus dem Endstand der Vorsaison."}
+                : "Noch kein Spieltag gewertet — die Reihenfolge sind die Startplätze aus dem Endstand der Vorsaison."}{" "}
+              Gezeigt werden die menschlich geführten Teams und alles von deiner Merkliste.
             </p>
             <div style={{ overflowX: "auto" }}>
               <table className="nl-tnum">
@@ -2591,36 +2699,49 @@ export default function DisciplineStageArena({
                     <th className="is-num">Saisonrang</th>
                     <th>Team</th>
                     <th className="is-num">Punkte</th>
-                    <th aria-label="Beziehung" />
+                    <th aria-label="Grund der Beobachtung" />
                   </tr>
                 </thead>
                 <tbody>
                   {preMatchContext.rows.map((row) => (
                     <tr
                       key={row.teamId}
-                      className={row.relation === "mine" ? "is-own" : undefined}
+                      className={row.istEigen ? "is-own" : undefined}
                       onClick={onOpenTeam ? () => onOpenTeam(row.teamId) : undefined}
                       style={onOpenTeam ? { cursor: "pointer" } : undefined}
                       title={onOpenTeam ? `${row.name} öffnen` : undefined}
                     >
                       <td className="is-num">{row.rank != null ? row.rank : "—"}</td>
                       <td>
-                        {row.relation === "mine" ? "★ " : ""}
                         {row.name} · {row.code}
                       </td>
                       <td className="is-num">{fmt1(row.points ?? 0)}</td>
                       <td>
-                        {row.relation === "rival" ? (
-                          <span className="arena-prematch-rival-tag">✕ Rivale</span>
-                        ) : row.relation === "ally" ? (
-                          <span className="arena-prematch-ally-tag">Verbündet</span>
-                        ) : null}
+                        <span className="arena-prematch-tagrow">
+                          {row.istEigen ? (
+                            <span className="arena-prematch-own-tag">Dein Team</span>
+                          ) : row.menschlich ? (
+                            <span className="arena-prematch-mensch-tag">
+                              {row.ownerLabel ? `Mensch · ${row.ownerLabel}` : "Mensch"}
+                            </span>
+                          ) : null}
+                          {/* Am eigenen Team waere „Gemerkt" nur Rauschen — es steht ohnehin immer hier. */}
+                          {row.gemerkt && !row.istEigen ? (
+                            <span className="arena-prematch-merk-tag">Gemerkt</span>
+                          ) : null}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {preMatchContext.merklisteLeer ? (
+              <p className="arena-prematch-ctx-hint">
+                Deine Merkliste ist leer. Der Stern auf einer Team- oder Spielerseite legt einen
+                Eintrag an — gemerkte Teams erscheinen dann vor jedem Spieltag hier.
+              </p>
+            ) : null}
           </section>
         ) : null}
       </div>
