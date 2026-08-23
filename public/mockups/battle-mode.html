@@ -123,6 +123,13 @@
   .hint{display:flex;gap:8px;padding:8px 11px;border-radius:7px;background:var(--sunk);font-size:12.5px;color:var(--muted);margin-top:10px}
   .hint b{color:var(--ink);font-weight:600}
 
+  .plan{background:linear-gradient(180deg,rgba(226,168,74,.10),rgba(226,168,74,.03));
+    border:1px solid rgba(226,168,74,.34);border-radius:8px;padding:9px 11px;margin-bottom:10px;cursor:help}
+  .plan b{display:block;color:var(--gold,#E2A84A);font-size:13px;letter-spacing:.02em;margin-bottom:3px}
+  .plan p{margin:0;font-size:12px;line-height:1.5;color:var(--muted,#93A2B8)}
+  .planzeile{display:flex;gap:10px;align-items:baseline;padding:7px 12px;
+    border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--muted,#93A2B8);line-height:1.5}
+  .planzeile b{color:var(--gold,#E2A84A);white-space:nowrap;letter-spacing:.02em}
   .oppline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
   .oppline:last-child{border-bottom:0}
   .oppline small{display:block;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--muted)}
@@ -263,6 +270,7 @@
     <div class="frame">
       <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
+      <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
       <div class="scoreline">
         <div class="tname">Armageddon Aftermath<em>A-A · <span id="aliveL">6</span> im Kampf</em></div>
         <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · Punkte</small></div>
@@ -284,9 +292,9 @@
         <div class="wertung">
           <div class="wtitel">Wertung <em>laufend</em></div>
           <div class="tbl-wrap"><table class="wtbl"><thead><tr>
-            <th>Kämpfer</th><th class="n">Schaden</th><th class="n">Heilung</th><th class="n">Getankt</th><th class="n">KO</th><th class="n">Leistung</th>
+            <th>Kämpfer</th><th class="n">Schaden</th><th class="n">Heilung</th><th class="n">Verhindert</th><th class="n">Getankt</th><th class="n">KO</th><th class="n">Leistung</th>
           </tr></thead><tbody id="wbody"></tbody></table></div>
-          <div class="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          <div class="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
         </div>
       </div>
     </div>
@@ -385,7 +393,7 @@
   const SKILLS={
     shoot:{id:"shoot",name:"Shoot",stufe:"Common",art:"Grundschuss",
       text:"Aufladbarer Bogenschuss. Zum Zielen muss er stehen (0,25 s) — laufen und schießen geht nicht.",flavour:"Straight to the point.",
-      mult:1.0,reichweite:280,knock:40,cd:0.35,ladung:0.6,zielzeit:0.25,mp:0,sp:0},
+      mult:1.0,reichweite:280,knock:40,takt:1.0,ladung:0.6,zielzeit:0.25,mp:0,sp:0},
     dash:{id:"dash",name:"Light Dash",stufe:"Common",art:"Ausweichrolle",
       text:"Rolle zur Seite, 0,3 s unverwundbar.",flavour:"If I'm not wearing armor, I'ma take advantage of it!",
       mult:0,strecke:150,dauer:0.3,cd:3,mp:0,sp:20},
@@ -402,7 +410,7 @@
     slash:{id:"slash",name:"Paladin Slash",stufe:"Common",art:"Hammerschlag",
       text:"Schneller heiliger Schlag. Mit Ausdauer wird aufgeladen: +15–75 % Schaden, dafür langsamer und mit voller Wucht.",
       flavour:"Order, applied by hand.",
-      mult:1.0,schwer:{von:1.15,bis:1.75},reichweite:60,knock:219,cd:0.34,cdSchwer:0.62,mp:0,sp:8},
+      mult:1.0,schwer:{von:1.15,bis:1.75},reichweite:60,knock:219,takt:1.0,taktSchwer:1.8,mp:0,sp:8},
     heavydash:{id:"heavydash",name:"Heavy Dash",stufe:"Common",art:"Sturmschritt",
       text:"Gewichtiger Satz nach vorn auf das eigene Ziel, 0,4 s unverwundbar. Bricht durch, wer sich dazwischenstellt.",
       flavour:"A powerful, weighted dash for armored units.",
@@ -667,8 +675,11 @@
             const schaden=sk.mult>0
               ? (sk.schuss?sk.schuss+" × "+Math.max(1,Math.round(dmgOf(s.ANG,60)*sk.mult))+" Schaden":Math.round(dmgOf(s.ANG,60)*sk.mult)+" Schaden")
               : "kein Schaden";
+            const rhythmus=sk.takt
+              ? "Schlagfolge "+(sk.takt/(0.5+s.TMP/120)).toFixed(2)+" s (aus seinem Tempo "+s.TMP+")"
+              : "Abklingzeit "+sk.cd+" s";
             tipOn(b,sk.name+" · "+sk.stufe,
-              sk.text+" "+schaden+" · Abklingzeit "+sk.cd+" s"+
+              sk.text+" "+schaden+" · "+rhythmus+
               (sk.reichweite?" · Reichweite "+sk.reichweite:"")+
               (sk.knock?" · Rückstoß "+sk.knock:"")+
               (kosten!=="—"?" · Kosten "+kosten:"")+
@@ -773,15 +784,111 @@
     }
   }
 
+  // ===================================================================================
+  // DIE KI ENTSCHEIDET SICH.
+  //
+  // Bis hierher hatte jeder Gegner eine feste Einstellung. Skarn ist deshalb allein in
+  // Buttercup hineingelaufen und gestorben — das hat niemand ENTSCHIEDEN, das stand einfach
+  // so da. Eine KI, die einen Kampf managed, muss sich vorher ueberlegen, ob sie zu sechst
+  // durch die Mitte schiebt, ob sie den Schadensausteiler fokussiert und wie viele Leute
+  // sie dafuer aussen herum schickt.
+  //
+  // Die Grundlage ist DIESELBE VORSCHAU, die auch der Spieler bekommt: Name, Rolle und die
+  // sechs Kampfwerte. Keine Innenansicht, kein Blick in Wuerfel. Was die KI hier rechnet,
+  // kann der Spieler mit derselben Tabelle nachrechnen.
+  function gegnerVorschau(){
+    return inDisc("tdm").slice(0,6).map(p=>{
+      const s=stats(p,"tdm");
+      const fern=p.fern===true,heiler=istHeiler(p);
+      // Schlagfolge: der Fernkaempfer haengt an der Abklingzeit seines Schusses,
+      // der Nahkaempfer an seinem Tempo. Beides sind die Formeln der Simulation.
+      const takt=0.5+s.TMP/120;
+      return {n:p.n,c:p.c,fern,heiler,eig:p.d.tdm,TMP:s.TMP,
+        dps:heiler?0:Math.round(s.ANG*0.5*takt),
+        hps:heiler?Math.round(s.ANG*0.42*takt):0,
+        zaeh:Math.round(s.LP*6*(1+s.VER/100))};
+    });
+  }
+
+  // Aus der Vorschau wird ein Plan. Drei Antworten auf drei Lagen — und zu jeder steht
+  // die Begruendung mit den Zahlen da, aus denen sie gezogen wurde.
+  function schlachtplan(){
+    const v=gegnerVorschau();
+    if(!v.length)return null;
+    const gesamt=v.reduce((a,x)=>a+x.dps,0)||1;
+    const sortiert=[...v].sort((a,b)=>b.dps-a.dps);
+    const top=sortiert[0];
+    const anteil=top.dps/gesamt;
+    const zaehSort=[...v].map(x=>x.zaeh).sort((a,b)=>a-b);
+    const medianZaeh=zaehSort[Math.floor(v.length/2)];
+    const heiler=v.filter(x=>x.hps>0).sort((a,b)=>b.hps-a.hps)[0];
+    const pz=(x)=>Math.round(x*100)+" %";
+
+    let name,grund,flanker,ziel;
+    if(anteil>=0.30&&top.zaeh<medianZaeh){
+      // Ein weicher Spitzenschaden ist die lohnendste Investition, die es gibt.
+      flanker=anteil>=0.42?5:4;
+      ziel="bedrohung";
+      name="Kopf abschlagen";
+      grund=top.n+" stellt allein "+pz(anteil)+" des gegnerischen Schadens ("+top.dps+" von "+gesamt+
+        " je Sekunde) und ist mit "+top.zaeh+" effektiven Lebenspunkten weicher als der Durchschnitt ("+
+        medianZaeh+"). "+flanker+" von 6 gehen außen herum auf sie, "+(6-flanker)+
+        (6-flanker===1?" hält":" halten")+" vorn die Linie und bindet"+(6-flanker===1?"":"n")+" den Rest.";
+    }else if(heiler&&heiler.hps*4>gesamt){
+      flanker=2; ziel="heiler";
+      name="Heiler zuerst";
+      grund=heiler.n+" heilt "+heiler.hps+" je Sekunde und macht damit "+
+        "den Schaden von vier Sekunden Kampf wieder wett. Zwei Schnelle gehen außen herum auf "+
+        heiler.n+", die anderen vier schieben frontal, damit der Druck nicht nachlässt.";
+    }else{
+      flanker=0; ziel="naechster";
+      name="Mauer schieben";
+      grund="Kein Ausreißer: der Stärkste stellt nur "+pz(anteil)+" des Schadens. Sich aufzuteilen "+
+        "würde nur die eigene Übermacht verschenken — alle sechs gehen geschlossen durch die Mitte "+
+        "und schlagen, was am nächsten steht.";
+    }
+
+    // ZUTEILUNG. Die Zaehesten halten vorn — sie sollen binden, nicht toeten. Aussen
+    // herum gehen die Schnellsten, weil der Umweg Zeit kostet und die Zeit ihr Preis ist.
+    const nachZaeh=[...OPP].map((o,i)=>({o,i,zaeh:o.lo+o.hi})).sort((a,b)=>b.zaeh-a.zaeh);
+    const halter=new Set(nachZaeh.slice(0,OPP.length-flanker).map(x=>x.o.n));
+    const zuteilung={};
+    for(const o of OPP){
+      zuteilung[o.n]=halter.has(o.n)
+        ?{ord:"mitlinie",zielP:"naechster",rolle:"hält die Linie"}
+        :{ord:"flanke",zielP:ziel,rolle:"geht außen herum"};
+    }
+    return {name,grund,zuteilung,vorschau:v,flanker};
+  }
+
+  let PLAN=null;
+
   function renderOpp(){
     const box=document.getElementById("opp");box.textContent="";
+    PLAN=schlachtplan();
+    if(PLAN){
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Plan der KI: "+PLAN.name));
+      k.appendChild(el("p",null,PLAN.grund));
+      k.tabIndex=0;
+      tipOn(k,"Woher der Plan kommt",
+        "Die KI sieht genau die Vorschau, die du auch siehst — Name, Rolle und die sechs "+
+        "Kampfwerte deiner Aufstellung, sonst nichts. Daraus rechnet sie Schaden je Sekunde "+
+        "und effektive Lebenspunkte, sucht den lohnendsten Angriffspunkt und verteilt danach "+
+        "ihre Befehle. Änderst du deine Aufstellung, ändert sich der Plan.");
+      box.appendChild(k);
+    }
     OPP.forEach(o=>{
+      const z=PLAN?PLAN.zuteilung[o.n]:null;
+      const ord=z?z.ord:o.ord;
       const r=el("div","oppline");
       const l=el("div");l.appendChild(el("b",null,o.n));
-      l.appendChild(el("small",null,o.c+" · "+ORDERS.find(x=>x[0]===o.ord)[1]));
+      l.appendChild(el("small",null,o.c+" · "+ORDERS.find(x=>x[0]===ord)[1]+(z?" — "+z.rolle:"")));
       r.appendChild(l);r.appendChild(el("span","rng",o.lo+"–"+o.hi));
       box.appendChild(r);
     });
+    const ap=document.getElementById("arenaplan");
+    if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
   }
 
   // STUFENAUFSTIEG: der Zuwachs geht in ein ATTRIBUT, nicht in einen Kampfwert.
@@ -845,8 +952,12 @@
     return{x:cols[row],y:70+(H-140)*(n<2?0.5:i/(n-1||1))};
   }
 
+  // Ist die Flanke schon losgelassen? Je Seite eine Entscheidung, nicht je Kopf.
+  let freigabe=[false,false];
+
   function build(){
-    seed=1337;U=[];floats=[];t=0;done=false;
+    seed=1337;U=[];floats=[];t=0;done=false;freigabe=[false,false];
+    PLAN=schlachtplan();
     const mine=inDisc("tdm").slice(0,6);
     const byRow={0:[],1:[],2:[]};mine.forEach(p=>byRow[place[p.n].row].push(p));
     let id=0;
@@ -860,7 +971,7 @@
           fern:p.fern===true,reach:p.fern?SKILLS.shoot.reichweite:RANGE,
           skills:p.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
-          st:{dmg:0,heal:0,tank:0,ko:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
       });
     }
     const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
@@ -876,13 +987,14 @@
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
         const bp=PERS[pk],pd=PERSDEF[pk];
-        U.push({id:id++,n:o.n,side:1,row,eig:(o.lo+o.hi)/2,ord:o.ord,zielP:o.jagd?"bedrohung":"naechster",heiler:o.heiler===true,...s,
+        const z=(PLAN&&PLAN.zuteilung[o.n])||{ord:o.ord,zielP:o.jagd?"bedrohung":"naechster"};
+        U.push({id:id++,n:o.n,side:1,row,eig:(o.lo+o.hi)/2,ord:z.ord,zielP:z.zielP,heiler:o.heiler===true,...s,
           form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null,
           fern:false,reach:(o.skills||[]).includes("slash")?SKILLS.slash.reichweite:RANGE,skills:o.skills||null,mp:100,sp:100,cds:{},invuln:0,cast:null,castLeft:0,castZiel:null,trail:[],rtCd:0,
           schild:0,schildT:0,schildVon:null,wurzel:0,leer:0,zwang:false,durch:false,durchAn:false,zielSeit:0,tgtVor:null,
-          st:{dmg:0,heal:0,tank:0,ko:0}});
+          st:{dmg:0,heal:0,tank:0,verh:0,ko:0}});
       });
     }
   }
@@ -900,7 +1012,12 @@
   // verhinderter Schaden ist derselbe Beitrag wie geheilter.
   function treffer(von,z,roh,sd){
     const d=Math.max(1,Math.round(roh*sd*(100/(100+z.VER))));
-    z.st.tank+=roh*sd; von.st.dmg+=d;
+    // VERHINDERT: was seine Verteidigung von diesem Schlag weggenommen hat. Das ist keine
+    // Deutung und kein Bonus — es ist die Differenz zwischen dem, was ankam, und dem, was
+    // angekommen waere, und sie entsteht aus SEINEM Attributwert. Damit ist sie genau so
+    // viel wert wie eine geheilte Lebenspunktezahl, und ein Tank steht endlich mit dem in
+    // der Tabelle, wofuer er gebaut ist.
+    z.st.tank+=roh*sd; z.st.verh+=roh*sd-d; von.st.dmg+=d;
     let rest=d;
     if(z.schild>0){
       const weg=Math.min(z.schild,rest);
@@ -944,6 +1061,22 @@
     if(tg.hp===0&&!tg.down){tg.down=true;u.st.ko++;feed(tg.side,tg.n+" ist ausgeschieden.",true);}
   }
 
+  // EINE UHR FUER ALLE.
+  //
+  // Vorher liefen zwei: der Grundangriff schlug alle 1/(0,5+TMP/120) Sekunden, die Skills
+  // aber in den Sekunden aus Eslabong — Shoot alle 0,35 s. Damit schoss Buttercup fast
+  // dreimal so oft wie Baumkopf zuschlug, und zwar NICHT wegen ihrer Attribute, sondern
+  // weil eine Zahl aus einem fremden Spiel danebenstand. Genau da ist die Kette
+  // Marktwert -> Attribute -> Wirkung gerissen: Baumkopf geht mit Einsatzwert 81 rein,
+  // Buttercup mit 57, und trotzdem lag sie bei 244 % und er bei 47 %.
+  //
+  // Jetzt hat JEDER Angriff dieselbe Grunduhr aus dem Tempo. Ein Skill sagt nur noch, wie
+  // viele Schlaege er dieser Uhr wert ist: der Grundschuss 1,0, der schwere Hammerschlag
+  // 1,8 (dafuer +15-75 % Schaden). Seltene Faehigkeiten (Barrage, Dash, Segen) behalten
+  // ihre echten Abklingzeiten in Sekunden — die sind Ereignisse, nicht der Takt.
+  const grundtakt=(u,fat)=>1/((0.5+u.TMP/120)*Math.max(.5,fat));
+  const skillTakt=(u,fak,fat)=>grundtakt(u,fat)*fak;
+
   const live=s=>U.filter(u=>u.side===s&&!u.down);
   const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   const RANGE=44;
@@ -974,7 +1107,7 @@
     }
     if(u.ord==="flanke"){
       const deep=u.side===0?u.x>MID+180:u.x<MID-180;
-      if(!deep){
+      if(!deep||!freigabe[u.side]){
         // Unterwegs nur wehren, wenn wirklich jemand direkt dranhaengt.
         const cling=foes.filter(f=>dist(u,f)<58);
         return cling.length?nearest(cling):null;
@@ -1067,6 +1200,26 @@
     // sinnlos. Wer dann noch auf seinem Posten steht, waehrend nebenan abgeraeumt wird,
     // hilft niemandem — das war der Gegner, der am Ende nur herumstand.
     const endspiel=live(0).length<=2||live(1).length<=2;
+
+    // SAMMELN, DANN GEMEINSAM REIN.
+    //
+    // Gemessen: fuenf Flankierer, die einzeln losmarschieren, laufen einer nach dem anderen
+    // in Buttercups Schussfeld. Sie kam mit 100 % Leben und vier Ausschaltungen aus dem
+    // Kampf — der Plan war richtig, die Ausfuehrung hat ihn umgebracht. Ein Umgehen ist nur
+    // dann etwas wert, wenn es GEMEINSAM ankommt. Also warten die Flankierer am Rand, bis
+    // genug von ihnen da sind, und gehen dann zusammen rein. Spaetestens nach 20 s reicht
+    // es: laenger zu warten verschenkt den Kampf an die Mitte.
+    for(const seite of[0,1]){
+      if(freigabe[seite])continue;
+      const fl=live(seite).filter(u=>u.ord==="flanke");
+      if(!fl.length){freigabe[seite]=true;continue;}
+      const tief=fl.filter(u=>seite===0?u.x>MID+180:u.x<MID-180);
+      if(fl.length<=1||tief.length>=Math.ceil(fl.length*0.7)||t>20){
+        freigabe[seite]=true;
+        feed(seite,fl.length>1?fl.length+" gehen gemeinsam in die Flanke.":"Die Flanke geht rein.");
+      }
+    }
+
     for(const u of U){
       if(u.down)continue;
       const fat=t>35?Math.max(0.55,1-(100-u.AUS)*0.0011*(t-35)):1;
@@ -1101,7 +1254,7 @@
       // OFFENSIVZWANG. Zwei Faelle, in denen Stellungsbefehle nichts mehr wert sind:
       // wer laenger als 3,5 s ueberhaupt kein Ziel hatte, und das Endspiel.
       // Ein Flankierer, der noch laeuft, ist nicht untaetig — er ist unterwegs.
-      const flankeUnterwegs=u.ord==="flanke"&&!(u.side===0?u.x>MID+180:u.x<MID-180);
+      const flankeUnterwegs=u.ord==="flanke"&&(!freigabe[u.side]||!(u.side===0?u.x>MID+180:u.x<MID-180));
       if(!u.tgt&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
       const zwangVor=u.zwang;
       u.zwang=endspiel||u.leer>4.5;
@@ -1126,7 +1279,15 @@
       else{u.zielSeit=0;u.tgtVor=u.tgt;u.durch=false;u.durchAn=false;}
       const weitWeg=u.tgt&&!u.tgt.down&&dist(u,u.tgt)>u.reach*1.4;
       if(!u.tgt||u.tgt.down||u.retreat>0)u.durch=false;
-      else if(u.zielSeit>3&&weitWeg){
+      // WIE LANGE JEMAND DRANBLEIBT, BEVOR ER DURCHGEHT, ist eine Frage seiner Bindung.
+      // Der Unbeirrte laesst sich nach anderthalb Sekunden nicht mehr aufhalten; der
+      // Opportunist probiert es fuenfeinhalb Sekunden und nimmt lieber, was vor ihm steht.
+      // Genau deshalb steht die Bindung in der Aufstellung: sie entscheidet, ob eine
+      // Flanke unbedingt durchkommen will oder unterwegs Beute macht.
+      const durchAb=1.5+u.opp/100*4;
+      // Ein Opportunist geht nicht durch, solange direkt vor ihm etwas Angeschlagenes steht.
+      const beuteDa=u.opp>=60&&live(1-u.side).some(f=>dist(u,f)<100&&f.hp/f.max<0.45);
+      if(u.zielSeit>durchAb&&weitWeg&&!beuteDa){
         u.durch=true;
         if(!u.durchAn){u.durchAn=true;feed(u.side,u.n+" ignoriert die Störer und geht auf "+u.tgt.n+" durch.");}
       }
@@ -1147,7 +1308,11 @@
       // FORMATIONSTREUE: je hoeher, desto naeher bleibt er der eigenen Linie.
       // "Verfolgen" hebt sie ausdruecklich auf — so steht es auch im Tooltip.
       const front=teamFront(u.side);
-      if(u.ord!=="verfolgen"&&u.retreat<=0&&!u.durch&&!u.zwang){
+      // "Flanke" ist genau wie "Verfolgen" ein Befehl, der die Linie ausdruecklich verlaesst —
+      // sonst waere er keiner. Vorher hing die Leine auch an ihm: die Flankierer sind nie
+      // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
+      // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
+      if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
         const leine=40+(100-u.form)*3.4;
         if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
       }
@@ -1296,7 +1461,7 @@
         }
         // 3. Shoot: der Grundschuss.
         if(tgS&&dist(u,tgS)<=u.reach&&(u.cds.shoot||0)<=0){
-          u.cds.shoot=SKILLS.shoot.cd/Math.max(.5,fat);
+          u.cds.shoot=skillTakt(u,SKILLS.shoot.takt,fat);
           u.wurzel=SKILLS.shoot.zielzeit;
           feuerSkill(u,"shoot");
           continue;
@@ -1338,7 +1503,7 @@
           if(schwer)u.sp-=SKILLS.slash.sp;
           const sw=SKILLS.slash.schwer;
           const m=schwer?sw.von+rr()*(sw.bis-sw.von):SKILLS.slash.mult;
-          u.cds.slash=(schwer?SKILLS.slash.cdSchwer:SKILLS.slash.cd)/Math.max(.5,fat);
+          u.cds.slash=skillTakt(u,schwer?SKILLS.slash.taktSchwer:SKILLS.slash.takt,fat);
           u.lunge=0.2;
           nahschlag(u,tgM,m,schwer?SKILLS.slash.knock:0,schwer?"Schwerer Hammerschlag":null,sd);
           continue;
@@ -1360,10 +1525,13 @@
 
   // BEITRAG und LEISTUNG.
   //
-  // Beitrag ist die absolute Wirkung: Schaden, Heilung, abgefangener Rohschaden, Ausschaltungen.
-  // Tanken zaehlt mit 0,35 — abgefangener Schaden ist wertvoll, aber ein Treffer, der jemanden
-  // umbringt, ist wertvoller als einer, den ein Tank wegsteckt.
-  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.tank*0.35+u.st.ko*140;
+  // Beitrag ist die absolute Wirkung: Schaden, Heilung, VERHINDERTER Schaden und
+  // Ausschaltungen — dazu ein kleiner Anteil (0,15) des Rohschadens, den jemand auf sich
+  // gezogen hat. Der grosse Posten des Tanks ist bewusst das Verhinderte, nicht das
+  // Eingesteckte: verhinderte Punkte sind dasselbe wie geheilte, waehrend "ich wurde
+  // beschossen" fuer sich genommen noch keine Leistung ist — es zaehlt nur, weil in dieser
+  // Zeit niemand anderes beschossen wurde.
+  const beitragVon=(u)=>u.st.dmg+u.st.heal+u.st.verh+u.st.tank*0.15+u.st.ko*140;
 
   // LEISTUNG beantwortet die eigentliche Frage: hat jemand geliefert, was sein Einsatzwert
   // verspricht? Erwartet wird der Anteil, den seine Eignung am Feld ausmacht. 100 heisst
@@ -1380,7 +1548,7 @@
     const tb=document.getElementById("wbody");if(!tb)return;
     const reihen=[...U].sort((a,b)=>beitragVon(b)-beitragVon(a));
     const maxD=Math.max(1,...U.map(u=>u.st.dmg)),maxH=Math.max(1,...U.map(u=>u.st.heal)),
-          maxT=Math.max(1,...U.map(u=>u.st.tank));
+          maxT=Math.max(1,...U.map(u=>u.st.tank)),maxV=Math.max(1,...U.map(u=>u.st.verh));
     tb.textContent="";
     for(const u of reihen){
       const tr=el("tr",(u.side===0?"eigen":"gegner")+(u.down?" raus":""));
@@ -1388,6 +1556,7 @@
       const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(Math.round(v)):"—";return td;};
       tr.appendChild(c(u.st.dmg,maxD));
       tr.appendChild(c(u.st.heal,maxH));
+      tr.appendChild(c(u.st.verh,maxV));
       tr.appendChild(c(u.st.tank,maxT));
       tr.appendChild(c(u.st.ko,99));
       const l=leistungVon(u,U);
