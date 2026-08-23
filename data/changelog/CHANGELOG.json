@@ -3,6 +3,15 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Team · Training",
+      "pr": null,
+      "text": "Der Schritt „Training prüfen\" hält nicht mehr an Spielern hängen, die aus einem älteren Spielstand ohne Trainingsmodus stammen. Zweimal wurde dafür schon eine Stelle geschlossen — der Saisonwechsel und der Direktkauf setzen den Vorgabewert seither selbst —, aber beide Male nur für neue Vorgänge: wer vorher ohne Modus in den Kader gekommen war, blieb es, und ein einziger solcher Spieler blockierte den ganzen Flow. Der Vorgabewert wird jetzt beim Laden und beim Speichern eines Spielstands nachgezogen, damit auch bestehende Kader von selbst heilen. Über alle Spielstände gemessen betraf das elf Spieler in drei Spielständen; danach keinen mehr.",
+      "quelle": "gepflegt",
+      "gewicht": null,
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Markt · Verkauf",
       "pr": null,
       "text": "Wenn der Verkaufen-Knopf gesperrt ist, steht daneben jetzt der Grund, den der Dienst wirklich genannt hat. Vorher schob der Dialog eine fremde Sperre dem Kader in die Schuhe: sobald der Kader klein war, las man, er sei am Minimum und ein Verkauf mache die Aufstellung unmöglich — auch dann, wenn in Wahrheit der Verkaufspreis fehlte oder der Spieler nicht mehr aktiv war. Ein Kadergrund kann eine Verkaufssperre gar nicht auslösen; keiner der beiden Verkaufsdienste kennt einen. Der Hinweis am Ende des Dialogs warnt weiterhin, aber nur noch vor der echten Grenze: unter sieben Spielern ist keine Aufstellung mehr möglich. Unter dem Team-Minimum ist sie es sehr wohl — das Minimum steuert das Kaufen, nicht das Verkaufen.",
