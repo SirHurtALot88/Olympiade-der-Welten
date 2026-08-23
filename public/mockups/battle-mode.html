@@ -929,6 +929,13 @@
     return {wert:Math.round(w), jeSekunde:Math.round(w/zeit*10)/10, zeit:Math.round(zeit*100)/100, teile};
   }
 
+  // PLATZHALTERKIT FUER ALLE. Bis eben hatten drei von zwoelf Spielern ein Kit und neun
+  // gar keins — und die drei waren von mir willkuerlich gewaehlt. Damit mass jede Serie
+  // vor allem, wer zufaellig Skills hatte: mit gleichem Kit auf beiden Seiten sank die
+  // Kampfdauer von 15 auf 24 s und die Ergebnisse wurden erst vergleichbar.
+  // Solange die echten Klassensaetze fehlen, tragen alle denselben Satz. Das ist keine
+  // Balance-Aussage, sondern die Bedingung dafuer, dass eine Messung ueberhaupt etwas
+  // ueber die Spieler sagt statt ueber meine Kit-Verteilung.
   const SQUAD=[
     // Klasse, Rasse, Unterklassen und Eigenschaften stammen eins zu eins aus dem
     // Spielstand (data/persistence/oly-app.sqlite, Feld className). Vorher standen hier
@@ -939,11 +946,11 @@
     // Die KITS sind weiterhin Platzhalter — es gibt noch keine echten Klassensaetze.
     // Sie haengen jetzt aber an der WIRKLICHEN Klasse statt an einer ausgedachten.
     {n:"Baumkopf Holzfaust",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
-    {n:"T Mask",c:"Sprinter",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.8,spurt:81},a:{power:64,health:55,stamina:72,intelligence:38,awareness:94,determination:79,speed:91,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
-    {n:"Greenkraut",c:"Berserker",r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:60.5,spurt:19.9},a:{power:94,health:83,stamina:66,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:11}},
-    {n:"Rustrow",c:"Tank",r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:39},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
-    {n:"Buttercup",c:"Berserker",skills:FIGHTER,r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.4},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:43}},
-    {n:"Serris",c:"Berserker",r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.9},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
+    {n:"T Mask",c:"Sprinter",skills:MATRIARCH,r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.8,spurt:81},a:{power:64,health:55,stamina:72,intelligence:38,awareness:94,determination:79,speed:91,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
+    {n:"Greenkraut",c:"Berserker",skills:MATRIARCH,r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:60.5,spurt:19.9},a:{power:94,health:83,stamina:66,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:11}},
+    {n:"Rustrow",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:39},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
+    {n:"Buttercup",c:"Berserker",skills:MATRIARCH,r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.4},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:43}},
+    {n:"Serris",c:"Berserker",skills:MATRIARCH,r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.9},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
     {n:"Riley Le Rogue",c:"Rogue",r:"Unknown",sub:[],tp:[],tn:[],d:{tdm:35.1,spurt:18.3},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
     {n:"Remiel",c:"Rogue",r:"Divine",sub:["Angel","Warrior"],tp:["Diligent"],tn:["Feisty","Devious"],d:{tdm:25.8,spurt:43.3},a:{power:34,health:66,stamina:7,intelligence:36,awareness:60,determination:43,speed:78,dexterity:74,charisma:16,will:9,spirit:49,torment:65}},
     {n:"Professor Paranoix",c:"Overseer",r:"Human",sub:["Alchemist","Monk","Servant"],tp:["Diligent","Healthy"],tn:["Feisty","Paranoid","Obsessive"],d:{tdm:14.9,spurt:36.7},a:{power:8,health:23,stamina:22,intelligence:81,awareness:82,determination:65,speed:67,dexterity:48,charisma:35,will:27,spirit:23,torment:47}},
@@ -956,12 +963,12 @@
   // Spannen; die haben den Gegner staerker gemacht, als er ist, und damit jede Aussage
   // ueber Leistung verzerrt. Team-TDM: 298,3 (Platz 21 von 32) gegen unsere 339,7 (Platz 12).
   const OPP=[
-    {n:"Volcanoth",c:"Charger",skills:FIGHTER,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.9,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
-    {n:"Ultralisk",c:"Charger",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.3,spurt:42.1},a:{power:71,health:84,stamina:93,intelligence:2,awareness:2,determination:1,speed:89,dexterity:28,charisma:1,will:36,spirit:15,torment:68}},
-    {n:"Lhyor",c:"Charger",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48,spurt:80.8},a:{power:72,health:64,stamina:70,intelligence:15,awareness:30,determination:71,speed:68,dexterity:97,charisma:68,will:46,spirit:5,torment:88}},
-    {n:"Nocture",c:"Charger",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73,stamina:74,intelligence:1,awareness:54,determination:26,speed:81,dexterity:32,charisma:13,will:12,spirit:3,torment:94}},
-    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:54.6,spurt:21.6},a:{power:65,health:85,stamina:8,intelligence:62,awareness:21,determination:40,speed:11,dexterity:7,charisma:66,will:57,spirit:83,torment:52}},
-    {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.3,spurt:37.5},a:{power:37,health:60,stamina:87,intelligence:48,awareness:42,determination:29,speed:91,dexterity:64,charisma:22,will:9,spirit:75,torment:26}}
+    {n:"Volcanoth",c:"Charger",skills:MATRIARCH,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.9,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
+    {n:"Ultralisk",c:"Charger",skills:MATRIARCH,r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.3,spurt:42.1},a:{power:71,health:84,stamina:93,intelligence:2,awareness:2,determination:1,speed:89,dexterity:28,charisma:1,will:36,spirit:15,torment:68}},
+    {n:"Lhyor",c:"Charger",skills:MATRIARCH,r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48,spurt:80.8},a:{power:72,health:64,stamina:70,intelligence:15,awareness:30,determination:71,speed:68,dexterity:97,charisma:68,will:46,spirit:5,torment:88}},
+    {n:"Nocture",c:"Charger",skills:MATRIARCH,r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73,stamina:74,intelligence:1,awareness:54,determination:26,speed:81,dexterity:32,charisma:13,will:12,spirit:3,torment:94}},
+    {n:"Minion Master",c:"Hero",skills:MATRIARCH,r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:54.6,spurt:21.6},a:{power:65,health:85,stamina:8,intelligence:62,awareness:21,determination:40,speed:11,dexterity:7,charisma:66,will:57,spirit:83,torment:52}},
+    {n:"Moro",c:"Sprinter",skills:MATRIARCH,r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.3,spurt:37.5},a:{power:37,health:60,stamina:87,intelligence:48,awareness:42,determination:29,speed:91,dexterity:64,charisma:22,will:9,spirit:75,torment:26}}
   ];
   const REC={
     // NACHGEZOGEN AN DIE DISZIPLINGEWICHTE. Diese Rezepte stammten von Eslabong, nicht aus
@@ -2245,15 +2252,14 @@
     // PARADE. Ein Nahkampfschlag geht nicht daneben — er wird abgewehrt. Das ist eine
     // Leistung des VERTEIDIGERS: sein Tempo gegen die Praezision des Angreifers. Bei
     // gleichen Werten sind es 20 %, gedeckelt auf 5 bis 40 %.
-    const parade=Math.max(0.05,Math.min(0.40,0.20+(tg.TMP-u.PRZ)/300));
+    // KEIN PARIER-WURF MEHR. Im Vorbild trifft ein Nahkampfschlag in Reichweite immer;
+    // ausweichen oder parieren kann nur, wer einen Skill dafuer hat — und den hat bei uns
+    // noch niemand. Vorher wurden bis zu 40 % aller Schlaege verschluckt, und zwar
+    // ausgerechnet gegen langsame Kaempfer wie Baumkopf: die Formel war
+    // 0,20 + (Tempo des Ziels - Praezision)/300, also traf er umso schlechter, je
+    // schneller sein Gegner war. Praezision entscheidet jetzt nur noch ueber den
+    // kritischen Treffer.
     tg.lastHit=u;
-    if(rr()<parade){
-      const ax=tg.x-u.x,ay=tg.y-u.y,aL=Math.hypot(ax,ay)||1;
-      tg.dx=-ay/aL;tg.dy=ax/aL;tg.dodge=0.26;
-      schwebe({x:tg.x,y:tg.y-26,txt:"pariert",life:.8,crit:false});
-      feed(tg.side,tg.n+" pariert "+u.n+".");
-      return;
-    }
     const crit=rr()<u.PRZ/400;
     const roh=skillSchaden(u,sk,mult)*(crit?1.5:1);
     const d=treffer(u,tg,roh,sd);
@@ -2341,7 +2347,13 @@
   // steht ueberall eine Zahl, die man vorlesen kann.
   const BASISMITTE=50;
   const angFaktor=(ang)=>ang/BASISMITTE;
-  const LEBEN_JE_LP=12;
+  // Leben je Punkt LP. Stand auf 12 — geraten, von mir. Die Klassenkarten sagen etwas
+  // anderes: ueber alle 35 Archetypen laufen die Lebensspannen von 81 bis 390, und der
+  // groesste Tank ueberhaupt (Bullbreaker) endet bei 390. Unsere Arena gab Rustrow 1188,
+  // also das Dreifache des staerksten Wertes, den das Vorbild kennt. Deshalb ziehen sich
+  // die Kaempfe auch so: bei dreifachem Leben braucht jeder Kampf die dreifache Zeit.
+  // Mit 4 landet Rustrow (LP 99) bei 396 und damit genau am oberen Rand der Karten.
+  const LEBEN_JE_LP=4;
   // Die drei Umrechnungen, die auch in der Anzeige stehen:
   const angProzent=(ang)=>Math.round((angFaktor(ang)-1)*100);
   const minderung=(ver)=>Math.round(ver/(ver+100)*100);
