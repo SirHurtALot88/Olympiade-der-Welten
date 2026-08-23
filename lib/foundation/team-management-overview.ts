@@ -7,8 +7,7 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { saisonstandDisciplineColumns } from "@/lib/foundation/saisonstand-column-contract";
-import { SEASON_DISCIPLINE_AREA_GROUPS } from "@/lib/season/season-discipline-area-groups";
-import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import { buildTeamSeasonAreaPoints } from "@/lib/foundation/season-area-points";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
@@ -271,105 +270,6 @@ function deriveVisibleSeasonPoints(
   return roundValue(numericValues.reduce((sum, value) => sum + value, 0), 1);
 }
 
-function derivePpsByAreaFromDisciplineValues(
-  disciplineValues: Record<string, number | null> | null | undefined,
-) {
-  const totals = {
-    total: 0,
-    pow: 0,
-    spe: 0,
-    men: 0,
-    soc: 0,
-  };
-
-  if (!disciplineValues) {
-    return totals;
-  }
-
-  for (const disciplineKey of visibleSeasonPointsDisciplineKeys) {
-    const value = disciplineValues[disciplineKey];
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      continue;
-    }
-
-    totals.total += value;
-  }
-
-  for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
-    const areaTotal = group.keys.reduce((sum, key) => {
-      const value = disciplineValues[key];
-      return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
-    }, 0);
-    totals[group.id] = roundValue(areaTotal, 1);
-  }
-
-  return {
-    total: roundValue(totals.total, 1),
-    pow: totals.pow,
-    spe: totals.spe,
-    men: totals.men,
-    soc: totals.soc,
-  };
-}
-
-/**
- * WELCHER ZEITPUNKT GILT FÜR DIE ACHSPUNKTE — und zwar derselbe wie für die Disziplin-Spalten
- * daneben.
- *
- * BEFUND: Diese Funktion las `preferStandingDisciplineValues` nie. Sie nahm den Live-Ledger-Wert,
- * sobald er `> 0` war. Die Disziplin-Spalten derselben Zeile beachten das Flag aber sehr wohl
- * (`mergeSeasonDisciplineValues` bekommt `ledgerValues: null`, wenn es gesetzt ist). Beim Blick
- * auf eine ARCHIVIERTE Saison standen deshalb Snapshot-Disziplinwerte neben den PPs der
- * LAUFENDEN Saison — zwei Zeitpunkte in einer Zeile, gemessen am Live-Spielstand: Snapshot 11/12
- * gegen laufende 4,2/3,8.
- *
- * Das ist dieselbe Fehlerklasse, die den Saison-Snapshot-Umbau ausgelöst hat („in der teams
- * tabelle sind MW und Cash auch noch zum falschen zeitpunkt") — nur an einer anderen Lesestelle.
- *
- * Mit gesetztem Flag gilt jetzt ausschliesslich der Snapshot-Stand. Der Rückfall auf den
- * abgeleiteten Disziplinwert bleibt derselbe Ausdruck; er ist unter dem Flag ohnehin schon
- * rein aus `standing.disciplineValues` gebildet.
- */
-function resolveDisplayAreaPoints(ledgerValue: number, disciplineFallback: number, preferStandingValues: boolean) {
-  if (preferStandingValues) {
-    return disciplineFallback;
-  }
-  if (ledgerValue > 0) {
-    return ledgerValue;
-  }
-  return disciplineFallback;
-}
-
-function mergeSeasonDisciplineValues(input: {
-  standingValues?: Record<string, number | null> | null;
-  ledgerValues?: Record<string, number> | null;
-}) {
-  const merged = Object.fromEntries(
-    saisonstandDisciplineColumns
-      .filter((columnKey) => columnKey !== "bonuspunkte")
-      .map((columnKey) => [columnKey, null] as const),
-  ) as Record<string, number | null>;
-
-  for (const [key, value] of Object.entries(input.standingValues ?? {})) {
-    merged[key] = typeof value === "number" && Number.isFinite(value) ? roundValue(value, 1) : null;
-  }
-
-  for (const [disciplineId, value] of Object.entries(input.ledgerValues ?? {})) {
-    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-      continue;
-    }
-
-    const normalizedKey = normalizeLineupDisciplineFieldName(disciplineId);
-    if (!normalizedKey || !(normalizedKey in merged)) {
-      continue;
-    }
-
-    merged[normalizedKey] = roundValue(value, 1);
-  }
-
-  return merged;
-}
-
 /**
  * Perf (Audit #2 F4/F5): `buildTeamSeasonOverviewRows` ist eine liga-weite O(Teams×Kader)-Berechnung
  * (Rating-Maps, Setpoint-Reduktionen, Snapshot-Historie) und wird auf dem Default-Input-Pfad dutzendfach
@@ -530,10 +430,6 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       ovrValues.length > 0
         ? roundValue(ovrValues.reduce((sum, value) => sum + value, 0) / ovrValues.length, 2)
         : null;
-    const ppsPow = roundValue(seasonPointsSummary?.pointsByArea.power ?? 0, 1);
-    const ppsSpe = roundValue(seasonPointsSummary?.pointsByArea.speed ?? 0, 1);
-    const ppsMen = roundValue(seasonPointsSummary?.pointsByArea.mental ?? 0, 1);
-    const ppsSoc = roundValue(seasonPointsSummary?.pointsByArea.social ?? 0, 1);
     const ppsTotal = hasCurrentPps ? currentPpsTotal : fallbackPpsTotal;
     const formAvg =
       rosterPlayers.length > 0
@@ -554,20 +450,22 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
     });
     const cashFc = standing?.cashFc ?? null;
     const cashDelta = budget != null && cash != null ? roundValue(cash - budget, 2) : null;
-    const disciplineValues = mergeSeasonDisciplineValues({
-      standingValues: standing?.disciplineValues,
-      ledgerValues: preferStandingDisciplineValues ? null : seasonPointsSummary?.pointsByDiscipline ?? null,
-    });
-    const fallbackPpsByArea = derivePpsByAreaFromDisciplineValues(disciplineValues);
-    const displayPpsPow = resolveDisplayAreaPoints(ppsPow, fallbackPpsByArea.pow, preferStandingDisciplineValues);
-    const displayPpsSpe = resolveDisplayAreaPoints(ppsSpe, fallbackPpsByArea.spe, preferStandingDisciplineValues);
-    const displayPpsMen = resolveDisplayAreaPoints(ppsMen, fallbackPpsByArea.men, preferStandingDisciplineValues);
-    const displayPpsSoc = resolveDisplayAreaPoints(ppsSoc, fallbackPpsByArea.soc, preferStandingDisciplineValues);
-    const displayPpsTotal = resolveDisplayAreaPoints(
-      hasCurrentPps ? ppsTotal : 0,
-      fallbackPpsByArea.total,
+    // Eine Rechnung fuer Tabelle UND RANG-Popover (`lib/foundation/season-area-points.ts`) —
+    // vorher lagen die drei Helfer privat hier, und das Popover baute sich seine eigenen Zahlen.
+    const areaPoints = buildTeamSeasonAreaPoints({
+      standingDisciplineValues: standing?.disciplineValues,
+      ledgerPointsByDiscipline: seasonPointsSummary?.pointsByDiscipline ?? null,
+      ledgerPointsByArea: seasonPointsSummary?.pointsByArea ?? null,
+      ledgerTotalPoints: ppsTotal,
+      hasCurrentPps,
       preferStandingDisciplineValues,
-    );
+    });
+    const disciplineValues = areaPoints.disciplineValues;
+    const displayPpsPow = areaPoints.displayPow;
+    const displayPpsSpe = areaPoints.displaySpe;
+    const displayPpsMen = areaPoints.displayMen;
+    const displayPpsSoc = areaPoints.displaySoc;
+    const displayPpsTotal = areaPoints.displayTotal;
     disciplineValues.bonuspunkte =
       hasCurrentPps && seasonPointsSummary != null && seasonPointsSummary.mutatorPpsBonus > 0
         ? roundValue(seasonPointsSummary.mutatorPpsBonus, 1)
