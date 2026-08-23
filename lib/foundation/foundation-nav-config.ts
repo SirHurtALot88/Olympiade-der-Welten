@@ -28,6 +28,15 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag live: Disziplinen mit echten Save-Werten (Wert/Fatigue/Form) durchspielen.", icon: "◉" },
       { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
+      // Entwurf des Battle Mode. Steht bewusst NEBEN der Arena statt unter "Info":
+      // beurteilen laesst er sich nur da, wo man ihn mit der echten Arena vergleicht.
+      // Er liest und schreibt keinen Spielstand.
+      {
+        id: "battleArena",
+        label: "Battle Arena",
+        tooltip: "Entwurf für den Battle Mode: Aufstellung mit Reihen und Befehlen, dazu ein laufender 6-gegen-6-Kampf.",
+        icon: "⚔",
+      },
     ],
   },
   {
@@ -96,14 +105,6 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
         label: "Changelog",
         tooltip: "Was zuletzt gefixt oder geändert wurde — mit PR-Nummer als Beleg.",
         icon: "✓",
-      },
-      // Ganz unten und bewusst in "Info": ein Entwurf zum Anschauen, keine Spielsteuerung.
-      // Er liest und schreibt keinen Spielstand.
-      {
-        id: "mockup",
-        label: "Mockup",
-        tooltip: "Entwurf für den Battle Mode: Aufstellung mit Reihen und Befehlen, dazu eine laufende Arena.",
-        icon: "◇",
       },
     ],
   },
