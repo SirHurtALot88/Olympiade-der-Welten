@@ -3205,6 +3205,8 @@
     if(t.mp)u.mp-=t.mp;
     if(t.sp)u.sp-=t.sp;
     u.cds[sk.id]=(t.cd||0)*(1-cdKuerzung(u))/Math.max(.5,fat);
+    // Ein Heiler bezahlt jeden Angriff mit seiner Heil-Uhr: entweder oder, nie beides.
+    if(u.heiler)u.cd=Math.max(u.cd,abkling(u,GRUNDSCHLAG.cd,fat));
     u.letzterSkill=sk.id;
     if(u.bereit)u.bereit[sk.id]=0;
 
@@ -3745,7 +3747,27 @@
       // Der Kaempfer wartet nie: findet die Bewertung nichts Besseres, schlaegt er
       // weiter zu. "Aufsparen" ist deshalb kein Zustand, sondern ein verlorener
       // Vergleich — er war die ganze Zeit produktiv.
-      if(u.skills&&u.skills.length&&u.retreat<=0){
+      // ENTWEDER ODER: ein Heiler hat EINE Uhr.
+      //
+      // Chris: "mir ist aufgefallen dass die beiden heiler ZUSAETZLICH noch normal
+      // angreifen, sie muessen entweder angreifen oder heilen, wenn sie ab und zu
+      // angreifen wuerde sich die heilung reduzieren".
+      //
+      // Er hat recht, und die Luecke sass genau hier. Der Grundangriff teilt sich mit dem
+      // Heal die Uhr `u.cd` — der war also sauber ausgeschlossen. Die SKILLS aber laufen
+      // auf eigenen Abklingzeiten in `u.cds[id]`, und `fuehreAus` fasst `u.cd` nie an.
+      // Ein Heiler heilte damit (Uhr fuer HEILTAKT = 2,0 s belegt) und feuerte in genau
+      // diesen zwei Sekunden trotzdem weiter Skills. Heilung UND Schaden, voll, gratis.
+      //
+      // Dieselbe Klasse Fehler wie die fuenf davor: die Planung rechnet den Heiler mit
+      // `dps: 0` (siehe oben), der Kampf liess ihn schlagen. Wer eine Zahl anzeigt, die
+      // der Kampf nicht fuehrt, erklaert nichts.
+      //
+      // Jetzt gilt fuer Heiler: jede Handlung belegt dieselbe Uhr. Wer angreift, heilt in
+      // dieser Zeit nicht — die Heilrate faellt also von selbst, im Verhaeltnis dazu, wie
+      // oft er angreift. Genau die Kopplung, die Chris beschreibt. Fuer alle anderen
+      // aendert sich nichts.
+      if(u.skills&&u.skills.length&&u.retreat<=0&&(!u.heiler||u.cd<=0)){
         u.bereit=u.bereit||{};
         for(const id of u.skills){
           if((u.cds[id]||0)<=0)u.bereit[id]=(u.bereit[id]||0)+dt; else u.bereit[id]=0;
