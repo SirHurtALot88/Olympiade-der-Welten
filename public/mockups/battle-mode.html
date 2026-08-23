@@ -1072,14 +1072,21 @@
   // Ist die Flanke schon losgelassen? Je Seite eine Entscheidung, nicht je Kopf.
   let freigabe=[false,false];
 
-  // Welche Reichweite jemand hat, sagt sein Kit — nicht eine Sonderregel je Klasse.
-  // "reach" ist die weiteste Bedrohung (der aufgeladene Schlag), "reichNah" die, auf die
-  // er wirklich herangeht. Ohne Kit sind beide der blosse Nahkampf.
+  // Der Platz, den ein Kaempfer wirklich einnimmt. Das Icon ist 40 breit, der Lebensbalken
+  // 44, darunter stehen Name und Befehl — deshalb quer mehr als hoch.
+  const KOERPER_X=48, KOERPER_Y=64;
+
+  // REICHWEITEN WERDEN VOM KOERPER AUS GEMESSEN, nicht von Mittelpunkt zu Mittelpunkt.
+  //
+  // Das ist keine Kosmetik: seit sich niemand mehr in jemand anderem stehen kann, waere ein
+  // Schlag mit Kit-Reichweite 18 nie wieder gelandet — die beiden stehen ja schon 48 px
+  // auseinander, weil sie zwei Koerper sind. Die Zahl aus dem Kit ist der Arm, nicht der
+  // Abstand der Fusspunkte.
   function reichweiten(skills,fern){
-    if(fern)return{reach:SKILLS.shoot.reichweite,reichNah:SKILLS.shoot.reichweite};
+    if(fern)return{reach:KOERPER_X+SKILLS.shoot.reichweite,reichNah:KOERPER_X+SKILLS.shoot.reichweite};
     const sw=(skills||[]).find(id=>SKILLS[id]&&SKILLS[id].reichweiteSchwer);
-    if(!sw)return{reach:RANGE,reichNah:RANGE};
-    return{reach:SKILLS[sw].reichweiteSchwer,reichNah:SKILLS[sw].reichweite};
+    if(!sw)return{reach:KOERPER_X+RANGE,reichNah:KOERPER_X+RANGE};
+    return{reach:KOERPER_X+SKILLS[sw].reichweiteSchwer,reichNah:KOERPER_X+SKILLS[sw].reichweite};
   }
 
   function build(saat){
@@ -1233,7 +1240,10 @@
   let stumm=false;
   const floats=[];
   const schwebe=(o)=>{ if(!stumm)floats.push(o); };
-  const RANGE=44;
+  // Der blosse Nahkampf ohne Kit: ein Arm, kein Abstand. Er wird vom Koerper aus gemessen,
+  // liegt damit effektiv bei 62 px — zwischen dem schnellen Schlag des Fighters (66) und
+  // dem der Matriarch (71), also genau da, wo ein Platzhalter hingehoert.
+  const RANGE=14;
   // Nachfuellraten je Kit, unveraendert aus den Klassenkarten des Vorbilds.
   const REGEN={
     fighter:{mp:5,sp:25},matriarch:{mp:5,sp:15},archer:{mp:5,sp:20},neutral:{mp:5,sp:15}
@@ -1295,7 +1305,7 @@
   // Der Rueckstoss ist ein Nebeneffekt, kein Grund. Der Grund ist Reichweite: 18 gegen 50.
   function hauSchwer(u,tg,sk){
     if(u.sp<sk.sp)return false;
-    return dist(u,tg)>sk.reichweite;
+    return dist(u,tg)>u.reichNah;
   }
 
   // Abstand eines Punktes zur Strecke A->B. Braucht der Sturmangriff: erwischt wird, wer
@@ -1686,18 +1696,31 @@
         u.vx=sx/dt; u.vy=sy/dt;
         u.y=Math.max(34,Math.min(H-34,u.y));u.x=Math.max(34,Math.min(W-34,u.x));
       }
-      // ENTZERRUNG. Ohne sie klumpt am Ende die halbe Mannschaft auf einen Punkt: alle
-      // haben dasselbe Ziel, laufen also auf dieselbe Stelle und stehen dann ineinander.
-      // Ein sanftes Abstossen bei unter 34 px haelt die Gruppe lesbar, ohne dass jemand
-      // aus seiner Aufgabe geschoben wird.
+      // ENTZERRUNG — jetzt gegen JEDEN, nicht nur gegen die eigenen Leute.
+      //
+      // Vorher galt sie nur innerhalb einer Mannschaft, mit 34 px. Ein Icon ist aber 40 px
+      // breit, sein Lebensbalken 44, und darunter stehen noch Name und Befehl: der echte
+      // Platzbedarf ist rund 44 breit und 75 hoch. Angreifer und Verteidigter standen
+      // deshalb regelmaessig ineinander, und genau dann sieht man nicht mehr, wer wo steht —
+      // was den ganzen Sinn einer Aufstellung aufhebt.
+      //
+      // Der Abstand ist RECHTECKIG, weil die Icons rechteckig sind. Ein elliptischer liess
+      // Diagonalen zu, die trotzdem sichtbar ueberlappten (gemessen 5,5 % der Paare, bis zu
+      // 25 px Ueberdeckung). Aufgeloest wird ueber die kuerzere der beiden Achsen — so
+      // weicht man zur Seite aus, wenn man nebeneinander steht, und nach oben oder unten,
+      // wenn man voreinander steht. Zwei Kaempfer stehen damit voreinander wie zwei
+      // Modelle, nicht uebereinander wie zwei Sticker.
       for(const a of U){
-        if(a===u||a.down||a.side!==u.side)continue;
-        const ex=u.x-a.x,ey=u.y-a.y,eL=Math.hypot(ex,ey);
-        if(eL<34){
-          const nx=eL>0.01?ex/eL:(u.id%2?1:-1),ny=eL>0.01?ey/eL:1;
-          const schub=(34-eL)*0.5;
-          u.x=Math.max(34,Math.min(W-34,u.x+nx*schub));
-          u.y=Math.max(34,Math.min(H-34,u.y+ny*schub));
+        if(a===u||a.down)continue;
+        const dx=u.x-a.x, dy=u.y-a.y;
+        const ueX=KOERPER_X-Math.abs(dx), ueY=KOERPER_Y-Math.abs(dy);
+        if(ueX<=0||ueY<=0)continue;
+        if(ueX/KOERPER_X<ueY/KOERPER_Y){
+          const r=(dx>=0?1:-1)*ueX*0.5;
+          u.x=Math.max(34,Math.min(W-34,u.x+(dx===0?(u.id%2?1:-1)*ueX*0.5:r)));
+        }else{
+          const r=(dy>=0?1:-1)*ueY*0.5;
+          u.y=Math.max(34,Math.min(H-34,u.y+(dy===0?(u.id%2?1:-1)*ueY*0.5:r)));
         }
       }
 
@@ -1820,9 +1843,9 @@
         }
         const tgM=u.tgt&&!u.tgt.down?u.tgt:null;
         // 2. Heavy Dash: Ziel ausser Hammerreichweite, Sturmschritt hin, 0,4 s unverwundbar.
-        if(tgM&&dist(u,tgM)>SKILLS.slash.reichweite*1.6&&(u.cds.heavydash||0)<=0&&u.sp>=SKILLS.heavydash.sp){
+        if(tgM&&dist(u,tgM)>u.reach*1.3&&(u.cds.heavydash||0)<=0&&u.sp>=SKILLS.heavydash.sp){
           const ax=tgM.x-u.x,ay=tgM.y-u.y,L2=Math.hypot(ax,ay)||1;
-          const w=Math.max(0,Math.min(SKILLS.heavydash.strecke,L2-SKILLS.slash.reichweite*0.6));
+          const w=Math.max(0,Math.min(SKILLS.heavydash.strecke,L2-u.reichNah*0.8));
           u.x=Math.max(34,Math.min(W-34,u.x+ax/L2*w));
           u.y=Math.max(34,Math.min(H-34,u.y+ay/L2*w));
           u.invuln=SKILLS.heavydash.dauer;u.sp-=SKILLS.heavydash.sp;u.cds.heavydash=SKILLS.heavydash.cd;
@@ -1831,7 +1854,7 @@
           continue;
         }
         // 3. Paladin Slash. Mit Ausdauer wird aufgeladen: mehr Schaden, volle Wucht, langsamer.
-        if(tgM&&dist(u,tgM)<=SKILLS.slash.reichweiteSchwer&&(u.cds.slash||0)<=0){
+        if(tgM&&dist(u,tgM)<=u.reach&&(u.cds.slash||0)<=0){
           const schwer=hauSchwer(u,tgM,SKILLS.slash);
           if(schwer)u.sp-=SKILLS.slash.sp;
           const sw=SKILLS.slash.schwer;
@@ -1873,7 +1896,7 @@
         }
         // 3. Slash. Aufgeladen nur, wenn das Ziel sonst nicht zu erreichen ist oder
         //    mehrere dicht stehen — sonst ist der schnelle Schlag mehr wert.
-        if(tgF&&dist(u,tgF)<=SKILLS.fslash.reichweiteSchwer&&(u.cds.fslash||0)<=0){
+        if(tgF&&dist(u,tgF)<=u.reach&&(u.cds.fslash||0)<=0){
           const schwer=hauSchwer(u,tgF,SKILLS.fslash);
           if(schwer)u.sp-=SKILLS.fslash.sp;
           const sw=SKILLS.fslash.schwer;
