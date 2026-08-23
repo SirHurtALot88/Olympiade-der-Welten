@@ -92,7 +92,9 @@ describe("Saisonstand-GuV · die gespeicherte Zeile veraltet nicht mehr", () => 
   it("zieht die eingefrorene Zeile auf den gebuchten Stand", () => {
     const vorher = baueSpielstand({ apronLogs: [{ teamId: "L-K", cashDelta: 2.4, kind: "payout" }] });
     const apronVorher = (vorher.seasonState.standings?.["L-K"]?.guvPosten ?? []).find((e) => e.key === "apron");
-    expect(apronVorher?.counted).toBe(false);
+    // Gezaehlt wird der Apron in beiden Zustaenden (Chris: „DAS MUSS MIT REIN!"). Was die Buchung
+    // aendert, ist die Notiz und der Betrag — aus der Hochrechnung wird der abgerechnete Wert.
+    expect(apronVorher?.counted).toBe(true);
     expect(apronVorher?.note).toContain("noch nicht gebucht");
 
     const { gameState, geaenderteTeams } = zieheSaisonstandGuvNach(vorher);

@@ -3,6 +3,24 @@
   "eintraege": [
     {
       "datum": "2026-08-23",
+      "seite": "Team · Kader",
+      "pr": null,
+      "text": "B-P und V-V streben jetzt einen Spieler mehr an — B-P 11 statt 10, V-V 12 statt 11. Gemeldet war, dass beide im Spiel abfallen, weil sie nicht rotieren können; am Spielstand nachgemessen war es schlimmer als das: beide standen bei acht Spielern, während ein Spieltag elf verlangt. Sie konnten also nicht bloß nicht rotieren, sie konnten nicht einmal vollständig aufstellen. Über die ganze Liga gerechnet hängt der Rang deutlich an der Kadergröße (Korrelation −0,72); die sieben Teams mit acht Spielern belegten die Ränge 19, 23, 27, 28, 29, 31 und 32, B-P davon Rang 27 und V-V Rang 28. Am Geld lag es nicht, beide hatten über 40 Mio Cash. Die Zielgröße steht im Identitätsblatt, laufende Spielstände ziehen also von selbst nach; wirksam wird sie, sobald wieder eingekauft wird. Für die übrigen 30 Teams gilt die bisherige Regel unverändert.",
+      "quelle": "gepflegt",
+      "gewicht": "grundlegend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
+      "seite": "Team · Profil",
+      "pr": null,
+      "text": "Die kleine Ligatabelle unter der RANG-Kachel zeigt jetzt die tatsächlich geholten PPs statt der Kaderstärke. Sie war mit „PPs“ beschriftet, führte darunter aber die Summe der Disziplin-Stärken der besten sechs Spieler — Papierform statt Ertrag. Am Spielstand nachgemessen stand ein Team mit „6.395 PPs“ da, geholt hatte es 112; die echte Zahl stand die ganze Zeit daneben, denn die „112 P“ der Zeile SIND die 112 PPs. Auch die vier Bereichswerte (POW/SPE/MEN/SOC) waren betroffen und lagen um den Faktor fünfzig daneben. Die Anzeige rechnet jetzt nicht mehr selbst, sondern ruft dieselbe Funktion wie die Saisonstand-Tabelle: über alle 32 Teams stimmen beide Ansichten jetzt exakt überein. Die Gesamtzahl steht nur noch einmal in der Zeile: Punkte und PP-Summe sind dieselbe Zahl, und die Aufschlüsselung liefern ohnehin die vier Bereiche darunter. Dafür sind die drei Rechenschritte, die bisher privat im Saisonstand-Baustein lagen, in ein gemeinsames Modul gezogen worden — die Auflösung ist mehrstufig und lässt zum Beispiel Bonuspunkte bewusst aus der Bereichs-Summe heraus, sodass jeder Nachbau die nächste Abweichung erzeugt hätte.",
+      "quelle": "gepflegt",
+      "gewicht": "behebung",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-23",
       "seite": "Spieltag · Saisonstand",
       "pr": null,
       "text": "Im Saisonstand hängen jetzt drei Hovers: über dem Marktwert eines Teams stehen die Spieler dahinter, absteigend sortiert und mit ihrem Anteil; über den Gehältern dieselbe Liste mit Vertragsform und Restlaufzeit; und über dem Teamnamen eine kompakte Kurzübersicht mit Kadergröße, Ø OVR, auslaufenden Verträgen und den drei wertvollsten Spielern. Gezeigt werden höchstens fünf Zeilen, der Rest steht als Summe darunter; Spieler ohne hinterlegten Wert werden getrennt gezählt statt mitgerechnet. Zweitens zeigt die GuV jetzt überall dieselbe Zahl. Der Hover im Team-Profil rechnete bisher eigenständig Cash minus Gehälter plus Sponsoren — das war weder dieselbe Formel wie im Saisonstand noch überhaupt dieselbe Größe: der Saisonstand weist ein Ergebnis aus, der Hover einen Kontostand, und es fehlten Vorstandsziele, Kredite, Apron und Transfers. Beide lesen jetzt dieselbe Rechnung, und der Kontostand steht als eigene Zeile darunter statt als GuV getarnt. Außerdem entstand die GuV bisher erst am Saisonende, weshalb die Spalte in jeder laufenden Saison leer blieb; sie wird jetzt nach jedem Spieltag nachgezogen.",
