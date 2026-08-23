@@ -79758,6 +79758,76 @@ span.nl-facility-ampel-chip {
   font-size: 12.5px;
 }
 
+/* Der Seiten-Zaehler wechselt auf „gut", sobald die Seite voll ist — dieselbe Bereit-Semantik
+   wie der Status-Pill im Hero, damit ein Blick reicht. */
+.arena-prematch-disc-badge.is-full {
+  border-color: var(--nl-good);
+  color: var(--nl-good);
+}
+
+.arena-prematch-athletes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.arena-prematch-athlete {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-bg);
+  padding: 5px 9px;
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+/* Die Nummer ist der ECHTE Slot aus dem Einsatzlisten-Entwurf: Positionen sind verbindlich, eine
+   Luecke davor verschiebt sie nicht — deshalb steht sie am Namen und ist kein Laufindex. */
+.arena-prematch-athlete-slot {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nl-mut);
+}
+
+.arena-prematch-athlete-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arena-prematch-athlete-captain {
+  flex: none;
+  color: var(--nl-accent-text);
+}
+
+.arena-prematch-disc-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* Textknopf statt Knopfflaeche: der grosse Handlungsknopf lebt im Hero, ein zweiter voller Knopf
+   auf derselben Tafel wuerde mit ihm konkurrieren. */
+.arena-prematch-inlinelink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--nl-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 .arena-prematch-ctx {
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-lg);
@@ -79817,20 +79887,60 @@ span.nl-facility-ampel-chip {
   border-left: 3px solid var(--nl-accent);
 }
 
-.arena-prematch-rival-tag {
-  color: var(--nl-risk);
+/* Drei Herkunfts-Etiketten statt Verbuendet/Rivale: sie beantworten „warum steht dieses Team
+   hier" — eigen (Akzent), Mensch (die echten Gegner, gruen wie „bereit"), gemerkt (Warnton als
+   Lesezeichen-Band). Die frueheren zwei kamen aus einer automatisch vergebenen Rivalitaet und
+   halfen bei keiner Entscheidung. */
+.arena-prematch-tagrow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.arena-prematch-own-tag {
+  color: var(--nl-accent-text);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.arena-prematch-ally-tag {
+.arena-prematch-mensch-tag {
   color: var(--nl-good);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.arena-prematch-merk-tag {
+  color: var(--nl-warn);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.arena-prematch-ctx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.arena-prematch-ctx-count {
+  font-size: 12px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.arena-prematch-ctx-hint {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--nl-line);
+  font-size: 12px;
+  color: var(--nl-mut);
 }
 
 .arena-prematch-ghost {
