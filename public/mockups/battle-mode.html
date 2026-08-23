@@ -451,7 +451,11 @@
     "T Mask":            {kopf:"human",haut:"amber",ruest:"leder",waffe:"schwert"},
     "Greenkraut":        {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
     "Rustrow":           {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
-    "Buttercup":         {kopf:"wolf", haut:"fur_brown",ruest:"leder",waffe:"bogen"},
+    // Buttercup traegt keinen Bogen. Der Steckbrief im Spielstand nennt ihn ein Kalb,
+    // das gross wie ein Scheunentor wurde, und sagt ausdruecklich: "Den schweren Panzer
+    // traegt er nicht fuer sich." Also Panzer statt Leder, Hoerner und Schnauze statt
+    // Wolfskopf allein. Die Laterne an seiner Kette fehlt uns noch als Ebene.
+    "Buttercup":         {kopf:"wolf", haut:"fur_brown",ruest:"plate",hoerner:true,ohren:true,waffe:"schwert"},
     "Serris":            {kopf:"human",haut:"olive",ruest:"leder",hoerner:true,waffe:"schwert"},
     "Volcanoth":         {kopf:"lizard",haut:"bright_green",ruest:"plate",schwanz:true,waffe:"schwert"},
     "Ultralisk":         {kopf:"wolf", haut:"fur_grey",ruest:"leder",waffe:"schwert"},
@@ -716,34 +720,37 @@
   }
 
   const SQUAD=[
-    {n:"Baumkopf Holzfaust",c:"Fighter",skills:FIGHTER,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
-    {n:"T Mask",c:"Rogue",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
-    {n:"Greenkraut",c:"Warlord",r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:61.1,spurt:19.9},a:{power:95,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
-    {n:"Rustrow",c:"Tank",r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:38.9},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
-    {n:"Buttercup",c:"Archer",skills:ARCHER,fern:true,r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.3},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:44}},
-    {n:"Serris",c:"Berserker",r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.8},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
-    {n:"Riley Le Rogue",c:"Charger",r:"Unknown",sub:[],tp:[],tn:[],d:{tdm:35.1,spurt:18.2},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
-    {n:"Remiel",c:"Rogue",r:"Divine",sub:["Angel","Warrior"],tp:["Diligent"],tn:["Feisty","Devious"],d:{tdm:25.9,spurt:44.6},a:{power:35,health:65,stamina:7,intelligence:36,awareness:61,determination:44,speed:81,dexterity:78,charisma:15,will:9,spirit:48,torment:67}},
-    {n:"Professor Paranoix",c:"Overseer",r:"Human",sub:["Alchemist","Monk","Servant"],tp:["Diligent","Healthy"],tn:["Feisty","Paranoid","Obsessive"],d:{tdm:14.6,spurt:36.8},a:{power:7,health:23,stamina:22,intelligence:82,awareness:83,determination:65,speed:67,dexterity:48,charisma:36,will:27,spirit:23,torment:47}},
-    {n:"Marzipella",c:"Bard",r:"Human",sub:["Warlock","Trickster"],tp:["Caring","Altruistic"],tn:["Lazy"],d:{tdm:11.5,spurt:12.2},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
-    {n:"Byrnja",c:"Overseer",r:"Construct",sub:["Servant","Apparition"],tp:[],tn:["FaintHearted","Manipulative","ColdBlooded"],d:{tdm:7.6,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:29,awareness:25,determination:11,speed:16,dexterity:18,charisma:21,will:8,spirit:28,torment:15}},
-    {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
+    // Klasse, Rasse, Unterklassen und Eigenschaften stammen eins zu eins aus dem
+    // Spielstand (data/persistence/oly-app.sqlite, Feld className). Vorher standen hier
+    // neun von achtzehn Klassen falsch — von mir gesetzt, nicht nachgesehen. Buttercup
+    // lief als "Archer" mit Bogen durch die Messung und war zweitbester Spieler des
+    // Feldes; in Wahrheit ist er ein Berserker, ein gepanzertes Rind, das keine zehn
+    // Meter weit schiesst. Jede Leistungszahl davor mass zum Teil diese Erfindung.
+    // Die KITS sind weiterhin Platzhalter — es gibt noch keine echten Klassensaetze.
+    // Sie haengen jetzt aber an der WIRKLICHEN Klasse statt an einer ausgedachten.
+    {n:"Baumkopf Holzfaust",c:"Tank",skills:MATRIARCH,r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
+    {n:"T Mask",c:"Sprinter",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.8,spurt:81},a:{power:64,health:55,stamina:72,intelligence:38,awareness:94,determination:79,speed:91,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
+    {n:"Greenkraut",c:"Berserker",r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:60.5,spurt:19.9},a:{power:94,health:83,stamina:66,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:11}},
+    {n:"Rustrow",c:"Tank",r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:39},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
+    {n:"Buttercup",c:"Berserker",skills:FIGHTER,r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.4},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:43}},
+    {n:"Serris",c:"Berserker",r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.9},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
+    {n:"Riley Le Rogue",c:"Rogue",r:"Unknown",sub:[],tp:[],tn:[],d:{tdm:35.1,spurt:18.3},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
+    {n:"Remiel",c:"Rogue",r:"Divine",sub:["Angel","Warrior"],tp:["Diligent"],tn:["Feisty","Devious"],d:{tdm:25.8,spurt:43.3},a:{power:34,health:66,stamina:7,intelligence:36,awareness:60,determination:43,speed:78,dexterity:74,charisma:16,will:9,spirit:49,torment:65}},
+    {n:"Professor Paranoix",c:"Overseer",r:"Human",sub:["Alchemist","Monk","Servant"],tp:["Diligent","Healthy"],tn:["Feisty","Paranoid","Obsessive"],d:{tdm:14.9,spurt:36.7},a:{power:8,health:23,stamina:22,intelligence:81,awareness:82,determination:65,speed:67,dexterity:48,charisma:35,will:27,spirit:23,torment:47}},
+    {n:"Marzipella",c:"Bard",r:"Human",sub:["Warlock","Trickster"],tp:["Caring","Altruistic"],tn:["Lazy"],d:{tdm:11.5,spurt:12.3},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
+    {n:"Byrnja",c:"Tactician",r:"Construct",sub:["Servant","Apparition"],tp:[],tn:["FaintHearted","Manipulative","ColdBlooded"],d:{tdm:7.4,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:28,awareness:24,determination:11,speed:17,dexterity:19,charisma:21,will:8,spirit:27,torment:14}},
+    {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7,spurt:7},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:15,speed:1,dexterity:20,charisma:68,will:19,spirit:19,torment:1}}
   ];
   // DIE ECHTEN BLAZING BEASTS aus dem laufenden Spielstand — Attribute, Klassen,
   // Unterklassen und Eigenschaften eins zu eins. Vorher standen hier von mir gesetzte
   // Spannen; die haben den Gegner staerker gemacht, als er ist, und damit jede Aussage
   // ueber Leistung verzerrt. Team-TDM: 298,3 (Platz 21 von 32) gegen unsere 339,7 (Platz 12).
   const OPP=[
-    {n:"Volcanoth",c:"Charger",r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.8,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
-    {n:"Ultralisk",c:"Berserker",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.5,spurt:42.2},a:{power:72,health:84.5,stamina:93,intelligence:1.7,awareness:1.5,determination:1,speed:89,dexterity:28.2,charisma:1,will:36.1,spirit:14.8,torment:68.5}},
-    {n:"Lhyor",c:"Berserker",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48.3,spurt:80.8},a:{power:72.8,health:64.1,stamina:70.4,intelligence:14.6,awareness:29.8,determination:70.8,speed:68.8,dexterity:97,charisma:67.7,will:46,spirit:4.6,torment:88.2}},
-    {n:"Nocture",c:"Berserker",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73.2,stamina:74,intelligence:1,awareness:54,determination:25.9,speed:80.9,dexterity:32.2,charisma:12.9,will:12,spirit:3.1,torment:94}},
-    // PLATZHALTER-KIT: Der Matriarch-Satz lag ohne Traeger im Entwurf, seit die Aufstellung
-    // auf die echten Blazing Beasts umgestellt wurde. Ein Drittel des Skill-Gerüsts — der
-    // Stuetz-Zweig mit Schild auf einen Verbuendeten — lief dadurch in keinem einzigen Kampf.
-    // Untestet ist nicht dasselbe wie richtig, also bekommt der Stuetzspieler des Gegners ihn.
-    // Das ist eine Zuordnung fuer die Messung, keine Aussage darueber, was ein Hero spaeter kann.
-    {n:"Minion Master",c:"Hero",skills:MATRIARCH,r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
+    {n:"Volcanoth",c:"Charger",skills:FIGHTER,r:"Aqua",sub:["Beast","Behemoth","Prime Evil"],tp:["Healthy","FiredUp"],tn:["ColdBlooded"],row:0,d:{tdm:62.8,spurt:51.7},a:{power:94,health:88,stamina:76,intelligence:38,awareness:10,determination:29,speed:60,dexterity:18,charisma:9,will:69,spirit:22,torment:86}},
+    {n:"Ultralisk",c:"Charger",r:"Animal",sub:["Beast"],tp:["Healthy"],tn:["Lazy","ColdBlooded"],row:0,d:{tdm:44.5,spurt:42.2},a:{power:72,health:84.5,stamina:93,intelligence:1.7,awareness:1.5,determination:1,speed:89,dexterity:28.2,charisma:1,will:36.1,spirit:14.8,torment:68.5}},
+    {n:"Lhyor",c:"Charger",r:"Demon",sub:["Assassin","Isolated","Creature"],tp:["Flexible","Motivated"],tn:["Scandalous","Renegade","Cruel"],row:1,d:{tdm:48.3,spurt:80.8},a:{power:72.8,health:64.1,stamina:70.4,intelligence:14.6,awareness:29.8,determination:70.8,speed:68.8,dexterity:97,charisma:67.7,will:46,spirit:4.6,torment:88.2}},
+    {n:"Nocture",c:"Charger",r:"Demon",sub:["Beast","Apparition","Destroyer"],tp:["FiredUp"],tn:["Scandalous","ColdBlooded"],row:1,d:{tdm:44.2,spurt:48.1},a:{power:78,health:73.2,stamina:74,intelligence:1,awareness:54,determination:25.9,speed:80.9,dexterity:32.2,charisma:12.9,will:12,spirit:3.1,torment:94}},
+    {n:"Minion Master",c:"Hero",r:"Demon",sub:["Pet Master","Behemoth"],tp:["Eloquent","Healthy"],tn:["FaintHearted","Mercenary"],row:2,d:{tdm:55.3,spurt:21.4},a:{power:65.8,health:85.1,stamina:8,intelligence:61.9,awareness:20.9,determination:40.1,speed:10.8,dexterity:6.2,charisma:66.5,will:57,spirit:83.4,torment:52}},
     {n:"Moro",c:"Sprinter",r:"Animal",sub:["Beast","Jungle"],tp:["Motivated","Altruistic"],tn:["Paranoid"],row:2,d:{tdm:43.2,spurt:37.9},a:{power:36.5,health:59.8,stamina:87.7,intelligence:47.8,awareness:42.6,determination:29.1,speed:91.9,dexterity:64.7,charisma:21.7,will:8.7,spirit:75.2,torment:25.9}}
   ];
   const REC={
