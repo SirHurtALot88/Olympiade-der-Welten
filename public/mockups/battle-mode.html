@@ -104,9 +104,21 @@
   .brow i{display:block;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
   .brow i s{display:block;height:100%;background:var(--home);border-radius:2px}
   .brow u{text-decoration:none;font-family:"IBM Plex Mono",monospace;font-size:8.5px;text-align:right;color:var(--muted)}
+  .heilbadge{margin-top:4px!important;color:var(--ok)!important;font-size:8.5px!important;cursor:help;
+    display:block;letter-spacing:.04em}
   .neig{margin-top:4px!important;color:var(--home)!important;font-size:9px!important}
   .unit .rm{float:right;background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
 
+  .tipbox{position:absolute;z-index:50;max-width:320px;background:var(--surface);border:1px solid var(--home);
+    border-radius:8px;padding:11px 13px;box-shadow:var(--shadow);pointer-events:none}
+  .tipbox b{display:block;font-family:"Barlow Condensed",sans-serif;font-size:15px;letter-spacing:.03em;
+    color:var(--home);text-transform:uppercase;margin-bottom:5px}
+  .tipbox p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink)}
+  .persline{display:flex;align-items:center;gap:6px;margin-top:5px;padding:4px 6px;border-radius:5px;
+    background:var(--home-bg);cursor:help}
+  .persline b{font-family:"Barlow Condensed",sans-serif;font-size:13px!important;letter-spacing:.03em;
+    text-transform:uppercase;color:var(--home)!important;display:inline!important}
+  .persline em{font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8.5px;color:var(--faint)}
   .hint{display:flex;gap:8px;padding:8px 11px;border-radius:7px;background:var(--sunk);font-size:12.5px;color:var(--muted);margin-top:10px}
   .hint b{color:var(--ink);font-weight:600}
 
@@ -341,23 +353,23 @@
 (() => {
   "use strict";
   const SQUAD=[
-    {n:"Baumkopf Holzfaust",c:"Tank",r:"Construct",d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
-    {n:"T Mask",c:"Rogue",r:"Human",d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
-    {n:"Greenkraut",c:"Warlord",r:"Construct",d:{tdm:61.1,spurt:19.9},a:{power:95,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
-    {n:"Rustrow",c:"Tank",r:"Construct",d:{tdm:60.2,spurt:38.9},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
-    {n:"Buttercup",c:"Charger",r:"Animal",d:{tdm:57.4,spurt:46.3},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:44}},
-    {n:"Serris",c:"Berserker",r:"Construct",d:{tdm:33.9,spurt:44.8},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
-    {n:"Riley Le Rogue",c:"Charger",r:"Unknown",d:{tdm:35.1,spurt:18.2},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
-    {n:"Remiel",c:"Rogue",r:"Divine",d:{tdm:25.9,spurt:44.6},a:{power:35,health:65,stamina:7,intelligence:36,awareness:61,determination:44,speed:81,dexterity:78,charisma:15,will:9,spirit:48,torment:67}},
-    {n:"Professor Paranoix",c:"Overseer",r:"Human",d:{tdm:14.6,spurt:36.8},a:{power:7,health:23,stamina:22,intelligence:82,awareness:83,determination:65,speed:67,dexterity:48,charisma:36,will:27,spirit:23,torment:47}},
-    {n:"Marzipella",c:"Bard",r:"Human",d:{tdm:11.5,spurt:12.2},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
-    {n:"Byrnja",c:"Overseer",r:"Construct",d:{tdm:7.6,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:29,awareness:25,determination:11,speed:16,dexterity:18,charisma:21,will:8,spirit:28,torment:15}},
-    {n:"Kloeschen",c:"Bard",r:"Alien",d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
+    {n:"Baumkopf Holzfaust",c:"Tank",r:"Construct",sub:["Jungle","Guardian","Knight"],tp:["Eloquent","Motivated","Diligent"],tn:[],d:{tdm:81.0,spurt:43.7},a:{power:77,health:82,stamina:92,intelligence:37,awareness:45,determination:70,speed:22,dexterity:32,charisma:75,will:59,spirit:53,torment:43}},
+    {n:"T Mask",c:"Rogue",r:"Human",sub:["Agent","Ninja","Augmented"],tp:["Cool","Diligent"],tn:["ColdBlooded"],d:{tdm:44.9,spurt:83.5},a:{power:64,health:55,stamina:74,intelligence:38,awareness:94,determination:80,speed:92,dexterity:87,charisma:28,will:43,spirit:21,torment:39}},
+    {n:"Greenkraut",c:"Warlord",r:"Construct",sub:["Behemoth","Pet Master","Druid"],tp:["Healthy","Flexible"],tn:["Timid"],d:{tdm:61.1,spurt:19.9},a:{power:95,health:83,stamina:67,intelligence:22,awareness:39,determination:28,speed:32,dexterity:19,charisma:14,will:21,spirit:46,torment:12}},
+    {n:"Rustrow",c:"Tank",r:"Construct",sub:["Bot","Behemoth","Destroyer"],tp:["Diligent","Healthy"],tn:["Mercenary","ColdBlooded"],d:{tdm:60.2,spurt:38.9},a:{power:94,health:88,stamina:72,intelligence:20,awareness:11,determination:62,speed:16,dexterity:11,charisma:6,will:38,spirit:14,torment:76}},
+    {n:"Buttercup",c:"Charger",r:"Animal",sub:["Guardian","Beast"],tp:["Loyal","Relaxed"],tn:["FaintHearted"],d:{tdm:57.4,spurt:46.3},a:{power:81,health:70,stamina:60,intelligence:21,awareness:8,determination:66,speed:89,dexterity:42,charisma:18,will:16,spirit:71,torment:44}},
+    {n:"Serris",c:"Berserker",r:"Construct",sub:["Apparition","Assassin"],tp:["FiredUp","Ambitious"],tn:["Devious","Renegade","Feisty"],d:{tdm:33.9,spurt:44.8},a:{power:69,health:47,stamina:35,intelligence:21,awareness:70,determination:11,speed:58,dexterity:76,charisma:3,will:26,spirit:39,torment:89}},
+    {n:"Riley Le Rogue",c:"Charger",r:"Unknown",sub:[],tp:[],tn:[],d:{tdm:35.1,spurt:18.2},a:{power:58,health:46,stamina:42,intelligence:11,awareness:15,determination:4,speed:58,dexterity:61,charisma:36,will:1,spirit:68,torment:33}},
+    {n:"Remiel",c:"Rogue",r:"Divine",sub:["Angel","Warrior"],tp:["Diligent"],tn:["Feisty","Devious"],d:{tdm:25.9,spurt:44.6},a:{power:35,health:65,stamina:7,intelligence:36,awareness:61,determination:44,speed:81,dexterity:78,charisma:15,will:9,spirit:48,torment:67}},
+    {n:"Professor Paranoix",c:"Overseer",r:"Human",sub:["Alchemist","Monk","Servant"],tp:["Diligent","Healthy"],tn:["Feisty","Paranoid","Obsessive"],d:{tdm:14.6,spurt:36.8},a:{power:7,health:23,stamina:22,intelligence:82,awareness:83,determination:65,speed:67,dexterity:48,charisma:36,will:27,spirit:23,torment:47}},
+    {n:"Marzipella",c:"Bard",r:"Human",sub:["Warlock","Trickster"],tp:["Caring","Altruistic"],tn:["Lazy"],d:{tdm:11.5,spurt:12.2},a:{power:1,health:1,stamina:2,intelligence:65,awareness:70,determination:41,speed:50,dexterity:60,charisma:69,will:22,spirit:84,torment:1}},
+    {n:"Byrnja",c:"Overseer",r:"Construct",sub:["Servant","Apparition"],tp:[],tn:["FaintHearted","Manipulative","ColdBlooded"],d:{tdm:7.6,spurt:7.1},a:{power:9,health:18,stamina:22,intelligence:29,awareness:25,determination:11,speed:16,dexterity:18,charisma:21,will:8,spirit:28,torment:15}},
+    {n:"Kloeschen",c:"Bard",r:"Alien",sub:["Servant"],tp:["Caring","Loyal"],tn:[],d:{tdm:7.0,spurt:7.0},a:{power:1,health:1,stamina:1,intelligence:19,awareness:6,determination:16,speed:1,dexterity:20,charisma:68,will:20,spirit:20,torment:1}}
   ];
   const OPP=[
-    {n:"Skarn",c:"Warlord",lo:64,hi:79,row:0,ord:"vor"},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke"},
-    {n:"Brambleaux",c:"Tank",lo:52,hi:66,row:0,ord:"vor"},{n:"Nixie",c:"Bard",lo:33,hi:49,row:2,ord:"deck"},
-    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"halten"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke"}
+    {n:"Skarn",c:"Warlord",lo:64,hi:79,row:0,ord:"natur"},{n:"Vexhowl",c:"Charger",lo:55,hi:71,row:0,ord:"flanke"},
+    {n:"Brambleaux",c:"Tank",lo:52,hi:66,row:0,ord:"hinter"},{n:"Nixie",c:"Bard",lo:33,hi:49,row:2,ord:"decken"},
+    {n:"Ordvarr",c:"Overseer",lo:28,hi:44,row:1,ord:"natur"},{n:"Kresh",c:"Berserker",lo:47,hi:63,row:1,ord:"flanke"}
   ];
   const REC={
     power:{ANG:{power:50,torment:25,determination:25},VER:{health:40,power:30,will:30},LP:{health:55,stamina:30,will:15},TMP:{speed:50,dexterity:30,awareness:20},PRZ:{dexterity:40,awareness:35,intelligence:25},AUS:{stamina:50,determination:30,will:20}},
@@ -366,7 +378,21 @@
   const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4}};
   const KEYS=["LP","ANG","VER","TMP","PRZ","AUS"];
   const LONG={LP:"Lebenspunkte",ANG:"Angriff",VER:"Verteidigung",TMP:"Tempo",PRZ:"Präzision",AUS:"Ausdauer"};
-  const ORDERS=[["vor","Vormarsch"],["halten","Formation halten"],["deck","Backrow decken"],["flanke","Flanke"],["begleit","Begleiten"]];
+  // JEDER BEFEHL HAT EINE EXAKT BESCHREIBBARE WIRKUNG. Der Tooltip unten ist ein
+  // Versprechen — was dort steht, tut die Simulation, sonst darf es dort nicht stehen.
+  const ORDERS=[
+    ["natur","Natürlich",
+      "Die Persönlichkeit entscheidet. Der Spieler rückt mit der Linie vor und hält so viel Abstand zu ihr, wie sein Zusammenhalt vorgibt."],
+    ["hinter","Hinter den Eigenen",
+      "Bleibt hinter der vordersten eigenen Einheit und überquert diese Linie nie. Er darf seitlich ausweichen und nachrücken, verfolgt aber keinen Gegner über die Front hinaus."],
+    ["decken","Rücken decken",
+      "Bleibt in der eigenen Hälfte. Greift nur an, wer die eigene Hälfte betritt — und läuft ihm dann entgegen. Ohne Eindringling hält er seine Position."],
+    ["flanke","Flanke",
+      "Läuft an den Spielfeldrand und außen herum in die gegnerische Hälfte. Unterwegs wehrt er sich nur gegen Gegner in unmittelbarer Nähe. Angekommen greift er den stärksten Gegner der hinteren Reihe an."],
+    ["verfolgen","Verfolgen",
+      "Bleibt an seinem Ziel dran, quer über das ganze Feld. Ignoriert die Formation vollständig — er kehrt nicht zur Linie zurück."]
+  ];
+  const ORDTIP=Object.fromEntries(ORDERS.map(([v,l,t])=>[v,{l,t}]));
   // Persoenlichkeit setzt die Grundveranlagung. Der Befehl VERSCHIEBT sie, er ersetzt sie nicht.
   // form  = Formationstreue: wie nah bleibt er der eigenen Linie
   // opp   = Opportunismus:   wie bereitwillig wechselt er das Ziel
@@ -386,6 +412,27 @@
   const HALTUNG=[["defensiv","Defensiv"],["vorsichtig","Vorsichtig"],["ausgewogen","Ausgewogen"],["offensiv","Offensiv"],["wild","Ungestüm"]];
   const ZUSAMMEN=[["eigen","Eigenmächtig"],["locker","Locker"],["ausgewogen","Ausgewogen"],["eng","Eng"],["dicht","Dicht"]];
   const BINDUNG=[["opportun","Opportunistisch"],["flexibel","Flexibel"],["ausgewogen","Ausgewogen"],["treu","Zielstrebig"],["unbeirrt","Unbeirrt"]];
+  // ZIELPRIORITAET — uebersteuert die Neigung der Persoenlichkeit.
+  const ZIELE=[
+    ["natur","Natürlich",""],
+    ["bedrohung","Größte Bedrohung","Greift den Gegner mit dem höchsten Angriffswert an, egal wie weit er entfernt ist."],
+    ["schwach","Angeschlagensten","Greift den Gegner mit den wenigsten verbleibenden Lebenspunkten an — Fokusfeuer, um ihn schnell auszuschalten."],
+    ["naechster","Nächsten","Greift immer den nächststehenden Gegner an. Läuft niemandem hinterher."],
+    ["hinten","Hintere Reihe","Sucht sich ein Ziel in der hintersten gegnerischen Reihe, sofern eines erreichbar ist."],
+    ["heiler","Heiler zuerst","Greift bevorzugt gegnerische Heiler an. Steht keiner im Feld, gilt wieder die natürliche Neigung."]
+  ];
+  const ZIELTIP=Object.fromEntries(ZIELE.map(([v,l,t])=>[v,{l,t}]));
+  // Wer heilt: die Unterklasse entscheidet. Alle vier gibt es im Spielstand bereits
+  // (Cleric 68, Healer 59, Shaman 93, Druid 101).
+  const HEILER=new Set(["Cleric","Healer","Shaman","Druid"]);
+  const istHeiler=(p)=>(p.sub||[]).some(x=>HEILER.has(x));
+
+  const SKTIP={
+    h:"Haltung steuert, wann jemand abbricht. Defensiv löst sich schon bei knapp der Hälfte seiner Lebenspunkte aus dem Kampf und fällt zurück; ungestüm kämpft bis zum Ende weiter und zieht sich nie zurück.",
+    z:"Zusammenhalt bestimmt, wie weit sich jemand von der eigenen Linie entfernen darf. Dicht bleibt eng bei den Kameraden und kehrt zurück; eigenmächtig läuft dem Ziel hinterher, auch quer über das Feld.",
+    ziel:"Wen dieser Spieler bevorzugt angreift. Natürlich heißt: seine Persönlichkeit entscheidet — ein Duellant sucht den Stärksten, ein Opportunist den Schwächsten, ein Bollwerk den Nächsten.",
+    b:"Bindung bestimmt, wie oft neu gezielt wird. Opportunistisch prüft alle 0,35 Sekunden und wechselt auf das lohnendste Ziel; unbeirrt bleibt bis zu 2,8 Sekunden am einmal gewählten Gegner und ignoriert Angreifer im Rücken."
+  };
   const SK=(arr,v)=>Math.max(0,arr.findIndex(x=>x[0]===v))/(arr.length-1);
   // Jede Persoenlichkeit hat ihre eigene Grundstellung auf den drei Skalen.
   const PERSDEF={
@@ -432,15 +479,69 @@
   const dmgOf=(atk,vr)=>Math.max(2,Math.round(atk*0.5*(100/(100+vr))));
 
   let disc="tdm",sel=null;
-  const place={},order={};
-  const persOf={"Baumkopf Holzfaust":"bollwerk","Rustrow":"bollwerk","Greenkraut":"draufgaenger",
-    "Buttercup":"beschuetzer","Serris":"draufgaenger","T Mask":"schleicher","Remiel":"schleicher",
-    "Riley Le Rogue":"duellant","Professor Paranoix":"opportunist","Marzipella":"opportunist",
-    "Byrnja":"duellant","Kloeschen":"duellant"};
-  [["Baumkopf Holzfaust",0,"vor"],["Rustrow",0,"halten"],["Greenkraut",0,"vor"],
-   ["Buttercup",2,"deck"],["Serris",1,"flanke"],["T Mask",1,"begleit"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
-  [["Remiel",1,"vor"],["Riley Le Rogue",0,"vor"],["Professor Paranoix",2,"deck"],["Marzipella",1,"halten"]]
+  const place={},order={},zielOf={};
+  // DIE PERSOENLICHKEIT WIRD NICHT GEWAEHLT — SIE ENTSTEHT.
+  // Aus Klasse, Rasse, Unterklassen und Traits. Alles Daten, die es im Spiel schon gibt.
+  // Jede Quelle vergibt Punkte; wer die meisten hat, gewinnt. Damit ist die Herleitung
+  // nachvollziehbar und laesst sich im Tooltip auch begruenden.
+  const PW={
+    klasse:{Tank:{bollwerk:3},Templar:{bollwerk:3},Berserker:{draufgaenger:3},Charger:{draufgaenger:2},
+      Rogue:{schleicher:3},Sprinter:{schleicher:2},Bard:{opportunist:2},Overseer:{opportunist:2},
+      Mage:{opportunist:2},Tactician:{opportunist:2},Warlord:{duellant:2},Hero:{duellant:2},Badass:{duellant:2},Kosten:{duellant:1}},
+    rasse:{Construct:{bollwerk:1},Animal:{draufgaenger:1},Divine:{beschuetzer:1},Demon:{draufgaenger:1},
+      Elf:{schleicher:1},Orc:{draufgaenger:1},Human:{duellant:1},Alien:{opportunist:1}},
+    sub:{Guardian:{beschuetzer:3},Knight:{bollwerk:2},Behemoth:{bollwerk:2},Assassin:{draufgaenger:2},
+      Ninja:{schleicher:3},Agent:{schleicher:2},Trickster:{opportunist:2},Servant:{beschuetzer:1},
+      Warrior:{duellant:2},Destroyer:{draufgaenger:2},Monk:{bollwerk:1},Beast:{draufgaenger:1},
+      Angel:{beschuetzer:2},Alchemist:{opportunist:1},Warlock:{opportunist:1},Bot:{bollwerk:1},
+      Apparition:{schleicher:1},Augmented:{duellant:1},Jungle:{bollwerk:1},Druid:{beschuetzer:1},
+      "Pet Master":{opportunist:1}},
+    plus:{Loyal:{beschuetzer:2},Diligent:{bollwerk:1},FiredUp:{draufgaenger:2},Ambitious:{duellant:1},
+      Caring:{beschuetzer:2},Altruistic:{beschuetzer:2},Cool:{schleicher:1},Motivated:{duellant:1},
+      Relaxed:{opportunist:1},Flexible:{opportunist:2},Healthy:{bollwerk:1},Eloquent:{beschuetzer:1}},
+    minus:{FaintHearted:{schleicher:2},Renegade:{draufgaenger:2},Feisty:{draufgaenger:1},Paranoid:{opportunist:2},
+      Devious:{opportunist:1},ColdBlooded:{duellant:1},Lazy:{opportunist:1},Timid:{schleicher:2},
+      Obsessive:{duellant:1},Manipulative:{opportunist:1},Mercenary:{opportunist:1}}
+  };
+  function leitePers(p){
+    const sc={},warum=[];
+    const add=(tab,key,label)=>{const w=tab[key];if(!w)return;
+      for(const[k,v]of Object.entries(w))sc[k]=(sc[k]||0)+v;warum.push(label);};
+    add(PW.klasse,p.c,p.c);
+    add(PW.rasse,p.r,p.r);
+    (p.sub||[]).forEach(x=>add(PW.sub,x,x));
+    (p.tp||[]).forEach(x=>add(PW.plus,x,x));
+    (p.tn||[]).forEach(x=>add(PW.minus,x,x));
+    let best="duellant",bv=-1;
+    for(const[k,v]of Object.entries(sc))if(v>bv){bv=v;best=k;}
+    return{key:best,warum};
+  }
+  const persOf={},persWarum={};
+  SQUAD.forEach(p=>{const r=leitePers(p);persOf[p.n]=r.key;persWarum[p.n]=r.warum;});  [["Baumkopf Holzfaust",0,"natur"],["Rustrow",0,"hinter"],["Greenkraut",0,"verfolgen"],
+   ["Buttercup",2,"decken"],["Serris",1,"natur"],["T Mask",1,"flanke"]].forEach(([n,r,o])=>{place[n]={d:"tdm",row:r};order[n]=o;});
+  [["Remiel",1,"natur"],["Riley Le Rogue",0,"natur"],["Professor Paranoix",2,"decken"],["Marzipella",1,"hinter"]]
     .forEach(([n,r,o])=>{place[n]={d:"spurt",row:r};order[n]=o;});
+
+  // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
+  // Simulation — sonst darf es hier nicht stehen.
+  const tipBox=document.createElement("div");tipBox.className="tipbox";tipBox.hidden=true;
+  document.body.appendChild(tipBox);
+  function tipOn(node,titel,text){
+    const show=(ev)=>{
+      tipBox.textContent="";
+      const h=document.createElement("b");h.textContent=titel;tipBox.appendChild(h);
+      const pgf=document.createElement("p");pgf.textContent=text;tipBox.appendChild(pgf);
+      tipBox.hidden=false;
+      const r=node.getBoundingClientRect();
+      const top=r.top+window.scrollY-8;
+      tipBox.style.left=Math.min(window.innerWidth-330,r.left+window.scrollX)+"px";
+      tipBox.style.top=Math.max(8,top-tipBox.offsetHeight)+"px";
+    };
+    node.addEventListener("mouseenter",show);
+    node.addEventListener("focus",show);
+    node.addEventListener("mouseleave",()=>{tipBox.hidden=true;});
+    node.addEventListener("blur",()=>{tipBox.hidden=true;});
+  }
 
   const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;};
   const inDisc=(d)=>SQUAD.filter(p=>place[p.n]&&place[p.n].d===d);
@@ -482,20 +583,44 @@
         u.appendChild(rm);
         u.appendChild(el("b",null,p.n));
         u.appendChild(el("span",null,"LP "+s.LP+" · ANG "+s.ANG+" · VER "+s.VER+" · TMP "+s.TMP));
+        if(istHeiler(p)){
+          const hb=el("span","heilbadge","HEILER · "+Math.round(s.ANG*0.42)+" Heilung statt Schaden");
+          hb.tabIndex=0;
+          tipOn(hb,"Heiler",
+            "Diese Unterklasse heilt statt Schaden zu machen: "+(p.sub||[]).filter(x=>HEILER.has(x)).join(", ")+
+            ". Der Angriffswert wird zur Heilkraft und geht an den am stärksten verwundeten Kameraden in Reichweite. Kein neuer Wert — dieselbe Zahl, andere Wirkung.");
+          u.appendChild(hb);
+        }
         u.appendChild(el("span",null,"Schaden je Treffer "+dmgOf(s.ANG,60)+" · Präzision "+s.PRZ));
 
-        const pe=el("select");pe.setAttribute("aria-label","Persönlichkeit von "+p.n);
-        Object.entries(PERS).forEach(([v,d])=>{const o=el("option",null,d.l);o.value=v;
-          if((persOf[p.n]||"duellant")===v)o.selected=true;pe.appendChild(o);});
-        pe.addEventListener("click",e=>e.stopPropagation());
-        pe.addEventListener("change",()=>{persOf[p.n]=pe.value;renderBoard();});
-        u.appendChild(pe);
+        // Persoenlichkeit: ABGELEITET, nicht gewaehlt. Der Tooltip zeigt, woraus.
+        const pk=persOf[p.n]||"duellant";
+        const pl=el("div","persline");
+        pl.appendChild(el("b",null,PERS[pk].l));
+        pl.appendChild(el("em",null,"abgeleitet"));
+        pl.tabIndex=0;
+        tipOn(pl,PERS[pk].l+" — Persönlichkeit",
+          "Entsteht aus "+p.c+" · "+p.r+(p.sub&&p.sub.length?" · "+p.sub.join(", "):"")+
+          ((p.tp&&p.tp.length)||(p.tn&&p.tn.length)?" · "+[...(p.tp||[]),...(p.tn||[])].join(", "):"")+
+          ". Sie setzt die Grundstellung der drei Skalen darunter — überall dort, wo natürlich eingestellt ist.");
+        u.appendChild(pl);
 
         const se=el("select");se.setAttribute("aria-label","Befehl für "+p.n);
         ORDERS.forEach(([v,l])=>{const o=el("option",null,l);o.value=v;if(order[p.n]===v)o.selected=true;se.appendChild(o);});
         se.addEventListener("click",e=>e.stopPropagation());
         se.addEventListener("change",()=>{order[p.n]=se.value;renderBoard();});
+        const cur=ORDTIP[order[p.n]||"natur"];
+        tipOn(se,cur.l,cur.t);
         u.appendChild(se);
+
+        const ze=el("select");ze.setAttribute("aria-label","Zielpriorität für "+p.n);
+        ZIELE.forEach(([v,l])=>{const o=el("option",null,"Ziel: "+l);o.value=v;
+          if((zielOf[p.n]||"natur")===v)o.selected=true;ze.appendChild(o);});
+        ze.addEventListener("click",e=>e.stopPropagation());
+        ze.addEventListener("change",()=>{zielOf[p.n]=ze.value;renderBoard();});
+        const zc=ZIELTIP[zielOf[p.n]||"natur"];
+        tipOn(ze,"Zielpriorität: "+zc.l,zc.t||SKTIP.ziel);
+        u.appendChild(ze);
 
         // Drei Skalen, jeweils mit „natürlich" als Vorgabe: dann entscheidet die
         // Persoenlichkeit. Man stellt nur ein, was einen wirklich stoert.
@@ -506,6 +631,7 @@
             const row=el("div","srow");row.title=lbl;
             row.appendChild(el("b",null,lbl));
             const se=el("select");se.setAttribute("aria-label",lbl+" von "+p.n);
+            tipOn(se,lbl,SKTIP[key]);
             const nat=el("option",null,"natürlich");nat.value="natur";
             if(!(takt[p.n]&&takt[p.n][key]&&takt[p.n][key]!=="natur"))nat.selected=true;
             se.appendChild(nat);
@@ -525,7 +651,7 @@
       z.addEventListener("click",()=>{
         if(!sel)return;
         if(inDisc(disc).length>=DISCS[disc].size&&(!place[sel]||place[sel].d!==disc))return;
-        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="halten";
+        place[sel]={d:disc,row:ri};if(!order[sel])order[sel]="natur";
         sel=null;renderAll();
       });
       pit.appendChild(z);
@@ -598,7 +724,7 @@
       byRow[row].forEach((p,i)=>{
         const s=stats(p,"tdm"),h=homeFor(0,row,i,byRow[row].length);
         const bh=behav(p.n);
-        U.push({id:id++,n:p.n,side:0,row,ord:order[p.n]||"halten",...s,...bh,
+        U.push({id:id++,n:p.n,side:0,row,ord:order[p.n]||"natur",zielP:zielOf[p.n]||"natur",heiler:istHeiler(p),...s,...bh,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dx:0,dy:0,reev:0,retreat:0,lastHit:null});
       });
@@ -612,9 +738,9 @@
           TMP:Math.round(Math.min(99,s0.TMP*f*1.25)),PRZ:Math.round(s0.PRZ*f),AUS:Math.round(s0.AUS*f)};
         const h=homeFor(1,row,i,oByRow[row].length);
         const pk=["bollwerk","draufgaenger","duellant","schleicher","beschuetzer","opportunist"][i%6];
-        const bp=PERS[pk],bm=ORDMOD[o.ord];
-        U.push({id:id++,n:o.n,side:1,row,ord:o.ord,...s,
-          form:clamp(bp.form+bm.form),opp:clamp(bp.opp+bm.opp),selb:clamp(bp.selb+bm.selb),ziel:bp.ziel,
+        const bp=PERS[pk],pd=PERSDEF[pk];
+        U.push({id:id++,n:o.n,side:1,row,ord:o.ord,zielP:"natur",heiler:o.heiler===true,...s,
+          form:Math.round(SK(ZUSAMMEN,pd.z)*100),opp:Math.round((1-SK(BINDUNG,pd.b))*100),selb:Math.round((1-SK(HALTUNG,pd.h))*100),ziel:bp.ziel,
           hp:s.LP*6,max:s.LP*6,x:h.x,y:h.y,hx:h.x,hy:h.y,cd:0,down:false,lunge:0,tgt:null,
           dodge:0,dy:0,dx:0,reev:0,retreat:0,lastHit:null});
       });
@@ -636,7 +762,7 @@
     // Ein Angreifer im Ruecken schlaegt jede Absicht — je opportunistischer, desto eher.
     if(u.lastHit&&!u.lastHit.down&&dist(u,u.lastHit)<130&&u.opp>=45)return u.lastHit;
 
-    if(u.ord==="deck"){
+    if(u.ord==="decken"){
       const intr=foes.filter(own);
       return intr.length?nearest(intr):null;
     }
@@ -649,6 +775,14 @@
       }
       const back=foes.filter(f=>f.row===2);
       return (back.length?back:foes).reduce((b,x)=>x.ANG>b.ANG?x:b);
+    }
+    // Uebersteuerte Zielpriorität geht der Persoenlichkeit vor.
+    if(u.zielP&&u.zielP!=="natur"){
+      if(u.zielP==="bedrohung")return foes.reduce((b,x)=>x.ANG>b.ANG?x:b);
+      if(u.zielP==="schwach")return foes.reduce((b,x)=>x.hp<b.hp?x:b);
+      if(u.zielP==="naechster")return nearest(foes);
+      if(u.zielP==="hinten"){const bk=foes.filter(f=>f.row===2);if(bk.length)return nearest(bk);}
+      if(u.zielP==="heiler"){const hl=foes.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
     }
     // Grundneigung aus der Persoenlichkeit
     if(u.ziel==="gefaehrlichster")return foes.reduce((b,x)=>x.ANG>b.ANG?x:b);
@@ -700,9 +834,27 @@
       }
 
       // FORMATIONSTREUE: je hoeher, desto naeher bleibt er der eigenen Linie.
+      // "Verfolgen" hebt sie ausdruecklich auf — so steht es auch im Tooltip.
       const front=teamFront(u.side);
-      const leine=40+(100-u.form)*3.4;
-      if(u.retreat<=0&&Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+      if(u.ord!=="verfolgen"&&u.retreat<=0){
+        const leine=40+(100-u.form)*3.4;
+        if(Math.abs(gx-front)>leine){ gx=front+Math.sign(gx-front)*leine; }
+      }
+
+      // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
+      // Seitlich ausweichen bleibt erlaubt — genau das, was der Tooltip verspricht.
+      if(u.ord==="hinter"&&u.retreat<=0){
+        const vorderste=live(u.side).reduce((b,x)=>((u.side===0?x.x>b.x:x.x<b.x)?x:b),u);
+        if(vorderste!==u){
+          if(u.side===0)gx=Math.min(gx,vorderste.x-26);
+          else gx=Math.max(gx,vorderste.x+26);
+        }
+      }
+
+      // "RUECKEN DECKEN": bleibt in der eigenen Haelfte, auch beim Verfolgen eines Eindringlings.
+      if(u.ord==="decken"&&u.retreat<=0){
+        if(u.side===0)gx=Math.min(gx,MID-30); else gx=Math.max(gx,MID+30);
+      }
 
       const dx=gx-u.x,dy=gy-u.y,L=Math.hypot(dx,dy)||1;
       const inRange=tg&&!tg.down&&dist(u,tg)<=RANGE;
@@ -714,6 +866,21 @@
         u.y=Math.max(34,Math.min(H-34,u.y));u.x=Math.max(34,Math.min(W-34,u.x));
       }
       u.cd-=dt;
+      // HEILER: Wer Cleric, Healer, Shaman oder Druid als Unterklasse hat, richtet keinen
+      // Schaden an — sein Angriffswert wird zur Heilkraft am am staerksten verwundeten
+      // Kameraden in Reichweite. Ein bestehender Wert, andere Wirkung.
+      if(u.heiler&&u.retreat<=0&&u.cd<=0){
+        const verwundet=live(u.side).filter(a=>a!==u&&a.hp<a.max&&dist(u,a)<190);
+        if(verwundet.length){
+          const ziel=verwundet.reduce((b,x)=>(x.hp/x.max<b.hp/b.max?x:b));
+          u.cd=1/((0.5+u.TMP/120)*fat);u.lunge=0.16;u.tgt=null;
+          const heal=Math.round(u.ANG*0.42);
+          ziel.hp=Math.min(ziel.max,ziel.hp+heal);
+          floats.push({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,crit:false,heil:true});
+          feed(u.side,u.n+" heilt "+ziel.n+" · "+heal);
+          continue;
+        }
+      }
       if(inRange&&u.cd<=0&&u.retreat<=0){
         u.cd=1/((0.5+u.TMP/120)*fat);
         u.lunge=0.16;
@@ -790,11 +957,16 @@
       ctx.globalAlpha=u.down?.22:.8;
       ctx.fillStyle=css("--muted");ctx.font="400 9.5px 'IBM Plex Mono',monospace";
       ctx.fillText(u.n.length>14?u.n.slice(0,13)+"…":u.n,x,y+40);
+      // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
+      // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
+      ctx.font="400 8.5px 'IBM Plex Mono',monospace";
+      ctx.fillStyle=u.heiler?css("--ok"):css("--faint");
+      ctx.fillText(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),x,y+51);
       ctx.globalAlpha=1;
     }
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
-      ctx.fillStyle=f.crit?css("--crit"):css("--ink");
+      ctx.fillStyle=f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.font=(f.crit?"700 19px":"600 14px")+" 'Barlow Condensed',sans-serif";
       ctx.textAlign="center";ctx.fillText(f.txt,f.x,f.y);ctx.globalAlpha=1;
     }
