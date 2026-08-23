@@ -4021,8 +4021,19 @@
   // statt ihn zu toeten.
   // ===================================================================================
   const SPURT_REZEPT={
-    ANTRITT:    {speed:55,determination:25,power:20},
-    ENDTEMPO:   {speed:53,will:27,stamina:20},
+    // NACHGEZOGEN AN DIE SPURT-MATRIX. Chris' Grundsatz: "immer ueber die Diszi-
+    // Gewichtungen gehen, um zu schauen, was die Leute antreibt."
+    //
+    // Gemessen (spurtEinfluss): Speed trug 47,6 % dazu bei, ob jemand Plaetze gutmacht —
+    // die Matrix bepreist ihn mit 18. Der Grund lag hier: Antritt und Endtempo hingen zu
+    // 55 und 53 an Speed und multiplizieren direkt die Grundgeschwindigkeit, waehrend
+    // alles andere nur moduliert. Wer Speed hatte, gewann; wer Zaehigkeit hatte, nicht.
+    //
+    // Jetzt traegt Speed in beiden Werten noch die Hauptlast — es bleibt ein Rennen —,
+    // aber Wille, Ausdauer und Entschlossenheit tragen mit. Das sind genau die
+    // Attribute, die die Matrix mit 14, 4 und 15 fuehrt.
+    ANTRITT:    {speed:40,determination:32,power:28},
+    ENDTEMPO:   {speed:38,will:37,stamina:25},
     TECHNIK:    {dexterity:55,awareness:35,determination:10},
     // NEU: Wendigkeit. Bisher konnte niemand die Bahn wechseln — jeder lief seine Spur
     // von vorn bis hinten durch, und Windschatten war damit unmoeglich. Wer wendig ist,
@@ -4075,8 +4086,15 @@
     return o;
   }
 
-  const BAHNEN=8, HUERDEN=[0.22,0.40,0.58,0.76];
+  // SIEBEN HUERDEN STATT VIER. Mit vieren war das Rennen zu elf Sekunden fast reine
+  // Gerade, und die Hindernisse konnten Speed nicht die Waage halten — genau der Punkt,
+  // den Chris gemacht hat: "es gibt ja Hindernisse, das heisst, wenn Lulu mehr Speed auf
+  // den Geraden hat, muesste Gram die Hindernisse besser wegraeumen." Dafuer muessen sie
+  // oft genug kommen, um ins Gewicht zu fallen.
+  const BAHNEN=8, HUERDEN=[0.14,0.26,0.38,0.50,0.62,0.74,0.86];
   let LAEUFER=[], rennFertig=[], rennT=0;
+
+  const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
     seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
@@ -4208,7 +4226,7 @@
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
       const ueber=Math.max(0.4,(u.pos>=u.ab?1.0:u.tempo));
       let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
-      if(u.kraft>0)zehr*=1.5;              // gerade getackelt oder selbst gerempelt
+      if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
@@ -4218,16 +4236,37 @@
       }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
+      // HUERDEN — ZWEI WEGE HINDURCH.
+      //
+      // Chris: "wenn Lulu mehr Speed auf den Geraden hat, muesste Gram die Hindernisse
+      // besser wegraeumen und oefter tackeln und kaeme damit besser voran."
+      //
+      // Genau das fehlte. Vorher gab es nur den technischen Weg: wer Dexterity und
+      // Awareness hat, nimmt die Huerde im Lauf, alle anderen stolpern. Damit belohnte das
+      // Hindernis ausgerechnet das, was die Spurt-Matrix am zweitschwaechsten bepreist —
+      // und Wucht, die sie mit 14 fuehrt, half gar nicht.
+      //
+      // Jetzt: erst TECHNIK (drueberspringen, kostet nichts). Misslingt sie, entscheidet
+      // WUCHT — durchbrechen. Das kostet Kraft und einen Wimpernschlag, aber keinen Sturz.
+      // Erst wenn beides misslingt, liegt er. Ein Bulle wie Gram raeumt die Huerde weg,
+      // wo ein Leichtgewicht sie reissen wuerde.
       for(const h of HUERDEN){
         if(vor<h&&u.pos>=h){
-          const glueck=rr();
-          const chance=Math.min(0.97,0.35+u.TECHNIK*0.0065);
-          if(glueck>chance){
-            u.stolper=0.45+ (1-u.TECHNIK/100)*0.5;
-            u.gestolpert++;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
-            feed(u.seite,u.n+" reißt die Hürde.");
+          const technik=Math.min(0.97,0.35+u.TECHNIK*0.0065);
+          if(rr()<=technik)continue;                       // sauber drueber
+          const wucht=Math.min(0.92,0.10+u.WUCHT*0.0090);
+          if(rr()<=wucht){                                 // durchgebrochen
+            u.reserve=Math.max(0,u.reserve-14);
+            u.stolper=0.12;
+            u.durchbruch=(u.durchbruch||0)+1;
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
+            feed(u.seite,u.n+" nimmt die Hürde mit Gewalt.");
+            continue;
           }
+          u.stolper=0.45+ (1-u.TECHNIK/100)*0.5;
+          u.gestolpert++;
+          schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
+          feed(u.seite,u.n+" reißt die Hürde.");
         }
       }
 
@@ -4240,10 +4279,15 @@
           && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
         if(opfer.length){
           const o=opfer.sort((a,b)=>b.pos-a.pos)[0];
-          u.tackleCd=2.2; u.kraft=0.5; u.tackles++;
+          // Der Rempler kostet den Remplenden weniger, als er den Getroffenen kostet —
+          // sonst waere Wucht ein Nachteil, und genau das hat die Messung gezeigt:
+          // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
+          // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
+          // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
+          u.tackleCd=1.8; u.kraft=0.26; u.tackles++;
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
-            o.stolper=0.35+stark*0.6; o.getackelt++;
+            o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
             schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
@@ -4836,6 +4880,74 @@
   // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
   // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
   // wie lange er im Windschatten hing, wie oft er einbrach, stolperte und tackelte.
+  // WAS TREIBT DIE LEUTE AN? — die Messung zu Chris' Grundsatz.
+  //
+  // Chris: "immer ueber die Diszi-Gewichtungen gehen, um zu schauen, was die Leute
+  // antreibt." Die Matrix ist die Ansage, die Mechanik hat sie einzuloesen. Ob sie das
+  // tut, laesst sich messen statt behaupten: jedem Laeufer nacheinander EIN Attribut um
+  // 15 Punkte anheben und sehen, um wie viele Plaetze er sich verbessert.
+  //
+  // Das Ergebnis ist ein Einflussvektor ueber die zwoelf Attribute. Steht er quer zur
+  // Disziplinmatrix, belohnt das Rennen etwas anderes, als die Wertung bepreist — genau
+  // der Fehler, der im TDM viermal aufgetreten ist.
+  function spurtEinfluss(n){
+    const ATTR=["power","health","stamina","intelligence","awareness","determination",
+                "speed","dexterity","charisma","will","spirit","torment"];
+    const alt={disc, LAEUFER, rennFertig, rennT, done};
+    disc="spurt";
+
+    // EINEN Laeufer anheben, seine EIGENE Platzierung messen.
+    //
+    // Zwei Anlaeufe vorher waren falsch, beide aus demselben Grund — ich hatte nicht
+    // ueberlegt, WAS die Groesse eigentlich misst:
+    //
+    //   1. Mittlere Platzverbesserung ueber ALLE Laeufer -> immer exakt null. Plaetze
+    //      sind ein Nullsummenspiel; wer einen gutmacht, nimmt ihn einem anderen weg.
+    //   2. Mittlere ZIELZEIT bei Anhebung aller -> misst nur, was schneller macht. Damit
+    //      kann Wucht nie gewinnen: ein Rempler macht nicht MICH schneller, sondern den
+    //      anderen langsamer. Eine relative Waffe an einem absoluten Massstab gemessen.
+    //
+    // Richtig ist: nur EINER bekommt die 15 Punkte, und gezaehlt wird, wie viele Plaetze
+    // ER dadurch gutmacht. Das erfasst schnell machen UND andere aufhalten.
+    const laufSerie=(wer,anhebung)=>{
+      const platz={};
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+i*104729);
+        bauSpurt(1337+i*7919);
+        for(const u of LAEUFER){
+          const q=SPIELER_NACH_NAME[u.n]; if(!q)continue;
+          const a={...q.a};
+          if(anhebung&&u.n===wer)a[anhebung]=Math.min(100,(a[anhebung]||0)+15);
+          const w=spurtWerte(q,a);
+          for(const k of SPURT_KEYS)u[k]=w[k];
+          u.reserveMax=KRAFT_VON(u); u.reserve=u.reserveMax;
+        }
+        let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }
+        [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+          .forEach((u,pl)=>{platz[u.n]=(platz[u.n]||0)+pl+1;});
+      }
+      return platz;
+    };
+
+    bauSpurt(1337);
+    const namen=LAEUFER.map(u=>u.n);
+    const grund=laufSerie(null,null);
+    const raus=[];
+    for(const at of ATTR){
+      let summe=0;
+      for(const wer of namen){
+        const mit=laufSerie(wer,at);
+        summe += (grund[wer]-mit[wer])/n;      // positiv = Plaetze gutgemacht
+      }
+      raus.push({attribut:at, gewinn:+(summe/namen.length).toFixed(3)});
+    }
+    disc=alt.disc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig; rennT=alt.rennT; done=alt.done;
+    zieheFormkarten(20260823);
+    const summe=raus.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+    return raus.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
+               .sort((a,b)=>b.gewinn-a.gewinn);
+  }
+
   function spurtSerie(n){
     const alt={disc, LAEUFER, rennFertig, rennT, done};
     disc="spurt";
@@ -4868,7 +4980,7 @@
       schattenAnteil:Math.round(schattenGesamt/(laeufe*8)*100)};
   }
 
-  window.__arena={ serie, spurtSerie, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, spurtSerie, spurtEinfluss, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
