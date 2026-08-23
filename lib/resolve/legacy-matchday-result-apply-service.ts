@@ -29,7 +29,10 @@ import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToCo
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
-import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
+import {
+  markMatchdayResolveSnapshotAsBooked,
+  resolveMatchdayPreviewToBook,
+} from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
 
 type DbClient = typeof db;
@@ -923,6 +926,29 @@ export class LegacyMatchdayResultApplyService {
         resultAuditLogs: [...(seasonState.resultAuditLogs ?? []), nextAuditLog],
       },
     };
+    /**
+     * DIE GEBUCHTE RECHNUNG WIRD GESTEMPELT — damit die Buehne danach SIE zeigt und nicht neu
+     * rechnet.
+     *
+     * GEMELDET VON CHRIS: Sekunden nach dem Buchen standen in der Arena andere Zahlen und
+     * getauschte Plaetze (Malagor 98,8 → 92,1, S-S 14,9 → 14,2, C-S 14,4 → 14,9). Ursache: ein
+     * durchgebuchter Spieltag machte die Vorberechnung ungueltig, die Arena fiel auf den
+     * Live-Pfad und rechnete gegen den Zustand NACH der Buchung — mit der Nach-Spieltags-Fatigue,
+     * die ein paar Zeilen weiter unten (`applyFatigueAndInjuryAfterMatchday`) genau hier
+     * geschrieben wird.
+     *
+     * Der Stempel steht bewusst VOR dem Fatigue-Apply in derselben Kette: er haengt an dem, was
+     * gebucht WURDE, nicht an dem, was danach gilt. Und er traegt `prepared.preview` — also
+     * dieselbe Rechnung, aus der `nextDisciplineResults` entstanden sind, egal ob sie aus der
+     * Vorberechnung kam oder live gerechnet wurde.
+     */
+    const nextGameStateMitBeleg = markMatchdayResolveSnapshotAsBooked({
+      gameState: nextGameState,
+      scope: { saveId: params.saveId, seasonId: params.seasonId, matchdayId: params.matchdayId },
+      preview: prepared.preview,
+      matchdayResultId,
+      bookedAt: now,
+    });
     const recordMapMs = elapsedSince(recordMapStartedAt);
 
     // Idempotenz unter forceReplace: Existiert bereits ein Ergebnis für diesen Spieltag, so
@@ -932,14 +958,14 @@ export class LegacyMatchdayResultApplyService {
     // ORIGINAL-Save (vor dem Einfügen von `nextMatchdayResult`) ermittelt.
     const isMatchdayReplay = Boolean(existingResult);
     const injuryRollMap = buildMatchdayInjuryRollMap({
-      gameState: nextGameState,
+      gameState: nextGameStateMitBeleg,
       saveId: params.saveId,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       isMatchdayReplay,
     });
     const injuryResult = applyFatigueAndInjuryAfterMatchday({
-          gameState: nextGameState,
+          gameState: nextGameStateMitBeleg,
           saveId: params.saveId,
           seasonId: params.seasonId,
           matchdayId: params.matchdayId,

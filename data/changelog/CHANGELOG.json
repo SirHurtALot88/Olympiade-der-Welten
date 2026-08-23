@@ -30,6 +30,15 @@
     },
     {
       "datum": "2026-08-22",
+      "seite": "Arena · Spieltags-Ergebnis",
+      "pr": null,
+      "text": "Die Zahlen in der Arena aenderten sich, nachdem der Spieltag gebucht war — Punkte, Scores und damit auch die Reihenfolge. Gemeldet mit zwei Screenshots im Abstand von etwa einer Minute: Silver Soldiers standen erst bei 14,9 und danach bei 14,2, Cold Steel umgekehrt bei 14,4 und dann 14,9, die beiden tauschten die Plaetze; bei den Spielern ging Malagor von 98,8 auf 92,1 zurueck. Ursache war kein Rechenfehler, sondern ein Zeitpunkt: ein durchgebuchter Spieltag machte die Vorberechnung ungueltig — mit gutem Grund, denn eine veraltete darf die gebuchte Wahrheit nicht ueberstimmen —, und die Buehne rechnete den Spieltag daraufhin NEU. Nur eben gegen den Zustand NACH der Buchung, und die schreibt die Nach-Spieltags-Ermuedung: derselbe Spieltag kommt damit zwangslaeufig anders heraus. Jetzt stempelt die Buchung die Rechnung, aus der sie entstanden ist, mit der Ergebnis-ID. Zum Anzeigen ist ab da genau diese die Quelle — auch wenn sich der Spielstand danach weiterdreht. Neu gerechnet wird nach dem Buchen gar nicht mehr. Zum Buchen selbst bleibt eine bereits gebuchte Rechnung gesperrt, damit ein zweiter Durchlauf sie nicht ein weiteres Mal festschreibt, und eine Vorberechnung ohne diesen Stempel wird nach der Buchung weiterhin verworfen.",
+      "quelle": "gepflegt",
+      "gewicht": "spielblockierend",
+      "version": "0.5"
+    },
+    {
+      "datum": "2026-08-22",
       "seite": "Team · Ewige Tabelle",
       "pr": null,
       "text": "Die Ewige Tabelle führt ab jetzt nur noch abgeschlossene Saisons. Die laufende zählt erst mit, wenn sie vorbei ist — vorher stand sie als eigene Zeile darin, und genau daraus entstanden die doppelten Punkte: der Saisonstand-Feed trägt am Anfang einer neuen Saison noch die Zahlen der eben beendeten, die damit zweimal in der Liste stand. Nachgezählt wurde übrigens auch der Verdacht, es werde etwas doppelt gespeichert — das war es nicht: in jedem Spielstand liegt je Saison genau ein Schnappschuss. Der Fehler saß im Zusammenrechnen, nicht im Speichern.",
