@@ -2,6 +2,6 @@
   "datum": "2026-08-12",
   "seite": "Spieltag · Arena",
   "text": "Ein Spieltag liess sich nicht abschliessen, obwohl Punkte zu sehen waren. Gemeldet als „ich haenge in MD4 fest und die spieltagsdaten werden anscheinend nicht berechnet\". Am Spielstand gemessen war nur EINE der beiden Disziplinen gewertet: 32 Ergebniszeilen fuer Wettessen, null fuer Mini-DM. Die sichtbaren Punkte kamen also aus der ersten Haelfte. Der Spieltagswechsel blockte zu Recht — liesse er einen halben Spieltag durch, waere die zweite Disziplin danach nicht mehr nachholbar und alle Spieler, die dort antraten, fehlten fuer diesen Spieltag dauerhaft in den Leistungsdaten, sichtbar als zu niedrige Einsatzzahl in Moral und Gehaltsforderungen. Die Sperre bleibt deshalb, wie sie ist. Neu ist ein Reparaturskript, das die fehlende Seite NACHBUCHT, statt die Sperre zu umgehen — ueber denselben Weg, den die Arena geht, dessen Wiederaufnahme den Fall „erste Disziplin gebucht, zweite offen\" ausdruecklich kennt und nichts doppelt bucht. Am Abbild gefahren: Wertung springt von halb auf vollstaendig, alle 32 Teams bekommen ihre zweite Disziplin, und der Spieltagswechsel ist danach frei. Standard ist der Trockenlauf; geschrieben wird nur auf ausdrueckliche Anweisung, und der Spieltagswechsel selbst bleibt beim Spieler.",
-  "gewicht": "wichtig",
+  "gewicht": "spielblockierend",
   "version": "0.4"
 }

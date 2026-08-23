@@ -340,7 +340,7 @@ import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-p
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
-import { computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
+import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
 import { usePlayerDirectorySlice } from "@/lib/foundation/use-player-directory-slice";
 import { useSeasonRatingsSlice } from "@/lib/foundation/use-season-ratings-slice";
@@ -421,6 +421,9 @@ import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/Founda
 import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
+import type { FoundationMerklisteHostProps } from "@/app/foundation/merkliste-v2/FoundationMerklisteHost";
+import { baueMerklistenAnsicht } from "@/lib/merkliste/merkliste-ansicht";
+import { normalisiereMerklistenBesitzer, vergiss } from "@/lib/merkliste/merkliste-service";
 import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
 import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
@@ -11028,6 +11031,16 @@ export function useFoundationShellRouterBodyScope({
            * davor warnt der Kommentar an `computeTeamBuildingCost`.
            */
           hoverKader: buildSaisonstandHoverKader(gameState, row.teamId),
+          // Die TEILE der Zahlenspalten fuer die Hovers (Chris, 23.08.). Sie stehen im Datensatz
+          // getrennt; gezeigt wurde bisher nur die Summe.
+          sponsorBasis: row.sponsorBasis ?? null,
+          sponsorRank: row.sponsorRank ?? null,
+          sponsorSeason: row.sponsorSeason ?? null,
+          transferBuyCount: row.transferBuyCount ?? null,
+          transferSellCount: row.transferSellCount ?? null,
+          transferBuyTotal: row.transferBuyTotal ?? null,
+          transferSellTotal: row.transferSellTotal ?? null,
+          buildingUpkeep: computeTeamBuildingUpkeepRows(gameState, row.teamId),
           disciplineValues: {
             bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
             tdm: row.disciplineValues.tdm ?? null,
@@ -12382,6 +12395,32 @@ export function useFoundationShellRouterBodyScope({
     onOpenPlayer: openPlayerProfileById,
   };
 
+  /**
+   * MERKLISTE — die Ansicht zum Nachschauen („sich die dann noch mal angucken kann", Chris).
+   *
+   * Das Modell ist eine reine Ableitung; hier haengt nur der Besitzer dran und die zwei
+   * Rueckrufe zum Entfernen. Wie ueberall bei der Merkliste ohne Netzaufruf: der Autosave nimmt
+   * die Aenderung beim naechsten Schreiben mit.
+   */
+  const merklisteAnsichtOwnerId = normalisiereMerklistenBesitzer(activeOwnerId);
+  const merklistenAnsicht = useMemo(
+    () => baueMerklistenAnsicht({ gameState, ownerId: merklisteAnsichtOwnerId }),
+    [gameState, merklisteAnsichtOwnerId],
+  );
+  const foundationMerklisteHostProps: FoundationMerklisteHostProps = {
+    ansicht: merklistenAnsicht,
+    onOpenTeam: openTeamProfileById,
+    onOpenPlayer: (playerId: string) => void openPlayerDrawerById(playerId),
+    onEntfernenTeam: (teamId: string) =>
+      setGameState((current) =>
+        vergiss({ gameState: current, ownerId: merklisteAnsichtOwnerId, art: "team", id: teamId }),
+      ),
+    onEntfernenSpieler: (playerId: string) =>
+      setGameState((current) =>
+        vergiss({ gameState: current, ownerId: merklisteAnsichtOwnerId, art: "spieler", id: playerId }),
+      ),
+  };
+
   const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
     model: allTimeTableModel,
     selectedTeamId: activeManagerTeamId,
@@ -13011,6 +13050,7 @@ export function useFoundationShellRouterBodyScope({
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
     foundationAllTimeTableHostProps,
+    foundationMerklisteHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
     foundationTrainingCompactHostProps,

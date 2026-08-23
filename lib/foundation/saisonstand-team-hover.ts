@@ -167,3 +167,106 @@ export function buildSaisonstandHoverKader(gameState: GameState, teamId: string)
     })
     .filter((eintrag): eintrag is SaisonstandHoverSpieler => eintrag != null);
 }
+
+/* ------------------------------------------------------------------ */
+/* DIE VIER ZAHLEN-HOVERS — Sponsoren, Transfers, Gebäude, Cash.        */
+/*                                                                      */
+/* Chris am 23.08.: „hast du noch vorschläge wo wir noch hovers          */
+/* gebrauchen könnten … ich finde die sind eine sehr charmante lösung"   */
+/* — und auf den Vorschlag: „1-4 auf jeden fall direkt umsetzen".        */
+/*                                                                      */
+/* Alle vier zerlegen eine Zahl, deren TEILE bereits im Spielstand       */
+/* liegen. Keiner rechnet etwas Neues; wo ein Teil fehlt, bleibt die     */
+/* Zeile leer, statt aus dem Rest eine Zahl zu erfinden.                 */
+/* ------------------------------------------------------------------ */
+
+export type SaisonstandPostenZeile = {
+  label: string;
+  wert: number | null;
+  /** `true` = Ergebniszeile (Summe), wird abgesetzt dargestellt. */
+  istSumme?: boolean;
+  /** Zusatz, der die Zeile einordnet — Anzahl, Stufe, Rang. */
+  notiz?: string | null;
+};
+
+/**
+ * SPONSOREN — Basis + Rangbonus + Saisonanteil = Gesamt.
+ *
+ * Die vier Zahlen stehen im Saisonstand-Datensatz längst getrennt (`sponsorBasis`, `sponsorRank`,
+ * `sponsorSeason`, `sponsorTotal`); gezeigt wurde nur die Summe. Der Rangbonus ist die
+ * interessante Zeile — an ihr sieht man, ob ein guter Platz sich ausgezahlt hat.
+ *
+ * KEINE ERSATZRECHNUNG: fehlt ein Teil, bleibt seine Zeile leer. Die Summe aus den vorhandenen
+ * Teilen zu bilden wäre eine andere Zahl als die gespeicherte — und genau solche stillen
+ * Zweitrechnungen sind der Grund, warum die GuV heute repariert werden musste.
+ */
+export function buildSponsorHover(input: {
+  sponsorBasis: number | null | undefined;
+  sponsorRank: number | null | undefined;
+  sponsorSeason: number | null | undefined;
+  sponsorTotal: number | null | undefined;
+}): SaisonstandPostenZeile[] | null {
+  const basis = endlich(input.sponsorBasis);
+  const rang = endlich(input.sponsorRank);
+  const saison = endlich(input.sponsorSeason);
+  const gesamt = endlich(input.sponsorTotal);
+  if (basis == null && rang == null && saison == null && gesamt == null) return null;
+  return [
+    { label: "Basis", wert: basis },
+    { label: "Rangbonus", wert: rang, notiz: "hängt am aktuellen Tabellenplatz" },
+    { label: "Saisonanteil", wert: saison },
+    { label: "Gesamt", wert: gesamt, istSumme: true },
+  ];
+}
+
+/**
+ * TRANSFERS — Verkäufe und Käufe getrennt, je mit Anzahl.
+ *
+ * Der Saisonstand zeigt nur das Netto. Genau daran hing Chris' Meldung `ls9jfg`: „so wären dann ein
+ * paar Teams positiv und ein paar negativ. Hier sind alle 0 oder schlechter weil nur die Käufe drin
+ * sind!" Die getrennten Summen lagen schon damals vor — sie waren nur nirgends zu sehen.
+ */
+export function buildTransferHover(input: {
+  transferSellCount: number | null | undefined;
+  transferSellTotal: number | null | undefined;
+  transferBuyCount: number | null | undefined;
+  transferBuyTotal: number | null | undefined;
+  transferNet: number | null | undefined;
+}): SaisonstandPostenZeile[] | null {
+  const verkaufSumme = endlich(input.transferSellTotal);
+  const kaufSumme = endlich(input.transferBuyTotal);
+  const netto = endlich(input.transferNet);
+  if (verkaufSumme == null && kaufSumme == null && netto == null) return null;
+  const anzahl = (wert: number | null | undefined) => {
+    const zahl = endlich(wert);
+    return zahl == null ? null : `${zahl} ${zahl === 1 ? "Transfer" : "Transfers"}`;
+  };
+  return [
+    { label: "Verkäufe", wert: verkaufSumme, notiz: anzahl(input.transferSellCount) },
+    // Käufe kosten Geld — als negative Zahl, damit die Richtung ohne Nachdenken stimmt.
+    {
+      label: "Käufe",
+      wert: kaufSumme == null ? null : runde(-Math.abs(kaufSumme)),
+      notiz: anzahl(input.transferBuyCount),
+    },
+    { label: "Netto", wert: netto, istSumme: true },
+  ];
+}
+
+/** Eine gebaute Anlage mit ihrem Saison-Unterhalt. */
+export type SaisonstandGebaeudeZeile = { facilityId: string; label: string; level: number; upkeep: number };
+
+/**
+ * GEBÄUDE — welche Anlage kostet wie viel.
+ *
+ * Die Spalte zeigt den Saison-Unterhalt als Summe. Ob 4,2 Mio aus einer teuren Anlage stammen oder
+ * aus sechs kleinen, ist für die Frage „wo kann ich sparen" der ganze Unterschied.
+ *
+ * NUR GEBAUTE ANLAGEN (Stufe > 0) und nur solche mit Unterhalt: eine Liste mit zwanzig Nullzeilen
+ * beantwortet nichts.
+ */
+export function buildGebaeudeHover(zeilen: SaisonstandGebaeudeZeile[]): SaisonstandGebaeudeZeile[] {
+  return [...zeilen]
+    .filter((zeile) => zeile.level > 0 && zeile.upkeep > 0)
+    .sort((links, rechts) => rechts.upkeep - links.upkeep);
+}

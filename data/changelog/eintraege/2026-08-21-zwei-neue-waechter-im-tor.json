@@ -2,6 +2,6 @@
   "datum": "2026-08-21",
   "seite": "Technik",
   "text": "Zwei zusätzliche Prüfungen laufen ab jetzt mit, bevor eine Änderung ins Spiel darf. Die erste fährt alle Tests, die eine Ansicht wirklich aufbauen — 21 Dateien in 15 Sekunden. Das kann etwas, was die bisherigen Wächter prinzipbedingt nie konnten: bemerken, dass eine Ansicht beim Anzeigen abstürzt, statt nur zu prüfen, ob der richtige Text in der Datei steht. Genau so ein Absturz war im August ins Spiel gerutscht. Die zweite bündelt alle Tests rund um das Speichern und Laden von Spielständen zu einem eigenen, anhakbaren Prüflauf — 174 Dateien, gut elf Minuten, und damit die Sorte Fehler, die im schlimmsten Fall einen Spielstand kostet. Beide Prüflisten wachsen von selbst mit: wer künftig einen neuen Test schreibt, muss ihn nirgends eintragen, er wird beim nächsten Lauf erkannt.",
-  "gewicht": "klein",
+  "gewicht": "feinschliff",
   "version": "0.5"
 }

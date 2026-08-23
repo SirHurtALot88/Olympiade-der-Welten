@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-23",
+  "seite": "Was ist neu",
+  "text": "Der Reiter „Was ist neu“ sortiert wieder richtig. 47 Einträge standen am Ende unter „Ohne Einstufung“, obwohl in der Quelle eine Einstufung stand — sie trug nur ein Wort, das das Spiel gar nicht kennt (etwa „normal“ oder „klein“ statt „Behoben“ oder „Feinschliff“). Unbekannte Wörter wurden stillschweigend verworfen, deshalb fiel es nie auf. Alle 47 sind jetzt einsortiert, und ein neuer Prüflauf lässt ein erfundenes Wort nicht mehr durch.",
+  "gewicht": "behebung",
+  "version": "0.5"
+}

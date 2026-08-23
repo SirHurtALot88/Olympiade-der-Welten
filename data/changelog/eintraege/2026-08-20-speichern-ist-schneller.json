@@ -2,6 +2,6 @@
   "datum": "2026-08-20",
   "seite": "Intern · Spielstand",
   "text": "Speichern ist gut ein Drittel schneller. Bei jedem Speichern prüfte eine Wache sämtliche Spieler-Ausgangswerte darauf, ob jemand sie überschreiben will — knapp 3000 Datensätze, jedes Mal neu normalisiert und mit neuer Prüfsumme versehen. Das kostete rund 420 der 1140 Millisekunden, und gefunden hat es im Normalfall nichts: diese Werte sind der Stand bei Spielbeginn und ändern sich praktisch nie. Die Wache läuft jetzt nur noch, wenn sich an den Prüfsummen wirklich etwas geändert hat; ein Speichern fällt damit von 1138 auf 726 Millisekunden. Vor dem Umbau nachgewiesen: über alle Abbilder liefert der abgekürzte Weg denselben Spielstand wie der volle.",
-  "gewicht": null,
+  "gewicht": "feinschliff",
   "version": "0.5"
 }

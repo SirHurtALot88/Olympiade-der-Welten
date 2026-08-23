@@ -32,7 +32,10 @@ type SeasonV2TeamSummary = {
   marketValueTotal: number | null;
 };
 
-import type { SaisonstandHoverSpieler } from "@/lib/foundation/saisonstand-team-hover";
+import type {
+  SaisonstandGebaeudeZeile,
+  SaisonstandHoverSpieler,
+} from "@/lib/foundation/saisonstand-team-hover";
 
 export type SeasonV2StandingsRow = {
   teamId: string;
@@ -93,6 +96,20 @@ export type SeasonV2StandingsRow = {
    * und der Aufbau kostet EINMAL beim Zeilenbau statt bei jeder Mausbewegung.
    */
   hoverKader?: SaisonstandHoverSpieler[] | null;
+  /**
+   * Die TEILE der vier Zahlenspalten — Grundlage der Hovers auf Sponsoren, Transfers und Gebäude
+   * (Chris, 23.08.: „1-4 auf jeden fall direkt umsetzen"). Sie liegen im Saisonstand-Datensatz
+   * längst getrennt vor; gezeigt wurde bisher nur die jeweilige Summe.
+   */
+  sponsorBasis?: number | null;
+  sponsorRank?: number | null;
+  sponsorSeason?: number | null;
+  transferBuyCount?: number | null;
+  transferSellCount?: number | null;
+  transferBuyTotal?: number | null;
+  transferSellTotal?: number | null;
+  /** Gebaute Anlagen mit Stufe und Saison-Unterhalt. */
+  buildingUpkeep?: SaisonstandGebaeudeZeile[] | null;
   disciplineValues: Record<SeasonV2DisciplineKey, number | null>;
   rosterCount: number;
   avgContractLength: number | null;

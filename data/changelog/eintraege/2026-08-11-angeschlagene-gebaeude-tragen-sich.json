@@ -2,6 +2,6 @@
   "datum": "2026-08-11",
   "seite": "Gebaeude",
   "text": "Ein stark abgenutztes Einnahmegebaeude wurde bisher zum Zuschussgeschaeft: Ein Fan Shop auf Stufe 3 bringt bei voller Wirkung 11,70 gegen 1,40 Unterhalt — bei Zustand 5 aber nur noch 0,73, also ein Minus. Ein Gebaeude, das Geld kostet, WEIL es alt ist, waere eine Falle mit nur einer richtigen Antwort. Jetzt wirkt jedes stehende Gebaeude mindestens zu einem Viertel; derselbe Shop traegt damit auch im schlimmsten Zustand noch 2,93 und rentiert sich minimal. Bei Zustand 0 zaehlt es weiterhin als nicht vorhanden. Ausserdem lohnt sich die Reparatur jetzt frueher: vorher rechnete sie sich erst unterhalb von Zustand 30, man haette also nur fast tote Gebaeude instandgesetzt. Ab spuerbarem Wirkungsverlust ist sie jetzt die bessere Wahl.",
-  "gewicht": "normal",
+  "gewicht": "grundlegend",
   "version": "0.4"
 }

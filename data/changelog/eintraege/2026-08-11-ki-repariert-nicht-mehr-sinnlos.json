@@ -2,6 +2,6 @@
   "datum": "2026-08-11",
   "seite": "Gebaeude · KI-Teams",
   "text": "KI-Teams reparierten bisher jedes Gebaeude, das nicht exakt bei 100 Prozent stand — auch wenn es laengst noch mit voller Leistung arbeitete. Im laufenden Spielstand standen alle zwoelf Gebaeude der Liga bei 92 Prozent und damit bei voller Wirkung; der naechste Vorsaison-Lauf haette fuer jedes davon Geld ausgegeben, ohne dass ein einziger Punkt Leistung zurueckgekommen waere. Mit dem staerkeren Verschleiss waere daraus ein Dauerposten geworden. Jetzt wird erst repariert, wenn ein Gebaeude tatsaechlich unter die Wirkschwelle gefallen ist. Ausserdem passt die Zustandsanzeige wieder zur Schwelle: 'alternd' beginnt jetzt dort, wo die Leistung wieder vollstaendig ist, statt quer darueber hinweg zu spannen.",
-  "gewicht": "normal",
+  "gewicht": "behebung",
   "version": "0.4"
 }

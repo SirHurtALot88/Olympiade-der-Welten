@@ -22,6 +22,7 @@ export const FOUNDATION_VIEW_IDS = [
   "trainingV2",
   "players",
   "playerProfile",
+  "merkliste",
   "teamProfile",
   "ranks",
   "diszis",
