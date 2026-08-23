@@ -553,7 +553,76 @@ function isSameTeamPower(left: TeamPowerRecord, right: TeamPowerRecord): boolean
   );
 }
 
+/**
+ * RAEUMT DIE ALTEN TEAM-POWER-DATEN AUS EINEM SPIELSTAND.
+ *
+ * CHRIS AM 23.08.2026: „die alten teamPowers können raus."
+ *
+ * Der Schalter `TEAM_POWERS_ENABLED` steht seit laengerem aus, und die Mechanik wirkt nachweislich
+ * nicht mehr (`tests/team-power-bleibt-aus-dem-scoring.test.ts`). Die DATEN lagen aber weiter in
+ * den Spielstaenden: am Live-Abbild vom 23.08. gemessen 2131 `teamPowers` ueber sieben Staende,
+ * und in `n90y4m` trugen 13 Aufstellungs-Entwuerfe noch eine `teamPowerId`.
+ *
+ * WAS DAS KOSTET, WENN ES BLEIBT: die Reste sind nicht bloss Ballast. In
+ * `LegacyLineupLabClient.tsx` steht eine Klammer, die es genau deswegen gibt — ohne sie meldete
+ * das Speichern „1 Power" fuer etwas, das nirgends waehlbar ist und nicht wirkt. Solche Klammern
+ * braucht es an jeder Stelle, die die Daten anfasst, solange sie da sind.
+ *
+ * WAS ES KOSTET, WENN ES GEHT — und das gehoert dazu: legt jemand den Schalter je zurueck, sind
+ * die frueher getroffenen Auswahlen weg. Der Generator baut die Powers dann neu auf
+ * (`buildGeneratedTeamPowersForSeason`), aber `selectedForSeason` startet bei seinem Vorgabewert
+ * statt bei dem, was einmal gewaehlt war. Der Kill-Pfad-Kommentar oben sagte bis heute „es gibt
+ * nichts zu migrieren" — das gilt ab jetzt nicht mehr, und deshalb steht es hier.
+ *
+ * GIBT DIESELBE REFERENZ ZURUECK, WENN NICHTS ZU RAEUMEN IST. Das ist keine Kosmetik: die
+ * Aufrufer schliessen aus einer neuen Referenz auf „es hat sich etwas geaendert" und schreiben den
+ * kompletten Spielstand — am Live-Save rund 1,2 s. Ohne diesen Kurzschluss liefe die Raeumung auf
+ * jedem Aufstellungs-Aufruf und in jedem Spieltagsabschluss erneut.
+ */
+export function raeumeAbgeschalteteTeamPowers(gameState: GameState): GameState {
+  const powers = gameState.seasonState.teamPowers ?? [];
+  const drafts = gameState.seasonState.lineupDrafts ?? [];
+  const draftsMitPower = drafts.filter((draft) => getSelectedPowerIds(draft.modifiers).length > 0);
+  if (powers.length === 0 && draftsMitPower.length === 0) {
+    return gameState;
+  }
+
+  const naechsteDrafts =
+    draftsMitPower.length === 0
+      ? drafts
+      : drafts.map((draft) => {
+          if (getSelectedPowerIds(draft.modifiers).length === 0) return draft;
+          const modifiers = draft.modifiers ?? {};
+          return {
+            ...draft,
+            modifiers: Object.fromEntries(
+              Object.entries(modifiers).map(([seite, wert]) => [
+                seite,
+                // NUR die `teamPowerId` faellt. Formkarten, Intensitaet und Kapitaen stehen in
+                // derselben Struktur und sind weiter in Gebrauch — hier wird geraeumt, nicht
+                // aufgeraeumt.
+                wert && typeof wert === "object" ? { ...wert, teamPowerId: null } : wert,
+              ]),
+            ),
+          };
+        });
+
+  const naechsterSeasonState = { ...gameState.seasonState, lineupDrafts: naechsteDrafts } as GameState["seasonState"];
+  // Das Feld ganz entfernen statt auf `[]` zu setzen: `teamPowers?:` ist optional, und eine leere
+  // Liste waere eine Aussage („dieses Team hat keine Powers") statt einer Abwesenheit.
+  delete (naechsterSeasonState as { teamPowers?: unknown }).teamPowers;
+
+  return { ...gameState, seasonState: naechsterSeasonState };
+}
+
 export function ensureLocalTeamPowersForSeason(gameState: GameState, saveId: string, seasonId: string): GameState {
+  // ABGESCHALTET HEISST AB JETZT AUCH: NICHT ERZEUGEN. Bis hierher lief der Generator unabhaengig
+  // vom Schalter weiter — er stand auf drei heissen Pfaden (Aufstellung laden, KI-Stapellauf,
+  // Spieltagsabschluss) und haette jede Raeumung sofort wieder rueckgaengig gemacht. Ein
+  // Ladeweg-Nachzug allein waere damit eine Tretmuehle gewesen, und zwar eine teure.
+  if (!teamPowersEnabled) {
+    return raeumeAbgeschalteteTeamPowers(gameState);
+  }
   const existing = gameState.seasonState.teamPowers ?? [];
   const generated = buildGeneratedTeamPowersForSeason(gameState, saveId, seasonId);
   const generatedIds = new Set(generated.map((power) => power.id));
@@ -629,8 +698,15 @@ function buildTeamPowerUsageMap(gameState: GameState, seasonId: string, excludeL
  *      Beitrag und `teamPowerImpact` bleibt 0. Damit laufen auch die Debuffs leer, denn
  *      `applyTeamPowerDebuffs` sammelt nur Quellen mit `teamPowerImpact > 0`.
  *
- * Bereits gespeicherte `teamPowerId`-Eintraege in Drafts bleiben unangetastet und wirken
- * wieder, sobald der Schalter zurueckgeht — es gibt nichts zu migrieren.
+ * DIESER ABSATZ STAND HIER UND STIMMT SEIT DEM 23.08.2026 NICHT MEHR: „Bereits gespeicherte
+ * `teamPowerId`-Eintraege in Drafts bleiben unangetastet und wirken wieder, sobald der Schalter
+ * zurueckgeht — es gibt nichts zu migrieren."
+ *
+ * Chris hat die Raeumung angeordnet („die alten teamPowers können raus"). Solange der Schalter aus
+ * steht, entfernt `raeumeAbgeschalteteTeamPowers` die gespeicherten Records UND die
+ * `teamPowerId`-Eintraege der Entwuerfe, und `ensureLocalTeamPowersForSeason` erzeugt nichts mehr
+ * nach. Geht der Schalter zurueck, baut der Generator die Powers neu auf — die frueher getroffene
+ * AUSWAHL (`selectedForSeason`) ist dann aber weg.
  */
 export const TEAM_POWERS_ENABLED = false;
 
