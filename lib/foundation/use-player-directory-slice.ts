@@ -18,6 +18,7 @@ const EMPTY_PERFORMANCE_BY_PLAYER_ID: PlayerDirectorySliceResponse["performanceB
 const EMPTY_CAREER_STATS_BY_PLAYER_ID: PlayerDirectorySliceResponse["careerStatsByPlayerId"] = {};
 const EMPTY_DISCIPLINE_POINTS_BY_PLAYER_ID: PlayerDirectorySliceResponse["disciplinePointsByPlayerId"] = {};
 const EMPTY_SELL_VALUE_BY_PLAYER_ID: PlayerDirectorySliceResponse["sellValueByPlayerId"] = {};
+const EMPTY_MARKET_VALUE_BREAKDOWN_BY_PLAYER_ID: PlayerDirectorySliceResponse["marketValueBreakdownByPlayerId"] = {};
 
 function buildPlayerDirectorySliceRequestKey(input: {
   saveId: string;
@@ -130,6 +131,10 @@ export function usePlayerDirectorySlice(input: {
   // Gleiche Vorsichtsmassnahme: ein vor diesem Feld gecachter Payload (oder der
   // Projektions-Pfad, der es leer laesst) darf kein `undefined` durch die Deps tragen.
   const sellValueByPlayerId = payload?.sellValueByPlayerId ?? EMPTY_SELL_VALUE_BY_PLAYER_ID;
+  // Dieselbe Vorsichtsmassnahme fuer die MW-Zerlegung. Sie ist das juengste dieser Felder, also
+  // ist ein gecachter Payload OHNE sie der Normalfall, nicht die Ausnahme.
+  const marketValueBreakdownByPlayerId =
+    payload?.marketValueBreakdownByPlayerId ?? EMPTY_MARKET_VALUE_BREAKDOWN_BY_PLAYER_ID;
 
   return {
     payload,
@@ -138,6 +143,7 @@ export function usePlayerDirectorySlice(input: {
     careerStatsByPlayerId,
     disciplinePointsByPlayerId,
     sellValueByPlayerId,
+    marketValueBreakdownByPlayerId,
     loading,
     error,
   };
