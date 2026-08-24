@@ -1332,7 +1332,17 @@
     "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder",fluegel:true,haar:"haar_lang",haarTon:"blue"},
     "Steel Sinister":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:true},
     "Isuzu":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert"},
-    "Eldara":             {kopf:"human",haut:"brown",hoerner:true}
+    "Eldara":             {kopf:"human",haut:"brown",hoerner:true},
+    "Lucky":              {kopf:"human",haut:"light",haar:"haar_mop",haarTon:"chestnut"},
+    "Terradon":           {kopf:"orc",haut:"amber"},
+    "Byrd":               {kopf:"human",haut:"brown"},
+    "Clara":              {kopf:"human",haut:"light",krone:true,haar:"haar_lang",haarTon:"white"},
+    "Arachna":            {kopf:"human",haut:"olive",ruest:"plate",ruestTon:"dunkel",krone:true,haar:"haar_lang",haarTon:"ash"},
+    "Tavascron":          {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
+    "Catherine":          {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert"},
+    "Breeze":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown"},
+    "Wu Tang":            {kopf:"human",haut:"amber",haar:"haar_lang",haarTon:"black"},
+    "Dyrth":              {kopf:"orc",haut:"black",hoerner:true,fluegel:true}
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
 
@@ -1392,14 +1402,26 @@
     if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
     if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
     zeichne("body_"+ani,64,0,0,b.haut);
-    zeichne("k"+b.kopf+"_"+ani,64,0,0,b.haut);
+    // Von den zwanzig Koepfen haben nur die urspruenglichen fuenf (alien/human/lizard/
+    // orc/wolf) ein eigenes Schlag-Blatt ("k*_slash") — die 23.08.-Nachladung und die
+    // fuenfzehn spaeter eingebetteten Koepfe haben nur idle/walk/run/hurt/shoot. Ohne
+    // Rueckfall verschwindet der Kopf im Nahkampf fuer die Dauer des Schlags komplett
+    // (mehrfach von den Sprite-Agenten unabhaengig gefunden, u.a. bei Wu Tang/Catherine).
+    // "shoot" ist die naechstliegende Ersatzpose (Ueberkopf-Ausfallschritt statt gar
+    // nichts).
+    const kopfHatSlash=["alien","human","lizard","orc","wolf"].includes(b.kopf);
+    zeichne("k"+b.kopf+"_"+(ani==="slash"&&!kopfHatSlash?"shoot":ani),64,0,0,b.haut);
     if(b.ohren)zeichne("ohren_"+ani,64,0,0,b.haut);
     if(b.ruest)zeichneR(b.ruest+"_"+ani,b.ruestTon);
     if(b.hoerner)zeichne("hoerner_"+ani,64,0,0,b.haut);
-    if(b.haar)zeichneHaar(b.haar+"_"+ani,b.haarTon||"brown");
-    if(b.bart)zeichneHaar("bart_"+ani,b.haarTon||"brown");
+    // Haar/Bart/Krone kennen GAR KEIN Schlag-Blatt (nur idle/walk/run/hurt/shoot) —
+    // derselbe Rueckfall, sonst verschwindet Haar/Bart/Krone bei jedem Nahkampf-Schlag
+    // (King Arlen Morgolor, Cassandra, Jorund eingeschlossen).
+    const zubehoerAni=ani==="slash"?"shoot":ani;
+    if(b.haar)zeichneHaar(b.haar+"_"+zubehoerAni,b.haarTon||"brown");
+    if(b.bart)zeichneHaar("bart_"+zubehoerAni,b.haarTon||"brown");
     if(b.helm)zeichneR("helm_"+ani,b.ruestTon);
-    if(b.krone)zeichne("krone_"+ani,64,0,0,null);
+    if(b.krone)zeichne("krone_"+zubehoerAni,64,0,0,null);
     if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
     if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
     if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
