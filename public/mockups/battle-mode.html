@@ -2465,22 +2465,26 @@
   // Lockere Ruheformation nahe der eigenen Grundlinie — kein starres Band aus sechs
   // Figuren. `n` ist die Teamgroesse, `i` der Index in fixer Reihenfolge (SQUAD-Reihenfolge
   // bleibt stabil, damit niemand bei jedem Frame den Platz wechselt).
+  //
+  // Spielrichtung LINKS↔RECHTS (Grundlinie/Korb liegen auf der X-Achse), nicht oben↔unten
+  // — echte Sportfelder werden so gezeigt (Fernsehperspektive), und der Court war vorher
+  // hochkant in einen Canvas gepresst, der selbst breit ist (1240×470) statt tief.
   function fsIdlePos(side,i,n){
-    const basisY=side===0?H*0.32:H*0.68;
-    const breite=W*0.46;
+    const basisX=side===0?W*0.32:W*0.68;
+    const hoehe=H*0.46;
     const t=n>1?i/(n-1):0.5;
-    const bogen=Math.abs(t-0.5)*H*0.05;
-    return {x:MID-breite/2+breite*t, y:basisY+bogen*(side===0?1:-1)};
+    const bogen=Math.abs(t-0.5)*W*0.05;
+    return {x:basisX+bogen*(side===0?1:-1), y:H/2-hoehe/2+hoehe*t};
   }
 
   // Ein Zug ist aktiv: seine Teilnehmer bewegen sich vom Ruheplatz zum GEGNERISCHEN
   // Korb hin (man greift dort an, wo der andere verteidigt), Verteidiger und Rebounder
   // eingeschlossen. `naeher` 0..1 kommt aus der Zug-Phase.
   function fsAktivPos(u,naeher){
-    const korbY=u.side===0?H*0.90:H*0.10;
-    const startY=u.side===0?H*0.32:H*0.68;
+    const korbX=u.side===0?W*0.90:W*0.10;
+    const startX=u.side===0?W*0.32:W*0.68;
     const seitlich=(u.id%2?1:-1)*22;
-    return {x:MID+seitlich, y:startY+(korbY-startY)*naeher};
+    return {x:startX+(korbX-startX)*naeher, y:H/2+seitlich};
   }
 
   // SPIELZUEGE bekommen keine eigenen Positions-Sonderfaelle, sondern zeigen auf drei
@@ -2512,7 +2516,8 @@
         ? Math.sin(((phase-0.66)/0.34)*Math.PI)*28 : 0;
       // Screen Pass: der Ballfuehrer schlaengelt sich seitlich durch, statt geradeaus
       // zu laufen — reine Render-Auslenkung, nicht Teil seiner echten Zielposition.
-      u.wobbleX=(szDef&&szDef.choreo==="flachpass-lauf"&&u===e.spieler)
+      // Seitlich heisst jetzt quer zur Spielrichtung, also auf der Y-Achse.
+      u.wobbleY=(szDef&&szDef.choreo==="flachpass-lauf"&&u===e.spieler)
         ? Math.sin(phase*Math.PI*2.4)*16 : 0;
     }));
     if(e){
@@ -2521,15 +2526,16 @@
       if(szDef&&szDef.choreo==="hochpass"){
         // Der Ball fliegt in EINEM hohen Bogen direkt zum Korb, nicht erst zum
         // Mitspieler — der Finisher wird ihn nie kontrollieren, nur aus der Luft
-        // versenken (oder eben nicht, beim verpatzten Versuch).
-        const korbY=nach.side===0?H*0.90:H*0.10;
-        bx=von.x+(MID-von.x)*phase; by=von.y+(korbY-von.y)*phase-Math.sin(phase*Math.PI)*90;
+        // versenken (oder eben nicht, beim verpatzten Versuch). Der Bogen selbst
+        // bleibt eine Bildschirm-Hoehe (Y), unabhaengig von der Spielrichtung (X).
+        const korbX=nach.side===0?W*0.90:W*0.10;
+        bx=von.x+(korbX-von.x)*phase; by=von.y+(H/2-von.y)*phase-Math.sin(phase*Math.PI)*90;
       } else if(szDef&&szDef.choreo==="flachpass-lauf"){
         // Kurzer, flacher Pass frueh in der Phase, danach "traegt" der Laeufer den
         // Ball mit — die Ballbahn folgt seiner (bereits verwackelten) Position.
         const p2=Math.min(1,phase/0.3);
         bx=von.x+(nach.x-von.x)*p2; by=von.y+(nach.y-von.y)*p2;
-        if(phase>0.3)bx+=(nach.wobbleX||0);
+        if(phase>0.3)by+=(nach.wobbleY||0);
       } else {
         bx=von.x+(nach.x-von.x)*phase; by=von.y+(nach.y-von.y)*phase;
         // Weitpass-lauf (Deep Ball) bekommt denselben linearen Grundpfad wie ein
@@ -2607,19 +2613,21 @@
       // betont — zeichnerisch sogar einfacher als der Basketball-Court, weil es nur
       // Geraden sind. Keine Torstangen (waeren am Canvas-Rand kaum lesbar); die
       // Endzonen-Fuellung allein macht das Feld schon eindeutig als Football statt
-      // Fussball erkennbar.
+      // Fussball erkennbar. Spielrichtung LINKS↔RECHTS entlang W (der langen
+      // Canvas-Achse), die Seitenlinien liegen auf H — wie ein echtes Feld im TV, nicht
+      // hochkant in einen 1240×470-Canvas gepresst.
       ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=2;
-      ctx.strokeRect(50,H*0.04,W-100,H*0.92);
+      ctx.strokeRect(W*0.04,50,W*0.92,H-100);
       ctx.fillStyle="rgba(255,255,255,.07)";
-      ctx.fillRect(50,H*0.04,W-100,H*0.09);
-      ctx.fillRect(50,H*0.87,W-100,H*0.09);
+      ctx.fillRect(W*0.04,50,W*0.09,H-100);
+      ctx.fillRect(W*0.87,50,W*0.09,H-100);
       ctx.strokeStyle="rgba(255,255,255,.28)";ctx.lineWidth=1;
       for(let i=1;i<10;i++){
-        const y=H*0.13+H*0.74*(i/10);
-        ctx.beginPath();ctx.moveTo(50,y);ctx.lineTo(W-50,y);ctx.stroke();
+        const x=W*0.13+W*0.74*(i/10);
+        ctx.beginPath();ctx.moveTo(x,50);ctx.lineTo(x,H-50);ctx.stroke();
       }
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(50,H/2);ctx.lineTo(W-50,H/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(W/2,50);ctx.lineTo(W/2,H-50);ctx.stroke();
       return;
     }
     if(feldspielDisc!=="basketball"){
@@ -2632,30 +2640,33 @@
       }
       return;
     }
-    // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld.
-    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(60,H*0.06,W-120,H*0.88);
+    // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld. Spielrichtung
+    // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
+    // Grund-/Deckenlinien eines hochkant gedachten Courts.
+    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(W*0.06,60,W*0.88,H-120);
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    ctx.strokeRect(60,H*0.06,W-120,H*0.88);
-    ctx.beginPath();ctx.moveTo(60,H/2);ctx.lineTo(W-60,H/2);ctx.stroke();
-    ctx.beginPath();ctx.arc(MID,H/2,H*0.09,0,6.3);ctx.stroke();
-    // Alle Masse ab hier haengen an H, nicht an W: jede Hallenhaelfte ist hier sehr
-    // viel flacher als breit (H*0.44 tief, W-120 breit). Ein an W bemessener Radius
-    // sprengt bei diesem Seitenverhaeltnis die Haelfte und ueberlappt die Mittellinie.
-    for(const oben of [true,false]){
-      const grundY=oben?H*0.06:H*0.94, korbY=oben?H*0.115:H*0.885, richt=oben?1:-1;
+    ctx.strokeRect(W*0.06,60,W*0.88,H-120);
+    ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
+    ctx.beginPath();ctx.arc(W/2,H/2,H*0.09,0,6.3);ctx.stroke();
+    // Alle Radien haengen weiter an H, nicht an W: H (470) ist die Seitenlinien-Tiefe
+    // und bleibt die knappe Achse, auch nachdem die Spielrichtung auf X gedreht ist —
+    // ein an W bemessener Radius wuerde ueber die Seitenlinien hinausschiessen.
+    for(const links of [true,false]){
+      const grundX=links?W*0.06:W*0.94, korbX=links?W*0.115:W*0.885;
       // Zone (die Zahnstocher-Box unterm Korb)
-      ctx.strokeRect(MID-H*0.08,oben?grundY:grundY-H*0.16,H*0.16,H*0.16);
+      ctx.strokeRect(links?grundX:grundX-H*0.16,H/2-H*0.08,H*0.16,H*0.16);
       // Freiwurflinie mit Halbkreis
-      ctx.beginPath();ctx.arc(MID,oben?grundY+H*0.16:grundY-H*0.16,H*0.09,0,6.3);ctx.stroke();
-      // Dreierlinie — ein flacher Bogen vor dem Korb.
+      ctx.beginPath();ctx.arc(links?grundX+H*0.16:grundX-H*0.16,H/2,H*0.09,0,6.3);ctx.stroke();
+      // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
       ctx.beginPath();
-      ctx.arc(MID,korbY,H*0.24,oben?0.20:Math.PI+0.20,oben?Math.PI-0.20:6.08);
+      ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
+        links?Math.PI/2-0.20:1.5*Math.PI-0.20);
       ctx.stroke();
       // Korb: Ring plus kurzer Brett-Strich an der Grundlinie.
       ctx.fillStyle="rgba(255,140,60,.9)";
-      ctx.beginPath();ctx.arc(MID,korbY,7,0,6.3);ctx.fill();
+      ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
       ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
-      ctx.beginPath();ctx.moveTo(MID-18,grundY);ctx.lineTo(MID+18,grundY);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
   }
@@ -2671,7 +2682,7 @@
         // Bei Alley-Oop/Screen-Play verschiebt sich die SICHTBARE Position kurz vom
         // Bodenwert weg (Sprung-Hop, seitliches Schlaengeln) — der Schatten bleibt am
         // Boden, Figur/Name/Statzeile folgen der verschobenen Position.
-        const x=gx+(u.wobbleX||0), y=gy-(u.hop||0);
+        const x=gx, y=gy+(u.wobbleY||0)-(u.hop||0);
         const aktiv=fsAktuell&&(u===fsAktuell.spieler||u===fsAktuell.verteidiger
           ||u===fsAktuell.passgeber||u===fsAktuell.rebounder);
         ctx.fillStyle=c;ctx.globalAlpha=aktiv?0.30:0.20;
