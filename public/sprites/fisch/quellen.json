@@ -62,6 +62,15 @@
     "url": "https://opengameart.org/content/64x64-creature-sprites"
   },
   "_kraken_hinweis": "Ein grosser Kraken (echte 'maechtige' Meereskreatur, N/S/E/W, 96x128-Zellen wie die Drachen) liegt bewusst unter public/sprites/monster/kraken.png, nicht hier — er gehoert thematisch zu den 'maechtigen Monstern', siehe monster/quellen.json.",
+  "froschmensch.png": {
+    "original": "PNG/48x64/frogman.png",
+    "paket": "Stendhal Frogmen",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64, 4 Richtungen (N/S/O/W, Stendhal-Konvention) x 3 Gehframes, unveraendert. Echter transparenter Alphakanal (kein Farbschluessel).",
+    "urheber": "Kimmo Rundelin (kiheru), urspruenglich fuer das Spiel Stendhal",
+    "lizenz": "CC-BY-SA 3.0 or later (Volltext lag der Paket-ZIP als LICENSE.txt bei, direkt auf der OGA-Seite bestaetigt am 24.08.)",
+    "url": "https://opengameart.org/content/stendhal-frogmen",
+    "hinweis": "Beschafft fuer die 'Aqua'-Rasse (24.08., zweite Runde) als HUMANOIDES Pendant zu den reinen Fischen/Tentakelwesen oben — ein bipedaler, aufrecht gehender Froschmensch mit menschenaehnlichen Proportionen (Kopf/Rumpf/Arme/Beine), nicht nur eine Fischsilhouette. TEIL-Stilbruch mit exakt demselben Muster wie werwolf.png in monster/quellen.json: 48x64 statt 64x64 breite Zellen, 3 statt 9 Gehframes je Richtung — naeher am LPC-Raster als Drachen/Kraken, aber kein exakter Formular-Fit fuer die bestehende Baukasten-Ebenen-Logik. Das Paket enthaelt zusaetzlich caped_frogman.png und wizard_frogman.png (gleiche Masse, mit Umhang bzw. Zauberer-Kleidung) als Varianten, falls spaeter mehr als ein Froschmensch-Look gebraucht wird — nicht heruntergeladen, liegen aber unter derselben URL/Lizenz."
+  },
   "_nicht_uebernommen": {
     "mer-rpg-character": {
       "url": "https://opengameart.org/content/mer-rpg-character",

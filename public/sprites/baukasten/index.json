@@ -160,6 +160,167 @@
     "hoehe": 256,
     "richtungen": 4
   },
+  "katzenohren_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 777,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_bg_idle": {
+    "bilder": 2,
+    "breite": 128,
+    "bytes": 533,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_bg_run": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 707,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_bg_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 617,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_bg_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 699,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1222,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_fg_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 681,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "katzenohren_fg_idle": {
+    "bilder": 2,
+    "breite": 128,
+    "bytes": 717,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_fg_run": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 1043,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_fg_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 967,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenohren_fg_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1013,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_bg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 1474,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_bg_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 690,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "katzenschwanz_bg_idle": {
+    "bilder": 2,
+    "breite": 128,
+    "bytes": 658,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_bg_run": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 1504,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_bg_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1680,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_bg_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1750,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_fg": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 857,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_fg_hurt": {
+    "bilder": 6,
+    "breite": 384,
+    "bytes": 497,
+    "hoehe": 64,
+    "richtungen": 1
+  },
+  "katzenschwanz_fg_idle": {
+    "bilder": 2,
+    "breite": 128,
+    "bytes": 496,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_fg_run": {
+    "bilder": 8,
+    "breite": 512,
+    "bytes": 1589,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_fg_shoot": {
+    "bilder": 13,
+    "breite": 832,
+    "bytes": 1042,
+    "hoehe": 256,
+    "richtungen": 4
+  },
+  "katzenschwanz_fg_walk": {
+    "bilder": 9,
+    "breite": 576,
+    "bytes": 1026,
+    "hoehe": 256,
+    "richtungen": 4
+  },
   "kopf_alien": {
     "bilder": 6,
     "breite": 384,
