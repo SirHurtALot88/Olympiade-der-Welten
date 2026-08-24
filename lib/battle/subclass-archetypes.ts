@@ -690,6 +690,34 @@ export const BILDBEFUNDE: readonly Bildbefund[] = [
     schliesstAus:
       "Voidfist: sie führt eine Wurfklinge, nicht unbewaffnet. Orc Shaman, Matriarch, Priest (aus Druid): keine Naturmagie-Geste, keine Rüstung eines Heilers — sie ist eine bewaffnete Schleicherin. Übrig bleibt aus Assassin der Klingenkämpfer.",
   },
+  {
+    spieler: "Lava Golem",
+    bild: "Riesiger Koloss aus geschmolzenem Lavagestein, gehörnter Dämonenkopf mit glühenden Augen, unbewaffnete Fäuste, Feuer und Arena im Hintergrund.",
+    archetypen: ["Bullbreaker"],
+    schliesstAus:
+      "Monk, Hunter und Steelwind (aus Wayfarer): keine Klinge, kein Fernkampf, keine präzise Kampfkunst — nur rohe, unbewaffnete Wucht. Barbarian und Orc Warrior (aus Behemoth) fallen ebenfalls weg: er ist kein bewaffneter Humanoider, sondern ein unbewaffneter Elementar-Koloss — wie schon bei Krag'Zul und Rhyx'Tal bleibt dafür nur Bullbreaker übrig. Passt zu den Werten: Power 98 und Health 99 liegen beide nahe am Maximum, Intelligence 1 und Speed 1 schließen jede Magie- oder Fernkampf-Lesart aus.",
+  },
+  {
+    spieler: "Inefinna",
+    bild: "Weiße Priesterin mit goldenem Strahlenkranz, Augen geschlossen im Gebet, hält ein Schwert senkrecht vor sich wie eine Reliquie, golddurchwirkte Robe über silberner Verzierung, Tempelstufen im Hintergrund.",
+    archetypen: ["Priest"],
+    schliesstAus:
+      "Rogue, Steelwind und Crusader (aus Vigilante): nichts an der Szene ist verdeckt, geworfen oder mit Kriegshammer bewaffnet — sie steht offen und andächtig, und Crusader führt ohnehin den Hammer statt das Schwert. Matriarch und Templar (aus Ambassador) fallen trotz Schwert ebenfalls weg: mit Power 2 und Health 2 ist sie keine Nah- oder Hybridkämpferin, das Schwert wirkt wie eine gesegnete Reliquie, kein Kampfgerät. Übrig bleibt Priest — reiner Support-Caster, passend zu Intelligence 84, Spirit 89 und Will 70.",
+  },
+  {
+    spieler: "Lulu",
+    bild: "Blonde Waldnymphe sitzt barfuß auf Baumwurzeln, lässt goldene Blätter schweben, leichte Wickelkleidung ohne Rüstung, keine Waffe, Wald im Gegenlicht.",
+    archetypen: ["Priest"],
+    schliesstAus:
+      "Orc Shaman (aus Druid) fällt weg: sie ist kein Ork, so wie es die Shaman-Zuordnung schon für vergleichbare Fälle vorsieht. Matriarch (aus Druid und Healer) fällt weg: keine Rüstung, kein Hammer, und Power 2 passt nicht zu einer Nahkampf-Stützerin. Cleric (aus Healer) fällt ebenfalls weg: Cleric operiert laut Kartentext näher an der Gefahr, dafür sind Power 2 und Health 5 zu niedrig. Übrig bleibt Priest — reine Distanz-Unterstützung, passend zu Intelligence 86 und Spirit 88.",
+  },
+  {
+    spieler: "Xelara",
+    bild: "Grauhäutige Alien-Diplomatin mit länglichem Schädel und großen schwarzen Augen, schlichte dunkle Lederuniform ohne sichtbare Waffe, futuristische Halle mit der Aufschrift 'DIPLOMACY' im Hintergrund.",
+    archetypen: ["Priest"],
+    schliesstAus:
+      "Blackguard, Bullbreaker und Frost Knight (aus Guardian): keine Peitsche, kein Schild, keine massige Statur, keine Eisausrüstung — und mit Health 15 fehlt jede Tank-Statur. Matriarch und Templar (aus Ambassador) fallen ebenfalls weg: kein Hammer, keine geweihte Panzerung, keine Kampf-Aggression zu sehen — die Szene zeigt reine Diplomatie, wie es die Aufschrift im Hintergrund selbst sagt. Übrig bleibt Priest, die 'Unterstützung'-Lesart von Ambassador, passend zu Charisma 87 und Spirit 84.",
+  },
 ];
 
 const BEFUND_NACH_SPIELER = new Map(BILDBEFUNDE.map((b) => [b.spieler, b] as const));
