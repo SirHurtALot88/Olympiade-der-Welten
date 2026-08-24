@@ -3978,13 +3978,20 @@
           schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56,"#dfe6ef",8);
       });
     });
-    // Der Ball. Klein, orange, folgt fsLerpPositionen — von Passgeber zu Ballfuehrer,
-    // bei Treffer/Block weiter zum Korb, bei Steal zum Verteidiger.
+    // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
+    // weiter zum Korb, bei Steal zum Verteidiger. Fables Fund (Polish-Runde, 24.08.): der
+    // echte Basketball-Sprite (public/sprites/basketball/ball.png) lag seit der ersten
+    // Court-Runde ungenutzt im Repo — der Ball war bis eben ein reiner Vektor-Punkt. Selber
+    // Rueckfall wie beim Korb: laedt das Bild nicht, bleibt der alte Kreis stehen.
     if(fsBall.sichtbar){
-      ctx.fillStyle="#e8823a";
-      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
-      ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+      if(bkDa("ball")){
+        ctx.drawImage(bkBild.ball,fsBall.x-9,fsBall.y-35,18,18);
+      } else {
+        ctx.fillStyle="#e8823a";
+        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
+        ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+      }
     }
     for(const f of floats){
       if(f._spieler==null)continue;
@@ -6808,7 +6815,7 @@
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
-  const BK_TEILE=["parkett","korb_topdown","zuschauer"];
+  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
   const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
