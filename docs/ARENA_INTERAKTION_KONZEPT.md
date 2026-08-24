@@ -254,6 +254,32 @@ zweistellige Zahl je Saison obendrauf — das muss vor dem Merge mit einem Audit
 **gemessen** werden (im Stil von `scripts/export-injury-balance-audit.ts`), nicht
 geraten. Platzhalter-Ziel: ≤10–15 % Zuwachs auf den bestehenden Korridor.
 
+### Dieselbe Idee für Bewegungs-Disziplinen (Chris' Ergänzung)
+
+Nicht nur Kampf — auch Spurt, Staffel & Co. sollen Verletzungen auslösen können, über
+genau das Analogon, das der Bahn-Motor selbst schon benennt: „Der Ersatz für LEBEN ist
+die KRAFTRESERVE … der Ersatz für VERTEIDIGUNG ist ROBUSTHEIT" (Kommentar im Code, siehe
+oben bei Climbing). Übertragen:
+
+- **Auslöser**: die Kraftreserve (STEHEN) eines Läufers erreicht 0, weil sie **durch
+  Tackles stärkerer Gegner** aufgebraucht wurde (nicht durch normales Renntempo — der
+  Unterschied ist wichtig, sonst würde ein sauberer, kraftvoller Lauf plötzlich als
+  „Verletzung" enden). Wie in Chris' Bild: „ich muss mich durch superstarke Gegner
+  durchschlängeln, und die geben mir alle einen aufm Deckel."
+- **Risiko**: dieselbe Gap-Kurve wie im Kampf, nur mit ROBUST statt VER —
+  `clamp((WUCHT_Gegner−ROBUST_Läufer−20)×0,4%, 0, 8%)` (Platzhalter, identische Formel
+  wiederverwendet statt eine zweite erfunden).
+- **Folge, explizit Chris' Vorgabe**: die Disziplin läuft **weiter zu Ende** — kein DNF.
+  Ab dem Verletzungszeitpunkt aber **dauerhaft 50 % auf die bewegungsrelevanten Werte**
+  (TEMPO/ANTRITT/ENDTEMPO) für den Rest dieses einen Laufs.
+- **Keine zweite Verletzung obendrauf**: ist ein Läufer einmal verletzt, wird für ihn in
+  diesem Lauf kein zweiter Injury-Wurf mehr gemacht — „verletzt ist verletzt", kein
+  Stapeln von Mali.
+- **Balance-Bedingung, ebenfalls Chris' Vorgabe**: das darf nicht dazu führen, dass jede
+  Disziplin routinemäßig mehrere Verletzungen produziert. Dieselbe Korridor-Messung wie
+  oben gilt hier genauso — eher strenger, weil Bewegungs-Disziplinen häufiger laufen als
+  Kampf-Disziplinen und sich die Rate sonst schneller aufsummiert.
+
 ---
 
 ## Skills für Bewegungs-Disziplinen — vorerst nein
@@ -318,7 +344,8 @@ erkämpfen").
 | Rutschrisiko (ZUG-Passagen) | `clamp(0,02+(50−ZUG)×0,004; 0; 0,25)` |
 | Rutsch-Verlust | 30 % der Passagen-Arbeit |
 | Kollisionsfenster (Bahn) | `|Δpos| < 0.01` |
-| Verletzungsrisiko-Kurve | `clamp((Gap−20)×0,4%, 0, 8%)` |
+| Verletzungsrisiko-Kurve (Kampf: ANG−VER, Bahn: WUCHT−ROBUST) | `clamp((Gap−20)×0,4%, 0, 8%)` |
+| Stat-Malus nach Verletzung (Bewegungs-Disziplinen) | 50 % auf TEMPO/ANTRITT/ENDTEMPO, Rest des Laufs |
 
 ## Offen — mit Chris zu klären
 
