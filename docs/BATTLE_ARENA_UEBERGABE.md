@@ -217,80 +217,162 @@ anrichten konnten.
 
 ---
 
-## Sofort prüfen, wenn die neue Sitzung startet
+## Der Netzzugang ist offen — Stand 23.08., 23:30
+
+Chris hat die Umgebung auf **Full** gestellt und eine neue Sitzung gestartet. Zum
+Nachmessen, nicht zum Vertrauen:
 
 ```sh
 curl -sS -o /dev/null -w "%{http_code}\n" https://opengameart.org/
 curl -sS -o /dev/null -w "%{http_code}\n" https://www.dropbox.com/
 ```
 
-`200` statt `000` heißt: der Zugang steht. Dann zuerst die drei Punkte unter
-„Wartet auf Netzzugang".
+`200` statt `000` heißt: er steht. Falls doch `000` — die Policy wird beim Start des
+Containers eingefroren, eine laufende Sitzung sieht eine Änderung **nie**. Dann eine
+neue Sitzung, nicht suchen.
+
+Wo der Schalter sitzt, falls er nochmal gebraucht wird: **claude.ai/code im Browser**
+(nicht die Desktop-App), Wolken-Symbol mit dem Umgebungsnamen über dem Eingabefeld →
+Zahnrad → **Network access**. Vier Stufen: None, Trusted, Full, Custom. Die Voreinstellung
+*Trusted* hat **kein Feld für eigene Domains** — dort einzutragen wirkt nicht. Das war
+der Grund, warum „ich hab doch alles freigegeben" nichts brachte: der Schalter unter
+`Einstellungen → Fähigkeiten → Code-Ausführung` gilt für die **Analyse-Sandbox in
+Chats**, nicht für Claude Code.
 
 ---
 
-## Wartet auf Netzzugang
+## Das steht jetzt an
 
-### 1. Die 599 Spielerbilder aus Chris' Dropbox
+### 1. Die 599 Spielerbilder aus Chris' Dropbox ← der große Posten
 
-Der Dropbox-Connector funktioniert (Suche, Metadaten, Ordner) — **nur die Bilddaten
-selbst** kamen nicht durch, weil sie von `dropboxusercontent.com` ausgeliefert werden.
+Der Connector funktionierte schon immer (Suche, Metadaten, Ordner), nur die **Bilddaten**
+kamen nicht durch — sie werden von `*.dropboxusercontent.com` ausgeliefert. Mit Full ist
+das offen.
 
 Ordner: `/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/` und `Spieler/fertig/`
-(höhere Auflösung). Benannt nach Spielernamen, z. B. `Krolach.jpg`.
+(höhere Auflösung). **Der Dateiname IST der Spielername** — `Krolach.jpg`, `Grimborg.jpg`,
+`Nazuna.jpg`. Chris ausdrücklich: „namen der jpg sind die spieler". Die Zuordnung ist
+also trivial, es braucht keine Heuristik.
+
+Weg: `mcp__Dropbox__download_link` liefert eine einmalig gültige URL, die dann mit `curl`
+geholt wird. **Nicht** vorher per HEAD antesten — der Link wird von der ersten Anfrage
+verbraucht, egal welcher Methode.
 
 **Wozu:** `lib/battle/subclass-archetypes.ts` ordnet jede der 56 Unterklassen MEHREREN
-Archetypen zu — nach Chris' ausdrücklicher Regel „im Zweifel alle zuweisen, dann ist der
-Skill-Pool größer". Ein Spielerbild verengt diese Auswahl für **diesen einen** Spieler.
-Fünf sind schon eingearbeitet (`BILDBEFUNDE`), 594 fehlen.
+Archetypen zu — nach Chris' Regel „im Zweifel alle zuweisen, dann ist der Skill-Pool
+größer". Ein Bild verengt die Auswahl für **diesen einen** Spieler. Fünf sind
+eingearbeitet (`BILDBEFUNDE`), 594 fehlen.
 
 Ebenfalls dort: `Rassen Klassen Traits.xlsx`, `Oly Player Stats 05-2026.xlsx`,
-`Olympiade Player Stats.csv` — noch nie angesehen, könnten die Zuordnung stützen.
+`Olympiade Player Stats.csv` — noch nie angesehen.
 
-### 2. Die fehlenden Lauf-Sprites
+### 2. Hintergründe für die Disziplinen
 
-**Alle 77 Blätter des Sprite-Baukastens liegen jetzt als PNG-Dateien** unter
-`public/sprites/baukasten/` — mit `index.json` (Maße, Bildzahl, Richtungen) und einer
-README, die den Aufbau erklärt. Sie sind zusätzlich in `battle-mode.html` eingebettet.
-Vorher lagen sie nur als base64 in zwei HTML-Dokumenten.
+TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Noch gar nicht
+angefangen, weil OpenGameArt nicht erreichbar war. Jetzt ist es das.
 
-Den vollen Satz aus Gang, Schlag und Schuss haben aber nur **vier** Ebenen: Körper
-(`k_*`), Kopf (`g_*`), Rüstung (`r_*`) und Haar (`h_*`). Krone, Bart, Schultern, Arme,
-Beine, Stiefel, Umhang, Hörnerhelm, Visier, Schild, Doppelaxt und die zwanzig Köpfe gibt
-es **nur als Schlag-Blatt** (6 Bilder). Für die Animation fehlen deren Gang-Varianten
-(9 Bilder), die Schuss-Varianten (13) und **alle `hurt`-Blätter**.
+### 3. Die Lauf-Sprites — zum größten Teil erledigt, der Rest ist keine Lücke
 
-Quelle: Liberated Pixel Cup, dieselben Urheber wie in `CREDITS.csv`. Solange sie fehlen,
-zeichnet die **stehende** Figur aus dem vollen Baukasten und der **laufende** Kämpfer aus
-dem animierbaren Rest. Kommen die Blätter, fällt die Teilung weg.
+**Der LPC-Satz lag nie hinter der Netzsperre.** Er liegt auf GitHub, und GitHub war die
+ganze Zeit offen:
 
-Zwei konkrete Lücken darüber hinaus:
-- **Krone für die Arena** — King Arlen hat sie in der Kaderliste, im Kampf nicht.
-- **Vogel-Sprite für Seraph-11** — sein Bild zeigt einen mechanischen Vogel; er läuft
-  derzeit als Metallgestalt mit Flügeln. Steht als Platzhalter im Code.
+```sh
+git clone --depth 1 https://github.com/LiberatedPixelCup/universal-lpc-spritesheet-character-generator
+```
 
-### 3. Hintergründe für die Disziplinen
+522 MB, 88.114 PNG, 768 JSON-Definitionen. Daraus sind **209 Blätter** in den Baukasten
+gewandert — `walk`, `run`, `shoot`, `hurt`, `idle` für alle 45 Ebenen, die sich zuordnen
+ließen. Damit laufen jetzt auch Krone, Bart und Schulterstücke, und die `hurt`-Blätter
+für gefallene Kämpfer sind da.
 
-TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Bisher gar nicht
-angefangen, weil OpenGameArt nicht erreichbar war.
+Zugeordnet über die **Alpha-Maske** (die überlebt das Umfärben, die Farben nicht); alle 45
+sind byte-identisch mit ihrer Quelle. `public/sprites/baukasten/quellen.json` hält je
+Ebene den LPC-Pfad fest.
+
+**Was fehlt, fehlt im LPC-Standard selbst** — nachgemessen, nicht vermutet:
+
+| | |
+|---|---|
+| Arme, Beine (Platte) | `run` nur für Stoff und Kleinteile, für Plattenrüstung in **keiner** Variante |
+| Umhang, Fetzen | die Kategorie `cape/` hat **null** `run`-Blätter |
+| Haar | unser `h_*` kommt aus `flat_top_fade/male/` (kein `run`); `adult/` daneben hat eines, ist aber anderes Bild |
+| **Waffen** | **keine einzige** Waffe im ganzen Satz hat `run` |
+
+Draco kann mit Doppelaxt stehen und gehen, nicht rennen. Das ist eine Entscheidung
+(Waffe im Sprint ausblenden, oder `walk` fahren), kein Beschaffungsproblem.
+
+Offen bleiben zwei benannte Lücken:
+- **Krone für die Arena** — King Arlen hat sie in der Kaderliste, im Kampf noch nicht.
+- **Vogel-Sprite für Seraph-11** — sein Bild zeigt einen mechanischen Vogel; er läuft als
+  Metallgestalt mit Flügeln. Steht als Platzhalter im Code.
+
+---
+
+## Was die Sitzung vom 23.08. abends geändert hat (PR #654)
+
+Setzt auf #651 auf. Vier Dinge, jedes gemessen:
+
+**Heiler griffen zusätzlich an.** Chris: „die beiden heiler ZUSÄTZLICH noch normal
+angreifen, sie müssen entweder angreifen oder heilen". Der Grundangriff teilte sich mit
+dem Heal die Uhr `u.cd`, war also ausgeschlossen — die **Skills** aber laufen auf eigenen
+Abklingzeiten in `u.cds[id]`, und `fuehreAus` fasste `u.cd` nie an. Ein Heiler heilte
+(Uhr für 2,0 s belegt) und feuerte in genau diesen zwei Sekunden weiter Skills.
+
+| | vorher | nachher |
+|---|---:|---:|
+| Schaden **durch Heiler** je Kampf | 655 | 1 |
+| Greenkraut | 383 Schaden / 354 Heilung | 0 / 308 |
+| Seraph-11 | 272 / 177 | 1 / 177 |
+| Siegquote V-W | 25 % | 100 % |
+
+Die beiden trugen zusammen mehr Schaden bei als Cassandra (289), die stärkste Angreiferin
+von A-A. Jetzt belegt **jede** Handlung eines Heilers dieselbe Uhr.
+
+**Die Serie zog die Mutatoren nur einmal.** Für die Formkarten war das repariert, für die
+Mutatoren nicht — 24 Kämpfe maßen einen einzigen Zug 24 Mal. Jetzt je Kampf neu.
+
+**Elf von zwanzig Köpfen ließen sich nie umfärben.** `bFaerbe` suchte immer die helle
+Hautrampe; tatsächlich liegen nur drei Köpfe dort (`light`), vier in `green`, drei in
+`fur_brown`, vier in eigenen Sonderpaletten. Unsichtbar, weil ein grüner Echsenkopf grün
+aussieht, ob man ihn anfasst oder nicht. Jedes Körperblatt bestimmt seine Quellrampe
+jetzt selbst. Dazu: `B_PAL` führte sieben Hauttöne, jetzt alle 22 des LPC-Satzes.
+
+**Rhyx'Tal ist ein Gargoyle** (Chris: „ja bau den gargoyle"). Steingrau `fur_grey`,
+`z_hoerner`, `z_fluegel_bg/_fg` — ohne ein neues Blatt. Ehrlich vermerkt, auch im Code:
+Flügel stehen **nicht** in seinem Portrait, das ist Chris' Ansage.
 
 ---
 
 ## Offene fachliche Punkte
 
-### A. Die Mutatoren drehen das Ergebnis (wichtigster offener Punkt)
+### A. Die Mutatoren — ENTSCHIEDEN, nicht mehr offen
 
-In der **reinen Messlage** (ohne Mutatoren, ohne Formkarten, Intensität normal) gewinnen
-die Vigilante Wranglers gegen Armageddon Aftermath **6:0 in 24 von 24 Kämpfen** — das ist
-richtig so, V-W steht auf TDM-Rang 6, A-A auf 20.
+Der Zweifel der Vorsitzung („Renegade meinte wohl ein Auslösen im Kampf, nicht einen
+Dauerbonus") war **falsch**. Chris am 23.08.:
 
-Mit allem eingeschaltet sind es nur **25 %**. Ursache: `TRAIT_PUNKTE = 6` gibt A-A **+60**
-Eignungspunkte gegen V-W **+30**. Gemessen: bei `TRAIT_PUNKTE = 3` steht V-W bei 50 %.
+> „renegade ist n mutator wie jeder andere und bringt 6 score punkte und 0,3 PPs
+> das bleibt auch weiter so"
 
-**Der eigentliche Zweifel:** Chris' Satz „wenn Renegade triggert, sind das auch +6 Punkte"
-meinte vermutlich ein **Auslösen im Kampf**, nicht einen dauerhaften Aufschlag auf die
-Disziplinwertung. Daraus wurde ein permanenter Bonus gemacht — das ist wieder eine zweite
-Gewichtung neben der ersten. **Vor dem nächsten Balancing mit Chris klären.**
+Damit ist es ein dauerhafter Aufschlag auf die Disziplinwertung, und der Code hatte es die
+ganze Zeit richtig. Nachgeprüft in `lib/lineups/legacy-lineup-modifiers.ts`:
+
+```ts
+playerMutatorBonuses[playerId]    = Number((hits * 6).toFixed(1));
+playerMutatorPpsBonuses[playerId] = Number((hits * 0.3).toFixed(2));
+```
+
+Im Mockup entspricht das `TRAIT_PUNKTE = 6`. **Nicht daran drehen.** Wer künftig ein
+Ungleichgewicht bei den Mutatoren vermutet, sucht die Ursache woanders — die Zahl steht.
+
+**Was die Klärung stattdessen aufgedeckt hat:** die Serie zog die Mutatoren nur EINMAL
+beim Laden und ließ sie für alle 24 Kämpfe gelten — derselbe Messfehler, der für die
+Formkarten schon repariert war. Behoben in PR #654, sie werden jetzt je Kampf gezogen.
+
+**Der Balance-Stand danach:** mit dem Heiler-Fix gewinnt V-W **100 %** bei gestreuten
+Ergebnissen (6:0 9×, 6:2 5×, 6:3 5×, 6:1 4×, 6:4 1×). Das ist **kein Erfolg, sondern der
+nächste Befund** — 100 % ist so wenig eine Balance wie 25 %. Der Doppelbezug der Heiler
+hatte A-A getragen; ohne ihn tragen die Mutatoren das Ergebnis nicht mehr. Hier ist der
+nächste Punkt zum Messen, und zwar **ohne** an `TRAIT_PUNKTE` zu drehen.
 
 ### B. Der Level- und Marktentwurf — Chris' Entscheidung steht
 
