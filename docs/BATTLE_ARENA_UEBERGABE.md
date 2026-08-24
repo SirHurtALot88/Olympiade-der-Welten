@@ -1061,6 +1061,55 @@ diesmal von Anfang an in die Rezepte eingeflossen sind.
 
 ---
 
+## Die Bahn-Kamera: zoomen statt strecken
+
+Chris' Wunsch aus der Vorsitzung: „man kann ja auch raus zoomen oder rein zoomen und dann
+die ganze Strecke sehen ... die Spieler werden in eine Lane geforced, wo man mehr
+miteinander interagieren muss oder Abstand halten muss beim Überholen, was Performance
+kosten kann."
+
+Die zweite Hälfte davon GAB ES SCHON, bevor dieser Abschnitt geschrieben wurde: Bahnwechsel
+(`u.wechsel`), Windschatten und Rempler sind seit dem Bahn-Chassis im Motor, und ein
+Spurwechsel kostet bereits Tempo, solange er läuft (`quer=u.wechsel>0?0.94:1` in
+`tempoVon()`). Was fehlte, war, es zu SEHEN: die Rennposition 0..1 wurde immer stur auf
+die volle Canvasbreite gestreckt — ein Feld, das zwei Meter auseinanderlag, sah exakt so
+aus wie eines, das zwanzig Meter auseinanderlag. Enge Duelle um einen Windschatten waren
+im Bild nicht von einem entschiedenen Rennen zu unterscheiden.
+
+**Die Kamera folgt jetzt dem Feld der noch Laufenden**, nicht der Rennuhr: `cam={zoom,cx}`
+wird jeden Schritt aus der Distanz zwischen Erstem und Letztem berechnet
+(`kameraUpdate()`, kurz vor dem Ende von `stepSpurt()`). Eng beieinander (Start, ein
+Duell im Windschatten) → nah heran, bis 3,4×; auseinandergezogen (nach einem Ausreißer
+oder wenn nur noch einer läuft) → wieder weiter weg. Kein Regler, keine Handarbeit, kein
+neuer Zustand, den Chris pflegen müsste.
+
+Alle Bildschirmpositionen auf der Bahn — Läufer, Hindernisse, Start- und Ziellinie, die
+schwebenden Textmeldungen — laufen jetzt durch `camX(posFrac)` statt durch die alte feste
+Formel `80+pos*strecke`. Nur die Baumreihe im Hintergrund bleibt bewusst fest stehen: der
+leichte Parallax zwischen ruhigem Hintergrund und zoomender Bahn macht das Heranzoomen im
+Bild spürbar, ohne dass dafür etwas extra programmiert wurde. Ein kleiner Hinweis
+„Kamera 2,9×" unten links zeigt die Stufe an, aber nur, wenn tatsächlich hereingezoomt ist
+— bei 1,0× (volle Streckenübersicht) bleibt er weg, sonst wäre er ständiges Rauschen.
+
+**Rein kosmetisch, nichts an der Physik geändert:** `kameraUpdate()` liest nur `LAEUFER`
+und schreibt nur in `cam` — keine Rückwirkung auf Tempo, Kraftreserve oder Ergebnis. Zur
+Kontrolle lief `window.__arena.bahnSerie('spurt', 4)` und `bahnSerie('takeshis-castle', 3)`
+im Headless-Modus (kein Rendering, also auch keine Kamera-Berechnung mit Bildbezug) exakt
+wie vorher durch — die Abnahmemessungen aus den vorigen Abschnitten dieses Dokuments
+bleiben also gültig, ohne erneut gezogen werden zu müssen.
+
+Getestet per Playwright-Screenshot auf Spurt UND Takeshi's Castle (unterschiedliche
+Hindernis-Grafik, gleicher Motor) — in beiden Fällen zoomt und scrollt die Kamera korrekt
+mit, Hindernisse tauchen rechtzeitig vor dem Feld auf statt abrupt.
+
+**Offen, absichtlich nicht angefasst:** Chris' Nebensatz „dann muss es nicht immer nur von
+links nach rechts gehen" (ein gekrümmter oder vertikaler Streckenverlauf statt einer
+Geraden) ist eine deutlich größere Änderung an Physik UND Bild und stand nicht im Zentrum
+der Bitte — die Kamera war die konkrete, klar umrissene Anfrage. Sollte ein nicht-lineares
+Streckenlayout gewünscht sein, ist das ein eigener Auftrag.
+
+---
+
 ## Verlässliche Einstiegspunkte
 
 | Was | Wo |

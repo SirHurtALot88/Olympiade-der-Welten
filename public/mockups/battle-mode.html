@@ -5271,8 +5271,11 @@
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    const oben=H*0.14, unten=H*0.94, strecke=W-170;
-    // Baumreihe ueber der Bahn — an einer Kletterwand steht kein Wald.
+    const oben=H*0.14, unten=H*0.94;
+    // Baumreihe ueber der Bahn — Hintergrund, bewusst NICHT unter der Kamera: sie steht
+    // fest wie ein Tribuenendach, waehrend die Bahn darunter zoomt. Der leichte
+    // Parallax-Effekt macht das Heranzoomen im Bild spuerbar, ohne dass er programmiert
+    // werden musste. An einer Kletterwand steht ohnehin kein Wald.
     for(let i=0;i<(BA().baeume===false?0:26);i++){
       const x=12+i*(W/25), yb=oben-24;
       ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
@@ -5294,10 +5297,12 @@
     for(let i=0;i<=BN;i++){const y=oben+(unten-oben)*i/BN;
       ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
     // Hindernisse genau dort, wo die Simulation sie prueft — in der Form, die die
-    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff.
+    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff. Ihre Bildschirmposition kommt
+    // jetzt aus camX(): gezoomt und im Rennverlauf verschoben wie das Feld selbst.
     const wort=BA().hindernisWort;
     for(const h of HUERDEN_N()){
-      const x=80+h*strecke;
+      const x=camX(h);
+      if(x<-20||x>W+20)continue;         // ausserhalb des Bildausschnitts — nicht zeichnen
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
         if(wort==="Griff"){
@@ -5313,12 +5318,26 @@
         }
       }
     }
-    // Start und Ziel
-    ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(80,oben);ctx.lineTo(80,unten);ctx.stroke();
-    ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
-    ctx.beginPath();ctx.moveTo(80+strecke,oben);ctx.lineTo(80+strecke,unten);ctx.stroke();
-    ctx.setLineDash([]);
+    // Start und Ziel — ebenfalls unter der Kamera, damit sie beim Auszoomen wieder
+    // ins Bild kommen, statt an einer festen Pixelstelle zu kleben.
+    const xStart=camX(0), xZiel=camX(1);
+    if(xStart>-4&&xStart<W+4){
+      ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(xStart,oben);ctx.lineTo(xStart,unten);ctx.stroke();
+    }
+    if(xZiel>-4&&xZiel<W+4){
+      ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
+      ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Zoomstufe als kleiner, fester HUD-Hinweis — nur wenn die Kamera ueberhaupt
+    // herangezoomt hat, sonst waere er staendig sichtbares Rauschen.
+    if(cam.zoom>1.08){
+      ctx.font="400 9px 'IBM Plex Mono',monospace";
+      ctx.textAlign="left";
+      ctx.fillStyle="rgba(255,255,255,.55)";
+      ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10);
+    }
   }
 
   // ===================================================================================
@@ -5662,10 +5681,49 @@
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
 
+  // ===================================================================================
+  // KAMERA. Chris: "man kann ja auch raus zoomen oder rein zoomen und dann die ganze
+  // strecke sehen ... die spieler werden in eine lane geforced wo man mehr miteinander
+  // interagieren muss". Bahnwechsel, Windschatten und Rempler GIBT es schon (oben) —
+  // was fehlte, war, sie zu SEHEN: bisher stand jeder Laeufer, egal wie eng das Feld
+  // beieinander lag, ueber die volle Canvasbreite verteilt, weil die Position 0..1 immer
+  // stur auf die volle Breite gestreckt wurde. Ein enges Feld sah dann aus wie ein weites.
+  //
+  // Die Kamera folgt stattdessen dem, was gerade zaehlt: dem Feld der noch Laufenden.
+  // Eng beieinander (Start, Verfolgung im Windschatten) -> nah heran, man sieht Rempler
+  // und Spurwechsel im Detail. Auseinandergezogen (nach einem Ausreisser) -> weiter weg,
+  // man sieht die ganze Strecke wieder. Kein Regler, keine Handarbeit: die Zoomstufe IST
+  // die Distanz zwischen Erstem und Letztem, mit etwas Polster vor und hinter dem Feld,
+  // damit das naechste Hindernis schon ins Bild ragt statt ueberraschend aufzutauchen.
+  let cam={zoom:1,cx:0.5};
+  const camStrecke=()=>W-170;
+  function camView(){
+    const strecke=camStrecke(), viewW=strecke/cam.zoom;
+    const links=Math.max(0,Math.min(strecke-viewW,cam.cx*strecke-viewW/2));
+    return {strecke,viewW,links};
+  }
+  // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
+  const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
+  function kameraUpdate(dt){
+    const aktiv=LAEUFER.filter(u=>u.fertig==null);
+    const quelle=aktiv.length?aktiv:LAEUFER;
+    if(!quelle.length)return;
+    let minP=quelle[0].pos,maxP=quelle[0].pos;
+    for(const u of quelle){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
+    const zielCx=Math.max(0,Math.min(1,(minP+maxP)/2));
+    // 0,10 Polster: das naechste Hindernis soll schon sichtbar sein, bevor es dran ist.
+    const spanne=Math.max(0.05,(maxP-minP)+0.10);
+    const zielZoom=Math.max(1,Math.min(3.4,1/spanne));
+    const t=Math.min(1,dt*1.8);           // weich nachziehen, kein Ruckeln
+    cam.zoom+=(zielZoom-cam.zoom)*t;
+    cam.cx+=(zielCx-cam.cx)*t;
+  }
+
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
     seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    cam={zoom:1,cx:0.5};
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
     // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
@@ -5864,7 +5922,7 @@
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
         feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
@@ -5899,7 +5957,7 @@
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
@@ -5937,12 +5995,12 @@
           if(BA().nervenKosten && u.nerven<=0){
             u.raus=true; u.fertig=90+rennFertig.length*0.001;
             rennFertig.push(u);
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
           }
-          schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
+          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
       }
@@ -5973,10 +6031,10 @@
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
             feed(o.seite,o.n+" steckt den Rempler weg.");
           }
         }
@@ -6001,10 +6059,10 @@
               *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
           } else {
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
             feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
           }
         }
@@ -6025,6 +6083,7 @@
         }
       }
     }
+    kameraUpdate(dt);
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
   }
 
@@ -6032,10 +6091,9 @@
 
   function zeichneSpurt(){
     zeichneBoden();
-    const strecke=W-170;
     for(const u of LAEUFER){
       const platz=rennFertig.indexOf(u);
-      const x=80+u.pos*strecke+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
+      const x=camX(u.pos)+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
       ctx.globalAlpha=0.25;ctx.fillStyle="#000";
       ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
       zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
