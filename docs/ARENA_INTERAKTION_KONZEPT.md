@@ -586,6 +586,56 @@ AUFBAU/ABSCHLUSS/TECHNIK), Speed/Torment leicht unterrepräsentiert. Funktional 
 Playwright gegengeprüft: 16 Pässe, 12 Treffer, 5 Fehlwürfe, 7 Rebounds, 2 Steals, 2
 Blocks in einem Spiel, Endstand 16:15 — ein erkennbar echtes, kompetitives Spiel.
 
+### Vier Spielgefühl-Funde nach dem ersten Live-Zusehen (Chris' Feedback)
+
+Direkt nachdem Chris das erste Mal beim Live-Basketball zugesehen hat, vier konkrete
+Rückmeldungen — keine Balance-Fragen, sondern Lücken in dem, was überhaupt passieren
+konnte:
+
+**Rebounds wirkten wie ein Teleport.** `stepBasketballLive` löste einen freien Ball beim
+ALLERERSTEN Spieler in `GREIF_REICHWEITE` sofort auf — ein zweiter, fast gleichzeitig
+ankommender Spieler kam nie zum Zug. Neu: `fsLive.reboundKampf` haelt bei ≥2 Spielern in
+Reichweite eine kurze Ringphase (0,55s PLATZHALTER) offen, in der noch weitere Spieler
+heranlaufen können (sie tun das ohnehin schon über `LAUF_ZUM_BALL_RADIUS`), bevor der
+Gewinner gewürfelt wird. Ein Feed-Ereignis „Kampf um den Rebound!" markiert den Beginn.
+Bei nur einem Spieler in Reichweite bleibt es beim sofortigen Greifen — kein Gegner, mit
+dem sich streiten ließe.
+
+**Verteidigung konnte keine Pässe abfangen.** `versucheSteal` griff nur, solange der Ball
+bei einem Spieler war — ein abgespielter Pass war die gesamte Flugzeit über unantastbar,
+selbst wenn ein Verteidiger direkt in der Passlinie stand. Neu: `passeAb` würfelt beim
+Abwurf (nicht bei Ankunft — dasselbe Determinismus-Muster wie `wirf`s `treffer`), ob der
+Verteidiger mit dem kürzesten Abstand zur Passlinie (`distZuLinie`, Punkt-zu-Strecke)
+innerhalb von `PASSLINIE_RADIUS` (55px, PLATZHALTER) abfängt. Chance hängt von seiner
+ABWEHR und der Nähe zur Linie ab (3-32 %, PLATZHALTER-Formel). Per Playwright bestätigt:
+in einem 60-Sekunden-Testlauf feuerte die erste Interception nach 6 Sekunden.
+
+**Die Wurfanimation war eine Waffenanimation.** `zeichneSprite` kannte für den
+Ausfallschritt (`lunge>0`) nur zwei Zustände: „shoot" (Bogenzug) für Charaktere mit
+`waffe:"bogen"`, sonst „slash" (Schwerthieb) — beides falsch für einen Korbleger. Feldspiel
+bekommt jetzt über einen neuen `feldspiel`-Parameter immer die „shoot"-Pose, aber ohne
+jedes Waffen-Overlay (`bogen_shoot`/`schwertbg_fg_slash` werden dort nie gezeichnet) —
+die einzige Ueberkopf-Bewegung, die der Baukasten kennt, ohne Waffe in der Hand.
+
+**Die Wertungstabelle stand im Feldspiel komplett auf „–".** `renderWertung()` liest
+`u.st.dmg/heal/tank/verh/ko` — Felder, die Feldspiel-Einheiten nie hatten. Die eigentlich
+längst mitgezählten Werte (`punkte/rebounds/assists/steals/bloecke/verluste`, seit dem
+ursprünglichen `bauSpieler` vorhanden und von `wirf`/`versucheSteal`/`loeseFlugAuf`
+befüllt) wurden nirgends angezeigt, weil `updateHudFeldspiel()` nie eine Wertungsfunktion
+aufrief. Neu: `renderWertungFeldspiel()` plus `setWertungKopf()` (schaltet die
+Tabellen-Header inklusive Fußzeile zwischen Kampf- und Feldspiel-Beschriftung um) zeigen
+jetzt Punkte/Rebounds/Assists/Steals/Blocks/Verluste.
+
+**Nebenbei aufgefallen und mitkorrigiert:** vier Spieler aus Chris' eigenem Team (Lava
+Golem, Inefinna, Lulu, Xelara) hatten in `BILDBEFUNDE` noch mehrere Kandidat-Archetypen
+statt eines einzelnen (aus Batch 2), UND — wichtiger — die live-animierte Ansicht liest
+ihre Sprite-Rezepte aus einer eigenen `BAU`-Tabelle in `battle-mode.html`, komplett
+unabhängig von `BILDBEFUNDE`. Lava Golem lief dort z. B. weiterhin als Ork mit Platte und
+Schwert, obwohl sein Kartenbild einen unbewaffneten Lavakoloss zeigt — die beiden Systeme
+sind nicht verknüpft, ein Fund für sich, der bei künftigen Sprite-Batches mitgedacht
+werden muss: ein `BILDBEFUNDE`-Eintrag allein ändert nichts an dem, was man im Kampf
+tatsächlich sieht.
+
 ### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
 
 Auf OpenGameArt gibt es **keine** fertigen 2D-Top-Down-Court/Field-Tilesets im passenden
