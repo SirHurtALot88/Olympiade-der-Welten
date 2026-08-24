@@ -3760,10 +3760,23 @@
       }
       return;
     }
+    // Zuschauer (Fables Recherche, 24.08.): Streifen ausserhalb der Seitenlinien, oben
+    // und unten. Zwei Wipp-Bilder im Blatt (je 40x66 bei x=0/40) — welches gerade zeigt,
+    // haengt an `t` (Spielzeit), damit die Menge im Takt der Zeit "atmet", ohne einen
+    // eigenen Animationszustand fuehren zu muessen.
+    if(bkDa("zuschauer")){
+      const zFrame=Math.floor(t*2)%2, zw=40, zh=66;
+      const zReihen=[{y:60-zh*0.55},{y:H-60-zh*0.45}];
+      for(const {y} of zReihen)
+        for(let x=W*0.04;x<W*0.96;x+=zw)
+          ctx.drawImage(bkBild.zuschauer,zFrame*zw,0,zw,zh,x,y,zw,zh);
+    }
     // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld. Spielrichtung
     // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
     // Grund-/Deckenlinien eines hochkant gedachten Courts.
-    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(W*0.06,60,W*0.88,H-120);
+    const parkett=bkMust("parkett");
+    ctx.fillStyle=parkett||"rgba(120,84,46,.18)";
+    ctx.fillRect(W*0.06,60,W*0.88,H-120);
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     ctx.strokeRect(W*0.06,60,W*0.88,H-120);
     ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
@@ -3782,11 +3795,23 @@
       ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
         links?Math.PI/2-0.20:1.5*Math.PI-0.20);
       ctx.stroke();
-      // Korb: Ring plus kurzer Brett-Strich an der Grundlinie.
-      ctx.fillStyle="rgba(255,140,60,.9)";
-      ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
-      ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
-      ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
+      // Korb: Kenney-Sprite in Draufsicht (Brett quer, Ring davor), an der Grundlinie
+      // gespiegelt/gedreht — Chris' Fund: "die Leute treffen den Korb nicht weil er
+      // nicht existiert". Bild zeigt das Brett OBEN, den Ring darunter (Ring zeigt nach
+      // "unten" im Blatt) — gedreht, damit der Ring ins Feld zeigt statt zur Wand.
+      if(bkDa("korb_topdown")){
+        ctx.save();
+        ctx.translate(grundX,H/2);
+        ctx.rotate(links?-Math.PI/2:Math.PI/2);
+        ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
+        ctx.restore();
+      } else {
+        // Rueckfall: Ring plus kurzer Brett-Strich, wie vor der Asset-Runde.
+        ctx.fillStyle="rgba(255,140,60,.9)";
+        ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
+        ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
+        ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
+      }
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
   }
@@ -6654,6 +6679,17 @@
     if(!aMuster[n])aMuster[n]=ctx.createPattern(aBild[n],"repeat");
     return aMuster[n]; };
 
+  // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
+  // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
+  // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
+  const BK_TEILE=["parkett","korb_topdown","zuschauer"];
+  const bkBild={}, bkMuster={};
+  for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
+  const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+  const bkMust=n=>{ if(!bkDa(n))return null;
+    if(!bkMuster[n])bkMuster[n]=ctx.createPattern(bkBild[n],"repeat");
+    return bkMuster[n]; };
+
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
     if(istBuehne(disc))return bodenBuehne();
@@ -8527,6 +8563,7 @@
       zeichneSprite(ctx,u,32,46,!!feldspiel);
       return c.toDataURL();
     },
+    renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
