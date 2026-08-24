@@ -14,11 +14,20 @@ Sprite-Nachschub braucht, wartet deshalb hier.
 
 Die **Battle Arena** ist ein *zuschaubarer Auto-Battler* für die Olympiade der Welten.
 Der Manager stellt auf, die Spieler kämpfen von selbst, und man sieht zu — es gibt keine
-Steuerung im Kampf. Zwei Disziplinen sind entworfen:
+Steuerung im Kampf. Ziel ist ein Grundkonzept für **alle 20 Disziplinen**; Stand dieser
+Sitzung: **18 von 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
+(„Chassis") statt 18 getrennter Implementierungen:
 
-- **TDM** — 6 gegen 6, Team gegen Team, sechs benannte Slots
-- **Spurt** — ein Hürdenlauf im Freien mit vier Slots, eigenen abgeleiteten Werten und
-  Tacklings, die sichtbar und mechanisch wirken
+| Chassis | Disziplinen | Motor |
+|---|---|---|
+| Kampf | TDM, Mini-DM, Fechten, Battlefield | `build()`/`stepSim()`, Rezepte aus `ARENA_ART` |
+| Bahn | Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle | `bauSpurt()`/`stepSpurt()`, Konfiguration aus `BAHN_ART` |
+| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
+| Feldspiel | Basketball, Football, Hockey, Tennis | `bauFeldspiel()`/`stepFeldspiel()`, Konfiguration aus `FELDSPIEL_ART` |
+
+Offen: Denkduell (Speed-Schach, I-Spy) — nach Fable-Konsultation kein eigenes Chassis,
+sondern eine Bühne-Variante (abwechselnde Züge statt unabhängiger Durchgänge, eine
+Vorteils-Anzeige statt Jury-Punkten).
 
 Sie liegt als **eine** HTML-Datei vor (`public/mockups/battle-mode.html`, ~800 KB, kein
 Bundle, keine Abhängigkeiten) und ist im Spiel als Reiter eingebettet. **Sie liest und
@@ -512,6 +521,494 @@ Zur Warnung, weil jeder dieser Posten monatelang wie ein Befund aussah:
 
 ---
 
+## Alle 20 Disziplinen: die Grundlage steht
+
+Die Daten für **alle zwanzig** Disziplinen liegen jetzt im Entwurf, und sie sind nicht
+abgeschrieben, sondern erzeugt:
+
+```sh
+npx tsx scripts/generiere-arena-daten.ts              # nur der Bericht
+npx tsx scripts/generiere-arena-daten.ts --schreiben  # direkt in den Entwurf
+```
+
+Das Skript liest `lib/player-generator/official-discipline-weights.ts` (die Matrizen) und
+`lib/lineups/matchday-slot-roles.ts` (die Slot-Rollen) und ersetzt im Entwurf den Bereich
+zwischen `// <<< GENERIERT: arena-daten` und `// >>> ENDE GENERIERT: arena-daten`. Alles
+andere bleibt unangetastet. Ergebnis: 20 Matrizen (jede summiert exakt auf 100) und 112
+Slot-Profile.
+
+Warum überhaupt: von Hand ging es bei zwei Disziplinen noch. Bei zwanzig sind es über
+1400 Zahlen. Der Beweis kam beim ersten Lauf — der handgetippte Wert für `holdline`
+stand auf `stamina: 12.4`, die Quelle sagt `12.5`. Ein Zehntel, und die 24 Kämpfe endeten
+messbar anders (`3:6` statt `2:6` in sechs Läufen). Genau diese Sorte Drift ist der Grund.
+
+**Was das Skript nicht kennt**, steht bewusst daneben und überlebt jeden Lauf: `SLOT_ZUSATZ`
+mit Reihe, Befehl und Aufstellungsposition je Slot. Das ist Inszenierung dieses Entwurfs,
+keine Spielregel — das Spiel kennt keine Reihen. Für die 18 noch nicht gebauten
+Disziplinen greift ein Platzhalter (je zwei Slots eine Reihe, Befehl `mitlinie`).
+
+### Die Abnahmebedingung für jede neue Disziplin
+
+Chris' Grundsatz — *„immer über die Diszi-Gewichtungen gehen, um zu schauen, was die Leute
+antreibt"* — ist jetzt eine Messung, und zwar eine allgemeine:
+
+```sh
+node scripts/messe-arena-einfluss.mjs spurt 12
+```
+
+Sie hebt bei je einem Teilnehmer je ein Attribut um 15 Punkte an und misst, wie viel
+besser **er** dadurch abschneidet. Die eine Zahl am Ende ist die **Abweichung in
+Prozentpunkten**: Summe der Beträge aus (gemessener Anteil − Matrixgewicht). Null hieße,
+die Mechanik löst die Wertung exakt ein.
+
+Damit das für alle zwanzig gilt, kennt die Messung die Disziplinen nicht — die Motoren
+melden sich an (`MOTOREN` im Entwurf). Ein Motor muss vier Dinge können: einen Durchgang
+bauen, ihn zu Ende rechnen, sagen wer mitmacht, und je Teilnehmer **eine Zahl liefern, bei
+der größer besser heißt**. Im Rennen ist das die negative Platzierung, im Kampf die
+Leistung. Was „besser" heißt, ist die einzige Entscheidung, die je Disziplin fällt.
+
+Angehoben wird an **genau einer Stelle** (`ATTR_HEBUNG` / `gehoben()`), die beide Baupfade
+lesen. Das ist wichtig: die frühere Spurt-Messung hat die fertigen Laufwerte nachträglich
+angefasst und damit Slot-Aufschlag, Form und Stufe übersprungen — sie maß eine kürzere
+Kette, als das Spiel sie rechnet. Speed las sich dadurch als 24,9 % statt 19,1 %.
+
+### Wie viele Läufe es braucht
+
+**Zwölf sind zu wenig — und zwar systematisch zu günstig.** Bei kleiner Stichprobe greifen
+ein paar Attribute den ganzen positiven Gewinn ab und der Rest liest null; weil die Anteile
+nur über die positiven Gewinne normiert werden, sieht das Ergebnis geordneter aus, als es
+ist. Gemessen: Spurt **40,9 Pp bei n = 12 gegen 54,7 bei n = 48**, Climbing 28,9 gegen 37,2.
+
+Noch größer ist der Bedarf, wenn sich mehrere Teilnehmer **ein** Ergebnis teilen. In der
+Staffel hängen sechs Läufer an einer Teamzeit: bei n = 12 las dort jedes Attribut entweder
+0 % oder einen Ausreißer (Charisma 40 % bei Matrixgewicht 10), und erst ab etwa 120 Läufen
+wird die Reihenfolge stabil. Das Skript setzt die Vorgaben deshalb selbst (48, Staffel 144).
+
+**Stand heute** (n = 48, Staffel 144):
+
+| Disziplin | Abweichung | Bemerkung |
+|---|---|---|
+| Staffel | **21,9 Pp** | Speed 27,1 vs. 24. Offen: Spirit 10,3 statt 16 |
+| Time-Trial | **33,6 Pp** | Speed 21,2 vs. 22, Intelligence 22,6 vs. 18. Offen: Dexterity 14 statt 25 |
+| Takeshi's Castle | **34,1 Pp** | Wille 24,8 vs. 22, Intelligence 11,3 vs. 11. Offen: Charisma 6,4 statt 14 |
+| Climbing | **37,9 Pp** | Ausdauer 32,9 vs. 26. Offen: Health 4,2 statt 10 |
+| Spurt | **56,7 Pp** | siehe „Zwei Befunde" unten |
+| TDM | **133,9 Pp** (n = 6, 554 s) | siehe unten |
+
+### Ein Befund, der eine Entscheidung braucht
+
+Die TDM-Messung sagt: der Kampf belohnt **Speed mit 40,8 % und Dexterity mit 22,3 %** —
+zwei Attribute, die in der TDM-Matrix mit **null** stehen. Zusammen fast zwei Drittel des
+gemessenen Einflusses auf etwas, das die Wertung gar nicht bepreist. Umgekehrt liegen
+Charisma, Determination und Will bei 0,0 %, obwohl die Matrix ihnen 10, 6 und 0 gibt.
+
+Die Ursache liegt nahe: Tempo entscheidet, wer zuerst am Gegner ist, und wer zuerst da ist,
+schlägt länger zu. Nur sagt die Disziplingewichtung, dass Tempo im TDM nichts wert ist.
+
+Das ist **kein Bug, den man still wegpatcht** — es ist eine Balancing-Entscheidung:
+soll die Bewegung im Teamfight überhaupt an Speed hängen, wenn die Wertung Speed dort mit
+null bepreist? Bitte an Chris.
+
+Nachgemessen mit n = 6 (554 s): **133,9 Pp**, Speed 43,6 %, Dexterity 23,4 %, Power 5,5 %
+gegen ein Matrixgewicht von 28. Der Befund aus dem groben Lauf hält also.
+
+### Zuerst: der Maßstab selbst war falsch
+
+Bevor irgendeine Zahl zu TDM gilt, gehört diese Korrektur davor — sie betrifft alles, was
+in dieser Sitzung über die Kampf-Disziplinen gemessen wurde.
+
+`aufEignung()` normiert die drei Kampfwerte **auf die Eignung**: die Rezepte geben die
+FORM, die Eignung gibt die MENGE. Das ist Absicht und stammt aus der 0:6-Untersuchung.
+`einflussVon()` hob aber ein Attribut, **ohne die Eignung mitzuheben**. Damit war das
+Ergebnis vorbestimmt: ein gehobenes Kampfattribut konnte nur noch die Form ändern (LP
+gegen ANG gegen VER), nie die Menge. Nur `TMP` und `AUS` liegen außerhalb der Normierung —
+also las die Messung ausgerechnet die Bewegung als das, was alles entscheidet.
+
+Im Spiel ist die Eignung eine Funktion der Attribute: `calculateRawDisciplineScore` in
+`lib/player-formulas/discipline-rating-engine.ts` summiert Attribut × Gewicht über dieselbe
+Matrix. Ich hatte genau den Kanal zugehalten, den die Matrix beschreibt.
+
+Behoben: die Anhebung hebt die Eignung mit, um `plus × Gewicht / 100`.
+
+**Was das ändert** — und was es *nicht* ändert:
+
+| Disziplin | alter Maßstab | korrigiert |
+|---|---|---|
+| Mini-DM | 60 Pp | **13,8 Pp** |
+| Fechten | 157 Pp | 87 Pp |
+| Battlefield | 68,5 Pp | 110 Pp |
+| TDM | 133,9 Pp | **152,4 Pp** |
+
+Mini-DM mit 13,8 Pp ist der Beweis, dass der Maßstab jetzt stimmt: dieselbe Messung,
+dieselbe Mechanik, aber Rezepte, die aus der eigenen Matrix gebaut sind.
+
+**Und TDM wird dadurch nicht besser, sondern schlechter.** Ich hatte zwischenzeitlich
+geschrieben, der TDM-Befund sei größtenteils ein Messfehler — das war falsch. Er ist
+größer als gedacht.
+
+### Der Mechanismus, präzise
+
+`aufEignung()` normiert LP, ANG und VER — `TMP` und `AUS` nicht. Ein Attribut, das dort
+steht, bekommt einen **Gewinn erster Ordnung**, unabhängig von seinem Matrixgewicht.
+
+Im TDM stehen Speed mit 46 und Dexterity mit 24 in `TMP`, und beide haben in der
+TDM-Matrix Gewicht **null**: sie bringen vollen Gewinn ohne jede Gegenleistung an die
+Eignung. Gemessen: Speed 46,1 %, Dexterity 24,7 %, während Power (Gewicht 28) auf 3,9 %
+fällt und Health (20), Stamina (14) und Charisma (10) auf exakt null.
+
+Dasselbe Muster erklärte Battlefield (Entschlossenheit und Ausdauer bei Matrixgewicht 4
+auf je 24 %, weil ich sie in `AUS` gesetzt hatte) und Fechten (Intelligence und Health bei
+Gewicht 4 auf 24 % bzw. 24 %).
+
+### Ein Versuch, der mit dem kaputten Maßstab gemessen wurde — nicht verwenden
+
+Zwischenzeitlich habe ich die Bewegung von Speed und Dexterity entkoppelt und gemessen:
+133,9 → 180 Pp, also scheinbar schlechter, mit Awareness bei 49,5 % und Intelligence bei
+39,3 %. Daraus hatte ich geschlossen, es liege nicht an Speed, sondern daran, dass „zuerst
+ankommen" den Teamfight entscheidet.
+
+**Dieser Versuch lief mit dem kaputten Maßstab und trägt nichts.** Er ist hier nur
+aufgeschrieben, damit ihn niemand aus einer älteren Nachricht heraussucht und für gültig
+hält. Der Effekt, den er zeigte, war die Signatur des Messfehlers: was in `TMP` steht,
+gewinnt — und ich hatte Awareness und Intelligence hineingesetzt.
+
+### Das Ventil — geschlossen, dann wieder aufgemacht
+
+`TMP` und `AUS` gehen bei `aufEignung()` nicht in die Normierung ein; LP, ANG und VER
+schon. Ein Attribut, das in `TMP`/`AUS` steht, bekommt dadurch in der Messung einen Gewinn
+**erster Ordnung**, unabhängig von seinem Matrixgewicht. Testweise wurden `TMP` und `AUS`
+mit hineingenommen:
+
+| Disziplin | ohne Kappung | mit Kappung |
+|---|---|---|
+| Mini-DM | 13,8 Pp | 14,0 Pp |
+| Fechten | 87 Pp | 39 Pp |
+| Battlefield | 110 Pp | 101,7 Pp |
+| TDM | 152,4 Pp | 83,7 Pp |
+
+Als Diagnoseinstrument funktioniert das: die Abweichung sinkt überall, und im TDM lasen
+Speed und Dexterity danach sauber 0 % (Matrixgewicht je 0), Power stieg von 3,9 auf 21,4 %
+(Gewicht 28).
+
+**Am echten Kampf gemessen war es aber keine Reparatur, sondern eine Verschlechterung —
+und zwar aus einem Grund, der nichts mit den Mutatoren zu tun hat.** Kurz nachdem die
+Kappung fiel, landete #654: der Heiler-Doppelbezug war der eigentliche Grund für A-A's
+Stärke (Schaden durch Heiler fiel von 655 auf 1 je Kampf). Mit diesem Fix gewinnt V-W TDM
+bereits **ohne** jede Kappung 100 % — mit **gestreuten** Ergebnissen (6:0 neunmal, 6:2
+fünfmal, 6:1 viermal, Rest knapper). Mit der Kappung obendrauf wurden daraus 96 % Siegquote,
+aber **23 von 24 Kämpfen exakt 6:0** — die Kappung nahm der KI genau die Bewegungsfreiheit,
+mit der sie überhaupt an V-W herankommt, und machte aus einem Sieg einen Blowout.
+
+**Die Kappung ist deshalb wieder raus** (siehe Kommentar in `aufEignung()`). Was bleibt:
+
+- Der strukturelle Befund ist weiter richtig — `TMP`/`AUS` liegen außerhalb der
+  Eignungs-Normierung, und `einflussVon()` liest deshalb bei jeder Kampfdisziplin einen
+  Bewegungs-Bonus, den die Matrix nicht rechtfertigt. Das ist eine Eigenschaft der
+  MESSUNG, keine, die man am `aufEignung()`-Code beheben sollte, ohne den Kampf selbst
+  zu verschlechtern.
+- **Wichtig, und das war vorher falsch dokumentiert: die Mutatoren sind NICHT die
+  Ursache und NICHT anzufassen.** Chris hat das am 23.08. entschieden: Renegade bringt
+  6 Score-Punkte und 0,3 PPs, „das bleibt auch weiter so". `TRAIT_PUNKTE = 6` bleibt
+  stehen. Eine frühere Fassung dieses Abschnitts schlug vor, die Mutatoren
+  auszugleichen — das war vor dieser Entscheidung geschrieben und gilt nicht mehr.
+- Die eigentliche offene Frage ist die, die #654 selbst schon aufgeschrieben hat: mit
+  dem Heiler-Fix gewinnt V-W TDM zu 100 %, das ist „so wenig eine Balance wie 25 %".
+  Nachgemessen nach dem Merge dieser Sitzung: **Mini-DM 100 %, Fechten 100 %,
+  Battlefield 88 %** (je n = 8) — dieselbe Schieflage betrifft alle vier
+  Kampfdisziplinen, weil sie sich `baueEinheit()` und die KI-Logik teilen. Das ist
+  konsistent mit #654s Befund, keine neue Ursache aus dieser Sitzung.
+
+---
+
+## Das Bahn-Chassis: fünf Disziplinen, ein Motor
+
+Fünf der zwanzig Disziplinen sind im Kern dieselbe Sache — von einem Start zu einem Ziel
+kommen, unterwegs stehen Hindernisse im Weg, und die Kraft reicht nicht für alles. Sie
+fünfmal zu programmieren hieße, denselben Fehler fünfmal einbauen zu können. Also einmal
+Motor, fünfmal Konfiguration: `BAHN_ART` im Entwurf.
+
+Die **sieben Rollen** sind überall dieselben, nur ihr Name und ihre Zutaten wechseln:
+
+| Rolle | Spurt | Staffel | Time-Trial | Climbing | Takeshi |
+|---|---|---|---|---|---|
+| ANTRITT | Antritt | Antritt | Antritt | Zug | Losstürmen |
+| ENDTEMPO | Endtempo | Abschnittstempo | Renntempo | Ausdauertempo | Durchhaltetempo |
+| TECHNIK | Technik | **Wechsel** | **Linie** | **Griff** | **Falle lesen** |
+| WENDIGKEIT | Wendigkeit | Bahnarbeit | Umsetzen | Umsetzen | **Aufstehen** |
+| STEHEN | Stehvermögen | Stehvermögen | Durchhalten | Kraftausdauer | **Wille** |
+| WUCHT | Wucht | **Zug an der Spitze** | **Risiko** | **Kraftzug** | **Durchbrettern** |
+| ROBUST | Robustheit | Verlässlichkeit | Fahrsicherheit | Zähigkeit | Nehmerqualität |
+
+Was je Disziplin schaltbar ist: Windschatten, Tackling, Zahl und Art der Hindernisse, wie
+schwer sie zu nehmen sind, was ein Fehler kostet, der Kraftvorrat, die Steigung, Boden und
+Bäume. Eine sechste Bahn braucht einen Eintrag in `BAHN_ART` — sonst nichts: die Motoren
+melden sich selbst bei der Messung an, und die Aufstellung baut sich aus den erzeugten
+Slots.
+
+**Ersatzaufstellung.** Für Spurt stellt Chris von Hand auf; für eine neue Bahn gibt es noch
+keine Aufstellung, und ohne Läufer lässt sich nichts messen. Wer nicht gesetzt ist, wird
+nach Eignung gesetzt. Sobald jemand von Hand aufstellt, gilt seine Aufstellung.
+
+### Was die Messung dabei gelehrt hat
+
+Drei Fehler, jeder zuerst als Vermutung gehabt und dann von der Messung widerlegt oder
+bestätigt:
+
+1. **Ein zu weit gespreiztes Feld macht jede Feinheit unsichtbar.** Time-Trial lief 8,3 s
+   gegen 22,2 s. Bei so einer Spreizung dreht keine verpasste Kurve mehr einen Platz —
+   Intelligence las **0,0 %** bei einem Matrixgewicht von 18. Nach dem Verdichten
+   (Grundtempo hoch, Spanne runter): 18,2 %.
+2. **Ein Hindernis, das zu 80 % gelingt, bezahlt sein Attribut nicht.** Deshalb sind
+   Kurve und Griff schwerer als die Hürde.
+3. **Wendigkeit war totes Gewicht, wo es keine Spur zu wechseln gibt.** Ohne Windschatten
+   und ohne Gegner in Reichweite wechselt im Zeitfahren und an der Wand niemand die Bahn —
+   Awareness las exakt 0 %. Jetzt verkürzt Wendigkeit dort die Erholung nach einem Fehler:
+   die Linie wiederfinden, den Griff neu setzen.
+
+Und ein Fehlschlag, der nicht behoben wurde, sondern zurückgenommen: der Versuch, Spurts
+Will-Anteil durch weniger Will in den Rezepten zu senken, machte es **schlechter** —
+Determination rückte einfach nach.
+
+### Staffel und Takeshi's Castle: was dort anders ist
+
+**Staffel** ist die einzige Bahn, auf der nicht alle gleichzeitig laufen. Sechs Läufer,
+sechs Abschnitte, fünf Wechsel — immer nur einer je Mannschaft ist unterwegs, die übrigen
+stehen sichtbar in ihrer Wechselzone. Geprüft wird die Übergabe mit dem **Schnitt aus
+abgebendem und annehmendem** Läufer; wer sie verpatzt, kostet die Mannschaft Zeit. Deshalb
+zählt hier die **Teamzeit** und nicht die eigene Platzierung — alle sechs teilen sich
+dasselbe Ergebnis, und Plätze kippen nur, wenn die Teams tauschen. Das ist ein Münzwurf,
+kein Maß: mit Platzierung las jedes Attribut exakt 0 %.
+
+Dabei fiel ein echter Modellfehler auf, der alle Bahnen betraf: die Beschleunigungsphase
+hing an der **Rennuhr**, nicht am Läufer. Nach 3,2 Sekunden war ANTRITT für alle erledigt —
+der Schlussmann, der bei Sekunde neun aus dem Stand übernimmt, hatte also gar keinen
+Antritt. Spirit, das dort sitzt, las 0 % bei einem Matrixgewicht von 16.
+
+**Takeshi's Castle** ist keine Laufbahn, sondern ein Spießrutenlauf: vierzehn Fallen, und
+Speed steht in der Matrix mit 4 fast ganz unten. Wille steht mit 22 oben — also entscheidet
+nicht Tempo, sondern **Durchkommen**. Erste Fassung warf nach drei Stürzen raus, egal bei
+wem; gemessen trug damit Torment 33,6 % (Matrix 7) und Wille 8,9 % (Matrix 22), also genau
+verkehrt herum. Der Grund war logisch: wenn jeder gleich viele Stürze verträgt, entscheidet
+nur, wer sie **vermeidet** — und das ist Wucht. Wer wieder aufsteht, kam nie vor.
+
+Jetzt hat jeder ein **Nervenkostüm** aus seinem Willen, ein Sturz kostet davon, und wer
+leer ist, scheidet aus. Die Nerven wirken außerdem laufend aufs Tempo: wer zweimal im
+Wasser lag, geht die nächste Falle zaghafter an. Das **Publikum** ist der Kanal für
+Charisma — wer die Menge hat, sammelt zwischen zwei Fallen wieder Nerven.
+
+### Zwei Befunde, die eine Entscheidung brauchen
+
+**1. Die Bahn baute beide Seiten ungleich — derselbe Fehler wie im TDM.** Unsere Läufer
+bekamen Slot-Aufschlag, Form und Stufe, der Gegner nur seinen Disziplinwert. Im Kampf ist
+das seit der 0:6-Untersuchung behoben, auf der Bahn stand es noch. Im Bild sah man es
+daran, dass alle sechs Gegner denselben Rennplan trugen — die Zuordnung hängt an einem
+Slot, den sie gar nicht hatten. Behoben; alle Zahlen oben sind **nach** dieser Korrektur
+gemessen (sie hat jede Disziplin verschoben, Staffel 30,5 → 21,9, Spurt 47 → 59,6).
+
+**2. Rempeln ist uneigennützig — deshalb kann Torment in Spurt nicht bezahlen.** Die
+Spurt-Matrix führt Torment mit 14; gemessen trägt es 5,5 %. Das ist kein Tuning-Problem,
+sondern die Mechanik selbst:
+
+- Rempeln passiert oft genug (8,35 Rempler je Rennen).
+- **Mehr** Rempeln machte es schlechter: mit wuchtabhängiger Häufigkeit fiel Torment auf
+  1,3 % und die Gesamtabweichung stieg auf 59 Pp.
+- Der Grund: ein Rempler kostete den Remplenden selbst Tempo und Kraft, half aber dem
+  **ganzen Feld** hinter dem Opfer. Nimmt man die Eigenkosten weg, steigt Torment sofort
+  von 2,2 auf 7,4 % — das ist jetzt so eingestellt.
+
+Mehr geht mit diesem Maßstab nicht: gemessen wird die eigene Platzierung, und ein Rempler
+bringt sie nur zufällig. Entweder darf ein Rempler den Remplenden gezielt **vorbeibringen**
+(dann zahlt Wucht), oder Spurts Matrixgewicht von 14 beschreibt nicht, was ein Sprint tut.
+Das ist Chris' Entscheidung, nicht meine.
+
+Der Rest von Spurts 56,7 Pp sitzt bei Wille (27,1 gegen 14) und Entschlossenheit (24,9
+gegen 15). Beide stecken in ANTRITT und ENDTEMPO, also in dem, was direkt schnell macht —
+in einem Rennen dominiert das, was Tempo gibt. Weder ein größerer Kraftvorrat (59,6 → 58,9)
+noch eine schwächere Ermüdung (→ 56,7) hat daran viel geändert.
+
+---
+
+## Das Arena-Chassis: TDM, Mini-DM, Fechten, Battlefield
+
+Was das Bahn-Chassis für die Rennen ist, ist dies für die Kämpfe: ein Motor
+(`build()`/`stepSim()`), vier Konfigurationen (`ARENA_ART`). Die fünf Kampfwerte (ANG,
+VER, LP, TMP, AUS) bleiben überall dieselben; was sie speist, kommt aus der Matrix der
+jeweiligen Disziplin statt aus einer von zwei geteilten Kategorien.
+
+- **Mini-DM** (4 gegen 4): sechs Attribute mit Gewicht, keins davon Charisma,
+  Intelligence oder Spirit — hier führt niemand und liest niemand.
+- **Fechten** (6 gegen 6): die einzige Kampfdisziplin mit Gewicht auf Speed (16) und
+  fast keinem auf Health (4). Ein Fechter fällt nicht um, weil er dünn ist, sondern weil
+  er zu spät kommt.
+- **Battlefield** (4 gegen 4): die einzige, in der Power nicht oben steht — Charisma,
+  Intelligence und Spirit tragen zusammen die Hälfte des Gewichts, ein geführtes Gefecht.
+
+**Der Maßstab war zunächst falsch** (siehe unten „Der Maßstab selbst war falsch") und ist
+seit dieser Sitzung korrigiert. Eine testweise Kappung von `TMP`/`AUS` senkte die
+gemessene Abweichung deutlich, verschlechterte aber den ECHTEN Kampf (mehr Blowouts) und
+ist zurückgenommen — Details im Abschnitt „Das Ventil".
+
+**Zuletzt gemessen, NACH dem Merge mit #654 (Heiler-Fix), n = 6:**
+
+TDM 160,1 Pp (Spirit 38,1 %, Intelligence 33,1 %, Torment 28,9 % dominieren; Power,
+Health, Stamina, Charisma bei exakt 0 % trotz Matrixgewichten 28/20/14/10). Mini-DM,
+Fechten und Battlefield sind seit dem Merge nicht neu mit `einflussVon()` gemessen — nur
+die Siegquote (Mini-DM 100 %, Fechten 100 %, Battlefield 88 %, je n = 8), die zusammen mit
+TDM zeigt: der Heiler-Fix hat die Kampfdynamik grundlegend verschoben, und **welches
+Attribut das Kampfergebnis dominiert, ist seitdem dreimal umgesprungen** (Speed/Dexterity
+vor dem Maßstab-Fix → weiterhin Speed/Dexterity nach dem Maßstab-Fix, aber schwächer →
+jetzt Spirit/Intelligence/Torment nach dem Heiler-Fix). Das ist kein Rauschen, sondern ein
+Hinweis, dass die Ursache tiefer liegt als eine einzelne Formel — vermutlich in
+`leistungVon()`/der Skill-Priorisierung, die bestimmt, wer wie oft trifft. Nicht mehr mit
+Vermutungen nachgejagt in dieser Sitzung; das ist die nächste echte Aufgabe an TDM,
+unabhängig vom Chassis-Ausbau.
+
+---
+
+## Das Bühne-Chassis: Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen
+
+Fünf Disziplinen sind weder Rennen noch Kampf: niemand läuft eine Strecke, niemand tritt
+gegen einen Gegner an. Jeder tritt EINZELN auf, in mehreren Durchgängen, und wird
+bewertet — der dritte Motor (`bauBuehne()`/`stepBuehne()`, Konfiguration `BUEHNE_ART`).
+
+Sieben Rollen, wie bei Bahn und Kampf, aber sie messen eine Auftrittsbewertung statt Tempo
+oder Kampfkraft:
+
+| Rolle | Bedeutung |
+|---|---|
+| GRUNDLAGE | der verlässliche Kern jedes Durchgangs |
+| SPITZENMOMENT | was ein gelungener großer Versuch zusätzlich bringt |
+| TECHNIK | wie oft der große Versuch gelingt |
+| PUBLIKUM | ein Bonus, der immer kommt, ohne Risiko |
+| NERVEN | trägt zur Gelingchance bei, unter Wettkampfdruck |
+| AUSDAUER | wie wenig späte Durchgänge gegenüber frühen abfallen |
+| WAGNIS | wie groß der Bonus ausfällt, wenn der Versuch gelingt |
+
+Ein Durchgang: Basis (aus GRUNDLAGE, gedämpft durch Ermüdung) plus — bei Erfolg (TECHNIK
+und NERVEN entscheiden) — ein WAGNIS-skalierter SPITZENMOMENT-Bonus, sonst ein Abschlag
+(`failAbzug`, je Disziplin unterschiedlich hart); PUBLIKUM kommt immer oben drauf. Die
+Summe aller Durchgänge ist das Ergebnis — direkt verwendbar als `wert()` für die
+Abnahmemessung, keine Platzierung nötig.
+
+Reihenfolge: rundenweise wie eine Setzliste (Durchgang 1 für alle, dann Durchgang 2), Seiten
+wechseln sich ab. Alle Durchgänge werden beim Aufbau durchgerechnet und über die Zeit
+enthüllt — dieselbe Ehrlichkeit wie im Kampf: Formkarte und Disziplinwert stehen fest,
+bevor der Auftritt beginnt.
+
+**Was die erste Messung gelehrt hat:** Charisma (Gewichtheben, Matrixgewicht 23) und
+Torment (Breaking, Gewicht 22) saßen zunächst nur in risikofreien, additiven Rollen
+(PUBLIKUM/SPITZENMOMENT), während Dexterity (Gewicht 6 bzw. 2) in der erfolgsentscheidenden
+Rolle TECHNIK saß — derselbe Fehler wie beim Bahn- und Arena-Chassis: ein Attribut in einer
+**Erfolgschance-Rolle** gewinnt strukturell mehr Einfluss als eines, das nur additiv
+beiträgt, unabhängig vom Matrixgewicht. Nachgezogen (Charisma/Torment jetzt auch in
+TECHNIK/NERVEN, Dexterity nur noch dort, wo die Matrix ihm ein Gewicht gibt).
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Wettessen | **12,6 Pp** |
+| Eiskunstlauf | **23,9 Pp** |
+| Showcase | **28,7 Pp** |
+| Breaking | **29 Pp** |
+| Gewichtheben | **31,8 Pp** |
+
+Das ist der beste Chassis-Durchschnitt der Sitzung — vermutlich, weil die Lehren aus Bahn
+und Arena (Feldspreizung, Erfolgschance-Attribute, additive vs. bedingte Boni) diesmal
+vorab in die Rezepte eingeflossen sind, statt nachträglich entdeckt zu werden.
+
+Visuell: eine Bühne mit drei Scheinwerferkegeln statt Sandplatz oder Laufbahn, jeder
+Teilnehmer als stehende Figur (derselbe Sprite-Baukasten, wiederverwendet über
+`zeichneSprite()`) mit laufender Punktzahl und Fortschrittsanzeige „x/N Durchgänge"
+darunter — geprüft an Gewichtheben und Eiskunstlauf, in beiden auf einen Blick lesbar.
+
+## Das Feldspiel-Chassis: Basketball, Football, Hockey, Tennis
+
+Vierter Motor — Chris' eigener Vorschlag, unabhängig von Fable bestätigt: Ballsport ist
+weder Rennen, Kampf mit Skills noch Auftritt in Durchgängen, sondern eine
+**Ballwechsel-Schleife**. Ballbesitz ist ein geteilter Zustand zwischen den Teams; das
+unterscheidet es von Bühne, wo jeder für sich antritt.
+
+Sieben Rollen: AUFBAU (bringt den Ball zum Abschluss), ABSCHLUSS (die Wurf-/Schuss-
+Mechanik), TECHNIK (Erfolgschance), ZWEITCHANCE (Rebound/Fumble-Recovery — wer den
+verpassten Abschluss aufsammelt), ABWEHR (kann den Zug per Steal/Block beenden),
+TEAMGEIST (risikofreier Bonus — Assists/Chemie, da Spirit drei von vier Matrizen
+anführt), AUSDAUER. Wie bei Bühne wird die ganze Partie beim Aufbau durchgerechnet und
+über die Zeit enthüllt.
+
+**Zwei echte Bugs, beide aus demselben Muster wie schon bei Bahn/Arena — ein Attribut in
+einer Erfolgschance-Rolle gewinnt strukturell mehr Einfluss:**
+
+1. **"Immer der beste Verteidiger"** — erste Fassung wählte für JEDEN Zug per
+   `reduce()` den Spieler mit dem höchsten ABWEHR-Wert. Damit hing der gesamte
+   gegnerische Erfolg an EINER Person: hob man deren Awareness, wirkte das bei praktisch
+   jedem gegnerischen Angriff, nicht nur bei eigenen Zügen. Gemessen: Awareness 35 % bei
+   Matrixgewicht 14 (Basketball). Behoben durch **gewichtetes Los** (`gewichtetesLos()`)
+   — die Chance, den Zug zu verteidigen, ist proportional zum eigenen Wert, nicht
+   deterministisch der Höchste. Dasselbe für den Rebound.
+2. **TEAMGEIST als Team-Durchschnitt verwässerte jede Messung.** `einflussVon()` hebt
+   IMMER nur einen Spieler an; ein Sechser-Team-Schnitt bewegt sich davon nur um ein
+   Sechstel. Spirit — der höchste oder zweithöchste Matrixwert in drei von vier
+   Disziplinen — las deshalb nahe 0 %, egal wie hoch der Koeffizient stand. Jetzt zählt
+   der eigene TEAMGEIST-Wert des Ballführers, ungeteilt.
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Basketball | **35,5 Pp** |
+| Tennis | **46,5 Pp** |
+| Hockey | **46,4 Pp** |
+| Football | **63,1 Pp** |
+
+Football bleibt der Ausreißer: Spirit liest jetzt 47,9 % bei Matrixgewicht 25 —
+übernachgezogen, nachdem Will (vorher 31,6 % bei Gewicht 10) aus `TEAMGEIST` raus- und
+Spirit hineingezogen wurde. Nicht weiter gejagt, wie bei den anderen Chassis auch: ein
+Punkt, an dem eine weitere Iteration mehr Zeit als Erkenntnis gebracht hätte.
+
+Visuell: ein Spielfeld mit Mittelkreis und zwei Zonenbögen statt Sandplatz, Ereignisse im
+Feed ("Krag'Zul holt den Rebound", "Draco trifft von weit draußen — +3") — geprüft an
+Basketball und Football, beide lesbar mit echten Punktständen.
+
+### Die Rundenlänge — auf Chris' Wunsch ziemlich genau 60 Sekunden
+
+Bei Bühne ist das sicher: die Punktzahl steht schon fest, bevor die Enthüllung beginnt,
+also ändert das Reveal-Tempo nichts an der Balance. Rundendauer = 60 / (Durchgänge ×
+Teilnehmer × 2), geprüft im Browser: alle fünf Bühne-Disziplinen landen bei 58–60
+Sekunden. Bei Feldspiel dieselbe Formel, dieselbe Sicherheit (`zugDauer:60/(zuegeJeSeite*2*2)`).
+
+**Bei Bahn und Kampf ist die Rundenlänge NICHT angetastet** — dort hängt sie an
+Konstanten, die für die Balance fein justiert sind (Kraftverbrauch pro Sekunde,
+Abklingzeiten, Nervenregeneration). Eine reine Geschwindigkeitsskalierung würde die
+Balance verschieben, weil diese Konstanten an absoluter Zeit hängen, nicht an
+zurückgelegter Strecke. Das braucht einen eigenen, koordinierten Durchgang — offen.
+
+---
+
+## Fable-Konsultation: ein Motor pro Disziplin oder wenige geteilte?
+
+Chris' Frage: sollten alle Disziplinen den Kampf-Motor mit angepassten Stats nutzen
+(einfacher, sieht überall wie TDM aus), oder echte physische Interaktion je Disziplin
+(z. B. Klettern mit Rempeln/Angreifen) — und wie verhindert man, dass volle Skills/AOE
+in einer Disziplin wie Climbing absurd werden?
+
+Fables Antwort, unabhängig gegengeprüft: **nicht alles auf Kampf umstellen** — nicht nur
+aus thematischen Gründen, sondern weil der Kampf-Motor zwölf Attribute durch einen
+verlustbehafteten Trichter (fünf Kampfwerte) presst; Disziplinen mit anderem Profil
+(Climbing: stamina 26; Tennis: intelligence 22) würden ihn zwingen, ihr Profil zu
+verfälschen — die Pp-Messung würde das sofort zeigen. **Vier Motoren sind die richtige
+Granularität**, Unterscheidbarkeit gehört in Ablaufstruktur und Präsentation (billig,
+selbstbalancierend), nicht in Interaktionssysteme (Skills/AOE sind teuer und
+kombinatorisch). Leitplanke: **maximal ein Interaktionsverb** je Bahn/Feldspiel-Disziplin
+(Rempeln ODER Blockieren ODER Steal — nicht mehrere), sonst kriecht das Skill-System
+durch die Hintertür zurück. Denkduell braucht keinen fünften Motor — strukturell ist es
+Bühne (abwechselnde Züge, Erfolg/Misserfolg, Ermüdung), nur mit einer
+Vorteils-Anzeige statt Jury-Punkten.
+
+---
+
+## Verlässliche Einstiegspunkte
+
 ## Verlässliche Einstiegspunkte
 
 | Was | Wo |
@@ -521,6 +1018,8 @@ Zur Warnung, weil jeder dieser Posten monatelang wie ein Befund aussah:
 | Artefakt | https://claude.ai/code/artifact/af3bba05-dc93-4bcc-92f0-5f742f42380e |
 | Sprite-Baukasten | https://claude.ai/code/artifact/bea50d43-e66c-4008-aabf-36a293d594fd |
 | Messreihe | `node scripts/miss-arena-serie.mjs 24` (aus dem Repo-Wurzelverzeichnis!) |
+| Abnahme-Messung | `node scripts/messe-arena-einfluss.mjs <disziplin> <läufe>` |
+| Daten erzeugen | `npx tsx scripts/generiere-arena-daten.ts --schreiben` |
 | Spielstand | `git fetch origin live-save` — siehe `CLAUDE.md` |
 
 Playwright-Skripte **müssen im Repo liegen und von dort laufen**, sonst findet Node das

@@ -1403,7 +1403,23 @@
   // Bei 50 landet man also auf denselben 100 wie dort.
   const vorrat=(wert)=>Math.round(wert*2);
 
-  const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4}};
+  const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4},
+    "time-trial":{label:"Time-Trial",cat:"speed",size:6},
+    climbing:{label:"Climbing",cat:"speed",size:6},
+    "takeshis-castle":{label:"Takeshi",cat:"chaos",size:6},
+    staffel:{label:"Staffel",cat:"speed",size:6},
+    "mini-dm":{label:"Mini-DM",cat:"power",size:4},
+    fechten:{label:"Fechten",cat:"power",size:6},
+    battlefield:{label:"Battlefield",cat:"power",size:4},
+    gewichtheben:{label:"Gewichtheben",cat:"buehne",size:6},
+    showcase:{label:"Showcase",cat:"buehne",size:6},
+    eiskunstlauf:{label:"Eiskunstlauf",cat:"buehne",size:6},
+    breaking:{label:"Breaking",cat:"buehne",size:6},
+    wettessen:{label:"Wettessen",cat:"buehne",size:6},
+    basketball:{label:"Basketball",cat:"feldspiel",size:6},
+    football:{label:"Football",cat:"feldspiel",size:6},
+    hockey:{label:"Hockey",cat:"feldspiel",size:6},
+    tennis:{label:"Tennis",cat:"feldspiel",size:6}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -1539,62 +1555,224 @@
   // ein Shotcaller nach Charisma und Intelligence. Damit beeinflusst der Slot die
   // Grundwerte des Spielers, statt nur zu sagen, wo er steht.
   //
-  // Die Profile sind ABGESCHRIEBEN, nicht nachgebaut: resolveSlotRolesForDiscipline
-  // ("tdm","TDM",6) rechnet sie aus verschobenen Gewichten aus, die sich ueber alle
-  // sechs Slots zu null addieren. Diese Konstruktion hier nachzuprogrammieren hiesse,
-  // sie ein zweites Mal zu erfinden. Also: einmal vom echten Code ausgeben lassen,
-  // Zahlen uebernehmen. Bei der Anbindung ans Spiel ruft der Reiter die Funktion selbst.
+  // Die Profile werden nicht nachgebaut und auch nicht mehr abgeschrieben, sondern
+  // ERZEUGT: scripts/generiere-arena-daten.ts liest die echten Quellen des Spiels und
+  // schreibt den Block unten. Abschreiben ging bei zwei Disziplinen noch; bei zwanzig
+  // sind es ueber 1400 Zahlen, die lautlos auseinanderlaufen koennen.
+  //
+  //   npx tsx scripts/generiere-arena-daten.ts --schreiben
+  //
+  // Was das Skript NICHT kennt, sind Reihe und Befehl je Slot — das ist Inszenierung
+  // dieses Entwurfs, keine Spielregel. Die stehen deshalb unter SLOT_ZUSATZ direkt
+  // hinter dem erzeugten Block und ueberleben jeden Lauf.
+  // <<< GENERIERT: arena-daten — nicht von Hand ändern
+  // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:
+  //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)
+  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen)
+  // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.
   const BASIS_JE_DISC={
-    tdm:  {power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2},
-    spurt:{speed:18,determination:15,will:14,torment:14,dexterity:12,power:10,awareness:7,health:6,stamina:4}
+    "tdm": {power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2},
+    "mini-dm": {torment:24,health:20,power:16,stamina:16,will:14,dexterity:10},
+    "battlefield": {charisma:20,intelligence:16,spirit:16,torment:12,power:10,awareness:10,health:8,determination:4,stamina:4},
+    "gewichtheben": {power:28,charisma:23,health:16,determination:12,will:7,speed:6,dexterity:6,stamina:2},
+    "climbing": {stamina:26,determination:16,speed:12,dexterity:12,health:10,power:8,awareness:8,will:8},
+    "staffel": {speed:24,stamina:16,spirit:16,awareness:12,charisma:10,dexterity:8,will:8,determination:4,health:2},
+    "time-trial": {dexterity:25,speed:22,intelligence:18,stamina:15,awareness:12,power:5,torment:3},
+    "spurt": {speed:18,determination:15,will:14,torment:14,dexterity:12,power:10,awareness:7,health:6,stamina:4},
+    "tennis": {intelligence:22,awareness:20,spirit:18,stamina:12,dexterity:12,determination:6,speed:6,charisma:4},
+    "hockey": {power:18,health:18,speed:12,spirit:12,stamina:10,torment:10,awareness:8,determination:4,dexterity:4,will:4},
+    "showcase": {charisma:27,spirit:16,determination:14,power:11,intelligence:10,dexterity:9,speed:8,health:3,torment:2},
+    "speed-schach": {intelligence:28,awareness:21,determination:14,will:14,speed:10,dexterity:7,charisma:6},
+    "takeshis-castle": {will:22,determination:18,charisma:14,intelligence:11,awareness:8,torment:7,stamina:6,dexterity:6,health:4,speed:4},
+    "breaking": {will:28,torment:22,health:18,power:10,determination:10,stamina:8,dexterity:2,intelligence:2},
+    "wettessen": {will:26,health:22,stamina:22,determination:16,intelligence:8,torment:6},
+    "basketball": {spirit:22,intelligence:16,awareness:14,charisma:11,speed:10,dexterity:8,power:7,stamina:6,torment:6},
+    "football": {spirit:25,torment:16,health:14,awareness:11,will:10,determination:8,power:6,stamina:6,charisma:4},
+    "eiskunstlauf": {charisma:28,dexterity:18,spirit:16,awareness:14,speed:10,intelligence:8,determination:6},
+    "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
+    "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
   };
-  // Jede Disziplin hat ihre eigene Slot-Zahl: TDM sechs, Spurt vier. Vorher hingen hier
-  // die sechs TDM-Slots fest — im Spurt tauchten damit zwei Slots auf, die es dort gar
-  // nicht gibt.
   const SLOTS_JE_DISC={
-    tdm:[
-    {id:"vanguard",  label:"Vanguard",   reihe:0, ord:"mitlinie",
-     text:"Öffnet Teamfights mit Power und Health.", gross:"power", klein:"health", last:"stamina", mueh:"hoch",
-     profil:{power:33.4,health:23.4,determination:5.0,stamina:11.5,awareness:1.8,intelligence:5.0,charisma:8.3,spirit:9.9,torment:1.8}},
-    {id:"holdline",  label:"Hold Line",  reihe:0, ord:"mitlinie",
-     text:"Stabilisiert knappe Phasen mit Health und Determination.", gross:"health", klein:"determination", last:"stamina", mueh:"mittel",
-     profil:{power:24.8,health:25.4,determination:8.7,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:8.9,spirit:10.7,torment:1.9}},
-    {id:"breaker",   label:"Breaker",    reihe:1, ord:"verfolgen",
-     text:"Bricht Widerstand mit Power und Torment.", gross:"power", klein:"stamina", last:"awareness", mueh:"hoch",
-     profil:{power:35.0,health:17.7,determination:6.1,stamina:15.4,awareness:2.8,intelligence:6.3,charisma:6.2,spirit:7.7,torment:2.8}},
-    {id:"skirmisher",label:"Skirmisher", reihe:1, ord:"flanke",
-     text:"Sucht schnelle Picks und hält Tempo im Fight.", gross:"stamina", klein:"spirit", last:"health", mueh:"mittel",
-     profil:{power:24.5,health:17.5,determination:5.3,stamina:19.4,awareness:1.8,intelligence:5.3,charisma:8.8,spirit:15.4,torment:1.8}},
-    // "hinter" hiess hier bis eben "haelt sich aus dem Kampf". Gemessen: Buttercup kam
-    // ueber 24 Kaempfe auf NULL Schaden und NULL erlittenen Schaden, Baumkopf auf 31 %
-    // Leistung. Beides war meine Erfindung — keine Slot-Definition des Spiels sagt, dass
-    // ein Shotcaller sich raushaelt; sie sagt "Ordnet den Fight". Die Slots starten
-    // weiterhin in der hinteren Reihe, ruecken aber mit der Linie vor. Danach: Buttercup
-    // 97 %, Baumkopf 58 %.
-    {id:"shotcaller",label:"Shotcaller", reihe:2, ord:"mitlinie",
-     text:"Ordnet den Fight über Intelligence und Charisma.", gross:"charisma", klein:"intelligence", last:"power", mueh:"niedrig",
-     profil:{power:25.6,health:18.3,determination:5.5,stamina:12.8,awareness:1.9,intelligence:8.7,charisma:14.4,spirit:11.0,torment:1.9}},
-    {id:"rallypoint",label:"Rally Point",reihe:2, ord:"mitlinie",
-     text:"Hebt Team-Momentum über Spirit und Charisma.", gross:"spirit", klein:"charisma", last:"power", mueh:"niedrig",
-     profil:{power:24.7,health:17.7,determination:5.4,stamina:12.4,awareness:1.9,intelligence:5.4,charisma:13.4,spirit:17.3,torment:1.9}}
+    "tdm":[
+      {id:"vanguard",label:"Vanguard",text:"Oeffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
+      {id:"skirmisher",label:"Skirmisher",text:"Sucht schnelle Picks und haelt Tempo im Fight.",gross:"stamina",klein:"spirit",last:"health",mueh:"medium",profil:{power:24.5,stamina:19.4,health:17.5,spirit:15.4,charisma:8.8,determination:5.3,intelligence:5.3,awareness:1.8,torment:1.8}},
+      {id:"shotcaller",label:"Shotcaller",text:"Ordnet den Fight über Intelligence und Charisma.",gross:"charisma",klein:"intelligence",last:"power",mueh:"low",profil:{power:25.6,health:18.3,charisma:14.4,stamina:12.8,spirit:11,intelligence:8.7,determination:5.5,awareness:1.9,torment:1.9}},
+      {id:"holdline",label:"Hold Line",text:"Stabilisiert knappe Phasen mit Health und Determination.",gross:"health",klein:"determination",last:"stamina",mueh:"medium",profil:{health:25.4,power:24.8,stamina:12.5,spirit:10.7,charisma:8.9,determination:8.7,intelligence:5.4,awareness:1.9,torment:1.9}},
+      {id:"rallypoint",label:"Rally Point",text:"Hebt Team-Momentum über Spirit und Charisma.",gross:"spirit",klein:"charisma",last:"power",mueh:"low",profil:{power:24.7,health:17.7,spirit:17.3,charisma:13.4,stamina:12.4,determination:5.4,intelligence:5.4,awareness:1.9,torment:1.9}},
+      {id:"breaker",label:"Breaker",text:"Bricht Widerstand mit Power und Torment.",gross:"power",klein:"stamina",last:"awareness",mueh:"high",profil:{power:35,health:17.7,stamina:15.4,spirit:7.7,intelligence:6.3,charisma:6.2,determination:6.1,awareness:2.8,torment:2.8}}
     ],
-    spurt:[
-    {id:"blockstart", label:"Block Start",  reihe:0, ord:"mitlinie",
-     text:"Explodiert aus dem Start über Speed und Determination.", gross:"speed", klein:"determination", last:"stamina", mueh:"hoch",
-     profil:{power:8.7,health:5.3,determination:18.4,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:12.1,torment:12.1}},
-    {id:"acceleration",label:"Acceleration",reihe:0, ord:"mitlinie",
-     text:"Baut Tempo über Speed und Torment auf.", gross:"speed", klein:"torment", last:"health", mueh:"mittel",
-     profil:{power:8.7,health:5.3,determination:13.0,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:12.1,torment:17.4}},
-    {id:"topspeed",   label:"Top Speed",   reihe:1, ord:"verfolgen",
-     text:"Maximiert Endtempo über Speed und Will.", gross:"speed", klein:"will", last:"determination", mueh:"hoch",
-     profil:{power:8.7,health:5.3,determination:13.0,stamina:3.5,speed:23.4,dexterity:10.4,awareness:6.1,will:17.4,torment:12.1}},
-    {id:"lanecontrol",label:"Lane Control",reihe:1, ord:"flanke",
-     text:"Bleibt sauber über Dexterity und Awareness.", gross:"dexterity", klein:"power", last:"speed", mueh:"niedrig",
-     profil:{power:13.9,health:8.2,determination:15.6,stamina:5.4,speed:1.8,dexterity:16.8,awareness:9.7,will:14.3,torment:14.3}}
+    "mini-dm":[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:25.4,torment:20.6,power:19.4,stamina:13.8,will:12.1,dexterity:8.7}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:21.5,health:17.9,will:17.4,dexterity:14.4,power:14.4,stamina:14.4}},
+      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:24.5,stamina:22,health:19.4,power:16.3,will:14.3,dexterity:3.5}}
+    ],
+    "battlefield":[
+      {id:"commander",label:"Commander",text:"Fuehrt grosse Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"spotter",label:"Spotter",text:"Liest Lücken und Ziele über Awareness.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
+      {id:"siegecore",label:"Siege Core",text:"Drueckt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Haelt Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
+    ],
+    "gewichtheben":[
+      {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
+      {id:"safelift",label:"Safe Lift",text:"Sichert Punkte über Health und Determination.",gross:"health",klein:"determination",last:"power",mueh:"low",profil:{power:24.4,health:21.4,charisma:20.1,determination:15.4,will:6.2,speed:5.3,dexterity:5.3,stamina:1.8}},
+      {id:"pressurelift",label:"Pressure Lift",text:"Geht aggressiv in schwere Versuche.",gross:"charisma",klein:"power",last:"health",mueh:"high",profil:{power:31.4,charisma:28.4,health:13,determination:9.8,will:5.8,speed:5,dexterity:5,stamina:1.8}},
+      {id:"technicallift",label:"Technical Lift",text:"Belohnt saubere Ausfuehrung über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"power",mueh:"medium",profil:{power:26.3,charisma:21.6,health:15,determination:11.3,speed:8.7,dexterity:8.7,will:6.6,stamina:1.9}},
+      {id:"gripanchor",label:"Grip Anchor",text:"Haelt über Will und Determination, wenn es eng wird.",gross:"determination",klein:"will",last:"health",mueh:"medium",profil:{power:25.7,charisma:21.1,determination:15.4,health:14.7,will:10.1,speed:5.6,dexterity:5.6,stamina:1.9}},
+      {id:"finalattempt",label:"Final Attempt",text:"Lebt vom grossen Moment und Charisma.",gross:"charisma",klein:"will",last:"stamina",mueh:"medium",profil:{charisma:27.6,power:26.8,health:12.5,determination:10,will:7.4,speed:6.4,dexterity:6.4,stamina:2.8}}
+    ],
+    "climbing":[
+      {id:"routereader",label:"Route Reader",text:"Findet die Linie über Determination und Awareness.",gross:"determination",klein:"awareness",last:"stamina",mueh:"low",profil:{stamina:22.9,determination:21.4,awareness:11.4,speed:10.6,dexterity:10.6,health:8.9,power:7.1,will:7.1}},
+      {id:"gripspecialist",label:"Grip Specialist",text:"Braucht Dexterity und Power für harte Zuege.",gross:"dexterity",klein:"power",last:"health",mueh:"medium",profil:{stamina:23.1,dexterity:17.3,determination:14.2,power:11.4,speed:10.7,health:8.9,awareness:7.2,will:7.2}},
+      {id:"paceclimber",label:"Pace Climber",text:"Haelt Tempo über Stamina und Speed.",gross:"stamina",klein:"speed",last:"will",mueh:"medium",profil:{stamina:31.4,speed:15.4,determination:13.7,dexterity:10.3,health:8.6,power:6.9,awareness:6.9,will:6.9}},
+      {id:"endurancewall",label:"Endurance Wall",text:"Klettert stabil über Stamina und Health.",gross:"stamina",klein:"health",last:"dexterity",mueh:"high",profil:{stamina:31.4,determination:13.7,health:13.4,speed:10.3,dexterity:10.3,power:6.9,awareness:6.9,will:6.9}},
+      {id:"dynamicmove",label:"Dynamic Move",text:"Sucht explosive Zuege über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"determination",mueh:"medium",profil:{stamina:22.9,speed:17.3,dexterity:15.4,determination:14.1,health:8.9,power:7.1,awareness:7.1,will:7.1}},
+      {id:"summitpush",label:"Summit Push",text:"Zieht den Schluss über Determination und Will.",gross:"will",klein:"determination",last:"stamina",mueh:"high",profil:{stamina:24.3,determination:18.8,will:12.8,health:11.3,power:8.5,awareness:8.5,dexterity:8.1,speed:7.6}}
+    ],
+    "staffel":[
+      {id:"startrunner",label:"Start Runner",text:"Bringt die Staffel mit Speed in Position.",gross:"speed",klein:"stamina",last:"awareness",mueh:"medium",profil:{speed:29.4,stamina:19.4,spirit:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
+      {id:"tempolink",label:"Tempo Link",text:"Haelt Zwischenzeiten über Stamina und Spirit.",gross:"stamina",klein:"spirit",last:"speed",mueh:"medium",profil:{stamina:21.4,speed:20.7,spirit:19.4,awareness:10.4,charisma:8.7,dexterity:7,will:7,determination:3.5,health:1.8}},
+      {id:"batontech",label:"Baton Tech",text:"Sichert Wechsel über Awareness und Dexterity.",gross:"awareness",klein:"dexterity",last:"stamina",mueh:"low",profil:{speed:21.3,awareness:17.3,stamina:14.2,spirit:14.2,dexterity:11.4,charisma:8.9,will:7.2,determination:3.6,health:1.9}},
+      {id:"curverunner",label:"Curve Runner",text:"Braucht Speed und Will für schwierige Abschnitte.",gross:"speed",klein:"will",last:"dexterity",mueh:"medium",profil:{speed:29.4,stamina:13.9,spirit:13.9,will:11.4,awareness:10.4,charisma:8.7,dexterity:7,determination:3.5,health:1.8}},
+      {id:"chaserunner",label:"Chase Runner",text:"Jagt Rückstände mit Spirit und Speed.",gross:"spirit",klein:"speed",last:"stamina",mueh:"high",profil:{speed:27.4,spirit:21.4,stamina:13.5,awareness:10.2,charisma:8.5,dexterity:6.8,will:6.8,determination:3.5,health:1.8}},
+      {id:"anchor",label:"Anchor",text:"Schliesst die Staffel über Spirit und Charisma.",gross:"charisma",klein:"spirit",last:"stamina",mueh:"medium",profil:{charisma:16.7,speed:15.8,stamina:13.6,spirit:13.6,awareness:13.5,dexterity:8.9,will:8.8,determination:6.3,health:2.9}}
+    ],
+    "time-trial":[
+      {id:"pacer",label:"Pacer",text:"Haelt die Linie über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"stamina",mueh:"medium",profil:{dexterity:30.4,speed:25.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"linereader",label:"Line Reader",text:"Findet Sekunden über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"speed",mueh:"low",profil:{intelligence:23.4,dexterity:21.8,speed:19.2,awareness:15.4,stamina:13.1,power:4.4,torment:2.7}},
+      {id:"aerodrive",label:"Aero Drive",text:"Drueckt Geschwindigkeit über Speed.",gross:"speed",klein:"dexterity",last:"intelligence",mueh:"medium",profil:{dexterity:28.4,speed:27.4,intelligence:14.9,stamina:12.5,awareness:10,power:4.2,torment:2.6}},
+      {id:"splitcontrol",label:"Split Control",text:"Kontrolliert Zwischenzeiten über Intelligence.",gross:"intelligence",klein:"stamina",last:"dexterity",mueh:"low",profil:{intelligence:23.4,dexterity:21.6,speed:19,stamina:18.4,awareness:10.4,power:4.4,torment:2.7}},
+      {id:"risksegment",label:"Risk Segment",text:"Nimmt Risiko über Dexterity und Torment.",gross:"dexterity",klein:"torment",last:"awareness",mueh:"high",profil:{dexterity:30.4,speed:19.9,intelligence:16.3,stamina:13.6,awareness:10.9,power:4.6,torment:4.5}},
+      {id:"finishkick",label:"Finish Kick",text:"Holt den Schluss über Speed und Power.",gross:"stamina",klein:"awareness",last:"stamina",mueh:"high",profil:{speed:21.1,stamina:20,dexterity:17.4,awareness:15.3,intelligence:15.1,power:8.1,torment:3}}
+    ],
+    "spurt":[
+      {id:"blockstart",label:"Block Start",text:"Explodiert aus dem Start über Speed und Determination.",gross:"speed",klein:"determination",last:"stamina",mueh:"high",profil:{speed:23.4,determination:18.4,will:12.1,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
+      {id:"acceleration",label:"Acceleration",text:"Baut Tempo über Speed und Torment auf.",gross:"speed",klein:"torment",last:"health",mueh:"medium",profil:{speed:23.4,torment:17.4,determination:13,will:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
+      {id:"topspeed",label:"Top Speed",text:"Maximiert Endtempo über Speed und Will.",gross:"speed",klein:"will",last:"determination",mueh:"high",profil:{speed:23.4,will:17.4,determination:13,torment:12.1,dexterity:10.4,power:8.7,awareness:6.1,health:5.3,stamina:3.5}},
+      {id:"lanecontrol",label:"Lane Control",text:"Bleibt sauber über Dexterity und Awareness.",gross:"dexterity",klein:"power",last:"speed",mueh:"low",profil:{dexterity:16.8,determination:15.6,will:14.3,torment:14.3,power:13.9,awareness:9.7,health:8.2,stamina:5.4,speed:1.8}}
+    ],
+    "tennis":[
+      {id:"serve",label:"Serve",text:"Setzt Druck über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"stamina",mueh:"medium",profil:{awareness:25.4,spirit:21.4,intelligence:18.7,stamina:10.3,dexterity:10.3,determination:5.2,speed:5.2,charisma:3.5}},
+      {id:"return",label:"Return",text:"Liest Aufschlaege über Intelligence und Awareness.",gross:"intelligence",klein:"awareness",last:"dexterity",mueh:"low",profil:{intelligence:27.4,awareness:23.4,spirit:15.2,stamina:10.2,dexterity:10.2,determination:5.1,speed:5.1,charisma:3.5}},
+      {id:"rallycontrol",label:"Rally Control",text:"Haelt Ballwechsel über Intelligence und Stamina.",gross:"intelligence",klein:"stamina",last:"spirit",mueh:"medium",profil:{intelligence:27.4,awareness:17.2,spirit:15.5,stamina:15.4,dexterity:10.4,determination:5.3,speed:5.3,charisma:3.5}},
+      {id:"netpressure",label:"Net Pressure",text:"Greift über Dexterity und Speed an.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:19.8,awareness:18,dexterity:17.3,spirit:16.2,stamina:10.9,speed:8.7,determination:5.5,charisma:3.7}},
+      {id:"matchiq",label:"Match IQ",text:"Gewinnt Muster über Intelligence und Determination.",gross:"intelligence",klein:"determination",last:"stamina",mueh:"low",profil:{intelligence:27.4,awareness:17.7,spirit:16,stamina:10.7,dexterity:10.7,determination:8.7,speed:5.4,charisma:3.6}},
+      {id:"tiebreak",label:"Tiebreak Clutch",text:"Braucht Spirit und Awareness im Druckmoment.",gross:"spirit",klein:"stamina",last:"determination",mueh:"high",profil:{spirit:23.7,awareness:18.2,stamina:14.6,dexterity:13.2,intelligence:11.3,speed:6.4,determination:6.3,charisma:6.2}}
+    ],
+    "hockey":[
+      {id:"powerforward",label:"Power Forward",text:"Geht dahin, wo es weh tut.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:23.4,health:21.4,speed:10.3,spirit:10.3,stamina:8.6,torment:8.6,awareness:6.9,determination:3.5,dexterity:3.5,will:3.5}},
+      {id:"defensivewall",label:"Defensive Wall",text:"Schliesst Raeume über Health und Spirit.",gross:"health",klein:"spirit",last:"speed",mueh:"medium",profil:{health:23.4,power:15.6,spirit:15.4,speed:10.5,stamina:8.7,torment:8.7,awareness:7,determination:3.6,dexterity:3.6,will:3.6}},
+      {id:"playmaker",label:"Playmaker",text:"Verbindet Linien über Power und Awareness.",gross:"awareness",klein:"power",last:"health",mueh:"medium",profil:{power:21.4,health:16.2,awareness:11.5,speed:10.9,spirit:10.9,stamina:9.1,torment:9.1,determination:3.7,dexterity:3.7,will:3.7}},
+      {id:"transition",label:"Transition Runner",text:"Dreht Tempo über Speed und Stamina.",gross:"speed",klein:"stamina",last:"power",mueh:"high",profil:{speed:17.3,power:15.9,health:15.9,stamina:13.4,spirit:10.6,torment:8.9,awareness:7.1,determination:3.6,dexterity:3.6,will:3.6}},
+      {id:"slotfinisher",label:"Slot Finisher",text:"Schliesst Chancen über Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"medium",profil:{power:23.4,health:15.7,torment:13.4,speed:10.5,spirit:10.5,stamina:8.8,awareness:7,determination:3.6,dexterity:3.6,will:3.6}},
+      {id:"captainline",label:"Captain Line",text:"Hebt die Reihe über Spirit.",gross:"spirit",klein:"determination",last:"stamina",mueh:"low",profil:{health:15.3,spirit:14.3,speed:12.6,stamina:11.4,torment:11.3,awareness:8.4,power:8.3,determination:6.1,dexterity:6.1,will:6.1}}
+    ],
+    "showcase":[
+      {id:"stagelead",label:"Stage Lead",text:"Traegt die Show über Charisma.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"crowdhook",label:"Crowd Hook",text:"Holt Publikum über Charisma und Showcase-Power.",gross:"charisma",klein:"power",last:"intelligence",mueh:"low",profil:{charisma:32.4,power:14.4,spirit:13.6,determination:11.9,intelligence:8.6,dexterity:7.7,speed:6.9,health:2.7,torment:1.8}},
+      {id:"styletech",label:"Style Tech",text:"Belohnt saubere Details über Determination und Dexterity.",gross:"determination",klein:"dexterity",last:"charisma",mueh:"medium",profil:{charisma:23.8,determination:19.4,spirit:14.1,dexterity:12.4,power:9.7,intelligence:8.9,speed:7.1,health:2.7,torment:1.9}},
+      {id:"controlbeat",label:"Control Beat",text:"Fuehrt Rhythmus über Intelligence.",gross:"intelligence",klein:"determination",last:"power",mueh:"low",profil:{charisma:24.1,determination:17.4,intelligence:14.4,spirit:14.3,power:9.9,dexterity:8.1,speed:7.2,health:2.8,torment:1.9}},
+      {id:"bigmoment",label:"Big Moment",text:"Lebt von Charisma und Spirit im Spotlight.",gross:"charisma",klein:"spirit",last:"determination",mueh:"medium",profil:{charisma:32.4,spirit:19.4,determination:11.7,power:9.3,intelligence:8.4,dexterity:7.6,speed:6.8,health:2.6,torment:1.8}},
+      {id:"finale",label:"Finale",text:"Setzt den Schlussakzent über Spirit.",gross:"speed",klein:"spirit",last:"power",mueh:"medium",profil:{charisma:17,spirit:15.1,power:13.5,speed:13.3,determination:11.8,intelligence:11.3,dexterity:10.6,health:4.6,torment:2.9}}
+    ],
+    "speed-schach":[
+      {id:"openingprep",label:"Opening Prep",text:"Kommt über Intelligence und Awareness ins Spiel.",gross:"intelligence",klein:"awareness",last:"will",mueh:"low",profil:{intelligence:33.4,awareness:24.4,determination:11.5,will:11.5,speed:8.3,dexterity:5.8,charisma:5}},
+      {id:"patternread",label:"Pattern Read",text:"Erkennt Muster über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"speed",mueh:"low",profil:{intelligence:31.4,awareness:26.4,determination:11.5,will:11.5,speed:8.3,dexterity:5.8,charisma:5}},
+      {id:"clockpressure",label:"Clock Pressure",text:"Spielt Uhrdruck über Will und Speed.",gross:"will",klein:"speed",last:"intelligence",mueh:"medium",profil:{intelligence:24.7,will:19.4,awareness:18.5,speed:13.4,determination:12.4,dexterity:6.2,charisma:5.4}},
+      {id:"calculation",label:"Calculation Core",text:"Rechnet Linien über Intelligence.",gross:"determination",klein:"intelligence",last:"awareness",mueh:"low",profil:{intelligence:22.5,determination:20.6,awareness:14.7,will:13.6,dexterity:10.1,speed:10,charisma:8.6}}
+    ],
+    "takeshis-castle":[
+      {id:"gatecrash",label:"Gate Crash",text:"Oeffnet Hindernisse über Will und Determination.",gross:"will",klein:"determination",last:"health",mueh:"high",profil:{will:27.4,determination:21.4,charisma:11.8,intelligence:9.3,awareness:6.8,torment:6,stamina:5.1,dexterity:5.1,health:3.5,speed:3.5}},
+      {id:"balancerun",label:"Balance Run",text:"Bleibt sauber über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"will",mueh:"medium",profil:{will:19.9,determination:16.3,intelligence:15.9,charisma:12.7,dexterity:8.7,awareness:7.3,torment:6.4,stamina:5.5,health:3.7,speed:3.7}},
+      {id:"trapreader",label:"Trap Reader",text:"Liest Fallen über Awareness und Intelligence.",gross:"awareness",klein:"intelligence",last:"determination",mueh:"low",profil:{will:20,determination:16.4,intelligence:14.4,charisma:12.8,awareness:11.5,torment:6.4,stamina:5.5,dexterity:5.5,health:3.7,speed:3.7}},
+      {id:"ironwill",label:"Iron Will",text:"Beisst sich über Will durch.",gross:"will",klein:"health",last:"dexterity",mueh:"high",profil:{will:27.4,determination:16.2,charisma:12.6,intelligence:9.9,awareness:7.2,torment:6.3,health:5.8,stamina:5.5,dexterity:5.5,speed:3.7}},
+      {id:"chaosdodge",label:"Chaos Dodge",text:"Ueberlebt Unordnung über Charisma und Torment.",gross:"charisma",klein:"torment",last:"awareness",mueh:"medium",profil:{will:19.5,charisma:19.4,determination:16,torment:10.1,intelligence:9.8,awareness:7.2,stamina:5.4,dexterity:5.4,health:3.6,speed:3.6}},
+      {id:"finalwall",label:"Final Wall",text:"Braucht Determination und Will im letzten Hindernis.",gross:"determination",klein:"stamina",last:"health",mueh:"high",profil:{determination:21.7,will:17.7,charisma:14.7,stamina:9,awareness:8,torment:6.8,intelligence:6.7,speed:5.9,dexterity:5.9,health:3.8}}
+    ],
+    "breaking":[
+      {id:"powermove",label:"Power Move",text:"Drueckt schwere Moves über Will und Torment.",gross:"will",klein:"torment",last:"health",mueh:"high",profil:{will:33.4,torment:25.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"footwork",label:"Footwork",text:"Sammelt Punkte über Health und Dexterity.",gross:"health",klein:"dexterity",last:"will",mueh:"medium",profil:{will:25.5,health:23.4,torment:20.1,power:9.2,determination:9.2,stamina:7.3,dexterity:3.5,intelligence:1.9}},
+      {id:"freezecontrol",label:"Freeze Control",text:"Haelt Kontrolle über Health und Determination.",gross:"health",klein:"determination",last:"torment",mueh:"medium",profil:{will:24.4,health:23.4,torment:19.2,determination:13.4,power:8.8,stamina:7.1,dexterity:1.8,intelligence:1.8}},
+      {id:"musicality",label:"Musicality",text:"Findet Flow über Will und Determination.",gross:"will",klein:"determination",last:"power",mueh:"low",profil:{will:33.4,torment:18.7,health:15.4,determination:13.4,power:8.6,stamina:6.9,dexterity:1.8,intelligence:1.8}},
+      {id:"battlenerve",label:"Battle Nerve",text:"Antwortet im Battle über Torment und Will.",gross:"torment",klein:"will",last:"health",mueh:"high",profil:{will:31.4,torment:27.4,health:14.7,power:8.2,determination:8.2,stamina:6.6,dexterity:1.8,intelligence:1.8}},
+      {id:"finaleset",label:"Finale Set",text:"Setzt den Abschluss über Power und Torment.",gross:"power",klein:"stamina",last:"determination",mueh:"medium",profil:{torment:21.2,will:19.8,power:17.1,health:16.6,stamina:13.5,determination:7.6,intelligence:3,dexterity:1.4}}
+    ],
+    "wettessen":[
+      {id:"capacity",label:"Capacity",text:"Hat Grundvolumen über Health und Stamina.",gross:"health",klein:"stamina",last:"will",mueh:"high",profil:{health:27.4,stamina:25.4,will:21.8,determination:13.5,intelligence:6.8,torment:5.1}},
+      {id:"pacecontrol",label:"Pace Control",text:"Teilt Kraefte über Stamina und Intelligence ein.",gross:"stamina",klein:"intelligence",last:"health",mueh:"medium",profil:{stamina:27.4,will:22.7,health:19.2,determination:14,intelligence:11.4,torment:5.3}},
+      {id:"ironstomach",label:"Iron Stomach",text:"Haelt Belastung über Health und Will.",gross:"health",klein:"will",last:"stamina",mueh:"high",profil:{will:29.4,health:27.4,stamina:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"tablefocus",label:"Table Focus",text:"Bleibt klar über Determination und Intelligence.",gross:"determination",klein:"intelligence",last:"health",mueh:"low",profil:{will:23,determination:21.4,health:19.4,stamina:19.4,intelligence:11.4,torment:5.4}},
+      {id:"secondwind",label:"Second Wind",text:"Kommt über Will und Stamina zurück.",gross:"will",klein:"stamina",last:"health",mueh:"medium",profil:{will:31.4,stamina:25.4,health:18.2,determination:13.3,intelligence:6.7,torment:5.1}},
+      {id:"finalbite",label:"Final Bite",text:"Zieht den Schluss über Determination und Torment.",gross:"determination",klein:"torment",last:"will",mueh:"high",profil:{will:27.8,determination:20.7,health:20.4,stamina:16.1,torment:10.1,intelligence:5}}
+    ],
+    "basketball":[
+      {id:"floorgeneral",label:"Floor General",text:"Fuehrt Possessions über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{spirit:27.4,intelligence:19.4,awareness:11.9,charisma:9.4,speed:8.6,dexterity:6.9,power:6,stamina:5.2,torment:5.2}},
+      {id:"rimpressure",label:"Rim Pressure",text:"Attackiert den Korb über Awareness und Speed.",gross:"awareness",klein:"speed",last:"spirit",mueh:"high",profil:{awareness:19.4,spirit:19.4,intelligence:14.1,speed:13.4,charisma:9.7,dexterity:7.1,power:6.2,stamina:5.4,torment:5.4}},
+      {id:"perimeter",label:"Perimeter",text:"Schafft Winkel über Intelligence und Dexterity.",gross:"intelligence",klein:"dexterity",last:"power",mueh:"medium",profil:{intelligence:21.4,spirit:19.4,awareness:12.4,dexterity:11.4,charisma:9.7,speed:8.9,power:6.2,stamina:5.4,torment:5.4}},
+      {id:"helpdefense",label:"Help Defense",text:"Rotiert über Awareness und Spirit.",gross:"awareness",klein:"spirit",last:"speed",mueh:"medium",profil:{spirit:25.4,awareness:19.4,intelligence:13.7,charisma:9.5,speed:8.6,dexterity:6.9,power:6.1,stamina:5.2,torment:5.2}},
+      {id:"clutchshot",label:"Clutch Shot",text:"Braucht Spirit und Charisma im Wurfmoment.",gross:"spirit",klein:"charisma",last:"awareness",mueh:"medium",profil:{spirit:27.4,charisma:14.4,intelligence:13.8,awareness:12.1,speed:8.7,dexterity:7,power:6.1,stamina:5.3,torment:5.3}},
+      {id:"fastbreak",label:"Fast Break",text:"Läuft Punkte über Speed und Dexterity.",gross:"power",klein:"stamina",last:"stamina",mueh:"high",profil:{intelligence:13.6,charisma:13.3,spirit:13.1,speed:11.9,power:11.4,stamina:9.7,torment:9.7,awareness:8.8,dexterity:8.7}}
+    ],
+    "football":[
+      {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Spirit und Torment.",gross:"spirit",klein:"torment",last:"health",mueh:"high",profil:{spirit:30.4,torment:19.4,health:11.8,awareness:9.3,will:8.5,determination:6.8,power:5.1,stamina:5.1,charisma:3.5}},
+      {id:"routeburst",label:"Route Burst",text:"Schafft Separation über Health und Will.",gross:"health",klein:"will",last:"awareness",mueh:"medium",profil:{spirit:22,health:19.4,torment:14.1,will:13.4,awareness:9.7,determination:7.1,power:5.4,stamina:5.4,charisma:3.6}},
+      {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{spirit:22.4,awareness:15.9,torment:14.3,health:12.6,determination:11.4,will:9,power:5.4,stamina:5.4,charisma:3.6}},
+      {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{spirit:21.8,torment:21.4,awareness:14.4,health:12.3,will:8.8,determination:7.1,power:5.3,stamina:5.3,charisma:3.6}},
+      {id:"redzone",label:"Red Zone",text:"Braucht Spirit und Power nahe der Linie.",gross:"spirit",klein:"power",last:"will",mueh:"high",profil:{spirit:30.4,torment:14.1,health:12.3,awareness:9.7,will:8.8,power:8.7,determination:7.1,stamina:5.3,charisma:3.6}},
+      {id:"lockerleader",label:"Locker Leader",text:"Fuehrt über Spirit und Charisma.",gross:"stamina",klein:"spirit",last:"health",mueh:"low",profil:{spirit:23.1,health:15.6,torment:12.7,will:11.5,stamina:9.4,determination:8.5,awareness:7,power:6.1,charisma:6.1}}
+    ],
+    "eiskunstlauf":[
+      {id:"edgecontrol",label:"Edge Control",text:"Traegt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
+      {id:"jumpsetup",label:"Jump Setup",text:"Braucht Dexterity und Awareness für Spruenge.",gross:"dexterity",klein:"awareness",last:"determination",mueh:"high",profil:{charisma:24.3,dexterity:23.4,awareness:17.4,spirit:13.9,speed:8.7,intelligence:7,determination:5.3}},
+      {id:"spingrace",label:"Spin Grace",text:"Sammelt Stil über Charisma und Spirit.",gross:"charisma",klein:"spirit",last:"dexterity",mueh:"medium",profil:{charisma:33.4,spirit:19.4,dexterity:15.1,awareness:11.8,speed:8.4,intelligence:6.8,determination:5.1}},
+      {id:"programflow",label:"Program Flow",text:"Verbindet Elemente über Spirit und Intelligence.",gross:"spirit",klein:"intelligence",last:"speed",mueh:"low",profil:{charisma:24.7,spirit:21.4,dexterity:15.9,awareness:12.4,intelligence:11.4,speed:8.9,determination:5.4}},
+      {id:"crowdmoment",label:"Crowd Moment",text:"Hebt den Auftritt über Charisma.",gross:"charisma",klein:"awareness",last:"determination",mueh:"medium",profil:{charisma:33.4,awareness:17.4,dexterity:15.2,spirit:13.5,speed:8.5,intelligence:6.8,determination:5.2}},
+      {id:"finalpose",label:"Final Pose",text:"Setzt den Abschluss über Spirit und Charisma.",gross:"speed",klein:"determination",last:"dexterity",mueh:"low",profil:{charisma:18.9,speed:17.1,dexterity:17,spirit:14.4,awareness:13.3,determination:10,intelligence:9.2}}
+    ],
+    "fechten":[
+      {id:"duelist",label:"Duelist",text:"Sauberer Kernslot für direkte Duelle.",gross:"dexterity",klein:"speed",last:"speed",mueh:"medium",profil:{dexterity:25.4,torment:21.4,speed:19.4,awareness:12.9,power:8.6,determination:5.2,health:3.5,intelligence:3.5}},
+      {id:"aggressor",label:"Aggressor",text:"Bringt Druck über Torment und Power.",gross:"torment",klein:"power",last:"awareness",mueh:"high",profil:{torment:30.4,dexterity:17.2,speed:13.8,power:13.4,awareness:12.9,determination:5.2,health:3.5,intelligence:3.5}},
+      {id:"defender",label:"Defender",text:"Hält Duelle stabil und federt Gegenangriffe ab.",gross:"awareness",klein:"health",last:"speed",mueh:"medium",profil:{torment:22.7,awareness:20.4,dexterity:18.2,speed:14.6,power:9.1,health:5.8,determination:5.5,intelligence:3.7}},
+      {id:"technician",label:"Technician",text:"Gewinnt über Technik, Timing und Kontrolle.",gross:"dexterity",klein:"awareness",last:"torment",mueh:"low",profil:{dexterity:25.4,torment:21.5,awareness:18.4,speed:13.8,power:8.7,determination:5.2,health:3.5,intelligence:3.5}},
+      {id:"countertempo",label:"Counter Tempo",text:"Dreht Timing über speed und Intelligence.",gross:"speed",klein:"intelligence",last:"health",mueh:"medium",profil:{torment:22.7,speed:21.4,dexterity:18.2,awareness:13.7,power:9.1,intelligence:5.8,determination:5.5,health:3.7}},
+      {id:"finaltouch",label:"Final Touch",text:"Schliesst enge Gefechte über Torment und Determination.",gross:"torment",klein:"determination",last:"awareness",mueh:"high",profil:{torment:31.3,dexterity:15.7,speed:13.1,awareness:11.7,power:11,determination:9.3,health:4,intelligence:4}}
+    ],
+    "i-spy":[
+      {id:"observer",label:"Observer",text:"Sieht Details über Intelligence und Torment.",gross:"intelligence",klein:"torment",last:"health",mueh:"low",profil:{intelligence:23.4,torment:20.4,spirit:11.2,will:10.3,charisma:7.8,determination:6.9,speed:6.9,dexterity:6.9,awareness:4.4,health:1.8}},
+      {id:"patternlock",label:"Pattern Lock",text:"Verkettet Hinweise über Intelligence und Spirit.",gross:"intelligence",klein:"spirit",last:"speed",mueh:"low",profil:{intelligence:23.4,spirit:16.4,torment:14.7,will:10.4,charisma:7.8,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"socialread",label:"Social Read",text:"Liest Verhalten über Torment und Charisma.",gross:"torment",klein:"charisma",last:"intelligence",mueh:"medium",profil:{torment:22.4,intelligence:15.8,charisma:12.4,spirit:11.4,will:10.5,determination:7.1,speed:7.1,dexterity:7.1,awareness:4.5,health:1.8}},
+      {id:"logicchain",label:"Logic Chain",text:"Baut Loesungen über Intelligence und Will.",gross:"intelligence",klein:"will",last:"torment",mueh:"low",profil:{intelligence:23.4,will:15.4,torment:14.8,spirit:11.3,charisma:7.9,determination:7,speed:7,dexterity:7,awareness:4.4,health:1.8}},
+      {id:"quietmove",label:"Quiet Move",text:"Bewegt sich unauffaellig über Dexterity und Speed.",gross:"dexterity",klein:"speed",last:"awareness",mueh:"medium",profil:{intelligence:16.5,torment:15.6,spirit:11.9,dexterity:11.5,speed:11.4,will:11,charisma:8.3,determination:7.4,awareness:4.6,health:1.9}},
+      {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
+  // >>> ENDE GENERIERT: arena-daten
+  // Reihe und Befehl je Slot — die Inszenierung, nicht die Regel. Das Spiel kennt keine
+  // Reihen; dass ein Breaker vorprescht und ein Skirmisher flankiert, ist eine Entscheidung
+  // dieses Entwurfs. Fuer die 18 noch nicht gebauten Disziplinen greift die Ersatzregel
+  // darunter: je zwei Slots eine Reihe, Befehl "mitlinie". Das ist ein Platzhalter und
+  // wird beim Bau der jeweiligen Disziplin ersetzt.
+  // pos ist die AUFSTELLUNGSREIHENFOLGE, und sie muss hier stehen: der Erzeuger gibt die
+  // Slots in der Reihenfolge der Quelle aus (vanguard, skirmisher, shotcaller, holdline,
+  // …), die Formation im Kampf setzt die Kaempfer aber nach Position innerhalb der Reihe.
+  // Ohne diese Ordnung tauschen holdline und skirmisher die Plaetze — gemessen: dieselbe
+  // Siegquote, aber eine andere Ergebnisverteilung ueber 24 Kaempfe.
+  const SLOT_ZUSATZ={
+    vanguard:{reihe:0,ord:"mitlinie",pos:0},   holdline:{reihe:0,ord:"mitlinie",pos:1},
+    breaker:{reihe:1,ord:"verfolgen",pos:2},   skirmisher:{reihe:1,ord:"flanke",pos:3},
+    shotcaller:{reihe:2,ord:"mitlinie",pos:4}, rallypoint:{reihe:2,ord:"mitlinie",pos:5},
+    blockstart:{reihe:0,ord:"mitlinie",pos:0}, acceleration:{reihe:0,ord:"mitlinie",pos:1},
+    topspeed:{reihe:1,ord:"verfolgen",pos:2},  lanecontrol:{reihe:1,ord:"flanke",pos:3}
+  };
+  const SLOT_STELLE=(()=>{const o={};for(const d in SLOTS_JE_DISC)SLOTS_JE_DISC[d].forEach((s2,i)=>{o[s2.id]=i;});return o;})();
+  const slotReihe=(id)=>SLOT_ZUSATZ[id]?SLOT_ZUSATZ[id].reihe:Math.min(2,Math.floor((SLOT_STELLE[id]||0)/2));
+  const slotOrd=(id)=>SLOT_ZUSATZ[id]?SLOT_ZUSATZ[id].ord:"mitlinie";
+
   const SLOTVON=Object.fromEntries(Object.values(SLOTS_JE_DISC).flat().map(s2=>[s2.id,s2]));
-  const slotsVon=(d)=>SLOTS_JE_DISC[d]||[];
+  const SLOTS_SORT={};
+  const slotsVon=(d)=>SLOTS_SORT[d]||(SLOTS_SORT[d]=(SLOTS_JE_DISC[d]||[]).slice()
+    .map((s2,i)=>[s2,SLOT_ZUSATZ[s2.id]?SLOT_ZUSATZ[s2.id].pos:i])
+    .sort((x,y)=>x[1]-y[1]).map(x=>x[0]));
 
   // Gewichteter Attributschnitt — dieselbe Rechnung wie resolveWeightedAttributeScore.
   function gewichtet(a,profil){ let s2=0,w=0;
@@ -1668,7 +1846,7 @@
   // sie kommt aus denselben Rezepten (REC), aus denen die Kampfwerte selbst entstehen.
   function traitVerteilung(slotId,dId){
     const sl=SLOTVON[slotId]; if(!sl)return null;
-    const rec=REC[DISCS[dId].cat];
+    const rec=rezeptVon(dId);
     const verteile=(attrs)=>{
       const roh={}; let summe=0;
       for(const k of KEYS){
@@ -1727,9 +1905,15 @@
     const breit=Object.keys(W).filter(k=>W[k]>0);
     if(!eng)return breit;
     const sl=SLOTVON[slotId]; if(!sl)return breit;
-    const rec=REC[DISCS[dId].cat];
+    // WELCHE REZEPTE HIER GEFRAGT SIND. Bis eben stand hier immer REC — die KAMPFrezepte.
+    // Auf einer Bahn ist das die falsche Frage: dort speist kein Attribut einen Kampfwert,
+    // sondern Antritt, Technik, Stehvermoegen. Solange nur TDM und Spurt existierten, fiel
+    // es nicht auf; mit Takeshi's Castle brach es hart weg, weil dessen Kategorie in REC
+    // gar nicht vorkommt. Jetzt fragt jede Disziplin ihre eigenen Rezepte.
+    const rec=BAHN_ART[dId]?BAHN_ART[dId].rezept:rezeptVon(dId);
+    if(!rec)return breit;
     const fokus=[sl.gross,sl.klein].filter(k=>W[k]>0);
-    const speist=fokus.some(k=>KEYS.some(x=>rec[x]&&rec[x][k]));
+    const speist=fokus.some(k=>Object.keys(rec).some(x=>rec[x]&&rec[x][k]));
     return speist?fokus:breit;
   }
 
@@ -1827,10 +2011,746 @@
     o.LP =Math.max(1,s.LP *f);
     o.ANG=Math.max(1,s.ANG*f);
     o.VER=Math.max(0,s.VER*f);
+    // TEMPO UND AUSDAUER WURDEN HIER TESTWEISE MITGENOMMEN — ZURUeCKGENOMMEN.
+    //
+    // aufEignung() normiert LP, ANG und VER auf die Eignung; TMP und AUS nicht. Ein
+    // Attribut, das dort steht (im TDM: Speed 46, Dexterity 24, beide Matrixgewicht 0),
+    // bekommt dadurch einen Gewinn ERSTER ORDNUNG in der einflussVon()-Messung. Testweise
+    // wurden TMP und AUS mit in die Normierung genommen: die gemessene Abweichung fiel
+    // von 152,4 auf 83,7 Pp, Speed und Dexterity lasen sauber 0 %.
+    //
+    // Am ECHTEN Kampf gemessen war das Ergebnis aber das Gegenteil von einer Reparatur.
+    // Mit dem Heiler-Fix aus #654 gewinnt V-W TDM inzwischen 100 % — mit GESTREUTEN
+    // Ergebnissen (6:0 neunmal, 6:2 fuenfmal, 6:1 viermal, Rest knapper). Mit der Kappung
+    // wurden daraus 96 % Siegquote, aber 23 von 24 Kaempfen 6:0 — die Kappung nahm der
+    // KI genau die Bewegungsfreiheit, mit der sie ueberhaupt an V-W herankommt, und
+    // machte aus einem Sieg einen Blowout.
+    //
+    // Die Messung (einflussVon) zeigt weiterhin richtig, dass TMP/AUS ausserhalb der
+    // Normierung liegen und Speed/Dexterity dort unbepreist Einfluss kaufen — das bleibt
+    // ein echter struktureller Befund. Aber ihn am LIVE-KAMPF zu reparieren, verschlechtert
+    // das Spiel; die 100-%-Quote nach dem Heiler-Fix ist der naechste offene Punkt, den
+    // #654 schon benennt, und den man NICHT durch Anfassen von aufEignung() loest.
     return o;
   }
 
-  function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
+  // ===================================================================================
+  // DAS ARENA-CHASSIS.
+  //
+  // Was das Bahn-Chassis fuer die Rennen ist, ist dies fuer die Kaempfe: ein Motor,
+  // mehrere Disziplinen. TDM, Mini-DM, Fechten und Battlefield sind alle „zwei Gruppen
+  // treffen aufeinander" — sie unterscheiden sich darin, WIE VIELE, WORAUS sich die
+  // Kampfwerte speisen und was ueberhaupt zaehlt.
+  //
+  // Die fuenf Kampfwerte bleiben ueberall dieselben (ANG, VER, LP, TMP, AUS); was sie
+  // speist, kommt aus der Matrix der jeweiligen Disziplin. Vorher hing das an einer
+  // Kategorie ("power" oder "speed") — zwei Rezeptsaetze fuer zwanzig Disziplinen, und
+  // eine neue Disziplin haette einfach den Satz einer anderen geerbt.
+  //
+  // Wer hier eine Disziplin eintraegt, bekommt sie fertig: Aufstellung aus den erzeugten
+  // Slots, Motor fuer die Abnahmemessung, Reiter in der Oberflaeche.
+  const ARENA_ART={
+    tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
+
+    "mini-dm":{
+      // MATRIX: torment 24, health 20, power 16, stamina 16, will 14, dexterity 10.
+      //
+      // SECHS Attribute, und keins davon ist Charisma, Intelligence oder Spirit. Das ist
+      // die Ansage: hier fuehrt niemand, hier liest niemand — hier wird geschlagen und
+      // eingesteckt. Vier gegen vier, kein Platz zum Ausweichen.
+      //
+      // Vor allem fehlt SPEED. Im TDM speist Speed mit 46 die Bewegung, obwohl die
+      // TDM-Matrix ihn mit null bepreist — der Befund, der unten offen steht. Bei einer
+      // neuen Disziplin diesen Fehler zu wiederholen waere mutwillig: das Tempo speist
+      // sich hier aus Dexterity, Ausdauer und Torment, also aus dem, was die Matrix
+      // wirklich fuehrt.
+      label:"Mini-DM", jeSeite:4,
+      rezept:{ANG:{torment:46,power:34,dexterity:20},
+              VER:{health:44,stamina:30,will:26},
+              LP:{health:42,stamina:32,will:26},
+              TMP:{dexterity:40,stamina:32,torment:28},
+              AUS:{stamina:48,will:32,health:20}}
+    },
+
+    fechten:{
+      // MATRIX: torment 25, dexterity 20, speed 16, awareness 15, power 10,
+      // determination 6, health 4, intelligence 4.
+      //
+      // Die einzige Kampfdisziplin, in der Speed ueberhaupt ein Gewicht hat (16) — und
+      // die einzige, in der Health fast keins hat (4). Ein Fechter faellt nicht um, weil
+      // er duenn ist, sondern weil er zu spaet kommt. Deshalb traegt Health hier kaum
+      // Lebenspunkte; die tragen Entschlossenheit und Aufmerksamkeit, also das, was einen
+      // im Gefecht haelt.
+      //
+      // Torment mit 25 ist der hoechste Wert: die Klinge sucht die Bloesse.
+      label:"Fechten", jeSeite:6,
+      // NACHGEZOGEN aus demselben Grund wie Battlefield: TMP und AUS liegen ausserhalb
+      // der Eignungs-Normierung, also bekommt jedes Attribut dort einen Bonus erster
+      // Ordnung. Entschlossenheit stand mit 40 in der Ausdauer und mit 36 in den
+      // Lebenspunkten, obwohl die Matrix ihr nur 6 gibt; Speed mit 46 im Tempo bei
+      // Gewicht 16. Jetzt tragen Torment (25) und Dexterity (20) auch dort.
+      rezept:{ANG:{torment:42,dexterity:32,power:26},
+              VER:{awareness:40,dexterity:34,health:26},
+              LP:{health:34,determination:34,awareness:32},
+              TMP:{dexterity:38,speed:34,awareness:28},
+              AUS:{torment:36,awareness:32,dexterity:24,determination:8}}
+    },
+
+    battlefield:{
+      // MATRIX: charisma 20, intelligence 16, spirit 16, torment 12, power 10,
+      // awareness 10, health 8, determination 4, stamina 4.
+      //
+      // Die einzige Kampfdisziplin, in der Power nicht oben steht — sie steht mit 10 im
+      // Mittelfeld, waehrend Charisma, Intelligence und Spirit zusammen die Haelfte des
+      // Gewichts tragen. Das ist keine Schlaegerei, das ist ein GEFUEHRTES Gefecht: wer
+      // die Lage liest und seine Leute zusammenhaelt, gewinnt.
+      //
+      // Deshalb speist Charisma hier den Angriff mit (ein Befehl richtet mehr aus als
+      // ein Schlag), Spirit die Verteidigung, und das Tempo kommt aus Aufmerksamkeit und
+      // Verstand statt aus den Beinen: man ist frueher da, weil man frueher weiss, wohin.
+      label:"Battlefield", jeSeite:4,
+      // NACHGEZOGEN, WEIL DIE MESSUNG ES VERLANGT HAT. Erste Fassung stand bei 110 Pp,
+      // und das Profil sagte genau, warum: Entschlossenheit und Ausdauer lasen 24,6 und
+      // 24,4 % bei einem Matrixgewicht von je 4, waehrend Charisma (20), Intelligence
+      // (16) und Spirit (16) zusammen auf 8 % kamen.
+      //
+      // Der Grund ist kein Zufall, sondern eine Eigenschaft des Modells: aufEignung()
+      // normiert LP, ANG und VER auf die Eignung — TMP und AUS nicht. Wer ein Attribut
+      // dorthin setzt, gibt ihm einen Bonus ERSTER ORDNUNG, voellig unabhaengig davon,
+      // was die Matrix dazu sagt. Ich hatte ausgerechnet die beiden schwaechsten
+      // Attribute der Matrix in die Ausdauer gesetzt.
+      //
+      // Jetzt tragen die schweren Attribute auch Tempo und Ausdauer: wer die Lage liest
+      // und seine Leute zusammenhaelt, ist frueher da und haelt laenger durch. Ausdauer
+      // und Entschlossenheit bleiben mit kleinem Anteil drin — die Matrix gibt ihnen 4,
+      // nicht 0.
+      rezept:{ANG:{torment:38,power:32,charisma:30},
+              VER:{spirit:40,health:32,awareness:28},
+              LP:{health:32,spirit:32,charisma:28,determination:8},
+              TMP:{awareness:36,intelligence:34,charisma:30},
+              AUS:{spirit:36,charisma:32,intelligence:24,stamina:8}}
+    }
+  };
+  const istArena=(d)=>!!ARENA_ART[d];
+  const rezeptVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].rezept)||REC[(DISCS[dId]||{}).cat]||REC.power;
+  const jeSeiteVon=(dId)=>
+    (ARENA_ART[dId]&&ARENA_ART[dId].jeSeite)
+    ||(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[dId]&&FELDSPIEL_ART[dId].jeSeite)
+    ||(typeof BUEHNE_ART!=="undefined"&&BUEHNE_ART[dId]&&BUEHNE_ART[dId].jeSeite)
+    ||6;
+
+  // ===================================================================================
+  // DAS BUeHNE-CHASSIS.
+  //
+  // Fuenf Disziplinen sind weder Rennen noch Kampf: Gewichtheben, Showcase,
+  // Eiskunstlauf, Breaking, Wettessen. Niemand tritt gegeneinander an, niemand laeuft
+  // eine Strecke — jeder tritt EINZELN auf, in mehreren Durchgaengen, und wird bewertet.
+  //
+  // Sieben Rollen, wie bei Bahn und Arena — aber sie messen nicht Tempo oder Kampfkraft,
+  // sondern eine AUFTRITTSBEWERTUNG:
+  //
+  //   GRUNDLAGE      der verlaessliche Kern jedes Durchgangs
+  //   SPITZENMOMENT  was ein gelungener grosser Versuch zusaetzlich bringt
+  //   TECHNIK        wie oft der grosse Versuch gelingt
+  //   PUBLIKUM       ein Bonus, der immer kommt, ohne Risiko
+  //   NERVEN         traegt zur Gelingchance bei, unter Wettkampfdruck
+  //   AUSDAUER       wie wenig die spaeten Durchgaenge gegenueber den fruehen abfallen
+  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt
+  //
+  // WIE EIN DURCHGANG BEWERTET WIRD — eine Formel fuer alle fuenf, die Zutaten kommen
+  // aus der jeweiligen Matrix:
+  //
+  //   Basis    = 20 + GRUNDLAGE * 0,7, gedaempft durch Ermuedung (niedrige AUSDAUER
+  //              kostet in spaeten Durchgaengen)
+  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt
+  //   Gelingt  = Basis + SPITZENMOMENT-Bonus, skaliert mit WAGNIS
+  //   Misslingt= Basis * failAbzug — bei Gewichtheben hart (0: ein verpatzter Versuch
+  //              zaehlt nichts), bei den anderen weich (ein Patzer kostet, wirft aber
+  //              nicht auf null)
+  //   Publikum = PUBLIKUM-Bonus kommt immer oben drauf, ohne Risiko
+  //
+  // Die Ergebniszahl ist die Summe aller Durchgaenge — direkt verwendbar als wert() fuer
+  // die Abnahmemessung, groesser ist besser, keine Platzierung noetig.
+  // RUNDENDAUER: darauf gezielt, dass ein Auftritt insgesamt rund 60 Sekunden dauert
+  // (Chris: "am besten so bauen, dass die Runde immer so ungefaehr 60 Sekunden dauert").
+  // Ein Auftritt enthuellt rundenN * jeSeite * 2 Durchgaenge, also rundenDauer =
+  // 60 / (rundenN * jeSeite * 2). Sicher, weil rein kosmetisch: jeder Durchgang wird
+  // beim Aufbau vollstaendig durchgerechnet (siehe bauBuehne), die Rundendauer steuert
+  // nur, wie schnell das Ergebnis ENTHUELLT wird — sie aendert nichts an der Punktzahl
+  // und nichts an der Pp-Messung.
+  // ===================================================================================
+  // DAS FELDSPIEL-CHASSIS.
+  //
+  // Vierter Motor, Chris' eigener Vorschlag: Hockey, Basketball, Football und Tennis
+  // sind alle eine BALLWECHSEL-SCHLEIFE — kein Rennen, kein Kampf mit Skills, kein
+  // Auftritt in Durchgaengen, sondern BALLBESITZ, der zwischen zwei Teams wechselt.
+  // Genau das unterscheidet es von Buehne: dort tritt jeder fuer sich an, hier haengt
+  // das Ergebnis eines Zugs vom GEGNER ab (Abwehr kann den Zug beenden).
+  //
+  // Sieben Rollen, dieselbe Sprache wie Bahn und Buehne, aber fuer Ballbesitz:
+  //
+  //   AUFBAU       bringt den Ball in Abschlussposition, ohne ihn zu verlieren
+  //   ABSCHLUSS    die Wurf-/Schuss-Mechanik selbst
+  //   TECHNIK      wie oft der Abschluss gelingt
+  //   ZWEITCHANCE  wer den verpassten Abschluss aufsammelt — Rebound, nicht Sturz
+  //   ABWEHR       vom VERTEIDIGENDEN Team: kann den Zug per Steal/Block beenden
+  //   TEAMGEIST    ein risikofreier Bonus — Assists, Chemie (spirit fuehrt drei der
+  //                vier Matrizen, das ist die Rolle dafuer)
+  //   AUSDAUER     wie sehr spaete Ballwechsel gegenueber fruehen abfallen
+  //
+  // EIN ZUG: das Team am Ball schickt reihum einen Spieler; AUFBAU des Ballfuehrers
+  // gegen ABWEHR des staerksten Verteidigers entscheidet, ob der Zug ueberhaupt zum
+  // Abschluss kommt (sonst: Steal, Ballbesitz wechselt sofort). Kommt er durch,
+  // entscheiden TECHNIK und TEAMGEIST ueber Erfolg; bei Erfolg Punkte (der schwerere
+  // Wurftyp bringt mehr, gewichtet nach WAGNIS-Analogon in ABSCHLUSS selbst). Bei
+  // Misslingen entscheidet ZWEITCHANCE gegen die ABWEHR des Gegners, wer den Ball
+  // bekommt — eigenes Team (zweiter Versuch) oder der Gegner (Ballbesitzwechsel).
+  //
+  // Wie bei Buehne wird die ganze Partie beim Aufbau durchgerechnet und dann ueber die
+  // Zeit enthuellt — sicher fuer die Pp-Messung, weil die Enthuellungsgeschwindigkeit
+  // nichts am Ergebnis aendert.
+  const FELDSPIEL_ART={
+    basketball:{
+      // MATRIX: spirit 22, intelligence 16, awareness 14, charisma 11, speed 10,
+      // dexterity 8, power 7, stamina 6, torment 6.
+      label:"Basketball", jeSeite:6, zuegeJeSeite:12, zugDauer:60/(12*2*2),
+      punkteNah:2, punkteFern:3, fernAnteil:0.32,
+      wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
+      rezept:{
+        AUFBAU:      {intelligence:40,spirit:30,dexterity:30},
+        ABSCHLUSS:   {dexterity:40,power:30,speed:30},
+        TECHNIK:     {intelligence:40,awareness:35,dexterity:25},
+        ZWEITCHANCE: {power:45,awareness:30,stamina:25},
+        ABWEHR:      {awareness:40,speed:35,torment:25},
+        TEAMGEIST:   {spirit:55,charisma:45},
+        AUSDAUER:    {stamina:50,torment:25,speed:25}
+      }
+    },
+    football:{
+      // MATRIX: spirit 25, torment 16, health 14, awareness 11, will 10,
+      // determination 8, power 6, stamina 6, charisma 4.
+      label:"Football", jeSeite:6, zuegeJeSeite:8, zugDauer:60/(8*2*2),
+      punkteNah:6, punkteFern:3, fernAnteil:0.30,
+      wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
+      rezept:{
+        AUFBAU:      {awareness:40,determination:30,will:30},
+        ABSCHLUSS:   {power:40,torment:30,health:30},
+        TECHNIK:     {awareness:40,determination:35,torment:25},
+        ZWEITCHANCE: {health:40,power:35,torment:25},
+        ABWEHR:      {torment:45,awareness:30,health:25},
+        // Nachgezogen: Will sass in Aufbau UND Teamgeist (jetzt individuell, mit
+        // starkem Koeffizienten in zwei Erfolgsformeln) und las 31,6 % bei Matrixgewicht
+        // 10. Teamgeist traegt jetzt Health mit statt Will — Health (14) war bislang kaum
+        // vertreten.
+        TEAMGEIST:   {spirit:65,health:35},
+        AUSDAUER:    {stamina:40,health:35,spirit:25}
+      }
+    },
+    hockey:{
+      // MATRIX: power 18, health 18, speed 12, spirit 12, stamina 10, torment 10,
+      // awareness 8, determination 4, dexterity 4, will 4.
+      label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
+      punkteNah:1, punkteFern:1, fernAnteil:0,
+      wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      rezept:{
+        AUFBAU:      {awareness:35,speed:35,power:30},
+        ABSCHLUSS:   {power:40,torment:30,dexterity:30},
+        TECHNIK:     {dexterity:40,awareness:35,determination:25},
+        ZWEITCHANCE: {power:40,health:35,torment:25},
+        ABWEHR:      {health:40,power:35,speed:25},
+        // Nachgezogen: Determination hat in der Hockey-Matrix nur Gewicht 4, sass aber
+        // mit 45 in Teamgeist (individuell, starker Koeffizient) und las 24,8 %. Ersetzt
+        // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
+        // nicht Entschlossenheit.
+        TEAMGEIST:   {spirit:60,torment:40},
+        AUSDAUER:    {stamina:50,health:30,will:20}
+      }
+    },
+    tennis:{
+      // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
+      // determination 6, speed 6, charisma 4. Kein echtes "Team" — die sechs tragen
+      // abwechselnd den Ballwechsel aus, wie eine Setzliste, dieselbe Struktur wie
+      // ueberall sonst.
+      label:"Tennis", jeSeite:6, zuegeJeSeite:16, zugDauer:60/(16*2*2),
+      punkteNah:1, punkteFern:1, fernAnteil:0,
+      wortAbwehr:"Return", wortBlock:"Ass", wortRebound:"Vorteil",
+      // NACHGEZOGEN: erste Messung stand bei 105,7 Pp. Dexterity (Matrixgewicht 12) sass
+      // in DREI Rollen (Abschluss, Technik, Abwehr) und las 28,2 %. Intelligence, der
+      // hoechste Matrixwert (22), sass nur in zwei Rollen und las 6,7 %. Jetzt traegt
+      // Intelligence auch Abwehr und Aufbau fuehrend, Dexterity nur noch dort, wo ein
+      // schneller Schlag wirklich zaehlt (Abschluss).
+      rezept:{
+        AUFBAU:      {intelligence:40,awareness:35,spirit:25},
+        ABSCHLUSS:   {dexterity:35,intelligence:35,speed:30},
+        TECHNIK:     {intelligence:50,awareness:35,determination:15},
+        ZWEITCHANCE: {stamina:40,determination:35,awareness:25},
+        ABWEHR:      {intelligence:35,awareness:35,dexterity:30},
+        TEAMGEIST:   {spirit:55,charisma:45},
+        AUSDAUER:    {stamina:50,determination:30,spirit:20}
+      }
+    }
+  };
+  let feldspielDisc="basketball";
+  const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
+  const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
+
+  let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsT=0, fsPunkte=[0,0];
+
+  function bauFeldspiel(saat){
+    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsPunkte=[0,0]; floats.length=0;
+    const art=FB(), n=art.jeSeite, R=art.rezept;
+    const slotListe=slotsVon(feldspielDisc);
+    const gesetzt=inDisc(feldspielDisc);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[feldspielDisc]||0)-(a.d[feldspielDisc]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gegner=OPP.slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    let id=0;
+    const bauSpieler=(p,seite,istGegner,idx)=>{
+      const sl=istGegner?null:slotFuer(p,idx);
+      const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
+      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
+      const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        eig:(p.d[feldspielDisc]||0)+engP+breitP,...R2,
+        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0};
+    };
+    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
+
+    // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
+    // steht fest, bevor die Enthuellung beginnt.
+    fsZuege=[];
+    const gesamtZuege=art.zuegeJeSeite*2;
+    // GEWICHTETE ZUFALLSAUSWAHL STATT "IMMER DER BESTE". Erste Fassung waehlte fuer
+    // Verteidigung und Rebound reduce()-artig den staerksten Spieler des Teams — FUER
+    // JEDEN EINZELNEN ZUG. Damit haengte sich der ganze gegnerische Erfolg an EINE
+    // Person: hob man deren Awareness (in ABWEHR), wirkte das nicht nur bei den eigenen
+    // Zuegen, sondern bei praktisch jedem Angriff des Gegners. Gemessen: Awareness 35 %
+    // bei einem Matrixgewicht von nur 14 (Basketball) bzw. 20 (Tennis). Jetzt ist die
+    // Chance, den Zug zu verteidigen oder den Rebound zu holen, proportional zum
+    // eigenen Wert — der Beste bekommt mehr Anteile, aber nicht alle.
+    const gewichtetesLos=(spieler,rolle)=>{
+      const summe=spieler.reduce((s,x)=>s+Math.max(1,x[rolle]),0);
+      let r=rr()*summe;
+      for(const x of spieler){ r-=Math.max(1,x[rolle]); if(r<=0)return x; }
+      return spieler[spieler.length-1];
+    };
+    let amBall=0; // 0 oder 1, wer beginnt
+    for(let z=0;z<gesamtZuege;z++){
+      const team=FSTEAM[amBall], gegnerTeam=FSTEAM[1-amBall];
+      const ballfuehrer=team[z%team.length];
+      const verteidiger=gewichtetesLos(gegnerTeam,"ABWEHR");
+      // TEAMGEIST — ERST TEAM-DURCHSCHNITT, DANN VERWORFEN. Ein Durchschnitt ueber
+      // sechs Spieler verduennt jede Messung: hebt einflussVon() EINEN Spieler um 15,
+      // bewegt das den Sechser-Schnitt nur um 2,5 — egal wie hoch der Koeffizient steht,
+      // das Signal bleibt schwach. Jetzt zaehlt TEAMGEIST des Ballfuehrers selbst (seine
+      // eigene Spielverbindung, wenn ER am Ball ist) — dasselbe Prinzip wie ueberall
+      // sonst in diesem Entwurf: der Beitrag haengt an der Person, nicht am Teamschnitt.
+      const ermued=1-Math.max(0,(60-ballfuehrer.AUSDAUER))*0.003*(z/Math.max(1,gesamtZuege-1));
+      const aufbauChance=Math.min(0.94,Math.max(0.20,
+        0.50+(ballfuehrer.AUFBAU-verteidiger.ABWEHR)*0.0035+ballfuehrer.TEAMGEIST*0.0060))*Math.max(0.5,ermued);
+      const eintrag={seite:amBall,spieler:ballfuehrer,verteidiger,art:"steal",punkte:0};
+      if(rr()>=aufbauChance){
+        eintrag.art="steal"; verteidiger.steals++; ballfuehrer.verluste++;
+        amBall=1-amBall; fsZuege.push(eintrag); continue;
+      }
+      const fernwurf=rr()<art.fernAnteil;
+      const technik=Math.min(0.92,0.16+ballfuehrer.TECHNIK*0.0050+ballfuehrer.TEAMGEIST*0.0060
+        -(fernwurf?0.10:0));
+      if(rr()<technik){
+        const pkt=fernwurf?art.punkteFern:art.punkteNah;
+        eintrag.art="treffer"; eintrag.punkte=pkt; eintrag.fern=fernwurf;
+        ballfuehrer.punkte+=pkt; fsPunkte[amBall]+=pkt;
+        amBall=1-amBall;
+      } else {
+        // ZWEITCHANCE vs. ABWEHR: wer sammelt den verpassten Abschluss auf.
+        const rebounder=gewichtetesLos(team,"ZWEITCHANCE");
+        const chance=Math.min(0.85,Math.max(0.15,
+          0.45+(rebounder.ZWEITCHANCE-verteidiger.ABWEHR)*0.0035));
+        if(rr()<chance){
+          eintrag.art="rebound"; rebounder.rebounds++; eintrag.fern=fernwurf;
+          // Ballbesitz bleibt beim Team — derselbe Zugindex zaehlt nicht doppelt gegen
+          // das Kontingent, aber fuer die Enthuellung ist es ein eigenes Ereignis.
+        } else {
+          eintrag.art="block"; verteidiger.bloecke++; eintrag.fern=fernwurf;
+          amBall=1-amBall;
+        }
+      }
+      fsZuege.push(eintrag);
+    }
+  }
+
+  function stepFeldspiel(dt){
+    if(done)return;
+    fsT+=dt;
+    for(const team of FSTEAM)for(const u of team)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
+    fsAkt-=dt;
+    if(fsAkt<=0 && fsZeiger<fsZuege.length){
+      const e=fsZuege[fsZeiger++];
+      e.spieler.lunge=0.5;
+      const art=FB();
+      let txt;
+      if(e.art==="steal")txt=e.verteidiger.n+" erobert den Ball — "+art.wortAbwehr+".";
+      else if(e.art==="treffer")txt=e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
+      else if(e.art==="rebound")txt=e.spieler.n+" holt den "+art.wortRebound+".";
+      else txt=e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
+      feed(e.seite,txt,e.art==="treffer");
+      if(e.art==="treffer")schwebe({x:0,y:0,txt:"+"+e.punkte,life:1,crit:true,_spieler:e.spieler.id});
+      fsAkt=art.zugDauer;
+    }
+    if(fsZeiger>=fsZuege.length)done=true;
+  }
+
+  function updateHudFeldspiel(){
+    document.getElementById("clock").textContent=
+      Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
+    document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
+    document.getElementById("score").textContent=fsPunkte[0]+" : "+fsPunkte[1];
+    const maxPkt=Math.max(1,fsPunkte[0],fsPunkte[1]);
+    document.getElementById("thpL").style.width=(fsPunkte[0]/maxPkt*100)+"%";
+    document.getElementById("thpR").style.width=(fsPunkte[1]/maxPkt*100)+"%";
+    renderKader();
+  }
+
+  function bodenFeldspiel(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#1c2e1e");g.addColorStop(1,"#152418");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
+    ctx.strokeRect(60,H*0.10,W-120,H*0.80);
+    ctx.beginPath();ctx.moveTo(MID,H*0.10);ctx.lineTo(MID,H*0.90);ctx.stroke();
+    ctx.beginPath();ctx.arc(MID,H/2,44,0,6.3);ctx.stroke();
+    for(const x of [60,W-60]){
+      ctx.beginPath();ctx.arc(x,H/2,70,x<MID?-1.05:Math.PI-1.05,x<MID?1.05:Math.PI+1.05);ctx.stroke();
+    }
+  }
+
+  function zeichneFeldspiel(){
+    bodenFeldspiel();
+    const art=FB();
+    [0,1].forEach(side=>{
+      const g=FSTEAM[side];
+      const y=side===0?H*0.30:H*0.68;
+      g.forEach((u,i)=>{
+        const x=100+(W-200)*(g.length>1?i/(g.length-1):0.5);
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
+        zeichneSprite(ctx,u,x,y);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        if(u.punkte||u.rebounds||u.steals||u.bloecke)
+          schrift(u.punkte+"P "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
+      });
+    });
+    for(const f of floats){
+      if(f._spieler==null)continue;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=css("--ok");
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      let ort=null;
+      for(let side=0;side<2&&!ort;side++){
+        const idx=FSTEAM[side].findIndex(u=>u.id===f._spieler);
+        if(idx>=0){const g=FSTEAM[side];
+          const x=100+(W-200)*(g.length>1?idx/(g.length-1):0.5);
+          const y=(side===0?H*0.30:H*0.68)-30-((1-f.life)*20);
+          ort={x,y};
+        }
+      }
+      if(ort)ctx.fillText(f.txt,ort.x,ort.y);
+      ctx.globalAlpha=1;
+    }
+  }
+
+  const BUEHNE_ART={
+    gewichtheben:{
+      // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
+      // dexterity 6, stamina 2.
+      //
+      // Power fuer das Gewicht, aber Charisma fast genauso hoch — das ist die Ansage:
+      // der Grenzversuch gelingt nicht allein durch Kraft, das Publikum traegt den Lifter
+      // durch die letzten Kilo. Drei Versuche, ein verpatzter zaehlt NICHTS (failAbzug 0)
+      // — echtes Gewichtheben kennt keine Teilpunkte fuer eine gerissene Hantel.
+      label:"Gewichtheben", jeSeite:6, rundenN:3, rundenDauer:1.65,
+      failAbzug:0, failWort:"Fehlversuch", erfolgWort:"sauber durchgestemmt",
+      // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
+      // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
+      // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
+      // Erfolgschance-Rolle, und gewann dadurch weit mehr Einfluss, als sein Gewicht
+      // hergibt (15,7 % statt 6). Jetzt hat Charisma auch einen Platz in einer
+      // erfolgsentscheidenden Rolle (NERVEN, TECHNIK) — passend zur Erzaehlung: das
+      // Publikum traegt nicht nur mit, es hilft durch den Grenzversuch.
+      rezept:{
+        GRUNDLAGE:    {power:55,health:25,determination:20},
+        SPITZENMOMENT:{power:50,will:30,determination:20},
+        TECHNIK:      {dexterity:30,charisma:25,health:25,determination:20},
+        PUBLIKUM:     {charisma:70,will:30},
+        NERVEN:       {charisma:35,will:35,determination:20,health:10},
+        AUSDAUER:     {stamina:40,health:35,determination:25},
+        WAGNIS:       {power:45,charisma:30,speed:25}
+      }
+    },
+
+    showcase:{
+      // MATRIX: charisma 27, spirit 16, determination 14, power 11, intelligence 10,
+      // dexterity 9, speed 8, health 3, torment 2.
+      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0,
+      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      rezept:{
+        GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
+        SPITZENMOMENT:{charisma:45,power:30,speed:25},
+        TECHNIK:      {dexterity:40,intelligence:35,determination:25},
+        PUBLIKUM:     {charisma:50,spirit:50},
+        NERVEN:       {determination:40,spirit:35,intelligence:25},
+        AUSDAUER:     {spirit:40,determination:35,health:25},
+        WAGNIS:       {torment:45,power:30,speed:25}
+      }
+    },
+
+    eiskunstlauf:{
+      // MATRIX: charisma 28, dexterity 18, spirit 16, awareness 14, speed 10,
+      // intelligence 8, determination 6.
+      label:"Eiskunstlauf", jeSeite:6, rundenN:6, rundenDauer:0.85,
+      failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
+      rezept:{
+        GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
+        SPITZENMOMENT:{dexterity:45,speed:30,awareness:25},
+        TECHNIK:      {dexterity:40,awareness:35,intelligence:25},
+        PUBLIKUM:     {charisma:70,spirit:30},
+        NERVEN:       {determination:40,awareness:30,intelligence:30},
+        AUSDAUER:     {spirit:40,determination:30,dexterity:30},
+        WAGNIS:       {speed:45,dexterity:30,awareness:25}
+      }
+    },
+
+    breaking:{
+      // MATRIX: will 28, torment 22, health 18, power 10, determination 10, stamina 8,
+      // dexterity 2, intelligence 2. KEIN Charisma — anders als die anderen drei
+      // Buehnen-Disziplinen traegt hier nicht das Lächeln, sondern die Praesenz im
+      // Battle. Publikum speist sich deshalb aus Wille und Torment, nicht aus Charisma.
+      label:"Breaking", jeSeite:6, rundenN:4, rundenDauer:1.25,
+      failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
+      // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
+      // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
+      // mehr als Wille (28, der Hoechstwert). Torment (22, zweithoechster Wert) sass NUR
+      // in den beiden nicht erfolgsgebundenen Rollen (SPITZENMOMENT, PUBLIKUM, WAGNIS)
+      // und blieb bei 11,7 %. Jetzt traegt Torment auch die Erfolgschance mit, Dexterity
+      // bleibt nur dort, wo die Matrix ihm ueberhaupt ein Gewicht gibt.
+      rezept:{
+        GRUNDLAGE:    {will:45,health:30,stamina:25},
+        SPITZENMOMENT:{torment:45,power:35,will:20},
+        TECHNIK:      {torment:35,determination:35,will:30},
+        PUBLIKUM:     {torment:50,will:50},
+        NERVEN:       {will:40,determination:30,health:30},
+        AUSDAUER:     {stamina:45,health:35,will:20},
+        WAGNIS:       {torment:50,power:30,dexterity:20}
+      }
+    },
+
+    wettessen:{
+      // MATRIX: will 26, health 22, stamina 22, determination 16, intelligence 8,
+      // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
+      // eigene Wille, der den naechsten Bissen nimmt.
+      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65,
+      failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
+      rezept:{
+        GRUNDLAGE:    {stamina:40,health:35,will:25},
+        SPITZENMOMENT:{torment:45,will:30,determination:25},
+        TECHNIK:      {intelligence:45,determination:30,health:25},
+        PUBLIKUM:     {will:50,determination:50},
+        NERVEN:       {will:45,health:35,determination:20},
+        AUSDAUER:     {stamina:50,health:30,will:20},
+        WAGNIS:       {torment:50,stamina:30,intelligence:20}
+      }
+    }
+  };
+  let buehneDisc="gewichtheben";
+  const BB=()=>BUEHNE_ART[buehneDisc]||BUEHNE_ART.gewichtheben;
+  const istBuehne=(d)=>!!BUEHNE_ART[d];
+
+  let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+
+  function bauBuehne(saat){
+    seed=saat||1337; buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    floats.length=0;
+    const art=BB(), n=art.jeSeite, R=art.rezept;
+    const slotListe=slotsVon(buehneDisc);
+    const gesetzt=inDisc(buehneDisc);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[buehneDisc]||0)-(a.d[buehneDisc]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gegner=OPP.slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    let id=0;
+    const setz=(p,seite,istGegner,idx)=>{
+      const sl=istGegner?null:slotFuer(p,idx);
+      const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
+      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
+      const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        eig:(p.d[buehneDisc]||0)+engP+breitP,...R2,
+        runden:[], summe:0, aktuell:-1};
+      // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
+      // die Logik einfach — kein "wer ist als naechstes dran" ueber mehrere Frames — und
+      // ist ehrlich: die Formkarte und der Disziplinwert stehen fest, bevor der Auftritt
+      // beginnt, genau wie beim Kampf.
+      for(let ri=0;ri<art.rundenN;ri++){
+        const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
+        const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
+        const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+        let punkte, ereignis;
+        if(rr()<erfolg){
+          punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+          ereignis=art.erfolgWort;
+        } else {
+          punkte=basis*art.failAbzug;
+          ereignis=art.failWort;
+        }
+        punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+        L.runden.push({punkte,ereignis});
+      }
+      TEILNEHMER.push(L);
+    };
+    mine.forEach((p,i)=>setz(p,0,false,i));
+    gegner.forEach((o,i)=>setz(o,1,true,i));
+
+    // REIHENFOLGE. Rundenweise abwechselnd wie eine Setzliste — Durchgang 1 fuer alle,
+    // dann Durchgang 2 — und innerhalb einer Runde wechseln sich die Seiten ab, damit
+    // kein Team geschlossen zuerst dran ist.
+    buehneQueue=[];
+    for(let ri=0;ri<art.rundenN;ri++){
+      for(let i=0;i<Math.max(mine.length,gegner.length);i++){
+        if(i<mine.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n));
+        if(i<gegner.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n));
+      }
+    }
+  }
+
+  function stepBuehne(dt){
+    if(done)return;
+    buehneT+=dt;
+    for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
+    buehneAkt-=dt;
+    if(buehneAkt<=0 && buehneZeiger<buehneQueue.length){
+      const u=buehneQueue[buehneZeiger++];
+      u.aktuell++;
+      const r=u.runden[u.aktuell];
+      u.summe+=r.punkte;
+      u.lunge=0.5;
+      schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
+      feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").");
+      buehneAkt=BB().rundenDauer;
+    }
+    if(buehneZeiger>=buehneQueue.length)done=true;
+  }
+
+  function updateHudBuehne(){
+    document.getElementById("clock").textContent=
+      Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
+    // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
+    const sd=document.querySelector(".hpbars .sd");
+    if(sd)sd.textContent=BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
+    document.querySelectorAll(".scoreline .tname em").forEach(e=>{
+      e.innerHTML=e.innerHTML.replace(/im Kampf/g,"aufgetreten");});
+    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
+    document.getElementById("aliveL").textContent=String(fertig(0));
+    document.getElementById("aliveR").textContent=String(fertig(1));
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
+    document.getElementById("score").textContent=summe(0)+" : "+summe(1);
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
+      return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    renderKader();
+  }
+
+  function bodenBuehne(){
+    // BUeHNE STATT SANDPLATZ. Ein Podest mit Scheinwerferkegeln statt der Kampfarena —
+    // die Kosmetik sagt sofort, dass hier niemand kaempft.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#1b1622");g.addColorStop(1,"#0d0a12");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    for(const x of [W*0.22,W*0.5,W*0.78]){
+      const s=ctx.createRadialGradient(x,0,10,x,H*0.55,W*0.28);
+      s.addColorStop(0,"rgba(255,232,180,.14)");s.addColorStop(1,"rgba(255,232,180,0)");
+      ctx.fillStyle=s;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x-90,H);ctx.lineTo(x+90,H);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.fillStyle="#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
+    ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
+    for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*W/8,H*0.78);ctx.lineTo(i*W/8,H);ctx.stroke();}
+  }
+
+  function zeichneBuehne(){
+    bodenBuehne();
+    const art=BB();
+    // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
+    // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
+    const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const y=side===0?H*0.32:H*0.66;
+      g.forEach((u,i)=>{
+        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        ctx.globalAlpha=u.lunge>0?1:0.92;
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+        ctx.globalAlpha=1;
+        zeichneSprite(ctx,u,x,y);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        // Punktesaeule: wie weit im Feld, nicht absolut — sonst waere Gewichtheben (kurze
+        // Zahlen) neben Wettessen (viele Runden) optisch schief.
+        const w=30,p=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+        // Fortschritt: wie viele Durchgaenge schon enthuellt
+        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+      });
+    });
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      if(f._teilnehmer!=null){
+        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
+        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
+          const i=g.indexOf(u);
+          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
+          ctx.fillText(f.txt,x,y);
+        }
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+
+  function stats(p,dId){const rec=rezeptVon(dId),o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
     return o;}
@@ -1888,12 +2808,12 @@
   // werden. Krolach ist der grosse Gewinner: +8,5 als Vanguard, die Obergrenze.
   [["Krolach","vanguard"],["Johanna","holdline"],["Lava Golem","breaker"],
    ["Rhyx'Tal","skirmisher"],["Draco","shotcaller"],["King Arlen Morgolor","rallypoint"]]
-    .forEach(([n,sl])=>{place[n]={d:"tdm",slot:sl};order[n]=SLOTVON[sl].ord;});
+    .forEach(([n,sl])=>{place[n]={d:"tdm",slot:sl};order[n]=slotOrd(sl);});
   // Spurt hat im Entwurf noch keine Slot-Rollen — die liegen im Spiel unter derselben
   // Funktion bereit, sind hier aber nicht abgeschrieben. Bis dahin behelfsweise ohne Slot.
   [["Jorund","blockstart"],["Lulu","acceleration"],
    ["Xelara","topspeed"],["Gram","lanecontrol"]]
-    .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=SLOTVON[sl].ord;});
+    .forEach(([n,sl])=>{place[n]={d:"spurt",slot:sl};order[n]=slotOrd(sl);});
 
   // Ein Tooltip wie im Vorbild: Titel plus genaue Wirkung. Was hier steht, TUT die
   // Simulation — sonst darf es hier nicht stehen.
@@ -2094,7 +3014,7 @@
           v.addEventListener("click",()=>{
             const raus=here.find(x=>place[x.n].slot===rw.id);
             if(raus)delete place[raus.n];
-            place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=rw.ord;sel=null;renderAll();});
+            place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=slotOrd(rw.id);sel=null;renderAll();});
           z.appendChild(v);}
       }
       // Ablegen per Ziehen.
@@ -2106,7 +3026,7 @@
         const alt=here.find(x=>place[x.n].slot===rw.id&&x.n!==n);
         const vorher=place[n]?place[n].slot:null;
         if(alt&&vorher)place[alt.n]={d:disc,slot:vorher}; else if(alt)delete place[alt.n];
-        place[n]={d:disc,slot:rw.id}; if(!order[n])order[n]=rw.ord;
+        place[n]={d:disc,slot:rw.id}; if(!order[n])order[n]=slotOrd(rw.id);
         sel=null;renderAll();});
       drin.forEach(p=>{
         const s=stats(p,disc);
@@ -2291,7 +3211,7 @@
       z.addEventListener("click",()=>{
         if(!sel)return;
         if(inDisc(disc).length>=DISCS[disc].size&&(!place[sel]||place[sel].d!==disc))return;
-        place[sel]={d:disc,slot:rw.id};if(!order[sel])order[sel]=rw.ord;
+        place[sel]={d:disc,slot:rw.id};if(!order[sel])order[sel]=slotOrd(rw.id);
         sel=null;renderAll();
       });
       pit.appendChild(z);
@@ -2415,13 +3335,14 @@
       name="Heiler zuerst";
       grund=heiler.n+" heilt "+heiler.hps+" je Sekunde und macht damit "+
         "den Schaden von vier Sekunden Kampf wieder wett. Zwei Schnelle gehen außen herum auf "+
-        heiler.n+", die anderen vier schieben frontal, damit der Druck nicht nachlässt.";
+        heiler.n+", die anderen "+(jeSeiteVon(disc)-2)+" schieben frontal, damit der Druck nicht nachlässt.";
     }else{
       flanker=0; ziel="naechster";
       name="Mauer schieben";
       grund="Kein Ausreißer: der Stärkste stellt nur "+pz(anteil)+" des Schadens. Sich aufzuteilen "+
-        "würde nur die eigene Übermacht verschenken — alle sechs gehen geschlossen durch die Mitte "+
-        "und schlagen, was am nächsten steht.";
+        "würde nur die eigene Übermacht verschenken — alle "+
+        ["","eins","zwei","drei","vier","fünf","sechs"][jeSeiteVon(disc)]+
+        " gehen geschlossen durch die Mitte und schlagen, was am nächsten steht.";
     }
 
     // ZUTEILUNG. Die Zaehesten halten vorn — sie sollen binden, nicht toeten. Aussen
@@ -2508,7 +3429,52 @@
     reg.appendChild(el("s",null,SPAEHGRAD+" %"));
     reg.appendChild(el("em",null,["kaum etwas","grobe Bereiche","brauchbar","genau"][spaehStufe(SPAEHGRAD)]));
     box.appendChild(reg);
-    if(PLAN){
+    if(istFeldspiel(disc)){
+      // Kein Schlachtplan: hier zaehlt, wer am Ball ist. Statt einer Taktik zeigt sich
+      // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Ballwechsel"));
+      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Zuege insgesamt, abwechselnd zwischen "+
+        "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
+        "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
+        "einen verpassten Abschluss aufsammelt."));
+      box.appendChild(k);
+      const apb2=document.getElementById("arenaplan");
+      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Zuege, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      const pl2=document.querySelector(".planzeile b");
+      if(pl2)pl2.textContent="Ballwechsel";
+    } else if(istBuehne(disc)){
+      // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
+      // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Bewertung"));
+      k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
+        "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
+        "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
+      box.appendChild(k);
+      const apb=document.getElementById("arenaplan");
+      if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      const pl=document.querySelector(".planzeile b");
+      if(pl)pl.textContent="Bewertung";
+    } else if(istBahn(disc)){
+      // Auf der Bahn gibt es keinen Schlachtplan: jeder Laeufer bringt seinen eigenen
+      // Rennplan mit, und der kommt aus dem Slot, auf dem er steht. Den Kampfplan hier
+      // stehen zu lassen hiesse, eine Absicht anzuzeigen, die niemand hat.
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Rennpläne des Gegners"));
+      const art=BA();
+      const zaehl={};
+      for(const sl of slotsVon(disc)){const pid=art.planJeSlot[sl.id]; if(pid)zaehl[pid]=(zaehl[pid]||0)+1;}
+      k.appendChild(el("p",null,Object.entries(zaehl)
+        .map(([pid,n])=>n+"× "+art.plaene[pid].label).join(" · ")
+        +" — jeder Läufer bringt den Plan seines Slots mit."));
+      box.appendChild(k);
+      const apb=document.getElementById("arenaplan");
+      if(apb)apb.textContent=Object.entries(zaehl)
+        .map(([pid,n])=>n+"× "+art.plaene[pid].label+" — "+art.plaene[pid].text).join("  ·  ");
+      const pl=document.querySelector(".planzeile b");
+      if(pl)pl.textContent="Rennpläne";
+    } else if(PLAN){
       const k=el("div","plan"+(spaehStufe(SPAEHGRAD)<2?" verdeckt":""));
       k.appendChild(el("b",null,spaehStufe(SPAEHGRAD)<2
         ? "Plan der KI: noch nicht durchschaut"
@@ -2546,8 +3512,12 @@
       r.appendChild(w);
       box.appendChild(r);
     });
-    const ap=document.getElementById("arenaplan");
-    if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
+    if(!istBahn(disc)&&!istBuehne(disc)&&!istFeldspiel(disc)){
+      const ap=document.getElementById("arenaplan");
+      if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
+      const pl=document.querySelector(".planzeile b");
+      if(pl)pl.textContent="Plan der KI";
+    }
   }
 
   // STUFENAUFSTIEG: der Zuwachs geht in ein ATTRIBUT, nicht in einen Kampfwert.
@@ -2682,17 +3652,58 @@
   // Jetzt geht jede Einheit durch dieselbe Funktion. Unterschiede duerfen nur noch aus
   // DATEN kommen — Formkarte, Intensitaet, Ermuedung, Attribute, Slot —, nie mehr daraus,
   // auf welcher Seite jemand steht.
-  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers){
+  // DER HEBEL FUER MESSUNGEN. einflussVon() will wissen, was ein Attribut wirklich
+  // bewirkt, und hebt es dafuer bei EINEM Teilnehmer um ein paar Punkte an. Damit das
+  // ueberall dieselbe Wirkung hat, gibt es genau eine Stelle, an der die Rohattribute
+  // gelesen werden: hier. Wer stattdessen die fertigen Kampf- oder Laufwerte nachtraeglich
+  // anfasst, umgeht Slot-Aufschlag, Form und Stufe — und misst dann eine kuerzere Kette,
+  // als das Spiel sie rechnet. Im Spielbetrieb ist der Hebel immer null.
+  let ATTR_HEBUNG=null;
+  const gehoben=(p)=>{
+    if(!ATTR_HEBUNG||ATTR_HEBUNG.wer!==p.n)return p.a;
+    const a={...p.a};
+    a[ATTR_HEBUNG.attribut]=Math.min(100,(a[ATTR_HEBUNG.attribut]||0)+ATTR_HEBUNG.plus);
+    return a;
+  };
+
+  // DIE EIGNUNG MUSS MITGEHEN — sonst misst die Abnahme das Gegenteil von dem, was sie soll.
+  //
+  // Das war ein Fehler in MEINEM Massstab, und er hat die Arena-Zahlen erklaert. Im Spiel
+  // ist die Eignung eine Funktion der Attribute: calculateRawDisciplineScore in
+  // lib/player-formulas/discipline-rating-engine.ts summiert Attribut x Gewicht ueber die
+  // Matrix. Wer Power gewinnt, gewinnt im TDM Eignung — das IST der Kanal, den die Matrix
+  // beschreibt.
+  //
+  // Meine Messung hob das Attribut, liess die Eignung aber stehen. Und weil aufEignung()
+  // die drei Kampfwerte auf genau diese Eignung normiert, war das Ergebnis vorbestimmt:
+  // ein gehobenes Kampfattribut aendert nur noch die FORM (LP gegen ANG gegen VER), nie
+  // die MENGE. Nur TMP und AUS liegen ausserhalb der Normierung — also las die Messung
+  // ausgerechnet die Bewegung als das, was alles entscheidet. Im Fechten kam Speed damit
+  // auf 94,5 %, im TDM Speed und Dexterity zusammen auf 67 %, waehrend Power bei
+  // Matrixgewicht 28 auf 5,5 % lag.
+  //
+  // Der Kanal war nicht kaputt — ich hatte ihn zugehalten und mich dann ueber die Stille
+  // gewundert. Jetzt hebt die Anhebung die Eignung mit, und zwar genau um das, was die
+  // Matrix dafuer vorsieht.
+  const eigHebung=(p,d)=>{
+    if(!ATTR_HEBUNG||ATTR_HEBUNG.wer!==p.n)return 0;
+    const w=(BASIS_JE_DISC[d]||{})[ATTR_HEBUNG.attribut]||0;
+    if(!w)return 0;
+    const alt=p.a[ATTR_HEBUNG.attribut]||0;
+    return (Math.min(100,alt+ATTR_HEBUNG.plus)-alt)*w/100;
+  };
+  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
+    const d=dId||"tdm";
     const bh=behav(p.n);
     const tr=traitTreffer(p);
-    const engPunkte=(slId?slotAufschlag(p,slId,"tdm"):0)+tr.netto;   // haengt an der Position
-    const breitPunkte=formVon(p.n)+stufenWert();                     // trifft jeden gleich
-    const eigWert=p.d.tdm+engPunkte+breitPunkte;
+    const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
+    const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
+    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte+eigHebung(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
-    let attr=mitAufschlag(p.a,engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
-    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
     // Rezepte geben die FORM, die Eignung gibt die MENGE.
-    const sMod=aufEignung(stats({...p,a:attr},"tdm"),eigWert);
+    const sMod=aufEignung(stats({...p,a:attr},d),eigWert);
     const s={};
     for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
     s.MANA=sMod.MANA;
@@ -2714,38 +3725,54 @@
   // bekommt ihren Slot aus der Aufstellung; die Gegner haben keine Aufstellung, die wir
   // kennen — sie bekommen den Slot ihrer Reihe. Damit trifft sie derselbe Aufschlag nach
   // derselben Regel, statt gar keiner.
-  const slotsDerReihe=(row)=>slotsVon("tdm").filter(sl=>sl.reihe===row);
+  const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
-    if(disc==="spurt")return bauSpurt(saat);
+    if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
+    if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
+    if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
     let id=0;
 
     // UNSERE SEITE — Slot aus der Aufstellung, Befehl aus dem Slot, Ziel aus der
     // Persoenlichkeit (oder aus dem, was der Spieler von Hand gesetzt hat).
-    const mine=inDisc("tdm").slice(0,6);
+    const d=disc, n=jeSeiteVon(d), slotListe=slotsVon(d);
+    // ERSATZAUFSTELLUNG wie auf der Bahn: fuer TDM stellt Chris von Hand auf, eine neue
+    // Arena-Disziplin hat noch keine Aufstellung — und ohne Kaempfer laesst sich nichts
+    // messen. Wer nicht gesetzt ist, wird nach Eignung gesetzt. Stellt jemand von Hand
+    // auf, gilt seine Aufstellung.
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     const byRow={0:[],1:[],2:[]};
-    mine.forEach(p=>byRow[(SLOTVON[place[p.n].slot]||{reihe:1}).reihe].push(p));
+    mine.forEach((p,i)=>byRow[slotReihe(slotFuer(p,i))].push(p));
     for(const row of[0,1,2]){
       byRow[row].forEach((p,i)=>{
-        const slId=place[p.n]&&place[p.n].slot;
+        const slId=slotFuer(p,mine.indexOf(p));
         U.push(baueEinheit(p,0,row,i,byRow[row].length,id++,slId,
-          order[p.n],zielOf[p.n]));
+          order[p.n]||slotOrd(slId),zielOf[p.n],d));
       });
     }
 
     // GEGNERSEITE — derselbe Aufruf. Der Slot kommt aus der Reihe, Befehl und Ziel aus
     // dem Schlachtplan der KI (das ist ihre Taktik, so wie die Aufstellung unsere ist);
     // fehlt der Plan, greift derselbe Standard wie bei uns.
-    const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
+    // Die Gegnerliste ist fuer sechs gebaut. Bei vier Koepfen je Seite werden die besten
+    // vier genommen und neu auf die Reihen verteilt, statt zwei Reihen leer zu lassen.
+    const gegner=OPP.slice(0,n);
+    const oByRow={0:[],1:[],2:[]};
+    gegner.forEach((o,i)=>oByRow[n===OPP.length?o.row:Math.min(2,Math.floor(i*3/n))].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
-        const reihenSlots=slotsDerReihe(row);
+        const reihenSlots=slotsDerReihe(row,d);
         const z=(PLAN&&PLAN.zuteilung[o.n])||{};
-        const slId=z.slot||(reihenSlots[i%Math.max(1,reihenSlots.length)]||{}).id||null;
+        const slId=z.slot||(reihenSlots[i%Math.max(1,reihenSlots.length)]||{}).id
+                   ||(slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
         U.push(baueEinheit(o,1,row,i,oByRow[row].length,id++,slId,
-          z.ord||(SLOTVON[slId]||{}).ord,z.zielP||(o.jagd?"bedrohung":null)));
+          z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null),d));
       });
     }
   }
@@ -3511,7 +4538,9 @@
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
   function stepSim(dt){
-    if(disc==="spurt")return stepSpurt(dt);
+    if(istFeldspiel(disc))return stepFeldspiel(dt);
+    if(istBuehne(disc))return stepBuehne(dt);
+    if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
@@ -4016,6 +5045,35 @@
     }
   }
 
+  // ANZEIGE FUER DIE BAHN. Die TDM-Anzeige rechnet mit Leben und ausgeschalteten Gegnern —
+  // beides gibt es im Rennen nicht. Vorher lief sie deshalb gar nicht, und ueber dem
+  // Rennen stand dauerhaft "0 : 0" und "0:00". Hier stehen die Groessen, die ein Rennen
+  // wirklich hat: verstrichene Zeit, wie viele im Ziel sind, und wie weit das Feld ist.
+  function updateHudBahn(){
+    document.getElementById("clock").textContent=
+      Math.floor(rennT/60)+":"+String(Math.floor(rennT%60)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // Die Beschriftungen der Kampfanzeige stimmen auf der Bahn nicht: es gibt kein Sudden
+    // Death, niemand ist "im Kampf", und die Punkte sind Zieleinlaeufe.
+    const sd=document.querySelector(".hpbars .sd");
+    if(sd)sd.textContent=(BA().hindernisWort==="Griff"?"Wand":"Strecke")+" — Schnitt der Mannschaft";
+    document.querySelectorAll(".scoreline .tname em").forEach(e=>{
+      e.innerHTML=e.innerHTML.replace(/im Kampf/g,"im Ziel");});
+    const kl=document.querySelector(".clock small");
+    if(kl)kl.innerHTML=kl.innerHTML.replace(/· Punkte/,"· im Ziel");
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
+    document.getElementById("aliveL").textContent=String(imZiel(0));
+    document.getElementById("aliveR").textContent=String(imZiel(1));
+    // Der Punktestand ist die Zahl der Laeufer im Ziel — die Reihenfolge entscheidet.
+    document.getElementById("score").textContent=imZiel(0)+" : "+imZiel(1);
+    // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
+    const schnitt=(s)=>{const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;};
+    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    renderKader();
+  }
+
   function updateHud(){
     document.getElementById("clock").textContent="0:"+String(Math.floor(t)).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
@@ -4047,7 +5105,9 @@
   const bodenSaat=(i)=>{const x=Math.sin(i*127.1)*43758.5453;return x-Math.floor(x);};
 
   function zeichneBoden(){
-    if(disc==="spurt")return bodenSpurt();
+    if(istFeldspiel(disc))return bodenFeldspiel();
+    if(istBuehne(disc))return bodenBuehne();
+    if(istBahn(disc))return bodenSpurt();
     return bodenArena();
   }
 
@@ -4076,9 +5136,23 @@
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
     ctx.strokeStyle="#3a2f20";ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
-    // Mittellinie, dezent
-    ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;ctx.setLineDash([6,10]);
-    ctx.beginPath();ctx.moveTo(MID,26);ctx.lineTo(MID,H-26);ctx.stroke();ctx.setLineDash([]);
+    // FARBIGE HAELFTEN. Chris: "wir muessen auf jeden Fall beide Teams in der Arena
+    // besser voneinander unterscheiden koennen, sonst ist es sehr unuebersichtlich." Im
+    // Getuemmel sieht man kaum noch, wer zu wem gehoert, wenn nur ein duenner Ring am
+    // einzelnen Kaempfer haengt. Also faerbt schon der BODEN die Seite ein — sanft genug,
+    // um den Sand nicht zu verdecken, deutlich genug, um auf einen Blick zu tragen.
+    const heim=ctx.createLinearGradient(0,0,MID,0);
+    heim.addColorStop(0,"rgba(242,160,61,.16)");heim.addColorStop(1,"rgba(242,160,61,0)");
+    ctx.fillStyle=heim;ctx.fillRect(0,0,MID,H);
+    const gast=ctx.createLinearGradient(MID,0,W,0);
+    gast.addColorStop(0,"rgba(69,176,201,0)");gast.addColorStop(1,"rgba(69,176,201,.16)");
+    ctx.fillStyle=gast;ctx.fillRect(MID,0,W-MID,H);
+    // Mittellinie, jetzt in beiden Teamfarben statt neutralem Weiss
+    ctx.strokeStyle="rgba(242,160,61,.35)";ctx.lineWidth=1.5;ctx.setLineDash([6,10]);
+    ctx.beginPath();ctx.moveTo(MID-1,26);ctx.lineTo(MID-1,H-26);ctx.stroke();
+    ctx.strokeStyle="rgba(69,176,201,.35)";
+    ctx.beginPath();ctx.moveTo(MID+1,26);ctx.lineTo(MID+1,H-26);ctx.stroke();
+    ctx.setLineDash([]);
     // Fackeln
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
       ctx.fillStyle="#2b2318";ctx.fillRect(x-3,y,6,22);
@@ -4096,15 +5170,16 @@
     g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     const oben=H*0.14, unten=H*0.94, strecke=W-170;
-    // Baumreihe ueber der Bahn
-    for(let i=0;i<26;i++){
+    // Baumreihe ueber der Bahn — an einer Kletterwand steht kein Wald.
+    for(let i=0;i<(BA().baeume===false?0:26);i++){
       const x=12+i*(W/25), yb=oben-24;
       ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
       ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
       ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
     }
-    // Laufbahn
-    ctx.fillStyle="#8a4a32";ctx.fillRect(0,oben,W,unten-oben);
+    // Laufbahn — Farbe je Bahn-Art. Eine Kletterwand ist kein Tartan, und ein
+    // Zeitfahrkurs ist Asphalt. Kosmetik, aber sie sagt sofort, welche Disziplin laeuft.
+    ctx.fillStyle=BA().boden||"#8a4a32";ctx.fillRect(0,oben,W,unten-oben);
     ctx.globalAlpha=0.07;
     for(let i=0;i<320;i++){
       const x=bodenSaat(i+300)*W, y=oben+bodenSaat(i+340)*(unten-oben);
@@ -4113,15 +5188,27 @@
     ctx.globalAlpha=1;
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
-    for(let i=0;i<=BAHNEN;i++){const y=oben+(unten-oben)*i/BAHNEN;
+    const BN=BAHNEN_N();
+    for(let i=0;i<=BN;i++){const y=oben+(unten-oben)*i/BN;
       ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-    // Huerden genau dort, wo die Simulation sie prueft.
-    for(const h of HUERDEN){
+    // Hindernisse genau dort, wo die Simulation sie prueft — in der Form, die die
+    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff.
+    const wort=BA().hindernisWort;
+    for(const h of HUERDEN_N()){
       const x=80+h*strecke;
-      for(let b=0;b<BAHNEN;b++){
+      for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
-        ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3);
-        ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10);
+        if(wort==="Griff"){
+          ctx.fillStyle="#cfa46b";
+          ctx.beginPath();ctx.arc(x,y-7,5,0,6.283);ctx.fill();
+          ctx.fillStyle="#8d6a3f";ctx.fillRect(x-1,y-7,2,7);
+        } else if(wort==="Kurve"){
+          ctx.fillStyle="#f2d75a";ctx.fillRect(x-2,y-14,4,14);
+          ctx.fillStyle="rgba(242,215,90,.30)";ctx.fillRect(x-9,y-14,18,3);
+        } else {
+          ctx.fillStyle="#e6e0d2";ctx.fillRect(x-14,y-13,28,3);
+          ctx.fillStyle="#9a9486";ctx.fillRect(x-14,y-10,3,10);ctx.fillRect(x+11,y-10,3,10);
+        }
       }
     }
     // Start und Ziel
@@ -4160,69 +5247,305 @@
   // auszuweichen. Der Ersatz fuer ANGRIFF ist WUCHT — man raeumt jemanden von der Bahn,
   // statt ihn zu toeten.
   // ===================================================================================
-  const SPURT_REZEPT={
-    // NACHGEZOGEN AN DIE SPURT-MATRIX. Chris' Grundsatz: "immer ueber die Diszi-
-    // Gewichtungen gehen, um zu schauen, was die Leute antreibt."
-    //
-    // Gemessen (spurtEinfluss): Speed trug 47,6 % dazu bei, ob jemand Plaetze gutmacht —
-    // die Matrix bepreist ihn mit 18. Der Grund lag hier: Antritt und Endtempo hingen zu
-    // 55 und 53 an Speed und multiplizieren direkt die Grundgeschwindigkeit, waehrend
-    // alles andere nur moduliert. Wer Speed hatte, gewann; wer Zaehigkeit hatte, nicht.
-    //
-    // Jetzt traegt Speed in beiden Werten noch die Hauptlast — es bleibt ein Rennen —,
-    // aber Wille, Ausdauer und Entschlossenheit tragen mit. Das sind genau die
-    // Attribute, die die Matrix mit 14, 4 und 15 fuehrt.
-    ANTRITT:    {speed:40,determination:32,power:28},
-    ENDTEMPO:   {speed:38,will:37,stamina:25},
-    TECHNIK:    {dexterity:55,awareness:35,determination:10},
-    // NEU: Wendigkeit. Bisher konnte niemand die Bahn wechseln — jeder lief seine Spur
-    // von vorn bis hinten durch, und Windschatten war damit unmoeglich. Wer wendig ist,
-    // findet den Windschatten, weicht einem Stuerzenden aus und entkommt einem Rempler.
-    WENDIGKEIT: {dexterity:48,awareness:32,speed:20},
-    STEHEN:     {determination:55,will:35,health:10},
-    WUCHT:      {torment:57,power:40,speed:3},
-    ROBUST:     {health:26,torment:27,will:22,dexterity:17,awareness:8}
-  };
-  const SPURT_KEYS=Object.keys(SPURT_REZEPT);
-  const SPURT_LANG={ANTRITT:"Antritt",ENDTEMPO:"Endtempo",TECHNIK:"Technik",
-    WENDIGKEIT:"Wendigkeit",STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"};
+  // ===================================================================================
+  // DAS BAHN-CHASSIS.
+  //
+  // Fuenf der zwanzig Disziplinen sind im Kern dieselbe Sache: von einem Start zu einem
+  // Ziel kommen, unterwegs stehen Hindernisse im Weg, und die Kraft reicht nicht fuer
+  // alles. Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle. Sie fuenfmal zu
+  // programmieren hiesse, denselben Fehler fuenfmal einbauen zu koennen.
+  //
+  // Also einmal Motor, fuenfmal Konfiguration. Was sich unterscheidet, steht hier; was
+  // gleich ist, steht unten in bauSpurt/stepSpurt.
+  //
+  // DIE SIEBEN ROLLEN sind in allen fuenf dieselben — nur ihr Name und woraus sie sich
+  // speisen, wechselt:
+  //
+  //   ANTRITT     wie schnell er in Fahrt kommt
+  //   ENDTEMPO    was er ueber die Distanz haelt
+  //   TECHNIK     ob er ein Hindernis SAUBER nimmt
+  //   WENDIGKEIT  ob er die Spur wechselt, ausweicht, vorbeikommt
+  //   STEHEN      wie viel bis zum Ziel uebrig bleibt
+  //   WUCHT       ob er ein Hindernis mit Gewalt nimmt, wenn die Technik misslingt
+  //   ROBUST      was er einsteckt, ohne liegenzubleiben
+  //
+  // Beim Klettern heisst ANTRITT „Zug" und WUCHT „Kraftzug", bei der Staffel heisst
+  // TECHNIK „Wechsel" und WUCHT „Zug an der Spitze", bei Takeshi heisst TECHNIK „Falle
+  // lesen". Dieselbe Mechanik, andere Sprache — und vor allem: andere Zutaten.
+  //
+  // DIE ZUTATEN KOMMEN AUS DER MATRIX. Chris' Grundsatz gilt hier zwanzigmal: „immer
+  // ueber die Diszi-Gewichtungen gehen, um zu schauen, was die Leute antreibt." Jedes
+  // Rezept unten benutzt nur Attribute, die die eigene Matrix ueberhaupt bepreist, und
+  // gewichtet sie in deren Richtung. Ob das aufgeht, sagt nicht die Absicht, sondern
+  //   node scripts/messe-arena-einfluss.mjs <disziplin> 12
+  // ===================================================================================
+  const BAHN_ART={
+    spurt:{
+      label:"Spurt", jeSeite:4, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
+      hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
+      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65, muedGrad:0.00028,
+      wendigErholt:0.0035, tackleAb:36, tackleRate:2.4, tackleKosten:0,
+      rezept:{
+        // NACHGEZOGEN AN DIE SPURT-MATRIX. Gemessen: Speed trug 47,6 % dazu bei, ob
+        // jemand Plaetze gutmacht — die Matrix bepreist ihn mit 18. Der Grund lag hier:
+        // Antritt und Endtempo hingen zu 55 und 53 an Speed und multiplizieren direkt die
+        // Grundgeschwindigkeit, waehrend alles andere nur moduliert. Wer Speed hatte,
+        // gewann; wer Zaehigkeit hatte, nicht. Jetzt tragen Wille, Ausdauer und
+        // Entschlossenheit mit — genau die Werte, die die Matrix mit 14, 4 und 15 fuehrt.
+        // ZWEITE NACHZIEHUNG, diesmal gemessen statt geschaetzt. Mit der allgemeinen
+        // Abnahmemessung stand Spurt bei 79,5 Pp — schlechter als die beiden neuen
+        // Bahnen. Aufgeschluesselt: Will 32 % gegen Matrix 14, Ausdauer 21 gegen 4,
+        // Torment 0 gegen 14, Dexterity 2,5 gegen 12, Power 1,8 gegen 10.
+        //
+        // Zwei Ursachen, beide dieselben wie im Zeitfahren: Will sass mit 37 im Endtempo,
+        // das direkt die Geschwindigkeit multipliziert, und das Feld war so weit
+        // gespreizt (8,5 s gegen 17,1 s), dass eine gerissene Huerde nie einen Platz
+        // gekostet hat. Damit zahlte Technik nichts — und Wucht erst recht nicht.
+        ANTRITT:    {speed:42,power:34,determination:24},
+        ENDTEMPO:   {speed:36,will:30,determination:22,stamina:12},
+        TECHNIK:    {dexterity:52,awareness:30,determination:18},
+        WENDIGKEIT: {dexterity:46,awareness:34,speed:20},
+        STEHEN:     {determination:44,will:32,health:24},
+        WUCHT:      {torment:55,power:42,speed:3},
+        ROBUST:     {health:28,torment:24,will:20,dexterity:18,awareness:10}
+      },
+      lang:{ANTRITT:"Antritt",ENDTEMPO:"Endtempo",TECHNIK:"Technik",WENDIGKEIT:"Wendigkeit",
+            STEHEN:"Stehvermögen",WUCHT:"Wucht",ROBUST:"Robustheit"},
+      plaene:{
+        vorn:    {label:"Von vorn",      tempo:1.00, sucht:0.15, ab:0.70,
+                  text:"Geht sofort an die Spitze und diktiert das Rennen. Kostet Kraft — im Wind läuft niemand billig."},
+        schatten:{label:"Windschatten",  tempo:0.94, sucht:0.90, ab:0.78,
+                  text:"Hängt sich an und spart Kraft, bis der Vordermann leer ist."},
+        kick:    {label:"Schlusssprint", tempo:0.90, sucht:0.55, ab:0.62,
+                  text:"Hält sich zurück und wirft alles auf das letzte Drittel."}
+      },
+      planJeSlot:{blockstart:"vorn", acceleration:"vorn", topspeed:"kick", lanecontrol:"schatten"}
+    },
 
-  // DIE KRAFTRESERVE. Zwei Drittel Stehvermoegen, ein Drittel Robustheit: wer durchhaelt,
-  // hat mehr, und wer viel einsteckt, verliert weniger davon. Die 240 sind der Rahmen, in
-  // dem ein Rennen ueber vierzig Sekunden ueberhaupt entschieden werden kann — bei 100
-  // waere jeder nach zehn Sekunden leer, bei 600 nie.
+    "time-trial":{
+      // MATRIX: dexterity 25, speed 22, intelligence 18, stamina 15, awareness 12,
+      // power 5, torment 3.
+      //
+      // Ein Zeitfahren ist ein Rennen OHNE Gegner: jeder faehrt fuer sich, niemand kann
+      // gerempelt werden, und es gibt keinen Windschatten zu erben. Deshalb sind beide
+      // Schalter aus — und genau deshalb muss die Strecke selbst die Entscheidung
+      // liefern. Das tun die Kurven: neun Stueck, und in jeder entscheidet die LINIE.
+      //
+      // Wer die Linie liest (Intelligence, Awareness) und haelt (Dexterity), verliert
+      // nichts. Wer sie verpasst, kann noch RISIKO nehmen — mehr Tempo in die Kurve
+      // tragen, als sauber waere. Das kostet Reserve und geht manchmal schief. So bekommt
+      // Torment seine 3 und Dexterity seine 25.
+      // Die Kurve ist der Kern des Zeitfahrens, also darf sie nicht fast immer gelingen:
+      // bei Linie 70 kommen 62 % sauber durch, der Rest muss RISIKO nehmen oder verliert
+      // die Linie. Der Haushalt ist grosszuegiger als im Sprint, weil hier niemand Sog
+      // erben kann — ohne das brachen 74 % ein, und ein Einbruch, den fast jeder hat, ist
+      // kein Drama, sondern Grundrauschen.
+      technikBasis:0.20, technikSpanne:0.0060, wuchtBasis:0.12, wuchtSpanne:0.0085,
+      wendigErholt:0.0050,
+      wuchtKraft:16, wuchtZeit:0.16, stolperGrund:0.75, stolperSpanne:0.90, stolperKraft:6,
+      kraftBasis:290, kraftSpanne:2.7,
+      label:"Time-Trial", jeSeite:6, hindernisse:[0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90],
+      hindernisWort:"Kurve", boden:"#3c3f45", schatten:false, tackle:false, grundTempo:96, tempoSpanne:0.82,
+      rezept:{
+        // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
+        // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
+        // lagen. Ein Attribut, das ueberall mitzaehlt, gewinnt immer. Jetzt tragen Kopf
+        // und Blick die Linie, und Dexterity haelt sie nur noch.
+        ANTRITT:    {speed:48,power:30,dexterity:22},
+        ENDTEMPO:   {speed:42,stamina:34,intelligence:24},
+        TECHNIK:    {intelligence:40,dexterity:34,awareness:26},
+        WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
+        STEHEN:     {stamina:46,intelligence:30,awareness:24},
+        WUCHT:      {torment:40,dexterity:32,awareness:28},
+        ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20}
+      },
+      lang:{ANTRITT:"Antritt",ENDTEMPO:"Renntempo",TECHNIK:"Linie",WENDIGKEIT:"Umsetzen",
+            STEHEN:"Durchhalten",WUCHT:"Risiko",ROBUST:"Fahrsicherheit"},
+      plaene:{
+        gleich:  {label:"Gleichmaß",     tempo:0.93, sucht:0, ab:0.75,
+                  text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
+        negativ: {label:"Negativ-Split", tempo:0.88, sucht:0, ab:0.55,
+                  text:"Erste Hälfte verhalten, zweite Hälfte alles. Verlangt Kopf und Reserve."},
+        attacke: {label:"Attacke",       tempo:1.00, sucht:0, ab:0.60,
+                  text:"Von Beginn an über der eigenen Schwelle. Geht auf oder geht schief."}
+      },
+      planJeSlot:{pacer:"gleich", linereader:"gleich", aerodrive:"attacke",
+                  splitcontrol:"negativ", risksegment:"attacke", finishkick:"negativ"}
+    },
+
+    climbing:{
+      // MATRIX: stamina 26, determination 16, speed 12, dexterity 12, health 10,
+      // power 8, awareness 8, will 8.
+      //
+      // Ausdauer mit 26 ist der hoechste Einzelwert aller fuenf Bahn-Disziplinen. Eine
+      // Wand ist kein Rennen, sondern ein Haushalt: die Reserve ist knapp, und die Wand
+      // wird nach oben steiler. Deshalb zieht `steigung` den Verbrauch mit der Hoehe an —
+      // wer oben noch etwas hat, kommt an. Wer unten alles gibt, haengt auf halber Hoehe.
+      //
+      // Zehn Griffe statt sieben Huerden: an jedem entscheidet erst der GRIFF (Dexterity,
+      // Awareness), dann der KRAFTZUG (Power, Determination). Ein Fehlgriff wirft nicht
+      // um, er kostet Zeit und Kraft — das ist der Unterschied zur Huerde.
+      // Der Griff entscheidet die Wand. Misslingt er, hilft der KRAFTZUG — das kostet
+      // Reserve, die hier ohnehin knapp ist. Der Haushalt liegt hoeher als im Sprint, weil
+      // die Steigung ihn oben zusaetzlich zusammenzieht; mit dem Sprint-Wert war nach
+      // zwoelf Laeufen jeder Einzelne leer.
+      technikBasis:0.25, technikSpanne:0.0062, wuchtBasis:0.14, wuchtSpanne:0.0092,
+      wendigErholt:0.0045,
+      wuchtKraft:18, wuchtZeit:0.18, stolperGrund:0.42, stolperSpanne:0.5, stolperKraft:8,
+      kraftBasis:310, kraftSpanne:3.1,
+      label:"Climbing", jeSeite:6, hindernisse:[0.08,0.17,0.26,0.35,0.44,0.53,0.62,0.71,0.80,0.89],
+      hindernisWort:"Griff", boden:"#5d5a54", baeume:false, schatten:false, tackle:false, grundTempo:80, tempoSpanne:0.80,
+      steigung:0.85,
+      rezept:{
+        ANTRITT:    {power:38,dexterity:32,speed:30},
+        ENDTEMPO:   {stamina:44,determination:31,speed:25},
+        TECHNIK:    {dexterity:44,awareness:33,power:23},
+        WENDIGKEIT: {dexterity:45,speed:32,awareness:23},
+        STEHEN:     {stamina:44,determination:26,will:18,health:12},
+        WUCHT:      {power:42,determination:28,health:30},
+        ROBUST:     {health:32,stamina:28,will:24,determination:16}
+      },
+      lang:{ANTRITT:"Zug",ENDTEMPO:"Ausdauertempo",TECHNIK:"Griff",WENDIGKEIT:"Umsetzen",
+            STEHEN:"Kraftausdauer",WUCHT:"Kraftzug",ROBUST:"Zähigkeit"},
+      plaene:{
+        sparsam: {label:"Sparsam",   tempo:0.86, sucht:0, ab:0.72,
+                  text:"Klettert unter der Schwelle und hebt sich alles für die Steilstufe auf."},
+        stetig:  {label:"Stetig",    tempo:0.94, sucht:0, ab:0.66,
+                  text:"Gleichmäßiger Zug. Kommt an, ohne zu glänzen."},
+        angriff: {label:"Durchziehen",tempo:1.00, sucht:0, ab:0.55,
+                  text:"Zieht von unten durch. Oben wird es eng — wenn die Reserve reicht."}
+      },
+      planJeSlot:{routereader:"stetig", gripspecialist:"stetig", paceclimber:"sparsam",
+                  endurancewall:"sparsam", dynamicmove:"angriff", summitpush:"angriff"}
+    }
+,
+
+    staffel:{
+      // MATRIX: speed 24, stamina 16, spirit 16, awareness 12, charisma 10, dexterity 8,
+      // will 8, determination 4, health 2.
+      //
+      // Eine Staffel ist die einzige Bahn, auf der nicht alle gleichzeitig laufen. Sechs
+      // Laeufer, sechs Abschnitte, fuenf Wechsel — und immer nur EINER je Mannschaft ist
+      // unterwegs. Das ist keine Kosmetik: es ist der Grund, warum Spirit mit 16 und
+      // Charisma mit 10 in einer Laufdisziplin ueberhaupt vorkommen. Ein Stab wird
+      // uebergeben, und das gelingt oder nicht.
+      //
+      // TECHNIK heisst hier WECHSEL und speist sich aus Awareness, Dexterity und
+      // Charisma — geprueft wird mit dem Schnitt aus abgebendem und annehmendem Laeufer.
+      // Wer sie verpatzt, verliert Zeit fuer die ganze Mannschaft; deshalb zaehlt hier
+      // nicht die eigene Zeit, sondern die des Teams.
+      //
+      // Windschatten bleibt an — der Verfolger kann sich anhaengen. Getackelt wird nicht:
+      // in einer Staffel raeumt niemand den Gegner von der Bahn.
+      label:"Staffel", jeSeite:6, staffel:true, bahnenFest:2,
+      hindernisse:[], hindernisWort:"Wechsel", boden:"#8a4a32",
+      schatten:true, tackle:false, grundTempo:92, tempoSpanne:0.90,
+      wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
+      kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      rezept:{
+        ANTRITT:    {speed:44,spirit:30,stamina:26},
+        ENDTEMPO:   {speed:38,stamina:35,will:27},
+        TECHNIK:    {awareness:38,dexterity:32,charisma:30},
+        WENDIGKEIT: {dexterity:42,awareness:34,speed:24},
+        STEHEN:     {stamina:45,will:33,determination:22},
+        WUCHT:      {spirit:45,charisma:33,speed:22},
+        ROBUST:     {stamina:30,will:26,health:24,spirit:20}
+      },
+      lang:{ANTRITT:"Antritt",ENDTEMPO:"Abschnittstempo",TECHNIK:"Wechsel",
+            WENDIGKEIT:"Bahnarbeit",STEHEN:"Stehvermögen",WUCHT:"Zug an der Spitze",
+            ROBUST:"Verlässlichkeit"},
+      plaene:{
+        halten:  {label:"Halten",     tempo:0.94, sucht:0.75, ab:0.72,
+                  text:"Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt."},
+        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.60,
+                  text:"Geht seinen Abschnitt von vorn an und legt vor."},
+        schluss: {label:"Schlussmann",tempo:0.90, sucht:0.85, ab:0.55,
+                  text:"Hängt sich an und wirft alles auf das letzte Stück."}
+      },
+      planJeSlot:{startrunner:"angehen", tempolink:"halten", batontech:"halten",
+                  curverunner:"angehen", chaserunner:"schluss", anchor:"schluss"}
+    },
+
+    "takeshis-castle":{
+      // MATRIX: will 22, determination 18, charisma 14, intelligence 11, awareness 8,
+      // torment 7, stamina 6, dexterity 6, health 4, speed 4.
+      //
+      // Zehn Attribute mit Gewicht, und der hoechste ist WILLE. Das ist keine Laufbahn,
+      // das ist ein Spiessrutenlauf: vierzehn Fallen, jede kann einen umwerfen, und wer
+      // aufsteht und weitermacht, kommt an. Speed steht mit 4 fast ganz unten — schnell
+      // sein hilft hier kaum, DURCHKOMMEN ist alles.
+      //
+      // Deshalb drei Dinge anders als auf jeder anderen Bahn:
+      //
+      //   1. AUSSCHEIDEN. Wer dreimal faellt, ist raus. Das ist der Grund, warum Wille
+      //      und Entschlossenheit hier oben stehen und nicht das Tempo — ein Rennen, das
+      //      man verlieren kann, ohne langsam zu sein.
+      //   2. Das PUBLIKUM. Charisma mit 14 ist fuer eine Hindernisbahn ungewoehnlich
+      //      hoch, und es gibt nur einen Ort, an den es gehoert: die Menge traegt den,
+      //      den sie mag. Wer Publikum hat, steht schneller wieder auf — Charisma sitzt
+      //      deshalb in WENDIGKEIT, und Wendigkeit verkuerzt hier die Erholung.
+      //   3. Die Fallen sind SCHWER (bei Technik 70 kommen 56 % sauber durch) und teuer.
+      //      Eine Falle, die fast immer gelingt, waere Dekoration.
+      label:"Takeshi's Castle", jeSeite:6,
+      hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
+      hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
+      grundTempo:92, tempoSpanne:0.70,
+      technikBasis:0.26, technikSpanne:0.0060, wuchtBasis:0.10, wuchtSpanne:0.0060,
+      wuchtKraft:14, wuchtZeit:0.20, stolperGrund:0.80, stolperSpanne:0.95, stolperKraft:9,
+      wendigErholt:0.0030, kraftBasis:300, kraftSpanne:2.8, nervenKosten:34, nervenRegen:0.05,
+      rezept:{
+        ANTRITT:    {will:40,determination:32,speed:28},
+        ENDTEMPO:   {will:38,determination:33,stamina:29},
+        TECHNIK:    {intelligence:36,awareness:30,dexterity:22,will:12},
+        WENDIGKEIT: {charisma:40,dexterity:32,awareness:28},
+        STEHEN:     {will:46,determination:34,health:20},
+        WUCHT:      {charisma:38,determination:32,torment:30},
+        ROBUST:     {health:28,will:30,determination:24,charisma:18}
+      },
+      lang:{ANTRITT:"Losstürmen",ENDTEMPO:"Durchhaltetempo",TECHNIK:"Falle lesen",
+            WENDIGKEIT:"Aufstehen",STEHEN:"Wille",WUCHT:"Durchbrettern",ROBUST:"Nehmerqualität"},
+      plaene:{
+        vorsicht:{label:"Vorsichtig",  tempo:0.84, sucht:0, ab:0.80,
+                  text:"Geht jede Falle langsam an. Kommt selten glanzvoll an — aber er kommt an."},
+        stetig:  {label:"Beherzt",     tempo:0.93, sucht:0, ab:0.65,
+                  text:"Nimmt die Fallen im Tempo und steht wieder auf, wenn es schiefgeht."},
+        wild:    {label:"Kopf voran",  tempo:1.00, sucht:0, ab:0.50,
+                  text:"Rennt durch und hofft. Das Publikum liebt es. Drei Stürze und Schluss."}
+      },
+      planJeSlot:{gatecrash:"wild", balancerun:"vorsicht", trapreader:"vorsicht",
+                  ironwill:"stetig", chaosdodge:"wild", finalwall:"stetig"}
+    }
+  };
+
+  // Welche Bahn gerade gerechnet wird. Steht getrennt von `disc`, weil eine Messung eine
+  // Disziplin durchrechnen kann, ohne die Ansicht umzuschalten.
+  // DIE KRAFTRESERVE — der Ersatz fuer Lebenspunkte. Sie geht nicht durch Schlaege
+  // verloren, sondern durch Tempo: wer schneller laeuft, als er kann, ist frueher leer,
+  // und wer leer ist, faellt zurueck und kommt nicht mehr heran.
+  //
   // NACHGERECHNET, NICHT GERATEN. Der Verbrauch betraegt bei vollem Tempo
-  // (0,55 + 1,0^2 x 1,9) x 10 = 24,5 je Sekunde, im Windschatten 16,2. Ein Rennen dauert
-  // rund elf Sekunden. Voll durchgelaufen kostet es also ~270, im Sog gespart ~180.
+  // (0,55 + 1,0^2 x 1,9) x 10 = 24,5 je Sekunde, im Windschatten 16,2. Ein Sprint dauert
+  // rund elf Sekunden — voll durchgelaufen kostet er ~270, im Sog gespart ~180. Eine
+  // erste Fassung gab 180 bei mittleren Werten: 91 % der Laeufer brachen ein, und ein
+  // Einbruch, den fast jeder hat, ist kein Drama, sondern Grundrauschen. Bei 240 kommt
+  // durch, wer spart, und geht leer, wer von vorn durchzieht. Dort soll es entschieden
+  // werden.
   //
-  // Erste Fassung gab 180 bei mittleren Werten — Reserve reichte 7,3 s bei 11 s Rennen,
-  // und 91 % der Laeufer brachen ein. Ein Einbruch, den fast jeder hat, ist kein Drama,
-  // sondern Grundrauschen. Jetzt liegt die Mitte bei 240: wer im Sog spart, kommt durch,
-  // wer von vorn durchzieht, geht kurz vor dem Ziel leer. Genau dort soll das Rennen
-  // entschieden werden.
-  const KRAFT_VON=(u)=>Math.round(150+ (u.STEHEN*0.7+u.ROBUST*0.3) *1.8);
-
-  // RENNPLAENE. Das Gegenstueck zu den Befehlen im Kampf — und sie kommen aus DEMSELBEN
-  // Ort: dem Slot, auf dem der Spieler steht. Ein Block Start geht von vorn, ein Lane
-  // Control setzt sich in den Windschatten, ein Top Speed hebt sich fuer den Schlusssprint
-  // auf. Damit entscheidet die Aufstellung das Rennen, nicht der Zufall.
-  //
-  //   tempo   Anteil der eigenen Hoechstgeschwindigkeit, den er von sich aus laeuft
-  //   sucht   wie stark er den Windschatten sucht (0 = laeuft lieber frei)
-  //   ab      ab welchem Streckenanteil er alles gibt
-  const RENNPLAN={
-    vorn:    {label:"Von vorn",      tempo:1.00, sucht:0.15, ab:0.70,
-              text:"Geht sofort an die Spitze und diktiert das Rennen. Kostet Kraft — im Wind läuft niemand billig."},
-    schatten:{label:"Windschatten",  tempo:0.94, sucht:0.90, ab:0.78,
-              text:"Hängt sich an und spart Kraft, bis der Vordermann leer ist."},
-    kick:    {label:"Schlusssprint", tempo:0.90, sucht:0.55, ab:0.62,
-              text:"Hält sich zurück und wirft alles auf das letzte Drittel."}
+  // Je Disziplin verschiebbar: an der Wand ist der Haushalt knapper (die Steigung zieht
+  // zusaetzlich), im Zeitfahren grosszuegiger, weil dort niemand Sog erben kann.
+  const KRAFT_VON=(u)=>{
+    const a=BA();
+    return Math.round((a.kraftBasis??150) + (u.STEHEN*0.7+u.ROBUST*0.3)*(a.kraftSpanne??1.8));
   };
-  const PLAN_JE_SLOT={blockstart:"vorn", acceleration:"vorn",
-                      topspeed:"kick",   lanecontrol:"schatten"};
+
+  let bahnDisc="spurt";
+  const BA=()=>BAHN_ART[bahnDisc]||BAHN_ART.spurt;
+  const istBahn=(d)=>!!BAHN_ART[d];
+  const SPURT_KEYS=Object.keys(BAHN_ART.spurt.rezept);
   function spurtWerte(p,extra){
     const a=extra||p.a, o={};
-    for(const k of SPURT_KEYS)o[k]=Math.round(mische({a},SPURT_REZEPT[k]));
+    const R=BA().rezept;
+    for(const k in R)o[k]=Math.round(mische({a},R[k]));
     return o;
   }
 
@@ -4231,37 +5554,77 @@
   // den Chris gemacht hat: "es gibt ja Hindernisse, das heisst, wenn Lulu mehr Speed auf
   // den Geraden hat, muesste Gram die Hindernisse besser wegraeumen." Dafuer muessen sie
   // oft genug kommen, um ins Gewicht zu fallen.
-  const BAHNEN=8, HUERDEN=[0.14,0.26,0.38,0.50,0.62,0.74,0.86];
+  // Bahnzahl und Hindernisorte kommen jetzt aus BAHN_ART. Beide Namen bleiben als
+  // Funktion stehen, damit der Motor unveraendert lesen kann.
+  const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
+  const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
 
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
     seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
-    const mine=inDisc("spurt").slice(0,4);
-    const gegen=OPP.slice(0,4);
+    const d=bahnDisc, art=BA(), n=art.jeSeite;
+    // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
+    // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
+    // wer nicht gesetzt ist, wird nach EIGNUNG gesetzt — die besten n der Disziplin, jeder
+    // auf den Slot, der der Reihe nach frei ist. Das ist keine Taktik, sondern ein
+    // Ausgangspunkt; sobald jemand von Hand aufstellt, gilt seine Aufstellung.
+    const gesetzt=inDisc(d);
+    const slotListe=slotsVon(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    const gegen=OPP.slice(0,n);
     let id=0;
-    const setz=(p,seite,bahn,istGegner)=>{
-      const sl=(!istGegner&&place[p.n])?place[p.n].slot:null;
-      const engP=sl?slotAufschlag(p,sl,"spurt"):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
-      let attr=mitAufschlag(p.a,engP,betroffeneAttribute(sl,"spurt",true),"spurt");
-      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,"spurt",false),"spurt");
+    const setz=(p,seite,bahn,istGegner,idx)=>{
+      // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
+      // 24 von 24 Kaempfen verursacht hat: unsere Laeufer bekamen Slot, Form und Stufe,
+      // der Gegner nur seinen Disziplinwert. Im Kampf ist das laengst behoben, auf der
+      // Bahn stand es noch — der Gegner lief ohne Slot-Aufschlag und ohne Stufe, und im
+      // Bild bekamen alle sechs denselben Rennplan, weil die Zuordnung an einem Slot
+      // haengt, den sie gar nicht hatten.
+      const sl=slotFuer(p,idx);
+      const engP=sl?slotAufschlag(p,sl,d):0;
+      const breitP=formVon(p.n)+stufenWert();
+      let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,d,true),d);
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,d,false),d);
       const w=spurtWerte(p,attr);
-      const planId=(sl&&PLAN_JE_SLOT[sl])||"schatten";
+      const P=BA().plaene, JS=BA().planJeSlot;
+      const planId=(sl&&JS[sl])||Object.keys(P)[1]||Object.keys(P)[0];
       const L={id:id++,n:p.n,seite,bahn,...w,
-        eig:(p.d.spurt||0)+engP+breitP,
+        // ZWEI KOPPLUNGEN, BEIDE VERTRETBAR — aber sie sind verschieden, und das sollte
+        // niemand fuer ein Versehen halten. In der Arena setzt aufEignung() die MENGE der
+        // Kampfwerte auf die Eignung; die Rezepte geben nur die Form. Auf der Bahn geben
+        // die Rezepte Form UND Menge, und die Eignung steht hier nur zur Anzeige.
+        //
+        // Das ist kein Fehler: die Eignung ist selbst eine gewichtete Summe derselben
+        // Attribute. Wer sie auf der Bahn zusaetzlich anlegte, zaehlte sie doppelt.
+        // Die Folge ist trotzdem eine Frage an Chris: auf der Bahn entscheidet damit
+        // NICHT der Disziplinrang, sondern nur die Attribute, aus denen er entsteht. Zwei
+        // Laeufer mit gleichen Attributen laufen gleich schnell, auch wenn der eine im
+        // Spurt auf Rang 6 und der andere auf Rang 20 steht.
+        eig:(p.d[d]||0)+engP+breitP+eigHebung(p,d),
         pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
-        plan:planId, ...RENNPLAN[planId],
+        plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
         bahnZ:bahn, wechselCd:0, wechsel:0,
         reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
         pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
+      // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
+      // von Anfang an unterwegs; die uebrigen stehen sichtbar in ihrer Wechselzone, was
+      // genau das ist, was man bei einer Staffel sieht.
+      if(art.staffel){
+        L.bein=idx; L.beinVon=idx/n; L.beinBis=(idx+1)/n;
+        L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
+      }
       LAEUFER.push(L);
     };
-    mine.forEach((p,i)=>setz(p,0,i*2,false));
-    gegen.forEach((o,i)=>setz(o,1,i*2+1,true));
+    mine.forEach((p,i)=>setz(p,0,i*2,false,i));
+    gegen.forEach((o,i)=>setz(o,1,i*2+1,true,i));
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -4272,6 +5635,9 @@
   // spart, und irgendwann muss man trotzdem vorbei.
   const SCHATTEN_ABSTAND=0.062, SCHATTEN_TEMPO=1.045, SCHATTEN_SPAREN=0.66;
   function vordermann(u){
+    // Kein Windschatten im Zeitfahren und an der Wand: dort faehrt/klettert jeder fuer
+    // sich, und ein Sog waere geschenkte Zeit, die die Disziplin nicht kennt.
+    if(!BA().schatten)return null;
     let best=null, bestD=9;
     for(const o of LAEUFER){
       if(o===u||o.fertig!=null)continue;
@@ -4287,12 +5653,21 @@
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
   function tempoVon(u){
-    const phase=Math.min(1,rennT/3.2);
+    // JEDER HAT SEINE EIGENE ANFAHRT. Bisher hing die Phase an der Rennuhr: nach 3,2
+    // Sekunden war ANTRITT fuer alle erledigt. In einer Staffel ist das falsch — der
+    // Schlusslaeufer uebernimmt bei Sekunde neun aus dem Stand und muss selbst erst in
+    // Fahrt kommen. Gemessen trug Spirit (das im Antritt sitzt) exakt 0 %, obwohl die
+    // Matrix es mit 16 fuehrt.
+    const phase=Math.min(1,(rennT-(u.startT||0))/3.2);
     const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
     // Der Plan: bis zum Angriffspunkt laeuft er verhalten, danach alles.
     const planT=u.pos>=u.ab?1.0:u.tempo;
     // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
-    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*0.00055*(u.pos-0.45)*100):1;
+    // ERMUEDUNG. Der Beiwert entscheidet, wie stark das Stehvermoegen die zweite
+    // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
+    // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
+    // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
+    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(u.pos-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -4305,9 +5680,13 @@
     // zusaetzlich ab: wer zaeh ist, schleppt sich besser ins Ziel als einer, der es nicht
     // ist — genau das, wofuer der Wert da ist.
     const leer=u.leer?(0.74+u.STEHEN*0.0012):1;
+    // ANGESCHLAGEN. Wo es Nerven gibt, sind sie keine reine Schwelle: wer schon zweimal
+    // im Wasser lag, geht die naechste Falle zaghafter an. Ohne das wirkte der Wille nur
+    // im Moment des Ausscheidens — gemessen 8,9 % bei einem Matrixgewicht von 22.
+    const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
-    return (60+grund*1.5)*planT*mued*stolper*sog*leer*quer*(u.kraft>0?0.82:1);
+    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
   }
 
   function stepSpurt(dt){
@@ -4316,10 +5695,19 @@
     const strecke=W-170;
     for(const u of LAEUFER){
       if(u.fertig!=null)continue;
+      // In der Staffel laeuft immer nur einer je Mannschaft. Die anderen stehen in ihrer
+      // Wechselzone — sie verbrauchen keine Kraft und bewegen sich nicht.
+      if(BA().staffel && !u.aktiv)continue;
       if(u.stolper>0)u.stolper-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
       if(u.kraft>0)u.kraft-=dt;
       if(u.wechselCd>0)u.wechselCd-=dt;
+      // DAS PUBLIKUM. Charisma steht in Takeshi's Matrix mit 14 — fuer eine Hindernisbahn
+      // ungewoehnlich hoch, und es gibt genau einen Ort, an den es gehoert: die Menge
+      // traegt den, den sie mag. Wer sie hat, sammelt zwischen zwei Fallen wieder Nerven.
+      // Ohne diesen Kanal las Charisma 3,9 % — es sass nur in Werten, die kaum wirkten.
+      if(BA().nervenRegen&&u.nervenMax)
+        u.nerven=Math.min(u.nervenMax,u.nerven+u.WENDIGKEIT*BA().nervenRegen*dt);
 
       // ---- WINDSCHATTEN: haengt er gerade in einem? ----
       const vm=vordermann(u);
@@ -4337,7 +5725,7 @@
         if(u.wechsel<=0)u.bahnZ=u.bahn;
       } else if(u.wechselCd<=0 && u.fertig==null){
         let wunsch=null;
-        const frei=(b)=>b>=0&&b<BAHNEN&&!LAEUFER.some(o=>o!==u&&o.fertig==null
+        const frei=(b)=>b>=0&&b<BAHNEN_N()&&!LAEUFER.some(o=>o!==u&&o.fertig==null
           && Math.round(o.bahnZ)===b && Math.abs(o.pos-u.pos)<0.02);
         const gefallen=LAEUFER.find(o=>o!==u&&o.fertig==null&&o.stolper>0
           && Math.abs(o.bahnZ-u.bahnZ)<0.6 && o.pos-u.pos>0 && o.pos-u.pos<0.03);
@@ -4366,6 +5754,9 @@
       // ueberproportional; wer im Windschatten haengt, zahlt ein Drittel weniger.
       const ueber=Math.max(0.4,(u.pos>=u.ab?1.0:u.tempo));
       let zehr=(0.55+ueber*ueber*1.9)*(u.imSchatten?SCHATTEN_SPAREN:1);
+      // STEIGUNG. Eine Wand ist unten leichter als oben. Der Verbrauch waechst mit der
+      // Hoehe — deshalb entscheidet beim Klettern der Haushalt, nicht der Antritt.
+      if(BA().steigung)zehr*=1+BA().steigung*u.pos;
       if(u.kraft>0)zehr*=1.15;             // gerade getackelt oder selbst gerempelt
       if(u.stolper>0)zehr*=1.4;            // Wiederaufnehmen kostet extra
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
@@ -4390,23 +5781,67 @@
       // WUCHT — durchbrechen. Das kostet Kraft und einen Wimpernschlag, aber keinen Sturz.
       // Erst wenn beides misslingt, liegt er. Ein Bulle wie Gram raeumt die Huerde weg,
       // wo ein Leichtgewicht sie reissen wuerde.
-      for(const h of HUERDEN){
+      for(const h of HUERDEN_N()){
         if(vor<h&&u.pos>=h){
-          const technik=Math.min(0.97,0.35+u.TECHNIK*0.0065);
+          // WIE SCHWER EIN HINDERNIS IST, entscheidet die Disziplin. Eine Huerde nimmt
+          // fast jeder Sprinter; eine Kurve im Zeitfahren und ein Griff an der Wand nicht.
+          // Das ist kein Geschmack, sondern Rechnung: solange ein Hindernis zu 80 % gelingt,
+          // kostet es fast nie etwas — und dann zahlt das Attribut nicht, das es entscheidet.
+          // Gemessen hat das Zeitfahren Intelligence mit 3,5 % gefuehrt, wo die Matrix 18
+          // sagt. Der Grund war genau das: die Kurve war zu leicht.
+          const A=BA();
+          const technik=Math.min(0.97,(A.technikBasis??0.35)+u.TECHNIK*(A.technikSpanne??0.0065));
           if(rr()<=technik)continue;                       // sauber drueber
-          const wucht=Math.min(0.92,0.10+u.WUCHT*0.0090);
+          const wucht=Math.min(0.92,(A.wuchtBasis??0.10)+u.WUCHT*(A.wuchtSpanne??0.0090));
           if(rr()<=wucht){                                 // durchgebrochen
-            u.reserve=Math.max(0,u.reserve-14);
-            u.stolper=0.12;
+            u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
+            u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
             schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
-            feed(u.seite,u.n+" nimmt die Hürde mit Gewalt.");
+            feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
-          u.stolper=0.45+ (1-u.TECHNIK/100)*0.5;
+          u.stolper=(BA().stolperGrund??0.45)+ (1-u.TECHNIK/100)*(BA().stolperSpanne??0.5);
+          // WENDIGKEIT, WO ES KEINE SPUR ZU WECHSELN GIBT.
+          //
+          // Im Sprint entscheidet Wendigkeit ueber Bahnwechsel: in den Sog kommen, am
+          // Vordermann vorbei, einem Gestuerzten ausweichen. Im Zeitfahren und an der Wand
+          // gibt es davon nichts — kein Sog, keine Gegner in Reichweite. Damit war der
+          // Wert dort TOTES GEWICHT, und gemessen las Awareness (sein Hauptbestandteil)
+          // exakt 0 %, wo die Matrix 12 bzw. 8 sagt.
+          //
+          // Also bekommt er dort die Aufgabe, die er in Wirklichkeit hat: die Linie wieder
+          // finden, den Griff neu setzen. Wer wendig ist, haengt kuerzer.
+          if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
+          if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
           u.gestolpert++;
+          // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
+          //
+          // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
+          // Torment 33,6 % (Matrix: 7) und Wille 8,9 % (Matrix: 22) — genau verkehrt
+          // herum. Der Grund war logisch, nicht zufaellig: wenn jeder gleich viele Stuerze
+          // vertraegt, entscheidet nur, wer sie VERMEIDET, und das ist Wucht. Wer
+          // WIEDERAUFSTEHT, kam nie vor.
+          //
+          // Jetzt hat jeder ein Nervenkostuem aus seinem Willen. Ein Sturz kostet davon
+          // einen festen Betrag; ist es leer, ist er raus. Wer zaeh ist, haelt fuenf
+          // Stuerze aus, wer es nicht ist, zwei. Das ist die Disziplin, die die Matrix
+          // beschreibt.
+          if(BA().nervenKosten){
+            // Was ein Sturz kostet, haengt an der Nehmerqualitaet — dort sitzt das
+            // Publikum (Charisma 18), das einen wieder hochholt.
+            u.nerven-=BA().nervenKosten*Math.max(0.45,1-u.ROBUST*0.0045);
+          }
+          if(BA().nervenKosten && u.nerven<=0){
+            u.raus=true; u.fertig=90+rennFertig.length*0.001;
+            rennFertig.push(u);
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
+              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
+            break;
+          }
           schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
-          feed(u.seite,u.n+" reißt die Hürde.");
+          feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
       }
 
@@ -4414,7 +5849,15 @@
       // selbst Tempo. Ob er es TUT, haengt an seiner Persoenlichkeit, nicht am Zufall.
       const willTackeln=({draufgaenger:0.9,duellant:0.55,schleicher:0.5,opportunist:0.7,
         bollwerk:0.25,taktiker:0.3})[u.pers] ?? 0.5;
-      if(u.tackleCd<=0 && u.WUCHT>45 && rr()<willTackeln*dt*1.6){
+      // Gemessen hat Torment im Spurt 0 % getragen, obwohl die Matrix es mit 14 fuehrt.
+      // Ein Teil davon war die Schwelle: bei WUCHT > 45 kamen ueber ein ganzes Rennen rund
+      // ein Rempler zustande, und was einmal passiert, entscheidet nichts.
+      // WIE OFT er zulangt, hing bisher NUR an der Persoenlichkeit — die Wucht war eine
+      // Schwelle und darueber fast wirkungslos. Damit kaufte mehr Torment so gut wie
+      // nichts, und gemessen trug es 2,2 % bei einem Matrixgewicht von 14. Jetzt kauft
+      // Wucht auch Gelegenheiten, nicht nur Durchschlagskraft.
+      if(BA().tackle && u.tackleCd<=0 && u.WUCHT>(BA().tackleAb??45)
+         && rr()<willTackeln*dt*(BA().tackleRate??1.6)){
         const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null
           && Math.abs(o.bahnZ-u.bahnZ)<=1.6 && Math.abs(o.pos-u.pos)<0.035);
         if(opfer.length){
@@ -4424,7 +5867,7 @@
           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
           // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
           // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
-          u.tackleCd=1.8; u.kraft=0.26; u.tackles++;
+          u.tackleCd=1.8; u.kraft=BA().tackleKosten??0.26; u.tackles++;
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
@@ -4437,13 +5880,53 @@
         }
       }
 
-      if(u.pos>=1){u.pos=1;u.fertig=rennT;rennFertig.push(u);
-        feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");}
+      // ---- WECHSEL. Der Stab geht weiter, und beide sind daran beteiligt: geprueft wird
+      // mit dem Schnitt aus dem Wechselwert des Abgebenden und des Annehmenden. Misslingt
+      // er, verliert die MANNSCHAFT Zeit — nicht der Einzelne. Genau deshalb zaehlt in
+      // dieser Disziplin die Teamzeit und nicht die eigene.
+      if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
+        const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        u.aktiv=false; u.pos=u.beinBis; u.durch=true;
+        if(naechster){
+          naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
+          const gut=Math.min(0.96,(BA().wechselBasis??0.34)
+            + ((u.TECHNIK+naechster.TECHNIK)/2)*(BA().wechselSpanne??0.0062));
+          if(rr()>gut){
+            // Bahnarbeit hilft, den Anschluss wiederzufinden. Ohne diesen Kanal war
+            // WENDIGKEIT in der Staffel voellig unbeschaeftigt: zwei Bahnen, keine freie
+            // Spur, keine Hindernisse — Awareness und Dexterity lasen 0 %.
+            naechster.stolper=(BA().wechselStrafe??1.30)
+              *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+            naechster.reserve=Math.max(0,naechster.reserve-12);
+            u.gestolpert++;
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
+          } else {
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
+          }
+        }
+        continue;
+      }
+
+      if(u.pos>=1){
+        u.pos=1;
+        if(BA().staffel){
+          // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
+          // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
+          const team=LAEUFER.filter(o=>o.seite===u.seite);
+          for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
+        } else {
+          u.fertig=rennT;rennFertig.push(u);
+          feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+        }
+      }
     }
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
   }
 
-  const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN);};
+  const bahnY=(b)=>{const oben=H*0.14,unten=H*0.94;return oben+(unten-oben)*((b+0.5)/BAHNEN_N());};
 
   function zeichneSpurt(){
     zeichneBoden();
@@ -4482,7 +5965,7 @@
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
       if(u.fertig==null){
         ctx.font="400 8px 'IBM Plex Mono',monospace";
-        const pl=(RENNPLAN[u.plan]||{}).label||"";
+        const pl=((BA().plaene)[u.plan]||{}).label||"";
         const zus=u.leer?" · leer":(u.imSchatten?" · Sog":"");
         ctx.strokeText(pl+zus,x,y-40);
         ctx.fillStyle=u.leer?"#c0504a":(u.imSchatten?"#78beff":"#8795A9");
@@ -4560,7 +6043,9 @@
 
   function draw(){
     ctx.clearRect(0,0,W,H);
-    if(disc==="spurt"){zeichneSpurt();return;}
+    if(istFeldspiel(disc)){zeichneFeldspiel();return;}
+    if(istBuehne(disc)){zeichneBuehne();return;}
+    if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
 
     for(const u of U){
@@ -4581,11 +6066,20 @@
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
+      //
+      // VORHER: ein 1,5 px Strich bei 70 % Deckkraft — im dichten Getuemmel (siehe
+      // Battlefield-Screenshot) ging er neben Sprite und Beschriftung unter, und man
+      // musste raten, wer zu wem gehoert. JETZT: eine gefuellte Teamfarb-Flaeche unter
+      // jeder Figur plus ein kraeftigerer Ring, beide deutlich sichtbar auch bei zehn
+      // Kaempfern auf engem Raum.
+      ctx.globalAlpha=u.down?.10:.22;
+      ctx.fillStyle=c;
+      ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
       ctx.globalAlpha=u.down?.12:.30;
       ctx.fillStyle="#000";
       ctx.beginPath();ctx.ellipse(x,y+19,13,4.5,0,0,6.3);ctx.fill();
-      ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.globalAlpha=u.down?.18:.7;
-      ctx.beginPath();ctx.ellipse(x,y+19,15,5.5,0,0,6.3);ctx.stroke();
+      ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.globalAlpha=u.down?.22:.95;
+      ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.stroke();
       ctx.globalAlpha=u.down?.28:1;
       ctx.imageSmoothingEnabled=false;
       zeichneSprite(ctx,u,x,y);
@@ -4613,7 +6107,10 @@
         ctx.strokeText(txt,x,y+dy);
         ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
-      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,"#dfe6ef",9.5);
+      // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
+      // einem Gedraenge aus zehn Beschriftungen war vorher nicht auf einen Blick zu sehen,
+      // welcher Name zu welcher Seite gehoert.
+      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,c,9.5);
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
       schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),55,
@@ -4668,6 +6165,11 @@
       while(acc>=1/60){stepSim(1/60);acc-=1/60;}
       floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
       for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
+      // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
+      // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
+      if(istFeldspiel(disc))updateHudFeldspiel();
+      else if(istBuehne(disc))updateHudBuehne();
+      else if(istBahn(disc))updateHudBahn();
     }
     draw();
     requestAnimationFrame(loop);
@@ -4742,7 +6244,10 @@
       // einer zweiten Liste, die auseinanderlaufen koennte.
       const liste=document.getElementById(seite===0?"elisteL":"elisteR");
       liste.textContent="";
-      const feld=disc==="spurt"?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite})):U.filter(u=>u.side===seite);
+      const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :U.filter(u=>u.side===seite);
       const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
       for(const u of feld){
         const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
@@ -4862,7 +6367,12 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
-      for(const u of (disc==="spurt"?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1})):U.filter(x=>x.side===seite))){
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
+        :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
+          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,hp:x.punkte,
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>y.punkte))}))
+        :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
         const bar=el("div","kbar");
@@ -4873,8 +6383,13 @@
       }
     }
     const m=document.getElementById("kmitte");
-    if(m)m.textContent=disc==="spurt"
+    if(m)m.textContent=istBahn(disc)
       ? (rennFertig.filter(x=>x.seite===0).length+" : "+rennFertig.filter(x=>x.seite===1).length)
+      : istBuehne(disc)
+      ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
+         Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+      : istFeldspiel(disc)
+      ? (fsPunkte[0]+" : "+fsPunkte[1])
       : (live(0).length+" : "+live(1).length);
   }
 
@@ -4936,9 +6451,14 @@
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
-    document.getElementById("arenaDisc").textContent="TDM · "+live(0).length+" gegen "+live(1).length;
+    document.getElementById("arenaDisc").textContent=
+      (DISCS[disc]?DISCS[disc].label:disc)+" · "+
+      (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
+                    :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
+                    :(live(0).length+" gegen "+live(1).length));
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
-    if(disc!=="spurt")updateHud();
+    istBahn(disc)?updateHudBahn():istBuehne(disc)?updateHudBuehne()
+      :istFeldspiel(disc)?updateHudFeldspiel():updateHud();
     draw();renderKader();
     document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
@@ -4976,9 +6496,10 @@
   // Rauschen. Wer wissen will, ob jemand seinem Einsatzwert entspricht, muss ihn oefter
   // spielen lassen. Diese Schleife rechnet dieselbe Aufstellung mit n Saatkoernern durch,
   // ohne zu zeichnen, und liefert die Mittelwerte.
-  function serie(n,zwang){
+  function serieVon(d,n,zwang){
     planZwang=zwang||null;
-    const summe={},alt={U,pfeile,t,done,seed,freigabe};
+    const summe={},alt={disc,U,pfeile,t,done,seed,freigabe};
+    if(d)disc=d;
     let siege=0,dauer=0; const ergebnisse={}, messSumme={};
     for(let i=0;i<n;i++){
       // JE KAMPF EINE NEUE FORMKARTEN-ZIEHUNG.
@@ -5010,7 +6531,8 @@
         a.n+=MESS[k].n;a.ziele+=MESS[k].ziele;a.eng+=MESS[k].eng;a.bereit+=MESS[k].bereit;}
       if(live(0).length>live(1).length)siege++;
       // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
-      const e=(6-live(1).length)+":"+(6-live(0).length);
+      const nJe=jeSeiteVon(disc);
+      const e=(nJe-live(1).length)+":"+(nJe-live(0).length);
       ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
       for(const u of feld){
@@ -5019,91 +6541,198 @@
         s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
       }
     }
-    U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
     zieheMutatoren(20260823);
     zieheFormkarten(20260823);
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
-    return {plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
+    return {disziplin:d||alt.disc,plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
       reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
         dmg:Math.round(s.dmg/n),heal:Math.round(s.heal/n),verh:Math.round(s.verh/n),
         tank:Math.round(s.tank/n),ko:+(s.ko/n).toFixed(2),leist:Math.round(s.leist/n),
         totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
   }
 
+  const serie=(n,zwang)=>serieVon("tdm",n,zwang);
+
   // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
   // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
   // wie lange er im Windschatten hing, wie oft er einbrach, stolperte und tackelte.
   // WAS TREIBT DIE LEUTE AN? — die Messung zu Chris' Grundsatz.
   //
-  // Chris: "immer ueber die Diszi-Gewichtungen gehen, um zu schauen, was die Leute
-  // antreibt." Die Matrix ist die Ansage, die Mechanik hat sie einzuloesen. Ob sie das
-  // tut, laesst sich messen statt behaupten: jedem Laeufer nacheinander EIN Attribut um
-  // 15 Punkte anheben und sehen, um wie viele Plaetze er sich verbessert.
+  // "Immer ueber die Diszi-Gewichtungen gehen, um zu schauen, was die Leute antreibt."
+  // Die Matrix ist die Ansage, die Mechanik hat sie einzuloesen. Ob sie das tut, laesst
+  // sich messen statt behaupten: einem Teilnehmer nacheinander EIN Attribut anheben und
+  // sehen, wie viel besser er dadurch abschneidet.
   //
   // Das Ergebnis ist ein Einflussvektor ueber die zwoelf Attribute. Steht er quer zur
-  // Disziplinmatrix, belohnt das Rennen etwas anderes, als die Wertung bepreist — genau
-  // der Fehler, der im TDM viermal aufgetreten ist.
-  function spurtEinfluss(n){
-    const ATTR=["power","health","stamina","intelligence","awareness","determination",
-                "speed","dexterity","charisma","will","spirit","torment"];
-    const alt={disc, LAEUFER, rennFertig, rennT, done};
-    disc="spurt";
-
-    // EINEN Laeufer anheben, seine EIGENE Platzierung messen.
-    //
-    // Zwei Anlaeufe vorher waren falsch, beide aus demselben Grund — ich hatte nicht
-    // ueberlegt, WAS die Groesse eigentlich misst:
-    //
-    //   1. Mittlere Platzverbesserung ueber ALLE Laeufer -> immer exakt null. Plaetze
-    //      sind ein Nullsummenspiel; wer einen gutmacht, nimmt ihn einem anderen weg.
-    //   2. Mittlere ZIELZEIT bei Anhebung aller -> misst nur, was schneller macht. Damit
-    //      kann Wucht nie gewinnen: ein Rempler macht nicht MICH schneller, sondern den
-    //      anderen langsamer. Eine relative Waffe an einem absoluten Massstab gemessen.
-    //
-    // Richtig ist: nur EINER bekommt die 15 Punkte, und gezaehlt wird, wie viele Plaetze
-    // ER dadurch gutmacht. Das erfasst schnell machen UND andere aufhalten.
-    const laufSerie=(wer,anhebung)=>{
-      const platz={};
-      for(let i=0;i<n;i++){
-        zieheFormkarten(20260823+i*104729);
-        bauSpurt(1337+i*7919);
-        for(const u of LAEUFER){
-          const q=SPIELER_NACH_NAME[u.n]; if(!q)continue;
-          const a={...q.a};
-          if(anhebung&&u.n===wer)a[anhebung]=Math.min(100,(a[anhebung]||0)+15);
-          const w=spurtWerte(q,a);
-          for(const k of SPURT_KEYS)u[k]=w[k];
-          u.reserveMax=KRAFT_VON(u); u.reserve=u.reserveMax;
-        }
-        let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }
-        [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
-          .forEach((u,pl)=>{platz[u.n]=(platz[u.n]||0)+pl+1;});
-      }
-      return platz;
+  // Disziplinmatrix, belohnt die Disziplin etwas anderes, als die Wertung bepreist —
+  // genau der Fehler, der im TDM viermal aufgetreten ist.
+  //
+  // WARUM DAS HIER ALLGEMEIN STEHT. Es gibt zwanzig Disziplinen und bisher zwei Motoren.
+  // Fuer die achtzehn uebrigen ist das die Abnahmebedingung: gebaut ist eine Disziplin
+  // erst, wenn ihr Einflussvektor zur Matrix passt. Eine Messung, die nur Spurt kann,
+  // waere fuer diesen Zweck wertlos gewesen — deshalb melden Motoren sich an, statt dass
+  // die Messung sie kennt.
+  //
+  // Ein Motor muss vier Dinge koennen: einen Durchgang bauen, ihn zu Ende rechnen, sagen
+  // wer mitmacht, und je Teilnehmer eine Zahl liefern, bei der GROESSER BESSER heisst.
+  // Beim Rennen ist das die negative Platzierung, im Kampf die Leistung. Was "besser"
+  // heisst, ist die einzige Entscheidung, die je Disziplin faellt.
+  const MOTOREN={};
+  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Was
+  // „besser" heisst, ist im Kampf die LEISTUNG: der Beitrag, gemessen an dem, was der
+  // Einsatzwert erwarten laesst. Eine Platzierung gibt es hier nicht.
+  for(const ad of Object.keys(ARENA_ART)){
+    MOTOREN[ad]={
+      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe}),
+      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;},
+      vorher:()=>{disc=ad;},
+      bau:(saat)=>{disc=ad; build(saat);},
+      lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
+      namen:()=>U.map(u=>u.n),
+      wert:()=>{const feld=[...U],o={}; for(const u of feld)o[u.n]=leistungVon(u,feld)||0; return o;}
     };
-
-    bauSpurt(1337);
-    const namen=LAEUFER.map(u=>u.n);
-    const grund=laufSerie(null,null);
-    const raus=[];
-    for(const at of ATTR){
-      let summe=0;
-      for(const wer of namen){
-        const mit=laufSerie(wer,at);
-        summe += (grund[wer]-mit[wer])/n;      // positiv = Plaetze gutgemacht
+  }
+  // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
+  // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
+  // Zeitfahren und die Wand. Kommt eine sechste Bahn dazu, reicht ein Eintrag in
+  // BAHN_ART; hier ist nichts nachzutragen.
+  for(const bd of Object.keys(BAHN_ART)){
+    MOTOREN[bd]={
+      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done}),
+      zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
+                    rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;},
+      vorher:()=>{disc=bd; bahnDisc=bd;},
+      bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
+      lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
+      namen:()=>LAEUFER.map(u=>u.n),
+      // WORAN "BESSER" GEMESSEN WIRD — die einzige Entscheidung, die je Disziplin faellt.
+      //
+      // Im Einzelrennen ist es die PLATZIERUNG, negativ genommen, damit groesser besser
+      // heisst. Absolute Zeit waere dort falsch: ein Rempler macht nicht mich schneller,
+      // sondern den anderen langsamer, und eine relative Waffe an einem absoluten
+      // Massstab liest sich als null.
+      //
+      // In der Staffel ist es umgekehrt. Alle sechs einer Mannschaft teilen sich
+      // dieselbe Zeit und damit denselben Platz — Plaetze kippen nur, wenn die beiden
+      // Teams tauschen, und das ist ein Muenzwurf, kein Mass. Gemessen las damit JEDES
+      // Attribut exakt 0 %. Hier ist die Teamzeit richtig, und sie ist es gefahrlos:
+      // getackelt wird in einer Staffel nicht.
+      wert:()=>{
+        if(BAHN_ART[bd].staffel){
+          const o={};
+          for(const u of LAEUFER)o[u.n]=-(u.fertig??60);
+          return o;
+        }
+        const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+          .forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
       }
-      raus.push({attribut:at, gewinn:+(summe/namen.length).toFixed(3)});
-    }
-    disc=alt.disc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig; rennT=alt.rennT; done=alt.done;
-    zieheFormkarten(20260823);
-    const summe=raus.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
-    return raus.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
-               .sort((a,b)=>b.gewinn-a.gewinn);
+    };
+  }
+  // JEDE BUeHNE-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen. Die Wertung ist hier
+  // am einfachsten von allen: die Summe der Durchgangspunkte ist bereits eine Zahl, bei
+  // der groesser besser heisst, keine Platzierung noetig.
+  for(const bd of Object.keys(BUEHNE_ART)){
+    MOTOREN[bd]={
+      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done}),
+      zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER;
+                    buehneT=a.buehneT; buehneZeiger=a.buehneZeiger; buehneQueue=a.buehneQueue;
+                    buehneAkt=a.buehneAkt; done=a.done;},
+      vorher:()=>{disc=bd; buehneDisc=bd;},
+      bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
+      lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
+      namen:()=>TEILNEHMER.map(u=>u.n),
+      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
+    };
+  }
+  // JEDES FELDSPIEL MELDET SICH SELBST AN. "Besser" ist hier ein kleiner Box-Score:
+  // Punkte zaehlen voll, Rebounds und Abwehr-Ereignisse (Steal/Block) etwas weniger,
+  // ein Ballverlust zieht ab — dieselbe Grundidee wie eine echte Plus/Minus-Statistik.
+  for(const fd of Object.keys(FELDSPIEL_ART)){
+    MOTOREN[fd]={
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done}),
+      zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
+                    fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
+                    fsPunkte=a.fsPunkte; done=a.done;},
+      vorher:()=>{disc=fd; feldspielDisc=fd;},
+      bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
+      lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
+      namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
+      wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
+        o[u.n]=u.punkte+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
+    };
   }
 
-  function spurtSerie(n){
-    const alt={disc, LAEUFER, rennFertig, rennT, done};
-    disc="spurt";
+  // NUR EINER BEKOMMT DIE PUNKTE.
+  //
+  // Zwei Anlaeufe vorher waren falsch, beide aus demselben Grund — ich hatte nicht
+  // ueberlegt, WAS die Groesse eigentlich misst:
+  //
+  //   1. Mittlere Platzverbesserung ueber ALLE Teilnehmer -> immer exakt null. Plaetze
+  //      sind ein Nullsummenspiel; wer einen gutmacht, nimmt ihn einem anderen weg.
+  //   2. Mittlere ZIELZEIT bei Anhebung aller -> misst nur, was schneller macht. Damit
+  //      kann Wucht nie gewinnen: ein Rempler macht nicht MICH schneller, sondern den
+  //      anderen langsamer. Eine relative Waffe an einem absoluten Massstab gemessen.
+  //
+  // Richtig ist: nur EINER bekommt die Punkte, und gezaehlt wird, wie viel ER dadurch
+  // gewinnt. Das erfasst besser werden UND andere aufhalten.
+  const EINFLUSS_ATTR=["power","health","stamina","intelligence","awareness","determination",
+                       "speed","dexterity","charisma","will","spirit","torment"];
+  function einflussVon(dId,n,plus){
+    const M=MOTOREN[dId];
+    if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
+    const hoehe=plus||15;
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
+    if(M.vorher)M.vorher();
+
+    const durchlauf=(wer,attribut)=>{
+      ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+      const w={};
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+i*104729);
+        M.bau(1337+i*7919);
+        M.lauf();
+        const e=M.wert();
+        for(const k in e)w[k]=(w[k]||0)+e[k]/n;
+      }
+      return w;
+    };
+
+    M.bau(1337);
+    const namen=M.namen();
+    const grund=durchlauf(null,null);
+    const roh=EINFLUSS_ATTR.map(at=>{
+      let summe=0;
+      for(const wer of namen)summe+=(durchlauf(wer,at)[wer]-grund[wer]);
+      return {attribut:at, gewinn:+(summe/namen.length).toFixed(3)};
+    });
+
+    ATTR_HEBUNG=hebungVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+    const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
+                    .sort((a,b)=>b.gewinn-a.gewinn);
+
+    // ABWEICHUNG ZUR MATRIX. Die eine Zahl, an der eine neue Disziplin haengt: Summe der
+    // Betraege aus (gemessener Anteil minus Gewicht). Null hiesse, die Mechanik loest die
+    // Wertung exakt ein; je hoeher, desto mehr belohnt sie etwas anderes.
+    const W=BASIS_JE_DISC[dId]||{};
+    const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
+      s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    return {disziplin:dId, laeufe:n, anhebung:hoehe,
+      abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+  const spurtEinfluss=(n)=>einflussVon("spurt",n);
+
+  function bahnSerie(d,n){
+    // WER SICH NICHT ANMELDET, WIRD NICHT STILL DURCH SPURT ERSETZT. BA() faellt ohne
+    // Eintrag in BAHN_ART auf BAHN_ART.spurt zurueck — praktisch fuer den Normalfall,
+    // gefaehrlich hier: ein Aufruf mit einer Buehnen- oder Arena-Disziplin wuerde sonst
+    // lautlos Spurt-Zahlen unter falschem Namen ausliefern. Genau dieses Muster (eine
+    // Konstruktion faellt still auf etwas Falsches zurueck) hat in dieser Sitzung schon
+    // mehrfach Messungen verfaelscht.
+    if(!BAHN_ART[d])throw new Error("bahnSerie: \""+d+"\" ist keine Bahn-Disziplin");
+    const alt={disc, bahnDisc, LAEUFER, rennFertig, rennT, done};
+    disc=d; bahnDisc=d;
     const summe={}; let leerGesamt=0, schattenGesamt=0, laeufe=0;
     for(let i=0;i<n;i++){
       zieheFormkarten(20260823+i*104729);
@@ -5120,7 +6749,8 @@
         leerGesamt+=u.leer?1:0; schattenGesamt+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
       });
     }
-    disc=alt.disc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig; rennT=alt.rennT; done=alt.done;
+    disc=alt.disc; bahnDisc=alt.bahnDisc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig;
+    rennT=alt.rennT; done=alt.done;
     zieheFormkarten(20260823);
     const reihen=Object.values(summe).map(e=>({n:e.n,seite:e.seite,plan:e.plan,
       eig:Math.round(e.eig*10)/10,
@@ -5128,12 +6758,14 @@
       schatten:Math.round(e.schatten/laeufe*100), leerQuote:Math.round(e.leer/laeufe*100),
       stolper:+(e.stolper/laeufe).toFixed(2), tackles:+(e.tackles/laeufe).toFixed(2),
       getackelt:+(e.getackelt/laeufe).toFixed(2)})).sort((a,b)=>a.platz-b.platz);
-    return {laeufe, reihen,
-      leerQuote:Math.round(leerGesamt/(laeufe*8)*100),
-      schattenAnteil:Math.round(schattenGesamt/(laeufe*8)*100)};
+    const koepfe=Math.max(1,reihen.length);
+    return {disziplin:d, laeufe, reihen,
+      leerQuote:Math.round(leerGesamt/(laeufe*koepfe)*100),
+      schattenAnteil:Math.round(schattenGesamt/(laeufe*koepfe)*100)};
   }
+  const spurtSerie=(n)=>bahnSerie("spurt",n);
 
-  window.__arena={ serie, spurtSerie, spurtEinfluss, kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
