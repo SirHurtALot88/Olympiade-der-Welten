@@ -1949,11 +1949,16 @@
       //
       // Torment mit 25 ist der hoechste Wert: die Klinge sucht die Bloesse.
       label:"Fechten", jeSeite:6,
-      rezept:{ANG:{torment:44,dexterity:30,power:26},
-              VER:{awareness:42,dexterity:34,health:24},
-              LP:{determination:36,awareness:34,health:30},
-              TMP:{speed:46,dexterity:32,awareness:22},
-              AUS:{determination:40,awareness:32,torment:28}}
+      // NACHGEZOGEN aus demselben Grund wie Battlefield: TMP und AUS liegen ausserhalb
+      // der Eignungs-Normierung, also bekommt jedes Attribut dort einen Bonus erster
+      // Ordnung. Entschlossenheit stand mit 40 in der Ausdauer und mit 36 in den
+      // Lebenspunkten, obwohl die Matrix ihr nur 6 gibt; Speed mit 46 im Tempo bei
+      // Gewicht 16. Jetzt tragen Torment (25) und Dexterity (20) auch dort.
+      rezept:{ANG:{torment:42,dexterity:32,power:26},
+              VER:{awareness:40,dexterity:34,health:26},
+              LP:{health:34,determination:34,awareness:32},
+              TMP:{dexterity:38,speed:34,awareness:28},
+              AUS:{torment:36,awareness:32,dexterity:24,determination:8}}
     },
 
     battlefield:{
@@ -1969,11 +1974,26 @@
       // ein Schlag), Spirit die Verteidigung, und das Tempo kommt aus Aufmerksamkeit und
       // Verstand statt aus den Beinen: man ist frueher da, weil man frueher weiss, wohin.
       label:"Battlefield", jeSeite:4,
-      rezept:{ANG:{torment:40,power:34,charisma:26},
-              VER:{spirit:40,health:34,awareness:26},
-              LP:{health:38,spirit:34,stamina:28},
-              TMP:{awareness:40,intelligence:34,spirit:26},
-              AUS:{stamina:36,spirit:34,determination:30}}
+      // NACHGEZOGEN, WEIL DIE MESSUNG ES VERLANGT HAT. Erste Fassung stand bei 110 Pp,
+      // und das Profil sagte genau, warum: Entschlossenheit und Ausdauer lasen 24,6 und
+      // 24,4 % bei einem Matrixgewicht von je 4, waehrend Charisma (20), Intelligence
+      // (16) und Spirit (16) zusammen auf 8 % kamen.
+      //
+      // Der Grund ist kein Zufall, sondern eine Eigenschaft des Modells: aufEignung()
+      // normiert LP, ANG und VER auf die Eignung — TMP und AUS nicht. Wer ein Attribut
+      // dorthin setzt, gibt ihm einen Bonus ERSTER ORDNUNG, voellig unabhaengig davon,
+      // was die Matrix dazu sagt. Ich hatte ausgerechnet die beiden schwaechsten
+      // Attribute der Matrix in die Ausdauer gesetzt.
+      //
+      // Jetzt tragen die schweren Attribute auch Tempo und Ausdauer: wer die Lage liest
+      // und seine Leute zusammenhaelt, ist frueher da und haelt laenger durch. Ausdauer
+      // und Entschlossenheit bleiben mit kleinem Anteil drin — die Matrix gibt ihnen 4,
+      // nicht 0.
+      rezept:{ANG:{torment:38,power:32,charisma:30},
+              VER:{spirit:40,health:32,awareness:28},
+              LP:{health:32,spirit:32,charisma:28,determination:8},
+              TMP:{awareness:36,intelligence:34,charisma:30},
+              AUS:{spirit:36,charisma:32,intelligence:24,stamina:8}}
     }
   };
   const istArena=(d)=>!!ARENA_ART[d];
