@@ -5096,13 +5096,30 @@
   // tot. Chris wollte etwas, das zur Disziplin passt — TDM eine toedliche Kampfarena,
   // Spurt ein Hindernislauf im Freien.
   //
-  // Bewusst GEZEICHNET statt aus Bildern zusammengesetzt. Zwei Gruende: OpenGameArt ist
-  // aus dieser Umgebung nicht erreichbar (nur GitHub und npm sind offen), und ein
-  // eingebetteter Kachelsatz haette die Datei noch einmal deutlich aufgeblaeht — sie
-  // traegt schon die Sprite-Blaetter. Gezeichnet ist ausserdem deterministisch und wirft
-  // keine Lizenzfrage auf. Echte Kacheln koennen das hier spaeter jederzeit ersetzen;
-  // die Zeichenschleife fragt nur nach EINER Funktion.
+  // Frueher stand hier, das sei bewusst GEZEICHNET statt aus Bildern gebaut, weil
+  // OpenGameArt aus dieser Umgebung nicht erreichbar sei. Der Grund ist entfallen: das
+  // Netz ist offen, die Kacheln liegen unter /sprites/arena/ und quellen.json belegt zu
+  // jeder, aus welchem Blatt sie stammt.
+  //
+  // Die gezeichnete Fassung bleibt trotzdem stehen — als RUECKFALL. Laedt eine Kachel
+  // nicht (Datei geoeffnet statt ausgeliefert, Pfad verschoben), sieht man weiter eine
+  // Arena und keine leere Flaeche. Jede Kachel wird einzeln geprueft, nicht der Satz als
+  // Ganzes: eine fehlende Fackel darf nicht den Sandboden mitnehmen.
   const bodenSaat=(i)=>{const x=Math.sin(i*127.1)*43758.5453;return x-Math.floor(x);};
+
+  // Die Bausteine liegen als DATEIEN, nicht als base64 in dieser Datei. Zwei Gruende:
+  // sie stammen aus fremden Blaettern und sollen dort nachweisbar bleiben, wo ihre
+  // Herkunft steht; und ein Kachelsatz je Disziplin waere sonst jedes Mal Ballast im
+  // HTML. Die Sprite-Blaetter der Kaempfer liegen weiter eingebettet — die brauchen
+  // Farbtausch je Pixel und muessen deshalb ohnehin durch die Leinwand.
+  const A_TEILE=["boden_sand","boden_stein","boden_erde","mauer_ziegel","rasen",
+    "bahn_ocker","zaun_holz","baum_1","baum_2","baum_3","baum_4","fackel"];
+  const aBild={}, aMuster={};
+  for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
+  const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
+  const aMust=n=>{ if(!aDa(n))return null;
+    if(!aMuster[n])aMuster[n]=ctx.createPattern(aBild[n],"repeat");
+    return aMuster[n]; };
 
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
@@ -5113,28 +5130,46 @@
 
   // TDM: Sandgrund, Steinring, Blutflecken, Fackeln an den Seiten.
   function bodenArena(){
-    const g=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
-    g.addColorStop(0,"#5a4a34");g.addColorStop(0.6,"#463823");g.addColorStop(1,"#2e2517");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    // Sandkoernung
-    ctx.globalAlpha=0.05;
-    for(let i=0;i<520;i++){
-      const x=bodenSaat(i)*W, y=bodenSaat(i+900)*H, r=1+bodenSaat(i+1800)*2;
-      ctx.fillStyle=bodenSaat(i+2700)>0.5?"#fff":"#000";
-      ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.fill();
+    const sand=aMust("boden_sand");
+    if(sand){ ctx.fillStyle=sand;ctx.fillRect(0,0,W,H);
+      // Die Kachel ist HELLER als der alte Malgrund, und das ist kein Schoenheitsfehler:
+      // die Kaempfer sind selbst hell, und auf hellem Sand verschwinden sie. Deshalb ein
+      // multiplizierter Ton darueber — er nimmt Helligkeit, ohne die Koernung zu glaetten,
+      // wie es eine deckende Schicht taete.
+      ctx.globalCompositeOperation="multiply";
+      ctx.fillStyle="#8d7350";ctx.fillRect(0,0,W,H);
+      ctx.globalCompositeOperation="source-over";
+      // Dazu der Verlauf, der die Tiefe traegt, die vorher allein vom Radialverlauf kam.
+      const v=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
+      v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.62,"rgba(0,0,0,.16)");
+      v.addColorStop(1,"rgba(0,0,0,.42)");
+      ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    } else {
+      const g=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
+      g.addColorStop(0,"#5a4a34");g.addColorStop(0.6,"#463823");g.addColorStop(1,"#2e2517");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      // Sandkoernung — nur noetig, solange keine echte Kachel da ist.
+      ctx.globalAlpha=0.05;
+      for(let i=0;i<520;i++){
+        const x=bodenSaat(i)*W, y=bodenSaat(i+900)*H, r=1+bodenSaat(i+1800)*2;
+        ctx.fillStyle=bodenSaat(i+2700)>0.5?"#fff":"#000";
+        ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.fill();
+      }
+      ctx.globalAlpha=1;
     }
-    ctx.globalAlpha=1;
-    // Alte Flecken im Sand
-    ctx.globalAlpha=0.10;ctx.fillStyle="#5a1410";
+    // Alte Flecken im Sand. Sie bleiben gezeichnet: sie sagen etwas ueber den Ort,
+    // und keine Kachel traegt diese Aussage.
+    ctx.globalAlpha=0.16;ctx.fillStyle="#4a0f0c";
     for(let i=0;i<14;i++){
       const x=90+bodenSaat(i+40)*(W-180), y=60+bodenSaat(i+70)*(H-120);
       ctx.beginPath();ctx.ellipse(x,y,14+bodenSaat(i+110)*26,7+bodenSaat(i+150)*12,bodenSaat(i+190)*3,0,6.283);ctx.fill();
     }
     ctx.globalAlpha=1;
-    // Steinring
-    ctx.strokeStyle="#6b5a41";ctx.lineWidth=10;
+    // Der Ring. Aus Ziegeln, wenn die Mauerkachel da ist — sonst der alte Steinstrich.
+    const mauer=aMust("mauer_ziegel");
+    ctx.strokeStyle=mauer||"#6b5a41";ctx.lineWidth=mauer?14:10;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
-    ctx.strokeStyle="#3a2f20";ctx.lineWidth=2;
+    ctx.strokeStyle="rgba(0,0,0,.55)";ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
     // FARBIGE HAELFTEN. Chris: "wir muessen auf jeden Fall beide Teams in der Arena
     // besser voneinander unterscheiden koennen, sonst ist es sehr unuebersichtlich." Im
@@ -5153,9 +5188,12 @@
     ctx.strokeStyle="rgba(69,176,201,.35)";
     ctx.beginPath();ctx.moveTo(MID+1,26);ctx.lineTo(MID+1,H-26);ctx.stroke();
     ctx.setLineDash([]);
-    // Fackeln
+    // Fackeln. Das Blatt hat neun Bilder zu 32x64; die Flamme laeuft nach der Wanduhr,
+    // nicht nach der Simulationsuhr — sie ist Schmuck und darf keine Messung beruehren.
+    const fk=aDa("fackel"), bild=fk?Math.floor(performance.now()/110)%9:0;
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
-      ctx.fillStyle="#2b2318";ctx.fillRect(x-3,y,6,22);
+      if(fk) ctx.drawImage(aBild.fackel,bild*32,0,32,64,x-16,y-42,32,64);
+      else { ctx.fillStyle="#2b2318";ctx.fillRect(x-3,y,6,22); }
       const f=ctx.createRadialGradient(x,y-4,1,x,y-4,16);
       f.addColorStop(0,"rgba(255,214,140,.85)");f.addColorStop(1,"rgba(255,150,40,0)");
       ctx.fillStyle=f;ctx.beginPath();ctx.arc(x,y-4,16,0,6.283);ctx.fill();
@@ -5166,26 +5204,76 @@
   // Konstanten, mit denen das Rennen rechnet (BAHNEN, HUERDEN, bahnY) — vorher zeigte der
   // Boden vier Bahnen und drei Huerden, waehrend die Simulation mit acht und vier lief.
   function bodenSpurt(){
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    // Der Hintergrund ueber/unter der Bahn ist nur bei grasnahen Disziplinen gruen
+    // (Spurt, Staffel). Eine Kletterwand oder ein Asphaltkurs (BA().baeume===false)
+    // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
+    // Steinwand ploetzlich Wiese, nur weil dieselbe Zeichenfunktion beide bedient.
+    const grasHintergrund=BA().baeume!==false;
+    if(grasHintergrund){
+      const rasen=aMust("rasen");
+      if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H);
+        const v=ctx.createLinearGradient(0,0,0,H);
+        v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
+        v.addColorStop(1,"rgba(0,0,0,.30)");
+        ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+      } else {
+        const g=ctx.createLinearGradient(0,0,0,H);
+        g.addColorStop(0,"#2f4a2a");g.addColorStop(1,"#22381f");
+        ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      }
+    } else {
+      ctx.fillStyle=BA().boden||"#3c3f45";ctx.fillRect(0,0,W,H);
+      const v=ctx.createLinearGradient(0,0,0,H);
+      v.addColorStop(0,"rgba(0,0,0,.35)");v.addColorStop(0.5,"rgba(0,0,0,.05)");
+      v.addColorStop(1,"rgba(0,0,0,.35)");
+      ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    }
     const oben=H*0.14, unten=H*0.94, strecke=W-170;
-    // Baumreihe ueber der Bahn — an einer Kletterwand steht kein Wald.
+    // Baumreihe ueber der Bahn. Vier Nadelbaum-Blaetter im Wechsel; die Wahl haengt am
+    // Platz in der Reihe, nicht am Zufall — sonst tanzt der Wald bei jedem Bild. An einer
+    // Kletterwand steht kein Wald (BA().baeume===false), da bleibt die Schleife leer.
+    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
     for(let i=0;i<(BA().baeume===false?0:26);i++){
       const x=12+i*(W/25), yb=oben-24;
-      ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
-      ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
-      ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
+      if(baeume.length){
+        const b=aBild[baeume[i%baeume.length]];
+        ctx.drawImage(b,Math.round(x-b.naturalWidth/2),Math.round(yb+14-b.naturalHeight));
+      } else {
+        ctx.fillStyle="#2a1d12";ctx.fillRect(x-2,yb,4,14);
+        ctx.fillStyle=i%2?"#355c2c":"#2c4d25";
+        ctx.beginPath();ctx.arc(x,yb-6,13,0,6.283);ctx.fill();
+      }
     }
     // Laufbahn — Farbe je Bahn-Art. Eine Kletterwand ist kein Tartan, und ein
-    // Zeitfahrkurs ist Asphalt. Kosmetik, aber sie sagt sofort, welche Disziplin laeuft.
-    ctx.fillStyle=BA().boden||"#8a4a32";ctx.fillRect(0,oben,W,unten-oben);
-    ctx.globalAlpha=0.07;
-    for(let i=0;i<320;i++){
-      const x=bodenSaat(i+300)*W, y=oben+bodenSaat(i+340)*(unten-oben);
-      ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";ctx.fillRect(x,y,2,2);
+    // Zeitfahrkurs ist Asphalt. Die Ocker-Kachel passt nur zur Erdbahn (Spurt, Staffel —
+    // beide fuehren BA().boden auf denselben Ton "#8a4a32"); jede andere Bahn-Art bleibt
+    // bei ihrer eigenen Flaechenfarbe statt der Grasbahn-Kachel.
+    const bodenFarbe=BA().boden||"#8a4a32";
+    const bahn=bodenFarbe==="#8a4a32" ? aMust("bahn_ocker") : null;
+    if(bahn){ ctx.fillStyle=bahn;ctx.fillRect(0,oben,W,unten-oben);
+      // Dieselbe Rechnung wie beim Sand: die Ockerkachel ist zu hell fuer helle Laeufer.
+      ctx.globalCompositeOperation="multiply";
+      ctx.fillStyle="#b08a5e";ctx.fillRect(0,oben,W,unten-oben);
+      ctx.globalCompositeOperation="source-over"; }
+    else {
+      ctx.fillStyle=bodenFarbe;ctx.fillRect(0,oben,W,unten-oben);
+      ctx.globalAlpha=0.07;
+      for(let i=0;i<320;i++){
+        const x=bodenSaat(i+300)*W, y=oben+bodenSaat(i+340)*(unten-oben);
+        ctx.fillStyle=bodenSaat(i+380)>0.5?"#fff":"#000";ctx.fillRect(x,y,2,2);
+      }
+      ctx.globalAlpha=1;
     }
-    ctx.globalAlpha=1;
+    // Ein Zaun trennt Rasen und Bahn — oben und unten, wenn die Kachel da ist. Nur bei
+    // grasnahen Bahn-Arten (Spurt, Staffel): eine Kletterwand oder ein Asphaltkurs hat
+    // keinen Rasen daneben, den ein Zaun abgrenzen koennte.
+    if(grasHintergrund && aDa("zaun_holz")){
+      const z=aBild.zaun_holz;
+      for(let x=0;x<W;x+=z.naturalWidth){
+        ctx.drawImage(z,x,Math.round(oben-z.naturalHeight+4));
+        ctx.drawImage(z,x,Math.round(unten-4));
+      }
+    }
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
     const BN=BAHNEN_N();
