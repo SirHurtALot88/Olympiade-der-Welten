@@ -1299,7 +1299,9 @@
 
   const DISCS={tdm:{label:"TDM",cat:"power",size:6},spurt:{label:"Spurt",cat:"speed",size:4},
     "time-trial":{label:"Time-Trial",cat:"speed",size:6},
-    climbing:{label:"Climbing",cat:"speed",size:6}};
+    climbing:{label:"Climbing",cat:"speed",size:6},
+    "takeshis-castle":{label:"Takeshi",cat:"chaos",size:6},
+    staffel:{label:"Staffel",cat:"speed",size:6}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -1785,9 +1787,15 @@
     const breit=Object.keys(W).filter(k=>W[k]>0);
     if(!eng)return breit;
     const sl=SLOTVON[slotId]; if(!sl)return breit;
-    const rec=REC[DISCS[dId].cat];
+    // WELCHE REZEPTE HIER GEFRAGT SIND. Bis eben stand hier immer REC — die KAMPFrezepte.
+    // Auf einer Bahn ist das die falsche Frage: dort speist kein Attribut einen Kampfwert,
+    // sondern Antritt, Technik, Stehvermoegen. Solange nur TDM und Spurt existierten, fiel
+    // es nicht auf; mit Takeshi's Castle brach es hart weg, weil dessen Kategorie in REC
+    // gar nicht vorkommt. Jetzt fragt jede Disziplin ihre eigenen Rezepte.
+    const rec=BAHN_ART[dId]?BAHN_ART[dId].rezept:REC[(DISCS[dId]||{}).cat];
+    if(!rec)return breit;
     const fokus=[sl.gross,sl.klein].filter(k=>W[k]>0);
-    const speist=fokus.some(k=>KEYS.some(x=>rec[x]&&rec[x][k]));
+    const speist=fokus.some(k=>Object.keys(rec).some(x=>rec[x]&&rec[x][k]));
     return speist?fokus:breit;
   }
 
@@ -4309,7 +4317,8 @@
     spurt:{
       label:"Spurt", jeSeite:4, hindernisse:[0.14,0.26,0.38,0.50,0.62,0.74,0.86],
       hindernisWort:"Hürde", schatten:true, tackle:true, grundTempo:88, tempoSpanne:0.95,
-      wendigErholt:0.0035, tackleAb:36, tackleRate:2.4,
+      technikBasis:0.24, technikSpanne:0.0060, kraftBasis:265, kraftSpanne:2.65, muedGrad:0.00028,
+      wendigErholt:0.0035, tackleAb:36, tackleRate:2.4, tackleKosten:0,
       rezept:{
         // NACHGEZOGEN AN DIE SPURT-MATRIX. Gemessen: Speed trug 47,6 % dazu bei, ob
         // jemand Plaetze gutmacht — die Matrix bepreist ihn mit 18. Der Grund lag hier:
@@ -4443,6 +4452,103 @@
       planJeSlot:{routereader:"stetig", gripspecialist:"stetig", paceclimber:"sparsam",
                   endurancewall:"sparsam", dynamicmove:"angriff", summitpush:"angriff"}
     }
+,
+
+    staffel:{
+      // MATRIX: speed 24, stamina 16, spirit 16, awareness 12, charisma 10, dexterity 8,
+      // will 8, determination 4, health 2.
+      //
+      // Eine Staffel ist die einzige Bahn, auf der nicht alle gleichzeitig laufen. Sechs
+      // Laeufer, sechs Abschnitte, fuenf Wechsel — und immer nur EINER je Mannschaft ist
+      // unterwegs. Das ist keine Kosmetik: es ist der Grund, warum Spirit mit 16 und
+      // Charisma mit 10 in einer Laufdisziplin ueberhaupt vorkommen. Ein Stab wird
+      // uebergeben, und das gelingt oder nicht.
+      //
+      // TECHNIK heisst hier WECHSEL und speist sich aus Awareness, Dexterity und
+      // Charisma — geprueft wird mit dem Schnitt aus abgebendem und annehmendem Laeufer.
+      // Wer sie verpatzt, verliert Zeit fuer die ganze Mannschaft; deshalb zaehlt hier
+      // nicht die eigene Zeit, sondern die des Teams.
+      //
+      // Windschatten bleibt an — der Verfolger kann sich anhaengen. Getackelt wird nicht:
+      // in einer Staffel raeumt niemand den Gegner von der Bahn.
+      label:"Staffel", jeSeite:6, staffel:true, bahnenFest:2,
+      hindernisse:[], hindernisWort:"Wechsel", boden:"#8a4a32",
+      schatten:true, tackle:false, grundTempo:92, tempoSpanne:0.90,
+      wechselBasis:0.24, wechselSpanne:0.0060, wechselStrafe:1.55,
+      kraftBasis:230, kraftSpanne:2.4, wendigErholt:0.0040,
+      rezept:{
+        ANTRITT:    {speed:44,spirit:30,stamina:26},
+        ENDTEMPO:   {speed:38,stamina:35,will:27},
+        TECHNIK:    {awareness:38,dexterity:32,charisma:30},
+        WENDIGKEIT: {dexterity:42,awareness:34,speed:24},
+        STEHEN:     {stamina:45,will:33,determination:22},
+        WUCHT:      {spirit:45,charisma:33,speed:22},
+        ROBUST:     {stamina:30,will:26,health:24,spirit:20}
+      },
+      lang:{ANTRITT:"Antritt",ENDTEMPO:"Abschnittstempo",TECHNIK:"Wechsel",
+            WENDIGKEIT:"Bahnarbeit",STEHEN:"Stehvermögen",WUCHT:"Zug an der Spitze",
+            ROBUST:"Verlässlichkeit"},
+      plaene:{
+        halten:  {label:"Halten",     tempo:0.94, sucht:0.75, ab:0.72,
+                  text:"Bleibt dran und spart für die Übergabe. Kein Abschnitt wird verschenkt."},
+        angehen: {label:"Angehen",    tempo:1.00, sucht:0.20, ab:0.60,
+                  text:"Geht seinen Abschnitt von vorn an und legt vor."},
+        schluss: {label:"Schlussmann",tempo:0.90, sucht:0.85, ab:0.55,
+                  text:"Hängt sich an und wirft alles auf das letzte Stück."}
+      },
+      planJeSlot:{startrunner:"angehen", tempolink:"halten", batontech:"halten",
+                  curverunner:"angehen", chaserunner:"schluss", anchor:"schluss"}
+    },
+
+    "takeshis-castle":{
+      // MATRIX: will 22, determination 18, charisma 14, intelligence 11, awareness 8,
+      // torment 7, stamina 6, dexterity 6, health 4, speed 4.
+      //
+      // Zehn Attribute mit Gewicht, und der hoechste ist WILLE. Das ist keine Laufbahn,
+      // das ist ein Spiessrutenlauf: vierzehn Fallen, jede kann einen umwerfen, und wer
+      // aufsteht und weitermacht, kommt an. Speed steht mit 4 fast ganz unten — schnell
+      // sein hilft hier kaum, DURCHKOMMEN ist alles.
+      //
+      // Deshalb drei Dinge anders als auf jeder anderen Bahn:
+      //
+      //   1. AUSSCHEIDEN. Wer dreimal faellt, ist raus. Das ist der Grund, warum Wille
+      //      und Entschlossenheit hier oben stehen und nicht das Tempo — ein Rennen, das
+      //      man verlieren kann, ohne langsam zu sein.
+      //   2. Das PUBLIKUM. Charisma mit 14 ist fuer eine Hindernisbahn ungewoehnlich
+      //      hoch, und es gibt nur einen Ort, an den es gehoert: die Menge traegt den,
+      //      den sie mag. Wer Publikum hat, steht schneller wieder auf — Charisma sitzt
+      //      deshalb in WENDIGKEIT, und Wendigkeit verkuerzt hier die Erholung.
+      //   3. Die Fallen sind SCHWER (bei Technik 70 kommen 56 % sauber durch) und teuer.
+      //      Eine Falle, die fast immer gelingt, waere Dekoration.
+      label:"Takeshi's Castle", jeSeite:6,
+      hindernisse:[0.07,0.14,0.21,0.28,0.35,0.42,0.49,0.56,0.63,0.70,0.77,0.84,0.91,0.96],
+      hindernisWort:"Falle", boden:"#4a5f3a", schatten:false, tackle:false,
+      grundTempo:92, tempoSpanne:0.70,
+      technikBasis:0.26, technikSpanne:0.0060, wuchtBasis:0.10, wuchtSpanne:0.0060,
+      wuchtKraft:14, wuchtZeit:0.20, stolperGrund:0.80, stolperSpanne:0.95, stolperKraft:9,
+      wendigErholt:0.0030, kraftBasis:300, kraftSpanne:2.8, nervenKosten:34, nervenRegen:0.05,
+      rezept:{
+        ANTRITT:    {will:40,determination:32,speed:28},
+        ENDTEMPO:   {will:38,determination:33,stamina:29},
+        TECHNIK:    {intelligence:36,awareness:30,dexterity:22,will:12},
+        WENDIGKEIT: {charisma:40,dexterity:32,awareness:28},
+        STEHEN:     {will:46,determination:34,health:20},
+        WUCHT:      {charisma:38,determination:32,torment:30},
+        ROBUST:     {health:28,will:30,determination:24,charisma:18}
+      },
+      lang:{ANTRITT:"Losstürmen",ENDTEMPO:"Durchhaltetempo",TECHNIK:"Falle lesen",
+            WENDIGKEIT:"Aufstehen",STEHEN:"Wille",WUCHT:"Durchbrettern",ROBUST:"Nehmerqualität"},
+      plaene:{
+        vorsicht:{label:"Vorsichtig",  tempo:0.84, sucht:0, ab:0.80,
+                  text:"Geht jede Falle langsam an. Kommt selten glanzvoll an — aber er kommt an."},
+        stetig:  {label:"Beherzt",     tempo:0.93, sucht:0, ab:0.65,
+                  text:"Nimmt die Fallen im Tempo und steht wieder auf, wenn es schiefgeht."},
+        wild:    {label:"Kopf voran",  tempo:1.00, sucht:0, ab:0.50,
+                  text:"Rennt durch und hofft. Das Publikum liebt es. Drei Stürze und Schluss."}
+      },
+      planJeSlot:{gatecrash:"wild", balancerun:"vorsicht", trapreader:"vorsicht",
+                  ironwill:"stetig", chaosdodge:"wild", finalwall:"stetig"}
+    }
   };
 
   // Welche Bahn gerade gerechnet wird. Steht getrennt von `disc`, weil eine Messung eine
@@ -4484,7 +4590,7 @@
   // oft genug kommen, um ins Gewicht zu fallen.
   // Bahnzahl und Hindernisorte kommen jetzt aus BAHN_ART. Beide Namen bleiben als
   // Funktion stehen, damit der Motor unveraendert lesen kann.
-  const BAHNEN_N=()=>BA().jeSeite*2;
+  const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
 
@@ -4503,13 +4609,19 @@
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
-                          :((slotListe[i]||{}).id||null);
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     const gegen=OPP.slice(0,n);
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
-      const sl=istGegner?null:slotFuer(p,idx);
+      // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
+      // 24 von 24 Kaempfen verursacht hat: unsere Laeufer bekamen Slot, Form und Stufe,
+      // der Gegner nur seinen Disziplinwert. Im Kampf ist das laengst behoben, auf der
+      // Bahn stand es noch — der Gegner lief ohne Slot-Aufschlag und ohne Stufe, und im
+      // Bild bekamen alle sechs denselben Rennplan, weil die Zuordnung an einem Slot
+      // haengt, den sie gar nicht hatten.
+      const sl=slotFuer(p,idx);
       const engP=sl?slotAufschlag(p,sl,d):0;
-      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      const breitP=formVon(p.n)+stufenWert();
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,d,true),d);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,d,false),d);
       const w=spurtWerte(p,attr);
@@ -4524,6 +4636,14 @@
         reserve:0, reserveMax:0, leer:false, imSchatten:false, schattenS:0, spitzeS:0,
         pers:persOf[p.n]||"duellant", getackelt:0, tackles:0, gestolpert:0, fertig:null};
       L.reserveMax=KRAFT_VON(L); L.reserve=L.reserveMax;
+      L.nervenMax=L.STEHEN*2.2; L.nerven=L.nervenMax;
+      // STAFFEL: jeder bekommt seinen Abschnitt und wartet dort. Nur der Startlaeufer ist
+      // von Anfang an unterwegs; die uebrigen stehen sichtbar in ihrer Wechselzone, was
+      // genau das ist, was man bei einer Staffel sieht.
+      if(art.staffel){
+        L.bein=idx; L.beinVon=idx/n; L.beinBis=(idx+1)/n;
+        L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
+      }
       LAEUFER.push(L);
     };
     mine.forEach((p,i)=>setz(p,0,i*2,false,i));
@@ -4556,12 +4676,21 @@
   // das Endtempo. Darauf wirken: sein Rennplan, der Windschatten, seine Kraftreserve und
   // was ihm gerade zugestossen ist.
   function tempoVon(u){
-    const phase=Math.min(1,rennT/3.2);
+    // JEDER HAT SEINE EIGENE ANFAHRT. Bisher hing die Phase an der Rennuhr: nach 3,2
+    // Sekunden war ANTRITT fuer alle erledigt. In einer Staffel ist das falsch — der
+    // Schlusslaeufer uebernimmt bei Sekunde neun aus dem Stand und muss selbst erst in
+    // Fahrt kommen. Gemessen trug Spirit (das im Antritt sitzt) exakt 0 %, obwohl die
+    // Matrix es mit 16 fuehrt.
+    const phase=Math.min(1,(rennT-(u.startT||0))/3.2);
     const grund=u.ANTRITT*(1-phase)+u.ENDTEMPO*phase;
     // Der Plan: bis zum Angriffspunkt laeuft er verhalten, danach alles.
     const planT=u.pos>=u.ab?1.0:u.tempo;
     // Ermuedung: wer wenig Stehvermoegen hat, verliert ab der Haelfte spuerbar.
-    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*0.00055*(u.pos-0.45)*100):1;
+    // ERMUEDUNG. Der Beiwert entscheidet, wie stark das Stehvermoegen die zweite
+    // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
+    // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
+    // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
+    const mued=u.pos>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(u.pos-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
     // LEER heisst leer — aber nicht liegengeblieben. Wer seine Reserve verbraucht hat,
@@ -4574,9 +4703,13 @@
     // zusaetzlich ab: wer zaeh ist, schleppt sich besser ins Ziel als einer, der es nicht
     // ist — genau das, wofuer der Wert da ist.
     const leer=u.leer?(0.74+u.STEHEN*0.0012):1;
+    // ANGESCHLAGEN. Wo es Nerven gibt, sind sie keine reine Schwelle: wer schon zweimal
+    // im Wasser lag, geht die naechste Falle zaghafter an. Ohne das wirkte der Wille nur
+    // im Moment des Ausscheidens — gemessen 8,9 % bei einem Matrixgewicht von 22.
+    const nerv=(BA().nervenKosten&&u.nervenMax)?0.78+0.22*Math.max(0,u.nerven/u.nervenMax):1;
     // Ein Bahnwechsel kostet Tempo, solange er laeuft.
     const quer=u.wechsel>0?0.94:1;
-    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*quer*(u.kraft>0?0.82:1);
+    return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer*(u.kraft>0?0.82:1);
   }
 
   function stepSpurt(dt){
@@ -4585,10 +4718,19 @@
     const strecke=W-170;
     for(const u of LAEUFER){
       if(u.fertig!=null)continue;
+      // In der Staffel laeuft immer nur einer je Mannschaft. Die anderen stehen in ihrer
+      // Wechselzone — sie verbrauchen keine Kraft und bewegen sich nicht.
+      if(BA().staffel && !u.aktiv)continue;
       if(u.stolper>0)u.stolper-=dt;
       if(u.tackleCd>0)u.tackleCd-=dt;
       if(u.kraft>0)u.kraft-=dt;
       if(u.wechselCd>0)u.wechselCd-=dt;
+      // DAS PUBLIKUM. Charisma steht in Takeshi's Matrix mit 14 — fuer eine Hindernisbahn
+      // ungewoehnlich hoch, und es gibt genau einen Ort, an den es gehoert: die Menge
+      // traegt den, den sie mag. Wer sie hat, sammelt zwischen zwei Fallen wieder Nerven.
+      // Ohne diesen Kanal las Charisma 3,9 % — es sass nur in Werten, die kaum wirkten.
+      if(BA().nervenRegen&&u.nervenMax)
+        u.nerven=Math.min(u.nervenMax,u.nerven+u.WENDIGKEIT*BA().nervenRegen*dt);
 
       // ---- WINDSCHATTEN: haengt er gerade in einem? ----
       const vm=vordermann(u);
@@ -4696,6 +4838,31 @@
           if(BA().wendigErholt)u.stolper*=Math.max(0.35,1-u.WENDIGKEIT*BA().wendigErholt);
           if(BA().stolperKraft)u.reserve=Math.max(0,u.reserve-BA().stolperKraft);
           u.gestolpert++;
+          // AUSSCHEIDEN — UEBER DIE NERVEN, NICHT UEBER EINEN ZAEHLER.
+          //
+          // Erste Fassung warf nach drei Stuerzen raus, egal bei wem. Gemessen trug damit
+          // Torment 33,6 % (Matrix: 7) und Wille 8,9 % (Matrix: 22) — genau verkehrt
+          // herum. Der Grund war logisch, nicht zufaellig: wenn jeder gleich viele Stuerze
+          // vertraegt, entscheidet nur, wer sie VERMEIDET, und das ist Wucht. Wer
+          // WIEDERAUFSTEHT, kam nie vor.
+          //
+          // Jetzt hat jeder ein Nervenkostuem aus seinem Willen. Ein Sturz kostet davon
+          // einen festen Betrag; ist es leer, ist er raus. Wer zaeh ist, haelt fuenf
+          // Stuerze aus, wer es nicht ist, zwei. Das ist die Disziplin, die die Matrix
+          // beschreibt.
+          if(BA().nervenKosten){
+            // Was ein Sturz kostet, haengt an der Nehmerqualitaet — dort sitzt das
+            // Publikum (Charisma 18), das einen wieder hochholt.
+            u.nerven-=BA().nervenKosten*Math.max(0.45,1-u.ROBUST*0.0045);
+          }
+          if(BA().nervenKosten && u.nerven<=0){
+            u.raus=true; u.fertig=90+rennFertig.length*0.001;
+            rennFertig.push(u);
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
+              " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
+            break;
+          }
           schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
@@ -4708,6 +4875,10 @@
       // Gemessen hat Torment im Spurt 0 % getragen, obwohl die Matrix es mit 14 fuehrt.
       // Ein Teil davon war die Schwelle: bei WUCHT > 45 kamen ueber ein ganzes Rennen rund
       // ein Rempler zustande, und was einmal passiert, entscheidet nichts.
+      // WIE OFT er zulangt, hing bisher NUR an der Persoenlichkeit — die Wucht war eine
+      // Schwelle und darueber fast wirkungslos. Damit kaufte mehr Torment so gut wie
+      // nichts, und gemessen trug es 2,2 % bei einem Matrixgewicht von 14. Jetzt kauft
+      // Wucht auch Gelegenheiten, nicht nur Durchschlagskraft.
       if(BA().tackle && u.tackleCd<=0 && u.WUCHT>(BA().tackleAb??45)
          && rr()<willTackeln*dt*(BA().tackleRate??1.6)){
         const opfer=LAEUFER.filter(o=>o.seite!==u.seite&&o.fertig==null
@@ -4719,7 +4890,7 @@
           // torment machte LANGSAMER (-0,31 s), obwohl die Matrix es mit 14 fuehrt.
           // Vorher: 0,5 s eigenes Bremsen gegen 0,35-0,95 s beim Opfer, dazu 1,5-facher
           // Kraftverbrauch fuer den Taeter. Jetzt halb so teuer, dafuer haerter.
-          u.tackleCd=1.8; u.kraft=0.26; u.tackles++;
+          u.tackleCd=1.8; u.kraft=BA().tackleKosten??0.26; u.tackles++;
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
@@ -4732,8 +4903,48 @@
         }
       }
 
-      if(u.pos>=1){u.pos=1;u.fertig=rennT;rennFertig.push(u);
-        feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");}
+      // ---- WECHSEL. Der Stab geht weiter, und beide sind daran beteiligt: geprueft wird
+      // mit dem Schnitt aus dem Wechselwert des Abgebenden und des Annehmenden. Misslingt
+      // er, verliert die MANNSCHAFT Zeit — nicht der Einzelne. Genau deshalb zaehlt in
+      // dieser Disziplin die Teamzeit und nicht die eigene.
+      if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
+        const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        u.aktiv=false; u.pos=u.beinBis; u.durch=true;
+        if(naechster){
+          naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
+          const gut=Math.min(0.96,(BA().wechselBasis??0.34)
+            + ((u.TECHNIK+naechster.TECHNIK)/2)*(BA().wechselSpanne??0.0062));
+          if(rr()>gut){
+            // Bahnarbeit hilft, den Anschluss wiederzufinden. Ohne diesen Kanal war
+            // WENDIGKEIT in der Staffel voellig unbeschaeftigt: zwei Bahnen, keine freie
+            // Spur, keine Hindernisse — Awareness und Dexterity lasen 0 %.
+            naechster.stolper=(BA().wechselStrafe??1.30)
+              *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+            naechster.reserve=Math.max(0,naechster.reserve-12);
+            u.gestolpert++;
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
+          } else {
+            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
+          }
+        }
+        continue;
+      }
+
+      if(u.pos>=1){
+        u.pos=1;
+        if(BA().staffel){
+          // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
+          // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
+          const team=LAEUFER.filter(o=>o.seite===u.seite);
+          for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
+          feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+rennT.toFixed(1)+" s.");
+        } else {
+          u.fertig=rennT;rennFertig.push(u);
+          feed(u.seite,u.n+" im Ziel — Platz "+rennFertig.length+" bei "+rennT.toFixed(1)+" s.");
+        }
+      }
     }
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
   }
@@ -5365,9 +5576,27 @@
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
       namen:()=>LAEUFER.map(u=>u.n),
-      // Platz 1 ist besser als Platz 8, also negativ: groesser bleibt besser.
-      wert:()=>{const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
-        .forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;}
+      // WORAN "BESSER" GEMESSEN WIRD — die einzige Entscheidung, die je Disziplin faellt.
+      //
+      // Im Einzelrennen ist es die PLATZIERUNG, negativ genommen, damit groesser besser
+      // heisst. Absolute Zeit waere dort falsch: ein Rempler macht nicht mich schneller,
+      // sondern den anderen langsamer, und eine relative Waffe an einem absoluten
+      // Massstab liest sich als null.
+      //
+      // In der Staffel ist es umgekehrt. Alle sechs einer Mannschaft teilen sich
+      // dieselbe Zeit und damit denselben Platz — Plaetze kippen nur, wenn die beiden
+      // Teams tauschen, und das ist ein Muenzwurf, kein Mass. Gemessen las damit JEDES
+      // Attribut exakt 0 %. Hier ist die Teamzeit richtig, und sie ist es gefahrlos:
+      // getackelt wird in einer Staffel nicht.
+      wert:()=>{
+        if(BAHN_ART[bd].staffel){
+          const o={};
+          for(const u of LAEUFER)o[u.n]=-(u.fertig??60);
+          return o;
+        }
+        const o={}; [...LAEUFER].sort((a,b)=>(a.fertig??99)-(b.fertig??99))
+          .forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
+      }
     };
   }
 

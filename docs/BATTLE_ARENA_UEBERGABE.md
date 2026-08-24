@@ -481,13 +481,27 @@ lesen. Das ist wichtig: die frühere Spurt-Messung hat die fertigen Laufwerte na
 angefasst und damit Slot-Aufschlag, Form und Stufe übersprungen — sie maß eine kürzere
 Kette, als das Spiel sie rechnet. Speed las sich dadurch als 24,9 % statt 19,1 %.
 
-**Stand heute:**
+### Wie viele Läufe es braucht
+
+**Zwölf sind zu wenig — und zwar systematisch zu günstig.** Bei kleiner Stichprobe greifen
+ein paar Attribute den ganzen positiven Gewinn ab und der Rest liest null; weil die Anteile
+nur über die positiven Gewinne normiert werden, sieht das Ergebnis geordneter aus, als es
+ist. Gemessen: Spurt **40,9 Pp bei n = 12 gegen 54,7 bei n = 48**, Climbing 28,9 gegen 37,2.
+
+Noch größer ist der Bedarf, wenn sich mehrere Teilnehmer **ein** Ergebnis teilen. In der
+Staffel hängen sechs Läufer an einer Teamzeit: bei n = 12 las dort jedes Attribut entweder
+0 % oder einen Ausreißer (Charisma 40 % bei Matrixgewicht 10), und erst ab etwa 120 Läufen
+wird die Reihenfolge stabil. Das Skript setzt die Vorgaben deshalb selbst (48, Staffel 144).
+
+**Stand heute** (n = 48, Staffel 144):
 
 | Disziplin | Abweichung | Bemerkung |
 |---|---|---|
-| Climbing | **28,9 Pp** (n = 12) | Ausdauer 29,2 vs. 26. Offen: Health 5,9 statt 10, Dexterity 8,7 statt 12 |
-| Time-Trial | **30,1 Pp** (n = 12) | Speed 21 vs. 22, Intelligence 18,2 vs. 18. Offen: Torment 9,7 statt 3 |
-| Spurt | **40,9 Pp** (n = 12) | war 79,5 vor der Nachziehung. Offen: Will 29,1 statt 14, Torment 3,9 statt 14 |
+| Staffel | **21,9 Pp** | Speed 27,1 vs. 24. Offen: Spirit 10,3 statt 16 |
+| Time-Trial | **33,6 Pp** | Speed 21,2 vs. 22, Intelligence 22,6 vs. 18. Offen: Dexterity 14 statt 25 |
+| Takeshi's Castle | **34,1 Pp** | Wille 24,8 vs. 22, Intelligence 11,3 vs. 11. Offen: Charisma 6,4 statt 14 |
+| Climbing | **37,9 Pp** | Ausdauer 32,9 vs. 26. Offen: Health 4,2 statt 10 |
+| Spurt | **56,7 Pp** | siehe „Zwei Befunde" unten |
 | TDM | **133,9 Pp** (n = 6, 554 s) | siehe unten |
 
 ### Ein Befund, der eine Entscheidung braucht
@@ -509,7 +523,7 @@ gegen ein Matrixgewicht von 28. Der Befund aus dem groben Lauf hält also.
 
 ---
 
-## Das Bahn-Chassis: Spurt, Time-Trial, Climbing
+## Das Bahn-Chassis: fünf Disziplinen, ein Motor
 
 Fünf der zwanzig Disziplinen sind im Kern dieselbe Sache — von einem Start zu einem Ziel
 kommen, unterwegs stehen Hindernisse im Weg, und die Kraft reicht nicht für alles. Sie
@@ -518,15 +532,15 @@ Motor, fünfmal Konfiguration: `BAHN_ART` im Entwurf.
 
 Die **sieben Rollen** sind überall dieselben, nur ihr Name und ihre Zutaten wechseln:
 
-| Rolle | Spurt | Time-Trial | Climbing |
-|---|---|---|---|
-| ANTRITT | Antritt | Antritt | Zug |
-| ENDTEMPO | Endtempo | Renntempo | Ausdauertempo |
-| TECHNIK | Technik | **Linie** | **Griff** |
-| WENDIGKEIT | Wendigkeit | Umsetzen | Umsetzen |
-| STEHEN | Stehvermögen | Durchhalten | Kraftausdauer |
-| WUCHT | Wucht | **Risiko** | **Kraftzug** |
-| ROBUST | Robustheit | Fahrsicherheit | Zähigkeit |
+| Rolle | Spurt | Staffel | Time-Trial | Climbing | Takeshi |
+|---|---|---|---|---|---|
+| ANTRITT | Antritt | Antritt | Antritt | Zug | Losstürmen |
+| ENDTEMPO | Endtempo | Abschnittstempo | Renntempo | Ausdauertempo | Durchhaltetempo |
+| TECHNIK | Technik | **Wechsel** | **Linie** | **Griff** | **Falle lesen** |
+| WENDIGKEIT | Wendigkeit | Bahnarbeit | Umsetzen | Umsetzen | **Aufstehen** |
+| STEHEN | Stehvermögen | Stehvermögen | Durchhalten | Kraftausdauer | **Wille** |
+| WUCHT | Wucht | **Zug an der Spitze** | **Risiko** | **Kraftzug** | **Durchbrettern** |
+| ROBUST | Robustheit | Verlässlichkeit | Fahrsicherheit | Zähigkeit | Nehmerqualität |
 
 Was je Disziplin schaltbar ist: Windschatten, Tackling, Zahl und Art der Hindernisse, wie
 schwer sie zu nehmen sind, was ein Fehler kostet, der Kraftvorrat, die Steigung, Boden und
@@ -555,10 +569,65 @@ bestätigt:
    die Linie wiederfinden, den Griff neu setzen.
 
 Und ein Fehlschlag, der nicht behoben wurde, sondern zurückgenommen: der Versuch, Spurts
-Will-Anteil (29 % gegen Matrix 14) durch weniger Will in den Rezepten zu senken, machte es
-**schlechter** (40,9 → 64,1 Pp) — Determination rückte einfach nach. Die Dominanz sitzt
-nicht in der Zusammensetzung von STEHEN, sondern darin, dass der Einbruch am Ende das
-Rennen entscheidet. Wer das senken will, muss dort ansetzen, nicht an den Zutaten.
+Will-Anteil durch weniger Will in den Rezepten zu senken, machte es **schlechter** —
+Determination rückte einfach nach.
+
+### Staffel und Takeshi's Castle: was dort anders ist
+
+**Staffel** ist die einzige Bahn, auf der nicht alle gleichzeitig laufen. Sechs Läufer,
+sechs Abschnitte, fünf Wechsel — immer nur einer je Mannschaft ist unterwegs, die übrigen
+stehen sichtbar in ihrer Wechselzone. Geprüft wird die Übergabe mit dem **Schnitt aus
+abgebendem und annehmendem** Läufer; wer sie verpatzt, kostet die Mannschaft Zeit. Deshalb
+zählt hier die **Teamzeit** und nicht die eigene Platzierung — alle sechs teilen sich
+dasselbe Ergebnis, und Plätze kippen nur, wenn die Teams tauschen. Das ist ein Münzwurf,
+kein Maß: mit Platzierung las jedes Attribut exakt 0 %.
+
+Dabei fiel ein echter Modellfehler auf, der alle Bahnen betraf: die Beschleunigungsphase
+hing an der **Rennuhr**, nicht am Läufer. Nach 3,2 Sekunden war ANTRITT für alle erledigt —
+der Schlussmann, der bei Sekunde neun aus dem Stand übernimmt, hatte also gar keinen
+Antritt. Spirit, das dort sitzt, las 0 % bei einem Matrixgewicht von 16.
+
+**Takeshi's Castle** ist keine Laufbahn, sondern ein Spießrutenlauf: vierzehn Fallen, und
+Speed steht in der Matrix mit 4 fast ganz unten. Wille steht mit 22 oben — also entscheidet
+nicht Tempo, sondern **Durchkommen**. Erste Fassung warf nach drei Stürzen raus, egal bei
+wem; gemessen trug damit Torment 33,6 % (Matrix 7) und Wille 8,9 % (Matrix 22), also genau
+verkehrt herum. Der Grund war logisch: wenn jeder gleich viele Stürze verträgt, entscheidet
+nur, wer sie **vermeidet** — und das ist Wucht. Wer wieder aufsteht, kam nie vor.
+
+Jetzt hat jeder ein **Nervenkostüm** aus seinem Willen, ein Sturz kostet davon, und wer
+leer ist, scheidet aus. Die Nerven wirken außerdem laufend aufs Tempo: wer zweimal im
+Wasser lag, geht die nächste Falle zaghafter an. Das **Publikum** ist der Kanal für
+Charisma — wer die Menge hat, sammelt zwischen zwei Fallen wieder Nerven.
+
+### Zwei Befunde, die eine Entscheidung brauchen
+
+**1. Die Bahn baute beide Seiten ungleich — derselbe Fehler wie im TDM.** Unsere Läufer
+bekamen Slot-Aufschlag, Form und Stufe, der Gegner nur seinen Disziplinwert. Im Kampf ist
+das seit der 0:6-Untersuchung behoben, auf der Bahn stand es noch. Im Bild sah man es
+daran, dass alle sechs Gegner denselben Rennplan trugen — die Zuordnung hängt an einem
+Slot, den sie gar nicht hatten. Behoben; alle Zahlen oben sind **nach** dieser Korrektur
+gemessen (sie hat jede Disziplin verschoben, Staffel 30,5 → 21,9, Spurt 47 → 59,6).
+
+**2. Rempeln ist uneigennützig — deshalb kann Torment in Spurt nicht bezahlen.** Die
+Spurt-Matrix führt Torment mit 14; gemessen trägt es 5,5 %. Das ist kein Tuning-Problem,
+sondern die Mechanik selbst:
+
+- Rempeln passiert oft genug (8,35 Rempler je Rennen).
+- **Mehr** Rempeln machte es schlechter: mit wuchtabhängiger Häufigkeit fiel Torment auf
+  1,3 % und die Gesamtabweichung stieg auf 59 Pp.
+- Der Grund: ein Rempler kostete den Remplenden selbst Tempo und Kraft, half aber dem
+  **ganzen Feld** hinter dem Opfer. Nimmt man die Eigenkosten weg, steigt Torment sofort
+  von 2,2 auf 7,4 % — das ist jetzt so eingestellt.
+
+Mehr geht mit diesem Maßstab nicht: gemessen wird die eigene Platzierung, und ein Rempler
+bringt sie nur zufällig. Entweder darf ein Rempler den Remplenden gezielt **vorbeibringen**
+(dann zahlt Wucht), oder Spurts Matrixgewicht von 14 beschreibt nicht, was ein Sprint tut.
+Das ist Chris' Entscheidung, nicht meine.
+
+Der Rest von Spurts 56,7 Pp sitzt bei Wille (27,1 gegen 14) und Entschlossenheit (24,9
+gegen 15). Beide stecken in ANTRITT und ENDTEMPO, also in dem, was direkt schnell macht —
+in einem Rennen dominiert das, was Tempo gibt. Weder ein größerer Kraftvorrat (59,6 → 58,9)
+noch eine schwächere Ermüdung (→ 56,7) hat daran viel geändert.
 
 ---
 

@@ -21,7 +21,20 @@
 import { chromium } from "playwright";
 
 const disziplin = process.argv[2] || "spurt";
-const laeufe = Number(process.argv[3] || 12);
+// WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
+//
+// Zwoelf Laeufe sind zu wenig, und zwar nicht harmlos zu wenig: sie sind SYSTEMATISCH zu
+// guenstig. Bei kleiner Stichprobe greifen ein paar Attribute den ganzen positiven Gewinn
+// ab und der Rest liest null; weil die Anteile nur ueber die positiven Gewinne normiert
+// werden, sieht das Ergebnis geordneter aus, als es ist. Gemessen: Spurt 40,9 Pp bei
+// n = 12 gegen 54,7 Pp bei n = 48, Climbing 28,9 gegen 37,2.
+//
+// Noch groesser ist der Bedarf, wenn sich mehrere Teilnehmer EIN Ergebnis teilen. In der
+// Staffel haengen sechs Laeufer an einer Teamzeit: dort las bei n = 12 jedes Attribut
+// entweder 0 % oder einen Ausreisser (Charisma 40 % bei Matrixgewicht 10), und erst ab
+// etwa 120 Laeufen wird die Reihenfolge stabil.
+const VORGABE = { staffel: 144 };
+const laeufe = Number(process.argv[3] || VORGABE[disziplin] || 48);
 // Dritter Aufrufwert: ein anderer Entwurf. Nuetzlich, um eine lange TDM-Messung gegen
 // eine eingefrorene Kopie laufen zu lassen, waehrend am Original weitergearbeitet wird.
 const pfad = process.argv[4] || "/home/user/Olympiade-der-Welten/public/mockups/battle-mode.html";
