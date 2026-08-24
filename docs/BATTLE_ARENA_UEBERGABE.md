@@ -719,6 +719,60 @@ mit der sie überhaupt an V-W herankommt, und machte aus einem Sieg einen Blowou
   Kampfdisziplinen, weil sie sich `baueEinheit()` und die KI-Logik teilen. Das ist
   konsistent mit #654s Befund, keine neue Ursache aus dieser Sitzung.
 
+### Die Ursache der 100 % — gefunden, nicht mehr vage
+
+Diese Sitzung hat die offene Frage von oben zu Ende verfolgt: warum verliert A-A TDM
+**mit jedem einzelnen Spieler in 100 % der Kämpfe** (n = 16), obwohl die Eignungssummen
+beider Seiten nur 8,8 % auseinanderliegen (V-W 379,3, A-A 348,7)? Ein Rand-Effekt wäre das
+nicht — hier klärt sich, warum es keiner ist.
+
+**A-A stellt zwei Heiler von sechs Slots (Greenkraut, Seraph-11), V-W keinen einzigen.**
+Das ist keine Nebensache, sondern der ganze Unterschied:
+
+| | V-W (6 Angreifer) | A-A (4 Angreifer + 2 Heiler) |
+|---|---|---|
+| Schaden gesamt (Ø je Kampf) | **2533** | 1252 |
+| Heilung gesamt (Ø je Kampf) | 0 | 404 |
+| Sterbequote je Spieler | 6–38 % | **100 % — bei allen sechs** |
+
+Der Mechanismus dahinter ist eine bewusste Regel, kein Fehler: „Ein Heiler bezahlt jeden
+Angriff mit seiner Heil-Uhr: entweder oder, nie beides" (Kommentar bei `fuehreAus()`).
+Greenkraut griff in keinem der 16 Kämpfe auch nur einmal an (`dmg: 0`), Seraph-11 fast nie
+(`dmg: 1`) — beide zahlten ihren Slot vollständig in Heilung. Macht man daraus eine
+Milchmädchenrechnung in derselben Währung (HP), die auch `wirkungswert()` benutzt, um
+Heilung gegen Schaden zu vergleichen: **404 HP Heilung stehen einem Schadensausfall von
+rund 1281 HP gegenüber** (die Differenz zwischen dem, was zwei weitere Angreifer auf
+A-A's Stelle vermutlich beigetragen hätten, und dem, was die beiden Heiler stattdessen
+heilten). Das ist kein knapper Tausch, sondern ein Verlustgeschäft von grob 3:1 — und
+erklärt die 100 %, ohne dass an `aufEignung()`, `TMP`/`AUS` oder den Mutatoren irgendetwas
+verändert werden müsste.
+
+**Damit ist der „Speed/Dexterity"- bzw. „Spirit/Intelligence/Torment"-Befund aus den
+früheren `einflussVon()`-Läufen dieser Sitzung kein Widerspruch, sondern eine andere
+Frage.** `einflussVon()` isoliert EIN Attribut bei EINEM Teilnehmer und hält den Rest der
+Aufstellung fest — das misst, was ein einzelner Attributpunkt bei fester Besetzung
+bewirkt. Die 100-%-Schieflage entsteht dagegen aus der BESETZUNG selbst (zwei Slots ohne
+Schadensbeitrag), nicht aus einem einzelnen Attribut. Beide Befunde sind real, beantworten
+aber unterschiedliche Fragen, und keiner löst den anderen.
+
+**Was das für Chris bedeutet — eine Design-, keine Code-Frage:**
+
+- Ist ein Zwei-Heiler-Kader gegen einen Voll-Schaden-Kader überhaupt als gleichwertige
+  Strategie gedacht? Wenn ja, müsste Heilung deutlich wirksamer werden (oder Heiler
+  dürften nicht mehr ihre gesamte Angriffskadenz dafür abgeben) — eine Balance-Änderung,
+  keine Bugfix.
+- Wenn nein — wenn ein Kader mit zwei dedizierten Heilern schlicht eine schwache
+  Kaderwahl sein SOLL, so wie in vielen Team-Spielen ein Full-Support-Team gegen ein
+  Full-DPS-Team verliert —, dann ist die 100-%-Quote **kein Befund, den man beheben muss**,
+  sondern die korrekte Konsequenz einer Aufstellungsentscheidung, die A-A (bzw. wer immer
+  den Kader zusammenstellt) getroffen hat. In diesem Fall ist nichts kaputt.
+- Sollte Chris die zweite Lesart bestätigen, ist auch nichts weiter zu tun — die Zahlen
+  oben genügen dann als Beleg, warum die Quote so aussieht, wie sie aussieht.
+
+Nicht angefasst: kein Code für diesen Abschnitt geändert. Das ist eine bewusste
+Zurückhaltung — genau wie bei der Kappung von `TMP`/`AUS` wäre ein Eingriff hier eine
+Balance-Entscheidung, die nur Chris treffen sollte, mit den Zahlen oben als Grundlage.
+
 ---
 
 ## Das Bahn-Chassis: fünf Disziplinen, ein Motor
