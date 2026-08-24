@@ -14,11 +14,18 @@ Sprite-Nachschub braucht, wartet deshalb hier.
 
 Die **Battle Arena** ist ein *zuschaubarer Auto-Battler* für die Olympiade der Welten.
 Der Manager stellt auf, die Spieler kämpfen von selbst, und man sieht zu — es gibt keine
-Steuerung im Kampf. Zwei Disziplinen sind entworfen:
+Steuerung im Kampf. Ziel ist ein Grundkonzept für **alle 20 Disziplinen**; Stand dieser
+Sitzung: **14 von 20** haben eine erste Mockup-Version, verteilt auf drei geteilte Motoren
+(„Chassis") statt 14 getrennter Implementierungen:
 
-- **TDM** — 6 gegen 6, Team gegen Team, sechs benannte Slots
-- **Spurt** — ein Hürdenlauf im Freien mit vier Slots, eigenen abgeleiteten Werten und
-  Tacklings, die sichtbar und mechanisch wirken
+| Chassis | Disziplinen | Motor |
+|---|---|---|
+| Kampf | TDM, Mini-DM, Fechten, Battlefield | `build()`/`stepSim()`, Rezepte aus `ARENA_ART` |
+| Bahn | Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle | `bauSpurt()`/`stepSpurt()`, Konfiguration aus `BAHN_ART` |
+| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
+
+Offen: Feldspiel (Hockey, Basketball, Football, Tennis) und Denkduell (Speed-Schach,
+I-Spy) — zwei weitere Chassis, noch nicht begonnen.
 
 Sie liegt als **eine** HTML-Datei vor (`public/mockups/battle-mode.html`, ~800 KB, kein
 Bundle, keine Abhängigkeiten) und ist im Spiel als Reiter eingebettet. **Sie liest und
@@ -818,6 +825,100 @@ in einem Rennen dominiert das, was Tempo gibt. Weder ein größerer Kraftvorrat 
 noch eine schwächere Ermüdung (→ 56,7) hat daran viel geändert.
 
 ---
+
+## Das Arena-Chassis: TDM, Mini-DM, Fechten, Battlefield
+
+Was das Bahn-Chassis für die Rennen ist, ist dies für die Kämpfe: ein Motor
+(`build()`/`stepSim()`), vier Konfigurationen (`ARENA_ART`). Die fünf Kampfwerte (ANG,
+VER, LP, TMP, AUS) bleiben überall dieselben; was sie speist, kommt aus der Matrix der
+jeweiligen Disziplin statt aus einer von zwei geteilten Kategorien.
+
+- **Mini-DM** (4 gegen 4): sechs Attribute mit Gewicht, keins davon Charisma,
+  Intelligence oder Spirit — hier führt niemand und liest niemand.
+- **Fechten** (6 gegen 6): die einzige Kampfdisziplin mit Gewicht auf Speed (16) und
+  fast keinem auf Health (4). Ein Fechter fällt nicht um, weil er dünn ist, sondern weil
+  er zu spät kommt.
+- **Battlefield** (4 gegen 4): die einzige, in der Power nicht oben steht — Charisma,
+  Intelligence und Spirit tragen zusammen die Hälfte des Gewichts, ein geführtes Gefecht.
+
+**Der Maßstab war zunächst falsch** (siehe unten „Der Maßstab selbst war falsch") und ist
+seit dieser Sitzung korrigiert. Eine testweise Kappung von `TMP`/`AUS` senkte die
+gemessene Abweichung deutlich, verschlechterte aber den ECHTEN Kampf (mehr Blowouts) und
+ist zurückgenommen — Details im Abschnitt „Das Ventil".
+
+**Zuletzt gemessen, NACH dem Merge mit #654 (Heiler-Fix), n = 6:**
+
+TDM 160,1 Pp (Spirit 38,1 %, Intelligence 33,1 %, Torment 28,9 % dominieren; Power,
+Health, Stamina, Charisma bei exakt 0 % trotz Matrixgewichten 28/20/14/10). Mini-DM,
+Fechten und Battlefield sind seit dem Merge nicht neu mit `einflussVon()` gemessen — nur
+die Siegquote (Mini-DM 100 %, Fechten 100 %, Battlefield 88 %, je n = 8), die zusammen mit
+TDM zeigt: der Heiler-Fix hat die Kampfdynamik grundlegend verschoben, und **welches
+Attribut das Kampfergebnis dominiert, ist seitdem dreimal umgesprungen** (Speed/Dexterity
+vor dem Maßstab-Fix → weiterhin Speed/Dexterity nach dem Maßstab-Fix, aber schwächer →
+jetzt Spirit/Intelligence/Torment nach dem Heiler-Fix). Das ist kein Rauschen, sondern ein
+Hinweis, dass die Ursache tiefer liegt als eine einzelne Formel — vermutlich in
+`leistungVon()`/der Skill-Priorisierung, die bestimmt, wer wie oft trifft. Nicht mehr mit
+Vermutungen nachgejagt in dieser Sitzung; das ist die nächste echte Aufgabe an TDM,
+unabhängig vom Chassis-Ausbau.
+
+---
+
+## Das Bühne-Chassis: Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen
+
+Fünf Disziplinen sind weder Rennen noch Kampf: niemand läuft eine Strecke, niemand tritt
+gegen einen Gegner an. Jeder tritt EINZELN auf, in mehreren Durchgängen, und wird
+bewertet — der dritte Motor (`bauBuehne()`/`stepBuehne()`, Konfiguration `BUEHNE_ART`).
+
+Sieben Rollen, wie bei Bahn und Kampf, aber sie messen eine Auftrittsbewertung statt Tempo
+oder Kampfkraft:
+
+| Rolle | Bedeutung |
+|---|---|
+| GRUNDLAGE | der verlässliche Kern jedes Durchgangs |
+| SPITZENMOMENT | was ein gelungener großer Versuch zusätzlich bringt |
+| TECHNIK | wie oft der große Versuch gelingt |
+| PUBLIKUM | ein Bonus, der immer kommt, ohne Risiko |
+| NERVEN | trägt zur Gelingchance bei, unter Wettkampfdruck |
+| AUSDAUER | wie wenig späte Durchgänge gegenüber frühen abfallen |
+| WAGNIS | wie groß der Bonus ausfällt, wenn der Versuch gelingt |
+
+Ein Durchgang: Basis (aus GRUNDLAGE, gedämpft durch Ermüdung) plus — bei Erfolg (TECHNIK
+und NERVEN entscheiden) — ein WAGNIS-skalierter SPITZENMOMENT-Bonus, sonst ein Abschlag
+(`failAbzug`, je Disziplin unterschiedlich hart); PUBLIKUM kommt immer oben drauf. Die
+Summe aller Durchgänge ist das Ergebnis — direkt verwendbar als `wert()` für die
+Abnahmemessung, keine Platzierung nötig.
+
+Reihenfolge: rundenweise wie eine Setzliste (Durchgang 1 für alle, dann Durchgang 2), Seiten
+wechseln sich ab. Alle Durchgänge werden beim Aufbau durchgerechnet und über die Zeit
+enthüllt — dieselbe Ehrlichkeit wie im Kampf: Formkarte und Disziplinwert stehen fest,
+bevor der Auftritt beginnt.
+
+**Was die erste Messung gelehrt hat:** Charisma (Gewichtheben, Matrixgewicht 23) und
+Torment (Breaking, Gewicht 22) saßen zunächst nur in risikofreien, additiven Rollen
+(PUBLIKUM/SPITZENMOMENT), während Dexterity (Gewicht 6 bzw. 2) in der erfolgsentscheidenden
+Rolle TECHNIK saß — derselbe Fehler wie beim Bahn- und Arena-Chassis: ein Attribut in einer
+**Erfolgschance-Rolle** gewinnt strukturell mehr Einfluss als eines, das nur additiv
+beiträgt, unabhängig vom Matrixgewicht. Nachgezogen (Charisma/Torment jetzt auch in
+TECHNIK/NERVEN, Dexterity nur noch dort, wo die Matrix ihm ein Gewicht gibt).
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Wettessen | **12,6 Pp** |
+| Eiskunstlauf | **23,9 Pp** |
+| Showcase | **28,7 Pp** |
+| Breaking | **29 Pp** |
+| Gewichtheben | **31,8 Pp** |
+
+Das ist der beste Chassis-Durchschnitt der Sitzung — vermutlich, weil die Lehren aus Bahn
+und Arena (Feldspreizung, Erfolgschance-Attribute, additive vs. bedingte Boni) diesmal
+vorab in die Rezepte eingeflossen sind, statt nachträglich entdeckt zu werden.
+
+Visuell: eine Bühne mit drei Scheinwerferkegeln statt Sandplatz oder Laufbahn, jeder
+Teilnehmer als stehende Figur (derselbe Sprite-Baukasten, wiederverwendet über
+`zeichneSprite()`) mit laufender Punktzahl und Fortschrittsanzeige „x/N Durchgänge"
+darunter — geprüft an Gewichtheben und Eiskunstlauf, in beiden auf einen Blick lesbar.
 
 ## Verlässliche Einstiegspunkte
 

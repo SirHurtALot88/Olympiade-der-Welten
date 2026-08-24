@@ -1410,7 +1410,12 @@
     staffel:{label:"Staffel",cat:"speed",size:6},
     "mini-dm":{label:"Mini-DM",cat:"power",size:4},
     fechten:{label:"Fechten",cat:"power",size:6},
-    battlefield:{label:"Battlefield",cat:"power",size:4}};
+    battlefield:{label:"Battlefield",cat:"power",size:4},
+    gewichtheben:{label:"Gewichtheben",cat:"buehne",size:6},
+    showcase:{label:"Showcase",cat:"buehne",size:6},
+    eiskunstlauf:{label:"Eiskunstlauf",cat:"buehne",size:6},
+    breaking:{label:"Breaking",cat:"buehne",size:6},
+    wettessen:{label:"Wettessen",cat:"buehne",size:6}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -2126,6 +2131,316 @@
   const rezeptVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].rezept)||REC[(DISCS[dId]||{}).cat]||REC.power;
   const jeSeiteVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].jeSeite)||6;
 
+  // ===================================================================================
+  // DAS BUeHNE-CHASSIS.
+  //
+  // Fuenf Disziplinen sind weder Rennen noch Kampf: Gewichtheben, Showcase,
+  // Eiskunstlauf, Breaking, Wettessen. Niemand tritt gegeneinander an, niemand laeuft
+  // eine Strecke — jeder tritt EINZELN auf, in mehreren Durchgaengen, und wird bewertet.
+  //
+  // Sieben Rollen, wie bei Bahn und Arena — aber sie messen nicht Tempo oder Kampfkraft,
+  // sondern eine AUFTRITTSBEWERTUNG:
+  //
+  //   GRUNDLAGE      der verlaessliche Kern jedes Durchgangs
+  //   SPITZENMOMENT  was ein gelungener grosser Versuch zusaetzlich bringt
+  //   TECHNIK        wie oft der grosse Versuch gelingt
+  //   PUBLIKUM       ein Bonus, der immer kommt, ohne Risiko
+  //   NERVEN         traegt zur Gelingchance bei, unter Wettkampfdruck
+  //   AUSDAUER       wie wenig die spaeten Durchgaenge gegenueber den fruehen abfallen
+  //   WAGNIS         wie gross der Bonus ausfaellt, wenn der Versuch gelingt
+  //
+  // WIE EIN DURCHGANG BEWERTET WIRD — eine Formel fuer alle fuenf, die Zutaten kommen
+  // aus der jeweiligen Matrix:
+  //
+  //   Basis    = 20 + GRUNDLAGE * 0,7, gedaempft durch Ermuedung (niedrige AUSDAUER
+  //              kostet in spaeten Durchgaengen)
+  //   Erfolg   = TECHNIK und NERVEN entscheiden, ob der Durchgang gelingt
+  //   Gelingt  = Basis + SPITZENMOMENT-Bonus, skaliert mit WAGNIS
+  //   Misslingt= Basis * failAbzug — bei Gewichtheben hart (0: ein verpatzter Versuch
+  //              zaehlt nichts), bei den anderen weich (ein Patzer kostet, wirft aber
+  //              nicht auf null)
+  //   Publikum = PUBLIKUM-Bonus kommt immer oben drauf, ohne Risiko
+  //
+  // Die Ergebniszahl ist die Summe aller Durchgaenge — direkt verwendbar als wert() fuer
+  // die Abnahmemessung, groesser ist besser, keine Platzierung noetig.
+  const BUEHNE_ART={
+    gewichtheben:{
+      // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
+      // dexterity 6, stamina 2.
+      //
+      // Power fuer das Gewicht, aber Charisma fast genauso hoch — das ist die Ansage:
+      // der Grenzversuch gelingt nicht allein durch Kraft, das Publikum traegt den Lifter
+      // durch die letzten Kilo. Drei Versuche, ein verpatzter zaehlt NICHTS (failAbzug 0)
+      // — echtes Gewichtheben kennt keine Teilpunkte fuer eine gerissene Hantel.
+      label:"Gewichtheben", jeSeite:6, rundenN:3, rundenDauer:2.4,
+      failAbzug:0, failWort:"Fehlversuch", erfolgWort:"sauber durchgestemmt",
+      // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
+      // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
+      // Zuschlag, der immer kommt. Dexterity (Gewicht 6) sass dagegen in TECHNIK, der
+      // Erfolgschance-Rolle, und gewann dadurch weit mehr Einfluss, als sein Gewicht
+      // hergibt (15,7 % statt 6). Jetzt hat Charisma auch einen Platz in einer
+      // erfolgsentscheidenden Rolle (NERVEN, TECHNIK) — passend zur Erzaehlung: das
+      // Publikum traegt nicht nur mit, es hilft durch den Grenzversuch.
+      rezept:{
+        GRUNDLAGE:    {power:55,health:25,determination:20},
+        SPITZENMOMENT:{power:50,will:30,determination:20},
+        TECHNIK:      {dexterity:30,charisma:25,health:25,determination:20},
+        PUBLIKUM:     {charisma:70,will:30},
+        NERVEN:       {charisma:35,will:35,determination:20,health:10},
+        AUSDAUER:     {stamina:40,health:35,determination:25},
+        WAGNIS:       {power:45,charisma:30,speed:25}
+      }
+    },
+
+    showcase:{
+      // MATRIX: charisma 27, spirit 16, determination 14, power 11, intelligence 10,
+      // dexterity 9, speed 8, health 3, torment 2.
+      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.8,
+      failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
+      rezept:{
+        GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
+        SPITZENMOMENT:{charisma:45,power:30,speed:25},
+        TECHNIK:      {dexterity:40,intelligence:35,determination:25},
+        PUBLIKUM:     {charisma:50,spirit:50},
+        NERVEN:       {determination:40,spirit:35,intelligence:25},
+        AUSDAUER:     {spirit:40,determination:35,health:25},
+        WAGNIS:       {torment:45,power:30,speed:25}
+      }
+    },
+
+    eiskunstlauf:{
+      // MATRIX: charisma 28, dexterity 18, spirit 16, awareness 14, speed 10,
+      // intelligence 8, determination 6.
+      label:"Eiskunstlauf", jeSeite:6, rundenN:6, rundenDauer:1.6,
+      failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
+      rezept:{
+        GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
+        SPITZENMOMENT:{dexterity:45,speed:30,awareness:25},
+        TECHNIK:      {dexterity:40,awareness:35,intelligence:25},
+        PUBLIKUM:     {charisma:70,spirit:30},
+        NERVEN:       {determination:40,awareness:30,intelligence:30},
+        AUSDAUER:     {spirit:40,determination:30,dexterity:30},
+        WAGNIS:       {speed:45,dexterity:30,awareness:25}
+      }
+    },
+
+    breaking:{
+      // MATRIX: will 28, torment 22, health 18, power 10, determination 10, stamina 8,
+      // dexterity 2, intelligence 2. KEIN Charisma — anders als die anderen drei
+      // Buehnen-Disziplinen traegt hier nicht das Lächeln, sondern die Praesenz im
+      // Battle. Publikum speist sich deshalb aus Wille und Torment, nicht aus Charisma.
+      label:"Breaking", jeSeite:6, rundenN:4, rundenDauer:2.0,
+      failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
+      // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
+      // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
+      // mehr als Wille (28, der Hoechstwert). Torment (22, zweithoechster Wert) sass NUR
+      // in den beiden nicht erfolgsgebundenen Rollen (SPITZENMOMENT, PUBLIKUM, WAGNIS)
+      // und blieb bei 11,7 %. Jetzt traegt Torment auch die Erfolgschance mit, Dexterity
+      // bleibt nur dort, wo die Matrix ihm ueberhaupt ein Gewicht gibt.
+      rezept:{
+        GRUNDLAGE:    {will:45,health:30,stamina:25},
+        SPITZENMOMENT:{torment:45,power:35,will:20},
+        TECHNIK:      {torment:35,determination:35,will:30},
+        PUBLIKUM:     {torment:50,will:50},
+        NERVEN:       {will:40,determination:30,health:30},
+        AUSDAUER:     {stamina:45,health:35,will:20},
+        WAGNIS:       {torment:50,power:30,dexterity:20}
+      }
+    },
+
+    wettessen:{
+      // MATRIX: will 26, health 22, stamina 22, determination 16, intelligence 8,
+      // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
+      // eigene Wille, der den naechsten Bissen nimmt.
+      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:1.2,
+      failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
+      rezept:{
+        GRUNDLAGE:    {stamina:40,health:35,will:25},
+        SPITZENMOMENT:{torment:45,will:30,determination:25},
+        TECHNIK:      {intelligence:45,determination:30,health:25},
+        PUBLIKUM:     {will:50,determination:50},
+        NERVEN:       {will:45,health:35,determination:20},
+        AUSDAUER:     {stamina:50,health:30,will:20},
+        WAGNIS:       {torment:50,stamina:30,intelligence:20}
+      }
+    }
+  };
+  let buehneDisc="gewichtheben";
+  const BB=()=>BUEHNE_ART[buehneDisc]||BUEHNE_ART.gewichtheben;
+  const istBuehne=(d)=>!!BUEHNE_ART[d];
+
+  let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+
+  function bauBuehne(saat){
+    seed=saat||1337; buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
+    floats.length=0;
+    const art=BB(), n=art.jeSeite, R=art.rezept;
+    const slotListe=slotsVon(buehneDisc);
+    const gesetzt=inDisc(buehneDisc);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[buehneDisc]||0)-(a.d[buehneDisc]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gegner=OPP.slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    let id=0;
+    const setz=(p,seite,istGegner,idx)=>{
+      const sl=istGegner?null:slotFuer(p,idx);
+      const engP=sl?slotAufschlag(p,sl,buehneDisc):0;
+      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
+      const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      const L={id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        eig:(p.d[buehneDisc]||0)+engP+breitP,...R2,
+        runden:[], summe:0, aktuell:-1};
+      // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
+      // die Logik einfach — kein "wer ist als naechstes dran" ueber mehrere Frames — und
+      // ist ehrlich: die Formkarte und der Disziplinwert stehen fest, bevor der Auftritt
+      // beginnt, genau wie beim Kampf.
+      for(let ri=0;ri<art.rundenN;ri++){
+        const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
+        const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
+        const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+        let punkte, ereignis;
+        if(rr()<erfolg){
+          punkte=basis+L.SPITZENMOMENT*0.35*(0.4+L.WAGNIS*0.006);
+          ereignis=art.erfolgWort;
+        } else {
+          punkte=basis*art.failAbzug;
+          ereignis=art.failWort;
+        }
+        punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+        L.runden.push({punkte,ereignis});
+      }
+      TEILNEHMER.push(L);
+    };
+    mine.forEach((p,i)=>setz(p,0,false,i));
+    gegner.forEach((o,i)=>setz(o,1,true,i));
+
+    // REIHENFOLGE. Rundenweise abwechselnd wie eine Setzliste — Durchgang 1 fuer alle,
+    // dann Durchgang 2 — und innerhalb einer Runde wechseln sich die Seiten ab, damit
+    // kein Team geschlossen zuerst dran ist.
+    buehneQueue=[];
+    for(let ri=0;ri<art.rundenN;ri++){
+      for(let i=0;i<Math.max(mine.length,gegner.length);i++){
+        if(i<mine.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n));
+        if(i<gegner.length)buehneQueue.push(TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n));
+      }
+    }
+  }
+
+  function stepBuehne(dt){
+    if(done)return;
+    buehneT+=dt;
+    for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
+    buehneAkt-=dt;
+    if(buehneAkt<=0 && buehneZeiger<buehneQueue.length){
+      const u=buehneQueue[buehneZeiger++];
+      u.aktuell++;
+      const r=u.runden[u.aktuell];
+      u.summe+=r.punkte;
+      u.lunge=0.5;
+      schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
+      feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").");
+      buehneAkt=BB().rundenDauer;
+    }
+    if(buehneZeiger>=buehneQueue.length)done=true;
+  }
+
+  function updateHudBuehne(){
+    document.getElementById("clock").textContent=
+      Math.floor(buehneT/60)+":"+String(Math.floor(buehneT%60)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
+    // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
+    const sd=document.querySelector(".hpbars .sd");
+    if(sd)sd.textContent=BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
+    document.querySelectorAll(".scoreline .tname em").forEach(e=>{
+      e.innerHTML=e.innerHTML.replace(/im Kampf/g,"aufgetreten");});
+    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
+    document.getElementById("aliveL").textContent=String(fertig(0));
+    document.getElementById("aliveR").textContent=String(fertig(1));
+    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
+    document.getElementById("score").textContent=summe(0)+" : "+summe(1);
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
+      return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
+    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    renderKader();
+  }
+
+  function bodenBuehne(){
+    // BUeHNE STATT SANDPLATZ. Ein Podest mit Scheinwerferkegeln statt der Kampfarena —
+    // die Kosmetik sagt sofort, dass hier niemand kaempft.
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#1b1622");g.addColorStop(1,"#0d0a12");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    for(const x of [W*0.22,W*0.5,W*0.78]){
+      const s=ctx.createRadialGradient(x,0,10,x,H*0.55,W*0.28);
+      s.addColorStop(0,"rgba(255,232,180,.14)");s.addColorStop(1,"rgba(255,232,180,0)");
+      ctx.fillStyle=s;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x-90,H);ctx.lineTo(x+90,H);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.fillStyle="#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
+    ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
+    for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*W/8,H*0.78);ctx.lineTo(i*W/8,H);ctx.stroke();}
+  }
+
+  function zeichneBuehne(){
+    bodenBuehne();
+    const art=BB();
+    // Zwei Reihen — V-W oben, A-A unten — jeder Teilnehmer als stehende Figur mit
+    // Punktesaeule darunter. Wer gerade dran war, bekommt kurz eine Ausfallpose (lunge).
+    const jeReihe=Math.max(TEILNEHMER.filter(u=>u.side===0).length,1);
+    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
+    [0,1].forEach(side=>{
+      const g=TEILNEHMER.filter(u=>u.side===side);
+      const y=side===0?H*0.32:H*0.66;
+      g.forEach((u,i)=>{
+        const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+        ctx.globalAlpha=u.lunge>0?1:0.92;
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+        ctx.globalAlpha=1;
+        zeichneSprite(ctx,u,x,y);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+        // Punktesaeule: wie weit im Feld, nicht absolut — sonst waere Gewichtheben (kurze
+        // Zahlen) neben Wettessen (viele Runden) optisch schief.
+        const w=30,p=Math.min(1,u.summe/maxSumme);
+        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
+        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+        // Fortschritt: wie viele Durchgaenge schon enthuellt
+        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+      });
+    });
+    for(const f of floats){
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.crit?css("--ok"):css("--ink");
+      ctx.font=(f.crit?"700 15px":"600 13px")+" 'Barlow Condensed',sans-serif";
+      ctx.textAlign="center";
+      if(f._teilnehmer!=null){
+        const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
+        if(u){const seite=u.side, g=TEILNEHMER.filter(x=>x.side===seite);
+          const i=g.indexOf(u);
+          const x=90+(W-180)*(g.length>1?i/(g.length-1):0.5);
+          const y=(seite===0?H*0.32:H*0.66)-30-((1-f.life)*20);
+          ctx.fillText(f.txt,x,y);
+        }
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+
   function stats(p,dId){const rec=rezeptVon(dId),o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
@@ -2805,7 +3120,20 @@
     reg.appendChild(el("s",null,SPAEHGRAD+" %"));
     reg.appendChild(el("em",null,["kaum etwas","grobe Bereiche","brauchbar","genau"][spaehStufe(SPAEHGRAD)]));
     box.appendChild(reg);
-    if(istBahn(disc)){
+    if(istBuehne(disc)){
+      // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
+      // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Bewertung"));
+      k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
+        "den Seiten. Jeder Durchgang: "+BB().erfolgWort+" oder "+BB().failWort+" — "+
+        "entschieden durch Technik und Nerven, die Höhe durch Spitzenmoment und Wagnis."));
+      box.appendChild(k);
+      const apb=document.getElementById("arenaplan");
+      if(apb)apb.textContent=BB().rundenN+" Durchgänge, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      const pl=document.querySelector(".planzeile b");
+      if(pl)pl.textContent="Bewertung";
+    } else if(istBahn(disc)){
       // Auf der Bahn gibt es keinen Schlachtplan: jeder Laeufer bringt seinen eigenen
       // Rennplan mit, und der kommt aus dem Slot, auf dem er steht. Den Kampfplan hier
       // stehen zu lassen hiesse, eine Absicht anzuzeigen, die niemand hat.
@@ -2861,7 +3189,7 @@
       r.appendChild(w);
       box.appendChild(r);
     });
-    if(!istBahn(disc)){
+    if(!istBahn(disc)&&!istBuehne(disc)){
       const ap=document.getElementById("arenaplan");
       if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
       const pl=document.querySelector(".planzeile b");
@@ -3077,6 +3405,7 @@
   const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
+    if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     PLAN=schlachtplan();
@@ -3885,6 +4214,7 @@
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
   function stepSim(dt){
+    if(istBuehne(disc))return stepBuehne(dt);
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
@@ -4450,6 +4780,7 @@
   const bodenSaat=(i)=>{const x=Math.sin(i*127.1)*43758.5453;return x-Math.floor(x);};
 
   function zeichneBoden(){
+    if(istBuehne(disc))return bodenBuehne();
     if(istBahn(disc))return bodenSpurt();
     return bodenArena();
   }
@@ -5386,6 +5717,7 @@
 
   function draw(){
     ctx.clearRect(0,0,W,H);
+    if(istBuehne(disc)){zeichneBuehne();return;}
     if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
 
@@ -5508,7 +5840,8 @@
       for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
-      if(istBahn(disc))updateHudBahn();
+      if(istBuehne(disc))updateHudBuehne();
+      else if(istBahn(disc))updateHudBahn();
     }
     draw();
     requestAnimationFrame(loop);
@@ -5583,7 +5916,9 @@
       // einer zweiten Liste, die auseinanderlaufen koennte.
       const liste=document.getElementById(seite===0?"elisteL":"elisteR");
       liste.textContent="";
-      const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite})):U.filter(u=>u.side===seite);
+      const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :U.filter(u=>u.side===seite);
       const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
       for(const u of feld){
         const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
@@ -5703,7 +6038,10 @@
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
       box.textContent="";
-      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1})):U.filter(x=>x.side===seite))){
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
+        :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
+          hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
+        :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
         const bar=el("div","kbar");
@@ -5716,6 +6054,9 @@
     const m=document.getElementById("kmitte");
     if(m)m.textContent=istBahn(disc)
       ? (rennFertig.filter(x=>x.seite===0).length+" : "+rennFertig.filter(x=>x.seite===1).length)
+      : istBuehne(disc)
+      ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
+         Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
       : (live(0).length+" : "+live(1).length);
   }
 
@@ -5780,9 +6121,10 @@
     document.getElementById("arenaDisc").textContent=
       (DISCS[disc]?DISCS[disc].label:disc)+" · "+
       (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
+                    :istBuehne(disc)?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
-    istBahn(disc)?updateHudBahn():updateHud();
+    istBahn(disc)?updateHudBahn():istBuehne(disc)?updateHudBuehne():updateHud();
     draw();renderKader();
     document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
@@ -5953,6 +6295,22 @@
       }
     };
   }
+  // JEDE BUeHNE-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen. Die Wertung ist hier
+  // am einfachsten von allen: die Summe der Durchgangspunkte ist bereits eine Zahl, bei
+  // der groesser besser heisst, keine Platzierung noetig.
+  for(const bd of Object.keys(BUEHNE_ART)){
+    MOTOREN[bd]={
+      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done}),
+      zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER;
+                    buehneT=a.buehneT; buehneZeiger=a.buehneZeiger; buehneQueue=a.buehneQueue;
+                    buehneAkt=a.buehneAkt; done=a.done;},
+      vorher:()=>{disc=bd; buehneDisc=bd;},
+      bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
+      lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
+      namen:()=>TEILNEHMER.map(u=>u.n),
+      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
+    };
+  }
 
   // NUR EINER BEKOMMT DIE PUNKTE.
   //
@@ -6015,6 +6373,13 @@
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
 
   function bahnSerie(d,n){
+    // WER SICH NICHT ANMELDET, WIRD NICHT STILL DURCH SPURT ERSETZT. BA() faellt ohne
+    // Eintrag in BAHN_ART auf BAHN_ART.spurt zurueck — praktisch fuer den Normalfall,
+    // gefaehrlich hier: ein Aufruf mit einer Buehnen- oder Arena-Disziplin wuerde sonst
+    // lautlos Spurt-Zahlen unter falschem Namen ausliefern. Genau dieses Muster (eine
+    // Konstruktion faellt still auf etwas Falsches zurueck) hat in dieser Sitzung schon
+    // mehrfach Messungen verfaelscht.
+    if(!BAHN_ART[d])throw new Error("bahnSerie: \""+d+"\" ist keine Bahn-Disziplin");
     const alt={disc, bahnDisc, LAEUFER, rennFertig, rennT, done};
     disc=d; bahnDisc=d;
     const summe={}; let leerGesamt=0, schattenGesamt=0, laeufe=0;

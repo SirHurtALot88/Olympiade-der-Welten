@@ -6,8 +6,12 @@
 // sie einzuloesen. Dieses Skript prueft, ob sie das tut — es hebt bei je einem
 // Teilnehmer je ein Attribut an und misst, wie viel besser er dadurch abschneidet.
 //
-// Ausgegeben wird der Einflussvektor und die Abweichung zur Matrix in Prozentpunkten.
-// Null hiesse: die Mechanik belohnt exakt das, was die Wertung bepreist.
+// Ausgegeben wird der Einflussvektor und die Abweichung zur Matrix in Prozentpunkten
+// (Pp). Konkret: die Matrix sagt "Speed zaehlt im TDM 0 % zur Wertung". Gemessen trug
+// Speed aber 43 % des Kampfergebnisses — eine Luecke von 43 Punkten bei nur diesem einen
+// Attribut. Ueber alle zwoelf Attribute aufsummiert (Betraege, nicht Vorzeichen) ergibt
+// das die Abweichung. NULL Pp hiesse: die Mechanik belohnt exakt das, was die Wertung
+// bepreist. Je hoeher die Zahl, desto mehr belohnt die Mechanik etwas anderes.
 //
 //   node scripts/messe-arena-einfluss.mjs                → Serie + Spurt-Einfluss
 //   node scripts/messe-arena-einfluss.mjs spurt 12       → nur Spurt, 12 Laeufe
