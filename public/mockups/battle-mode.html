@@ -1896,6 +1896,24 @@
     o.LP =Math.max(1,s.LP *f);
     o.ANG=Math.max(1,s.ANG*f);
     o.VER=Math.max(0,s.VER*f);
+    // TEMPO UND AUSDAUER GEHEN MIT.
+    //
+    // Vorher blieben beide stehen, und das war das offene Ventil: wer ein Attribut in TMP
+    // oder AUS stehen hatte, bekam einen Gewinn ERSTER ORDNUNG, waehrend jedes
+    // Kampfattribut gegen die Normierung lief. Im TDM stehen Speed mit 46 und Dexterity
+    // mit 24 im Tempo — beide mit Matrixgewicht NULL. Sie brachten vollen Gewinn ohne
+    // jede Gegenleistung an die Eignung: gemessen 46,1 % und 24,7 %, waehrend Power bei
+    // Gewicht 28 auf 3,9 % lag und Health, Ausdauer und Charisma auf exakt null.
+    //
+    // Mit dieser Zeile: Abweichung 152,4 -> 83,7 Pp, Speed und Dexterity auf 0 %, Power
+    // von 3,9 auf 21,4. Fechten 87 -> 39, Mini-DM unveraendert bei 14.
+    //
+    // WARUM es so stark wirkt, ist nicht abschliessend geklaert — der Faktor haengt nur
+    // an LP, VER und ANG, TMP wird also mitskaliert, nicht auf ein Ziel normiert. Der
+    // Effekt ist gemessen, die Erklaerung dafuer noch nicht. Wer hier weiterarbeitet,
+    // sollte das wissen und es nicht fuer verstanden halten.
+    o.TMP=Math.max(1,s.TMP*f);
+    o.AUS=Math.max(1,s.AUS*f);
     return o;
   }
 

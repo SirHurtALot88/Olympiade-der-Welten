@@ -581,25 +581,58 @@ aufgeschrieben, damit ihn niemand aus einer älteren Nachricht heraussucht und f
 hält. Der Effekt, den er zeigte, war die Signatur des Messfehlers: was in `TMP` steht,
 gewinnt — und ich hatte Awareness und Intelligence hineingesetzt.
 
-### Was stattdessen gerade geprüft wird
+### Das Ventil ist geschlossen — und was das kostet
 
-Wenn `TMP` und `AUS` mit in die Normierung kämen, könnte kein Rezept mehr durch bloße
-Platzierung eines Attributs einen Gewinn erzeugen — und Speed könnte im TDM gar nicht mehr
-zahlen. Erste Messungen mit dieser Fassung (n = 6):
+`TMP` und `AUS` gehen jetzt mit in die Normierung. Damit kann kein Rezept mehr durch bloße
+Platzierung eines Attributs einen Gewinn erster Ordnung erzeugen.
 
-| Disziplin | ohne Kappung | mit Kappung |
+| Disziplin | vorher | jetzt |
 |---|---|---|
-| Mini-DM | 13,8 Pp | **14,0 Pp** — der gute Fall bleibt heil |
+| Mini-DM | 13,8 Pp | **14,0 Pp** |
 | Fechten | 87 Pp | **39 Pp** (zusammen mit neu gezogenen Rezepten) |
-| Battlefield | 110 Pp | **101,7 Pp** — bewegt sich kaum, siehe unten |
-| TDM | 152,4 Pp | steht noch aus |
+| Battlefield | 110 Pp | **101,7 Pp** |
+| **TDM** | 152,4 Pp | **83,7 Pp** |
 
-Battlefield bleibt auffällig: Ausdauer und Entschlossenheit lesen 20,8 %, obwohl sie in
-den neuen Rezepten nur noch mit 8 vorkommen und die Matrix ihnen 4 gibt. Das ist mit n = 6
-und acht Beteiligten möglicherweise Rauschen — vor einer Deutung mit größerer Stichprobe
-nachmessen.
+Im TDM fallen **Speed und Dexterity auf exakt 0 %** (Matrixgewicht je 0), und Power steigt
+von 3,9 auf 21,4 % (Gewicht 28). Genau das war das Ziel.
 
-**Solange TDM aussteht, ist zu dieser Frage nichts entschieden.**
+**Was noch nicht stimmt:** Awareness liest im TDM 29,7 % bei Gewicht 2, Health 34,1 % bei
+Gewicht 20, Stamina und Charisma weiter 0 % bei 14 und 10. Und Battlefield bewegt sich
+kaum — Ausdauer und Entschlossenheit lesen dort 20,8 %, obwohl die neuen Rezepte sie nur
+noch mit 8 führen und die Matrix ihnen 4 gibt. Bei n = 6 und acht Beteiligten kann das
+Rauschen sein; vor einer Deutung mit größerer Stichprobe nachmessen.
+
+**Und ehrlich gesagt: WARUM es so stark wirkt, ist nicht geklärt.** Der Faktor hängt nur an
+LP, VER und ANG; `TMP` wird mitskaliert, nicht auf ein Ziel normiert. Der Effekt ist
+gemessen, die Erklärung dafür nicht. Wer hier weiterarbeitet, sollte das wissen und es
+nicht für verstanden halten.
+
+### Der Preis — und er gehört Chris
+
+Die Änderung dreht das Kräfteverhältnis **nicht** um. In der reinen Messlage (ohne
+Mutatoren, ohne Formkarten) gewinnt V-W **100 % in allen vier Kampfdisziplinen — mit und
+ohne Kappung, unverändert**.
+
+Mit allem drum herum sieht es anders aus:
+
+| | ohne Kappung | mit Kappung |
+|---|---|---|
+| TDM | 25 % | **0 %** |
+| Mini-DM | 25 % | **0 %** |
+| Fechten | 50 % | 25 % |
+| Battlefield | 25 % | **0 %** |
+
+Der Grund liegt nicht in der Kappung selbst, sondern in einer Schieflage, die es vorher
+schon gab: die Mutatoren geben A-A **+60** Eignungspunkte gegen V-W **+30**. Vorher hob
+dieser Vorsprung nur die Kampfwerte; jetzt hebt er auch Tempo und Ausdauer, und damit
+schlägt er doppelt durch.
+
+**Das ist eine Entscheidung, keine Reparatur.** Entweder die Mutatoren werden ausgeglichen
+(sie sind eine zweite Gewichtung neben der Disziplinmatrix — genau das Muster, das in
+dieser Sitzung dreimal Ärger gemacht hat), oder die Kappung bleibt draußen und die Matrix
+setzt sich im Kampf weiterhin nicht durch. Beides ist vertretbar; ich habe die Kappung
+drin gelassen, weil sie das strukturelle Problem löst, und schreibe den Preis hierher,
+statt ihn zu verstecken.
 
 ---
 
