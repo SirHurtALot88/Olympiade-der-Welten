@@ -2464,6 +2464,27 @@
     }
   }
 
+  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. bauFeldspiel() rechnet die
+  // ganze Partie vorab durch und schreibt dabei direkt in die Spielerobjekte (punkte,
+  // assists, rebounds, steals, bloecke, verluste) und in fsPunkte: bequem zum Bauen, aber
+  // als Anzeige wären es Spoiler — genau der Fehler, der im Denkduell schon einmal behoben
+  // wurde (u.vorteil statt u.verlauf[u.aktuell]). Jede Stelle, die live etwas anzeigt
+  // (Score, Kader-Panel, Spielerzeile auf dem Feld), fragt deshalb HIER nach statt die
+  // Objektfelder direkt zu lesen — nur bis fsZeiger, dem Stand der Enthuellung.
+  function fsBisher(){
+    const team=[0,0], spieler=new Map();
+    const s=(u)=>{ if(!spieler.has(u.id))spieler.set(u.id,{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0});
+      return spieler.get(u.id); };
+    for(const e of fsZuege.slice(0,fsZeiger)){
+      if(e.art==="treffer"){ team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
+        if(e.passgeber)s(e.passgeber).assists++; }
+      else if(e.art==="rebound") s(e.rebounder).rebounds++;
+      else if(e.art==="block") s(e.verteidiger).bloecke++;
+      else if(e.art==="steal"){ s(e.verteidiger).steals++; s(e.spieler).verluste++; }
+    }
+    return {team,spieler};
+  }
+
   // Lockere Ruheformation nahe der eigenen Grundlinie — kein starres Band aus sechs
   // Figuren. `n` ist die Teamgroesse, `i` der Index in fixer Reihenfolge (SQUAD-Reihenfolge
   // bleibt stabil, damit niemand bei jedem Frame den Platz wechselt).
@@ -2595,10 +2616,12 @@
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
     document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
-    document.getElementById("score").textContent=fsPunkte[0]+" : "+fsPunkte[1];
-    const maxPkt=Math.max(1,fsPunkte[0],fsPunkte[1]);
-    document.getElementById("thpL").style.width=(fsPunkte[0]/maxPkt*100)+"%";
-    document.getElementById("thpR").style.width=(fsPunkte[1]/maxPkt*100)+"%";
+    // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
+    const bisher=fsBisher().team;
+    document.getElementById("score").textContent=bisher[0]+" : "+bisher[1];
+    const maxPkt=Math.max(1,bisher[0],bisher[1]);
+    document.getElementById("thpL").style.width=(bisher[0]/maxPkt*100)+"%";
+    document.getElementById("thpR").style.width=(bisher[1]/maxPkt*100)+"%";
     renderKader();
   }
 
@@ -2676,6 +2699,9 @@
   function zeichneFeldspiel(){
     bodenFeldspiel();
     const art=FB();
+    // Enthuellte Werte, einmal je Bild — siehe fsBisher(). Fehlt ein Spieler noch in der
+    // Map (kein Zug bisher enthuellt, an dem er beteiligt war), ist er bei null Werten.
+    const bisher=fsBisher(), NULLWERTE={punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0};
     FSTEAM.forEach((g,side)=>{
       const c=side===0?css("--home"):css("--away");
       g.forEach(u=>{
@@ -2701,8 +2727,9 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        if(u.punkte||u.rebounds||u.steals||u.bloecke||u.assists)
-          schrift(u.punkte+"P "+u.assists+"A "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
+        const stat=bisher.spieler.get(u.id)||NULLWERTE;
+        if(stat.punkte||stat.rebounds||stat.steals||stat.bloecke||stat.assists)
+          schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56,"#dfe6ef",8);
       });
     });
     // Der Ball. Klein, orange, folgt fsLerpPositionen — von Passgeber zu Ballfuehrer,
@@ -6903,6 +6930,9 @@
   }
 
   function renderKader(){
+    // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
+    // fsBisher(). Einmal je Aufruf, nicht je Spieler.
+    const fsStand=istFeldspiel(disc)?fsBisher():null;
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
@@ -6910,8 +6940,9 @@
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
-        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,hp:x.punkte,
-          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>y.punkte))}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,
+          hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
@@ -6932,7 +6963,7 @@
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
       : istFeldspiel(disc)
-      ? (fsPunkte[0]+" : "+fsPunkte[1])
+      ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
   }
 
