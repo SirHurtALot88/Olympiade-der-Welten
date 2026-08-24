@@ -1,0 +1,55 @@
+{
+  "_hinweis": "Feuerwaffen-Overlays (Pistole, Schrotflinte, Sturmgewehr) + Muendungsfeuer-Effekte. Beschafft am 24.08. auf Chris' Nachfrage nach modernen/futuristischen Waffen. Das bestehende Waffensystem im Baukasten (public/sprites/baukasten/) kennt nur 'schwert' und 'bogen' als Mittelalter/Fantasy-Overlays im LPC-Universal-Generator-Fundus — dort gibt es KEINE Feuerwaffen (die Waffen-Kategorien des Generators sind nur magic/sword/ranged(Bogen)/polearm/blunt, siehe https://github.com/LiberatedPixelCup/universal-lpc-spritesheet-character-generator/tree/master/spritesheets/weapon). Diese Dateien stammen stattdessen aus '[LPC] Skorpio's SciFi Sprite Pack' — demselben Paket, aus dem bereits die Roboter (public/sprites/monster/roboter_*.png) kommen. Gleiche Lizenz, gleiches 64px-Kachelmass, KEIN Stilbruch bei der Zellengroesse — nur ein anderes (sci-fi statt Fantasy) Sprite-Set. Passt inhaltlich zu den Spec-Ops-Sprites in public/sprites/spec_ops/.",
+  "pistole.png": {
+    "original": "Weapons Muzzleflashes/Pistols.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256 = 9 Spalten x 4 Reihen zu 64x64 — Waffen-Overlay ausgerichtet auf den Standard-LPC-Gehzyklus (leer/keine Waffe in Ruhehaltung, Pistole in den Bewegungs-/Schussframes), unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "schrotflinte.png": {
+    "original": "Weapons Muzzleflashes/Shotgun.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau wie pistole.png",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "sturmgewehr.png": {
+    "original": "Weapons Muzzleflashes/AssaultRifle.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau wie pistole.png",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "muendungsfeuer.png": {
+    "original": "Weapons Muzzleflashes/Muzzleflash.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, Effekt-Overlay im gleichen Raster wie die Waffen",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "muendungsfeuer_pistole.png": {
+    "original": "Weapons Muzzleflashes/MuzzleflashPistol.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, Effekt-Overlay speziell fuer die Pistolen-Haltung",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "muendungsfeuer_schuss.png": {
+    "original": "Weapons Muzzleflashes/Muzzleflashes-Shots.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "160x160 — eigenstaendiges, kleineres Effektblatt (kein 64px-Raster, freistehende Schuss-/Blitz-Icons zum separaten Platzieren)",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "_nicht_uebernommen": {
+    "CarWeapons.png": "Im selben Paket enthalten (fahrzeugmontierte Waffen), aber fuer Kampf zwischen Charakteren nicht einschlaegig — nicht kopiert.",
+    "andere_pakete": "Mehrfach nach eigenstaendigen 'moderne/tactical' Feuerwaffen-Sets auf OpenGameArt gesucht (u.a. 'Pixel Art Top Down Soldiers', 'Top Down Man With Gun - Animated', 'Sci-fi soldier'). Ergebnis: entweder falscher Blickwinkel (echtes Vogelperspektive-von-oben statt LPCs 3/4-Ansicht — 'Top Down Man With Gun'), zu kleines Raster (32x32, 'Pixel Art Top Down Soldiers'), oder 3D-Modell statt 2D-Sprite ('Sci-fi soldier', CC0 aber kein Sprite). Alle verworfen zugunsten von Skorpios Paket, das bereits im Projekt etabliert und lizenzgeprueft ist."
+  }
+}

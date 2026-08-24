@@ -78,5 +78,65 @@
     "urheber": "Skorpio",
     "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
     "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "_nachtrag_24_08_b": "Zweite Runde am 24.08.: 'maechtige' Grossmonster (Golem, Kraken, mechanischer Drache) und Werwolf, nachgefragt von Chris. Golem liegt sauber im 64px-LPC-Raster. Kraken ist wie die Drachen ein STILBRUCH mit 96x128-Zellen (gleiche Stendhal-Logik, nur andere Kreatur). Werwolf ist ein TEIL-Stilbruch: 48x64 statt 64x64 breite Zellen und nur 3 statt 9 Gehframes je Richtung — naeher am LPC-Raster als die Drachen/der Kraken, aber kein exakter Formular-Fit fuer die bestehende Baukasten-Ebenen-Logik.",
+  "golem_walk.png": {
+    "original": "golem-walk.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x256 = 7 Spalten x 4 Reihen zu 64x64, 4 Richtungen, 7 Gehframes, unveraendert",
+    "urheber": "Stephen 'Redshrike' Challener (Grafik), William Thompson/William.Thompsonj (Beitrag)",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem",
+    "verwendung": "grosses/'maechtiges' Steinmonster im normalen 64px-Raster — kein Stilbruch noetig"
+  },
+  "golem_angriff.png": {
+    "original": "golem-atk.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x384, Angriffsanimation, unveraendert, Aufbau wie golem_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William Thompson",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem"
+  },
+  "golem_tod.png": {
+    "original": "golem-die.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x128, Todesanimation, unveraendert",
+    "urheber": "Stephen 'Redshrike' Challener, William Thompson",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem"
+  },
+  "kraken.png": {
+    "paket": "Kraken (Stendhal)",
+    "blatt": "288x512 = 3 Spalten x 4 Reihen zu 96x128, Reihenfolge oben/rechts/unten/links (Stendhal-Konvention, gleiches Schema wie die Drachen), 3 Frames je Richtung, unveraendert",
+    "urheber": "Diligent Dodo (a.k.a. soniccuz), eingereicht von StendhalGame",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/kraken",
+    "hinweis": "BEWUSSTER STILBRUCH wie die Drachen: 96x128-Zellen statt 64x64. Riesenoktopus/Kraken als 'maechtiges' Seeungeheuer — passt sowohl zu 'grosse Monster' als auch zu Unterwasser-Gegnern."
+  },
+  "drache_mechanisch.png": {
+    "original": "dracomachina.png",
+    "paket": "64x64 Creature Sprites",
+    "blatt": "einzelnes 64x64-Bild, eine Blickrichtung — 'mechanical dragon', kein 4-Richtungs-Walkzyklus",
+    "urheber": "Kiovenn",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/64x64-creature-sprites",
+    "hinweis": "Statisches Einzelbild im 64x64-Kachelmass, ergaenzt die vier fliegenden Drachen um eine mechanische Variante; siehe auch fisch/quellen.json fuer die anderen Sprites desselben Pakets (Meerjungfrau, Tintenfisch, Fischskelett)"
+  },
+  "werwolf.png": {
+    "original": "werewolf-NESW.png",
+    "paket": "Werewolf (LPC)",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64 (schmaler als die 64x64-Standardzelle!), Reihenfolge N/E/S/W, 3 Gehframes je Richtung",
+    "urheber": "Stephen Challener (Redshrike) und William Thompson (LPC-Koerperbasis + LPC-Wolf-Animation als Ausgangsmaterial), zusammengesetzt von Jordan Irwin (AntumDeluge)",
+    "lizenz": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/werewolf-lpc",
+    "hinweis": "TEIL-Stilbruch: 48px statt 64px Zellbreite und 3 statt 9 Frames je Richtung. Kein Baukasten-Layer (der LPC-Generator selbst kennt keinen Werwolf-Koerper, nur den Wolfskopf 'kopf_wolf' fuer menschliche Koerper) — eigenstaendiges Kreatur-Sprite wie wolf.png, nicht ueber die Ebenen-Logik einbaubar."
+  },
+  "werwolf_alt.png": {
+    "original": "werewolf-alt-NESW.png",
+    "paket": "Werewolf (LPC)",
+    "blatt": "wie werwolf.png, alternative Armhaltung in den Seitenframes (Arme naeher am Koerper)",
+    "urheber": "Stephen Challener (Redshrike), William Thompson, Jordan Irwin (AntumDeluge)",
+    "lizenz": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/werewolf-lpc"
   }
 }

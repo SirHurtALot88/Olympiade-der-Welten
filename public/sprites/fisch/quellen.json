@@ -1,0 +1,73 @@
+{
+  "_hinweis": "Fisch-/Unterwasser-Kreaturen. Beschafft am 24.08. fuer die 'Aqua'-Rassen-Spieler im Kader (Tidesinger, Erna Wellenlaut, Wu Tang). Alle Lizenzen (CC0/CC-BY 4.0/CC-BY-SA 3.0+4.0) sind fuer das private, nicht kommerzielle Spiel in Ordnung. ACHTUNG Zellenraster: fisch_gross*.png und fisch_klein*.png liegen NICHT im 64px-LPC-Raster (32px bzw. 16px-Zellen) — echte Fischsilhouetten, gedacht als kleine Wasserbewohner/Deko, nicht als vollwertiges Kampf-Sprite in Kadergroesse. meerjungfrau_aal.png, tintenfisch_stachel.png und fischskelett.png sind dagegen echte 64x64-Einzelbilder (siehe unten) und passen direkt ins Raster wie die uebrigen Monster.",
+  "fisch_gross.png": {
+    "paket": "[LPC] Fish",
+    "original": "lpc_fish/lpc_fish.png",
+    "blatt": "128x128 = 4 Spalten x 4 Reihen zu 32x32, 4 Richtungen x 4 Schwimm-Frames, unveraendert",
+    "urheber": "FiveBrosStopMosYT",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/lpc-fish",
+    "hinweis": "32px-Zellen, kein 64px-LPC-Raster — generischer Fisch fuer Wasserflaechen/Deko"
+  },
+  "fisch_gross_blau.png": {
+    "paket": "[LPC] Fish",
+    "original": "lpc_fish/lpc_fish_tinted.png",
+    "blatt": "wie fisch_gross.png, blau eingefaerbt fuer nicht-transparentes Wasser",
+    "urheber": "FiveBrosStopMosYT (Fisch), Sharm/Lanea Zimmerman (Wasser-Palette fuer die Einfaerbung)",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/lpc-fish",
+    "attribution": "Bei Verwendung der getoenten Variante muss zusaetzlich zu FiveBrosStopMosYT auch Sharm genannt werden (Wasser-Palette) sowie Bluecarrot16 (urspruengliches Konzept/Unterstuetzung)."
+  },
+  "fisch_klein.png": {
+    "paket": "[LPC] Fish",
+    "original": "lpc_fish_small/lpc_fish_small_prototype_final.png",
+    "blatt": "64x64 = 4 Spalten x 4 Reihen zu 16x16, 4 Richtungen x 4 Frames, unveraendert",
+    "urheber": "FiveBrosStopMosYT",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/lpc-fish",
+    "hinweis": "16px-Zellen — sehr klein, nur als Deko-Fisch brauchbar, nicht als Kampf-Sprite"
+  },
+  "fisch_klein_blau.png": {
+    "paket": "[LPC] Fish",
+    "original": "lpc_fish_small/lpc_fish_small_tinted.png",
+    "blatt": "wie fisch_klein.png, blau eingefaerbt",
+    "urheber": "FiveBrosStopMosYT (Fisch), Sharm/Lanea Zimmerman (Wasser-Palette)",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/lpc-fish",
+    "attribution": "s. fisch_gross_blau.png"
+  },
+  "meerjungfrau_aal.png": {
+    "original": "eelWielder.png",
+    "paket": "64x64 Creature Sprites",
+    "blatt": "einzelnes 64x64-Bild, EINE Blickrichtung (kein Richtungs-/Gehzyklus) — 'Electric-eel-wielding mermaid'",
+    "urheber": "Kiovenn",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/64x64-creature-sprites",
+    "hinweis": "Statisches Einzelbild wie die anderen Sprites dieses Pakets (siehe auch drache_mechanisch.png in monster/) — kein 4-Richtungs-Walkzyklus wie bei den LPC-Monstern, aber im gleichen 64x64-Kachelmass"
+  },
+  "tintenfisch_stachel.png": {
+    "original": "shredSquid.png",
+    "paket": "64x64 Creature Sprites",
+    "blatt": "einzelnes 64x64-Bild, eine Blickrichtung — stachliger Riesen-Tintenfisch/Kalmar",
+    "urheber": "Kiovenn",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/64x64-creature-sprites"
+  },
+  "fischskelett.png": {
+    "original": "fishbone.png",
+    "paket": "64x64 Creature Sprites",
+    "blatt": "einzelnes 64x64-Bild, eine Blickrichtung — animiertes Fisch-Skelett",
+    "urheber": "Kiovenn",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/64x64-creature-sprites"
+  },
+  "_kraken_hinweis": "Ein grosser Kraken (echte 'maechtige' Meereskreatur, N/S/E/W, 96x128-Zellen wie die Drachen) liegt bewusst unter public/sprites/monster/kraken.png, nicht hier — er gehoert thematisch zu den 'maechtigen Monstern', siehe monster/quellen.json.",
+  "_nicht_uebernommen": {
+    "mer-rpg-character": {
+      "url": "https://opengameart.org/content/mer-rpg-character",
+      "lizenz": "CC0",
+      "urheber": "Shepardskin",
+      "grund": "Gepruefte, saubere CC0-Lizenz, ABER die eigentlichen Schwimm-Sprites liegen nur als winzige GIFs vor (12x15 bis 20x22 Pixel pro Bild, Overworld-Avatar-Groesse). Im 64px-Kampfraster waere das nur stark hochskaliert und unscharf. Nicht heruntergeladen/verwendet — bei Bedarf fuer eine kleine Overworld-Kachel koennte man spaeter darauf zurueckkommen."
+    }
+  }
+}

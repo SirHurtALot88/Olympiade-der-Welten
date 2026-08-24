@@ -1,0 +1,110 @@
+{
+  "_hinweis": "Spec-Ops/Agenten/moderne Ausruestung — nachgefragt von Chris am 24.08. Der LPC-Universal-Generator (https://github.com/LiberatedPixelCup/universal-lpc-spritesheet-character-generator) wurde gezielt nach taktischer/moderner Kleidung durchsucht (hat/torso/facial-Kategorien): Ergebnis wie erwartet NICHTS — LPC ist konsequent Mittelalter/Fantasy (Helme, Kapuzen, Piratenhuete, Ruestungen; einzig eine schlichte Stoffmaske unter facial/masks/plain und Bandana/Hood-Kopfbedeckungen kaemen einer Ninja-Optik naeher, sind aber selbst nur Fantasy-Zubehoer, kein eigenstaendiges Spec-Ops-Outfit). KEIN Baukasten-Fit moeglich. Alle Sprites hier sind daher ein bewusster Stilbruch analog zu den Drachen — ABER: anders als die Drachen liegen sie exakt im 64px-LPC-Kachelmass (576x256 = 9 Spalten x 4 Reihen zu 64x64, identischer Aufbau wie k_walk.png/kw_walk.png im Baukasten), weil sie aus demselben '[LPC] Skorpio's SciFi Sprite Pack' stammen, das bereits fuer die Roboter (public/sprites/monster/roboter_*.png) verwendet wird. Der Stilbruch ist also inhaltlich/thematisch (Sci-Fi/Moderne statt Fantasy), nicht geometrisch. Gehoert zusammen mit public/sprites/waffen/ (Feuerwaffen aus demselben Paket).",
+  "agent_walk.png": {
+    "original": "Characters/Agent/AgentWalk.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256 = 9x4 zu 64x64, Standard-LPC-Gehzyklus, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "beschreibung": "Anzugtraeger mit dunklem Haar — klassischer 'Agenten'-Look (Anzug, keine sichtbare Waffe in Ruhehaltung)"
+  },
+  "agent_schuss.png": {
+    "original": "Characters/Agent/AgentShoot.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau, Schusshaltung mit Pistole in den Seitenframes",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "operative_walk.png": {
+    "original": "Characters/Character 1/Walk/Character1Walk.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256 = 9x4 zu 64x64, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "beschreibung": "Schwarze taktische Jacke/Hose mit orangenen Akzenten, Sonnenbrille, kurzes Haar — passt am ehesten zu 'Ninja/verdeckter Operateur' aus Chris' Anfrage",
+    "hinweis": "Im Quellordner liegen zusaetzlich einzelne Ebenen (Jacket.png, Pants.png, Hair1/2.png, Sunglasses.png, Cybereyes.png, Wristband.png, Cable.png, Shoes.png) fuer eine modulare Zusammenstellung wie im eigenen Baukasten — hier NICHT uebernommen, nur das fertig zusammengesetzte Basisbild. Bei Bedarf koennen die Einzelteile spaeter aus dem Originalpaket nachgezogen werden."
+  },
+  "operative_schuss.png": {
+    "original": "Characters/Character 1/Shoot/Character1Shoot.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau, Schusshaltung",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "trooper_schwer_walk.png": {
+    "original": "Characters/Armor1/ArmorWalk.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256 = 9x4 zu 64x64, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "beschreibung": "Schwere gepanzerte Kampfanzug-Einheit mit rot leuchtendem Visier — taktische/futuristische Ruestung"
+  },
+  "trooper_schwer_schuss.png": {
+    "original": "Characters/Armor1/ArmorShoot.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "trooper_schwer_tod.png": {
+    "original": "Characters/Armor1/ArmorDeath.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "384x64 = 6x1 zu 64x64, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "trooper_hell_walk.png": {
+    "original": "Characters/Armor2/Armor2Walk.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256 = 9x4 zu 64x64, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "beschreibung": "Heller weiss/tuerkiser futuristischer Raumanzug/Trooper mit gruen leuchtendem Visier — Alternative zum schweren dunklen Trooper"
+  },
+  "trooper_hell_schuss.png": {
+    "original": "Characters/Armor2/Armor2Shoot.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "576x256, gleicher Aufbau",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "trooper_hell_hurt.png": {
+    "original": "Characters/Armor2/Armor2Hurt.png",
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "384x64 = 6x1 zu 64x64, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "_nicht_uebernommen": {
+    "ninja-npc-sprite-sheet": {
+      "url": "https://opengameart.org/content/ninja-npc-sprite-sheet",
+      "lizenz": "CC0",
+      "grund": "Saubere Lizenz, aber winziges Chibi/RPG-Maker-Raster (grob 16px-Zellen auf einem 64x112-Blatt) in komplett anderem Zeichenstil als LPC/Skorpio — haette als Stilbruch selbst nicht funktioniert, waere zu klein und stilistisch zu weit weg."
+    },
+    "pixel-art-top-down-soldiers": {
+      "url": "https://opengameart.org/content/pixel-art-top-down-soldiers",
+      "lizenz": "CC0",
+      "grund": "32x32-Raster, keine Animation, keine Feuerwaffen (nur Speer) — nicht passend."
+    },
+    "top-down-man-with-gun-animated": {
+      "url": "https://opengameart.org/content/top-down-man-with-gun-animated",
+      "lizenz": "CC0",
+      "grund": "Echte Vogelperspektive von oben (man sieht nur den Scheitel) statt LPCs 3/4-Ansicht — voellig anderer Blickwinkel, waere im Spiel neben allen anderen Sprites sofort als Fremdkoerper aufgefallen."
+    },
+    "sci-fi-soldier": {
+      "url": "https://opengameart.org/content/sci-fi-soldier",
+      "lizenz": "CC0",
+      "grund": "3D-Modellpaket (Blender/Substance Painter/Unity), kein 2D-Sprite."
+    }
+  }
+}
