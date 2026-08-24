@@ -2226,6 +2226,21 @@
         ABWEHR:      {awareness:40,speed:35,torment:25},
         TEAMGEIST:   {spirit:55,charisma:45},
         AUSDAUER:    {stamina:50,torment:25,speed:25}
+      },
+      // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
+      // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
+      // Alle Zahlen hier sind PLATZHALTER, keine gemessenen Werte. `rolle` bestimmt,
+      // ueber welchen Wert der Finisher aus den Mitspielern gelost wird (nicht ABSCHLUSS
+      // wie beim Normalpass); `neigung` ist die Chance, dass aus einem laufenden Pass
+      // dieser Zug wird; `abschluss` ersetzt die normale Technik-Erfolgsformel.
+      spielzuege:{
+        alleyoop:{
+          label:"Alley-Oop", rolle:"ZWEITCHANCE", choreo:"hochpass", jubel:"gross",
+          neigung:(pg,bf)=>Math.min(0.22,Math.max(0.02,
+            0.06+(pg.TECHNIK-50)*0.0020+(bf.ZWEITCHANCE-50)*0.0020)),
+          abschluss:(pg,bf)=>Math.min(0.90,0.10+bf.ABSCHLUSS*0.0045+pg.TECHNIK*0.0025),
+          text:(pg,bf)=>pg.n+" wirft hoch zum Korb — "+bf.n+" steigt ab und dankt rein"
+        }
       }
     },
     football:{
@@ -2246,6 +2261,25 @@
         // vertreten.
         TEAMGEIST:   {spirit:65,health:35},
         AUSDAUER:    {stamina:40,health:35,spirit:25}
+      },
+      // Zwei Zuege, meine Auswahl (Chris hat keinen benannt) — nah an echten
+      // Football-Konzepten, aber bewusst auf die zwei bestehenden Choreografie-Primitive
+      // gemappt statt auf ein drittes eigenes zu erfinden. PLATZHALTER, wie bei Basketball.
+      spielzuege:{
+        screen:{
+          label:"Screen Pass", rolle:"ABSCHLUSS", choreo:"flachpass-lauf", jubel:"gross",
+          neigung:(pg,bf)=>Math.min(0.20,Math.max(0.02,
+            0.05+(pg.AUFBAU-50)*0.0018+(bf.ABSCHLUSS-50)*0.0018)),
+          abschluss:(pg,bf)=>Math.min(0.88,0.12+bf.ABSCHLUSS*0.0040+pg.AUFBAU*0.0020),
+          text:(pg,bf)=>pg.n+" legt kurz ab — "+bf.n+" schlängelt sich durch"
+        },
+        deepball:{
+          label:"Deep Ball", rolle:"ZWEITCHANCE", choreo:"weitpass-lauf", jubel:"riesig",
+          neigung:(pg,bf)=>Math.min(0.16,Math.max(0.02,
+            0.04+(pg.TECHNIK-50)*0.0015+(bf.ZWEITCHANCE-50)*0.0015)),
+          abschluss:(pg,bf)=>Math.min(0.80,0.07+bf.ZWEITCHANCE*0.0035+pg.TECHNIK*0.0020),
+          text:(pg,bf)=>pg.n+" bringt den langen Ball — "+bf.n+" gewinnt den Zweikampf"
+        }
       }
     },
     hockey:{
@@ -2362,7 +2396,7 @@
       const ermued=1-Math.max(0,(60-anspieler.AUSDAUER))*0.003*(z/Math.max(1,gesamtZuege-1));
       const aufbauChance=Math.min(0.94,Math.max(0.20,
         0.50+(anspieler.AUFBAU-verteidiger.ABWEHR)*0.0035+anspieler.TEAMGEIST*0.0060))*Math.max(0.5,ermued);
-      const eintrag={seite:amBall,spieler:anspieler,verteidiger,art:"steal",punkte:0,passgeber:null};
+      const eintrag={seite:amBall,spieler:anspieler,verteidiger,art:"steal",punkte:0,passgeber:null,zug:null};
       if(rr()>=aufbauChance){
         eintrag.art="steal"; verteidiger.steals++; anspieler.verluste++;
         amBall=1-amBall; fsZuege.push(eintrag); continue;
@@ -2373,19 +2407,39 @@
       // (ABSCHLUSS war bis hierhin ein Wert, der berechnet, aber NIE gelesen wurde — tote
       // Kalibriermasse, jetzt hat er eine Aufgabe). Faellt der Korb, bekommt der
       // Passgeber den Assist.
-      let ballfuehrer=anspieler, passgeber=null;
+      //
+      // SPIELZUEGE: bevor der normale Passempfaenger (nach ABSCHLUSS) gelost wird,
+      // prueft die Simulation der Reihe nach jeden in art.spielzuege deklarierten Zug —
+      // eine Veredelung DIESES Passes, kein eigener Ereignistyp (docs/
+      // ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge"). Der erste, der auslöst,
+      // gewinnt; sein Finisher wird über die zugeigene Rolle gelost (z. B. ZWEITCHANCE
+      // beim Alley-Oop), nicht über ABSCHLUSS wie beim Normalpass.
+      let ballfuehrer=anspieler, passgeber=null, zug=null;
       if(team.length>1){
         const passChance=Math.min(0.75,Math.max(0.20,0.35+anspieler.AUFBAU*0.0030));
         if(rr()<passChance){
           const mitspieler=team.filter(x=>x!==anspieler);
-          ballfuehrer=gewichtetesLos(mitspieler,"ABSCHLUSS");
-          passgeber=anspieler;
+          for(const key in (art.spielzuege||{})){
+            const sz=art.spielzuege[key];
+            const kandidat=gewichtetesLos(mitspieler,sz.rolle);
+            if(rr()<sz.neigung(anspieler,kandidat)){
+              zug=key; ballfuehrer=kandidat; passgeber=anspieler; break;
+            }
+          }
+          if(!zug){
+            ballfuehrer=gewichtetesLos(mitspieler,"ABSCHLUSS");
+            passgeber=anspieler;
+          }
         }
       }
-      eintrag.spieler=ballfuehrer; eintrag.passgeber=passgeber;
-      const fernwurf=rr()<art.fernAnteil;
-      const technik=Math.min(0.92,0.16+ballfuehrer.TECHNIK*0.0050+ballfuehrer.TEAMGEIST*0.0060
-        -(fernwurf?0.10:0));
+      eintrag.spieler=ballfuehrer; eintrag.passgeber=passgeber; eintrag.zug=zug;
+      const szDef=zug?art.spielzuege[zug]:null;
+      // Spielzuege sind Nahdistanz-Kombinationen — ein Alley-Oop von der Dreierlinie
+      // gibt es nicht, ein Field Goal ist semantisch etwas anderes als ein Deep Ball.
+      const fernwurf=szDef?false:(rr()<art.fernAnteil);
+      const technik=szDef ? szDef.abschluss(passgeber,ballfuehrer)
+        : Math.min(0.92,0.16+ballfuehrer.TECHNIK*0.0050+ballfuehrer.TEAMGEIST*0.0060
+          -(fernwurf?0.10:0));
       if(rr()<technik){
         const pkt=fernwurf?art.punkteFern:art.punkteNah;
         eintrag.art="treffer"; eintrag.punkte=pkt; eintrag.fern=fernwurf;
@@ -2413,28 +2467,43 @@
   // Lockere Ruheformation nahe der eigenen Grundlinie — kein starres Band aus sechs
   // Figuren. `n` ist die Teamgroesse, `i` der Index in fixer Reihenfolge (SQUAD-Reihenfolge
   // bleibt stabil, damit niemand bei jedem Frame den Platz wechselt).
+  //
+  // Spielrichtung LINKS↔RECHTS (Grundlinie/Korb liegen auf der X-Achse), nicht oben↔unten
+  // — echte Sportfelder werden so gezeigt (Fernsehperspektive), und der Court war vorher
+  // hochkant in einen Canvas gepresst, der selbst breit ist (1240×470) statt tief.
   function fsIdlePos(side,i,n){
-    const basisY=side===0?H*0.32:H*0.68;
-    const breite=W*0.46;
+    const basisX=side===0?W*0.32:W*0.68;
+    const hoehe=H*0.46;
     const t=n>1?i/(n-1):0.5;
-    const bogen=Math.abs(t-0.5)*H*0.05;
-    return {x:MID-breite/2+breite*t, y:basisY+bogen*(side===0?1:-1)};
+    const bogen=Math.abs(t-0.5)*W*0.05;
+    return {x:basisX+bogen*(side===0?1:-1), y:H/2-hoehe/2+hoehe*t};
   }
 
   // Ein Zug ist aktiv: seine Teilnehmer bewegen sich vom Ruheplatz zum GEGNERISCHEN
   // Korb hin (man greift dort an, wo der andere verteidigt), Verteidiger und Rebounder
   // eingeschlossen. `naeher` 0..1 kommt aus der Zug-Phase.
   function fsAktivPos(u,naeher){
-    const korbY=u.side===0?H*0.90:H*0.10;
-    const startY=u.side===0?H*0.32:H*0.68;
+    const korbX=u.side===0?W*0.90:W*0.10;
+    const startX=u.side===0?W*0.32:W*0.68;
     const seitlich=(u.id%2?1:-1)*22;
-    return {x:MID+seitlich, y:startY+(korbY-startY)*naeher};
+    return {x:startX+(korbX-startX)*naeher, y:H/2+seitlich};
+  }
+
+  // SPIELZUEGE bekommen keine eigenen Positions-Sonderfaelle, sondern zeigen auf drei
+  // wiederverwendbare Choreografie-Primitive (docs/ARENA_INTERAKTION_KONZEPT.md). Jede
+  // kuenftige Disziplin mappt ihre benannten Zuege darauf, statt eine eigene Bahn zu
+  // schreiben. PLATZHALTER-Amplituden, wie alles hier.
+  function fsSzDef(e){
+    if(!e||!e.zug)return null;
+    const art=FB();
+    return (art.spielzuege&&art.spielzuege[e.zug])||null;
   }
 
   function fsLerpPositionen(dt){
     const e=fsAktuell;
     const phase=(e&&fsAktMax>0)?Math.min(1,Math.max(0,1-fsAkt/fsAktMax)):0;
     const k=Math.min(1,dt*5);
+    const szDef=fsSzDef(e);
     FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
       let ziel=fsIdlePos(side,i,team.length);
       if(e){
@@ -2443,11 +2512,39 @@
       }
       if(!u.x&&!u.y){u.x=ziel.x;u.y=ziel.y;}
       u.x+=(ziel.x-u.x)*k; u.y+=(ziel.y-u.y)*k;
+      // Alley-Oop: der Finisher hebt im letzten Phasendrittel sichtbar ab, statt
+      // bodennah zum Korb zu laufen — trifft dort auf den Ball, kontrolliert ihn nie.
+      u.hop=(szDef&&szDef.choreo==="hochpass"&&u===e.spieler&&phase>0.66)
+        ? Math.sin(((phase-0.66)/0.34)*Math.PI)*28 : 0;
+      // Screen Pass: der Ballfuehrer schlaengelt sich seitlich durch, statt geradeaus
+      // zu laufen — reine Render-Auslenkung, nicht Teil seiner echten Zielposition.
+      // Seitlich heisst jetzt quer zur Spielrichtung, also auf der Y-Achse.
+      u.wobbleY=(szDef&&szDef.choreo==="flachpass-lauf"&&u===e.spieler)
+        ? Math.sin(phase*Math.PI*2.4)*16 : 0;
     }));
     if(e){
       const von=e.passgeber||e.spieler, nach=e.art==="steal"?e.verteidiger:e.spieler;
-      let bx=von.x+(nach.x-von.x)*phase, by=von.y+(nach.y-von.y)*phase;
-      if(e.art==="treffer")by-=Math.sin(phase*Math.PI)*36;
+      let bx,by;
+      if(szDef&&szDef.choreo==="hochpass"){
+        // Der Ball fliegt in EINEM hohen Bogen direkt zum Korb, nicht erst zum
+        // Mitspieler — der Finisher wird ihn nie kontrollieren, nur aus der Luft
+        // versenken (oder eben nicht, beim verpatzten Versuch). Der Bogen selbst
+        // bleibt eine Bildschirm-Hoehe (Y), unabhaengig von der Spielrichtung (X).
+        const korbX=nach.side===0?W*0.90:W*0.10;
+        bx=von.x+(korbX-von.x)*phase; by=von.y+(H/2-von.y)*phase-Math.sin(phase*Math.PI)*90;
+      } else if(szDef&&szDef.choreo==="flachpass-lauf"){
+        // Kurzer, flacher Pass frueh in der Phase, danach "traegt" der Laeufer den
+        // Ball mit — die Ballbahn folgt seiner (bereits verwackelten) Position.
+        const p2=Math.min(1,phase/0.3);
+        bx=von.x+(nach.x-von.x)*p2; by=von.y+(nach.y-von.y)*p2;
+        if(phase>0.3)by+=(nach.wobbleY||0);
+      } else {
+        bx=von.x+(nach.x-von.x)*phase; by=von.y+(nach.y-von.y)*phase;
+        // Weitpass-lauf (Deep Ball) bekommt denselben linearen Grundpfad wie ein
+        // normaler Pass, nur einen deutlich hoeheren Bogen — der lange, hohe Ball.
+        const bogen=(szDef&&szDef.choreo==="weitpass-lauf")?75:(e.art==="treffer"?36:0);
+        by-=Math.sin(phase*Math.PI)*bogen;
+      }
       fsBall={sichtbar:true,x:bx,y:by};
     } else fsBall={sichtbar:false,x:0,y:0};
   }
@@ -2464,16 +2561,28 @@
       if(e.passgeber)e.passgeber.lunge=0.3;
       if(e.rebounder)e.rebounder.lunge=0.35;
       const art=FB();
+      const szDef=fsSzDef(e);
       let txt;
       if(e.art==="steal")txt=e.verteidiger.n+" erobert den Ball — "+art.wortAbwehr+".";
       else {
-        const vor=e.passgeber?e.passgeber.n+" passt zu "+e.spieler.n+" — ":"";
-        if(e.art==="treffer")txt=vor+e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
-        else if(e.art==="rebound")txt=e.rebounder.n+" holt den "+art.wortRebound+".";
-        else txt=e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
+        // Ein Spielzug-Versuch bekommt seinen eigenen Ansagetext statt des Pass-Prefix
+        // — auch bei Fehlschlag: ein verpatzter Alley-Oop, den der Verteidiger
+        // wegblockt, ist von selbst dramatisch.
+        const vor=szDef?szDef.label+"-Versuch: ":(e.passgeber?e.passgeber.n+" passt zu "+e.spieler.n+" — ":"");
+        if(e.art==="treffer")
+          txt=szDef ? vor+szDef.text(e.passgeber,e.spieler)+" — +"+e.punkte+"!"
+                    : vor+e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
+        else if(e.art==="rebound")txt=vor+e.rebounder.n+" holt den "+art.wortRebound+".";
+        else txt=vor+e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
       }
       feed(e.seite,txt,e.art==="treffer");
-      if(e.art==="treffer")schwebe({x:0,y:0,txt:"+"+e.punkte,life:1,crit:true,_spieler:e.spieler.id});
+      if(e.art==="treffer"){
+        // Groesserer, laenger stehender Jubel-Text bei einem gelungenen Spielzug — das
+        // "noch mehr Jubel bei was Besonderem", das Chris fuer die Zuschauer wollte.
+        const gross=!!(szDef&&(szDef.jubel==="gross"||szDef.jubel==="riesig"));
+        schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+e.punkte,
+          life:gross?1.7:1,crit:true,_spieler:e.spieler.id,_gross:gross});
+      }
       fsAktMax=art.zugDauer; fsAkt=fsAktMax;
     }
     if(fsZeiger>=fsZuege.length)done=true;
@@ -2501,6 +2610,28 @@
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#1c2e1e");g.addColorStop(1,"#152418");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    if(feldspielDisc==="football"){
+      // Ein echtes Football-Feld: zwei Endzonen, Yard-Linien alle 10 %, Mittellinie
+      // betont — zeichnerisch sogar einfacher als der Basketball-Court, weil es nur
+      // Geraden sind. Keine Torstangen (waeren am Canvas-Rand kaum lesbar); die
+      // Endzonen-Fuellung allein macht das Feld schon eindeutig als Football statt
+      // Fussball erkennbar. Spielrichtung LINKS↔RECHTS entlang W (der langen
+      // Canvas-Achse), die Seitenlinien liegen auf H — wie ein echtes Feld im TV, nicht
+      // hochkant in einen 1240×470-Canvas gepresst.
+      ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=2;
+      ctx.strokeRect(W*0.04,50,W*0.92,H-100);
+      ctx.fillStyle="rgba(255,255,255,.07)";
+      ctx.fillRect(W*0.04,50,W*0.09,H-100);
+      ctx.fillRect(W*0.87,50,W*0.09,H-100);
+      ctx.strokeStyle="rgba(255,255,255,.28)";ctx.lineWidth=1;
+      for(let i=1;i<10;i++){
+        const x=W*0.13+W*0.74*(i/10);
+        ctx.beginPath();ctx.moveTo(x,50);ctx.lineTo(x,H-50);ctx.stroke();
+      }
+      ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(W/2,50);ctx.lineTo(W/2,H-50);ctx.stroke();
+      return;
+    }
     if(feldspielDisc!=="basketball"){
       ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
       ctx.strokeRect(60,H*0.10,W-120,H*0.80);
@@ -2511,30 +2642,33 @@
       }
       return;
     }
-    // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld.
-    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(60,H*0.06,W-120,H*0.88);
+    // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld. Spielrichtung
+    // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
+    // Grund-/Deckenlinien eines hochkant gedachten Courts.
+    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(W*0.06,60,W*0.88,H-120);
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
-    ctx.strokeRect(60,H*0.06,W-120,H*0.88);
-    ctx.beginPath();ctx.moveTo(60,H/2);ctx.lineTo(W-60,H/2);ctx.stroke();
-    ctx.beginPath();ctx.arc(MID,H/2,H*0.09,0,6.3);ctx.stroke();
-    // Alle Masse ab hier haengen an H, nicht an W: jede Hallenhaelfte ist hier sehr
-    // viel flacher als breit (H*0.44 tief, W-120 breit). Ein an W bemessener Radius
-    // sprengt bei diesem Seitenverhaeltnis die Haelfte und ueberlappt die Mittellinie.
-    for(const oben of [true,false]){
-      const grundY=oben?H*0.06:H*0.94, korbY=oben?H*0.115:H*0.885, richt=oben?1:-1;
+    ctx.strokeRect(W*0.06,60,W*0.88,H-120);
+    ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
+    ctx.beginPath();ctx.arc(W/2,H/2,H*0.09,0,6.3);ctx.stroke();
+    // Alle Radien haengen weiter an H, nicht an W: H (470) ist die Seitenlinien-Tiefe
+    // und bleibt die knappe Achse, auch nachdem die Spielrichtung auf X gedreht ist —
+    // ein an W bemessener Radius wuerde ueber die Seitenlinien hinausschiessen.
+    for(const links of [true,false]){
+      const grundX=links?W*0.06:W*0.94, korbX=links?W*0.115:W*0.885;
       // Zone (die Zahnstocher-Box unterm Korb)
-      ctx.strokeRect(MID-H*0.08,oben?grundY:grundY-H*0.16,H*0.16,H*0.16);
+      ctx.strokeRect(links?grundX:grundX-H*0.16,H/2-H*0.08,H*0.16,H*0.16);
       // Freiwurflinie mit Halbkreis
-      ctx.beginPath();ctx.arc(MID,oben?grundY+H*0.16:grundY-H*0.16,H*0.09,0,6.3);ctx.stroke();
-      // Dreierlinie — ein flacher Bogen vor dem Korb.
+      ctx.beginPath();ctx.arc(links?grundX+H*0.16:grundX-H*0.16,H/2,H*0.09,0,6.3);ctx.stroke();
+      // Dreierlinie — ein flacher Bogen vor dem Korb, oeffnet zur Feldmitte hin.
       ctx.beginPath();
-      ctx.arc(MID,korbY,H*0.24,oben?0.20:Math.PI+0.20,oben?Math.PI-0.20:6.08);
+      ctx.arc(korbX,H/2,H*0.24,links?0.20-Math.PI/2:Math.PI/2+0.20,
+        links?Math.PI/2-0.20:1.5*Math.PI-0.20);
       ctx.stroke();
       // Korb: Ring plus kurzer Brett-Strich an der Grundlinie.
       ctx.fillStyle="rgba(255,140,60,.9)";
-      ctx.beginPath();ctx.arc(MID,korbY,7,0,6.3);ctx.fill();
+      ctx.beginPath();ctx.arc(korbX,H/2,7,0,6.3);ctx.fill();
       ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
-      ctx.beginPath();ctx.moveTo(MID-18,grundY);ctx.lineTo(MID+18,grundY);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(grundX,H/2-18);ctx.lineTo(grundX,H/2+18);ctx.stroke();
       ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
   }
@@ -2545,12 +2679,16 @@
     FSTEAM.forEach((g,side)=>{
       const c=side===0?css("--home"):css("--away");
       g.forEach(u=>{
-        const x=u.x||fsIdlePos(side,g.indexOf(u),g.length).x;
-        const y=u.y||fsIdlePos(side,g.indexOf(u),g.length).y;
+        const gx=u.x||fsIdlePos(side,g.indexOf(u),g.length).x;
+        const gy=u.y||fsIdlePos(side,g.indexOf(u),g.length).y;
+        // Bei Alley-Oop/Screen-Play verschiebt sich die SICHTBARE Position kurz vom
+        // Bodenwert weg (Sprung-Hop, seitliches Schlaengeln) — der Schatten bleibt am
+        // Boden, Figur/Name/Statzeile folgen der verschobenen Position.
+        const x=gx, y=gy+(u.wobbleY||0)-(u.hop||0);
         const aktiv=fsAktuell&&(u===fsAktuell.spieler||u===fsAktuell.verteidiger
           ||u===fsAktuell.passgeber||u===fsAktuell.rebounder);
         ctx.fillStyle=c;ctx.globalAlpha=aktiv?0.30:0.20;
-        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
+        ctx.beginPath();ctx.ellipse(gx,gy+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
         if(aktiv){
           ctx.strokeStyle=c;ctx.globalAlpha=0.55;ctx.lineWidth=2;
           ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
@@ -2578,8 +2716,8 @@
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
-      ctx.fillStyle=css("--ok");
-      ctx.font="700 15px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      ctx.fillStyle=f._gross?css("--warn"):css("--ok");
+      ctx.font=(f._gross?"800 22px":"700 15px")+" 'Barlow Condensed',sans-serif";ctx.textAlign="center";
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
         const u=FSTEAM[side].find(x=>x.id===f._spieler);
