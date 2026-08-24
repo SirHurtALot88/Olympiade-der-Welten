@@ -2332,10 +2332,43 @@
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
   let fsAktuell=null, fsBall={sichtbar:false,x:0,y:0};
+  // Nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive) — Ballzustand und
+  // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
+  // zurueck() (MOTOREN.basketball) sie mit einer Zeile mitnehmen koennen.
+  let fsLive=null;
+
+  // GEWICHTETE ZUFALLSAUSWAHL STATT "IMMER DER BESTE". Frueher waehlte die Simulation
+  // fuer Verteidigung/Rebound reduce()-artig IMMER den staerksten Spieler des Teams —
+  // damit haengte sich der ganze gegnerische Erfolg an eine einzige Person. Jetzt ist
+  // die Chance proportional zum eigenen Wert. Modulweit statt lokal in bauFeldspiel,
+  // damit die Live-Basketball-Engine (stepBasketballLive) dieselbe Funktion nutzt statt
+  // eine zweite Kopie zu pflegen.
+  const gewichtetesLos=(spieler,rolle)=>{
+    const summe=spieler.reduce((s,x)=>s+Math.max(1,x[rolle]),0);
+    let r=rr()*summe;
+    for(const x of spieler){ r-=Math.max(1,x[rolle]); if(r<=0)return x; }
+    return spieler[spieler.length-1];
+  };
+
+  // BASKETBALL-LIVE-ENGINE — Konstanten. Alle PLATZHALTER, wie ueberall in diesem
+  // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
+  // ARENA_INTERAKTION_KONZEPT.md).
+  const SPIELDAUER_BASKETBALL=45;   // Sekunden Sim-Zeit — das alte Vorab-Modell enthuellte ~30s
+  const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
+  const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
+  const DREIER_RADIUS=145;          // ... bis hierhin ein Fernwurf, weiter draussen wird nur gepasst
+  const STEAL_REICHWEITE=45;        // wie nah ein Decker sein muss, um es auf einen Steal ankommen zu lassen
+  const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
+  const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
+  const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
+  // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,115/0,885) —
+  // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
+  // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
+  const korbXVon=(side)=>side===0?W*0.885:W*0.115;
 
   function bauFeldspiel(saat){
     seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
-    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0;
+    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -2361,24 +2394,17 @@
       const p=fsIdlePos(side,i,team.length); u.x=p.x; u.y=p.y;
     }));
 
+    // BASKETBALL LAEUFT AB HIER LIVE (Chris' Entscheidung: Feldspiel soll sich wie
+    // Kampf/Bahn anfuehlen — Ereignisse entstehen beim Zusehen, nicht vorab feststehend.
+    // Erster Schritt, nur diese eine Disziplin, siehe initBasketballLive/
+    // stepBasketballLive). Football/Hockey/Tennis bleiben unten beim bewaehrten
+    // Vorab-Durchlauf, bis sich das Muster bewaehrt hat.
+    if(feldspielDisc==="basketball"){ initBasketballLive(art); return; }
+
     // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
     // steht fest, bevor die Enthuellung beginnt.
     fsZuege=[];
     const gesamtZuege=art.zuegeJeSeite*2;
-    // GEWICHTETE ZUFALLSAUSWAHL STATT "IMMER DER BESTE". Erste Fassung waehlte fuer
-    // Verteidigung und Rebound reduce()-artig den staerksten Spieler des Teams — FUER
-    // JEDEN EINZELNEN ZUG. Damit haengte sich der ganze gegnerische Erfolg an EINE
-    // Person: hob man deren Awareness (in ABWEHR), wirkte das nicht nur bei den eigenen
-    // Zuegen, sondern bei praktisch jedem Angriff des Gegners. Gemessen: Awareness 35 %
-    // bei einem Matrixgewicht von nur 14 (Basketball) bzw. 20 (Tennis). Jetzt ist die
-    // Chance, den Zug zu verteidigen oder den Rebound zu holen, proportional zum
-    // eigenen Wert — der Beste bekommt mehr Anteile, aber nicht alle.
-    const gewichtetesLos=(spieler,rolle)=>{
-      const summe=spieler.reduce((s,x)=>s+Math.max(1,x[rolle]),0);
-      let r=rr()*summe;
-      for(const x of spieler){ r-=Math.max(1,x[rolle]); if(r<=0)return x; }
-      return spieler[spieler.length-1];
-    };
     let amBall=0; // 0 oder 1, wer beginnt
     for(let z=0;z<gesamtZuege;z++){
       const team=FSTEAM[amBall], gegnerTeam=FSTEAM[1-amBall];
@@ -2464,13 +2490,20 @@
     }
   }
 
-  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. bauFeldspiel() rechnet die
-  // ganze Partie vorab durch und schreibt dabei direkt in die Spielerobjekte (punkte,
-  // assists, rebounds, steals, bloecke, verluste) und in fsPunkte: bequem zum Bauen, aber
-  // als Anzeige wären es Spoiler — genau der Fehler, der im Denkduell schon einmal behoben
-  // wurde (u.vorteil statt u.verlauf[u.aktuell]). Jede Stelle, die live etwas anzeigt
-  // (Score, Kader-Panel, Spielerzeile auf dem Feld), fragt deshalb HIER nach statt die
-  // Objektfelder direkt zu lesen — nur bis fsZeiger, dem Stand der Enthuellung.
+  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. Das alte Vorab-Modell (fuer
+  // Football/Hockey/Tennis unten weiter aktiv) rechnet die ganze Partie im Voraus durch
+  // und schreibt dabei direkt in die Spielerobjekte (punkte, assists, rebounds, steals,
+  // bloecke, verluste) und in fsPunkte: bequem zum Bauen, aber als Anzeige wären es
+  // Spoiler — genau der Fehler, der im Denkduell schon einmal behoben wurde (u.vorteil
+  // statt u.verlauf[u.aktuell]). Jede Stelle, die live etwas anzeigt (Score, Kader-Panel,
+  // Spielerzeile auf dem Feld), fragt deshalb HIER nach statt die Objektfelder direkt zu
+  // lesen — nur bis fsZeiger, dem Stand der Enthuellung.
+  //
+  // Fuer die Basketball-Live-Engine (unten) ist dieselbe Funktion ein reiner Mitschnitt:
+  // logZug() haengt jedes Ereignis an, sobald es passiert, und haelt fsZeiger dabei
+  // deckungsgleich mit fsZuege.length — "bisher enthuellt" ist dort automatisch "alles".
+  // Ein Feldname weicht ab: die Live-Engine traegt den Rebounder als e.spieler statt
+  // e.rebounder (logZug(...,"rebound",{spieler:gewinner})), daher der Fallback unten.
   function fsBisher(){
     const team=[0,0], spieler=new Map();
     const s=(u)=>{ if(!spieler.has(u.id))spieler.set(u.id,{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0});
@@ -2478,11 +2511,357 @@
     for(const e of fsZuege.slice(0,fsZeiger)){
       if(e.art==="treffer"){ team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
         if(e.passgeber)s(e.passgeber).assists++; }
-      else if(e.art==="rebound") s(e.rebounder).rebounds++;
+      else if(e.art==="rebound") s(e.rebounder||e.spieler).rebounds++;
       else if(e.art==="block") s(e.verteidiger).bloecke++;
       else if(e.art==="steal"){ s(e.verteidiger).steals++; s(e.spieler).verluste++; }
     }
     return {team,spieler};
+  }
+
+  // ===================================================================================
+  // BASKETBALL — LIVE-ENGINE. Kein Vorab-Durchlauf mehr: Ballbesitz, Deckung und Wuerfe
+  // entstehen Tick fuer Tick, genau wie im Kampf-Motor (stepSim) — Chris' Entscheidung,
+  // nachdem er zehn Fragen dazu beantwortet hat (docs/ARENA_INTERAKTION_KONZEPT.md).
+  // Uebersetzt aus Kampfs Mustern: gedrosselte Neubewertung (reevXxx, Analogon zu
+  // u.reev), abstandsbasierte Interaktion (dist(a,b), Analogon zu bindAn), und
+  // Feed-Text GENAU im Tick, in dem ein Zustand kippt. Football/Hockey/Tennis bleiben
+  // unveraendert beim Vorab-Durchlauf oben, bis sich dieses Muster bewaehrt hat.
+  //
+  // fsZuege wird hier zum ARCHIV abgeschlossener Ereignisse (logZug haengt an, statt
+  // vorab zu fuellen) — dieselbe Form wie vorher, nur umgekehrte Fuellrichtung. HUD und
+  // sichern()/zurueck() lesen es dadurch unveraendert.
+  // ===================================================================================
+
+  function initBasketballLive(art){
+    fsZuege=[]; fsZeiger=0;
+    for(const team of FSTEAM)for(const u of team){
+      // reevBall wird erst relevant, sobald jemand den Ball bekommt (ballUebernehmen/
+      // loeseFlugAuf setzen es dann sofort frisch) — ein Startwert hier wurde nie
+      // gelesen, bevor er ueberschrieben wird (Opus-Review-Fund). aktionCd faellt ganz
+      // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
+      // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
+      Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
+        wobbleY:0,frischerPassVon:null});
+    }
+    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}};
+    ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
+  }
+
+  // Mann-gegen-Mann-Zuteilung: jeder Verteidiger nimmt den ihm naechsten noch freien
+  // Angreifer (gieriges Matching nach Abstand) — live nachvollzogen, nicht einmalig
+  // festgelegt. `voll` erzwingt eine komplette Neuzuteilung (Ballwechsel); sonst wird
+  // nur neu zugeordnet, wessen `reevDeckung` abgelaufen ist — das ist die Drossel, die
+  // verhindert, dass alle fuenf jeden Frame neu zuordnen (Analogon zu Kampfs `reev`).
+  function zuordneDeckung(voll){
+    for(let seite=0;seite<2;seite++){
+      const verteidiger=FSTEAM[1-seite], angreifer=FSTEAM[seite];
+      // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
+      // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
+      // ohne diese Bereinigung griff sich ein neu bewertender Verteidiger regelmaessig
+      // einen bereits gedeckten Angreifer, waehrend ein anderer frei blieb (in ~85 %
+      // der Ticks gemessen) — und `entscheideBallaktion`/`versucheSteal` lasen dann per
+      // `find` nur den ERSTEN Decker, der zweite war fuer Bedraengnis/Steal unsichtbar.
+      const belegt=new Set();
+      if(!voll)for(const v of verteidiger)if(v.reevDeckung>0&&v.deckt)belegt.add(v.deckt);
+      const frei=angreifer.filter(a=>!belegt.has(a));
+      for(const v of verteidiger){
+        if(!voll&&v.reevDeckung>0)continue;
+        let naechster=null,minD=Infinity;
+        for(const a of frei){ const d=dist(v,a); if(d<minD){minD=d;naechster=a;} }
+        if(naechster){ v.deckt=naechster; frei.splice(frei.indexOf(naechster),1); }
+        v.reevDeckung=0.5+(100-v.ABWEHR)/100*1.5; // PLATZHALTER, nach Fables Vorschlag (Awareness liest das Feld)
+      }
+    }
+  }
+
+  function ballUebernehmen(u){
+    for(const team of FSTEAM)for(const x of team)x.hatBall=false;
+    u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    // EINZIGE Stelle, an der festgelegt wird, wer angreift — Opus-Review-Fund:
+    // `fsLive.amBall` wurde beim Aufbau einmal zufaellig gesetzt und danach nie wieder
+    // aktualisiert, `bewegeSpielerLive` fragte stattdessen `fsLive.ball.traeger?.side`
+    // ab, was waehrend Flug/freiem Ball `null` ist — dann liefen ALLE zwoelf Spieler in
+    // die Ruheformation zurueck, weit weg vom Korb, und blieben dort haengen (der Ball
+    // konnte bis zu 30s ungeholt liegen bleiben).
+    fsLive.amBall=u.side;
+    u.reevBall=0.25; // PLATZHALTER — kurze, feste Schonfrist direkt nach Ballerhalt
+    zuordneDeckung(true);
+  }
+
+  function naechsterAngriff(seite){
+    fsLive.angriffSeit=0;
+    ballUebernehmen(gewichtetesLos(FSTEAM[seite],"AUFBAU"));
+  }
+
+  function logZug(seite,art,extra){
+    fsZuege.push(Object.assign({seite,art},extra));
+    fsZeiger=fsZuege.length;
+  }
+
+  // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
+  // Kampfs Zielwahl. `erzwingen` kommt von der Schussuhr: dann wird notfalls auch von
+  // weit draussen ohne freien Wurf abgeschlossen, statt endlos zu dribbeln.
+  function entscheideBallaktion(u,art,erzwingen){
+    const team=FSTEAM[u.side];
+    const korbX=korbXVon(u.side);
+    const zumKorb=dist(u,{x:korbX,y:H/2});
+    const nah=zumKorb<KORB_NAH_RADIUS, fern=!nah&&zumKorb<DREIER_RADIUS;
+    const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
+    const deckerAbstand=decker?dist(u,decker):999;
+    // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
+    // ist, senkt die Erfolgschance zusaetzlich — das gab es im Vorab-Modell nicht, weil
+    // dort nie ein tatsaechlicher Deckerabstand vorlag.
+    const bedraengnis=Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
+    // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
+    // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
+    // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
+    // `passgeber` beim normalen Pass gar nicht bis zum Wurf durchgereicht, Assists
+    // entstanden dadurch faktisch nur noch beim Alley-Oop).
+    const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
+
+    if(nah||fern||erzwingen){
+      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
+        -(fern?0.10:0)-bedraengnis);
+      wirf(u,u,art,fern,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
+      return;
+    }
+    if(team.length>1){
+      const mitspieler=team.filter(x=>x!==u);
+      // Balance-Fund (nach dem Opus-Review): Intelligence (Matrixgewicht 16, zweithoechstes
+      // in Basketball) las trotz 40 % Anteil an AUFBAU konstant negativ (-0,033 im rohen,
+      // ungeklammerten Einfluss — gemessen, nicht vermutet, ueber `einflussVon`s internen
+      // `roh`-Wert). Ursache gefunden: ein hoher AUFBAU-Wert erhoehte die eigene Passbereit-
+      // schaft SO stark, dass ein Spieler mit hoher Intelligence seine eigenen Punkte
+      // haeufiger gegen Assists eintauschte, als der Zusatzschub durch die haeufigere
+      // Ballfuehrer-Rolle (gewichtetesLos ueber AUFBAU) wettmachte — waehrend Spirit
+      // denselben Effekt kleiner traf (30 % statt 40 % Anteil an AUFBAU) und zusaetzlich
+      // ueber TEAMGEIST (55 % Anteil, hoechster Koeffizient in der Wurfformel) profitierte.
+      // Koeffizient testweise durchgemessen (messe-arena-einfluss.mjs basketball 48):
+      // 0,0030 (Original) 48,2 Pp, 0,0010 48,3 Pp, 0,0005 40,7 Pp, 0,0003 36,6 Pp,
+      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt. PLATZHALTER, kein Endwert.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+u.AUFBAU*0.0002));
+      if(rr()<passChance){
+        // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
+        // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen
+        // Ballaktion, was 7-10 Wuerfe pro Angriff auf `neigung` bedeutete und
+        // Alley-Oops aus Halbfeld-Distanz erzeugte, Opus-Review-Fund). Nur nah genug am
+        // Korb, exakt wie im Vorab-Modell kommentiert: "Spielzuege sind
+        // Nahdistanz-Kombinationen".
+        if(zumKorb<KORB_NAH_RADIUS*2){ // PLATZHALTER-Reichweite fuer "nah genug fuer einen Zug"
+          for(const key in (art.spielzuege||{})){
+            const sz=art.spielzuege[key];
+            const kandidat=gewichtetesLos(mitspieler,sz.rolle);
+            if(rr()<sz.neigung(u,kandidat)){
+              wirf(u,kandidat,art,false,sz.abschluss(u,kandidat),u,key,null);
+              return;
+            }
+          }
+        }
+        passeAb(u,gewichtetesLos(mitspieler,"ABSCHLUSS"));
+        return;
+      }
+    }
+    u.reevBall=0.4+(100-u.AUFBAU)/100*0.8; // PLATZHALTER, s. Konzeptdoc
+  }
+
+  // `von` ist, wer den Ball gerade loslaesst (Position, aus der der Flug startet);
+  // `schuetze` ist, wem der Wurf gehoert — beim Alley-Oop nicht dieselbe Person, der
+  // Ball fliegt direkt zum Korb, der Finisher wird ihn nie kontrollieren.
+  function wirf(von,schuetze,art,fern,technik,passgeber,zug,blockKandidat){
+    von.hatBall=false; fsLive.ball.traeger=null;
+    von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
+    const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
+    fsLive.ball.flug={
+      von:{x:von.x,y:von.y}, nach:{x:korbXVon(schuetze.side),y:H/2},
+      art:zug?"alley":"wurf", t:0, dauer:zug?0.55:0.45, // PLATZHALTER
+      treffer, fern, punkte:fern?art.punkteFern:art.punkteNah,
+      schuetze, passgeber, zug, ziel:schuetze, blockKandidat
+    };
+  }
+
+  function passeAb(von,nach){
+    von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
+    fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
+      treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null};
+  }
+
+  // Steal-Versuch des Deckers — unabhaengig von der Ballfuehrer-Entscheidung, der
+  // Verteidiger handelt selbst. KALIBRIERFALLE (aus Fables Uebersetzung): im
+  // Vorab-Modell war Steal EIN Wurf pro Zug; live gibt es mehrere Gelegenheiten pro
+  // Angriff (gebremst durch stealCd). Die Pro-Versuch-Chance ist deshalb auf
+  // `1-basis^(1/k)` herunterskaliert (PLATZHALTER k=3 erwartete Versuche je
+  // Schussuhr-Fenster), sonst waere die Gesamt-Stealrate viel hoeher als vorher und der
+  // Einflussvektor von ABWEHR liefe aus dem Ruder.
+  function versucheSteal(decker,traeger,art){
+    const basis=Math.min(0.94,Math.max(0.20,
+      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0035+traeger.TEAMGEIST*0.0060));
+    const proVersuch=1-Math.pow(basis,1/3);
+    decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
+    if(rr()<proVersuch){
+      decker.steals++; traeger.verluste++; decker.lunge=0.4;
+      feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
+      logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
+      naechsterAngriff(decker.side);
+    }
+  }
+
+  function loeseFlugAuf(flug,art){
+    if(flug.art==="pass"){
+      flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
+      flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
+      // Merkt sich den Passgeber fuer GENAU die naechste Ballaktions-Entscheidung des
+      // Empfaengers (dort sofort wieder geleert) — sonst gibt es beim normalen Pass nie
+      // einen Assist, weil `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
+      flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.lunge=0.2;
+      feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
+      fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      return;
+    }
+    const schuetze=flug.schuetze;
+    const szDef=flug.zug?art.spielzuege[flug.zug]:null;
+    if(flug.treffer){
+      schuetze.punkte+=flug.punkte; fsPunkte[schuetze.side]+=flug.punkte;
+      if(flug.passgeber)flug.passgeber.assists++;
+      const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
+                       : schuetze.n+" trifft"+(flug.fern?" von weit draußen":"")+" — +"+flug.punkte+".";
+      feed(schuetze.side,txt,true);
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug});
+      const gross=!!(szDef&&(szDef.jubel==="gross"||szDef.jubel==="riesig"));
+      schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
+        life:gross?1.7:1,crit:true,_spieler:schuetze.id,_gross:gross});
+      fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      naechsterAngriff(1-schuetze.side);
+    } else {
+      const vor=szDef?szDef.label+"-Versuch: ":"";
+      // Ein bedraengter Fehlwurf zaehlt anteilig als Block statt als bloßer Fehlwurf —
+      // PLATZHALTER-Anteil, s. Konzeptdoc.
+      if(flug.blockKandidat&&rr()<0.4){
+        flug.blockKandidat.bloecke++;
+        feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
+        logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
+      } else {
+        feed(schuetze.side,vor+schuetze.n+" verfehlt"+(flug.fern?" von weit draußen":"")+".");
+        logZug(schuetze.side,"fehlwurf",{spieler:schuetze});
+      }
+      fsAktuell={spieler:null,verteidiger:flug.blockKandidat,passgeber:flug.passgeber,rebounder:null};
+      fsLive.ball.frei={x:flug.nach.x,y:flug.nach.y,vonSeite:schuetze.side};
+    }
+  }
+
+  // Positionsintegration: jeder Spieler laeuft jeden Tick Richtung eines live
+  // berechneten Laufziels — kein Phasenwert wie im Vorab-Modell mehr, weil es keine
+  // vorab bekannte "Zug-Dauer" mehr gibt.
+  function bewegeSpielerLive(dt){
+    const k=Math.min(1,dt*4); // PLATZHALTER Lerp-Geschwindigkeit
+    // Eigene, langsamere Rate fuers Dribbeln: bei der gemeinsamen Rate oben (k, Halbwertszeit
+    // ~0,17s) waere der Ballfuehrer binnen einer halben Sekunde am Korb — praktisch das
+    // urspruengliche Tempo-Problem aus #660 nochmal, nur diesmal ohne den zusaetzlichen
+    // Daempfungsfaktor, der es zwischenzeitlich ins Gegenteil (17-19s) verkehrt hatte
+    // (Opus-Review-Fund, s. unten). ~0,6/s ergibt aus typischer Anspieldistanz
+    // (345-552px, gemessen) rechnerisch 2-3s bis zur Wurfreichweite — PLATZHALTER.
+    const kDribble=Math.min(1,dt*0.6);
+    // `fsLive.amBall` statt `fsLive.ball.traeger?.side` — der Ball ist waehrend Flug UND
+    // freiem Liegen `traeger:null`, aber die Seiten bleiben trotzdem Angreifer/
+    // Verteidiger. Opus-Review-Fund: mit der alten Abfrage liefen in genau diesen
+    // Phasen ALLE zwoelf Spieler in die weit entfernte Ruheformation zurueck und blieben
+    // dort haengen, weil niemand mehr nah genug an einen freien Ball herankam (bis zu
+    // 30s gemessener Stillstand). `amBall` ist jetzt die einzige Quelle dafuer, wer
+    // gerade angreift (siehe ballUebernehmen).
+    const ballSeite=fsLive.amBall;
+    for(const team of FSTEAM)for(const u of team){
+      let zx=u.x, zy=u.y;
+      const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
+      if(u.hatBall){
+        // Dribbelt Richtung Korb. Opus-Review-Fund: hier stand vorher ZUSAETZLICH zum
+        // Lerp am Ende dieser Funktion ein eigener Daempfungsfaktor ("*0,03"), macht
+        // zusammen effektiv nur ~0,2 % der Reststrecke pro Tick — 17-19s bis zur
+        // Wurfreichweite, bei einer Schussuhr von 8s. Jetzt EIN Schritt: Ziel ist der
+        // Korb direkt, `kDribble` (s. oben) uebernimmt das Tempo.
+        zx=korbX; zy=H/2+(u.id%2?40:-40);
+      } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
+        zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
+      } else if(ballSeite===u.side){
+        // Angriff ohne Ball: gemischte Formation statt alle im Wurfradius — zwei nah am
+        // Korb (Cutter/Rebounder), zwei im Mitteldistanz-, zwei im Fernwurf-Abstand.
+        // Sonst gibt es niemanden AUSSERHALB der Wurfreichweite, an den sich ein Pass
+        // ueberhaupt lohnen wuerde.
+        const idx=team.indexOf(u);
+        const distFaktor=[0.3,0.3,1.5,1.5,2.3,2.3][idx%6];
+        const seitlich=[0,0,1,-1,1,-1][idx%6];
+        const zumFeld=u.side===0?-1:1; // Richtung Feldmitte, weg vom eigenen Korb
+        zx=korbX+zumFeld*distFaktor*KORB_NAH_RADIUS; zy=H/2+seitlich*90;
+      } else if(u.deckt){
+        // Verteidigung: nah am gedeckten Mann bleiben, mit leichtem Zug zum eigenen
+        // Korb — Opus-Review-Fund: der Zug war vorher PROPORTIONAL zum Abstand des
+        // Mannes vom Korb (bei 450px Korbabstand stand der Decker 135px weg), weit
+        // ausserhalb von STEAL_REICHWEITE(45)/BEDRAENGT_RADIUS(30) — Steal und Block
+        // waren dadurch in der Praxis unerreichbar. Jetzt gedeckelt.
+        const zumEigenenKorb=eigenerKorbX-u.deckt.x;
+        const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
+        zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+      } else {
+        const p=fsIdlePos(u.side,team.indexOf(u),team.length);
+        zx=p.x; zy=p.y;
+      }
+      const stepK=u.hatBall?kDribble:k;
+      u.x+=(zx-u.x)*stepK; u.y+=(zy-u.y)*stepK;
+      if(u.hop>0&&!(fsLive.ball.flug&&fsLive.ball.flug.ziel===u))u.hop=Math.max(0,u.hop-dt*2);
+    }
+  }
+
+  function stepBasketballLive(dt){
+    if(done)return;
+    fsT+=dt;
+    if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0}; return; }
+    const art=FB();
+    fsLive.angriffSeit+=dt;
+    for(const team of FSTEAM)for(const u of team){
+      if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
+      if(u.reevDeckung>0)u.reevDeckung-=dt;
+      if(u.reevBall>0)u.reevBall-=dt;
+      if(u.stealCd>0)u.stealCd-=dt;
+    }
+
+    const flug=fsLive.ball.flug;
+    if(flug){
+      flug.t+=dt;
+      const phase=Math.min(1,flug.t/flug.dauer);
+      fsBall={sichtbar:true,
+        x:flug.von.x+(flug.nach.x-flug.von.x)*phase,
+        y:flug.von.y+(flug.nach.y-flug.von.y)*phase
+          -Math.sin(phase*Math.PI)*(flug.art==="alley"?90:flug.art==="wurf"?36:0)};
+      if(flug.art==="alley"&&phase>0.66)flug.ziel.hop=Math.sin(((phase-0.66)/0.34)*Math.PI)*28;
+      if(phase>=1){ loeseFlugAuf(flug,art); fsLive.ball.flug=null; }
+    } else if(fsLive.ball.frei){
+      const f=fsLive.ball.frei;
+      fsBall={sichtbar:true,x:f.x,y:f.y};
+      const nah=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
+      if(nah.length){
+        const gewinner=gewichtetesLos(nah,"ZWEITCHANCE");
+        gewinner.rebounds++;
+        const eigen=gewinner.side===f.vonSeite;
+        feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
+        logZug(gewinner.side,"rebound",{spieler:gewinner});
+        fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
+        if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
+        else naechsterAngriff(gewinner.side);
+      }
+    } else {
+      const traeger=fsLive.ball.traeger;
+      if(traeger){
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y-18};
+        const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
+        fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
+        const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
+        if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
+        if(fsLive.ball.traeger===traeger&&decker&&decker.stealCd<=0&&dist(decker,traeger)<STEAL_REICHWEITE){
+          versucheSteal(decker,traeger,art);
+        }
+      }
+    }
+
+    zuordneDeckung(false);
+    bewegeSpielerLive(dt);
   }
 
   // Lockere Ruheformation nahe der eigenen Grundlinie — kein starres Band aus sechs
@@ -2571,6 +2950,7 @@
   }
 
   function stepFeldspiel(dt){
+    if(feldspielDisc==="basketball")return stepBasketballLive(dt);
     if(done){fsLerpPositionen(dt);return;}
     fsT+=dt;
     for(const team of FSTEAM)for(const u of team)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
@@ -7227,10 +7607,13 @@
   // ein Ballverlust zieht ab — dieselbe Grundidee wie eine echte Plus/Minus-Statistik.
   for(const fd of Object.keys(FELDSPIEL_ART)){
     MOTOREN[fd]={
-      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done}),
+      // fsLive: nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive), fuer
+      // die drei Vorab-Disziplinen bleibt es null — kein Sonderfall im Motor, einfach
+      // mitgesichert wie alles andere.
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive}),
       zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
                     fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
-                    fsPunkte=a.fsPunkte; done=a.done;},
+                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
       bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},

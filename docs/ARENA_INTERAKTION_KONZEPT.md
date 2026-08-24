@@ -457,6 +457,135 @@ auf ABSCHLUSS/ZWEITCHANCE setzen, die schon Power tragen. Football stand schon v
 verschwiegen, aber hier nicht mitgelöst, genau wie die Dexterity-Lücke bei Basketball in
 #660.
 
+### Basketball wird live simuliert — Architekturwechsel, kein Feature
+
+Chris, nach diesem PR: Feldspiel (und perspektivisch Bühne) sollen sich **genau wie
+Kampf und Bahn anfühlen** — echte Tick-für-Tick-Simulation, Ereignisse entstehen beim
+Zusehen, nicht vorab feststehend und nur enthüllt. Zehn konkrete Fragen dazu beantwortet
+(Reihenfolge, Umfang, Determinismus, Tempo-Steuerung — alle Antworten: „genau wie
+Kampf/Bahn", „erst Basketball, sauber", Determinismus bleibt Pflicht). Mit Fable
+übersetzt (Kampfs `stepSim`-Muster: gedrosselte Neubewertung, abstandsbasierte
+Interaktion, Feed-Text im Kipp-Tick) und für **nur Basketball** gebaut — Football/
+Hockey/Tennis bleiben beim Vorab-Durchlauf, bis sich das Muster bewährt hat, exakt wie
+entschieden.
+
+**Was jetzt läuft** (`initBasketballLive`/`stepBasketballLive`, `battle-mode.html`, nach
+`bauFeldspiel`): jeder Spieler trägt eigenen Live-Zustand (`deckt`, `reevDeckung`,
+`reevBall`, `stealCd` — Drosseln nach Kampf-Vorbild, keine Zufalls-Jitter mehr, das war
+ein eigener Fund, siehe unten). Der Ball ist ein eigenes Objekt (getragen/im Flug/frei).
+Verteidiger ordnen sich **live neu zu** (gieriges Matching nach Abstand, gedrosselt) —
+Chris' Punkt 2 aus den zehn Fragen, „aktives Agieren und Reagieren". Der Alley-Oop löst
+**live** aus (einmal pro Ballaktions-Entscheidung gewürfelt, nicht vorab), mit derselben
+`neigung`/`abschluss`-Formel wie zuvor. Determinismus bleibt erhalten: derselbe geseedete
+`rr()`, dieselbe feste Schrittweite, `MOTOREN.basketball.lauf()` ruft denselben
+`stepFeldspiel(1/60)` ungerendert — bestätigt reproduzierbar (`messe-arena-einfluss.mjs`
+liefert bei gleichem Seed zweimal exakt dasselbe Ergebnis).
+
+**Ein echter Fund unterwegs — und behoben:** die erste Fassung ließ den Ballführer pro
+Tick 15 % der Reststrecke zum Korb zurücklegen. Damit war er binnen einer halben Sekunde
+praktisch immer schon in Wurfreichweite — `entscheideBallaktion` prüft Nah-/Fernwurf
+ZUERST und wirft dann sofort selbst, Pass/Spielzug kamen nie zum Zug. AUFBAU, ABSCHLUSS,
+TEAMGEIST und die Spielzug-Formeln waren dadurch faktisch tote Kalibriermasse — dieselbe
+Lektion wie bei ABSCHLUSS in #660, hier strukturell statt an einer einzelnen Formel.
+Zusätzlich standen alle Mitspieler ohne Ball innerhalb von 70 px vom Korb, also selbst
+IMMER in Wurfreichweite — ein Pass hätte sich nie gelohnt. Beides behoben: Dribbeltempo
+auf 3 %/Tick gesenkt, Mitspieler-Formation gemischt (zwei nah, zwei Mitteldistanz, zwei
+außerhalb der Fernwurfreichweite). Sichtbar im Feed: echte Passketten
+(„Greenkraut passt zu Seraph-11. Seraph-11 passt zu Tidesprinter. Tidesprinter passt zu
+Greenkraut. Greenkraut trifft — +2.") statt sofortiger Alleingänge.
+
+### Opus-Review vor dem Balance-Tuning — sieben echte Korrektheitsfehler, keine Balance-Frage
+
+Chris' ausdrückliche Auflage: erst ein Review durch Opus, dann erst Balance-Tuning. Gut
+so — der Review (instrumentierte Kopie, fünf komplette Spiele Tick für Tick protokolliert)
+fand, dass die Engine bei 84,6 Pp mechanisch **gar nicht lief**, nicht schlecht
+balanciert war: ein 45-Sekunden-Spiel produzierte 4-6 Ereignisse, der Ball lag bis zu 30s
+tot herum, drei der fünf Ereignistypen (Steal, Block, Nah-/Fernwurf) wurden nie erreicht.
+Balance-Tuning auf diesem Stand hätte Konstanten justiert, die nie gelesen werden. Sieben
+Funde, alle behoben:
+
+1. **Ball blieb liegen.** `bewegeSpielerLive` fragte `fsLive.ball.traeger?.side` ab — das
+   ist während Flug UND freiem Liegen `null`, also liefen alle zwölf Spieler in die
+   Ruheformation zurück und blieben dort (gemessen: bis zu 30,5 s Stillstand). Fix: eine
+   einzige Quelle dafür, wer angreift — `fsLive.amBall`, gesetzt in `ballUebernehmen`.
+2. **`fsLive.amBall` wurde gesetzt und nie gelesen** — genau das Feld, das Fund 1 braucht.
+3. **Nah-/Fernwurf waren unerreichbar.** Der Ballführer hatte ZWEI Dämpfungsfaktoren
+   hintereinander (Ziel-Fraktion *und* Lerp), effektiv ~0,2 % der Reststrecke pro Tick —
+   17-19 s bis zur Wurfreichweite bei 8 s Schussuhr. Jeder Angriff war Dribbeln plus
+   Verzweiflungswurf. Fix: ein Schritt, eigene (langsamere als die geteilte) Lerp-Rate
+   fürs Dribbeln.
+4. **Steal/Block waren unerreichbar.** Der Decker-Abstand war PROPORTIONAL zur Distanz
+   des Manns vom Korb (bei 450 px Korbabstand 135 px Sag) — weit außerhalb von
+   `STEAL_REICHWEITE`(45)/`BEDRAENGT_RADIUS`(30). Fix: Sag gedeckelt auf 35 px.
+5. **Doppeldeckung in ~85 % aller Ticks**, weil `zuordneDeckung`s Teil-Durchlauf die
+   volle Angreiferliste als „frei" ansah, obwohl übersprungene Verteidiger ihren Mann
+   behielten. Verzerrte jede ABWEHR-Messung.
+6. **Assists entstanden faktisch nur noch beim Alley-Oop** — ein normaler Pass reichte
+   den Passgeber nie bis zum späteren Wurf durch.
+7. **Der Spielzug war von einer Pass-Veredelung zur unabhängigen Alternative bei jeder
+   Entscheidung geworden**, ohne Distanzprüfung — gemessene Alley-Oops aus 438-679 px
+   Entfernung, obwohl das Vorab-Modell ausdrücklich „Nahdistanz-Kombinationen" meint.
+
+Dazu kleinere, unabhängige Funde: `u.lunge` wurde im Live-Pfad nie gesetzt (keine
+Wurf-/Pass-Animation mehr), ein toter Startwert für `reevBall`, ein 20 px-Versatz
+zwischen simuliertem und gezeichnetem Korb — alle mitbehoben.
+
+**Ergebnis, gemessen statt behauptet:** `messe-arena-einfluss.mjs basketball 48` fällt
+allein durch diese Korrektheitsfixes von 84,6 auf **48,2 Pp** — noch vor jeder gezielten
+Balance-Arbeit. Alle Ereignistypen treten jetzt in jedem Spiel auf (Playwright-Check: 17
+Pässe, 9 Treffer, 17 Fehlwürfe, 21 Rebounds, 3 Steals, 4 Blocks in einem einzelnen
+Spiel), Alley-Oop weiterhin bestätigt (732 Auslöser über viele Simulationsläufe). Nur
+Intelligence liest noch exakt 0 % — das ist jetzt echtes Balance-Tuning, kein
+Korrektheitsfehler mehr.
+
+Die Aufstellung wirkte vorher visuell noch zu sehr wie eine Reihe — als Nebeneffekt der
+Opus-Fixes (gemischte Mitspieler-Formation für Fund 3, s. o.) inzwischen erledigt, kein
+eigener Posten mehr.
+
+### Erste Balance-Runde: Intelligence gefunden und behoben — 32,5 Pp
+
+Direkt im Anschluss an die Opus-Fixes die erste echte Balance-Runde, wie von Chris
+angeordnet. Statt zu raten: den rohen (ungeklammerten) Einfluss jedes Attributs über
+`einflussVon`s internen `roh`-Wert ausgelesen (`Anteil` in der Ausgabe zeigt nur positive
+Werte — ein negativer Rohwert erscheint dort als „0 %", ist aber trotzdem voll in die
+Pp-Abweichung eingerechnet). Intelligence: **-0,033**, als einziges sinnvoll gewichtetes
+Attribut negativ, alle anderen positiv (0,04 bis 0,18).
+
+**Ursache gefunden, nicht vermutet:** ein hoher AUFBAU-Wert erhöhte die eigene
+Passbereitschaft (`passChance=0.35+u.AUFBAU*0.0030`) so stark, dass ein Spieler mit hoher
+Intelligence (40 % Anteil an AUFBAU, der höchste Einzelwert dort) seine eigenen Punkte
+häufiger gegen Assists eintauschte, als der Zusatzschub durch die häufigere
+Ballführer-Rolle das wettmachte. Spirit traf derselbe Mechanismus kleiner (nur 30 %
+Anteil an AUFBAU) und profitierte zusätzlich stark über TEAMGEIST (55 % Anteil, mit
+0,0060 der höchste Koeffizient in der Wurfformel) — deshalb las Spirit stark positiv,
+Intelligence negativ, obwohl beide über AUFBAU denselben Hebel ziehen.
+
+**Durchgemessen statt geraten**, `messe-arena-einfluss.mjs basketball 48`, nur der
+AUFBAU-Koeffizient in `passChance` verändert:
+
+| Koeffizient | Pp | Intelligence |
+|---|---|---|
+| 0,0030 (Original) | 48,2 | 0 % (roh: -0,033) |
+| 0,0010 | 48,3 | 5,5 % |
+| 0,0005 | 40,7 | 9,4 % |
+| 0,0003 | 36,6 | 11,1 % |
+| **0,0002 (gewählt)** | **32,5** | **13 %** |
+
+0,0002 reproduzierbar bestätigt (zweimal identisch gemessen). Nicht monoton bis 0
+durchprobiert — ein Test ganz ohne AUFBAU-Einfluss (`passChance=0.5` fest) lag bei 41,6
+Pp, schlechter als 0,0002. Es gibt also ein Optimum, keinen einfachen "je weniger, desto
+besser"-Zusammenhang; 0,0002 ist der beste unter den getesteten Werten, kein Beweis für
+global optimal. **PLATZHALTER, kein Endwert.**
+
+**32,5 Pp liegt jetzt in derselben Größenordnung wie das alte Vorab-Modell (27-32 Pp)** —
+nach zwei Runden (Opus-Fixes: 84,6→48,2 Pp, diese Balance-Runde: 48,2→32,5 Pp) hat die
+Live-Engine die Vorab-Engine in Sachen Werte-Treue eingeholt. Verbleibende Lücken, alle
+bereits aus früheren PRs bekannt und hier nicht neu: Dexterity überrepräsentiert (+9,8 Pp
+— dieselbe seit #656 bekannte Dexterity-Frage, dort sitzt der Wert gleichzeitig in
+AUFBAU/ABSCHLUSS/TECHNIK), Speed/Torment leicht unterrepräsentiert. Funktional per
+Playwright gegengeprüft: 16 Pässe, 12 Treffer, 5 Fehlwürfe, 7 Rebounds, 2 Steals, 2
+Blocks in einem Spiel, Endstand 16:15 — ein erkennbar echtes, kompetitives Spiel.
+
 ### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
 
 Auf OpenGameArt gibt es **keine** fertigen 2D-Top-Down-Court/Field-Tilesets im passenden
