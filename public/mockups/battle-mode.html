@@ -1061,7 +1061,111 @@
     // Genau Chris' Frage von vorhin, am Bild beantwortet: Bogen, keine Armbrust. Sie ist
     // damit die erste echte Fernkaempferin im Feld — deshalb traegt ihr Eintrag im Kader
     // jetzt auch fern:true, sonst rennt eine Bogenschuetzin in den Nahkampf.
-    "Cassandra":          {kopf:"human",haut:"light",ruest:"leder",ohren:true,waffe:"bogen"}
+    "Cassandra":          {kopf:"human",haut:"light",ruest:"leder",ohren:true,waffe:"bogen"},
+
+    // ===================================================================================
+    // BATCH 3 (27 neue Eintraege) — nach lib/battle/subclass-archetypes.ts BILDBEFUNDE.
+    // Greenkraut, Tidesprinter und Ralazar the Balanced aus derselben Welle standen oben
+    // schon. WICHTIG: der animierbare Baukasten (SPRITES weiter oben, das ist, was
+    // zeichneSprite() im Live-Kampf tatsaechlich zeichnet) kennt nur FUENF Koepfe
+    // (alien/human/lizard/orc/wolf) und ZWEI Ruestungen (leder/plate) mit Schwert/Bogen
+    // als einzigen Waffen — Krone, Axt, Fluegel, Haartrachten, Bart und Stab und die
+    // uebrigen 15 Koepfe gibt es nur im vollen Baukasten fuer die STEHENDE Figur (B_FIGUR),
+    // NICHT hier. Jede Naeherung, die deshalb vom Bild abweicht, steht im Kommentar; wo das
+    // Bild gar keinen Charakter zeigt (Schiff, Pflanze), steht PLATZHALTER.
+    // ===================================================================================
+    // Bild: blasses Maedchen, schwarzes Kleid, kein Kampfmotiv — kein Kopftyp und keine
+    // Kleidung im Baukasten trifft die surreale Tortenboden-Szene; "leder" bleibt als
+    // naechstliegender Ersatz fuer das Kleid stehen (wie bei Inefinnas Robe).
+    "Byrnja":             {kopf:"human",haut:"light",ruest:"leder"},
+    // Bild: Elfe mit Langbogen, Koecher, gruenem Umhang, leichter Ruestung — deckungsgleich
+    // mit Cassandras Bauplan (Bogen, keine Armbrust).
+    "Elara":              {kopf:"human",haut:"light",ohren:true,ruest:"leder",waffe:"bogen"},
+    // Bild: weiblicher Cyborg, schwarze Techruestung, spitze Antennenohren, pinke
+    // Energieklinge. Keine Techruestung im Baukasten: "plate" in "dunkel" vertritt sie,
+    // die Energieklinge vertritt das Schwert.
+    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert"},
+    // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
+    // schwebende Faeden mit erhobenen Haenden.
+    "Mindtamer":          {kopf:"human",haut:"light",helm:true,ruest:"leder"},
+    // Bild: kleines freundliches Wesen aus Rinde und Moos, keine Waffe, keine Ruestung —
+    // bloss der Hautton uebernimmt das Gruen.
+    "Tsubaki Cleaning":   {kopf:"orc",haut:"green"},
+    // Bild: insektoides schwarzes Wesen mit Klauen und Fluegeln, unbewaffnet. Kein
+    // Insektenkopf im Baukasten; "wolf" steht fuer das tierisch-monstroese Auftreten.
+    "Othrama":            {kopf:"wolf",haut:"black"},
+    // Bild: kosmischer Drache mit sternenuebersaeten Fluegeln — kein Drachenkopf, keine
+    // Fluegel im animierbaren Satz. "lizard" fuer die Schuppenform, "lavender" fuer den
+    // Sternenschimmer. PLATZHALTER: das Bild ist in BILDBEFUNDE bereits als Widerspruch
+    // vorgelegt, hier gilt dieselbe Einschraenkung.
+    "Butterfly":          {kopf:"lizard",haut:"lavender"},
+    // Bild: Mann mit Fliegerhaube, Tentakel-Parasit im Gesicht, stuetzt sich auf einen
+    // Gehstock (keine Waffe) — die Haube wird zur Kapuze.
+    "Myrkos":             {kopf:"human",haut:"light",kapuze:true},
+    // Bild: Orkin mit Streitaxt. Keine Axt im Baukasten; das Schwert vertritt sie, wie
+    // schon bei Draco.
+    "Mavra":              {kopf:"orc",haut:"green",ruest:"leder",waffe:"schwert"},
+    // Bild: Sumpfmonster aus Moos und Faeulnis, unbewaffnet.
+    "Murky":              {kopf:"orc",haut:"dark_green"},
+    // Bild: gewaltiger oestlicher Drache mit goldener Maehne, an Ketten gelegt. Kein
+    // Drachenkopf; "lizard" fuer die Schuppenform, "amber" fuer den Goldschimmer, "plate"
+    // in "gold" fuer die schiere Masse (Bullbreaker).
+    "Leviathan":          {kopf:"lizard",haut:"amber",ruest:"plate",ruestTon:"gold"},
+    // Bild: schlanker Cyborg mit Bildschirmkopf, cyanfarbene Energieschlieren, unbewaffnet.
+    // Kein Roboterkopf im Baukasten; "fur_grey" fuer den metallischen Ton, wie bei
+    // Seraph-11.
+    "Node":               {kopf:"human",haut:"fur_grey",ruest:"leder"},
+    // Bild: ein Frachtschiff, kein Charakter — bereits als Widerspruch vorgelegt
+    // (BILDBEFUNDE). PLATZHALTER: kein Bauteil bildet ein Schiff ab; "plate" in "dunkel"
+    // fuer die rostige Masse ist die am wenigsten falsche Naeherung.
+    "Aegirion":           {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
+    // Bild: elfische Zauberin, schwarz-goldene Robe, Kristallstab, goldene
+    // Sternzeichen-Ringe. Kein Stab im animierbaren Satz (nur B_FIGUR kennt t_stab);
+    // "leder" vertritt die Robe.
+    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder"},
+    // Bild: kolossales kristallines Sternenwesen, wirbelnde Energieringe — dieselbe Wahl
+    // wie Krag'Zul (auch ein Kristallkoloss): "alien"/"lavender"/"plate" plus Hoerner fuer
+    // die Zacken.
+    "Starbound":          {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true},
+    // Bild: weisser Geisterwolf mit leuchtend blauen Runen, drittem Auge, unbewaffnet —
+    // der einzige Fall in dieser Welle, wo der Baukasten den woertlichen Kopf hat.
+    "Brightpaw":          {kopf:"wolf",haut:"fur_grey"},
+    // Bild: gehoerntes Tiefsee-Monster mit Tentakeln, Stachelpanzer, blauen Energieadern.
+    "Abysskraken":        {kopf:"lizard",haut:"blue",hoerner:true,ruest:"plate"},
+    // Bild: zerfallenes Geisterschiff, kein Besatzungsmitglied sichtbar — bereits als
+    // Widerspruch vorgelegt (BILDBEFUNDE). PLATZHALTER: kein Bauteil bildet ein Schiff ab;
+    // Kapuze und dunkler Hautton stehen fuer den Totenweg (Reaper Mage/Necromancer), nicht
+    // fuer eine Abbildung des Bildes selbst.
+    "Kreischende Kogge":  {kopf:"human",haut:"black",kapuze:true},
+    // Bild: alter, muskuloeser baertiger Mann mit Stammestaetowierungen, stuetzt sich auf
+    // einen Wanderstab (keine Waffe). Kein Bart im animierbaren Satz.
+    "Greybeard":          {kopf:"human",haut:"brown"},
+    // Bild: leuchtende Pflanze, wurzelt in einem Lichtbecken — kein humanoider Koerper.
+    // PLATZHALTER: kein Bauteil bildet eine Pflanze ab; "green" Hautton und "leder" stehen
+    // fuer den Support-Weg (Priest/Matriarch), nicht fuer eine Abbildung des Bildes selbst.
+    "Tropfina":           {kopf:"human",haut:"green",ruest:"leder"},
+    // Bild: Minotaurus mit Nasenring, stuetzt sich auf einen Holzstab (keine Waffe) —
+    // bereits als Widerspruch vorgelegt (BILDBEFUNDE, Servant-Unterklasse passt nicht zum
+    // Bild). Kein Minotaurus-Kopf im animierbaren Satz; "orc" mit Hoernern vertritt den
+    // Stierkopf.
+    "Roddox Harthelm":    {kopf:"orc",haut:"brown",hoerner:true},
+    // Bild: riesiges bruellendes Reptilwesen mit gehoerntem Kamm, Zaehnen und Klauen,
+    // unbewaffnet.
+    "Ironhoof":           {kopf:"lizard",haut:"olive",hoerner:true},
+    // Bild: alte Hexe mit leuchtend blauen Augen, dunkler bestickter Robe.
+    "Babuschinka":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder"},
+    // Bild: gehoerntes reptilienartiges Monster, unbewaffnet — bereits als Widerspruch
+    // vorgelegt (BILDBEFUNDE, weder Servant- noch Monk-Motiv im Bild).
+    "Rok Kyl":            {kopf:"lizard",haut:"dark_green",hoerner:true},
+    // Bild: massiger gehoernter Daemon mit violett leuchtender Brust, aggressiv.
+    "Omniclops":          {kopf:"orc",haut:"black",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
+    // Bild: gefluegelter Krieger in goldener Plattenruestung, Kriegshammer, Heiligenschein.
+    // Keine Fluegel im animierbaren Satz (nur B_FIGUR kennt z_fluegel); kein Hammer, das
+    // Schwert vertritt ihn wie schon bei Draco/Mavra.
+    "Enforcer":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",helm:true,waffe:"schwert"},
+    // Bild: Frau mit rosa Haar, schwarzer Spitzenrobe, spielt Gitarre — keine Waffe, keine
+    // Kapuze. "leder" vertritt die Robe.
+    "Melody":             {kopf:"human",haut:"light",ruest:"leder"}
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
 
