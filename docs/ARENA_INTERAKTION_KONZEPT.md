@@ -494,18 +494,52 @@ außerhalb der Fernwurfreichweite). Sichtbar im Feed: echte Passketten
 („Greenkraut passt zu Seraph-11. Seraph-11 passt zu Tidesprinter. Tidesprinter passt zu
 Greenkraut. Greenkraut trifft — +2.") statt sofortiger Alleingänge.
 
-**Offen — ehrlich gemessen, nicht schöngerechnet:** `messe-arena-einfluss.mjs basketball
-48` steht nach diesen Fixes bei **84,6 Pp** Abweichung — deutlich schlechter als die 27 Pp
-des Vorab-Modells vor diesem Umbau. Intelligence und Spirit (die beiden höchsten
-Matrixgewichte, 22 und 16, beide Haupttreiber von AUFBAU) lesen weiterhin exakt 0 %.
-Arbeitshypothese, noch nicht verifiziert: ein Spieler mit hohem AUFBAU passt öfter statt
-selbst zu werfen — das senkt seine EIGENEN `punkte` zugunsten von `assists` (Gewicht 1,0
-in `wert()`), was im Live-Modell netto ein schwächeres Signal für ihn selbst sein könnte
-als im Vorab-Modell, wo Assist und nachfolgender Wurf im selben Zug fest gekoppelt waren.
-Nicht weiter verfolgt in diesem PR — das würde vermutlich eine Zeit lang Tuning brauchen,
-und Chris' Auftrag war „erst sauber", nicht „erst perfekt balanciert". Zusätzlich: die
-Aufstellung wirkt visuell noch zu sehr wie eine Reihe (alle nah an derselben Y-Linie),
-kein echtes Formations-Gefühl — auch das ein Folge-Posten, keiner, den dieser PR löst.
+### Opus-Review vor dem Balance-Tuning — sieben echte Korrektheitsfehler, keine Balance-Frage
+
+Chris' ausdrückliche Auflage: erst ein Review durch Opus, dann erst Balance-Tuning. Gut
+so — der Review (instrumentierte Kopie, fünf komplette Spiele Tick für Tick protokolliert)
+fand, dass die Engine bei 84,6 Pp mechanisch **gar nicht lief**, nicht schlecht
+balanciert war: ein 45-Sekunden-Spiel produzierte 4-6 Ereignisse, der Ball lag bis zu 30s
+tot herum, drei der fünf Ereignistypen (Steal, Block, Nah-/Fernwurf) wurden nie erreicht.
+Balance-Tuning auf diesem Stand hätte Konstanten justiert, die nie gelesen werden. Sieben
+Funde, alle behoben:
+
+1. **Ball blieb liegen.** `bewegeSpielerLive` fragte `fsLive.ball.traeger?.side` ab — das
+   ist während Flug UND freiem Liegen `null`, also liefen alle zwölf Spieler in die
+   Ruheformation zurück und blieben dort (gemessen: bis zu 30,5 s Stillstand). Fix: eine
+   einzige Quelle dafür, wer angreift — `fsLive.amBall`, gesetzt in `ballUebernehmen`.
+2. **`fsLive.amBall` wurde gesetzt und nie gelesen** — genau das Feld, das Fund 1 braucht.
+3. **Nah-/Fernwurf waren unerreichbar.** Der Ballführer hatte ZWEI Dämpfungsfaktoren
+   hintereinander (Ziel-Fraktion *und* Lerp), effektiv ~0,2 % der Reststrecke pro Tick —
+   17-19 s bis zur Wurfreichweite bei 8 s Schussuhr. Jeder Angriff war Dribbeln plus
+   Verzweiflungswurf. Fix: ein Schritt, eigene (langsamere als die geteilte) Lerp-Rate
+   fürs Dribbeln.
+4. **Steal/Block waren unerreichbar.** Der Decker-Abstand war PROPORTIONAL zur Distanz
+   des Manns vom Korb (bei 450 px Korbabstand 135 px Sag) — weit außerhalb von
+   `STEAL_REICHWEITE`(45)/`BEDRAENGT_RADIUS`(30). Fix: Sag gedeckelt auf 35 px.
+5. **Doppeldeckung in ~85 % aller Ticks**, weil `zuordneDeckung`s Teil-Durchlauf die
+   volle Angreiferliste als „frei" ansah, obwohl übersprungene Verteidiger ihren Mann
+   behielten. Verzerrte jede ABWEHR-Messung.
+6. **Assists entstanden faktisch nur noch beim Alley-Oop** — ein normaler Pass reichte
+   den Passgeber nie bis zum späteren Wurf durch.
+7. **Der Spielzug war von einer Pass-Veredelung zur unabhängigen Alternative bei jeder
+   Entscheidung geworden**, ohne Distanzprüfung — gemessene Alley-Oops aus 438-679 px
+   Entfernung, obwohl das Vorab-Modell ausdrücklich „Nahdistanz-Kombinationen" meint.
+
+Dazu kleinere, unabhängige Funde: `u.lunge` wurde im Live-Pfad nie gesetzt (keine
+Wurf-/Pass-Animation mehr), ein toter Startwert für `reevBall`, ein 20 px-Versatz
+zwischen simuliertem und gezeichnetem Korb — alle mitbehoben.
+
+**Ergebnis, gemessen statt behauptet:** `messe-arena-einfluss.mjs basketball 48` fällt
+allein durch diese Korrektheitsfixes von 84,6 auf **48,2 Pp** — noch vor jeder gezielten
+Balance-Arbeit. Alle Ereignistypen treten jetzt in jedem Spiel auf (Playwright-Check: 17
+Pässe, 9 Treffer, 17 Fehlwürfe, 21 Rebounds, 3 Steals, 4 Blocks in einem einzelnen
+Spiel), Alley-Oop weiterhin bestätigt (732 Auslöser über viele Simulationsläufe). Nur
+Intelligence liest noch exakt 0 % — das ist jetzt echtes Balance-Tuning, kein
+Korrektheitsfehler mehr, und der nächste Schritt.
+
+Zusätzlich, unverändert offen: die Aufstellung wirkt visuell noch zu sehr wie eine Reihe
+(alle nah an derselben Y-Linie), kein echtes Formations-Gefühl.
 
 ### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
 
