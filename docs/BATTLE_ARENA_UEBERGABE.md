@@ -1110,6 +1110,64 @@ Streckenlayout gewünscht sein, ist das ein eigener Auftrag.
 
 ---
 
+## Kampf und Bahn auf ~60 Sekunden — ohne eine einzige Balance-Konstante anzufassen
+
+Buehne und Feldspiel hatten ihr 60-Sekunden-Ziel schon (`rundenDauer`, siehe oben). Kampf
+und Bahn standen bisher weit darunter und waren bewusst zurückgestellt:
+
+| Disziplin | Ist-Dauer vorher (n=20) |
+|---|---|
+| Spurt | 11,2 s |
+| Staffel | 12,9 s |
+| Time-Trial | 13,7 s |
+| Climbing | 13,7 s |
+| Takeshi's Castle | 27,6 s |
+| TDM | 32 s |
+| Mini-DM | 21 s |
+| Fechten | 37 s |
+| Battlefield | 12 s |
+
+Der Grund für das Zurückstellen war berechtigt: Kampf und Bahn laufen als durchgehende
+Physik, in der jede Formel über `dt` skaliert — Reserveverbrauch, Abklingzeiten,
+Ermüdung, Zufallschancen pro Tick. Irgendeine dieser Konstanten von Hand hochzuziehen,
+hätte das über zwanzig Disziplinen hinweg mit sehr viel Messarbeit passend gemachte
+Kräfteverhältnis riskiert wieder zu verstellen — genau das, was diese ganze Sitzung an
+Pp-Messungen aufgebaut hat.
+
+**Der sichere Weg, den es stattdessen gibt: keine Formel anfassen, nur wie viel
+Simulationszeit ein echter Sekundenbruchteil bewegt.** `loop()` fütterte `stepSim()`
+bisher immer mit einem festen `1/60`; jetzt mit `(1/60)/ZEIT_DEHNUNG[disc]`. Weil jede
+Formel im Kampf- und Bahn-Motor ausschließlich über `dt` skaliert — nichts darin fragt
+„wie viel echte Zeit ist vergangen", alles fragt nur „wie viel `dt` kam gerade rein" —
+ändert eine gleichmäßige Verkleinerung von `dt` die INNERE Balance nicht messbar. Es ist
+dasselbe Prinzip wie eine Zeitlupe im Film: derselbe Kampf, dieselbe Ereignisfolge relativ
+zu Position/Zustand, nur über mehr echte Sekunden gestreckt. Die Uhr im HUD zeigt
+`t*Faktor` bzw. `rennT*Faktor` an (die interne Zeitbasis selbst bleibt unverändert, damit
+Schwellen wie „Sudden Death ab t>50" korrekt sitzen — die verschieben sich automatisch mit,
+weil `t` an genau derselben Stelle im Kampf steht wie vorher).
+
+**Nachgewiesen, nicht behauptet:** `serieVon('tdm', 20).dauer` und der Mittelwert aus
+`bahnSerie('spurt', 20)` liefern nach der Änderung exakt dieselben Werte wie vorher (32
+bzw. 11,2) — die Messpfade rufen `stepSim`/`stepSpurt` direkt mit festem `1/60` auf, ohne
+über `loop()` zu laufen, und bleiben deshalb komplett unberührt. Live per Playwright
+gegengemessen: bei TEMPO 1× zeigt die Uhr nach 20,0 echten Sekunden „0:19", beim
+Kampfende nach 50,1 echten Sekunden „0:49" — Uhr und Stoppuhr laufen praktisch deckungsgleich.
+
+Faktoren (Ist-Dauer ÷ 60, siehe `ZEIT_DEHNUNG` in `battle-mode.html`):
+
+| Disziplin | Faktor | | Disziplin | Faktor |
+|---|---|---|---|---|
+| TDM | 1,88 | | Spurt | 5,36 |
+| Mini-DM | 2,86 | | Staffel | 4,65 |
+| Fechten | 1,62 | | Time-Trial | 4,38 |
+| Battlefield | 5,00 | | Climbing | 4,38 |
+| | | | Takeshi's Castle | 2,17 |
+
+Fehlt eine Disziplin in der Liste (Bühne, Feldspiel), bleibt sie automatisch unangetastet
+— `ZEIT_DEHNUNG[disc]||1` fällt auf Faktor 1 zurück.
+
+---
+
 ## Verlässliche Einstiegspunkte
 
 | Was | Wo |

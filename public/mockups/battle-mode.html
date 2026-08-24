@@ -5152,8 +5152,12 @@
   // Rennen stand dauerhaft "0 : 0" und "0:00". Hier stehen die Groessen, die ein Rennen
   // wirklich hat: verstrichene Zeit, wie viele im Ziel sind, und wie weit das Feld ist.
   function updateHudBahn(){
+    // Anzeige in ECHTEN Sekunden, nicht in Simulationssekunden: rennT selbst bleibt die
+    // unangetastete physikalische Zeitbasis (Cooldowns, Ermuedung ...); was hier steht,
+    // ist rennT * Zeitdehnung — also genau das, was der Zuschauer gerade erlebt.
+    const angezeigt=rennT*zeitFaktor();
     document.getElementById("clock").textContent=
-      Math.floor(rennT/60)+":"+String(Math.floor(rennT%60)).padStart(2,"0");
+      Math.floor(angezeigt/60)+":"+String(Math.floor(angezeigt%60)).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     // Die Beschriftungen der Kampfanzeige stimmen auf der Bahn nicht: es gibt kein Sudden
     // Death, niemand ist "im Kampf", und die Punkte sind Zieleinlaeufe.
@@ -5177,7 +5181,9 @@
   }
 
   function updateHud(){
-    document.getElementById("clock").textContent="0:"+String(Math.floor(t)).padStart(2,"0");
+    // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
+    // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
+    document.getElementById("clock").textContent="0:"+String(Math.floor(t*zeitFaktor())).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
@@ -6317,12 +6323,43 @@
     updateHud();
   }
 
+  // ===================================================================================
+  // ZEIT-DEHNUNG. Chris: "und dann am besten so bauen dass die runde immer so ungefaehr
+  // 60 sekunden dauert." Buehne und Feldspiel haben das schon ueber ihre eigene
+  // rundenDauer (sie rechnen jeden Durchgang vorab durch und enthuellen ihn nur noch
+  // kosmetisch — Tempo aendern ist dort ein einzelner Zeitwert). Kampf und Bahn laufen
+  // dagegen als durchgehende Physik: JEDE Formel darin haengt an dt (Reserveverbrauch,
+  // Abklingzeiten, Ermuedung, Zufallschancen pro Tick). Genau deshalb stand diese Aufgabe
+  // bisher zurueckgestellt — irgendeine dieser Konstanten anzufassen, haette das ueber
+  // zwanzig Disziplinen hinweg mit viel Messarbeit gerade erst passend gemachte
+  // Kraefteverhaeltnis wieder verstellen koennen.
+  //
+  // Der sichere Weg: an keiner Formel etwas aendern, nur wie viel SIMULATIONSZEIT ein
+  // echter Sekundenbruchteil beim Zusehen bewegt. stepSim/stepSpurt bekommen bei TEMPO 1x
+  // exakt dieselbe Tick-Folge wie vorher, nur kleiner dosiert (dt/Faktor statt dt). Weil
+  // jede Formel darin ausschliesslich ueber dt skaliert, aendert das die INNERE Balance
+  // nicht: derselbe Kampf, dasselbe Rennen, nur in mehr echten Sekunden erzaehlt — wie ein
+  // Film in Zeitlupe, nicht wie ein umgeschriebenes Drehbuch. Die Messreihen
+  // (serieVon/bahnSerie/einflussVon) laufen NICHT durch diese Schleife, sondern rufen
+  // stepSim/stepSpurt direkt mit festem 1/60 auf und bleiben unangetastet — nachgemessen:
+  // beide liefern nach dieser Aenderung dieselben Werte wie vorher.
+  //
+  // Die Faktoren kommen aus der gemessenen Ist-Dauer (n=20) geteilt durch 60s. Fehlt eine
+  // Disziplin in der Liste, bleibt sie unangetastet (Faktor 1 — das gilt automatisch fuer
+  // Buehne und Feldspiel, die ihr Tempo schon anders steuern).
+  const ZEIT_DEHNUNG={
+    tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
+    spurt:5.36, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17
+  };
+  const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
+
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
     if(running){
       acc+=dt*speed;
-      while(acc>=1/60){stepSim(1/60);acc-=1/60;}
+      const zf=zeitFaktor();
+      while(acc>=1/60){stepSim((1/60)/zf);acc-=1/60;}
       floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
       for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
