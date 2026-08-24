@@ -4479,9 +4479,23 @@
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
     ctx.strokeStyle="#3a2f20";ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
-    // Mittellinie, dezent
-    ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;ctx.setLineDash([6,10]);
-    ctx.beginPath();ctx.moveTo(MID,26);ctx.lineTo(MID,H-26);ctx.stroke();ctx.setLineDash([]);
+    // FARBIGE HAELFTEN. Chris: "wir muessen auf jeden Fall beide Teams in der Arena
+    // besser voneinander unterscheiden koennen, sonst ist es sehr unuebersichtlich." Im
+    // Getuemmel sieht man kaum noch, wer zu wem gehoert, wenn nur ein duenner Ring am
+    // einzelnen Kaempfer haengt. Also faerbt schon der BODEN die Seite ein — sanft genug,
+    // um den Sand nicht zu verdecken, deutlich genug, um auf einen Blick zu tragen.
+    const heim=ctx.createLinearGradient(0,0,MID,0);
+    heim.addColorStop(0,"rgba(242,160,61,.16)");heim.addColorStop(1,"rgba(242,160,61,0)");
+    ctx.fillStyle=heim;ctx.fillRect(0,0,MID,H);
+    const gast=ctx.createLinearGradient(MID,0,W,0);
+    gast.addColorStop(0,"rgba(69,176,201,0)");gast.addColorStop(1,"rgba(69,176,201,.16)");
+    ctx.fillStyle=gast;ctx.fillRect(MID,0,W-MID,H);
+    // Mittellinie, jetzt in beiden Teamfarben statt neutralem Weiss
+    ctx.strokeStyle="rgba(242,160,61,.35)";ctx.lineWidth=1.5;ctx.setLineDash([6,10]);
+    ctx.beginPath();ctx.moveTo(MID-1,26);ctx.lineTo(MID-1,H-26);ctx.stroke();
+    ctx.strokeStyle="rgba(69,176,201,.35)";
+    ctx.beginPath();ctx.moveTo(MID+1,26);ctx.lineTo(MID+1,H-26);ctx.stroke();
+    ctx.setLineDash([]);
     // Fackeln
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
       ctx.fillStyle="#2b2318";ctx.fillRect(x-3,y,6,22);
@@ -5393,11 +5407,20 @@
       ctx.globalAlpha=u.down?.28:1;
       // Schatten und Teamring bleiben — ohne sie sieht man im Getuemmel nicht, wer zu wem
       // gehoert. Der Ring liegt UNTER der Figur, damit er sie nicht ueberdeckt.
+      //
+      // VORHER: ein 1,5 px Strich bei 70 % Deckkraft — im dichten Getuemmel (siehe
+      // Battlefield-Screenshot) ging er neben Sprite und Beschriftung unter, und man
+      // musste raten, wer zu wem gehoert. JETZT: eine gefuellte Teamfarb-Flaeche unter
+      // jeder Figur plus ein kraeftigerer Ring, beide deutlich sichtbar auch bei zehn
+      // Kaempfern auf engem Raum.
+      ctx.globalAlpha=u.down?.10:.22;
+      ctx.fillStyle=c;
+      ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
       ctx.globalAlpha=u.down?.12:.30;
       ctx.fillStyle="#000";
       ctx.beginPath();ctx.ellipse(x,y+19,13,4.5,0,0,6.3);ctx.fill();
-      ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.globalAlpha=u.down?.18:.7;
-      ctx.beginPath();ctx.ellipse(x,y+19,15,5.5,0,0,6.3);ctx.stroke();
+      ctx.strokeStyle=c;ctx.lineWidth=2.5;ctx.globalAlpha=u.down?.22:.95;
+      ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.stroke();
       ctx.globalAlpha=u.down?.28:1;
       ctx.imageSmoothingEnabled=false;
       zeichneSprite(ctx,u,x,y);
@@ -5425,7 +5448,10 @@
         ctx.strokeText(txt,x,y+dy);
         ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
       };
-      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,"#dfe6ef",9.5);
+      // Der Name in Teamfarbe statt neutralem Grau — derselbe Grund wie beim Ring: in
+      // einem Gedraenge aus zehn Beschriftungen war vorher nicht auf einen Blick zu sehen,
+      // welcher Name zu welcher Seite gehoert.
+      schrift(u.n.length>14?u.n.slice(0,13)+"…":u.n,44,c,9.5);
       // Der eingestellte Befehl steht am Icon: so laesst sich nachpruefen, dass die Einheit
       // wirklich tut, was der Tooltip in der Aufstellung versprochen hat.
       schrift(u.heiler?"HEILER":(ORDTIP[u.ord]?ORDTIP[u.ord].l.toUpperCase():""),55,
