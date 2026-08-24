@@ -3342,6 +3342,7 @@
                        : schuetze.n+" trifft"+(flug.fern?" von weit draußen":"")+" — +"+flug.punkte+".";
       feed(schuetze.side,txt,true);
       logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug});
+      if(feldspielDisc==="basketball"){bkSfx("korb_treffer.mp3",0.65);bkSfx("publikum_jubel.mp3",0.35);}
       const gross=!!(szDef&&(szDef.jubel==="gross"||szDef.jubel==="riesig"));
       schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
         life:gross?1.7:1,crit:true,_spieler:schuetze.id,_gross:gross});
@@ -3366,9 +3367,11 @@
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
+        if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
         feed(schuetze.side,vor+schuetze.n+" verfehlt"+(flug.fern?" von weit draußen":"")+".");
         logZug(schuetze.side,"fehlwurf",{spieler:schuetze});
+        if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.4);
       }
       fsAktuell={spieler:null,verteidiger:flug.blockKandidat,passgeber:flug.passgeber,rebounder:null};
       // REBOUND-STREUUNG: vorher landete jeder Fehlwurf exakt auf dem Ringpunkt — jeder
@@ -3526,7 +3529,8 @@
   function stepBasketballLive(dt){
     if(done)return;
     fsT+=dt;
-    if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0}; return; }
+    if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
+      bkSfx("buzzer.mp3",0.8); bkLoopStop(); return; }
     const art=FB();
     fsLive.angriffSeit+=dt;
     for(const team of FSTEAM)for(const u of team){
@@ -6723,6 +6727,32 @@
     if(!bkMuster[n])bkMuster[n]=ctx.createPattern(bkBild[n],"repeat");
     return bkMuster[n]; };
 
+  // Basketball-Sound (Fables Recherche, 24.08.): lag als Datei bereit, aber die ganze
+  // Datei hatte bisher KEINERLEI Audio-Infrastruktur (kein <audio>, kein Audio(), kein
+  // AudioContext — nachgeprueft). Ein-Schuss-Effekte ueber einen kleinen Pool (mehrere
+  // gleichzeitige Instanzen moeglich, z.B. wenn zwei Treffer knapp hintereinander fallen),
+  // Dribbeln/Publikum als EIN Loop-Objekt je Kanal, gestartet/gestoppt vom Play-Button
+  // (echte Nutzergeste — Browser blocken Audio sonst).
+  const bkSfxPool={};
+  function bkSfx(name,vol){
+    try{
+      let pool=bkSfxPool[name];
+      if(!pool){pool=bkSfxPool[name]=[0,1,2].map(()=>{const a=new Audio("/sound/basketball/"+name);a.preload="auto";return a;});}
+      const frei=pool.find(a=>a.paused||a.ended)||pool[0];
+      frei.currentTime=0;frei.volume=vol??0.6;frei.play().catch(()=>{});
+    }catch(e){}
+  }
+  const bkLoop={dribbeln:null,publikum:null};
+  function bkLoopStart(){
+    if(!bkLoop.dribbeln){
+      bkLoop.dribbeln=new Audio("/sound/basketball/dribbeln.mp3");bkLoop.dribbeln.loop=true;bkLoop.dribbeln.volume=0.22;
+      bkLoop.publikum=new Audio("/sound/basketball/publikum_ambiente.ogg");bkLoop.publikum.loop=true;bkLoop.publikum.volume=0.16;
+    }
+    bkLoop.dribbeln.play().catch(()=>{});bkLoop.publikum.play().catch(()=>{});
+  }
+  function bkLoopPause(){ if(bkLoop.dribbeln){bkLoop.dribbeln.pause();bkLoop.publikum.pause();} }
+  function bkLoopStop(){ bkLoopPause(); if(bkLoop.dribbeln){bkLoop.dribbeln.currentTime=0;bkLoop.publikum.currentTime=0;} }
+
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
     if(istBuehne(disc))return bodenBuehne();
@@ -8235,6 +8265,7 @@
 
   function reset(){
     running=false;done=false;last=0;acc=0;pfeile=[];
+    bkLoopStop();
     build();
     document.getElementById("feed").textContent="";
     document.getElementById("play").textContent="Kampf starten";
@@ -8256,6 +8287,9 @@
     zeigeEinlauf(false);
     running=!running;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
+    // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
+    // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
+    if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
   });
   document.getElementById("reset").addEventListener("click",reset);
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
@@ -8597,6 +8631,7 @@
       return c.toDataURL();
     },
     renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
+    setDisc:(d)=>{ disc=d; reset(); },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
