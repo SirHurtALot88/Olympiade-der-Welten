@@ -276,10 +276,32 @@ eingearbeitet (`BILDBEFUNDE`), 594 fehlen.
 Ebenfalls dort: `Rassen Klassen Traits.xlsx`, `Oly Player Stats 05-2026.xlsx`,
 `Olympiade Player Stats.csv` — noch nie angesehen.
 
-### 2. Hintergründe für die Disziplinen
+### 2. Hintergründe für die Disziplinen — ERLEDIGT am 24.08.
 
-TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Noch gar nicht
-angefangen, weil OpenGameArt nicht erreichbar war. Jetzt ist es das.
+TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Beides steht jetzt
+aus echten Kacheln statt aus Farbverläufen: Sandgrund und Ziegelring mit brennenden
+Fackeln, Rasen mit Baumreihe, Holzzaun und ockerfarbener Laufbahn.
+
+Dreizehn Dateien, zusammen **56 KB**, in `public/sprites/arena/`; `quellen.json` belegt zu
+jeder Paket, Blatt, Schnittstelle, Urheber und Lizenz, `HERKUNFT/` trägt die
+Urheberketten im Wortlaut (bei CC-BY-SA ist das Bedingung, nicht Höflichkeit). Erzeugt und
+jederzeit neu erzeugbar mit `node scripts/arena-assets-schneiden.mjs`.
+
+Die Kachelwahl ist **gemessen, nicht nach Augenmaß**: für jede Fläche hat ein Suchlauf im
+Originalblatt jede mögliche 32×32-Stelle geprüft — voll deckend, texturiert, und mit
+möglichst unauffälliger Kante beim Wiederholen. Dass das allein nicht reicht, hat der Lauf
+selbst gezeigt: zweimal gewann eine **Wasserkachel** die Ausschreibung für „Sand", weil der
+Suchbereich in den Nachbarblock reichte, und ohne Textur-Schranke gewann jedes Mal die
+einfarbige Grundfläche — eine Fläche ohne Muster hat keine Kante. Jede Wahl ist deshalb
+zusätzlich als 3×3-Kachelung angesehen worden.
+
+**Der Boden fällt einzeln zurück.** Fehlt eine Kachel, zeichnet genau dieser Teil die alte
+Fassung; eine fehlende Fackel nimmt nicht den Sandboden mit. Nachgemessen, indem die Datei
+aus einem Ordner ausgeliefert wurde, in dem alle Kacheln 404 geben — es erscheint weiter
+die gezeichnete Arena von vorher.
+
+Und weil es zählt: **an der Simulation ändert das keine Zeile.** Beide Disziplinen laufen
+im Browser durch, Konsole ohne Fehler.
 
 ### 3. Die Lauf-Sprites — zum größten Teil erledigt, der Rest ist keine Lücke
 
@@ -311,10 +333,35 @@ Ebene den LPC-Pfad fest.
 Draco kann mit Doppelaxt stehen und gehen, nicht rennen. Das ist eine Entscheidung
 (Waffe im Sprint ausblenden, oder `walk` fahren), kein Beschaffungsproblem.
 
-Offen bleiben zwei benannte Lücken:
-- **Krone für die Arena** — King Arlen hat sie in der Kaderliste, im Kampf noch nicht.
-- **Vogel-Sprite für Seraph-11** — sein Bild zeigt einen mechanischen Vogel; er läuft als
-  Metallgestalt mit Flügeln. Steht als Platzhalter im Code.
+**Nachgeprüft am 24.08. mit offenem Netz, und die Lücke ist echt:** der größte
+Erweiterungssatz des Ökosystems — *Expanded Universal LPC Spritesheet: Idle, Run, Jump,
+LPC Revised Combat and Assets* von JaidynReiman (Stand 15.10.2024, OGA-BY 3.0/4.0) — bringt
+`run` ausschließlich für **Kleidung und Körper**: Hemden, Hosen, Socken, Schuhe, Stiefel,
+Hosenträger. Keine Waffe, kein Umhang, keine Plattenarme. Wer also nochmal loszieht, um
+Renn-Bilder für die Doppelaxt zu suchen, sucht etwas, das es nicht gibt. Der einzige
+weitere Ort wäre ElizaWy' *LPC Revised* (github.com/ElizaWy/LPC) — ein **neu gezeichneter**
+Satz mit anderen Proportionen; das wäre kein Nachschub, sondern ein Stilwechsel für alle
+Figuren.
+
+Die zwei benannten Lücken haben sich beim Nachsehen als etwas anderes herausgestellt:
+
+- **Krone für die Arena** — **kein Beschaffungsproblem mehr.** `krone_walk`, `krone_run`,
+  `krone_idle`, `krone_hurt` und `krone_shoot` liegen seit PR #654 in
+  `public/sprites/baukasten/`. Aber `battle-mode.html` trägt die Blätter als base64 im
+  HTML, und dort stecken **77** — die alten. Die 209 neuen liegen nur als Dateien. Solange
+  das so ist, kann King Arlen im Kampf keine Krone tragen, obwohl das Blatt da ist. Die
+  Frage ist damit: **lädt der Baukasten künftig aus Dateien statt aus base64?** Das ist
+  eine Entscheidung über die Ladeweise, keine Suche. (Der Boden geht diesen Weg bereits.)
+- **Vogel-Sprite für Seraph-11** — **gefunden.** `[LPC] Birds` von bluecarrot16 hat einen
+  Adler mit vier Flug- und vier Standrichtungen zu je drei Bildern; er liegt als
+  `public/sprites/arena/vogel_adler.png`. **Noch nicht verbaut** — er müsste über dieselbe
+  Metall-Rampe umgefärbt werden wie der Harnisch, damit aus dem Adler ein mechanischer
+  Vogel wird.
+
+**Nebenbefund, der jemanden beißen wird:** von den 286 Blättern im Baukasten stehen nur
+**77 in `index.json`** und **45 in `quellen.json`**. Die 209 Bewegungsblätter aus PR #654
+sind in keiner der beiden Listen. Wer künftig fragt „woher kommt `arme_run`?", findet keine
+Antwort — obwohl die Datei da ist.
 
 ---
 

@@ -17,8 +17,15 @@ describe("media assets portrait mapping", () => {
       "/api/media/player-portrait/player-0154-riley-le-rouge",
     );
     expect(getPlayerPortraitPathById("player-2969-lakshmi-ekelemann")).toContain("Lakshmi Ekelmann.jpg");
-    expect(getPlayerPortraitBrowserUrl("player-2968-toothkrix")).toBe(
-      "/api/media/player-portrait/player-2968-toothkrix",
+    // public/portraits/ now carries a Dropbox-sourced file for toothkrix (see
+    // public/portraits/README.md), and files there always outrank the legacy
+    // absolute-path map above (lib/data/mediaAssets.ts, same rule as team
+    // logos below). "peacock" is the one player the Dropbox import found no
+    // matching image for, so it's the case that still exercises the legacy
+    // API-route fallback.
+    expect(getPlayerPortraitBrowserUrl("player-2968-toothkrix")).toBe("/portraits/toothkrix.jpg");
+    expect(getPlayerPortraitBrowserUrl("player-2676-peacock")).toBe(
+      "/api/media/player-portrait/player-2676-peacock",
     );
     expect(getPlayerPortraitPathById("player-2676-peacock")).toContain("Peacock.png");
   });
