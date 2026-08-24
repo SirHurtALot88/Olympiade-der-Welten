@@ -1,25 +1,53 @@
-# Interaktion in Bühne und Bahn — ein Konzept, kein Code
+# Interaktion in allen Disziplinen — ein Konzept, kein Code
 
-Stand: 24.08.2026. Entstanden aus Chris' Beobachtung, dass Bühne-Disziplinen sich wie
-„nur Rumstehen" anfühlen — jeder wird unabhängig bewertet, es gibt keinen Berührungspunkt
-zwischen Konkurrenten. Ausgearbeitet zusammen mit Fable (auf dessen ausdrücklichen Wunsch
-hinzugezogen), an zwei von Chris genannten Fällen: **Breaking** (Schmerz aushalten,
-Folter-Thematik) und **Eiskunstlauf**. Dazu ein zweiter Strang: Bahn soll zoombar werden,
-mit echten Lanes und einem Preis fürs Überholen.
+Stand: 24.08.2026, zweite Fassung. Entstanden aus Chris' Beobachtung, dass Bühne-
+Disziplinen sich wie „nur Rumstehen" anfühlen. Ausgearbeitet zusammen mit Fable (zweimal
+hinzugezogen, auf Chris' ausdrücklichen Wunsch). Die erste Fassung deckte nur zwei
+Bühne-Fälle ab (Breaking, Eiskunstlauf) und beschränkte Störung auf „nur den
+Punkteführer angreifen" — Chris' Rückmeldung dazu direkt: das sei „irgendwie kacke",
+weil es Interaktion auf einen einzigen, statischen Fall verengt. Diese Fassung geht
+weiter: Interaktion in **allen** beweglichen Disziplinen, eine Regel für **echte**
+Verletzungen als Spielkonsequenz statt Zierde, und eine Antwort auf die Frage, ob
+Bewegungs-Disziplinen ein eigenes Skill-System brauchen.
 
-**Dies ist ein Konzeptdokument, kein implementierter Code.** Die andere Sitzung baut zur
-selben Zeit live an `battle-mode.html` (drei Motoren fertig — Kampf, Bahn, Bühne —, ein
-vierter „Feldspiel" im Bau). Um nicht in dieselbe Datei zu schreiben, während dort aktiv
-gearbeitet wird, liegt das hier als eigenständiges Dokument vor. Umsetzung folgt, sobald
-der aktuelle Stand dort ruht.
+**Dies ist ein Konzeptdokument, kein implementierter Code.** Die andere Sitzung hat
+inzwischen #656 gemergt: alle vier Motoren (Kampf, Bahn, Bühne, Feldspiel) existieren
+jetzt als echter Code in `battle-mode.html`, nicht mehr nur als Namen. Dieses Dokument
+prüft seine Vorschläge deshalb an der echten Datei, nicht mehr an einer Beschreibung.
 
 ---
 
-## Die Grundidee: keine neuen Werte, nur eine neue Lesart
+## Ein Strukturbefund, der alles Weitere bestimmt
 
-Die Battle Arena hat bereits fünf Kampfwerte, jeder ein gewichtetes Rezept über dieselben
-zwölf Attribute (`lib/battle/…`, im Mockup ab `const REC.power` — siehe
-`docs/BATTLE_ARENA_UEBERGABE.md`):
+Beim Nachsehen im jetzt gemergten Bühne-Code (`battle-mode.html`, `bauBuehne()`,
+~Zeile 2583) zeigt sich etwas Wichtiges: **Bühne (und genauso Feldspiel) ist nicht live
+simuliert.** Der komplette Auftritt — alle Durchgänge jedes Teilnehmers, jedes Gelingen
+und Misslingen — wird in einem einzigen synchronen Durchlauf beim Aufbau **vorab
+berechnet** (`ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN`,
+Kommentar im Code). Die sichtbare Zeit auf der Bühne ist reine Enthüllungsgeschwindigkeit
+— sie ändert nichts am Ergebnis.
+
+**Das entscheidet die zentrale offene Frage der ersten Fassung von selbst:** eine
+Störung, die „den Punktezuwachs für X Sekunden pausiert", kann in diesem Modell nicht
+funktionieren — es gibt keinen laufenden Zeitstrom, den man pausieren könnte, nur eine
+Liste bereits fertiger Zahlen. Störung muss deshalb **in denselben Vorab-Durchlauf**
+eingewoben werden, als zusätzlicher Faktor in der bestehenden Erfolgsformel:
+
+```js
+const erfolg=Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035);
+```
+
+(`battle-mode.html:2612`, exakt der Ort, an dem TECHNIK und NERVEN heute schon
+entscheiden, ob ein Durchgang gelingt.) Kampf und Bahn sind dagegen weiterhin **echte**
+Frame-für-Frame-Simulationen (`stepSim`, `requestAnimationFrame`) — dort bleibt eine
+live wirkende Störung (Engstellen, Tackles) genau richtig.
+
+---
+
+## Die Grundidee bleibt: keine neuen Werte, nur eine neue Lesart
+
+Die Battle Arena hat fünf Kampfwerte, jeder ein gewichtetes Rezept über dieselben zwölf
+Attribute:
 
 ```
 ANG (Angriff)      power 62 · charisma 18 · determination 12 · torment 8
@@ -29,156 +57,292 @@ TMP (Tempo)         speed 46 · dexterity 24 · stamina 16 · awareness 14
 AUS (Ausdauer)       stamina 52 · determination 26 · power 22
 ```
 
-Schaden im Kampf-Motor: `Basisschaden × (ANG/50) × 100/(100+VER)`. Trefferchance beim
-Tackle im Bahn-Motor (`battle-mode.html:4428`): `stark = WUCHT/(WUCHT+ROBUST)` — ein
-Muster, das schon zweimal im Code steht, bevor dieses Konzept überhaupt entstand.
-
-**Der Vorschlag: Bühne bekommt eine Störung, die exakt dieselben fünf Werte wiederverwendet
-— nur mit neuer Bedeutung.** ANG wird zum Sabotage-Wurf, VER/LP zur Resilienz dagegen, TMP
-zum Ausweichen/Wegkommen (genau Chris' Vorgabe für Eiskunstlauf: „speed wie schnell man weg
-kommt"), AUS zum Durchhalten. Keine sechste Wertefamilie — dieselbe Formel, anders gelesen.
-Das hält die Regel „keine erfundenen Werte" ein: die *Bausteine* sind alle schon belegt,
-erfunden sind nur die Zahlen, die sie zusammenfügen (unten einzeln markiert).
+Schaden im Kampf: `Basisschaden × (ANG/50) × 100/(100+VER)`. Trefferchance beim Tackle im
+Bahn-Motor: `stark = WUCHT/(WUCHT+ROBUST)` (`battle-mode.html:5871`, seit #656 mit
+`BA().tackleAb`/`BA().tackleRate` je Disziplin konfigurierbar). Beide Muster tauchen
+unten wieder auf — nicht neu erfunden, nur auf neue Situationen angewendet.
 
 ---
 
-## Bühne: die Störung als geteilter Zustand
+## Bewegungs-Disziplinen: Geraden und typisierte Engstellen
 
-Bisher entstehen Bühne-Punkte als fertige Blöcke je Durchgang (Gelingen/Misslingen über
-sieben Rollen: GRUNDLAGE, SPITZENMOMENT, TECHNIK, PUBLIKUM, NERVEN, AUSDAUER, WAGNIS —
-diese Rollen sind aus der PR-Beschreibung von #656 übernommen; **der Code dazu liegt nicht
-im geprüften Stand, nur die Namen**). Damit gibt es nichts, das ein Gegner einem wegnehmen
-könnte. Der Vorschlag macht daraus einen **Strom über Zeit**:
+Chris' Bild: Climbing soll keine glatte Wand sein, sondern ein Parcours mit **großen
+Hindernissen**, an denen mehrere Läufer zusammenkommen und sich um die Position streiten
+— mal kraftbasiert (gerade hoch, Griffstärke), mal agilitätsbasiert (seitwärts). Und:
+das Ergebnis muss aus der Eignung selbst folgen, nicht daneben erzählt werden — „wir
+haben bisher Werte, die projizieren nur eins zu eins und zeigen irgendein random
+Gameplay. Jetzt will ich, dass wir die Werte in ein Gameplay-System übersetzen und das,
+was wir sehen, das Ergebnis ist."
 
-- **Störwurf** — Trefferchance = `ANG_Störer / (ANG_Störer + TMP_Ziel)`, dasselbe Muster
-  wie der Tackle im Bahn-Motor.
-- **Aussetzer** — bei Treffer ruht der Punktezuwachs des Ziels für
-  `T = T_basis × 100/(100+VER_Ziel)` — derselbe Mitigations-Term wie beim Kampfschaden,
-  nur auf Zeit statt HP angewandt. VER 40 → 71 % der Basiszeit; VER 80 → 56 %.
-- **Fassung (aus LP)** — Pool `LP × 10`. Treffer ziehen `Basisschaden × (ANG/50)` ab;
-  unter 50 %/25 % Fassung sinkt die Gelingenschance der verbleibenden Durchgänge um
-  10/20 Prozentpunkte.
-- **Budget (aus AUS)** — Störversuche kosten den Störer selbst (eigene Performzeit,
-  eigene Fassung). Budget = `⌊AUS/25⌋` Versuche je Auftritt.
+**Guter Ausgangspunkt, schon gemergt:** #656 hat den Bahn-Motor bereits auf fünf
+Disziplinen verallgemeinert (`BAHN_ART`), mit sieben Rollen pro Disziplin (ANTRITT,
+ENDTEMPO, TECHNIK, WENDIGKEIT, STEHEN, WUCHT, ROBUST) und eigenem Hindernis-Wort
+(„Hürde", „Griff", „Kurve", „Falle") je nach Disziplin. Climbing hat dort bereits zehn
+Griffe statt Hürden, mit eigenem Rezept (`TECHNIK` aus Dexterity/Awareness fürs
+Greifen, `WUCHT` aus Power/Determination fürs Durchziehen bei Fehlgriff). Was fehlt, ist
+die **Engstelle als geteilter Ort** — heute läuft jeder Teilnehmer für sich auf seiner
+eigenen Bahn, Kontakt gibt es nur beim seitlichen Tackle.
 
-### Breaking, durchgerechnet
+### Drei Verben statt einer Formel
 
-Eine passive Schmerzquelle tickt 8 Fassung/Sekunde gegen jeden Teilnehmer — das ist der
-Kern der Disziplin, kein Gegnerzutun nötig. Gegner können nachlegen: Basisschaden 30,
-ANG 55 → 33 Schaden. VER wirkt hier **nicht** als Schadensreduktion, sondern verdoppelt
-sich in der Erholungszeit: nach einem Treffer tickt der Schmerz `4 s × 100/(100+VER)`
-zusätzlich (VER 40 → 2,9 s Nachwirkung, VER 80 → 2,2 s). Sieger: wer am längsten steht.
-Zwischenwertung: Haltungspunkte pro Sekunde.
+1. **FORTBEWEGEN** — auf Geraden, wie heute (`ANTRITT`/`ENDTEMPO`).
+2. **ARBEITEN** — an einer Passage. Eine Passage ist kein Zeitabzug mehr, sondern ein
+   **Arbeitskonto**, das mit einer Rate abgetragen wird: `rate = TYP_WERT × 0,2`
+   Arbeitspunkte/s (Platzhalter, wie alles hier). Eine Passage mit `arbeit: 100`
+   (Chris' eigenes Beispiel, ausdrücklich als Platzhalter genannt) kostet bei
+   `TYP_WERT 78` → 15,6/s → **6,4 s**; bei `TYP_WERT 45` → 9,0/s → **11,1 s**.
+3. **STREITEN** — um einen Platz an der Engstelle, nach demselben Tackle-Muster
+   `WUCHT/(WUCHT+ROBUST)`, das im Bahn-Motor schon existiert. Keine neue Formel, nur eine
+   neue Gelegenheit, sie anzuwenden.
 
-### Eiskunstlauf, durchgerechnet
+Jede Passage bekommt eine `kapazitaet` (wie viele Läufer gleichzeitig arbeiten dürfen).
+Kapazität 1 = Nadelöhr, Kapazität 2 = breite Stelle. Wer ankommt und keinen Platz findet,
+wartet — oder streitet: exakt Chris' Bild vom „Zusammenstehen und Festhängen für ein
+paar Sekunden".
 
-Kür bleibt eine Elementfolge (Durchgänge wie bisher). Ein Störer mit ANG 60 greift ein
-Ziel mit TMP 45 an: Trefferchance `60/(60+45) ≈ 57 %`. Bei Treffer misslingt das laufende
-Element automatisch, der Punktestrom ruht `3 s × 100/(100+VER_Ziel)` (VER 50 → 2 s). Der
-Preis für den Störer: sein **eigener** nächster Durchgang bekommt −15 Prozentpunkte
-Gelingenschance — er hat seine eigene Kür für den Angriff unterbrochen.
+### Climbing, durchgerechnet (alle Zahlen Platzhalter)
 
-### Der Balance-Anker
+Zwei Passagentypen: **ZUG** (gerade hoch, Griffstärke: `power 45, determination 35,
+health 20`) mit Rutschrisiko, und **QUER** (seitwärts, Agilität: `dexterity 50,
+awareness 30, speed 20`), dazu **DRUCK**/**HALT** als WUCHT/ROBUST-Analogon fürs
+Streiten um eine besetzte Passage.
 
-Erwartungsnutzen des Störens = Trefferchance × entgangene Gegnerpunkte, gegen einen fixen
-eigenen Preis. Ziel: Stören lohnt sich gezielt gegen den Führenden, nicht flächendeckend —
-sonst wird Bühne zu einem Kampf-Motor im Kostüm, und das ist ausdrücklich nicht die Absicht.
+| | Kraftkletterer K | Agiler Kletterer A |
+|---|---|---|
+| Werte | TEMPO 55, ZUG 78, QUER 42, DRUCK 70, HALT 65 | TEMPO 75, ZUG 45, QUER 80, DRUCK 40, HALT 45 |
+| 3 Geraden | 4,2 s | 3,5 s |
+| ZUG-Passage (arbeit 100) | 6,4 s | 11,1 s (+ Rutschrisiko) |
+| QUER-Passage (arbeit 80) | 9,5 s | 5,0 s |
+| **Summe** | **20,1 s** | **19,6 s** |
+
+Das Rennen ist knapp — aber die **Segment-Splits erzählen, wer wer ist**: K holt seinen
+Vorsprung komplett an der Griffpassage, A komplett auf Geraden und im Quergang. Genau
+Chris' Punkt: das Ergebnis (inklusive der Splits als Anzeige) *ist* die Übersetzung der
+Werte, keine Zufallsanimation daneben.
+
+**Die Engstelle:** A kommt zuerst an der ZUG-Passage (Kapazität 1) an und besetzt sie. K
+kommt 0,7 s später und streitet: `p = DRUCK_K/(DRUCK_K+HALT_A) = 70/115 ≈ 61 %`. Gelingt
+es, verliert A Fortschritt und taumelt kurz; K übernimmt den Platz. Misslingt es, wartet
+K mit Cooldown (analog zum bestehenden `tackleCd=1.8`) und versucht es erneut oder
+arbeitet, sobald frei. **Ob** überhaupt gestritten wird statt gewartet, hängt an der
+bereits bestehenden Persönlichkeits-Tabelle (`willTackeln`, `battle-mode.html:5850`) —
+die passt unverändert.
+
+**Runterrutschen** (nur ZUG-Passagen): je Sekunde ein Haltecheck, Rutschchance
+`clamp(0,02 + (50−ZUG)×0,004; 0; 0,25)` (Platzhalter). Bei Rutsch verliert er 30 % der
+bisherigen Arbeit an dieser Passage (Platzhalter) — sichtbar als Zurückrutschen, kein
+Sturz. Das Analogon zur Hürden-Kaskade Technik→Wucht→Sturz im Spurt: Schwäche kostet
+Zeit, tötet aber nicht.
+
+### Übertragung auf Staffel und Spurt
+
+- **Spurt** ist bereits eine Instanz dieses Modells: Hürden sind Passagen mit
+  `arbeit≈0` und Sofort-Check statt Arbeitskonto, Tackles sind das Streiten. Nichts
+  umzubauen.
+- **Staffel:** Basisziel bleibt Timing. Die **Stab-Übergabe wird eine Passage** vom Typ
+  WECHSEL (Rezept `dexterity/awareness/will`, Platzhalter) mit kleinem Arbeitskonto —
+  ein sauberer Wechsel trägt sich schnell ab. Support obendrauf: während des
+  Übergabefensters ist der Übergebende **streitbar** — ein Gegner in Reichweite darf
+  einen DRUCK/HALT-Check setzen; verliert der Übergebende, kostet es Übergabezeit oder
+  einen Fast-Fumble.
+
+### Die Übersetzungsebene als Regel, nicht nur als Ziel
+
+Damit die Matrix nicht nur die Eignung ausrechnet, sondern die **Strecke selbst formt**:
+der Streckengenerator verteilt das Zeitbudget einer Disziplin auf Segmentklassen
+**proportional zu den Matrixgewichten** der Attribute, die die jeweilige Klasse füttern.
+Lädt die Matrix 40 % auf Speed/Dexterity und 35 % auf Power/Determination, besteht die
+Strecke zu ~40 % Zeitanteil aus Geraden/QUER und ~35 % aus ZUG-Passagen. Ein Spieler mit
+95 in dieser Matrix muss dann zwangsläufig in beiden Segmentklassen liefern — die
+Eignung kann nicht mehr an der Strecke vorbeiprojizieren, weil die Strecke aus ihr selbst
+gebaut ist.
 
 ---
 
-## Bahn: Lanes, Überhol-Ökonomie, Kamera
+## Bühne: die Störung als Faktor im Vorab-Durchlauf
 
-**Ein Überraschungsbefund beim Nachsehen:** ein Großteil dessen, was Chris sich wünscht,
-existiert bereits, nur unsichtbar. `battle-mode.html:4273`:
+Wegen des Strukturbefunds oben ist die Störung jetzt **kein Zeit-Aussetzer mehr**,
+sondern ein Malus auf die bestehende Erfolgschance, gesetzt für einzelne Durchgänge
+während desselben Vorab-Durchlaufs, der heute schon alle Punkte berechnet.
+
+**Und die Zielregel „nur den Punkteführer" fällt weg**, wie Chris zu Recht angemerkt
+hat. Sie war ein künstlicher Zaun um ein Problem, das sich von selbst löst: das
+**Störbudget** (`⌊AUS/25⌋` Versuche, unverändert aus der ersten Fassung) begrenzt schon,
+wie viel ein einzelner Teilnehmer stören kann — jeder Versuch kostet eigene Fassung und
+eigene Erfolgschance in einem eigenen Durchgang. Wer wild um sich stört, schwächt sich
+selbst. Das reicht als Bremse, ohne eine erzählerisch beliebige „nur gegen den Ersten"-
+Regel zu brauchen.
+
+**Störwurf** (unverändert): Trefferchance `ANG_Störer/(ANG_Störer+TMP_Ziel)`.
+
+**Wirkung, neu formuliert:** bei Treffer sinkt für den **nächsten Durchgang** des Ziels
+die Erfolgschance:
 
 ```js
-const SCHATTEN_ABSTAND=0.062, SCHATTEN_TEMPO=1.045, SCHATTEN_SPAREN=0.66;
+erfolg = Math.min(0.94, 0.15 + TECHNIK*0.0055 + NERVEN*0.0035 - stoerMalus)
+stoerMalus = 0.25 * 100/(100+VER_Ziel)   // Platzhalter-Basis 0,25
 ```
 
-Windschatten gibt heute schon +4,5 % Tempo und −34 % Kraftverbrauch. Ein Bahnwechsel
-kostet schon Zeit (`0.55 − WENDIGKEIT×0.0022` Sekunden), Tempo (`quer=0.94` während des
-Wechsels) und hat einen Cooldown (1,6 s) — und verlässt man den Windschatten fürs
-Überholen, entfällt der Kraft-Rabatt sofort. Das *ist* im Kern schon „Abstand halten beim
-Überholen kostet etwas".
+VER wirkt wie überall als Mitigation, nur jetzt auf einen Erfolgschance-Abzug statt auf
+Schaden oder Zeit — VER 40 → Malus 0,18; VER 80 → Malus 0,14. Das ersetzt den alten
+„Fassungspool"-Aussetzer direkt an der Stelle, an der das Spiel den Erfolg wirklich
+entscheidet.
 
-**Was fehlt, ist genau eine Sache: die Kollisionszone.** Solange zwei Läufer nebeneinander
-liegen (`|Δpos| < 0.01`, Nachbarbahn), sollte für beide ein erhöhtes Stolperrisiko gelten,
-und der Überholer bekommt in diesem Fenster keinen Windschatten. Damit wird „früh mit
-Abstand vorbeiziehen" gegen „bis zur Zielgeraden dranbleiben" eine echte Entscheidung mit
-Zeitkosten auf beiden Seiten — nicht nur ein Nebeneffekt der bestehenden Formel.
+**Fassung (aus LP), Budget (aus AUS)** bleiben wie in der ersten Fassung: Pool `LP×10`,
+Treffer ziehen `Basisschaden×(ANG/50)` ab, unter 50 %/25 % ein zusätzlicher fester Malus
+von 0,10/0,20 auf `erfolg` (ersetzt die alten „−10/−20 Prozentpunkte", gleiche Zahl,
+jetzt am richtigen Ort angewandt).
 
-**Lane-Vergabe** ist heute starr (`i*2`/`i*2+1`, `battle-mode.html` nahe `bauSpurt`).
-Vorschlag: nach Setzliste (Saison-Eignung), beste Läufer auf die Mittelbahnen 3–6, wie in
-der echten Leichtathletik. Eine offene Frage an Chris: nach Setzliste oder ausgelost?
+### Breaking und Eiskunstlauf bleiben die Referenzfälle
 
-**Kamera.** Der entscheidende Punkt: `pos` läuft bereits normalisiert 0..1, `HUERDEN` sind
-Streckenbrüche — beides bleibt unverändert, die Simulation merkt vom Zoomen nichts. Nur
-das Zeichnen wechselt von `x = 80 + pos×strecke` auf eine Welt→Schirm-Transformation:
-
-```
-worldX  = pos × STRECKE_M
-screenX = (worldX − cam.x) × pxProMeter × cam.zoom
-```
-
-`bahnY(b)` und `BAHNEN=8` bleiben unangetastet — Fable schlägt vor, **nur horizontal** zu
-zoomen, damit die Lanes vertikal immer lesbar bleiben. Auto-Kamera: verfolgt den
-Schwerpunkt der Spitzengruppe, `zoom = clamp(min, sichtbareBreite / (Feldspreizung +
-Puffer))`, geglättet per Lerp. Längere Strecken werden dann eine reine Konstante
-(`STRECKE_M` hoch, mehr Hürden) statt eines Eingriffs in die Mechanik.
+Bei **Breaking** tickt eine passive Schmerzquelle unabhängig von Gegnern gegen die
+Fassung — das ist der Kern der Disziplin. Gegner können zusätzlich nachlegen (Basis 30,
+ANG 55 → 33 Schaden), was über den Fassungs-Malus die restlichen Durchgänge schwerer
+macht. Bei **Eiskunstlauf** trifft ein Störwurf gezielt den *nächsten* Durchgang des
+Ziels — sein aktuelles Element „verwackelt" statt zu misslingen, weil ohnehin nichts live
+läuft, das misslingen könnte.
 
 ---
 
-## Die drei noch unzugeordneten Disziplinen (kurz)
+## Verletzungen als echte Konsequenz, nicht Zierde
 
-- **Speed-Schach** passt direkt zur neuen Bühne-mit-Störung: die gegnerische Bedenkzeit
-  *ist* der LP-Pool, jeder Zug ein Störwurf gegen sie — der geteilte Zustand kommt gratis
-  mit.
-- **Tennis** ist Feldspiel pur: Ballwechsel = Ballbesitz-Zyklus, Winner = Abschluss,
-  Fehler = Ballverlust — passt in den vierten Motor, sobald der steht.
-- **I-Spy** eher als Bühne mit knapper Ressource statt Angriff: ein begrenzter
-  Fund-Pool, wer zuerst findet, nimmt dem anderen das Ziel weg. Interaktion ohne
-  Störwurf — ein dritter Interaktionstyp neben „stören" und „Ball wegnehmen".
+Chris' Erinnerung: großer Abstand zwischen Angriffs- und Verteidigungswert (sein
+Beispiel: 80 gegen 55) konnte früher zu einer Verletzung führen. Nachgesehen: diese
+Formel existiert im aktuellen Code **nicht** — vermutlich ein sehr altes, nicht mehr
+vorhandenes Regelwerk. Sie muss neu entworfen werden. Wichtiger als die Formel ist Chris'
+eigentlicher Punkt dahinter: „so wie wir's bisher gehandhabt haben, projizieren die Werte
+nur eins zu eins und wir zeigen random Gameplay — jetzt will ich, dass die Werte sich in
+ein Gameplay-System übersetzen und das, was wir sehen, das Ergebnis ist." Eine Verletzung
+muss also eine **echte Folge eines echten kritischen Treffers** sein, nicht ein
+unabhängig gewürfelter Text daneben.
+
+**Die gute Nachricht:** das Spiel hat bereits ein vollständiges Verfügbarkeits-/
+Verletzungssystem (`lib/fatigue/fatigue-injury-service.ts`, 1321 Zeilen) — `rollInjuryRisk`,
+`precomputedInjuryRolls`, `INJURY_UNAVAILABLE_MATCHDAYS`, Recovery, Historie
+(`appendPlayerInjuryHistory`). Es ist heute **Ermüdungs-basiert** (Fatigue über eine
+Saison), nicht Kampfwert-basiert — `injuryReason` steht sogar hart auf
+`"fatigue_over_30_after_matchday_use"` (Zeile 1273). Der Vorschlag dockt an, statt ein
+zweites, paralleles Verletzungssystem zu bauen:
+
+1. **Ein neuer Wurf**, im selben Muster wie `rollInjuryRisk`, aber mit eigener Quelle
+   `"battle_crit_injury_v1"`:
+   ```
+   riskPercent = clamp((angVerGap − 20) × 0,4, 0, 8)   // Platzhalter
+   ```
+   Gap 25 (Chris' Beispiel 80 vs. 55 = Gap 25) → 2 %; Gap 40 → 8 %. Ein Wurf je Spieler
+   und Spieltag, auf dem härtesten erlittenen Gap — nicht je einzelnem Treffer, sonst
+   explodiert die Rate.
+2. **Die Einspeisung**: `applyFatigueAndInjuryAfterMatchday` nimmt bereits
+   `precomputedInjuryRolls` entgegen (Zeile 1094). Der Aufrufer überlagert die normale
+   Fatigue-Map: wo der Fatigue-Wurf „gesund" sagt, aber der neue Crit-Wurf „verletzt",
+   ersetzt der Crit-Roll den Eintrag. Alles Weitere — Status, Verfügbarkeitsfenster,
+   Historie, Highlight, Spieltag-Text — läuft unverändert mit, weil der bestehende Code
+   nur auf `roll.result` schaut.
+3. **Zwei kleine, ehrliche Erweiterungen**: die `source`-Union um
+   `"battle_crit_injury_v1"` ergänzen; `injuryReason` (Zeile 1273) aus `roll.source`
+   ableiten statt hart zu tippen, damit im Spieler-Drawer der echte Grund steht.
+4. **Offene Frage, nicht stillschweigend angenommen:** läuft der produktive Kampf-Motor
+   im Apply-Pfad (nicht nur das Mockup) deterministisch je Spieltag? Der Replay-Pfad
+   (`restorePreMatchdayAvailability`) verlangt das. Falls nicht, Rückfallvariante: den
+   Gap nicht aus dem simulierten Kampfverlauf ziehen, sondern rein aus den Aufstellungen
+   — `angVerGap = max(ANG aller gegnerischen Kampf-Spieler) − VER des Spielers`.
+   Vollständig deterministisch, verliert nur die Information, ob der Treffer wirklich saß.
+
+**Korridor-Warnung:** Chris' bestehender Verletzungskorridor (~140–200/Saison, mühsam
+austariert) darf nicht heimlich gerissen werden. Mit CAP 8 % käme grob eine niedrige
+zweistellige Zahl je Saison obendrauf — das muss vor dem Merge mit einem Audit-Sweep
+**gemessen** werden (im Stil von `scripts/export-injury-balance-audit.ts`), nicht
+geraten. Platzhalter-Ziel: ≤10–15 % Zuwachs auf den bestehenden Korridor.
+
+---
+
+## Skills für Bewegungs-Disziplinen — vorerst nein
+
+Chris' Frage: brauchen Climbing & Co. eigene Skills („schneller über ein Hindernis",
+„seitwärts springen")? Drei Gründe, erstmal nicht:
+
+1. Die **Hindernis-Typisierung leistet schon, was die Beispiel-Skills sollen** —
+   „schneller über ein Hindernis" ist ein hoher Typ-Wert, „seitwärts springen" ist QUER.
+   Ein Skill obendrauf wäre eine zweite Stellschraube für denselben Effekt.
+2. Die vorhandene Infrastruktur reicht, falls doch gewünscht: `Skill`-Interface in
+   `lib/battle/class-kits.ts` ist generisch genug für einen „Bewegungs"-Kontext im
+   selben Pool, statt eine zweite Skill-Infrastruktur zu bauen.
+3. **Der Abschrift-Vertrag**: `class-kits.ts` ist ausdrücklich eine Abschrift von Chris'
+   Klassenkarten. Bewegungs-Skills zu erfinden hieße, diesen Vertrag zu brechen — wenn,
+   dann als echte Karten von Chris, nicht als Erfindung.
+
+Empfehlung: erst die Hindernis-Typisierung bauen und messen, ob sich die Archetypen an
+den Segment-Splits ablesen lassen. Erst wenn dabei fehlende **Spielerentscheidungen**
+auffallen (nicht fehlender Werte-Ausdruck), Skills als Pool-Erweiterung nachziehen.
+
+---
+
+## Bahn: Lanes, Überhol-Ökonomie, Kamera (unverändert aus der ersten Fassung)
+
+Windschatten und Bahnwechsel-Kosten existieren bereits (`SCHATTEN_TEMPO=1.045`,
+`SCHATTEN_SPAREN=0.66`, Bahnwechsel kostet Zeit/Tempo/Cooldown). Was fehlt: eine
+**Kollisionszone** — solange zwei Läufer nebeneinanderliegen (`|Δpos|<0.01`,
+Nachbarbahn), erhöhtes Stolperrisiko für beide, kein Windschatten für den Überholer in
+diesem Fenster.
+
+**Lane-Vergabe** ist starr (`i*2`/`i*2+1`). Vorschlag: nach Setzliste, beste Läufer auf
+die Mittelbahnen — offene Frage an Chris: Setzliste oder Los?
+
+**Kamera:** `pos` bleibt normalisiert 0..1, nur das Zeichnen wechselt auf eine
+Welt→Schirm-Transformation (`screenX = (worldX−cam.x) × pxProMeter × cam.zoom`), nur
+horizontal gezoomt, damit Lanes lesbar bleiben.
+
+---
+
+## Die drei ehemals unzugeordneten Disziplinen
+
+Inzwischen von #656 selbst eingeordnet: **Tennis** läuft im Feldspiel-Motor (Ballwechsel
+= Ballbesitz-Zyklus). **Speed-Schach** und **I-Spy** stehen noch nicht in einer der vier
+Registries — Speed-Schach passt weiter zur Bühne-Störung (Bedenkzeit als Fassungspool),
+I-Spy eher als Bühne mit knapper Ressource statt Angriffswurf (begrenzter Fund-Pool,
+Interaktion ohne Störwurf — ein dritter Interaktionstyp neben „stören" und „Engstelle
+erkämpfen").
 
 ---
 
 ## Was hier erfunden ist (Kennzeichnungspflicht)
 
-Nichts davon ist aus einer Quelle abgeschrieben — Kalibriermasse, die beim Bauen justiert
-werden muss:
-
-| Wert | Zahl | 
+| Wert | Zahl |
 |---|---|
-| Basis-Störschaden (Bühne) | 30 |
-| `T_basis` (Aussetzer-Grundzeit) | 3–4 s, disziplinabhängig |
-| Störbudget | `⌊AUS/25⌋` |
+| Störbudget (Bühne) | `⌊AUS/25⌋` |
 | Fassungspool | `LP × 10` |
-| Fassungs-Schwellen | 50 % / 25 % → −10/−20 Pp Gelingenschance |
+| Störmalus-Basis (Bühne) | 0,25 auf die Erfolgschance |
+| Fassungs-Schwellen | 50 % / 25 % → −0,10/−0,20 zusätzlicher Malus |
+| Arbeitsrate (Passagen) | `TYP_WERT × 0,2` Punkte/s |
+| Passagen-Arbeit (Beispiel) | 100 (Chris' eigenes Platzhalter-Beispiel) |
+| Rutschrisiko (ZUG-Passagen) | `clamp(0,02+(50−ZUG)×0,004; 0; 0,25)` |
+| Rutsch-Verlust | 30 % der Passagen-Arbeit |
 | Kollisionsfenster (Bahn) | `|Δpos| < 0.01` |
-| Eigenpreis fürs Stören (Eiskunstlauf) | −15 Pp auf den nächsten eigenen Durchgang |
+| Verletzungsrisiko-Kurve | `clamp((Gap−20)×0,4%, 0, 8%)` |
 
 ## Offen — mit Chris zu klären
 
-1. Lassen sich Bühne-Punkte wirklich auf einen zeitlichen Strom umstellen, oder müssen
-   Durchgänge hart blockweise bleiben? Falls Letzteres: Störung wird gröber — „ein
-   Durchgang des Ziels misslingt" statt Sekunden-Aussetzer.
-2. Die sieben Bühne-Rollen (GRUNDLAGE…WAGNIS) sind nur als Namen bekannt, nicht als Code —
-   vermutlich dockt NERVEN am sinnvollsten an den Fassungsverlust an, aber das muss am
-   echten Bühne-Code (sobald gemergt) geprüft werden, nicht geraten.
+1. ~~Strom über Zeit oder blockweise?~~ **Beantwortet**: Bühne ist Vorab-Durchlauf, kein
+   Zeitstrom — Störung wirkt als Erfolgschance-Malus im selben Durchlauf.
+2. ~~Wie dockt NERVEN an?~~ **Beantwortet**: direkt in derselben Formel
+   (`0.15+TECHNIK*0.0055+NERVEN*0.0035`), Störmalus ist ein dritter Term davon.
 3. Lane-Vergabe: Setzliste oder Los?
-4. Verlässt der Störer sichtbar seine Position während des Angriffs (Lesbarkeit fürs
-   Publikum), oder ist es ein reiner Fernwurf?
-5. Soll die Kamera je doch vertikal mitzoomen, oder bleiben die Lanes fix?
+4. Verlässt ein Störer sichtbar seine Position (Lesbarkeit fürs Publikum), oder ist es
+   ein reiner Fernwurf — gilt für Bühne wie fürs Streiten an Engstellen?
+5. Läuft der produktive Kampf-Motor im Matchday-Apply-Pfad deterministisch? Entscheidet,
+   ob die Verletzungsformel den echten Kampfverlauf lesen darf oder auf die
+   Aufstellungs-Rückfallvariante ausweichen muss.
+6. Kamera: nur horizontal zoomen, oder soll sie auch vertikal mitgehen?
 
 ## Quellen
 
-Recherchiert als Vergleichspunkt, nicht als Bauplan — die eigene Formel bleibt eigen:
-
-- [Poise/Interruption-Systeme in Soulslikes](https://gamerant.com/soulslike-games-best-stagger-mechanics/) — Vorbild für „Fassungspool, der bei Unterschreiten die Erfolgschance senkt statt sofort auszuschalten"
+- [Poise/Interruption-Systeme in Soulslikes](https://gamerant.com/soulslike-games-best-stagger-mechanics/) — Vorbild für einen Fassungspool, der bei Unterschreiten die Erfolgschance senkt statt sofort auszuschalten
 - [Interruption Resistance, Genshin Impact Wiki](https://genshin-impact.fandom.com/wiki/Interruption_Resistance)
 - [Windschatten/Blocken in Rennspielen](https://drivingfast.net/slipstream-overtaking/) — Vorbild für die Kollisionszone beim Überholen
 - [Racecraft: Überholen in der Kurve](https://drivingfast.net/racecraft-overtaking-on-a-corner/)
 
-Figur-Skating-Spiele mit Rivalen-Sabotage wurden gesucht und **nicht gefunden** — echter
-Eiskunstlauf ist kontaktfrei, kein Vorbild existiert. Das ist also eine eigene Erfindung
-fürs fiktive Universum der Olympiade, nicht aus einem Vorbild übernommen — sollte bei der
-Umsetzung entsprechend benannt bleiben.
+Figur-Skating-Spiele mit Rivalen-Sabotage: gesucht, nicht gefunden — echter Eiskunstlauf
+ist kontaktfrei. Eine eigene Erfindung fürs fiktive Universum, kein übernommenes Vorbild.
+Engstellen-Contests an Hindernissen: kein einzelnes Spiel als Vorbild genannt — das
+Prinzip (Arbeitskonto + Kapazität + Streit-Check) ist eine Verallgemeinerung des bereits
+bestehenden Tackle-Musters, kein Fund aus der Recherche.
