@@ -2551,6 +2551,10 @@
       wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
       rezept:{
         AUFBAU:      {intelligence:40,spirit:30,dexterity:30},
+        // ABSCHLUSS bewusst NICHT auf die matrixstarken TECHNIK/TEAMGEIST-Attribute
+        // umgeschrieben (durchgemessen und verworfen, s. offensterMitspieler unten fuer
+        // den tatsaechlichen Fix) — ein eigenstaendiges Rezept haelt dexterity/power/speed
+        // ueberhaupt sichtbar, statt sie ganz aus der Nutzungs-Gewichtung zu verdraengen.
         ABSCHLUSS:   {dexterity:40,power:30,speed:30},
         TECHNIK:     {intelligence:40,awareness:35,dexterity:25},
         ZWEITCHANCE: {power:45,awareness:30,stamina:25},
@@ -2962,7 +2966,6 @@
     // konnte bis zu 30s ungeholt liegen bleiben).
     fsLive.amBall=u.side;
     u.reevBall=0.25; // PLATZHALTER — kurze, feste Schonfrist direkt nach Ballerhalt
-    zuordneDeckung(true);
     // Opus-Review-Fund #11: `fsLive.fastbreak` endete bisher NUR ueber `fsT<bis` — es
     // ueberlebte damit Korberfolg, Ballverlust und jeden Possession-Wechsel. Konkret: holt
     // das fastbreakende Team seinen EIGENEN Fehlwurf, blieb das Fenster (samt ausgesetzter
@@ -2970,7 +2973,13 @@
     // aktiv. Jeder Ballwechsel loescht es jetzt hier; die drei echten Fastbreak-Ausloeser
     // (Steal, Interception, Defensiv-Rebound) rufen `startFastbreak` bewusst NACH diesem
     // Aufruf wieder auf, damit ein frisch gestartetes Fenster nicht sofort geloescht wird.
+    //
+    // Opus-Review-2-Fund (A10): stand bisher NACH zuordneDeckung(true) — lief dieser
+    // Aufruf hier waehrend ein ALTES Fenster noch als aktiv galt (fsT<bis), ueberspringt
+    // zuordneDeckung(true) genau die Seite, fuer die es lief, obwohl DIESER Ballwechsel das
+    // Fenster gerade beenden soll. Jetzt zuerst loeschen, dann voll neu zuordnen.
     fsLive.fastbreak=null;
+    zuordneDeckung(true);
   }
 
   function naechsterAngriff(seite){
@@ -3020,7 +3029,27 @@
     // Ein Spieler im Roll-Fenster (gerade geblockt und zum Korb geschnitten) ist die
     // Belohnung fuers Screenen — sein Passgewicht verdreifacht sich fuer das Fenster
     // (Fables Vorschlag), unabhaengig von seiner sonstigen Offenheit.
-    return gewichtetesLosNach(mitspieler,m=>m.ABSCHLUSS*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
+    //
+    // Opus-Review-2-Fund (A5/B, Usage-Einzeiler): Passgewicht lief bisher NUR ueber
+    // ABSCHLUSS — ein Wert, der nichts mit der tatsaechlichen Trefferchance zu tun hat
+    // (die haengt allein an TECHNIK/TEAMGEIST). Ergebnis: ein reiner dex/power/speed-
+    // "Scorer" bekam den Ball oft und verwarf ihn haeufig, der beste tatsaechliche Schuetze
+    // (hohe TECHNIK/TEAMGEIST, niedrige ABSCHLUSS) wurde fast nie gesucht.
+    //
+    // Zwei durchgemessene Alternativen verworfen: `qualitaet` allein ersetzen (57,7 Pp,
+    // dexterity/power/speed fallen dabei auf 0 % — sie haben sonst keinen zweiten Kanal)
+    // und `qualitaet` hoch drei mit ABSCHLUSS-Rezept-Umbau (47,1 Pp, TECHNIK-Attribute
+    // sitzen dann doppelt — einmal im Rezept, einmal in der Formel hier — und ueberzeichnen
+    // sich gegenseitig). Jetzt beide Werte MULTIPLIZIERT: ABSCHLUSS bleibt eigenstaendig
+    // (haelt dexterity/power/speed sichtbar), `qualitaet` straft einen schlechten Schuetzen
+    // zusaetzlich ab, egal wie hoch seine ABSCHLUSS ist. Exponent auf `qualitaet` durchgemessen:
+    // hoch 1 -> 36,6 Pp (intelligence faellt auf 4 %, viel zu schwach), hoch 2 -> 36,8 Pp bei
+    // spuerbar besserer Verteilung (intelligence 11,6 %) — gewaehlt. Bleibt insgesamt ueber
+    // dem alten 18,7-Pp-Stand (der eigentliche Bug — falscher Spieler bekommt den Ball — ist
+    // damit behoben; die Restabweichung ist Arbeit fuer eine weitere Messrunde, PLATZHALTER).
+    const qualitaet=(m)=>Math.max(0.01,0.16+m.TECHNIK*0.0050+m.TEAMGEIST*0.0060);
+    return gewichtetesLosNach(mitspieler,m=>
+      m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -3057,6 +3086,15 @@
       // schon fast verbraucht (Wurfquote 96 % beim ersten Versuch, `wartetInReichweite`
       // faktisch nie erreicht). `rangeSeit` misst jetzt ab EINTRITT in die Reichweite.
       if(u.rangeSeit==null)u.rangeSeit=fsT;
+      // Opus-Review-2-Fund (Nachzieher, VERWORFEN nach Messung): ein Assist-Bonus (+0,03
+      // bei frischem Pass) plus Deckel-Anhebung 0,92->0,94 klang nach einer kleinen,
+      // sicheren Verbesserung — durchgemessen aber ein Pp-Sprung von 36,6 auf 50,6.
+      // Ursache: bei der neuen, an TECHNIK/TEAMGEIST gekoppelten Ballverteilung (s.
+      // offensterMitspieler) ist praktisch JEDER Wurf ein Assist-Wurf, der Bonus wirkt also
+      // fast uniform — schiebt aber TECHNIK/TEAMGEIST-starke Spieler haeufiger gegen den
+      // Deckel, wo Attributzuwaechse sich nicht mehr auszahlen (Saettigung), waehrend
+      // Attribute ohne Deckel-Beruehrung (power/speed/stamina) ihren Anteil relativ dazu
+      // vergroessern. Bewusst NICHT eingebaut — Deckel bleibt bei 0,92, kein Assist-Term.
       const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
         -(fern?0.10:0)-bedraengnis+(imFastbreak?0.12:0));
       const schwelle=erzwingen?-1:Math.max(0.05,
@@ -3274,8 +3312,13 @@
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
       // Ein bedraengter Fehlwurf zaehlt anteilig als Block statt als bloßer Fehlwurf —
-      // PLATZHALTER-Anteil, s. Konzeptdoc.
-      if(flug.blockKandidat&&rr()<0.4){
+      // PLATZHALTER-Anteil, s. Konzeptdoc. Opus-Review-2-Fund (Nachzieher): der Anteil war
+      // ein fixer Wuerfel (rr()<0.4) — ABWEHR (Matrixgewicht in keiner Disziplin klein)
+      // hatte auf den Block selbst nie Einfluss, nur auf die Chance, ueberhaupt als
+      // `blockKandidat` in Frage zu kommen. Jetzt skaliert mit der ABWEHR des Deckers,
+      // um den Mittelwert (ABWEHR ~50 -> 0,40) herum.
+      const blockChance=flug.blockKandidat?Math.min(0.65,Math.max(0.15,0.10+flug.blockKandidat.ABWEHR*0.0060)):0;
+      if(flug.blockKandidat&&rr()<blockChance){
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
@@ -3307,7 +3350,12 @@
     const fastbreak=fsLive.fastbreak;
     const imFastbreak=!!(fastbreak&&fsT<fastbreak.bis);
     for(const team of FSTEAM)for(const u of team){
-      let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.55;
+      // Opus-Review-2-Fund (Volumen-Hebel, Pp-neutral): das Spiel produzierte nur ~6,7
+      // Wuerfe/Spiel — zu wenig, damit sich Spezialisierung ueberhaupt zeigen kann, egal
+      // wie gut die Formeln sind. Dribbel-Abzug 0,55->0,85 (der Fastbreak-Bonus unten wird
+      // dadurch redundant, aber harmlos) hebt das auf ~11/Spiel, ohne die Pp-Abweichung zu
+      // veraendern (durchgemessen).
+      let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
         zx=korbX; zy=H/2+(u.id%2?40:-40);
@@ -3413,7 +3461,9 @@
       // 0,3 -> 23,2 Pp, 0,15 -> 18,7 Pp (gewaehlt, liegt UNTER dem alten 32,5-Pp-Stand vor
       // dieser ganzen Dynamik-Runde). PLATZHALTER, kein Endwert, nicht weiter unterhalb
       // 0,15 durchprobiert.
-      const tempoPx=(140+u.LAUFTEMPO*0.15)*tempoMul*(u.hatBall?dribbelFaktor:1);
+      // Basistempo 140->230 (Volumen-Hebel, s. oben) — LAUFTEMPO-Koeffizient (0,15)
+      // unveraendert, durchgemessen Pp-neutral.
+      const tempoPx=(230+u.LAUFTEMPO*0.15)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
       // Opus-Review-Fund #12: `u.vx=dx` schrieb die RESTDISTANZ zum Ziel, nicht die
@@ -8456,7 +8506,9 @@
   }
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+    namenVon:(dId)=>{const M=MOTOREN[dId]; if(!M)return []; const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337); const namen=M.namen(); M.zurueck(g); return namen;},
+    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
