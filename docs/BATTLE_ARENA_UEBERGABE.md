@@ -15,19 +15,20 @@ Sprite-Nachschub braucht, wartet deshalb hier.
 Die **Battle Arena** ist ein *zuschaubarer Auto-Battler* für die Olympiade der Welten.
 Der Manager stellt auf, die Spieler kämpfen von selbst, und man sieht zu — es gibt keine
 Steuerung im Kampf. Ziel ist ein Grundkonzept für **alle 20 Disziplinen**; Stand dieser
-Sitzung: **18 von 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
-(„Chassis") statt 18 getrennter Implementierungen:
+Sitzung: **alle 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
+(„Chassis") statt 20 getrennter Implementierungen:
 
 | Chassis | Disziplinen | Motor |
 |---|---|---|
 | Kampf | TDM, Mini-DM, Fechten, Battlefield | `build()`/`stepSim()`, Rezepte aus `ARENA_ART` |
 | Bahn | Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle | `bauSpurt()`/`stepSpurt()`, Konfiguration aus `BAHN_ART` |
-| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
+| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen, **Speed-Schach, I-Spy** | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
 | Feldspiel | Basketball, Football, Hockey, Tennis | `bauFeldspiel()`/`stepFeldspiel()`, Konfiguration aus `FELDSPIEL_ART` |
 
-Offen: Denkduell (Speed-Schach, I-Spy) — nach Fable-Konsultation kein eigenes Chassis,
-sondern eine Bühne-Variante (abwechselnde Züge statt unabhängiger Durchgänge, eine
-Vorteils-Anzeige statt Jury-Punkten).
+Denkduell (Speed-Schach, I-Spy) bekam kein eigenes fünftes Chassis — nach
+Fable-Konsultation eine Bühne-**Variante**: Teilnehmer treten paarweise gegeneinander an
+(Brett i gegen Brett i, wie ein Schach-Mannschaftskampf) statt unabhängig für sich, und
+die Wertung ist ein laufender Vorteil statt einer Jury-Punktzahl. Details unten.
 
 Sie liegt als **eine** HTML-Datei vor (`public/mockups/battle-mode.html`, ~800 KB, kein
 Bundle, keine Abhängigkeiten) und ist im Spiel als Reiter eingebettet. **Sie liest und
@@ -765,6 +766,60 @@ mit der sie überhaupt an V-W herankommt, und machte aus einem Sieg einen Blowou
   Kampfdisziplinen, weil sie sich `baueEinheit()` und die KI-Logik teilen. Das ist
   konsistent mit #654s Befund, keine neue Ursache aus dieser Sitzung.
 
+### Die Ursache der 100 % — gefunden, nicht mehr vage
+
+Diese Sitzung hat die offene Frage von oben zu Ende verfolgt: warum verliert A-A TDM
+**mit jedem einzelnen Spieler in 100 % der Kämpfe** (n = 16), obwohl die Eignungssummen
+beider Seiten nur 8,8 % auseinanderliegen (V-W 379,3, A-A 348,7)? Ein Rand-Effekt wäre das
+nicht — hier klärt sich, warum es keiner ist.
+
+**A-A stellt zwei Heiler von sechs Slots (Greenkraut, Seraph-11), V-W keinen einzigen.**
+Das ist keine Nebensache, sondern der ganze Unterschied:
+
+| | V-W (6 Angreifer) | A-A (4 Angreifer + 2 Heiler) |
+|---|---|---|
+| Schaden gesamt (Ø je Kampf) | **2533** | 1252 |
+| Heilung gesamt (Ø je Kampf) | 0 | 404 |
+| Sterbequote je Spieler | 6–38 % | **100 % — bei allen sechs** |
+
+Der Mechanismus dahinter ist eine bewusste Regel, kein Fehler: „Ein Heiler bezahlt jeden
+Angriff mit seiner Heil-Uhr: entweder oder, nie beides" (Kommentar bei `fuehreAus()`).
+Greenkraut griff in keinem der 16 Kämpfe auch nur einmal an (`dmg: 0`), Seraph-11 fast nie
+(`dmg: 1`) — beide zahlten ihren Slot vollständig in Heilung. Macht man daraus eine
+Milchmädchenrechnung in derselben Währung (HP), die auch `wirkungswert()` benutzt, um
+Heilung gegen Schaden zu vergleichen: **404 HP Heilung stehen einem Schadensausfall von
+rund 1281 HP gegenüber** (die Differenz zwischen dem, was zwei weitere Angreifer auf
+A-A's Stelle vermutlich beigetragen hätten, und dem, was die beiden Heiler stattdessen
+heilten). Das ist kein knapper Tausch, sondern ein Verlustgeschäft von grob 3:1 — und
+erklärt die 100 %, ohne dass an `aufEignung()`, `TMP`/`AUS` oder den Mutatoren irgendetwas
+verändert werden müsste.
+
+**Damit ist der „Speed/Dexterity"- bzw. „Spirit/Intelligence/Torment"-Befund aus den
+früheren `einflussVon()`-Läufen dieser Sitzung kein Widerspruch, sondern eine andere
+Frage.** `einflussVon()` isoliert EIN Attribut bei EINEM Teilnehmer und hält den Rest der
+Aufstellung fest — das misst, was ein einzelner Attributpunkt bei fester Besetzung
+bewirkt. Die 100-%-Schieflage entsteht dagegen aus der BESETZUNG selbst (zwei Slots ohne
+Schadensbeitrag), nicht aus einem einzelnen Attribut. Beide Befunde sind real, beantworten
+aber unterschiedliche Fragen, und keiner löst den anderen.
+
+**Was das für Chris bedeutet — eine Design-, keine Code-Frage:**
+
+- Ist ein Zwei-Heiler-Kader gegen einen Voll-Schaden-Kader überhaupt als gleichwertige
+  Strategie gedacht? Wenn ja, müsste Heilung deutlich wirksamer werden (oder Heiler
+  dürften nicht mehr ihre gesamte Angriffskadenz dafür abgeben) — eine Balance-Änderung,
+  keine Bugfix.
+- Wenn nein — wenn ein Kader mit zwei dedizierten Heilern schlicht eine schwache
+  Kaderwahl sein SOLL, so wie in vielen Team-Spielen ein Full-Support-Team gegen ein
+  Full-DPS-Team verliert —, dann ist die 100-%-Quote **kein Befund, den man beheben muss**,
+  sondern die korrekte Konsequenz einer Aufstellungsentscheidung, die A-A (bzw. wer immer
+  den Kader zusammenstellt) getroffen hat. In diesem Fall ist nichts kaputt.
+- Sollte Chris die zweite Lesart bestätigen, ist auch nichts weiter zu tun — die Zahlen
+  oben genügen dann als Beleg, warum die Quote so aussieht, wie sie aussieht.
+
+Nicht angefasst: kein Code für diesen Abschnitt geändert. Das ist eine bewusste
+Zurückhaltung — genau wie bei der Kappung von `TMP`/`AUS` wäre ein Eingriff hier eine
+Balance-Entscheidung, die nur Chris treffen sollte, mit den Zahlen oben als Grundlage.
+
 ---
 
 ## Das Bahn-Chassis: fünf Disziplinen, ein Motor
@@ -1054,7 +1109,165 @@ Vorteils-Anzeige statt Jury-Punkten.
 
 ---
 
-## Verlässliche Einstiegspunkte
+## Denkduell: Speed-Schach und I-Spy — Bühne mit Paarung statt Einzelauftritt
+
+Zwei Änderungen an der bestehenden Bühne, kein neuer Code-Pfad für Aufstellung, Messung
+oder Reiter — beides ergibt sich aus dem `duell:true`-Schalter in `BUEHNE_ART`.
+
+**Paarung statt Einzelauftritt.** Statt dass jeder für sich bewertet wird, ist Brett i
+mein Teilnehmer i gegen Gegner i — wie ein Schach-Mannschaftskampf mit mehreren Brettern,
+nicht ein einzelnes Spiel. Die Punkteformel je Durchgang ist exakt dieselbe wie bei jeder
+anderen Bühnen-Disziplin (`bauBuehne()` läuft unverändert); neu ist nur ein zweiter Schritt
+danach: `vorteil = eigene Punkte − Punkte des Brett-Gegners`, aufsummiert über alle
+Durchgänge. Das ist der einzige neue Rechenschritt.
+
+**Vorteils-Anzeige statt Jury-Punkten.** Der Punktestand zeigt gewonnene Bretter (Vorteil
+am Ende positiv), nicht die rohe Punktesumme — Fables Vorschlag, wie eine Schach-Eval-Bar.
+`einflussVon()` misst bei Duell-Disziplinen ebenfalls den Vorteil, nicht die Summe: „besser"
+heißt hier, das eigene Brett zu gewinnen, nicht viele Punkte zu sammeln.
+
+### Ein echter Bug, gefunden vor dem Merge
+
+Erste Fassung zeigte in der Aufstellung/Arena den **fertigen Endstand** der Partie, schon
+bevor auch nur ein Zug enthüllt war — ein Brett stand bei „Zug 0/10" und zeigte trotzdem
+„−606 Vorteil". Der Fehler: die Anzeige griff auf `u.vorteil` zu, das Endergebnis der ganzen
+(im Voraus durchgerechneten) Partie, statt auf `u.verlauf[u.aktuell]`, den Stand nach dem
+zuletzt enthüllten Zug. Das verriet den Ausgang vor dem ersten sichtbaren Zug — behoben,
+seither zeigt ein Brett ohne enthüllte Züge „0 Vorteil", genau wie der Feed-Text (der
+`verlauf` von Anfang an richtig benutzt hat).
+
+### Die beiden Matrizen
+
+```
+speed-schach  intelligence 28 · awareness 21 · determination 14 · will 14 · speed 10
+              · dexterity 7 · charisma 6
+i-spy         intelligence 18 · torment 17 · spirit 13 · will 12 · charisma 9
+              · determination 8 · speed 8 · dexterity 8 · awareness 5 · health 2
+              (die breiteste Matrix aller zwanzig Disziplinen — zehn Attribute mit Gewicht)
+```
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Speed-Schach | **18,2 Pp** — der beste Wert der gesamten Sitzung, ohne Nachziehen |
+| I-Spy | **43 Pp** (nach einer Nachziehung: Intelligence saß in drei Rollen, davon eine
+  Erfolgschance-Rolle, und las 30,1 % bei Matrixgewicht 18 — Torment, der zweithöchste
+  Wert, dafür nur 12,9 %. Torment trägt jetzt auch Spitzenmoment) |
+
+Speed-Schach lief beim ersten Versuch besser als jede andere Disziplin dieser Sitzung —
+vermutlich, weil die Lehren aus Bahn, Arena, Bühne und Feldspiel (Erfolgschance-Rollen
+bevorzugt besetzen, keine Rolle mit Matrixgewicht nahe null in eine Gating-Rolle setzen)
+diesmal von Anfang an in die Rezepte eingeflossen sind.
+
+---
+
+## Die Bahn-Kamera: zoomen statt strecken
+
+Chris' Wunsch aus der Vorsitzung: „man kann ja auch raus zoomen oder rein zoomen und dann
+die ganze Strecke sehen ... die Spieler werden in eine Lane geforced, wo man mehr
+miteinander interagieren muss oder Abstand halten muss beim Überholen, was Performance
+kosten kann."
+
+Die zweite Hälfte davon GAB ES SCHON, bevor dieser Abschnitt geschrieben wurde: Bahnwechsel
+(`u.wechsel`), Windschatten und Rempler sind seit dem Bahn-Chassis im Motor, und ein
+Spurwechsel kostet bereits Tempo, solange er läuft (`quer=u.wechsel>0?0.94:1` in
+`tempoVon()`). Was fehlte, war, es zu SEHEN: die Rennposition 0..1 wurde immer stur auf
+die volle Canvasbreite gestreckt — ein Feld, das zwei Meter auseinanderlag, sah exakt so
+aus wie eines, das zwanzig Meter auseinanderlag. Enge Duelle um einen Windschatten waren
+im Bild nicht von einem entschiedenen Rennen zu unterscheiden.
+
+**Die Kamera folgt jetzt dem Feld der noch Laufenden**, nicht der Rennuhr: `cam={zoom,cx}`
+wird jeden Schritt aus der Distanz zwischen Erstem und Letztem berechnet
+(`kameraUpdate()`, kurz vor dem Ende von `stepSpurt()`). Eng beieinander (Start, ein
+Duell im Windschatten) → nah heran, bis 3,4×; auseinandergezogen (nach einem Ausreißer
+oder wenn nur noch einer läuft) → wieder weiter weg. Kein Regler, keine Handarbeit, kein
+neuer Zustand, den Chris pflegen müsste.
+
+Alle Bildschirmpositionen auf der Bahn — Läufer, Hindernisse, Start- und Ziellinie, die
+schwebenden Textmeldungen — laufen jetzt durch `camX(posFrac)` statt durch die alte feste
+Formel `80+pos*strecke`. Nur die Baumreihe im Hintergrund bleibt bewusst fest stehen: der
+leichte Parallax zwischen ruhigem Hintergrund und zoomender Bahn macht das Heranzoomen im
+Bild spürbar, ohne dass dafür etwas extra programmiert wurde. Ein kleiner Hinweis
+„Kamera 2,9×" unten links zeigt die Stufe an, aber nur, wenn tatsächlich hereingezoomt ist
+— bei 1,0× (volle Streckenübersicht) bleibt er weg, sonst wäre er ständiges Rauschen.
+
+**Rein kosmetisch, nichts an der Physik geändert:** `kameraUpdate()` liest nur `LAEUFER`
+und schreibt nur in `cam` — keine Rückwirkung auf Tempo, Kraftreserve oder Ergebnis. Zur
+Kontrolle lief `window.__arena.bahnSerie('spurt', 4)` und `bahnSerie('takeshis-castle', 3)`
+im Headless-Modus (kein Rendering, also auch keine Kamera-Berechnung mit Bildbezug) exakt
+wie vorher durch — die Abnahmemessungen aus den vorigen Abschnitten dieses Dokuments
+bleiben also gültig, ohne erneut gezogen werden zu müssen.
+
+Getestet per Playwright-Screenshot auf Spurt UND Takeshi's Castle (unterschiedliche
+Hindernis-Grafik, gleicher Motor) — in beiden Fällen zoomt und scrollt die Kamera korrekt
+mit, Hindernisse tauchen rechtzeitig vor dem Feld auf statt abrupt.
+
+**Offen, absichtlich nicht angefasst:** Chris' Nebensatz „dann muss es nicht immer nur von
+links nach rechts gehen" (ein gekrümmter oder vertikaler Streckenverlauf statt einer
+Geraden) ist eine deutlich größere Änderung an Physik UND Bild und stand nicht im Zentrum
+der Bitte — die Kamera war die konkrete, klar umrissene Anfrage. Sollte ein nicht-lineares
+Streckenlayout gewünscht sein, ist das ein eigener Auftrag.
+
+---
+
+## Kampf und Bahn auf ~60 Sekunden — ohne eine einzige Balance-Konstante anzufassen
+
+Buehne und Feldspiel hatten ihr 60-Sekunden-Ziel schon (`rundenDauer`, siehe oben). Kampf
+und Bahn standen bisher weit darunter und waren bewusst zurückgestellt:
+
+| Disziplin | Ist-Dauer vorher (n=20) |
+|---|---|
+| Spurt | 11,2 s |
+| Staffel | 12,9 s |
+| Time-Trial | 13,7 s |
+| Climbing | 13,7 s |
+| Takeshi's Castle | 27,6 s |
+| TDM | 32 s |
+| Mini-DM | 21 s |
+| Fechten | 37 s |
+| Battlefield | 12 s |
+
+Der Grund für das Zurückstellen war berechtigt: Kampf und Bahn laufen als durchgehende
+Physik, in der jede Formel über `dt` skaliert — Reserveverbrauch, Abklingzeiten,
+Ermüdung, Zufallschancen pro Tick. Irgendeine dieser Konstanten von Hand hochzuziehen,
+hätte das über zwanzig Disziplinen hinweg mit sehr viel Messarbeit passend gemachte
+Kräfteverhältnis riskiert wieder zu verstellen — genau das, was diese ganze Sitzung an
+Pp-Messungen aufgebaut hat.
+
+**Der sichere Weg, den es stattdessen gibt: keine Formel anfassen, nur wie viel
+Simulationszeit ein echter Sekundenbruchteil bewegt.** `loop()` fütterte `stepSim()`
+bisher immer mit einem festen `1/60`; jetzt mit `(1/60)/ZEIT_DEHNUNG[disc]`. Weil jede
+Formel im Kampf- und Bahn-Motor ausschließlich über `dt` skaliert — nichts darin fragt
+„wie viel echte Zeit ist vergangen", alles fragt nur „wie viel `dt` kam gerade rein" —
+ändert eine gleichmäßige Verkleinerung von `dt` die INNERE Balance nicht messbar. Es ist
+dasselbe Prinzip wie eine Zeitlupe im Film: derselbe Kampf, dieselbe Ereignisfolge relativ
+zu Position/Zustand, nur über mehr echte Sekunden gestreckt. Die Uhr im HUD zeigt
+`t*Faktor` bzw. `rennT*Faktor` an (die interne Zeitbasis selbst bleibt unverändert, damit
+Schwellen wie „Sudden Death ab t>50" korrekt sitzen — die verschieben sich automatisch mit,
+weil `t` an genau derselben Stelle im Kampf steht wie vorher).
+
+**Nachgewiesen, nicht behauptet:** `serieVon('tdm', 20).dauer` und der Mittelwert aus
+`bahnSerie('spurt', 20)` liefern nach der Änderung exakt dieselben Werte wie vorher (32
+bzw. 11,2) — die Messpfade rufen `stepSim`/`stepSpurt` direkt mit festem `1/60` auf, ohne
+über `loop()` zu laufen, und bleiben deshalb komplett unberührt. Live per Playwright
+gegengemessen: bei TEMPO 1× zeigt die Uhr nach 20,0 echten Sekunden „0:19", beim
+Kampfende nach 50,1 echten Sekunden „0:49" — Uhr und Stoppuhr laufen praktisch deckungsgleich.
+
+Faktoren (Ist-Dauer ÷ 60, siehe `ZEIT_DEHNUNG` in `battle-mode.html`):
+
+| Disziplin | Faktor | | Disziplin | Faktor |
+|---|---|---|---|---|
+| TDM | 1,88 | | Spurt | 5,36 |
+| Mini-DM | 2,86 | | Staffel | 4,65 |
+| Fechten | 1,62 | | Time-Trial | 4,38 |
+| Battlefield | 5,00 | | Climbing | 4,38 |
+| | | | Takeshi's Castle | 2,17 |
+
+Fehlt eine Disziplin in der Liste (Bühne, Feldspiel), bleibt sie automatisch unangetastet
+— `ZEIT_DEHNUNG[disc]||1` fällt auf Faktor 1 zurück.
+
+---
 
 ## Verlässliche Einstiegspunkte
 

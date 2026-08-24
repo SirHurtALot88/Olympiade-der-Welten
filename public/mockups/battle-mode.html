@@ -1419,7 +1419,9 @@
     basketball:{label:"Basketball",cat:"feldspiel",size:6},
     football:{label:"Football",cat:"feldspiel",size:6},
     hockey:{label:"Hockey",cat:"feldspiel",size:6},
-    tennis:{label:"Tennis",cat:"feldspiel",size:6}};
+    tennis:{label:"Tennis",cat:"feldspiel",size:6},
+    "speed-schach":{label:"Speed-Schach",cat:"buehne",size:6},
+    "i-spy":{label:"I-Spy",cat:"buehne",size:6}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -2488,6 +2490,34 @@
     }
   }
 
+  // WAS BISHER ENTHUELLT IST — nicht, was am Ende herauskommt. Das alte Vorab-Modell (fuer
+  // Football/Hockey/Tennis unten weiter aktiv) rechnet die ganze Partie im Voraus durch
+  // und schreibt dabei direkt in die Spielerobjekte (punkte, assists, rebounds, steals,
+  // bloecke, verluste) und in fsPunkte: bequem zum Bauen, aber als Anzeige wären es
+  // Spoiler — genau der Fehler, der im Denkduell schon einmal behoben wurde (u.vorteil
+  // statt u.verlauf[u.aktuell]). Jede Stelle, die live etwas anzeigt (Score, Kader-Panel,
+  // Spielerzeile auf dem Feld), fragt deshalb HIER nach statt die Objektfelder direkt zu
+  // lesen — nur bis fsZeiger, dem Stand der Enthuellung.
+  //
+  // Fuer die Basketball-Live-Engine (unten) ist dieselbe Funktion ein reiner Mitschnitt:
+  // logZug() haengt jedes Ereignis an, sobald es passiert, und haelt fsZeiger dabei
+  // deckungsgleich mit fsZuege.length — "bisher enthuellt" ist dort automatisch "alles".
+  // Ein Feldname weicht ab: die Live-Engine traegt den Rebounder als e.spieler statt
+  // e.rebounder (logZug(...,"rebound",{spieler:gewinner})), daher der Fallback unten.
+  function fsBisher(){
+    const team=[0,0], spieler=new Map();
+    const s=(u)=>{ if(!spieler.has(u.id))spieler.set(u.id,{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0});
+      return spieler.get(u.id); };
+    for(const e of fsZuege.slice(0,fsZeiger)){
+      if(e.art==="treffer"){ team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
+        if(e.passgeber)s(e.passgeber).assists++; }
+      else if(e.art==="rebound") s(e.rebounder||e.spieler).rebounds++;
+      else if(e.art==="block") s(e.verteidiger).bloecke++;
+      else if(e.art==="steal"){ s(e.verteidiger).steals++; s(e.spieler).verluste++; }
+    }
+    return {team,spieler};
+  }
+
   // ===================================================================================
   // BASKETBALL — LIVE-ENGINE. Kein Vorab-Durchlauf mehr: Ballbesitz, Deckung und Wuerfe
   // entstehen Tick fuer Tick, genau wie im Kampf-Motor (stepSim) — Chris' Entscheidung,
@@ -2966,10 +2996,12 @@
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
     document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
-    document.getElementById("score").textContent=fsPunkte[0]+" : "+fsPunkte[1];
-    const maxPkt=Math.max(1,fsPunkte[0],fsPunkte[1]);
-    document.getElementById("thpL").style.width=(fsPunkte[0]/maxPkt*100)+"%";
-    document.getElementById("thpR").style.width=(fsPunkte[1]/maxPkt*100)+"%";
+    // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
+    const bisher=fsBisher().team;
+    document.getElementById("score").textContent=bisher[0]+" : "+bisher[1];
+    const maxPkt=Math.max(1,bisher[0],bisher[1]);
+    document.getElementById("thpL").style.width=(bisher[0]/maxPkt*100)+"%";
+    document.getElementById("thpR").style.width=(bisher[1]/maxPkt*100)+"%";
     renderKader();
   }
 
@@ -3047,6 +3079,9 @@
   function zeichneFeldspiel(){
     bodenFeldspiel();
     const art=FB();
+    // Enthuellte Werte, einmal je Bild — siehe fsBisher(). Fehlt ein Spieler noch in der
+    // Map (kein Zug bisher enthuellt, an dem er beteiligt war), ist er bei null Werten.
+    const bisher=fsBisher(), NULLWERTE={punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0};
     FSTEAM.forEach((g,side)=>{
       const c=side===0?css("--home"):css("--away");
       g.forEach(u=>{
@@ -3072,8 +3107,9 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        if(u.punkte||u.rebounds||u.steals||u.bloecke||u.assists)
-          schrift(u.punkte+"P "+u.assists+"A "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
+        const stat=bisher.spieler.get(u.id)||NULLWERTE;
+        if(stat.punkte||stat.rebounds||stat.steals||stat.bloecke||stat.assists)
+          schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56,"#dfe6ef",8);
       });
     });
     // Der Ball. Klein, orange, folgt fsLerpPositionen — von Passgeber zu Ballfuehrer,
@@ -3199,6 +3235,49 @@
         AUSDAUER:     {stamina:50,health:30,will:20},
         WAGNIS:       {torment:50,stamina:30,intelligence:20}
       }
+    },
+
+    "speed-schach":{
+      // MATRIX: intelligence 28, awareness 21, determination 14, will 14, speed 10,
+      // dexterity 7, charisma 6.
+      //
+      // DUELL STATT EINZELAUFTRITT (Fables Rat, kein fuenfter Motor): Brett i ist mein
+      // Teilnehmer i gegen Gegner i, wie ein Schach-Mannschaftskampf mit mehreren
+      // Brettern. Dieselbe Punkteformel wie ueberall — nur die Auswertung ist jetzt
+      // relativ (Vorteil = eigene Punkte minus die des Gegners je Zug), nicht absolut.
+      label:"Speed-Schach", jeSeite:6, rundenN:10, rundenDauer:60/(10*6*2), duell:true,
+      failAbzug:0.55, failWort:"verliert Zeit am Zug", erfolgWort:"findet den starken Zug",
+      rezept:{
+        GRUNDLAGE:    {intelligence:45,awareness:35,determination:20},
+        SPITZENMOMENT:{intelligence:40,determination:35,awareness:25},
+        TECHNIK:      {intelligence:40,awareness:35,dexterity:25},
+        PUBLIKUM:     {charisma:55,will:45},
+        NERVEN:       {will:45,determination:30,speed:25},
+        AUSDAUER:     {will:40,determination:35,speed:25},
+        WAGNIS:       {speed:45,dexterity:30,charisma:25}
+      }
+    },
+
+    "i-spy":{
+      // MATRIX: intelligence 18, torment 17, spirit 13, will 12, charisma 9,
+      // determination 8, speed 8, dexterity 8, awareness 5, health 2. Zehn Attribute mit
+      // Gewicht — die breiteste Matrix aller zwanzig Disziplinen.
+      label:"I-Spy", jeSeite:6, rundenN:6, rundenDauer:60/(6*6*2), duell:true,
+      failAbzug:0.55, failWort:"übersieht das Detail", erfolgWort:"entdeckt den Hinweis",
+      // NACHGEZOGEN: erste Messung stand bei 46,4 Pp. Intelligence sass in DREI Rollen
+      // (Grundlage, Spitzenmoment, Technik) — davon Technik eine Erfolgschance-Rolle —
+      // und las 30,1 % bei Matrixgewicht 18. Torment (der zweithoechste Wert, 17) und
+      // Speed (8) blieben dagegen zu schwach vertreten. Jetzt traegt Spitzenmoment
+      // Torment statt Intelligence, und Speed bekommt einen Platz in Nerven.
+      rezept:{
+        GRUNDLAGE:    {intelligence:40,spirit:30,will:30},
+        SPITZENMOMENT:{torment:55,determination:30,spirit:15},
+        TECHNIK:      {intelligence:40,awareness:35,dexterity:25},
+        PUBLIKUM:     {charisma:55,torment:45},
+        NERVEN:       {will:35,spirit:30,speed:20,determination:15},
+        AUSDAUER:     {spirit:40,will:35,health:25},
+        WAGNIS:       {torment:45,speed:30,dexterity:25}
+      }
     }
   };
   let buehneDisc="gewichtheben";
@@ -3253,6 +3332,29 @@
     mine.forEach((p,i)=>setz(p,0,false,i));
     gegner.forEach((o,i)=>setz(o,1,true,i));
 
+    // DUELL-VARIANTE (Speed-Schach, I-Spy) — Fables Rat: kein eigener fuenfter Motor,
+    // sondern Buehne mit zwei Aenderungen. Erstens Paarung statt Einzelauftritt: Brett i
+    // ist mein Teilnehmer i gegen den Gegner i, wie bei einem Schach-Mannschaftskampf mit
+    // mehreren Brettern statt einem einzigen Spiel. Zweitens eine VORTEILS-ANZEIGE statt
+    // Jury-Punkten: was die eine Seite pro Durchgang gewinnt, verliert die andere — die
+    // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
+    // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
+    if(art.duell){
+      for(let i=0;i<n;i++){
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        if(!a||!b)continue;
+        let lauf=0; const verlauf=[];
+        for(let r=0;r<art.rundenN;r++){
+          lauf += (a.runden[r]?a.runden[r].punkte:0)-(b.runden[r]?b.runden[r].punkte:0);
+          verlauf.push(lauf);
+        }
+        a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
+        a.vorteil=lauf; b.vorteil=-lauf;
+        a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+      }
+    }
+
     // REIHENFOLGE. Rundenweise abwechselnd wie eine Setzliste — Durchgang 1 fuer alle,
     // dann Durchgang 2 — und innerhalb einer Runde wechseln sich die Seiten ab, damit
     // kein Team geschlossen zuerst dran ist.
@@ -3277,7 +3379,15 @@
       u.summe+=r.punkte;
       u.lunge=0.5;
       schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:r.punkte>=60,_teilnehmer:u.id});
-      feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").");
+      // DUELL: statt "X Punkte" die laufende Vorteils-Anzeige — dieselbe Zahl, die auch
+      // fuer wert() zaehlt, damit Anzeige und Messung nie auseinanderlaufen.
+      if(BB().duell&&u.verlauf){
+        const v=u.verlauf[u.aktuell];
+        feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
+          " · Vorteil "+(v>0?"+":"")+v+" (Brett "+((u.brett??0)+1)+", Zug "+(u.aktuell+1)+"/"+BB().rundenN+").");
+      } else {
+        feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").");
+      }
       buehneAkt=BB().rundenDauer;
     }
     if(buehneZeiger>=buehneQueue.length)done=true;
@@ -3290,14 +3400,23 @@
     // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
     // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd)sd.textContent=BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
+    if(sd)sd.textContent=BB().duell
+      ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
+      : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       e.innerHTML=e.innerHTML.replace(/im Kampf/g,"aufgetreten");});
     const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
-    const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
-    document.getElementById("score").textContent=summe(0)+" : "+summe(1);
+    // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
+    // rohe Punktesumme — genau wie beim Schach-Mannschaftskampf, den es nachbildet.
+    if(BB().duell){
+      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN&&u.vorteil>0).length;
+      document.getElementById("score").textContent=bretter(0)+" : "+bretter(1);
+    } else {
+      const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
+      document.getElementById("score").textContent=summe(0)+" : "+summe(1);
+    }
     const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const schnitt=(s)=>{const g=TEILNEHMER.filter(u=>u.side===s);
       return g.length?g.reduce((a,u)=>a+u.summe,0)/(g.length*maxSumme):0;};
@@ -3348,15 +3467,32 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
-        // Punktesaeule: wie weit im Feld, nicht absolut — sonst waere Gewichtheben (kurze
-        // Zahlen) neben Wettessen (viele Runden) optisch schief.
-        const w=30,p=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
-        // Fortschritt: wie viele Durchgaenge schon enthuellt
-        ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
-        ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        if(art.duell){
+          // DUELL: der LAUFENDE Vorteil bis zum enthuellten Zug, nicht der fertige
+          // Endstand. u.vorteil ist das Endergebnis der ganzen Partie und stand vorher
+          // hier — verriet das Ergebnis, bevor auch nur ein Zug gezeigt wurde (ein Brett
+          // zeigte "-606 Vorteil" bei "Zug 0/10"). u.verlauf[u.aktuell] ist der Stand
+          // NACH dem zuletzt enthuellten Zug; vor dem ersten Zug (aktuell=-1) neutral.
+          const v=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
+          schrift((v>0?"+":"")+v+" Vorteil",56,v>0?css("--ok"):(v<0?css("--crit"):"#8a93a3"),9);
+          const maxVorteil=Math.max(1,...TEILNEHMER.map(x=>Math.abs(x.vorteil||0)));
+          const w=30,mitte=x,halb=Math.min(w/2,(w/2)*Math.abs(v)/maxVorteil);
+          ctx.fillStyle=css("--line");ctx.fillRect(mitte-w/2,y+64,w,3);
+          ctx.fillStyle=v>=0?css("--ok"):css("--crit");
+          ctx.fillRect(v>=0?mitte:mitte-halb,y+64,halb,3);
+          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+          ctx.fillText("Brett "+((u.brett??0)+1)+" · Zug "+(u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        } else {
+          schrift(String(u.summe)+" Pkt",56,"#dfe6ef",9);
+          // Punktesaeule: wie weit im Feld, nicht absolut — sonst waere Gewichtheben
+          // (kurze Zahlen) neben Wettessen (viele Runden) optisch schief.
+          const w=30,p=Math.min(1,u.summe/maxSumme);
+          ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+64,w,3);
+          ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+64,w*p,3);
+          // Fortschritt: wie viele Durchgaenge schon enthuellt
+          ctx.font="400 8px 'IBM Plex Mono',monospace";ctx.fillStyle="#8a93a3";
+          ctx.fillText((u.aktuell+1)+"/"+art.rundenN,x,y+74);
+        }
       });
     });
     for(const f of floats){
@@ -5677,8 +5813,12 @@
   // Rennen stand dauerhaft "0 : 0" und "0:00". Hier stehen die Groessen, die ein Rennen
   // wirklich hat: verstrichene Zeit, wie viele im Ziel sind, und wie weit das Feld ist.
   function updateHudBahn(){
+    // Anzeige in ECHTEN Sekunden, nicht in Simulationssekunden: rennT selbst bleibt die
+    // unangetastete physikalische Zeitbasis (Cooldowns, Ermuedung ...); was hier steht,
+    // ist rennT * Zeitdehnung — also genau das, was der Zuschauer gerade erlebt.
+    const angezeigt=rennT*zeitFaktor();
     document.getElementById("clock").textContent=
-      Math.floor(rennT/60)+":"+String(Math.floor(rennT%60)).padStart(2,"0");
+      Math.floor(angezeigt/60)+":"+String(Math.floor(angezeigt%60)).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":"läuft";
     // Die Beschriftungen der Kampfanzeige stimmen auf der Bahn nicht: es gibt kein Sudden
     // Death, niemand ist "im Kampf", und die Punkte sind Zieleinlaeufe.
@@ -5702,7 +5842,9 @@
   }
 
   function updateHud(){
-    document.getElementById("clock").textContent="0:"+String(Math.floor(t)).padStart(2,"0");
+    // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
+    // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
+    document.getElementById("clock").textContent="0:"+String(Math.floor(t*zeitFaktor())).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
@@ -5855,10 +5997,14 @@
       v.addColorStop(1,"rgba(0,0,0,.35)");
       ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     }
-    const oben=H*0.14, unten=H*0.94, strecke=W-170;
+    const oben=H*0.14, unten=H*0.94;
     // Baumreihe ueber der Bahn. Vier Nadelbaum-Blaetter im Wechsel; die Wahl haengt am
     // Platz in der Reihe, nicht am Zufall — sonst tanzt der Wald bei jedem Bild. An einer
     // Kletterwand steht kein Wald (BA().baeume===false), da bleibt die Schleife leer.
+    //
+    // Bewusst NICHT unter der Kamera: die Baumreihe steht fest wie ein Tribuenendach,
+    // waehrend die Bahn darunter zoomt. Der leichte Parallax-Effekt macht das
+    // Heranzoomen im Bild spuerbar, ohne dass er eigens programmiert werden musste.
     const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
     for(let i=0;i<(BA().baeume===false?0:26);i++){
       const x=12+i*(W/25), yb=oben-24;
@@ -5907,10 +6053,12 @@
     for(let i=0;i<=BN;i++){const y=oben+(unten-oben)*i/BN;
       ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
     // Hindernisse genau dort, wo die Simulation sie prueft — in der Form, die die
-    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff.
+    // Disziplin kennt: Huerde, Kurvenmarkierung, Griff. Ihre Bildschirmposition kommt
+    // jetzt aus camX(): gezoomt und im Rennverlauf verschoben wie das Feld selbst.
     const wort=BA().hindernisWort;
     for(const h of HUERDEN_N()){
-      const x=80+h*strecke;
+      const x=camX(h);
+      if(x<-20||x>W+20)continue;         // ausserhalb des Bildausschnitts — nicht zeichnen
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+13;
         if(wort==="Griff"){
@@ -5926,12 +6074,26 @@
         }
       }
     }
-    // Start und Ziel
-    ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(80,oben);ctx.lineTo(80,unten);ctx.stroke();
-    ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
-    ctx.beginPath();ctx.moveTo(80+strecke,oben);ctx.lineTo(80+strecke,unten);ctx.stroke();
-    ctx.setLineDash([]);
+    // Start und Ziel — ebenfalls unter der Kamera, damit sie beim Auszoomen wieder
+    // ins Bild kommen, statt an einer festen Pixelstelle zu kleben.
+    const xStart=camX(0), xZiel=camX(1);
+    if(xStart>-4&&xStart<W+4){
+      ctx.strokeStyle="rgba(255,255,255,.75)";ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(xStart,oben);ctx.lineTo(xStart,unten);ctx.stroke();
+    }
+    if(xZiel>-4&&xZiel<W+4){
+      ctx.setLineDash([7,7]);ctx.lineWidth=4;ctx.strokeStyle="#fff";
+      ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Zoomstufe als kleiner, fester HUD-Hinweis — nur wenn die Kamera ueberhaupt
+    // herangezoomt hat, sonst waere er staendig sichtbares Rauschen.
+    if(cam.zoom>1.08){
+      ctx.font="400 9px 'IBM Plex Mono',monospace";
+      ctx.textAlign="left";
+      ctx.fillStyle="rgba(255,255,255,.55)";
+      ctx.fillText("Kamera "+cam.zoom.toFixed(1)+"×",10,H-10);
+    }
   }
 
   // ===================================================================================
@@ -6275,10 +6437,49 @@
   const HUERDEN_N=()=>BA().hindernisse;
   let LAEUFER=[], rennFertig=[], rennT=0;
 
+  // ===================================================================================
+  // KAMERA. Chris: "man kann ja auch raus zoomen oder rein zoomen und dann die ganze
+  // strecke sehen ... die spieler werden in eine lane geforced wo man mehr miteinander
+  // interagieren muss". Bahnwechsel, Windschatten und Rempler GIBT es schon (oben) —
+  // was fehlte, war, sie zu SEHEN: bisher stand jeder Laeufer, egal wie eng das Feld
+  // beieinander lag, ueber die volle Canvasbreite verteilt, weil die Position 0..1 immer
+  // stur auf die volle Breite gestreckt wurde. Ein enges Feld sah dann aus wie ein weites.
+  //
+  // Die Kamera folgt stattdessen dem, was gerade zaehlt: dem Feld der noch Laufenden.
+  // Eng beieinander (Start, Verfolgung im Windschatten) -> nah heran, man sieht Rempler
+  // und Spurwechsel im Detail. Auseinandergezogen (nach einem Ausreisser) -> weiter weg,
+  // man sieht die ganze Strecke wieder. Kein Regler, keine Handarbeit: die Zoomstufe IST
+  // die Distanz zwischen Erstem und Letztem, mit etwas Polster vor und hinter dem Feld,
+  // damit das naechste Hindernis schon ins Bild ragt statt ueberraschend aufzutauchen.
+  let cam={zoom:1,cx:0.5};
+  const camStrecke=()=>W-170;
+  function camView(){
+    const strecke=camStrecke(), viewW=strecke/cam.zoom;
+    const links=Math.max(0,Math.min(strecke-viewW,cam.cx*strecke-viewW/2));
+    return {strecke,viewW,links};
+  }
+  // posFrac: Rennposition 0..1 -> Bildschirm-X unter der aktuellen Kamera.
+  const camX=(posFrac)=>{const v=camView();return 80+(posFrac*v.strecke-v.links)*cam.zoom;};
+  function kameraUpdate(dt){
+    const aktiv=LAEUFER.filter(u=>u.fertig==null);
+    const quelle=aktiv.length?aktiv:LAEUFER;
+    if(!quelle.length)return;
+    let minP=quelle[0].pos,maxP=quelle[0].pos;
+    for(const u of quelle){if(u.pos<minP)minP=u.pos;if(u.pos>maxP)maxP=u.pos;}
+    const zielCx=Math.max(0,Math.min(1,(minP+maxP)/2));
+    // 0,10 Polster: das naechste Hindernis soll schon sichtbar sein, bevor es dran ist.
+    const spanne=Math.max(0.05,(maxP-minP)+0.10);
+    const zielZoom=Math.max(1,Math.min(3.4,1/spanne));
+    const t=Math.min(1,dt*1.8);           // weich nachziehen, kein Ruckeln
+    cam.zoom+=(zielZoom-cam.zoom)*t;
+    cam.cx+=(zielCx-cam.cx)*t;
+  }
+
   const SPIELER_NACH_NAME=Object.fromEntries([...SQUAD,...OPP].map(p=>[p.n,p]));
 
   function bauSpurt(saat){
     seed=saat||1337; rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
+    cam={zoom:1,cx:0.5};
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
     // gibt es noch keine Aufstellung, und ohne Laeufer laesst sich nichts messen. Also:
@@ -6477,7 +6678,7 @@
       u.reserve=Math.max(0,u.reserve-zehr*dt*10);
       if(!u.leer && u.reserve<=0){
         u.leer=true;
-        schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
+        schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"eingebrochen",life:1.2,crit:true});
         feed(u.seite,u.n+" bricht ein — Reserve leer bei "+Math.round(u.pos*100)+" % der Strecke.");
       }
 
@@ -6512,7 +6713,7 @@
             u.reserve=Math.max(0,u.reserve-(A.wuchtKraft??14));
             u.stolper=A.wuchtZeit??0.12;
             u.durchbruch=(u.durchbruch||0)+1;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"bricht durch",life:.8,crit:false});
             feed(u.seite,u.n+" nimmt "+(BA().hindernisWort==="Griff"?"den Griff":"die "+BA().hindernisWort)+" mit Gewalt.");
             continue;
           }
@@ -6550,12 +6751,12 @@
           if(BA().nervenKosten && u.nerven<=0){
             u.raus=true; u.fertig=90+rennFertig.length*0.001;
             rennFertig.push(u);
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"ausgeschieden",life:1.4,crit:true});
             feed(u.seite,u.n+" scheidet aus — Nerven am Ende nach "+u.gestolpert+
               " Stürzen bei "+Math.round(u.pos*100)+" % der Strecke.");
             break;
           }
-          schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
+          schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"stolpert",life:.9,crit:false});
           feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt die "+BA().hindernisWort+"."));
         }
       }
@@ -6586,10 +6787,10 @@
           const stark=u.WUCHT/(u.WUCHT+o.ROBUST);
           if(rr()<stark){
             o.stolper=0.55+stark*0.9; o.reserve=Math.max(0,o.reserve-18); o.getackelt++;
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"getackelt",life:1,crit:true});
             feed(u.seite,u.n+" räumt "+o.n+" von der Bahn.");
           } else {
-            schwebe({x:80+o.pos*strecke,y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
+            schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false});
             feed(o.seite,o.n+" steckt den Rempler weg.");
           }
         }
@@ -6614,10 +6815,10 @@
               *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
             naechster.reserve=Math.max(0,naechster.reserve-12);
             u.gestolpert++;
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Wechsel verpatzt",life:1.2,crit:true});
             feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+".");
           } else {
-            schwebe({x:80+u.pos*strecke,y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
+            schwebe({x:camX(u.pos),y:bahnY(u.bahnZ)-20,txt:"Stab weiter",life:.7,crit:false});
             feed(u.seite,u.n+" übergibt sauber an "+naechster.n+".");
           }
         }
@@ -6638,6 +6839,7 @@
         }
       }
     }
+    kameraUpdate(dt);
     if(rennFertig.length>=LAEUFER.length||rennT>60)done=true;
   }
 
@@ -6645,10 +6847,9 @@
 
   function zeichneSpurt(){
     zeichneBoden();
-    const strecke=W-170;
     for(const u of LAEUFER){
       const platz=rennFertig.indexOf(u);
-      const x=80+u.pos*strecke+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
+      const x=camX(u.pos)+(platz>=0?12+platz*9:0), y=bahnY(u.bahnZ);
       ctx.globalAlpha=0.25;ctx.fillStyle="#000";
       ctx.beginPath();ctx.ellipse(x,y+16,14,5,0,0,6.283);ctx.fill();ctx.globalAlpha=1;
       zeichneSprite(ctx,{n:u.n,id:u.id,vx:u.stolper>0?0:4,vy:0,side:u.seite,
@@ -6872,12 +7073,43 @@
     updateHud();
   }
 
+  // ===================================================================================
+  // ZEIT-DEHNUNG. Chris: "und dann am besten so bauen dass die runde immer so ungefaehr
+  // 60 sekunden dauert." Buehne und Feldspiel haben das schon ueber ihre eigene
+  // rundenDauer (sie rechnen jeden Durchgang vorab durch und enthuellen ihn nur noch
+  // kosmetisch — Tempo aendern ist dort ein einzelner Zeitwert). Kampf und Bahn laufen
+  // dagegen als durchgehende Physik: JEDE Formel darin haengt an dt (Reserveverbrauch,
+  // Abklingzeiten, Ermuedung, Zufallschancen pro Tick). Genau deshalb stand diese Aufgabe
+  // bisher zurueckgestellt — irgendeine dieser Konstanten anzufassen, haette das ueber
+  // zwanzig Disziplinen hinweg mit viel Messarbeit gerade erst passend gemachte
+  // Kraefteverhaeltnis wieder verstellen koennen.
+  //
+  // Der sichere Weg: an keiner Formel etwas aendern, nur wie viel SIMULATIONSZEIT ein
+  // echter Sekundenbruchteil beim Zusehen bewegt. stepSim/stepSpurt bekommen bei TEMPO 1x
+  // exakt dieselbe Tick-Folge wie vorher, nur kleiner dosiert (dt/Faktor statt dt). Weil
+  // jede Formel darin ausschliesslich ueber dt skaliert, aendert das die INNERE Balance
+  // nicht: derselbe Kampf, dasselbe Rennen, nur in mehr echten Sekunden erzaehlt — wie ein
+  // Film in Zeitlupe, nicht wie ein umgeschriebenes Drehbuch. Die Messreihen
+  // (serieVon/bahnSerie/einflussVon) laufen NICHT durch diese Schleife, sondern rufen
+  // stepSim/stepSpurt direkt mit festem 1/60 auf und bleiben unangetastet — nachgemessen:
+  // beide liefern nach dieser Aenderung dieselben Werte wie vorher.
+  //
+  // Die Faktoren kommen aus der gemessenen Ist-Dauer (n=20) geteilt durch 60s. Fehlt eine
+  // Disziplin in der Liste, bleibt sie unangetastet (Faktor 1 — das gilt automatisch fuer
+  // Buehne und Feldspiel, die ihr Tempo schon anders steuern).
+  const ZEIT_DEHNUNG={
+    tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
+    spurt:5.36, staffel:4.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17
+  };
+  const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
+
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
     if(running){
       acc+=dt*speed;
-      while(acc>=1/60){stepSim(1/60);acc-=1/60;}
+      const zf=zeitFaktor();
+      while(acc>=1/60){stepSim((1/60)/zf);acc-=1/60;}
       floats.forEach(f=>{f.y-=42/60;f.life-=1.1/60;});
       for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
@@ -7078,6 +7310,9 @@
   }
 
   function renderKader(){
+    // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
+    // fsBisher(). Einmal je Aufruf, nicht je Spieler.
+    const fsStand=istFeldspiel(disc)?fsBisher():null;
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"kaderL":"kaderR");
       if(!box)return;
@@ -7085,8 +7320,9 @@
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
-        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,hp:x.punkte,
-          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>y.punkte))}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,
+          hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
@@ -7100,11 +7336,14 @@
     const m=document.getElementById("kmitte");
     if(m)m.textContent=istBahn(disc)
       ? (rennFertig.filter(x=>x.seite===0).length+" : "+rennFertig.filter(x=>x.seite===1).length)
+      : (istBuehne(disc)&&BB().duell)
+      ? (TEILNEHMER.filter(x=>x.side===0&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length+" : "+
+         TEILNEHMER.filter(x=>x.side===1&&x.aktuell+1>=BB().rundenN&&x.vorteil>0).length)
       : istBuehne(disc)
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
       : istFeldspiel(disc)
-      ? (fsPunkte[0]+" : "+fsPunkte[1])
+      ? (fsStand.team[0]+" : "+fsStand.team[1])
       : (live(0).length+" : "+live(1).length);
   }
 
@@ -7357,7 +7596,10 @@
       bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
       namen:()=>TEILNEHMER.map(u=>u.n),
-      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
+      // Duell (Speed-Schach, I-Spy): "besser" ist der eigene Vorteil am Brett, nicht die
+      // absolute Punktesumme — ein Brett kann man mit wenigen, aber besseren Zuegen
+      // gewinnen. Sonst wie ueberall: die Summe der Durchgangspunkte.
+      wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=BUEHNE_ART[bd].duell?(u.vorteil||0):u.summe; return o;}
     };
   }
   // JEDES FELDSPIEL MELDET SICH SELBST AN. "Besser" ist hier ein kleiner Box-Score:
