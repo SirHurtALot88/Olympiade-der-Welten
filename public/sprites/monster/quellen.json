@@ -1,0 +1,82 @@
+{
+  "_hinweis": "Kreaturen-Sprites: Drachen, LPC-Monster, Vierbeiner, Roboter. Beschafft am 24.08. Alle Lizenzen (CC0/CC-BY/CC-BY-SA/OGA-BY/GPL) sind fuer das private, nicht kommerzielle Spiel in Ordnung. ACHTUNG Zellenraster: die LPC-Monster, Wolf, Pferd und Roboter liegen im normalen 64px-Raster (Pferd 128px); die vier Drachen sind ein BEWUSSTER STILBRUCH mit 144x128-Zellen — siehe eigene Eintraege.",
+  "_stilbruch_drachen": "Chris hat ausdruecklich erlaubt, fuer Drachen/Bots/Pflanzen/Monster stilistisch abweichende Sprites zu nehmen, wenn der LPC-Baukasten strukturell nichts hat. Der LPC-Satz kennt keinen Drachenkopf (nur Echse + Echsenfluegel/-schwanz als Anbauteile). Die fliegenden Drachen hier sind Pixelart in Draufsicht mit 4 Richtungen — gleiche Logik wie LPC, nur groessere Zellen (144x128 statt 64x64) und 3 statt 9 Bilder. Fuer Butterfly/Mushu/Leviathan gedacht.",
+  "drache_rot.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_dragon-red.png, unveraendert; 3 Spalten x 4 Reihen zu 144x128, Reihenfolge oben/rechts/unten/links (Stendhal-Konvention), 3 Flugschlag-Bilder je Richtung",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "drache_gold.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_dragon-gold.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "drache_zweikopf_rot.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_twin_headed_dragon-red.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework",
+    "verwendung": "zweikoepfig — Kandidat fuer Leviathan/Hydra-artige Kaempfer"
+  },
+  "drache_zweikopf_blau.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_twin_headed_dragon-blue.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "_lpc_monster": "Die folgenden 11 Blaetter stammen aus '[LPC] Monsters': Originale von Charles Sanchez (CharlesGabriel) aus den LPC-Basis-Assets, Angriffs-Animationen von bluecarrot16, beauftragt von Pierre Vigier (Vagabond). Lizenz CC-BY-SA 3.0 / GPL 3.0. https://opengameart.org/content/lpc-monsters — LPC-Raster 64x64, 4 Richtungen, unveraendert uebernommen (nur umbenannt).",
+  "fledermaus.png": { "original": "bat.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "biene.png": { "original": "bee.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wurm_gross.png": { "original": "big_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "auge.png": { "original": "eyeball.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "geist.png": { "original": "ghost.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "fleischfresser_blume.png": { "original": "man_eater_flower.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters", "verwendung": "Pflanzenwesen — deckt Chris' 'plants'-Wunsch ab, im LPC-Raster" },
+  "kuerbis.png": { "original": "pumpking.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schleim.png": { "original": "slime.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schleim_geschoss.png": { "original": "slime-projectile.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wurm_klein.png": { "original": "small_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schlange.png": { "original": "snake.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wolf.png": {
+    "paket": "[LPC] Wolf Animation",
+    "blatt": "wolfsheet1.png, unveraendert (640x384, 64px-Zellen, 4 Richtungen: gehen/rennen etc., siehe OGA-Seite)",
+    "urheber": "William.Thompsonj (Auftraggeber/Bearbeitung), Stephen Challener (Redshrike, Original)",
+    "lizenz": "OGA-BY 3.0 (alternativ CC-BY 3.0/4.0, GPL 2.0/3.0)",
+    "url": "https://opengameart.org/content/lpc-wolf-animation",
+    "verwendung": "generischer Vierbeiner — laesst sich wie die Koerper-Ebenen umfaerben"
+  },
+  "pferd_braun.png": {
+    "paket": "[LPC] Horses",
+    "blatt": "horse-brown.png, unveraendert (512x2560, 128px-Zellen, gehen/trab/galopp/fressen, 4 Richtungen)",
+    "urheber": "bluecarrot16",
+    "lizenz": "OGA-BY 3.0 (alternativ CC-BY 3.0, CC-BY-SA 3.0, GPL 2.0/3.0)",
+    "url": "https://opengameart.org/content/lpc-horses"
+  },
+  "roboter_walk.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Walk.png, unveraendert (512x256 = 8 Bilder x 4 Richtungen zu 64x64)",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "verwendung": "Roboter im LPC-Raster — fuer die 'bots' im Kader"
+  },
+  "roboter_tod.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Death.png, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "roboter_schuss.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Shot.png, unveraendert (Projektil/Muendungsfeuer)",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  }
+}

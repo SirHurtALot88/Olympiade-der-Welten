@@ -51,6 +51,29 @@ mit ihrer LPC-Quelle; `quellen.json` nennt zu jeder Ebene den Pfad im LPC-Satz.
 Damit fällt die Teilung „stehende Figur aus dem vollen Satz, laufender Kämpfer aus dem
 animierbaren Kern" weg. Auch die `hurt`-Blätter für gefallene Kämpfer sind jetzt da.
 
+### Weibliche Körper sind da (24.08.)
+
+Zwölf neue Blätter aus derselben Quelle, byte-identisch übernommen: `kw_*` ist der
+**weibliche Körper** (`body/bodies/female/`), `gw_*` der **weibliche Menschenkopf**
+(`head/heads/human/female/`), jeweils für `walk`, `run`, `idle`, `hurt`, `shoot`, `slash`.
+
+Drei Dinge sind nachgemessen, nicht vermutet:
+
+- **Gleiche Blattmaße** wie die männlichen Gegenstücke in allen sechs Bewegungen —
+  gleiche Zellen, gleiche Bildzahlen, ein Drop-in-Ersatz für `k_*`/`g_*`.
+- **Gleiche 6-Farben-Basisrampe** wie der männliche Körper — das Umfärben zur Laufzeit
+  funktioniert unverändert.
+- **Die Tierköpfe passen auch auf den weiblichen Körper.** Die `sheet_definitions` des
+  LPC-Generators erklären alle `adult`-Köpfe (Alien, Wolf, Echse, …) ausdrücklich für
+  `female` gültig, mit demselben Blatt und denselben Offsets; Sichtprüfung bestätigt.
+  Nur der Menschenkopf hat ein eigenes weibliches Blatt — dafür ist `gw_*` da.
+
+Einbau-Idee (rückwärtskompatibel): ein optionales Feld `geschlecht` am Bauplan; fehlt es,
+werden wie bisher `k_*`/`g_*` gezeichnet, steht dort `"w"`, greifen `kw_*`/`gw_*`.
+Die 124 bestehenden Rezepte bleiben unangetastet gültig. Grenze: das männliche Haar
+`h_*` (`flat_top_fade/male`) hat **kein** weibliches Pendant im Satz; die `adult`-Frisuren
+(`haar_lang`, `haar_mop`, `haar_dread`) passen dagegen auf beide Körper.
+
 **Was weiterhin fehlt — und warum es nicht nachzuholen ist.** Sieben Ebenen haben kein
 `run`. Nachgemessen im gesamten LPC-Satz, nicht nur in unserem Ausschnitt:
 
