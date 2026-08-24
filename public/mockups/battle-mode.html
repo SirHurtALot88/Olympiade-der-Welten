@@ -2246,7 +2246,11 @@
         ZWEITCHANCE: {power:45,awareness:30,stamina:25},
         ABWEHR:      {awareness:40,speed:35,torment:25},
         TEAMGEIST:   {spirit:55,charisma:45},
-        AUSDAUER:    {stamina:50,torment:25,speed:25}
+        AUSDAUER:    {stamina:50,torment:25,speed:25},
+        // Fables Dynamik-Runde: ohne Lauftempo bewegt sich jeder Spieler exakt gleich
+        // schnell (nur der Lerp-Faktor entschied), Speed hatte in der Bewegung selbst nie
+        // eine Rolle. PLATZHALTER-Rezept, wie alle anderen hier.
+        LAUFTEMPO:   {speed:50,stamina:30,dexterity:20}
       },
       // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
       // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
@@ -2553,6 +2557,29 @@
   // sichern()/zurueck() lesen es dadurch unveraendert.
   // ===================================================================================
 
+  // FABLES DYNAMIK-RUNDE (fuenf Slots ums Angriffsbrett — zwei Ecken, zwei Fluegel, ein
+  // "Zentrum" nah am Korb). Radius als Vielfaches von KORB_NAH_RADIUS, seitlich als
+  // Vielfaches von 90px (derselbe Massstab wie die alte fixe Formation). PLATZHALTER-
+  // Geometrie, an echten Basketball-Spacing-Spots orientiert, nicht gemessen.
+  const SLOTS=[
+    {radius:0.55, seitlich:0},
+    {radius:1.55, seitlich:1.0},
+    {radius:1.55, seitlich:-1.0},
+    {radius:2.3,  seitlich:1.3},
+    {radius:2.3,  seitlich:-1.3}
+  ];
+  // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
+  // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
+  // bleiben nah dran, Schuetzen ziehen weit raus". Neu bei jedem Possession-Wechsel
+  // (naechsterAngriff), nicht bei jedem einzelnen Pass innerhalb derselben Possession.
+  function zuordneSlots(seite){
+    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
+    // Neue Possession heisst auch: kein Screen/Roll aus dem vorigen Angriff schleppt sich
+    // mit rein.
+    for(const u of FSTEAM[seite]){ u.screent=null; u.rollBis=0; u.screenRuf=0; }
+  }
+
   function initBasketballLive(art){
     fsZuege=[]; fsZeiger=0;
     for(const team of FSTEAM)for(const u of team){
@@ -2562,9 +2589,11 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null});
+        wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0});
     }
-    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}, reboundKampf:null};
+    zuordneSlots(0); zuordneSlots(1);
+    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}, reboundKampf:null,
+      fastbreak:null, einwurfBis:0};
     ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
   }
 
@@ -2575,6 +2604,10 @@
   // verhindert, dass alle fuenf jeden Frame neu zuordnen (Analogon zu Kampfs `reev`).
   function zuordneDeckung(voll){
     for(let seite=0;seite<2;seite++){
+      // FASTBREAK: die verteidigende Seite sprintet erst zurueck (s. bewegeSpielerLive) —
+      // solange keine Manndeckung zuteilen, sonst haelt sie ihre alten Maenner fest und
+      // rennt ihnen hinterher statt zum eigenen Korb. Echte Ueberzahl statt Kosmetik.
+      if(fsLive.fastbreak&&fsLive.fastbreak.seite===seite&&fsT<fsLive.fastbreak.bis)continue;
       const verteidiger=FSTEAM[1-seite], angreifer=FSTEAM[seite];
       // Wer diesmal NICHT neu zuordnet (reevDeckung noch nicht abgelaufen), behaelt
       // seinen Mann — der darf deshalb nicht mehr in `frei` stehen. Opus-Review-Fund:
@@ -2611,12 +2644,43 @@
 
   function naechsterAngriff(seite){
     fsLive.angriffSeit=0;
+    zuordneSlots(seite);
     ballUebernehmen(gewichtetesLos(FSTEAM[seite],"AUFBAU"));
   }
 
   function logZug(seite,art,extra){
     fsZuege.push(Object.assign({seite,art},extra));
     fsZeiger=fsZuege.length;
+  }
+
+  // Wie offen EIN Mitspieler fuer einen Pass VON `von` ist: sein eigener Deckerabstand
+  // (naeher dran = weniger offen) MAL ein Abschlag, falls irgendein Verteidiger nah an
+  // der geraden Passlinie zwischen `von` und ihm steht (distZuLinie existiert bereits
+  // fuer die Interception in passeAb — hier VOR der Entscheidung gelesen statt nur
+  // danach als Strafe). Fables Fund: der Passgeber "sieht" bisher keine Verteidigung,
+  // waehlt rein nach ABSCHLUSS. PLATZHALTER-Formel.
+  function offenheitFuerPass(von,ziel){
+    const decker=FSTEAM[1-ziel.side].find(v=>v.deckt===ziel);
+    let offen=Math.min(1,Math.max(0.2,(decker?dist(ziel,decker):200)/60));
+    let minLinie=Infinity;
+    for(const v of FSTEAM[1-von.side]){ const d=distZuLinie(v,von,ziel); if(d<minLinie)minLinie=d; }
+    if(minLinie<40)offen*=0.35; // PLATZHALTER
+    return offen;
+  }
+  // Gewichtetes Los ueber eine frei waehlbare Bewertungsfunktion statt eines festen
+  // Attributnamens (gewichtetesLos oben kann das nicht) — deterministisch ueber rr().
+  function gewichtetesLosNach(liste,gewichtFn){
+    const gewichte=liste.map(x=>Math.max(0.01,gewichtFn(x)));
+    const summe=gewichte.reduce((s,x)=>s+x,0);
+    let r=rr()*summe;
+    for(let i=0;i<liste.length;i++){ r-=gewichte[i]; if(r<=0)return liste[i]; }
+    return liste[liste.length-1];
+  }
+  function offensterMitspieler(mitspieler,von){
+    // Ein Spieler im Roll-Fenster (gerade geblockt und zum Korb geschnitten) ist die
+    // Belohnung fuers Screenen — sein Passgewicht verdreifacht sich fuer das Fenster
+    // (Fables Vorschlag), unabhaengig von seiner sonstigen Offenheit.
+    return gewichtetesLosNach(mitspieler,m=>m.ABSCHLUSS*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -2629,10 +2693,12 @@
     const nah=zumKorb<KORB_NAH_RADIUS, fern=!nah&&zumKorb<DREIER_RADIUS;
     const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
     const deckerAbstand=decker?dist(u,decker):999;
+    const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
     // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
     // ist, senkt die Erfolgschance zusaetzlich — das gab es im Vorab-Modell nicht, weil
-    // dort nie ein tatsaechlicher Deckerabstand vorlag.
-    const bedraengnis=Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
+    // dort nie ein tatsaechlicher Deckerabstand vorlag. Im Fastbreak (Fables Fund) ist
+    // die Verteidigung noch am Zurueckrennen — deutlich weniger Bedraengnis.
+    const bedraengnis=(imFastbreak?0.3:1)*Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
     // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
     // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
     // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
@@ -2640,10 +2706,34 @@
     // entstanden dadurch faktisch nur noch beim Alley-Oop).
     const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
 
-    if(nah||fern||erzwingen){
+    if(nah||fern){
+      // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
+      // mechanischste Moment der Engine (Fables Fund). Die Wurfqualitaet (dieselbe
+      // Erfolgsformel wie zuvor) muss eine mit der Schussuhr sinkende Schwelle
+      // uebertreffen; gute Schuetzen (hohe ABSCHLUSS) trauen sich frueher. Im Fastbreak
+      // ein Bonus, damit der schnelle Korbleger dort spuerbar leichter faellt.
+      // PLATZHALTER-Formel, alle Zahlen ungemessen.
       const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
-        -(fern?0.10:0)-bedraengnis);
-      wirf(u,u,art,fern,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
+        -(fern?0.10:0)-bedraengnis+(imFastbreak?0.12:0));
+      const schwelle=erzwingen?-1:Math.max(0.05,
+        0.42-(fsLive.angriffSeit/SCHUSSUHR_BASKETBALL)*0.30-(u.ABSCHLUSS-50)*0.0010);
+      if(technik>schwelle){
+        wirf(u,u,art,fern,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
+        return;
+      }
+      // Der Wurf lohnt sich (noch) nicht: bedraengt UND ein Mitspieler steht offener da
+      // -> Kick-Out statt stur weiterzudribbeln bis zur Schussuhr-Zwangsloesung.
+      if(bedraengnis>0&&team.length>1){
+        const mitspieler=team.filter(x=>x!==u);
+        passeAb(u,offensterMitspieler(mitspieler,u));
+        return;
+      }
+      u.reevBall=0.25; // PLATZHALTER — kurz, gleich wieder pruefen statt lange zu warten
+      return;
+    }
+    if(erzwingen){
+      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060-bedraengnis);
+      wirf(u,u,art,true,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
       return;
     }
     if(team.length>1){
@@ -2671,15 +2761,32 @@
         if(zumKorb<KORB_NAH_RADIUS*2){ // PLATZHALTER-Reichweite fuer "nah genug fuer einen Zug"
           for(const key in (art.spielzuege||{})){
             const sz=art.spielzuege[key];
-            const kandidat=gewichtetesLos(mitspieler,sz.rolle);
+            // Rollfenster bevorzugt (s. offensterMitspieler) — ein geblockter Roll zum
+            // Korb ist eine glaubwuerdige Entstehung fuer den Alley-Oop, statt eines
+            // reinen Wuerfelwurfs.
+            const kandidat=gewichtetesLosNach(mitspieler,m=>Math.max(1,m[sz.rolle])*(m.rollBis>fsT?3:1));
             if(rr()<sz.neigung(u,kandidat)){
               wirf(u,kandidat,art,false,sz.abschluss(u,kandidat),u,key,null);
               return;
             }
           }
         }
-        passeAb(u,gewichtetesLos(mitspieler,"ABSCHLUSS"));
+        passeAb(u,offensterMitspieler(mitspieler,u));
         return;
+      }
+      // SCREEN/PICK-AND-ROLL: weder Wurf noch Pass diesmal — statt einfach nur zu warten,
+      // kann der Ballfuehrer einen Mitspieler zum Block rufen. Fables Fund: das taktische
+      // "zwei Spieler tun sichtbar etwas zusammen" fehlte komplett, es gab nur die drei
+      // festen Spielzuege nah am Korb. PLATZHALTER-Chance und -Dauer.
+      if(!u.screenRuf||u.screenRuf<=0){
+        const screenChance=Math.min(0.30,Math.max(0.05,0.15+(u.AUFBAU-50)*0.0020));
+        if(rr()<screenChance){
+          const screener=gewichtetesLos(mitspieler,"ZWEITCHANCE");
+          if(!screener.screent){
+            screener.screent={fuer:u,bis:fsT+1.2}; // PLATZHALTER
+            u.screenRuf=1.5; // PLATZHALTER — Sperre gegen sofortigen erneuten Ruf
+          }
+        }
       }
     }
     u.reevBall=0.4+(100-u.AUFBAU)/100*0.8; // PLATZHALTER, s. Konzeptdoc
@@ -2750,8 +2857,16 @@
       decker.steals++; traeger.verluste++; decker.lunge=0.4;
       feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
+      startFastbreak(decker.side);
       naechsterAngriff(decker.side);
     }
+  }
+
+  // FASTBREAK: nach Steal/Interception/Defensiv-Rebound zaehlt Tempo, nicht nur
+  // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
+  // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
+  function startFastbreak(seite){
+    fsLive.fastbreak={seite, bis:fsT+3};
   }
 
   function loeseFlugAuf(flug,art){
@@ -2762,6 +2877,7 @@
         feed(f.side,f.n+" fängt den Pass ab — Steal.");
         logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
         fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
+        startFastbreak(f.side);
         fsLive.angriffSeit=0; ballUebernehmen(f);
         return;
       }
@@ -2788,6 +2904,7 @@
       schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
         life:gross?1.7:1,crit:true,_spieler:schuetze.id,_gross:gross});
       fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      fsLive.einwurfBis=fsT+0.8; // PLATZHALTER: kurze Einwurf-Pause, damit der Fastbreak-Kontrast wirkt
       naechsterAngriff(1-schuetze.side);
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
@@ -2802,67 +2919,98 @@
         logZug(schuetze.side,"fehlwurf",{spieler:schuetze});
       }
       fsAktuell={spieler:null,verteidiger:flug.blockKandidat,passgeber:flug.passgeber,rebounder:null};
-      fsLive.ball.frei={x:flug.nach.x,y:flug.nach.y,vonSeite:schuetze.side};
+      // REBOUND-STREUUNG: vorher landete jeder Fehlwurf exakt auf dem Ringpunkt — jeder
+      // Rebound-Kampf am selben Fleck, kein kurzer/langer Abpraller. Fernwuerfe prallen
+      // weiter ab (auch physikalisch plausibel). Zwei rr()-Wuerfe, deterministisch.
+      const scatterR=10+rr()*(flug.fern?70:40); // PLATZHALTER
+      const winkel=rr()*Math.PI*2;
+      fsLive.ball.frei={x:flug.nach.x+Math.cos(winkel)*scatterR,
+        y:flug.nach.y+Math.sin(winkel)*scatterR,vonSeite:schuetze.side};
     }
   }
 
   // Positionsintegration: jeder Spieler laeuft jeden Tick Richtung eines live
-  // berechneten Laufziels — kein Phasenwert wie im Vorab-Modell mehr, weil es keine
-  // vorab bekannte "Zug-Dauer" mehr gibt.
+  // berechneten Laufziels. FABLES DYNAMIK-RUNDE ersetzt hier den alten Exponential-Lerp
+  // (Geschwindigkeit ~ Restdistanz — wer weit weg war, "zoomte", wer nah dran war, kroch,
+  // nie eine echte Maximalgeschwindigkeit, und kein Attribut beeinflusste je die Bewegung
+  // selbst — Chris' "die teleportieren sich ja quasi") durch geschwindigkeitsbegrenztes
+  // Laufen mit `LAUFTEMPO` als Basis. `fsLive.amBall` statt `fsLive.ball.traeger?.side`
+  // bleibt (Opus-Review-Fund, s. History): der Ball ist waehrend Flug/freiem Liegen
+  // `traeger:null`, die Seiten bleiben trotzdem Angreifer/Verteidiger.
   function bewegeSpielerLive(dt){
-    const k=Math.min(1,dt*4); // PLATZHALTER Lerp-Geschwindigkeit
-    // Eigene, langsamere Rate fuers Dribbeln: bei der gemeinsamen Rate oben (k, Halbwertszeit
-    // ~0,17s) waere der Ballfuehrer binnen einer halben Sekunde am Korb — praktisch das
-    // urspruengliche Tempo-Problem aus #660 nochmal, nur diesmal ohne den zusaetzlichen
-    // Daempfungsfaktor, der es zwischenzeitlich ins Gegenteil (17-19s) verkehrt hatte
-    // (Opus-Review-Fund, s. unten). ~0,6/s ergibt aus typischer Anspieldistanz
-    // (345-552px, gemessen) rechnerisch 2-3s bis zur Wurfreichweite — PLATZHALTER.
-    const kDribble=Math.min(1,dt*0.6);
-    // `fsLive.amBall` statt `fsLive.ball.traeger?.side` — der Ball ist waehrend Flug UND
-    // freiem Liegen `traeger:null`, aber die Seiten bleiben trotzdem Angreifer/
-    // Verteidiger. Opus-Review-Fund: mit der alten Abfrage liefen in genau diesen
-    // Phasen ALLE zwoelf Spieler in die weit entfernte Ruheformation zurueck und blieben
-    // dort haengen, weil niemand mehr nah genug an einen freien Ball herankam (bis zu
-    // 30s gemessener Stillstand). `amBall` ist jetzt die einzige Quelle dafuer, wer
-    // gerade angreift (siehe ballUebernehmen).
     const ballSeite=fsLive.amBall;
+    const fastbreak=fsLive.fastbreak;
+    const imFastbreak=!!(fastbreak&&fsT<fastbreak.bis);
     for(const team of FSTEAM)for(const u of team){
-      let zx=u.x, zy=u.y;
+      let zx=u.x, zy=u.y, tempoMul=1;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
-        // Dribbelt Richtung Korb. Opus-Review-Fund: hier stand vorher ZUSAETZLICH zum
-        // Lerp am Ende dieser Funktion ein eigener Daempfungsfaktor ("*0,03"), macht
-        // zusammen effektiv nur ~0,2 % der Reststrecke pro Tick — 17-19s bis zur
-        // Wurfreichweite, bei einer Schussuhr von 8s. Jetzt EIN Schritt: Ziel ist der
-        // Korb direkt, `kDribble` (s. oben) uebernimmt das Tempo.
         zx=korbX; zy=H/2+(u.id%2?40:-40);
       } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
+      } else if(u.screent&&fsT<u.screent.bis){
+        // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
+        // den er blockt, und dessen Decker — Fables Fund: "zwei Spieler tun sichtbar
+        // etwas zusammen" fehlte komplett.
+        const bf=u.screent.fuer, bfDecker=FSTEAM[1-bf.side].find(v=>v.deckt===bf);
+        zx=bfDecker?(bf.x+bfDecker.x)/2:bf.x; zy=bfDecker?(bf.y+bfDecker.y)/2:bf.y;
+      } else if(u.rollBis>fsT){
+        // GEROLLT: das Screen-Fenster ist vorbei, jetzt schneidet derselbe Spieler zum
+        // Korb (Roll) statt in seinen Slot zurueckzulaufen — Zielscheibe fuer den Pass,
+        // der Alley-Oop eingeschlossen (Passgewicht dafuer in offensterMitspieler/
+        // gewichtetesLosNach fuer den Spielzug-Kandidaten).
+        zx=korbX; zy=H/2;
       } else if(ballSeite===u.side){
-        // Angriff ohne Ball: gemischte Formation statt alle im Wurfradius — zwei nah am
-        // Korb (Cutter/Rebounder), zwei im Mitteldistanz-, zwei im Fernwurf-Abstand.
-        // Sonst gibt es niemanden AUSSERHALB der Wurfreichweite, an den sich ein Pass
-        // ueberhaupt lohnen wuerde.
-        const idx=team.indexOf(u);
-        const distFaktor=[0.3,0.3,1.5,1.5,2.3,2.3][idx%6];
-        const seitlich=[0,0,1,-1,1,-1][idx%6];
-        const zumFeld=u.side===0?-1:1; // Richtung Feldmitte, weg vom eigenen Korb
-        zx=korbX+zumFeld*distFaktor*KORB_NAH_RADIUS; zy=H/2+seitlich*90;
+        // Angriff ohne Ball: rollenbasierte Slots (zuordneSlots) statt einer fixen
+        // Team-Index-Formation, PLUS Ausweichdruck vom Ballfuehrer PLUS gelegentliches
+        // Freilaufen, wenn der eigene Decker zu eng klebt — sonst ist Offense ohne Ball
+        // ein Standbild (Fables Fund).
+        const slot=SLOTS[u.slotIdx??0];
+        const zumFeld=u.side===0?-1:1;
+        let bx=korbX+zumFeld*slot.radius*KORB_NAH_RADIUS, by=H/2+slot.seitlich*90;
+        const traeger=fsLive.ball.traeger;
+        if(traeger&&traeger!==u){
+          const dx0=bx-traeger.x, dy0=by-traeger.y, d0=Math.hypot(dx0,dy0)||1, mindest=80; // PLATZHALTER
+          if(d0<mindest){ bx+=dx0/d0*(mindest-d0); by+=dy0/d0*(mindest-d0); }
+        }
+        const meinDecker=FSTEAM[1-u.side].find(v=>v.deckt===u);
+        u.slotSeit=(u.slotSeit||0)+dt;
+        if(meinDecker&&dist(u,meinDecker)<25&&u.slotSeit>1.2){ // PLATZHALTER
+          u.slotIdx=(u.slotIdx+1+Math.floor(rr()*3))%SLOTS.length;
+          u.slotSeit=0;
+        }
+        zx=bx; zy=by;
+        if(imFastbreak&&fastbreak.seite===u.side&&team.indexOf(u)<2)tempoMul=1.3; // PLATZHALTER: die ersten beiden sprinten mit
       } else if(u.deckt){
-        // Verteidigung: nah am gedeckten Mann bleiben, mit leichtem Zug zum eigenen
-        // Korb — Opus-Review-Fund: der Zug war vorher PROPORTIONAL zum Abstand des
-        // Mannes vom Korb (bei 450px Korbabstand stand der Decker 135px weg), weit
-        // ausserhalb von STEAL_REICHWEITE(45)/BEDRAENGT_RADIUS(30) — Steal und Block
-        // waren dadurch in der Praxis unerreichbar. Jetzt gedeckelt.
-        const zumEigenenKorb=eigenerKorbX-u.deckt.x;
-        const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
-        zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+        if(imFastbreak&&fastbreak.seite!==u.side){
+          // FASTBREAK-VERTEIDIGUNG: erst zurueck zum eigenen Korb sprinten, Manndeckung
+          // wird waehrenddessen in zuordneDeckung ausgesetzt (echte Ueberzahl-Situation
+          // aus dem, was schon da ist, statt eines weiteren Sonderfalls).
+          zx=eigenerKorbX; zy=H/2+(u.id%2?40:-40); tempoMul=1.25; // PLATZHALTER
+        } else {
+          // Verteidigung: nah am gedeckten Mann bleiben, mit gedeckeltem Zug zum eigenen
+          // Korb (Opus-Review-Fund, History). SCREEN-BREMSE: steht ein gegnerischer
+          // Screener nah am Blockpunkt zwischen mir und meinem Mann, komme ich diesen
+          // Tick kaum vom Fleck — die eigentliche Wirkung eines Blocks.
+          const zumEigenenKorb=eigenerKorbX-u.deckt.x;
+          const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
+          zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+          const screener=FSTEAM[u.deckt.side].find(s=>s.screent&&s.screent.fuer===u.deckt&&fsT<s.screent.bis);
+          if(screener&&dist(screener,{x:(u.x+u.deckt.x)/2,y:(u.y+u.deckt.y)/2})<26)tempoMul=0.35; // PLATZHALTER
+        }
       } else {
         const p=fsIdlePos(u.side,team.indexOf(u),team.length);
         zx=p.x; zy=p.y;
       }
-      const stepK=u.hatBall?kDribble:k;
-      u.x+=(zx-u.x)*stepK; u.y+=(zy-u.y)*stepK;
+      // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
+      // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
+      // (0,55×, ersetzt das alte separate kDribble), Fastbreak/Retreat/Screen-Bremse
+      // wirken ueber denselben `tempoMul`. PLATZHALTER-Basiswert (140+LAUFTEMPO*1,4).
+      const tempoPx=(140+u.LAUFTEMPO*1.4)*tempoMul*(u.hatBall?0.55:1);
+      const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
+      const schritt=Math.min(distZiel,tempoPx*dt);
+      if(distZiel>0.5){ u.x+=dx/distZiel*schritt; u.y+=dy/distZiel*schritt; }
+      u.vx=dx; u.vy=dy; // fuer blickAus() beim Zeichnen — vorher nie gesetzt, alle standen immer gleich rum
       if(u.hop>0&&!(fsLive.ball.flug&&fsLive.ball.flug.ziel===u))u.hop=Math.max(0,u.hop-dt*2);
     }
   }
@@ -2878,6 +3026,12 @@
       if(u.reevDeckung>0)u.reevDeckung-=dt;
       if(u.reevBall>0)u.reevBall-=dt;
       if(u.stealCd>0)u.stealCd-=dt;
+      if(u.screenRuf>0)u.screenRuf-=dt;
+      // SCREEN -> ROLL: das Blockfenster ist um, jetzt schneidet derselbe Spieler zum
+      // Korb statt in seinen Slot zurueckzulaufen (bewegeSpielerLive), und sein
+      // Passgewicht ist fuer das Rollfenster erhoeht (offensterMitspieler,
+      // Spielzug-Kandidat) — die Belohnung fuers Blocken.
+      if(u.screent&&fsT>=u.screent.bis){ u.screent=null; u.rollBis=fsT+1.5; } // PLATZHALTER
     }
 
     const flug=fsLive.ball.flug;
@@ -2919,7 +3073,7 @@
           fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
           fsLive.reboundKampf=null;
           if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
-          else naechsterAngriff(gewinner.side);
+          else { startFastbreak(gewinner.side); naechsterAngriff(gewinner.side); }
         }
       }
     } else {
@@ -2929,7 +3083,7 @@
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
-        if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
+        if((erzwingen||traeger.reevBall<=0)&&fsT>=fsLive.einwurfBis)entscheideBallaktion(traeger,art,erzwingen);
         if(fsLive.ball.traeger===traeger&&decker&&decker.stealCd<=0&&dist(decker,traeger)<STEAL_REICHWEITE){
           versucheSteal(decker,traeger,art);
         }
