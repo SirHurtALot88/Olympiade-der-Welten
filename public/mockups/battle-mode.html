@@ -835,6 +835,33 @@
   // sah als grauer Fussknecht schlicht falsch aus.
   const RUEST_RAMPE=[[0x1D,0x13,0x1E],[0x4D,0x4A,0x5D],[0x72,0x6B,0x7E],
                      [0x86,0x7E,0x7F],[0xC4,0xB5,0x9F],[0xFF,0xFF,0xFF]];
+  // Opus-Review-Fund (Sprite-Sichtcheck, 24.08.): spriteRuest nahm IMMER RUEST_RAMPE
+  // (die Stahl/Platte-Palette) als Quelle an — bei ruest:"leder" trifft davon kein
+  // einziger Pixel (andere Rohfarben), `ruestTon` blieb also fuer JEDE Lederruestung
+  // wirkungslos, egal was eingetragen war (repoweit >8 Betroffene, mehrfach unabhaengig
+  // gefunden). Zweite Quellrampe aus leder_walk ausgezaehlt (dieselbe Methode wie oben
+  // bei plate_walk): #2B1C1D, #4B2B13, #704325, #75502D, #9A6F37, #C4B59F.
+  const RUEST_QUELLEN=[
+    {name:"plate",rgb:RUEST_RAMPE},
+    {name:"leder",rgb:[[0x2B,0x1C,0x1D],[0x4B,0x2B,0x13],[0x70,0x43,0x25],
+                        [0x75,0x50,0x2D],[0x9A,0x6F,0x37],[0xC4,0xB5,0x9F]]}
+  ];
+  function quellRampeRuest(q){
+    let best=null,bestN=0,gesamt=0;
+    for(let i=0;i<q.data.length;i+=4)if(q.data[i+3]>200)gesamt++;
+    for(const r of RUEST_QUELLEN){
+      let n=0;
+      for(let i=0;i<q.data.length;i+=4){
+        if(q.data[i+3]<=200)continue;
+        for(const c of r.rgb)if(trifft(q.data,i,c)){n++;break;}
+      }
+      if(n>bestN){bestN=n;best=r;}
+    }
+    // Niedrigere Schwelle als bei Haut (60 %): Leder-Blaetter mischen Gurte/Schnallen in
+    // einer zweiten, absichtlich UNGEFAERBTEN Materialfarbe — 50 % reicht, um "das ist
+    // eindeutig eine der beiden bekannten Ruestungspaletten" zu erkennen, wie bei Haar.
+    return (bestN*100/Math.max(1,gesamt))>=50?best.rgb:null;
+  }
   const RUEST_TON={
     gold:  ["#2A1B08","#6B4A12","#A87524","#D19B2E","#F0C858","#FFF0B8"],
     bronze:["#241408","#5A3418","#8A5424","#AD6E31","#D2954F","#F0D2A0"],
@@ -847,15 +874,16 @@
     if(!ruestGefaerbt[id]){
       const im=sprBild[key];
       if(!im||!im.complete||!im.width)return im;
-      const ziel=RUEST_TON[ton].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
       const c=document.createElement("canvas");c.width=im.width;c.height=im.height;
       const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(im,0,0);
       const d=x.getImageData(0,0,c.width,c.height),q=d.data;
+      const quelle=im.__ruestRampe!==undefined?im.__ruestRampe:(im.__ruestRampe=quellRampeRuest(d));
+      if(!quelle)return im;
+      const ziel=RUEST_TON[ton].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
       for(let i=0;i<q.length;i+=4){
         if(q[i+3]===0)continue;
-        for(let k=0;k<RUEST_RAMPE.length;k++){
-          if(Math.abs(q[i]-RUEST_RAMPE[k][0])<10&&Math.abs(q[i+1]-RUEST_RAMPE[k][1])<10&&Math.abs(q[i+2]-RUEST_RAMPE[k][2])<10){
-            q[i]=ziel[k][0];q[i+1]=ziel[k][1];q[i+2]=ziel[k][2];break;}
+        for(let k=0;k<quelle.length;k++){
+          if(trifft(q,i,quelle[k])){q[i]=ziel[k][0];q[i+1]=ziel[k][1];q[i+2]=ziel[k][2];break;}
         }
       }
       x.putImageData(d,0,0);ruestGefaerbt[id]=c;
@@ -1057,7 +1085,7 @@
     // Rogue und Sprinter Leder, Bard, Mage und Overseer die Kapuze.
     // Bild: schwere Schuppenpanzerung, GEHOERNTER Helm, Streitaxt und Schild, Drache im
     // Hintergrund. Hoerner dazu; eine Axt haben wir als Ebene nicht, das Schwert vertritt sie.
-    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"schwert"},
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"schwert",ruestTon:"dunkel"},
     // Bild: gehoernter, unbewaffneter Feuer-/Lavakoloss mit geborstener Magmahaut, kaempft
     // mit blossen Faeusten. EIGENER FEHLER, von Chris gefunden: "frankenstein" stand hier
     // als Kopf, aber die ANIMIERTE Ansicht (zeichneSprite, diese Tabelle) kennt nur FUENF
@@ -1069,9 +1097,9 @@
     // ist der naechstliegende unter den fuenf echten Optionen. Die reichere Kader-Ansicht
     // (const B_FIGUR oben, "kopf_frankenstein") bleibt unveraendert — DORT existiert das
     // Bild wirklich, weil B_FIGUR keine Animationsphasen braucht.
-    "Lava Golem":         {kopf:"orc",haut:"olive",hoerner:true},
-    "Krolach":            {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
-    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert",geschlecht:"w"},
+    "Lava Golem":         {kopf:"orc",haut:"black",hoerner:true},
+    "Krolach":            {kopf:"troll",haut:"dark_green",ruest:"leder",hoerner:true},
+    "Johanna":            {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel"},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
     // dargestellt. Goldene Platte und Vollhelm. Eine KRONE gibt es unter den 59
     // Sprite-Blaettern nicht; die fehlt und gehoert auf die Liste.
@@ -1081,34 +1109,34 @@
     // s. spriteHaar oben). Jetzt eingebettet: Krone statt Helm (ein Koenig traegt beides
     // nicht gleichzeitig), graues Haar und ein grauer Bart wie im Portrait.
     "King Arlen Morgolor":{kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",krone:true,haar:"haar_lang",bart:true,haarTon:"gray",waffe:"schwert"},
-    "Gram":               {kopf:"lizard",haut:"dark_green",ruest:"plate",schwanz:true,waffe:"schwert"},
+    "Gram":               {kopf:"lizard",haut:"black",ruest:"plate",schwanz:true,waffe:"schwert",ruestTon:"bronze"},
     // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
     // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
     // Fluegel jetzt auch in der animierten Ansicht (nur ein statisches Bild, kein
     // Laufzyklus — s. zeichneFluegel oben), dieselbe Chris-Ansage wie bei B_FIGUR oben:
     // Fluegel stehen NICHT im Portrait, sind sein ausdruecklicher Wunsch.
-    "Rhyx'Tal":           {kopf:"lizard",haut:"black",ruest:"plate",fluegel:true},
+    "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey"},
     // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
     // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
-    "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w"},
+    "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w",ruestTon:"dunkel"},
     // Bild: alter Mann, graues Haar und Vollbart, Fellumhang, Holzstab — keine Kapuze
     // (die stand hier nur als Behelf, solange Haar nicht animiert werden konnte).
-    "Jorund":             {kopf:"human",haut:"olive",ruest:"leder",haar:"haar_lang",bart:true,haarTon:"gray"},
+    "Jorund":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",bart:true,haarTon:"gray"},
     // Bild: Priesterin mit Strahlenkranz, betend, KEINE Kapuze — der Heiligenschein braucht
     // den freien Kopf. "leder" bleibt als naechstliegender Ersatz fuer die golddurchwirkte
     // Robe stehen (eine echte Robe gibt es im Baukasten nicht). Das Schwert im Bild ist eine
     // Reliquie, keine gefuehrte Waffe (Chris' Fund korrigiert die Kapuze; unbewaffnet blieb
     // schon vorher richtig).
-    "Inefinna":           {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w"},
+    "Inefinna":           {kopf:"human",haut:"light",ruest:"plate",geschlecht:"w",ruestTon:"gold",krone:true,haar:"haar_lang",haarTon:"white",waffe:"schwert"},
     // Bild: unbewaffnete Waldnymphe, leichte Wickelkleidung, keine Kapuze — sitzt barfuss im
     // Wald. Kapuze war falsch (Chris' Fund); "leder" bleibt als naechstliegender Ersatz fuer
     // die leichte Kleidung stehen.
-    "Lulu":               {kopf:"human",haut:"light",ohren:true,ruest:"leder",geschlecht:"w"},
+    "Lulu":               {kopf:"human",haut:"light",ohren:true,ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"blonde"},
     // Armageddon Aftermath.
     "Greenkraut":         {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
     // Bild: Koloss aus Kristallschollen mit violetter Energie, UNBEWAFFNET. Kein Ork, kein
     // Schwert: die Zacken werden zu Hoernern, die Platte bleibt als Kristallpanzer.
-    "Krag'Zul":           {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true},
+    "Krag'Zul":           {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true,ruestTon:"dunkel"},
     "Tidesprinter":       {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true,waffe:"schwert"},
     // Bild: mechanischer VOGEL mit leuchtendem Kern. Einen Vogel haben wir als Ebene nicht —
     // bis dahin ein schmaler, unbewaffneter Kapuzentraeger in Metallton. Das ist ein
@@ -1116,7 +1144,7 @@
     "Seraph-11":          {kopf:"alien",haut:"fur_grey",ruest:"leder",kapuze:true},
     // Kastanienbraunes Haar und Bart wie im Portrait, keine Kapuze (derselbe Behelf wie
     // bei Jorund, jetzt behoben).
-    "Ralazar the Balanced":{kopf:"human",haut:"brown",ruest:"leder",haar:"haar_mop",bart:true,haarTon:"chestnut"},
+    "Ralazar the Balanced":{kopf:"human",haut:"olive",ruest:"plate",haar:"haar_mop",bart:true,haarTon:"dark_brown",ruestTon:"dunkel"},
     // Bild: rothaarige ELFE mit LANGBOGEN und Koecher, gruener Umhang, leichte Ruestung.
     // Genau Chris' Frage von vorhin, am Bild beantwortet: Bogen, keine Armbrust. Sie ist
     // damit die erste echte Fernkaempferin im Feld — deshalb traegt ihr Eintrag im Kader
@@ -1138,44 +1166,44 @@
     // Bild: blasses Maedchen, schwarzes Kleid, kein Kampfmotiv — kein Kopftyp und keine
     // Kleidung im Baukasten trifft die surreale Tortenboden-Szene; "leder" bleibt als
     // naechstliegender Ersatz fuer das Kleid stehen (wie bei Inefinnas Robe).
-    "Byrnja":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w"},
+    "Byrnja":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_mop",haarTon:"white"},
     // Bild: Elfe mit Langbogen, Koecher, gruenem Umhang, leichter Ruestung — deckungsgleich
     // mit Cassandras Bauplan (Bogen, keine Armbrust).
-    "Elara":              {kopf:"human",haut:"light",ohren:true,ruest:"leder",waffe:"bogen",geschlecht:"w"},
+    "Elara":              {kopf:"human",haut:"light",ohren:true,ruest:"leder",waffe:"bogen",geschlecht:"w",haar:"haar_lang",haarTon:"white"},
     // Bild: weiblicher Cyborg, schwarze Techruestung, spitze Antennenohren, pinke
     // Energieklinge. Keine Techruestung im Baukasten: "plate" in "dunkel" vertritt sie,
     // die Energieklinge vertritt das Schwert.
-    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w"},
+    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"dark_brown"},
     // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
     // schwebende Faeden mit erhobenen Haenden.
-    "Mindtamer":          {kopf:"human",haut:"light",helm:true,ruest:"leder",geschlecht:"w"},
+    "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder",geschlecht:"w"},
     // Bild: kleines freundliches Wesen aus Rinde und Moos, keine Waffe, keine Ruestung —
     // bloss der Hautton uebernimmt das Gruen.
-    "Tsubaki Cleaning":   {kopf:"orc",haut:"green"},
+    "Tsubaki Cleaning":   {kopf:"orc",haut:"green",hoerner:true},
     // Bild: insektoides schwarzes Wesen mit Klauen und Fluegeln, unbewaffnet. Kein
     // Insektenkopf im Baukasten; "wolf" steht fuer das tierisch-monstroese Auftreten.
-    "Othrama":            {kopf:"wolf",haut:"black"},
+    "Othrama":            {kopf:"alien",haut:"black",fluegel:true},
     // Bild: kosmischer Drache mit sternenuebersaeten Fluegeln — kein Drachenkopf, keine
     // Fluegel im animierbaren Satz. "lizard" fuer die Schuppenform, "lavender" fuer den
     // Sternenschimmer. PLATZHALTER: das Bild ist in BILDBEFUNDE bereits als Widerspruch
     // vorgelegt, hier gilt dieselbe Einschraenkung.
-    "Butterfly":          {kopf:"lizard",haut:"lavender",geschlecht:"w"},
+    "Butterfly":          {kopf:"lizard",haut:"dark_green",geschlecht:"w",hoerner:true,fluegel:true,schwanz:true},
     // Bild: Mann mit Fliegerhaube, Tentakel-Parasit im Gesicht, stuetzt sich auf einen
     // Gehstock (keine Waffe) — die Haube wird zur Kapuze.
-    "Myrkos":             {kopf:"human",haut:"light",kapuze:true},
+    "Myrkos":             {kopf:"human",haut:"light",kapuze:true,ruest:"leder"},
     // Bild: Orkin mit Streitaxt. Keine Axt im Baukasten; das Schwert vertritt sie, wie
     // schon bei Draco.
-    "Mavra":              {kopf:"orc",haut:"green",ruest:"leder",waffe:"schwert",geschlecht:"w"},
+    "Mavra":              {kopf:"orc",haut:"green",ruest:"leder",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
     // Bild: Sumpfmonster aus Moos und Faeulnis, unbewaffnet.
     "Murky":              {kopf:"orc",haut:"dark_green"},
     // Bild: gewaltiger oestlicher Drache mit goldener Maehne, an Ketten gelegt. Kein
     // Drachenkopf; "lizard" fuer die Schuppenform, "amber" fuer den Goldschimmer, "plate"
     // in "gold" fuer die schiere Masse (Bullbreaker).
-    "Leviathan":          {kopf:"lizard",haut:"amber",ruest:"plate",ruestTon:"gold"},
+    "Leviathan":          {kopf:"lizard",haut:"blue",ruest:"plate",ruestTon:"gold",fluegel:true,hoerner:true},
     // Bild: schlanker Cyborg mit Bildschirmkopf, cyanfarbene Energieschlieren, unbewaffnet.
     // Kein Roboterkopf im Baukasten; "fur_grey" fuer den metallischen Ton, wie bei
     // Seraph-11.
-    "Node":               {kopf:"human",haut:"fur_grey",ruest:"leder"},
+    "Node":               {kopf:"human",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",helm:true},
     // Bild: ein Frachtschiff, kein Charakter — bereits als Widerspruch vorgelegt
     // (BILDBEFUNDE). PLATZHALTER: kein Bauteil bildet ein Schiff ab; "plate" in "dunkel"
     // fuer die rostige Masse ist die am wenigsten falsche Naeherung.
@@ -1183,7 +1211,7 @@
     // Bild: elfische Zauberin, schwarz-goldene Robe, Kristallstab, goldene
     // Sternzeichen-Ringe. Kein Stab im animierbaren Satz (nur B_FIGUR kennt t_stab);
     // "leder" vertritt die Robe.
-    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder",geschlecht:"w"},
+    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"white"},
     // Bild: kolossales kristallines Sternenwesen, wirbelnde Energieringe — dieselbe Wahl
     // wie Krag'Zul (auch ein Kristallkoloss): "alien"/"lavender"/"plate" plus Hoerner fuer
     // die Zacken.
@@ -1192,15 +1220,15 @@
     // der einzige Fall in dieser Welle, wo der Baukasten den woertlichen Kopf hat.
     "Brightpaw":          {kopf:"wolf",haut:"fur_grey"},
     // Bild: gehoerntes Tiefsee-Monster mit Tentakeln, Stachelpanzer, blauen Energieadern.
-    "Abysskraken":        {kopf:"lizard",haut:"blue",hoerner:true,ruest:"plate"},
+    "Abysskraken":        {kopf:"lizard",haut:"fur_grey",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
     // Bild: zerfallenes Geisterschiff, kein Besatzungsmitglied sichtbar — bereits als
     // Widerspruch vorgelegt (BILDBEFUNDE). PLATZHALTER: kein Bauteil bildet ein Schiff ab;
     // Kapuze und dunkler Hautton stehen fuer den Totenweg (Reaper Mage/Necromancer), nicht
     // fuer eine Abbildung des Bildes selbst.
-    "Kreischende Kogge":  {kopf:"human",haut:"black",kapuze:true},
+    "Kreischende Kogge":  {kopf:"skeleton",haut:"black",kapuze:true,ruest:"leder",ruestTon:"dunkel"},
     // Bild: alter, muskuloeser baertiger Mann mit Stammestaetowierungen, stuetzt sich auf
     // einen Wanderstab (keine Waffe). Kein Bart im animierbaren Satz.
-    "Greybeard":          {kopf:"human",haut:"brown"},
+    "Greybeard":          {kopf:"human",haut:"light",haar:"haar_lang",bart:true,haarTon:"white",ruest:"leder"},
     // Bild: leuchtende Pflanze, wurzelt in einem Lichtbecken — kein humanoider Koerper.
     // PLATZHALTER: kein Bauteil bildet eine Pflanze ab; "green" Hautton und "leder" stehen
     // fuer den Support-Weg (Priest/Matriarch), nicht fuer eine Abbildung des Bildes selbst.
@@ -1213,21 +1241,21 @@
     "Roddox Harthelm":    {kopf:"minotaur",haut:"brown"},
     // Bild: riesiges bruellendes Reptilwesen mit gehoerntem Kamm, Zaehnen und Klauen,
     // unbewaffnet.
-    "Ironhoof":           {kopf:"lizard",haut:"olive",hoerner:true},
+    "Ironhoof":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
     // Bild: alte Hexe mit leuchtend blauen Augen, dunkler bestickter Robe.
     "Babuschinka":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
     // Bild: gehoerntes reptilienartiges Monster, unbewaffnet — bereits als Widerspruch
     // vorgelegt (BILDBEFUNDE, weder Servant- noch Monk-Motiv im Bild).
-    "Rok Kyl":            {kopf:"lizard",haut:"dark_green",hoerner:true},
+    "Rok Kyl":            {kopf:"lizard",haut:"brown",hoerner:true},
     // Bild: massiger gehoernter Daemon mit violett leuchtender Brust, aggressiv.
-    "Omniclops":          {kopf:"orc",haut:"black",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
+    "Omniclops":          {kopf:"orc",haut:"brown",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
     // Bild: gefluegelter Krieger in goldener Plattenruestung, Kriegshammer, Heiligenschein.
     // Keine Fluegel im animierbaren Satz (nur B_FIGUR kennt z_fluegel); kein Hammer, das
     // Schwert vertritt ihn wie schon bei Draco/Mavra.
-    "Enforcer":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",helm:true,waffe:"schwert"},
+    "Enforcer":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",waffe:"schwert",fluegel:true,kapuze:true},
     // Bild: Frau mit rosa Haar, schwarzer Spitzenrobe, spielt Gitarre — keine Waffe, keine
     // Kapuze. "leder" vertritt die Robe.
-    "Melody":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w"},
+    "Melody":             {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"pink"},
 
     // ===================================================================================
     // BATCH 5 (80 neue Eintraege) — zehn parallele Agenten, je 10 Spieler aus der
@@ -1236,58 +1264,58 @@
     // ===================================================================================
     "Pinkypie":           {kopf:"human",haut:"light",ruest:"leder",ohren:true,haar:"haar_lang",haarTon:"chestnut",geschlecht:"w"},
     "Jihanna":            {kopf:"human",haut:"light",ruest:"leder",ruestTon:"bronze",ohren:true,haar:"haar_lang",haarTon:"platinum",geschlecht:"w"},
-    "Serena":             {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
+    "Serena":             {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",haar:"haar_lang",haarTon:"white",geschlecht:"w",krone:true},
     "Nocture":            {kopf:"alien",haut:"black"},
-    "Drop Dead":          {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
+    "Drop Dead":          {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",geschlecht:"w",waffe:"schwert"},
     "Nachtschatten":      {kopf:"human",haut:"light",ruest:"leder",ruestTon:"dunkel",ohren:true,haar:"haar_lang",haarTon:"black",geschlecht:"w"},
-    "Erna Wellenlaut":    {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"platinum",geschlecht:"w"},
+    "Erna Wellenlaut":    {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Xerathis":           {kopf:"alien",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",geschlecht:"w"},
     "Alarm":              {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",geschlecht:"w"},
     "Aurora":             {kopf:"human",haut:"light",ruest:"leder",ruestTon:"dunkel",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
-    "Elyon":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",helm:true,fluegel:true,waffe:"schwert"},
-    "Vorrak":             {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
+    "Elyon":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,fluegel:true,waffe:"schwert"},
+    "Vorrak":             {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",waffe:"bogen"},
     "Orakelpfropf":       {kopf:"wolf",haut:"fur_brown",geschlecht:"w"},
     "Lilly":              {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",waffe:"schwert",geschlecht:"w"},
-    "Elyssa Nightclaw":   {kopf:"lizard",haut:"dark_green",ruest:"leder",kapuze:true,geschlecht:"w"},
+    "Elyssa Nightclaw":   {kopf:"lizard",haut:"dark_green",ruest:"leder",kapuze:true,geschlecht:"w",schwanz:true},
     "Emphi":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",haar:"haar_lang",haarTon:"raven",geschlecht:"w"},
-    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w"},
-    "Nelchael":           {kopf:"human",haut:"fur_grey",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
+    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder",geschlecht:"w",haar:"haar_lang",haarTon:"raven",ruestTon:"dunkel"},
+    "Nelchael":           {kopf:"zombie",haut:"fur_grey",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Akali":              {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
     "Nahli-Ke":           {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w"},
-    "Gralakar":           {kopf:"human",haut:"black",kapuze:true,geschlecht:"w"},
+    "Gralakar":           {kopf:"human",haut:"light",kapuze:true,geschlecht:"w",ruest:"leder"},
     "Lady Yueqin":        {kopf:"human",haut:"light",ohren:true,ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
     "Falcon":             {kopf:"wolf",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
     "Vigil":              {kopf:"alien",haut:"fur_grey",geschlecht:"w"},
     "Moonveil":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",geschlecht:"w"},
-    "Riley Le Rogue":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",haar:"haar_lang",haarTon:"blonde",waffe:"schwert"},
+    "Riley Le Rogue":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
     "Whispra":            {kopf:"human",haut:"black",kapuze:true,fluegel:true,geschlecht:"w"},
-    "Puschelix":          {kopf:"orc",haut:"green"},
+    "Puschelix":          {kopf:"wolf",haut:"green"},
     "Rootheart":          {kopf:"orc",haut:"dark_green",bart:true,haarTon:"green"},
     "Vargan":             {kopf:"human",haut:"light",ruest:"leder",kapuze:true,bart:true,haarTon:"dark_brown",waffe:"schwert"},
-    "Harbinger":          {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",fluegel:true},
+    "Harbinger":          {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",fluegel:true,waffe:"schwert"},
     "Bana":               {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
     "Reefstrike":         {kopf:"wolf",haut:"blue"},
-    "Taryn":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",geschlecht:"w"},
-    "Cyrn":               {kopf:"orc",haut:"green"},
+    "Taryn":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",geschlecht:"w",ruestTon:"dunkel"},
+    "Cyrn":               {kopf:"orc",haut:"green",waffe:"schwert",ruest:"leder"},
     // Chris' Fund: ein Tauren-Kopf ("kopf_minotaur_walk.png") lag im Baukasten, war nur
     // nie eingebettet — jetzt nachgeholt statt der Ork-mit-Hoernern-Naeherung.
     "Medibull":           {kopf:"minotaur",haut:"fur_brown"},
-    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"chestnut",geschlecht:"w"},
+    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Phantomblade":       {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",waffe:"schwert",haar:"haar_mop",haarTon:"white",geschlecht:"w"},
-    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
-    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"sandy",geschlecht:"w"},
-    "Burster":            {kopf:"orc",haut:"amber"},
+    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
+    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"sandy",geschlecht:"w",waffe:"schwert"},
+    "Burster":            {kopf:"skeleton",haut:"olive"},
     "Bearington":         {kopf:"wolf",haut:"lavender",geschlecht:"w"},
     "Sweet Dreams":       {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",krone:true,haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
-    "Issyria":            {kopf:"human",haut:"light",ohren:true,ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
+    "Issyria":            {kopf:"human",haut:"light",ohren:true,ruest:"plate",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
     "Nhyra-Vel":          {kopf:"alien",haut:"blue",geschlecht:"w"},
-    "Gronkslime":         {kopf:"orc",haut:"bright_green",hoerner:true},
+    "Gronkslime":         {kopf:"orc",haut:"dark_green",hoerner:true},
     "Wingless":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",haar:"haar_lang",haarTon:"white",geschlecht:"w"},
-    "Hellvoice":          {kopf:"human",haut:"amber",hoerner:true,ohren:true,ruest:"leder",fluegel:true,haar:"haar_mop",haarTon:"black"},
-    "Orichalcos":         {kopf:"human",haut:"light",ruest:"leder",kapuze:true},
+    "Hellvoice":          {kopf:"human",haut:"amber",hoerner:true,ohren:true,ruest:"leder",fluegel:true,haar:"haar_lang",haarTon:"black"},
+    "Orichalcos":         {kopf:"human",haut:"light",ruest:"leder",kapuze:true,waffe:"schwert"},
     "Sunny":              {kopf:"human",haut:"light",ruest:"plate",waffe:"schwert",fluegel:true,haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
-    "Ciacia":             {kopf:"wolf",haut:"amber",ruest:"plate",ruestTon:"bronze",geschlecht:"w"},
-    "Kento":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert"},
+    "Ciacia":             {kopf:"wolf",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",geschlecht:"w"},
+    "Kento":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",ruestTon:"dunkel"},
     "Xylaris":            {kopf:"human",haut:"light",haar:"haar_lang",haarTon:"white",fluegel:true,ruest:"leder",geschlecht:"w"},
     "Grizz":              {kopf:"orc",haut:"green",ohren:true,helm:true,ruest:"plate",ruestTon:"bronze"},
     // Chris' Fund: ein Skelett-Kopf ("kopf_skeleton_walk.png") lag im Baukasten, war nur
@@ -1295,13 +1323,13 @@
     // menschlichen Naeherung.
     "Threnox":            {kopf:"skeleton",haut:"fur_grey"},
     // Skelett-Kopf jetzt echt statt der menschlichen Naeherung (Name sagt es schon).
-    "Knochenrichter":     {kopf:"skeleton",haut:"fur_grey",ruest:"leder"},
-    "Kora":               {kopf:"orc",haut:"brown",hoerner:true,schwanz:true,ruest:"leder",waffe:"schwert",geschlecht:"w"},
+    "Knochenrichter":     {kopf:"skeleton",haut:"fur_grey",ruest:"leder",ruestTon:"dunkel"},
+    "Kora":               {kopf:"minotaur",haut:"brown",schwanz:true,ruest:"leder",waffe:"schwert",geschlecht:"w"},
     "Grieving Colossus":  {kopf:"orc",haut:"black"},
-    "Tartarus":           {kopf:"orc",haut:"black",hoerner:true,ruest:"plate",ruestTon:"dunkel",waffe:"schwert"},
+    "Tartarus":           {kopf:"minotaur",haut:"black",ruest:"plate",ruestTon:"dunkel",waffe:"schwert"},
     "Treantos":           {kopf:"orc",haut:"green"},
-    "Bloater":            {kopf:"orc",haut:"dark_green"},
-    "Dawnwhisper":        {kopf:"human",haut:"amber",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
+    "Bloater":            {kopf:"zombie",haut:"dark_green"},
+    "Dawnwhisper":        {kopf:"human",haut:"olive",ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
     "Caldor":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"chestnut",waffe:"schwert"},
     "Skittermind":        {kopf:"lizard",haut:"blue",ruest:"leder",schwanz:true},
     "Shield":             {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",helm:true,waffe:"schwert"},
@@ -1310,18 +1338,18 @@
     "Eike":               {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"dark_brown"},
     "Lynara":             {kopf:"human",haut:"light",ohren:true,ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",krone:true,geschlecht:"w"},
     "Cadrael":            {kopf:"human",haut:"light",fluegel:true,ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",krone:true,geschlecht:"w"},
-    "Raven":              {kopf:"wolf",haut:"olive",fluegel:true},
-    "Nimri":              {kopf:"alien",haut:"blue",ohren:true,fluegel:true,geschlecht:"w"},
-    "Galactus":           {kopf:"lizard",haut:"black",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
+    "Raven":              {kopf:"wolf",haut:"black",fluegel:true},
+    "Nimri":              {kopf:"human",haut:"blue",ohren:true,fluegel:true,geschlecht:"w"},
+    "Galactus":           {kopf:"lizard",haut:"fur_grey",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
     "Yuko":               {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",fluegel:true,haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Shadowsage":         {kopf:"human",haut:"fur_grey",kapuze:true,ruest:"leder"},
     "Dr Ironmind":        {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
-    "Mushu":              {kopf:"lizard",haut:"light",hoerner:true,fluegel:true,schwanz:true},
-    "Bombblitzer":        {kopf:"orc",haut:"black",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:true},
+    "Mushu":              {kopf:"lizard",haut:"fur_grey",hoerner:true,fluegel:true,schwanz:true},
+    "Bombblitzer":        {kopf:"skeleton",haut:"black",ruest:"plate",ruestTon:"dunkel",hoerner:true},
     "Timantha":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,geschlecht:"w"},
-    "Holzfaust":          {kopf:"orc",haut:"green",ohren:true},
+    "Holzfaust":          {kopf:"orc",haut:"green",ohren:true,ruest:"leder",haar:"haar_mop",haarTon:"black"},
     "Lumen Serene":       {kopf:"human",haut:"light",fluegel:true,haar:"haar_mop",haarTon:"dark_brown",geschlecht:"w"},
-    "Tidesinger":         {kopf:"human",haut:"blue",ruest:"plate",krone:true,haar:"haar_lang",haarTon:"white",schwanz:true,geschlecht:"w"},
+    "Tidesinger":         {kopf:"human",haut:"blue",ruest:"plate",krone:true,haar:"haar_lang",haarTon:"white",schwanz:true,geschlecht:"w",ruestTon:"dunkel"},
     "PixiKat":            {kopf:"alien",haut:"lavender",ohren:true,geschlecht:"w"},
     // Chris' Fund: ein Vampir-Kopf ("kopf_vampire_walk.png") lag im Baukasten, war nur
     // nie eingebettet — Fangzaehne/Krallen-Motiv jetzt echt statt der menschlichen
@@ -1329,19 +1357,19 @@
     "Velkin":             {kopf:"vampire",haut:"light",ohren:true,ruest:"leder",haar:"haar_mop",haarTon:"black"},
     "Brobot":             {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",hoerner:true,fluegel:true},
     "Crumbsage":          {kopf:"orc",haut:"brown"},
-    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder",fluegel:true,haar:"haar_lang",haarTon:"blue"},
+    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
     "Steel Sinister":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:true},
     "Isuzu":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
-    "Eldara":             {kopf:"human",haut:"brown",hoerner:true,geschlecht:"w"},
-    "Lucky":              {kopf:"human",haut:"light",haar:"haar_mop",haarTon:"chestnut"},
+    "Eldara":             {kopf:"human",haut:"light",hoerner:true,geschlecht:"w",ruest:"leder"},
+    "Lucky":              {kopf:"human",haut:"light",haar:"haar_mop",haarTon:"dark_brown",ruest:"leder",waffe:"schwert"},
     "Terradon":           {kopf:"orc",haut:"amber"},
-    "Byrd":               {kopf:"human",haut:"brown",geschlecht:"w"},
-    "Clara":              {kopf:"human",haut:"light",krone:true,haar:"haar_lang",haarTon:"white",geschlecht:"w"},
-    "Arachna":            {kopf:"human",haut:"olive",ruest:"plate",ruestTon:"dunkel",krone:true,haar:"haar_lang",haarTon:"ash",geschlecht:"w"},
-    "Tavascron":          {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
+    "Byrd":               {kopf:"human",haut:"brown",geschlecht:"w",kapuze:true,ruest:"leder"},
+    "Clara":              {kopf:"human",haut:"light",krone:true,haar:"haar_lang",haarTon:"white",geschlecht:"w",ruest:"leder",ruestTon:"gold"},
+    "Arachna":            {kopf:"human",haut:"olive",ruest:"plate",ruestTon:"dunkel",krone:true,haar:"haar_lang",haarTon:"platinum",geschlecht:"w"},
+    "Tavascron":          {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",waffe:"bogen"},
     "Catherine":          {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
     "Breeze":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
-    "Wu Tang":            {kopf:"human",haut:"amber",haar:"haar_lang",haarTon:"black",geschlecht:"w"},
+    "Wu Tang":            {kopf:"human",haut:"amber",haar:"haar_lang",haarTon:"black",geschlecht:"w",hoerner:true,ruest:"leder"},
     "Dyrth":              {kopf:"orc",haut:"black",hoerner:true,fluegel:true}
   };
   const BAU_STD={kopf:"human",haut:"light",ruest:"leder"};
@@ -1424,7 +1452,6 @@
     zeichne(kopfKey,64,0,0,b.haut);
     if(b.ohren)zeichne("ohren_"+ani,64,0,0,b.haut);
     if(b.ruest)zeichneR(b.ruest+"_"+ani,b.ruestTon);
-    if(b.hoerner)zeichne("hoerner_"+ani,64,0,0,b.haut);
     // Haar/Bart/Krone kennen GAR KEIN Schlag-Blatt (nur idle/walk/run/hurt/shoot) —
     // derselbe Rueckfall, sonst verschwindet Haar/Bart/Krone bei jedem Nahkampf-Schlag
     // (King Arlen Morgolor, Cassandra, Jorund eingeschlossen).
@@ -1432,6 +1459,12 @@
     if(b.haar)zeichneHaar(b.haar+"_"+zubehoerAni,b.haarTon||"brown");
     if(b.bart)zeichneHaar("bart_"+zubehoerAni,b.haarTon||"brown");
     if(b.helm)zeichneR("helm_"+ani,b.ruestTon);
+    // Opus-Review-Fund (Sprite-Sichtcheck, 24.08.): stand VOR dem Helm — ein voller
+    // Topfhelm ueberzeichnet die Hoerner komplett, sie waren de facto unsichtbar (Draco,
+    // Bombblitzer, Steel Sinister — bei allen dreien ist im Originalbild ausdruecklich
+    // ein GEHOERNTER Helm zu sehen, der Sprite zeigte einen glatten). Jetzt danach, damit
+    // die Hoerner durch/ueber den Helm ragen, wie auf allen drei Kartenbildern.
+    if(b.hoerner)zeichne("hoerner_"+ani,64,0,0,b.haut);
     if(b.krone)zeichne("krone_"+zubehoerAni,64,0,0,null);
     if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
     if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
