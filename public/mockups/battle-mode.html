@@ -2743,12 +2743,21 @@
   // "Zentrum" nah am Korb). Radius als Vielfaches von KORB_NAH_RADIUS, seitlich als
   // Vielfaches von 90px (derselbe Massstab wie die alte fixe Formation). PLATZHALTER-
   // Geometrie, an echten Basketball-Spacing-Spots orientiert, nicht gemessen.
+  // Opus-Review-Fund #7: `radius` wurde als reiner X-Versatz benutzt (nicht als echter
+  // Korbabstand), macht zusammen mit `seitlich*90` einen tatsaechlichen Abstand von
+  // hypot(radius*94,seitlich*90) — bei den alten Werten 171-246px, ALLE ausser Slot 0
+  // ausserhalb von DREIER_RADIUS(145). Kein einziger Slot lag in Wurfreichweite, Catch-
+  // and-Shoot war unmoeglich (Wuerfe/Spiel 17,5 -> 7,1 gemessen). `radius` ist jetzt der
+  // ECHTE Zielabstand in px; die X-Komponente wird so berechnet, dass hypot(x,y) genau
+  // diesen Wert trifft (s. bewegeSpielerLive). Sechs statt fuenf Slots — bei `jeSeite:6`
+  // bekamen sonst zwei Spieler denselben Slot (Opus-Fund #7b).
   const SLOTS=[
-    {radius:0.55, seitlich:0},
-    {radius:1.55, seitlich:1.0},
-    {radius:1.55, seitlich:-1.0},
-    {radius:2.3,  seitlich:1.3},
-    {radius:2.3,  seitlich:-1.3}
+    {radius:55,  seitlich:0},
+    {radius:85,  seitlich:0.7},
+    {radius:125, seitlich:1.0},
+    {radius:125, seitlich:-1.0},
+    {radius:140, seitlich:1.3},
+    {radius:140, seitlich:-1.3}
   ];
   // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
   // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
@@ -2757,9 +2766,12 @@
   function zuordneSlots(seite){
     const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
     sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
-    // Neue Possession heisst auch: kein Screen/Roll aus dem vorigen Angriff schleppt sich
-    // mit rein.
-    for(const u of FSTEAM[seite]){ u.screent=null; u.rollBis=0; u.screenRuf=0; }
+    // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
+    // sitzen aber immer beim Team, das den Ball gerade VERLOR. Ohne Raeumen lief ein
+    // Verteidiger bis zu 1,5s weiter zu seinem alten Blockpunkt bzw. Richtung GEGNERischem
+    // Korb (rollBis), statt seinen Mann zu decken (26 % aller Roll-Ticks liefen so,
+    // gemessen). Jetzt beide Teams.
+    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null; }
   }
 
   function initBasketballLive(art){
@@ -2771,11 +2783,12 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0});
+        wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        screenRuf:0,rangeSeit:null});
     }
     zuordneSlots(0); zuordneSlots(1);
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}, reboundKampf:null,
-      fastbreak:null, einwurfBis:0};
+      fastbreak:null};
     ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
   }
 
@@ -2822,6 +2835,14 @@
     fsLive.amBall=u.side;
     u.reevBall=0.25; // PLATZHALTER — kurze, feste Schonfrist direkt nach Ballerhalt
     zuordneDeckung(true);
+    // Opus-Review-Fund #11: `fsLive.fastbreak` endete bisher NUR ueber `fsT<bis` — es
+    // ueberlebte damit Korberfolg, Ballverlust und jeden Possession-Wechsel. Konkret: holt
+    // das fastbreakende Team seinen EIGENEN Fehlwurf, blieb das Fenster (samt ausgesetzter
+    // gegnerischer Deckung und Wurfbonus) in einer ganz gewoehnlichen Halbfeld-Situation
+    // aktiv. Jeder Ballwechsel loescht es jetzt hier; die drei echten Fastbreak-Ausloeser
+    // (Steal, Interception, Defensiv-Rebound) rufen `startFastbreak` bewusst NACH diesem
+    // Aufruf wieder auf, damit ein frisch gestartetes Fenster nicht sofort geloescht wird.
+    fsLive.fastbreak=null;
   }
 
   function naechsterAngriff(seite){
@@ -2845,7 +2866,16 @@
     const decker=FSTEAM[1-ziel.side].find(v=>v.deckt===ziel);
     let offen=Math.min(1,Math.max(0.2,(decker?dist(ziel,decker):200)/60));
     let minLinie=Infinity;
-    for(const v of FSTEAM[1-von.side]){ const d=distZuLinie(v,von,ziel); if(d<minLinie)minLinie=d; }
+    // Opus-Review-Fund #5: `von`s eigener Decker steht per Definition dicht an `von` —
+    // also IMMER "auf der Linie", genau dann, wenn Kick-Out ueberhaupt gerufen wird
+    // (bedraengnis>0 heisst deckerAbstand<30px). Ohne Ausschluss bekam JEDER Kandidat
+    // denselben 0,35er-Abschlag, der sich durch die Normierung in gewichtetesLosNach
+    // wieder heraushob — der Passlinien-Term wirkte in genau der Situation nicht, fuer
+    // die er gebaut wurde.
+    for(const v of FSTEAM[1-von.side]){
+      if(v.deckt===von)continue;
+      const d=distZuLinie(v,von,ziel); if(d<minLinie)minLinie=d;
+    }
     if(minLinie<40)offen*=0.35; // PLATZHALTER
     return offen;
   }
@@ -2891,14 +2921,18 @@
     if(nah||fern){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
       // mechanischste Moment der Engine (Fables Fund). Die Wurfqualitaet (dieselbe
-      // Erfolgsformel wie zuvor) muss eine mit der Schussuhr sinkende Schwelle
-      // uebertreffen; gute Schuetzen (hohe ABSCHLUSS) trauen sich frueher. Im Fastbreak
-      // ein Bonus, damit der schnelle Korbleger dort spuerbar leichter faellt.
-      // PLATZHALTER-Formel, alle Zahlen ungemessen.
+      // Erfolgsformel wie zuvor) muss eine mit der Zeit IN Wurfreichweite sinkende
+      // Schwelle uebertreffen; gute Schuetzen (hohe ABSCHLUSS) trauen sich frueher. Im
+      // Fastbreak ein Bonus, damit der schnelle Korbleger dort spuerbar leichter faellt.
+      // Opus-Review-Fund #6: die Schwelle lief vorher gegen `angriffSeit` (die GANZE
+      // Possession) — bis der Ballfuehrer ueberhaupt in Reichweite dribbelte, war sie
+      // schon fast verbraucht (Wurfquote 96 % beim ersten Versuch, `wartetInReichweite`
+      // faktisch nie erreicht). `rangeSeit` misst jetzt ab EINTRITT in die Reichweite.
+      if(u.rangeSeit==null)u.rangeSeit=fsT;
       const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
         -(fern?0.10:0)-bedraengnis+(imFastbreak?0.12:0));
       const schwelle=erzwingen?-1:Math.max(0.05,
-        0.42-(fsLive.angriffSeit/SCHUSSUHR_BASKETBALL)*0.30-(u.ABSCHLUSS-50)*0.0010);
+        0.42-((fsT-u.rangeSeit)/4)*0.30-(u.ABSCHLUSS-50)*0.0010); // PLATZHALTER: 4s Abbauzeit
       if(technik>schwelle){
         wirf(u,u,art,fern,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
         return;
@@ -2910,11 +2944,17 @@
         passeAb(u,offensterMitspieler(mitspieler,u));
         return;
       }
-      u.reevBall=0.25; // PLATZHALTER — kurz, gleich wieder pruefen statt lange zu warten
-      return;
-    }
-    if(erzwingen){
-      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060-bedraengnis);
+      // Opus-Review-Fund #6 (zweiter Teil): dieser Zweig endete vorher IMMER mit einem
+      // return — sobald der Ballfuehrer in Reichweite war, waren Pass/Spielzug/Screen-Ruf
+      // fuer den Rest der Possession unerreichbar. Jetzt faellt ein abgelehnter, nicht
+      // bedraengter Wurf in dieselbe geteilte Pass-/Spielzug-/Screen-Logik durch wie
+      // ausserhalb der Reichweite — kein return hier mehr.
+    } else if(erzwingen){
+      // Opus-Review-Fund #4: dieser Zwangswurf ging als Fernwurf durch (`punkteFern`,
+      // 3 Punkte), die Erfolgsformel liess den ueblichen Fernwurf-Abzug (-0,10) aber weg
+      // — ein Verzweiflungswurf jenseits der Dreierlinie traf so oft wie ein Korbleger,
+      // fuer einen Punkt mehr. Jetzt derselbe Abzug wie im nah||fern-Zweig.
+      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060-0.10-bedraengnis);
       wirf(u,u,art,true,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
       return;
     }
@@ -2964,9 +3004,14 @@
         const screenChance=Math.min(0.30,Math.max(0.05,0.15+(u.AUFBAU-50)*0.0020));
         if(rr()<screenChance){
           const screener=gewichtetesLos(mitspieler,"ZWEITCHANCE");
+          // Opus-Review-Fund #9 (zweiter Teil): `screenRuf` stand vorher NUR im
+          // Erfolgsfall (freier Screener) — war der geloste Screener schon am Screenen,
+          // wurde weder ein neuer Block gesetzt noch die Sperre, der Ballfuehrer wuerfelte
+          // bei jeder Entscheidung neu und der Ruf verpuffte still. Jetzt immer gesetzt,
+          // sobald ueberhaupt gerufen wurde.
+          u.screenRuf=1.5; // PLATZHALTER — Sperre gegen sofortigen erneuten Ruf
           if(!screener.screent){
             screener.screent={fuer:u,bis:fsT+1.2}; // PLATZHALTER
-            u.screenRuf=1.5; // PLATZHALTER — Sperre gegen sofortigen erneuten Ruf
           }
         }
       }
@@ -3039,8 +3084,11 @@
       decker.steals++; traeger.verluste++; decker.lunge=0.4;
       feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
-      startFastbreak(decker.side);
+      // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
+      // fsLive.fastbreak bei JEDEM Ballwechsel (Opus-Review-Fund #11) — startFastbreak
+      // muss deshalb NACH diesem Aufruf kommen, sonst loescht er sein eigenes Fenster.
       naechsterAngriff(decker.side);
+      startFastbreak(decker.side);
     }
   }
 
@@ -3059,8 +3107,10 @@
         feed(f.side,f.n+" fängt den Pass ab — Steal.");
         logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
         fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
-        startFastbreak(f.side);
+        // Reihenfolge bewusst: ballUebernehmen() loescht fsLive.fastbreak bei jedem
+        // Ballwechsel (Opus-Review-Fund #11) — startFastbreak muss danach kommen.
         fsLive.angriffSeit=0; ballUebernehmen(f);
+        startFastbreak(f.side);
         return;
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
@@ -3086,7 +3136,12 @@
       schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
         life:gross?1.7:1,crit:true,_spieler:schuetze.id,_gross:gross});
       fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
-      fsLive.einwurfBis=fsT+0.8; // PLATZHALTER: kurze Einwurf-Pause, damit der Fastbreak-Kontrast wirkt
+      // Opus-Review-Fund #10: die fruehere "Einwurf-Pause" (fsLive.einwurfBis) sperrte nur
+      // entscheideBallaktion — Bewegung, Schussuhr und Steal liefen waehrenddessen
+      // unveraendert weiter (Ballfuehrer dribbelte in der "Pause" weiter, Verteidigung
+      // sprintete weiter, ein Steal blieb moeglich). Ersatzlos gestrichen: der Fastbreak-
+      // Kontrast entsteht jetzt allein aus dem Tempo-Unterschied (s. bewegeSpielerLive),
+      // nicht aus einer halb wirksamen Pause.
       naechsterAngriff(1-schuetze.side);
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
@@ -3124,10 +3179,20 @@
     const fastbreak=fsLive.fastbreak;
     const imFastbreak=!!(fastbreak&&fsT<fastbreak.bis);
     for(const team of FSTEAM)for(const u of team){
-      let zx=u.x, zy=u.y, tempoMul=1;
+      let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.55;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
         zx=korbX; zy=H/2+(u.id%2?40:-40);
+        // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
+        // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
+        // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
+        // dem Feld (115px/s), die Verteidigung (262px/s, 1,25×) immer zuerst am eigenen
+        // Korb und stand geschlossen in der Zone — der Fastbreak war invertiert. Jetzt
+        // bekommt der Ballfuehrer denselben 1,3×-Bonus wie seine Mitsprinter, und der
+        // Dribbel-Abzug ist im Fastbreak leichter (0,85× statt 0,55×) — er bleibt langsamer
+        // als seine freilaufenden Mitspieler, aber schneller als die zurueckweichende
+        // Verteidigung (deren Bonus gleichzeitig von 1,25× auf 1,0× sinkt, s. unten).
+        if(imFastbreak&&fastbreak.seite===u.side){ tempoMul=1.3; dribbelFaktor=0.85; }
       } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
@@ -3149,7 +3214,14 @@
         // ein Standbild (Fables Fund).
         const slot=SLOTS[u.slotIdx??0];
         const zumFeld=u.side===0?-1:1;
-        let bx=korbX+zumFeld*slot.radius*KORB_NAH_RADIUS, by=H/2+slot.seitlich*90;
+        // Opus-Review-Fund #7: `radius` als reiner X-Versatz benutzt, tatsaechlicher
+        // Korbabstand war hypot(radius*94,seitlich*90) — bei den alten Werten 171-246px,
+        // ausserhalb von DREIER_RADIUS(145). `radius` ist jetzt der ECHTE Zielabstand
+        // (s. Definition oben); die X-Komponente wird so berechnet, dass hypot(x,y) genau
+        // diesen Wert trifft.
+        const yOff=slot.seitlich*90;
+        let bx=korbX+zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),
+            by=H/2+yOff;
         const traeger=fsLive.ball.traeger;
         if(traeger&&traeger!==u){
           const dx0=bx-traeger.x, dy0=by-traeger.y, d0=Math.hypot(dx0,dy0)||1, mindest=80; // PLATZHALTER
@@ -3157,8 +3229,15 @@
         }
         const meinDecker=FSTEAM[1-u.side].find(v=>v.deckt===u);
         u.slotSeit=(u.slotSeit||0)+dt;
-        if(meinDecker&&dist(u,meinDecker)<25&&u.slotSeit>1.2){ // PLATZHALTER
-          u.slotIdx=(u.slotIdx+1+Math.floor(rr()*3))%SLOTS.length;
+        // Opus-Review-Fund #8: der Slot-Tausch war ein reiner Zufallssprung ohne
+        // Belegungspruefung — feuerte 29,4×/Spiel, zerwuerfelte die ZWEITCHANCE-basierte
+        // Vergabe aus zuordneSlots binnen Sekunden und konnte mehrere Spieler auf denselben
+        // Slot setzen, waehrend das Laufziel diskontinuierlich sprang. Jetzt: seltener
+        // (2,4s statt 1,2s), und nur auf einen Slot, den kein Mitspieler gerade haelt.
+        if(meinDecker&&dist(u,meinDecker)<25&&u.slotSeit>2.4){ // PLATZHALTER
+          const belegt=new Set(team.filter(t=>t!==u).map(t=>t.slotIdx));
+          const frei=[...SLOTS.keys()].filter(i=>i!==u.slotIdx&&!belegt.has(i));
+          if(frei.length){ u.slotIdx=frei[Math.floor(rr()*frei.length)]; }
           u.slotSeit=0;
         }
         zx=bx; zy=by;
@@ -3167,13 +3246,23 @@
         if(imFastbreak&&fastbreak.seite!==u.side){
           // FASTBREAK-VERTEIDIGUNG: erst zurueck zum eigenen Korb sprinten, Manndeckung
           // wird waehrenddessen in zuordneDeckung ausgesetzt (echte Ueberzahl-Situation
-          // aus dem, was schon da ist, statt eines weiteren Sonderfalls).
-          zx=eigenerKorbX; zy=H/2+(u.id%2?40:-40); tempoMul=1.25; // PLATZHALTER
+          // aus dem, was schon da ist, statt eines weiteren Sonderfalls). Opus-Review-Fund
+          // #2: 1,25× machte die Verteidigung schneller als selbst die mitsprintenden
+          // Angreifer — sie parkte geschlossen im Zielbereich, bevor der Ball ankam.
+          // Jetzt kein Bonus mehr: sie ist normal schnell, der Ballfuehrer (1,3×/0,85×
+          // Dribbelabzug, s. oben) ist im Fastbreak schneller als sie.
+          zx=eigenerKorbX; zy=H/2+(u.id%2?40:-40);
         } else {
           // Verteidigung: nah am gedeckten Mann bleiben, mit gedeckeltem Zug zum eigenen
           // Korb (Opus-Review-Fund, History). SCREEN-BREMSE: steht ein gegnerischer
           // Screener nah am Blockpunkt zwischen mir und meinem Mann, komme ich diesen
-          // Tick kaum vom Fleck — die eigentliche Wirkung eines Blocks.
+          // Tick kaum vom Fleck — die eigentliche Wirkung eines Blocks. Opus-Review-Fund
+          // #3: Verteidiger hatten dieselbe Hoechstgeschwindigkeit wie ihr Mann — eine
+          // einmal gerissene Luecke konnte NIE wieder geschlossen werden (Deckerabstand
+          // 33 -> 97px gemessen, bedraengte Entscheidungen -77 %). Ein kleiner Vorsprung
+          // (1,15×, PLATZHALTER) gibt "Deckung halten" ueberhaupt eine Chance, ohne sie
+          // unbeatbar zu machen.
+          tempoMul=1.15;
           const zumEigenenKorb=eigenerKorbX-u.deckt.x;
           const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
           zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
@@ -3186,13 +3275,28 @@
       }
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
-      // (0,55×, ersetzt das alte separate kDribble), Fastbreak/Retreat/Screen-Bremse
-      // wirken ueber denselben `tempoMul`. PLATZHALTER-Basiswert (140+LAUFTEMPO*1,4).
-      const tempoPx=(140+u.LAUFTEMPO*1.4)*tempoMul*(u.hatBall?0.55:1);
+      // (`dribbelFaktor`, ersetzt das alte separate kDribble; im Fastbreak leichter, s.
+      // oben), Fastbreak/Retreat/Screen-Bremse/Deckungs-Vorsprung wirken ueber denselben
+      // `tempoMul`. Balance-Runde (nach dem zweiten Opus-Review): LAUFTEMPO bestimmt jetzt
+      // ALLES an Bewegung, also auch WER ueberhaupt zum Ball/Slot/Loch kommt — selbst ein
+      // kleiner Tempo-Vorteil compoundet ueber ein ganzes Spiel. Erster Koeffizient (1,4)
+      // liess Speed auf 22-26 % Einfluss laufen (Matrixgewicht 10). Durchgemessen
+      // (messe-arena-einfluss.mjs basketball 48): 1,4 -> 72,8-78 Pp, 0,6 -> 51,4 Pp,
+      // 0,3 -> 23,2 Pp, 0,15 -> 18,7 Pp (gewaehlt, liegt UNTER dem alten 32,5-Pp-Stand vor
+      // dieser ganzen Dynamik-Runde). PLATZHALTER, kein Endwert, nicht weiter unterhalb
+      // 0,15 durchprobiert.
+      const tempoPx=(140+u.LAUFTEMPO*0.15)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
-      if(distZiel>0.5){ u.x+=dx/distZiel*schritt; u.y+=dy/distZiel*schritt; }
-      u.vx=dx; u.vy=dy; // fuer blickAus() beim Zeichnen — vorher nie gesetzt, alle standen immer gleich rum
+      // Opus-Review-Fund #12: `u.vx=dx` schrieb die RESTDISTANZ zum Ziel, nicht die
+      // tatsaechliche Bewegung — wurde auch gesetzt, wenn `distZiel<=0.5` und der Spieler
+      // gar nicht lief. blickAus() liest das aber wie eine Geschwindigkeit; ein Spieler,
+      // der auf seinem Slot steht, fiel auf die Default-Blickrichtung. Jetzt der
+      // tatsaechlich gegangene Schritt.
+      if(distZiel>0.5){
+        const nx=dx/distZiel*schritt, ny=dy/distZiel*schritt;
+        u.x+=nx; u.y+=ny; u.vx=nx; u.vy=ny;
+      } else { u.vx=0; u.vy=0; }
       if(u.hop>0&&!(fsLive.ball.flug&&fsLive.ball.flug.ziel===u))u.hop=Math.max(0,u.hop-dt*2);
     }
   }
@@ -3209,6 +3313,12 @@
       if(u.reevBall>0)u.reevBall-=dt;
       if(u.stealCd>0)u.stealCd-=dt;
       if(u.screenRuf>0)u.screenRuf-=dt;
+      // Opus-Review-Fund #9 (erster Teil): `screent` hielt eine harte Referenz auf den
+      // Ballfuehrer zum Zeitpunkt des Rufs — passt der den Ball im selben Zyklus ab (kann
+      // er), blockte der Screener 1,2s weiter fuer jemanden ohne Ball, und die
+      // Screen-Bremse in bewegeSpielerLive bremste den Decker eines irrelevanten Mannes.
+      // Jetzt: hat `fuer` den Ball verloren, loest sich der Screen sofort auf (kein Roll).
+      if(u.screent&&u.screent.fuer!==fsLive.ball.traeger){ u.screent=null; }
       // SCREEN -> ROLL: das Blockfenster ist um, jetzt schneidet derselbe Spieler zum
       // Korb statt in seinen Slot zurueckzulaufen (bewegeSpielerLive), und sein
       // Passgewicht ist fuer das Rollfenster erhoeht (offensterMitspieler,
@@ -3255,7 +3365,9 @@
           fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
           fsLive.reboundKampf=null;
           if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
-          else { startFastbreak(gewinner.side); naechsterAngriff(gewinner.side); }
+          // Reihenfolge bewusst: naechsterAngriff() loescht fsLive.fastbreak bei jedem
+          // Ballwechsel (Opus-Review-Fund #11) — startFastbreak muss danach kommen.
+          else { naechsterAngriff(gewinner.side); startFastbreak(gewinner.side); }
         }
       }
     } else {
@@ -3265,7 +3377,7 @@
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
-        if((erzwingen||traeger.reevBall<=0)&&fsT>=fsLive.einwurfBis)entscheideBallaktion(traeger,art,erzwingen);
+        if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
         if(fsLive.ball.traeger===traeger&&decker&&decker.stealCd<=0&&dist(decker,traeger)<STEAL_REICHWEITE){
           versucheSteal(decker,traeger,art);
         }
@@ -8146,6 +8258,34 @@
   }
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
 
+  // BOXSCORE-SERIE: dasselbe Bau/Lauf-Muster wie einflussVon, aber statt eines
+  // Einflussvektors ueber alle Attribute liefert sie Siegquote (favoritenlastig oder
+  // ausgeglichen?) und, falls `heben` gesetzt ist, die Punkte EINES benannten Spielers je
+  // Lauf — die direkte Antwort auf "gewinnt der Favorit oefter, und sieht man einen Star
+  // im Boxscore". `heben` hat dieselbe Form wie ATTR_HEBUNG ({wer,attribut,plus}).
+  function boxscoreSerie(dId,n,heben){
+    const M=MOTOREN[dId];
+    if(!M)return {fehler:"kein Motor angemeldet"};
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
+    if(M.vorher)M.vorher();
+    ATTR_HEBUNG=heben||null;
+    let siegeL=0,siegeR=0,unentschieden=0; const punkteHeben=[], punkteTeamL=[], punkteTeamR=[];
+    for(let i=0;i<n;i++){
+      zieheFormkarten(20260823+i*104729);
+      M.bau(1337+i*7919);
+      M.lauf();
+      const s=M.sichern();
+      punkteTeamL.push(s.fsPunkte[0]); punkteTeamR.push(s.fsPunkte[1]);
+      if(s.fsPunkte[0]>s.fsPunkte[1])siegeL++; else if(s.fsPunkte[1]>s.fsPunkte[0])siegeR++; else unentschieden++;
+      if(heben){
+        const u=[...s.FSTEAM[0],...s.FSTEAM[1]].find(x=>x.n===heben.wer);
+        if(u)punkteHeben.push(u.punkte);
+      }
+    }
+    ATTR_HEBUNG=hebungVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    return {n,siegeL,siegeR,unentschieden,punkteTeamL,punkteTeamR,punkteHeben};
+  }
+
   function bahnSerie(d,n){
     // WER SICH NICHT ANMELDET, WIRD NICHT STILL DURCH SPURT ERSETZT. BA() faellt ohne
     // Eintrag in BAHN_ART auf BAHN_ART.spurt zurueck — praktisch fuer den Normalfall,
@@ -8188,7 +8328,7 @@
   }
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
