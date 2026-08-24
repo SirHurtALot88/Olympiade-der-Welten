@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-24",
+      "seite": "Team · Spieler",
+      "pr": null,
+      "text": "Der Marktwert-Hover in der Spielerliste ist nachgeprüft: er wird wirklich angezeigt, und die gezeigten Zahlen ergeben in jedem geprüften Fall exakt den Marktwert daneben. Neu ist der Nachweis dafür — bisher haben alle Prüfungen zu dieser Tabelle nur den Quelltext gelesen, keine einzige hat sie tatsächlich aufgebaut. Genau so ein Fall war schon einmal überall grün und im Spiel trotzdem leer. Jetzt wird die Tabelle beim Prüfen wirklich gerendert.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-23",
       "seite": "Spieltag · Aufstellung",
       "pr": null,
