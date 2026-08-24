@@ -457,6 +457,56 @@ auf ABSCHLUSS/ZWEITCHANCE setzen, die schon Power tragen. Football stand schon v
 verschwiegen, aber hier nicht mitgelöst, genau wie die Dexterity-Lücke bei Basketball in
 #660.
 
+### Basketball wird live simuliert — Architekturwechsel, kein Feature
+
+Chris, nach diesem PR: Feldspiel (und perspektivisch Bühne) sollen sich **genau wie
+Kampf und Bahn anfühlen** — echte Tick-für-Tick-Simulation, Ereignisse entstehen beim
+Zusehen, nicht vorab feststehend und nur enthüllt. Zehn konkrete Fragen dazu beantwortet
+(Reihenfolge, Umfang, Determinismus, Tempo-Steuerung — alle Antworten: „genau wie
+Kampf/Bahn", „erst Basketball, sauber", Determinismus bleibt Pflicht). Mit Fable
+übersetzt (Kampfs `stepSim`-Muster: gedrosselte Neubewertung, abstandsbasierte
+Interaktion, Feed-Text im Kipp-Tick) und für **nur Basketball** gebaut — Football/
+Hockey/Tennis bleiben beim Vorab-Durchlauf, bis sich das Muster bewährt hat, exakt wie
+entschieden.
+
+**Was jetzt läuft** (`initBasketballLive`/`stepBasketballLive`, `battle-mode.html`, nach
+`bauFeldspiel`): jeder Spieler trägt eigenen Live-Zustand (`deckt`, `reevDeckung`,
+`reevBall`, `stealCd` — Drosseln nach Kampf-Vorbild, keine Zufalls-Jitter mehr, das war
+ein eigener Fund, siehe unten). Der Ball ist ein eigenes Objekt (getragen/im Flug/frei).
+Verteidiger ordnen sich **live neu zu** (gieriges Matching nach Abstand, gedrosselt) —
+Chris' Punkt 2 aus den zehn Fragen, „aktives Agieren und Reagieren". Der Alley-Oop löst
+**live** aus (einmal pro Ballaktions-Entscheidung gewürfelt, nicht vorab), mit derselben
+`neigung`/`abschluss`-Formel wie zuvor. Determinismus bleibt erhalten: derselbe geseedete
+`rr()`, dieselbe feste Schrittweite, `MOTOREN.basketball.lauf()` ruft denselben
+`stepFeldspiel(1/60)` ungerendert — bestätigt reproduzierbar (`messe-arena-einfluss.mjs`
+liefert bei gleichem Seed zweimal exakt dasselbe Ergebnis).
+
+**Ein echter Fund unterwegs — und behoben:** die erste Fassung ließ den Ballführer pro
+Tick 15 % der Reststrecke zum Korb zurücklegen. Damit war er binnen einer halben Sekunde
+praktisch immer schon in Wurfreichweite — `entscheideBallaktion` prüft Nah-/Fernwurf
+ZUERST und wirft dann sofort selbst, Pass/Spielzug kamen nie zum Zug. AUFBAU, ABSCHLUSS,
+TEAMGEIST und die Spielzug-Formeln waren dadurch faktisch tote Kalibriermasse — dieselbe
+Lektion wie bei ABSCHLUSS in #660, hier strukturell statt an einer einzelnen Formel.
+Zusätzlich standen alle Mitspieler ohne Ball innerhalb von 70 px vom Korb, also selbst
+IMMER in Wurfreichweite — ein Pass hätte sich nie gelohnt. Beides behoben: Dribbeltempo
+auf 3 %/Tick gesenkt, Mitspieler-Formation gemischt (zwei nah, zwei Mitteldistanz, zwei
+außerhalb der Fernwurfreichweite). Sichtbar im Feed: echte Passketten
+(„Greenkraut passt zu Seraph-11. Seraph-11 passt zu Tidesprinter. Tidesprinter passt zu
+Greenkraut. Greenkraut trifft — +2.") statt sofortiger Alleingänge.
+
+**Offen — ehrlich gemessen, nicht schöngerechnet:** `messe-arena-einfluss.mjs basketball
+48` steht nach diesen Fixes bei **84,6 Pp** Abweichung — deutlich schlechter als die 27 Pp
+des Vorab-Modells vor diesem Umbau. Intelligence und Spirit (die beiden höchsten
+Matrixgewichte, 22 und 16, beide Haupttreiber von AUFBAU) lesen weiterhin exakt 0 %.
+Arbeitshypothese, noch nicht verifiziert: ein Spieler mit hohem AUFBAU passt öfter statt
+selbst zu werfen — das senkt seine EIGENEN `punkte` zugunsten von `assists` (Gewicht 1,0
+in `wert()`), was im Live-Modell netto ein schwächeres Signal für ihn selbst sein könnte
+als im Vorab-Modell, wo Assist und nachfolgender Wurf im selben Zug fest gekoppelt waren.
+Nicht weiter verfolgt in diesem PR — das würde vermutlich eine Zeit lang Tuning brauchen,
+und Chris' Auftrag war „erst sauber", nicht „erst perfekt balanciert". Zusätzlich: die
+Aufstellung wirkt visuell noch zu sehr wie eine Reihe (alle nah an derselben Y-Linie),
+kein echtes Formations-Gefühl — auch das ein Folge-Posten, keiner, den dieser PR löst.
+
 ### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
 
 Auf OpenGameArt gibt es **keine** fertigen 2D-Top-Down-Court/Field-Tilesets im passenden
