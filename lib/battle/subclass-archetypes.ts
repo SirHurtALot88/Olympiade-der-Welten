@@ -184,10 +184,12 @@ export const ZUORDNUNGEN: readonly Zuordnung[] = [
  * die Vereinigung für genau diesen Spieler, ohne die allgemeine Regel anzufassen. Ein
  * anderer Hunter kann weiterhin eine Armbrust tragen.
  *
- * Die Bilder liegen in Chris' Dropbox unter "Mark VI Cardgame/Spieler/". Aus dieser
- * Sitzung heraus sind sie NICHT abrufbar — der Egress-Proxy blockt
- * dropboxusercontent.com —, sie kamen einzeln über den Chat. Wer hier etwas ändert,
- * braucht das Bild dazu.
+ * Die Bilder liegen in Chris' Dropbox unter "Mark VI Cardgame/Spieler/<Spielername>.jpg".
+ * Sie SIND aus einer Agentensitzung heraus abrufbar (verifiziert): Dropbox-MCP
+ * `list_folder`/`search`, dann `download_link` für eine Einweg-URL (600s gültig),
+ * die URL per `curl` in eine lokale Datei geladen (nicht mit WebFetch anfassen — die
+ * dl.dropboxusercontent.com-URLs sind nur per direktem Download nutzbar) und die Datei
+ * mit dem Read-Tool angesehen. Wer hier etwas ändert, braucht das Bild dazu.
  */
 export interface Bildbefund {
   readonly spieler: string;
@@ -241,6 +243,191 @@ export const BILDBEFUNDE: readonly Bildbefund[] = [
     archetypen: ["Priest", "Cleric"],
     schliesstAus:
       "Blackguard, Bullbreaker und Frost Knight (kamen aus Guardian): keine Rüstung, keine Waffe, kein Panzer. Der leuchtende Kern passt zu den beiden Lichtwegen — und das sind genau die zwei Kits, die schon vorliegen.",
+  },
+
+  // ===================================================================================
+  // BATCH 1 — 22 Spieler, ausgewählt nach: Bild in der Dropbox vorhanden UND alle drei
+  // Unterklassen als "offen" markiert (die unsichersten Fälle, wo ein Bildbefund am
+  // meisten hilft). Zwei weitere Kandidaten (Cipher, Lyrion) wurden geprüft, aber NICHT
+  // aufgenommen: ihre Bilder zeigen keinerlei Kampfausrüstung (Cipher: Hacker am
+  // Rechner: Lyrion: Barde mit Laute) und liefern damit keine Verengung — ein Bildbefund
+  // ohne Verengung wäre keiner.
+  // ===================================================================================
+  {
+    spieler: "Meira",
+    bild:
+      "Katzenartiges Fellwesen (Beastfolk) in Kletterhaltung auf einem Ast, Kegelhut, leichte Stoffkleidung ohne Rüstung, Holzstab mit leuchtender goldener Kugel an der Spitze, Dschungel.",
+    archetypen: ["Conjurer"],
+    schliesstAus:
+      "Fighter, Orc Warrior, Barbarian, Steelwind (aus Warrior): keine Rüstung, keine Nahkampfwaffe — sie trägt einen Zauberstab, keine Klinge. Hunter, Thunderclaw (aus Jungle): kein Bogen, kein elektrischer Effekt. Rogue, Astralwing (aus Trickster): keine Klinge bzw. keine umkreisenden Sterne, sondern eine einzelne leuchtende Kugel am Stab — das passt zum kontrollierenden Zauberer Conjurer.",
+  },
+  {
+    spieler: "Yaezakura",
+    bild:
+      "Schwer gepanzerter Kämpfer in schwarzer Stachelrüstung mit rotem Helmbusch und Skelettmaske, hält einen Stab mit aufgespießten Schädeln, Schlachtfeld mit Feuer und Krähen im Hintergrund.",
+    archetypen: ["Fighter", "Orc Warrior", "Barbarian"],
+    schliesstAus:
+      "Rogue, Steelwind (aus Vigilante): er trägt volle Platte, keine leichte Klinge oder Krummschwert für einen Schleicher. Hunter (aus Isolated): kein Bogen. Necromancer (aus Isolated): er trägt Schädel als Trophäen, beschwört aber nichts — kein Skelett, kein Zauber sichtbar. Crusader (aus Vigilante): die Optik ist finster und mit Totenköpfen behängt, nicht geweiht. Übrig bleiben die drei schweren Nahkämpfer aus Warrior.",
+  },
+  {
+    spieler: "Princess Pride",
+    bild:
+      "Blonde Frau in goldener Ziererüstung (Brustpanzer, Schulterplatten, Handschuhe), roter Umhang, keine Waffe sichtbar, vor antiken Säulenruinen.",
+    archetypen: ["Templar", "Crusader", "Matriarch"],
+    schliesstAus:
+      "Fighter, Orc Warrior, Barbarian, Steelwind (aus Warrior) und Rogue (aus Vigilante): die Rüstung ist golden-zeremoniell und herrschaftlich, nicht die schlichte oder wilde Bauart eines Haudegens oder Schleichers. Ohne sichtbare Waffe bleiben die drei geweiht-herrschaftlichen Wege aus Royalty offen.",
+  },
+  {
+    spieler: "Robofighter",
+    bild:
+      "Massiver Kampfroboter mit riesiger Kanone am Arm, keine Klinge, Großstadt bei Nacht im Hintergrund.",
+    archetypen: ["Crossbowman"],
+    schliesstAus:
+      "Steelwind (aus Bot/Agent) und Fighter, Orc Warrior, Barbarian, Rogue (aus Warrior/Agent): er kämpft mit einer schweren Feuerwaffe aus der Distanz, nicht mit Klinge oder bloßen Fäusten. Astralwing (aus Agent): keine Magie, das ist Technik. Übrig bleibt der einzige Fernkampf-Archetyp mit schwerem Gerät statt Bogen.",
+  },
+  {
+    spieler: "Orinex",
+    bild:
+      "Goldener gepanzerter Konstrukt mit blau leuchtenden Energiekugeln in Brust, Schultern und Handschuhen, schwingt einen Hammer mit hellem Blitz-Energiekopf, Blitze im Hintergrund, Uhrwerk-Tempel.",
+    archetypen: ["Lightning Mage"],
+    schliesstAus:
+      "Fire Mage, Ice Mage (aus Mage): keine Flammen, kein Frost, sondern deutlich sichtbare Blitze am Hammerkopf. Archmage (aus Mage/Alchemist): kein zyklisches Dreifach-Element zu sehen, nur eine einzelne elektrische Energie. Conjurer, Ember Priest (aus Alchemist/Trickster): keine Gravitations- oder Heilmagie erkennbar. Rogue, Astralwing (aus Trickster): keine Klinge, keine Sternbilder. Übrig bleibt der Blitzweg.",
+  },
+  {
+    spieler: "Nightowl",
+    bild:
+      "Vermummter Mann im zerschlissenen Umhang mit Kapuze, hält einen Speer mit Metallspitze, Gewitter und Ruinen im Hintergrund, Regen.",
+    archetypen: ["Hunter", "Rogue"],
+    schliesstAus:
+      "Monk (aus Wayfarer): er ist bewaffnet, kein waffenloser Kämpfer. Steelwind (aus Wayfarer): kein Krummschwert/Shuriken. Conjurer, Astralwing (aus Trickster): keine Magie sichtbar. Necromancer (aus Isolated): keine Totenbeschwörung. Weder Hunter (Bogen) noch Rogue (Klinge) bilden die tatsächliche Waffe exakt ab — er trägt einen Speer, den keiner seiner Kandidaten kennt —, aber sie sind die einzigen einzelgängerischen Nah-/Fernkampf-Lesarten, die überhaupt übrig bleiben. Diese Lücke ist Chris vorzulegen.",
+  },
+  {
+    spieler: "Calawynn",
+    bild:
+      "Geflügelte Meerjungfrau/Fee mit durchscheinenden Schmetterlingsflügeln, weißem Haar, Fischschwanz, unter Wasser, keine Waffe, keine Rüstung, ruhige schwebende Haltung.",
+    archetypen: ["Astralwing", "Monk"],
+    schliesstAus:
+      "Templar, Crusader, Matriarch (aus Royalty): keine Rüstung, kein Hammer. Hunter, Steelwind (aus Wayfarer): kein Bogen, keine Klinge. Reaper Mage (aus Whore): keine Geschütze oder Fernkampfwaffen sichtbar. Übrig bleiben nur die beiden waffenlosen/geflügelten Lesarten — das Bild zeigt aber keinerlei Kampfhaltung, nur ein schwebendes Porträt, die Verengung bleibt entsprechend unsicher.",
+  },
+  {
+    spieler: "Impulse",
+    bild:
+      "Weiblicher Kampfroboter/Cyborg in weiß-schwarzer Panzerung mit oranger Energie, hält eine glühende Energieklinge in der Hand, zerstörte Sci-Fi-Stadt im Hintergrund.",
+    archetypen: ["Steelwind", "Rogue", "Fighter"],
+    schliesstAus:
+      "Crossbowman (aus Bot/Agent): keine Fernkampfwaffe, sie kämpft mit einer Klinge. Conjurer, Astralwing (aus Trickster/Agent): keine Zaubermagie, die Klinge ist technisch-energetisch, nicht arkan. Übrig bleiben die drei klingenfähigen Nahkämpfer.",
+  },
+  {
+    spieler: "Alaric",
+    bild:
+      "Zerlumpter bärtiger Mann mit Holzstab voller Anhänger (Federn, Knochen), hält eine leuchtende Kugel in der offenen Hand, Gürtel voller leuchtender Tränkefläschchen, Wald, freundlicher Blick.",
+    archetypen: ["Conjurer", "Ember Priest", "Archmage"],
+    schliesstAus:
+      "Monk, Hunter, Steelwind (aus Wayfarer) und Rogue (aus Isolated): keine Kampfhaltung, keine Waffe außer dem Ritualstab, kein Bogen, keine Klinge. Necromancer (aus Isolated): kein Totenmotiv, die Szene ist warm und freundlich, nicht düster. Übrig bleiben die drei Zauberwege, die zu Tränken und offener Handmagie passen.",
+  },
+  {
+    spieler: "Slither",
+    bild:
+      "Reptilienhafter Dämon mit Drachenschwanz, schwarz-roter Stachelrüstung mit roten Edelsteinen, roter Kapuze, glühenden Augen, hält eine einzelne gekrümmte rote Klinge, Ruinen.",
+    archetypen: ["Rogue", "Steelwind"],
+    schliesstAus:
+      "Crusader (aus Vigilante): kein geweihtes Motiv, sondern dämonisch-finster. Fighter, Orc Warrior, Barbarian (aus Warrior): kein grobschlächtiger Bauart-Kämpfer, sondern eine schlanke Gestalt mit einer einzelnen gekrümmten Klinge. Hunter (aus Isolated): kein Bogen. Necromancer (aus Isolated): keine Totenbeschwörung, nur persönliche Rüstung. Übrig bleiben die beiden Klingenwege.",
+  },
+  {
+    spieler: "Toasty",
+    bild:
+      "Kleiner Toaster-Panzerroboter auf Kettenlaufwerken, glühend rote Augen, Toastscheiben oben, hält ein einzelnes Messer in einer Klaue, Schrottplatz.",
+    archetypen: ["Rogue", "Steelwind", "Fighter", "Barbarian"],
+    schliesstAus:
+      "Crossbowman (aus Bot): keine Fernkampfwaffe. Reaver (aus Rebel): keine Wurfäxte, nur ein einzelnes Messer. Conjurer, Astralwing (aus Trickster): keine Magie. Übrig bleiben die vier klingen-/nahkampffähigen Messerträger, unter denen das Bild allein nicht weiter entscheidet.",
+  },
+  {
+    spieler: "Cardinal Richelieu",
+    bild:
+      "Pestarzt-Vogelmaske mit rotem Kardinalshut, schwarze Robe mit rotem Cape, Kreuzkette, hält eine Laterne und eine Schriftrolle, keine Waffe, Krypta/Kathedrale.",
+    archetypen: ["Conjurer", "Ember Priest", "Archmage", "Necromancer"],
+    schliesstAus:
+      "Hunter (aus Isolated), Reaver, Barbarian (aus Rebel): keine Waffe, keine Kampfhaltung. Rogue (aus Isolated): keine Klinge. Übrig bleiben die vier robenbekleideten Zauber-/Totenwege, zwischen denen Laterne und schlichtes Kreuz nicht klar entscheiden — die Kryptenszene passt besonders gut zu Necromancer.",
+  },
+  {
+    spieler: "Patience",
+    bild:
+      "Alter Halbelf mit weißem Bart, moosbewachsene Robe mit Pilzen an der Schulter, sitzt meditierend an einem Wasserfall, keine Waffe.",
+    archetypen: ["Monk"],
+    schliesstAus:
+      "Hunter, Thunderclaw, Barbarian (aus Jungle): kein Bogen, keine Elektrizität, kein wilder Nahkämpfer. Steelwind, Rogue (aus Wayfarer/Isolated): keine Klinge. Necromancer (aus Isolated): kein Totenmotiv. Übrig bleibt der einzige waffenlose Weg.",
+  },
+  {
+    spieler: "Radegas der Braune",
+    bild:
+      "Baumartiges Wesen aus Rinde und Wurzeln mit langem Bart, hält einen knorrigen Holzstab, füttert Vögel, Eichhörnchen daneben, Wald bei Nacht.",
+    archetypen: ["Monk"],
+    schliesstAus:
+      "Hunter, Rogue, Necromancer (aus Isolated) sowie Thunderclaw, Barbarian (aus Jungle) und Steelwind (aus Wayfarer): kein Bogen, keine Klinge, keine Totenbeschwörung, kein elektrischer Effekt, kein Krummschwert. Der Stab wirkt wie ein Wanderstab, keine Kampfwaffe — am ehesten passt noch der waffenlose Monk.\n\nBEFUND: Das Bild zeigt eindeutig einen Naturgeist/Baummagier (Radagast-Motiv), aber KEIN Archetyp aus Isolated, Jungle oder Wayfarer bildet Naturmagie ab — dafür bräuchte es einen Weg wie Orc Shaman oder Conjurer, der aus seinen Unterklassen nicht erreichbar ist. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Pantina",
+    bild:
+      "Dunkelhäutige Elfe mit spitzen Ohren in dunklem Lederkorsett-Kleid, sitzt mit einem Dolch in der Hand, Wald bei Nacht.",
+    archetypen: ["Steelwind", "Thunderclaw"],
+    schliesstAus:
+      "Astralwing, Reaper Mage (aus Whore): keine Magie sichtbar, sondern eine physische Klinge. Monk (aus Wayfarer): sie ist bewaffnet. Hunter (aus Jungle/Wayfarer): kein Bogen. Barbarian (aus Jungle): keine grobschlächtige Kampfhaltung, sondern eine einzelne präzise Klinge in ruhiger Pose. Übrig bleiben die beiden Klingenwege.",
+  },
+  {
+    spieler: "Xandrix",
+    bild:
+      "Alter Zauberer mit grauem Haar und Bart, prunkvolle lila-goldene Robe, hält einen Kristallstab und eine geometrische leuchtende Kugel mit Sternsymbolen, Sternenhimmel-Hintergrund.",
+    archetypen: ["Archmage", "Astralwing", "Conjurer"],
+    schliesstAus:
+      "Fire Mage, Ice Mage, Lightning Mage (aus Mage): kein spezifisches Element sichtbar, das Licht ist weiß-golden, nicht farblich elementar. Rogue (aus Trickster) und Reaver, Barbarian (aus Rebel): keine Klinge, kein grober Nahkampf, sondern eindeutig ein robenbekleideter Zauberer. Übrig bleiben die drei nicht-elementaren, kosmisch/arkan wirkenden Wege.",
+  },
+  {
+    spieler: "Juggler",
+    bild:
+      "Vermummte Gestalt mit leuchtend blauen Augen unter der Kapuze, schwarzer Umhang über Lederrüstung, jongliert schwebende dunkle Kugeln und Dolche um sich herum, dunkle Gasse.",
+    archetypen: ["Conjurer", "Necromancer", "Rogue"],
+    schliesstAus:
+      "Steelwind, Fighter, Crossbowman (aus Bot), Hunter (aus Isolated): die schwebenden Kugeln und Dolche wirken durch Magie kontrolliert, nicht geworfen oder geschossen. Archmage, Fire Mage, Ice Mage, Lightning Mage (aus Mage): kein spezifisches Element, nur dunkle Energie. Übrig bleiben die Wege, die entweder Objekte magisch kontrollieren (Conjurer, Necromancer) oder die schwebenden Dolche als geworfene Klingen lesen (Rogue).",
+  },
+  {
+    spieler: "Udalf",
+    bild:
+      "Kahlköpfiger, muskulöser Mann mit Stammestüchern, hält einen Stab mit blau-weißer Flamme an der Spitze, glühende orange Risse auf der Haut, antiker Tempel.",
+    archetypen: ["Archmage", "Fire Mage", "Ice Mage"],
+    schliesstAus:
+      "Lightning Mage (aus Mage): keine Blitze, die Hautrisse sehen eher wie Glut aus. Rogue (aus Trickster), Reaver, Barbarian (aus Rebel): keine Klinge, kein grober Nahkampf, sondern eindeutig ein Stabzauberer. Conjurer (aus Trickster): keine Gravitations-/Kontrollmagie erkennbar. Die Flammenfarbe ist uneindeutig zwischen Blau (frostnah) und den orangen Hautrissen (feuernah) — deshalb bleiben Fire Mage und Ice Mage beide stehen, dazu Archmage, dessen Karte ohnehin zwischen Feuer und Eis wechselt.",
+  },
+  {
+    spieler: "Bruiser",
+    bild:
+      "Frau in voller Stahlplattenrüstung mit Helm und Schild, roter Umhang, Schlachtfeld mit weiteren Rittern.",
+    archetypen: ["Fighter", "Orc Warrior"],
+    schliesstAus:
+      "Barbarian (aus Warrior): die diszipliniert getragene Vollrüstung mit Schild passt nicht zum wilden Nahkampf-Blender. Steelwind (aus Wayfarer): keine Klinge/Shuriken sichtbar. Monk (aus Wayfarer): sie ist schwer gepanzert, nicht waffenlos. Hunter, Rogue, Necromancer (aus Isolated): kein Bogen, keine Klinge, keine Totenmagie. Übrig bleiben die beiden Schild-Rüstungswege.",
+  },
+  {
+    spieler: "Slugger",
+    bild:
+      "Violetthäutiger Alien-Humanoid mit großen schwarzen Augen, Lederjacke mit Patches, trägt eine massive stachelbewehrte Keule über der Schulter.",
+    archetypen: ["Barbarian", "Fighter", "Orc Warrior"],
+    schliesstAus:
+      "Rogue (aus Rebel/Isolated) und Steelwind (aus Warrior): keine Klinge, sondern eine stumpfe Wuchtwaffe. Reaver (aus Rebel): dessen Kit ist auf Wurfäxte ausgelegt, nicht auf eine Keule. Hunter, Necromancer (aus Isolated): kein Bogen, keine Totenmagie. Übrig bleiben die drei schweren Wuchtwaffen-Nahkämpfer.",
+  },
+  {
+    spieler: "Aerin",
+    bild:
+      "Bleichhäutige, spitzohrige Frau mit dunklem Lederkorsett und Metallverzierung, leuchtender Stirnstein, kühler Blick, Wald bei Nacht, keine Waffe sichtbar.",
+    archetypen: ["Rogue", "Conjurer"],
+    schliesstAus:
+      "Reaver, Barbarian (aus Rebel): keine Waffe, keine grobe Kampfhaltung. Steelwind (aus Vigilante): keine Klinge sichtbar. Crusader (aus Vigilante): kein geweihtes Motiv, die Optik ist dunkel-elegant. Astralwing (aus Trickster): keine Sternbilder. Übrig bleiben die schleichend-dunkle Lesart (Rogue) und die durch den leuchtenden Stirnstein nahegelegte Magie-Lesart (Conjurer).",
+  },
+  {
+    spieler: "Dorothy",
+    bild:
+      "Blonde spitzohrige Frau in blau-goldener Zierrüstung, lächelnd, streckt die Hand nach einem goldenen Hund aus, feine goldene Lichtpartikel in der Luft, Wald, keine Waffe.",
+    archetypen: ["Monk", "Conjurer"],
+    schliesstAus:
+      "Hunter (aus Jungle/Wayfarer): der Hund ist kein Wildschwein-Begleiter, kein Bogen zu sehen. Steelwind (aus Wayfarer): keine Klinge. Fire Mage, Ice Mage, Lightning Mage, Archmage (aus Mage): keine elementspezifischen Effekte, nur diffuses goldenes Glitzern. Thunderclaw, Barbarian (aus Jungle): keine Elektrizität, keine grobe Kampfhaltung. Übrig bleiben die unbewaffnete Lesart (Monk) und die durch das Glitzern nahegelegte, unspezifische Zaubermagie (Conjurer).",
   },
 ];
 
