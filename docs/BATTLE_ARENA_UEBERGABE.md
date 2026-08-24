@@ -15,19 +15,20 @@ Sprite-Nachschub braucht, wartet deshalb hier.
 Die **Battle Arena** ist ein *zuschaubarer Auto-Battler* für die Olympiade der Welten.
 Der Manager stellt auf, die Spieler kämpfen von selbst, und man sieht zu — es gibt keine
 Steuerung im Kampf. Ziel ist ein Grundkonzept für **alle 20 Disziplinen**; Stand dieser
-Sitzung: **18 von 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
-(„Chassis") statt 18 getrennter Implementierungen:
+Sitzung: **alle 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
+(„Chassis") statt 20 getrennter Implementierungen:
 
 | Chassis | Disziplinen | Motor |
 |---|---|---|
 | Kampf | TDM, Mini-DM, Fechten, Battlefield | `build()`/`stepSim()`, Rezepte aus `ARENA_ART` |
 | Bahn | Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle | `bauSpurt()`/`stepSpurt()`, Konfiguration aus `BAHN_ART` |
-| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
+| Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen, **Speed-Schach, I-Spy** | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
 | Feldspiel | Basketball, Football, Hockey, Tennis | `bauFeldspiel()`/`stepFeldspiel()`, Konfiguration aus `FELDSPIEL_ART` |
 
-Offen: Denkduell (Speed-Schach, I-Spy) — nach Fable-Konsultation kein eigenes Chassis,
-sondern eine Bühne-Variante (abwechselnde Züge statt unabhängiger Durchgänge, eine
-Vorteils-Anzeige statt Jury-Punkten).
+Denkduell (Speed-Schach, I-Spy) bekam kein eigenes fünftes Chassis — nach
+Fable-Konsultation eine Bühne-**Variante**: Teilnehmer treten paarweise gegeneinander an
+(Brett i gegen Brett i, wie ein Schach-Mannschaftskampf) statt unabhängig für sich, und
+die Wertung ist ein laufender Vorteil statt einer Jury-Punktzahl. Details unten.
 
 Sie liegt als **eine** HTML-Datei vor (`public/mockups/battle-mode.html`, ~800 KB, kein
 Bundle, keine Abhängigkeiten) und ist im Spiel als Reiter eingebettet. **Sie liest und
@@ -1007,7 +1008,58 @@ Vorteils-Anzeige statt Jury-Punkten.
 
 ---
 
-## Verlässliche Einstiegspunkte
+## Denkduell: Speed-Schach und I-Spy — Bühne mit Paarung statt Einzelauftritt
+
+Zwei Änderungen an der bestehenden Bühne, kein neuer Code-Pfad für Aufstellung, Messung
+oder Reiter — beides ergibt sich aus dem `duell:true`-Schalter in `BUEHNE_ART`.
+
+**Paarung statt Einzelauftritt.** Statt dass jeder für sich bewertet wird, ist Brett i
+mein Teilnehmer i gegen Gegner i — wie ein Schach-Mannschaftskampf mit mehreren Brettern,
+nicht ein einzelnes Spiel. Die Punkteformel je Durchgang ist exakt dieselbe wie bei jeder
+anderen Bühnen-Disziplin (`bauBuehne()` läuft unverändert); neu ist nur ein zweiter Schritt
+danach: `vorteil = eigene Punkte − Punkte des Brett-Gegners`, aufsummiert über alle
+Durchgänge. Das ist der einzige neue Rechenschritt.
+
+**Vorteils-Anzeige statt Jury-Punkten.** Der Punktestand zeigt gewonnene Bretter (Vorteil
+am Ende positiv), nicht die rohe Punktesumme — Fables Vorschlag, wie eine Schach-Eval-Bar.
+`einflussVon()` misst bei Duell-Disziplinen ebenfalls den Vorteil, nicht die Summe: „besser"
+heißt hier, das eigene Brett zu gewinnen, nicht viele Punkte zu sammeln.
+
+### Ein echter Bug, gefunden vor dem Merge
+
+Erste Fassung zeigte in der Aufstellung/Arena den **fertigen Endstand** der Partie, schon
+bevor auch nur ein Zug enthüllt war — ein Brett stand bei „Zug 0/10" und zeigte trotzdem
+„−606 Vorteil". Der Fehler: die Anzeige griff auf `u.vorteil` zu, das Endergebnis der ganzen
+(im Voraus durchgerechneten) Partie, statt auf `u.verlauf[u.aktuell]`, den Stand nach dem
+zuletzt enthüllten Zug. Das verriet den Ausgang vor dem ersten sichtbaren Zug — behoben,
+seither zeigt ein Brett ohne enthüllte Züge „0 Vorteil", genau wie der Feed-Text (der
+`verlauf` von Anfang an richtig benutzt hat).
+
+### Die beiden Matrizen
+
+```
+speed-schach  intelligence 28 · awareness 21 · determination 14 · will 14 · speed 10
+              · dexterity 7 · charisma 6
+i-spy         intelligence 18 · torment 17 · spirit 13 · will 12 · charisma 9
+              · determination 8 · speed 8 · dexterity 8 · awareness 5 · health 2
+              (die breiteste Matrix aller zwanzig Disziplinen — zehn Attribute mit Gewicht)
+```
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Speed-Schach | **18,2 Pp** — der beste Wert der gesamten Sitzung, ohne Nachziehen |
+| I-Spy | **43 Pp** (nach einer Nachziehung: Intelligence saß in drei Rollen, davon eine
+  Erfolgschance-Rolle, und las 30,1 % bei Matrixgewicht 18 — Torment, der zweithöchste
+  Wert, dafür nur 12,9 %. Torment trägt jetzt auch Spitzenmoment) |
+
+Speed-Schach lief beim ersten Versuch besser als jede andere Disziplin dieser Sitzung —
+vermutlich, weil die Lehren aus Bahn, Arena, Bühne und Feldspiel (Erfolgschance-Rollen
+bevorzugt besetzen, keine Rolle mit Matrixgewicht nahe null in eine Gating-Rolle setzen)
+diesmal von Anfang an in die Rezepte eingeflossen sind.
+
+---
 
 ## Verlässliche Einstiegspunkte
 
