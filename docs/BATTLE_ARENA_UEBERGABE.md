@@ -521,6 +521,28 @@ null bepreist? Bitte an Chris.
 Nachgemessen mit n = 6 (554 s): **133,9 Pp**, Speed 43,6 %, Dexterity 23,4 %, Power 5,5 %
 gegen ein Matrixgewicht von 28. Der Befund aus dem groben Lauf hält also.
 
+### Und die naheliegende Lösung funktioniert nicht
+
+Bevor die Frage an Chris geht, ist sie ausprobiert: die Bewegung im Kampf (`TMP`) speist
+sich zu 46 aus Speed und zu 24 aus Dexterity — beide mit Matrixgewicht null. Was passiert,
+wenn man sie durch Attribute ersetzt, die die TDM-Matrix wirklich führt (`stamina 38,
+determination 26, awareness 20, spirit 16`)?
+
+**Es wird schlechter: 133,9 → 180 Pp.** Speed und Dexterity lesen jetzt sauber 0 % — aber
+an ihre Stelle treten Awareness mit **49,5 %** (Matrixgewicht 2) und Intelligence mit
+**39,3 %** (Gewicht 6), während Power (28) und Health (20) auf null fallen.
+
+Damit ist die Frage eine andere als gedacht. Es liegt nicht an Speed. **Was auch immer die
+Bewegung speist, beherrscht den Teamfight** — wer zuerst am Gegner ist, schlägt länger zu,
+und das schlägt jeden Kampfwert. Die Entscheidung, die Chris zu treffen hat, lautet
+deshalb nicht „soll Speed zählen?", sondern:
+
+> Soll **zuerst ankommen** einen Teamfight so stark entscheiden, wie es das gerade tut?
+
+Möglichkeiten, die ich sehe (keine davon ohne Rückfrage umgesetzt): die Kämpfer starten
+näher beieinander; die Bewegungsspanne wird gestaucht, wie es auf der Bahn geholfen hat;
+oder der Anmarsch zählt gar nicht mit, weil er vor dem eigentlichen Kampf liegt.
+
 ---
 
 ## Das Bahn-Chassis: fünf Disziplinen, ein Motor

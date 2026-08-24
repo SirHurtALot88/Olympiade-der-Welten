@@ -1301,7 +1301,10 @@
     "time-trial":{label:"Time-Trial",cat:"speed",size:6},
     climbing:{label:"Climbing",cat:"speed",size:6},
     "takeshis-castle":{label:"Takeshi",cat:"chaos",size:6},
-    staffel:{label:"Staffel",cat:"speed",size:6}};
+    staffel:{label:"Staffel",cat:"speed",size:6},
+    "mini-dm":{label:"Mini-DM",cat:"power",size:4},
+    fechten:{label:"Fechten",cat:"power",size:6},
+    battlefield:{label:"Battlefield",cat:"power",size:4}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -1728,7 +1731,7 @@
   // sie kommt aus denselben Rezepten (REC), aus denen die Kampfwerte selbst entstehen.
   function traitVerteilung(slotId,dId){
     const sl=SLOTVON[slotId]; if(!sl)return null;
-    const rec=REC[DISCS[dId].cat];
+    const rec=rezeptVon(dId);
     const verteile=(attrs)=>{
       const roh={}; let summe=0;
       for(const k of KEYS){
@@ -1792,7 +1795,7 @@
     // sondern Antritt, Technik, Stehvermoegen. Solange nur TDM und Spurt existierten, fiel
     // es nicht auf; mit Takeshi's Castle brach es hart weg, weil dessen Kategorie in REC
     // gar nicht vorkommt. Jetzt fragt jede Disziplin ihre eigenen Rezepte.
-    const rec=BAHN_ART[dId]?BAHN_ART[dId].rezept:REC[(DISCS[dId]||{}).cat];
+    const rec=BAHN_ART[dId]?BAHN_ART[dId].rezept:rezeptVon(dId);
     if(!rec)return breit;
     const fokus=[sl.gross,sl.klein].filter(k=>W[k]>0);
     const speist=fokus.some(k=>Object.keys(rec).some(x=>rec[x]&&rec[x][k]));
@@ -1896,7 +1899,88 @@
     return o;
   }
 
-  function stats(p,dId){const rec=REC[DISCS[dId].cat],o={};
+  // ===================================================================================
+  // DAS ARENA-CHASSIS.
+  //
+  // Was das Bahn-Chassis fuer die Rennen ist, ist dies fuer die Kaempfe: ein Motor,
+  // mehrere Disziplinen. TDM, Mini-DM, Fechten und Battlefield sind alle „zwei Gruppen
+  // treffen aufeinander" — sie unterscheiden sich darin, WIE VIELE, WORAUS sich die
+  // Kampfwerte speisen und was ueberhaupt zaehlt.
+  //
+  // Die fuenf Kampfwerte bleiben ueberall dieselben (ANG, VER, LP, TMP, AUS); was sie
+  // speist, kommt aus der Matrix der jeweiligen Disziplin. Vorher hing das an einer
+  // Kategorie ("power" oder "speed") — zwei Rezeptsaetze fuer zwanzig Disziplinen, und
+  // eine neue Disziplin haette einfach den Satz einer anderen geerbt.
+  //
+  // Wer hier eine Disziplin eintraegt, bekommt sie fertig: Aufstellung aus den erzeugten
+  // Slots, Motor fuer die Abnahmemessung, Reiter in der Oberflaeche.
+  const ARENA_ART={
+    tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
+
+    "mini-dm":{
+      // MATRIX: torment 24, health 20, power 16, stamina 16, will 14, dexterity 10.
+      //
+      // SECHS Attribute, und keins davon ist Charisma, Intelligence oder Spirit. Das ist
+      // die Ansage: hier fuehrt niemand, hier liest niemand — hier wird geschlagen und
+      // eingesteckt. Vier gegen vier, kein Platz zum Ausweichen.
+      //
+      // Vor allem fehlt SPEED. Im TDM speist Speed mit 46 die Bewegung, obwohl die
+      // TDM-Matrix ihn mit null bepreist — der Befund, der unten offen steht. Bei einer
+      // neuen Disziplin diesen Fehler zu wiederholen waere mutwillig: das Tempo speist
+      // sich hier aus Dexterity, Ausdauer und Torment, also aus dem, was die Matrix
+      // wirklich fuehrt.
+      label:"Mini-DM", jeSeite:4,
+      rezept:{ANG:{torment:46,power:34,dexterity:20},
+              VER:{health:44,stamina:30,will:26},
+              LP:{health:42,stamina:32,will:26},
+              TMP:{dexterity:40,stamina:32,torment:28},
+              AUS:{stamina:48,will:32,health:20}}
+    },
+
+    fechten:{
+      // MATRIX: torment 25, dexterity 20, speed 16, awareness 15, power 10,
+      // determination 6, health 4, intelligence 4.
+      //
+      // Die einzige Kampfdisziplin, in der Speed ueberhaupt ein Gewicht hat (16) — und
+      // die einzige, in der Health fast keins hat (4). Ein Fechter faellt nicht um, weil
+      // er duenn ist, sondern weil er zu spaet kommt. Deshalb traegt Health hier kaum
+      // Lebenspunkte; die tragen Entschlossenheit und Aufmerksamkeit, also das, was einen
+      // im Gefecht haelt.
+      //
+      // Torment mit 25 ist der hoechste Wert: die Klinge sucht die Bloesse.
+      label:"Fechten", jeSeite:6,
+      rezept:{ANG:{torment:44,dexterity:30,power:26},
+              VER:{awareness:42,dexterity:34,health:24},
+              LP:{determination:36,awareness:34,health:30},
+              TMP:{speed:46,dexterity:32,awareness:22},
+              AUS:{determination:40,awareness:32,torment:28}}
+    },
+
+    battlefield:{
+      // MATRIX: charisma 20, intelligence 16, spirit 16, torment 12, power 10,
+      // awareness 10, health 8, determination 4, stamina 4.
+      //
+      // Die einzige Kampfdisziplin, in der Power nicht oben steht — sie steht mit 10 im
+      // Mittelfeld, waehrend Charisma, Intelligence und Spirit zusammen die Haelfte des
+      // Gewichts tragen. Das ist keine Schlaegerei, das ist ein GEFUEHRTES Gefecht: wer
+      // die Lage liest und seine Leute zusammenhaelt, gewinnt.
+      //
+      // Deshalb speist Charisma hier den Angriff mit (ein Befehl richtet mehr aus als
+      // ein Schlag), Spirit die Verteidigung, und das Tempo kommt aus Aufmerksamkeit und
+      // Verstand statt aus den Beinen: man ist frueher da, weil man frueher weiss, wohin.
+      label:"Battlefield", jeSeite:4,
+      rezept:{ANG:{torment:40,power:34,charisma:26},
+              VER:{spirit:40,health:34,awareness:26},
+              LP:{health:38,spirit:34,stamina:28},
+              TMP:{awareness:40,intelligence:34,spirit:26},
+              AUS:{stamina:36,spirit:34,determination:30}}
+    }
+  };
+  const istArena=(d)=>!!ARENA_ART[d];
+  const rezeptVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].rezept)||REC[(DISCS[dId]||{}).cat]||REC.power;
+  const jeSeiteVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].jeSeite)||6;
+
+  function stats(p,dId){const rec=rezeptVon(dId),o={};
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
     return o;}
@@ -2481,13 +2565,14 @@
       name="Heiler zuerst";
       grund=heiler.n+" heilt "+heiler.hps+" je Sekunde und macht damit "+
         "den Schaden von vier Sekunden Kampf wieder wett. Zwei Schnelle gehen außen herum auf "+
-        heiler.n+", die anderen vier schieben frontal, damit der Druck nicht nachlässt.";
+        heiler.n+", die anderen "+(jeSeiteVon(disc)-2)+" schieben frontal, damit der Druck nicht nachlässt.";
     }else{
       flanker=0; ziel="naechster";
       name="Mauer schieben";
       grund="Kein Ausreißer: der Stärkste stellt nur "+pz(anteil)+" des Schadens. Sich aufzuteilen "+
-        "würde nur die eigene Übermacht verschenken — alle sechs gehen geschlossen durch die Mitte "+
-        "und schlagen, was am nächsten steht.";
+        "würde nur die eigene Übermacht verschenken — alle "+
+        ["","eins","zwei","drei","vier","fünf","sechs"][jeSeiteVon(disc)]+
+        " gehen geschlossen durch die Mitte und schlagen, was am nächsten steht.";
     }
 
     // ZUTEILUNG. Die Zaehesten halten vorn — sie sollen binden, nicht toeten. Aussen
@@ -2783,17 +2868,18 @@
     a[ATTR_HEBUNG.attribut]=Math.min(100,(a[ATTR_HEBUNG.attribut]||0)+ATTR_HEBUNG.plus);
     return a;
   };
-  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers){
+  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
+    const d=dId||"tdm";
     const bh=behav(p.n);
     const tr=traitTreffer(p);
-    const engPunkte=(slId?slotAufschlag(p,slId,"tdm"):0)+tr.netto;   // haengt an der Position
-    const breitPunkte=formVon(p.n)+stufenWert();                     // trifft jeden gleich
-    const eigWert=p.d.tdm+engPunkte+breitPunkte;
+    const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
+    const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
+    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte;
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
-    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,"tdm",true),"tdm");
-    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,"tdm",false),"tdm");
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
     // Rezepte geben die FORM, die Eignung gibt die MENGE.
-    const sMod=aufEignung(stats({...p,a:attr},"tdm"),eigWert);
+    const sMod=aufEignung(stats({...p,a:attr},d),eigWert);
     const s={};
     for(const k of KEYS)s[k]=Math.round(sMod[k]*10)/10;
     s.MANA=sMod.MANA;
@@ -2815,7 +2901,7 @@
   // bekommt ihren Slot aus der Aufstellung; die Gegner haben keine Aufstellung, die wir
   // kennen — sie bekommen den Slot ihrer Reihe. Damit trifft sie derselbe Aufschlag nach
   // derselben Regel, statt gar keiner.
-  const slotsDerReihe=(row)=>slotsVon("tdm").filter(sl=>slotReihe(sl.id)===row);
+  const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
@@ -2825,28 +2911,42 @@
 
     // UNSERE SEITE — Slot aus der Aufstellung, Befehl aus dem Slot, Ziel aus der
     // Persoenlichkeit (oder aus dem, was der Spieler von Hand gesetzt hat).
-    const mine=inDisc("tdm").slice(0,6);
+    const d=disc, n=jeSeiteVon(d), slotListe=slotsVon(d);
+    // ERSATZAUFSTELLUNG wie auf der Bahn: fuer TDM stellt Chris von Hand auf, eine neue
+    // Arena-Disziplin hat noch keine Aufstellung — und ohne Kaempfer laesst sich nichts
+    // messen. Wer nicht gesetzt ist, wird nach Eignung gesetzt. Stellt jemand von Hand
+    // auf, gilt seine Aufstellung.
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     const byRow={0:[],1:[],2:[]};
-    mine.forEach(p=>byRow[slotReihe(place[p.n].slot)].push(p));
+    mine.forEach((p,i)=>byRow[slotReihe(slotFuer(p,i))].push(p));
     for(const row of[0,1,2]){
       byRow[row].forEach((p,i)=>{
-        const slId=place[p.n]&&place[p.n].slot;
+        const slId=slotFuer(p,mine.indexOf(p));
         U.push(baueEinheit(p,0,row,i,byRow[row].length,id++,slId,
-          order[p.n],zielOf[p.n]));
+          order[p.n]||slotOrd(slId),zielOf[p.n],d));
       });
     }
 
     // GEGNERSEITE — derselbe Aufruf. Der Slot kommt aus der Reihe, Befehl und Ziel aus
     // dem Schlachtplan der KI (das ist ihre Taktik, so wie die Aufstellung unsere ist);
     // fehlt der Plan, greift derselbe Standard wie bei uns.
-    const oByRow={0:[],1:[],2:[]};OPP.forEach(o=>oByRow[o.row].push(o));
+    // Die Gegnerliste ist fuer sechs gebaut. Bei vier Koepfen je Seite werden die besten
+    // vier genommen und neu auf die Reihen verteilt, statt zwei Reihen leer zu lassen.
+    const gegner=OPP.slice(0,n);
+    const oByRow={0:[],1:[],2:[]};
+    gegner.forEach((o,i)=>oByRow[n===OPP.length?o.row:Math.min(2,Math.floor(i*3/n))].push(o));
     for(const row of[0,1,2]){
       oByRow[row].forEach((o,i)=>{
-        const reihenSlots=slotsDerReihe(row);
+        const reihenSlots=slotsDerReihe(row,d);
         const z=(PLAN&&PLAN.zuteilung[o.n])||{};
-        const slId=z.slot||(reihenSlots[i%Math.max(1,reihenSlots.length)]||{}).id||null;
+        const slId=z.slot||(reihenSlots[i%Math.max(1,reihenSlots.length)]||{}).id
+                   ||(slotListe[i%Math.max(1,slotListe.length)]||{}).id||null;
         U.push(baueEinheit(o,1,row,i,oByRow[row].length,id++,slId,
-          z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null)));
+          z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null),d));
       });
     }
   }
@@ -5488,9 +5588,10 @@
   // Rauschen. Wer wissen will, ob jemand seinem Einsatzwert entspricht, muss ihn oefter
   // spielen lassen. Diese Schleife rechnet dieselbe Aufstellung mit n Saatkoernern durch,
   // ohne zu zeichnen, und liefert die Mittelwerte.
-  function serie(n,zwang){
+  function serieVon(d,n,zwang){
     planZwang=zwang||null;
-    const summe={},alt={U,pfeile,t,done,seed,freigabe};
+    const summe={},alt={disc,U,pfeile,t,done,seed,freigabe};
+    if(d)disc=d;
     let siege=0,dauer=0; const ergebnisse={}, messSumme={};
     for(let i=0;i<n;i++){
       // JE KAMPF EINE NEUE FORMKARTEN-ZIEHUNG.
@@ -5510,7 +5611,8 @@
         a.n+=MESS[k].n;a.ziele+=MESS[k].ziele;a.eng+=MESS[k].eng;a.bereit+=MESS[k].bereit;}
       if(live(0).length>live(1).length)siege++;
       // Der Punktestand ist die Zahl ausgeschalteter Gegner — genau der, den die Arena anzeigt.
-      const e=(6-live(1).length)+":"+(6-live(0).length);
+      const nJe=jeSeiteVon(disc);
+      const e=(nJe-live(1).length)+":"+(nJe-live(0).length);
       ergebnisse[e]=(ergebnisse[e]||0)+1;
       const feld=[...U];
       for(const u of feld){
@@ -5519,15 +5621,17 @@
         s.leist+=leistungVon(u,feld)||0; if(u.down)s.tod++;
       }
     }
-    U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
+    disc=alt.disc;U=alt.U;pfeile=alt.pfeile;t=alt.t;done=alt.done;seed=alt.seed;freigabe=alt.freigabe;
     zieheFormkarten(20260823);
     const gewaehlt=PLAN?PLAN.name:null; planZwang=null;
-    return {plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
+    return {disziplin:d||alt.disc,plan:gewaehlt,laeufe:n,skills:messSumme,ergebnisse:Object.entries(ergebnisse).sort((a,b)=>b[1]-a[1]),siegquote:Math.round(siege/n*100),dauer:Math.round(dauer/n),
       reihen:Object.values(summe).map(s=>({n:s.n,seite:s.seite,eig:s.eig,
         dmg:Math.round(s.dmg/n),heal:Math.round(s.heal/n),verh:Math.round(s.verh/n),
         tank:Math.round(s.tank/n),ko:+(s.ko/n).toFixed(2),leist:Math.round(s.leist/n),
         totquote:Math.round(s.tod/n*100)})).sort((a,b)=>b.leist-a.leist)};
   }
+
+  const serie=(n,zwang)=>serieVon("tdm",n,zwang);
 
   // MESSREIHE FUERS RENNEN. Dasselbe Prinzip wie serie() im Kampf: ein einzelnes Rennen
   // ist ein Wurf, keine Messung. Liefert je Laeufer die mittlere Platzierung und Zielzeit,
@@ -5553,16 +5657,21 @@
   // wer mitmacht, und je Teilnehmer eine Zahl liefern, bei der GROESSER BESSER heisst.
   // Beim Rennen ist das die negative Platzierung, im Kampf die Leistung. Was "besser"
   // heisst, ist die einzige Entscheidung, die je Disziplin faellt.
-  const MOTOREN={
-    tdm:{
-      sichern:()=>({U,pfeile,t,done,seed,freigabe}),
-      zurueck:(a)=>{U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;},
-      bau:(saat)=>build(saat),
+  const MOTOREN={};
+  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Was
+  // „besser" heisst, ist im Kampf die LEISTUNG: der Beitrag, gemessen an dem, was der
+  // Einsatzwert erwarten laesst. Eine Platzierung gibt es hier nicht.
+  for(const ad of Object.keys(ARENA_ART)){
+    MOTOREN[ad]={
+      sichern:()=>({disc,U,pfeile,t,done,seed,freigabe}),
+      zurueck:(a)=>{disc=a.disc;U=a.U;pfeile=a.pfeile;t=a.t;done=a.done;seed=a.seed;freigabe=a.freigabe;},
+      vorher:()=>{disc=ad;},
+      bau:(saat)=>{disc=ad; build(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
       namen:()=>U.map(u=>u.n),
       wert:()=>{const feld=[...U],o={}; for(const u of feld)o[u.n]=leistungVon(u,feld)||0; return o;}
-    },
-  };
+    };
+  }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
   // Zeitfahren und die Wand. Kommt eine sechste Bahn dazu, reicht ein Eintrag in
@@ -5695,7 +5804,7 @@
   }
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
-  window.__arena={ serie, spurtSerie, bahnSerie, spurtEinfluss, einflussVon, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
