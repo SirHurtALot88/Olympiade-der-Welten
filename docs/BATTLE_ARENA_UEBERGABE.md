@@ -217,80 +217,162 @@ anrichten konnten.
 
 ---
 
-## Sofort prüfen, wenn die neue Sitzung startet
+## Der Netzzugang ist offen — Stand 23.08., 23:30
+
+Chris hat die Umgebung auf **Full** gestellt und eine neue Sitzung gestartet. Zum
+Nachmessen, nicht zum Vertrauen:
 
 ```sh
 curl -sS -o /dev/null -w "%{http_code}\n" https://opengameart.org/
 curl -sS -o /dev/null -w "%{http_code}\n" https://www.dropbox.com/
 ```
 
-`200` statt `000` heißt: der Zugang steht. Dann zuerst die drei Punkte unter
-„Wartet auf Netzzugang".
+`200` statt `000` heißt: er steht. Falls doch `000` — die Policy wird beim Start des
+Containers eingefroren, eine laufende Sitzung sieht eine Änderung **nie**. Dann eine
+neue Sitzung, nicht suchen.
+
+Wo der Schalter sitzt, falls er nochmal gebraucht wird: **claude.ai/code im Browser**
+(nicht die Desktop-App), Wolken-Symbol mit dem Umgebungsnamen über dem Eingabefeld →
+Zahnrad → **Network access**. Vier Stufen: None, Trusted, Full, Custom. Die Voreinstellung
+*Trusted* hat **kein Feld für eigene Domains** — dort einzutragen wirkt nicht. Das war
+der Grund, warum „ich hab doch alles freigegeben" nichts brachte: der Schalter unter
+`Einstellungen → Fähigkeiten → Code-Ausführung` gilt für die **Analyse-Sandbox in
+Chats**, nicht für Claude Code.
 
 ---
 
-## Wartet auf Netzzugang
+## Das steht jetzt an
 
-### 1. Die 599 Spielerbilder aus Chris' Dropbox
+### 1. Die 599 Spielerbilder aus Chris' Dropbox ← der große Posten
 
-Der Dropbox-Connector funktioniert (Suche, Metadaten, Ordner) — **nur die Bilddaten
-selbst** kamen nicht durch, weil sie von `dropboxusercontent.com` ausgeliefert werden.
+Der Connector funktionierte schon immer (Suche, Metadaten, Ordner), nur die **Bilddaten**
+kamen nicht durch — sie werden von `*.dropboxusercontent.com` ausgeliefert. Mit Full ist
+das offen.
 
 Ordner: `/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/` und `Spieler/fertig/`
-(höhere Auflösung). Benannt nach Spielernamen, z. B. `Krolach.jpg`.
+(höhere Auflösung). **Der Dateiname IST der Spielername** — `Krolach.jpg`, `Grimborg.jpg`,
+`Nazuna.jpg`. Chris ausdrücklich: „namen der jpg sind die spieler". Die Zuordnung ist
+also trivial, es braucht keine Heuristik.
+
+Weg: `mcp__Dropbox__download_link` liefert eine einmalig gültige URL, die dann mit `curl`
+geholt wird. **Nicht** vorher per HEAD antesten — der Link wird von der ersten Anfrage
+verbraucht, egal welcher Methode.
 
 **Wozu:** `lib/battle/subclass-archetypes.ts` ordnet jede der 56 Unterklassen MEHREREN
-Archetypen zu — nach Chris' ausdrücklicher Regel „im Zweifel alle zuweisen, dann ist der
-Skill-Pool größer". Ein Spielerbild verengt diese Auswahl für **diesen einen** Spieler.
-Fünf sind schon eingearbeitet (`BILDBEFUNDE`), 594 fehlen.
+Archetypen zu — nach Chris' Regel „im Zweifel alle zuweisen, dann ist der Skill-Pool
+größer". Ein Bild verengt die Auswahl für **diesen einen** Spieler. Fünf sind
+eingearbeitet (`BILDBEFUNDE`), 594 fehlen.
 
 Ebenfalls dort: `Rassen Klassen Traits.xlsx`, `Oly Player Stats 05-2026.xlsx`,
-`Olympiade Player Stats.csv` — noch nie angesehen, könnten die Zuordnung stützen.
+`Olympiade Player Stats.csv` — noch nie angesehen.
 
-### 2. Die fehlenden Lauf-Sprites
+### 2. Hintergründe für die Disziplinen
 
-**Alle 77 Blätter des Sprite-Baukastens liegen jetzt als PNG-Dateien** unter
-`public/sprites/baukasten/` — mit `index.json` (Maße, Bildzahl, Richtungen) und einer
-README, die den Aufbau erklärt. Sie sind zusätzlich in `battle-mode.html` eingebettet.
-Vorher lagen sie nur als base64 in zwei HTML-Dokumenten.
+TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Noch gar nicht
+angefangen, weil OpenGameArt nicht erreichbar war. Jetzt ist es das.
 
-Den vollen Satz aus Gang, Schlag und Schuss haben aber nur **vier** Ebenen: Körper
-(`k_*`), Kopf (`g_*`), Rüstung (`r_*`) und Haar (`h_*`). Krone, Bart, Schultern, Arme,
-Beine, Stiefel, Umhang, Hörnerhelm, Visier, Schild, Doppelaxt und die zwanzig Köpfe gibt
-es **nur als Schlag-Blatt** (6 Bilder). Für die Animation fehlen deren Gang-Varianten
-(9 Bilder), die Schuss-Varianten (13) und **alle `hurt`-Blätter**.
+### 3. Die Lauf-Sprites — zum größten Teil erledigt, der Rest ist keine Lücke
 
-Quelle: Liberated Pixel Cup, dieselben Urheber wie in `CREDITS.csv`. Solange sie fehlen,
-zeichnet die **stehende** Figur aus dem vollen Baukasten und der **laufende** Kämpfer aus
-dem animierbaren Rest. Kommen die Blätter, fällt die Teilung weg.
+**Der LPC-Satz lag nie hinter der Netzsperre.** Er liegt auf GitHub, und GitHub war die
+ganze Zeit offen:
 
-Zwei konkrete Lücken darüber hinaus:
-- **Krone für die Arena** — King Arlen hat sie in der Kaderliste, im Kampf nicht.
-- **Vogel-Sprite für Seraph-11** — sein Bild zeigt einen mechanischen Vogel; er läuft
-  derzeit als Metallgestalt mit Flügeln. Steht als Platzhalter im Code.
+```sh
+git clone --depth 1 https://github.com/LiberatedPixelCup/universal-lpc-spritesheet-character-generator
+```
 
-### 3. Hintergründe für die Disziplinen
+522 MB, 88.114 PNG, 768 JSON-Definitionen. Daraus sind **209 Blätter** in den Baukasten
+gewandert — `walk`, `run`, `shoot`, `hurt`, `idle` für alle 45 Ebenen, die sich zuordnen
+ließen. Damit laufen jetzt auch Krone, Bart und Schulterstücke, und die `hurt`-Blätter
+für gefallene Kämpfer sind da.
 
-TDM in einer tödlichen Kampfarena, Spurt als Hindernislauf im Freien. Bisher gar nicht
-angefangen, weil OpenGameArt nicht erreichbar war.
+Zugeordnet über die **Alpha-Maske** (die überlebt das Umfärben, die Farben nicht); alle 45
+sind byte-identisch mit ihrer Quelle. `public/sprites/baukasten/quellen.json` hält je
+Ebene den LPC-Pfad fest.
+
+**Was fehlt, fehlt im LPC-Standard selbst** — nachgemessen, nicht vermutet:
+
+| | |
+|---|---|
+| Arme, Beine (Platte) | `run` nur für Stoff und Kleinteile, für Plattenrüstung in **keiner** Variante |
+| Umhang, Fetzen | die Kategorie `cape/` hat **null** `run`-Blätter |
+| Haar | unser `h_*` kommt aus `flat_top_fade/male/` (kein `run`); `adult/` daneben hat eines, ist aber anderes Bild |
+| **Waffen** | **keine einzige** Waffe im ganzen Satz hat `run` |
+
+Draco kann mit Doppelaxt stehen und gehen, nicht rennen. Das ist eine Entscheidung
+(Waffe im Sprint ausblenden, oder `walk` fahren), kein Beschaffungsproblem.
+
+Offen bleiben zwei benannte Lücken:
+- **Krone für die Arena** — King Arlen hat sie in der Kaderliste, im Kampf noch nicht.
+- **Vogel-Sprite für Seraph-11** — sein Bild zeigt einen mechanischen Vogel; er läuft als
+  Metallgestalt mit Flügeln. Steht als Platzhalter im Code.
+
+---
+
+## Was die Sitzung vom 23.08. abends geändert hat (PR #654)
+
+Setzt auf #651 auf. Vier Dinge, jedes gemessen:
+
+**Heiler griffen zusätzlich an.** Chris: „die beiden heiler ZUSÄTZLICH noch normal
+angreifen, sie müssen entweder angreifen oder heilen". Der Grundangriff teilte sich mit
+dem Heal die Uhr `u.cd`, war also ausgeschlossen — die **Skills** aber laufen auf eigenen
+Abklingzeiten in `u.cds[id]`, und `fuehreAus` fasste `u.cd` nie an. Ein Heiler heilte
+(Uhr für 2,0 s belegt) und feuerte in genau diesen zwei Sekunden weiter Skills.
+
+| | vorher | nachher |
+|---|---:|---:|
+| Schaden **durch Heiler** je Kampf | 655 | 1 |
+| Greenkraut | 383 Schaden / 354 Heilung | 0 / 308 |
+| Seraph-11 | 272 / 177 | 1 / 177 |
+| Siegquote V-W | 25 % | 100 % |
+
+Die beiden trugen zusammen mehr Schaden bei als Cassandra (289), die stärkste Angreiferin
+von A-A. Jetzt belegt **jede** Handlung eines Heilers dieselbe Uhr.
+
+**Die Serie zog die Mutatoren nur einmal.** Für die Formkarten war das repariert, für die
+Mutatoren nicht — 24 Kämpfe maßen einen einzigen Zug 24 Mal. Jetzt je Kampf neu.
+
+**Elf von zwanzig Köpfen ließen sich nie umfärben.** `bFaerbe` suchte immer die helle
+Hautrampe; tatsächlich liegen nur drei Köpfe dort (`light`), vier in `green`, drei in
+`fur_brown`, vier in eigenen Sonderpaletten. Unsichtbar, weil ein grüner Echsenkopf grün
+aussieht, ob man ihn anfasst oder nicht. Jedes Körperblatt bestimmt seine Quellrampe
+jetzt selbst. Dazu: `B_PAL` führte sieben Hauttöne, jetzt alle 22 des LPC-Satzes.
+
+**Rhyx'Tal ist ein Gargoyle** (Chris: „ja bau den gargoyle"). Steingrau `fur_grey`,
+`z_hoerner`, `z_fluegel_bg/_fg` — ohne ein neues Blatt. Ehrlich vermerkt, auch im Code:
+Flügel stehen **nicht** in seinem Portrait, das ist Chris' Ansage.
 
 ---
 
 ## Offene fachliche Punkte
 
-### A. Die Mutatoren drehen das Ergebnis (wichtigster offener Punkt)
+### A. Die Mutatoren — ENTSCHIEDEN, nicht mehr offen
 
-In der **reinen Messlage** (ohne Mutatoren, ohne Formkarten, Intensität normal) gewinnen
-die Vigilante Wranglers gegen Armageddon Aftermath **6:0 in 24 von 24 Kämpfen** — das ist
-richtig so, V-W steht auf TDM-Rang 6, A-A auf 20.
+Der Zweifel der Vorsitzung („Renegade meinte wohl ein Auslösen im Kampf, nicht einen
+Dauerbonus") war **falsch**. Chris am 23.08.:
 
-Mit allem eingeschaltet sind es nur **25 %**. Ursache: `TRAIT_PUNKTE = 6` gibt A-A **+60**
-Eignungspunkte gegen V-W **+30**. Gemessen: bei `TRAIT_PUNKTE = 3` steht V-W bei 50 %.
+> „renegade ist n mutator wie jeder andere und bringt 6 score punkte und 0,3 PPs
+> das bleibt auch weiter so"
 
-**Der eigentliche Zweifel:** Chris' Satz „wenn Renegade triggert, sind das auch +6 Punkte"
-meinte vermutlich ein **Auslösen im Kampf**, nicht einen dauerhaften Aufschlag auf die
-Disziplinwertung. Daraus wurde ein permanenter Bonus gemacht — das ist wieder eine zweite
-Gewichtung neben der ersten. **Vor dem nächsten Balancing mit Chris klären.**
+Damit ist es ein dauerhafter Aufschlag auf die Disziplinwertung, und der Code hatte es die
+ganze Zeit richtig. Nachgeprüft in `lib/lineups/legacy-lineup-modifiers.ts`:
+
+```ts
+playerMutatorBonuses[playerId]    = Number((hits * 6).toFixed(1));
+playerMutatorPpsBonuses[playerId] = Number((hits * 0.3).toFixed(2));
+```
+
+Im Mockup entspricht das `TRAIT_PUNKTE = 6`. **Nicht daran drehen.** Wer künftig ein
+Ungleichgewicht bei den Mutatoren vermutet, sucht die Ursache woanders — die Zahl steht.
+
+**Was die Klärung stattdessen aufgedeckt hat:** die Serie zog die Mutatoren nur EINMAL
+beim Laden und ließ sie für alle 24 Kämpfe gelten — derselbe Messfehler, der für die
+Formkarten schon repariert war. Behoben in PR #654, sie werden jetzt je Kampf gezogen.
+
+**Der Balance-Stand danach:** mit dem Heiler-Fix gewinnt V-W **100 %** bei gestreuten
+Ergebnissen (6:0 9×, 6:2 5×, 6:3 5×, 6:1 4×, 6:4 1×). Das ist **kein Erfolg, sondern der
+nächste Befund** — 100 % ist so wenig eine Balance wie 25 %. Der Doppelbezug der Heiler
+hatte A-A getragen; ohne ihn tragen die Mutatoren das Ergebnis nicht mehr. Hier ist der
+nächste Punkt zum Messen, und zwar **ohne** an `TRAIT_PUNKTE` zu drehen.
 
 ### B. Der Level- und Marktentwurf — Chris' Entscheidung steht
 
@@ -581,58 +663,51 @@ aufgeschrieben, damit ihn niemand aus einer älteren Nachricht heraussucht und f
 hält. Der Effekt, den er zeigte, war die Signatur des Messfehlers: was in `TMP` steht,
 gewinnt — und ich hatte Awareness und Intelligence hineingesetzt.
 
-### Das Ventil ist geschlossen — und was das kostet
+### Das Ventil — geschlossen, dann wieder aufgemacht
 
-`TMP` und `AUS` gehen jetzt mit in die Normierung. Damit kann kein Rezept mehr durch bloße
-Platzierung eines Attributs einen Gewinn erster Ordnung erzeugen.
+`TMP` und `AUS` gehen bei `aufEignung()` nicht in die Normierung ein; LP, ANG und VER
+schon. Ein Attribut, das in `TMP`/`AUS` steht, bekommt dadurch in der Messung einen Gewinn
+**erster Ordnung**, unabhängig von seinem Matrixgewicht. Testweise wurden `TMP` und `AUS`
+mit hineingenommen:
 
-| Disziplin | vorher | jetzt |
+| Disziplin | ohne Kappung | mit Kappung |
 |---|---|---|
-| Mini-DM | 13,8 Pp | **14,0 Pp** |
-| Fechten | 87 Pp | **39 Pp** (zusammen mit neu gezogenen Rezepten) |
-| Battlefield | 110 Pp | **101,7 Pp** |
-| **TDM** | 152,4 Pp | **83,7 Pp** |
+| Mini-DM | 13,8 Pp | 14,0 Pp |
+| Fechten | 87 Pp | 39 Pp |
+| Battlefield | 110 Pp | 101,7 Pp |
+| TDM | 152,4 Pp | 83,7 Pp |
 
-Im TDM fallen **Speed und Dexterity auf exakt 0 %** (Matrixgewicht je 0), und Power steigt
-von 3,9 auf 21,4 % (Gewicht 28). Genau das war das Ziel.
+Als Diagnoseinstrument funktioniert das: die Abweichung sinkt überall, und im TDM lasen
+Speed und Dexterity danach sauber 0 % (Matrixgewicht je 0), Power stieg von 3,9 auf 21,4 %
+(Gewicht 28).
 
-**Was noch nicht stimmt:** Awareness liest im TDM 29,7 % bei Gewicht 2, Health 34,1 % bei
-Gewicht 20, Stamina und Charisma weiter 0 % bei 14 und 10. Und Battlefield bewegt sich
-kaum — Ausdauer und Entschlossenheit lesen dort 20,8 %, obwohl die neuen Rezepte sie nur
-noch mit 8 führen und die Matrix ihnen 4 gibt. Bei n = 6 und acht Beteiligten kann das
-Rauschen sein; vor einer Deutung mit größerer Stichprobe nachmessen.
+**Am echten Kampf gemessen war es aber keine Reparatur, sondern eine Verschlechterung —
+und zwar aus einem Grund, der nichts mit den Mutatoren zu tun hat.** Kurz nachdem die
+Kappung fiel, landete #654: der Heiler-Doppelbezug war der eigentliche Grund für A-A's
+Stärke (Schaden durch Heiler fiel von 655 auf 1 je Kampf). Mit diesem Fix gewinnt V-W TDM
+bereits **ohne** jede Kappung 100 % — mit **gestreuten** Ergebnissen (6:0 neunmal, 6:2
+fünfmal, 6:1 viermal, Rest knapper). Mit der Kappung obendrauf wurden daraus 96 % Siegquote,
+aber **23 von 24 Kämpfen exakt 6:0** — die Kappung nahm der KI genau die Bewegungsfreiheit,
+mit der sie überhaupt an V-W herankommt, und machte aus einem Sieg einen Blowout.
 
-**Und ehrlich gesagt: WARUM es so stark wirkt, ist nicht geklärt.** Der Faktor hängt nur an
-LP, VER und ANG; `TMP` wird mitskaliert, nicht auf ein Ziel normiert. Der Effekt ist
-gemessen, die Erklärung dafür nicht. Wer hier weiterarbeitet, sollte das wissen und es
-nicht für verstanden halten.
+**Die Kappung ist deshalb wieder raus** (siehe Kommentar in `aufEignung()`). Was bleibt:
 
-### Der Preis — und er gehört Chris
-
-Die Änderung dreht das Kräfteverhältnis **nicht** um. In der reinen Messlage (ohne
-Mutatoren, ohne Formkarten) gewinnt V-W **100 % in allen vier Kampfdisziplinen — mit und
-ohne Kappung, unverändert**.
-
-Mit allem drum herum sieht es anders aus:
-
-| | ohne Kappung | mit Kappung |
-|---|---|---|
-| TDM | 25 % | **0 %** |
-| Mini-DM | 25 % | **0 %** |
-| Fechten | 50 % | 25 % |
-| Battlefield | 25 % | **0 %** |
-
-Der Grund liegt nicht in der Kappung selbst, sondern in einer Schieflage, die es vorher
-schon gab: die Mutatoren geben A-A **+60** Eignungspunkte gegen V-W **+30**. Vorher hob
-dieser Vorsprung nur die Kampfwerte; jetzt hebt er auch Tempo und Ausdauer, und damit
-schlägt er doppelt durch.
-
-**Das ist eine Entscheidung, keine Reparatur.** Entweder die Mutatoren werden ausgeglichen
-(sie sind eine zweite Gewichtung neben der Disziplinmatrix — genau das Muster, das in
-dieser Sitzung dreimal Ärger gemacht hat), oder die Kappung bleibt draußen und die Matrix
-setzt sich im Kampf weiterhin nicht durch. Beides ist vertretbar; ich habe die Kappung
-drin gelassen, weil sie das strukturelle Problem löst, und schreibe den Preis hierher,
-statt ihn zu verstecken.
+- Der strukturelle Befund ist weiter richtig — `TMP`/`AUS` liegen außerhalb der
+  Eignungs-Normierung, und `einflussVon()` liest deshalb bei jeder Kampfdisziplin einen
+  Bewegungs-Bonus, den die Matrix nicht rechtfertigt. Das ist eine Eigenschaft der
+  MESSUNG, keine, die man am `aufEignung()`-Code beheben sollte, ohne den Kampf selbst
+  zu verschlechtern.
+- **Wichtig, und das war vorher falsch dokumentiert: die Mutatoren sind NICHT die
+  Ursache und NICHT anzufassen.** Chris hat das am 23.08. entschieden: Renegade bringt
+  6 Score-Punkte und 0,3 PPs, „das bleibt auch weiter so". `TRAIT_PUNKTE = 6` bleibt
+  stehen. Eine frühere Fassung dieses Abschnitts schlug vor, die Mutatoren
+  auszugleichen — das war vor dieser Entscheidung geschrieben und gilt nicht mehr.
+- Die eigentliche offene Frage ist die, die #654 selbst schon aufgeschrieben hat: mit
+  dem Heiler-Fix gewinnt V-W TDM zu 100 %, das ist „so wenig eine Balance wie 25 %".
+  Nachgemessen nach dem Merge dieser Sitzung: **Mini-DM 100 %, Fechten 100 %,
+  Battlefield 88 %** (je n = 8) — dieselbe Schieflage betrifft alle vier
+  Kampfdisziplinen, weil sie sich `baueEinheit()` und die KI-Logik teilen. Das ist
+  konsistent mit #654s Befund, keine neue Ursache aus dieser Sitzung.
 
 ---
 

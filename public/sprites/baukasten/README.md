@@ -37,12 +37,33 @@ Alles andere — Krone, Bart, Schulterstücke, Arm- und Beinschienen, Stiefel, U
 Hörnerhelm, Visier, Schild, Doppelaxt und die zwanzig Köpfe — gibt es **nur als
 Schlag-Blatt**. Der Baukasten war für stehende Posen gebaut, nicht für Animation.
 
-Deshalb zeichnet in `battle-mode.html` die **stehende** Figur (Kaderliste, Aufstellung)
-aus dem vollen Satz, der **laufende** Kämpfer dagegen aus dem animierbaren Kern. Kommen
-die fehlenden Gang- und Schuss-Blätter dazu, fällt die Teilung weg. Sie existieren im
-LPC-Satz und brauchen nur Netzzugang.
+### Die Lücke ist geschlossen (23.08.)
 
-Ebenfalls nicht vorhanden: `hurt`-Blätter für gefallene Kämpfer.
+Der LPC-Satz liegt nicht hinter der Netzsperre — er liegt auf **GitHub**, und GitHub ist
+offen. Aus `LiberatedPixelCup/universal-lpc-spritesheet-character-generator` sind **209
+Blätter** dazugekommen: `walk`, `run`, `shoot`, `hurt` und `idle` für alle 45 Ebenen, die
+sich eindeutig zuordnen ließen.
+
+Die Zuordnung ist gemessen, nicht geraten. Verglichen wurde die **Alpha-Maske** — die
+überlebt das Umfärben, die Farben nicht. Alle 45 Ebenen sind darüber hinaus **byte-identisch**
+mit ihrer LPC-Quelle; `quellen.json` nennt zu jeder Ebene den Pfad im LPC-Satz.
+
+Damit fällt die Teilung „stehende Figur aus dem vollen Satz, laufender Kämpfer aus dem
+animierbaren Kern" weg. Auch die `hurt`-Blätter für gefallene Kämpfer sind jetzt da.
+
+**Was weiterhin fehlt — und warum es nicht nachzuholen ist.** Sieben Ebenen haben kein
+`run`. Nachgemessen im gesamten LPC-Satz, nicht nur in unserem Ausschnitt:
+
+| Ebene | Lage im LPC-Satz |
+|---|---|
+| Arme, Beine (Plattenrüstung) | `run` gibt es unter `arms/` und `legs/` **nur für Stoff und Kleinteile** — Armschienen, Handschuhe, Ringe, Hosen. Für **Plattenrüstung in keiner Variante**, weder `male` noch `thin` |
+| Umhang, Fetzen | die Kategorie `cape/` hat **null** `run`-Blätter, über alle Umhänge hinweg |
+| Haar | unser `h_*` stammt aus `hair/flat_top_fade/male/`, das kein `run` führt. Der Ordner `adult/` daneben hat eines — aber es ist **anderes Bild** (byte-verschieden in jeder Bewegung), also kein Ersatz |
+| **Waffen** | **keine einzige Waffe im ganzen Satz** hat ein `run`-Blatt, null von allen |
+
+Das ist kein Loch im Download, sondern der LPC-Standard: getragene Platten, Umhänge und
+Waffen werden nur zu `walk` und den Angriffen geführt. Draco kann mit Doppelaxt stehen und
+gehen, nicht rennen. Wer das ändern will, muss zeichnen — oder im Sprint `walk` fahren.
 
 ## Umfärben
 
