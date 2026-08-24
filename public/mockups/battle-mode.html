@@ -2868,13 +2868,40 @@
     a[ATTR_HEBUNG.attribut]=Math.min(100,(a[ATTR_HEBUNG.attribut]||0)+ATTR_HEBUNG.plus);
     return a;
   };
+
+  // DIE EIGNUNG MUSS MITGEHEN — sonst misst die Abnahme das Gegenteil von dem, was sie soll.
+  //
+  // Das war ein Fehler in MEINEM Massstab, und er hat die Arena-Zahlen erklaert. Im Spiel
+  // ist die Eignung eine Funktion der Attribute: calculateRawDisciplineScore in
+  // lib/player-formulas/discipline-rating-engine.ts summiert Attribut x Gewicht ueber die
+  // Matrix. Wer Power gewinnt, gewinnt im TDM Eignung — das IST der Kanal, den die Matrix
+  // beschreibt.
+  //
+  // Meine Messung hob das Attribut, liess die Eignung aber stehen. Und weil aufEignung()
+  // die drei Kampfwerte auf genau diese Eignung normiert, war das Ergebnis vorbestimmt:
+  // ein gehobenes Kampfattribut aendert nur noch die FORM (LP gegen ANG gegen VER), nie
+  // die MENGE. Nur TMP und AUS liegen ausserhalb der Normierung — also las die Messung
+  // ausgerechnet die Bewegung als das, was alles entscheidet. Im Fechten kam Speed damit
+  // auf 94,5 %, im TDM Speed und Dexterity zusammen auf 67 %, waehrend Power bei
+  // Matrixgewicht 28 auf 5,5 % lag.
+  //
+  // Der Kanal war nicht kaputt — ich hatte ihn zugehalten und mich dann ueber die Stille
+  // gewundert. Jetzt hebt die Anhebung die Eignung mit, und zwar genau um das, was die
+  // Matrix dafuer vorsieht.
+  const eigHebung=(p,d)=>{
+    if(!ATTR_HEBUNG||ATTR_HEBUNG.wer!==p.n)return 0;
+    const w=(BASIS_JE_DISC[d]||{})[ATTR_HEBUNG.attribut]||0;
+    if(!w)return 0;
+    const alt=p.a[ATTR_HEBUNG.attribut]||0;
+    return (Math.min(100,alt+ATTR_HEBUNG.plus)-alt)*w/100;
+  };
   function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
     const d=dId||"tdm";
     const bh=behav(p.n);
     const tr=traitTreffer(p);
     const engPunkte=(slId?slotAufschlag(p,slId,d):0)+tr.netto;   // haengt an der Position
     const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
-    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte;
+    const eigWert=(p.d[d]||0)+engPunkte+breitPunkte+eigHebung(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
     let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
@@ -4728,7 +4755,18 @@
       const P=BA().plaene, JS=BA().planJeSlot;
       const planId=(sl&&JS[sl])||Object.keys(P)[1]||Object.keys(P)[0];
       const L={id:id++,n:p.n,seite,bahn,...w,
-        eig:(p.d[d]||0)+engP+breitP,
+        // ZWEI KOPPLUNGEN, BEIDE VERTRETBAR — aber sie sind verschieden, und das sollte
+        // niemand fuer ein Versehen halten. In der Arena setzt aufEignung() die MENGE der
+        // Kampfwerte auf die Eignung; die Rezepte geben nur die Form. Auf der Bahn geben
+        // die Rezepte Form UND Menge, und die Eignung steht hier nur zur Anzeige.
+        //
+        // Das ist kein Fehler: die Eignung ist selbst eine gewichtete Summe derselben
+        // Attribute. Wer sie auf der Bahn zusaetzlich anlegte, zaehlte sie doppelt.
+        // Die Folge ist trotzdem eine Frage an Chris: auf der Bahn entscheidet damit
+        // NICHT der Disziplinrang, sondern nur die Attribute, aus denen er entsteht. Zwei
+        // Laeufer mit gleichen Attributen laufen gleich schnell, auch wenn der eine im
+        // Spurt auf Rang 6 und der andere auf Rang 20 steht.
+        eig:(p.d[d]||0)+engP+breitP+eigHebung(p,d),
         pos:0, v:0, stolper:0, huerde:0, kraft:0, tackleCd:0, ziel:null,
         plan:planId, ...P[planId],
         // Bahn als Kommazahl: der Wechsel laeuft ueber mehrere Zehntel, statt zu springen.
