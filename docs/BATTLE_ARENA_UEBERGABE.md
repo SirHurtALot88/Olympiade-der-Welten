@@ -485,8 +485,10 @@ Kette, als das Spiel sie rechnet. Speed las sich dadurch als 24,9 % statt 19,1 %
 
 | Disziplin | Abweichung | Bemerkung |
 |---|---|---|
-| Spurt | **79,5 Pp** (n = 12, 2 s) | Speed sitzt (19,1 vs. 18). Offen: Torment 0 statt 14, Will 32 statt 14, Stamina 21 statt 4 |
-| TDM | **131,7 Pp** (n = 2, 158 s) | siehe unten |
+| Climbing | **28,9 Pp** (n = 12) | Ausdauer 29,2 vs. 26. Offen: Health 5,9 statt 10, Dexterity 8,7 statt 12 |
+| Time-Trial | **30,1 Pp** (n = 12) | Speed 21 vs. 22, Intelligence 18,2 vs. 18. Offen: Torment 9,7 statt 3 |
+| Spurt | **40,9 Pp** (n = 12) | war 79,5 vor der Nachziehung. Offen: Will 29,1 statt 14, Torment 3,9 statt 14 |
+| TDM | **133,9 Pp** (n = 6, 554 s) | siehe unten |
 
 ### Ein Befund, der eine Entscheidung braucht
 
@@ -500,8 +502,63 @@ schlägt länger zu. Nur sagt die Disziplingewichtung, dass Tempo im TDM nichts 
 
 Das ist **kein Bug, den man still wegpatcht** — es ist eine Balancing-Entscheidung:
 soll die Bewegung im Teamfight überhaupt an Speed hängen, wenn die Wertung Speed dort mit
-null bepreist? Bitte an Chris. (Die Zahl ist bei n = 2 grob; vor einer Entscheidung mit
-n ≥ 6 nachmessen, das dauert dann rund acht Minuten.)
+null bepreist? Bitte an Chris.
+
+Nachgemessen mit n = 6 (554 s): **133,9 Pp**, Speed 43,6 %, Dexterity 23,4 %, Power 5,5 %
+gegen ein Matrixgewicht von 28. Der Befund aus dem groben Lauf hält also.
+
+---
+
+## Das Bahn-Chassis: Spurt, Time-Trial, Climbing
+
+Fünf der zwanzig Disziplinen sind im Kern dieselbe Sache — von einem Start zu einem Ziel
+kommen, unterwegs stehen Hindernisse im Weg, und die Kraft reicht nicht für alles. Sie
+fünfmal zu programmieren hieße, denselben Fehler fünfmal einbauen zu können. Also einmal
+Motor, fünfmal Konfiguration: `BAHN_ART` im Entwurf.
+
+Die **sieben Rollen** sind überall dieselben, nur ihr Name und ihre Zutaten wechseln:
+
+| Rolle | Spurt | Time-Trial | Climbing |
+|---|---|---|---|
+| ANTRITT | Antritt | Antritt | Zug |
+| ENDTEMPO | Endtempo | Renntempo | Ausdauertempo |
+| TECHNIK | Technik | **Linie** | **Griff** |
+| WENDIGKEIT | Wendigkeit | Umsetzen | Umsetzen |
+| STEHEN | Stehvermögen | Durchhalten | Kraftausdauer |
+| WUCHT | Wucht | **Risiko** | **Kraftzug** |
+| ROBUST | Robustheit | Fahrsicherheit | Zähigkeit |
+
+Was je Disziplin schaltbar ist: Windschatten, Tackling, Zahl und Art der Hindernisse, wie
+schwer sie zu nehmen sind, was ein Fehler kostet, der Kraftvorrat, die Steigung, Boden und
+Bäume. Eine sechste Bahn braucht einen Eintrag in `BAHN_ART` — sonst nichts: die Motoren
+melden sich selbst bei der Messung an, und die Aufstellung baut sich aus den erzeugten
+Slots.
+
+**Ersatzaufstellung.** Für Spurt stellt Chris von Hand auf; für eine neue Bahn gibt es noch
+keine Aufstellung, und ohne Läufer lässt sich nichts messen. Wer nicht gesetzt ist, wird
+nach Eignung gesetzt. Sobald jemand von Hand aufstellt, gilt seine Aufstellung.
+
+### Was die Messung dabei gelehrt hat
+
+Drei Fehler, jeder zuerst als Vermutung gehabt und dann von der Messung widerlegt oder
+bestätigt:
+
+1. **Ein zu weit gespreiztes Feld macht jede Feinheit unsichtbar.** Time-Trial lief 8,3 s
+   gegen 22,2 s. Bei so einer Spreizung dreht keine verpasste Kurve mehr einen Platz —
+   Intelligence las **0,0 %** bei einem Matrixgewicht von 18. Nach dem Verdichten
+   (Grundtempo hoch, Spanne runter): 18,2 %.
+2. **Ein Hindernis, das zu 80 % gelingt, bezahlt sein Attribut nicht.** Deshalb sind
+   Kurve und Griff schwerer als die Hürde.
+3. **Wendigkeit war totes Gewicht, wo es keine Spur zu wechseln gibt.** Ohne Windschatten
+   und ohne Gegner in Reichweite wechselt im Zeitfahren und an der Wand niemand die Bahn —
+   Awareness las exakt 0 %. Jetzt verkürzt Wendigkeit dort die Erholung nach einem Fehler:
+   die Linie wiederfinden, den Griff neu setzen.
+
+Und ein Fehlschlag, der nicht behoben wurde, sondern zurückgenommen: der Versuch, Spurts
+Will-Anteil (29 % gegen Matrix 14) durch weniger Will in den Rezepten zu senken, machte es
+**schlechter** (40,9 → 64,1 Pp) — Determination rückte einfach nach. Die Dominanz sitzt
+nicht in der Zusammensetzung von STEHEN, sondern darin, dass der Einbruch am Ende das
+Rennen entscheidet. Wer das senken will, muss dort ansetzen, nicht an den Zutaten.
 
 ---
 

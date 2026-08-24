@@ -22,7 +22,10 @@ import { chromium } from "playwright";
 
 const disziplin = process.argv[2] || "spurt";
 const laeufe = Number(process.argv[3] || 12);
-const datei = "file:///home/user/Olympiade-der-Welten/public/mockups/battle-mode.html";
+// Dritter Aufrufwert: ein anderer Entwurf. Nuetzlich, um eine lange TDM-Messung gegen
+// eine eingefrorene Kopie laufen zu lassen, waehrend am Original weitergearbeitet wird.
+const pfad = process.argv[4] || "/home/user/Olympiade-der-Welten/public/mockups/battle-mode.html";
+const datei = "file://" + pfad;
 
 const browser = await chromium.launch({
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
