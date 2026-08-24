@@ -504,9 +504,9 @@
         <div class="wertung">
           <div class="wtitel">Wertung <em>laufend</em></div>
           <div class="tbl-wrap"><table class="wtbl"><thead><tr>
-            <th>Kämpfer</th><th class="n">Schaden</th><th class="n">Heilung</th><th class="n">Verhindert</th><th class="n">Getankt</th><th class="n">KO</th><th class="n">Leistung</th>
+            <th id="wthN">Kämpfer</th><th class="n" id="wth0">Schaden</th><th class="n" id="wth1">Heilung</th><th class="n" id="wth2">Verhindert</th><th class="n" id="wth3">Getankt</th><th class="n" id="wth4">KO</th><th class="n" id="wth5">Leistung</th>
           </tr></thead><tbody id="wbody"></tbody></table></div>
-          <div class="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
+          <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
         </div>
       </div>
     </div>
@@ -1015,7 +1015,13 @@
     // Bild: schwere Schuppenpanzerung, GEHOERNTER Helm, Streitaxt und Schild, Drache im
     // Hintergrund. Hoerner dazu; eine Axt haben wir als Ebene nicht, das Schwert vertritt sie.
     "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"schwert"},
-    "Lava Golem":         {kopf:"orc",  haut:"black",ruest:"plate",hoerner:true,waffe:"schwert"},
+    // Bild: gehoernter, unbewaffneter Feuer-/Lavakoloss mit geborstener Magmahaut, kaempft
+    // mit blossen Faeusten. Vorher lief er als ork-koepfiger Schwertkaempfer in Platte —
+    // beides falsch (Chris' Fund). Kein Kopf im Baukasten heisst "Lava"; frankenstein
+    // (zusammengesetzter Koerper) kommt dem Koloss-Bild am naechsten, wie schon in der
+    // Kader-Ansicht (const oben) gewaehlt — hier derselbe Hautton, damit beide Ansichten
+    // zueinander passen.
+    "Lava Golem":         {kopf:"frankenstein",haut:"olive",hoerner:true},
     "Krolach":            {kopf:"orc",  haut:"fur_grey",ruest:"plate",helm:true,waffe:"schwert"},
     "Johanna":            {kopf:"human",haut:"light",ruest:"plate",helm:true,waffe:"schwert"},
     // Koenig mit Charisma 95, Unterklasse Royalty — als grauer Fussknecht war er falsch
@@ -1026,10 +1032,20 @@
     // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
     // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
     "Rhyx'Tal":           {kopf:"lizard",haut:"black",ruest:"plate"},
-    "Xelara":             {kopf:"alien",haut:"blue",ruest:"leder",kapuze:true},
+    // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
+    // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
+    "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder"},
     "Jorund":             {kopf:"human",haut:"olive",ruest:"leder",kapuze:true},
-    "Inefinna":           {kopf:"human",haut:"light",ruest:"leder",kapuze:true},
-    "Lulu":               {kopf:"human",haut:"light",ruest:"leder",ohren:true,kapuze:true},
+    // Bild: Priesterin mit Strahlenkranz, betend, KEINE Kapuze — der Heiligenschein braucht
+    // den freien Kopf. "leder" bleibt als naechstliegender Ersatz fuer die golddurchwirkte
+    // Robe stehen (eine echte Robe gibt es im Baukasten nicht). Das Schwert im Bild ist eine
+    // Reliquie, keine gefuehrte Waffe (Chris' Fund korrigiert die Kapuze; unbewaffnet blieb
+    // schon vorher richtig).
+    "Inefinna":           {kopf:"human",haut:"light",ruest:"leder"},
+    // Bild: unbewaffnete Waldnymphe, leichte Wickelkleidung, keine Kapuze — sitzt barfuss im
+    // Wald. Kapuze war falsch (Chris' Fund); "leder" bleibt als naechstliegender Ersatz fuer
+    // die leichte Kleidung stehen.
+    "Lulu":               {kopf:"human",haut:"light",ohren:true,ruest:"leder"},
     // Armageddon Aftermath.
     "Greenkraut":         {kopf:"orc",  haut:"green",ruest:"leder",kapuze:true},
     // Bild: Koloss aus Kristallschollen mit violetter Energie, UNBEWAFFNET. Kein Ork, kein
@@ -1059,12 +1075,17 @@
     return u.side===0?3:1;
   }
 
-  function zeichneSprite(ctx,u,x,y){
+  function zeichneSprite(ctx,u,x,y,feldspiel){
     const b=BAU[u.n]||BAU_STD;
-    const bogen=b.waffe==="bogen";
+    // Feldspiel-Disziplinen kennen keine Waffen — ein Korbleger ist kein Schwerthieb und
+    // kein Bogenschuss. Ausfallschritt bekommt hier IMMER die "shoot"-Pose (die einzige
+    // Ueberkopf-Bewegung, die der Baukasten kennt), aber ohne Waffen-Overlay (s. unten) —
+    // naeher an einem Wurf als "slash", auch wenn sie urspruenglich fuer den Bogen
+    // gezeichnet wurde. Chris' Wunsch: keine Waffenanimation im Feldspiel.
+    const bogen=!feldspiel&&b.waffe==="bogen";
     let ani="walk";
     if(u.down)ani="hurt";
-    else if(u.lunge>0)ani=bogen?"shoot":"slash";
+    else if(u.lunge>0)ani=feldspiel?"shoot":(bogen?"shoot":"slash");
     else if(Math.abs(u.vx||0)+Math.abs(u.vy||0)<3)ani="walk";
     const n=ANIBILDER[ani];
     // Der Angriff laeuft EINMAL durch, solange der Ausfallschritt dauert; sonst laeuft der
@@ -1085,7 +1106,7 @@
     // Dasselbe, nur ueber die Ruestungsrampe statt der Hautrampe.
     const zeichneR=(key,ton)=>male(spriteRuest(key,ton),64,0,0);
     if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
-    if(b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
+    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
     zeichne("body_"+ani,64,0,0,b.haut);
     zeichne("k"+b.kopf+"_"+ani,64,0,0,b.haut);
     if(b.ohren)zeichne("ohren_"+ani,64,0,0,b.haut);
@@ -1095,7 +1116,7 @@
     if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
     if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
     if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
-    if(b.waffe==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
+    if(!feldspiel&&b.waffe==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
   }
 
   // SKILLS — Struktur aus Eslabong uebernommen, Zahlen bleiben unsere.
@@ -2513,7 +2534,7 @@
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
         wobbleY:0,frischerPassVon:null});
     }
-    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}};
+    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}, reboundKampf:null};
     ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
   }
 
@@ -2649,10 +2670,38 @@
     };
   }
 
+  // Kuerzester Abstand eines Punkts zur STRECKE a-b (nicht zur unendlichen Geraden) —
+  // gebraucht, um zu pruefen, wie nah ein Verteidiger an einer Passlinie steht.
+  function distZuLinie(p,a,b){
+    const dx=b.x-a.x, dy=b.y-a.y, len2=dx*dx+dy*dy;
+    if(len2<1) return dist(p,a);
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/len2;
+    t=Math.max(0,Math.min(1,t));
+    return Math.hypot(p.x-(a.x+dx*t), p.y-(a.y+dy*t));
+  }
+  const PASSLINIE_RADIUS=55; // PLATZHALTER: wie nah ein Verteidiger an der Passlinie stehen muss
+
   function passeAb(von,nach){
     von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
+    // PASS-INTERCEPTION: ohne diesen Zweig konnte Verteidigung ausschliesslich stehlen,
+    // wenn sie direkt am Ballfuehrer klebte (versucheSteal) — ein abgespielter Pass war
+    // IMMER sicher, egal wie nah ein Verteidiger an der Flugbahn stand. Chris wollte
+    // Verteidigung sehen, "die Bälle abfängt" — das ist bisher nirgends moeglich gewesen.
+    // Gewuerfelt beim Abwurf, enthuellt bei Ankunft (dasselbe Muster wie `treffer` in
+    // wirf) — bleibt damit deterministisch reproduzierbar.
+    let abgefangenVon=null, minD=Infinity, waechter=null;
+    for(const v of FSTEAM[1-von.side]){
+      const d=distZuLinie(v,von,nach);
+      if(d<minD){minD=d;waechter=v;}
+    }
+    if(waechter&&minD<PASSLINIE_RADIUS){
+      const chance=Math.min(0.32,Math.max(0.03,
+        0.04+(waechter.ABWEHR-50)*0.0025+(PASSLINIE_RADIUS-minD)/PASSLINIE_RADIUS*0.12)); // PLATZHALTER
+      if(rr()<chance)abgefangenVon=waechter;
+    }
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
-      treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null};
+      treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
+      abgefangenVon};
   }
 
   // Steal-Versuch des Deckers — unabhaengig von der Ballfuehrer-Entscheidung, der
@@ -2677,6 +2726,15 @@
 
   function loeseFlugAuf(flug,art){
     if(flug.art==="pass"){
+      if(flug.abgefangenVon){
+        const f=flug.abgefangenVon;
+        f.steals++; flug.passgeber.verluste++; f.lunge=0.4;
+        feed(f.side,f.n+" fängt den Pass ab — Steal.");
+        logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
+        fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
+        fsLive.angriffSeit=0; ballUebernehmen(f);
+        return;
+      }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // Merkt sich den Passgeber fuer GENAU die naechste Ballaktions-Entscheidung des
@@ -2806,15 +2864,33 @@
       const f=fsLive.ball.frei;
       fsBall={sichtbar:true,x:f.x,y:f.y};
       const nah=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
-      if(nah.length){
-        const gewinner=gewichtetesLos(nah,"ZWEITCHANCE");
-        gewinner.rebounds++;
-        const eigen=gewinner.side===f.vonSeite;
-        feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
-        logZug(gewinner.side,"rebound",{spieler:gewinner});
-        fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
-        if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
-        else naechsterAngriff(gewinner.side);
+      // REBOUND-KAMPF: bei echtem Gedraenge (>=2 Spieler zugleich in Reichweite) wird
+      // nicht sofort aufgeloest — erst nach einer kurzen Ringphase, in der noch weitere
+      // Spieler heranlaufen koennen (bewegeSpielerLive schickt ohnehin jeden Spieler in
+      // LAUF_ZUM_BALL_RADIUS auf den freien Ball zu). Vorher war der ERSTE Kontakt sofort
+      // der Gewinner — das wirkte wie ein Teleport statt wie ein Gerangel um den Ball
+      // (Chris' Fund). Bei nur einem Spieler in Reichweite bleibt es beim sofortigen
+      // Greifen — da gibt es niemanden, mit dem er sich prügeln könnte.
+      if(nah.length&&!fsLive.reboundKampf){
+        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.08}; // PLATZHALTER
+        if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
+      }
+      if(fsLive.reboundKampf){
+        fsLive.reboundKampf.t+=dt;
+        if(!nah.length){ fsLive.reboundKampf=null; } // Ball wieder ausser jeder Reichweite gerollt
+        else if(fsLive.reboundKampf.t>=fsLive.reboundKampf.dauer){
+          const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
+          const kandidaten=jetzt.length?jetzt:nah;
+          const gewinner=gewichtetesLos(kandidaten,"ZWEITCHANCE");
+          gewinner.rebounds++;
+          const eigen=gewinner.side===f.vonSeite;
+          feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
+          logZug(gewinner.side,"rebound",{spieler:gewinner});
+          fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
+          fsLive.reboundKampf=null;
+          if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
+          else naechsterAngriff(gewinner.side);
+        }
       }
     } else {
       const traeger=fsLive.ball.traeger;
@@ -2970,6 +3046,8 @@
     const maxPkt=Math.max(1,fsPunkte[0],fsPunkte[1]);
     document.getElementById("thpL").style.width=(fsPunkte[0]/maxPkt*100)+"%";
     document.getElementById("thpR").style.width=(fsPunkte[1]/maxPkt*100)+"%";
+    setWertungKopf(true);
+    renderWertungFeldspiel();
     renderKader();
   }
 
@@ -3064,7 +3142,7 @@
           ctx.strokeStyle=c;ctx.globalAlpha=0.55;ctx.lineWidth=2;
           ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
         }
-        zeichneSprite(ctx,u,x,y);
+        zeichneSprite(ctx,u,x,y,true);
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
           ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
@@ -5672,6 +5750,46 @@
     }
   }
 
+  // WERTUNG FUERS FELDSPIEL. Dieselbe Tabelle wie im Kampf, aber die dortigen Kampf-
+  // Spalten (Schaden/Heilung/Verhindert/Getankt/KO/Leistung) sagen im Feldspiel nichts
+  // aus — deshalb standen sie dort bisher immer auf "–", Chris' Fund. Die Felder
+  // punkte/rebounds/assists/steals/bloecke/verluste sitzen bereits an jeder Feldspiel-
+  // Einheit (bauSpieler) und werden von der Basketball-Live-Engine schon befuellt
+  // (wirf/versucheSteal/loeseFlugAuf) — es fehlte nur die Anzeige. Header-Beschriftung
+  // wird in setWertungKopf() passend zur Disziplin umgeschaltet.
+  const WERTUNG_KOPF={
+    kampf:["Schaden","Heilung","Verhindert","Getankt","KO","Leistung"],
+    feldspiel:["Punkte","Rebounds","Assists","Steals","Blocks","Verluste"]};
+  function setWertungKopf(feldspiel){
+    const kopf=feldspiel?WERTUNG_KOPF.feldspiel:WERTUNG_KOPF.kampf;
+    for(let i=0;i<kopf.length;i++){
+      const th=document.getElementById("wth"+i); if(th)th.textContent=kopf[i];
+    }
+    const fuss=document.getElementById("wfuss");
+    if(fuss)fuss.textContent=feldspiel
+      ? "„Verluste\" sind Ballverluste — abgefangene Pässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf."
+      : "„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.";
+  }
+  function renderWertungFeldspiel(){
+    const tb=document.getElementById("wbody");if(!tb)return;
+    const alle=[...FSTEAM[0],...FSTEAM[1]];
+    const reihen=[...alle].sort((a,b)=>b.punkte-a.punkte||b.assists-a.assists);
+    const maxP=Math.max(1,...alle.map(u=>u.punkte));
+    tb.textContent="";
+    for(const u of reihen){
+      const tr=el("tr",u.side===0?"eigen":"gegner");
+      tr.appendChild(el("td",null,u.n.length>15?u.n.slice(0,14)+"…":u.n));
+      const c=(v,mx)=>{const td=el("td","n"+(v>=mx&&v>0?" top":""));td.textContent=v?String(v):"—";return td;};
+      tr.appendChild(c(u.punkte,maxP));
+      tr.appendChild(c(u.rebounds,99));
+      tr.appendChild(c(u.assists,99));
+      tr.appendChild(c(u.steals,99));
+      tr.appendChild(c(u.bloecke,99));
+      tr.appendChild(c(u.verluste,99));
+      tb.appendChild(tr);
+    }
+  }
+
   // ANZEIGE FUER DIE BAHN. Die TDM-Anzeige rechnet mit Leben und ausgeschalteten Gegnern —
   // beides gibt es im Rennen nicht. Vorher lief sie deshalb gar nicht, und ueber dem
   // Rennen stand dauerhaft "0 : 0" und "0:00". Hier stehen die Groessen, die ein Rennen
@@ -5712,6 +5830,7 @@
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
+    setWertungKopf(false);
     renderWertung();
     renderKader();
   }
