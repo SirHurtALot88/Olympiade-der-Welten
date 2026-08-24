@@ -381,6 +381,141 @@ erkämpfen").
 
 ---
 
+## Feldspiel: Spielzüge, Assets, Sound, Zuschauer-Spannung
+
+Chris, nach #660 (Basketball bekam Bewegung, Ball, Pässe, Assists): er will **echte,
+wiedererkennbare Spielzüge** sehen — sein Vorbild ein Alley-Oop im Basketball — und ein
+Äquivalent für **American Football** (ausdrücklich nicht Fußball). Dazu passende Assets,
+Sound mit steigerbarem Publikumsjubel, und die Frage, was dem Feldspiel-Motor sonst noch
+fehlt. Auf seinen Wunsch einmal groß mit Fable durchdacht, damit das für mehrere
+Disziplinen trägt statt bei jeder neuen wieder bei null anzufangen. Fables Befund unten
+ist an der echten Datei auf diesem Branch gegengeprüft (Zeilennummern stimmen); was
+danach in **implementiert** steht, ist echter, getesteter Code, kein Vorschlag mehr.
+
+### Spielzüge — implementiert
+
+Ein Spielzug ist **kein neuer Ereignistyp**, sondern eine Veredelung des bestehenden
+Pass-Zweigs in `bauFeldspiel` (`public/mockups/battle-mode.html`, Pass-Entscheidung ab
+Zeile ~2374): bevor der normale Passempfänger nach ABSCHLUSS gelost wird, prüft die
+Simulation der Reihe nach jeden in `FELDSPIEL_ART[disc].spielzuege` deklarierten Zug. Der
+erste, der auslöst, gewinnt; sein Finisher wird über eine zugeigene Rolle gelost (z. B.
+ZWEITCHANCE beim Alley-Oop statt ABSCHLUSS beim Normalpass), seine Erfolgschance ersetzt
+die normale Technik-Formel, und `eintrag.zug` trägt den Namen bis in Feed, Jubel-Text und
+Choreografie — auch bei Fehlschlag, ein verpatzter Alley-Oop bleibt sichtbar ein
+Alley-Oop-Versuch.
+
+**Basketball: Alley-Oop.** Finisher gelost über ZWEITCHANCE (der Sprung-zum-Ball-Wert,
+schon vorhanden). Auslösechance steigt mit `passgeber.TECHNIK` und `finisher.ZWEITCHANCE`
+(2–22 %, PLATZHALTER), Erfolgschance mit `finisher.ABSCHLUSS` und `passgeber.TECHNIK`
+(Basis 10 % statt 16 % beim Normalpass — riskanter, aber bei starkem Duo lohnender).
+
+**American Football: zwei Züge, meine Auswahl** (Chris hat keinen benannt) — *Screen
+Pass* (kurzer Pass, Finisher über ABSCHLUSS/power-torment-health, schlängelt sich durch)
+und *Deep Ball* (langer hoher Ball, Finisher über ZWEITCHANCE gewinnt den Zweikampf um
+den hohen Ball — riskanteste Variante, größter Jubel). Beide nur im Nah-Zweig (Touchdown,
+6 Punkte) — `fern` bedeutet bei Football schon Field Goal, ein Spielzug dort wäre
+semantisch etwas anderes.
+
+**Choreografie: drei wiederverwendbare Primitive** statt Sonderfälle je Zug/Disziplin
+(`fsLerpPositionen`, ~Zeile 2497 ff.):
+
+1. `hochpass` (Alley-Oop) — der Ball fliegt in einem hohen Bogen (90 px, PLATZHALTER)
+   direkt zum Korb statt erst zum Mitspieler; der Finisher hebt im letzten Phasendrittel
+   sichtbar ab (`sin`-Hop, 28 px) und trifft den Ball dort, statt ihn je zu kontrollieren.
+2. `flachpass-lauf` (Screen Pass) — kurzer, flacher Pass früh in der Phase, danach
+   „trägt" der Läufer den Ball mit einer seitlichen Schlängel-Auslenkung (16 px) weiter.
+3. `weitpass-lauf` (Deep Ball) — derselbe lineare Grundpfad wie ein Normalpass, nur ein
+   deutlich höherer Bogen (75 px statt 36 px beim normalen Treffer).
+
+Jede künftige Disziplin (Hockey, Tennis, oder ein fünfter Feldspiel-Fall) mappt ihre
+eigenen benannten Züge auf diese drei Primitive, statt eine vierte zu erfinden — das ist
+der eigentlich wiederverwendbare Teil.
+
+**Zuschauer-Hype:** ein gelungener Spielzug bekommt einen größeren, länger stehenden
+Jubel-Text (goldfarben statt grün, 22 px statt 15 px, 1,7 s statt 1 s Lebensdauer) statt
+des normalen „+N" — das „noch mehr Jubel bei was Besonderem", das Chris wollte. Echter
+Sound (siehe unten) ist davon unabhängig und noch nicht gebaut.
+
+**American Football bekommt ein eigenes Feld** (`bodenFeldspiel`, football-Zweig):
+Endzonen, Yard-Linien alle 10 %, betonte Mittellinie — bislang teilte sich Football den
+neutralen Fußballfeld-Look mit Hockey/Tennis. Hockey/Tennis behalten den vorerst, eigene
+Markierungen für die sind ein eigener Auftrag.
+
+**Explizit nicht gemacht, auf Chris' eigenen Hinweis:** keine neuen Spielerfiguren für
+American Football. Er hat das mitten in der Arbeit selbst klargestellt — die
+bestehenden Sprites bleiben, nur Ball/Feld ändern sich. Deckt sich mit Fables eigener
+Empfehlung unten (B), die BananaCat-Spielerfiguren aus Stilgründen ohnehin nicht
+einzusetzen.
+
+**Empirisch geprüft** (`node scripts/messe-arena-einfluss.mjs <disc> 48`, dieselbe
+Abnahmemessung wie immer): Basketball verbessert sich von 32 auf **27 Pp** Abweichung —
+die Spielzug-Formeln lesen zusätzlich TECHNIK und ZWEITCHANCE ein, ohne neue tote Werte.
+Football verschlechtert sich dagegen von 39 auf **48,4 Pp** — vor allem Power liest jetzt
+deutlich stärker (13,8 % statt 8,1 %, bei Matrixgewicht 6), weil beide neuen Züge stark
+auf ABSCHLUSS/ZWEITCHANCE setzen, die schon Power tragen. Football stand schon vor dieser
+Änderung bei 39 Pp (kein Fund dieser Änderung, aus #656) — festgehalten, nicht
+verschwiegen, aber hier nicht mitgelöst, genau wie die Dexterity-Lücke bei Basketball in
+#660.
+
+### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
+
+Auf OpenGameArt gibt es **keine** fertigen 2D-Top-Down-Court/Field-Tilesets im passenden
+Stil für Basketball, American Football oder Eishockey — vielfach nachgesucht, nichts
+Brauchbares. Empfehlung, der hier gefolgt wird: **bei selbst gezeichneten Canvas-Feldern
+bleiben** (wie Basketball in #660, jetzt auch Football) statt ein fremdes Tileset zu
+verbiegen — die Felder müssen ohnehin exakt zu den Korb-/Zonen-Positionen der Simulation
+passen. Gefundene Icon-Assets (CC0-Basketbälle, ein CC-BY-3.0-American-Football-Sprite-
+Set von BananaCat mit Football-/Torstangen-Icon) sind für eine spätere Runde brauchbar,
+aber noch **nicht eingebaut** — das bräuchte eine Lizenzdatei
+(`public/mockups/assets/LIZENZEN.md`, analog zur bestehenden Asset-Handhabung) und ist in
+dieser Änderung nicht enthalten. Eine zweite Suchrunde für Court-Tilesets lohnt laut
+Fable kaum; für die fehlenden SFX (siehe unten) sei freesound.org ergiebiger als
+OpenGameArt — auch das noch nicht verfolgt.
+
+### Sound — Konzept, nicht implementiert
+
+Es gibt **keine** Audio-Infrastruktur im Mockup (kein `new Audio`, keine Sounddatei im
+Repo) — kompletter Neubau, hier bewusst nicht angefangen, weil er eine eigene, größere
+Änderung wäre. Fables Vorschlag als Grundlage für später:
+
+| Kategorie | Ereignis | Quelle (gefunden, nicht geprüft/eingebaut) |
+|---|---|---|
+| Grundrauschen (Loop) | während des Spiels | Crowd-Cheering-Paket, Ambient-Track |
+| Jubel klein | `treffer` normal | Crowd-Cheering, „Soft"-Track |
+| Jubel mittel | `treffer` mit `fern` | Crowd-Cheering, kurzer „Strong"-Track |
+| Jubel groß | `treffer` mit `zug` gesetzt; Sieg | Crowd-Cheering, langer „Strong+rhythmic"-Track |
+| Anerkennung | `rebound`, `block` | Applause (CC-BY 3.0) |
+| Pfiff | Spielbeginn/-ende | Whistle (Kim Lightyear, CC-BY 3.0) |
+
+Anbindung technisch gedacht (nicht gebaut): ein `AudioContext`, entsperrt beim ersten
+Klick, Trigger direkt in `stepFeldspiel` an der Stelle, an der `feed(...)` schon läuft —
+der Ereignistyp (inkl. `e.zug`) ist dort bereits vollständig bekannt, exakt der Haken, an
+dem auch der `_gross`-Jubel-Text oben hängt. Schuhquietschen und Ballaufprall wurden
+gesucht und **nicht gefunden** — echte Lücke, offen für eine freesound-Runde.
+
+### Was dem Feldspiel-Motor noch fehlt — Priorität (Fable, unverändert übernommen)
+
+1. **Trainer-Anweisung/taktische Pläne.** Bestätigte Lücke: `plaene`/`planJeSlot`
+   existieren nur in `BAHN_ART` (`grep -n "plaene:{" battle-mode.html` — alle Treffer
+   zwischen Zeile 5518 und 5719, keiner in `FELDSPIEL_ART`/`BUEHNE_ART`). Sinnvollster
+   nächster Schritt, aber **teamweit statt je Slot** (Feldspiel-Züge sind Teamzüge) — z. B.
+   „Tempo-Spiel" (fernAnteil ↑, Passchance ↓), „Kontrolliert" (Passchance ↑,
+   Spielzug-Neigung ↓), „Spektakel" (Spielzug-Neigung ×2, Abschluss-Basis ↓). Noch nicht
+   gebaut.
+2. **Schlussphasen-Dramaturgie.** Bei knappem Stand die Enthüllung der letzten Züge
+   verlangsamen, Feed markieren, Jubel-Kategorie anheben — reine Enthüllungs-Regie über
+   die längst vorberechneten `fsZuege`, kein Simulationseingriff.
+3. **Momentum sichtbar machen.** Serien erkennen (Steal→Fast-Break-Ketten, mehrere
+   Treffer in Folge) und im Feed/Crowd-Pegel spiegeln.
+4. **Endstands-Rückblick.** Die Zähler (`punkte, rebounds, steals, bloecke, assists,
+   verluste`) existieren pro Spieler bereits vollständig — eine Bestenkarte nach `done`
+   ist billig und belohnt genau das, was der Spieler bei der Aufstellung eingestellt hat.
+5. **Bühne nachziehen.** Dieselbe Plan-Struktur aus Punkt 1 passt später auf
+   `BUEHNE_ART` als Risiko-Regler — nicht jetzt bauen, aber die Feldspiel-Pläne so
+   entwerfen, dass die Struktur dort wiederverwendbar bleibt.
+
+---
+
 ## Was hier erfunden ist (Kennzeichnungspflicht)
 
 | Wert | Zahl |
@@ -396,6 +531,13 @@ erkämpfen").
 | Kollisionsfenster (Bahn) | `|Δpos| < 0.01` |
 | Verletzungsrisiko-Kurve (Kampf: ANG−VER, Bahn: WUCHT−ROBUST) | `clamp((Gap−20)×0,4%, 0, 8%)` |
 | Stat-Malus nach Verletzung (Bewegungs-Disziplinen) | 50 % auf TEMPO/ANTRITT/ENDTEMPO, Rest des Laufs |
+| Spielzug-Neigung (Alley-Oop) | `clamp(0,06+(TECHNIK_pg−50)·0,0020+(ZWEITCHANCE_bf−50)·0,0020; 0,02; 0,22)` |
+| Spielzug-Erfolg (Alley-Oop) | `min(0,90; 0,10+ABSCHLUSS_bf·0,0045+TECHNIK_pg·0,0025)` |
+| Spielzug-Neigung (Screen Pass) | `clamp(0,05+(AUFBAU_pg−50)·0,0018+(ABSCHLUSS_bf−50)·0,0018; 0,02; 0,20)` |
+| Spielzug-Erfolg (Screen Pass) | `min(0,88; 0,12+ABSCHLUSS_bf·0,0040+AUFBAU_pg·0,0020)` |
+| Spielzug-Neigung (Deep Ball) | `clamp(0,04+(TECHNIK_pg−50)·0,0015+(ZWEITCHANCE_bf−50)·0,0015; 0,02; 0,16)` |
+| Spielzug-Erfolg (Deep Ball) | `min(0,80; 0,07+ZWEITCHANCE_bf·0,0035+TECHNIK_pg·0,0020)` |
+| Choreografie-Amplituden (Alley-Oop-Hop / Screen-Wobble / Deep-Ball-Bogen) | 28 px / 16 px / 75 px |
 
 ## Offen — mit Chris zu klären
 
