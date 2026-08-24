@@ -1,0 +1,64 @@
+{
+  "_hinweis": "Vollkoerper-Sprites fuer die Rasse 'Demon' (1481 Spieler im Live-Save, bislang ohne eigenen Kopf/Koerper — nur der Hoerner-Flag auf orc/human-Koepfen). Beschafft am 24.08. aus '[LPC] Imp 2' (OpenGameArt). KEIN Stilbruch: alle Blaetter liegen exakt im 64px-LPC-Raster (256x256 = 4 Spalten x 4 Reihen zu 64x64, Reihenfolge oben/links/unten/rechts wie der uebrige Baukasten), nur mit 4 statt 9 Gehframes und 4 statt 6 Schlagframes — wie schon bei '[LPC] Monsters' in monster/quellen.json ueblich. 'demon_rot_tod.png' ist wie golem_tod.png einzeilig (7 Frames, keine Richtung).",
+  "_lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 (direkt auf der Quellseite geprueft, Feld 'License(s)'), fuer das private nicht-kommerzielle Spiel unproblematisch.",
+  "_farbvarianten": "Das Originalpaket hat 3 Farbvarianten (rot/gruen/blau) und pro Variante 5 Bewaffnungs-Varianten (vanilla/pitchfork/pitchfork+schild/schwert/schwert+schild) sowie eine Todesanimation je Farbe. Uebernommen sind hier nur 'vanilla' (unbewaffnet) fuer alle drei Farben plus die Todesanimation fuer Rot — genug fuer 'mehr Variation', ohne den Ordner mit allen 45 Kombinationen zu fluten. Bei Bedarf liegt der Rest im selben Zip.",
+  "demon_rot_walk.png": {
+    "original": "LPC Imp 2/red/walk - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256 = 4 Spalten x 4 Reihen zu 64x64, 4 Richtungen (oben/links/unten/rechts), 4 Gehframes je Richtung, unveraendert",
+    "urheber": "Stephen 'Redshrike' Challener (Grafik, kommissioniert), William.Thompsonj (Auftraggeber/Beitrag)",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2",
+    "verwendung": "rote Farbvariante — klassischste 'daemonische' Optik (rote Haut, Hoerner, Fledermausfluegel), passt am direktesten zur Rasse Demon"
+  },
+  "demon_rot_angriff.png": {
+    "original": "LPC Imp 2/red/attack - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256, Aufbau wie demon_rot_walk.png, Krallenangriff (unbewaffnete Variante)",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2"
+  },
+  "demon_rot_tod.png": {
+    "original": "LPC Imp 2/red/imp death.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "448x64 = 7 Spalten x 1 Reihe zu 64x64, Todesanimation, keine Richtung (wie golem_tod.png im monster-Ordner)",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2"
+  },
+  "demon_gruen_walk.png": {
+    "original": "LPC Imp 2/green/walk - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256, Aufbau wie demon_rot_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2",
+    "verwendung": "gruene Farbvariante fuer Diversitaet innerhalb der Rasse"
+  },
+  "demon_gruen_angriff.png": {
+    "original": "LPC Imp 2/green/attack - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256, Aufbau wie demon_rot_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2"
+  },
+  "demon_blau_walk.png": {
+    "original": "LPC Imp 2/blue/walk - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256, Aufbau wie demon_rot_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2",
+    "verwendung": "blaue Farbvariante fuer Diversitaet innerhalb der Rasse"
+  },
+  "demon_blau_angriff.png": {
+    "original": "LPC Imp 2/blue/attack - vanilla.png",
+    "paket": "[LPC] Imp 2",
+    "blatt": "256x256, Aufbau wie demon_rot_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William.Thompsonj",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0",
+    "url": "https://opengameart.org/content/lpc-imp-2"
+  }
+}

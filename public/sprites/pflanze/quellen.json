@@ -1,0 +1,47 @@
+{
+  "_hinweis": "Neuer Ordner, angelegt am 24.08. fuer ein HUMANOIDES Pendant zur 'Plant'-Rasse (147 Spieler). public/sprites/monster/fleischfresser_blume.png (LPC Monsters) deckt die Rasse bereits ab, ist aber eine reine Fressblume ohne Menschenform — Chris hat Spieler mit Pflanzen-Thema, die einen humanoiden Koerper brauchen (Rinde/Blaetter/Ranken auf Menschenform), keinen zweiten Monster-Sprite. Alle Lizenzen hier (CC-BY 3.0) sind fuer das private, nicht kommerzielle Spiel in Ordnung.",
+  "dryade.png": {
+    "original": "elementals3.png, oben-rechte Zelle (Zelle 2 von 4 in einem 2x2-Sheet aus vier verschiedenen Elementarwesen: Skelett-Ritter oben-links, Baum-/Dryaden-Wesen oben-rechts, Daemon unten-links, Windgeist unten-rechts)",
+    "paket": "JS Monster Set - Elementals III",
+    "urheber": "JosephSeraph",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/js-monster-set-elementals-iii",
+    "bearbeitung": "BEARBEITET, nicht unveraendert: aus dem 144x176-Sheet (2 Spalten x 2 Reihen zu 72x88) wurde nur die Baum-/Dryaden-Zelle (rechts oben) freigestellt (Hintergrundfarbe #7F00FF per Farbschluessel transparent gemacht), auf ihre Inhalts-Bounding-Box zugeschnitten (47x64 Pixel) und mittig/bodenbuendig auf eine 64x64-Leinwand montiert — passt dadurch exakt in dasselbe 64x64-Einzelbild-Raster wie meerjungfrau_aal.png/tintenfisch_stachel.png/drache_mechanisch.png. CC-BY 3.0 erlaubt Bearbeitungen mit Namensnennung; die Original-Datei liegt zum Abgleich unveraendert daneben.",
+    "raster": "einzelnes 64x64-Bild (nach Zuschnitt), EINE Blickrichtung (Frontalpose, kein Richtungs-/Gehzyklus) — wie die uebrigen Stilbruch-Einzelbilder dieses Musters",
+    "aussehen": "aufrechte, zweibeinige Gestalt mit Astwerk/Wurzeln als 'Beinen', Laubkrone als Kopf, sichtbaren Armen — humanoide Silhouette, kein reiner Busch/Baum"
+  },
+  "_quelle_elementals3_original.png": {
+    "original": "elementals3.png, unveraendert (144x176, 2x2-Sheet mit vier Elementarwesen)",
+    "paket": "JS Monster Set - Elementals III",
+    "urheber": "JosephSeraph",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/js-monster-set-elementals-iii",
+    "hinweis": "Nur als Referenz/Nachweis fuer den Zuschnitt aufbewahrt (siehe dryade.png). Enthaelt drei weitere, hier NICHT verwendete Elementarwesen (Skelett-Ritter, Daemon, Windgeist) — bei Bedarf spaeter fuer andere Rassen nutzbar."
+  },
+  "_recherchiert_nicht_uebernommen": {
+    "plant-like-rpg-character": {
+      "url": "https://opengameart.org/content/plant-like-rpg-character",
+      "lizenz": "CC0",
+      "urheber": "JotaFaD",
+      "grund": "Sauberste denkbare Lizenz (CC0), aber statisches Illustrations-Icon bei 258x258px (PNG 1.3 KB, sehr grob/kantig, kein Pixel-Art-Sprite) im Stil von 'Realm of the Mad God' — passt stilistisch nicht neben die LPC-/Pixel-Sprites."
+    },
+    "swamp-dryad": {
+      "url": "https://opengameart.org/content/swamp-dryad",
+      "lizenz": "CC0",
+      "urheber": "5hiroi",
+      "grund": "CC0, aber gemalte Concept-Art (GIMP-Digitalgemaelde), keine Pixel-Grafik und kein Sprite/Cutout — als Kampfsprite ungeeignet."
+    },
+    "the-free-monsters": {
+      "url": "https://opengameart.org/content/the-free-monsters",
+      "lizenz": "CC-BY-SA 3.0 / GPL 3.0 / GPL 2.0",
+      "urheber": "Justin Nichol",
+      "grund": "Enthaelt zwar 'Treefolk' (und eine Naga), aber als gemalte Concept-Art in einem 148-MB-Archiv (PNG+XCF), kein Pixel-Art-Sprite — Stilbruch waere staerker als bei dryade.png und der Download unverhaeltnismaessig gross fuer ein Motiv."
+    },
+    "treant-monster": {
+      "url": "https://opengameart.org/content/treant-monster",
+      "lizenz": "CC-BY 3.0",
+      "urheber": "Tuomo Untinen",
+      "grund": "Echtes Pixel-Art-Sprite mit 4-Richtungs-Gehzyklus, aber nur 32x60 Pixel je Zelle — deutlich kleiner als jedes andere Baukasten-/Monster-Blatt (auch kleiner als der 48x64-Teil-Stilbruch von werwolf/froschmensch) und wirkt im 64px-Kampfraster hochskaliert unscharf. dryade.png (64x64, gleiche Groesse wie die uebrigen Einzelbild-Stilbrueche) ist die bessere Wahl."
+    }
+  }
+}

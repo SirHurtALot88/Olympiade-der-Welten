@@ -1,0 +1,45 @@
+{
+  "_hinweis": "Sound-Grundausstattung Basketball, beschafft am 24.08. Die vier Freesound-Dateien sind CC0 (auf der jeweiligen Seite nachgeprueft: publicdomain/zero). Technische Anmerkung: von Freesound liegen hier die offiziellen HQ-Vorschau-MP3s (128 kbps) — der Original-WAV-Download verlangt einen Login, die Vorschau ist frei abrufbar und fuer Browser-Sound voellig ausreichend. In battle-mode.html gibt es noch KEINE Audio-Infrastruktur (kein <audio>, kein new Audio(), kein AudioContext) — das Verdrahten ist der naechste Schritt.",
+  "dribbeln.mp3": {
+    "titel": "basketball ext dribble bounce hard surface",
+    "urheber": "kyles (Freesound)",
+    "lizenz": "CC0",
+    "url": "https://freesound.org/people/kyles/sounds/453757/",
+    "verwendung": "laufendes Dribbeln waehrend des Ballbesitzes"
+  },
+  "ballaufprall.mp3": {
+    "titel": "Basketball bounce.WAV",
+    "urheber": "cribbler (Freesound)",
+    "lizenz": "CC0",
+    "url": "https://freesound.org/people/cribbler/sounds/396309/",
+    "verwendung": "einzelner Aufprall (Pass/Abpraller)"
+  },
+  "korb_treffer.mp3": {
+    "titel": "Outdoor Basketball Shot.wav",
+    "urheber": "fattirewhitey (Freesound)",
+    "lizenz": "CC0",
+    "url": "https://freesound.org/people/fattirewhitey/sounds/381410/",
+    "verwendung": "Wurf mit Swish — beim Korberfolg abspielen"
+  },
+  "buzzer.mp3": {
+    "titel": "buzzer.wav",
+    "urheber": "Philip_Daniels (Freesound)",
+    "lizenz": "CC0",
+    "url": "https://freesound.org/people/Philip_Daniels/sounds/259290/",
+    "verwendung": "Schlusssignal / Viertelende"
+  },
+  "publikum_ambiente.ogg": {
+    "titel": "Audience",
+    "urheber": "Alexandr Zhelanov",
+    "lizenz": "CC-BY 3.0 (Namensnennung noetig — steht hiermit hier)",
+    "url": "https://opengameart.org/content/audience",
+    "verwendung": "leises Grundrauschen der Halle in Dauerschleife; mit 5,2 MB die groesste Datei — falls das im Repo stoert, beim Verdrahten kuerzen"
+  },
+  "publikum_jubel.mp3": {
+    "titel": "Free Crowd Cheering Sounds — 04 Strong cheering II (Short)",
+    "urheber": "Gregor Quendel",
+    "lizenz": "CC-BY 4.0 (Namensnennung noetig — steht hiermit hier)",
+    "url": "https://opengameart.org/content/free-crowd-cheering-sounds",
+    "verwendung": "Jubel nach Korb/Sieg"
+  }
+}

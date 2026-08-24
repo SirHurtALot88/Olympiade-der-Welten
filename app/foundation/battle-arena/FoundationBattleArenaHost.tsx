@@ -1,5 +1,7 @@
 "use client";
 
+import FoundationBattleArenaSpriteGallery from "@/app/foundation/battle-arena/FoundationBattleArenaSpriteGallery";
+
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
  *
@@ -47,6 +49,7 @@ export default function FoundationBattleArenaHost() {
       <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
         Lässt sich auch direkt öffnen unter <code>/mockups/battle-mode.html</code>.
       </p>
+      <FoundationBattleArenaSpriteGallery />
     </section>
   );
 }

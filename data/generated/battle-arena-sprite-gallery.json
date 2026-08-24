@@ -1,0 +1,578 @@
+[
+ {
+  "name": "Abysskraken",
+  "slug": "abysskraken"
+ },
+ {
+  "name": "Aegirion",
+  "slug": "aegirion"
+ },
+ {
+  "name": "Aeon Flux",
+  "slug": "aeon-flux"
+ },
+ {
+  "name": "Akali",
+  "slug": "akali"
+ },
+ {
+  "name": "Alarm",
+  "slug": "alarm"
+ },
+ {
+  "name": "Arachna",
+  "slug": "arachna"
+ },
+ {
+  "name": "Aurora",
+  "slug": "aurora"
+ },
+ {
+  "name": "Babuschinka",
+  "slug": "babuschinka"
+ },
+ {
+  "name": "Bana",
+  "slug": "bana"
+ },
+ {
+  "name": "Bearington",
+  "slug": "bearington"
+ },
+ {
+  "name": "Bloater",
+  "slug": "bloater"
+ },
+ {
+  "name": "Bombblitzer",
+  "slug": "bombblitzer"
+ },
+ {
+  "name": "Breeze",
+  "slug": "breeze"
+ },
+ {
+  "name": "Brightpaw",
+  "slug": "brightpaw"
+ },
+ {
+  "name": "Brobot",
+  "slug": "brobot"
+ },
+ {
+  "name": "Brunhilde",
+  "slug": "brunhilde"
+ },
+ {
+  "name": "Burster",
+  "slug": "burster"
+ },
+ {
+  "name": "Butterfly",
+  "slug": "butterfly"
+ },
+ {
+  "name": "Byrd",
+  "slug": "byrd"
+ },
+ {
+  "name": "Byrnja",
+  "slug": "byrnja"
+ },
+ {
+  "name": "Cadrael",
+  "slug": "cadrael"
+ },
+ {
+  "name": "Caldor",
+  "slug": "caldor"
+ },
+ {
+  "name": "Cassandra",
+  "slug": "cassandra"
+ },
+ {
+  "name": "Catherine",
+  "slug": "catherine"
+ },
+ {
+  "name": "Ciacia",
+  "slug": "ciacia"
+ },
+ {
+  "name": "Clara",
+  "slug": "clara"
+ },
+ {
+  "name": "Crumbsage",
+  "slug": "crumbsage"
+ },
+ {
+  "name": "Cyrn",
+  "slug": "cyrn"
+ },
+ {
+  "name": "Dawnwhisper",
+  "slug": "dawnwhisper"
+ },
+ {
+  "name": "Dr Ironmind",
+  "slug": "dr-ironmind"
+ },
+ {
+  "name": "Draco",
+  "slug": "draco"
+ },
+ {
+  "name": "Drop Dead",
+  "slug": "drop-dead"
+ },
+ {
+  "name": "Dyrth",
+  "slug": "dyrth"
+ },
+ {
+  "name": "Eike",
+  "slug": "eike"
+ },
+ {
+  "name": "Elara",
+  "slug": "elara"
+ },
+ {
+  "name": "Eldara",
+  "slug": "eldara"
+ },
+ {
+  "name": "Elyon",
+  "slug": "elyon"
+ },
+ {
+  "name": "Elyssa Nightclaw",
+  "slug": "elyssa-nightclaw"
+ },
+ {
+  "name": "Emphi",
+  "slug": "emphi"
+ },
+ {
+  "name": "Enforcer",
+  "slug": "enforcer"
+ },
+ {
+  "name": "Erna Wellenlaut",
+  "slug": "erna-wellenlaut"
+ },
+ {
+  "name": "Falcon",
+  "slug": "falcon"
+ },
+ {
+  "name": "Galactus",
+  "slug": "galactus"
+ },
+ {
+  "name": "Gralakar",
+  "slug": "gralakar"
+ },
+ {
+  "name": "Gram",
+  "slug": "gram"
+ },
+ {
+  "name": "Greenkraut",
+  "slug": "greenkraut"
+ },
+ {
+  "name": "Greybeard",
+  "slug": "greybeard"
+ },
+ {
+  "name": "Grieving Colossus",
+  "slug": "grieving-colossus"
+ },
+ {
+  "name": "Grizz",
+  "slug": "grizz"
+ },
+ {
+  "name": "Gronkslime",
+  "slug": "gronkslime"
+ },
+ {
+  "name": "Harbinger",
+  "slug": "harbinger"
+ },
+ {
+  "name": "Hellvoice",
+  "slug": "hellvoice"
+ },
+ {
+  "name": "Holzfaust",
+  "slug": "holzfaust"
+ },
+ {
+  "name": "Inefinna",
+  "slug": "inefinna"
+ },
+ {
+  "name": "Ironhoof",
+  "slug": "ironhoof"
+ },
+ {
+  "name": "Issyria",
+  "slug": "issyria"
+ },
+ {
+  "name": "Isuzu",
+  "slug": "isuzu"
+ },
+ {
+  "name": "Jihanna",
+  "slug": "jihanna"
+ },
+ {
+  "name": "Johanna",
+  "slug": "johanna"
+ },
+ {
+  "name": "Jorund",
+  "slug": "jorund"
+ },
+ {
+  "name": "Kento",
+  "slug": "kento"
+ },
+ {
+  "name": "King Arlen Morgolor",
+  "slug": "king-arlen-morgolor"
+ },
+ {
+  "name": "Knochenrichter",
+  "slug": "knochenrichter"
+ },
+ {
+  "name": "Kora",
+  "slug": "kora"
+ },
+ {
+  "name": "Krag'Zul",
+  "slug": "krag-zul"
+ },
+ {
+  "name": "Kreischende Kogge",
+  "slug": "kreischende-kogge"
+ },
+ {
+  "name": "Krolach",
+  "slug": "krolach"
+ },
+ {
+  "name": "Lady Mournvale",
+  "slug": "lady-mournvale"
+ },
+ {
+  "name": "Lady Yueqin",
+  "slug": "lady-yueqin"
+ },
+ {
+  "name": "Lava Golem",
+  "slug": "lava-golem"
+ },
+ {
+  "name": "Leviathan",
+  "slug": "leviathan"
+ },
+ {
+  "name": "Lilly",
+  "slug": "lilly"
+ },
+ {
+  "name": "Lucky",
+  "slug": "lucky"
+ },
+ {
+  "name": "Lulu",
+  "slug": "lulu"
+ },
+ {
+  "name": "Lumen Serene",
+  "slug": "lumen-serene"
+ },
+ {
+  "name": "Lynara",
+  "slug": "lynara"
+ },
+ {
+  "name": "Lys Puppenkopf",
+  "slug": "lys-puppenkopf"
+ },
+ {
+  "name": "Mavra",
+  "slug": "mavra"
+ },
+ {
+  "name": "Medibull",
+  "slug": "medibull"
+ },
+ {
+  "name": "Melody",
+  "slug": "melody"
+ },
+ {
+  "name": "Mindtamer",
+  "slug": "mindtamer"
+ },
+ {
+  "name": "Moonveil",
+  "slug": "moonveil"
+ },
+ {
+  "name": "Murky",
+  "slug": "murky"
+ },
+ {
+  "name": "Mushu",
+  "slug": "mushu"
+ },
+ {
+  "name": "Myrkos",
+  "slug": "myrkos"
+ },
+ {
+  "name": "Nachtschatten",
+  "slug": "nachtschatten"
+ },
+ {
+  "name": "Nahli-Ke",
+  "slug": "nahli-ke"
+ },
+ {
+  "name": "Nelchael",
+  "slug": "nelchael"
+ },
+ {
+  "name": "Nhyra-Vel",
+  "slug": "nhyra-vel"
+ },
+ {
+  "name": "Nimri",
+  "slug": "nimri"
+ },
+ {
+  "name": "Nocture",
+  "slug": "nocture"
+ },
+ {
+  "name": "Node",
+  "slug": "node"
+ },
+ {
+  "name": "Omniclops",
+  "slug": "omniclops"
+ },
+ {
+  "name": "Orakelpfropf",
+  "slug": "orakelpfropf"
+ },
+ {
+  "name": "Orichalcos",
+  "slug": "orichalcos"
+ },
+ {
+  "name": "Othrama",
+  "slug": "othrama"
+ },
+ {
+  "name": "Phantomblade",
+  "slug": "phantomblade"
+ },
+ {
+  "name": "Pinkypie",
+  "slug": "pinkypie"
+ },
+ {
+  "name": "PixiKat",
+  "slug": "pixikat"
+ },
+ {
+  "name": "Puschelix",
+  "slug": "puschelix"
+ },
+ {
+  "name": "Ralazar the Balanced",
+  "slug": "ralazar-the-balanced"
+ },
+ {
+  "name": "Raven",
+  "slug": "raven"
+ },
+ {
+  "name": "Reefstrike",
+  "slug": "reefstrike"
+ },
+ {
+  "name": "Rhyx'Tal",
+  "slug": "rhyx-tal"
+ },
+ {
+  "name": "Riley Le Rogue",
+  "slug": "riley-le-rogue"
+ },
+ {
+  "name": "Roddox Harthelm",
+  "slug": "roddox-harthelm"
+ },
+ {
+  "name": "Rok Kyl",
+  "slug": "rok-kyl"
+ },
+ {
+  "name": "Rootheart",
+  "slug": "rootheart"
+ },
+ {
+  "name": "Sanctrix",
+  "slug": "sanctrix"
+ },
+ {
+  "name": "Seraph-11",
+  "slug": "seraph-11"
+ },
+ {
+  "name": "Serena",
+  "slug": "serena"
+ },
+ {
+  "name": "Shadowsage",
+  "slug": "shadowsage"
+ },
+ {
+  "name": "Shield",
+  "slug": "shield"
+ },
+ {
+  "name": "Sister Ilora",
+  "slug": "sister-ilora"
+ },
+ {
+  "name": "Skittermind",
+  "slug": "skittermind"
+ },
+ {
+  "name": "Starbound",
+  "slug": "starbound"
+ },
+ {
+  "name": "Starflame",
+  "slug": "starflame"
+ },
+ {
+  "name": "Steel Sinister",
+  "slug": "steel-sinister"
+ },
+ {
+  "name": "Sunny",
+  "slug": "sunny"
+ },
+ {
+  "name": "Sweet Dreams",
+  "slug": "sweet-dreams"
+ },
+ {
+  "name": "Tartarus",
+  "slug": "tartarus"
+ },
+ {
+  "name": "Taryn",
+  "slug": "taryn"
+ },
+ {
+  "name": "Tavascron",
+  "slug": "tavascron"
+ },
+ {
+  "name": "Terradon",
+  "slug": "terradon"
+ },
+ {
+  "name": "Threnox",
+  "slug": "threnox"
+ },
+ {
+  "name": "Tidesinger",
+  "slug": "tidesinger"
+ },
+ {
+  "name": "Tidesprinter",
+  "slug": "tidesprinter"
+ },
+ {
+  "name": "Timantha",
+  "slug": "timantha"
+ },
+ {
+  "name": "Treantos",
+  "slug": "treantos"
+ },
+ {
+  "name": "Tropfina",
+  "slug": "tropfina"
+ },
+ {
+  "name": "Tsubaki Cleaning",
+  "slug": "tsubaki-cleaning"
+ },
+ {
+  "name": "Umbra",
+  "slug": "umbra"
+ },
+ {
+  "name": "Vargan",
+  "slug": "vargan"
+ },
+ {
+  "name": "Velkin",
+  "slug": "velkin"
+ },
+ {
+  "name": "Verla Compliance",
+  "slug": "verla-compliance"
+ },
+ {
+  "name": "Vigil",
+  "slug": "vigil"
+ },
+ {
+  "name": "Vorrak",
+  "slug": "vorrak"
+ },
+ {
+  "name": "Whispra",
+  "slug": "whispra"
+ },
+ {
+  "name": "Wingless",
+  "slug": "wingless"
+ },
+ {
+  "name": "Wu Tang",
+  "slug": "wu-tang"
+ },
+ {
+  "name": "Xelara",
+  "slug": "xelara"
+ },
+ {
+  "name": "Xerathis",
+  "slug": "xerathis"
+ },
+ {
+  "name": "Xylaris",
+  "slug": "xylaris"
+ },
+ {
+  "name": "Yuko",
+  "slug": "yuko"
+ }
+]

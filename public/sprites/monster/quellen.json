@@ -1,0 +1,142 @@
+{
+  "_hinweis": "Kreaturen-Sprites: Drachen, LPC-Monster, Vierbeiner, Roboter. Beschafft am 24.08. Alle Lizenzen (CC0/CC-BY/CC-BY-SA/OGA-BY/GPL) sind fuer das private, nicht kommerzielle Spiel in Ordnung. ACHTUNG Zellenraster: die LPC-Monster, Wolf, Pferd und Roboter liegen im normalen 64px-Raster (Pferd 128px); die vier Drachen sind ein BEWUSSTER STILBRUCH mit 144x128-Zellen — siehe eigene Eintraege.",
+  "_stilbruch_drachen": "Chris hat ausdruecklich erlaubt, fuer Drachen/Bots/Pflanzen/Monster stilistisch abweichende Sprites zu nehmen, wenn der LPC-Baukasten strukturell nichts hat. Der LPC-Satz kennt keinen Drachenkopf (nur Echse + Echsenfluegel/-schwanz als Anbauteile). Die fliegenden Drachen hier sind Pixelart in Draufsicht mit 4 Richtungen — gleiche Logik wie LPC, nur groessere Zellen (144x128 statt 64x64) und 3 statt 9 Bilder. Fuer Butterfly/Mushu/Leviathan gedacht.",
+  "drache_rot.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_dragon-red.png, unveraendert; 3 Spalten x 4 Reihen zu 144x128, Reihenfolge oben/rechts/unten/links (Stendhal-Konvention), 3 Flugschlag-Bilder je Richtung",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "drache_gold.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_dragon-gold.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "drache_zweikopf_rot.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_twin_headed_dragon-red.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework",
+    "verwendung": "zweikoepfig — Kandidat fuer Leviathan/Hydra-artige Kaempfer"
+  },
+  "drache_zweikopf_blau.png": {
+    "paket": "Flying Dragon Rework (Stendhal)",
+    "blatt": "PNG/144x128/flying_twin_headed_dragon-blue.png, unveraendert, Aufbau wie drache_rot.png",
+    "urheber": "AntumDeluge (Rework), Original von ZaPaper",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/flying-dragon-rework"
+  },
+  "_lpc_monster": "Die folgenden 11 Blaetter stammen aus '[LPC] Monsters': Originale von Charles Sanchez (CharlesGabriel) aus den LPC-Basis-Assets, Angriffs-Animationen von bluecarrot16, beauftragt von Pierre Vigier (Vagabond). Lizenz CC-BY-SA 3.0 / GPL 3.0. https://opengameart.org/content/lpc-monsters — LPC-Raster 64x64, 4 Richtungen, unveraendert uebernommen (nur umbenannt).",
+  "fledermaus.png": { "original": "bat.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "biene.png": { "original": "bee.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wurm_gross.png": { "original": "big_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "auge.png": { "original": "eyeball.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "geist.png": { "original": "ghost.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "fleischfresser_blume.png": { "original": "man_eater_flower.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters", "verwendung": "Pflanzenwesen — deckt Chris' 'plants'-Wunsch ab, im LPC-Raster" },
+  "kuerbis.png": { "original": "pumpking.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schleim.png": { "original": "slime.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schleim_geschoss.png": { "original": "slime-projectile.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wurm_klein.png": { "original": "small_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "schlange.png": { "original": "snake.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "wolf.png": {
+    "paket": "[LPC] Wolf Animation",
+    "blatt": "wolfsheet1.png, unveraendert (640x384, 64px-Zellen, 4 Richtungen: gehen/rennen etc., siehe OGA-Seite)",
+    "urheber": "William.Thompsonj (Auftraggeber/Bearbeitung), Stephen Challener (Redshrike, Original)",
+    "lizenz": "OGA-BY 3.0 (alternativ CC-BY 3.0/4.0, GPL 2.0/3.0)",
+    "url": "https://opengameart.org/content/lpc-wolf-animation",
+    "verwendung": "generischer Vierbeiner — laesst sich wie die Koerper-Ebenen umfaerben"
+  },
+  "pferd_braun.png": {
+    "paket": "[LPC] Horses",
+    "blatt": "horse-brown.png, unveraendert (512x2560, 128px-Zellen, gehen/trab/galopp/fressen, 4 Richtungen)",
+    "urheber": "bluecarrot16",
+    "lizenz": "OGA-BY 3.0 (alternativ CC-BY 3.0, CC-BY-SA 3.0, GPL 2.0/3.0)",
+    "url": "https://opengameart.org/content/lpc-horses"
+  },
+  "roboter_walk.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Walk.png, unveraendert (512x256 = 8 Bilder x 4 Richtungen zu 64x64)",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "verwendung": "Roboter im LPC-Raster — fuer die 'bots' im Kader"
+  },
+  "roboter_tod.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Death.png, unveraendert",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "roboter_schuss.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "blatt": "Mechs/Mech1/Mech1Shot.png, unveraendert (Projektil/Muendungsfeuer)",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack"
+  },
+  "_nachtrag_24_08_b": "Zweite Runde am 24.08.: 'maechtige' Grossmonster (Golem, Kraken, mechanischer Drache) und Werwolf, nachgefragt von Chris. Golem liegt sauber im 64px-LPC-Raster. Kraken ist wie die Drachen ein STILBRUCH mit 96x128-Zellen (gleiche Stendhal-Logik, nur andere Kreatur). Werwolf ist ein TEIL-Stilbruch: 48x64 statt 64x64 breite Zellen und nur 3 statt 9 Gehframes je Richtung — naeher am LPC-Raster als die Drachen/der Kraken, aber kein exakter Formular-Fit fuer die bestehende Baukasten-Ebenen-Logik.",
+  "golem_walk.png": {
+    "original": "golem-walk.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x256 = 7 Spalten x 4 Reihen zu 64x64, 4 Richtungen, 7 Gehframes, unveraendert",
+    "urheber": "Stephen 'Redshrike' Challener (Grafik), William Thompson/William.Thompsonj (Beitrag)",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem",
+    "verwendung": "grosses/'maechtiges' Steinmonster im normalen 64px-Raster — kein Stilbruch noetig"
+  },
+  "golem_angriff.png": {
+    "original": "golem-atk.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x384, Angriffsanimation, unveraendert, Aufbau wie golem_walk.png",
+    "urheber": "Stephen 'Redshrike' Challener, William Thompson",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem"
+  },
+  "golem_tod.png": {
+    "original": "golem-die.png",
+    "paket": "[LPC] Golem",
+    "blatt": "448x128, Todesanimation, unveraendert",
+    "urheber": "Stephen 'Redshrike' Challener, William Thompson",
+    "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-golem"
+  },
+  "kraken.png": {
+    "paket": "Kraken (Stendhal)",
+    "blatt": "288x512 = 3 Spalten x 4 Reihen zu 96x128, Reihenfolge oben/rechts/unten/links (Stendhal-Konvention, gleiches Schema wie die Drachen), 3 Frames je Richtung, unveraendert",
+    "urheber": "Diligent Dodo (a.k.a. soniccuz), eingereicht von StendhalGame",
+    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
+    "url": "https://opengameart.org/content/kraken",
+    "hinweis": "BEWUSSTER STILBRUCH wie die Drachen: 96x128-Zellen statt 64x64. Riesenoktopus/Kraken als 'maechtiges' Seeungeheuer — passt sowohl zu 'grosse Monster' als auch zu Unterwasser-Gegnern."
+  },
+  "drache_mechanisch.png": {
+    "original": "dracomachina.png",
+    "paket": "64x64 Creature Sprites",
+    "blatt": "einzelnes 64x64-Bild, eine Blickrichtung — 'mechanical dragon', kein 4-Richtungs-Walkzyklus",
+    "urheber": "Kiovenn",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/64x64-creature-sprites",
+    "hinweis": "Statisches Einzelbild im 64x64-Kachelmass, ergaenzt die vier fliegenden Drachen um eine mechanische Variante; siehe auch fisch/quellen.json fuer die anderen Sprites desselben Pakets (Meerjungfrau, Tintenfisch, Fischskelett)"
+  },
+  "werwolf.png": {
+    "original": "werewolf-NESW.png",
+    "paket": "Werewolf (LPC)",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64 (schmaler als die 64x64-Standardzelle!), Reihenfolge N/E/S/W, 3 Gehframes je Richtung",
+    "urheber": "Stephen Challener (Redshrike) und William Thompson (LPC-Koerperbasis + LPC-Wolf-Animation als Ausgangsmaterial), zusammengesetzt von Jordan Irwin (AntumDeluge)",
+    "lizenz": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/werewolf-lpc",
+    "hinweis": "TEIL-Stilbruch: 48px statt 64px Zellbreite und 3 statt 9 Frames je Richtung. Kein Baukasten-Layer (der LPC-Generator selbst kennt keinen Werwolf-Koerper, nur den Wolfskopf 'kopf_wolf' fuer menschliche Koerper) — eigenstaendiges Kreatur-Sprite wie wolf.png, nicht ueber die Ebenen-Logik einbaubar."
+  },
+  "werwolf_alt.png": {
+    "original": "werewolf-alt-NESW.png",
+    "paket": "Werewolf (LPC)",
+    "blatt": "wie werwolf.png, alternative Armhaltung in den Seitenframes (Arme naeher am Koerper)",
+    "urheber": "Stephen Challener (Redshrike), William Thompson, Jordan Irwin (AntumDeluge)",
+    "lizenz": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/werewolf-lpc"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "_hinweis": "Vollkoerper-Sprites fuer die Rasse 'Voidborn' (89 Spieler im Live-Save, bislang OHNE jedes eigene Sprite-Motiv). Voidborn ist die am wenigsten klar definierte Rassenkategorie im Spiel — hier wurde nach Chris' Freigabe kreativ nach einem Schatten-/Leere-Motiv gesucht. Fuendig geworden im selben Paket wie Divine: 'Angels' (OpenGameArt) enthaelt neben hellen Engeln auch 'fallen_angel'-Varianten — vermummte, vollstaendig schwarze Gestalten mit gluehenden Augen und einem bedrohlich ROTEN (statt goldenem) Heiligenschein. Das liest sich weniger als 'gefallener Engel' im religioesen Sinn und mehr als abstrakte Schatten-/Leere-Kreatur mit einem uebernatuerlichen Lichtring — passt inhaltlich gut zu 'Voidborn', ohne dass dafuer eine eigene Kategorie noetig war.",
+  "_stilbruch": "BEWUSSTER STILBRUCH wie divine/quellen.json (selbes Paket): 144x256 = 3 Spalten x 4 Reihen zu 48x64 (nicht 64x64), N/E/S/W-Reihenfolge (Stendhal-Konvention), 3 Gehframes + Ruhepose.",
+  "_lizenz": "OGA-BY 3.0 oder neuer / CC-BY 3.0 oder neuer (direkt auf der Quellseite geprueft, Feld 'License(s)', identisch mit divine/quellen.json — selbe Quellseite). Attributionspflicht: Svetlana Kushnariova (Cabbit) samt E-Mail lana-chan@yandex.ru MUSS genannt werden; die 'reclining devil'-Vorlage stammt laut Seite von johnny_automatic.",
+  "_geprueft_und_verworfen": "Zusaetzlich gesucht und wieder verworfen: 'Little Shadow Monster Sprites' (bevouliin.com, CC-BY 4.0, https://opengameart.org/content/little-shadow-monster-sprites) — thematisch naeher an 'Schattenwesen', aber technisch unbrauchbar: 43 einzelne PNG-Frames zu je 315x329px, NUR EINE Blickrichtung (Seitenansicht fuer Sidescroller), kein 4-Richtungs-Sheet wie der Rest des Baukastens. Waere ein viel groesserer Stilbruch als die Angels-Variante und liesse sich nicht als drehbare Kampf-Figur einsetzen. Nicht heruntergeladen.",
+  "schattenwesen_schwarz.png": {
+    "original": "fallen_angel-001.png (48x64-Fassung)",
+    "paket": "Angels (Stendhal)",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64, N/E/S/W, 3 Gehframes + Ruhepose, unveraendert",
+    "urheber": "Basis: Svetlana Kushnariova (Cabbit); Fluegel: liftarn; Vorlage 'reclining devil': johnny_automatic; Halo: freedo; Zusammensetzung: Jordan Irwin (AntumDeluge)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "verwendung": "vollstaendig schwarze vermummte Gestalt, dunkle Fluegel, gluehend roter Heiligenschein, gelbe Augen — Hauptmotiv fuer Voidborn"
+  },
+  "schattenwesen_rot.png": {
+    "original": "fallen_angel-004.png (48x64-Fassung)",
+    "paket": "Angels (Stendhal)",
+    "blatt": "144x256, Aufbau wie schattenwesen_schwarz.png",
+    "urheber": "Svetlana Kushnariova (Cabbit), liftarn, johnny_automatic (Vorlage), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "verwendung": "Farbvariante mit dunkelroten Schwingen statt schwarzer Fluegel — zweite Optik fuer Diversitaet innerhalb der Rasse"
+  }
+}

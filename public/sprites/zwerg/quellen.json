@@ -1,0 +1,29 @@
+{
+  "_hinweis": "Zwergen-Vollkoerper-Sprites fuer die 'Dwarf'-Rasse (436 Spieler im Live-Save, Stand 24.08.). Beschafft am 24.08. auf Auftrag von Chris: der LPC-Universal-Generator (spritesheets/body/bodies/) hat KEINE eigene Zwergen-Statur — nur male/female/muscular/pregnant/teen/child/skeleton/zombie, alles menschliche Proportionen. Ein 'kopf_zwerg' auf einem normalen LPC-Koerper waere ein Kopf ohne die kurze, breite Statur, die einen Zwerg optisch ausmacht. Diese Sprites sind deshalb wie golem_walk.png/werwolf.png in monster/ EIGENSTAENDIGE Vollkoerper-Kreatur-Sprites, keine Baukasten-Kopf-Ebene — sie lassen sich NICHT ueber die kopf_*-Ebenen-Logik einbauen, sondern nur als komplette Figur wie die anderen Nicht-Baukasten-Charaktere.",
+  "_stilbruch": "TEIL-Stilbruch wie werwolf.png/roboter_*.png: 144x256 = 3 Spalten x 4 Reihen zu 48x64 (schmaler als die 64x64-Standardzelle des Baukastens), Reihenfolge N/E/S/W (Stendhal-Konvention), 3 Gehframes je Richtung (idle = mittleres Bild je Reihe) statt der 9 Frames der Baukasten-Ebenen. Gleiches Schema wie werwolf.png und space_bot (roboter, siehe Konstrukt-Recherche) — alle vier stammen aus dem gleichen Stendhal/AntumDeluge-Formularsatz.",
+  "_herkunft_gemeinsam": "Alle fuenf Dateien aus dem Paket 'Dwarves' (dwarf-1.0.zip), Ordner PNG/48x64_scale/, unveraendert uebernommen (nur umbenannt). Erstellt als Drop-in-Ersatz fuer Stendhal, basierend auf Vorarbeiten von Svetlana Kushnariova, diamonddmgirl und GrumpyDiamond.",
+  "_lizenz_gemeinsam": "OGA-BY 3.0 / CC-BY 3.0 / CC-BY 4.0 (alle drei zur Wahl, siehe LICENSE-*.txt im Paket). Fuer CC-BY-Nutzung: Svetlana Kushnariova ausdruecklich als 'Svetlana Kushnariova' UND mit E-Mail lana-chan@yandex.ru nennen (ihre explizite Attributions-Bedingung). GrumpyDiamond-Nennung ist laut Paket-README nicht erforderlich, aber erwuenscht.",
+  "_url_gemeinsam": "https://opengameart.org/content/dwarves-0",
+  "_autoren_gemeinsam": "Svetlana Kushnariova (Cabbit) <lana-chan@yandex.ru>, diamonddmgirl, GrumpyDiamond, Jordan Irwin (AntumDeluge, Zusammenstellung)",
+  "zwerg_arbeiter.png": {
+    "original": "dwarf-m-001.png",
+    "blatt": "144x256, unbewaffneter/Axt tragender Standard-Zwerg, dunkles Haar, blaue Kleidung",
+    "verwendung": "generischer Basis-Zwerg — Standardvorschlag fuer die 'Dwarf'-Rasse"
+  },
+  "zwerg_aeltester.png": {
+    "original": "dwarf_elder-m-001.png",
+    "blatt": "144x256, kahler alter Zwerg mit langem grauem Bart, blaue Latzhose"
+  },
+  "zwerg_waechter.png": {
+    "original": "dwarf_guardian-m-001.png",
+    "blatt": "144x256, gehoernter Helm, Ruestung, Streitaxt — kampfbereiter Zwerg"
+  },
+  "zwerg_held.png": {
+    "original": "dwarf_hero-m-001.png",
+    "blatt": "144x256, gruene Weste, dunkler Bart, haelt zwei leuchtend orange Kugeln (Zauber-/Bombeneffekt?)"
+  },
+  "zwerg_anfuehrer.png": {
+    "original": "dwarf_leader-m-001.png",
+    "blatt": "144x256, rote Kappe, haelt Feuerballs/orange Energie — auffaelligste Farbgebung der fuenf Varianten"
+  }
+}
