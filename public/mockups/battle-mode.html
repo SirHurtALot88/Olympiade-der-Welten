@@ -2294,10 +2294,12 @@
   const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
-  let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsT=0, fsPunkte=[0,0];
+  let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
+  let fsAktuell=null, fsBall={sichtbar:false,x:0,y:0};
 
   function bauFeldspiel(saat){
-    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsPunkte=[0,0]; floats.length=0;
+    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -2316,9 +2318,12 @@
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         eig:(p.d[feldspielDisc]||0)+engP+breitP,...R2,
-        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0};
+        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
+    FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
+      const p=fsIdlePos(side,i,team.length); u.x=p.x; u.y=p.y;
+    }));
 
     // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
     // steht fest, bevor die Enthuellung beginnt.
@@ -2341,7 +2346,10 @@
     let amBall=0; // 0 oder 1, wer beginnt
     for(let z=0;z<gesamtZuege;z++){
       const team=FSTEAM[amBall], gegnerTeam=FSTEAM[1-amBall];
-      const ballfuehrer=team[z%team.length];
+      // AUFBAU statt Reihum — wer den Zug einleitet, war bisher schlicht team[z%n], also
+      // voellig unabhaengig vom eigenen Wert. Jetzt gewichtet nach AUFBAU: ein Spielmacher
+      // hat den Ball haeufiger in der Hand als jemand, dessen Matrix dort nichts hergibt.
+      const anspieler=gewichtetesLos(team,"AUFBAU");
       const verteidiger=gewichtetesLos(gegnerTeam,"ABWEHR");
       // TEAMGEIST — ERST TEAM-DURCHSCHNITT, DANN VERWORFEN. Ein Durchschnitt ueber
       // sechs Spieler verduennt jede Messung: hebt einflussVon() EINEN Spieler um 15,
@@ -2349,14 +2357,30 @@
       // das Signal bleibt schwach. Jetzt zaehlt TEAMGEIST des Ballfuehrers selbst (seine
       // eigene Spielverbindung, wenn ER am Ball ist) — dasselbe Prinzip wie ueberall
       // sonst in diesem Entwurf: der Beitrag haengt an der Person, nicht am Teamschnitt.
-      const ermued=1-Math.max(0,(60-ballfuehrer.AUSDAUER))*0.003*(z/Math.max(1,gesamtZuege-1));
+      const ermued=1-Math.max(0,(60-anspieler.AUSDAUER))*0.003*(z/Math.max(1,gesamtZuege-1));
       const aufbauChance=Math.min(0.94,Math.max(0.20,
-        0.50+(ballfuehrer.AUFBAU-verteidiger.ABWEHR)*0.0035+ballfuehrer.TEAMGEIST*0.0060))*Math.max(0.5,ermued);
-      const eintrag={seite:amBall,spieler:ballfuehrer,verteidiger,art:"steal",punkte:0};
+        0.50+(anspieler.AUFBAU-verteidiger.ABWEHR)*0.0035+anspieler.TEAMGEIST*0.0060))*Math.max(0.5,ermued);
+      const eintrag={seite:amBall,spieler:anspieler,verteidiger,art:"steal",punkte:0,passgeber:null};
       if(rr()>=aufbauChance){
-        eintrag.art="steal"; verteidiger.steals++; ballfuehrer.verluste++;
+        eintrag.art="steal"; verteidiger.steals++; anspieler.verluste++;
         amBall=1-amBall; fsZuege.push(eintrag); continue;
       }
+      // DER PASS. Vorher endete jeder Zug beim Ballfuehrer selbst — kein Zuspiel, keine
+      // Assists, nichts, das "den Ball hin- und herspielen" sichtbar machte. Jetzt gibt
+      // der Aufbauspieler den Ball oft an den besten Abschluss-Spieler im Team weiter
+      // (ABSCHLUSS war bis hierhin ein Wert, der berechnet, aber NIE gelesen wurde — tote
+      // Kalibriermasse, jetzt hat er eine Aufgabe). Faellt der Korb, bekommt der
+      // Passgeber den Assist.
+      let ballfuehrer=anspieler, passgeber=null;
+      if(team.length>1){
+        const passChance=Math.min(0.75,Math.max(0.20,0.35+anspieler.AUFBAU*0.0030));
+        if(rr()<passChance){
+          const mitspieler=team.filter(x=>x!==anspieler);
+          ballfuehrer=gewichtetesLos(mitspieler,"ABSCHLUSS");
+          passgeber=anspieler;
+        }
+      }
+      eintrag.spieler=ballfuehrer; eintrag.passgeber=passgeber;
       const fernwurf=rr()<art.fernAnteil;
       const technik=Math.min(0.92,0.16+ballfuehrer.TECHNIK*0.0050+ballfuehrer.TEAMGEIST*0.0060
         -(fernwurf?0.10:0));
@@ -2364,6 +2388,7 @@
         const pkt=fernwurf?art.punkteFern:art.punkteNah;
         eintrag.art="treffer"; eintrag.punkte=pkt; eintrag.fern=fernwurf;
         ballfuehrer.punkte+=pkt; fsPunkte[amBall]+=pkt;
+        if(passgeber)passgeber.assists++;
         amBall=1-amBall;
       } else {
         // ZWEITCHANCE vs. ABWEHR: wer sammelt den verpassten Abschluss auf.
@@ -2371,7 +2396,7 @@
         const chance=Math.min(0.85,Math.max(0.15,
           0.45+(rebounder.ZWEITCHANCE-verteidiger.ABWEHR)*0.0035));
         if(rr()<chance){
-          eintrag.art="rebound"; rebounder.rebounds++; eintrag.fern=fernwurf;
+          eintrag.art="rebound"; rebounder.rebounds++; eintrag.fern=fernwurf; eintrag.rebounder=rebounder;
           // Ballbesitz bleibt beim Team — derselbe Zugindex zaehlt nicht doppelt gegen
           // das Kontingent, aber fuer die Enthuellung ist es ein eigenes Ereignis.
         } else {
@@ -2383,25 +2408,74 @@
     }
   }
 
+  // Lockere Ruheformation nahe der eigenen Grundlinie — kein starres Band aus sechs
+  // Figuren. `n` ist die Teamgroesse, `i` der Index in fixer Reihenfolge (SQUAD-Reihenfolge
+  // bleibt stabil, damit niemand bei jedem Frame den Platz wechselt).
+  function fsIdlePos(side,i,n){
+    const basisY=side===0?H*0.32:H*0.68;
+    const breite=W*0.46;
+    const t=n>1?i/(n-1):0.5;
+    const bogen=Math.abs(t-0.5)*H*0.05;
+    return {x:MID-breite/2+breite*t, y:basisY+bogen*(side===0?1:-1)};
+  }
+
+  // Ein Zug ist aktiv: seine Teilnehmer bewegen sich vom Ruheplatz zum GEGNERISCHEN
+  // Korb hin (man greift dort an, wo der andere verteidigt), Verteidiger und Rebounder
+  // eingeschlossen. `naeher` 0..1 kommt aus der Zug-Phase.
+  function fsAktivPos(u,naeher){
+    const korbY=u.side===0?H*0.90:H*0.10;
+    const startY=u.side===0?H*0.32:H*0.68;
+    const seitlich=(u.id%2?1:-1)*22;
+    return {x:MID+seitlich, y:startY+(korbY-startY)*naeher};
+  }
+
+  function fsLerpPositionen(dt){
+    const e=fsAktuell;
+    const phase=(e&&fsAktMax>0)?Math.min(1,Math.max(0,1-fsAkt/fsAktMax)):0;
+    const k=Math.min(1,dt*5);
+    FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
+      let ziel=fsIdlePos(side,i,team.length);
+      if(e){
+        const aktiv=u===e.spieler||u===e.verteidiger||u===e.passgeber||u===e.rebounder;
+        if(aktiv)ziel=fsAktivPos(u,Math.min(1,phase*1.5));
+      }
+      if(!u.x&&!u.y){u.x=ziel.x;u.y=ziel.y;}
+      u.x+=(ziel.x-u.x)*k; u.y+=(ziel.y-u.y)*k;
+    }));
+    if(e){
+      const von=e.passgeber||e.spieler, nach=e.art==="steal"?e.verteidiger:e.spieler;
+      let bx=von.x+(nach.x-von.x)*phase, by=von.y+(nach.y-von.y)*phase;
+      if(e.art==="treffer")by-=Math.sin(phase*Math.PI)*36;
+      fsBall={sichtbar:true,x:bx,y:by};
+    } else fsBall={sichtbar:false,x:0,y:0};
+  }
+
   function stepFeldspiel(dt){
-    if(done)return;
+    if(done){fsLerpPositionen(dt);return;}
     fsT+=dt;
     for(const team of FSTEAM)for(const u of team)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     fsAkt-=dt;
     if(fsAkt<=0 && fsZeiger<fsZuege.length){
       const e=fsZuege[fsZeiger++];
+      fsAktuell=e;
       e.spieler.lunge=0.5;
+      if(e.passgeber)e.passgeber.lunge=0.3;
+      if(e.rebounder)e.rebounder.lunge=0.35;
       const art=FB();
       let txt;
       if(e.art==="steal")txt=e.verteidiger.n+" erobert den Ball — "+art.wortAbwehr+".";
-      else if(e.art==="treffer")txt=e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
-      else if(e.art==="rebound")txt=e.spieler.n+" holt den "+art.wortRebound+".";
-      else txt=e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
+      else {
+        const vor=e.passgeber?e.passgeber.n+" passt zu "+e.spieler.n+" — ":"";
+        if(e.art==="treffer")txt=vor+e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
+        else if(e.art==="rebound")txt=e.rebounder.n+" holt den "+art.wortRebound+".";
+        else txt=e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
+      }
       feed(e.seite,txt,e.art==="treffer");
       if(e.art==="treffer")schwebe({x:0,y:0,txt:"+"+e.punkte,life:1,crit:true,_spieler:e.spieler.id});
-      fsAkt=art.zugDauer;
+      fsAktMax=art.zugDauer; fsAkt=fsAktMax;
     }
     if(fsZeiger>=fsZuege.length)done=true;
+    fsLerpPositionen(dt);
   }
 
   function updateHudFeldspiel(){
@@ -2417,30 +2491,68 @@
     renderKader();
   }
 
+  // Basketball bekommt einen echten Platz — zwei Koerbe, Zonen, Dreierlinien. Die
+  // anderen drei Feldspiel-Disziplinen (Football, Hockey, Tennis) teilen sich vorerst
+  // den neutralen Platz von vorher; eigene Feldmarkierungen fuer die sind ein eigener
+  // Auftrag, keiner, den diese Aenderung nebenbei mitloest.
   function bodenFeldspiel(){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#1c2e1e");g.addColorStop(1,"#152418");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
-    ctx.strokeRect(60,H*0.10,W-120,H*0.80);
-    ctx.beginPath();ctx.moveTo(MID,H*0.10);ctx.lineTo(MID,H*0.90);ctx.stroke();
-    ctx.beginPath();ctx.arc(MID,H/2,44,0,6.3);ctx.stroke();
-    for(const x of [60,W-60]){
-      ctx.beginPath();ctx.arc(x,H/2,70,x<MID?-1.05:Math.PI-1.05,x<MID?1.05:Math.PI+1.05);ctx.stroke();
+    if(feldspielDisc!=="basketball"){
+      ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
+      ctx.strokeRect(60,H*0.10,W-120,H*0.80);
+      ctx.beginPath();ctx.moveTo(MID,H*0.10);ctx.lineTo(MID,H*0.90);ctx.stroke();
+      ctx.beginPath();ctx.arc(MID,H/2,44,0,6.3);ctx.stroke();
+      for(const x of [60,W-60]){
+        ctx.beginPath();ctx.arc(x,H/2,70,x<MID?-1.05:Math.PI-1.05,x<MID?1.05:Math.PI+1.05);ctx.stroke();
+      }
+      return;
+    }
+    // Parkett-Ton statt Rasen — es ist eine Halle, kein Feld.
+    ctx.fillStyle="rgba(120,84,46,.18)";ctx.fillRect(60,H*0.06,W-120,H*0.88);
+    ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
+    ctx.strokeRect(60,H*0.06,W-120,H*0.88);
+    ctx.beginPath();ctx.moveTo(60,H/2);ctx.lineTo(W-60,H/2);ctx.stroke();
+    ctx.beginPath();ctx.arc(MID,H/2,H*0.09,0,6.3);ctx.stroke();
+    // Alle Masse ab hier haengen an H, nicht an W: jede Hallenhaelfte ist hier sehr
+    // viel flacher als breit (H*0.44 tief, W-120 breit). Ein an W bemessener Radius
+    // sprengt bei diesem Seitenverhaeltnis die Haelfte und ueberlappt die Mittellinie.
+    for(const oben of [true,false]){
+      const grundY=oben?H*0.06:H*0.94, korbY=oben?H*0.115:H*0.885, richt=oben?1:-1;
+      // Zone (die Zahnstocher-Box unterm Korb)
+      ctx.strokeRect(MID-H*0.08,oben?grundY:grundY-H*0.16,H*0.16,H*0.16);
+      // Freiwurflinie mit Halbkreis
+      ctx.beginPath();ctx.arc(MID,oben?grundY+H*0.16:grundY-H*0.16,H*0.09,0,6.3);ctx.stroke();
+      // Dreierlinie — ein flacher Bogen vor dem Korb.
+      ctx.beginPath();
+      ctx.arc(MID,korbY,H*0.24,oben?0.20:Math.PI+0.20,oben?Math.PI-0.20:6.08);
+      ctx.stroke();
+      // Korb: Ring plus kurzer Brett-Strich an der Grundlinie.
+      ctx.fillStyle="rgba(255,140,60,.9)";
+      ctx.beginPath();ctx.arc(MID,korbY,7,0,6.3);ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(MID-18,grundY);ctx.lineTo(MID+18,grundY);ctx.stroke();
+      ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     }
   }
 
   function zeichneFeldspiel(){
     bodenFeldspiel();
     const art=FB();
-    [0,1].forEach(side=>{
-      const g=FSTEAM[side];
-      const y=side===0?H*0.30:H*0.68;
-      g.forEach((u,i)=>{
-        const x=100+(W-200)*(g.length>1?i/(g.length-1):0.5);
-        const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+    FSTEAM.forEach((g,side)=>{
+      const c=side===0?css("--home"):css("--away");
+      g.forEach(u=>{
+        const x=u.x||fsIdlePos(side,g.indexOf(u),g.length).x;
+        const y=u.y||fsIdlePos(side,g.indexOf(u),g.length).y;
+        const aktiv=fsAktuell&&(u===fsAktuell.spieler||u===fsAktuell.verteidiger
+          ||u===fsAktuell.passgeber||u===fsAktuell.rebounder);
+        ctx.fillStyle=c;ctx.globalAlpha=aktiv?0.30:0.20;
         ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
+        if(aktiv){
+          ctx.strokeStyle=c;ctx.globalAlpha=0.55;ctx.lineWidth=2;
+          ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
+        }
         zeichneSprite(ctx,u,x,y);
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
@@ -2449,10 +2561,18 @@
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
         schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-        if(u.punkte||u.rebounds||u.steals||u.bloecke)
-          schrift(u.punkte+"P "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
+        if(u.punkte||u.rebounds||u.steals||u.bloecke||u.assists)
+          schrift(u.punkte+"P "+u.assists+"A "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
       });
     });
+    // Der Ball. Klein, orange, folgt fsLerpPositionen — von Passgeber zu Ballfuehrer,
+    // bei Treffer/Block weiter zum Korb, bei Steal zum Verteidiger.
+    if(fsBall.sichtbar){
+      ctx.fillStyle="#e8823a";
+      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
+      ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+    }
     for(const f of floats){
       if(f._spieler==null)continue;
       ctx.globalAlpha=Math.max(0,f.life);
@@ -2460,12 +2580,8 @@
       ctx.font="700 15px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
-        const idx=FSTEAM[side].findIndex(u=>u.id===f._spieler);
-        if(idx>=0){const g=FSTEAM[side];
-          const x=100+(W-200)*(g.length>1?idx/(g.length-1):0.5);
-          const y=(side===0?H*0.30:H*0.68)-30-((1-f.life)*20);
-          ort={x,y};
-        }
+        const u=FSTEAM[side].find(x=>x.id===f._spieler);
+        if(u)ort={x:u.x,y:u.y-30-((1-f.life)*20)};
       }
       if(ort)ctx.fillText(f.txt,ort.x,ort.y);
       ctx.globalAlpha=1;
@@ -6747,7 +6863,7 @@
       lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
       namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
       wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
-        o[u.n]=u.punkte+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
+        o[u.n]=u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
     };
   }
 
