@@ -15,17 +15,19 @@ Sprite-Nachschub braucht, wartet deshalb hier.
 Die **Battle Arena** ist ein *zuschaubarer Auto-Battler* für die Olympiade der Welten.
 Der Manager stellt auf, die Spieler kämpfen von selbst, und man sieht zu — es gibt keine
 Steuerung im Kampf. Ziel ist ein Grundkonzept für **alle 20 Disziplinen**; Stand dieser
-Sitzung: **14 von 20** haben eine erste Mockup-Version, verteilt auf drei geteilte Motoren
-(„Chassis") statt 14 getrennter Implementierungen:
+Sitzung: **18 von 20** haben eine erste Mockup-Version, verteilt auf vier geteilte Motoren
+(„Chassis") statt 18 getrennter Implementierungen:
 
 | Chassis | Disziplinen | Motor |
 |---|---|---|
 | Kampf | TDM, Mini-DM, Fechten, Battlefield | `build()`/`stepSim()`, Rezepte aus `ARENA_ART` |
 | Bahn | Spurt, Staffel, Time-Trial, Climbing, Takeshi's Castle | `bauSpurt()`/`stepSpurt()`, Konfiguration aus `BAHN_ART` |
 | Bühne | Gewichtheben, Showcase, Eiskunstlauf, Breaking, Wettessen | `bauBuehne()`/`stepBuehne()`, Konfiguration aus `BUEHNE_ART` |
+| Feldspiel | Basketball, Football, Hockey, Tennis | `bauFeldspiel()`/`stepFeldspiel()`, Konfiguration aus `FELDSPIEL_ART` |
 
-Offen: Feldspiel (Hockey, Basketball, Football, Tennis) und Denkduell (Speed-Schach,
-I-Spy) — zwei weitere Chassis, noch nicht begonnen.
+Offen: Denkduell (Speed-Schach, I-Spy) — nach Fable-Konsultation kein eigenes Chassis,
+sondern eine Bühne-Variante (abwechselnde Züge statt unabhängiger Durchgänge, eine
+Vorteils-Anzeige statt Jury-Punkten).
 
 Sie liegt als **eine** HTML-Datei vor (`public/mockups/battle-mode.html`, ~800 KB, kein
 Bundle, keine Abhängigkeiten) und ist im Spiel als Reiter eingebettet. **Sie liest und
@@ -919,6 +921,93 @@ Visuell: eine Bühne mit drei Scheinwerferkegeln statt Sandplatz oder Laufbahn, 
 Teilnehmer als stehende Figur (derselbe Sprite-Baukasten, wiederverwendet über
 `zeichneSprite()`) mit laufender Punktzahl und Fortschrittsanzeige „x/N Durchgänge"
 darunter — geprüft an Gewichtheben und Eiskunstlauf, in beiden auf einen Blick lesbar.
+
+## Das Feldspiel-Chassis: Basketball, Football, Hockey, Tennis
+
+Vierter Motor — Chris' eigener Vorschlag, unabhängig von Fable bestätigt: Ballsport ist
+weder Rennen, Kampf mit Skills noch Auftritt in Durchgängen, sondern eine
+**Ballwechsel-Schleife**. Ballbesitz ist ein geteilter Zustand zwischen den Teams; das
+unterscheidet es von Bühne, wo jeder für sich antritt.
+
+Sieben Rollen: AUFBAU (bringt den Ball zum Abschluss), ABSCHLUSS (die Wurf-/Schuss-
+Mechanik), TECHNIK (Erfolgschance), ZWEITCHANCE (Rebound/Fumble-Recovery — wer den
+verpassten Abschluss aufsammelt), ABWEHR (kann den Zug per Steal/Block beenden),
+TEAMGEIST (risikofreier Bonus — Assists/Chemie, da Spirit drei von vier Matrizen
+anführt), AUSDAUER. Wie bei Bühne wird die ganze Partie beim Aufbau durchgerechnet und
+über die Zeit enthüllt.
+
+**Zwei echte Bugs, beide aus demselben Muster wie schon bei Bahn/Arena — ein Attribut in
+einer Erfolgschance-Rolle gewinnt strukturell mehr Einfluss:**
+
+1. **"Immer der beste Verteidiger"** — erste Fassung wählte für JEDEN Zug per
+   `reduce()` den Spieler mit dem höchsten ABWEHR-Wert. Damit hing der gesamte
+   gegnerische Erfolg an EINER Person: hob man deren Awareness, wirkte das bei praktisch
+   jedem gegnerischen Angriff, nicht nur bei eigenen Zügen. Gemessen: Awareness 35 % bei
+   Matrixgewicht 14 (Basketball). Behoben durch **gewichtetes Los** (`gewichtetesLos()`)
+   — die Chance, den Zug zu verteidigen, ist proportional zum eigenen Wert, nicht
+   deterministisch der Höchste. Dasselbe für den Rebound.
+2. **TEAMGEIST als Team-Durchschnitt verwässerte jede Messung.** `einflussVon()` hebt
+   IMMER nur einen Spieler an; ein Sechser-Team-Schnitt bewegt sich davon nur um ein
+   Sechstel. Spirit — der höchste oder zweithöchste Matrixwert in drei von vier
+   Disziplinen — las deshalb nahe 0 %, egal wie hoch der Koeffizient stand. Jetzt zählt
+   der eigene TEAMGEIST-Wert des Ballführers, ungeteilt.
+
+**Stand (n = 12):**
+
+| Disziplin | Abweichung |
+|---|---|
+| Basketball | **35,5 Pp** |
+| Tennis | **46,5 Pp** |
+| Hockey | **46,4 Pp** |
+| Football | **63,1 Pp** |
+
+Football bleibt der Ausreißer: Spirit liest jetzt 47,9 % bei Matrixgewicht 25 —
+übernachgezogen, nachdem Will (vorher 31,6 % bei Gewicht 10) aus `TEAMGEIST` raus- und
+Spirit hineingezogen wurde. Nicht weiter gejagt, wie bei den anderen Chassis auch: ein
+Punkt, an dem eine weitere Iteration mehr Zeit als Erkenntnis gebracht hätte.
+
+Visuell: ein Spielfeld mit Mittelkreis und zwei Zonenbögen statt Sandplatz, Ereignisse im
+Feed ("Krag'Zul holt den Rebound", "Draco trifft von weit draußen — +3") — geprüft an
+Basketball und Football, beide lesbar mit echten Punktständen.
+
+### Die Rundenlänge — auf Chris' Wunsch ziemlich genau 60 Sekunden
+
+Bei Bühne ist das sicher: die Punktzahl steht schon fest, bevor die Enthüllung beginnt,
+also ändert das Reveal-Tempo nichts an der Balance. Rundendauer = 60 / (Durchgänge ×
+Teilnehmer × 2), geprüft im Browser: alle fünf Bühne-Disziplinen landen bei 58–60
+Sekunden. Bei Feldspiel dieselbe Formel, dieselbe Sicherheit (`zugDauer:60/(zuegeJeSeite*2*2)`).
+
+**Bei Bahn und Kampf ist die Rundenlänge NICHT angetastet** — dort hängt sie an
+Konstanten, die für die Balance fein justiert sind (Kraftverbrauch pro Sekunde,
+Abklingzeiten, Nervenregeneration). Eine reine Geschwindigkeitsskalierung würde die
+Balance verschieben, weil diese Konstanten an absoluter Zeit hängen, nicht an
+zurückgelegter Strecke. Das braucht einen eigenen, koordinierten Durchgang — offen.
+
+---
+
+## Fable-Konsultation: ein Motor pro Disziplin oder wenige geteilte?
+
+Chris' Frage: sollten alle Disziplinen den Kampf-Motor mit angepassten Stats nutzen
+(einfacher, sieht überall wie TDM aus), oder echte physische Interaktion je Disziplin
+(z. B. Klettern mit Rempeln/Angreifen) — und wie verhindert man, dass volle Skills/AOE
+in einer Disziplin wie Climbing absurd werden?
+
+Fables Antwort, unabhängig gegengeprüft: **nicht alles auf Kampf umstellen** — nicht nur
+aus thematischen Gründen, sondern weil der Kampf-Motor zwölf Attribute durch einen
+verlustbehafteten Trichter (fünf Kampfwerte) presst; Disziplinen mit anderem Profil
+(Climbing: stamina 26; Tennis: intelligence 22) würden ihn zwingen, ihr Profil zu
+verfälschen — die Pp-Messung würde das sofort zeigen. **Vier Motoren sind die richtige
+Granularität**, Unterscheidbarkeit gehört in Ablaufstruktur und Präsentation (billig,
+selbstbalancierend), nicht in Interaktionssysteme (Skills/AOE sind teuer und
+kombinatorisch). Leitplanke: **maximal ein Interaktionsverb** je Bahn/Feldspiel-Disziplin
+(Rempeln ODER Blockieren ODER Steal — nicht mehrere), sonst kriecht das Skill-System
+durch die Hintertür zurück. Denkduell braucht keinen fünften Motor — strukturell ist es
+Bühne (abwechselnde Züge, Erfolg/Misserfolg, Ermüdung), nur mit einer
+Vorteils-Anzeige statt Jury-Punkten.
+
+---
+
+## Verlässliche Einstiegspunkte
 
 ## Verlässliche Einstiegspunkte
 

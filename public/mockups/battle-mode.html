@@ -1415,7 +1415,11 @@
     showcase:{label:"Showcase",cat:"buehne",size:6},
     eiskunstlauf:{label:"Eiskunstlauf",cat:"buehne",size:6},
     breaking:{label:"Breaking",cat:"buehne",size:6},
-    wettessen:{label:"Wettessen",cat:"buehne",size:6}};
+    wettessen:{label:"Wettessen",cat:"buehne",size:6},
+    basketball:{label:"Basketball",cat:"feldspiel",size:6},
+    football:{label:"Football",cat:"feldspiel",size:6},
+    hockey:{label:"Hockey",cat:"feldspiel",size:6},
+    tennis:{label:"Tennis",cat:"feldspiel",size:6}};
   // ===================================================================================
   // WAS EINE KLASSENKARTE WIRKLICH KENNT.
   //
@@ -2129,7 +2133,11 @@
   };
   const istArena=(d)=>!!ARENA_ART[d];
   const rezeptVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].rezept)||REC[(DISCS[dId]||{}).cat]||REC.power;
-  const jeSeiteVon=(dId)=>(ARENA_ART[dId]&&ARENA_ART[dId].jeSeite)||6;
+  const jeSeiteVon=(dId)=>
+    (ARENA_ART[dId]&&ARENA_ART[dId].jeSeite)
+    ||(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[dId]&&FELDSPIEL_ART[dId].jeSeite)
+    ||(typeof BUEHNE_ART!=="undefined"&&BUEHNE_ART[dId]&&BUEHNE_ART[dId].jeSeite)
+    ||6;
 
   // ===================================================================================
   // DAS BUeHNE-CHASSIS.
@@ -2163,6 +2171,307 @@
   //
   // Die Ergebniszahl ist die Summe aller Durchgaenge — direkt verwendbar als wert() fuer
   // die Abnahmemessung, groesser ist besser, keine Platzierung noetig.
+  // RUNDENDAUER: darauf gezielt, dass ein Auftritt insgesamt rund 60 Sekunden dauert
+  // (Chris: "am besten so bauen, dass die Runde immer so ungefaehr 60 Sekunden dauert").
+  // Ein Auftritt enthuellt rundenN * jeSeite * 2 Durchgaenge, also rundenDauer =
+  // 60 / (rundenN * jeSeite * 2). Sicher, weil rein kosmetisch: jeder Durchgang wird
+  // beim Aufbau vollstaendig durchgerechnet (siehe bauBuehne), die Rundendauer steuert
+  // nur, wie schnell das Ergebnis ENTHUELLT wird — sie aendert nichts an der Punktzahl
+  // und nichts an der Pp-Messung.
+  // ===================================================================================
+  // DAS FELDSPIEL-CHASSIS.
+  //
+  // Vierter Motor, Chris' eigener Vorschlag: Hockey, Basketball, Football und Tennis
+  // sind alle eine BALLWECHSEL-SCHLEIFE — kein Rennen, kein Kampf mit Skills, kein
+  // Auftritt in Durchgaengen, sondern BALLBESITZ, der zwischen zwei Teams wechselt.
+  // Genau das unterscheidet es von Buehne: dort tritt jeder fuer sich an, hier haengt
+  // das Ergebnis eines Zugs vom GEGNER ab (Abwehr kann den Zug beenden).
+  //
+  // Sieben Rollen, dieselbe Sprache wie Bahn und Buehne, aber fuer Ballbesitz:
+  //
+  //   AUFBAU       bringt den Ball in Abschlussposition, ohne ihn zu verlieren
+  //   ABSCHLUSS    die Wurf-/Schuss-Mechanik selbst
+  //   TECHNIK      wie oft der Abschluss gelingt
+  //   ZWEITCHANCE  wer den verpassten Abschluss aufsammelt — Rebound, nicht Sturz
+  //   ABWEHR       vom VERTEIDIGENDEN Team: kann den Zug per Steal/Block beenden
+  //   TEAMGEIST    ein risikofreier Bonus — Assists, Chemie (spirit fuehrt drei der
+  //                vier Matrizen, das ist die Rolle dafuer)
+  //   AUSDAUER     wie sehr spaete Ballwechsel gegenueber fruehen abfallen
+  //
+  // EIN ZUG: das Team am Ball schickt reihum einen Spieler; AUFBAU des Ballfuehrers
+  // gegen ABWEHR des staerksten Verteidigers entscheidet, ob der Zug ueberhaupt zum
+  // Abschluss kommt (sonst: Steal, Ballbesitz wechselt sofort). Kommt er durch,
+  // entscheiden TECHNIK und TEAMGEIST ueber Erfolg; bei Erfolg Punkte (der schwerere
+  // Wurftyp bringt mehr, gewichtet nach WAGNIS-Analogon in ABSCHLUSS selbst). Bei
+  // Misslingen entscheidet ZWEITCHANCE gegen die ABWEHR des Gegners, wer den Ball
+  // bekommt — eigenes Team (zweiter Versuch) oder der Gegner (Ballbesitzwechsel).
+  //
+  // Wie bei Buehne wird die ganze Partie beim Aufbau durchgerechnet und dann ueber die
+  // Zeit enthuellt — sicher fuer die Pp-Messung, weil die Enthuellungsgeschwindigkeit
+  // nichts am Ergebnis aendert.
+  const FELDSPIEL_ART={
+    basketball:{
+      // MATRIX: spirit 22, intelligence 16, awareness 14, charisma 11, speed 10,
+      // dexterity 8, power 7, stamina 6, torment 6.
+      label:"Basketball", jeSeite:6, zuegeJeSeite:12, zugDauer:60/(12*2*2),
+      punkteNah:2, punkteFern:3, fernAnteil:0.32,
+      wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
+      rezept:{
+        AUFBAU:      {intelligence:40,spirit:30,dexterity:30},
+        ABSCHLUSS:   {dexterity:40,power:30,speed:30},
+        TECHNIK:     {intelligence:40,awareness:35,dexterity:25},
+        ZWEITCHANCE: {power:45,awareness:30,stamina:25},
+        ABWEHR:      {awareness:40,speed:35,torment:25},
+        TEAMGEIST:   {spirit:55,charisma:45},
+        AUSDAUER:    {stamina:50,torment:25,speed:25}
+      }
+    },
+    football:{
+      // MATRIX: spirit 25, torment 16, health 14, awareness 11, will 10,
+      // determination 8, power 6, stamina 6, charisma 4.
+      label:"Football", jeSeite:6, zuegeJeSeite:8, zugDauer:60/(8*2*2),
+      punkteNah:6, punkteFern:3, fernAnteil:0.30,
+      wortAbwehr:"Tackle", wortBlock:"Sack", wortRebound:"Fumble-Recovery",
+      rezept:{
+        AUFBAU:      {awareness:40,determination:30,will:30},
+        ABSCHLUSS:   {power:40,torment:30,health:30},
+        TECHNIK:     {awareness:40,determination:35,torment:25},
+        ZWEITCHANCE: {health:40,power:35,torment:25},
+        ABWEHR:      {torment:45,awareness:30,health:25},
+        // Nachgezogen: Will sass in Aufbau UND Teamgeist (jetzt individuell, mit
+        // starkem Koeffizienten in zwei Erfolgsformeln) und las 31,6 % bei Matrixgewicht
+        // 10. Teamgeist traegt jetzt Health mit statt Will — Health (14) war bislang kaum
+        // vertreten.
+        TEAMGEIST:   {spirit:65,health:35},
+        AUSDAUER:    {stamina:40,health:35,spirit:25}
+      }
+    },
+    hockey:{
+      // MATRIX: power 18, health 18, speed 12, spirit 12, stamina 10, torment 10,
+      // awareness 8, determination 4, dexterity 4, will 4.
+      label:"Hockey", jeSeite:6, zuegeJeSeite:14, zugDauer:60/(14*2*2),
+      punkteNah:1, punkteFern:1, fernAnteil:0,
+      wortAbwehr:"Check", wortBlock:"Save", wortRebound:"Abpraller",
+      rezept:{
+        AUFBAU:      {awareness:35,speed:35,power:30},
+        ABSCHLUSS:   {power:40,torment:30,dexterity:30},
+        TECHNIK:     {dexterity:40,awareness:35,determination:25},
+        ZWEITCHANCE: {power:40,health:35,torment:25},
+        ABWEHR:      {health:40,power:35,speed:25},
+        // Nachgezogen: Determination hat in der Hockey-Matrix nur Gewicht 4, sass aber
+        // mit 45 in Teamgeist (individuell, starker Koeffizient) und las 24,8 %. Ersetzt
+        // durch Torment (10) — passt auch besser zur "Captain Line", die Haerte gibt,
+        // nicht Entschlossenheit.
+        TEAMGEIST:   {spirit:60,torment:40},
+        AUSDAUER:    {stamina:50,health:30,will:20}
+      }
+    },
+    tennis:{
+      // MATRIX: intelligence 22, awareness 20, spirit 18, stamina 12, dexterity 12,
+      // determination 6, speed 6, charisma 4. Kein echtes "Team" — die sechs tragen
+      // abwechselnd den Ballwechsel aus, wie eine Setzliste, dieselbe Struktur wie
+      // ueberall sonst.
+      label:"Tennis", jeSeite:6, zuegeJeSeite:16, zugDauer:60/(16*2*2),
+      punkteNah:1, punkteFern:1, fernAnteil:0,
+      wortAbwehr:"Return", wortBlock:"Ass", wortRebound:"Vorteil",
+      // NACHGEZOGEN: erste Messung stand bei 105,7 Pp. Dexterity (Matrixgewicht 12) sass
+      // in DREI Rollen (Abschluss, Technik, Abwehr) und las 28,2 %. Intelligence, der
+      // hoechste Matrixwert (22), sass nur in zwei Rollen und las 6,7 %. Jetzt traegt
+      // Intelligence auch Abwehr und Aufbau fuehrend, Dexterity nur noch dort, wo ein
+      // schneller Schlag wirklich zaehlt (Abschluss).
+      rezept:{
+        AUFBAU:      {intelligence:40,awareness:35,spirit:25},
+        ABSCHLUSS:   {dexterity:35,intelligence:35,speed:30},
+        TECHNIK:     {intelligence:50,awareness:35,determination:15},
+        ZWEITCHANCE: {stamina:40,determination:35,awareness:25},
+        ABWEHR:      {intelligence:35,awareness:35,dexterity:30},
+        TEAMGEIST:   {spirit:55,charisma:45},
+        AUSDAUER:    {stamina:50,determination:30,spirit:20}
+      }
+    }
+  };
+  let feldspielDisc="basketball";
+  const FB=()=>FELDSPIEL_ART[feldspielDisc]||FELDSPIEL_ART.basketball;
+  const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
+
+  let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsT=0, fsPunkte=[0,0];
+
+  function bauFeldspiel(saat){
+    seed=saat||1337; fsT=0; done=false; fsZeiger=0; fsAkt=0; fsPunkte=[0,0]; floats.length=0;
+    const art=FB(), n=art.jeSeite, R=art.rezept;
+    const slotListe=slotsVon(feldspielDisc);
+    const gesetzt=inDisc(feldspielDisc);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[feldspielDisc]||0)-(a.d[feldspielDisc]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gegner=OPP.slice(0,n);
+    const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===feldspielDisc)?place[p.n].slot
+                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    let id=0;
+    const bauSpieler=(p,seite,istGegner,idx)=>{
+      const sl=istGegner?null:slotFuer(p,idx);
+      const engP=sl?slotAufschlag(p,sl,feldspielDisc):0;
+      const breitP=formVon(p.n)+(istGegner?0:stufenWert());
+      let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
+      attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
+      const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
+        eig:(p.d[feldspielDisc]||0)+engP+breitP,...R2,
+        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0};
+    };
+    FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
+
+    // ALLE ZUEGE VORAB DURCHRECHNEN — dieselbe Ehrlichkeit wie Buehne: der Spielstand
+    // steht fest, bevor die Enthuellung beginnt.
+    fsZuege=[];
+    const gesamtZuege=art.zuegeJeSeite*2;
+    // GEWICHTETE ZUFALLSAUSWAHL STATT "IMMER DER BESTE". Erste Fassung waehlte fuer
+    // Verteidigung und Rebound reduce()-artig den staerksten Spieler des Teams — FUER
+    // JEDEN EINZELNEN ZUG. Damit haengte sich der ganze gegnerische Erfolg an EINE
+    // Person: hob man deren Awareness (in ABWEHR), wirkte das nicht nur bei den eigenen
+    // Zuegen, sondern bei praktisch jedem Angriff des Gegners. Gemessen: Awareness 35 %
+    // bei einem Matrixgewicht von nur 14 (Basketball) bzw. 20 (Tennis). Jetzt ist die
+    // Chance, den Zug zu verteidigen oder den Rebound zu holen, proportional zum
+    // eigenen Wert — der Beste bekommt mehr Anteile, aber nicht alle.
+    const gewichtetesLos=(spieler,rolle)=>{
+      const summe=spieler.reduce((s,x)=>s+Math.max(1,x[rolle]),0);
+      let r=rr()*summe;
+      for(const x of spieler){ r-=Math.max(1,x[rolle]); if(r<=0)return x; }
+      return spieler[spieler.length-1];
+    };
+    let amBall=0; // 0 oder 1, wer beginnt
+    for(let z=0;z<gesamtZuege;z++){
+      const team=FSTEAM[amBall], gegnerTeam=FSTEAM[1-amBall];
+      const ballfuehrer=team[z%team.length];
+      const verteidiger=gewichtetesLos(gegnerTeam,"ABWEHR");
+      // TEAMGEIST — ERST TEAM-DURCHSCHNITT, DANN VERWORFEN. Ein Durchschnitt ueber
+      // sechs Spieler verduennt jede Messung: hebt einflussVon() EINEN Spieler um 15,
+      // bewegt das den Sechser-Schnitt nur um 2,5 — egal wie hoch der Koeffizient steht,
+      // das Signal bleibt schwach. Jetzt zaehlt TEAMGEIST des Ballfuehrers selbst (seine
+      // eigene Spielverbindung, wenn ER am Ball ist) — dasselbe Prinzip wie ueberall
+      // sonst in diesem Entwurf: der Beitrag haengt an der Person, nicht am Teamschnitt.
+      const ermued=1-Math.max(0,(60-ballfuehrer.AUSDAUER))*0.003*(z/Math.max(1,gesamtZuege-1));
+      const aufbauChance=Math.min(0.94,Math.max(0.20,
+        0.50+(ballfuehrer.AUFBAU-verteidiger.ABWEHR)*0.0035+ballfuehrer.TEAMGEIST*0.0060))*Math.max(0.5,ermued);
+      const eintrag={seite:amBall,spieler:ballfuehrer,verteidiger,art:"steal",punkte:0};
+      if(rr()>=aufbauChance){
+        eintrag.art="steal"; verteidiger.steals++; ballfuehrer.verluste++;
+        amBall=1-amBall; fsZuege.push(eintrag); continue;
+      }
+      const fernwurf=rr()<art.fernAnteil;
+      const technik=Math.min(0.92,0.16+ballfuehrer.TECHNIK*0.0050+ballfuehrer.TEAMGEIST*0.0060
+        -(fernwurf?0.10:0));
+      if(rr()<technik){
+        const pkt=fernwurf?art.punkteFern:art.punkteNah;
+        eintrag.art="treffer"; eintrag.punkte=pkt; eintrag.fern=fernwurf;
+        ballfuehrer.punkte+=pkt; fsPunkte[amBall]+=pkt;
+        amBall=1-amBall;
+      } else {
+        // ZWEITCHANCE vs. ABWEHR: wer sammelt den verpassten Abschluss auf.
+        const rebounder=gewichtetesLos(team,"ZWEITCHANCE");
+        const chance=Math.min(0.85,Math.max(0.15,
+          0.45+(rebounder.ZWEITCHANCE-verteidiger.ABWEHR)*0.0035));
+        if(rr()<chance){
+          eintrag.art="rebound"; rebounder.rebounds++; eintrag.fern=fernwurf;
+          // Ballbesitz bleibt beim Team — derselbe Zugindex zaehlt nicht doppelt gegen
+          // das Kontingent, aber fuer die Enthuellung ist es ein eigenes Ereignis.
+        } else {
+          eintrag.art="block"; verteidiger.bloecke++; eintrag.fern=fernwurf;
+          amBall=1-amBall;
+        }
+      }
+      fsZuege.push(eintrag);
+    }
+  }
+
+  function stepFeldspiel(dt){
+    if(done)return;
+    fsT+=dt;
+    for(const team of FSTEAM)for(const u of team)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
+    fsAkt-=dt;
+    if(fsAkt<=0 && fsZeiger<fsZuege.length){
+      const e=fsZuege[fsZeiger++];
+      e.spieler.lunge=0.5;
+      const art=FB();
+      let txt;
+      if(e.art==="steal")txt=e.verteidiger.n+" erobert den Ball — "+art.wortAbwehr+".";
+      else if(e.art==="treffer")txt=e.spieler.n+" trifft"+(e.fern?" von weit draußen":"")+" — +"+e.punkte+".";
+      else if(e.art==="rebound")txt=e.spieler.n+" holt den "+art.wortRebound+".";
+      else txt=e.verteidiger.n+" verhindert den Abschluss — "+art.wortBlock+".";
+      feed(e.seite,txt,e.art==="treffer");
+      if(e.art==="treffer")schwebe({x:0,y:0,txt:"+"+e.punkte,life:1,crit:true,_spieler:e.spieler.id});
+      fsAkt=art.zugDauer;
+    }
+    if(fsZeiger>=fsZuege.length)done=true;
+  }
+
+  function updateHudFeldspiel(){
+    document.getElementById("clock").textContent=
+      Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
+    document.getElementById("phase").textContent=done?"beendet":"läuft";
+    document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
+    document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
+    document.getElementById("score").textContent=fsPunkte[0]+" : "+fsPunkte[1];
+    const maxPkt=Math.max(1,fsPunkte[0],fsPunkte[1]);
+    document.getElementById("thpL").style.width=(fsPunkte[0]/maxPkt*100)+"%";
+    document.getElementById("thpR").style.width=(fsPunkte[1]/maxPkt*100)+"%";
+    renderKader();
+  }
+
+  function bodenFeldspiel(){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#1c2e1e");g.addColorStop(1,"#152418");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle="rgba(255,255,255,.14)";ctx.lineWidth=2;
+    ctx.strokeRect(60,H*0.10,W-120,H*0.80);
+    ctx.beginPath();ctx.moveTo(MID,H*0.10);ctx.lineTo(MID,H*0.90);ctx.stroke();
+    ctx.beginPath();ctx.arc(MID,H/2,44,0,6.3);ctx.stroke();
+    for(const x of [60,W-60]){
+      ctx.beginPath();ctx.arc(x,H/2,70,x<MID?-1.05:Math.PI-1.05,x<MID?1.05:Math.PI+1.05);ctx.stroke();
+    }
+  }
+
+  function zeichneFeldspiel(){
+    bodenFeldspiel();
+    const art=FB();
+    [0,1].forEach(side=>{
+      const g=FSTEAM[side];
+      const y=side===0?H*0.30:H*0.68;
+      g.forEach((u,i)=>{
+        const x=100+(W-200)*(g.length>1?i/(g.length-1):0.5);
+        const c=side===0?css("--home"):css("--away");
+        ctx.fillStyle=c;ctx.globalAlpha=0.20;
+        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
+        zeichneSprite(ctx,u,x,y);
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        const schrift=(txt,dy,farbe,groesse)=>{
+          ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
+          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
+          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
+        };
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        if(u.punkte||u.rebounds||u.steals||u.bloecke)
+          schrift(u.punkte+"P "+u.rebounds+"R "+(u.steals+u.bloecke)+"D",56,"#dfe6ef",8);
+      });
+    });
+    for(const f of floats){
+      if(f._spieler==null)continue;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=css("--ok");
+      ctx.font="700 15px 'Barlow Condensed',sans-serif";ctx.textAlign="center";
+      let ort=null;
+      for(let side=0;side<2&&!ort;side++){
+        const idx=FSTEAM[side].findIndex(u=>u.id===f._spieler);
+        if(idx>=0){const g=FSTEAM[side];
+          const x=100+(W-200)*(g.length>1?idx/(g.length-1):0.5);
+          const y=(side===0?H*0.30:H*0.68)-30-((1-f.life)*20);
+          ort={x,y};
+        }
+      }
+      if(ort)ctx.fillText(f.txt,ort.x,ort.y);
+      ctx.globalAlpha=1;
+    }
+  }
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -2172,7 +2481,7 @@
       // der Grenzversuch gelingt nicht allein durch Kraft, das Publikum traegt den Lifter
       // durch die letzten Kilo. Drei Versuche, ein verpatzter zaehlt NICHTS (failAbzug 0)
       // — echtes Gewichtheben kennt keine Teilpunkte fuer eine gerissene Hantel.
-      label:"Gewichtheben", jeSeite:6, rundenN:3, rundenDauer:2.4,
+      label:"Gewichtheben", jeSeite:6, rundenN:3, rundenDauer:1.65,
       failAbzug:0, failWort:"Fehlversuch", erfolgWort:"sauber durchgestemmt",
       // NACHGEZOGEN: erste Messung stand bei 64 Pp, weil Charisma (Matrixgewicht 23,
       // zweithoechster Wert) nur im risikofreien PUBLIKUM-Bonus sass — einem FLACHEN
@@ -2195,7 +2504,7 @@
     showcase:{
       // MATRIX: charisma 27, spirit 16, determination 14, power 11, intelligence 10,
       // dexterity 9, speed 8, health 3, torment 2.
-      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.8,
+      label:"Showcase", jeSeite:6, rundenN:5, rundenDauer:1.0,
       failAbzug:0.55, failWort:"verpatzt", erfolgWort:"reisst das Publikum mit",
       rezept:{
         GRUNDLAGE:    {charisma:55,spirit:30,determination:15},
@@ -2211,7 +2520,7 @@
     eiskunstlauf:{
       // MATRIX: charisma 28, dexterity 18, spirit 16, awareness 14, speed 10,
       // intelligence 8, determination 6.
-      label:"Eiskunstlauf", jeSeite:6, rundenN:6, rundenDauer:1.6,
+      label:"Eiskunstlauf", jeSeite:6, rundenN:6, rundenDauer:0.85,
       failAbzug:0.35, failWort:"stürzt", erfolgWort:"landet sauber",
       rezept:{
         GRUNDLAGE:    {charisma:50,spirit:30,dexterity:20},
@@ -2229,7 +2538,7 @@
       // dexterity 2, intelligence 2. KEIN Charisma — anders als die anderen drei
       // Buehnen-Disziplinen traegt hier nicht das Lächeln, sondern die Praesenz im
       // Battle. Publikum speist sich deshalb aus Wille und Torment, nicht aus Charisma.
-      label:"Breaking", jeSeite:6, rundenN:4, rundenDauer:2.0,
+      label:"Breaking", jeSeite:6, rundenN:4, rundenDauer:1.25,
       failAbzug:0.55, failWort:"Move bricht ab", erfolgWort:"setzt den Move",
       // NACHGEZOGEN: erste Messung stand bei 68,4 Pp. Dexterity (Matrixgewicht 2, quasi
       // irrelevant) sass in TECHNIK, der Erfolgschance-Rolle, und las dadurch 26,2 % —
@@ -2252,7 +2561,7 @@
       // MATRIX: will 26, health 22, stamina 22, determination 16, intelligence 8,
       // torment 6. Auch hier kein Charisma — das Publikum feuert an, aber es ist der
       // eigene Wille, der den naechsten Bissen nimmt.
-      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:1.2,
+      label:"Wettessen", jeSeite:6, rundenN:8, rundenDauer:0.65,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -3120,7 +3429,21 @@
     reg.appendChild(el("s",null,SPAEHGRAD+" %"));
     reg.appendChild(el("em",null,["kaum etwas","grobe Bereiche","brauchbar","genau"][spaehStufe(SPAEHGRAD)]));
     box.appendChild(reg);
-    if(istBuehne(disc)){
+    if(istFeldspiel(disc)){
+      // Kein Schlachtplan: hier zaehlt, wer am Ball ist. Statt einer Taktik zeigt sich
+      // das Prinzip der Schleife — Ballbesitz wechselt bei Steal oder Treffer.
+      const k=el("div","plan");
+      k.appendChild(el("b",null,"Ballwechsel"));
+      k.appendChild(el("p",null,FB().zuegeJeSeite*2+" Zuege insgesamt, abwechselnd zwischen "+
+        "den Seiten. Aufbau gegen Abwehr entscheidet, ob es zum Abschluss kommt; Technik "+
+        "und Teamgeist entscheiden den Abschluss; Zweitchance gegen Abwehr entscheidet, wer "+
+        "einen verpassten Abschluss aufsammelt."));
+      box.appendChild(k);
+      const apb2=document.getElementById("arenaplan");
+      if(apb2)apb2.textContent=FB().zuegeJeSeite*2+" Zuege, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+".";
+      const pl2=document.querySelector(".planzeile b");
+      if(pl2)pl2.textContent="Ballwechsel";
+    } else if(istBuehne(disc)){
       // Auf der Buehne gibt es keinen Schlachtplan und keinen Rennplan — jeder tritt fuer
       // sich an und wird bewertet. Was hier zaehlt, ist die Reihenfolge der Durchgaenge.
       const k=el("div","plan");
@@ -3189,7 +3512,7 @@
       r.appendChild(w);
       box.appendChild(r);
     });
-    if(!istBahn(disc)&&!istBuehne(disc)){
+    if(!istBahn(disc)&&!istBuehne(disc)&&!istFeldspiel(disc)){
       const ap=document.getElementById("arenaplan");
       if(ap)ap.textContent=PLAN?PLAN.name+" — "+PLAN.grund:"";
       const pl=document.querySelector(".planzeile b");
@@ -3405,6 +3728,7 @@
   const slotsDerReihe=(row,d)=>slotsVon(d||"tdm").filter(sl=>slotReihe(sl.id)===row);
 
   function build(saat){
+    if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
     if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
     if(istBahn(disc)){bahnDisc=disc; return bauSpurt(saat);}
     seed=saat||1337;U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
@@ -4214,6 +4538,7 @@
   const formMitFuehrung=(u)=>Math.min(100,(u.form||0)+FUEHRUNG[u.side].wert*0.35);
 
   function stepSim(dt){
+    if(istFeldspiel(disc))return stepFeldspiel(dt);
     if(istBuehne(disc))return stepBuehne(dt);
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
@@ -4780,6 +5105,7 @@
   const bodenSaat=(i)=>{const x=Math.sin(i*127.1)*43758.5453;return x-Math.floor(x);};
 
   function zeichneBoden(){
+    if(istFeldspiel(disc))return bodenFeldspiel();
     if(istBuehne(disc))return bodenBuehne();
     if(istBahn(disc))return bodenSpurt();
     return bodenArena();
@@ -5717,6 +6043,7 @@
 
   function draw(){
     ctx.clearRect(0,0,W,H);
+    if(istFeldspiel(disc)){zeichneFeldspiel();return;}
     if(istBuehne(disc)){zeichneBuehne();return;}
     if(istBahn(disc)){zeichneSpurt();return;}
     zeichneBoden();
@@ -5840,7 +6167,8 @@
       for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
-      if(istBuehne(disc))updateHudBuehne();
+      if(istFeldspiel(disc))updateHudFeldspiel();
+      else if(istBuehne(disc))updateHudBuehne();
       else if(istBahn(disc))updateHudBahn();
     }
     draw();
@@ -5918,6 +6246,7 @@
       liste.textContent="";
       const feld=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
         :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite).map(u=>({n:u.n,eig:u.eig,side:seite}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(u=>({n:u.n,eig:u.eig,side:seite}))
         :U.filter(u=>u.side===seite);
       const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
       for(const u of feld){
@@ -6041,6 +6370,8 @@
       for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite).map(x=>({n:x.n,down:x.stolper>0,hp:1-x.pos,max:1}))
         :istBuehne(disc)?TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
           hp:x.summe,max:Math.max(1,...TEILNEHMER.map(y=>y.summe))}))
+        :istFeldspiel(disc)?FSTEAM[seite].map(x=>({n:x.n,down:false,hp:x.punkte,
+          max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>y.punkte))}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         k.appendChild(el("b",null,u.n));
@@ -6057,6 +6388,8 @@
       : istBuehne(disc)
       ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
          Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+      : istFeldspiel(disc)
+      ? (fsPunkte[0]+" : "+fsPunkte[1])
       : (live(0).length+" : "+live(1).length);
   }
 
@@ -6121,10 +6454,11 @@
     document.getElementById("arenaDisc").textContent=
       (DISCS[disc]?DISCS[disc].label:disc)+" · "+
       (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
-                    :istBuehne(disc)?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
+                    :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
     feed(0,"Aufstellung steht. Befehle sind gesetzt.");
-    istBahn(disc)?updateHudBahn():istBuehne(disc)?updateHudBuehne():updateHud();
+    istBahn(disc)?updateHudBahn():istBuehne(disc)?updateHudBuehne()
+      :istFeldspiel(disc)?updateHudFeldspiel():updateHud();
     draw();renderKader();
     document.getElementById("endstand").hidden=true;
     renderEinlauf();zeigeEinlauf(true);
@@ -6309,6 +6643,23 @@
       lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
       namen:()=>TEILNEHMER.map(u=>u.n),
       wert:()=>{const o={}; for(const u of TEILNEHMER)o[u.n]=u.summe; return o;}
+    };
+  }
+  // JEDES FELDSPIEL MELDET SICH SELBST AN. "Besser" ist hier ein kleiner Box-Score:
+  // Punkte zaehlen voll, Rebounds und Abwehr-Ereignisse (Steal/Block) etwas weniger,
+  // ein Ballverlust zieht ab — dieselbe Grundidee wie eine echte Plus/Minus-Statistik.
+  for(const fd of Object.keys(FELDSPIEL_ART)){
+    MOTOREN[fd]={
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done}),
+      zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
+                    fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
+                    fsPunkte=a.fsPunkte; done=a.done;},
+      vorher:()=>{disc=fd; feldspielDisc=fd;},
+      bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
+      lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
+      namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
+      wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
+        o[u.n]=u.punkte+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
     };
   }
 
