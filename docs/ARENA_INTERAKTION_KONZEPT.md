@@ -202,6 +202,56 @@ macht. Bei **Eiskunstlauf** trifft ein Störwurf gezielt den *nächsten* Durchga
 Ziels — sein aktuelles Element „verwackelt" statt zu misslingen, weil ohnehin nichts live
 läuft, das misslingen könnte.
 
+### Namen statt Kürzel (Chris' Ergänzung)
+
+Zurecht kritisiert: im Feed dürften nicht die rohen Kürzel ANG/VER/LP/TMP/AUS auftauchen.
+Sein Bild — „offensiver Skill, defensiver Skill, beim Sport zum Beispiel Ausweichen oder
+Parieren" — ist bereits ein bestehendes Muster im Code: `BAHN_ART` benennt seine sieben
+Rollen für jede der fünf Bahn-Disziplinen einzeln um, über ein `lang`-Objekt (z. B.
+Climbing: `ANTRITT:"Zug"`, Spurt: `ANTRITT:"Antritt"` — gleiche Struktur, andere Wörter).
+Dieselbe Idee, angewendet auf die fünf Störwerte, einmal je Bühne-Disziplin (alle
+kollisionsfrei gegen die sieben Rezept-Rollennamen GRUNDLAGE…WAGNIS geprüft):
+
+| Disziplin | ANG (Störzug) | TMP (Ausweichen) | VER (Parieren) | LP (Fassungspool) | AUS (Budget) |
+|---|---|---|---|---|---|
+| Gewichtheben | Einschüchtern | Tunnelblick | Standfestigkeit | Sammlung | Körner |
+| Showcase | Show stehlen | Überspielen | Bühnenpräsenz | Selbstvertrauen | Atem |
+| Eiskunstlauf | Stichelei | Drüberstehen | Haltung | Contenance | Giftvorrat |
+| Breaking | Ansage | Flow | Härte | Schmerzgrenze | Akku |
+| Wettessen | Appetitverderber | Weiteressen | Eiserner Magen | Ekelschwelle | Puste |
+
+Beispiel-Feed-Zeilen im bestehenden `feed()`-Muster (kurz, Aktion, kein Fließtext):
+
+```
+Gewichtheben ANG: u.n+" schüchtert "+z.n+" vor dem Versuch ein."
+Eiskunstlauf ANG: u.n+" stichelt gegen "+z.n+" — der nächste Sprung wackelt."
+Wettessen TMP:    z.n+" isst einfach weiter."
+Breaking LP:       z.n+" ist über der Schmerzgrenze — die Moves leiden."
+```
+
+„Y isst einfach weiter" (Wettessen, Ausweichen) braucht keine Erklärung und ist komisch,
+weil es stimmt — genau der Maßstab aus Chris' dritter Bedingung („beim Einsetzen schon
+sieht und nachvollziehen kann").
+
+**Als Prinzip weitergedacht, nicht nur für die Störung:** dieselbe Lücke besteht schon
+heute in `BUEHNE_ART` und `FELDSPIEL_ART` selbst — GRUNDLAGE heißt bei Gewichtheben und
+Wettessen gleich, obwohl das Rezept dahinter unterschiedlich ist (dort Power/Health, hier
+Stamina/Health). Beide Registries fehlt ein `lang`-Objekt, das `BAHN_ART` hat. Beispiel,
+wie GRUNDLAGE dort greifbar würde: Breaking → „Foundation" (echter Breakdance-Begriff für
+verlässliche Basis-Moves, passt auf `{will,health,stamina}`), Eiskunstlauf → „Ausstrahlung"
+(das Rezept `{charisma,spirit,dexterity}` ist Präsenz, keine „Grundlage").
+
+**Wichtiger Vorbehalt, nachgemessen statt vermutet:** die fünf bestehenden Bahn-`lang`-
+Objekte werden im Mockup **nirgends gelesen** — `grep` auf `.lang[` liefert null Treffer,
+es ist definierte, aber tote Daten. Was der Bahn-Feed tatsächlich für unterschiedliche
+Sprache je Disziplin nutzt, sind die separaten Wort-Slots `hindernisWort`/`failWort`/
+`erfolgWort`, die tatsächlich in die Feed-Zeilen einfließen — und dieses Muster hat
+`BUEHNE_ART` bereits (z. B. „stürzt"/„landet sauber", „Move bricht ab"). Ein `lang`-Objekt
+einzuführen heißt deshalb **zwei** Schritte, nicht einen: die Namen definieren UND sie an
+jeder Stelle verdrahten, an der ein Rollenname einem Zuschauer gezeigt wird (Einheiten-
+Panel, Tooltip, künftig die Stör-Feed-Zeilen) — sonst entsteht dieselbe Halb-Lücke ein
+zweites Mal, nur eine Ebene tiefer.
+
 ---
 
 ## Verletzungen als echte Konsequenz, nicht Zierde
@@ -360,6 +410,9 @@ erkämpfen").
    ob die Verletzungsformel den echten Kampfverlauf lesen darf oder auf die
    Aufstellungs-Rückfallvariante ausweichen muss.
 6. Kamera: nur horizontal zoomen, oder soll sie auch vertikal mitgehen?
+7. Sollen `BUEHNE_ART`/`FELDSPIEL_ART` ein `lang`-Objekt für ihre sieben Rollen bekommen
+   (wie `BAHN_ART`), inklusive der Verdrahtung, die beim Bahn-Vorbild bisher fehlt? Die
+   25 Störwert-Namen oben sind davon unabhängig umsetzbar.
 
 ## Quellen
 
