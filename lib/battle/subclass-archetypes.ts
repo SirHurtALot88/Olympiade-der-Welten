@@ -718,6 +718,268 @@ export const BILDBEFUNDE: readonly Bildbefund[] = [
     schliesstAus:
       "Blackguard, Bullbreaker und Frost Knight (aus Guardian): keine Peitsche, kein Schild, keine massige Statur, keine Eisausrüstung — und mit Health 15 fehlt jede Tank-Statur. Matriarch und Templar (aus Ambassador) fallen ebenfalls weg: kein Hammer, keine geweihte Panzerung, keine Kampf-Aggression zu sehen — die Szene zeigt reine Diplomatie, wie es die Aufschrift im Hintergrund selbst sagt. Übrig bleibt Priest, die 'Unterstützung'-Lesart von Ambassador, passend zu Charisma 87 und Spirit 84.",
   },
+
+  // ===================================================================================
+  // BATCH 3 — 30 Spieler. V-W (Chris' eigenes Team) war nach Batch 2 bereits vollständig
+  // abgedeckt, also ging es direkt in den Rest der aktiven Liga: die kompletten
+  // Rest-Kader von A-A (Armageddon Aftermath), B-B (Blazing Beasts) und B-P (Black
+  // Panthers), dazu der Anfang von C-C (Cash Creators), in Teamreihenfolge.
+  //
+  // Auffällig oft zeigen die Bilder in dieser Welle keine Menschen, sondern Kreaturen,
+  // Schiffe oder sogar ein ganzes Schwarmmonster ohne Waffe in der Hand — die Zuordnung
+  // stützt sich dort auf Statur, Verhalten und Motiv statt auf Waffentyp. Wo auch das
+  // nicht reicht (Aegirion ist ein Schiff, kein Charakter; Rok Kyl und Roddox Harthelm
+  // widersprechen ihrer Servant-Unterklasse; Butterfly ist ein Drache, kein Wayfarer),
+  // steht das explizit als Widerspruch für Chris.
+  // ===================================================================================
+
+  // --- Rest-Roster A-A (Armageddon Aftermath) ---
+  {
+    spieler: "Ralazar the Balanced",
+    bild:
+      "Muskulöser Mann in verzierter Lederrüstung mit Blattmuster-Brustpanzer, violetter Schal, kein sichtbares Schwert, ruhige disziplinierte Haltung vor einem Ruinenbogen.",
+    archetypen: ["Fighter"],
+    schliesstAus:
+      "Orc Warrior, Barbarian (aus Warrior): kein Ork, keine wilde Berserker-Haltung — die Rüstung ist fein gearbeitet und diszipliniert getragen. Steelwind: kein Krummschwert-/Tech-Motiv. BEFUND: Archmage, Fire Mage, Ice Mage, Lightning Mage, Conjurer (aus Mage) finden im Bild keinerlei Deckung — kein Zaubereffekt, nur Rüstung. Die Unterklasse Mage bleibt unbestätigt, übrig bleibt der ruhige, ausbalancierte Nahkämpfer aus Warrior. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Byrnja",
+    bild:
+      "Blasses Mädchen mit weißblondem Bob, schwarzem Kleid mit weißem Kragen; ein abgeschnittener Tortenboden liegt wie eine Kopfhaube auf ihrem Schädel, eine fremde Hand schneidet mit einem Messer ein Stück heraus — surreales, unheimliches Bild ohne Rüstung oder Waffe in ihrer eigenen Hand.",
+    archetypen: ["Reaper Mage", "Necromancer"],
+    schliesstAus:
+      "Priest, Matriarch, Cleric (aus Servant): keine Heil- oder Dienstgeste, keine Robe. Astralwing (aus Apparition): keine Sterne oder Himmelslicht. Die morbide, entkörperlichte Inszenierung passt zu den beiden dunklen Wegen aus Apparition.",
+  },
+  {
+    spieler: "Elara",
+    bild:
+      "Silberhaarige Elfe im Wald, spannt einen Langbogen, Köcher mit Pfeilen und zwei Dolche am Gürtel, grüner Umhang, leichte Lederrüstung.",
+    archetypen: ["Bowman", "Hunter"],
+    schliesstAus:
+      "Crossbowman: sie trägt einen Bogen, keine Armbrust — wie bei Cassandra ist damit Chris' eigenes Beispiel beantwortet.",
+  },
+  {
+    spieler: "Aeon Flux",
+    bild:
+      "Weiblicher Cyborg in schwarzer Techrüstung mit spitzen Antennen-Ohren, führt eine pinke Energieklinge, futuristische Stadt.",
+    archetypen: ["Steelwind", "Spellblade"],
+    schliesstAus:
+      "Rogue, Crossbowman, Bowman (aus Agent/Spec Ops): keine physische Klinge oder Fernkampfwaffe, sondern eine Energiewaffe. Astralwing: keine Sternbilder, das Leuchten ist technisch. Voidfist (aus Augmented): sie führt eine Waffe, kämpft nicht unbewaffnet. Übrig bleiben die beiden technisch-magischen Klingenwege.",
+  },
+  {
+    spieler: "Mindtamer",
+    bild:
+      "Frau mit gläsernem Helm über einem leuchtenden Gehirn, kontrolliert mit erhobenen Händen schwebende Rauch-/Lichtfäden, unbewaffnet, Gewölbe.",
+    archetypen: ["Conjurer"],
+    schliesstAus:
+      "Necromancer, Reaper Mage (aus Warlock): kein Totenmotiv, keine zehrende Magie — die Fäden werden telekinetisch gelenkt, nicht beschworen. Priest, Matriarch, Templar (aus Ambassador): keine Rüstung, keine Heilgeste, keine diplomatische Pose. Übrig bleibt der kontrollierende Zauberer, der zur Gedankenkontrolle im Namen passt.",
+  },
+  {
+    spieler: "Tidesprinter",
+    bild:
+      "Blauhäutiger Wassermann/Meeresdämon mit Dreizack, schreiend, Schuppenschwanz, tost aus einem Strudel.",
+    archetypen: ["Barbarian"],
+    schliesstAus:
+      "Rogue, Conjurer, Astralwing (aus Trickster): keine List oder Beschwörung, nur roher Frontalangriff. Fighter, Orc Warrior, Steelwind (aus Warrior): die wilde, ungebändigte Erscheinung mit offenem Maul passt zum Berserker, nicht zum disziplinierten oder technischen Kämpfer.",
+  },
+  {
+    spieler: "Greenkraut",
+    bild:
+      "Riesiges baumartiges Wesen aus Rinde, trägt behutsam ein Vogelnest mit Küken in den Händen, orangene Blüte auf dem Kopf, Wald.",
+    archetypen: ["Orc Shaman", "Bullbreaker"],
+    schliesstAus:
+      "Conjurer, Necromancer (aus Pet Master): kein Beschwörungseffekt, das Küken ist kein herbeigerufenes Vertrautes, sondern wird nur behütet. Matriarch, Priest (aus Druid): keine Heilgeste an Verbündeten. Barbarian, Orc Warrior (aus Behemoth): keine Aggression, kein Angriff. Übrig bleiben der naturverbundene Schamane für die pflegende Geste und der massige Koloss für die schiere Größe.",
+  },
+
+  // --- Rest-Roster B-B (Blazing Beasts) ---
+  {
+    spieler: "Tsubaki Cleaning",
+    bild:
+      "Kleines Wesen aus Rinde, Moos und Zweigen mit großen Kulleraugen, besprüht eine Farnpflanze aus einer Sprühflasche, Bonsai im Hintergrund, freundliches Lächeln.",
+    archetypen: ["Orc Shaman"],
+    schliesstAus:
+      "Matriarch, Priest (aus Druid): keine Heil-/Support-Geste an Verbündeten. Hunter, Thunderclaw, Barbarian (aus Jungle): kein Bogen, keine Aggression, keine Kampfhaltung. Übrig bleibt der naturverbundene Weg, der zur pflanzenpflegenden Szene passt.",
+  },
+  {
+    spieler: "Othrama",
+    bild:
+      "Insektoides schwarzes Wesen mit durchsichtigen Flügeln, glühend grünen Facettenaugen, langen Klauen, kauert im dunklen Regenwald.",
+    archetypen: ["Thunderclaw", "Barbarian"],
+    schliesstAus:
+      "Hunter (aus Jungle): kein Bogen. Orc Warrior (aus Creature): kein Humanoider mit Waffe. Die tierisch-monströse Erscheinung mit Klauen und Fühlern passt zu den beiden Kandidaten, die in Jungle UND Creature zugleich auftauchen.",
+  },
+  {
+    spieler: "Butterfly",
+    bild:
+      "Ein gewaltiger Drache mit kosmisch schillernden, sternenübersäten Flügeln fliegt in der Abenddämmerung über einen Dschungel.",
+    archetypen: ["Hunter"],
+    schliesstAus:
+      "Monk, Steelwind (aus Wayfarer): kein Nahkampf, kein Kämpfer im eigentlichen Sinn erkennbar. BEFUND: Das Bild zeigt keinen humanoiden Kämpfer, sondern einen Drachen — keiner der drei Wayfarer-Archetypen (Monk, Hunter, Steelwind) bildet ein Flugwesen ab. Hunter bleibt als einzige Lesart stehen, die zumindest den wandernden, distanzierten Charakter von Wayfarer trägt, ist aber keine echte Verengung. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Myrkos",
+    bild:
+      "Mann mit Fliegerhaube und Schutzbrille, das halbe Gesicht von einer tentakelartigen Parasiten-Kreatur überwuchert, die sich um Hals und Rücken windet, stützt sich auf einen Gehstock, postapokalyptische Landstraße im Nebel.",
+    archetypen: ["Voidfist"],
+    schliesstAus:
+      "Steelwind, Spellblade: keine Techrüstung, keine Klinge — der Stock ist eine Gehhilfe, keine Waffe. Die organische Verschmelzung mit dem Tentakelwesen liest sich als körperliche, waffenlose Veränderung; am ehesten passt der unbewaffnete Nahkämpfer.",
+  },
+  {
+    spieler: "Mavra",
+    bild:
+      "Weibliche Orkin mit grüner Haut, zerrissenem rotem Top, schwingt eine Streitaxt, Vollmond mit mehreren Monden im Hintergrund.",
+    archetypen: ["Orc Warrior", "Barbarian"],
+    schliesstAus:
+      "Fighter, Steelwind (aus Warrior): zu diszipliniert/technisch für die wilde, zornige Haltung. Thunderclaw, Reaver (aus Beast): kein Elektromotiv, keine zwei Waffen. Sie ist buchstäblich eine Orkin im Kampfrausch — beide Kandidaten, die in Warrior UND Beast zugleich Sinn ergeben, bleiben stehen.",
+  },
+  {
+    spieler: "Murky",
+    bild:
+      "Sumpfmonster aus tropfendem Moos und Fäulnis, glühend grüne Augen, erhebt sich halb aus dunklem Wasser, keine Waffe.",
+    archetypen: ["Barbarian"],
+    schliesstAus:
+      "Thunderclaw: kein elektrisches oder tierisch-elegantes Motiv, eher zerfließende Fäulnis. Reaver: keine geführte Waffe. Übrig bleibt der rohe, unbewaffnete Nahkämpfer.",
+  },
+  {
+    spieler: "Leviathan",
+    bild:
+      "Gewaltiger östlicher Drache mit goldener Mähne, an Ketten gelegt, bäumt sich über tosender See vor Vollmond auf.",
+    archetypen: ["Bullbreaker", "Thunderclaw"],
+    schliesstAus:
+      "Die Unterklassen-Liste ist für diesen Spieler leer (Datenlücke im Spielstand) — die Zuordnung stützt sich allein auf das Bild. Ein gekettetes drachenhaftes Kolossalwesen passt am ehesten zum massigen Tank (wie bei Krag'Zul/Terradon/Gram gehandhabt) und zum tierischen Kraftmotiv.",
+  },
+
+  // --- Rest-Roster B-P (Black Panthers) ---
+  {
+    spieler: "Node",
+    bild:
+      "Schlanker Cyborg mit digitalem Bildschirmkopf, sprintet mit cyanfarbenen Energieschlieren durch eine zerstörte Stadt, keine sichtbare Waffe.",
+    archetypen: ["Steelwind", "Rogue"],
+    schliesstAus:
+      "Bullbreaker, Barbarian, Orc Warrior (aus Behemoth): keine massige Statur, sondern schlank und schnell. Crossbowman, Bowman (aus Bot/Agent): keine Fernkampfwaffe. Astralwing: keine Sternbilder, das Leuchten ist Technik. Übrig bleiben die beiden agilen, technisch-verdeckten Wege.",
+  },
+  {
+    spieler: "Aegirion",
+    bild:
+      "Riesiges rostiges Frachtschiff mit Schornsteinen und Kranarmen, schwebt auf Antriebsdüsen über einer Stadt, Name „AEGIRION“ am Rumpf — kein humanoider Charakter zu sehen.",
+    archetypen: ["Bullbreaker"],
+    schliesstAus:
+      "BEFUND: Kein Archetyp der Karten bildet ein Schiff ab. Von den verfügbaren Kandidaten aus Behemoth/Bot passt einzig der massige, kolossale Tank noch am ehesten zur schieren Größe — die feineren Bot-Lesarten (Steelwind, Fighter, Crossbowman, Rogue) setzen einen beweglichen Einzelkämpfer voraus, den dieses Bild nicht zeigt. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Starflame",
+    bild:
+      "Elfische Zauberin in schwarz-goldener Robe, hält einen Kristallstab, in der anderen Hand kreisen goldene Sternzeichen-Ringe, Sternenhimmel.",
+    archetypen: ["Archmage", "Conjurer"],
+    schliesstAus:
+      "Fire Mage, Ice Mage, Lightning Mage (aus Mage): kein Element erkennbar, nur arkanes Sternenlicht. Necromancer, Reaper Mage (aus Warlock): kein Totenmotiv. Übrig bleiben die beiden Wege, die zum kosmisch-arkanen, kontrollierenden Auftreten passen.",
+  },
+  {
+    spieler: "Starbound",
+    bild:
+      "Kolossales kristallines Sternenwesen mit leuchtendem Kern, umkreist von wirbelnden Energieringen, antike Ruinen.",
+    archetypen: ["Astralwing"],
+    schliesstAus:
+      "Reaper Mage, Necromancer (aus Apparition): kein Totenmotiv, keine zehrende Magie — die Erscheinung ist sternenhaft-kristallin, nicht morbide. Steelwind, Fighter, Crossbowman (aus Bot): keine Maschine, kein Metall. Archmage, Fire Mage, Ice Mage, Lightning Mage, Conjurer (aus Mage): kein Element, kein Stab. Übrig bleibt der sternenumkreiste Weg aus Apparition, der zum kristallinen Kosmoswesen passt.",
+  },
+  {
+    spieler: "Brightpaw",
+    bild:
+      "Majestätischer weißer Geisterwolf mit leuchtend blauen Runenmarkierungen und drittem Auge auf der Stirn, Lichtkranz, Zauberzeichen ringsum, Wald.",
+    archetypen: ["Thunderclaw", "Matriarch"],
+    schliesstAus:
+      "Barbarian, Reaver (aus Beast): kein grober Nahkämpfer, sondern ein mystisches Tierwesen. Blackguard, Bullbreaker, Frost Knight (aus Guardian): keine Rüstung, kein Panzer. Übrig bleiben das tierische Motiv und die schützend-spirituelle Ausstrahlung, die zur Rolle als Wächter passt.",
+  },
+  {
+    spieler: "Abysskraken",
+    bild:
+      "Gewaltiges gehörntes Tiefsee-Monster mit Tentakeln, Stachelpanzer und leuchtend blauen Energieadern, brüllt aus dem Wasser.",
+    archetypen: ["Barbarian", "Bullbreaker", "Thunderclaw"],
+    schliesstAus:
+      "Reaver, Voidfist (aus Destroyer): keine geführte Waffe, keine bloßen Fäuste — er ist ein monströser Koloss, keine Kampfstil-Figur. Orc Warrior (aus Behemoth): kein Humanoider. Barbarian ist der einzige Archetyp, der in ALLEN drei Unterklassen-Listen auftaucht — dazu passen Bullbreaker für die schiere Masse und Thunderclaw für die elektrischen Adern.",
+  },
+  {
+    spieler: "Kreischende Kogge",
+    bild:
+      "Zerfallenes Geisterschiff mit totenkopfförmigem Segel, grün schimmerndem Rumpf, Blitz im Sturm — kein Besatzungsmitglied sichtbar.",
+    archetypen: ["Reaper Mage", "Necromancer"],
+    schliesstAus:
+      "Rogue, Crossbowman, Steelwind (aus Pirate): keine Figur, die eine Waffe führen könnte — es ist das Schiff selbst, das im Bild steht. Das Totenkopfsegel und das Geisterlicht passen zu den beiden Totenwegen aus Wraith.",
+  },
+  {
+    spieler: "Greybeard",
+    bild:
+      "Alter, muskulöser bärtiger Mann mit Stammestätowierungen am Arm, stützt sich auf einen Wanderstab, Wald.",
+    archetypen: ["Orc Shaman", "Barbarian"],
+    schliesstAus:
+      "Bullbreaker, Orc Warrior (aus Behemoth): kein Humanoider von übermenschlicher Größe, nur ein kräftiger alter Mann. Priest, Ember Priest (aus Shaman): keine geistliche Robe. Reaver (aus Viking): keine geführte Waffe. Die Stammestätowierungen passen zum primalen Schamanen, der massige Körperbau zum rohen Kämpfer.",
+  },
+
+  // --- C-C (Cash Creators), Anfang ---
+  {
+    spieler: "Tropfina",
+    bild:
+      "Leuchtende Pflanze mit tropfenbesetzten Blättern, wurzelt in einem glühenden türkisen Lichtbecken im Wasser, kein humanoider Körper.",
+    archetypen: ["Priest", "Matriarch"],
+    schliesstAus:
+      "Cleric: keine Rüstung, kein Kampfstil erkennbar — die reine Naturheil-Ästhetik mit leuchtenden Tropfen passt eher zu den beiden lichtgebenden Support-Wegen.",
+  },
+  {
+    spieler: "Roddox Harthelm",
+    bild:
+      "Muskulöser Stierkopf-Humanoide (Minotaurus) mit Nasenring, stützt sich ruhig auf einen einfachen Holzstab, grüne Wiese.",
+    archetypen: ["Barbarian"],
+    schliesstAus:
+      "Thunderclaw, Reaver (aus Beast): kein elektrisches Motiv, keine zwei Waffen. Priest, Matriarch, Cleric (aus Servant): keine Robe, keine Heilgeste — der Holzstab ist eine Gehhilfe, kein Ritualgegenstand. BEFUND: Das ruhige, fast dienstbare Auftreten passt zu keinem der Beast-Kandidaten, und keiner der Servant-Kandidaten zeigt sich im Bild — übrig bleibt der körperlich stärkste Kandidat aus Beast als am wenigsten falsche Wahl. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Ironhoof",
+    bild:
+      "Riesiges brüllendes Reptilwesen mit gehörntem Kamm, scharfen Zähnen und Klauen, kauert vor einer Horde ähnlicher Kreaturen, Ödland.",
+    archetypen: ["Barbarian", "Orc Warrior"],
+    schliesstAus:
+      "Fighter, Steelwind (aus Warrior): kein disziplinierter oder technischer Kämpfer, ein rohes Monster. Thunderclaw, Reaver (aus Beast): kein elektrisches Motiv, keine zwei geführten Waffen. Übrig bleiben die beiden wildesten Nahkampf-Lesarten.",
+  },
+  {
+    spieler: "Babuschinka",
+    bild:
+      "Alte Hexe mit leuchtend blauen Augen, dunkler bestickter Robe, hält ein Bündel Geldscheine und zeigt anklagend mit dem Finger, Marktkulisse.",
+    archetypen: ["Conjurer", "Necromancer"],
+    schliesstAus:
+      "Reaper Mage (aus Warlock): keine zehrende Magie sichtbar. Ember Priest, Archmage (aus Alchemist): kein Element, kein arkaner Effekt. Die manipulative, hexenhafte Erscheinung mit den leuchtenden Augen passt zu den Wegen, die dunkle Kontrolle über Zehrung stellen.",
+  },
+  {
+    spieler: "Rok Kyl",
+    bild:
+      "Gehörntes reptilienartiges Monster mit aufgerissenem Maul und Klauen, brüllt inmitten einer Kreaturenhorde, unbewaffnet.",
+    archetypen: ["Voidfist"],
+    schliesstAus:
+      "Priest, Matriarch, Cleric (aus Servant): keine Heil- oder Dienstgeste, ein reines Angriffsmonster. Monk, Priest (aus Monk): kein geistlicher/asketischer Habitus erkennbar. BEFUND: Weder das Servant- noch das Monk-Motiv ist im Bild wiederzufinden — übrig bleibt Voidfist als einziger Kandidat, der zumindest den unbewaffneten, mit bloßen Klauen kämpfenden Charakter trifft. Widerspruch, Chris vorzulegen.",
+  },
+  {
+    spieler: "Omniclops",
+    bild:
+      "Massiger gehörnter Dämon mit violett leuchtender Brust, aggressive Haltung, dunkler Wald mit weiteren Kreaturen.",
+    archetypen: ["Bullbreaker"],
+    schliesstAus:
+      "Priest, Matriarch, Cleric (aus Servant): keine Heil- oder Dienstgeste, ein aggressiver Dämon. Barbarian, Orc Warrior (aus Behemoth): kein Humanoider mit Waffe. Übrig bleibt der massige Tank als Lesart, die der schieren Größe am nächsten kommt.",
+  },
+  {
+    spieler: "Enforcer",
+    bild:
+      "Geflügelter Krieger in goldener Plattenrüstung mit Kapuze, schwingt einen riesigen Kriegshammer, Heiligenschein, Kreuzsymbol auf der Robe.",
+    archetypen: ["Crusader", "Templar"],
+    schliesstAus:
+      "Frost Knight (aus Knight): kein Frost-Motiv. Blackguard (aus Knight): kein finsteres Auftreten, sondern strahlend-geweiht. Monk, Voidfist, Priest (aus Monk): er ist voll gepanzert und bewaffnet, kein unbewaffneter oder rein geistlicher Kämpfer. Übrig bleiben die beiden geweihten Ritterwege.",
+  },
+  {
+    spieler: "Melody",
+    bild:
+      "Frau mit rosa Haar und schwarzer Spitzenrobe, spielt Gitarre am Lagerfeuer, umgeben von durchscheinenden geisterhaften Gestalten mit leuchtenden Augen und vermummten Kapuzenfiguren, Wald bei Nacht.",
+    archetypen: ["Necromancer", "Reaper Mage"],
+    schliesstAus:
+      "Priest, Matriarch, Templar (aus Ambassador): keine Rüstung, keine diplomatische Pose. Rogue (aus Vampire): keine Klinge. Die geisterhaften Gestalten, die sie umringen, wirken wie von ihr gerufen — das passt zu den beiden Totenwegen, die in Vampire UND Undead zugleich stehen.",
+  },
 ];
 
 const BEFUND_NACH_SPIELER = new Map(BILDBEFUNDE.map((b) => [b.spieler, b] as const));
