@@ -1,0 +1,32 @@
+{
+  "_hinweis": "Vollkoerper-Sprites fuer die Rasse 'Divine' (701 Spieler im Live-Save, bislang ohne eigenen Kopf — nur Krone+Fluegel-Flags auf dem Menschenkopf). Beschafft am 24.08. aus 'Angels' (OpenGameArt, Stendhal-Drop-in von Svetlana Kushnariova alias Cabbit). BEWUSSTER STILBRUCH: 144x256 = 3 Spalten x 4 Reihen zu 48x64 (nicht 64x64), Reihenfolge N/E/S/W (Stendhal-Konvention, gleiches Schema wie drache_*.png/kraken.png in monster/quellen.json), 3 Gehframes je Richtung plus eine Ruhepose in der Mitte. Der LPC-Generator selbst hat KEINEN Heiligenschein/Halo als eigenstaendiges Zubehoerteil (siehe Rechercheergebnis unten) — deshalb hier Vollkoerper-Engel statt Kopf+Zubehoer.",
+  "_lizenz": "OGA-BY 3.0 oder neuer / CC-BY 3.0 oder neuer (direkt auf der Quellseite geprueft, Feld 'License(s)'). Attributions-Pflicht laut Seite: Urheberin Svetlana Kushnariova (Cabbit) samt ihrer E-Mail lana-chan@yandex.ru MUSS bei Weitergabe genannt werden (ihre ausdrueckliche Bedingung) — liftarn/johnny_automatic/freedo sind laut Seite nicht attributionspflichtig, aber der Vollstaendigkeit halber mitgefuehrt.",
+  "_halo_recherche": "Im LPC-Universal-Generator selbst (spritesheets/hat/*, spritesheets/neck/*, spritesheets/facial/*) gibt es keinen Heiligenschein/Halo als anbaubares Zubehoerteil — nachgesehen in allen hat/-Unterordnern (visor, pirate, formal, magic, holiday, accessory [nur Echsenfluegel], helmet, cloth, headband) sowie neck/ und facial/. Der einzige Halo, der ueberhaupt existiert, ist fest in dieses 'Angels'-Sprite einkomponiert (laut Quellseite von 'freedo' beigesteuert, aber nicht separat als Ebene herunterladbar) — er laesst sich aus dem fertigen Vollkoerper-Sprite nicht sauber als eigene Ebene herausloesen. Fuer eine echte Zubehoer-Loesung (Halo ueber einem beliebigen Kopf, wie 'krone' oder 'helm_horn') muesste man neu zeichnen oder das Halo-Element manuell aus einem der Angel-Blaetter freistellen.",
+  "engel_mann.png": {
+    "original": "angel-m-001.png (48x64-Fassung, auf der Quellseite als eigener Dateianhang gefuehrt)",
+    "paket": "Angels (Stendhal)",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64, N/E/S/W, 3 Gehframes + Ruhepose, unveraendert",
+    "urheber": "24x32-Basis: Svetlana Kushnariova (Cabbit); Fluegel: liftarn; Halo: freedo; Zusammensetzung/48x64: Jordan Irwin (AntumDeluge)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "verwendung": "maennlicher Engel — goldener Heiligenschein, weisse Fluegel, blaue Robe mit Ruestungsteilen"
+  },
+  "engel_frau_braun.png": {
+    "original": "angel-f-001.png (48x64)",
+    "paket": "Angels (Stendhal)",
+    "blatt": "144x256, Aufbau wie engel_mann.png",
+    "urheber": "Svetlana Kushnariova (Cabbit), liftarn (Fluegel), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "verwendung": "weiblicher Engel, braunes Haar/Fluegel, weiss-blaues Kleid"
+  },
+  "engel_frau_silber.png": {
+    "original": "angel-f-002.png (48x64)",
+    "paket": "Angels (Stendhal)",
+    "blatt": "144x256, Aufbau wie engel_mann.png",
+    "urheber": "Svetlana Kushnariova (Cabbit), liftarn (Fluegel), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "verwendung": "weiblicher Engel, silber-weisses Haar/Fluegel — zweite Farbvariante fuer Diversitaet"
+  }
+}
