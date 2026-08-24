@@ -429,6 +429,267 @@ export const BILDBEFUNDE: readonly Bildbefund[] = [
     schliesstAus:
       "Hunter (aus Jungle/Wayfarer): der Hund ist kein Wildschwein-Begleiter, kein Bogen zu sehen. Steelwind (aus Wayfarer): keine Klinge. Fire Mage, Ice Mage, Lightning Mage, Archmage (aus Mage): keine elementspezifischen Effekte, nur diffuses goldenes Glitzern. Thunderclaw, Barbarian (aus Jungle): keine Elektrizität, keine grobe Kampfhaltung. Übrig bleiben die unbewaffnete Lesart (Monk) und die durch das Glitzern nahegelegte, unspezifische Zaubermagie (Conjurer).",
   },
+
+  // ===================================================================================
+  // BATCH 2 — priorisiert nach Chris' AKTIVEM Spielstand (new-game-1787123325719-swnjlk),
+  // nicht nach der vollen Kartei: ERST sein eigenes Team "Vigilante Wranglers" (V-W),
+  // DANACH Rest-Roster in der Reihenfolge aus roster-rest-missing.json. Ausgelassen:
+  // Byrd und Orakelpfropf — ihre Bilder zeigen keinerlei Kampf-/Magie-Motiv (Zwiebel-
+  // Hausangestellte mit Besen; Katze mit Plastikbecher auf dem Kopf) und liefern damit
+  // keine Verengung.
+  // ===================================================================================
+
+  // --- Chris' eigenes Team "Vigilante Wranglers" (V-W) ---
+  {
+    spieler: "Xelara",
+    bild:
+      "Grauhäutige Alien-Diplomatin mit hoher, kahler Schädelform, schwarzem gegürtetem Ledergewand und Umhang, kein sichtbarer Waffengriff. Im Hintergrund leuchtet zweimal das Wort „DIPLOMACY“.",
+    archetypen: ["Priest"],
+    schliesstAus:
+      "Matriarch, Templar, Blackguard, Bullbreaker, Frost Knight (aus Guardian): keine Platte, kein Hammer, keine Klinge — das Leder ist Robe, keine Rüstung. Sie steht unbewaffnet und redend da, das Bild selbst beschriftet sie als Diplomatin. Übrig bleibt aus Ambassador allein der unbewaffnete Support-Caster.",
+  },
+  {
+    spieler: "Inefinna",
+    bild:
+      "Weißhaarige Kriegerin mit goldenem Strahlenkranz-Diadem, aufwendiger silber-goldener Plattenrüstung mit Schulterpanzern, hält ein großes Schwert mit beiden Händen vor sich, Augen geschlossen, helle Tempelhalle im Hintergrund.",
+    archetypen: ["Matriarch", "Templar", "Crusader"],
+    schliesstAus:
+      "Rogue: keine Klinge im Verborgenen, sondern ein aufrecht präsentiertes Zweihandschwert samt voller Panzerung. Steelwind: kein Tech-Motiv, kein Krummschwert. Priest: sie trägt schwere Rüstung und ein Schwert statt unbewaffnet zu wirken — der Heiligenschein passt zu allen drei verbleibenden Paladin-Wegen, die Klinge entscheidet nicht zwischen ihnen.",
+  },
+  {
+    spieler: "Johanna",
+    bild:
+      "Blonde Kriegerin in dunkler geschwärzter Plattenrüstung mit Pelzbesatz an der Schulter, riesiger verzierter Kriegshammer in der einen, Turmschild in der anderen Hand, Schneewald im Hintergrund.",
+    archetypen: ["Matriarch", "Crusader", "Frost Knight"],
+    schliesstAus:
+      "Blackguard: sein Kit ist Peitsche und Schild, sie trägt Hammer und Schild. Templar: zu leicht und agil für dieses Bild — sie steht schwer gepanzert mit Turmschild, nicht sprungbereit. Bullbreaker ist an den Minotaurus gebunden, sie ist Mensch. Hammer plus Schild passt zu Matriarch und Crusader; der Schneewald lässt Frost Knight stehen.",
+  },
+  {
+    spieler: "Gram",
+    bild:
+      "Riesiger drachenartiger Lavakoloss mit gehörntem, brennendem Kopf, geschuppter Magmahaut mit goldenen Schulterplatten, schwingt eine große Kriegsaxt, keine Deckung.",
+    archetypen: ["Bullbreaker"],
+    schliesstAus:
+      "Blackguard: keine Peitsche, kein Schild. Frost Knight: das Bild ist durchgehend Feuer/Lava, das Gegenteil von Frost. Matriarch: kein Hammer, keine Support-Haltung — er greift mit der Axt an. Übrig bleibt aus Guardian nur der massige, formationsbrechende Koloss.",
+  },
+  {
+    spieler: "Lava Golem",
+    bild:
+      "Menschengroßer Feuer-/Lavadämon mit Hörnern und glühenden Augen, geborstene Magmahaut, geballte Fäuste ohne Waffe, Arena-Kolosseum im Hintergrund.",
+    archetypen: ["Bullbreaker", "Monk", "Orc Warrior"],
+    schliesstAus:
+      "Hunter: kein Fernkampf, er steht mitten in der Arena. Steelwind: kein Tech-Motiv, keine Klinge. Barbarian setzt eine geführte Waffe voraus (\"bleeding strikes\"), er hat keine — die drei verbleibenden Kandidaten kämpfen alle unbewaffnet mit den Fäusten oder durch schiere Masse.",
+  },
+  {
+    spieler: "Krolach",
+    bild:
+      "Steinerner Elementarkoloss aus Fels, Wasserfällen und Eis, orange und blaue Kristalle im Rumpf eingelassen, keine Waffe, tost im Meer zwischen Klippen.",
+    archetypen: ["Bullbreaker", "Frost Knight", "Voidfist"],
+    schliesstAus:
+      "Blackguard: keine Peitsche, kein Schild. Matriarch: kein Hammer, keine Support-Geste. Reaver und Barbarian setzen eine geführte Klinge oder Axt voraus, die hier fehlt. Übrig bleiben der massige Fels-Tank, der Frost/Wasser-Ritter und der unbewaffnete Void-Kämpfer — alle drei kommen ohne Waffe in der Hand aus.",
+  },
+  {
+    spieler: "Lulu",
+    bild:
+      "Junge Frau im Wald auf einem Baumstamm sitzend, hält goldene, leicht schwebende Blätter in der Hand, leichte Stoffkleidung, keine Rüstung, keine Waffe.",
+    archetypen: ["Orc Shaman", "Priest"],
+    schliesstAus:
+      "Matriarch: kein Hammer, keine Rüstung — ihre Geste ist Naturmagie, kein Kampfstand. Cleric operiert laut Kartentext näher an der Gefahr und mit mehr Rüstung als hier zu sehen; sie sitzt unbewaffnet und entspannt im Wald. Übrig bleiben die beiden reinen Zauberwege aus Druid und Healer.",
+  },
+  {
+    spieler: "King Arlen Morgolor",
+    bild:
+      "Alter König mit weißem Vollbart, goldener Zackenkrone, schwerer gold-silberner Plattenrüstung mit hohen Schulterpanzern und rotem Umhang, Hände leer an der Seite, starre Frontalpose.",
+    archetypen: ["Crusader", "Matriarch", "Fighter"],
+    schliesstAus:
+      "Orc Warrior: er ist Mensch, kein Ork, und seine Pose ist würdevoll statt brutal-stürmend. Barbarian und Steelwind setzen eine geführte Waffe voraus, die hier fehlt. Templar ist zu leicht und sprungbereit für diese massive, stehende Rüstung. Übrig bleiben die schweren, beschützenden Wege aus Warrior und Royalty.",
+  },
+
+  // --- Rest-Roster, in der Reihenfolge aus roster-rest-missing.json ---
+  {
+    spieler: "Lucky",
+    bild:
+      "Lächelnder Mann mit wildem dunklem Haar auf einem Jahrmarkt, mehrere Wurfmesser quer über der Brust gegürtet, hält einen Beutel Goldmünzen in der Hand.",
+    archetypen: ["Rogue", "Steelwind"],
+    schliesstAus:
+      "Fighter, Orc Warrior, Barbarian (aus Warrior): kein Schwertkampf, kein Ansturm — er trägt nur kleine Wurfklingen und zählt Münzen. Conjurer, Astralwing: kein Magie-Motiv. Die Wurfmesser passen zum schnellen Klingenkämpfer und zum Distanz-Spezialisten mit Wurfwaffen.",
+  },
+  {
+    spieler: "Terradon",
+    bild:
+      "Menschengroßer Lavakoloss mit geborstener Magmahaut und glühenden Rissen, geballte Fäuste ohne Waffe, Gebirgsschlucht im Hintergrund.",
+    archetypen: ["Bullbreaker"],
+    schliesstAus:
+      "Blackguard: keine Peitsche, kein Schild. Frost Knight: durchgehend Feuer statt Frost. Matriarch: kein Hammer, keine Support-Haltung — er stürmt mit bloßen Fäusten. Übrig bleibt aus Guardian nur der massige, unbewaffnete Koloss.",
+  },
+  {
+    spieler: "Clara",
+    bild:
+      "Eiskönigin mit gezackter goldener Krone, hält eine leuchtend blaue Eiskugel in der erhobenen Hand, Frostkristalle und Eiswände im Hintergrund.",
+    archetypen: ["Ice Mage"],
+    schliesstAus:
+      "Fire Mage, Lightning Mage: falsches Element, ihre Magie ist durchgehend blau-eisig. Archmage zyklt Arkan/Feuer/Eis im Wechsel — hier ist nur Eis zu sehen. Conjurer: keine Gravitations- oder Fesseleffekte. Priest, Matriarch, Templar (aus Ambassador): sie greift offensiv mit einem Eisball an, keine Rüstung, keine Heilgeste.",
+  },
+  {
+    spieler: "Arachna",
+    bild:
+      "Spinnenhybride mit menschlichem Oberkörper in dunkler Dornenrüstung, acht lange gepanzerte Spinnenbeine als Unterleib, Zackenkrone, Ruinen im Abendlicht, keine Waffe in den Händen.",
+    archetypen: ["Necromancer", "Reaper Mage"],
+    schliesstAus:
+      "Orc Shaman: keine Totems, keine primal-tribale Ausstattung, sie wirkt herrschaftlich-finster statt schamanisch. Conjurer: keine Gravitations- oder Fesseleffekte zu sehen. Die monströse, dunkle Spinnengestalt passt zu den beiden Wegen dunkler Magie aus Warlock.",
+  },
+  {
+    spieler: "Tavascron",
+    bild:
+      "Riesiger Transformer-artiger Kampfroboter mit Fahrzeugteilen im Körper, leuchtenden Bernstein-Lichtlinien, geballten Metallfäusten ohne Fernwaffe, brennende Stadt im Hintergrund.",
+    archetypen: ["Steelwind", "Bullbreaker", "Fighter"],
+    schliesstAus:
+      "Crossbowman: keine Armbrust oder Fernwaffe verbaut. Orc Warrior, Barbarian: kein organisches Ork-Motiv, keine geführte Klinge — reine Maschine. Übrig bleiben die Tech-Lesart, die schiere Masse und der allroundtaugliche Muskelkoloss aus Bot und Behemoth.",
+  },
+  {
+    spieler: "Catherine",
+    bild:
+      "Blonde Kriegerin in goldener Plattenrüstung, schwingt einen großen Kriegshammer über dem Kopf, Vogel-Wappenschild an der Seite, antike Ruinen im Sonnenlicht.",
+    archetypen: ["Crusader"],
+    schliesstAus:
+      "Blackguard: sein Kit ist Peitsche, sie führt einen Hammer. Frost Knight: kein Frost-Motiv. Templar ist zu leicht und sprungbereit für die volle Plattenrüstung mit Turmschild. Cleric, Priest: sie kämpft frontal mit Hammer statt zu heilen. Übrig bleibt der schwere, hammerführende Frontkämpfer.",
+  },
+  {
+    spieler: "Breeze",
+    bild:
+      "Junge Frau mit Brille hält ein aufgeschlagenes Zauberbuch, goldene arkane Lichtschlieren wirbeln um sie, gotische Torbögen im Hintergrund.",
+    archetypen: ["Archmage"],
+    schliesstAus:
+      "Fire Mage, Ice Mage, Lightning Mage: keine der drei Elementfarben ist zu erkennen, nur reines goldenes Arkan-Licht. Conjurer: keine Gravitations- oder Fesseleffekte, sie liest aus einem Buch statt das Schlachtfeld zu formen. Übrig bleibt der vielseitige Arkan-Weg.",
+  },
+  {
+    spieler: "Wu Tang",
+    bild:
+      "Baumartige Naturgestalt mit Geweihkrone aus Ästen, Rinden-Körper, geschlossene Augen in meditativer Haltung, Fische schweben ringsum in einem versunkenen Wald.",
+    archetypen: ["Orc Shaman"],
+    schliesstAus:
+      "Thunderclaw, Barbarian, Orc Warrior (aus Creature): kein Ansturm, keine Aggression — sie steht reglos und meditiert. Conjurer, Necromancer: kein arkanes oder totes Motiv, ihre Magie ist eindeutig Natur/Erde. Übrig bleibt aus Pet Master der primal-naturverbundene Weg.",
+  },
+  {
+    spieler: "Dyrth",
+    bild:
+      "Riesige schwarze Dämonengestalt mit Hörnern, weit ausgebreiteten Flügeln und leuchtend weißen Augen, umklammert schützend ein kleines Kind, mehrere Pfeile stecken in Körper und Flügeln.",
+    archetypen: ["Bullbreaker", "Matriarch"],
+    schliesstAus:
+      "Blackguard: keine Peitsche, kein Schild. Frost Knight: kein Frost-Motiv. Reaper Mage, Astralwing: keine Fernkampf-Magie zu sehen, sie schirmt das Kind mit dem eigenen Körper ab. Übrig bleiben der massige Beschützer und der stützende, Verbündete abschirmende Weg aus Guardian und Fallen Angel.",
+  },
+  {
+    spieler: "Pinkypie",
+    bild:
+      "Hexe mit großem Spitzhut, aufgerissene leuchtend blaue Augen, hält ein Grimoire mit Pentagramm auf, nächtliche Ruinen mit Wasserfällen im Hintergrund.",
+    archetypen: ["Archmage"],
+    schliesstAus:
+      "Fire Mage, Ice Mage, Lightning Mage: keine passende Elementfarbe oder Effekt sichtbar, nur ein allgemeines Zauberbuch. Conjurer: keine Gravitations- oder Fesseleffekte. Übrig bleibt der vielseitige Arkan-Weg.",
+  },
+  {
+    spieler: "Jihanna",
+    bild:
+      "Verletzte Elfe mit Tränen im Gesicht, hält zwei blutverschmierte Dolche im Rückhandgriff, zerschlissene leichte Rüstung, staubige Kulisse.",
+    archetypen: ["Rogue"],
+    schliesstAus:
+      "Voidfist: sie kämpft mit geführten Klingen, nicht unbewaffnet. Übrig bleibt aus Assassin allein der Klingenkämpfer.",
+  },
+  {
+    spieler: "Serena",
+    bild:
+      "Silberhaarige Kriegerin mit Diadem, hält ein einzelnes verziertes Langschwert kampfbereit über dem Kopf, fließende leichte Rüstung, Stadtkulisse.",
+    archetypen: ["Rogue", "Fighter"],
+    schliesstAus:
+      "Spellblade: keine Feuer- oder Zaubereffekte an der Klinge. Conjurer, Astralwing: kein Magie-Motiv. Barbarian, Orc Warrior: ihre Haltung ist elegant-duellierend statt berserkerhaft. Steelwind: kein Krummschwert, keine Wurfsterne. Übrig bleiben der Klingenkämpfer und der allroundtaugliche Schwertkämpfer.",
+  },
+  {
+    spieler: "Nocture",
+    bild:
+      "Formlose, rauchig-klauenartige Schattengestalt mit rotglühender Energie im Inneren, tastende Fangarme, eine winzige Menschenfigur davor zum Größenvergleich.",
+    archetypen: ["Reaper Mage", "Necromancer"],
+    schliesstAus:
+      "Thunderclaw: die Energie ist rot-glühend, nicht elektrisch-blau. Reaver, Barbarian: keine geführte Axt oder Klinge, keine humanoide Gestalt. Voidfist: kein fassbarer Nahkämpfer-Körper. Übrig bleiben die beiden dunklen Magiewege, die zur körperlosen Erscheinung passen.",
+  },
+  {
+    spieler: "Drop Dead",
+    bild:
+      "Blonde Kriegerin mit wütendem Blick, kämpft mit zwei Schwertern gleichzeitig, geschulterte Rüstungsteile, rauchiger Hintergrund.",
+    archetypen: ["Rogue"],
+    schliesstAus:
+      "Voidfist: sie führt zwei Klingen, kämpft nicht unbewaffnet. Hunter: kein Fernkampf. Necromancer: kein dunkles Magie-Motiv. Übrig bleibt aus Assassin allein der Klingenkämpfer.",
+  },
+  {
+    spieler: "Nachtschatten",
+    bild:
+      "Spitzohrige Frau in schwarzem Lederkostüm mit Fledermausmaske, lehnt entspannt auf einer Dachbrüstung vor Vollmond, keine sichtbare Waffe.",
+    archetypen: ["Rogue", "Voidfist"],
+    schliesstAus:
+      "Steelwind: kein Krummschwert, keine Wurfsterne zu sehen. Crusader: keine Rüstung, kein Hammer — sie ist leicht und unbewaffnet. Übrig bleiben der schleichende Dieb und der unbewaffnete Nahkämpfer, zwischen denen das Bild nicht entscheidet.",
+  },
+  {
+    spieler: "Erna Wellenlaut",
+    bild:
+      "Geflügelte, durchscheinende Fee spielt eine Silberflöte, sanftes Licht, keine Rüstung, keine Waffe.",
+    archetypen: ["Priest", "Cleric"],
+    schliesstAus:
+      "Templar: keine Rüstung, kein Schwert. Lancer, Halberdier: keine Stangenwaffe. Ice Mage: kein Frost-Effekt. Conjurer: keine Gravitations- oder Fesselgeste, sie musiziert statt zu kontrollieren. Übrig bleiben die beiden reinen Support-Heilwege aus Angel.",
+  },
+  {
+    spieler: "Xerathis",
+    bild:
+      "Grauhäutige Alien-Agentin in schwarzem Tech-Anzug mit leuchtenden Energieadern, Taktikgürtel mit Ausrüstung, futuristischer Raumschiffkorridor.",
+    archetypen: ["Rogue"],
+    schliesstAus:
+      "Crossbowman: keine Armbrust. Astralwing: keine Sternbild-Magie, ihre Adern sind Tech, kein Himmelslicht. Priest, Matriarch, Templar (aus Ambassador): keine Rüstung, keine Heilgeste — der Taktikgürtel und der lautlose Korridor passen zur verdeckt operierenden Agentin.",
+  },
+  {
+    spieler: "Alarm",
+    bild:
+      "Riesiger Kampfroboter mit rot leuchtendem Sirenenkopf und der Aufschrift „ALARM“, Klauenhände, zertrümmert eine brennende Stadt, ein roter Stöckelschuh statt eines Fußes.",
+    archetypen: ["Steelwind", "Bullbreaker"],
+    schliesstAus:
+      "Fighter, Crossbowman: keine geführte Waffe oder Fernwaffe verbaut, nur Klauen. Blackguard: keine Peitsche, kein Schild. Frost Knight: kein Frost-Motiv. Matriarch: kein Hammer, keine Support-Geste. Übrig bleiben die Tech-Lesart aus Bot und die schiere zermalmende Masse aus Guardian.",
+  },
+  {
+    spieler: "Aurora",
+    bild:
+      "Blasse Frau in schwarzer Spitzenrobe, blutige Träne im Gesicht, hält einen Kelch mit rotem Wein/Blut in der Hand, Flammenruinen im Hintergrund.",
+    archetypen: ["Necromancer", "Reaper Mage"],
+    schliesstAus:
+      "Hunter, Rogue: keine Waffe, sie trinkt statt zu kämpfen. Die beiden dunklen Magiewege passen zum vampirischen, unbewaffneten Auftreten aus Vampire und Undead.",
+  },
+  {
+    spieler: "Elyon",
+    bild:
+      "Geflügelter Ritter in schwarz-goldener Plattenrüstung mit Heiligenschein, führt ein langes Schwert und einen Schild, an dem eine Kette hängt.",
+    archetypen: ["Blackguard", "Crusader", "Templar"],
+    schliesstAus:
+      "Priest, Cleric: er kämpft in voller Rüstung mit Schwert statt zu heilen. Rogue, Steelwind: keine Klinge im Verborgenen, keine Wurfsterne — offen geführtes Langschwert. Die Kette am Schild passt zum Zieh-Kit von Blackguard, das Schwert zu den beiden anderen Ritterwegen.",
+  },
+  {
+    spieler: "Vorrak",
+    bild:
+      "Dunkler Kriegsgolem mit Schulterkanonen, glühend rotem Energiekern und roten Augen, geballte Metallfäuste ohne Handwaffe.",
+    archetypen: ["Bullbreaker", "Orc Warrior", "Voidfist"],
+    schliesstAus:
+      "Blackguard: keine Peitsche, kein Schild. Frost Knight: kein Frost-Motiv. Matriarch: kein Hammer, keine Support-Geste. Reaver, Barbarian: keine geführte Axt oder Klinge. Übrig bleiben die drei unbewaffneten, kraftbasierten Wege aus Guardian, Destroyer und Behemoth.",
+  },
+  {
+    spieler: "Lilly",
+    bild:
+      "Frau mit Augenklappe hält einen blutigen Dolch, Lederkorsage vor einer Kulisse aus rostigen Zahnrädern.",
+    archetypen: ["Rogue"],
+    schliesstAus:
+      "Voidfist, Monk: sie kämpft mit einer geführten Klinge, nicht unbewaffnet. Übrig bleibt aus Ninja und Assassin allein der Klingenkämpfer.",
+  },
+  {
+    spieler: "Elyssa Nightclaw",
+    bild:
+      "Echsenwesen in dunkler Kapuzenrüstung, hält einen kleinen Wurfdolch, geschwungener Schwanz, Ruinen bei Vollmond.",
+    archetypen: ["Rogue"],
+    schliesstAus:
+      "Voidfist: sie führt eine Wurfklinge, nicht unbewaffnet. Orc Shaman, Matriarch, Priest (aus Druid): keine Naturmagie-Geste, keine Rüstung eines Heilers — sie ist eine bewaffnete Schleicherin. Übrig bleibt aus Assassin der Klingenkämpfer.",
+  },
 ];
 
 const BEFUND_NACH_SPIELER = new Map(BILDBEFUNDE.map((b) => [b.spieler, b] as const));
