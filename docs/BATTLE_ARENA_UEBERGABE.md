@@ -521,27 +521,85 @@ null bepreist? Bitte an Chris.
 Nachgemessen mit n = 6 (554 s): **133,9 Pp**, Speed 43,6 %, Dexterity 23,4 %, Power 5,5 %
 gegen ein Matrixgewicht von 28. Der Befund aus dem groben Lauf hält also.
 
-### Und die naheliegende Lösung funktioniert nicht
+### Zuerst: der Maßstab selbst war falsch
 
-Bevor die Frage an Chris geht, ist sie ausprobiert: die Bewegung im Kampf (`TMP`) speist
-sich zu 46 aus Speed und zu 24 aus Dexterity — beide mit Matrixgewicht null. Was passiert,
-wenn man sie durch Attribute ersetzt, die die TDM-Matrix wirklich führt (`stamina 38,
-determination 26, awareness 20, spirit 16`)?
+Bevor irgendeine Zahl zu TDM gilt, gehört diese Korrektur davor — sie betrifft alles, was
+in dieser Sitzung über die Kampf-Disziplinen gemessen wurde.
 
-**Es wird schlechter: 133,9 → 180 Pp.** Speed und Dexterity lesen jetzt sauber 0 % — aber
-an ihre Stelle treten Awareness mit **49,5 %** (Matrixgewicht 2) und Intelligence mit
-**39,3 %** (Gewicht 6), während Power (28) und Health (20) auf null fallen.
+`aufEignung()` normiert die drei Kampfwerte **auf die Eignung**: die Rezepte geben die
+FORM, die Eignung gibt die MENGE. Das ist Absicht und stammt aus der 0:6-Untersuchung.
+`einflussVon()` hob aber ein Attribut, **ohne die Eignung mitzuheben**. Damit war das
+Ergebnis vorbestimmt: ein gehobenes Kampfattribut konnte nur noch die Form ändern (LP
+gegen ANG gegen VER), nie die Menge. Nur `TMP` und `AUS` liegen außerhalb der Normierung —
+also las die Messung ausgerechnet die Bewegung als das, was alles entscheidet.
 
-Damit ist die Frage eine andere als gedacht. Es liegt nicht an Speed. **Was auch immer die
-Bewegung speist, beherrscht den Teamfight** — wer zuerst am Gegner ist, schlägt länger zu,
-und das schlägt jeden Kampfwert. Die Entscheidung, die Chris zu treffen hat, lautet
-deshalb nicht „soll Speed zählen?", sondern:
+Im Spiel ist die Eignung eine Funktion der Attribute: `calculateRawDisciplineScore` in
+`lib/player-formulas/discipline-rating-engine.ts` summiert Attribut × Gewicht über dieselbe
+Matrix. Ich hatte genau den Kanal zugehalten, den die Matrix beschreibt.
 
-> Soll **zuerst ankommen** einen Teamfight so stark entscheiden, wie es das gerade tut?
+Behoben: die Anhebung hebt die Eignung mit, um `plus × Gewicht / 100`.
 
-Möglichkeiten, die ich sehe (keine davon ohne Rückfrage umgesetzt): die Kämpfer starten
-näher beieinander; die Bewegungsspanne wird gestaucht, wie es auf der Bahn geholfen hat;
-oder der Anmarsch zählt gar nicht mit, weil er vor dem eigentlichen Kampf liegt.
+**Was das ändert** — und was es *nicht* ändert:
+
+| Disziplin | alter Maßstab | korrigiert |
+|---|---|---|
+| Mini-DM | 60 Pp | **13,8 Pp** |
+| Fechten | 157 Pp | 87 Pp |
+| Battlefield | 68,5 Pp | 110 Pp |
+| TDM | 133,9 Pp | **152,4 Pp** |
+
+Mini-DM mit 13,8 Pp ist der Beweis, dass der Maßstab jetzt stimmt: dieselbe Messung,
+dieselbe Mechanik, aber Rezepte, die aus der eigenen Matrix gebaut sind.
+
+**Und TDM wird dadurch nicht besser, sondern schlechter.** Ich hatte zwischenzeitlich
+geschrieben, der TDM-Befund sei größtenteils ein Messfehler — das war falsch. Er ist
+größer als gedacht.
+
+### Der Mechanismus, präzise
+
+`aufEignung()` normiert LP, ANG und VER — `TMP` und `AUS` nicht. Ein Attribut, das dort
+steht, bekommt einen **Gewinn erster Ordnung**, unabhängig von seinem Matrixgewicht.
+
+Im TDM stehen Speed mit 46 und Dexterity mit 24 in `TMP`, und beide haben in der
+TDM-Matrix Gewicht **null**: sie bringen vollen Gewinn ohne jede Gegenleistung an die
+Eignung. Gemessen: Speed 46,1 %, Dexterity 24,7 %, während Power (Gewicht 28) auf 3,9 %
+fällt und Health (20), Stamina (14) und Charisma (10) auf exakt null.
+
+Dasselbe Muster erklärte Battlefield (Entschlossenheit und Ausdauer bei Matrixgewicht 4
+auf je 24 %, weil ich sie in `AUS` gesetzt hatte) und Fechten (Intelligence und Health bei
+Gewicht 4 auf 24 % bzw. 24 %).
+
+### Ein Versuch, der mit dem kaputten Maßstab gemessen wurde — nicht verwenden
+
+Zwischenzeitlich habe ich die Bewegung von Speed und Dexterity entkoppelt und gemessen:
+133,9 → 180 Pp, also scheinbar schlechter, mit Awareness bei 49,5 % und Intelligence bei
+39,3 %. Daraus hatte ich geschlossen, es liege nicht an Speed, sondern daran, dass „zuerst
+ankommen" den Teamfight entscheidet.
+
+**Dieser Versuch lief mit dem kaputten Maßstab und trägt nichts.** Er ist hier nur
+aufgeschrieben, damit ihn niemand aus einer älteren Nachricht heraussucht und für gültig
+hält. Der Effekt, den er zeigte, war die Signatur des Messfehlers: was in `TMP` steht,
+gewinnt — und ich hatte Awareness und Intelligence hineingesetzt.
+
+### Was stattdessen gerade geprüft wird
+
+Wenn `TMP` und `AUS` mit in die Normierung kämen, könnte kein Rezept mehr durch bloße
+Platzierung eines Attributs einen Gewinn erzeugen — und Speed könnte im TDM gar nicht mehr
+zahlen. Erste Messungen mit dieser Fassung (n = 6):
+
+| Disziplin | ohne Kappung | mit Kappung |
+|---|---|---|
+| Mini-DM | 13,8 Pp | **14,0 Pp** — der gute Fall bleibt heil |
+| Fechten | 87 Pp | **39 Pp** (zusammen mit neu gezogenen Rezepten) |
+| Battlefield | 110 Pp | **101,7 Pp** — bewegt sich kaum, siehe unten |
+| TDM | 152,4 Pp | steht noch aus |
+
+Battlefield bleibt auffällig: Ausdauer und Entschlossenheit lesen 20,8 %, obwohl sie in
+den neuen Rezepten nur noch mit 8 vorkommen und die Matrix ihnen 4 gibt. Das ist mit n = 6
+und acht Beteiligten möglicherweise Rauschen — vor einer Deutung mit größerer Stichprobe
+nachmessen.
+
+**Solange TDM aussteht, ist zu dieser Frage nichts entschieden.**
 
 ---
 
