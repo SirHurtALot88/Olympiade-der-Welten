@@ -2597,7 +2597,19 @@
     }
     if(team.length>1){
       const mitspieler=team.filter(x=>x!==u);
-      const passChance=Math.min(0.75,Math.max(0.20,0.35+u.AUFBAU*0.0030));
+      // Balance-Fund (nach dem Opus-Review): Intelligence (Matrixgewicht 16, zweithoechstes
+      // in Basketball) las trotz 40 % Anteil an AUFBAU konstant negativ (-0,033 im rohen,
+      // ungeklammerten Einfluss — gemessen, nicht vermutet, ueber `einflussVon`s internen
+      // `roh`-Wert). Ursache gefunden: ein hoher AUFBAU-Wert erhoehte die eigene Passbereit-
+      // schaft SO stark, dass ein Spieler mit hoher Intelligence seine eigenen Punkte
+      // haeufiger gegen Assists eintauschte, als der Zusatzschub durch die haeufigere
+      // Ballfuehrer-Rolle (gewichtetesLos ueber AUFBAU) wettmachte — waehrend Spirit
+      // denselben Effekt kleiner traf (30 % statt 40 % Anteil an AUFBAU) und zusaetzlich
+      // ueber TEAMGEIST (55 % Anteil, hoechster Koeffizient in der Wurfformel) profitierte.
+      // Koeffizient testweise durchgemessen (messe-arena-einfluss.mjs basketball 48):
+      // 0,0030 (Original) 48,2 Pp, 0,0010 48,3 Pp, 0,0005 40,7 Pp, 0,0003 36,6 Pp,
+      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt. PLATZHALTER, kein Endwert.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+u.AUFBAU*0.0002));
       if(rr()<passChance){
         // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
         // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen

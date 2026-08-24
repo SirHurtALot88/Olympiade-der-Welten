@@ -536,10 +536,55 @@ Balance-Arbeit. Alle Ereignistypen treten jetzt in jedem Spiel auf (Playwright-C
 Pässe, 9 Treffer, 17 Fehlwürfe, 21 Rebounds, 3 Steals, 4 Blocks in einem einzelnen
 Spiel), Alley-Oop weiterhin bestätigt (732 Auslöser über viele Simulationsläufe). Nur
 Intelligence liest noch exakt 0 % — das ist jetzt echtes Balance-Tuning, kein
-Korrektheitsfehler mehr, und der nächste Schritt.
+Korrektheitsfehler mehr.
 
-Zusätzlich, unverändert offen: die Aufstellung wirkt visuell noch zu sehr wie eine Reihe
-(alle nah an derselben Y-Linie), kein echtes Formations-Gefühl.
+Die Aufstellung wirkte vorher visuell noch zu sehr wie eine Reihe — als Nebeneffekt der
+Opus-Fixes (gemischte Mitspieler-Formation für Fund 3, s. o.) inzwischen erledigt, kein
+eigener Posten mehr.
+
+### Erste Balance-Runde: Intelligence gefunden und behoben — 32,5 Pp
+
+Direkt im Anschluss an die Opus-Fixes die erste echte Balance-Runde, wie von Chris
+angeordnet. Statt zu raten: den rohen (ungeklammerten) Einfluss jedes Attributs über
+`einflussVon`s internen `roh`-Wert ausgelesen (`Anteil` in der Ausgabe zeigt nur positive
+Werte — ein negativer Rohwert erscheint dort als „0 %", ist aber trotzdem voll in die
+Pp-Abweichung eingerechnet). Intelligence: **-0,033**, als einziges sinnvoll gewichtetes
+Attribut negativ, alle anderen positiv (0,04 bis 0,18).
+
+**Ursache gefunden, nicht vermutet:** ein hoher AUFBAU-Wert erhöhte die eigene
+Passbereitschaft (`passChance=0.35+u.AUFBAU*0.0030`) so stark, dass ein Spieler mit hoher
+Intelligence (40 % Anteil an AUFBAU, der höchste Einzelwert dort) seine eigenen Punkte
+häufiger gegen Assists eintauschte, als der Zusatzschub durch die häufigere
+Ballführer-Rolle das wettmachte. Spirit traf derselbe Mechanismus kleiner (nur 30 %
+Anteil an AUFBAU) und profitierte zusätzlich stark über TEAMGEIST (55 % Anteil, mit
+0,0060 der höchste Koeffizient in der Wurfformel) — deshalb las Spirit stark positiv,
+Intelligence negativ, obwohl beide über AUFBAU denselben Hebel ziehen.
+
+**Durchgemessen statt geraten**, `messe-arena-einfluss.mjs basketball 48`, nur der
+AUFBAU-Koeffizient in `passChance` verändert:
+
+| Koeffizient | Pp | Intelligence |
+|---|---|---|
+| 0,0030 (Original) | 48,2 | 0 % (roh: -0,033) |
+| 0,0010 | 48,3 | 5,5 % |
+| 0,0005 | 40,7 | 9,4 % |
+| 0,0003 | 36,6 | 11,1 % |
+| **0,0002 (gewählt)** | **32,5** | **13 %** |
+
+0,0002 reproduzierbar bestätigt (zweimal identisch gemessen). Nicht monoton bis 0
+durchprobiert — ein Test ganz ohne AUFBAU-Einfluss (`passChance=0.5` fest) lag bei 41,6
+Pp, schlechter als 0,0002. Es gibt also ein Optimum, keinen einfachen "je weniger, desto
+besser"-Zusammenhang; 0,0002 ist der beste unter den getesteten Werten, kein Beweis für
+global optimal. **PLATZHALTER, kein Endwert.**
+
+**32,5 Pp liegt jetzt in derselben Größenordnung wie das alte Vorab-Modell (27-32 Pp)** —
+nach zwei Runden (Opus-Fixes: 84,6→48,2 Pp, diese Balance-Runde: 48,2→32,5 Pp) hat die
+Live-Engine die Vorab-Engine in Sachen Werte-Treue eingeholt. Verbleibende Lücken, alle
+bereits aus früheren PRs bekannt und hier nicht neu: Dexterity überrepräsentiert (+9,8 Pp
+— dieselbe seit #656 bekannte Dexterity-Frage, dort sitzt der Wert gleichzeitig in
+AUFBAU/ABSCHLUSS/TECHNIK), Speed/Torment leicht unterrepräsentiert. Funktional per
+Playwright gegengeprüft: 16 Pässe, 12 Treffer, 5 Fehlwürfe, 7 Rebounds, 2 Steals, 2
+Blocks in einem Spiel, Endstand 16:15 — ein erkennbar echtes, kompetitives Spiel.
 
 ### Asset-Lage — Bewertung (Fable, Recherche bereits vorher abgeschlossen)
 
