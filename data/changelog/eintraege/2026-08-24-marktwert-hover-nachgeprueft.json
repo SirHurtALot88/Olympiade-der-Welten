@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-24",
+  "seite": "Team · Spieler",
+  "text": "Der Marktwert-Hover in der Spielerliste ist nachgeprüft: er wird wirklich angezeigt, und die gezeigten Zahlen ergeben in jedem geprüften Fall exakt den Marktwert daneben. Neu ist der Nachweis dafür — bisher haben alle Prüfungen zu dieser Tabelle nur den Quelltext gelesen, keine einzige hat sie tatsächlich aufgebaut. Genau so ein Fall war schon einmal überall grün und im Spiel trotzdem leer. Jetzt wird die Tabelle beim Prüfen wirklich gerendert.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}
