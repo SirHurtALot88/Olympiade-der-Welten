@@ -1171,10 +1171,13 @@
     "Gram":               {kopf:"lizard",haut:"black",ruest:"plate",schwanz:true,waffe:"schwert",ruestTon:"bronze"},
     // Bild: massiges Steinwesen mit ECHSENKOPF und gluehenden Augen, UNBEWAFFNET, kauert
     // in einer Hoehle. Vorher lief er als lavendelfarbener Alien mit Schwert — beides falsch.
-    // Fluegel jetzt auch in der animierten Ansicht (nur ein statisches Bild, kein
-    // Laufzyklus — s. zeichneFluegel oben), dieselbe Chris-Ansage wie bei B_FIGUR oben:
-    // Fluegel stehen NICHT im Portrait, sind sein ausdruecklicher Wunsch.
-    "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey"},
+    // Chris' Fund (25.08.): Fluegel fehlten in der animierten Ansicht, obwohl die
+    // Vorschau (B_FIGUR oben, Zeile ~1069) sie laengst zeigt — der Kommentar hier
+    // kuendigte das schon an ("Fluegel jetzt auch in der animierten Ansicht"), das
+    // eigentliche Flag fehlte aber im Objekt. Vorschau hat auch Schwanz und Hoerner
+    // (s_schwanz_bg/fg, z_hoerner) — beim Nachziehen gleich mit uebernommen, damit
+    // beide Ansichten dieselbe Figur zeigen.
+    "Rhyx'Tal":           {kopf:"lizard",haut:"fur_grey",fluegel:true,schwanz:true,hoerner:true},
     // Bild: grauhaeutige Alien-Diplomatin, kahler laenglicher Schaedel, unbewaffnet, keine
     // Kapuze — steht offen redend da. Grauton statt Blau, keine Kapuze mehr (Chris' Fund).
     "Xelara":             {kopf:"alien",haut:"lavender",ruest:"leder",geschlecht:"w",ruestTon:"dunkel"},
@@ -2933,7 +2936,7 @@
   // BASKETBALL-LIVE-ENGINE — Konstanten. Alle PLATZHALTER, wie ueberall in diesem
   // Entwurf; nachzuziehen, sobald das Spielgefuehl gegengemessen ist (docs/
   // ARENA_INTERAKTION_KONZEPT.md).
-  const SPIELDAUER_BASKETBALL=45;   // Sekunden Sim-Zeit — das alte Vorab-Modell enthuellte ~30s
+  const SPIELDAUER_BASKETBALL=90;   // Chris' Wunsch (25.08.): doppelte Spieldauer (vorher 45s)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
   const DREIER_RADIUS=145;          // ... bis hierhin ein Fernwurf, weiter draussen wird nur gepasst
