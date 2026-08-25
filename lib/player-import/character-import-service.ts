@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import type { Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import { leiteVorlaeufigeHoeheAb } from "@/lib/player-generator/provisional-height";
 import { attachPlayerPortraitPath } from "@/lib/data/mediaAssets";
 import { hydratePlayerWithAttributeSheet } from "@/lib/data/playerAttributeSheetData";
 import { loadImportedPlayerStats } from "@/lib/data/playerStatsAdapter";
@@ -60,7 +61,7 @@ export type CharacterImportValidationIssue = {
 
 export type CharacterImportResult = {
   player: Player;
-  attributeRow: Record<string, string | number | null>;
+  attributeRow: Record<string, string | number | boolean | null>;
   validationIssues: CharacterImportValidationIssue[];
   economy: {
     marketValue: number;
@@ -146,7 +147,7 @@ function materializeStatsPlayerFromBrief(
   playerId: string,
   leaguePlayers: Player[],
 ): Omit<Player, "marketValue" | "salaryDemand" | "displayMarketValue" | "displaySalary"> {
-  const attributeRow = buildAttributeRow(brief.name, brief.attributes);
+  const attributeRow = buildAttributeRow(brief.name, brief.attributes, brief.race, brief.subclasses ?? []);
   const draftPlayer = {
     id: playerId,
     name: brief.name.trim(),
@@ -160,6 +161,8 @@ function materializeStatsPlayerFromBrief(
     traitsNegative: brief.traitsNegative ?? [],
     coreStats: deriveCoreStats(brief.attributes),
     attributeSheetStats: {
+      height: attributeRow.height,
+      heightIsEstimate: attributeRow.heightIsEstimate,
       power: attributeRow.power,
       health: attributeRow.health,
       stamina: attributeRow.stamina,
@@ -234,10 +237,20 @@ function deriveRating(value: number) {
   return getTransfermarktTierFromPoints(value);
 }
 
-function buildAttributeRow(name: string, attributes: PlayerGeneratorAttributes) {
+function buildAttributeRow(
+  name: string,
+  attributes: PlayerGeneratorAttributes,
+  race: string,
+  subclasses: readonly string[],
+) {
   return {
     name,
-    height: null,
+    // Vorlaeufige Groesse statt hartem null, s. lib/player-generator/provisional-height.ts —
+    // ohne Rassen-Populationsstatistik zur Hand (die braucht den ganzen Katalog, s.
+    // scripts/wende-vorlaeufige-hoehe-an.ts), deshalb hier ohne Statur-Modifikator.
+    // Ein Bulk-Lauf des Skripts kann das spaeter fuer diesen Spieler nachschaerfen.
+    height: leiteVorlaeufigeHoeheAb(race, subclasses),
+    heightIsEstimate: true,
     ...attributes,
     powerRating: deriveRating(attributes.power),
     healthRating: deriveRating(attributes.health),
@@ -269,7 +282,7 @@ export function buildPlayerFromBrief(
   const validationIssues = validateCharacterBrief(brief);
   const playerId = brief.id ?? buildPlayerId(brief.name, existingPlayers);
   const statsPlayer = materializeStatsPlayerFromBrief(brief, playerId, existingPlayers);
-  const attributeRow = buildAttributeRow(brief.name, brief.attributes);
+  const attributeRow = buildAttributeRow(brief.name, brief.attributes, brief.race, brief.subclasses ?? []);
 
   const catalogPlayers = existingPlayers.some((player) => player.id === playerId)
     ? existingPlayers.map((player) => (player.id === playerId ? { ...player, ...statsPlayer } : player))

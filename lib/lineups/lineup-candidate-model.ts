@@ -31,7 +31,10 @@ import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet
 // ---------------------------------------------------------------------------
 
 export type MatchdayFocusAttribute = {
-  key: keyof PlayerAttributeSheetStats;
+  // heightIsEstimate ist ein echt/geschaetzt-Flag (s. olyDataTypes.ts), kein
+  // anzeigbarer numerischer Wert wie die anderen 13 Schluessel — ausgeschlossen,
+  // sonst wird `value` unten faelschlich number|boolean.
+  key: Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">;
   label: string;
   shortLabel: string;
   weightPct: number;
@@ -178,7 +181,9 @@ export type TeamdeckCandidateGroup = {
 // abhaengen).
 // ---------------------------------------------------------------------------
 
-export const attributeShortLabels: Record<keyof PlayerAttributeSheetStats, string> = {
+// heightIsEstimate ist Metadaten (echt/geschaetzt-Flag, s. olyDataTypes.ts), kein
+// anzeigbares Attribut wie die anderen 13 Schluessel — bewusst ausgeschlossen.
+export const attributeShortLabels: Record<Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">, string> = {
   power: "POW",
   health: "HEA",
   stamina: "STA",

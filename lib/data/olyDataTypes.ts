@@ -655,6 +655,14 @@ export type TeamGeneralManagerAssignment = {
 
 export type PlayerAttributeSheetStats = {
   height?: number | null;
+  /**
+   * true, solange `height` aus lib/player-generator/provisional-height.ts geschaetzt
+   * ist (Rasse+Subklasse+Statur-Heuristik), statt aus echten importierten Daten zu
+   * stammen. Muss beim Import echter Height-Werte auf false/undefined zurueckgesetzt
+   * werden — sonst laesst sich ein geschaetzter nicht mehr von einem echten Wert
+   * unterscheiden.
+   */
+  heightIsEstimate?: boolean | null;
   power?: number | null;
   health?: number | null;
   stamina?: number | null;

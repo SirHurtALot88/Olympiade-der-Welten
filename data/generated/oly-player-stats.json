@@ -312257,7 +312257,8 @@
       "soc": 69.3
     },
     "attributeSheetStats": {
-      "height": null,
+      "height": 5,
+      "heightIsEstimate": true,
       "power": 72,
       "health": 78,
       "stamina": 74,
