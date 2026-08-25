@@ -894,6 +894,66 @@
     return ruestGefaerbt[id];
   }
 
+  // ===================================================================================
+  // BEINE/HOSE UEBER DIE RUESTUNGSFARBE — Chris' Meldung "viele Spieler haben gar keine
+  // Hose oder Beinkleidung, oder da stimmt was nicht".
+  //
+  // Nachgemessen, nicht vermutet: keins der 266 Blaetter im ANIMIERTEN Baukasten (walk/
+  // slash/shoot/hurt) traegt eine eigene Bein-/Hosenebene — nur die STEHENDE Vorschau
+  // (B_FIGUR, "beine"/"stiefel") kennt so etwas, fuer die animierte Kampfansicht (zeichne-
+  // Sprite/BAU) gibt es sie nicht. "plate_walk" und "leder_walk" sind reine BRUSTSTUECKE
+  // (Bildbefund): keins der beiden Blaetter deckt mehr als die obere Haelfte der Zelle ab.
+  // Was darunter zu sehen ist, ist ausnahmslos body_walk/bodyw_walk selbst — ein nackter,
+  // hautfarbener Koerper. JEDE Ruestung endete an der Taille, gleich ob Platte oder Leder,
+  // gleich welcher der 144 Charaktere: keine Einzelfaelle in BAU, sondern eine Luecke im
+  // Baukasten selbst, seit es die Ebene gibt.
+  //
+  // Der Fix haengt sich an das, was es schon gibt: dieselbe Materialrampe, die den
+  // Brustharnisch faerbt (RUEST_QUELLEN/RUEST_TON), faerbt jetzt auch die BEIN-Pixel der
+  // Koerperebene ein — automatisch, fuer jeden mit gesetztem `ruest`, ohne dass eine
+  // einzelne BAU-Zeile angefasst werden muss. Ein Ritter in goldener Platte bekommt damit
+  // goldene Beine, ein Haeuptling in dunklem Leder dunkle Lederbeine, im selben Ton wie
+  // sein Oberkoerper — genau Chris' zweite Vorgabe ("wenn oben schwere Ruestung, soll das
+  // unten mitgehen").
+  //
+  // Wo "Bein" beginnt, ist am Blatt selbst nachgemessen: bei y<=48 (innerhalb der 64px-
+  // Zelle) bildet body_walk in JEDER der vier Blickrichtungen und JEDEM Laufbild einen
+  // einzigen zusammenhaengenden Klumpen (Torso+Arme, nach der Armspreizung um y~41 wieder
+  // vereint) — ab y=51 teilt er sich zuverlaessig in zwei getrennte Beine. 48 nimmt die
+  // Huefte noch mit ins Bein, sonst bliebe ein heller hautfarbener Guertelrand stehen.
+  const BEIN_Y=48;
+  const beineGefaerbt={};
+  function spriteBeine(key,hautTon,ruestKey,ruestTon){
+    const hautZiel=HAUT[hautTon];
+    const quelleDef=RUEST_QUELLEN.find(r=>r.name===ruestKey);
+    if(!hautZiel||!quelleDef)return sprite(key,hautTon);
+    const id=key+"|"+hautTon+"|"+ruestKey+"|"+(ruestTon||"-");
+    if(beineGefaerbt[id])return beineGefaerbt[id];
+    const roh=sprBild[key];
+    if(!roh||!roh.complete||!roh.width)return roh;
+    const c=document.createElement("canvas");c.width=roh.width;c.height=roh.height;
+    const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(roh,0,0);
+    const d=x.getImageData(0,0,c.width,c.height),q=d.data;
+    const quelle=roh.__rampe!==undefined?roh.__rampe:(roh.__rampe=quellRampe(d));
+    if(!quelle)return sprite(key,hautTon);
+    const hz=hautZiel.map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+    const beinTon=(ruestTon&&RUEST_TON[ruestTon])
+      ? RUEST_TON[ruestTon].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)])
+      : quelleDef.rgb;
+    const w=c.width;
+    for(let i=0;i<q.length;i+=4){
+      if(q[i+3]===0)continue;
+      const py=Math.floor((i/4)/w)%64; // Zeile INNERHALB der 64px-Zelle, unabhaengig von Blattzeile/Spalte.
+      const ziel=py>=BEIN_Y?beinTon:hz;
+      for(let k=0;k<quelle.length;k++){
+        if(trifft(q,i,quelle[k])){q[i]=ziel[k][0];q[i+1]=ziel[k][1];q[i+2]=ziel[k][2];break;}
+      }
+    }
+    x.putImageData(d,0,0);
+    beineGefaerbt[id]=c;
+    return c;
+  }
+
   function sprite(key,ton){
     if(!ton)return sprBild[key];
     const id=key+"|"+ton;
@@ -1247,7 +1307,10 @@
     // Bild). Chris' Fund: "kopf_minotaur_walk.png" lag im Baukasten, war aber (wie
     // Haar/Bart/Krone vorher) nie eingebettet — jetzt nachgeholt, echter Stierkopf statt
     // der Ork-mit-Hoernern-Naeherung.
-    "Roddox Harthelm":    {kopf:"minotaur",haut:"brown"},
+    // Portrait zeigt einen Lendenschurz/Kilt um die Huefte — im Baukasten gibt es dafuer nur
+    // "leder" (Bildbefund, Fable-Runde 25.08.: bislang komplett ohne `ruest`, Beine liefen
+    // deshalb hautfarben/nackt statt in dem Leder, das das Bild zeigt).
+    "Roddox Harthelm":    {kopf:"minotaur",haut:"brown",ruest:"leder"},
     // Bild: riesiges bruellendes Reptilwesen mit gehoerntem Kamm, Zaehnen und Klauen,
     // unbewaffnet.
     "Ironhoof":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
@@ -1300,7 +1363,9 @@
     "Vigil":              {kopf:"alien",haut:"fur_grey",geschlecht:"w"},
     "Moonveil":           {kopf:"human",haut:"light",ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",geschlecht:"w"},
     "Riley Le Rogue":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"bronze",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
-    "Whispra":            {kopf:"human",haut:"black",kapuze:true,fluegel:true,geschlecht:"w"},
+    // Portrait: dunkle Lederriemen, Beutel und Trophaeen um Torso/Huefte — bislang komplett
+    // ohne `ruest` (Bildbefund, Fable-Runde 25.08.), Beine liefen nackt/hautfarben.
+    "Whispra":            {kopf:"human",haut:"black",kapuze:true,fluegel:true,geschlecht:"w",ruest:"leder",ruestTon:"dunkel"},
     // Bild (25.08.): mooshaftes Waldwesen mit ausgepraegten spitzen Ohren und einem grossen
     // buschigen Farnschwanz — die Silhouette ist eindeutig katzenartig (Ohren+Schwanz), nur
     // aus Laub statt Fell. ohren/schwanz "katze" statt der Echsen-Variante.
@@ -1313,12 +1378,19 @@
     // die Pistole ist die groessere/zentralere Waffe im Bild.
     "Harbinger":          {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",fluegel:true,waffe:"pistole"},
     "Bana":               {kopf:"human",haut:"light",kapuze:true,ruest:"leder",geschlecht:"w"},
-    "Reefstrike":         {kopf:"wolf",haut:"blue"},
+    // Portrait: um die Huefte gewickeltes Tuch mit Seil (Bildbefund, Fable-Runde 25.08.) —
+    // "leder" ist der naechstliegende Ersatz im Baukasten (kein Stoff/Robe-Blatt vorhanden,
+    // derselbe Rueckgriff wie bei anderen Roben-Charakteren in dieser Tabelle). Bislang ganz
+    // ohne `ruest`, Beine liefen nackt/hautfarben.
+    "Reefstrike":         {kopf:"wolf",haut:"blue",ruest:"leder"},
     "Taryn":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",geschlecht:"w",ruestTon:"dunkel"},
     "Cyrn":               {kopf:"orc",haut:"green",waffe:"schwert",ruest:"leder"},
     // Chris' Fund: ein Tauren-Kopf ("kopf_minotaur_walk.png") lag im Baukasten, war nur
     // nie eingebettet — jetzt nachgeholt statt der Ork-mit-Hoernern-Naeherung.
-    "Medibull":           {kopf:"minotaur",haut:"fur_brown"},
+    // Portrait: gruene Cargo-Hose, Gurt, Sanitaeter-Ausruestung (Bildbefund, Fable-Runde
+    // 25.08.) — "leder" ist die naechstliegende Stoff-/Materialrampe im Baukasten (kein
+    // Gruenton verfuegbar). Bislang ganz ohne `ruest`, Beine liefen nackt/hautfarben.
+    "Medibull":           {kopf:"minotaur",haut:"fur_brown",ruest:"leder"},
     "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     "Phantomblade":       {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",waffe:"schwert",haar:"haar_mop",haarTon:"white",geschlecht:"w"},
     "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
@@ -1359,7 +1431,9 @@
     "Eike":               {kopf:"human",haut:"light",ruest:"leder",ruestTon:"gold",haar:"haar_mop",bart:true,haarTon:"dark_brown"},
     "Lynara":             {kopf:"human",haut:"light",ohren:true,ruest:"leder",ruestTon:"gold",haar:"haar_lang",haarTon:"platinum",krone:true,geschlecht:"w"},
     "Cadrael":            {kopf:"human",haut:"light",fluegel:true,ruest:"plate",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",krone:true,geschlecht:"w"},
-    "Raven":              {kopf:"wolf",haut:"black",fluegel:true},
+    // Portrait: dunkler Lederrock/Wickel mit Guertel um die Huefte (Bildbefund, Fable-Runde
+    // 25.08.) — bislang ganz ohne `ruest`, Beine liefen nackt/hautfarben.
+    "Raven":              {kopf:"wolf",haut:"black",fluegel:true,ruest:"leder",ruestTon:"dunkel"},
     "Nimri":              {kopf:"human",haut:"blue",ohren:true,fluegel:true,geschlecht:"w"},
     "Galactus":           {kopf:"lizard",haut:"fur_grey",hoerner:true,ruest:"plate",ruestTon:"dunkel"},
     "Yuko":               {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",fluegel:true,haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
@@ -1537,7 +1611,12 @@
     // (walk/slash/shoot/hurt), wie bei jeder anderen Zubehoer-Ebene — idle/run fragt
     // zeichneSprite nie an.
     const weiblich=b.geschlecht==="w";
-    zeichne((weiblich?"bodyw_":"body_")+ani,64,0,0,b.haut);
+    const koerperKey=(weiblich?"bodyw_":"body_")+ani;
+    // Beine faerben sich jetzt mit, wenn eine Ruestung eingetragen ist (s. spriteBeine oben)
+    // — ohne `ruest` bleibt der Koerper wie bisher komplett hautfarben (unveraendertes
+    // Verhalten fuer die paar Kreaturen, die absichtlich keine Ruestung tragen).
+    if(b.ruest)male(spriteBeine(koerperKey,b.haut,b.ruest,b.ruestTon),64,0,0);
+    else zeichne(koerperKey,64,0,0,b.haut);
     // Von den zwanzig Koepfen haben nur die urspruenglichen fuenf (alien/human/lizard/
     // orc/wolf) ein eigenes Schlag-Blatt ("k*_slash") — die 23.08.-Nachladung und die
     // fuenfzehn spaeter eingebetteten Koepfe haben nur idle/walk/run/hurt/shoot. Ohne
