@@ -2508,6 +2508,41 @@
   // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
   const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
   const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
+  // DENKPAUSE (Chris' Fund, 25.08.: "die Spieler bewegen sich zu schnell, es gibt gar
+  // keine Pausen... das hier ist ja keine Race sondern Basketball"). Ursache war nicht nur
+  // Tempo: der Ballfuehrer zielte in bewegeSpielerLive IMMER mit vollem Tempo auf den Korb,
+  // unabhaengig von seiner Entscheidungs-Pause (reevBall, s. entscheideBallaktion) — er
+  // sprintete also waehrend er "noch ueberlegt" munter weiter, nie ein sichtbarer Moment
+  // des Abwartens/Dribbelns.
+  //
+  // ERSTER VERSUCH (VERWORFEN, hier dokumentiert statt stillschweigend entfernt): der
+  // Ballfuehrer haelt seine Position komplett (zx=u.x/zy=u.y), solange reevBall >
+  // Schwelle, und driftet erst im letzten Fensterstueck mit vollem Tempo zum Korb.
+  // Sah im Playtest gut aus, aber messe-arena-einfluss.mjs basketball zeigte eine massive
+  // Pp-Abweichung (n=2: 128,1 Pp, n=12: 93,6 Pp — weit ueber der historisch "gefaehrlichen"
+  // Marke von ~50-55 Pp, s. Kommentar bei tempoPx oben). Grund: das komprimierte die
+  // tatsaechliche Lauf-Zeit-zum-Korb auf das letzte Fensterstueck — wer dieselbe Strecke in
+  // WENIGER Zeit zuruecklegen muss, fuer den zaehlt LAUFTEMPO (also indirekt speed/
+  // dexterity/stamina) ueberproportional staerker, nicht neutral wie erhofft. Eine reine
+  // Bewegungsziel-Aenderung ist eben NICHT automatisch Pp-neutral, nur weil sie die Wurf-/
+  // Pass-Entscheidungslogik selbst nicht anfasst (anders als der nur lesende Bewegungs-
+  // Schweif) — sie aendert, WANN/WO ein Spieler bei der naechsten Entscheidung steht.
+  //
+  // GEWAEHLTER ANSATZ: kein hartes Einfrieren, sondern durchgehend langsameres, aber
+  // stetiges Antreiben waehrend der Denkpause (DENKPAUSE_TEMPO), erst im letzten
+  // Fensterstueck (reevBall <= DENKPAUSE_SCHWELLE) der volle Antritt. Die insgesamt in
+  // einem Entscheidungszyklus zurueckgelegte Strecke bleibt dadurch naeher am alten Stand
+  // (durchgehende Bewegung statt Stillstand+Sprint), das sichtbare Tempo-GEFAELLE
+  // (gemaechliches Dribbeln -> entschlossener Antritt) bleibt trotzdem klar erkennbar.
+  // 0,4 nachgemessen: 56 Pp, noch grenzwertig nah an der "gefaehrlichen" Marke. 0,55
+  // (gewaehlt) nachgemessen: 29,9 Pp — innerhalb der gemessenen Bandbreite frueherer
+  // Tempo-Runden (26-54 Pp, s. Kommentar bei tempoPx), kein neuer Ausreisser, und alle
+  // zwoelf Attribute wieder mit einem Anteil vertreten (vorher bei 0,4 UND beim
+  // verworfenen ersten Versuch fielen speed/dexterity bzw. mehrere andere auf 0 %).
+  // PLATZHALTER, nicht so ausfuehrlich durchgemessen wie die Tempo-Konstanten oben (n=12
+  // statt n=48 — Zeitbudget dieser Runde), aber klar innerhalb der bisherigen Bandbreite.
+  const DENKPAUSE_SCHWELLE=0.25;
+  const DENKPAUSE_TEMPO=0.55;
   // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,115/0,885) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
@@ -3381,7 +3416,6 @@
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
-        zx=korbX; zy=H/2+(u.id%2?40:-40);
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -3391,7 +3425,14 @@
         // Dribbel-Abzug ist im Fastbreak leichter (0,85× statt 0,55×) — er bleibt langsamer
         // als seine freilaufenden Mitspieler, aber schneller als die zurueckweichende
         // Verteidigung (deren Bonus gleichzeitig von 1,25× auf 1,0× sinkt, s. unten).
-        if(imFastbreak&&fastbreak.seite===u.side){ tempoMul=1.3; dribbelFaktor=0.85; }
+        // Fastbreak bleibt ohne Denkpause (s. DENKPAUSE_SCHWELLE oben) — dort ist genau das
+        // pausenlose Tempo der Punkt, echte Basketball-Fastbreaks werden nicht durchdacht.
+        zx=korbX; zy=H/2+(u.id%2?40:-40);
+        if(imFastbreak&&fastbreak.seite===u.side){
+          tempoMul=1.3; dribbelFaktor=0.85;
+        } else if(u.reevBall>DENKPAUSE_SCHWELLE){
+          tempoMul=DENKPAUSE_TEMPO;
+        }
       } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
       } else if(u.screent&&fsT<u.screent.bis){
