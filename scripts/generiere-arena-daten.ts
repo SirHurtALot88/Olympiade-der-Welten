@@ -160,13 +160,16 @@ if (!schreiben) {
     `\n${officialDisciplineWeightOrder.length} Disziplinen. Mit --schreiben landet der Block direkt im Entwurf.`,
   );
 } else {
-  const pfad = resolve(process.cwd(), "public/mockups/battle-mode.html");
+  // Seit Phase 2 (Modul-Extraktion) liegt der Motor-Code nicht mehr inline in
+  // battle-mode.html, sondern in der ausgelagerten battle-mode.engine.js — die Marker
+  // und der BASIS_JE_DISC-Block sind mitgewandert, s. FoundationBattleArenaHost.tsx.
+  const pfad = resolve(process.cwd(), "public/mockups/battle-mode.engine.js");
   const alt = readFileSync(pfad, "utf8");
   const auf = alt.indexOf(MARKER_AUF);
   const zu = alt.indexOf(MARKER_ZU);
   if (auf < 0 || zu < 0) {
     console.error(
-      "Marker nicht gefunden. Der Entwurf braucht einmalig die beiden Zeilen\n" +
+      "Marker nicht gefunden. Der Motor (public/mockups/battle-mode.engine.js) braucht einmalig die beiden Zeilen\n" +
         `  ${MARKER_AUF}\n  ${MARKER_ZU}\n` +
         "um den bisherigen BASIS_JE_DISC/SLOTS_JE_DISC-Block herum.",
     );

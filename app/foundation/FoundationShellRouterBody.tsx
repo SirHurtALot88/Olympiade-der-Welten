@@ -3239,7 +3239,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           {/* Der Changelog braucht keinen Spielstand — er liest die zur Build-Zeit generierte Datei. */}
           {activeView === "changelog" ? <FoundationChangelogHost /> : null}
-          {activeView === "battleArena" ? <FoundationBattleArenaHost /> : null}
+          {activeView === "battleArena" ? (
+            <FoundationBattleArenaHost
+              gameState={gameState}
+              activeManagerTeamId={activeManagerTeamId}
+              saveId={activeSaveId}
+            />
+          ) : null}
 
           {/* Der Debug-Block hing bis hierher nur an einer CSS-Klasse (`getViewClass` gibt
               lediglich `foundation-section-hidden` zurueck). Das hiess: der komplette
