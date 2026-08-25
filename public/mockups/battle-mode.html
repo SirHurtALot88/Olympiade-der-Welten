@@ -3640,7 +3640,14 @@
   }
 
   function stepBasketballLive(dt){
-    if(done)return;
+    // Fable-Playtest (25.08.): nach Spielende stand alles bewegungslos still — der fruehe
+    // Return liess bewegeSpielerLive() nie wieder laufen. Anders als die anderen
+    // Feldspiel-Disziplinen (die ueber fsLerpPositionen() in feste Formationsslots
+    // ausschwingen, stepFeldspiel Zeile ~3822) treibt Basketballs Live-Motor Positionen
+    // ueber bewegeSpielerLive() aus fsLive — genau die Funktion weiterlaufen zu lassen
+    // (ohne entscheideBallaktion/versucheSteal, die neue Ballwechsel ausloesen wuerden)
+    // laesst die Spieler sanft in ihre letzte Ziel-Position auslaufen statt einzufrieren.
+    if(done){bewegeSpielerLive(dt);return;}
     fsT+=dt;
     if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
       bkSfx("buzzer.mp3",0.8); bkLoopStop(); return; }
@@ -3857,6 +3864,28 @@
     document.getElementById("clock").textContent=
       Math.floor(fsT/60)+":"+String(Math.floor(fsT%60)).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":"läuft";
+    // Fable-Playtest (25.08.): der Play-Button blieb nach Spielende auf "Pause" stehen,
+    // weil nur ein Klick seinen Text setzt (Zeile ~8417) — anders als im Kampf, wo
+    // finish() ihn beim automatischen Ende auf "Vorbei" umstellt.
+    if(done)document.getElementById("play").textContent="Vorbei";
+    // Beschriftungen wie im Kampf passen hier nicht — es gibt kein
+    // Sudden Death und niemand ist "im Kampf". Buehne (Zeile ~4303) und Bahn (Zeile ~6778)
+    // tauschen dieselben zwei geteilten Elemente schon fuer ihren Kontext; Feldspiel hatte
+    // das nie bekommen, deshalb blieb die Kampf-Beschriftung auch bei Basketball stehen.
+    const sd=document.querySelector(".hpbars .sd");
+    if(sd)sd.textContent=FB().label+" — Live-Spielstand";
+    // Nicht kumulativ ersetzen (Fund beim Regressionscheck): "im Kampf" existiert nach
+    // dem ersten Treffer nicht mehr im DOM, ein zweiter Feldspiel-Besuch faende also
+    // nichts mehr zu ersetzen. dataset.origHtml haelt die Vorlage fest, damit jeder
+    // Aufruf — auch nach einem Discipline-Wechsel hin und zurueck — vom selben
+    // Ausgangstext startet statt vom Ergebnis des letzten Wechsels.
+    document.querySelectorAll(".scoreline .tname em").forEach(e=>{
+      if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
+      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"Spielzüge");});
+    // Nur die Bahn schreibt ".clock small" um — falls zuletzt die Bahn dran war, hier
+    // zurueck auf die Vorlage (Feldspiel hat dafuer keinen eigenen Text noetig).
+    const kl=document.querySelector(".clock small");
+    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
     document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
     document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
     // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
@@ -4304,8 +4333,16 @@
     if(sd)sd.textContent=BB().duell
       ? BB().rundenN+" Züge je Brett — Vorteil läuft mit"
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
+    // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
+    // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
+    // ersetzt oder Text eines anderen Modus stehen laesst.
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
-      e.innerHTML=e.innerHTML.replace(/im Kampf/g,"aufgetreten");});
+      if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
+      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"aufgetreten");});
+    // Nur die Bahn schreibt ".clock small" um — falls zuletzt die Bahn dran war, hier
+    // zurueck auf die Vorlage (Buehne hat dafuer keinen eigenen Text noetig).
+    const kl=document.querySelector(".clock small");
+    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
     const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
@@ -6777,10 +6814,17 @@
     // Death, niemand ist "im Kampf", und die Punkte sind Zieleinlaeufe.
     const sd=document.querySelector(".hpbars .sd");
     if(sd)sd.textContent=(BA().hindernisWort==="Griff"?"Wand":"Strecke")+" — Schnitt der Mannschaft";
+    // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
+    // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
+    // ersetzt oder Text eines anderen Modus stehen laesst.
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
-      e.innerHTML=e.innerHTML.replace(/im Kampf/g,"im Ziel");});
+      if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
+      e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"im Ziel");});
     const kl=document.querySelector(".clock small");
-    if(kl)kl.innerHTML=kl.innerHTML.replace(/· Punkte/,"· im Ziel");
+    if(kl){
+      if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML;
+      kl.innerHTML=kl.dataset.origHtml.replace(/· Punkte/,"· im Ziel");
+    }
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
@@ -6799,6 +6843,22 @@
     // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
     document.getElementById("clock").textContent="0:"+String(Math.floor(t*zeitFaktor())).padStart(2,"0");
     document.getElementById("phase").textContent=done?"beendet":(t>50?"Sudden Death":"läuft");
+    // Regressionsfund beim Fable-Basketball-Fix (25.08.): Feldspiel/Buehne/Bahn ersetzen
+    // ".sd" und die "im Kampf"-Beschriftung fuer ihren eigenen Kontext, stellen sie aber
+    // nie zurueck — der Discipline-Umschalter (renderDbar) wechselt disc auf demselben DOM
+    // ohne Neuladen, also blieb z.B. "Basketball — Live-Spielstand" auch nach dem Zurueck-
+    // wechsel zu TDM stehen. updateHud() ist TDMs einzige Gelegenheit, das geradezuziehen —
+    // dieselbe dataset.origHtml-Vorlage wie in den anderen drei Updatern, hier aber als
+    // Rueckwaerts-Wiederherstellung statt als Ersetzung.
+    const sd=document.querySelector(".hpbars .sd");
+    if(sd){ if(sd.dataset.orig===undefined)sd.dataset.orig=sd.textContent; sd.textContent=sd.dataset.orig; }
+    document.querySelectorAll(".scoreline .tname em").forEach(e=>{
+      if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
+      e.innerHTML=e.dataset.origHtml;});
+    // Nur die Bahn schreibt ".clock small" um ("· Punkte" -> "· im Ziel") — dieselbe
+    // Wiederherstellung wie oben, falls zuletzt die Bahn dran war.
+    const kl=document.querySelector(".clock small");
+    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
@@ -8190,7 +8250,11 @@
       for(const u of feld){
         const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
         const pl=place[u.n];
-        const rolle=(pl&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
+        // Fable-Playtest (25.08.): ein Spieler, der nur fuer eine ANDERE Disziplin
+        // aufgestellt war, zeigte hier trotzdem deren Rollen-Label (z.B. TDM-Slot
+        // "Shotcaller" beim Basketball-Einlauf) — place[n].d haelt fest, fuer welche
+        // Disziplin der Slot gilt, wurde hier aber nie geprueft.
+        const rolle=(pl&&pl.d===disc&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
         z.appendChild(el("span","erolle",rolle.toUpperCase()));
         z.appendChild(el("span","ename",u.n));
         const w=el("span","ewert",u.eig.toFixed(1));
