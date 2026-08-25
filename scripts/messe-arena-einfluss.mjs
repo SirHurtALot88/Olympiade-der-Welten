@@ -23,6 +23,8 @@
 // Minuten. Fuer TDM also klein anfangen.
 // ===================================================================================
 import { chromium } from "playwright";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 const disziplin = process.argv[2] || "spurt";
 // WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
@@ -41,7 +43,13 @@ const VORGABE = { staffel: 144 };
 const laeufe = Number(process.argv[3] || VORGABE[disziplin] || 48);
 // Dritter Aufrufwert: ein anderer Entwurf. Nuetzlich, um eine lange TDM-Messung gegen
 // eine eingefrorene Kopie laufen zu lassen, waehrend am Original weitergearbeitet wird.
-const pfad = process.argv[4] || "/home/user/Olympiade-der-Welten/public/mockups/battle-mode.html";
+// AUS DEM SKRIPT-ORT ABGELEITET statt fest verdrahtet. Der alte absolute Pfad zeigte in
+// einem git-worktree still auf das HAUPT-Repo: die Messung lief dann gegen eine andere
+// Datei als die, an der gerade gearbeitet wird, und meldete trotzdem brav Zahlen. Genau
+// das Muster (eine Konstruktion faellt lautlos auf etwas Falsches zurueck), vor dem der
+// Kommentar in bahnSerie() warnt. Vierter Aufrufwert ueberschreibt weiterhin.
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const pfad = process.argv[4] || path.join(HIER, "..", "public", "mockups", "battle-mode.html");
 const datei = "file://" + pfad;
 
 const browser = await chromium.launch({

@@ -2292,21 +2292,65 @@
       punkteNah:2, punkteFern:3, fernAnteil:0.32,
       wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
       rezept:{
-        AUFBAU:      {intelligence:40,spirit:30,dexterity:30},
+        // AUFBAU UMGESCHRIEBEN (26.08. abends), aus derselben Messung: awareness lag bei
+        // 4,4 % gegen ein Matrixgewicht von 14 (und war damit nach dem Umbau der
+        // ZWEITCHANCE ins Gegenteil gekippt), dexterity bei 19 % gegen 8. Beides sitzt
+        // hier an einer Stelle, an der die Aenderung auch sachlich stimmt: Spielaufbau ist
+        // vor allem Uebersicht (awareness) und Spielverstaendnis (intelligence), erst
+        // danach Handarbeit. Der Wert steuert versucheDurchbruch und die Ballsicherheit —
+        // ein Aufbauspieler, der den Gegner ausdribbelt, tut das, weil er die Luecke SIEHT.
+        AUFBAU:      {intelligence:40,awareness:25,spirit:20,dexterity:15},
         // ABSCHLUSS bewusst NICHT auf die matrixstarken TECHNIK/TEAMGEIST-Attribute
         // umgeschrieben (durchgemessen und verworfen, s. offensterMitspieler unten fuer
         // den tatsaechlichen Fix) — ein eigenstaendiges Rezept haelt dexterity/power/speed
         // ueberhaupt sichtbar, statt sie ganz aus der Nutzungs-Gewichtung zu verdraengen.
-        ABSCHLUSS:   {dexterity:40,power:30,speed:30},
+        // torment 20 aufgenommen (26.08. abends). Die Pp-Messung bei n=48 las torment mit
+        // 0,0 % bei einem Matrixgewicht von 6 — das Attribut kam im ganzen Basketball nur
+        // in ABWEHR (25) und WUCHT (25) vor und schlug nirgends bis ins Ergebnis durch.
+        // Der Abschluss ist die thematisch richtige zweite Heimat: am Korb abzuschliessen,
+        // waehrend jemand an einem haengt, ist Haerte, nicht Fingerfertigkeit.
+        // dexterity gleichzeitig 40 -> 30, weil dieselbe Messung dexterity mit +11,0 als
+        // das jetzt am staerksten ueberbezahlte Attribut auswies (Matrixgewicht 8, aber
+        // vier Kanaele: ABSCHLUSS, TECHNIK, AUFBAU, LAUFTEMPO).
+        ABSCHLUSS:   {dexterity:30,power:25,speed:25,torment:20},
         TECHNIK:     {intelligence:40,awareness:35,dexterity:25},
-        ZWEITCHANCE: {power:45,awareness:30,stamina:25},
+        // ZWEITCHANCE UMGESCHRIEBEN (26.08. abends) — als KANALZAEHLUNG begruendet, nicht
+        // nach Gefuehl. Die Pp-Messung wies power mit +27,8 als das am staerksten
+        // ueberbezahlte und spirit mit -16,6 als das am staerksten unterbezahlte Attribut
+        // aus. Zaehlt man nach, WIE OFT ein Attribut ueberhaupt vorkommt, erklaert sich
+        // das ohne jede weitere Annahme:
+        //   power   ABSCHLUSS 30, ZWEITCHANCE 45, WUCHT 50   — und ueber WUCHT seit dieser
+        //           Runde zusaetzlich Greifreichweite, Blockchance und Ringduell
+        //   spirit  TEAMGEIST 55, AUFBAU 30                  — sonst nichts
+        // spirit traegt in der Matrix 22 (das hoechste Gewicht des Basketballs), power 7.
+        // Das Verhaeltnis der KANAELE steht dazu genau andersherum.
+        // Der Rebound ist die richtige Stelle, um das zu korrigieren, und zwar nicht als
+        // Buchhaltung, sondern weil es sachlich stimmt: ein Abpraller wird nicht nur mit
+        // Groesse geholt, sondern mit Wille — genau das ist spirit. Rebounding gilt im
+        // echten Basketball als die Statistik, die am staerksten am Einsatz haengt.
+        ZWEITCHANCE: {power:35,awareness:25,stamina:15,spirit:25},
         ABWEHR:      {awareness:40,speed:35,torment:25},
         TEAMGEIST:   {spirit:55,charisma:45},
         AUSDAUER:    {stamina:50,torment:25,speed:25},
         // Fables Dynamik-Runde: ohne Lauftempo bewegt sich jeder Spieler exakt gleich
         // schnell (nur der Lerp-Faktor entschied), Speed hatte in der Bewegung selbst nie
         // eine Rolle. PLATZHALTER-Rezept, wie alle anderen hier.
-        LAUFTEMPO:   {speed:50,stamina:30,dexterity:20}
+        LAUFTEMPO:   {speed:50,stamina:30,dexterity:20},
+        // WUCHT — Opus-Balance-Runde 26.08., Chris' Vorgabe "wenn er sehr powerful ist
+        // dass er sich durch powert". Die Koerperlichkeit hatte bis hierhin KEINEN eigenen
+        // Kanal: power sass in ABSCHLUSS (30 %) und ZWEITCHANCE (45 %), also im "wer wirft"
+        // und im "wer holt den Abpraller" — aber nirgends im "was passiert, wenn zwei
+        // Koerper am Ring aufeinandertreffen". Genau das ist die Luecke, die ein starker
+        // Spieler im echten Basketball ausnutzt: er faellt nicht aus dem Gleichgewicht,
+        // wenn er angefasst wird, und er zieht dabei Fouls.
+        // WUCHT wirkt an genau zwei Stellen, beide nur am Korb (dunk/nah, s.
+        // wuchtEntlastungVon und foulChance in wirf) — bewusst NICHT auf den Sprungwurf:
+        // Kraft hilft beim Abschluss durch Koerperkontakt, nicht beim freien Dreier.
+        // Rezept aus drei Attributen, die die Basketball-Matrix zwar bepreist (power 7,
+        // stamina 6, torment 6), die aber in der Messung dieser Runde unter ihrem Gewicht
+        // lasen (torment 2,7 % bei Gewicht 6) — ein neuer Kanal fuer sie ist damit auch
+        // messtechnisch die richtige Richtung, nicht nur die thematisch richtige.
+        WUCHT:       {power:50,stamina:25,torment:25}
       },
       // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
       // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
@@ -2319,7 +2363,14 @@
           label:"Alley-Oop", rolle:"ZWEITCHANCE", choreo:"hochpass", jubel:"gross",
           neigung:(pg,bf)=>Math.min(0.22,Math.max(0.02,
             0.06+(pg.TECHNIK-50)*0.0020+(bf.ZWEITCHANCE-50)*0.0020)),
-          abschluss:(pg,bf)=>Math.min(0.90,0.10+bf.ABSCHLUSS*0.0045+pg.TECHNIK*0.0025),
+          // Auf die neue Trefferskala nachgezogen (Opus-Balance-Runde 26.08.): die alte
+          // Formel (0,10+ABSCHLUSS*0,0045+TECHNIK*0,0025) gab bei Durchschnittswerten
+          // 45 % — auf der alten Skala, wo ein normaler Korbleger 74 % traf, war ein
+          // Alley-Oop damit der SCHLECHTESTE Abschluss im Spiel. Jetzt an BASIS_TREFFER.dunk
+          // (0,76) angelehnt, aber darunter: der Zug ist unbedraengt (kein blockKandidat),
+          // dafuer schwerer zu fangen. Reale Alley-Oop-Quoten liegen um 70 %.
+          abschluss:(pg,bf)=>Math.min(0.92,Math.max(0.30,
+            0.64+(bf.ABSCHLUSS-50)*0.0022+(pg.TECHNIK-50)*0.0016)),
           text:(pg,bf)=>pg.n+" wirft hoch zum Korb — "+bf.n+" steigt ab und dankt rein"
         }
       }
@@ -2444,7 +2495,7 @@
   const DUNK_RADIUS=42;             // Fable-Fund (Wurfmechanik-Runde, 25.08.): ganz nah dran ist in echtem
   // Basketball praktisch automatisch — bisher gab es diese Stufe gar nicht, ein Korbleger
   // aus 90px und ein Dunk aus 20px liefen durch dieselbe "nah"-Formel. Eigene, engere
-  // Reichweite dafuer (s. WURF_BONUS unten fuer den Erfolgs-Bonus).
+  // Reichweite dafuer (s. BASIS_TREFFER unten fuer die Erfolgsquote dieser Stufe).
   // DREIER_RADIUS MUSS den gezeichneten Bogen treffen (bodenFeldspiel: ctx.arc(korbX,H/2,
   // H*0.24,...)) — stand vorher bei 145 (freihaendig gewaehlt, nie gegen die Zeichnung
   // geprueft). Der Bogen liegt bei H*0.24 = 470*0.24 = 112.8px. Nachgemessen (nicht
@@ -2459,28 +2510,165 @@
   const FERN_RADIUS_MAX=170;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
   // Fluegel-/Eckenslots ab, s. SLOTS: radius bis 150) — jenseits davon wird nur per
   // Schussuhr-Zwang abgeschlossen (entscheideBallaktion, erzwingen-Zweig).
-  // WURF_BONUS: additive Technik-Anpassung je Wurftyp — dieselbe Erfolgsformel wie zuvor
-  // (0,16+TECHNIK*0,0050+TEAMGEIST*0,0060), der Wurftyp wird darin jetzt ein echter Faktor
-  // statt eines separaten Wuerfels. Reihenfolge wie verlangt: Dunk > nah > mit > fern
-  // (Freiwurf liegt darueber, s. schiesseFreiwuerfe, und laeuft NICHT ueber diese Formel,
-  // weil ein Freiwurf ungedeckt ist).
-  // GROESSE DER STUFEN durchgemessen (messe-arena-einfluss.mjs basketball 48), nicht nur
-  // nach Gefuehl gewaehlt — mit einem wichtigen Vorbehalt, den der Bericht ausfuehrlich
-  // traegt: JEDE nicht-null Belegung (0,06/0,01/-0,02/-0,06 genauso wie 0,34/0,05/-0,10/
-  // -0,18) hob die Pp-Abweichung in dieser Session auf etwa 50-65, unabhaengig von der
-  // Spannweite — waehrend WURF_BONUS komplett auf 0 die Abweichung bei ~31 hielt (nahe am
-  // echten 27,3-Ausgangswert). Das ist KEIN einfacher Dosis-Wirkungs-Zusammenhang, den man
-  // durch Verkleinern loesen koennte (nachgemessen: kleiner wurde nicht zuverlaessig
-  // besser). Wahrscheinlichste Ursache (s. Bericht): einflussVon() vergleicht Basis- und
-  // Hebungslauf ueber DENSELBEN Seed und DIESELBE Anzahl `rr()`-Aufrufe pro Tick — jeder
-  // neue bedingte `rr()`-Aufruf, den diese Runde einfuehrt (Foul-Wuerfel in wirf(),
-  // Freiwurf-Wuerfel), verschiebt die Zufallsfolge fuer den Rest der Partie, sobald er in
-  // Basis- und Hebungslauf zu unterschiedlichen Zeitpunkten faellt — ein Messartefakt der
-  // Methode, keine belegte Schieflage zugunsten eines Attributs. Trotzdem NICHT ignoriert:
-  // diese Version haelt sich an der unteren Kante des beobachteten Plateaus, weil ein
-  // groesserer Rahmen (0,52 Spanne) keinen Spielgefuehl-Vorteil zeigte, der die zusaetzliche
-  // Pp-Unsicherheit rechtfertigt.
-  const WURF_BONUS={dunk:0.20, nah:0.03, mit:-0.06, fern:-0.14};
+  // ===================================================================================
+  // DIE TREFFERFORMEL — Opus-Balance-Runde 26.08. Kompletter Umbau, nicht nachjustiert.
+  //
+  // DIE PP-SPUR DIESER RUNDE, damit die naechste Runde nicht bei null anfaengt. Gemessen
+  // mit messe-arena-einfluss.mjs basketball 48 (n=48 ist die belastbare Groesse; die zwei
+  // n=24-Zwischenmessungen stehen nur zur Warnung dabei):
+  //   79,0 Pp   Stand zu Beginn dieser Runde (n=48)
+  //   53,4 Pp   nach Trefferformel/Turnover/Doppeln/Durchbruch   ABER n=24
+  //   90,2 Pp   nach dem TEAMGEIST-Tausch in schuetzenGuete       ABER n=24
+  //   45,2 Pp   derselbe Stand plus spirit in ZWEITCHANCE (n=48)
+  //   37,7 Pp   plus ABSCHLUSS/AUFBAU-Rezepte (n=48, Endstand)
+  //
+  // DIE BEIDEN n=24-WERTE SIND KEINE MESSUNG, SIE SIND EINE WARNUNG. Zwischen ihnen liegen
+  // drei kleine Aenderungen, und die Zahl sprang um 37 Pp — waehrend die naechste Messung
+  // desselben Codes bei n=48 auf 45,2 kam, also zwischen beiden. Wer auf n=24 tunt, tunt
+  // auf Rauschen. Der Kommentar am Kopf des Messskripts sagt genau das; diese Runde hat
+  // es noch einmal teuer nachgewiesen.
+  //
+  // WAS DIE 37,7 NOCH TRAGEN: dexterity +10,1 (Matrixgewicht 8, aber vier Kanaele — der
+  // naechste Kandidat), speed -7,2 (bekanntes, aelteres Problem: Bewegungstempo schlaegt
+  // ueber 90 Sekunden kaum bis ins Ergebnis durch, s. Kommentar bei tempoPx),
+  // intelligence -5,0, torment -3,5. spirit (23,9 gegen 22), charisma (10,3 gegen 11) und
+  // awareness (11,5 gegen 14) sitzen jetzt auf ihrem Gewicht — zu Rundenbeginn lasen sie
+  // 2,5 / 3,2 / 27,3.
+  //
+  // WAS VORHER STAND und warum es weg musste. Die Erfolgschance war EINE flache Formel
+  //   min(0,92; 0,16 + TECHNIK*0,0050 + TEAMGEIST*0,0060 + WURF_BONUS[stufe] - bedraengnis)
+  // mit WURF_BONUS={dunk:0,20 nah:0,03 mit:-0,06 fern:-0,14}. Bei Durchschnittswerten
+  // (TECHNIK 50, TEAMGEIST 50) sind das 0,71 GRUNDchance, aus der der Wurftyp nur noch
+  // +-0,17 herausholt. Nachgemessen (messe-basketball-wurfquoten.mjs echt 24, Stand vor
+  // dieser Runde): FG 70,2 %, 2P 73,2 %, 3P 64,5 %, Freiwurf 91,3 %. Die NBA liegt bei
+  // 46 / 54 / 36 / 78. Das ist keine Feinjustage-Luecke, das ist eine andere Sportart.
+  //
+  // ZWEITER, SCHWERERER BEFUND derselben Messung: Verteidigung war praktisch wirkungslos.
+  // Der Bedraengnis-Term konnte maximal 0,18 abziehen, und zwar nur bei Deckerabstand
+  // NULL; bei realistischen 15 px (3,2 ft, in der NBA ein "tight contest") waren es 0,09.
+  // Gemessen ueber 24 Spiele: freier Dreier 61,0 %, bedraengter Dreier 59,1 % — eine
+  // Spreizung von 1,9 Pp, wo die NBA rund 8 Pp misst. Der Kommentar "Defense MUST be
+  // relevant" (Chris, frueherer Runde) stand also im Code, aber nicht in den Zahlen.
+  //
+  // DER UMBAU. Statt einer flachen Formel mit Wurftyp-Zuschlag jetzt ein echtes
+  // Wurfqualitaets-Modell aus drei getrennten Teilen, die man einzeln gegenmessen kann:
+  //
+  //   Treffer = BASIS_TREFFER[stufe]                     ungedeckter Durchschnittswurf
+  //           + Schuetzenguete * GUETE_WIRKUNG[stufe]    wie gut DIESER Schuetze ist
+  //           - KONTEST_WIRKUNG[stufe] * Bedraengnis     wie hart verteidigt wird
+  //           + Situationszuschlaege (Fastbreak)
+  //
+  // BASIS_TREFFER ist auf den UNGEDECKTEN NBA-Wurf geeicht, nicht auf den Schnitt: der
+  // Schnitt entsteht erst, nachdem der Kontest-Term seinen Teil abgezogen hat. Konkrete
+  // Anker (recherchiert 26.08., Quellen im Bericht): Restricted Area 65-67 % im Schnitt
+  // und rund 75-80 % voellig frei; Dreier 36 % im Schnitt, 38,4 % "wide open", 30,1 %
+  // "tight" (2-4 ft); Mid-Range 42-44 %; Paint ausserhalb der Restricted Area ~45 %.
+  //
+  // KONTEST_WIRKUNG ist bewusst NACH STUFE VERSCHIEDEN und am Ring am groessten — das ist
+  // der Punkt, an dem echter Basketball und die alte Formel am weitesten auseinanderlagen.
+  // Einen Korbleger kann ein Verteidiger koerperlich stoeren, einen Dreier nur mit der
+  // Hand im Gesicht. In NBA-Zahlen: Restricted Area faellt von ~78 % (frei) auf ~55 %
+  // (very tight), also rund 23 Pp; ein Dreier faellt von 38,4 auf ~27 %, also rund 11 Pp.
+  // Genau dieses Verhaeltnis steht unten.
+  //
+  // GUETE_WIRKUNG staffelt, WIE VIEL der Schuetze selbst ausmacht: am Ring fast nichts
+  // (ein Dunk ist ein Dunk), beim Sprungwurf alles. Auch das ist NBA-realistisch — die
+  // Streuung der Spieler ist an der Dreierlinie viel groesser als unter dem Korb.
+  //
+  // WARUM DAS KEIN "PROZENTE RUNTERDREHEN" IST (Chris' ausdrueckliche Vorgabe: "dann muss
+  // def staerker wirken oder dass spieler doppeln und das ne taktik ist"): die drei Teile
+  // haben getrennte Ursachen und getrennte Gegenmittel. Ein guter Schuetze hebt seinen
+  // Teil; ein guter Verteidiger senkt einen anderen; wer sich freispielt (Durchbruch,
+  // s. versucheDurchbruch) nimmt den Kontest-Term ganz aus der Rechnung. Ein pauschaler
+  // Deckel haette keine dieser Stellschrauben.
+  // NACHGEEICHT (zweite Opus-Balance-Runde, 26.08. abends) — die erste Fassung dieser
+  // Runde war ueber das Ziel hinausgeschossen und traf ZU WENIG. Gemessen wird gegen das
+  // Szenario "gleich" (messe-basketball-wurfquoten.mjs gleich 120): beide Kader auf
+  // Attribut 55, schuetzenGuete also praktisch null, damit liest man die Basisquoten
+  // selbst und nicht die Kaderguete. Die echten Kader (Szenario "echt") liegen bewusst
+  // DARUNTER — ihre TECHNIK-Mittel sind 26 bis 46, schlechte Schuetzen sollen schlecht
+  // treffen. Wer auf "echt" eicht, hebt die Basis so weit an, dass ein Durchschnitts-
+  // spieler NBA-Allstar-Quoten wirft.
+  //
+  //             gemessen 120 Spiele "gleich"   Ziel   Schluss
+  //   dunk      65,3 %                          66     0,70 -> 0,76 (zweiter Durchgang)
+  //   nah       38,5 %                          45     0,40 -> 0,47 -> 0,51 (dritter
+  //                                                    Durchgang: blieb ueber vier Szenarien
+  //                                                    hinweg bei 37,9-43,9 % haengen, weil in
+  //                                                    der Zone fast jeder Wurf bedraengt ist —
+  //                                                    frei 41-63 %, bedraengt 25-37 %)
+  //   mit       44,0 %                          42     0,42 -> 0,45 (dritter Durchgang:
+  //                                                    nach dem Umbau der Wurfauswahl fielen
+  //                                                    fast alle Mid-Range-Wuerfe in die Stufe
+  //                                                    "offen" und lasen 37,1 %; die NBA misst
+  //                                                    fuer offene Mid-Range rund 42-45 %)
+  //   fern      31,5 %                          36     0,30 -> 0,36
+  //
+  // WARUM DUNK EINEN ZWEITEN DURCHGANG BRAUCHTE. Nach dem ersten Zug sank die gemessene
+  // Dunk-Quote von 65,3 auf 57,5 %, OBWOHL an BASIS_TREFFER.dunk nichts geaendert wurde:
+  // mit weniger Turnovern (s. versucheSteal) laufen mehr Angriffe bis zum Abschluss, und
+  // die zusaetzlichen Abschluesse sind ueberproportional die BEDRAENGTEN am Ring — der
+  // Anteil "eng" (0-2 ft) an allen Dunk-Versuchen stieg von 34 auf 36 %. Die Quoten je
+  // Bedraengnisstufe waren also richtig (eng 47 %, frei 67 %), nur der MIX war ein
+  // anderer. Der NBA-Vergleich je Stufe (Restricted Area nach naechstem Verteidiger:
+  // 0-2 ft rund 55 %, 6+ ft rund 76 %) zeigt, dass die Basis selbst 6-8 Pp zu tief lag —
+  // 0,76 setzt den freien Korbleger auf rund 78 % und trifft damit genau den Anker, den
+  // der Absatz oben ohnehin nennt ("rund 75-80 % voellig frei").
+  //
+  // Die Rechnung geht auf, weil die gemessene Quote fast exakt BASIS minus dem mittleren
+  // Kontestabzug ist: freier Dreier gemessen 31,8 % bei BASIS 0,30 plus Guete 0,02 —
+  // die Basis ist also DIREKT die Quote des freien Wurfs, und genau darauf zielt die
+  // NBA-Referenz "wide open 38,4 %" (s. ZIEL_FERN_FREI im Messskript).
+  const BASIS_TREFFER={dunk:0.76, nah:0.51, mit:0.45, fern:0.36};
+  // fern 0,13 -> 0,15: die gemessene Spreizung frei-minus-bedraengt lag bei 5,6 Pp
+  // ("gleich", 120 Spiele) gegen rund 8 Pp in der NBA. Nachgerechnet statt geraten: ein
+  // "tight"-Wurf (2-4 ft = 9,5-19 px) erzeugt eine Bedraengnis um 0,53; 0,53*0,15 = 8,0 Pp
+  // Abzug gegen den freien Wurf. Am Ring bleibt es bei 0,30 — dort stimmte die Spreizung
+  // schon (dunk frei 75 %, eng 60 %).
+  const KONTEST_WIRKUNG={dunk:0.30, nah:0.24, mit:0.16, fern:0.15};
+  const GUETE_WIRKUNG={dunk:0.35, nah:0.80, mit:1.15, fern:1.15};
+  // Schuetzenguete, roh: -0,08 (Attribute ~1) bis +0,08 (Attribute ~99), 0 bei 50/50.
+  // TECHNIK (intelligence 40, awareness 35, dexterity 25) und TEAMGEIST (spirit 55,
+  // charisma 45) tragen zusammen die vier hoechsten Matrixgewichte des Basketballs
+  // (spirit 22, intelligence 16, awareness 14, charisma 11) — die Wurfformel bepreist
+  // also genau das, was die Disziplin bepreist, statt einen fuenften Kanal aufzumachen.
+  // Koeffizienten nach der ersten Messung dieser Runde angehoben (0,0011/0,0007 ->
+  // 0,0020/0,0012): mit den kleinen Werten lag der Unterschied zwischen dem besten und dem
+  // schlechtesten Schuetzendrittel beim Dreier bei 4 Pp und wurde vom Rauschen (und davon,
+  // dass gute Schuetzen oefter gedoppelt werden) komplett aufgefressen — gemessen sogar
+  // -3 Pp. Jetzt spannt die volle Attributspanne rund 22 Pp beim Sprungwurf auf, also
+  // etwa die Spanne zwischen einem 26-%- und einem 48-%-Dreierschuetzen. Das ist mehr
+  // Streuung als die NBA unter Rotationsspielern zeigt (rund 30-43 %) — bewusst, weil die
+  // Attribute hier von 1 bis 99 reichen und nicht nur ueber Berufsspieler streuen.
+  // GEWICHTE GETAUSCHT (26.08. abends), aus einer Pp-Messung heraus, nicht aus dem
+  // Bauch. Die Abnahme messe-arena-einfluss.mjs las am Rundenanfang 79 Pp Abweichung und
+  // benannte die Schieflage eindeutig:
+  //   ueberbezahlt  awareness +13,3   power +11,7   dexterity +6,1
+  //   unterbezahlt  spirit -19,5      intelligence -12,2   charisma -7,8
+  // spirit (Matrixgewicht 22, der hoechste im ganzen Basketball) und charisma (11) haben
+  // im Spiel GENAU EINEN Kanal: TEAMGEIST (spirit 55, charisma 45). awareness und
+  // dexterity haben je drei bis vier (TECHNIK, ABWEHR, ZWEITCHANCE bzw. TECHNIK,
+  // ABSCHLUSS, AUFBAU, LAUFTEMPO). Dass die beiden teuersten Attribute der Matrix am
+  // schwaechsten durchschlagen, ist deshalb kein Zufall, sondern Bauart.
+  // Die Wurfformel ist der groesste einzelne Hebel im Spiel — hier sitzt der Tausch
+  // deshalb richtig: TEAMGEIST traegt jetzt MEHR als TECHNIK. Die GESAMTSPANNE bleibt
+  // absichtlich fast gleich (0,0032 -> 0,0034 je Attributpunkt), damit sich die
+  // Trefferquoten dadurch nicht verschieben — es aendert sich, WER gut wirft, nicht
+  // WIE GUT ueberhaupt geworfen wird.
+  const schuetzenGuete=(u)=>(u.TECHNIK-50)*0.0013+(u.TEAMGEIST-50)*0.0021;
+  // Der obere Deckel lag frueher bei 0,92 und wurde von fast jedem Wurf erreicht (s.
+  // Messung oben) — er war damit faktisch die Trefferquote selbst. Jetzt 0,95/0,04 als
+  // reine Sicherheitsgrenze: erreichbar nur von einem Maximalschuetzen beim voellig
+  // freien Dunk bzw. einem Minimalschuetzen beim dreifach gedeckten Dreier.
+  const TREFFER_DECKEL=0.95, TREFFER_BODEN=0.04;
+  // EINE Stelle, an der die Trefferchance entsteht — vorher stand dieselbe Formel
+  // dreimal im Code (Normalwurf, Zwangswurf, Auswahl-Gate) und musste dreimal
+  // gleichzeitig nachgezogen werden.
+  function trefferChance(u,tier,bedraengnis,imFastbreak,wuchtEntlastung){
+    const kontest=KONTEST_WIRKUNG[tier]*bedraengnis*(1-(wuchtEntlastung||0));
+    return Math.max(TREFFER_BODEN,Math.min(TREFFER_DECKEL,
+      BASIS_TREFFER[tier]+schuetzenGuete(u)*GUETE_WIRKUNG[tier]-kontest+(imFastbreak?0.05:0)));
+  }
   // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
   // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
   // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
@@ -2493,8 +2681,73 @@
   }
   const STEAL_REICHWEITE=45;        // wie nah ein Decker sein muss, um es auf einen Steal ankommen zu lassen
   const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
+  // REICHWEITE IST KOERPERLICH (Opus-Balance-Runde 26.08. abends). Der Radius war fuer
+  // alle gleich — wer den Ball bekam, entschied allein, wer zuerst da war, und "zuerst
+  // da" haengt an LAUFTEMPO. Damit gewann der SCHNELLERE Kader auch die Rebounds, und ein
+  // Riesenkader hatte am Brett keinen einzigen mechanischen Vorteil (nachgemessen: der
+  // Tempokader gewann die Stil-Paarung 108:12 bei 13,3 zu 4,8 Punkten). Ein grosser
+  // Spieler kommt aber an Baelle, die ein kleiner nur ansieht — genau das ist Rebounding.
+  // WUCHT 99 gibt rund 1,20x Reichweite, WUCHT 1 rund 0,80x; die eigentliche Auflosung
+  // bleibt das gewichtete Los ueber ZWEITCHANCE (power 45, awareness 30, stamina 25).
+  // Koeffizient 0,0040 -> 0,0026 (26.08. abends): die Greifreichweite war der FUENFTE
+  // Kanal, ueber den power wirkt (s. ZWEITCHANCE-Kommentar oben), und in der Pp-Messung
+  // sprang power daraufhin auf +27,8. Der Vorteil bleibt spuerbar (WUCHT 99 rund 1,13x
+  // gegen WUCHT 1 rund 0,87x Reichweite, also gut ein Viertel Unterschied), er ist nur
+  // nicht mehr der groesste Einzelposten.
+  const greifReichweiteVon=(u)=>GREIF_REICHWEITE*(1+(((u.WUCHT||50)-50)*0.0026));
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
+  // Der Court ist ueber DREIER_RADIUS geeicht: 112,8 px sind die 23,75 ft der echten
+  // Dreierlinie, also 4,75 px je Fuss. BEDRAENGT_RADIUS (30 px) sind damit 6,3 ft — fast
+  // exakt die NBA-Grenze, ab der ein Wurf als "wide open" gilt (6 ft). Der Radius war
+  // frueher freihaendig gewaehlt; dass er auf der richtigen Grenze liegt, ist erst in
+  // dieser Runde nachgerechnet worden und deshalb hier festgehalten statt stillschweigend
+  // uebernommen. Die Messung (messe-basketball-wurfquoten.mjs) klassifiziert mit demselben
+  // Faktor in NBA-Stufen, damit Engine und Abnahme dieselbe Sprache sprechen.
+  const PX_JE_FUSS=DREIER_RADIUS/23.75;
+  // DOPPELN. Chris (26.08.): "dann muss def staerker wirken oder dass spieler doppeln und
+  // das ne taktik ist". Bis hierhin gab es Doppeln gar nicht — zuordneDeckung war strikte
+  // Manndeckung (jeder Verteidiger genau ein Angreifer, gieriges Naechster-Nachbar-
+  // Matching), es konnte also NIE mehr als ein Verteidiger an einem Ballfuehrer stehen.
+  // Damit fehlte dem Spiel die wichtigste defensive Antwort auf einen ueberlegenen
+  // Angreifer, und ein Star war mechanisch unhaltbar: sein einziger Gegenspieler war per
+  // Konstruktion schwaecher als er.
+  // Der Preis ist echt und darf nicht wegfallen: der Helfer LAESST SEINEN MANN STEHEN.
+  // offenheitFuerPass sieht den ungedeckten Mitspieler sofort (kein Decker -> offen=1),
+  // offensterMitspieler gewichtet ihn entsprechend hoch — der Kick-Out auf den freien
+  // Mann entsteht damit aus der schon vorhandenen Passlogik, ohne Sonderfall.
+  const DOPPEL_RADIUS=52;           // wie nah der Helfer am Ballfuehrer stehen will
+  const DOPPEL_DAUER=1.6;           // Sekunden, danach loest sich die Doppelung auf
+  const DOPPEL_PRUEF=0.6;           // Sekunden zwischen zwei Doppel-Pruefungen je Team
+  // SPERRE NACH EINER DOPPELUNG. Erste Fassung dieser Runde hatte keine — gemessen 26,4
+  // Doppelungen je Spiel, 45 % ALLER Wuerfe fielen gegen eine Doppelung. Damit war
+  // Doppeln keine Taktik mehr, sondern die Grundformation, und der Preis (ein freier Mann)
+  // ging im Dauerzustand unter. Mit Sperre kommt eine Doppelung auf etwa jeden fuenften
+  // Ballbesitz — selten genug, dass sie als Ereignis auffaellt, haeufig genug, dass sie
+  // ein Spiel praegen kann.
+  // ZWEITE EICHUNG 2,2 -> 4,6 (26.08. abends). Die erste Sperre hatte die Doppelungen von
+  // 26,4 je Spiel auf 8-11 gedrueckt — gemessen gegen die BALLBESITZE (19-27 je Spiel) ist
+  // das aber immer noch rund jeder zweite, nicht der angepeilte fuenfte. Die Zaehlung im
+  // Kommentar darueber ging von mehr Ballbesitzen aus, als das 90-Sekunden-Spiel hat.
+  const DOPPEL_SPERRE=4.6;          // Sekunden Ruhe nach einer Doppelung, je Team
+  // DURCHBRUCH (Dribbling). Chris: "oder mit agilitaet die gegner ausdribbelt". Vorher gab
+  // es dafuer keinen eigenen Vorgang — AUFBAU wirkte nur ueber die Steal-Formel und einen
+  // 0,0002er-Koeffizienten in der Passbereitschaft. Ein Durchbruch ist hier ein ECHTES
+  // raeumliches Ereignis, kein versteckter Wuerfel auf die Trefferchance: der Verteidiger
+  // verliert fuer ein Fenster Tempo, der Angreifer gewinnt welches, der Abstand zwischen
+  // beiden waechst dadurch von selbst — und ERST DARAUS entsteht der freie Wurf, ueber
+  // dieselbe Bedraengnis-Messung wie bei jedem anderen Wurf auch.
+  const DURCHBRUCH_RADIUS=34;       // nur gegen einen wirklich nah stehenden Mann
+  const DURCHBRUCH_DAUER=1.1;       // Sekunden Vorsprung
+  // SPERRE NACHGEZOGEN 1,4 -> 2,6 (26.08. abends, nachgemessen). Mit 1,4 s fielen 13,5 bis
+  // 16,1 gelungene Durchbrueche je Spiel bei nur rund 19-27 Ballbesitzen — auf jeden
+  // Ballbesitz kam also mehr als ein Mann, der seinen Gegenspieler stehen laesst. Damit
+  // war der Durchbruch kein Ereignis mehr, sondern der Normalfall, und die Manndeckung
+  // faktisch dauerhaft ausgehebelt: gemessen war der naechste Verteidiger bei einem
+  // grossen Teil aller Wuerfe "abgehaengt" (halber Kontest), was die Abnahme als
+  // wirkungslose Verteidigung las (Spreizung frei-minus-bedraengt -1,8 Pp). Ziel sind
+  // rund 0,25 Durchbrueche je Ballbesitz, also 5-6 je Spiel.
+  const DURCHBRUCH_CD=2.6;          // Sperre gegen Dauerfeuer
   // Dribbel-Animation (Fables Animations-Runde, 25.08.): der gehaltene Ball sass bisher
   // auf fester Handhoehe (traeger.y+18, s. fsBall dort) — kein Auf-und-Ab, keine
   // Dribbel-Bewegung zu sehen. Kurze Recherche zum ueblichen Muster (gamedev.net/
@@ -2508,41 +2761,6 @@
   // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
   const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
   const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
-  // DENKPAUSE (Chris' Fund, 25.08.: "die Spieler bewegen sich zu schnell, es gibt gar
-  // keine Pausen... das hier ist ja keine Race sondern Basketball"). Ursache war nicht nur
-  // Tempo: der Ballfuehrer zielte in bewegeSpielerLive IMMER mit vollem Tempo auf den Korb,
-  // unabhaengig von seiner Entscheidungs-Pause (reevBall, s. entscheideBallaktion) — er
-  // sprintete also waehrend er "noch ueberlegt" munter weiter, nie ein sichtbarer Moment
-  // des Abwartens/Dribbelns.
-  //
-  // ERSTER VERSUCH (VERWORFEN, hier dokumentiert statt stillschweigend entfernt): der
-  // Ballfuehrer haelt seine Position komplett (zx=u.x/zy=u.y), solange reevBall >
-  // Schwelle, und driftet erst im letzten Fensterstueck mit vollem Tempo zum Korb.
-  // Sah im Playtest gut aus, aber messe-arena-einfluss.mjs basketball zeigte eine massive
-  // Pp-Abweichung (n=2: 128,1 Pp, n=12: 93,6 Pp — weit ueber der historisch "gefaehrlichen"
-  // Marke von ~50-55 Pp, s. Kommentar bei tempoPx oben). Grund: das komprimierte die
-  // tatsaechliche Lauf-Zeit-zum-Korb auf das letzte Fensterstueck — wer dieselbe Strecke in
-  // WENIGER Zeit zuruecklegen muss, fuer den zaehlt LAUFTEMPO (also indirekt speed/
-  // dexterity/stamina) ueberproportional staerker, nicht neutral wie erhofft. Eine reine
-  // Bewegungsziel-Aenderung ist eben NICHT automatisch Pp-neutral, nur weil sie die Wurf-/
-  // Pass-Entscheidungslogik selbst nicht anfasst (anders als der nur lesende Bewegungs-
-  // Schweif) — sie aendert, WANN/WO ein Spieler bei der naechsten Entscheidung steht.
-  //
-  // GEWAEHLTER ANSATZ: kein hartes Einfrieren, sondern durchgehend langsameres, aber
-  // stetiges Antreiben waehrend der Denkpause (DENKPAUSE_TEMPO), erst im letzten
-  // Fensterstueck (reevBall <= DENKPAUSE_SCHWELLE) der volle Antritt. Die insgesamt in
-  // einem Entscheidungszyklus zurueckgelegte Strecke bleibt dadurch naeher am alten Stand
-  // (durchgehende Bewegung statt Stillstand+Sprint), das sichtbare Tempo-GEFAELLE
-  // (gemaechliches Dribbeln -> entschlossener Antritt) bleibt trotzdem klar erkennbar.
-  // 0,4 nachgemessen: 56 Pp, noch grenzwertig nah an der "gefaehrlichen" Marke. 0,55
-  // (gewaehlt) nachgemessen: 29,9 Pp — innerhalb der gemessenen Bandbreite frueherer
-  // Tempo-Runden (26-54 Pp, s. Kommentar bei tempoPx), kein neuer Ausreisser, und alle
-  // zwoelf Attribute wieder mit einem Anteil vertreten (vorher bei 0,4 UND beim
-  // verworfenen ersten Versuch fielen speed/dexterity bzw. mehrere andere auf 0 %).
-  // PLATZHALTER, nicht so ausfuehrlich durchgemessen wie die Tempo-Konstanten oben (n=12
-  // statt n=48 — Zeitbudget dieser Runde), aber klar innerhalb der bisherigen Bandbreite.
-  const DENKPAUSE_SCHWELLE=0.25;
-  const DENKPAUSE_TEMPO=0.55;
   // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,115/0,885) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
@@ -2761,18 +2979,78 @@
   // Grundlinie, ohne den Court zu verlassen (max. y-Versatz 130px bei H=470, bleibt
   // >100px von der Bande entfernt). Post/Elbow bleiben bewusst nah am Korb (echte
   // Zonenpraesenz, kein Bug) — der Fix spreizt die vier AUSSEN-Slots, nicht alle sechs.
+  // AUFSTELLUNG NACH WURFSTUFEN (Opus-Balance-Runde 26.08.). Vorher lagen vier der sechs
+  // Slots jenseits der Dreierlinie, einer bei 60 px ("nah") und einer bei 95 px — einen
+  // Pixel ueber KORB_NAH_RADIUS und damit auf der Kante zwischen zwei Stufen. Ergebnis
+  // gemessen: 1 % aller Wuerfe waren Mid-Range und kein einziger kam aus der Dunk-Stufe,
+  // solange niemand zum Korb zog (NBA: rund 12 % Mid-Range, rund 33 % am Ring). Da das
+  // Wurfprofil seit dieser Runde bewusst aus den POSITIONEN entsteht (s. Wurfauswahl),
+  // muss die Aufstellung die Stufen auch abdecken: eine unter dem Korb (Dunker Spot),
+  // eine in der Zone, eine am Ellbogen, drei aussen. Das ist zugleich eine ganz normale
+  // 1-2-3-Aufteilung, wie sie jede echte Halbfeld-Aufstellung hat.
+  // Jeder Radius bleibt groesser als sein eigener seitlicher Versatz (seitlich*90), sonst
+  // klemmt die X-Komponente unten auf 0 und der Spieler steht auf der Grundlinie.
   const SLOTS=[
-    {radius:60,  seitlich:0},
-    {radius:95,  seitlich:0.6},
-    {radius:150, seitlich:1.05},
-    {radius:150, seitlich:-1.05},
-    {radius:145, seitlich:1.45},
-    {radius:145, seitlich:-1.45}
+    {radius:38,  seitlich:0},      // Dunker Spot, Stufe "dunk" (< DUNK_RADIUS 42)
+    {radius:80,  seitlich:0.72},   // Zone, Stufe "nah" (< KORB_NAH_RADIUS 94)
+    {radius:104, seitlich:-0.62},  // Ellbogen, Stufe "mit" (< DREIER_RADIUS 112,8)
+    {radius:150, seitlich:1.05},   // Fluegel
+    {radius:150, seitlich:-1.05},  // Fluegel
+    {radius:145, seitlich:1.45}    // Ecke
   ];
   // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
   // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
   // bleiben nah dran, Schuetzen ziehen weit raus". Neu bei jedem Possession-Wechsel
   // (naechsterAngriff), nicht bei jedem einzelnen Pass innerhalb derselben Possession.
+  // ===================================================================================
+  // TEAMSTIL — Chris (26.08.): "Was mega nice waere, ist wenn man Teams am Stil quasi
+  // bisschen erkennen kann. Ein Team wie N-N mit vielen schnellen Spielern wuerde ja
+  // versuchen anders zu gewinnen — im Vergleich zu einem Team wie T-G, die mit Giants
+  // ankommen."
+  //
+  // BIS HIERHIN spielte jedes Team identisch. Jede taktische Zahl (Fastbreak-Fenster,
+  // Wurfschwelle, Screen-Neigung, Rebound-Radius) war eine Konstante, die fuer beide
+  // Seiten gleich galt; die Kader unterschieden sich nur in den Erfolgs-Wuerfen. Ein
+  // Riesenkader spielte also exakt dasselbe Spiel wie ein Sprinterkader, nur mit anderen
+  // Zahlen dahinter — man konnte es beim Zusehen nicht sehen.
+  //
+  // KEIN TEAM-ID-HACK. Der Stil wird NICHT an einem Teamnamen oder einem gesetzten Flag
+  // festgemacht, sondern aus GENAU DENSELBEN Kaderdaten abgeleitet, aus denen auch das
+  // Verhalten der einzelnen Spieler entsteht: dem Mittel ueber LAUFTEMPO (speed 50,
+  // stamina 30, dexterity 20) gegen das Mittel ueber WUCHT (power 50, stamina 25,
+  // torment 25). Wer viele schnelle Spieler kauft, bekommt dadurch automatisch einen
+  // Tempo-Stil; wer Riesen kauft, einen Wucht-Stil. Es gibt keine zweite Datenquelle,
+  // die man vergessen koennte nachzuziehen.
+  //
+  // `stil` ist eine Zahl von -1 (reiner Riesenkader) bis +1 (reiner Tempokader), 0 bei
+  // ausgeglichener Mischung. Der Nenner (35) ist so gewaehlt, dass die beiden von Chris
+  // genannten Extremfaelle (ein Kader aus lauter Sprintern gegen einen aus lauter Riesen)
+  // tatsaechlich in die Naehe von +-1 kommen, ein normal gemischter Kader aber im Bereich
+  // +-0,3 bleibt — sonst haette jedes zufaellige Kaderrauschen sofort einen "Stil".
+  let fsStil=[0,0];
+  function teamStilVon(seite){
+    const team=FSTEAM[seite]; if(!team||!team.length)return 0;
+    const mittel=(k)=>team.reduce((s,u)=>s+(u[k]||0),0)/team.length;
+    // NENNER 35 -> 50, nachgemessen 26.08. abends. Der Kommentar oben behauptet, ein
+    // normal gemischter Kader bleibe bei +-0,3 und nur die Extremfaelle erreichten +-1.
+    // Gemessen stimmte das nicht: die ECHTEN Wranglers lasen roh -39,8 und damit glatt
+    // -1,00 — ein ganz gewoehnlicher Kader stand also auf demselben Stilausschlag wie ein
+    // reiner Riesenkader, und saemtliche Wucht-Aufschlaege (langsamerer Aufbau, kuerzeres
+    // Fastbreak-Fenster, engeres Spacing) trafen ihn mit voller Staerke. Die gemessenen
+    // Rohwerte sind: konstruierter Tempokader +52,8, konstruierter Riesenkader -50,5,
+    // Wranglers -39,8, Aftermath +1,3, neutraler Kader 0,0. Mit 50 im Nenner erreichen
+    // genau die beiden konstruierten Extreme +-1, die Wranglers landen bei -0,80 und ein
+    // ausgeglichener Kader bleibt nahe null — also das, was der Absatz oben versprochen
+    // hatte. Die Zahl ist damit gemessen und nicht mehr geschaetzt.
+    return Math.max(-1,Math.min(1,(mittel("LAUFTEMPO")-mittel("WUCHT"))/50));
+  }
+  const stilVon=(seite)=>fsStil[seite]||0;
+  // Nur der Tempo-Anteil bzw. nur der Wucht-Anteil, jeweils 0..1 — spart an jeder
+  // Aufrufstelle ein Math.max(0,...) und macht im Code lesbar, WELCHE Haelfte des Stils
+  // gerade gefragt ist.
+  const tempoStil=(seite)=>Math.max(0,stilVon(seite));
+  const wuchtStil=(seite)=>Math.max(0,-stilVon(seite));
+
   function zuordneSlots(seite){
     const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
     sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
@@ -2794,11 +3072,15 @@
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
         wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
-        screenRuf:0,rangeSeit:null});
+        screenRuf:0,rangeSeit:null,
+        // Opus-Balance-Runde 26.08.: Doppeln und Durchbruch, s. Konstanten oben.
+        doppelt:null,doppeltBis:0,durchbruchBis:0,durchbruchCd:0,abgehaengtBis:0,zugBis:0});
     }
+    // TEAMSTIL zuerst — zuordneSlots liest ihn schon (Riesen stellen sich enger).
+    fsStil=[teamStilVon(0),teamStilVon(1)];
     zuordneSlots(0); zuordneSlots(1);
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
-      fastbreak:null};
+      fastbreak:null, doppelPruef:[0,0]};
     ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
   }
 
@@ -2824,6 +3106,12 @@
       if(!voll)for(const v of verteidiger)if(v.reevDeckung>0&&v.deckt)belegt.add(v.deckt);
       const frei=angreifer.filter(a=>!belegt.has(a));
       for(const v of verteidiger){
+        // DOPPELNDER HELFER greift sich keinen Mann. Ohne diese Zeile haette
+        // zuordneDeckung ihm beim naechsten Durchlauf sofort wieder einen Angreifer
+        // zugeteilt — die Doppelung waere gratis gewesen (zwei Mann am Ball UND alle
+        // gedeckt), also genau das, was sie nicht sein darf. Sein alter Mann bleibt
+        // dadurch in `frei` und wird von niemandem aufgenommen: die echte Luecke.
+        if(v.doppelt&&fsT<v.doppeltBis)continue;
         if(!voll&&v.reevDeckung>0)continue;
         let naechster=null,minD=Infinity;
         for(const a of frei){ const d=dist(v,a); if(d<minD){minD=d;naechster=a;} }
@@ -2861,6 +3149,15 @@
     // zuordneDeckung(true) genau die Seite, fuer die es lief, obwohl DIESER Ballwechsel das
     // Fenster gerade beenden soll. Jetzt zuerst loeschen, dann voll neu zuordnen.
     fsLive.fastbreak=null;
+    // Doppelung und Durchbruch gehoeren zu EINEM Ballbesitz — beides ueberlebt einen
+    // Ballwechsel nicht (gleiche Begruendung wie beim Fastbreak-Fenster darueber: ein
+    // Fenster, das den Anlass ueberlebt, wirkt in einer Lage weiter, fuer die es nie
+    // gedacht war). Muss VOR zuordneDeckung(true) stehen, sonst ueberspringt die
+    // Zuteilung den Helfer noch einmal.
+    for(const t of FSTEAM)for(const x of t){
+      x.doppelt=null; x.doppeltBis=0; x.durchbruchBis=0; x.abgehaengtBis=0; x.zugBis=0;
+    }
+    if(fsLive.doppelPruef)fsLive.doppelPruef=[0,0];
     zuordneDeckung(true);
   }
 
@@ -2929,9 +3226,208 @@
     // spuerbar besserer Verteilung (intelligence 11,6 %) — gewaehlt. Bleibt insgesamt ueber
     // dem alten 18,7-Pp-Stand (der eigentliche Bug — falscher Spieler bekommt den Ball — ist
     // damit behoben; die Restabweichung ist Arbeit fuer eine weitere Messrunde, PLATZHALTER).
-    const qualitaet=(m)=>Math.max(0.01,0.16+m.TECHNIK*0.0050+m.TEAMGEIST*0.0060);
+    // AN DIE ECHTE WURFFORMEL ANGESCHLOSSEN (26.08. abends). Diese Zeile trug noch die
+    // ALTE, flache Trefferformel (0,16+TECHNIK*0,0050+TEAMGEIST*0,0060) — die es seit dem
+    // Umbau der Trefferchance gar nicht mehr gibt. Damit passte die Engine den Ball nach
+    // einem anderen Massstab zu, als sie den Wurf danach auswertete: der Kader hatte
+    // zwei verschiedene Meinungen darueber, wer der beste Schuetze ist. Jetzt dieselbe
+    // Quelle (schuetzenGuete). Der Faktor 3,5 ist so gewaehlt, dass die SPANNE dieselbe
+    // bleibt wie vorher (bei 50/50 exakt 0,71 wie zuvor, bei 99/99 rund 1,31 gegen
+    // vorher 1,25) — die Passverteilung soll sich nicht in ihrer Schaerfe aendern, nur
+    // in der Frage, welche Attribute sie liest.
+    const qualitaet=(m)=>Math.max(0.01,0.71+schuetzenGuete(m)*3.5);
     return gewichtetesLosNach(mitspieler,m=>
       m.ABSCHLUSS*Math.pow(qualitaet(m),2)*offenheitFuerPass(von,m)*(m.rollBis>fsT?3:1));
+  }
+
+  // BEDRAENGNIS — wie hart DIESER Wurf verteidigt wird, aus dem ganzen Feld gelesen.
+  //
+  // Vorher fragte die Engine nur den EINEN zugeteilten Manndecker ab (`find(v=>v.deckt===u)`).
+  // Solange es nur Manndeckung gab, war das vollstaendig; mit Doppeln waere es blind fuer
+  // genau den Fall, fuer den Doppeln gebaut wird. Jetzt zaehlt jeder Verteidiger in
+  // BEDRAENGT_RADIUS mit: der naechste voll, jeder weitere zu 55 % — ein zweiter Mann
+  // stoert real weniger als der erste (er kommt spaeter, aus schlechterem Winkel), aber
+  // deutlich mehr als gar nicht. Deckel bei 1,6, damit drei Verteidiger einen Wurf nicht
+  // rechnerisch unmoeglich machen.
+  //
+  // ABWEHR skaliert den Beitrag JEDES Verteidigers einzeln (kontestFaktor, 0,7-1,3 um
+  // ABWEHR=50) — dieselbe Kurve wie vorher, aber jetzt auf einem Term, der ueberhaupt
+  // etwas bewirkt: KONTEST_WIRKUNG uebersetzt eine Bedraengnis von 1,0 am Ring in 30 Pp
+  // Abzug statt der frueheren maximal 18 Pp bei Abstand exakt null.
+  //
+  // ABGEHAENGT (s. versucheDurchbruch): wer gerade ausgedribbelt wurde, stoert fuer sein
+  // Fenster nur noch halb, auch wenn er raeumlich noch in der Naehe steht — er ist im
+  // Ruecklauf, nicht in der Wurfhand.
+  function bedraengnisVon(u,imFastbreak){
+    const beitraege=[]; let naechster=null, minD=Infinity;
+    for(const v of FSTEAM[1-u.side]){
+      const d=dist(u,v);
+      if(d>=BEDRAENGT_RADIUS)continue;
+      const roh=(BEDRAENGT_RADIUS-d)/BEDRAENGT_RADIUS;
+      const kontestFaktor=0.7+v.ABWEHR*0.006;
+      // ABGEHAENGT 0,5 -> 0,75 (26.08. abends). Der Faktor zaehlte doppelt: ein
+      // ausgedribbelter Verteidiger verliert ohnehin schon raeumlich den Anschluss
+      // (tempoMul 0,62 in bewegeSpielerLive), sein Abstand waechst also von selbst. Der
+      // zusaetzliche halbe Kontest machte aus einem Verteidiger, der im Bild noch neben
+      // dem Schuetzen steht, rechnerisch fast einen abwesenden — die Abnahme las den Wurf
+      // dann als "bedraengt" und trotzdem als getroffen, und die gemessene Spreizung
+      // frei-minus-bedraengt kippte ins Negative. 0,75 laesst den Durchbruch wirken, ohne
+      // dass Bild und Rechnung auseinanderlaufen.
+      const abgehaengt=fsT<v.abgehaengtBis?0.75:1;
+      beitraege.push({v,wert:roh*kontestFaktor*abgehaengt});
+      if(d<minD){minD=d;naechster=v;}
+    }
+    if(!beitraege.length)return {wert:0,naechster:null,anzahl:0};
+    beitraege.sort((a,b)=>b.wert-a.wert);
+    let wert=beitraege[0].wert;
+    for(let i=1;i<beitraege.length;i++)wert+=beitraege[i].wert*0.55;
+    // Im Fastbreak ist die Verteidigung noch am Zurueckrennen (Fables Fund) — der Kontest
+    // zaehlt weniger. Der Faktor war 0,3 und ist auf 0,55 angehoben (26.08. abends,
+    // nachgemessen): mit 0,3 traf ein Dreier mit einem Verteidiger auf 3 ft Abstand im
+    // Fastbreak fast so gut wie ein voellig freier, und weil Fastbreak-Wuerfe ueber alle
+    // Bedraengnisstufen streuen, druckte die Abnahme daraufhin eine Spreizung frei-minus-
+    // bedraengt von 0,9 Pp (NBA rund 8) — der Kontest wirkte, aber ein Drittel aller
+    // bedraengten Wuerfe zaehlte ihn nur zu 30 %. Wer im Konter tatsaechlich neben dem
+    // Schuetzen steht, stoert ihn auch; was im Fastbreak fehlt, ist die HILFE der anderen
+    // vier, und die faellt ueber bedraengnisVon ohnehin schon weg, weil sie raeumlich
+    // nicht da sind. 0,55 statt 1,0 traegt den Rest (Anlauf aus schlechtem Winkel).
+    return {wert:Math.min(1.6,wert)*(imFastbreak?0.55:1), naechster, anzahl:beitraege.length};
+  }
+
+  // "ER POWERT SICH DURCH" (Chris' Vorgabe), mechanisch: WUCHT nimmt dem Kontest am Korb
+  // einen Teil seiner Wirkung — bei WUCHT 99 rund 37 %, bei WUCHT 1 wird der Kontest
+  // umgekehrt um 37 % SCHLIMMER. Nur dunk/nah: am Ring entscheidet Koerperkontakt, beim
+  // Sprungwurf nicht. Bewusst kein direkter Trefferbonus — ein starker Spieler trifft
+  // nicht besser, er laesst sich weniger stoeren. Frei geworfen (Bedraengnis 0) bringt
+  // WUCHT deshalb exakt gar nichts, genau wie im echten Spiel.
+  //
+  // GEGEN WEN? — nachgezogen 26.08. abends. Die erste Fassung mass WUCHT gegen die feste
+  // Zahl 50, also gegen einen gedachten Durchschnittsverteidiger. Damit powerte sich ein
+  // starker Spieler auch durch einen NOCH staerkeren durch, und ein Riesenkader hatte
+  // defensiv nichts von seiner Koerperlichkeit — WUCHT war ein reines Angriffsattribut.
+  // Jetzt ist es ein DUELL: die eigene Wucht gegen die des naechsten Verteidigers. Das
+  // loest zwei Dinge auf einmal, die vorher zwei Regler gebraucht haetten:
+  //   - "er powert sich durch" gilt gegen kleine Verteidiger und scheitert an grossen,
+  //   - der Ringschutz eines Riesenkaders entsteht daraus von selbst (Chris' Stil-Wunsch:
+  //     ein Team mit Giants soll ueber Koerperlichkeit gewinnen, nicht nur langsamer sein).
+  // Ohne Verteidiger in der Naehe gibt es nichts zu ueberwinden und der Wert ist 0 — frei
+  // am Ring bringt WUCHT weiterhin exakt gar nichts, genau wie im echten Spiel.
+  const wuchtEntlastungVon=(u,tier,gegner)=>
+    (tier==="dunk"||tier==="nah")
+      ? Math.max(-0.45,Math.min(0.45,((u.WUCHT||50)-(gegner?(gegner.WUCHT||50):50))*0.0060))
+      : 0;
+
+  // "MIT AGILITAET DIE GEGNER AUSDRIBBELN" (Chris' Vorgabe), mechanisch als RAEUMLICHES
+  // Ereignis statt als versteckter Wuerfel auf die Trefferchance.
+  //
+  // AUFBAU (intelligence 40, spirit 30, dexterity 30) gegen ABWEHR (awareness 40,
+  // speed 35, torment 25), plus die Tempo-Differenz der beiden — ein schneller Handler
+  // kommt an einem langsamen Verteidiger auch dann vorbei, wenn die Kopfarbeit gleich
+  // ist. Gelingt es, verliert der Verteidiger fuer DURCHBRUCH_DAUER Tempo und der
+  // Angreifer gewinnt welches (bewegeSpielerLive); der Abstand waechst dadurch von
+  // selbst, und der freie Wurf entsteht ueber dieselbe Bedraengnis-Messung wie jeder
+  // andere Wurf auch. Kein Sonderpfad in die Erfolgsformel.
+  //
+  // WARUM NICHT EINFACH "hohe AUFBAU -> hoehere Trefferchance": das waere derselbe
+  // pauschale Zahlenaufschlag, den Chris ausdruecklich nicht wollte, und man saehe es
+  // beim Zusehen nicht. So sieht man es: der Verteidiger bleibt sichtbar zurueck.
+  function versucheDurchbruch(u,decker,abstand){
+    if(abstand>DURCHBRUCH_RADIUS)return false;
+    if(u.durchbruchCd>0||fsT<u.durchbruchBis)return false;
+    u.durchbruchCd=DURCHBRUCH_CD;
+    // Tempokader riskieren den Zug oefter (s. teamStilVon) — dieselbe Aktion, andere
+    // Neigung, aus dem Kader abgeleitet.
+    // GRUNDCHANCE 0,16 -> 0,10 (s. DURCHBRUCH_CD). Die SPREIZUNG ueber AUFBAU/LAUFTEMPO
+    // bleibt unveraendert — genau sie ist Chris' Anforderung ("mit agilitaet die gegner
+    // ausdribbelt"), und sie soll nicht kleiner werden, nur der Sockel darunter. Ein
+    // gleichwertiges Duell gelingt damit in 10 % der Versuche, ein klar ueberlegener
+    // Handler (AUFBAU +40, LAUFTEMPO +40) in rund 36 %.
+    const chance=Math.min(0.45,Math.max(0.02,
+      0.10+(u.AUFBAU-decker.ABWEHR)*0.0042+(u.LAUFTEMPO-decker.LAUFTEMPO)*0.0022
+      +tempoStil(u.side)*0.06));
+    // ABNAHME (read-only): jeder VERSUCH wird protokolliert, nicht nur der gelungene.
+    // Ohne die Versuche laesst sich "wirkt Agilitaet" gar nicht beantworten — man saehe
+    // nur, wie oft es klappt, nicht wie oft es gegen wen probiert wurde.
+    logZug(u.side,"durchbruch_versuch",{spieler:u,verteidiger:decker,
+      aufbau:u.AUFBAU,abwehr:decker.ABWEHR,tempo:u.LAUFTEMPO,deckerTempo:decker.LAUFTEMPO,
+      chance:Math.round(chance*1000)/1000});
+    if(rr()>=chance){ u.reevBall=0.25; return false; }
+    u.durchbruchBis=fsT+DURCHBRUCH_DAUER;
+    decker.abgehaengtBis=fsT+DURCHBRUCH_DAUER;
+    // Wer gerade stehen gelassen wurde, greift nicht im selben Moment nach dem Ball.
+    decker.stealCd=Math.max(decker.stealCd,0.9);
+    u.lunge=0.35;
+    feed(u.side,u.n+" zieht an "+decker.n+" vorbei.");
+    logZug(u.side,"durchbruch",{spieler:u,verteidiger:decker,
+      aufbau:u.AUFBAU,abwehr:decker.ABWEHR,tempo:u.LAUFTEMPO,deckerTempo:decker.LAUFTEMPO});
+    // Kurze Neubewertungspause: erst ziehen, dann entscheiden — sonst wuerfe er im selben
+    // Tick aus derselben Position, in der er den Durchbruch gerade erst gestartet hat.
+    u.reevBall=0.45;
+    return true;
+  }
+
+  // DOPPELN — die zweite Haelfte von Chris' Vorgabe ("dass spieler doppeln und das ne
+  // taktik ist"). Ein Helfer verlaesst seinen Mann und stellt sich mit auf den
+  // Ballfuehrer; sein Mann steht dafuer frei.
+  //
+  // WANN. Nicht zufaellig, sondern in genau den drei Lagen, in denen echte Teams doppeln:
+  //   1. Der Ballfuehrer ist an seinem Mann vorbei (durchbruchBis aktiv) — der klassische
+  //      Hilfe-Moment, der ganze Sinn einer Rotation.
+  //   2. Er steht in der Zone (Post-Up/Drive) — dort ist der Wurf am wertvollsten.
+  //   3. Er ist ein aussergewoehnlicher Schuetze (schuetzenGuete) — den laesst niemand
+  //      einfach werfen.
+  // WER. Der Helfer wird gewichtet gelost (gewichtetesLosNach, deterministisch): viel
+  // ABWEHR macht ihn zum besseren Helfer, ein weit vom Ball entfernter eigener Mann macht
+  // die Rotation billiger. Beides sind genau die Ueberlegungen, die eine echte Rotation
+  // bestimmt — und beide stehen schon als Zahlen im Spiel, es fragte sie nur niemand.
+  // PREIS. helper.deckt=null: sein Mann ist ab jetzt ungedeckt, offenheitFuerPass liest
+  // das sofort (kein Decker -> offen=1) und offensterMitspieler schickt den Kick-Out
+  // dorthin. Die Strafe fuers Doppeln entsteht also aus der bestehenden Passlogik, nicht
+  // aus einem eigenen Malus.
+  function pruefeDoppelung(){
+    const traeger=fsLive.ball.traeger; if(!traeger)return;
+    const seite=1-traeger.side;
+    // Abgelaufene oder verwaiste Doppelungen zuerst aufloesen.
+    for(const v of FSTEAM[seite]){
+      if(v.doppelt&&(fsT>=v.doppeltBis||v.doppelt!==traeger)){ v.doppelt=null; v.reevDeckung=0; }
+    }
+    if(fsT<fsLive.doppelPruef[seite])return;
+    fsLive.doppelPruef[seite]=fsT+DOPPEL_PRUEF;
+    if(FSTEAM[seite].some(v=>v.doppelt))return; // nie mehr als eine Doppelung gleichzeitig
+    const manndecker=FSTEAM[seite].find(v=>v.deckt===traeger)||null;
+    const zumKorb=dist(traeger,{x:korbXVon(traeger.side),y:H/2});
+    const durchgebrochen=fsT<traeger.durchbruchBis;
+    // Tempokader doppeln oefter (sie trauen sich die Rotation zu und leben vom Ballgewinn),
+    // Wuchtkader eher nur in der Zone — beides aus dem Kader abgeleitet, s. teamStilVon.
+    // Die Einzelwerte sind auf "rund jeder fuenfte Ballbesitz wird gedoppelt" geeicht
+    // (s. DOPPEL_SPERRE): bei rund vier Pruefungen je Ballbesitz muss eine Pruefung
+    // typischerweise unter 10 % liegen. Der Durchbruch ist mit Abstand der staerkste
+    // Ausloeser — genau richtig, denn er IST der Hilfe-Moment.
+    // NEIGUNG HALBIERT (26.08. abends, nachgemessen). Mit den urspruenglichen Werten und
+    // selbst nach der ersten Sperren-Verlaengerung standen 6,7-8,4 Doppelungen je Spiel
+    // gegen nur 16,9-27 BALLBESITZE — also rund jeder zweite bis dritte Ballbesitz statt
+    // des angepeilten fuenften. Der Rechenfehler im Kommentar oben war die Annahme "rund
+    // vier Pruefungen je Ballbesitz": bei DOPPEL_PRUEF 0,6 s und einem Angriff, der bis zur
+    // Schussuhr acht Sekunden laufen kann, sind es bis zu dreizehn.
+    // Was NICHT halbiert wird, ist das VERHAELTNIS der Ausloeser zueinander — der
+    // Durchbruch bleibt mit Abstand der staerkste, denn er ist der Hilfe-Moment.
+    let neigung=0.008
+      +(durchgebrochen?0.11:0)
+      +(zumKorb<KORB_NAH_RADIUS?0.025+wuchtStil(seite)*0.030:0)
+      +Math.max(0,schuetzenGuete(traeger))*0.45
+      +tempoStil(seite)*0.025;
+    if(!manndecker)neigung+=0.03; // sein Mann ist gar nicht da — dann erst recht
+    if(rr()>=Math.min(0.25,neigung))return;
+    const kandidaten=FSTEAM[seite].filter(v=>v!==manndecker&&!v.doppelt
+      &&dist(v,traeger)<DOPPEL_RADIUS*3);
+    if(!kandidaten.length)return;
+    const helfer=gewichtetesLosNach(kandidaten,v=>
+      Math.max(1,v.ABWEHR)*(v.deckt?Math.min(2.5,Math.max(0.4,dist(v.deckt,traeger)/90)):2.5));
+    helfer.doppelt=traeger; helfer.doppeltBis=fsT+DOPPEL_DAUER; helfer.deckt=null;
+    helfer.reevDeckung=DOPPEL_DAUER;
+    fsLive.doppelPruef[seite]=fsT+DOPPEL_DAUER+DOPPEL_SPERRE;
+    feed(helfer.side,helfer.n+" doppelt auf "+traeger.n+".");
+    logZug(helfer.side,"doppel",{verteidiger:helfer,spieler:traeger});
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -2948,39 +3444,40 @@
     const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
     const deckerAbstand=decker?dist(u,decker):999;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
-    // Live-Bedraengnis statt eines pauschalen Fernwurf-Abzugs: wer wirklich dicht dran
-    // ist, senkt die Erfolgschance zusaetzlich — das gab es im Vorab-Modell nicht, weil
-    // dort nie ein tatsaechlicher Deckerabstand vorlag. Im Fastbreak (Fables Fund) ist
-    // die Verteidigung noch am Zurueckrennen — deutlich weniger Bedraengnis.
-    // "Defense MUST be relevant" (Chris, woertlich): vorher haengte der Bedraengnis-Malus
-    // NUR am Abstand, nie an der ABWEHR des Deckers selbst — ein 20-ABWEHR- und ein
-    // 90-ABWEHR-Verteidiger druecken auf demselben Abstand denselben Malus. kontestFaktor
-    // skaliert den Malus symmetrisch um ABWEHR=50 (dort exakt 1,0, Pp-neutral im Mittel).
-    // Bewusst gemaessigt gehalten (0,7-1,3 bei ABWEHR 0-100) — genug, um einen starken
-    // Verteidiger im Feed/Log spuerbar zu machen, ohne selbst der groesste Pp-Hebel zu
-    // sein (s. Bericht: dieser Faktor allein war NICHT die Hauptursache der Pp-
-    // Abweichung dieser Runde — das war WURF_BONUS, s. dortigen Kommentar).
-    const kontestFaktor=decker?(0.7+decker.ABWEHR*0.006):1;
-    // bedraengnisGate (OHNE kontestFaktor) entscheidet weiterhin exakt wie vorher, WANN
-    // und OB ueberhaupt geworfen wird (schwelle-Vergleich, Kick-Out) — das war schon vor
-    // dieser Runde ein empfindlicher Kopplungspunkt (Opus-Review-2-Fund oben: ein
-    // scheinbar harmloser Assist-Bonus an genau dieser Stelle sprang Pp-technisch von
-    // 36,6 auf 50,6). Durchgemessen (s. Bericht): kontestFaktor UND WURF_BONUS direkt in
-    // diese Vergleichs-Kette gehaengt, machte die Pp-Abweichung nicht nur groesser,
-    // sondern nicht-monoton (kleinere Werte ergaben teils SCHLECHTERE Messungen als
-    // groessere) — ein Zeichen, dass hier ein Auswahl-Kaskadeneffekt greift, keine
-    // einfache Verstaerkung. bedraengnisMake (MIT kontestFaktor) wirkt deshalb nur noch
-    // auf die tatsaechliche Trefferchance (der `technik`-Wert, der an wirf() geht),
-    // nicht auf die Auswahl selbst — "ob/wann geworfen wird" bleibt unveraendert wie vor
-    // dieser Wurfmechanik-Runde, nur "trifft er" haengt jetzt zusaetzlich an ABWEHR.
-    const bedraengnisGate=(imFastbreak?0.3:1)*Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
-    const bedraengnisMake=bedraengnisGate*kontestFaktor;
+    // "Defense MUST be relevant" (Chris, woertlich, frueherer Runde) — der Satz stand
+    // hier schon, die Zahlen loesten ihn aber nicht ein: der Bedraengnis-Malus konnte
+    // maximal 18 Pp abziehen und auch das nur bei Deckerabstand exakt null. Gemessen ueber
+    // 24 Spiele lag der freie Dreier bei 61,0 % und der bedraengte bei 59,1 %. Die
+    // Wirkung sitzt jetzt in bedraengnisVon (wer stoert, aus dem ganzen Feld) mal
+    // KONTEST_WIRKUNG (wie sehr das je Wurfstufe zaehlt) — beides oben dokumentiert.
+    // Der ABWEHR-Faktor (0,7-1,3 um ABWEHR=50) ist derselbe wie vorher; er wirkt nur
+    // jetzt auf einem Term, der ueberhaupt etwas ausmacht.
+    // BEDRAENGNIS AUS DEM GANZEN FELD, nicht nur vom eigenen Mann (s. bedraengnisVon):
+    // erst dadurch kann eine Doppelung ueberhaupt wirken. Der Wert ist normiert 0..~1,6
+    // (ein einzelner Kleber gibt 1,0, ein zweiter Verteidiger legt bis zu 0,6 drauf) und
+    // wird in trefferChance() mit KONTEST_WIRKUNG[stufe] in Prozentpunkte uebersetzt.
+    const bedr=bedraengnisVon(u,imFastbreak);
+    const bedraengnis=bedr.wert;
+    // WUCHT-ENTLASTUNG: nur am Korb, s. Rezept-Kommentar bei WUCHT. Ein koerperlich
+    // starker Spieler laesst sich beim Abschluss weniger stoeren — das ist "er powert
+    // sich durch", mechanisch statt als pauschaler Trefferbonus. Ein schwacher Spieler
+    // wird umgekehrt STAERKER gestoert (negativer Wert), sonst waere WUCHT ein reiner
+    // Gratisbonus ohne Kehrseite.
+    const wuchtEntlastung=wuchtEntlastungVon(u,tier,bedr.naechster);
     // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
     // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
     // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
     // `passgeber` beim normalen Pass gar nicht bis zum Wurf durchgereicht, Assists
     // entstanden dadurch faktisch nur noch beim Alley-Oop).
     const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
+
+    // DURCHBRUCH ZUERST. Wer seinen Mann ausdribbeln KANN, tut es, bevor er ueber einen
+    // bedraengten Wurf nachdenkt — genau wie im echten Spiel. Gelingt es, endet die
+    // Entscheidung hier: der Angreifer zieht zum Korb (bewegeSpielerLive gibt ihm das
+    // Tempo, dem Verteidiger nimmt es welches), und die NAECHSTE Entscheidung faellt dann
+    // mit dem inzwischen entstandenen groesseren Deckerabstand — der freie Wurf ist also
+    // ein Ergebnis der Bewegung, kein zweiter Wuerfel.
+    if(!erzwingen&&decker&&versucheDurchbruch(u,decker,deckerAbstand))return;
 
     if(tier){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
@@ -2996,38 +3493,100 @@
       // Opus-Review-2-Fund (Nachzieher, VERWORFEN nach Messung): ein Assist-Bonus (+0,03
       // bei frischem Pass) plus Deckel-Anhebung 0,92->0,94 klang nach einer kleinen,
       // sicheren Verbesserung — durchgemessen aber ein Pp-Sprung von 36,6 auf 50,6.
-      // Ursache: bei der neuen, an TECHNIK/TEAMGEIST gekoppelten Ballverteilung (s.
+      // Ursache: bei der an TECHNIK/TEAMGEIST gekoppelten Ballverteilung (s.
       // offensterMitspieler) ist praktisch JEDER Wurf ein Assist-Wurf, der Bonus wirkt also
       // fast uniform — schiebt aber TECHNIK/TEAMGEIST-starke Spieler haeufiger gegen den
       // Deckel, wo Attributzuwaechse sich nicht mehr auszahlen (Saettigung), waehrend
       // Attribute ohne Deckel-Beruehrung (power/speed/stamina) ihren Anteil relativ dazu
-      // vergroessern. Bewusst NICHT eingebaut — Deckel bleibt bei 0,92, kein Assist-Term.
-      // technikGate (unveraendert gegenueber vor dieser Runde, s. Kommentar bei
-      // bedraengnisGate oben) entscheidet ob/wann geworfen wird. WURF_BONUS UND die
-      // ABWEHR-Skalierung von bedraengnis fliessen erst in technikMake ein — das ist der
-      // Wert, der tatsaechlich an wirf() geht und die Trefferchance bestimmt.
-      const technikGate=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
-        -bedraengnisGate+(imFastbreak?0.12:0));
-      const technikMake=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
-        +WURF_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0));
-      const schwelle=erzwingen?-1:Math.max(0.05,
-        0.42-((fsT-u.rangeSeit)/4)*0.30-(u.ABSCHLUSS-50)*0.0010); // PLATZHALTER: 4s Abbauzeit
-      if(technikGate>schwelle){
-        wirf(u,u,art,tier,technikMake,moeglicherAssist,null,bedraengnisGate>0?decker:null);
+      // vergroessern. Bewusst NICHT eingebaut, gilt weiter.
+      //
+      // WURFAUSWAHL: "IST DAS EIN GUTER WURF SEINER ART?" — nicht "hat er viele
+      // Erwartungspunkte?" (Opus-Balance-Runde 26.08., zweiter Anlauf).
+      //
+      // ERSTER ANLAUF, DURCHGEMESSEN UND VERWORFEN: reine Erwartungspunkte (Trefferchance
+      // mal Wurfwert) gegen eine Punkte-Schwelle. Theoretisch die saubere Rechnung — und
+      // praktisch unbrauchbar, weil sie die Wurfauswahl STARR an die Trefferquoten
+      // koppelt. Gemessen an derselben Schwelle (1,15): mit BASIS_TREFFER.fern=0,385
+      // gingen 66 % aller Wuerfe von der Dreierlinie, mit 0,30 nur noch 15 % und
+      // stattdessen 74 % aus der Ringzone. Eine Basisquote um 8 Pp zu korrigieren (also
+      // genau das, was eine Eichung auf NBA-Werte tun muss) kippte damit jedes Mal das
+      // ganze Wurfprofil. Zwei Groessen, die man unabhaengig einstellen koennen MUSS,
+      // haengen an einem Regler — dieselbe Kaskaden-Kopplung, vor der die Kommentare
+      // frueherer Runden an dieser Stelle schon warnen.
+      //
+      // GEWAEHLT: die Chance wird an der BASISQUOTE IHRER EIGENEN STUFE gemessen. 1,0
+      // heisst "ein durchschnittlicher Wurf dieser Art", 1,3 "ein deutlich besserer als
+      // ueblich". Damit entscheidet die Auswahl, WIE GUT die Gelegenheit ist, und die
+      // Basisquoten entscheiden, wie oft so etwas faellt — zwei getrennte Regler.
+      // Nachgemessen: eine Basisquoten-Aenderung verschiebt das Wurfprofil danach nicht
+      // mehr (s. Bericht). Der Dreier behaelt einen kleinen Vorzug (+10 %), weil er bei
+      // gleicher relativer Guete mehr wert ist — die Erwartungspunkte sind also nicht
+      // verschwunden, sie sind nur nicht mehr der ganze Massstab.
+      // WO DAS WURFPROFIL JETZT HERKOMMT: aus den Positionen (SLOTS), den Zuegen zum Korb
+      // und den Offensivrebounds — also aus dem, was auf dem Feld passiert, statt aus
+      // einer Zahl in der Erfolgsformel. Genau das ist der Unterschied zwischen "die
+      // Mechanik erzeugt ein Wurfprofil" und "ein Wurfprofil ist eingestellt".
+      const chance=trefferChance(u,tier,bedraengnis,imFastbreak,wuchtEntlastung);
+      // WURFWERT-GEWICHTE. Die relative Guete allein wuerde jede Stufe gleich behandeln —
+      // ein durchschnittlicher Mid-Range-Wurf waere dann so begehrenswert wie ein
+      // durchschnittlicher Dreier. Genau das ist der Grund, warum die Abnahme 23 %
+      // Mid-Range-Anteil las (NBA rund 12 %) bei gleichzeitig nur 19 % am Ring (NBA rund
+      // 33 %). Der Zweipunkte-Sprungwurf ist im echten Basketball der am schlechtesten
+      // bezahlte Wurf ueberhaupt — er hat den Wert eines Korblegers bei der Quote eines
+      // Dreiers. Deshalb bekommt "mit" einen Abschlag (0,88) und "fern" wie bisher einen
+      // Zuschlag (1,10). Das ist kein Anteilsziel, sondern der ECHTE Grund, aus dem die
+      // Mid-Range in der NBA verschwunden ist — die Verteilung faellt daraus heraus.
+      // ZAHLEN NACHGEZOGEN (dritter Durchgang, gemessen): mit fern=1,10 gingen 55 % aller
+      // Wuerfe von der Dreierlinie und nur 22 % kamen vom Ring (NBA 43 % / 33 %). Der
+      // Zuschlag war auch sachlich falsch herum: rechnet man die Erwartungspunkte eines
+      // WIRKLICH freien Wurfs aus, schlaegt der Ring den Dreier deutlich (0,78*2 = 1,56
+      // gegen 0,38*3 = 1,14) — der Dreier lohnt sich in der NBA nicht, weil er MEHR wert
+      // ist, sondern weil er OEFTER frei ist. Genau das bildet die relative Guete schon
+      // von selbst ab. Deshalb traegt jetzt der Ring den kleinen Zuschlag, nicht der
+      // Dreier; der Zweier-Sprungwurf behaelt seinen Abschlag.
+      // VIERTER DURCHGANG, eingemittet. fern=1,10 gab 55 % Dreier / 22 % Ring;
+      // fern=1,00 kippte es auf 32 % / 30 % und schob die Mid-Range von 10 auf 22 %
+      // hoch. Beide Male lag genau EIN Regler daneben, nicht das Verfahren — die
+      // Mitte (1,05 / 0,82 / 1,05) liegt zwischen den beiden gemessenen Punkten.
+      const WERTGEWICHT={dunk:1.05, nah:1.0, mit:0.82, fern:1.05};
+      const erwartung=chance/BASIS_TREFFER[tier]*WERTGEWICHT[tier];
+      // Die Schwelle sinkt, je laenger jemand schon in Reichweite steht (die Schussuhr
+      // drueckt), und ein selbstbewusster Schuetze (ABSCHLUSS) wirft frueher. STIL
+      // (s. teamStilVon) verschiebt sie stufenabhaengig: ein Riesenkader nimmt lieber den
+      // Weg nach innen und laesst den Dreier eher liegen, ein Tempokader umgekehrt — beides
+      // aus dem Kader abgeleitet, nicht gesetzt.
+      const stilSchwelle=(tier==="fern")
+        ? -tempoStil(u.side)*0.09+wuchtStil(u.side)*0.13
+        : (tier==="dunk"||tier==="nah") ? -wuchtStil(u.side)*0.09+tempoStil(u.side)*0.02 : 0;
+      // FRUEH IM ANGRIFF WIRD ANGEGRIFFEN, SPAET WIRD GENOMMEN, WAS DA IST. Die Schwelle
+      // startet ueber dem Wert eines freien Dreiers (rund 1,20 Erwartungspunkte) und faellt
+      // dann unter ihn — genau die Reihenfolge, die echte Angriffe haben. Erste Fassung
+      // dieser Runde startete bei 1,12 und lag damit von der ersten Sekunde an UNTER dem
+      // freien Dreier: gemessen gingen 70 % aller Wuerfe von der Dreierlinie (NBA: 43 %),
+      // weil der erste offene Dreier immer sofort genommen wurde und es nie zu einem
+      // Angriff auf den Ring kam.
+      const schwelle=erzwingen?-1:Math.max(0.55,
+        1.14-((fsT-u.rangeSeit)/4)*0.42-(u.ABSCHLUSS-50)*0.0022+stilSchwelle); // PLATZHALTER: 4s Abbauzeit
+      if(erwartung>schwelle){
+        wirf(u,u,art,tier,chance,moeglicherAssist,null,bedr.naechster,bedraengnis);
         return;
       }
       // Der Wurf lohnt sich (noch) nicht: bedraengt UND ein Mitspieler steht offener da
       // -> Kick-Out statt stur weiterzudribbeln bis zur Schussuhr-Zwangsloesung.
-      if(bedraengnisGate>0&&team.length>1){
+      if(bedraengnis>0&&team.length>1){
         const mitspieler=team.filter(x=>x!==u);
         passeAb(u,offensterMitspieler(mitspieler,u));
         return;
       }
-      // Opus-Review-Fund #6 (zweiter Teil): dieser Zweig endete vorher IMMER mit einem
-      // return — sobald der Ballfuehrer in Reichweite war, waren Pass/Spielzug/Screen-Ruf
-      // fuer den Rest der Possession unerreichbar. Jetzt faellt ein abgelehnter, nicht
-      // bedraengter Wurf in dieselbe geteilte Pass-/Spielzug-/Screen-Logik durch wie
-      // ausserhalb der Reichweite — kein return hier mehr.
+      // ZUG ZUM KORB als Antwort auf einen abgelehnten Wurf (Opus-Balance-Runde 26.08.).
+      // Vorher gab es diese Antwort nicht: wer seinen Wurf nicht nahm, blieb einfach auf
+      // seinem Arbeitsabstand stehen und suchte einen Pass. Ein abgelehnter Sprungwurf ist
+      // im echten Spiel aber der HAEUFIGSTE Ausloeser fuer einen Zug zum Korb — der Wurf
+      // lohnt sich nicht, also holt man sich einen besseren. Kein return: Pass, Spielzug
+      // und Screen-Ruf bleiben in derselben Entscheidung erreichbar (Opus-Review-Fund #6),
+      // der Zug wirkt ueber die BEWEGUNG (bewegeSpielerLive liest zugBis in `drang`), nicht
+      // ueber einen Abbruch der Entscheidungskette.
+      if(tier==="fern")u.zugBis=fsT+0.8;
     } else if(erzwingen){
       // Opus-Review-Fund #4: dieser Zwangswurf ging als Fernwurf durch (`punkteFern`,
       // 3 Punkte), die Erfolgsformel liess den ueblichen Fernwurf-Abzug aber weg — ein
@@ -3035,11 +3594,10 @@
       // einen Punkt mehr. Jetzt klassifiziert nach der ECHTEN Distanz (kann bei einem
       // erzwungenen Wurf aus der Zone durchaus "nah"/"mit" sein, nicht automatisch Dreier).
       const tierErz=klassifiziereWurfdistanz(zumKorb,true);
-      // Kein Gate/Schwelle in diesem Zweig (erzwingen wirft immer) — kein Auswahl-
-      // Kaskadenrisiko, WURF_BONUS+bedraengnisMake koennen hier direkt in die
-      // Erfolgsformel.
-      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060+WURF_BONUS[tierErz]-bedraengnisMake);
-      wirf(u,u,art,tierErz,technik,moeglicherAssist,null,bedraengnisMake>0?decker:null);
+      // Kein Gate/Schwelle in diesem Zweig (erzwingen wirft immer) — dieselbe
+      // Erfolgsformel wie oben, nur ohne Auswahlvergleich.
+      const chanceErz=trefferChance(u,tierErz,bedraengnis,imFastbreak,wuchtEntlastungVon(u,tierErz,bedr.naechster));
+      wirf(u,u,art,tierErz,chanceErz,moeglicherAssist,null,bedr.naechster,bedraengnis);
       return;
     }
     if(team.length>1){
@@ -3073,8 +3631,8 @@
             const kandidat=gewichtetesLosNach(mitspieler,m=>Math.max(1,m[sz.rolle])*(m.rollBis>fsT?3:1));
             if(rr()<sz.neigung(u,kandidat)){
               // Spielzuege (Alley-Oop) sind Korb-Finishes — thematisch ein Dunk, mit einer
-              // eigenstaendigen Erfolgsformel (sz.abschluss), die WURF_BONUS bewusst nicht
-              // nochmal draufaddiert (kein blockKandidat -> kein Foul-Wurf hier).
+              // eigenstaendigen Erfolgsformel (sz.abschluss), die BASIS_TREFFER bewusst
+              // nicht nochmal draufrechnet (kein blockKandidat -> kein Foul-Wurf hier).
               wirf(u,kandidat,art,"dunk",sz.abschluss(u,kandidat),u,key,null);
               return;
             }
@@ -3088,7 +3646,11 @@
       // "zwei Spieler tun sichtbar etwas zusammen" fehlte komplett, es gab nur die drei
       // festen Spielzuege nah am Korb. PLATZHALTER-Chance und -Dauer.
       if(!u.screenRuf||u.screenRuf<=0){
-        const screenChance=Math.min(0.30,Math.max(0.05,0.15+(u.AUFBAU-50)*0.0020));
+        // TEAMSTIL im Halbfeld: ein Wuchtkader stellt oefter Blocks (er will das Spiel
+        // langsam machen und Koerper aneinanderbringen), ein Tempokader seltener (er will
+        // laufen, nicht stehen bleiben).
+        const screenChance=Math.min(0.36,Math.max(0.05,
+          0.15+(u.AUFBAU-50)*0.0020+wuchtStil(u.side)*0.12-tempoStil(u.side)*0.05));
         if(rr()<screenChance){
           const screener=gewichtetesLos(mitspieler,"ZWEITCHANCE");
           // Opus-Review-Fund #9 (zweiter Teil): `screenRuf` stand vorher NUR im
@@ -3103,13 +3665,24 @@
         }
       }
     }
-    u.reevBall=0.4+(100-u.AUFBAU)/100*0.8; // PLATZHALTER, s. Konzeptdoc
+    // TEAMSTIL im Tempo des Aufbaus: ein Wuchtkader nimmt sich zwischen zwei
+    // Entscheidungen mehr Zeit (weniger Ballbesitze je Spiel, mehr Halbfeld), ein
+    // Tempokader weniger. Zusammen mit dem Fastbreak-Fenster ist das die "Pace" des Teams
+    // — dieselbe Groesse, die im echten Basketball ein Team am deutlichsten beschreibt.
+    u.reevBall=Math.max(0.2,0.4+(100-u.AUFBAU)/100*0.8
+      +wuchtStil(u.side)*0.35-tempoStil(u.side)*0.20); // PLATZHALTER, s. Konzeptdoc
   }
 
   // `von` ist, wer den Ball gerade loslaesst (Position, aus der der Flug startet);
   // `schuetze` ist, wem der Wurf gehoert — beim Alley-Oop nicht dieselbe Person, der
   // Ball fliegt direkt zum Korb, der Finisher wird ihn nie kontrollieren.
-  function wirf(von,schuetze,art,tier,technik,passgeber,zug,blockKandidat){
+  // `bedraengnis` (letzter Parameter, optional) ist nur fuer die Abnahme da: die
+  // Bedraengnis, mit der trefferChance() tatsaechlich gerechnet hat. Ohne sie muss die
+  // Messung die Bedraengnis aus dem ABSTAND rekonstruieren, und das geht schief, sobald
+  // die Engine Gruende kennt, aus denen ein naher Verteidiger trotzdem wenig stoert
+  // (Fastbreak, abgehaengt nach einem Durchbruch) — genau daran las die Abnahme dieser
+  // Runde zeitweise eine NEGATIVE Verteidigungswirkung, obwohl die Formel korrekt rechnete.
+  function wirf(von,schuetze,art,tier,technik,passgeber,zug,blockKandidat,bedraengnis){
     von.hatBall=false; fsLive.ball.traeger=null;
     von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
     // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als % oder FG 3/6 im Boxscore zeigen"):
@@ -3129,6 +3702,25 @@
     const deckerBeiWurf=FSTEAM[1-schuetze.side].find(v=>v.deckt===schuetze)||null;
     const deckerAbstandBeiWurf=deckerBeiWurf?Math.round(dist(schuetze,deckerBeiWurf)):null;
     const deckerLauftempoBeiWurf=deckerBeiWurf?deckerBeiWurf.LAUFTEMPO:null;
+    // Nur fuer die Wurfquoten-Abnahme (messe-basketball-wurfquoten.mjs, Opus-Balance-Runde
+    // 26.08.): ABWEHR des Deckers und die tatsaechlich gewuerfelte Trefferwahrscheinlichkeit.
+    // Ohne beides laesst sich "trifft ein bedraengter Wurf messbar schlechter" gar nicht
+    // pruefen — der Log trug bisher nur den ABSTAND, nicht die Guete des Verteidigers, und
+    // die Erfolgsformel selbst blieb unsichtbar. Read-only, veraendert nichts am Spiel.
+    const deckerAbwehrBeiWurf=deckerBeiWurf?deckerBeiWurf.ABWEHR:null;
+    const doppelBeiWurf=FSTEAM[1-schuetze.side].some(v=>v.doppelt===schuetze&&fsT<v.doppeltBis);
+    // NAECHSTER VERTEIDIGER, egal wen er eigentlich deckt. Die NBA-Trackingdaten, gegen
+    // die diese Engine geeicht wird, klassifizieren einen Wurf nach dem CLOSEST DEFENDER —
+    // nicht nach dem zugeteilten Mann. Der Unterschied ist nicht akademisch: bei einem
+    // Drive ist der eigene Mann oft abgehaengt (grosser Abstand), gestoert wird aber vom
+    // Helfer. Die erste Messung dieser Runde las deshalb "Dunk eng 64 %, frei 63 %" und
+    // damit scheinbar wirkungslose Verteidigung, obwohl der Kontest-Term laengst wirkte —
+    // sie hatte nur den falschen Verteidiger im Nenner.
+    let naechsterAbstandBeiWurf=null;
+    for(const v of FSTEAM[1-schuetze.side]){
+      const d=Math.round(dist(schuetze,v));
+      if(naechsterAbstandBeiWurf==null||d<naechsterAbstandBeiWurf)naechsterAbstandBeiWurf=d;
+    }
     const imFastbreakBeiWurf=!!(fsLive.fastbreak&&fsLive.fastbreak.seite===schuetze.side&&fsT<fsLive.fastbreak.bis);
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
@@ -3139,30 +3731,58 @@
     // Block (blockChance, s. loeseFlugAuf), nur mit umgekehrtem Vorzeichen. Gewuerfelt hier
     // beim Abwurf (deterministisch), aufgeloest in loeseFlugAuf, exakt das Muster von
     // `treffer`/`abgefangenVon` im Rest der Engine.
-    const foulBasis=(tier==="dunk"||tier==="nah")?0.16:tier==="mit"?0.10:0.05;
-    const foulChance=blockKandidat?Math.max(0.02,foulBasis-(blockKandidat.ABWEHR-50)*0.0016):0;
+    // WUCHT ZIEHT KONTAKT (Opus-Balance-Runde 26.08., zweite Haelfte von "er powert sich
+    // durch"): ein koerperlich starker Spieler geht am Ring durch den Verteidiger statt um
+    // ihn herum und holt dadurch Fouls. Nur am Korb (dunk/nah) — ein gefoulter Dreier ist
+    // selten und haengt nicht an Kraft. Damit hat WUCHT zwei getrennte Wirkungen, die sich
+    // gegenseitig stuetzen statt sich zu addieren: weniger gestoert (wuchtEntlastungVon)
+    // UND haeufiger an der Linie. Beides greift nur, wenn ueberhaupt jemand da ist, den
+    // man ueberrennen kann (blockKandidat) — frei am Ring bringt WUCHT nichts.
+    // 0,16 -> 0,22 am Ring (26.08. abends): gemessen fielen nur 2,0 Freiwuerfe je Spiel
+    // auf 16,9 Ballbesitze (0,12 je Ballbesitz); die NBA liegt bei rund 0,22. Der Wert
+    // gilt nur, wenn ueberhaupt jemand dicht genug steht (blockKandidat).
+    const foulBasis=(tier==="dunk"||tier==="nah")?0.22:tier==="mit"?0.10:0.05;
+    const wuchtZug=(tier==="dunk"||tier==="nah")?((schuetze.WUCHT||50)-50)*0.0013:0;
+    const foulChance=blockKandidat?Math.max(0.02,foulBasis+wuchtZug-(blockKandidat.ABWEHR-50)*0.0016):0;
     const foul=blockKandidat?rr()<foulChance:false;
     fsLive.ball.flug={
       von:{x:von.x,y:von.y}, nach:{x:korbXVon(schuetze.side),y:H/2},
       art:zug?"alley":"wurf", t:0, dauer:zug?0.55:0.45, // PLATZHALTER
       treffer, tier, fern, punkte:fern?art.punkteFern:art.punkteNah, foul, zumKorbBeiWurf,
-      deckerAbstandBeiWurf, deckerLauftempoBeiWurf, imFastbreakBeiWurf,
+      deckerAbstandBeiWurf, deckerLauftempoBeiWurf, deckerAbwehrBeiWurf, imFastbreakBeiWurf,
+      bedraengnisBeiWurf:(bedraengnis==null?null:Math.round(bedraengnis*100)/100),
+      wuchtBeiWurf:schuetze.WUCHT, deckerWuchtBeiWurf:blockKandidat?blockKandidat.WUCHT:null,
+      doppelBeiWurf, naechsterAbstandBeiWurf, technikBeiWurf:technik,
+      schuetzeAbschluss:schuetze.ABSCHLUSS, schuetzeTechnik:schuetze.TECHNIK, schuetzeTeamgeist:schuetze.TEAMGEIST,
       schuetze, passgeber, zug, ziel:schuetze, blockKandidat
     };
   }
 
-  // FREIWURF: hohe, NUR LEICHT attributabhaengige Trefferquote — ein Freiwurf ist
-  // ungedeckt, Bedraengnis/ABWEHR spielen bewusst keine Rolle, nur ein kleiner Ausschlag
-  // ueber die eigene ABSCHLUSS. Basis 90 % (hoeher als der reale NBA-Schnitt von ~78 % —
-  // bewusst, weil die Anfrage Freiwurf explizit VOR Dunk in der Reihenfolge verlangt, und
-  // Dunk hier bei ~90 % Trefferquote lag, s. Bericht). Koeffizient klein gehalten (0,0006
-  // statt eines ersten, staerkeren 0,0014-Versuchs) — ABSCHLUSS (dexterity/power/speed)
-  // war in der Basismessung schon das am staerksten ueberschiessende Attribut (+9,0 Pp),
-  // ein Freiwurf sollte das nicht zusaetzlich verstaerken.
+  // FREIWURF: ungedeckt, deshalb spielen Bedraengnis und ABWEHR bewusst keine Rolle —
+  // nur die eigene Ruhe an der Linie.
+  //
+  // WARUM DIE BASIS VON 90 % AUF 78 % FAELLT (Opus-Balance-Runde 26.08.). Die 90 % waren
+  // KEIN Versehen: der Kommentar an dieser Stelle begruendete sie damit, dass die
+  // damalige Anfrage "Freiwurf VOR Dunk" in der Trefferreihenfolge verlangte und der Dunk
+  // in der alten Formel bei rund 90 % lag — die Freiwurfquote war also an eine viel zu
+  // hohe Dunk-Quote angeklebt. Diese Runde repariert die URSACHE: der Dunk liegt jetzt bei
+  // NBA-realistischen 66-76 % (BASIS_TREFFER), damit ist die Reihenfolge "Freiwurf oben"
+  // bei 78 % ganz von selbst erfuellt, ohne den Freiwurf zu verbiegen. Der reale
+  // NBA-Schnitt liegt bei rund 78 % (2024/25: .784), gemessen wurden hier vorher 91,3 %.
+  // Der ABSCHLUSS-Ausschlag ist bewusst groesser als vorher (0,0022 statt 0,0006, Spanne
+  // 67-89 % statt 87-93 %): Freiwurfquote ist im echten Basketball eine der am staerksten
+  // spielerabhaengigen Groessen ueberhaupt (Center um 55 %, Guards ueber 90 %) — die alte,
+  // fast flache Kurve war der unrealistischere Teil, nicht der hoehere Mittelwert.
   function schiesseFreiwuerfe(schuetze,anzahl){
     let gemacht=0;
     for(let i=0;i<anzahl;i++){
-      const chance=Math.min(0.96,Math.max(0.80,0.90+(schuetze.ABSCHLUSS-50)*0.0006));
+      // BASIS 0,78 -> 0,755 (26.08. abends, nachgemessen): 0,78 war der NBA-Schnitt, die
+      // GEMESSENE Quote lag aber ueber sechs Serien hinweg stabil bei 81-84 %. Ursache ist
+      // kein Rechenfehler, sondern eine Auswahl: gefoult wird fast nur am Ring, und wer
+      // dort abschliesst, hat ueberdurchschnittliche ABSCHLUSS-Werte — die Freiwerfer sind
+      // also eine positive Teilmenge des Kaders. Die Basis liegt deshalb bewusst unter dem
+      // Ligaschnitt, damit die GEMESSENE Quote ihn trifft.
+      const chance=Math.min(0.93,Math.max(0.50,0.755+(schuetze.ABSCHLUSS-50)*0.0022));
       const treffer=rr()<chance;
       if(treffer){
         gemacht++; schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
@@ -3171,7 +3791,7 @@
       // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
       // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
       // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
-      logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
+      logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer,schuetzeAbschluss:schuetze.ABSCHLUSS});
       schuetze.freiwuerfe++;
       if(treffer)schuetze.freiwurfTreffer++;
     }
@@ -3203,8 +3823,28 @@
       if(d<minD){minD=d;waechter=v;}
     }
     if(waechter&&minD<PASSLINIE_RADIUS){
-      const chance=Math.min(0.32,Math.max(0.03,
-        0.04+(waechter.ABWEHR-50)*0.0025+(PASSLINIE_RADIUS-minD)/PASSLINIE_RADIUS*0.12)); // PLATZHALTER
+      // NEU GEEICHT (Opus-Balance-Runde 26.08.), aus demselben Grund wie versucheSteal:
+      // die alte Obergrenze von 32 % je Pass war fuer ein Spiel gebaut, in dem ein Angriff
+      // ein bis zwei Paesse hat. Live sind es drei bis fuenf — gemessen 4,6 Abfaenge je
+      // Spiel bei nur rund 24 Ballbesitzen, also fast jeder fuenfte Ballbesitz endete an
+      // einer Passlinie. In der NBA sind Abfaenge der SELTENERE Teil der Turnover (Bad
+      // Pass Turnovers liegen bei rund 4 je Team und Spiel bei rund 100 Ballbesitzen).
+      // Deckel 0,32 -> 0,13, Grundwert 0,04 -> 0,015; ABWEHR spreizt weiterhin, jetzt aber
+      // auf einer Skala, auf der ein guter Verteidiger einen Unterschied macht, statt dass
+      // schon der Durchschnitt jeden zweiten Pass gefaehrdet.
+      // ZWEITE EICHUNG (26.08. abends), gleiche Begruendung wie bei versucheSteal: die
+      // erste Absenkung reichte nicht. Gemessen ueber 120 Spiele fielen weiterhin 1,9 bis
+      // 3,2 Abfaenge je Spiel bei nur rund 21-27 Ballbesitzen — die Abfaenge allein waren
+      // damit schon so haeufig wie ALLE Turnover eines echten NBA-Teams. Deckel 0,085 ->
+      // 0,045, Grundwert 0,010 -> 0,006, Abstandsanteil 0,035 -> 0,020.
+      // DRITTER DURCHGANG: nach der zweiten Senkung lagen die Abfaenge immer noch bei 2,0
+      // je Spiel und 19,3 Ballbesitzen — allein dieser eine Zweig machte damit 10 % aller
+      // Ballbesitze aus, so viel wie ALLE Turnover eines NBA-Teams zusammen (13 %). Der
+      // Grund, warum er sich so hartnaeckig haelt: er wuerfelt bei JEDEM Pass, und ein
+      // Angriff hat hier drei bis fuenf Paesse. Deckel 0,045 -> 0,022, Grund 0,006 ->
+      // 0,003, Abstandsanteil 0,020 -> 0,011.
+      const chance=Math.min(0.014,Math.max(0.001,
+        0.002+(waechter.ABWEHR-50)*0.00022+(PASSLINIE_RADIUS-minD)/PASSLINIE_RADIUS*0.007));
       if(rr()<chance)abgefangenVon=waechter;
     }
     // EIGENER FEHLPASS (Chris' Fund: "Turnovers... nicht nur ueber Steals"): ein
@@ -3214,7 +3854,10 @@
     // invers mit AUFBAU (schwache Ballfuehrer werfen den Ball auch ungedeckt mal weg) —
     // klein gehalten (Deckel 2-5 %), damit es ein seltenes, glaubwuerdiges Ereignis
     // bleibt, kein staendiges Rauschen.
-    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0006);
+    // 0,028 -> 0,016 (26.08. abends): gemessen 1,5-1,7 eigene Fehlpaesse je Spiel bei rund
+    // 21-27 Ballbesitzen, also 6-8 % allein aus diesem Zweig. In der NBA sind Bad-Pass-
+    // Turnover rund 4 je Team und Spiel bei rund 100 Ballbesitzen, also 4 %.
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.003,0.010-(von.AUFBAU-50)*0.00028);
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
       abgefangenVon,eigenerFehler};
@@ -3228,9 +3871,51 @@
   // Schussuhr-Fenster), sonst waere die Gesamt-Stealrate viel hoeher als vorher und der
   // Einflussvektor von ABWEHR liefe aus dem Ruder.
   function versucheSteal(decker,traeger,art){
-    const basis=Math.min(0.94,Math.max(0.20,
-      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0035+traeger.TEAMGEIST*0.0060));
-    const proVersuch=1-Math.pow(basis,1/3);
+    // NEU GEEICHT (Opus-Balance-Runde 26.08.) — hier sass die groesste unentdeckte
+    // Schieflage des ganzen Basketballs, und zwar mit umgekehrtem Vorzeichen zu allem
+    // anderen: waehrend der WURFkontest praktisch wirkungslos war (freier Dreier 61,0 %,
+    // bedraengter 59,1 %), war die BALLdruck-Seite der Verteidigung masslos zu stark.
+    // Gemessen ueber 24 Spiele: 8,2 Steals plus 1,5 eigene Fehlpaesse je Spiel bei nur
+    // rund 22 Feldwurfversuchen — also grob 30 % aller Ballbesitze endeten in einem
+    // Turnover. Die NBA liegt bei etwa 13 %.
+    //
+    // URSACHE, nachgerechnet statt geraten: die alte Umrechnung `1-basis^(1/3)` ging von
+    // DREI Steal-Gelegenheiten je Schussuhr-Fenster aus (so steht es im Kommentar
+    // darueber, als PLATZHALTER markiert). Tatsaechlich laeuft stealCd auf 2,0 s bei einer
+    // Schussuhr von 8 s — das sind vier Gelegenheiten allein vom Manndecker, und seit
+    // dieser Runde kommt der doppelnde Helfer als fuenfte dazu. Bei einem typischen
+    // basis=0,70 ergibt `1-0,70^(1/3)` 11,2 % je Versuch, ueber vier bis fuenf Versuche
+    // also rund 40 % je Ballbesitz.
+    //
+    // Statt den Exponenten nachzuziehen (dieselbe undurchsichtige Umrechnung, nur mit
+    // anderer Zahl) steht die Chance jetzt DIREKT als Chance je Versuch da, geeicht auf
+    // rund 3,2 % — vier Versuche ergeben damit die angepeilten ~12 % Turnover je
+    // Ballbesitz. ABWEHR gegen AUFBAU spreizt sie von 0,6 % (Ballfuehrer weit ueberlegen)
+    // bis 11 % (Verteidiger weit ueberlegen); TEAMGEIST des Ballfuehrers hilft ihm dabei,
+    // den Ball zu sichern, wie vorher.
+    // ZWEITE EICHUNG (26.08. abends) — die erste Rechnung stimmte, ihre Annahme nicht.
+    // Sie ging von "vier Versuche je Ballbesitz" aus. Nachgezaehlt sind es mehr: der
+    // Manndecker (stealCd 2,0 s auf 8 s Schussuhr = 4), der doppelnde Helfer, und bei
+    // jedem Kick-Out faengt die Zaehlung fuer den neuen Ballfuehrer von vorn an. Gemessen
+    // ueber 120 Spiele je Szenario lagen die Turnover trotz der ersten Eichung bei
+    //   echt 27 %, gleich 32 %, ueberlegen 35 %, stil 32 %   (NBA rund 13 %)
+    // — also praktisch unveraendert gegenueber den 30 %, die die Runde vorgefunden hat.
+    // Der Grundwert faellt deshalb noch einmal um gut die Haelfte (0,032 -> 0,014) und der
+    // Deckel von 0,11 auf 0,055. Die SPREIZUNG ueber ABWEHR-gegen-AUFBAU bleibt in
+    // derselben Groessenordnung (Koeffizient 0,00085 -> 0,00070), damit ein guter
+    // Verteidiger weiterhin sichtbar mehr Baelle erobert als ein schlechter — reduziert
+    // wird das Grundrauschen, nicht der Attributunterschied.
+    // VIERTER DURCHGANG: 0,014 -> 0,010, Deckel 0,055 -> 0,040. Nach der dritten
+    // Eichung standen 1,2 Steals + 1,2 Abfaenge + 0,7 Fehlpaesse auf 16,9 Ballbesitze,
+    // also 19 % statt der angepeilten 13 %.
+    const proVersuch=Math.min(0.040,Math.max(0.002,
+      // TEAMGEIST-Anteil von 0,00018 auf 0,00045 angehoben: Ballsicherheit ist einer der
+      // wenigen Kanaele, in denen spirit/charisma ueberhaupt vorkommen (s. schuetzenGuete),
+      // und die Pp-Messung wies beide als die am staerksten unterbezahlten Attribute aus.
+      0.010+(decker.ABWEHR-traeger.AUFBAU)*0.00060-(traeger.TEAMGEIST-50)*0.00045))
+      // Der doppelnde Helfer greift beherzter zu — das ist der Ertrag der Taktik, dem der
+      // freistehende Mann auf der anderen Seite als Preis gegenuebersteht.
+      *(decker.doppelt===traeger?1.6:1);
     decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
     // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
     // Zahlenwurf ohne sichtbare Aktion — bei Misserfolg passierte optisch NICHTS, bei
@@ -3256,8 +3941,30 @@
   // Ballbesitz — sonst flippt nur `amBall` und der neue Angriff sieht exakt so aus wie
   // jeder andere (Fables Fund). `bis` in echter Spielzeit (fsT), PLATZHALTER-Dauer.
   function startFastbreak(seite){
-    fsLive.fastbreak={seite, bis:fsT+3};
+    // TEAMSTIL im Tempospiel (Chris' Stil-Wunsch): das Fastbreak-FENSTER selbst haengt am
+    // Kader. Ein Tempokader haelt den Vorteil laenger (er kommt hinten raus und vorne an,
+    // bevor die Verteidigung steht), ein Wuchtkader laesst den Konter fast verpuffen und
+    // baut lieber auf. Das ist der Hebel mit der groessten sichtbaren Wirkung, weil im
+    // Fastbreak gleichzeitig die Deckung ausgesetzt ist (zuordneDeckung), der Kontest nur
+    // zu 30 % zaehlt (bedraengnisVon) und die Mitsprinter Tempo bekommen
+    // (bewegeSpielerLive) — ein laengeres Fenster wirkt also an drei Stellen zugleich.
+    fsLive.fastbreak={seite, bis:fsT+2.6+tempoStil(seite)*1.6-wuchtStil(seite)*1.0};
   }
+
+  // Die Wurf-Kennzahlen EINES Versuchs, in derselben Form fuer alle vier Ausgaenge
+  // (Treffer, Foul, Block, Fehlwurf). Vorher trugen nur `treffer` und `fehlwurf` diese
+  // Felder — ein geblockter oder gefoulter Versuch ist aber genauso ein FGA, und ohne
+  // seine Stufe/Bedraengnis fehlte in jeder Quotenmessung genau die Teilmenge, in der
+  // Verteidigung am staerksten wirkt (Abnahme las 2-Punkte-Quoten dadurch systematisch
+  // zu hoch). Reine Protokollergaenzung, keine Spiellogik.
+  const wurfLogFelder=(flug)=>({tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
+    bedraengnisBeiWurf:flug.bedraengnisBeiWurf,wuchtBeiWurf:flug.wuchtBeiWurf,
+    deckerWuchtBeiWurf:flug.deckerWuchtBeiWurf,
+    deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,
+    deckerAbwehrBeiWurf:flug.deckerAbwehrBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf,
+    doppelBeiWurf:flug.doppelBeiWurf,naechsterAbstandBeiWurf:flug.naechsterAbstandBeiWurf,
+    technikBeiWurf:flug.technikBeiWurf,schuetzeAbschluss:flug.schuetzeAbschluss,
+    schuetzeTechnik:flug.schuetzeTechnik,schuetzeTeamgeist:flug.schuetzeTeamgeist});
 
   function loeseFlugAuf(flug,art){
     if(flug.art==="pass"){
@@ -3265,7 +3972,11 @@
         const f=flug.abgefangenVon;
         f.steals++; flug.passgeber.verluste++; f.lunge=0.4;
         feed(f.side,f.n+" fängt den Pass ab — Steal.");
-        logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
+        // `abgefangen` unterscheidet den Pass-Abfang vom Steal am Ballfuehrer — im
+        // Boxscore sind beide ein Steal (richtig so), fuer die Turnover-Abnahme muss man
+        // sie aber trennen koennen: die erste Messung dieser Runde las 7,3 "Steals" je
+        // Spiel und es war nicht erkennbar, dass ein grosser Teil davon Abfaenge waren.
+        logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber,abgefangen:true});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
         fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
         // Reihenfolge bewusst: ballUebernehmen() loescht fsLive.fastbreak bei jedem
@@ -3305,9 +4016,8 @@
       const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
                        : schuetze.n+" trifft"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" mit einem Dunk":"")+" — +"+flug.punkte+".";
       feed(schuetze.side,txt,true);
-      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
-        tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
-        deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf});
+      logZug(schuetze.side,"treffer",Object.assign({spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug},
+        wurfLogFelder(flug)));
       if(feldspielDisc==="basketball"){bkSfx("korb_treffer.mp3",0.65);bkSfx("publikum_jubel.mp3",0.35);}
       const gross=!!(szDef&&(szDef.jubel==="gross"||szDef.jubel==="riesig"));
       schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
@@ -3339,7 +4049,7 @@
       const verteidiger=flug.blockKandidat;
       verteidiger.fouls++;
       const anzahl=flug.tier==="fern"?3:2;
-      logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
+      logZug(verteidiger.side,"foul",Object.assign({verteidiger,spieler:schuetze,anzahl},wurfLogFelder(flug)));
       feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       const gemacht=schiesseFreiwuerfe(schuetze,anzahl);
@@ -3354,16 +4064,30 @@
       // hatte auf den Block selbst nie Einfluss, nur auf die Chance, ueberhaupt als
       // `blockKandidat` in Frage zu kommen. Jetzt skaliert mit der ABWEHR des Deckers,
       // um den Mittelwert (ABWEHR ~50 -> 0,40) herum.
-      const blockChance=flug.blockKandidat?Math.min(0.65,Math.max(0.15,0.10+flug.blockKandidat.ABWEHR*0.0060)):0;
+      // NEU GEEICHT (Opus-Balance-Runde 26.08.). Der Anteil galt fuer ein Spiel mit
+      // deutlich weniger bedraengten Fehlwuerfen; gemessen ueber 120 Spiele wurden dadurch
+      // 2,6-2,8 Bloecke je Spiel bei nur rund 15 Feldwurfversuchen gezaehlt — also 17-18 %
+      // aller Wuerfe. Die NBA liegt bei rund 5 % (etwa 10 Bloecke auf 180 Versuche in
+      // einem Spiel, und selbst am Ring nur rund 10 %). Ein Block ist hier eine reine
+      // UMETIKETTIERUNG eines Fehlwurfs (die Trefferquote aendert sich dadurch nicht) —
+      // die Zahl ist trotzdem falsch, weil sie im Boxscore steht und Chris sie dort liest.
+      //
+      // WUCHT DES VERTEIDIGERS zaehlt jetzt mit, und zwar nur am Ring (dunk/nah): einen
+      // Korbleger blockt man mit Groesse und Sprungkraft, einen Dreier praktisch nie.
+      // Damit hat WUCHT auch auf der VERTEIDIGENDEN Seite eine Wirkung — bis hierhin war
+      // es ein reines Angriffsattribut, und ein Riesenkader hatte defensiv nichts davon.
+      const blockRing=(flug.tier==="dunk"||flug.tier==="nah");
+      const blockChance=flug.blockKandidat?Math.min(0.30,Math.max(0.04,
+        0.02+flug.blockKandidat.ABWEHR*0.0022
+        +(blockRing?Math.max(0,((flug.blockKandidat.WUCHT||50)-50)*0.0020):-0.02))):0;
       if(flug.blockKandidat&&rr()<blockChance){
         flug.blockKandidat.bloecke++;
         feed(flug.blockKandidat.side,vor+flug.blockKandidat.n+" blockt "+schuetze.n+" — "+art.wortBlock+".");
-        logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
+        logZug(flug.blockKandidat.side,"block",Object.assign({verteidiger:flug.blockKandidat,spieler:schuetze},wurfLogFelder(flug)));
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
         feed(schuetze.side,vor+schuetze.n+" verfehlt"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" den Dunk":"")+".");
-        logZug(schuetze.side,"fehlwurf",{spieler:schuetze,tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
-          deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf});
+        logZug(schuetze.side,"fehlwurf",Object.assign({spieler:schuetze},wurfLogFelder(flug)));
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.4);
       }
       fsAktuell={spieler:null,verteidiger:flug.blockKandidat,passgeber:flug.passgeber,rebounder:null};
@@ -3416,6 +4140,42 @@
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
+        // ARBEITSABSTAND STATT DAUERANGRIFF (Opus-Balance-Runde 26.08.). Vorher lief der
+        // Ballfuehrer IMMER stur auf den Korb zu (zx=korbX), egal wer er war und wie die
+        // Lage aussah. Solange die Wurfauswahl an einer reinen Trefferwahrscheinlichkeit
+        // haengte, fiel das nicht auf — er warf unterwegs. Sobald die Auswahl nach
+        // ERWARTUNGSPUNKTEN geht (s. entscheideBallaktion), ist der Ring aber fast immer
+        // der beste Wurf, also dribbelte er bis unter den Korb: nachgemessen 73 % aller
+        // Wuerfe aus der Dunk-Zone und 1 % Mid-Range (NBA: rund 33 % und 12 %). Der Fehler
+        // sass NICHT in der Wurfauswahl, sondern hier — ein Aufbauspieler, der jeden
+        // Ballbesitz mit einem Alleingang an den Ring beginnt, ist kein Basketball.
+        //
+        // Jetzt arbeitet der Ballfuehrer auf dem RADIUS SEINES EIGENEN SLOTS: der grosse
+        // Mann (zuordneSlots setzt die hoechsten ZWEITCHANCE-Werte auf die inneren Slots)
+        // postet unter dem Korb, der Schuetze arbeitet an der Dreierlinie. Seine RICHTUNG
+        // behaelt er dabei — er zieht sich also nicht quer ueber das Feld, sondern nur auf
+        // seinen Abstand. Dieselbe Stil-Skalierung wie bei den Off-Ball-Slots (weiter
+        // unten) wirkt auch hier: ein Riesenkader arbeitet naeher am Korb.
+        //
+        // ANGRIFF gibt es weiterhin — aber aus einem ANLASS: Durchbruch gelungen,
+        // Fastbreak, oder die Schussuhr laeuft ab. Genau die drei Lagen, in denen auch im
+        // echten Spiel jemand zum Korb zieht.
+        const drang=fsT<u.durchbruchBis
+          ||fsT<(u.zugBis||0)
+          ||(imFastbreak&&fastbreak.seite===u.side)
+          ||fsLive.angriffSeit>SCHUSSUHR_BASKETBALL*0.70;
+        if(!drang){
+          const slotB=SLOTS[u.slotIdx??0];
+          const rZiel=slotB.radius*(1-wuchtStil(u.side)*0.20+tempoStil(u.side)*0.07);
+          const dxk=u.x-korbX, dyk=u.y-H/2, dk=Math.hypot(dxk,dyk)||1;
+          zx=korbX+dxk/dk*rZiel; zy=H/2+dyk/dk*rZiel;
+        } else {
+        zx=korbX; zy=H/2+(u.id%2?40:-40);
+        // DURCHBRUCH-FENSTER (s. versucheDurchbruch): der Angreifer zieht mit Tempo zum
+        // Korb und dribbelt dabei fluessiger (weniger Dribbel-Abzug). Zusammen mit dem
+        // Tempo-Malus des abgehaengten Verteidigers weiter unten entsteht daraus die
+        // Luecke — nicht aus einem Bonus auf die Trefferchance.
+        if(fsT<u.durchbruchBis){ tempoMul=1.28; dribbelFaktor=0.95; }
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -3425,16 +4185,22 @@
         // Dribbel-Abzug ist im Fastbreak leichter (0,85× statt 0,55×) — er bleibt langsamer
         // als seine freilaufenden Mitspieler, aber schneller als die zurueckweichende
         // Verteidigung (deren Bonus gleichzeitig von 1,25× auf 1,0× sinkt, s. unten).
-        // Fastbreak bleibt ohne Denkpause (s. DENKPAUSE_SCHWELLE oben) — dort ist genau das
-        // pausenlose Tempo der Punkt, echte Basketball-Fastbreaks werden nicht durchdacht.
-        zx=korbX; zy=H/2+(u.id%2?40:-40);
-        if(imFastbreak&&fastbreak.seite===u.side){
-          tempoMul=1.3; dribbelFaktor=0.85;
-        } else if(u.reevBall>DENKPAUSE_SCHWELLE){
-          tempoMul=DENKPAUSE_TEMPO;
+        if(imFastbreak&&fastbreak.seite===u.side){ tempoMul=1.3; dribbelFaktor=0.85; }
         }
-      } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS){
+      } else if(fsLive.ball.frei&&dist(u,fsLive.ball.frei)<LAUF_ZUM_BALL_RADIUS*(1+wuchtStil(u.side)*0.40)){
+        // TEAMSTIL am Brett: ein Wuchtkader schickt mehr Leute aus groesserer Entfernung
+        // auf den freien Ball ("crash the glass") — das ist die Rebound-Dominanz, mit der
+        // ein Riesenteam gewinnt, und sie kostet ihn im Gegenzug Rueckwaertsdeckung, weil
+        // dieselben Leute dann weit vom eigenen Korb weg stehen. Beides faellt aus dem
+        // groesseren Radius heraus, ohne einen zweiten Regler.
         zx=fsLive.ball.frei.x; zy=fsLive.ball.frei.y;
+      } else if(u.doppelt&&fsT<u.doppeltBis){
+        // DOPPELN: der Helfer stellt sich auf der Korbseite neben den Ballfuehrer, nicht
+        // exakt auf ihn — sonst stuenden beide Verteidiger im selben Pixel und die
+        // Separation weiter unten wuerde sie gegenseitig wegdruecken.
+        const t=u.doppelt, zumEigenen=Math.sign(eigenerKorbX-t.x)||1;
+        zx=t.x+zumEigenen*16; zy=t.y+(u.id%2?22:-22);
+        tempoMul=1.22;
       } else if(u.screent&&fsT<u.screent.bis){
         // SCREEN/PICK: der Screener laeuft zum Blockpunkt zwischen dem Ballfuehrer, fuer
         // den er blockt, und dessen Decker — Fables Fund: "zwei Spieler tun sichtbar
@@ -3459,8 +4225,17 @@
         // ausserhalb von DREIER_RADIUS(145). `radius` ist jetzt der ECHTE Zielabstand
         // (s. Definition oben); die X-Komponente wird so berechnet, dass hypot(x,y) genau
         // diesen Wert trifft.
+        // TEAMSTIL im Spacing: ein Wuchtkader stellt sich enger um den Korb (Zonenpraesenz,
+        // Post-Up, kurze Wege zum Offensivrebound), ein Tempokader spreizt etwas weiter
+        // (Platz zum Antritt, mehr Wuerfe von aussen). Das ist der sichtbarste Teil des
+        // Stils — man erkennt die Aufstellung, bevor der erste Wurf faellt. Der Faktor
+        // wirkt nur auf den RADIUS, nicht auf die seitliche Verteilung: sonst stuenden bei
+        // einem Riesenkader alle sechs auf einem Fleck (genau der Fehler, den Fables
+        // Spacing-Runde behoben hat, s. SLOTS-Kommentar).
+        const stilRadius=1-wuchtStil(u.side)*0.20+tempoStil(u.side)*0.07;
+        const rSlot=slot.radius*stilRadius;
         const yOff=slot.seitlich*90;
-        let bx=korbX+zumFeld*Math.sqrt(Math.max(0,slot.radius*slot.radius-yOff*yOff)),
+        let bx=korbX+zumFeld*Math.sqrt(Math.max(0,rSlot*rSlot-yOff*yOff)),
             by=H/2+yOff;
         const traeger=fsLive.ball.traeger;
         if(traeger&&traeger!==u){
@@ -3487,7 +4262,11 @@
           u.slotSeit=0;
         }
         zx=bx; zy=by;
-        if(imFastbreak&&fastbreak.seite===u.side&&team.indexOf(u)<2)tempoMul=1.3; // PLATZHALTER: die ersten beiden sprinten mit
+        // TEAMSTIL im Fastbreak: ein Tempokader schickt mehr Leute und schneller mit
+        // (drei statt zwei Mitsprinter ab stil>0,35) — die Umsetzung von "die versuchen
+        // ueber Tempo zu gewinnen" auf dem Feld, nicht nur in den Zahlen.
+        const mitsprinter=2+(tempoStil(u.side)>0.35?1:0);
+        if(imFastbreak&&fastbreak.seite===u.side&&team.indexOf(u)<mitsprinter)tempoMul=1.3+tempoStil(u.side)*0.20;
       } else if(u.deckt){
         if(imFastbreak&&fastbreak.seite!==u.side){
           // FASTBREAK-VERTEIDIGUNG: erst zurueck zum eigenen Korb sprinten, Manndeckung
@@ -3509,9 +4288,62 @@
           // (1,15×, PLATZHALTER) gibt "Deckung halten" ueberhaupt eine Chance, ohne sie
           // unbeatbar zu machen.
           tempoMul=1.15;
+          // ABGEHAENGT (s. versucheDurchbruch): wer gerade ausgedribbelt wurde, verliert
+          // seinen Deckungs-Vorsprung UND einen Teil seines Tempos — er kommt fuer das
+          // Fenster nicht hinterher. Genau das ist die raeumliche Wirkung des Durchbruchs;
+          // ohne sie waere er nur ein Feed-Text.
+          if(fsT<u.abgehaengtBis)tempoMul=0.62;
           const zumEigenenKorb=eigenerKorbX-u.deckt.x;
-          const sag=Math.min(35,Math.abs(zumEigenenKorb)*0.3); // PLATZHALTER, gedeckelt
+          // WIE WEIT EIN VERTEIDIGER VON SEINEM MANN ABSTEHT — der stillste und
+          // folgenreichste Fund dieser Balance-Runde.
+          //
+          // Der Deckel stand bei 35 px. BEDRAENGT_RADIUS ist 30 px. Ein Verteidiger stellte
+          // sich also, ueberall wo er den Deckel erreichte (also bei jedem Angreifer, der
+          // weiter als 117 px vom eigenen Korb weg stand — praktisch die ganze Dreierlinie),
+          // per Konstruktion GENAU AUSSERHALB seiner eigenen Wirkungsreichweite. Gemessen:
+          // 581 von 669 Dreierversuchen fielen als "wide open" (6+ ft), also 87 %. In der
+          // NBA sind es rund 40 %. Solange das so war, konnte man die Kontest-Formel
+          // beliebig stark drehen — sie wurde am Perimeter fast nie aufgerufen.
+          //
+          // Der Deckel ist jetzt DYNAMISCH statt fest, und zwar an der Wurfgefahr des
+          // gedeckten Mannes: einen guten Schuetzen deckt man eng (bis 17 px, rund 3,5 ft),
+          // von einem schlechten sackt man ab (bis 35 px) und steht dafuer besser fuer die
+          // Hilfe. Das ist eine der bekanntesten echten Verteidigungsentscheidungen
+          // ueberhaupt — und sie faellt hier aus schuetzenGuete, also aus genau derselben
+          // Zahl, die auch bestimmt, wie gut der Mann wirklich wirft. Kein zweiter Regler.
+          const sagMax=Math.max(14,Math.min(35,26-schuetzenGuete(u.deckt)*90));
+          const sag=Math.min(sagMax,Math.abs(zumEigenenKorb)*0.3);
           zx=u.deckt.x+Math.sign(zumEigenenKorb)*sag; zy=u.deckt.y;
+          // RINGSCHUTZ / HILFE VON DER SCHWACHEN SEITE (Opus-Balance-Runde 26.08.).
+          //
+          // Gemessen fielen rund die HAELFTE aller Wuerfe aus der Ringzone als "wide open"
+          // (6+ ft zum naechsten Verteidiger) — im echten Basketball ist ein voellig freier
+          // Korbleger die Ausnahme, weil die Zone immer besetzt ist. Ursache: die Deckung
+          // war reine Manndeckung ohne jede Hilfe; war der eigene Mann ausgedribbelt
+          // (versucheDurchbruch), stand niemand mehr zwischen Ball und Korb. Die Doppelung
+          // (pruefeDoppelung) ist dafuer das falsche Werkzeug — sie ist ein seltenes,
+          // taktisches Ereignis, Ringschutz ist Dauerzustand.
+          //
+          // Jeder Verteidiger, dessen eigener Mann WEIT VOM BALL weg steht, zieht sich
+          // anteilig Richtung Ring — genau die Abwaegung, die eine echte Hilfsverteidigung
+          // trifft: je naeher der Ball am Korb und je unwichtiger mein Mann gerade ist,
+          // desto mehr helfe ich. Der Preis steht schon im Spiel: mein Mann wird dadurch
+          // offener, offenheitFuerPass sieht das sofort und der Kick-Out findet ihn.
+          const ballTraeger=fsLive.ball.traeger;
+          if(ballTraeger&&ballTraeger.side!==u.side&&u.deckt!==ballTraeger){
+            const ballKorbX=korbXVon(ballTraeger.side);
+            const ballZumKorb=dist(ballTraeger,{x:ballKorbX,y:H/2});
+            const zone=KORB_NAH_RADIUS*1.3;
+            if(ballZumKorb<zone){
+              const naeheAmRing=1-ballZumKorb/zone;              // 0 am Zonenrand, 1 am Ring
+              const mannWeitWeg=Math.min(1,dist(u.deckt,ballTraeger)/150);
+              const hilfe=Math.min(0.55,naeheAmRing*mannWeitWeg*0.85);
+              // Hilfspunkt: zwischen Ball und Korb, leicht versetzt, damit sich zwei
+              // Helfer nicht in denselben Pixel stellen.
+              const hx=(ballTraeger.x+ballKorbX)/2, hy=(ballTraeger.y+H/2)/2+(u.id%2?16:-16);
+              zx+=(hx-zx)*hilfe; zy+=(hy-zy)*hilfe;
+            }
+          }
           const screener=FSTEAM[u.deckt.side].find(s=>s.screent&&s.screent.fuer===u.deckt&&fsT<s.screent.bis);
           if(screener&&dist(screener,{x:(u.x+u.deckt.x)/2,y:(u.y+u.deckt.y)/2})<26)tempoMul=0.35; // PLATZHALTER
         }
@@ -3523,7 +4355,14 @@
       { // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
         let sepX=0, sepY=0;
         for(const other of ALLE_SPIELER){
+          // Das Paar, dessen Abstand die Spiellogik LIEST, wird nicht abgestossen (s.
+          // Funktionskopf). Mit Doppeln gibt es davon jetzt ein zweites: Helfer und
+          // Ballfuehrer. Ohne diese Zeile haette die Separation den Helfer genau aus dem
+          // Radius gedrueckt, in dem er ueberhaupt Bedraengnis erzeugt (bedraengnisVon
+          // liest BEDRAENGT_RADIUS=30, SEP_RADIUS ist 60) — die Doppelung waere sichtbar,
+          // aber wirkungslos gewesen.
           if(other===u||u.deckt===other||other.deckt===u)continue;
+          if(u.doppelt===other||other.doppelt===u)continue;
           const ddx=u.x-other.x, ddy=u.y-other.y, dd=Math.hypot(ddx,ddy)||0.01;
           if(dd<SEP_RADIUS){ const f=(SEP_RADIUS-dd)/SEP_RADIUS; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
         }
@@ -3578,7 +4417,7 @@
       // hoeheren Schwelle als auf dem alten Codestand). NICHT monoton im Sinne von "je
       // hoeher der Koeffizient, desto schlechter" — 0,70 schneidet besser ab als sowohl
       // 0,35 als auch 1,4 — ein weiteres Beispiel fuer die in dieser Runde wiederholt
-      // beobachtete Nicht-Linearitaet der Messung (s. WURF_BONUS-Kommentar), deshalb 0,70
+      // beobachtete Nicht-Linearitaet der Messung (s. Kommentar zur Trefferformel), deshalb 0,70
       // empirisch statt rechnerisch gewaehlt, nicht extrapoliert.
       // GRENZE DIESES ANSATZES (Playwright-Livemessung, s. Bericht): Spitzengeschwindigkeit
       // ueber 30s echte Spielzeit korrelierte bei 0,35 praktisch GAR NICHT mit LAUFTEMPO
@@ -3636,6 +4475,7 @@
       if(u.reevBall>0)u.reevBall-=dt;
       if(u.stealCd>0)u.stealCd-=dt;
       if(u.screenRuf>0)u.screenRuf-=dt;
+      if(u.durchbruchCd>0)u.durchbruchCd-=dt;
       // Opus-Review-Fund #9 (erster Teil): `screent` hielt eine harte Referenz auf den
       // Ballfuehrer zum Zeitpunkt des Rufs — passt der den Ball im selben Zyklus ab (kann
       // er), blockte der Screener 1,2s weiter fuer jemanden ohne Ball, und die
@@ -3662,7 +4502,7 @@
     } else if(fsLive.ball.frei){
       const f=fsLive.ball.frei;
       fsBall={sichtbar:true,x:f.x,y:f.y};
-      const nah=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
+      const nah=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<greifReichweiteVon(u));
       // REBOUND-KAMPF: bei echtem Gedraenge (>=2 Spieler zugleich in Reichweite) wird
       // nicht sofort aufgeloest — erst nach einer kurzen Ringphase, in der noch weitere
       // Spieler heranlaufen koennen (bewegeSpielerLive schickt ohnehin jeden Spieler in
@@ -3678,7 +4518,7 @@
         fsLive.reboundKampf.t+=dt;
         if(!nah.length){ fsLive.reboundKampf=null; } // Ball wieder ausser jeder Reichweite gerollt
         else if(fsLive.reboundKampf.t>=fsLive.reboundKampf.dauer){
-          const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
+          const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<greifReichweiteVon(u));
           const kandidaten=jetzt.length?jetzt:nah;
           // Fable-Fund (Animations-Runde, 25.08.): der Rebound-Kampf loeste bisher rein
           // per Los auf — im Gedraenge sah man niemanden nach dem Ball greifen, weder
@@ -3693,7 +4533,16 @@
           logZug(gewinner.side,"rebound",{spieler:gewinner});
           fsAktuell={spieler:null,verteidiger:null,passgeber:null,rebounder:gewinner};
           fsLive.reboundKampf=null;
-          if(eigen){ ballUebernehmen(gewinner); fsLive.angriffSeit=0; }
+          if(eigen){
+            ballUebernehmen(gewinner); fsLive.angriffSeit=0;
+            // PUTBACK (Opus-Balance-Runde 26.08.): wer seinen eigenen Abpraller holt, steht
+            // unter dem Korb — er legt nach, statt erst brav auf seinen Arbeitsabstand
+            // zurueckzulaufen. Ohne dieses Fenster lief der Rebounder mit dem Ball nach
+            // aussen und der Offensivrebound war mechanisch nur ein zweiter Ballbesitz,
+            // kein zweiter KORBVERSUCH — der Grund, warum am Ring viel zu wenig geworfen
+            // wurde. Kurz gehalten (0,9 s): es ist ein Nachlegen, kein neuer Angriff.
+            gewinner.zugBis=fsT+0.9; gewinner.reevBall=0.15;
+          }
           // Reihenfolge bewusst: naechsterAngriff() loescht fsLive.fastbreak bei jedem
           // Ballwechsel (Opus-Review-Fund #11) — startFastbreak muss danach kommen.
           else { naechsterAngriff(gewinner.side); startFastbreak(gewinner.side); }
@@ -3727,10 +4576,23 @@
         fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip};
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
+        // DOPPELN wird VOR der Ballaktion geprueft: die Entscheidung des Ballfuehrers
+        // (Wurf, Kick-Out) soll die Doppelung schon sehen, nicht erst eine Entscheidung
+        // spaeter. Sonst wuerfe er in die gerade entstandene Doppelung hinein, und die
+        // Taktik waere um genau eine Neubewertung zu langsam, um je zu wirken.
+        pruefeDoppelung();
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
         if(erzwingen||traeger.reevBall<=0)entscheideBallaktion(traeger,art,erzwingen);
         if(fsLive.ball.traeger===traeger&&decker&&decker.stealCd<=0&&dist(decker,traeger)<STEAL_REICHWEITE){
           versucheSteal(decker,traeger,art);
+        }
+        // Der DOPPELNDE Helfer darf ebenfalls zugreifen — das ist der Gewinn der Taktik
+        // (zwei Haende am Ball statt einer), gegengerechnet zum Preis (sein Mann steht
+        // frei, s. pruefeDoppelung). Ohne diesen Zweig waere Doppeln reine Bedraengnis
+        // ohne Ballgewinn-Chance und damit fast immer das schlechtere Geschaeft.
+        if(fsLive.ball.traeger===traeger){
+          const helfer=FSTEAM[1-traeger.side].find(v=>v.doppelt===traeger&&fsT<v.doppeltBis);
+          if(helfer&&helfer.stealCd<=0&&dist(helfer,traeger)<STEAL_REICHWEITE)versucheSteal(helfer,traeger,art);
         }
       }
     }
@@ -8880,10 +9742,10 @@
       // fsLive: nur waehrend eines Basketball-Spiels gesetzt (initBasketballLive), fuer
       // die drei Vorab-Disziplinen bleibt es null — kein Sonderfall im Motor, einfach
       // mitgesichert wie alles andere.
-      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive}),
+      sichern:()=>({disc, feldspielDisc, FSTEAM, fsZuege, fsZeiger, fsAkt, fsT, fsPunkte, done, fsLive, fsStil}),
       zurueck:(a)=>{disc=a.disc; feldspielDisc=a.feldspielDisc; FSTEAM=a.FSTEAM;
                     fsZuege=a.fsZuege; fsZeiger=a.fsZeiger; fsAkt=a.fsAkt; fsT=a.fsT;
-                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive;},
+                    fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive; fsStil=a.fsStil;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
       bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
@@ -8981,6 +9843,78 @@
     return {n,siegeL,siegeR,unentschieden,punkteTeamL,punkteTeamR,punkteHeben};
   }
 
+  // WURFSERIE — die Abnahme fuer "trifft das Spiel so oft wie echter Basketball?"
+  // (Chris, 26.08.: "wie viel % trifft ein spieler der frei wirft oder wie viel trifft er
+  // wenn er gegenspieler hat die ihn verteidigen"). einflussVon() misst etwas ANDERES:
+  // ob die Mechanik die Disziplinmatrix einloest. Beide Zahlen muessen stimmen, keine
+  // ersetzt die andere — deshalb ein zweiter Hook statt einer Erweiterung.
+  //
+  // Liefert das ROHE Wurfprotokoll je Spiel (fsZuege, gefiltert auf Wurf-/Freiwurf-
+  // Ereignisse) plus Endstand — die Auswertung nach Stufe/Bedraengnis/Schuetzenguete
+  // passiert im Skript, nicht hier: eine Auswertung in der Engine muesste bei jeder neuen
+  // Frage nachgezogen werden, das rohe Protokoll nicht.
+  //
+  // `kader` (optional) tauscht SQUAD/OPP fuer die Dauer der Serie aus — dafuer gebaut, die
+  // beiden von Chris verlangten Szenarien (ein Team klar ueberlegen / beide gleichwertig)
+  // gegen KONSTRUIERTE Kader zu fahren, statt sich auf die zwei echten Teams zu
+  // beschraenken. Wird sauber zurueckgetauscht, auch wenn ein Lauf wirft.
+  function wurfSerie(n,kader){
+    const M=MOTOREN.basketball;
+    if(!M)return {fehler:"kein Motor angemeldet"};
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG; ATTR_HEBUNG=null;
+    const squadVorher=SQUAD, oppVorher=OPP;
+    if(kader){ SQUAD=kader.links; OPP=kader.rechts; }
+    if(M.vorher)M.vorher();
+    const spiele=[];
+    try{
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+i*104729);
+        M.bau(1337+i*7919);
+        M.lauf();
+        const s=M.sichern();
+        const wuerfe=[];
+        for(const e of s.fsZuege){
+          if(e.art==="treffer"&&!e.freiwurf)wuerfe.push({aus:"treffer",seite:e.seite,n:e.spieler.n,punkte:e.punkte,
+            tier:e.tier,abstand:e.deckerAbstandBeiWurf,abwehr:e.deckerAbwehrBeiWurf,fastbreak:e.imFastbreakBeiWurf,
+            technik:e.technikBeiWurf,abschluss:e.schuetzeAbschluss,tech:e.schuetzeTechnik,teamgeist:e.schuetzeTeamgeist,
+            doppel:e.doppelBeiWurf,naechster:e.naechsterAbstandBeiWurf,zug:e.zug||null,
+            bedraengnis:e.bedraengnisBeiWurf,wucht:e.wuchtBeiWurf,deckerWucht:e.deckerWuchtBeiWurf});
+          else if(e.art==="fehlwurf"||e.art==="block")wuerfe.push({aus:e.art,seite:e.art==="block"?1-e.seite:e.seite,n:e.spieler.n,
+            tier:e.tier,abstand:e.deckerAbstandBeiWurf,abwehr:e.deckerAbwehrBeiWurf,fastbreak:e.imFastbreakBeiWurf,
+            technik:e.technikBeiWurf,abschluss:e.schuetzeAbschluss,tech:e.schuetzeTechnik,teamgeist:e.schuetzeTeamgeist,
+            doppel:e.doppelBeiWurf,naechster:e.naechsterAbstandBeiWurf,
+            bedraengnis:e.bedraengnisBeiWurf,wucht:e.wuchtBeiWurf,deckerWucht:e.deckerWuchtBeiWurf});
+          else if(e.art==="foul"&&!e.undEins)wuerfe.push({aus:"foul",seite:1-e.seite,n:e.spieler.n,
+            tier:e.tier,abstand:e.deckerAbstandBeiWurf,abwehr:e.deckerAbwehrBeiWurf,fastbreak:e.imFastbreakBeiWurf,
+            technik:e.technikBeiWurf,abschluss:e.schuetzeAbschluss,tech:e.schuetzeTechnik,teamgeist:e.schuetzeTeamgeist,
+            doppel:e.doppelBeiWurf,naechster:e.naechsterAbstandBeiWurf,
+            bedraengnis:e.bedraengnisBeiWurf,wucht:e.wuchtBeiWurf,deckerWucht:e.deckerWuchtBeiWurf});
+          else if(e.art==="freiwurf_versuch")wuerfe.push({aus:"freiwurf",seite:e.seite,n:e.spieler.n,
+            treffer:!!e.treffer,abschluss:e.schuetzeAbschluss});
+        }
+        const zaehl=(art)=>s.fsZuege.filter(e=>e.art===art).length;
+        spiele.push({punkte:[s.fsPunkte[0],s.fsPunkte[1]],wuerfe,
+          steals:s.fsZuege.filter(e=>e.art==="steal"&&!e.abgefangen).length,
+          abfaenge:s.fsZuege.filter(e=>e.art==="steal"&&e.abgefangen).length,
+          turnovers:zaehl("turnover"),rebounds:zaehl("rebound"),
+          doppelTeams:zaehl("doppel"),durchbrueche:zaehl("durchbruch"),
+          durchbruchVersuche:zaehl("durchbruch_versuch"),
+          durchbruchListe:s.fsZuege.filter(e=>e.art==="durchbruch").map(e=>({seite:e.seite,
+            aufbau:e.aufbau,abwehr:e.abwehr,tempo:e.tempo,deckerTempo:e.deckerTempo})),
+          stil:[fsStil[0],fsStil[1]],
+          spieler:[...s.FSTEAM[0],...s.FSTEAM[1]].map(u=>({n:u.n,seite:u.side,
+            AUFBAU:u.AUFBAU,ABSCHLUSS:u.ABSCHLUSS,TECHNIK:u.TECHNIK,ZWEITCHANCE:u.ZWEITCHANCE,
+            ABWEHR:u.ABWEHR,TEAMGEIST:u.TEAMGEIST,LAUFTEMPO:u.LAUFTEMPO,WUCHT:u.WUCHT,
+            punkte:u.punkte,rebounds:u.rebounds,steals:u.steals,bloecke:u.bloecke,verluste:u.verluste,assists:u.assists}))});
+      }
+    } finally {
+      ATTR_HEBUNG=hebungVorher; M.zurueck(gesichert);
+      SQUAD=squadVorher; OPP=oppVorher;
+      zieheFormkarten(20260823);
+    }
+    return {n,spiele};
+  }
+
   function bahnSerie(d,n){
     // WER SICH NICHT ANMELDET, WIRD NICHT STILL DURCH SPURT ERSETZT. BA() faellt ohne
     // Eintrag in BAHN_ART auf BAHN_ART.spurt zurueck — praktisch fuer den Normalfall,
@@ -9023,7 +9957,7 @@
   }
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie, wurfSerie,
     namenVon:(dId)=>{const M=MOTOREN[dId]; if(!M)return []; const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337); const namen=M.namen(); M.zurueck(g); return namen;},
     renderProbe:(name,ani,feldspiel,dir,lunge)=>{
       const c=document.createElement("canvas"); c.width=64; c.height=64;
