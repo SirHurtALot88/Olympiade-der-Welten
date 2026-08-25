@@ -15,6 +15,10 @@
  *     aber nichts haelt sie fest; ein Umbau koennte sie still entfernen.
  *  3. Ein Fix war nur zur Haelfte gebaut (`33c172`) — das faengt kein Skript, das faengt nur
  *     Nachlesen. Deshalb steht es hier auch nicht als Pruefung, sondern als Mahnung im Kopf.
+ *  4. NACHGETRAGEN 25.08.2026: der Spiegel-Abgleich selbst pruefte nur, ob der Meldungscode
+ *     IRGENDWO im Namen einer Quittung vorkam — zwei Quittungen fehlte das `bug-`-Praefix, das
+ *     die Routine als Dateinamen verlangt, und der Abgleich meldete trotzdem „erledigt". Jetzt
+ *     exakter Dateiname statt Substring (`bestimmeUnbearbeiteteMeldungen`).
  *
  * ZWEI TEILE, WEIL ZWEI UMGEBUNGEN. Der Ratchet und die Test-Existenz brauchen nur das Repo und
  * laufen deshalb in der CI mit. Der Abgleich gegen `origin/bug-reports` braucht den Spiegel-Branch,
@@ -35,6 +39,19 @@ import { join } from "node:path";
 
 const WURZEL = process.cwd();
 const TRIAGE = join(WURZEL, "data/bug-reports/triage");
+
+/**
+ * Welche Meldungen aus dem Spiegel (`git ls-tree origin/bug-reports … data/bug-reports/`) haben
+ * KEINE Quittung unter ihrem exakten Dateinamen im Triage-Ordner? Ausgelagert, damit ein Test die
+ * echte Vergleichslogik prueft, nicht deren Nacherzaehlung — siehe Kopfkommentar zum
+ * 25.08.2026-Fund (Substring statt exaktem Dateinamen).
+ */
+export function bestimmeUnbearbeiteteMeldungen(spiegelPfade: string[], triageOrdner: string): string[] {
+  return spiegelPfade
+    .filter((pfad) => pfad.endsWith(".json"))
+    .map((pfad) => pfad.split("/").pop()!.replace(/\.json$/, ""))
+    .filter((basisname) => basisname && !existsSync(join(triageOrdner, `${basisname}.md`)));
+}
 
 /**
  * OBERGRENZE FUER BEHOBENE MELDUNGEN OHNE BENANNTEN TEST — gemessener Stand am 23.08.2026: 25.
@@ -151,10 +168,9 @@ if (!process.argv.includes("--nur-repo")) {
     // Befund auszugeben waere genau der Fehler, den die Routine ausdruecklich verbietet.
     console.log("Spiegel `origin/bug-reports` nicht verfuegbar — Abgleich uebersprungen.");
   } else {
-    const alleQuittungstexte = quittungen.map((q) => q.datei).join("\n");
-    const offen = spiegel
-      .map((pfad) => pfad.replace(/\.json$/, "").split("-").pop() ?? "")
-      .filter((id) => id && !alleQuittungstexte.includes(id));
+    // EXAKTER DATEINAME, NICHT SUBSTRING — siehe `bestimmeUnbearbeiteteMeldungen` und den Fund
+    // vom 25.08.2026 (Kopfkommentar der Funktion).
+    const offen = bestimmeUnbearbeiteteMeldungen(spiegel, TRIAGE);
     console.log(`Meldungen im Spiegel: ${spiegel.length} · unbearbeitet: ${offen.length}`);
     // Offene Meldungen sind ARBEIT, kein Fehlschlag — der Lauf bearbeitet sie danach.
     for (const id of offen) console.log(`  offen: ${id}`);
