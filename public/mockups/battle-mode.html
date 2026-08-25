@@ -2296,11 +2296,21 @@
     MUTATOREN=[MUTATOR_POS[r(MUTATOR_POS.length)], MUTATOR_NEG[r(MUTATOR_NEG.length)]];
   }
 
-  // Wie viel ein Spieler durch die gezogenen Traits gewinnt oder verliert.
+  // Wie viel ein Spieler durch die gezogenen Traits gewinnt — NIE verliert. Chris am
+  // 23.08.: "renegade ist n mutator wie jeder andere und bringt 6 score punkte und
+  // 0,3 PPs das bleibt auch weiter so" — ENTSCHIEDEN, nicht mehr offen (siehe
+  // docs/BATTLE_ARENA_UEBERGABE.md, Abschnitt A). `pos`/`neg` sind nur die THEMATISCHE
+  // Einordnung des Traits (fuer die Einfaerbung "auf"/"ab" in der Anzeige) — ob ein Trait
+  // in der "negativen" Namensliste steht, aendert nichts an seiner Wirkung: jeder Treffer
+  // zaehlt +6, genau wie in legacy-lineup-modifiers.ts (`hits * 6`, ohne Vorzeichen). Hier
+  // stand bis eben `(pos.length-neg.length)`, also ein STRAFPUNKT fuer einen "negativen"
+  // Mutator-Treffer — im Widerspruch zum eigenen Kommentar direkt ueber MUTATOR_POS
+  // ("positiv wie negativ") und zu Chris' Entscheidung. Gemeldet als Anzeigefehler in
+  // der Battle-Arena-Vorschau, Ursache war aber die Zahl selbst, nicht nur die Anzeige.
   function traitTreffer(p){
     const pos=(p.tp||[]).filter(t=>MUTATOREN.includes(t));
     const neg=(p.tn||[]).filter(t=>MUTATOREN.includes(t));
-    return {pos, neg, netto:(pos.length-neg.length)*TRAIT_PUNKTE};
+    return {pos, neg, netto:(pos.length+neg.length)*TRAIT_PUNKTE};
   }
 
   // WOHIN der Bonus geht. Nicht pauschal auf alles — sondern in die Kampfwerte, die von
@@ -4729,15 +4739,21 @@
           if(!ta.tr.pos.length&&!ta.tr.neg.length){
             tz.appendChild(el("span","tleer","Keine der gezogenen Eigenschaften greift"));
           } else {
+            // "+"-Praefix fuer BEIDE Listen: die Klasse (auf/ab) faerbt nur ein, ob der
+            // Trait thematisch als positiv oder negativ gilt — die Wirkung ist immer +6,
+            // siehe traitTreffer(). Ein "−" hier waere derselbe Anzeigefehler nochmal.
             for(const t of ta.tr.pos)tz.appendChild(el("span","tchip auf","+"+t));
-            for(const t of ta.tr.neg)tz.appendChild(el("span","tchip ab","−"+t));
+            for(const t of ta.tr.neg)tz.appendChild(el("span","tchip ab","+"+t));
             const attrNeu=mitAufschlag(p.a,ta.netto,betroffeneAttribute(sl,disc,true),disc);
             const vorher=stats(p,disc), nachher=stats({...p,a:attrNeu},disc);
             const wohin=KEYS.map(k=>[k,nachher[k]-vorher[k]]).filter(([,v])=>Math.abs(v)>=0.05)
               .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
               .map(([k,v])=>k+" "+(v>0?"+":"")+v.toFixed(1)).join(" · ");
-            const text = wohin ? (ta.breit?wohin+" (breit verteilt)":wohin)
-              : (ta.netto===0 ? "heben sich auf" : "kein passender Kampfwert");
+            // "heben sich auf" gab es nur, solange netto = pos-neg sein konnte. Seit
+            // Treffer sich addieren statt aufzurechnen, ist ta.netto in diesem Zweig immer
+            // positiv (mindestens ein Treffer liegt vor, sonst waeren wir im ersten Zweig
+            // oben) — der Fall bleibt hier nur als Kommentar, damit niemand ihn vermisst.
+            const text = wohin ? (ta.breit?wohin+" (breit verteilt)":wohin) : "kein passender Kampfwert";
             const z2=el("span","twohin",text);
             z2.tabIndex=0;
             tipOn(z2,"Warum dorthin",
@@ -8127,7 +8143,7 @@
     if(!istGegner){
       const tr=traitTreffer(p);
       if(tr.netto)teile.push(["Mutator",tr.netto,
-        [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"−"+t)].join(", ")]);
+        [...tr.pos.map(t=>"+"+t),...tr.neg.map(t=>"+"+t)].join(", ")]);
       const iv=stufenWert();
       if(iv)teile.push(["Intensität",iv,INTENSITAET[STUFE].label]);
     }
@@ -8183,8 +8199,10 @@
       let mz=eg.querySelector(".emutator");
       if(!mz){mz=el("div","emutator");eg.appendChild(mz);}
       mz.textContent="";
+      // Beide mit "+": der zweite Mutator ist nur FARBLICH als "ab" markiert (thematisch
+      // negativ gelistet), seine Wirkung ist genau wie beim ersten +6 — siehe traitTreffer().
       mz.appendChild(el("span","tchip auf","+"+MUTATOREN[0]));
-      mz.appendChild(el("span","tchip ab","−"+MUTATOREN[1]));
+      mz.appendChild(el("span","tchip ab","+"+MUTATOREN[1]));
     }
   }
   const zeigeEinlauf=(an)=>{const e=document.getElementById("einlauf");if(e)e.hidden=!an;};
