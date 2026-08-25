@@ -5532,7 +5532,7 @@
   // Wer hat wem was getan. Ohne das ist "8.412 Schaden" eine Zahl ohne Adresse.
   function gegenZaehler(u,name,feld,wert){
     if(!u||!u.st)return;
-    const g=u.st.gegen[name]||(u.st.gegen[name]={dmg:0,erl:0,ko:0,cc:0});
+    const g=u.st.gegen[name]||(u.st.gegen[name]={dmg:0,erl:0,ko:0,cc:0,heil:0});
     g[feld]+=wert;
   }
 
@@ -6132,6 +6132,7 @@
       if(e.art==="heilung"){
         for(const z of ziele){const h=Math.round(e.basis*angFaktor(u.ANG)*(e.mult||1));
           const echt=Math.min(h,z.max-z.hp); z.hp=Math.min(z.max,z.hp+h); u.st.heal+=echt;
+          gegenZaehler(u,z.n,"heil",echt);
           schwebe({x:z.x,y:z.y-26,txt:"+"+h,life:.95,heil:true});
           feed(u.side,u.n+" heilt "+z.n+" · "+h);}
         continue;
@@ -6624,6 +6625,7 @@
           const echt=Math.min(heal,ziel.max-ziel.hp);
           ziel.hp=Math.min(ziel.max,ziel.hp+heal);
           u.st.heal+=echt;
+          gegenZaehler(u,ziel.n,"heil",echt);
           schwebe({x:ziel.x,y:ziel.y-26,txt:"+"+heal,life:.95,heil:true});
           feed(u.side,u.n+" heilt "+ziel.n+" · "+heal);
           continue;
@@ -8558,7 +8560,10 @@
   const ESPALTEN=[["K","ko"],["T","tode"],["B","beihilfe"],["CC","cc"],["H","heal"],["S","schild"],
                   ["SCH","dmg"],["ERL","tank"],["FF","ff"]];
   // Welche Spalten sich nach Gegner aufschluesseln lassen.
-  const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl"};
+  // GEMELDET (Chris): „heal fehlt noch komplett dass man sieht wen man geheilt hat" — die
+  // Spalte H zeigte nur die Summe, ohne die Adresse. Derselbe Mechanismus wie bei
+  // dmg/cc/ko, nur mit dem eigenen Team als Ziel statt der gegnerischen Seite.
+  const GEGENFELD={ko:"ko",cc:"cc",dmg:"dmg",tank:"erl",heal:"heil"};
   function renderEndstand(){
     const sieger = live(0).length>live(1).length ? 0 : live(1).length>live(0).length ? 1 : null;
     document.getElementById("esieger").textContent =
@@ -8589,7 +8594,9 @@
               .filter(([,x])=>x>0).sort((a,b)=>b[1]-a[1]);
             if(liste.length){
               z.tabIndex=0; z.classList.add("hovbar");
-              tipOn(z,lab+" von "+u.n+" — gegen wen",
+              // Heilung geht an Teamkollegen, nicht gegen den Gegner — "an wen" statt
+              // "gegen wen" haelt den Titel bei den eigenen Zahlen sprachlich richtig.
+              tipOn(z,lab+" von "+u.n+" — "+(f==="heal"?"an wen":"gegen wen"),
                 liste.map(([n,x])=>n+": "+Math.round(x*10)/10).join("\n"));
             }
           }

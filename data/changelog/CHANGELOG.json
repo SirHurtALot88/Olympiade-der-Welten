@@ -2,6 +2,15 @@
   "hinweis": "GENERIERT — nicht von Hand editieren. Quellen: die changelog:-Zeilen in data/bug-reports/triage/*.md und die Eintragsdateien in data/changelog/eintraege/ (abgeloest, aber weiter gelesen: data/changelog/eintraege.json). Neu bauen: npm run changelog:bauen.",
   "eintraege": [
     {
+      "datum": "2026-08-25",
+      "seite": "Spieltag · Battle Arena",
+      "pr": null,
+      "text": "Im Endscreen der Battle Arena zeigt die Spalte „H“ (Heilung) jetzt beim Darüberfahren, wen ein Heiler geheilt hat — genau wie Schaden, Betäubung und KOs das schon zeigten. Vorher stand dort nur eine Summe ohne Adresse.",
+      "quelle": "gepflegt",
+      "gewicht": "feinschliff",
+      "version": "0.5"
+    },
+    {
       "datum": "2026-08-24",
       "seite": "Team · Spieler",
       "pr": null,
