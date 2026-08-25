@@ -525,7 +525,7 @@
         <div class="wertung">
           <div class="wtitel">Wertung <em>laufend</em></div>
           <div class="tbl-wrap"><table class="wtbl"><thead><tr>
-            <th id="wthN">Kämpfer</th><th class="n" id="wth0">Schaden</th><th class="n" id="wth1">Heilung</th><th class="n" id="wth2">Verhindert</th><th class="n" id="wth3">Getankt</th><th class="n" id="wth4">KO</th><th class="n" id="wth5">Leistung</th>
+            <th id="wthN">Kämpfer</th><th class="n" id="wth0">Schaden</th><th class="n" id="wth1">Heilung</th><th class="n" id="wth2">Verhindert</th><th class="n" id="wth3">Getankt</th><th class="n" id="wth4">KO</th><th class="n" id="wth5">Leistung</th><th class="n" id="wth6">–</th>
           </tr></thead><tbody id="wbody"></tbody></table></div>
           <div class="wfuss" id="wfuss">„Getankt" ist der Rohschaden <strong>vor</strong> Abzug der Schadensminderung, „Verhindert" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. <strong>Leistung</strong> vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.</div>
         </div>
@@ -2957,7 +2957,56 @@
   const SPIELDAUER_BASKETBALL=90;   // Chris' Wunsch (25.08.): doppelte Spieldauer (vorher 45s)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
   const KORB_NAH_RADIUS=94;         // Abstand zum Korb, ab dem ein Nahwurf moeglich ist
-  const DREIER_RADIUS=145;          // ... bis hierhin ein Fernwurf, weiter draussen wird nur gepasst
+  const DUNK_RADIUS=42;             // Fable-Fund (Wurfmechanik-Runde, 25.08.): ganz nah dran ist in echtem
+  // Basketball praktisch automatisch — bisher gab es diese Stufe gar nicht, ein Korbleger
+  // aus 90px und ein Dunk aus 20px liefen durch dieselbe "nah"-Formel. Eigene, engere
+  // Reichweite dafuer (s. WURF_BONUS unten fuer den Erfolgs-Bonus).
+  // DREIER_RADIUS MUSS den gezeichneten Bogen treffen (bodenFeldspiel: ctx.arc(korbX,H/2,
+  // H*0.24,...)) — stand vorher bei 145 (freihaendig gewaehlt, nie gegen die Zeichnung
+  // geprueft). Der Bogen liegt bei H*0.24 = 470*0.24 = 112.8px. Nachgemessen (nicht
+  // vermutet): bei 145 zaehlte jeder Wurf zwischen 94 und 145px als Dreier, obwohl der
+  // gezeichnete Bogen schon bei 112.8px endet — ein Wurf von z.B. 100px (innerhalb des
+  // sichtbaren Bogens) gab also 3 Punkte fuer einen sichtbar Zweier-Wurf. Direkt aus H
+  // abgeleitet waere schoener, aber H existiert an dieser Stelle im Skript noch nicht
+  // (const H=cv.width... erst im ARENA-Setup viel weiter unten, TDZ) — deshalb der
+  // ausgerechnete Literalwert, mit Herleitung im Kommentar statt eines zweiten
+  // "145-PLATZHALTER"-Raetsels.
+  const DREIER_RADIUS=112.8;        // = H*0.24 bei H=470 (cv.height, s. ARENA-Setup) — ab hier ein Dreier
+  const FERN_RADIUS_MAX=170;        // aeusserste Distanz fuer einen UNGEZWUNGENEN Dreier (deckt die
+  // Fluegel-/Eckenslots ab, s. SLOTS: radius bis 150) — jenseits davon wird nur per
+  // Schussuhr-Zwang abgeschlossen (entscheideBallaktion, erzwingen-Zweig).
+  // WURF_BONUS: additive Technik-Anpassung je Wurftyp — dieselbe Erfolgsformel wie zuvor
+  // (0,16+TECHNIK*0,0050+TEAMGEIST*0,0060), der Wurftyp wird darin jetzt ein echter Faktor
+  // statt eines separaten Wuerfels. Reihenfolge wie verlangt: Dunk > nah > mit > fern
+  // (Freiwurf liegt darueber, s. schiesseFreiwuerfe, und laeuft NICHT ueber diese Formel,
+  // weil ein Freiwurf ungedeckt ist).
+  // GROESSE DER STUFEN durchgemessen (messe-arena-einfluss.mjs basketball 48), nicht nur
+  // nach Gefuehl gewaehlt — mit einem wichtigen Vorbehalt, den der Bericht ausfuehrlich
+  // traegt: JEDE nicht-null Belegung (0,06/0,01/-0,02/-0,06 genauso wie 0,34/0,05/-0,10/
+  // -0,18) hob die Pp-Abweichung in dieser Session auf etwa 50-65, unabhaengig von der
+  // Spannweite — waehrend WURF_BONUS komplett auf 0 die Abweichung bei ~31 hielt (nahe am
+  // echten 27,3-Ausgangswert). Das ist KEIN einfacher Dosis-Wirkungs-Zusammenhang, den man
+  // durch Verkleinern loesen koennte (nachgemessen: kleiner wurde nicht zuverlaessig
+  // besser). Wahrscheinlichste Ursache (s. Bericht): einflussVon() vergleicht Basis- und
+  // Hebungslauf ueber DENSELBEN Seed und DIESELBE Anzahl `rr()`-Aufrufe pro Tick — jeder
+  // neue bedingte `rr()`-Aufruf, den diese Runde einfuehrt (Foul-Wuerfel in wirf(),
+  // Freiwurf-Wuerfel), verschiebt die Zufallsfolge fuer den Rest der Partie, sobald er in
+  // Basis- und Hebungslauf zu unterschiedlichen Zeitpunkten faellt — ein Messartefakt der
+  // Methode, keine belegte Schieflage zugunsten eines Attributs. Trotzdem NICHT ignoriert:
+  // diese Version haelt sich an der unteren Kante des beobachteten Plateaus, weil ein
+  // groesserer Rahmen (0,52 Spanne) keinen Spielgefuehl-Vorteil zeigte, der die zusaetzliche
+  // Pp-Unsicherheit rechtfertigt.
+  const WURF_BONUS={dunk:0.20, nah:0.03, mit:-0.06, fern:-0.14};
+  // Klassifiziert eine Wurfdistanz in eine der vier Stufen. `erzwingen` haengt den oberen
+  // Deckel (FERN_RADIUS_MAX) aus: ein per Schussuhr erzwungener Verzweiflungswurf aus
+  // Halbfeld-Distanz ist geometrisch trotzdem ein Dreier, kein "kein Wurf".
+  function klassifiziereWurfdistanz(zumKorb,erzwingen){
+    if(zumKorb<DUNK_RADIUS)return "dunk";
+    if(zumKorb<KORB_NAH_RADIUS)return "nah";
+    if(zumKorb<DREIER_RADIUS)return "mit";
+    if(erzwingen||zumKorb<FERN_RADIUS_MAX)return "fern";
+    return null; // ausserhalb jeder Reichweite fuer einen ungezwungenen Wurf
+  }
   const STEAL_REICHWEITE=45;        // wie nah ein Decker sein muss, um es auf einen Steal ankommen zu lassen
   const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
@@ -3007,7 +3056,8 @@
       const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
         eig:basisWert+engP+breitP,...R2,
-        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,x:0,y:0};
+        punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,
+        fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
     FSTEAM.forEach((team,side)=>team.forEach((u,i)=>{
@@ -3126,14 +3176,29 @@
   // e.rebounder (logZug(...,"rebound",{spieler:gewinner})), daher der Fallback unten.
   function fsBisher(){
     const team=[0,0], spieler=new Map();
-    const s=(u)=>{ if(!spieler.has(u.id))spieler.set(u.id,{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0});
+    const s=(u)=>{ if(!spieler.has(u.id))spieler.set(u.id,{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0,fouls:0,feldwuerfe:0,feldwuerfeTreffer:0});
       return spieler.get(u.id); };
     for(const e of fsZuege.slice(0,fsZeiger)){
-      if(e.art==="treffer"){ team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
-        if(e.passgeber)s(e.passgeber).assists++; }
+      if(e.art==="treffer"){
+        team[e.seite]+=e.punkte; s(e.spieler).punkte+=e.punkte;
+        if(e.passgeber)s(e.passgeber).assists++;
+        // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als FG 3/6 im Boxscore"): ein Freiwurf
+        // (e.freiwurf, s. schiesseFreiwuerfe) ist kein Feldwurf-Versuch, zaehlt hier also
+        // NICHT mit — real-basketball-konform (FT% und FG% sind getrennte Statistiken).
+        if(!e.freiwurf){ s(e.spieler).feldwuerfe++; s(e.spieler).feldwuerfeTreffer++; }
+      }
       else if(e.art==="rebound") s(e.rebounder||e.spieler).rebounds++;
-      else if(e.art==="block") s(e.verteidiger).bloecke++;
+      else if(e.art==="block"){ s(e.verteidiger).bloecke++; s(e.spieler).feldwuerfe++; } // geblockter Versuch zaehlt als FGA
+      else if(e.art==="fehlwurf") s(e.spieler).feldwuerfe++;
       else if(e.art==="steal"){ s(e.verteidiger).steals++; s(e.spieler).verluste++; }
+      else if(e.art==="turnover") s(e.spieler).verluste++; // eigener Fehlpass, s. passeAb — kein Steal-Gutschrift fuer einen Verteidiger
+      // Fouls: keine eigene Box-Score-Spalte (die Wertungstabelle hat feste 6 Spalten,
+      // geteilt mit Kampf — s. Bericht, bewusst nicht angefasst), aber fuer Feed/Debug
+      // mitgezaehlt, gleiches Muster wie die anderen Zaehler. Ein gefoulter FEHLWURF (kein
+      // and-eins) hat keinen eigenen "fehlwurf"-Eintrag (der Pfiff ersetzt ihn komplett,
+      // s. loeseFlugAuf) — zaehlt hier trotzdem als FGA, echtem Basketball-Boxscore-Verhalten
+      // entsprechend.
+      else if(e.art==="foul"){ s(e.verteidiger).fouls++; if(!e.undEins)s(e.spieler).feldwuerfe++; }
     }
     return {team,spieler};
   }
@@ -3357,7 +3422,10 @@
     const team=FSTEAM[u.side];
     const korbX=korbXVon(u.side);
     const zumKorb=dist(u,{x:korbX,y:H/2});
-    const nah=zumKorb<KORB_NAH_RADIUS, fern=!nah&&zumKorb<DREIER_RADIUS;
+    // WURFDISTANZ-KLASSIFIZIERUNG (Fable-Fund, Wurfmechanik-Runde): frueher nur ein
+    // nah/fern-Bit, geometrisch nicht am gezeichneten Dreier-Bogen ausgerichtet (s.
+    // DREIER_RADIUS-Herleitung oben). Jetzt vier echte Stufen.
+    const tier=klassifiziereWurfdistanz(zumKorb,false);
     const decker=FSTEAM[1-u.side].find(v=>v.deckt===u)||null;
     const deckerAbstand=decker?dist(u,decker):999;
     const imFastbreak=fsLive.fastbreak&&fsLive.fastbreak.seite===u.side&&fsT<fsLive.fastbreak.bis;
@@ -3365,7 +3433,29 @@
     // ist, senkt die Erfolgschance zusaetzlich — das gab es im Vorab-Modell nicht, weil
     // dort nie ein tatsaechlicher Deckerabstand vorlag. Im Fastbreak (Fables Fund) ist
     // die Verteidigung noch am Zurueckrennen — deutlich weniger Bedraengnis.
-    const bedraengnis=(imFastbreak?0.3:1)*Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
+    // "Defense MUST be relevant" (Chris, woertlich): vorher haengte der Bedraengnis-Malus
+    // NUR am Abstand, nie an der ABWEHR des Deckers selbst — ein 20-ABWEHR- und ein
+    // 90-ABWEHR-Verteidiger druecken auf demselben Abstand denselben Malus. kontestFaktor
+    // skaliert den Malus symmetrisch um ABWEHR=50 (dort exakt 1,0, Pp-neutral im Mittel).
+    // Bewusst gemaessigt gehalten (0,7-1,3 bei ABWEHR 0-100) — genug, um einen starken
+    // Verteidiger im Feed/Log spuerbar zu machen, ohne selbst der groesste Pp-Hebel zu
+    // sein (s. Bericht: dieser Faktor allein war NICHT die Hauptursache der Pp-
+    // Abweichung dieser Runde — das war WURF_BONUS, s. dortigen Kommentar).
+    const kontestFaktor=decker?(0.7+decker.ABWEHR*0.006):1;
+    // bedraengnisGate (OHNE kontestFaktor) entscheidet weiterhin exakt wie vorher, WANN
+    // und OB ueberhaupt geworfen wird (schwelle-Vergleich, Kick-Out) — das war schon vor
+    // dieser Runde ein empfindlicher Kopplungspunkt (Opus-Review-2-Fund oben: ein
+    // scheinbar harmloser Assist-Bonus an genau dieser Stelle sprang Pp-technisch von
+    // 36,6 auf 50,6). Durchgemessen (s. Bericht): kontestFaktor UND WURF_BONUS direkt in
+    // diese Vergleichs-Kette gehaengt, machte die Pp-Abweichung nicht nur groesser,
+    // sondern nicht-monoton (kleinere Werte ergaben teils SCHLECHTERE Messungen als
+    // groessere) — ein Zeichen, dass hier ein Auswahl-Kaskadeneffekt greift, keine
+    // einfache Verstaerkung. bedraengnisMake (MIT kontestFaktor) wirkt deshalb nur noch
+    // auf die tatsaechliche Trefferchance (der `technik`-Wert, der an wirf() geht),
+    // nicht auf die Auswahl selbst — "ob/wann geworfen wird" bleibt unveraendert wie vor
+    // dieser Wurfmechanik-Runde, nur "trifft er" haengt jetzt zusaetzlich an ABWEHR.
+    const bedraengnisGate=(imFastbreak?0.3:1)*Math.max(0,(BEDRAENGT_RADIUS-deckerAbstand)/BEDRAENGT_RADIUS)*0.18; // PLATZHALTER
+    const bedraengnisMake=bedraengnisGate*kontestFaktor;
     // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
     // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
     // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
@@ -3373,7 +3463,7 @@
     // entstanden dadurch faktisch nur noch beim Alley-Oop).
     const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
 
-    if(nah||fern){
+    if(tier){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
       // mechanischste Moment der Engine (Fables Fund). Die Wurfqualitaet (dieselbe
       // Erfolgsformel wie zuvor) muss eine mit der Zeit IN Wurfreichweite sinkende
@@ -3393,17 +3483,23 @@
       // Deckel, wo Attributzuwaechse sich nicht mehr auszahlen (Saettigung), waehrend
       // Attribute ohne Deckel-Beruehrung (power/speed/stamina) ihren Anteil relativ dazu
       // vergroessern. Bewusst NICHT eingebaut — Deckel bleibt bei 0,92, kein Assist-Term.
-      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
-        -(fern?0.10:0)-bedraengnis+(imFastbreak?0.12:0));
+      // technikGate (unveraendert gegenueber vor dieser Runde, s. Kommentar bei
+      // bedraengnisGate oben) entscheidet ob/wann geworfen wird. WURF_BONUS UND die
+      // ABWEHR-Skalierung von bedraengnis fliessen erst in technikMake ein — das ist der
+      // Wert, der tatsaechlich an wirf() geht und die Trefferchance bestimmt.
+      const technikGate=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
+        -bedraengnisGate+(imFastbreak?0.12:0));
+      const technikMake=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060
+        +WURF_BONUS[tier]-bedraengnisMake+(imFastbreak?0.12:0));
       const schwelle=erzwingen?-1:Math.max(0.05,
         0.42-((fsT-u.rangeSeit)/4)*0.30-(u.ABSCHLUSS-50)*0.0010); // PLATZHALTER: 4s Abbauzeit
-      if(technik>schwelle){
-        wirf(u,u,art,fern,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
+      if(technikGate>schwelle){
+        wirf(u,u,art,tier,technikMake,moeglicherAssist,null,bedraengnisGate>0?decker:null);
         return;
       }
       // Der Wurf lohnt sich (noch) nicht: bedraengt UND ein Mitspieler steht offener da
       // -> Kick-Out statt stur weiterzudribbeln bis zur Schussuhr-Zwangsloesung.
-      if(bedraengnis>0&&team.length>1){
+      if(bedraengnisGate>0&&team.length>1){
         const mitspieler=team.filter(x=>x!==u);
         passeAb(u,offensterMitspieler(mitspieler,u));
         return;
@@ -3415,11 +3511,16 @@
       // ausserhalb der Reichweite — kein return hier mehr.
     } else if(erzwingen){
       // Opus-Review-Fund #4: dieser Zwangswurf ging als Fernwurf durch (`punkteFern`,
-      // 3 Punkte), die Erfolgsformel liess den ueblichen Fernwurf-Abzug (-0,10) aber weg
-      // — ein Verzweiflungswurf jenseits der Dreierlinie traf so oft wie ein Korbleger,
-      // fuer einen Punkt mehr. Jetzt derselbe Abzug wie im nah||fern-Zweig.
-      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060-0.10-bedraengnis);
-      wirf(u,u,art,true,technik,moeglicherAssist,null,bedraengnis>0?decker:null);
+      // 3 Punkte), die Erfolgsformel liess den ueblichen Fernwurf-Abzug aber weg — ein
+      // Verzweiflungswurf jenseits der Dreierlinie traf so oft wie ein Korbleger, fuer
+      // einen Punkt mehr. Jetzt klassifiziert nach der ECHTEN Distanz (kann bei einem
+      // erzwungenen Wurf aus der Zone durchaus "nah"/"mit" sein, nicht automatisch Dreier).
+      const tierErz=klassifiziereWurfdistanz(zumKorb,true);
+      // Kein Gate/Schwelle in diesem Zweig (erzwingen wirft immer) — kein Auswahl-
+      // Kaskadenrisiko, WURF_BONUS+bedraengnisMake koennen hier direkt in die
+      // Erfolgsformel.
+      const technik=Math.min(0.92,0.16+u.TECHNIK*0.0050+u.TEAMGEIST*0.0060+WURF_BONUS[tierErz]-bedraengnisMake);
+      wirf(u,u,art,tierErz,technik,moeglicherAssist,null,bedraengnisMake>0?decker:null);
       return;
     }
     if(team.length>1){
@@ -3452,7 +3553,10 @@
             // reinen Wuerfelwurfs.
             const kandidat=gewichtetesLosNach(mitspieler,m=>Math.max(1,m[sz.rolle])*(m.rollBis>fsT?3:1));
             if(rr()<sz.neigung(u,kandidat)){
-              wirf(u,kandidat,art,false,sz.abschluss(u,kandidat),u,key,null);
+              // Spielzuege (Alley-Oop) sind Korb-Finishes — thematisch ein Dunk, mit einer
+              // eigenstaendigen Erfolgsformel (sz.abschluss), die WURF_BONUS bewusst nicht
+              // nochmal draufaddiert (kein blockKandidat -> kein Foul-Wurf hier).
+              wirf(u,kandidat,art,"dunk",sz.abschluss(u,kandidat),u,key,null);
               return;
             }
           }
@@ -3486,16 +3590,73 @@
   // `von` ist, wer den Ball gerade loslaesst (Position, aus der der Flug startet);
   // `schuetze` ist, wem der Wurf gehoert — beim Alley-Oop nicht dieselbe Person, der
   // Ball fliegt direkt zum Korb, der Finisher wird ihn nie kontrollieren.
-  function wirf(von,schuetze,art,fern,technik,passgeber,zug,blockKandidat){
+  function wirf(von,schuetze,art,tier,technik,passgeber,zug,blockKandidat){
     von.hatBall=false; fsLive.ball.traeger=null;
     von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
+    // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als % oder FG 3/6 im Boxscore zeigen"):
+    // jeder wirf()-Aufruf IST ein Feldwurf-Versuch (Freiwuerfe laufen nie durch wirf(),
+    // s. schiesseFreiwuerfe) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
+    // sobald flug.treffer bekannt ist.
+    schuetze.feldwuerfe++;
     const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
+    const fern=tier==="fern";
+    // Nur fuer die Wurfmechanik-Abnahme (s. fsZuege()-Debughook): die tatsaechliche
+    // Distanz zum Korb IM Abwurfmoment, damit sich die Tier-Klassifizierung nachtraeglich
+    // gegen die echte Geometrie pruefen laesst, ohne die Spiellogik selbst zu beeinflussen.
+    const zumKorbBeiWurf=Math.round(dist(schuetze,{x:korbXVon(schuetze.side),y:H/2}));
+    // Nur fuer die Fastbreak-Abnahme (Chris' Nachfrage: "produziert ein Tempo-Unterschied
+    // WIRKLICH einen Fastbreak-Vorteil, oder trudelt nur die Animation schneller"): Stand
+    // des eigenen Deckers IM Abwurfmoment — wie weit weg, ob gerade ein Fastbreak laeuft.
+    const deckerBeiWurf=FSTEAM[1-schuetze.side].find(v=>v.deckt===schuetze)||null;
+    const deckerAbstandBeiWurf=deckerBeiWurf?Math.round(dist(schuetze,deckerBeiWurf)):null;
+    const deckerLauftempoBeiWurf=deckerBeiWurf?deckerBeiWurf.LAUFTEMPO:null;
+    const imFastbreakBeiWurf=!!(fsLive.fastbreak&&fsLive.fastbreak.seite===schuetze.side&&fsT<fsLive.fastbreak.bis);
+    // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
+    // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
+    // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
+    // nach Wurftyp (naeher am Korb = mehr Koerperkontakt, wie in echtem Basketball), aber
+    // skaliert INVERS mit der ABWEHR des Deckers: "defense MUST be relevant" heisst hier
+    // auch, ein guter Verteidiger foult SELTENER, nicht mehr — derselbe Regler wie beim
+    // Block (blockChance, s. loeseFlugAuf), nur mit umgekehrtem Vorzeichen. Gewuerfelt hier
+    // beim Abwurf (deterministisch), aufgeloest in loeseFlugAuf, exakt das Muster von
+    // `treffer`/`abgefangenVon` im Rest der Engine.
+    const foulBasis=(tier==="dunk"||tier==="nah")?0.16:tier==="mit"?0.10:0.05;
+    const foulChance=blockKandidat?Math.max(0.02,foulBasis-(blockKandidat.ABWEHR-50)*0.0016):0;
+    const foul=blockKandidat?rr()<foulChance:false;
     fsLive.ball.flug={
       von:{x:von.x,y:von.y}, nach:{x:korbXVon(schuetze.side),y:H/2},
       art:zug?"alley":"wurf", t:0, dauer:zug?0.55:0.45, // PLATZHALTER
-      treffer, fern, punkte:fern?art.punkteFern:art.punkteNah,
+      treffer, tier, fern, punkte:fern?art.punkteFern:art.punkteNah, foul, zumKorbBeiWurf,
+      deckerAbstandBeiWurf, deckerLauftempoBeiWurf, imFastbreakBeiWurf,
       schuetze, passgeber, zug, ziel:schuetze, blockKandidat
     };
+  }
+
+  // FREIWURF: hohe, NUR LEICHT attributabhaengige Trefferquote — ein Freiwurf ist
+  // ungedeckt, Bedraengnis/ABWEHR spielen bewusst keine Rolle, nur ein kleiner Ausschlag
+  // ueber die eigene ABSCHLUSS. Basis 90 % (hoeher als der reale NBA-Schnitt von ~78 % —
+  // bewusst, weil die Anfrage Freiwurf explizit VOR Dunk in der Reihenfolge verlangt, und
+  // Dunk hier bei ~90 % Trefferquote lag, s. Bericht). Koeffizient klein gehalten (0,0006
+  // statt eines ersten, staerkeren 0,0014-Versuchs) — ABSCHLUSS (dexterity/power/speed)
+  // war in der Basismessung schon das am staerksten ueberschiessende Attribut (+9,0 Pp),
+  // ein Freiwurf sollte das nicht zusaetzlich verstaerken.
+  function schiesseFreiwuerfe(schuetze,anzahl){
+    let gemacht=0;
+    for(let i=0;i<anzahl;i++){
+      const chance=Math.min(0.96,Math.max(0.80,0.90+(schuetze.ABSCHLUSS-50)*0.0006));
+      const treffer=rr()<chance;
+      if(treffer){
+        gemacht++; schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
+        logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:null,punkte:1,zug:null,freiwurf:true});
+      }
+      // Debug-only fuer die Wurfmechanik-Abnahme (s. fsZuege()-Hook) — auch der Fehlversuch
+      // wird protokolliert, damit sich die tatsaechliche Freiwurfquote nachmessen laesst;
+      // fsBisher()/die UI kennen den Art-Namen "freiwurf_versuch" nicht und ignorieren ihn.
+      logZug(schuetze.side,"freiwurf_versuch",{spieler:schuetze,treffer});
+      schuetze.freiwuerfe++;
+      if(treffer)schuetze.freiwurfTreffer++;
+    }
+    return gemacht;
   }
 
   // Kuerzester Abstand eines Punkts zur STRECKE a-b (nicht zur unendlichen Geraden) —
@@ -3527,9 +3688,17 @@
         0.04+(waechter.ABWEHR-50)*0.0025+(PASSLINIE_RADIUS-minD)/PASSLINIE_RADIUS*0.12)); // PLATZHALTER
       if(rr()<chance)abgefangenVon=waechter;
     }
+    // EIGENER FEHLPASS (Chris' Fund: "Turnovers... nicht nur ueber Steals"): ein
+    // Ballverlust OHNE dass ein Verteidiger etwas dafuer tut — der reale Basketball-
+    // Turnover-Anteil (schlechter Pass, ins Aus, verlorenes Gleichgewicht), der bisher
+    // komplett fehlte, weil das einzige Verlust-Ereignis eine Interception war. Skaliert
+    // invers mit AUFBAU (schwache Ballfuehrer werfen den Ball auch ungedeckt mal weg) —
+    // klein gehalten (Deckel 2-5 %), damit es ein seltenes, glaubwuerdiges Ereignis
+    // bleibt, kein staendiges Rauschen.
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0006);
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
-      abgefangenVon};
+      abgefangenVon,eigenerFehler};
   }
 
   // Steal-Versuch des Deckers — unabhaengig von der Ballfuehrer-Entscheidung, der
@@ -3586,6 +3755,18 @@
         startFastbreak(f.side);
         return;
       }
+      if(flug.eigenerFehler){
+        flug.passgeber.verluste++;
+        feed(flug.passgeber.side,flug.passgeber.n+" verliert den Ball — Fehlpass.");
+        logZug(flug.passgeber.side,"turnover",{spieler:flug.passgeber});
+        if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.4);
+        // Loser Ball statt sofortigem Ballwechsel — laeuft ueber dieselbe Rebound-Kampf-
+        // Logik wie ein Fehlwurf (s. stepBasketballLive), inklusive Fastbreak fuers Team,
+        // das ihn aufsammelt.
+        fsLive.ball.frei={x:flug.nach.x,y:flug.nach.y,vonSeite:flug.passgeber.side};
+        fsAktuell={spieler:null,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+        return;
+      }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
       // Merkt sich den Passgeber fuer GENAU die naechste Ballaktions-Entscheidung des
@@ -3600,22 +3781,51 @@
     const szDef=flug.zug?art.spielzuege[flug.zug]:null;
     if(flug.treffer){
       schuetze.punkte+=flug.punkte; fsPunkte[schuetze.side]+=flug.punkte;
+      schuetze.feldwuerfeTreffer++;
       if(flug.passgeber)flug.passgeber.assists++;
       const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
-                       : schuetze.n+" trifft"+(flug.fern?" von weit draußen":"")+" — +"+flug.punkte+".";
+                       : schuetze.n+" trifft"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" mit einem Dunk":"")+" — +"+flug.punkte+".";
       feed(schuetze.side,txt,true);
-      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug});
+      logZug(schuetze.side,"treffer",{spieler:schuetze,passgeber:flug.passgeber,punkte:flug.punkte,zug:flug.zug,
+        tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
+        deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf});
       if(feldspielDisc==="basketball"){bkSfx("korb_treffer.mp3",0.65);bkSfx("publikum_jubel.mp3",0.35);}
       const gross=!!(szDef&&(szDef.jubel==="gross"||szDef.jubel==="riesig"));
       schwebe({x:0,y:0,txt:(szDef?szDef.label.toUpperCase()+" ":"")+"+"+flug.punkte,
         life:gross?1.7:1,crit:true,_spieler:schuetze.id,_gross:gross});
       fsAktuell={spieler:schuetze,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
+      // AND-ONE: der Verteidiger foult trotz Treffer — ein Zusatz-Freiwurf. blockKandidat
+      // ist hier immer derselbe Decker, der sonst ueber blockChance haette blocken koennen
+      // (Foul und Block schliessen sich gegenseitig aus, s. `foul`-Wuerfel in `wirf`).
+      if(flug.foul&&flug.blockKandidat){
+        const verteidiger=flug.blockKandidat;
+        verteidiger.fouls++;
+        logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,undEins:true});
+        feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Treffer — und eins!");
+        const ftGemacht=schiesseFreiwuerfe(schuetze,1);
+        feed(schuetze.side,schuetze.n+(ftGemacht?" verwandelt":" verfehlt")+" den Zusatz-Freiwurf.");
+      }
       // Opus-Review-Fund #10: die fruehere "Einwurf-Pause" (fsLive.einwurfBis) sperrte nur
       // entscheideBallaktion — Bewegung, Schussuhr und Steal liefen waehrenddessen
       // unveraendert weiter (Ballfuehrer dribbelte in der "Pause" weiter, Verteidigung
       // sprintete weiter, ein Steal blieb moeglich). Ersatzlos gestrichen: der Fastbreak-
       // Kontrast entsteht jetzt allein aus dem Tempo-Unterschied (s. bewegeSpielerLive),
       // nicht aus einer halb wirksamen Pause.
+      naechsterAngriff(1-schuetze.side);
+    } else if(flug.foul&&flug.blockKandidat){
+      // SHOOTING FOUL: ersetzt Block/Fehlwurf komplett — ein Pfiff unterbricht den
+      // Rebound-Kampf, es gibt Freiwuerfe statt eines freien Balls. 2 fuer einen gefoulten
+      // Zweier (dunk/nah/mit), 3 fuer einen gefoulten Dreier — die vom Wurftyp geforderte
+      // Teilmenge (kein 1-und-1/Bonus-Regelwerk, s. Bericht: bewusst nicht gebaut).
+      const verteidiger=flug.blockKandidat;
+      verteidiger.fouls++;
+      const anzahl=flug.tier==="fern"?3:2;
+      logZug(verteidiger.side,"foul",{verteidiger,spieler:schuetze,anzahl});
+      feed(schuetze.side,verteidiger.n+" foult "+schuetze.n+" beim Wurf — "+anzahl+" Freiwürfe.");
+      if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
+      const gemacht=schiesseFreiwuerfe(schuetze,anzahl);
+      feed(schuetze.side,schuetze.n+" verwandelt "+gemacht+" von "+anzahl+" Freiwürfen.");
+      fsAktuell={spieler:schuetze,verteidiger,passgeber:flug.passgeber,rebounder:null};
       naechsterAngriff(1-schuetze.side);
     } else {
       const vor=szDef?szDef.label+"-Versuch: ":"";
@@ -3632,15 +3842,16 @@
         logZug(flug.blockKandidat.side,"block",{verteidiger:flug.blockKandidat,spieler:schuetze});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       } else {
-        feed(schuetze.side,vor+schuetze.n+" verfehlt"+(flug.fern?" von weit draußen":"")+".");
-        logZug(schuetze.side,"fehlwurf",{spieler:schuetze});
+        feed(schuetze.side,vor+schuetze.n+" verfehlt"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" den Dunk":"")+".");
+        logZug(schuetze.side,"fehlwurf",{spieler:schuetze,tier:flug.tier,zumKorbBeiWurf:flug.zumKorbBeiWurf,
+          deckerAbstandBeiWurf:flug.deckerAbstandBeiWurf,deckerLauftempoBeiWurf:flug.deckerLauftempoBeiWurf,imFastbreakBeiWurf:flug.imFastbreakBeiWurf});
         if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.4);
       }
       fsAktuell={spieler:null,verteidiger:flug.blockKandidat,passgeber:flug.passgeber,rebounder:null};
       // REBOUND-STREUUNG: vorher landete jeder Fehlwurf exakt auf dem Ringpunkt — jeder
       // Rebound-Kampf am selben Fleck, kein kurzer/langer Abpraller. Fernwuerfe prallen
       // weiter ab (auch physikalisch plausibel). Zwei rr()-Wuerfe, deterministisch.
-      const scatterR=10+rr()*(flug.fern?70:40); // PLATZHALTER
+      const scatterR=10+rr()*(flug.fern?70:flug.tier==="dunk"?15:40); // PLATZHALTER
       const winkel=rr()*Math.PI*2;
       fsLive.ball.frei={x:flug.nach.x+Math.cos(winkel)*scatterR,
         y:flug.nach.y+Math.sin(winkel)*scatterR,vonSeite:schuetze.side};
@@ -3805,9 +4016,56 @@
       // 0,3 -> 23,2 Pp, 0,15 -> 18,7 Pp (gewaehlt, liegt UNTER dem alten 32,5-Pp-Stand vor
       // dieser ganzen Dynamik-Runde). PLATZHALTER, kein Endwert, nicht weiter unterhalb
       // 0,15 durchprobiert.
-      // Basistempo 140->230 (Volumen-Hebel, s. oben) — LAUFTEMPO-Koeffizient (0,15)
-      // unveraendert, durchgemessen Pp-neutral.
-      const tempoPx=(230+u.LAUFTEMPO*0.15)*tempoMul*(u.hatBall?dribbelFaktor:1);
+      // SPEED-SICHTBARKEIT (Fable-Recherche, 25.08., s. Bericht): der lineare 0,15-
+      // Koeffizient oben war bewusst konservativ (18,7 Pp, s. Kommentarblock) — Chris hat
+      // diese Session live gesagt, dass ihm sichtbarer Tempo-Unterschied jetzt WICHTIGER
+      // ist als die alte 32,5-Pp-Deckelung, und ausdruecklich verlangt, das nicht einfach
+      // hochzudrehen, sondern erst zu recherchieren (WebSearch, s. Bericht fuer Quellen).
+      // Recherche-Befund: Diminishing-Returns-Kurven sind das Standardmuster gegen "ein
+      // Attribut dominiert alles" (TvTropes "Diminishing Returns for Balance"; Madden NFL
+      // begrenzt sein SPEED-Attribut selbst auf ~51-99 statt 0-99, Ratio 1,94x, damit jeder
+      // Punkt spuerbar bleibt, ohne dass Extremwerte den Ratio sprengen).
+      // ERSTER VERSUCH (VERWORFEN, hier dokumentiert statt stillschweigend entfernt): eine
+      // Wurzelkurve sign(delta)*sqrt(|delta|)*K um LAUFTEMPO=50. Durchgemessen (messe-
+      // arena-einfluss.mjs basketball 48): K=5 -> 55,1 Pp, K=3 (KLEINER!) -> 88,9 Pp,
+      // reproduzierbar (zweimal exakt identisch: dexterity 28 %, awareness 23,7 %,
+      // charisma 23,1 %, spirit UND stamina auf 0 %). Nicht-monoton UND destabilisierend
+      // Attribute, die mit Bewegung gar nichts zu tun haben (charisma) — das ist kein
+      // Mess-Rauschen (deterministisch reproduziert), sondern ein echtes Strukturproblem:
+      // dexterity steckt gleichzeitig in LAUFTEMPO (20%), ABSCHLUSS (40%) und TECHNIK
+      // (25%) — die Kurve verschiebt, WER zuerst am Rebound/Ball/Slot ist (lauter
+      // Alles-oder-nichts-Entscheidungen), und das kippt bei jedem Koeffizienten anders,
+      // je nachdem welche Wettrennen dadurch knapp die Seite wechseln. Eine Kurvenform,
+      // die in genau diesem Punkt nicht messbar stabil ist, ist fuer eine Balance-Aenderung
+      // ungeeignet, egal wie gut sie in der Theorie klingt — deshalb verworfen, nicht nur
+      // kleiner gedreht (s. Chris' eigene Vorgabe dazu).
+      // GEWAEHLTER ANSATZ: in der nachweislich MONOTONEN linearen Familie bleiben (1,4/0,6/
+      // 0,3/0,15 s.o. verhielten sich auf dem ALTEN Codestand sauber monoton), UND den
+      // groesseren Teil der sichtbaren Wirkung in eine rein kosmetische Schicht verlegen,
+      // die gar nicht erst in tempoPx einfliesst (Bewegungs-Schweif in zeichneFeldspiel,
+      // liest u.vx/u.vy und u.LAUFTEMPO, schreibt nichts zurueck — exakt die zweite von
+      // Chris genannte Option: visuelle Geschwindigkeit von der Positions-Geschwindigkeit
+      // trennen; dort auch der Fund, WARUM das noetig ist, s. Kommentar dort).
+      // KOEFFIZIENT DURCHGEMESSEN auf dem VOLLEN Endstand dieser Session (Wurfmechanik +
+      // Fouls/Freiwurf + Kontest + Fehlpaesse + 90s Spieldauer, nicht mehr der alte 45s-
+      // Stand): 0,35 -> 34,2 Pp, 0,70 -> 26,0 Pp (unter dem 27,3-Ausgangswert!), 1,4 -> 53,9
+      // Pp (die historisch "gefaehrliche" Marke bestaetigt sich auch hier, aber bei einer
+      // hoeheren Schwelle als auf dem alten Codestand). NICHT monoton im Sinne von "je
+      // hoeher der Koeffizient, desto schlechter" — 0,70 schneidet besser ab als sowohl
+      // 0,35 als auch 1,4 — ein weiteres Beispiel fuer die in dieser Runde wiederholt
+      // beobachtete Nicht-Linearitaet der Messung (s. WURF_BONUS-Kommentar), deshalb 0,70
+      // empirisch statt rechnerisch gewaehlt, nicht extrapoliert.
+      // GRENZE DIESES ANSATZES (Playwright-Livemessung, s. Bericht): Spitzengeschwindigkeit
+      // ueber 30s echte Spielzeit korrelierte bei 0,35 praktisch GAR NICHT mit LAUFTEMPO
+      // (schnellster Spieler HINTER mehreren langsameren) — situative tempoMul-Werte
+      // (Fastbreak 1,3x, Deckungsvorsprung 1,15x, Screen-Bremse 0,35x) schwanken staerker
+      // als der ganze LAUFTEMPO-Koeffizient und ueberdecken ihn in einer EINZELNEN kurzen
+      // Beobachtung. Bei 0,70 etwas deutlicher (Verhaeltnis schnellster/langsamster
+      // Spitzenwert 1,13x statt 1,03x), aber immer noch von Situation dominiert. Der
+      // Bewegungs-Schweif (s.u.) traegt deshalb bewusst einen ZWEITEN, situationsunab-
+      // haengigen LAUFTEMPO-Faktor, nicht nur die Momentangeschwindigkeit — das macht das
+      // ATTRIBUT selbst sichtbar, nicht nur den gerade aktiven Bonus/Malus.
+      const tempoPx=(230+(u.LAUFTEMPO-50)*0.70)*tempoMul*(u.hatBall?dribbelFaktor:1);
       const dx=zx-u.x, dy=zy-u.y, distZiel=Math.hypot(dx,dy);
       const schritt=Math.min(distZiel,tempoPx*dt);
       // Opus-Review-Fund #12: `u.vx=dx` schrieb die RESTDISTANZ zum Ziel, nicht die
@@ -4254,6 +4512,38 @@
         // getroffene BAU-Looks wieder verwaschen).
         ctx.strokeStyle=c;ctx.globalAlpha=aktiv?0.55:0.28;ctx.lineWidth=aktiv?2:1.5;
         ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
+        // SPEED-SICHTBARKEIT, kosmetischer Teil (s. Bericht/Kommentar bei `tempoPx` in
+        // bewegeSpielerLive): ein kurzer Bewegungs-Schweif macht den Tempo-Unterschied
+        // fuer das Auge sichtbar, OHNE irgendetwas an der tatsaechlichen Bewegung zu
+        // aendern — liest nur u.vx/u.vy (der schon berechnete Weg-pro-Tick) und u.LAUFTEMPO,
+        // schreibt nichts zurueck, also per Konstruktion Pp-neutral. Nur Basketball: die
+        // anderen Feldspiel-Disziplinen laufen weiter ueber fsLerpPositionen (Vorab-
+        // Durchlauf ohne echtes vx/vy), bewusst nicht angefasst.
+        //
+        // Fable-Fund (Playwright-Geschwindigkeitsmessung, s. Bericht): die reine
+        // Momentangeschwindigkeit (hypot(vx,vy)) haengt weit staerker an SITUATIVEN
+        // tempoMul-Werten (Fastbreak 1,3x, Deckungs-Vorsprung 1,15x, Screen-Bremse 0,35x —
+        // alles GROESSERE Ausschlaege als der ganze LAUFTEMPO-Koeffizient) als an
+        // LAUFTEMPO selbst — gemessen ueber 30s echte Spielzeit lag der schnellste Spieler
+        // (LAUFTEMPO 87) beim Spitzentempo HINTER mehreren deutlich langsameren (LAUFTEMPO
+        // 10, 19, 29), weil die Situation den Ausschlag dominierte, nicht das Attribut.
+        // Ein reiner Momentan-Schweif haette also genau denselben blinden Fleck geerbt.
+        // sichtbarkeitsFaktor macht LAUFTEMPO selbst zu einem zweiten, situationsunab-
+        // haengigen Multiplikator auf den Schweif — ein schneller Spieler zieht IMMER,
+        // wenn er sich ueberhaupt bewegt, einen laengeren/kraeftigeren Schweif als ein
+        // langsamer in derselben Situation, auch wenn beide gerade z.B. im selben
+        // Fastbreak-Bonus stecken.
+        if(feldspielDisc==="basketball"){
+          const tempoJetzt=Math.hypot(u.vx||0,u.vy||0);
+          const sichtbarkeitsFaktor=0.55+u.LAUFTEMPO*0.011; // LAUFTEMPO 0->0.55, 50->1.1, 100->1.65
+          if(tempoJetzt>2){
+            const laenge=Math.min(32,tempoJetzt*0.9*sichtbarkeitsFaktor);
+            const rx=-(u.vx/tempoJetzt), ry=-(u.vy/tempoJetzt);
+            ctx.strokeStyle=c; ctx.globalAlpha=Math.min(0.55,tempoJetzt*0.015*sichtbarkeitsFaktor); ctx.lineWidth=3;
+            ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+rx*laenge,y+ry*laenge); ctx.stroke();
+            ctx.globalAlpha=1;
+          }
+        }
         zeichneSprite(ctx,u,x,y,true);
         if(FS_DEBUG_ZIELE&&u._zielHomeX!=null){
           ctx.fillStyle=c;ctx.globalAlpha=0.9;
@@ -6992,6 +7282,9 @@
         td.style.fontWeight=l>=140||l<=60?"600":"400";}
       td.title="Beitrag gemessen an dem, was der Einsatzwert erwarten lässt";
       tr.appendChild(td);
+      // 7. Spalte existiert nur fuers Feldspiel (FG-Quote, s. renderWertungFeldspiel) —
+      // hier ein leerer Platzhalter, damit Kopf- und Zeilen-Spaltenzahl uebereinstimmen.
+      tr.appendChild(el("td","n","–"));
       tb.appendChild(tr);
     }
   }
@@ -7004,8 +7297,8 @@
   // (wirf/versucheSteal/loeseFlugAuf) — es fehlte nur die Anzeige. Header-Beschriftung
   // wird in setWertungKopf() passend zur Disziplin umgeschaltet.
   const WERTUNG_KOPF={
-    kampf:["Schaden","Heilung","Verhindert","Getankt","KO","Leistung"],
-    feldspiel:["Punkte","Rebounds","Assists","Steals","Blocks","Verluste"]};
+    kampf:["Schaden","Heilung","Verhindert","Getankt","KO","Leistung","–"],
+    feldspiel:["Punkte","Rebounds","Assists","Steals","Blocks","Verluste","FG"]};
   function setWertungKopf(feldspiel){
     const kopf=feldspiel?WERTUNG_KOPF.feldspiel:WERTUNG_KOPF.kampf;
     for(let i=0;i<kopf.length;i++){
@@ -7013,7 +7306,7 @@
     }
     const fuss=document.getElementById("wfuss");
     if(fuss)fuss.textContent=feldspiel
-      ? "„Verluste\" sind Ballverluste — abgefangene Pässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf."
+      ? "„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit)."
       : "„Getankt\" ist der Rohschaden vor Abzug der Schadensminderung, „Verhindert\" der Teil davon, den seine eigene Verteidigung weggenommen hat — er zählt genauso viel wie geheilte Punkte. Leistung vergleicht den Beitrag mit dem, was der Einsatzwert erwarten lässt: 100 % heißt wie erwartet.";
   }
   function renderWertungFeldspiel(){
@@ -7025,7 +7318,7 @@
     // also dieselben Werte wie ein Direktzugriff — kostet hier nichts.
     const alle=[...FSTEAM[0],...FSTEAM[1]];
     const bisher=fsBisher().spieler;
-    const s=(u)=>bisher.get(u.id)||{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0};
+    const s=(u)=>bisher.get(u.id)||{punkte:0,assists:0,rebounds:0,steals:0,bloecke:0,verluste:0,feldwuerfe:0,feldwuerfeTreffer:0};
     const reihen=[...alle].sort((a,b)=>s(b).punkte-s(a).punkte||s(b).assists-s(a).assists);
     const maxP=Math.max(1,...alle.map(u=>s(u).punkte));
     tb.textContent="";
@@ -7040,6 +7333,12 @@
       tr.appendChild(c(st.steals,99));
       tr.appendChild(c(st.bloecke,99));
       tr.appendChild(c(st.verluste,99));
+      // FG-SPALTE (Chris' Fund): Feldwurf-Treffer/Versuche, nicht nur Punkte — "FG 3/6"
+      // liest sich sofort als Trefferquote, waehrend eine reine Prozentzahl bei kleinen
+      // Versuchszahlen (ein 1/1-Spiel = 100 %) irrefuehrend waere. "—" ohne jeden Versuch.
+      const fg=el("td","n");
+      fg.textContent=st.feldwuerfe?st.feldwuerfeTreffer+"/"+st.feldwuerfe:"—";
+      tr.appendChild(fg);
       tb.appendChild(tr);
     }
   }
@@ -9219,6 +9518,11 @@
     },
     setDisc:(d)=>{ disc=d; reset(); },
     debugZiele:(an)=>{ FS_DEBUG_ZIELE=!!an; },
+    // Nur fuer die Wurfmechanik-Abnahme (Fable, 25.08.): rohes Ereignisprotokoll der
+    // Basketball-Live-Engine, dieselbe Quelle wie fsBisher(). Read-only, wie kader()/
+    // einheiten() daneben.
+    fsZuege:()=>fsZuege,
+    fsSpielerPos:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,x:u.x,y:u.y,LAUFTEMPO:u.LAUFTEMPO})),
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
