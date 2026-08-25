@@ -498,6 +498,9 @@
         <button class="btn" id="play">Kampf starten</button>
         <button class="btn g" id="reset">Zurücksetzen</button>
         <button class="btn g" id="spd">Tempo 1×</button>
+        <button class="btn g" id="ton" title="Ton an/aus" aria-pressed="false">🔊 Ton</button>
+        <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
+          style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">
       </div>
       <div class="untenraum">
         <div class="feed" id="feed"></div>
@@ -2830,6 +2833,10 @@
   // Team-Timer der Live-Engine, gebuendelt statt einzelner Globals, damit sichern()/
   // zurueck() (MOTOREN.basketball) sie mit einer Zeile mitnehmen koennen.
   let fsLive=null;
+  // Debug-Anzeige der rollenbasierten Ziel-Position VOR der Separation (s.
+  // bewegeSpielerLive), nur ueber window.__arena.debugZiele(true) einschaltbar — im
+  // normalen Spiel unsichtbar, dient nur der Spacing-Abnahme/Feinjustage.
+  let FS_DEBUG_ZIELE=false;
 
   // GEWICHTETE ZUFALLSAUSWAHL STATT "IMMER DER BESTE". Frueher waehlte die Simulation
   // fuer Verteidigung/Rebound reduce()-artig IMMER den staerksten Spieler des Teams —
@@ -3038,13 +3045,26 @@
   // ECHTE Zielabstand in px; die X-Komponente wird so berechnet, dass hypot(x,y) genau
   // diesen Wert trifft (s. bewegeSpielerLive). Sechs statt fuenf Slots — bei `jeSeite:6`
   // bekamen sonst zwei Spieler denselben Slot (Opus-Fund #7b).
+  // Fable-Fund (Playwright-Sichttest, 25.08.): alle sechs Ziele lagen bei den obigen
+  // Werten deutlich UNTER dem Dreier-Radius (145) und dazu eng beieinander (Slot 2/4
+  // beispielsweise nur 27px seitlich versetzt) — mit den Verteidigern, die sich (in
+  // zuordneDeckung/bewegeSpielerLive, unveraendert) auf ihren Angreifer draufsetzen,
+  // stand die gesamte Zwoelfergruppe sichtbar auf einem Fleck naeh am Korb, egal wie die
+  // Possession lief (per diagPositionen nachgemessen, s. Kommentar am Aufruf).
+  // Reine Zielkorrektur, keine Mechanik angefasst: die WINKEL/RADIEN sind jetzt näher an
+  // echten Spacing-Rollen (Ecke naeh der Grundlinie -> kuerzerer Radius als der Fluegel,
+  // genau wie beim echten Corner-Three; Fluegel nah an der Dreierlinie statt deutlich
+  // davor). `seitlich` reicht bis 1,45 (statt 1,3) und damit deutlich naeher an die
+  // Grundlinie, ohne den Court zu verlassen (max. y-Versatz 130px bei H=470, bleibt
+  // >100px von der Bande entfernt). Post/Elbow bleiben bewusst nah am Korb (echte
+  // Zonenpraesenz, kein Bug) — der Fix spreizt die vier AUSSEN-Slots, nicht alle sechs.
   const SLOTS=[
-    {radius:55,  seitlich:0},
-    {radius:85,  seitlich:0.7},
-    {radius:125, seitlich:1.0},
-    {radius:125, seitlich:-1.0},
-    {radius:140, seitlich:1.3},
-    {radius:140, seitlich:-1.3}
+    {radius:60,  seitlich:0},
+    {radius:95,  seitlich:0.6},
+    {radius:150, seitlich:1.05},
+    {radius:150, seitlich:-1.05},
+    {radius:145, seitlich:1.45},
+    {radius:145, seitlich:-1.45}
   ];
   // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
   // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
@@ -3509,6 +3529,24 @@
     const ballSeite=fsLive.amBall;
     const fastbreak=fsLive.fastbreak;
     const imFastbreak=!!(fastbreak&&fsT<fastbreak.bis);
+    // SEPARATION (Fable-Spacing-Fix, 25.08., Musterformel nach CMUnited/SPAR- bzw.
+    // FC-Portugal/SBSP-Aufstellungslogik und Reynolds' Boids): das Zielsystem oben ist
+    // schon "homePos(rolle) [+ wBall-Zug Richtung Ball, s. `mindest`-Abstossung im
+    // Angriff-ohne-Ball-Zweig]" — der dritte, bisher fehlende Term ist eine generische
+    // Abstossung von JEDEM anderen Spieler in der Naehe (Mitspieler UND Gegner), egal
+    // welcher Zweig sein Ziel gesetzt hat. Genau das fehlte: Verteidiger setzen sich per
+    // Konstruktion (s. `u.deckt`-Zweig unten) auf ihren Mann, SLOTS allein aendert daran
+    // nichts, weil die Verteidigung jede Zielverschiebung des Angreifers 1:1 mitmacht.
+    // Ausdruecklich NICHT abgestossen wird das eine Paar, dessen Abstand die Spiellogik
+    // tatsaechlich LIEST (`dist(decker,traeger)` fuer BEDRAENGT_RADIUS/STEAL_REICHWEITE,
+    // s. entscheideBallaktion/versucheSteal) — sonst aendert eine reine Render-Zielkorrektur
+    // ploetzlich Wurf-/Steal-Wahrscheinlichkeiten. Wirkt auf ALLE 12 Positionsziele gleich,
+    // ob Slot, Manndeckung, Screen, Fastbreak oder Ruheformation — Uebertragbar auf
+    // Football/Hockey/Tennis (dieselbe 6-gegen-6-Struktur) und auf TDM (dort Attraktor der
+    // naechste Gegner/das Ziel statt des Balls) durch denselben Term; hier bewusst nur fuer
+    // Basketball verdrahtet.
+    const ALLE_SPIELER=[...FSTEAM[0],...FSTEAM[1]];
+    const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
     for(const team of FSTEAM)for(const u of team){
       // Opus-Review-2-Fund (Volumen-Hebel, Pp-neutral): das Spiel produzierte nur ~6,7
       // Wuerfe/Spiel — zu wenig, damit sich Spezialisierung ueberhaupt zeigen kann, egal
@@ -3560,7 +3598,13 @@
             by=H/2+yOff;
         const traeger=fsLive.ball.traeger;
         if(traeger&&traeger!==u){
-          const dx0=bx-traeger.x, dy0=by-traeger.y, d0=Math.hypot(dx0,dy0)||1, mindest=80; // PLATZHALTER
+          // Fable-Fund: 80 gab dem Ballfuehrer (fuer den `hatBall` immer Kurs auf den
+          // eigenen Korb setzt, s. oben) kaum Vorfahrt vor den eigenen Mitspielern — beim
+          // Antritt zum Korb liefen die Slot-Ziele fast unveraendert mit, statt Platz zu
+          // machen. 110 (PLATZHALTER, wie zuvor) schafft sichtbar mehr Fahrspur, ohne
+          // etwas an Wurf-/Pass-/Steal-Wahrscheinlichkeiten zu aendern — die haengen an
+          // deckerAbstand (zuordneDeckung, unveraendert), nicht an diesem Abstossradius.
+          const dx0=bx-traeger.x, dy0=by-traeger.y, d0=Math.hypot(dx0,dy0)||1, mindest=110; // PLATZHALTER
           if(d0<mindest){ bx+=dx0/d0*(mindest-d0); by+=dy0/d0*(mindest-d0); }
         }
         const meinDecker=FSTEAM[1-u.side].find(v=>v.deckt===u);
@@ -3608,6 +3652,16 @@
       } else {
         const p=fsIdlePos(u.side,team.indexOf(u),team.length);
         zx=p.x; zy=p.y;
+      }
+      u._zielHomeX=zx; u._zielHomeY=zy; // Debug-Anzeige (window.__arena.debugZiele), s.u.
+      { // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
+        let sepX=0, sepY=0;
+        for(const other of ALLE_SPIELER){
+          if(other===u||u.deckt===other||other.deckt===u)continue;
+          const ddx=u.x-other.x, ddy=u.y-other.y, dd=Math.hypot(ddx,ddy)||0.01;
+          if(dd<SEP_RADIUS){ const f=(SEP_RADIUS-dd)/SEP_RADIUS; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
+        }
+        zx+=sepX*SEP_RADIUS*SEP_STAERKE; zy+=sepY*SEP_RADIUS*SEP_STAERKE;
       }
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
@@ -3719,7 +3773,14 @@
     } else {
       const traeger=fsLive.ball.traeger;
       if(traeger){
-        fsBall={sichtbar:true,x:traeger.x,y:traeger.y-18};
+        // Chris' Fund (25.08.): der Ball sass auf dem Kopf statt in der Hand. Ursache:
+        // zeichneSprite() zeichnet Figuren mit dem Kopf bei y-46 und den Fuessen bei y+18
+        // (Kommentar dort: "steht mit den Fuessen auf dem Schatten", Sprite ist 64px hoch)
+        // — der Ball-Zeichenaufruf zieht seinerseits nochmal 26-35px von fsBall.y ab. Mit
+        // dem alten y-18 landete der Ball also bei ~y-44 bis -53: praktisch am Kopf-Oberrand.
+        // +18 setzt den gezeichneten Ballmittelpunkt auf ~y-8, Hueft-/Handhoehe zwischen
+        // Kopf und Fuessen.
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18};
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
@@ -3979,8 +4040,13 @@
       // nicht existiert". Bild zeigt das Brett OBEN, den Ring darunter (Ring zeigt nach
       // "unten" im Blatt) — gedreht, damit der Ring ins Feld zeigt statt zur Wand.
       if(bkDa("korb_topdown")){
+        // Chris' Fund (25.08.): der Wurf traf den Korb optisch gar nicht. Ursache: das
+        // Korb-Sprite hing an `grundX` (der Grundlinie), waehrend der Ballflug bei einem
+        // Wurf IMMER auf `korbX` (=korbXVon(seite), dieselbe X, an der auch Dreierlinie und
+        // Schuss-Distanzklassifizierung haengen) zielt — zwei verschiedene X-Werte fuer
+        // "wo der Korb ist". Jetzt haengt das Sprite an derselben Referenz wie der Ballflug.
         ctx.save();
-        ctx.translate(grundX,H/2);
+        ctx.translate(korbX,H/2);
         ctx.rotate(links?-Math.PI/2:Math.PI/2);
         ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56);
         ctx.restore();
@@ -4023,16 +4089,31 @@
         ctx.strokeStyle=c;ctx.globalAlpha=aktiv?0.55:0.28;ctx.lineWidth=aktiv?2:1.5;
         ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
         zeichneSprite(ctx,u,x,y,true);
+        if(FS_DEBUG_ZIELE&&u._zielHomeX!=null){
+          ctx.fillStyle=c;ctx.globalAlpha=0.9;
+          ctx.beginPath();ctx.arc(u._zielHomeX,u._zielHomeY,4,0,6.3);ctx.fill();
+          ctx.globalAlpha=0.35;ctx.strokeStyle=c;ctx.lineWidth=1;
+          ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(u._zielHomeX,u._zielHomeY);ctx.stroke();
+          ctx.globalAlpha=1;
+        }
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
           ctx.font="400 "+groesse+"px 'IBM Plex Mono',monospace";
           ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
           ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
         };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
+        // Fable-Fund: ein Manndecker steht per Konstruktion (zuordneDeckung/
+        // bewegeSpielerLive, unveraendert) nur wenige Pixel von seinem Angreifer entfernt
+        // — beide Namenslabels lagen dadurch praktisch immer uebereinander und verschmolzen
+        // zu Buchstabensalat ("KroiCassandra"). Reine Zeichen-Position, keine
+        // Spiel-Koordinate: die verteidigende Seite schreibt ihr Label OBERHALB der Figur
+        // statt darunter, die angreifende bleibt darunter — trennt die beiden Zeilen auch
+        // dann, wenn x/y (fuer Deckung/Steal/Bedraengnis absichtlich) fast identisch sind.
+        const istAbwehr=fsLive&&fsLive.amBall!=null&&side!==fsLive.amBall, vz=istAbwehr?-1:1;
+        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
         const stat=bisher.spieler.get(u.id)||NULLWERTE;
         if(stat.punkte||stat.rebounds||stat.steals||stat.bloecke||stat.assists)
-          schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56,"#dfe6ef",8);
+          schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56*vz,"#dfe6ef",8);
       });
     });
     // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
@@ -6921,21 +7002,34 @@
   // gleichzeitige Instanzen moeglich, z.B. wenn zwei Treffer knapp hintereinander fallen),
   // Dribbeln/Publikum als EIN Loop-Objekt je Kanal, gestartet/gestoppt vom Play-Button
   // (echte Nutzergeste — Browser blocken Audio sonst).
+  // Lautstaerke-Regler (Chris' Fund, 25.08.): es gab ueberhaupt keine Moeglichkeit, den
+  // Basketball-Ton auszuschalten oder leiser zu stellen — anders als "bisher in der
+  // Arena", wo es diesen Regler schon gibt. bkVolume/bkMuted sind der globale
+  // Multiplikator ueber JEDEN bkSfx/bkLoop-Aufruf, in localStorage gemerkt, damit die
+  // Einstellung eine Sitzung ueberlebt.
+  let bkVolume=(()=>{ const v=parseFloat(localStorage.getItem("bkVolume")); return isFinite(v)&&v>=0&&v<=1?v:0.6; })();
+  let bkMuted=localStorage.getItem("bkMuted")==="1";
+  const bkPegel=(basis)=>bkMuted?0:basis*bkVolume/0.6; // /0.6, weil 0.6 die alte Default-Basislautstaerke war
   const bkSfxPool={};
   function bkSfx(name,vol){
     try{
       let pool=bkSfxPool[name];
       if(!pool){pool=bkSfxPool[name]=[0,1,2].map(()=>{const a=new Audio("/sound/basketball/"+name);a.preload="auto";return a;});}
       const frei=pool.find(a=>a.paused||a.ended)||pool[0];
-      frei.currentTime=0;frei.volume=vol??0.6;frei.play().catch(()=>{});
+      frei.currentTime=0;frei.volume=bkPegel(vol??0.6);frei.play().catch(()=>{});
     }catch(e){}
   }
   const bkLoop={dribbeln:null,publikum:null};
+  function bkLoopLautstaerkeAnwenden(){
+    if(bkLoop.dribbeln)bkLoop.dribbeln.volume=bkPegel(0.22);
+    if(bkLoop.publikum)bkLoop.publikum.volume=bkPegel(0.16);
+  }
   function bkLoopStart(){
     if(!bkLoop.dribbeln){
-      bkLoop.dribbeln=new Audio("/sound/basketball/dribbeln.mp3");bkLoop.dribbeln.loop=true;bkLoop.dribbeln.volume=0.22;
-      bkLoop.publikum=new Audio("/sound/basketball/publikum_ambiente.ogg");bkLoop.publikum.loop=true;bkLoop.publikum.volume=0.16;
+      bkLoop.dribbeln=new Audio("/sound/basketball/dribbeln.mp3");bkLoop.dribbeln.loop=true;
+      bkLoop.publikum=new Audio("/sound/basketball/publikum_ambiente.ogg");bkLoop.publikum.loop=true;
     }
+    bkLoopLautstaerkeAnwenden();
     bkLoop.dribbeln.play().catch(()=>{});bkLoop.publikum.play().catch(()=>{});
   }
   function bkLoopPause(){ if(bkLoop.dribbeln){bkLoop.dribbeln.pause();bkLoop.publikum.pause();} }
@@ -8489,6 +8583,24 @@
     speed=speed===1?2:speed===2?4:1;
     document.getElementById("spd").textContent="Tempo "+speed+"×";
   });
+  // Ton-Regler: wirkt sofort auf laufende Loops (bkLoopLautstaerkeAnwenden), nicht erst
+  // beim naechsten bkSfx-Aufruf — sonst bliebe Dribbeln/Publikum beim Verstellen stumm,
+  // bis zufaellig ein neuer Ein-Schuss-Effekt startet.
+  const tonBtn=document.getElementById("ton"), volSlider=document.getElementById("vol");
+  volSlider.value=String(Math.round(bkVolume*100));
+  const tonAnzeigeAktualisieren=()=>{
+    tonBtn.textContent=bkMuted?"🔇 Ton":"🔊 Ton";
+    tonBtn.setAttribute("aria-pressed",bkMuted?"true":"false");
+  };
+  tonAnzeigeAktualisieren();
+  tonBtn.addEventListener("click",()=>{
+    bkMuted=!bkMuted; localStorage.setItem("bkMuted",bkMuted?"1":"0");
+    tonAnzeigeAktualisieren(); bkLoopLautstaerkeAnwenden();
+  });
+  volSlider.addEventListener("input",()=>{
+    bkVolume=Number(volSlider.value)/100; localStorage.setItem("bkVolume",String(bkVolume));
+    bkLoopLautstaerkeAnwenden();
+  });
 
   const tabs=[...document.querySelectorAll(".tab")];
   tabs.forEach(tb=>tb.addEventListener("click",()=>{
@@ -8841,6 +8953,11 @@
         if(fsT>=naechster){
           eimer.push({t:Math.round(fsT),
             x:[...FSTEAM[0],...FSTEAM[1]].map(u=>Math.round(u.x)),
+            // y ergaenzt (Fable-Spacing-Fix, 25.08.): der Court ist links/rechts
+            // gerichtet (Korb-zu-Korb-Achse), Verteilung UEBER die Spielfeldbreite zeigt
+            // sich also in y, nicht in x — ohne y liest man nur "die Gruppe wandert" statt
+            // "die Gruppe faechert sich auf".
+            y:[...FSTEAM[0],...FSTEAM[1]].map(u=>Math.round(u.y)),
             ballSeite:fsLive?fsLive.amBall:null});
           naechster+=5;
         }
@@ -8848,6 +8965,7 @@
       return eimer;
     },
     setDisc:(d)=>{ disc=d; reset(); },
+    debugZiele:(an)=>{ FS_DEBUG_ZIELE=!!an; },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
