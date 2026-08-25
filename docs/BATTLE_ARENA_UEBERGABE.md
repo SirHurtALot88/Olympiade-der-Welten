@@ -502,6 +502,32 @@ Sprite hat den Bogen, ihr Kit folgt, sobald Bowman und Hunter vorliegen.
 - **Krits** sollen laut Chris nur noch an Skills hängen, nicht mehr am Grundschlag —
   Präzision ist bereits entfernt, die Skill-Krits fehlen noch.
 
+### F. PP-Berechnung und Balancing bei 1v1-Matchups — noch offen, für später
+
+Chris' eigener Fund (25.08., Gespräch über 1v1-Formate für Bühne-Disziplinen à la
+Denkduell): die bestehende Regel „3,3 PPs pro teilnehmendem Spieler, nach Leistung
+verteilt" ist für eine Liga-Struktur mit Team-Gesamtpunkten gedacht. Sobald eine
+Disziplin auf 1v1-Matchups umgestellt wird (wie es `BB().duell` heute schon für
+Speed-Schach/I-Spy tut, siehe Analyse oben), entkoppeln sich Team-Punkte/Punkte-
+verhältnis von den Einzel-PPs — ein Spieler, der sein eigenes Brett gewinnt, hat damit
+noch keinen klar abgeleiteten Anteil am Team-Gesamtergebnis. Chris' eigene Worte: „wir
+haben ja keine Liga mehr in dem Sinne, also müssten wir PPs anders berechnen."
+
+Dazu, im selben Gespräch, zwei verwandte, noch unentschiedene Punkte:
+- **Fatigue durch Usage**: ein Star, der staendig den Ball bekommt, sollte dafuer
+  ermueden koennen — mit Rueckwirkung auf die KI (mal zu einem anderen Spieler passen,
+  wenn der Star schon zu erschoepft ist, oder weil er gedoppelt wird / vom besten
+  gegnerischen Verteidiger verfolgt wird). Haengt am „wer verteidigt wen"-Mechanismus,
+  der gerade ohnehin ueberarbeitet wird (Fouls/Verteidigungs-Relevanz, s. aktuelle
+  Basketball-Runde) — governance darueber erst NACH dieser Runde sinnvoll.
+- **Tabellen-Punkte**: Sieg = 2, Unentschieden = 1, Niederlage = 0 (Chris' Vorgabe) —
+  Punkte-fuer/-gegen muessen aus den Matchergebnissen sinnvoll abgeleitet werden, sobald
+  die Ergebnisse selbst konsistent genug sind, um darauf eine Tabelle zu bauen.
+
+Alle drei Punkte sind explizit **nicht** fuer die laufende Basketball-Polish-Runde
+gedacht — Chris will sie als TODO fuer eine spaetere, eigene Design-Runde festgehalten
+haben, nachdem Basketball als Benchmark steht.
+
 ---
 
 ## Was in dieser Sitzung fertig wurde
