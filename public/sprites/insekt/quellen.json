@@ -1,0 +1,13 @@
+{
+  "_hinweis": "Neuer Ordner, angelegt am 25.08. fuer ein INSEKTOIDES/ARACHNIDES Motiv — im gesamten Baukasten (kopf_*.png) und in allen bisherigen Rassen-Ordnern (demon/divine/voidborn/zwerg/fisch/pflanze) gab es keinen einzigen humanoiden Insekten- oder Spinnenkoerper; public/sprites/monster/biene.png ist nur eine reine Biene ohne Menschenform, taugt also nicht als Kopf-/Vollkoerper-Ersatz. Gesucht auf Chris' Vorgabe ('je mehr Variation desto besser'), keiner konkreten Spiel-Rasse fest zugeordnet (am ehesten als Alien/Voidborn/Mutant einsetzbar) — wie schon bei pflanze/voidborn folgt die Auswahl dem Prinzip 'passendste verfuegbare Kreatur statt erzwungener Notloesung'.",
+  "_stilbruch": "144x256 = 3 Spalten x 4 Reihen zu 48x64 (nicht 64x64), Reihenfolge N/E/S/W (Stendhal-Konvention) — exakt dasselbe Format wie divine/quellen.json, voidborn/quellen.json und zwerg/quellen.json (gleiche Autoren-Gruppe: Redshrike/Cabbit/AntumDeluge-Kollektiv), 3 Gehframes je Richtung.",
+  "spinnenwesen_walk.png": {
+    "original": "arachne-nesw.png",
+    "paket": "Arachne (Stendhal)",
+    "blatt": "144x256 = 3 Spalten x 4 Reihen zu 48x64, N/E/S/W, 3 Gehframes je Richtung, unveraendert",
+    "urheber": "Basis-LPC-Spinne: Stephen 'Redshrike' Challener, William.Thompsonj; Oberkoerper/Zusammensetzung: Svetlana Kushnariova (Cabbit) <lana-chan@yandex.ru>, Jordan Irwin (AntumDeluge)",
+    "lizenz": "CC-BY 3.0 / OGA-BY 3.0",
+    "url": "https://opengameart.org/content/arachne",
+    "verwendung": "humanoide Spinnenfrau — menschlicher Oberkoerper mit grauem Haar geht nahtlos in einen schwarz-goldenen Spinnen-Hinterleib mit vier Beinpaaren ueber. Einziges insektoides/arachnides Vollkoerper-Motiv im Baukasten bislang."
+  }
+}
