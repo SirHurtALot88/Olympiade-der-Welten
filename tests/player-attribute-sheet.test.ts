@@ -45,6 +45,7 @@ describe("playerAttributeSheet", () => {
         {
           name: "Tyrael",
           height: null,
+          heightIsEstimate: false,
           power: 64,
           health: 68,
           stamina: 71,

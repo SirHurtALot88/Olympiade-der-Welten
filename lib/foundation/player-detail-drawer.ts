@@ -1130,7 +1130,10 @@ function buildBaselineAttributeDeltas(
   if (!baseline || !baselineAttributes) return [];
   const latestEvent = progressionEvents[0] ?? null;
   return buildAttributeStats(player).map((entry) => {
-    const key = entry.key as keyof NonNullable<Player["attributeSheetStats"]>;
+    // heightIsEstimate ist ein echt/geschaetzt-Flag (boolean, s. olyDataTypes.ts), kein
+    // anzeigbarer numerischer Wert wie die anderen Attribute — ausgeschlossen, sonst
+    // wird currentValue faelschlich number|boolean.
+    const key = entry.key as Exclude<keyof NonNullable<Player["attributeSheetStats"]>, "heightIsEstimate">;
     const baselineValue = Object.prototype.hasOwnProperty.call(baselineAttributes, key)
       ? baselineAttributes[key as keyof typeof baselineAttributes] ?? null
       : null;

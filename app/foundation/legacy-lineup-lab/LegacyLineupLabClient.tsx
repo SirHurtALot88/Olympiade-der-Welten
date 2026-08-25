@@ -447,7 +447,9 @@ type LegacyLineupTablePreset = {
 
 const LEGACY_LINEUP_TABLE_PREFERENCES_STORAGE_KEY = "legacy-lineup-table-preferences-v1";
 
-const attributeLabels: Record<keyof PlayerAttributeSheetStats, string> = {
+// heightIsEstimate ist Metadaten (echt/geschaetzt-Flag, s. olyDataTypes.ts), kein
+// anzeigbares Attribut wie die anderen 13 Schluessel — bewusst ausgeschlossen.
+const attributeLabels: Record<Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">, string> = {
   power: "Power",
   health: "Health",
   stamina: "Stamina",
@@ -660,9 +662,9 @@ function getTopAttributeWeights(
     .sort((left, right) => right.weightPct - left.weightPct)
     .slice(0, limit)
     .map((weight) => ({
-      key: weight.attributeKey as keyof PlayerAttributeSheetStats,
-      label: attributeLabels[weight.attributeKey as keyof PlayerAttributeSheetStats] ?? weight.attributeKey,
-      shortLabel: attributeShortLabels[weight.attributeKey as keyof PlayerAttributeSheetStats] ?? weight.attributeKey.toUpperCase(),
+      key: weight.attributeKey as Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">,
+      label: attributeLabels[weight.attributeKey as Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">] ?? weight.attributeKey,
+      shortLabel: attributeShortLabels[weight.attributeKey as Exclude<keyof PlayerAttributeSheetStats, "heightIsEstimate">] ?? weight.attributeKey.toUpperCase(),
       weightPct: weight.weightPct,
     }));
 }

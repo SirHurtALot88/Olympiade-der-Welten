@@ -8,6 +8,8 @@ export const ATTRIBUTE_SHEET_ALIASES: Record<string, string> = {
 export type PlayerAttributeSheetRow = {
   name: string;
   height: number | null;
+  /** s. PlayerAttributeSheetStats.heightIsEstimate (lib/data/olyDataTypes.ts) */
+  heightIsEstimate: boolean | null;
   power: number | null;
   health: number | null;
   stamina: number | null;
@@ -119,6 +121,10 @@ function toPlayerAttributeSheetRow(record: CsvRecord): PlayerAttributeSheetRow {
   return {
     name: record.Name?.trim() ?? "",
     height: toNumber(record.Height ?? record.height ?? record.Size ?? record.Groesse ?? record["Größe"]),
+    // Eine aus dem echten Sheet gelesene Zeile ist per Definition kein Platzhalter —
+    // auch wenn die Height-Spalte (noch) leer ist, ist "keine Schaetzung" die richtige
+    // Aussage; die Schaetzung entsteht ausschliesslich in provisional-height.ts.
+    heightIsEstimate: false,
     power: toNumber(record.Power),
     health: toNumber(record.Health),
     stamina: toNumber(record.Stamina),
