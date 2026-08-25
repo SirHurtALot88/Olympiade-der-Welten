@@ -323,8 +323,24 @@
   .ezeile .erolle{color:#7f8c9e;font:600 clamp(8px,.9vw,10px)/1.6 ui-monospace,monospace;
     text-transform:uppercase;letter-spacing:.05em}
   .ezeile .ename{color:#e6edf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ezeile .ewert{color:#e8c07a;font:600 clamp(9px,1.05vw,12.5px)/1 ui-monospace,monospace}
+  .ezeile .ewert{color:#e8c07a;font:600 clamp(9px,1.05vw,12.5px)/1 ui-monospace,monospace;
+    display:inline-flex;align-items:baseline;gap:4px}
   .ezeile.stern{background:#232c22;box-shadow:inset 0 0 0 1px #3c5238}
+  /* Chris' Fund (25.08.): der Einlauf zeigte nur die fertig verrechnete Endzahl, nicht den
+     Basiswert samt Anpassung ("Draco 71 (+8,5)" statt nur "79.5"). Die Faerbung der Anpassung
+     uebernimmt dieselben acht Baender wie getPoolHeatClass() in lib/foundation/
+     player-league-heat.ts (rot=schwach -> blau=stark) — hier ohne Liga-Pool als eigenstaendige
+     Perzentil-Berechnung ueber die 24 sichtbaren Einlauf-Spieler (das Mockup haelt sonst keine
+     Liga-Werte vor), aber dieselben acht Hex-Paare, damit es sich wie derselbe Maßstab liest. */
+  .edelta{border-radius:4px;padding:0 4px;font-weight:700;font-size:.92em}
+  .edelta.heat-1{background:#7c3434;color:#fff0ed}
+  .edelta.heat-2{background:#c9827a;color:#25100e}
+  .edelta.heat-3{background:#d89a65;color:#261308}
+  .edelta.heat-4{background:#e4d59c;color:#181508}
+  .edelta.heat-5{background:#abc994;color:#111811}
+  .edelta.heat-6{background:#5f8f59;color:#f7fff4}
+  .edelta.heat-7{background:#7fa2d1;color:#101929}
+  .edelta.heat-8{background:#355f9d;color:#f7fbff}
 
   .ctrl{display:flex;gap:8px;align-items:center;padding:11px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}
   .btn{font-family:"Barlow Condensed",sans-serif;font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
@@ -2968,8 +2984,14 @@
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,feldspielDisc,true),feldspielDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,feldspielDisc,false),feldspielDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      // Chris' Fund (25.08.): p.d haelt nur "tdm"/"spurt" vorberechnet — fuer jede neuere
+      // Disziplin (Basketball eingeschlossen) fiel das auf 0 zurueck, und `eig` bestand nur
+      // noch aus den kleinen Slot-/Form-Zuschlaegen (typisch -5 bis +10 statt eines echten
+      // Fertigkeitswerts). gewichtet(p.a, BASIS_JE_DISC[...]) ist dieselbe Formel, mit der
+      // p.d.tdm ueberhaupt erst entstanden ist — hier live nachgerechnet statt vorgebacken.
+      const basisWert=p.d[feldspielDisc]!=null?p.d[feldspielDisc]:gewichtet(p.a,BASIS_JE_DISC[feldspielDisc]||{});
       return {id:id++,n:p.n,side:seite,seite,vx:0,vy:0,down:false,lunge:0,
-        eig:(p.d[feldspielDisc]||0)+engP+breitP,...R2,
+        eig:basisWert+engP+breitP,...R2,
         punkte:0,rebounds:0,steals:0,bloecke:0,verluste:0,assists:0,x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,false,i)), gegner.map((o,i)=>bauSpieler(o,1,true,i))];
@@ -8400,7 +8422,10 @@
   // koennen, ohne den Code zu lesen.
   function aufschluesselung(p,dId,istGegner){
     const sl=(!istGegner&&place[p.n])?place[p.n].slot:null;
-    const basis=(p.d&&p.d[dId])||0;
+    // Chris' Fund (25.08.): p.d haelt nur "tdm"/"spurt" vorberechnet — fuer jede neuere
+    // Disziplin (Basketball eingeschlossen) fiel das auf 0 zurueck. gewichtet(p.a,...) ist
+    // dieselbe Formel, mit der p.d.tdm ueberhaupt erst entstanden ist (s. bauSpieler).
+    const basis=(p.d&&p.d[dId]!=null)?p.d[dId]:(p.a?gewichtet(p.a,BASIS_JE_DISC[dId]||{}):0);
     const teile=[["Basis",basis,"Der Disziplinwert aus den zwölf Attributen."]];
     if(sl)teile.push(["Slot",slotAufschlag(p,sl,dId),
       "Passung zum Profil von "+SLOTVON[sl].label+" (+"+SLOTVON[sl].gross+" +"+SLOTVON[sl].klein+")."]);
@@ -8420,7 +8445,36 @@
     (i===0?"":(v>0?"+ ":"− "))+(i===0?"":Math.abs(v).toFixed(1)+" ")+k+(i===0?" "+v.toFixed(1):"")
   ).join("  ")+"   =  "+a.summe.toFixed(1);
 
+  // Dieselbe Perzentil-Logik wie getPoolHeatClass() in lib/foundation/player-league-heat.ts
+  // (App-Code, nicht Teil dieses Mockups) — 8 Baender, Rand 1=schwaechster Wert im Pool,
+  // Rand 8=staerkster. Ohne Liga-Pool (das Mockup kennt nur diese 24 Spieler) laeuft die
+  // Perzentil-Berechnung ueber genau diese 24, statt einer erfundenen Liga-Verteilung.
+  function heatBand(wert,pool){
+    const sortiert=[...new Set(pool.filter(x=>Number.isFinite(x)))].sort((a,b)=>a-b);
+    if(sortiert.length<2)return 5;
+    let idx=0; for(let i=0;i<sortiert.length;i++)if(sortiert[i]<=wert)idx=i;
+    const perzentil=idx/(sortiert.length-1);
+    return Math.min(7,Math.max(0,Math.floor(perzentil*8)))+1;
+  }
+
   function renderEinlauf(){
+    // Erster Durchlauf ueber beide Seiten: Basis+Anpassung je Spieler EINMAL berechnen
+    // (nicht pro Zeile neu, s.u.) und den Anpassungs-Pool fuer die Faerbung sammeln —
+    // braucht beide Teams, bevor die erste Zeile gezeichnet wird.
+    const aufschluesselungenJeSeite=[[],[]];
+    const deltaPool=[];
+    for(const seite of [0,1]){
+      const feldRoh=istBahn(disc)?LAEUFER.filter(u=>u.seite===seite)
+        :istBuehne(disc)?TEILNEHMER.filter(u=>u.side===seite)
+        :istFeldspiel(disc)?FSTEAM[seite]
+        :U.filter(u=>u.side===seite);
+      for(const u of feldRoh){
+        const p=seite===0?SQUAD.find(x=>x.n===u.n):OPP.find(x=>x.n===u.n);
+        const auf=p?aufschluesselung(p,disc,seite===1):{teile:[["Basis",u.eig,""]],summe:u.eig};
+        aufschluesselungenJeSeite[seite].push(auf);
+        deltaPool.push(auf.summe-auf.teile[0][1]);
+      }
+    }
     for(const seite of [0,1]){
       const v=VEREIN[seite];
       const k=document.getElementById(seite===0?"eteamL":"eteamR");
@@ -8443,7 +8497,7 @@
         :istFeldspiel(disc)?FSTEAM[seite].map(u=>({n:u.n,eig:u.eig,side:seite}))
         :U.filter(u=>u.side===seite);
       const mitte=feld.length?feld.map(u=>u.eig).sort((a,b)=>a-b)[Math.floor(feld.length/2)]:0;
-      for(const u of feld){
+      feld.forEach((u,i)=>{
         const z=el("div");z.className="ezeile"+(u.eig>=mitte*1.35?" stern":"");
         const pl=place[u.n];
         // Fable-Playtest (25.08.): ein Spieler, der nur fuer eine ANDERE Disziplin
@@ -8453,15 +8507,24 @@
         const rolle=(pl&&pl.d===disc&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
         z.appendChild(el("span","erolle",rolle.toUpperCase()));
         z.appendChild(el("span","ename",u.n));
-        const w=el("span","ewert",u.eig.toFixed(1));
-        const auf=aufschluesselung(seite===0?SQUAD.find(x=>x.n===u.n)||{n:u.n,d:{tdm:u.eig}}
-                                           :OPP.find(x=>x.n===u.n)||{n:u.n,d:{tdm:u.eig}},"tdm",seite===1);
+        // Chris' Fund (25.08.): hier stand nur die fertig verrechnete Endzahl — jetzt
+        // Basiswert (der reine Disziplinwert aus den zwoelf Attributen) plus die Anpassung
+        // (Slot/Form/Mutator/Intensitaet zusammen) in Klammern, z.B. "71 (+8,5)". Die
+        // Anpassung ist gefaerbt (heatBand, s.o.) — rot=verschlechtert den Spieler fuer
+        // diesen Slot spuerbar, blau=hebt ihn deutlich, dieselbe Skala wie im echten Spiel.
+        const auf=aufschluesselungenJeSeite[seite][i];
+        const basis=auf.teile[0][1], deltaWert=auf.summe-basis;
+        const w=el("span","ewert");
+        w.appendChild(document.createTextNode(basis.toFixed(1)+" "));
+        const vz=deltaWert>=0?"+":"−";
+        w.appendChild(el("span","edelta heat-"+heatBand(deltaWert,deltaPool),
+          "("+vz+Math.abs(deltaWert).toFixed(1)+")"));
         w.tabIndex=0;
-        tipOn(w,"Wie sich "+u.eig.toFixed(1)+" zusammensetzt",
+        tipOn(w,"Wie sich "+auf.summe.toFixed(1)+" zusammensetzt",
           auf.teile.map(([k,v,warum])=>k+" "+(v>=0&&k!=="Basis"?"+":"")+v.toFixed(1)+" — "+warum).join("\n"));
         z.appendChild(w);
         liste.appendChild(z);
-      }
+      });
     }
     document.getElementById("edisz").textContent=DISCS[disc].label;
     const eg=document.querySelector(".egegen");
