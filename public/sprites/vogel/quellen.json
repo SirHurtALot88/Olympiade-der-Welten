@@ -1,0 +1,74 @@
+{
+  "_hinweis": "Neuer Ordner, angelegt am 25.08. fuer ein AVIAN/VOGELMENSCH-Motiv (Harpyie) — im Baukasten gibt es keinen einzigen Vogelkopf (kopf_*.png hat boarman/mouse/pig/rabbit/rat/sheep/wolf als Tier-Koepfe, aber keinen Vogel), und public/sprites/arena/vogel_adler.png ist nur ein Deko-Adler in der Arena (unveraendert, noch nicht als Spielercharakter verbaut, laut eigenem Vermerk 'vorgesehen als mechanischer Vogel fuer Seraph-11'), kein humanoider Spieler-Sprite. Beschafft aus '24x32 Supernatural Creatures' (diamonddmgirl — dieselbe Kuenstlerin, die schon an den Dwarves-Sprites in zwerg/quellen.json mitgewirkt hat).",
+  "_stilbruch": "BEWUSSTER Stilbruch, deutlicher als bei den anderen Nicht-Baukasten-Ordnern: Die Harpyie-Sprites liegen NICHT im 64px-LPC-Raster, sondern im 24x32-Basisformat dieses Pakets (RPG-Maker-aehnliche Proportionen mit ueberproportional grossem Kopf) mit unterschiedlich grossen Zuschnitten je Animation (Portrait 65x76, Flug 160x74 = 5 Frames zu 32x74 mit Ganzkoerper-Wandel Mensch->Vogel, Huepfen 48x128 = 1 Spalte x 4 Reihen zu 48x32 mit Rueckenansicht/Seitenansicht/Vogelform). Kein Gehzyklus im eigentlichen Sinn (Harpyien laufen im Originalpaket nicht, sie huepfen/fliegen) — 'huepfen' ist hier der naechstliegende Ersatz fuer eine Bodenbewegung.",
+  "_farbvarianten": "Das Originalpaket hat zwei Farbvarianten ('light' = hell-braunes Gefieder/dunkles Haar, 'dark' = tiefschwarzes Gefieder) sowie zusaetzlich diverse Gesichtsausdrucks-Portraits (smile/frown/smirk/eyebrow/hurt/sleeping etc.), von denen hier nur je ein neutrales Portrait uebernommen wurde — die Mimik-Varianten liegen bei Bedarf im selben Zip.",
+  "_lizenz": "CC-BY 4.0 (laut Quellseite direkt gepruefte Feldangabe 'License(s)'), fuer das private nicht-kommerzielle Spiel unproblematisch. Notiz der Urheberin im Paket: Basis-Koerper stammen aus ihren eigenen '24x32 Bases'-Paketen, als Vorlage/Recherche dienten zudem 'Animated Birds 32x32' (fremdes Referenzpaket, nicht direkt uebernommen) und ein Wikimedia-Commons-Harpyie-Foto sowie ein Gemaelde-Motiv (Claude Lorrain) als Stilinspiration.",
+  "harpyie_hell_referenz.png": {
+    "original": "harpy light.png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "581x162, vollstaendiges unveraendertes Sammel-Sheet (Kollage aller Frames dieser Farbvariante) — als Referenz danebengelegt, analog zu pflanze/_quelle_elementals3_original.png",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures"
+  },
+  "harpyie_dunkel_referenz.png": {
+    "original": "harpy dark.png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "581x162, wie harpyie_hell_referenz.png, unveraendert",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures"
+  },
+  "harpyie_hell_portrait.png": {
+    "original": "harpy light portrait..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "65x76, Einzelbild, neutraler Gesichtsausdruck, unveraendert (bereits vom Original-Autor freigestellt aus dem Sammel-Sheet geliefert)",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures",
+    "verwendung": "hellbraune Farbvariante — Portrait/Icon-Groesse"
+  },
+  "harpyie_dunkel_portrait.png": {
+    "original": "harpy dark portrait..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "65x76, wie harpyie_hell_portrait.png",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures",
+    "verwendung": "schwarze Farbvariante fuer Diversitaet innerhalb der Rasse"
+  },
+  "harpyie_hell_huepfen.png": {
+    "original": "harpy light hopping..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "48x128 = 1 Spalte x 4 Reihen zu 48x32, Bodenbewegung (Vogelform huepft/laeuft), unveraendert",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures",
+    "verwendung": "Ersatz fuer einen Gehzyklus — naechstliegende Bodenbewegungs-Animation im Originalpaket"
+  },
+  "harpyie_dunkel_huepfen.png": {
+    "original": "harpy dark hopping..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "48x128, wie harpyie_hell_huepfen.png",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures"
+  },
+  "harpyie_hell_flug.png": {
+    "original": "harpy light flying..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "160x74 = 5 Frames unterschiedlicher Breite in einer Reihe, Verwandlung Mensch-Oberkoerper zu Vogelform im Flug, unveraendert",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures",
+    "verwendung": "Angriffs-/Bewegungsanimation, zeigt den namensgebenden Mensch-Vogel-Wandel der Harpyie"
+  },
+  "harpyie_dunkel_flug.png": {
+    "original": "harpy dark flying..png",
+    "paket": "24x32 Supernatural Creatures",
+    "blatt": "160x74, wie harpyie_hell_flug.png",
+    "urheber": "diamonddmgirl",
+    "lizenz": "CC-BY 4.0",
+    "url": "https://opengameart.org/content/24x32-supernatural-creatures"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_hinweis": "Neuer Ordner, angelegt am 25.08. fuer die Rasse 'Goblin' — im Baukasten gibt es zwar bereits kopf_goblin.png (nur Kopf-Layer auf menschlicher Statur), aber keinen einzigen Vollkoerper-Sprite mit tatsaechlich goblinartiger (kleiner, gruener, breiter) Statur. Beschafft aus '[LPC] Female Orc/Ogre/Goblin/Troll (base walkcycle)' — der Titel nennt vier Kreaturentypen, das Sprite selbst zeigt eine kleine, gruenhaeutige, spitzohrige Gestalt, die optisch am naechsten an 'Goblin' liegt (kein vergroesserter Ogre-Massstab, siehe unten).",
+  "_hinweis_massstab": "Trotz des Paket-Titels ('Orc/Ogre/Goblin/Troll') ist die Statur NICHT riesenhaft/oger-gross, sondern eher klein bis kindlich proportioniert (kurze Beine, grosser Kopf) — fuer ein echtes 'Riesen/Oger'-Motiv (eigene Kategorie, von Chris ebenfalls gewuenscht) waere dieses Sprite die falsche Wahl; als Goblin-Basis passt die kleine Statur dagegen gut.",
+  "_stilbruch": "Kein Stilbruch: 576x256 = 9 Spalten x 4 Reihen zu 64x64, Standard-LPC-Gehzyklus, exakt wie beine_walk.png/kopf_human_walk.png im baukasten-Ordner. Direkt kompatibel mit dem bestehenden 64px-Raster, unveraendert uebernommen (nur umbenannt).",
+  "goblin_basis_walk.png": {
+    "original": "BODY_FEMALE_ORC_0.png",
+    "paket": "[LPC] Female Orc/Ogre/Goblin/Troll (base walkcycle)",
+    "blatt": "576x256 = 9 Spalten x 4 Reihen zu 64x64, 4 Richtungen, 9 Gehframes je Richtung, unveraendert",
+    "urheber": "madmarcel",
+    "lizenz": "OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-female-orcogregoblintroll-base-walkcycle",
+    "verwendung": "unbekleidete gruenhaeutige Basis-Statur — Standardvorschlag fuer die Rasse 'Goblin'"
+  },
+  "goblin_pirat_walk.png": {
+    "original": "orc_piratess.png",
+    "paket": "[LPC] Female Orc/Ogre/Goblin/Troll (base walkcycle)",
+    "blatt": "576x256, Aufbau wie goblin_basis_walk.png",
+    "urheber": "madmarcel",
+    "lizenz": "OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-female-orcogregoblintroll-base-walkcycle",
+    "verwendung": "bekleidete Variante (rotes Kopftuch, Augenklappe, Traegerhose) — zweite Optik fuer Diversitaet innerhalb der Rasse, passt zum bereits vorhandenen Piraten-Thema (siehe player-generator-archetypes.ts, Archetyp 'Pirate')"
+  }
+}

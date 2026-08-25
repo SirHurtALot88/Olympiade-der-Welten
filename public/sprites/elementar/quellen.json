@@ -1,0 +1,33 @@
+{
+  "_hinweis": "Neuer Ordner, angelegt am 25.08. fuer ELEMENTARWESEN (Feuer/Wasser/Blitz/Erde/Licht/Schatten/Leere/Wind) — eine eigene, von Chris nicht wortwoertlich benannte, aber durch 'je mehr Variation desto besser' gedeckte Optik-Kategorie, analog zur Voidborn-Recherche (voidborn/quellen.json), die ebenfalls kreativ statt anhand eines festen Rassennamens gesucht wurde. Kein Ueberschneiden mit pflanze/dryade.png (humanoide Baum-/Ranken-Gestalt) oder monster/-Kreaturen — hier geht es um reine Energie-/Elementarkoerper ohne feste Anatomie.",
+  "_pflanze_praezedenzfall": "public/sprites/pflanze/quellen.json hat bereits EINE Zelle ('elementals3.png', Baum-Elementar) aus derselben Paketreihe ('JS Monster Set - Elementals') verwendet und dabei per Farbschluessel (#7F00FF) freigestellt, auf die Inhalts-Bounding-Box zugeschnitten und auf eine 64x64-Leinwand zentriert. Dieser Ordner versucht denselben Weg fuer die Pakete I und II derselben Reihe — mit anderem Ergebnis, siehe naechster Punkt.",
+  "_warum_unbearbeitet": "Der Farbschluessel-Zuschnitt wurde fuer alle 8 Motive in elementals.png/elementals2.png PROBIERT und wieder VERWORFEN: anders als beim Baum-Elementar in pflanze/ ist #7F00FF (bzw. sehr nahe Toene) hier nicht nur Hintergrundfarbe, sondern bei allen acht Kreaturen zugleich eine bewusste GESTALTUNGSFARBE innerhalb der Silhouette selbst (z.B. das lilane Schattenspiel im Wasser-/Feuer-/Blitz-/Erdwesen, die durchgehend violette Fluegel-Innenzeichnung bei Schatten-/Licht-/Leere-/Windwesen). Ein Flood-Fill vom Bildrand entfernt nur den AUSSEN anschliessenden Hintergrund, nicht aber diese im Inneren der Figur eingeschlossenen, gleichfarbigen Flaechen — das Ergebnis waren Figuren mit sichtbar durchsichtigen Loechern mitten im Koerper (kein sauberer Freisteller, sondern ein optischer Fehler). Ein bildweiter Farbschluessel-Ersatz haette umgekehrt Teile der eigentlichen Gestaltung mit weggeschnitten. Deshalb: beide Sheets liegen UNBEARBEITET (mit vollem lilanem Hintergrund) als Referenz bei, wie es die Vorlage fuer 'ein einzelnes Referenzbild, wo kein sauberer Zuschnitt moeglich ist' ausdruecklich erlaubt (vgl. pflanze/_quelle_elementals3_original.png fuer den unbearbeiteten Vergleichsfall).",
+  "_lizenz": "CC-BY 3.0 fuer beide JS-Monster-Set-Elementals-Sheets (Urheber JosephSeraph, direkt auf der Quellseite geprueft) sowie fuer das separate Eis-Elementar (Urheber Ouren) — alle fuer das private, nicht kommerzielle Spiel unproblematisch.",
+  "_quelle_elementals1_original.png": {
+    "original": "elementals.png",
+    "paket": "JS Monster Set - Elementals",
+    "blatt": "144x176 = 2 Spalten x 2 Reihen zu 72x88, vier Kreaturen: oben-links Wasser (blau-tuerkise Gestalt aus fliessendem Wasser), oben-rechts Feuer (orangene Flammengestalt), unten-links Blitz (gelb-weisse Elektro-Gestalt), unten-rechts Erde (sitzende, meditierende erdbraune Gestalt mit Steinen/Blaettern) — voller lilaner Hintergrund (#7F00FF), UNVERAENDERT",
+    "urheber": "JosephSeraph",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/js-monster-set-elementals",
+    "verwendung": "Referenzblatt fuer vier Elementarwesen-Optiken (Wasser/Feuer/Blitz/Erde) — siehe _warum_unbearbeitet fuer den Grund, warum kein Einzel-Zuschnitt beiliegt"
+  },
+  "_quelle_elementals2_original.png": {
+    "original": "elementals2.png",
+    "paket": "JS Monster Set - Elementals II",
+    "blatt": "160x144 = 2 Spalten x 2 Reihen zu 80x72, vier weitere Kreaturen: oben-links ein dunkler, fledermausfluegeliger Schatten-/Daemonengeist, oben-rechts eine helle, engelsgleiche Lichtgestalt mit weissen Schwingen (thematisch nahe an divine/, aber eigenstaendiges Motiv), unten-links eine reine Schatten-/Leere-Wirbelmasse, unten-rechts ein geisterhafter, drachenaehnlicher Windgeist — voller lilaner Hintergrund (#7F00FF), UNVERAENDERT",
+    "urheber": "JosephSeraph",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/js-monster-set-elementals-ii",
+    "verwendung": "Referenzblatt fuer vier weitere Elementarwesen-Optiken (Schatten/Licht/Leere/Wind)"
+  },
+  "elementarwesen_eis.png": {
+    "original": "Ice_Elemental_1.png",
+    "paket": "Ice Elemental (Einzelwerk, nicht Teil der JS-Monster-Set-Reihe)",
+    "blatt": "128x128, echte Alpha-Transparenz (kein Farbschluessel noetig), mehrere kleine Kristall-/Edelstein-Frames (ruhend, leuchtend, Split-Varianten) plus ein Kristallhaufen unten links — unveraendert",
+    "urheber": "Ouren",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/ice-elemental",
+    "verwendung": "achtes Elementarmotiv (Eis/Kristall) als drittes, unabhaengiges Referenzblatt — bereits transparent, kein Freistellungsproblem wie bei den beiden JS-Sheets"
+  }
+}
