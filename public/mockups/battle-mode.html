@@ -2962,6 +2962,19 @@
   const GREIF_REICHWEITE=40;        // wie nah jemand an einem freien Ball sein muss, um ihn zu greifen
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
+  // Dribbel-Animation (Fables Animations-Runde, 25.08.): der gehaltene Ball sass bisher
+  // auf fester Handhoehe (traeger.y+18, s. fsBall dort) — kein Auf-und-Ab, keine
+  // Dribbel-Bewegung zu sehen. Kurze Recherche zum ueblichen Muster (gamedev.net/
+  // GDC-Devlogs zu Footstep-/Bounce-Sync, 25.08.): der Standardweg ist NICHT ein
+  // Wanduhr-Timer fuer den Sound, sondern ein Phasenwert aus derselben Formel, die auch
+  // die Bewegung zeichnet — der Ton feuert exakt dort, wo die Y-Kurve von fallend auf
+  // steigend dreht (Bodenkontakt). Genau das macht BK_DRIBBEL unten: EIN sin-Bogen pro
+  // Periode, ueber denselben `dt` wie die restliche Simulation fortgeschrieben — damit
+  // bleibt der Bodenkontakt-Frame exakt, egal ob bei 1x oder 4x Tempo (stepSim laeuft bei
+  // hoeherem Tempo nur OEFTER mit demselben festen dt, s. loop()/ZEIT_DEHNUNG oben, nicht
+  // mit groesserem dt) — ein Wanduhr-Timer wuerde bei 4x dagegen sofort auseinanderlaufen.
+  const BK_DRIBBEL_PERIODE=0.5;     // Sekunden je Bodenkontakt — ~2 Dribbel/s, echtes Tempo
+  const BK_DRIBBEL_AMPLITUDE=13;    // px, wie tief der Ball Richtung Boden eintaucht
   // Muss exakt den gezeichneten Ring treffen (bodenFeldspiel, korbX dort: 0,115/0,885) —
   // vorher stand hier 0,90/0,10, ein Opus-Review-Fund: jeder Wurf landete ~20px NEBEN
   // dem Ring, und genau dort blieb ein Fehlwurf als freier Ball liegen.
@@ -3200,7 +3213,7 @@
         screenRuf:0,rangeSeit:null});
     }
     zuordneSlots(0); zuordneSlots(1);
-    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null}, reboundKampf:null,
+    fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
       fastbreak:null};
     ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
   }
@@ -3239,6 +3252,10 @@
   function ballUebernehmen(u){
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    // Neuer Ballfuehrer beginnt seinen Dribbel-Zyklus bei Handhoehe (Phase 0), nicht
+    // mitten in einem fremden Bounce — sonst haette der Ball beim Passwechsel einen
+    // sichtbaren Sprung in der Hoehe.
+    fsLive.ball.dribbelT=0;
     // EINZIGE Stelle, an der festgelegt wird, wer angreift — Opus-Review-Fund:
     // `fsLive.amBall` wurde beim Aufbau einmal zufaellig gesetzt und danach nie wieder
     // aktualisiert, `bewegeSpielerLive` fragte stattdessen `fsLive.ball.traeger?.side`
@@ -3527,8 +3544,15 @@
       0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0035+traeger.TEAMGEIST*0.0060));
     const proVersuch=1-Math.pow(basis,1/3);
     decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
+    // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
+    // Zahlenwurf ohne sichtbare Aktion — bei Misserfolg passierte optisch NICHTS, bei
+    // Erfolg zuckte der Decker erst nachtraeglich. `lunge` treibt in zeichneSprite()
+    // dieselbe Angriffs-Pose wie beim Wurf (s. wirf() oben, selbes Muster) — hier VOR
+    // dem Wuerfeln gesetzt, gilt also fuer beide Ausgaenge und faellt in dasselbe
+    // Bildfenster wie Feed-Text/Outcome unten (win-Zweig) bzw. das stille Scheitern.
+    decker.lunge=0.4;
     if(rr()<proVersuch){
-      decker.steals++; traeger.verluste++; decker.lunge=0.4;
+      decker.steals++; traeger.verluste++;
       feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
       if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
@@ -3873,6 +3897,12 @@
         else if(fsLive.reboundKampf.t>=fsLive.reboundKampf.dauer){
           const jetzt=[...FSTEAM[0],...FSTEAM[1]].filter(u=>dist(u,f)<GREIF_REICHWEITE);
           const kandidaten=jetzt.length?jetzt:nah;
+          // Fable-Fund (Animations-Runde, 25.08.): der Rebound-Kampf loeste bisher rein
+          // per Los auf — im Gedraenge sah man niemanden nach dem Ball greifen, weder
+          // Gewinner noch Verlierer. Alle Kandidaten bekommen denselben lunge-Puls wie
+          // ein Steal-Versuch (s. versucheSteal, selbes Muster), ausgeloest im selben
+          // Frame wie der Feed-Text/das Outcome direkt darunter.
+          for(const k of kandidaten)k.lunge=0.4;
           const gewinner=gewichtetesLos(kandidaten,"ZWEITCHANCE");
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
@@ -3896,7 +3926,22 @@
         // dem alten y-18 landete der Ball also bei ~y-44 bis -53: praktisch am Kopf-Oberrand.
         // +18 setzt den gezeichneten Ballmittelpunkt auf ~y-8, Hueft-/Handhoehe zwischen
         // Kopf und Fuessen.
-        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18};
+        // Dribbel-Bounce: Phase laeuft ueber denselben `dt` wie die restige Simulation
+        // weiter (s. Kommentar bei BK_DRIBBEL_PERIODE oben). `alt`/`neu` sind die
+        // Halbperioden-Indizes vor/nach diesem Tick — steigt der Index um mindestens
+        // eins UND landet er auf einem ungeraden Wert, hat die sin-Kurve gerade ihren
+        // Scheitel durchlaufen (Ableitung von steigend auf fallend, in Bildkoordinaten
+        // "faellt nicht mehr, sondern hebt wieder ab") — exakt der Bodenkontakt-Frame.
+        // Kein Pass/Wurf in der Luft (der laeuft ueber den `flug`-Zweig oben, gar nicht
+        // hier hinein) — der Bounce gilt also nur fuer den wirklich gehaltenen Ball.
+        const altT=fsLive.ball.dribbelT||0, neuT=altT+dt;
+        fsLive.ball.dribbelT=neuT;
+        const halbPeriode=BK_DRIBBEL_PERIODE/2;
+        const altIdx=Math.floor(altT/halbPeriode), neuIdx=Math.floor(neuT/halbPeriode);
+        if(neuIdx!==altIdx&&(neuIdx%2)===1)bkSfx("ballaufprall.mp3",0.32);
+        const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
+        const dribbelDip=Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip};
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
@@ -7139,21 +7184,26 @@
       frei.currentTime=0;frei.volume=bkPegel(vol??0.6);frei.play().catch(()=>{});
     }catch(e){}
   }
-  const bkLoop={dribbeln:null,publikum:null};
+  // Fable-Fund (Animations-Runde, 25.08.): Chris — "der Ton soll wirklich nur spielen,
+  // wenn der Ball auf dem Boden aufkommt." Bisher lief dribbeln.mp3 als dauerhafter
+  // Ambient-Loop ab Spielstart, komplett unabhaengig vom sichtbaren Ball (der bisher
+  // ohnehin nicht bounct hat). Jetzt gibt es je Bodenkontakt einen echten Einzelschuss
+  // ueber bkSfx (s. stepBasketballLive, BK_DRIBBEL_PERIODE) — der alte Loop wird deshalb
+  // nicht mehr gestartet. Die Publikums-Ambience bleibt: sie beschreibt die Halle, nicht
+  // den Ball, und macht die Stille zwischen zwei Dribbeln nicht leer.
+  const bkLoop={publikum:null};
   function bkLoopLautstaerkeAnwenden(){
-    if(bkLoop.dribbeln)bkLoop.dribbeln.volume=bkPegel(0.22);
     if(bkLoop.publikum)bkLoop.publikum.volume=bkPegel(0.16);
   }
   function bkLoopStart(){
-    if(!bkLoop.dribbeln){
-      bkLoop.dribbeln=new Audio("/sound/basketball/dribbeln.mp3");bkLoop.dribbeln.loop=true;
+    if(!bkLoop.publikum){
       bkLoop.publikum=new Audio("/sound/basketball/publikum_ambiente.ogg");bkLoop.publikum.loop=true;
     }
     bkLoopLautstaerkeAnwenden();
-    bkLoop.dribbeln.play().catch(()=>{});bkLoop.publikum.play().catch(()=>{});
+    bkLoop.publikum.play().catch(()=>{});
   }
-  function bkLoopPause(){ if(bkLoop.dribbeln){bkLoop.dribbeln.pause();bkLoop.publikum.pause();} }
-  function bkLoopStop(){ bkLoopPause(); if(bkLoop.dribbeln){bkLoop.dribbeln.currentTime=0;bkLoop.publikum.currentTime=0;} }
+  function bkLoopPause(){ if(bkLoop.publikum)bkLoop.publikum.pause(); }
+  function bkLoopStop(){ bkLoopPause(); if(bkLoop.publikum)bkLoop.publikum.currentTime=0; }
 
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
