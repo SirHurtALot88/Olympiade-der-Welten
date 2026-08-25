@@ -1,4 +1,5 @@
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
+import type { LeagueTier } from "@/lib/season/league-split";
 // Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
@@ -2462,6 +2463,13 @@ export type Fixture = {
   awayTeamId: string;
   matchdayId: string;
   status: "scheduled" | "resolved";
+  /**
+   * Liga, in der diese Paarung ausgetragen wird — siehe lib/season/league-split.ts. Optional und von
+   * keinem heutigen Fixture-Generator gesetzt (`buildSeasonFixtures` in
+   * preseason-workflow-service.ts kennt den Split noch nicht, PR 1 aus
+   * docs/design/liga-split-plan.md); fehlt bei jedem heutigen Spielstand.
+   */
+  leagueTier?: LeagueTier;
 };
 
 export type Season = {
@@ -3469,6 +3477,18 @@ export type SeasonState = {
    * after the season completes; cleared when a new season activates. See FrozenValuationSnapshot.
    */
   frozenValuationSnapshot?: FrozenValuationSnapshot;
+  /**
+   * LIGA-ZUGEHOERIGKEIT je Team (docs/design/liga-split-plan.md, Abschnitt 2.1). Optional und von
+   * keinem heutigen Code gesetzt — ein fehlendes Feld heisst Legacy-32er-Modus, siehe
+   * `isLeagueSplitActive` in lib/season/league-split.ts. Aendert sich pro Saison (Auf-/Abstieg), ist
+   * also ein Saison-Fakt wie `standings`, nicht Team-Identitaet.
+   */
+  leagueByTeamId?: Record<string, LeagueTier>;
+  /**
+   * Migrationsmarker fuer den Liga-Split, nach dem Muster von `sponsorLadderMigrationVersion` oben
+   * (Plan-Abschnitt 8). Optional, von keinem heutigen Code gesetzt oder gelesen.
+   */
+  leagueSplitMigrationVersion?: number;
 };
 
 export type SeasonEconomyFactorRecord = {

@@ -25,7 +25,13 @@ import type { SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { SPONSOR_CURVE_SHAPES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { sponsorV3AnchorWeights } from "@/lib/sponsor/sponsor-v3-model";
 
-/** Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell. */
+/**
+ * Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell. Bleibt der
+ * DEFAULT fuer alle Funktionen unten (docs/design/liga-split-plan.md, PR 1: reine Parametrisierung,
+ * Verhalten bei Default unveraendert). Ein optionaler `leagueSize`-Parameter erlaubt eine kleinere
+ * Ligagroesse (z. B. `LEAGUE_SIZE = 16` aus lib/season/league-split.ts), ohne dass ein bestehender
+ * Aufruf ohne diesen Parameter sich aendert.
+ */
 const SPONSOR_LIGA_RANKS = 32;
 
 /**
@@ -71,45 +77,60 @@ export const SPONSOR_WERTUNG_KURVE = 1.35;
  */
 export const SPONSOR_BODEN = 43 * SPONSOR_AUSSCHUETTUNG;
 
-const clampRank = (rank: number): number =>
-  Math.max(1, Math.min(SPONSOR_LIGA_RANKS, Math.round(Number.isFinite(rank) ? rank : SPONSOR_LIGA_RANKS)));
+const clampRank = (rank: number, leagueSize: number = SPONSOR_LIGA_RANKS): number =>
+  Math.max(1, Math.min(leagueSize, Math.round(Number.isFinite(rank) ? rank : leagueSize)));
 
 /**
  * Der Sockel eines Teams — linear ueber den STARTRANG, NICHT den Salary Factor. Das ist Absicht: der
  * Sockel ist die planbare Absicherung, gegen die ein Team seine Gehaelter zusagt, bevor die Saison
  * anfaengt. Haenge er am Salary Factor, wuesste ein Team seinen Sockel erst, wenn die Konjunktur der
  * Saison schon feststeht — zu spaet fuer die Kaderplanung.
+ *
+ * `leagueSize` default `SPONSOR_LIGA_RANKS` (32) — heutiges Verhalten unveraendert.
  */
-export function sponsorSockelFuerStartrang(startRank: number): number {
-  const rank = clampRank(startRank);
-  return SPONSOR_SOCKEL_MIN + ((SPONSOR_SOCKEL_MAX - SPONSOR_SOCKEL_MIN) * (rank - 1)) / (SPONSOR_LIGA_RANKS - 1);
+export function sponsorSockelFuerStartrang(startRank: number, leagueSize: number = SPONSOR_LIGA_RANKS): number {
+  const rank = clampRank(startRank, leagueSize);
+  return SPONSOR_SOCKEL_MIN + ((SPONSOR_SOCKEL_MAX - SPONSOR_SOCKEL_MIN) * (rank - 1)) / (leagueSize - 1);
+}
+
+/** Rang-Gewichte des Wertungstopfs fuer eine gegebene Ligagroesse (siehe `sponsorWertungsGewichte`). */
+function computeWertungsGewichte(leagueSize: number): readonly number[] {
+  return Array.from({ length: leagueSize }, (_, index) => {
+    const rank = index + 1;
+    return ((leagueSize - rank) / (leagueSize - 1)) ** SPONSOR_WERTUNG_KURVE;
+  });
 }
 
 /**
- * Die Rang-Gewichte des Wertungstopfs, EINMAL berechnet (Modul-Konstante): Rang 1 bekommt das volle
- * Gewicht 1, Rang 32 exakt 0 — der Letzte der Liga bekommt aus dem Wertungstopf nichts, nur seinen
- * Sockel. Dazwischen faellt das Gewicht mit `SPONSOR_WERTUNG_KURVE`.
+ * Die Rang-Gewichte des Wertungstopfs bei `SPONSOR_LIGA_RANKS` (32), EINMAL berechnet
+ * (Modul-Konstante): Rang 1 bekommt das volle Gewicht 1, Rang 32 exakt 0 — der Letzte der Liga
+ * bekommt aus dem Wertungstopf nichts, nur seinen Sockel. Dazwischen faellt das Gewicht mit
+ * `SPONSOR_WERTUNG_KURVE`.
  */
-const WERTUNGS_GEWICHTE: readonly number[] = Array.from({ length: SPONSOR_LIGA_RANKS }, (_, index) => {
-  const rank = index + 1;
-  return ((SPONSOR_LIGA_RANKS - rank) / (SPONSOR_LIGA_RANKS - 1)) ** SPONSOR_WERTUNG_KURVE;
-});
+const WERTUNGS_GEWICHTE: readonly number[] = computeWertungsGewichte(SPONSOR_LIGA_RANKS);
 const WERTUNGS_GEWICHTE_SUMME = WERTUNGS_GEWICHTE.reduce((sum, value) => sum + value, 0);
 
-export function sponsorWertungsGewichte(): readonly number[] {
-  return WERTUNGS_GEWICHTE;
+/** `leagueSize` default `SPONSOR_LIGA_RANKS` (32) — liefert bei Default die gecachte 32er-Reihe. */
+export function sponsorWertungsGewichte(leagueSize: number = SPONSOR_LIGA_RANKS): readonly number[] {
+  return leagueSize === SPONSOR_LIGA_RANKS ? WERTUNGS_GEWICHTE : computeWertungsGewichte(leagueSize);
 }
 
 /**
- * Die NEUTRALE Ligaleiter: 32 Sprossen, Sockel (konstant ueber den Endrang, haengt nur am Startrang)
- * plus der anteilige Wertungstopf (haengt nur am Endrang). OHNE Boden — der wird erst spaeter, ueber
- * das eingefrorene `terms.floor`, angewandt (siehe `sponsor-v3-model.ts`), damit diese Funktion pure,
- * ungeklammerte Arithmetik bleibt und der Anker in `sponsorKurvenLeiter` exakt trifft.
+ * Die NEUTRALE Ligaleiter: `leagueSize` Sprossen (default 32), Sockel (konstant ueber den Endrang,
+ * haengt nur am Startrang) plus der anteilige Wertungstopf (haengt nur am Endrang). OHNE Boden — der
+ * wird erst spaeter, ueber das eingefrorene `terms.floor`, angewandt (siehe `sponsor-v3-model.ts`),
+ * damit diese Funktion pure, ungeklammerte Arithmetik bleibt und der Anker in `sponsorKurvenLeiter`
+ * exakt trifft.
  */
-export function sponsorLigaLeiter(input: { startRank: number; salaryFactor: number }): number[] {
-  const sockel = sponsorSockelFuerStartrang(input.startRank);
+export function sponsorLigaLeiter(input: { startRank: number; salaryFactor: number; leagueSize?: number }): number[] {
+  const leagueSize = input.leagueSize ?? SPONSOR_LIGA_RANKS;
+  const sockel = sponsorSockelFuerStartrang(input.startRank, leagueSize);
+  const gewichte = sponsorWertungsGewichte(leagueSize);
+  const gewichteSumme = leagueSize === SPONSOR_LIGA_RANKS
+    ? WERTUNGS_GEWICHTE_SUMME
+    : gewichte.reduce((sum, value) => sum + value, 0);
   const topf = SPONSOR_WERTUNGSTOPF * input.salaryFactor;
-  return WERTUNGS_GEWICHTE.map((gewicht) => sockel + (topf * gewicht) / WERTUNGS_GEWICHTE_SUMME);
+  return gewichte.map((gewicht) => sockel + (topf * gewicht) / gewichteSumme);
 }
 
 /**

@@ -39,8 +39,8 @@ export type RangmarkenHaerte = "mild" | "hart";
  * also aufsteigend in der GUETE und absteigend in der ZAHL. Gesucht ist die kleinste Zahl, die den
  * Rang noch fasst — deshalb wird von hinten gelesen. Von vorne gelesen bekaeme der Meister „Top 28".
  */
-export function blockFuerRang(rang: number): number {
-  const geklammert = Math.max(1, Math.min(32, Math.round(rang)));
+export function blockFuerRang(rang: number, leagueSize: number = 32): number {
+  const geklammert = Math.max(1, Math.min(leagueSize, Math.round(rang)));
   for (let index = RANGMARKEN_BLOECKE.length - 1; index >= 0; index -= 1) {
     const block = RANGMARKEN_BLOECKE[index]!;
     if (geklammert <= block) return block;
@@ -58,13 +58,14 @@ export function blockFuerRang(rang: number): number {
  * keine Sprosse mehr, und eine Marke, die niemand reissen kann, ist keine — aber sie darf auch
  * nicht dazu fuehren, dass ausgerechnet das schwaechste Team seine Leihe nie nutzen kann.
  */
-export function baueRangmarke(input: { startRang: number; haerte: RangmarkenHaerte }): number {
-  const block = blockFuerRang(input.startRang);
+export function baueRangmarke(input: { startRang: number; haerte: RangmarkenHaerte; leagueSize?: number }): number {
+  const leagueSize = input.leagueSize ?? 32;
+  const block = blockFuerRang(input.startRang, leagueSize);
   if (input.haerte === "hart") return block;
   const index = RANGMARKEN_BLOECKE.indexOf(block as (typeof RANGMARKEN_BLOECKE)[number]);
   // Ein Block weiter unten heisst: groessere Zahl. Im untersten Block gibt es keinen mehr, dann
   // deckt die Marke die ganze Tabelle ab.
-  return index <= 0 ? 32 : RANGMARKEN_BLOECKE[index - 1]!;
+  return index <= 0 ? leagueSize : RANGMARKEN_BLOECKE[index - 1]!;
 }
 
 /** Haelt dieses Team seine Marke gerade? */

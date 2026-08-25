@@ -73,14 +73,18 @@ function buildBudgetRankByTeamId(rows: TeamManagementSnapshotRow[]) {
 }
 
 function buildMarketValueRankByTeamId(rows: TeamManagementSnapshotRow[], budgetRankByTeamId: Map<string, number>) {
+  // Fallback aus der TATSAECHLICHEN Zahl der uebergebenen Teams statt einer festen 32: identisches
+  // Verhalten, solange `rows` alle 32 Teams enthaelt (heute immer), automatisch richtig fuer eine
+  // kuenftige liga-lokale Aufrufstelle mit nur 16 Zeilen (Liga-Split).
+  const fallbackRank = Math.max(1, rows.length);
   const sorted = [...rows].sort((left, right) => {
     const leftValue = left.marketValueTotal ?? 0;
     const rightValue = right.marketValueTotal ?? 0;
     if (rightValue !== leftValue) {
       return rightValue - leftValue;
     }
-    const leftBudgetRank = budgetRankByTeamId.get(left.teamId) ?? 32;
-    const rightBudgetRank = budgetRankByTeamId.get(right.teamId) ?? 32;
+    const leftBudgetRank = budgetRankByTeamId.get(left.teamId) ?? fallbackRank;
+    const rightBudgetRank = budgetRankByTeamId.get(right.teamId) ?? fallbackRank;
     if (leftBudgetRank !== rightBudgetRank) {
       return leftBudgetRank - rightBudgetRank;
     }

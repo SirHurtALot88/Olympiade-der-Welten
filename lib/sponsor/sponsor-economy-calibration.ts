@@ -47,7 +47,10 @@ export function readLockedRankPayout(ladder: number[], finalRank: number | null 
   if (finalRank == null || !Number.isFinite(finalRank)) {
     return ladder[ladder.length - 1] ?? 0;
   }
-  const boundedRank = Math.min(32, Math.max(1, Math.round(finalRank)));
+  // Rangraum aus der TATSAECHLICHEN Leiterlaenge, nicht aus einer festen 32: identisches Verhalten,
+  // solange Leitern 32 Sprossen haben (heute immer), automatisch richtig fuer eine kuenftige
+  // 16er-Leiter (Liga-Split, docs/design/liga-split-plan.md).
+  const boundedRank = Math.min(ladder.length, Math.max(1, Math.round(finalRank)));
   return ladder[boundedRank - 1] ?? ladder[ladder.length - 1] ?? 0;
 }
 
@@ -143,7 +146,11 @@ export function buildSponsorOfferTermForecast(gameState: GameState, offer: Spons
   }
   const termSeasons = offer.termSeasons ?? 1;
   const window = gameState.seasonState.seasonEconomyFactors ?? [];
-  const rankIndex = Math.max(0, Math.min(31, Math.round(terms.startRank) - 1));
+  // Obergrenze aus der TATSAECHLICHEN Leiterlaenge dieses Vertrags statt der festen 31 (= 32-1):
+  // identisches Verhalten bei den heutigen 32er-Leitern, automatisch richtig fuer eine kuenftige
+  // 16er-Leiter (Liga-Split).
+  const ranks = terms.rankLadder.length || 32;
+  const rankIndex = Math.max(0, Math.min(ranks - 1, Math.round(terms.startRank) - 1));
 
   return Array.from({ length: termSeasons }, (_, seasonIndex) => {
     const vorausgewuerfelt = window.find((entry) => entry.horizonIndex === seasonIndex)?.factor;
