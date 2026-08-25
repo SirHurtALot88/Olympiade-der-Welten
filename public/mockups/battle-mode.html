@@ -3383,6 +3383,7 @@
       decker.steals++; traeger.verluste++; decker.lunge=0.4;
       feed(decker.side,decker.n+" erobert den Ball — "+art.wortAbwehr+".");
       logZug(decker.side,"steal",{verteidiger:decker,spieler:traeger});
+      if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
       // Reihenfolge bewusst: naechsterAngriff() -> ballUebernehmen() loescht
       // fsLive.fastbreak bei JEDEM Ballwechsel (Opus-Review-Fund #11) — startFastbreak
       // muss deshalb NACH diesem Aufruf kommen, sonst loescht er sein eigenes Fenster.
@@ -3405,6 +3406,7 @@
         f.steals++; flug.passgeber.verluste++; f.lunge=0.4;
         feed(f.side,f.n+" fängt den Pass ab — Steal.");
         logZug(f.side,"steal",{verteidiger:f,spieler:flug.passgeber});
+        if(feldspielDisc==="basketball")bkSfx("ballaufprall.mp3",0.5);
         fsAktuell={spieler:null,verteidiger:f,passgeber:flug.passgeber,rebounder:null};
         // Reihenfolge bewusst: ballUebernehmen() loescht fsLive.fastbreak bei jedem
         // Ballwechsel (Opus-Review-Fund #11) — startFastbreak muss danach kommen.
@@ -3961,10 +3963,14 @@
           ||u===fsAktuell.passgeber||u===fsAktuell.rebounder);
         ctx.fillStyle=c;ctx.globalAlpha=aktiv?0.30:0.20;
         ctx.beginPath();ctx.ellipse(gx,gy+19,16,6,0,0,6.3);ctx.fill();ctx.globalAlpha=1;
-        if(aktiv){
-          ctx.strokeStyle=c;ctx.globalAlpha=0.55;ctx.lineWidth=2;
-          ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
-        }
+        // Fables Fund (Polish-Runde, 24.08.): die Ruestungsfarben der Charaktere sind pro
+        // Person fix (Draco dunkel, King Arlen gold, ...) — im Gewuehl liessen sich die
+        // beiden Teams am Feld selbst nicht unterscheiden, nur ueber die winzigen Namens-
+        // labels. Ein dauerhafter, dezenter Team-Ring statt nur beim aktiven Spieler
+        // loest das ohne eine einzige Ruestung umzufaerben (das haette 144 individuell
+        // getroffene BAU-Looks wieder verwaschen).
+        ctx.strokeStyle=c;ctx.globalAlpha=aktiv?0.55:0.28;ctx.lineWidth=aktiv?2:1.5;
+        ctx.beginPath();ctx.arc(x,y,20,0,6.3);ctx.stroke();ctx.globalAlpha=1;
         zeichneSprite(ctx,u,x,y,true);
         ctx.textAlign="center";ctx.textBaseline="middle";
         const schrift=(txt,dy,farbe,groesse)=>{
@@ -3978,13 +3984,20 @@
           schrift(stat.punkte+"P "+stat.assists+"A "+stat.rebounds+"R "+(stat.steals+stat.bloecke)+"D",56,"#dfe6ef",8);
       });
     });
-    // Der Ball. Klein, orange, folgt fsLerpPositionen — von Passgeber zu Ballfuehrer,
-    // bei Treffer/Block weiter zum Korb, bei Steal zum Verteidiger.
+    // Der Ball. Folgt fsLerpPositionen — von Passgeber zu Ballfuehrer, bei Treffer/Block
+    // weiter zum Korb, bei Steal zum Verteidiger. Fables Fund (Polish-Runde, 24.08.): der
+    // echte Basketball-Sprite (public/sprites/basketball/ball.png) lag seit der ersten
+    // Court-Runde ungenutzt im Repo — der Ball war bis eben ein reiner Vektor-Punkt. Selber
+    // Rueckfall wie beim Korb: laedt das Bild nicht, bleibt der alte Kreis stehen.
     if(fsBall.sichtbar){
-      ctx.fillStyle="#e8823a";
-      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
-      ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-      ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+      if(bkDa("ball")){
+        ctx.drawImage(bkBild.ball,fsBall.x-9,fsBall.y-35,18,18);
+      } else {
+        ctx.fillStyle="#e8823a";
+        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
+        ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+      }
     }
     for(const f of floats){
       if(f._spieler==null)continue;
@@ -6808,7 +6821,7 @@
   // Basketball-Halle: dieselbe Datei-statt-base64-Idee wie A_TEILE oben, nur eigener
   // Ordner (Fables Recherche, 24.08., quellen.json dort). Selber Rueckfall-Grundsatz:
   // laedt ein Bild nicht, zeichnet bodenFeldspiel weiter die alte Vektor-Fassung.
-  const BK_TEILE=["parkett","korb_topdown","zuschauer"];
+  const BK_TEILE=["parkett","korb_topdown","zuschauer","ball"];
   const bkBild={}, bkMuster={};
   for(const n of BK_TEILE){const im=new Image();im.src="/sprites/basketball/"+n+".png";bkBild[n]=im;}
   const bkDa=n=>{const im=bkBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -8730,6 +8743,20 @@
       return c.toDataURL();
     },
     renderFeldBoden:(disc)=>{ feldspielDisc=disc||feldspielDisc; bodenFeldspiel(); return cv.toDataURL(); },
+    diagPositionen:(saat)=>{
+      feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      const eimer=[]; let naechster=5;
+      while(!done&&fsT<125){
+        stepFeldspiel(1/60);
+        if(fsT>=naechster){
+          eimer.push({t:Math.round(fsT),
+            x:[...FSTEAM[0],...FSTEAM[1]].map(u=>Math.round(u.x)),
+            ballSeite:fsLive?fsLive.amBall:null});
+          naechster+=5;
+        }
+      }
+      return eimer;
+    },
     setDisc:(d)=>{ disc=d; reset(); },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
