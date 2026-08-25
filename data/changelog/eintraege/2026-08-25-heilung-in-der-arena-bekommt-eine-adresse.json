@@ -1,0 +1,7 @@
+{
+  "datum": "2026-08-25",
+  "seite": "Spieltag · Battle Arena",
+  "text": "Im Endscreen der Battle Arena zeigt die Spalte „H“ (Heilung) jetzt beim Darüberfahren, wen ein Heiler geheilt hat — genau wie Schaden, Betäubung und KOs das schon zeigten. Vorher stand dort nur eine Summe ohne Adresse.",
+  "gewicht": "feinschliff",
+  "version": "0.5"
+}
