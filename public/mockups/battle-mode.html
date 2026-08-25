@@ -310,6 +310,8 @@
   .eteam h4{margin:0;font-size:clamp(13px,1.7vw,21px);color:#eef3f9}
   .eteam .eplatz{margin:2px 0 0;font-size:clamp(10px,1.15vw,13px);color:#93a1b3}
   .eteam .eplatz b{color:#e8c07a}
+  .eteam .eplatzdiszi{margin:1px 0 0;font-size:clamp(9px,1.05vw,12px);color:#7fb8cf}
+  .eteam .eplatzdiszi b{color:#7fb8cf}
   .egegen{text-align:center;color:#93a1b3}
   .egegen b{display:block;font-size:clamp(13px,1.9vw,22px);color:#eef3f9;letter-spacing:.06em}
   .egegen em{font-style:normal;font-size:clamp(9px,1.05vw,12px)}
@@ -8402,9 +8404,37 @@
   // /team-logos/<Kuerzel>.jpg — im Spiel laedt der Reiter sie von dort. Wird die Datei
   // nicht gefunden (etwa beim Oeffnen ueber file://), tritt ein Monogramm an ihre
   // Stelle, damit der Einlauf nie leer aussieht.
+  // platzDiszi: der DISZIPLIN-SPEZIFISCHE Rang jedes Teams unter allen 32 Ligateams —
+  // nicht die Tabellenplatzierung oben (die kommt aus Punkten/Ergebnissen), sondern wie
+  // stark der Kader FUER GENAU DIESE DISZIPLIN im Ligavergleich dasteht.
+  //
+  // Quelle: dieselbe Formel, die die echte App fuer Team-Disziplin-Raenge auch anzeigt
+  // (Teams-Tab und Team-Profil) — lib/foundation/team-discipline-rank-engine.ts,
+  // buildTeamDisciplineRankRowsFromGameState(). Team-Score je Disziplin = Summe der
+  // TOP-6 player.disciplineRatings[disciplineId] im Kader; disziplinRatings selbst kommt
+  // aus lib/player-formulas/discipline-rating-engine.ts (gewichtete Attributsumme ->
+  // Liga-Rang -> Rank-zu-Stat-Tabelle, dieselben Gewichte wie BASIS_JE_DISC oben). Kein
+  // neu erfundenes Mass — derselbe Live-Pfad, den Chris im Teams-Tab sieht.
+  //
+  // Gezogen am 25.08.2026 aus dem live-save-Abbild (git fetch origin live-save; siehe
+  // CLAUDE.md) mit: OLY_APP_SQLITE_PATH=/tmp/abbild.sqlite npx tsx
+  // scripts/fable-discipline-rank-pull.ts — Spielstand new-game-1787123325719-swnjlk,
+  // Saison 2, 32 Teams/2984 Spieler/328 Kaderzeilen im Abbild. Gesamt-Teamstaerke-Rang
+  // laut derselben Formel: V-W 20 von 32, A-A 24 von 32 — deckt sich der RICHTUNG nach
+  // mit der Tabelle (Platz 9 vs. 22), auch wenn Kaderstaerke und Punktestand naturgemaess
+  // nicht dieselbe Zahl sind (Ergebnisse vs. Rohpotential). Um zukuenftig neu zu ziehen,
+  // dasselbe Skript erneut laufen lassen, sobald der Spielstand fortgeschritten ist.
   const VEREIN={
-    0:{name:"Vigilante Wranglers",  kurz:"V-W", platz:9,  punkte:112.2},
-    1:{name:"Armageddon Aftermath", kurz:"A-A", platz:22, punkte:78.1}
+    0:{name:"Vigilante Wranglers",  kurz:"V-W", platz:9,  punkte:112.2,
+      platzDiszi:{tdm:6,spurt:29,"time-trial":32,climbing:31,"takeshis-castle":10,staffel:30,
+        "mini-dm":8,fechten:32,battlefield:7,gewichtheben:2,showcase:3,eiskunstlauf:11,
+        breaking:3,wettessen:14,basketball:18,football:4,hockey:19,tennis:27,
+        "speed-schach":24,"i-spy":19}},
+    1:{name:"Armageddon Aftermath", kurz:"A-A", platz:22, punkte:78.1,
+      platzDiszi:{tdm:20,spurt:16,"time-trial":7,climbing:12,"takeshis-castle":26,staffel:25,
+        "mini-dm":21,fechten:10,battlefield:30,gewichtheben:24,showcase:31,eiskunstlauf:27,
+        breaking:25,wettessen:24,basketball:27,football:27,hockey:15,tennis:14,
+        "speed-schach":10,"i-spy":26}}
   };
   const LIGAGROESSE=32;
 
@@ -8486,6 +8516,14 @@
       pl.appendChild(el("b","","Platz "+v.platz));
       pl.appendChild(document.createTextNode(" von "+LIGAGROESSE+" · "+v.punkte+" Punkte"));
       txt.appendChild(pl);
+
+      // Zweite, eigene Zeile: der Rang ist der DISZIPLIN-Rang, nicht die Tabellenplatzierung
+      // oben — deshalb eigene Klasse, eigene Farbe und explizit "in <Disziplin>" im Text.
+      const dr=v.platzDiszi&&v.platzDiszi[disc];
+      const pd=el("p");pd.className="eplatzdiszi";
+      pd.appendChild(el("b","",dr?"Platz "+dr:"—"));
+      pd.appendChild(document.createTextNode(" von "+LIGAGROESSE+" in "+DISCS[disc].label));
+      txt.appendChild(pd);
       k.appendChild(txt);
 
       // Die Aufstellung kommt aus DENSELBEN Einheiten, die gleich kaempfen — nicht aus
