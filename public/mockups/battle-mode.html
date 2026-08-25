@@ -451,7 +451,7 @@
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
       <div class="scoreline">
         <div class="tname">Vigilante Wranglers<em>V-W · <span id="aliveL">6</span> im Kampf</em></div>
-        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · Punkte</small></div>
+        <div class="clock"><span id="score">0 : 0</span><small><span id="clock">0:00</span> · <span id="phase">bereit</span> · <span id="klsuffix">Punkte</span></small></div>
         <div class="tname r">Armageddon Aftermath<em><span id="aliveR">6</span> im Kampf · A-A</em></div>
       </div>
       <div class="hpbars">
@@ -3783,7 +3783,17 @@
     if(done){bewegeSpielerLive(dt);return;}
     fsT+=dt;
     if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
-      bkSfx("buzzer.mp3",0.8); bkLoopStop(); return; }
+      bkSfx("buzzer.mp3",0.8); bkLoopStop();
+      // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
+      // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
+      // renderEndstand() sind Kampf-spezifisch (K/T/B/CC/H/S-Spalten, "wer hat mehr
+      // Ueberlebende") und passen nicht auf Basketballs Punktestand — deshalb hier keine
+      // Weiterleitung dorthin, sondern eine eigene, einfache Ansage im Feed. Scoreboard
+      // und Wertung-Panel bleiben ohnehin sichtbar (kein Tab-Wechsel beim Spielende).
+      const sieger=fsPunkte[0]>fsPunkte[1]?"Vigilante Wranglers":fsPunkte[1]>fsPunkte[0]?"Armageddon Aftermath":null;
+      feed(0,(sieger?"Schlusssirene — "+sieger+" gewinnt ":"Schlusssirene — Unentschieden ")
+        +fsPunkte[0]+":"+fsPunkte[1]+".",true);
+      return; }
     const art=FB();
     fsLive.angriffSeit+=dt;
     for(const team of FSTEAM)for(const u of team){
@@ -4022,10 +4032,15 @@
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"Spielzüge");});
-    // Nur die Bahn schreibt ".clock small" um — falls zuletzt die Bahn dran war, hier
-    // zurueck auf die Vorlage (Feldspiel hat dafuer keinen eigenen Text noetig).
-    const kl=document.querySelector(".clock small");
-    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
+    // Fable-Fund (Runde 2, 25.08.): die vorige Fassung ersetzte HIER das komplette
+    // innerHTML von ".clock small" — dem WRAPPER, der die Live-Spans #clock/#phase
+    // selbst enthaelt. Jeder Frame zerstoerte damit genau die Knoten, die zwei Zeilen
+    // weiter oben gerade frisch beschrieben wurden, und ersetzte sie durch das beim
+    // allerersten Aufruf zwischengespeicherte, seither eingefrorene "0:00"/"bereit" —
+    // die Uhr stand fuer die gesamte Partie still. Jetzt ein eigenes Element
+    // (#klsuffix) nur fuer das austauschbare Schlusswort, das die Live-Spans nie
+    // beruehrt. Nur die Bahn setzt hier "im Ziel"; alles andere bleibt bei "Punkte".
+    document.getElementById("klsuffix").textContent="Punkte";
     document.getElementById("aliveL").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===0).length);
     document.getElementById("aliveR").textContent=String(fsZuege.slice(0,fsZeiger).filter(e=>e.seite===1).length);
     // Enthuellter Spielstand, nicht das vorab durchgerechnete Endergebnis — siehe fsBisher().
@@ -4499,10 +4514,9 @@
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"aufgetreten");});
-    // Nur die Bahn schreibt ".clock small" um — falls zuletzt die Bahn dran war, hier
-    // zurueck auf die Vorlage (Buehne hat dafuer keinen eigenen Text noetig).
-    const kl=document.querySelector(".clock small");
-    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
+    // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
+    // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
+    document.getElementById("klsuffix").textContent="Punkte";
     const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=BB().rundenN).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
@@ -6980,11 +6994,10 @@
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,"im Ziel");});
-    const kl=document.querySelector(".clock small");
-    if(kl){
-      if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML;
-      kl.innerHTML=kl.dataset.origHtml.replace(/· Punkte/,"· im Ziel");
-    }
+    // Nicht mehr per innerHTML-Ersetzung (Fable-Fund Runde 2): das zerstoerte bei jedem
+    // Aufruf die Live-Spans #clock/#phase im selben Wrapper und fror die Uhr auf ihren
+    // allerersten Stand ein. #klsuffix ist ein eigenes Element nur fuer dieses Wort.
+    document.getElementById("klsuffix").textContent="im Ziel";
     const imZiel=(s)=>rennFertig.filter(x=>x.seite===s).length;
     document.getElementById("aliveL").textContent=String(imZiel(0));
     document.getElementById("aliveR").textContent=String(imZiel(1));
@@ -7015,10 +7028,11 @@
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml;});
-    // Nur die Bahn schreibt ".clock small" um ("· Punkte" -> "· im Ziel") — dieselbe
-    // Wiederherstellung wie oben, falls zuletzt die Bahn dran war.
-    const kl=document.querySelector(".clock small");
-    if(kl){ if(kl.dataset.origHtml===undefined)kl.dataset.origHtml=kl.innerHTML; kl.innerHTML=kl.dataset.origHtml; }
+    // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2): das ueberschrieb bei jedem
+    // Frame die Live-Spans #clock/#phase im selben Wrapper mit dem beim allerersten
+    // Aufruf zwischengespeicherten Startwert — die Uhr stand im Kampf fest. #klsuffix
+    // ist ein eigenes Element nur fuer das austauschbare Schlusswort.
+    document.getElementById("klsuffix").textContent="Punkte";
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
@@ -8280,7 +8294,13 @@
     if(stumm)return;
     const f=document.getElementById("feed");
     const d=el("div");
-    d.appendChild(el("span","tk","0:"+String(Math.floor(t)).padStart(2,"0")));
+    // Fable-Fund (Runde 2, 25.08.): jede Feed-Zeile zeigte "0:00", unabhaengig vom
+    // echten Spielverlauf — der Stempel hing fest an `t`, der Kampf-eigenen Uhr, die
+    // auf der Bahn/Buehne/im Feldspiel nie hochgezaehlt wird (die haben ihre eigenen
+    // Uhren fsT/buehneT/rennT). Jetzt zeigt der Stempel dieselbe Uhr, die auch im
+    // Kopf angezeigt wird (s. updateHudFeldspiel/-Buehne/-Bahn).
+    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t;
+    d.appendChild(el("span","tk","0:"+String(Math.floor(anzeigeT)).padStart(2,"0")));
     d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
     f.appendChild(d);
     while(f.children.length>140)f.removeChild(f.firstChild);
