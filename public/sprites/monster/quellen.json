@@ -31,17 +31,73 @@
     "url": "https://opengameart.org/content/flying-dragon-rework"
   },
   "_lpc_monster": "Die folgenden 11 Blaetter stammen aus '[LPC] Monsters': Originale von Charles Sanchez (CharlesGabriel) aus den LPC-Basis-Assets, Angriffs-Animationen von bluecarrot16, beauftragt von Pierre Vigier (Vagabond). Lizenz CC-BY-SA 3.0 / GPL 3.0. https://opengameart.org/content/lpc-monsters — LPC-Raster 64x64, 4 Richtungen, unveraendert uebernommen (nur umbenannt).",
-  "fledermaus.png": { "original": "bat.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "biene.png": { "original": "bee.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "wurm_gross.png": { "original": "big_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "auge.png": { "original": "eyeball.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "geist.png": { "original": "ghost.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "fleischfresser_blume.png": { "original": "man_eater_flower.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters", "verwendung": "Pflanzenwesen — deckt Chris' 'plants'-Wunsch ab, im LPC-Raster" },
-  "kuerbis.png": { "original": "pumpking.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "schleim.png": { "original": "slime.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "schleim_geschoss.png": { "original": "slime-projectile.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "wurm_klein.png": { "original": "small_worm.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
-  "schlange.png": { "original": "snake.png", "paket": "[LPC] Monsters", "lizenz": "CC-BY-SA 3.0 / GPL 3.0", "url": "https://opengameart.org/content/lpc-monsters" },
+  "fledermaus.png": {
+    "original": "bat.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "biene.png": {
+    "original": "bee.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "wurm_gross.png": {
+    "original": "big_worm.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "auge.png": {
+    "original": "eyeball.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "geist.png": {
+    "original": "ghost.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "fleischfresser_blume.png": {
+    "original": "man_eater_flower.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters",
+    "verwendung": "Pflanzenwesen — deckt Chris' 'plants'-Wunsch ab, im LPC-Raster"
+  },
+  "kuerbis.png": {
+    "original": "pumpking.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "schleim.png": {
+    "original": "slime.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "schleim_geschoss.png": {
+    "original": "slime-projectile.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "wurm_klein.png": {
+    "original": "small_worm.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
+  "schlange.png": {
+    "original": "snake.png",
+    "paket": "[LPC] Monsters",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-monsters"
+  },
   "wolf.png": {
     "paket": "[LPC] Wolf Animation",
     "blatt": "wolfsheet1.png, unveraendert (640x384, 64px-Zellen, 4 Richtungen: gehen/rennen etc., siehe OGA-Seite)",
@@ -139,5 +195,89 @@
     "urheber": "Stephen Challener (Redshrike), William Thompson, Jordan Irwin (AntumDeluge)",
     "lizenz": "CC-BY-SA 3.0",
     "url": "https://opengameart.org/content/werewolf-lpc"
+  },
+  "_nachtrag_26_08_bots": "NEU am 26.08. (Rassen-/Subclass-Luecken-Recherche, Subclass 'Bot' = 170 Spieler / Rasse Construct = 334): Der Kader hatte bislang genau EINEN Roboter (roboter_walk.png = Mech1, grau). Aus DEMSELBEN bereits lizenzgeprueften Skorpio-Paket (Zip neu heruntergeladen und per md5 gegen roboter_walk.png verifiziert) jetzt alle uebrigen Roboter-Motive uebernommen: die braune Mech1-Farbvariante (identisches 8x4/64px-Raster wie roboter_walk.png, also ohne neue Mechanik ueber denselben VOLLBILD-Eintrag nutzbar), der GROSSE Mech2 (768x384 = 8 Spalten x 4 Reihen zu 96x96, Standard-LPC-Zeilenfolge 0 hinten/1 links/2 vorn/3 rechts — am Blatt nachgesehen, nicht geraten; erster 96px-LPC-Vollbildkandidat, Zellgroesse wie kraken.png nur quadratisch) und die 5 Cutiebots (je 128x128 EINZELBILD, nur Frontansicht, KEIN Richtungs-/Gehzyklus — ehrlich gesagt nur als Standbild nutzbar, wie schiff_pirat.png mit rows:1, oder als Portrait/Icon). Damit ist das Skorpio-Paket vollstaendig ausgeschoepft: mehr Roboter enthaelt es nicht. Weiblich/maennlich gibt es bei Robotern im gesamten LPC-Oekosystem nicht — kein Fund, bei keinem Paket.",
+  "roboter_braun_walk.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Mechs/Mech1/Mech1brownWalk.png, unveraendert (512x256 = 8 Bilder x 4 Richtungen zu 64x64, wie roboter_walk.png)",
+    "verwendung": "braune Farbvariante des verdrahteten Mech1 — zweite Bot-Optik ohne neue Zeichenmechanik"
+  },
+  "roboter_braun_tod.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Mechs/Mech1/Mech1brownDeath.png, unveraendert (320x64 = 5 Bilder x 1 Reihe)"
+  },
+  "mech_gross_walk.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Mechs/Mech2/Mech2Walk.png, unveraendert (768x384 = 8 Spalten x 4 Reihen zu 96x96, LPC-Zeilenfolge)",
+    "verwendung": "grosser schwerer Kampf-Mech mit Schulterkanone — dritte, deutlich massigere Bot-Optik"
+  },
+  "mech_gross_hurt.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Mechs/Mech2/Mech2Hurt.png, unveraendert (480x96 = 5 Bilder x 1 Reihe zu 96x96)"
+  },
+  "mech_gross_tod.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Mechs/Mech2/Mech2Death.png, unveraendert (576x96 = 6 Bilder x 1 Reihe zu 96x96)"
+  },
+  "cutiebot_1.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Cutiebots/Cutiebot1.png, unveraendert (128x128 Einzelbild, nur Frontansicht)",
+    "verwendung": "kleiner 'niedlicher' Kastenroboter — Standbild"
+  },
+  "cutiebot_2.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Cutiebots/Cutiebot2.png, unveraendert (128x128 Einzelbild)"
+  },
+  "cutiebot_3.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Cutiebots/Cutiebot3.png, unveraendert (128x128 Einzelbild)"
+  },
+  "cutiebot_4.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Cutiebots/Cutiebot4.png, unveraendert (128x128 Einzelbild)"
+  },
+  "cutiebot_5.png": {
+    "paket": "[LPC] Skorpio's SciFi Sprite Pack",
+    "urheber": "Skorpio",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
+    "blatt": "Cutiebots/Cutiebot5.png, unveraendert (128x128 Einzelbild)"
+  },
+  "_nachtrag_26_08_zweiter_mech": "NEU am 26.08. (Doppelbelegung repariert): Robofighter UND Tavascron liefen beide auf vollbild:'mech_gross' (Mech2 aus dem Skorpio-Paket) — sahen im Spiel dadurch IDENTISCH aus. Das Skorpio-SciFi-Paket ist laut Nachtrag oben bereits vollstaendig ausgeschoepft (roboter/roboter_braun/mech_gross/Cutiebots), lieferte also kein zweites Motiv mehr. Suche auf OpenGameArt.org nach einem ECHT ANDEREN Mech/Robot-Blatt (Kriterium: eigenes, andersartig gerendertes Motiv statt einer weiteren Farbvariante desselben Skorpio-Blatts): 'Mechs 64x64' (CruzR) traf das — 3D-gerenderte (nicht LPC-Pixelart) Kampfmechs, komplett anderer Bildstil als jedes Skorpio-Blatt, mit vollem 8-Richtungs-Gehzyklus. walker3.png (das dunklere der drei Modelle, mit gelb-bernsteinfarbenen Akzentlichtern an den Beinen) passt zu Tavascrons Bildbefund ('leuchtende Bernstein-Lichtlinien') beim Farbton, auch wenn die Chassis-Form eher insektoid/vierbeinig als 'Transformer mit Faeusten' ist — die naechstliegende Annaeherung, die die Suche ergab, und in jedem Fall ein voellig eigenstaendiges Motiv statt einer Farbvariante von Robofighters Blatt. Robofighter behaelt 'mech_gross' (die eingebaute Schulterkanone trifft 'riesige Kanone am Arm' bereits gut) — die groessere Bildabweichung lag bei Tavascron (Transformer/Faeuste/kein Fernwaffen-Bildbefund, aber ein Kanonen-Mech verdrahtet).",
+  "mech_transformer_walk.png": {
+    "original": "walker3.png",
+    "paket": "Mechs 64x64",
+    "urheber": "CruzR (3D-Rendering von Skorpios Mech-Modellen, s. dessen Originalposts 'THB-5J Thunderbird' und 'Mech' auf OpenGameArt) — Attribution laut Autor: 'There's no need to credit me, just credit Skorpio.'",
+    "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
+    "url": "https://opengameart.org/content/mechs-64x64",
+    "blatt": "walker3.png, unveraendert (1024x512 = 16 Spalten x 8 Reihen zu 64x64). ACHTUNG: 8-Richtungs-Blatt, keine LPC-4-Reihen- oder Stendhal-Reihenfolge — nachgemessen per Bildvergleich (Gesichtsvisier vorn sichtbar/nicht sichtbar): Reihenfolge S,SW,W,NW,N,NE,E,SE (Zeile 0-7). Fuer die vier von blickAus() gebrauchten Richtungen (hinten/links/vorn/rechts) verwendet per rowMap:[4,2,0,6] nur die Reihen N/W/S/E, die vier diagonalen Reihen bleiben ungenutzt.",
+    "verwendung": "zweites, eigenstaendiges Mech-Motiv fuer Tavascron (s. Nachtrag oben) — loest die Doppelbelegung mit Robofighter auf mech_gross"
   }
 }

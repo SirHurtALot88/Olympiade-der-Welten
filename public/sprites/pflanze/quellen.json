@@ -18,6 +18,16 @@
     "url": "https://opengameart.org/content/js-monster-set-elementals-iii",
     "hinweis": "Nur als Referenz/Nachweis fuer den Zuschnitt aufbewahrt (siehe dryade.png). Enthaelt drei weitere, hier NICHT verwendete Elementarwesen (Skelett-Ritter, Daemon, Windgeist) — bei Bedarf spaeter fuer andere Rassen nutzbar."
   },
+  "treant.png": {
+    "original": "treant.png, unveraendert heruntergeladen am 26.08.",
+    "paket": "Treant Monster",
+    "urheber": "Reemax (Tuomo Untinen)",
+    "lizenz": "CC-BY 3.0",
+    "url": "https://opengameart.org/content/treant-monster",
+    "raster": "288x256 = 9 Spalten x 4 Reihen zu 32x64. Laut Quellseiten-Beschreibung (woertlich nachgelesen, nicht geraten): Spalten 1-3 = Gehen (Spalte 2 = Stehen), Spalten 4-6 = Sterben, Spalten 7-9 = Angriff, jeweils in allen vier Richtungen (Zeilen). Am 26.08. per Raster-Schnitt nachgeprueft: jede 32x64-Zelle enthaelt genau einen Baum, Zeilenordnung der Richtungen beim Verdrahten nachmessen.",
+    "revision_26_08": "Am 24.08. unter _recherchiert_nicht_uebernommen abgelehnt ('nur 32x60 je Zelle, wirkt hochskaliert unscharf') — diese Begruendung haelt der Nachpruefung nicht stand: die ZELLHOEHE ist 64px wie bei werwolf.png/froschmensch.png (48x64), der Inhalt ~60px hoch. Bei der ueblichen 64px-Fusshoehen-Skalierung der VOLLBILD-Mechanik wird also gar nichts hochskaliert, der Treant ist nur SCHMALER (32px statt 48/64). Damit ist er der einzige gefundene ANIMIERTE humanoide Pflanzen-Sprite (dryade.png ist ein Standbild ohne Richtungen) und als 'maennlich-knorriges' Gegenstueck zur weiblichen Dryade uebernommen — Plant hat damit erstmals ein m/w-unterscheidbares Paar.",
+    "aussehen": "knorriger Laubbaum mit Gesicht, Astarmen und Wurzelbeinen — wuchtiger/maskuliner als die schlanke Dryade"
+  },
   "_recherchiert_nicht_uebernommen": {
     "plant-like-rpg-character": {
       "url": "https://opengameart.org/content/plant-like-rpg-character",
@@ -41,7 +51,7 @@
       "url": "https://opengameart.org/content/treant-monster",
       "lizenz": "CC-BY 3.0",
       "urheber": "Tuomo Untinen",
-      "grund": "Echtes Pixel-Art-Sprite mit 4-Richtungs-Gehzyklus, aber nur 32x60 Pixel je Zelle — deutlich kleiner als jedes andere Baukasten-/Monster-Blatt (auch kleiner als der 48x64-Teil-Stilbruch von werwolf/froschmensch) und wirkt im 64px-Kampfraster hochskaliert unscharf. dryade.png (64x64, gleiche Groesse wie die uebrigen Einzelbild-Stilbrueche) ist die bessere Wahl."
+      "grund": "VERALTET — am 26.08. revidiert und doch uebernommen, siehe treant.png oben. Die urspruengliche Ablehnung ('32x60 je Zelle, hochskaliert unscharf') war ein Messfehler: die Zellhoehe ist 64px, es wird nichts hochskaliert."
     }
   }
 }
