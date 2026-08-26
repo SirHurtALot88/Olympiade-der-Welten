@@ -79,7 +79,7 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.seasonSnapshots).toEqual([]);
   }, 120_000);
 
-  it("sets Season 1 setup and start ranks from real start budgets", () => {
+  it("sets Season 1 setup and GLOBAL start ranks for a Manager Mode game (default, no gameMode)", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({
       presetId: "solo_1",
       now: "2026-06-13T10:00:00.000Z",
@@ -93,10 +93,42 @@ describe("new-game-setup-service", () => {
     expect(gameState.season.id).toBe("season-1");
     expect(gameState.season.currentMatchday).toBe(1);
     expect(gameState.matchdayState.status).toBe("planning");
-    // Liga-Split-Aktivierung (docs/design/liga-split-plan.md, Abschnitt 9, PR 6): jedes neue Spiel
-    // bekommt ab jetzt eine Liga-Zuordnung, und die Startplaetze werden liga-lokal (1..16) statt
-    // global (1..32) vergeben. M-M ist Budget-Rang 1 (global wie liga-lokal identisch: 1). R-R ist
-    // Budget-Rang 32 global, aber Liga-2-Rang 16 (32 - LEAGUE_SIZE).
+    expect(gameState.scenarioMeta?.gameMode).toBe("manager");
+    // BUGFIX (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 0 Fund 1-2, Abschnitt 4 PR 1):
+    // Liga-Split war nie als Standard fuer ALLE neuen Spiele gedacht, sondern nur ein optionales
+    // Battle-Mode-Feature. Ohne `gameMode: "battle"` bleibt ein neues Spiel exakt im
+    // Legacy-32er-Zustand: kein Liga-Split, globaler Budget-Startrang 1..32. M-M ist Budget-Rang 1,
+    // R-R ist Budget-Rang 32 -- GLOBAL, nicht liga-lokal.
+    expect(isLeagueSplitActive(gameState)).toBe(false);
+    expect(gameState.seasonState.leagueByTeamId?.["M-M"]).toBeUndefined();
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBeUndefined();
+    expect(Object.keys(gameState.seasonState.leagueByTeamId ?? {})).toHaveLength(0);
+    expect(gameState.seasonState.standings["M-M"]?.startplatz).toBe(1);
+    expect(gameState.seasonState.standings["M-M"]?.rank).toBe(1);
+    expect(gameState.seasonState.standings["R-R"]?.startplatz).toBe(32);
+    expect(gameState.seasonState.standings["R-R"]?.rank).toBe(32);
+    expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
+    expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
+    // Kein liga-gesplitteter Spielplan fuer Manager Mode: der ererbte Baseline-Spielplan bleibt
+    // unangetastet (der alte, saveunabhaengige Dummy-Platzhalter aus dem Seed), nicht die
+    // 160-Fixture-Liga-Split-Paarung.
+    expect(gameState.seasonState.schedule).not.toHaveLength(160);
+  }, 120_000);
+
+  it("sets Season 1 setup and LEAGUE-LOCAL start ranks for a Battle Mode game (gameMode: \"battle\")", () => {
+    const { gameState, preview } = buildNewGameStateFromBaseline({
+      presetId: "solo_1",
+      gameMode: "battle",
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(gameState.gamePhase).toBe("season_active");
+    expect(gameState.scenarioMeta?.gameMode).toBe("battle");
+    // Liga-Split-Aktivierung (docs/design/liga-split-plan.md, Abschnitt 9, PR 6), jetzt hinter
+    // `gameMode: "battle"` gegated (battle-mode-spielmodus-plan.md, Abschnitt 4 PR 3): die
+    // Startplaetze werden liga-lokal (1..16) statt global (1..32) vergeben. M-M ist Budget-Rang 1
+    // (global wie liga-lokal identisch: 1). R-R ist Budget-Rang 32 global, aber Liga-2-Rang 16
+    // (32 - LEAGUE_SIZE).
     expect(isLeagueSplitActive(gameState)).toBe(true);
     expect(gameState.seasonState.leagueByTeamId?.["M-M"]).toBe("liga1");
     expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");

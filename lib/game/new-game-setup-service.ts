@@ -1,5 +1,6 @@
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import type {
+  GameMode,
   GameState,
   ScenarioType,
   SeasonState,
@@ -29,6 +30,13 @@ export type NewGamePresetId = "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "c
 
 export type NewGameSetupInput = {
   presetId: NewGamePresetId;
+  /**
+   * Spielmodus des neuen Saves (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.2). Default
+   * "manager" bei Fehlen -- derselbe Fallback wie `resolveGameMode()` in lib/season/game-mode.ts.
+   * Nur "battle" aktiviert Liga-Split (leagueByTeamId, liga-lokaler Spielplan/Rang) fuer dieses
+   * neue Spiel; "manager" (oder fehlend) bleibt exakt der heutige Legacy-32er-Zustand.
+   */
+  gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
   sandbox?: boolean;
@@ -332,52 +340,76 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
 
   /**
-   * LIGA-SPLIT AKTIVIERUNG FUER NEUE SPIELE (docs/design/liga-split-plan.md, Abschnitt 9, PR 6).
+   * LIGA-SPLIT AKTIVIERUNG NUR FUER BATTLE-MODE-SAVES (docs/design/battle-mode-spielmodus-plan.md,
+   * Abschnitt 0 Fund 1-2, Abschnitt 2.2, Abschnitt 4 PR 1+3).
    *
-   * Jedes neu angelegte Spiel bekommt ab hier eine Liga-Zuordnung — das ist der eigentliche
-   * Aktivierungsschalter: `isLeagueSplitActive()` (lib/season/league-split.ts) prueft nur noch, ob
-   * `seasonState.leagueByTeamId` gesetzt und nicht leer ist. Bestehende/laufende Saves setzen dieses
-   * Feld nie (Migration ist bewusst NICHT Teil dieser PRs), bleiben also unveraendert im
-   * Legacy-32er-Modus.
+   * Frueher (bis einschliesslich `liga-split-plan.md` PR 6) bekam JEDES neu angelegte Spiel
+   * unbedingt eine Liga-Zuordnung — das war nie beabsichtigt, Liga-Split sollte ein optionales
+   * Battle-Mode-Feature sein. Diese Zuweisung (und der direkt danebenliegende
+   * `buildSeasonFixtureSchedule()`-Aufruf) haengt jetzt an `gameMode === "battle"`.
+   * `isLeagueSplitActive()` (lib/season/league-split.ts) prueft weiterhin nur, ob
+   * `seasonState.leagueByTeamId` gesetzt und nicht leer ist — der gesamte bereits gebaute
+   * Liga-Split-/Sponsor-/Facility-Stack bleibt dadurch unangetastet und wird automatisch zu einem
+   * "Battle-Mode-Only"-Feature. Manager-Mode-Saves (Default, auch bei fehlendem `gameMode`) bleiben
+   * bit-identisch zum Legacy-32er-Zustand: `leagueByTeamId` leer, Rang = globaler Budget-Startrang.
    *
    * Der liga-lokale Rang 1..LEAGUE_SIZE folgt REIN ARITHMETISCH aus dem globalen Budget-Startrang
    * oben (`startRankByTeamId`, dieselbe Sortierung wie `buildInitialLeagueAssignment`) — kein
    * zweites Mal sortieren, keine zweite Rangquelle.
    */
-  const leagueByTeamId = buildInitialLeagueAssignment(baseGameState.teams);
+  const gameMode: GameMode = input.gameMode === "battle" ? "battle" : "manager";
+  const isBattleMode = gameMode === "battle";
+
+  const leagueByTeamId = isBattleMode ? buildInitialLeagueAssignment(baseGameState.teams) : {};
   const leagueTeamIds: Record<LeagueTier, string[]> = { liga1: [], liga2: [] };
-  for (const team of baseGameState.teams) {
-    const tier = leagueByTeamId[team.teamId];
-    if (tier) {
-      leagueTeamIds[tier].push(team.teamId);
+  if (isBattleMode) {
+    for (const team of baseGameState.teams) {
+      const tier = leagueByTeamId[team.teamId];
+      if (tier) {
+        leagueTeamIds[tier].push(team.teamId);
+      }
     }
   }
   const leagueLocalRankByTeamId = new Map<string, number>();
-  for (const [teamId, globalRank] of startRankByTeamId) {
-    leagueLocalRankByTeamId.set(teamId, globalRank <= LEAGUE_SIZE ? globalRank : globalRank - LEAGUE_SIZE);
+  if (isBattleMode) {
+    for (const [teamId, globalRank] of startRankByTeamId) {
+      leagueLocalRankByTeamId.set(teamId, globalRank <= LEAGUE_SIZE ? globalRank : globalRank - LEAGUE_SIZE);
+    }
   }
 
   // Echter Spielplan der ersten Saison ueber den Fixture-Generator statt der alten
-  // Dummy-Paarung (Plan-Abschnitt 5) — nur fuer neue, liga-gesplittete Spiele; Legacy-Saves
-  // (buildSeasonFixtures in preseason-workflow-service.ts) bleiben unangetastet.
-  const seasonOneFixtureSchedule = buildSeasonFixtureSchedule({
-    saveId: input.saveId ?? "season-1-new-game-preview",
-    seasonId: "season-1",
-    matchdayIds: resetGameState.season.matchdayIds,
-    leagueTeamIds,
-  });
-  warnings.push(...seasonOneFixtureSchedule.warnings);
+  // Dummy-Paarung (Plan-Abschnitt 5) — nur fuer Battle-Mode-Saves. Manager-Mode-Saves behalten den
+  // ererbten Spielplan aus dem Baseline-Seed unveraendert (`resetGameState.seasonState.schedule`,
+  // Legacy-Verhalten von vor dem Liga-Split-Bug), `schedule` wird unten fuer sie NICHT ueberschrieben.
+  const seasonOneFixtureSchedule = isBattleMode
+    ? buildSeasonFixtureSchedule({
+        saveId: input.saveId ?? "season-1-new-game-preview",
+        seasonId: "season-1",
+        matchdayIds: resetGameState.season.matchdayIds,
+        leagueTeamIds,
+      })
+    : null;
+  if (seasonOneFixtureSchedule) {
+    warnings.push(...seasonOneFixtureSchedule.warnings);
+  }
 
   const standings: SeasonState["standings"] = Object.fromEntries(
-    baseGameState.teams.map((team) => [
-      team.teamId,
-      {
-        points: 0,
-        rank: leagueLocalRankByTeamId.get(team.teamId) ?? null,
-        startplatz: leagueLocalRankByTeamId.get(team.teamId) ?? null,
-        rankDiff: 0,
-      },
-    ]),
+    baseGameState.teams.map((team) => {
+      // Battle Mode: liga-lokaler Rang 1..LEAGUE_SIZE. Manager Mode: globaler Budget-Startrang
+      // 1..32, exakt wie vor dem Liga-Split-Bug (Fund 1-2 oben).
+      const rank = isBattleMode
+        ? leagueLocalRankByTeamId.get(team.teamId) ?? null
+        : startRankByTeamId.get(team.teamId) ?? null;
+      return [
+        team.teamId,
+        {
+          points: 0,
+          rank,
+          startplatz: rank,
+          rankDiff: 0,
+        },
+      ];
+    }),
   );
 
   const scenarioType: ScenarioType = input.sandbox ? "sandbox_multiseason_test" : "new_game";
@@ -398,6 +430,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       label: saveName,
       saveMode: input.presetId,
       newGamePresetId: input.presetId,
+      gameMode,
       description: input.sandbox
         ? "Neues Sandbox-Testspiel aus immutable Player-Baseline."
         : "Neues Spiel aus immutable Player-Baseline und echten Startbudgets.",
@@ -445,9 +478,10 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       ...resetGameState.seasonState,
       seasonId: "season-1",
       standings,
-      // Liga-Split-Aktivierung (siehe Kommentar oben) + echter Spielplan statt Dummy-Paarung.
+      // Liga-Split-Aktivierung (siehe Kommentar oben) NUR fuer Battle-Mode-Saves. Manager Mode:
+      // leagueByTeamId explizit leer, `schedule` bleibt unangetastet (ererbter Baseline-Spielplan).
       leagueByTeamId,
-      schedule: seasonOneFixtureSchedule.fixtures,
+      ...(isBattleMode && seasonOneFixtureSchedule ? { schedule: seasonOneFixtureSchedule.fixtures } : {}),
       teamControlSettings,
       teamFacilities: {},
       facilityEvents: [],
