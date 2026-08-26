@@ -123,9 +123,9 @@ export function achsenRang(gameState: GameState, teamId: string, achse: LeihAchs
  * ihren Platz. ±2 Raenge als normale Saisonbewegung ist eine ANNAHME aus #490 und ungemessen — sie
  * steht als offener Punkt 3 in der Bauvorlage.
  */
-export function baueAchsenLatte(startRang: number): number {
-  const geklammert = Math.max(1, Math.min(32, Math.round(startRang)));
-  if (geklammert <= 8) return Math.min(32, geklammert + 2);
+export function baueAchsenLatte(startRang: number, leagueSize: number = 32): number {
+  const geklammert = Math.max(1, Math.min(leagueSize, Math.round(startRang)));
+  if (geklammert <= 8) return Math.min(leagueSize, geklammert + 2);
   if (geklammert <= 24) return geklammert;
   return Math.max(1, geklammert - 2);
 }

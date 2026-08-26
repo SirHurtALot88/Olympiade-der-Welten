@@ -276,11 +276,20 @@ export function sponsorV3GoalSizeFor(rarity: string): number {
 
 export type SponsorV3StrengthClass = 0 | 1 | 2;
 
-/** Drei Staerkeklassen: 0 = stark/elite (1..11), 1 = mittel (12..21), 2 = schwach/aufbau (22..32). */
-export function sponsorV3StrengthClassOf(expectedRank: number): SponsorV3StrengthClass {
+/**
+ * Drei Staerkeklassen: 0 = stark/elite, 1 = mittel, 2 = schwach/aufbau — proportional zu `leagueSize`
+ * (Default 32, heutiges Verhalten). Die Schnittpunkte sind `round(leagueSize/3)` und
+ * `round(2*leagueSize/3)`: bei 32 ergibt das exakt die alten Grenzen 11/21 (0 = 1..11, 1 = 12..21,
+ * 2 = 22..32); bei `LEAGUE_SIZE = 16` (lib/season/league-split.ts) ergibt dieselbe Formel 5/11
+ * (0 = 1..5, 1 = 6..11, 2 = 12..16) — genau die Drittelung aus docs/design/liga-split-plan.md,
+ * Abschnitt 3.1.
+ */
+export function sponsorV3StrengthClassOf(expectedRank: number, leagueSize: number = SPONSOR_V3_RANKS): SponsorV3StrengthClass {
   if (!Number.isFinite(expectedRank)) return 1;
-  if (expectedRank <= 11) return 0;
-  if (expectedRank <= 21) return 1;
+  const lowerCut = Math.round(leagueSize / 3);
+  const upperCut = Math.round((2 * leagueSize) / 3);
+  if (expectedRank <= lowerCut) return 0;
+  if (expectedRank <= upperCut) return 1;
   return 2;
 }
 
@@ -367,8 +376,9 @@ export function sponsorV3GoalProbability(specialKey: string | null | undefined, 
 
 // ── Die eingefrorene Leiter ────────────────────────────────────────────────────────────────────
 
-const clampRank = (rank: number): number =>
-  Math.max(1, Math.min(SPONSOR_V3_RANKS, Math.round(Number.isFinite(rank) ? rank : SPONSOR_V3_RANKS)));
+/** Rang auf `1..ranks` geklammert. `ranks` default 32 (SPONSOR_V3_RANKS) — heutiges Verhalten. */
+const clampRank = (rank: number, ranks: number = SPONSOR_V3_RANKS): number =>
+  Math.max(1, Math.min(ranks, Math.round(Number.isFinite(rank) ? rank : ranks)));
 
 /**
  * DIE BENCHMARK-LEITER `M(f) = Preisgeld(f) + Platzierungsbonus(Startrang − f)` fuer alle Endraenge
@@ -387,13 +397,13 @@ export function sponsorV3BenchmarkLadder(input: {
   prizeCurve: readonly number[];
   startRank: number;
   placementBonus: (rankDelta: number) => number;
-}): number[] {
-  const start = clampRank(input.startRank);
+}, ranks: number = SPONSOR_V3_RANKS): number[] {
+  const start = clampRank(input.startRank, ranks);
   const prizeAt = (rank: number): number => {
-    const value = input.prizeCurve[clampRank(rank) - 1];
+    const value = input.prizeCurve[clampRank(rank, ranks) - 1];
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
   };
-  return Array.from({ length: SPONSOR_V3_RANKS }, (_, index) =>
+  return Array.from({ length: ranks }, (_, index) =>
     prizeAt(index + 1) + input.placementBonus(start - (index + 1)));
 }
 
@@ -402,13 +412,15 @@ export function sponsorV3BenchmarkLadder(input: {
  * an 1..32 gestutzt und renormiert. `A` ist damit eine ZAHL IM VERTRAG — gegen sie ist jeder Tilt
  * EXAKT EV-neutral, ohne Naeherung und ohne Liga-K.
  */
-export function sponsorV3AnchorWeights(startRank: number, sigma: number = SPONSOR_V3_ANCHOR_SIGMA): number[] {
-  const center = clampRank(startRank);
+export function sponsorV3AnchorWeights(
+  startRank: number, sigma: number = SPONSOR_V3_ANCHOR_SIGMA, ranks: number = SPONSOR_V3_RANKS,
+): number[] {
+  const center = clampRank(startRank, ranks);
   const spread = Math.max(0.5, sigma);
-  const raw = Array.from({ length: SPONSOR_V3_RANKS }, (_, index) =>
+  const raw = Array.from({ length: ranks }, (_, index) =>
     Math.exp(-((index + 1 - center) ** 2) / (2 * spread * spread)));
   const sum = raw.reduce((acc, value) => acc + value, 0);
-  return sum > 0 ? raw.map((value) => value / sum) : raw.map(() => 1 / SPONSOR_V3_RANKS);
+  return sum > 0 ? raw.map((value) => value / sum) : raw.map(() => 1 / ranks);
 }
 
 /** Der eingefrorene Erwartungsanker `A` = erwarteter Benchmark-Wert bei Unterschrift. */
@@ -534,7 +546,12 @@ export function buildSponsorV3TermsCore(input: {
   // eine negative Sprosse waere eine Karte, die Geld KOSTET, und die gibt es im Modell nicht.
   const leihVerzicht = Number.isFinite(input.leihVerzicht) ? Math.max(0, input.leihVerzicht ?? 0) : 0;
   const baseLadder = input.baseLadder.map((wert) => Math.max(0, wert - leihVerzicht));
-  const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA);
+  // Rangraum aus der TATSAECHLICHEN Laenge der uebergebenen `baseLadder`, nicht aus der
+  // Modul-Konstante: identisches Verhalten bei den heutigen 32-langen Leitern, automatisch richtig
+  // fuer eine kuenftige 16er-Leiter (Liga-Split, docs/design/liga-split-plan.md) — sonst wuerde der
+  // Anker ueber Gewichte fuer 32 Raenge gemittelt, obwohl die Leiter nur 16 Sprossen hat.
+  const ranks = baseLadder.length || SPONSOR_V3_RANKS;
+  const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA, ranks);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, beta);
@@ -571,7 +588,7 @@ export function buildSponsorV3TermsCore(input: {
     cardKey: input.card.key,
     cardName: input.card.name,
     rarity: input.rarity,
-    startRank: clampRank(input.startRank),
+    startRank: clampRank(input.startRank, ranks),
     goalKey: festesZiel != null ? festesZiel.key : axis != null ? `axis_v4_${axis.key}` : input.goalKey,
     goalP,
     goalSize,
@@ -615,7 +632,11 @@ export function sponsorV3Settle(
 export function sponsorV3LadderValue(
   terms: SponsorV3ContractTerms, finalRank: number | null | undefined,
 ): number {
-  const index = clampRank(Number(finalRank ?? SPONSOR_V3_RANKS)) - 1;
+  // Rangraum aus der TATSAECHLICHEN Leiterlaenge dieses Vertrags, nicht aus der Modul-Konstante:
+  // heutige Vertraege haben immer 32 Sprossen (identisches Verhalten), eine kuenftige 16er-Leiter
+  // (Liga-Split) waere damit automatisch richtig geklammert.
+  const ranks = terms.rankLadder.length || SPONSOR_V3_RANKS;
+  const index = clampRank(Number(finalRank ?? ranks), ranks) - 1;
   return Math.max(terms.floor, terms.rankLadder[index] ?? 0);
 }
 
@@ -624,7 +645,8 @@ export function sponsorV3LadderValue(
  * als Gewinnstufen und genau aus ihnen zahlt das Settlement Saisonbasis und Tabellenplatz.
  */
 export function sponsorV3GuaranteedLadder(terms: SponsorV3ContractTerms): number[] {
-  return Array.from({ length: SPONSOR_V3_RANKS }, (_, index) => sponsorV3LadderValue(terms, index + 1));
+  const ranks = terms.rankLadder.length || SPONSOR_V3_RANKS;
+  return Array.from({ length: ranks }, (_, index) => sponsorV3LadderValue(terms, index + 1));
 }
 
 /**
@@ -633,9 +655,10 @@ export function sponsorV3GuaranteedLadder(terms: SponsorV3ContractTerms): number
  * so faellt auf, wenn eine Leiter je nicht mehr zu ihrem Anker passt (Migration, Altvertrag).
  */
 export function sponsorV3ExpectedPayout(terms: SponsorV3ContractTerms): number {
-  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const ranks = terms.rankLadder.length || SPONSOR_V3_RANKS;
+  const weights = sponsorV3AnchorWeights(terms.startRank, undefined, ranks);
   let acc = 0;
-  for (let rank = 1; rank <= SPONSOR_V3_RANKS; rank += 1) {
+  for (let rank = 1; rank <= ranks; rank += 1) {
     const weight = weights[rank - 1] ?? 0;
     acc += weight * (terms.goalP * sponsorV3Settle(terms, rank, 1) + (1 - terms.goalP) * sponsorV3Settle(terms, rank, 0));
   }
@@ -644,10 +667,11 @@ export function sponsorV3ExpectedPayout(terms: SponsorV3ContractTerms): number {
 
 /** Standardabweichung der Karte ueber die Anker-Verteilung — die Risikoachse fuer die Anzeige. */
 export function sponsorV3StandardDeviation(terms: SponsorV3ContractTerms): number {
-  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const ranks = terms.rankLadder.length || SPONSOR_V3_RANKS;
+  const weights = sponsorV3AnchorWeights(terms.startRank, undefined, ranks);
   const mean = sponsorV3ExpectedPayout(terms);
   let acc = 0;
-  for (let rank = 1; rank <= SPONSOR_V3_RANKS; rank += 1) {
+  for (let rank = 1; rank <= ranks; rank += 1) {
     const weight = weights[rank - 1] ?? 0;
     for (const [probability, value] of [
       [terms.goalP, sponsorV3Settle(terms, rank, 1)] as const,
@@ -684,10 +708,11 @@ export function sponsorV3StandardDeviation(terms: SponsorV3ContractTerms): numbe
  * EV wie `sponsorV3StandardDeviation`. Je kleiner, desto sicherer die Karte.
  */
 export function sponsorV3DownsideShortfall(terms: SponsorV3ContractTerms): number {
-  const weights = sponsorV3AnchorWeights(terms.startRank);
+  const ranks = terms.rankLadder.length || SPONSOR_V3_RANKS;
+  const weights = sponsorV3AnchorWeights(terms.startRank, undefined, ranks);
   const ev = sponsorV3ExpectedPayout(terms);
   let acc = 0;
-  for (let rank = 1; rank <= SPONSOR_V3_RANKS; rank += 1) {
+  for (let rank = 1; rank <= ranks; rank += 1) {
     const weight = weights[rank - 1] ?? 0;
     for (const [probability, value] of [
       [terms.goalP, sponsorV3Settle(terms, rank, 1)] as const,
