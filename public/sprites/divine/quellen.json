@@ -28,5 +28,33 @@
     "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
     "url": "https://opengameart.org/content/angels",
     "verwendung": "weiblicher Engel, silber-weisses Haar/Fluegel — zweite Farbvariante fuer Diversitaet"
+  },
+  "_nachtrag_26_08_fallen_angel": "NEU am 26.08. (Rassen-/Subclass-Luecken-Recherche, Subclass 'Fallen Angel' = 64 Spieler): Dieselbe Quellseite wie engel_mann/engel_frau_* fuehrt auch DUNKLE Engel als eigene Blaetter — bisher lag davon nur eines im Repo, und zwar zweckentfremdet als Voidborn (voidborn/schattenwesen_schwarz.png IST fallen_angel-001, per md5 verifiziert). Jetzt die drei uebrigen dunklen Varianten nachgezogen, gleiches Raster wie alle Angels-Blaetter: 144x256 = 3 Spalten x 4 Reihen zu 48x64, N/E/S/W (Stendhal), 3 Gehframes + Ruhepose. Gleiche Lizenz- und Attributionslage wie oben (_lizenz), insbesondere die Namensnennung von Svetlana Kushnariova samt E-Mail.",
+  "engel_dunkel_mann.png": {
+    "paket": "Angels (Stendhal)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "urheber": "Svetlana Kushnariova (Cabbit, lana-chan@yandex.ru), liftarn (Fluegel), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "original": "dark_angel-m-001 (144x256-Fassung)",
+    "blatt": "144x256 = 3x4 zu 48x64, N/E/S/W, wie engel_mann.png",
+    "verwendung": "maennlicher dunkler Engel: braunes Haar, goldener Heiligenschein, WEISSE Fluegel, schwarze Robe — 'gerade erst gefallen', naechster optischer Verwandter des hellen engel_mann"
+  },
+  "gefallener_engel_schwarz.png": {
+    "paket": "Angels (Stendhal)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "urheber": "Svetlana Kushnariova (Cabbit, lana-chan@yandex.ru), liftarn (Fluegel), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "original": "fallen_angel-002 (144x256)",
+    "blatt": "144x256 = 3x4 zu 48x64, N/E/S/W, wie engel_mann.png",
+    "verwendung": "komplett schwarze Schattengestalt mit ROTEM Heiligenschein, gelben Augen und schwarzen Fluegeln — die daemonischste der drei Varianten"
+  },
+  "gefallener_engel_weissfluegel.png": {
+    "paket": "Angels (Stendhal)",
+    "lizenz": "OGA-BY 3.0+ / CC-BY 3.0+",
+    "url": "https://opengameart.org/content/angels",
+    "urheber": "Svetlana Kushnariova (Cabbit, lana-chan@yandex.ru), liftarn (Fluegel), freedo (Halo), Jordan Irwin (AntumDeluge)",
+    "original": "fallen_angel-003 (144x256)",
+    "blatt": "144x256 = 3x4 zu 48x64, N/E/S/W, wie engel_mann.png",
+    "verwendung": "schwarze Gestalt mit rotem Heiligenschein, aber noch WEISSEN Fluegeln — Zwischenstufe zwischen engel_dunkel_mann und gefallener_engel_schwarz"
   }
 }
