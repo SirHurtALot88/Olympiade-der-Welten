@@ -102,10 +102,22 @@ export type ScenarioType =
    */
   | "gameplay_smoke_readonly";
 
+/**
+ * Der Spielmodus eines Saves (docs/design/battle-mode-spielmodus-plan.md, Abschnitt 2.1) — ein
+ * Save-Fakt, bei Anlage entschieden, danach nie mehr geaendert. `"manager"` ist der heutige Zustand
+ * (32 Teams, ein Rangraum, PPS-Formel), `"battle"` aktiviert den bereits gebauten Liga-Split-Stack
+ * (Fixtures, liga-lokales Scoring, Sponsor-/Gebaeude-Rabatt) plus, in spaeteren PRs, echte
+ * Arena-Ergebnisse fuer Basketball. Fehlt das Feld (jeder Save vor diesem Feature), gilt "manager" —
+ * siehe `resolveGameMode()` in lib/season/game-mode.ts, der EINZIGEN Quelle fuer dieses Fallback.
+ */
+export type GameMode = "manager" | "battle";
+
 export type ScenarioMeta = {
   scenarioType: ScenarioType;
   label: string;
   description?: string;
+  /** Siehe {@link GameMode}. Fehlt bei jedem Save vor diesem Feature -> Fallback "manager". */
+  gameMode?: GameMode;
   saveCategory?: "manual" | "autosave" | "pre-deploy" | "pre-season" | "post-season" | "emergency" | "recovery";
   // PAKET 2 (docs/MULTIPLAYER_MODI_1V1_2V2_PLAN.md, E4): "online_1v1"/"online_2v2" ergaenzt, damit
   // ein 1+1-/2+2-Raum sein eigenes `FoundationSaveModePreset` (lib/persistence/foundation-save-mode.ts)
