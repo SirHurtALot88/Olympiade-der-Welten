@@ -63,7 +63,8 @@
     "urheber": "Skorpio",
     "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
     "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
-    "verwendung": "Roboter im LPC-Raster — fuer die 'bots' im Kader"
+    "verwendung": "Roboter im LPC-Raster — fuer die 'bots' im Kader",
+    "verdrahtet": "25.08. in public/mockups/battle-mode.html eingebettet (B_SPRITES 'b_roboter', VOLLBILD-Eintrag 'roboter') und Alarm zugewiesen."
   },
   "roboter_tod.png": {
     "paket": "[LPC] Skorpio's SciFi Sprite Pack",
