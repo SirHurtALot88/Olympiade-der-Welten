@@ -2947,7 +2947,10 @@ export function listLocalTransferHistory(input: TransferHistoryReadParams = {}):
    * ein auslaufender Vertrag ist kein Transfer.
    */
   const letzteSpieltageJeSaison = ermittleLetzteSpieltageJeSaison(gameState.transferHistory);
-  const spieltageProSaison = gameState.seasonState.schedule?.length ?? null;
+  // Liga-Split (docs/design/liga-split-plan.md, Abschnitt 5, "Wichtiger Fund"): `schedule.length`
+  // ist bei zwei 16er-Ligen die FIXTURE-Zahl (bis zu 160), nicht die Spieltagszahl — die steht
+  // unveraendert in `season.matchdayIds`, Legacy wie Split.
+  const spieltageProSaison = gameState.season.matchdayIds?.length ?? null;
   const gehoertZurFensterSaison = (entry: { seasonId: string; matchdayId?: string | null; phase?: string | null }) =>
     !input.seasonId ||
     ermittleFensterSaisonId(entry, letzteSpieltageJeSaison, spieltageProSaison) === input.seasonId;

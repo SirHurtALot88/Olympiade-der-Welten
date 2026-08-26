@@ -77140,6 +77140,45 @@ span.nl-facility-ampel-chip {
   font-size: 11px;
 }
 
+/* Gegner-Zeile der Spieltag-Karte (Liga-Split, docs/design/liga-split-plan.md Abschnitt 6) — nur
+   gerendert, wenn der Cross-Tab-Hook Gegnerdaten liefert (aktiver Split + ausgewaehltes Team). */
+.is-new-look .nl-diszis-md-opponent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--nl-line-2);
+  font-size: 11px;
+}
+
+.is-new-look .nl-diszis-md-opponent-logo {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.is-new-look .nl-diszis-md-opponent-logo-fallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-diszis-md-opponent-name {
+  font-weight: 700;
+  color: var(--nl-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-diszis-md-opponent-rank {
+  letter-spacing: 0.02em;
+}
+
 /* --- Gehaltsverhandlung („Verlängern") — Overlay-Modal -------------------
    Verhandlungsfenster für Vertragsverlängerungen (ContractRenewalNegotiationModal,
    Teams → Verträge/Kader). Nutzt den bestehenden `foundation-modal-backdrop`/

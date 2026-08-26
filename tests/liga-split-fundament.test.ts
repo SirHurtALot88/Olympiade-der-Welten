@@ -62,11 +62,17 @@ describe("league-split.ts — Fundament", () => {
     expect(RELEGATION_COUNT).toBe(3);
   });
 
-  it("isLeagueSplitActive ist IMMER false — der Schalter ist noch nicht scharf", () => {
+  it("isLeagueSplitActive: aktiv seit PR 2+3+6, sobald leagueByTeamId gesetzt und nicht leer ist", () => {
+    // Scharfgeschaltet in PR 2+3+6 (docs/design/liga-split-plan.md, Abschnitt 9) —
+    // buildNewGameStateFromBaseline (lib/game/new-game-setup-service.ts) setzt das Feld seither fuer
+    // JEDES neu angelegte Spiel. Bestehende/laufende Saves ohne das Feld bleiben unveraendert im
+    // Legacy-32er-Modus (Migration ist bewusst NICHT Teil dieser PRs).
     const ohneFeld = { seasonState: {} } as unknown as GameState;
+    const leeresFeld = { seasonState: { leagueByTeamId: {} } } as unknown as GameState;
     const mitFeld = { seasonState: { leagueByTeamId: { "M-M": "liga1" } } } as unknown as GameState;
     expect(isLeagueSplitActive(ohneFeld)).toBe(false);
-    expect(isLeagueSplitActive(mitFeld)).toBe(false);
+    expect(isLeagueSplitActive(leeresFeld)).toBe(false);
+    expect(isLeagueSplitActive(mitFeld)).toBe(true);
   });
 
   it("getLeagueOf/getLeagueTeamIds: null/leer, solange leagueByTeamId fehlt", () => {

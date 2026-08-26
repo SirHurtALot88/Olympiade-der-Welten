@@ -14,6 +14,7 @@ import {
   getSponsorV3SalaryFactor,
   getSponsorV3Terms,
   rerollSponsorV3TermsForNewSeason,
+  resolveSponsorLeagueTier,
   sponsorV3GuaranteedLadder,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
 
@@ -160,6 +161,10 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
           {
             newSalaryFactor: getSponsorV3SalaryFactor(gameState),
             contractYear,
+            // LIGA-SPLIT PR4: Liga-Zugehoerigkeit des Teams in der NEUEN Saison (`gameState` traegt an
+            // dieser Stelle bereits deren Fenster, siehe Kommentar oben) — `undefined`, solange der
+            // Split nicht aktiv ist (heute immer).
+            leagueTier: resolveSponsorLeagueTier(gameState, team.teamId),
           },
         )
       : null;

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { Discipline, GameState, Team } from "@/lib/data/olyDataTypes";
+import type { Discipline, GameState, SeasonDisciplineScheduleEntry, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { sortTableRows as sortRows } from "@/components/foundation/FoundationTableUi";
@@ -10,6 +10,8 @@ import {
   type SpielplanMutatorSlotSummary,
 } from "@/lib/foundation/spielplan-mutator-summary";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { getOpponentOf } from "@/lib/season/season-fixture-schedule";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
 import {
   shouldBuildDisciplineConfigDerivations as resolveShouldBuildDisciplineConfigDerivations,
   shouldBuildDisciplineRanks as resolveShouldBuildDisciplineRanks,
@@ -79,6 +81,23 @@ export type FoundationDisciplineConfigRow = Discipline & {
 
 type SeasonSnapshotInput = NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number];
 
+/**
+ * Spielplan-Zeile MIT Gegner (docs/design/liga-split-plan.md, Abschnitt 6, PR 2+3+6-UI-Teil).
+ *
+ * Die reinen Disziplin-Slots (`discipline1`/`discipline2`) sind saisonweit identisch fuer jedes
+ * Team; die Gegner-Felder sind es NICHT — sie gelten fuer `activeTeamId`. Ohne aktiven Liga-Split
+ * oder ohne `activeTeamId` bleiben sie `null` (kein Gegner-Konzept im Legacy-32er-Rennen).
+ */
+export type FoundationSeasonDisciplineScheduleRow = SeasonDisciplineScheduleEntry & {
+  opponentTeamId: string | null;
+  opponentName: string | null;
+  opponentLogo: string | null;
+  /** Liga-Tabellenrang des Gegners (`standings[opponentTeamId].rank`), liga-lokal 1..LEAGUE_SIZE. */
+  opponentLeagueRank: number | null;
+  /** Team-Disziplin-Raenge des Gegners (dieselbe Rangfunktion wie die Ranks-Tabelle, liga-lokal). */
+  opponentDisciplineRanks: Record<string, number> | null;
+};
+
 export function shouldBuildFoundationDisciplineRanks(input: {
   activeView: FoundationViewId;
   shouldBuildTeamsHeavyComparison: boolean;
@@ -105,6 +124,8 @@ export function useFoundationCrossTabDisciplineRanks(input: {
   ranksSeasonId: string;
   seasonHistorySnapshots: SeasonSnapshotInput[];
   tableSorts: Record<string, SortState>;
+  /** Das Team, dessen Gegner der Spielplan-Tab zeigt (typischerweise das aktuell verwaltete Team). */
+  activeTeamId?: string | null;
 }) {
   const shouldBuildDisciplineRanks = shouldBuildFoundationDisciplineRanks({
     activeView: input.activeView,
@@ -209,13 +230,58 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     teamsById,
   ]);
 
-  const seasonDisciplineScheduleRows = useMemo(
+  const rawSeasonDisciplineScheduleRows = useMemo(
     () =>
       getSeasonDisciplineSchedule(input.gameState, {
         saveId: input.activeSaveId || "normalized-local-save",
       }),
     [input.activeSaveId, input.gameState],
   );
+
+  const splitActive = isLeagueSplitActive(input.gameState);
+
+  // Gegner-Disziplin-Raenge (docs/design/liga-split-plan.md, Abschnitt 6): dieselbe Rangfunktion
+  // wie die Ranks-Tabelle oben, aber unabhaengig von `shouldBuildDisciplineRanks` berechnet — der
+  // Spielplan-Tab ("diszis") baut `disciplineRankRows` sonst gar nicht auf (andere aktive View).
+  // Nur berechnet, wenn ueberhaupt gebraucht (Split aktiv + ein Team ausgewaehlt), sonst leer.
+  const disciplineRankRowByTeamId = useMemo(() => {
+    if (!splitActive || !input.activeTeamId) {
+      return new Map<string, Record<string, number>>();
+    }
+    return new Map(
+      buildTeamDisciplineRankRowsFromGameState(input.gameState, input.orderedDisciplines).map((row) => [
+        row.teamId,
+        row.disciplineRanks,
+      ]),
+    );
+  }, [input.activeTeamId, input.gameState, input.orderedDisciplines, splitActive]);
+
+  const seasonDisciplineScheduleRows: FoundationSeasonDisciplineScheduleRow[] = useMemo(() => {
+    if (!splitActive || !input.activeTeamId) {
+      return rawSeasonDisciplineScheduleRows.map((entry) => ({
+        ...entry,
+        opponentTeamId: null,
+        opponentName: null,
+        opponentLogo: null,
+        opponentLeagueRank: null,
+        opponentDisciplineRanks: null,
+      }));
+    }
+
+    const standings = input.gameState.seasonState.standings ?? {};
+    return rawSeasonDisciplineScheduleRows.map((entry) => {
+      const opponentTeamId = getOpponentOf(input.gameState, input.activeTeamId!, entry.matchdayId);
+      const opponentTeam = opponentTeamId ? teamsById.get(opponentTeamId) ?? null : null;
+      return {
+        ...entry,
+        opponentTeamId,
+        opponentName: opponentTeam?.name ?? null,
+        opponentLogo: opponentTeam?.logoPath ?? null,
+        opponentLeagueRank: opponentTeamId ? standings[opponentTeamId]?.rank ?? null : null,
+        opponentDisciplineRanks: opponentTeamId ? disciplineRankRowByTeamId.get(opponentTeamId) ?? null : null,
+      };
+    });
+  }, [disciplineRankRowByTeamId, input.activeTeamId, input.gameState, rawSeasonDisciplineScheduleRows, splitActive, teamsById]);
 
   const seasonBriefingScheduleReady = useMemo(
     () =>

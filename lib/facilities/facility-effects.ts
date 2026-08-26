@@ -103,6 +103,22 @@ export function calculateFacilityUpkeep(teamFacilities: TeamFacilityCollection |
 }
 
 /**
+ * LIGA-SPLIT PR4 (docs/design/liga-split-plan.md; Chris: „Der Abschlag gilt auch für
+ * Gebäudeeinnahmen [Facility-Income]."): derselbe 0,8-Faktor wie beim Sponsor-Wertungstopf
+ * (`SPONSOR_TOPF_FAKTOR_JE_LIGA`), hier auf das ERGEBNIS der Gebäude-Einnahme angewandt — was ein
+ * Gebäude-Upgrade bewirkt und wie sich die Einnahme aus Stufe/Effizienz/Beliebtheit ergibt, bleibt
+ * fuer beide Ligen exakt gleich, nur das Endergebnis wird fuer Liga-2-Teams um 20 % gekuerzt.
+ *
+ * Nur wirksam, wenn ein Aufrufer explizit `incomeFaktor` uebergibt — ohne dieses Feld (jeder heutige
+ * Aufrufer) ist der Faktor 1 und das Verhalten bit-identisch zu vor diesem PR. Siehe
+ * `facility-season-end-service.ts` (`buildRows`) fuer die REALE, cash-wirksame Anwendung.
+ */
+export const FACILITY_INCOME_FAKTOR_JE_LIGA: Readonly<Record<"liga1" | "liga2", number>> = {
+  liga1: 1,
+  liga2: 0.8,
+};
+
+/**
  * Summiert die effektiven Saison-Einnahmen aller Gebäude (effizienzgewichtet).
  *
  * `arenaPopularityFactor` (Beliebtheit, Default 1.0 = Liga-Durchschnitt) skaliert
@@ -110,15 +126,20 @@ export function calculateFacilityUpkeep(teamFacilities: TeamFacilityCollection |
  * 1.0 hält Aufrufer ohne Liga-Kontext (und Alt-Tests) auf der reinen Basis.
  * Reales Cash wird an der echten Season-End-Resolution (facility-season-end-service)
  * mit dem team-spezifischen Faktor gutgeschrieben.
+ *
+ * `incomeFaktor` (Default 1, Liga-Split PR4): globaler Nachrabatt auf die GESAMTE Summe, siehe
+ * `FACILITY_INCOME_FAKTOR_JE_LIGA` — wirkt NACH der Effekt-/Effizienzrechnung, nicht in ihr.
  */
 export function calculateFacilityIncome(
   teamFacilities: TeamFacilityCollection | null | undefined,
-  options?: { arenaPopularityFactor?: number },
+  options?: { arenaPopularityFactor?: number; incomeFaktor?: number },
 ) {
   const arenaPopularityFactor =
     typeof options?.arenaPopularityFactor === "number" && Number.isFinite(options.arenaPopularityFactor)
       ? options.arenaPopularityFactor
       : 1;
+  const incomeFaktor =
+    typeof options?.incomeFaktor === "number" && Number.isFinite(options.incomeFaktor) ? options.incomeFaktor : 1;
   return roundValue(
     FACILITY_CATALOG.reduce((sum, facility) => {
       const level = getFacilityLevel(teamFacilities, facility.facilityId);
@@ -129,7 +150,7 @@ export function calculateFacilityIncome(
         ((getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) /
           100
       );
-    }, 0),
+    }, 0) * incomeFaktor,
   );
 }
 

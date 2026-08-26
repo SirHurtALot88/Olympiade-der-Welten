@@ -11,6 +11,8 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { LEAGUE_SIZE, buildInitialLeagueAssignment, type LeagueTier } from "@/lib/season/league-split";
+import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -328,13 +330,51 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(baseGameState.teams, chrisTeamIds, frankyTeamIds);
 
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
+
+  /**
+   * LIGA-SPLIT AKTIVIERUNG FUER NEUE SPIELE (docs/design/liga-split-plan.md, Abschnitt 9, PR 6).
+   *
+   * Jedes neu angelegte Spiel bekommt ab hier eine Liga-Zuordnung — das ist der eigentliche
+   * Aktivierungsschalter: `isLeagueSplitActive()` (lib/season/league-split.ts) prueft nur noch, ob
+   * `seasonState.leagueByTeamId` gesetzt und nicht leer ist. Bestehende/laufende Saves setzen dieses
+   * Feld nie (Migration ist bewusst NICHT Teil dieser PRs), bleiben also unveraendert im
+   * Legacy-32er-Modus.
+   *
+   * Der liga-lokale Rang 1..LEAGUE_SIZE folgt REIN ARITHMETISCH aus dem globalen Budget-Startrang
+   * oben (`startRankByTeamId`, dieselbe Sortierung wie `buildInitialLeagueAssignment`) — kein
+   * zweites Mal sortieren, keine zweite Rangquelle.
+   */
+  const leagueByTeamId = buildInitialLeagueAssignment(baseGameState.teams);
+  const leagueTeamIds: Record<LeagueTier, string[]> = { liga1: [], liga2: [] };
+  for (const team of baseGameState.teams) {
+    const tier = leagueByTeamId[team.teamId];
+    if (tier) {
+      leagueTeamIds[tier].push(team.teamId);
+    }
+  }
+  const leagueLocalRankByTeamId = new Map<string, number>();
+  for (const [teamId, globalRank] of startRankByTeamId) {
+    leagueLocalRankByTeamId.set(teamId, globalRank <= LEAGUE_SIZE ? globalRank : globalRank - LEAGUE_SIZE);
+  }
+
+  // Echter Spielplan der ersten Saison ueber den Fixture-Generator statt der alten
+  // Dummy-Paarung (Plan-Abschnitt 5) — nur fuer neue, liga-gesplittete Spiele; Legacy-Saves
+  // (buildSeasonFixtures in preseason-workflow-service.ts) bleiben unangetastet.
+  const seasonOneFixtureSchedule = buildSeasonFixtureSchedule({
+    saveId: input.saveId ?? "season-1-new-game-preview",
+    seasonId: "season-1",
+    matchdayIds: resetGameState.season.matchdayIds,
+    leagueTeamIds,
+  });
+  warnings.push(...seasonOneFixtureSchedule.warnings);
+
   const standings: SeasonState["standings"] = Object.fromEntries(
     baseGameState.teams.map((team) => [
       team.teamId,
       {
         points: 0,
-        rank: startRankByTeamId.get(team.teamId) ?? null,
-        startplatz: startRankByTeamId.get(team.teamId) ?? null,
+        rank: leagueLocalRankByTeamId.get(team.teamId) ?? null,
+        startplatz: leagueLocalRankByTeamId.get(team.teamId) ?? null,
         rankDiff: 0,
       },
     ]),
@@ -405,6 +445,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       ...resetGameState.seasonState,
       seasonId: "season-1",
       standings,
+      // Liga-Split-Aktivierung (siehe Kommentar oben) + echter Spielplan statt Dummy-Paarung.
+      leagueByTeamId,
+      schedule: seasonOneFixtureSchedule.fixtures,
       teamControlSettings,
       teamFacilities: {},
       facilityEvents: [],

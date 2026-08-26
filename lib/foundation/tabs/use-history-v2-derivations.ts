@@ -213,8 +213,11 @@ export function useHistoryV2Derivations(input: UseHistoryV2DerivationsInput) {
    * als Saisonabschluss.
    */
   const transferFensterSaisonIdByEntry = useMemo(
-    () => ordneNachTransferfenster(historyFeed?.items ?? [], gameState.seasonState.schedule?.length ?? null),
-    [gameState.seasonState.schedule?.length, historyFeed],
+    // Liga-Split (docs/design/liga-split-plan.md, Abschnitt 5, "Wichtiger Fund"): `schedule.length`
+    // ist bei zwei 16er-Ligen die FIXTURE-Zahl (bis zu 160), nicht die Spieltagszahl — die steht
+    // unveraendert in `season.matchdayIds`, Legacy wie Split.
+    () => ordneNachTransferfenster(historyFeed?.items ?? [], gameState.season.matchdayIds?.length ?? null),
+    [gameState.season.matchdayIds?.length, historyFeed],
   );
 
   const transferHistoryRows = useMemo(() => {

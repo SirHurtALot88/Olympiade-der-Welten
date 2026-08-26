@@ -17,6 +17,8 @@ import {
 import type { RankToPointsSheetRow, SeasonStandingsSheetRow } from "@/lib/standings/season-standings-sheet";
 import { db } from "@/src/server/db";
 import { resolveTeamMutatorPpsBonus } from "@/lib/foundation/player-points-total";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 
 export type StandingsPreviewSource = "sqlite" | "prisma";
 export type StandingsPreviewResultStatus =
@@ -268,6 +270,41 @@ function buildCurrentRankMap<
 
 function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));
+}
+
+/**
+ * LIGA-LOKALES STANDINGS-RANKING (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3).
+ *
+ * Partitioniert eine Team-Liste nach Liga, BEVOR sie durch eine der Rank-/Tie-Funktionen unten
+ * laeuft, sobald der Split aktiv ist. Ohne aktiven Split (jeder heutige Save) liefert das genau EINE
+ * Gruppe in Eingabe-Reihenfolge zurueck — jeder Aufrufer unten faellt dann auf sein bisheriges,
+ * bit-identisches Verhalten zurueck (eine Gruppe verarbeiten = direkt verarbeiten).
+ */
+function partitionTeamsByLeague<T extends { teamId: string }>(gameState: GameState, items: T[]): T[][] {
+  if (!isLeagueSplitActive(gameState)) {
+    return [items];
+  }
+
+  const liga1: T[] = [];
+  const liga2: T[] = [];
+  const unassigned: T[] = [];
+  for (const item of items) {
+    const tier = getLeagueOf(gameState, item.teamId);
+    if (tier === "liga1") liga1.push(item);
+    else if (tier === "liga2") liga2.push(item);
+    else unassigned.push(item);
+  }
+  return [liga1, liga2, unassigned].filter((group) => group.length > 0);
+}
+
+function mergeRankMaps<V>(maps: Array<Map<string, V>>): Map<string, V> {
+  const merged = new Map<string, V>();
+  for (const map of maps) {
+    for (const [teamId, value] of map) {
+      merged.set(teamId, value);
+    }
+  }
+  return merged;
 }
 
 function resolveLocalDisciplinePlayerCount(
@@ -552,19 +589,27 @@ export async function buildStandingsPreview(
       };
     });
 
-    const currentRankByTeamId = buildCurrentRankMap(itemsBase);
-    const matchdayRankByTeamId = resolveMatchdayRankWithTiePolicy(
-      itemsBase.map((item) => ({
-        teamId: item.teamId,
-        teamName: item.teamName,
-        totalScore: item.totalScore,
-        projectedPoints: null,
-        currentRank: currentRankByTeamId.get(item.teamId) ?? null,
-        currentPoints: item.currentPoints,
-        matchdayRank: null,
-        cash: item.cash,
-      })),
-      DEFAULT_STANDINGS_TIEBREAKER_MODE,
+    // Liga-Split (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3): jede der folgenden vier
+    // Rank-/Tie-Berechnungen laeuft ueber `partitionTeamsByLeague`-Gruppen statt ueber alle Teams auf
+    // einmal, sobald der Split aktiv ist. Ohne aktiven Split liefert das genau eine Gruppe zurueck —
+    // bit-identisch zum bisherigen direkten Aufruf.
+    const currentRankByTeamId = mergeRankMaps(
+      partitionTeamsByLeague(scope.save.gameState, itemsBase).map((group) => buildCurrentRankMap(group)),
+    );
+    const matchdayRankByTeamId = mergeRankMaps(
+      partitionTeamsByLeague(
+        scope.save.gameState,
+        itemsBase.map((item) => ({
+          teamId: item.teamId,
+          teamName: item.teamName,
+          totalScore: item.totalScore,
+          projectedPoints: null,
+          currentRank: currentRankByTeamId.get(item.teamId) ?? null,
+          currentPoints: item.currentPoints,
+          matchdayRank: null,
+          cash: item.cash,
+        })),
+      ).map((group) => resolveMatchdayRankWithTiePolicy(group, DEFAULT_STANDINGS_TIEBREAKER_MODE)),
     );
 
     const withProjectedPoints = itemsBase.map((item) => {
@@ -576,20 +621,23 @@ export async function buildStandingsPreview(
       };
     });
 
-    const projectedRankByTeamId = resolveProjectedRankWithTiePolicy(
-      withProjectedPoints.map((item) => ({
-        teamId: item.teamId,
-        teamName: item.teamName,
-        totalScore: item.totalScore,
-        projectedPoints: item.projectedPoints,
-        currentRank: item.currentRank,
-        currentPoints: item.currentPoints,
-        matchdayRank: item.matchdayRank,
-        cash: item.cash,
-      })),
-      DEFAULT_STANDINGS_TIEBREAKER_MODE,
+    const projectedRankByTeamId = mergeRankMaps(
+      partitionTeamsByLeague(
+        scope.save.gameState,
+        withProjectedPoints.map((item) => ({
+          teamId: item.teamId,
+          teamName: item.teamName,
+          totalScore: item.totalScore,
+          projectedPoints: item.projectedPoints,
+          currentRank: item.currentRank,
+          currentPoints: item.currentPoints,
+          matchdayRank: item.matchdayRank,
+          cash: item.cash,
+        })),
+      ).map((group) => resolveProjectedRankWithTiePolicy(group, DEFAULT_STANDINGS_TIEBREAKER_MODE)),
     );
-    const tieGroups = detectStandingTieGroups(
+    const tieGroups = partitionTeamsByLeague(
+      scope.save.gameState,
       withProjectedPoints.map((item) => ({
         teamId: item.teamId,
         teamName: item.teamName,
@@ -600,7 +648,7 @@ export async function buildStandingsPreview(
         matchdayRank: item.matchdayRank,
         cash: item.cash,
       })),
-    ) as StandingsPreviewTieGroup[];
+    ).flatMap((group) => detectStandingTieGroups(group)) as StandingsPreviewTieGroup[];
     const tieTeamIds = new Set(tieGroups.flatMap((group) => group.affectedTeams.map((team) => team.teamId)));
     const blockedRules =
       tieGroups.length > 0 ? [...baseBlockedRules, "global_score_tie_breaker_missing"] : baseBlockedRules.slice();

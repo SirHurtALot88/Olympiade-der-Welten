@@ -8752,6 +8752,7 @@ export function useFoundationShellRouterBodyScope({
     ranksSeasonId: seasonOverviewSeasonId || gameState.season.id,
     seasonHistorySnapshots,
     tableSorts,
+    activeTeamId: selectedTeamId,
   });
   const rankLeaderCards = disciplineLeaderEntries;
 
