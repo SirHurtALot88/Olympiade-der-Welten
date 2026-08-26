@@ -3066,6 +3066,13 @@
       // sie sind gegen reale FG%-Referenzwerte kalibriert, und jeder frueherer Versuch,
       // die Matrix ueber sie statt ueber die Rezepte einzuloesen, hat die Abweichung
       // gesprengt (s. dortige Kommentare). Der einzige Hebel hier sind die zehn Rezepte.
+      //
+      // STAND SEIT DIESEM BLOCK: die Messtabelle oben (17,2 / 19,4 Pp) beschreibt den
+      // Stand von PR #680. Danach ist EIN Rezept nachgezogen worden — ABWEHR, wegen
+      // eines Nebeneffekts bei der Verteidiger-Differenzierung; die Begruendung, die
+      // Messreihe und die fuenf verworfenen Fassungen stehen ausfuehrlich beim ABWEHR-
+      // Rezept unten. Aktueller Stand: 20,3 Pp (Saatfamilie dieses Skripts) und 32,5 Pp
+      // gegen eine zweite, unabhaengige Saatfamilie, in der PR #680 selbst 31,3 Pp las.
       // ===============================================================================
       rezept:{
         // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Zuerst
@@ -3111,15 +3118,82 @@
         // abprallt (intelligence/awareness), und der sich am Ring behauptet
         // (power/stamina). Kraft bleibt also drin, wie von Chris verlangt — aber als
         // vierter Faktor, nicht als erster.
+        //
+        // VERTEIDIGER-DIFFERENZIERUNG (s. ABWEHR unten) — HIER BEWUSST UNVERAENDERT.
+        // Der erste Anlauf verschob die von ABWEHR abgegebene intelligence/awareness-
+        // Masse hierher (intelligence 23 -> 28, awareness 15 -> 18, torment/speed 6 -> 2)
+        // und gab SCHUSS_NAH awareness an power/dexterity ab. Gemessen: 38,5 Pp gegen
+        // 17,2 Pp vorher — verworfen. ZWEITCHANCE ist der empfindlichste Sub-Skill der
+        // Disziplin (er entscheidet ueber zuordneSlots(), wer korbnah steht); fuenf
+        // Punkte intelligence mehr hoben den gemessenen intelligence-Anteil von 15,9 auf
+        // 26,3 %. Wer hier anfasst, misst nach JEDEM einzelnen Punkt.
         ZWEITCHANCE: {spirit:27,intelligence:23,awareness:15,power:9,stamina:8,torment:6,dexterity:6,speed:6},
-        // Verteidigung ist der zweitgroesste Kanal (Steal/Interception/Block zaehlen im
-        // Boxscore je 1,5). torment sitzt hier als einziger echter Heimatplatz — die
-        // Haerte im Zweikampf; damit ist ein torment-lastiger Spieler auch der einzige
-        // Attributtyp, der sich EINDEUTIG als Verteidiger lesen laesst (Archetyp-Test).
-        // Dazu Lesen des Feldes (awareness/intelligence), Antizipation und
-        // Kommunikation (spirit/charisma — Chris: "das Team pushen" gilt auch defensiv),
-        // Herauslaufen (speed) und Haende am Ball (dexterity).
-        ABWEHR:      {awareness:22,intelligence:18,torment:16,spirit:14,speed:12,charisma:6,dexterity:5,power:4,stamina:3},
+        // ===========================================================================
+        // VERTEIDIGER-DIFFERENZIERUNG — der eine Punkt, an dem das Rezept aus PR #680
+        // einen echten Nebeneffekt hatte. torment fuehrt jetzt, intelligence ist raus.
+        //
+        // BEFUND. Ein Demo-Lauf mit zwei extremen Builds (Verteidiger awareness/
+        // intelligence/torment/spirit 92-98 gegen Scorer intelligence/power/dexterity/
+        // awareness 90-97) machte BEIDE zu Top-Scorern — der "Verteidiger" sogar zum
+        // besten: 3,44 PTS bei 60,5 FG% gegen 2,41 PTS bei 54,7 FG% des Scorers
+        // (360 Spiele). Die Engine gab ihm SCHUSS_FERN 99 und TECHNIK 99, WEIL er
+        // Verteidiger sein sollte. Ursache: ABWEHR fuehrte mit awareness 22 +
+        // intelligence 18 = 40 % genau die zwei Attribute, die SCHUSS_FERN
+        // (intelligence 48 + awareness 19 = 67 %) und TECHNIK (49 + 23 = 72 %) fuehren.
+        // Wer ABWEHR ueber 90 wollte, MUSSTE beide hochziehen — und bekam den
+        // Distanzschuetzen gratis dazu.
+        //
+        // AENDERUNG. intelligence 18 -> 4, torment 16 -> 26 (fuehrt jetzt), awareness
+        // 22 -> 20, charisma 6 -> 10, dexterity 5 -> 8, power 4 -> 6, speed 12 -> 9.
+        // Logisch tragbar: Verteidigung braucht Spielverstaendnis, aber nicht in dem
+        // Ausmass, in dem ein Distanzwurf es braucht. Die Haerte im Zweikampf (torment)
+        // ist das, was einen Verteidiger von einem Werfer UNTERSCHEIDET; das Lesen des
+        // Feldes (awareness) ist das, was beide teilen, und darf deshalb nicht fuehren.
+        // charisma steht fuer die Kommunikation in der Verteidigung, dexterity fuer die
+        // Haende am Ball, power fuer das Behaupten der Position.
+        //
+        // WARUM SPEED RUNTER STATT HOCH — der Auftrag schlug das Gegenteil vor, die
+        // Messung widerspricht zweimal. (1) Matrix: jeder Punkt speed mehr in ABWEHR hob
+        // den gemessenen speed-Anteil um rund einen Prozentpunkt; die Fassung mit
+        // speed 17 las 13,8 % (Matrixvorgabe 10) und riss die Abweichung in der zweiten
+        // Saatfamilie auf 51,5 Pp. (2) Differenzierung: speed treibt ueber LAUFTEMPO
+        // (speed 60) die Laufgeschwindigkeit tempoPx und damit die Rennen um lose Baelle,
+        // Rebounds und Fastbreaks. speed ist also DUAL USE — ein Verteidiger, den man
+        // ueber speed baut, scort in der Umschaltbewegung, ohne einen einzigen Wurf-Skill
+        // zu brauchen. Gemessen (480 Spiele, spirit bei beiden Builds gleich 90, damit
+        // TEAMGEIST herausfaellt): derselbe Verteidiger mit speed 95 schlaegt den Scorer
+        // 3,29 zu 3,01 PTS bei 61,1 zu 56,6 FG%; mit speed 78 liegt er bei 2,38 zu 3,35
+        // PTS und 51,3 zu 60,9 FG%; mit speed 50 bei 2,08 zu 3,36. torment ist das
+        // einzige Attribut der Disziplin, das AUSSCHLIESSLICH Verteidigung bezahlt —
+        // deshalb traegt es hier den Hauptteil, nicht speed.
+        //
+        // GEMESSEN. messe-arena-einfluss.mjs basketball 48: 17,2 Pp (PR #680) -> 20,3 Pp.
+        // Zusaetzlich gegen eine ZWEITE, unabhaengige Saatfamilie geprueft (die Saaten in
+        // einflussVon sind fest verdrahtet, fuer den Gegenlauf einmalig auf
+        // zieheFormkarten(20260824+i*15485863)/M.bau(4241+i*32452843) gesetzt): dort
+        // 31,3 Pp (PR #680) -> 32,5 Pp. Der Aufschlag ist also in BEIDEN Familien klein
+        // (+3,1 / +1,2) — das war bei den verworfenen Fassungen nicht so.
+        //
+        // VERWORFEN, alle gemessen (Saatfamilie A / zweite Familie):
+        //   torment30 speed24 aware13 dex10 spirit7, dazu ZWEITCHANCE- und
+        //     SCHUSS_NAH-Umbau                                    38,5 / —
+        //   dieselbe ABWEHR ohne die zwei anderen Rezepte         24,8 / —
+        //   torment30 speed16 aware18 dex12 spirit8 cha8          32,2 / —
+        //   torment27 aware20 speed17 spirit14 cha7               21,5 / 51,5
+        //   torment23 aware20 spirit14 speed13 cha10 pow8         25,4 / 33,1
+        // Die Reihenfolge ist NICHT monoton in irgendeinem Gewicht — dieselbe Sprung-
+        // haftigkeit, vor der der Block ganz oben warnt. Wer hier weitermacht: nach jeder
+        // einzelnen Zahl messen, und immer gegen BEIDE Saatfamilien.
+        //
+        // WAS DAS NICHT LOEST — nachgemessen, damit es niemand fuer einen Fehler haelt:
+        // ein Build mit spirit 90+ bleibt auch als "Verteidiger" ein ordentlicher Scorer,
+        // und das ist KEIN Rezeptfehler. spirit ist mit 22 der hoechste Matrixwert der
+        // Disziplin, und TEAMGEIST (spirit 41) geht mit Koeffizient 0,0030 in technikMake
+        // ein — mehr als der Wurf-Skill selbst mit 0,0022. Ein spirit-90-Spieler ist per
+        // Matrix-Ansage ueberall gut; wer das aendern will, aendert die Matrix, nicht das
+        // Rezept.
+        // ===========================================================================
+        ABWEHR:      {torment:26,awareness:20,spirit:14,charisma:10,speed:9,dexterity:8,power:6,intelligence:4,stamina:3},
         // TEAMGEIST geht in technikMake UND in die Pass-Lotterie (qualitaet hoch zwei)
         // ein — ein starker, aber wegen des 0,92-Deckels stark nichtlinearer Kanal (ein
         // frueherer Versuch, spirit hier NOCH weiter hochzuziehen, hob die Abweichung auf
