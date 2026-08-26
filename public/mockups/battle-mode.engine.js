@@ -2962,65 +2962,186 @@
       label:"Basketball", jeSeite:6, zuegeJeSeite:12, zugDauer:60/(12*2*2),
       punkteNah:2, punkteFern:3, fernAnteil:0.32,
       wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
-      // REZEPT-NEUBAU, VERSUCH VERWORFEN (Chris' Methode, 26.08.): ein Attribut-zentrierter
-      // Neuaufbau aller 10 Rezepte (pro Attribut ein 100%-Budget ueber alle Sub-Skills verteilt,
-      // dann zurueckgerechnet) wurde gebaut und gegen die DAMALS noch alte, unkalibrierte
-      // Trefferformel gemessen: 31,8 Pp -> 22,8 Pp, vielversprechend. Nach der parallel
-      // gelaufenen Wurfquoten-Rekalibrierung (technikMake-Koeffizienten 0,16/0,0050/0,0060 ->
-      // -0,02/0,0022/0,0030, s. GEO_BONUS-Kommentar oben) GEGEN DIE ECHTE, JETZT GUELTIGE
-      // Formel nachgemessen: 53,7 Pp — deutlich SCHLECHTER als der Ausgangswert. Die neue
-      // Formel gewichtet TECHNIK/TEAMGEIST anders als die alte, wodurch dieselbe Rezept-
-      // Verteilung eine andere Wirkung entfaltet. Zurueckgesetzt auf das vorherige, gegen DIESE
-      // Formel bereits einmal (31,8 Pp) gemessene Rezept — eine echte attribut-zentrierte
-      // Neuverteilung nach Chris' Methode steht noch aus, muss aber gegen die aktuelle Formel
-      // kalibriert werden, nicht gegen die alte.
+      // ===============================================================================
+      // REZEPT-NEUBAU NACH CHRIS' METHODE (26.08., gegen DIESE Formel kalibriert)
+      //
+      // Vorgeschichte: ein erster attribut-zentrierter Neubau wurde gegen die DAMALS noch
+      // alte, unkalibrierte Trefferformel gemessen (31,8 -> 22,8 Pp) und nach der
+      // Wurfquoten-Rekalibrierung (technikMake 0,16/0,0050/0,0060 -> -0,02/0,0022/0,0030,
+      // s. GEO_BONUS oben) mit 53,7 Pp wieder verworfen. Diese Runde macht denselben
+      // Neubau noch einmal — aber mit einem vorgeschalteten Schritt, der beim ersten Mal
+      // fehlte: ERST MESSEN, WIE VIEL EINFLUSS JEDER SUB-SKILL UEBERHAUPT TRAEGT.
+      //
+      // 1) EINFLUSS-GEWICHT JE SUB-SKILL, aus der Messung zurueckgerechnet. Der
+      //    gemessene Anteil eines Attributs ist naeherungsweise die Summe seiner
+      //    Rezept-Anteile mal dem Einfluss-Gewicht des jeweiligen Sub-Skills. Aus dem
+      //    Ausgangsstand (63,6 Pp, N=48) laesst sich das System nach den zehn Gewichten
+      //    aufloesen (nicht-negativ, Summe 100):
+      //
+      //      ZWEITCHANCE 39,5 | ABWEHR 18,0 | LAUFTEMPO 13,6 | SCHUSS_NAH 11,4
+      //      TEAMGEIST 10,0   | AUFBAU  6,4 | SCHUSS_FERN ~2 | ABSCHLUSS ~1 | TECHNIK ~1
+      //      AUSDAUER 0
+      //
+      //    ACHTUNG, NACHTRAG (nachgerechnet, nicht vermutet): der damals genannte
+      //    Restfehler von 2,2 Pp bedeutet NICHT, dass das Modell gut trifft — er ist ein
+      //    Artefakt. Neun Gleichungen, zehn Unbekannte: aus EINER Messung ist das System
+      //    unterbestimmt, jede Loesung passt sich perfekt an. Gegen alle sechs inzwischen
+      //    vorliegenden Messungen (Ausgangsstand + v1-v5) gerechnet bleibt ein
+      //    In-Sample-Restfehler von 17-63 Pp je Messung stehen, und in der
+      //    Kreuzvalidierung (Messung jeweils weggelassen) liegt der Prognosefehler bei
+      //    im Mittel 49 Pp — das Modell sagt eine ungesehene Messung also praktisch gar
+      //    nicht voraus. Eine Potenzform (Anteil ~ linear hoch gamma, gamma 1-3) hilft
+      //    nicht, die Kreuzvalidierung bleibt bei 47-65 Pp.
+      //
+      //    Der Grund steckt in der Messung selbst: `einflussVon` normiert ueber
+      //    Sigma max(0, Gewinn), und die ROHGEWINNE sind klein (0,01-0,6 Boxscore-Punkte
+      //    bei einem Gesamtpool um 2,0). Zwei fast gleiche Rezepte (v4 gegen v5, nur
+      //    ZWEITCHANCE/LAUFTEMPO um wenige Punkte verschoben) lieferten Rohgewinne von
+      //    stamina 0,068 gegen 0,496 und power +0,343 gegen -0,046 — die Groesse springt,
+      //    weil dahinter Schwellen stehen (Slot-RANG in zuordneSlots, Wurfentscheidungs-
+      //    Schwelle), keine glatte Kennlinie. DIE ZAHLEN OBEN SIND DESHALB EINE
+      //    ARBEITSHYPOTHESE, KEIN MESSWERT. Wer hier weitermacht, misst besser nach,
+      //    statt dem Modell zu glauben: fuenf von fuenf Rezepten, die aus ihm abgeleitet
+      //    oder gegen es optimiert wurden, waren am Ende schlechter als dieses hier.
+      //
+      //    Das deckt sich mit dem Code: ZWEITCHANCE entscheidet ueber zuordneSlots(),
+      //    WER auf dem korbnaechsten Slot steht — und damit, wer Dunks nimmt
+      //    (GEO_BONUS.dunk 0,70 gegen fern 0,075, der mit Abstand groesste Term in
+      //    technikMake). AUSDAUER wird von der Basketball-LIVE-Engine ueberhaupt nicht
+      //    gelesen (der einzige AUSDAUER-Verbraucher, `ermued`, sitzt im Vorab-Modell
+      //    fuer Football/Hockey/Tennis) — sein Rezept ist mechanisch folgenlos.
+      //    technikGate ist bei Durchschnittswerten (~0,72) immer ueber der Schwelle
+      //    (max. 0,42), deshalb liest TECHNIK fast null.
+      //
+      // 2) CHRIS' VERTEILUNG: je ATTRIBUT wird sein Matrixgewicht als 100%-Budget ueber
+      //    die Sub-Skills verteilt, in denen es logisch etwas zu suchen hat. Damit die
+      //    Rechnung aufgeht, muss die auf einen Sub-Skill entfallende Gesamtmasse gleich
+      //    seinem Einfluss-Gewicht sein — genau deshalb traegt ZWEITCHANCE hier so viel
+      //    (39,5 % der Gesamtmasse) und ABSCHLUSS/TECHNIK so wenig.
+      //
+      //    Attribut   AUF ABS TEC S_NAH S_FERN ZWEIT ABW TEAM LAUF  (% des Attributbudgets)
+      //    spirit       4   1   1    12     1    59    9   13    -
+      //    intelligence 14   -   3     -     5    67   11    -    -
+      //    awareness     6   1   2    18     3    54   16    -    -
+      //    charisma     15   3   -     -     -     -   16   66    -
+      //    speed         -   -   -     -     -     -   21    -   79
+      //    dexterity    10   4   3    36     6     -    5    -   36
+      //    power         -   2   -    49     -    49    -    -    -
+      //    stamina       -   -   -     -     -    66    -    -   34
+      //    torment       -   -   -     -     -     -  100    -    -
+      //    (AUSDAUER steht bewusst nicht in der Tabelle: mechanisch tot, s. oben — sein
+      //     Rezept ist rein logisch belegt und zieht keinem Attribut Budget ab.)
+      //
+      // 3) DIE ECHTE MESSUNG (messe-arena-einfluss.mjs basketball 48), zweimal, mit zwei
+      //    voneinander unabhaengigen Saatstaemmen — der zweite Lauf ist noetig, weil die
+      //    Saaten in einflussVon fest verdrahtet sind: eine Messung ist reproduzierbar,
+      //    aber sie ist EINE Stichprobe, und nach Punkt 1 ist die Groesse sprunghaft.
+      //
+      //      Attribut       Matrix   Lauf A   Lauf B (andere Saaten)
+      //      spirit           22      23,8     19,2
+      //      intelligence     16      15,9     14,6
+      //      awareness        14      15,7     16,0
+      //      charisma         11       8,7     12,8
+      //      speed            10       8,2      9,3
+      //      dexterity         8       4,4      9,4
+      //      power             7       6,2      6,2
+      //      stamina           6      10,7     10,5
+      //      torment           6       6,4      2,0
+      //      ABWEICHUNG              17,2 Pp  19,4 Pp
+      //
+      //    Vorher (Ausgangsstand): 63,6 Pp. Die einzige in BEIDEN Laeufen gleichgerichtete
+      //    Restabweichung ist stamina (+4,7 / +4,5); alles andere wechselt zwischen den
+      //    Saatstaemmen das Vorzeichen und ist damit Stichprobe, nicht Struktur.
+      //
+      //    Vier Versuche, genau dieses stamina zu senken, wurden gemessen und ALLE
+      //    VERWORFEN, weil sie die Gesamtabweichung erhoehten: LAUFTEMPO stamina 26->16
+      //    plus dexterity 14->22 (28,6 Pp), dasselbe mit charisma-Nachzug in AUFBAU/
+      //    TEAMGEIST (20,4 Pp), LAUFTEMPO speed 60->68/stamina 26->20 mit ZWEITCHANCE
+      //    stamina 8->5 (20,2 Pp) und die halb so grosse Fassung davon (22,0 Pp). Der
+      //    Stand hier ist also nicht der erste brauchbare, sondern der beste von fuenf
+      //    gemessenen — wer ihn anfasst, misst bitte gegen 17,2/19,4, nicht gegen 63,6.
+      //
+      // Die Erfolgsformeln selbst (technikMake/technikGate/GEO_BONUS/bedraengnis*/
+      // kontestFaktor/die 0,92-Deckel) sind dabei mit KEINER Zeile angefasst worden —
+      // sie sind gegen reale FG%-Referenzwerte kalibriert, und jeder frueherer Versuch,
+      // die Matrix ueber sie statt ueber die Rezepte einzuloesen, hat die Abweichung
+      // gesprengt (s. dortige Kommentare). Der einzige Hebel hier sind die zehn Rezepte.
+      // ===============================================================================
       rezept:{
-        AUFBAU:      {intelligence:40,spirit:30,dexterity:30},
-        // ABSCHLUSS bewusst NICHT auf die matrixstarken TECHNIK/TEAMGEIST-Attribute
-        // umgeschrieben (durchgemessen und verworfen, s. offensterMitspieler unten fuer
-        // den tatsaechlichen Fix) — ein eigenstaendiges Rezept haelt dexterity/power/speed
-        // ueberhaupt sichtbar, statt sie ganz aus der Nutzungs-Gewichtung zu verdraengen.
-        // Bleibt nach der Wurf-Distanz-Aufspaltung (SCHUSS_NAH/SCHUSS_FERN unten) als
-        // eigenstaendiger dritter Wert stehen: er entscheidet NICHT mehr die Trefferchance
-        // (das tun jetzt die beiden Distanz-Skills), sondern nur noch, wer als Zielspieler
-        // fuer Pass/Spielzug gelost wird bzw. wie fruh sich ein Ballfuehrer einen Wurf
-        // zutraut (offensterMitspieler, schwelle in entscheideBallaktion) — "generische
-        // Abschlussstaerke" fuer die Auswahl, kein Erfolgswert.
-        ABSCHLUSS:   {dexterity:40,power:30,speed:30},
-        // Chris' Fund (Bedraengnis-Bugfix-Runde, "Shot Intelligence"): intelligence war im
-        // Rezept mit 40 % schon das groesste Einzelgewicht, las gemessen aber trotzdem
-        // deutlich unter der Matrix-Vorgabe (9,0 % vs. 16 %) — TECHNIK selbst ging in der
-        // finalen Wurfformel nur mit halb so starkem Koeffizienten ein wie TEAMGEIST
-        // (0,0050 vs. 0,0060), verduennte also jeden Rezept-Anteil zusaetzlich. Jetzt
-        // intelligence im Rezept hoeher (40->55, auf Kosten von dexterity, das
-        // eigenstaendig ueber ABSCHLUSS sichtbar bleibt) — "Shot Intelligence" wirkt sich
-        // damit staerker auf die Wurfauswahl und Praezision aus.
-        TECHNIK:     {intelligence:55,awareness:30,dexterity:15},
+        // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Zuerst
+        // Spielverstaendnis (wer sieht die Struktur), dann Charisma — der Aufbauspieler
+        // dirigiert die anderen fuenf, und Charisma hat ausserhalb von TEAMGEIST/AUFBAU/
+        // ABSCHLUSS logisch keine Heimat. Kein power/stamina/torment: den Ball
+        // hochzubringen ist keine Kraftfrage.
+        AUFBAU:      {intelligence:36,charisma:22,awareness:16,spirit:14,dexterity:8,speed:4},
+        // ABSCHLUSS ist KEIN Erfolgswert (das sind SCHUSS_NAH/SCHUSS_FERN), sondern
+        // "generische Abschlussstaerke" fuer drei Auswahl-Entscheidungen: wer als
+        // Zielspieler angespielt wird (offensterMitspieler), wie frueh sich ein
+        // Ballfuehrer einen Wurf zutraut (schwelle) und die Freiwurfquote. Genau dafuer
+        // steht hier Handling (dexterity) vor Selbstvertrauen (charisma/spirit) —
+        // "der Typ, der den Ball haben WILL, wenn es eng wird".
+        ABSCHLUSS:   {spirit:24,dexterity:20,charisma:16,power:14,awareness:12,intelligence:9,speed:5},
+        // Wurfauswahl und Geduld ("Shot Intelligence", Chris' Wort). Bleibt
+        // intelligence-gefuehrt wie bisher; das Rezept ist logisch richtig, sein
+        // MECHANISCHER Einfluss ist nur klein, weil technikGate bei Durchschnittswerten
+        // immer ueber der Schwelle liegt (s. Punkt 1 oben) — das ist eine Eigenschaft
+        // der Formel, kein Grund, das Rezept unlogisch zu machen.
+        TECHNIK:     {intelligence:49,awareness:23,spirit:18,dexterity:10},
         // SCHUSS_NAH/SCHUSS_FERN (Chris' Wunsch: "scorst du 2P/3P separat und laesst die
-        // Gewichtung da reinlaufen"): ersetzen den einen geteilten Technik-Erfolgspfad in
-        // entscheideBallaktion/wirf() fuer die eigentliche Trefferchance. Nur aus den fuer
-        // Basketball erlaubten 9 Attributen, KEIN speed (s. Kommentar bei WURF_BONUS unten
-        // zu Doppel-Zaehlung mit dem bestehenden Fastbreak/Bedraengnis-Mechanismus).
-        // dexterity+awareness gemeinsam (beide Distanzen brauchen sauberes Handling/
-        // Timing), power nur nah (Kraft am Ring), intelligence nur fern (Wurftechnik/
-        // Bogenwahl von draussen) — dieselbe Asymmetrie, die einen reinen Korbleger von
-        // einem reinen Distanzschuetzen unterscheidbar macht.
-        SCHUSS_NAH:  {power:40,dexterity:35,awareness:25},
-        SCHUSS_FERN: {intelligence:40,dexterity:35,awareness:25},
-        ZWEITCHANCE: {power:45,awareness:30,stamina:25},
-        // Chris' Fund (dieselbe Runde): spirit fehlte in ABWEHR komplett, obwohl "gute
-        // Spielzuege zu den freien Mitspielern spielen und das Team pushen" laut Chris
-        // explizit auch defensiv gilt (Team-Verteidigungskoordination durch Fuehrung).
-        // speed war gleichzeitig das am staerksten UEBERgewichtete Attribut der gesamten
-        // Disziplin und steckt bereits in drei anderen Sub-Skills (ABSCHLUSS, AUSDAUER,
-        // LAUFTEMPO) — spirit uebernimmt hier den groessten Teil von speeds altem Anteil.
-        ABWEHR:      {awareness:35,spirit:25,torment:25,speed:15},
-        TEAMGEIST:   {spirit:55,charisma:45},
-        AUSDAUER:    {stamina:50,torment:25,speed:25},
-        // Fables Dynamik-Runde: ohne Lauftempo bewegt sich jeder Spieler exakt gleich
-        // schnell (nur der Lerp-Faktor entschied), Speed hatte in der Bewegung selbst nie
-        // eine Rolle. PLATZHALTER-Rezept, wie alle anderen hier.
-        LAUFTEMPO:   {speed:50,stamina:30,dexterity:20}
+        // Gewichtung da reinlaufen") tragen die eigentliche Trefferchance in technikMake.
+        // Nur aus den fuer Basketball erlaubten 9 Attributen, KEIN speed (Doppel-Zaehlung
+        // mit dem Fastbreak/Bedraengnis-Mechanismus, s. schussSkillFuer oben).
+        // Die Asymmetrie, die einen Korbleger von einem Distanzschuetzen unterscheidbar
+        // macht, bleibt und ist sogar schaerfer als vorher: power NUR nah (Kraft am
+        // Ring, dort auch das groesste Einzelgewicht), intelligence NUR fern
+        // (Wurftechnik/Bogenwahl — Chris woertlich: "um 3P-Wuerfe zu machen braucht man
+        // mehr intelligence als power, ist ja logischer"). dexterity/awareness/spirit
+        // liegen auf beiden Distanzen, weil sauberes Handling, Timing und der Wille,
+        // den Wurf zu nehmen, distanzunabhaengig sind.
+        SCHUSS_NAH:  {power:28,spirit:26,awareness:22,dexterity:14,stamina:6,torment:4},
+        SCHUSS_FERN: {intelligence:48,spirit:21,awareness:19,dexterity:12},
+        // DER GROSSE HEBEL DIESER RUNDE. ZWEITCHANCE bestimmt ueber zuordneSlots(), wer
+        // korbnah steht — und damit indirekt, wer die hochprozentigen Wuerfe bekommt;
+        // gemessen traegt der Sub-Skill fast 40 % des gesamten Einflusses. Bisher stand
+        // dort {power 45, awareness 30, stamina 25}, also fast nur Attribute, die die
+        // Matrix ganz unten fuehrt (power 7, stamina 6) — genau daher kamen die
+        // +15,6 Pp power und +7,7 Pp stamina der Ausgangsmessung.
+        // Logisch begruendet neu: der zweite Ball gehoert dem, der ihn am meisten WILL
+        // (spirit — der hoechste Matrixwert der Disziplin), der frueher liest, wohin er
+        // abprallt (intelligence/awareness), und der sich am Ring behauptet
+        // (power/stamina). Kraft bleibt also drin, wie von Chris verlangt — aber als
+        // vierter Faktor, nicht als erster.
+        ZWEITCHANCE: {spirit:27,intelligence:23,awareness:15,power:9,stamina:8,torment:6,dexterity:6,speed:6},
+        // Verteidigung ist der zweitgroesste Kanal (Steal/Interception/Block zaehlen im
+        // Boxscore je 1,5). torment sitzt hier als einziger echter Heimatplatz — die
+        // Haerte im Zweikampf; damit ist ein torment-lastiger Spieler auch der einzige
+        // Attributtyp, der sich EINDEUTIG als Verteidiger lesen laesst (Archetyp-Test).
+        // Dazu Lesen des Feldes (awareness/intelligence), Antizipation und
+        // Kommunikation (spirit/charisma — Chris: "das Team pushen" gilt auch defensiv),
+        // Herauslaufen (speed) und Haende am Ball (dexterity).
+        ABWEHR:      {awareness:22,intelligence:18,torment:16,spirit:14,speed:12,charisma:6,dexterity:5,power:4,stamina:3},
+        // TEAMGEIST geht in technikMake UND in die Pass-Lotterie (qualitaet hoch zwei)
+        // ein — ein starker, aber wegen des 0,92-Deckels stark nichtlinearer Kanal (ein
+        // frueherer Versuch, spirit hier NOCH weiter hochzuziehen, hob die Abweichung auf
+        // 44+ Pp). Deshalb geht der Weg diesmal andersherum: charisma fuehrt, spirit holt
+        // sich seinen Anteil ueber ZWEITCHANCE. Logisch traegt das: Mannschaftsgeist ist
+        // die Verbindung zur Mannschaft, und die entsteht ueber Ausstrahlung mindestens
+        // so sehr wie ueber eigenen Willen. Es ist zugleich der einzige Kanal, ueber den
+        // charisma (Matrix 11) ueberhaupt nennenswert durchschlagen kann.
+        TEAMGEIST:   {charisma:59,spirit:41},
+        // MECHANISCH FOLGENLOS in der Basketball-Live-Engine: kein einziger Aufruf liest
+        // u.AUSDAUER (der `ermued`-Term sitzt im Vorab-Modell, das nur Football/Hockey/
+        // Tennis fahren). Bewusst trotzdem logisch richtig belegt statt als Ablage fuer
+        // unerwuenschte Attribute missbraucht — wenn die Live-Engine spaeter einen
+        // Ermuedungsterm bekommt, stimmt das Rezept dann sofort, und die Budgetrechnung
+        // oben zieht ihm zugleich keinem Attribut etwas ab.
+        AUSDAUER:    {stamina:44,spirit:25,torment:20,speed:11},
+        // Fables Dynamik-Runde: Lauftempo treibt die tatsaechliche Laufgeschwindigkeit
+        // (tempoPx) und entscheidet damit die Rennen um freie Baelle. Praktisch
+        // unveraendert zum Vorgaenger — speed las in der Ausgangsmessung mit 10,0 %
+        // exakt seine Matrixvorgabe, das war die einzige punktgenaue Zeile der Tabelle
+        // und wird deshalb nicht angefasst.
+        LAUFTEMPO:   {speed:60,stamina:26,dexterity:14}
       },
       // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
       // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
