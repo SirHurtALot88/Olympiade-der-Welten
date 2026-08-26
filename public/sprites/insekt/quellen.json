@@ -8,6 +8,7 @@
     "urheber": "Basis-LPC-Spinne: Stephen 'Redshrike' Challener, William.Thompsonj; Oberkoerper/Zusammensetzung: Svetlana Kushnariova (Cabbit) <lana-chan@yandex.ru>, Jordan Irwin (AntumDeluge)",
     "lizenz": "CC-BY 3.0 / OGA-BY 3.0",
     "url": "https://opengameart.org/content/arachne",
-    "verwendung": "humanoide Spinnenfrau — menschlicher Oberkoerper mit grauem Haar geht nahtlos in einen schwarz-goldenen Spinnen-Hinterleib mit vier Beinpaaren ueber. Einziges insektoides/arachnides Vollkoerper-Motiv im Baukasten bislang."
+    "verwendung": "humanoide Spinnenfrau — menschlicher Oberkoerper mit grauem Haar geht nahtlos in einen schwarz-goldenen Spinnen-Hinterleib mit vier Beinpaaren ueber. Einziges insektoides/arachnides Vollkoerper-Motiv im Baukasten bislang.",
+    "verdrahtet": "25.08. in public/mockups/battle-mode.html eingebettet (B_SPRITES 'b_spinnenwesen', VOLLBILD-Eintrag 'spinne') und Arachna zugewiesen."
   }
 }

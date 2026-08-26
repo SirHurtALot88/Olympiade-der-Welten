@@ -79,5 +79,18 @@
  "umhang_bg": "cape/solid/bg/slash.png",
  "umhang_fg": "cape/solid/fg/slash.png",
  "visier": "hat/visor/slit/adult/slash.png",
- "visier_horn": "hat/visor/horned/adult/slash.png"
+ "visier_horn": "hat/visor/horned/adult/slash.png",
+ "_hinweis_waffen_25_08": "sw_bg/sw_fg, axt_bg/axt_fg und t_stab_bg/t_stab_fg lagen alle drei schon vor dem 25.08. im Baukasten, waren aber nirgends in DIESER Datei dokumentiert (Luecke, nicht neu entstanden) — nachgeholt, als sie erstmals als `waffe:`-Typ in der animierten Ansicht verdrahtet wurden (zeichneSprite, zeichneB). Alle drei liegen wie der Rest des Baukastens im 'slash'-Sechserraster (192px-Zelle bei axt/t_stab, weil beide Blaetter breiter sind als der 128px-Schwertsatz — nachgemessen an den PNG-Kopfdaten: axt/t_stab 1152x768 bzw. 1536x768, macht 6 bzw. 8 Spalten zu 192px). zweihaender_bg/fg sind die einzige an diesem Tag NEU heruntergeladene Quelle, fuer Chris' ausdruecklichen Wunsch nach einem echten Zweihaender ('vom Kampfstab bis zum Zweihaender') — dasselbe 192px-Sechserraster wie axt, also ohne weitere Anpassung ueber dieselbe zeichneB()-Mechanik nutzbar.",
+ "sw_bg": "weapon/sword/arming/attack_slash/bg.png",
+ "sw_fg": "weapon/sword/arming/attack_slash/fg.png",
+ "_quelle_sw": "ElizaWy; walk/down von JaidynReiman — OGA-BY 3.0 — https://github.com/ElizaWy/LPC/tree/main/Characters/Props/Sword%2001%20-%20Arming%20Sword, https://opengameart.org/content/lpc-expanded-sit-run-jump-more",
+ "axt_bg": "weapon/blunt/waraxe/attack_slash/behind/waraxe.png",
+ "axt_fg": "weapon/blunt/waraxe/attack_slash/waraxe.png",
+ "_quelle_axt": "Benjamin K. Smith (BenCreating), bluecarrot16, Sander Frenken (castelonia) — CC-BY-SA 3.0 / GPL 3.0 — https://opengameart.org/content/lpc-medieval-weapons",
+ "t_stab_bg": "weapon/magic/gnarled/thrust/background/gnarled.png",
+ "t_stab_fg": "weapon/magic/gnarled/thrust/foreground/gnarled.png",
+ "_quelle_t_stab": "bluecarrot16 — OGA-BY 3.0+ / GPL 3.0 / CC-BY 4.0 — https://opengameart.org/content/lpc-more-weapons. Ist ein THRUST-Blatt (Stossanimation, 8 Bilder je Richtung), kein slash — zeichneB() liest trotzdem nur die ersten 6 Spalten (wie ANIBILDER.slash), das ergibt eine kohaerente, wenn auch nicht bildgenau synchronisierte Stab-Haltehaltung waehrend des Angriffs-Frames. Naeherung, keine exakte Stoss-Animation.",
+ "zweihaender_bg": "weapon/sword/longsword/attack_slash/behind/longsword.png",
+ "zweihaender_fg": "weapon/sword/longsword/attack_slash/longsword.png",
+ "_quelle_zweihaender": "NEU am 25.08., Chris' Auftrag 'vom Kampfstab bis zum Zweihaender' — Johannes Sjoelund (wulax), bluecarrot16 — OGA-BY 3.0 / CC-BY-SA 3.0 — https://opengameart.org/content/lpc-medieval-fantasy-character-sprites, https://opengameart.org/content/lpc-extended-weapon-animations. Nachgemessen 1152x768 = 6 Spalten x 4 Reihen zu 192px, exakt dasselbe Raster wie axt_bg/axt_fg — deshalb ueber dieselbe zeichneB()-Mechanik nutzbar, keine Sonderbehandlung noetig."
 }
