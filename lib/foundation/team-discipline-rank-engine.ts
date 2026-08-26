@@ -6,6 +6,37 @@ import type {
   TeamStrengthRankCaptureRecord,
 } from "@/lib/data/olyDataTypes";
 import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+
+/**
+ * LIGA-LOKALE TEAM-DISZIPLIN-RAENGE (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3).
+ *
+ * `buildSharedRankMap` selbst bleibt unveraendert (rein, ohne GameState/Liga-Wissen) — dieser
+ * Wrapper gruppiert die Werte nach Liga, BEVOR er rankt, sobald der Split aktiv ist. Ohne aktiven
+ * Split (jeder heutige Save) bleibt exakt eine Gruppe uebrig, der Aufruf ist dann bit-identisch zu
+ * einem direkten `buildSharedRankMap(values)`.
+ */
+function buildScopedRankMap(gameState: GameState, values: Array<{ teamId: string; value: number }>): Map<string, number> {
+  if (!isLeagueSplitActive(gameState)) {
+    return buildSharedRankMap(values);
+  }
+
+  const groups = new Map<string, Array<{ teamId: string; value: number }>>();
+  for (const entry of values) {
+    const key = getLeagueOf(gameState, entry.teamId) ?? "unassigned";
+    const list = groups.get(key) ?? [];
+    list.push(entry);
+    groups.set(key, list);
+  }
+
+  const merged = new Map<string, number>();
+  for (const list of groups.values()) {
+    for (const [teamId, rank] of buildSharedRankMap(list)) {
+      merged.set(teamId, rank);
+    }
+  }
+  return merged;
+}
 
 export type TeamDisciplineRankScorePack = {
   total: number;
@@ -182,31 +213,36 @@ export function buildTeamDisciplineRankRowsFromGameState(
     });
   }
 
-  const totalRankMap = buildSharedRankMap(
+  const totalRankMap = buildScopedRankMap(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.total ?? 0,
     })),
   );
-  const powRankMap = buildSharedRankMap(
+  const powRankMap = buildScopedRankMap(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.pow ?? 0,
     })),
   );
-  const speRankMap = buildSharedRankMap(
+  const speRankMap = buildScopedRankMap(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.spe ?? 0,
     })),
   );
-  const menRankMap = buildSharedRankMap(
+  const menRankMap = buildScopedRankMap(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.men ?? 0,
     })),
   );
-  const socRankMap = buildSharedRankMap(
+  const socRankMap = buildScopedRankMap(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.soc ?? 0,
@@ -216,7 +252,8 @@ export function buildTeamDisciplineRankRowsFromGameState(
   const disciplineRankMaps = new Map(
     orderedDisciplines.map((discipline) => [
       discipline.id,
-      buildSharedRankMap(
+      buildScopedRankMap(
+        gameState,
         gameState.teams.map((team) => ({
           teamId: team.teamId,
           value: disciplineScoresByTeam.get(team.teamId)?.disciplines[discipline.id] ?? 0,

@@ -217,6 +217,74 @@ describe("legacy matchday resolve preview", () => {
     expect(Math.round(((alphaTop?.pointsAwarded ?? 0) + (alphaSecond?.pointsAwarded ?? 0)) * 10) / 10).toBe(6.6);
   });
 
+  describe("liga split (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3)", () => {
+    // A/B in Liga 1, C/D in Liga 2. Die Basiswerte sind so weit auseinander (190 vs. 90 vs. 50 vs. 9),
+    // dass der kleine, deterministische Pro-Spieler-Intensitaets-Jitter (siehe Kommentare oben, im
+    // niedrigen einstelligen Bereich) die Reihenfolge nicht kippen kann. Der Witz des Setups: OHNE
+    // Split waere die globale Reihenfolge A > C > D > B (Alpha global staerkste, Beta global
+    // schwaechste) -- MIT Split muss B trotzdem Liga-1-Rang 2 bekommen (nicht Rang 4) und C
+    // Liga-2-Rang 1 (nicht Rang 2), weil beide nur noch gegen die eigene Liga antreten.
+    function buildLeagueSplitGameState() {
+      return {
+        season: { id: "season-1" },
+        rosters: [],
+        players: [],
+        teamCaptains: [],
+        seasonState: {
+          leagueByTeamId: { "A-A": "liga1", "B-B": "liga1", "C-C": "liga2", "D-D": "liga2" },
+        },
+      } as unknown as GameState;
+    }
+
+    function contextsFor(gameState?: GameState) {
+      const teams = [
+        { teamId: "A-A", teamName: "Alpha", d1Scores: [100, 90], d2Scores: [10, 9] },
+        { teamId: "B-B", teamName: "Beta", d1Scores: [5, 4], d2Scores: [1, 1] },
+        { teamId: "C-C", teamName: "Charlie", d1Scores: [50, 40], d2Scores: [5, 4] },
+        { teamId: "D-D", teamName: "Delta", d1Scores: [30, 20], d2Scores: [3, 2] },
+      ];
+      return teams.map((team) => ({
+        ...createContext({ ...team, fatigueByPlayerId: {}, fatigueSourceStatus: "mapped" }),
+        gameState,
+      }));
+    }
+
+    it("without an active split, ranks all teams together (global race)", () => {
+      const preview = buildLegacyMatchdayResolvePreview(contextsFor(undefined));
+      const d1Preview = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+      const rankOf = (teamId: string) => d1Preview?.teamResults.find((team) => team.teamId === teamId)?.rank;
+
+      expect(rankOf("A-A")).toBe(1);
+      expect(rankOf("C-C")).toBe(2);
+      expect(rankOf("D-D")).toBe(3);
+      expect(rankOf("B-B")).toBe(4);
+      // Ueberblicksrang (Summe D1+D2 ueber alle Teams) folgt derselben globalen Reihenfolge.
+      expect(preview.teamResults.find((team) => team.teamId === "B-B")?.rank).toBe(4);
+    });
+
+    it("with an active split, ranks each team only within its own league", () => {
+      const preview = buildLegacyMatchdayResolvePreview(contextsFor(buildLeagueSplitGameState()));
+      const d1Preview = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+      const teamResultOf = (teamId: string) => d1Preview?.teamResults.find((team) => team.teamId === teamId);
+
+      expect(teamResultOf("A-A")?.rank).toBe(1);
+      expect(teamResultOf("B-B")?.rank).toBe(2);
+      expect(teamResultOf("C-C")?.rank).toBe(1);
+      expect(teamResultOf("D-D")?.rank).toBe(2);
+      // Liga-1-Rang-1 (Alpha) und Liga-2-Rang-1 (Charlie) bekommen dieselben Rang-1-Punkte,
+      // obwohl Charlie global nur der zweitstaerkste Score im ganzen Feld ist.
+      expect(teamResultOf("A-A")?.teamPoints).toBe(teamResultOf("C-C")?.teamPoints);
+      expect(teamResultOf("B-B")?.teamPoints).toBe(teamResultOf("D-D")?.teamPoints);
+
+      // Derselbe Split gilt fuer den Ueberblicksrang (Summe D1+D2) am Ende des Spieltags.
+      const overallRankOf = (teamId: string) => preview.teamResults.find((team) => team.teamId === teamId)?.rank;
+      expect(overallRankOf("A-A")).toBe(1);
+      expect(overallRankOf("B-B")).toBe(2);
+      expect(overallRankOf("C-C")).toBe(1);
+      expect(overallRankOf("D-D")).toBe(2);
+    });
+  });
+
   it("uses final preview contribution for top players and team discipline scores", () => {
     const captainContext = createContext({
       teamId: "A-A",

@@ -1,16 +1,19 @@
 /**
- * FUNDAMENT DES LIGA-SPLITS — PR 1 aus docs/design/liga-split-plan.md, Abschnitt 9.
+ * FUNDAMENT DES LIGA-SPLITS — PR 1 aus docs/design/liga-split-plan.md, Abschnitt 9, AKTIVIERT IN PR
+ * 2+3+6 (Fixture-Generator, liga-lokales Scoring, Aktivierung fuer NEUE Spiele).
  *
- * Diese Datei fuehrt die Konstanten und Typen ein, an denen der spaetere 2×16-Split (Plan-Abschnitt 1
- * und 2.1) haengen wird — OHNE dass heute irgendwo Verhalten davon abhaengt. `isLeagueSplitActive`
- * gibt deshalb bewusst IMMER `false` zurueck: `seasonState.leagueByTeamId` wird von keinem
- * Produktionscode gesetzt, der Schalter existiert nur strukturell fuer PR 3 (liga-lokales Scoring
- * hinter genau diesem Schalter). Bis dahin bleibt jeder Spielstand im Legacy-32er-Modus.
+ * `isLeagueSplitActive` gab in PR 1 bewusst IMMER `false` zurueck (kein Produktionscode setzte
+ * `seasonState.leagueByTeamId`). Seit PR 6 setzt `buildNewGameStateFromBaseline`
+ * (lib/game/new-game-setup-service.ts) dieses Feld fuer JEDES neu angelegte Spiel — der Schalter hier
+ * liest ab jetzt genau das: Feld gesetzt und nicht leer → Split aktiv. Bestehende/laufende Saves ohne
+ * das Feld bleiben unveraendert im Legacy-32er-Modus (Migration bestehender Saves ist explizit NICHT
+ * Teil dieser PRs, siehe Plan-Abschnitt 8 / PR 8).
  *
  * `buildInitialLeagueAssignment` ist die einzige Funktion hier, die schon "richtig" sein muss: sie
  * bildet Plan-Abschnitt 0, Fund 1 nach (Budget-Startraenge 1..16 → Liga 1, 17..32 → Liga 2, sortiert
- * wie `buildStartRankByTeamId` in lib/game/new-game-setup-service.ts) — wird aber von keinem
- * bestehenden Code aufgerufen.
+ * wie `buildStartRankByTeamId` in lib/game/new-game-setup-service.ts) — dieselbe Sortierung liefert
+ * dort auch den liga-lokalen Rang 1..16 rein arithmetisch aus dem globalen Budget-Startrang 1..32
+ * (Liga 1: unveraendert, Liga 2: Rang minus LEAGUE_SIZE), ohne ein zweites Mal zu sortieren.
  */
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
@@ -28,14 +31,16 @@ export type LeagueTier = "liga1" | "liga2";
 /**
  * DER EINE SCHALTER Legacy-32 vs. 2×16 (Plan-Abschnitt 2.1, 8).
  *
- * Gibt heute IMMER `false` zurueck. Der Split wird erst in einer spaeteren PR scharf geschaltet, wenn
- * `seasonState.leagueByTeamId` tatsaechlich von der Spiel-/Saisonlogik gesetzt wird (Migration bzw.
- * Saisonuebergang, Plan-Abschnitt 7/8). Bis dahin ist das Feld hoechstens von Hand gesetzt und muss
- * ignoriert werden — sonst haette bereits das blosse Vorhandensein des optionalen Feldes im
- * Datenmodell (Schritt dieser PR) Verhalten geaendert, was PR 1 explizit ausschliesst.
+ * Aktiv, sobald `seasonState.leagueByTeamId` gesetzt UND nicht leer ist — das ist seit PR 6 fuer
+ * jedes NEU angelegte Spiel der Fall (`buildNewGameStateFromBaseline` in
+ * lib/game/new-game-setup-service.ts). Ein fehlendes oder leeres Feld heisst weiterhin Legacy-32er-
+ * Modus: jeder bestehende/laufende Save vor dieser PR hat das Feld nie gesetzt bekommen (Migration
+ * bestehender Saves ist bewusst NICHT Teil dieser PRs, Plan-Abschnitt 8 / PR 8), bleibt also
+ * unveraendert im 32er-Rangraum, bit-identisch zum Verhalten vor PR 1.
  */
-export function isLeagueSplitActive(_gameState: GameState): boolean {
-  return false;
+export function isLeagueSplitActive(gameState: GameState): boolean {
+  const byTeamId = gameState.seasonState.leagueByTeamId;
+  return Object.keys(byTeamId ?? {}).length > 0;
 }
 
 /**

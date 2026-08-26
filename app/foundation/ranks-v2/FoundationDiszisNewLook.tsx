@@ -122,6 +122,49 @@ function ScheduleSlotRow({ slot }: { slot: ScheduleSlot }) {
   );
 }
 
+/**
+ * Gegner-Zeile der Spieltag-Karte (docs/design/liga-split-plan.md, Abschnitt 6). Nur sichtbar, wenn
+ * der Cross-Tab-Hook ueberhaupt Gegnerdaten mitgibt — ohne aktiven Liga-Split (jeder heutige Save)
+ * liefert er `opponentTeamId: null`, die Karte sieht dann exakt wie vor dieser Aenderung aus.
+ */
+function ScheduleOpponentRow({ row }: { row: ScheduleRow }) {
+  const opponentTeamId = row.opponentTeamId as string | null | undefined;
+  if (!opponentTeamId) {
+    return null;
+  }
+
+  const opponentName = (row.opponentName as string | null | undefined) ?? opponentTeamId;
+  const opponentLogo = row.opponentLogo as string | null | undefined;
+  const opponentLeagueRank = row.opponentLeagueRank as number | null | undefined;
+  const opponentDisciplineRanks = (row.opponentDisciplineRanks as Record<string, number> | null | undefined) ?? null;
+  const discipline1 = row.discipline1 as ScheduleSlot;
+  const discipline2 = row.discipline2 as ScheduleSlot;
+  const slotRank = (slot: ScheduleSlot) =>
+    slot?.disciplineId && opponentDisciplineRanks ? opponentDisciplineRanks[slot.disciplineId] ?? null : null;
+
+  return (
+    <div className="nl-diszis-md-opponent">
+      {opponentLogo ? (
+        <img src={opponentLogo} alt="" className="nl-diszis-md-opponent-logo" width={20} height={20} />
+      ) : (
+        <span className="nl-diszis-md-opponent-logo nl-diszis-md-opponent-logo-fallback" aria-hidden="true" />
+      )}
+      <span className="nl-diszis-md-opponent-name">{opponentName}</span>
+      {opponentLeagueRank != null ? (
+        <span className="muted nl-diszis-md-opponent-rank">Liga-Rang {formatNlNumber(opponentLeagueRank, 0)}</span>
+      ) : null}
+      {[discipline1, discipline2].map((slot, index) => {
+        const rank = slotRank(slot);
+        return rank != null ? (
+          <span key={index} className="muted nl-diszis-md-opponent-rank">
+            {slot?.displayName ?? `D${index + 1}`}-Rang {formatNlNumber(rank, 0)}
+          </span>
+        ) : null;
+      })}
+    </div>
+  );
+}
+
 function ScheduleMatchdayCard({ row, isCurrent }: { row: ScheduleRow; isCurrent: boolean }) {
   const discipline1 = row.discipline1 as ScheduleSlot;
   const discipline2 = row.discipline2 as ScheduleSlot;
@@ -135,6 +178,7 @@ function ScheduleMatchdayCard({ row, isCurrent }: { row: ScheduleRow; isCurrent:
         <ScheduleSlotRow slot={discipline1} />
         <ScheduleSlotRow slot={discipline2} />
       </div>
+      <ScheduleOpponentRow row={row} />
       {/* W4-Befund 1: der technische Quelle-Status ("season_seed") stand hier
           zehnmal als Karten-Fußzeile — er lebt jetzt einmal im
           "Details"-Aufklappen der Karte, nicht mehr im Spieler-UI. */}

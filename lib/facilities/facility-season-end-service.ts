@@ -6,11 +6,18 @@ import {
   getFacilityLevelDefinition,
   type FacilityId,
 } from "@/lib/facilities/facility-catalog";
-import { calculateFacilitySeasonUpkeep, getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import {
+  calculateFacilitySeasonUpkeep,
+  FACILITY_INCOME_FAKTOR_JE_LIGA,
+  getFacilityEfficiency,
+  getFacilityLevel,
+  getTeamFacilityState,
+} from "@/lib/facilities/facility-effects";
 import { degradeFacilityCondition } from "@/lib/facilities/facility-condition";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 
 export type FacilitySeasonEndFinanceFacilityRow = {
   facilityId: FacilityId;
@@ -87,11 +94,24 @@ function getRawFacilityLevel(teamFacilities: TeamFacilityCollection, facilityId:
   return Math.max(0, Math.min(5, Math.round(raw)));
 }
 
+/**
+ * LIGA-SPLIT PR4: der Gebäudeeinnahme-Rabatt fuer DIESES Team — nur `FACILITY_INCOME_FAKTOR_JE_LIGA.liga2`,
+ * wenn der Split aktiv ist UND das Team Liga 2 zugeordnet ist (heute nie, `isLeagueSplitActive`
+ * liefert immer `false`). Sonst 1, bit-identisch zu vor diesem PR.
+ */
+export function resolveFacilityIncomeFaktor(gameState: GameState, teamId: string): number {
+  if (!isLeagueSplitActive(gameState)) return 1;
+  return getLeagueOf(gameState, teamId) === "liga2" ? FACILITY_INCOME_FAKTOR_JE_LIGA.liga2 : 1;
+}
+
 function buildRows(
   teamFacilities: TeamFacilityCollection,
   cashBefore: number | null,
   seasonId: string,
   arenaPopularityFactor: number,
+  // LIGA-SPLIT PR4 (Chris: „Der Abschlag gilt auch für Gebäudeeinnahmen"): Default 1, bit-identisch
+  // zu vor diesem PR — siehe `resolveFacilityIncomeFaktor` fuer den Liga-Split-gegateten Aufrufer.
+  incomeFaktor = 1,
 ) {
   const enabledRows = FACILITY_CATALOG.map((facility) => {
     const state = teamFacilities.facilities[facility.facilityId];
@@ -108,7 +128,9 @@ function buildRows(
       level: rawLevel,
       enabled,
       upkeep: calculateFacilitySeasonUpkeep(facility.facilityId, teamFacilities),
-      income: roundValue(((definition?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) / 100),
+      // Liga-2-Rabatt wirkt NACH der Effekt-/Effizienzrechnung (Stufe, Zustand, Beliebtheit bleiben
+      // fuer beide Ligen identisch) — reines Kuerzen des Endergebnisses, wie von Chris gefordert.
+      income: roundValue((((definition?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) / 100) * incomeFaktor),
       status: rawLevel <= 0 ? "not_built" : enabled ? "enabled" : "disabled",
       warning: !enabled && rawLevel > 0 ? state?.disabledReason ?? "facility_disabled" : null,
     } satisfies FacilitySeasonEndFinanceFacilityRow;
@@ -152,7 +174,8 @@ export function previewFacilitySeasonEndFinance(
   // Beliebtheit skaliert die Arena-Einnahme (real cash). Läuft für Menschen- UND
   // KI-Teams; fehlt der Team-/Kontext, liefert die Funktion neutral 1.0.
   const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
-  const rows = buildRows(teamFacilities, cashBeforeFacilities, gameState.season.id, arenaPopularityFactor);
+  const incomeFaktor = resolveFacilityIncomeFaktor(gameState, teamId);
+  const rows = buildRows(teamFacilities, cashBeforeFacilities, gameState.season.id, arenaPopularityFactor, incomeFaktor);
   // Gebäude werden NICHT mehr durch Nichtzahlung deaktiviert (Unterhalt ist Pflicht) — daher immer leer.
   // Feld bleibt für API-/Anzeige-Kompatibilität erhalten. (Verfall-bedingtes Brechen läuft separat im Apply.)
   const disabledFacilities: FacilitySeasonEndFinanceFacilityRow[] = [];

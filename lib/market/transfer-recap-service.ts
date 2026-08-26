@@ -411,7 +411,10 @@ function buildLocalTransferRecap(params: TransferRecapParams): TransferRecapResu
    * unter S2 und der Recap daneben unter S1.
    */
   const letzteSpieltageJeSaison = ermittleLetzteSpieltageJeSaison(gameState.transferHistory);
-  const spieltageProSaison = gameState.seasonState.schedule?.length ?? null;
+  // Liga-Split (docs/design/liga-split-plan.md, Abschnitt 5, "Wichtiger Fund"): `schedule.length`
+  // ist bei zwei 16er-Ligen die FIXTURE-Zahl (bis zu 160), nicht die Spieltagszahl — die steht
+  // unveraendert in `season.matchdayIds`, Legacy wie Split.
+  const spieltageProSaison = gameState.season.matchdayIds?.length ?? null;
   const historyEntries = gameState.transferHistory
     .filter(
       (entry) => ermittleFensterSaisonId(entry, letzteSpieltageJeSaison, spieltageProSaison) === seasonId,

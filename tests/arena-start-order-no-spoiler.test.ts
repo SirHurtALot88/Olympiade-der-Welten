@@ -103,10 +103,16 @@ describe("Die Buehne wendet die Reihenfolge auch an", () => {
   /**
    * Gegenprobe zur Ursache: die Engine sortiert weiterhin nach Score. Aendert sich das
    * eines Tages, ist die Begruendung oben hinfaellig — dann soll dieser Test auffallen.
+   *
+   * Liga-Split (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3): `rankDescendingSharedTies`
+   * heisst an dieser Stelle seit PR 3 `rankWithinLeagueScope` — sie rankt weiterhin absteigend nach
+   * Score ("Sieger zuerst"), nur zusaetzlich innerhalb der eigenen Liga statt ueber alle 32 Teams,
+   * sobald der Split aktiv ist (ohne Split: bit-identisch zu vorher, eine einzige Gruppe). Die
+   * Ursache oben (Sieger zuerst) besteht also unveraendert fort.
    */
   it("die Engine liefert weiterhin nach Score sortiert (die Ursache besteht fort)", () => {
     const engine = read("lib/resolve/legacy-matchday-resolve-engine.ts");
-    expect(engine).toContain("const teamResultsRanked = rankDescendingSharedTies(");
+    expect(engine).toContain("const teamResultsRanked = rankWithinLeagueScope(");
     expect(engine).toContain("(result) => result.score,");
   });
 });

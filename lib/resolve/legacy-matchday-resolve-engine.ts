@@ -16,6 +16,8 @@ import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   DisciplineHighlightCandidate,
   DisciplineResolvePreview,
@@ -52,6 +54,42 @@ function rankDescendingSharedTies<T>(items: T[], scoreAccessor: (item: T) => num
     }
     return { item, rank: sharedRank };
   });
+}
+
+/**
+ * LIGA-LOKALES RANKING (docs/design/liga-split-plan.md, Abschnitt 0 Fund 3 / 2.2, PR 3).
+ *
+ * `rankDescendingSharedTies` rankt seit jeher ALLE uebergebenen Teams gemeinsam (das 32er-"Rennen").
+ * Ist der Liga-Split aktiv, wird daraus je Disziplin/Seite ein 16er-Rennen PRO LIGA -- die Formel
+ * (Shared-Ties, `getRankToPointsValue`) bleibt exakt dieselbe, nur der Rangraum schrumpft auf die
+ * eigene Liga. Ohne aktiven Split (jeder heutige Save, `gameState` fehlt oder
+ * `isLeagueSplitActive()===false`) bleibt GENAU EINE Gruppe uebrig -- bit-identisch zu einem
+ * direkten `rankDescendingSharedTies(items, scoreAccessor)`-Aufruf (gleiche Sortierung, gleiche
+ * Reihenfolge, da die Gruppe in Iterationsreihenfolge der Eingabe befuellt wird).
+ */
+function rankWithinLeagueScope<T>(
+  items: T[],
+  scoreAccessor: (item: T) => number,
+  teamIdAccessor: (item: T) => string,
+  gameState: GameState | undefined,
+): Array<{ item: T; rank: number }> {
+  if (!gameState || !isLeagueSplitActive(gameState)) {
+    return rankDescendingSharedTies(items, scoreAccessor);
+  }
+
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = getLeagueOf(gameState, teamIdAccessor(item)) ?? "unassigned";
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+
+  const result: Array<{ item: T; rank: number }> = [];
+  for (const list of groups.values()) {
+    result.push(...rankDescendingSharedTies(list, scoreAccessor));
+  }
+  return result;
 }
 
 function selectDebuffTargets(input: {
@@ -657,9 +695,11 @@ export function buildLegacyMatchdayResolvePreview(
         })),
       }));
     const { results: teamResultsAfterPowers, factorByTeamId: teamPowerDebuffFactorByTeamId } = applyTeamPowerDebuffs(rawTeamResults);
-    const teamResultsRanked = rankDescendingSharedTies(
+    const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
+      (result) => result.teamId,
+      base.gameState,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => ({
       ...item,
       rank,
@@ -859,7 +899,7 @@ export function buildLegacyMatchdayResolvePreview(
     }
   }
 
-  const rankedTeams = rankDescendingSharedTies(
+  const rankedTeams = rankWithinLeagueScope(
     rankedTeamsBeforePowers.map((team) => {
       const scores = disciplineScoreSummaryByTeamId.get(team.teamId);
       const d1Score = scores?.d1Score ?? team.d1Score;
@@ -872,6 +912,8 @@ export function buildLegacyMatchdayResolvePreview(
       };
     }),
     (team) => team.totalScore,
+    (team) => team.teamId,
+    base.gameState,
   ).map(({ item, rank }) => ({
     ...item,
     rank,

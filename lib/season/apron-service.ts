@@ -87,6 +87,7 @@ import {
   getSeasonEconomyFactorWindow,
   isBeforeSeasonEconomyFactorAdvance,
 } from "@/lib/season/season-economy-factors";
+import { getLeagueOf, getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
 
 export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
@@ -368,14 +369,39 @@ export type ApronLines = {
  * gegen ihre eigene Linie. Schwelle und Referenzwert sind dieselben wie beim Sponsorsystem, keine
  * zweite erfundene Zahl: gemessene Summe unter 25 % der erwarteten (32 × Referenz) ⇒ Referenz je Team.
  */
-function getLeagueDisplaySalaries(gameState: GameState): { salaries: number[]; usedReference: boolean } {
-  const measured = gameState.teams.map((team) => getTeamApronSalaryBase(gameState, team.teamId));
+/**
+ * LIGA-SPLIT PR4: `teamIds` grenzt den Rangraum ein, ueber den der Median gezogen wird — Default
+ * ALLE Teams des Saves (heutiges Verhalten, bit-identisch). Analog zu PR1s Parametrisierung der
+ * Sponsor-Formeln (`lib/sponsor/*.ts`, Rangraum als Parameter statt harter 32).
+ */
+function getLeagueDisplaySalaries(
+  gameState: GameState,
+  teamIds?: readonly string[],
+): { salaries: number[]; usedReference: boolean } {
+  const scope = teamIds ?? gameState.teams.map((team) => team.teamId);
+  const measured = scope.map((teamId) => getTeamApronSalaryBase(gameState, teamId));
   const teamCount = Math.max(1, measured.length);
   const measuredSum = measured.reduce((sum, value) => sum + value, 0);
   if (measuredSum >= teamCount * SPONSOR_V3_REFERENCE_SALARY_PER_TEAM * 0.25) {
     return { salaries: measured, usedReference: false };
   }
   return { salaries: measured.map(() => SPONSOR_V3_REFERENCE_SALARY_PER_TEAM), usedReference: true };
+}
+
+/**
+ * DIE LIGA, ÜBER DIE EIN TEAM SEINEN APRON-MEDIAN MISST (Liga-Split PR4, Plan Abschnitt 0 Fund 6 +
+ * Abschnitt 3.4): ohne aktiven Split (heute immer, `isLeagueSplitActive` liefert immer `false`) oder
+ * ohne Liga-Zuordnung dieses Teams bleibt es die GESAMTE Liga (`null` = "kein eingeschraenkter
+ * Scope", von `computeApronLines`/`resolveSeasonApronLines` als "alle Teams" gelesen) — bit-
+ * identisches Verhalten zu vor diesem PR. Aktiv rechnet der Median NUR ueber die eigene 16er-Liga:
+ * ein globaler 32er-Median wuerde sonst Liga 1 strukturell bestrafen (typischerweise hoehere
+ * Gehaelter) und Liga 2 subventionieren, statt jede Liga an ihrem eigenen Niveau zu messen.
+ */
+export function resolveApronTeamScope(gameState: GameState, teamId: string): readonly string[] | null {
+  if (!isLeagueSplitActive(gameState)) return null;
+  const tier = getLeagueOf(gameState, teamId);
+  if (!tier) return null;
+  return getLeagueTeamIds(gameState, tier);
 }
 
 /**
@@ -412,8 +438,13 @@ export function getTeamApronSalaryBase(gameState: GameState, teamId: string): nu
  * schon benutzt (gemessene Summe unter 25 % der erwarteten ⇒ Referenz `SPONSOR_V3_REFERENCE_SALARY_PER_TEAM`
  * je Team). Keine zweite erfundene Zahl.
  */
-export function computeApronLines(gameState: GameState): ApronLines {
-  const { salaries, usedReference } = getLeagueDisplaySalaries(gameState);
+/**
+ * `teamIds` (Liga-Split PR4): grenzt Median UND Umverteilungstopf-Bemessung auf einen Team-Scope ein
+ * — weggelassen (jeder heutige Aufrufer) rechnet ueber ALLE Teams des Saves, bit-identisch zu vor
+ * diesem PR. Siehe `resolveApronTeamScope` fuer die Liga-Split-gegateten Aufrufer.
+ */
+export function computeApronLines(gameState: GameState, teamIds?: readonly string[]): ApronLines {
+  const { salaries, usedReference } = getLeagueDisplaySalaries(gameState, teamIds);
   const medianSalary = median(salaries);
   return {
     medianSalary: round1(medianSalary),
@@ -567,11 +598,20 @@ function vorsaisonMedianAnker(gameState: GameState): number | null {
  * Grenze kaufen, die sich durch die eigenen Käufe verschiebt. Nur gilt das für die laufende Saison,
  * nicht für die Aufbauphase davor. Mit dem Finalisieren endet der Kaderbau, ab da steht die Grenze.
  */
-export function resolveSeasonApronLines(gameState: GameState): ApronLines {
+/**
+ * `teamIds` (Liga-Split PR4, siehe `computeApronLines`): weggelassen rechnet diese Funktion wie
+ * bisher ueber alle Teams — bit-identisch zu vor diesem PR. GEZIELT NICHT ANGEFASST: der eingefrorene
+ * Snapshot (`apronLinesSnapshot`) und der Vorsaison-Anker (`vorsaisonMedianAnker`) sind heute globale,
+ * EINZELNE Werte im `seasonState` — eine echte Liga-2-Bemessung braucht dafuer je Liga einen eigenen
+ * Snapshot/Anker, was eine Datenmodell-Erweiterung ist (spaetere Aktivierungs-PR). Mit `teamIds`
+ * gesetzt gilt der Scope deshalb nur fuer die LIVE-Berechnung; ein bereits eingefrorener Snapshot
+ * oder Vorsaison-Anker wird unveraendert zurueckgegeben bzw. als globaler Wert herangezogen.
+ */
+export function resolveSeasonApronLines(gameState: GameState, teamIds?: readonly string[]): ApronLines {
   if (areSeasonApronLinesFrozen(gameState)) {
     return gameState.seasonState!.apronLinesSnapshot!;
   }
-  const live = computeApronLines(gameState);
+  const live = computeApronLines(gameState, teamIds);
   const anker = vorsaisonMedianAnker(gameState);
   if (anker === null || anker <= live.medianSalary) return live;
   const medianSalary = round1(anker);
@@ -602,12 +642,27 @@ const WERTUNGS_GEWICHTE_SUMME = WERTUNGS_GEWICHTE.reduce((sum, value) => sum + v
  * (`sponsorSockelFuerStartrang`) — beide Ränge messen bewusst Verschiedenes und werden hier nicht
  * vermischt.
  */
-export function apronWertungsanteil(finalRank: number, salaryFactor: number): number {
-  const league = WERTUNGS_GEWICHTE.length;
-  const rank = Math.max(1, Math.min(league, Math.round(Number.isFinite(finalRank) ? finalRank : league)));
-  const gewicht = WERTUNGS_GEWICHTE[rank - 1] ?? 0;
+/**
+ * `leagueSize` (Liga-Split PR4): Rangraum der Gewichtstabelle — Default die gecachte 32er-Reihe
+ * (heutiges Verhalten, bit-identisch). `topfFaktor` (Default 1): derselbe Topf-Rabatt wie in
+ * `sponsorLigaLeiterOhneZonenTerm` (`SPONSOR_TOPF_FAKTOR_JE_LIGA`) — der Deckel des Apron
+ * (`APRON_CAP_SHARE_OF_RANK_PAYOUT × rankShare`) muss auf demselben, ggf. rabattierten Wertungstopf
+ * fussen wie die tatsaechliche Sponsorauszahlung, sonst deckelt er gegen einen Topf, den es fuer
+ * dieses Team gar nicht gibt.
+ */
+export function apronWertungsanteil(
+  finalRank: number,
+  salaryFactor: number,
+  leagueSize: number = WERTUNGS_GEWICHTE.length,
+  topfFaktor = 1,
+): number {
+  const gewichte = leagueSize === WERTUNGS_GEWICHTE.length ? WERTUNGS_GEWICHTE : sponsorWertungsGewichte(leagueSize);
+  const gewichteSumme =
+    leagueSize === WERTUNGS_GEWICHTE.length ? WERTUNGS_GEWICHTE_SUMME : gewichte.reduce((sum, value) => sum + value, 0);
+  const rank = Math.max(1, Math.min(leagueSize, Math.round(Number.isFinite(finalRank) ? finalRank : leagueSize)));
+  const gewicht = gewichte[rank - 1] ?? 0;
   const factor = Number.isFinite(salaryFactor) && salaryFactor > 0 ? salaryFactor : 1;
-  return (SPONSOR_WERTUNGSTOPF * factor * gewicht) / WERTUNGS_GEWICHTE_SUMME;
+  return (SPONSOR_WERTUNGSTOPF * factor * topfFaktor * gewicht) / gewichteSumme;
 }
 
 // ── Abgaben und Ausgleiche ─────────────────────────────────────────────────────────────────────

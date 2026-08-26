@@ -26,6 +26,7 @@ import { buildSponsorV4AxisTerms } from "@/lib/sponsor/sponsor-v4-axes";
 import { buildSponsorOfferModuleIds } from "@/lib/sponsor/sponsor-modules";
 import { SPONSOR_LEIH_BONUS } from "@/lib/sponsor/sponsor-leih-ziele";
 import { SPONSOR_BODEN, sponsorKurvenLeiter, sponsorSockelFuerStartrang } from "@/lib/sponsor/sponsor-liga-leiter";
+import { getLeagueOf, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { SPONSOR_CURVE_SHAPE_KEYS } from "@/lib/sponsor/sponsor-curve-shapes";
 import { getSponsorTermMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import {
@@ -184,6 +185,18 @@ export function resetSponsorV3PrizeCurveCache(): void {
   prizeCurveCache.clear();
 }
 
+/**
+ * LIGA-SPLIT PR4: die Liga-Zugehoerigkeit, gegen die `sponsorKurvenLeiter` ihren Topf-Rabatt
+ * (`SPONSOR_TOPF_FAKTOR_JE_LIGA`) und ihren Zonen-Term bemisst — `undefined`, solange der Split nicht
+ * aktiv ist ODER kein `teamId` vorliegt (z. B. Migrations-/Vergleichsskripte ohne Team-Kontext).
+ * Heute (`isLeagueSplitActive` liefert immer `false`) also fuer JEDEN Aufrufer `undefined` — bit-
+ * identisches Verhalten zu vor diesem PR, scharf geschaltet erst mit der Aktivierungs-PR.
+ */
+export function resolveSponsorLeagueTier(gameState: GameState, teamId: string | null | undefined): LeagueTier | undefined {
+  if (!teamId || !isLeagueSplitActive(gameState)) return undefined;
+  return getLeagueOf(gameState, teamId) ?? undefined;
+}
+
 // ── Konditionen bauen ──────────────────────────────────────────────────────────────────────────
 
 const RARITY_FALLBACK: SponsorRarity = "magisch";
@@ -297,10 +310,14 @@ export function buildSponsorV3Terms(input: {
   // Cash-Karte derselben Rarität nie schlechter als eine Gebäude-Karte, und der Unterschied zwischen
   // ihnen ist genau das, was man dafuer bekommt.
   const wertFaktor = sponsorV3WertFaktorFuerKarte({ rarity, leihVerzicht: input.leihVerzicht });
+  // LIGA-SPLIT PR4: Topf-Rabatt + Zonen-Term nur, wenn der Split aktiv ist UND das Team einer Liga
+  // zugeordnet ist — siehe `resolveSponsorLeagueTier`. Heute immer `undefined` (Legacy-Verhalten).
+  const leagueTier = resolveSponsorLeagueTier(input.gameState, input.teamId);
   const baseLadder = sponsorKurvenLeiter({
     shape: input.curveShape,
     startRank: input.startRank,
     salaryFactor,
+    leagueTier,
   }).map((wert) => wert * wertFaktor);
   return buildSponsorV3TermsCore({
     baseLadder,
@@ -360,7 +377,17 @@ export function buildSponsorV3Terms(input: {
  */
 export function rerollSponsorV3TermsForNewSeason(
   terms: SponsorV3ContractTerms,
-  input: { newSalaryFactor: number; contractYear: SponsorTermSeasons },
+  input: {
+    newSalaryFactor: number;
+    contractYear: SponsorTermSeasons;
+    /**
+     * LIGA-SPLIT PR4: die Liga-Zugehoerigkeit des Teams IN DER NEUEN SAISON (aus `resolveSponsorLeagueTier`
+     * am Aufrufer, der `gameState` + `teamId` kennt — z. B. `advanceSponsorContractsForNewSeason` in
+     * sponsor-contract-lifecycle.ts). Weggelassen: Topf-Rabatt und Zonen-Term bleiben aus, bit-identisch
+     * zu vor diesem PR.
+     */
+    leagueTier?: LeagueTier;
+  },
 ): SponsorV3ContractTerms {
   if (!terms.curveShape) {
     /**
@@ -429,6 +456,7 @@ export function rerollSponsorV3TermsForNewSeason(
     shape: terms.curveShape,
     startRank: terms.startRank,
     salaryFactor: input.newSalaryFactor,
+    leagueTier: input.leagueTier,
   }).map((wert) => wert * wertFaktor);
   const multiplier = getSponsorTermMultiplier(input.contractYear);
   // Erosion NUR auf den Wertungsanteil (Wert oberhalb des Sockels) — der Sockel selbst bleibt exakt

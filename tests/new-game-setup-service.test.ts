@@ -6,6 +6,7 @@ import {
 } from "@/lib/game/new-game-setup-service";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -92,11 +93,35 @@ describe("new-game-setup-service", () => {
     expect(gameState.season.id).toBe("season-1");
     expect(gameState.season.currentMatchday).toBe(1);
     expect(gameState.matchdayState.status).toBe("planning");
+    // Liga-Split-Aktivierung (docs/design/liga-split-plan.md, Abschnitt 9, PR 6): jedes neue Spiel
+    // bekommt ab jetzt eine Liga-Zuordnung, und die Startplaetze werden liga-lokal (1..16) statt
+    // global (1..32) vergeben. M-M ist Budget-Rang 1 (global wie liga-lokal identisch: 1). R-R ist
+    // Budget-Rang 32 global, aber Liga-2-Rang 16 (32 - LEAGUE_SIZE).
+    expect(isLeagueSplitActive(gameState)).toBe(true);
+    expect(gameState.seasonState.leagueByTeamId?.["M-M"]).toBe("liga1");
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
+    expect(Object.keys(gameState.seasonState.leagueByTeamId ?? {})).toHaveLength(32);
     expect(gameState.seasonState.standings["M-M"]?.startplatz).toBe(1);
     expect(gameState.seasonState.standings["M-M"]?.rank).toBe(1);
-    expect(gameState.seasonState.standings["R-R"]?.startplatz).toBe(32);
+    expect(gameState.seasonState.standings["R-R"]?.startplatz).toBe(16);
+    expect(gameState.seasonState.standings["R-R"]?.rank).toBe(16);
     expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
     expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
+    // Echter Spielplan der ersten Saison statt der Dummy-Paarung (Plan-Abschnitt 5): 2 Ligen *
+    // 10 Spieltage * 8 Paarungen = 160 Fixtures, jedes Team genau 1 Fixture pro Spieltag, alle
+    // Paarungen liga-intern.
+    expect(gameState.seasonState.schedule).toHaveLength(160);
+    const md1Fixtures = gameState.seasonState.schedule.filter(
+      (fixture) => fixture.matchdayId === gameState.season.matchdayIds[0],
+    );
+    expect(md1Fixtures).toHaveLength(16);
+    const teamsOnMd1 = md1Fixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]);
+    expect(new Set(teamsOnMd1).size).toBe(32);
+    for (const fixture of gameState.seasonState.schedule) {
+      expect(gameState.seasonState.leagueByTeamId?.[fixture.homeTeamId]).toBe(
+        gameState.seasonState.leagueByTeamId?.[fixture.awayTeamId],
+      );
+    }
   }, 120_000);
 
   it("seeds sponsor offers for the human team so the choose_sponsor step has real cards to show", () => {
