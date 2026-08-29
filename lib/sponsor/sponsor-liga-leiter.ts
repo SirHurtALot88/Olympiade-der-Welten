@@ -25,7 +25,23 @@ import type { SponsorCurveShape } from "@/lib/data/olyDataTypes";
 import { SPONSOR_CURVE_SHAPES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { sponsorV3AnchorWeights } from "@/lib/sponsor/sponsor-v3-model";
 
-/** Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell. */
+/**
+ * Ligagroesse, ueber die die Leiter laeuft — dieselbe 32er-Tabelle wie im V3-Modell.
+ *
+ * OFFEN FUER DEN BATTLE-MODUS (16 Teams): dort gibt es die Raenge 17..32 gar nicht, die Leiter
+ * wird also nur in ihrer oberen Haelfte benutzt. Was das heisst, ist gemessen und nicht geraten:
+ * der Sockel laeuft linear von Rang 1 bis Rang 32, ein 16er-Feld schoepft davon nur die Spanne
+ * bis Rang 16 aus (rund die Haelfte der Sockel-Spreizung), und vom Wertungstopf verteilt sich nur
+ * der Teil, der auf die Raenge 1..16 entfaellt — der Rest bleibt schlicht liegen. Ein
+ * Battle-Spielstand zahlt seinen Teams damit WENIGER Sponsorgeld aus als ein Management-
+ * Spielstand, und die Spreizung zwischen Erstem und Letztem ist flacher.
+ *
+ * BEWUSST NICHT JETZT REPARIERT. Die Leiter ist auf Σ Gehaelter einer 32er-Liga kalibriert
+ * (Messlauf `scripts/messlauf-sponsoren-gebaeude.ts`, Deckung 94 %); sie einfach auf 16 Sprossen
+ * umzustellen aendert dieselbe Kalibrierung mit, und WELCHE Deckung eine 16er-Battle-Liga haben
+ * soll, ist eine Balancing-Entscheidung von Chris, keine Umrechnung. Diese Phase baut den
+ * Spielplan, nicht die Wirtschaft.
+ */
 const SPONSOR_LIGA_RANKS = 32;
 
 /**

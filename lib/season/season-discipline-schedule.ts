@@ -3,12 +3,26 @@ import type {
   Discipline,
   GameState,
   Matchday,
+  PlayMode,
   SeasonDisciplineScheduleEntry,
   SeasonDisciplineScheduleSlot,
 } from "@/lib/data/olyDataTypes";
 
 const SCHEDULE_SOURCE_NOTE =
   "Legacy-Fallback fuer alte Saves ohne vollstaendigen Season-Schedule.";
+
+/**
+ * Schedule-Version des Battle-Modus. Sie geht in den Seed ein
+ * (`${saveId}:${seasonId}:${scheduleVersion}`) und trennt die Auslosung damit sauber von der des
+ * Management-Modus: derselbe Save-/Saison-Schluessel wuerde sonst in beiden Spielarten dieselbe
+ * erste Haelfte auswuerfeln.
+ */
+export const BATTLE_MODE_SCHEDULE_VERSION = "battle-mode-v1-double-round";
+
+/** Fehlt die Spielart, ist es "management" — siehe `PlayMode` in olyDataTypes.ts. */
+export function resolvePlayMode(playMode?: PlayMode | null): PlayMode {
+  return playMode === "battle" ? "battle" : "management";
+}
 
 type ScheduledDiscipline = {
   discipline: Discipline;
@@ -38,7 +52,12 @@ function hashToUint(input: string) {
   return hash >>> 0;
 }
 
-function createSeededRandom(seed: string) {
+/**
+ * Der Zufallsgeber der Spielplanung — exportiert, damit die Battle-Paarungen
+ * (`lib/season/battle-mode-spielplan.ts`) DIESELBE Quelle benutzen und nicht eine zweite,
+ * eigene erfinden. Ein Save-Spielplan darf nur an einem Seed haengen, nicht an zwei.
+ */
+export function createSeededRandom(seed: string) {
   let state = hashToUint(seed) || 1;
   return () => {
     state = Math.imul(state ^ (state >>> 15), 1 | state);
@@ -47,7 +66,7 @@ function createSeededRandom(seed: string) {
   };
 }
 
-function shuffleSeeded<T>(items: T[], seed: string) {
+export function shuffleSeeded<T>(items: T[], seed: string) {
   const next = [...items];
   const random = createSeededRandom(seed);
   for (let index = next.length - 1; index > 0; index -= 1) {
@@ -107,9 +126,18 @@ function buildSeededDisciplinePairs(input: {
   seed: string;
   requiredMatchdays: number;
   maxCombinedPlayerCount: number;
+  /**
+   * Vorgegebene Spielerzahlen je Disziplin. Nur der Battle-Modus reicht sie ein: dort laeuft
+   * dieselbe Paarung ZWEIMAL mit unterschiedlichem Seed (zwei Saisonhaelften), und ohne diese
+   * Vorgabe wuerfelte `buildSeasonPlayerCountByDiscipline` je Haelfte eine ANDERE Spielerzahl
+   * fuer dieselbe Disziplin aus — Basketball waere im ersten Auftritt ein 6er und im zweiten ein
+   * 3er. Die Spielerzahl gehoert der Saison, nicht dem einzelnen Spieltag.
+   */
+  playerCountByDisciplineId?: Map<string, number>;
 }): { pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]>; warnings: string[] } {
   const shuffled = shuffleSeeded(sortDisciplinesForSeasonSchedule(input.disciplines), input.seed);
-  const playerCountByDisciplineId = buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
+  const playerCountByDisciplineId =
+    input.playerCountByDisciplineId ?? buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
   const available = shuffled.map((discipline) => ({
     discipline,
     playerCount: playerCountByDisciplineId.get(discipline.id) ?? buildSeasonPlayerCount(discipline, input.seed),
@@ -143,6 +171,110 @@ function buildSeededDisciplinePairs(input: {
   return { pairs, warnings: Array.from(new Set(warnings)) };
 }
 
+/** Ungeordneter Schluessel einer Disziplin-Paarung — Basketball+Schach = Schach+Basketball. */
+function disziplinPaarSchluessel(pair: [ScheduledDiscipline | null, ScheduledDiscipline | null]): string | null {
+  const first = pair[0]?.discipline.id ?? null;
+  const second = pair[1]?.discipline.id ?? null;
+  if (!first || !second) {
+    return null;
+  }
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+}
+
+/**
+ * Wie oft darf die zweite Saisonhaelfte neu gewuerfelt werden, bis sie keine Paarung der ersten
+ * wiederholt? Gerechnet fuer die reale Ligagroesse (20 Disziplinen, 10 Paarungen je Haelfte):
+ * eine einzelne Paarung der zweiten Haelfte trifft mit 10/190 ≈ 5 % eine der schon vergebenen,
+ * ein ganzer Wurf geht also mit rund (1 − 10/190)^10 ≈ 58 % glatt durch. 40 Versuche scheitern
+ * demnach mit ~0,42^40 ≈ 10^-15 — die Ersatzregel unten ist der Vollstaendigkeit halber da, nicht
+ * weil sie erwartet wird.
+ */
+const BATTLE_MODE_MAX_PAAR_VERSUCHE = 40;
+
+/**
+ * DIE DOPPELRUNDE — jede Disziplin ZWEIMAL pro Saison, aber nie dieselbe Kombination zweimal.
+ *
+ * Chris' Vorgabe fuer den Battle-Modus: 20 Spieltage à 2 Disziplinen = 40 Plaetze, verteilt auf
+ * 20 Disziplinen ⇒ jede genau zweimal. Verboten ist nur die WIEDERHOLTE KOMBINATION: wenn
+ * Basketball+Schach an einem Spieltag stand, muss Basketballs zweiter Auftritt einen anderen
+ * Partner finden.
+ *
+ * KEIN NEUES VERFAHREN, sondern das bestehende zweimal: die Saison wird in zwei Haelften zerlegt
+ * und jede Haelfte mit `buildSeededDisciplinePairs` ausgelost — genau der Algorithmus, der auch
+ * den Management-Modus auslost. Jede Haelfte verbraucht den Pool einmal komplett; daraus folgt
+ * ohne jede Zusatzpruefung: jede Disziplin genau zweimal, und INNERHALB einer Haelfte kann sich
+ * keine Kombination wiederholen (jede Disziplin kommt dort nur einmal vor). Zu pruefen bleibt
+ * damit einzig die Kollision ZWISCHEN den Haelften.
+ *
+ * VERWORFEN — der Pool aus 40 Eintraegen (jede Disziplin doppelt) in EINEM Lauf: dann laesst sich
+ * "jede genau zweimal" nicht mehr aus dem Verbrauch ablesen, sondern muss eigens erzwungen werden,
+ * und obendrein kann eine Disziplin an einem Spieltag gegen SICH SELBST gepaart werden. Zwei
+ * Haelften geben beide Zusicherungen geschenkt.
+ *
+ * NEBENWIRKUNG, DIE WIR WOLLEN: weil jede Haelfte den Pool komplett verbraucht, faellt der zweite
+ * Auftritt einer Disziplin immer in die zweite Saisonhaelfte. Die Auftritte liegen damit
+ * zwangslaeufig weit auseinander statt an Spieltag 3 und 4.
+ */
+function buildBattleModeDisciplinePairs(input: {
+  disciplines: Discipline[];
+  seed: string;
+  requiredMatchdays: number;
+  maxCombinedPlayerCount: number;
+}): { pairs: Array<[ScheduledDiscipline | null, ScheduledDiscipline | null]>; warnings: string[] } {
+  const playerCountByDisciplineId = buildSeasonPlayerCountByDiscipline(input.disciplines, input.seed);
+  const ersteHaelfteMatchdays = Math.ceil(input.requiredMatchdays / 2);
+  const zweiteHaelfteMatchdays = input.requiredMatchdays - ersteHaelfteMatchdays;
+
+  const ersteHaelfte = buildSeededDisciplinePairs({
+    disciplines: input.disciplines,
+    seed: `${input.seed}:haelfte-1`,
+    requiredMatchdays: ersteHaelfteMatchdays,
+    maxCombinedPlayerCount: input.maxCombinedPlayerCount,
+    playerCountByDisciplineId,
+  });
+  const belegteKombinationen = new Set(
+    ersteHaelfte.pairs.map((pair) => disziplinPaarSchluessel(pair)).filter((key): key is string => key !== null),
+  );
+
+  let zweiteHaelfte = ersteHaelfte;
+  let kollisionsWarnung: string | null = null;
+  if (zweiteHaelfteMatchdays > 0) {
+    let letzterWurf: typeof ersteHaelfte | null = null;
+    let gefunden = false;
+    for (let versuch = 1; versuch <= BATTLE_MODE_MAX_PAAR_VERSUCHE; versuch += 1) {
+      const wurf = buildSeededDisciplinePairs({
+        disciplines: input.disciplines,
+        seed: `${input.seed}:haelfte-2:versuch-${versuch}`,
+        requiredMatchdays: zweiteHaelfteMatchdays,
+        maxCombinedPlayerCount: input.maxCombinedPlayerCount,
+        playerCountByDisciplineId,
+      });
+      letzterWurf = wurf;
+      const kollidiert = wurf.pairs.some((pair) => {
+        const key = disziplinPaarSchluessel(pair);
+        return key !== null && belegteKombinationen.has(key);
+      });
+      if (!kollidiert) {
+        gefunden = true;
+        break;
+      }
+    }
+    zweiteHaelfte = letzterWurf ?? { pairs: [], warnings: [] };
+    if (!gefunden) {
+      kollisionsWarnung = "battle_mode_schedule_pair_collision_unresolved";
+    }
+  } else {
+    zweiteHaelfte = { pairs: [], warnings: [] };
+  }
+
+  return {
+    pairs: [...ersteHaelfte.pairs, ...zweiteHaelfte.pairs],
+    warnings: Array.from(
+      new Set([...ersteHaelfte.warnings, ...zweiteHaelfte.warnings, ...(kollisionsWarnung ? [kollisionsWarnung] : [])]),
+    ),
+  };
+}
+
 export function getDisciplineColor(category?: DisciplineCategory | null) {
   if (category === "power") return "red";
   if (category === "speed") return "green";
@@ -162,8 +294,18 @@ export function sortDisciplinesForSeasonSchedule(disciplines: Discipline[]) {
   });
 }
 
-export function getRequiredSeasonDisciplineMatchdayCount(disciplines: Discipline[]) {
-  return Math.max(1, Math.ceil(sortDisciplinesForSeasonSchedule(disciplines).length / 2));
+/**
+ * WIE VIELE SPIELTAGE TRAEGT DIE SAISON — abgeleitet aus dem Disziplin-Pool, nicht gesetzt.
+ *
+ * Management: 2 Disziplinen je Spieltag, jede Disziplin EINMAL ⇒ ceil(20/2) = 10 Spieltage.
+ * Battle:     2 Disziplinen je Spieltag, jede Disziplin ZWEIMAL ⇒ 2 × ceil(20/2) = 20 Spieltage.
+ *
+ * Der Parameter ist bewusst OPTIONAL und steht hinten: jeder bestehende Aufrufer (alle im
+ * Management-Modus) ruft weiter mit einem Argument auf und bekommt exakt dieselbe Zahl wie vorher.
+ */
+export function getRequiredSeasonDisciplineMatchdayCount(disciplines: Discipline[], playMode?: PlayMode | null) {
+  const einfach = Math.max(1, Math.ceil(sortDisciplinesForSeasonSchedule(disciplines).length / 2));
+  return resolvePlayMode(playMode) === "battle" ? einfach * 2 : einfach;
 }
 
 function sortScheduleEntries(entries: SeasonDisciplineScheduleEntry[]) {
@@ -175,8 +317,13 @@ function sortScheduleEntries(entries: SeasonDisciplineScheduleEntry[]) {
   });
 }
 
-function buildNormalizedMatchdayIds(input: { seasonId: string; disciplines: Discipline[]; matchdayIds?: string[] | null }) {
-  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines);
+function buildNormalizedMatchdayIds(input: {
+  seasonId: string;
+  disciplines: Discipline[];
+  matchdayIds?: string[] | null;
+  playMode?: PlayMode | null;
+}) {
+  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines, input.playMode);
   if (input.matchdayIds && input.matchdayIds.length >= requiredMatchdays) {
     return input.matchdayIds.slice(0, requiredMatchdays);
   }
@@ -190,8 +337,9 @@ export function hasCompleteSeasonDisciplineSchedule(input: {
   disciplines: Discipline[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[] | null;
   seasonId?: string | null;
+  playMode?: PlayMode | null;
 }) {
-  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines);
+  const requiredMatchdays = getRequiredSeasonDisciplineMatchdayCount(input.disciplines, input.playMode);
   const schedule = (input.disciplineSchedule ?? []).filter((entry) => !input.seasonId || entry.seasonId === input.seasonId);
   if (schedule.length < requiredMatchdays) {
     return false;
@@ -246,10 +394,18 @@ export function buildSeasonSeededDisciplineSchedule(input: {
   matchdayCount?: number;
   matchdayIds?: string[];
   maxCombinedPlayerCount?: number;
+  /** Fehlt = "management" — der bisherige Weg, Zeichen fuer Zeichen unveraendert. */
+  playMode?: PlayMode | null;
 }): { entries: SeasonDisciplineScheduleEntry[]; matchdayIds: string[]; scheduleSeed: string; warnings: string[] } {
-  const scheduleVersion = input.scheduleVersion ?? "season-setup-v3-balanced-slot-buckets";
+  const playMode = resolvePlayMode(input.playMode);
+  const scheduleVersion =
+    input.scheduleVersion ??
+    (playMode === "battle" ? BATTLE_MODE_SCHEDULE_VERSION : "season-setup-v3-balanced-slot-buckets");
   const scheduleSeed = `${input.saveId}:${input.seasonId}:${scheduleVersion}`;
-  const requiredMatchdays = Math.max(1, input.matchdayCount ?? getRequiredSeasonDisciplineMatchdayCount(input.disciplines));
+  const requiredMatchdays = Math.max(
+    1,
+    input.matchdayCount ?? getRequiredSeasonDisciplineMatchdayCount(input.disciplines, playMode),
+  );
   const matchdayIds =
     input.matchdayIds && input.matchdayIds.length >= requiredMatchdays
       ? input.matchdayIds.slice(0, requiredMatchdays)
@@ -272,14 +428,25 @@ export function buildSeasonSeededDisciplineSchedule(input: {
    * Der Parameter bleibt, damit Tests und Sonderlaeufe weiterhin eng fuehren koennen.
    */
   const maxCombinedPlayerCount = input.maxCombinedPlayerCount ?? Number.POSITIVE_INFINITY;
-  const paired = buildSeededDisciplinePairs({
-    disciplines: input.disciplines,
-    seed: scheduleSeed,
-    requiredMatchdays,
-    maxCombinedPlayerCount,
-  });
+  const paired =
+    playMode === "battle"
+      ? buildBattleModeDisciplinePairs({
+          disciplines: input.disciplines,
+          seed: scheduleSeed,
+          requiredMatchdays,
+          maxCombinedPlayerCount,
+        })
+      : buildSeededDisciplinePairs({
+          disciplines: input.disciplines,
+          seed: scheduleSeed,
+          requiredMatchdays,
+          maxCombinedPlayerCount,
+        });
+  // Im Battle-Modus deckt der Pool jeden Platz ZWEIMAL ab — die Warnung misst deshalb gegen die
+  // Plaetze EINER Saisonhaelfte, sonst schluege sie bei einer voellig gesunden Auslosung an.
+  const belegteSlots = playMode === "battle" ? requiredMatchdays : requiredMatchdays * 2;
   const warnings = [
-    ...(input.disciplines.length < requiredMatchdays * 2 ? ["season_schedule_discipline_pool_smaller_than_slots"] : []),
+    ...(input.disciplines.length < belegteSlots ? ["season_schedule_discipline_pool_smaller_than_slots"] : []),
     ...paired.warnings,
   ];
 
@@ -323,10 +490,12 @@ function buildResolvedSeasonDisciplineSchedule(
   gameState: GameState,
   saveId = "normalized-local-save",
 ): SeasonDisciplineScheduleEntry[] {
+  const playMode = resolvePlayMode(gameState.playMode);
   const matchdayIds = buildNormalizedMatchdayIds({
     seasonId: gameState.season.id,
     disciplines: gameState.disciplines,
     matchdayIds: gameState.season.matchdayIds,
+    playMode,
   });
   return buildSeasonSeededDisciplineSchedule({
     saveId,
@@ -334,6 +503,7 @@ function buildResolvedSeasonDisciplineSchedule(
     disciplines: gameState.disciplines,
     matchdayIds,
     matchdayCount: matchdayIds.length,
+    playMode,
   }).entries;
 }
 
@@ -354,6 +524,7 @@ export function getSeasonDisciplineSchedule(gameState: GameState, options?: { sa
       disciplines: gameState.disciplines,
       disciplineSchedule: stored,
       seasonId: gameState.season.id,
+      playMode: gameState.playMode,
     })
   ) {
     const activeSchedule = sortScheduleEntries(stored.filter((entry) => entry.seasonId === gameState.season.id));

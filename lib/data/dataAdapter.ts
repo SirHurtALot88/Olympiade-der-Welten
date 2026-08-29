@@ -9,7 +9,13 @@ import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
 import { loadSeasonManagementReferenceRows, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
-import { buildSeasonSeededDisciplineSchedule, buildMatchdaysFromSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonSeededDisciplineSchedule,
+  buildMatchdaysFromSeasonDisciplineSchedule,
+  getRequiredSeasonDisciplineMatchdayCount,
+  resolvePlayMode,
+} from "@/lib/season/season-discipline-schedule";
+import { baueBattleModeSpielplan, waehleBattleModeTeamIds } from "@/lib/season/battle-mode-spielplan";
 import type {
   Contract,
   Discipline,
@@ -21,6 +27,7 @@ import type {
   Matchday,
   MatchdayState,
   OlySeedData,
+  PlayMode,
   Player,
   RosterEntry,
   SaveGameState,
@@ -37,19 +44,6 @@ type MappingRow = {
   teamId: string;
   sourceNote?: string;
 };
-
-export const foundationSeedSeason: Season = {
-  id: "season-1",
-  name: "Season 1",
-  year: 1,
-  currentMatchday: 1,
-  matchdayIds: Array.from({ length: 10 }, (_, index) => `matchday-${index + 1}`),
-};
-
-export const foundationSeedFixtures: Fixture[] = [
-  { id: "fixture-1", homeTeamId: "C-C", awayTeamId: "B-B", matchdayId: "matchday-1", status: "scheduled" },
-  { id: "fixture-2", homeTeamId: "R-C", awayTeamId: "T-G", matchdayId: "matchday-2", status: "scheduled" },
-];
 
 export const foundationSeedDisciplines: Discipline[] = [
   { id: "tennis", name: "Tennis", category: "mental", weight: 1.02, originalOrder: 13, displayOrder: 16, playerCount: 3, mutator1: null, mutator2: null },
@@ -72,6 +66,39 @@ export const foundationSeedDisciplines: Discipline[] = [
   { id: "fechten", name: "Fechten", category: "speed", weight: 1.08, originalOrder: 10, displayOrder: 2, playerCount: 5, mutator1: null, mutator2: null },
   { id: "i-spy", name: "I Spy", category: "mental", weight: 1.01, originalOrder: 14, displayOrder: 4, playerCount: 6, mutator1: null, mutator2: null },
   { id: "breaking", name: "Breaking", category: "power", weight: 1.0, originalOrder: 5, displayOrder: 12, playerCount: 4, mutator1: null, mutator2: null },
+];
+
+/**
+ * Die Spieltags-Ids der Startsaison. Bewusst weiter das Legacy-Muster `matchday-N` (ohne
+ * Saison-Praefix) — `buildNormalizedMatchdayIds` erkennt es und behaelt es beim Nachziehen bei.
+ *
+ * Die Zahl der Spieltage kommt aus dem Disziplin-Pool, nicht aus einer zweiten Konstante: 10 im
+ * Management-Modus (jede Disziplin einmal), 20 im Battle-Modus (jede zweimal). Vorher stand hier
+ * eine harte 10, die von `getRequiredSeasonDisciplineMatchdayCount` unabhaengig war — zwei Zahlen
+ * fuer dieselbe Aussage, die im Battle-Modus zwangslaeufig auseinandergelaufen waeren.
+ */
+function baueSeedSeason(playMode: PlayMode): Season {
+  const spieltage = getRequiredSeasonDisciplineMatchdayCount(foundationSeedDisciplines, playMode);
+  return {
+    id: "season-1",
+    name: "Season 1",
+    year: 1,
+    currentMatchday: 1,
+    matchdayIds: Array.from({ length: spieltage }, (_, index) => `matchday-${index + 1}`),
+  };
+}
+
+export const foundationSeedSeason: Season = baueSeedSeason("management");
+
+/**
+ * Die zwei erfundenen Management-Fixtures. Sie sind seit jeher Attrappe: im Management-Modus gibt
+ * es keine Kopf-an-Kopf-Paarungen (eine flache Einzelrangliste entscheidet), und alle Lesestellen
+ * fassen nur `.length` bzw. `.matchdayId` an. Sie bleiben unveraendert stehen — der Battle-Modus
+ * bekommt seine eigenen, echten Paarungen (siehe `baueBattleModeSpielplan`).
+ */
+export const foundationSeedFixtures: Fixture[] = [
+  { id: "fixture-1", homeTeamId: "C-C", awayTeamId: "B-B", matchdayId: "matchday-1", status: "scheduled" },
+  { id: "fixture-2", homeTeamId: "R-C", awayTeamId: "T-G", matchdayId: "matchday-2", status: "scheduled" },
 ];
 
 const foundationSeedDisciplineSchedule = buildSeasonSeededDisciplineSchedule({
@@ -115,6 +142,7 @@ function createSeasonState(
   disciplines: Discipline[],
   matchdayIds: string[],
   scheduleSeedId: string,
+  playMode: PlayMode = "management",
 ): SeasonState {
   return {
     seasonId,
@@ -125,6 +153,7 @@ function createSeasonState(
       disciplines,
       matchdayIds,
       matchdayCount: matchdayIds.length,
+      playMode,
     }).entries,
     lineupDrafts: [],
     playerGeneratorDrafts: [],
@@ -282,11 +311,31 @@ export function summarizeTeamRosterCoverage(teams: Team[], players: Player[], ro
   };
 }
 
-export function buildRosterSeedData(): OlySeedData {
-  const teams = loadSourceTeams();
+export function buildRosterSeedData(options?: {
+  playMode?: PlayMode | null;
+  /**
+   * Save-Id fuer die Battle-Auslosung. Ohne sie bekaeme JEDER Battle-Spielstand dieselben 5
+   * Zusatzrunden -- die Pflichtrunden sind ohnehin fuer alle gleich (Kreisverfahren), aber der
+   * ausgeloste Teil soll wie die Disziplin-Auslosung am Spielstand haengen, nicht an der Datei.
+   */
+  scheduleSeedId?: string | null;
+}): OlySeedData {
+  const playMode = resolvePlayMode(options?.playMode);
+  const istBattle = playMode === "battle";
+  const alleTeams = loadSourceTeams();
+  // PLATZHALTER-AUSWAHL: siehe `waehleBattleModeTeamIds` -- welche 16 es wirklich werden, entscheidet
+  // Chris. Der Management-Modus sieht unveraendert alle 32.
+  const battleTeamIds = istBattle ? new Set(waehleBattleModeTeamIds(alleTeams)) : null;
+  const teams = battleTeamIds ? alleTeams.filter((team) => battleTeamIds.has(team.teamId)) : alleTeams;
   const teamIdentities = loadSourceTeamIdentities();
   const players = loadImportedPlayerStats();
-  const mappingRows = loadSourcePlayerTeamMapping();
+  // Im Battle-Modus faellt die Haelfte der Liga weg. Ihre Mapping-Zeilen sind dann nicht "falsch",
+  // sondern schlicht nicht Teil dieser Liga -- sie stumm zu ueberspringen ist richtig, sie als
+  // `unknownTeamCode` zu melden waere ein Fehlalarm ueber rund 130 Zeilen.
+  const mappingRows = battleTeamIds
+    ? loadSourcePlayerTeamMapping().filter((row) => battleTeamIds.has(row.teamId))
+    : loadSourcePlayerTeamMapping();
+  const season = baueSeedSeason(playMode);
 
   const warnings: MappingWarning[] = [];
   const mediaSummary = getMediaMappingSummary();
@@ -372,7 +421,7 @@ export function buildRosterSeedData(): OlySeedData {
       purchasePrice: player.marketValue,
       currentValue: player.marketValue,
       roleTag,
-      joinedSeasonId: foundationSeedSeason.id,
+      joinedSeasonId: season.id,
     });
     contracts.push({
       id: `contract-${index + 1}`,
@@ -400,7 +449,10 @@ export function buildRosterSeedData(): OlySeedData {
   const { unmappedPlayers, teamsWithoutPlayers } = summarizeTeamRosterCoverage(teams, players, rosters);
   const transferHistory = createTransferHistory(teams, players, rosters, transferListings);
 
-  for (const playerName of unmappedPlayers.slice(0, 200)) {
+  // Ohne Team zu sein ist im Battle-Modus der NORMALFALL fuer die Spieler der 16 nicht
+  // teilnehmenden Teams -- sie sind schlicht freie Spieler. Eine Warnung je Spieler waere hier
+  // keine Auffaelligkeit, sondern 200 Zeilen Rauschen, das die echten Warnungen zudeckt.
+  for (const playerName of istBattle ? [] : unmappedPlayers.slice(0, 200)) {
     warnings.push({
       type: "playerWithoutTeam",
       message: `${playerName} hat aktuell keine Teamzuordnung.`,
@@ -433,7 +485,52 @@ export function buildRosterSeedData(): OlySeedData {
     warnings,
   };
 
+  // BATTLE-MODUS: der Spielplan wird hier ERZEUGT, nicht erfunden -- 15 Round-Robin-Runden plus
+  // 5 nach Teamwert ausgeglichene Zusatzrunden (lib/season/battle-mode-spielplan.ts).
+  //
+  // Der Teamwert-Schnappschuss laeuft hier BEWUSST MIT LEEREN KADERN (`rosters: []`), obwohl an
+  // dieser Stelle schon welche berechnet sind: ein frisch angelegter Spielstand geht ueber
+  // `loadFreshSeasonOneSeedData`, das die Kader gleich wieder leert -- die Kader entstehen erst im
+  // KI-Draft. Wuerde hier der Kaderwert einfliessen, lieferten `loadSeedData()` und
+  // `loadFreshSeasonOneSeedData()` ZWEI VERSCHIEDENE Spielplaene fuer denselben Save, und der aus
+  // dem Entwicklungs-Seed waere der falsche. Der Teamwert ist zu diesem Zeitpunkt also reine
+  // Kasse -- und der Plan damit vorlaeufig. Er wird neu gezogen, sobald die Kader stehen
+  // (`erneuereBattleModeZusatzrunden`, aufgerufen wenn `leagueSetupStatus` auf "ready" springt).
+  const battleSpielplan = istBattle
+    ? baueBattleModeSpielplan({
+        seasonId: season.id,
+        matchdayIds: season.matchdayIds,
+        teams,
+        rosters: [],
+        players,
+        teamIds: teams.map((team) => team.teamId),
+        quelle: "new_game_seed",
+        seed: `${options?.scheduleSeedId ?? "foundation-seed"}:${season.id}:battle-mode-fixtures`,
+        erstelltAm: mappingReport.generatedAt,
+      })
+    : null;
+  const fixtures = battleSpielplan ? battleSpielplan.fixtures : foundationSeedFixtures;
+  const fixtureIdsByMatchdayId = fixtures.reduce<Record<string, string[]>>((acc, fixture) => {
+    acc[fixture.matchdayId] = [...(acc[fixture.matchdayId] ?? []), fixture.id];
+    return acc;
+  }, {});
+  const matchdays = istBattle
+    ? buildMatchdaysFromSeasonDisciplineSchedule(
+        season.id,
+        buildSeasonSeededDisciplineSchedule({
+          saveId: "foundation-seed",
+          seasonId: season.id,
+          disciplines: foundationSeedDisciplines,
+          matchdayIds: season.matchdayIds,
+          matchdayCount: season.matchdayIds.length,
+          playMode,
+        }).entries,
+        fixtureIdsByMatchdayId,
+      )
+    : foundationSeedMatchdays;
+
   return {
+    playMode,
     teamIdentities,
     teams,
     disciplines: foundationSeedDisciplines,
@@ -442,19 +539,22 @@ export function buildRosterSeedData(): OlySeedData {
     contracts,
     transferListings,
     transferHistory,
-    season: foundationSeedSeason,
-    matchdays: foundationSeedMatchdays,
-    fixtures: foundationSeedFixtures,
+    season,
+    matchdays,
+    fixtures,
     mappingReport,
   };
 }
 
-export function loadSeedData(): OlySeedData {
-  return structuredClone(buildRosterSeedData());
+export function loadSeedData(options?: { playMode?: PlayMode | null; scheduleSeedId?: string | null }): OlySeedData {
+  return structuredClone(buildRosterSeedData(options));
 }
 
-export function loadFreshSeasonOneSeedData(): OlySeedData {
-  const seed = loadSeedData();
+export function loadFreshSeasonOneSeedData(options?: {
+  playMode?: PlayMode | null;
+  scheduleSeedId?: string | null;
+}): OlySeedData {
+  const seed = loadSeedData(options);
   const identityByTeamId = new Map(seed.teamIdentities.map((identity) => [identity.teamId, identity]));
   return {
     ...seed,
@@ -468,10 +568,17 @@ export function loadFreshSeasonOneSeedData(): OlySeedData {
   };
 }
 
-export function createGameStateFromSeed(input: OlySeedData = loadSeedData(), options?: { scheduleSeedId?: string }): GameState {
+export function createGameStateFromSeed(
+  input: OlySeedData = loadSeedData(),
+  options?: { scheduleSeedId?: string; playMode?: PlayMode | null },
+): GameState {
   const data = structuredClone(input);
   const scheduleSeedId = options?.scheduleSeedId ?? "local-game-state";
+  // Die Spielart steht am Seed. Die Option ist nur der Notausgang fuer Aufrufer, die einen Seed
+  // von aussen reichen -- sonst gaebe es zwei Wahrheiten darueber, was fuer ein Spiel das ist.
+  const playMode = resolvePlayMode(options?.playMode ?? data.playMode);
   const hydrated = hydrateGameStateMedia({
+    ...(playMode === "battle" ? { playMode } : {}),
     season: data.season,
     seasonState: {
       ...createSeasonState(
@@ -481,6 +588,7 @@ export function createGameStateFromSeed(input: OlySeedData = loadSeedData(), opt
         data.disciplines,
         data.season.matchdayIds,
         scheduleSeedId,
+        playMode,
       ),
       teamControlSettings: buildTeamControlSettingsMap(data.teams),
       teamStrategyProfiles: buildTeamStrategyProfileMap(data.teams, data.teamIdentities),

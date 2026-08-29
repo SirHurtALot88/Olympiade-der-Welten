@@ -8,7 +8,7 @@ import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-ident
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
-import type { GameLogEntry, GameState, SaveGameState } from "@/lib/data/olyDataTypes";
+import type { GameLogEntry, GameState, PlayMode, SaveGameState } from "@/lib/data/olyDataTypes";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
 
 function createLog(message: string, type: GameLogEntry["type"]): GameLogEntry {
@@ -36,12 +36,24 @@ export function createSingleplayerGameState(): GameState {
   return withNormalizedLocalTeamSettings(createGameStateFromSeed(loadSeedData()));
 }
 
-export function createFreshSeasonOneGameState(saveId?: string | null): GameState {
+/**
+ * @param options.playMode Spielart des NEUEN Spielstands. Fehlt sie, ist es "management" — und
+ * dann ist dieser Aufruf Zeichen fuer Zeichen der von vorher: derselbe 32er-Seed, dieselben 10
+ * Spieltage, dieselbe Disziplin-Auslosung. Nur `"battle"` biegt auf den 16er-Seed mit 20
+ * Spieltagen und echtem Kopf-an-Kopf-Spielplan ab.
+ */
+export function createFreshSeasonOneGameState(
+  saveId?: string | null,
+  options?: { playMode?: PlayMode | null },
+): GameState {
   // Threading saveId here seeds the initial season-1 discipline schedule (pairings + 2..6
   // player counts) per save instead of always reusing the "local-game-state" default — see
   // lib/season/season-discipline-schedule.ts for the seed derivation.
   return withNormalizedLocalTeamSettings(
-    createGameStateFromSeed(loadFreshSeasonOneSeedData(), saveId ? { scheduleSeedId: saveId } : undefined),
+    createGameStateFromSeed(loadFreshSeasonOneSeedData({ playMode: options?.playMode, scheduleSeedId: saveId }), {
+      ...(saveId ? { scheduleSeedId: saveId } : {}),
+      playMode: options?.playMode,
+    }),
   );
 }
 

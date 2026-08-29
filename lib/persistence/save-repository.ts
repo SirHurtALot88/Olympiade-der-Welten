@@ -6,6 +6,7 @@ import type {
   GameState,
   MappingReport,
   MatchdayState,
+  PlayMode,
   Player,
   PlayerBaselineRecord,
   PlayerBaselineWriteGuardEvent,
@@ -133,6 +134,18 @@ type SaveRow = {
 
 type GameMetadata = {
   gamePhase?: GamePhase;
+  /**
+   * Spielart des Spielstands ("management" | "battle"). Wird beim Anlegen einmal festgeschrieben
+   * und danach nur noch gelesen — ein Save ist dauerhaft das eine ODER das andere.
+   *
+   * Liegt in `game_metadata` und nicht in `scenarioMeta`, weil Spielplan- und Spieltagslogik sie
+   * beim KALTLADEN brauchen (`readSliceGameStateForSave` traegt sie deshalb ebenfalls nach) —
+   * `scenarioMeta` wird beim Schreiben aus dem Zustand NEU GEBAUT (`buildScenarioMeta`) und waere
+   * damit die falsche Ablage fuer etwas, das der Zustand selbst tragen soll.
+   *
+   * FEHLT DAS FELD (jeder Save von vor dieser Aenderung), gilt "management".
+   */
+  playMode?: PlayMode;
   seasonTransition?: SeasonTransitionState;
   scenarioMeta?: ScenarioMeta;
   saveVersion?: number;
@@ -1352,6 +1365,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   mark("collections loaded");
   const hydrated = hydrateGameStateMedia({
     ...(gamePhase ? { gamePhase } : {}),
+    ...(gameMetadata?.playMode ? { playMode: gameMetadata.playMode } : {}),
     ...(gameMetadata?.seasonTransition ? { seasonTransition: gameMetadata.seasonTransition } : {}),
     ...(gameMetadata?.scenarioMeta ? { scenarioMeta: gameMetadata.scenarioMeta } : {}),
     ...(Number.isFinite(gameMetadata?.saveVersion) ? { saveVersion: gameMetadata?.saveVersion } : {}),
@@ -1509,6 +1523,12 @@ export function readSliceGameStateForSave(saveId: string): GameState | null {
   const gamePhase = inferCompletedGamePhase({ metadata: gameMetadata, season, seasonState, matchdayState });
   const hydrated = hydrateGameStateMedia({
     ...(gamePhase ? { gamePhase } : {}),
+    // MUSS AUCH HIER STEHEN, nicht nur in `materializePersistedSave`: der Spielplan-Normalisierer
+    // (`withNormalizedSeasonDisciplineSchedule`) liest die Spielart aus dem GameState, um die
+    // ZAHL DER SPIELTAGE abzuleiten (10 vs. 20). Faellt sie auf diesem leichteren Ladeweg weg,
+    // haelt er einen Battle-Save fuer einen Management-Save und kuerzt dessen Spielplan beim
+    // naechsten Schreiben von 20 auf 10 Spieltage — lautlos und unwiderruflich.
+    ...(gameMetadata?.playMode ? { playMode: gameMetadata.playMode } : {}),
     ...(gameMetadata?.scenarioMeta ? { scenarioMeta: gameMetadata.scenarioMeta } : {}),
     ...(Number.isFinite(gameMetadata?.saveVersion) ? { saveVersion: gameMetadata?.saveVersion } : {}),
     season,
@@ -1811,6 +1831,7 @@ function createPersistedSaveRecord(input: {
     const transition = guardedGameState.seasonTransition;
     replaceSingleton("game_metadata", input.saveId, {
       gamePhase: guardedGameState.gamePhase,
+      playMode: guardedGameState.playMode,
       seasonTransition: transition,
       scenarioMeta: buildScenarioMeta({ gameState: guardedGameState }),
       saveVersion: guardedGameState.saveVersion,

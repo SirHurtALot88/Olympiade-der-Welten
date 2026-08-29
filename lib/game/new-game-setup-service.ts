@@ -1,11 +1,13 @@
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import type {
   GameState,
+  PlayMode,
   ScenarioType,
   SeasonState,
   Team,
   TeamControlMode,
 } from "@/lib/data/olyDataTypes";
+import { resolvePlayMode } from "@/lib/season/season-discipline-schedule";
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
@@ -27,6 +29,20 @@ export type NewGamePresetId = "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "c
 
 export type NewGameSetupInput = {
   presetId: NewGamePresetId;
+  /**
+   * SPIELART DES NEUEN SPIELSTANDS -- die eine Entscheidung, die sich spaeter nicht mehr aendern
+   * laesst. "management" (Default, wenn das Feld fehlt) = 32 Teams, 10 Spieltage, flache
+   * Einzelrangliste; "battle" = 16 Teams, 20 Spieltage, echte Kopf-an-Kopf-Liga.
+   *
+   * NICHT ZU VERWECHSELN MIT `presetId`. Das ist die STEUERUNGS-Voreinstellung (wer fuehrt wie
+   * viele Teams: solo_1 / solo_2 / solo_4 / online_4v4 / custom) und steht senkrecht dazu -- ein
+   * Battle-Spielstand kann genauso solo_1 wie online_4v4 sein. Der Name `gameMode` war fuer diese
+   * zweite Bedeutung schon vergeben (`lib/foundation/team-control-settings.ts`), daher `playMode`.
+   *
+   * Heute nur ueber diesen Parameter setzbar -- eine Auswahl im Neuspiel-Bildschirm gibt es noch
+   * nicht und gehoert nicht in diese Phase.
+   */
+  playMode?: PlayMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
   sandbox?: boolean;
@@ -50,6 +66,8 @@ export type NewGameTeamPreview = {
 export type NewGameSetupPreview = {
   mode: "preview";
   presetId: NewGamePresetId;
+  /** Spielart des Spielstands, der aus dieser Vorschau entstehen wuerde. */
+  playMode: PlayMode;
   saveName: string;
   sandbox: boolean;
   scenarioType: ScenarioType;
@@ -225,6 +243,7 @@ function createScenarioRoomMeta(input: {
 
 function createConfirmToken(input: {
   presetId: NewGamePresetId;
+  playMode: PlayMode;
   chrisTeamIds: string[];
   frankyTeamIds: string[];
   sandbox: boolean;
@@ -235,6 +254,12 @@ function createConfirmToken(input: {
   return [
     "new_game_setup_v1",
     input.presetId,
+    // Der Management-Modus haengt hier bewusst GAR KEIN Segment an -- auch kein leeres. Ein
+    // leerer String waere beim `join(":")` ein zusaetzliches `::` und haette damit JEDES bisher
+    // ausgegebene Token entwertet (`new_game_setup_confirm_token_stale` bei jedem Neuspiel, das
+    // die Vorschau vor dieser Aenderung geholt hat). So bleibt das Management-Token buchstabengleich,
+    // und ein Battle-Token laesst sich trotzdem nie fuer ein Management-Neuspiel einloesen.
+    ...(input.playMode === "battle" ? ["battle"] : []),
     input.sandbox ? "sandbox" : "standard",
     input.chrisTeamIds.join(","),
     input.frankyTeamIds.join(","),
@@ -279,7 +304,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // is seeded per-save rather than reusing the shared "local-game-state" default. Preview-only
   // calls (no saveId yet) still fall back to the default seed, which is fine since previews are
   // never persisted.
-  const baseGameState = createFreshSeasonOneGameState(input.saveId);
+  const playMode = resolvePlayMode(input.playMode);
+  const baseGameState = createFreshSeasonOneGameState(input.saveId, { playMode });
   const validTeamIds = new Set(baseGameState.teams.map((team) => team.teamId));
   const preset = getPreset(input.presetId);
   const chrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);
@@ -310,11 +336,23 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const rankSignature = ["M-M", "R-R"]
     .map((teamId) => `${teamId}:${startRankByTeamId.get(teamId) ?? "missing"}`)
     .join("|");
-  if (startRankByTeamId.get("M-M") !== 1) {
-    warnings.push(`start_rank_reference_mismatch:M-M:${startRankByTeamId.get("M-M") ?? "missing"}`);
-  }
-  if (startRankByTeamId.get("R-R") !== 32) {
-    warnings.push(`start_rank_reference_mismatch:R-R:${startRankByTeamId.get("R-R") ?? "missing"}`);
+  /**
+   * DIESE ZWEI PRUEFUNGEN MESSEN GEGEN DIE 32er-LIGA -- im Battle-Modus messen sie ins Leere.
+   *
+   * Sie sind eine Plausibilitaetsprobe auf die Startbudgets: M-M muss der Startrang 1 sein, R-R
+   * der Startrang 32. Ein Battle-Spielstand hat aber nur 16 Teams, und in der Platzhalter-Auswahl
+   * (`waehleBattleModeTeamIds`) ist R-R gar nicht dabei, waehrend M-M dort auf Rang 5 der 16
+   * liegt. Beide Pruefungen schluegen also bei JEDEM Battle-Neuspiel an und meldeten einen Fehler,
+   * wo keiner ist -- eine Warnung, die immer kommt, wird in null Sekunden zu einer, die niemand
+   * mehr liest. Fuer den Management-Modus bleiben sie Zeichen fuer Zeichen dieselben.
+   */
+  if (playMode !== "battle") {
+    if (startRankByTeamId.get("M-M") !== 1) {
+      warnings.push(`start_rank_reference_mismatch:M-M:${startRankByTeamId.get("M-M") ?? "missing"}`);
+    }
+    if (startRankByTeamId.get("R-R") !== 32) {
+      warnings.push(`start_rank_reference_mismatch:R-R:${startRankByTeamId.get("R-R") ?? "missing"}`);
+    }
   }
 
   const roomMeta = createScenarioRoomMeta({
@@ -349,6 +387,10 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
 
   const baseGameStateBeforeSponsorOffers: GameState = {
     ...resetGameState,
+    // NUR IM BATTLE-MODUS GESETZT. Ein Management-Spielstand traegt das Feld GAR NICHT -- damit
+    // ist sein GameState (und alles, was daraus abgeleitet oder verglichen wird) byteweise der
+    // von vorher, statt sich nur "gleichbedeutend" zu verhalten.
+    ...(playMode === "battle" ? { playMode } : {}),
     gamePhase: "season_active",
     saveVersion: 1,
     lastAppliedEventId: null,
@@ -492,6 +534,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const preview: NewGameSetupPreview = {
     mode: "preview",
     presetId: input.presetId,
+    playMode,
     saveName,
     sandbox: Boolean(input.sandbox),
     scenarioType,
@@ -546,6 +589,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     blockers,
     confirmToken: createConfirmToken({
       presetId: input.presetId,
+      playMode,
       chrisTeamIds,
       frankyTeamIds,
       sandbox: Boolean(input.sandbox),

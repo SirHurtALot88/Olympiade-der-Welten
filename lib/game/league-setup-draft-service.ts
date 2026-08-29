@@ -3,6 +3,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
+import { erneuereBattleModeZusatzrunden } from "@/lib/season/battle-mode-spielplan";
 
 /**
  * GETEILTER LIGA-SETUP-DRAFT — EIN Ort statt drei Kopien.
@@ -297,10 +298,30 @@ function schreibeLigaSetupStatus(
       return;
     }
     try {
+      /**
+       * BATTLE-MODUS: HIER wird der Teamwert festgehalten, nicht frueher.
+       *
+       * Chris' Vorgabe fuer die 5 ausgeglichenen Zusatzrunden war „Marktwert des Kaders + Kasse,
+       * einmal festgehalten, direkt nachdem die Kader stehen". Genau dieser Moment ist es: der
+       * Draft ist eben durchgelaufen, gleich springt der Status auf "ready". Beim ANLEGEN des
+       * Spielstands waren die Kader noch leer -- der dort gebaute Plan kannte nur die Startkasse
+       * und ist ausdruecklich vorlaeufig.
+       *
+       * Die Spieltage 1..15 (Round Robin) bleiben dabei unangetastet; neu gezogen wird nur der
+       * Schwanz ab Spieltag 16. Im Management-Modus gibt die Funktion DIESELBE Referenz zurueck,
+       * dieser Schritt kostet dort also nichts und aendert nichts.
+       *
+       * Nur bei "ready": nach einem gescheiterten Draft stehen die Kader gerade NICHT, ein
+       * Schnappschuss darauf waere schlechter als der vorlaeufige.
+       */
+      const gameState =
+        status === "ready"
+          ? erneuereBattleModeZusatzrunden(save.gameState, { saveId, quelle: "league_setup_ready" })
+          : save.gameState;
       persistence.saveSingleplayerState(saveId, {
-        ...save.gameState,
+        ...gameState,
         seasonState: {
-          ...save.gameState.seasonState,
+          ...gameState.seasonState,
           leagueSetupStatus: status,
           ...(warnings ? { leagueSetupWarnings: warnings } : {}),
         },
@@ -464,10 +485,16 @@ export async function repairLeagueSetupEmptyRosters(input: {
     leagueSetupStatusAfter = "ready";
     const afterSave = persistence.getSaveById(saveId);
     if (afterSave) {
+      // Derselbe Zeitpunkt wie oben, nur auf dem Reparaturweg: die Kader stehen jetzt, also darf
+      // der Battle-Spielplan seine Zusatzrunden am echten Teamwert neu ziehen. Management: no-op.
+      const gameState = erneuereBattleModeZusatzrunden(afterSave.gameState, {
+        saveId,
+        quelle: "league_setup_ready",
+      });
       persistence.saveSingleplayerState(saveId, {
-        ...afterSave.gameState,
+        ...gameState,
         seasonState: {
-          ...afterSave.gameState.seasonState,
+          ...gameState.seasonState,
           leagueSetupStatus: "ready",
           leagueSetupWarnings: warnings,
         },

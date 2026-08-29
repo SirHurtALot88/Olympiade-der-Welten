@@ -3575,8 +3575,30 @@ export type MappingReport = {
   warnings: MappingWarning[];
 };
 
+/**
+ * DIE EINE SPIELART EINES SPIELSTANDS — einmal bei der Neuanlage gewaehlt, danach unveraenderlich.
+ *
+ * "management" ist die bisherige (und einzige) Olympiade: 32 Teams, EINE flache Einzelrangliste,
+ * 10 Spieltage, jede der 20 Disziplinen genau einmal pro Saison.
+ * "battle"     ist die zweite Spielart: 16 Teams, echte Kopf-an-Kopf-Liga (Round Robin), 20
+ *              Spieltage, jede Disziplin genau zweimal.
+ *
+ * ES IST BEWUSST NICHT `gameMode`. Der Name ist im Repo schon vergeben und meint etwas ganz
+ * anderes: `lib/foundation/team-control-settings.ts` (`getGameModeOwnershipLimits`,
+ * `resolveGameModeFromState`) benutzt ihn fuer die STEUERUNGS-Voreinstellung eines Saves
+ * (solo_1/solo_2/solo_4/online_4v4/custom — wer welche Teams fuehrt). Beide Begriffe unter einem
+ * Feldnamen haetten sich beim Lesen jeder Fundstelle gegenseitig verdeckt.
+ *
+ * FEHLT DAS FELD, IST ES "management". Jeder bestehende Spielstand und jeder Aufrufer, der es
+ * nicht setzt, verhaelt sich damit exakt wie vorher — das ist die wichtigste Zusicherung dieses
+ * Felds, nicht nur eine Bequemlichkeit (siehe tests/battle-mode-management-unveraendert.test.ts).
+ */
+export type PlayMode = "management" | "battle";
+
 export type GameState = {
   gamePhase?: GamePhase;
+  /** Spielart des Spielstands. Fehlt = "management" (siehe `PlayMode`). */
+  playMode?: PlayMode;
   seasonTransition?: SeasonTransitionState;
   scenarioMeta?: ScenarioMeta;
   saveVersion?: number;
@@ -3694,6 +3716,8 @@ export type ServerActionConflictCode =
   | "confirm_token_stale";
 
 export type OlySeedData = {
+  /** Spielart, aus der dieser Seed gebaut wurde. Fehlt = "management" (siehe `PlayMode`). */
+  playMode?: PlayMode;
   teamIdentities: TeamIdentity[];
   teams: Team[];
   disciplines: Discipline[];
