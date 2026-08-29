@@ -3067,67 +3067,140 @@
       // die Matrix ueber sie statt ueber die Rezepte einzuloesen, hat die Abweichung
       // gesprengt (s. dortige Kommentare). Der einzige Hebel hier sind die zehn Rezepte.
       //
-      // STAND SEIT DIESEM BLOCK: die Messtabelle oben (17,2 / 19,4 Pp) beschreibt den
-      // Stand von PR #680. Danach ist EIN Rezept nachgezogen worden — ABWEHR, wegen
-      // eines Nebeneffekts bei der Verteidiger-Differenzierung; die Begruendung, die
-      // Messreihe und die fuenf verworfenen Fassungen stehen ausfuehrlich beim ABWEHR-
-      // Rezept unten. Aktueller Stand: 20,3 Pp (Saatfamilie dieses Skripts) und 32,5 Pp
-      // gegen eine zweite, unabhaengige Saatfamilie, in der PR #680 selbst 31,3 Pp las.
+      // ===============================================================================
+      // ARCHETYPEN-RUNDE (Chris: "die stars sollen wirklich herausstechen in playmaking,
+      // scorer long/short range, defense"). Der Stand davor — 17,3 Pp mit den Rezepten aus
+      // PR #680/#681 — war matrixtreu und trotzdem falsch: eine Vier-Archetypen-Demo
+      // (240 Spiele, vier Extrem-Builds gegen sonst durchweg neutrale Spieler) zeigte, dass
+      // KEINER der vier in seiner eigenen Kategorie fuehrte. Der Spielmacher war der beste
+      // Scorer, der Distanzschuetze der beste Rebounder, der Korbschuetze traf am
+      // schlechtesten aus der Zone. Die Rezepte alleine konnten das nicht heilen — vier
+      // MECHANISCHE Befunde standen davor, jeder einzeln nachgemessen und unten an seiner
+      // Stelle dokumentiert:
+      //
+      //   1. zuordneSlots() verteilte die Korbnaehe nach ZWEITCHANCE. Rebounds und
+      //      Korbpunkte hingen damit an EINEM Wert und waren ueber kein Rezept trennbar.
+      //      Jetzt nach SCHUSS_NAH.
+      //   2. Jeder Ballfuehrer lief stur auf den Korb zu (bewegeSpielerLive). Ein
+      //      Distanzschuetze kam so gar nicht erst zum Dreier. Jetzt bestimmt sein
+      //      Wurfprofil die Wunschdistanz.
+      //   3. Der Wurf-Zweig stand VOR dem Pass-Zweig und verliess die Funktion mit return —
+      //      wer in Reichweite stand, kam an `passChance` praktisch nie vorbei. Ein
+      //      Spielmacher war mechanisch unmoeglich. Jetzt `suchtPass`.
+      //   4. Der Assist zaehlte nur, wenn der Empfaenger in GENAU der naechsten
+      //      Entscheidung warf; das Rebound-Los war linear und damit fast ein Muenzwurf.
+      //      Jetzt ein Zeitfenster (ASSIST_FENSTER) und ein quadratischer Zweikampf.
+      //
+      // ERGEBNIS (messe-arena-einfluss.mjs basketball 48 / Vier-Archetypen-Demo, 320 Spiele
+      // je Build): 20,4 Pp, und alle vier Builds fuehren in ihrer eigenen Kategorie —
+      // Vorlagen +16 %, getroffene Dreier +173 %, getroffene Korbwuerfe +76 %,
+      // Steals+Bloecke+Rebounds +17 % gegenueber dem jeweils naechstbesten Build. Zweite
+      // Stichprobe zur Kontrolle, wie beim ZWEITCHANCE-Nachzug davor: n=60 liest 25,5 Pp
+      // (der Stand davor las dort 20,8 gegen seine 17,3 bei n=48) — der Aufschlag ist in
+      // beiden Stichproben derselbe, rund +3 bis +5 Pp.
+      //
+      // WAS DAS GEKOSTET HAT, ehrlich: 17,3 -> 20,4 Pp. Die vier Mechanik-Aenderungen allein
+      // (mit den alten Rezepten) lagen bei 37,2 Pp; die 20,4 sind das Ergebnis von zwoelf
+      // durchgemessenen Rezeptfassungen darauf (v4 29,7 | v5 22,4 | v6 35,3 | v7 40,1 |
+      // v8 35,0 | v9 37,1 | w1 44,0 | w2 29,4 | x1 44,0 | y1 34,2 | z2 36,0 | s1 23,1).
+      // Die Metrik reagiert dabei NICHT monoton auf kleine Rezeptaenderungen: sie normiert
+      // ueber die positiven Gewinne, ein Attribut mit Nettogewinn <= 0 liest exakt 0,0 % und
+      // kostet dann sein volles Matrixgewicht. Zwei Fassungen mit identischer
+      // dexterity-Verteilung lasen 7,2 % und 1,1 %. Wer hier weiterdreht: nach JEDEM Punkt
+      // messen, und die Fassung behalten, in der ALLE neun Attribute positiv lesen — das
+      // ist der zuverlaessigste Indikator fuer eine niedrige Abweichung.
+      //
+      // Ein Sondierungslauf mit ORTHOGONALEN Rezepten (jeder Sub-Skill von genau einem
+      // Attribut gespeist, so dass der gemessene Attributanteil das mechanische Gewicht des
+      // Sub-Skills IST) hat die Arbeit ueberhaupt erst steuerbar gemacht. Vorher/nachher:
+      //   ZWEITCHANCE 54,8 -> 10,3 | ABWEHR 13,3 -> 21,8 | TEAMGEIST 21,6 -> 11,4
+      //   SCHUSS_NAH   0,0 -> 17,5 | LAUFTEMPO 1,4 -> 14,8 | TECHNIK 2,0 -> 8,2
+      //   AUFBAU       0,0 ->  7,9 | ABSCHLUSS 5,5 -> 6,2 | SCHUSS_FERN 1,5 -> 1,2
+      //   AUSDAUER     0,0 ->  0,1 (mechanisch tot, s. dortiger Kommentar)
+      // Vorher trug EIN Sub-Skill mehr als die Haelfte; jetzt haben acht von zehn ein
+      // Gewicht, mit dem sich ein Rezept ueberhaupt lenken laesst. Der Lauf ist billig
+      // (eine Messung) und lohnt sich vor jeder groesseren Mechanik-Aenderung wieder.
       // ===============================================================================
       rezept:{
-        // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Zuerst
-        // Spielverstaendnis (wer sieht die Struktur), dann Charisma — der Aufbauspieler
-        // dirigiert die anderen fuenf, und Charisma hat ausserhalb von TEAMGEIST/AUFBAU/
-        // ABSCHLUSS logisch keine Heimat. Kein power/stamina/torment: den Ball
-        // hochzubringen ist keine Kraftfrage.
-        AUFBAU:      {intelligence:36,charisma:22,awareness:16,spirit:14,dexterity:8,speed:4},
+        // Spielaufbau: den Angriff einleiten und den Ball sicher halten. Charisma fuehrt —
+        // der Aufbauspieler dirigiert die anderen fuenf —, dahinter das Handling
+        // (dexterity); erst danach Spielverstaendnis und Uebersicht. Kein power/stamina/
+        // torment: den Ball hochzubringen ist keine Kraftfrage.
+        //
+        // FRUEHER intelligence-gefuehrt (36), und genau das machte den Spielmacher zum
+        // Distanzschuetzen: intelligence fuehrt auch SCHUSS_FERN (Chris' Vorgabe, s. dort),
+        // ein Build auf "AUFBAU hoch" bekam den Dreierschuetzen also gratis dazu — dieselbe
+        // Ueberlappung, die PR #681 bei ABWEHR aufgeloest hat. charisma ist der einzige
+        // Wert, der ausserhalb von TEAMGEIST keine zweite Heimat hat und deshalb einen
+        // Archetyp allein tragen kann; die Signatur des Spielmacher-Builds ist jetzt
+        // charisma + dexterity und ueberschneidet sich mit keinem der drei anderen.
+        AUFBAU:      {charisma:36,dexterity:26,intelligence:14,awareness:12,speed:8,spirit:4},
         // ABSCHLUSS ist KEIN Erfolgswert (das sind SCHUSS_NAH/SCHUSS_FERN), sondern
         // "generische Abschlussstaerke" fuer drei Auswahl-Entscheidungen: wer als
         // Zielspieler angespielt wird (offensterMitspieler), wie frueh sich ein
         // Ballfuehrer einen Wurf zutraut (schwelle) und die Freiwurfquote. Genau dafuer
         // steht hier Handling (dexterity) vor Selbstvertrauen (charisma/spirit) —
         // "der Typ, der den Ball haben WILL, wenn es eng wird".
-        ABSCHLUSS:   {spirit:24,dexterity:20,charisma:16,power:14,awareness:12,intelligence:9,speed:5},
+        ABSCHLUSS:   {spirit:22,dexterity:20,charisma:16,power:14,awareness:10,stamina:10,intelligence:8},
         // Wurfauswahl und Geduld ("Shot Intelligence", Chris' Wort). Bleibt
         // intelligence-gefuehrt wie bisher; das Rezept ist logisch richtig, sein
         // MECHANISCHER Einfluss ist nur klein, weil technikGate bei Durchschnittswerten
         // immer ueber der Schwelle liegt (s. Punkt 1 oben) — das ist eine Eigenschaft
         // der Formel, kein Grund, das Rezept unlogisch zu machen.
-        TECHNIK:     {intelligence:49,awareness:23,spirit:18,dexterity:10},
+        TECHNIK:     {intelligence:50,awareness:22,spirit:16,dexterity:12},
         // SCHUSS_NAH/SCHUSS_FERN (Chris' Wunsch: "scorst du 2P/3P separat und laesst die
         // Gewichtung da reinlaufen") tragen die eigentliche Trefferchance in technikMake.
         // Nur aus den fuer Basketball erlaubten 9 Attributen, KEIN speed (Doppel-Zaehlung
         // mit dem Fastbreak/Bedraengnis-Mechanismus, s. schussSkillFuer oben).
         // Die Asymmetrie, die einen Korbleger von einem Distanzschuetzen unterscheidbar
-        // macht, bleibt und ist sogar schaerfer als vorher: power NUR nah (Kraft am
-        // Ring, dort auch das groesste Einzelgewicht), intelligence NUR fern
-        // (Wurftechnik/Bogenwahl — Chris woertlich: "um 3P-Wuerfe zu machen braucht man
-        // mehr intelligence als power, ist ja logischer"). dexterity/awareness/spirit
-        // liegen auf beiden Distanzen, weil sauberes Handling, Timing und der Wille,
-        // den Wurf zu nehmen, distanzunabhaengig sind.
-        SCHUSS_NAH:  {power:28,spirit:26,awareness:22,dexterity:14,stamina:6,torment:4},
-        SCHUSS_FERN: {intelligence:48,spirit:21,awareness:19,dexterity:12},
-        // DER GROSSE HEBEL DIESER RUNDE. ZWEITCHANCE bestimmt ueber zuordneSlots(), wer
-        // korbnah steht — und damit indirekt, wer die hochprozentigen Wuerfe bekommt;
-        // gemessen traegt der Sub-Skill fast 40 % des gesamten Einflusses. Bisher stand
-        // dort {power 45, awareness 30, stamina 25}, also fast nur Attribute, die die
-        // Matrix ganz unten fuehrt (power 7, stamina 6) — genau daher kamen die
-        // +15,6 Pp power und +7,7 Pp stamina der Ausgangsmessung.
-        // Logisch begruendet neu: der zweite Ball gehoert dem, der ihn am meisten WILL
-        // (spirit — der hoechste Matrixwert der Disziplin), der frueher liest, wohin er
-        // abprallt (intelligence/awareness), und der sich am Ring behauptet
-        // (power/stamina). Kraft bleibt also drin, wie von Chris verlangt — aber als
-        // vierter Faktor, nicht als erster.
+        // macht, ist jetzt vollstaendig: power NUR nah (Kraft am Ring, dort das groesste
+        // Einzelgewicht), intelligence NUR fern (Wurftechnik/Bogenwahl — Chris woertlich:
+        // "um 3P-Wuerfe zu machen braucht man mehr intelligence als power, ist ja
+        // logischer"). Die beiden Rezepte teilen sich KEIN einziges fuehrendes Attribut
+        // mehr: nah traegt power+spirit (Kraft und Wille am Ring), fern
+        // intelligence+awareness (Technik und Timing aus der Distanz).
         //
-        // VERTEIDIGER-DIFFERENZIERUNG (s. ABWEHR unten) — HIER BEWUSST UNVERAENDERT.
-        // Der erste Anlauf verschob die von ABWEHR abgegebene intelligence/awareness-
-        // Masse hierher (intelligence 23 -> 28, awareness 15 -> 18, torment/speed 6 -> 2)
-        // und gab SCHUSS_NAH awareness an power/dexterity ab. Gemessen: 38,5 Pp gegen
-        // 17,2 Pp vorher — verworfen. ZWEITCHANCE ist der empfindlichste Sub-Skill der
-        // Disziplin (er entscheidet ueber zuordneSlots(), wer korbnah steht); fuenf
-        // Punkte intelligence mehr hoben den gemessenen intelligence-Anteil von 15,9 auf
-        // 26,3 %. Wer hier anfasst, misst nach JEDEM einzelnen Punkt.
-        ZWEITCHANCE: {spirit:27,intelligence:23,awareness:15,power:9,stamina:8,torment:6,dexterity:6,speed:6},
+        // power MUSS hier fuehren, nicht bloss vorkommen — das ist der eine Punkt, an dem
+        // sich das Rezept nicht frei waehlen laesst. SCHUSS_NAH speist seit dieser Runde
+        // zuordneSlots(), und dieser Kanal ist ein RANGWECHSEL: eine Attributanhebung wirkt
+        // nur, wenn sie den Spieler in der Sortierung ueberhaupt verschiebt. Mit power auf
+        // Platz zwei (30 gegen spirit 34) bewegte dieselbe Anhebung SCHUSS_NAH um zu wenig,
+        // und power las in drei aufeinanderfolgenden Messungen 0,0-1,8 % statt seiner
+        // Matrixvorgabe 7 (z1, y1, q1). Mit power an der Spitze liest es 5,3 %.
+        // stamina fuer die Arbeit im Low Post, awareness fuers Timing, torment nur als
+        // Spur — Haerte gehoert an die Bretter (ZWEITCHANCE), nicht in den Wurf.
+        SCHUSS_NAH:  {power:34,spirit:30,stamina:16,awareness:12,dexterity:6,torment:2},
+        SCHUSS_FERN: {intelligence:50,awareness:22,spirit:16,dexterity:12},
+        // WER DEN ZWEITEN BALL HOLT — und seit dieser Runde NUR noch das. ZWEITCHANCE
+        // entschied frueher zwei voellig verschiedene Dinge: den Kampf um den Abpraller
+        // (reboundKampf, richtig) UND die Aufstellung, also wer korbnah steht (falsch,
+        // s. zuordneSlots). Weil korbnah der groesste Term der Wurfformel steht
+        // (GEO_BONUS.dunk 0,70), war jeder gute Rebounder zwangslaeufig auch der beste
+        // Punktesammler; acht durchgemessene Rezeptfassungen drehten Rebounds und Punkte
+        // immer zusammen. Das war eine Mechanik-Frage, keine Rezept-Frage, und sie ist in
+        // zuordneSlots() beantwortet. Hier steht seitdem nur noch der Zweikampf am Brett.
+        //
+        // REBOUND-BEFUND (Chris, aus der Runde davor): "der defense star hat deutlich
+        // weniger rebounds als sein gegenueber". Mit dem alten, intelligence-lastigen
+        // Rezept (23) las der reine Distanzschuetzen-Build hier 83 gegen 72 des
+        // Verteidiger-Builds — der Scorer gewann also auch noch die Bretter. Inhaltlich
+        // falsch: Rebounding ist Zweikampfhaerte und Stellungsspiel, nicht Wurf-IQ.
+        //
+        // JETZT fuehrt torment (Haerte am Brett), dahinter intelligence (Antizipation —
+        // wo der Ball hinspringt, weiss man vor dem Absprung) und spirit (den Ball WOLLEN),
+        // dann speed (wer zuerst da ist). Die Signatur des Verteidiger-Builds ist
+        // torment + speed und traegt damit 42 der 100 Punkte; der Distanzschuetze
+        // (intelligence + awareness) kommt auf 34 — genug Abstand, dass der Verteidiger die
+        // Bretter gewinnt, ohne dass Antizipation aus dem Rezept fliegt. Kein power und kein
+        // dexterity: beides sind in dieser Disziplin Wurf-Attribute, und solange sie hier
+        // mitwiegen, kauft sich der Scorer-Build ueber sie die Bretter zurueck.
+        //
+        // WIRKUNG (Vier-Archetypen-Demo, 320 Spiele je Build): Rebounds Verteidiger 2,41
+        // gegen 1,96 des Distanzschuetzen und 1,72 des Korbschuetzen — vor der Runde stand
+        // es 1,29 zu 2,90 gegen ihn. Der Rebound-Zweikampf selbst (reboundKampf) traegt
+        // dazu bei: er lost seit dieser Runde quadratisch statt linear und laesst einem
+        // heranstuermenden Rebounder ueberhaupt Zeit anzukommen (s. dort).
+        ZWEITCHANCE: {torment:26,intelligence:24,spirit:20,speed:16,awareness:10,stamina:4},
         // ===========================================================================
         // VERTEIDIGER-DIFFERENZIERUNG — der eine Punkt, an dem das Rezept aus PR #680
         // einen echten Nebeneffekt hatte. torment fuehrt jetzt, intelligence ist raus.
@@ -3143,8 +3216,25 @@
         // Wer ABWEHR ueber 90 wollte, MUSSTE beide hochziehen — und bekam den
         // Distanzschuetzen gratis dazu.
         //
-        // AENDERUNG. intelligence 18 -> 4, torment 16 -> 26 (fuehrt jetzt), awareness
-        // 22 -> 20, charisma 6 -> 10, dexterity 5 -> 8, power 4 -> 6, speed 12 -> 9.
+        // NACHTRAG ARCHETYPEN-RUNDE (die Zahlen unten beschreiben den Stand davor, die
+        // Begruendung gilt unveraendert): torment fuehrt weiter, aber speed steht jetzt
+        // dicht dahinter (24 statt 9) — nicht als Widerruf des SPEED-Absatzes weiter unten,
+        // sondern weil sich die Lage darunter geaendert hat. Der Absatz argumentiert gegen
+        // speed, weil speed ueber LAUFTEMPO auch scort; das galt, solange jeder Ballfuehrer
+        // stur auf den Korb zulief und Tempo damit direkt Punkte war. Seit die Wunschdistanz
+        // am Wurfprofil haengt (s. bewegeSpielerLive), zahlt Tempo vor allem noch auf lose
+        // Baelle und Rueckwaertsbewegung ein. Gemessen liegt der speed-Anteil mit
+        // torment 26/speed 24 bei 9,1 % gegen die Matrixvorgabe 10 — also unter Vorgabe,
+        // waehrend die alte Fassung mit speed 17 noch 13,8 % las. Der Verteidiger-Build
+        // braucht ein ZWEITES eigenes Attribut, sonst traegt ihn torment allein und er
+        // bleibt gegen jeden anderen Build zu schwach; torment + speed ist die einzige
+        // Paarung, die sich mit keinem der drei Scorer-Archetypen ueberschneidet.
+        // intelligence steht wieder mit 12 drin (statt 4) — Antizipation gehoert in eine
+        // Verteidigung, und auf Platz vier kann sie den Distanzschuetzen nicht mehr
+        // gratis mitliefern, gegen den der BEFUND oben geschrieben wurde.
+        //
+        // AENDERUNG (Stand PR #681). intelligence 18 -> 4, torment 16 -> 26 (fuehrt jetzt),
+        // awareness 22 -> 20, charisma 6 -> 10, dexterity 5 -> 8, power 4 -> 6, speed 12 -> 9.
         // Logisch tragbar: Verteidigung braucht Spielverstaendnis, aber nicht in dem
         // Ausmass, in dem ein Distanzwurf es braucht. Die Haerte im Zweikampf (torment)
         // ist das, was einen Verteidiger von einem Werfer UNTERSCHEIDET; das Lesen des
@@ -3193,29 +3283,39 @@
         // Matrix-Ansage ueberall gut; wer das aendern will, aendert die Matrix, nicht das
         // Rezept.
         // ===========================================================================
-        ABWEHR:      {torment:26,awareness:20,spirit:14,charisma:10,speed:9,dexterity:8,power:6,intelligence:4,stamina:3},
+        ABWEHR:      {torment:26,speed:24,awareness:20,intelligence:12,dexterity:10,charisma:8},
         // TEAMGEIST geht in technikMake UND in die Pass-Lotterie (qualitaet hoch zwei)
         // ein — ein starker, aber wegen des 0,92-Deckels stark nichtlinearer Kanal (ein
         // frueherer Versuch, spirit hier NOCH weiter hochzuziehen, hob die Abweichung auf
-        // 44+ Pp). Deshalb geht der Weg diesmal andersherum: charisma fuehrt, spirit holt
-        // sich seinen Anteil ueber ZWEITCHANCE. Logisch traegt das: Mannschaftsgeist ist
-        // die Verbindung zur Mannschaft, und die entsteht ueber Ausstrahlung mindestens
-        // so sehr wie ueber eigenen Willen. Es ist zugleich der einzige Kanal, ueber den
-        // charisma (Matrix 11) ueberhaupt nennenswert durchschlagen kann.
-        TEAMGEIST:   {charisma:59,spirit:41},
+        // 44+ Pp). Deshalb geht der Weg andersherum: charisma fuehrt, spirit holt sich
+        // seinen Anteil ueber SCHUSS_NAH und ZWEITCHANCE. Logisch traegt das:
+        // Mannschaftsgeist ist die Verbindung zur Mannschaft, und die entsteht ueber
+        // Ausstrahlung mindestens so sehr wie ueber eigenen Willen.
+        //
+        // 59/41 -> 56/44 (Archetypen-Runde): TEAMGEIST ist fuer charisma nicht mehr der
+        // einzige Kanal, sondern der einzige POSITIVE. AUFBAU, das charisma seit dieser
+        // Runde anfuehrt, nimmt seinem Traeger im Boxscore-Mass zuerst etwas weg — wer
+        // abgibt, tauscht rund 1,2 erwartete eigene Punkte gegen eine Vorlage zu 1,0
+        // (s. suchtPass/passChance in entscheideBallaktion). Genau daran ist charisma in
+        // mehreren Fassungen auf 0,6-4,2 % eingebrochen, obwohl die Matrix es mit 11
+        // bepreist. Vier Punkte zurueck zu spirit halten den Ausgleich: gemessen liest
+        // charisma jetzt 11,4 % bei Vorgabe 11 und spirit 19,9 % bei Vorgabe 22.
+        TEAMGEIST:   {charisma:56,spirit:44},
         // MECHANISCH FOLGENLOS in der Basketball-Live-Engine: kein einziger Aufruf liest
         // u.AUSDAUER (der `ermued`-Term sitzt im Vorab-Modell, das nur Football/Hockey/
         // Tennis fahren). Bewusst trotzdem logisch richtig belegt statt als Ablage fuer
         // unerwuenschte Attribute missbraucht — wenn die Live-Engine spaeter einen
         // Ermuedungsterm bekommt, stimmt das Rezept dann sofort, und die Budgetrechnung
         // oben zieht ihm zugleich keinem Attribut etwas ab.
-        AUSDAUER:    {stamina:44,spirit:25,torment:20,speed:11},
+        AUSDAUER:    {stamina:48,spirit:22,torment:18,speed:12},
         // Fables Dynamik-Runde: Lauftempo treibt die tatsaechliche Laufgeschwindigkeit
-        // (tempoPx) und entscheidet damit die Rennen um freie Baelle. Praktisch
-        // unveraendert zum Vorgaenger — speed las in der Ausgangsmessung mit 10,0 %
-        // exakt seine Matrixvorgabe, das war die einzige punktgenaue Zeile der Tabelle
-        // und wird deshalb nicht angefasst.
-        LAUFTEMPO:   {speed:60,stamina:26,dexterity:14}
+        // (tempoPx) und entscheidet damit die Rennen um freie Baelle. speed 60 -> 52,
+        // stamina 26 -> 32 (Archetypen-Runde): speed traegt jetzt zusaetzlich 24 in ABWEHR
+        // (s. dort) und wuerde ueber beide Kanaele zusammen ueberschiessen; stamina hat
+        // ausser hier und in SCHUSS_NAH keine mechanische Heimat mehr, seit AUSDAUER in der
+        // Live-Engine nichts mehr auszahlt (s. dortiger Kommentar) — es las in mehreren
+        // Fassungen 0,1-0,3 % bei Vorgabe 6. Mit 32 liest es 9,6 %.
+        LAUFTEMPO:   {speed:52,stamina:32,dexterity:16}
       },
       // SPIELZUEGE: eine Veredelung des Pass-Zweigs in bauFeldspiel, kein eigener
       // Ereignistyp — siehe docs/ARENA_INTERAKTION_KONZEPT.md, Abschnitt "Spielzüge".
@@ -3437,6 +3537,17 @@
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
   const HILFE_RADIUS=90;            // ab wann ein NICHT zustaendiger Verteidiger als Doppel-Helfer in Frage kommt (s. bewegeSpielerLive)
+  // ASSIST-FENSTER (Playmaker-Runde, s. passChance/frischerPassVon unten): wie lange nach
+  // einem Zuspiel ein Abschluss noch als vom Passgeber vorbereitet gilt. Vorher gab es gar
+  // kein Zeitfenster, sondern ein ENTSCHEIDUNGS-Fenster von genau eins: `frischerPassVon`
+  // wurde bei der naechsten Ballaktion des Empfaengers gelesen UND sofort geleert — wer den
+  // Ball annahm, einmal andribbelte und ERST DANN warf, brachte seinem Passgeber nie einen
+  // Assist ein. Da `reevBall` nach der Annahme 0,25s betraegt und danach 0,4-1,2s je
+  // Entscheidung, deckt 1,6s zuverlaessig die Annahme plus eine Zwischen-Entscheidung ab —
+  // und bleibt zugleich innerhalb dessen, was real als Assist gilt (Abschluss unmittelbar
+  // aus dem Zuspiel, ein bis zwei Dribblings). Laenger waere kein Assist mehr, sondern nur
+  // noch "hat den Ball irgendwann mal beruehrt".
+  const ASSIST_FENSTER=1.6;         // Sekunden Spielzeit, s. frischerPassBis
   // Dribbel-Animation (Fables Animations-Runde, 25.08.): der gehaltene Ball sass bisher
   // auf fester Handhoehe (traeger.y+18, s. fsBall dort) — kein Auf-und-Ab, keine
   // Dribbel-Bewegung zu sehen. Kurze Recherche zum ueblichen Muster (gamedev.net/
@@ -3718,12 +3829,33 @@
     {radius:145, seitlich:1.45},
     {radius:145, seitlich:-1.45}
   ];
-  // Rollenbasierte Slot-Vergabe: die staerksten ZWEITCHANCE-Werte (typische Rebounder)
-  // zuerst auf den innersten Slot, der Rest nach aussen — grobe Annaeherung an "Bigs
-  // bleiben nah dran, Schuetzen ziehen weit raus". Neu bei jedem Possession-Wechsel
-  // (naechsterAngriff), nicht bei jedem einzelnen Pass innerhalb derselben Possession.
+  // Rollenbasierte Slot-Vergabe: der staerkste SCHUSS_NAH-Wert zuerst auf den innersten
+  // Slot, der Rest nach aussen — "wer aus der Zone trifft, steht in der Zone; wer das
+  // nicht kann, zieht raus". Neu bei jedem Possession-Wechsel (naechsterAngriff), nicht
+  // bei jedem einzelnen Pass innerhalb derselben Possession.
+  //
+  // FRUEHER: sortiert nach ZWEITCHANCE. Der Rebound-Rezeptkommentar oben notierte den
+  // Nebeneffekt schon als offen ("MECHANIK-Frage, keine Rezept-Frage") — hier ist er
+  // behoben. ZWEITCHANCE hing an ZWEI voellig verschiedenen Dingen: wer den Abpraller holt
+  // (reboundKampf, richtig) UND wer korbnah aufgestellt wird (falsch). Weil korbnah der
+  // groesste Term der Wurfformel steht (GEO_BONUS.dunk 0,70), war jeder gute Rebounder
+  // damit automatisch auch der beste Punktesammler — Rebounds und Korbpunkte liessen sich
+  // ueber kein Rezept mehr trennen (acht durchgemessene Fassungen, alle drehten beides
+  // zusammen).
+  //
+  // VERWORFEN, weil durchgemessen: nach der DIFFERENZ SCHUSS_NAH minus SCHUSS_FERN zu
+  // sortieren (der Korbschuetze innen, der Distanzschuetze in die Ecke) klingt richtiger und
+  // gaebe SCHUSS_FERN endlich einen mechanischen Kanal — es zerstoert aber beide. Im
+  // Sondierungslauf (orthogonale Rezepte, jeder Sub-Skill von genau einem Attribut gespeist,
+  // so dass der gemessene Attributanteil das mechanische Gewicht des Sub-Skills IST) fielen
+  // SCHUSS_NAH von 17,5 auf 0,0 % und SCHUSS_FERN von 1,2 auf 0,0 %; die Gesamtabweichung
+  // stieg von 37,2 auf 78,0 Pp. Grund: der Positionskanal ist ein RANGWECHSEL, kein
+  // Zahlenwert. Haengt der Rang an der Differenz zweier Werte, verdoppelt sich die Streuung
+  // des Sortierschluessels, und dieselbe Attributanhebung kippt nur noch halb so oft einen
+  // Rang — beide Wurfwerte rutschen unter die Rauschschwelle der Messung statt sich den
+  // Kanal zu teilen.
   function zuordneSlots(seite){
-    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
+    const sortiert=[...FSTEAM[seite]].sort((a,b)=>b.SCHUSS_NAH-a.SCHUSS_NAH);
     sortiert.forEach((u,i)=>{ u.slotIdx=Math.min(SLOTS.length-1,i); u.slotSeit=0; });
     // Opus-Review-Fund #1: das raeumte bisher nur beim NEUEN Angreifer auf — Screen/Roll
     // sitzen aber immer beim Team, das den Ball gerade VERLOR. Ohne Raeumen lief ein
@@ -3742,13 +3874,13 @@
       // weg: es sperrte den Ex-Ballfuehrer, aber der ist per Definition nicht mehr
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
-        wobbleY:0,frischerPassVon:null,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        wobbleY:0,frischerPassVon:null,frischerPassBis:0,slotIdx:0,slotSeit:0,screent:null,rollBis:0,
         screenRuf:0,rangeSeit:null});
     }
     zuordneSlots(0); zuordneSlots(1);
     fsLive={amBall:0, angriffSeit:0, ball:{traeger:null,flug:null,frei:null,dribbelT:0}, reboundKampf:null,
       fastbreak:null};
-    ballUebernehmen(gewichtetesLos(FSTEAM[rr()<0.5?0:1],"AUFBAU"));
+    ballUebernehmen(spielmacherLos(FSTEAM[rr()<0.5?0:1]));
   }
 
   // Mann-gegen-Mann-Zuteilung: jeder Verteidiger nimmt den ihm naechsten noch freien
@@ -3785,6 +3917,9 @@
   function ballUebernehmen(u){
     for(const team of FSTEAM)for(const x of team)x.hatBall=false;
     u.hatBall=true; fsLive.ball.traeger=u; fsLive.ball.frei=null;
+    // Kein Assist-Fenster: hierher kommt man ueber Rebound, Steal, Anwurf oder neuen
+    // Angriff — nie ueber ein Zuspiel (das laeuft ueber loeseFlugAuf, s. dort).
+    u.frischerPassVon=null;
     // Neuer Ballfuehrer beginnt seinen Dribbel-Zyklus bei Handhoehe (Phase 0), nicht
     // mitten in einem fremden Bounce — sonst haette der Ball beim Passwechsel einen
     // sichtbaren Sprung in der Hoehe.
@@ -3816,7 +3951,17 @@
   function naechsterAngriff(seite){
     fsLive.angriffSeit=0;
     zuordneSlots(seite);
-    ballUebernehmen(gewichtetesLos(FSTEAM[seite],"AUFBAU"));
+    ballUebernehmen(spielmacherLos(FSTEAM[seite]));
+  }
+
+  // WER DEN ANGRIFF EROEFFNET. Frueher ein lineares gewichtetesLos ueber AUFBAU — bei
+  // realistischen Werten (Spielmacher 83, Rest 54) sind das 26 % gegen 17 % je Mitspieler,
+  // also fast Reihum. Derselbe Nullpunkt/Exponent wie beim Rebound-Zweikampf (s. dort):
+  // der Spielmacher bringt den Ball jetzt in gut der Haelfte aller Angriffe selbst hoch,
+  // der Rest verteilt sich weiter. Ohne das gibt es kein Spielmacher-Profil im Boxscore —
+  // ein hoher AUFBAU-Wert wirkt nur, wenn der Spieler den Ball auch in die Hand bekommt.
+  function spielmacherLos(team){
+    return gewichtetesLosNach(team,u=>Math.pow(Math.max(1,u.AUFBAU-20),2));
   }
 
   function logZug(seite,art,extra){
@@ -3962,14 +4107,42 @@
     // kontestFaktor) — zwei Verteidiger sind mehr als ein staerkerer einer.
     const doppelMalus=gedoppelt?0.26:0; // PLATZHALTER, s. Bericht
     const bedraengnisMake=bedraengnisGate*kontestFaktor+doppelMalus;
-    // War der letzte Ballwechsel ein Pass AN u, gilt genau diese eine Entscheidung noch
-    // als moeglicher Assist — sofort geleert, damit ein Assist nur den unmittelbar
-    // naechsten Abschluss zaehlt, nicht jeden spaeteren (Opus-Review-Fund: vorher wurde
-    // `passgeber` beim normalen Pass gar nicht bis zum Wurf durchgereicht, Assists
-    // entstanden dadurch faktisch nur noch beim Alley-Oop).
-    const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;
+    // War der letzte Ballwechsel ein Pass AN u, gilt der Abschluss noch als vom Passgeber
+    // vorbereitet — solange er INNERHALB von ASSIST_FENSTER faellt (s. dort).
+    //
+    // PLAYMAKER-BEFUND (Chris: "die stars sollen in playmaking herausstechen"): hier stand
+    // `const moeglicherAssist=u.frischerPassVon; u.frischerPassVon=null;` — gelesen und im
+    // selben Atemzug geleert, egal was der Empfaenger daraufhin tat. Genau ein Bruchteil
+    // der Abschluesse faellt aber in DIESER einen Entscheidung; wer annahm, andribbelte und
+    // erst in der naechsten Runde warf, loeschte den Assist selbst. Gemessen ueber 240
+    // Spiele lag die Assistquote der Builds dadurch bei 0,4-0,7 je Spiel, voellig
+    // unabhaengig von AUFBAU. Das Fenster laeuft jetzt ueber die Zeit (frischerPassBis) und
+    // wird dort geleert, wo der Ball den Empfaenger wirklich verlaesst: in wirf() und
+    // passeAb() (er hat abgeschlossen bzw. weitergegeben) sowie in ballUebernehmen() (er
+    // hat den Ball ueber einen anderen Weg als ein Zuspiel bekommen — Rebound, Einwurf,
+    // erobert). Ohne diese drei Loeschungen wuerde derselbe Passgeber zweimal gutgeschrieben.
+    const moeglicherAssist=(u.frischerPassVon&&fsT<(u.frischerPassBis||0))?u.frischerPassVon:null;
+    if(!moeglicherAssist)u.frischerPassVon=null;
 
-    if(tier){
+    // SPIELMACHER SUCHT ZUERST DEN PASS. Ohne diese Zeile kann es keinen Spielmacher
+    // geben, und das liegt an der Reihenfolge, nicht an einer Wahrscheinlichkeit: der
+    // Wurf-Zweig unten steht VOR dem Pass-Zweig und verlaesst die Funktion mit `return`.
+    // Wer in Wurfreichweite steht, kam an `passChance` also nur, wenn er den Wurf vorher
+    // ablehnte — und das tut hier praktisch niemand, weil `technikGate` (0,16 + TECHNIK
+    // + TEAMGEIST) bei normalen Werten um 0,9 liegt und damit immer ueber `schwelle`
+    // (hoechstens 0,42). Gemessen: der Playmaker-Build nahm 2,4 eigene Wuerfe je Spiel und
+    // gab 0,65 Vorlagen — er war ein mittelmaessiger Scorer, kein Spielmacher.
+    //
+    // `suchtPass` ueberspringt den Wurf-Zweig und faellt in dieselbe Pass-/Spielzug-Logik
+    // durch, die auch ausserhalb der Wurfreichweite greift. Der Nullpunkt liegt bei
+    // AUFBAU 55: ein durchschnittlicher Spieler wuerfelt hier NIE, fuer ihn aendert sich
+    // gar nichts (dieselbe Vorsicht wie beim zentrierten passChance darunter — der
+    // Liga-Mittelwert bleibt, nur die Spanne oeffnet sich). Ein Spielmacher mit AUFBAU 83
+    // laesst gut jede fuenfte Wurfgelegenheit liegen und sucht stattdessen den freien Mann.
+    // Beim Zwangswurf (Schussuhr) gilt das nicht — dann wird geworfen.
+    const suchtPass=!erzwingen&&team.length>1&&rr()<Math.min(0.35,Math.max(0,(u.AUFBAU-55)*0.0080));
+
+    if(tier&&!suchtPass){
       // SHOT-SELECTION: nicht jeder Wurf in Reichweite wird auch genommen — bisher der
       // mechanischste Moment der Engine (Fables Fund). Die Wurfqualitaet (dieselbe
       // Erfolgsformel wie zuvor) muss eine mit der Zeit IN Wurfreichweite sinkende
@@ -4077,8 +4250,25 @@
       // ueber TEAMGEIST (55 % Anteil, hoechster Koeffizient in der Wurfformel) profitierte.
       // Koeffizient testweise durchgemessen (messe-arena-einfluss.mjs basketball 48):
       // 0,0030 (Original) 48,2 Pp, 0,0010 48,3 Pp, 0,0005 40,7 Pp, 0,0003 36,6 Pp,
-      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt. PLATZHALTER, kein Endwert.
-      const passChance=Math.min(0.75,Math.max(0.20,0.35+u.AUFBAU*0.0002));
+      // 0,0002 32,5 Pp (reproduzierbar) — danach gewaehlt.
+      //
+      // PLAYMAKER-RUNDE: 0,0002 war zu klein, um ueberhaupt noch ein Spielmacher-Profil zu
+      // erzeugen — ueber die volle AUFBAU-Spanne 0-100 bewegte sich die Passbereitschaft um
+      // ganze 0,02. Der Ausweg ist NICHT, den alten Koeffizienten wiederzuholen, sondern zu
+      // sehen, WAS der Messreihe oben eigentlich wehtat: `0,35 + AUFBAU*k` hob mit k den
+      // Mittelwert MIT — bei k=0,0030 passte die ganze Liga mit 0,50 statt 0,35, jeder
+      // Angriff bestand aus mehr Paessen und weniger eigenen Abschluessen, und weil ein
+      // abgegebener Wurf im Boxscore-Mass weniger wert ist als ein genommener (Assist 1,0
+      // gegen ~1,2 erwartete Punkte, plus Abfang-Risiko), lief das fuehrende AUFBAU-Attribut
+      // negativ ein. Jetzt ist der Term um AUFBAU=50 ZENTRIERT: die Liga passt im Mittel
+      // weiter mit 0,35 wie bisher, nur die Spanne oeffnet sich (AUFBAU 20 -> 0,26,
+      // AUFBAU 80 -> 0,44). Der Mittelwert-Effekt, der die alte Messreihe trug, faellt damit
+      // weg; uebrig bleibt genau der Unterschied zwischen Spielmacher und Abschlussspieler.
+      // Zusammen mit dem Assist-Fenster (s. ASSIST_FENSTER) ist ein abgegebener Ball
+      // ausserdem deutlich haeufiger wirklich ein Assist — der Tausch lohnt sich fuer den
+      // Passgeber jetzt auch im Boxscore-Mass. Gemessen (s. Bericht): der intelligence-
+      // Anteil bleibt positiv, die Abweichung faellt statt zu steigen.
+      const passChance=Math.min(0.75,Math.max(0.20,0.35+(u.AUFBAU-50)*0.0040));
       if(rr()<passChance){
         // SPIELZUEGE: Veredelung DIESES Passes (nicht mehr — wie zwischenzeitlich —
         // eine von der Pass-Entscheidung unabhaengige Alternative bei jeder einzelnen
@@ -4133,6 +4323,9 @@
   // Ball fliegt direkt zum Korb, der Finisher wird ihn nie kontrollieren.
   function wirf(von,schuetze,art,tier,technik,passgeber,zug,blockKandidat){
     von.hatBall=false; fsLive.ball.traeger=null;
+    // Assist-Fenster schliessen: der Abschluss ist raus, ein zweiter Assist aus demselben
+    // Zuspiel darf nicht entstehen (s. ASSIST_FENSTER).
+    von.frischerPassVon=null;
     von.lunge=0.3; schuetze.lunge=0.5; // Wurf-/Zuspiel-Animation, Analogon zu Kampfs lunge
     // FG-ZAEHLUNG (Chris' Fund: "Trefferquote als % oder FG 3/6 im Boxscore zeigen"):
     // jeder wirf()-Aufruf IST ein Feldwurf-Versuch (Freiwuerfe laufen nie durch wirf(),
@@ -4234,6 +4427,9 @@
 
   function passeAb(von,nach,druckBonus=0){
     von.hatBall=false; fsLive.ball.traeger=null; von.lunge=0.3;
+    // Assist-Fenster schliessen: wer weitergibt, hat nicht abgeschlossen — der Assist
+    // gehoert dann (falls ueberhaupt) dem naechsten Passgeber (s. ASSIST_FENSTER).
+    von.frischerPassVon=null;
     // PASS-INTERCEPTION: ohne diesen Zweig konnte Verteidigung ausschliesslich stehlen,
     // wenn sie direkt am Ballfuehrer klebte (versucheSteal) — ein abgespielter Pass war
     // IMMER sicher, egal wie nah ein Verteidiger an der Flugbahn stand. Chris wollte
@@ -4261,7 +4457,15 @@
     // invers mit AUFBAU (schwache Ballfuehrer werfen den Ball auch ungedeckt mal weg) —
     // klein gehalten (Deckel 2-5 %), damit es ein seltenes, glaubwuerdiges Ereignis
     // bleibt, kein staendiges Rauschen.
-    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0006);
+    // Koeffizient 0,0006 -> 0,0016 (Archetypen-Runde): AUFBAU ist seit dem Spielmacher-
+    // Umbau ein Sub-Skill, der seinem Traeger im Boxscore-Mass zuerst etwas WEGNIMMT — wer
+    // abgibt, tauscht rund 1,2 erwartete eigene Punkte gegen eine Vorlage zu 1,0. Der
+    // Ausgleich dafuer gehoert dorthin, wo Ballfuehrung wirklich zaehlt: in die
+    // Ballsicherheit. Ein Ballfuehrer mit AUFBAU 85 wirft den Ball jetzt in 1,5 % statt
+    // 3,9 % der Paesse selbst weg (Deckel unveraendert bei 1,5 %), ein schwacher mit
+    // AUFBAU 30 in 5,0 % — der Ballverlust zieht im Mass 0,8 ab und war vorher praktisch
+    // skillunabhaengig.
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015,0.05-(von.AUFBAU-50)*0.0016);
     fsLive.ball.flug={von:{x:von.x,y:von.y},nach:{x:nach.x,y:nach.y},art:"pass",t:0,dauer:0.3,
       treffer:null,fern:null,punkte:0,schuetze:null,passgeber:von,zug:null,ziel:nach,blockKandidat:null,
       abgefangenVon,eigenerFehler};
@@ -4275,8 +4479,14 @@
   // Schussuhr-Fenster), sonst waere die Gesamt-Stealrate viel hoeher als vorher und der
   // Einflussvektor von ABWEHR liefe aus dem Ruder.
   function versucheSteal(decker,traeger,art){
+    // Koeffizient 0,0035 -> 0,0050 (Archetypen-Runde): der Verteidiger-Build hatte zwar die
+    // knapp dreifache Chance JE VERSUCH, kam aber auf weniger Steals je Spiel als der
+    // korbnah aufgestellte Korbschuetze — weil der schlicht oefter neben dem Ball steht und
+    // damit mehr Versuche bekommt. Die Zahl der Gelegenheiten haengt an der Aufstellung, die
+    // Chance je Gelegenheit an ABWEHR; wenn ein Verteidiger sich gegen die Aufstellung
+    // durchsetzen soll, muss der zweite Hebel schwerer wiegen.
     const basis=Math.min(0.94,Math.max(0.20,
-      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0035+traeger.TEAMGEIST*0.0060));
+      0.50+(traeger.AUFBAU-decker.ABWEHR)*0.0050+traeger.TEAMGEIST*0.0060));
     const proVersuch=1-Math.pow(basis,1/3);
     decker.stealCd=2.0; // PLATZHALTER — fest, kein Jitter (s. Kommentar unten)
     // Fable-Fund (Animations-Runde, 25.08.): der Steal-Versuch war bisher ein reiner
@@ -4335,10 +4545,17 @@
       }
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
-      // Merkt sich den Passgeber fuer GENAU die naechste Ballaktions-Entscheidung des
-      // Empfaengers (dort sofort wieder geleert) — sonst gibt es beim normalen Pass nie
-      // einen Assist, weil `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
-      flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.lunge=0.2;
+      // Merkt sich den Passgeber fuer ASSIST_FENSTER Sekunden (s. dort und
+      // entscheideBallaktion) — sonst gibt es beim normalen Pass nie einen Assist, weil
+      // `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
+      // Fensterlaenge nach dem AUFBAU des PASSGEBERS: ein Zuspiel des Spielmachers kommt
+      // im Rhythmus (der Abschluss folgt unmittelbar), ein hingeworfener Ball muss erst
+      // sortiert werden und ist bis zum Wurf laengst kein Assist mehr. Faktor 0,70 bei
+      // AUFBAU 50 bis 1,00 bei AUFBAU 100 — das Fenster wird also nie laenger als
+      // ASSIST_FENSTER, nur kuerzer, wenn der Passgeber keiner ist.
+      const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(flug.passgeber.AUFBAU-50)*0.0060));
+      flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.frischerPassBis=fsT+ASSIST_FENSTER*fensterFaktor;
+      flug.ziel.lunge=0.2;
       feed(flug.ziel.side,(flug.passgeber?flug.passgeber.n+" passt zu ":"")+flug.ziel.n+".");
       fsAktuell={spieler:flug.ziel,verteidiger:null,passgeber:flug.passgeber,rebounder:null};
       return;
@@ -4463,7 +4680,32 @@
       let zx=u.x, zy=u.y, tempoMul=1, dribbelFaktor=0.85;
       const korbX=korbXVon(u.side), eigenerKorbX=korbXVon(1-u.side);
       if(u.hatBall){
-        zx=korbX; zy=H/2+(u.id%2?40:-40);
+        // WUNSCHDISTANZ statt "immer zum Korb" (Archetypen-Runde). Bisher stand hier
+        // `zx=korbX` fuer JEDEN Ballfuehrer: wer den Ball hatte, zog los Richtung Ring,
+        // egal ob er von dort ueberhaupt trifft. Das war der Grund, warum ein reiner
+        // Distanzschuetze im Boxscore keiner war — gemessen ueber 240 Spiele nahm ein Build
+        // mit SCHUSS_FERN 93 gegen SCHUSS_NAH 57 trotzdem 1,70 Zweier gegen 0,63 Dreier,
+        // weil ihn die Bewegung jedes Mal unter den Korb trug, bevor er ueberhaupt zum Wurf
+        // kam. Die Aufstellung (zuordneSlots) konnte das nicht heilen: sie gilt nur, solange
+        // man den Ball NICHT hat.
+        //
+        // Jetzt bestimmt das Wurfprofil, wie weit er faehrt: `profil` ist der Vorsprung des
+        // Fernwurfs vor dem Nahwurf. Ab +14 will er hinter die Dreierlinie (DREIER_RADIUS
+        // plus 18px Sicherheitsabstand, damit die Klassifizierung im Wurfmoment nicht auf
+        // "mit" kippt), ab -12 zieht er ganz durch bis unter den Ring, dazwischen linear —
+        // der ausgeglichene Schuetze landet im Mitteldistanzbereich. Das ist keine neue
+        // Wahrscheinlichkeit, nur ein anderes LAUFZIEL; Trefferchance, Bedraengnis und
+        // Wurfauswahl rechnen unveraendert weiter.
+        const profil=u.SCHUSS_FERN-u.SCHUSS_NAH;
+        const anteil=Math.max(0,Math.min(1,(profil+12)/26));
+        const wunsch=(DREIER_RADIUS+18)*anteil;
+        const zumFeldB=u.side===0?-1:1;
+        zy=H/2+(u.id%2?40:-40);
+        // X-Komponente so, dass der Abstand zum Korb genau `wunsch` betraegt (dieselbe
+        // Rechnung wie bei den Slot-Zielen unten); passt sie nicht mehr in die Y-Ablage,
+        // wird direkt der Korb angelaufen.
+        const yAbl=zy-H/2;
+        zx=korbX+zumFeldB*Math.sqrt(Math.max(0,wunsch*wunsch-yAbl*yAbl));
         // Opus-Review-Fund #2: der Fastbreak-Ballfuehrer bekam NIE einen `tempoMul` (nur
         // die off-ball-Sprinter und die zuruecksprintende Verteidigung) — dazu noch der
         // 0,55×-Dribbel-Abzug obendrauf. Ergebnis: der Ballfuehrer war der LANGSAMSTE auf
@@ -4742,7 +4984,16 @@
       // (Chris' Fund). Bei nur einem Spieler in Reichweite bleibt es beim sofortigen
       // Greifen — da gibt es niemanden, mit dem er sich prügeln könnte.
       if(nah.length&&!fsLive.reboundKampf){
-        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.08}; // PLATZHALTER
+        // ZWEITE ZAHL ANGEHOBEN (0,08 -> 0,40, Playmaker/Archetypen-Runde): der Fall "genau
+        // einer ist schon da" war faktisch ein Erstkontakt-Zuschlag — der Ball gehoerte, wem
+        // die Aufstellung ihn vor die Fuesse legte, und ein heranstuermender Rebounder kam
+        // nie ins Gerangel. Gemessen ueber 60 Spiele hatten 64 % aller Rebounds hoechstens
+        // drei Kandidaten; der korbnah aufgestellte Spieler holte dadurch mehr als doppelt so
+        // viele Bretter wie der deutlich bessere Rebounder (2,90 gegen 1,29 je Spiel), obwohl
+        // ZWEITCHANCE die Entscheidung tragen soll. 0,40s reicht einem schnellen Spieler aus
+        // der zweiten Reihe, um in GREIF_REICHWEITE zu kommen — und bleibt kurz genug, dass
+        // ein wirklich freier Ball weiter sofort aufgenommen aussieht.
+        fsLive.reboundKampf={t:0,dauer:nah.length>1?0.55:0.40}; // PLATZHALTER
         if(nah.length>1)feed(f.vonSeite,"Kampf um den "+art.wortRebound+"!");
       }
       if(fsLive.reboundKampf){
@@ -4757,7 +5008,14 @@
           // ein Steal-Versuch (s. versucheSteal, selbes Muster), ausgeloest im selben
           // Frame wie der Feed-Text/das Outcome direkt darunter.
           for(const k of kandidaten)k.lunge=0.4;
-          const gewinner=gewichtetesLos(kandidaten,"ZWEITCHANCE");
+          // ZWEIKAMPF STATT LOSTOPF: gewichtetesLos() loste linear ueber den Rohwert — bei
+          // realistischen Werten (etwa 73 gegen 60) sind das 55 zu 45, also praktisch ein
+          // Muenzwurf zwischen einem sehr guten und einem mittelmaessigen Rebounder. Der
+          // Nullpunkt liegt jetzt bei 20 statt bei 0 und die Differenz geht quadratisch ein:
+          // 53² zu 40² = 64 zu 36. Immer noch kein Automatismus (der schwaechere gewinnt gut
+          // jeden dritten Ball, wie es sich fuer ein Gerangel gehoert), aber der Unterschied
+          // zwischen zwei Spielern ist im Boxscore jetzt zu sehen.
+          const gewinner=gewichtetesLosNach(kandidaten,k=>Math.pow(Math.max(1,k.ZWEITCHANCE-20),2));
           gewinner.rebounds++;
           const eigen=gewinner.side===f.vonSeite;
           feed(gewinner.side,gewinner.n+" holt "+(eigen?"den eigenen ":"den ")+art.wortRebound+".");
