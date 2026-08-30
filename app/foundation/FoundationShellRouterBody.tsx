@@ -224,11 +224,6 @@ const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/F
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
 });
-const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
-  ssr: false,
-  loading: () => <FoundationPanelSkeleton label="Entwurf wird geladen…" />,
-});
-
 const FoundationChangelogHost = dynamic(() => import("@/app/foundation/changelog/FoundationChangelogHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Changelog wird geladen…" />,
