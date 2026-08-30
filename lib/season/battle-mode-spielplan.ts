@@ -20,19 +20,19 @@
  *     kleines Team bekommt fuenf Spieltage am Stueck die Spitze vorgesetzt.
  *
  * ────────────────────────────────────────────────────────────────────────────────────────────
- * OFFENE FRAGE AN CHRIS — DIE VORGABE WIDERSPRICHT SICH HIER, und zwar nachweisbar:
+ * GEKLAERT MIT CHRIS (29./30.08.) — WAR URSPRUENGLICH WIDERSPRUECHLICH:
  *
- * Woertlich hiess es, die 5 Zusatzrunden sollen jedes Team gegen einen Gegner setzen, „den es in
- * den 15 Round-Robin-Runden noch NICHT hatte". Das kann es nicht geben. 15 volle Round-Robin-
- * Runden verbrauchen ALLE C(16,2) = 120 moeglichen Paarungen — nach Spieltag 15 hat jedes Team
- * jedes andere schon gespielt, es ist kein unverbrauchtes Paar mehr uebrig.
+ * Woertlich hiess es zuerst, die 5 Zusatzrunden sollen jedes Team gegen einen Gegner setzen, „den
+ * es in den 15 Round-Robin-Runden noch NICHT hatte". Das kann es nicht geben. 15 volle Round-
+ * Robin-Runden verbrauchen ALLE C(16,2) = 120 moeglichen Paarungen — nach Spieltag 15 hat jedes
+ * Team jedes andere schon gespielt, es ist kein unverbrauchtes Paar mehr uebrig.
  *
- * WAS HIER STATTDESSEN GILT (die einzige widerspruchsfreie Lesart): in den 5 Zusatzrunden darf
- * sich keine Paarung WIEDERHOLEN. Jedes Paar trifft sich also hoechstens zweimal in der Saison —
- * einmal in der Pflichtrunde, hoechstens einmal als Zusatz. `bereitsGepaarteSchluessel` traegt
- * genau diese Sperre und ist deshalb ein Parameter geblieben: sollte Chris den Plan spaeter auf
- * eine Ligagroesse umstellen, bei der nach der Pflichtrunde noch Paarungen uebrig sind (z. B. 12
- * Teams à 11 Pflichtrunden), reicht es, die Round-Robin-Paare hier hineinzugeben.
+ * Vorgeschlagen und von Chris bestaetigt ("1" — so lassen): in den 5 Zusatzrunden darf sich keine
+ * Paarung WIEDERHOLEN. Jedes Paar trifft sich also hoechstens zweimal in der Saison — einmal in
+ * der Pflichtrunde, hoechstens einmal als Zusatz. `bereitsGepaarteSchluessel` traegt genau diese
+ * Sperre und ist deshalb ein Parameter geblieben: sollte Chris den Plan spaeter auf eine
+ * Ligagroesse umstellen, bei der nach der Pflichtrunde noch Paarungen uebrig sind (z. B. 12 Teams
+ * à 11 Pflichtrunden), reicht es, die Round-Robin-Paare hier hineinzugeben.
  * ────────────────────────────────────────────────────────────────────────────────────────────
  */
 import type { Fixture, Player, PlayMode, RosterEntry, Team } from "@/lib/data/olyDataTypes";
