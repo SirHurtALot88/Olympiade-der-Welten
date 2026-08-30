@@ -3469,7 +3469,11 @@
   const FW_ANLAUF=0.9;              // Ritual am Ball, bevor der Schuetze abdrueckt
   const FW_FLUG=0.5;                // Ballflug zum Ring (Muster wie flug.dauer bei einem Feldwurf)
   const FW_NACH=0.7;                // Nachklang, bevor der naechste Freiwurf beginnt bzw. die Phase endet
-  const PFIFF_DAUER=1.8;            // wie lange der Schiedsrichter die Foul-Geste haelt (echte Sekunden)
+  // Opus-Review-Fund (30.08.): NICHT "echte Sekunden" — bewegeSchiri()/pfiffT zaehlen in
+  // `dt`, und `dt` kommt im interaktiven Spiel bereits durch zeitFaktor() geteilt (Faktor 2
+  // fuer Basketball, s. ZEIT_DEHNUNG) beim Aufrufer an. Die Geste haelt also 1,8 Simulations-
+  // sekunden, was bei laufendem Spiel ~3,6 echten Sekunden entspricht.
+  const PFIFF_DAUER=1.8;            // Simulationssekunden, s. Kommentar oben
   const SCHIRI_TEMPO=300;           // px/s, mit denen der Schiedsrichter laeuft
   const SPIELDAUER_BASKETBALL=120;  // Chris' Wunsch (25.08.: 45->90; 29.08.: nochmal laenger)
   const SCHUSSUHR_BASKETBALL=8;     // erzwingt einen Abschluss, sonst dribbelt ein Angriff endlos
@@ -5333,7 +5337,9 @@
     }
     fsT+=dt;
     if(fsT>=SPIELDAUER_BASKETBALL){ done=true; fsAktuell=null; fsBall={sichtbar:false,x:0,y:0};
-      fsLive.phase="laufend"; fsLive.freiwurf=null;
+      // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
+      // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
+      // returnt vorher), das erneute Setzen aenderte also nie etwas.
       bkSfx("buzzer.mp3",0.8); bkLoopStop();
       // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
       // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
@@ -8829,6 +8835,11 @@
         const th=document.getElementById("wth"+i+suf); if(th)th.textContent=kopf[i];
       }
     }
+    // Opus-Review-Fund (30.08.): die Namensspalte selbst (wthN/wthNr) wurde nie
+    // umgeschrieben — hiess deshalb auch im Feldspiel immer "Kämpfer".
+    for(const suf of["","r"]){
+      const thN=document.getElementById("wthN"+suf); if(thN)thN.textContent=feldspiel?"Spieler":"Kämpfer";
+    }
     const fuss=document.getElementById("wfuss");
     if(fuss)fuss.textContent=feldspiel
       ? "„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" gewichtet Punkte/Rebounds/Steals+Blocks/Ballverluste zu einem Kompositwert. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
@@ -10783,6 +10794,7 @@
     // Zusammengesetzt aus Textknoten statt innerHTML: der Name kommt aus dem Spielstand
     // und darf nie als Markup ankommen.
     const txt=document.getElementById("fokustext");
+    if(!txt)return; // Opus-Review-Fund (30.08.): gleicher Null-Guard wie bei `zeile` oben
     txt.textContent="";
     if(u){
       txt.appendChild(el("i","fmarke"));
@@ -11217,7 +11229,14 @@
                     fsPunkte=a.fsPunkte; done=a.done; fsLive=a.fsLive; fsSchiri=a.fsSchiri;},
       vorher:()=>{disc=fd; feldspielDisc=fd;},
       bau:(saat)=>{feldspielDisc=fd; bauFeldspiel(saat);},
-      lauf:()=>{let g=0; while(!done&&g<120){ stepFeldspiel(1/60); g+=1/60; }},
+      // Opus-Review-Fund (30.08.): das Budget stand bei 120 — exakt SPIELDAUER_BASKETBALL,
+      // also OHNE Reserve. Waehrend jeder Freiwurf-Standphase steht die Uhr (fsT), aber
+      // dieses `g` zaehlt echte Simulationssekunden weiter — jede Sequenz (3,7-7,9s) ging
+      // also voll zulasten des Budgets, bevor `fsT` je 120 erreichte. Foulstarke Builds
+      // brachen ihr eigenes Spiel dadurch systematisch frueher ab, mit direkter Wirkung auf
+      // einflussVon()/boxscoreSerie() (die Pp-Messung selbst). 60s Reserve deckt den
+      // schlimmsten plausiblen Fall (mehrere Sequenzen a ~8s) sicher ab.
+      lauf:()=>{let g=0; while(!done&&g<180){ stepFeldspiel(1/60); g+=1/60; }},
       namen:()=>[...FSTEAM[0],...FSTEAM[1]].map(u=>u.n),
       wert:()=>{const o={}; for(const u of [...FSTEAM[0],...FSTEAM[1]])
         o[u.n]=u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8; return o;}
