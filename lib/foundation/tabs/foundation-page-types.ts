@@ -97,8 +97,7 @@ export type FoundationView =
   | "admin"
   | "credits"
   | "finances"
-  | "changelog"
-  | "battleArena";
+  | "changelog";
 
 export const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
