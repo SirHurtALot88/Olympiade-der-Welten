@@ -976,20 +976,42 @@ seit dieser Sitzung korrigiert. Eine testweise Kappung von `TMP`/`AUS` senkte di
 gemessene Abweichung deutlich, verschlechterte aber den ECHTEN Kampf (mehr Blowouts) und
 ist zurückgenommen — Details im Abschnitt „Das Ventil".
 
-**Zuletzt gemessen, NACH dem Merge mit #654 (Heiler-Fix), n = 6:**
+**Update, Auftrag „möglichst unter 15 Pp" (Chris): die Ursache gefunden, nicht mehr nur
+umschifft.** `leistungVon()` (Beitrag / Eignungserwartung) hatte einen mathematischen
+Kurzschluss: `aufEignung()` skaliert LP/ANG/VER proportional zur Eignung
+(Attribut×Matrixgewicht, summiert), und genau diese Eignung steht auch im Nenner der
+Leistungsformel. Hebt man ein Attribut an, wachsen Zähler und Nenner im selben Verhältnis
+mit — der Quotient bleibt stehen. Gemessen wurde nur noch Rauschen zweiter Ordnung, das
+zufällig auf ein, zwei Attribute traf und deren ganzen Anteil an sich zog, während die
+übrigen auf 0 % klemmten. **Das erklärt rückwirkend, warum „welches Attribut dominiert"
+dreimal umgesprungen ist** (s. unten — es war jedesmal Rauschen, kein echter
+Bedeutungswechsel), warum die TMP/AUS-Kappung die Zahl senkte, ohne den Kampf zu
+verbessern (sie entfernte den letzten Rest Signal, übrig blieb reines Rauschen), und
+warum Mini-DM einmal 13,8 Pp las (ein Treffer der Streuung, kein Beweis).
 
-TDM 160,1 Pp (Spirit 38,1 %, Intelligence 33,1 %, Torment 28,9 % dominieren; Power,
-Health, Stamina, Charisma bei exakt 0 % trotz Matrixgewichten 28/20/14/10). Mini-DM,
-Fechten und Battlefield sind seit dem Merge nicht neu mit `einflussVon()` gemessen — nur
-die Siegquote (Mini-DM 100 %, Fechten 100 %, Battlefield 88 %, je n = 8), die zusammen mit
-TDM zeigt: der Heiler-Fix hat die Kampfdynamik grundlegend verschoben, und **welches
-Attribut das Kampfergebnis dominiert, ist seitdem dreimal umgesprungen** (Speed/Dexterity
-vor dem Maßstab-Fix → weiterhin Speed/Dexterity nach dem Maßstab-Fix, aber schwächer →
-jetzt Spirit/Intelligence/Torment nach dem Heiler-Fix). Das ist kein Rauschen, sondern ein
-Hinweis, dass die Ursache tiefer liegt als eine einzelne Formel — vermutlich in
-`leistungVon()`/der Skill-Priorisierung, die bestimmt, wer wie oft trifft. Nicht mehr mit
-Vermutungen nachgejagt in dieser Sitzung; das ist die nächste echte Aufgabe an TDM,
-unabhängig vom Chassis-Ausbau.
+Fix: `MOTOREN[d].wert()` (nur von `einflussVon()` gelesen, also nur die Abnahmemessung —
+am Kampf selbst ändert sich nichts) misst jetzt den **Anteil am Gesamtbeitrag** der Partie
+statt der eignungsnormierten Leistung. `leistungVon()` bleibt unverändert die Anzeige im
+Endstand.
+
+**Gemessen bei n = 12, mit dem korrigierten Maßstab:**
+
+| Disziplin | Abweichung | Ziel <15 Pp erreicht? |
+|---|---|---|
+| Battlefield | **12,0 Pp** | ja — Rezept unangetastet, allein der Maßstab hat es gebracht |
+| Fechten | **11,0 Pp** | ja — Maßstab + kleine Ausdauer-Korrektur im Rezept |
+| TDM | **54,2 Pp** | nein |
+
+TDM bleibt offen. Vier neue Rezepte wurden gebaut und bei n = 6 bzw. n = 12 gemessen (ein
+voller Neubau, eine gezielte Korrektur der größten Lücken, zwei ANG/VER-Varianten) — keins
+schlug das unveränderte `REC.power`-Rezept messbar; bei doppeltem n lag die beste
+Alternative (57,9 Pp) innerhalb der Streuung des Unveränderten (54,2 Pp), nicht darunter.
+Der wahrscheinliche Grund: `REC.power` trägt in TMP/AUS ausgerechnet die Attribute
+(speed/dexterity/stamina), die den Kampf strukturell am Laufen halten, während ANG/VER
+durch `aufEignung()` proportional zur Eignung skalieren und dadurch wenig Spielraum für
+Feintuning lassen. Eine nächste Runde müsste vermutlich am Chassis ansetzen
+(`aufEignung()`/die TMP-AUS-Normierung selbst) statt an den Rezeptgewichten — Details im
+Code-Kommentar an `ARENA_ART.tdm`.
 
 ---
 

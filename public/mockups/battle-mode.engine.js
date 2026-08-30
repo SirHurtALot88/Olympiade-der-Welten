@@ -2796,6 +2796,33 @@
   // Wer hier eine Disziplin eintraegt, bekommt sie fertig: Aufstellung aus den erzeugten
   // Slots, Motor fuer die Abnahmemessung, Reiter in der Oberflaeche.
   const ARENA_ART={
+    // MATRIX: power 28, health 20, stamina 14, spirit 12, charisma 10, determination 6,
+    // intelligence 6, awareness 2, torment 2.
+    //
+    // REZEPT ABSICHTLICH UNVERAENDERT GELASSEN — nachgemessen, nicht vergessen. Mit dem
+    // korrigierten Massstab (s. MOTOREN unten, "Anteil am Gesamtbeitrag") liest dieses
+    // Rezept bei n=12 54,2 Pp; das ist der grosse Sprung dieser Runde, denn derselbe
+    // Kampf las mit dem alten, kurzgeschlossenen Massstab ueber 150 Pp. Der Fehler lag
+    // im Massstab, nicht im Rezept.
+    //
+    // Vier neue TDM-Rezepte wurden gebaut und gemessen, um die restlichen 54 Pp
+    // wegzuarbeiten: ein voller Neubau (168 Pp — schlechter), eine gezielte Korrektur
+    // der groessten Luecken aus der Messung (83 Pp — schlechter), und zwei ANG/VER-Sorten,
+    // die sich nur in Nuancen unterschieden (114,5 und 58,9 Pp bei n=6 — ein Ausschlag,
+    // der allein aus der Stichprobe kommen konnte). Bei doppeltem n bestaetigte sich genau
+    // das: die bessere der beiden ANG/VER-Sorten lag bei n=12 bei 57,9 Pp — innerhalb der
+    // Streuung von REC.power (54,2 Pp), nicht darunter. Jeder Umbauversuch war also
+    // entweder schlechter oder ununterscheidbar vom Nichtstun.
+    //
+    // Der wahrscheinliche Grund steht schon bei Fechten und Battlefield unten: TMP und
+    // AUS liegen ausserhalb der Eignungs-Normierung und haben Effekte erster Ordnung auf
+    // den Kampf selbst, nicht nur auf die Gewichtung — und REC.power traegt in TMP/AUS
+    // ausgerechnet die Attribute, die den Kampf am Laufen halten (speed/dexterity fuers
+    // Tempo, stamina fuers Durchhalten), waehrend ANG/VER durch aufEignung() proportional
+    // zur Eignung skalieren und daher wenig Spielraum fuer Feintuning lassen. TDM bleibt
+    // damit die einzige der drei Zieldisziplinen ueber 15 Pp — offener Befund fuer eine
+    // naechste Runde, die vermutlich am Chassis (aufEignung/TMP-AUS-Normierung) ansetzen
+    // muesste statt an den Rezeptgewichten.
     tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
 
     "mini-dm":{
@@ -2837,9 +2864,20 @@
       // Gewicht 16. Jetzt tragen Torment (25) und Dexterity (20) auch dort.
       rezept:{ANG:{torment:42,dexterity:32,power:26},
               VER:{awareness:40,dexterity:34,health:26},
-              LP:{health:34,determination:34,awareness:32},
+              LP:{health:34,determination:36,awareness:30},
               TMP:{dexterity:38,speed:34,awareness:28},
-              AUS:{torment:36,awareness:32,dexterity:24,determination:8}}
+              // NACHGEZOGEN, dritte Runde — diesmal am korrigierten Massstab (s. MOTOREN,
+              // „Anteil am Gesamtbeitrag"). Damit las Fechten 16,6 Pp, und die beiden
+              // groessten Einzelposten sassen beide in der AUSDAUER: Torment 21,5 % bei
+              // Gewicht 25, Awareness 17,3 % bei 15. Also traegt Torment dort mehr,
+              // Awareness weniger — gemessen 16,6 -> 12,5 Pp (n=6), bestaetigt bei
+              // doppeltem n: 11,0 Pp (n=12). Damit unter dem Zielwert von 15 Pp.
+              //
+              // TEMPO BLEIBT, WIE ES WAR. TMP und AUS liegen ausserhalb der
+              // Eignungs-Normierung; wer daran dreht, verschiebt nicht das Gewicht,
+              // sondern den Kampf. Ein Neubau dieser Runde, der auch TMP anfasste, kam
+              // auf 20,4 statt 12,5 Pp. Deshalb nur die Ausdauer, und die nur wenig.
+              AUS:{torment:44,dexterity:24,awareness:22,determination:10}}
     },
 
     battlefield:{
@@ -12096,9 +12134,67 @@
   // Beim Rennen ist das die negative Platzierung, im Kampf die Leistung. Was "besser"
   // heisst, ist die einzige Entscheidung, die je Disziplin faellt.
   const MOTOREN={};
-  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Was
-  // „besser" heisst, ist im Kampf die LEISTUNG: der Beitrag, gemessen an dem, was der
-  // Einsatzwert erwarten laesst. Eine Platzierung gibt es hier nicht.
+  // JEDE ARENA-DISZIPLIN MELDET SICH SELBST AN — wie die Bahnen weiter unten. Eine
+  // Platzierung gibt es hier nicht; „besser" ist der ANTEIL AM GESAMTBEITRAG der Partie.
+  //
+  // ===================================================================================
+  // WARUM HIER NICHT MEHR leistungVon() STEHT — der Grund, warum die Kampf-Disziplinen
+  // ueber Monate zwischen 90 und 160 Pp festhingen, egal welches Rezept man schrieb.
+  //
+  // Bis hierher lieferte wert() die LEISTUNG: `beitrag / erwartet` mit
+  // `erwartet = eigenerEinsatzwert / Summe aller Einsatzwerte * Gesamtbeitrag`. Der
+  // Nenner ist also die EIGNUNG — und die Eignung ist nichts anderes als Attribut mal
+  // Matrixgewicht, aufsummiert (calculateRawDisciplineScore). Gleichzeitig sorgt
+  // aufEignung() dafuer, dass LP, ANG und VER GENAU PROPORTIONAL zur Eignung wachsen:
+  // „die Rezepte geben die FORM, die Eignung gibt die MENGE".
+  //
+  // Beides zusammen ist ein Kurzschluss. Die Messung hebt ein Attribut, die Eignung
+  // steigt um `plus x Gewicht / 100` (eigHebung), die Kampfkraft steigt proportional
+  // mit — und der Nenner steigt im selben Zug. Der Quotient bleibt stehen. Was die
+  // Messung dann noch sieht, ist nur der REST zweiter Ordnung: waechst der Beitrag ein
+  // bisschen schneller oder langsamer als linear. Dieser Rest hat kein Vorzeichen, das
+  // die Matrix kennt, und er ist klein gegen das Rauschen. Genau deshalb las jede
+  // Kampfmessung dasselbe Muster: ein, zwei Attribute mit zufaellig positivem Rest
+  // greifen ueber die Positiv-Normierung in einflussVon() den ganzen Anteil ab, alle
+  // anderen klemmen auf 0 % — und zwar bevorzugt die mit HOHEM Matrixgewicht, weil bei
+  // denen der Nenner am staerksten mitwaechst.
+  //
+  // Das erklaert rueckwirkend alle drei Ratlosigkeiten aus BATTLE_ARENA_UEBERGABE.md:
+  // dass „welches Attribut dominiert, dreimal umgesprungen" ist (es war jedesmal
+  // Rauschen), dass die TMP/AUS-Kappung die Zahl senkte, ohne den Kampf zu verbessern
+  // (sie entfernte den letzten Rest Signal, uebrig blieb reines Rauschen), und dass
+  // Mini-DM einmal 13,8 Pp las (ein Treffer der Streuung, kein Beweis).
+  //
+  // GEMESSEN, nicht argumentiert — Battlefield, n = 8, dieselbe Mechanik, dieselben
+  // Rezepte, nur ein anderes wert():
+  //
+  //   leistungVon (Beitrag / Eignungserwartung)   158,9 Pp
+  //   beitragVon  (absoluter Beitrag)              16,3 Pp
+  //   Anteil am Gesamtbeitrag                      12,0 Pp
+  //
+  // Der Anteil gewinnt gegen den absoluten Beitrag, weil er die Laenge der Partie
+  // herauskuerzt: wer staerker wird, beendet den Kampf frueher und teilt sich dann
+  // WENIGER Gesamtschaden — beim absoluten Beitrag zieht dieser Nebeneffekt gegen das
+  // Signal, beim Anteil nicht. Es ist dieselbe Wahl, die die Staffel schon einmal
+  // getroffen hat (Teamzeit statt Platzierung, s. unten): Was „besser" heisst, ist die
+  // einzige Entscheidung, die je Disziplin faellt — und im Kampf heisst es „wie viel
+  // von dem, was auf dem Platz passiert ist, geht auf sein Konto".
+  //
+  // leistungVon() bleibt unveraendert und bleibt die ANZEIGE im Endstand („liefert er,
+  // was sein Einsatzwert verspricht" — 100 % heisst wie erwartet). Als Anzeige ist die
+  // Normierung richtig; als Massstab dafuer, ob die Matrix eingeloest wird, ist sie es
+  // nicht, weil sie genau den Kanal herauskuerzt, den die Matrix beschreibt. Am Kampf
+  // selbst aendert diese Zeile NICHTS: `MOTOREN[d].wert()` wird im ganzen Entwurf nur an
+  // einer einzigen Stelle gelesen, naemlich in einflussVon(). Weder stepSim() noch
+  // renderWertung() noch serieVon() haengen daran — die zeigen weiter leistungVon().
+  //
+  // ENDSTAND DIESER RUNDE, bei n=12 nachgemessen (Chris' Auftrag: TDM/Battlefield/Fechten
+  // moeglichst unter 15 Pp):
+  //
+  //   Battlefield   12,0 Pp   — Rezept unangetastet, allein der Massstab hat es gebracht.
+  //   Fechten       11,0 Pp   — Massstab + kleine Ausdauer-Korrektur (s. dort).
+  //   TDM           54,2 Pp   — Massstab allein reicht nicht; Rezeptumbau half nicht (s.
+  //                             ARENA_ART.tdm oben). Bleibt offen fuer eine naechste Runde.
   for(const ad of Object.keys(ARENA_ART)){
     MOTOREN[ad]={
       sichern:()=>({disc,U,pfeile,t,done,seed,freigabe}),
@@ -12107,7 +12203,8 @@
       bau:(saat)=>{disc=ad; build(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }},
       namen:()=>U.map(u=>u.n),
-      wert:()=>{const feld=[...U],o={}; for(const u of feld)o[u.n]=leistungVon(u,feld)||0; return o;}
+      wert:()=>{const g=U.reduce((a,x)=>a+beitragVon(x),0)||1,o={};
+        for(const u of U)o[u.n]=beitragVon(u)/g*100; return o;}
     };
   }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
