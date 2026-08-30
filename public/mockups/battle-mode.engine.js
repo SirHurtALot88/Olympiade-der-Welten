@@ -4534,7 +4534,16 @@
     // Rebound-Zweikampf entscheidet (ZWEITCHANCE, s. stepBasketballLive).
     const angreifer=FSTEAM[schuetze.side].filter(u=>u!==schuetze).sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
     const verteidiger=[...FSTEAM[1-schuetze.side]].sort((a,b)=>b.ZWEITCHANCE-a.ZWEITCHANCE);
-    const gassen=[{anteil:0.25,abwehr:true},{anteil:0.65,abwehr:false},{anteil:1.05,abwehr:true}];
+    // GASSENABSTAND (30.08., Anti-Stacking-Runde): die Anteile lagen bei 0,25/0,65/1,05,
+    // also 0,40 x zonenTiefe = 30,1px auseinander — GENAU die Breite einer gezeichneten
+    // Figur. Im Screenshot (scratchpad/freiwurf-nah.png) standen die drei Rebounder je
+    // Gasse deshalb sichtbar ineinander, obwohl die Formation rechnerisch stimmte. Jetzt
+    // 0,18/0,68/1,18, also 0,50 x zonenTiefe = 37,6px — der Abstand liegt damit UEBER
+    // SEP_RADIUS_STAND (30, s. bewegeSpielerLive) und ueber ZEICH_MIN_ABSTAND, die fertige
+    // Formation wird also von keiner der beiden Entzerrungen mehr angefasst. Reine
+    // Zeichen-/Stellungsfrage: die Freiwurfquote rechnet verbucheFreiwurf() aus
+    // Attributen, nicht aus Positionen.
+    const gassen=[{anteil:0.18,abwehr:true},{anteil:0.68,abwehr:false},{anteil:1.18,abwehr:true}];
     for(const g of gassen)for(const vz of [-1,1]){
       const u=(g.abwehr?verteidiger:angreifer).shift();
       if(u)plaetze[u.id]={x:geo.grundX+geo.zumFeld*geo.zonenTiefe*g.anteil,y:H/2+vz*geo.zonenHalb};
@@ -4581,14 +4590,14 @@
     const fw=fsLive.freiwurf, schuetze=fw.schuetze;
     fw.t+=dt;
     if(fw.stufe==="formation"){
-      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18};
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18,traegerId:schuetze.id};
       if(fw.t>=FW_FORMATION){ fw.stufe="anlauf"; fw.t=0; }
       return;
     }
     if(fw.stufe==="anlauf"){
       // Ball in der Hand, leicht wippend — dasselbe sin-Muster wie der Dribbel-Bounce,
       // nur flacher (der Schuetze prellt an der Linie, er dribbelt nicht durchs Feld).
-      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18+Math.sin(fw.t/FW_ANLAUF*Math.PI*3)*7};
+      fsBall={sichtbar:true,x:schuetze.x,y:schuetze.y+18+Math.sin(fw.t/FW_ANLAUF*Math.PI*3)*7,traegerId:schuetze.id};
       if(fw.t>=FW_ANLAUF){
         schuetze.lunge=0.5;                     // Wurf-Pose, selbes Feld wie in wirf()
         // Gewuerfelt beim Abwurf, enthuellt bei Ankunft — exakt das Muster von
@@ -4991,6 +5000,20 @@
     // Basketball verdrahtet.
     const ALLE_SPIELER=[...FSTEAM[0],...FSTEAM[1]];
     const SEP_RADIUS=60, SEP_STAERKE=0.5; // PLATZHALTER, durchgemessen (messe-arena-einfluss)
+    // STANDPHASE (30.08., Anti-Stacking-Runde): frueher war die Separation waehrend des
+    // Freiwurfs KOMPLETT aus (`if(!stehtStill)` weiter unten) — mit der Begruendung, ein
+    // Radius von 60 wuerde die Zonen-Gassen (Abstand 30px) auseinandertreiben. Richtig
+    // war die Diagnose, falsch die Konsequenz: gemessen (window.__arena.diagAbstaende,
+    // 5 Saaten x 120s) fielen die Figuren waehrend der Phase bis auf 1,2px zusammen —
+    // nicht auf den Zonenplaetzen, sondern auf dem WEG dorthin, wo sich zwoelf Laufwege
+    // durch eine Zone kreuzen. Jetzt laeuft die Separation auch in der Standphase, aber
+    // mit einem Radius UNTERHALB des Gassenabstands (der gleichzeitig auf 37,6px
+    // aufgemacht wurde, s. freiwurfAufstellung): die fertige Formation liegt damit
+    // ausserhalb der Abstossung und bleibt Pixel fuer Pixel die geplante, waehrend sich
+    // die Laufwege dorthin trotzdem entzerren. Pp-neutral per Konstruktion — waehrend der
+    // Standphase ist die freie Simulation ohnehin ausgesetzt (kein entscheideBallaktion,
+    // kein Steal, keine Deckung), es liest also niemand diese Abstaende.
+    const SEP_RADIUS_STAND=30, SEP_STAERKE_STAND=0.45; // PLATZHALTER
     for(const team of FSTEAM)for(const u of team){
       // Opus-Review-2-Fund (Volumen-Hebel, Pp-neutral): das Spiel produzierte nur ~6,7
       // Wuerfe/Spiel — zu wenig, damit sich Spezialisierung ueberhaupt zeigen kann, egal
@@ -5177,12 +5200,13 @@
         zx=p.x; zy=p.y;
       }
       u._zielHomeX=zx; u._zielHomeY=zy; // Debug-Anzeige (window.__arena.debugZiele), s.u.
-      // SEPARATION AUS WAEHREND DER STANDPHASE: die Zonenplaetze liegen konstruktions-
-      // bedingt eng beieinander (Gassenabstand ~30px, quer ueber die Zone 75px) — alles
-      // innerhalb von SEP_RADIUS=60. Die Abstossung wuerde genau die Formation
-      // auseinandertreiben, die die Phase zeigen soll. In der freien Simulation bleibt sie
-      // unveraendert aktiv.
-      if(!stehtStill){ // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf).
+      // SEPARATION anwenden (Definition/Begruendung s. Funktionskopf). In der Standphase
+      // mit dem kleineren Paar SEP_RADIUS_STAND/SEP_STAERKE_STAND (Begruendung dort) —
+      // frueher war sie hier ganz aus, was die Figuren auf dem Weg in die Formation
+      // ineinanderlaufen liess.
+      {
+        const sepR=stehtStill?SEP_RADIUS_STAND:SEP_RADIUS;
+        const sepS=stehtStill?SEP_STAERKE_STAND:SEP_STAERKE;
         let sepX=0, sepY=0;
         for(const other of ALLE_SPIELER){
           if(other===u||u.deckt===other||other.deckt===u)continue;
@@ -5197,9 +5221,9 @@
           // Zeichen die von vorher, sonst verschoebe sich die Balance aus PR #682.
           if(fokusHelfer&&other===fsLive.ball.traeger)continue;
           const ddx=u.x-other.x, ddy=u.y-other.y, dd=Math.hypot(ddx,ddy)||0.01;
-          if(dd<SEP_RADIUS){ const f=(SEP_RADIUS-dd)/SEP_RADIUS; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
+          if(dd<sepR){ const f=(sepR-dd)/sepR; sepX+=ddx/dd*f; sepY+=ddy/dd*f; }
         }
-        zx+=sepX*SEP_RADIUS*SEP_STAERKE; zy+=sepY*SEP_RADIUS*SEP_STAERKE;
+        zx+=sepX*sepR*sepS; zy+=sepY*sepR*sepS;
       }
       // TEMPO statt Lerp: pro Tick maximal `tempoPx*dt` Pixel Richtung Ziel, nie mehr —
       // erst dadurch bekommt Speed ueberhaupt eine sichtbare Rolle. Dribbeln bremst
@@ -5433,7 +5457,7 @@
         if(neuIdx!==altIdx&&(neuIdx%2)===1)bkSfx("ballaufprall.mp3",0.32);
         const dribbelPhase=(neuT%BK_DRIBBEL_PERIODE)/BK_DRIBBEL_PERIODE;
         const dribbelDip=Math.sin(dribbelPhase*Math.PI)*BK_DRIBBEL_AMPLITUDE;
-        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip};
+        fsBall={sichtbar:true,x:traeger.x,y:traeger.y+18+dribbelDip,traegerId:traeger.id};
         const decker=FSTEAM[1-traeger.side].find(v=>v.deckt===traeger)||null;
         fsAktuell={spieler:traeger,verteidiger:decker,passgeber:null,rebounder:null};
         const erzwingen=fsLive.angriffSeit>SCHUSSUHR_BASKETBALL;
@@ -5726,15 +5750,150 @@
     }
   }
 
+  // ===================================================================================
+  // ZEICHEN-ENTZERRUNG (Chris, 30.08.: "du musst schauen dass nicht alle aufeinander
+  // haengen — die spieler brauchen richtige models dass man nicht 2 uebereinander stapeln
+  // kann ausser um darzustellen dass einer etwas dahinter ist").
+  //
+  // WARUM NOCH EINE SCHICHT NEBEN DER SEPARATION IN bewegeSpielerLive. Nachgemessen, nicht
+  // vermutet (window.__arena.diagAbstaende + eine Paar-Zuordnung ueber diagDetail, Saat
+  // 1337, 120s): der kleinste paarweise Abstand der zwoelf Figuren lag ueber fuenf Saaten
+  // bei 0,0px, im Mittel bei 15,8px, und in 34-41 % aller Frames war irgendein Paar naeher
+  // als 12px. Von den Paaren unter 24px waren 63,8 % das MANNDECKUNGS-PAAR — genau das
+  // eine Paar, das die Separation ausdruecklich ausnimmt (`u.deckt===other`), und zwar aus
+  // gutem Grund: seinen Abstand LIEST die Spiellogik als stetige Groesse (`offen` in
+  // waehleZiel, `bedraengnisGate` in entscheideBallaktion, STEAL_REICHWEITE in
+  // versucheSteal). Ihn auseinanderzudruecken waere keine Optik-, sondern eine
+  // Balance-Aenderung — genau das, was der Kommentar im Funktionskopf von
+  // bewegeSpielerLive verbietet. Verschaerfend: das Deckungsziel ist
+  // `u.deckt.x + sign*min(35,|Korbabstand|*0,3)` — faehrt der Angreifer zum Ring, geht
+  // dieser Versatz gegen NULL, der Verteidiger steht also per Formel exakt auf ihm. Das
+  // ist die Ballung in der Zone aus scratchpad/fokus-feld.png.
+  //
+  // Loesung deshalb wie beim Bewegungs-Schweif (s. Kommentar dort): die SICHTBARE Position
+  // von der Spiel-Position trennen. Diese Funktion laesst u.x/u.y unberuehrt und schreibt
+  // nur einen Zeichen-Versatz (u._zvx/u._zvy), den ausschliesslich zeichneFeldspiel liest.
+  // Per Konstruktion Pp-neutral: kein Simulationszweig fragt _zv* je ab.
+  //
+  // Verfahren: ein paar Runden paarweise Relaxation (Reynolds-Separation, aber auf
+  // POSITIONEN statt auf Zielen — deshalb wirkt sie, wo die Ziel-Variante versagt), dann
+  // ein Deckel auf den Versatz und eine Glaettung ueber die Frames.
+  //   ZEICH_MIN_ABSTAND  Sprites sind ~28px breit; darunter beruehren sie sich sichtbar.
+  //   ZEICH_MAX_VERSATZ  wie weit eine Figur hoechstens von ihrem echten Ort wegrutschen
+  //                      darf — ohne Deckel koennte eine Sechser-Ballung jemanden aus dem
+  //                      Bild schieben, und Ring/Schatten wuerden zur Luege.
+  //   ZEICH_NACHZIEHEN   Anteil je Bild; ohne Glaettung springen Figuren, sobald sich die
+  //                      Relaxation umsortiert.
+  // Absichtlich NICHT vollstaendig: der Deckel laesst in echten Ballungen einen Rest
+  // Ueberlappung zu — das ist der von Chris ausdruecklich erlaubte "einer steht dahinter"-
+  // Fall, und die Zeichenreihenfolge unten (nach y sortiert) macht ihn lesbar.
+  const ZEICH_MIN_ABSTAND=30;   // PLATZHALTER, an der Sprite-Breite (~28px) ausgerichtet
+  const ZEICH_MAX_VERSATZ=24;   // PLATZHALTER
+  const ZEICH_NACHZIEHEN=0.3;   // PLATZHALTER, Anteil je Bild
+  const ZEICH_HARTGRENZE=18;    // PLATZHALTER, s. Notbremse unten
+  // Eine Runde paarweiser Relaxation auf einer Punktliste [{x,y},...] — dieselbe Formel
+  // fuer beide Durchgaenge unten (weicher Zielabstand und harte Notbremse), nur mit
+  // anderem Mindestabstand. Gibt zurueck, ob ueberhaupt etwas zu schieben war.
+  function zeichRelax(p,minAbstand,runden){
+    let bewegtIrgendwann=false;
+    for(let runde=0;runde<runden;runde++){
+      let bewegt=false;
+      for(let i=0;i<p.length;i++)for(let j=i+1;j<p.length;j++){
+        const a=p[i], b=p[j];
+        let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+        if(d>=minAbstand)continue;
+        if(d<0.001){
+          // Exakt uebereinander: es gibt keine Richtung mehr, aus der sich eine ergaebe.
+          // Ein Zufallswert wuerde flackern — deshalb ein fester, aus den beiden Indizes
+          // abgeleiteter Winkel, der fuer dasselbe Paar in jedem Bild derselbe ist.
+          const w=i*2.399+j*0.7; dx=Math.cos(w); dy=Math.sin(w); d=1;
+        }
+        const schub=(minAbstand-d)*0.5*0.55; // 0,55 = Daempfung, sonst schwingt es
+        const nx=dx/d*schub, ny=dy/d*schub;
+        a.x-=nx; a.y-=ny; b.x+=nx; b.y+=ny; bewegt=true; bewegtIrgendwann=true;
+      }
+      if(!bewegt)break;
+    }
+    return bewegtIrgendwann;
+  }
+  function zeichenVersatzSchritt(){
+    if(!FSTEAM[0]||!FSTEAM[0].length)return;
+    const alle=[...FSTEAM[0],...FSTEAM[1]];
+    const decke=(u,dx,dy)=>{
+      const m=Math.hypot(dx,dy);
+      return m>ZEICH_MAX_VERSATZ?[dx/m*ZEICH_MAX_VERSATZ,dy/m*ZEICH_MAX_VERSATZ]:[dx,dy];
+    };
+    // 1. Durchgang: Ziel-Versatz aus den echten Positionen, gedeckelt, dann geglaettet.
+    const p=alle.map(u=>({u,x:u.x,y:u.y}));
+    zeichRelax(p,ZEICH_MIN_ABSTAND,8);
+    for(const {u,x,y} of p){
+      const [dx,dy]=decke(u,x-u.x,y-u.y);
+      u._zvx=(u._zvx||0)+(dx-(u._zvx||0))*ZEICH_NACHZIEHEN;
+      u._zvy=(u._zvy||0)+(dy-(u._zvy||0))*ZEICH_NACHZIEHEN;
+    }
+    // 2. Durchgang, NOTBREMSE: die Glaettung oben braucht ein paar Bilder — springen zwei
+    // Figuren schlagartig aufeinander (Ballwechsel, neue Slot-Zuordnung), zeigt das Bild in
+    // der Zwischenzeit trotzdem ein Ineinander. Gemessen blieben so 1,8 % der Frames unter
+    // 12px, obwohl der Zielversatz laengst stimmte. Deshalb ein zweiter Lauf DIREKT auf den
+    // schon geglaetteten Zeichenpositionen, mit einer kleineren, dafuer sofort wirkenden
+    // Grenze: naeher als ZEICH_HARTGRENZE kommen sich zwei Sprites in keinem einzigen Bild.
+    // Der Sprung dabei ist klein (Differenz zu 18px), er faellt weniger auf als das
+    // Ineinanderfallen, das er verhindert.
+    const q=alle.map(u=>({u,x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)}));
+    if(zeichRelax(q,ZEICH_HARTGRENZE,6)){
+      for(const {u,x,y} of q){
+        const [dx,dy]=decke(u,x-u.x,y-u.y);
+        u._zvx=dx; u._zvy=dy;
+      }
+    }
+  }
+
+  // NAMEN NUR IM BALLBEREICH (Chris, 30.08.: "nur die Namen von der person am Ball und in
+  // direkter naehe sichtbar auf dem Feld — dann erkennt man die leute auch so wieder").
+  // Zwoelf Schriftzuege gleichzeitig waren derselbe Fehler wie die Box-Score-Zahlenwolke,
+  // die PR #683 entfernt hat: im Gewuehl ueberlagern sie sich zu Buchstabensalat
+  // (s. scratchpad/fokus-feld.png). Das "auch so wieder" ist Chris' eigene Begruendung —
+  // die Kaderleiste unten zeigt seit dieser Runde Sprite UND Name (s. renderKader), die
+  // Zuordnung Figur->Person haengt also nicht mehr am Feld-Label.
+  // Radius im Mass der bestehenden Reichweiten gewaehlt, nicht frei gegriffen: gerade so
+  // weit wie EIN Separationsabstand (SEP_RADIUS 60), also der Ring der Spieler, die sich
+  // ueberhaupt noch gegenseitig wegdruecken — "wer am Geschehen beteiligt ist", nicht "wer
+  // im selben Drittel steht". Zum Vergleich: STEAL_REICHWEITE 45 waere nur der eine
+  // Manndecker, HILFE_RADIUS 90 schon die halbe Haelfte. PLATZHALTER, an Chris' Auge
+  // abzunehmen ("in direkter naehe").
+  const NAME_NAH_RADIUS=62;
+
   function zeichneFeldspiel(){
     bodenFeldspiel();
+    zeichenVersatzSchritt();
     const art=FB();
     let fokusMarke=null; // gefuellt in der Spieler-Schleife, gezeichnet danach (s. unten)
-    FSTEAM.forEach((g,side)=>{
-      const c=side===0?css("--home"):css("--away");
-      g.forEach(u=>{
-        const gx=u.x||fsIdlePos(side,g.indexOf(u),g.length).x;
-        const gy=u.y||fsIdlePos(side,g.indexOf(u),g.length).y;
+    // WER TRAEGT DEN NAMEN: Ankerpunkt fuer NAME_NAH_RADIUS (s. dort). Im laufenden Spiel
+    // der Ballfuehrer, in der Standphase der Freiwerfer (dort hat niemand `hatBall`).
+    // Ohne fsLive — die uebrigen Feldspiel-Disziplinen laufen ueber fsLerpPositionen —
+    // bleibt der Anker null und es sind wie bisher ALLE Namen zu sehen.
+    const namensAnker=fsLive
+      ? (fsLive.ball.traeger||(fsLive.freiwurf&&fsLive.freiwurf.schuetze)||null)
+      : null;
+    // ZEICHENREIHENFOLGE NACH y STATT NACH TEAM. Vorher zeichnete Team 0 komplett vor
+    // Team 1 — wer "dahinter" stand, konnte trotzdem obenauf liegen, und der von Chris
+    // erlaubte Rest-Versatz ("einer etwas dahinter") las sich als Fehler statt als Tiefe.
+    // Jetzt liegt die weiter unten stehende Figur vorn, wie in jeder 2,5D-Ansicht.
+    const zuZeichnen=[]
+      .concat(FSTEAM[0].map((u,i)=>({u,side:0,i,g:FSTEAM[0]})))
+      .concat(FSTEAM[1].map((u,i)=>({u,side:1,i,g:FSTEAM[1]})))
+      .sort((a,b)=>(a.u.y+(a.u._zvy||0))-(b.u.y+(b.u._zvy||0)));
+    zuZeichnen.forEach(({u,side,i,g})=>{
+      { // Block ohne eigene Bedeutung: er haelt den unveraenderten Rumpf auf seiner alten
+        // Einrueckung, damit der Diff dieser Runde die Zeichenlogik nicht komplett neu
+        // formatiert (frueher war das die innere `g.forEach(u=>{`-Ebene).
+        const c=side===0?css("--home"):css("--away");
+        // ZEICHEN-VERSATZ (s. zeichenVersatzSchritt): Schatten, Ring, Figur, Name und
+        // Fokus-Marke wandern GEMEINSAM — die Einheit bleibt in sich stimmig, sie steht
+        // nur ein paar Pixel neben ihrer Spielkoordinate.
+        const vx=u._zvx||0, vy=u._zvy||0;
+        const gx=(u.x||fsIdlePos(side,i,g.length).x)+vx;
+        const gy=(u.y||fsIdlePos(side,i,g.length).y)+vy;
         // Bei Alley-Oop/Screen-Play verschiebt sich die SICHTBARE Position kurz vom
         // Bodenwert weg (Sprung-Hop, seitliches Schlaengeln) — der Schatten bleibt am
         // Boden, Figur/Name/Statzeile folgen der verschobenen Position.
@@ -5810,12 +5969,19 @@
         // statt darunter, die angreifende bleibt darunter — trennt die beiden Zeilen auch
         // dann, wenn x/y (fuer Deckung/Steal/Bedraengnis absichtlich) fast identisch sind.
         const istAbwehr=fsLive&&fsLive.amBall!=null&&side!==fsLive.amBall, vz=istAbwehr?-1:1;
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
+        // NAME NUR IM BALLBEREICH (s. NAME_NAH_RADIUS oben). Gemessen wird am ECHTEN
+        // Spielort (u.x/u.y), nicht am entzerrten Zeichenort — sonst haenge eine reine
+        // Optikkorrektur daran, wessen Name erscheint. Der fokussierte Gegner behaelt
+        // seinen Namen immer: er ist die eine Figur, die der Nutzer selbst markiert hat.
+        const istFokus=fsLive&&fsLive.fokusZiel!=null&&u.id===fsLive.fokusZiel;
+        const zeigName=!namensAnker||u===namensAnker||istFokus
+          ||dist(u,namensAnker)<NAME_NAH_RADIUS;
+        if(zeigName)schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44*vz,c,9.5);
         // Chris' Fund (29.08.): eine Box-Score-Zeile UNTER JEDER der zwoelf Figuren
         // gleichzeitig war unlesbar — zwoelf ueberlappende Zahlenwolken auf engem Raum.
         // Die vollen Werte stehen bereits geordnet in der Wertungstabelle (renderWertung-
         // Feldspiel); auf dem Feld bleibt nur noch der Name plus die Farbmarkierung.
-      });
+      }
     });
     // FOKUS-MARKIERUNG, zweiter Durchgang (Position kam aus der Schleife oben). Sie muss
     // sich von BEIDEN vorhandenen Ringen unterscheiden — vom dauerhaften Team-Ring
@@ -5849,13 +6015,24 @@
     // Court-Runde ungenutzt im Repo — der Ball war bis eben ein reiner Vektor-Punkt. Selber
     // Rueckfall wie beim Korb: laedt das Bild nicht, bleibt der alte Kreis stehen.
     if(fsBall.sichtbar){
+      // Haelt eine Figur den Ball (Dribbeln, Freiwurf-Formation/-Anlauf), dann setzen die
+      // Schrittfunktionen fsBall auf deren SPIEL-Koordinate und legen `traegerId` dazu.
+      // Damit der Ball nicht neben der entzerrt gezeichneten Hand schwebt, bekommt er
+      // denselben Zeichen-Versatz. Ein FLIEGENDER Ball (Pass/Wurf) traegt keine traegerId
+      // und bleibt unveraendert auf seiner interpolierten Bahn.
+      let bvx=0, bvy=0;
+      if(fsBall.traegerId!=null){
+        const h=FSTEAM[0].concat(FSTEAM[1]).find(u=>u.id===fsBall.traegerId);
+        if(h){ bvx=h._zvx||0; bvy=h._zvy||0; }
+      }
+      const bx=fsBall.x+bvx, by=fsBall.y+bvy;
       if(bkDa("ball")){
-        ctx.drawImage(bkBild.ball,fsBall.x-9,fsBall.y-35,18,18);
+        ctx.drawImage(bkBild.ball,bx-9,by-35,18,18);
       } else {
         ctx.fillStyle="#e8823a";
-        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.fill();
+        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.fill();
         ctx.strokeStyle="rgba(40,20,5,.6)";ctx.lineWidth=1;
-        ctx.beginPath();ctx.arc(fsBall.x,fsBall.y-26,5,0,6.3);ctx.stroke();
+        ctx.beginPath();ctx.arc(bx,by-26,5,0,6.3);ctx.stroke();
       }
     }
     for(const f of floats){
@@ -5869,7 +6046,8 @@
       let ort=null;
       for(let side=0;side<2&&!ort;side++){
         const u=FSTEAM[side].find(x=>x.id===f._spieler);
-        if(u)ort={x:u.x,y:u.y-30-((1-f.life)*20)};
+        // Zeichen-Versatz mitnehmen, sonst schwebt das "+2" neben dem Kopf, zu dem es gehoert.
+        if(u)ort={x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)-30-((1-f.life)*20)};
       }
       if(ort)ctx.fillText(f.txt,ort.x,ort.y);
       ctx.globalAlpha=1;
@@ -10660,6 +10838,29 @@
     if(weg)weg.addEventListener("click",()=>{ if(fsLive)fsLive.fokusZiel=null; renderKader(); });
   }
 
+  // SPRITE IN DER KADERLEISTE (Chris, 30.08.: "bei den health Bars unten noch jeweils das
+  // sprite vom spieler sichtbar waere ... dann erkennt man die leute auch so wieder").
+  // Gegenstueck zur Namens-Reduktion auf dem Feld (s. NAME_NAH_RADIUS): wenn dort nur noch
+  // der Ballbereich beschriftet ist, muss die Zuordnung Figur->Person woanders stehen.
+  //
+  // KEINE ZWEITE ZEICHENROUTINE. Es ist figur() — dieselbe Funktion, mit der Kaderliste
+  // und Aufstellungs-Board zeichnen, und damit derselbe Ebenen-Baukasten (B_FIGUR bzw. der
+  // BAU/VOLLBILD-Rueckfall), aus dem auch zeichneSprite() auf dem Feld schoepft. Ein
+  // <img> mit fertigem Pfad geht nicht: die Figuren sind aus bis zu einem Dutzend
+  // eingefaerbter Ebenen zusammengesetzt, es gibt gar keine einzelne Datei je Spieler.
+  //
+  // ZWISCHENSPEICHER, weil renderKader je Bild neu baut (s. Kommentar beim Fokus-Klick
+  // unten): ohne ihn liefe ein zwoelffacher Ebenen-Aufbau sechzig Mal je Sekunde. Je Name
+  // wird der Canvas EINMAL gebaut; box.textContent="" haengt ihn nur aus dem DOM, das
+  // Objekt bleibt in der Map und wird im naechsten Bild wieder eingehaengt. Ein Name kommt
+  // je Bild hoechstens einmal vor (beide Kader sind disjunkt), ein Knoten reicht also.
+  const KADER_FIGUREN=new Map();
+  function kaderFigur(name){
+    let c=KADER_FIGUREN.get(name);
+    if(!c){ c=figur({n:name}); c.className="kkfigur"; KADER_FIGUREN.set(name,c); }
+    return c;
+  }
+
   function renderKader(){
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
@@ -10676,7 +10877,12 @@
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte))}))
         :U.filter(x=>x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
-        k.appendChild(el("b",null,u.n));
+        // Sprite links, Name rechts daneben — die Lebens-/Punkteleiste bleibt darunter
+        // ueber die volle Kachelbreite, damit sie ablesbar bleibt.
+        const kopf=el("div","kkkopf");
+        kopf.appendChild(kaderFigur(u.n));
+        kopf.appendChild(el("b",null,u.n));
+        k.appendChild(kopf);
         const bar=el("div","kbar");
         const f=el("s"); f.style.width=Math.max(0,Math.min(100,u.hp/u.max*100))+"%";
         bar.appendChild(f); k.appendChild(bar);
@@ -11233,6 +11439,43 @@
         }
       }
       return eimer;
+    },
+    // ANTI-STACKING-MESSUNG (30.08.): der paarweise MINDESTABSTAND aller zwoelf Figuren,
+    // je Tick gemessen (nicht alle 0,5s wie diagDetail — ein Ineinanderfallen dauert oft
+    // nur ein paar Frames und faellt aus einem 0,5s-Raster heraus). Gibt sowohl die
+    // SIMULATIONS-Positionen (u.x/u.y) als auch die ZEICHEN-Positionen zurueck (dieselben
+    // plus dem Versatz aus zeichenVersatzSchritt, s. dort) — genau die Trennung, um die es
+    // beim Stacking geht: die Spiellogik darf ihre Abstaende behalten, das Bild nicht.
+    // Read-only wie diagDetail/diagPositionen daneben.
+    diagAbstaende:(saat,bis)=>{
+      feldspielDisc="basketball"; bauFeldspiel(saat||1337);
+      const stufen=[12,18,24,30];
+      const leer=()=>({min:1e9,frames:0,unter:stufen.map(()=>0),summeMin:0});
+      const sim=leer(), zei=leer(), fw=leer();
+      const paarMin=(hol)=>{
+        const a=[...FSTEAM[0],...FSTEAM[1]].map(hol);
+        let m=1e9;
+        for(let i=0;i<a.length;i++)for(let j=i+1;j<a.length;j++)
+          m=Math.min(m,Math.hypot(a[i].x-a[j].x,a[i].y-a[j].y));
+        return m;
+      };
+      const buche=(z,m)=>{ z.frames++; z.min=Math.min(z.min,m); z.summeMin+=m;
+        stufen.forEach((s,i)=>{ if(m<s)z.unter[i]++; }); };
+      let guard=0;
+      while(!done&&fsT<(bis||60)&&guard<40000){
+        stepFeldspiel(1/60); guard++;
+        const mSim=paarMin(u=>({x:u.x,y:u.y}));
+        buche(sim,mSim);
+        // Zeichen-Versatz genauso fortschreiben, wie es zeichneFeldspiel je Bild tut —
+        // sonst misst man die Zielwerte statt der wirklich gezeigten (eingeschwungenen).
+        if(typeof zeichenVersatzSchritt==="function")zeichenVersatzSchritt();
+        buche(zei,paarMin(u=>({x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)})));
+        if(fsLive&&fsLive.phase==="freiwurf")buche(fw,paarMin(u=>({x:u.x+(u._zvx||0),y:u.y+(u._zvy||0)})));
+      }
+      const fasse=(z)=>({minAbstand:+z.min.toFixed(1),frames:z.frames,
+        mittlererMin:z.frames?+(z.summeMin/z.frames).toFixed(1):null,
+        anteilUnter:Object.fromEntries(stufen.map((s,i)=>[s,z.frames?+(z.unter[i]/z.frames*100).toFixed(1):0]))});
+      return {stufen,sim:fasse(sim),zeichnung:fasse(zei),freiwurf:fasse(fw)};
     },
     // TEMP-DIAGNOSE (Spacing-Untersuchung, 26.08.): wie diagPositionen, aber feiner (alle 0.5s
     // statt 5s) und mit hatBall/slotIdx/deckt-Namen, um zu sehen, WELCHER Spieler wann wohin
